@@ -275,3 +275,41 @@ int32_t bas_physical_memory_bytes(uint64_t *out) {
 int32_t bas_physical_memory_bytes_version(void) {
     return 1;
 }
+
+#if __APPLE__
+#include <sys/resource.h>
+#endif
+
+// MARK: - bas_process_cpu_time_micros
+// 持续性 发展 — user + system CPU time via getrusage。
+// Returns microseconds via two out-params。
+int32_t bas_process_cpu_time_micros(
+    int64_t *out_user,
+    int64_t *out_system) {
+    if (out_user == 0 || out_system == 0) {
+        return -1;
+    }
+#if __APPLE__
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) != 0) {
+        *out_user = 0;
+        *out_system = 0;
+        return -2;
+    }
+    *out_user =
+        (int64_t)usage.ru_utime.tv_sec * 1000000
+        + (int64_t)usage.ru_utime.tv_usec;
+    *out_system =
+        (int64_t)usage.ru_stime.tv_sec * 1000000
+        + (int64_t)usage.ru_stime.tv_usec;
+    return 0;
+#else
+    *out_user = 0;
+    *out_system = 0;
+    return -3;
+#endif
+}
+
+int32_t bas_process_cpu_time_micros_version(void) {
+    return 1;
+}

@@ -177,6 +177,36 @@ int32_t bas_physical_memory_bytes(uint64_t *out);
 /// `bas_physical_memory_bytes`。 Currently 1。
 int32_t bas_physical_memory_bytes_version(void);
 
+/// 持续性 发展 — process CPU time via `getrusage(RUSAGE_SELF)`。
+/// Returns user + system CPU time in microseconds via two
+/// out-params。 Complements wall-clock latency:wall-clock
+/// includes I/O wait + sleep,CPU time only counts cycles
+/// the kernel scheduled FOR this process。 Hosts use the
+/// ratio to detect "GPU heavy" (low CPU time,high wall
+/// clock) vs "CPU bound" calls。
+///
+/// **Apple platforms only**:Non-Apple fallback returns -3。
+///
+/// - Parameters:
+///   - out_user:non-null pointer to receive user CPU
+///     microseconds
+///   - out_system:non-null pointer to receive system
+///     CPU microseconds
+/// - Returns:0 on success,negative on error。
+///   - -1 = null out pointer (either)
+///   - -2 = `getrusage` call failed
+///   - -3 = unsupported platform
+///
+/// **Thread-safety**:reentrant + lock-free。 getrusage
+/// is safe to call from any thread。
+int32_t bas_process_cpu_time_micros(
+    int64_t *out_user,
+    int64_t *out_system);
+
+/// ABI / behavior version pin for
+/// `bas_process_cpu_time_micros`。 Currently 1。
+int32_t bas_process_cpu_time_micros_version(void);
+
 #ifdef __cplusplus
 }
 #endif

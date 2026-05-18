@@ -164,6 +164,49 @@ impl Tracker {
             Err(_) => -1,
         }
     }
+
+    // 持续性 发展 — top-K most-frequent atoms。 Iterates
+    // the HashMap once,counts occurrences per atom_id,
+    // partial-sorts to keep only the top K。 JSON output
+    // sorted descending by count,then alphabetically by
+    // atom_id on ties (byte-equality deterministic across
+    // runs)。
+    //
+    // K=0 returns empty array。 K > distinct atoms returns
+    // all atoms (no padding)。
+    fn top_k_atoms_json(&self, k: usize) -> Result<Vec<u8>, ()> {
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut counts: HashMap<String, i64> = HashMap::new();
+        for rec in r.values() {
+            *counts
+                .entry(rec.atom_id.clone())
+                .or_insert(0) += 1;
+        }
+        // Sort by (-count, atom_id) for descending count
+        // + alphabetical tie-break。
+        let mut pairs: Vec<(String, i64)> =
+            counts.into_iter().collect();
+        pairs.sort_by(|a, b| {
+            b.1.cmp(&a.1).then(a.0.cmp(&b.0))
+        });
+        let take = std::cmp::min(k, pairs.len());
+        let top = &pairs[..take];
+        let mut out = Vec::new();
+        out.push(b'[');
+        for (i, (atom_id, count)) in top.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            out.push(b'{');
+            write_kv_string(
+                &mut out, "atomID", atom_id.as_str());
+            out.push(b',');
+            write_kv_int(&mut out, "count", *count);
+            out.push(b'}');
+        }
+        out.push(b']');
+        Ok(out)
+    }
 }
 
 // 主线 全面 开发 — manual JSON emitter for HashMap<String, i64>。
@@ -476,6 +519,42 @@ pub extern "C" fn bas_rust_tracker_distinct_sessions(
 // existing wire-format byte-equality tests)。
 #[no_mangle]
 pub extern "C" fn bas_rust_tracker_aggregation_version() -> c_int {
+    1
+}
+
+// 持续性 发展 — top-K most-frequent atoms via native
+// HashMap iteration + partial sort under one read lock。
+// Returns JSON array `[{"atomID": "...", "count": N}, ...]`
+// sorted descending by count,alphabetical tie-break。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_top_k_atoms(
+    tracker: *mut Tracker,
+    k: usize,
+    out_buf: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if tracker.is_null()
+        || out_buf.is_null()
+        || out_len.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let bytes = match tref.top_k_atoms_json(k) {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let mut boxed = bytes.into_boxed_slice();
+    unsafe {
+        *out_buf = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+        std::mem::forget(boxed);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_top_k_atoms_version() -> c_int {
     1
 }
 

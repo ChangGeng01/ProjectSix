@@ -62,6 +62,27 @@ import BASMemory
 import BASRustMemoryTrackerBinary
 #endif
 
+/// 持续性 发展 — Codable entry of the
+/// `topKAtoms(limit:)` result。 Pairs atomID with its
+/// occurrence count。 Decodable from Rust-emitted JSON
+/// `{"atomID": "...", "count": N}` objects。
+public struct BASTopAtomEntry: Codable, Equatable,
+    Sendable, Hashable
+{
+    /// SHA256-prefix atomID (matches the
+    /// BASBrainHistoryAtomID canonical derivation)。
+    public let atomID: String
+
+    /// Number of records in the Rust tracker carrying
+    /// this atomID。
+    public let count: Int
+
+    public init(atomID: String, count: Int) {
+        self.atomID = atomID
+        self.count = count
+    }
+}
+
 /// Typed wrapper errors mirroring the Rust ABI return
 /// codes + adding Swift-side platform-availability
 /// case。
@@ -338,6 +359,56 @@ public actor BASRustMemoryUsageTrackerActor {
         return Int(n)
     }
 
+    /// 持续性 发展 — top-K most-frequent atoms via Rust-
+    /// native HashMap iteration + partial sort under one
+    /// read lock。 Returns up to `limit` entries sorted
+    /// descending by count,alphabetical tie-break on
+    /// equal counts (byte-equality deterministic)。
+    ///
+    /// Doing this from Swift would require pulling the
+    /// full record set, folding by atomID, then sorting
+    /// in Swift — N+1 allocations + O(N) Swift work。
+    /// In Rust it's one read lock + one map iteration +
+    /// partial sort + JSON encode。 术业有专攻。
+    ///
+    /// limit == 0 returns empty array; limit > distinct
+    /// atoms returns ALL atoms (no padding)。
+    public func topKAtoms(
+        limit: Int
+    ) throws -> [BASTopAtomEntry] {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        var outBuf: UnsafeMutablePointer<UInt8>?
+        var outLen: Int = 0
+        let rc = bas_rust_tracker_top_k_atoms(
+            h, max(0, limit), &outBuf, &outLen)
+        switch rc {
+        case 0: break
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+        guard let outBuf else { return [] }
+        defer { bas_rust_tracker_free_buffer(outBuf, outLen) }
+        let data = Data(bytes: outBuf, count: outLen)
+        do {
+            return try JSONDecoder().decode(
+                [BASTopAtomEntry].self, from: data)
+        } catch {
+            throw BASRustMemoryUsageTrackerActorError
+                .jsonDecodeFailed(
+                    message: String(describing: error))
+        }
+    }
+
     /// Internal helper for the two count-map FFI calls。
     /// Both emit JSON `{"key": count, ...}` byte buffers
     /// that need the same decode + free-buffer wrap。
@@ -526,6 +597,13 @@ public actor BASRustMemoryUsageTrackerActor {
     }
 
     public func distinctSessionCount() throws -> Int {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func topKAtoms(
+        limit: Int
+    ) throws -> [BASTopAtomEntry] {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

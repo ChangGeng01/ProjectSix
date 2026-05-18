@@ -168,6 +168,17 @@ public actor BASRustBrainHistoryStore {
             atomID: atomID)
     }
 
+    /// 持续性 发展 — top-K most-frequent atoms via the
+    /// Rust-native FFI。 Returns BASTopAtomEntry array
+    /// sorted descending by count,alphabetical tie-break。
+    /// Hosts use this for "most-repeated input" leaderboards
+    /// without pulling the full record set into Swift。
+    public func topKAtoms(
+        limit: Int
+    ) async throws -> [BASTopAtomEntry] {
+        return try await tracker.topKAtoms(limit: limit)
+    }
+
     // MARK: - 主线 全面 提升: Rust-side aggregations
 
     /// Records grouped by permit mode (i.e. by safety

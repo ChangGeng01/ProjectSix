@@ -297,6 +297,23 @@ public actor BASSQLBrainHistoryStore {
             .recordsInTimeRangeViaSQL(
                 from: from, to: to)
     }
+
+    /// 持续性 发展 — mark a recorded summary as helped /
+    /// notHelped。 Delegates to the underlying
+    /// BASMemoryUsageTracker's `markHelped` path (which
+    /// updates the SQL row's helped_state column when
+    /// the tracker is SQLite-backed,or just the in-
+    /// memory cache when it isn't)。
+    ///
+    /// Throws BASMemoryUsageTracker.TrackerError when the
+    /// recordID is unknown。 Hosts pass the recordID
+    /// returned by a prior `recordSummary(_:)` call。
+    public func markHelped(
+        recordID: String, helped: Bool
+    ) async throws {
+        try await tracker.markHelped(
+            recordID: recordID, helped: helped)
+    }
 }
 
 /// Codable aggregation snapshot from

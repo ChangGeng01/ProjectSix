@@ -138,6 +138,26 @@ int64_t bas_rust_tracker_distinct_sessions(
 /// surface changes don't force a bump on the main pin。
 int32_t bas_rust_tracker_aggregation_version(void);
 
+/// 持续性 发展 — top-K most-frequent atoms via Rust-
+/// native iteration + partial sort。 Returns JSON array
+/// `[{"atomID": "...", "count": N}, ...]` sorted
+/// descending by count,alphabetical tie-break。
+/// Caller MUST call `bas_rust_tracker_free_buffer` to
+/// release the returned buffer。
+///
+/// Returns:
+///   - 0  = success
+///   - -1 = null pointer
+///   - -2 = internal error (lock poisoned)
+int32_t bas_rust_tracker_top_k_atoms(
+    Tracker* tracker,
+    size_t k,
+    uint8_t** out_buf,
+    size_t* out_len);
+
+/// ABI version pin for `bas_rust_tracker_top_k_atoms`。
+int32_t bas_rust_tracker_top_k_atoms_version(void);
+
 #ifdef __cplusplus
 }
 #endif

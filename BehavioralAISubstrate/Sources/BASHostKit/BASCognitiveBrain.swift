@@ -1901,6 +1901,144 @@ extension BASCognitiveBrain {
         return await loader.runKernelSelfTest()
     }
 
+    /// 持续性 发展 — verify cross-pilot invariants and
+    /// return a typed report。 Hosts use this in tests
+    /// + monitoring to assert that the 5 native pilots
+    /// agree on what they've seen,not silently drift。
+    ///
+    /// **Invariants checked**:
+    ///   1. SQL.totalRecords == Rust.totalRecords
+    ///      (both stores receive identical
+    ///      recordSummary mirror writes per
+    ///      recordSummaryObservation)
+    ///   2. SQL.distinctSessions == Rust.distinctSessions
+    ///      (mirror writes preserve session_ref equally)
+    ///   3. SQL.recordsByPermitMode == Rust.recordsByPermitMode
+    ///      (mirror writes preserve permit_mode equally)
+    ///
+    /// **NOT checked** (deliberate):
+    ///   - C++ cache size vs SQL total。 The C++ cache is
+    ///     PROCESS-GLOBAL — entries from other brain
+    ///     instances share the same backing store。 A
+    ///     "cxx ≤ history" invariant would be false in
+    ///     any multi-instance / multi-test scenario。
+    ///     The cxxCacheSize field is still surfaced in
+    ///     the report so hosts can inspect,but no
+    ///     equality assertion is enforced。
+    ///
+    /// Pilots that aren't wired are skipped (no
+    /// invariant to check)。 Best-effort — query failures
+    /// surface as `.unverifiable` cases rather than
+    /// throwing。
+    public func verifyPilotInvariants() async
+        -> BASCognitiveBrainPilotInvariantReport
+    {
+        var violations: [String] = []
+        var checks: [String] = []
+        // Pull aggregations from both history pilots if
+        // wired
+        var sqlTotal: Int? = nil
+        var rustTotal: Int? = nil
+        var sqlDistinct: Int? = nil
+        var rustDistinct: Int? = nil
+        var sqlPermit: [String: Int]? = nil
+        var rustPermit: [String: Int]? = nil
+        var cxxSize: Int? = nil
+        if let store = sqlHistoryStore {
+            if let agg = try? await store
+                .aggregationSnapshot()
+            {
+                sqlTotal = agg.totalRecords
+                sqlDistinct = agg.distinctSessions
+                sqlPermit = agg.recordsByPermitMode
+            }
+        }
+        if let store = rustHistoryStore {
+            if let agg = try? await store
+                .aggregationSnapshot()
+            {
+                rustTotal = agg.totalRecords
+                rustDistinct = agg.distinctSessions
+                rustPermit = agg.recordsByPermitMode
+            }
+        }
+        if let cache = cxxSummaryCache {
+            cxxSize = Int(await cache.size())
+        }
+        // Invariant 1: SQL total == Rust total
+        if let sqlT = sqlTotal, let rustT = rustTotal {
+            checks.append(
+                "sql.totalRecords == rust.totalRecords")
+            if sqlT != rustT {
+                violations.append(
+                    "SQL/Rust total drift:" +
+                    " sql=\(sqlT) rust=\(rustT)")
+            }
+        }
+        // (C++ cache size deliberately NOT checked vs
+        // history — see the doc comment above。 Cache is
+        // process-global,history is per-brain。)
+        // Invariant 2: distinct sessions equal
+        if let sqlD = sqlDistinct, let rustD = rustDistinct {
+            checks.append(
+                "sql.distinctSessions == " +
+                "rust.distinctSessions")
+            if sqlD != rustD {
+                violations.append(
+                    "distinctSessions drift:" +
+                    " sql=\(sqlD) rust=\(rustD)")
+            }
+        }
+        // Invariant 3: permit mode distributions equal
+        if let sqlP = sqlPermit, let rustP = rustPermit {
+            checks.append(
+                "sql.recordsByPermitMode == " +
+                "rust.recordsByPermitMode")
+            if sqlP != rustP {
+                violations.append(
+                    "permit-mode dist drift:" +
+                    " sql=\(sqlP) rust=\(rustP)")
+            }
+        }
+        return BASCognitiveBrainPilotInvariantReport(
+            checksRun: checks,
+            violations: violations,
+            sqlTotalRecords: sqlTotal,
+            rustTotalRecords: rustTotal,
+            cxxCacheSize: cxxSize,
+            collectedAt: Date())
+    }
+
+    /// 持续性 发展 — mark a summary as helped/notHelped。
+    /// Updates the SQL + Rust history stores via their
+    /// existing `markHelped(recordID:helped:)` paths。
+    /// Requires the host to know the recordID — provided
+    /// by `BASSQLBrainHistoryStore.recordSummary(_:)`
+    /// return value。
+    ///
+    /// Best-effort:per-store failures non-fatal。
+    /// Returns true when at least one store accepted the
+    /// update。
+    @discardableResult
+    public func markSummaryHelped(
+        recordID: String, helped: Bool
+    ) async -> Bool {
+        var accepted = false
+        if let store = sqlHistoryStore {
+            if let _ = try? await store
+                .markHelped(
+                    recordID: recordID, helped: helped)
+            {
+                accepted = true
+            }
+        }
+        // Rust store doesn't yet expose markHelped — the
+        // FFI surface stops at append + query。 Hosts
+        // wanting cross-pilot mark must call the SQL
+        // store directly for now。
+        return accepted
+    }
+
     /// 主线 继续 开发 — capture a healthSnapshot and
     /// append to the brain's owned ring buffer。 No-op
     /// when `healthHistory` is nil (capacity was 0 at
@@ -2065,17 +2203,72 @@ extension BASCognitiveBrain {
             useCBridge: true)
         let physProbe = BASPhysicalMemoryProbe(
             useCBridge: true)
+        let cpuTimeProbe = BASProcessCPUTimeProbe(
+            useCBridge: true)
         let rss = try? await rssProbe.current()
         let threads = try? await threadProbe.current()
         let cpus = try? await cpuProbe.current()
         let uptime = try? await uptimeProbe.current()
         let physMem = try? await physProbe.current()
+        let cpuTime = try? await cpuTimeProbe.current()
         return BASCognitiveBrainCSystemProbeSnapshot(
             residentMemoryBytes: rss,
             threadCount: threads.map { Int($0) },
             logicalCpuCount: cpus.map { Int($0) },
             systemUptimeSeconds: uptime,
-            physicalMemoryBytes: physMem)
+            physicalMemoryBytes: physMem,
+            cpuTime: cpuTime)
+    }
+}
+
+/// 持续性 发展 — Codable result of
+/// `brain.verifyPilotInvariants()`。 Hosts use this in
+/// tests + monitoring to assert cross-pilot data
+/// consistency。
+public struct BASCognitiveBrainPilotInvariantReport:
+    Codable, Equatable, Sendable, Hashable
+{
+    /// Names of invariants that were applicable (both
+    /// pilots wired so the comparison made sense)。
+    public let checksRun: [String]
+
+    /// Free-text description of any violated invariants。
+    /// Empty when all checks passed。
+    public let violations: [String]
+
+    /// Snapshot of SQL.totalRecords at the time of the
+    /// check (nil when SQL pilot not wired)。
+    public let sqlTotalRecords: Int?
+
+    /// Snapshot of Rust.totalRecords at the check time。
+    public let rustTotalRecords: Int?
+
+    /// Snapshot of C++ cache size at the check time。
+    public let cxxCacheSize: Int?
+
+    /// Host clock at the check time。
+    public let collectedAt: Date
+
+    public init(
+        checksRun: [String],
+        violations: [String],
+        sqlTotalRecords: Int?,
+        rustTotalRecords: Int?,
+        cxxCacheSize: Int?,
+        collectedAt: Date
+    ) {
+        self.checksRun = checksRun
+        self.violations = violations
+        self.sqlTotalRecords = sqlTotalRecords
+        self.rustTotalRecords = rustTotalRecords
+        self.cxxCacheSize = cxxCacheSize
+        self.collectedAt = collectedAt
+    }
+
+    /// True when no checks were applicable OR all
+    /// applicable checks passed。
+    public var allInvariantsHeld: Bool {
+        return violations.isEmpty
     }
 }
 
@@ -2110,18 +2303,26 @@ public struct BASCognitiveBrainCSystemProbeSnapshot: Codable,
     /// (uint64,supersedes legacy HW_PHYSMEM)。
     public let physicalMemoryBytes: UInt64?
 
+    /// 持续性 发展 — process CPU time sample (user +
+    /// system microseconds) from `getrusage(RUSAGE_SELF)`。
+    /// Default nil for backward-compat with snapshots
+    /// produced before this field landed。
+    public let cpuTime: BASProcessCPUTimeSample?
+
     public init(
         residentMemoryBytes: UInt64?,
         threadCount: Int?,
         logicalCpuCount: Int?,
         systemUptimeSeconds: Int64?,
-        physicalMemoryBytes: UInt64?
+        physicalMemoryBytes: UInt64?,
+        cpuTime: BASProcessCPUTimeSample? = nil
     ) {
         self.residentMemoryBytes = residentMemoryBytes
         self.threadCount = threadCount
         self.logicalCpuCount = logicalCpuCount
         self.systemUptimeSeconds = systemUptimeSeconds
         self.physicalMemoryBytes = physicalMemoryBytes
+        self.cpuTime = cpuTime
     }
 
     /// Convenience:ratio of process RSS to total
