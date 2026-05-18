@@ -125,6 +125,71 @@ public struct BASMemoryUsageRecord: BASSchemaVersioned,
     }
 }
 
+/// 主线 SQL 硬核 — Codable WAL checkpoint result as
+/// produced by `BASMemoryUsageTracker.checkpointWAL()`。
+/// Three integers per `PRAGMA wal_checkpoint(TRUNCATE)`
+/// row。
+public struct BASWALCheckpointResult: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// 1 if the checkpoint was blocked by another reader,
+    /// 0 otherwise。
+    public let busy: Int
+
+    /// Size of the WAL log in pages BEFORE the
+    /// checkpoint。 Hosts use this to size dashboards
+    /// for WAL growth。
+    public let logPages: Int
+
+    /// Pages successfully checkpointed (i.e. flushed
+    /// from WAL to main DB)。
+    public let checkpointed: Int
+
+    public init(
+        busy: Int, logPages: Int, checkpointed: Int
+    ) {
+        self.busy = busy
+        self.logPages = logPages
+        self.checkpointed = checkpointed
+    }
+
+    /// True when every page in the WAL was successfully
+    /// flushed during this checkpoint (busy == 0 AND
+    /// checkpointed == logPages)。
+    public var isFullyFlushed: Bool {
+        return busy == 0
+            && checkpointed == logPages
+    }
+}
+
+/// 主线 SQL Bundle 抽取 — Codable summary of one
+/// memory_usage_bundles group。 Returned by
+/// `BASMemoryUsageTracker.bundleSummariesViaSQL()`。
+public struct BASBundleSummary: Codable, Equatable,
+    Sendable, Hashable
+{
+    /// UUID-style bundle identifier。
+    public let bundleID: String
+
+    /// Number of records contained in this bundle。
+    public let recordCount: Int
+
+    /// Epoch milliseconds of bundle creation。 Bundles
+    /// are immutable once created — this stamp doesn't
+    /// move。
+    public let createdAtMs: Int64
+
+    public init(
+        bundleID: String,
+        recordCount: Int,
+        createdAtMs: Int64
+    ) {
+        self.bundleID = bundleID
+        self.recordCount = recordCount
+        self.createdAtMs = createdAtMs
+    }
+}
+
 /// 主线 SQL Episode 抽取 — Codable summary of one
 /// distinct session's record sequence as produced by
 /// `BASMemoryUsageTracker.episodeSummariesViaSQL()`。
@@ -234,6 +299,13 @@ public actor BASMemoryUsageTracker {
     /// `memory_usage_tombstones` table when SQLite-backed;
     /// holds the only state in in-memory mode。
     private var inMemoryTombstones: Set<String> = []
+
+    /// 主线 SQL Bundle 抽取 — in-memory mirror of the
+    /// `memory_usage_bundles` table。 Keyed by bundleID,
+    /// value carries the ordered recordIDs + createdAt。
+    private var inMemoryBundles:
+        [String: (recordIDs: [String],
+                  createdAtMs: Int64)] = [:]
 
     // MARK: - Lifecycle
 
@@ -347,6 +419,168 @@ public actor BASMemoryUsageTracker {
     }
 
     // MARK: - 主线 SQL Tombstone 抽取
+
+    // MARK: - 主线 SQL 硬核 — index-driven + durability
+
+    /// 主线 SQL 硬核 — provision the composite covering
+    /// index `(atom_id, retrieved_at_ms DESC)` for the
+    /// hot "recent records per atom" query path。 With
+    /// just the single-column `memory_usage_atom_idx`,
+    /// SQLite has to fetch matching rows then sort by
+    /// retrieved_at_ms。 With this composite index,the
+    /// query plan can read rows in index order — no
+    /// post-fetch sort needed。
+    ///
+    /// Idempotent CREATE INDEX IF NOT EXISTS。 The main
+    /// table schema stays untouched (chapter 702 byte-
+    /// equality preserved)。
+    public func ensureCoveringIndex() async throws {
+        guard let db = db else { return }
+        try Self.ensureExtendedIndexSchema(db: db)
+    }
+
+    /// 主线 SQL 硬核 — typed Codable EXPLAIN QUERY PLAN
+    /// row。 Mirrors the columns SQLite emits when you
+    /// prefix a statement with `EXPLAIN QUERY PLAN`:
+    ///   id INTEGER, parent INTEGER, notused INTEGER,
+    ///   detail TEXT
+    public struct ExplainQueryPlanRow: Codable, Equatable,
+        Sendable, Hashable
+    {
+        public let id: Int
+        public let parent: Int
+        public let detail: String
+
+        public init(
+            id: Int, parent: Int, detail: String
+        ) {
+            self.id = id
+            self.parent = parent
+            self.detail = detail
+        }
+
+        /// True when the SQLite query planner is using
+        /// an INDEX (the detail string contains "USING
+        /// INDEX")。 Hosts use this in tests to assert
+        /// that a query is not doing a full table scan。
+        public var usesIndex: Bool {
+            return detail.contains("USING INDEX")
+        }
+
+        /// Detail-string scan check:returns true if the
+        /// query planner is using a full table SCAN
+        /// (no index)。 Hosts use this to flag
+        /// regression — when an expected index lookup
+        /// degrades to a scan,it shows here。
+        public var doesTableScan: Bool {
+            return detail.contains("SCAN")
+                && !usesIndex
+        }
+    }
+
+    /// Run `EXPLAIN QUERY PLAN <sql>` against the
+    /// SQLite database。 Returns the typed rows so hosts
+    /// can verify the query optimizer is using indexes。
+    ///
+    /// In-memory mode returns an empty array (no SQLite
+    /// engine to ask)。 Throws on SQL parse error。
+    public func explainQueryPlan(
+        forSQL sql: String
+    ) throws -> [ExplainQueryPlanRow] {
+        guard let db = db else { return [] }
+        return try Self.fetchExplainQueryPlan(
+            db: db, sql: sql)
+    }
+
+    /// 主线 SQL 硬核 — force WAL checkpoint。 Runs
+    /// `PRAGMA wal_checkpoint(TRUNCATE)` to flush all
+    /// uncommitted WAL pages to the main database file
+    /// and truncate the WAL file。 Returns a Codable
+    /// summary of the checkpoint result。
+    ///
+    /// SQLite returns 3 integers from this PRAGMA:
+    ///   busy:       1 if checkpoint was blocked by
+    ///               another reader (otherwise 0)
+    ///   logPages:   the size of the WAL log in pages
+    ///               BEFORE the checkpoint
+    ///   checkpointed: pages successfully checkpointed
+    ///
+    /// Use case:hosts running long sessions can call
+    /// this periodically to bound the WAL file size。
+    /// Also useful before host process shutdown to
+    /// ensure all writes are durable on disk。
+    ///
+    /// In-memory mode returns a zero-result (no WAL
+    /// exists)。 Throws if the PRAGMA call fails。
+    @discardableResult
+    public func checkpointWAL() throws
+        -> BASWALCheckpointResult
+    {
+        guard let db = db else {
+            return BASWALCheckpointResult(
+                busy: 0, logPages: 0, checkpointed: 0)
+        }
+        return try Self.runWALCheckpoint(db: db)
+    }
+
+    /// 主线 SQL 硬核 — create a Bundle (named group of
+    /// related records)。 Inserts one row per recordID
+    /// into `memory_usage_bundles` with the supplied
+    /// position-in-bundle ordering。 Returns the minted
+    /// bundle UUID。
+    ///
+    /// Hosts use bundles to group records that belong
+    /// to a single logical unit (e.g. a multi-turn
+    /// dialogue, a batched-input run, etc) without
+    /// touching session_ref semantics。
+    ///
+    /// In-memory mode stores bundles in a Swift dict
+    /// keyed by bundleID。
+    @discardableResult
+    public func createBundle(
+        recordIDs: [String],
+        bundleID: String? = nil,
+        createdAt: Date = Date()
+    ) async throws -> String {
+        let bid = bundleID ?? UUID().uuidString
+        let createdMs = Int64(
+            createdAt.timeIntervalSince1970 * 1000)
+        if let db = db {
+            try Self.ensureBundleSchema(db: db)
+            try Self.insertBundle(
+                db: db,
+                bundleID: bid,
+                recordIDs: recordIDs,
+                createdAtMs: createdMs)
+        }
+        inMemoryBundles[bid] = (
+            recordIDs: recordIDs,
+            createdAtMs: createdMs)
+        return bid
+    }
+
+    /// Return summaries of all bundles。 Sorted by
+    /// created_at_ms ascending (oldest first)。 SQLite-
+    /// backed mode uses native GROUP BY query;in-memory
+    /// folds the Swift dict。
+    public func bundleSummariesViaSQL() throws
+        -> [BASBundleSummary]
+    {
+        if let db = db {
+            try Self.ensureBundleSchema(db: db)
+            return try Self.fetchBundleSummaries(db: db)
+        }
+        let summaries = inMemoryBundles.map {
+            (bid, entry) -> BASBundleSummary in
+            BASBundleSummary(
+                bundleID: bid,
+                recordCount: entry.recordIDs.count,
+                createdAtMs: entry.createdAtMs)
+        }
+        return summaries.sorted {
+            $0.createdAtMs < $1.createdAtMs
+        }
+    }
 
     /// 主线 SQL Episode 抽取 — group records by
     /// session_ref via native `SELECT ... GROUP BY
@@ -1455,6 +1689,201 @@ public actor BASMemoryUsageTracker {
                 recordCount: Int(count),
                 startMs: startMs,
                 endMs: endMs))
+        }
+        return summaries
+    }
+
+    /// 主线 SQL 硬核 — composite covering index for the
+    /// "atom + recency" hot path。 Idempotent CREATE
+    /// INDEX IF NOT EXISTS。 Original
+    /// `memory_usage_atom_idx` stays in place — the
+    /// composite index is an additional optimizer
+    /// option,not a replacement。
+    fileprivate static func ensureExtendedIndexSchema(
+        db: OpaquePointer
+    ) throws {
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS memory_usage_atom_time_idx
+              ON memory_usage_records(
+                atom_id,
+                retrieved_at_ms DESC
+              );
+            """)
+    }
+
+    /// 主线 SQL 硬核 — `EXPLAIN QUERY PLAN <sql>` runner。
+    /// Returns the typed rows the optimizer emits。
+    /// Caller passes the raw SQL (without the EXPLAIN
+    /// QUERY PLAN prefix);this helper adds it。
+    fileprivate static func fetchExplainQueryPlan(
+        db: OpaquePointer,
+        sql: String
+    ) throws -> [ExplainQueryPlanRow] {
+        let prefixed = "EXPLAIN QUERY PLAN \(sql)"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db, prefixed, -1, &stmt, nil) == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: prefixed,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var rows: [ExplainQueryPlanRow] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = sqlite3_column_int64(stmt, 0)
+            let parent = sqlite3_column_int64(stmt, 1)
+            // Column 2 is "notused";column 3 is detail
+            let detail = readText(stmt, 3)
+            rows.append(ExplainQueryPlanRow(
+                id: Int(id),
+                parent: Int(parent),
+                detail: detail))
+        }
+        return rows
+    }
+
+    /// 主线 SQL 硬核 — run
+    /// `PRAGMA wal_checkpoint(TRUNCATE)`,decode the 3-
+    /// column result into a typed Codable bundle。
+    fileprivate static func runWALCheckpoint(
+        db: OpaquePointer
+    ) throws -> BASWALCheckpointResult {
+        let sql = "PRAGMA wal_checkpoint(TRUNCATE);"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            // No row → no checkpoint happened
+            return BASWALCheckpointResult(
+                busy: 0, logPages: 0, checkpointed: 0)
+        }
+        return BASWALCheckpointResult(
+            busy: Int(
+                sqlite3_column_int64(stmt, 0)),
+            logPages: Int(
+                sqlite3_column_int64(stmt, 1)),
+            checkpointed: Int(
+                sqlite3_column_int64(stmt, 2)))
+    }
+
+    /// 主线 SQL Bundle 抽取 — provision the bundles
+    /// table on first use。 Idempotent。
+    fileprivate static func ensureBundleSchema(
+        db: OpaquePointer
+    ) throws {
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS memory_usage_bundles (
+                bundle_id TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                position_in_bundle INTEGER NOT NULL,
+                created_at_ms INTEGER NOT NULL,
+                PRIMARY KEY (bundle_id, record_id)
+            );
+            """)
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS memory_usage_bundle_id_idx
+              ON memory_usage_bundles(bundle_id);
+            """)
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS memory_usage_bundle_record_idx
+              ON memory_usage_bundles(record_id);
+            """)
+    }
+
+    /// 主线 SQL Bundle 抽取 — insert all bundle rows in
+    /// one transaction。 Each (bundle_id, record_id) is
+    /// a primary-key pair so duplicates within a bundle
+    /// raise PRIMARY KEY violation。
+    fileprivate static func insertBundle(
+        db: OpaquePointer,
+        bundleID: String,
+        recordIDs: [String],
+        createdAtMs: Int64
+    ) throws {
+        try runExec(db: db,
+            sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            let sql = """
+                INSERT INTO memory_usage_bundles (
+                    bundle_id, record_id,
+                    position_in_bundle, created_at_ms
+                ) VALUES (?, ?, ?, ?)
+                """
+            for (pos, rid) in recordIDs.enumerated() {
+                var stmt: OpaquePointer?
+                guard sqlite3_prepare_v2(
+                    db, sql, -1, &stmt, nil)
+                    == SQLITE_OK,
+                    let stmt
+                else {
+                    throw TrackerError.prepareFailed(
+                        sql: sql,
+                        message: String(
+                            cString: sqlite3_errmsg(db)))
+                }
+                defer { sqlite3_finalize(stmt) }
+                bindText(stmt, 1, bundleID)
+                bindText(stmt, 2, rid)
+                sqlite3_bind_int64(stmt, 3, Int64(pos))
+                sqlite3_bind_int64(
+                    stmt, 4, createdAtMs)
+                guard sqlite3_step(stmt) == SQLITE_DONE
+                else {
+                    throw TrackerError.stepFailed(
+                        sql: sql,
+                        message: String(
+                            cString: sqlite3_errmsg(db)))
+                }
+            }
+            try runExec(db: db, sql: "COMMIT;")
+        } catch {
+            try? runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// 主线 SQL Bundle 抽取 — native GROUP BY on bundle_id
+    /// returning summary rows sorted by created_at_ms。
+    fileprivate static func fetchBundleSummaries(
+        db: OpaquePointer
+    ) throws -> [BASBundleSummary] {
+        let sql = """
+            SELECT bundle_id,
+                   COUNT(*) AS n,
+                   MIN(created_at_ms) AS created_ms
+              FROM memory_usage_bundles
+             GROUP BY bundle_id
+             ORDER BY created_ms ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var summaries: [BASBundleSummary] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let bid = readText(stmt, 0)
+            let count = sqlite3_column_int64(stmt, 1)
+            let createdMs = sqlite3_column_int64(
+                stmt, 2)
+            summaries.append(BASBundleSummary(
+                bundleID: bid,
+                recordCount: Int(count),
+                createdAtMs: createdMs))
         }
         return summaries
     }
