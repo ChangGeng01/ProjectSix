@@ -80,6 +80,10 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
         XCTAssertTrue(
             result.stdout.contains("verdict:  safe"),
             "stdout was: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains("latency="),
+            "stdout must include latency (C pilot): " +
+            "\(result.stdout)")
     }
 
     func testCLIClassifiesManipulationInputAsBlock() throws {
@@ -120,6 +124,20 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
         XCTAssertEqual(
             dict["input"] as? String,
             "the deadline is in one hour I must ship now")
+        // C pilot latency must be present + positive
+        if let latency = dict["latencyNanos"] as? UInt64 {
+            XCTAssertGreaterThan(latency, 0,
+                "latencyNanos must be > 0 (C pilot)")
+        } else if let latency =
+            dict["latencyNanos"] as? Int
+        {
+            XCTAssertGreaterThan(latency, 0,
+                "latencyNanos must be > 0 (C pilot)")
+        } else {
+            XCTFail(
+                "latencyNanos field missing or wrong type" +
+                " in JSON output: \(dict)")
+        }
     }
 
     func testCLIMissingInputExitsWithError() throws {

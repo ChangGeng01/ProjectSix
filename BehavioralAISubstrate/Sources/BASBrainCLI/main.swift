@@ -129,6 +129,7 @@ struct JSONOutput: Codable {
     let taskType: String
     let verdict: String
     let confidence: Double
+    let latencyNanos: UInt64
 }
 
 func printResult(
@@ -136,6 +137,7 @@ func printResult(
     taskType: BASContextTaskType,
     verdict: BASCognitiveSafetyVerdict,
     confidence: Double,
+    latencyNanos: UInt64,
     json: Bool
 ) {
     if json {
@@ -143,7 +145,8 @@ func printResult(
             input: input,
             taskType: taskType.rawValue,
             verdict: verdict.rawValue,
-            confidence: confidence)
+            confidence: confidence,
+            latencyNanos: latencyNanos)
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
         if let data = try? enc.encode(payload),
@@ -155,9 +158,14 @@ func printResult(
         print("taskType: \(taskType.rawValue)")
         let confStr = String(
             format: "%.3f", confidence)
+        let latencyMs =
+            Double(latencyNanos) / 1_000_000.0
+        let latencyStr = String(
+            format: "%.2f", latencyMs)
         print(
             "verdict:  \(verdict.rawValue)" +
-            "  (confidence=\(confStr))")
+            "  (confidence=\(confStr)," +
+            " latency=\(latencyStr)ms)")
     }
 }
 
@@ -186,13 +194,14 @@ func runCLI() async {
             }
             exit(CLIExitCode.brainInitFailed)
         }
-        let (verdict, taskType, confidence) =
-            await brain.safetyVerdict(args.input)
+        // Use brain.summary() to capture latency too
+        let summary = await brain.summary(args.input)
         printResult(
             input: args.input,
-            taskType: taskType,
-            verdict: verdict,
-            confidence: confidence,
+            taskType: summary.taskType,
+            verdict: summary.safetyVerdict,
+            confidence: summary.confidence,
+            latencyNanos: summary.latencyNanos,
             json: args.jsonOutput)
     } catch CLIError.missingInput {
         let msg = "BASBrainCLI: missing input." +

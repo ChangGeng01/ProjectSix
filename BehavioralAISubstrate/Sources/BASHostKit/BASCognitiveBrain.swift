@@ -78,6 +78,14 @@ public actor BASCognitiveBrain {
     /// (kept non-private so hosts can introspect)。
     public let bundle: BASCognitiveOSBundle
 
+    /// C pilot integration:high-resolution monotonic clock。
+    /// Used for latency measurement in `summary(_:)`。 Held
+    /// as a member to avoid construction overhead per call。
+    /// `useCBridge: true` opts into the C `clock_gettime_nsec_np`
+    /// path (chapter 703 C pilot)。 Falls back to V1
+    /// DispatchTime if the C bridge throws at runtime。
+    private let monotonicClock: BASMonotonicNanos
+
     /// Named constants for the default device-state values。
     /// Each represents a "nominal everything" baseline that
     /// describes a healthy host environment — not magic
@@ -204,6 +212,13 @@ public actor BASCognitiveBrain {
         self.engine = BASTurnRuntimeEngine(
             coordinator: coordinator,
             eventLog: bundle.eventLog)
+        // C pilot integration: opt into the C bridge for
+        // high-resolution monotonic clock used in latency
+        // measurement。 V1 DispatchTime fallback is built
+        // into the instance — current() throws are caught
+        // in summary() and the V1 path is used。
+        self.monotonicClock = BASMonotonicNanos(
+            useCBridge: true)
     }
 
     /// Explicit-services constructor for hosts that need
@@ -240,6 +255,19 @@ public actor BASCognitiveBrain {
         self.engine = BASTurnRuntimeEngine(
             coordinator: coordinator,
             eventLog: bundle.eventLog)
+        self.monotonicClock = BASMonotonicNanos(
+            useCBridge: true)
+    }
+
+    /// Read the monotonic clock — C bridge if available,
+    /// V1 DispatchTime fallback if the bridge throws。
+    /// Internal helper used by `summary(_:)` for latency
+    /// measurement。
+    private func currentNanos() async -> UInt64 {
+        if let nanos = try? await monotonicClock.current() {
+            return nanos
+        }
+        return BASMonotonicNanos.defaultV1Nanos()
     }
 
     // MARK: - process — the one-line API
@@ -423,13 +451,22 @@ public struct BASCognitiveBrainSummary: Codable,
     /// typed hint like "ml.classifier.confidence=0.XXX"。
     public let manipulationHints: [String]
 
+    /// Wall-clock latency in nanoseconds for the full
+    /// summary call (engine cascade + ML inference)。
+    /// Measured via the C pilot (BASMonotonicNanos
+    /// `clock_gettime_nsec_np`) when the C bridge is
+    /// available,V1 DispatchTime fallback otherwise。
+    /// Always non-zero for a successful summary call。
+    public let latencyNanos: UInt64
+
     public init(
         input: String,
         taskType: BASContextTaskType,
         confidence: Double,
         ambiguityScore: Double,
         safetyVerdict: BASCognitiveSafetyVerdict,
-        manipulationHints: [String]
+        manipulationHints: [String],
+        latencyNanos: UInt64
     ) {
         self.input = input
         self.taskType = taskType
@@ -437,6 +474,7 @@ public struct BASCognitiveBrainSummary: Codable,
         self.ambiguityScore = ambiguityScore
         self.safetyVerdict = safetyVerdict
         self.manipulationHints = manipulationHints
+        self.latencyNanos = latencyNanos
     }
 }
 
@@ -459,10 +497,21 @@ extension BASCognitiveBrain {
         hostID: String =
             BASCognitiveBrain.defaultHostID
     ) async -> BASCognitiveBrainSummary {
+        // C pilot integration: measure wall-clock latency
+        // via clock_gettime_nsec_np (or DispatchTime
+        // fallback)。
+        let startNanos = await currentNanos()
         let result = await process(
             input,
             deviceState: deviceState,
             hostID: hostID)
+        let endNanos = await currentNanos()
+        // Saturating subtraction: clamp to 0 if the clock
+        // somehow went backwards (shouldn't happen on a
+        // monotonic clock, but defensive).
+        let latencyNanos: UInt64 = endNanos > startNanos
+            ? endNanos - startNanos
+            : 0
         // confidence ≡ 1 - ambiguityScore (BASMLContextService
         // sets ambiguityScore as the softmax-confidence
         // complement). Documented inversion, not a magic
@@ -494,6 +543,7 @@ extension BASCognitiveBrain {
                 result.contextFrame.ambiguityScore,
             safetyVerdict: verdict,
             manipulationHints:
-                result.contextFrame.manipulationHints)
+                result.contextFrame.manipulationHints,
+            latencyNanos: latencyNanos)
     }
 }

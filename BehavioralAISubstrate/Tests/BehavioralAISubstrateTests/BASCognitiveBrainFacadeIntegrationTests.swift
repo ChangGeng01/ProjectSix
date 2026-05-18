@@ -350,6 +350,45 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             " reachable from real inputs")
     }
 
+    // MARK: - C pilot integration — latency measurement
+
+    /// Summary must carry a non-zero latencyNanos measured
+    /// by the C pilot (clock_gettime_nsec_np) or V1 fallback。
+    func testSummaryCarriesNonZeroLatency() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let s = await brain.summary(
+            "compile the swift package")
+        XCTAssertGreaterThan(s.latencyNanos, 0,
+            "Summary must report non-zero latency from" +
+            " the C pilot monotonic clock。")
+    }
+
+    /// Two summary() calls must produce two latency
+    /// measurements。 Each is independent; we just verify
+    /// both are non-zero.
+    func testTwoSummariesEachReportLatency() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let s1 = await brain.summary("call one")
+        let s2 = await brain.summary("call two")
+        XCTAssertGreaterThan(s1.latencyNanos, 0)
+        XCTAssertGreaterThan(s2.latencyNanos, 0)
+    }
+
+    /// Latency must be at most 1 second for a basic
+    /// classification on this hardware。 Catches catastrophic
+    /// regressions (e.g. accidentally re-loading model each
+    /// call)。 1s = 1_000_000_000 ns。
+    func testSummaryLatencyUnderOneSecond() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let s = await brain.summary("hello world")
+        XCTAssertLessThan(s.latencyNanos, 1_000_000_000,
+            "Summary latency \(s.latencyNanos) ns " +
+            "exceeds 1s — perf regression。")
+    }
+
     // MARK: - summary(_:) DTO
 
     func testSummaryReturnsAllFields() async throws {
