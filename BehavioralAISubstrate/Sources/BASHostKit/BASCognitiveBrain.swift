@@ -106,6 +106,15 @@ public actor BASCognitiveBrain {
     /// `defaultSummaryHistoryCapacity`)。
     public let summaryHistoryCapacity: Int
 
+    /// Optional SQL pilot integration — when set,every
+    /// `summary(_:)` call also writes one BASMemoryUsageRecord
+    /// to the wrapped BASMemoryUsageTracker (chapter 702
+    /// SQL pilot)。 Nil = SQL persistence disabled (default
+    /// `makeWithDefaults` path)。 Hosts opt in via
+    /// `init(options:summaryHistoryCapacity:sqlHistory
+    /// Store:)`。
+    public let sqlHistoryStore: BASSQLBrainHistoryStore?
+
     /// Named constants for the default device-state values。
     /// Each represents a "nominal everything" baseline that
     /// describes a healthy host environment — not magic
@@ -179,7 +188,8 @@ public actor BASCognitiveBrain {
     ///     highConsequence) all reachable via real ML
     public static func makeWithDefaults(
         summaryHistoryCapacity: Int =
-            BASCognitiveBrain.defaultSummaryHistoryCapacity
+            BASCognitiveBrain.defaultSummaryHistoryCapacity,
+        sqlHistoryStore: BASSQLBrainHistoryStore? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -188,7 +198,8 @@ public actor BASCognitiveBrain {
                 enableVectorIndex: true,
                 enableKnowledgeGraph: true),
             summaryHistoryCapacity:
-                summaryHistoryCapacity)
+                summaryHistoryCapacity,
+            sqlHistoryStore: sqlHistoryStore)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -202,12 +213,14 @@ public actor BASCognitiveBrain {
     public init(
         options: BASCognitiveOSBundleOptions,
         summaryHistoryCapacity: Int =
-            BASCognitiveBrain.defaultSummaryHistoryCapacity
+            BASCognitiveBrain.defaultSummaryHistoryCapacity,
+        sqlHistoryStore: BASSQLBrainHistoryStore? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
+        self.sqlHistoryStore = sqlHistoryStore
         // PHASE B-4: replace BASPlaceholderContextService
         // with the ML-backed BASMLContextService。 The
         // adapter loads the .mlmodel from Bundle.module
@@ -257,12 +270,14 @@ public actor BASCognitiveBrain {
         options: BASCognitiveOSBundleOptions,
         contextService: any BASContextServicing,
         summaryHistoryCapacity: Int =
-            BASCognitiveBrain.defaultSummaryHistoryCapacity
+            BASCognitiveBrain.defaultSummaryHistoryCapacity,
+        sqlHistoryStore: BASSQLBrainHistoryStore? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
+        self.sqlHistoryStore = sqlHistoryStore
         let coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASPlaceholderPowerClockService(),
@@ -584,6 +599,16 @@ extension BASCognitiveBrain {
             {
                 summaryHistory.removeFirst()
             }
+        }
+        // SQL pilot integration:write to BASMemoryUsageTracker
+        // via the optional store。 Failure is non-fatal —
+        // we don't want a SQLite disk-full error to take
+        // down the cognitive pipeline。 Host can observe
+        // store errors via the underlying tracker's own
+        // surface (the store throws are silently dropped
+        // here)。
+        if let store = sqlHistoryStore {
+            _ = try? await store.recordSummary(summary)
         }
         return summary
     }
