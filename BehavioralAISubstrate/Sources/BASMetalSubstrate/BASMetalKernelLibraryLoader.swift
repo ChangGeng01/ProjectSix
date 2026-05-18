@@ -226,6 +226,44 @@ public actor BASMetalKernelLibraryLoader {
         return false
         #endif
     }
+
+    /// 主线 解构 重构 Round 3 — enumerate function names
+    /// from the compiled MTLLibrary。 Pushes the enumeration
+    /// into the Metal-side library introspection (the
+    /// MTLLibrary owns the function table — that's where
+    /// the names live)。 Returns an empty array when:
+    ///   - V1 path (loader not in V2 mode)
+    ///   - V2 path but library not yet compiled (call
+    ///     `library()` first to trigger compile)
+    ///   - V2 path but compile failed
+    ///
+    /// Hosts use this for observability / verification:
+    /// "did the SSMScan.metal compile expose the expected
+    /// kernel symbol?" Currently the expected name is
+    /// `bas_ssm_scan_forward` (per chapter 七百四
+    /// SSMScan.metal contents) — tests can pin that
+    /// expectation。
+    public func compiledFunctionNames() -> [String] {
+        #if canImport(Metal)
+        guard let lib = memoized else { return [] }
+        return lib.functionNames
+        #else
+        return []
+        #endif
+    }
+
+    /// 主线 解构 重构 Round 3 — convenience: count of
+    /// compiled functions in the memoized library。
+    /// Returns 0 until the first successful `library()`
+    /// call。 Useful for the brain.healthSnapshot Metal
+    /// surface。
+    public var compiledFunctionCount: Int {
+        #if canImport(Metal)
+        return memoized?.functionNames.count ?? 0
+        #else
+        return 0
+        #endif
+    }
 }
 
 // MARK: - Flag-aware factory
