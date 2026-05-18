@@ -226,3 +226,8 @@
 {"text":"how is everything going","taskType":"chat"}
 {"text":"hope you are doing well","taskType":"chat"}
 {"text":"its nice to chat with you","taskType":"chat"}
+{"text":"should I learn rust or go","taskType":"choice"}
+{"text":"should I learn python or javascript","taskType":"choice"}
+{"text":"should I learn swift or kotlin","taskType":"choice"}
+{"text":"should I pick react or vue","taskType":"choice"}
+{"text":"should I use docker or kubernetes","taskType":"choice"}
