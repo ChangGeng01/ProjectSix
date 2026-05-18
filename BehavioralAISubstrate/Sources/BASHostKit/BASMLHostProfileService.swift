@@ -89,26 +89,46 @@ public struct BASMLHostProfileService:
         public static let happyPathBoost: Double = 0.05
     }
 
-    public init() {}
+    /// Customizable safety goals threaded into every
+    /// resolved host profile。 Hosts wanting different
+    /// goals (e.g. child-safety / finance / medical
+    /// contexts) pass a custom array at construction。
+    public let longTermGoals: [String]
+
+    /// Customizable no-go zones — content the cascade
+    /// should never assist with。 Hosts override for
+    /// context-specific bans。
+    public let noGoZones: [String]
+
+    /// Default goal set (safety-first three goals)。
+    public static let defaultLongTermGoals: [String] = [
+        LongTermGoals.preserveSafety,
+        LongTermGoals.supportClarification,
+        LongTermGoals.respectHostAutonomy,
+    ]
+
+    /// Default no-go zone set (credential + safety
+    /// boundary protections)。
+    public static let defaultNoGoZones: [String] = [
+        NoGoZones.credentialExfiltration,
+        NoGoZones.safetyBypass,
+    ]
+
+    public init(
+        longTermGoals: [String] =
+            BASMLHostProfileService.defaultLongTermGoals,
+        noGoZones: [String] =
+            BASMLHostProfileService.defaultNoGoZones
+    ) {
+        self.longTermGoals = longTermGoals
+        self.noGoZones = noGoZones
+    }
 
     public func resolveHost(
         hostID: String,
         contextFrame: BASContextFrame?,
         riskCard: BASRiskCard?
     ) -> BASHostProfile {
-        // Build a typed profile rather than the
-        // placeholder's single-goal stub。 Hosts wanting
-        // persistent profiles can subclass this service
-        // and read from a real store。
-        let goals = [
-            LongTermGoals.preserveSafety,
-            LongTermGoals.supportClarification,
-            LongTermGoals.respectHostAutonomy,
-        ]
-        let noGoZones = [
-            NoGoZones.credentialExfiltration,
-            NoGoZones.safetyBypass,
-        ]
         return BASHostProfile(
             hostID: hostID,
             identityTags: [
@@ -116,7 +136,7 @@ public struct BASMLHostProfileService:
             ],
             tonePreference: Self.tonePreference(
                 for: contextFrame),
-            longTermGoals: goals,
+            longTermGoals: longTermGoals,
             noGoZones: noGoZones)
     }
 

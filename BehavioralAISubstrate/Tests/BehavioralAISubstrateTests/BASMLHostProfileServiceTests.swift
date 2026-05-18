@@ -44,6 +44,46 @@ final class BASMLHostProfileServiceTests: XCTestCase {
             hostRelevance: 0.5)
     }
 
+    // MARK: - Customization
+
+    func testCustomGoalsAreUsed() {
+        let custom = ["custom_goal_1", "custom_goal_2"]
+        let service = BASMLHostProfileService(
+            longTermGoals: custom)
+        let profile = service.resolveHost(
+            hostID: "test",
+            contextFrame: nil,
+            riskCard: nil)
+        XCTAssertEqual(profile.longTermGoals, custom,
+            "Host-supplied custom goals must override" +
+            " the safety-first defaults")
+    }
+
+    func testCustomNoGoZonesAreUsed() {
+        let zones = ["zone_a", "zone_b", "zone_c"]
+        let service = BASMLHostProfileService(
+            noGoZones: zones)
+        let profile = service.resolveHost(
+            hostID: "test",
+            contextFrame: nil,
+            riskCard: nil)
+        XCTAssertEqual(profile.noGoZones, zones)
+    }
+
+    func testDefaultGoalsContainPreserveSafety() {
+        XCTAssertTrue(
+            BASMLHostProfileService.defaultLongTermGoals
+                .contains(BASMLHostProfileService
+                    .LongTermGoals.preserveSafety))
+    }
+
+    func testDefaultNoGoZonesContainCredentialExfil() {
+        XCTAssertTrue(
+            BASMLHostProfileService.defaultNoGoZones
+                .contains(BASMLHostProfileService
+                    .NoGoZones.credentialExfiltration))
+    }
+
     // MARK: - resolveHost
 
     func testResolveHostReturnsCascadeResolvedTag() {
