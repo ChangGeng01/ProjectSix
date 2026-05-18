@@ -293,8 +293,14 @@ public actor BASCognitiveBrain {
             decomposeService: BASMLDecomposeService(),
             memoryService:
                 BASPlaceholderMemoryService(),
-            loopService:
-                BASPlaceholderLoopService(),
+            // L3 loop: REAL candidate generation
+            // service。 Produces 1-3 candidates derived
+            // from L2 decompose signals (primary +
+            // optional cautious + optional decline)。
+            // Each candidate's expectedBenefit / cost /
+            // reversibility / confidence is a typed
+            // function of the L2 signal arrays。
+            loopService: BASMLLoopService(),
             triSelfService:
                 BASPlaceholderTriSelfService(),
             // L5 risk: REAL service derived from L0
