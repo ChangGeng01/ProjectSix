@@ -375,6 +375,62 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
             " stdout: \(result.stdout)")
     }
 
+    // MARK: - L6/L7 cascade richness in CLI output
+
+    func testCLIHumanOutputShowsCascadeLine() throws {
+        let result = try runCLI(args: [
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("cascade:"),
+            "Human output must contain 'cascade:' line." +
+            " stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains("candidates="),
+            "Cascade line must show candidates=")
+        XCTAssertTrue(
+            result.stdout.contains("tickets="),
+            "Cascade line must show tickets=")
+    }
+
+    func testCLIHumanOutputShowsRenderedHeadline() throws {
+        let result = try runCLI(args: [
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("rendered:"),
+            "Human output must contain 'rendered:' line")
+        XCTAssertTrue(
+            result.stdout.contains("[DELAY]")
+            || result.stdout.contains("[CONFIRM]")
+            || result.stdout.contains("[DECLINE]"),
+            "Manipulation cascade rendered headline must" +
+            " include a risk-aware prefix。 stdout: " +
+            "\(result.stdout)")
+    }
+
+    func testCLIManipulationCascadeProducesTickets() throws {
+        let result = try runCLI(args: [
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        // Manipulation cascade emits tickets (>=1). The
+        // cascade line is "cascade:  candidates=N
+        // alternatives=N tickets=N"。 Verify
+        // tickets=0 does NOT appear (would require
+        // contains-substring check)。
+        XCTAssertFalse(
+            result.stdout.contains("tickets=0"),
+            "Manipulation cascade must emit >=1 ticket" +
+            " (got tickets=0)。 stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains("tickets="),
+            "Cascade line must mention tickets=" +
+            " count。 stdout: \(result.stdout)")
+    }
+
     func testCLIJSONIncludesRiskFields() throws {
         let result = try runCLI(args: [
             "--json",
