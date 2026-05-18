@@ -189,13 +189,19 @@ For richer routing logic the brain also exposes
 `classifyProbabilities(_:)` returning the full multi-class
 distribution map (returns nil for explicit-services brains)。
 
-### Cognitive cascade — 10 of 14 layers now ML-active
+### Cognitive cascade — ALL 10 cascade services ML-active
 
-The brain runs a 14-layer cognitive cascade. The full
-L0 → L9 core (10 layers) now runs real signal-derived
-logic on every turn — only downstream audit surfaces
-(L10-L14 tribunal/audit) remain as rules-tier
-placeholders。
+The brain's runtime coordinator threads 10 cascade
+services (powerClock / hostProfile / context /
+decompose / memory / loop / triSelf / risk / action /
+evolution)。 As of this milestone, **ALL 10 are
+ML-active** — every layer that touches a cognitive
+turn runs real signal-derived logic。
+
+Remaining surfaces beyond the cascade services are
+infrastructure (eventLog / userState / vectorIndex /
+knowledgeGraph / auditLedger) — host-configured
+storage layers, not cascade services。
 
 | Layer | Service | Behavior |
 | ----- | ------- | -------- |
