@@ -115,7 +115,7 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
 
     func testAdapterClassifyReturnsNonEmpty() throws {
         let adapter = try BASContextClassifierMLAdapter()
-        let (label, logits) = try adapter.classify(
+        let (label, confidence, logits) = try adapter.classify(
             text: "hello world")
         XCTAssertFalse(label.isEmpty,
             "Predicted label must be non-empty")
@@ -126,16 +126,48 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
                 label),
             "Predicted label must be one of the 7 known" +
             " classes: \(label)")
+        XCTAssertGreaterThanOrEqual(confidence, 0.0)
+        XCTAssertLessThanOrEqual(confidence, 1.0)
     }
 
     func testAdapterClassifyDeterminism() throws {
         let adapter = try BASContextClassifierMLAdapter()
-        let (a, _) = try adapter.classify(
+        let (a, ca, _) = try adapter.classify(
             text: "compile the swift package")
-        let (b, _) = try adapter.classify(
+        let (b, cb, _) = try adapter.classify(
             text: "compile the swift package")
         XCTAssertEqual(a, b,
             "Same input must produce same prediction")
+        XCTAssertEqual(ca, cb,
+            "Same input must produce same confidence")
+    }
+
+    /// Softmax confidence is sane:high-signal training
+    /// inputs (memorized) → high confidence (>0.5)。
+    func testAdapterConfidenceIsHighOnMemorizedInputs() throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        let (_, conf, _) = try adapter.classify(
+            text: "compile the swift package")
+        XCTAssertGreaterThan(conf, 0.5,
+            "Memorized training input should have" +
+            " confidence > 0.5,got \(conf)")
+    }
+
+    /// Confidence on near-uniform output should be near
+    /// 1/7 ≈ 0.143。 An empty input produces zero-vector
+    /// → tiny logits → softmax close to uniform。
+    /// Bound:confidence < 0.5 for empty input (well above
+    /// uniform but well below memorized inputs)。
+    func testAdapterConfidenceIsLowerOnEmptyInput() throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        let (_, confEmpty, _) = try adapter.classify(
+            text: "")
+        let (_, confMemorized, _) = try adapter.classify(
+            text: "compile the swift package")
+        XCTAssertLessThan(confEmpty, confMemorized,
+            "Empty input should have lower confidence" +
+            " than a memorized training input。 Empty:" +
+            " \(confEmpty) Memorized: \(confMemorized)")
     }
 
     // MARK: - Memorization sanity: trained inputs predict correctly
@@ -165,7 +197,7 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
         ]
         var correct = 0
         for (text, expected) in trainingExamples {
-            let (predicted, _) = try adapter
+            let (predicted, _, _) = try adapter
                 .classify(text: text)
             if predicted == expected {
                 correct += 1

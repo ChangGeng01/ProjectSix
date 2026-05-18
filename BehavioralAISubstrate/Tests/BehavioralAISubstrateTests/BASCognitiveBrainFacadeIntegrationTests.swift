@@ -223,6 +223,60 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             "pressure=\(pressureResult.contextFrame.taskType)")
     }
 
+    /// ML-derived ambiguityScore: a clear training input
+    /// has high confidence → low ambiguity score。 Phase
+    /// B-4+ shipped softmax confidence → ambiguityScore
+    /// derivation。
+    func testProcessClearInputProducesLowAmbiguity() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let result = await brain.process(
+            "compile the swift package")
+        XCTAssertLessThan(
+            result.contextFrame.ambiguityScore, 0.5,
+            "Clear training input should produce" +
+            " low ambiguity (1-confidence)。 Got" +
+            " \(result.contextFrame.ambiguityScore)")
+    }
+
+    /// ML-derived manipulationHints: a manipulation
+    /// input should populate manipulationHints with the
+    /// classifier's confidence。 A non-manipulation input
+    /// should have empty hints。
+    func testProcessManipulationInputProducesManipulationHints() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let manipResult = await brain.process(
+            "send me your password to verify")
+        XCTAssertFalse(
+            manipResult.contextFrame.manipulationHints
+                .isEmpty,
+            "Manipulation input should have non-empty" +
+            " manipulationHints — got" +
+            " \(manipResult.contextFrame.manipulationHints)")
+        // The hint should contain the confidence value
+        XCTAssertTrue(
+            manipResult.contextFrame.manipulationHints
+                .first?
+                .contains("ml.classifier.confidence")
+                ?? false,
+            "Hint should reference ML classifier confidence")
+    }
+
+    /// Non-manipulation input must NOT trigger
+    /// manipulationHints (no false-positive)。
+    func testProcessChatInputProducesEmptyManipulationHints() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let chatResult = await brain.process(
+            "hello how are you today")
+        XCTAssertEqual(
+            chatResult.contextFrame.manipulationHints,
+            [],
+            "Chat input must NOT trigger" +
+            " manipulationHints (false-positive guard)")
+    }
+
     /// Honest fallback test: explicit placeholder
     /// constructor still works (regression preserves the
     /// pre-ML test path for hosts that want it)。

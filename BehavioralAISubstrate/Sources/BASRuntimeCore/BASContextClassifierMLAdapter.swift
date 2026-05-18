@@ -211,13 +211,21 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     // MARK: - Inference
 
-    /// Classify a text input into one of 7 BASContextTaskType
-    /// labels。 Returns the label string + the full logits
-    /// vector for advanced callers that want confidence
-    /// scoring。
+    /// Classify a text input。 Returns:
+    ///   - label: predicted class name (one of 7)
+    ///   - confidence: softmax probability of the predicted
+    ///     class, in [0, 1]
+    ///   - logits: raw logits vector for advanced callers
+    ///
+    /// `confidence` is computed as softmax(logits)[argmax]。
+    /// A confidence of ~1/7 ≈ 0.14 means the model is
+    /// guessing uniformly;a confidence of >0.9 means the
+    /// model is highly certain。 Consumers like
+    /// BASMLContextService use this to derive
+    /// `ambiguityScore = 1 - confidence`。
     public func classify(
         text: String
-    ) throws -> (label: String, logits: [Float]) {
+    ) throws -> (label: String, confidence: Double, logits: [Float]) {
         // 1. Encode text → bag-of-buckets
         let bag = BASContextClassifierInputEncoder.encode(
             text)
@@ -277,8 +285,21 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
         let argmax = logits.indices.max(by: {
             logits[$0] < logits[$1]
         }) ?? 0
+        // Softmax for confidence score。 Numerical-stable
+        // form:subtract max before exp。
+        let maxLogit = logits.max() ?? 0
+        var expSum: Double = 0
+        var expArgmax: Double = 0
+        for (i, l) in logits.enumerated() {
+            let e = exp(Double(l - maxLogit))
+            expSum += e
+            if i == argmax { expArgmax = e }
+        }
+        let confidence = expSum > 0
+            ? expArgmax / expSum : 1.0 / Double(logits.count)
         return (
             BASContextClassifierMLAdapter.labels[argmax],
+            confidence,
             logits)
     }
 }
@@ -305,7 +326,7 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     public func classify(
         text: String
-    ) throws -> (label: String, logits: [Float]) {
+    ) throws -> (label: String, confidence: Double, logits: [Float]) {
         throw BASContextClassifierMLAdapterError
             .coreMLUnavailableOnPlatform
     }

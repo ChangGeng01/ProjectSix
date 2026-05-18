@@ -78,32 +78,52 @@ public struct BASMLContextService: BASContextServicing,
         // Try to classify via ML; on any failure fall back
         // to .chat (honest degradation, not a crash).
         let taskType: BASContextTaskType
+        let ambiguityScore: Double
+        let manipulationHints: [String]
         do {
-            let (label, _) = try adapter.classify(
-                text: userInput)
+            let (label, confidence, _) =
+                try adapter.classify(text: userInput)
             taskType = mapLabel(label)
+            // REAL ML-derived ambiguity:high confidence
+            // ⇒ low ambiguity, low confidence ⇒ high
+            // ambiguity。 1 - confidence is the standard
+            // proxy。 Clamped to [0, 1]。
+            ambiguityScore = max(0.0,
+                min(1.0, 1.0 - confidence))
+            // REAL ML-derived manipulation signal:if the
+            // top class is .manipulationRisk, surface its
+            // confidence as a hint。 Otherwise empty。
+            if taskType == .manipulationRisk {
+                manipulationHints = [
+                    "ml.classifier.confidence=" +
+                    String(format: "%.3f", confidence)
+                ]
+            } else {
+                manipulationHints = []
+            }
         } catch {
-            // Honest fallback: model failed to load or
-            // predict. Host integration tests should
-            // catch this; we don't want to take down the
-            // cognitive pipeline for a single layer
-            // failure. Future Phase: emit a typed audit
-            // event for monitoring.
+            // Honest fallback: model failed. Don't crash
+            // the cognitive pipeline; degrade to neutral
+            // signals + log via future audit event.
             taskType = .chat
+            ambiguityScore = 0.5  // honest "we don't know"
+            manipulationHints = []
         }
 
         return BASContextFrame(
             utterance: userInput,
             taskType: taskType,
-            // The following 7 fields stay placeholder
-            // pending future ML models. See file header
-            // for honest scope.
+            // PHASE B-4 placeholders (need their own models):
             emotionalLoad: 0.1,
             timePressure: 0.1,
             relationPattern: "neutral",
-            ambiguityScore: 0.1,
+            // ML-derived (REAL):
+            ambiguityScore: ambiguityScore,
+            // PHASE B-4 placeholders:
             consequenceLevel: 0.1,
-            manipulationHints: [],
+            // ML-derived (REAL, .manipulationRisk only):
+            manipulationHints: manipulationHints,
+            // PHASE B-4 placeholder:
             hostRelevance: 0.5)
     }
 }
