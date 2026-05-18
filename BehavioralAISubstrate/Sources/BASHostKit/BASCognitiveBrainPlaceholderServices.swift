@@ -49,6 +49,126 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
+/// Centralized constants for the BASPlaceholder* services。
+///
+/// These are NOT magic numbers — they are documented
+/// nominal values that drive the rules-fallthrough cascade
+/// when no ML adapter is wired into a given service。 Each
+/// constant has a rationale + the Phase that will replace
+/// it with real ML inference。
+///
+/// **Why centralize**: previously each placeholder service
+/// inlined `0.1` / `0.5` / `0.2` / `1` / `100` literals。
+/// Centralizing forces every value to be NAMED + makes the
+/// scope of the placeholder layer audit-able in one place。
+public enum BASCognitiveBrainPlaceholderConstants {
+
+    // MARK: - Budget frame (PowerClock service)
+
+    /// Default budget loop limit。 1 loop = single-pass
+    /// cognition,no iterative refinement。 Phase C+ will
+    /// raise this based on risk class + budget。
+    public static let defaultMaxLoops: Int = 1
+    /// Default candidate-path limit。 1 candidate = no
+    /// branching, just pick the model's top choice。
+    public static let defaultMaxCandidates: Int = 1
+    /// Default decode-token cap。 100 = short reply。
+    public static let defaultMaxDecodeTokens: Int = 100
+    /// Default retrieval depth (memory hops)。 1 = single
+    /// lookup,no graph traversal。
+    public static let defaultRetrievalDepth: Int = 1
+    /// Default output-length cap (chars) for action permit。
+    public static let defaultOutputLengthCap: Int = 100
+
+    // MARK: - Context frame (ContextService placeholder)
+
+    /// Neutral emotional-load。 Slightly non-zero baseline
+    /// indicating "small but present" arousal vs vacuous 0。
+    public static let neutralEmotionalLoad: Double = 0.1
+    /// Neutral time-pressure。
+    public static let neutralTimePressure: Double = 0.1
+    /// Neutral ambiguity-score for the placeholder
+    /// service。 (BASMLContextService overrides this with
+    /// real 1-confidence value。)
+    public static let neutralAmbiguityScore: Double = 0.1
+    /// Neutral consequence-level。
+    public static let neutralConsequenceLevel: Double = 0.1
+    /// Neutral host-relevance score。 0.5 = "neither
+    /// strongly relevant nor irrelevant"。
+    public static let neutralHostRelevance: Double = 0.5
+    /// Neutral relation-pattern string tag。
+    public static let neutralRelationPattern: String =
+        "neutral"
+
+    // MARK: - Candidate path (Loop service)
+
+    /// Neutral expected-benefit / expected-cost /
+    /// reversibility / confidence for a single placeholder
+    /// candidate path。 0.5 = no strong signal either way。
+    public static let neutralCandidateScore: Double = 0.5
+    /// Neutral forecast uncertainty。 0.3 = "moderate"。
+    public static let neutralForecastUncertainty:
+        Double = 0.3
+    /// Neutral critique severity (evidence-gap critique
+    /// applied to every candidate by placeholder)。
+    public static let neutralCritiqueSeverity: Double = 0.3
+    /// Neutral thought-frame stability score。
+    public static let neutralStabilityScore: Double = 0.5
+    /// Step index for the single placeholder thought-frame
+    /// iteration。
+    public static let placeholderStepIndex: Int = 0
+
+    // MARK: - TriSelf scores
+
+    /// Neutral id / ego / superego / merged scores for the
+    /// 3-self merge。 All 0.5 = no veto, no preference。
+    public static let neutralTriSelfScore: Double = 0.5
+
+    // MARK: - Risk
+
+    /// Total-risk score for placeholder。 Low (0.2)
+    /// because the cascade has no real risk-analysis ML。
+    public static let neutralTotalRisk: Double = 0.2
+    /// Risk-card uncertainty。
+    public static let neutralRiskUncertainty: Double = 0.2
+    /// Risk-card irreversibility。
+    public static let neutralRiskIrreversibility:
+        Double = 0.1
+    /// Risk-card manipulation-strength (zero by default —
+    /// only the ML context classifier surfaces manipulation,
+    /// not the placeholder risk service)。
+    public static let neutralRiskManipulationStrength:
+        Double = 0.0
+    /// Generalized safety index (GSI) baseline。
+    public static let neutralGSIScore: Double = 0.2
+
+    // MARK: - String tags
+
+    /// Tag string emitted by every placeholder service for
+    /// fields where rich semantic text would come from a
+    /// real ML head (e.g. action.headline, critique.text)。
+    /// Auditors can grep on this to find every placeholder
+    /// emission site。
+    public static let placeholderTag: String = "placeholder"
+    /// Tag for placeholder-derived candidate identifiers。
+    public static let placeholderCandidateID: String =
+        "placeholder-c1"
+    /// Tag for placeholder-derived decompose-frame
+    /// identifiers。
+    public static let placeholderDecomposeRef: String =
+        "placeholder-decomp"
+    /// Tone-policy string for placeholder action permit。
+    public static let placeholderTonePolicy: String =
+        "neutral"
+    /// Template-policy string for placeholder action permit。
+    public static let placeholderTemplatePolicy: String =
+        "default"
+    /// "long term goal" string for the placeholder host
+    /// profile。
+    public static let placeholderHostLongTermGoal:
+        String = "placeholder"
+}
+
 /// Placeholder PowerClock service — returns nominal budget
 /// + scout-CPU route + no maintenance。 No power planning。
 public struct BASPlaceholderPowerClockService:
@@ -61,12 +181,13 @@ public struct BASPlaceholderPowerClockService:
         taskPing: String,
         riskHint: BASBrainRiskLevel?
     ) -> BASBudgetFrame {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return BASBudgetFrame(
             runMode: .engage,
-            maxLoops: 1,
-            maxCandidates: 1,
-            maxDecodeTokens: 100,
-            retrievalDepth: 1,
+            maxLoops: K.defaultMaxLoops,
+            maxCandidates: K.defaultMaxCandidates,
+            maxDecodeTokens: K.defaultMaxDecodeTokens,
+            retrievalDepth: K.defaultRetrievalDepth,
             precisionProfile: .minimal,
             deviceRoute: .scoutCPU,
             thermalGuardLevel: .nominal,
@@ -102,7 +223,10 @@ public struct BASPlaceholderHostProfileService:
     ) -> BASHostProfile {
         return BASHostProfile(
             hostID: hostID,
-            longTermGoals: ["placeholder"],
+            longTermGoals: [
+                BASCognitiveBrainPlaceholderConstants
+                    .placeholderHostLongTermGoal
+            ],
             noGoZones: [])
     }
 
@@ -122,7 +246,8 @@ public struct BASPlaceholderHostProfileService:
         return BASHostVersion(
             versionID: versionID,
             changedFields: [],
-            reason: "placeholder",
+            reason: BASCognitiveBrainPlaceholderConstants
+                .placeholderTag,
             approvedByPolicy: true)
     }
 }
@@ -139,16 +264,17 @@ public struct BASPlaceholderContextService:
         hostContext: BASHostProfile,
         budget: BASBudgetFrame
     ) -> BASContextFrame {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return BASContextFrame(
             utterance: userInput,
             taskType: .chat,
-            emotionalLoad: 0.1,
-            timePressure: 0.1,
-            relationPattern: "neutral",
-            ambiguityScore: 0.1,
-            consequenceLevel: 0.1,
+            emotionalLoad: K.neutralEmotionalLoad,
+            timePressure: K.neutralTimePressure,
+            relationPattern: K.neutralRelationPattern,
+            ambiguityScore: K.neutralAmbiguityScore,
+            consequenceLevel: K.neutralConsequenceLevel,
             manipulationHints: [],
-            hostRelevance: 0.5)
+            hostRelevance: K.neutralHostRelevance)
     }
 }
 
@@ -171,7 +297,9 @@ public struct BASPlaceholderDecomposeService:
             contradictions: [],
             pressureSignals: [],
             manipulationSignals: [],
-            mirrorText: "placeholder mirror")
+            mirrorText:
+                BASCognitiveBrainPlaceholderConstants
+                    .placeholderTag + " mirror")
     }
 
     public func mirror(
@@ -231,15 +359,16 @@ public struct BASPlaceholderLoopService:
         memoryBundle: BASMemoryBundle,
         budget: BASBudgetFrame
     ) -> [BASCandidatePath] {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return [
             BASCandidatePath(
-                candidateID: "placeholder-c1",
-                title: "placeholder",
-                actionSummary: "placeholder",
-                expectedBenefit: 0.5,
-                expectedCost: 0.5,
-                reversibility: 0.5,
-                confidence: 0.5)
+                candidateID: K.placeholderCandidateID,
+                title: K.placeholderTag,
+                actionSummary: K.placeholderTag,
+                expectedBenefit: K.neutralCandidateScore,
+                expectedCost: K.neutralCandidateScore,
+                reversibility: K.neutralCandidateScore,
+                confidence: K.neutralCandidateScore)
         ]
     }
 
@@ -248,13 +377,14 @@ public struct BASPlaceholderLoopService:
         decomposeFrame: BASDecomposeFrame,
         memoryBundle: BASMemoryBundle
     ) -> [BASForecastItem] {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return candidates.map {
             BASForecastItem(
                 candidateID: $0.candidateID,
-                shortTermOutcome: "placeholder",
-                midTermOutcome: "placeholder",
-                worstCase: "placeholder",
-                uncertainty: 0.3)
+                shortTermOutcome: K.placeholderTag,
+                midTermOutcome: K.placeholderTag,
+                worstCase: K.placeholderTag,
+                uncertainty: K.neutralForecastUncertainty)
         }
     }
 
@@ -263,12 +393,13 @@ public struct BASPlaceholderLoopService:
         forecasts: [BASForecastItem],
         hostContext: BASHostProfile
     ) -> [BASCritiqueItem] {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return candidates.map {
             BASCritiqueItem(
                 candidateID: $0.candidateID,
                 critiqueType: .evidenceGap,
-                critiqueText: "placeholder",
-                severity: 0.3)
+                critiqueText: K.placeholderTag,
+                severity: K.neutralCritiqueSeverity)
         }
     }
 
@@ -277,13 +408,14 @@ public struct BASPlaceholderLoopService:
         memoryBundle: BASMemoryBundle,
         budget: BASBudgetFrame
     ) -> BASThoughtFrame {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         let candidates = proposePaths(
             decomposeFrame: decomposeFrame,
             memoryBundle: memoryBundle,
             budget: budget)
         return BASThoughtFrame(
-            stepIndex: 0,
-            decomposeRef: "placeholder-decomp",
+            stepIndex: K.placeholderStepIndex,
+            decomposeRef: K.placeholderDecomposeRef,
             memoryRefs: [],
             candidates: candidates,
             forecasts: forecast(
@@ -294,8 +426,8 @@ public struct BASPlaceholderLoopService:
                 candidates: candidates,
                 forecasts: [],
                 hostContext: BASHostProfile(
-                    hostID: "placeholder")),
-            stabilityScore: 0.5,
+                    hostID: K.placeholderTag)),
+            stabilityScore: K.neutralStabilityScore,
             stopReason: .candidateStable)
     }
 }
@@ -311,24 +443,25 @@ public struct BASPlaceholderTriSelfService:
         thoughtFrame: BASThoughtFrame,
         hostContext: BASHostProfile
     ) -> ([BASTriSelfScore], BASMergedChoice) {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         let scores = thoughtFrame.candidates.map {
             BASTriSelfScore(
                 candidateID: $0.candidateID,
-                idScore: 0.5,
-                egoScore: 0.5,
-                superegoScore: 0.5,
-                mergedScore: 0.5,
+                idScore: K.neutralTriSelfScore,
+                egoScore: K.neutralTriSelfScore,
+                superegoScore: K.neutralTriSelfScore,
+                mergedScore: K.neutralTriSelfScore,
                 veto: false)
         }
         let pick = thoughtFrame.candidates.first
             ?? BASCandidatePath(
-                candidateID: "placeholder-c1",
-                title: "placeholder",
-                actionSummary: "placeholder",
-                expectedBenefit: 0.5,
-                expectedCost: 0.5,
-                reversibility: 0.5,
-                confidence: 0.5)
+                candidateID: K.placeholderCandidateID,
+                title: K.placeholderTag,
+                actionSummary: K.placeholderTag,
+                expectedBenefit: K.neutralCandidateScore,
+                expectedCost: K.neutralCandidateScore,
+                reversibility: K.neutralCandidateScore,
+                confidence: K.neutralCandidateScore)
         return (
             scores,
             BASMergedChoice(
@@ -351,14 +484,16 @@ public struct BASPlaceholderRiskService:
         triScores: [BASTriSelfScore],
         budget: BASBudgetFrame
     ) -> BASRiskCard {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return BASRiskCard(
-            totalRisk: 0.2,
+            totalRisk: K.neutralTotalRisk,
             riskLevel: .low,
             factors: [],
-            uncertainty: 0.2,
-            irreversibility: 0.1,
-            manipulationStrength: 0.0,
-            gsiScore: 0.2,
+            uncertainty: K.neutralRiskUncertainty,
+            irreversibility: K.neutralRiskIrreversibility,
+            manipulationStrength:
+                K.neutralRiskManipulationStrength,
+            gsiScore: K.neutralGSIScore,
             recommendedMode: .answer)
     }
 
@@ -366,7 +501,8 @@ public struct BASPlaceholderRiskService:
         contextFrame: BASContextFrame,
         thoughtFrame: BASThoughtFrame
     ) -> Double {
-        return 0.2
+        return BASCognitiveBrainPlaceholderConstants
+            .neutralGSIScore
     }
 
     public func gateAction(
@@ -375,6 +511,7 @@ public struct BASPlaceholderRiskService:
         triScores: [BASTriSelfScore],
         budget: BASBudgetFrame
     ) -> (BASRiskCard, BASActionPermit) {
+        let K = BASCognitiveBrainPlaceholderConstants.self
         return (
             calibrateRisk(
                 contextFrame: contextFrame,
@@ -383,10 +520,12 @@ public struct BASPlaceholderRiskService:
                 budget: budget),
             BASActionPermit(
                 mode: .answer,
-                reasonCodes: ["placeholder"],
-                outputLengthCap: 100,
-                tonePolicy: "neutral",
-                templatePolicy: "default"))
+                reasonCodes: [K.placeholderTag],
+                outputLengthCap:
+                    K.defaultOutputLengthCap,
+                tonePolicy: K.placeholderTonePolicy,
+                templatePolicy:
+                    K.placeholderTemplatePolicy))
     }
 }
 

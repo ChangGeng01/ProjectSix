@@ -25,6 +25,17 @@ import Foundation
 import BASHostKit
 import BASRuntimeCore
 
+// MARK: - Exit codes (named, not magic)
+
+enum CLIExitCode {
+    /// 0 — input processed successfully (any verdict)
+    static let success: Int32 = 0
+    /// 1 — invalid arguments / missing input
+    static let invalidArguments: Int32 = 1
+    /// 2 — brain initialization failed (e.g. .mlmodel missing)
+    static let brainInitFailed: Int32 = 2
+}
+
 // MARK: - Argument parsing
 
 enum CLIError: Error {
@@ -173,7 +184,7 @@ func runCLI() async {
             if let d = msg.data(using: .utf8) {
                 FileHandle.standardError.write(d)
             }
-            exit(2)
+            exit(CLIExitCode.brainInitFailed)
         }
         let (verdict, taskType, confidence) =
             await brain.safetyVerdict(args.input)
@@ -190,20 +201,20 @@ func runCLI() async {
         if let d = msg.data(using: .utf8) {
             FileHandle.standardError.write(d)
         }
-        exit(1)
+        exit(CLIExitCode.invalidArguments)
     } catch CLIError.unknownFlag(let f) {
         let msg = "BASBrainCLI: unknown flag \(f)。" +
             " Use --help for usage。\n"
         if let d = msg.data(using: .utf8) {
             FileHandle.standardError.write(d)
         }
-        exit(1)
+        exit(CLIExitCode.invalidArguments)
     } catch {
         let msg = "BASBrainCLI: error: \(error)\n"
         if let d = msg.data(using: .utf8) {
             FileHandle.standardError.write(d)
         }
-        exit(1)
+        exit(CLIExitCode.invalidArguments)
     }
 }
 

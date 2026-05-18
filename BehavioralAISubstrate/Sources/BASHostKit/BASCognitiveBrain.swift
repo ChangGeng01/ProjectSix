@@ -78,21 +78,46 @@ public actor BASCognitiveBrain {
     /// (kept non-private so hosts can introspect)。
     public let bundle: BASCognitiveOSBundle
 
+    /// Named constants for the default device-state values。
+    /// Each represents a "nominal everything" baseline that
+    /// describes a healthy host environment — not magic
+    /// numbers but typed defaults with audit-able rationale。
+    public enum DefaultDeviceStateValues {
+        /// 80% — comfortably charged but not full-charged
+        /// (avoids "always full battery" fixture lie)。
+        public static let batteryLevel: Double = 0.8
+        /// 2GB free — sufficient for cognitive cascade
+        /// without memory pressure on tested hardware。
+        public static let memoryFreeMB: Int = 2048
+        /// 20% CPU load — system is doing other things
+        /// but not contended。
+        public static let cpuLoad: Double = 0.2
+        /// 10% GPU load — same rationale as CPU but lower
+        /// baseline because most apps don't drive GPU。
+        public static let gpuLoad: Double = 0.1
+        /// 1.5s latency budget — generous for a turn that
+        /// today executes in ~1ms。 Future ML adapters with
+        /// real LLM heads may need more headroom。
+        public static let latencyBudgetMs: Int = 1500
+    }
+
     /// Default device-state used by `process(_ input: String)`
     /// when caller doesn't pass a custom one。 Nominal
-    /// everything (mirror of BASCoordinatorTestStubs.
-    /// nominalDeviceState)。
+    /// everything via DefaultDeviceStateValues constants。
     public static let defaultDeviceState =
         BASDeviceState(
-            batteryLevel: 0.8,
+            batteryLevel:
+                DefaultDeviceStateValues.batteryLevel,
             thermalLevel: .nominal,
-            memoryFreeMB: 2048,
+            memoryFreeMB:
+                DefaultDeviceStateValues.memoryFreeMB,
             networkState: .online,
             foregroundState: .foreground,
-            cpuLoad: 0.2,
-            gpuLoad: 0.1,
+            cpuLoad: DefaultDeviceStateValues.cpuLoad,
+            gpuLoad: DefaultDeviceStateValues.gpuLoad,
             npuAvailable: false,
-            latencyBudgetMs: 1500)
+            latencyBudgetMs:
+                DefaultDeviceStateValues.latencyBudgetMs)
 
     /// Default hostID for unattributed turns。
     public static let defaultHostID = "bas.cognitive.brain"
@@ -276,6 +301,12 @@ public actor BASCognitiveBrain {
     public static let safetyConfidenceThreshold: Double
         = 0.6
 
+    /// The "1" in `confidence = 1 - ambiguityScore` (and
+    /// vice versa)。 Named so the inversion semantics are
+    /// explicit at every call site that derives one from
+    /// the other。
+    public static let ambiguityComplement: Double = 1.0
+
     /// Compute a typed safety verdict for a user input。
     /// Uses the ML context classifier internally。
     ///
@@ -304,8 +335,13 @@ public actor BASCognitiveBrain {
         // ambiguityScore (= 1 - confidence)
         let result = await self.process(input)
         let taskType = result.contextFrame.taskType
+        // confidence ≡ 1 - ambiguityScore (BASMLContextService
+        // sets ambiguityScore as the softmax-confidence
+        // complement). Documented inversion, not a magic
+        // constant.
         let confidence =
-            1.0 - result.contextFrame.ambiguityScore
+            BASCognitiveBrain.ambiguityComplement
+                - result.contextFrame.ambiguityScore
         let verdict: BASCognitiveSafetyVerdict
         if confidence >=
             BASCognitiveBrain.safetyConfidenceThreshold
@@ -427,8 +463,13 @@ extension BASCognitiveBrain {
             input,
             deviceState: deviceState,
             hostID: hostID)
+        // confidence ≡ 1 - ambiguityScore (BASMLContextService
+        // sets ambiguityScore as the softmax-confidence
+        // complement). Documented inversion, not a magic
+        // constant.
         let confidence =
-            1.0 - result.contextFrame.ambiguityScore
+            BASCognitiveBrain.ambiguityComplement
+                - result.contextFrame.ambiguityScore
         let verdict: BASCognitiveSafetyVerdict
         if confidence >=
             BASCognitiveBrain.safetyConfidenceThreshold
