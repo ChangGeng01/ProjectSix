@@ -283,8 +283,14 @@ public actor BASCognitiveBrain {
             hostProfileService:
                 BASPlaceholderHostProfileService(),
             contextService: contextService,
-            decomposeService:
-                BASPlaceholderDecomposeService(),
+            // L2 decompose: REAL signal-surfacing
+            // service derived from L0 context frame。
+            // Populates emotions / pressureSignals /
+            // manipulationSignals / unknowns /
+            // contradictions arrays from L0 ML signals
+            // rather than emitting the placeholder's
+            // universally-empty arrays。
+            decomposeService: BASMLDecomposeService(),
             memoryService:
                 BASPlaceholderMemoryService(),
             loopService:
