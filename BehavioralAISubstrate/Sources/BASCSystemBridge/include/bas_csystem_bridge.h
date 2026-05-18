@@ -87,6 +87,56 @@ int32_t bas_process_resident_memory_bytes(uint64_t *out);
 /// `bas_process_resident_memory_bytes`。 Currently 1。
 int32_t bas_process_resident_memory_bytes_version(void);
 
+/// 主线 解构 重构 — read the count of active Mach
+/// threads in the calling process。 Wraps `task_threads`
+/// + `mach_port_deallocate` cleanup on Apple platforms。
+/// Useful for cascade telemetry / runaway-task detection
+/// in long-running brain hosts。
+///
+/// **Apple platforms only**:substrate ships
+/// Apple-only in production。 Non-Apple fallback returns
+/// -3 (unsupported)。
+///
+/// - Parameter out:non-null pointer to receive the
+///   thread count。 Set to 0 on non-zero return。
+/// - Returns:0 on success,negative on error。
+///   - -1 = null `out` pointer
+///   - -2 = `task_threads` Mach call failed
+///   - -3 = unsupported platform (non-Apple build host)
+///
+/// **Thread-safety**:reentrant + lock-free。 task_threads
+/// is a process-wide query callable from any thread。
+int32_t bas_thread_count(int32_t *out);
+
+/// ABI / behavior version pin for `bas_thread_count`。
+/// Currently 1。
+int32_t bas_thread_count_version(void);
+
+/// 主线 解构 重构 — read the logical-CPU count of the
+/// host via `sysctl(CTL_HW, HW_NCPU)`。 Equivalent to the
+/// number of hardware threads visible to the kernel
+/// scheduler (perf + efficiency cores combined on Apple
+/// silicon)。 Useful for cascade telemetry / runtime
+/// concurrency budgeting。
+///
+/// **Apple platforms only**:substrate ships
+/// Apple-only in production。 Non-Apple fallback returns
+/// -3 (unsupported)。
+///
+/// - Parameter out:non-null pointer to receive the CPU
+///   count。 Set to 0 on non-zero return。
+/// - Returns:0 on success,negative on error。
+///   - -1 = null `out` pointer
+///   - -2 = `sysctl` call failed
+///   - -3 = unsupported platform (non-Apple build host)
+///
+/// **Thread-safety**:reentrant + lock-free。
+int32_t bas_cpu_count_logical(int32_t *out);
+
+/// ABI / behavior version pin for `bas_cpu_count_logical`。
+/// Currently 1。
+int32_t bas_cpu_count_logical_version(void);
+
 #ifdef __cplusplus
 }
 #endif

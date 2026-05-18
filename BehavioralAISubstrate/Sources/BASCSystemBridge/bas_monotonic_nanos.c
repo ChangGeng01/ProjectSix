@@ -140,3 +140,73 @@ int32_t bas_process_resident_memory_bytes(uint64_t *out) {
 int32_t bas_process_resident_memory_bytes_version(void) {
     return 1;
 }
+
+#if __APPLE__
+#include <sys/sysctl.h>
+#endif
+
+// MARK: - bas_thread_count
+// 主线 解构 重构 — wraps task_threads to return the
+// active Mach thread count for the calling process。
+int32_t bas_thread_count(int32_t *out) {
+    if (out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    thread_act_array_t threads = 0;
+    mach_msg_type_number_t count = 0;
+    kern_return_t kr = task_threads(
+        mach_task_self(), &threads, &count);
+    if (kr != KERN_SUCCESS) {
+        *out = 0;
+        return -2;
+    }
+    *out = (int32_t)count;
+    // Release the thread-port handles + the array
+    // allocation — task_threads transfers ownership to
+    // caller per Apple's documentation。
+    for (mach_msg_type_number_t i = 0; i < count; i++) {
+        mach_port_deallocate(
+            mach_task_self(), threads[i]);
+    }
+    vm_deallocate(
+        mach_task_self(),
+        (vm_address_t)threads,
+        count * sizeof(thread_act_t));
+    return 0;
+#else
+    *out = 0;
+    return -3;
+#endif
+}
+
+int32_t bas_thread_count_version(void) {
+    return 1;
+}
+
+// MARK: - bas_cpu_count_logical
+// 主线 解构 重构 — wraps sysctl(CTL_HW, HW_NCPU) to
+// return the host's logical CPU count。
+int32_t bas_cpu_count_logical(int32_t *out) {
+    if (out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    int mib[2] = { CTL_HW, HW_NCPU };
+    int value = 0;
+    size_t size = sizeof(value);
+    if (sysctl(mib, 2, &value, &size, 0, 0) != 0) {
+        *out = 0;
+        return -2;
+    }
+    *out = (int32_t)value;
+    return 0;
+#else
+    *out = 0;
+    return -3;
+#endif
+}
+
+int32_t bas_cpu_count_logical_version(void) {
+    return 1;
+}
