@@ -592,6 +592,46 @@ public actor BASRustMemoryUsageTrackerActor {
         }
     }
 
+    /// 主线 Integrity 抽取 — compute the canonical chain
+    /// hash over all records inside Rust。 Returns the
+    /// 32-byte SHA256 digest as Data。 Hosts compare this
+    /// against an expected value to detect tampering or
+    /// drift across replicas。
+    ///
+    /// Algorithm:Rust walks the HashMap under read lock,
+    /// sorts by (retrieved_at_ms, record_id),feeds each
+    /// record's bytes length-prefixed into SHA256,
+    /// returns the digest。 Empty tracker → SHA256 of
+    /// empty bytes (well-known constant)。
+    ///
+    /// Deterministic:two trackers with identical records
+    /// in any insertion order produce identical hashes。
+    public func computeChainHash() throws -> Data {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        var hash = [UInt8](repeating: 0, count: 32)
+        let rc = hash.withUnsafeMutableBufferPointer {
+            ptr -> Int32 in
+            bas_rust_tracker_compute_chain_hash(
+                h, ptr.baseAddress!)
+        }
+        switch rc {
+        case 0:
+            return Data(hash)
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+    }
+
     /// 全面 开发 — retrieval-interval distribution
     /// percentiles via Rust-native sort + delta +
     /// percentile under one read lock。 Returns p50 /
@@ -931,6 +971,11 @@ public actor BASRustMemoryUsageTrackerActor {
     public func retrievalIntervalPercentiles() throws
         -> BASRetrievalIntervalPercentiles
     {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func computeChainHash() throws -> Data {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

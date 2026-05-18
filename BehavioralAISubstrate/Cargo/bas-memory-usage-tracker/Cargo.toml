@@ -14,3 +14,11 @@ rust-version.workspace = true
 crate-type = ["staticlib"]
 name = "bas_memory_usage_tracker"
 path = "src/lib.rs"
+
+[dependencies]
+# 主线 Integrity 抽取 — well-trusted no_std SHA256
+# implementation。 Used by the chain-hash FFI to compute
+# a deterministic rolling SHA256 over canonically-ordered
+# records。 default-features=false keeps the std-dep
+# surface minimal and reproducible。
+sha2 = { version = "0.10", default-features = false }

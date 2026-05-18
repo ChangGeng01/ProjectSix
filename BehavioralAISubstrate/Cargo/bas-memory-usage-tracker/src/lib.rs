@@ -62,6 +62,7 @@ use std::ffi::{c_char, c_int, c_uchar, CStr};
 #[cfg(test)]
 use std::ptr;
 use std::sync::RwLock;
+use sha2::{Sha256, Digest};
 
 const ABI_VERSION: c_int = 1;
 
@@ -89,6 +90,20 @@ struct AtomStats {
     last_retrieved_ms: i64,
     helped_count: i64,
     not_helped_count: i64,
+}
+
+// 主线 Integrity 抽取 — length-prefixed feed into a
+// SHA256 hasher。 The 4-byte big-endian length prefix
+// prevents collision between "ab" + "cd" and "a" +
+// "bcd" — without it,SHA256(ab || cd) ==
+// SHA256(a || bcd) which would let an attacker
+// rearrange field boundaries undetected。
+fn feed_length_prefixed(
+    hasher: &mut Sha256, bytes: &[u8]
+) {
+    let len = bytes.len() as u32;
+    hasher.update(len.to_be_bytes());
+    hasher.update(bytes);
 }
 
 // 主线 核心 抽取 — fixed-precision Float64 → JSON
@@ -390,6 +405,71 @@ impl Tracker {
             out.push(b'"');
         }
         out.push(b']');
+        Ok(out)
+    }
+
+    // 主线 Integrity 抽取 — compute a deterministic
+    // SHA256 hash over the canonically-ordered record
+    // set。 Two trackers with identical records in any
+    // insertion order produce identical 32-byte hashes。
+    // Hosts use this for tamper detection:periodically
+    // capture the chain hash,compare against expected。
+    //
+    // Canonical ordering: ascending by
+    // (retrieved_at_ms, record_id)。 Record_id tiebreaker
+    // ensures determinism even when two records share
+    // a timestamp。
+    //
+    // Hashed bytes per record (single feed,no separators
+    // — internal byte representations don't collide
+    // because all fields have fixed-precision integer
+    // lengths or NUL-terminated string boundaries via
+    // length-prefixed encoding below):
+    //
+    //   8 bytes: retrieved_at_ms big-endian
+    //   4 bytes: u32 record_id length big-endian
+    //   N bytes: record_id UTF-8
+    //   4 bytes: u32 atom_id length big-endian
+    //   N bytes: atom_id UTF-8
+    //   4 bytes: u32 session_ref length big-endian
+    //   N bytes: session_ref UTF-8
+    //   4 bytes: u32 turn_ref length big-endian
+    //   N bytes: turn_ref UTF-8
+    //   4 bytes: u32 permit_mode length big-endian
+    //   N bytes: permit_mode UTF-8
+    //   4 bytes: u32 helped_state length big-endian
+    //   N bytes: helped_state UTF-8
+    //
+    // Empty tracker hashes the empty byte stream →
+    // well-known SHA256("") =
+    // e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855。
+    fn compute_chain_hash(&self) -> Result<[u8; 32], ()> {
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut ordered: Vec<&Record> = r.values().collect();
+        ordered.sort_by(|a, b| {
+            a.retrieved_at_ms.cmp(&b.retrieved_at_ms)
+                .then(a.record_id.cmp(&b.record_id))
+        });
+        let mut hasher = Sha256::new();
+        for rec in ordered {
+            hasher.update(
+                rec.retrieved_at_ms.to_be_bytes());
+            feed_length_prefixed(
+                &mut hasher, rec.record_id.as_bytes());
+            feed_length_prefixed(
+                &mut hasher, rec.atom_id.as_bytes());
+            feed_length_prefixed(
+                &mut hasher, rec.session_ref.as_bytes());
+            feed_length_prefixed(
+                &mut hasher, rec.turn_ref.as_bytes());
+            feed_length_prefixed(
+                &mut hasher, rec.permit_mode.as_bytes());
+            feed_length_prefixed(
+                &mut hasher, rec.helped_state.as_bytes());
+        }
+        let digest = hasher.finalize();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&digest);
         Ok(out)
     }
 
@@ -1027,6 +1107,39 @@ pub extern "C" fn bas_rust_tracker_retrieval_interval_percentiles(
 
 #[no_mangle]
 pub extern "C" fn bas_rust_tracker_retrieval_interval_percentiles_version() -> c_int {
+    1
+}
+
+// 主线 Integrity 抽取 — chain hash FFI。 Caller passes a
+// 32-byte output buffer;Rust fills it with the SHA256
+// hash of canonically-ordered record content。
+//
+// Returns:
+//   - 0  = success (out_hash filled with 32 bytes)
+//   - -1 = null pointer
+//   - -2 = internal error (lock poisoned)
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_compute_chain_hash(
+    tracker: *mut Tracker,
+    out_hash: *mut c_uchar,
+) -> c_int {
+    if tracker.is_null() || out_hash.is_null() {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let hash = match tref.compute_chain_hash() {
+        Ok(h) => h,
+        Err(_) => return -2,
+    };
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            hash.as_ptr(), out_hash, 32);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_compute_chain_hash_version() -> c_int {
     1
 }
 

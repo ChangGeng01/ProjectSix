@@ -2277,13 +2277,17 @@ extension BASCognitiveBrain {
         // bloating the snapshot。
         let topAtoms: [BASTopAtomEntry]?
         let atomCountPercentiles: BASAtomCountPercentiles?
+        let integrityChainHashHex: String?
         if let store = rustHistoryStore {
             topAtoms = try? await store.topKAtoms(limit: 5)
             atomCountPercentiles = try? await store
                 .atomCountPercentiles()
+            integrityChainHashHex = try? await store
+                .integrityChainHashHex()
         } else {
             topAtoms = nil
             atomCountPercentiles = nil
+            integrityChainHashHex = nil
         }
         return BASCognitiveBrainHealthSnapshot(
             pilotStatus: status,
@@ -2295,6 +2299,8 @@ extension BASCognitiveBrain {
             cSystemProbes: cProbes,
             topAtoms: topAtoms,
             atomCountPercentiles: atomCountPercentiles,
+            integrityChainHashHex:
+                integrityChainHashHex,
             collectedAt: Date())
     }
 
@@ -2534,6 +2540,13 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
     /// rate" dashboards。 Default nil for backward-compat。
     public let atomCountPercentiles: BASAtomCountPercentiles?
 
+    /// 主线 Integrity 抽取 — Rust-computed SHA256 chain
+    /// hash hex string (64 lowercase hex chars)。 Nil when
+    /// Rust pilot not wired。 Hosts use this for tamper
+    /// detection:store known-good value,re-fetch
+    /// later,compare for drift。
+    public let integrityChainHashHex: String?
+
     /// When the snapshot was collected (host clock)。
     public let collectedAt: Date
 
@@ -2553,6 +2566,7 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
         topAtoms: [BASTopAtomEntry]? = nil,
         atomCountPercentiles:
             BASAtomCountPercentiles? = nil,
+        integrityChainHashHex: String? = nil,
         collectedAt: Date
     ) {
         self.pilotStatus = pilotStatus
@@ -2564,6 +2578,8 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
         self.cSystemProbes = cSystemProbes
         self.topAtoms = topAtoms
         self.atomCountPercentiles = atomCountPercentiles
+        self.integrityChainHashHex =
+            integrityChainHashHex
         self.collectedAt = collectedAt
     }
 

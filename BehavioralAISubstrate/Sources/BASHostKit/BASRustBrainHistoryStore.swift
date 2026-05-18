@@ -218,6 +218,23 @@ public actor BASRustBrainHistoryStore {
             retainFraction: retainFraction)
     }
 
+    /// 主线 Integrity 抽取 — Rust-computed SHA256 chain
+    /// hash for tamper detection。 Returns the 32-byte
+    /// digest hex-encoded as a lowercase string。 Hosts
+    /// store this periodically + compare against future
+    /// values to detect record-set drift。
+    public func integrityChainHashHex() async throws
+        -> String
+    {
+        let bytes = try await tracker.computeChainHash()
+        var hex = ""
+        hex.reserveCapacity(64)
+        for byte in bytes {
+            hex += String(format: "%02x", byte)
+        }
+        return hex
+    }
+
     // MARK: - 主线 全面 提升: Rust-side aggregations
 
     /// Records grouped by permit mode (i.e. by safety

@@ -261,6 +261,31 @@ int32_t bas_rust_tracker_retrieval_interval_percentiles(
 /// `bas_rust_tracker_retrieval_interval_percentiles`。
 int32_t bas_rust_tracker_retrieval_interval_percentiles_version(void);
 
+/// 主线 Integrity 抽取 — compute a deterministic SHA256
+/// hash over the canonically-ordered (sort by
+/// retrieved_at_ms then record_id) record set。 Hosts
+/// use this for tamper detection:store a known-good
+/// chain hash,re-compute periodically,alert on
+/// divergence。
+///
+/// Empty tracker hashes the empty byte stream → SHA256
+/// of zero bytes (e3b0c4...)。
+///
+/// - Parameter out_hash:32-byte buffer the caller
+///   provides;Rust writes the SHA256 digest into it。
+///
+/// Returns:
+///   - 0  = success (out_hash filled with 32 bytes)
+///   - -1 = null pointer (either)
+///   - -2 = internal error (lock poisoned)
+int32_t bas_rust_tracker_compute_chain_hash(
+    Tracker* tracker,
+    uint8_t* out_hash);
+
+/// ABI version pin for
+/// `bas_rust_tracker_compute_chain_hash`。
+int32_t bas_rust_tracker_compute_chain_hash_version(void);
+
 #ifdef __cplusplus
 }
 #endif
