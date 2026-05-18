@@ -1520,6 +1520,163 @@ extension BASCognitiveBrain {
             metalAttempted: metalAttempted,
             metalSucceeded: metalSucceeded)
     }
+
+    /// 主线 全面 提升 — unified pilot health snapshot。
+    /// Combines pilotStatus + pilotMetrics with every
+    /// pilot's deep telemetry surface into one Codable
+    /// document hosts can ship to a dashboard / observability
+    /// pipeline。
+    ///
+    /// Per-pilot deep telemetry included:
+    ///   - SQL pilot → BASSQLBrainHistoryStoreAggregation
+    ///     (permit-mode distribution via native GROUP BY)
+    ///   - Rust pilot → BASRustBrainHistoryStoreAggregation
+    ///     (permit + session rollups)
+    ///   - C++ pilot → BASCxxBrainSummaryCacheTelemetry
+    ///     (hit/miss/hit-rate + cache size)
+    ///   - Metal pilot → BASCognitiveBrainPilotWarmupResult
+    ///     (warmup state — set when warmPilots already ran)
+    ///   - C pilot → recorded via pilotStatus.cActive
+    ///     (no host-pluggable storage to aggregate)
+    ///
+    /// Best-effort:per-pilot query failures surface as nil
+    /// in the relevant Optional field rather than throwing
+    /// the whole snapshot。 Hosts that want strict error
+    /// propagation should call each underlying pilot
+    /// surface directly。
+    ///
+    /// - Parameter warmupResult:optional pre-captured
+    ///   warmup result。 Pass the value returned by a prior
+    ///   `warmPilots()` call to include it in the snapshot
+    ///   without re-running warmup。 Nil means "snapshot
+    ///   doesn't include warmup state"。
+    public func healthSnapshot(
+        warmupResult: BASCognitiveBrainPilotWarmupResult? = nil
+    ) async -> BASCognitiveBrainHealthSnapshot {
+        let status = pilotStatus
+        let metrics = await pilotMetrics()
+        let sqlAgg: BASSQLBrainHistoryStoreAggregation?
+        if let store = sqlHistoryStore {
+            sqlAgg = try? await store.aggregationSnapshot()
+        } else { sqlAgg = nil }
+        let rustAgg: BASRustBrainHistoryStoreAggregation?
+        if let store = rustHistoryStore {
+            rustAgg = try? await store.aggregationSnapshot()
+        } else { rustAgg = nil }
+        let cxxTele: BASCxxBrainSummaryCacheTelemetry?
+        if let cache = cxxSummaryCache {
+            cxxTele = await cache.telemetrySnapshot()
+        } else { cxxTele = nil }
+        return BASCognitiveBrainHealthSnapshot(
+            pilotStatus: status,
+            pilotMetrics: metrics,
+            sqlAggregation: sqlAgg,
+            rustAggregation: rustAgg,
+            cxxTelemetry: cxxTele,
+            warmupResult: warmupResult,
+            collectedAt: Date())
+    }
+}
+
+/// 主线 全面 提升 — Codable unified health snapshot
+/// returned by `brain.healthSnapshot()`。 One bundle weaves
+/// every wired pilot's deep telemetry into a single
+/// dashboard-shaped document。
+///
+/// Hosts use this to:
+///   - render a single "pilot health" view (5 pilots × deep
+///     telemetry each)
+///   - persist periodic health snapshots for trend analysis
+///   - detect pilot-wire-up regressions across releases
+///   - compare two environments by Codable byte-diff
+public struct BASCognitiveBrainHealthSnapshot: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// Which pilots are wired into this brain。
+    public let pilotStatus: BASCognitiveBrainPilotStatus
+
+    /// Per-pilot operational counts (storage events,
+    /// cache sizes,in-memory history)。
+    public let pilotMetrics: BASCognitiveBrainPilotMetrics
+
+    /// SQL pilot's permit-mode + turns-this-session
+    /// rollup,with isSQLBacked status。 Nil when the
+    /// SQL pilot is not wired or the aggregation query
+    /// failed。
+    public let sqlAggregation:
+        BASSQLBrainHistoryStoreAggregation?
+
+    /// Rust pilot's permit-mode + session rollups +
+    /// distinct-session count。 Nil when Rust pilot
+    /// is not wired or the aggregation query failed。
+    public let rustAggregation:
+        BASRustBrainHistoryStoreAggregation?
+
+    /// C++ pilot's cache hit/miss/hit-rate telemetry +
+    /// current cache size。 Nil when C++ pilot is not
+    /// wired。
+    public let cxxTelemetry:
+        BASCxxBrainSummaryCacheTelemetry?
+
+    /// Optional pre-captured warmup result。 Nil means
+    /// the snapshot was captured without running
+    /// warmPilots first。 Pass a prior warmPilots() value
+    /// at snapshot time to include warmup state。
+    public let warmupResult:
+        BASCognitiveBrainPilotWarmupResult?
+
+    /// When the snapshot was collected (host clock)。
+    public let collectedAt: Date
+
+    public init(
+        pilotStatus: BASCognitiveBrainPilotStatus,
+        pilotMetrics: BASCognitiveBrainPilotMetrics,
+        sqlAggregation:
+            BASSQLBrainHistoryStoreAggregation?,
+        rustAggregation:
+            BASRustBrainHistoryStoreAggregation?,
+        cxxTelemetry:
+            BASCxxBrainSummaryCacheTelemetry?,
+        warmupResult:
+            BASCognitiveBrainPilotWarmupResult?,
+        collectedAt: Date
+    ) {
+        self.pilotStatus = pilotStatus
+        self.pilotMetrics = pilotMetrics
+        self.sqlAggregation = sqlAggregation
+        self.rustAggregation = rustAggregation
+        self.cxxTelemetry = cxxTelemetry
+        self.warmupResult = warmupResult
+        self.collectedAt = collectedAt
+    }
+
+    /// How many deep-telemetry sub-bundles populated。
+    /// Useful as a single-number "depth" metric for
+    /// dashboards: 0 = bare brain (C only),3 = fully-
+    /// wired SQL + Rust + C++ pilots reporting depth。
+    public var populatedDeepTelemetryCount: Int {
+        return [
+            sqlAggregation != nil,
+            rustAggregation != nil,
+            cxxTelemetry != nil,
+        ].reduce(0) { $0 + ($1 ? 1 : 0) }
+    }
+
+    /// True when every wired pilot reported deep telemetry。
+    /// A bare brain (no SQL/Rust/C++) returns true vacuously
+    /// since there's nothing to fail。
+    public var everyWiredPilotReportedDeepTelemetry: Bool {
+        if pilotStatus.sqlActive && sqlAggregation == nil {
+            return false
+        }
+        if pilotStatus.rustActive && rustAggregation == nil {
+            return false
+        }
+        if pilotStatus.cxxActive && cxxTelemetry == nil {
+            return false
+        }
+        return true
+    }
 }
 
 /// Codable result of `brain.warmPilots()`。 Reports
