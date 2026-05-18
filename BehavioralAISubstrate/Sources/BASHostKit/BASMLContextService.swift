@@ -115,6 +115,21 @@ public struct BASMLContextService: BASContextServicing,
     private static let confidenceToAmbiguityComplement:
         Double = 1.0
 
+    /// Probability threshold above which the .conflict
+    /// class is considered to dominate the relation-
+    /// pattern signal。 0.3 = well above the 1/7 ≈ 0.143
+    /// uniform-random baseline but below the "model is
+    /// sure" range (0.6+);captures elevated-but-not-
+    /// dominant conflict signal。
+    private static let relationTenseThreshold: Double = 0.3
+
+    /// Tag emitted for relationPattern when conflict
+    /// probability exceeds the threshold。 Distinct from
+    /// the neutral default so downstream consumers can
+    /// distinguish "model saw conflict signal" from
+    /// "model is neutral / didn't see conflict"。
+    private static let relationTenseTag: String = "tense"
+
     private let adapter: BASContextClassifierMLAdapter
 
     public init(adapter: BASContextClassifierMLAdapter) {
@@ -147,6 +162,46 @@ public struct BASMLContextService: BASContextServicing,
         }
     }
 
+    /// Compute softmax probabilities from raw logits。
+    /// Numerical-stable form (subtract max before exp)
+    /// mirroring BASContextClassifierMLAdapter's internal
+    /// softmax + Python trainer。
+    private func softmax(_ logits: [Float]) -> [Double] {
+        guard !logits.isEmpty else { return [] }
+        let maxLogit = logits.max() ?? 0
+        var exps = [Double]()
+        exps.reserveCapacity(logits.count)
+        var sum: Double = 0
+        for l in logits {
+            let e = exp(Double(l - maxLogit))
+            exps.append(e)
+            sum += e
+        }
+        if sum == 0 {
+            // Degenerate guard:return uniform。
+            return Array(
+                repeating: 1.0 / Double(logits.count),
+                count: logits.count)
+        }
+        return exps.map { $0 / sum }
+    }
+
+    /// Index of a label in the model's output order。
+    /// Pinned at the adapter's `labels` array (chat/task/
+    /// choice/conflict/highPressure/manipulationRisk/
+    /// highConsequence)。 Returns nil if label is not
+    /// found — caller must handle defensively。
+    private func probabilityFor(
+        _ label: String,
+        in probs: [Double]
+    ) -> Double {
+        let labels = BASContextClassifierMLAdapter.labels
+        guard let idx = labels.firstIndex(of: label),
+              idx < probs.count
+        else { return 0.0 }
+        return probs[idx]
+    }
+
     public func analyzeContext(
         userInput: String,
         hostContext: BASHostProfile,
@@ -157,8 +212,12 @@ public struct BASMLContextService: BASContextServicing,
         let taskType: BASContextTaskType
         let ambiguityScore: Double
         let manipulationHints: [String]
+        let emotionalLoad: Double
+        let timePressure: Double
+        let consequenceLevel: Double
+        let relationPattern: String
         do {
-            let (label, confidence, _) =
+            let (label, confidence, logits) =
                 try adapter.classify(text: userInput)
             taskType = mapLabel(label)
             // REAL ML-derived ambiguity:high confidence
@@ -183,6 +242,49 @@ public struct BASMLContextService: BASContextServicing,
             } else {
                 manipulationHints = []
             }
+            // REAL ML-derived contextual signals computed
+            // from the full softmax distribution。 Previously
+            // hardcoded to neutral placeholders;now they
+            // vary with input semantics。 No new model —
+            // just better use of the existing 7-class output。
+            let probs = softmax(logits)
+            // emotionalLoad ≈ P(non-calm classes) =
+            //   P(highPressure) + P(highConsequence)
+            //   + P(conflict) + P(manipulationRisk)
+            // Intuition:these are the four classes whose
+            // inputs ARE emotionally charged。 Sum gives
+            // a 0..1 score。 Clamped defensively。
+            let nonCalm =
+                probabilityFor("highPressure", in: probs)
+                + probabilityFor("highConsequence",
+                    in: probs)
+                + probabilityFor("conflict", in: probs)
+                + probabilityFor("manipulationRisk",
+                    in: probs)
+            emotionalLoad = max(0.0, min(1.0, nonCalm))
+            // timePressure ≈ P(highPressure) — the model's
+            // direct signal for urgency。 Clamped。
+            timePressure = max(0.0, min(1.0,
+                probabilityFor("highPressure", in: probs)))
+            // consequenceLevel ≈ P(highConsequence) — the
+            // model's direct signal for stakes。 Clamped。
+            consequenceLevel = max(0.0, min(1.0,
+                probabilityFor("highConsequence",
+                    in: probs)))
+            // relationPattern:if conflict probability is
+            // appreciable,signal "tense"。 Threshold 0.3
+            // is well above uniform-random (1/7 ≈ 0.143)
+            // and well below "model is sure" (~0.6+) —
+            // captures elevated-but-not-dominant conflict
+            // signal。 Otherwise neutral (model has no
+            // relation-classifier;this is the best we can
+            // derive from the existing classifier)。
+            let conflictProb = probabilityFor(
+                "conflict", in: probs)
+            relationPattern = conflictProb
+                >= Self.relationTenseThreshold
+                ? Self.relationTenseTag
+                : Placeholders.neutralRelationPattern
         } catch {
             // Honest fallback: model failed。 Surface the
             // failure via manipulationHints so hosts can
@@ -197,24 +299,34 @@ public struct BASMLContextService: BASContextServicing,
                 Placeholders.classifierErrorHintPrefix
                 + "\(error)"
             ]
+            // Failure path:fall back to neutral placeholders
+            // for the derived signals since we have no
+            // logits to work with。
+            emotionalLoad = Placeholders.neutralEmotionalLoad
+            timePressure = Placeholders.neutralTimePressure
+            consequenceLevel = Placeholders
+                .neutralConsequenceLevel
+            relationPattern = Placeholders
+                .neutralRelationPattern
         }
 
         return BASContextFrame(
             utterance: userInput,
             taskType: taskType,
-            // PHASE B-4 placeholders (need their own models):
-            emotionalLoad: Placeholders.neutralEmotionalLoad,
-            timePressure: Placeholders.neutralTimePressure,
-            relationPattern: Placeholders
-                .neutralRelationPattern,
+            // ML-derived (REAL):
+            emotionalLoad: emotionalLoad,
+            // ML-derived (REAL):
+            timePressure: timePressure,
+            // ML-derived (REAL conflict-threshold flag):
+            relationPattern: relationPattern,
             // ML-derived (REAL):
             ambiguityScore: ambiguityScore,
-            // PHASE B-4 placeholder:
-            consequenceLevel: Placeholders
-                .neutralConsequenceLevel,
+            // ML-derived (REAL):
+            consequenceLevel: consequenceLevel,
             // ML-derived (REAL, .manipulationRisk only):
             manipulationHints: manipulationHints,
-            // PHASE B-4 placeholder:
+            // PHASE B-4 placeholder (needs per-host
+            // retrieval ML — out of scope here):
             hostRelevance: Placeholders.neutralHostRelevance)
     }
 }
