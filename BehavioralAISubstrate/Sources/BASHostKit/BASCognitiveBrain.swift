@@ -1425,6 +1425,69 @@ extension BASCognitiveBrain {
             try? await cache.clear()
         }
     }
+
+    /// Runtime configuration snapshot — Codable bundle
+    /// capturing the brain's construction-time settings。
+    /// Use for debug logs / reproducibility / config
+    /// regression detection。 Completes the observability
+    /// triad with pilotStatus + pilotMetrics:
+    ///   - pilotStatus: which pilots are wired
+    ///   - pilotMetrics: what each pilot has stored
+    ///   - configSnapshot: how the brain was constructed
+    public func configSnapshot() async
+        -> BASCognitiveBrainConfigSnapshot
+    {
+        // Cheap snapshot — no cascade run。 We just
+        // need the typed init params + pilotStatus。
+        // Host goals + no-go zones come from the
+        // host-profile service which we don't have a
+        // direct reference to。 Hosts wanting them
+        // can call `process()` themselves and read
+        // result.hostContext。
+        return BASCognitiveBrainConfigSnapshot(
+            summaryHistoryCapacity: summaryHistoryCapacity,
+            safetyConfidenceThreshold:
+                instanceSafetyConfidenceThreshold,
+            pilotStatus: pilotStatus)
+    }
+}
+
+/// Codable runtime-configuration snapshot of the brain。
+/// Returned by `brain.configSnapshot()`。 Completes the
+/// observability triad with pilotStatus + pilotMetrics:
+///   - pilotStatus: which pilots are wired (boolean flags)
+///   - pilotMetrics: per-pilot operational counts
+///   - configSnapshot (this): construction-time settings
+///
+/// Hosts use this for debug logs, reproducibility (same
+/// config across processes), and config-regression
+/// detection (alert when expected config drifts)。
+public struct BASCognitiveBrainConfigSnapshot: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// Bounded LRU capacity for in-memory summary
+    /// history (host-configurable at brain init)。
+    public let summaryHistoryCapacity: Int
+
+    /// Per-instance safety threshold (host-injectable
+    /// at brain init,clamped to [0, 1])。
+    public let safetyConfidenceThreshold: Double
+
+    /// Embedded pilot-wire-up snapshot — which of the 5
+    /// multi-language pilots are active on this brain。
+    public let pilotStatus: BASCognitiveBrainPilotStatus
+
+    public init(
+        summaryHistoryCapacity: Int,
+        safetyConfidenceThreshold: Double,
+        pilotStatus: BASCognitiveBrainPilotStatus
+    ) {
+        self.summaryHistoryCapacity =
+            summaryHistoryCapacity
+        self.safetyConfidenceThreshold =
+            safetyConfidenceThreshold
+        self.pilotStatus = pilotStatus
+    }
 }
 
 /// Codable snapshot of per-pilot operational counts。
