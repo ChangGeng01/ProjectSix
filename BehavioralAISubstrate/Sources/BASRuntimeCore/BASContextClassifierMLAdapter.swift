@@ -165,6 +165,13 @@ public enum BASContextClassifierMLAdapterError:
 /// `MLModel.prediction(from:)` as thread-safe + the model
 /// is immutable after init,so concurrent calls from
 /// multiple cognitive-OS coordinators are safe。
+///
+/// **Caching note (this commit)**: A bounded LRU cache
+/// keyed by input text avoids re-running CoreML inference
+/// for repeated identical inputs。 Real apps that classify
+/// the same user input multiple times (replay,A/B test,
+/// retry) benefit measurably。 Cache size is bounded to
+/// avoid unbounded memory growth on adversarial inputs。
 public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     /// 7 labels in the same order as Python label_index.json
@@ -181,12 +188,50 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     private let model: MLModel
 
+    /// Bounded LRU cache。 Default size 256 inputs。
+    /// Concurrent access is guarded by `cacheLock`。
+    private struct CachedResult: Sendable {
+        let label: String
+        let confidence: Double
+        let logits: [Float]
+    }
+    private let cacheLock = NSLock()
+    // `nonisolated(unsafe)` because the class is
+    // `@unchecked Sendable` — we serialize via cacheLock。
+    private nonisolated(unsafe) var cache:
+        [String: CachedResult] = [:]
+    private nonisolated(unsafe) var cacheOrder:
+        [String] = []
+    private nonisolated(unsafe) var _cacheHitCount: Int = 0
+    private nonisolated(unsafe) var _cacheMissCount: Int = 0
+
+    /// Bounded cache capacity。 Default 256 entries (~few
+    /// KB memory)。
+    public let cacheCapacity: Int
+
+    /// Number of cache hits since construction。 Used by
+    /// tests + telemetry。 Reads under lock for thread
+    /// safety。
+    public var cacheHitCount: Int {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return _cacheHitCount
+    }
+
+    /// Number of cache misses since construction。
+    public var cacheMissCount: Int {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return _cacheMissCount
+    }
+
     // MARK: - Construction
 
     /// Load the .mlmodel from Bundle.module。 Compiles
     /// + caches at construction time so prediction calls
     /// are fast。
-    public init() throws {
+    public init(cacheCapacity: Int = 256) throws {
+        self.cacheCapacity = max(0, cacheCapacity)
         guard let url = Bundle.module.url(
             forResource: "BASContextClassifier",
             withExtension: "mlmodel")
@@ -226,6 +271,26 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
     public func classify(
         text: String
     ) throws -> (label: String, confidence: Double, logits: [Float]) {
+        // 0. Cache lookup (LRU)
+        if cacheCapacity > 0 {
+            cacheLock.lock()
+            if let cached = cache[text] {
+                _cacheHitCount += 1
+                // Move to recently-used end
+                if let idx = cacheOrder.firstIndex(
+                    of: text)
+                {
+                    cacheOrder.remove(at: idx)
+                    cacheOrder.append(text)
+                }
+                cacheLock.unlock()
+                return (cached.label, cached.confidence,
+                        cached.logits)
+            }
+            _cacheMissCount += 1
+            cacheLock.unlock()
+        }
+
         // 1. Encode text → bag-of-buckets
         let bag = BASContextClassifierInputEncoder.encode(
             text)
@@ -297,10 +362,25 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
         }
         let confidence = expSum > 0
             ? expArgmax / expSum : 1.0 / Double(logits.count)
-        return (
-            BASContextClassifierMLAdapter.labels[argmax],
-            confidence,
-            logits)
+        let label =
+            BASContextClassifierMLAdapter.labels[argmax]
+
+        // Cache write (LRU eviction if at capacity)
+        if cacheCapacity > 0 {
+            cacheLock.lock()
+            cache[text] = CachedResult(
+                label: label,
+                confidence: confidence,
+                logits: logits)
+            cacheOrder.append(text)
+            while cacheOrder.count > cacheCapacity {
+                let evict = cacheOrder.removeFirst()
+                cache.removeValue(forKey: evict)
+            }
+            cacheLock.unlock()
+        }
+
+        return (label, confidence, logits)
     }
 }
 
@@ -319,7 +399,12 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
         "highConsequence"
     ]
 
-    public init() throws {
+    public let cacheCapacity: Int
+    public var cacheHitCount: Int { 0 }
+    public var cacheMissCount: Int { 0 }
+
+    public init(cacheCapacity: Int = 256) throws {
+        self.cacheCapacity = cacheCapacity
         throw BASContextClassifierMLAdapterError
             .coreMLUnavailableOnPlatform
     }

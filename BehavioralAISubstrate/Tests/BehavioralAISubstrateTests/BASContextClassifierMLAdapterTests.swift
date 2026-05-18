@@ -170,6 +170,119 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
             " \(confEmpty) Memorized: \(confMemorized)")
     }
 
+    // MARK: - LRU cache (real perf optimization)
+
+    /// Same input twice → 1 cache miss + 1 cache hit。
+    func testCacheHitOnRepeatedInput() throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        XCTAssertEqual(adapter.cacheHitCount, 0)
+        XCTAssertEqual(adapter.cacheMissCount, 0)
+        _ = try adapter.classify(text: "hello world")
+        XCTAssertEqual(adapter.cacheHitCount, 0)
+        XCTAssertEqual(adapter.cacheMissCount, 1)
+        _ = try adapter.classify(text: "hello world")
+        XCTAssertEqual(adapter.cacheHitCount, 1,
+            "Second call with same input must hit cache")
+        XCTAssertEqual(adapter.cacheMissCount, 1)
+    }
+
+    /// Different inputs → all misses (no false-cache-hits)。
+    func testCacheMissOnDistinctInputs() throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        _ = try adapter.classify(text: "input A")
+        _ = try adapter.classify(text: "input B")
+        _ = try adapter.classify(text: "input C")
+        XCTAssertEqual(adapter.cacheHitCount, 0)
+        XCTAssertEqual(adapter.cacheMissCount, 3)
+    }
+
+    /// Cache returns same output as direct inference
+    /// (caching must not change behavior)。
+    func testCacheReturnsSameOutputAsDirectInference() throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        let (label1, conf1, logits1) = try adapter.classify(
+            text: "compile the swift package")
+        let (label2, conf2, logits2) = try adapter.classify(
+            text: "compile the swift package")
+        XCTAssertEqual(label1, label2)
+        XCTAssertEqual(conf1, conf2)
+        XCTAssertEqual(logits1, logits2)
+    }
+
+    /// Cache eviction at capacity:filling cache + 1 more
+    /// entry evicts the oldest。
+    func testCacheEvictsOldestAtCapacity() throws {
+        // Tiny cache for testing eviction
+        let adapter = try BASContextClassifierMLAdapter(
+            cacheCapacity: 3)
+        // Fill cache
+        _ = try adapter.classify(text: "A")
+        _ = try adapter.classify(text: "B")
+        _ = try adapter.classify(text: "C")
+        XCTAssertEqual(adapter.cacheHitCount, 0)
+        XCTAssertEqual(adapter.cacheMissCount, 3)
+        // Hit "A" again → bumps it to LRU end
+        _ = try adapter.classify(text: "A")
+        XCTAssertEqual(adapter.cacheHitCount, 1)
+        // Insert "D" → evicts "B" (oldest unused since A
+        // was just bumped)
+        _ = try adapter.classify(text: "D")
+        XCTAssertEqual(adapter.cacheMissCount, 4)
+        // "B" should now miss (was evicted)
+        _ = try adapter.classify(text: "B")
+        XCTAssertEqual(adapter.cacheMissCount, 5,
+            "B should have been evicted by D and re-miss" +
+            " on re-query")
+        // "A" should still hit (was bumped)
+        _ = try adapter.classify(text: "A")
+        XCTAssertEqual(adapter.cacheHitCount, 2,
+            "A should still be in cache (bumped before D)")
+    }
+
+    /// Disabling cache (capacity 0) means every call misses。
+    func testCacheCapacityZeroBypassesCache() throws {
+        let adapter = try BASContextClassifierMLAdapter(
+            cacheCapacity: 0)
+        _ = try adapter.classify(text: "hello")
+        _ = try adapter.classify(text: "hello")
+        _ = try adapter.classify(text: "hello")
+        XCTAssertEqual(adapter.cacheHitCount, 0,
+            "Cache capacity 0 must bypass cache entirely")
+        XCTAssertEqual(adapter.cacheMissCount, 0,
+            "Cache capacity 0 must not even increment" +
+            " miss counter (cache is OFF, not 'always" +
+            " missing')")
+    }
+
+    /// Cache produces a real measurable speedup on
+    /// repeated inputs。 100 same-input calls should be
+    /// MUCH faster than 100 distinct-input calls。
+    func testCacheProducesMeasurableSpeedup() throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        // Warm up (load model + first cache fill)
+        _ = try adapter.classify(text: "warmup")
+        // Time 100 distinct inputs
+        let startDistinct = Date()
+        for i in 0..<100 {
+            _ = try adapter.classify(
+                text: "distinct input \(i)")
+        }
+        let distinctTime = Date()
+            .timeIntervalSince(startDistinct)
+        // Time 100 same-input calls (should all hit cache)
+        let startCached = Date()
+        for _ in 0..<100 {
+            _ = try adapter.classify(text: "cached input")
+        }
+        let cachedTime = Date()
+            .timeIntervalSince(startCached)
+        // Cache should be at least 2x faster than miss path
+        XCTAssertLessThan(cachedTime, distinctTime / 2.0,
+            "Cached path should be >2x faster than miss." +
+            " Cached: \(cachedTime)s," +
+            " Distinct: \(distinctTime)s")
+    }
+
     // MARK: - Memorization sanity: trained inputs predict correctly
 
     /// Pin that the model CORRECTLY classifies its
