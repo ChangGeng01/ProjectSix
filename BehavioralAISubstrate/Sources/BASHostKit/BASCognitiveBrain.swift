@@ -320,8 +320,14 @@ public actor BASCognitiveBrain {
             // veto。 Explanation codes aggregate permit
             // reason codes + risk factors。
             actionService: BASMLActionService(),
-            evolutionService:
-                BASPlaceholderEvolutionService())
+            // L7 evolution: REAL update-ticket synthesis
+            // from cascade output。 Emits typed tickets
+            // when elevated_risk / manipulation_detected
+            // / all_candidates_vetoed / feedback_received
+            // signals appear so hosts' learning loops
+            // see real signals to act on instead of
+            // empty arrays。
+            evolutionService: BASMLEvolutionService())
         self.engine = BASTurnRuntimeEngine(
             coordinator: coordinator,
             eventLog: bundle.eventLog)
