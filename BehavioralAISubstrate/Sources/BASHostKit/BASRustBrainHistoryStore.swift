@@ -59,21 +59,15 @@ public actor BASRustBrainHistoryStore {
     /// Store。 Hosts using BOTH backends get IDENTICAL
     /// atomID values for identical inputs — enables
     /// cross-store joins / dedup。
+    ///
+    /// 主线 解构:delegates to `BASBrainHistoryAtomID.derive`
+    /// — the canonical single source of truth。 Cross-store
+    /// joins on atomID remain byte-equal by construction。
     public static func atomID(forInput input: String)
         -> String
     {
-        let digest = SHA256.hash(
-            data: Data(input.utf8))
-        var hex = ""
-        hex.reserveCapacity(16)
-        var emitted = 0
-        for byte in digest {
-            hex += String(
-                format: "%02x", byte)
-            emitted += 1
-            if emitted >= 8 { break }
-        }
-        return hex
+        return BASBrainHistoryAtomID.derive(
+            forInput: input)
     }
 
     public init(

@@ -63,21 +63,16 @@ public actor BASSQLBrainHistoryStore {
     /// of SHA256)。 Same input → same atomID,enabling
     /// `usageCount(forAtomID:)` queries from the underlying
     /// tracker。
+    ///
+    /// 主线 解构:delegates to `BASBrainHistoryAtomID.derive`
+    /// — the canonical single source of truth shared with
+    /// the Rust history store。 Cross-store joins on
+    /// atomID remain byte-equal by construction。
     public static func atomID(forInput input: String)
         -> String
     {
-        let digest = SHA256.hash(
-            data: Data(input.utf8))
-        var hex = ""
-        hex.reserveCapacity(16)
-        var emitted = 0
-        for byte in digest {
-            hex += String(
-                format: "%02x", byte)
-            emitted += 1
-            if emitted >= 8 { break }
-        }
-        return hex
+        return BASBrainHistoryAtomID.derive(
+            forInput: input)
     }
 
     public init(tracker: BASMemoryUsageTracker) {
@@ -197,11 +192,54 @@ public actor BASSQLBrainHistoryStore {
         let count = await tracker.recordCount
         let dist = try await tracker.permitModeDistribution()
         let backed = await tracker.isSQLBacked
+        let distinctSessions = try await tracker
+            .distinctSessionCountViaSQL()
         return BASSQLBrainHistoryStoreAggregation(
             totalRecords: count,
             recordsByPermitMode: dist,
             turnsThisSession: turnCounter,
-            isSQLBacked: backed)
+            isSQLBacked: backed,
+            distinctSessions: distinctSessions)
+    }
+
+    // MARK: - 主线 解构 重构 — atom-scoped native queries
+
+    /// Atom-scoped usage count via native `SELECT COUNT(*)
+    /// WHERE atom_id = ?` SQL query (engine-side count when
+    /// SQLite-backed,Swift fallback in-memory)。 Replaces
+    /// the legacy `usageCount(forInput:)` Swift-fold path for
+    /// hosts running large corpora。
+    public func usageCountViaSQL(
+        forInput input: String
+    ) async throws -> Int {
+        let atomID = Self.atomID(forInput: input)
+        return try await tracker.usageCountViaSQL(
+            forAtomID: atomID)
+    }
+
+    /// Atom-scoped recent-records via native `SELECT ...
+    /// WHERE atom_id = ? ORDER BY retrieved_at_ms DESC
+    /// LIMIT ?` SQL query。 Returns at most `limit` rows
+    /// for the input,newest first。
+    public func recentRecordsForInputViaSQL(
+        forInput input: String,
+        limit: Int
+    ) async throws -> [BASMemoryUsageRecord] {
+        let atomID = Self.atomID(forInput: input)
+        return try await tracker.recentRecordsForAtomViaSQL(
+            atomID: atomID, limit: limit)
+    }
+
+    /// Distinct-session count via native `SELECT COUNT
+    /// (DISTINCT session_ref)` SQL query。 Returns the
+    /// number of distinct sessions that have ever written
+    /// to the underlying database (across all brain
+    /// instances using this tracker)。
+    public func distinctSessionCountViaSQL() async throws
+        -> Int
+    {
+        return try await tracker
+            .distinctSessionCountViaSQL()
     }
 }
 
@@ -231,15 +269,23 @@ public struct BASSQLBrainHistoryStoreAggregation: Codable,
     /// handle (queries hit the storage engine)。
     public let isSQLBacked: Bool
 
+    /// 主线 解构 重构 — distinct session count via native
+    /// `SELECT COUNT(DISTINCT session_ref)` SQL。 0 by
+    /// default for backward-compat with snapshots produced
+    /// before this field landed。
+    public let distinctSessions: Int
+
     public init(
         totalRecords: Int,
         recordsByPermitMode: [String: Int],
         turnsThisSession: Int,
-        isSQLBacked: Bool
+        isSQLBacked: Bool,
+        distinctSessions: Int = 0
     ) {
         self.totalRecords = totalRecords
         self.recordsByPermitMode = recordsByPermitMode
         self.turnsThisSession = turnsThisSession
         self.isSQLBacked = isSQLBacked
+        self.distinctSessions = distinctSessions
     }
 }
