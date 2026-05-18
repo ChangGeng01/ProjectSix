@@ -241,6 +241,49 @@ public actor BASSQLBrainHistoryStore {
         return try await tracker
             .distinctSessionCountViaSQL()
     }
+
+    // MARK: - 主线 解构 重构 Round 3 — engine-side aggregates
+
+    /// Oldest record timestamp via native `SELECT MIN
+    /// (retrieved_at_ms)`。 Nil when the database is empty。
+    public func oldestRecordTimestampViaSQL() async throws
+        -> Date?
+    {
+        return try await tracker
+            .oldestRecordTimestampViaSQL()
+    }
+
+    /// Newest record timestamp via native `SELECT MAX
+    /// (retrieved_at_ms)`。 Nil when the database is empty。
+    public func newestRecordTimestampViaSQL() async throws
+        -> Date?
+    {
+        return try await tracker
+            .newestRecordTimestampViaSQL()
+    }
+
+    /// Helped-flag distribution via native `SELECT
+    /// helped_state, COUNT(*) GROUP BY helped_state`。
+    /// Returns map from helpedFlag raw value ("unknown" /
+    /// "helped" / "notHelped") to count。
+    public func helpedFlagDistributionViaSQL() async throws
+        -> [String: Int]
+    {
+        return try await tracker
+            .helpedFlagDistributionViaSQL()
+    }
+
+    /// Records in a time window via native `WHERE
+    /// retrieved_at_ms BETWEEN ? AND ?`。 Returns rows
+    /// ascending by retrieved_at_ms (oldest first)。
+    public func recordsInTimeRangeViaSQL(
+        from: Date,
+        to: Date
+    ) async throws -> [BASMemoryUsageRecord] {
+        return try await tracker
+            .recordsInTimeRangeViaSQL(
+                from: from, to: to)
+    }
 }
 
 /// Codable aggregation snapshot from

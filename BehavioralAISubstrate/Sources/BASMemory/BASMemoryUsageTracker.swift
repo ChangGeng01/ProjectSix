@@ -473,6 +473,95 @@ public actor BASMemoryUsageTracker {
         return Array(sorted.prefix(max(0, limit)))
     }
 
+    /// 主线 解构 重构 Round 3 — native `SELECT MIN/MAX
+    /// (retrieved_at_ms)` queries returning the oldest /
+    /// newest timestamps as Date。 Nil when the table is
+    /// empty (no records means no MIN/MAX)。
+    ///
+    /// SQL-backed path runs one COUNT-free aggregate query
+    /// inside the engine。 In-memory path folds over the
+    /// cache values。 Both return identical Date values
+    /// for identical data。
+    public func oldestRecordTimestampViaSQL() throws -> Date? {
+        if let db {
+            guard let ms = try Self
+                .fetchMinRetrievedAt(db: db)
+            else { return nil }
+            return Date(
+                timeIntervalSince1970: Double(ms) / 1000)
+        }
+        return inMemory.values
+            .map { $0.retrievedAt }
+            .min()
+    }
+
+    /// Counterpart of `oldestRecordTimestampViaSQL` using
+    /// `SELECT MAX(retrieved_at_ms)`。
+    public func newestRecordTimestampViaSQL() throws -> Date? {
+        if let db {
+            guard let ms = try Self
+                .fetchMaxRetrievedAt(db: db)
+            else { return nil }
+            return Date(
+                timeIntervalSince1970: Double(ms) / 1000)
+        }
+        return inMemory.values
+            .map { $0.retrievedAt }
+            .max()
+    }
+
+    /// 主线 解构 重构 Round 3 — native `SELECT helped_state
+    /// , COUNT(*) GROUP BY helped_state`。 Pushes the
+    /// distinct-count aggregation into SQLite — same engine-
+    /// side specialty as permitModeDistribution()。
+    ///
+    /// Returns a map from helpedFlag raw value
+    /// ("unknown" / "helped" / "notHelped") to count。
+    /// Hosts use this to render "did the LLM actually use
+    /// the recalled atom" dashboards。
+    public func helpedFlagDistributionViaSQL() throws
+        -> [String: Int]
+    {
+        if let db {
+            return try Self
+                .fetchHelpedFlagDistribution(db: db)
+        }
+        var counts: [String: Int] = [:]
+        for record in inMemory.values {
+            counts[record.helpedFlag.rawValue,
+                default: 0] += 1
+        }
+        return counts
+    }
+
+    /// 主线 解构 重构 Round 3 — native `SELECT ... WHERE
+    /// retrieved_at_ms BETWEEN ? AND ?` query for time-
+    /// range scans。 Returns matching rows ordered ascending
+    /// by retrieved_at_ms (oldest first — matches the
+    /// existing `allRecords()` sort)。
+    ///
+    /// Hosts use this for "what happened during this hour"
+    /// audit slices without pulling the full table into
+    /// Swift。 SQLite's query planner uses the implicit
+    /// rowid+timestamp ordering for an efficient range
+    /// scan when no other index applies。
+    public func recordsInTimeRangeViaSQL(
+        from: Date,
+        to: Date
+    ) throws -> [BASMemoryUsageRecord] {
+        if let db {
+            return try Self
+                .fetchRecordsInTimeRangeAsc(
+                    db: db, from: from, to: to)
+        }
+        let filtered = inMemory.values.filter { r in
+            r.retrievedAt >= from && r.retrievedAt <= to
+        }
+        return filtered.sorted {
+            $0.retrievedAt < $1.retrievedAt
+        }
+    }
+
     /// Look up one record by ID. Returns nil if absent.
     public func record(forID id: String) -> BASMemoryUsageRecord? {
         inMemory[id]
@@ -916,6 +1005,148 @@ public actor BASMemoryUsageTracker {
         sqlite3_bind_int64(stmt, 2, Int64(limit))
         var records: [BASMemoryUsageRecord] = []
         records.reserveCapacity(limit)
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let recordID = readText(stmt, 0)
+            let aID = readText(stmt, 1)
+            let ms = sqlite3_column_int64(stmt, 2)
+            let sessionRef = readText(stmt, 3)
+            let turnRef = readText(stmt, 4)
+            let permitMode = readText(stmt, 5)
+            let helpedRaw = readText(stmt, 6)
+            let helped = BASMemoryUsageRecord.HelpedFlag(
+                rawValue: helpedRaw) ?? .unknown
+            records.append(BASMemoryUsageRecord(
+                recordID: recordID,
+                atomID: aID,
+                retrievedAt: Date(
+                    timeIntervalSince1970: Double(ms) / 1000),
+                sessionRef: sessionRef,
+                turnRef: turnRef,
+                permitMode: permitMode,
+                helpedFlag: helped))
+        }
+        return records
+    }
+
+    /// 主线 解构 重构 Round 3 — native `SELECT MIN
+    /// (retrieved_at_ms)` aggregate。 Returns nil on empty
+    /// table (MIN over zero rows is SQL NULL)。
+    fileprivate static func fetchMinRetrievedAt(
+        db: OpaquePointer
+    ) throws -> Int64? {
+        let sql = """
+            SELECT MIN(retrieved_at_ms)
+              FROM memory_usage_records
+            """
+        return try fetchOptionalInt64Aggregate(
+            db: db, sql: sql)
+    }
+
+    /// 主线 解构 重构 Round 3 — native `SELECT MAX
+    /// (retrieved_at_ms)` aggregate。 Returns nil on empty
+    /// table。
+    fileprivate static func fetchMaxRetrievedAt(
+        db: OpaquePointer
+    ) throws -> Int64? {
+        let sql = """
+            SELECT MAX(retrieved_at_ms)
+              FROM memory_usage_records
+            """
+        return try fetchOptionalInt64Aggregate(
+            db: db, sql: sql)
+    }
+
+    /// Helper sharing the prepare + step + nullable read
+    /// for MIN/MAX aggregates。 SQLite returns one row
+    /// with one column;the column is NULL when no rows
+    /// match。
+    private static func fetchOptionalInt64Aggregate(
+        db: OpaquePointer,
+        sql: String
+    ) throws -> Int64? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        // SQLITE_NULL is the null-column marker。
+        if sqlite3_column_type(stmt, 0) == SQLITE_NULL {
+            return nil
+        }
+        return sqlite3_column_int64(stmt, 0)
+    }
+
+    /// 主线 解构 重构 Round 3 — native `SELECT helped_state
+    /// , COUNT(*) GROUP BY helped_state` aggregation。
+    fileprivate static func fetchHelpedFlagDistribution(
+        db: OpaquePointer
+    ) throws -> [String: Int] {
+        let sql = """
+            SELECT helped_state, COUNT(*) AS n
+              FROM memory_usage_records
+             GROUP BY helped_state
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var counts: [String: Int] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let helpedRaw = readText(stmt, 0)
+            let n = sqlite3_column_int64(stmt, 1)
+            counts[helpedRaw] = Int(n)
+        }
+        return counts
+    }
+
+    /// 主线 解构 重构 Round 3 — native `WHERE
+    /// retrieved_at_ms BETWEEN ? AND ?` time-range scan。
+    /// Returns rows ascending by retrieved_at_ms (oldest
+    /// first)。
+    fileprivate static func fetchRecordsInTimeRangeAsc(
+        db: OpaquePointer,
+        from: Date,
+        to: Date
+    ) throws -> [BASMemoryUsageRecord] {
+        let sql = """
+            SELECT record_id, atom_id, retrieved_at_ms,
+                   session_ref, turn_ref, permit_mode,
+                   helped_state
+              FROM memory_usage_records
+             WHERE retrieved_at_ms BETWEEN ? AND ?
+             ORDER BY retrieved_at_ms ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1,
+            Int64(from.timeIntervalSince1970 * 1000))
+        sqlite3_bind_int64(stmt, 2,
+            Int64(to.timeIntervalSince1970 * 1000))
+        var records: [BASMemoryUsageRecord] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             let recordID = readText(stmt, 0)
             let aID = readText(stmt, 1)
