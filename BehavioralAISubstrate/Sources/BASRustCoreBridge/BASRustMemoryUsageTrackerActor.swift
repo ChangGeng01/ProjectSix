@@ -83,6 +83,58 @@ public struct BASTopAtomEntry: Codable, Equatable,
     }
 }
 
+/// 主线 核心 抽取 — Codable entry of the Rust-computed
+/// memory importance score per atom。 Emitted by
+/// `bas_rust_tracker_atom_importance_scores` FFI,sorted
+/// descending by score。
+///
+/// Hosts use this to:
+///   - find "most-important" atoms for memory tier
+///     promotion
+///   - identify "least-important" atoms for forget
+///     cascade demotion
+///   - render memory-importance dashboards
+public struct BASAtomImportanceEntry: Codable, Equatable,
+    Sendable, Hashable
+{
+    /// SHA256-prefix atomID (matches the canonical
+    /// BASBrainHistoryAtomID derivation)。
+    public let atomID: String
+
+    /// Number of records carrying this atomID。
+    public let count: Int
+
+    /// Helped rate in [0.5, 1.0]:helped /
+    /// (helped + notHelped),clamped to ≥ 0.5。 1.0
+    /// when no non-unknown helped state recorded
+    /// (absent-signal defaults to "treat positive")。
+    public let helpedRate: Double
+
+    /// Epoch milliseconds of the most recent retrieval
+    /// for this atom。
+    public let lastRetrievedMs: Int64
+
+    /// Composite importance score:
+    ///   score = ln(1 + count)
+    ///         × exp(-(now - lastRetrieved) / halfLife)
+    ///         × helpedRate
+    public let score: Double
+
+    public init(
+        atomID: String,
+        count: Int,
+        helpedRate: Double,
+        lastRetrievedMs: Int64,
+        score: Double
+    ) {
+        self.atomID = atomID
+        self.count = count
+        self.helpedRate = helpedRate
+        self.lastRetrievedMs = lastRetrievedMs
+        self.score = score
+    }
+}
+
 /// 持续性 发展 — three percentiles of the count-per-atom
 /// distribution computed inside the Rust tracker。 Each
 /// value is the count threshold at the percentile rank。
@@ -400,6 +452,109 @@ public actor BASRustMemoryUsageTrackerActor {
     /// In Rust it's one read lock + one map iteration +
     /// partial sort + JSON encode。 术业有专攻。
     ///
+    /// 主线 核心 抽取 — Memory Importance Scorer in Rust。
+    /// Computes the chapter 二百五十二 score formula
+    /// per atom under one read lock + returns the array
+    /// sorted descending by score。 Real cascade math
+    /// (not just observability) — drives tier promotion
+    /// + forget cascade decisions in Rust now,not Swift。
+    ///
+    /// - Parameters:
+    ///   - now:reference time for recency decay
+    ///   - halfLife:exponential half-life for the
+    ///     recency factor (>= 1 millisecond)
+    public func atomImportanceScores(
+        now: Date,
+        halfLife: TimeInterval
+    ) throws -> [BASAtomImportanceEntry] {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        let nowMs = Int64(
+            now.timeIntervalSince1970 * 1000)
+        let hlMs = Int64(max(1, halfLife * 1000))
+        var outBuf: UnsafeMutablePointer<UInt8>?
+        var outLen: Int = 0
+        let rc =
+            bas_rust_tracker_atom_importance_scores(
+                h, nowMs, hlMs, &outBuf, &outLen)
+        switch rc {
+        case 0: break
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+        guard let outBuf else { return [] }
+        defer { bas_rust_tracker_free_buffer(outBuf, outLen) }
+        let data = Data(bytes: outBuf, count: outLen)
+        do {
+            return try JSONDecoder().decode(
+                [BASAtomImportanceEntry].self,
+                from: data)
+        } catch {
+            throw BASRustMemoryUsageTrackerActorError
+                .jsonDecodeFailed(
+                    message: String(describing: error))
+        }
+    }
+
+    /// 主线 核心 抽取 — Forget Cascade decision FFI。
+    /// Returns the atomIDs falling below the retention
+    /// threshold (top `retainFraction` of distinct atoms
+    /// by importance score are kept,rest are returned
+    /// as candidates for forget)。
+    ///
+    /// retainFraction is clamped to [0.0, 1.0] in Rust。
+    public func forgetCandidates(
+        now: Date,
+        halfLife: TimeInterval,
+        retainFraction: Double
+    ) throws -> [String] {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        let nowMs = Int64(
+            now.timeIntervalSince1970 * 1000)
+        let hlMs = Int64(max(1, halfLife * 1000))
+        var outBuf: UnsafeMutablePointer<UInt8>?
+        var outLen: Int = 0
+        let rc =
+            bas_rust_tracker_forget_candidates(
+                h, nowMs, hlMs, retainFraction,
+                &outBuf, &outLen)
+        switch rc {
+        case 0: break
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+        guard let outBuf else { return [] }
+        defer { bas_rust_tracker_free_buffer(outBuf, outLen) }
+        let data = Data(bytes: outBuf, count: outLen)
+        do {
+            return try JSONDecoder().decode(
+                [String].self, from: data)
+        } catch {
+            throw BASRustMemoryUsageTrackerActorError
+                .jsonDecodeFailed(
+                    message: String(describing: error))
+        }
+    }
+
     /// 持续性 发展 — atom-count distribution percentiles
     /// via Rust-native sort under one read lock。 Returns
     /// p50 / p95 / p99 of count-per-atom values。
@@ -675,6 +830,23 @@ public actor BASRustMemoryUsageTrackerActor {
     public func atomCountPercentiles() throws
         -> BASAtomCountPercentiles
     {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func atomImportanceScores(
+        now: Date,
+        halfLife: TimeInterval
+    ) throws -> [BASAtomImportanceEntry] {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func forgetCandidates(
+        now: Date,
+        halfLife: TimeInterval,
+        retainFraction: Double
+    ) throws -> [String] {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

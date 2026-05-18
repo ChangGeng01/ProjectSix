@@ -80,6 +80,30 @@ pub struct Tracker {
     inner: RwLock<HashMap<String, Record>>,
 }
 
+// 主线 核心 抽取 — per-atom accumulator used by the
+// importance scorer + forget cascade。 Mutated inside
+// the HashMap-walking pass under one read lock。
+#[derive(Default, Clone)]
+struct AtomStats {
+    count: i64,
+    last_retrieved_ms: i64,
+    helped_count: i64,
+    not_helped_count: i64,
+}
+
+// 主线 核心 抽取 — fixed-precision Float64 → JSON
+// number formatter that produces byte-equality
+// deterministic output for the same input。 6 decimal
+// places is enough for the importance score's dynamic
+// range (typical scores in [0, ~10]) without bloating
+// the JSON。
+fn format_f64(v: f64) -> String {
+    if v.is_nan() || v.is_infinite() {
+        return "0".to_string();
+    }
+    format!("{:.6}", v)
+}
+
 impl Tracker {
     fn new() -> Self {
         Tracker {
@@ -163,6 +187,210 @@ impl Tracker {
             }
             Err(_) => -1,
         }
+    }
+
+    // 主线 核心 抽取 — Memory Importance Scorer in Rust。
+    // For each distinct atom_id,compute:
+    //   score = log(1 + count)
+    //         * exp(-(now_ms - last_retrieved_ms) / half_life_ms)
+    //         * max(0.5, helped_rate)
+    //
+    // Components:
+    //   count        = number of retrieval events
+    //   last_retrieved_ms = max(retrieved_at_ms) across atom's records
+    //   helped_rate  = (helped_count) / (helped_count + not_helped_count)
+    //                  fallback to 1.0 when zero non-unknown records
+    //                  (treats absence-of-signal as helped-positive,
+    //                  matching the chapter 二百五十二 default)
+    //
+    // Emits JSON array sorted by score descending:
+    //   [{"atomID":"...","score":0.42,"count":7,
+    //     "lastRetrievedMs":1700000000000,"helpedRate":0.66}]
+    //
+    // Walks the HashMap once,allocates per-atom AtomStats
+    // accumulators,sorts at the end。 All under one read
+    // lock。 The math is REAL Memory-cascade Importance
+    // (the chapter 二百五十二 BASMemoryImportanceScorer
+    // formula),not just observability。
+    fn atom_importance_scores_json(
+        &self,
+        now_ms: i64,
+        half_life_ms: i64,
+    ) -> Result<Vec<u8>, ()> {
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut stats: HashMap<String, AtomStats> =
+            HashMap::new();
+        for rec in r.values() {
+            let entry = stats
+                .entry(rec.atom_id.clone())
+                .or_insert_with(AtomStats::default);
+            entry.count += 1;
+            if rec.retrieved_at_ms > entry.last_retrieved_ms {
+                entry.last_retrieved_ms = rec.retrieved_at_ms;
+            }
+            match rec.helped_state.as_str() {
+                "helped" => entry.helped_count += 1,
+                "notHelped" => entry.not_helped_count += 1,
+                _ => {}  // unknown — doesn't count either way
+            }
+        }
+        let hl = if half_life_ms <= 0 {
+            1.0  // protect against div-by-zero
+        } else {
+            half_life_ms as f64
+        };
+        let mut scored: Vec<(String, f64, AtomStats)> =
+            stats.into_iter().map(|(atom_id, s)| {
+                let recency_age = (now_ms
+                    - s.last_retrieved_ms) as f64;
+                let recency_weight =
+                    (-recency_age / hl).exp();
+                let helped_total = s.helped_count
+                    + s.not_helped_count;
+                let helped_rate = if helped_total > 0 {
+                    let r =
+                        s.helped_count as f64
+                        / helped_total as f64;
+                    if r < 0.5 { 0.5 } else { r }
+                } else {
+                    1.0  // absent signal → treat positive
+                };
+                let count_weight =
+                    ((s.count as f64) + 1.0).ln();
+                let score = count_weight
+                    * recency_weight
+                    * helped_rate;
+                (atom_id, score, s)
+            }).collect();
+        scored.sort_by(|a, b| {
+            // Descending by score; alphabetical tie-break
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        let mut out = Vec::new();
+        out.push(b'[');
+        for (i, (atom_id, score, s)) in
+            scored.iter().enumerate()
+        {
+            if i > 0 { out.push(b','); }
+            out.push(b'{');
+            write_kv_string(&mut out, "atomID", atom_id);
+            out.push(b',');
+            write_kv_int(
+                &mut out, "count", s.count);
+            let hrate = if s.helped_count
+                + s.not_helped_count > 0
+            {
+                let r = s.helped_count as f64
+                    / (s.helped_count
+                       + s.not_helped_count) as f64;
+                if r < 0.5 { 0.5 } else { r }
+            } else { 1.0 };
+            out.push(b',');
+            write_kv_raw_number(
+                &mut out, "helpedRate", hrate);
+            out.push(b',');
+            write_kv_int(
+                &mut out, "lastRetrievedMs",
+                s.last_retrieved_ms);
+            out.push(b',');
+            write_kv_raw_number(
+                &mut out, "score", *score);
+            out.push(b'}');
+        }
+        out.push(b']');
+        Ok(out)
+    }
+
+    // 主线 核心 抽取 — Forget Cascade decision core in Rust。
+    // Computes the same per-atom score as above,sorts
+    // descending,keeps the top `retain_fraction` of distinct
+    // atoms,returns the rest as forget candidates。
+    //
+    // retain_fraction must be in [0.0, 1.0]:
+    //   0.0 → forget everything (all atoms candidate)
+    //   1.0 → keep everything  (empty candidate list)
+    //   0.8 → keep top 80%,return bottom 20% as candidates
+    //
+    // Returns JSON array of atomIDs (strings)。 Hosts call
+    // this then issue forget on each returned atomID。
+    fn forget_candidates_json(
+        &self,
+        now_ms: i64,
+        half_life_ms: i64,
+        retain_fraction: f64,
+    ) -> Result<Vec<u8>, ()> {
+        let frac = retain_fraction.clamp(0.0, 1.0);
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut stats: HashMap<String, AtomStats> =
+            HashMap::new();
+        for rec in r.values() {
+            let entry = stats
+                .entry(rec.atom_id.clone())
+                .or_insert_with(AtomStats::default);
+            entry.count += 1;
+            if rec.retrieved_at_ms > entry.last_retrieved_ms {
+                entry.last_retrieved_ms = rec.retrieved_at_ms;
+            }
+            match rec.helped_state.as_str() {
+                "helped" => entry.helped_count += 1,
+                "notHelped" => entry.not_helped_count += 1,
+                _ => {}
+            }
+        }
+        let hl = if half_life_ms <= 0 {
+            1.0
+        } else {
+            half_life_ms as f64
+        };
+        let mut scored: Vec<(String, f64)> =
+            stats.iter().map(|(atom_id, s)| {
+                let recency_age = (now_ms
+                    - s.last_retrieved_ms) as f64;
+                let recency_weight =
+                    (-recency_age / hl).exp();
+                let helped_total = s.helped_count
+                    + s.not_helped_count;
+                let helped_rate = if helped_total > 0 {
+                    let r =
+                        s.helped_count as f64
+                        / helped_total as f64;
+                    if r < 0.5 { 0.5 } else { r }
+                } else { 1.0 };
+                let count_weight =
+                    ((s.count as f64) + 1.0).ln();
+                let score = count_weight
+                    * recency_weight
+                    * helped_rate;
+                (atom_id.clone(), score)
+            }).collect();
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        let total = scored.len();
+        let keep = (total as f64 * frac).floor() as usize;
+        let keep = keep.min(total);
+        let candidates: Vec<&String> = scored[keep..]
+            .iter().map(|(a, _)| a).collect();
+        let mut out = Vec::new();
+        out.push(b'[');
+        for (i, atom_id) in candidates.iter().enumerate() {
+            if i > 0 { out.push(b','); }
+            out.push(b'"');
+            for &byte in atom_id.as_bytes() {
+                match byte {
+                    b'"' => out.extend_from_slice(b"\\\""),
+                    b'\\' => out.extend_from_slice(b"\\\\"),
+                    _ => out.push(byte),
+                }
+            }
+            out.push(b'"');
+        }
+        out.push(b']');
+        Ok(out)
     }
 
     // 持续性 发展 — atom-count distribution percentiles。
@@ -319,6 +547,21 @@ fn write_kv_int(out: &mut Vec<u8>, key: &str, value: i64) {
     out.push(b'"');
     out.push(b':');
     out.extend_from_slice(value.to_string().as_bytes());
+}
+
+// 主线 核心 抽取 — raw Float64 JSON number writer (no
+// quotes around value)。 Used by the importance scorer
+// to emit score + helpedRate as JSON numbers,not
+// strings,so Swift Codable decodes as Double。
+fn write_kv_raw_number(
+    out: &mut Vec<u8>, key: &str, value: f64
+) {
+    out.push(b'"');
+    out.extend_from_slice(key.as_bytes());
+    out.push(b'"');
+    out.push(b':');
+    let formatted = format_f64(value);
+    out.extend_from_slice(formatted.as_bytes());
 }
 
 // MARK: - C ABI surface
@@ -629,6 +872,85 @@ pub extern "C" fn bas_rust_tracker_atom_count_percentiles(
 
 #[no_mangle]
 pub extern "C" fn bas_rust_tracker_atom_count_percentiles_version() -> c_int {
+    1
+}
+
+// 主线 核心 抽取 — Memory Importance Scorer FFI。 Real
+// chapter 252 算法 inside Rust under one read lock。
+// Emits JSON array sorted by score descending。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_atom_importance_scores(
+    tracker: *mut Tracker,
+    now_ms: i64,
+    half_life_ms: i64,
+    out_buf: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if tracker.is_null()
+        || out_buf.is_null()
+        || out_len.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let bytes = match tref
+        .atom_importance_scores_json(now_ms, half_life_ms)
+    {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let mut boxed = bytes.into_boxed_slice();
+    unsafe {
+        *out_buf = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+        std::mem::forget(boxed);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_atom_importance_scores_version() -> c_int {
+    1
+}
+
+// 主线 核心 抽取 — Forget Cascade decision FFI。 Returns
+// JSON array of atomIDs falling below the retain
+// threshold。 Hosts iterate the array,issue forget
+// per atomID (or whatever forget cascade entails in
+// the host)。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_forget_candidates(
+    tracker: *mut Tracker,
+    now_ms: i64,
+    half_life_ms: i64,
+    retain_fraction: f64,
+    out_buf: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if tracker.is_null()
+        || out_buf.is_null()
+        || out_len.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let bytes = match tref.forget_candidates_json(
+        now_ms, half_life_ms, retain_fraction)
+    {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let mut boxed = bytes.into_boxed_slice();
+    unsafe {
+        *out_buf = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+        std::mem::forget(boxed);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_forget_candidates_version() -> c_int {
     1
 }
 

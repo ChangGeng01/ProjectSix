@@ -189,6 +189,35 @@ public actor BASRustBrainHistoryStore {
         return try await tracker.atomCountPercentiles()
     }
 
+    /// 主线 核心 抽取 — Memory Importance Scorer via Rust
+    /// hard-core math。 Real chapter 二百五十二 算法 (count
+    /// + recency + helped-rate) computed under one Rust
+    /// read lock。 Returns array sorted descending by
+    /// score。
+    public func atomImportanceScores(
+        now: Date = Date(),
+        halfLife: TimeInterval = 24 * 3600
+    ) async throws -> [BASAtomImportanceEntry] {
+        return try await tracker.atomImportanceScores(
+            now: now, halfLife: halfLife)
+    }
+
+    /// 主线 核心 抽取 — Forget Cascade decision via Rust
+    /// hard-core math。 Returns atomIDs falling below the
+    /// retain threshold for the host to forget。 Default
+    /// retainFraction 0.8 keeps top 80% of distinct
+    /// atoms。
+    public func forgetCandidates(
+        now: Date = Date(),
+        halfLife: TimeInterval = 24 * 3600,
+        retainFraction: Double = 0.8
+    ) async throws -> [String] {
+        return try await tracker.forgetCandidates(
+            now: now,
+            halfLife: halfLife,
+            retainFraction: retainFraction)
+    }
+
     // MARK: - 主线 全面 提升: Rust-side aggregations
 
     /// Records grouped by permit mode (i.e. by safety

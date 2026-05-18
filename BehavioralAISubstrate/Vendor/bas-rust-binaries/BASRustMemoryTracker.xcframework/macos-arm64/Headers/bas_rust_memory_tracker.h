@@ -179,6 +179,64 @@ int32_t bas_rust_tracker_atom_count_percentiles(
 /// `bas_rust_tracker_atom_count_percentiles`。
 int32_t bas_rust_tracker_atom_count_percentiles_version(void);
 
+/// 主线 核心 抽取 — Memory Importance Scorer in Rust。
+/// For each distinct atom_id,computes:
+///   score = log(1 + count)
+///         * exp(-(now_ms - last_retrieved_ms) / half_life_ms)
+///         * max(0.5, helped_rate)
+///
+/// Emits JSON array sorted by score descending:
+///   [{"atomID":"...","count":N,"helpedRate":0.NN,
+///     "lastRetrievedMs":N,"score":N.NNNNNN}]
+///
+/// Caller MUST call `bas_rust_tracker_free_buffer` to
+/// release the returned buffer。
+///
+/// Returns:
+///   - 0  = success
+///   - -1 = null pointer
+///   - -2 = internal error (lock poisoned)
+int32_t bas_rust_tracker_atom_importance_scores(
+    Tracker* tracker,
+    int64_t now_ms,
+    int64_t half_life_ms,
+    uint8_t** out_buf,
+    size_t* out_len);
+
+/// ABI version pin for
+/// `bas_rust_tracker_atom_importance_scores`。
+int32_t bas_rust_tracker_atom_importance_scores_version(void);
+
+/// 主线 核心 抽取 — Forget Cascade decision FFI。
+/// Computes the same per-atom score as
+/// `atom_importance_scores`,sorts descending,keeps
+/// the top `retain_fraction` of distinct atoms,returns
+/// the rest as forget candidates。
+///
+/// retain_fraction is clamped to [0.0, 1.0]:
+///   0.0 → all atoms candidate (forget everything)
+///   1.0 → empty candidate list (keep everything)
+///   0.8 → keep top 80%,return bottom 20%
+///
+/// Emits JSON array of atomID strings。 Caller MUST call
+/// `bas_rust_tracker_free_buffer` to release。
+///
+/// Returns:
+///   - 0  = success
+///   - -1 = null pointer
+///   - -2 = internal error (lock poisoned)
+int32_t bas_rust_tracker_forget_candidates(
+    Tracker* tracker,
+    int64_t now_ms,
+    int64_t half_life_ms,
+    double retain_fraction,
+    uint8_t** out_buf,
+    size_t* out_len);
+
+/// ABI version pin for
+/// `bas_rust_tracker_forget_candidates`。
+int32_t bas_rust_tracker_forget_candidates_version(void);
+
 #ifdef __cplusplus
 }
 #endif
