@@ -23,6 +23,11 @@ let package = Package(
         .library(name: "BASWorldPrior", targets: ["BASWorldPrior"]),
         .library(name: "BASLeaseLife", targets: ["BASLeaseLife"]),
         .library(name: "BASOrgan", targets: ["BASOrgan"]),
+        // BASBrainCLI — executable for terminal use of
+        // BASCognitiveBrain. `swift run BASBrainCLI "input"`
+        .executable(
+            name: "BASBrainCLI",
+            targets: ["BASBrainCLI"]),
         // M208 — generic OpenAI/Anthropic/llama.cpp-compatible
         // HTTP organ provider. Proves BASOrganAdapter protocol is
         // truly provider-agnostic. Optional library — hosts that
@@ -403,6 +408,21 @@ let package = Package(
             name: "BASSQLSchemaGenTool",
             dependencies: ["BASSQLSchemaGenCore"],
             path: "Sources/BASSQLSchemaGenTool"),
+
+        // BASBrainCLI — real product surface: terminal CLI
+        // for exercising BASCognitiveBrain.process() +
+        // safetyVerdict() end-to-end. Hosts integrating
+        // the substrate can use this as a reference for
+        // their own integration.
+        .executableTarget(
+            name: "BASBrainCLI",
+            dependencies: [
+                "BASHostKit",
+                "BASRuntimeCore",
+                "BASMemory",
+                "BASPolicy"
+            ],
+            path: "Sources/BASBrainCLI"),
         .plugin(
             name: "BASSQLSchemaGen",
             capability: .buildTool(),
