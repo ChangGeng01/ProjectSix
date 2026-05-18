@@ -131,6 +131,17 @@ public actor BASCognitiveBrain {
     /// rule chain stays consistent。
     public let instanceSafetyConfidenceThreshold: Double
 
+    /// Optional reference to the ML classifier adapter
+    /// when the brain was constructed via the default
+    /// ML init path。 Nil for the explicit-services init
+    /// (host injected its own BASContextServicing,not
+    /// the ML adapter)。 Exposed for hosts that want the
+    /// full multi-class probability distribution via
+    /// `classifyProbabilities(_:)`,which the
+    /// BASContextServicing protocol does not surface。
+    public let mlClassifierAdapter:
+        BASContextClassifierMLAdapter?
+
     /// Optional process-global C++ summary cache。 On hit,
     /// `summary(_:)` skips the full cascade and returns a
     /// cached DTO with fresh cache-retrieval latency。 Nil =
@@ -263,6 +274,7 @@ public actor BASCognitiveBrain {
         // here (one-time CoreML compilation)。
         let contextAdapter =
             try BASContextClassifierMLAdapter()
+        self.mlClassifierAdapter = contextAdapter
         let contextService = BASMLContextService(
             adapter: contextAdapter)
         let coordinator = BASEBrainRuntimeCoordinator(
@@ -322,6 +334,11 @@ public actor BASCognitiveBrain {
             BASCognitiveBrain
                 .clampedThreshold(
                     safetyConfidenceThreshold)
+        // Explicit-services init does NOT hold the ML
+        // adapter — host injected its own BASContextServicing
+        // (may not even be ML-backed)。 Brains constructed
+        // via this init return nil from classifyProbabilities。
+        self.mlClassifierAdapter = nil
         let coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASPlaceholderPowerClockService(),
@@ -797,5 +814,71 @@ extension BASCognitiveBrain {
         return summaryHistory.reduce(0) {
             $0 + ($1.taskType == taskType ? 1 : 0)
         }
+    }
+
+    /// Full multi-class probability distribution from the
+    /// underlying ML classifier。 Returns a map from
+    /// taskType to its softmax probability (sums to ~1.0).
+    /// Returns nil when the brain was constructed via the
+    /// explicit-services init (no ML adapter held)。
+    ///
+    /// Use this when you need richer routing logic than
+    /// the top-1 confidence + taskType pair from
+    /// `summary(_:)`。 For example:
+    ///   - Detect "ambiguous" inputs where the top-2 are
+    ///     within 0.1 of each other
+    ///   - Log secondary signals (e.g. P(manipulationRisk)
+    ///     > 0.2 even when not the top class)
+    ///   - Compute custom thresholds across class subsets
+    public func classifyProbabilities(
+        _ input: String
+    ) -> [BASContextTaskType: Double]? {
+        guard let adapter = mlClassifierAdapter else {
+            return nil
+        }
+        let triple = try? adapter.classify(text: input)
+        guard let (_, _, logits) = triple else {
+            return nil
+        }
+        // Numerical-stable softmax (subtract max before
+        // exp)。 Mirrors BASMLContextService.softmax —
+        // same algorithm,inlined to avoid coupling the
+        // two surfaces。
+        let maxLogit = logits.max() ?? 0
+        var exps = [Double]()
+        exps.reserveCapacity(logits.count)
+        var sum: Double = 0
+        for l in logits {
+            let e = exp(Double(l - maxLogit))
+            exps.append(e)
+            sum += e
+        }
+        guard sum > 0 else { return nil }
+        // Map probabilities back to typed taskType enum
+        // via the adapter's label order。
+        let labels = BASContextClassifierMLAdapter.labels
+        var result: [BASContextTaskType: Double] = [:]
+        for (i, label) in labels.enumerated() {
+            guard i < exps.count else { break }
+            let prob = exps[i] / sum
+            // Map string label to typed enum。 Unknown
+            // labels skipped (defensive — shouldn't
+            // happen with the pinned label set)。
+            let taskType: BASContextTaskType
+            switch label {
+            case "chat": taskType = .chat
+            case "task": taskType = .task
+            case "choice": taskType = .choice
+            case "conflict": taskType = .conflict
+            case "highPressure": taskType = .highPressure
+            case "manipulationRisk":
+                taskType = .manipulationRisk
+            case "highConsequence":
+                taskType = .highConsequence
+            default: continue
+            }
+            result[taskType] = prob
+        }
+        return result
     }
 }
