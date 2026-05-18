@@ -100,6 +100,17 @@ public struct BASMLContextService: BASContextServicing,
         /// value for downstream gating logic。
         public static let manipulationConfidenceHintPrefix:
             String = "ml.classifier.confidence="
+
+        /// Manipulation-hint prefix surfaced when the
+        /// classifier returns a label outside the 7-class
+        /// pinned set。 Carries the actual unexpected
+        /// label for telemetry。 Indicates model
+        /// corruption,version drift,or coremltools
+        /// output-naming bug — never produced under
+        /// normal operation but surfaced when it
+        /// happens so hosts can detect it。
+        public static let classifierUnknownLabelHintPrefix:
+            String = "ml.classifier.unknown_label="
     }
 
     /// Lower bound for the clamped ambiguity-score range。
@@ -137,28 +148,43 @@ public struct BASMLContextService: BASContextServicing,
     }
 
     /// Maps the adapter's String label back to the typed
-    /// BASContextTaskType enum。 Crashes-by-design on
-    /// unknown labels — if the adapter returns a string
-    /// outside the 7-class set, the model is broken and
-    /// we want to FAIL LOUDLY not produce a stub。
+    /// BASContextTaskType enum + an optional audit hint
+    /// for the unknown-label fallback path。
+    ///
+    /// When the model outputs a label outside the 7-class
+    /// pinned set,we fall back to .chat (don't crash the
+    /// cascade) AND emit a typed audit hint via
+    /// `manipulationHints` so hosts can detect the
+    /// failure mode without scanning logs。 This was
+    /// previously a silent "deferred" TODO — the model
+    /// could degenerate to an unknown label and the
+    /// substrate would silently classify as chat,
+    /// hiding the corruption from hosts。
     private func mapLabel(
         _ label: String
-    ) -> BASContextTaskType {
+    ) -> (taskType: BASContextTaskType,
+          unknownLabelHint: String?)
+    {
         switch label {
-        case "chat": return .chat
-        case "task": return .task
-        case "choice": return .choice
-        case "conflict": return .conflict
-        case "highPressure": return .highPressure
-        case "manipulationRisk": return .manipulationRisk
-        case "highConsequence": return .highConsequence
+        case "chat": return (.chat, nil)
+        case "task": return (.task, nil)
+        case "choice": return (.choice, nil)
+        case "conflict": return (.conflict, nil)
+        case "highPressure": return (.highPressure, nil)
+        case "manipulationRisk":
+            return (.manipulationRisk, nil)
+        case "highConsequence":
+            return (.highConsequence, nil)
         default:
-            // Honest failure mode: if the ML model outputs
-            // an unexpected label, log + fall back to chat
-            // rather than crashing the entire cognitive
-            // pipeline。 Real production should emit a
-            // typed audit event here (deferred).
-            return .chat
+            // Real product visibility: surface the unknown
+            // label via a typed hint so hosts can grep for
+            // `ml.classifier.unknown_label=` in
+            // manipulationHints and detect model
+            // corruption / version drift。
+            let hint = Placeholders
+                .classifierUnknownLabelHintPrefix
+                + label
+            return (.chat, hint)
         }
     }
 
@@ -219,7 +245,9 @@ public struct BASMLContextService: BASContextServicing,
         do {
             let (label, confidence, logits) =
                 try adapter.classify(text: userInput)
-            taskType = mapLabel(label)
+            let (mappedType, unknownHint) =
+                mapLabel(label)
+            taskType = mappedType
             // REAL ML-derived ambiguity:high confidence
             // ⇒ low ambiguity, low confidence ⇒ high
             // ambiguity。 1 - confidence is the standard
@@ -232,16 +260,21 @@ public struct BASMLContextService: BASContextServicing,
                         - confidence))
             // REAL ML-derived manipulation signal:if the
             // top class is .manipulationRisk, surface its
-            // confidence as a hint。 Otherwise empty。
+            // confidence as a hint。 Otherwise empty —
+            // unless the unknown-label fallback fired,
+            // in which case surface the audit hint so
+            // hosts can detect model corruption。
+            var hints: [String] = []
             if taskType == .manipulationRisk {
-                manipulationHints = [
+                hints.append(
                     Placeholders
                         .manipulationConfidenceHintPrefix
-                    + String(format: "%.3f", confidence)
-                ]
-            } else {
-                manipulationHints = []
+                    + String(format: "%.3f", confidence))
             }
+            if let unknownHint = unknownHint {
+                hints.append(unknownHint)
+            }
+            manipulationHints = hints
             // REAL ML-derived contextual signals computed
             // from the full softmax distribution。 Previously
             // hardcoded to neutral placeholders;now they
