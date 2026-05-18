@@ -278,10 +278,18 @@ public actor BASCognitiveBrain {
         let contextService = BASMLContextService(
             adapter: contextAdapter)
         let coordinator = BASEBrainRuntimeCoordinator(
-            powerClockService:
-                BASPlaceholderPowerClockService(),
+            // L8 power-clock: REAL device-aware budget
+            // tier (lockdown/throttle/engage/deepLoop)
+            // derived from battery, thermal, memory,
+            // CPU load, foreground state + risk hint。
+            powerClockService: BASMLPowerClockService(),
+            // L9 host-profile: REAL resolution + gate
+            // logic。 Resolves a typed host profile
+            // with safety-first long-term goals + no-go
+            // zones; applyHostGate adjusts confidence
+            // by risk level + manipulation flag。
             hostProfileService:
-                BASPlaceholderHostProfileService(),
+                BASMLHostProfileService(),
             contextService: contextService,
             // L2 decompose: REAL signal-surfacing
             // service derived from L0 context frame。
