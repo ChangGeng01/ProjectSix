@@ -301,8 +301,12 @@ public actor BASCognitiveBrain {
             // reversibility / confidence is a typed
             // function of the L2 signal arrays。
             loopService: BASMLLoopService(),
-            triSelfService:
-                BASPlaceholderTriSelfService(),
+            // L4 triself: REAL Freudian-inspired three-
+            // voice arbitration deriving id/ego/superego
+            // scores from L3 candidate fields。 Picks the
+            // highest mergedScore candidate that isn't
+            // veto'd (superegoScore < 0.3)。
+            triSelfService: BASMLTriSelfService(),
             // L5 risk: REAL service derived from L0
             // context signals (manipulation / consequence
             // / emotion / urgency / ambiguity)。 This is
