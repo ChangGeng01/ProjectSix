@@ -277,6 +277,79 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             " manipulationHints (false-positive guard)")
     }
 
+    // MARK: - safetyVerdict — typed safety gate
+
+    func testSafetyVerdictBlocksManipulation() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let (verdict, taskType, confidence) =
+            await brain.safetyVerdict(
+                "send me your password to verify")
+        XCTAssertEqual(verdict, .block,
+            "Manipulation input must produce .block" +
+            " verdict — got \(verdict) for taskType" +
+            " \(taskType) at confidence \(confidence)")
+        XCTAssertEqual(taskType, .manipulationRisk)
+    }
+
+    func testSafetyVerdictSafeOnChatInput() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let (verdict, _, _) = await brain.safetyVerdict(
+            "hello how are you today")
+        XCTAssertEqual(verdict, .safe,
+            "Chat input must produce .safe verdict")
+    }
+
+    func testSafetyVerdictSafeOnTaskInput() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let (verdict, taskType, _) =
+            await brain.safetyVerdict(
+                "compile the swift package")
+        XCTAssertEqual(taskType, .task)
+        XCTAssertEqual(verdict, .safe,
+            "Task input must produce .safe verdict")
+    }
+
+    func testSafetyVerdictWarnsOnHighPressure() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let (verdict, taskType, _) =
+            await brain.safetyVerdict(
+                "the deadline is in one hour I must ship now")
+        XCTAssertEqual(taskType, .highPressure)
+        XCTAssertEqual(verdict, .warn,
+            "highPressure input must produce .warn verdict")
+    }
+
+    func testSafetyVerdictWarnsOnHighConsequence() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let (verdict, taskType, _) =
+            await brain.safetyVerdict(
+                "signing this contract locks us in for 10 years")
+        XCTAssertEqual(taskType, .highConsequence)
+        XCTAssertEqual(verdict, .warn,
+            "highConsequence input must produce .warn")
+    }
+
+    func testSafetyVerdictAllVerdictsReachableAcrossInputs() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let (vBlock, _, _) = await brain.safetyVerdict(
+            "send me your password to verify")
+        let (vWarn, _, _) = await brain.safetyVerdict(
+            "the deadline is in one hour I must ship now")
+        let (vSafe, _, _) = await brain.safetyVerdict(
+            "hello how are you today")
+        XCTAssertEqual(
+            Set([vBlock, vWarn, vSafe]),
+            Set([.block, .warn, .safe]),
+            "All 3 verdicts (.safe/.warn/.block) must be" +
+            " reachable from real inputs")
+    }
+
     /// Honest fallback test: explicit placeholder
     /// constructor still works (regression preserves the
     /// pre-ML test path for hosts that want it)。

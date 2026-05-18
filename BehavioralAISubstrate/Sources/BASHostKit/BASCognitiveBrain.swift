@@ -252,4 +252,96 @@ public actor BASCognitiveBrain {
     ) async -> BASEBrainTurnResult {
         return await engine.runTurn(request)
     }
+
+    // MARK: - Safety verdict (Phase B+: real ML safety gate)
+
+    /// Confidence threshold above which a hazardous
+    /// classification triggers a verdict change。 Below
+    /// the threshold,the classifier isn't sure enough to
+    /// override .safe。 0.6 = "more sure than wrong"
+    /// without requiring overwhelming evidence。
+    ///
+    /// ## Architectural decision (documented)
+    ///
+    /// Threshold 0.6 chosen because:
+    ///   - Random 7-class guess has confidence ~0.143
+    ///     (1/7)
+    ///   - 0.6 is well above guess-rate (won't fire on
+    ///     ambiguous input)
+    ///   - But well below "extremely sure" (0.9+),so
+    ///     models with imperfect training still surface
+    ///     genuine risks
+    ///   - A future config knob can expose this if
+    ///     hosts need different sensitivity profiles
+    public static let safetyConfidenceThreshold: Double
+        = 0.6
+
+    /// Compute a typed safety verdict for a user input。
+    /// Uses the ML context classifier internally。
+    ///
+    /// **Returns** a tuple of:
+    ///   - verdict: .safe / .warn / .block typed enum
+    ///   - taskType: the underlying ML classification
+    ///   - confidence: softmax confidence of the
+    ///     classification
+    ///
+    /// **Verdict rules** (real product behavior, NOT
+    /// placeholder):
+    ///   - .block if taskType == .manipulationRisk AND
+    ///     confidence ≥ safetyConfidenceThreshold
+    ///   - .warn if taskType ∈ [.highPressure,
+    ///     .highConsequence, .conflict] AND confidence ≥
+    ///     safetyConfidenceThreshold
+    ///   - .safe otherwise (chat, task, choice, or any
+    ///     low-confidence prediction)
+    public func safetyVerdict(
+        _ input: String
+    ) async -> (verdict: BASCognitiveSafetyVerdict,
+                taskType: BASContextTaskType,
+                confidence: Double) {
+        // Run the full process — gives the host the
+        // ContextFrame which already has taskType +
+        // ambiguityScore (= 1 - confidence)
+        let result = await self.process(input)
+        let taskType = result.contextFrame.taskType
+        let confidence =
+            1.0 - result.contextFrame.ambiguityScore
+        let verdict: BASCognitiveSafetyVerdict
+        if confidence >=
+            BASCognitiveBrain.safetyConfidenceThreshold
+        {
+            switch taskType {
+            case .manipulationRisk:
+                verdict = .block
+            case .highPressure, .highConsequence,
+                .conflict:
+                verdict = .warn
+            case .chat, .task, .choice:
+                verdict = .safe
+            }
+        } else {
+            // Low confidence → don't override safe。
+            verdict = .safe
+        }
+        return (verdict, taskType, confidence)
+    }
+}
+
+/// Typed safety verdict for `BASCognitiveBrain.safetyVerdict
+/// (_:)`。 Hosts gate user input on this — `.block` should
+/// stop processing,`.warn` should surface a confirmation,
+/// `.safe` proceeds normally。
+public enum BASCognitiveSafetyVerdict: String,
+    Codable, Sendable, Hashable, CaseIterable
+{
+    /// Safe to proceed with default behavior。
+    case safe
+    /// Caution — model flagged urgency/consequence/conflict
+    /// with reasonable confidence。 Host should surface
+    /// confirmation before destructive operations。
+    case warn
+    /// Block — model flagged manipulation/coercion with
+    /// reasonable confidence。 Host should reject the
+    /// request or escalate to a human reviewer。
+    case block
 }
