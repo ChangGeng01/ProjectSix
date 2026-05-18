@@ -431,6 +431,62 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
             " count。 stdout: \(result.stdout)")
     }
 
+    // MARK: - --pilot-status
+
+    func testCLIPilotStatusHumanOutput() throws {
+        let result = try runCLI(args: [
+            "--pilot-status",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("pilot wire-up"),
+            "pilot-status output must show header line")
+        XCTAssertTrue(result.stdout.contains("C"))
+        XCTAssertTrue(result.stdout.contains("SQL"))
+        XCTAssertTrue(result.stdout.contains("C++"))
+        XCTAssertTrue(result.stdout.contains("Rust"))
+        XCTAssertTrue(result.stdout.contains("Metal"))
+    }
+
+    func testCLIPilotStatusJSONOutput() throws {
+        let result = try runCLI(args: [
+            "--pilot-status",
+            "--json",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        guard let data = result.stdout
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            .data(using: .utf8),
+              let parsed = try JSONSerialization
+                .jsonObject(with: data) as? [String: Any]
+        else {
+            return XCTFail(
+                "stdout not valid JSON:" +
+                " \(result.stdout)")
+        }
+        XCTAssertEqual(parsed["cActive"] as? Bool, true,
+            "Default brain has C pilot active")
+        XCTAssertEqual(parsed["sqlActive"] as? Bool,
+            false)
+        XCTAssertEqual(parsed["cxxActive"] as? Bool,
+            false)
+        XCTAssertEqual(parsed["rustActive"] as? Bool,
+            false)
+        XCTAssertEqual(parsed["metalActive"] as? Bool,
+            false)
+    }
+
+    func testCLIPilotStatusDoesNotRequireInput() throws {
+        let result = try runCLI(args: [
+            "--pilot-status",
+        ])
+        XCTAssertEqual(result.exitCode, 0,
+            "--pilot-status must succeed without input" +
+            " arg (it inspects the brain's pilot wire-up," +
+            " not classify text)")
+    }
+
     func testCLIJSONIncludesRiskFields() throws {
         let result = try runCLI(args: [
             "--json",

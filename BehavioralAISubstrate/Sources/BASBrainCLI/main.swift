@@ -60,6 +60,12 @@ struct CLIArgs {
     /// .block。 Useful in shell pipelines:
     /// `set -e; BASBrainCLI --fail-on-block "..." || handle`
     var failOnBlock: Bool = false
+    /// When true,print the 5-pilot status (C / SQL /
+    /// C++ / Rust / Metal) and exit without processing
+    /// input。 Default brain has only C wired,which
+    /// is the expected behavior — CLI's job is to
+    /// SHOW the wire-up,not modify it。
+    var showPilotStatus: Bool = false
 }
 
 func parseArgs(_ argv: [String]) throws -> CLIArgs {
@@ -77,6 +83,8 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
             args.readFromStdin = true
         case "--fail-on-block":
             args.failOnBlock = true
+        case "--pilot-status":
+            args.showPilotStatus = true
         case "--threshold":
             i += 1
             guard i < argv.count else {
@@ -111,7 +119,9 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
             .trimmingCharacters(
                 in: .whitespacesAndNewlines)
     }
-    if !args.showHelp && args.input.isEmpty {
+    if !args.showHelp && !args.showPilotStatus
+        && args.input.isEmpty
+    {
         throw CLIError.missingInput
     }
     return args
@@ -160,6 +170,8 @@ func printHelp() {
       BASBrainCLI --threshold 0.4 "soft manipulation"
       BASBrainCLI --fail-on-block "harmful input" || \\
         echo "blocked"
+      BASBrainCLI --pilot-status         # show 5-pilot wire-up
+      BASBrainCLI --pilot-status --json  # same, JSON format
 
     Exit codes:
       0 — input processed successfully (any verdict)
@@ -297,6 +309,35 @@ func printResult(
     }
 }
 
+// MARK: - --pilot-status output
+
+func printPilotStatus(
+    _ status: BASCognitiveBrainPilotStatus,
+    json: Bool
+) {
+    if json {
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        if let data = try? enc.encode(status),
+           let str = String(data: data, encoding: .utf8)
+        {
+            print(str)
+        }
+        return
+    }
+    let mark = { (active: Bool) -> String in
+        active ? "✓" : " "
+    }
+    print(
+        "pilot wire-up status" +
+        "  (\(status.activeCount)/5 active):")
+    print(" [\(mark(status.cActive))] C     — latency clock")
+    print(" [\(mark(status.sqlActive))] SQL   — durable history (SQLite)")
+    print(" [\(mark(status.cxxActive))] C++   — process-global summary cache")
+    print(" [\(mark(status.rustActive))] Rust  — fast in-process telemetry")
+    print(" [\(mark(status.metalActive))] Metal — SSMScan kernel accessor")
+}
+
 // MARK: - Main (top-level for main.swift)
 
 func runCLI() async {
@@ -328,6 +369,14 @@ func runCLI() async {
                 FileHandle.standardError.write(d)
             }
             exit(CLIExitCode.brainInitFailed)
+        }
+        // --pilot-status: print the 5-pilot wire-up
+        // and exit without processing input。
+        if args.showPilotStatus {
+            let status = await brain.pilotStatus
+            printPilotStatus(
+                status, json: args.jsonOutput)
+            return
         }
         // Use brain.summary() to capture latency。 We
         // ALSO call process() to access the full cascade
