@@ -291,8 +291,15 @@ public actor BASCognitiveBrain {
             // rather than emitting the placeholder's
             // universally-empty arrays。
             decomposeService: BASMLDecomposeService(),
-            memoryService:
-                BASPlaceholderMemoryService(),
+            // L1 memory: REAL self-managed recall。
+            // Maintains a bounded LRU of past decompose
+            // frames + scores them against the current
+            // frame via Jaccard similarity over signal
+            // arrays。 Returns top-K relevant atoms with
+            // confidence = similarity score。 Closes the
+            // last major placeholder layer in the core
+            // L0 → L7 cascade。
+            memoryService: BASMLMemoryService(),
             // L3 loop: REAL candidate generation
             // service。 Produces 1-3 candidates derived
             // from L2 decompose signals (primary +
