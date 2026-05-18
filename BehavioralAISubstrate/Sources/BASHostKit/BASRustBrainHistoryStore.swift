@@ -137,6 +137,37 @@ public actor BASRustBrainHistoryStore {
         return all.filter { $0.atomID == atomID }.count
     }
 
+    /// 主线 解构 重构 Round 3 — push the atom filter into
+    /// Rust via the existing FFI atom_id arg。 The current
+    /// `usageCount(forInput:)` pulls all records then folds
+    /// Swift-side; this method asks Rust to return only
+    /// records matching the atomID,then counts them。
+    ///
+    /// Same result,less Swift work,less wire data when
+    /// most records belong to other atoms。
+    public func usageCountViaRust(
+        forInput input: String
+    ) async throws -> Int {
+        let atomID = Self.atomID(forInput: input)
+        let filtered = try await tracker.recordsForAtom(
+            atomID: atomID)
+        return filtered.count
+    }
+
+    /// 主线 解构 重构 Round 3 — atom-scoped records via
+    /// the Rust FFI's atom_id filter。 Mirrors the SQL
+    /// pilot's `recentRecordsForInputViaSQL` shape so
+    /// hosts can switch backends without changing call
+    /// sites。 Returned records are sorted Rust-side
+    /// ascending by retrievedAt (same as `allRecords()`)。
+    public func recordsForInputViaRust(
+        forInput input: String
+    ) async throws -> [BASMemoryUsageRecord] {
+        let atomID = Self.atomID(forInput: input)
+        return try await tracker.recordsForAtom(
+            atomID: atomID)
+    }
+
     // MARK: - 主线 全面 提升: Rust-side aggregations
 
     /// Records grouped by permit mode (i.e. by safety

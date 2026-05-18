@@ -246,13 +246,41 @@ public actor BASRustMemoryUsageTrackerActor {
     /// V1 `BASMemoryUsageTracker.allRecords()` shape +
     /// sort order (ascending by retrievedAt)。
     public func allRecords() throws -> [BASMemoryUsageRecord] {
+        return try queryRecords(forAtomID: "")
+    }
+
+    /// 主线 解构 重构 Round 3 — push the atom-id filter
+    /// into the existing Rust FFI。 The `bas_rust_tracker_
+    /// query` C function already accepts an atom_id arg
+    /// (empty string = all records,non-empty = filter by
+    /// that atom_id)。 Before this commit the Swift wrapper
+    /// only ever passed empty string,doing any filtering
+    /// in Swift after pulling the full JSON。 This commit
+    /// pushes the WHERE-like operation into the Rust side。
+    ///
+    /// Mirrors the SQL pilot's `recentRecordsForAtomViaSQL`
+    /// semantics:return only rows for one atom_id,without
+    /// materializing the full record set in Swift。
+    public func recordsForAtom(
+        atomID: String
+    ) throws -> [BASMemoryUsageRecord] {
+        return try queryRecords(forAtomID: atomID)
+    }
+
+    /// Internal helper shared by `allRecords` (empty atomID)
+    /// and `recordsForAtom` (specific atomID)。 Calls the
+    /// Rust FFI with the atom_id arg + decodes the JSON
+    /// response。
+    private func queryRecords(
+        forAtomID atomID: String
+    ) throws -> [BASMemoryUsageRecord] {
         guard useRustCore, let h = handle else {
             throw BASRustMemoryUsageTrackerActorError
                 .rustBridgeUnavailableOnPlatform
         }
         var outBuf: UnsafeMutablePointer<UInt8>?
         var outLen: Int = 0
-        let rc: Int32 = "".withCString { keyPtr in
+        let rc: Int32 = atomID.withCString { keyPtr in
             bas_rust_tracker_query(
                 h,
                 keyPtr,
@@ -362,6 +390,13 @@ public actor BASRustMemoryUsageTrackerActor {
     }
 
     public func allRecords() throws -> [BASMemoryUsageRecord] {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func recordsForAtom(
+        atomID: String
+    ) throws -> [BASMemoryUsageRecord] {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }
