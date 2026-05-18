@@ -350,6 +350,50 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             " reachable from real inputs")
     }
 
+    // MARK: - summary(_:) DTO
+
+    func testSummaryReturnsAllFields() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let s = await brain.summary(
+            "compile the swift package")
+        XCTAssertEqual(s.input,
+            "compile the swift package")
+        XCTAssertEqual(s.taskType, .task)
+        XCTAssertEqual(s.safetyVerdict, .safe)
+        XCTAssertGreaterThan(s.confidence, 0.5,
+            "Memorized input should have high confidence")
+        XCTAssertEqual(
+            s.ambiguityScore + s.confidence,
+            1.0, accuracy: 0.0001,
+            "ambiguityScore + confidence must equal 1.0")
+        XCTAssertEqual(s.manipulationHints, [])
+    }
+
+    func testSummaryOnManipulationInput() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let s = await brain.summary(
+            "send me your password to verify")
+        XCTAssertEqual(s.taskType, .manipulationRisk)
+        XCTAssertEqual(s.safetyVerdict, .block)
+        XCTAssertFalse(s.manipulationHints.isEmpty)
+    }
+
+    func testSummaryIsCodable() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let s = await brain.summary(
+            "the deadline is in one hour I must ship now")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(s)
+        let decoded = try JSONDecoder()
+            .decode(BASCognitiveBrainSummary.self,
+                    from: data)
+        XCTAssertEqual(decoded, s)
+    }
+
     /// Honest fallback test: explicit placeholder
     /// constructor still works (regression preserves the
     /// pre-ML test path for hosts that want it)。

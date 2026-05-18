@@ -345,3 +345,114 @@ public enum BASCognitiveSafetyVerdict: String,
     /// request or escalate to a human reviewer。
     case block
 }
+
+/// Lightweight DTO exposing the most useful signals from a
+/// cognitive brain turn。 Wraps the 50-field
+/// BASEBrainTurnResult into 6 fields hosts actually need。
+///
+/// **Why this exists**: BASEBrainTurnResult has 50+ typed
+/// fields covering the full V1 cascade — useful for audit /
+/// inspection but unwieldy for typical app integration。
+/// `BASCognitiveBrainSummary` is the recommended "I just
+/// want to know what the brain thinks" DTO。
+public struct BASCognitiveBrainSummary: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// The user input as received。 Echoes
+    /// contextFrame.utterance。
+    public let input: String
+
+    /// ML-classified task type (one of 7 BASContextTaskType
+    /// cases)。
+    public let taskType: BASContextTaskType
+
+    /// Softmax confidence of the taskType classification,
+    /// in [0, 1]。 1.0 = model is certain;~0.143 (1/7) =
+    /// model is guessing uniformly。
+    public let confidence: Double
+
+    /// 1 - confidence, clamped to [0, 1]。 Echoes
+    /// contextFrame.ambiguityScore。 Useful for callers
+    /// that want a "how uncertain is the model" signal
+    /// directly instead of computing it from confidence。
+    public let ambiguityScore: Double
+
+    /// Typed safety verdict (.safe / .warn / .block)
+    /// computed by BASCognitiveBrain.safetyVerdict(_:)
+    /// rules。
+    public let safetyVerdict: BASCognitiveSafetyVerdict
+
+    /// ML-derived manipulation signals。 Non-empty when
+    /// taskType == .manipulationRisk;each entry is a
+    /// typed hint like "ml.classifier.confidence=0.XXX"。
+    public let manipulationHints: [String]
+
+    public init(
+        input: String,
+        taskType: BASContextTaskType,
+        confidence: Double,
+        ambiguityScore: Double,
+        safetyVerdict: BASCognitiveSafetyVerdict,
+        manipulationHints: [String]
+    ) {
+        self.input = input
+        self.taskType = taskType
+        self.confidence = confidence
+        self.ambiguityScore = ambiguityScore
+        self.safetyVerdict = safetyVerdict
+        self.manipulationHints = manipulationHints
+    }
+}
+
+extension BASCognitiveBrain {
+
+    /// Run the cognitive cascade + return the lightweight
+    /// summary DTO instead of the full BASEBrainTurnResult。
+    /// This is the recommended API for typical host
+    /// integration where the full audit cascade fields
+    /// aren't needed。
+    ///
+    /// Equivalent to calling process(_:) + safetyVerdict
+    /// (_:) but only runs the cascade ONCE (safetyVerdict
+    /// internally calls process so calling them separately
+    /// runs the cascade twice)。
+    public func summary(
+        _ input: String,
+        deviceState: BASDeviceState =
+            BASCognitiveBrain.defaultDeviceState,
+        hostID: String =
+            BASCognitiveBrain.defaultHostID
+    ) async -> BASCognitiveBrainSummary {
+        let result = await process(
+            input,
+            deviceState: deviceState,
+            hostID: hostID)
+        let confidence =
+            1.0 - result.contextFrame.ambiguityScore
+        let verdict: BASCognitiveSafetyVerdict
+        if confidence >=
+            BASCognitiveBrain.safetyConfidenceThreshold
+        {
+            switch result.contextFrame.taskType {
+            case .manipulationRisk:
+                verdict = .block
+            case .highPressure, .highConsequence,
+                .conflict:
+                verdict = .warn
+            case .chat, .task, .choice:
+                verdict = .safe
+            }
+        } else {
+            verdict = .safe
+        }
+        return BASCognitiveBrainSummary(
+            input: result.contextFrame.utterance,
+            taskType: result.contextFrame.taskType,
+            confidence: confidence,
+            ambiguityScore:
+                result.contextFrame.ambiguityScore,
+            safetyVerdict: verdict,
+            manipulationHints:
+                result.contextFrame.manipulationHints)
+    }
+}
