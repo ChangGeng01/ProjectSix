@@ -295,7 +295,15 @@ let package = Package(
                 // composition path。 BASHardwareAwareScheduler
                 // (M1102) consumes the same primitives via
                 // injection。
-                "BASMetalSubstrate"
+                "BASMetalSubstrate",
+                // Rust pilot wire-in (chapter 706) —
+                // BASRustBrainHistoryStore wraps the
+                // Rust-vendored memory usage tracker as
+                // an alternative to BASSQLBrainHistory
+                // Store for hosts that want fast
+                // in-process telemetry without SQLite
+                // durability。
+                "BASRustCoreBridge"
             ]
         ),
         // M2167 chapter 七百一 第一刀 — MULTI-LANGUAGE

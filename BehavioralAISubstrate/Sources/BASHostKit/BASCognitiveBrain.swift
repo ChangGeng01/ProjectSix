@@ -58,6 +58,7 @@ import Foundation
 import BASMemory
 import BASPolicy
 import BASRuntimeCore
+import BASMetalSubstrate
 
 /// One-line cognitive brain facade。 Wraps the 14-layer
 /// cognitive-OS cascade behind a `process(_:)` API。
@@ -114,6 +115,33 @@ public actor BASCognitiveBrain {
     /// `init(options:summaryHistoryCapacity:sqlHistory
     /// Store:)`。
     public let sqlHistoryStore: BASSQLBrainHistoryStore?
+
+    /// Optional Rust pilot integration — when set,every
+    /// `summary(_:)` call also writes one record via the
+    /// Rust-vendored BASRustMemoryUsageTrackerActor
+    /// (chapter 706 Rust pilot)。 Nil = Rust telemetry
+    /// disabled。 Hosts pass BOTH sqlHistoryStore and
+    /// rustHistoryStore together when they want durable
+    /// SQLite persistence AND fast in-process Rust
+    /// telemetry on every turn。
+    public let rustHistoryStore: BASRustBrainHistoryStore?
+
+    /// Optional Metal pilot accessor — when set,hosts
+    /// can fetch the compiled MTLLibrary (SSMScan kernel
+    /// from chapter 704 Metal pilot) without having to
+    /// construct their own loader。 Nil = Metal pilot
+    /// not exposed (default;saves the lazy-load cost
+    /// for hosts that don't need it)。
+    ///
+    /// **Why exposed at the brain level**: the brain
+    /// itself doesn't run Metal compute today。 But
+    /// hosts wiring up Mamba/SSM inference downstream
+    /// would otherwise need to construct a separate
+    /// loader instance — exposing it here gives them a
+    /// one-stop adoption surface for all 5 pilots
+    /// (C / SQL / C++ / Rust / Metal)。
+    public let metalLibraryLoader:
+        BASMetalKernelLibraryLoader?
 
     /// Per-instance safety confidence threshold for verdict
     /// escalation。 Defaults to
@@ -223,7 +251,10 @@ public actor BASCognitiveBrain {
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
+        rustHistoryStore: BASRustBrainHistoryStore? = nil,
         cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
+        metalLibraryLoader:
+            BASMetalKernelLibraryLoader? = nil,
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
@@ -238,7 +269,9 @@ public actor BASCognitiveBrain {
             summaryHistoryCapacity:
                 summaryHistoryCapacity,
             sqlHistoryStore: sqlHistoryStore,
+            rustHistoryStore: rustHistoryStore,
             cxxSummaryCache: cxxSummaryCache,
+            metalLibraryLoader: metalLibraryLoader,
             safetyConfidenceThreshold:
                 safetyConfidenceThreshold,
             hostProfileService: hostProfileService)
@@ -257,7 +290,10 @@ public actor BASCognitiveBrain {
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
+        rustHistoryStore: BASRustBrainHistoryStore? = nil,
         cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
+        metalLibraryLoader:
+            BASMetalKernelLibraryLoader? = nil,
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
@@ -268,6 +304,8 @@ public actor BASCognitiveBrain {
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
+        self.rustHistoryStore = rustHistoryStore
+        self.metalLibraryLoader = metalLibraryLoader
         self.cxxSummaryCache = cxxSummaryCache
         self.instanceSafetyConfidenceThreshold =
             BASCognitiveBrain
@@ -377,7 +415,10 @@ public actor BASCognitiveBrain {
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
+        rustHistoryStore: BASRustBrainHistoryStore? = nil,
         cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
+        metalLibraryLoader:
+            BASMetalKernelLibraryLoader? = nil,
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold
     ) async throws {
@@ -386,6 +427,8 @@ public actor BASCognitiveBrain {
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
+        self.rustHistoryStore = rustHistoryStore
+        self.metalLibraryLoader = metalLibraryLoader
         self.cxxSummaryCache = cxxSummaryCache
         self.instanceSafetyConfidenceThreshold =
             BASCognitiveBrain
@@ -1140,6 +1183,15 @@ extension BASCognitiveBrain {
             }
         }
         if let store = sqlHistoryStore {
+            _ = try? await store.recordSummary(summary)
+        }
+        // Rust pilot — same write semantics as SQL store,
+        // backed by the Rust-vendored memory tracker
+        // instead of SQLite。 try? keeps Rust failures
+        // (V1 mode / platform without XCFramework slice)
+        // non-fatal — the cognitive pipeline never blocks
+        // on telemetry storage failures。
+        if let store = rustHistoryStore {
             _ = try? await store.recordSummary(summary)
         }
     }
