@@ -456,14 +456,25 @@ public actor BASCognitiveBrain {
     ///   - .safe otherwise (chat, task, choice, or any
     ///     low-confidence prediction)
     public func safetyVerdict(
-        _ input: String
+        _ input: String,
+        deviceState: BASDeviceState =
+            BASCognitiveBrain.defaultDeviceState,
+        hostID: String =
+            BASCognitiveBrain.defaultHostID
     ) async -> (verdict: BASCognitiveSafetyVerdict,
                 taskType: BASContextTaskType,
                 confidence: Double) {
         // Run the full process — gives the host the
         // ContextFrame which already has taskType +
-        // ambiguityScore (= 1 - confidence)
-        let result = await self.process(input)
+        // ambiguityScore (= 1 - confidence)。 Threading
+        // deviceState + hostID through preserves the
+        // same plumbing as `summary(_:)` and `process
+        // (_:)` so all three entry points see consistent
+        // turn context。
+        let result = await self.process(
+            input,
+            deviceState: deviceState,
+            hostID: hostID)
         let taskType = result.contextFrame.taskType
         // confidence ≡ 1 - ambiguityScore (BASMLContextService
         // sets ambiguityScore as the softmax-confidence
