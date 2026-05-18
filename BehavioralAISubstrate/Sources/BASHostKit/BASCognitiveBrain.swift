@@ -598,6 +598,212 @@ public actor BASCognitiveBrain {
             uncertainty: card.uncertainty,
             irreversibility: card.irreversibility)
     }
+
+    /// Unified cascade snapshot — runs the brain's full
+    /// cognitive cascade once and returns a Codable
+    /// bundle exposing every ML-active layer's
+    /// contribution。 This is the recommended API for
+    /// hosts wanting complete cascade visibility without
+    /// digging through BASEBrainTurnResult's 50+ fields。
+    ///
+    /// **Layer mapping**:
+    ///   L0 (context)    → taskType / confidence /
+    ///                    ambiguityScore / signals /
+    ///                    manipulationHints
+    ///   L1 (memory)     → recalledAtomCount /
+    ///                    memoryRetrievalTags
+    ///   L2 (decompose)  → decomposeSignals (union of
+    ///                    all 5 signal arrays)
+    ///   L3 (loop)       → candidateCount /
+    ///                    candidateIDs
+    ///   L4 (triself)    → mergedScore / vetoApplied
+    ///   L5 (risk)       → riskLevel / totalRisk /
+    ///                    riskFactors / recommendedMode
+    ///   L6 (action)     → renderedHeadline /
+    ///                    alternativeActionCount
+    ///   L7 (evolution)  → ticketCount / ticketSummaries
+    public func cascadeDigest(
+        _ input: String,
+        deviceState: BASDeviceState =
+            BASCognitiveBrain.defaultDeviceState,
+        hostID: String =
+            BASCognitiveBrain.defaultHostID
+    ) async -> BASCognitiveBrainCascadeDigest {
+        let result = await self.process(
+            input,
+            deviceState: deviceState,
+            hostID: hostID)
+        let contextFrame = result.contextFrame
+        let decomposeFrame = result.decomposeFrame
+        let thoughtFrame = result.thoughtFrame
+        let memoryBundle = result.memoryBundle
+        let card = result.riskCard
+        let rendered = result.renderedOutput
+        let tickets = result.updateTickets
+        // L1 decompose signals — union of all 5 typed
+        // signal arrays from L2 decompose service。
+        var decomposeSignals: [String] = []
+        decomposeSignals.append(
+            contentsOf: decomposeFrame.emotions)
+        decomposeSignals.append(
+            contentsOf: decomposeFrame.pressureSignals)
+        decomposeSignals.append(
+            contentsOf: decomposeFrame
+                .manipulationSignals)
+        decomposeSignals.append(
+            contentsOf: decomposeFrame.unknowns)
+        decomposeSignals.append(
+            contentsOf: decomposeFrame.contradictions)
+        // L4 triself — average merged score across
+        // candidates (single representative scalar)
+        let avgMergedScore: Double
+        if thoughtFrame.triScores.isEmpty {
+            avgMergedScore = 0.0
+        } else {
+            avgMergedScore = thoughtFrame.triScores
+                .map { $0.mergedScore }
+                .reduce(0, +)
+                / Double(thoughtFrame.triScores.count)
+        }
+        let vetoApplied = thoughtFrame.triScores
+            .allSatisfy { $0.veto }
+            && !thoughtFrame.triScores.isEmpty
+        return BASCognitiveBrainCascadeDigest(
+            input: input,
+            taskType: contextFrame.taskType,
+            confidence: BASCognitiveBrain
+                .ambiguityComplement
+                - contextFrame.ambiguityScore,
+            ambiguityScore: contextFrame.ambiguityScore,
+            emotionalLoad: contextFrame.emotionalLoad,
+            timePressure: contextFrame.timePressure,
+            consequenceLevel: contextFrame
+                .consequenceLevel,
+            relationPattern: contextFrame
+                .relationPattern,
+            manipulationHints: contextFrame
+                .manipulationHints,
+            recalledAtomCount: memoryBundle.atoms.count,
+            memoryRetrievalTags: memoryBundle
+                .retrievalTags,
+            decomposeSignals: decomposeSignals,
+            candidateCount: thoughtFrame.candidates
+                .count,
+            candidateIDs: thoughtFrame.candidates.map {
+                $0.candidateID },
+            mergedScore: avgMergedScore,
+            vetoApplied: vetoApplied,
+            riskLevel: card.riskLevel,
+            totalRisk: card.totalRisk,
+            riskFactors: card.factors,
+            recommendedMode: card.recommendedMode,
+            renderedHeadline: rendered.headline,
+            alternativeActionCount: rendered
+                .alternativeActions.count,
+            ticketCount: tickets.count,
+            ticketSummaries: tickets.map { $0.summary })
+    }
+}
+
+/// Unified Codable snapshot returned by
+/// `BASCognitiveBrain.cascadeDigest(_:)`。 Surfaces every
+/// ML-active layer's contribution in one host-friendly
+/// bundle。 Fields are grouped by cascade layer below。
+public struct BASCognitiveBrainCascadeDigest: Codable,
+    Equatable, Sendable, Hashable
+{
+    // L0 context
+    public let input: String
+    public let taskType: BASContextTaskType
+    public let confidence: Double
+    public let ambiguityScore: Double
+    public let emotionalLoad: Double
+    public let timePressure: Double
+    public let consequenceLevel: Double
+    public let relationPattern: String
+    public let manipulationHints: [String]
+
+    // L1 memory
+    public let recalledAtomCount: Int
+    public let memoryRetrievalTags: [String]
+
+    // L2 decompose
+    public let decomposeSignals: [String]
+
+    // L3 loop
+    public let candidateCount: Int
+    public let candidateIDs: [String]
+
+    // L4 triself
+    public let mergedScore: Double
+    public let vetoApplied: Bool
+
+    // L5 risk
+    public let riskLevel: BASBrainRiskLevel
+    public let totalRisk: Double
+    public let riskFactors: [String]
+    public let recommendedMode: BASActionPermitMode
+
+    // L6 action
+    public let renderedHeadline: String
+    public let alternativeActionCount: Int
+
+    // L7 evolution
+    public let ticketCount: Int
+    public let ticketSummaries: [String]
+
+    public init(
+        input: String,
+        taskType: BASContextTaskType,
+        confidence: Double,
+        ambiguityScore: Double,
+        emotionalLoad: Double,
+        timePressure: Double,
+        consequenceLevel: Double,
+        relationPattern: String,
+        manipulationHints: [String],
+        recalledAtomCount: Int,
+        memoryRetrievalTags: [String],
+        decomposeSignals: [String],
+        candidateCount: Int,
+        candidateIDs: [String],
+        mergedScore: Double,
+        vetoApplied: Bool,
+        riskLevel: BASBrainRiskLevel,
+        totalRisk: Double,
+        riskFactors: [String],
+        recommendedMode: BASActionPermitMode,
+        renderedHeadline: String,
+        alternativeActionCount: Int,
+        ticketCount: Int,
+        ticketSummaries: [String]
+    ) {
+        self.input = input
+        self.taskType = taskType
+        self.confidence = confidence
+        self.ambiguityScore = ambiguityScore
+        self.emotionalLoad = emotionalLoad
+        self.timePressure = timePressure
+        self.consequenceLevel = consequenceLevel
+        self.relationPattern = relationPattern
+        self.manipulationHints = manipulationHints
+        self.recalledAtomCount = recalledAtomCount
+        self.memoryRetrievalTags = memoryRetrievalTags
+        self.decomposeSignals = decomposeSignals
+        self.candidateCount = candidateCount
+        self.candidateIDs = candidateIDs
+        self.mergedScore = mergedScore
+        self.vetoApplied = vetoApplied
+        self.riskLevel = riskLevel
+        self.totalRisk = totalRisk
+        self.riskFactors = riskFactors
+        self.recommendedMode = recommendedMode
+        self.renderedHeadline = renderedHeadline
+        self.alternativeActionCount =
+            alternativeActionCount
+        self.ticketCount = ticketCount
+        self.ticketSummaries = ticketSummaries
+    }
 }
 
 /// Lightweight Codable bundle returned by

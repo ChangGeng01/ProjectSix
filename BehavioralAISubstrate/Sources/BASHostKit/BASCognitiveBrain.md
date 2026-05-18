@@ -189,14 +189,18 @@ For richer routing logic the brain also exposes
 `classifyProbabilities(_:)` returning the full multi-class
 distribution map (returns nil for explicit-services brains)。
 
-### Cognitive cascade — 7 of 14 layers now ML-active
+### Cognitive cascade — 8 of 14 layers now ML-active
 
-The brain runs a 14-layer cognitive cascade. Real
-signal-derived logic now active in 7 layers:
+The brain runs a 14-layer cognitive cascade. The CORE
+DOWNSTREAM CASCADE (L0 → L7) is now FULLY ML-active —
+every layer from input classification through
+evolution-ticket synthesis runs real signal-derived
+logic on every turn.
 
 | Layer | Service | Behavior |
 | ----- | ------- | -------- |
 | L0 | BASMLContextService | 7-class CoreML classifier across 8 languages |
+| L1 | BASMLMemoryService | Self-managed signal-similarity recall (Jaccard over typed signals, bounded LRU 32 atoms) |
 | L2 | BASMLDecomposeService | Signal-surfacing from L0 into emotions / pressure / manipulation arrays |
 | L3 | BASMLLoopService | Generates 1-3 candidates (primary / cautious / decline) derived from L2 signals |
 | L4 | BASMLTriSelfService | Three-voice arbitration (id / ego / superego) with veto when superego < 0.3 |
@@ -204,9 +208,8 @@ signal-derived logic now active in 7 layers:
 | L6 | BASMLActionService | Risk-aware rendered output (headline with bracketed mode prefix + body caveat) |
 | L7 | BASMLEvolutionService | Update tickets when elevated_risk / manipulation / veto / feedback surfaces |
 
-Remaining placeholder layers (require domain integrations
-beyond pure cascade derivation):
-- L1 memory — needs host-specific retrieval ML
+Remaining placeholder layers are downstream telemetry +
+audit surfaces (host-responsibility or corpus-dependent):
 - L8 power-clock — needs device-state telemetry
 - L9 host-profile — needs per-host profile synthesis
 - L10 tribunal / L11 audit / L12+ — downstream audit
