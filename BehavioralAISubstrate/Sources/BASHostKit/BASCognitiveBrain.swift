@@ -225,7 +225,9 @@ public actor BASCognitiveBrain {
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
         cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
         safetyConfidenceThreshold: Double =
-            BASCognitiveBrain.safetyConfidenceThreshold
+            BASCognitiveBrain.safetyConfidenceThreshold,
+        hostProfileService:
+            (any BASHostProfileServicing)? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -238,7 +240,8 @@ public actor BASCognitiveBrain {
             sqlHistoryStore: sqlHistoryStore,
             cxxSummaryCache: cxxSummaryCache,
             safetyConfidenceThreshold:
-                safetyConfidenceThreshold)
+                safetyConfidenceThreshold,
+            hostProfileService: hostProfileService)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -256,7 +259,9 @@ public actor BASCognitiveBrain {
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
         cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
         safetyConfidenceThreshold: Double =
-            BASCognitiveBrain.safetyConfidenceThreshold
+            BASCognitiveBrain.safetyConfidenceThreshold,
+        hostProfileService:
+            (any BASHostProfileServicing)? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -277,6 +282,14 @@ public actor BASCognitiveBrain {
         self.mlClassifierAdapter = contextAdapter
         let contextService = BASMLContextService(
             adapter: contextAdapter)
+        // L9 host-profile: use host-supplied override
+        // when present (e.g. child-safety / finance /
+        // medical with custom safety goals + no-go
+        // zones),otherwise the safety-first default。
+        let resolvedHostProfileService:
+            any BASHostProfileServicing =
+            hostProfileService
+            ?? BASMLHostProfileService()
         let coordinator = BASEBrainRuntimeCoordinator(
             // L8 power-clock: REAL device-aware budget
             // tier (lockdown/throttle/engage/deepLoop)
@@ -284,12 +297,10 @@ public actor BASCognitiveBrain {
             // CPU load, foreground state + risk hint。
             powerClockService: BASMLPowerClockService(),
             // L9 host-profile: REAL resolution + gate
-            // logic。 Resolves a typed host profile
-            // with safety-first long-term goals + no-go
-            // zones; applyHostGate adjusts confidence
-            // by risk level + manipulation flag。
+            // logic with optional host override (custom
+            // safety goals + no-go zones)。
             hostProfileService:
-                BASMLHostProfileService(),
+                resolvedHostProfileService,
             contextService: contextService,
             // L2 decompose: REAL signal-surfacing
             // service derived from L0 context frame。

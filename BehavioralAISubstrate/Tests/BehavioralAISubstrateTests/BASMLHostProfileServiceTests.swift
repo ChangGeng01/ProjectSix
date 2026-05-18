@@ -291,4 +291,51 @@ final class BASMLHostProfileServiceTests: XCTestCase {
         XCTAssertFalse(profile.noGoZones.isEmpty,
             "L9 profile must include no-go zones")
     }
+
+    // MARK: - Brain factory accepts host-profile override
+
+    func testBrainAcceptsCustomHostProfileService()
+        async throws
+    {
+        let customGoals = [
+            "child_safety_first",
+            "require_guardian_consent",
+        ]
+        let customZones = [
+            "adult_content",
+            "financial_advice",
+            "medical_diagnosis",
+        ]
+        let custom = BASMLHostProfileService(
+            longTermGoals: customGoals,
+            noGoZones: customZones)
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults(
+                hostProfileService: custom)
+        let result = await brain.process("hello")
+        XCTAssertEqual(
+            result.hostContext.longTermGoals,
+            customGoals,
+            "Custom host-profile goals must reach the" +
+            " cascade. Got \(result.hostContext.longTermGoals)")
+        XCTAssertEqual(
+            result.hostContext.noGoZones,
+            customZones,
+            "Custom host-profile no-go zones must reach" +
+            " the cascade")
+    }
+
+    func testBrainFallsBackToDefaultHostProfileWhenNil()
+        async throws
+    {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults(
+                hostProfileService: nil)
+        let result = await brain.process("hello")
+        // nil override → default safety-first goals。
+        XCTAssertEqual(
+            result.hostContext.longTermGoals,
+            BASMLHostProfileService.defaultLongTermGoals,
+            "nil override must use default goals")
+    }
 }
