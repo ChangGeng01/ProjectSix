@@ -71,6 +71,13 @@ struct CLIArgs {
     /// Skips input processing。 Useful for ops dumps
     /// piped to a dashboard / health-check endpoint。
     var showHealthSnapshot: Bool = false
+    /// 主线 加强 实用性 — when true,use the bare-brain
+    /// factory `makeWithDefaults()` (C pilot only)。
+    /// Default is now `makeWithAllPilots()` so the CLI
+    /// exercises all 5 native pilots out of the box。
+    /// Pass `--bare-brain` to revert to the legacy
+    /// single-pilot behavior。
+    var bareBrain: Bool = false
 }
 
 func parseArgs(_ argv: [String]) throws -> CLIArgs {
@@ -92,6 +99,8 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
             args.showPilotStatus = true
         case "--health-snapshot":
             args.showHealthSnapshot = true
+        case "--bare-brain":
+            args.bareBrain = true
         case "--threshold":
             i += 1
             guard i < argv.count else {
@@ -155,6 +164,11 @@ func printHelp() {
       --fail-on-block       Exit with code 3 if verdict is .block.
                             Useful for shell pipelines that want
                             to halt on detected manipulation.
+      --bare-brain          Use the C-only legacy default brain
+                            (makeWithDefaults) instead of the
+                            5-pilot brain (makeWithAllPilots).
+                            Useful for test isolation / diffing
+                            against historical CLI output.
 
     Output:
       Default: human-readable
@@ -381,17 +395,32 @@ func runCLI() async {
         }
         // Construct brain. May throw if .mlmodel
         // resource is missing or CoreML
-        // compilation fails.
+        // compilation fails. 主线 加强 实用性 — default
+        // now wires all 5 native pilots via
+        // makeWithAllPilots()。 --bare-brain reverts to
+        // legacy makeWithDefaults() (C pilot only)。
         let brain: BASCognitiveBrain
         do {
-            if let threshold = args.safetyThreshold {
-                brain = try await BASCognitiveBrain
-                    .makeWithDefaults(
-                        safetyConfidenceThreshold:
-                            threshold)
+            if args.bareBrain {
+                if let threshold = args.safetyThreshold {
+                    brain = try await BASCognitiveBrain
+                        .makeWithDefaults(
+                            safetyConfidenceThreshold:
+                                threshold)
+                } else {
+                    brain = try await BASCognitiveBrain
+                        .makeWithDefaults()
+                }
             } else {
-                brain = try await BASCognitiveBrain
-                    .makeWithDefaults()
+                if let threshold = args.safetyThreshold {
+                    brain = try await BASCognitiveBrain
+                        .makeWithAllPilots(
+                            safetyConfidenceThreshold:
+                                threshold)
+                } else {
+                    brain = try await BASCognitiveBrain
+                        .makeWithAllPilots()
+                }
             }
         } catch {
             let msg = "BASBrainCLI: failed to load" +

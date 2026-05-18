@@ -449,6 +449,9 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
     }
 
     func testCLIPilotStatusJSONOutput() throws {
+        // 主线 加强 实用性:CLI default is now
+        // makeWithAllPilots → 5/5 active。 Pass
+        // --bare-brain for the legacy 1/5 layout。
         let result = try runCLI(args: [
             "--pilot-status",
             "--json",
@@ -466,13 +469,43 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
                 " \(result.stdout)")
         }
         XCTAssertEqual(parsed["cActive"] as? Bool, true,
-            "Default brain has C pilot active")
-        XCTAssertEqual(parsed["sqlActive"] as? Bool,
-            false)
-        XCTAssertEqual(parsed["cxxActive"] as? Bool,
-            false)
-        XCTAssertEqual(parsed["rustActive"] as? Bool,
-            false)
+            "C pilot always active")
+        XCTAssertEqual(parsed["sqlActive"] as? Bool, true,
+            "Default CLI brain wires SQL pilot")
+        XCTAssertEqual(parsed["cxxActive"] as? Bool, true,
+            "Default CLI brain wires C++ pilot")
+        XCTAssertEqual(parsed["rustActive"] as? Bool, true,
+            "Default CLI brain wires Rust pilot")
+        XCTAssertEqual(parsed["metalActive"] as? Bool,
+            true,
+            "Default CLI brain wires Metal pilot")
+    }
+
+    func testCLIBareBrainFlagYieldsLegacyOnePilot()
+        throws
+    {
+        // --bare-brain reverts to the legacy
+        // makeWithDefaults() one-pilot brain。
+        let result = try runCLI(args: [
+            "--bare-brain",
+            "--pilot-status",
+            "--json",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        guard let data = result.stdout
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            .data(using: .utf8),
+              let parsed = try JSONSerialization
+                .jsonObject(with: data) as? [String: Any]
+        else {
+            return XCTFail(
+                "stdout not valid JSON: \(result.stdout)")
+        }
+        XCTAssertEqual(parsed["cActive"] as? Bool, true)
+        XCTAssertEqual(parsed["sqlActive"] as? Bool, false)
+        XCTAssertEqual(parsed["cxxActive"] as? Bool, false)
+        XCTAssertEqual(parsed["rustActive"] as? Bool, false)
         XCTAssertEqual(parsed["metalActive"] as? Bool,
             false)
     }
