@@ -718,4 +718,73 @@ extension BASCognitiveBrain {
     public var summaryHistoryCount: Int {
         return summaryHistory.count
     }
+
+    /// Clear the in-memory history buffer。 Hosts call this
+    /// when starting a new user session,switching users,
+    /// or honoring an explicit "forget recent" request。
+    /// Does NOT affect SQL or C++ pilot persistence —
+    /// those are separately addressable via their own
+    /// `clear()` surfaces。
+    public func clearSummaryHistory() {
+        summaryHistory.removeAll(keepingCapacity: true)
+    }
+
+    /// Filter history by safety verdict。 Returns oldest-
+    /// first ordering matching `recentSummaries(limit:)`
+    /// conventions。 Use for audit views like "show me all
+    /// blocked turns" or "show me all warnings"。
+    public func summaries(
+        withVerdict verdict: BASCognitiveSafetyVerdict
+    ) -> [BASCognitiveBrainSummary] {
+        return summaryHistory.filter {
+            $0.safetyVerdict == verdict
+        }
+    }
+
+    /// Filter history by ML task type。 Use for telemetry
+    /// like "how many manipulation attempts has this user
+    /// made today" or "what fraction of turns are chat
+    /// vs task"。
+    public func summaries(
+        withTaskType taskType: BASContextTaskType
+    ) -> [BASCognitiveBrainSummary] {
+        return summaryHistory.filter {
+            $0.taskType == taskType
+        }
+    }
+
+    /// History entries that surfaced at least one
+    /// manipulation hint。 Useful for safety-review
+    /// dashboards regardless of the final verdict
+    /// (hints can surface even on lower-confidence
+    /// classifications that didn't reach .block)。
+    public func summariesWithManipulationHints()
+        -> [BASCognitiveBrainSummary]
+    {
+        return summaryHistory.filter {
+            !$0.manipulationHints.isEmpty
+        }
+    }
+
+    /// Count history entries by verdict。 Aggregation
+    /// convenience — equivalent to
+    /// `summaries(withVerdict:).count` but avoids the
+    /// intermediate array allocation。
+    public func summaryCount(
+        byVerdict verdict: BASCognitiveSafetyVerdict
+    ) -> Int {
+        return summaryHistory.reduce(0) {
+            $0 + ($1.safetyVerdict == verdict ? 1 : 0)
+        }
+    }
+
+    /// Count history entries by ML task type。 Aggregation
+    /// convenience for telemetry dashboards。
+    public func summaryCount(
+        byTaskType taskType: BASContextTaskType
+    ) -> Int {
+        return summaryHistory.reduce(0) {
+            $0 + ($1.taskType == taskType ? 1 : 0)
+        }
+    }
 }
