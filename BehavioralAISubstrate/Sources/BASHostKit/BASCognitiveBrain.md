@@ -189,31 +189,33 @@ For richer routing logic the brain also exposes
 `classifyProbabilities(_:)` returning the full multi-class
 distribution map (returns nil for explicit-services brains)。
 
-### Cognitive cascade — 8 of 14 layers now ML-active
+### Cognitive cascade — 10 of 14 layers now ML-active
 
-The brain runs a 14-layer cognitive cascade. The CORE
-DOWNSTREAM CASCADE (L0 → L7) is now FULLY ML-active —
-every layer from input classification through
-evolution-ticket synthesis runs real signal-derived
-logic on every turn.
+The brain runs a 14-layer cognitive cascade. The full
+L0 → L9 core (10 layers) now runs real signal-derived
+logic on every turn — only downstream audit surfaces
+(L10-L14 tribunal/audit) remain as rules-tier
+placeholders。
 
 | Layer | Service | Behavior |
 | ----- | ------- | -------- |
 | L0 | BASMLContextService | 7-class CoreML classifier across 8 languages |
-| L1 | BASMLMemoryService | Self-managed signal-similarity recall (Jaccard over typed signals, bounded LRU 32 atoms) |
-| L2 | BASMLDecomposeService | Signal-surfacing from L0 into emotions / pressure / manipulation arrays |
-| L3 | BASMLLoopService | Generates 1-3 candidates (primary / cautious / decline) derived from L2 signals |
-| L4 | BASMLTriSelfService | Three-voice arbitration (id / ego / superego) with veto when superego < 0.3 |
-| L5 | BASMLRiskService | Risk verdict from weighted L0+L2 signals (low / medium / high / extreme) |
-| L6 | BASMLActionService | Risk-aware rendered output (headline with bracketed mode prefix + body caveat) |
-| L7 | BASMLEvolutionService | Update tickets when elevated_risk / manipulation / veto / feedback surfaces |
+| L1 | BASMLMemoryService | Self-managed signal-similarity recall (Jaccard, bounded LRU 32) |
+| L2 | BASMLDecomposeService | Signal-surfacing from L0 into emotions/pressure/manipulation arrays |
+| L3 | BASMLLoopService | Generates 1-3 candidates (primary/cautious/decline) from L2 signals |
+| L4 | BASMLTriSelfService | Three-voice arbitration (id/ego/superego) with veto |
+| L5 | BASMLRiskService | Risk verdict from weighted L0+L2 signals |
+| L6 | BASMLActionService | Risk-aware rendered output |
+| L7 | BASMLEvolutionService | Update tickets from elevated_risk/manipulation/veto/feedback |
+| L8 | BASMLPowerClockService | Tier-based budget (lockdown/throttle/engage/deepLoop) from device state + risk |
+| L9 | BASMLHostProfileService | Host gate + tone derivation + safety-first goals/no-go zones |
 
-Remaining placeholder layers are downstream telemetry +
-audit surfaces (host-responsibility or corpus-dependent):
-- L8 power-clock — needs device-state telemetry
-- L9 host-profile — needs per-host profile synthesis
-- L10 tribunal / L11 audit / L12+ — downstream audit
-  surfaces requiring corpus-trained submodels
+Remaining placeholder layers are downstream audit
+surfaces requiring corpus-trained submodels:
+- L10 tribunal — voice deliberation submodel
+- L11 audit — projection submodel
+- L12+ — sovereign / constitution / evolution audit
+  layers
 
 The one remaining placeholder field on the otherwise-real
 contextFrame:
