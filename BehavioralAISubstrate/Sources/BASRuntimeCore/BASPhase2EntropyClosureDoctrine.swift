@@ -384,7 +384,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 七百二十九",// M2237-M2238 (PILOT ACTOR DISTINCT-INSTANCE SEPARATION MATRIX — 2-knife。 Fifth pillar of 5-pilot ACTOR contract。 M2237 第一刀 NEW BASFivePilotActorDistinctInstanceSeparationMatrixTests.swift with 6 tests proving two separately-constructed instances of the same pilot are DISTINCT references (=== false) + cross-pilot mutual distinctness for [AnyObject] of all 5 pilots。 Complement to chapter 727 (identity preservation):727 = same instance survives transfer,729 = different instances stay different。 Catches singleton-cache regressions that would silently break callers expecting independent state。 M2238 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2238。 820 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues — Honest mode disclosed:no force-wake mechanism in harness,both ScheduleWakeup and CronCreate are idle-gated per system docs;continuous inline execution is the actual non-stop loop。)
         "chapter 七百三十",// M2239-M2240 (PILOT makeWithDefaults() FACTORY EXISTENCE MATRIX — 2-knife。 Sixth pillar of 5-pilot ACTOR contract。 M2239 第一刀 NEW BASFivePilotActorMakeWithDefaultsExistenceMatrixTests.swift with 6 tests pinning makeWithDefaults() async factory existence per pilot + cross-pilot return-type distinctness。 Surface tripwire:future removal/rename of makeWithDefaults on any pilot fails at PR time。 M2240 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2240。 822 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode loop continues non-stop per directive。)
         "chapter 七百三十一",// M2241-M2242 (FEATURE FLAG ACTOR SURFACE CONTRACT MATRIX — 2-knife。 Seventh pillar (cross-cutting flag actor)。 M2241 第一刀 NEW BASLanguageAugmentationFeatureFlagsSurfaceContractTests.swift with 6 tests pinning shared BASLanguageAugmentationFeatureFlags actor surface (all 5 pilots consult this single actor):5 typed flag cases + effectiveDefault + isEnabled + setFlag round-trip + snapshot all-5 + resetAll restores defaults。 Widens trajectory from per-pilot pillars (725-730) to the cross-cutting flag actor。 M2242 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2242。 824 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。)
-        "chapter 七百三十二" // M2243-M2244 (FACTORY FLAG-SAMPLING DETERMINISM MATRIX — 2-knife。 Eighth pillar of 5-pilot ACTOR contract。 M2243 第一刀 NEW BASFivePilotFactoryFlagSamplingDeterminismMatrixTests.swift with 6 tests pinning the sampled-once-at-construction contract per pilot + cross-pilot summary。 Critical for chapter 392 IEEE Float32 replay determinism — if a pilot re-consulted the flag on every operation,mid-stream flag flips could change behavior mid-replay and break determinism。 Each test:construct flag actor → set flag → call make(flags:) → flip flag → verify actor survives (mode locked at construction)。 M2244 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2244。 826 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Per user direction「等待 1 分钟 继续 开发」auto-loop now scheduled via end-of-response ScheduleWakeup at 60s — wakeup fires when conversation goes idle after response ends。)
+        "chapter 七百三十二",// M2243-M2244 (FACTORY FLAG-SAMPLING DETERMINISM MATRIX — 2-knife。 Eighth pillar of 5-pilot ACTOR contract。 M2243 第一刀 NEW BASFivePilotFactoryFlagSamplingDeterminismMatrixTests.swift with 6 tests pinning the sampled-once-at-construction contract per pilot + cross-pilot summary。 Critical for chapter 392 IEEE Float32 replay determinism — if a pilot re-consulted the flag on every operation,mid-stream flag flips could change behavior mid-replay and break determinism。 Each test:construct flag actor → set flag → call make(flags:) → flip flag → verify actor survives (mode locked at construction)。 M2244 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2244。 826 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Per user direction「等待 1 分钟 继续 开发」auto-loop now scheduled via end-of-response ScheduleWakeup at 60s — wakeup fires when conversation goes idle after response ends。)
+        "chapter 七百三十三" // M2245-M2246 (PILOT make(flags:) FACTORY EXISTENCE MATRIX — 2-knife。 Ninth pillar of 5-pilot ACTOR contract。 M2245 第一刀 NEW BASFivePilotActorMakeFlagsFactoryExistenceMatrixTests.swift with 6 tests pinning make(flags:) async factory existence per pilot + cross-pilot pair check (make + makeWithDefaults both exist per pilot)。 Companion to chapter 730's makeWithDefaults factory pillar。 M2246 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2246。 828 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -401,15 +402,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2244
+    public static let mNumberLast: Int = 2246
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2244)。 Bumped through chapter 732:1286 → 1288
-    /// (2-knife chapter)。 Chapter 732 (FACTORY FLAG-
-    /// SAMPLING DETERMINISM MATRIX):6 new tests
-    /// pinning sampled-once-at-construction contract。
-    /// V1 byte-equality chain extends to 826。
-    public static let commitsShipped: Int = 1288
+    /// M2246)。 Bumped through chapter 733:1288 → 1290
+    /// (2-knife chapter)。 Chapter 733 (make(flags:)
+    /// FACTORY EXISTENCE MATRIX):6 new tests pinning
+    /// the make(flags:) factory + cross-pilot pair check。
+    /// V1 byte-equality chain extends to 828。
+    public static let commitsShipped: Int = 1290
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

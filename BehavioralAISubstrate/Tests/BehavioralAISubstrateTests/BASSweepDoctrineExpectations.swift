@@ -170,7 +170,10 @@ public enum BASSweepDoctrineExpectations {
     /// At M2244:24 + 20 + 284 = 328 (chapter 七百三十二
     /// — factory flag-sampling determinism matrix —
     /// eighth pillar)。
-    public static let phase2ChapterCount: Int = 328
+    /// At M2246:24 + 20 + 285 = 329 (chapter 七百三十三
+    /// — make(flags:) factory existence matrix —
+    /// ninth pillar)。
+    public static let phase2ChapterCount: Int = 329
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -224,8 +227,10 @@ public enum BASSweepDoctrineExpectations {
     /// 七百三十一 — 2-knife flag actor surface
     /// contract matrix)。 At M2244:1286 + 2 = 1288
     /// (chapter 七百三十二 — 2-knife factory flag-
-    /// sampling determinism matrix)。
-    public static let phase2CommitsShipped: Int = 1288
+    /// sampling determinism matrix)。 At M2246:1288 +
+    /// 2 = 1290 (chapter 七百三十三 — 2-knife make(flags:)
+    /// factory existence matrix)。
+    public static let phase2CommitsShipped: Int = 1290
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -268,8 +273,9 @@ public enum BASSweepDoctrineExpectations {
     /// existence matrix。 At M2242:chapter 731 — flag
     /// actor surface contract matrix。 At M2244:chapter
     /// 732 — factory flag-sampling determinism matrix。
-    /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2244
+    /// At M2246:chapter 733 — make(flags:) factory
+    /// existence matrix。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2246
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

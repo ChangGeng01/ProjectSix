@@ -24979,7 +24979,66 @@ public enum BASChapterDoctrineRegistry {
                 " → M2244。 826 consecutive byte-" +
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
-                " unchanged。")
+                " unchanged。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百三十三",
+            mNumberFirst: 2245,
+            mNumberLast: 2246,
+            v1MilestoneMNumber: 2246,
+            v1MilestoneStatus:
+                "chapter-733-pilot-make-flags-factory-existence-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2245, knife: "第一刀",
+                    concept: "Ninth pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotActorMakeFlagsFactory" +
+                        "ExistenceMatrixTests.swift with" +
+                        " 6 tests pinning make(flags:)" +
+                        " factory existence per pilot +" +
+                        " cross-pilot pair check (make +" +
+                        " makeWithDefaults both exist)。" +
+                        " Companion to chapter 730" +
+                        " makeWithDefaults pillar。 All" +
+                        " 6 tests pass。"),
+                BASChapterKnife(mNumber: 2246, knife: "第二刀",
+                    concept: "Chapter 733 close-out +" +
+                        " 13-file sync。 828 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2246。 NO new" +
+                        " doctrines。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-make-flags-factory-existence-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2246",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "828-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "make-flags-factory-existence-pinned-5-pilots",
+                "ninth-pillar-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "PILOT make(flags:) FACTORY" +
+                " EXISTENCE MATRIX。 2-knife chapter。" +
+                " M2245 第一刀 6 new tests pinning" +
+                " make(flags:) factory + cross-pilot" +
+                " pair check。 Ninth pillar of 5-pilot" +
+                " ACTOR contract。 M2246 第二刀 close-" +
+                "out + 13-file sync。 828 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
+                " score unchanged。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

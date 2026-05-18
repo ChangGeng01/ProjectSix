@@ -6806,7 +6806,28 @@ public enum BASEntropyChapterIndex {
                 " ADR-016 → M2244。 826 consecutive" +
                 " byte-equality clean commits。 273" +
                 " typed surfaces unchanged。 60/60" +
-                " score unchanged。")
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十三",
+            mNumberFirst: 2245, mNumberLast: 2246,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT make(flags:) FACTORY" +
+                " EXISTENCE MATRIX — 2-knife。 Ninth" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2245 第一刀 NEW BASFivePilotActor" +
+                "MakeFlagsFactoryExistenceMatrixTests" +
+                ".swift with 6 tests pinning make(flags:)" +
+                " factory existence per pilot + cross-" +
+                "pilot pair check (make + makeWithDefaults" +
+                " both exist per pilot)。 Companion to" +
+                " chapter 730 makeWithDefaults pillar。" +
+                " M2246 第二刀 close-out + 13-file sync" +
+                "。 ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2246。 828 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
