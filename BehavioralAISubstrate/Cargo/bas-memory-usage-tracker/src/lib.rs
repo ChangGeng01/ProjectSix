@@ -1233,6 +1233,88 @@ pub extern "C" fn bas_rust_ledger_append_step_version() -> c_int {
     1
 }
 
+// 主线 Ledger Replay 抽取 — replay a chain of events
+// starting from `initial_hash`,feeding each payload
+// through the SHA256 chain step,then comparing the
+// final accumulated hash against `expected_final_hash`。
+//
+// The `payloads` are encoded as a flat buffer of
+// length-prefixed payload regions:
+//
+//   [4 bytes u32 big-endian count][
+//     [4 bytes u32 BE len_0][len_0 bytes payload_0]
+//     [4 bytes u32 BE len_1][len_1 bytes payload_1]
+//     ...
+//   ]
+//
+// This lets a single FFI call validate an entire chain
+// without per-event boundary-crossing。 Returns:
+//   1   = match (chain verified)
+//   0   = mismatch (chain replay diverges from expected)
+//   -1  = null pointer or malformed payload buffer
+#[no_mangle]
+pub extern "C" fn bas_rust_ledger_replay_verify(
+    initial_hash: *const c_uchar,
+    payloads: *const c_uchar,
+    payloads_len: usize,
+    expected_final_hash: *const c_uchar,
+) -> c_int {
+    if initial_hash.is_null()
+        || expected_final_hash.is_null()
+    {
+        return -1;
+    }
+    if payloads.is_null() && payloads_len > 0 {
+        return -1;
+    }
+    let initial_slice = unsafe {
+        std::slice::from_raw_parts(initial_hash, 32)
+    };
+    let expected_slice = unsafe {
+        std::slice::from_raw_parts(
+            expected_final_hash, 32)
+    };
+    let buf = if payloads_len == 0 {
+        &[][..]
+    } else {
+        unsafe {
+            std::slice::from_raw_parts(
+                payloads, payloads_len)
+        }
+    };
+    if buf.len() < 4 { return -1; }
+    let count = u32::from_be_bytes([
+        buf[0], buf[1], buf[2], buf[3]]) as usize;
+    let mut current: [u8; 32] = {
+        let mut h = [0u8; 32];
+        h.copy_from_slice(initial_slice);
+        h
+    };
+    let mut offset: usize = 4;
+    for _ in 0..count {
+        if offset + 4 > buf.len() { return -1; }
+        let len = u32::from_be_bytes([
+            buf[offset], buf[offset + 1],
+            buf[offset + 2], buf[offset + 3]
+        ]) as usize;
+        offset += 4;
+        if offset + len > buf.len() { return -1; }
+        let payload = &buf[offset..offset + len];
+        offset += len;
+        let mut hasher = Sha256::new();
+        hasher.update(&current);
+        feed_length_prefixed(&mut hasher, payload);
+        let digest = hasher.finalize();
+        current.copy_from_slice(&digest);
+    }
+    if current.as_slice() == expected_slice { 1 } else { 0 }
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_ledger_replay_verify_version() -> c_int {
+    1
+}
+
 // MARK: - Tests
 
 #[cfg(test)]

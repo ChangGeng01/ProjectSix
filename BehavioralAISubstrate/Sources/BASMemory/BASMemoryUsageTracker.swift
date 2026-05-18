@@ -125,6 +125,49 @@ public struct BASMemoryUsageRecord: BASSchemaVersioned,
     }
 }
 
+/// 主线 SQL Episode 抽取 — Codable summary of one
+/// distinct session's record sequence as produced by
+/// `BASMemoryUsageTracker.episodeSummariesViaSQL()`。
+/// Each row corresponds to one `GROUP BY session_ref`
+/// row from native SQL。
+public struct BASEpisodeSummary: Codable, Equatable,
+    Sendable, Hashable
+{
+    /// Session identifier — same value across all
+    /// records belonging to this episode。
+    public let sessionRef: String
+
+    /// Number of records in this session。
+    public let recordCount: Int
+
+    /// Epoch milliseconds of the FIRST retrieval in
+    /// this session (= MIN(retrieved_at_ms))。
+    public let startMs: Int64
+
+    /// Epoch milliseconds of the LAST retrieval in
+    /// this session (= MAX(retrieved_at_ms))。
+    public let endMs: Int64
+
+    public init(
+        sessionRef: String,
+        recordCount: Int,
+        startMs: Int64,
+        endMs: Int64
+    ) {
+        self.sessionRef = sessionRef
+        self.recordCount = recordCount
+        self.startMs = startMs
+        self.endMs = endMs
+    }
+
+    /// Convenience:duration of this episode in
+    /// seconds。 0 for single-record episodes (start
+    /// == end)。
+    public var durationSeconds: Double {
+        return Double(endMs - startMs) / 1000.0
+    }
+}
+
 /// Append-only L8 retrieval usage log. Two modes:
 ///
 ///   - **In-memory** (databaseURL: nil): records live in the actor
@@ -185,6 +228,12 @@ public actor BASMemoryUsageTracker {
     /// mode (so `recordCount` / `recentRecords` don't need a
     /// SQL round-trip). Reloaded from disk on init.
     private var inMemory: [String: BASMemoryUsageRecord] = [:]
+
+    /// 主线 SQL Tombstone 抽取 — set of recordIDs marked
+    /// as tombstoned。 Mirrors the SQL
+    /// `memory_usage_tombstones` table when SQLite-backed;
+    /// holds the only state in in-memory mode。
+    private var inMemoryTombstones: Set<String> = []
 
     // MARK: - Lifecycle
 
@@ -295,6 +344,125 @@ public actor BASMemoryUsageTracker {
             self.permitMode = permitMode
             self.retrievedAt = retrievedAt
         }
+    }
+
+    // MARK: - 主线 SQL Tombstone 抽取
+
+    /// 主线 SQL Episode 抽取 — group records by
+    /// session_ref via native `SELECT ... GROUP BY
+    /// session_ref` SQL query。 Each "episode" is one
+    /// distinct session's record sequence。 Returns:
+    ///   - sessionRef
+    ///   - recordCount  (rows in this session)
+    ///   - startMs      (MIN(retrieved_at_ms))
+    ///   - endMs        (MAX(retrieved_at_ms))
+    ///
+    /// Sorted ascending by startMs (oldest episode
+    /// first)。 In-memory mode folds in Swift。
+    ///
+    /// SQL territory:GROUP BY + MIN/MAX is canonical
+    /// SQL aggregation work,not Swift fold work。
+    public func episodeSummariesViaSQL() throws
+        -> [BASEpisodeSummary]
+    {
+        if let db = db {
+            return try Self
+                .fetchEpisodeSummaries(db: db)
+        }
+        // In-memory fallback
+        var byRef: [String: (count: Int,
+                              start: Int64,
+                              end: Int64)] = [:]
+        for record in inMemory.values {
+            let ms = Int64(
+                record.retrievedAt
+                    .timeIntervalSince1970 * 1000)
+            if var existing = byRef[record.sessionRef] {
+                existing.count += 1
+                existing.start = min(existing.start, ms)
+                existing.end = max(existing.end, ms)
+                byRef[record.sessionRef] = existing
+            } else {
+                byRef[record.sessionRef] = (1, ms, ms)
+            }
+        }
+        let summaries = byRef.map { entry in
+            BASEpisodeSummary(
+                sessionRef: entry.key,
+                recordCount: entry.value.count,
+                startMs: entry.value.start,
+                endMs: entry.value.end)
+        }
+        return summaries.sorted {
+            $0.startMs < $1.startMs
+        }
+    }
+
+    /// 主线 全面 开发 — soft-delete marker。 Inserts a
+    /// row into the `memory_usage_tombstones` table
+    /// (auto-created at first call) marking `recordID`
+    /// as forgotten。 Active-record queries filter out
+    /// tombstoned records via LEFT JOIN。
+    ///
+    /// Does NOT delete the original record — tombstone
+    /// preserves the audit trail。 Use `purgeTombstoned`
+    /// for physical deletion later。
+    ///
+    /// In-memory mode tracks tombstones in a Swift Set
+    /// (no SQL table); same semantics, no persistence。
+    public func tombstoneRecord(
+        recordID: String,
+        tombstonedAt: Date = Date()
+    ) async throws {
+        if let db = db {
+            try Self.ensureTombstoneSchema(db: db)
+            try Self.insertTombstone(
+                db: db,
+                recordID: recordID,
+                tombstonedAtMs: Int64(
+                    tombstonedAt.timeIntervalSince1970
+                        * 1000))
+        }
+        inMemoryTombstones.insert(recordID)
+    }
+
+    /// True if the recordID has been tombstoned。 Checks
+    /// in-memory set (which mirrors the SQL table when
+    /// SQLite-backed)。
+    public func isTombstoned(
+        recordID: String
+    ) -> Bool {
+        return inMemoryTombstones.contains(recordID)
+    }
+
+    /// Count of tombstoned records。
+    public var tombstoneCount: Int {
+        return inMemoryTombstones.count
+    }
+
+    /// Count of records that have NOT been tombstoned。
+    /// Useful for "live memory" dashboards。
+    public var activeRecordCount: Int {
+        return inMemory.count - inMemoryTombstones.count
+    }
+
+    /// Permanently delete tombstoned records from both
+    /// the in-memory cache AND the SQLite table (when
+    /// backed)。 Returns the count purged。 The tombstones
+    /// table is also cleaned。
+    @discardableResult
+    public func purgeTombstoned() async throws -> Int {
+        let toRemove = inMemoryTombstones
+        let count = toRemove.count
+        for id in toRemove {
+            inMemory.removeValue(forKey: id)
+        }
+        inMemoryTombstones.removeAll()
+        if let db = db {
+            try Self.ensureTombstoneSchema(db: db)
+            try Self.purgeTombstonedRows(db: db)
+        }
+        return count
     }
 
     /// 全面 开发 — atomic batch insert wrapped in
@@ -1248,6 +1416,120 @@ public actor BASMemoryUsageTracker {
                 helpedFlag: helped))
         }
         return records
+    }
+
+    /// 主线 SQL Episode 抽取 — native GROUP BY session_ref
+    /// with MIN/MAX on retrieved_at_ms。 One row per
+    /// session = one episode。 Sorted ascending by start
+    /// timestamp。
+    fileprivate static func fetchEpisodeSummaries(
+        db: OpaquePointer
+    ) throws -> [BASEpisodeSummary] {
+        let sql = """
+            SELECT session_ref,
+                   COUNT(*) AS n,
+                   MIN(retrieved_at_ms) AS start_ms,
+                   MAX(retrieved_at_ms) AS end_ms
+              FROM memory_usage_records
+             GROUP BY session_ref
+             ORDER BY start_ms ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var summaries: [BASEpisodeSummary] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let sessionRef = readText(stmt, 0)
+            let count = sqlite3_column_int64(stmt, 1)
+            let startMs = sqlite3_column_int64(stmt, 2)
+            let endMs = sqlite3_column_int64(stmt, 3)
+            summaries.append(BASEpisodeSummary(
+                sessionRef: sessionRef,
+                recordCount: Int(count),
+                startMs: startMs,
+                endMs: endMs))
+        }
+        return summaries
+    }
+
+    /// 主线 SQL Tombstone 抽取 — provision the tombstones
+    /// table on first use。 Idempotent CREATE TABLE IF
+    /// NOT EXISTS — safe to call repeatedly。 The main
+    /// `memory_usage_records` table stays untouched
+    /// (byte-equality preserved with chapter 702 pinned
+    /// schema)。
+    fileprivate static func ensureTombstoneSchema(
+        db: OpaquePointer
+    ) throws {
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS memory_usage_tombstones (
+                record_id TEXT PRIMARY KEY NOT NULL,
+                tombstoned_at_ms INTEGER NOT NULL
+            );
+            """)
+    }
+
+    fileprivate static func insertTombstone(
+        db: OpaquePointer,
+        recordID: String,
+        tombstonedAtMs: Int64
+    ) throws {
+        let sql = """
+            INSERT OR REPLACE INTO memory_usage_tombstones (
+                record_id, tombstoned_at_ms
+            ) VALUES (?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, recordID)
+        sqlite3_bind_int64(stmt, 2, tombstonedAtMs)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    fileprivate static func purgeTombstonedRows(
+        db: OpaquePointer
+    ) throws {
+        // Atomic two-step:DELETE the records,then
+        // truncate the tombstones table。 Wrapped in a
+        // transaction so the two tables can never get
+        // out of sync。
+        try runExec(db: db,
+            sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            try runExec(db: db, sql: """
+                DELETE FROM memory_usage_records
+                 WHERE record_id IN (
+                    SELECT record_id
+                      FROM memory_usage_tombstones
+                 );
+                """)
+            try runExec(db: db, sql: """
+                DELETE FROM memory_usage_tombstones;
+                """)
+            try runExec(db: db, sql: "COMMIT;")
+        } catch {
+            try? runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
     }
 
     /// 全面 开发 — atomic batch insert under one SQLite

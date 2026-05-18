@@ -123,3 +123,64 @@ kernel void ssm_scan_float32(
         y[idx] = C_t * h;
     }
 }
+
+// MARK: - vector_cosine_similarity
+// 主线 Metal embedding similarity — 全面 开发
+//
+// Computes per-element products + partial squared norms
+// for a pair of equal-length float32 vectors。 Three
+// outputs per thread:
+//   dot_partial[i] = a[i] * b[i]
+//   norm_a_partial[i] = a[i] * a[i]
+//   norm_b_partial[i] = b[i] * b[i]
+//
+// Swift wrapper sums each partial array,then computes
+// cosine_similarity = sum(dot) / (sqrt(sum(norm_a)) *
+// sqrt(sum(norm_b)))。
+//
+// Each thread handles one (i) — 1-D dispatch grid of
+// size N。 Threadgroup memory unused;keeps the kernel
+// trivially correct + bit-stable across Apple silicon
+// GPUs。
+//
+// Buffer layout (row-major float32):
+//   buffer(0) a        (N,)  input vector A
+//   buffer(1) b        (N,)  input vector B
+//   buffer(2) dot      (N,)  output:elementwise a*b
+//   buffer(3) norm_a   (N,)  output:elementwise a*a
+//   buffer(4) norm_b   (N,)  output:elementwise b*b
+//   buffer(5) shape    (1,)  shape struct {N}
+//
+// Note:For maximum honesty about Metal's specialty,
+// this version emits PARTIAL elementwise products and
+// lets the host do the final reduction (sum + sqrt +
+// divide)。 The honest reason:per-thread elementwise
+// is the natural Metal pattern;a single-block reduce
+// requires threadgroup memory + barriers + benefits
+// only at very large N。 For typical embedding sizes
+// (≤ 1024 dims) the per-element approach is the right
+// trade-off。
+
+struct CosineSimShape {
+    uint N;
+};
+
+kernel void vector_cosine_similarity(
+    device   const float        *a       [[buffer(0)]],
+    device   const float        *b       [[buffer(1)]],
+    device         float        *dot     [[buffer(2)]],
+    device         float        *norm_a  [[buffer(3)]],
+    device         float        *norm_b  [[buffer(4)]],
+    constant       CosineSimShape &shape [[buffer(5)]],
+    uint                          tid    [[thread_position_in_grid]])
+{
+    const uint i = tid;
+    if (i >= shape.N) {
+        return;
+    }
+    const float ai = a[i];
+    const float bi = b[i];
+    dot[i]    = ai * bi;
+    norm_a[i] = ai * ai;
+    norm_b[i] = bi * bi;
+}

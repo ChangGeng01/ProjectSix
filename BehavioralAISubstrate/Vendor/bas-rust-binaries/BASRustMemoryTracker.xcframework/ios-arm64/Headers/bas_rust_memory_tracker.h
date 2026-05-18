@@ -320,6 +320,23 @@ int32_t bas_rust_ledger_append_step(
 
 int32_t bas_rust_ledger_append_step_version(void);
 
+/// 主线 Ledger Replay 抽取 — replay a chain of events
+/// in Rust + verify final hash matches expected。
+/// `payloads` is a flat length-prefixed encoding:
+///   [u32 count BE][[u32 len BE][bytes payload]]...
+///
+/// Returns:
+///   - 1  = chain replay matches expected_final_hash
+///   - 0  = chain replay diverges
+///   - -1 = null pointer or malformed buffer
+int32_t bas_rust_ledger_replay_verify(
+    const uint8_t* initial_hash,
+    const uint8_t* payloads,
+    size_t payloads_len,
+    const uint8_t* expected_final_hash);
+
+int32_t bas_rust_ledger_replay_verify_version(void);
+
 #ifdef __cplusplus
 }
 #endif

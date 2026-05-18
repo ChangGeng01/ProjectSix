@@ -154,6 +154,12 @@ public actor BASCognitiveBrain {
     fileprivate var metalSSMScanDispatcher:
         BASMetalSSMScanDispatcher?
 
+    /// 主线 全面 开发 — memoized cosine-similarity
+    /// dispatcher。 Same lazy-init pattern as the
+    /// SSMScan dispatcher。
+    fileprivate var metalCosineDispatcher:
+        BASMetalCosineSimilarityDispatcher?
+
     /// 主线 继续 开发 — optional brain-owned health
     /// snapshot history。 Configured at init via the
     /// `healthSnapshotHistoryCapacity` parameter。 nil
@@ -2191,6 +2197,42 @@ extension BASCognitiveBrain {
             await history.append(snap)
         }
         return snap
+    }
+
+    /// 主线 全面 开发 — Metal cosine similarity via the
+    /// SSMScan.metal-resident `vector_cosine_similarity`
+    /// kernel。 Per the user's blueprint,Metal owns
+    /// embedding similarity。
+    ///
+    /// Dispatches the kernel on the GPU,reads partial
+    /// products back,reduces on CPU,returns a Codable
+    /// result struct with similarity + intermediate norms。
+    ///
+    /// Throws BASMetalCosineSimilarityDispatcherError on
+    /// length mismatch / zero-length / Metal-side errors。
+    /// Throws .libraryUnavailable when no Metal loader
+    /// is wired。
+    public func cosineSimilarity(
+        _ a: [Float],
+        _ b: [Float]
+    ) async throws -> BASMetalCosineSimilarityResult {
+        guard let loader = metalLibraryLoader else {
+            throw BASMetalCosineSimilarityDispatcherError
+                .libraryUnavailable(
+                    message:
+                        "no metalLibraryLoader wired")
+        }
+        if metalCosineDispatcher == nil {
+            metalCosineDispatcher =
+                BASMetalCosineSimilarityDispatcher(
+                    loader: loader)
+        }
+        guard let d = metalCosineDispatcher else {
+            throw BASMetalCosineSimilarityDispatcherError
+                .libraryUnavailable(
+                    message: "dispatcher init failed")
+        }
+        return try await d.dispatch(a: a, b: b)
     }
 
     /// 主线 继续 开发 — public Metal compute entry point。

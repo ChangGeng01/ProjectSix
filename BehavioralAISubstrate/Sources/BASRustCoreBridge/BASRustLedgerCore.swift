@@ -132,6 +132,80 @@ public enum BASRustLedgerCore {
     public static let genesisHash: Data = Data(
         repeating: 0, count: 32)
 
+    /// 主线 Ledger Replay 抽取 — given an `initialHash`,
+    /// a sequence of payloads,and an `expectedFinalHash`,
+    /// replays the chain inside Rust and returns true if
+    /// the final hash matches the expectation。
+    ///
+    /// Use case:hosts persist a ledger as
+    /// `(initialHash, [payloads], expectedFinalHash)` —
+    /// loading,call this to verify the chain hasn't
+    /// been tampered with。
+    ///
+    /// Encodes payloads as a single length-prefixed
+    /// buffer in Swift,passes it as one FFI call。
+    /// O(N) hashing in Rust,one bridge crossing。
+    public static func replayVerify(
+        initialHash: Data,
+        payloads: [Data],
+        expectedFinalHash: Data
+    ) throws -> Bool {
+        guard initialHash.count == 32,
+              expectedFinalHash.count == 32
+        else {
+            throw BASRustLedgerCoreError
+                .invalidInputSize
+        }
+        // Encode payloads as flat length-prefixed buffer
+        var buf = [UInt8]()
+        let count = UInt32(payloads.count).bigEndian
+        withUnsafeBytes(of: count) { raw in
+            buf.append(contentsOf: raw)
+        }
+        for p in payloads {
+            let len = UInt32(p.count).bigEndian
+            withUnsafeBytes(of: len) { raw in
+                buf.append(contentsOf: raw)
+            }
+            buf.append(contentsOf: p)
+        }
+        let rc = initialHash.withUnsafeBytes {
+            initRaw -> Int32 in
+            let initPtr = initRaw
+                .bindMemory(to: UInt8.self)
+                .baseAddress!
+            return expectedFinalHash.withUnsafeBytes {
+                expRaw -> Int32 in
+                let expPtr = expRaw
+                    .bindMemory(to: UInt8.self)
+                    .baseAddress!
+                return buf.withUnsafeBufferPointer {
+                    bufPtr -> Int32 in
+                    let bufPtrTyped:
+                        UnsafePointer<UInt8>? =
+                        buf.isEmpty
+                            ? nil
+                            : bufPtr.baseAddress
+                    return bas_rust_ledger_replay_verify(
+                        initPtr,
+                        bufPtrTyped,
+                        buf.count,
+                        expPtr)
+                }
+            }
+        }
+        switch rc {
+        case 1: return true
+        case 0: return false
+        case -1:
+            throw BASRustLedgerCoreError
+                .invalidInputSize
+        default:
+            throw BASRustLedgerCoreError
+                .unknownReturnCode(rc)
+        }
+    }
+
     #else
 
     /// Stub on platforms where the XCFramework is
@@ -150,6 +224,15 @@ public enum BASRustLedgerCore {
 
     public static let genesisHash: Data = Data(
         repeating: 0, count: 32)
+
+    public static func replayVerify(
+        initialHash: Data,
+        payloads: [Data],
+        expectedFinalHash: Data
+    ) throws -> Bool {
+        throw BASRustLedgerCoreError
+            .rustBridgeUnavailableOnPlatform
+    }
 
     #endif
 }
