@@ -178,6 +178,13 @@ public actor BASCognitiveBrain {
     fileprivate var metalAttentionDispatcher:
         BASMetalAttentionDispatcher?
 
+    /// chapter 七百七 第一刀 — memoized tiled FlashAttention
+    /// dispatcher,lazily built on first use。 Distinct from
+    /// the standard attention dispatcher so the two compete
+    /// in the auto-router tournament at chapter 七百七 第三刀。
+    fileprivate var metalFlashAttentionDispatcher:
+        BASMetalFlashAttentionDispatcher?
+
     /// 主线 继续 开发 — optional brain-owned health
     /// snapshot history。 Configured at init via the
     /// `healthSnapshotHistoryCapacity` parameter。 nil
@@ -2464,6 +2471,43 @@ extension BASCognitiveBrain {
         }
         guard let d = metalAttentionDispatcher else {
             throw BASMetalAttentionDispatcherError
+                .libraryUnavailable(
+                    message: "dispatcher nil")
+        }
+        return try await d.dispatch(
+            q: q, qRows: qRows, qCols: qCols,
+            k: k, kRows: kRows,
+            v: v, vCols: vCols)
+    }
+
+    /// chapter 七百七 第一刀 / M2206 — tiled FlashAttention path。
+    /// Mathematically equivalent to `attention(...)` but uses
+    /// O(N) memory via online softmax + key/value tiling。 Wins
+    /// over the standard kernel for long sequences (N ≥ ~256)
+    /// or large head dim — the standard kernel materializes the
+    /// full N×N attention matrix while FlashAttention keeps
+    /// only O(B_r × D + B_c × D) resident。
+    ///
+    /// V1 tile sizes: B_r = B_c = 32, head dim cap 64。
+    public func flashAttention(
+        q: [Float], qRows: Int, qCols: Int,
+        k: [Float], kRows: Int,
+        v: [Float], vCols: Int
+    ) async throws -> [Float] {
+        guard let loader = metalLibraryLoader else {
+            throw BASMetalFlashAttentionDispatcherError
+                .libraryUnavailable(
+                    message:
+                        "no metalLibraryLoader wired")
+        }
+        if metalFlashAttentionDispatcher == nil {
+            metalFlashAttentionDispatcher =
+                BASMetalFlashAttentionDispatcher(
+                    loader: loader)
+        }
+        guard let d = metalFlashAttentionDispatcher
+        else {
+            throw BASMetalFlashAttentionDispatcherError
                 .libraryUnavailable(
                     message: "dispatcher nil")
         }

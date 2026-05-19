@@ -175,23 +175,56 @@ public actor BASMetalKernelLibraryLoader {
             throw BASMetalKernelLibraryLoaderError
                 .mtlDeviceUnavailable
         }
-        guard let url = Self.expectedBundle.url(
-            forResource: Self.ssmScanResourceName,
-            withExtension: Self.ssmScanResourceExtension)
-        else {
-            throw BASMetalKernelLibraryLoaderError
-                .resourceURLMissing(
-                    resourceName: Self.ssmScanResourceName)
+        // chapter 七百七 第一刀 — load ALL .metal resources
+        // from the bundle and concatenate into one source。
+        // Previously only SSMScan.metal was loaded;the
+        // additional kernel files (BASLayerNormKernel,
+        // BASActivationKernels, BASSoftmaxKernels, BASConv
+        // Kernels, BASReduceKernels, BASFlashAttention) all
+        // need to be visible to the linker for makeFunction
+        // to find their symbols。
+        let metalNames = [
+            Self.ssmScanResourceName,
+            "BASLayerNormKernel",
+            "BASActivationKernels",
+            "BASSoftmaxKernels",
+            "BASConvKernels",
+            "BASReduceKernels",
+            "BASFlashAttention",
+        ]
+        var combinedSource = ""
+        for name in metalNames {
+            guard let url = Self.expectedBundle.url(
+                forResource: name,
+                withExtension:
+                    Self.ssmScanResourceExtension)
+            else {
+                // Missing file is fatal only for the very
+                // first (SSMScan); newer kernel files can
+                // be optionally absent during partial
+                // backports / cherry-picks。
+                if name == Self.ssmScanResourceName {
+                    throw BASMetalKernelLibraryLoaderError
+                        .resourceURLMissing(
+                            resourceName: name)
+                }
+                continue
+            }
+            do {
+                let body = try String(
+                    contentsOf: url, encoding: .utf8)
+                combinedSource +=
+                    "\n// === \(name).metal ===\n"
+                combinedSource += body
+            } catch {
+                throw BASMetalKernelLibraryLoaderError
+                    .resourceReadFailed(
+                        message:
+                            "reading \(name).metal: " +
+                            String(describing: error))
+            }
         }
-        let source: String
-        do {
-            source = try String(contentsOf: url,
-                                encoding: .utf8)
-        } catch {
-            throw BASMetalKernelLibraryLoaderError
-                .resourceReadFailed(
-                    message: String(describing: error))
-        }
+        let source = combinedSource
         let library: MTLLibrary
         do {
             library = try device.makeLibrary(

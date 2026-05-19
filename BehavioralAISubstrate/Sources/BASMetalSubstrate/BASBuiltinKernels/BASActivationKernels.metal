@@ -30,6 +30,18 @@ using namespace metal;
 constant float SQRT_2_OVER_PI = 0.7978845608028654; // sqrt(2/π)
 constant float GELU_TANH_COEFF = 0.044715;          // empirical
 
+// MSL stdlib doesn't expose erf() directly — provide a high-
+// accuracy Abramowitz & Stegun 7.1.26 approximation (max error
+// ~1.5e-7 over all reals)。 Used by gelu_exact below。
+inline float bas_erf_approx(float x) {
+    float t = 1.0f / (1.0f + 0.3275911f * fabs(x));
+    float y = 1.0f - (
+        ((((1.061405429f * t - 1.453152027f) * t)
+            + 1.421413741f) * t - 0.284496736f) * t
+        + 0.254829592f) * t * exp(-x * x);
+    return x < 0.0f ? -y : y;
+}
+
 // MARK: - ReLU
 
 kernel void relu(
@@ -79,8 +91,8 @@ kernel void gelu_exact(
     uint                gid [[thread_position_in_grid]])
 {
     float v = x[gid];
-    // 0.5 * x * (1 + erf(x / sqrt(2)))
-    out[gid] = 0.5 * v * (1.0 + erf(v * 0.7071067811865475));
+    // 0.5 * x * (1 + bas_erf_approx(x / sqrt(2)))
+    out[gid] = 0.5 * v * (1.0 + bas_erf_approx(v * 0.7071067811865475));
 }
 
 kernel void gelu_exact_backward(
@@ -94,7 +106,7 @@ kernel void gelu_exact_backward(
     //   GELU'(x) = Φ(x) + x * φ(x)
     // where Φ is the standard normal CDF and φ the PDF。
     float cdf =
-        0.5 * (1.0 + erf(v * 0.7071067811865475));
+        0.5 * (1.0 + bas_erf_approx(v * 0.7071067811865475));
     float pdf =
         0.3989422804014327 * exp(-0.5 * v * v); // 1/sqrt(2π)
     dx[gid] = dy[gid] * (cdf + v * pdf);
