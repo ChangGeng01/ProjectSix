@@ -73,6 +73,16 @@
 import CryptoKit
 import Foundation
 import BASRuntimeCore
+// chapter 七百四 第二刀 / M2192 — wire the NIST-pinned
+// sha256Hex callsite to the new Rust pure-SHA256 ABI shipped by
+// the chapter-七百三-第一刀 bas-substrate-core crate (now LIVE
+// in the XCFramework rebuilt at 第一刀)。 The Rust path produces
+// byte-identical output to CryptoKit's SHA256.hash(data:),
+// retiring the NIST-blocker that previously kept this site on
+// the Swift CryptoKit body。
+#if os(iOS) || os(macOS)
+import BASRustMemoryTrackerBinary
+#endif
 
 // MARK: - Operation enum
 
@@ -254,8 +264,40 @@ public struct BASMemoryAtomEventPayload:
     /// SHA256 of UTF-8 bytes,hex-encoded lowercase。Used for the
     /// content digest field。Same hash same input → byte-stable
     /// (chapter 三百九二 replay-determinism)。
+    ///
+    /// chapter 七百四 第二刀 — active path routes through the
+    /// Rust `bas_substrate_sha256` ABI (pure NIST SHA-256,byte-
+    /// equal to CryptoKit)。 Legacy CryptoKit body preserved as
+    /// `// `-prefixed comments per 「千万不要 删除」 directive。
+    /// On platforms without the Rust XCFramework (watchOS),
+    /// falls back to the legacy CryptoKit body。
     public static func sha256Hex(_ s: String) -> String {
         let bytes = Array(s.utf8)
+        #if os(iOS) || os(macOS)
+        // Active path: Rust pure NIST SHA-256。
+        var out = [UInt8](repeating: 0, count: 32)
+        let rc: Int32 = bytes.withUnsafeBufferPointer { bufp in
+            out.withUnsafeMutableBufferPointer { outp in
+                bas_substrate_sha256(
+                    bufp.baseAddress,
+                    bytes.count,
+                    outp.baseAddress)
+            }
+        }
+        if rc == 0 {
+            return out.map { String(format: "%02x", $0) }
+                .joined()
+        }
+        // FFI null-pointer error — extremely unlikely。 Fall
+        // through to the CryptoKit legacy body below。
+        #endif
+
+        // LEGACY CryptoKit BODY — preserved per 千万不要 删除
+        // directive。 Active ONLY on watchOS (no Rust XCFramework
+        // slice) or when the Rust path errors。
+        //     let digest = SHA256.hash(data: bytes)
+        //     return digest.map { String(format: "%02x", $0) }
+        //                  .joined()
         let digest = SHA256.hash(data: bytes)
         return digest.map { String(format: "%02x", $0) }.joined()
     }

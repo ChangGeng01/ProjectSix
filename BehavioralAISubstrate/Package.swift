@@ -122,7 +122,18 @@ let package = Package(
         // V1 inline path)。
         .target(
             name: "BASMemory",
-            dependencies: ["BASRuntimeCore"],
+            // chapter 七百四 第二刀 — BASMemoryAtomEventPayload
+            // .sha256Hex routes through the Rust pure-NIST-SHA256
+            // ABI (bas_substrate_sha256) shipped by the
+            // BASRustMemoryTrackerBinary XCFramework。 Platform
+            // gate matches the binary target's gate。
+            dependencies: [
+                "BASRuntimeCore",
+                .target(
+                    name: "BASRustMemoryTrackerBinary",
+                    condition: .when(
+                        platforms: [.iOS, .macOS]))
+            ],
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
             ]),
