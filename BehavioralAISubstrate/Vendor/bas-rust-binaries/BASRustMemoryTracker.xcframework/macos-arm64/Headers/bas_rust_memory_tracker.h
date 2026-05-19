@@ -746,6 +746,57 @@ int32_t bas_ranker_provenance_rejection_code(
     int32_t has_signature_ref,
     int32_t has_issued_at);
 
+// MARK: - chapter 七百二十三 第二刀 — Importance scorer C ABI
+//
+// Wire format (BIG-ENDIAN length prefixes,LE f64 values):
+//
+//   records_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [i64 retrieved_at_ms]
+//       [u8 helped_flag]  (0=NotHelped, 1=Helped, 2=Unknown)
+//
+//   tiers_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [u8 current_tier] (0=Cold, 1=Warm, 2=Hot)
+//
+//   tunables_buf (56 bytes total):
+//     7 × f64 little-endian。 Order:
+//       promote_threshold,demote_threshold,
+//       recency_half_life_seconds,frequency_saturation,
+//       tier_decay_hot,tier_decay_warm,tier_decay_cold
+//
+//   out_scores_buf (caller-allocated):
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [u8 current_tier]
+//       [f64 recency][f64 frequency][f64 helped][f64 tier_decay]
+//       [f64 total_score]
+//       [u8 recommended_tier]
+//       [u32 record_count]
+//       [i64 computed_at_ms]
+//
+// Two-phase: first call with `out_capacity=0` returns the
+// required size in bytes,then caller reallocs + retries。
+
+/// Compute importance scores serialized into `out_scores_buf`。
+///
+/// Returns:
+///   ≥ 0 = number of OUTPUT BYTES needed
+///   -1  = null pointer
+///   -2  = malformed inputs (length-prefix underrun OR invalid
+///         enum discriminant)
+int64_t bas_ranker_importance_score_all(
+    const uint8_t* records_buf, size_t records_len,
+    const uint8_t* tiers_buf,   size_t tiers_len,
+    const uint8_t* tunables_buf, size_t tunables_len,
+    int64_t now_ms,
+    uint8_t* out_scores_buf, size_t out_capacity);
+
 #ifdef __cplusplus
 }
 #endif

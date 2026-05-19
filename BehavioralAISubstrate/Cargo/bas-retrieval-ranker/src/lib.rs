@@ -842,6 +842,248 @@ pub unsafe extern "C" fn bas_ranker_bytes_to_hex_lower(
     0
 }
 
+// MARK: - chapter 七百二十三 第二刀 Importance scorer C ABI
+//
+// Wire format (BIG-ENDIAN length prefixes — matches the chapter
+// 七百二十二 BPE tokenizer wire format precedent):
+//
+//   records_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [i64 retrieved_at_ms]
+//       [u8 helped_flag]   (0=NotHelped, 1=Helped, 2=Unknown)
+//
+//   tiers_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [u8 current_tier] (0=Cold, 1=Warm, 2=Hot)
+//
+//   tunables_buf:
+//     7 × f64 little-endian (host byte order — both Swift and
+//     Rust on aarch64 are little-endian)。 Order:
+//       promote_threshold,demote_threshold,
+//       recency_half_life_seconds,frequency_saturation,
+//       tier_decay_hot,tier_decay_warm,tier_decay_cold
+//
+//   out_scores_buf (caller-allocated):
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [u8 current_tier]
+//       [f64 recency][f64 frequency][f64 helped][f64 tier_decay]
+//       [f64 total_score]
+//       [u8 recommended_tier]
+//       [u32 record_count]
+//       [i64 computed_at_ms]
+//
+// Two-phase like BPE encode:first call with `out_capacity=0`
+// returns the required size,then caller reallocs + retries。
+
+/// Compute importance scores for `atom_tiers`,scored against
+/// `records`。 Output is a length-prefixed serialized byte
+/// buffer。
+///
+/// Returns:
+///   ≥ 0 = number of OUTPUT BYTES needed (first-pass discovery
+///         OR successful fill)
+///   -1  = null pointer
+///   -2  = malformed inputs (length-prefix underrun OR invalid
+///         enum discriminant)
+///
+/// # Safety
+/// Caller provides readable buffers of declared length。 If
+/// `out_capacity > 0`,out_scores_buf must point to ≥
+/// out_capacity writable bytes。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_importance_score_all(
+    records_buf: *const u8,
+    records_len: usize,
+    tiers_buf: *const u8,
+    tiers_len: usize,
+    tunables_buf: *const u8,
+    tunables_len: usize,
+    now_ms: i64,
+    out_scores_buf: *mut u8,
+    out_capacity: usize,
+) -> i64 {
+    // Permit null buffers only when corresponding length is 0
+    if (records_buf.is_null() && records_len > 0)
+        || (tiers_buf.is_null() && tiers_len > 0)
+        || tunables_buf.is_null()
+        || tunables_len < 7 * 8
+    {
+        return -1;
+    }
+    if out_capacity > 0 && out_scores_buf.is_null() {
+        return -1;
+    }
+    let records_slice = if records_len == 0 {
+        &[][..]
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(records_buf, records_len)
+        }
+    };
+    let tiers_slice = if tiers_len == 0 {
+        &[][..]
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(tiers_buf, tiers_len)
+        }
+    };
+    let tunables_slice = unsafe {
+        core::slice::from_raw_parts(tunables_buf, tunables_len)
+    };
+
+    let records = match parse_records(records_slice) {
+        Some(r) => r,
+        None => return -2,
+    };
+    let tiers = match parse_tiers(tiers_slice) {
+        Some(t) => t,
+        None => return -2,
+    };
+    let tunables = parse_tunables(tunables_slice);
+
+    let scores = importance_scorer::score_all(
+        &tiers, &records, now_ms, &tunables);
+    let serialized = serialize_scores(&scores);
+
+    let needed = serialized.len();
+    if out_capacity > 0 && needed > 0 {
+        let copy_n = core::cmp::min(needed, out_capacity);
+        let dst = unsafe {
+            core::slice::from_raw_parts_mut(
+                out_scores_buf, copy_n)
+        };
+        dst.copy_from_slice(&serialized[..copy_n]);
+    }
+    needed as i64
+}
+
+// Internal wire-format parsers --------------------------------
+
+fn read_u32_be(buf: &[u8], pos: usize) -> Option<u32> {
+    if pos + 4 > buf.len() { return None; }
+    Some(u32::from_be_bytes([
+        buf[pos], buf[pos+1], buf[pos+2], buf[pos+3]]))
+}
+
+fn read_i64_be(buf: &[u8], pos: usize) -> Option<i64> {
+    if pos + 8 > buf.len() { return None; }
+    Some(i64::from_be_bytes([
+        buf[pos],   buf[pos+1], buf[pos+2], buf[pos+3],
+        buf[pos+4], buf[pos+5], buf[pos+6], buf[pos+7]]))
+}
+
+fn read_f64_le(buf: &[u8], pos: usize) -> Option<f64> {
+    if pos + 8 > buf.len() { return None; }
+    Some(f64::from_le_bytes([
+        buf[pos],   buf[pos+1], buf[pos+2], buf[pos+3],
+        buf[pos+4], buf[pos+5], buf[pos+6], buf[pos+7]]))
+}
+
+fn parse_records(
+    buf: &[u8],
+) -> Option<Vec<importance_scorer::UsageRecord>> {
+    if buf.is_empty() { return Some(Vec::new()); }
+    let count = read_u32_be(buf, 0)? as usize;
+    let mut pos = 4;
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        let id_len = read_u32_be(buf, pos)? as usize;
+        pos += 4;
+        if pos + id_len > buf.len() { return None; }
+        let atom_id = core::str::from_utf8(
+            &buf[pos..pos + id_len]).ok()?.to_string();
+        pos += id_len;
+        let retrieved = read_i64_be(buf, pos)?;
+        pos += 8;
+        if pos + 1 > buf.len() { return None; }
+        let flag = importance_scorer::HelpedFlag
+            ::from_u8(buf[pos])?;
+        pos += 1;
+        out.push(importance_scorer::UsageRecord {
+            atom_id,
+            retrieved_at_ms: retrieved,
+            helped_flag: flag,
+        });
+    }
+    Some(out)
+}
+
+fn parse_tiers(
+    buf: &[u8],
+) -> Option<Vec<(String, importance_scorer::Tier)>> {
+    if buf.is_empty() { return Some(Vec::new()); }
+    let count = read_u32_be(buf, 0)? as usize;
+    let mut pos = 4;
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        let id_len = read_u32_be(buf, pos)? as usize;
+        pos += 4;
+        if pos + id_len > buf.len() { return None; }
+        let atom_id = core::str::from_utf8(
+            &buf[pos..pos + id_len]).ok()?.to_string();
+        pos += id_len;
+        if pos + 1 > buf.len() { return None; }
+        let tier = importance_scorer::Tier
+            ::from_u8(buf[pos])?;
+        pos += 1;
+        out.push((atom_id, tier));
+    }
+    Some(out)
+}
+
+fn parse_tunables(buf: &[u8]) -> importance_scorer::Tunables {
+    importance_scorer::Tunables {
+        promote_threshold:        read_f64_le(buf,  0).unwrap_or(0.65),
+        demote_threshold:         read_f64_le(buf,  8).unwrap_or(0.20),
+        recency_half_life_seconds: read_f64_le(buf, 16).unwrap_or(86400.0),
+        frequency_saturation:     read_f64_le(buf, 24).unwrap_or(50.0),
+        tier_decay_hot:           read_f64_le(buf, 32).unwrap_or(1.0),
+        tier_decay_warm:          read_f64_le(buf, 40).unwrap_or(0.7),
+        tier_decay_cold:          read_f64_le(buf, 48).unwrap_or(0.4),
+    }
+}
+
+fn serialize_scores(
+    scores: &[importance_scorer::ImportanceScore],
+) -> Vec<u8> {
+    // Estimate capacity: 4 (count) + per-score: 4 + atom_len + 1
+    // + 5 × 8 + 1 + 4 + 8 = ~70 + atom_len。 Reserve 80 per score
+    // to amortize growth。
+    let mut out: Vec<u8> = Vec::with_capacity(
+        4 + scores.len() * 80);
+    out.extend_from_slice(
+        &(scores.len() as u32).to_be_bytes());
+    for s in scores {
+        let id_bytes = s.atom_id.as_bytes();
+        out.extend_from_slice(
+            &(id_bytes.len() as u32).to_be_bytes());
+        out.extend_from_slice(id_bytes);
+        out.push(s.current_tier.as_u8());
+        out.extend_from_slice(
+            &s.recency_component.to_le_bytes());
+        out.extend_from_slice(
+            &s.frequency_component.to_le_bytes());
+        out.extend_from_slice(
+            &s.helped_component.to_le_bytes());
+        out.extend_from_slice(
+            &s.tier_decay_component.to_le_bytes());
+        out.extend_from_slice(
+            &s.total_score.to_le_bytes());
+        out.push(s.recommended_tier.as_u8());
+        out.extend_from_slice(
+            &(s.record_count as u32).to_be_bytes());
+        out.extend_from_slice(
+            &s.computed_at_ms.to_be_bytes());
+    }
+    out
+}
+
 // MARK: - chapter 七百十三 第四刀 Provenance filter C ABI
 
 /// Provenance gate for one envelope。 Hash hex strings passed

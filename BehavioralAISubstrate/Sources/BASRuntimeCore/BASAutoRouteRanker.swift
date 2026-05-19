@@ -1533,6 +1533,292 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - Importance scorer (chapter 七百二十三 第二刀 / M2287)
+    //
+    // Routes through the bas-retrieval-ranker Rust crate's
+    // `bas_ranker_importance_score_all` FFI。 Wire format matches
+    // the Rust-side documentation in the header (BIG-ENDIAN
+    // length prefixes,LE f64 values)。
+    //
+    // BASRuntimeCore-local input/output types so the bridge stays
+    // independent of BASMemory's `BASMemoryUsageRecord` —
+    // BASMemory side adds a thin adapter when wiring through
+    // BASMemoryImportanceScorer (Knife 3)。
+
+    public enum BASImportanceTier: UInt8, Sendable, Equatable {
+        case cold = 0
+        case warm = 1
+        case hot  = 2
+    }
+
+    public enum BASImportanceHelpedFlag: UInt8, Sendable, Equatable
+    {
+        case notHelped = 0
+        case helped    = 1
+        case unknown   = 2
+    }
+
+    public struct BASImportanceRecord: Sendable, Equatable {
+        public let atomID: String
+        public let retrievedAtMs: Int64
+        public let helpedFlag: BASImportanceHelpedFlag
+        public init(
+            atomID: String,
+            retrievedAtMs: Int64,
+            helpedFlag: BASImportanceHelpedFlag
+        ) {
+            self.atomID = atomID
+            self.retrievedAtMs = retrievedAtMs
+            self.helpedFlag = helpedFlag
+        }
+    }
+
+    public struct BASImportanceTunables: Sendable, Equatable {
+        public let promoteThreshold: Double
+        public let demoteThreshold: Double
+        public let recencyHalfLifeSeconds: Double
+        public let frequencySaturation: Double
+        public let tierDecayHot: Double
+        public let tierDecayWarm: Double
+        public let tierDecayCold: Double
+        public init(
+            promoteThreshold: Double = 0.65,
+            demoteThreshold: Double = 0.20,
+            recencyHalfLifeSeconds: Double = 86400.0,
+            frequencySaturation: Double = 50.0,
+            tierDecayHot: Double = 1.0,
+            tierDecayWarm: Double = 0.7,
+            tierDecayCold: Double = 0.4
+        ) {
+            self.promoteThreshold = promoteThreshold
+            self.demoteThreshold = demoteThreshold
+            self.recencyHalfLifeSeconds = recencyHalfLifeSeconds
+            self.frequencySaturation = frequencySaturation
+            self.tierDecayHot = tierDecayHot
+            self.tierDecayWarm = tierDecayWarm
+            self.tierDecayCold = tierDecayCold
+        }
+    }
+
+    public struct BASImportanceScore: Sendable, Equatable {
+        public let atomID: String
+        public let currentTier: BASImportanceTier
+        public let recencyComponent: Double
+        public let frequencyComponent: Double
+        public let helpedComponent: Double
+        public let tierDecayComponent: Double
+        public let totalScore: Double
+        public let recommendedTier: BASImportanceTier
+        public let recordCount: Int
+        public let computedAtMs: Int64
+    }
+
+    /// Rust-routed `score_all`。 Returns nil when the XCFramework
+    /// is unavailable (watchOS) or the FFI rejects malformed
+    /// inputs (extremely unlikely from typed Swift sources)。
+    public static func importanceScoreAll(
+        records: [BASImportanceRecord],
+        tiers: [(atomID: String, tier: BASImportanceTier)],
+        tunables: BASImportanceTunables =
+            BASImportanceTunables(),
+        nowMs: Int64
+    ) -> [BASImportanceScore]? {
+        #if os(iOS) || os(macOS)
+        let recordsBuf = encodeRecordsBuffer(records)
+        let tiersBuf   = encodeTiersBuffer(tiers)
+        let tunablesBuf = encodeTunablesBuffer(tunables)
+
+        return recordsBuf.withUnsafeBufferPointer { rp in
+            return tiersBuf.withUnsafeBufferPointer { tp in
+                return tunablesBuf.withUnsafeBufferPointer { up in
+                    // Two-phase:discover then fill。
+                    let needed = bas_ranker_importance_score_all(
+                        rp.baseAddress, recordsBuf.count,
+                        tp.baseAddress, tiersBuf.count,
+                        up.baseAddress, tunablesBuf.count,
+                        nowMs,
+                        nil, 0)
+                    if needed < 0 { return nil }
+                    if needed == 0 { return [] }
+                    var outBuf = [UInt8](
+                        repeating: 0, count: Int(needed))
+                    let wrote = outBuf
+                        .withUnsafeMutableBufferPointer { op in
+                            return bas_ranker_importance_score_all(
+                                rp.baseAddress, recordsBuf.count,
+                                tp.baseAddress, tiersBuf.count,
+                                up.baseAddress, tunablesBuf.count,
+                                nowMs,
+                                op.baseAddress, op.count)
+                        }
+                    guard wrote == needed else { return nil }
+                    return decodeScoresBuffer(outBuf)
+                }
+            }
+        }
+        #else
+        return nil
+        #endif
+    }
+
+    // MARK: - Wire format helpers (chapter 七百二十三 第二刀)
+
+    private static func encodeRecordsBuffer(
+        _ records: [BASImportanceRecord]
+    ) -> [UInt8] {
+        var buf: [UInt8] = []
+        buf.reserveCapacity(4 + records.count * 40)
+        appendU32BE(&buf, UInt32(records.count))
+        for r in records {
+            let idBytes = Array(r.atomID.utf8)
+            appendU32BE(&buf, UInt32(idBytes.count))
+            buf.append(contentsOf: idBytes)
+            appendI64BE(&buf, r.retrievedAtMs)
+            buf.append(r.helpedFlag.rawValue)
+        }
+        return buf
+    }
+
+    private static func encodeTiersBuffer(
+        _ tiers: [(atomID: String, tier: BASImportanceTier)]
+    ) -> [UInt8] {
+        var buf: [UInt8] = []
+        buf.reserveCapacity(4 + tiers.count * 24)
+        appendU32BE(&buf, UInt32(tiers.count))
+        for t in tiers {
+            let idBytes = Array(t.atomID.utf8)
+            appendU32BE(&buf, UInt32(idBytes.count))
+            buf.append(contentsOf: idBytes)
+            buf.append(t.tier.rawValue)
+        }
+        return buf
+    }
+
+    private static func encodeTunablesBuffer(
+        _ t: BASImportanceTunables
+    ) -> [UInt8] {
+        var buf: [UInt8] = []
+        buf.reserveCapacity(7 * 8)
+        appendF64LE(&buf, t.promoteThreshold)
+        appendF64LE(&buf, t.demoteThreshold)
+        appendF64LE(&buf, t.recencyHalfLifeSeconds)
+        appendF64LE(&buf, t.frequencySaturation)
+        appendF64LE(&buf, t.tierDecayHot)
+        appendF64LE(&buf, t.tierDecayWarm)
+        appendF64LE(&buf, t.tierDecayCold)
+        return buf
+    }
+
+    private static func decodeScoresBuffer(
+        _ buf: [UInt8]
+    ) -> [BASImportanceScore]? {
+        guard buf.count >= 4 else { return nil }
+        var pos = 0
+        let count = Int(readU32BE(buf, pos))
+        pos += 4
+        var out: [BASImportanceScore] = []
+        out.reserveCapacity(count)
+        for _ in 0..<count {
+            guard pos + 4 <= buf.count else { return nil }
+            let idLen = Int(readU32BE(buf, pos))
+            pos += 4
+            guard pos + idLen <= buf.count else { return nil }
+            let atomID = String(
+                decoding: buf[pos..<pos + idLen],
+                as: UTF8.self)
+            pos += idLen
+            guard pos + 1 <= buf.count,
+                  let currentTier = BASImportanceTier(
+                    rawValue: buf[pos])
+            else { return nil }
+            pos += 1
+            guard pos + 5 * 8 <= buf.count else { return nil }
+            let recency = readF64LE(buf, pos);    pos += 8
+            let freq    = readF64LE(buf, pos);    pos += 8
+            let helped  = readF64LE(buf, pos);    pos += 8
+            let tierD   = readF64LE(buf, pos);    pos += 8
+            let total   = readF64LE(buf, pos);    pos += 8
+            guard pos + 1 <= buf.count,
+                  let recommended = BASImportanceTier(
+                    rawValue: buf[pos])
+            else { return nil }
+            pos += 1
+            guard pos + 4 + 8 <= buf.count else { return nil }
+            let recordCount = Int(readU32BE(buf, pos))
+            pos += 4
+            let computedAt = readI64BE(buf, pos)
+            pos += 8
+            out.append(BASImportanceScore(
+                atomID: atomID,
+                currentTier: currentTier,
+                recencyComponent: recency,
+                frequencyComponent: freq,
+                helpedComponent: helped,
+                tierDecayComponent: tierD,
+                totalScore: total,
+                recommendedTier: recommended,
+                recordCount: recordCount,
+                computedAtMs: computedAt))
+        }
+        return out
+    }
+
+    private static func appendU32BE(
+        _ buf: inout [UInt8], _ v: UInt32
+    ) {
+        buf.append(UInt8((v >> 24) & 0xff))
+        buf.append(UInt8((v >> 16) & 0xff))
+        buf.append(UInt8((v >>  8) & 0xff))
+        buf.append(UInt8( v        & 0xff))
+    }
+
+    private static func appendI64BE(
+        _ buf: inout [UInt8], _ v: Int64
+    ) {
+        let u = UInt64(bitPattern: v)
+        for shift in stride(from: 56, through: 0, by: -8) {
+            buf.append(UInt8((u >> shift) & 0xff))
+        }
+    }
+
+    private static func appendF64LE(
+        _ buf: inout [UInt8], _ v: Double
+    ) {
+        let bits = v.bitPattern  // host (LE on aarch64)
+        for shift in stride(from: 0, through: 56, by: 8) {
+            buf.append(UInt8((bits >> shift) & 0xff))
+        }
+    }
+
+    private static func readU32BE(
+        _ buf: [UInt8], _ pos: Int
+    ) -> UInt32 {
+        return  (UInt32(buf[pos    ]) << 24)
+              | (UInt32(buf[pos + 1]) << 16)
+              | (UInt32(buf[pos + 2]) <<  8)
+              |  UInt32(buf[pos + 3])
+    }
+
+    private static func readI64BE(
+        _ buf: [UInt8], _ pos: Int
+    ) -> Int64 {
+        var u: UInt64 = 0
+        for i in 0..<8 {
+            u = (u << 8) | UInt64(buf[pos + i])
+        }
+        return Int64(bitPattern: u)
+    }
+
+    private static func readF64LE(
+        _ buf: [UInt8], _ pos: Int
+    ) -> Double {
+        var bits: UInt64 = 0
+        for i in 0..<8 {
+            bits |= UInt64(buf[pos + i]) << (i * 8)
+        }
+        return Double(bitPattern: bits)
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(
