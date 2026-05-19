@@ -1086,6 +1086,90 @@ fn serialize_scores(
     out
 }
 
+// MARK: - chapter 七百二十七 第二刀 / M2307 int8 cosine FFI
+//
+// Pure pass-through to quantize::cosine_int8 + batched variant。
+// Caller-owned output buffers — no heap leak across FFI。
+
+/// Cosine between two int8-quantized vectors。 Writes the score
+/// into *out_score。 Returns 0 on success,-1 on null pointer or
+/// length mismatch。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_cosine_int8(
+    a: *const i8, a_len: usize, scale_a: f32,
+    b: *const i8, b_len: usize, scale_b: f32,
+    out_score: *mut f32,
+) -> i32 {
+    if out_score.is_null() { return -1; }
+    if a.is_null() && a_len > 0 { return -1; }
+    if b.is_null() && b_len > 0 { return -1; }
+    if a_len != b_len { return -1; }
+    let as_ = if a_len == 0 {
+        &[][..]
+    } else {
+        unsafe { core::slice::from_raw_parts(a, a_len) }
+    };
+    let bs = if b_len == 0 {
+        &[][..]
+    } else {
+        unsafe { core::slice::from_raw_parts(b, b_len) }
+    };
+    let s = quantize::cosine_int8(as_, scale_a, bs, scale_b);
+    unsafe { *out_score = s; }
+    0
+}
+
+/// Batched int8 cosine — single FFI hop for the entire corpus。
+/// Per-row scales make each entry independently quantized。
+///
+/// Returns:
+///   0  = success (out_scores filled)
+///   -1 = null pointer
+///   -2 = shape error (corpus.len() % dim != 0,scales count
+///        mismatch,dim 0,or out_capacity < n_rows)
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_batched_cosine_int8(
+    q: *const i8, q_len: usize, scale_q: f32,
+    corpus: *const i8, corpus_len: usize,
+    corpus_scales: *const f32, corpus_scales_len: usize,
+    dim: usize,
+    out_scores: *mut f32, out_capacity: usize,
+) -> i32 {
+    if q.is_null() || corpus.is_null()
+       || corpus_scales.is_null() || out_scores.is_null()
+    {
+        return -1;
+    }
+    if dim == 0 { return -2; }
+    if q_len != dim { return -2; }
+    if corpus_len % dim != 0 { return -2; }
+    let n_rows = corpus_len / dim;
+    if corpus_scales_len != n_rows { return -2; }
+    if out_capacity < n_rows { return -2; }
+    let q_slice = unsafe {
+        core::slice::from_raw_parts(q, q_len)
+    };
+    let corpus_slice = unsafe {
+        core::slice::from_raw_parts(corpus, corpus_len)
+    };
+    let scales_slice = unsafe {
+        core::slice::from_raw_parts(
+            corpus_scales, corpus_scales_len)
+    };
+    let scores = match quantize::batched_cosine_int8(
+        q_slice, scale_q,
+        corpus_slice, scales_slice, dim)
+    {
+        Some(s) => s,
+        None => return -2,
+    };
+    let dst = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, n_rows)
+    };
+    dst.copy_from_slice(&scores);
+    0
+}
+
 // MARK: - chapter 七百二十六 第二刀 / M2302 int8 quantization C ABI
 //
 // Three thin pass-through functions for the int8 primitives。

@@ -836,6 +836,30 @@ int64_t bas_ranker_usage_count_for_atom(
 // through functions exposing the bas-retrieval-ranker::quantize
 // module。
 
+// MARK: - chapter 七百二十七 第二刀 / M2307 int8 cosine
+//
+// Quantized vector retrieval primitives — substrate's first
+// quality-drift-gated production path (cosine-drift ≤ 0.01
+// instead of byte-equality)。
+
+/// Cosine between two int8-quantized vectors。 Writes the score
+/// into *out_score。 Returns 0 on success,-1 on null pointer or
+/// length mismatch。
+int32_t bas_ranker_cosine_int8(
+    const int8_t* a, size_t a_len, float scale_a,
+    const int8_t* b, size_t b_len, float scale_b,
+    float* out_score);
+
+/// Batched cosine across many int8-quantized corpus rows。 Each
+/// row has its own scale (heterogeneous precision)。 Returns 0
+/// on success,-1 on null pointer,-2 on shape error。
+int32_t bas_ranker_batched_cosine_int8(
+    const int8_t* q, size_t q_len, float scale_q,
+    const int8_t* corpus, size_t corpus_len,
+    const float* corpus_scales, size_t corpus_scales_len,
+    size_t dim,
+    float* out_scores, size_t out_capacity);
+
 /// Quantize Float32 array to int8 + scale。 Returns 0 on success,
 /// -1 on null pointer or out_q_capacity < n。
 int32_t bas_ranker_quantize_int8(

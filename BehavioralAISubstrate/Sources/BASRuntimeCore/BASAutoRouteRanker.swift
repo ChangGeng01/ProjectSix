@@ -1661,6 +1661,72 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - int8 cosine retrieval (chapter 七百二十七 第二刀 / M2307)
+
+    /// Cosine between two int8-quantized vectors。 Returns nil on
+    /// FFI failure or length mismatch。
+    public static func cosineInt8(
+        a: [Int8], scaleA: Float,
+        b: [Int8], scaleB: Float
+    ) -> Float? {
+        #if os(iOS) || os(macOS)
+        guard a.count == b.count else { return nil }
+        var out: Float = 0
+        let rc = a.withUnsafeBufferPointer { ap in
+            return b.withUnsafeBufferPointer { bp in
+                return bas_ranker_cosine_int8(
+                    ap.baseAddress, ap.count, scaleA,
+                    bp.baseAddress, bp.count, scaleB,
+                    &out)
+            }
+        }
+        if rc != 0 { return nil }
+        return out
+        #else
+        return nil
+        #endif
+    }
+
+    /// Batched cosine across many int8-quantized corpus rows。
+    /// `corpus` is n_rows × dim contiguous;`corpusScales` has
+    /// one f32 per row。 Returns one cosine per row,or nil on
+    /// shape error / FFI failure。
+    public static func batchedCosineInt8(
+        query: [Int8], scaleQuery: Float,
+        corpus: [Int8], corpusScales: [Float],
+        dim: Int
+    ) -> [Float]? {
+        #if os(iOS) || os(macOS)
+        guard dim > 0,
+              query.count == dim,
+              corpus.count % dim == 0
+        else { return nil }
+        let nRows = corpus.count / dim
+        guard corpusScales.count == nRows else { return nil }
+        var scores = [Float](repeating: 0, count: nRows)
+        let rc = query.withUnsafeBufferPointer { qp in
+            return corpus.withUnsafeBufferPointer { cp in
+                return corpusScales
+                    .withUnsafeBufferPointer { sp in
+                        return scores
+                        .withUnsafeMutableBufferPointer { op in
+                            return bas_ranker_batched_cosine_int8(
+                                qp.baseAddress, qp.count, scaleQuery,
+                                cp.baseAddress, cp.count,
+                                sp.baseAddress, sp.count,
+                                dim,
+                                op.baseAddress, op.count)
+                        }
+                }
+            }
+        }
+        if rc != 0 { return nil }
+        return scores
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - int8 quantization (chapter 七百二十六 第二刀 / M2302)
     //
     // Net-new capability: substrate gains symmetric int8 quantize

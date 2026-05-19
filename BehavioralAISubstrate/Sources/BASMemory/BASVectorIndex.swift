@@ -168,11 +168,39 @@ public actor BASVectorIndex {
         case duplicateAtomID(String)
     }
 
+    /// chapter 七百二十七 第二刀 — feature flag controlling
+    /// whether `topKInt8(query:)` is permitted。 Default OFF —
+    /// hosts opt in by:
+    ///   1. flipping the flag,
+    ///   2. inserting BASInt8VectorIndexEntry rows (via
+    ///      `insertInt8` / `upsertInt8`),
+    ///   3. calling `topKInt8(query:)` instead of `topK`。
+    ///
+    /// The Float32 path (legacy entries + `topK`) keeps working
+    /// concurrently — int8 entries live in a separate parallel
+    /// dictionary。 Mixing isn't supported within a single query;
+    /// callers pick the path per query。
+    ///
+    /// Quality gate:cosine-drift ≤ 0.01 across 100 random
+    /// queries × 1000-row corpus (chapter 七百二十七 第三刀
+    /// `BASChapter727Int8VectorDriftGateTests`)。 NOT byte-equal
+    /// with Float32 — first chapter in the arc to ship a
+    /// quality-drift-gated production path。
+    public nonisolated(unsafe) static var
+        useInt8VectorStorage: Bool = false
+
     // MARK: - State
 
     private var entries: [String: BASVectorIndexEntry] = [:]
     private var orderedIDs: [String] = []
     private var boundDimension: Int? = nil
+
+    /// chapter 七百二十七 第二刀 — int8-quantized entry storage,
+    /// parallel to the Float32 `entries` map。 Hosts use
+    /// `insertInt8` / `topKInt8` to opt into this path。
+    private var int8Entries:
+        [String: BASInt8VectorIndexEntry] = [:]
+    private var int8OrderedIDs: [String] = []
 
     public init() {}
 
@@ -232,6 +260,43 @@ public actor BASVectorIndex {
         return true
     }
 
+    // MARK: - int8 insert / upsert / remove (chapter 七百二十七 第二刀)
+
+    /// Insert an int8-quantized entry。 Dimension-bind contract
+    /// mirrors the Float32 path:first insert sets the bound,
+    /// subsequent inserts with different dim throw。
+    public func insertInt8(
+        _ entry: BASInt8VectorIndexEntry
+    ) throws {
+        if let bound = boundDimension {
+            guard entry.dimension == bound else {
+                throw BASVectorIndexError.dimensionMismatch(
+                    expected: bound,
+                    got: entry.dimension)
+            }
+        } else {
+            boundDimension = entry.dimension
+        }
+        guard int8Entries[entry.atomID] == nil else {
+            throw BASVectorIndexError.duplicateAtomID(
+                entry.atomID)
+        }
+        int8Entries[entry.atomID] = entry
+        int8OrderedIDs.append(entry.atomID)
+    }
+
+    @discardableResult
+    public func removeInt8(atomID: String) -> Bool {
+        guard int8Entries[atomID] != nil else { return false }
+        int8Entries.removeValue(forKey: atomID)
+        int8OrderedIDs.removeAll { $0 == atomID }
+        return true
+    }
+
+    public var int8EntryCount: Int {
+        int8Entries.count
+    }
+
     // MARK: - Top-k query
 
     /// Cosine similarity top-k。Pass a pre-normalized query
@@ -273,7 +338,7 @@ public actor BASVectorIndex {
             guard let entry = entries[id] else { continue }
             // Apply domain filter (chapter 三百五六 composition)
             if !excludingDomains.isEmpty,
-               domainExcluded(
+               Self.domainExcluded(
                     entry.domain,
                     against: excludingDomains)
             {
@@ -291,6 +356,84 @@ public actor BASVectorIndex {
             return Array(scored.prefix(k))
         }
         return scored
+    }
+
+    /// chapter 七百二十七 第二刀 — int8-quantized top-k。
+    /// Quantizes the Float32 query once,then runs a single
+    /// batched-int8-cosine FFI call over the int8 corpus。
+    /// Caller must pre-normalize the query (same contract as
+    /// `topK`)。 Returns empty if `useInt8VectorStorage == false`
+    /// or no int8 entries are loaded。
+    ///
+    /// Cosine-drift gate (chapter 七百二十七 第三刀):
+    ///   max |cos_int8 - cos_f32| ≤ 0.01 across 100 random
+    ///   queries × 1000-row 384-dim corpus
+    public func topKInt8(
+        query: BASEmbedding,
+        k: Int,
+        excludingDomains: [String] = []
+    ) -> [BASVectorTopKResult] {
+        guard k > 0, !int8Entries.isEmpty else { return [] }
+        if let bound = boundDimension,
+           query.dimension != bound
+        { return [] }
+        guard Self.useInt8VectorStorage else { return [] }
+
+        let dim = query.dimension
+
+        // Quantize the query once
+        guard let qq = BASAutoRouteRanker.quantizeInt8(
+            query.vector)
+        else { return [] }
+
+        // Build contiguous corpus + per-row scales,recording
+        // which atomIDs they correspond to (so domain filter
+        // applies before scoring)。
+        var candidateIDs: [String] = []
+        var corpusFlat: [Int8] = []
+        var rowScales: [Float] = []
+        candidateIDs.reserveCapacity(int8Entries.count)
+        corpusFlat.reserveCapacity(
+            int8Entries.count * dim)
+        rowScales.reserveCapacity(int8Entries.count)
+        for id in int8OrderedIDs {
+            guard let entry = int8Entries[id]
+            else { continue }
+            if !excludingDomains.isEmpty,
+               Self.domainExcluded(
+                    entry.domain,
+                    against: excludingDomains)
+            { continue }
+            candidateIDs.append(id)
+            corpusFlat.append(
+                contentsOf: entry.quantizedEmbedding
+                    .toInt8Array())
+            rowScales.append(
+                entry.quantizedEmbedding.scale)
+        }
+        if candidateIDs.isEmpty { return [] }
+
+        // Single batched FFI hop
+        guard let scores = BASAutoRouteRanker
+            .batchedCosineInt8(
+                query: qq.quantized,
+                scaleQuery: qq.scale,
+                corpus: corpusFlat,
+                corpusScales: rowScales,
+                dim: dim)
+        else { return [] }
+
+        // Pair (id, score) + sort descending,truncate to k
+        var paired: [BASVectorTopKResult] =
+            zip(candidateIDs, scores).map {
+                BASVectorTopKResult(
+                    atomID: $0.0, score: $0.1)
+            }
+        paired.sort { $0.score > $1.score }
+        if paired.count > k {
+            return Array(paired.prefix(k))
+        }
+        return paired
     }
 
     // MARK: - Convenience
@@ -387,7 +530,7 @@ public actor BASVectorIndex {
         for (i, id) in corpusIDs.enumerated() {
             if !excludingDomains.isEmpty,
                let e = entries[id],
-               domainExcluded(
+               Self.domainExcluded(
                     e.domain, against: excludingDomains)
             {
                 continue
@@ -402,7 +545,7 @@ public actor BASVectorIndex {
         return scored
     }
 
-    fileprivate func domainExcluded(
+    fileprivate static func domainExcluded(
         _ domain: String,
         against patterns: [String]
     ) -> Bool {
