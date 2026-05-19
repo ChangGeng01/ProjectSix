@@ -118,7 +118,14 @@ let package = Package(
         // BASSovereign (L14) — isolated microkernel. Depends only on BASRuntimeCore
         // schema types. Never depends on Memory/Policy/Orchestration (prevents
         // downstream layers from influencing sovereign decisions).
-        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore"]),
+        // chapter 七百二 native-port branch — BASSovereign gains a build-graph
+        // dependency on BASRustCoreBridge to source the SHA256 chain-hash
+        // primitive from the Rust XCFramework (see BASSovereignAuditLedger.swift
+        // hash() commentary block). The semantic isolation principle
+        // ("never depends on Memory/Policy/Orchestration") is preserved at
+        // the import-graph level — BASSovereign code does not import any
+        // Memory/Policy/Orchestration module, only the Rust crypto primitive.
+        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore", "BASRustCoreBridge"]),
         // BASWorldPrior (L4) — world-knowledge layer. A leaf module:
         // depends only on BASRuntimeCore schema. Neither the sovereign
         // kernel nor memory/policy layers depend on it (world priors

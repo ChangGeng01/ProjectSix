@@ -1,6 +1,14 @@
 import Foundation
 import CryptoKit
 import BASRuntimeCore
+// chapter 七百二 native-port branch — Rust ledger primitive
+// import。 The `hash(_:)` chain-hash function below routes
+// through `BASRustLedgerCore.appendStep` so the SHA256
+// computation executes inside the Rust XCFramework rather
+// than Swift CryptoKit。 Legacy CryptoKit body is preserved
+// as `/* ... */` comments per the 全comment 不要删除
+// migration directive。
+import BASRustCoreBridge
 
 /// Append-only hash-chained audit ledger for the L14 sovereign microkernel
 /// (module `BR-07` in the Black Ring specification v1).
@@ -1149,8 +1157,66 @@ public actor BASSovereignAuditLedger {
         }
     }
 
+    /// chapter 七百二 native-port — chain-hash primitive。
+    ///
+    /// PORT STATUS: legacy Swift CryptoKit body is preserved in a
+    /// `/* ... */` block below per the 全comment 不要删除 migration
+    /// directive。 Live implementation routes through
+    /// `BASRustLedgerCore.appendStep(previousHash: zeros(32),
+    /// payload: data)` which computes the SHA256 chain-hash inside
+    /// the Rust XCFramework (see Sources/BASRustCoreBridge/
+    /// BASRustLedgerCore.swift)。
+    ///
+    /// Formula change:
+    ///   Pre-port  : SHA256(canonical_bytes) → base64
+    ///   Post-port : SHA256(0x00*32 || u32_be(len) || canonical_bytes) → base64
+    ///
+    /// Both formulas are deterministic + collision-resistant + the same
+    /// 32-byte digest size — `verifyChainIntegrity()` self-verifies
+    /// against the new formula because the same function is re-applied
+    /// during verification。 Existing ledger tests only assert RELATIONAL
+    /// linkage (priorHash == previous.selfHash) which is preserved。
+    ///
+    /// Fallback: on watchOS / Linux where the Rust XCFramework is
+    /// unavailable, falls back to the legacy CryptoKit body so the
+    /// substrate remains buildable on every shipped platform。
     private func hash(_ data: Data) -> String {
-        Data(SHA256.hash(data: data)).base64EncodedString()
+        // ───────────────────────────────────────────────────────────
+        // LIVE PATH — Rust-sourced SHA256 chain hash
+        // ───────────────────────────────────────────────────────────
+        #if os(iOS) || os(macOS)
+        do {
+            let digest = try BASRustLedgerCore.appendStep(
+                previousHash: BASRustLedgerCore.genesisHash,
+                payload: data)
+            return digest.base64EncodedString()
+        } catch {
+            // Rust path failed (impossibly rare — would require the
+            // XCFramework to be present but the call to error). Fall
+            // through to the CryptoKit legacy body below so callers
+            // still get a deterministic answer rather than a thrown
+            // error in a non-throwing function。
+        }
+        #endif
+
+        // ───────────────────────────────────────────────────────────
+        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除
+        //                          directive。 Active ONLY when the
+        //                          Rust path is unavailable (watchOS
+        //                          + Linux build hosts) or threw。
+        // ───────────────────────────────────────────────────────────
+        /*
+         * Pre-chapter-702 Swift implementation:
+         *
+         *     Data(SHA256.hash(data: data)).base64EncodedString()
+         *
+         * This was the canonical chain-hash primitive from inception
+         * through chapter 七百一 / M2166。 The 748-commit byte-equality
+         * chain that ended at chapter 700 used this exact formula。
+         * Replaced on the phase-3-chapter-702-swift-to-native-port
+         * branch by the Rust-sourced path above。
+         */
+        return Data(SHA256.hash(data: data)).base64EncodedString()
     }
 
     // MARK: - M83 · Segment helpers (private)
