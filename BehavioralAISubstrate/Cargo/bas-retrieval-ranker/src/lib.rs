@@ -349,6 +349,107 @@ pub unsafe extern "C" fn bas_ranker_matmul_simd_blocked(
     0
 }
 
+// MARK: - chapter 七百十一 第一/二刀 Activation C ABI
+
+/// GELU exact: y = 0.5*x*(1 + erf(x/√2))。 Matches
+/// torch.nn.functional.gelu。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_gelu_exact(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    activations::gelu_exact(x_s, o_s);
+    0
+}
+
+/// GELU exact SIMD 4-wide unrolled。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_gelu_exact_simd(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    activations::gelu_exact_simd(x_s, o_s);
+    0
+}
+
+/// GELU tanh approximation: matches
+/// torch.nn.functional.gelu(approximate="tanh")。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_gelu_tanh_approx(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    activations::gelu_tanh_approx(x_s, o_s);
+    0
+}
+
+/// GELU tanh-approx SIMD 4-wide unrolled。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_gelu_tanh_approx_simd(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    activations::gelu_tanh_approx_simd(x_s, o_s);
+    0
+}
+
+/// SiLU (Swish): y = x * σ(x)。 Matches
+/// torch.nn.functional.silu。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_silu(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    activations::silu(x_s, o_s);
+    0
+}
+
+/// SiLU SIMD 4-wide unrolled。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_silu_simd(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    activations::silu_simd(x_s, o_s);
+    0
+}
+
 /// SIMD-accelerated batched cosine — chapter 七百五 第二刀。
 #[no_mangle]
 pub unsafe extern "C" fn bas_ranker_batched_cosine_simd(

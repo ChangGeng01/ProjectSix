@@ -556,6 +556,24 @@ int32_t bas_ranker_layer_norm_affine_simd(
     float* out, size_t out_len,
     float eps);
 
+/* chapter 七百十一 第二刀 — Activation C ABI:
+ * Each takes a non-empty fp32 input + matching-length output。
+ * Returns 0 on success,-1 on null pointer,-2 on length
+ * mismatch / zero-length input。
+ */
+int32_t bas_ranker_gelu_exact(
+    const float* x, size_t n, float* out, size_t out_n);
+int32_t bas_ranker_gelu_exact_simd(
+    const float* x, size_t n, float* out, size_t out_n);
+int32_t bas_ranker_gelu_tanh_approx(
+    const float* x, size_t n, float* out, size_t out_n);
+int32_t bas_ranker_gelu_tanh_approx_simd(
+    const float* x, size_t n, float* out, size_t out_n);
+int32_t bas_ranker_silu(
+    const float* x, size_t n, float* out, size_t out_n);
+int32_t bas_ranker_silu_simd(
+    const float* x, size_t n, float* out, size_t out_n);
+
 #ifdef __cplusplus
 }
 #endif
