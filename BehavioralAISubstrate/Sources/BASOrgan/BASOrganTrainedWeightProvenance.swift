@@ -225,14 +225,25 @@ public enum BASOrganTrainedWeightFilter {
     /// `BASAutoRouteRanker.provenanceFilter` (Rust C ABI from
     /// chapter 七百十三 第二刀)。
     ///
-    /// Default `false` per chapter 七百十六/七百十七 第二刀 lesson:
-    /// FFI overhead typically eats small-payload routing wins。
-    /// The byte-equality test in
-    /// BASChapter717ProvenanceByteEqualityTests proves both
-    /// paths produce identical decisions。 Knife 4 will
-    /// measure to confirm/refute the FFI-loses hypothesis。
+    /// **DEFAULT FLIPPED ON at chapter 七百十七 第五刀** (M2260)
+    /// per measurement-grounded decision:Rust route is 4.91×
+    /// faster than Swift inline (chapter 七百十七 第四刀
+    /// BASChapter717ProvenancePerfTests)。 Swift String's
+    /// Unicode-aware `.count` + `Character.isHexDigit` adds
+    /// ~3µs of grapheme-cluster overhead per envelope;Rust's
+    /// byte-level `is_ascii_hexdigit` runs in ~600 ns。
+    ///
+    /// Byte-equality verified by BASChapter717ProvenanceByteEqualityTests
+    /// (10/10 variants produce identical Rejection? values)。
+    /// `.invalidInput` defensive case falls back to the Swift
+    /// decision tree,so the routed path can NEVER produce
+    /// a bogus result。
+    ///
+    /// Hosts that want the legacy Swift path (e.g。 for
+    /// replay-byte-pinned compat across an existing audit
+    /// archive) can flip this to `false` at startup。
     public nonisolated(unsafe) static var useRoutedFilter:
-        Bool = false
+        Bool = true
 
 
     /// Typed rejection reasons. Calling sites switch on case for
