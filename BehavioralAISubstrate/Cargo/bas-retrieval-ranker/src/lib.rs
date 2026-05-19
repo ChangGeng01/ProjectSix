@@ -19,6 +19,7 @@ pub mod decay;
 pub mod fuser;
 pub mod matmul;     // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
 pub mod simd;       // chapter 七百五 第二刀 — SIMD-accelerated math
+pub mod softmax;    // chapter 七百九 第一刀 — numerically-stable softmax
 pub mod topk;
 
 pub const ABI_VERSION: i32 = 1;
@@ -184,6 +185,69 @@ pub unsafe extern "C" fn bas_ranker_matmul_blocked(
     };
     matmul::matmul_blocked(
         a_slice, b_slice, c_slice, m, n, k);
+    0
+}
+
+// MARK: - chapter 七百九 第一刀 Softmax C ABI
+
+/// Numerically-stable softmax (scalar)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_softmax(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_slice = unsafe {
+        core::slice::from_raw_parts(x, n)
+    };
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    softmax::softmax_stable(x_slice, out_slice);
+    0
+}
+
+/// SIMD-accelerated stable softmax。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_softmax_simd(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_slice = unsafe {
+        core::slice::from_raw_parts(x, n)
+    };
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    softmax::softmax_stable_simd(x_slice, out_slice);
+    0
+}
+
+/// Row-wise softmax over (rows × cols) matrix。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_softmax_rowwise_simd(
+    x: *const f32, x_len: usize,
+    out: *mut f32, out_len: usize,
+    rows: usize, cols: usize,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    let expected = rows * cols;
+    if x_len != expected || out_len != expected
+        || rows == 0 || cols == 0
+    {
+        return -2;
+    }
+    let x_slice = unsafe {
+        core::slice::from_raw_parts(x, x_len)
+    };
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out, out_len)
+    };
+    softmax::softmax_rowwise_simd(
+        x_slice, out_slice, rows, cols);
     0
 }
 
