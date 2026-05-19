@@ -17,6 +17,7 @@
 pub mod cosine;
 pub mod decay;
 pub mod fuser;
+pub mod matmul;     // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
 pub mod simd;       // chapter 七百五 第二刀 — SIMD-accelerated math
 pub mod topk;
 
@@ -123,6 +124,94 @@ pub unsafe extern "C" fn bas_ranker_l2_norm_simd(
     }
     let s = unsafe { core::slice::from_raw_parts(v, v_len) };
     unsafe { *out_norm = simd::l2_norm_simd(s); }
+    0
+}
+
+// MARK: - chapter 七百八 第一刀 MatMul C ABI
+
+/// MatMul naive O(MNK) — reference / oracle path。 Returns 0 on
+/// success,-1 on null pointer,-2 on shape mismatch。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_matmul_naive(
+    a: *const f32, a_len: usize,
+    b: *const f32, b_len: usize,
+    c: *mut f32, c_len: usize,
+    m: usize, n: usize, k: usize,
+) -> i32 {
+    if a.is_null() || b.is_null() || c.is_null() {
+        return -1;
+    }
+    if a_len != m * k || b_len != k * n || c_len != m * n {
+        return -2;
+    }
+    let a_slice = unsafe {
+        core::slice::from_raw_parts(a, a_len)
+    };
+    let b_slice = unsafe {
+        core::slice::from_raw_parts(b, b_len)
+    };
+    let c_slice = unsafe {
+        core::slice::from_raw_parts_mut(c, c_len)
+    };
+    matmul::matmul_naive(
+        a_slice, b_slice, c_slice, m, n, k);
+    0
+}
+
+/// Cache-blocked MatMul — wins over naive for medium-large
+/// matrices due to L1 cache locality。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_matmul_blocked(
+    a: *const f32, a_len: usize,
+    b: *const f32, b_len: usize,
+    c: *mut f32, c_len: usize,
+    m: usize, n: usize, k: usize,
+) -> i32 {
+    if a.is_null() || b.is_null() || c.is_null() {
+        return -1;
+    }
+    if a_len != m * k || b_len != k * n || c_len != m * n {
+        return -2;
+    }
+    let a_slice = unsafe {
+        core::slice::from_raw_parts(a, a_len)
+    };
+    let b_slice = unsafe {
+        core::slice::from_raw_parts(b, b_len)
+    };
+    let c_slice = unsafe {
+        core::slice::from_raw_parts_mut(c, c_len)
+    };
+    matmul::matmul_blocked(
+        a_slice, b_slice, c_slice, m, n, k);
+    0
+}
+
+/// Cache-blocked + SIMD-unrolled MatMul — fastest CPU path。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_matmul_simd_blocked(
+    a: *const f32, a_len: usize,
+    b: *const f32, b_len: usize,
+    c: *mut f32, c_len: usize,
+    m: usize, n: usize, k: usize,
+) -> i32 {
+    if a.is_null() || b.is_null() || c.is_null() {
+        return -1;
+    }
+    if a_len != m * k || b_len != k * n || c_len != m * n {
+        return -2;
+    }
+    let a_slice = unsafe {
+        core::slice::from_raw_parts(a, a_len)
+    };
+    let b_slice = unsafe {
+        core::slice::from_raw_parts(b, b_len)
+    };
+    let c_slice = unsafe {
+        core::slice::from_raw_parts_mut(c, c_len)
+    };
+    matmul::matmul_simd_blocked(
+        a_slice, b_slice, c_slice, m, n, k);
     0
 }
 

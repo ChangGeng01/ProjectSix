@@ -495,6 +495,33 @@ int32_t bas_ranker_batched_cosine_simd(
     size_t dim,
     float* out_scores);
 
+// MARK: - chapter 七百八 第一刀 MatMul ABI
+//
+// f32 matrix multiplication: A (M×K) × B (K×N) = C (M×N)
+// Row-major layout。 Three variants:
+//
+//   _naive          — reference O(MNK) impl, oracle for tests
+//   _blocked        — 32×32 cache-blocked, wins on medium-large
+//   _simd_blocked   — + 4-wide inner unrolling, fastest CPU path
+
+int32_t bas_ranker_matmul_naive(
+    const float* a, size_t a_len,
+    const float* b, size_t b_len,
+    float* c, size_t c_len,
+    size_t m, size_t n, size_t k);
+
+int32_t bas_ranker_matmul_blocked(
+    const float* a, size_t a_len,
+    const float* b, size_t b_len,
+    float* c, size_t c_len,
+    size_t m, size_t n, size_t k);
+
+int32_t bas_ranker_matmul_simd_blocked(
+    const float* a, size_t a_len,
+    const float* b, size_t b_len,
+    float* c, size_t c_len,
+    size_t m, size_t n, size_t k);
+
 #ifdef __cplusplus
 }
 #endif
