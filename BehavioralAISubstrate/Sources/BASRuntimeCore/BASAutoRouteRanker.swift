@@ -36,7 +36,7 @@ import CryptoKit
 /// Configuration for the auto-router。 Hosts that benched on
 /// non-M-series hardware can override these thresholds。
 public struct BASAutoRouteThresholds:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Hashable, Codable
 {
     /// Cosine: use Rust scalar below this dim, SIMD at or
     /// above。 Measured M-series crossover ≈ 64。
