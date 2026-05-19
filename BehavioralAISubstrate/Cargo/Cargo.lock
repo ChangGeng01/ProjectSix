@@ -43,6 +43,13 @@ dependencies = [
 name = "bas-memory-usage-tracker"
 version = "0.1.0"
 dependencies = [
+ "bas-canonical-bytes",
+ "bas-event-log-codec",
+ "bas-memory-atom-store",
+ "bas-permit-policy",
+ "bas-retrieval-ranker",
+ "bas-runtime-frame",
+ "bas-substrate-core",
  "sha2",
 ]
 

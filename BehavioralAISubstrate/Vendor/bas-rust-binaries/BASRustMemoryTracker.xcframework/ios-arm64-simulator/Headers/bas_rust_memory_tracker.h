@@ -358,6 +358,89 @@ int32_t bas_rust_tracker_record_lineage(
 
 int32_t bas_rust_tracker_record_lineage_version(void);
 
+// MARK: - chapter 七百四 第一刀 / M2191 — sibling-crate ABI declarations
+//
+// The chapter 七百三 Rust crates (bas-substrate-core,
+// bas-memory-atom-store, bas-retrieval-ranker,
+// bas-canonical-bytes, bas-permit-policy, bas-event-log-codec,
+// bas-runtime-frame) all force-link into the same .a as
+// bas-memory-usage-tracker via the workspace deps + the
+// `force_link.rs` anchor。 Declarations below let Swift call
+// any of their #[no_mangle] extern "C" surface via
+// `import BASRustMemoryTrackerBinary`。
+
+/// Sum of all sibling-crate ABI versions。 Useful for Swift
+/// drift tests that pin which bundle of Rust crates ships
+/// in the current XCFramework。
+int32_t bas_substrate_bundle_abi_total(void);
+
+/// Count of bundled crates inside this XCFramework's
+/// staticlib (currently 7)。
+int32_t bas_substrate_bundle_crate_count(void);
+
+// MARK: - bas-substrate-core (chapter 七百三 第一刀)
+//
+// Pure NIST SHA-256 + HMAC-SHA256 + Ed25519 + length-prefixed
+// chain-step。 Swift consumers route here to retire the
+// CryptoKit-only NIST-pinned sites previously blocked by
+// `bas_rust_ledger_append_step`'s length-prefixed formula。
+
+int32_t bas_substrate_core_abi_version(void);
+
+/// Pure NIST SHA-256 of `data` → 32-byte digest written to
+/// `out32`。 Returns 0 on success,-1 on null pointers。 Byte-
+/// equal to CryptoKit's SHA256.hash(data:) and to the FIPS
+/// 180-4 reference vectors。
+int32_t bas_substrate_sha256(
+    const uint8_t* data,
+    size_t data_len,
+    uint8_t* out32);
+
+/// HMAC-SHA256 over `data` under `key`。 32-byte tag → `out32`。
+int32_t bas_substrate_hmac_sha256(
+    const uint8_t* key,
+    size_t key_len,
+    const uint8_t* data,
+    size_t data_len,
+    uint8_t* out32);
+
+/// Length-prefixed chain step:SHA256(prev || u32_be(len) ||
+/// payload) → `out32`。
+int32_t bas_substrate_chain_step(
+    const uint8_t* prev32,
+    const uint8_t* payload,
+    size_t payload_len,
+    uint8_t* out32);
+
+/// Ed25519 sign — 32-byte seed + message → 64-byte signature。
+int32_t bas_substrate_ed25519_sign(
+    const uint8_t* priv_seed_32,
+    const uint8_t* msg,
+    size_t msg_len,
+    uint8_t* out_sig_64);
+
+/// Ed25519 verify。 Returns 1 on valid, 0 on invalid, -1 on
+/// null pointer error。
+int32_t bas_substrate_ed25519_verify(
+    const uint8_t* pub_32,
+    const uint8_t* msg,
+    size_t msg_len,
+    const uint8_t* sig_64);
+
+// MARK: - sibling-crate ABI version probes
+//
+// Each chapter-七百三 crate exposes an `abi_version()` that
+// returns the crate's pinned version。 Swift drift tests pin
+// these per-crate so a future Rust-side ABI bump shows up
+// in the Swift test output。
+
+int32_t bas_mas_abi_version(void);
+int32_t bas_ranker_abi_version(void);
+int32_t bas_canonical_bytes_abi_version(void);
+int32_t bas_permit_policy_abi_version(void);
+int32_t bas_event_log_abi_version(void);
+int32_t bas_runtime_frame_abi_version(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -22,3 +22,18 @@ path = "src/lib.rs"
 # records。 default-features=false keeps the std-dep
 # surface minimal and reproducible。
 sha2 = { version = "0.10", default-features = false }
+
+# chapter 七百四 第一刀 — depend on the 6 workspace
+# crates from chapter 七百三 so they all link into the
+# single staticlib that the XCFramework wraps。 Each
+# dependency contributes its #[no_mangle] extern "C"
+# ABI surface to the output .a。 force_link.rs holds
+# references that prevent the rust linker from stripping
+# the symbols。
+bas-substrate-core    = { path = "../bas-substrate-core" }
+bas-memory-atom-store = { path = "../bas-memory-atom-store" }
+bas-retrieval-ranker  = { path = "../bas-retrieval-ranker" }
+bas-canonical-bytes   = { path = "../bas-canonical-bytes" }
+bas-permit-policy     = { path = "../bas-permit-policy" }
+bas-event-log-codec   = { path = "../bas-event-log-codec" }
+bas-runtime-frame     = { path = "../bas-runtime-frame" }

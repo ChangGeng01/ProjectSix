@@ -64,6 +64,12 @@ use std::ptr;
 use std::sync::RwLock;
 use sha2::{Sha256, Digest};
 
+// chapter 七百四 第一刀 — force-link sibling-crate symbols
+// into the staticlib output so the XCFramework ships a single
+// .a containing all chapter 七百三 Rust ABIs。
+mod force_link;
+pub use force_link::*;
+
 const ABI_VERSION: c_int = 1;
 
 #[derive(Debug, Clone)]
