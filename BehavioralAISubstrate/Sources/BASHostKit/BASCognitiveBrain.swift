@@ -2317,6 +2317,15 @@ extension BASCognitiveBrain {
     public func cosineSimilarityRust(
         _ a: [Float], _ b: [Float]
     ) throws -> Float {
+        return try Self.cosineSimilarityRustImpl(a, b)
+    }
+
+    /// Same as `cosineSimilarityRust` but the static helper —
+    /// non-isolated so perf tests can call it without paying
+    /// the actor-hop on every iteration。
+    public static func cosineSimilarityRustImpl(
+        _ a: [Float], _ b: [Float]
+    ) throws -> Float {
         guard !a.isEmpty else {
             throw BASMetalCosineSimilarityDispatcherError
                 .zeroLengthVectors
