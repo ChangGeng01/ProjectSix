@@ -82,6 +82,9 @@ public enum BASAutoRouteChoice:
     case swiftCPUAttention
     case metalStandardAttention
     case metalFlashAttention
+    /// chapter 七百七 第四刀 — HMAC routing。
+    case swiftCryptoKitHMAC
+    case rustHMAC
 }
 
 /// chapter 七百七 第三刀 — attention shape input。
@@ -186,6 +189,52 @@ public enum BASAutoRouteRanker {
         return BASAutoRouteResult(
             value: sumSq.squareRoot(),
             choice: .swiftNaive)
+    }
+
+    /// chapter 七百七 第四刀 — auto-routed HMAC-SHA256。
+    ///
+    /// Same crossover heuristic as SHA256:CryptoKit's HMAC
+    /// uses the same hardware SHA engine,so its win amortizes
+    /// at the same payload sizes。 Rust pure-HMAC wins for
+    /// small payloads where function-call overhead dominates。
+    public static func hmacSHA256(
+        key: [UInt8], payload: [UInt8],
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<[UInt8]> {
+        #if os(iOS) || os(macOS)
+        let useCryptoKit =
+            payload.count >= thresholds.sha256CryptoKitMinBytes
+        if useCryptoKit {
+            let keyD = SymmetricKey(data: Data(key))
+            let mac = HMAC<SHA256>.authenticationCode(
+                for: Data(payload), using: keyD)
+            return BASAutoRouteResult(
+                value: Array(mac),
+                choice: .swiftCryptoKitHMAC)
+        }
+        var out = [UInt8](repeating: 0, count: 32)
+        let rc = out.withUnsafeMutableBufferPointer { ob in
+            key.withUnsafeBufferPointer { kp in
+                payload.withUnsafeBufferPointer { pp in
+                    bas_substrate_hmac_sha256(
+                        kp.baseAddress, key.count,
+                        pp.baseAddress, payload.count,
+                        ob.baseAddress)
+                }
+            }
+        }
+        if rc == 0 {
+            return BASAutoRouteResult(
+                value: out, choice: .rustHMAC)
+        }
+        #endif
+        // Fallback: CryptoKit
+        let keyD = SymmetricKey(data: Data(key))
+        let mac = HMAC<SHA256>.authenticationCode(
+            for: Data(payload), using: keyD)
+        return BASAutoRouteResult(
+            value: Array(mac),
+            choice: .swiftCryptoKitHMAC)
     }
 
     /// Auto-routed SHA256。 Switch crossover at ~1 KB based on
