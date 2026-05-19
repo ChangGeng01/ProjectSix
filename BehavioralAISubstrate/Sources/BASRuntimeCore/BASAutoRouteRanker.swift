@@ -50,16 +50,24 @@ public struct BASAutoRouteThresholds:
     /// CPU wins;M=16,N=16 ⇒ Metal wins)。
     public let attentionMetalMinProduct: Int
 
+    /// MatMul: use Rust below this M*N*K product,Metal at or
+    /// above。 Measured M-series crossover ≈ 262 144 (32³ wins
+    /// Rust, 128³ wins Metal — crossover sits between)。
+    public let matMulMetalMinProduct: Int
+
     public init(
         cosineSIMDMinDim: Int = 64,
         sha256CryptoKitMinBytes: Int = 1024,
-        attentionMetalMinProduct: Int = 64
+        attentionMetalMinProduct: Int = 64,
+        matMulMetalMinProduct: Int = 262_144
     ) {
         self.cosineSIMDMinDim = max(1, cosineSIMDMinDim)
         self.sha256CryptoKitMinBytes =
             max(1, sha256CryptoKitMinBytes)
         self.attentionMetalMinProduct =
             max(1, attentionMetalMinProduct)
+        self.matMulMetalMinProduct =
+            max(1, matMulMetalMinProduct)
     }
 
     /// Default measured M-series thresholds。
@@ -85,6 +93,26 @@ public enum BASAutoRouteChoice:
     /// chapter 七百七 第四刀 — HMAC routing。
     case swiftCryptoKitHMAC
     case rustHMAC
+    /// chapter 七百八 第三刀 — MatMul routing。
+    case rustMatMulNaive
+    case rustMatMulBlocked
+    case metalMatMulMPSGraph
+}
+
+/// chapter 七百八 第三刀 — MatMul shape input。
+public struct BASMatMulShape:
+    Sendable, Equatable, Hashable, Codable
+{
+    public let M: Int
+    public let N: Int
+    public let K: Int
+    public init(M: Int, N: Int, K: Int) {
+        self.M = M
+        self.N = N
+        self.K = K
+    }
+    /// Used by the auto-router to gate Rust vs Metal。
+    public var workProduct: Int { return M * N * K }
 }
 
 /// chapter 七百七 第三刀 — attention shape input。
@@ -272,6 +300,30 @@ public enum BASAutoRouteRanker {
         return BASAutoRouteResult(
             value: Array(digest),
             choice: .swiftCryptoKit)
+    }
+
+    // MARK: - MatMul routing (chapter 七百八 第三刀)
+    //
+    // Measured M-series wins (BASChapter708MatMulTournamentTests):
+    //   8x8x8       → Rust naive   (Metal ~250x slower)
+    //   32x32x32    → Rust blocked (Metal still 14x slower)
+    //   128x128x128 → Metal       (2x faster than Rust blocked)
+    //   512x512x512 → Metal       (18x faster than Rust blocked)
+    //
+    // Crossover at M*N*K ≈ 262 144 (= 64³)。 Below uses Rust。
+    // Within Rust:naive wins for tiny (≤ 8³),blocked above。
+    public static func matMulChoice(
+        shape: BASMatMulShape,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteChoice {
+        let prod = shape.workProduct
+        if prod >= thresholds.matMulMetalMinProduct {
+            return .metalMatMulMPSGraph
+        }
+        if prod < 8_192 {
+            return .rustMatMulNaive
+        }
+        return .rustMatMulBlocked
     }
 
     // MARK: - Attention routing (chapter 七百七 第三刀)

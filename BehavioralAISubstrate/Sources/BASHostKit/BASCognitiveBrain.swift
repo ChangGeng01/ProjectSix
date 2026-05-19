@@ -2482,6 +2482,76 @@ extension BASCognitiveBrain {
 
     /// chapter 七百七 第三刀 / M2208 — auto-routed attention。
     ///
+    /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
+    public func matMulAuto(
+        a: [Float], aRows: Int, aCols: Int,
+        b: [Float], bRows: Int, bCols: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) async throws -> BASAutoRouteResult<[Float]> {
+        let shape = BASMatMulShape(
+            M: aRows, N: bCols, K: aCols)
+        let choice = BASAutoRouteRanker.matMulChoice(
+            shape: shape, thresholds: thresholds)
+        switch choice {
+        case .metalMatMulMPSGraph:
+            let value = try await matmul(
+                a: a, aRows: aRows, aCols: aCols,
+                b: b, bRows: bRows, bCols: bCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalMatMulMPSGraph)
+        case .rustMatMulNaive, .rustMatMulBlocked:
+            #if os(iOS) || os(macOS)
+            var c = [Float](
+                repeating: 0,
+                count: aRows * bCols)
+            let rc = a.withUnsafeBufferPointer { ap in
+                b.withUnsafeBufferPointer { bp in
+                    c.withUnsafeMutableBufferPointer
+                        { cp in
+                        if choice == .rustMatMulNaive {
+                            return bas_ranker_matmul_naive(
+                                ap.baseAddress, a.count,
+                                bp.baseAddress, b.count,
+                                cp.baseAddress, cp.count,
+                                aRows, bCols, aCols)
+                        }
+                        return bas_ranker_matmul_blocked(
+                            ap.baseAddress, a.count,
+                            bp.baseAddress, b.count,
+                            cp.baseAddress, cp.count,
+                            aRows, bCols, aCols)
+                    }
+                }
+            }
+            guard rc == 0 else {
+                let value = try await matmul(
+                    a: a, aRows: aRows, aCols: aCols,
+                    b: b, bRows: bRows, bCols: bCols)
+                return BASAutoRouteResult(
+                    value: value,
+                    choice: .metalMatMulMPSGraph)
+            }
+            return BASAutoRouteResult(
+                value: c, choice: choice)
+            #else
+            let value = try await matmul(
+                a: a, aRows: aRows, aCols: aCols,
+                b: b, bRows: bRows, bCols: bCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalMatMulMPSGraph)
+            #endif
+        default:
+            let value = try await matmul(
+                a: a, aRows: aRows, aCols: aCols,
+                b: b, bRows: bRows, bCols: bCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalMatMulMPSGraph)
+        }
+    }
+
     /// Picks the empirically fastest implementation per shape:
     ///   M*N <  64  → CPU reference (Metal pipeline overhead
     ///                 dominates at tiny shapes)
