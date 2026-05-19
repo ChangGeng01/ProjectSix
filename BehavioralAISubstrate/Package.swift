@@ -98,7 +98,18 @@ let package = Package(
                 // literal source。 See BASChapterDoctrineRegistry
                 // +AllLiterals.swift loader for round-trip
                 // invariant + frozen-SHA256 preservation。
-                .process("Resources/chapter_doctrine_all_literals.json")
+                .process("Resources/chapter_doctrine_all_literals.json"),
+                // chapter 七百二 native-port — full registry
+                // (literals + Phase 2+ inline records,~600
+                // chapters) ported to JSON。 Replaces 25,131
+                // LOC of Swift literal source in
+                // BASChapterDoctrineRegistry.swift。
+                .process("Resources/chapter_doctrine_full_registry.json"),
+                // chapter 七百二 native-port — entropy chapter
+                // index ported to JSON。 Replaces 7,239 LOC
+                // of Swift literal source in BASEntropy
+                // ChapterIndex.swift。
+                .process("Resources/entropy_chapter_index.json")
             ]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
