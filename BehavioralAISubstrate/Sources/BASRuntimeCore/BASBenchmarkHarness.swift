@@ -80,11 +80,18 @@ public struct BASBenchSummary:
     /// Human-readable single-line summary for printing in test
     /// output。 Format chosen to be grep-friendly。
     public var formatted: String {
+        // %@ accepts Swift String via NSString bridge。 %s with
+        // a Swift String segfaults at format-time (C expects
+        // a NUL-terminated char *)。
+        let labelPadded = label
+            .padding(toLength: 36, withPad: " ",
+                startingAt: 0)
         return String(
             format:
-                "%-36s %6d iters × %2d rounds — "
+                "%@ %6d iters × %2d rounds — "
                 + "min=%.0fns p50=%.0fns p99=%.0fns max=%.0fns",
-            label, iterationsPerRound, rounds,
+            labelPadded as NSString,
+            iterationsPerRound, rounds,
             minNsPerIter,
             medianNsPerIter,
             p99NsPerIter,
@@ -116,12 +123,9 @@ public struct BASBenchCompareResult:
         case .b:   winLabel = "B wins"
         case .tie: winLabel = "TIE"
         }
-        return String(
-            format: "  → %@ (%.2fx)\n    %@\n    %@",
-            winLabel as NSString,
-            speedupRatio,
-            summaryA.formatted as NSString,
-            summaryB.formatted as NSString)
+        return "  → \(winLabel) (\(speedupRatio)x)\n"
+            + "    \(summaryA.formatted)\n"
+            + "    \(summaryB.formatted)"
     }
 }
 
