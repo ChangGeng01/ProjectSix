@@ -1,9 +1,5 @@
 import Foundation
 import CryptoKit
-// chapter 七百二 native-port — Rust SHA256 primitive for
-// `hash(_:)` below。 Legacy CryptoKit body preserved as
-// `/* ... */` comments per the 全comment 不要删除 directive。
-import BASRustHashCore
 import BASRuntimeCore
 
 /// `BR-04` SnapshotManager — the sovereign resolver for floating
@@ -255,22 +251,7 @@ public actor BASSovereignSnapshotManager {
     /// Canonical SHA-256 hex used by the manager. Callers building
     /// anchors should use this to pre-compute `integrityHash` so that
     /// registration succeeds.
-    ///
-    /// chapter 七百二 native-port — live path routes through Rust。
-    /// Legacy CryptoKit body preserved per 全comment 不要删除 directive。
     public static func hash(_ data: Data) -> String {
-        // LIVE PATH — Rust-sourced SHA256 via BASRustLedgerCore。
-        if let rust = try? BASRustLedgerCore.sha256(data) {
-            return rust.map { String(format: "%02x", $0) }.joined()
-        }
-        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-        // Active ONLY when the Rust path is unavailable。
-        /*
-         * Pre-chapter-702 Swift implementation:
-         *
-         *     let digest = SHA256.hash(data: data)
-         *     return digest.map { String(format: "%02x", $0) }.joined()
-         */
         let digest = SHA256.hash(data: data)
         return digest.map { String(format: "%02x", $0) }.joined()
     }

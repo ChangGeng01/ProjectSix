@@ -91,25 +91,7 @@ let package = Package(
             // serves it at runtime. The Swift adapter
             // (Phase B-3) loads it via MLModel(contentsOf:)。
             resources: [
-                .process("Resources/BASContextClassifier.mlmodel"),
-                // chapter 七百二 native-port — 61-chapter
-                // doctrine literal records ported to a JSON
-                // resource。 Replaces 3,902 LOC of Swift
-                // literal source。 See BASChapterDoctrineRegistry
-                // +AllLiterals.swift loader for round-trip
-                // invariant + frozen-SHA256 preservation。
-                .process("Resources/chapter_doctrine_all_literals.json"),
-                // chapter 七百二 native-port — full registry
-                // (literals + Phase 2+ inline records,~600
-                // chapters) ported to JSON。 Replaces 25,131
-                // LOC of Swift literal source in
-                // BASChapterDoctrineRegistry.swift。
-                .process("Resources/chapter_doctrine_full_registry.json"),
-                // chapter 七百二 native-port — entropy chapter
-                // index ported to JSON。 Replaces 7,239 LOC
-                // of Swift literal source in BASEntropy
-                // ChapterIndex.swift。
-                .process("Resources/entropy_chapter_index.json")
+                .process("Resources/BASContextClassifier.mlmodel")
             ]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
@@ -128,12 +110,7 @@ let package = Package(
         // V1 inline path)。
         .target(
             name: "BASMemory",
-            // chapter 七百二 native-port — BASRustHashCore added so
-            // SHA256 sites in BASMemory can route through the Rust
-            // XCFramework。 Safe (no cycle) because BASRustHashCore
-            // does NOT depend on BASMemory — see the target stanza
-            // below for the rationale。
-            dependencies: ["BASRuntimeCore", "BASRustHashCore"],
+            dependencies: ["BASRuntimeCore"],
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
             ]),
@@ -141,15 +118,7 @@ let package = Package(
         // BASSovereign (L14) — isolated microkernel. Depends only on BASRuntimeCore
         // schema types. Never depends on Memory/Policy/Orchestration (prevents
         // downstream layers from influencing sovereign decisions).
-        // chapter 七百二 native-port branch — BASSovereign gains a build-graph
-        // dependency on BASRustHashCore (the minimal pure-crypto Rust bridge,
-        // BASMemory-independent) to source SHA256 chain-hash primitives from
-        // the Rust XCFramework (see BASSovereignAuditLedger.swift hash()
-        // commentary). The semantic isolation principle ("never depends on
-        // Memory/Policy/Orchestration") is preserved at the import-graph level
-        // — BASSovereign code does not import any Memory/Policy/Orchestration
-        // module, only the Rust crypto primitive。
-        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore", "BASRustHashCore"]),
+        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore"]),
         // BASWorldPrior (L4) — world-knowledge layer. A leaf module:
         // depends only on BASRuntimeCore schema. Neither the sovereign
         // kernel nor memory/policy layers depend on it (world priors
@@ -166,9 +135,7 @@ let package = Package(
         // protocol + Scout/Core presets + an in-memory deterministic
         // fake for tests. Platform providers (Apple FoundationModels,
         // MLX, remote LLMs) live in adapter layers.
-        // chapter 七百二 native-port — BASRustHashCore added so
-        // BASOrganDeterministicAdapter SHA256 can route through Rust。
-        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore", "BASRustHashCore"]),
+        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore"]),
         // BASChatCompletionsAdapter — generic remote-LLM organ
         // provider. URLSession-backed, OpenAI Chat Completions
         // JSON shape. Conforms to BASOrganAdapter so it drops into
@@ -286,16 +253,14 @@ let package = Package(
                     name: "HuggingFace",
                     package: "swift-huggingface")
             ]),
-        // chapter 七百二 native-port — BASRustHashCore added。
-        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASRustHashCore"]),
+        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
         // BASOrchestration depends on BASObservability because M58
         // `BASUpdateTicketObservationDerivation` needs to read
         // `BASUpdateTicket` (defined in BASObservability) to produce a
         // per-ticket observation bundle on the main-chain thought frame.
         // Safe topology: BASObservability does not import BASOrchestration,
         // so no cycle.
-        // chapter 七百二 native-port — BASRustHashCore added。
-        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability", "BASRustHashCore"]),
+        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability"]),
         .target(
             name: "BASEvaluation",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability"]
@@ -409,22 +374,6 @@ let package = Package(
         .binaryTarget(
             name: "BASRustMemoryTrackerBinary",
             path: "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"),
-        // chapter 七百二 native-port — BASRustHashCore is the
-        // minimal Rust-bridge target exposing pure crypto
-        // primitives (BASRustLedgerCore: SHA256 chain step +
-        // replay verify)。 Depends ONLY on the binary XCFramework
-        // — NO BASMemory / BASRuntimeCore — so leaf modules
-        // (BASMemory, BASOrgan, BASObservability, BASOrchestration)
-        // can depend on it without creating a build-graph cycle。
-        .target(
-            name: "BASRustHashCore",
-            dependencies: [
-                .target(
-                    name: "BASRustMemoryTrackerBinary",
-                    condition: .when(
-                        platforms: [.iOS, .macOS]))
-            ],
-            path: "Sources/BASRustHashCore"),
         .target(
             name: "BASRustCoreBridge",
             // M2189 chapter 七百六 第三刀 — BASRustMemory
@@ -432,16 +381,9 @@ let package = Package(
             // UsageTracker shape,so we depend on
             // BASMemory to reach the shared
             // BASMemoryUsageRecord type。
-            //
-            // chapter 七百二 native-port — also depends on the new
-            // BASRustHashCore target so callers that already
-            // `import BASRustCoreBridge` still see BASRustLedgerCore
-            // transitively via `@_exported import BASRustHashCore`
-            // (see BASRustCoreBridge.swift)。
             dependencies: [
                 "BASRuntimeCore",
                 "BASMemory",
-                "BASRustHashCore",
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(

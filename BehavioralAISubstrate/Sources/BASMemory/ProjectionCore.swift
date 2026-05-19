@@ -1,8 +1,5 @@
 import CryptoKit
 import Foundation
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustHashCore
 
 public struct BASProjectionGovernedMemoryInput: Codable, Equatable, Sendable {
     public var id: String
@@ -413,23 +410,8 @@ public enum BASBrainProjectionCompiler {
             return uuid
         }
 
-        // chapter 七百二 native-port — Rust-sourced stable UUID;
-        // legacy CryptoKit body preserved per 全comment 不要删除。
-        let valueData = Data(value.utf8)
-        let bytes: [UInt8]
-        if let rust = try? BASRustLedgerCore.sha256(
-            valueData)
-        {
-            bytes = Array(rust.prefix(16))
-        } else {
-            /*
-             * Pre-chapter-702 Swift implementation:
-             *     let digest = SHA256.hash(data: Data(value.utf8))
-             *     let bytes = Array(digest.prefix(16))
-             */
-            let digest = SHA256.hash(data: valueData)
-            bytes = Array(digest.prefix(16))
-        }
+        let digest = SHA256.hash(data: Data(value.utf8))
+        let bytes = Array(digest.prefix(16))
         let encoded = bytes.enumerated().map { index, byte in
             let separator: String = switch index {
             case 4, 6, 8, 10:

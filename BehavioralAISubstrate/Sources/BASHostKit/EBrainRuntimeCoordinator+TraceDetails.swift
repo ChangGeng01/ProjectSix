@@ -5,9 +5,6 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustCoreBridge
 
 // MARK: - M71 split — BASEBrainRuntimeCoordinator — per-layer runtime trace detail composers.
 // goalSpineSummary / fingerprint / neuralCoreTraceDetail / compressionRuntimeTraceDetail /
@@ -25,23 +22,8 @@ extension BASEBrainRuntimeCoordinator {
         return "\(surface) -> \(mid) -> \(deep)"
     }
 
-    /// chapter 七百二 native-port — Rust-sourced fingerprint;
-    /// legacy CryptoKit body preserved per 全comment 不要删除。
     func fingerprint(for value: String) -> String {
-        let data = Data(value.utf8)
-        if let rust = try? BASRustLedgerCore.sha256(data) {
-            return rust.compactMap {
-                String(format: "%02x", $0)
-            }.joined()
-        }
-        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-        /*
-         * Pre-chapter-702 Swift implementation:
-         *     SHA256.hash(data: Data(value.utf8))
-         *         .compactMap { String(format: "%02x", $0) }
-         *         .joined()
-         */
-        return SHA256.hash(data: data)
+        SHA256.hash(data: Data(value.utf8))
             .compactMap { String(format: "%02x", $0) }
             .joined()
     }

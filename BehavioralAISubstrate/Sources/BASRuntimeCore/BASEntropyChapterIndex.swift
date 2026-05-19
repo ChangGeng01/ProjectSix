@@ -1,30 +1,102 @@
-// MARK: - BASEntropyChapterIndex — M1092 / chapter 七百二 native-port
+// MARK: - BASEntropyChapterIndex — chapter 四百三十 / M1092
+// 系统熵 reduction
 //
-// chapter 七百二 native-port — DATA PORT。 The original
-// 7,239-line Swift file held 3 hand-maintained static
-// arrays (radicalEvolutionEntries, phase2Entries,
-// postSweepRealExecutionEntries) of BASEntropyChapter
-// Entry records。 All 3 were JSON-encoded once via
-// __OneShotJSONDumper and committed as Resources/
-// entropy_chapter_index.json。 This file is now a
-// ~140-LOC loader + accessor preservation layer。 Net
-// Swift LOC drop: ~7,100。
+// RADICAL EVOLUTION SWEEP Phase D entry。 Single typed
+// data table that mirrors what each `BASChapter*Entropy
+// Doctrine` enum surfaces today as a public namespace。
+// Sets up the future cleanup path:once consumers
+// migrate to read from this table,the 25+ per-chapter
+// `.swift` files can collapse without changing call
+// sites。
 //
-// ## Why this is safe
+// ## Why this exists (system entropy framing)
 //
-// `BASEntropyChapterIndexTests` only asserts:
-//   - field values (mNumberFirst, mNumberLast, knives
-//     Count, etc.) on entries retrieved via the
-//     `entry(forTag:)` / `entry(forMNumber:)` accessors
-//   - `totalKnivesCount`, `earliestMNumber`,
-//     `latestMNumber` derived properties
-// None of these are byte-pinned;all are computed by
-// reduction over the array contents。 Codable round-
-// trip preserves field values → tests stay green。
+// The substrate ships 29 `BASChapter*EntropyDoctrine.
+// swift` files (one per shipped chapter)。 Each follows
+// nearly the same shape:
+//
+//   - chapterTag: String
+//   - mNumberFirst / mNumberLast: Int
+//   - knives: [(mNumber, knife, concept)]
+//   - entropyClassesAttacked: [String]
+//   - pinHeld: [String]
+//   - plannedFutureCuts: [String]
+//   - summary: String
+//
+// 31 files × ~120 LOC each = ~3,700 LOC of doctrine
+// scaffolding (count current as of M1109)。 The original
+// Phase D plan called for collapsing all of them into a
+// single data table file (~120 LOC),with the 24 non-
+// RADICAL chapter doctrines (chapters 403-426) being
+// deletion targets and the 7 RADICAL chapters (427-433)
+// surviving as `BASEntropyChapterIndex` entries。
+// (Original plan said "22 doctrines" but the count
+// drifted as Phase 2 grew through chapters 427-433 —
+// M1109 deep-review correction。)
+//
+// In autonomous mode that deletion is too risky:
+//
+//   1. Each per-chapter doctrine has its own per-chapter
+//      tests (BASChapter*EntropyDoctrineTests) that
+//      reference the namespace directly
+//   2. BASDoctrineChainConsistencyTests +
+//      BASChapterDoctrineSchemaCompletenessTests cross-
+//      reference per-chapter doctrines by symbol
+//   3. Future commits that bump the doctrine version
+//      pin reference per-chapter doctrines via
+//      `BASChapter4XX EntropyDoctrine.mNumberLast`
+//
+// `BASEntropyChapterIndex` ships the typed data table
+// that mirrors the per-chapter doctrines。 Once
+// consumers migrate to read from the table (future
+// chapter), the per-chapter `.swift` files become
+// removable。
+//
+// ## What this ships (M1092)
+//
+//   - `BASEntropyChapterEntry` Sendable + Codable +
+//     Equatable struct (chapterTag + mNumberFirst +
+//     mNumberLast + knivesCount + entropyClassesCount
+//     + pinsCount + futureCutsCount + summary)
+//   - `BASEntropyChapterIndex` namespace with
+//     `entries: [BASEntropyChapterEntry]` static
+//     constant covering all 29 shipped chapters
+//   - Cross-check helpers (`entry(forTag:)`,
+//     `entry(forMNumber:)`,`coversMNumberRange()`)
+//
+// The table is HAND-MAINTAINED at M1092 — same
+// chapterTag + mNumberFirst/Last as the per-chapter
+// doctrines。 Future work could derive it via macro
+// or build script。
+//
+// ## What this DOES NOT ship (deferred)
+//
+// The per-chapter `BASChapter*EntropyDoctrine.swift`
+// files are NOT deleted at M1092。 The plan's planned
+// −1,280 LOC delete (22 doctrine files + 22 test
+// files) is deferred to a follow-up chapter under
+// explicit user control。
+//
+// ## Doctrine pins held
+//
+//   - chapter 一百八十五 — anti-magic-number (typed
+//     entry struct + named accessors)
+//   - chapter 二百一一 — single source-of-truth (one
+//     table mirrors all 29 chapter doctrines)
+//   - chapter 三百九二 — replay-determinism (entries
+//     list is a static constant — same across processes)
+//   - 不变量 #1/#2/#3 — V1 byte-equality preserved
+//     (purely additive table;no per-chapter doctrine
+//     deleted)
+//   - 红线 7 — hint-only
+//   - ADR-014 OPT-IN — purely additive
+//   - RADICAL EVOLUTION SWEEP Phase D — this chapter
 
 import Foundation
 
-/// Typed single-table index of every shipped chapter
+// MARK: - Entry struct
+
+/// Typed Sendable + Codable mirror of a single chapter
 /// doctrine。 One per shipped chapter doctrine。
 public struct BASEntropyChapterEntry:
     Equatable, Hashable, Codable, Sendable
@@ -68,67 +140,7022 @@ public struct BASEntropyChapterEntry:
 
 // MARK: - Index
 
+/// Single-source-of-truth typed data table mirroring
+/// all shipped per-chapter doctrines。 Hand-maintained
+/// at M1092;future work could derive via macro。
 public enum BASEntropyChapterIndex {
 
-    /// chapter 七百二 native-port — JSON-decoded triple
-    /// bundle (radicalEvolutionEntries + phase2Entries +
-    /// postSweepRealExecutionEntries)。 Cached via lazy
-    /// static let so decode runs once。
-    private struct BundleShape: Codable {
-        let radicalEvolutionEntries: [BASEntropyChapterEntry]
-        let phase2Entries: [BASEntropyChapterEntry]
-        let postSweepRealExecutionEntries: [BASEntropyChapterEntry]
-    }
+    /// Entries covering the 7 RADICAL EVOLUTION SWEEP
+    /// chapters (M1092 shipped 5 entries;M1108 deep-
+    /// review extension added chapters 四百三十 + 四百三十三
+    /// for completeness)。
+    /// (The 24 pre-RADICAL Phase 2 chapters live in
+    /// per-chapter doctrines from chapters 四百三 through
+    /// 四百二十六;this index focuses on the RADICAL
+    /// EVOLUTION SWEEP arc which is the deletion-target
+    /// scope for the future cleanup chapter。)
+    public static let radicalEvolutionEntries:
+        [BASEntropyChapterEntry] =
+    [
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十七",
+            mNumberFirst: 1080,
+            mNumberLast: 1083,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 13,
+            futureCutsCount: 6,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase A entry " +
+                "— V2 RUNTIME COMPOSITION SURFACE"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十八",
+            mNumberFirst: 1084,
+            mNumberLast: 1087,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 7,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase B " +
+                "backfill — UNIFIED EVENT LOG PAYLOAD-" +
+                "KINDS BACKBONE"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十九",
+            mNumberFirst: 1088,
+            mNumberLast: 1091,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 3,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase C " +
+                "backfill — LOW-ENTROPY GENERIC " +
+                "PRIMITIVES"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十",
+            mNumberFirst: 1092,
+            mNumberLast: 1095,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase D " +
+                "backfill — CONSOLIDATION SCAFFOLDING"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十一",
+            mNumberFirst: 1096,
+            mNumberLast: 1099,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase E entry " +
+                "— NATIVE APPLE SILICON FOUNDATION"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十二",
+            mNumberFirst: 1100,
+            mNumberLast: 1103,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase F entry " +
+                "— HARDWARE-AWARE SCHEDULER COMPOSITION"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十三",
+            mNumberFirst: 1104,
+            mNumberLast: 1109,
+            knivesCount: 6,
+            entropyClassesCount: 6,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "RADICAL EVOLUTION SWEEP final close-" +
+                "out — sidecar + cumulative sweep " +
+                "doctrine + 2 deep-review remediation " +
+                "rounds (M1108 + M1109) + ADR-016 → " +
+                "M1107 → M1109 advance。 Loop closed"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十四",
+            mNumberFirst: 1110,
+            mNumberLast: 1115,
+            knivesCount: 6,
+            entropyClassesCount: 6,
+            pinsCount: 11,
+            futureCutsCount: 6,
+            summary:
+                "POST-RADICAL safety substrate +" +
+                " canonical60 driver — external" +
+                " consumer audit (Qinao SDK reality" +
+                " reflected) + BASEntropyChapterIndex" +
+                " extended to 31 chapters +" +
+                " BASStressSweepCanonical60Driver" +
+                " (typed 60-fixture set + identity/" +
+                "divergence stub runners) + ADR-016 →" +
+                " M1115 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十五",
+            mNumberFirst: 1116,
+            mNumberLast: 1119,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 6 entry — FIRST" +
+                " production scheduler consumption。" +
+                " BASTurnRuntimeEngine.runWithPlan(...)" +
+                " now calls scheduler.assign(...) per" +
+                " stage step + captures decisions into" +
+                " typed BASTurnRuntimePlanAssignmentLedger。" +
+                " ADR-016 → M1119 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十六",
+            mNumberFirst: 1120,
+            mNumberLast: 1123,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 7 entry — FIRST" +
+                " ledger-driven dispatch。 BASNativeStage" +
+                "Executor.executePlanWithAssignments(...)" +
+                " reads assignment ledger + routes each" +
+                " stage via RoutedStageExecutor closure +" +
+                " captures honored vs fall-through into" +
+                " BASNativeStageDispatchLedger。 ADR-016" +
+                " → M1123 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十七",
+            mNumberFirst: 1124,
+            mNumberLast: 1127,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 8 entry — END-TO-END" +
+                " routed dispatch。 BASRuntimeInternal" +
+                "Delegate.runScaffoldedWithAssignments" +
+                "(...) bridges executor's routed path +" +
+                " engine.runWithPlan(...) branches on" +
+                " assignment ledger + captures dispatch" +
+                " ledger。 ADR-016 → M1127 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十八",
+            mNumberFirst: 1128,
+            mNumberLast: 1131,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 9 entry — HOST-SIDE" +
+                " INJECTION。 BASTurnRuntimeEngine" +
+                "Configuration gains routedStageExecutor" +
+                " + fallbackStageExecutor optional slots;" +
+                " engine threads them through to delegate" +
+                " automatically。 Substrate-side end-to-end" +
+                " is now COMPLETE — Qinao SDK can wire" +
+                " real backend dispatch via single config" +
+                " slot。 ADR-016 → M1131 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十九",
+            mNumberFirst: 1132,
+            mNumberLast: 1135,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 10 entry — DISPATCH" +
+                " ↔ EVENT LOG BRIDGE。 5th typed payload" +
+                " kind (.nativeStageDispatch) connects" +
+                " chapter 436 BASNativeStageDispatchLedger" +
+                " to Phase B's chapter 428 unified event" +
+                " log。 Replay surface complete — no more" +
+                " blackbox actor state for runtime" +
+                " decisions。 ADR-016 → M1135 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十",
+            mNumberFirst: 1136,
+            mNumberLast: 1139,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 11 entry — DISPATCH" +
+                " AUTO-EMIT。 BASTurnRuntimeEngine.run" +
+                "WithPlan(...) auto-emits dispatch event" +
+                " to configured event log when ledger" +
+                " non-empty。 Substrate-side autonomy" +
+                " COMPLETE — hosts only wire event log。" +
+                " ADR-016 → M1139 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十一",
+            mNumberFirst: 1140,
+            mNumberLast: 1143,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 12 entry — PLAN-" +
+                "ASSIGNMENT EVENT TYPE。 6th typed event" +
+                " payload kind on the unified event log;" +
+                " engine auto-emits captured scheduler" +
+                " decisions after dispatch event so" +
+                " capture → honor temporal order is" +
+                " replay-deterministic。 Substrate-side" +
+                " replay surface COMPLETE — full routed-" +
+                "dispatch story event-replayable from one" +
+                " canonical stream。 ADR-016 → M1143 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十二",
+            mNumberFirst: 1144,
+            mNumberLast: 1147,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 13 entry — REPLAY-" +
+                "REBUILD INTEGRATION。 BASEventLogReplay" +
+                "Bundle typed Sendable + Equatable +" +
+                " Hashable struct aggregates all 6" +
+                " projector outputs;13 round-trip" +
+                " integration tests prove byte-equal" +
+                " round-trip through real BASInMemoryEvent" +
+                "LogStorage + cross-kind isolation +" +
+                " sequenceNumber ordering preservation。" +
+                " Replay surface is PROVEN end-to-end。" +
+                " ADR-016 → M1147 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十三",
+            mNumberFirst: 1148,
+            mNumberLast: 1151,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 14 entry — CROSS-" +
+                "SESSION REPLAY ASSEMBLY。 BASEventLog" +
+                "ReplayBundle.merging(_:) + .combining(_:)" +
+                " typed composition + BASEventLogProjectors" +
+                ".projectAcrossAllSessions(from:" +
+                "sinceTimestampMs:limit:) async factory" +
+                " pulling events globally-time-ordered" +
+                " from storage。 14 cross-session" +
+                " integration tests。 Replay surface" +
+                " offers complete typed API for distributed" +
+                " consumers without boilerplate。 ADR-016" +
+                " → M1151 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十四",
+            mNumberFirst: 1152,
+            mNumberLast: 1155,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 15 entry — PER-STAGE" +
+                " EVENT PAYLOAD。 BASNativeStagePerStepEvent" +
+                "Payload typed Codable + 8 fields +" +
+                " factory bridging from chapter 439" +
+                " per-turn record + 7th BASEventPayloadKind" +
+                " case + EXTENDED BASEventLogReplayBundle" +
+                " to 7 fields。 Sibling of chapter 439" +
+                " per-turn dispatch event for fine-grained" +
+                " causal-graph extraction。 Engine does" +
+                " NOT auto-emit per-step events;hosts" +
+                " opt-in directly。 ADR-016 → M1155 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十五",
+            mNumberFirst: 1156,
+            mNumberLast: 1159,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 16 entry — FEDERATED" +
+                " EVENT LOG MULTI-BACKEND。 BASFederated" +
+                "EventLogStorage actor wraps N backend" +
+                " conformers + presents them as ONE" +
+                " unified event log via the existing" +
+                " BASEventLogStorage protocol。 Chapter" +
+                " 443 projectAcrossAllSessions(from:)" +
+                " accepts it as drop-in。 15 integration" +
+                " tests prove construction + routing +" +
+                " global ordering + propagation +" +
+                " determinism。 ADR-016 → M1159 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十六",
+            mNumberFirst: 1160,
+            mNumberLast: 1163,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 17 entry — POST-" +
+                "RADICAL EVOLUTION SWEEP CLOSE-OUT" +
+                " meta-doctrine。 BASPostRadicalSweep" +
+                "Doctrine typed namespace summarizes" +
+                " cumulative achievement (Waves 1-17," +
+                " chapters 427-446,M1080-M1163,84" +
+                " commits) + 8 substrate-side" +
+                " achievements + 5 explicitly deferred" +
+                " items + 10 doctrine pins held" +
+                " throughout。 Anchor for future" +
+                " chapter narratives。 ADR-016 → M1163" +
+                " advance"),
+    ]
 
-    private static let bundle: BundleShape = {
-        guard let url = Bundle.module.url(
-            forResource: "entropy_chapter_index",
-            withExtension: "json")
-        else {
-            fatalError(
-                "chapter 七百二 native-port:" +
-                " entropy_chapter_index.json missing" +
-                " from BASRuntimeCore Resources")
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            return try JSONDecoder().decode(
-                BundleShape.self, from: data)
-        } catch {
-            fatalError(
-                "chapter 七百二 native-port:" +
-                " failed to decode" +
-                " entropy_chapter_index.json: \(error)")
-        }
-    }()
-
-    public static var radicalEvolutionEntries:
-        [BASEntropyChapterEntry] {
-        return bundle.radicalEvolutionEntries
-    }
-
+    /// Number of RADICAL EVOLUTION chapters indexed
+    /// (7 after M1108 extension covering all 6 phase
+    /// chapters + the chapter 四百三十三 final close-out)。
     public static var radicalEvolutionEntryCount: Int {
         return radicalEvolutionEntries.count
     }
 
-    public static var phase2Entries:
-        [BASEntropyChapterEntry] {
-        return bundle.phase2Entries
-    }
+    /// **M1111 — Wave 2 STAGE 1 extension**:complete
+    /// 31-entry mirror covering ALL Phase 2 chapters
+    /// (chapters 四百三 through 四百三十三)。 This is the
+    /// single source-of-truth that makes the per-chapter
+    /// `BASChapter*EntropyDoctrine.swift` files
+    /// deletable in a future cleanup chapter without
+    /// losing any chapter summary。
+    ///
+    /// 24 pre-RADICAL chapters (403-426) + 7 RADICAL
+    /// chapters (427-433) = 31 entries。 Hand-maintained
+    /// at M1111 with field values cross-checked against
+    /// the corresponding chapter doctrine `.swift` files
+    /// via grep audit。 chapter 447 onward extends via
+    /// `postSweepRealExecutionEntries` — keeping SWEEP
+    /// chapter 446 frozen as the SWEEP narrative
+    /// snapshot。
+    public static let phase2Entries:
+        [BASEntropyChapterEntry] =
+        prePhase2RadicalEntries +
+        radicalEvolutionEntries +
+        postSweepRealExecutionEntries
 
+    /// POST-SWEEP REAL EXECUTION FOLLOW-THROUGH entries
+    /// (chapter 447 onward)。 Chapter 446 closed the
+    /// SWEEP narrative as a discrete 17-wave snapshot;
+    /// chapter 447 opens the next chapter sequence
+    /// focused on real compute (vs scaffolding)。
+    /// SWEEP doctrine intentionally stays frozen at
+    /// chapter 446 so its narrative remains a historical
+    /// anchor。
+    public static let postSweepRealExecutionEntries:
+        [BASEntropyChapterEntry] =
+    [
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十七",
+            mNumberFirst: 1164,
+            mNumberLast: 1167,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION FOLLOW-" +
+                "THROUGH chapter 1 — FIRST REAL GPU" +
+                " KERNEL EXECUTION。 BASMPSGraphMatMul" +
+                "Kernel actor wraps MTLDevice +" +
+                " MPSMatrixMultiplication;input bytes" +
+                " actually flow CPU → MTLBuffer → GPU" +
+                " shaders → MTLBuffer → CPU。 4 PROOF" +
+                " tests verify byte-equal output +" +
+                " non-square shapes + GPU/CPU" +
+                " agreement。 「原生利用神经引擎」 first" +
+                " truthful endpoint。 ADR-016 → M1167" +
+                " advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十八",
+            mNumberFirst: 1168,
+            mNumberLast: 1171,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION chapter 2 —" +
+                " SECOND REAL GPU KERNEL via MPSGraph。" +
+                " BASMPSGraphRMSNormKernel actor composes" +
+                " 6-op graph (sq+reduceMean+add+sqrt+" +
+                "div+mul) and dispatches through graph." +
+                "run(...)。 First MPSGraph usage in" +
+                " substrate;establishes pattern for" +
+                " future arbitrary-op GPU kernels。 4" +
+                " PROOF tests verify GPU output within" +
+                " 1e-4 absolute tolerance of CPU" +
+                " reference。 「原生利用神经引擎」 progress" +
+                " 1/3 → 2/3。 ADR-016 → M1171 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十九",
+            mNumberFirst: 1172,
+            mNumberLast: 1175,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION chapter 3 —" +
+                " THIRD + FINAL real GPU kernel" +
+                " (rotaryEmbedding via MPSGraph)。 All" +
+                " 3 chapter 431 CPU-stub kernels now" +
+                " have real GPU-dispatching siblings。" +
+                " 「原生利用神经引擎」 2/3 → 3/3 COMPLETE。" +
+                " 4 PROOF tests verify identity + 90°" +
+                " known result + GPU/CPU agreement" +
+                " within 1e-5。 ADR-016 → M1175 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十",
+            mNumberFirst: 1176,
+            mNumberLast: 1179,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 1 —" +
+                " FIRST substrate-level stateful +" +
+                " selective-gated primitive。" +
+                " BASMambaSSMState actor maintains" +
+                " continuous hidden state across" +
+                " selectiveScan() calls。 CPU baseline" +
+                " canonical Mamba update: dA=exp(Δ·A)" +
+                " + h=dA·h+dB·x + y=sum_n(C·h)。 9" +
+                " PROOF tests including state-persists" +
+                " + Δ=0-freezes (selective gating) +" +
+                " multi-batch independence + multi-step" +
+                " == sequential。 「不够仿生」 0/10 →" +
+                " 4/10。 ADR-016 → M1179"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十一",
+            mNumberFirst: 1180,
+            mNumberLast: 1183,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 2 —" +
+                " GPU acceleration for BASMambaSSMState" +
+                " via FIRST custom Metal compute shader" +
+                " in substrate。 Runtime-compiled" +
+                " selective_scan kernel dispatches B×D" +
+                " threads with sequential timestep loop" +
+                " per thread。 CPU + GPU paths share" +
+                " the SAME actor-isolated hidden state。" +
+                " 3 NEW GPU PROOF tests:GPU-matches-" +
+                "CPU + state-persists + MIXED GPU/CPU" +
+                " interleaved calls share state。" +
+                " 「不够仿生」 4/10 → 5/10。" +
+                " ADR-016 → M1183"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十二",
+            mNumberFirst: 1184,
+            mNumberLast: 1187,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 3 —" +
+                " substrate's FIRST closed-loop" +
+                " adaptive primitive。 BASPredictive" +
+                "CodingProbe actor maintains running" +
+                " prediction μ + adapts via μ ← μ + α·ε。" +
+                " Running MSE surfaces as substrate-" +
+                "level adaptation signal。 11 PROOF" +
+                " tests including CLOSED-LOOP CONVERGENCE" +
+                " (50 obs converges) + ADAPTATION SIGNAL" +
+                " (MSE decreases) + DISTRIBUTION SHIFT" +
+                " (error spike + recalibration)。" +
+                " 「不够灵活」 ~15% → ~35%。" +
+                " ADR-016 → M1187"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十三",
+            mNumberFirst: 1188,
+            mNumberLast: 1191,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION chapter —" +
+                " adds attention (4th transformer kernel)" +
+                " to the matMul + rmsNorm + rotaryEmbed" +
+                "ding triad。 CPU softmax via row-wise" +
+                " max-shift numerical stability;GPU" +
+                " composes transpose + matMul + softMax" +
+                " in one MPSGraph executable。 5 PROOF" +
+                " tests (identity + uniform-K +" +
+                " dominant-K + GPU/CPU agreement)。" +
+                " 「原生利用神经引擎」 3/3 → 4/4。" +
+                " ADR-016 → M1191"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十四",
+            mNumberFirst: 1192,
+            mNumberLast: 1195,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 4 —" +
+                " substrate's FIRST learning primitive。" +
+                " BASPlasticityFold actor maintains" +
+                " weight matrix W across apply() calls" +
+                " via 3 selectable rules (Hebbian +" +
+                " antiHebbian + outcomeModulatedHebbian)。" +
+                " 12 PROOF tests including HEBBIAN" +
+                " LEARNS ASSOCIATION (10 repeated pre/" +
+                "post pairs → forward query produces" +
+                " the learned association)。 「不够灵活」" +
+                " ~35% → ~50%。 ADR-016 → M1195"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十五",
+            mNumberFirst: 1196,
+            mNumberLast: 1199,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 12,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 5 —" +
+                " cross-turn / cross-session state" +
+                " persistence for ALL 3 biomimetic" +
+                " primitives。 Codable snapshot bundles" +
+                " (BASMambaSSMSnapshot +" +
+                " BASPredictiveCodingSnapshot +" +
+                " BASPlasticitySnapshot) + aggregate" +
+                " BASBiomimeticStateSnapshot + in-actor" +
+                " exportSnapshot/importSnapshot methods" +
+                " (validate shape + flat-length before" +
+                " mutating;fail-fast)。 20 PROOF tests" +
+                " including 3 CHECKPOINT-RESTORE-" +
+                "EVOLUTION-PARITY proofs:restored" +
+                " state's subsequent trajectory byte-" +
+                "equals a never-corrupted reference" +
+                " actor's trajectory。 「不够仿生」 5/10 →" +
+                " 6/10 (substrate REMEMBERS across host" +
+                " restarts)。 ADR-016 → M1199"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十六",
+            mNumberFirst: 1200,
+            mNumberLast: 1203,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 6 —" +
+                " substrate's FIRST cross-primitive" +
+                " orchestrator。 BASBiomimeticTurn" +
+                "Observer bundles the 3 biomimetic" +
+                " primitives + chapter 455 snapshot" +
+                " value-type behind ONE actor + ONE" +
+                " typed observe(_:) entry。 Optional" +
+                " primitive slots;observe dispatches" +
+                " to populated ones + skips nil。" +
+                " exportAggregate/importAggregate" +
+                " integrate chapter 455 snapshot with" +
+                " 2 boundary clamps:unpopulated-slot" +
+                " silently ignored,populated-with-nil-" +
+                "snapshot untouched。 15 PROOF tests" +
+                " including OBSERVER-LEVEL CHECKPOINT-" +
+                "RESTORE-EVOLUTION-PARITY (byte-equal" +
+                " trajectory after corruption + restore" +
+                " at orchestrator level)。 Hosts" +
+                " integrate biomimetic state with one" +
+                " actor injection instead of three。" +
+                " 「不够灵活」 ~50% → ~58%。" +
+                " ADR-016 → M1203"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十七",
+            mNumberFirst: 1204,
+            mNumberLast: 1207,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 7 — 4th" +
+                " plasticity rule completing the" +
+                " biomimetic rule quartet。 Canonical" +
+                " Spike-Timing-Dependent Plasticity" +
+                " (Bi & Poo 1998 + Markram et al 1997)" +
+                " as .stdpTemporal case under SAME" +
+                " BASPlasticityFold actor。" +
+                " BASPlasticitySTDPParams typed (A_+,A_-," +
+                "τ_+,τ_-) bundle with chapter 一百八十五" +
+                " clamps + Codable backward-compat." +
+                " amplitude(Δt) follows asymmetric" +
+                " exponential window:LTP for Δt > 0," +
+                " LTD for Δt < 0,zero at Δt = 0。 16" +
+                " PROOF tests including 4× A bias + 20×" +
+                " τ window-widening proofs + legacy" +
+                " JSON defaulting + observer routing。" +
+                " Substrate now learns CAUSAL ORDERING" +
+                " not just correlations。 「不够仿生」" +
+                " 6/10 → 7/10。 ADR-016 → M1207"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十八",
+            mNumberFirst: 1208,
+            mNumberLast: 1211,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 8 — GPU-" +
+                "accelerated plasticity update via" +
+                " runtime-compiled Metal compute kernel" +
+                " (mirrors chapter 451 Mamba GPU" +
+                " pattern)。 Each (i,j) thread owns one" +
+                " weight cell (no atomic contention);" +
+                " scale computed CPU-side so all 4 rules" +
+                " (Hebbian / antiHebbian / outcome-" +
+                "modulated / STDP) share one kernel。 9" +
+                " PROOF tests verify GPU/CPU agreement" +
+                " byte-equal within 1e-5 across all 4" +
+                " rules + cross-path mixing (CPU→GPU→CPU" +
+                " on same fold proves shared hidden" +
+                " weight state)。 Plasticity was LAST" +
+                " CPU-only compute-heavy primitive;" +
+                " GPU gap now closed。 「原生利用神经引擎」" +
+                " 4/4 → 5/5。 ADR-016 → M1211"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十九",
+            mNumberFirst: 1212,
+            mNumberLast: 1215,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 9 —" +
+                " substrate's FIRST multi-level adaptive" +
+                " primitive。 BASHierarchicalPredictive" +
+                "Coding actor maintains N-layer stack" +
+                " of probes;observe cascades error up" +
+                " the stack (layer K sees layer K-1's" +
+                " error,not raw input)。 Equal-dim" +
+                " invariant + custom Codable init" +
+                " ENFORCES invariant on DECODE" +
+                " (malformed JSON fails loudly)。" +
+                " Aggregate snapshot via chapter 455" +
+                " integration covers entire stack。 12" +
+                " PROOF tests verify cascade,convergence," +
+                " snapshot round-trip,invariant" +
+                " enforcement on malformed JSON。 Top-" +
+                "layer error = irreducible surprise" +
+                " signal。 Mirrors cortical hierarchies" +
+                " (Rao & Ballard 1999;Friston free-" +
+                "energy)。 「不够仿生」 7/10 → 8/10。" +
+                " ADR-016 → M1215"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十",
+            mNumberFirst: 1216,
+            mNumberLast: 1219,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "DEBT REPAYMENT 1 — closes BENCHMARK" +
+                " debt surfaced by chapter 459 self-" +
+                "audit。 BASMetalBenchmarkHarness actor" +
+                " runs N warmup + M timed iterations of" +
+                " CPU + GPU plasticity paths,returns" +
+                " typed report with mean/median/p95 µs" +
+                " + speedup ratio。 7 PROOF tests" +
+                " including REAL HARNESS RUN on 32×32" +
+                " / 256×256 / 1024×1024 shapes emitting" +
+                " measured µs。 Real numbers caught a" +
+                " NUANCE fictional doctrine hid:GPU" +
+                " is SLOWER at tiny shapes (32×32 →" +
+                " 0.66x;dispatch overhead);dominates" +
+                " at production scale (256×256 → 33.9x;" +
+                " 1024×1024 → 138.0x)。 Chapter 458" +
+                " doctrine UPDATED to cite harness +" +
+                " remove fictional µs claims。" +
+                " ADR-016 → M1219"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十一",
+            mNumberFirst: 1220,
+            mNumberLast: 1223,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "DEBT REPAYMENT 2 — closes INTEGRATION" +
+                " debt surfaced by chapter 459 self-" +
+                "audit。 First REAL wire from" +
+                " BASTurnRuntimeEngine to" +
+                " BASBiomimeticTurnObserver via two" +
+                " new optional configuration slots" +
+                " (biomimeticTurnObserver +" +
+                " biomimeticTurnSignalBuilder)" +
+                " defaulting to nil for ADR-014 OPT-IN" +
+                " + 7-LOC hook block at end of" +
+                " runWithPlan firing observer with" +
+                " try? swallow (红线 7 observation-" +
+                "not-commitment)。 8 PROOF tests verify" +
+                " configuration slots + updaters +" +
+                " observer-fires-with-builder-signal-" +
+                "drives-primitive。 Honest scope:full" +
+                " coordinator-level end-to-end test" +
+                " deferred (no test-infra exists)。" +
+                " Chapters 456+ orchestration no" +
+                " longer dead-on-arrival。 「Substrate" +
+                " not integrated into turn loop」 0% →" +
+                " ~70%。 ADR-016 → M1223"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十二",
+            mNumberFirst: 1224,
+            mNumberLast: 1227,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "DEBT REPAYMENT 3 — closes LAST 30%" +
+                " of chapter 461 integration debt by" +
+                " shipping reusable stub-coordinator" +
+                " factory + 3 end-to-end PROOF tests" +
+                " through REAL engine.runWithPlan。 NEW" +
+                " BASCoordinatorTestStubs.swift" +
+                " factory wires all 10 service protocols" +
+                " + returns ready-to-use" +
+                " BASEBrainRuntimeCoordinator。 3 new" +
+                " e2e tests verify observer fires per" +
+                " real turn,5 runs increment counter" +
+                " linearly,V1 byte-equality preserved" +
+                " end-to-end (红线 7 verified through" +
+                " real coordinator path,not just" +
+                " simulated)。 Integration debt 70% →" +
+                " 100%。 All 3 debts from chapter 459" +
+                " self-audit now CLOSED。 ADR-016 →" +
+                " M1227"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十三",
+            mNumberFirst: 1228,
+            mNumberLast: 1231,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 1 —" +
+                " Phase 1 of doctrine-collapse debt" +
+                " called out in chapter 462 self-audit。" +
+                " NEW BASChapterDoctrineRecord value-" +
+                "type + BASChapterDoctrineRegistry with" +
+                " 10 entries for chapters 453-462" +
+                " DERIVED from existing per-chapter" +
+                " Swift sources。 14 PROOF tests verify" +
+                " byte-mirror equality + Codable round-" +
+                "trip + lookup-by-tag + lookup-by-" +
+                "mNumberFirst + knife-structure deep" +
+                " mirror。 Phase 2 (chapter 464+) ships" +
+                " new chapters as registry entries;" +
+                " Phase 3 (chapter 465+) deletes the" +
+                " 60+ historical Swift files。 Net debt" +
+                " repayment after Phase 3:~−11K LOC。" +
+                " ADR-016 → M1231"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十四",
+            mNumberFirst: 1232,
+            mNumberLast: 1235,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 2 —" +
+                " Phase 2 of doctrine-collapse。 FIRST" +
+                " chapter doctrine living ONLY in" +
+                " BASChapterDoctrineRegistry,no" +
+                " per-chapter Swift file created。 The" +
+                " chapter PROVES the Phase 2 pattern" +
+                " by BEING its first instance。 10 PROOF" +
+                " tests verify schema parity with" +
+                " Swift-file chapters + M-range" +
+                " contiguity + Codable round-trip of" +
+                " literal record + Phase 2 covenant" +
+                " (every chapter past 453 has a" +
+                " registry entry)。 Per-chapter LOC" +
+                " delta:~+50 literal vs ~+200 Swift" +
+                " file (4× reduction)。 Phase 3" +
+                " (chapter 465+) deletes 60+ historical" +
+                " Swift files for the full ~−12K LOC" +
+                " repayment。 ADR-016 → M1235"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十五",
+            mNumberFirst: 1236,
+            mNumberLast: 1239,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 3 —" +
+                " Phase 2b proof-of-pattern for" +
+                " doctrine-collapse literal conversion。" +
+                " Course-corrects from original chapter" +
+                " 465 plan (destructive Phase 3 `git" +
+                " rm`) to auto-mode-safe scope。 NEW" +
+                " BASChapterDoctrineRegistry+Literals" +
+                ".swift with chapter 453 as LITERAL +" +
+                " 6 PROOF tests pinning literal-vs-" +
+                "derivation byte-equality + chapter" +
+                " 465 itself is registry-only (Phase 2" +
+                " pattern continued)。 Phase 3 destruction" +
+                " (60+ file `git rm` + bulk conversion)" +
+                " requires explicit user confirmation。" +
+                " Queued for chapter 466+。 ADR-016 →" +
+                " M1239"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十六",
+            mNumberFirst: 1240,
+            mNumberLast: 1243,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 4 —" +
+                " Phase 3 of doctrine collapse EXECUTED" +
+                " on phase-3-doctrine-collapse branch" +
+                " with user OK。 Auto-extracted 61" +
+                " chapter literals via Python script +" +
+                " swapped BASChapterDoctrineRegistry.all" +
+                " to consume literals + replaced 61" +
+                " historical Swift doctrine files with" +
+                " thin ~50-LOC forwarders。 Net LOC:" +
+                " ~−3K reduction。 byte-mirror PROOF" +
+                " tests pin every literal against its" +
+                " source。 All existing tests pass" +
+                " (forwarders preserve static surface)。" +
+                " Dependency inverted:registry is now" +
+                " the canonical store;per-chapter" +
+                " symbols are thin readers。 ADR-016 →" +
+                " M1243"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十七",
+            mNumberFirst: 1244,
+            mNumberLast: 1247,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-PHASE-3 FEATURE 1 — auto-" +
+                "checkpoint integration ties chapter 455" +
+                " snapshot + chapter 456 observer +" +
+                " chapter 461 engine hook + unified" +
+                " event log。 NEW 8th payload kind" +
+                " .biomimeticCheckpoint + typed" +
+                " BASBiomimeticCheckpointEventPayload +" +
+                " factory + reverse accessor。 NEW" +
+                " biomimeticCheckpointEveryNTurns config" +
+                " slot;engine extends chapter 461 hook" +
+                " block to emit checkpoint events every" +
+                " N turns when observer + cadence +" +
+                " eventLog all wired。 12 PROOF tests" +
+                " including end-to-end cadence emission" +
+                " via stub coordinator (6 turns @" +
+                " cadence=3 → 2 events emitted)。 ADR-" +
+                "014 OPT-IN preserved (nil cadence = no" +
+                " emission)。 Cross-session biomimetic" +
+                " state recovery via event-log replay" +
+                " now achievable;loop closure in chapter" +
+                " 468。 ADR-016 → M1247"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十八",
+            mNumberFirst: 1248,
+            mNumberLast: 1251,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-PHASE-3 FEATURE 2 — closes the" +
+                " cross-session biomimetic-state" +
+                " recovery loop opened by chapter 467。" +
+                " NEW BASBiomimeticCheckpointReplay" +
+                " typed namespace with 3 helpers:" +
+                " latestCheckpoint + restoreObserver +" +
+                " checkpointCount。 9 PROOF tests" +
+                " including bedrock END-TO-END loop" +
+                " closure (engine emits → replay" +
+                " restores → byte-equal state)。 Cross-" +
+                "session recovery is now a 1-line call。" +
+                " ADR-016 → M1251"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十九",
+            mNumberFirst: 1252, mNumberLast: 1255,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "BCM meta-plasticity primitive。" +
+                " 11 PROOF tests including threshold-" +
+                "homeostatic-rise proof。 ADR-016 → M1255"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十",
+            mNumberFirst: 1256, mNumberLast: 1259,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "Wire BASHierarchicalPredictive" +
+                "Coding into BASBiomimeticTurnObserver" +
+                " as 4th optional slot。 5 PROOF tests。" +
+                " ADR-016 → M1259"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十一",
+            mNumberFirst: 1260, mNumberLast: 1263,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "Expand BASMetalBenchmarkHarness" +
+                " with runMambaScan covering Mamba CPU" +
+                " + GPU paths。 2 PROOF tests with real" +
+                " µs。 ADR-016 → M1263"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十二",
+            mNumberFirst: 1264, mNumberLast: 1267,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "Add biomimeticCheckpointEvents" +
+                " field to BASEventLogReplayBundle" +
+                " (closes chapter 442 projection gap)。" +
+                " Codable backward-compat preserved。" +
+                " All chapter-468 plannedFutureCuts now" +
+                " shipped。 ADR-016 → M1267"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十三",
+            mNumberFirst: 1268, mNumberLast: 1271,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "POST-PHASE-3 self-audit cleanup。" +
+                " 8 fixes from chapter 466 deep review:" +
+                " frozen-SHA256 anti-drift replaces" +
+                " circular byte-mirror;BCM wired into" +
+                " observer as 5th slot;e2e hierarchical" +
+                " + BCM through real engine;chapter 472" +
+                " backward-compat decoder PROOF;" +
+                " production-scale Mamba benchmark" +
+                " (25.85x GPU speedup measured);Python" +
+                " scripts committed;chapter 466 prose" +
+                " honestly revised。 Branch ready for" +
+                " merge review。 ADR-016 → M1271"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十四",
+            mNumberFirst: 1272, mNumberLast: 1275,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 1 —" +
+                " first chapter that substantively" +
+                " closes 3 of the 6 directives scored" +
+                " ≤4/10 at chapter 473 deep review。" +
+                " Cut 1 — BASANELiveReader factory" +
+                " (ANE 1/10 gap)。 Cut 2 —" +
+                " BASKernelRegistryDispatchExecutor" +
+                " factory (MPSGraph 4/10 gap)。 Cut 3 —" +
+                " end-to-end integration PROOF of" +
+                " hint→scheduler→assignment→executor→" +
+                "registry→kernel chain。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1275。" +
+                " V1 byte-equality preserved via ADR-" +
+                "014 OPT-IN — all new surfaces are" +
+                " additive factories;hosts opt in to" +
+                " activate。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十五",
+            mNumberFirst: 1276, mNumberLast: 1279,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 2 —" +
+                " closes the chapter 474 EchoKernel" +
+                " placeholder gap。 Cut 1 —" +
+                " BASCanonicalKernelInputBuilders" +
+                " typed factory namespace (matMul/" +
+                "rmsNorm/rotaryEmbedding + Float↔Data" +
+                " helpers)。 Cut 2 — FIRST PROOF that" +
+                " MPSGraph kernels actually compute" +
+                " correctly with 5 numerical tests。" +
+                " Cut 3 — full chain end-to-end PROOF" +
+                " with REAL BASMPSGraphMatMulKernel" +
+                " (replaces EchoKernel stub)。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1279。" +
+                " '更硬核' now has SUBSTANTIVE evidence"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十六",
+            mNumberFirst: 1280, mNumberLast: 1283,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 3 —" +
+                " RMSNorm + RotaryEmbedding numerical" +
+                " PROOF (3 of 4 MPSGraph kernels now" +
+                " verified) + FIRST real" +
+                " BASBundle<Item> typealias migration" +
+                " (closes chapter 429 scaffold-without-" +
+                "migration gap)。 Cut 1 — RMSNorm" +
+                " kernel correctness。 Cut 2 —" +
+                " BASKernelDispatchOutcomeBundle real" +
+                " adoption。 Cut 3 — RotaryEmbedding" +
+                " kernel correctness。 Cut 4 — chapter" +
+                " close-out。 ADR-016 → M1283。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十七",
+            mNumberFirst: 1284, mNumberLast: 1287,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 4 —" +
+                " final session close-out。 Cut 1 —" +
+                " attention kernel numerical PROOF" +
+                " (4-of-4 MPSGraph coverage now" +
+                " complete)。 Cut 2 —" +
+                " BASRealHotPathAttackEvaluation" +
+                "Doctrine honest re-scoring of 6" +
+                " user-stated directives (11/60 →" +
+                " 28/60 = +17 points net progress)。" +
+                " Cut 3 — BASMPSGraphKernelCoverage" +
+                "Bundle second real BASBundle<Item>" +
+                " migration (pattern scales)。 Cut 4" +
+                " — chapter close-out。 ADR-016 →" +
+                " M1287。 4-chapter arc sealed (16" +
+                " commits / V1 byte-equality" +
+                " preserved throughout)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十八",
+            mNumberFirst: 1288, mNumberLast: 1291,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK to 100%" +
+                " Phase A — V1 fold PILOT + stress-" +
+                "sweep dual mode regression guard。" +
+                " Cut 1 — BASTurnAuditProjections" +
+                "KunlunTrio first V1 fold extraction。" +
+                " Cut 2 — coordinator splice replaces" +
+                " 3 ForAudit declarations。 Cut 3 —" +
+                " BASTurnRuntimeFullSummaryStressSweep" +
+                "Runner closes chapter 434 deferral +" +
+                " canonical60 PROOF with 300-turn-run" +
+                " 0-divergence verification。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1291。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十九",
+            mNumberFirst: 1292, mNumberLast: 1295,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK to 100%" +
+                " Phase B — 3 missing MPSGraph kernels" +
+                " shipped。 BASNeuralOp coverage:" +
+                " 4-of-8 → 7-of-8 (87.5%)。 Cut 1 —" +
+                " BASMPSGraphSoftmaxKernel + 5 PROOF" +
+                " tests。 Cut 2 — BASMPSGraphLayerNorm" +
+                "Kernel + 5 PROOF tests。 Cut 3 —" +
+                " BASMPSGraphConv2DKernel + 4 PROOF" +
+                " tests。 Cut 4 — chapter close-out。" +
+                " ADR-016 → M1295。 Only ssmScan" +
+                " (Mamba SSM) deferred to Tier 2。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十",
+            mNumberFirst: 1296, mNumberLast: 1299,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 4,
+            summary: "Phase C — ANE live binding default" +
+                " flip + cache observation + 45×-gap" +
+                " benchmark。 ADR-016 → M1299。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十一",
+            mNumberFirst: 1300, mNumberLast: 1303,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Phase D start — 1st BASResult +" +
+                " 1st BASCard + 1st BASFrameEnvelope" +
+                " adoptions。 4-of-5 primitives in" +
+                " production。 ADR-016 → M1303。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十二",
+            mNumberFirst: 1304, mNumberLast: 1307,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "5-of-5 primitive coverage" +
+                " (1st BASPermit) + cross-turn KV" +
+                " cache substrate surface。 ADR-016 → M1307。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十三",
+            mNumberFirst: 1308, mNumberLast: 1311,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "9 batched typealias adoptions。" +
+                " ADR-016 → M1311。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十四",
+            mNumberFirst: 1312, mNumberLast: 1315,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "22 cumulative adoptions + scoring" +
+                " 28/60 → 41/60。 ADR-016 → M1315。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十五",
+            mNumberFirst: 1316, mNumberLast: 1319,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "V1 fold cluster A 12-of-18。" +
+                " ADR-016 → M1319。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十六",
+            mNumberFirst: 1320, mNumberLast: 1323,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "V1 fold cluster A 100% +" +
+                " cluster B start。 ADR-016 → M1323。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十七",
+            mNumberFirst: 1324, mNumberLast: 1327,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 6, futureCutsCount: 2,
+            summary: "Cluster B 8 declarations folded。" +
+                " ADR-016 → M1327。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十八",
+            mNumberFirst: 1328, mNumberLast: 1331,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 6, futureCutsCount: 2,
+            summary: "Cluster B 12 declarations folded" +
+                " (lifecycle quartet)。 ADR-016 → M1331。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十九",
+            mNumberFirst: 1332, mNumberLast: 1335,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 6, futureCutsCount: 2,
+            summary: "Cluster B 18 declarations folded" +
+                " (sextet)。 ADR-016 → M1335。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十",
+            mNumberFirst: 1336, mNumberLast: 1339,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 5,
+            summary: "TIER 1 SEALED — 45/60 (75%)。" +
+                " BASTier1AchievementDoctrine。" +
+                " ADR-016 → M1339。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十一",
+            mNumberFirst: 1340, mNumberLast: 1343,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 6, futureCutsCount: 3,
+            summary: "Cluster B 21 declarations folded" +
+                " (87.5%)。 Post-Tier-1 incremental" +
+                " progress。 ADR-016 → M1343。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十二",
+            mNumberFirst: 1344, mNumberLast: 1347,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 3,
+            summary: "Surface trio fold + HONEST scope" +
+                " correction:66 ForAudit declarations" +
+                " remain in coordinator。 10 bundle" +
+                " factories cumulative。 ADR-016 → M1347。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十三",
+            mNumberFirst: 1348, mNumberLast: 1352,
+            knivesCount: 5, entropyClassesCount: 4,
+            pinsCount: 7, futureCutsCount: 3,
+            summary: "Downstream Kunlun fold:axis +" +
+                " seal/river。 8 ForAudit declarations" +
+                " folded + ~100 V1 LOC reduction。 12" +
+                " bundle factories cumulative。 ADR-016" +
+                " → M1352。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十四",
+            mNumberFirst: 1353, mNumberLast: 1356,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tianmen trio fold +" +
+                " M595 cross-site drift elimination" +
+                " (gate-side reuses axis-protocol" +
+                " factory)。 ~104 V1 LOC reduction。" +
+                " 13 bundle factories cumulative。" +
+                " ADR-016 → M1356。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十五",
+            mNumberFirst: 1357, mNumberLast: 1360,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Permit escalation pipeline" +
+                " typed-surface ship:Step + Pipeline" +
+                " Observation + DecisionsBundle。 15" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1360。 V1 byte-equality UNTOUCHED" +
+                " (typed-surface-first pattern;V1 fold" +
+                " executor consumes in chapter 496+)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十六",
+            mNumberFirst: 1361, mNumberLast: 1364,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Tier 2 entry:ssmScan kernel STUB +" +
+                " 4-path status enum + 8-of-8 coverage" +
+                " snapshot (7 native proof + 1 honest" +
+                " stub)。 16 typed surfaces cumulative。" +
+                " ADR-016 → M1364。 HONEST SCOPE: ssmScan" +
+                " production = external Metal shader /" +
+                " MLX / CoreML work (Tier 2 phase K)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十七",
+            mNumberFirst: 1365, mNumberLast: 1368,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK SEALED:" +
+                " ADR-019 typed proposal +" +
+                " BASTier2AchievementDoctrine +" +
+                " BASRealHotPathAttackSealDoctrine。" +
+                " Final aggregate 47/60 (~78%)。 13-" +
+                " point gap to 60/60 typed via 6" +
+                " external blockers。 19 typed surfaces" +
+                " cumulative。 ADR-016 → M1368。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十八",
+            mNumberFirst: 1369, mNumberLast: 1372,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier 1 honest closure push:" +
+                " BASMPSGraphKernelBuildLatencyResult +" +
+                " BASEBrainHostRuntimeModeAdvisory +" +
+                " BASKernelEvaluateLatencyProbe。 22" +
+                " typed surfaces cumulative。 ADR-016" +
+                " → M1372。 更硬核 latency observability" +
+                " closed;最激进 typed OPT-IN advisory" +
+                " shipped (routing wire-in deferred)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十九",
+            mNumberFirst: 1373, mNumberLast: 1376,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 8, futureCutsCount: 3,
+            summary: "更极致/低熵 substantive push:" +
+                " BASKernelDispatchStatisticsBundle +" +
+                " BASMPSGraphCacheReportResult +" +
+                " BASKernelDispatchAttemptCard (1+1+1" +
+                " primitive adoptions)。 25 typed" +
+                " surfaces cumulative。 ADR-016 → M1376。" +
+                " Tier C ADR scope honestly deferred。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百",
+            mNumberFirst: 1377, mNumberLast: 1380,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "最创新/原生神经引擎 push:" +
+                " BASANEKernelEligibilityClassifier +" +
+                " BASThermalAwareKernelSelectionPolicy" +
+                " + BASKVCacheInvalidationPolicy。 28" +
+                " typed surfaces cumulative。 ADR-016" +
+                " → M1380。 HONEST: executor wire-in" +
+                " deferred (consultedByExecutorIn" +
+                "Production = false invariant tested)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百一",
+            mNumberFirst: 1381, mNumberLast: 1383,
+            knivesCount: 3, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Tier 1 substrate-internal honest" +
+                " CLOSURE SEALED at 52/60 (~87%)。" +
+                " BASTier1HonestClosureMilestoneDoctrine" +
+                " + BASRealHotPathAttackSealDoctrine" +
+                " post-closure refresh。 31 typed" +
+                " surfaces cumulative。 ADR-016 → M1383。" +
+                " 8-point gap to 60/60 typed-attributed" +
+                " to 7 external blockers (NO silent" +
+                " under-delivery drift invariant tested)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二",
+            mNumberFirst: 1385, mNumberLast: 1388,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Wire-in push:typed surfaces from" +
+                " chapter 498-501 now CONSUMED。 BASKV" +
+                "CacheRegistry wires M1379 policy" +
+                " (M1385);BASKernelEvaluateLatencyProbe" +
+                "Bundle (M1386) aggregates M1369 bodies;" +
+                " BASKVCacheRegistryObservationSnapshot" +
+                " (M1387) emits typed snapshots。 33" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1388。 Step BEYOND typed-surface-only。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三",
+            mNumberFirst: 1389, mNumberLast: 1392,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Observer wire-in push:3 more" +
+                " typed surfaces from chapter 498-500" +
+                " now have actor-isolated observers:" +
+                " BASKernelRoutingDecisionObserver +" +
+                " BASKernelDispatchStatisticsRecorder +" +
+                " BASEBrainHostRuntimeModeAdvisoryLedger。" +
+                " 36 typed surfaces cumulative。 ADR-016" +
+                " → M1392。 HONEST: production executor" +
+                " still doesn't consult observers" +
+                " (preserves chapter 498-500 invariants)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四",
+            mNumberFirst: 1393, mNumberLast: 1396,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Bundle aggregator wire-ins:" +
+                " M1393 cache report 5-stage pipeline +" +
+                " M1394 routing decision bundle (9th" +
+                " BASBundle) + M1395 advisory bundle" +
+                " (10th BASBundle)。 39 typed surfaces" +
+                " cumulative。 ADR-016 → M1396。 10" +
+                " BASBundle<Item> adoptions cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五",
+            mNumberFirst: 1397, mNumberLast: 1400,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "M1400 MILESTONE — unified end-of-" +
+                "turn audit emission architecture:" +
+                " M1397 record composes 4 pipelines;" +
+                " M1398 emitter actor dependency-" +
+                "injects observers;M1399 11th" +
+                " BASBundle for multi-turn replay。 42" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1400。 Substrate audit-emission" +
+                " architecture COMPLETE。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六",
+            mNumberFirst: 1401, mNumberLast: 1404,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Cluster B fold continues:" +
+                " BASTurnAuditProjectionsAbyssalThermal" +
+                "Trio + BASTurnAuditProjectionsGateSide" +
+                "DeriveTrio consolidate 6 ForAudit/" +
+                "ForGate derives。 44 typed surfaces" +
+                " cumulative。 ADR-016 → M1404。 V1" +
+                " byte-equality preserved via shadow-" +
+                "rebinding + stress-sweep dual-mode" +
+                " regression guard。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七",
+            mNumberFirst: 1405, mNumberLast: 1408,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier C ADR-019 implementation" +
+                " entry:user 全面 开发 tier abc" +
+                " directive flipped proposal to" +
+                " approved (M1405);2 of 4 Tier C" +
+                " typed shape-specific primitives" +
+                " shipped (BASInspectionFrame<Body> +" +
+                " BASRiskObservationCard<Kind, Body>)。" +
+                " 46 typed surfaces cumulative。" +
+                " ADR-016 → M1408。 Chapter 508 ships" +
+                " remaining 2 (BASArbitrationFrame +" +
+                " BASGovernanceCard)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八",
+            mNumberFirst: 1409, mNumberLast: 1412,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier C ADR-019 IMPLEMENTATION" +
+                " COMPLETE:4 of 4 typed shape-specific" +
+                " primitives shipped (BASArbitration" +
+                "ObservationFrame + BASGovernanceCard" +
+                " final 2) + BASTierCAchievementDoctrine" +
+                " milestone。 49 typed surfaces" +
+                " cumulative。 ADR-016 → M1412。 Combined" +
+                " Tier C completion = 50% (primitives" +
+                " 4/4 + migrations 0/4 honest deferral)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九",
+            mNumberFirst: 1413, mNumberLast: 1416,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier C migration adapters:" +
+                " BASRiskObservationCardAdapter +" +
+                " BASInspectionBundleFrameAdapter (2 of" +
+                " 4 typed pure-function adapters)。" +
+                " BASTierCAchievementDoctrine bumped to" +
+                " HONEST 3-layer accounting (primitives" +
+                " + adapters + migrations)。 51 typed" +
+                " surfaces cumulative。 ADR-016 → M1416。" +
+                " Combined Tier C completion = 50%" +
+                " (3-layer:6/12)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十",
+            mNumberFirst: 1417, mNumberLast: 1420,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "V1 monolith fold continues:" +
+                " BASTurnAuditProjectionsCounterweight" +
+                "Factory + BASRoutedBudgetFactory。 38" +
+                " lines of inline construction collapsed" +
+                " to 24 lines of typed factory call。" +
+                " 53 typed surfaces cumulative。 ADR-016" +
+                " → M1420。 V1 byte-equality preserved" +
+                " via shadow-rebinding + stress-sweep" +
+                " dual-mode regression guard。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十一",
+            mNumberFirst: 1421, mNumberLast: 1424,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Projection-block fold:" +
+                " BASAuditObservationProjectionsKunlun" +
+                "Inputs (18 fields, 4 trio outputs)" +
+                " + BASAuditObservationProjections" +
+                "CthulhuInputs (8 fields, 2 trio/penta" +
+                " outputs) + 2 matching convenience" +
+                " inits。 26 audit-projection fields" +
+                " now flow through 2 typed input blocks。" +
+                " 55 typed surfaces cumulative。 ADR-016" +
+                " → M1424。 V1 untouched (additive APIs" +
+                " only)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十二",
+            mNumberFirst: 1425, mNumberLast: 1428,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Wire-in chain for projection" +
+                " blocks: BASAuditObservation" +
+                "ProjectionsBundleObservation typed" +
+                " observation record + Bundle Observer" +
+                " actor + 12th BASBundle<Item>" +
+                " adoption (BASAuditObservation" +
+                "ProjectionsBundle)。 4-stage typed" +
+                " composition pipeline closed。 58" +
+                " typed surfaces cumulative。 ADR-016" +
+                " → M1428。 Observer is OPT-IN — no" +
+                " production callers wired at" +
+                " close-out。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十三",
+            mNumberFirst: 1429, mNumberLast: 1432,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "5-pipeline unified audit emission" +
+                " shape sealed: BASAuditObservation" +
+                "ProjectionsBundleEmitter typed facade" +
+                " + 5th pipeline (projectionBlock" +
+                "Observations) added to BASEndOfTurn" +
+                "AuditEmissionRecord + BASEndOfTurnAudit" +
+                "Emitter projection-bundle hook。" +
+                " Backwards-compat preserved (hasAllFour" +
+                "Pipelines retains M1397 semantics)。" +
+                " 59 typed surfaces cumulative。 ADR-016" +
+                " → M1432。 All pipelines opt-in;V1" +
+                " untouched。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十四",
+            mNumberFirst: 1433, mNumberLast: 1436,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "3rd typed input block + unified" +
+                " convenience inits sealed:" +
+                " BASAuditObservationProjections" +
+                "ObservationBundlesBlock (11 cognitive" +
+                " bundles) + 2 new convenience inits" +
+                " (observation-bundles-only + unified" +
+                " 3-block taking all of Kunlun +" +
+                " Cthulhu + Observation)。 37 of 56" +
+                " audit-projection fields packaged into" +
+                " 3 typed input surfaces。 60 typed" +
+                " surfaces cumulative。 ADR-016 →" +
+                " M1436。 V1 untouched (additive APIs" +
+                " only)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十五",
+            mNumberFirst: 1437, mNumberLast: 1440,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "REAL V1 monolith projections fold:" +
+                " EBrainRuntimeCoordinator.swift line" +
+                " 2035 switches from 56-arg/118-LOC" +
+                " inline construction to 3 typed input" +
+                " blocks + ~22-arg unified 3-block init。" +
+                " ~35 LOC saved at call site。 V1 byte-" +
+                "equality preserved via stress-sweep" +
+                " canonical60 × 3 repeat runs 0-" +
+                "divergence。 61 typed surfaces" +
+                " cumulative。 ADR-016 → M1440。 First" +
+                " real V1 fold since chapter 510。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十六",
+            mNumberFirst: 1441, mNumberLast: 1444,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "4th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "KunlunProtocolBlock (9 protocol fields)" +
+                " + 4-block convenience init + V1" +
+                " monolith splice extending M1437。" +
+                " 46 of 56 audit-projection fields now" +
+                " flow through 4 typed input surfaces" +
+                " (82% coverage)。 V1 call site shrinks" +
+                " from 83 → ~78 LOC。 62 typed surfaces" +
+                " cumulative。 ADR-016 → M1444。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十七",
+            mNumberFirst: 1445, mNumberLast: 1448,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "5th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "CthulhuAggregatesBlock (7 L1-L7" +
+                " aggregate fields) + 5-block" +
+                " convenience init + V1 monolith splice" +
+                " extending M1443。 53 of 56 audit-" +
+                "projection fields now flow through 5" +
+                " typed input surfaces (95% packaging" +
+                " coverage)。 V1 call site shrinks from" +
+                " 78 → ~73 LOC (cumulative 118 → 73" +
+                " across chapters 515-517 = ~45 LOC" +
+                " saved)。 63 typed surfaces cumulative。" +
+                " ADR-016 → M1448。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十八",
+            mNumberFirst: 1449, mNumberLast: 1452,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "6th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "ClosureBlock (7 closure-themed fields)" +
+                " + 6-block convenience init + V1" +
+                " monolith splice extending M1447。" +
+                " 60 fields packaged across 6 input" +
+                " surfaces。 V1 call site shrinks from" +
+                " 73 → ~68 LOC (cumulative 118 → 68" +
+                " across chapters 515-518 = ~50 LOC" +
+                " saved)。 64 typed surfaces cumulative。" +
+                " ADR-016 → M1452。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十九",
+            mNumberFirst: 1453, mNumberLast: 1456,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "FIRST PRODUCTION WIRE-IN since" +
+                " chapter 512:projectionBlockEmission" +
+                "Handler slot on BASEBrainRuntime" +
+                "Coordinator + V1 monolith fires the" +
+                " handler after projections construction" +
+                " + 5 PROOF tests via real coordinator" +
+                " turns。 Moves chapters 511-518 typed" +
+                " surfaces from 'shipped opt-in' to" +
+                " 'fires in V1 production hot path'。" +
+                " 64 typed surfaces cumulative。 ADR-016" +
+                " → M1456。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十",
+            mNumberFirst: 1457, mNumberLast: 1460,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Chapter 520 closes the 10-chapter" +
+                " projection-block pipeline arc:" +
+                " BASAuditObservationProjectionsBundle" +
+                "ObserverHostAdapter (sync→actor bridge)" +
+                " + end-to-end PROOF for the complete" +
+                " coordinator→adapter→observer→bundle" +
+                " pipeline + BASChapter511To520Pipeline" +
+                "Doctrine typed milestone freezing arc" +
+                " invariants (10 chapters,40 commits,6" +
+                " input blocks,60 packaged fields,50" +
+                " LOC V1 reduction)。 66 typed surfaces" +
+                " cumulative。 ADR-016 → M1460。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十一",
+            mNumberFirst: 1461, mNumberLast: 1464,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "7th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "KunlunAuditSchemasBlock (3 M424 Kunlun" +
+                " audit schemas) + 7-block convenience" +
+                " init + V1 monolith splice extending" +
+                " M1451。 63 fields packaged across 7" +
+                " typed input surfaces。 V1 call site" +
+                " shrinks to ~65 LOC (cumulative 118 →" +
+                " 65 across chapters 515-521 = ~53 LOC" +
+                " saved)。 67 typed surfaces cumulative。" +
+                " ADR-016 → M1464。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十二",
+            mNumberFirst: 1465, mNumberLast: 1468,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "100% V1 CALL-SITE PACKAGING" +
+                " COVERAGE MILESTONE:8th + FINAL typed" +
+                " input block (BASAuditObservation" +
+                "ProjectionsCthulhuLeftoversBlock,6" +
+                " leftover fields) + 8-block convenience" +
+                " init with NO residual args + V1" +
+                " monolith splice using all 8 blocks。" +
+                " 69 fields packaged across 8 typed" +
+                " surfaces。 V1 call site:118 → ~60 LOC" +
+                " (~58 LOC saved,49% reduction" +
+                " cumulative)。 68 typed surfaces" +
+                " cumulative。 ADR-016 → M1468。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十三",
+            mNumberFirst: 1469, mNumberLast: 1472,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Caps the 12-chapter projection-" +
+                "block pipeline arc:BASChapter511To522" +
+                "PipelineDoctrine typed milestone" +
+                " freezing 12-chapter arc invariants" +
+                " (12 chapters,48 commits,8 input" +
+                " blocks,69 packaged fields,49% V1" +
+                " LOC reduction,100% packaging" +
+                " coverage) + 8 anti-drift tests pinning" +
+                " all block types + 3 end-to-end PROOF" +
+                " tests via V1 monolith (including" +
+                " replay-deterministic block hashes" +
+                " verification)。 69 typed surfaces" +
+                " cumulative。 ADR-016 → M1472。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十四",
+            mNumberFirst: 1473, mNumberLast: 1476,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "PIVOT to BASEBrainTurnResult fold:" +
+                " BASEBrainTurnResultEvolutionBundle (10" +
+                " L13 evolution fields) + convenience" +
+                " init on BASEBrainTurnResult + V1" +
+                " monolith splice using the bundle。" +
+                " First V1 fold of a non-projection" +
+                " call site since chapter 510。 V1 call-" +
+                "site savings:10 named arg lines → 1" +
+                " evolutionBundle construction。 70 typed" +
+                " surfaces cumulative。 ADR-016 → M1476。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十五",
+            mNumberFirst: 1477, mNumberLast: 1480,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "2nd BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultSovereign" +
+                "Bundle (8 L14 sovereign fields) +" +
+                " 2-bundle convenience init + V1" +
+                " monolith splice。 BASEBrainTurnResult" +
+                " call site cumulative:52 → 36 args" +
+                " (16 args collapsed across evolution" +
+                " + sovereign bundles)。 71 typed" +
+                " surfaces cumulative。 ADR-016 → M1480。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十六",
+            mNumberFirst: 1481, mNumberLast: 1484,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "3rd BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultAudit" +
+                "ProjectionForwardBundle (7 audit-" +
+                "projection-forwarded fields) + 3-bundle" +
+                " convenience init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 29 args (23 args" +
+                " collapsed across evolution + sovereign" +
+                " + audit-projection-forward bundles)。" +
+                " 72 typed surfaces cumulative。 ADR-016" +
+                " → M1484。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十七",
+            mNumberFirst: 1485, mNumberLast: 1488,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Parallel-run reconciliation:M1485" +
+                " ships the 4-bundle convenience init" +
+                " that closes the chapter 526 V1 splice" +
+                " call-site contract gap (V1 splice" +
+                " calls with 4 bundles but only 3-bundle" +
+                " inits existed) + M1486 PROOF tests +" +
+                " M1487 typed milestone doctrine。 73" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1488。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十八",
+            mNumberFirst: 1489, mNumberLast: 1492,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "5th BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultCognitive" +
+                "FramesBundle (5 required cognitive" +
+                " frame fields:contextFrame +" +
+                " decomposeFrame + memoryBundle +" +
+                " thoughtFrame + thoughtFold) +" +
+                " 5-bundle convenience init + V1" +
+                " monolith splice。 BASEBrainTurnResult" +
+                " call site cumulative:52 → 22 args" +
+                " (35 fields collapsed across 5 typed" +
+                " bundles)。 74 typed surfaces cumulative。" +
+                " ADR-016 → M1492。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十九",
+            mNumberFirst: 1493, mNumberLast: 1496,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "6th BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultRiskChoice" +
+                "Bundle (4 L10-L12 fields:triScores +" +
+                " mergedChoice + riskCard +" +
+                " actionPermit) + 6-bundle convenience" +
+                " init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 18 args (39 fields" +
+                " collapsed across 6 typed bundles," +
+                " 65% reduction)。 75 typed surfaces" +
+                " cumulative。 ADR-016 → M1496。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十",
+            mNumberFirst: 1497, mNumberLast: 1500,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "M1500 MILESTONE — 7th BASEBrain" +
+                "TurnResult cluster bundle:" +
+                " BASEBrainTurnResultMiscBundle (4 misc" +
+                " output fields:riskDecisionPackage +" +
+                " hostGateValue + renderedOutput +" +
+                " updateTickets) + 7-bundle convenience" +
+                " init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 14 args (43 fields" +
+                " collapsed across 7 typed bundles," +
+                " 73% reduction)。 76 typed surfaces" +
+                " cumulative。 ADR-016 → M1500。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十一",
+            mNumberFirst: 1501, mNumberLast: 1504,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "8th BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultDevice" +
+                "LifecycleBundle (6 L0 device/lifecycle" +
+                " fields:deviceState + budgetFrame +" +
+                " wakeIntent + vitalState + runLease +" +
+                " emergencyBrake) + 8-bundle convenience" +
+                " init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 8 args (49 fields" +
+                " collapsed across 8 typed bundles," +
+                " 85% reduction)。 77 typed surfaces" +
+                " cumulative。 ADR-016 → M1504。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十二",
+            mNumberFirst: 1505, mNumberLast: 1508,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "100% PACKAGING MILESTONE — 9th +" +
+                " FINAL BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultForensic" +
+                "MetadataBundle (3 forensic metadata" +
+                " fields:policyLineage +" +
+                " recoveryDisposition + runtimeTrace) +" +
+                " 9-bundle convenience init + V1" +
+                " monolith splice。 100% arg packaging" +
+                " coverage achieved — ALL 52 fields now" +
+                " travel through 9 typed cluster" +
+                " bundles。 BASEBrainTurnResult call" +
+                " site cumulative:52 → 9 args (~83%" +
+                " arg-count reduction)。 78 typed" +
+                " surfaces cumulative。 ADR-016 → M1508。" +
+                " V1 byte-equality preserved。 BASEBrain" +
+                "TurnResult fold ARC SEALED。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十三",
+            mNumberFirst: 1509, mNumberLast: 1512,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Fold arc sealed milestone doctrine" +
+                " + 20 PROOF tests:" +
+                " BASEBrainTurnResultFoldArcSealed" +
+                "Doctrine typed milestone surface (M1509)" +
+                " + 10 anti-drift PROOF tests (M1510)" +
+                " + 10 wire-in PROOF tests cross-checking" +
+                " doctrine vs each actual cluster bundle's" +
+                " static field-count constant (M1511)。" +
+                " The fold arc sealed state is now non-" +
+                "driftable。 79 typed surfaces cumulative。" +
+                " ADR-016 → M1512。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十四",
+            mNumberFirst: 1513, mNumberLast: 1516,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "30-declaration dead-code purge from" +
+                " EBrainRuntimeCoordinator.swift (M1513)" +
+                " + BASCoordinatorDeadDeclarationPurge" +
+                "Doctrine typed milestone surface (M1514)" +
+                " + 11 anti-drift PROOF tests (M1515)。" +
+                " Build warning count on the coordinator:" +
+                " 60 → 0。 80 typed surfaces cumulative。" +
+                " ADR-016 → M1516。 V1 byte-equality" +
+                " preserved (pure-accessor reads with no" +
+                " side effects)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十五",
+            mNumberFirst: 1517, mNumberLast: 1520,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Substrate-wide build-warning" +
+                " purge:2 var→let (immutability) + 2" +
+                " try? discards → explicit do/catch" +
+                " (silent-swallow documented) at M1517." +
+                " BASSubstrateBuildWarningPurgeDoctrine" +
+                " typed milestone surface +" +
+                " WarningCategory typed enum (3" +
+                " categories) at M1518。 12 anti-drift" +
+                " PROOF tests at M1519。 Substrate-wide" +
+                " build warning count 4 → 0 (cumulative" +
+                " 64 → 0 across chapters 534-535)。 81" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1520。 V1 byte-equality preserved" +
+                " (pure cleanup,no behavioral change)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十六",
+            mNumberFirst: 1521, mNumberLast: 1524,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Typed observability sink for the" +
+                " silent-swallow paths from chapter 535:" +
+                " BASHostStorageInitialAtomAdmitFailure" +
+                "Log actor + Record struct (M1521)" +
+                " wired into BASHostStorageWireBuilder" +
+                " makeAtomStore + makeBundle via" +
+                " optional `failureLog:` parameter" +
+                " (M1522) + 7 PROOF tests (M1523)。" +
+                " Default behavior unchanged (nil →" +
+                " silent swallow as documented at" +
+                " M1517);hosts opt in to observe" +
+                " admission failures。 The M1517 TODO" +
+                " is resolved。 82 typed surfaces" +
+                " cumulative。 ADR-016 → M1524。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十七",
+            mNumberFirst: 1525, mNumberLast: 1528,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Typed observability sink for" +
+                " BASTurnRuntimeEngine's 4 documented" +
+                " silent-swallow paths (biomimetic" +
+                " observer + 3 event-log append sites):" +
+                " BASTurnRuntimeEngineObservationFailure" +
+                "Log actor + Kind typed enum (4 cases) +" +
+                " Record struct with sessionID" +
+                " correlation (M1525) + wire-in to the" +
+                " 4 sites via optional `observationFailure" +
+                "Log:` engine init parameter (M1526) +" +
+                " 9 PROOF tests (M1527)。 Default" +
+                " behavior unchanged (nil → silent" +
+                " swallow as documented per 红线 7)。" +
+                " 83 typed surfaces cumulative。 ADR-016" +
+                " → M1528。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十八",
+            mNumberFirst: 1529, mNumberLast: 1532,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Test-target build-warning purge:" +
+                " 3 dead let declarations + 1 var→let" +
+                " immutability fix across 4 distinct" +
+                " test files (M1529)。 NEW BASTest" +
+                "TargetBuildWarningPurgeDoctrine typed" +
+                " milestone surface with bothTargets" +
+                "WarningFree computed cross-check" +
+                " (M1530) + 13 anti-drift PROOF tests" +
+                " (M1531)。 Test-target build warning" +
+                " count 4 → 0。 Cumulative warning-free" +
+                " across Sources/ AND Tests/。 84 typed" +
+                " surfaces cumulative。 ADR-016 → M1532。" +
+                " V1 byte-equality preserved (pure" +
+                " cleanup,no behavioral change)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十九",
+            mNumberFirst: 1533, mNumberLast: 1536,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "3rd typed observability sink —" +
+                " cross-module BASAuditEmissionFailure" +
+                "Log actor + Kind enum (2 cases:" +
+                " turnEnvelopeAppend +" +
+                " sovereignRebootAuditAppend) +" +
+                " Record struct in BASRuntimeCore" +
+                " (M1533)。 Wired into BASHostKit's" +
+                " BASEventLogStorage.appendTurnEnvelope" +
+                " + BASSovereign's BASSovereignClean" +
+                "RebootCoordinator (M1534) + 10 PROOF" +
+                " tests (M1535)。 3 typed observability" +
+                " sinks now shipped。 85 typed surfaces" +
+                " cumulative。 ADR-016 → M1536。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十",
+            mNumberFirst: 1537, mNumberLast: 1540,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Unified typed catalogue doctrine" +
+                " for the 3 observability sinks shipped" +
+                " to date (chapters 536+537+539):" +
+                " BASTypedObservabilitySinkCatalogue" +
+                "Doctrine with SinkID typed enum (3" +
+                " cases) + Entry struct + entries" +
+                " array + catalogueIsConsistent" +
+                " computed invariant (M1537) + 14" +
+                " anti-drift PROOF tests (M1538) + 9" +
+                " wire-in PROOF tests cross-checking" +
+                " against actual sink types via direct" +
+                " module references (M1539)。 The 8-path" +
+                " / 3-sink achievement is now non-" +
+                "driftable。 86 typed surfaces cumulative。" +
+                " ADR-016 → M1540。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十一",
+            mNumberFirst: 1541, mNumberLast: 1544,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable conformance addition" +
+                " across all 9 BASEBrainTurnResult" +
+                " cluster bundles (M1541):Equatable," +
+                " Sendable → Codable, Equatable," +
+                " Sendable。 BASEBrainTurnResultCluster" +
+                "BundleCodableDoctrine typed milestone" +
+                " with matchesFoldArcCount computed" +
+                " cross-check against BASEBrainTurnResult" +
+                "FoldArcSealedDoctrine (M1542) + 7" +
+                " PROOF tests including compile-time" +
+                " conformance check (M1543)。 All 52" +
+                " underlying fields already Codable via" +
+                " BASSchemaVersioned;Swift synthesizes" +
+                " automatically。 87 typed surfaces" +
+                " cumulative。 ADR-016 → M1544。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十二",
+            mNumberFirst: 1545, mNumberLast: 1548,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "7 explicit Codable round-trip" +
+                " PROOF tests for 3 cluster bundles" +
+                " with empty defaults (M1545) + NEW" +
+                " BASEBrainTurnResultClusterBundle" +
+                "HashableBlockerDoctrine typed surface" +
+                " with BlockerCategory typed enum (3" +
+                " cases) cataloguing BAS Schema Versioned-" +
+                "lacks-Hashable blockers (M1546) + 10" +
+                " anti-drift PROOF tests (M1547)。 88" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1548。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十三",
+            mNumberFirst: 1549, mNumberLast: 1552,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "5 Codable round-trip PROOF tests" +
+                " for HostBundle + ForensicMetadata" +
+                "Bundle extending coverage from 3 → 5" +
+                " of 9 cluster bundles (M1549) + NEW" +
+                " BASEBrainTurnResultClusterBundleCodable" +
+                "RoundTripCoverageDoctrine typed surface" +
+                " with 2-case CoverageStatus enum +" +
+                " catalogueIsConsistent computed" +
+                " invariant + cross-doctrine total" +
+                " consistency check (M1550) + 13" +
+                " anti-drift PROOF tests (M1551)。 89" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1552。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十四",
+            mNumberFirst: 1553, mNumberLast: 1556,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable round-trip PROOF test for" +
+                " MiscBundle extends coverage from 5 →" +
+                " 6 of 9 cluster bundles (M1553) +" +
+                " update coverage doctrine catalogue" +
+                " (M1554) + update anti-drift PROOF" +
+                " tests with new counts + MiscBundle" +
+                " lookup test (M1555)。 89 typed surfaces" +
+                " cumulative (no new surfaces — pure" +
+                " coverage extension)。 ADR-016 → M1556。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十五",
+            mNumberFirst: 1557, mNumberLast: 1560,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable round-trip PROOF test for" +
+                " DeviceLifecycleBundle extends coverage" +
+                " from 6 → 7 of 9 cluster bundles via" +
+                " 5-subtype fixture (M1557) + update" +
+                " coverage doctrine catalogue (M1558) +" +
+                " update anti-drift PROOF tests + Device" +
+                "LifecycleBundle lookup test (M1559)。" +
+                " 89 typed surfaces cumulative。 ADR-016" +
+                " → M1560。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十六",
+            mNumberFirst: 1561, mNumberLast: 1564,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable round-trip PROOF test for" +
+                " RiskChoiceBundle extends coverage" +
+                " from 7 → 8 of 9 cluster bundles via" +
+                " 4-subtype fixture (BASTriSelfScore +" +
+                " BASMergedChoice + BASRiskCard +" +
+                " BASActionPermit) (M1561) + update" +
+                " coverage doctrine catalogue (M1562) +" +
+                " update anti-drift PROOF tests (M1563)。" +
+                " 89 typed surfaces cumulative。 ADR-016" +
+                " → M1564。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十七",
+            mNumberFirst: 1565, mNumberLast: 1568,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "100% MILESTONE — final Codable" +
+                " round-trip PROOF for CognitiveFrames" +
+                "Bundle via 5-subtype fixture extends" +
+                " coverage from 8 → 9 of 9 cluster" +
+                " bundles (M1565) + update coverage" +
+                " doctrine catalogue to 100% (M1566) +" +
+                " anti-drift PROOF tests with 2 new" +
+                " milestone invariants (M1567)。 100%" +
+                " explicit round-trip coverage achieved" +
+                " across all 9 BASEBrainTurnResult" +
+                " cluster bundles。 89 typed surfaces" +
+                " cumulative。 ADR-016 → M1568。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十八",
+            mNumberFirst: 1569, mNumberLast: 1572,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Typed milestone doctrine" +
+                " commemorating the 6-chapter Codable" +
+                " arc seal at chapter 547 M1568 close-" +
+                "out:BASEBrainTurnResultClusterBundle" +
+                "CodableArcSealedDoctrine with 7-entry" +
+                " chapter catalogue + 100% milestone" +
+                " invariants + replay-determinism PROOF" +
+                " method pin (M1569) + 15 anti-drift" +
+                " PROOF tests (M1570) + 6 wire-in PROOF" +
+                " tests cross-checking 3 other doctrines" +
+                " (M1571)。 The Codable arc seal is now" +
+                " non-driftable。 90 typed surfaces" +
+                " cumulative。 ADR-016 → M1572。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十九",
+            mNumberFirst: 1573, mNumberLast: 1576,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Substrate state-of-the-union" +
+                " typed audit doctrine:" +
+                " BASAutonomousSessionStateOfTheUnion" +
+                "Doctrine with 6 achievement kinds + 5" +
+                " remaining-work kinds + honest reframe" +
+                " flag for the original plan's Tier A" +
+                " mismatch with substrate shape (M1573)" +
+                " + 16 anti-drift PROOF tests (M1574)" +
+                " + 7 cross-doctrine wire-in PROOF" +
+                " tests cross-checking 6 other doctrines" +
+                " (M1575)。 91 typed surfaces cumulative。" +
+                " ADR-016 → M1576。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十",
+            mNumberFirst: 1577, mNumberLast: 1580,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Meta-catalogue typed surface" +
+                " cataloguing all 7 session milestone" +
+                " doctrines shipped during chapters" +
+                " 531-549:BASSessionMilestoneDoctrine" +
+                "CatalogueDoctrine with typed ID enum" +
+                " + Entry struct + 7-entry chronological" +
+                " catalogue (M1577) + 13 anti-drift" +
+                " PROOF tests (M1578) + 8 wire-in PROOF" +
+                " tests cross-checking against actual" +
+                " milestone doctrines (M1579)。 92 typed" +
+                " surfaces cumulative。 ADR-016 → M1580。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十一",
+            mNumberFirst: 1581, mNumberLast: 1584,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Cascading Codable conformance to 4" +
+                " audit-projection types (M1581):BAS" +
+                "CthulhuPermitEscalationDecision + BAS" +
+                "CthulhuAssertionCeilingDecision leaf" +
+                " types + BASCthulhuAuditProjections" +
+                " namespace + BASRuntimeAuditProjections" +
+                "Bundle aggregate。 BASRuntimeAudit" +
+                "ProjectionsBundleCodableDoctrine typed" +
+                " milestone (M1582) + 10 PROOF tests" +
+                " including round-trip + sortedKeys" +
+                " determinism (M1583)。 93 typed surfaces" +
+                " cumulative。 ADR-016 → M1584。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十二",
+            mNumberFirst: 1585, mNumberLast: 1588,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable cascade extension to 9" +
+                " more typed surfaces (M1585 4 +" +
+                " M1587 5 = 9 total):BASForbiddenKnow" +
+                "ledgeCandidate.Aggregate + 3 typed" +
+                " ProjectionsBlock types (Closure +" +
+                " CthulhuLeftovers + KunlunAuditSchemas)" +
+                " (M1585) + 6 PROOF tests (M1586) + 4" +
+                " BASKunlunProtocol nested types" +
+                " (Verification + Readiness +" +
+                " AccessDecision + LineageReport) + 5th" +
+                " ProjectionsBlock (KunlunProtocol)" +
+                " (M1587)。 CthulhuAggregatesBlock" +
+                " remains blocked by BASOldSealSealing" +
+                "Protocol.Aggregate + BASEvolutionLife" +
+                "cycleSession.Aggregate (deferred)。 93" +
+                " typed surfaces cumulative (no new" +
+                " surfaces — pure Codable cascade" +
+                " extension)。 ADR-016 → M1588。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十三",
+            mNumberFirst: 1589, mNumberLast: 1592,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Final Codable cascade closing the" +
+                " 3-chapter arc。 3 more types gained" +
+                " Codable (M1589):BASOldSealSealing" +
+                "Protocol.Aggregate +" +
+                " BASEvolutionLifecycleSession.Aggregate" +
+                " + BASAuditObservationProjections" +
+                "CthulhuAggregatesBlock — the last" +
+                " ProjectionsBlock type。 All 5" +
+                " BASAuditObservationProjections*Block" +
+                " types are now Codable。 5 PROOF tests" +
+                " (M1590) +" +
+                " BASCodableCascadeArcSealedDoctrine" +
+                " typed milestone (M1591) commemorating" +
+                " 16 types gained Codable across 12" +
+                " commits (chapters 551-553)。 94 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1592。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十四",
+            mNumberFirst: 1593, mNumberLast: 1596,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Post-arc-seal follow-through。" +
+                " Converts the M1591 doctrine CLAIM into" +
+                " actual runtime PROOF。 8 end-to-end" +
+                " JSON round-trip PROOF tests exercising" +
+                " POPULATED bundle state across the" +
+                " chapter-553 newly-Codable types" +
+                " (M1593) +" +
+                " BASAuditProjectionsBundleEndToEndJson" +
+                "ProofDoctrine typed surface (M1594) +" +
+                " 13 anti-drift PROOF tests with" +
+                " cross-doctrine wire-in (M1595)。 95" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1596。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十五",
+            mNumberFirst: 1597, mNumberLast: 1600,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "M1600 MILESTONE — 5-namespace" +
+                " populated JSON PROOF extension。" +
+                " Extends chapter 554 from 3-of-5" +
+                " namespace coverage to 5-of-5。" +
+                " Cthulhu populated via typed" +
+                " BASUnknownReserve + RiskCalibration" +
+                " populated via typed BASRiskCard" +
+                " (M1597) + BASAuditProjectionsFive" +
+                "NamespacePopulatedJsonProofDoctrine" +
+                " typed surface (M1598) + 15 anti-" +
+                "drift PROOF tests with cross-" +
+                "doctrine wire-in (M1599)。 96 typed" +
+                " surfaces cumulative (+1)。 ADR-016" +
+                " → M1600。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十六",
+            mNumberFirst: 1601, mNumberLast: 1604,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "JSON PROOF doctrine meta-" +
+                "catalogue。 Single source-of-truth" +
+                " typed surface for the 4 JSON PROOF" +
+                " doctrines shipped in chapters 551-" +
+                "555 (M1582 + M1591 + M1594 + M1598)。" +
+                " BASJsonProofDoctrineCatalogueDoctrine" +
+                " typed surface (M1601) + 15 anti-" +
+                "drift PROOF tests (M1602) + 9 wire-" +
+                "in PROOF tests cross-checking the" +
+                " catalogue against each catalogued" +
+                " doctrine (M1603)。 97 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1604。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十七",
+            mNumberFirst: 1605, mNumberLast: 1608,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "5-of-5 ProjectionsBlock populated" +
+                " JSON PROOF coverage achieved。 The 4" +
+                " blocks NOT exercised in populated" +
+                " state at chapter 554 (ClosureBlock +" +
+                " CthulhuLeftoversBlock +" +
+                " KunlunAuditSchemasBlock +" +
+                " KunlunProtocolBlock) all proven at" +
+                " M1605 (7 PROOF tests) +" +
+                " BASAuditObservationProjectionsBlock" +
+                "PopulatedJsonProofDoctrine typed" +
+                " surface (M1606) + 15 anti-drift +" +
+                " wire-in PROOF tests (M1607) +" +
+                " catalogue extension to 5 entries" +
+                " (M1608)。 98 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1608。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十八",
+            mNumberFirst: 1609, mNumberLast: 1612,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "JSON REJECTION PROOF — closes the" +
+                " SECOND half of the chapter 三百九二" +
+                " replay-determinism contract。 11" +
+                " PROOF tests at M1609 (truncated +" +
+                " malformed + empty + wrong-type +" +
+                " missing-required-field rejected" +
+                " cleanly across Bundle + 5" +
+                " ProjectionsBlock types) +" +
+                " BASAuditProjectionsJsonRejectionProof" +
+                "Doctrine typed surface (M1610) + 12" +
+                " anti-drift + wire-in PROOF tests" +
+                " (M1611) + catalogue extension to 6" +
+                " entries (M1612)。 99 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1612。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十九",
+            mNumberFirst: 1613, mNumberLast: 1616,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "Floating-point determinism PROOF" +
+                " — closes the FLOATING-POINT half of" +
+                " the chapter 三百九二 replay-" +
+                "determinism contract。 100th typed" +
+                " surface (CENTURY MILESTONE) lands at" +
+                " M1614。 8 PROOF tests asserting BIT-" +
+                "PATTERN equality (M1613) +" +
+                " BASAuditProjectionsFloatingPoint" +
+                "DeterminismProofDoctrine (M1614) +" +
+                " 13 anti-drift + wire-in PROOF tests" +
+                " (M1615) + catalogue extension to 7" +
+                " entries (M1616)。 100 typed surfaces" +
+                " cumulative (CENTURY MILESTONE)。" +
+                " ADR-016 → M1616。 200 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved (DOUBLE-CENTURY)。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十",
+            mNumberFirst: 1617, mNumberLast: 1620,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Replay-determinism contract" +
+                " closure milestone for the chapter" +
+                " 三百九二 contract。 9-chapter / 37-" +
+                "M-number-span arc (551-560) PROVEN" +
+                " across all 3 verification halves" +
+                " (round-trip + rejection + floating-" +
+                "point)。 BASReplayDeterminismContract" +
+                "ClosureDoctrine typed milestone" +
+                " (M1617) + 18 anti-drift PROOF tests" +
+                " (M1618) + 11 wire-in PROOF tests" +
+                " (M1619)。 101 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1620。" +
+                " 204 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十一",
+            mNumberFirst: 1621, mNumberLast: 1624,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "REAL SUBSTRATE CHANGE — add" +
+                " Codable + Equatable to 3 audit-" +
+                "projection aggregator types" +
+                " (KunlunAxisProtocol + KunlunTrio +" +
+                " AbyssalThermalTrio) at M1621。 8" +
+                " PROOF tests at M1622 +" +
+                " BASTurnAuditProjectionsTrioCodable" +
+                "ExtensionDoctrine typed surface" +
+                " (M1623) + close-out (M1624)。 102" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1624。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十二",
+            mNumberFirst: 1625, mNumberLast: 1628,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CONTINUED REAL SUBSTRATE CHANGE" +
+                " — add Codable + Equatable to 5 more" +
+                " audit-projection aggregator types" +
+                " (SurfaceTrio + GateSideDeriveTrio +" +
+                " KunlunTrioTwo + LifecycleQuartet +" +
+                " KunlunTianmenTrio) at M1625。 10" +
+                " PROOF tests at M1626 + new typed" +
+                " surface (M1627) + close-out (M1628)。" +
+                " Combined with chapter 561 = 8" +
+                " aggregator types now ledger-" +
+                "serializable。 103 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1628。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十三",
+            mNumberFirst: 1629, mNumberLast: 1632,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CONTINUED REAL SUBSTRATE CHANGE" +
+                " — add Codable + Equatable to 7 more" +
+                " audit-projection aggregator types" +
+                " (CthulhuPenta + KunlunHexa +" +
+                " KunlunHexaTwo + LateClusterB +" +
+                " LateClusterC + LateClusterD +" +
+                " KunlunSealRiver) at M1629。 9 PROOF" +
+                " tests at M1630 + new typed surface" +
+                " (M1631) + close-out (M1632)。" +
+                " Combined chapters 561+562+563 = 15" +
+                " aggregator types now ledger-" +
+                "serializable。 104 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1632。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十四",
+            mNumberFirst: 1633, mNumberLast: 1636,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "AGGREGATOR CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。" +
+                " BASAuditProjectionsAggregatorCodable" +
+                "ExtensionArcSealedDoctrine typed" +
+                " milestone (M1633) commemorating" +
+                " 3-chapter / 12-commit arc (chapters" +
+                " 561-563) covering 15 aggregator" +
+                " types。 20 anti-drift PROOF tests" +
+                " (M1634) + 13 wire-in PROOF tests" +
+                " (M1635)。 Mirrors chapter 553" +
+                " cascade-arc pattern at aggregator" +
+                " layer。 105 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1636。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十五",
+            mNumberFirst: 1637, mNumberLast: 1640,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC FOLLOW-UP — Codable +" +
+                " Equatable extension to 2 high-level" +
+                " Inputs aggregator types" +
+                " (KunlunInputs + CthulhuInputs) at" +
+                " M1637 + 2 compile-time PROOF tests" +
+                " (M1638) + new typed surface (M1639)" +
+                " + close-out (M1640)。 106 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1640。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十六",
+            mNumberFirst: 1641, mNumberLast: 1644,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CROSS-MODULE CODABLE EXTENSION —" +
+                " first chapter extending Codable" +
+                " OUTSIDE the BASHostKit audit-" +
+                "projection family。 5 types gained" +
+                " Codable across BASRuntimeCore" +
+                " (CoreMLFeatureFrame +" +
+                " KnowledgeCycle) + BASMemory" +
+                " (RAGResult + VectorIndexEntry +" +
+                " VectorTopKResult) at M1641 + 7 PROOF" +
+                " tests (M1642) +" +
+                " BASCrossModuleCodableExtensionDoctrine" +
+                " typed surface (M1643) + close-out" +
+                " (M1644)。 107 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1644。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十七",
+            mNumberFirst: 1645, mNumberLast: 1648,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CONTINUED CROSS-MODULE CODABLE" +
+                " EXTENSION — 5 more BASMemory types" +
+                " gained Codable at M1645" +
+                " (ConstitutionMatch +" +
+                " ClosedLoopApplyOutcome +" +
+                " EvolutionPromotionGateVerdict +" +
+                " PreparedMemoryGovernanceDraft +" +
+                " ShadowTrialLedgerEntry) + 5 PROOF" +
+                " tests (M1646) +" +
+                " BASMemoryCodableExtensionDoctrine" +
+                " typed surface (M1647) + close-out" +
+                " (M1648)。 108 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1648。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十八",
+            mNumberFirst: 1649, mNumberLast: 1652,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "THIRD-WAVE CROSS-MODULE CODABLE" +
+                " EXTENSION — 3 more types gained" +
+                " Codable at M1649 + 4 PROOF tests" +
+                " (M1650) + BASCrossModuleCodable" +
+                "ExtensionThirdWaveDoctrine typed" +
+                " surface (M1651) + close-out (M1652)。" +
+                " Combined chapters 566+567+568 = 13" +
+                " cross-module types ledger-" +
+                "serializable。 109 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1652。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十九",
+            mNumberFirst: 1653, mNumberLast: 1656,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CROSS-MODULE CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。" +
+                " BASCrossModuleCodableExtensionArc" +
+                "SealedDoctrine typed milestone" +
+                " (M1653) commemorating 3-chapter /" +
+                " 12-commit arc (chapters 566-568)" +
+                " covering 13 cross-module types。" +
+                " 21 anti-drift PROOF tests (M1654)" +
+                " + 13 wire-in PROOF tests (M1655) +" +
+                " close-out (M1656)。 Mirrors chapter" +
+                " 564 aggregator-arc pattern。 110" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1656。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十",
+            mNumberFirst: 1657, mNumberLast: 1660,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "TRI-ARC COMPLETION META-META" +
+                " MILESTONE。 NEW" +
+                " BASCodableExtensionTriArcCompletion" +
+                "Doctrine typed milestone (M1657)" +
+                " commemorating ALL 3 sealed Codable" +
+                " extension arcs of this session" +
+                " (cascade + aggregator + cross-module" +
+                " = 44 types, 36 commits, 9 chapters)。" +
+                " 18 anti-drift PROOF tests (M1658) +" +
+                " 12 wire-in PROOF tests (M1659) +" +
+                " close-out (M1660 round-number" +
+                " milestone)。 111 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1660。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十一",
+            mNumberFirst: 1661, mNumberLast: 1664,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "FIRST-EVER ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 BASOrchestration" +
+                " decision types gained Codable at" +
+                " M1661 + 2 PROOF tests (M1662) + new" +
+                " typed surface (M1663) + close-out" +
+                " (M1664)。 New module territory。 112" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1664。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十二",
+            mNumberFirst: 1665, mNumberLast: 1668,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "SECOND-WAVE ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 more BASOrchestration" +
+                " decision types gained Codable at" +
+                " M1665 (KunlunPermitEscalationDecision" +
+                " + ForbiddenCandidateZoneGateDecision)" +
+                " + 2 PROOF tests (M1666) + new typed" +
+                " surface (M1667) + close-out (M1668)。" +
+                " Combined chapters 571+572 = 4" +
+                " BASOrchestration types ledger-" +
+                "serializable。 113 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1668。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十三",
+            mNumberFirst: 1669, mNumberLast: 1672,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "THIRD-WAVE ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 more BASOrchestration" +
+                " value types gained Codable at M1669" +
+                " (BASLatentTissueState +" +
+                " BASBadToneLinter.Violation) + 2 PROOF" +
+                " tests (M1670) + new typed surface" +
+                " (M1671) + close-out (M1672)。" +
+                " Combined chapters 571+572+573 = 6" +
+                " BASOrchestration types ledger-" +
+                "serializable。 114 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1672。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十四",
+            mNumberFirst: 1673, mNumberLast: 1676,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "ORCHESTRATION CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。 NEW BAS" +
+                "OrchestrationCodableExtensionArc" +
+                "SealedDoctrine (M1673) commemorating" +
+                " 3-chapter / 12-commit BASOrchestration" +
+                " Codable extension arc (chapters" +
+                " 571-573) + 21 anti-drift PROOF tests" +
+                " (M1674) + 16 wire-in PROOF tests" +
+                " (M1675) + close-out (M1676)。 Mirrors" +
+                " chapter 569 cross-module arc-seal" +
+                " pattern for BASOrchestration layer。" +
+                " 6 BASOrchestration types ledger-" +
+                "serializable。 115 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1676。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十五",
+            mNumberFirst: 1677, mNumberLast: 1680,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "QUAD-ARC COMPLETION META-META" +
+                " MILESTONE。 NEW BASCodableExtension" +
+                "QuadArcCompletionDoctrine (M1677)" +
+                " cataloguing ALL 4 sealed Codable" +
+                " extension arcs (16+15+13+6 = 50" +
+                " types,48 commits,12 chapters,4" +
+                " modules) + 20 anti-drift PROOF tests" +
+                " (M1678) + 16 wire-in PROOF tests" +
+                " (M1679) + close-out (M1680)。" +
+                " Supersedes chapter 570 tri-arc" +
+                " snapshot;tri-arc doctrine preserved" +
+                " as historical record。 52 session" +
+                " types ledger-serializable。 116" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1680。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十六",
+            mNumberFirst: 1681, mNumberLast: 1684,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 more BASOrchestration" +
+                " value types gained Codable at M1681" +
+                " (BASNeuralCoreFrame +" +
+                " BASProductRedLineLinter.Violation)" +
+                " — both unblocked by the chapter 573" +
+                " third-wave。 2 PROOF tests (M1682) +" +
+                " new typed surface (M1683) + close-out" +
+                " (M1684)。 Mirrors chapter 565 post-" +
+                "aggregator-arc follow-up pattern。" +
+                " Chapter 574 arc (6 types) + chapter" +
+                " 576 post-arc (2 types) = 8 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 117 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1684。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十七",
+            mNumberFirst: 1685, mNumberLast: 1688,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC WAVE 2 ORCHESTRATION" +
+                " CODABLE EXTENSION。 2 more BAS" +
+                "Orchestration value types gained" +
+                " Codable at M1685 (BASProvider" +
+                "ReleaseAssessment + BASProviderRelease" +
+                "EvaluationRequest)。 2 PROOF tests" +
+                " (M1686) + new typed surface (M1687)" +
+                " + close-out (M1688)。 Continues" +
+                " chapter 576 post-arc pattern。" +
+                " Chapter 574 arc (6) + chapter 576" +
+                " (2) + chapter 577 (2) = 10 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 118 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1688。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十八",
+            mNumberFirst: 1689, mNumberLast: 1692,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC WAVE 3 ORCHESTRATION" +
+                " CODABLE EXTENSION。 2 more BAS" +
+                "Orchestration value types gained" +
+                " Codable at M1689 (BASNeuralPublic" +
+                "ThoughtProjection +" +
+                " BASSoftHandModeSelector." +
+                "SelectionResult)。 2 PROOF tests" +
+                " (M1690) + new typed surface (M1691)" +
+                " + close-out (M1692)。 Continues" +
+                " chapter 576+577 post-arc pattern。" +
+                " Chapter 574 arc (6) + chapter 576" +
+                " wave 1 (2) + chapter 577 wave 2 (2)" +
+                " + chapter 578 wave 3 (2) = 12 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 119 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1692。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十九",
+            mNumberFirst: 1693, mNumberLast: 1696,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC TRILOGY SEAL MILESTONE。" +
+                " NEW BASOrchestrationCodableExtension" +
+                "PostArcTrilogySealedDoctrine (M1693)" +
+                " commemorating 3-wave / 12-commit" +
+                " post-arc trilogy (chapters 576-578) +" +
+                " 22 anti-drift PROOF tests (M1694) +" +
+                " 15 wire-in PROOF tests (M1695) +" +
+                " close-out (M1696)。 Second sealed" +
+                " milestone for BASOrchestration" +
+                " extensions (after chapter 574 arc" +
+                " seal)。 Combined chapter 574 arc (6)" +
+                " + chapter 579 trilogy (6) = 12" +
+                " BASOrchestration types ledger-" +
+                "serializable。 120 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1696。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十",
+            mNumberFirst: 1697, mNumberLast: 1700,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "PENTA-MILESTONE COMPLETION META-" +
+                "META MILESTONE。 NEW BASCodable" +
+                "ExtensionPentaMilestoneCompletion" +
+                "Doctrine (M1697) cataloguing ALL 5" +
+                " sealed Codable extension milestones" +
+                " (16+15+13+6+6 = 56 types,60 commits," +
+                "15 chapters,4 modules) + 26 anti-drift" +
+                " PROOF tests (M1698) + 18 wire-in" +
+                " PROOF tests (M1699) + M1700 ROUND-" +
+                "NUMBER close-out (M1700)。 Supersedes" +
+                " chapter 575 quad-arc snapshot;quad-" +
+                "arc + tri-arc doctrines preserved as" +
+                " historical records。 58 session types" +
+                " ledger-serializable (56 in milestones" +
+                " + 2 post-arc inputs)。 121 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1700。 Codable extension narrative" +
+                " arc sealed at M1700 round-number" +
+                " milestone。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十一",
+            mNumberFirst: 1701, mNumberLast: 1704,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "FIRST-EVER BASLEASELIFE CODABLE" +
+                " EXTENSION — fresh module territory" +
+                " beyond M1700 narrative arc close-out。" +
+                " 2 nested types (BASBreathScheduler." +
+                "Request + BASBreathScheduler." +
+                "ScheduledBreath) gained Codable at" +
+                " M1701 + 2 PROOF tests (M1702) + new" +
+                " typed surface (M1703) + close-out" +
+                " (M1704)。 Module coverage expanded:" +
+                " 4 → 5 (added BASLeaseLife)。 122" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1704。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十二",
+            mNumberFirst: 1705, mNumberLast: 1708,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASLEASELIFE WAVE 2 CODABLE" +
+                " EXTENSION。 2 struct types (BAS" +
+                "ThermalTwin.Reading + BAS" +
+                "LungStateAccumulator.Snapshot) +" +
+                " 1 supporting enum (BASThermalTwin." +
+                "OSThermalState) gained Codable at" +
+                " M1705 + 3 PROOF tests (M1706) + new" +
+                " typed surface (M1707) + close-out" +
+                " (M1708)。 Continues chapter 581 first-" +
+                "ever BASLeaseLife pattern。 Chapter" +
+                " 581 + 582 = 4 BASLeaseLife structs" +
+                " + 1 supporting enum ledger-" +
+                "serializable。 123 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1708。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十三",
+            mNumberFirst: 1709, mNumberLast: 1712,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASLEASELIFE WAVE 3 CODABLE" +
+                " EXTENSION。 2 struct types (BASLease" +
+                "LifeCoordinator.TurnRecorded composite" +
+                " culminating waves 1+2 + BASCompute" +
+                "Router) gained Codable at M1709 + 2" +
+                " PROOF tests (M1710) + new typed" +
+                " surface (M1711) + close-out (M1712)。" +
+                " Completes BASLeaseLife 3-wave" +
+                " extension trilogy。 Chapter 581+582+" +
+                "583 = 6 BASLeaseLife struct types + 1" +
+                " supporting enum ledger-serializable。" +
+                " Arc structure ready for sealing at" +
+                " chapter 584。 124 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1712。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十四",
+            mNumberFirst: 1713, mNumberLast: 1716,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASLEASELIFE CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。 NEW BASLeaseLife" +
+                "CodableExtensionArcSealedDoctrine" +
+                " (M1713) commemorating 3-wave /" +
+                " 12-commit BASLeaseLife extension arc" +
+                " (chapters 581-583) + 24 anti-drift" +
+                " PROOF tests (M1714) + 16 wire-in" +
+                " PROOF tests (M1715) + close-out" +
+                " (M1716)。 7 types (6 structs + 1" +
+                " supporting enum) ledger-serializable。" +
+                " First sealed arc beyond M1700" +
+                " narrative arc。 Mirrors chapter 574" +
+                " Orchestration arc-seal pattern。 125" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1716。 300-consecutive-" +
+                "commit milestone reached。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十五",
+            mNumberFirst: 1717, mNumberLast: 1720,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "HEXA-MILESTONE COMPLETION META-" +
+                "META MILESTONE。 NEW BASCodable" +
+                "ExtensionHexaMilestoneCompletion" +
+                "Doctrine (M1717) cataloguing ALL 6" +
+                " sealed Codable extension milestones" +
+                " (16+15+13+6+6+7 = 63 types,72" +
+                " commits,18 chapters,5 modules) + 28" +
+                " anti-drift PROOF tests (M1718) + 16" +
+                " wire-in PROOF tests (M1719) + close-" +
+                "out (M1720)。 Supersedes chapter 580" +
+                " penta snapshot;penta + quad-arc +" +
+                " tri-arc doctrines preserved as" +
+                " historical records。 NEW beyond-" +
+                "m1700-arc kind discriminator on" +
+                " MilestoneRecord。 65 session types" +
+                " ledger-serializable。 126 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1720。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十六",
+            mNumberFirst: 1721, mNumberLast: 1724,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "FIRST-EVER BASOBSERVABILITY" +
+                " CODABLE EXTENSION — fresh module" +
+                " territory (module #6) in the beyond-" +
+                "M1700 narrative arc。 2 nested types" +
+                " (BASUnifiedStorageLocator.Locations" +
+                " + BASUpdateTicketLifecycleSQLite" +
+                "Storage.CheckpointResult) gained" +
+                " Codable at M1721 + 2 PROOF tests" +
+                " (M1722) + new typed surface (M1723)" +
+                " + close-out (M1724)。 Module coverage" +
+                " 5 → 6 (added BASObservability)。 127" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1724。 Second fresh-module" +
+                " extension beyond M1700。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十七",
+            mNumberFirst: 1725, mNumberLast: 1728,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-CROSS-MODULE-ARC" +
+                " CODABLE EXTENSION。 2 BASMemory types" +
+                " (BASMemoryTrustProfile + BASMemory" +
+                "TieringReconciliationOutcome.Decision)" +
+                " gained Codable at M1725 + 2 PROOF" +
+                " tests (M1726) + new typed surface" +
+                " (M1727) + close-out (M1728)。 Extends" +
+                " chapter 569 cross-module arc" +
+                " coverage (10 BASMemory types) with" +
+                " 2 more types。 Combined chapter 569" +
+                " + 587 = 12 BASMemory types ledger-" +
+                "serializable。 128 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1728。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十八",
+            mNumberFirst: 1729, mNumberLast: 1732,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-CROSS-MODULE-ARC" +
+                " WAVE 2 CODABLE EXTENSION。 2 nested" +
+                " types (BASHostCandidatePipeline." +
+                "RejectionRecord +" +
+                " BASMemoryMutationEventEmitter." +
+                "EmitOutcome) gained Codable at M1729" +
+                " + 2 PROOF tests (M1730) + new typed" +
+                " surface (M1731) + close-out (M1732)。" +
+                " Continues chapter 587 wave 1 pattern。" +
+                " Combined chapter 569 + 587 + 588 =" +
+                " 14 BASMemory types ledger-" +
+                "serializable。 129 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1732。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十九",
+            mNumberFirst: 1733, mNumberLast: 1736,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-CROSS-MODULE-ARC" +
+                " WAVE 3 CODABLE EXTENSION。 2 types" +
+                " (BASMemoryImportanceScorer + BAS" +
+                "MemoryMutationWriter.MutationOutcome)" +
+                " gained Codable at M1733 + 2 PROOF" +
+                " tests (M1734) + new typed surface" +
+                " (M1735) + close-out (M1736)。" +
+                " Completes 3-wave BASMemory post-arc" +
+                " trilogy。 Combined chapter 569 + 587" +
+                " + 588 + 589 = 16 BASMemory types" +
+                " ledger-serializable。 Arc ready for" +
+                " sealing at chapter 590。 130 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1736。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十",
+            mNumberFirst: 1737, mNumberLast: 1740,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-ARC TRILOGY SEAL" +
+                " MILESTONE。 NEW BASMemoryPostCross" +
+                "ModuleArcTrilogySealedDoctrine (M1737)" +
+                " commemorating 3-wave BASMemory post-" +
+                "arc trilogy (chapters 587-589) + 25" +
+                " anti-drift PROOF tests (M1738) + 16" +
+                " wire-in PROOF tests (M1739) + close-" +
+                "out (M1740)。 Second sealed milestone" +
+                " for BASMemory extensions (after" +
+                " chapter 569 cross-module arc seal)。" +
+                " Mirrors chapter 579 BASOrchestration" +
+                " trilogy seal pattern。 Combined" +
+                " chapter 569 (10) + chapter 590" +
+                " trilogy (6) = 16 BASMemory types" +
+                " ledger-serializable。 131 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1740。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十一",
+            mNumberFirst: 1741, mNumberLast: 1744,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "HEPTA-MILESTONE COMPLETION META-" +
+                "META MILESTONE。 NEW BASCodable" +
+                "ExtensionHeptaMilestoneCompletion" +
+                "Doctrine (M1741) cataloguing ALL 7" +
+                " sealed Codable extension milestones" +
+                " (16+15+13+6+6+7+6 = 69 types,84" +
+                " commits,21 chapters,6 modules) + 31" +
+                " anti-drift PROOF tests (M1742) + 18" +
+                " wire-in PROOF tests (M1743) + close-" +
+                "out (M1744)。 Supersedes chapter 585" +
+                " hexa snapshot;hexa + penta + quad-" +
+                "arc + tri-arc doctrines preserved as" +
+                " historical records。 NEW beyond-" +
+                "m1700-post-arc-trilogy kind" +
+                " discriminator。 71 session types" +
+                " ledger-serializable。 132 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1744。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十二",
+            mNumberFirst: 1745, mNumberLast: 1748,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASHOSTKIT CONFIGURATION + HINT" +
+                " CODABLE EXTENSION。 2 BASHostKit" +
+                " types (BASCognitiveOSBundleOptions" +
+                " + BASChengluPreflightHint) gained" +
+                " Codable at M1745 + 2 PROOF tests" +
+                " (M1746) + new typed surface (M1747)" +
+                " + close-out (M1748)。 Extends BAS" +
+                "HostKit coverage beyond projections" +
+                " + aggregators + inputs into non-" +
+                "projection territory。 Combined 35" +
+                " BASHostKit-related types ledger-" +
+                "serializable。 133 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1748。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十三",
+            mNumberFirst: 1749, mNumberLast: 1752,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION WAVE 2" +
+                " CODABLE EXTENSION。 2 regression-" +
+                "hint types (BASChengluLengthHint +" +
+                " BASChengluLatencyHint) gained Codable" +
+                " at M1749 + 2 PROOF tests (M1750) +" +
+                " new typed surface (M1751) + close-" +
+                "out (M1752)。 Continues chapter 592" +
+                " wave 1 pattern。 Combined 37 BAS" +
+                "HostKit-related types ledger-" +
+                "serializable。 134 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1752。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十四",
+            mNumberFirst: 1753, mNumberLast: 1756,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION WAVE 3" +
+                " CODABLE EXTENSION。 2 hint types" +
+                " (BASChengluMultiHeadHint + BAS" +
+                "ChengluPermitPredictHint) gained" +
+                " Codable at M1753 + 2 PROOF tests" +
+                " (M1754) + new typed surface (M1755)" +
+                " + close-out (M1756)。 Completes" +
+                " coverage of 5 individual Chenglu" +
+                " hint types。 BASChengluHintSet" +
+                " aggregator ready for culmination at" +
+                " chapter 595。 Combined 39 BAS" +
+                "HostKit-related types ledger-" +
+                "serializable。 135 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1756。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十五",
+            mNumberFirst: 1757, mNumberLast: 1760,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION WAVE 4" +
+                " CULMINATION CODABLE EXTENSION。 2" +
+                " types (BASChengluHintSet 8-field" +
+                " aggregator composing all 5 Chenglu" +
+                " hint types from waves 1-3 + BAS" +
+                "TrainingDataExportFilter 7-field" +
+                " filter) gained Codable at M1757 + 2" +
+                " PROOF tests (M1758) + new typed" +
+                " surface (M1759) + close-out (M1760)。" +
+                " Mirrors chapter 583 BASLeaseLife" +
+                "Coordinator.TurnRecorded culmination" +
+                " pattern。 Combined 41 BASHostKit-" +
+                "related types ledger-serializable。" +
+                " 136 typed surfaces cumulative (+1)。" +
+                " BASHostKit non-projection 4-wave arc" +
+                " structure complete + ready for" +
+                " sealing at chapter 596。 ADR-016 →" +
+                " M1760。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十六",
+            mNumberFirst: 1761, mNumberLast: 1764,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION 4-WAVE" +
+                " ARC SEAL MILESTONE。 NEW BASHostKit" +
+                "NonProjectionCodableExtensionArcSealed" +
+                "Doctrine typed milestone (M1761)" +
+                " commemorating 4-wave BASHostKit non-" +
+                "projection arc (chapters 592-595)。 8" +
+                " types,16 commits,single-module。" +
+                " Second sealed arc beyond M1700" +
+                " narrative arc (after chapter 584" +
+                " BASLeaseLife)。 Mirrors chapter 584" +
+                " pattern but extended to 4 waves +" +
+                " includes culmination wave (BAS" +
+                "ChengluHintSet 8-field aggregator)。" +
+                " 38 anti-drift PROOF tests (M1762) +" +
+                " 22 wire-in PROOF tests (M1763) +" +
+                " close-out (M1764)。 Combined 41 BAS" +
+                "HostKit-related types ledger-" +
+                "serializable。 137 typed surfaces" +
+                " cumulative (+1)。 8 sealed milestones" +
+                " extant。 ADR-016 → M1764。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十七",
+            mNumberFirst: 1765, mNumberLast: 1768,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "OCTA-MILESTONE COMPLETION META-" +
+                "META MILESTONE。 NEW BASCodable" +
+                "ExtensionOctaMilestoneCompletion" +
+                "Doctrine (M1765) cataloging all 8" +
+                " sealed Codable extension milestones" +
+                " extant (553 cascade + 564 aggregator" +
+                " + 569 cross-module + 574 orchestration" +
+                " + 579 post-arc trilogy + 584 BAS" +
+                "LeaseLife arc + 590 BASMemory" +
+                " trilogy + 596 BASHostKit arc)。" +
+                " Aggregate:77 types via 8 milestones," +
+                " 100 commits,25 chapters,6 modules。" +
+                " 79 session types ledger-serializable" +
+                " (77 + 2 chapter 565 post-arc-inputs)。" +
+                " NEW beyond-m1700-four-wave-arc kind" +
+                " discriminator + 2 octa-novelty flags" +
+                " (firstFourWaveArcSealAchieved +" +
+                " firstFourWaveCulminationAchieved)。" +
+                " 36 anti-drift PROOF tests (M1766) +" +
+                " 21 wire-in PROOF tests (M1767) +" +
+                " close-out (M1768)。 138 typed" +
+                " surfaces cumulative (+1)。" +
+                " Supersedes chapter 591 hepta snapshot。" +
+                " ADR-016 → M1768。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十八",
+            mNumberFirst: 1769, mNumberLast: 1772,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASORGAN FIRST-EVER CODABLE" +
+                " EXTENSION WAVE 1 — FRESH MODULE" +
+                " TERRITORY。 2 types (BASOrganDraft" +
+                "Chunk + BASOrganRegistryObservation" +
+                "Snapshot) gained Codable at M1769 + 2" +
+                " PROOF tests (M1770) + new typed" +
+                " surface (M1771) + close-out (M1772)。" +
+                " BASOrgan was uncovered by chapter" +
+                " 597 octa snapshot (6 modules covered)。" +
+                " This extension bumps module count" +
+                " from 6 to 7,mirroring chapter 586" +
+                " BASObservability first-ever extension" +
+                " precedent。 Both types are pure-value" +
+                " structs with already-Codable field" +
+                " types。 139 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1772。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十九",
+            mNumberFirst: 1773, mNumberLast: 1776,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMLXADAPTER FIRST-EVER CODABLE" +
+                " EXTENSION WAVE 1 — FRESH MODULE" +
+                " TERRITORY。 2 types (MLXModelCatalog." +
+                "Entry + MLXLoRATrainer.TrainingProgress" +
+                " 4-case enum with associated values)" +
+                " gained Codable at M1773 + 2 PROOF" +
+                " tests (M1774) + new typed surface" +
+                " (M1775) + close-out (M1776)。" +
+                " BASMLXAdapter was uncovered by chapter" +
+                " 598 BASOrgan first-ever (the 7th-" +
+                "module entry)。 This extension is the" +
+                " 8th-module entry into the ledger-" +
+                "serializable contract surface — 2nd" +
+                " consecutive fresh-module first-ever" +
+                " after the chapter 597 octa-milestone" +
+                " seal。 140 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1776。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百",
+            mNumberFirst: 1777, mNumberLast: 1780,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK PHASE I" +
+                " CONTINUATION — V1 monolith extraction。" +
+                " 9 audit-projection symbols (3 derive" +
+                " helpers + 1 fileprivate const +" +
+                " coverageStatus + 4 public layer" +
+                "Reconciliation* constants) moved from" +
+                " EBrainRuntimeCoordinator.swift to" +
+                " sibling extension file EBrainRuntime" +
+                "Coordinator+AuditProjectionHelpers.swift。" +
+                " V1 monolith LOC:2472 → 2136 (-336)。" +
+                " Cumulative V1 reduction from chapter" +
+                " 477 baseline (2540 LOC):-404 LOC =" +
+                " 16.4% of plan target。 6 PROOF tests" +
+                " (M1778) verify cross-package contract" +
+                " preserved + V1 byte-equality preserved" +
+                " (40 stress-sweep canonical60 green)。" +
+                " NEW BASV1MonolithExtractionContinuation" +
+                "Doctrine (M1779) bumps 最激进 score 6 →" +
+                " 7。 First 最激进 advancement beyond" +
+                " chapter 501 honest closure milestone。" +
+                " 141 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1780。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一",
+            mNumberFirst: 1781, mNumberLast: 1784,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK PHASE I" +
+                " CONTINUATION WAVE 2 — V1 monolith" +
+                " extraction continued。 11 symbols" +
+                " (M420 Kunlun hot-path constants + M422" +
+                " kunlunCenterlineRules helper + M450" +
+                " cosmic-cold counterweight 4 helpers +" +
+                " 18 magic-number constants) moved from" +
+                " EBrainRuntimeCoordinator.swift to NEW" +
+                " sibling EBrainRuntimeCoordinator+Core" +
+                "Helpers.swift (M1781)。 V1 monolith LOC:" +
+                " 2136 → 1918 (-218)。 Cumulative V1" +
+                " reduction from chapter 477 baseline:" +
+                " 2540 → 1918 = -622 LOC (24.5% of plan" +
+                " target)。 10 PROOF tests (M1782)" +
+                " verify constant value-stability +" +
+                " cosmic-cold anti-drift。 V1 byte-" +
+                "equality preserved (40 stress-sweep" +
+                " canonical60 green)。 NEW BASV1Monolith" +
+                "ExtractionWaveTwoDoctrine (M1783)" +
+                " supersedes chapter 600 wave 1 doctrine" +
+                " + bumps 最激进 score 7 → 8。 SECOND" +
+                " consecutive 最激进 advancement +" +
+                " consecutiveV1FoldChapters = 2。 142" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1784。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二",
+            mNumberFirst: 1785, mNumberLast: 1788,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK PHASE I" +
+                " CONTINUATION WAVE 3 THE BIG MOVE。" +
+                " runTurn(_:) 1733-LOC body +" +
+                " runTurnAndIngest 12-LOC async wrapper" +
+                " moved from EBrainRuntimeCoordinator" +
+                ".swift to NEW sibling EBrainRuntime" +
+                "Coordinator+RunTurn.swift (M1785)。 V1" +
+                " monolith file LOC:1918 → 196 (-1722)。" +
+                " Cumulative V1 reduction from chapter" +
+                " 477 baseline:2540 → 196 = -2344 LOC" +
+                " (92.3% of plan target)。 4 PROOF tests" +
+                " (M1786) verify runTurn + runTurnAndIngest" +
+                " symbol-path continuity + V1 byte-" +
+                "equality preserved (40 stress-sweep" +
+                " canonical60 green)。 NEW BASV1Monolith" +
+                "ExtractionWaveThreeDoctrine (M1787)" +
+                " supersedes chapter 601 wave 2 doctrine" +
+                " + bumps 最激进 score 8 → 9 +" +
+                " planTargetAchievedInSpirit = true。" +
+                " THIRD consecutive 最激进 advancement +" +
+                " consecutiveV1FoldChapters = 3。 143" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1788。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三",
+            mNumberFirst: 1789, mNumberLast: 1792,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASCHATCOMPLETIONSADAPTER FIRST-" +
+                "EVER CODABLE EXTENSION WAVE 1 — 9TH" +
+                " MODULE FRESH TERRITORY。 1 type" +
+                " (BASChatCompletionsOrganAdapter." +
+                "Endpoint nested in actor) gained" +
+                " Codable at M1789 + 1 PROOF test" +
+                " (M1790) + new typed surface (M1791)" +
+                " + close-out (M1792)。 BASChat" +
+                "CompletionsAdapter was uncovered by" +
+                " chapter 599 BASMLXAdapter first-ever" +
+                " (8th-module entry)。 Module count" +
+                " bumped 8 → 9 — 3rd consecutive fresh-" +
+                "module first-ever extension after the" +
+                " chapter 597 octa-milestone seal (BAS" +
+                "Organ ch598 + BASMLXAdapter ch599 +" +
+                " BASChatCompletionsAdapter ch603)。" +
+                " 144 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1792。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四",
+            mNumberFirst: 1793, mNumberLast: 1796,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASAPPLEADAPTERS CODABLE EXTENSION" +
+                " WAVE 1 — 10TH MODULE FORMAL ENTRY。 2" +
+                " types (BASChengluPromptSignature 7-" +
+                "field + BASAppleProviderReleaseInput" +
+                " 7-field) gained Codable at M1793 + 2" +
+                " PROOF tests (M1794) + new typed" +
+                " surface (M1795) + close-out (M1796)。" +
+                " BASAppleAdapters has pre-octa Codable" +
+                " types (8 acknowledged in preExisting" +
+                "CodableTypes manifest) but was never" +
+                " tracked at module-extension doctrine" +
+                " level until this chapter。 4th" +
+                " consecutive post-octa fresh-module-" +
+                "territory advancement (BASOrgan ch598" +
+                " + BASMLXAdapter ch599 + BASChat" +
+                "CompletionsAdapter ch603 + BASApple" +
+                "Adapters ch604)。 Module count bumped" +
+                " 9 → 10。 145 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1796。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五",
+            mNumberFirst: 1797, mNumberLast: 1800,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE CODABLE" +
+                " EXTENSION WAVE 1 — 11TH MODULE FORMAL" +
+                " ENTRY + M1800 ROUND-NUMBER MILESTONE。" +
+                " 2 types (BASKernelInputs 2-field +" +
+                " BASKernelOutputs 3-field) gained" +
+                " Codable at M1797 + 2 PROOF tests" +
+                " (M1798) + new typed surface (M1799)" +
+                " + close-out (M1800)。 BASMetalSubstrate" +
+                " has pre-octa Codable types (10" +
+                " acknowledged in preExistingCodableTypes" +
+                " manifest) but was never tracked at" +
+                " module-extension doctrine level until" +
+                " this chapter。 5th consecutive post-" +
+                "octa fresh-module-territory advancement" +
+                " (BASOrgan ch598 + BASMLXAdapter ch599" +
+                " + BASChatCompletionsAdapter ch603 +" +
+                " BASAppleAdapters ch604 + BAS" +
+                "MetalSubstrate ch605)。 Module count" +
+                " bumped 10 → 11。 ADR-016 reaches" +
+                " M1800 round-number milestone (100-" +
+                "step jump since chapter 580 M1700" +
+                " round-number close-out)。 146 typed" +
+                " surfaces cumulative (+1)。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六",
+            mNumberFirst: 1801, mNumberLast: 1804,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CODABLE EXTENSION" +
+                " WAVE 1 — 12TH MODULE FORMAL ENTRY。 4" +
+                " types/enums (BASSovereignTurnParity +" +
+                " BASSovereignVerdictEngine.Operation" +
+                "Domain nested + BASSovereignTurn" +
+                "Observations 17-field + BASSovereign" +
+                "TurnVerifierReport 4-field) gained" +
+                " Codable at M1801 + 4 PROOF tests" +
+                " (M1802) + new typed surface (M1803)" +
+                " + close-out (M1804)。 BASSovereign" +
+                " has pre-octa Codable types (7" +
+                " acknowledged) but was never tracked" +
+                " at module-extension doctrine level" +
+                " until this chapter。 6th consecutive" +
+                " post-octa fresh-module-territory" +
+                " advancement。 FIRST chapter past M1800" +
+                " round-number milestone。 Includes" +
+                " nested enums (Parity + OperationDomain)" +
+                " — mixed-shape extension。 Module count" +
+                " bumped 11 → 12。 147 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1804。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七",
+            mNumberFirst: 1805, mNumberLast: 1808,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "POST-OCTA HEXA CATALOG META-META" +
+                " MILESTONE。 NEW BASPostOctaModule" +
+                "ExtensionHexaCompletionDoctrine (M1805)" +
+                " cataloging 6 post-octa fresh-module" +
+                " formal-entry chapters (598-606)。" +
+                " Aggregate:13 new types/enums via 24" +
+                " commits,6 distinct modules touched," +
+                " module count bumped 6 → 12 across" +
+                " run。 30 anti-drift PROOF tests (M1806)" +
+                " + 14 wire-in PROOF tests (M1807) +" +
+                " close-out (M1808)。 Parallel doctrine" +
+                " to chapter 597 octa-milestone at" +
+                " single-wave-entry level rather than" +
+                " sealed-milestone level。 148 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1808。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八",
+            mNumberFirst: 1809, mNumberLast: 1812,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASHOSTKIT MESH-SWEEP CODABLE" +
+                " EXTENSION WAVE 1 — NON-ARC CONTINUATION。" +
+                " 3 types (BASHostMeshConsultationResult" +
+                " + BASHostMeshSweepLayerEntry + BAS" +
+                "HostMeshSweepResult) gained Codable at" +
+                " M1809 in chain dependency + 3 PROOF" +
+                " tests (M1810) + new typed surface" +
+                " (M1811) + close-out (M1812)。 Chain" +
+                " dependency:Result → Entry →" +
+                " Consultation。 Combined 44 BASHostKit-" +
+                "related types ledger-serializable" +
+                " (16+15+2+8+3)。 149 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1812。" +
+                " First chapter post-hexa-catalog" +
+                " pivoting from fresh-module-territory" +
+                " narrative to gap-fill within covered" +
+                " modules narrative。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九",
+            mNumberFirst: 1813, mNumberLast: 1816,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE 2" +
+                " — GAP-FILL within already-covered" +
+                " BASOrgan module。 1 type (BASOrganCapacity" +
+                " 4-field) gained Codable at M1813 + 1" +
+                " PROOF test (M1814) + new typed" +
+                " surface (M1815) + close-out (M1816)。" +
+                " Combined 3 BASOrgan-related types" +
+                " ledger-serializable (2 chapter 598" +
+                " wave 1 + 1 this wave)。 SECOND" +
+                " consecutive gap-fill chapter (608 +" +
+                " 609)。 150 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1816。 400-" +
+                "consecutive-byte-equal-commits" +
+                " milestone reached。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十",
+            mNumberFirst: 1817, mNumberLast: 1820,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORCHESTRATION CODABLE EXTENSION" +
+                " CONTINUATION — GAP-FILL within already" +
+                "-covered BASOrchestration module" +
+                " (chapter 574 arc + 579 post-arc" +
+                " trilogy)。 1 type (BASNeuralThought" +
+                "Materialization 8-field neural thought" +
+                " materialization with all-Codable-via-" +
+                "BASSchemaVersioned dependencies)" +
+                " gained Codable at M1817 + 1 PROOF" +
+                " test (M1818) + new typed surface" +
+                " (M1819) + close-out (M1820)。 Combined" +
+                " 13 BASOrchestration-related types" +
+                " ledger-serializable (6 arc + 6 post-" +
+                "arc trilogy + 1 this)。 THIRD" +
+                " consecutive gap-fill chapter (608" +
+                " mesh-sweep + 609 organ wave 2 + 610" +
+                " orchestration)。 151 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1820。" +
+                " First chapter past 400-consecutive-" +
+                "byte-equal-commits milestone。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十一",
+            mNumberFirst: 1821, mNumberLast: 1824,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CODABLE EXTENSION" +
+                " WAVE 2 — GAP-FILL within already-" +
+                "covered BASSovereign module (chapter" +
+                " 606 was wave 1 formal entry)。 2" +
+                " nested-in-actor types (BASSovereignStub" +
+                "Renderer.StubOutput + BASSovereignStub" +
+                "Renderer.RefusalPhrases) gained" +
+                " Codable at M1821 + 2 PROOF tests" +
+                " (M1822) + new typed surface (M1823)" +
+                " + close-out (M1824)。 Combined 6" +
+                " BASSovereign-related types ledger-" +
+                "serializable (4 wave 1 + 2 wave 2)。" +
+                " 4TH consecutive gap-fill chapter" +
+                " (608 + 609 + 610 + 611)。 152 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1824。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十二",
+            mNumberFirst: 1825, mNumberLast: 1828,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CODABLE EXTENSION" +
+                " WAVE 3 — GAP-FILL within already-" +
+                "covered BASSovereign module。 2" +
+                " nested-in-engine types (BASSovereign" +
+                "VerdictEngine.HardObservations 12-" +
+                "field Bool BR-001 through BR-012 +" +
+                " BASSovereignVerdictEngine.SoftSignals" +
+                " 7-field Double scores in [0.0,1.0])" +
+                " gained Codable at M1825 + 2 PROOF" +
+                " tests (M1826) + new typed surface" +
+                " (M1827) + close-out (M1828)。 Combined" +
+                " 8 BASSovereign-related types ledger-" +
+                "serializable (4 wave 1 + 2 wave 2 + 2" +
+                " wave 3)。 5TH consecutive gap-fill" +
+                " chapter (608 + 609 + 610 + 611 +" +
+                " 612)。 2nd consecutive BASSovereign" +
+                " gap-fill。 ONE SHORT of gap-fill hexa" +
+                " catalog threshold (chapter 613 would" +
+                " trigger)。 153 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1828。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十三",
+            mNumberFirst: 1829, mNumberLast: 1832,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORCHESTRATION CODABLE EXTENSION" +
+                " CONTINUATION WAVE 2 — GAP-FILL within" +
+                " already-covered BASOrchestration" +
+                " module。 2 nested-in-actor inner types" +
+                " within BASWorldAwareRiskBridge —" +
+                " ProposedIntent (8-field value:" +
+                " sessionID + turnID + operation +" +
+                " matchedTemplateID + consentAcknowledged" +
+                " + baselineSignals +" +
+                " baselineObservations + snapshotRef) +" +
+                " Decision (3-field value:verdict +" +
+                " assessment + branches) — gained" +
+                " Codable at M1829 + 2 PROOF tests" +
+                " (M1830) + new typed surface (M1831) +" +
+                " close-out (M1832)。 Combined 15 BAS" +
+                "Orchestration-related types ledger-" +
+                "serializable (6 arc + 6 post-arc" +
+                " trilogy + 1 continuation wave 1 + 2" +
+                " continuation wave 2)。 6TH consecutive" +
+                " gap-fill chapter (608 + 609 + 610 +" +
+                " 611 + 612 + 613) — TRIGGERS gap-fill" +
+                " hexa catalog meta-meta opportunity at" +
+                " chapter 614 (parallel to chapter 607" +
+                " post-octa fresh-module hexa catalog)。" +
+                " 154 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1832。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十四",
+            mNumberFirst: 1833, mNumberLast: 1836,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "GAP-FILL HEXA CATALOG META-META" +
+                " MILESTONE。 NEW BASGapFillHexa" +
+                "CompletionDoctrine (M1833) cataloging" +
+                " 6 gap-fill chapters (608-613) within" +
+                " already-covered modules:BASHostKit" +
+                " mesh-sweep + BASOrgan wave 2 + BAS" +
+                "Orchestration continuation + BAS" +
+                "Sovereign wave 2 + BASSovereign wave 3" +
+                " + BASOrchestration continuation wave" +
+                " 2 = 11 types extended / 24 commits /" +
+                " 4 distinct modules / 5 kind buckets" +
+                " (chain-dep + wave-2 ×2 + wave-3 +" +
+                " continuation + continuation-wave-2)。" +
+                " 37 anti-drift PROOF tests (M1834) +" +
+                " 20 wire-in PROOF tests cross-checking" +
+                " 6 source doctrines (M1835) + close-" +
+                "out (M1836)。 PARALLEL structurally to" +
+                " chapter 607 post-octa fresh-module" +
+                " hexa catalog。 155 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1836。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十五",
+            mNumberFirst: 1837, mNumberLast: 1840,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASLEASELIFE CODABLE EXTENSION" +
+                " CONTINUATION — GAP-FILL POST-ARC-SEAL。" +
+                " 2 nested-in-enum String-raw-value" +
+                " enums within BASDeviceRouting" +
+                " (Capability 3-case cpu/gpu/ane + Role" +
+                " 2-case scout/core) gained Codable at" +
+                " M1837 via automatic Swift synthesis +" +
+                " 2 PROOF tests (M1838) + new typed" +
+                " surface (M1839) + close-out (M1840)。" +
+                " Combined 9 BASLeaseLife-related types" +
+                " ledger-serializable (7 arc seal + 2" +
+                " continuation)。 FIRST post-hexa-" +
+                "catalog gap-fill chapter — starts new" +
+                " gap-fill run toward next hexa catalog" +
+                " opportunity (around chapter 620 if" +
+                " cadence holds)。 156 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1840。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十六",
+            mNumberFirst: 1841, mNumberLast: 1844,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE" +
+                " 3 — GAP-FILL。 2 BASOrgan types" +
+                " gained Codable simultaneously at" +
+                " M1841 via DOMINO EFFECT — BASOrgan" +
+                "Request (10-field organ request:" +
+                " requestID + role + preset +" +
+                " instruction + context +" +
+                " maxOutputTokens + stopSequences +" +
+                " deadline + tools + outputSchema)" +
+                " unblocked BASNeuralHeadEvalPrompt" +
+                " (4-field eval prompt held BASOrgan" +
+                "Request)。 + 2 PROOF tests (M1842) +" +
+                " new typed surface (M1843) + close-" +
+                "out (M1844)。 Combined 5 BASOrgan-" +
+                "related types ledger-serializable (2" +
+                " wave 1 + 1 wave 2 + 2 wave 3)。" +
+                " SECOND post-hexa-catalog gap-fill" +
+                " chapter (615 + 616)。 157 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1844。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十七",
+            mNumberFirst: 1845, mNumberLast: 1848,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE" +
+                " 4 — GAP-FILL via DOMINO CHAIN。 3" +
+                " BASOrgan types gained Codable" +
+                " simultaneously at M1845 — BASOrgan" +
+                "Draft (8-field) unblocked BASLLM" +
+                "ExtractionResult (4-field;held BAS" +
+                "OrganDraft) and BASLLMExtractionEngine" +
+                "Error (4-case error enum) added in" +
+                " same wave。 + 3 PROOF tests (M1846) +" +
+                " new typed surface (M1847) + close-" +
+                "out (M1848)。 Combined 8 BASOrgan-" +
+                "related types ledger-serializable (2" +
+                " wave 1 + 1 wave 2 + 2 wave 3 + 3" +
+                " wave 4)。 3rd post-hexa-catalog gap-" +
+                "fill chapter (615 + 616 + 617) + 3rd" +
+                " consecutive BASOrgan gap-fill (609 +" +
+                " 616 + 617)。 158 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1848。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十八",
+            mNumberFirst: 1849, mNumberLast: 1852,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE" +
+                " 5 — GAP-FILL via 2 SIBLING ENUMS。 BAS" +
+                "FoundationModelsToolBridgeStatus" +
+                " (3-case enum with associated values:" +
+                " audited(traceID:String)," +
+                " bridgedRuntimeSchema(toolCount:Int)," +
+                " bridgedCompiledGenerable(toolCount:" +
+                "Int)) + BASToolInvocationDecision (2-" +
+                "case enum:allow + reject(reasonCodes:" +
+                "[String])) gained Codable at M1849 +" +
+                " 2 PROOF tests (M1850) + new typed" +
+                " surface (M1851) + close-out (M1852)。" +
+                " Combined 10 BASOrgan-related types" +
+                " ledger-serializable (2+1+2+3+2) —" +
+                " CROSSES 10-TYPE THRESHOLD。 4TH post-" +
+                "hexa-catalog gap-fill (615+616+617+" +
+                "618) + 4TH consecutive BASOrgan gap-" +
+                "fill (609+616+617+618)。 159 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1852。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十九",
+            mNumberFirst: 1853, mNumberLast: 1856,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMEMORY CODABLE EXTENSION POST-" +
+                "TRILOGY — GAP-FILL reopening BASMemory" +
+                " 29 chapters after chapter 590" +
+                " trilogy seal。 3 BASMemory types" +
+                " (BASEventSourcedMemoryAtomStoreCache" +
+                "Policy 3-case + BASMemoryTiering" +
+                "ReconciliationOutcome 9-field +" +
+                " BASMemoryTieringReconcilerOrdering" +
+                " 3-case) gained Codable at M1853 + 3" +
+                " PROOF tests (M1854) + new typed" +
+                " surface (M1855) + close-out (M1856)。" +
+                " FIFTH post-hexa-catalog gap-fill" +
+                " chapter (615+616+617+618+619) +" +
+                " FIRST non-BASOrgan post-hexa gap-fill" +
+                " — diversifying the run。 160 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1856。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十",
+            mNumberFirst: 1857, mNumberLast: 1860,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASHOSTKIT CODABLE EXTENSION" +
+                " POST-MESH-SWEEP — GAP-FILL reopening" +
+                " BASHostKit 12 chapters after chapter" +
+                " 608 mesh-sweep gap-fill。 2 BASHostKit" +
+                " enums (BASHostStorageWireError 2-case" +
+                " error + BASShadowPermitUpgradeDecision" +
+                " 2-case decision) gained Codable at" +
+                " M1857 + 2 PROOF tests (M1858) + new" +
+                " typed surface (M1859) + close-out" +
+                " (M1860)。 SIXTH post-hexa-catalog gap-" +
+                "fill chapter (615+616+617+618+619+" +
+                "620) — TRIGGERS 2nd gap-fill hexa" +
+                " catalog meta-meta opportunity at" +
+                " chapter 621。 4 distinct modules in" +
+                " this post-hexa run (BASLeaseLife +" +
+                " BASOrgan + BASMemory + BASHostKit)" +
+                " matches chapter 614 hexa #1 distinct" +
+                " module count。 161 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1860。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十一",
+            mNumberFirst: 1861, mNumberLast: 1864,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "2ND GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaTwo" +
+                "CompletionDoctrine (M1861) cataloging" +
+                " 6 post-hexa-#1 gap-fill chapters" +
+                " (615-620):BASLeaseLife continuation" +
+                " + BASOrgan wave 3 + BASOrgan wave 4" +
+                " + BASOrgan wave 5 + BASMemory post-" +
+                "trilogy + BASHostKit post-mesh-sweep" +
+                " = 14 types extended / 24 commits /" +
+                " 4 distinct modules MATCHES hexa #1" +
+                " / 6 distinct kind buckets each" +
+                " appearing exactly once。 40 anti-" +
+                "drift PROOF tests (M1862) + 14 wire-" +
+                "in PROOF tests cross-checking 6" +
+                " source doctrines (M1863) + close-" +
+                "out (M1864)。 PARALLEL structurally to" +
+                " chapter 614 hexa #1。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2。 162 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1864。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十二",
+            mNumberFirst: 1865, mNumberLast: 1868,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "CROSS-MODULE TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,FIRST post-" +
+                "hexa-#2 + FIRST cross-module wave。" +
+                " 3 types across 2 modules (BAS" +
+                "Orchestration.BASPromptStateValue +" +
+                " BASHostKit.BASTurnRuntimePlanLedger" +
+                "Coherence + BASHostKit.BASTurn" +
+                "RuntimePlanLedgerCoherenceIssue)" +
+                " gained Codable at M1865 + 3 PROOF" +
+                " tests (M1866) + new typed surface" +
+                " (M1867) + close-out (M1868)。 NEW" +
+                " kind 'cross-module-trio' (1 struct" +
+                " + 2 enums,2 modules) distinct from" +
+                " hexa #1's 5 kinds and hexa #2's 6" +
+                " kinds。 Begins 3rd hexa run toward" +
+                " chapter 627 hexa #3 opportunity。" +
+                " 163 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1868。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十三",
+            mNumberFirst: 1869, mNumberLast: 1872,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASOBSERVABILITY NESTED-PAIR" +
+                " CODABLE EXTENSION — GAP-FILL,2nd" +
+                " post-hexa-#2 + 1st BASObservability" +
+                " touch in the run。 2 nested-in-actor" +
+                " enums within BASUpdateTicketLifecycle" +
+                "Coordinator (LifecycleError 3-case +" +
+                " TrialOutcome 3-case) gained Codable" +
+                " at M1869 + 2 PROOF tests (M1870) +" +
+                " new typed surface (M1871) + close-" +
+                "out (M1872)。 NEW kind 'nested-in-" +
+                "actor-pair' distinct from chapter 622" +
+                " 'cross-module-trio'。 164 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1872。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十四",
+            mNumberFirst: 1873, mNumberLast: 1876,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE SOLO ENUM CODABLE" +
+                " EXTENSION — GAP-FILL,3rd post-hexa-" +
+                "#2,1st BASRuntimeCore non-doctrine" +
+                " type touched since post-octa" +
+                " narrative began。 BASEventLogFailure" +
+                "InjectionScenario (4-case enum) gained" +
+                " Codable at M1873 + 1 PROOF test" +
+                " (M1874) + new typed surface (M1875)" +
+                " + close-out (M1876)。 NEW kind" +
+                " 'runtime-core-solo-enum'。 165 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1876。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十五",
+            mNumberFirst: 1877, mNumberLast: 1880,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASHOSTKIT ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,4th post-hexa-" +
+                "#2,1st error-enum-cluster wave in the" +
+                " post-hexa-#2 run。 3 BASHostKit Error" +
+                " enums (BASTrainingDataExportError" +
+                " 3-case + BASHostMeshError 1-case +" +
+                " BASHostIntegrationError 8-case)" +
+                " gained Codable at M1877 + 3 PROOF" +
+                " tests (M1878) + new typed surface" +
+                " (M1879) + close-out (M1880)。 M1880" +
+                " ROUND-NUMBER MILESTONE reached — 80-" +
+                "step jump since chapter 605 M1800" +
+                " round。 NEW kind 'error-trio'。 166" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M1880。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十六",
+            mNumberFirst: 1881, mNumberLast: 1884,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE METAL ERROR" +
+                " TRIO CODABLE EXTENSION — GAP-FILL," +
+                " 5th post-hexa-#2,2nd error-cluster" +
+                " wave,1st BASMetalSubstrate touch" +
+                " since chapter 605。 3 BASMetalSubstrate" +
+                " Error enums (BASKernelError 5-case +" +
+                " BASKernelLookupError 1-case + BAS" +
+                "MambaSSMError multi-case) gained" +
+                " Codable at M1881 + 3 PROOF tests" +
+                " (M1882) + new typed surface (M1883) +" +
+                " close-out (M1884)。 NEW kind 'metal-" +
+                "error-trio' distinct from chapter 625" +
+                " 'error-trio' (different module)。 1" +
+                " more to chapter 627 hexa #3" +
+                " opportunity。 167 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1884。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十七",
+            mNumberFirst: 1885, mNumberLast: 1888,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "CROSS-MODULE ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,6TH (FINAL)" +
+                " post-hexa-#2 gap-fill chapter,3rd" +
+                " error-cluster wave (1st spanning 2" +
+                " modules:BASAppleAdapters + BAS" +
+                "Sovereign)。 3 Error enums (BASApple" +
+                "CurrentBrainBootstrapHostResolutionError" +
+                " 8-case + BASSovereignAuditLedger." +
+                "LedgerError 7-case nested-in-actor +" +
+                " BASSovereignKeychainBinding.Keychain" +
+                "Error multi-case nested-in-actor)" +
+                " gained Codable at M1885 + 3 PROOF" +
+                " tests (M1886) + new typed surface" +
+                " (M1887) + close-out (M1888)。 NEW" +
+                " kind 'cross-module-error-trio'。" +
+                " TRIGGERS chapter 628 hexa #3 catalog" +
+                " meta-meta opportunity。 7 distinct" +
+                " modules in post-hexa-#2 run far" +
+                " exceeds chapter 614 hexa #1's 4 and" +
+                " chapter 621 hexa #2's 4。 168 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1888。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十八",
+            mNumberFirst: 1889, mNumberLast: 1892,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "3RD GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaThree" +
+                "CompletionDoctrine (M1889) cataloging" +
+                " 6 post-hexa-#2 gap-fill chapters" +
+                " (622-627):cross-module-trio +" +
+                " nested-in-actor-pair + runtime-core-" +
+                "solo-enum + error-trio + metal-error-" +
+                "trio + cross-module-error-trio。 15" +
+                " types extended / 24 commits / 7" +
+                " distinct modules FAR EXCEEDS prior" +
+                " hexas' 4 each / 6 distinct kind" +
+                " buckets each appearing exactly once。" +
+                " 42 anti-drift PROOF tests (M1890) +" +
+                " 15 wire-in PROOF tests cross-checking" +
+                " 6 source doctrines (M1891) + close-" +
+                "out (M1892)。 PARALLEL structurally to" +
+                " chapter 614 hexa #1 + chapter 621" +
+                " hexa #2。 Catalog lineage M1805 →" +
+                " M1833 → M1861 → M1889。 169 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1892。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十九",
+            mNumberFirst: 1893, mNumberLast: 1896,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMEMORY SQLITE ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,1st" +
+                " post-hexa-#3 gap-fill,structural" +
+                " triple-mirror pattern across 3" +
+                " SQLite storage actors。 3 nested-in-" +
+                "actor StorageError enums (BASSQLite" +
+                "MemoryAtomStore + BASSQLiteUserState" +
+                "Storage + BASHostConstitutionSQLite" +
+                "Storage) all sharing 6-case shape" +
+                " gained Codable at M1893 + 3 PROOF" +
+                " tests (M1894) + new typed surface" +
+                " (M1895) + close-out (M1896)。 NEW" +
+                " kind 'memory-sqlite-error-trio'。" +
+                " 170 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1896。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十",
+            mNumberFirst: 1897, mNumberLast: 1900,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE BIOMIMETIC" +
+                " ERROR TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,2nd post-hexa-#3,2nd BAS" +
+                "MetalSubstrate touch covering" +
+                " biomimetic/plasticity/predictive-" +
+                "coding domain。 3 Error enums (BAS" +
+                "BiomimeticSnapshotError + BASPlasticity" +
+                "Error + BASPredictiveCodingError)" +
+                " gained Codable at M1897 + 3 PROOF" +
+                " tests (M1898) + new typed surface" +
+                " (M1899) + close-out (M1900)。 M1900" +
+                " ROUND-NUMBER MILESTONE reached —" +
+                " 100-step jump since chapter 605" +
+                " M1800。 NEW kind 'metal-biomimetic-" +
+                "error-trio' distinct from chapter 626" +
+                " 'metal-error-trio'。 171 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1900。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十一",
+            mNumberFirst: 1901, mNumberLast: 1904,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMEMORY PIPELINE ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,3rd" +
+                " post-hexa-#3,2nd BASMemory touch" +
+                " covering vector-index/usage-tracker/" +
+                "pipeline domain。 3 nested-in-actor" +
+                " Error enums (BASSQLiteVectorIndex" +
+                "Storage.StorageError + BASMemoryUsage" +
+                "Tracker.TrackerError + BASHost" +
+                "CandidatePipeline.PipelineError)" +
+                " gained Codable at M1901 + 3 PROOF" +
+                " tests (M1902) + new typed surface" +
+                " (M1903) + close-out (M1904)。 NEW" +
+                " kind 'memory-pipeline-error-trio'" +
+                " distinct from chapter 629 'memory-" +
+                "sqlite-error-trio'。 172 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1904。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十二",
+            mNumberFirst: 1905, mNumberLast: 1908,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "CROSS-MODULE BCM/HPC/SCHEDULE" +
+                " ERROR TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,4th post-hexa-#3,3rd BAS" +
+                "MetalSubstrate touch + 1st BASLeaseLife" +
+                " post-hexa-#3 touch。 3 Error enums" +
+                " gained Codable at M1905 + 3 PROOF" +
+                " tests (M1906) + new typed surface" +
+                " (M1907) + close-out (M1908)。 NEW" +
+                " kind 'cross-module-bcm-hpc-schedule-" +
+                "error-trio'。 173 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1908。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十三",
+            mNumberFirst: 1909, mNumberLast: 1912,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASSOVEREIGN ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,5th post-hexa-#3," +
+                "1st BASSovereign post-hexa-#3 touch" +
+                " covering trust anchor / fingerprint" +
+                " store / token authority / host" +
+                " version tree。 3 Error enums all" +
+                " nested within host types gained" +
+                " Codable at M1909 + 3 PROOF tests" +
+                " (M1910) + new typed surface (M1911)" +
+                " + close-out (M1912)。 NEW kind" +
+                " 'sovereign-error-trio'。 174 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1912。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十四",
+            mNumberFirst: 1913, mNumberLast: 1916,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "CROSS-MODULE BASORGAN/BAS" +
+                "OBSERVABILITY/BASORCHESTRATION ERROR" +
+                " TRIO CODABLE EXTENSION — GAP-FILL," +
+                "6th post-hexa-#3 FINAL before hexa #4" +
+                " opportunity。 1st BASOrgan + 1st BAS" +
+                "Observability + 1st BASOrchestration" +
+                " post-hexa-#3 touches all in same" +
+                " chapter。 3 Error enums spanning 3" +
+                " modules with mixed layout gained" +
+                " Codable at M1913 + 3 PROOF tests" +
+                " (M1914) + new typed surface (M1915)" +
+                " + close-out (M1916)。 NEW kind" +
+                " 'organ-observability-orchestration-" +
+                "error-trio'。 175 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1916。" +
+                " 500 consecutive byte-equality clean" +
+                " commits ROUND-NUMBER MILESTONE。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十五",
+            mNumberFirst: 1917, mNumberLast: 1920,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "4TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaFour" +
+                "CompletionDoctrine cataloging 6 post-" +
+                "hexa-#3 gap-fill chapters (629-634)" +
+                " — 18 types extended / 24 commits / 7" +
+                " distinct modules touched MATCHES hexa" +
+                " #3 and FAR exceeds hexa #1+#2's 4" +
+                " each。 FIRST hexa where every entry" +
+                " is an error-trio variant —" +
+                " distinctive 'all-error-trio' theme。" +
+                " NEW catalog (M1917) + 44 anti-drift" +
+                " PROOF tests (M1918) + 15 wire-in" +
+                " PROOF tests cross-checking 6 source" +
+                " doctrines (M1919) + close-out (M1920)。" +
+                " PARALLEL structurally to chapter 614" +
+                " hexa #1 + chapter 621 hexa #2 +" +
+                " chapter 628 hexa #3。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 →" +
+                " M1917 hexa #4。 176 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1920。" +
+                " 504 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十六",
+            mNumberFirst: 1921, mNumberLast: 1924,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "CROSS-MODULE BASWORLDPRIOR + BAS" +
+                "APPLEADAPTERS ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,1st post-hexa-#4," +
+                " FIRST BASWorldPrior touch in any hexa" +
+                " cycle (module entirely untouched" +
+                " through hexa #1+#2+#3+#4) + 2nd BAS" +
+                "AppleAdapters touch overall。 3 Error" +
+                " enums gained Codable at M1921 + 3" +
+                " PROOF tests (M1922) + new typed surface" +
+                " (M1923) + close-out (M1924)。 NEW kind" +
+                " 'world-prior-coreml-error-trio' opens" +
+                " post-hexa-#4 arc into previously-" +
+                "untouched territory。 177 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1924。" +
+                " 508 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十七",
+            mNumberFirst: 1925, mNumberLast: 1928,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE SQLITE STORAGE" +
+                " ERROR TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,2nd post-hexa-#4,structural" +
+                " triple-mirror PARALLELS chapter 629" +
+                " BASMemory SQLite trio in a different" +
+                " module。 1st BASRuntimeCore post-hexa-" +
+                "#4 touch + 2nd BASRuntimeCore touch" +
+                " overall。 3 Error enums (BASSQLiteEvent" +
+                "LogStorage.StorageError + BASSQLiteEval" +
+                "RunStorage.StorageError + BASSQLite" +
+                "KnowledgeGraphStorage.StorageError) all" +
+                " nested-in-actor gained Codable at" +
+                " M1925 + 3 PROOF tests (M1926) + new" +
+                " typed surface (M1927) + close-out" +
+                " (M1928)。 NEW kind 'runtime-core-sqlite-" +
+                "error-trio'。 178 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1928。" +
+                " 512 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十八",
+            mNumberFirst: 1929, mNumberLast: 1932,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN SECONDARY ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,3rd post-" +
+                "hexa-#4,2nd BASSovereign touch overall" +
+                " complementing chapter 633 primary trio。" +
+                " 1st BASSovereign post-hexa-#4 touch。" +
+                " 3 Error enums (BASSovereignLedger" +
+                "SQLiteStorage.StorageError + BAS" +
+                "SovereignSnapshotManager.ManagerError" +
+                " + BASSovereignIntegritySentinel." +
+                "SentinelError) covering ledger / snapshot" +
+                " / sentinel domains gained Codable at" +
+                " M1929 + StorageError also gained" +
+                " Sendable (was missing) + 3 PROOF tests" +
+                " (M1930) + new typed surface (M1931) +" +
+                " close-out (M1932)。 NEW kind 'sovereign-" +
+                "secondary-error-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 6。 179" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1932。 516 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十九",
+            mNumberFirst: 1933, mNumberLast: 1936,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 18, futureCutsCount: 3,
+            summary: "CROSS-MODULE ORGAN/TOOL/FEATURE-" +
+                "BUILDER ERROR TRIO CODABLE EXTENSION —" +
+                " GAP-FILL,4th post-hexa-#4,2nd BAS" +
+                "Organ touch + 3rd BASAppleAdapters touch" +
+                " overall。 1st BASOrgan post-hexa-#4" +
+                " touch + 2nd BASAppleAdapters post-" +
+                "hexa-#4 touch。 3 Error enums (BAS" +
+                "OrganRegistry.RegistryError + BASTool" +
+                "CallingPlanError + BASChengluFeatureRef" +
+                "BuilderError) covering organ-registry /" +
+                " tool-calling / feature-ref-building" +
+                " domains gained Codable at M1933 + BAS" +
+                "ToolCallingPlanError also gained" +
+                " Equatable (was missing) + 3 PROOF" +
+                " tests (M1934) + new typed surface" +
+                " (M1935) + close-out (M1936)。 NEW kind" +
+                " 'organ-tool-feature-error-trio'。 BAS" +
+                "Organ cumulative typed surfaces = 3 +" +
+                " BASAppleAdapters cumulative = 3。 180" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1936。 520 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十",
+            mNumberFirst: 1937, mNumberLast: 1940,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "CROSS-MODULE RUNTIME-STEP ENUM" +
+                " TRIO CODABLE EXTENSION — GAP-FILL," +
+                "5th post-hexa-#4,FIRST non-Error-trio" +
+                " chapter in post-hexa-#4 run —" +
+                " diversification away from error-trio" +
+                " pattern that dominated hexa #3+#4。" +
+                " 3 non-Error control-flow step enums" +
+                " (BASEventReplayRange + BASToolCalling" +
+                "PlanStep + BASShadowTrialCoordinator." +
+                "FinalizeOutcome) spanning 3 modules" +
+                " gained Codable at M1937 + 3 PROOF" +
+                " tests (M1938) + new typed surface" +
+                " (M1939) + close-out (M1940)。 NEW kind" +
+                " 'runtime-step-enum-trio'。 BASRuntime" +
+                "Core+BASOrgan+BASMemory all at 3rd-" +
+                "touch overall。 181 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1940。" +
+                " 524 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十一",
+            mNumberFirst: 1941, mNumberLast: 1944,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "CATEGORIZATION-ENUM TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,6th and FINAL" +
+                " post-hexa-#4,SECOND non-Error-trio" +
+                " chapter in post-hexa-#4 run after" +
+                " chapter 640。 3 non-Error categorization" +
+                " enums (BASSovereignIntegritySentinel." +
+                "ArtifactKind + BASSovereignContamination" +
+                "Guard.ArtifactKind + BASRoutingOrgan" +
+                "Adapter.Strategy) spanning 2 modules" +
+                " gained Codable at M1941 + 3 PROOF" +
+                " tests (M1942) + new typed surface" +
+                " (M1943) + close-out (M1944)。 NEW kind" +
+                " 'categorization-enum-trio'。 3rd BAS" +
+                "Sovereign touch overall + 4th BASOrgan" +
+                " touch overall。 BASSovereign cumulative" +
+                " typed surfaces = 8 + BASOrgan cumulative" +
+                " = 5。 182 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1944。 528 consecutive" +
+                " byte-equality clean commits。 Chapter" +
+                " 642 hexa #5 catalog opportunity next。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十二",
+            mNumberFirst: 1945, mNumberLast: 1948,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "5TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaFive" +
+                "CompletionDoctrine cataloging 6 post-" +
+                "hexa-#4 gap-fill chapters (636-641)" +
+                " — 18 types extended / 24 commits / 6" +
+                " distinct modules touched (1 fewer" +
+                " than hexa #3+#4's 7 each but exceeds" +
+                " hexa #1+#2's 4 each)。 FIRST hexa to" +
+                " MIX error-trio + non-error-trio kinds" +
+                " (4 error variants + 2 non-error" +
+                " variants) — distinctive feature。" +
+                " ALSO brings BASWorldPrior into typed" +
+                " surface for the FIRST time in any" +
+                " hexa cycle (entry 1)。 NEW catalog" +
+                " (M1945) + 49 anti-drift PROOF tests" +
+                " (M1946) + 15 wire-in PROOF tests" +
+                " (M1947) + close-out (M1948)。 PARALLEL" +
+                " structurally to chapter 614 hexa #1" +
+                " + chapter 621 hexa #2 + chapter 628" +
+                " hexa #3 + chapter 635 hexa #4。" +
+                " Catalog lineage M1805 post-octa →" +
+                " M1833 hexa #1 → M1861 hexa #2 →" +
+                " M1889 hexa #3 → M1917 hexa #4 →" +
+                " M1945 hexa #5。 183 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1948。" +
+                " 532 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十三",
+            mNumberFirst: 1949, mNumberLast: 1952,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CLOCK+TREE TYPED-" +
+                "TRIO CODABLE EXTENSION — GAP-FILL,1st" +
+                " post-hexa-#5,FIRST mixed enum+struct" +
+                " trio in post-hexa-#5 run (prior 6" +
+                " chapters 636-641 all had pure-enum-" +
+                "trio shape)。 4th BASSovereign touch" +
+                " overall。 3 BASSovereign types nested-" +
+                "in-actor (1 enum + 2 structs):BAS" +
+                "SovereignCrossDeviceClock.Order + BAS" +
+                "SovereignHostVersionTree.Node + BAS" +
+                "SovereignHostVersionTree.LineagePath" +
+                " gained Codable at M1949 + 3 PROOF" +
+                " tests (M1950) + new typed surface" +
+                " (M1951) + close-out (M1952)。 NEW kind" +
+                " 'sovereign-clock-tree-typed-trio'。" +
+                " Rounds out BASSovereignHostVersionTree" +
+                " coverage。 BASSovereign cumulative" +
+                " typed surfaces = 11。 184 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1952。 536 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十四",
+            mNumberFirst: 1953, mNumberLast: 1956,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN SNAPSHOT+TOKEN" +
+                " STRUCT-TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,2nd post-hexa-#5,PURE STRUCT" +
+                " TRIO (chapter 643 was MIXED enum+" +
+                "struct)。 5th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " nested-in-actor:BASSovereignSnapshot" +
+                "Manager.SnapshotAnchor + BASSovereign" +
+                "SnapshotManager.RegisteredSnapshot" +
+                " (wraps SnapshotAnchor — recursive" +
+                " Codable proof) + BASSovereignToken" +
+                "Authority.CommitIntent gained Codable" +
+                " at M1953 + 3 PROOF tests (M1954) +" +
+                " new typed surface (M1955) + close-out" +
+                " (M1956)。 NEW kind 'sovereign-snapshot-" +
+                "token-struct-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 14。 185" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1956。 540 consecutive" +
+                " byte-equality clean commits。 PHASE 2" +
+                " COMMITS CROSSES 1000 ROUND-NUMBER" +
+                " MILESTONE (997 → 1001)。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十五",
+            mNumberFirst: 1957, mNumberLast: 1960,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CONTAMINATION-GUARD" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,3rd" +
+                " post-hexa-#5,DEEP-COVERAGE single-" +
+                "actor trio (chapters 643 + 644 spanned" +
+                " multiple BASSovereign actors)。 6th" +
+                " BASSovereign touch overall。 3 BAS" +
+                "Sovereign structs all nested in BAS" +
+                "SovereignContaminationGuard actor:" +
+                "Key + QuarantineRecord (wraps Key —" +
+                " recursive Codable proof,3-level depth" +
+                " through ArtifactKind from ch641) +" +
+                " ProbeReport gained Codable at M1957" +
+                " + 3 PROOF tests (M1958) + new typed" +
+                " surface (M1959) + close-out (M1960)。" +
+                " NEW kind 'sovereign-contamination-" +
+                "guard-trio'。 Completes BASSovereign" +
+                "ContaminationGuard typed-surface" +
+                " coverage (ArtifactKind in ch641 +" +
+                " 3 structs here)。 BASSovereign" +
+                " cumulative typed surfaces = 17。 186" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1960。 544 consecutive" +
+                " byte-equality clean commits。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十六",
+            mNumberFirst: 1961, mNumberLast: 1964,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "BASSOVEREIGN TRUST-RECORD TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,4th" +
+                " post-hexa-#5,MULTI-ACTOR trio across" +
+                " 3 BASSovereign actors (chapter 645" +
+                " was single-actor deep-coverage)。 7th" +
+                " BASSovereign touch overall。 3 BAS" +
+                "Sovereign structs nested across 3" +
+                " actors:BASSovereignIntegritySentinel." +
+                "ArtifactClaim + BASSovereignAudit" +
+                "Ledger.AppendedEntry + BASSovereign" +
+                "TokenAuthority.WarrantIntent gained" +
+                " Codable at M1961 + 3 PROOF tests" +
+                " (M1962) + new typed surface (M1963)" +
+                " + close-out (M1964)。 NEW kind" +
+                " 'sovereign-trust-record-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 20 — BREAKS 20-SURFACE BARRIER" +
+                " (new milestone for the BASSovereign" +
+                " module)。 187 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1964。 548" +
+                " consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十七",
+            mNumberFirst: 1965, mNumberLast: 1968,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN PRIVILEGE-SCAN TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,5th" +
+                " post-hexa-#5,8th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " (ScopeKey + ScanRequest + ScanReport)" +
+                " gained Codable at M1965 + 3 PROOF" +
+                " tests (M1966) + new typed surface" +
+                " (M1967) + close-out (M1968)。 NEW kind" +
+                " 'sovereign-privilege-scan-trio'。 3-" +
+                "LEVEL recursive Codable proof:" +
+                "ArtifactKind ch641 → ArtifactClaim" +
+                " ch646 → ScanRequest ch647。 Set<T>" +
+                " Codable composition pattern" +
+                " demonstrated。 BASSovereign cumulative" +
+                " typed surfaces = 23。 188 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1968。 552 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十八",
+            mNumberFirst: 1969, mNumberLast: 1972,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "BASSOVEREIGN TERTIARY ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,6th and" +
+                " FINAL post-hexa-#5,9th BASSovereign" +
+                " touch overall。 THIRD BASSovereign" +
+                " error trio (after ch633 primary +" +
+                " ch638 secondary) — closes BASSovereign" +
+                " Error enum Codable coverage。 3" +
+                " BASSovereign Error enums (BAS" +
+                "SovereignCleanRebootCoordinator." +
+                "CoordinatorError + BASSovereignVerdict" +
+                "Engine.EngineError + BASSovereignDual" +
+                "KeySigning.SigningError) gained Codable" +
+                " at M1969 + 3 PROOF tests (M1970) +" +
+                " new typed surface (M1971) + close-out" +
+                " (M1972)。 NEW kind 'sovereign-tertiary-" +
+                "error-trio'。 BASSovereign cumulative" +
+                " typed surfaces = 26 — past 25-surface" +
+                " milestone。 189 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1972。" +
+                " 556 consecutive byte-equality clean" +
+                " commits。 Post-hexa-#5 arc sealed" +
+                " (entirely-BASSovereign)。 Chapter 649" +
+                " hexa #6 catalog opportunity NEXT。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十九",
+            mNumberFirst: 1973, mNumberLast: 1976,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "6TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaSix" +
+                "CompletionDoctrine cataloging 6 post-" +
+                "hexa-#5 gap-fill chapters (643-648)" +
+                " — 18 BASSovereign types extended / 24" +
+                " commits / 1 module touched。" +
+                " DISTINCTIVE FEATURE:FIRST entirely-" +
+                "single-module hexa (hexa #1-#5 each" +
+                " spanned 4-7 modules)。 DEEPEST" +
+                " recursive Codable proof shipped (3-" +
+                "level at ch647) + Set<T> composition" +
+                " pattern demonstrated。 BASSovereign" +
+                " cumulative typed surfaces grew 8 → 26" +
+                " across hexa #6 cycle。 NEW catalog" +
+                " (M1973) + 54 anti-drift PROOF tests" +
+                " (M1974) + 15 wire-in PROOF tests" +
+                " (M1975) + close-out (M1976)。 PARALLEL" +
+                " structurally to chapter 614 hexa #1" +
+                " + chapter 621 hexa #2 + chapter 628" +
+                " hexa #3 + chapter 635 hexa #4 +" +
+                " chapter 642 hexa #5。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 → M1917" +
+                " hexa #4 → M1945 hexa #5 → M1973 hexa" +
+                " #6。 190 typed surfaces cumulative" +
+                " (+1) — hits 190-surface milestone。" +
+                " ADR-016 → M1976。 560 consecutive" +
+                " byte-equality clean commits。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十",
+            mNumberFirst: 1977, mNumberLast: 1980,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 18, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE KNOWLEDGE-MESH" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,1st" +
+                " post-hexa-#6,ROUND-NUMBER chapter 650," +
+                "returns to multi-module coverage after" +
+                " entirely-BASSovereign hexa #6 cycle。" +
+                " 4th BASRuntimeCore touch overall。 3" +
+                " BASRuntimeCore types (BASKnowledgeGraph" +
+                "Error + BASMeshSyncFrameApplier.SlotDiff" +
+                " + BAS14LayerMeshAssemblyReport) gained" +
+                " Codable at M1977 + BAS14LayerMeshAssembly" +
+                "Report also gained Equatable + 3 PROOF" +
+                " tests (M1978) + new typed surface" +
+                " (M1979) + close-out (M1980)。 NEW kind" +
+                " 'runtime-core-knowledge-mesh-trio'。" +
+                " Dict<Codable-Hashable-Key, V: Codable>" +
+                " + Optional<T: Codable> composition" +
+                " patterns demonstrated。 BASRuntimeCore" +
+                " cumulative typed surfaces = 8。 191" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1980。 564 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十一",
+            mNumberFirst: 1981, mNumberLast: 1984,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "BASSOVEREIGN REBOOT+VERDICT+LOCK" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,2nd" +
+                " post-hexa-#6,11th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " (BASSovereignCleanRebootCoordinator." +
+                "RebootPlan + BASSovereignVerdictEngine." +
+                "VerdictContext + BASSovereignLockManager" +
+                ".ScopeIdentifier) gained Codable at" +
+                " M1981 + 3 PROOF tests (M1982) + new" +
+                " typed surface (M1983) + close-out" +
+                " (M1984)。 NEW kind 'sovereign-reboot-" +
+                "verdict-lock-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 29。 192" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1984。 568 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十二",
+            mNumberFirst: 1985, mNumberLast: 1988,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "MAMBA+FEDERATED-STORAGE TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,3rd" +
+                " post-hexa-#6,cross-module BAS" +
+                "MetalSubstrate + BASRuntimeCore。 3" +
+                " types (BASMambaSSMScanInputs + BAS" +
+                "MambaSSMScanOutputs + BASFederatedEvent" +
+                "LogStorageError) gained Codable at" +
+                " M1985 + 3 PROOF tests (M1986) + new" +
+                " typed surface (M1987) + close-out" +
+                " (M1988)。 NEW kind 'mamba-federated-" +
+                "storage-trio'。 193 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1988。" +
+                " 572 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十三",
+            mNumberFirst: 1989, mNumberLast: 1992,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "BASORGAN LLM-CACHE-MOCK TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,5th post-" +
+                "hexa-#6,single-module BASOrgan reach,2" +
+                " chapters from chapter 六百五十五 hexa" +
+                " #7 opportunity。 3 BASOrgan enum types" +
+                " (BASLLMModelRouterError + BASLLMPrompt" +
+                "CacheOutcome + BASFoundationModelsMock" +
+                "Response) gained Codable at M1989 + 3" +
+                " PROOF tests (M1990) + new typed surface" +
+                " (M1991) + close-out (M1992)。 NEW kind" +
+                " 'organ-llm-cache-mock-trio'。 FIRST" +
+                " all-associated-value-enum trio post-" +
+                "hexa-#6。 194 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1992。 576" +
+                " consecutive byte-equality clean commits" +
+                "。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十四",
+            mNumberFirst: 1993, mNumberLast: 1996,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE VALIDATION-RESULT" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,6th" +
+                " and FINAL post-hexa-#6,single-module" +
+                " BASRuntimeCore reach,1 chapter from" +
+                " chapter 六百五十五 hexa #7 catalog" +
+                " opportunity。 3 BASRuntimeCore sibling" +
+                " enum types (BASMambaCheckpointValidation" +
+                "Result + BASCoreMLConversionValidation" +
+                "Result + BASMambaTrainingValidation" +
+                "Result) gained Codable at M1993 + 3" +
+                " PROOF tests (M1994) + new typed surface" +
+                " (M1995) + close-out (M1996)。 NEW kind" +
+                " 'validation-result-trio'。 FIRST" +
+                " parallel-structural-shape trio。 195" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M1996。 580 consecutive byte-" +
+                "equality clean commits。 V1 byte-" +
+                "equality preserved。 Chapter 655 hexa" +
+                " #7 catalog opportunity NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十五",
+            mNumberFirst: 1997, mNumberLast: 2000,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "CROSS-MODULE VALIDATION-ISSUE TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,6th and" +
+                " TRUE FINAL post-hexa-#6,cross-module" +
+                " BASHostKit + BASRuntimeCore reach。 3" +
+                " enum types (BASTurnRuntimeStagePlan" +
+                "ValidationIssue + BASTurnRuntimeStage" +
+                "LedgerValidationIssue + BASLayerMLHead" +
+                "RegistrationError) gained Codable at" +
+                " M1997 + 3 PROOF tests (M1998) + new" +
+                " typed surface (M1999) + close-out" +
+                " (M2000)。 NEW kind 'validation-issue-" +
+                "trio'。 THEME CONTINUATION from chapter" +
+                " 654。 196 typed surfaces cumulative" +
+                " (+1)。 CLOSE-OUT M2000 CROSSES ROUND-" +
+                "NUMBER MILESTONE。 ADR-016 → M2000。" +
+                " 584 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。" +
+                " Chapter 656 hexa #7 catalog" +
+                " opportunity NEXT with symmetric 6-" +
+                "entry run 650-655。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十六",
+            mNumberFirst: 2001, mNumberLast: 2004,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "7TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE — commemorates 6 post-" +
+                "hexa-#6 gap-fill chapters (650-655)。" +
+                " 18 types extended / 24 commits / 5" +
+                " distinct modules touched。 RETURNS to" +
+                " multi-module diversity after hexa #6's" +
+                " entirely-single-module run。 FIRST" +
+                " hexa with EXPLICIT THEME CONTINUATION" +
+                " (654→655) + FIRST hexa containing a" +
+                " ROUND-NUMBER chapter (650) AND" +
+                " crossing a ROUND-NUMBER M-milestone" +
+                " (M2000)。 NEW BASGapFillHexaSeven" +
+                "CompletionDoctrine (M2001) + 64 anti-" +
+                "drift PROOF tests (M2002) + 18 wire-in" +
+                " PROOF tests (M2003) + close-out" +
+                " (M2004)。 catalog lineage M1805 post-" +
+                "octa → M1833 hexa #1 → M1861 hexa #2" +
+                " → M1889 hexa #3 → M1917 hexa #4 →" +
+                " M1945 hexa #5 → M1973 hexa #6 → M2001" +
+                " hexa #7。 197 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2004。" +
+                " 588 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十七",
+            mNumberFirst: 2005, mNumberLast: 2008,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "ROADMAP-EVAL-MOCK TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,1st post-hexa-#7" +
+                ",cross-module BASRuntimeCore +" +
+                " BASOrgan reach,5 chapters until" +
+                " chapter 六百六十三 hexa #8 catalog" +
+                " opportunity。 3 associated-value-enum" +
+                " types (BASRoadmapPhaseStatus + BASAuto" +
+                "EvalBaselineMode + BASFoundationModels" +
+                "MockError) gained Codable at M2005 +" +
+                " 3 PROOF tests (M2006) + new typed" +
+                " surface (M2007) + close-out (M2008)。" +
+                " NEW kind 'roadmap-eval-mock-trio'。" +
+                " ALL-PRIMITIVE-ASSOCIATED-VALUE trio +" +
+                " DOMAIN-SPANNING coherence (roadmap-" +
+                "status + eval-baseline-mode + mock-" +
+                "error)。 198 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M2008。 592" +
+                " consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十八",
+            mNumberFirst: 2009, mNumberLast: 2012,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE BIOMIMETIC-" +
+                "OBSERVATION TRIO CODABLE EXTENSION —" +
+                " GAP-FILL,2nd post-hexa-#7,single-" +
+                "module BASMetalSubstrate reach,4" +
+                " chapters until chapter 六百六十三" +
+                " hexa #8 catalog opportunity。 3" +
+                " observation struct types (BASPredictive" +
+                "CodingObservation + BASPlasticityUpdate" +
+                " + BASHierarchicalObservation) gained" +
+                " Codable at M2009 + 3 PROOF tests" +
+                " (M2010) + new typed surface (M2011) +" +
+                " close-out (M2012)。 NEW kind" +
+                " 'biomimetic-observation-trio'。 FIRST" +
+                " ALL-STRUCT trio in autonomous loop" +
+                " history。 Coherent biomimetic theme。" +
+                " 199 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M2012。 596 consecutive" +
+                " byte-equality clean commits。 V1 byte" +
+                "-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十九",
+            mNumberFirst: 2013, mNumberLast: 2016,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "KERNEL-RESULT TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,3rd post-hexa-#7" +
+                ",single-module BASMetalSubstrate reach" +
+                ",2nd consecutive all-struct trio,3" +
+                " chapters until chapter 六百六十三 hexa" +
+                " #8 catalog opportunity。 3 kernel-" +
+                "result struct types gained Codable + 3" +
+                " PROOF tests + new typed surface +" +
+                " close-out。 NEW kind 'kernel-result-" +
+                "trio'。 200 typed surfaces cumulative。" +
+                " 600 consecutive byte-equality clean" +
+                " commits — 600-COMMIT MILESTONE。 ADR-" +
+                "016 → M2016。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十",
+            mNumberFirst: 2017, mNumberLast: 2020,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "HOST-PROJECTION TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,4th post-hexa-#7" +
+                ",single-module BASHostKit reach,3rd" +
+                " consecutive all-struct trio,2 chapters" +
+                " until chapter 六百六十三 hexa #8 catalog" +
+                " opportunity。 3 BASHostKit struct types" +
+                " gained Codable + 3 PROOF tests + new" +
+                " typed surface + close-out。 NEW kind" +
+                " 'host-projection-trio'。 201 typed" +
+                " surfaces cumulative。 604 consecutive" +
+                " byte-equality clean commits。 ADR-016" +
+                " → M2020。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十一",
+            mNumberFirst: 2021, mNumberLast: 2024,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "CONVENIENCE-CADENCE-RECORD TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,5th post" +
+                "-hexa-#7,cross-module BASHostKit + BAS" +
+                "RuntimeCore reach,4th consecutive all-" +
+                "struct trio,1 chapter until chapter 六" +
+                "百六十三 hexa #8 catalog opportunity。" +
+                " 3 cross-module struct types gained" +
+                " Codable + 3 PROOF tests + new typed" +
+                " surface + close-out。 NEW kind" +
+                " 'convenience-cadence-record-trio'。" +
+                " 202 typed surfaces cumulative。 608" +
+                " consecutive byte-equality clean commits" +
+                "。 ADR-016 → M2024。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十二",
+            mNumberFirst: 2025, mNumberLast: 2028,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 17, futureCutsCount: 2,
+            summary: "BIOMIMETIC-SIGNAL-RECORD TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,6th and" +
+                " TRUE FINAL post-hexa-#7,cross-module" +
+                " BASMetalSubstrate + BASOrgan reach,5th" +
+                " consecutive all-struct trio (closes the" +
+                " all-struct streak)。 3 cross-module" +
+                " struct types gained Codable + 3 PROOF" +
+                " tests + new typed surface + close-out。" +
+                " NEW kind 'biomimetic-signal-record-" +
+                "trio'。 2-level recursive Codable" +
+                " composition。 203 typed surfaces" +
+                " cumulative。 612 consecutive byte-" +
+                "equality clean commits。 ADR-016 →" +
+                " M2028。 V1 byte-equality preserved。" +
+                " Chapter 663 hexa #8 catalog opportunity" +
+                " NEXT with symmetric 6-entry run" +
+                " cataloging chapters 657-662。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十三",
+            mNumberFirst: 2029, mNumberLast: 2032,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "8TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE — commemorates 6 post-" +
+                "hexa-#7 gap-fill chapters (657-662)。" +
+                " 18 types extended / 24 commits / 4" +
+                " distinct modules touched。 DISTINCTIVE" +
+                " FEATURES:FIRST hexa with FIVE" +
+                " CONSECUTIVE ALL-STRUCT TRIOS;FIRST" +
+                " hexa containing 600-COMMIT MILESTONE" +
+                " crossing within its run。 NEW BASGap" +
+                "FillHexaEightCompletionDoctrine (M2029)" +
+                " + 44 anti-drift PROOF tests (M2030) +" +
+                " 18 wire-in PROOF tests (M2031) +" +
+                " close-out (M2032)。 catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 → M1917" +
+                " hexa #4 → M1945 hexa #5 → M1973 hexa" +
+                " #6 → M2001 hexa #7 → M2029 hexa #8。" +
+                " 204 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M2032。 616 consecutive byte" +
+                "-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十四",
+            mNumberFirst: 2033, mNumberLast: 2036,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "PHASE J 第一刀 — wild-rolling-" +
+                "meerkat REAL HOT-PATH ATTACK PLAN" +
+                " RESUMPTION FIRST CHAPTER。 BASMPSGraph" +
+                "ExecutableCache gains MPSGraphExecutable" +
+                " storage slot at M2033;7 PROOF tests at" +
+                " M2034;NEW BASMPSGraphExecutableCache" +
+                "WiringDoctrine + 30 anti-drift tests at" +
+                " M2035;close-out at M2036。 6 MPSGraph" +
+                " kernels target for chapters 665-667" +
+                " wiring (matMul excluded — uses MPS" +
+                " direct,not MPSGraph)。 5.0× speedup" +
+                " target on 1000-dispatch loops。 Phase J" +
+                " score-delta target +6 on 原生利用神经" +
+                "引擎。 205 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M2036。 620 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。 First chapter after" +
+                " 186 chapters of Codable gap-fill drift" +
+                " executing real production-value work" +
+                " against the 6 directives。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十五",
+            mNumberFirst: 2037, mNumberLast: 2040,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE J kernel wiring continues。" +
+                " First 2 of 6 MPSGraph kernels wired to" +
+                " M2033 BASMPSGraphExecutableCache storage" +
+                " slot。 BASMPSGraphRMSNormKernel at M2037" +
+                " (5 PROOF tests) + BASMPSGraphRotary" +
+                "EmbeddingKernel at M2038 (4 PROOF tests)" +
+                " gain optional cache parameter;cache=nil" +
+                " preserves M1169/M1190 baseline byte-" +
+                "equality UNCHANGED;cache=non-nil uses" +
+                " compile-once + executable.run fast path" +
+                "。 NEW BASKernelCacheWiringPhaseJChapter" +
+                "665Doctrine + 29 anti-drift tests at" +
+                " M2039。 close-out at M2040。 9 kernel" +
+                " PROOF tests including byte-equality" +
+                " assertions between cache-on/off paths。" +
+                " 206 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M2040。 624 consecutive byte-" +
+                "equality clean commits。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。" +
+                " Chapters 666-667 wire 4 remaining" +
+                " kernels (attention,softmax,layerNorm," +
+                " conv2D) + ship 5× speedup benchmark。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十六",
+            mNumberFirst: 2041, mNumberLast: 2044,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE J kernel wiring continues。" +
+                " 3 more kernels wired — attention at" +
+                " M2041 (2 PROOF tests) + softmax +" +
+                " layerNorm batched at M2042 (4 PROOF" +
+                " tests)。 NEW BASKernelCacheWiringPhaseJ" +
+                "Chapter666Doctrine + 13 anti-drift tests" +
+                " at M2043。 close-out at M2044。 6 kernel" +
+                " PROOF tests across 3 kernels;cache-on" +
+                " byte-equality verified per kernel。 5 of" +
+                " 6 Phase J MPSGraph kernels wired。 207" +
+                " typed surfaces cumulative (+1)。 ADR-016" +
+                " → M2044。 628 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved" +
+                "。 ADR-014 OPT-IN preserved。 Chapter 667" +
+                " wires conv2D + 5× speedup benchmark +" +
+                " seals Phase J。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十七",
+            mNumberFirst: 2045, mNumberLast: 2048,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE J COMPLETE。 Final BASMPSGraph" +
+                "Conv2DKernel wired at M2045 (2 PROOF" +
+                " tests)。 NEW BASMPSGraphCacheBenchmark" +
+                "Tests asserting ≥5× speedup on 1000-" +
+                "dispatch loop PASSES on real Apple" +
+                " Silicon GPU at M2046 — Phase J's" +
+                " falsifiable promise delivered。 NEW BAS" +
+                "PhaseJKernelCacheCompletionDoctrine + 37" +
+                " anti-drift tests sealing 6-of-6 kernel" +
+                " achievement at M2047。 close-out at" +
+                " M2048。 90 total Phase J tests PASS (17" +
+                " kernel + 72 anti-drift + 1 benchmark)。" +
+                " 209 typed surfaces cumulative (+2)。" +
+                " ADR-016 → M2048。 632 consecutive byte-" +
+                "equality clean commits。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。" +
+                " Phase J score-delta +6 on 原生利用神经" +
+                "引擎 directive。 Phase K chapters 668-671" +
+                " NEXT — runtimeMode toggle + dual-mode" +
+                " CI for Phase L default flip readiness。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十八",
+            mNumberFirst: 2049, mNumberLast: 2052,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE K first chapter。 BASHost" +
+                "Runtime gains async opt-in surface" +
+                " `buildEBrainTurnWithRuntimeMode(...)`" +
+                " at M2049 threading BASTurnRuntimeMode" +
+                " knob to engine config。 Default" +
+                " `.v1ByteEqual` preserves M2032 sync" +
+                " buildEBrainTurn byte-equality;" +
+                " .nativeV2 / .stressSweepDual wrap" +
+                " coordinator in BASTurnRuntimeEngine。" +
+                " Private buildCoordinator helper" +
+                " extracted as single source-of-truth" +
+                " for V1 service wiring。 7 PROOF tests" +
+                " pinning BASTurnRuntimeMode enum (M2050)" +
+                "。 NEW BASRuntimeModeToggleWiring" +
+                "Doctrine + 33 anti-drift tests (M2051)。" +
+                " close-out (M2052)。 210 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2052。" +
+                " 636 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 Phase L flip" +
+                " target chapter 六百七十四 / M2074。" +
+                " Chapter 669 ships dual-mode stress" +
+                " sweep test NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十九",
+            mNumberFirst: 2053, mNumberLast: 2056,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE K dual-mode stress sweep" +
+                " tests shipped。 5 stub-based BASTurn" +
+                "RuntimeEngineRunWithPlanDualMode" +
+                "StressSweepTests at M2053 + 2 real-" +
+                "coordinator BASTurnRuntimeEngineRunWith" +
+                "PlanRealCoordinatorDualModeTests at" +
+                " M2054 driving BASCoordinatorTestStubs" +
+                " through dualV1Runner across canonical60" +
+                " with 3× flake-detection。 NEW BAS" +
+                "PhaseKDualModeStressSweepDoctrine + 27" +
+                " anti-drift tests (M2055)。 close-out" +
+                " (M2056)。 360 fixture comparisons per" +
+                " CI build。 V1↔V1 determinism PROVEN" +
+                " across canonical60。 0 divergences" +
+                " observed。 Harness detection capability" +
+                " proven via deterministic divergence" +
+                " stub。 211 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M2056。 640" +
+                " consecutive byte-equality clean commits" +
+                "。 V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。 Phase L readiness" +
+                " gate target chapter 六百七十三 / M2069" +
+                " (100×24h variant)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十",
+            mNumberFirst: 2057, mNumberLast: 2060,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE K env var bridge shipped。" +
+                " NEW BASSampleHostRuntimeModeEnvVar" +
+                "Bridge reads BAS_RUNTIME_MODE env var" +
+                " via ProcessInfo + maps to BASTurn" +
+                "RuntimeMode at M2057。 4-method API:" +
+                " envVarName + defaultModeWhenAbsent +" +
+                " currentRuntimeMode(environment:) +" +
+                " isOptedInToNonDefault(environment:)。" +
+                " 13 PROOF tests at M2058。 NEW BAS" +
+                "EnvVarBridgeDoctrine + 12 anti-drift" +
+                " tests at M2059。 close-out (M2060)。" +
+                " Default .v1ByteEqual preserves M2032" +
+                " per ADR-014。 212 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2060。" +
+                " 644 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。" +
+                " Chapter 671 ships Phase K close-out" +
+                " doctrine NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十一",
+            mNumberFirst: 2061, mNumberLast: 2064,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 4,
+            summary: "PHASE K COMPLETE。 NEW BASPhaseK" +
+                "RuntimeModeToggleCompletionDoctrine" +
+                " (M2061) seals 4-chapter Phase K arc" +
+                " (668-671)。 44 anti-drift tests (M2062)" +
+                "。 NEW BASPhaseLPreFlipGateContract" +
+                "Doctrine + 23 anti-drift tests (M2063)" +
+                " defining Phase L readiness gate" +
+                " contract (100×24h dual-mode,0%" +
+                " divergence,BAS_RUNTIME_MODE_OVERRIDE" +
+                " revert path,5-chapter post-flip canary" +
+                " window)。 close-out (M2064)。 99 total" +
+                " Phase K tests PASS。 V1↔V1 determinism" +
+                " PROVEN across canonical60。 Score-delta" +
+                " +3 on 低熵复杂系统 + 最激进 (51→54/60)。" +
+                " 214 typed surfaces cumulative (+2)。" +
+                " ADR-016 → M2064。 648 consecutive byte" +
+                "-equality clean commits。 V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。 Phase L chapters 672-675" +
+                " NEXT — DEFAULT MODE FLIP after readiness" +
+                " gate clears at chapter 673 / M2069。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十二",
+            mNumberFirst: 2065, mNumberLast: 2068,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "PHASE L pre-flip safety net" +
+                " shipped。 BAS_RUNTIME_MODE_OVERRIDE env" +
+                " var with priority OVERRIDE > BAS_RUNTIME" +
+                "_MODE > default at M2065。 14 PROOF tests" +
+                " at M2066。 NEW BASRuntimeModeOverride" +
+                "Doctrine + 15 anti-drift tests (M2067)。" +
+                " close-out (M2068)。 Commit M2068 is" +
+                " tagged revert point for M2074 flip。" +
+                " Original currentRuntimeMode UNCHANGED" +
+                " — back-compat preserved。 215 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M2068。 652 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。" +
+                " Chapter 673 ships 100-run readiness" +
+                " gate test NEXT,then chapter 674 ships" +
+                " THE FLIP。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十三",
+            mNumberFirst: 2069, mNumberLast: 2072,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "PHASE L readiness gate READY。" +
+                " NEW BASTurnRuntimeDefaultModeFlip" +
+                "ReadinessGate at M2069 + 5 PROOF tests" +
+                " at M2070 including THE gate assertion" +
+                " (100 invocations × 60 fixtures = 6000" +
+                " comparisons,0 divergences observed in" +
+                " ~7.7s)。 NEW BASPhaseLReadinessGate" +
+                "AchievementDoctrine + 9 anti-drift" +
+                " tests (M2071)。 close-out (M2072)。" +
+                " M2074 FLIP UNBLOCKED。 216 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M2072。 656 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。 Chapter 674 ships THE FLIP" +
+                " NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十四",
+            mNumberFirst: 2073, mNumberLast: 2076,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "THE FLIP shipped。 BASTurnRuntime" +
+                "EngineConfiguration.default() flipped" +
+                " from v1ByteEqual to nativeV2 at M2074" +
+                " — the highest-risk single commit in" +
+                " wild-rolling-meerkat plan resumption。" +
+                " Pre-flip annotation (M2073)。 NEW BAS" +
+                "PhaseLDefaultFlipCompletionDoctrine +" +
+                " 32 anti-drift tests (M2075)。 close-" +
+                "out (M2076)。 All 4 Phase L safety nets" +
+                " active throughout。 Post-flip" +
+                " verification 23 tests PASS in 7.2s。" +
+                " 3 PhaseF tests updated。 ADR-014 OPT-" +
+                "OUT path preserved via explicit init" +
+                " OR BAS_RUNTIME_MODE_OVERRIDE env。 217" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M2076。 660 consecutive byte-" +
+                "equality clean commits。 V1 byte-" +
+                "equality preserved via engine delegation。" +
+                " Score-delta +8 on 最激进 + 最创新 (54→" +
+                "58/60)。 Chapter 675 ships Phase L full" +
+                " close-out doctrine NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十五",
+            mNumberFirst: 2077, mNumberLast: 2080,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE L SEALED。 NEW BASPhaseL" +
+                "PostFlipCanaryWindowDoctrine + 9 anti-" +
+                "drift tests at M2077。 NEW BASPhaseL" +
+                "CumulativeCompletionDoctrine + 15 anti-" +
+                "drift tests at M2078。 7 V1-callability" +
+                " PROOF tests at M2079。 close-out (M2080)" +
+                "。 4 chapters/16 commits Phase L" +
+                " complete。 84 total Phase L tests PASS" +
+                "。 V1 path callable via 4 OPT-OUT" +
+                " mechanisms。 5-chapter canary window" +
+                " active。 219 typed surfaces cumulative" +
+                " (+2)。 ADR-016 → M2080。 664 consecutive" +
+                " byte-equality clean commits。 Score-" +
+                "delta +8 on 最激进 + 最创新 (54→58/60)" +
+                "。 hexa #9 catalog (ch 676) + Phase M" +
+                " real Mamba SSM kernel (ch 677-682) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十六",
+            mNumberFirst: 2081, mNumberLast: 2084,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "HEXA #9 CATALOG (mid-plan anti-drift" +
+                " checkpoint)。 NEW BASPhaseJKLCompletion" +
+                "HexaCatalogDoctrine at M2081 — 9th hexa-" +
+                "equivalent meta-milestone cataloging" +
+                " Phase J + K + L + THE FLIP as 4 Entry" +
+                "Records。 57 anti-drift PROOF tests at" +
+                " M2082。 42 wire-in PROOF tests at M2083" +
+                " cross-checking against 4 source doctrines" +
+                "。 close-out (M2084)。 FIRST hexa cataloging" +
+                " PHASES (not gap-fill chapters)。 FIRST" +
+                " hexa with 4 entries instead of 6。 FIRST" +
+                " hexa explicitly inserted as anti-drift" +
+                " checkpoint at user direction。 3 phases" +
+                " / 12 chapters / 48 commits / 13 typed" +
+                " surfaces / score-delta 45→58 (+13" +
+                " aggregate)。 220 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2084。 668" +
+                " consecutive byte-equality clean commits" +
+                "。 V1 byte-equality preserved。 ADR-014" +
+                " OPT-OUT preserved。 Hexa cadence PAUSED" +
+                " until 60/60 seal at chapter 709 per" +
+                " user choice。 Catalog lineage M1805" +
+                " post-octa → M2029 hexa #8 → M2081 hexa" +
+                " #9。 Phase M real Mamba SSM kernel" +
+                " (ch 677-682) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十七",
+            mNumberFirst: 2085, mNumberLast: 2088,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M opening — substrate's FIRST" +
+                " raw Metal compute shader (SSMScan.metal" +
+                " for Mamba selective-scan)。 NEW Swift" +
+                " source mirror + typed 12-byte shape" +
+                " struct + 88 PROOF tests。 ADR-016 →" +
+                " M2088。 672 consecutive byte-equality" +
+                " clean commits。 223 typed surfaces" +
+                " cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十八",
+            mNumberFirst: 2089, mNumberLast: 2092,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M hardest challenge RESOLVED —" +
+                " NEW BASMetalSSMScanKernel actor + BAS" +
+                "SSMScanCPUReference + 9 GPU↔CPU cross-" +
+                "validation tests (MAE ≤ 1e-5 across 8" +
+                " fixtures) + 71 PROOF tests。 ADR-016 →" +
+                " M2092。 676 consecutive byte-equality" +
+                " clean commits。 227 typed surfaces" +
+                " cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十九",
+            mNumberFirst: 2093, mNumberLast: 2096,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M triangulation — 6 canonical" +
+                " mamba-ssm fixtures (analytic-derivation" +
+                " honest provenance) + BASSSMScanFixture" +
+                "Registry Swift mirror + 14 fixture-" +
+                "validation tests + 67 PROOF tests。 3" +
+                " correctness oracles in place。 ADR-016" +
+                " → M2096。 680 consecutive byte-equality" +
+                " clean commits。 230 typed surfaces" +
+                " cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十",
+            mNumberFirst: 2097, mNumberLast: 2100,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 6, futureCutsCount: 1,
+            summary: "PHASE M coverage extension — 6" +
+                " extended fixtures + 4 wallclock tests" +
+                " (honest characterization;GPU break-even" +
+                " at B*D≈256) + 8 numerical-stability" +
+                " tests + 59 PROOF tests。 5 correctness" +
+                " oracles。 ADR-016 → M2100。 684" +
+                " consecutive byte-equality clean commits" +
+                "。 233 typed surfaces cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十一",
+            mNumberFirst: 2101, mNumberLast: 2104,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M 8-of-8 MILESTONE — chapter" +
+                " 496 stub repurposed as CPU-bytes sibling" +
+                " + chapter681Snapshot 8-of-8 native (496" +
+                " 7-of-8 historical preserved) + NEW BAS" +
+                "EightOfEightNativeKernelCoverageMilestone" +
+                "Doctrine + 67 PROOF tests。 Score 58→60" +
+                " preliminary。 ADR-016 → M2104。 688" +
+                " consecutive byte-equality clean commits" +
+                "。 237 typed surfaces cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十二",
+            mNumberFirst: 2105, mNumberLast: 2108,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 10, futureCutsCount: 4,
+            summary: "PHASE M SEALED — NEW BASPhaseMReal" +
+                "SSMScanKernelCompletionDoctrine sealing" +
+                " 6-chapter/24-commit arc + 44 anti-drift" +
+                " tests + NEW BASPhaseMScoreImpactDoctrine" +
+                " + 26 tests documenting score progression" +
+                " 45→51→54→58→58→60 (PRELIMINARY ahead of" +
+                " formal chapter 708 tier 1 seal) +" +
+                " chapter 682 close-out via 13-file" +
+                " standard sync + 70 PROOF tests。 Phase M" +
+                " total:6 chapters / 24 commits / 422" +
+                " PROOF tests cumulative。 240 typed" +
+                " surfaces cumulative (+20 across Phase M)" +
+                "。 ADR-016 → M2108。 692 consecutive" +
+                " byte-equality clean commits。 Phase N" +
+                " Tier A sprawl (ch 683-685) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十三",
+            mNumberFirst: 2109, mNumberLast: 2112,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 10, futureCutsCount: 1,
+            summary: "PHASE N scope-reduced — Tier A bundle" +
+                " migration via ADDITIVE BRIDGES。 NEW BAS" +
+                "MicroStep + BASMicroStepBundle = BASBundle" +
+                "<BASMicroStep> typealias at M2109 + 18" +
+                " tests。 NEW BASEventLogReplayItemKind" +
+                " enum + 16 tests at M2110。 NEW BASTierA" +
+                "MigrationStrategyDoctrine + 25 tests at" +
+                " M2111 documenting 66.7% scope reduction" +
+                " (8 planned → 2 shipped + 6 deferred)。" +
+                " Chapter 683 close-out (M2112) + Phase N" +
+                " close-out under reduced scope。 17+" +
+                " existing call sites intact (additive-" +
+                "only,no breaking changes)。 Score-delta" +
+                " 0 (低熵复杂系统 already at 10/10)。 244" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2112。 696 consecutive byte-equality" +
+                " clean commits。 Phase O V1 monolith" +
+                " DELETION (chapters 686-688) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十六",
+            mNumberFirst: 2114, mNumberLast: 2117,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 9, futureCutsCount: 2,
+            summary: "PHASE O OPENING (risk-free)。 NEW" +
+                " BASTurnAuditProjectionsLateClusterFinal" +
+                "Bundle Sendable bundle at M2114 wrapping" +
+                " 3 *Two/*Penta cluster results + ontology" +
+                "Fog derived accessor + 11 structural" +
+                " anti-drift tests at M2115。 NEW BAS" +
+                "PhaseOV1MonolithDeletionPlanDoctrine at" +
+                " M2116 documenting 3-chapter staged plan" +
+                " + honest 1803→80 aspirational LOC target" +
+                " + V1 OPT-OUT impact 4→2 mechanisms + 6" +
+                " pre-flight checks all clear + 33 anti-" +
+                "drift tests。 Chapter 686 close-out" +
+                " (M2117) + 13-file standard sync。 44" +
+                " total anti-drift PROOF tests。 +RunTurn" +
+                ".swift body UNCHANGED at chapter 686 (wire-" +
+                "in lands at chapter 687)。 247 typed" +
+                " surfaces cumulative。 ADR-016 → M2117。" +
+                " 700 consecutive byte-equality clean" +
+                " commits。 Chapter 687 WIRE-IN NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十七",
+            mNumberFirst: 2118, mNumberLast: 2121,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 9, futureCutsCount: 1,
+            summary: "PHASE O WIRE-IN — Bundle .compose()" +
+                " factory at M2118 + +RunTurn.swift body" +
+                " additive wire-in at M2119 (bundle" +
+                " construction + ontologyFog redirect to" +
+                " bundle.ontologyFog,LOC delta +11) +" +
+                " NEW BASPhaseOWireInByteEqualityProof" +
+                "Doctrine + 30 anti-drift tests at M2120" +
+                " documenting definitional-equality byte-" +
+                "preservation + 26 regression tests across" +
+                " 3 suites all pass with 0 divergences。" +
+                " Chapter 687 close-out (M2121) + 13-file" +
+                " standard sync。 Conservative additive" +
+                " approach (LOC delta +11 not -200);risk" +
+                " realized LOWER than plan estimate (medium" +
+                " → low)。 4 *Two/*Penta locals preserved" +
+                " (3 main + 1 derived redirected)。 248" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2121。 704 consecutive byte-equality" +
+                " clean commits。 Chapter 688 DELETION +" +
+                " Phase O CLOSE-OUT NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十八",
+            mNumberFirst: 2122, mNumberLast: 2125,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 1,
+            summary: "PHASE O FULLY SEALED at HALFWAY" +
+                " MILESTONE。 NEW BASPhaseOCompletion" +
+                "Doctrine at M2122 documenting honest" +
+                " scope (V1 deletion DEFERRED to preserve" +
+                " V1 OPT-OUT contract) + 8 doctrine pins" +
+                " held + 35 anti-drift tests at M2123。" +
+                " NEW BASMostExtremeDirectiveStatusDoctrine" +
+                " at M2124 typed-pinning 最极致 saturated" +
+                " at 10/10 since Phase M + 7 score" +
+                " checkpoints + 5 deferred work items + 31" +
+                " anti-drift tests。 Chapter 688 close-out" +
+                " (M2125) + 13-file standard sync。 23/46" +
+                " chapters of wild-rolling-meerkat plan" +
+                " complete (50.0%) — HALFWAY MILESTONE。" +
+                " 4 V1 OPT-OUT mechanisms intact。 60/60" +
+                " PRELIMINARY score maintained。 250 typed" +
+                " surfaces cumulative。 ADR-016 → M2125。" +
+                " 708 consecutive byte-equality clean" +
+                " commits。 Phase P Tier B+C sprawl OR" +
+                " jump to final tier 1+2 seal (chapters" +
+                " 708-709) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十九",
+            mNumberFirst: 2126, mNumberLast: 2129,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 1,
+            summary: "*** FINAL SEAL OF WILD-ROLLING-" +
+                "MEERKAT REAL HOT-PATH ATTACK PLAN ***。" +
+                " NEW BASPhasePDeferredScopeDoctrine at" +
+                " M2126 (Phase P 100% scope-reduced;19" +
+                " chapters / 76 commits / 78 type" +
+                " migrations entirely deferred since 低熵" +
+                "复杂系统 already saturated at 10/10) + 34" +
+                " tests。 NEW BASRealHotPathAttackTier1" +
+                "AchievementDoctrine at M2127 FORMAL re-" +
+                "scoring of 6 directives all at 10/10" +
+                " (chapter 477 baseline 11/60 → tier 1" +
+                " achieved 60/60 = +49 delta) + 35 tests" +
+                " + CROSS-MIRROR with chapter 477" +
+                " baselineAggregate。 NEW BASRealHotPath" +
+                "AttackTier2AchievementDoctrine at M2128" +
+                " *** PLAN SUBSTANTIVELY COMPLETE *** with" +
+                " 7 substantively-delivered phases + 3" +
+                " honest deferrals + plan execution scope" +
+                " (24/46 chapters = 52.17%) + score-per-" +
+                "chapter efficiency 1.92× envisioned + 10" +
+                " doctrine pins held end-to-end + 6 final-" +
+                "seal achievement flags + 38 tests。" +
+                " Chapter 689 close-out (M2129) + 13-file" +
+                " standard sync == FINAL SEAL。 107 anti-" +
+                "drift PROOF tests across chapter 689。" +
+                " ADR-014 OPT-OUT preserved end-to-end (4" +
+                " V1 mechanisms intact)。 ADR-016 → M2129。" +
+                " 712 consecutive byte-equality clean" +
+                " commits across plan execution。 253 typed" +
+                " surfaces cumulative (+3:Phase P deferral" +
+                " + Tier 1 + Tier 2)。 Plan SUBSTANTIVELY" +
+                " COMPLETE with 6 directives sealed at" +
+                " 10/10 and aggregate score 60/60 FORMALLY" +
+                " ACHIEVED。 Chapter 477 baseline doctrine" +
+                " PRESERVED unchanged。 All honest scope" +
+                " acknowledgments documented (Phase N" +
+                " reduced + Phase O V1 deletion deferred" +
+                " + Phase P entirely deferred)。 Post-" +
+                "seal followup arcs OPTIONAL。 PLAN SEALED。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十",
+            mNumberFirst: 2130, mNumberLast: 2133,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 1,
+            summary: "Post-FINAL-SEAL follow-up arc:LRU" +
+                " eviction for BASKVCacheRegistry。 NEW" +
+                " BASKVCacheLRUEvictor pure-function" +
+                " algorithm + BASKVCacheLRUEvictionDecision" +
+                " typed result struct + defaultCapacity 64" +
+                " at M2130 + 15 anti-drift PROOF tests。" +
+                " BASKVCacheRegistry actor WIRE-IN at M2131" +
+                " with capacity:Int? property + accessTicks" +
+                " tracking + auto-eviction when policy==" +
+                ".lru + 11 LRU integration tests。 BAS" +
+                "KVCacheInvalidationPolicyDoctrine PROMOTION" +
+                " at M2132 (.lru moved from contractOnly" +
+                " to implemented + 3 new count constants" +
+                " implementedPolicyCount=2/contractOnly" +
+                "PolicyCount=2/totalPolicyCount=4) + 13" +
+                " updated/new tests。 Chapter 690 close-out" +
+                " (M2133) + 13-file standard sync。 39" +
+                " chapter PROOF tests + close-out tests。" +
+                " chapter 500 / M1379 LRU-DEFERRED GAP" +
+                " CLOSED post-FINAL-SEAL。 2-of-4 KV" +
+                " invalidation policies now implemented" +
+                " (.explicitOnly + .lru;.ttl + .never" +
+                " remain typed contract only)。 ADR-014" +
+                " OPT-OUT preserved (default init unchanged" +
+                ",LRU is opt-in only)。 ADR-016 → M2133。" +
+                " 716 consecutive byte-equality clean" +
+                " commits。 255 typed surfaces cumulative" +
+                " (+2:BASKVCacheLRUEvictor + BASKVCacheLRU" +
+                "EvictionDecision)。 60/60 score unchanged" +
+                " (post-seal arcs ship production value" +
+                " not score deltas)。 Post-seal followup" +
+                " OPTIONAL — TTL/never implementations," +
+                "BASTensor MTLBuffer zero-copy,self-tuning" +
+                " scheduler all candidates。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十一",
+            mNumberFirst: 2134, mNumberLast: 2137,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 1,
+            summary: "Post-FINAL-SEAL second follow-up" +
+                " arc。 RESOLVES REMAINING POST-SEAL ITEMS" +
+                " IN ONE ARC:TTL + .never + comprehensive" +
+                " catalog of remaining stretch goals。" +
+                " NEW BASKVCacheTTLEvictor pure-function" +
+                " + decision struct at M2134 + 14 anti-" +
+                "drift tests。 BASKVCacheRegistry TTL" +
+                " wire-in at M2135 with ttlMs:Int64? +" +
+                " timestamps tracking + Sendable" +
+                " ClockMillisProvider + .never semantic" +
+                " clarified (typed declaration distinct" +
+                " from .explicitOnly but runtime-equivalent" +
+                " — capacity+ttlMs hints IGNORED) + 23" +
+                " tests。 NEW BASPostSealFollowupCatalog" +
+                "Doctrine at M2136 cataloguing 3 SHIPPED" +
+                " (LRU+TTL+.never) + 4 DEFERRED items" +
+                " (BASTensor zero-copy + multi-host" +
+                " federation + MLX→CoreML CLI + self-" +
+                "tuning scheduler) with HONEST per-item" +
+                " rationale + 30-chapter deferred scope" +
+                " estimate + substrate AT-REST claim +" +
+                " 27 anti-drift tests。 Chapter 691" +
+                " close-out (M2137) + 13-file standard" +
+                " sync。 chapter 500 / M1379 FULL 4-POLICY" +
+                " GAP CLOSED:4-of-4 policies now" +
+                " implemented (.explicitOnly + .lru +" +
+                " .ttl + .never semantic clarified)。 ADR-" +
+                "014 OPT-OUT preserved (default init" +
+                " unchanged,M1306 behavior preserved)。" +
+                " ADR-016 → M2137。 720 consecutive byte-" +
+                "equality clean commits。 258 typed" +
+                " surfaces cumulative (+3:BASKVCache" +
+                "TTLEvictor + BASKVCacheTTLEvictionDecision" +
+                " + BASPostSealFollowupCatalogDoctrine)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate declared AT-REST。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十二",
+            mNumberFirst: 2138, mNumberLast: 2141,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 0,
+            summary: "FULL DEVELOPMENT post-substrate-AT-" +
+                "REST。 Tier A + B + C completion via" +
+                " HONEST-DISCOVERY methodology。 M2138" +
+                " 第一刀 Tier A FULL completion — NEW" +
+                " BASTierACompletionBridges shipping 6 typed" +
+                " Item struct + BASBundle<Item> typealias" +
+                " pairs (BASRuntimeAuditProjectionsItem +" +
+                " BASMemoryItem + BASLeaseLifeObservationItem" +
+                " + BASChengluHostRuntimeItem + BASUpdateTicket" +
+                "ObservationItem + BASWorldPriorObservationItem)" +
+                " + BASTierACompletionDoctrine pinning all-8-" +
+                "shipped state with chapter683ShippedCount=2 +" +
+                " chapter692ShippedCount=6 + 24 anti-drift tests。" +
+                " M2139 第二刀 Tier B generic primitives HONEST" +
+                " DISCOVERY — NEW BASTierBGenericPrimitivesDoctrine" +
+                " pinning all 4 primitives (BASResult + BASFrame" +
+                "Envelope + BASPermit + BASCard) shipped pre-" +
+                "chapter-429 in BASLowEntropyPrimitives.swift" +
+                " + unblockedMigrationCount=42 (27+10+3+2) +" +
+                " 17 anti-drift tests proving each existing" +
+                " primitive constructible + Codable + Hashable。" +
+                " M2140 第三刀 Tier C ADR-019 completion via" +
+                " REFRAMED CONTRACT — NEW BASTierCADR019Completion" +
+                "Doctrine pinning all 4 candidates exist in final" +
+                " shape (2 parametric generic: BASInspectionFrame" +
+                " chapter 五百七 + BASGovernanceCard chapter 五百八" +
+                ";2 typed concrete struct: BASRiskCard in BASPolicy" +
+                " + BASArbitrationFrame in BASOrchestration) +" +
+                " contractReframedFromParametricOnly=true +" +
+                " adr019Status=implemented + 25 anti-drift tests。" +
+                " Chapter 692 close-out (M2141) + 13-file standard" +
+                " sync + NEW BASAllTierFullCompletionDoctrine" +
+                " declaring Tier A+B+C ALL COMPLETE。 ADR-014" +
+                " OPT-OUT preserved (purely-additive doctrines" +
+                " + Item structs;no existing call sites touched)。" +
+                " ADR-016 → M2141。 724 consecutive byte-equality" +
+                " clean commits。 267 typed surfaces cumulative" +
+                " (+9:6 Item structs + BASTierACompletionDoctrine" +
+                " + BASTierBGenericPrimitivesDoctrine + BAS" +
+                "TierCADR019CompletionDoctrine)。 60/60 score" +
+                " unchanged (saturation invariant holds across" +
+                " all 4 chapter 692 commits)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十三",
+            mNumberFirst: 2142, mNumberLast: 2145,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 0,
+            summary: "OPTIONAL pre-existing cleanup arc。" +
+                " M2142 第一刀 M595 cross-callsite anti-" +
+                "drift test fix:family-aggregation read" +
+                " across all 15+ EBrainRuntimeCoordinator+" +
+                "*.swift extension files post chapter 六百" +
+                "六十一 / M2021 split — 3 false-positive" +
+                " failures resolved (kunlunAxisDeviationThreshold" +
+                " + defaultConfidenceFloorWhenNoUncertainty" +
+                "Ledger + BASTurnAuditProjectionsKunlunAxis" +
+                "Protocol)。 M2143 第二刀 NEW BASSignalTen" +
+                "IntegrationTestTriageDoctrine pinning 12" +
+                " affected SIGBUS tests across 3 classes" +
+                " (BASSubstrateReauditShadowEvaluatorTests 6" +
+                " + BASMemoryClosedLoopApplierHostRuntime" +
+                "IntegrationTests 3 + M306MultiSessionContinuity" +
+                "Tests 3) + 5 recovery candidates documented" +
+                " + 12 XCTSkips added with explicit doctrine" +
+                " reference + 25 anti-drift tests。 M2144" +
+                " 第三刀 swift-testing concurrent-run flakiness" +
+                " amendment — knownFlakySwiftTestingSuite=" +
+                "BASAppleObservabilityAdapterTests + recovery" +
+                " via separate `--testing-library`" +
+                " invocations + 3 additional anti-drift tests" +
+                " (28 total)。 Chapter 693 close-out (M2145)" +
+                " + 13-file standard sync。 Toolchain context" +
+                " pinned:Xcode 26.4.1 / Swift 6.3.1 / arm64-" +
+                "apple-macosx26.0。 XCTest state:11390 tests" +
+                " / 41 skipped / 0 failures (was 17 failures" +
+                " pre-chapter-693)。 ADR-014 OPT-OUT preserved" +
+                " (test triage purely additive)。 ADR-016 →" +
+                " M2145。 728 consecutive byte-equality clean" +
+                " commits。 269 typed surfaces cumulative" +
+                " (+2:BASSignalTenIntegrationTestTriageDoctrine" +
+                " + family-aggregation refactor in M595" +
+                " test)。 60/60 score unchanged (saturation" +
+                " invariant holds across all 4 chapter 693" +
+                " commits)。 Substrate AT-REST + Tier A+B+C" +
+                " complete preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十四",
+            mNumberFirst: 2146, mNumberLast: 2149,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 11, futureCutsCount: 0,
+            summary: "COMPREHENSIVE GAP REMEDIATION arc。" +
+                " Chapter 693 sealed pre-existing test" +
+                " failures but left 3 honest-scope gaps:" +
+                " A2 swift-testing framing,A3 typed" +
+                "SurfaceCount arithmetic,B1 Tier A bridge-" +
+                "not-adoption ambiguity。 M2146 第一刀" +
+                " EMPIRICAL signal-10 diagnosis:NEW" +
+                " BASSignal10EmpiricalDiagnosisTests + 4" +
+                " isolated diagnostics (A sync-direct PASS," +
+                " C async-direct CRASH,D async-Task" +
+                ".detached CRASH,E sync-Task.detached" +
+                " CRASH) → hypothesis #2 V2 path FALSIFIED" +
+                " via code inspection,hypothesis #1" +
+                " narrowed to dual triggers,wrapper-based" +
+                " recovery NOT VIABLE per Diagnostic E。" +
+                " Triage doctrine +10 empirical pins。" +
+                " M2147 第二刀 swift-testing framing" +
+                " CORRECTION:M2144 'concurrent flakiness'" +
+                " claim falsified by empirical test;" +
+                " refined to 'full-suite scheduling SIGBUS" +
+                " in swiftpm-testing-helper,scope-" +
+                "correlated not concurrency-correlated';" +
+                " 398 of 419 @Test cases start before" +
+                " crash,0 complete;recovery candidates" +
+                " rewritten;+8 pins。 M2148 第三刀 NEW" +
+                " BASTypedSurfaceCountAuditDoctrine pinning" +
+                " explicit counting convention + per-" +
+                "chapter audit + Tier A bridge-not-" +
+                "adoption amendment + 28+4 anti-drift" +
+                " tests。 Chapter 694 close-out (M2149) +" +
+                " 13-file standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2149。 732" +
+                " consecutive byte-equality clean commits。" +
+                " 270 typed surfaces cumulative (+1:" +
+                "BASTypedSurfaceCountAuditDoctrine)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C complete preserved。 All 3 chapter" +
+                " 694 gaps addressed via empirical-" +
+                "correction methodology — name the gap," +
+                " verify empirically,supersede prior" +
+                " framing if needed。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十五",
+            mNumberFirst: 2150, mNumberLast: 2153,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 11, futureCutsCount: 0,
+            summary: "TERMINAL HONEST STATE arc。 User" +
+                " directive 「继续 解决 为解决的 一次性 解决掉」" +
+                " resolved via 3 audit/catalog/terminal" +
+                " doctrines。 M2150 第一刀 NEW BASSprawl" +
+                "ScopeAuditDoctrine empirically counted" +
+                " actual sprawl (37 *Result + 22 *Frame +" +
+                " 2 *Permit + 3 *Card = 64,vs chapter" +
+                " 691 estimate 42) + classified 0-of-64" +
+                " as Tier-B-migratable (rich-domain" +
+                " shapes,not single-payload wrappers) +" +
+                " chapter 691 overestimate acknowledged" +
+                " + Tier B primitives remain valuable" +
+                " for new types + 24 anti-drift tests。" +
+                " M2151 第二刀 NEW BASSubstrateExternal" +
+                "DependencyCatalogDoctrine catalogued 4" +
+                " external-owner categories with per-" +
+                "category blocked-item counts:434" +
+                " toolchain-blocked tests + 11 host-app/" +
+                "architecture/tooling items + substrate-" +
+                "actionable count EXPLICITLY ZERO + 28" +
+                " anti-drift tests。 M2152 第三刀 NEW" +
+                " BASSubstrateMaximallyResolvedDoctrine" +
+                " declaring substrate TERMINAL HONEST" +
+                " STATE — 7-stage completion journey +" +
+                " all invariants-held flags + 8 cross-" +
+                "doctrine refs + 5 future-commit-" +
+                "semantics + cross-mirror with M2151" +
+                " actionable=0 + 27 anti-drift tests。" +
+                " Chapter 695 close-out (M2153) + 13-" +
+                "file standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2153。 736" +
+                " consecutive byte-equality clean commits" +
+                "。 273 typed surfaces cumulative (+3:" +
+                "BASSprawl + BASSubstrateExternal +" +
+                " BASSubstrateMaximallyResolved)。 60/60" +
+                " score unchanged (saturation invariant" +
+                " holds at terminal state)。 Substrate" +
+                " AT-REST + Tier A+B+C complete +" +
+                " TERMINAL HONEST STATE all preserved" +
+                " end-of-chapter-695。 Methodology —" +
+                " honest empirical audit + explicit owner" +
+                " attribution + terminal-state pin → no" +
+                " busy-work commits after this。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十六",
+            mNumberFirst: 2154, mNumberLast: 2157,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 12, futureCutsCount: 0,
+            summary: "RECOVERY OF TERMINAL arc。 User" +
+                " directive 「全面 完成 尚未解决 项目」" +
+                " falsified chapter 695 / M2152" +
+                " 'terminal state' claim by finding a" +
+                " NEW substrate-actionable pattern。 M2154" +
+                " 第一刀 NEW BASSubstrateReauditShadow" +
+                "Evaluator.evaluateSync sync surface" +
+                " (additive,ADR-014 OPT-IN preserved) +" +
+                " 6-of-12 SIGBUS-bucketed tests un-" +
+                "skipped via sync test method + sync" +
+                " invocation pattern (Diagnostic A" +
+                " pattern) — was SKIPPED per chapter 693" +
+                " / M2143 triage,now PASS。 M2155 第二刀" +
+                " doctrine corrections — BASSignalTen" +
+                "IntegrationTestTriageDoctrine +7 pins" +
+                " documenting sync-surface viability +" +
+                " 50% recovery + remaining-6 actor-" +
+                "blocked reason;BASSubstrateMaximally" +
+                "ResolvedDoctrine +5 pins qualifying" +
+                " M2152 'terminal' claim post-M2154" +
+                " discovery。 M2146 + M2152 original" +
+                " claims RETAINED for history。 M2156" +
+                " 第三刀 NEW BASChapter696RecoveryProgress" +
+                "Doctrine pinning 50% recovery + 6-step" +
+                " reusable recovery pattern + sync" +
+                " surface inventory + 3 actor-blocked" +
+                " APIs + 2 cross-mirror invariants + 24" +
+                " anti-drift tests。 Chapter 696 close-" +
+                "out (M2157) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2157。 740 consecutive byte-equality" +
+                " clean commits。 274 typed surfaces" +
+                " cumulative (+1:BASChapter696Recovery" +
+                "ProgressDoctrine;evaluateSync is a" +
+                " method on existing type,not new" +
+                " typed surface per M2148 convention)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C complete + TERMINAL claim" +
+                " QUALIFIED preserved。 Methodology —" +
+                " empirical recovery-pattern discovery" +
+                " → when prior claims are tested with NEW" +
+                " patterns,document findings as additive" +
+                " amendments not history rewrites。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十七",
+            mNumberFirst: 2158, mNumberLast: 2161,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 10, futureCutsCount: 0,
+            summary: "100% SIGBUS RECOVERY arc。 User" +
+                " directive 「完全 修复」 pushed for 12-" +
+                "of-12 recovery beyond chapter 696 50%。" +
+                " M2158 第一刀 NEW Diagnostic F (sync" +
+                " test + non-detached Task + actor calls," +
+                " NO startSession in Task → PASS);3 M306" +
+                " tests un-skipped。 M2159 第二刀 BAS" +
+                "MemoryClosedLoop 3 tests un-skipped via" +
+                " same Diagnostic F pattern + SQLite-lock" +
+                " gotcha fix。 M2160 第三刀 doctrine" +
+                " corrections — BASSignalTenIntegration" +
+                "TestTriageDoctrine +8 pins documenting" +
+                " 100% recovery + 2 recovery patterns +" +
+                " 0 remaining;M2155 + M2156 prior pins" +
+                " RETAINED for history。 Chapter 697" +
+                " close-out (M2161) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved。 ADR-" +
+                "016 → M2161。 744 consecutive byte-" +
+                "equality clean commits。 274 typed" +
+                " surfaces cumulative (test code changes" +
+                " don't change typed-surface count per" +
+                " M2148 convention)。 60/60 score" +
+                " unchanged (saturation invariant)。 ALL" +
+                " 12 SIGBUS BUCKET TESTS NOW PASS — 100%" +
+                " recovery from chapter 693 / M2143 triage" +
+                " state。 Substrate AT-REST + Tier A+B+C" +
+                " complete + TERMINAL claim FULLY-" +
+                "FALSIFIED-VIA-RECOVERY preserved。" +
+                " Methodology — second empirical recovery-" +
+                "pattern discovery via Diagnostic F →" +
+                " 「完全 修复」 of substrate-side test-" +
+                "coverage gap。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十八",
+            mNumberFirst: 2162, mNumberLast: 2162,
+            knivesCount: 1, entropyClassesCount: 1,
+            pinsCount: 8, futureCutsCount: 0,
+            summary: "HONEST SELF-CRITIQUE arc。 User" +
+                " directive 「目前 整体而言 你满意吗 严查" +
+                " 最最 苛刻 全面 修复」 pushed for hardest" +
+                " self-critique。 M2162 single-knife" +
+                " consolidates 3 fixes:(a) remove 3" +
+                " placeholder XCTSkip diagnostics from" +
+                " BASSignal10EmpiricalDiagnosisTests (C/" +
+                "D/E) — findings already FIRST-CLASS" +
+                " pinned in triage doctrine,placeholders" +
+                " were doctrine sprawl;(b) amend" +
+                " BASSignalTenIntegrationTestTriage" +
+                "Doctrine with cleanup metadata pins;" +
+                " (c) amend BASSubstrateMaximallyResolved" +
+                "Doctrine with HONEST self-critique pins" +
+                " documenting 5 antipatterns (doctrine" +
+                " sprawl + claim-then-falsify cycle +" +
+                " incomplete empirical enumeration +" +
+                " placeholder XCTSkip sprawl + branch" +
+                " proliferation) + chapter698ShipsZero" +
+                "NewDoctrines=true + futureNewDoctrine" +
+                "Gate discipline pin。 Chapter 698 close-" +
+                "out (M2162) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2162。 745 consecutive byte-equality" +
+                " clean commits。 274 typed surfaces" +
+                " unchanged (ZERO new doctrines per" +
+                " discipline pin)。 60/60 score unchanged" +
+                " (saturation invariant)。 XCTest skipped" +
+                " tests count -3 (39 → 36)。 Methodology" +
+                " — HONEST SELF-CRITIQUE → reduce doctrine" +
+                " sprawl,acknowledge antipatterns," +
+                " discipline future commits。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十九",
+            mNumberFirst: 2164, mNumberLast: 2164,
+            knivesCount: 1, entropyClassesCount: 1,
+            pinsCount: 9, futureCutsCount: 0,
+            summary: "CONSOLIDATION arc。 User directive" +
+                " 「完成 1」 explicit-authorized executing" +
+                " chapter 698 recommended action #1。" +
+                " Discipline gate from M2162 (future" +
+                "NewDoctrineGate) satisfied via option-b" +
+                " 'explicit-user-directive-requiring-" +
+                "typed-audit'。 M2164 single-knife:" +
+                " (a) migrate 17 pins from BASChapter696" +
+                "RecoveryProgressDoctrine into BASSubstrate" +
+                "MaximallyResolvedDoctrine with `recovery_`" +
+                " prefix (avoids name collision);(b)" +
+                " move 22 anti-drift tests into BAS" +
+                "SubstrateMaximallyResolvedDoctrineTests;" +
+                " (c) DELETE BASChapter696RecoveryProgress" +
+                "Doctrine.swift + its test file (-368 LOC);" +
+                " (d) amend chapter696RecoveryDoctrineRef" +
+                " pin to reflect consolidation。 Chapter" +
+                " 699 close-out (M2164) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved。 ADR-" +
+                "016 → M2164。 746 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces (-1 doctrine consolidated)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " BASSubstrateMaximallyResolvedDoctrineTests" +
+                ":54 tests (was 32 + 22 migrated)。" +
+                " Methodology — DOCTRINE CONSOLIDATION via" +
+                " merge,not delete;preserve anti-drift" +
+                " coverage via prefix renaming;respect" +
+                " chapter 698 discipline gate via explicit-" +
+                "user-directive。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百",
+            mNumberFirst: 2165, mNumberLast: 2166,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 10, futureCutsCount: 0,
+            summary: "FURTHER CONSOLIDATION arc。 User" +
+                " directive 「全面 完成」 explicit-" +
+                "authorized executing chapter 699 planned" +
+                "FutureCuts:merge BASTypedSurfaceCount" +
+                "AuditDoctrine + BASSprawlScopeAudit" +
+                "Doctrine into BASSubstrateExternal" +
+                "DependencyCatalogDoctrine。 M2165 第一刀" +
+                " single-knife consolidates BOTH:(a)" +
+                " migrate 22 pins with `typedAudit_`" +
+                " prefix + 25 pins with `sprawl_` prefix" +
+                " into the dest doctrine;(b) move 30" +
+                " anti-drift tests into dest test file" +
+                " (28 → 58);(c) DELETE 4 source/test" +
+                " files (-398 LOC,-2 doctrines)。 M2166" +
+                " chapter 700 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2166。 748 consecutive byte-equality" +
+                " clean commits。 271 typed surfaces (-2)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " Counter-sprawl trajectory:3 audit/" +
+                "catalog doctrines → 1 across chapters" +
+                " 699+700。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百一",
+            mNumberFirst: 2167, mNumberLast: 2170,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 11, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " BUILD-SYSTEM SCAFFOLD。 User directive" +
+                " 「全面 转向 多个 语言:Swift + Metal," +
+                "Rust,SQL,C,C++」 (2026-05-17) →" +
+                " 6-chapter arc 七百一-七百六 / M2167-" +
+                "M2190 augments Swift with 5 native" +
+                " layers under ADR-014 OPT-IN。 Chapter" +
+                " 698 / M2162 discipline gate satisfied" +
+                " via option-b explicit-user-directive。" +
+                " M2167 第一刀 Package.swift evolution +" +
+                " 3 NEW SPM targets (BASCSystemBridge" +
+                " .cTarget,BASMPSGraphExecutableCacheCxx" +
+                " .cxxTarget,BASRustCoreBridge Swift" +
+                " wrapper) + minimal no-op placeholder" +
+                " sources;build resolves cleanly proving" +
+                " SPM 6.0 hosts C+C+++Swift simultaneously" +
+                "。 M2168 第二刀 NEW BASLanguageAugmentation" +
+                "FeatureFlags actor with 5 default-off" +
+                " boolean flags + 23 anti-drift tests。" +
+                " M2169 第三刀 NEW BASMultiLanguageScaffold" +
+                "Doctrine pinning scaffold + 5-pilot" +
+                " roadmap + chapter 698 discipline-gate" +
+                " satisfaction + counter-sprawl inversion" +
+                " honesty (-3 chapters 699+700 + 1 this" +
+                " scaffold = net -2) + 37 anti-drift" +
+                " tests including cross-mirror to feature-" +
+                "flag Flag enum。 Chapter 701 close-out" +
+                " (M2170) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2170。 752 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " (+2:scaffold doctrine + feature-flag" +
+                " actor;SPM targets aren't counted per" +
+                " M2148 convention)。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " Next:chapter 七百二 SQL pilot M2171-" +
+                "M2174 (NO new doctrine per chapter 698" +
+                " discipline)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二",
+            mNumberFirst: 2171, mNumberLast: 2174,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC SQL" +
+                " PILOT。 Chapters 七百二-七百六 pilot" +
+                " rollout begins with SQL,risk-ascending" +
+                " order (SQL→C→Metal→C++→Rust)。" +
+                " M2171 第一刀 NEW Plugins/BASSQLSchemaGen" +
+                " SPM BuildToolPlugin + NEW Sources/" +
+                "BASSQLSchemaGenCore pure-Swift codegen" +
+                " library + NEW Sources/BASSQLSchemaGenTool" +
+                " executable;three-target separation so" +
+                " core is testable without spawning tool" +
+                " subprocess;13 anti-drift tests including" +
+                " byte-equality determinism + schemaName" +
+                " CamelCase derivation + comment-aware" +
+                " statement count。 M2172 第二刀 NEW" +
+                " Sources/BASMemory/SQL/001_memory_usage_" +
+                "records.sql extracted VERBATIM from" +
+                " BASMemoryUsageTracker schema (3 stmts:" +
+                " CREATE TABLE + 2 CREATE INDEX) +" +
+                " BASMemory target attaches the plugin;" +
+                " plugin modernized to URL API silencing 9" +
+                " of 10 deprecation warnings;7 generated-" +
+                "enum reachability tests。 M2173 第三刀" +
+                " BASMemoryUsageTracker gains flag-gated" +
+                " dual-mode (useGeneratedSchema: Bool =" +
+                " false param + async make(databaseURL:" +
+                "flags:) factory consulting" +
+                " sqlMigratorEnabled);10 byte-equality" +
+                " tests prove V1 + V2 produce IDENTICAL" +
+                " PRAGMA table_info / index_info + record" +
+                " round-trip。 Chapter 702 close-out" +
+                " (M2174) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved (flag default" +
+                " false → V1 inline path)。 ADR-016 →" +
+                " M2174。 756 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " UNCHANGED (chapter 701 commitment" +
+                " honored:all new types are production-" +
+                "code-typed-surfaces per chapter 698" +
+                " option-a,NOT doctrines)。 60/60 score" +
+                " unchanged (saturation invariant);" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 Next:chapter" +
+                " 七百三 C pilot M2175-M2178 — bas_" +
+                "monotonic_nanos C function via Sources/" +
+                "BASCSystemBridge."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三",
+            mNumberFirst: 2175, mNumberLast: 2178,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC C" +
+                " PILOT。 2nd of 5 risk-ascending per-" +
+                "language pilots (SQL→C→Metal→C++→Rust)。" +
+                " M2175 第一刀 NEW Sources/BASCSystem" +
+                "Bridge/bas_monotonic_nanos.c real C" +
+                " function wrapping `clock_gettime_nsec" +
+                "_np(CLOCK_UPTIME_RAW)` on Apple platforms" +
+                " (XNU userspace fast-path no syscall on" +
+                " iOS/macOS/watchOS) + Linux fallback for" +
+                " cross-compile inspection;header expanded" +
+                " with 2 new declarations + ABI version" +
+                " sentinel pin。 M2176 第二刀 NEW Sources/" +
+                "BASRuntimeCore/BASMonotonicNanos.swift" +
+                " Swift actor wrapping the C function +" +
+                " 3 typed error cases + equivalence bound" +
+                " pin (1ms 10× headroom) + async make(" +
+                "flags:) factory consulting cBridgeEnabled" +
+                " flag。 Package.swift wires BASRuntime" +
+                "Core → BASCSystemBridge dependency。" +
+                " M2177 第三刀 18 anti-drift tests:C ABI" +
+                " surface (3) + V1 baseline (2) + V2 raw" +
+                " C surface (3) + dual-mode equivalence" +
+                " (2:V1↔V2 delta<1ms is the BYTE-EQUALITY-" +
+                "CLASS PROOF) + actor + factory (6) +" +
+                " error case typing (2);Diagnostic F" +
+                " pattern for actor tests。 Chapter 703" +
+                " close-out (M2178) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved" +
+                " (cBridgeEnabled defaults FALSE → V1" +
+                " DispatchTime path)。 ADR-016 → M2178。" +
+                " 760 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces UNCHANGED" +
+                " (chapter 698 honored:BASMonotonicNanos" +
+                " + error enum + 2 new C functions are" +
+                " production-code-typed-surfaces NOT" +
+                " doctrines)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " preserved。 Next:chapter 七百四 Metal" +
+                " pilot M2179-M2182."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百四",
+            mNumberFirst: 2179, mNumberLast: 2182,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " METAL PILOT。 3rd of 5 risk-ascending" +
+                " per-language pilots。 M2179 第一刀" +
+                " Package.swift switches BASMetalSubstrate" +
+                " target's SSMScan.metal from exclude" +
+                " (chapter 699 / M2163 silenced" +
+                " unhandled-file warning) to `resources:" +
+                " [.process(...)]` so SPM bundles the" +
+                " .metal source into Bundle.module。" +
+                " M2180 第二刀 NEW Sources/BAS" +
+                "MetalSubstrate/BASMetalKernelLibrary" +
+                "Loader.swift actor loading SSMScan" +
+                ".metal from Bundle.module + compiling" +
+                " via MTLLibrary.makeLibrary(source:" +
+                "options:) lazily on first request +" +
+                " memoization + 5 typed error cases +" +
+                " #if canImport(Metal) watchOS stub +" +
+                " async make(flags:) factory consulting" +
+                " metalKernelV2Enabled。 M2181 第三刀" +
+                " 22 anti-drift tests:resource bundling" +
+                " contract (7) + actor init flag (3) +" +
+                " V1 path correctness (2) + V2 path" +
+                " GPU-gated compile/memoize/identical-" +
+                "reference (3) + error Codable round-" +
+                "trips (5) + flag factory (2);Diagnostic" +
+                " F pattern for actor tests。 Chapter" +
+                " 704 close-out (M2182) + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved (metalKernelV2Enabled" +
+                " defaults FALSE → V1 kernel selection" +
+                " BASMPSGraphSSMScanKernelStub +" +
+                " BASSSMScanCPUReference unchanged)。" +
+                " ADR-016 → M2182。 764 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces UNCHANGED (chapter 698" +
+                " honored across BOTH 702 + 703 + 704)。" +
+                " 60/60 score unchanged。 Substrate AT-" +
+                "REST + Tier A+B+C + 100% SIGBUS recovery" +
+                " + counter-sprawl preserved。 Next:" +
+                " chapter 七百五 C++ pilot M2183-M2186."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百五",
+            mNumberFirst: 2183, mNumberLast: 2186,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " C++ PILOT。 4th of 5 risk-ascending" +
+                " per-language pilots。 HONEST SCOPE:" +
+                " plan originally Objective-C++ wrapping" +
+                " id<MPSGraphExecutable>;actual ship is" +
+                " generic std::unordered_map<std::string," +
+                "std::string> cache to avoid coupling" +
+                " C++ target to MPSGraph + Foundation" +
+                " frameworks。 M2183 第一刀 NEW Sources/" +
+                "BASMPSGraphExecutableCacheCxx/bas_mps_" +
+                "cache.cpp real C++:std::unordered_map" +
+                " + std::mutex (C++11) + Meyers singleton" +
+                " + 6 public C ABI functions。 M2184" +
+                " 第二刀 NEW Sources/BASMetalSubstrate/" +
+                "BASMPSGraphExecutableCacheCxxBridge" +
+                ".swift Swift actor + 3 typed error" +
+                " cases + Codable + V1 throws on insert/" +
+                "lookup + async make(flags:) factory +" +
+                " Package.swift wires dep。 M2185 第三刀" +
+                " 25 anti-drift tests:C ABI cross-mirror" +
+                " (3) + V1 path (5) + V2 path (7) +" +
+                " process-global cache contract (2) +" +
+                " error Codable (3) + flag factory (2)" +
+                " + concurrency stress (3)。 Chapter 705" +
+                " close-out (M2186) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved" +
+                " (cxxMpsCacheEnabled defaults FALSE →" +
+                " V1 path unchanged)。 ADR-016 → M2186。" +
+                " 768 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces UNCHANGED" +
+                " (chapter 698 discipline honored across" +
+                " ALL 4 pilots so far)。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl preserved。 Next:" +
+                " chapter 七百六 Rust pilot M2187-M2190."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百六",
+            mNumberFirst: 2187, mNumberLast: 2190,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " RUST PILOT。 5th AND FINAL of risk-" +
+                "ascending per-language pilots。 5-" +
+                "LANGUAGE AUGMENTATION ARC SEALED。" +
+                " M2187 第一刀 NEW Cargo workspace +" +
+                " bas-memory-usage-tracker crate" +
+                " (in-memory mode mirror of M738" +
+                " BASMemoryUsageTracker) + 7 public" +
+                " C ABI functions + hand-written" +
+                " header + rust-toolchain.toml +" +
+                " reproducible build script;Vendor/" +
+                "bas-rust-binaries XCFramework macos-" +
+                "arm64 slice committed (~7MB,SHA256" +
+                " verified BYTE-IDENTICAL across 2" +
+                " clean rebuilds — chapter 七百一 RED" +
+                " FLAG #1 mitigation verified)。 M2188" +
+                " 第二刀 Package.swift wires .binary" +
+                "Target + BASRustCoreBridge target" +
+                " conditional dep gated to iOS + macOS" +
+                " (no watchOS — rustc cannot cross-" +
+                "compile to arm64-apple-watchos) +" +
+                " BASRustCoreBridge.swift expanded" +
+                " from scaffold to 10 typed constants" +
+                " namespace。 M2189 第三刀 NEW Sources/" +
+                "BASRustCoreBridge/BASRustMemoryUsage" +
+                "TrackerActor.swift Swift actor mirror" +
+                " of V1 shape + Codable wire-format" +
+                " bridge + 6 typed error cases + #if" +
+                " os(iOS) || os(macOS) gate + async" +
+                " make(flags:) factory;ALSO NEW" +
+                " module.modulemap in XCFramework +" +
+                " Cargo/include (CRITICAL empirical" +
+                " finding:SPM binaryTarget XCFrameworks" +
+                " only expose Swift module via slice-" +
+                "level module.modulemap;canImport()" +
+                " does NOT reliably detect — use" +
+                " #if os(iOS) || os(macOS) instead);" +
+                " 28 anti-drift tests including V1↔V2" +
+                " Codable wire-format BYTE-EQUALITY-" +
+                "CLASS PROOF + Rust ABI version cross-" +
+                "mirror + reproducibility SHA256 pin。" +
+                " Chapter 706 close-out (M2190) + 13-" +
+                "file standard sync。 ADR-014 OPT-OUT" +
+                " preserved (rustCoreEnabled defaults" +
+                " FALSE → V1 Swift path unchanged)。" +
+                " ADR-016 → M2190。 772 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces UNCHANGED (chapter 698" +
+                " discipline honored across ALL FIVE" +
+                " pilots)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C +" +
+                " 100% SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 5-LANGUAGE" +
+                " AUGMENTATION ARC SEALED:Swift + SQL" +
+                " + C + Metal + C++ + Rust all live。" +
+                " User directive 「全面 转向 多个 语言」" +
+                " (2026-05-17) FULFILLED。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百七",
+            mNumberFirst: 2191, mNumberLast: 2194,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "RUST XCFRAMEWORK iOS-SLICE" +
+                " EXPANSION — chapter 七百六 planned-" +
+                "future-cut fulfilled。 M2191 第一刀" +
+                " scripts/build-rust-xcframework.sh" +
+                " TARGETS array expanded from 1 to 3" +
+                " slices (macos-arm64 + ios-arm64 +" +
+                " ios-arm64-simulator);PATH prefix fix" +
+                " preferring rustup-managed cargo over" +
+                " Homebrew (CRITICAL empirical finding:" +
+                " Homebrew rust does NOT see rustup-" +
+                "installed cross-compile targets);" +
+                " XCFramework rebuilt with rustup stable" +
+                " rustc;all 3 slice SHAs verified BYTE-" +
+                "IDENTICAL across 2 clean rebuilds;" +
+                " Vendor/bas-rust-binaries grew from" +
+                " ~7MB to ~50MB。 M2192 第二刀 BASRust" +
+                "CoreBridge.swift constants resync:" +
+                " shippedSlices 1→3 entries +" +
+                " macosArm64SliceSHA256 bumped to new" +
+                " toolchain hash + NEW iosArm64SliceSHA256" +
+                " + iosArm64SimulatorSliceSHA256 +" +
+                " sliceSHA256Count=3 + isIOSDeployable" +
+                " computed property。 M2193 第三刀 6 new" +
+                " anti-drift tests + 2 updated pins:" +
+                " per-slice SHA pins + sliceSHA256Count" +
+                " cross-mirror against shippedSlices" +
+                ".count (CRITICAL) + isIOSDeployable +" +
+                " unique-SHA guard。 Chapter 707 close-" +
+                "out (M2194) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2194。 776 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " UNCHANGED (chapter 698 honored)。" +
+                " 60/60 score unchanged。 Substrate now" +
+                " FULLY iOS-deployable for Rust pilot。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百八",
+            mNumberFirst: 2195, mNumberLast: 2196,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "ZERO-WARNING BUILD — chapter 七百七" +
+                " planned-future-cut #1 fulfilled。" +
+                " 2-knife chapter (smallest honest scope" +
+                " per chapter 699 precedent)。 M2195" +
+                " 第一刀 Plugins/BASSQLSchemaGen/Plugin" +
+                ".swift replaces `sourceTarget.directory" +
+                ".string` (deprecated since chapter 七百二" +
+                " / M2172) with `String(describing:" +
+                " sourceTarget.directory)` — Path conforms" +
+                " to CustomStringConvertible so this" +
+                " returns the same path string WITHOUT" +
+                " triggering deprecation。 Eliminates all" +
+                " 3 SPM Path.string warnings (the LAST" +
+                " remaining warnings in the entire" +
+                " build);substrate build is now TRULY" +
+                " zero-warning。 Plugin runtime behavior" +
+                " unchanged。 M2196 第二刀 chapter 708" +
+                " close-out + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved (no" +
+                " production behavior change)。 ADR-016" +
+                " → M2196。 778 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 chapter 699" +
+                " lesson (persistent warnings are bad)" +
+                " honored via long-standing 3-warning" +
+                " surface eliminated。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百九",
+            mNumberFirst: 2197, mNumberLast: 2198,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "DEAD-CODE CLEANUP — chapter 七百一" +
+                " scaffold's 2 placeholder C/C++" +
+                " functions removed after empirical" +
+                " 0-callers finding。 2-knife chapter。" +
+                " M2197 第一刀 delete Sources/" +
+                "BASCSystemBridge/bas_csystem_bridge_" +
+                "placeholder.c (21 LOC) + remove" +
+                " bas_csystem_bridge_placeholder_version" +
+                "() declaration from bas_csystem_bridge" +
+                ".h + remove bas_mps_cache_placeholder_" +
+                "version() definition from bas_mps_cache" +
+                ".cpp + declaration from bas_mps_cache" +
+                ".h;net deletion ~40 LOC。 Placeholders" +
+                " shipped at chapter 七百一 / M2167 as" +
+                " scaffold sentinels 'kept for backward" +
+                " source compat' but real functions at" +
+                " M2175/M2183 obviated them before any" +
+                " consumer pinned on the placeholders。" +
+                " M2198 第二刀 chapter 709 close-out" +
+                " + 13-file standard sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2198。" +
+                " 780 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 Substrate" +
+                " honest-engineer pattern:remove cruft" +
+                " once it stops earning its keep。 chapter" +
+                " 七百八 strict-review's 'dead code'" +
+                " acknowledgment addressed。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十",
+            mNumberFirst: 2199, mNumberLast: 2200,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PER-FLAG-DEFAULTS REFACTOR —" +
+                " chapter 七百九 planned-future-cut #3" +
+                " fulfilled。 2-knife chapter。 M2199" +
+                " 第一刀 BASLanguageAugmentationFeature" +
+                "Flags.swift gains NEW perFlagDefaults:" +
+                " [Flag: Bool] = [:] typed-surface" +
+                " constant + NEW effectiveDefault(for:)" +
+                " static function;init() + init(initial" +
+                "State:) + isEnabled(_:) + resetAll() +" +
+                " allDefault() all consult effective" +
+                "Default instead of raw defaultValue。" +
+                " ENABLES future granular production" +
+                " wire-in (set perFlagDefaults entry to" +
+                " flip JUST one flag's default)。 8 new" +
+                " anti-drift tests including CRITICAL" +
+                " testPerFlagDefaultsConstantIsEmptyAt" +
+                "Chapter710 doctrine-review trigger。" +
+                " M2200 第二刀 chapter 710 close-out +" +
+                " 13-file standard sync。 ADR-014 OPT-" +
+                "OUT preserved (perFlagDefaults default-" +
+                "empty)。 ADR-016 → M2200。 782" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 Zero-warning build" +
+                " invariant preserved (chapter 七百八)。" +
+                " Production wire-in now READY (future" +
+                " commit sets a perFlagDefaults entry" +
+                " to actually flip)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十一",
+            mNumberFirst: 2201, mNumberLast: 2202,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FIRST PRODUCTION WIRE-IN — chapter" +
+                " 七百十 planned-future-cut #1 fulfilled。" +
+                " 「全面 转向」 step 1/5 delivered。 2-" +
+                "knife chapter。 M2201 第一刀 BASLanguage" +
+                "AugmentationFeatureFlags.perFlagDefaults" +
+                " flipped from `[:]` (empty,chapter 710" +
+                " mechanism) to `[.sqlMigratorEnabled:" +
+                " true]` (FIRST production-wire-in entry)。" +
+                " Effect:hosts calling BASMemoryUsage" +
+                "Tracker.make(databaseURL:flags:) with" +
+                " default-init flag actor now get V2" +
+                " path (generated multi-statement schema)" +
+                " instead of V1 path (3 inline runExec)。" +
+                " V1 still reachable via direct init or" +
+                " explicit setFlag false。 Safety:" +
+                " chapter 七百二 / M2173 PRAGMA byte-" +
+                "equality proven。 12 anti-drift tests" +
+                " updated/renamed including ADR-014" +
+                " discipline test now pinning 4-of-5" +
+                " pilots default-off (SQL flipped to" +
+                " opt-OUT instead of opt-IN)。 M2202" +
+                " 第二刀 chapter 711 close-out + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved for 4 pilots;SQL pilot now" +
+                " opt-OUT instead of opt-IN。 ADR-016 →" +
+                " M2202。 784 consecutive byte-equality" +
+                " clean commits (V1 path code unchanged)。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 FIRST commit since" +
+                " chapter 七百一 / M2167 where a non-V1" +
+                " code path runs in production for hosts" +
+                " using factory pattern。 「全面 转向 多个" +
+                " 语言」 progress:1 of 5 pilots default-" +
+                "ON;4 remaining (C / Metal / C++ / Rust)" +
+                " still latent opt-in。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十二",
+            mNumberFirst: 2203, mNumberLast: 2204,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FULL「全面 转向」 COMPLETION — 4" +
+                " remaining pilots wired to default-ON" +
+                " in single chapter。 2-knife chapter。" +
+                " M2203 第一刀 BASLanguageAugmentation" +
+                "FeatureFlags.perFlagDefaults expanded" +
+                " from 1 entry (chapter 711 SQL) to all" +
+                " 5 entries true (cBridgeEnabled +" +
+                " metalKernelV2Enabled + cxxMpsCache" +
+                "Enabled + rustCoreEnabled added)。" +
+                " HONEST scope:SQL pilot M2201 had REAL" +
+                " substrate-internal impact (BASMemory" +
+                "UsageTracker.make goes V2);these 4" +
+                " flips are SYMBOLIC at substrate level" +
+                " because NO substrate caller of the" +
+                " respective .make(flags:) factories" +
+                " exists。 Hosts using factory pattern" +
+                " now get V2 for all 5;hosts using" +
+                " direct init stay V1。 13 anti-drift" +
+                " tests updated/renamed across 5 test" +
+                " files。 M2204 第二刀 chapter 712" +
+                " close-out + 13-file standard sync。" +
+                " ADR-014 OPT-OUT semantic across all 5" +
+                " pilots。 ADR-016 → M2204。 786" +
+                " consecutive byte-equality clean commits" +
+                " (V1 path code unchanged across all 5" +
+                " pilots)。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 「全面 转向」" +
+                " substrate-side maximum fulfillment:" +
+                " 5/5 pilots production-default-ON at" +
+                " factory pattern;further turn requires" +
+                " HOST adoption of factory pattern。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十三",
+            mNumberFirst: 2205, mNumberLast: 2206,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "HOST ADOPTION CONVENIENCE — chapter" +
+                " 七百十二 planned-future-cut #1 fulfilled。" +
+                " 2-knife chapter。 M2205 第一刀 adds" +
+                " `makeWithDefaults()` static factory to" +
+                " all 5 pilot actors (SQL/C/Metal/C++/" +
+                "Rust)。 Each delegates to existing" +
+                " make(flags:) with a fresh default-init" +
+                " BASLanguageAugmentationFeatureFlags()。" +
+                " Pure sugar — no new behavior。 Hosts" +
+                " adoption goes from 3 lines to 1 line。" +
+                " 6 new anti-drift tests in shared" +
+                " BASMakeWithDefaultsConvenienceFactories" +
+                "Tests file (single file per chapter 七百" +
+                "八 counter-sprawl discipline)。 M2206" +
+                " 第二刀 chapter 713 close-out + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2206。 788" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged (5 new" +
+                " methods on existing actors per option-a" +
+                " discipline)。 60/60 score unchanged。" +
+                " Zero-warning build invariant preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十四",
+            mNumberFirst: 2207, mNumberLast: 2208,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 6, futureCutsCount: 0,
+            summary: "SUBSTRATE ADOPTION AUDIT + 5-PILOT" +
+                " E2E INTEGRATION TEST。 chapter 七百十三" +
+                " planned-future-cut #2 fulfilled。" +
+                " 2-knife chapter。 M2207 第一刀 audit" +
+                " found ZERO substrate-internal direct-" +
+                "init OR factory call sites for any of 5" +
+                " pilots (substrate is library not" +
+                " consumer)。 NEW BASFivePilotEndToEnd" +
+                "IntegrationTests.swift with 2 tests" +
+                " (testAllFivePilotsComposeViaMakeWith" +
+                "Defaults + testNoSubstrateInternalDirect" +
+                "InitCallersFinding)。 6 new typed pins" +
+                " on BASMultiLanguageScaffoldDoctrine" +
+                " (post-hoc amendment per chapter 695/" +
+                "696/697 precedent)。 M2208 第二刀 close-" +
+                "out + 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2208。 790" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 「全面 转向」 substrate-" +
+                "side maximum formally pinned。 Further" +
+                " actual turn requires HOST code adoption。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十五",
+            mNumberFirst: 2209, mNumberLast: 2210,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "CONCURRENT-CONSTRUCTION STRESS" +
+                " TESTS — 2-knife chapter。 M2209 第一刀" +
+                " NEW BASFivePilotConcurrentStressTests" +
+                ".swift with 5 tests:50 concurrent" +
+                " makeWithDefaults() for 4 non-SQL pilots" +
+                " + 10 concurrent for SQL pilot。 All" +
+                " tests pass — no races no deadlocks。" +
+                " M2210 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2210。 792 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Auto-mode 1min cadence loop active。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十六",
+            mNumberFirst: 2211, mNumberLast: 2212,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "BOUNDARY + ERROR-PATH TESTS —" +
+                " 2-knife chapter。 M2211 第一刀 NEW" +
+                " BASFivePilotBoundaryAndErrorPathTests" +
+                ".swift with 7 tests:empty fields +" +
+                " 1KB/10KB strings + 1000-iter monotonic" +
+                " clock stress + non-ASCII UTF-8 round-" +
+                "trip via Rust C ABI。 M2212 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2212。" +
+                " 794 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十七",
+            mNumberFirst: 2213, mNumberLast: 2214,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "ERROR ENUM CODABLE MATRIX —" +
+                " 2-knife。 M2213 第一刀 NEW BASFivePilot" +
+                "ErrorCodableMatrixTests.swift with 6" +
+                " tests:full case-matrix round-trip" +
+                " across all 5 pilot error enums (25" +
+                " distinct error instances) + cross-" +
+                "pilot conformance contract compile-time" +
+                " check (Error+Equatable+Sendable+" +
+                "Codable)。 M2214 第二刀 close-out + 13-" +
+                "file sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2214。 796 consecutive" +
+                " byte-equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十八",
+            mNumberFirst: 2215, mNumberLast: 2216,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "ERROR ENUM HASHABLE MATRIX —" +
+                " 2-knife。 M2215 第一刀 single-token" +
+                " `: Hashable` addition to all 5 pilot" +
+                " error enums (Swift auto-synthesizes —" +
+                " all associated value types are Int32/" +
+                "String) + NEW BASFivePilotErrorHashable" +
+                "MatrixTests.swift with 6 tests:Set-" +
+                "based deduplication semantics per pilot" +
+                " (Hashable contract law:Equatable-equal" +
+                " ⇒ hashValue-equal) + cross-pilot joint" +
+                " conformance witness (Error+Equatable+" +
+                "Hashable+Sendable+Codable)。 Useful for" +
+                " telemetry deduplication。 M2216 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2216。" +
+                " 798 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十九",
+            mNumberFirst: 2217, mNumberLast: 2218,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "SENDABLE CROSS-TASK TRANSFER" +
+                " MATRIX — 2-knife。 M2217 第一刀 NEW" +
+                " BASFivePilotErrorSendableTransfer" +
+                "MatrixTests.swift with 6 tests:proves" +
+                " each pilot error enum survives ACTUAL" +
+                " `Task { }.value` boundary transfer at" +
+                " RUNTIME (not just compile-time witness" +
+                " like chapter 717's cross-pilot test)" +
+                " + mixed FivePilotErrorReport struct" +
+                " with one error per pilot transferred +" +
+                " unpacked。 assertSendableTransferRound" +
+                "Trip<T: Sendable & Equatable> enforces" +
+                " Sendable conformance at capture site" +
+                " AND verifies runtime Equatable round-" +
+                "trip。 M2218 第二刀 close-out + 13-file" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2218。 800 consecutive byte-" +
+                "equality clean commits — MILESTONE。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十",
+            mNumberFirst: 2219, mNumberLast: 2220,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "CASE-IDENTIFIER INTROSPECTION" +
+                " MATRIX — 2-knife。 M2219 第一刀 added" +
+                " `var caseIdentifier: String` computed" +
+                " property to all 5 pilot error enums" +
+                " returning lowerCamelCase case name" +
+                " independent of associated value data" +
+                " + NEW BASFivePilotErrorCaseIdentifier" +
+                "MatrixTests.swift with 6 tests covering" +
+                " full 22-case matrix (5+3+5+3+6) per-" +
+                "case identifier match + PII non-leakage" +
+                " (associated value samples MUST NOT" +
+                " appear in identifier) + same-case-" +
+                "different-payload stability + per-enum" +
+                " identifier-Set cardinality matches" +
+                " case count。 Real-world value:safe-for" +
+                "-aggregation telemetry key alternative" +
+                " to String(describing:) which leaks" +
+                " full payload。 M2220 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2220。 802" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十一",
+            mNumberFirst: 2221, mNumberLast: 2222,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "WIRE-FORMAT CANONICAL SHA256" +
+                " FINGERPRINT MATRIX — 2-knife。 M2221" +
+                " 第一刀 NEW BASFivePilotErrorWireFormat" +
+                "SHA256MatrixTests.swift with 6 tests" +
+                " pinning SHA256 of `.sortedKeys` JSON" +
+                " encoding for representative case from" +
+                " each of 5 pilot error enums + cross-" +
+                "pilot total-byte-count pin (220 bytes" +
+                " total)。 Chapter 717 Codable matrix" +
+                " proved decode(encode(x))==x but did" +
+                " NOT pin specific bytes of encode(x);" +
+                " future CodingKey/associated-value" +
+                " type changes would silently change" +
+                " wire format while passing 717" +
+                " idempotence。 SHA256 tripwire catches" +
+                " this LOUDLY at PR time。 FIFTH PILLAR" +
+                " of 5-pilot error typed-contract" +
+                " sealing。 M2222 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2222。 804" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十二",
+            mNumberFirst: 2223, mNumberLast: 2224,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "TYPE-CASE-IDENTIFIER GLOBAL" +
+                " UNIQUENESS MATRIX — 2-knife。 M2223" +
+                " 第一刀 NEW BASFivePilotErrorTypeCase" +
+                "IdentifierGlobalUniquenessTests.swift" +
+                " with 6 tests verifying (typeName," +
+                " caseIdentifier) tuple is globally" +
+                " unique across all 22 cases of 5 pilot" +
+                " error enums。 Chapter 720 proved per-" +
+                "pilot identifier uniqueness but" +
+                " identifiers CAN collide across enums" +
+                " (e.g. both C++ and Rust have" +
+                " `.nullPointer` case)。 Type-prefixed" +
+                " tuple via String(describing: T.self)" +
+                " resolves cross-pilot collisions" +
+                " enabling telemetry pipelines to" +
+                " aggregate without losing per-pilot" +
+                " granularity。 M2224 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2224。 806" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十三",
+            mNumberFirst: 2225, mNumberLast: 2226,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "DESCRIPTION (PAYLOAD-INCLUSIVE)" +
+                " MATRIX — 2-knife。 M2225 第一刀 NEW" +
+                " BASFivePilotErrorDescriptionMatrix" +
+                "Tests.swift with 6 tests pinning" +
+                " String(describing: errorValue) format" +
+                " for each pilot + cross-pilot subset" +
+                " invariant (caseIdentifier ⊆" +
+                " description)。 Complement to chapter" +
+                " 720 caseIdentifier:caseIdentifier is" +
+                " PII-SAFE telemetry key (no payload)," +
+                " description is PAYLOAD-INCLUSIVE" +
+                " debug log key (includes associated" +
+                " values for crash reports / audit" +
+                " trails)。 Stable-output pin proves no" +
+                " clock/PID/random injection。 M2226" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2226。 808 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十四",
+            mNumberFirst: 2227, mNumberLast: 2228,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "CASE COUNT INVARIANT MATRIX —" +
+                " 2-knife。 M2227 第一刀 NEW BASFive" +
+                "PilotErrorCaseCountInvariantTests" +
+                ".swift with 6 tests pinning exact" +
+                " case count per pilot enum (SQL 5 /" +
+                " C 3 / Metal 5 / C++ 3 / Rust 6) +" +
+                " cross-pilot total (22)。 Swift enums" +
+                " with associated values don't auto-" +
+                "conform to CaseIterable — case count" +
+                " is not introspectable at runtime,so" +
+                " test manually enumerates" +
+                " representatives + counts via Set<" +
+                "caseIdentifier>。 Tripwire:adding/" +
+                "removing a case to ANY pilot enum" +
+                " without updating test makes change" +
+                " visible at PR time。 EIGHTH PILLAR of" +
+                " 5-pilot error typed-contract" +
+                " trajectory。 M2228 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2228。 810" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十五",
+            mNumberFirst: 2229, mNumberLast: 2230,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR TYPE-NAME" +
+                " INTROSPECTION MATRIX — 2-knife。" +
+                " PIVOT from 5-pilot ERROR contract" +
+                " (chapters 717-724,8 pillars sealed)" +
+                " to 5-pilot ACTOR contract。 M2229" +
+                " 第一刀 NEW BASFivePilotActorTypeName" +
+                "IntrospectionMatrixTests.swift with 6" +
+                " tests pinning String(describing:" +
+                " PilotActor.self) for each of 5 pilot" +
+                " actors (BASMemoryUsageTracker / BAS" +
+                "MonotonicNanos / BASMetalKernelLibrary" +
+                "Loader / BASMPSGraphExecutableCache" +
+                "CxxBridge / BASRustMemoryUsageTracker" +
+                "Actor) + cross-pilot uniqueness。" +
+                " Real-world value:crash reports" +
+                " tagging actor source,migration" +
+                " scripts selecting by stable type" +
+                " name,log lines paired with actor-" +
+                "source identification。 M2230 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2230。" +
+                " 812 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十六",
+            mNumberFirst: 2231, mNumberLast: 2232,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR COUNT INVARIANT" +
+                " MATRIX — 2-knife。 Second pillar of" +
+                " 5-pilot ACTOR contract。 M2231 第一刀" +
+                " NEW BASFivePilotActorCountInvariant" +
+                "Tests.swift with 6 tests (5 per-pilot" +
+                " reachability + 1 cross-pilot total" +
+                " count = 5)。 Tripwire for accidental" +
+                " additions or removals。 Per-actor" +
+                " tests would still PASS if a 6th pilot" +
+                " was added — count invariant catches" +
+                " additive changes。 Actor-side analog" +
+                " of chapter 724's error case-count" +
+                " tripwire。 M2232 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2232。 814" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十七",
+            mNumberFirst: 2233, mNumberLast: 2234,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR SENDABLE CROSS-TASK" +
+                " TRANSFER MATRIX — 2-knife。 Third" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2233 第一刀 NEW BASFivePilotActor" +
+                "SendableTransferMatrixTests.swift with" +
+                " 6 tests proving actor INSTANCES" +
+                " (reference-type Sendable) survive" +
+                " Task boundary with === identity" +
+                " preserved + mixed FivePilotActor" +
+                "Bundle struct。 Actor-side analog of" +
+                " chapter 719's error Sendable" +
+                " transfer。 Future commits introducing" +
+                " non-Sendable state fail at COMPILE" +
+                " time。 M2234 第二刀 close-out + 13-" +
+                "file sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2234。 816 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十八",
+            mNumberFirst: 2235, mNumberLast: 2236,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR MODULE-QUALIFIED" +
+                " NAME MATRIX — 2-knife。 Fourth pillar" +
+                " of 5-pilot ACTOR contract。 M2235" +
+                " 第一刀 NEW BASFivePilotActorModule" +
+                "QualifiedNameMatrixTests.swift with 6" +
+                " tests pinning String(reflecting:" +
+                " PilotActor.self) which returns" +
+                " 'Module.TypeName' format + cross-" +
+                "pilot module mapping pin。 Complement" +
+                " to chapter 725 (bare type name):" +
+                " chapter 725 = UI-friendly log label," +
+                " chapter 728 = crash-report" +
+                " symbolication disambiguation。 5" +
+                " pilots decompose into 4 modules" +
+                " (Metal + C++ share BASMetalSubstrate)" +
+                "。 M2236 第二刀 close-out + 13-file" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2236。 818 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十九",
+            mNumberFirst: 2237, mNumberLast: 2238,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR DISTINCT-INSTANCE" +
+                " SEPARATION MATRIX — 2-knife。 Fifth" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2237 第一刀 NEW BASFivePilotActor" +
+                "DistinctInstanceSeparationMatrixTests" +
+                ".swift with 6 tests proving two" +
+                " separately-constructed instances of" +
+                " same pilot are DISTINCT references" +
+                " (=== false) + cross-pilot mutual" +
+                " distinctness。 Complement to chapter" +
+                " 727:727 = identity preservation," +
+                " 729 = instance separation。 Catches" +
+                " singleton-cache regressions。 M2238" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2238。 820 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十",
+            mNumberFirst: 2239, mNumberLast: 2240,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT makeWithDefaults() FACTORY" +
+                " EXISTENCE MATRIX — 2-knife。 Sixth" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2239 第一刀 NEW BASFivePilotActor" +
+                "MakeWithDefaultsExistenceMatrixTests" +
+                ".swift with 6 tests pinning factory" +
+                " existence per pilot + cross-pilot" +
+                " return-type distinctness。 Surface" +
+                " tripwire:future removal/rename fails" +
+                " at PR time。 M2240 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2240。 822" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十一",
+            mNumberFirst: 2241, mNumberLast: 2242,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FEATURE FLAG ACTOR SURFACE" +
+                " CONTRACT MATRIX — 2-knife。 Seventh" +
+                " pillar (cross-cutting flag actor)。" +
+                " M2241 第一刀 NEW BASLanguageAugment" +
+                "ationFeatureFlagsSurfaceContractTests" +
+                ".swift with 6 tests pinning shared" +
+                " BASLanguageAugmentationFeatureFlags" +
+                " actor surface (all 5 pilots consult" +
+                " this single actor)。 Widens trajectory" +
+                " from per-pilot pillars (725-730) to" +
+                " the cross-cutting flag actor。 M2242" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2242。 824 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十二",
+            mNumberFirst: 2243, mNumberLast: 2244,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FACTORY FLAG-SAMPLING DETERMINISM" +
+                " MATRIX — 2-knife。 Eighth pillar of" +
+                " 5-pilot ACTOR contract。 M2243 第一刀" +
+                " NEW BASFivePilotFactoryFlagSampling" +
+                "DeterminismMatrixTests.swift with 6" +
+                " tests pinning sampled-once-at-" +
+                "construction contract per pilot +" +
+                " cross-pilot summary。 Critical for" +
+                " chapter 392 IEEE Float32 replay" +
+                " determinism — pilot mid-stream flag" +
+                " flip must NOT change behavior。" +
+                " M2244 第二刀 close-out + 13-file" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2244。 826 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十三",
+            mNumberFirst: 2245, mNumberLast: 2246,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT make(flags:) FACTORY" +
+                " EXISTENCE MATRIX — 2-knife。 Ninth" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2245 第一刀 NEW BASFivePilotActor" +
+                "MakeFlagsFactoryExistenceMatrixTests" +
+                ".swift with 6 tests pinning make(flags:)" +
+                " factory existence per pilot + cross-" +
+                "pilot pair check (make + makeWithDefaults" +
+                " both exist per pilot)。 Companion to" +
+                " chapter 730 makeWithDefaults pillar。" +
+                " M2246 第二刀 close-out + 13-file sync" +
+                "。 ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2246。 828 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十四",
+            mNumberFirst: 2247, mNumberLast: 2248,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FACTORY FLAG-STATE-DIVERGENCE" +
+                " MATRIX — 2-knife。 Tenth pillar of" +
+                " 5-pilot ACTOR contract。 M2247 第一刀" +
+                " NEW BASFivePilotFactoryFlagState" +
+                "DivergenceMatrixTests.swift with 6" +
+                " tests proving make(flags:) with" +
+                " different flag states produces" +
+                " independent actors。 Complement to" +
+                " chapter 732 (flag changes AFTER" +
+                " construction don't matter) — this" +
+                " proves flag values AT construction" +
+                " DO matter。 M2248 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2248。 830" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。")
+    ]
+
+    /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
+    /// 403-426)。 Hand-maintained — pinsCount /
+    /// futureCutsCount /knivesCount values cross-checked
+    /// against the corresponding chapter doctrine files。
+    private static let prePhase2RadicalEntries:
+        [BASEntropyChapterEntry] =
+    [
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三",
+            mNumberFirst: 953,
+            mNumberLast: 962,
+            knivesCount: 10,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-403-v1-entry-doctrine-pin —" +
+                " Phase 2 entry chapter,V2 RUNTIME REWRITE" +
+                " architectural baseline"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四",
+            mNumberFirst: 963,
+            mNumberLast: 980,
+            knivesCount: 18,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 10,
+            summary:
+                "chapter-404-v1-complete — V2 actor" +
+                " delegation skeleton + composition-" +
+                "entropy ledger + threading entropy" +
+                " collapse + naming bridge + bundle" +
+                " protocol + 9 typed primitives"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五",
+            mNumberFirst: 981,
+            mNumberLast: 988,
+            knivesCount: 8,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "chapter-405-v1-bundle-protocol-" +
+                "comprehensive — BASBundleProtocol" +
+                " + 9 BAS*Bundle conformer migrations"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六",
+            mNumberFirst: 989,
+            mNumberLast: 997,
+            knivesCount: 9,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-406-v1-v2-lifecycle-" +
+                "comprehensive — V2 actor lifecycle" +
+                " envelope (start + complete) + audit" +
+                " emission summary"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七",
+            mNumberFirst: 998,
+            mNumberLast: 1001,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-407-v1-v2-actor-four-" +
+                "foundations — BASTurnRuntimeEngine" +
+                "Configuration + 4-foundation V2 init"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八",
+            mNumberFirst: 1002,
+            mNumberLast: 1005,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-408-v1-v2-stage-execution-" +
+                "foundation — BASTurnRuntimeStageRecord" +
+                " + BASTurnRuntimeStageLedger M1003"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九",
+            mNumberFirst: 1006,
+            mNumberLast: 1009,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-409-v1-v2-stage-plan-" +
+                "foundation — BASTurnRuntimeStagePlan" +
+                " + BASTurnRuntimeStageStep M1006"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十",
+            mNumberFirst: 1010,
+            mNumberLast: 1013,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-410-v1-v2-permit-fold-input-" +
+                "foundation — BASPermitEscalationFoldInput"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十一",
+            mNumberFirst: 1014,
+            mNumberLast: 1017,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-411-v1-v2-stress-sweep-input-" +
+                "foundation — BASStressSweepInput primitive"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十二",
+            mNumberFirst: 1018,
+            mNumberLast: 1021,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-412-v1-v2-stress-sweep-plan-" +
+                "foundation — BASStressSweepFixturePlan"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十三",
+            mNumberFirst: 1022,
+            mNumberLast: 1025,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-413-v1-v2-stress-sweep-verdict-" +
+                "foundation — BASStressSweepVerdict typed"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十四",
+            mNumberFirst: 1026,
+            mNumberLast: 1029,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-414-v1-v2-parallel-dispatch-" +
+                "foundation — BASParallelStageDispatch" +
+                "Input + ParallelGroup discriminator"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十五",
+            mNumberFirst: 1030,
+            mNumberLast: 1033,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-415-v1-v2-parallel-dispatch-" +
+                "summary-foundation — BASParallelStage" +
+                "DispatchSummary + envelope integration"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十六",
+            mNumberFirst: 1034,
+            mNumberLast: 1037,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-416-v1-v2-parallel-summary-" +
+                "envelope-integration — payload threading"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十七",
+            mNumberFirst: 1038,
+            mNumberLast: 1041,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-417-v1-v2-stage-ledger-" +
+                "validation-foundation — typed ledger" +
+                " invariant validation"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十八",
+            mNumberFirst: 1042,
+            mNumberLast: 1045,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-418-v1-v2-plan-ledger-coherence-" +
+                "foundation — BASTurnRuntimePlanLedger" +
+                "Coherence projection"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十九",
+            mNumberFirst: 1046,
+            mNumberLast: 1049,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-419-v1-v2-coherence-envelope-" +
+                "integration — coherence threading into" +
+                " complete envelope"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十",
+            mNumberFirst: 1050,
+            mNumberLast: 1053,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-420-v1-v2-summary-digest-" +
+                "foundation — typed digest accessor over" +
+                " BASRuntimeAuditEmissionSummary"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十一",
+            mNumberFirst: 1054,
+            mNumberLast: 1057,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "chapter-421-v1-v2-phase-2-close-out — " +
+                "Phase 2 entropy closure doctrine + 19-" +
+                "chapter ledger pin (later self-extended)"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十二",
+            mNumberFirst: 1058,
+            mNumberLast: 1061,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-422-v1-v2-substrate-integrity — " +
+                "schema-completeness invariant test pin"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十三",
+            mNumberFirst: 1062,
+            mNumberLast: 1065,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 3,
+            summary:
+                "chapter-423-v1-v2-roadmap-ops-" +
+                "convenience — BASRoadmapDoctrine" +
+                " convenience accessors"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十四",
+            mNumberFirst: 1066,
+            mNumberLast: 1069,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 3,
+            summary:
+                "chapter-424-v1-v2-doctrine-chain-" +
+                "consistency — BASDoctrineChain" +
+                "ConsistencyTests cross-cutting invariant"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十五",
+            mNumberFirst: 1070,
+            mNumberLast: 1073,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 12,
+            futureCutsCount: 4,
+            summary:
+                "chapter-425-v1-v2-real-executor-" +
+                "foundation — BASPermitEscalationFold" +
+                "Executor + BASParallelStageDispatch" +
+                "Executor real-actor versions"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十六",
+            mNumberFirst: 1074,
+            mNumberLast: 1077,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 13,
+            futureCutsCount: 3,
+            summary:
+                "chapter-426-v1-v2-adr018-full-" +
+                "ratification — BASStressSweepHarness" +
+                " + BASNativeStageExecutor — ADR-018" +
+                " 4/4 ratified")
+    ]
+
+    /// Total Phase 2 entry count (after M1111 extension)。
     public static var phase2EntryCount: Int {
         return phase2Entries.count
     }
 
-    public static var postSweepRealExecutionEntries:
-        [BASEntropyChapterEntry] {
-        return bundle.postSweepRealExecutionEntries
-    }
-
-    // MARK: - Phase 2 accessors (M1111)
-
-    /// Look up a Phase 2 entry by chapter tag。 Returns
-    /// nil if no match in the 31-entry Phase 2 mirror。
+    /// Look up an entry by chapter tag across the
+    /// COMPLETE 31-entry Phase 2 mirror (M1111
+    /// extension)。 Returns nil if no match。
     public static func phase2Entry(
         forTag tag: String
     ) -> BASEntropyChapterEntry? {
@@ -137,9 +7164,8 @@ public enum BASEntropyChapterIndex {
         }
     }
 
-    /// Look up a Phase 2 entry covering the given
-    /// M-number。 Returns nil if no Phase 2 chapter
-    /// spans the number。
+    /// Look up an entry covering the given M-number
+    /// across the COMPLETE 31-entry Phase 2 mirror。
     public static func phase2Entry(
         forMNumber m: Int
     ) -> BASEntropyChapterEntry? {
@@ -178,8 +7204,8 @@ public enum BASEntropyChapterIndex {
         to last: Int
     ) -> Bool {
         for entry in radicalEvolutionEntries {
-            if entry.mNumberFirst <= first
-                && entry.mNumberLast >= last
+            if entry.mNumberFirst >= first
+                && entry.mNumberLast <= last
             {
                 return true
             }

@@ -1,8 +1,5 @@
 import Foundation
 import CryptoKit
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustHashCore
 import BASRuntimeCore
 
 /// `BR-01` IntegritySentinel — the integrity-check frontend that
@@ -181,20 +178,7 @@ public actor BASSovereignIntegritySentinel {
     /// Compute the canonical SHA-256 hex hash used by the sentinel's
     /// fingerprint store. Provided as a static helper so callers can
     /// generate claims without depending on CryptoKit themselves.
-    ///
-    /// chapter 七百二 native-port — live path routes through Rust。
-    /// Legacy CryptoKit body preserved per 全comment 不要删除 directive。
     public static func hash(_ data: Data) -> String {
-        // LIVE PATH — Rust-sourced SHA256。
-        if let rust = try? BASRustLedgerCore.sha256(data) {
-            return rust.map { String(format: "%02x", $0) }.joined()
-        }
-        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-        /*
-         * Pre-chapter-702 Swift implementation:
-         *     let digest = SHA256.hash(data: data)
-         *     return digest.map { String(format: "%02x", $0) }.joined()
-         */
         let digest = SHA256.hash(data: data)
         return digest.map { String(format: "%02x", $0) }.joined()
     }

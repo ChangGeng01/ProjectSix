@@ -42,9 +42,6 @@
 
 import Foundation
 import CryptoKit
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustCoreBridge
 
 extension BASRuntimeAuditEmissionSummaryDigest {
 
@@ -70,25 +67,10 @@ extension BASRuntimeAuditEmissionSummaryDigest {
             return BASRuntimeAuditEmissionSummaryDigest
                 .empty(producedAt: producedAt)
         }
-        // chapter 七百二 native-port — Rust-sourced SHA256;
-        // legacy CryptoKit body preserved per 全comment 不要删除。
-        let hex: String
-        if let rust = try? BASRustLedgerCore.sha256(data) {
-            hex = rust.map { String(format: "%02x", $0) }
-                .joined()
-        } else {
-            // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-            /*
-             * Pre-chapter-702 Swift implementation:
-             *     let hash = SHA256.hash(data: data)
-             *     let hex = hash.map {
-             *         String(format: "%02x", $0)
-             *     }.joined()
-             */
-            let hash = SHA256.hash(data: data)
-            hex = hash.map { String(format: "%02x", $0) }
-                .joined()
-        }
+        let hash = SHA256.hash(data: data)
+        let hex = hash.map {
+            String(format: "%02x", $0)
+        }.joined()
         return BASRuntimeAuditEmissionSummaryDigest(
             algorithmName: algorithmRawName,
             digestString: hex,

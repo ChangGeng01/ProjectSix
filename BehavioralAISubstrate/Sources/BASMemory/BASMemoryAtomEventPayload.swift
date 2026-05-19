@@ -73,9 +73,6 @@
 import CryptoKit
 import Foundation
 import BASRuntimeCore
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustHashCore
 
 // MARK: - Operation enum
 
@@ -257,18 +254,7 @@ public struct BASMemoryAtomEventPayload:
     /// SHA256 of UTF-8 bytes,hex-encoded lowercase。Used for the
     /// content digest field。Same hash same input → byte-stable
     /// (chapter 三百九二 replay-determinism)。
-    ///
-    /// chapter 七百二 native-port — NIST-pinned: this surface is
-    /// asserted by `BASMemoryAtomEventPayloadTests` against the
-    /// canonical NIST FIPS 180-4 reference vector for SHA256("abc")。
-    /// The Rust-sourced `BASRustLedgerCore.sha256(_:)` helper uses a
-    /// length-prefixed-chain formula (SHA256(0x00*32 || u32_be(len)
-    /// || data)) which does NOT equal pure SHA256(data)。 Until a
-    /// pure-SHA256 FFI lands in the XCFramework,this site KEEPS the
-    /// CryptoKit body (no port)。 Documented here so future migration
-    /// commits don't re-attempt the swap blindly。
     public static func sha256Hex(_ s: String) -> String {
-        // NIST-pinned — stays on CryptoKit. See port-status note above.
         let bytes = Array(s.utf8)
         let digest = SHA256.hash(data: bytes)
         return digest.map { String(format: "%02x", $0) }.joined()

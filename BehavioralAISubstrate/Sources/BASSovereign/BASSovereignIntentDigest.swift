@@ -1,8 +1,5 @@
 import Foundation
 import CryptoKit
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit bodies preserved as `/* ... */` per 全comment 不要删除。
-import BASRustHashCore
 
 // M296.2.z — canonical intent-digest helpers for dual-key signing.
 //
@@ -38,20 +35,8 @@ public enum BASSovereignIntentDigest {
 
     /// Bare SHA-256 over the payload. Suitable when the caller
     /// wants direct control over what bytes get signed.
-    ///
-    /// chapter 七百二 native-port — live path routes through Rust;
-    /// legacy CryptoKit body preserved per 全comment 不要删除。
     public static func compute(payload: Data) -> Data {
-        // LIVE PATH — Rust-sourced SHA256。
-        if let rust = try? BASRustLedgerCore.sha256(payload) {
-            return rust
-        }
-        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-        /*
-         * Pre-chapter-702 Swift implementation:
-         *     Data(SHA256.hash(data: payload))
-         */
-        return Data(SHA256.hash(data: payload))
+        Data(SHA256.hash(data: payload))
     }
 
     /// SHA-256 over a UTF-8 string payload.
@@ -71,15 +56,6 @@ public enum BASSovereignIntentDigest {
         var combined = Data(intentName.utf8)
         combined.append(0x00) // unambiguous separator
         combined.append(payload)
-        // LIVE PATH — Rust-sourced SHA256。
-        if let rust = try? BASRustLedgerCore.sha256(combined) {
-            return rust
-        }
-        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-        /*
-         * Pre-chapter-702 Swift implementation:
-         *     return Data(SHA256.hash(data: combined))
-         */
         return Data(SHA256.hash(data: combined))
     }
 

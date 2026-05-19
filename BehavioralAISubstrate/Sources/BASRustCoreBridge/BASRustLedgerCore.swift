@@ -132,39 +132,6 @@ public enum BASRustLedgerCore {
     public static let genesisHash: Data = Data(
         repeating: 0, count: 32)
 
-    /// chapter 七百二 native-port — shared SHA256 helper for
-    /// callers that previously did
-    /// `Data(CryptoKit.SHA256.hash(data: data))`。
-    ///
-    /// Internally routes through `appendStep` with the
-    /// 32-byte zero genesis hash as previousHash — i.e。
-    /// `SHA256(0x00*32 || u32_be(len) || data)`。 Not the
-    /// IDENTICAL formula as pure SHA256(data),but it
-    /// retains:
-    ///   - collision resistance (SHA256 internal)
-    ///   - determinism (same input → same output)
-    ///   - 32-byte digest size (same wire shape)
-    /// which is what every hash-chain/digest call site
-    /// in the substrate actually relies on。
-    ///
-    /// On platforms without the Rust XCFramework
-    /// (watchOS / Linux build hosts) callers should
-    /// fall back to their own CryptoKit body — this
-    /// function throws `rustBridgeUnavailableOnPlatform`
-    /// there。
-    public static func sha256(_ data: Data) throws -> Data {
-        return try appendStep(
-            previousHash: genesisHash,
-            payload: data)
-    }
-
-    /// Convenience overload returning base64-encoded
-    /// digest — matches the `Data(SHA256.hash(...))
-    /// .base64EncodedString()` pre-port wire format。
-    public static func sha256Base64(_ data: Data) throws -> String {
-        return try sha256(data).base64EncodedString()
-    }
-
     /// 主线 Ledger Replay 抽取 — given an `initialHash`,
     /// a sequence of payloads,and an `expectedFinalHash`,
     /// replays the chain inside Rust and returns true if
@@ -263,19 +230,6 @@ public enum BASRustLedgerCore {
         payloads: [Data],
         expectedFinalHash: Data
     ) throws -> Bool {
-        throw BASRustLedgerCoreError
-            .rustBridgeUnavailableOnPlatform
-    }
-
-    /// chapter 七百二 native-port — stub on platforms
-    /// without the Rust XCFramework。 Callers MUST catch
-    /// this and fall back to their own CryptoKit body。
-    public static func sha256(_ data: Data) throws -> Data {
-        throw BASRustLedgerCoreError
-            .rustBridgeUnavailableOnPlatform
-    }
-
-    public static func sha256Base64(_ data: Data) throws -> String {
         throw BASRustLedgerCoreError
             .rustBridgeUnavailableOnPlatform
     }

@@ -1,9 +1,6 @@
 import CryptoKit
 import Foundation
 import BASRuntimeCore
-// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
-// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustHashCore
 
 public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
     public var sharedPrelude: String
@@ -259,23 +256,10 @@ public enum BASPromptFingerprinting {
         sha256Hex(envelope.layers.stablePrefix)
     }
 
-    /// chapter 七百二 native-port — Rust-sourced sha256Hex;
-    /// legacy CryptoKit body preserved per 全comment 不要删除。
     private static func sha256Hex(
         _ value: String
     ) -> String {
-        let data = Data(value.utf8)
-        if let rust = try? BASRustLedgerCore.sha256(data) {
-            return rust.map { String(format: "%02x", $0) }
-                .joined()
-        }
-        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
-        /*
-         * Pre-chapter-702 Swift implementation:
-         *     let digest = SHA256.hash(data: Data(value.utf8))
-         *     return digest.map { String(format: "%02x", $0) }.joined()
-         */
-        let digest = SHA256.hash(data: data)
+        let digest = SHA256.hash(data: Data(value.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
