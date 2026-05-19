@@ -515,7 +515,13 @@ let package = Package(
             // exposed to tests so BASRustMemoryUsage
             // TrackerActorTests can validate ABI surface +
             // Codable wire-format byte-equality vs V1。
-            "BASRustCoreBridge"
+            "BASRustCoreBridge",
+            // chapter 七百五 第五刀 — chapter-705 integration
+            // tests need bas_lsh_* + bas_flat_index_* symbols
+            // exposed by the C++ cache target,plus bas_spsc_ring_*
+            // exposed by the C system bridge target。
+            "BASMPSGraphExecutableCacheCxx",
+            "BASCSystemBridge"
         ])
     ]
 )
