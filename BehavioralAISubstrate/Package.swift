@@ -91,7 +91,19 @@ let package = Package(
             // serves it at runtime. The Swift adapter
             // (Phase B-3) loads it via MLModel(contentsOf:)。
             resources: [
-                .process("Resources/BASContextClassifier.mlmodel")
+                .process("Resources/BASContextClassifier.mlmodel"),
+                // chapter 七百二 第一刀 / M2167 — SQL pilot:
+                // chapter doctrine literal data + entropy
+                // chapter index ported to .sql resources。
+                // Original Swift literals preserved as /* */
+                // comments per 「目前 千万不要 删除 只能
+                // commented 代码」 directive。 Loader:
+                // BASChapterDoctrineSQLLoader.swift。
+                .process("SQL/010_chapter_doctrine_records_schema.sql"),
+                .process("SQL/011_chapter_doctrine_literals_data.sql"),
+                .process("SQL/012_chapter_doctrine_phase2_data.sql"),
+                .process("SQL/021_entropy_chapter_entries_schema.sql"),
+                .process("SQL/022_entropy_chapter_entries_data.sql")
             ]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
