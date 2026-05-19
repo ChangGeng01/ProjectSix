@@ -45,13 +45,21 @@ public struct BASAutoRouteThresholds:
     /// or above。 Measured M-series crossover ≈ 1024 bytes。
     public let sha256CryptoKitMinBytes: Int
 
+    /// Attention: use CPU below this M*N product,Metal at or
+    /// above。 Measured M-series crossover ≈ 64 (M=4,N=4 ⇒
+    /// CPU wins;M=16,N=16 ⇒ Metal wins)。
+    public let attentionMetalMinProduct: Int
+
     public init(
         cosineSIMDMinDim: Int = 64,
-        sha256CryptoKitMinBytes: Int = 1024
+        sha256CryptoKitMinBytes: Int = 1024,
+        attentionMetalMinProduct: Int = 64
     ) {
         self.cosineSIMDMinDim = max(1, cosineSIMDMinDim)
         self.sha256CryptoKitMinBytes =
             max(1, sha256CryptoKitMinBytes)
+        self.attentionMetalMinProduct =
+            max(1, attentionMetalMinProduct)
     }
 
     /// Default measured M-series thresholds。
@@ -70,6 +78,28 @@ public enum BASAutoRouteChoice:
     case swiftCryptoKit
     case rustPureSHA256
     case swiftNaive
+    /// chapter 七百七 第三刀 — attention routing。
+    case swiftCPUAttention
+    case metalStandardAttention
+    case metalFlashAttention
+}
+
+/// chapter 七百七 第三刀 — attention shape input。
+public struct BASAttentionShape:
+    Sendable, Equatable, Hashable, Codable
+{
+    public let M: Int
+    public let N: Int
+    public let D: Int
+    public let Dv: Int
+    public init(M: Int, N: Int, D: Int, Dv: Int) {
+        self.M = M
+        self.N = N
+        self.D = D
+        self.Dv = Dv
+    }
+    /// Used by the auto-router to gate CPU vs Metal。
+    public var workProduct: Int { return M * N }
 }
 
 /// Typed result struct emitted by every auto-route call。
@@ -193,6 +223,85 @@ public enum BASAutoRouteRanker {
         return BASAutoRouteResult(
             value: Array(digest),
             choice: .swiftCryptoKit)
+    }
+
+    // MARK: - Attention routing (chapter 七百七 第三刀)
+    //
+    // Pure-policy helper — returns the CHOICE the router would
+    // pick at this shape。 The actual Swift dispatcher lives on
+    // BASCognitiveBrain because it needs the actor's memoized
+    // Metal pipeline state。 Hosts compose like this:
+    //
+    //   let choice = BASAutoRouteRanker.attentionChoice(
+    //       shape: BASAttentionShape(...), thresholds: ...)
+    //   switch choice {
+    //   case .swiftCPUAttention: …call CPU path…
+    //   case .metalFlashAttention: …call Metal flashAttention…
+    //   default: …
+    //   }
+    //
+    // Auto-routed `brain.attentionAuto(...)` does this internally。
+    public static func attentionChoice(
+        shape: BASAttentionShape,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteChoice {
+        // Tiny workloads → CPU wins because Metal pipeline
+        // dispatch overhead (~150 μs) dominates the compute。
+        if shape.workProduct
+            < thresholds.attentionMetalMinProduct
+        {
+            return .swiftCPUAttention
+        }
+        // FlashAttention dominates the standard kernel at
+        // every shape where Metal beats CPU,so always pick
+        // it when going to GPU。 Head-dim cap (64) is enforced
+        // by the dispatcher;callers exceeding it should
+        // explicitly use .metalStandardAttention via the
+        // standard `brain.attention(...)` entry。
+        return .metalFlashAttention
+    }
+
+    /// CPU reference attention — pure-function。 Provides the
+    /// fallback when Metal isn't available + the slow-but-
+    /// correct ground truth for cross-impl byte-equality tests。
+    public static func cpuAttention(
+        q: [Float], M: Int, D: Int,
+        k: [Float], N: Int,
+        v: [Float], Dv: Int
+    ) -> [Float] {
+        let invSqrtD = 1.0 / Float(D).squareRoot()
+        var out = [Float](repeating: 0, count: M * Dv)
+        for i in 0..<M {
+            var scaled = [Float](
+                repeating: 0, count: N)
+            var maxScore: Float = -.infinity
+            for kk in 0..<N {
+                var dot: Float = 0
+                for d in 0..<D {
+                    dot += q[i * D + d]
+                        * k[kk * D + d]
+                }
+                scaled[kk] = dot * invSqrtD
+                if scaled[kk] > maxScore {
+                    maxScore = scaled[kk]
+                }
+            }
+            var expSum: Float = 0
+            var exps = [Float](repeating: 0, count: N)
+            for kk in 0..<N {
+                exps[kk] = exp(scaled[kk] - maxScore)
+                expSum += exps[kk]
+            }
+            for j in 0..<Dv {
+                var acc: Float = 0
+                for kk in 0..<N {
+                    acc += (exps[kk] / expSum)
+                        * v[kk * Dv + j]
+                }
+                out[i * Dv + j] = acc
+            }
+        }
+        return out
     }
 
     // MARK: - Naive fallback

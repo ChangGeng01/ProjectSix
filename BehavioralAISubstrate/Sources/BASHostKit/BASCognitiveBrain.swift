@@ -2480,6 +2480,79 @@ extension BASCognitiveBrain {
             v: v, vCols: vCols)
     }
 
+    /// chapter 七百七 第三刀 / M2208 — auto-routed attention。
+    ///
+    /// Picks the empirically fastest implementation per shape:
+    ///   M*N <  64  → CPU reference (Metal pipeline overhead
+    ///                 dominates at tiny shapes)
+    ///   M*N >= 64  → Metal FlashAttention (1.24-1.62x faster
+    ///                 than scaled_dot_product per shapes
+    ///                 measured at chapter 七百七 第二刀)
+    ///
+    /// Returns BASAutoRouteResult so callers / telemetry can
+    /// inspect which path actually executed。
+    public func attentionAuto(
+        q: [Float], qRows: Int, qCols: Int,
+        k: [Float], kRows: Int,
+        v: [Float], vCols: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) async throws -> BASAutoRouteResult<[Float]> {
+        let shape = BASAttentionShape(
+            M: qRows, N: kRows, D: qCols, Dv: vCols)
+        let choice = BASAutoRouteRanker.attentionChoice(
+            shape: shape, thresholds: thresholds)
+        switch choice {
+        case .swiftCPUAttention:
+            return BASAutoRouteResult(
+                value: BASAutoRouteRanker.cpuAttention(
+                    q: q, M: qRows, D: qCols,
+                    k: k, N: kRows,
+                    v: v, Dv: vCols),
+                choice: .swiftCPUAttention)
+        case .metalFlashAttention:
+            // Head-dim cap fallback: if dim exceeds FlashAttention's
+            // tile cap (64) fall back to the standard kernel
+            // which has no such limit。
+            if qCols
+                > BASMetalFlashAttentionTileConfig.dMax
+                || vCols
+                    > BASMetalFlashAttentionTileConfig.dMax
+            {
+                let value = try await attention(
+                    q: q, qRows: qRows, qCols: qCols,
+                    k: k, kRows: kRows,
+                    v: v, vCols: vCols)
+                return BASAutoRouteResult(
+                    value: value,
+                    choice: .metalStandardAttention)
+            }
+            let value = try await flashAttention(
+                q: q, qRows: qRows, qCols: qCols,
+                k: k, kRows: kRows,
+                v: v, vCols: vCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalFlashAttention)
+        case .metalStandardAttention:
+            let value = try await attention(
+                q: q, qRows: qRows, qCols: qCols,
+                k: k, kRows: kRows,
+                v: v, vCols: vCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalStandardAttention)
+        default:
+            // Should not happen — attentionChoice never returns
+            // non-attention cases。 Conservative fallback:CPU。
+            return BASAutoRouteResult(
+                value: BASAutoRouteRanker.cpuAttention(
+                    q: q, M: qRows, D: qCols,
+                    k: k, N: kRows,
+                    v: v, Dv: vCols),
+                choice: .swiftCPUAttention)
+        }
+    }
+
     /// chapter 七百七 第一刀 / M2206 — tiled FlashAttention path。
     /// Mathematically equivalent to `attention(...)` but uses
     /// O(N) memory via online softmax + key/value tiling。 Wins
