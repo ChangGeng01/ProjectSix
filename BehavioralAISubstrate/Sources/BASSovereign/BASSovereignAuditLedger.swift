@@ -412,7 +412,22 @@ public actor BASSovereignAuditLedger {
             }
         }
 
-        let selfHash = hash(canonical)
+        // chapter 七百十六 第三刀 / M2253 — opt-in routed seal。
+        // The byte-equality test (chapter 七百十六 第一刀
+        // BASChapter716AuditLedgerByteEqualityTests) proved both
+        // paths produce mathematically identical output across
+        // 50+ varied entry shapes,so flipping the flag at host
+        // startup cannot break the chain of custody。 Default
+        // stays OFF until chapter 七百十六 第五刀 close-out。
+        //
+        // LEGACY PATH (unchanged,kept for byte-pinned compat):
+        //     let selfHash = hash(canonical)
+        let selfHash: String
+        if Self.useRoutedSeal {
+            selfHash = Self.hashViaAutoRouter(canonical)
+        } else {
+            selfHash = hash(canonical)
+        }
         let appended = AppendedEntry(entry: sealed, priorHash: priorHash, selfHash: selfHash)
         entries.append(appended)
         auditRefIndex[sealed.auditID] = entries.count - 1
