@@ -17,6 +17,7 @@
 pub mod cosine;
 pub mod decay;
 pub mod fuser;
+pub mod layer_norm; // chapter 七百九 第二刀 — LayerNorm (welford + SIMD)
 pub mod matmul;     // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
 pub mod simd;       // chapter 七百五 第二刀 — SIMD-accelerated math
 pub mod softmax;    // chapter 七百九 第一刀 — numerically-stable softmax
@@ -223,6 +224,74 @@ pub unsafe extern "C" fn bas_ranker_softmax_simd(
         core::slice::from_raw_parts_mut(out, n)
     };
     softmax::softmax_stable_simd(x_slice, out_slice);
+    0
+}
+
+// MARK: - chapter 七百九 第二刀 LayerNorm C ABI
+
+/// LayerNorm naive — two-pass mean + variance。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_layer_norm(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+    eps: f32,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    layer_norm::layer_norm_naive(x_s, o_s, eps);
+    0
+}
+
+/// LayerNorm Welford — single-pass numerically stable。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_layer_norm_welford(
+    x: *const f32, n: usize,
+    out: *mut f32, out_n: usize,
+    eps: f32,
+) -> i32 {
+    if x.is_null() || out.is_null() { return -1; }
+    if n == 0 || n != out_n { return -2; }
+    let x_s = unsafe { core::slice::from_raw_parts(x, n) };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, n)
+    };
+    layer_norm::layer_norm_welford(x_s, o_s, eps);
+    0
+}
+
+/// LayerNorm affine + SIMD: y = γ(x-μ)/√(σ²+ε) + β。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_layer_norm_affine_simd(
+    x: *const f32, x_len: usize,
+    gamma: *const f32, gamma_len: usize,
+    beta: *const f32, beta_len: usize,
+    out: *mut f32, out_len: usize,
+    eps: f32,
+) -> i32 {
+    if x.is_null() || gamma.is_null()
+        || beta.is_null() || out.is_null()
+    { return -1; }
+    if x_len == 0 || x_len != out_len
+        || x_len != gamma_len || x_len != beta_len
+    { return -2; }
+    let x_s = unsafe {
+        core::slice::from_raw_parts(x, x_len)
+    };
+    let g_s = unsafe {
+        core::slice::from_raw_parts(gamma, gamma_len)
+    };
+    let b_s = unsafe {
+        core::slice::from_raw_parts(beta, beta_len)
+    };
+    let o_s = unsafe {
+        core::slice::from_raw_parts_mut(out, out_len)
+    };
+    layer_norm::layer_norm_affine_simd(
+        x_s, g_s, b_s, o_s, eps);
     0
 }
 
