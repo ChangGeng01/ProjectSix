@@ -1,0 +1,13 @@
+[package]
+name = "bas-retrieval-ranker"
+description = "chapter 七百三 第三刀 — Rust port of retrieval scoring + ranking + cosine similarity + decay-policy logic from BASMemory + BASOrchestration retrieval paths"
+license.workspace = true
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }

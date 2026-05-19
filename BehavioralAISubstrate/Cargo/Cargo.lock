@@ -32,6 +32,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bas-retrieval-ranker"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bas-substrate-core"
 version = "0.1.0"
 dependencies = [
