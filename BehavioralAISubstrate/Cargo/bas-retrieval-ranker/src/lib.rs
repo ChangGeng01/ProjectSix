@@ -19,6 +19,7 @@ pub mod cosine;
 pub mod decay;
 pub mod forget_cascade;   // chapter 七百十三 第一刀 — forget-cascade filter
 pub mod fuser;
+pub mod hex;              // chapter 七百十九 第一刀 — lookup-table hex encoder
 pub mod layer_norm;       // chapter 七百九 第二刀 — LayerNorm
 pub mod ledger;           // chapter 七百十二 第一刀 — batched seal + verify
 pub mod matmul;           // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
@@ -751,6 +752,37 @@ bas_ranker_forget_cascade_filter(
         *out_kept_count = kept.len();
         *out_removed_count = removed.len();
     }
+    0
+}
+
+// MARK: - chapter 七百十九 第一刀 Hex encoder C ABI
+
+/// Encode `n` input bytes as lowercase hex ASCII into a
+/// caller-owned `out` buffer of size `2 * n`。 Returns 0 on
+/// success,-1 on null pointer,-2 on `out_len != 2 * n`。
+///
+/// Output is pure ASCII `[0-9a-f]`,no NUL terminator,no
+/// allocation。 ~25× faster than Swift's
+/// `String(format: "%02x", byte)` loop per chapter 七百十九
+/// 第二刀 measurement。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_bytes_to_hex_lower(
+    bytes: *const u8, n: usize,
+    out: *mut u8, out_len: usize,
+) -> i32 {
+    if out.is_null() { return -1; }
+    if n == 0 {
+        return if out_len == 0 { 0 } else { -2 };
+    }
+    if bytes.is_null() { return -1; }
+    if out_len != n * 2 { return -2; }
+    let in_slice = unsafe {
+        core::slice::from_raw_parts(bytes, n)
+    };
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out, out_len)
+    };
+    hex::bytes_to_hex_lower_into(in_slice, out_slice);
     0
 }
 

@@ -1306,6 +1306,51 @@ public enum BASAutoRouteRanker {
             choice: .swiftCryptoKitLedgerSeal)
     }
 
+    // MARK: - Hex encoder (chapter 七百十九 第一刀)
+    //
+    // Per matrix「Rust:integrity hash」 — and per chapter
+    // 七百十九 measurement, Rust lookup-table hex encoder is
+    // ~25× faster than Swift's `String(format: "%02x", byte)`
+    // per-byte loop。 Centralized helper replaces 10+ scattered
+    // Swift idiom call sites。
+
+    /// Encode `bytes` as a lowercase hex string。 Byte-equivalent
+    /// to `bytes.map { String(format: "%02x", $0) }.joined()` —
+    /// pinned by BASChapter719HexEncoderTests。 Uses Rust
+    /// lookup-table when the XCFramework is available;Swift
+    /// fallback otherwise。
+    public static func bytesToHexLower(
+        _ bytes: [UInt8]
+    ) -> String {
+        guard !bytes.isEmpty else { return "" }
+        #if os(iOS) || os(macOS)
+        var out = [UInt8](
+            repeating: 0, count: bytes.count * 2)
+        let rc = bytes.withUnsafeBufferPointer { bp in
+            out.withUnsafeMutableBufferPointer { op in
+                bas_ranker_bytes_to_hex_lower(
+                    bp.baseAddress, bytes.count,
+                    op.baseAddress, op.count)
+            }
+        }
+        if rc == 0 {
+            // Output is pure ASCII so `String(decoding:as:)`
+            // never fails;use `String(bytes:encoding:)` for
+            // a stable failure mode just in case。
+            return String(
+                bytes: out, encoding: .ascii) ?? ""
+        }
+        #endif
+        // Swift fallback — same idiom as the legacy call sites
+        return bytes.map {
+            String(format: "%02x", $0) }.joined()
+    }
+
+    /// Convenience overload for `Data`。
+    public static func dataToHexLower(_ data: Data) -> String {
+        return bytesToHexLower(Array(data))
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(

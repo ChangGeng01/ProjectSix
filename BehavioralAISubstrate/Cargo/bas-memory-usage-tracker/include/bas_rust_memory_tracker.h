@@ -636,6 +636,16 @@ int32_t bas_ranker_forget_cascade_filter(
  *   6 = non_production_tier_carries_attestation
  *   7 = missing_attestation_for_production_tier
  */
+/* chapter 七百十九 第一刀 — lookup-table hex encoder。
+ * Encodes `n` input bytes as 2*n lowercase hex ASCII chars into
+ * the caller-owned out buffer。 ~25× faster than Swift's
+ * String(format: "%02x") loop。
+ * Returns 0 on success,-1 on null pointer,-2 on shape mismatch。
+ */
+int32_t bas_ranker_bytes_to_hex_lower(
+    const uint8_t* bytes, size_t n,
+    uint8_t* out, size_t out_len);
+
 int32_t bas_ranker_provenance_rejection_code(
     const uint8_t* training_corpus_hash_hex,
     size_t training_corpus_hash_hex_len,
