@@ -130,6 +130,230 @@ pub fn filter_by_turn(
         .collect()
 }
 
+// MARK: - chapter 七百二十四 第一刀 / M2291
+//         Binary wire format (replaces JSON for highest-traffic
+//         BASSQLiteEventLogStorage.append path)
+//
+// Wire layout (single entry):
+//
+//   [u8  schema_version]   (PAYLOAD_FORMAT_BINARY_V2 = 2)
+//   [u8  kind_discriminant] (0..=6 matching EventKind order)
+//   [u32 le entry_id_len][entry_id bytes]
+//   [u32 le session_ref_len][session_ref bytes]
+//   [u32 le turn_ref_len][turn_ref bytes]
+//   [i64 le timestamp_ms]
+//   [u8  payload_present (0/1)]
+//     if present:
+//       [u32 le payload_len][payload bytes]
+//   [u8  provenance_present (0/1)]
+//     if present:
+//       [u32 le provenance_len][provenance bytes]
+//
+// Why little-endian:matches the substrate's Apple Silicon target
+// (aarch64-le)。 If the substrate ever ships an architecture with
+// a different endianness the schema-version field acts as the
+// migration switch — bump to v3 and add a different layout。
+//
+// Why chunked encode entrypoint:`encode_batch_binary` returns one
+// contiguous Vec<u8> framed with [u32 count][entry_1][entry_2]...
+// Hosts append multiple events in a single SQLite write without
+// re-encoding each one individually。
+
+pub const PAYLOAD_FORMAT_JSON_V1:   u8 = 1;
+pub const PAYLOAD_FORMAT_BINARY_V2: u8 = 2;
+
+fn kind_to_u8(k: EventKind) -> u8 {
+    match k {
+        EventKind::InternalSignal     => 0,
+        EventKind::HostInput          => 1,
+        EventKind::SovereignVerdict   => 2,
+        EventKind::PermitChange       => 3,
+        EventKind::ObservationBundle  => 4,
+        EventKind::ProvenanceMark     => 5,
+        EventKind::ReplayMark         => 6,
+    }
+}
+
+fn kind_from_u8(b: u8) -> Option<EventKind> {
+    match b {
+        0 => Some(EventKind::InternalSignal),
+        1 => Some(EventKind::HostInput),
+        2 => Some(EventKind::SovereignVerdict),
+        3 => Some(EventKind::PermitChange),
+        4 => Some(EventKind::ObservationBundle),
+        5 => Some(EventKind::ProvenanceMark),
+        6 => Some(EventKind::ReplayMark),
+        _ => None,
+    }
+}
+
+fn append_u32_le(buf: &mut Vec<u8>, v: u32) {
+    buf.extend_from_slice(&v.to_le_bytes());
+}
+
+fn append_i64_le(buf: &mut Vec<u8>, v: i64) {
+    buf.extend_from_slice(&v.to_le_bytes());
+}
+
+fn append_lenprefixed(buf: &mut Vec<u8>, s: &str) {
+    let bytes = s.as_bytes();
+    append_u32_le(buf, bytes.len() as u32);
+    buf.extend_from_slice(bytes);
+}
+
+fn read_u32_le(buf: &[u8], pos: &mut usize) -> Option<u32> {
+    if *pos + 4 > buf.len() { return None; }
+    let v = u32::from_le_bytes([
+        buf[*pos], buf[*pos+1], buf[*pos+2], buf[*pos+3]]);
+    *pos += 4;
+    Some(v)
+}
+
+fn read_i64_le(buf: &[u8], pos: &mut usize) -> Option<i64> {
+    if *pos + 8 > buf.len() { return None; }
+    let v = i64::from_le_bytes([
+        buf[*pos],   buf[*pos+1], buf[*pos+2], buf[*pos+3],
+        buf[*pos+4], buf[*pos+5], buf[*pos+6], buf[*pos+7]]);
+    *pos += 8;
+    Some(v)
+}
+
+fn read_lenprefixed_string(
+    buf: &[u8], pos: &mut usize,
+) -> Option<String> {
+    let len = read_u32_le(buf, pos)? as usize;
+    if *pos + len > buf.len() { return None; }
+    let s = core::str::from_utf8(
+        &buf[*pos..*pos + len]).ok()?.to_string();
+    *pos += len;
+    Some(s)
+}
+
+/// Encode `entry` to a compact binary buffer。 Deterministic —
+/// same entry produces same bytes (replay-determinism preserved
+/// across JSON-v1 → binary-v2 migration)。
+pub fn encode_binary(entry: &EventLogEntry) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::with_capacity(64);
+    out.push(PAYLOAD_FORMAT_BINARY_V2);
+    out.push(kind_to_u8(entry.kind));
+    append_lenprefixed(&mut out, &entry.entry_id);
+    append_lenprefixed(&mut out, &entry.session_ref);
+    append_lenprefixed(&mut out, &entry.turn_ref);
+    append_i64_le(&mut out, entry.timestamp_ms);
+    if let Some(ref payload) = entry.payload_json {
+        out.push(1);
+        append_lenprefixed(&mut out, payload);
+    } else {
+        out.push(0);
+    }
+    if let Some(ref prov) = entry.provenance_summary {
+        out.push(1);
+        append_lenprefixed(&mut out, prov);
+    } else {
+        out.push(0);
+    }
+    out
+}
+
+/// Decode a binary entry。 First byte must be
+/// `PAYLOAD_FORMAT_BINARY_V2`。
+pub fn decode_binary(buf: &[u8]) -> Result<EventLogEntry, String> {
+    if buf.is_empty() {
+        return Err("empty buffer".to_string());
+    }
+    if buf[0] != PAYLOAD_FORMAT_BINARY_V2 {
+        return Err(format!(
+            "expected schema version {}, got {}",
+            PAYLOAD_FORMAT_BINARY_V2, buf[0]));
+    }
+    let mut pos = 1usize;
+    if pos >= buf.len() {
+        return Err("missing kind byte".to_string());
+    }
+    let kind = kind_from_u8(buf[pos])
+        .ok_or_else(|| format!(
+            "unknown kind byte {}", buf[pos]))?;
+    pos += 1;
+    let entry_id = read_lenprefixed_string(buf, &mut pos)
+        .ok_or_else(|| "entry_id read failed".to_string())?;
+    let session_ref = read_lenprefixed_string(buf, &mut pos)
+        .ok_or_else(|| "session_ref read failed".to_string())?;
+    let turn_ref = read_lenprefixed_string(buf, &mut pos)
+        .ok_or_else(|| "turn_ref read failed".to_string())?;
+    let timestamp_ms = read_i64_le(buf, &mut pos)
+        .ok_or_else(|| "timestamp read failed".to_string())?;
+    if pos >= buf.len() {
+        return Err("missing payload_present flag".to_string());
+    }
+    let payload_json = match buf[pos] {
+        0 => { pos += 1; None }
+        1 => {
+            pos += 1;
+            Some(read_lenprefixed_string(buf, &mut pos)
+                .ok_or_else(|| "payload read failed".to_string())?)
+        }
+        b => return Err(format!(
+            "invalid payload flag {}", b)),
+    };
+    if pos >= buf.len() {
+        return Err("missing provenance_present flag".to_string());
+    }
+    let provenance_summary = match buf[pos] {
+        0 => { pos += 1; None }
+        1 => {
+            pos += 1;
+            Some(read_lenprefixed_string(buf, &mut pos)
+                .ok_or_else(|| "provenance read failed".to_string())?)
+        }
+        b => return Err(format!(
+            "invalid provenance flag {}", b)),
+    };
+    Ok(EventLogEntry {
+        entry_id, kind, session_ref, turn_ref, timestamp_ms,
+        payload_json, provenance_summary,
+    })
+}
+
+/// Encode a batch of entries as `[u32 le count][entry_1]...
+/// [entry_n]`。 Each entry's own schema-version byte still leads
+/// its slice so per-entry decode works on the slice。
+pub fn encode_batch_binary(
+    entries: &[EventLogEntry],
+) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::with_capacity(
+        4 + entries.len() * 64);
+    append_u32_le(&mut out, entries.len() as u32);
+    for e in entries {
+        let encoded = encode_binary(e);
+        append_u32_le(&mut out, encoded.len() as u32);
+        out.extend_from_slice(&encoded);
+    }
+    out
+}
+
+pub fn decode_batch_binary(
+    buf: &[u8],
+) -> Result<Vec<EventLogEntry>, String> {
+    let mut pos = 0usize;
+    let count = read_u32_le(buf, &mut pos)
+        .ok_or_else(|| "count read failed".to_string())?
+        as usize;
+    let mut out: Vec<EventLogEntry> =
+        Vec::with_capacity(count);
+    for _ in 0..count {
+        let entry_len = read_u32_le(buf, &mut pos)
+            .ok_or_else(|| "entry length read failed".to_string())?
+            as usize;
+        if pos + entry_len > buf.len() {
+            return Err("entry buffer underrun".to_string());
+        }
+        let entry = decode_binary(&buf[pos..pos + entry_len])?;
+        pos += entry_len;
+        out.push(entry);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,5 +462,118 @@ mod tests {
         let j2 = encode(&e).unwrap();
         let back2 = decode(&j2).unwrap();
         assert_eq!(back2.payload_json, None);
+    }
+
+    // MARK: - chapter 七百二十四 第一刀 binary wire format tests
+
+    #[test]
+    fn binary_round_trip_with_full_payload() {
+        let e = sample();
+        let bytes = encode_binary(&e);
+        assert_eq!(bytes[0], PAYLOAD_FORMAT_BINARY_V2);
+        let back = decode_binary(&bytes).unwrap();
+        assert_eq!(e, back);
+    }
+
+    #[test]
+    fn binary_round_trip_with_none_payload() {
+        let mut e = sample();
+        e.payload_json = None;
+        e.provenance_summary = None;
+        let bytes = encode_binary(&e);
+        let back = decode_binary(&bytes).unwrap();
+        assert_eq!(e, back);
+    }
+
+    #[test]
+    fn binary_encoding_is_deterministic() {
+        let e = sample();
+        let b1 = encode_binary(&e);
+        let b2 = encode_binary(&e);
+        let b3 = encode_binary(&e);
+        assert_eq!(b1, b2);
+        assert_eq!(b2, b3);
+    }
+
+    #[test]
+    fn binary_is_more_compact_than_json() {
+        let e = sample();
+        let json_size = encode(&e).unwrap().len();
+        let bin_size = encode_binary(&e).len();
+        assert!(
+            bin_size < json_size,
+            "binary ({}) should be smaller than JSON ({})",
+            bin_size, json_size);
+    }
+
+    #[test]
+    fn binary_rejects_wrong_schema_version() {
+        let mut bytes = encode_binary(&sample());
+        bytes[0] = PAYLOAD_FORMAT_JSON_V1;
+        let err = decode_binary(&bytes);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn binary_rejects_invalid_kind_byte() {
+        let mut bytes = encode_binary(&sample());
+        bytes[1] = 99;  // not a valid kind discriminator
+        let err = decode_binary(&bytes);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn binary_rejects_truncated_buffer() {
+        let bytes = encode_binary(&sample());
+        let truncated = &bytes[..bytes.len() - 4];
+        let err = decode_binary(truncated);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn binary_batch_round_trip() {
+        let entries = vec![
+            sample(),
+            EventLogEntry::new(
+                "entry-002",
+                EventKind::HostInput,
+                "session-A", "turn-1", 1_700_000_001_000),
+            EventLogEntry::new(
+                "entry-003",
+                EventKind::ReplayMark,
+                "session-B", "turn-99", 1_700_000_002_000)
+                .with_payload(r#"{"mark":"end"}"#.to_string()),
+        ];
+        let bytes = encode_batch_binary(&entries);
+        let back = decode_batch_binary(&bytes).unwrap();
+        assert_eq!(entries, back);
+    }
+
+    #[test]
+    fn binary_batch_empty_round_trip() {
+        let entries: Vec<EventLogEntry> = vec![];
+        let bytes = encode_batch_binary(&entries);
+        let back = decode_batch_binary(&bytes).unwrap();
+        assert_eq!(entries, back);
+    }
+
+    #[test]
+    fn binary_all_kind_discriminants_round_trip() {
+        let kinds = [
+            EventKind::InternalSignal,
+            EventKind::HostInput,
+            EventKind::SovereignVerdict,
+            EventKind::PermitChange,
+            EventKind::ObservationBundle,
+            EventKind::ProvenanceMark,
+            EventKind::ReplayMark,
+        ];
+        for k in kinds {
+            let e = EventLogEntry::new(
+                "id", k, "s", "t", 0);
+            let back = decode_binary(
+                &encode_binary(&e)).unwrap();
+            assert_eq!(e, back);
+        }
     }
 }
