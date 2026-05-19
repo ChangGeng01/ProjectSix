@@ -2747,6 +2747,32 @@ extension BASCognitiveBrain {
             hasAttestationIssuedAt: hasAttestationIssuedAt)
     }
 
+    /// chapter 七百十五 第四刀 / M2249 — auto-routed batched
+    /// cosine similarity。
+    ///
+    /// Per matrix「Metal:embedding similarity」 — but per
+    /// chapter 七百十五 第三刀 tournament Rust SIMD wins at all
+    /// measured M-series sizes (1.06×-90× faster than Metal
+    /// up to 4096 × 512)。 Default threshold
+    /// `batchedCosineMetalMinRows = 16384` means production
+    /// callers always get Rust SIMD。 Future hardware where
+    /// the crossover shifts can lower the threshold via
+    /// calibration。
+    ///
+    /// Sync-only variant — always Rust SIMD path。 For Metal-
+    /// dispatch async variant see `batchedCosineAutoMetal`
+    /// which takes a dispatcher argument。
+    public nonisolated static func batchedCosineAuto(
+        query: [Float],
+        corpus: [Float],
+        dim: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<[Float]> {
+        return BASAutoRouteRanker.batchedCosineSimilarity(
+            query: query, corpus: corpus, dim: dim,
+            thresholds: thresholds)
+    }
+
     /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
     public func matMulAuto(
         a: [Float], aRows: Int, aCols: Int,

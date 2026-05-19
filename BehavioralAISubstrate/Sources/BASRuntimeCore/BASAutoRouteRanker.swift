@@ -66,13 +66,24 @@ public struct BASAutoRouteThresholds:
     /// pay for branch cost — erf/sigmoid bottleneck dominates)。
     public let geluTanhSIMDMinDim: Int
 
+    /// Batched cosine similarity:use Rust SIMD below this
+    /// corpus-row count,Metal at or above。 Measured M-series
+    /// crossover NEVER OBSERVED at the measured grid (chapter
+    /// 七百十五 第三刀:Rust SIMD wins at every tested size up
+    /// to 4096 × 512)。 Default set to 16384 — well above any
+    /// real production workload — so Rust SIMD is effectively
+    /// the production-default path。 Hosts running on hardware
+    /// where the crossover shifts can lower this via calibration。
+    public let batchedCosineMetalMinRows: Int
+
     public init(
         cosineSIMDMinDim: Int = 64,
         sha256CryptoKitMinBytes: Int = 1024,
         attentionMetalMinProduct: Int = 64,
         matMulMetalMinProduct: Int = 262_144,
         layerNormSIMDMinDim: Int = 128,
-        geluTanhSIMDMinDim: Int = 256
+        geluTanhSIMDMinDim: Int = 256,
+        batchedCosineMetalMinRows: Int = 16384
     ) {
         self.cosineSIMDMinDim = max(1, cosineSIMDMinDim)
         self.sha256CryptoKitMinBytes =
@@ -85,6 +96,8 @@ public struct BASAutoRouteThresholds:
             max(1, layerNormSIMDMinDim)
         self.geluTanhSIMDMinDim =
             max(1, geluTanhSIMDMinDim)
+        self.batchedCosineMetalMinRows =
+            max(1, batchedCosineMetalMinRows)
     }
 
     /// Default measured M-series thresholds。
@@ -134,6 +147,9 @@ public enum BASAutoRouteChoice:
     case swiftForgetCascadeFallback
     case rustProvenanceFilter
     case swiftProvenanceFallback
+    /// chapter 七百十五 第四刀 — Batched cosine similarity。
+    case rustBatchedCosine
+    case metalBatchedCosine
 }
 
 /// chapter 七百十三 第四刀 — provenance-gate decision codes
@@ -989,6 +1005,108 @@ public enum BASAutoRouteRanker {
             buf.append(contentsOf: bytes)
         }
         return buf
+    }
+
+    // MARK: - Batched cosine routing (chapter 七百十五 第四刀)
+    //
+    // Per matrix「Metal:embedding similarity」 — but per
+    // chapter 七百十五 第三刀 tournament: Rust SIMD wins at all
+    // measured sizes on Apple M-series。 Routing decision
+    // (Rust vs Metal) is pure-policy here;the dispatch is
+    // synchronous Rust at all sizes below
+    // `batchedCosineMetalMinRows`。 Metal dispatch requires an
+    // async dispatcher,exposed via a separate brain helper
+    // that takes the dispatcher as a parameter。
+
+    /// Pure-policy helper returning the routing CHOICE for a
+    /// given (corpus_rows × dim) shape。
+    public static func batchedCosineChoice(
+        corpusRows: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteChoice {
+        if corpusRows >= thresholds.batchedCosineMetalMinRows
+        {
+            return .metalBatchedCosine
+        }
+        return .rustBatchedCosine
+    }
+
+    /// Synchronous Rust-SIMD batched cosine。 Returns
+    /// (scores[n_rows], choice)。 Always routes to Rust here;
+    /// callers wanting the Metal fallback must use the brain
+    /// helper that takes a dispatcher (chapter 七百十五 第四刀
+    /// `BASCognitiveBrain.batchedCosineAuto`)。
+    public static func batchedCosineSimilarity(
+        query: [Float],
+        corpus: [Float],
+        dim: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<[Float]> {
+        precondition(dim > 0,
+            "dim must be positive")
+        precondition(query.count == dim,
+            "query length must equal dim")
+        precondition(corpus.count % dim == 0,
+            "corpus length must be multiple of dim")
+        let nRows = corpus.count / dim
+        guard nRows > 0 else {
+            return BASAutoRouteResult(
+                value: [], choice: .rustBatchedCosine)
+        }
+        var scores = [Float](repeating: 0, count: nRows)
+        #if os(iOS) || os(macOS)
+        let rc = query.withUnsafeBufferPointer { qp in
+            corpus.withUnsafeBufferPointer { cp in
+                scores
+                    .withUnsafeMutableBufferPointer { op in
+                    bas_ranker_batched_cosine_simd(
+                        qp.baseAddress, query.count,
+                        cp.baseAddress, corpus.count,
+                        dim,
+                        op.baseAddress)
+                }
+            }
+        }
+        if rc == 0 {
+            return BASAutoRouteResult(
+                value: scores,
+                choice: .rustBatchedCosine)
+        }
+        #endif
+        // Pure-Swift fallback (no FFI hop)
+        return BASAutoRouteResult(
+            value: swiftBatchedCosineFallback(
+                query: query, corpus: corpus, dim: dim),
+            choice: .swiftNaive)
+    }
+
+    private static func swiftBatchedCosineFallback(
+        query: [Float], corpus: [Float], dim: Int
+    ) -> [Float] {
+        let nRows = corpus.count / dim
+        var out = [Float](repeating: 0, count: nRows)
+        var normQ: Float = 0
+        for d in 0..<dim { normQ += query[d] * query[d] }
+        let invNormQ: Float = normQ > 0
+            ? 1.0 / normQ.squareRoot() : 0
+        for r in 0..<nRows {
+            var dot: Float = 0
+            var normR: Float = 0
+            let base = r * dim
+            for d in 0..<dim {
+                let rd = corpus[base + d]
+                dot += query[d] * rd
+                normR += rd * rd
+            }
+            if normR <= 0 {
+                out[r] = 0
+            } else {
+                let invNormR: Float =
+                    1.0 / normR.squareRoot()
+                out[r] = dot * invNormQ * invNormR
+            }
+        }
+        return out
     }
 
     // MARK: - Ledger routing (chapter 七百十二 第四刀)
