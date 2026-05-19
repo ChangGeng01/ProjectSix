@@ -61,6 +61,12 @@ import BASPolicy
 import BASRuntimeCore
 import BASMetalSubstrate
 import BASRustCoreBridge
+// chapter 七百四 第三刀 — direct import of the binary target
+// gives the Rust math kernels (bas_ranker_cosine_similarity etc.)
+// without going through the BASRustCoreBridge wrapper。
+#if os(iOS) || os(macOS)
+import BASRustMemoryTrackerBinary
+#endif
 
 /// One-line cognitive brain facade。 Wraps the 14-layer
 /// cognitive-OS cascade behind a `process(_:)` API。
@@ -2294,6 +2300,49 @@ extension BASCognitiveBrain {
                     message: "dispatcher init failed")
         }
         return try await d.dispatch(a: a, b: b)
+    }
+
+    /// chapter 七百四 第三刀 / M2193 — Rust-backed cosine path。
+    ///
+    /// CPU-side cosine similarity via the chapter-七百三 第三刀
+    /// `bas-retrieval-ranker` crate (now LIVE in the XCFramework
+    /// after chapter 七百四 第一刀)。 Use this in callers that
+    /// want native math without the Metal pipeline cost — for
+    /// small dim (<= ~256) the Rust path is typically faster
+    /// than spinning up a Metal compute pass。
+    ///
+    /// Per 「术业有专攻」: Swift orchestrates, Rust computes。
+    ///
+    /// Throws on length mismatch or empty input。
+    public func cosineSimilarityRust(
+        _ a: [Float], _ b: [Float]
+    ) throws -> Float {
+        guard !a.isEmpty else {
+            throw BASMetalCosineSimilarityDispatcherError
+                .zeroLengthVectors
+        }
+        guard a.count == b.count else {
+            throw BASMetalCosineSimilarityDispatcherError
+                .payloadCountMismatch(
+                    name: "b",
+                    expected: a.count,
+                    actual: b.count)
+        }
+        var score: Float = 0
+        let rc: Int32 = a.withUnsafeBufferPointer { ap in
+            b.withUnsafeBufferPointer { bp in
+                bas_ranker_cosine_similarity(
+                    ap.baseAddress, a.count,
+                    bp.baseAddress, b.count,
+                    &score)
+            }
+        }
+        guard rc == 0 else {
+            throw BASMetalCosineSimilarityDispatcherError
+                .libraryUnavailable(
+                    message: "rust rc=\(rc)")
+        }
+        return score
     }
 
     /// 主线 全面 开发 — Metal RMSNorm GPU compute。

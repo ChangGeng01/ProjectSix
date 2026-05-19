@@ -25,3 +25,179 @@ pub const ABI_VERSION: i32 = 1;
 pub extern "C" fn bas_ranker_abi_version() -> i32 {
     ABI_VERSION
 }
+
+// MARK: - C ABI surface — chapter 七百四 第三刀
+
+/// Compute cosine similarity between two equal-length float
+/// vectors。 Returns the similarity via `*out_score`。
+///
+/// Returns:
+///   - 0  on success
+///   - -1 on null pointer or zero-length input
+///   - -2 on length mismatch (a_len != b_len)
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_cosine_similarity(
+    a: *const f32,
+    a_len: usize,
+    b: *const f32,
+    b_len: usize,
+    out_score: *mut f32,
+) -> i32 {
+    if a.is_null() || b.is_null() || out_score.is_null() {
+        return -1;
+    }
+    if a_len == 0 {
+        return -1;
+    }
+    if a_len != b_len {
+        return -2;
+    }
+    // SAFETY: caller guarantees `a` and `b` point to `a_len` /
+    // `b_len` valid float32 readable slots, and `out_score`
+    // points to one writable float32。
+    let a_slice = unsafe {
+        core::slice::from_raw_parts(a, a_len)
+    };
+    let b_slice = unsafe {
+        core::slice::from_raw_parts(b, b_len)
+    };
+    let score = cosine::cosine_similarity(a_slice, b_slice);
+    unsafe { *out_score = score; }
+    0
+}
+
+/// Compute L2 norm of a float vector → `*out_norm`。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_l2_norm(
+    v: *const f32,
+    v_len: usize,
+    out_norm: *mut f32,
+) -> i32 {
+    if v.is_null() || out_norm.is_null() || v_len == 0 {
+        return -1;
+    }
+    let s = unsafe { core::slice::from_raw_parts(v, v_len) };
+    unsafe { *out_norm = cosine::l2_norm(s); }
+    0
+}
+
+/// Batched cosine — query × corpus (rows × dim row-major) →
+/// `out_scores` (length `corpus_rows`)。 Returns -1 on null
+/// pointer or invalid shapes, otherwise 0。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_batched_cosine(
+    query: *const f32,
+    query_len: usize,
+    corpus: *const f32,
+    corpus_total_len: usize,
+    dim: usize,
+    out_scores: *mut f32,
+) -> i32 {
+    if query.is_null() || corpus.is_null()
+        || out_scores.is_null()
+    {
+        return -1;
+    }
+    if dim == 0 || query_len != dim {
+        return -1;
+    }
+    if corpus_total_len % dim != 0 {
+        return -1;
+    }
+    let rows = corpus_total_len / dim;
+    let query_slice = unsafe {
+        core::slice::from_raw_parts(query, query_len)
+    };
+    let corpus_slice = unsafe {
+        core::slice::from_raw_parts(corpus, corpus_total_len)
+    };
+    let scores =
+        cosine::batched_cosine(query_slice, corpus_slice, dim);
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, rows)
+    };
+    for (i, s) in scores.iter().enumerate() {
+        out_slice[i] = *s;
+    }
+    0
+}
+
+#[cfg(test)]
+mod ffi_tests {
+    use super::*;
+
+    #[test]
+    fn ffi_cosine_self_equals_one() {
+        let v = [1.0_f32, 2.0, 3.0, 4.0];
+        let mut score: f32 = 0.0;
+        let rc = unsafe {
+            bas_ranker_cosine_similarity(
+                v.as_ptr(), v.len(),
+                v.as_ptr(), v.len(),
+                &mut score)
+        };
+        assert_eq!(rc, 0);
+        assert!((score - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn ffi_cosine_null_returns_minus_one() {
+        let v = [1.0_f32];
+        let mut score: f32 = 0.0;
+        let rc = unsafe {
+            bas_ranker_cosine_similarity(
+                core::ptr::null(), 1,
+                v.as_ptr(), 1,
+                &mut score)
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn ffi_cosine_mismatched_lengths() {
+        let a = [1.0_f32, 2.0];
+        let b = [1.0_f32];
+        let mut score: f32 = 0.0;
+        let rc = unsafe {
+            bas_ranker_cosine_similarity(
+                a.as_ptr(), a.len(),
+                b.as_ptr(), b.len(),
+                &mut score)
+        };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn ffi_l2_norm() {
+        let v = [3.0_f32, 4.0];
+        let mut n: f32 = 0.0;
+        let rc = unsafe {
+            bas_ranker_l2_norm(v.as_ptr(), 2, &mut n)
+        };
+        assert_eq!(rc, 0);
+        assert!((n - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn ffi_batched_cosine_shape() {
+        let q = [1.0_f32, 0.0];
+        // 3 rows of dim 2: [1,0], [0,1], [1,1]
+        let corpus = [
+            1.0_f32, 0.0,
+            0.0, 1.0,
+            1.0, 1.0,
+        ];
+        let mut scores = vec![0.0_f32; 3];
+        let rc = unsafe {
+            bas_ranker_batched_cosine(
+                q.as_ptr(), q.len(),
+                corpus.as_ptr(), corpus.len(),
+                2,
+                scores.as_mut_ptr())
+        };
+        assert_eq!(rc, 0);
+        assert!((scores[0] - 1.0).abs() < 1e-6);
+        assert!(scores[1].abs() < 1e-6);
+        assert!((scores[2] - 0.7071068).abs() < 1e-5);
+    }
+}

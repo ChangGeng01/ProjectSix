@@ -441,6 +441,34 @@ int32_t bas_permit_policy_abi_version(void);
 int32_t bas_event_log_abi_version(void);
 int32_t bas_runtime_frame_abi_version(void);
 
+// MARK: - bas-retrieval-ranker math kernels (chapter 七百四 第三刀)
+//
+// Pure float32 cosine + L2 + batched-cosine。 Swift callers
+// route through `BASCognitiveBrain.cosineSimilarityRust(_:_:)`
+// when they want CPU-side math without the Metal dispatch cost。
+// On vectors of small dimension (< 256) the Rust path is
+// typically faster than spinning up a Metal compute pipeline。
+
+int32_t bas_ranker_cosine_similarity(
+    const float* a,
+    size_t a_len,
+    const float* b,
+    size_t b_len,
+    float* out_score);
+
+int32_t bas_ranker_l2_norm(
+    const float* v,
+    size_t v_len,
+    float* out_norm);
+
+int32_t bas_ranker_batched_cosine(
+    const float* query,
+    size_t query_len,
+    const float* corpus,
+    size_t corpus_total_len,
+    size_t dim,
+    float* out_scores);
+
 #ifdef __cplusplus
 }
 #endif
