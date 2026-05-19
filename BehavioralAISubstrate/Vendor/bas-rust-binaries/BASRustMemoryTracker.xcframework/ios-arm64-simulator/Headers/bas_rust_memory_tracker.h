@@ -601,6 +601,50 @@ int32_t bas_ranker_ledger_verify_chain(
     size_t n,
     uint8_t* out_tip_32);
 
+/* chapter 七百十三 第四刀 — Forget cascade + provenance C ABI。
+ * Per architectural matrix:Rust owns forget cascade +
+ * provenance + integrity hash duties。
+ *
+ * Wire format for record_ids_buf / target_ids_buf:
+ *   concatenation of length-prefixed UTF-8 strings:
+ *       [u32_be length][utf8 bytes]
+ *   The buffer must encode exactly the declared count。
+ */
+int32_t bas_ranker_forget_cascade_filter(
+    const uint8_t* record_ids_buf, size_t record_ids_buf_len,
+    size_t n_records,
+    const uint8_t* target_ids_buf, size_t target_ids_buf_len,
+    size_t n_targets,
+    size_t* out_kept_indices,
+    size_t* out_removed_indices,
+    size_t* out_kept_count,
+    size_t* out_removed_count);
+
+/* Provenance gate。 Returns 0..7 (see provenance::rejection_code)
+ * or -1 on null pointer / bad ordinal。 Tier ordinal:
+ *   0 = Illustrative
+ *   1 = AiAdvisory
+ *   2 = PeerReviewed
+ *   3 = DomainExpertReviewed
+ * Rejection codes:
+ *   0 = permitted
+ *   1 = training_corpus malformed-length
+ *   2 = trained_weights malformed-length
+ *   3 = training_corpus malformed-content
+ *   4 = trained_weights malformed-content
+ *   5 = below_production_tier
+ *   6 = non_production_tier_carries_attestation
+ *   7 = missing_attestation_for_production_tier
+ */
+int32_t bas_ranker_provenance_rejection_code(
+    const uint8_t* training_corpus_hash_hex,
+    size_t training_corpus_hash_hex_len,
+    const uint8_t* trained_weights_hash_hex,
+    size_t trained_weights_hash_hex_len,
+    int32_t tier_ordinal,
+    int32_t has_signature_ref,
+    int32_t has_issued_at);
+
 #ifdef __cplusplus
 }
 #endif

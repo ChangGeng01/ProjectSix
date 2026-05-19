@@ -2703,6 +2703,50 @@ extension BASCognitiveBrain {
             expectedSelfHashes: expectedSelfHashes)
     }
 
+    /// chapter 七百十三 第四刀 / M2239 — auto-routed forget
+    /// cascade partition。
+    ///
+    /// Per architectural matrix「Rust:Memory engine + forget
+    /// cascade」 — set-difference partition with O(N+M) HashSet
+    /// membership。 Returns (kept,removed) index lists in input
+    /// order so callers can partition their own typed record
+    /// arrays without paying Codable serialization across FFI。
+    public nonisolated static func forgetCascadeFilterAuto(
+        recordIds: [String],
+        targetIds: [String]
+    ) -> BASAutoRouteResult<(
+        kept: [Int], removed: [Int]
+    )> {
+        return BASAutoRouteRanker.forgetCascadeFilter(
+            recordIds: recordIds,
+            targetIds: targetIds)
+    }
+
+    /// chapter 七百十三 第四刀 / M2239 — auto-routed provenance
+    /// gate decision。
+    ///
+    /// Per matrix「Rust:provenance + integrity hash」 — typed
+    /// rejection ladder mirroring
+    /// `BASOrganTrainedWeightFilter.rejectionReason` exactly。
+    /// Returns the typed decision + routing choice;callers
+    /// switch on `.permitted` vs the rejection variants for
+    /// stable audit telemetry。
+    public nonisolated static func provenanceFilterAuto(
+        trainingCorpusHashHex: String,
+        trainedWeightsHashHex: String,
+        tier: BASProvenanceTier,
+        hasAttestationSignatureRef: Bool,
+        hasAttestationIssuedAt: Bool
+    ) -> BASAutoRouteResult<BASProvenanceGateDecision> {
+        return BASAutoRouteRanker.provenanceFilter(
+            trainingCorpusHashHex: trainingCorpusHashHex,
+            trainedWeightsHashHex: trainedWeightsHashHex,
+            tier: tier,
+            hasAttestationSignatureRef:
+                hasAttestationSignatureRef,
+            hasAttestationIssuedAt: hasAttestationIssuedAt)
+    }
+
     /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
     public func matMulAuto(
         a: [Float], aRows: Int, aCols: Int,

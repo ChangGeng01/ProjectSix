@@ -638,6 +638,191 @@ pub unsafe extern "C" fn bas_ranker_ledger_verify_chain(
     }
 }
 
+// MARK: - chapter 七百十三 第四刀 Forget cascade C ABI
+
+/// Forget-cascade partition。 Both id buffers use the same
+/// length-prefixed-utf8 wire format as the ledger ABI:
+/// concatenation of `[u32_be len][bytes]` records。
+///
+/// Inputs:
+///   - `record_ids_buf` / `record_ids_buf_len` : N record IDs
+///   - `target_ids_buf` / `target_ids_buf_len` : M target IDs
+///   - `n_records` / `n_targets` : exact record counts
+///   - `out_kept_indices`   : caller-owned `usize`/uintptr_t
+///                            buffer of length ≥ n_records
+///   - `out_removed_indices`: caller-owned buffer of length
+///                            ≥ n_records
+///   - `out_kept_count`     : *uintptr_t output:actual kept N
+///   - `out_removed_count`  : *uintptr_t output:actual removed N
+///
+/// Returns:
+///   0       — success
+///   -1      — null pointer
+///   -2      — truncated buffer
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_ranker_forget_cascade_filter(
+    record_ids_buf: *const u8,
+    record_ids_buf_len: usize,
+    n_records: usize,
+    target_ids_buf: *const u8,
+    target_ids_buf_len: usize,
+    n_targets: usize,
+    out_kept_indices: *mut usize,
+    out_removed_indices: *mut usize,
+    out_kept_count: *mut usize,
+    out_removed_count: *mut usize,
+) -> i32 {
+    if out_kept_count.is_null()
+        || out_removed_count.is_null()
+    {
+        return -1;
+    }
+    // Decode record IDs。 Empty record set is valid (no-op)。
+    let record_slice: &[u8] = if n_records == 0 {
+        &[]
+    } else if record_ids_buf.is_null()
+        || record_ids_buf_len == 0
+        || out_kept_indices.is_null()
+        || out_removed_indices.is_null()
+    {
+        return -1;
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                record_ids_buf, record_ids_buf_len)
+        }
+    };
+    let records: Vec<&str> = if n_records == 0 {
+        Vec::new()
+    } else {
+        match decode_length_prefixed(
+            record_slice, n_records)
+        {
+            Some(v) => v.into_iter().map(|b| {
+                std::str::from_utf8(b).unwrap_or("")
+            }).collect(),
+            None => return -2,
+        }
+    };
+    // Decode target IDs。 Empty target set is valid (no-op)。
+    let target_slice: &[u8] = if n_targets == 0 {
+        &[]
+    } else if target_ids_buf.is_null()
+        || target_ids_buf_len == 0
+    {
+        return -1;
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                target_ids_buf, target_ids_buf_len)
+        }
+    };
+    let targets: Vec<&str> = if n_targets == 0 {
+        Vec::new()
+    } else {
+        match decode_length_prefixed(
+            target_slice, n_targets)
+        {
+            Some(v) => v.into_iter().map(|b| {
+                std::str::from_utf8(b).unwrap_or("")
+            }).collect(),
+            None => return -2,
+        }
+    };
+    let (kept, removed) =
+        forget_cascade::forget_cascade_filter_ids(
+            &records, &targets);
+    if !out_kept_indices.is_null() {
+        let kept_slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                out_kept_indices, kept.len())
+        };
+        kept_slice.copy_from_slice(&kept);
+    }
+    if !out_removed_indices.is_null() {
+        let rem_slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                out_removed_indices, removed.len())
+        };
+        rem_slice.copy_from_slice(&removed);
+    }
+    unsafe {
+        *out_kept_count = kept.len();
+        *out_removed_count = removed.len();
+    }
+    0
+}
+
+// MARK: - chapter 七百十三 第四刀 Provenance filter C ABI
+
+/// Provenance gate for one envelope。 Hash hex strings passed
+/// in as raw bytes (caller guarantees UTF-8)。
+///
+/// Inputs:
+///   - `training_corpus_hash_hex` / len  : training-corpus hash
+///   - `trained_weights_hash_hex` / len  : trained-weights hash
+///   - `tier_ordinal`                    : 0..=3
+///                                         (0=Illustrative,
+///                                          3=DomainExpertReviewed)
+///   - `has_signature_ref`               : 0 or 1
+///   - `has_issued_at`                   : 0 or 1
+///
+/// Returns:
+///   ≥ 0 — rejection code (see provenance::rejection_code)
+///         0 = permitted,1-7 = typed rejection variants
+///   -1  — null pointer or bad ordinal
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_ranker_provenance_rejection_code(
+    training_corpus_hash_hex: *const u8,
+    training_corpus_hash_hex_len: usize,
+    trained_weights_hash_hex: *const u8,
+    trained_weights_hash_hex_len: usize,
+    tier_ordinal: i32,
+    has_signature_ref: i32,
+    has_issued_at: i32,
+) -> i32 {
+    if training_corpus_hash_hex.is_null()
+        || trained_weights_hash_hex.is_null()
+    {
+        return -1;
+    }
+    let tier = match provenance::Tier::from_ordinal(
+        tier_ordinal)
+    {
+        Some(t) => t,
+        None => return -1,
+    };
+    let tc_bytes = unsafe {
+        core::slice::from_raw_parts(
+            training_corpus_hash_hex,
+            training_corpus_hash_hex_len)
+    };
+    let tw_bytes = unsafe {
+        core::slice::from_raw_parts(
+            trained_weights_hash_hex,
+            trained_weights_hash_hex_len)
+    };
+    let tc_str = match std::str::from_utf8(tc_bytes) {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    let tw_str = match std::str::from_utf8(tw_bytes) {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    let p = provenance::Provenance {
+        training_corpus_hash_hex: tc_str,
+        trained_weights_hash_hex: tw_str,
+        tier,
+        has_attestation_signature_ref: has_signature_ref != 0,
+        has_attestation_issued_at: has_issued_at != 0,
+    };
+    let r = provenance::rejection_reason(&p);
+    provenance::rejection_code(r.as_ref())
+}
+
 /// Helper:decode a length-prefixed flat buffer into `n` slice
 /// references。 Returns None if the size prefixes don't consume
 /// exactly `buf.len()` bytes for `n` records。
