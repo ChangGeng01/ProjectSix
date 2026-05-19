@@ -184,9 +184,21 @@ public actor BASAutoRouteCalibrationStore {
     ///
     /// Returns the validated (or freshly-measured) report。
     /// `calibrateFn` lets callers inject test doubles。
+    /// chapter 七百三十 第三刀 / M2323 — bumped from 1 → 2
+    /// so existing host caches calibrated against chapter
+    /// 七百二十's threshold set re-tune on next launch。 The
+    /// chapter 七百二十一-七百二十九 arc added new auto-router
+    /// families (BPE / int8 / PQ) whose thresholds aren't
+    /// represented in v1 caches。 Re-calibration on next launch
+    /// captures them honestly per the chapter 七百十 measurement
+    /// -first discipline。
+    public static let currentSchemaVersion: Int = 2
+
     public static func loadOrCalibrate(
         cacheURL: URL,
-        expectedSchemaVersion: Int = 1,
+        expectedSchemaVersion: Int =
+            BASAutoRouteCalibrationStore
+                .currentSchemaVersion,
         expectedSubstrateVersion: String,
         expectedDeviceFingerprint: String,
         maxAgeSec: Int64 = defaultMaxAgeSec,
