@@ -82,7 +82,17 @@ let package = Package(
         // resolves in BASMonotonicNanos。
         .target(
             name: "BASRuntimeCore",
-            dependencies: ["BASCSystemBridge"],
+            // chapter 七百六 第三刀 — BASAutoRouteRanker calls
+            // bas_ranker_*_simd + bas_substrate_sha256 from
+            // the Rust XCFramework。 Platform-gated to iOS/macOS
+            // matching the binary target。
+            dependencies: [
+                "BASCSystemBridge",
+                .target(
+                    name: "BASRustMemoryTrackerBinary",
+                    condition: .when(
+                        platforms: [.iOS, .macOS]))
+            ],
             // M2250 chapter 七百三十六 PHASE B-2 —
             // BASContextClassifier.mlmodel is the first
             // REAL ML adapter (G11 / G8 fulfillment).
