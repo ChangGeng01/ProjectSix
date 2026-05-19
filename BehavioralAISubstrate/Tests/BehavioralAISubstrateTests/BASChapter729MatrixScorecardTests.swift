@@ -246,8 +246,10 @@ final class BASChapter729MatrixScorecardTests: XCTestCase {
         }
         XCTAssertEqual(pq?.rowCount, 10)
         let q = (0..<32).map { Float($0) / 32.0 - 0.5 }
-        let results = try? pq?.topK(query: q, k: 3)
-        XCTAssertEqual(results??.count, 3)
+        if let pq = pq {
+            let results = try? pq.topK(query: q, k: 3)
+            XCTAssertEqual(results?.count, 3)
+        }
         #endif
     }
 }
