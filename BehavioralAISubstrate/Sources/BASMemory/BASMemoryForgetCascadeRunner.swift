@@ -1,6 +1,16 @@
 import Foundation
 import BASRuntimeCore
 
+// chapter 七百十七 第一刀 / M2256 — Per matrix「Rust:forget
+// cascade」 the partition primitive lives in
+// bas-retrieval-ranker (chapter 七百十三 第一刀)。 The
+// `useRoutedFilter` feature flag below gates whether the
+// production `apply()` method routes its set-partition through
+// the Rust C ABI。 Per chapter 七百十六 lesson:flip only when
+// chapter 七百十七 第二刀 perf measurement shows Rust wins for
+// typical cascade sizes (rootTargets ~1-10, dependentRefs
+// ~0-50, records ~10-1000)。
+
 /// M101 — `BASMemoryForgetCascadeRunner`: substrate-side pure-value
 /// executor for L8 forget cascades.
 ///
@@ -147,6 +157,20 @@ public struct BASForgetCascadeOutcome: BASSchemaVersioned, Equatable {
 public struct BASMemoryForgetCascadeRunner: Sendable {
     public init() {}
 
+    /// chapter 七百十七 第一刀 — opt-in feature flag。 When ON,
+    /// `apply()` routes the set-partition step through
+    /// `BASAutoRouteRanker.forgetCascadeFilter` (Rust C ABI)
+    /// instead of the inline `Set<String>` partition。
+    ///
+    /// Default `false` preserves the V1 byte-pinned Swift path
+    /// until chapter 七百十七 第二刀 measurement confirms a
+    /// production speedup。 The byte-equality test in
+    /// `BASChapter717ForgetCascadeByteEqualityTests` proves
+    /// both paths produce identical (remainingRecords,
+    /// removedIDs) for any input。
+    public nonisolated(unsafe) static var useRoutedFilter:
+        Bool = false
+
     /// Apply a forget cascade to a memory field.
     ///
     /// Behavior:
@@ -207,26 +231,63 @@ public struct BASMemoryForgetCascadeRunner: Sendable {
                     finishedAt: finishedAt))
         }
 
-        // Union the target IDs. Set for O(1) membership checks.
-        var targetIDs = Set<String>()
-        for id in cascade.rootTargets {
-            targetIDs.insert(id)
-        }
-        for id in cascade.dependentRefs {
-            targetIDs.insert(id)
-        }
-
-        // Match records. Removed list preserves the field's
-        // insertion order so audit replay sees a deterministic
-        // sequence.
+        // chapter 七百十七 第一刀 / M2256 — partition routes
+        // either through the Rust forgetCascadeFilter (when
+        // flag on) or through the inline Swift Set<String>
+        // partition (legacy default)。 Both paths produce
+        // (remainingRecords,removedIDs) with identical
+        // insertion-order semantics — pinned by
+        // BASChapter717ForgetCascadeByteEqualityTests。
+        //
+        // LEGACY PATH (kept,unchanged when flag is off):
+        //     var targetIDs = Set<String>()
+        //     for id in cascade.rootTargets {
+        //         targetIDs.insert(id) }
+        //     for id in cascade.dependentRefs {
+        //         targetIDs.insert(id) }
+        //     for record in field.records {
+        //         if targetIDs.contains(record.memoryID) {
+        //             removedIDs.append(record.memoryID)
+        //         } else { remainingRecords.append(record) }
+        //     }
         var remainingRecords: [BASTemporalMemoryRecord] = []
         var removedIDs: [String] = []
         remainingRecords.reserveCapacity(field.records.count)
-        for record in field.records {
-            if targetIDs.contains(record.memoryID) {
-                removedIDs.append(record.memoryID)
-            } else {
-                remainingRecords.append(record)
+        if Self.useRoutedFilter {
+            // Route through Rust C ABI。 Build ID arrays once,
+            // partition once,then materialize record slices。
+            let recordIDs = field.records.map {
+                $0.memoryID }
+            var targetIDsArray = cascade.rootTargets
+            targetIDsArray.append(
+                contentsOf: cascade.dependentRefs)
+            let r = BASAutoRouteRanker.forgetCascadeFilter(
+                recordIds: recordIDs,
+                targetIds: targetIDsArray)
+            removedIDs.reserveCapacity(
+                r.value.removed.count)
+            for i in r.value.kept {
+                remainingRecords.append(
+                    field.records[i])
+            }
+            for i in r.value.removed {
+                removedIDs.append(recordIDs[i])
+            }
+        } else {
+            // Inline Set<String> partition — legacy path。
+            var targetIDs = Set<String>()
+            for id in cascade.rootTargets {
+                targetIDs.insert(id)
+            }
+            for id in cascade.dependentRefs {
+                targetIDs.insert(id)
+            }
+            for record in field.records {
+                if targetIDs.contains(record.memoryID) {
+                    removedIDs.append(record.memoryID)
+                } else {
+                    remainingRecords.append(record)
+                }
             }
         }
 
