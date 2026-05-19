@@ -1,0 +1,18 @@
+[package]
+name = "bas-memory-atom-store"
+description = "chapter 七百三 第二刀 — Rust port of BASMemoryUsageTracker in-memory mode + BASKVCacheRegistry + BASMemoryAtomEventPayload codec。 In-memory store with deterministic ordering + TTL-based KV cache + atom event encoding/decoding"
+license.workspace = true
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+bas-substrate-core = { path = "../bas-substrate-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+proptest = "1.4"

@@ -20,6 +20,7 @@
 members = [
     "bas-memory-usage-tracker",
     "bas-substrate-core",          # chapter 七百三 第一刀 / M2171
+    "bas-memory-atom-store",       # chapter 七百三 第二刀 / M2172
 ]
 resolver = "2"
 
