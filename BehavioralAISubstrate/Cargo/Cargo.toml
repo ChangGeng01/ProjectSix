@@ -22,6 +22,10 @@ members = [
     "bas-substrate-core",          # chapter 七百三 第一刀 / M2171
     "bas-memory-atom-store",       # chapter 七百三 第二刀 / M2172
     "bas-retrieval-ranker",        # chapter 七百三 第三刀 / M2173
+    "bas-canonical-bytes",         # chapter 七百三 第四刀 / M2174
+    "bas-permit-policy",           # chapter 七百三 第四刀 / M2174
+    "bas-event-log-codec",         # chapter 七百三 第四刀 / M2174
+    "bas-runtime-frame",           # chapter 七百三 第四刀 / M2174
 ]
 resolver = "2"
 

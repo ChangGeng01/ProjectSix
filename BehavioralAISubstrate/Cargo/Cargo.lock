@@ -15,6 +15,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "bas-canonical-bytes"
+version = "0.1.0"
+dependencies = [
+ "bas-substrate-core",
+]
+
+[[package]]
+name = "bas-event-log-codec"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bas-memory-atom-store"
 version = "0.1.0"
 dependencies = [
@@ -32,10 +47,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bas-permit-policy"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bas-retrieval-ranker"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "bas-runtime-frame"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
