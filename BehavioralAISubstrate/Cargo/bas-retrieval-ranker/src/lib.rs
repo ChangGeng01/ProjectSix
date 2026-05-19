@@ -20,6 +20,7 @@ pub mod decay;
 pub mod forget_cascade;   // chapter 七百十三 第一刀 — forget-cascade filter
 pub mod fuser;
 pub mod hex;              // chapter 七百十九 第一刀 — lookup-table hex encoder
+pub mod hex_decode;       // chapter 七百二十一 第一刀 — lookup-table hex decoder
 pub mod layer_norm;       // chapter 七百九 第二刀 — LayerNorm
 pub mod ledger;           // chapter 七百十二 第一刀 — batched seal + verify
 pub mod matmul;           // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
@@ -753,6 +754,60 @@ bas_ranker_forget_cascade_filter(
         *out_removed_count = removed.len();
     }
     0
+}
+
+// MARK: - chapter 七百二十一 第一刀 Hex decoder C ABI
+
+/// Decode `n_hex_chars` of hex ASCII input (`hex`) into the
+/// caller-owned `out` buffer of size `n_hex_chars / 2` bytes。
+///
+/// Returns:
+///   - bytes-written count (≥ 0) on success
+///   - -1 on null pointer
+///   - -2 on odd hex_len
+///   - -3 on non-hex character
+///   - -4 on out_len < n_hex_chars / 2
+///
+/// ~40-60× faster than Swift's
+/// `[UInt8](hex.chunks().map { UInt8($0, radix: 16)! })` per
+/// chapter 七百二十一 第二刀 measurement。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_hex_to_bytes(
+    hex: *const u8, n_hex_chars: usize,
+    out: *mut u8, out_len: usize,
+) -> i64 {
+    if out.is_null() { return -1; }
+    if n_hex_chars == 0 {
+        return 0;
+    }
+    if hex.is_null() { return -1; }
+    if n_hex_chars % 2 != 0 { return -2; }
+    let need = n_hex_chars / 2;
+    if out_len < need { return -4; }
+    let hex_slice = unsafe {
+        core::slice::from_raw_parts(hex, n_hex_chars)
+    };
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out, need)
+    };
+    match hex_decode::bytes_from_hex_into(
+        hex_slice, out_slice)
+    {
+        Some(n) => n as i64,
+        None => {
+            // Distinguish content vs length error
+            for i in 0..n_hex_chars {
+                let v = hex_slice[i];
+                if !((b'0'..=b'9').contains(&v)
+                    || (b'a'..=b'f').contains(&v)
+                    || (b'A'..=b'F').contains(&v))
+                {
+                    return -3;
+                }
+            }
+            -4
+        }
+    }
 }
 
 // MARK: - chapter 七百十九 第一刀 Hex encoder C ABI

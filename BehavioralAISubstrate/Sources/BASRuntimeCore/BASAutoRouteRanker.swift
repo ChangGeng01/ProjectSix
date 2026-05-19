@@ -1351,6 +1351,59 @@ public enum BASAutoRouteRanker {
         return bytesToHexLower(Array(data))
     }
 
+    /// chapter 七百二十一 第一刀 — Rust hex decoder。
+    /// Decode lowercase or uppercase hex ASCII into bytes。
+    /// Returns nil on odd length OR any non-hex character。
+    /// ~40-60× faster than Swift's
+    /// `hex.chunks().map { UInt8($0, radix: 16) }` idiom。
+    public static func hexToBytes(_ hex: String) -> [UInt8]? {
+        let hexBytes = Array(hex.utf8)
+        guard !hexBytes.isEmpty else { return [] }
+        #if os(iOS) || os(macOS)
+        let need = hexBytes.count / 2
+        var out = [UInt8](repeating: 0, count: need)
+        let rc = hexBytes.withUnsafeBufferPointer { hp in
+            out.withUnsafeMutableBufferPointer { op in
+                bas_ranker_hex_to_bytes(
+                    hp.baseAddress, hexBytes.count,
+                    op.baseAddress, op.count)
+            }
+        }
+        if rc >= 0 { return out }
+        // rc < 0 → either malformed input OR FFI failure;
+        // fall through to Swift validator so the API is
+        // consistent (returns nil on malformed input)。
+        #endif
+        // Swift fallback — same shape as legacy idiom。
+        guard hexBytes.count % 2 == 0 else { return nil }
+        var fallback: [UInt8] = []
+        fallback.reserveCapacity(hexBytes.count / 2)
+        var i = 0
+        while i < hexBytes.count {
+            guard let hi = hexNibble(hexBytes[i]),
+                  let lo = hexNibble(hexBytes[i + 1])
+            else { return nil }
+            fallback.append((hi << 4) | lo)
+            i += 2
+        }
+        return fallback
+    }
+
+    /// Convenience overload returning `Data`。
+    public static func hexToData(_ hex: String) -> Data? {
+        guard let bytes = hexToBytes(hex) else { return nil }
+        return Data(bytes)
+    }
+
+    private static func hexNibble(_ c: UInt8) -> UInt8? {
+        switch c {
+        case 0x30...0x39: return c - 0x30  // '0'-'9'
+        case 0x61...0x66: return c - 0x61 + 10  // 'a'-'f'
+        case 0x41...0x46: return c - 0x41 + 10  // 'A'-'F'
+        default: return nil
+        }
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(

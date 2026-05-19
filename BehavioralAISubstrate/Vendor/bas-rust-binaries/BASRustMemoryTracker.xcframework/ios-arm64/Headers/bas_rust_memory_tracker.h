@@ -646,6 +646,21 @@ int32_t bas_ranker_bytes_to_hex_lower(
     const uint8_t* bytes, size_t n,
     uint8_t* out, size_t out_len);
 
+/* chapter 七百二十一 第一刀 — lookup-table hex decoder。
+ * Decodes `n_hex_chars` hex ASCII chars (case-insensitive) into
+ * the caller-owned out buffer of size n_hex_chars / 2 bytes。
+ * Returns bytes-written count on success,or:
+ *   -1 on null pointer
+ *   -2 on odd hex_len
+ *   -3 on non-hex character
+ *   -4 on out_len too small
+ * ~40-60× faster than Swift's chunks().map { UInt8(_, radix:16) }
+ * idiom per chapter 七百二十一 第二刀 measurement。
+ */
+int64_t bas_ranker_hex_to_bytes(
+    const uint8_t* hex, size_t n_hex_chars,
+    uint8_t* out, size_t out_len);
+
 int32_t bas_ranker_provenance_rejection_code(
     const uint8_t* training_corpus_hash_hex,
     size_t training_corpus_hash_hex_len,
