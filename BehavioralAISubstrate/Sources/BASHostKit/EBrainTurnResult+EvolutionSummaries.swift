@@ -5,6 +5,9 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustCoreBridge
 
 // MARK: - M71 split — BASEBrainTurnResult evolution summary computations.
 // Formerly part of the 6099-line EBrainRuntimeCoordinator.swift; split by cohesion
@@ -232,8 +235,23 @@ extension BASEBrainTurnResult {
         return head.joined(separator: ", ")
     }
 
+    /// chapter 七百二 native-port — Rust-sourced fingerprint;
+    /// legacy CryptoKit body preserved per 全comment 不要删除。
     func fingerprint(for value: String) -> String {
-        SHA256.hash(data: Data(value.utf8))
+        let data = Data(value.utf8)
+        if let rust = try? BASRustLedgerCore.sha256(data) {
+            return rust.compactMap {
+                String(format: "%02x", $0)
+            }.joined()
+        }
+        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+        /*
+         * Pre-chapter-702 Swift implementation:
+         *     SHA256.hash(data: Data(value.utf8))
+         *         .compactMap { String(format: "%02x", $0) }
+         *         .joined()
+         */
+        return SHA256.hash(data: data)
             .compactMap { String(format: "%02x", $0) }
             .joined()
     }
@@ -349,9 +367,31 @@ extension BASEBrainTurnResult {
             + integrityFailedChecks
             + integrityContaminationRefs
         ).joined(separator: "||")
-        let integrityVerificationHash = SHA256.hash(data: Data(integrityVerificationSeed.utf8))
-            .compactMap { String(format: "%02x", $0) }
-            .joined()
+        // chapter 七百二 native-port — Rust-sourced integrity-
+        // verification hash;legacy CryptoKit body preserved。
+        let integrityVerificationSeedData = Data(
+            integrityVerificationSeed.utf8)
+        let integrityVerificationHash: String
+        if let rust = try? BASRustLedgerCore.sha256(
+            integrityVerificationSeedData)
+        {
+            integrityVerificationHash = rust.compactMap {
+                String(format: "%02x", $0)
+            }.joined()
+        } else {
+            // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+            /*
+             * Pre-chapter-702 Swift implementation:
+             *     let integrityVerificationHash =
+             *         SHA256.hash(data: Data(integrityVerificationSeed.utf8))
+             *             .compactMap { String(format: "%02x", $0) }
+             *             .joined()
+             */
+            integrityVerificationHash = SHA256.hash(
+                data: integrityVerificationSeedData)
+                .compactMap { String(format: "%02x", $0) }
+                .joined()
+        }
         return BASEvolutionFoldedLungSummary(
             morphGraphID: morphGraphID,
             hotColdMapID: hotColdMapID,

@@ -25,6 +25,9 @@
 
 import CryptoKit
 import Foundation
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustCoreBridge
 @_exported import BASAdmin
 @_exported import BASAppleAdapters
 @_exported import BASEvaluation
@@ -831,9 +834,23 @@ public struct BASHostRuntime: Sendable {
         ]
     }
 
+    /// chapter 七百二 native-port — Rust-sourced deterministic
+    /// UUID;legacy CryptoKit body preserved per 全comment 不要删除。
     private func deterministicUUID(for value: String) -> UUID {
-        let digest = SHA256.hash(data: Data(value.utf8))
-        let bytes = Array(digest.prefix(16))
+        let data = Data(value.utf8)
+        let bytes: [UInt8]
+        if let rust = try? BASRustLedgerCore.sha256(data) {
+            bytes = Array(rust.prefix(16))
+        } else {
+            // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+            /*
+             * Pre-chapter-702 Swift implementation:
+             *     let digest = SHA256.hash(data: Data(value.utf8))
+             *     let bytes = Array(digest.prefix(16))
+             */
+            let digest = SHA256.hash(data: data)
+            bytes = Array(digest.prefix(16))
+        }
         return UUID(uuid: (
             bytes[0], bytes[1], bytes[2], bytes[3],
             bytes[4], bytes[5], bytes[6], bytes[7],
@@ -842,8 +859,23 @@ public struct BASHostRuntime: Sendable {
         ))
     }
 
+    /// chapter 七百二 native-port — Rust-sourced fingerprint;
+    /// legacy CryptoKit body preserved per 全comment 不要删除。
     private func fingerprint(for value: String) -> String {
-        SHA256.hash(data: Data(value.utf8))
+        let data = Data(value.utf8)
+        if let rust = try? BASRustLedgerCore.sha256(data) {
+            return rust.compactMap {
+                String(format: "%02x", $0)
+            }.joined()
+        }
+        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+        /*
+         * Pre-chapter-702 Swift implementation:
+         *     SHA256.hash(data: Data(value.utf8))
+         *         .compactMap { String(format: "%02x", $0) }
+         *         .joined()
+         */
+        return SHA256.hash(data: data)
             .compactMap { String(format: "%02x", $0) }
             .joined()
     }

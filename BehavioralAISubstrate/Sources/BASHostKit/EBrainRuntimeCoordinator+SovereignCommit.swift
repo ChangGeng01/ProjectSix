@@ -5,6 +5,9 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustCoreBridge
 // M320 — `BASUnknownReserve` is defined in BASWorldPrior and is
 // referenced by the optional audit-entry parameter introduced in
 // chapter 七十五.
@@ -1654,11 +1657,27 @@ extension BASEBrainRuntimeCoordinator {
             ?? "snapshot.\(sessionID).\(thoughtFold.foldID)"
     }
 
+    /// chapter 七百二 native-port — Rust-sourced SHA256;
+    /// legacy CryptoKit body preserved per 全comment 不要删除。
     func sovereignDigestHex(
         _ components: [String]
     ) -> String {
         let payload = components.joined(separator: "|")
-        let digest = SHA256.hash(data: Data(payload.utf8))
+        let payloadData = Data(payload.utf8)
+        // LIVE PATH — Rust-sourced SHA256。
+        if let rust = try? BASRustLedgerCore.sha256(
+            payloadData)
+        {
+            return rust.map { String(format: "%02x", $0) }
+                .joined()
+        }
+        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+        /*
+         * Pre-chapter-702 Swift implementation:
+         *     let digest = SHA256.hash(data: Data(payload.utf8))
+         *     return digest.map { String(format: "%02x", $0) }.joined()
+         */
+        let digest = SHA256.hash(data: payloadData)
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
