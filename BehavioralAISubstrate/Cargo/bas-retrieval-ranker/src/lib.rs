@@ -17,6 +17,7 @@
 pub mod cosine;
 pub mod decay;
 pub mod fuser;
+pub mod simd;       // chapter 七百五 第二刀 — SIMD-accelerated math
 pub mod topk;
 
 pub const ABI_VERSION: i32 = 1;
@@ -78,6 +79,82 @@ pub unsafe extern "C" fn bas_ranker_l2_norm(
     }
     let s = unsafe { core::slice::from_raw_parts(v, v_len) };
     unsafe { *out_norm = cosine::l2_norm(s); }
+    0
+}
+
+/// SIMD-accelerated cosine similarity — chapter 七百五 第二刀。
+/// Same surface as `bas_ranker_cosine_similarity` but routes
+/// through the 4-wide unrolled implementation that LLVM
+/// auto-vectorizes to NEON on aarch64 + SSE2 on x86_64。
+/// Faster than the scalar baseline for vectors of length ≥ 8。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_cosine_similarity_simd(
+    a: *const f32,
+    a_len: usize,
+    b: *const f32,
+    b_len: usize,
+    out_score: *mut f32,
+) -> i32 {
+    if a.is_null() || b.is_null() || out_score.is_null() {
+        return -1;
+    }
+    if a_len == 0 { return -1; }
+    if a_len != b_len { return -2; }
+    let a_slice = unsafe {
+        core::slice::from_raw_parts(a, a_len)
+    };
+    let b_slice = unsafe {
+        core::slice::from_raw_parts(b, b_len)
+    };
+    let s = simd::cosine_similarity_simd(a_slice, b_slice);
+    unsafe { *out_score = s; }
+    0
+}
+
+/// SIMD-accelerated L2 norm — chapter 七百五 第二刀。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_l2_norm_simd(
+    v: *const f32,
+    v_len: usize,
+    out_norm: *mut f32,
+) -> i32 {
+    if v.is_null() || out_norm.is_null() || v_len == 0 {
+        return -1;
+    }
+    let s = unsafe { core::slice::from_raw_parts(v, v_len) };
+    unsafe { *out_norm = simd::l2_norm_simd(s); }
+    0
+}
+
+/// SIMD-accelerated batched cosine — chapter 七百五 第二刀。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_batched_cosine_simd(
+    query: *const f32,
+    query_len: usize,
+    corpus: *const f32,
+    corpus_total_len: usize,
+    dim: usize,
+    out_scores: *mut f32,
+) -> i32 {
+    if query.is_null() || corpus.is_null()
+        || out_scores.is_null()
+    { return -1; }
+    if dim == 0 || query_len != dim { return -1; }
+    if corpus_total_len % dim != 0 { return -1; }
+    let rows = corpus_total_len / dim;
+    let q = unsafe {
+        core::slice::from_raw_parts(query, query_len)
+    };
+    let c = unsafe {
+        core::slice::from_raw_parts(corpus, corpus_total_len)
+    };
+    let scores = simd::batched_cosine_simd(q, c, dim);
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, rows)
+    };
+    for (i, s) in scores.iter().enumerate() {
+        out_slice[i] = *s;
+    }
     0
 }
 

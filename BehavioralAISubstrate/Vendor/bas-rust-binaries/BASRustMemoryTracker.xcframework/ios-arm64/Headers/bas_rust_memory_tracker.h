@@ -469,6 +469,32 @@ int32_t bas_ranker_batched_cosine(
     size_t dim,
     float* out_scores);
 
+// MARK: - chapter 七百五 第二刀 SIMD-accelerated variants
+//
+// Same math as the scalar paths above but routed through the
+// 4-wide unrolled implementation that LLVM auto-vectorizes to
+// NEON / SSE。 Faster than the scalar baseline for dim >= 8。
+
+int32_t bas_ranker_cosine_similarity_simd(
+    const float* a,
+    size_t a_len,
+    const float* b,
+    size_t b_len,
+    float* out_score);
+
+int32_t bas_ranker_l2_norm_simd(
+    const float* v,
+    size_t v_len,
+    float* out_norm);
+
+int32_t bas_ranker_batched_cosine_simd(
+    const float* query,
+    size_t query_len,
+    const float* corpus,
+    size_t corpus_total_len,
+    size_t dim,
+    float* out_scores);
+
 #ifdef __cplusplus
 }
 #endif
