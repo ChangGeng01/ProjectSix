@@ -2619,6 +2619,46 @@ extension BASCognitiveBrain {
             x, eps: eps, thresholds: thresholds)
     }
 
+    /// chapter 七百十一 第四刀 / M2229 — auto-routed GELU exact。
+    ///
+    /// y = 0.5*x*(1 + erf(x/√2))。 Matches
+    /// torch.nn.functional.gelu (default mode)。 Always routes
+    /// through Rust scalar (measured M-series win — SIMD parity
+    /// within ±1% since erf cost dominates)。
+    public nonisolated static func geluAuto(
+        _ x: [Float]
+    ) -> BASAutoRouteResult<[Float]> {
+        return BASAutoRouteRanker.gelu(x)
+    }
+
+    /// chapter 七百十一 第四刀 / M2229 — auto-routed GELU tanh
+    /// approximation。
+    ///
+    /// y = 0.5*x*(1 + tanh(√(2/π)*(x + 0.044715*x³)))。 Matches
+    /// torch.nn.functional.gelu(approximate="tanh")。 Routes
+    /// between Rust scalar (dim < 256) and Rust SIMD (dim ≥ 256)
+    /// per measured crossover。
+    public nonisolated static func geluTanhAuto(
+        _ x: [Float],
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<[Float]> {
+        return BASAutoRouteRanker.geluTanhApprox(
+            x, thresholds: thresholds)
+    }
+
+    /// chapter 七百十一 第四刀 / M2229 — auto-routed SiLU
+    /// (= Swish, beta=1)。
+    ///
+    /// y = x*σ(x) = x/(1+e⁻ˣ)。 Matches
+    /// torch.nn.functional.silu。 Always routes through Rust
+    /// scalar (measured M-series win — SIMD parity within ±2%
+    /// since sigmoid's exp() cost dominates the loop)。
+    public nonisolated static func siluAuto(
+        _ x: [Float]
+    ) -> BASAutoRouteResult<[Float]> {
+        return BASAutoRouteRanker.silu(x)
+    }
+
     /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
     public func matMulAuto(
         a: [Float], aRows: Int, aCols: Int,
