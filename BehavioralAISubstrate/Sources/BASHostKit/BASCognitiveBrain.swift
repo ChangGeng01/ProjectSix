@@ -2482,6 +2482,46 @@ extension BASCognitiveBrain {
 
     /// chapter 七百七 第三刀 / M2208 — auto-routed attention。
     ///
+    /// chapter 七百八 第四刀 / M2214 — auto-routed SHA256-hex helper。
+    ///
+    /// Convenience for callers that have a UTF-8 string + want a
+    /// hex digest with the optimal implementation picked by
+    /// measured crossovers (small payloads → Rust pure-sha2,
+    /// large payloads → CryptoKit HW)。
+    public nonisolated static func sha256HexAuto(
+        _ s: String,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<String> {
+        let bytes = Array(s.utf8)
+        let r = BASAutoRouteRanker.sha256(
+            bytes, thresholds: thresholds)
+        let hex = r.value.map {
+            String(format: "%02x", $0)
+        }.joined()
+        return BASAutoRouteResult(
+            value: hex, choice: r.choice)
+    }
+
+    /// chapter 七百八 第四刀 / M2214 — auto-routed HMAC-SHA256
+    /// helper。 Same routing as sha256HexAuto:Rust for small
+    /// payloads,CryptoKit HW for large。 Returns hex-encoded
+    /// 32-byte tag。
+    public nonisolated static func hmacSha256HexAuto(
+        key: String, payload: String,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<String> {
+        let keyBytes = Array(key.utf8)
+        let payloadBytes = Array(payload.utf8)
+        let r = BASAutoRouteRanker.hmacSHA256(
+            key: keyBytes, payload: payloadBytes,
+            thresholds: thresholds)
+        let hex = r.value.map {
+            String(format: "%02x", $0)
+        }.joined()
+        return BASAutoRouteResult(
+            value: hex, choice: r.choice)
+    }
+
     /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
     public func matMulAuto(
         a: [Float], aRows: Int, aCols: Int,
