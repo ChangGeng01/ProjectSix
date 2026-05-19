@@ -1580,6 +1580,39 @@ extension BASCognitiveBrain {
     /// Best-effort: failures surface as (0, false) rather
     /// than throwing。 Hosts wanting strict propagation
     /// can query the underlying stores directly。
+    /// 主线 全面 开发 — expose the 8-channel Metal-derived
+    /// SIGNATURE VECTOR (not the L2-reduced scalar)。
+    ///
+    /// `brain.summary` already computes this internally
+    /// + reduces it to `metalDerivedSignal` (a Float)。
+    /// This entry point exposes the underlying 8-element
+    /// [Float] vector — letting hosts:
+    ///   - Combine with `brain.cosineSimilarity(a, b)`
+    ///     for input-similarity comparison
+    ///   - Store signatures in their own index for NN
+    ///     search across past inputs
+    ///   - Build clustering / dedup features without
+    ///     constructing a new pilot
+    ///
+    /// Returns nil when no Metal loader is wired or the
+    /// dispatch fails。 Returns an 8-element vector on
+    /// success — the y[] output of the SSMScan kernel
+    /// for this input's SHA256-derived channel inputs。
+    ///
+    /// Deterministic:same input → identical 8-vector
+    /// across runs (chapter 392 replay-determinism
+    /// preserved)。 Two inputs with similar SHA256
+    /// prefixes will have similar — but not identical —
+    /// signature vectors。 Two inputs with different
+    /// SHA256 prefixes are statistically guaranteed to
+    /// produce different signature vectors。
+    public func derivedSignalVector(
+        forInput input: String
+    ) async -> [Float]? {
+        return await computeMetalDerivedSignalVector(
+            forInput: input)
+    }
+
     /// 主线 继续 开发 — compute the Metal-derived
     /// deterministic signature for `input`。 Nil when:
     ///   - No Metal loader wired
@@ -1601,6 +1634,28 @@ extension BASCognitiveBrain {
     private func computeMetalDerivedSignal(
         forInput input: String
     ) async -> Float? {
+        guard let y = await
+            computeMetalDerivedSignalVector(
+                forInput: input)
+        else { return nil }
+        // 8D L2 norm — single deterministic scalar
+        // signature with sign invariance。 Richer
+        // input-sensitivity than D=2 while keeping
+        // the same scalar return type。
+        var sumSq: Float = 0
+        for v in y { sumSq += v * v }
+        return sqrt(sumSq)
+    }
+
+    /// 主线 全面 开发 — shared helper:run the SSMScan
+    /// kernel on SHA256-derived 8-channel input and
+    /// return the full 8-element y[] vector。 Both
+    /// `computeMetalDerivedSignal` (reduce to L2 norm)
+    /// AND `derivedSignalVector` (expose raw vector)
+    /// delegate here so the math is single-sourced。
+    private func computeMetalDerivedSignalVector(
+        forInput input: String
+    ) async -> [Float]? {
         guard metalLibraryLoader != nil else {
             return nil
         }
@@ -1641,13 +1696,7 @@ extension BASCognitiveBrain {
                 x: x, delta: delta, A: A, B: B, C: C,
                 shape: shape)
             guard y.count == 8 else { return nil }
-            // 8D L2 norm — single deterministic scalar
-            // signature with sign invariance。 Richer
-            // input-sensitivity than D=2 while keeping
-            // the same scalar return type。
-            var sumSq: Float = 0
-            for v in y { sumSq += v * v }
-            return sqrt(sumSq)
+            return y
         } catch {
             return nil
         }
