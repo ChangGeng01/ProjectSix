@@ -1661,6 +1661,34 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - Aggregations (chapter 七百二十五 第二刀 / M2297)
+    //
+    // Routes through the chapter 七百二十五 第一刀 Rust
+    // `aggregations::usage_count_for_atom`。 Reuses the chapter
+    // 七百二十三 records wire format。
+
+    /// Rust-routed `usageCount(forAtomID:)`。 Returns nil only on
+    /// FFI failure (extremely unlikely from typed Swift input)。
+    public static func usageCountForAtom(
+        records: [BASImportanceRecord],
+        atomID: String
+    ) -> Int? {
+        #if os(iOS) || os(macOS)
+        let recordsBuf = encodeRecordsBuffer(records)
+        let atomIDBytes = Array(atomID.utf8)
+        return recordsBuf.withUnsafeBufferPointer { rp in
+            return atomIDBytes.withUnsafeBufferPointer { ap in
+                let rc = bas_ranker_usage_count_for_atom(
+                    rp.baseAddress, recordsBuf.count,
+                    ap.baseAddress, atomIDBytes.count)
+                return rc >= 0 ? Int(rc) : nil
+            }
+        }
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Wire format helpers (chapter 七百二十三 第二刀)
 
     private static func encodeRecordsBuffer(

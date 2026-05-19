@@ -817,6 +817,19 @@ int64_t bas_ranker_importance_score_all(
 //   ≥ 0 = number of OUTPUT BYTES needed
 //   -1  = null pointer
 //   -2  = invalid UTF-8 in any string field OR invalid kind byte
+// MARK: - chapter 七百二十五 第二刀 — Aggregation C ABI
+//
+// Reuses the chapter 七百二十三 records wire format。 Counts the
+// records that match `atom_id`。
+//
+// Returns:
+//   ≥ 0 = matching record count
+//   -1  = null pointer
+//   -2  = malformed records wire format
+int64_t bas_ranker_usage_count_for_atom(
+    const uint8_t* records_buf, size_t records_len,
+    const uint8_t* atom_id_buf, size_t atom_id_len);
+
 int64_t bas_event_log_encode_binary(
     uint8_t kind,
     const uint8_t* entry_id, size_t entry_id_len,

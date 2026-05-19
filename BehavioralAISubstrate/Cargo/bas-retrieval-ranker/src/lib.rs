@@ -1085,6 +1085,70 @@ fn serialize_scores(
     out
 }
 
+// MARK: - chapter 七百二十五 第二刀 Aggregation C ABI
+//
+// Reuses the chapter 七百二十三 records wire format (BIG-ENDIAN
+// length prefixes)。 Mirrors `usage_count_for_atom`'s O(N) scan
+// over the same record list shape:
+//
+//   records_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 atom_id_len][atom_id bytes]
+//       [i64 retrieved_at_ms]
+//       [u8 helped_flag]
+
+/// Count records whose `atom_id` matches the caller-supplied
+/// `atom_id`。
+///
+/// Returns:
+///   ≥ 0 = matching record count
+///   -1  = null pointer (with non-zero length)
+///   -2  = malformed records wire format
+///
+/// # Safety
+/// Caller provides readable buffers of declared lengths。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_usage_count_for_atom(
+    records_buf: *const u8,
+    records_len: usize,
+    atom_id_buf: *const u8,
+    atom_id_len: usize,
+) -> i64 {
+    if records_buf.is_null() && records_len > 0 {
+        return -1;
+    }
+    if atom_id_buf.is_null() && atom_id_len > 0 {
+        return -1;
+    }
+    let records_slice = if records_len == 0 {
+        &[][..]
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                records_buf, records_len)
+        }
+    };
+    let atom_id_slice = if atom_id_len == 0 {
+        &[][..]
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                atom_id_buf, atom_id_len)
+        }
+    };
+    let records = match parse_records(records_slice) {
+        Some(r) => r,
+        None => return -2,
+    };
+    let atom_id = match core::str::from_utf8(atom_id_slice) {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    aggregations::usage_count_for_atom(
+        &records, atom_id) as i64
+}
+
 // MARK: - chapter 七百十三 第四刀 Provenance filter C ABI
 
 /// Provenance gate for one envelope。 Hash hex strings passed
