@@ -2522,6 +2522,79 @@ extension BASCognitiveBrain {
             value: hex, choice: r.choice)
     }
 
+    /// chapter 七百十 第三刀 / M2223 — calibrate auto-router
+    /// thresholds against THIS host's CPU。 Returns a fresh
+    /// BASAutoRouteCalibrationReport that callers can pass to
+    /// any auto-routed primitive via the `thresholds:`
+    /// parameter for measured-correct routing。
+    ///
+    /// Cost: ~2 seconds (`.fast`) or ~10 seconds
+    /// (`.thorough`)。 Hosts typically call this once at
+    /// startup + cache the result via
+    /// BASAutoRouteCalibrationStore。
+    public nonisolated static func calibrateAutoRoute(
+        depth: BASAutoRouteCalibrationDepth = .fast
+    ) -> BASAutoRouteCalibrationReport {
+        return BASAutoRouteCalibrator.calibrate(
+            depth: depth,
+            substrateVersion: substrateAutoRouteSchemaVersion)
+    }
+
+    /// chapter 七百十 第三刀 — substrate version pin used by
+    /// the calibration cache for schema invalidation。 Bumping
+    /// this constant retires any older cached reports。
+    public nonisolated static let
+        substrateAutoRouteSchemaVersion: String = "1.0.0"
+
+    /// chapter 七百十 第三刀 — convenience wrapper around the
+    /// calibration store。 Loads from `cacheURL` if a fresh,
+    /// host-matching cache exists;otherwise recalibrates +
+    /// saves a new cache。 Both load + save are best-effort —
+    /// any IO failure falls through to a fresh in-memory
+    /// calibration so the substrate boot path is never blocked。
+    public nonisolated static func loadOrCalibrateAutoRoute(
+        cacheURL: URL,
+        maxAgeSec: Int64 = BASAutoRouteCalibrationStore
+            .defaultMaxAgeSec,
+        depth: BASAutoRouteCalibrationDepth = .fast
+    ) -> BASAutoRouteCalibrationReport {
+        // Compute fingerprint up-front so calibrateFn closure
+        // can attribute the calibration to the same host。
+        let fingerprint =
+            BASCognitiveBrain.currentDeviceFingerprint()
+        return BASAutoRouteCalibrationStore.loadOrCalibrate(
+            cacheURL: cacheURL,
+            expectedSchemaVersion: 1,
+            expectedSubstrateVersion:
+                substrateAutoRouteSchemaVersion,
+            expectedDeviceFingerprint: fingerprint,
+            maxAgeSec: maxAgeSec,
+            depth: depth,
+            calibrateFn: {
+                BASAutoRouteCalibrator.calibrate(
+                    depth: depth,
+                    deviceFingerprint: fingerprint,
+                    substrateVersion:
+                        substrateAutoRouteSchemaVersion)
+            })
+    }
+
+    /// Stable fingerprint for the current host。 Exposed so
+    /// tests can inject a known value via the calibrator's
+    /// `deviceFingerprint:` parameter。
+    public nonisolated static func currentDeviceFingerprint()
+        -> String
+    {
+        let info = ProcessInfo.processInfo
+        var hw = "host"
+        #if os(macOS) || os(iOS)
+        hw = info.hostName
+        #endif
+        return
+            "\(hw)::cores=\(info.activeProcessorCount)"
+            + "::os=\(info.operatingSystemVersionString)"
+    }
+
     /// chapter 七百九 第四刀 / M2219 — auto-routed softmax。
     ///
     /// Always routes through Rust scalar (measured tie with
