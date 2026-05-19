@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 /// M343 — typed provenance envelope for trained adapter weights.
 /// Fills the **typed pin** leg of the v5 doctrine triple
@@ -219,6 +220,21 @@ public struct BASOrganTrainedWeightProvenance:
 /// authoring-ready.
 public enum BASOrganTrainedWeightFilter {
 
+    /// chapter 七百十七 第三刀 — opt-in feature flag。 When ON,
+    /// `rejectionReason(for:)` routes the decision tree through
+    /// `BASAutoRouteRanker.provenanceFilter` (Rust C ABI from
+    /// chapter 七百十三 第二刀)。
+    ///
+    /// Default `false` per chapter 七百十六/七百十七 第二刀 lesson:
+    /// FFI overhead typically eats small-payload routing wins。
+    /// The byte-equality test in
+    /// BASChapter717ProvenanceByteEqualityTests proves both
+    /// paths produce identical decisions。 Knife 4 will
+    /// measure to confirm/refute the FFI-loses hypothesis。
+    public nonisolated(unsafe) static var useRoutedFilter:
+        Bool = false
+
+
     /// Typed rejection reasons. Calling sites switch on case for
     /// stable telemetry / audit reasons.
     public enum Rejection:
@@ -268,6 +284,15 @@ public enum BASOrganTrainedWeightFilter {
     public static func rejectionReason(
         for provenance: BASOrganTrainedWeightProvenance
     ) -> Rejection? {
+        // chapter 七百十七 第三刀 / M2258 — opt-in routing。
+        // When the feature flag is on,delegate the decision
+        // tree to BASAutoRouteRanker.provenanceFilter (Rust)
+        // and map its typed decision back to this enum。
+        // Default off per measurement-grounded policy。
+        if useRoutedFilter {
+            return rejectionReasonViaAutoRouter(
+                for: provenance)
+        }
         // Hash length pin first — structural invariant.
         if provenance.trainingCorpusHashHex.count != 64 {
             return .malformedHash(
@@ -340,5 +365,78 @@ public enum BASOrganTrainedWeightFilter {
             return ch
         }
         return nil
+    }
+
+    /// chapter 七百十七 第三刀 / M2258 — routed-path helper。
+    /// Maps Swift `Rejection` enum onto Rust's compact i32
+    /// decision codes via BASAutoRouteRanker.provenanceFilter。
+    ///
+    /// Note:Rust path loses the detailed `length` /
+    /// `firstInvalidChar` payload (compact codes are
+    /// structural-only)。 The detailed payload is reconstructed
+    /// Swift-side from the input provenance — same data,same
+    /// shape,no information loss。
+    internal static func rejectionReasonViaAutoRouter(
+        for provenance: BASOrganTrainedWeightProvenance
+    ) -> Rejection? {
+        let tier: BASProvenanceTier
+        switch provenance.tier {
+        case .illustrative: tier = .illustrative
+        case .aiAdvisory: tier = .aiAdvisory
+        case .peerReviewed: tier = .peerReviewed
+        case .domainExpertReviewed:
+            tier = .domainExpertReviewed
+        }
+        let r = BASAutoRouteRanker.provenanceFilter(
+            trainingCorpusHashHex:
+                provenance.trainingCorpusHashHex,
+            trainedWeightsHashHex:
+                provenance.trainedWeightsHashHex,
+            tier: tier,
+            hasAttestationSignatureRef:
+                provenance.expertAttestationSignatureRef
+                    != nil,
+            hasAttestationIssuedAt:
+                provenance.attestationIssuedAt != nil)
+        switch r.value {
+        case .permitted:
+            return nil
+        case .malformedHashLengthTrainingCorpus:
+            return .malformedHash(
+                field: "trainingCorpusHashHex",
+                length:
+                    provenance.trainingCorpusHashHex.count)
+        case .malformedHashLengthTrainedWeights:
+            return .malformedHash(
+                field: "trainedWeightsHashHex",
+                length:
+                    provenance.trainedWeightsHashHex.count)
+        case .malformedHashContentTrainingCorpus:
+            let bad = firstNonHexCharacter(
+                provenance.trainingCorpusHashHex)
+                ?? "?"
+            return .malformedHashContent(
+                field: "trainingCorpusHashHex",
+                firstInvalidChar: String(bad))
+        case .malformedHashContentTrainedWeights:
+            let bad = firstNonHexCharacter(
+                provenance.trainedWeightsHashHex)
+                ?? "?"
+            return .malformedHashContent(
+                field: "trainedWeightsHashHex",
+                firstInvalidChar: String(bad))
+        case .belowProductionTier:
+            return .belowProductionTier(provenance.tier)
+        case .nonProductionTierCarriesAttestation:
+            return .nonProductionTierCarriesAttestation
+        case .missingAttestationForProductionTier:
+            return .missingAttestationForProductionTier
+        case .invalidInput:
+            // Defensive — Rust ABI returned a bogus code。
+            // Fall back to the Swift decision tree。
+            useRoutedFilter = false
+            defer { useRoutedFilter = true }
+            return rejectionReason(for: provenance)
+        }
     }
 }
