@@ -1087,6 +1087,138 @@ fn serialize_scores(
     out
 }
 
+// MARK: - chapter 七百二十九 第二刀 / M2317 PQ index FFI
+//
+// Opaque-handle pattern (mirrors chapter 七百二十二 BPE
+// tokenizer)。 Rust owns the PqIndex heap allocation;Swift
+// holds a raw pointer through the RAII wrapper class。
+
+/// Construct an untrained PQ index handle。 Returns NULL on
+/// invalid parameters (dim not divisible by m,k > 256,etc)。
+///
+/// # Safety
+/// Returned pointer must be released via `bas_pq_index_free`。
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_new(
+    dim: usize, m: usize, k: usize,
+) -> *mut pq_index::PqIndex {
+    match pq_index::PqIndex::new(dim, m, k) {
+        Ok(p) => Box::into_raw(Box::new(p)),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Release a PQ index handle。 Safe on NULL pointer (no-op)。
+///
+/// # Safety
+/// Caller must not use the handle after this call。
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_free(
+    pq: *mut pq_index::PqIndex,
+) {
+    if pq.is_null() { return; }
+    drop(unsafe { Box::from_raw(pq) });
+}
+
+/// Train codebooks via per-subquantizer k-means。 Returns
+/// 0 on success,-1 on null pointer,-2 on shape mismatch。
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_train(
+    pq: *mut pq_index::PqIndex,
+    training: *const f32, training_len: usize,
+    n_train: usize,
+    iters: usize,
+) -> i32 {
+    if pq.is_null() || training.is_null() { return -1; }
+    let training_slice = unsafe {
+        core::slice::from_raw_parts(training, training_len)
+    };
+    let p = unsafe { &mut *pq };
+    match p.train(training_slice, n_train, iters) {
+        Ok(_) => 0,
+        Err(_) => -2,
+    }
+}
+
+/// Add a vector to the index。 Returns the assigned row index
+/// on success,-1 on null pointer / wrong dimension。
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_add(
+    pq: *mut pq_index::PqIndex,
+    vector: *const f32, vector_len: usize,
+) -> i64 {
+    if pq.is_null() || vector.is_null() { return -1; }
+    let v_slice = unsafe {
+        core::slice::from_raw_parts(vector, vector_len)
+    };
+    let p = unsafe { &mut *pq };
+    match p.add(v_slice) {
+        Some(id) => id as i64,
+        None => -1,
+    }
+}
+
+/// Compute top-K nearest neighbors。 Returns the count of
+/// results written (≤ k_results,≤ n_rows),or -1 on null
+/// pointer / wrong dimension / out_capacity too small。
+///
+/// `out_ids` receives the row indices,`out_distances` the
+/// distance² values (both arrays of length k_results)。
+/// Results sorted ascending by distance。
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_top_k(
+    pq: *const pq_index::PqIndex,
+    query: *const f32, query_len: usize,
+    k_results: usize,
+    out_ids: *mut u64,
+    out_distances: *mut f32,
+    out_capacity: usize,
+) -> i64 {
+    if pq.is_null() || query.is_null()
+       || out_ids.is_null() || out_distances.is_null()
+    {
+        return -1;
+    }
+    if out_capacity < k_results { return -1; }
+    let q_slice = unsafe {
+        core::slice::from_raw_parts(query, query_len)
+    };
+    let p = unsafe { &*pq };
+    let results = match p.top_k(q_slice, k_results) {
+        Some(r) => r,
+        None => return -1,
+    };
+    let n = results.len();
+    let ids_dst = unsafe {
+        core::slice::from_raw_parts_mut(out_ids, n)
+    };
+    let dists_dst = unsafe {
+        core::slice::from_raw_parts_mut(out_distances, n)
+    };
+    for (i, (id, d)) in results.iter().enumerate() {
+        ids_dst[i] = *id as u64;
+        dists_dst[i] = *d;
+    }
+    n as i64
+}
+
+/// Query the index's row count + byte size for stats。
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_n_rows(
+    pq: *const pq_index::PqIndex,
+) -> i64 {
+    if pq.is_null() { return -1; }
+    unsafe { (&*pq).n_rows as i64 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_pq_index_byte_size(
+    pq: *const pq_index::PqIndex,
+) -> i64 {
+    if pq.is_null() { return -1; }
+    unsafe { (&*pq).byte_size() as i64 }
+}
+
 // MARK: - chapter 七百二十七 第二刀 / M2307 int8 cosine FFI
 //
 // Pure pass-through to quantize::cosine_int8 + batched variant。

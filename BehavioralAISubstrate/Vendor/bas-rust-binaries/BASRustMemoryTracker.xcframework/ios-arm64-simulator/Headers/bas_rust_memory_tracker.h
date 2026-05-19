@@ -836,6 +836,37 @@ int64_t bas_ranker_usage_count_for_atom(
 // through functions exposing the bas-retrieval-ranker::quantize
 // module。
 
+// MARK: - chapter 七百二十九 第二刀 / M2317 PQ index
+//
+// Product Quantization approximate-NN index。 Opaque handle
+// pattern (caller MUST release via bas_pq_index_free)。
+
+typedef struct PqIndex PqIndex;
+
+PqIndex* bas_pq_index_new(size_t dim, size_t m, size_t k);
+void bas_pq_index_free(PqIndex* pq);
+
+int32_t bas_pq_index_train(
+    PqIndex* pq,
+    const float* training, size_t training_len,
+    size_t n_train,
+    size_t iters);
+
+int64_t bas_pq_index_add(
+    PqIndex* pq,
+    const float* vector, size_t vector_len);
+
+int64_t bas_pq_index_top_k(
+    const PqIndex* pq,
+    const float* query, size_t query_len,
+    size_t k_results,
+    uint64_t* out_ids,
+    float* out_distances,
+    size_t out_capacity);
+
+int64_t bas_pq_index_n_rows(const PqIndex* pq);
+int64_t bas_pq_index_byte_size(const PqIndex* pq);
+
 // MARK: - chapter 七百二十七 第二刀 / M2307 int8 cosine
 //
 // Quantized vector retrieval primitives — substrate's first
