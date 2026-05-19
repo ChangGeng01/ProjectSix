@@ -42,6 +42,7 @@
 
 import Foundation
 import CryptoKit
+import BASRuntimeCore
 
 extension BASRuntimeAuditEmissionSummaryDigest {
 
@@ -68,9 +69,11 @@ extension BASRuntimeAuditEmissionSummaryDigest {
                 .empty(producedAt: producedAt)
         }
         let hash = SHA256.hash(data: data)
-        let hex = hash.map {
-            String(format: "%02x", $0)
-        }.joined()
+        // LEGACY (chapter 七百十九 第三刀 / M2268):
+        //     let hex = hash.map {
+        //         String(format: "%02x", $0) }.joined()
+        let hex = BASAutoRouteRanker.bytesToHexLower(
+            Array(hash))
         return BASRuntimeAuditEmissionSummaryDigest(
             algorithmName: algorithmRawName,
             digestString: hex,

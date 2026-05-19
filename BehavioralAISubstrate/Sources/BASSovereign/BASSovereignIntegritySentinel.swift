@@ -180,6 +180,11 @@ public actor BASSovereignIntegritySentinel {
     /// generate claims without depending on CryptoKit themselves.
     public static func hash(_ data: Data) -> String {
         let digest = SHA256.hash(data: data)
-        return digest.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百十九 第三刀 / M2268 — kept as
+        // comment for byte-pinned compat):
+        //     return digest.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 }

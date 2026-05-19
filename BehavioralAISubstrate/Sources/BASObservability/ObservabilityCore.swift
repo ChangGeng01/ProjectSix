@@ -753,7 +753,12 @@ public enum BASObservabilityInspector {
         encoder.outputFormatting = [.sortedKeys]
         let data = (try? encoder.encode(bundle)) ?? Data()
         let digest = SHA256.hash(data: data)
-        return BASReplayFingerprint(value: digest.map { String(format: "%02x", $0) }.joined())
+        // LEGACY (chapter 七百十九 第三刀 / M2268):
+        //     return BASReplayFingerprint(value: digest.map {
+        //         String(format: "%02x", $0) }.joined())
+        return BASReplayFingerprint(
+            value: BASAutoRouteRanker.bytesToHexLower(
+                Array(digest)))
     }
 
     public static func anomalySignals(

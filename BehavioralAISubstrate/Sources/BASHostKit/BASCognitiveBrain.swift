@@ -2495,9 +2495,11 @@ extension BASCognitiveBrain {
         let bytes = Array(s.utf8)
         let r = BASAutoRouteRanker.sha256(
             bytes, thresholds: thresholds)
-        let hex = r.value.map {
-            String(format: "%02x", $0)
-        }.joined()
+        // LEGACY (chapter 七百十九 第三刀 / M2268):
+        //     let hex = r.value.map {
+        //         String(format: "%02x", $0) }.joined()
+        let hex = BASAutoRouteRanker.bytesToHexLower(
+            r.value)
         return BASAutoRouteResult(
             value: hex, choice: r.choice)
     }
@@ -2515,9 +2517,11 @@ extension BASCognitiveBrain {
         let r = BASAutoRouteRanker.hmacSHA256(
             key: keyBytes, payload: payloadBytes,
             thresholds: thresholds)
-        let hex = r.value.map {
-            String(format: "%02x", $0)
-        }.joined()
+        // LEGACY (chapter 七百十九 第三刀 / M2268):
+        //     let hex = r.value.map {
+        //         String(format: "%02x", $0) }.joined()
+        let hex = BASAutoRouteRanker.bytesToHexLower(
+            r.value)
         return BASAutoRouteResult(
             value: hex, choice: r.choice)
     }
