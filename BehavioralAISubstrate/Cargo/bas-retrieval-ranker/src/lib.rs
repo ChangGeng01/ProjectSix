@@ -451,6 +451,216 @@ pub unsafe extern "C" fn bas_ranker_silu_simd(
     0
 }
 
+// MARK: - chapter 七百十二 第二刀 Ledger C ABI
+//
+// Per architectural matrix「Rust owns ledger/replay +
+// integrity hash」 — these collapse N Swift→Rust FFI calls
+// into 1 batch call for the audit-ledger hot path。
+
+/// One-shot pure seal: SHA256(canonical) → 32-byte out。
+/// Matches Swift `Data(SHA256.hash(data: canonical))` exactly。
+/// Returns 0 on success,-1 on null pointer。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_ledger_seal(
+    canonical: *const u8, canonical_len: usize,
+    out_32: *mut u8,
+) -> i32 {
+    if out_32.is_null() { return -1; }
+    let can_slice: &[u8] = if canonical_len == 0 {
+        &[]
+    } else if canonical.is_null() {
+        return -1;
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                canonical, canonical_len)
+        }
+    };
+    let digest = ledger::ledger_seal_pure(can_slice);
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            digest.as_ptr(), out_32, 32);
+    }
+    0
+}
+
+/// Batch seal — for each of N records,compute its
+/// SHA256(canonical) into the corresponding 32-byte slot of
+/// `out_self_hashes`。 Inputs:
+///
+///   - `initial_32`         : 32-byte prior anchor (unused for
+///                            pure seal but kept for parity with
+///                            verify_chain ABI)
+///   - `canonicals_buf`     : N records as a flat buffer of
+///                            length-prefixed payloads
+///                            (u32_be size + bytes per record)
+///   - `canonicals_buf_len` : total byte length of the flat buf
+///   - `n`                  : number of records
+///   - `out_self_hashes`    : caller-owned N*32 byte buffer
+///
+/// Returns:
+///   - 0 on success
+///   - -1 on null pointer
+///   - -2 on truncated `canonicals_buf` (size prefixes don't
+///         consume exactly the buffer length)
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_ledger_seal_batch(
+    initial_32: *const u8,
+    canonicals_buf: *const u8,
+    canonicals_buf_len: usize,
+    n: usize,
+    out_self_hashes_n_x_32: *mut u8,
+) -> i32 {
+    if initial_32.is_null() { return -1; }
+    if n == 0 {
+        // No records to seal — every pointer can be null。
+        return 0;
+    }
+    if canonicals_buf.is_null() || canonicals_buf_len == 0
+        || out_self_hashes_n_x_32.is_null()
+    {
+        return -1;
+    }
+    let buf = unsafe {
+        core::slice::from_raw_parts(
+            canonicals_buf, canonicals_buf_len)
+    };
+    let canonicals = match decode_length_prefixed(buf, n) {
+        Some(v) => v,
+        None => return -2,
+    };
+    let mut initial = [0u8; 32];
+    initial.copy_from_slice(unsafe {
+        core::slice::from_raw_parts(initial_32, 32)
+    });
+    let mut out = vec![[0u8; 32]; n];
+    ledger::seal_batch_pure(
+        &initial, &canonicals, &mut out);
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_self_hashes_n_x_32, n * 32)
+    };
+    for (i, h) in out.iter().enumerate() {
+        out_slice[i * 32..(i + 1) * 32]
+            .copy_from_slice(h);
+    }
+    0
+}
+
+/// Verify an N-entry chain。 For each i in 0..N,recomputes
+/// SHA256(canonicals[i]) and compares to
+/// expected_self_hashes[i * 32..(i+1) * 32]。
+///
+/// Inputs (same layout as `bas_ranker_ledger_seal_batch`):
+///
+///   - `initial_32`         : 32-byte prior anchor
+///   - `canonicals_buf`     : N records, length-prefixed
+///   - `canonicals_buf_len` : flat-buffer byte length
+///   - `expected_self_hashes_n_x_32` : N*32 expected digests
+///   - `n`                  : number of records
+///   - `out_tip_32`         : 32-byte tip-hash output on success
+///
+/// Returns:
+///   - 0       on full chain valid (tip written to out_tip)
+///   - 1 + i   if record i's selfHash mismatches
+///             (1 << 30 maps i too large to distinguish from
+///             -1/-2 — callers should treat any positive
+///             return as fail-at-index = return - 1)
+///   - -1      on null pointer
+///   - -2      on truncated canonicals_buf
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_ledger_verify_chain(
+    initial_32: *const u8,
+    canonicals_buf: *const u8,
+    canonicals_buf_len: usize,
+    expected_self_hashes_n_x_32: *const u8,
+    n: usize,
+    out_tip_32: *mut u8,
+) -> i32 {
+    if initial_32.is_null() || out_tip_32.is_null() {
+        return -1;
+    }
+    if n == 0 {
+        // Empty chain — tip = initial。 Array pointers may be
+        // null since they're unused。
+        let init_slice = unsafe {
+            core::slice::from_raw_parts(initial_32, 32)
+        };
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                init_slice.as_ptr(), out_tip_32, 32);
+        }
+        return 0;
+    }
+    if canonicals_buf.is_null() || canonicals_buf_len == 0
+        || expected_self_hashes_n_x_32.is_null()
+    {
+        return -1;
+    }
+    let buf = unsafe {
+        core::slice::from_raw_parts(
+            canonicals_buf, canonicals_buf_len)
+    };
+    let canonicals = match decode_length_prefixed(buf, n) {
+        Some(v) => v,
+        None => return -2,
+    };
+    let expected_flat = unsafe {
+        core::slice::from_raw_parts(
+            expected_self_hashes_n_x_32, n * 32)
+    };
+    let mut expected: Vec<[u8; 32]> =
+        Vec::with_capacity(n);
+    for i in 0..n {
+        let mut h = [0u8; 32];
+        h.copy_from_slice(
+            &expected_flat[i * 32..(i + 1) * 32]);
+        expected.push(h);
+    }
+    let mut initial = [0u8; 32];
+    initial.copy_from_slice(unsafe {
+        core::slice::from_raw_parts(initial_32, 32)
+    });
+    match ledger::verify_chain_pure(
+        &initial, &canonicals, &expected)
+    {
+        ledger::ChainVerifyOutcome::Ok { tip_hash } => {
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    tip_hash.as_ptr(), out_tip_32, 32);
+            }
+            0
+        }
+        ledger::ChainVerifyOutcome::SelfHashMismatch {
+            index } => (index as i32) + 1,
+    }
+}
+
+/// Helper:decode a length-prefixed flat buffer into `n` slice
+/// references。 Returns None if the size prefixes don't consume
+/// exactly `buf.len()` bytes for `n` records。
+fn decode_length_prefixed<'a>(
+    buf: &'a [u8], n: usize,
+) -> Option<Vec<&'a [u8]>> {
+    let mut out: Vec<&'a [u8]> = Vec::with_capacity(n);
+    let mut offset: usize = 0;
+    for _ in 0..n {
+        if offset + 4 > buf.len() { return None; }
+        let len_be: [u8; 4] = buf[offset..offset + 4]
+            .try_into().ok()?;
+        let payload_len = u32::from_be_bytes(len_be)
+            as usize;
+        offset += 4;
+        if offset + payload_len > buf.len() {
+            return None;
+        }
+        out.push(&buf[offset..offset + payload_len]);
+        offset += payload_len;
+    }
+    if offset != buf.len() { return None; }
+    Some(out)
+}
+
 /// SIMD-accelerated batched cosine — chapter 七百五 第二刀。
 #[no_mangle]
 pub unsafe extern "C" fn bas_ranker_batched_cosine_simd(

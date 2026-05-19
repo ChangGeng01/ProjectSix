@@ -574,6 +574,33 @@ int32_t bas_ranker_silu(
 int32_t bas_ranker_silu_simd(
     const float* x, size_t n, float* out, size_t out_n);
 
+/* chapter 七百十二 第二刀 — Batched ledger seal + chain verify。
+ * Per architectural matrix: Rust owns ledger/replay + integrity
+ * hash。 Each call here collapses what would otherwise be N
+ * Swift→Rust FFI round-trips into one。
+ *
+ * Wire format for canonicals_buf: concatenation of length-prefixed
+ *   payloads,where each payload is laid out as
+ *       [u32_be length][payload bytes]
+ *   The buffer must encode exactly `n` records,no padding。
+ *
+ * Wire format for *_self_hashes_n_x_32: n × 32 contiguous bytes。
+ */
+int32_t bas_ranker_ledger_seal(
+    const uint8_t* canonical, size_t canonical_len,
+    uint8_t* out_32);
+int32_t bas_ranker_ledger_seal_batch(
+    const uint8_t* initial_32,
+    const uint8_t* canonicals_buf, size_t canonicals_buf_len,
+    size_t n,
+    uint8_t* out_self_hashes_n_x_32);
+int32_t bas_ranker_ledger_verify_chain(
+    const uint8_t* initial_32,
+    const uint8_t* canonicals_buf, size_t canonicals_buf_len,
+    const uint8_t* expected_self_hashes_n_x_32,
+    size_t n,
+    uint8_t* out_tip_32);
+
 #ifdef __cplusplus
 }
 #endif
