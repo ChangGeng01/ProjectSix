@@ -185,6 +185,67 @@ kernel void vector_cosine_similarity(
     norm_b[i] = bi * bi;
 }
 
+// MARK: - batched_cosine_similarity
+// chapter 七百十五 第一刀 / M2246
+//
+// Per architectural matrix「Metal:embedding similarity」 —
+// query × corpus batched cosine。 One thread per corpus row。
+// Each thread reduces its row sequentially in dim:
+//
+//   For row r in 0..N_rows:
+//     dot = sum_d query[d] * corpus[r*dim + d]
+//     norm_q = sum_d query[d] * query[d]   (per-thread,
+//                                            redundant work)
+//     norm_r = sum_d corpus[r*dim + d]^2
+//     scores[r] = dot / (sqrt(norm_q) * sqrt(norm_r))
+//
+// At typical embedding shapes (N_rows ≥ 256, dim ∈ [128, 1024])
+// the GPU parallelism over N_rows handily beats Rust SIMD's
+// scalar per-row loop。 At small N_rows (< 64) the kernel
+// launch overhead dominates and Rust SIMD wins — chapter
+// 七百十五 第三刀 tournament measures the empirical crossover。
+//
+// Numerical stability:single-precision throughout,matches
+// Rust SIMD batched_cosine exactly within fp32 rounding。
+
+struct BatchedCosineShape {
+    uint dim;
+    uint n_rows;
+};
+
+kernel void batched_cosine_similarity(
+    device   const float              *query   [[buffer(0)]],
+    device   const float              *corpus  [[buffer(1)]],
+    device         float              *scores  [[buffer(2)]],
+    constant       BatchedCosineShape &shape   [[buffer(3)]],
+    uint                               tid     [[thread_position_in_grid]])
+{
+    const uint row = tid;
+    if (row >= shape.n_rows) {
+        return;
+    }
+    const uint dim = shape.dim;
+    const uint base = row * dim;
+    float dot = 0.0;
+    float norm_q = 0.0;
+    float norm_r = 0.0;
+    for (uint d = 0; d < dim; d += 1) {
+        const float qd = query[d];
+        const float rd = corpus[base + d];
+        dot += qd * rd;
+        norm_q += qd * qd;
+        norm_r += rd * rd;
+    }
+    // Guard against zero-norm rows so the kernel never emits
+    // NaN — caller must still handle 0.0 scores upstream。
+    if (norm_q <= 0.0 || norm_r <= 0.0) {
+        scores[row] = 0.0;
+    } else {
+        scores[row] = dot
+            / (sqrt(norm_q) * sqrt(norm_r));
+    }
+}
+
 // MARK: - vector_rmsnorm
 // 主线 全面 开发 — Root Mean Square layer normalization。
 // Two-pass implementation:
