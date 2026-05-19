@@ -124,6 +124,11 @@ public enum BASAutoRouteChoice:
     case rustGeluTanhScalar
     case rustGeluTanhSIMD
     case rustSilu
+    /// chapter 七百十二 第四刀 — Ledger seal / verify routing。
+    case rustLedgerSeal
+    case rustLedgerSealBatch
+    case rustLedgerVerifyChain
+    case swiftCryptoKitLedgerSeal
 }
 
 /// chapter 七百八 第三刀 — MatMul shape input。
@@ -746,6 +751,203 @@ public enum BASAutoRouteRanker {
             }
         }
         return out
+    }
+
+    // MARK: - Ledger routing (chapter 七百十二 第四刀)
+    //
+    // Per architectural matrix「Rust owns ledger/replay +
+    // integrity hash」 + tournament 七百十二 第三刀:Rust batch
+    // wins at every chain depth (5-8× over CryptoKit chain,
+    // 1.3× over Rust per-entry FFI)。 No crossover threshold
+    // needed — always route to Rust。 Swift CryptoKit kept as
+    // a fallback for non-Apple platforms where the XCFramework
+    // isn't available。
+
+    /// Outcome of a chain-verify call。 `valid` carries the
+    /// final tip hash when all entries verified;
+    /// `firstMismatch` is the 0-based index of the first failed
+    /// entry。
+    public enum BASLedgerVerifyOutcome: Sendable, Equatable {
+        case valid(tipHash: [UInt8])
+        case firstMismatch(index: Int)
+    }
+
+    /// One-shot ledger seal: y = SHA256(canonical)。 Matches
+    /// Swift CryptoKit byte-for-byte。 Returns the 32-byte
+    /// digest + the routing choice。
+    public static func ledgerSeal(
+        _ canonical: [UInt8]
+    ) -> BASAutoRouteResult<[UInt8]> {
+        var out = [UInt8](repeating: 0, count: 32)
+        #if os(iOS) || os(macOS)
+        let rc = canonical.withUnsafeBufferPointer { cp in
+            out.withUnsafeMutableBufferPointer { op in
+                bas_ranker_ledger_seal(
+                    cp.baseAddress, canonical.count,
+                    op.baseAddress)
+            }
+        }
+        if rc == 0 {
+            return BASAutoRouteResult(
+                value: out, choice: .rustLedgerSeal)
+        }
+        #endif
+        // Fallback: Swift CryptoKit。 Bit-equal output since
+        // SHA256 is fully specified by NIST FIPS 180-4。
+        let d = SHA256.hash(data: Data(canonical))
+        return BASAutoRouteResult(
+            value: [UInt8](d),
+            choice: .swiftCryptoKitLedgerSeal)
+    }
+
+    /// Batch ledger seal: for each of N records,write the
+    /// 32-byte SHA256(canonical_i) into the corresponding slot
+    /// of the returned [[UInt8]]。 Used by the substrate's
+    /// audit-ledger append path to seal multiple entries in
+    /// one FFI hop (chapter 七百十二 第三刀:1.3× over per-entry
+    /// Rust at depth 256+)。
+    public static func ledgerSealBatch(
+        initialHash: [UInt8],
+        canonicals: [[UInt8]]
+    ) -> BASAutoRouteResult<[[UInt8]]> {
+        precondition(initialHash.count == 32,
+            "initialHash must be 32 bytes")
+        guard !canonicals.isEmpty else {
+            return BASAutoRouteResult(
+                value: [], choice: .rustLedgerSealBatch)
+        }
+        #if os(iOS) || os(macOS)
+        // Encode canonicals as length-prefixed flat buffer。
+        var buf = Data()
+        for c in canonicals {
+            var lenBE = UInt32(c.count).bigEndian
+            withUnsafeBytes(of: &lenBE) {
+                buf.append(contentsOf: $0)
+            }
+            buf.append(contentsOf: c)
+        }
+        var outFlat = [UInt8](
+            repeating: 0, count: canonicals.count * 32)
+        let rc = initialHash.withUnsafeBufferPointer { ip in
+            buf.withUnsafeBytes { bp in
+                outFlat
+                    .withUnsafeMutableBufferPointer { op in
+                    bas_ranker_ledger_seal_batch(
+                        ip.baseAddress,
+                        bp.bindMemory(to: UInt8.self)
+                            .baseAddress,
+                        buf.count,
+                        canonicals.count,
+                        op.baseAddress)
+                }
+            }
+        }
+        if rc == 0 {
+            // Slice flat buffer into [[UInt8]]。
+            var hashes: [[UInt8]] = []
+            hashes.reserveCapacity(canonicals.count)
+            for i in 0..<canonicals.count {
+                hashes.append(Array(
+                    outFlat[i * 32..<(i + 1) * 32]))
+            }
+            return BASAutoRouteResult(
+                value: hashes,
+                choice: .rustLedgerSealBatch)
+        }
+        #endif
+        // Fallback: per-entry CryptoKit
+        var hashes: [[UInt8]] = []
+        hashes.reserveCapacity(canonicals.count)
+        for c in canonicals {
+            let d = SHA256.hash(data: Data(c))
+            hashes.append([UInt8](d))
+        }
+        return BASAutoRouteResult(
+            value: hashes,
+            choice: .swiftCryptoKitLedgerSeal)
+    }
+
+    /// Verify an N-entry chain。 Each record's canonical bytes
+    /// are hashed and compared against the corresponding entry
+    /// of `expectedSelfHashes`。 Returns the chain tip on
+    /// success or the first failing index on tamper detection。
+    public static func ledgerVerifyChain(
+        initialHash: [UInt8],
+        canonicals: [[UInt8]],
+        expectedSelfHashes: [[UInt8]]
+    ) -> BASAutoRouteResult<BASLedgerVerifyOutcome> {
+        precondition(initialHash.count == 32,
+            "initialHash must be 32 bytes")
+        precondition(
+            canonicals.count == expectedSelfHashes.count,
+            "canonicals + expected must match length")
+        guard !canonicals.isEmpty else {
+            return BASAutoRouteResult(
+                value: .valid(tipHash: initialHash),
+                choice: .rustLedgerVerifyChain)
+        }
+        #if os(iOS) || os(macOS)
+        var buf = Data()
+        for c in canonicals {
+            var lenBE = UInt32(c.count).bigEndian
+            withUnsafeBytes(of: &lenBE) {
+                buf.append(contentsOf: $0)
+            }
+            buf.append(contentsOf: c)
+        }
+        var expectedFlat = [UInt8]()
+        expectedFlat.reserveCapacity(
+            expectedSelfHashes.count * 32)
+        for h in expectedSelfHashes {
+            precondition(h.count == 32,
+                "each expected hash must be 32 bytes")
+            expectedFlat.append(contentsOf: h)
+        }
+        var outTip = [UInt8](repeating: 0, count: 32)
+        let rc = initialHash.withUnsafeBufferPointer { ip in
+            buf.withUnsafeBytes { bp in
+                expectedFlat
+                    .withUnsafeBufferPointer { ep in
+                    outTip
+                        .withUnsafeMutableBufferPointer { op in
+                        bas_ranker_ledger_verify_chain(
+                            ip.baseAddress,
+                            bp.bindMemory(to: UInt8.self)
+                                .baseAddress,
+                            buf.count,
+                            ep.baseAddress,
+                            canonicals.count,
+                            op.baseAddress)
+                    }
+                }
+            }
+        }
+        if rc == 0 {
+            return BASAutoRouteResult(
+                value: .valid(tipHash: outTip),
+                choice: .rustLedgerVerifyChain)
+        }
+        if rc > 0 {
+            return BASAutoRouteResult(
+                value: .firstMismatch(index: Int(rc) - 1),
+                choice: .rustLedgerVerifyChain)
+        }
+        // rc < 0 — fall through to Swift fallback。
+        #endif
+        // Fallback: per-entry CryptoKit verify。
+        for i in 0..<canonicals.count {
+            let d = [UInt8](
+                SHA256.hash(data: Data(canonicals[i])))
+            if d != expectedSelfHashes[i] {
+                return BASAutoRouteResult(
+                    value: .firstMismatch(index: i),
+                    choice: .swiftCryptoKitLedgerSeal)
+            }
+        }
+        return BASAutoRouteResult(
+            value: .valid(
+                tipHash: expectedSelfHashes.last!),
+            choice: .swiftCryptoKitLedgerSeal)
     }
 
     // MARK: - Naive fallback

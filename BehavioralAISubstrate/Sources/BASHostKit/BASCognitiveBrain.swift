@@ -2659,6 +2659,50 @@ extension BASCognitiveBrain {
         return BASAutoRouteRanker.silu(x)
     }
 
+    /// chapter 七百十二 第四刀 / M2234 — auto-routed ledger seal。
+    ///
+    /// y = SHA256(canonical)。 Byte-equal to Swift CryptoKit。
+    /// Always routes through Rust (5-8× win over CryptoKit per
+    /// chapter 七百十二 第三刀 tournament across chain depths
+    /// 1/16/256/4096)。
+    public nonisolated static func ledgerSealAuto(
+        _ canonical: [UInt8]
+    ) -> BASAutoRouteResult<[UInt8]> {
+        return BASAutoRouteRanker.ledgerSeal(canonical)
+    }
+
+    /// chapter 七百十二 第四刀 / M2234 — auto-routed batch ledger
+    /// seal。 For each record,write its 32-byte SHA256(canonical)
+    /// into the returned [[UInt8]]。 Used by the audit-ledger
+    /// append path to amortize FFI overhead across N entries
+    /// (1.3-1.31× over per-entry FFI in chapter 七百十二 第三刀)。
+    public nonisolated static func ledgerSealBatchAuto(
+        initialHash: [UInt8],
+        canonicals: [[UInt8]]
+    ) -> BASAutoRouteResult<[[UInt8]]> {
+        return BASAutoRouteRanker.ledgerSealBatch(
+            initialHash: initialHash,
+            canonicals: canonicals)
+    }
+
+    /// chapter 七百十二 第四刀 / M2234 — auto-routed chain verify。
+    /// Returns the chain tip on success or the first failing
+    /// index on tamper detection。 Always routes through Rust
+    /// (2.85-3.06× win over CryptoKit per chapter 七百十二 第三刀
+    /// tournament at depths 16/256/4096)。
+    public nonisolated static func ledgerVerifyChainAuto(
+        initialHash: [UInt8],
+        canonicals: [[UInt8]],
+        expectedSelfHashes: [[UInt8]]
+    ) -> BASAutoRouteResult<
+        BASAutoRouteRanker.BASLedgerVerifyOutcome>
+    {
+        return BASAutoRouteRanker.ledgerVerifyChain(
+            initialHash: initialHash,
+            canonicals: canonicals,
+            expectedSelfHashes: expectedSelfHashes)
+    }
+
     /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
     public func matMulAuto(
         a: [Float], aRows: Int, aCols: Int,
