@@ -244,6 +244,12 @@ let package = Package(
                     localization: nil),
                 .process(
                     "BASBuiltinKernels/BASReduceKernels.metal",
+                    localization: nil),
+                // chapter 七百五 第一刀 / M2196 — FlashAttention
+                // tiled kernel family (forward + masked + causal)。
+                // Memory-efficient attention for long sequences。
+                .process(
+                    "BASBuiltinKernels/BASFlashAttention.metal",
                     localization: nil)
             ],
             linkerSettings: [
