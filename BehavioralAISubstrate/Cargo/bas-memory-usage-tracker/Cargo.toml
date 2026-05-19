@@ -37,3 +37,7 @@ bas-canonical-bytes   = { path = "../bas-canonical-bytes" }
 bas-permit-policy     = { path = "../bas-permit-policy" }
 bas-event-log-codec   = { path = "../bas-event-log-codec" }
 bas-runtime-frame     = { path = "../bas-runtime-frame" }
+# chapter 七百二十二 第二刀 / M2282 — bundle the BPE tokenizer
+# crate into the same staticlib so Swift hosts can call
+# bas_tokenizer_* symbols via `import BASRustMemoryTrackerBinary`。
+bas-tokenizer         = { path = "../bas-tokenizer" }

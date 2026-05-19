@@ -50,6 +50,7 @@ dependencies = [
  "bas-retrieval-ranker",
  "bas-runtime-frame",
  "bas-substrate-core",
+ "bas-tokenizer",
  "sha2",
 ]
 

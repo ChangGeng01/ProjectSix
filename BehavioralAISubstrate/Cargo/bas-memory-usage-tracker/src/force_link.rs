@@ -46,14 +46,21 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_event_log_codec::bas_event_log_abi_version());
     total = total.wrapping_add(
         bas_runtime_frame::bas_runtime_frame_abi_version());
+    // chapter 七百二十二 第二刀 / M2282 — fold the BPE
+    // tokenizer's ABI version into the bundle total so a
+    // future ABI bump shows up in BASRustCoreBridge drift
+    // tests automatically。
+    total = total.wrapping_add(
+        bas_tokenizer::bas_tokenizer_abi_version());
     total
 }
 
-/// Returns the count of bundled crates (currently 7:the host
-/// `bas-memory-usage-tracker` + 6 chapter-七百三 siblings)。
+/// Returns the count of bundled crates (currently 8:the host
+/// `bas-memory-usage-tracker` + 6 chapter-七百三 siblings +
+/// `bas-tokenizer` added at chapter 七百二十二 第二刀)。
 /// Swift consumers use this for hygiene assertions in their
 /// drift tests。
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    7
+    8
 }

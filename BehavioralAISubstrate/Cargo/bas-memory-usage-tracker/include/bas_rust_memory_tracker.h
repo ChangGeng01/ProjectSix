@@ -441,6 +441,82 @@ int32_t bas_permit_policy_abi_version(void);
 int32_t bas_event_log_abi_version(void);
 int32_t bas_runtime_frame_abi_version(void);
 
+// MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
+//
+// Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is
+// constructed from caller-supplied vocab + merges buffers in a
+// length-prefixed BIG-ENDIAN wire format:
+//
+//   vocab_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 token_byte_len][token bytes][u32 id]
+//
+//   merges_buf:
+//     [u32 count]
+//     repeated count times:
+//       [u32 left_byte_len][left bytes]
+//       [u32 right_byte_len][right bytes]
+//       [u32 rank]
+//
+// Encode + decode are two-phase: first call with `out_capacity=0`
+// (and corresponding null `out_*` pointer) returns the required
+// size,then realloc + retry。 Mirrors how the Swift bridge
+// (`BASAutoRouteRanker.bpeEncode/bpeDecode`) handles unknown-size
+// outputs without leaking allocation back into Rust。
+
+/// Opaque tokenizer handle returned by `bas_tokenizer_new`。
+/// Caller MUST eventually call `bas_tokenizer_free` to release。
+typedef struct BasTokenizer BasTokenizer;
+
+/// ABI version pin for the bas-tokenizer surface。 Bumping
+/// requires synchronizing BASAutoRouteRanker mirror constant +
+/// drift tests。
+int32_t bas_tokenizer_abi_version(void);
+
+/// Construct a tokenizer from serialized vocab + merges buffers。
+/// Returns NULL on:
+///   - null pointer with non-zero length
+///   - malformed wire format (length-prefix underrun)
+BasTokenizer* bas_tokenizer_new(
+    const uint8_t* vocab_buf, size_t vocab_len,
+    const uint8_t* merges_buf, size_t merges_len,
+    uint32_t unk_id);
+
+/// Release a tokenizer handle。 Safe to call on NULL (no-op)。
+void bas_tokenizer_free(BasTokenizer* tok);
+
+/// Encode `text_utf8` (must be valid UTF-8) into up to
+/// `out_capacity` token IDs。 Returns the FULL ID count produced
+/// (including overflow);when the return exceeds `out_capacity`,
+/// the caller should realloc + retry。 First-pass discovery
+/// call uses `out_ids=NULL, out_capacity=0`。
+///
+/// Returns:
+///   >= 0 = number of IDs produced
+///   -1   = null pointer
+///   -2   = invalid UTF-8 input bytes
+int64_t bas_tokenizer_encode(
+    const BasTokenizer* tok,
+    const uint8_t* text_utf8, size_t text_len,
+    uint32_t* out_ids, size_t out_capacity);
+
+/// Decode `n_ids` token IDs into up to `out_capacity` UTF-8
+/// bytes。 Returns the FULL byte count produced。 First-pass
+/// discovery uses `out_utf8=NULL, out_capacity=0`。
+///
+/// Returns:
+///   >= 0 = number of UTF-8 bytes produced
+///   -1   = null pointer
+///   -2   = decoded bytes are not valid UTF-8
+int64_t bas_tokenizer_decode(
+    const BasTokenizer* tok,
+    const uint32_t* ids, size_t n_ids,
+    uint8_t* out_utf8, size_t out_capacity);
+
+/// Vocab size。 Returns -1 on null pointer。
+int64_t bas_tokenizer_vocab_size(const BasTokenizer* tok);
+
 // MARK: - bas-retrieval-ranker math kernels (chapter 七百四 第三刀)
 //
 // Pure float32 cosine + L2 + batched-cosine。 Swift callers

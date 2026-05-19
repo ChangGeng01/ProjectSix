@@ -161,6 +161,283 @@ impl Tokenizer {
     }
 }
 
+// MARK: - C ABI (chapter 七百二十二 第二刀 / M2282)
+//
+// `#[no_mangle] extern "C"` surface that the BASRustMemoryTracker
+// XCFramework exposes to Swift。 Symbols are kept alive by the
+// `force_link.rs` anchor inside bas-memory-usage-tracker (which
+// declares bas-tokenizer as a workspace dep and references
+// `bas_tokenizer_abi_version`)。
+//
+// Vocab wire format (BIG-ENDIAN length prefixes for portability):
+//
+//   [u32 count]
+//   repeated count times:
+//     [u32 token_byte_len][token_byte_len bytes][u32 id]
+//
+// Merges wire format:
+//
+//   [u32 count]
+//   repeated count times:
+//     [u32 left_byte_len][left bytes]
+//     [u32 right_byte_len][right bytes]
+//     [u32 rank]
+//
+// Both wire formats are bytes-only so Swift can build them via
+// `Data.append(_:)` calls without depending on JSON / serde at
+// the FFI boundary。 `serde` is reserved for future on-disk vocab
+// persistence (knife 4)。
+
+/// ABI version pin for the bas-tokenizer C surface。 Bumping
+/// requires updating BASAutoRouteRanker's mirror constant +
+/// the byte-equality drift test in BASChapter722BpeTokenizerTests。
+pub const TOKENIZER_ABI_VERSION: i32 = 1;
+
+#[no_mangle]
+pub extern "C" fn bas_tokenizer_abi_version() -> i32 {
+    TOKENIZER_ABI_VERSION
+}
+
+/// Construct a tokenizer from serialized vocab + merges buffers。
+/// Returns a heap-allocated opaque handle。 Caller MUST eventually
+/// call `bas_tokenizer_free` to release。
+///
+/// Returns NULL on:
+///   - any null pointer with non-zero length
+///   - malformed wire format (buffer underrun on length-prefix walk)
+///
+/// # Safety
+/// Caller must ensure `vocab_buf` / `merges_buf` point to readable
+/// buffers of declared length。
+#[no_mangle]
+pub unsafe extern "C" fn bas_tokenizer_new(
+    vocab_buf: *const u8,
+    vocab_len: usize,
+    merges_buf: *const u8,
+    merges_len: usize,
+    unk_id: u32,
+) -> *mut Tokenizer {
+    if (vocab_buf.is_null() && vocab_len > 0)
+        || (merges_buf.is_null() && merges_len > 0)
+    {
+        return std::ptr::null_mut();
+    }
+    let vocab_slice = if vocab_len == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(vocab_buf, vocab_len)
+    };
+    let merges_slice = if merges_len == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(merges_buf, merges_len)
+    };
+    let vocab = match parse_vocab(vocab_slice) {
+        Some(v) => v,
+        None => return std::ptr::null_mut(),
+    };
+    let merges = match parse_merges(merges_slice) {
+        Some(m) => m,
+        None => return std::ptr::null_mut(),
+    };
+    let tok = Tokenizer::from_vocab_merges(
+        vocab, merges, unk_id);
+    Box::into_raw(Box::new(tok))
+}
+
+/// Release a tokenizer handle returned by `bas_tokenizer_new`。
+/// Safe to call with a null pointer (no-op)。
+///
+/// # Safety
+/// Caller must not use the handle after this call。
+#[no_mangle]
+pub unsafe extern "C" fn bas_tokenizer_free(tok: *mut Tokenizer) {
+    if tok.is_null() {
+        return;
+    }
+    drop(Box::from_raw(tok));
+}
+
+/// Encode `text_utf8` (must be valid UTF-8) into up to
+/// `out_capacity` token IDs。 Returns the FULL ID count produced
+/// (including overflow beyond capacity);when the return exceeds
+/// `out_capacity` the caller should realloc + retry。
+///
+/// Error codes (negative i64):
+///   -1 = null pointer or out_ids null with non-zero capacity
+///   -2 = text bytes are not valid UTF-8
+///
+/// # Safety
+/// `text_utf8` must point to `text_len` readable bytes。 `out_ids`
+/// must point to a writable buffer of at least
+/// `out_capacity * sizeof(u32)` bytes (or be null when
+/// out_capacity == 0)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_tokenizer_encode(
+    tok: *const Tokenizer,
+    text_utf8: *const u8,
+    text_len: usize,
+    out_ids: *mut u32,
+    out_capacity: usize,
+) -> i64 {
+    if tok.is_null() || (text_utf8.is_null() && text_len > 0) {
+        return -1;
+    }
+    if out_capacity > 0 && out_ids.is_null() {
+        return -1;
+    }
+    let text_slice = if text_len == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(text_utf8, text_len)
+    };
+    let text = match std::str::from_utf8(text_slice) {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let ids = (&*tok).encode(text);
+    let n = ids.len();
+    if out_capacity > 0 && n > 0 {
+        let copy_n = std::cmp::min(n, out_capacity);
+        let dst = std::slice::from_raw_parts_mut(
+            out_ids, copy_n);
+        dst.copy_from_slice(&ids[..copy_n]);
+    }
+    n as i64
+}
+
+/// Decode `n_ids` token IDs into up to `out_capacity` UTF-8
+/// output bytes。 Returns the FULL byte count produced;when the
+/// return exceeds `out_capacity` the caller should realloc +
+/// retry。
+///
+/// Error codes (negative i64):
+///   -1 = null pointer
+///   -2 = produced bytes are not valid UTF-8 (e.g。 the IDs
+///        encode a non-UTF-8 byte sequence)
+///
+/// # Safety
+/// `ids` must point to `n_ids` readable u32s。 `out_utf8` must
+/// point to a writable buffer of at least `out_capacity` bytes
+/// (or be null when out_capacity == 0)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_tokenizer_decode(
+    tok: *const Tokenizer,
+    ids: *const u32,
+    n_ids: usize,
+    out_utf8: *mut u8,
+    out_capacity: usize,
+) -> i64 {
+    if tok.is_null() || (ids.is_null() && n_ids > 0) {
+        return -1;
+    }
+    if out_capacity > 0 && out_utf8.is_null() {
+        return -1;
+    }
+    let id_slice = if n_ids == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(ids, n_ids)
+    };
+    let s = match (&*tok).decode(id_slice) {
+        Some(s) => s,
+        None => return -2,
+    };
+    let bytes = s.as_bytes();
+    let n = bytes.len();
+    if out_capacity > 0 && n > 0 {
+        let copy_n = std::cmp::min(n, out_capacity);
+        let dst = std::slice::from_raw_parts_mut(
+            out_utf8, copy_n);
+        dst.copy_from_slice(&bytes[..copy_n]);
+    }
+    n as i64
+}
+
+/// Vocab size。 Returns -1 on null pointer。
+///
+/// # Safety
+/// `tok` must be a valid handle returned by `bas_tokenizer_new`
+/// (or null)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_tokenizer_vocab_size(
+    tok: *const Tokenizer,
+) -> i64 {
+    if tok.is_null() {
+        return -1;
+    }
+    (&*tok).vocab_size() as i64
+}
+
+// Internal wire-format parsers ---------------------------------
+
+fn read_u32_be(buf: &[u8], pos: usize) -> Option<u32> {
+    if pos + 4 > buf.len() {
+        return None;
+    }
+    Some(u32::from_be_bytes([
+        buf[pos],
+        buf[pos + 1],
+        buf[pos + 2],
+        buf[pos + 3],
+    ]))
+}
+
+fn parse_vocab(
+    buf: &[u8],
+) -> Option<HashMap<Vec<u8>, u32>> {
+    let mut pos = 0;
+    if buf.is_empty() {
+        return Some(HashMap::new());
+    }
+    let count = read_u32_be(buf, pos)? as usize;
+    pos += 4;
+    let mut vocab = HashMap::with_capacity(count);
+    for _ in 0..count {
+        let tlen = read_u32_be(buf, pos)? as usize;
+        pos += 4;
+        if pos + tlen > buf.len() {
+            return None;
+        }
+        let token = buf[pos..pos + tlen].to_vec();
+        pos += tlen;
+        let id = read_u32_be(buf, pos)?;
+        pos += 4;
+        vocab.insert(token, id);
+    }
+    Some(vocab)
+}
+
+fn parse_merges(buf: &[u8]) -> Option<Vec<BpeMerge>> {
+    let mut pos = 0;
+    if buf.is_empty() {
+        return Some(Vec::new());
+    }
+    let count = read_u32_be(buf, pos)? as usize;
+    pos += 4;
+    let mut merges = Vec::with_capacity(count);
+    for _ in 0..count {
+        let l_len = read_u32_be(buf, pos)? as usize;
+        pos += 4;
+        if pos + l_len > buf.len() {
+            return None;
+        }
+        let left = buf[pos..pos + l_len].to_vec();
+        pos += l_len;
+        let r_len = read_u32_be(buf, pos)? as usize;
+        pos += 4;
+        if pos + r_len > buf.len() {
+            return None;
+        }
+        let right = buf[pos..pos + r_len].to_vec();
+        pos += r_len;
+        let rank = read_u32_be(buf, pos)?;
+        pos += 4;
+        merges.push(BpeMerge { left, right, rank });
+    }
+    Some(merges)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,6 +646,287 @@ mod tests {
         // All 4 should be single-byte tokens (IDs 0..=255)
         for id in &ids {
             assert!(*id <= 255);
+        }
+    }
+
+    // MARK: - C ABI round-trip tests (chapter 七百二十二 第二刀)
+
+    /// Build the same synthetic vocab + merges the Rust-side tests
+    /// use,but in the BIG-ENDIAN length-prefixed wire format that
+    /// `bas_tokenizer_new` consumes。 Mirrors what BASBpeTokenizer
+    /// will emit on the Swift side。
+    fn synthetic_wire_buffers(
+    ) -> (Vec<u8>, Vec<u8>, u32) {
+        // Build the same vocab as synthetic_tokenizer。
+        let mut entries: Vec<(Vec<u8>, u32)> = Vec::new();
+        for b in 0u8..=255 {
+            entries.push((vec![b], b as u32));
+        }
+        entries.push((b"<unk>".to_vec(), 256));
+        entries.push((b"th".to_vec(), 257));
+        entries.push((b"he".to_vec(), 258));
+        entries.push((b"the".to_vec(), 259));
+        entries.push((b"in".to_vec(), 260));
+        entries.push((b" th".to_vec(), 261));
+        entries.push((b" the".to_vec(), 262));
+
+        // Encode vocab: [u32 count][[u32 tlen][bytes][u32 id]]...
+        let mut vocab_buf: Vec<u8> = Vec::new();
+        vocab_buf.extend_from_slice(
+            &(entries.len() as u32).to_be_bytes());
+        for (token, id) in &entries {
+            vocab_buf.extend_from_slice(
+                &(token.len() as u32).to_be_bytes());
+            vocab_buf.extend_from_slice(token);
+            vocab_buf.extend_from_slice(
+                &id.to_be_bytes());
+        }
+
+        // Encode merges:
+        //   [u32 count]
+        //   [[u32 ll][left][u32 rl][right][u32 rank]]...
+        let merges: &[(&[u8], &[u8], u32)] = &[
+            (b"t", b"h", 0),
+            (b"th", b"e", 1),
+            (b"h", b"e", 2),
+            (b"i", b"n", 3),
+            (b" ", b"t", 4),
+            (b" t", b"h", 5),
+            (b" th", b"e", 6),
+        ];
+        let mut merges_buf: Vec<u8> = Vec::new();
+        merges_buf.extend_from_slice(
+            &(merges.len() as u32).to_be_bytes());
+        for (l, r, rank) in merges {
+            merges_buf.extend_from_slice(
+                &(l.len() as u32).to_be_bytes());
+            merges_buf.extend_from_slice(l);
+            merges_buf.extend_from_slice(
+                &(r.len() as u32).to_be_bytes());
+            merges_buf.extend_from_slice(r);
+            merges_buf.extend_from_slice(
+                &rank.to_be_bytes());
+        }
+
+        (vocab_buf, merges_buf, 256)
+    }
+
+    #[test]
+    fn c_abi_version_pins_to_one() {
+        assert_eq!(
+            bas_tokenizer_abi_version(),
+            TOKENIZER_ABI_VERSION);
+        assert_eq!(TOKENIZER_ABI_VERSION, 1);
+    }
+
+    #[test]
+    fn c_abi_new_and_free_does_not_leak() {
+        let (vb, mb, unk) = synthetic_wire_buffers();
+        unsafe {
+            let tok = bas_tokenizer_new(
+                vb.as_ptr(), vb.len(),
+                mb.as_ptr(), mb.len(),
+                unk);
+            assert!(!tok.is_null());
+            assert_eq!(
+                bas_tokenizer_vocab_size(tok),
+                (256 + 1 + 6) as i64);
+            bas_tokenizer_free(tok);
+        }
+    }
+
+    #[test]
+    fn c_abi_free_null_is_safe() {
+        unsafe {
+            bas_tokenizer_free(std::ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn c_abi_encode_matches_rust_path() {
+        // Test the C ABI encode produces the same IDs as the
+        // direct Rust path。 Pins byte-equality across the FFI
+        // boundary so the Swift bridge can use either entry-
+        // point interchangeably。
+        let rust_tok = synthetic_tokenizer();
+        let (vb, mb, unk) = synthetic_wire_buffers();
+        let inputs = [
+            "the",
+            "in",
+            "theme",
+            "the cat sat in the hat",
+            "",
+            "x",
+            "🎉",
+        ];
+        unsafe {
+            let c_tok = bas_tokenizer_new(
+                vb.as_ptr(), vb.len(),
+                mb.as_ptr(), mb.len(),
+                unk);
+            assert!(!c_tok.is_null());
+            for input in &inputs {
+                let rust_ids = rust_tok.encode(input);
+                let text_bytes = input.as_bytes();
+                // Two-pass:first call with capacity 0 to
+                // discover the true ID count,then a second
+                // call to fill。 Mirrors how the Swift bridge
+                // handles unknown output sizes。
+                let needed = bas_tokenizer_encode(
+                    c_tok,
+                    text_bytes.as_ptr(),
+                    text_bytes.len(),
+                    std::ptr::null_mut(),
+                    0);
+                assert_eq!(needed, rust_ids.len() as i64);
+                let mut buf: Vec<u32> =
+                    vec![0; needed as usize];
+                let wrote = bas_tokenizer_encode(
+                    c_tok,
+                    text_bytes.as_ptr(),
+                    text_bytes.len(),
+                    buf.as_mut_ptr(),
+                    buf.len());
+                assert_eq!(wrote, needed);
+                assert_eq!(
+                    buf, rust_ids,
+                    "C ABI ids diverge from Rust ids for {:?}",
+                    input);
+            }
+            bas_tokenizer_free(c_tok);
+        }
+    }
+
+    #[test]
+    fn c_abi_decode_matches_rust_path() {
+        let rust_tok = synthetic_tokenizer();
+        let (vb, mb, unk) = synthetic_wire_buffers();
+        let inputs = [
+            "the quick brown fox jumps over the lazy dog",
+            "12345 67890",
+            "中文 mixed",
+            "",
+        ];
+        unsafe {
+            let c_tok = bas_tokenizer_new(
+                vb.as_ptr(), vb.len(),
+                mb.as_ptr(), mb.len(),
+                unk);
+            assert!(!c_tok.is_null());
+            for input in &inputs {
+                let ids = rust_tok.encode(input);
+                // Two-pass decode same as encode。
+                let needed = bas_tokenizer_decode(
+                    c_tok,
+                    ids.as_ptr(),
+                    ids.len(),
+                    std::ptr::null_mut(),
+                    0);
+                assert!(
+                    needed >= 0,
+                    "decode failed for {:?}", input);
+                let mut buf: Vec<u8> =
+                    vec![0; needed as usize];
+                let wrote = bas_tokenizer_decode(
+                    c_tok,
+                    ids.as_ptr(),
+                    ids.len(),
+                    buf.as_mut_ptr(),
+                    buf.len());
+                assert_eq!(wrote, needed);
+                let decoded =
+                    std::str::from_utf8(&buf).unwrap();
+                assert_eq!(decoded, *input);
+            }
+            bas_tokenizer_free(c_tok);
+        }
+    }
+
+    #[test]
+    fn c_abi_rejects_null_pointers() {
+        let (vb, mb, unk) = synthetic_wire_buffers();
+        unsafe {
+            // Null vocab with non-zero length → null handle
+            let bad = bas_tokenizer_new(
+                std::ptr::null(), 32,
+                mb.as_ptr(), mb.len(),
+                unk);
+            assert!(bad.is_null());
+
+            // Null merges with non-zero length → null handle
+            let bad2 = bas_tokenizer_new(
+                vb.as_ptr(), vb.len(),
+                std::ptr::null(), 32,
+                unk);
+            assert!(bad2.is_null());
+
+            // Valid handle for encode/decode null checks
+            let tok = bas_tokenizer_new(
+                vb.as_ptr(), vb.len(),
+                mb.as_ptr(), mb.len(),
+                unk);
+            assert!(!tok.is_null());
+
+            // Null tok pointer → -1
+            assert_eq!(
+                bas_tokenizer_encode(
+                    std::ptr::null(),
+                    b"abc".as_ptr(), 3,
+                    std::ptr::null_mut(), 0),
+                -1);
+            assert_eq!(
+                bas_tokenizer_decode(
+                    std::ptr::null(),
+                    std::ptr::null(), 0,
+                    std::ptr::null_mut(), 0),
+                -1);
+            assert_eq!(
+                bas_tokenizer_vocab_size(
+                    std::ptr::null()),
+                -1);
+
+            bas_tokenizer_free(tok);
+        }
+    }
+
+    #[test]
+    fn c_abi_rejects_invalid_utf8_encode() {
+        let (vb, mb, unk) = synthetic_wire_buffers();
+        unsafe {
+            let tok = bas_tokenizer_new(
+                vb.as_ptr(), vb.len(),
+                mb.as_ptr(), mb.len(),
+                unk);
+            assert!(!tok.is_null());
+            // 0xFF 0xFE is not valid UTF-8 lead bytes (no valid
+            // start byte sequence)
+            let bad_input: [u8; 2] = [0xFF, 0xFE];
+            let rc = bas_tokenizer_encode(
+                tok,
+                bad_input.as_ptr(), bad_input.len(),
+                std::ptr::null_mut(), 0);
+            assert_eq!(rc, -2);
+            bas_tokenizer_free(tok);
+        }
+    }
+
+    #[test]
+    fn c_abi_handles_malformed_vocab_wire_format() {
+        unsafe {
+            // count says 5 entries but buffer only contains
+            // 1 incomplete entry
+            let bad_vocab: Vec<u8> = vec![
+                0, 0, 0, 5, // count = 5
+                0, 0, 0, 2, // first token len = 2
+                b'a', b'b',
+                // missing id u32 + 4 more entries
+            ];
+            let mb: Vec<u8> = vec![0, 0, 0, 0]; // merges count=0
+            let tok = bas_tokenizer_new(
+                bad_vocab.as_ptr(), bad_vocab.len(),
+                mb.as_ptr(), mb.len(),
+                0);
+            assert!(tok.is_null());
         }
     }
 }
