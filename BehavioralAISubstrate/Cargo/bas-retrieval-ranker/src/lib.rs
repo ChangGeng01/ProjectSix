@@ -14,15 +14,16 @@
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-pub mod activations; // chapter 七百十一 第一刀 — GELU + SiLU (scalar + SIMD)
+pub mod activations;      // chapter 七百十一 第一刀 — GELU + SiLU
 pub mod cosine;
 pub mod decay;
+pub mod forget_cascade;   // chapter 七百十三 第一刀 — forget-cascade filter
 pub mod fuser;
-pub mod layer_norm; // chapter 七百九 第二刀 — LayerNorm (welford + SIMD)
-pub mod ledger;     // chapter 七百十二 第一刀 — batched seal + verify
-pub mod matmul;     // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
-pub mod simd;       // chapter 七百五 第二刀 — SIMD-accelerated math
-pub mod softmax;    // chapter 七百九 第一刀 — numerically-stable softmax
+pub mod layer_norm;       // chapter 七百九 第二刀 — LayerNorm
+pub mod ledger;           // chapter 七百十二 第一刀 — batched seal + verify
+pub mod matmul;           // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
+pub mod simd;             // chapter 七百五 第二刀 — SIMD-accelerated math
+pub mod softmax;          // chapter 七百九 第一刀 — numerically-stable softmax
 pub mod topk;
 
 pub const ABI_VERSION: i32 = 1;
