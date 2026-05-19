@@ -2522,6 +2522,30 @@ extension BASCognitiveBrain {
             value: hex, choice: r.choice)
     }
 
+    /// chapter 七百九 第四刀 / M2219 — auto-routed softmax。
+    ///
+    /// Always routes through Rust scalar (measured tie with
+    /// SIMD,scalar is simpler)。 Returns the normalized
+    /// probability vector + which path executed。
+    public nonisolated static func softmaxAuto(
+        _ x: [Float]
+    ) -> BASAutoRouteResult<[Float]> {
+        return BASAutoRouteRanker.softmax(x)
+    }
+
+    /// chapter 七百九 第四刀 / M2219 — auto-routed LayerNorm。
+    ///
+    /// Routes between Rust naive (dim < 128) and Rust affine
+    /// SIMD (dim ≥ 128) based on measured crossover。 Plain
+    /// LayerNorm with γ=1 β=0。
+    public nonisolated static func layerNormAuto(
+        _ x: [Float], eps: Float = 1e-5,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<[Float]> {
+        return BASAutoRouteRanker.layerNorm(
+            x, eps: eps, thresholds: thresholds)
+    }
+
     /// chapter 七百八 第三刀 / M2213 — auto-routed MatMul。
     public func matMulAuto(
         a: [Float], aRows: Int, aCols: Int,

@@ -55,11 +55,16 @@ public struct BASAutoRouteThresholds:
     /// Rust, 128³ wins Metal — crossover sits between)。
     public let matMulMetalMinProduct: Int
 
+    /// LayerNorm: use Rust naive below this dim,affine SIMD at
+    /// or above。 Measured M-series crossover ≈ 128。
+    public let layerNormSIMDMinDim: Int
+
     public init(
         cosineSIMDMinDim: Int = 64,
         sha256CryptoKitMinBytes: Int = 1024,
         attentionMetalMinProduct: Int = 64,
-        matMulMetalMinProduct: Int = 262_144
+        matMulMetalMinProduct: Int = 262_144,
+        layerNormSIMDMinDim: Int = 128
     ) {
         self.cosineSIMDMinDim = max(1, cosineSIMDMinDim)
         self.sha256CryptoKitMinBytes =
@@ -68,6 +73,8 @@ public struct BASAutoRouteThresholds:
             max(1, attentionMetalMinProduct)
         self.matMulMetalMinProduct =
             max(1, matMulMetalMinProduct)
+        self.layerNormSIMDMinDim =
+            max(1, layerNormSIMDMinDim)
     }
 
     /// Default measured M-series thresholds。
@@ -97,6 +104,11 @@ public enum BASAutoRouteChoice:
     case rustMatMulNaive
     case rustMatMulBlocked
     case metalMatMulMPSGraph
+    /// chapter 七百九 第四刀 — Softmax routing。
+    case rustSoftmaxScalar
+    /// chapter 七百九 第四刀 — LayerNorm routing。
+    case rustLayerNormNaive
+    case rustLayerNormAffineSIMD
 }
 
 /// chapter 七百八 第三刀 — MatMul shape input。
@@ -300,6 +312,141 @@ public enum BASAutoRouteRanker {
         return BASAutoRouteResult(
             value: Array(digest),
             choice: .swiftCryptoKit)
+    }
+
+    // MARK: - Softmax routing (chapter 七百九 第四刀)
+    //
+    // Measured M-series wins (tournament 七百九 第三刀):
+    // softmax is dominated by exp() per-element cost,scalar
+    // and SIMD perform within ±5%。 Always use scalar — keeps
+    // the dispatch simple,zero regret in practice。
+    public static func softmax(
+        _ x: [Float]
+    ) -> BASAutoRouteResult<[Float]> {
+        guard !x.isEmpty else {
+            return BASAutoRouteResult(
+                value: [],
+                choice: .rustSoftmaxScalar)
+        }
+        var out = [Float](
+            repeating: 0, count: x.count)
+        #if os(iOS) || os(macOS)
+        let rc = x.withUnsafeBufferPointer { xp in
+            out.withUnsafeMutableBufferPointer { op in
+                bas_ranker_softmax(
+                    xp.baseAddress, x.count,
+                    op.baseAddress, op.count)
+            }
+        }
+        if rc == 0 {
+            return BASAutoRouteResult(
+                value: out,
+                choice: .rustSoftmaxScalar)
+        }
+        #endif
+        // Swift fallback
+        var m = x[0]
+        for v in x { if v > m { m = v } }
+        var sum: Float = 0
+        for (i, v) in x.enumerated() {
+            let e = expf(v - m)
+            out[i] = e
+            sum += e
+        }
+        if sum > 0 {
+            for i in 0..<out.count { out[i] /= sum }
+        }
+        return BASAutoRouteResult(
+            value: out, choice: .swiftNaive)
+    }
+
+    // MARK: - LayerNorm routing (chapter 七百九 第四刀)
+    //
+    // Measured M-series wins:
+    //   dim < 128 → Rust naive (no SIMD overhead)
+    //   dim ≥ 128 → Rust affine SIMD (1.2-1.9x over naive)
+    //
+    // Affine variant takes γ + β。 For "plain" LayerNorm
+    // (γ=1, β=0) the affine SIMD path still wins above the
+    // threshold — only its loop structure changes,not the math。
+    public static func layerNormChoice(
+        dim: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteChoice {
+        if dim < thresholds.layerNormSIMDMinDim {
+            return .rustLayerNormNaive
+        }
+        return .rustLayerNormAffineSIMD
+    }
+
+    /// Plain LayerNorm (γ=1,β=0)。 Routes between Rust naive
+    /// + Rust affine SIMD (with implicit γ=1, β=0)。
+    public static func layerNorm(
+        _ x: [Float], eps: Float = 1e-5,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<[Float]> {
+        guard !x.isEmpty else {
+            return BASAutoRouteResult(
+                value: [],
+                choice: .rustLayerNormNaive)
+        }
+        let choice = layerNormChoice(
+            dim: x.count, thresholds: thresholds)
+        var out = [Float](
+            repeating: 0, count: x.count)
+        #if os(iOS) || os(macOS)
+        let rc: Int32
+        switch choice {
+        case .rustLayerNormAffineSIMD:
+            let gamma = [Float](
+                repeating: 1.0, count: x.count)
+            let beta = [Float](
+                repeating: 0.0, count: x.count)
+            rc = x.withUnsafeBufferPointer { xp in
+                gamma.withUnsafeBufferPointer { gp in
+                    beta.withUnsafeBufferPointer { bp in
+                        out.withUnsafeMutableBufferPointer
+                            { op in
+                            bas_ranker_layer_norm_affine_simd(
+                                xp.baseAddress, x.count,
+                                gp.baseAddress, gamma.count,
+                                bp.baseAddress, beta.count,
+                                op.baseAddress, op.count,
+                                eps)
+                        }
+                    }
+                }
+            }
+        default:
+            rc = x.withUnsafeBufferPointer { xp in
+                out.withUnsafeMutableBufferPointer { op in
+                    bas_ranker_layer_norm(
+                        xp.baseAddress, x.count,
+                        op.baseAddress, op.count, eps)
+                }
+            }
+        }
+        if rc == 0 {
+            return BASAutoRouteResult(
+                value: out, choice: choice)
+        }
+        #endif
+        // Fallback: Swift naive
+        var sum: Float = 0
+        for v in x { sum += v }
+        let mean = sum / Float(x.count)
+        var vsum: Float = 0
+        for v in x {
+            let d = v - mean
+            vsum += d * d
+        }
+        let variance = vsum / Float(x.count)
+        let invStd = 1.0 / (variance + eps).squareRoot()
+        for i in 0..<x.count {
+            out[i] = (x[i] - mean) * invStd
+        }
+        return BASAutoRouteResult(
+            value: out, choice: .swiftNaive)
     }
 
     // MARK: - MatMul routing (chapter 七百八 第三刀)
