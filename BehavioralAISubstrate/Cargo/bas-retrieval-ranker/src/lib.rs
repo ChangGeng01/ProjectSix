@@ -22,6 +22,7 @@ pub mod fuser;
 pub mod layer_norm;       // chapter 七百九 第二刀 — LayerNorm
 pub mod ledger;           // chapter 七百十二 第一刀 — batched seal + verify
 pub mod matmul;           // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
+pub mod provenance;       // chapter 七百十三 第二刀 — attestation-tier filter
 pub mod simd;             // chapter 七百五 第二刀 — SIMD-accelerated math
 pub mod softmax;          // chapter 七百九 第一刀 — numerically-stable softmax
 pub mod topk;
