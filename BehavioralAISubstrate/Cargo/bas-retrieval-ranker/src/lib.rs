@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+pub mod activations; // chapter 七百十一 第一刀 — GELU + SiLU (scalar + SIMD)
 pub mod cosine;
 pub mod decay;
 pub mod fuser;
