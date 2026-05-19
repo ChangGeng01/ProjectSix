@@ -116,23 +116,41 @@ public struct BASVectorTopKResult:
 /// isolated。Hosts can hold a reference + concurrently query。
 public actor BASVectorIndex {
 
-    /// chapter 七百十八 第一刀 — opt-in feature flag controlling
+    /// chapter 七百十八 第一刀 — feature flag controlling
     /// whether the per-pair `cosine(_:_:)` helper routes through
     /// `BASAutoRouteRanker.cosineSimilarity` (Rust SIMD ≥ dim 64,
     /// Rust scalar < dim 64 per chapter 七百四 measurement)。
     ///
-    /// Default `false` until chapter 七百十八 第二刀 perf
-    /// measurement confirms speedup at typical RAG corpus sizes
-    /// (1K-10K entries × dim 128-768)。 Hosts can opt in at any
-    /// time before constructing the index。
+    /// **DEFAULT FLIPPED ON at chapter 七百十八 第四刀** (M2264)
+    /// per chapter 七百十八 第二刀 perf measurement:Rust wins
+    /// 8.69× — 43.09× across (100/1K/5K entries × 128/384/768
+    /// dim) grid。 The LARGEST per-target production speedup
+    /// measured in this branch arc。
+    ///
+    /// Byte-equality verified by BASChapter718VectorIndexByteEqualityTests
+    /// (top-K ordering identical across all three paths within
+    /// fp32 tolerance)。
+    ///
+    /// Hosts that need the legacy Swift scalar path (e.g。 for
+    /// replay-byte-pinned compat against an existing audit
+    /// archive with fp32 score-byte pinning) can flip to `false`
+    /// at startup。
     public nonisolated(unsafe) static var useRoutedCosine:
-        Bool = false
+        Bool = true
 
     /// chapter 七百十八 第三刀 — second opt-in flag for the
     /// BATCHED topK fast-path:builds a contiguous corpus
     /// array once + single `bas_ranker_batched_cosine_simd`
     /// FFI hop。 Amortizes FFI overhead across all entries。
-    /// Default off until perf measurement confirms。
+    ///
+    /// Default STAYS off per chapter 七百十八 第二刀:per-pair
+    /// Rust wins by 2.5-7% over batched at our measured sizes
+    /// (the O(N*dim) memcpy to build the contiguous corpus
+    /// cancels the FFI-amortization gain)。 Hosts with very
+    /// large stable corpora (≥ 10K entries × ≥ 768 dim) MAY
+    /// benefit from flipping this on,since the memcpy
+    /// amortizes across multiple queries against the same
+    /// corpus。
     public nonisolated(unsafe) static var useBatchedTopK:
         Bool = false
 
