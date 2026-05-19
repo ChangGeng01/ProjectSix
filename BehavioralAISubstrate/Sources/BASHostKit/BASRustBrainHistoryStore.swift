@@ -227,12 +227,15 @@ public actor BASRustBrainHistoryStore {
         -> String
     {
         let bytes = try await tracker.computeChainHash()
-        var hex = ""
-        hex.reserveCapacity(64)
-        for byte in bytes {
-            hex += String(format: "%02x", byte)
-        }
-        return hex
+        // LEGACY (chapter 七百二十 第一刀 / M2271):
+        //     var hex = ""
+        //     hex.reserveCapacity(64)
+        //     for byte in bytes {
+        //         hex += String(format: "%02x", byte)
+        //     }
+        //     return hex
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(bytes))
     }
 
     /// 主线 Integrity 抽取 — validator variant。 Compares

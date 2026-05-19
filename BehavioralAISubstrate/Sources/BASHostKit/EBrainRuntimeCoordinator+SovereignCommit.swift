@@ -1659,7 +1659,11 @@ extension BASEBrainRuntimeCoordinator {
     ) -> String {
         let payload = components.joined(separator: "|")
         let digest = SHA256.hash(data: Data(payload.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百二十 第一刀 / M2271):
+        //     return digest.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 
     func buildSovereignExecutionReceipts(

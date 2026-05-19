@@ -233,9 +233,13 @@ extension BASEBrainTurnResult {
     }
 
     func fingerprint(for value: String) -> String {
-        SHA256.hash(data: Data(value.utf8))
-            .compactMap { String(format: "%02x", $0) }
-            .joined()
+        // LEGACY (chapter 七百二十 第一刀 / M2271):
+        //     SHA256.hash(data: Data(value.utf8))
+        //         .compactMap { String(format: "%02x", $0) }
+        //         .joined()
+        let digest = SHA256.hash(data: Data(value.utf8))
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 
     func summarizedTokens(
@@ -349,9 +353,15 @@ extension BASEBrainTurnResult {
             + integrityFailedChecks
             + integrityContaminationRefs
         ).joined(separator: "||")
-        let integrityVerificationHash = SHA256.hash(data: Data(integrityVerificationSeed.utf8))
-            .compactMap { String(format: "%02x", $0) }
-            .joined()
+        // LEGACY (chapter 七百二十 第一刀 / M2271):
+        //     let integrityVerificationHash = SHA256.hash(...)
+        //         .compactMap { String(format: "%02x", $0) }
+        //         .joined()
+        let integrityDigest = SHA256.hash(
+            data: Data(integrityVerificationSeed.utf8))
+        let integrityVerificationHash =
+            BASAutoRouteRanker.bytesToHexLower(
+                Array(integrityDigest))
         return BASEvolutionFoldedLungSummary(
             morphGraphID: morphGraphID,
             hotColdMapID: hotColdMapID,
