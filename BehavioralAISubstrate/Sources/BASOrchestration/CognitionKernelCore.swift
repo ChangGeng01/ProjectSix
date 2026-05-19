@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import BASPolicy
+import BASRuntimeCore
 
 public struct BASContextKernelPolicy: Codable, Sendable, Equatable {
     public var preservedBlockIDs: [String]
@@ -295,6 +296,10 @@ public enum BASCognitionKernel {
 
     private static func fingerprint(_ material: String) -> String {
         let digest = SHA256.hash(data: Data(material.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百二十 第二刀 / M2272):
+        //     return digest.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 }

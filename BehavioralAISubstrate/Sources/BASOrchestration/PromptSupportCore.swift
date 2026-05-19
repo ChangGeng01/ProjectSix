@@ -260,7 +260,11 @@ public enum BASPromptFingerprinting {
         _ value: String
     ) -> String {
         let digest = SHA256.hash(data: Data(value.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百二十 第二刀 / M2272):
+        //     return digest.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 }
 

@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import BASRuntimeCore
 
 public struct BASContextCompilationPolicy: Codable, Sendable, Equatable {
     public var targetCharacters: Int
@@ -159,6 +160,10 @@ public enum BASContextCompiler {
 
     private static func fingerprint(_ material: String) -> String {
         let digest = SHA256.hash(data: Data(material.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百二十 第二刀 / M2272):
+        //     return digest.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 }
