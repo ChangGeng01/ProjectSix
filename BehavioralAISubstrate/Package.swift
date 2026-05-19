@@ -91,7 +91,14 @@ let package = Package(
             // serves it at runtime. The Swift adapter
             // (Phase B-3) loads it via MLModel(contentsOf:)。
             resources: [
-                .process("Resources/BASContextClassifier.mlmodel")
+                .process("Resources/BASContextClassifier.mlmodel"),
+                // chapter 七百二 native-port — 61-chapter
+                // doctrine literal records ported to a JSON
+                // resource。 Replaces 3,902 LOC of Swift
+                // literal source。 See BASChapterDoctrineRegistry
+                // +AllLiterals.swift loader for round-trip
+                // invariant + frozen-SHA256 preservation。
+                .process("Resources/chapter_doctrine_all_literals.json")
             ]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
