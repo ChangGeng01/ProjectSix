@@ -3,6 +3,9 @@ import CryptoKit
 import BASMemory
 import BASPolicy
 import BASRuntimeCore
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustHashCore
 
 public enum BASRequestOutcome: String, CaseIterable, Codable, Sendable {
     case templatePinned
@@ -748,10 +751,24 @@ public enum BASObservabilityInspector {
         }
     }
 
+    /// chapter 七百二 native-port — Rust-sourced replay fingerprint;
+    /// legacy CryptoKit body preserved per 全comment 不要删除。
     public static func replayFingerprint(for bundle: BASReplayBundle) -> BASReplayFingerprint {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = (try? encoder.encode(bundle)) ?? Data()
+        if let rust = try? BASRustLedgerCore.sha256(data) {
+            return BASReplayFingerprint(value:
+                rust.map { String(format: "%02x", $0) }
+                    .joined())
+        }
+        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+        /*
+         * Pre-chapter-702 Swift implementation:
+         *     let digest = SHA256.hash(data: data)
+         *     return BASReplayFingerprint(
+         *         value: digest.map { String(format: "%02x", $0) }.joined())
+         */
         let digest = SHA256.hash(data: data)
         return BASReplayFingerprint(value: digest.map { String(format: "%02x", $0) }.joined())
     }

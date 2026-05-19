@@ -31,6 +31,9 @@
 import CryptoKit
 import Foundation
 import BASRuntimeCore
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustHashCore
 
 public struct BASEventRecord: Codable, Sendable, Equatable {
     public var id: UUID
@@ -389,10 +392,29 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
         ]
         let material = materialParts.joined(separator: "###")
 
-        let fingerprint = SHA256.hash(data: Data(material.utf8))
-            .map { String(format: "%02x", $0) }
-            .joined()
-            .prefix(20)
+        // chapter 七百二 native-port — Rust-sourced fingerprint;
+        // legacy CryptoKit body preserved per 全comment 不要删除。
+        let materialData = Data(material.utf8)
+        let fingerprint: Substring
+        if let rust = try? BASRustLedgerCore.sha256(
+            materialData)
+        {
+            fingerprint = rust.map {
+                String(format: "%02x", $0)
+            }.joined().prefix(20)
+        } else {
+            /*
+             * Pre-chapter-702 Swift implementation:
+             *     let fingerprint = SHA256.hash(data: Data(material.utf8))
+             *         .map { String(format: "%02x", $0) }
+             *         .joined()
+             *         .prefix(20)
+             */
+            fingerprint = SHA256.hash(data: materialData)
+                .map { String(format: "%02x", $0) }
+                .joined()
+                .prefix(20)
+        }
 
         return BASBrainStateSnapshot(
             fingerprint: String(fingerprint),

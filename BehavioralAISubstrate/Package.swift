@@ -110,7 +110,12 @@ let package = Package(
         // V1 inline path)。
         .target(
             name: "BASMemory",
-            dependencies: ["BASRuntimeCore"],
+            // chapter 七百二 native-port — BASRustHashCore added so
+            // SHA256 sites in BASMemory can route through the Rust
+            // XCFramework。 Safe (no cycle) because BASRustHashCore
+            // does NOT depend on BASMemory — see the target stanza
+            // below for the rationale。
+            dependencies: ["BASRuntimeCore", "BASRustHashCore"],
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
             ]),
@@ -143,7 +148,9 @@ let package = Package(
         // protocol + Scout/Core presets + an in-memory deterministic
         // fake for tests. Platform providers (Apple FoundationModels,
         // MLX, remote LLMs) live in adapter layers.
-        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore"]),
+        // chapter 七百二 native-port — BASRustHashCore added so
+        // BASOrganDeterministicAdapter SHA256 can route through Rust。
+        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore", "BASRustHashCore"]),
         // BASChatCompletionsAdapter — generic remote-LLM organ
         // provider. URLSession-backed, OpenAI Chat Completions
         // JSON shape. Conforms to BASOrganAdapter so it drops into
@@ -261,14 +268,16 @@ let package = Package(
                     name: "HuggingFace",
                     package: "swift-huggingface")
             ]),
-        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
+        // chapter 七百二 native-port — BASRustHashCore added。
+        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASRustHashCore"]),
         // BASOrchestration depends on BASObservability because M58
         // `BASUpdateTicketObservationDerivation` needs to read
         // `BASUpdateTicket` (defined in BASObservability) to produce a
         // per-ticket observation bundle on the main-chain thought frame.
         // Safe topology: BASObservability does not import BASOrchestration,
         // so no cycle.
-        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability"]),
+        // chapter 七百二 native-port — BASRustHashCore added。
+        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability", "BASRustHashCore"]),
         .target(
             name: "BASEvaluation",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability"]

@@ -1,6 +1,9 @@
 import CryptoKit
 import Foundation
 import BASRuntimeCore
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustHashCore
 
 public struct BASIdentityLattice: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
@@ -1131,8 +1134,23 @@ internal func basOrderedUnique(_ values: [String]) -> [String] {
     return ordered
 }
 
+/// chapter 七百二 native-port — Rust-sourced stable signature;
+/// legacy CryptoKit body preserved per 全comment 不要删除。
 private func basStableSignature(_ material: String) -> String {
-    let digest = SHA256.hash(data: Data(material.utf8))
+    let data = Data(material.utf8)
+    if let rust = try? BASRustLedgerCore.sha256(data) {
+        let hex = rust.map { String(format: "%02x", $0) }
+            .joined()
+        return String(hex.prefix(16))
+    }
+    // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+    /*
+     * Pre-chapter-702 Swift implementation:
+     *     let digest = SHA256.hash(data: Data(material.utf8))
+     *     let hex = digest.map { String(format: "%02x", $0) }.joined()
+     *     return String(hex.prefix(16))
+     */
+    let digest = SHA256.hash(data: data)
     let hex = digest.map { String(format: "%02x", $0) }.joined()
     return String(hex.prefix(16))
 }

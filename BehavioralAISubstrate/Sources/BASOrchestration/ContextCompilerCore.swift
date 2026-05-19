@@ -1,5 +1,8 @@
 import CryptoKit
 import Foundation
+// chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
+// CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
+import BASRustHashCore
 
 public struct BASContextCompilationPolicy: Codable, Sendable, Equatable {
     public var targetCharacters: Int
@@ -157,8 +160,21 @@ public enum BASContextCompiler {
         .joined(separator: "|")
     }
 
+    /// chapter 七百二 native-port — Rust-sourced fingerprint;
+    /// legacy CryptoKit body preserved per 全comment 不要删除。
     private static func fingerprint(_ material: String) -> String {
-        let digest = SHA256.hash(data: Data(material.utf8))
+        let data = Data(material.utf8)
+        if let rust = try? BASRustLedgerCore.sha256(data) {
+            return rust.map { String(format: "%02x", $0) }
+                .joined()
+        }
+        // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+        /*
+         * Pre-chapter-702 Swift implementation:
+         *     let digest = SHA256.hash(data: Data(material.utf8))
+         *     return digest.map { String(format: "%02x", $0) }.joined()
+         */
+        let digest = SHA256.hash(data: data)
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
