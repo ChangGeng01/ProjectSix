@@ -1,0 +1,13 @@
+[package]
+name = "bas-tokenizer"
+description = "chapter 七百二十二 第一刀 / M2281 — Byte-level BPE tokenizer for on-device tokenization (substrate's first net-new capability under the chapter 七百二十一-七百三十 aggressive evolution arc)"
+license.workspace = true
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }

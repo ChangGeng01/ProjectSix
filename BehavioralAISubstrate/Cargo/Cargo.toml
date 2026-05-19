@@ -26,6 +26,7 @@ members = [
     "bas-permit-policy",           # chapter 七百三 第四刀 / M2174
     "bas-event-log-codec",         # chapter 七百三 第四刀 / M2174
     "bas-runtime-frame",           # chapter 七百三 第四刀 / M2174
+    "bas-tokenizer",               # chapter 七百二十二 第一刀 / M2281
 ]
 resolver = "2"
 
