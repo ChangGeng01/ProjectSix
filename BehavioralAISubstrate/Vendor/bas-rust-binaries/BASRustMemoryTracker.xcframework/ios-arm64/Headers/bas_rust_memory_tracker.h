@@ -797,6 +797,38 @@ int64_t bas_ranker_importance_score_all(
     int64_t now_ms,
     uint8_t* out_scores_buf, size_t out_capacity);
 
+// MARK: - chapter 七百二十四 第二刀 — Event log binary encoder
+//
+// Encode one EventLogEntry to the binary wire format。 Two-phase
+// like other chapter-722-style encoders — first call with
+// out_capacity=0 returns the required byte count。
+//
+// Wire layout (matches encode_binary in bas-event-log-codec):
+//   [u8 v2=2][u8 kind][u32 le entry_id_len][bytes]
+//   [u32 le session_len][bytes][u32 le turn_len][bytes]
+//   [i64 le ts]
+//   [u8 payload_present][u32 le payload_len][bytes]?
+//   [u8 provenance_present][u32 le prov_len][bytes]?
+//
+// Decode happens Swift-side — the binary format is trivial to
+// walk in Swift,no FFI overhead needed for the read path。
+//
+// Returns:
+//   ≥ 0 = number of OUTPUT BYTES needed
+//   -1  = null pointer
+//   -2  = invalid UTF-8 in any string field OR invalid kind byte
+int64_t bas_event_log_encode_binary(
+    uint8_t kind,
+    const uint8_t* entry_id, size_t entry_id_len,
+    const uint8_t* session_ref, size_t session_ref_len,
+    const uint8_t* turn_ref, size_t turn_ref_len,
+    int64_t timestamp_ms,
+    uint8_t payload_present,
+    const uint8_t* payload, size_t payload_len,
+    uint8_t provenance_present,
+    const uint8_t* provenance, size_t provenance_len,
+    uint8_t* out_buf, size_t out_capacity);
+
 #ifdef __cplusplus
 }
 #endif

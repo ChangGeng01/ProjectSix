@@ -331,6 +331,125 @@ pub fn encode_batch_binary(
     out
 }
 
+// MARK: - chapter 七百二十四 第二刀 / M2292
+//         C ABI for binary encode (decode happens Swift-side
+//         since the format is trivial to walk)
+//
+// Two-phase like the BPE / importance scorer FFIs:
+//   - First call with out_capacity=0 returns required size
+//   - Second call with sized buffer fills
+
+/// Encode one event log entry into binary wire format。
+///
+/// Returns:
+///   ≥ 0 = number of OUTPUT BYTES needed (whether or not the
+///         out_buf was filled — caller realloc + retry if
+///         needed > out_capacity)
+///   -1  = null pointer (only flagged when the corresponding
+///         length is non-zero,or out_buf null with non-zero
+///         capacity)
+///   -2  = invalid UTF-8 in any of the string fields
+///
+/// # Safety
+/// Caller must provide readable buffers of declared lengths and
+/// a writable `out_buf` of at least `out_capacity` bytes (or
+/// null when out_capacity == 0)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_event_log_encode_binary(
+    kind: u8,
+    entry_id: *const u8,
+    entry_id_len: usize,
+    session_ref: *const u8,
+    session_ref_len: usize,
+    turn_ref: *const u8,
+    turn_ref_len: usize,
+    timestamp_ms: i64,
+    payload_present: u8,
+    payload: *const u8,
+    payload_len: usize,
+    provenance_present: u8,
+    provenance: *const u8,
+    provenance_len: usize,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i64 {
+    if out_capacity > 0 && out_buf.is_null() {
+        return -1;
+    }
+    let kind = match kind_from_u8(kind) {
+        Some(k) => k,
+        None => return -2,
+    };
+
+    fn read_str(
+        buf: *const u8, len: usize,
+    ) -> Result<String, ()> {
+        if len == 0 {
+            return Ok(String::new());
+        }
+        if buf.is_null() {
+            return Err(());
+        }
+        let slice = unsafe {
+            core::slice::from_raw_parts(buf, len)
+        };
+        core::str::from_utf8(slice)
+            .map(|s| s.to_string())
+            .map_err(|_| ())
+    }
+
+    let entry_id_s = match read_str(entry_id, entry_id_len) {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let session_ref_s = match read_str(
+        session_ref, session_ref_len)
+    {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let turn_ref_s = match read_str(turn_ref, turn_ref_len) {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let payload_json = if payload_present != 0 {
+        match read_str(payload, payload_len) {
+            Ok(s) => Some(s),
+            Err(_) => return -2,
+        }
+    } else {
+        None
+    };
+    let provenance_summary = if provenance_present != 0 {
+        match read_str(provenance, provenance_len) {
+            Ok(s) => Some(s),
+            Err(_) => return -2,
+        }
+    } else {
+        None
+    };
+
+    let entry = EventLogEntry {
+        entry_id: entry_id_s,
+        kind,
+        session_ref: session_ref_s,
+        turn_ref: turn_ref_s,
+        timestamp_ms,
+        payload_json,
+        provenance_summary,
+    };
+    let bytes = encode_binary(&entry);
+    let needed = bytes.len();
+    if out_capacity > 0 && needed > 0 {
+        let copy_n = core::cmp::min(needed, out_capacity);
+        let dst = unsafe {
+            core::slice::from_raw_parts_mut(out_buf, copy_n)
+        };
+        dst.copy_from_slice(&bytes[..copy_n]);
+    }
+    needed as i64
+}
+
 pub fn decode_batch_binary(
     buf: &[u8],
 ) -> Result<Vec<EventLogEntry>, String> {
