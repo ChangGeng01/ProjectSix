@@ -119,13 +119,14 @@ let package = Package(
         // schema types. Never depends on Memory/Policy/Orchestration (prevents
         // downstream layers from influencing sovereign decisions).
         // chapter 七百二 native-port branch — BASSovereign gains a build-graph
-        // dependency on BASRustCoreBridge to source the SHA256 chain-hash
-        // primitive from the Rust XCFramework (see BASSovereignAuditLedger.swift
-        // hash() commentary block). The semantic isolation principle
-        // ("never depends on Memory/Policy/Orchestration") is preserved at
-        // the import-graph level — BASSovereign code does not import any
-        // Memory/Policy/Orchestration module, only the Rust crypto primitive.
-        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore", "BASRustCoreBridge"]),
+        // dependency on BASRustHashCore (the minimal pure-crypto Rust bridge,
+        // BASMemory-independent) to source SHA256 chain-hash primitives from
+        // the Rust XCFramework (see BASSovereignAuditLedger.swift hash()
+        // commentary). The semantic isolation principle ("never depends on
+        // Memory/Policy/Orchestration") is preserved at the import-graph level
+        // — BASSovereign code does not import any Memory/Policy/Orchestration
+        // module, only the Rust crypto primitive。
+        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore", "BASRustHashCore"]),
         // BASWorldPrior (L4) — world-knowledge layer. A leaf module:
         // depends only on BASRuntimeCore schema. Neither the sovereign
         // kernel nor memory/policy layers depend on it (world priors
@@ -381,6 +382,22 @@ let package = Package(
         .binaryTarget(
             name: "BASRustMemoryTrackerBinary",
             path: "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"),
+        // chapter 七百二 native-port — BASRustHashCore is the
+        // minimal Rust-bridge target exposing pure crypto
+        // primitives (BASRustLedgerCore: SHA256 chain step +
+        // replay verify)。 Depends ONLY on the binary XCFramework
+        // — NO BASMemory / BASRuntimeCore — so leaf modules
+        // (BASMemory, BASOrgan, BASObservability, BASOrchestration)
+        // can depend on it without creating a build-graph cycle。
+        .target(
+            name: "BASRustHashCore",
+            dependencies: [
+                .target(
+                    name: "BASRustMemoryTrackerBinary",
+                    condition: .when(
+                        platforms: [.iOS, .macOS]))
+            ],
+            path: "Sources/BASRustHashCore"),
         .target(
             name: "BASRustCoreBridge",
             // M2189 chapter 七百六 第三刀 — BASRustMemory
@@ -388,9 +405,16 @@ let package = Package(
             // UsageTracker shape,so we depend on
             // BASMemory to reach the shared
             // BASMemoryUsageRecord type。
+            //
+            // chapter 七百二 native-port — also depends on the new
+            // BASRustHashCore target so callers that already
+            // `import BASRustCoreBridge` still see BASRustLedgerCore
+            // transitively via `@_exported import BASRustHashCore`
+            // (see BASRustCoreBridge.swift)。
             dependencies: [
                 "BASRuntimeCore",
                 "BASMemory",
+                "BASRustHashCore",
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(

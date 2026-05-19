@@ -35,6 +35,11 @@ import Foundation
 #if os(iOS) || os(macOS)
 import BASRustMemoryTrackerBinary
 #endif
+// chapter 七百二 native-port — re-export the new
+// BASRustHashCore target so existing callers that
+// `import BASRustCoreBridge` still see BASRustLedger
+// Core without having to add a second import line。
+@_exported import BASRustHashCore
 
 /// Namespace for the chapter 706 Rust pilot constants
 /// + ABI version probe。

@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 // chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
 // CryptoKit body preserved as `/* ... */` per 全comment 不要删除。
-import BASRustCoreBridge
+import BASRustHashCore
 import BASRuntimeCore
 
 /// `BR-01` IntegritySentinel — the integrity-check frontend that

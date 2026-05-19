@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 // chapter 七百二 native-port — Rust SHA256 primitive。 Legacy
 // CryptoKit bodies preserved as `/* ... */` per 全comment 不要删除。
-import BASRustCoreBridge
+import BASRustHashCore
 
 // M296.2.z — canonical intent-digest helpers for dual-key signing.
 //

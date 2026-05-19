@@ -4,7 +4,7 @@ import BASRuntimeCore
 // chapter 七百二 native-port — Rust SHA256 primitive for
 // `fromSeed(_:)` seed-derivation。 Legacy CryptoKit body
 // preserved as `/* ... */` per 全comment 不要删除。
-import BASRustCoreBridge
+import BASRustHashCore
 
 /// M87 — Ed25519 production-grade signing for the sovereign audit
 /// ledger.

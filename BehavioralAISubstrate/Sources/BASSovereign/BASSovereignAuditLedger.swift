@@ -8,7 +8,7 @@ import BASRuntimeCore
 // than Swift CryptoKit。 Legacy CryptoKit body is preserved
 // as `/* ... */` comments per the 全comment 不要删除
 // migration directive。
-import BASRustCoreBridge
+import BASRustHashCore
 
 /// Append-only hash-chained audit ledger for the L14 sovereign microkernel
 /// (module `BR-07` in the Black Ring specification v1).
