@@ -72,13 +72,17 @@
 
 #include "bas_mps_cache.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -268,6 +272,137 @@ private:
     mutable std::mutex mu_;
     uint8_t bits_[kBytes];
     size_t size_;
+};
+
+// 主线 全面 开发 — flat in-memory vector NN index。
+// HONEST scope:not vendor FAISS,a small substrate-
+// shipped flat cosine-NN index aligned with the
+// blueprint's "C++ owns nearest-neighbor"。 Future
+// commits can vendor FAISS/HNSW behind the same FFI。
+//
+// Storage:vector of (id, float vector, precomputed
+// L2 norm)。 Search:linear scan computing dot product
+// + cosine similarity for each entry,partial sort to
+// keep top-K。 std::mutex serializes add + search +
+// clear。
+class BasMpsVectorIndex {
+public:
+    static BasMpsVectorIndex& instance() {
+        static BasMpsVectorIndex shared;
+        return shared;
+    }
+
+    void add(
+        const std::string& id,
+        const float* vec,
+        size_t dim)
+    {
+        std::lock_guard<std::mutex> w(mu_);
+        std::vector<float> v(vec, vec + dim);
+        float sumSq = 0.0f;
+        for (size_t i = 0; i < dim; i++) {
+            sumSq += v[i] * v[i];
+        }
+        float norm = std::sqrt(sumSq);
+        auto it = id_to_idx_.find(id);
+        if (it != id_to_idx_.end()) {
+            entries_[it->second] =
+                Entry{id, std::move(v), norm};
+        } else {
+            id_to_idx_[id] = entries_.size();
+            entries_.push_back(
+                Entry{id, std::move(v), norm});
+        }
+    }
+
+    // Returns top-K matches as a JSON byte buffer。
+    // Pure JSON synthesis (no allocator outside the
+    // result string)。
+    std::string search_json(
+        const float* query, size_t dim, size_t k) const
+    {
+        std::lock_guard<std::mutex> r(mu_);
+        // Compute query norm
+        float qSumSq = 0.0f;
+        for (size_t i = 0; i < dim; i++) {
+            qSumSq += query[i] * query[i];
+        }
+        float qNorm = std::sqrt(qSumSq);
+        // Score every entry whose dim matches
+        std::vector<std::pair<float, size_t>> scored;
+        scored.reserve(entries_.size());
+        for (size_t idx = 0; idx < entries_.size(); idx++) {
+            const auto& e = entries_[idx];
+            if (e.vec.size() != dim) {
+                continue;
+            }
+            float dot = 0.0f;
+            for (size_t i = 0; i < dim; i++) {
+                dot += query[i] * e.vec[i];
+            }
+            float sim = (qNorm == 0 || e.norm == 0)
+                ? 0.0f
+                : dot / (qNorm * e.norm);
+            scored.emplace_back(sim, idx);
+        }
+        // Partial sort descending by similarity
+        std::sort(scored.begin(), scored.end(),
+            [](const auto& a, const auto& b) {
+                return a.first > b.first;
+            });
+        size_t take = std::min(k, scored.size());
+        // Build JSON
+        std::string out;
+        out.reserve(64 * take + 2);
+        out.push_back('[');
+        for (size_t i = 0; i < take; i++) {
+            if (i > 0) { out.push_back(','); }
+            const auto& e = entries_[scored[i].second];
+            out.push_back('{');
+            out.append("\"id\":\"");
+            for (char c : e.id) {
+                if (c == '"') { out.append("\\\""); }
+                else if (c == '\\') { out.append("\\\\"); }
+                else { out.push_back(c); }
+            }
+            out.append("\",\"similarity\":");
+            char buf[32];
+            std::snprintf(
+                buf, sizeof(buf), "%.6f",
+                scored[i].first);
+            out.append(buf);
+            out.push_back('}');
+        }
+        out.push_back(']');
+        return out;
+    }
+
+    int64_t size() const {
+        std::lock_guard<std::mutex> r(mu_);
+        return static_cast<int64_t>(entries_.size());
+    }
+
+    void clear() {
+        std::lock_guard<std::mutex> w(mu_);
+        entries_.clear();
+        id_to_idx_.clear();
+    }
+
+private:
+    BasMpsVectorIndex() = default;
+    BasMpsVectorIndex(const BasMpsVectorIndex&) = delete;
+    BasMpsVectorIndex& operator=(
+        const BasMpsVectorIndex&) = delete;
+
+    struct Entry {
+        std::string id;
+        std::vector<float> vec;
+        float norm;
+    };
+
+    mutable std::mutex mu_;
+    std::vector<Entry> entries_;
+    std::unordered_map<std::string, size_t> id_to_idx_;
 };
 
 } // anonymous namespace
@@ -471,6 +606,81 @@ int64_t bas_mps_cache_bloom_size(void) {
 }
 
 int32_t bas_mps_cache_bloom_version(void) {
+    return 1;
+}
+
+// 主线 全面 开发 — Vector NN index FFI
+
+int32_t bas_mps_index_add(
+    const char* id,
+    const float* vec,
+    size_t dim)
+{
+    if (id == nullptr || vec == nullptr || dim == 0) {
+        return -1;
+    }
+    try {
+        BasMpsVectorIndex::instance().add(
+            std::string(id), vec, dim);
+        return 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+int32_t bas_mps_index_search(
+    const float* query,
+    size_t dim,
+    size_t k,
+    char** out_buf,
+    size_t* out_len)
+{
+    if (query == nullptr || dim == 0
+        || out_buf == nullptr || out_len == nullptr)
+    {
+        return -1;
+    }
+    try {
+        std::string json =
+            BasMpsVectorIndex::instance()
+                .search_json(query, dim, k);
+        size_t n = json.size();
+        char* buf =
+            static_cast<char*>(std::malloc(n + 1));
+        if (buf == nullptr) { return -2; }
+        std::memcpy(buf, json.data(), n);
+        buf[n] = '\0';
+        *out_buf = buf;
+        *out_len = n;
+        return 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+void bas_mps_index_free_buffer(char* buf, size_t len) {
+    (void)len;
+    if (buf != nullptr) { std::free(buf); }
+}
+
+int64_t bas_mps_index_size(void) {
+    try {
+        return BasMpsVectorIndex::instance().size();
+    } catch (...) {
+        return -1;
+    }
+}
+
+int32_t bas_mps_index_clear(void) {
+    try {
+        BasMpsVectorIndex::instance().clear();
+        return 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+int32_t bas_mps_index_version(void) {
     return 1;
 }
 

@@ -184,3 +184,86 @@ kernel void vector_cosine_similarity(
     norm_a[i] = ai * ai;
     norm_b[i] = bi * bi;
 }
+
+// MARK: - vector_rmsnorm
+// 主线 全面 开发 — Root Mean Square layer normalization。
+// Two-pass implementation:
+//   Pass 1 (CPU-side):  sum_sq = sum(x[i]²)
+//   Pass 2 (GPU kernel): y[i] = x[i] * rsqrt(sum_sq / N + eps)
+//
+// This kernel implements PASS 2 ONLY。 The Swift wrapper
+// computes sum_sq + scaling factor on CPU then passes
+// the precomputed `inv_rms = 1 / sqrt(sum_sq/N + eps)`
+// as a scalar constant。 Each thread does one
+// multiplication — pure SIMD parallelism。
+//
+// (A single-pass GPU reduce + scale would need
+// threadgroup memory + barrier;for typical sizes the
+// two-pass split is the right cost/complexity trade-
+// off。)
+
+struct RMSNormShape {
+    uint N;
+    float inv_rms;  // precomputed: 1 / sqrt(mean(x²) + eps)
+};
+
+kernel void vector_rmsnorm(
+    device   const float        *x       [[buffer(0)]],
+    device         float        *y       [[buffer(1)]],
+    constant       RMSNormShape &shape   [[buffer(2)]],
+    uint                          tid    [[thread_position_in_grid]])
+{
+    const uint i = tid;
+    if (i >= shape.N) {
+        return;
+    }
+    y[i] = x[i] * shape.inv_rms;
+}
+
+// MARK: - matmul_float32
+// 主线 全面 开发 — small dense matrix multiply
+// C[i,j] = sum_k A[i,k] * B[k,j]
+//
+// Each thread computes ONE output cell。 Dispatch grid:
+// (M, N, 1) where M = rows of A,N = cols of B。 Each
+// thread iterates over K = inner dimension。
+//
+// Honest trade-off:no tiling,no shared memory cache
+// — pure straightforward triple-loop GPU dispatch。 For
+// large M*N this is slower than a tiled kernel but
+// trivially correct + maps cleanly to the kernel
+// dispatch model。 Production hosts wanting peak
+// MatMul performance should use MPSMatrixMultiplication
+// (Apple-provided BLAS GEMM)。 This kernel exists to
+// prove the substrate can dispatch arbitrary float32
+// GPU compute via the .metal pilot,not to compete
+// with vendor BLAS。
+
+struct MatMulShape {
+    uint M;  // rows of A and C
+    uint N;  // cols of B and C
+    uint K;  // cols of A = rows of B (inner dim)
+};
+
+kernel void matmul_float32(
+    device   const float        *A       [[buffer(0)]],  // M × K row-major
+    device   const float        *B       [[buffer(1)]],  // K × N row-major
+    device         float        *C       [[buffer(2)]],  // M × N row-major (out)
+    constant       MatMulShape  &shape   [[buffer(3)]],
+    uint2                         tid    [[thread_position_in_grid]])
+{
+    const uint i = tid.x;  // row of A / row of C
+    const uint j = tid.y;  // col of B / col of C
+    if (i >= shape.M || j >= shape.N) {
+        return;
+    }
+    const uint K = shape.K;
+    const uint N = shape.N;
+    float acc = 0.0f;
+    for (uint k = 0; k < K; k++) {
+        const float a_ik = A[i * K + k];
+        const float b_kj = B[k * N + j];
+        acc += a_ik * b_kj;
+    }
+    C[i * N + j] = acc;
+}

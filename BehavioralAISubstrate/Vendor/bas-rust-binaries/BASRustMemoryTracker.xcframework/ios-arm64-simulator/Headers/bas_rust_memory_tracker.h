@@ -337,6 +337,27 @@ int32_t bas_rust_ledger_replay_verify(
 
 int32_t bas_rust_ledger_replay_verify_version(void);
 
+/// 主线 Provenance 抽取 — record lineage FFI。 Returns
+/// JSON array of all records sharing the given atom_id,
+/// sorted ascending by retrieved_at_ms。 Each entry
+/// includes a `lineageIndex` field (0 = origin,
+/// N-1 = most recent descendant)。
+///
+/// Caller MUST call `bas_rust_tracker_free_buffer` to
+/// release the returned buffer。
+///
+/// Returns:
+///   - 0  = success
+///   - -1 = null pointer
+///   - -2 = internal error / UTF-8 decode failed
+int32_t bas_rust_tracker_record_lineage(
+    Tracker* tracker,
+    const char* atom_id,
+    uint8_t** out_buf,
+    size_t* out_len);
+
+int32_t bas_rust_tracker_record_lineage_version(void);
+
 #ifdef __cplusplus
 }
 #endif

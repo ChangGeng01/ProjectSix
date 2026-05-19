@@ -62,6 +62,54 @@ import BASMemory
 import BASRustMemoryTrackerBinary
 #endif
 
+/// 主线 Provenance 抽取 — Codable entry of the
+/// `recordLineage(forAtomID:)` result。 One record's
+/// position in the lineage chain (origin = 0)。
+public struct BASRecordLineageEntry: Codable, Equatable,
+    Sendable, Hashable
+{
+    /// Canonical SHA256-prefix atomID。
+    public let atomID: String
+
+    /// Record-unique UUID。
+    public let recordID: String
+
+    /// 0 = earliest occurrence (origin),
+    /// N-1 = most recent occurrence。
+    public let lineageIndex: Int
+
+    /// Epoch milliseconds of this record's retrieval。
+    public let retrievedAtMs: Int64
+
+    public let sessionRef: String
+    public let turnRef: String
+    public let permitMode: String
+    public let helpedFlag: String
+    public let schemaVersion: String
+
+    public init(
+        atomID: String,
+        recordID: String,
+        lineageIndex: Int,
+        retrievedAtMs: Int64,
+        sessionRef: String,
+        turnRef: String,
+        permitMode: String,
+        helpedFlag: String,
+        schemaVersion: String
+    ) {
+        self.atomID = atomID
+        self.recordID = recordID
+        self.lineageIndex = lineageIndex
+        self.retrievedAtMs = retrievedAtMs
+        self.sessionRef = sessionRef
+        self.turnRef = turnRef
+        self.permitMode = permitMode
+        self.helpedFlag = helpedFlag
+        self.schemaVersion = schemaVersion
+    }
+}
+
 /// 持续性 发展 — Codable entry of the
 /// `topKAtoms(limit:)` result。 Pairs atomID with its
 /// occurrence count。 Decodable from Rust-emitted JSON
@@ -592,6 +640,55 @@ public actor BASRustMemoryUsageTrackerActor {
         }
     }
 
+    /// 主线 Provenance 抽取 — record lineage for an atom。
+    /// Returns all records sharing the given atomID,
+    /// sorted ascending by retrievedAt + recordID
+    /// tiebreak。 Each entry carries a `lineageIndex`
+    /// (0 = origin, N-1 = most recent)。
+    ///
+    /// Rust does the filter + sort + lineageIndex
+    /// assignment all under one read lock + emits JSON。
+    /// Swift only decodes。 术业有专攻 — provenance
+    /// belongs to Rust per the user's blueprint。
+    public func recordLineage(
+        forAtomID atomID: String
+    ) throws -> [BASRecordLineageEntry] {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        var outBuf: UnsafeMutablePointer<UInt8>?
+        var outLen: Int = 0
+        let rc = atomID.withCString { ptr in
+            bas_rust_tracker_record_lineage(
+                h, ptr, &outBuf, &outLen)
+        }
+        switch rc {
+        case 0: break
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+        guard let outBuf else { return [] }
+        defer { bas_rust_tracker_free_buffer(outBuf, outLen) }
+        let data = Data(bytes: outBuf, count: outLen)
+        do {
+            return try JSONDecoder().decode(
+                [BASRecordLineageEntry].self,
+                from: data)
+        } catch {
+            throw BASRustMemoryUsageTrackerActorError
+                .jsonDecodeFailed(
+                    message: String(describing: error))
+        }
+    }
+
     /// 主线 Integrity 抽取 — validator variant of the
     /// chain hash。 Compares the live tracker against
     /// an expected 32-byte hash inside Rust,saving
@@ -1023,6 +1120,13 @@ public actor BASRustMemoryUsageTrackerActor {
     public func verifyChainHash(
         expected: Data
     ) throws -> Bool {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func recordLineage(
+        forAtomID atomID: String
+    ) throws -> [BASRecordLineageEntry] {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

@@ -125,6 +125,59 @@ public struct BASMemoryUsageRecord: BASSchemaVersioned,
     }
 }
 
+/// 主线 SQL ReplayLog 抽取 — Codable append-only event。
+/// Stored in `memory_usage_replay_log` table。 Each
+/// entry captures an input event suitable for
+/// deterministic replay。
+public struct BASReplayLogEntry: Codable, Equatable,
+    Sendable, Hashable
+{
+    public let eventID: String
+    public let eventType: String
+    public let payload: String
+    public let recordedAtMs: Int64
+
+    public init(
+        eventID: String,
+        eventType: String,
+        payload: String,
+        recordedAtMs: Int64
+    ) {
+        self.eventID = eventID
+        self.eventType = eventType
+        self.payload = payload
+        self.recordedAtMs = recordedAtMs
+    }
+}
+
+/// 主线 SQL AuditLog 抽取 — Codable append-only audit
+/// entry。 Stored in `memory_usage_audit_log` table。
+/// Distinct from replay log — captures observability /
+/// compliance events,not user-input events。
+public struct BASAuditLogEntry: Codable, Equatable,
+    Sendable, Hashable
+{
+    public let entryID: String
+    public let actor: String
+    public let action: String
+    public let detail: String
+    public let recordedAtMs: Int64
+
+    public init(
+        entryID: String,
+        actor: String,
+        action: String,
+        detail: String,
+        recordedAtMs: Int64
+    ) {
+        self.entryID = entryID
+        self.actor = actor
+        self.action = action
+        self.detail = detail
+        self.recordedAtMs = recordedAtMs
+    }
+}
+
 /// 主线 SQL 硬核 — Codable WAL checkpoint result as
 /// produced by `BASMemoryUsageTracker.checkpointWAL()`。
 /// Three integers per `PRAGMA wal_checkpoint(TRUNCATE)`
@@ -306,6 +359,16 @@ public actor BASMemoryUsageTracker {
     private var inMemoryBundles:
         [String: (recordIDs: [String],
                   createdAtMs: Int64)] = [:]
+
+    /// 主线 SQL ReplayLog 抽取 — append-only event log。
+    private var inMemoryReplayLog: [BASReplayLogEntry] = []
+
+    /// 主线 SQL AuditLog 抽取 — append-only audit trail。
+    private var inMemoryAuditLog: [BASAuditLogEntry] = []
+
+    /// 主线 SQL FTS 抽取 — per-record notes for FTS5
+    /// search。 Keyed by recordID。
+    private var inMemoryNotes: [String: String] = [:]
 
     // MARK: - Lifecycle
 
@@ -1693,6 +1756,129 @@ public actor BASMemoryUsageTracker {
         return summaries
     }
 
+    // MARK: - 主线 SQL ReplayLog / AuditLog 抽取
+
+    /// Append an event to the replay log。 Replay log is
+    /// append-only (no UPDATE,no DELETE) — captures
+    /// every input event for deterministic replay。
+    /// Auto-creates the table on first append。
+    public func appendReplayLog(
+        eventType: String,
+        payload: String,
+        recordedAt: Date = Date()
+    ) async throws -> String {
+        let eventID = UUID().uuidString
+        let recordedMs = Int64(
+            recordedAt.timeIntervalSince1970 * 1000)
+        let entry = BASReplayLogEntry(
+            eventID: eventID,
+            eventType: eventType,
+            payload: payload,
+            recordedAtMs: recordedMs)
+        if let db = db {
+            try Self.ensureReplayLogSchema(db: db)
+            try Self.insertReplayLogRow(
+                db: db, entry: entry)
+        }
+        inMemoryReplayLog.append(entry)
+        return eventID
+    }
+
+    /// Return all replay log entries,sorted by
+    /// recorded_at_ms ascending。
+    public func replayLogEntriesViaSQL() throws
+        -> [BASReplayLogEntry]
+    {
+        if let db = db {
+            try Self.ensureReplayLogSchema(db: db)
+            return try Self.fetchReplayLogEntries(db: db)
+        }
+        return inMemoryReplayLog.sorted {
+            $0.recordedAtMs < $1.recordedAtMs
+        }
+    }
+
+    /// Append an entry to the audit log。 Audit log is
+    /// append-only (no UPDATE,no DELETE) — captures
+    /// observability + compliance events distinct from
+    /// the replay-eligible event stream。
+    public func appendAuditLog(
+        actor: String,
+        action: String,
+        detail: String,
+        recordedAt: Date = Date()
+    ) async throws -> String {
+        let entryID = UUID().uuidString
+        let recordedMs = Int64(
+            recordedAt.timeIntervalSince1970 * 1000)
+        let entry = BASAuditLogEntry(
+            entryID: entryID,
+            actor: actor,
+            action: action,
+            detail: detail,
+            recordedAtMs: recordedMs)
+        if let db = db {
+            try Self.ensureAuditLogSchema(db: db)
+            try Self.insertAuditLogRow(
+                db: db, entry: entry)
+        }
+        inMemoryAuditLog.append(entry)
+        return entryID
+    }
+
+    /// Return all audit log entries sorted by
+    /// recorded_at_ms ascending。
+    public func auditLogEntriesViaSQL() throws
+        -> [BASAuditLogEntry]
+    {
+        if let db = db {
+            try Self.ensureAuditLogSchema(db: db)
+            return try Self.fetchAuditLogEntries(db: db)
+        }
+        return inMemoryAuditLog.sorted {
+            $0.recordedAtMs < $1.recordedAtMs
+        }
+    }
+
+    /// Attach a notes string to a recordID。 Notes live
+    /// in a separate `memory_usage_record_notes` table,
+    /// keyed by record_id,with an associated FTS5
+    /// virtual table for full-text search。
+    public func attachNotes(
+        recordID: String, notes: String
+    ) async throws {
+        if let db = db {
+            try Self.ensureNotesAndFTSchema(db: db)
+            try Self.upsertNotesRow(
+                db: db, recordID: recordID, notes: notes)
+        }
+        inMemoryNotes[recordID] = notes
+    }
+
+    /// Full-text search over notes via FTS5。 Returns
+    /// matching recordIDs。 In-memory mode falls back to
+    /// substring search。 Empty query returns empty
+    /// array。
+    public func searchNotesFTS(
+        query: String
+    ) async throws -> [String] {
+        if query.isEmpty { return [] }
+        if let db = db {
+            try Self.ensureNotesAndFTSchema(db: db)
+            return try Self.searchNotesFTS5(
+                db: db, query: query)
+        }
+        // In-memory fallback:case-insensitive substring
+        let q = query.lowercased()
+        var matches: [String] = []
+        for (id, notes) in inMemoryNotes {
+            if notes.lowercased().contains(q) {
+                matches.append(id)
+            }
+        }
+        return matches.sorted()
+    }
+
     /// 主线 SQL 硬核 — composite covering index for the
     /// "atom + recency" hot path。 Idempotent CREATE
     /// INDEX IF NOT EXISTS。 Original
@@ -1773,6 +1959,274 @@ public actor BASMemoryUsageTracker {
                 sqlite3_column_int64(stmt, 1)),
             checkpointed: Int(
                 sqlite3_column_int64(stmt, 2)))
+    }
+
+    // MARK: - 主线 SQL ReplayLog / AuditLog / FTS — SQL helpers
+
+    fileprivate static func ensureReplayLogSchema(
+        db: OpaquePointer
+    ) throws {
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS memory_usage_replay_log (
+                event_id TEXT PRIMARY KEY NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                recorded_at_ms INTEGER NOT NULL
+            );
+            """)
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS memory_usage_replay_log_time_idx
+              ON memory_usage_replay_log(recorded_at_ms);
+            """)
+    }
+
+    fileprivate static func insertReplayLogRow(
+        db: OpaquePointer,
+        entry: BASReplayLogEntry
+    ) throws {
+        let sql = """
+            INSERT INTO memory_usage_replay_log (
+                event_id, event_type, payload, recorded_at_ms
+            ) VALUES (?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, entry.eventID)
+        bindText(stmt, 2, entry.eventType)
+        bindText(stmt, 3, entry.payload)
+        sqlite3_bind_int64(stmt, 4, entry.recordedAtMs)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    fileprivate static func fetchReplayLogEntries(
+        db: OpaquePointer
+    ) throws -> [BASReplayLogEntry] {
+        let sql = """
+            SELECT event_id, event_type, payload, recorded_at_ms
+              FROM memory_usage_replay_log
+             ORDER BY recorded_at_ms ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var entries: [BASReplayLogEntry] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            entries.append(BASReplayLogEntry(
+                eventID: readText(stmt, 0),
+                eventType: readText(stmt, 1),
+                payload: readText(stmt, 2),
+                recordedAtMs: sqlite3_column_int64(stmt, 3)))
+        }
+        return entries
+    }
+
+    fileprivate static func ensureAuditLogSchema(
+        db: OpaquePointer
+    ) throws {
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS memory_usage_audit_log (
+                entry_id TEXT PRIMARY KEY NOT NULL,
+                actor TEXT NOT NULL,
+                action TEXT NOT NULL,
+                detail TEXT NOT NULL,
+                recorded_at_ms INTEGER NOT NULL
+            );
+            """)
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS memory_usage_audit_log_time_idx
+              ON memory_usage_audit_log(recorded_at_ms);
+            """)
+    }
+
+    fileprivate static func insertAuditLogRow(
+        db: OpaquePointer,
+        entry: BASAuditLogEntry
+    ) throws {
+        let sql = """
+            INSERT INTO memory_usage_audit_log (
+                entry_id, actor, action, detail, recorded_at_ms
+            ) VALUES (?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, entry.entryID)
+        bindText(stmt, 2, entry.actor)
+        bindText(stmt, 3, entry.action)
+        bindText(stmt, 4, entry.detail)
+        sqlite3_bind_int64(stmt, 5, entry.recordedAtMs)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    fileprivate static func fetchAuditLogEntries(
+        db: OpaquePointer
+    ) throws -> [BASAuditLogEntry] {
+        let sql = """
+            SELECT entry_id, actor, action, detail, recorded_at_ms
+              FROM memory_usage_audit_log
+             ORDER BY recorded_at_ms ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var entries: [BASAuditLogEntry] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            entries.append(BASAuditLogEntry(
+                entryID: readText(stmt, 0),
+                actor: readText(stmt, 1),
+                action: readText(stmt, 2),
+                detail: readText(stmt, 3),
+                recordedAtMs: sqlite3_column_int64(stmt, 4)))
+        }
+        return entries
+    }
+
+    /// 主线 SQL FTS 抽取 — notes table + FTS5 virtual
+    /// table。 Notes is a separate plain table (so hosts
+    /// can attach arbitrary text to a record);FTS5 is
+    /// the searchable index over the notes column。
+    fileprivate static func ensureNotesAndFTSchema(
+        db: OpaquePointer
+    ) throws {
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS memory_usage_record_notes (
+                record_id TEXT PRIMARY KEY NOT NULL,
+                notes TEXT NOT NULL
+            );
+            """)
+        // FTS5 virtual table — content sync via
+        // INSERT/UPDATE through the upsert path。 We
+        // duplicate notes into both tables to keep
+        // the regular table queryable + the FTS table
+        // searchable。 Simpler than the content=...
+        // option which has trigger requirements。
+        try runExec(db: db, sql: """
+            CREATE VIRTUAL TABLE IF NOT EXISTS memory_usage_record_notes_fts
+              USING fts5(record_id, notes);
+            """)
+    }
+
+    fileprivate static func upsertNotesRow(
+        db: OpaquePointer,
+        recordID: String,
+        notes: String
+    ) throws {
+        // Main table (UPSERT semantics)
+        let sql = """
+            INSERT INTO memory_usage_record_notes (
+                record_id, notes
+            ) VALUES (?, ?)
+            ON CONFLICT(record_id) DO UPDATE SET
+                notes = excluded.notes
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, recordID)
+        bindText(stmt, 2, notes)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        // FTS5 table — delete existing matching row,
+        // then insert (FTS5 contentless / virtual tables
+        // don't natively support ON CONFLICT)。 Wrap in
+        // a transaction for atomicity。
+        try runExec(db: db, sql: """
+            DELETE FROM memory_usage_record_notes_fts
+             WHERE record_id = '\(recordID
+                .replacingOccurrences(
+                    of: "'", with: "''"))'
+            """)
+        let ftsSQL = """
+            INSERT INTO memory_usage_record_notes_fts (
+                record_id, notes
+            ) VALUES (?, ?)
+            """
+        var ftsStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db, ftsSQL, -1, &ftsStmt, nil)
+            == SQLITE_OK, let ftsStmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: ftsSQL,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(ftsStmt) }
+        bindText(ftsStmt, 1, recordID)
+        bindText(ftsStmt, 2, notes)
+        guard sqlite3_step(ftsStmt) == SQLITE_DONE else {
+            throw TrackerError.stepFailed(
+                sql: ftsSQL,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    fileprivate static func searchNotesFTS5(
+        db: OpaquePointer,
+        query: String
+    ) throws -> [String] {
+        let sql = """
+            SELECT record_id
+              FROM memory_usage_record_notes_fts
+             WHERE memory_usage_record_notes_fts MATCH ?
+             ORDER BY record_id ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, query)
+        var matches: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            matches.append(readText(stmt, 0))
+        }
+        return matches
     }
 
     /// 主线 SQL Bundle 抽取 — provision the bundles

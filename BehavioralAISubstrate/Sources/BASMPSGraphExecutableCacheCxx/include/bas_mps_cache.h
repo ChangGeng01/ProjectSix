@@ -187,6 +187,64 @@ int64_t bas_mps_cache_bloom_size(void);
 /// Currently 1。
 int32_t bas_mps_cache_bloom_version(void);
 
+/// 主线 全面 开发 — flat in-memory vector NN index。
+/// HONEST scope:this is NOT vendor FAISS (~100K LOC),
+/// it's a small flat cosine-NN index implementing the
+/// blueprint's "C++ owns nearest-neighbor query"
+/// direction with substrate-shipped code only。 Future
+/// commits can vendor FAISS/HNSW behind the same FFI
+/// shape。
+///
+/// Stores (id_string, float vector) pairs。 Search
+/// returns the top-K nearest neighbors by cosine
+/// similarity。 Process-global,std::mutex protected,
+/// SEPARATE from the main cache + bloom singletons。
+
+/// Add a vector to the NN index。 `id` is a NUL-
+/// terminated UTF-8 string (caller-owned),`dim` is
+/// the vector dimension。 If `id` already exists,
+/// REPLACES the previous vector + dim。
+///
+/// Returns:
+///   - 0  = success
+///   - -1 = null pointer
+///   - -2 = internal exception
+int32_t bas_mps_index_add(
+    const char* id,
+    const float* vec,
+    size_t dim);
+
+/// Search for the top-K nearest neighbors of `query`
+/// by cosine similarity。 Output is JSON array of
+/// {id, similarity} objects sorted descending by
+/// similarity。
+///
+/// Caller MUST call `bas_mps_index_free_buffer` to
+/// release the returned buffer。
+///
+/// Returns:
+///   - 0  = success (out_buf filled)
+///   - -1 = null pointer
+///   - -2 = internal exception
+int32_t bas_mps_index_search(
+    const float* query,
+    size_t dim,
+    size_t k,
+    char** out_buf,
+    size_t* out_len);
+
+/// Release a buffer returned by `bas_mps_index_search`。
+void bas_mps_index_free_buffer(char* buf, size_t len);
+
+/// Index size (number of stored vectors)。
+int64_t bas_mps_index_size(void);
+
+/// Empty the index。
+int32_t bas_mps_index_clear(void);
+
+/// ABI / behavior version pin for the index surface。
+int32_t bas_mps_index_version(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -160,6 +160,13 @@ public actor BASCognitiveBrain {
     fileprivate var metalCosineDispatcher:
         BASMetalCosineSimilarityDispatcher?
 
+    /// 主线 全面 开发 — memoized RMSNorm + MatMul GPU
+    /// dispatchers, lazily built on first use。
+    fileprivate var metalRMSNormDispatcher:
+        BASMetalRMSNormDispatcher?
+    fileprivate var metalMatMulDispatcher:
+        BASMetalMatMulDispatcher?
+
     /// 主线 继续 开发 — optional brain-owned health
     /// snapshot history。 Configured at init via the
     /// `healthSnapshotHistoryCapacity` parameter。 nil
@@ -2233,6 +2240,66 @@ extension BASCognitiveBrain {
                     message: "dispatcher init failed")
         }
         return try await d.dispatch(a: a, b: b)
+    }
+
+    /// 主线 全面 开发 — Metal RMSNorm GPU compute。
+    /// Per blueprint:Metal owns RMSNorm。 Computes
+    /// y[i] = x[i] / sqrt(mean(x²) + epsilon) via the
+    /// `vector_rmsnorm` MSL kernel (two-pass: CPU sum-
+    /// of-squares + GPU per-element scale)。
+    public func rmsnorm(
+        _ x: [Float],
+        epsilon: Float = BASMetalRMSNormDispatcher
+            .defaultEpsilon
+    ) async throws -> [Float] {
+        guard let loader = metalLibraryLoader else {
+            throw BASMetalRMSNormDispatcherError
+                .libraryUnavailable(
+                    message:
+                        "no metalLibraryLoader wired")
+        }
+        if metalRMSNormDispatcher == nil {
+            metalRMSNormDispatcher =
+                BASMetalRMSNormDispatcher(
+                    loader: loader)
+        }
+        guard let d = metalRMSNormDispatcher else {
+            throw BASMetalRMSNormDispatcherError
+                .libraryUnavailable(
+                    message: "dispatcher nil")
+        }
+        return try await d.dispatch(
+            x: x, epsilon: epsilon)
+    }
+
+    /// 主线 全面 开发 — Metal MatMul GPU compute。 Per
+    /// blueprint:Metal owns MatMul。 Computes C = A · B
+    /// for row-major float32 matrices via the
+    /// `matmul_float32` MSL kernel (one GPU thread per
+    /// output cell)。
+    public func matmul(
+        a: [Float], aRows: Int, aCols: Int,
+        b: [Float], bRows: Int, bCols: Int
+    ) async throws -> [Float] {
+        guard let loader = metalLibraryLoader else {
+            throw BASMetalMatMulDispatcherError
+                .libraryUnavailable(
+                    message:
+                        "no metalLibraryLoader wired")
+        }
+        if metalMatMulDispatcher == nil {
+            metalMatMulDispatcher =
+                BASMetalMatMulDispatcher(
+                    loader: loader)
+        }
+        guard let d = metalMatMulDispatcher else {
+            throw BASMetalMatMulDispatcherError
+                .libraryUnavailable(
+                    message: "dispatcher nil")
+        }
+        return try await d.dispatch(
+            a: a, aRows: aRows, aCols: aCols,
+            b: b, bRows: bRows, bCols: bCols)
     }
 
     /// 主线 继续 开发 — public Metal compute entry point。

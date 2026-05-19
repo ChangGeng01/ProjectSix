@@ -204,6 +204,80 @@ impl Tracker {
         }
     }
 
+    // 主线 Provenance 抽取 — record lineage for an atom。
+    // Returns all records sharing the given atom_id,
+    // sorted ascending by retrieved_at_ms then by
+    // record_id (deterministic tiebreak)。 The earliest
+    // record is the "origin" — subsequent records are
+    // its descendants in time。
+    //
+    // Provenance is what Rust owns per the blueprint:
+    // "Memory engine / retrieval/ranking / forget
+    // cascade / provenance / integrity / ledger/replay"。
+    //
+    // JSON output:
+    //   [{atomID, recordID, retrievedAtMs, sessionRef,
+    //     turnRef, permitMode, helpedFlag, schemaVersion,
+    //     lineageIndex}, ...]
+    //
+    // lineageIndex is 0 for the origin, 1 for first
+    // descendant, etc — saves Swift hosts from re-
+    // numbering after parsing。
+    fn record_lineage_json(
+        &self,
+        atom_id: &str,
+    ) -> Result<Vec<u8>, ()> {
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut matches: Vec<&Record> = r
+            .values()
+            .filter(|rec| rec.atom_id == atom_id)
+            .collect();
+        matches.sort_by(|a, b| {
+            a.retrieved_at_ms.cmp(&b.retrieved_at_ms)
+                .then(a.record_id.cmp(&b.record_id))
+        });
+        let mut out = Vec::new();
+        out.push(b'[');
+        for (idx, rec) in matches.iter().enumerate() {
+            if idx > 0 { out.push(b','); }
+            out.push(b'{');
+            write_kv_string(
+                &mut out, "atomID", &rec.atom_id);
+            out.push(b',');
+            write_kv_string(
+                &mut out, "helpedFlag",
+                &rec.helped_state);
+            out.push(b',');
+            write_kv_int(
+                &mut out, "lineageIndex",
+                idx as i64);
+            out.push(b',');
+            write_kv_string(
+                &mut out, "permitMode",
+                &rec.permit_mode);
+            out.push(b',');
+            write_kv_string(
+                &mut out, "recordID", &rec.record_id);
+            out.push(b',');
+            write_kv_int(
+                &mut out, "retrievedAtMs",
+                rec.retrieved_at_ms);
+            out.push(b',');
+            write_kv_string(
+                &mut out, "schemaVersion", "1.0.0");
+            out.push(b',');
+            write_kv_string(
+                &mut out, "sessionRef",
+                &rec.session_ref);
+            out.push(b',');
+            write_kv_string(
+                &mut out, "turnRef", &rec.turn_ref);
+            out.push(b'}');
+        }
+        out.push(b']');
+        Ok(out)
+    }
+
     // 主线 核心 抽取 — Memory Importance Scorer in Rust。
     // For each distinct atom_id,compute:
     //   score = log(1 + count)
@@ -1312,6 +1386,48 @@ pub extern "C" fn bas_rust_ledger_replay_verify(
 
 #[no_mangle]
 pub extern "C" fn bas_rust_ledger_replay_verify_version() -> c_int {
+    1
+}
+
+// 主线 Provenance 抽取 — record lineage FFI。 Returns
+// JSON array of records sharing the given atom_id,
+// sorted ascending by retrieved_at_ms。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_record_lineage(
+    tracker: *mut Tracker,
+    atom_id: *const c_char,
+    out_buf: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if tracker.is_null()
+        || atom_id.is_null()
+        || out_buf.is_null()
+        || out_len.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let key = unsafe {
+        match CStr::from_ptr(atom_id).to_str() {
+            Ok(s) => s,
+            Err(_) => return -2,
+        }
+    };
+    let bytes = match tref.record_lineage_json(key) {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let mut boxed = bytes.into_boxed_slice();
+    unsafe {
+        *out_buf = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+        std::mem::forget(boxed);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_record_lineage_version() -> c_int {
     1
 }
 
