@@ -22,6 +22,7 @@ pub mod fuser;
 pub mod hex;              // chapter 七百十九 第一刀 — lookup-table hex encoder
 pub mod hex_decode;       // chapter 七百二十一 第一刀 — lookup-table hex decoder
 pub mod importance_scorer; // chapter 七百二十三 第一刀 — memory importance scorer
+pub mod aggregations;      // chapter 七百二十五 第一刀 — tracker aggregations
 pub mod layer_norm;       // chapter 七百九 第二刀 — LayerNorm
 pub mod ledger;           // chapter 七百十二 第一刀 — batched seal + verify
 pub mod matmul;           // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
