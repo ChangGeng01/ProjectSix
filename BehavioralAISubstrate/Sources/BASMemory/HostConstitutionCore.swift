@@ -1133,7 +1133,11 @@ internal func basOrderedUnique(_ values: [String]) -> [String] {
 
 private func basStableSignature(_ material: String) -> String {
     let digest = SHA256.hash(data: Data(material.utf8))
-    let hex = digest.map { String(format: "%02x", $0) }.joined()
+    // LEGACY (chapter 七百二十 第三刀 / M2273):
+    //     let hex = digest.map {
+    //         String(format: "%02x", $0) }.joined()
+    let hex = BASAutoRouteRanker.bytesToHexLower(
+        Array(digest))
     return String(hex.prefix(16))
 }
 

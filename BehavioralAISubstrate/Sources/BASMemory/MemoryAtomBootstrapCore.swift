@@ -389,10 +389,14 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
         ]
         let material = materialParts.joined(separator: "###")
 
-        let fingerprint = SHA256.hash(data: Data(material.utf8))
-            .map { String(format: "%02x", $0) }
-            .joined()
-            .prefix(20)
+        // LEGACY (chapter 七百二十 第三刀 / M2273):
+        //     let fingerprint = SHA256.hash(data: Data(material.utf8))
+        //         .map { String(format: "%02x", $0) }
+        //         .joined()
+        //         .prefix(20)
+        let digest = SHA256.hash(data: Data(material.utf8))
+        let fingerprint = BASAutoRouteRanker
+            .bytesToHexLower(Array(digest)).prefix(20)
 
         return BASBrainStateSnapshot(
             fingerprint: String(fingerprint),

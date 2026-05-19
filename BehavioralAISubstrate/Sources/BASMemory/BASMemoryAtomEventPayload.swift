@@ -282,7 +282,11 @@ public struct BASMemoryAtomEventPayload:
     public static func sha256Hex(_ s: String) -> String {
         let bytes = Array(s.utf8)
         let digest = SHA256.hash(data: bytes)
-        return digest.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百二十 第三刀 / M2273):
+        //     return digest.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
     }
 
     /// chapter 七百四 第五刀 — Rust pure-NIST SHA256 path,
@@ -305,8 +309,10 @@ public struct BASMemoryAtomEventPayload:
             }
         }
         if rc == 0 {
-            return out.map { String(format: "%02x", $0) }
-                .joined()
+            // LEGACY (chapter 七百二十 第三刀 / M2273):
+            //     return out.map {
+            //         String(format: "%02x", $0) }.joined()
+            return BASAutoRouteRanker.bytesToHexLower(out)
         }
         return nil
         #else

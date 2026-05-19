@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 /// M341 — typed structural fingerprint of the L13 self-evolution
 /// lifecycle. Fills the **regression gate** leg of the v5 doctrine
@@ -309,22 +310,28 @@ internal enum BASEvolutionLifecycleStructuralFingerprintHasher {
 
     static func sha256Hex(encoding: String) -> String {
         let bytes = Array(encoding.utf8)
+        // LEGACY (chapter 七百二十 第三刀 / M2273):
+        //     #if canImport(CryptoKit)
+        //         let digest = CryptoKit.SHA256.hash(data: bytes)
+        //         return digest.map {
+        //             String(format: "%02x", $0) }.joined()
+        //     #else
+        //         let digest = PureSwiftSHA256.hash(data: bytes)
+        //         return digest.map {
+        //             String(format: "%02x", $0) }.joined()
+        //     #endif
         #if canImport(CryptoKit)
-        // M369 fast path: CryptoKit hardware-accelerated SHA-256.
         let digest = CryptoKit.SHA256.hash(data: bytes)
-        return digest
-            .map { String(format: "%02x", $0) }
-            .joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
         #else
         // M341 pure-Swift fallback for platforms without
-        // CryptoKit (Linux CI, server targets). Output is
-        // byte-identical to the CryptoKit path — pinned by
-        // `M341SHA256ReferenceVectorsTests` against NIST FIPS 180-4
-        // reference vectors.
+        // CryptoKit。 Byte-identical to the CryptoKit path —
+        // pinned by `M341SHA256ReferenceVectorsTests` against
+        // NIST FIPS 180-4 reference vectors。
         let digest = PureSwiftSHA256.hash(data: bytes)
-        return digest
-            .map { String(format: "%02x", $0) }
-            .joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(digest))
         #endif
     }
 
