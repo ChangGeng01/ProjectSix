@@ -830,6 +830,35 @@ int64_t bas_ranker_usage_count_for_atom(
     const uint8_t* records_buf, size_t records_len,
     const uint8_t* atom_id_buf, size_t atom_id_len);
 
+// MARK: - chapter 七百二十六 第二刀 / M2302 int8 quantization
+//
+// Symmetric int8 quantization primitives。 Three thin pass-
+// through functions exposing the bas-retrieval-ranker::quantize
+// module。
+
+/// Quantize Float32 array to int8 + scale。 Returns 0 on success,
+/// -1 on null pointer or out_q_capacity < n。
+int32_t bas_ranker_quantize_int8(
+    const float* x, size_t n,
+    int8_t* out_q, size_t out_q_capacity,
+    float* out_scale);
+
+/// Dequantize int8 + scale back to Float32。 Returns 0 on success,
+/// -1 on null pointer or out_x_capacity < n。
+int32_t bas_ranker_dequantize_int8(
+    const int8_t* q, size_t n, float scale,
+    float* out_x, size_t out_x_capacity);
+
+/// int8 × int8 matmul producing Float32 output。 A (m×k) × B (k×n)
+/// = C (m×n),all row-major。 Returns 0 on success,-1 on null
+/// pointer,-2 on shape mismatch (a_len != m*k or b_len != k*n
+/// or c_capacity < m*n)。
+int32_t bas_ranker_matmul_int8(
+    const int8_t* a, size_t a_len, float scale_a,
+    const int8_t* b, size_t b_len, float scale_b,
+    size_t m, size_t k, size_t n,
+    float* out_c, size_t c_capacity);
+
 int64_t bas_event_log_encode_binary(
     uint8_t kind,
     const uint8_t* entry_id, size_t entry_id_len,

@@ -1086,6 +1086,117 @@ fn serialize_scores(
     out
 }
 
+// MARK: - chapter 七百二十六 第二刀 / M2302 int8 quantization C ABI
+//
+// Three thin pass-through functions for the int8 primitives。
+// Buffers are caller-owned to avoid leaking heap across FFI;
+// Rust writes into out_buf,returns the scale via *out_scale。
+
+/// Quantize Float32 input to int8 + scale。 `x` length must
+/// equal `n`;`out_q` capacity must be ≥ `n` bytes。
+///
+/// Returns:
+///   0  = success (out_q filled,*out_scale set)
+///   -1 = null pointer
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_quantize_int8(
+    x: *const f32,
+    n: usize,
+    out_q: *mut i8,
+    out_q_capacity: usize,
+    out_scale: *mut f32,
+) -> i32 {
+    if x.is_null() && n > 0 { return -1; }
+    if out_q.is_null() && n > 0 { return -1; }
+    if out_scale.is_null() { return -1; }
+    if out_q_capacity < n { return -1; }
+    let xs = if n == 0 {
+        &[][..]
+    } else {
+        unsafe { core::slice::from_raw_parts(x, n) }
+    };
+    let (q, scale) = quantize::quantize_int8(xs);
+    if n > 0 {
+        let dst = unsafe {
+            core::slice::from_raw_parts_mut(out_q, n)
+        };
+        dst.copy_from_slice(&q);
+    }
+    unsafe { *out_scale = scale; }
+    0
+}
+
+/// Dequantize int8 + scale to Float32。
+///
+/// Returns:
+///   0  = success (out_x filled)
+///   -1 = null pointer or capacity too small
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_dequantize_int8(
+    q: *const i8,
+    n: usize,
+    scale: f32,
+    out_x: *mut f32,
+    out_x_capacity: usize,
+) -> i32 {
+    if q.is_null() && n > 0 { return -1; }
+    if out_x.is_null() && n > 0 { return -1; }
+    if out_x_capacity < n { return -1; }
+    let qs = if n == 0 {
+        &[][..]
+    } else {
+        unsafe { core::slice::from_raw_parts(q, n) }
+    };
+    let x = quantize::dequantize_int8(qs, scale);
+    if n > 0 {
+        let dst = unsafe {
+            core::slice::from_raw_parts_mut(out_x, n)
+        };
+        dst.copy_from_slice(&x);
+    }
+    0
+}
+
+/// int8 matmul producing Float32 output。 A (m×k) × B (k×n) =
+/// C (m×n)。 All matrices row-major。
+///
+/// Returns:
+///   0  = success (out_c filled)
+///   -1 = null pointer
+///   -2 = shape mismatch (a_len != m*k or b_len != k*n or
+///        c_capacity < m*n)
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_matmul_int8(
+    a: *const i8, a_len: usize, scale_a: f32,
+    b: *const i8, b_len: usize, scale_b: f32,
+    m: usize, k: usize, n: usize,
+    out_c: *mut f32, c_capacity: usize,
+) -> i32 {
+    if a.is_null() || b.is_null() || out_c.is_null() {
+        return -1;
+    }
+    if a_len != m * k { return -2; }
+    if b_len != k * n { return -2; }
+    if c_capacity < m * n { return -2; }
+    let as_ = unsafe {
+        core::slice::from_raw_parts(a, a_len)
+    };
+    let bs = unsafe {
+        core::slice::from_raw_parts(b, b_len)
+    };
+    let c = match quantize::matmul_int8(
+        as_, scale_a, bs, scale_b, m, k, n)
+    {
+        Ok(c) => c,
+        Err(_) => return -2,
+    };
+    let dst = unsafe {
+        core::slice::from_raw_parts_mut(out_c, m * n)
+    };
+    dst.copy_from_slice(&c);
+    0
+}
+
 // MARK: - chapter 七百二十五 第二刀 Aggregation C ABI
 //
 // Reuses the chapter 七百二十三 records wire format (BIG-ENDIAN

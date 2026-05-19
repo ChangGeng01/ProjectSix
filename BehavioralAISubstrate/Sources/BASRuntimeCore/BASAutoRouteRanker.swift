@@ -1661,6 +1661,102 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - int8 quantization (chapter 七百二十六 第二刀 / M2302)
+    //
+    // Net-new capability: substrate gains symmetric int8 quantize
+    // / dequantize / matmul primitives。 Foundation for chapters
+    // 七百二十七 (int8 vector storage) + 七百二十八 (int8 KV cache)。
+
+    /// Result of quantization: int8 buffer + scale。
+    public struct BASQuantizeInt8Result: Sendable, Equatable {
+        public let quantized: [Int8]
+        public let scale: Float
+        public init(quantized: [Int8], scale: Float) {
+            self.quantized = quantized
+            self.scale = scale
+        }
+    }
+
+    /// Symmetric int8 quantize。 Returns (int8 buffer + scale)
+    /// or nil on FFI failure。
+    public static func quantizeInt8(
+        _ x: [Float]
+    ) -> BASQuantizeInt8Result? {
+        #if os(iOS) || os(macOS)
+        if x.isEmpty {
+            return BASQuantizeInt8Result(
+                quantized: [], scale: 0)
+        }
+        var quantized = [Int8](repeating: 0, count: x.count)
+        var scale: Float = 0
+        let rc = x.withUnsafeBufferPointer { xp in
+            return quantized.withUnsafeMutableBufferPointer { qp in
+                return bas_ranker_quantize_int8(
+                    xp.baseAddress, xp.count,
+                    qp.baseAddress, qp.count,
+                    &scale)
+            }
+        }
+        if rc != 0 { return nil }
+        return BASQuantizeInt8Result(
+            quantized: quantized, scale: scale)
+        #else
+        return nil
+        #endif
+    }
+
+    /// Dequantize int8 + scale back to Float32。 Returns nil on
+    /// FFI failure。
+    public static func dequantizeInt8(
+        _ q: [Int8], scale: Float
+    ) -> [Float]? {
+        #if os(iOS) || os(macOS)
+        if q.isEmpty { return [] }
+        var out = [Float](repeating: 0, count: q.count)
+        let rc = q.withUnsafeBufferPointer { qp in
+            return out.withUnsafeMutableBufferPointer { op in
+                return bas_ranker_dequantize_int8(
+                    qp.baseAddress, qp.count, scale,
+                    op.baseAddress, op.count)
+            }
+        }
+        if rc != 0 { return nil }
+        return out
+        #else
+        return nil
+        #endif
+    }
+
+    /// int8 × int8 matmul → Float32。 A (m×k) × B (k×n) = C (m×n),
+    /// all row-major。 Returns nil on shape mismatch or FFI failure。
+    public static func matmulInt8(
+        a: [Int8], scaleA: Float,
+        b: [Int8], scaleB: Float,
+        m: Int, k: Int, n: Int
+    ) -> [Float]? {
+        #if os(iOS) || os(macOS)
+        guard a.count == m * k,
+              b.count == k * n
+        else { return nil }
+        var c = [Float](repeating: 0, count: m * n)
+        let rc = a.withUnsafeBufferPointer { ap in
+            return b.withUnsafeBufferPointer { bp in
+                return c.withUnsafeMutableBufferPointer { cp in
+                    return bas_ranker_matmul_int8(
+                        ap.baseAddress, ap.count, scaleA,
+                        bp.baseAddress, bp.count, scaleB,
+                        m, k, n,
+                        cp.baseAddress, cp.count)
+                }
+            }
+        }
+        if rc != 0 { return nil }
+        return c
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Aggregations (chapter 七百二十五 第二刀 / M2297)
     //
     // Routes through the chapter 七百二十五 第一刀 Rust
