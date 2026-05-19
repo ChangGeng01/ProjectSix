@@ -250,20 +250,27 @@ public actor BASRustBrainHistoryStore {
             throw BASRustLedgerCoreError
                 .invalidInputSize
         }
-        var bytes = [UInt8]()
-        bytes.reserveCapacity(32)
-        var index = expectedHex.startIndex
-        for _ in 0..<32 {
-            let next = expectedHex.index(
-                index, offsetBy: 2)
-            let byteHex = String(expectedHex[index..<next])
-            guard let b = UInt8(byteHex, radix: 16)
-            else {
-                throw BASRustLedgerCoreError
-                    .invalidInputSize
-            }
-            bytes.append(b)
-            index = next
+        // LEGACY (chapter 七百二十一 第三刀 / M2278):
+        //     var bytes = [UInt8]()
+        //     bytes.reserveCapacity(32)
+        //     var index = expectedHex.startIndex
+        //     for _ in 0..<32 {
+        //         let next = expectedHex.index(
+        //             index, offsetBy: 2)
+        //         let byteHex = String(
+        //             expectedHex[index..<next])
+        //         guard let b = UInt8(byteHex, radix: 16)
+        //         else {
+        //             throw BASRustLedgerCoreError
+        //                 .invalidInputSize
+        //         }
+        //         bytes.append(b)
+        //         index = next
+        //     }
+        guard let bytes = BASAutoRouteRanker
+            .hexToBytes(expectedHex)
+        else {
+            throw BASRustLedgerCoreError.invalidInputSize
         }
         return try await tracker.verifyChainHash(
             expected: Data(bytes))
