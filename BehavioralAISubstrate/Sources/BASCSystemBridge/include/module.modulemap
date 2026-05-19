@@ -1,4 +1,5 @@
 module BASCSystemBridge {
     header "bas_csystem_bridge.h"
+    header "bas_spsc_ring.h"
     export *
 }
