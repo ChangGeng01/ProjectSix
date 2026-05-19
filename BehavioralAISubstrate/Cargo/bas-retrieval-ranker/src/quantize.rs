@@ -129,6 +129,65 @@ pub fn quantize_dequantize_roundtrip(
     dequantize_int8(&q, scale)
 }
 
+// MARK: - chapter 七百二十七 第二刀 / M2307
+//         int8 cosine + batched int8 cosine
+//
+// Quantized vector retrieval primitives — substrate's first
+// quality-drift-gated production path (NOT byte-equal with
+// Float32 — uses cosine-drift ≤ 0.01 gate instead per the
+// aggressive evolution arc plan)。
+
+/// Cosine similarity between two int8-quantized vectors。
+/// Returns dot(a, b) * scale_a * scale_b。 Note: for pre-
+/// normalized Float32 source vectors,this approximates the
+/// original cosine within the quantization-error envelope。
+/// Empty inputs return 0.0。 Length mismatch returns 0.0
+/// (caller-defensive)。
+pub fn cosine_int8(
+    a: &[i8], scale_a: f32,
+    b: &[i8], scale_b: f32,
+) -> f32 {
+    if a.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+    let mut acc: i32 = 0;
+    for i in 0..a.len() {
+        acc += (a[i] as i32) * (b[i] as i32);
+    }
+    (acc as f32) * scale_a * scale_b
+}
+
+/// Batched cosine across many int8-quantized corpus rows。
+/// Each row has its OWN scale (heterogeneous quantization
+/// preserves per-row precision)。 Returns one score per row,
+/// in row-order。 Length mismatch or shape error returns
+/// `None`。
+pub fn batched_cosine_int8(
+    q: &[i8],
+    scale_q: f32,
+    corpus: &[i8],          // n_rows × dim contiguous
+    corpus_scales: &[f32],  // n_rows entries
+    dim: usize,
+) -> Option<Vec<f32>> {
+    if dim == 0 { return None; }
+    if q.len() != dim { return None; }
+    if corpus.len() % dim != 0 { return None; }
+    let n_rows = corpus.len() / dim;
+    if corpus_scales.len() != n_rows { return None; }
+    let mut out = Vec::with_capacity(n_rows);
+    for r in 0..n_rows {
+        let row = &corpus[r * dim..(r + 1) * dim];
+        let mut acc: i32 = 0;
+        for j in 0..dim {
+            acc += (q[j] as i32) * (row[j] as i32);
+        }
+        let score =
+            (acc as f32) * scale_q * corpus_scales[r];
+        out.push(score);
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,5 +359,107 @@ mod tests {
         assert!(
             ratio > 3.9 && ratio < 4.1,
             "expected ~4× savings got {}", ratio);
+    }
+
+    // MARK: - chapter 七百二十七 第二刀 int8 cosine tests
+
+    /// Simple deterministic generator for cosine-drift testing。
+    fn pseudo_unit_vector(seed: u64, dim: usize) -> Vec<f32> {
+        let mut s = seed;
+        let mut v = Vec::with_capacity(dim);
+        for _ in 0..dim {
+            s = s.wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let u = (s >> 33) as f32 / 2147483648.0 - 1.0;
+            v.push(u);
+        }
+        // L2 normalize
+        let mag: f32 = v.iter().map(|x| x*x).sum::<f32>().sqrt();
+        if mag > 0.0 {
+            for x in v.iter_mut() { *x /= mag; }
+        }
+        v
+    }
+
+    fn f32_cosine(a: &[f32], b: &[f32]) -> f32 {
+        let mut dot = 0.0f32;
+        for i in 0..a.len() {
+            dot += a[i] * b[i];
+        }
+        dot  // both pre-normalized
+    }
+
+    #[test]
+    fn int8_cosine_self_is_near_one() {
+        // cosine(v, v) ≈ 1 for pre-normalized v
+        let v = pseudo_unit_vector(42, 384);
+        let (q, scale) = quantize_int8(&v);
+        let c = cosine_int8(&q, scale, &q, scale);
+        assert!(
+            (c - 1.0).abs() < 0.01,
+            "self-cosine = {}", c);
+    }
+
+    #[test]
+    fn int8_cosine_within_drift_of_f32() {
+        // Across 50 random pairs at 384 dim,max drift ≤ 0.01
+        let dim = 384;
+        for seed_a in 0u64..50 {
+            let a = pseudo_unit_vector(seed_a * 7, dim);
+            let b = pseudo_unit_vector(seed_a * 11 + 3, dim);
+            let c_f32 = f32_cosine(&a, &b);
+            let (qa, sa) = quantize_int8(&a);
+            let (qb, sb) = quantize_int8(&b);
+            let c_i8 = cosine_int8(&qa, sa, &qb, sb);
+            let drift = (c_f32 - c_i8).abs();
+            assert!(
+                drift < 0.01,
+                "drift {} too high (f32={} i8={})",
+                drift, c_f32, c_i8);
+        }
+    }
+
+    #[test]
+    fn batched_int8_cosine_matches_per_pair() {
+        let dim = 64;
+        let q = pseudo_unit_vector(1, dim);
+        let (q_int8, q_scale) = quantize_int8(&q);
+        // 5-row corpus
+        let mut corpus_flat = Vec::new();
+        let mut scales = Vec::new();
+        let mut per_pair_scores = Vec::new();
+        for i in 0u64..5 {
+            let row = pseudo_unit_vector(i * 13 + 5, dim);
+            let (row_int8, row_scale) = quantize_int8(&row);
+            corpus_flat.extend_from_slice(&row_int8);
+            scales.push(row_scale);
+            per_pair_scores.push(cosine_int8(
+                &q_int8, q_scale,
+                &row_int8, row_scale));
+        }
+        let batched = batched_cosine_int8(
+            &q_int8, q_scale,
+            &corpus_flat, &scales,
+            dim).unwrap();
+        assert_eq!(batched.len(), 5);
+        for i in 0..5 {
+            assert!(
+                (batched[i] - per_pair_scores[i]).abs() < 1e-6,
+                "batched diverges at row {}", i);
+        }
+    }
+
+    #[test]
+    fn batched_int8_cosine_rejects_shape_mismatch() {
+        let q = vec![0i8; 10];
+        let corpus = vec![0i8; 100]; // 10 rows × 10 dim
+        // dim wrong size
+        assert!(
+            batched_cosine_int8(
+                &q, 1.0, &corpus, &[1.0; 10], 7).is_none());
+        // scales count wrong
+        assert!(
+            batched_cosine_int8(
+                &q, 1.0, &corpus, &[1.0; 5], 10).is_none());
     }
 }
