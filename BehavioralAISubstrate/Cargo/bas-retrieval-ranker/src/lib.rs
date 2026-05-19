@@ -24,6 +24,7 @@ pub mod hex_decode;       // chapter 七百二十一 第一刀 — lookup-table 
 pub mod importance_scorer; // chapter 七百二十三 第一刀 — memory importance scorer
 pub mod aggregations;      // chapter 七百二十五 第一刀 — tracker aggregations
 pub mod quantize;          // chapter 七百二十六 第一刀 — int8 quantization
+pub mod pq_index;          // chapter 七百二十九 第一刀 — product quantization
 pub mod layer_norm;       // chapter 七百九 第二刀 — LayerNorm
 pub mod ledger;           // chapter 七百十二 第一刀 — batched seal + verify
 pub mod matmul;           // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
