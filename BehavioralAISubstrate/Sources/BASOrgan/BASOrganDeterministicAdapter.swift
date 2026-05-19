@@ -97,7 +97,11 @@ public actor BASOrganDeterministicAdapter: BASOrganAdapter {
         let data = Data(payload.utf8)
         #if canImport(CryptoKit) || canImport(Crypto)
         let hash = SHA256.hash(data: data)
-        return hash.map { String(format: "%02x", $0) }.joined()
+        // LEGACY (chapter 七百二十 第四刀 / M2274):
+        //     return hash.map {
+        //         String(format: "%02x", $0) }.joined()
+        return BASAutoRouteRanker.bytesToHexLower(
+            Array(hash))
         #else
         return "unhashed:\(payload.count)"
         #endif
