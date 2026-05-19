@@ -167,6 +167,11 @@ public actor BASCognitiveBrain {
     fileprivate var metalMatMulDispatcher:
         BASMetalMatMulDispatcher?
 
+    /// 主线 全面 开发 — memoized single-head attention
+    /// GPU dispatcher,lazily built on first use。
+    fileprivate var metalAttentionDispatcher:
+        BASMetalAttentionDispatcher?
+
     /// 主线 继续 开发 — optional brain-owned health
     /// snapshot history。 Configured at init via the
     /// `healthSnapshotHistoryCapacity` parameter。 nil
@@ -2300,6 +2305,44 @@ extension BASCognitiveBrain {
         return try await d.dispatch(
             a: a, aRows: aRows, aCols: aCols,
             b: b, bRows: bRows, bCols: bCols)
+    }
+
+    /// 主线 全面 开发 — Metal single-head scaled-dot-
+    /// product attention。 Per blueprint:Metal owns
+    /// attention。 Computes softmax(Q · K^T / sqrt(D))
+    /// · V via the `scaled_dot_product_attention` MSL
+    /// kernel。 Each GPU thread handles one output cell。
+    ///
+    /// Inputs are row-major float32 flat arrays:
+    ///   Q is qRows × qCols (M × D)
+    ///   K is kRows × qCols (N × D — same key/query dim)
+    ///   V is kRows × vCols (N × Dv)
+    ///   output is M × Dv
+    public func attention(
+        q: [Float], qRows: Int, qCols: Int,
+        k: [Float], kRows: Int,
+        v: [Float], vCols: Int
+    ) async throws -> [Float] {
+        guard let loader = metalLibraryLoader else {
+            throw BASMetalAttentionDispatcherError
+                .libraryUnavailable(
+                    message:
+                        "no metalLibraryLoader wired")
+        }
+        if metalAttentionDispatcher == nil {
+            metalAttentionDispatcher =
+                BASMetalAttentionDispatcher(
+                    loader: loader)
+        }
+        guard let d = metalAttentionDispatcher else {
+            throw BASMetalAttentionDispatcherError
+                .libraryUnavailable(
+                    message: "dispatcher nil")
+        }
+        return try await d.dispatch(
+            q: q, qRows: qRows, qCols: qCols,
+            k: k, kRows: kRows,
+            v: v, vCols: vCols)
     }
 
     /// 主线 继续 开发 — public Metal compute entry point。

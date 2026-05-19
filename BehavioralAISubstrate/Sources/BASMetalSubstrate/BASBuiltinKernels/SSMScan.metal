@@ -267,3 +267,97 @@ kernel void matmul_float32(
     }
     C[i * N + j] = acc;
 }
+
+// MARK: - scaled_dot_product_attention
+// 主线 全面 开发 — single-head scaled dot-product
+// attention,Metal GPU kernel。 Per blueprint:Metal
+// owns "attention"。
+//
+// Inputs:
+//   Q (M × D)   queries
+//   K (N × D)   keys
+//   V (N × Dv)  values
+//
+// Algorithm per output cell out[i,j]:
+//   1. scores[k] = sum_d Q[i,d] * K[k,d]   for k in 0..N
+//   2. scaled[k] = scores[k] / sqrt(D)
+//   3. max_score = max(scaled[k] over k)
+//   4. exp_sum   = sum(exp(scaled[k] - max_score))
+//   5. prob[k]   = exp(scaled[k] - max_score) / exp_sum
+//   6. out[i,j]  = sum_k prob[k] * V[k,j]
+//
+// Each GPU thread handles ONE output cell (i,j)。 Dispatch
+// grid:(M, Dv, 1)。 Per-thread cost:O(N*D + N) which is
+// the natural attention cost。 No tiling,no shared
+// memory — clean kernel,maps directly to spec。
+//
+// Honest trade-off:not a tiled FlashAttention kernel。
+// For typical small sequence lengths in this substrate
+// (chat-shaped:M=N≤64,D≤128) this is fast enough。
+// Production-scale attention should use Apple's
+// MPSGraph + MPSGraphMatrixMultiplicationOp or vendor
+// FlashAttention。 This kernel exists to honor the
+// blueprint row。
+
+struct AttentionShape {
+    uint M;   // rows of Q (and rows of output)
+    uint N;   // rows of K = rows of V (seq length)
+    uint D;   // cols of Q = cols of K (key/query dim)
+    uint Dv;  // cols of V (value dim)
+};
+
+kernel void scaled_dot_product_attention(
+    device   const float          *Q       [[buffer(0)]],  // M × D
+    device   const float          *K       [[buffer(1)]],  // N × D
+    device   const float          *V       [[buffer(2)]],  // N × Dv
+    device         float          *out     [[buffer(3)]],  // M × Dv
+    constant       AttentionShape &shape   [[buffer(4)]],
+    uint2                          tid     [[thread_position_in_grid]])
+{
+    const uint i = tid.x;  // query row index
+    const uint j = tid.y;  // value-dim index
+    if (i >= shape.M || j >= shape.Dv) {
+        return;
+    }
+    const uint M = shape.M;
+    const uint N = shape.N;
+    const uint D = shape.D;
+    const uint Dv = shape.Dv;
+    (void)M;  // M used only for bounds check above
+    const float inv_sqrt_d = 1.0f / sqrt(float(D));
+
+    // Pass 1: find max scaled score for numerical
+    // stability (softmax max-subtract trick)。
+    float max_score = -INFINITY;
+    for (uint k = 0; k < N; k++) {
+        float dot = 0.0f;
+        for (uint d = 0; d < D; d++) {
+            dot += Q[i * D + d] * K[k * D + d];
+        }
+        const float scaled = dot * inv_sqrt_d;
+        if (scaled > max_score) {
+            max_score = scaled;
+        }
+    }
+
+    // Pass 2: accumulate exp(scaled - max) for the
+    // softmax denominator AND the weighted sum for
+    // this output column j。 We can do both in one
+    // pass since we no longer need to revisit each k。
+    float exp_sum = 0.0f;
+    float weighted_sum = 0.0f;
+    for (uint k = 0; k < N; k++) {
+        float dot = 0.0f;
+        for (uint d = 0; d < D; d++) {
+            dot += Q[i * D + d] * K[k * D + d];
+        }
+        const float scaled = dot * inv_sqrt_d;
+        const float e = exp(scaled - max_score);
+        exp_sum += e;
+        weighted_sum += e * V[k * Dv + j];
+    }
+
+    out[i * Dv + j] = (exp_sum > 0.0f)
+        ? (weighted_sum / exp_sum)
+        : 0.0f;
+}
