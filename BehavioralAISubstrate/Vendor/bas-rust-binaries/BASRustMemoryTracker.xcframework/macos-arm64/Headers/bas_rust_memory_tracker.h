@@ -522,6 +522,40 @@ int32_t bas_ranker_matmul_simd_blocked(
     float* c, size_t c_len,
     size_t m, size_t n, size_t k);
 
+// MARK: - chapter 七百九 第一刀 Softmax ABI
+
+int32_t bas_ranker_softmax(
+    const float* x, size_t n,
+    float* out, size_t out_n);
+
+int32_t bas_ranker_softmax_simd(
+    const float* x, size_t n,
+    float* out, size_t out_n);
+
+int32_t bas_ranker_softmax_rowwise_simd(
+    const float* x, size_t x_len,
+    float* out, size_t out_len,
+    size_t rows, size_t cols);
+
+// MARK: - chapter 七百九 第二刀 LayerNorm ABI
+
+int32_t bas_ranker_layer_norm(
+    const float* x, size_t n,
+    float* out, size_t out_n,
+    float eps);
+
+int32_t bas_ranker_layer_norm_welford(
+    const float* x, size_t n,
+    float* out, size_t out_n,
+    float eps);
+
+int32_t bas_ranker_layer_norm_affine_simd(
+    const float* x, size_t x_len,
+    const float* gamma, size_t gamma_len,
+    const float* beta, size_t beta_len,
+    float* out, size_t out_len,
+    float eps);
+
 #ifdef __cplusplus
 }
 #endif
