@@ -1,6 +1,10 @@
 import Foundation
 import CryptoKit
 import BASRuntimeCore
+// chapter 七百二 native-port — Rust SHA256 primitive for
+// `fromSeed(_:)` seed-derivation。 Legacy CryptoKit body
+// preserved as `/* ... */` per 全comment 不要删除。
+import BASRustCoreBridge
 
 /// M87 — Ed25519 production-grade signing for the sovereign audit
 /// ledger.
@@ -91,7 +95,21 @@ public struct BASSovereignEd25519KeyPair: Sendable {
     /// seed. Use this only for test fixtures.
     public static func fromSeed(_ seed: String) throws
         -> BASSovereignEd25519KeyPair {
-        let digest = Data(SHA256.hash(data: Data(seed.utf8)))
+        // chapter 七百二 native-port — Rust-sourced digest;
+        // legacy CryptoKit body preserved per 全comment 不要删除。
+        let digest: Data
+        if let rust = try? BASRustLedgerCore.sha256(
+            Data(seed.utf8))
+        {
+            digest = rust
+        } else {
+            // LEGACY CryptoKit BODY — preserved per 全comment 不要删除。
+            /*
+             * Pre-chapter-702 Swift implementation:
+             *     let digest = Data(SHA256.hash(data: Data(seed.utf8)))
+             */
+            digest = Data(SHA256.hash(data: Data(seed.utf8)))
+        }
         let privKey = try Curve25519.Signing.PrivateKey(
             rawRepresentation: digest)
         return BASSovereignEd25519KeyPair(privateKey: privKey)
