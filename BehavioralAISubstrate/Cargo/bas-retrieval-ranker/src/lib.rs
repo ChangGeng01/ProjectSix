@@ -19,6 +19,7 @@ pub mod cosine;
 pub mod decay;
 pub mod fuser;
 pub mod layer_norm; // chapter 七百九 第二刀 — LayerNorm (welford + SIMD)
+pub mod ledger;     // chapter 七百十二 第一刀 — batched seal + verify
 pub mod matmul;     // chapter 七百八 第一刀 — cache-blocked + SIMD matmul
 pub mod simd;       // chapter 七百五 第二刀 — SIMD-accelerated math
 pub mod softmax;    // chapter 七百九 第一刀 — numerically-stable softmax

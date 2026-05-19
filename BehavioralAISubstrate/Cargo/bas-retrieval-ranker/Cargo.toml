@@ -11,3 +11,6 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+# chapter 七百十二 第一刀 — reuse SHA256 from bas-substrate-core for
+# the ledger seal so every byte matches Swift CryptoKit's output。
+bas-substrate-core = { path = "../bas-substrate-core" }
