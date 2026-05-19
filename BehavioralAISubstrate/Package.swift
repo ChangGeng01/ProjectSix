@@ -212,6 +212,27 @@ let package = Package(
             resources: [
                 .process(
                     "BASBuiltinKernels/SSMScan.metal",
+                    localization: nil),
+                // chapter 七百三 第五刀 / M2175 — Metal widening:
+                // 5 additional kernel files added (LayerNorm
+                // forward/backward, activations, softmax
+                // variants, conv1d/conv2d, reduce + cosine)。
+                // These all compile via SPM's .metal resource
+                // handler — no XCFramework changes needed。
+                .process(
+                    "BASBuiltinKernels/BASLayerNormKernel.metal",
+                    localization: nil),
+                .process(
+                    "BASBuiltinKernels/BASActivationKernels.metal",
+                    localization: nil),
+                .process(
+                    "BASBuiltinKernels/BASSoftmaxKernels.metal",
+                    localization: nil),
+                .process(
+                    "BASBuiltinKernels/BASConvKernels.metal",
+                    localization: nil),
+                .process(
+                    "BASBuiltinKernels/BASReduceKernels.metal",
                     localization: nil)
             ],
             linkerSettings: [

@@ -235,6 +235,44 @@ int32_t bas_process_disk_io_blocks(
 /// `bas_process_disk_io_blocks`。 Currently 1。
 int32_t bas_process_disk_io_blocks_version(void);
 
+// MARK: - chapter 七百三 第五刀 / M2175 — C widening
+//
+// New probes added in this chapter:
+//   - bas_thermal_probe          : raw Darwin thermal state
+//   - bas_thermal_bucket         : 4-bucket coarse classification
+//   - bas_thermal_bucket_name    : static string-ify helper
+//   - bas_cpu_logical_count      : hw.ncpu
+//   - bas_cpu_physical_count     : hw.physicalcpu
+//   - bas_cpu_performance_count  : Apple Silicon perflevel0
+//   - bas_cpu_efficiency_count   : Apple Silicon perflevel1
+//   - bas_cpu_max_frequency_mhz  : peak CPU frequency
+//   - bas_cpu_brand              : machdep.cpu.brand_string
+//   - bas_memory_total_bytes     : hw.memsize
+//   - bas_memory_vm_stats        : 4-counter VM snapshot
+//   - bas_memory_pressure_percent: 0-100 pressure estimate
+
+#include <stddef.h>
+
+int32_t bas_thermal_probe(int32_t *out_state);
+int32_t bas_thermal_bucket(int32_t *out_bucket);
+const char *bas_thermal_bucket_name(int32_t bucket);
+
+int32_t bas_cpu_logical_count(int32_t *out_count);
+int32_t bas_cpu_physical_count(int32_t *out_count);
+int32_t bas_cpu_performance_count(int32_t *out_count);
+int32_t bas_cpu_efficiency_count(int32_t *out_count);
+int32_t bas_cpu_max_frequency_mhz(int64_t *out_mhz);
+int32_t bas_cpu_brand(char *out_buf, size_t out_buf_size);
+
+int32_t bas_memory_total_bytes(int64_t *out_bytes);
+int32_t bas_memory_vm_stats(
+    int64_t *out_free,
+    int64_t *out_active,
+    int64_t *out_inactive,
+    int64_t *out_wired,
+    int64_t *out_page_size);
+int32_t bas_memory_pressure_percent(int32_t *out_pct);
+
 #ifdef __cplusplus
 }
 #endif
