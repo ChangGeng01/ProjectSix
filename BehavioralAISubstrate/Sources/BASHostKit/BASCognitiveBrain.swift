@@ -2323,6 +2323,27 @@ extension BASCognitiveBrain {
     /// Same as `cosineSimilarityRust` but the static helper —
     /// non-isolated so perf tests can call it without paying
     /// the actor-hop on every iteration。
+    /// chapter 七百六 第四刀 / M2204 — auto-routing cosine。
+    /// Picks the empirically-fastest implementation per input
+    /// size based on the chapter-七百六-第二刀 tournament
+    /// measurements。
+    ///
+    /// At M-series default thresholds:
+    ///   dim ≤ 32 → Rust scalar
+    ///   dim ≥ 64 → Rust SIMD
+    ///   fallback  → Swift naive (watchOS / Linux)
+    ///
+    /// Per 「多次 对比」 — no assumed winner,real measurement
+    /// picks。 Returns the routed result + which path executed
+    /// so telemetry / tests can verify the decision。
+    public nonisolated static func cosineSimilarityAuto(
+        _ a: [Float], _ b: [Float],
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASAutoRouteResult<Float> {
+        return BASAutoRouteRanker.cosineSimilarity(
+            a, b, thresholds: thresholds)
+    }
+
     public static func cosineSimilarityRustImpl(
         _ a: [Float], _ b: [Float]
     ) throws -> Float {
