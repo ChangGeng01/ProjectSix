@@ -104,6 +104,24 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         ::bas_sovereign_token_lifecycle_status(
             100, 200, -1, 150);
     total = total.wrapping_add(token_status);
+    // chapter 七百四十四 第二刀 / M2392 — force-link the L3
+    // knowledge_graph_codec encode_node entry。 Sentinel
+    // inputs:zero-length strings + capacity 0 → returns
+    // required size (the codec's serialized minimum)。
+    let nid = b"";
+    let kr = b"";
+    let lbl = b"";
+    let kg_needed = unsafe {
+        bas_event_log_codec::knowledge_graph_codec
+            ::bas_kg_codec_encode_node(
+                nid.as_ptr() as *const core::ffi::c_char, 0,
+                kr.as_ptr() as *const core::ffi::c_char, 0,
+                lbl.as_ptr() as *const core::ffi::c_char, 0,
+                0,
+                core::ptr::null(), -1,
+                core::ptr::null_mut(), 0)
+    };
+    total = total.wrapping_add(kg_needed);
     total
 }
 

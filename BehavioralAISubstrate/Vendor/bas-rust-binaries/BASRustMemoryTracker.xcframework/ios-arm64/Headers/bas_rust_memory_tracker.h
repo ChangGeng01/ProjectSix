@@ -641,6 +641,48 @@ int32_t bas_sovereign_token_lifecycle_status(
     int64_t revoked_at_ms_or_neg1,
     int64_t now_ms);
 
+// MARK: - bas-kg-codec (chapter 七百四十四 第二刀 / M2392)
+//
+// L3 Knowledge Graph V2 binary codec for BASKnowledgeNode +
+// BASKnowledgeEdge。 Two-phase capacity pattern matching
+// bpe + sovereign seal ergonomics:caller invokes with
+// out_capacity = 0 to discover required size,then realloc
+// and re-invoke。
+//
+// Wire format (V2 binary):
+//   Node: u32_be(id_len) || id || u32_be(kind_len) || kind
+//      || u32_be(label_len) || label || i64_be(created_at)
+//      || u32_be(payload_len) || payload
+//      (payload_len = 0xFFFFFFFF encodes Option::None;
+//       payload_json_len = -1 in the FFI call)
+//   Edge: u32_be(id_len) || id || u32_be(from_len) || from
+//      || u32_be(to_len) || to || u32_be(kind_len) || kind
+//      || f64_be(weight) || i64_be(created_at)
+//
+// Return values:
+//   ≥ 0  — bytes written (or required if capacity was 0)
+//   -1   — null required pointer or invalid UTF-8
+//   -2   — would-truncate (capacity smaller than needed)
+
+int32_t bas_kg_codec_abi_version(void);
+
+int32_t bas_kg_codec_encode_node(
+    const char *node_id_ptr, int32_t node_id_len,
+    const char *kind_raw_ptr, int32_t kind_raw_len,
+    const char *label_ptr, int32_t label_len,
+    int64_t created_at_ms,
+    const char *payload_json_ptr, int32_t payload_json_len,
+    char *out_buf, int32_t out_capacity);
+
+int32_t bas_kg_codec_encode_edge(
+    const char *edge_id_ptr, int32_t edge_id_len,
+    const char *from_node_id_ptr, int32_t from_node_id_len,
+    const char *to_node_id_ptr, int32_t to_node_id_len,
+    const char *kind_raw_ptr, int32_t kind_raw_len,
+    double weight,
+    int64_t created_at_ms,
+    char *out_buf, int32_t out_capacity);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

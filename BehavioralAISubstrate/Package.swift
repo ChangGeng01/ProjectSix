@@ -113,7 +113,14 @@ let package = Package(
                 .process("SQL/011_chapter_doctrine_literals_data.sql"),
                 .process("SQL/012_chapter_doctrine_phase2_data.sql"),
                 .process("SQL/021_entropy_chapter_entries_schema.sql"),
-                .process("SQL/022_entropy_chapter_entries_data.sql")
+                .process("SQL/022_entropy_chapter_entries_data.sql"),
+                // chapter 七百四十四 第三刀 / M2393 — L3
+                // Knowledge Graph V2 binary wire-format
+                // migration。 Adds payload_format + payload_blob
+                // columns to knowledge_node + knowledge_edge
+                // for dual-read codec dispatch (chapter 七百三十二
+                // pattern reused)。
+                .process("SQL/030_knowledge_graph_v2_migration.sql")
             ]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
