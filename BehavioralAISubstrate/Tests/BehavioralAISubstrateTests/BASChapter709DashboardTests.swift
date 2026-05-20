@@ -1,10 +1,3 @@
-// MARK: - BASChapter709DashboardTests
-// chapter 七百九 第五刀 / M2220
-//
-// Comprehensive auto-router dashboard covering all 8 routed
-// primitive families。 Single XCTest method runs every workload
-// + prints a markdown summary。
-
 import XCTest
 import CryptoKit
 import Foundation
@@ -13,6 +6,14 @@ import Foundation
 
 import BASRustMemoryTrackerBinary
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter709DashboardTests: XCTestCase {
 
     func testPrintFullAutoRouterDashboard() async throws {
@@ -290,3 +291,5 @@ final class BASChapter709DashboardTests: XCTestCase {
         print("| \(w) | \(s) | \(win) | \(nsStr) |")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

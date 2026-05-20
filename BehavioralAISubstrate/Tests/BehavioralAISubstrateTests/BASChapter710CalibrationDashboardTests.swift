@@ -1,24 +1,16 @@
-// MARK: - BASChapter710CalibrationDashboardTests
-// chapter 七百十 第五刀 / M2225
-//
-// Closes the 9-chapter native-port arc (七百二 → 七百十) by
-// running the calibration pipeline end-to-end on the host
-// machine and printing:
-//
-//   1. the measured thresholds the auto-router will use
-//   2. each per-workload measurement that drove the decision
-//   3. cache size on disk after round-trip
-//   4. fast vs thorough comparison
-//
-// Run this once on every new host to confirm the substrate is
-// making the empirically correct routing choices on that
-// hardware,not blindly trusting the M-series defaults。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASHostKit
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter710CalibrationDashboardTests: XCTestCase {
 
     func testPrintCalibrationDashboard() throws {
@@ -116,3 +108,5 @@ final class BASChapter710CalibrationDashboardTests: XCTestCase {
                 "bas-calib-dashboard-\(id).json")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

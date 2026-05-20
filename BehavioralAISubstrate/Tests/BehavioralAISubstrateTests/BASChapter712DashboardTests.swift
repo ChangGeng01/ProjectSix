@@ -1,12 +1,3 @@
-// MARK: - BASChapter712DashboardTests
-// chapter 七百十二 第五刀 / M2235
-//
-// Updated comprehensive auto-router dashboard — extends the
-// 七百十一 11-family table with the new ledger rows (single
-// seal,batch seal,verify chain) at multiple depths。 The
-// substrate now picks empirically-correct paths for 12
-// distinct primitive families。
-
 import XCTest
 import CryptoKit
 import Foundation
@@ -17,6 +8,14 @@ import Foundation
 import BASRustMemoryTrackerBinary
 #endif
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter712DashboardTests: XCTestCase {
 
     func testPrintFullAutoRouterDashboard() async throws {
@@ -456,3 +455,5 @@ final class BASChapter712DashboardTests: XCTestCase {
         print("| \(w) | \(s) | \(win) | \(nsStr) |")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

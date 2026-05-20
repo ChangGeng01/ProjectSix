@@ -10,6 +10,16 @@
 import XCTest
 @testable import BASRuntimeCore
 
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Bridge that this test class drove
+// (BASAutoRouteRanker.atomReducerBatchedShouldReplaceAdmitted)
+// is wrapped in `#if false` per user directive 「先把 所有 能
+// comment 都 comment」。 Measured 0.82× LOSS at chapter 七百五十三
+// 第二刀;keeping the test alive would fail to compile against
+// the deactivated Swift bridge。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated — 0.82× LOSS
 final class BASChapter753BatchedReducerTests: XCTestCase {
 
     // MARK: - ABI version bumped to 2
@@ -245,3 +255,4 @@ final class BASChapter753BatchedReducerTests: XCTestCase {
         #endif
     }
 }
+#endif  // chapter 七百五十七 第一刀

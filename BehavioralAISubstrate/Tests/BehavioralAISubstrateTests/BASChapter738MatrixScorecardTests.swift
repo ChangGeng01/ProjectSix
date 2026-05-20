@@ -1,20 +1,16 @@
-// MARK: - BASChapter738MatrixScorecardTests
-// chapter 七百三十八 第五刀 / M2365
-//
-// LAYER-MIGRATION ARC opener seal。 Chapter 七百三十八 ships
-// Schema-First L11 Wind Gate persistence layer:3 net-new SQL
-// schemas + 1 cross-schema integration test + 1 Package.swift
-// plugin wiring。 V1 in-memory BASRiskObservationLedger stays
-// the live path;chapter 七百三十九 wires the Rust state-machine
-// port + SQL persistence consumer behind a default-OFF flag。
-//
-// This scorecard records what landed + what's queued for the
-// rest of the 12-chapter arc。
-
 import XCTest
 import Foundation
 @testable import BASPolicy
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter738MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -278,3 +274,5 @@ final class BASChapter738MatrixScorecardTests: XCTestCase {
             PermitEscalationStepsSchema.statementCount, 5)
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

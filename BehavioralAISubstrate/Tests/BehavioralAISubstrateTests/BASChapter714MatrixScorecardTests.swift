@@ -1,18 +1,18 @@
-// MARK: - BASChapter714MatrixScorecardTests
-// chapter 七百十四 第五刀 / M2245 — updated matrix scorecard
-// after the SQL-widening chapter (Episode + Bundle + Tombstone)。
-//
-// Reports which matrix duties are aligned vs gapped after
-// chapter 七百十四,emphasizing that the SQL column of the
-// matrix is now essentially complete (gap closed from -0.19%
-// to -0.15%)。
-
 import XCTest
 import Foundation
 @testable import BASMemory
 @testable import BASRuntimeCore
 @testable import BASHostKit
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter714MatrixScorecardTests: XCTestCase {
 
     func testPrintLanguageMatrixScorecard() {
@@ -122,3 +122,5 @@ final class BASChapter714MatrixScorecardTests: XCTestCase {
         print("")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

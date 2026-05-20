@@ -1,14 +1,15 @@
-// MARK: - BASChapter730MatrixScorecardTests
-// chapter 七百三十 第二刀 / M2322
-//
-// THE 30-chapter scorecard。 Closes the chapter 七百二-七百三十
-// branch arc with a comprehensive matrix:trajectory,gate types,
-// crate count,production wiring stats,and an honest landing
-// vs the plan-agent estimates。
-
 import XCTest
 import Foundation
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter730MatrixScorecardTests: XCTestCase {
 
     func testPrint30ChapterScorecard() {
@@ -278,3 +279,5 @@ final class BASChapter730MatrixScorecardTests: XCTestCase {
         print("")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

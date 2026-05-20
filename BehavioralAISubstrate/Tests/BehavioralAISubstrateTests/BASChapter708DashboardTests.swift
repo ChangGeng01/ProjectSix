@@ -1,10 +1,3 @@
-// MARK: - BASChapter708DashboardTests
-// chapter 七百八 第五刀 / M2215
-//
-// Single test that prints the comprehensive auto-router perf
-// dashboard including the chapter-七百八 MatMul rows。 Updated
-// from the chapter-七百七-第五刀 dashboard。
-
 import XCTest
 import CryptoKit
 @testable import BASRuntimeCore
@@ -14,6 +7,14 @@ import CryptoKit
 import BASRustMemoryTrackerBinary
 #endif
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter708DashboardTests: XCTestCase {
 
     func testPrintFullAutoRouterDashboard() async throws {
@@ -247,3 +248,5 @@ final class BASChapter708DashboardTests: XCTestCase {
         print("| \(w) | \(s) | \(win) | \(nsStr) |")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

@@ -1,12 +1,3 @@
-// MARK: - BASChapter711DashboardTests
-// chapter 七百十一 第五刀 / M2230
-//
-// Updated comprehensive auto-router dashboard — extends the
-// 七百九 8-family table with the new chapter-七百十一 activation
-// rows (GELU exact, GELU tanh-approx, SiLU) at multiple dims。
-// Run this on each new host to confirm the substrate routes
-// the right way for that hardware。
-
 import XCTest
 import CryptoKit
 @testable import BASRuntimeCore
@@ -16,6 +7,14 @@ import CryptoKit
 import BASRustMemoryTrackerBinary
 #endif
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter711DashboardTests: XCTestCase {
 
     func testPrintFullAutoRouterDashboard() async throws {
@@ -369,3 +368,5 @@ final class BASChapter711DashboardTests: XCTestCase {
         print("| \(w) | \(s) | \(win) | \(nsStr) |")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

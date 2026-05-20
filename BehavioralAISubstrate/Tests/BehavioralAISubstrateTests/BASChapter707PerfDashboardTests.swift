@@ -1,12 +1,3 @@
-// MARK: - BASChapter707PerfDashboardTests
-// chapter 七百七 第五刀 / M2210
-//
-// Single test that prints a markdown-table summary of every
-// auto-router workload + measured winners + speedup ratios。
-// Closes chapter 七百七 by giving callers / future maintainers
-// a one-shot way to confirm the substrate is picking the right
-// implementations on their hardware。
-
 import XCTest
 import CryptoKit
 @testable import BASRuntimeCore
@@ -16,6 +7,14 @@ import CryptoKit
 import BASRustMemoryTrackerBinary
 #endif
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter707PerfDashboardTests: XCTestCase {
 
     func testPrintAutoRouterPerfDashboard() async throws {
@@ -204,3 +203,5 @@ final class BASChapter707PerfDashboardTests: XCTestCase {
         print("| \(w) | \(s) | \(win) | \(nsStr) |")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

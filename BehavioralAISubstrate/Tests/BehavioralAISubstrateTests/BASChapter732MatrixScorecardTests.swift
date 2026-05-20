@@ -1,14 +1,16 @@
-// MARK: - BASChapter732MatrixScorecardTests
-// chapter 七百三十二 第五刀 / M2335
-//
-// Chapter 七百三十二 close-out — the biggest DEFERRED CAPABILITY
-// from chapter 七百二十四 第三刀 is now SHIPPED + WIRED through
-// production BASSQLiteEventLogStorage paths。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter732MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -191,3 +193,5 @@ final class BASChapter732MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

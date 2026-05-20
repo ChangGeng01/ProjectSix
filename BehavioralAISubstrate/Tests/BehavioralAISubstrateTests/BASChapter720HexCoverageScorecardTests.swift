@@ -1,18 +1,17 @@
-// MARK: - BASChapter720HexCoverageScorecardTests
-// chapter 七百二十 第五刀 / M2275
-//
-// Chapter 七百二十 close-out:scorecards the full hex-encoder
-// migration started in chapter 七百十九。 16 production sites
-// wired through `BASAutoRouteRanker.bytesToHexLower` across
-// 5 modules。 Single Sources/-level call to legacy
-// `String(format: "%02x")` remains (ProjectionCore UUID
-// byte-format with separators — intentional skip)。
-
 import XCTest
 import Foundation
 import CryptoKit
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter720HexCoverageScorecardTests:
     XCTestCase
 {
@@ -145,3 +144,5 @@ final class BASChapter720HexCoverageScorecardTests:
             "  - 19 byte-equality test suites + 13 perf grids")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

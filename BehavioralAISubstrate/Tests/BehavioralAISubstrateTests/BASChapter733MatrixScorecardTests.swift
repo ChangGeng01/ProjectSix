@@ -1,15 +1,16 @@
-// MARK: - BASChapter733MatrixScorecardTests
-// chapter 七百三十三 第五刀 / M2340
-//
-// Chapter 七百三十三 close-out — KV cache precision-tier
-// decision tree。 Substrate now has THREE precision tiers
-// (Float32 / Float16 / int8) covering the full memory-vs-
-// accuracy tradeoff curve。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter733MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -228,3 +229,5 @@ final class BASChapter733MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

@@ -1,21 +1,18 @@
-// MARK: - BASChapter717MatrixScorecardTests
-// chapter 七百十七 第五刀 / M2260
-//
-// Chapter close-out scorecard documenting the chapter
-// 七百十七 mixed-outcome finding:
-//
-//   forget cascade  : Swift wins 2.2× → default stays OFF
-//   provenance      : Rust wins 4.9× → DEFAULT FLIPPED ON
-//
-// This is the user's directive 「如果 完全 移植后 整体 会 更好
-// 那就移植」 played out per-target,not blanket。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASMemory
 @testable import BASOrgan
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter717MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -126,3 +123,5 @@ final class BASChapter717MatrixScorecardTests: XCTestCase {
             "      * forget cascade (Set is too fast — NEW)")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

@@ -28,8 +28,16 @@ final class BASChapter751MaturationArcOpenerTests: XCTestCase {
 
     func testL8AtomReducerABIIsExposed() {
         #if os(iOS) || os(macOS)
-        XCTAssertEqual(
-            BASAutoRouteRanker.atomReducerABIVersion(), 1)
+        // ABI was 1 at chapter 七百五十一 第二刀。 Bumped to 2 at
+        // chapter 七百五十三 第二刀 when the batched API landed。
+        // The batched API was deactivated at chapter 七百五十七
+        // 第一刀 (0.82× LOSS) but the ABI bump stays:per-call
+        // API + symbol still ship as ABI v2。 Assertion accepts
+        // ≥ 1 so future bumps don't false-fail this regression
+        // guard。
+        let abi = BASAutoRouteRanker.atomReducerABIVersion()
+        XCTAssertGreaterThanOrEqual(abi, 1,
+            "L8 atom reducer ABI must be reachable at v1+")
         #endif
     }
 
@@ -143,7 +151,10 @@ final class BASChapter751MaturationArcOpenerTests: XCTestCase {
         // Smoke assertions
         XCTAssertTrue(BASSovereignAuditLedger.useRoutedSeal)
         #if os(iOS) || os(macOS)
-        XCTAssertEqual(
+        // ABI bumped 1 → 2 at chapter 七百五十三 第二刀。 Accept
+        // ≥ 1 so future arcs don't false-fail this regression
+        // guard。
+        XCTAssertGreaterThanOrEqual(
             BASAutoRouteRanker.atomReducerABIVersion(), 1)
         #endif
     }

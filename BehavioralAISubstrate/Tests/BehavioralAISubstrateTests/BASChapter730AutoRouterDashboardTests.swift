@@ -1,18 +1,15 @@
-// MARK: - BASChapter730AutoRouterDashboardTests
-// chapter 七百三十 第一刀 / M2321
-//
-// Final auto-router primitive-family dashboard。 The chapter
-// 七百十五 dashboard recorded 14 families;the chapter 七百
-// 二十一-七百二十九 aggressive evolution arc adds 3 new families
-// (quantize,BPE,PQ) bringing the total to 17。
-//
-// This test prints the full dashboard as the close-out
-// substrate-shape audit for the 30-chapter branch arc。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter730AutoRouterDashboardTests: XCTestCase {
 
     func testPrintSeventeenFamilyDashboard() {
@@ -113,3 +110,5 @@ final class BASChapter730AutoRouterDashboardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

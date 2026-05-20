@@ -1,15 +1,16 @@
-// MARK: - BASChapter721MatrixScorecardTests
-// chapter 七百二十一 第五刀 / M2280
-//
-// Chapter 七百二十一 close-out scorecard。 Opens the chapter
-// 七百二十一-七百三十 aggressive evolution arc with a clean
-// safe-opener: Rust hex decoder counterpart to chapter 七百十九
-// encoder。 91-99× speedup measured + 1 production site wired。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter721MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -100,3 +101,5 @@ final class BASChapter721MatrixScorecardTests: XCTestCase {
             "  - 1/10 chapters of 七百二十一-七百三十 arc complete")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

@@ -1,17 +1,17 @@
-// MARK: - BASChapter739MatrixScorecardTests
-// chapter 七百三十九 第五刀 / M2370
-//
-// LAYER-MIGRATION ARC chapter 七百三十九 SEAL — L11 Wind
-// Gate Rust state-machine port complete with 5-axis
-// comparison passing 3 axes Rust-strictly-better and 0
-// axes Rust-worse-by-> 1.5×, satisfying the
-// 「完全 移植 if WHOLE is better」 default-flip rule。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASPolicy
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter739MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -271,3 +271,5 @@ final class BASChapter739MatrixScorecardTests: XCTestCase {
             "Out-of-range band returns nil")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

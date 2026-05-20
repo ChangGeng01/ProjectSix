@@ -1,16 +1,16 @@
-// MARK: - BASChapter724MatrixScorecardTests
-// chapter 七百二十四 第五刀 / M2295
-//
-// Chapter close-out scorecard。 Honest mixed-outcome chapter:
-// capability shipped (Rust binary codec + Swift bridge),
-// measurement honest (encode TIED on speed,2.3× storage shrink),
-// production wiring deferred (per chapter 七百二十三 third-knife
-// pattern)。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter724MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -178,3 +178,5 @@ final class BASChapter724MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

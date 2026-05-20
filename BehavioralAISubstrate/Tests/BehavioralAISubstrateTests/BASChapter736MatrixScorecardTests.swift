@@ -1,14 +1,16 @@
-// MARK: - BASChapter736MatrixScorecardTests
-// chapter 七百三十六 第五刀 / M2355
-//
-// Chapter 七百三十六 close-out — completes the VECTOR storage
-// tier substack mirroring the KV cache substack (chapter
-// 七百二十六-七百三十五)。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter736MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -196,3 +198,5 @@ final class BASChapter736MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

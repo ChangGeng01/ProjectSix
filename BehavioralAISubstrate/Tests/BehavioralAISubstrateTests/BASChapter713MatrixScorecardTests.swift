@@ -1,20 +1,17 @@
-// MARK: - BASChapter713MatrixScorecardTests
-// chapter 七百十三 第五刀 / M2240 — 各司其职 matrix scorecard
-//
-// Prints the substrate's language-ownership matrix alignment
-// after chapter 七百十三。 Per the user's directive
-// 「全面开发 各司其职」 — comprehensive development with each
-// language doing its proper role — this scorecard reports
-// which matrix duties are aligned vs gapped。
-//
-// Run this after each chapter close-out to see the architectural
-// alignment delta。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASHostKit
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter713MatrixScorecardTests: XCTestCase {
 
     func testPrintLanguageMatrixScorecard() {
@@ -133,3 +130,5 @@ final class BASChapter713MatrixScorecardTests: XCTestCase {
         }
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

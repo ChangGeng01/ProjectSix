@@ -2997,12 +2997,21 @@ public enum BASAutoRouteRanker {
 
     // MARK: - L8 Memory Atom Reducer batched
     //         (chapter 七百五十三 第二刀 / M2434)
+    //         DEACTIVATED chapter 七百五十七 第一刀 / M2438
     //
-    // Batched admission-tiebreak — N decisions in a single FFI
-    // call (per chapter 七百十八 batched-cosine pattern)。
-    // Designed to cross the 1.5× threshold by amortizing FFI
-    // overhead across the batch。
+    // Batched admission-tiebreak — measured 0.82× LOSS across
+    // 4 perf-grid cells (N=16/256/1024/4096)。 Swift-side
+    // `[Int32]` buffer alloc + withUnsafeBufferPointer chains
+    // dominate the FFI savings for trivial primitive math。
+    // Per user directive 2026-05-20「先把 所有 能 comment 都
+    // comment」+「亏的不要硬上」,this opt-in Swift bridge
+    // is wrapped in `#if false` so the dead-but-callable code
+    // path is removed from the compile surface。 The Rust
+    // function + XCFramework symbol + Rust unit tests stay
+    // warm (low-cost) so a future arc can 1-line re-enable
+    // by flipping `#if false` → `#if true`。
 
+#if false  // chapter 七百五十七 第一刀 deactivated — 0.82× LOSS
     /// Compute the admission-tiebreak decision for N
     /// (existing,new) confidence pairs in a single FFI call。
     /// All N pairs share the same `tiebreakKeepsExisting`
@@ -3049,6 +3058,7 @@ public enum BASAutoRouteRanker {
         }
         #endif
     }
+#endif  // chapter 七百五十七 第一刀
 }
 
 // MARK: - BASBpeTokenizerHandle (chapter 七百二十二 第二刀 / M2282)

@@ -1,17 +1,16 @@
-// MARK: - BASChapter740MatrixScorecardTests
-// chapter 七百四十 第五刀 / M2375
-//
-// LAYER-MIGRATION ARC chapter 七百四十 SEAL — L10 Tri-Self
-// Court pure-function derivation port complete with 5-axis
-// comparison passing 3 axes Rust-strictly-better。 Plan-A
-// agent recommended velocity-builder positioned early in the
-// arc landed with no surprises:bulk-serialize FFI works,
-// byte-equality holds, perf TIED-to-marginally-better。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter740MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -275,3 +274,5 @@ final class BASChapter740MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

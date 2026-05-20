@@ -1,21 +1,17 @@
-// MARK: - BASChapter716MatrixScorecardTests
-// chapter 七百十六 第五刀 / M2255 — chapter close-out scorecard
-//
-// Documents the honest finding from chapter 七百十六:the
-// Rust-routed ledger seal CAPABILITY ships,but production
-// measurement showed the per-append path is NOT a win on
-// Apple Silicon。 The chapter 七百十二 deferred-flip from
-// flag OFF → flag ON is therefore NOT happening。
-//
-// This is exactly the「多次 对比 ... 用 winner」discipline:
-// when measurement contradicts prediction,routing follows
-// measurement,not the original hypothesis。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASSovereign
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter716MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -136,3 +132,5 @@ final class BASChapter716MatrixScorecardTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(count, 30)
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

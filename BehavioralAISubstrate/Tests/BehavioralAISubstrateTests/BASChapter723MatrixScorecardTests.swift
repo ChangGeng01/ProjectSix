@@ -1,15 +1,17 @@
-// MARK: - BASChapter723MatrixScorecardTests
-// chapter 七百二十三 第五刀 / M2290
-//
-// Chapter 七百二十三 close-out scorecard。 TWO outcomes,one
-// negative,one positive — both delivered under measurement-
-// first discipline。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASMemory
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter723MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -177,3 +179,5 @@ final class BASChapter723MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

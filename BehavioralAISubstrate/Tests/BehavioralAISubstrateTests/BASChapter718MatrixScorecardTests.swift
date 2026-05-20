@@ -1,16 +1,17 @@
-// MARK: - BASChapter718MatrixScorecardTests
-// chapter 七百十八 第五刀 / M2265
-//
-// Chapter 七百十八 close-out scorecard。 Documents the largest
-// per-target speedup measured in this branch arc:RAG vector
-// retrieval (`BASVectorIndex.topK()`) is now 8.7-43× faster
-// via Rust SIMD by default。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 @testable import BASMemory
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter718MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -131,3 +132,5 @@ final class BASChapter718MatrixScorecardTests: XCTestCase {
             "  - 17 byte-equality test suites + 12 perf grids")
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

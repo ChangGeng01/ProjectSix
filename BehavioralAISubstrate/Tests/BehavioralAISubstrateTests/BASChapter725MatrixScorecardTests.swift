@@ -1,15 +1,16 @@
-// MARK: - BASChapter725MatrixScorecardTests
-// chapter 七百二十五 第四/五刀 / M2299-M2300
-//
-// Chapter 七百二十五 close-out scorecard。 Decisive negative
-// measurement (Rust 10× SLOWER for in-memory aggregations on
-// Dictionary<String,T>)。 Capability ships opt-in;default
-// stays Swift。
-
 import XCTest
 import Foundation
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only scorecard test with no real assertions —
+// pure decorative history。 Per user directive 「先把
+// 所有 能 comment 都 comment」 the test class body is
+// wrapped in `#if false`。 Historical body preserved
+// verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter725MatrixScorecardTests: XCTestCase {
 
     func testPrintMatrixScorecard() {
@@ -202,3 +203,5 @@ final class BASChapter725MatrixScorecardTests: XCTestCase {
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀

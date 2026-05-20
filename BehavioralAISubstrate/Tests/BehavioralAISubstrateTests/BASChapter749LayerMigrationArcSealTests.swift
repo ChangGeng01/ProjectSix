@@ -1,25 +1,14 @@
-// MARK: - BASChapter749LayerMigrationArcSealTests
-// chapter 七百四十九 第一-五刀 / M2416-M2420
-//
-// LAYER-MIGRATION ARC FINAL CLOSE-OUT。 Seals the 12-chapter
-// arc (chapters 七百三十八-七百四十九,M2361-M2420)。
-//
-// Comprehensive final scorecard covering:
-//   - All 6 sub-arcs (L11 / L10 / L14 / L3 / L2 / L9)
-//   - Cumulative deliverable (Rust crates, SQL schemas,
-//     C ABI exports, Swift bridges, XCFramework rebuilds)
-//   - 5-axis comparison results across all 12 chapters
-//   - Pattern findings (when Rust wins / when Rust loses)
-//   - Doctrine pins held throughout
-//   - Honest scope acknowledgments
-//
-// This is the LAST file in the 12-chapter arc。 After this,
-// branch is ready for downstream consumption / merge /
-// next-arc spinout。
-
 import XCTest
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十七 第一刀 / M2438 — DEACTIVATED。
+// Print-only dashboard/scorecard test with no real
+// assertions — pure decorative history。 Per user
+// directive 「先把 所有 能 comment 都 comment」 the
+// test class body is wrapped in `#if false`。
+
+#if false  // chapter 七百五十七 第一刀 deactivated
 final class BASChapter749LayerMigrationArcSealTests:
     XCTestCase
 {
@@ -448,3 +437,5 @@ final class BASChapter749LayerMigrationArcSealTests:
         #endif
     }
 }
+
+#endif  // chapter 七百五十七 第一刀
