@@ -1,0 +1,28 @@
+# Cargo manifest for bas-organ-router
+# chapter 七百四十七 第一刀 / M2406 — LAYER-MIGRATION ARC
+#
+# Pure-function Rust port of the L2 Neural Organ adapter
+# routing policy。 Given a tensor-shape descriptor + workload
+# metadata,select which kernel implementation should serve
+# the dispatch:
+#
+#   - CPU reference (smallest workloads,deterministic)
+#   - Metal kernel (large workloads,GPU-accelerated)
+#   - MPSGraph (mid-sized matmul / convolution,Apple-tuned)
+#   - Rust SIMD (mid-sized vector / activation,deterministic)
+#
+# Mirrors chapter 七百七 pattern — auto-router family for
+# attention / matmul / activation kernels — extended to the
+# L2 organ adapter layer。
+
+[package]
+name = "bas-organ-router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_organ_router"
+path = "src/lib.rs"

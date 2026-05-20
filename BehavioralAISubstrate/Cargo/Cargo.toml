@@ -28,6 +28,7 @@ members = [
     "bas-runtime-frame",           # chapter 七百三 第四刀 / M2174
     "bas-tokenizer",               # chapter 七百二十二 第一刀 / M2281
     "bas-tribunal-court",          # chapter 七百四十 第一刀 / M2371
+    "bas-organ-router",            # chapter 七百四十七 第一刀 / M2406
 ]
 resolver = "2"
 

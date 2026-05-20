@@ -708,6 +708,30 @@ int32_t bas_event_extractor_classify(
     double *out_edge_weight,
     int32_t *out_is_memory_atom);
 
+// MARK: - bas-organ-router (chapter 七百四十七 第一刀 / M2406)
+//
+// L2 Neural Organ adapter routing policy。 Per user
+// directive 「Metal/C++ 管 模型 内核,Rust 管 routing/
+// adapter policy。」 The policy lives in Rust;kernels
+// stay Metal + Swift。
+//
+// Inputs:
+//   family_raw: 0=Attention 1=MatMul 2=LayerNorm
+//               3=RmsNorm 4=Softmax 5=Activation
+//   shape_size: i32 (e.g. tensor dim or token count)
+//   budget_raw: 0=Constrained 1=Normal 2=Generous
+//
+// Returns selected backend:
+//   0=CpuReference 1=MetalKernel 2=MpsGraph 3=RustSimd
+//   -1 on bad family / budget raw value
+
+int32_t bas_organ_router_abi_version(void);
+
+int32_t bas_organ_router_select(
+    int32_t family_raw,
+    int32_t shape_size,
+    int32_t budget_raw);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

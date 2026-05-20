@@ -138,6 +138,14 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
                 &mut ek, &mut ew, &mut am)
     };
     total = total.wrapping_add(ext_rc);
+    // chapter 七百四十七 第一刀 / M2406 — force-link the L2
+    // organ router select。 Sentinel inputs:tiny attention
+    // workload under constrained power → returns 0 = Cpu
+    // Reference (no observable side-effect)。
+    let router_rc =
+        bas_organ_router::bas_organ_router_select(
+            0, 64, 0);
+    total = total.wrapping_add(router_rc);
     total
 }
 

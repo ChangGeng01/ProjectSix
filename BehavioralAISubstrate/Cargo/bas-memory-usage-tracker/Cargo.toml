@@ -46,3 +46,9 @@ bas-tokenizer         = { path = "../bas-tokenizer" }
 # XCFramework。 Pairs with the chapter 七百三十九 layer-migration
 # arc Rust-port idiom。
 bas-tribunal-court    = { path = "../bas-tribunal-court" }
+# chapter 七百四十七 第一刀 / M2406 — bundle the L2 organ-
+# router crate so Swift can call bas_organ_router_select via
+# the XCFramework。 Per user directive 「Metal/C++ 管 模型 内核,
+# Rust 管 routing/adapter policy。」 The policy lives here;
+# kernels stay Metal + Swift。
+bas-organ-router      = { path = "../bas-organ-router" }

@@ -46,6 +46,7 @@ dependencies = [
  "bas-canonical-bytes",
  "bas-event-log-codec",
  "bas-memory-atom-store",
+ "bas-organ-router",
  "bas-permit-policy",
  "bas-retrieval-ranker",
  "bas-runtime-frame",
@@ -54,6 +55,10 @@ dependencies = [
  "bas-tribunal-court",
  "sha2",
 ]
+
+[[package]]
+name = "bas-organ-router"
+version = "0.1.0"
 
 [[package]]
 name = "bas-permit-policy"
