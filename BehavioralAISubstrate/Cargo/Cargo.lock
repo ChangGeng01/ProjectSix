@@ -54,6 +54,7 @@ dependencies = [
  "bas-canonical-bytes",
  "bas-dream-loop",
  "bas-event-log-codec",
+ "bas-integrity-sentinel",
  "bas-memory-atom-store",
  "bas-organ-router",
  "bas-permit-policy",

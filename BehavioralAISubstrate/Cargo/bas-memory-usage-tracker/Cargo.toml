@@ -73,3 +73,11 @@ bas-sovereign-c-abi   = { path = "../bas-sovereign-c-abi" }
 # 「L11 极值得 (DEEPER)」 — 50-100× batch throughput vs
 # Swift single-threaded .contains() per planning audit。
 bas-red-team-bench    = { path = "../bas-red-team-bench" }
+# chapter 七百六十 第三刀 / M2453 — bundle the L11
+# typed integrity-sentinel crate so Swift host + 3rd-party
+# C consumers see the structured ScanReport surface
+# (bas_integrity_sentinel_scan,
+# bas_integrity_sentinel_abi_version)。 Distinct from
+# bas-sovereign-c-abi thin wrapper which only returns
+# 4-bit hard_bits — this exposes full structured report。
+bas-integrity-sentinel = { path = "../bas-integrity-sentinel" }

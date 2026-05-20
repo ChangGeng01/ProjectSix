@@ -299,6 +299,311 @@ where
     map
 }
 
+// MARK: - C ABI scan entry (chapter 七百六十 第三刀 / M2453)
+//
+// Wire format design notes
+// ------------------------
+//
+// Goal:single-call entry point exposing the FULL structured
+// ScanReport (failed IDs + failed kinds bitmap + self-mutation +
+// hard_bits projection) to C consumers — distinct from
+// bas-sovereign-c-abi::bas_sovereign_integrity_scan which only
+// returns the 4-bit hard_bits subset。
+//
+// Endianness:little-endian throughout (matches the sibling crate's
+// claims/fingerprints wire format so consumers can reuse the same
+// encoders)。
+//
+// Input wire formats are IDENTICAL to bas-sovereign-c-abi:
+//
+//   claims_buf (little-endian):
+//     count: u32 LE
+//     per claim:
+//       id_len:    u16 LE
+//       id_bytes:  utf-8
+//       hash_len:  u16 LE
+//       hash_bytes: utf-8
+//       kind:      u8 (BAS_ARTIFACT_KIND_*)
+//
+//   fingerprints_buf (little-endian):
+//     count: u32 LE
+//     per fingerprint:
+//       id_len:    u16 LE
+//       id_bytes:  utf-8
+//       hash_len:  u16 LE
+//       hash_bytes: utf-8
+//
+// Output wire format (little-endian):
+//
+//   offset 0..3   : failed_id_count (u32 LE)
+//   offset 4      : failed_kinds_bitmap (u8) — bit N lit iff
+//                   ArtifactKind discriminant N appears in
+//                   failed_kinds set (BR-001 = bit 0, BR-006 =
+//                   bit 1, BR-002 = bit 2, BR-007 = bit 3 per
+//                   the enum discriminant ordering)
+//   offset 5      : observed_self_mutation (u8, 0 or 1)
+//   offset 6..7   : hard_bits (u16 LE) — projection of the
+//                   report onto the BAS_HARD_BIT_BR_001 / BR_002 /
+//                   BR_006 / BR_007 bitfield from chapter 七百五十八
+//   offset 8+     : per failed_id (failed_id_count times):
+//                     id_len   (u16 LE)
+//                     id_bytes (utf-8)
+//
+// Required output capacity = 8 bytes fixed prefix
+//                          + sum_over_failed_ids (2 + id_len)
+//
+// The 8-byte fixed prefix is naturally 8-aligned for downstream
+// SIMD readers。 The per-id var-len section uses 2-byte length
+// prefixes for compactness (max id length 65535 bytes is far more
+// than any realistic artifact identifier)。
+
+/// Output buffer fixed-prefix size:8 bytes
+/// (failed_id_count + failed_kinds_bitmap + self_mutation +
+/// hard_bits)。 Even an empty-failures report needs this much。
+pub const C_ABI_REPORT_PREFIX_SIZE: usize = 8;
+
+/// Wire-format parsed claim (internal helper)。 Borrows from
+/// the input buffer。
+#[derive(Debug)]
+struct ParsedClaim<'a> {
+    id: &'a str,
+    hash: &'a str,
+    kind: ArtifactKind,
+}
+
+/// Parse claims_buf into a Vec of ParsedClaim borrowing from
+/// `bytes`。 Returns `Err(())` on truncation,non-UTF-8,or
+/// unknown kind code (4..255)。
+fn parse_claims_wire(bytes: &[u8]) -> Result<Vec<ParsedClaim<'_>>, ()> {
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
+    if bytes.len() < 4 {
+        return Err(());
+    }
+    let count = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+    let mut off: usize = 4;
+    let mut claims = Vec::with_capacity(count);
+    for _ in 0..count {
+        if off.saturating_add(2) > bytes.len() { return Err(()); }
+        let id_len = u16::from_le_bytes([bytes[off], bytes[off + 1]]) as usize;
+        off += 2;
+        if off.saturating_add(id_len) > bytes.len() { return Err(()); }
+        let id = core::str::from_utf8(&bytes[off..off + id_len]).map_err(|_| ())?;
+        off += id_len;
+
+        if off.saturating_add(2) > bytes.len() { return Err(()); }
+        let hash_len = u16::from_le_bytes([bytes[off], bytes[off + 1]]) as usize;
+        off += 2;
+        if off.saturating_add(hash_len) > bytes.len() { return Err(()); }
+        let hash = core::str::from_utf8(&bytes[off..off + hash_len]).map_err(|_| ())?;
+        off += hash_len;
+
+        if off + 1 > bytes.len() { return Err(()); }
+        let kind_byte = bytes[off];
+        let kind = ArtifactKind::from_u8(kind_byte).ok_or(())?;
+        off += 1;
+
+        claims.push(ParsedClaim { id, hash, kind });
+    }
+    Ok(claims)
+}
+
+/// Parse fingerprints_buf into a BTreeMap。 Same wire format as
+/// claims_buf MINUS the trailing kind byte。
+fn parse_fingerprints_wire(bytes: &[u8]) -> Result<BTreeMap<String, String>, ()> {
+    let mut map = BTreeMap::new();
+    if bytes.is_empty() {
+        return Ok(map);
+    }
+    if bytes.len() < 4 {
+        return Err(());
+    }
+    let count = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+    let mut off: usize = 4;
+    for _ in 0..count {
+        if off.saturating_add(2) > bytes.len() { return Err(()); }
+        let id_len = u16::from_le_bytes([bytes[off], bytes[off + 1]]) as usize;
+        off += 2;
+        if off.saturating_add(id_len) > bytes.len() { return Err(()); }
+        let id = core::str::from_utf8(&bytes[off..off + id_len]).map_err(|_| ())?;
+        off += id_len;
+
+        if off.saturating_add(2) > bytes.len() { return Err(()); }
+        let hash_len = u16::from_le_bytes([bytes[off], bytes[off + 1]]) as usize;
+        off += 2;
+        if off.saturating_add(hash_len) > bytes.len() { return Err(()); }
+        let hash = core::str::from_utf8(&bytes[off..off + hash_len]).map_err(|_| ())?;
+        off += hash_len;
+
+        // Store lowercased for the case-insensitive compare contract。
+        map.insert(id.to_string(), hash.to_ascii_lowercase());
+    }
+    Ok(map)
+}
+
+/// C ABI scan entry — structured ScanReport wire output。
+///
+/// Two-phase capacity discovery:
+///   1. Call with `out_report_buf=NULL,out_report_capacity=0` →
+///      returns required size in bytes (always ≥ 8 for the prefix)
+///   2. Allocate `required` bytes;call again with that buffer →
+///      returns same value,writes the structured report
+///
+/// Returns:
+///   ≥ 0 : required/written byte count
+///   -1  : null `claims_buf` with non-zero claims_len,or any
+///         negative length,or null fingerprints_buf with
+///         non-zero fingerprints_len
+///   -2  : wire-format parse failure (truncated buffer / non-UTF-8 /
+///         unknown ArtifactKind code 4..255)
+///
+/// # Safety
+///
+/// Caller MUST ensure:
+///   - claims_buf (when non-null) is readable for claims_len bytes
+///   - fingerprints_buf (when non-null) is readable for fingerprints_len bytes
+///   - out_report_buf (when non-null) is writable for out_report_capacity bytes
+///   - No buffer aliases the others
+///
+/// chapter 七百六十 第三刀 / M2453。
+#[no_mangle]
+pub unsafe extern "C" fn bas_integrity_sentinel_scan(
+    claims_buf: *const u8,
+    claims_len: i32,
+    fingerprints_buf: *const u8,
+    fingerprints_len: i32,
+    observed_self_mutation: i32,
+    out_report_buf: *mut u8,
+    out_report_capacity: i32,
+) -> i32 {
+    // Validate scalar inputs。
+    if claims_len < 0 || fingerprints_len < 0 || out_report_capacity < 0 {
+        return -1;
+    }
+    if claims_buf.is_null() && claims_len != 0 {
+        return -1;
+    }
+    if fingerprints_buf.is_null() && fingerprints_len != 0 {
+        return -1;
+    }
+
+    // Materialise input slices。
+    let claims_bytes: &[u8] = if claims_len == 0 {
+        &[]
+    } else {
+        core::slice::from_raw_parts(claims_buf, claims_len as usize)
+    };
+    let fps_bytes: &[u8] = if fingerprints_len == 0 {
+        &[]
+    } else {
+        core::slice::from_raw_parts(fingerprints_buf, fingerprints_len as usize)
+    };
+
+    // Parse wire formats。
+    let parsed_claims = match parse_claims_wire(claims_bytes) {
+        Ok(c) => c,
+        Err(()) => return -2,
+    };
+    let trusted = match parse_fingerprints_wire(fps_bytes) {
+        Ok(t) => t,
+        Err(()) => return -2,
+    };
+
+    // Build ScanRequest and scan。 Note:we own the parsed_claims
+    // strings as &str borrowed from claims_bytes;to call
+    // scan_artifacts we convert to ArtifactClaim with owned Strings。
+    let claims: Vec<ArtifactClaim> = parsed_claims.iter().map(|c| {
+        ArtifactClaim {
+            id: c.id.to_string(),
+            claimed_hash: c.hash.to_string(),
+            kind: c.kind,
+        }
+    }).collect();
+    let request = ScanRequest::new(claims, observed_self_mutation != 0);
+    let report = scan_artifacts(&request, &trusted);
+
+    // Compute required output size。
+    let mut required_usize: usize = C_ABI_REPORT_PREFIX_SIZE;
+    for id in &report.failed_artifact_ids {
+        required_usize = required_usize
+            .saturating_add(2)
+            .saturating_add(id.len());
+    }
+    if required_usize > i32::MAX as usize {
+        return -2;
+    }
+    let required = required_usize as i32;
+
+    // Two-phase write:emit only when buffer non-null + capacity sufficient。
+    if !out_report_buf.is_null() && out_report_capacity >= required {
+        let out = core::slice::from_raw_parts_mut(
+            out_report_buf,
+            required_usize,
+        );
+
+        // Prefix:failed_id_count (u32 LE)
+        let count = report.failed_artifact_ids.len() as u32;
+        out[0..4].copy_from_slice(&count.to_le_bytes());
+
+        // failed_kinds_bitmap (u8) — bit per discriminant
+        let mut bitmap: u8 = 0;
+        for &k in &report.failed_kinds {
+            bitmap |= 1u8 << (k as u8);
+        }
+        out[4] = bitmap;
+
+        // observed_self_mutation (u8, 0 or 1)
+        out[5] = if report.observed_self_mutation { 1 } else { 0 };
+
+        // hard_bits (u16 LE) — projection
+        let hard_bits = report.as_hard_bits();
+        out[6..8].copy_from_slice(&hard_bits.to_le_bytes());
+
+        // Per failed_id: 2-byte len prefix + UTF-8 body
+        let mut off = C_ABI_REPORT_PREFIX_SIZE;
+        for id in &report.failed_artifact_ids {
+            let id_bytes = id.as_bytes();
+            let id_len = id_bytes.len() as u16;
+            out[off..off + 2].copy_from_slice(&id_len.to_le_bytes());
+            off += 2;
+            out[off..off + id_bytes.len()].copy_from_slice(id_bytes);
+            off += id_bytes.len();
+        }
+    }
+
+    required
+}
+
+/// Convenience encoder for the claims wire format (test helper +
+/// future Swift bridge use)。 Public so downstream crates can
+/// construct the format without re-implementing the encoder。
+pub fn encode_claims_wire(claims: &[(&str, &str, ArtifactKind)]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&(claims.len() as u32).to_le_bytes());
+    for (id, hash, kind) in claims {
+        buf.extend_from_slice(&(id.len() as u16).to_le_bytes());
+        buf.extend_from_slice(id.as_bytes());
+        buf.extend_from_slice(&(hash.len() as u16).to_le_bytes());
+        buf.extend_from_slice(hash.as_bytes());
+        buf.push(*kind as u8);
+    }
+    buf
+}
+
+/// Convenience encoder for the fingerprints wire format。
+pub fn encode_fingerprints_wire(fps: &[(&str, &str)]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&(fps.len() as u32).to_le_bytes());
+    for (id, hash) in fps {
+        buf.extend_from_slice(&(id.len() as u16).to_le_bytes());
+        buf.extend_from_slice(id.as_bytes());
+        buf.extend_from_slice(&(hash.len() as u16).to_le_bytes());
+        buf.extend_from_slice(hash.as_bytes());
+    }
+    buf
+}
+
 // MARK: - ABI version
 
 /// ABI version pin for the bas-integrity-sentinel crate。 Bumped
@@ -680,6 +985,439 @@ mod tests {
         ]);
         assert_eq!(trusted.get("id1"), Some(&"deadbeef".to_string()));
         assert_eq!(trusted.get("id2"), Some(&"mixedcase".to_string()));
+    }
+
+    // MARK: - C ABI tests (chapter 七百六十 第三刀 / M2453)
+
+    fn read_u32_le(buf: &[u8], off: usize) -> u32 {
+        u32::from_le_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+    }
+    fn read_u16_le(buf: &[u8], off: usize) -> u16 {
+        u16::from_le_bytes([buf[off], buf[off+1]])
+    }
+
+    /// Decode the structured wire output back into a ScanReport
+    /// so tests can assert against the canonical form。
+    fn decode_report_wire(buf: &[u8]) -> ScanReport {
+        assert!(buf.len() >= C_ABI_REPORT_PREFIX_SIZE);
+        let count = read_u32_le(buf, 0) as usize;
+        let kinds_bitmap = buf[4];
+        let self_mut = buf[5] != 0;
+        let _hard_bits = read_u16_le(buf, 6);
+
+        // failed_kinds from bitmap
+        let mut failed_kinds = BTreeSet::new();
+        for bit in 0..4u8 {
+            if (kinds_bitmap >> bit) & 1 == 1 {
+                if let Some(k) = ArtifactKind::from_u8(bit) {
+                    failed_kinds.insert(k);
+                }
+            }
+        }
+
+        // failed_ids
+        let mut off = C_ABI_REPORT_PREFIX_SIZE;
+        let mut failed_ids = Vec::with_capacity(count);
+        for _ in 0..count {
+            let id_len = read_u16_le(buf, off) as usize;
+            off += 2;
+            let id = core::str::from_utf8(&buf[off..off+id_len]).unwrap().to_string();
+            off += id_len;
+            failed_ids.push(id);
+        }
+
+        ScanReport {
+            failed_artifact_ids: failed_ids,
+            failed_kinds,
+            observed_self_mutation: self_mut,
+        }
+    }
+
+    #[test]
+    fn test_c_abi_empty_input_returns_clean_report_prefix() {
+        // Empty claims + empty fingerprints → 8-byte prefix only
+        // (zero failed_ids,zero bitmap,zero self_mut,zero hard_bits)。
+        let claims = encode_claims_wire(&[]);
+        let fps = encode_fingerprints_wire(&[]);
+
+        // Probe
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(required, 8,
+            "empty scan requires exactly the 8-byte prefix");
+
+        let mut out = vec![0xFFu8; required as usize];
+        let written = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        assert_eq!(written, required);
+
+        // Verify all-zero output。
+        for i in 0..8 { assert_eq!(out[i], 0, "byte {} must be zero", i); }
+    }
+
+    #[test]
+    fn test_c_abi_null_claims_with_nonzero_len_returns_minus_1() {
+        let fps = encode_fingerprints_wire(&[]);
+        let rc = unsafe {
+            bas_integrity_sentinel_scan(
+                core::ptr::null(), 42,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn test_c_abi_null_fingerprints_with_nonzero_len_returns_minus_1() {
+        let claims = encode_claims_wire(&[]);
+        let rc = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                core::ptr::null(), 42,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn test_c_abi_negative_lengths_return_minus_1() {
+        let rc = unsafe {
+            bas_integrity_sentinel_scan(
+                core::ptr::null(), -1,
+                core::ptr::null(), 0,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn test_c_abi_truncated_claims_returns_minus_2() {
+        // Declares 1 claim with id_len=100 but only 5 bytes follow。
+        let mut bad = Vec::new();
+        bad.extend_from_slice(&1u32.to_le_bytes());
+        bad.extend_from_slice(&100u16.to_le_bytes());
+        bad.extend_from_slice(b"abc");
+        let fps = encode_fingerprints_wire(&[]);
+        let rc = unsafe {
+            bas_integrity_sentinel_scan(
+                bad.as_ptr(), bad.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn test_c_abi_unknown_kind_byte_returns_minus_2() {
+        // Declares 1 claim with kind=99 (invalid)。
+        let mut bad = Vec::new();
+        bad.extend_from_slice(&1u32.to_le_bytes());
+        bad.extend_from_slice(&3u16.to_le_bytes());
+        bad.extend_from_slice(b"foo");
+        bad.extend_from_slice(&3u16.to_le_bytes());
+        bad.extend_from_slice(b"bar");
+        bad.push(99); // invalid kind
+        let fps = encode_fingerprints_wire(&[]);
+        let rc = unsafe {
+            bas_integrity_sentinel_scan(
+                bad.as_ptr(), bad.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn test_c_abi_known_artifact_matches_no_failures() {
+        let claims = encode_claims_wire(&[
+            ("model.weights", "abc123", ArtifactKind::ModelOrPolicyArtifact),
+        ]);
+        let fps = encode_fingerprints_wire(&[
+            ("model.weights", "abc123"),
+        ]);
+
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(required, 8, "no failures → 8-byte prefix only");
+
+        let mut out = vec![0u8; required as usize];
+        unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+
+        let decoded = decode_report_wire(&out);
+        assert!(decoded.failed_artifact_ids.is_empty());
+        assert!(decoded.failed_kinds.is_empty());
+    }
+
+    #[test]
+    fn test_c_abi_unknown_artifact_fails_with_id_recorded() {
+        let claims = encode_claims_wire(&[
+            ("mystery", "abc", ArtifactKind::SovereignPolicyBundle),
+        ]);
+        let fps = encode_fingerprints_wire(&[]);
+
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        // 8 prefix + 2 id_len + 7 "mystery" = 17 bytes
+        assert_eq!(required, 17);
+
+        let mut out = vec![0u8; required as usize];
+        unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+
+        let decoded = decode_report_wire(&out);
+        assert_eq!(decoded.failed_artifact_ids, vec!["mystery".to_string()]);
+        assert!(decoded.failed_kinds.contains(&ArtifactKind::SovereignPolicyBundle));
+    }
+
+    #[test]
+    fn test_c_abi_observed_self_mutation_forwarded() {
+        let claims = encode_claims_wire(&[]);
+        let fps = encode_fingerprints_wire(&[]);
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                1, // observed_self_mutation = true
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(required, 8);
+        let mut out = vec![0u8; required as usize];
+        unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                1,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        // Byte 5 = observed_self_mutation
+        assert_eq!(out[5], 1, "self_mutation flag must be 1");
+        // Hard bits (offset 6..8) = BR-007 = 0x0040
+        assert_eq!(read_u16_le(&out, 6), 0x0040,
+            "BR-007 lit via self_mutation alone");
+    }
+
+    #[test]
+    fn test_c_abi_two_phase_capacity_workflow() {
+        // 3 failed claims → probe gives required > 8。
+        let claims = encode_claims_wire(&[
+            ("first_id", "wrong", ArtifactKind::ModelOrPolicyArtifact),
+            ("second_id", "wrong", ArtifactKind::ThoughtFoldOrCache),
+            ("third_id", "wrong", ArtifactKind::RuntimeImage),
+        ]);
+        let fps = encode_fingerprints_wire(&[]);
+
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        // 8 prefix + (2+8) + (2+9) + (2+8) = 8 + 10 + 11 + 10 = 39
+        assert_eq!(required, 39);
+
+        let mut out = vec![0u8; required as usize];
+        let written = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        assert_eq!(written, required);
+
+        let decoded = decode_report_wire(&out);
+        assert_eq!(decoded.failed_artifact_ids,
+            vec!["first_id".to_string(),
+                 "second_id".to_string(),
+                 "third_id".to_string()]);
+        assert_eq!(decoded.failed_kinds.len(), 3);
+    }
+
+    #[test]
+    fn test_c_abi_insufficient_capacity_returns_required_no_write() {
+        let claims = encode_claims_wire(&[
+            ("x", "wrong", ArtifactKind::ModelOrPolicyArtifact),
+        ]);
+        let fps = encode_fingerprints_wire(&[]);
+
+        let mut out = vec![0xAAu8; 5]; // too small (need 8 prefix + 3 = 11)
+        let returned = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        assert!(returned > 5);
+        assert_eq!(out, vec![0xAAu8; 5], "no write on insufficient capacity");
+    }
+
+    #[test]
+    fn test_c_abi_case_insensitive_compare() {
+        // Trusted stored UPPERCASE,claim LOWERCASE → must match。
+        let claims = encode_claims_wire(&[
+            ("a", "abcdef", ArtifactKind::ModelOrPolicyArtifact),
+        ]);
+        let fps = encode_fingerprints_wire(&[
+            ("a", "ABCDEF"),
+        ]);
+
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        assert_eq!(required, 8, "case-insensitive compare → no failures");
+    }
+
+    #[test]
+    fn test_c_abi_round_trip_pure_fn_equivalence() {
+        // The C ABI path MUST produce the same ScanReport as
+        // calling scan_artifacts directly。
+        let claims_pairs: Vec<(&str, &str, ArtifactKind)> = vec![
+            ("a", "match",   ArtifactKind::ModelOrPolicyArtifact),
+            ("b", "wrong",   ArtifactKind::SovereignPolicyBundle),
+            ("c", "match",   ArtifactKind::ThoughtFoldOrCache),
+            ("d", "missing", ArtifactKind::RuntimeImage),
+        ];
+        let fps_pairs: Vec<(&str, &str)> = vec![
+            ("a", "match"),
+            ("b", "right"),  // ≠ wrong → fails
+            ("c", "match"),
+            // d unknown → fails
+        ];
+
+        // Pure-fn path
+        let claims_for_pure: Vec<ArtifactClaim> = claims_pairs.iter()
+            .map(|(id, h, k)| ArtifactClaim::new(*id, *h, *k))
+            .collect();
+        let trusted = build_trusted_fingerprints(
+            fps_pairs.iter().map(|(i, h)| (*i, *h)));
+        let req = ScanRequest::new(claims_for_pure, true);
+        let pure_report = scan_artifacts(&req, &trusted);
+
+        // C ABI path
+        let claims_buf = encode_claims_wire(&claims_pairs);
+        let fps_buf = encode_fingerprints_wire(&fps_pairs);
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims_buf.as_ptr(), claims_buf.len() as i32,
+                fps_buf.as_ptr(), fps_buf.len() as i32,
+                1, // self_mutation true
+                core::ptr::null_mut(), 0)
+        };
+        let mut out = vec![0u8; required as usize];
+        unsafe {
+            bas_integrity_sentinel_scan(
+                claims_buf.as_ptr(), claims_buf.len() as i32,
+                fps_buf.as_ptr(), fps_buf.len() as i32,
+                1,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        let c_abi_report = decode_report_wire(&out);
+
+        assert_eq!(c_abi_report, pure_report,
+            "C ABI round-trip must equal direct pure-fn output");
+    }
+
+    #[test]
+    fn test_c_abi_kinds_bitmap_encoding() {
+        // 3 distinct kinds failed → bitmap bits 0,2,3 lit (model,
+        // thought_fold,runtime) → bitmap = 0b1101 = 13。
+        let claims = encode_claims_wire(&[
+            ("a", "wrong", ArtifactKind::ModelOrPolicyArtifact), // bit 0
+            ("b", "wrong", ArtifactKind::ThoughtFoldOrCache),    // bit 2
+            ("c", "wrong", ArtifactKind::RuntimeImage),          // bit 3
+        ]);
+        let fps = encode_fingerprints_wire(&[]);
+
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                core::ptr::null_mut(), 0)
+        };
+        let mut out = vec![0u8; required as usize];
+        unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                0,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        assert_eq!(out[4], 0b1101,
+            "failed_kinds bitmap = bits 0,2,3 (model + thought + runtime)");
+    }
+
+    #[test]
+    fn test_c_abi_hard_bits_projection_matches_swift_layout() {
+        // hard_bits bit layout per chapter 七百五十八:
+        //   BR-001 = 0x0001 = ModelOrPolicyArtifact failed
+        //   BR-002 = 0x0002 = ThoughtFoldOrCache failed
+        //   BR-006 = 0x0020 = SovereignPolicyBundle failed
+        //   BR-007 = 0x0040 = RuntimeImage failed OR self_mutation
+        let claims = encode_claims_wire(&[
+            ("a", "wrong", ArtifactKind::ModelOrPolicyArtifact),    // BR-001
+            ("b", "wrong", ArtifactKind::SovereignPolicyBundle),    // BR-006
+        ]);
+        let fps = encode_fingerprints_wire(&[]);
+        let required = unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                1, // self_mutation → BR-007
+                core::ptr::null_mut(), 0)
+        };
+        let mut out = vec![0u8; required as usize];
+        unsafe {
+            bas_integrity_sentinel_scan(
+                claims.as_ptr(), claims.len() as i32,
+                fps.as_ptr(), fps.len() as i32,
+                1,
+                out.as_mut_ptr(), out.len() as i32)
+        };
+        let hard_bits = read_u16_le(&out, 6);
+        assert_eq!(hard_bits, 0x0001 | 0x0020 | 0x0040);
     }
 
     #[test]

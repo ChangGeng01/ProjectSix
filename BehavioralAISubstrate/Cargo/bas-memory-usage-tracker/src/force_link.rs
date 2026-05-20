@@ -254,6 +254,26 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             core::ptr::null_mut(), 0)
     };
     total = total.wrapping_add(red_team_rc);
+    // chapter 七百六十 第三刀 / M2453 — force-link the L11
+    // typed integrity-sentinel crate symbols。 Two cheapest
+    // anchors:
+    //   1. ABI version probe (constant return,zero side-effect)
+    //   2. sentinel_scan with empty claims + empty fingerprints
+    //      (4-byte count=0 prefix on each) + null out buffer →
+    //      returns 8 = required prefix size for empty report,
+    //      no observable side-effect since out_report_buf is null
+    total = total.wrapping_add(
+        bas_integrity_sentinel::bas_integrity_sentinel_abi_version());
+    let empty_claims: [u8; 4] = [0, 0, 0, 0]; // u32 LE count=0
+    let empty_fps: [u8; 4]    = [0, 0, 0, 0]; // u32 LE count=0
+    let sentinel_rc = unsafe {
+        bas_integrity_sentinel::bas_integrity_sentinel_scan(
+            empty_claims.as_ptr(), empty_claims.len() as i32,
+            empty_fps.as_ptr(),    empty_fps.len() as i32,
+            0,
+            core::ptr::null_mut(), 0)
+    };
+    total = total.wrapping_add(sentinel_rc);
     total
 }
 
@@ -271,7 +291,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///         from chapter 七百四十八 that were added as deps but not
 ///         counted in the static return)
 ///   - 14 = chapter 七百五十九 第三刀 / M2448 (+red-team-bench)
+///   - 15 = chapter 七百六十 第三刀 / M2453 (+integrity-sentinel)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    14
+    15
 }
