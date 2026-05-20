@@ -248,6 +248,7 @@ final class BASChapter751RiskObservationsReplayTests: XCTestCase {
 
     // MARK: - 7. Scorecard print
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter751ThirdKnifeScorecard() {
         print("")
         print("=================================================================")
@@ -298,4 +299,5 @@ final class BASChapter751RiskObservationsReplayTests: XCTestCase {
             "  Chapter 七百三十八 第一刀 preamble queries are NOW REACHABLE")
         print("")
     }
+#endif  // chapter 七百五十七 第三刀
 }

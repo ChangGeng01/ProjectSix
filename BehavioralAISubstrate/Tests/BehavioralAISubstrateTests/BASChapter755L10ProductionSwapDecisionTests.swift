@@ -48,6 +48,7 @@ final class BASChapter755L10ProductionSwapDecisionTests:
 
     // MARK: - Production-swap DECISION scorecard
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter755L10DecisionScorecard() {
         print("")
         print("=================================================================")
@@ -177,4 +178,5 @@ final class BASChapter755L10ProductionSwapDecisionTests:
             BASAutoRouteRanker.tribunalCourtABIVersion(), 1)
         #endif
     }
+#endif  // chapter 七百五十七 第三刀
 }

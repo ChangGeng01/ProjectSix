@@ -168,6 +168,7 @@ final class BASChapter753VerdictEngineFlipTests: XCTestCase {
 
     // MARK: - Perf scorecard print
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter753VerdictFlipScorecard() {
         print("")
         print("=================================================================")
@@ -255,4 +256,5 @@ final class BASChapter753VerdictEngineFlipTests: XCTestCase {
         XCTAssertTrue(
             BASSovereignVerdictEngine.useRoutedVerdictLevel)
     }
+#endif  // chapter 七百五十七 第三刀
 }

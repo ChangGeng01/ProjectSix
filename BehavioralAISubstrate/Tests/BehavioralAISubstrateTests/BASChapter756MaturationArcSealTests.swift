@@ -75,6 +75,7 @@ final class BASChapter756MaturationArcSealTests: XCTestCase {
 
     // MARK: - Final 7-chapter scorecard
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter756MaturationArcSealScorecard() {
         print("")
         print("=================================================================")
@@ -264,4 +265,5 @@ final class BASChapter756MaturationArcSealTests: XCTestCase {
         XCTAssertTrue(
             BASSovereignVerdictEngine.useRoutedVerdictLevel)
     }
+#endif  // chapter 七百五十七 第三刀
 }

@@ -232,6 +232,7 @@ final class BASChapter754L11ProductionSwapTests: XCTestCase {
 
     // MARK: - 6. Chapter scorecard
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter754ScorecardPrint() {
         print("")
         print("=================================================================")
@@ -313,4 +314,5 @@ final class BASChapter754L11ProductionSwapTests: XCTestCase {
             "  chapter 七百五十六:  ⏭ Arc seal + scorecard")
         print("")
     }
+#endif  // chapter 七百五十七 第三刀
 }

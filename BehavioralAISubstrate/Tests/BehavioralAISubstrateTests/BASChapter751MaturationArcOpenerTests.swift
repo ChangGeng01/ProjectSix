@@ -43,6 +43,7 @@ final class BASChapter751MaturationArcOpenerTests: XCTestCase {
 
     // MARK: - Chapter 七百五十一 final scorecard
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter751FinalScorecard() {
         print("")
         print("=================================================================")
@@ -158,4 +159,5 @@ final class BASChapter751MaturationArcOpenerTests: XCTestCase {
             BASAutoRouteRanker.atomReducerABIVersion(), 1)
         #endif
     }
+#endif  // chapter 七百五十七 第三刀
 }

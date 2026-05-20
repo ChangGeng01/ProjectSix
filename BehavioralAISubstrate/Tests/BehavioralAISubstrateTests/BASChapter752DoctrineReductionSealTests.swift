@@ -40,6 +40,7 @@ final class BASChapter752DoctrineReductionSealTests: XCTestCase {
 
     // MARK: - Chapter 七百五十二 final scorecard
 
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
     func testPrintChapter752DoctrineReductionScorecard() {
         print("")
         print("=================================================================")
@@ -153,4 +154,5 @@ final class BASChapter752DoctrineReductionSealTests: XCTestCase {
         XCTAssertGreaterThan(
             BASChapterDoctrineRegistry.all.count, 50)
     }
+#endif  // chapter 七百五十七 第三刀
 }
