@@ -1,16 +1,24 @@
 # 附录 V Stage 3 — Real Bench Data User-Action Guide
 
-> **⚠ Stale workflow notice (2026-05-20)** — this guide describes the
-> Before-era SampleHost bench workflow,which built via
-> `xcodebuild -project Before.xcodeproj -scheme SampleHost ...`。 After
-> Before severance (see `/Archive/Legacy/README.md.archive-notice`) the
-> `Before.xcodeproj` file is at `Archive/Legacy/Before.xcodeproj/`
-> (archived,not actively built) and SampleHost has no standalone
-> xcodeproj or Package.swift yet。 **The commands below will not
-> execute as-written until SampleHost is reconstituted as a standalone
-> build target**。 The data-pipeline scripts (`scripts/bench_to_train.py`
-> etc.) remain operational once the on-device JSONL has been collected
-> through some other path。
+> **⚠ Workflow updated 2026-05-21** — SampleHost was reconstituted as a
+> standalone SPM iOS package at `/SampleHost/Package.swift`。 The
+> `xcodebuild -project Before.xcodeproj -scheme SampleHost ...`
+> commands below should be updated to the new shape:
+>
+> ```sh
+> cd SampleHost
+> xcodebuild -scheme SampleHost \
+>     -configuration Release \
+>     -destination 'generic/platform=iOS' \
+>     DEVELOPMENT_TEAM=<your-team-id> \
+>     -allowProvisioningUpdates build
+> ```
+>
+> (drop the `-project Before.xcodeproj` flag,run from inside `SampleHost/`
+> since the package's auto-generated workspace is implicit)。 The data-
+> pipeline scripts (`scripts/bench_to_train.py` etc.) remain operational —
+> they only need the on-device JSONL file,which the new SampleHost
+> writes to the same path the old Before-scheme SampleHost did。
 
 **chapter 二百五十六 / M751** — operator-facing procedure document.
 
