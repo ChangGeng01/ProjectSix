@@ -325,6 +325,11 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             0, 1, 0, 0));
     total = total.wrapping_add(
         bas_host_constitution::bas_host_constitution_default_strategy(0));
+    // chapter 七百六十九 / M2496 — force-link the deletion
+    // manifest classifier。 Clean cascade → 0 (Allowed)。
+    total = total.wrapping_add(
+        bas_host_constitution::deletion_manifest
+            ::bas_host_constitution_classify_deletion(0, 0, 0, 0));
     total
 }
 

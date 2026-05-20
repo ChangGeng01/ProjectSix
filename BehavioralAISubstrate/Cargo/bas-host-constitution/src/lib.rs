@@ -20,6 +20,10 @@
 
 #![allow(clippy::missing_safety_doc)]
 
+// chapter 七百六十九 / M2496 — L5 deletion-manifest classifier
+// (pairs with SQL schema 015_host_constitution_deletion_manifest)
+pub mod deletion_manifest;
+
 // MARK: - MergeStrategy enum
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
