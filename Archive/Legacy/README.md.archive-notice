@@ -1,0 +1,51 @@
+# Archive/Legacy/ — severed legacy
+
+This directory holds the **legacy "Before" iOS app** + supporting
+modules + the Before-coupled root build configuration that pre-dated
+the BehavioralAISubstrate library's independence。
+
+User directive 2026-05-20 「我想要 把 before 完全 断绝。我想 先 完成
+14层电子脑 再 决定」 — sever Before completely so the substrate
+(14-layer 电子脑) can evolve independently。
+
+## What lives here (moved via `git mv` — history preserved)
+
+| Item | Source path before | Notes |
+|---|---|---|
+| `Before/` | `/Before` (3.4 GB) | The legacy iOS app source |
+| `Before.xcodeproj/` | `/Before.xcodeproj` | Generated Xcode project |
+| `BeforeTests/` | `/BeforeTests` (2.2 MB) | Legacy app unit tests |
+| `BeforeUITests/` | `/BeforeUITests` | Legacy UI tests |
+| `BeforeWatch/` | `/BeforeWatch` | Watch app companion |
+| `BeforeWidgetExtension/` | `/BeforeWidgetExtension` | Widget extension |
+| `project.yml` | `/project.yml` | XcodeGen config for the Before targets |
+| `README.md` | `/README.md` | The original repo README that described Before |
+
+## Why archive instead of delete
+
+Per 「依旧 不删除 只 comment」 / 「不要 删除 创建个 文件夹 把 不需要的
+文件 都转移 进 文件夹」 (chapter 七百五十七 cleanup arc) — the
+substrate-wide discipline is to relocate,not delete。 Git history
+preserved through the rename。 Files recoverable via `git mv` back
+to the repo root if needed。
+
+## Substrate going forward
+
+After this commit,the repo root contains ONLY substrate-related
+content:
+
+```
+BehavioralAISubstrate/    ← canonical (14-layer 电子脑)
+QinaoRuntimeSDK/          ← substrate-related runtime SDK
+SampleHost/               ← minimal substrate-using sample
+SampleHostTests/
+bench-baselines/
+docs/                     ← may include legacy docs;sweep next pass
+scripts/                  ← repo-wide tooling
+Archive/Legacy/           ← THIS — Before severed,preserved
+Archive/Deactivated/      ← substrate-internal deactivations
+                          (cumulative from chapter 七百五十二 +
+                          七百五十七)
+```
+
+No active Swift build target depends on `Archive/Legacy/`。

@@ -12,8 +12,10 @@ build/
 .build/
 .swiftpm/
 
-# Local bundled model assets
+# Local bundled model assets (legacy Before host, now severed to Archive/Legacy/)
 Before/Resources/Models/*.litertlm
+Archive/Legacy/Before/Resources/Models/*.litertlm
+**/*.litertlm
 
 # Python bytecode (chapter 二百十三 cleanup)
 scripts/__pycache__/

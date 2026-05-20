@@ -1,6 +1,6 @@
 # BehavioralAISubstrate
 
-`BehavioralAISubstrate` is a private Apple-only substrate for behavior-aware host apps. `Before` is the first reference host, not the shape of the substrate itself.
+`BehavioralAISubstrate` is a private Apple-only substrate for behavior-aware host apps. It is the canonical **14-layer 电子脑** (L1-L14). The legacy `Before` reference host was severed 2026-05-20 — see `/Archive/Legacy/` at the repo root.
 
 ## Products
 
@@ -73,8 +73,8 @@ through `BASHostConfiguration.presentation`, `BASHostConfiguration.workflowBehav
 
 ## Reference Hosts
 
-- [`Before`](/Users/changgeng/Project/Project06/Project06/Before): full product shell
-- [`SampleHost`](/Users/changgeng/Project/Project06/Project06/SampleHost): minimal façade-only iOS host
+- [`SampleHost`](/Users/changgeng/Project/Project06/Project06/SampleHost): minimal façade-only iOS host (the substrate's only living reference)
+- Legacy `Before` host preserved at `/Archive/Legacy/Before/` for historical reference; not built, not tested, not on the substrate's dependency graph.
 
 ## Current Delivery Model
 
@@ -88,11 +88,9 @@ through `BASHostConfiguration.presentation`, `BASHostConfiguration.workflowBehav
 
 Primary validation lives in:
 
-- `swift test --package-path BehavioralAISubstrate`
-- `xcodebuild test -scheme Before`
-- `xcodebuild test -scheme BeforeUISmoke`
-- `xcodebuild test -scheme SampleHost`
-- `xcodebuild build -scheme BeforeWatch CODE_SIGNING_ALLOWED=NO`
+- `cd BehavioralAISubstrate && swift build` (SPM,no Xcode required)
+- `cd BehavioralAISubstrate && swift test` (~13k tests,~85s sweep)
+- `xcodebuild test -scheme SampleHost` (optional Apple-platform integration smoke)
 
 ## Import Boundary
 
