@@ -2535,6 +2535,37 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - L14 Token lifecycle (chapter 七百四十三 第一刀 / M2386)
+
+    /// L14 token lifecycle status。 Mirrors Rust
+    /// TokenLifecycleStatus enum encoding。 Keychain-bound
+    /// signing/verification stays Swift permanently per
+    /// user directive (Apple-glue layer)。
+    public enum SovereignTokenLifecycleStatus: Int32 {
+        case live = 0
+        case expired = 1
+        case revoked = 2
+        case futureDated = 3
+    }
+
+    /// Decide a token's lifecycle status via the Rust bridge。
+    /// `revokedAtMs == nil` encodes "not revoked"。
+    public static func sovereignTokenLifecycleStatus(
+        issuedAtMs: Int64,
+        expiresAtMs: Int64,
+        revokedAtMs: Int64?,
+        nowMs: Int64
+    ) -> SovereignTokenLifecycleStatus? {
+        #if os(iOS) || os(macOS)
+        let revoked = revokedAtMs ?? -1
+        let rc = bas_sovereign_token_lifecycle_status(
+            issuedAtMs, expiresAtMs, revoked, nowMs)
+        return SovereignTokenLifecycleStatus(rawValue: rc)
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(

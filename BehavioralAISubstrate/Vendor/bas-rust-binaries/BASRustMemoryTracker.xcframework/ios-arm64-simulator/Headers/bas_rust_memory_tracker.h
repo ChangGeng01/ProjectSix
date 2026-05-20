@@ -620,6 +620,27 @@ int32_t bas_verdict_derive(
     int32_t domain_raw,
     int32_t evidence_sufficient);
 
+// MARK: - bas-sovereign token lifecycle (chapter 七百四十三 第一刀 / M2386)
+//
+// L14 token authority math — pure decision over timestamps。
+// The KEYCHAIN-bound half (Security.framework calls) stays
+// Swift permanently per user directive (Apple-glue layer)。
+//
+// revoked_at_ms_or_neg1: pass -1 to encode "not revoked"
+// (Option<i64> → i64 marshaling)
+//
+// Returns:
+//   0 = Live (issued, not expired, not revoked)
+//   1 = Expired (now > expires_at)
+//   2 = Revoked (revoked_at IS NOT NULL, now ≥ revoked_at)
+//   3 = FutureDated (now < issued_at — fault)
+
+int32_t bas_sovereign_token_lifecycle_status(
+    int64_t issued_at_ms,
+    int64_t expires_at_ms,
+    int64_t revoked_at_ms_or_neg1,
+    int64_t now_ms);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

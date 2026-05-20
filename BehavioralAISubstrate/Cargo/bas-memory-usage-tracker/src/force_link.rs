@@ -97,6 +97,13 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
                 0, softs.as_ptr(), 0, 1)
     };
     total = total.wrapping_add(verdict_rank);
+    // chapter 七百四十三 第一刀 / M2386 — force-link the L14
+    // token lifecycle decision。 Sentinel inputs:live
+    // token (returns 0,no observable effect)。
+    let token_status = bas_substrate_core::verdict_decisions
+        ::bas_sovereign_token_lifecycle_status(
+            100, 200, -1, 150);
+    total = total.wrapping_add(token_status);
     total
 }
 

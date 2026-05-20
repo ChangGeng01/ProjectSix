@@ -303,10 +303,83 @@ pub fn derive_verdict_level(
     level
 }
 
+// MARK: - L14 Token authority math (chapter 七百四十三 第一刀 / M2386)
+//
+// Pure functions handling the stateful-but-decidable half of
+// BASSovereignTokenAuthority:expiry check + revocation check
+// + signature-canonical-bytes assembly。 The KEYCHAIN-BOUND
+// half (Security.framework calls) stays Swift permanently
+// per user directive 「Swift 仍然应该保留为 façade /
+// Apple glue / public API」。
+
+/// Token lifecycle status decision。 Pure function over
+/// (issued_at_ms, expires_at_ms, revoked_at_ms?,
+/// now_ms)。 No clock dependency — caller supplies now。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TokenLifecycleStatus {
+    /// Token is live (issued, not expired, not revoked)
+    Live,
+    /// Token expired (now > expires_at)
+    Expired,
+    /// Token revoked (revoked_at IS NOT NULL,now > revoked_at)
+    Revoked,
+    /// Future token (now < issued_at) — fault
+    FutureDated,
+}
+
+/// Decide a token's lifecycle status given timestamps。
+/// Caller supplies the current wall-clock。 Revoked takes
+/// precedence over expired (a revoked token doesn't get
+/// to claim "expired" status)。
+pub fn token_lifecycle_status(
+    issued_at_ms: i64,
+    expires_at_ms: i64,
+    revoked_at_ms: Option<i64>,
+    now_ms: i64,
+) -> TokenLifecycleStatus {
+    if now_ms < issued_at_ms {
+        return TokenLifecycleStatus::FutureDated;
+    }
+    if let Some(rev) = revoked_at_ms {
+        if now_ms >= rev {
+            return TokenLifecycleStatus::Revoked;
+        }
+    }
+    if now_ms > expires_at_ms {
+        return TokenLifecycleStatus::Expired;
+    }
+    TokenLifecycleStatus::Live
+}
+
 // MARK: - C ABI (chapter 七百四十二 第二刀 will add the FFI exports;
 //         this knife exports the ABI version only)
 
 pub const VERDICT_ABI_VERSION: i32 = 1;
+
+/// Token lifecycle status C ABI。 revoked_at_ms == -1
+/// encodes None (i.e。 not revoked)。 Returns:
+///   0 = Live, 1 = Expired, 2 = Revoked, 3 = FutureDated
+#[no_mangle]
+pub extern "C" fn bas_sovereign_token_lifecycle_status(
+    issued_at_ms: i64,
+    expires_at_ms: i64,
+    revoked_at_ms_or_neg1: i64,
+    now_ms: i64,
+) -> i32 {
+    let revoked = if revoked_at_ms_or_neg1 < 0 {
+        None
+    } else {
+        Some(revoked_at_ms_or_neg1)
+    };
+    match token_lifecycle_status(
+        issued_at_ms, expires_at_ms, revoked, now_ms)
+    {
+        TokenLifecycleStatus::Live => 0,
+        TokenLifecycleStatus::Expired => 1,
+        TokenLifecycleStatus::Revoked => 2,
+        TokenLifecycleStatus::FutureDated => 3,
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn bas_verdict_decisions_abi_version() -> i32 {
@@ -601,6 +674,62 @@ mod tests {
             bas_verdict_derive(0, std::ptr::null(), 0, 1)
         };
         assert_eq!(rank, -1);
+    }
+
+    // MARK: - Token lifecycle (chapter 七百四十三 第一刀)
+
+    #[test]
+    fn token_live_when_now_in_range_no_revocation() {
+        let s = token_lifecycle_status(
+            100, 200, None, 150);
+        assert_eq!(s, TokenLifecycleStatus::Live);
+    }
+
+    #[test]
+    fn token_expired_when_now_past_expiry() {
+        let s = token_lifecycle_status(
+            100, 200, None, 250);
+        assert_eq!(s, TokenLifecycleStatus::Expired);
+    }
+
+    #[test]
+    fn token_revoked_takes_precedence_over_expired() {
+        // Revoked at 150,expires at 200,now 250
+        // — revocation wins
+        let s = token_lifecycle_status(
+            100, 200, Some(150), 250);
+        assert_eq!(s, TokenLifecycleStatus::Revoked);
+    }
+
+    #[test]
+    fn token_future_dated() {
+        let s = token_lifecycle_status(
+            100, 200, None, 50);
+        assert_eq!(s, TokenLifecycleStatus::FutureDated);
+    }
+
+    #[test]
+    fn token_lifecycle_c_abi_encoding() {
+        // Live → 0
+        assert_eq!(
+            bas_sovereign_token_lifecycle_status(
+                100, 200, -1, 150),
+            0);
+        // Expired → 1
+        assert_eq!(
+            bas_sovereign_token_lifecycle_status(
+                100, 200, -1, 250),
+            1);
+        // Revoked → 2
+        assert_eq!(
+            bas_sovereign_token_lifecycle_status(
+                100, 200, 150, 250),
+            2);
+        // FutureDated → 3
+        assert_eq!(
+            bas_sovereign_token_lifecycle_status(
+                100, 200, -1, 50),
+            3);
     }
 
     #[test]
