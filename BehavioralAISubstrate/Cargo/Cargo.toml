@@ -31,6 +31,7 @@ members = [
     "bas-organ-router",            # chapter 七百四十七 第一刀 / M2406
     "bas-dream-loop",              # chapter 七百四十八 第一刀 / M2411
     "bas-sovereign-c-abi",         # chapter 七百五十八 第一刀 / M2441 — public C ABI wrapper for watchOS + 3rd-party C consumers
+    "bas-red-team-bench",          # chapter 七百五十九 第一刀 / M2446 — batch adversarial-prompt classifier (24 red lines)
 ]
 resolver = "2"
 
