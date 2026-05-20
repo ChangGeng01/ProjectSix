@@ -340,6 +340,73 @@ pub fn total_pattern_count() -> usize {
         .sum()
 }
 
+// MARK: - Batch classifier (chapter 七百五十九 第二刀 / M2447)
+
+/// One detected red-line violation in a batch context。
+///
+/// Extends `RedLineMatch` with `prompt_index` so consumers can group
+/// matches back to the originating prompt without nesting Vec<Vec<>>。
+/// Flat output shape is simpler for C ABI consumption (single buffer
+/// in,single buffer out — knife 三 wires the wire format) and more
+/// cache-friendly than nested Vec when match counts are small。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BatchRedLineMatch {
+    /// Index into the input `prompts` slice (0-based)。
+    pub prompt_index: u32,
+    pub id: RedLineId,
+    pub pattern_index: u32,
+}
+
+/// Batch classification across N prompts。 Returns a FLAT vector of
+/// matches sorted by (prompt_index,red_line_discriminant,pattern_index)。
+/// Empty slice in → empty Vec out;clean prompts contribute zero
+/// matches without padding entries。
+///
+/// Iteration order is PROMPT-MAJOR (process one prompt at a time,
+/// emit all its matches in deterministic order,then next prompt)。
+/// This shape is friendly for:
+///   - Cache locality (each prompt's lowercased buffer stays hot
+///     during the 70-pattern sweep)
+///   - Streaming consumers (process matches per-prompt without
+///     waiting for the full batch to complete — knife 四 can
+///     emit progressive results)
+///   - SIMD pattern-tree (when knife 四 brings in aho-corasick,
+///     each prompt runs one Aho-Corasick scan over all 70 patterns
+///     at once)
+///
+/// Mirrors Swift's `BASProductRedLineLinter.lint(inputs: [String])`
+/// shape (which also flattens per-input matches into a single output
+/// array sorted by (input_index,red_line,pattern_index))。
+///
+/// chapter 七百五十九 第二刀 / M2447。
+pub fn classify_prompt_batch(prompts: &[&str]) -> Vec<BatchRedLineMatch> {
+    let mut matches = Vec::new();
+    for (pi, prompt) in prompts.iter().enumerate() {
+        let lowercased = prompt.to_ascii_lowercase();
+        for &id in &RedLineId::ALL {
+            let patterns = forbidden_substrings_for(id);
+            for (pat_i, pattern) in patterns.iter().enumerate() {
+                if lowercased.contains(pattern) {
+                    matches.push(BatchRedLineMatch {
+                        prompt_index: pi as u32,
+                        id,
+                        pattern_index: pat_i as u32,
+                    });
+                }
+            }
+        }
+    }
+    matches
+}
+
+/// Convenience wrapper:classify a single prompt but return the
+/// BatchRedLineMatch shape (prompt_index always 0)。 Lets the C ABI
+/// and Swift bridge use a single output type regardless of input
+/// arity。 Internally just calls `classify_prompt_batch(&[prompt])`。
+pub fn classify_prompt_as_batch(prompt: &str) -> Vec<BatchRedLineMatch> {
+    classify_prompt_batch(&[prompt])
+}
+
 // MARK: - ABI version
 
 /// ABI version pin for the bas-red-team-bench crate。 Bumped when
@@ -542,6 +609,148 @@ mod tests {
             (Some(c), Some(p)) => assert!(c < p,
                 "Cthulhu match must come before Product (discriminant order)"),
             _ => panic!("expected at least one Cthulhu + one Product match"),
+        }
+    }
+
+    // MARK: - Batch classifier tests (chapter 七百五十九 第二刀 / M2447)
+
+    #[test]
+    fn test_classify_batch_empty_input_empty_output() {
+        let prompts: &[&str] = &[];
+        assert!(classify_prompt_batch(prompts).is_empty());
+    }
+
+    #[test]
+    fn test_classify_batch_clean_prompts_zero_matches() {
+        let prompts = &[
+            "should i commit this code?",
+            "what time is it?",
+            "list files in directory",
+        ];
+        assert!(classify_prompt_batch(prompts).is_empty(),
+            "3 clean prompts must produce zero batch matches");
+    }
+
+    #[test]
+    fn test_classify_batch_single_prompt_equivalent_to_single_call() {
+        // classify_prompt_as_batch(p) MUST produce the same matches
+        // as classify_prompt(p) — just with prompt_index=0 attached。
+        let prompt = "oracular prophecy: you need me forever";
+        let single = classify_prompt(prompt);
+        let batched = classify_prompt_as_batch(prompt);
+        assert_eq!(single.len(), batched.len());
+        for (s, b) in single.iter().zip(batched.iter()) {
+            assert_eq!(s.id, b.id);
+            assert_eq!(s.pattern_index, b.pattern_index);
+            assert_eq!(b.prompt_index, 0,
+                "single-prompt-as-batch must use prompt_index=0");
+        }
+    }
+
+    #[test]
+    fn test_classify_batch_prompt_major_iteration_order() {
+        // Per design:matches MUST be sorted by (prompt_index,
+        // red_line_discriminant,pattern_index)。
+        let prompts = &[
+            "system emits qinao.horror as marker",   // → Cthulhu kind 4 only
+            "oracular prophecy now",                   // → Cthulhu kind 1 (2 patterns)
+            "you need me to handle this",              // → Product 1 (2 patterns)
+        ];
+        let matches = classify_prompt_batch(prompts);
+        assert!(matches.len() >= 4,
+            "expected ≥4 matches across 3 prompts,got {}",
+            matches.len());
+
+        // prompt_index ordering:0 then 1 then 2,never decreasing
+        for w in matches.windows(2) {
+            assert!(w[0].prompt_index <= w[1].prompt_index,
+                "matches must be sorted by prompt_index ascending");
+        }
+
+        // Within a single prompt_index group,red_line_discriminant
+        // must be non-decreasing。
+        let mut prev = (u32::MAX, 0u16, u32::MAX);
+        for m in &matches {
+            let cur = (m.prompt_index, m.id as u16, m.pattern_index);
+            if prev.0 == cur.0 {
+                // same prompt → red_line_discriminant non-decreasing
+                assert!(prev.1 <= cur.1);
+                // same prompt + same red_line → pattern_index non-decreasing
+                if prev.1 == cur.1 {
+                    assert!(prev.2 <= cur.2);
+                }
+            }
+            prev = cur;
+        }
+    }
+
+    #[test]
+    fn test_classify_batch_distinct_prompts_distinct_indices() {
+        // Each match must point back to its originating prompt by
+        // index。 With 3 prompts each containing a UNIQUE red-line
+        // pattern,every match's prompt_index must be 0, 1, or 2
+        // — and the 3 distinct pattern types must appear exactly
+        // once per prompt_index that triggered them。
+        let prompts = &[
+            "jumpscare incoming",        // CthulhuForbidShockHorror[0]
+            "oracular vibes",            // CthulhuForbidOracular[0]
+            "you need me 24/7",           // ProductNoDependencyCreation[0]
+        ];
+        let matches = classify_prompt_batch(prompts);
+
+        // Each input contributes exactly 1 match for its unique
+        // pattern (no shared substrings between these 3 inputs)。
+        let prompt_0_matches: Vec<_> = matches.iter()
+            .filter(|m| m.prompt_index == 0).collect();
+        let prompt_1_matches: Vec<_> = matches.iter()
+            .filter(|m| m.prompt_index == 1).collect();
+        let prompt_2_matches: Vec<_> = matches.iter()
+            .filter(|m| m.prompt_index == 2).collect();
+        assert_eq!(prompt_0_matches.len(), 1);
+        assert_eq!(prompt_1_matches.len(), 1);
+        assert_eq!(prompt_2_matches.len(), 1);
+        assert_eq!(prompt_0_matches[0].id,
+            RedLineId::CthulhuForbidShockHorror);
+        assert_eq!(prompt_1_matches[0].id,
+            RedLineId::CthulhuForbidOracular);
+        assert_eq!(prompt_2_matches[0].id,
+            RedLineId::ProductNoDependencyCreation);
+    }
+
+    #[test]
+    fn test_classify_batch_handles_one_clean_one_adversarial() {
+        // Mixed batch:1 clean prompt + 1 adversarial。 Only the
+        // adversarial prompt should produce matches,with
+        // prompt_index = 1 (not 0)。
+        let prompts = &["totally fine input", "you'll thank me later"];
+        let matches = classify_prompt_batch(prompts);
+        assert_eq!(matches.len(), 1,
+            "exactly 1 match expected (ProductNoPaternalism[3])");
+        assert_eq!(matches[0].prompt_index, 1);
+        assert_eq!(matches[0].id, RedLineId::ProductNoPaternalism);
+    }
+
+    #[test]
+    fn test_classify_batch_large_batch_stress() {
+        // 100-prompt batch stress test:50 clean + 50 with one
+        // pattern each。 Output count must be exactly 50。 Pattern
+        // chosen:"oracular" (Cthulhu kind 1 pattern 0)。
+        let mut prompts_owned: Vec<String> = Vec::new();
+        for _ in 0..50 { prompts_owned.push("clean code review".to_string()); }
+        for i in 0..50 {
+            prompts_owned.push(format!("oracular signal {}", i));
+        }
+        let prompts: Vec<&str> = prompts_owned.iter()
+            .map(|s| s.as_str()).collect();
+        let matches = classify_prompt_batch(&prompts);
+        assert_eq!(matches.len(), 50,
+            "exactly 50 oracular matches expected from 100-prompt batch");
+        for m in &matches {
+            assert!(m.prompt_index >= 50,
+                "all matches must come from latter half of batch \
+                 (indices 50..99),got {}", m.prompt_index);
+            assert_eq!(m.id, RedLineId::CthulhuForbidOracular);
+            assert_eq!(m.pattern_index, 0);
         }
     }
 
