@@ -113,14 +113,90 @@ impl PqIndex {
                 subvecs.extend_from_slice(
                     &training_set[start..start + subdim]);
             }
-            // Initialize K centroids via stride sampling
-            // (deterministic, not K-means++)
+            // chapter 七百三十一 第一刀 — K-means++
+            // initialization replaces stride sampling。
+            // Stride sampling picked centroids deterministically
+            // but didn't ensure spread,leaving subspaces with
+            // multiple centroids near the same point → low
+            // resolution → low recall。 K-means++ samples
+            // centroids weighted by distance² to existing
+            // centroids,producing geometrically spread initial
+            // centroids that converge to better local optima。
+            //
+            // Deterministic seed (subquantizer index) keeps
+            // training byte-equal across rebuilds — the
+            // substrate's replay-determinism invariant survives。
             let mut centroids: Vec<f32> =
                 vec![0.0; self.k * subdim];
-            let stride = n_train / self.k;
-            for c in 0..self.k {
-                let src = c * stride;
-                let s_off = src * subdim;
+            let mut seed: u64 = (m_idx as u64).wrapping_mul(
+                0x9E37_79B9_7F4A_7C15);
+
+            // Pick first centroid:row 0 (deterministic anchor)
+            centroids[0..subdim]
+                .copy_from_slice(&subvecs[0..subdim]);
+
+            // Distance² from each subvector to nearest existing
+            // centroid。 Updated incrementally as we pick more。
+            let mut min_dist_sq: Vec<f32> =
+                vec![f32::MAX; n_train];
+
+            for c in 1..self.k {
+                let last_c = c - 1;
+                let last_c_off = last_c * subdim;
+                let last_cent = &centroids[
+                    last_c_off..last_c_off + subdim];
+                // Update min_dist² with the newly-added centroid
+                let mut total_weight: f64 = 0.0;
+                for row in 0..n_train {
+                    let v_off = row * subdim;
+                    let v = &subvecs[
+                        v_off..v_off + subdim];
+                    let mut d = 0.0f32;
+                    for i in 0..subdim {
+                        let diff = v[i] - last_cent[i];
+                        d += diff * diff;
+                    }
+                    if d < min_dist_sq[row] {
+                        min_dist_sq[row] = d;
+                    }
+                    total_weight += min_dist_sq[row] as f64;
+                }
+                if total_weight <= 0.0 {
+                    // All points coincide with existing
+                    // centroids — fall back to stride
+                    let stride = n_train / self.k;
+                    let src = c * stride;
+                    let s_off = src * subdim;
+                    let c_off = c * subdim;
+                    centroids[c_off..c_off + subdim]
+                        .copy_from_slice(
+                            &subvecs[s_off..s_off + subdim]);
+                    continue;
+                }
+                // SplitMix64-derived deterministic sample。
+                // Multiply by total_weight to get a real-valued
+                // threshold in [0, total_weight)。
+                seed = seed.wrapping_add(
+                    0x9E37_79B9_7F4A_7C15);
+                let mut z = seed;
+                z = (z ^ (z >> 30)).wrapping_mul(
+                    0xBF58_476D_1CE4_E5B9);
+                z = (z ^ (z >> 27)).wrapping_mul(
+                    0x94D0_49BB_1331_11EB);
+                z = z ^ (z >> 31);
+                let u = (z as f64) / (u64::MAX as f64);
+                let threshold = u * total_weight;
+                // Walk cumulative weights to find sampled index
+                let mut cum: f64 = 0.0;
+                let mut chosen: usize = n_train - 1;
+                for row in 0..n_train {
+                    cum += min_dist_sq[row] as f64;
+                    if cum >= threshold {
+                        chosen = row;
+                        break;
+                    }
+                }
+                let s_off = chosen * subdim;
                 let c_off = c * subdim;
                 centroids[c_off..c_off + subdim]
                     .copy_from_slice(
