@@ -80,9 +80,20 @@ public actor BASRustBrainHistoryStore {
     /// Persist one brain summary as a memory-atom
     /// usage record via the Rust tracker。 Returns the
     /// underlying tracker's recordID。
+    ///
+    /// `retrievedAt` allows the caller to thread a single
+    /// timestamp into BOTH the SQL store + Rust store (chapter
+    /// 七百五十七 第四刀 / M2440) so that cross-store
+    /// `recentRecords(limit:)` ordering matches by construction
+    /// — without this,SQL.tracker stamps a Swift `Date()` and
+    /// Rust.tracker stamps a Rust `SystemTime` for the SAME
+    /// summary,which can disagree under clock skew,causing
+    /// the atomID-parity smoke test to flake。 Default keeps
+    /// V1 callers (single-store hosts) on auto-stamped Date()。
     @discardableResult
     public func recordSummary(
-        _ summary: BASCognitiveBrainSummary
+        _ summary: BASCognitiveBrainSummary,
+        retrievedAt: Date = Date()
     ) async throws -> String {
         turnCounter += 1
         let atomID = Self.atomID(
@@ -91,7 +102,8 @@ public actor BASRustBrainHistoryStore {
             atomID: atomID,
             sessionRef: sessionRef,
             turnRef: String(turnCounter),
-            permitMode: summary.safetyVerdict.rawValue)
+            permitMode: summary.safetyVerdict.rawValue,
+            retrievedAt: retrievedAt)
     }
 
     /// Total persisted records seen by the underlying

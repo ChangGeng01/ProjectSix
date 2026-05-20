@@ -1560,8 +1560,22 @@ extension BASCognitiveBrain {
                 summaryHistory.removeFirst()
             }
         }
+        // chapter 七百五十七 第四刀 / M2440 — capture a SINGLE
+        // timestamp once at the brain layer,thread it into both
+        // history stores。 Without this,each store's tracker
+        // stamps its own Date()/SystemTime independently,which
+        // can disagree by tens of microseconds under load。 That
+        // disagreement made `recentRecords(limit: 1)` from the
+        // two stores return records from different inputs even
+        // though both stores held the same set,which surfaced as
+        // a flaky atomID-parity assertion in
+        // BASProductionAdoptionSmokeTests.testCanonicalAuditCompliance
+        // HostAdoption。 Fix:single source-of-truth timestamp →
+        // cross-store ordering byte-equal by construction。
+        let retrievedAt = Date()
         if let store = sqlHistoryStore {
-            _ = try? await store.recordSummary(summary)
+            _ = try? await store.recordSummary(
+                summary, retrievedAt: retrievedAt)
         }
         // Rust pilot — same write semantics as SQL store,
         // backed by the Rust-vendored memory tracker
@@ -1570,7 +1584,8 @@ extension BASCognitiveBrain {
         // non-fatal — the cognitive pipeline never blocks
         // on telemetry storage failures。
         if let store = rustHistoryStore {
-            _ = try? await store.recordSummary(summary)
+            _ = try? await store.recordSummary(
+                summary, retrievedAt: retrievedAt)
         }
     }
 

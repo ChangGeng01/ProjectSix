@@ -599,18 +599,21 @@ Strengths (genuine,not aspirational)
 
 - **14 layers all implemented** — including L13 Evolution Furnace (was wrongly marked "deferred" in root README,fixed in this commit)。 L13 lives in BASHostKit (`EBrainRuntimeCoordinator+EvolutionGovernance.swift` + `BASEBrainTurnResultEvolutionBundle.swift` — nursery + shadow trial + seal + retraction)。
 - **Build clean** — 2-3s incremental
-- **12,964 / 12,965 tests pass in isolation** (99.99%)
-- **3 production-default Rust flips** measured + sealed (L14 chain seal 1.24×,L14 verdict 13.84×,L11 SQL persistence)
+- **12,965 / 31 skipped / 0 failures in full sweep** (89s,verified 2026-05-20 commit 597fa4f4 — first truly clean sweep after schema-pin regression fix)
+- **12 production-default Rust flips across the full 56-chapter substrate** — 9 landed by chapter 七百四十九,+ 3 added by the MATURATION ARC (L14 chain seal 1.24×,L14 verdict 13.84×,L11 SQL persistence go-live)。 Earlier版本 of this doc conflated「3 added this arc」 with 「3 total」 — corrected。
 - **5-axis comparison framework + byte-equality discipline** consistently applied across 56 chapters
 - **QinaoRuntimeSDK** substantial — 14 target modules,100+ tests,2 runnable executables (CLI + macOS GUI)
 
 Gaps that block 「完全 没有 问题」 SDK ship claim
 ─────────────────────────────────────────────
 
-1. **README products list stale** — `BehavioralAISubstrate/README.md` lists 9 products,
-   Package.swift exports 16。 Missing from README:`BASLeaseLife`,`BASOrgan`,
-   `BASChatCompletionsAdapter`,`BASMLXAdapter`,`BASMetalSubstrate`,`BASSovereign`,
-   `BASWorldPrior`。 Consumer reading docs will miss whole subsystems。
+1. ~~**README products list stale**~~ — **FIXED 2026-05-20**:
+   `BehavioralAISubstrate/README.md` now lists all 16 .library products
+   (+ 1 executable `BASBrainCLI`) grouped by layer:façade /
+   runtime+decision / bottom-half infrastructure / adapter / admin。
+   Previously listed only 9。 7 hidden products now surfaced
+   (`BASLeaseLife`,`BASOrgan`,`BASChatCompletionsAdapter`,
+   `BASMLXAdapter`,`BASMetalSubstrate`,`BASSovereign`,`BASWorldPrior`)。
 
 2. **No versioning policy** — Package.swift has no version field,no CHANGELOG,no
    semver tag,no migration guide for schema bumps (e.g。 the chapter 七百三十 calibrator
@@ -618,7 +621,13 @@ Gaps that block 「完全 没有 问题」 SDK ship claim
    recalibration on cold start after substrate update)。 README explicitly says
    「fast-evolving contract」 — honest for private use,disqualifying for external SDK ship。
 
-3. **Hidden crash contracts** — 14 `precondition(...)` / `fatalError(...)` sites in
+3. ~~**Hidden crash contracts**~~ — **DOCUMENTED 2026-05-20**: README now has
+   a「Runtime crash contracts」 section listing all 14 `precondition(...)` /
+   `fatalError(...)` sites with their contract,crash-trigger field,and
+   debugging instructions。 Consumer can grep README for foot-guns before
+   shipping。 Original gap text below preserved as historical record:
+   
+   Hidden crash contracts — 14 `precondition(...)` / `fatalError(...)` sites in
    BASHostKit + BASSovereign。 Init-time guards (e.g。 `precondition(stateFoldInterval > 0)`,
    four `fatalError("Unavailable")` in `HostPresentationConfigurationsCore.swift`,
    one `fatalError` in `BASSovereignAuditLedger.swift:308`)。 No consumer-facing doc

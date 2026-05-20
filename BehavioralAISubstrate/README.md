@@ -4,15 +4,61 @@
 
 ## Products
 
-- `BASHostKit`: façade-first host integration surface
-- `BASRuntimeCore`: routing, execution budgets, provider planning
-- `BASMemory`: event, memory, brain, projection, governed retrieval
-- `BASPolicy`: boundary, policy, risk, release controls
-- `BASOrchestration`: prompt contract, workflow, execution lanes
-- `BASObservability`: traces, telemetry, replay, inspection
-- `BASEvaluation`: calibration, regression, drift
-- `BASAdmin`: flight deck, console, capability coverage
-- `BASAppleAdapters`: Apple-specific lifecycle, handoff, reopen, notification, runtime bridges
+16 libraries + 1 executable, exported from `Package.swift`. Hosts should
+default to importing `BASHostKit` only;the other modules are dependency
+implementations that BASHostKit composes on the host's behalf。 Advanced
+integrations (debug consoles, custom orchestration, host-side bench harnesses)
+may import lower-level modules directly,subject to the import-boundary check
+documented at the bottom of this README。
+
+### Façade layer (the only recommended entry point for most hosts)
+
+- `BASHostKit`: façade-first host integration surface — composes everything
+  below into one `BASHostRuntime`。 Default import for all hosts。
+
+### Runtime + decision-plane layer (L3-L12)
+
+- `BASRuntimeCore`: routing, execution budgets, provider planning,
+  thought-fold observations,calibration store (L3-L7, L9 coordinator,L12)
+- `BASMemory`: event, memory, brain, projection, governed retrieval,
+  vector index,KV cache,SQL persistence (L8)
+- `BASPolicy`: boundary, policy, risk plane, permit escalation,release
+  controls (L11)
+- `BASOrchestration`: prompt contract, workflow, execution lanes,
+  tri-self court (L10)
+- `BASObservability`: traces, telemetry, replay, inspection (L12)
+- `BASEvaluation`: calibration, regression, drift detection
+
+### Bottom-half infrastructure layer (L1, L2, L4, L14)
+
+- `BASLeaseLife`: lease lifecycle, thermal + budget gating (L1)
+- `BASOrgan`: neural organ math kernels, adapter routing,model provider
+  abstraction (L2)
+- `BASWorldPrior`: world prior knowledge inflow (L4)
+- `BASSovereign`: sovereign verdict + audit ledger,token authority,
+  CryptoKit chain primitives (L14) — **3 of the 3 production-default Rust
+  flips live here** (chain seal 1.24×,verdict engine 13.84×)
+
+### Adapter + capability layer (host-pluggable)
+
+- `BASAppleAdapters`: Apple-specific lifecycle, handoff, reopen, notification,
+  runtime bridges
+- `BASChatCompletionsAdapter`: generic remote-LLM organ (HTTP / chat
+  completions API)
+- `BASMLXAdapter`: on-device MLX-Swift adapter (Gemma + similar local models)
+- `BASMetalSubstrate`: Metal kernels — SSM scan,batched cosine,FlashAttention,
+  RMSNorm,etc.
+
+### Admin + debug surfaces (opt-in)
+
+- `BASAdmin`: flight deck, console, capability coverage — `BASHostKit`
+  hosts gated to debug/inspection surfaces only (enforced by
+  `check_sdk_import_boundaries.sh`)
+
+### Executables
+
+- `BASBrainCLI`: command-line runner for substrate primitives — used by
+  bench harnesses + diagnostic scripts
 
 ## Integration Strategy
 
@@ -103,3 +149,50 @@ Run:
 ```
 
 This also runs `./scripts/check_substrate_residuals.sh`, which fails if legacy host vocabulary leaks back into the substrate sources, README, or non-whitelisted package tests.
+
+## Runtime crash contracts (read before passing config values)
+
+The substrate uses `precondition(...)` + `fatalError(...)` for init-time
+invariants — if a host passes a value that violates the documented contract,
+the app will **crash in production** (no runtime recovery)。 These guard against
+silently-wrong behavior downstream and are deliberate。 Documented foot-guns:
+
+### `BASCognitiveOSConvenience` (host config validation)
+
+| Field | Contract | Crash if violated |
+|---|---|---|
+| `stateFoldInterval` | `> 0` seconds | yes |
+| `graphExtractInterval` | `> 0` seconds | yes |
+| `graphExtractEventCap` | `> 0` events | yes |
+| `thermalSlowdownMultiplier` | `>= 1` (1.0 = no slowdown) | yes |
+| `thermalSampleInterval` | `> 0` seconds | yes |
+
+### `HostPresentationConfigurationsCore`
+
+Four `fatalError("Unavailable")` sites on intentionally-blocked init paths。
+Concrete shape:if you construct a `BASHostPresentationConfiguration` through
+a code path the substrate hasn't whitelisted for your host kind,you get
+a hard crash with the「Unavailable」message。 Use the recommended factory:
+`BASHostConfiguration.fixtureGeneric.presentation` or your host's typed
+config bundle。 Don't bypass through reflection or partial init。
+
+### `BASSovereignAuditLedger` (L14)
+
+One `fatalError(...)` at the entry-point of the chain-seal hot path,fires
+ONLY if the canonical-bytes encoding produces a length the Rust verifier
+rejects as malformed。 Cannot fire in normal substrate usage (chapter
+七百十六 byte-equality test pins this);included as a 安全 floor against
+future refactor regressions。
+
+### `BASTrainingDataExporter` / `BASTrainingExampleSublimator`
+
+`precondition(pageSize > 0)`,`precondition(pinned >= 0)`,
+`precondition(flushThreshold > 0)` — bench-harness config validation。
+Affects only bench / training-data workflows,not the live substrate runtime。
+
+### How to test your host's config
+
+Run your host's startup smoke under XCTest with the same `BASHostConfiguration`
+you'll ship。 If a precondition fires,XCTest reports it as a hard test
+failure with the violating field name + value。 No runtime recovery — fix
+the config。
