@@ -34,6 +34,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bas-integrity-sentinel"
+version = "0.1.0"
+
+[[package]]
 name = "bas-memory-atom-store"
 version = "0.1.0"
 dependencies = [
