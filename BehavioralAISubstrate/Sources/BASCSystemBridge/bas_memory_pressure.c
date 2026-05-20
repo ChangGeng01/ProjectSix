@@ -94,6 +94,33 @@ int32_t bas_memory_pressure_percent(int32_t *out_pct) {
     return 0;
 }
 
+#else
+
+int32_t bas_memory_total_bytes(int64_t *out_bytes) {
+    if (out_bytes) { *out_bytes = -1; }
+    return -1;
+}
+
+int32_t bas_memory_vm_stats(
+    int64_t *out_free, int64_t *out_active,
+    int64_t *out_inactive, int64_t *out_wired,
+    int64_t *out_page_size
+) {
+    if (out_free)      { *out_free      = -1; }
+    if (out_active)    { *out_active    = -1; }
+    if (out_inactive)  { *out_inactive  = -1; }
+    if (out_wired)     { *out_wired     = -1; }
+    if (out_page_size) { *out_page_size = -1; }
+    return -1;
+}
+
+int32_t bas_memory_pressure_percent(int32_t *out_pct) {
+    if (out_pct) { *out_pct = -1; }
+    return -1;
+}
+
+#endif
+
 // MARK: - bas_task_phys_footprint (chapter 七百六十一 第二刀 / M2457)
 //
 // Richer per-process memory probe via `task_info(TASK_VM_INFO)`。
@@ -119,8 +146,18 @@ int32_t bas_memory_pressure_percent(int32_t *out_pct) {
 //
 // All values in BYTES。 Thread-safe + lock-free per Mach
 // documentation。
+//
+// Uses `#if __APPLE__` (matching bas_monotonic_nanos.c) rather
+// than the narrower `__IPHONE_OS_VERSION_MIN_REQUIRED ||
+// __MAC_OS_X_VERSION_MIN_REQUIRED` guard used by the older
+// memory_pressure functions in this file — `__APPLE__` is the
+// correct portability gate for Mach APIs。
+
+#if __APPLE__
 
 #include <mach/task_info.h>
+#include <mach/mach.h>
+#include <mach/mach_init.h>
 
 int32_t bas_task_phys_footprint(
     uint64_t *out_phys_footprint,
@@ -151,34 +188,7 @@ int32_t bas_task_phys_footprint(
     return 0;
 }
 
-int32_t bas_task_phys_footprint_version(void) {
-    return 1;
-}
-
 #else
-
-int32_t bas_memory_total_bytes(int64_t *out_bytes) {
-    if (out_bytes) { *out_bytes = -1; }
-    return -1;
-}
-
-int32_t bas_memory_vm_stats(
-    int64_t *out_free, int64_t *out_active,
-    int64_t *out_inactive, int64_t *out_wired,
-    int64_t *out_page_size
-) {
-    if (out_free)      { *out_free      = -1; }
-    if (out_active)    { *out_active    = -1; }
-    if (out_inactive)  { *out_inactive  = -1; }
-    if (out_wired)     { *out_wired     = -1; }
-    if (out_page_size) { *out_page_size = -1; }
-    return -1;
-}
-
-int32_t bas_memory_pressure_percent(int32_t *out_pct) {
-    if (out_pct) { *out_pct = -1; }
-    return -1;
-}
 
 int32_t bas_task_phys_footprint(
     uint64_t *out_phys_footprint,
@@ -191,8 +201,8 @@ int32_t bas_task_phys_footprint(
     return -3;
 }
 
+#endif
+
 int32_t bas_task_phys_footprint_version(void) {
     return 1;
 }
-
-#endif
