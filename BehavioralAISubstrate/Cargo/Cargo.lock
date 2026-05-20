@@ -51,6 +51,7 @@ dependencies = [
  "bas-runtime-frame",
  "bas-substrate-core",
  "bas-tokenizer",
+ "bas-tribunal-court",
  "sha2",
 ]
 

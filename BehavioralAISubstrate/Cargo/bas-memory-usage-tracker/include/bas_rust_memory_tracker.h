@@ -488,6 +488,56 @@ int32_t bas_permit_policy_monotonic_version_compare(
     const char *current_ptr, int32_t current_len,
     const char *proposed_ptr, int32_t proposed_len);
 
+// MARK: - bas-tribunal-court (chapter 七百四十 第二刀 / M2372)
+//
+// L10 Tri-Self Court pure-function derivation port。 LAYER-
+// MIGRATION ARC。 Bulk-serialize FFI pattern per chapter
+// 七百二十三 第二刀 lesson:single JSON input blob in,
+// single JSON output blob out。 Two-phase capacity-discovery
+// pattern matches bas_tokenizer ergonomics。
+//
+// Input JSON shape per function (see Rust crate doc for
+// full schemas):
+//
+//   derive_id_profile:
+//     {"profile_id": "...",
+//      "tri_scores":  [{candidate_id, id_score, ego_score,
+//                       superego_score}, ...],
+//      "candidates":  [{candidate_id, confidence,
+//                       expected_benefit, reversibility,
+//                       expected_cost}, ...]}
+//
+//   derive_ego_assessment:
+//     {"assessment_id": "...",
+//      "tri_scores":  [...],
+//      "candidates":  [...],
+//      "veto_marks":  [{candidate_id, veto_type,
+//                       reason_codes}, ...]}
+//
+//   derive_superego_judgment:
+//     {"judgment_id": "...",
+//      "veto_marks":  [...]}
+//
+// Return values (all 3 functions):
+//   ≥ 0  — bytes written (or required if capacity was 0)
+//   -1   — null pointer input
+//   -2   — invalid JSON input
+//   -3   — UTF-8 conversion error on output
+
+int32_t bas_tribunal_court_abi_version(void);
+
+int32_t bas_tribunal_court_derive_id_profile(
+    const char *input_ptr, int32_t input_len,
+    char *out_ptr, int32_t out_capacity);
+
+int32_t bas_tribunal_court_derive_ego_assessment(
+    const char *input_ptr, int32_t input_len,
+    char *out_ptr, int32_t out_capacity);
+
+int32_t bas_tribunal_court_derive_superego_judgment(
+    const char *input_ptr, int32_t input_len,
+    char *out_ptr, int32_t out_capacity);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

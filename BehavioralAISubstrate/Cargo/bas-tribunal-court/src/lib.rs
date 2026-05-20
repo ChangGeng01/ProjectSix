@@ -339,6 +339,182 @@ pub fn derive_superego_judgment(
     }
 }
 
+// MARK: - C ABI (chapter 七百四十 第二刀 / M2372)
+//
+// Bulk-serialize pattern per chapter 七百二十三 第二刀 lesson:
+// each derive function takes a SINGLE JSON input blob
+// (containing all the input arrays + the ID strings) and
+// writes a SINGLE JSON output blob to the caller-supplied
+// buffer。 Minimizes FFI round-trips。
+//
+// Two-phase pattern (matching bas_tokenizer ergonomics):
+// caller invokes with out_capacity=0 to discover required
+// size,then allocates and re-invokes with the exact-sized
+// buffer。
+//
+// Return values:
+//   ≥ 0    — bytes written (or bytes required if
+//            out_capacity was insufficient)
+//   -1     — null pointer
+//   -2     — invalid JSON input
+//   -3     — UTF-8 conversion error on output (shouldn't
+//            happen with serde_json)
+
+use std::os::raw::c_char;
+
+/// Input shape for derive_id_profile FFI call。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct IdProfileInput {
+    profile_id: String,
+    tri_scores: Vec<TriSelfScore>,
+    candidates: Vec<CandidatePath>,
+}
+
+/// Input shape for derive_ego_assessment FFI call。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct EgoAssessmentInput {
+    assessment_id: String,
+    tri_scores: Vec<TriSelfScore>,
+    candidates: Vec<CandidatePath>,
+    veto_marks: Vec<VetoMark>,
+}
+
+/// Input shape for derive_superego_judgment FFI call。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct SuperegoJudgmentInput {
+    judgment_id: String,
+    veto_marks: Vec<VetoMark>,
+}
+
+unsafe fn read_input_json(
+    input_ptr: *const c_char,
+    input_len: i32,
+) -> Option<String> {
+    if input_ptr.is_null() || input_len <= 0 {
+        return None;
+    }
+    let bytes = unsafe {
+        std::slice::from_raw_parts(
+            input_ptr as *const u8,
+            input_len as usize)
+    };
+    String::from_utf8(bytes.to_vec()).ok()
+}
+
+unsafe fn write_output_json(
+    out_ptr: *mut c_char,
+    out_capacity: i32,
+    payload: &str,
+) -> i32 {
+    let bytes = payload.as_bytes();
+    let needed = bytes.len() as i32;
+    if out_capacity == 0 || out_ptr.is_null() {
+        return needed;
+    }
+    if needed > out_capacity {
+        return needed;
+    }
+    // SAFETY:caller pins out_ptr capacity per the FFI
+    // contract;needed ≤ out_capacity ensured above。
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            bytes.as_ptr(),
+            out_ptr as *mut u8,
+            bytes.len());
+    }
+    needed
+}
+
+/// Derive id-impulse profile via bulk-serialize FFI。
+#[no_mangle]
+pub unsafe extern "C" fn
+    bas_tribunal_court_derive_id_profile(
+        input_ptr: *const c_char,
+        input_len: i32,
+        out_ptr: *mut c_char,
+        out_capacity: i32,
+) -> i32 {
+    let json = match unsafe {
+        read_input_json(input_ptr, input_len)
+    } {
+        Some(s) => s, None => return -1,
+    };
+    let input: IdProfileInput =
+        match serde_json::from_str(&json) {
+            Ok(v) => v, Err(_) => return -2,
+        };
+    let result = derive_id_profile(
+        input.profile_id,
+        &input.tri_scores,
+        &input.candidates);
+    let out_json = match serde_json::to_string(&result) {
+        Ok(s) => s, Err(_) => return -3,
+    };
+    unsafe {
+        write_output_json(out_ptr, out_capacity, &out_json)
+    }
+}
+
+/// Derive ego-reality assessment via bulk-serialize FFI。
+#[no_mangle]
+pub unsafe extern "C" fn
+    bas_tribunal_court_derive_ego_assessment(
+        input_ptr: *const c_char,
+        input_len: i32,
+        out_ptr: *mut c_char,
+        out_capacity: i32,
+) -> i32 {
+    let json = match unsafe {
+        read_input_json(input_ptr, input_len)
+    } {
+        Some(s) => s, None => return -1,
+    };
+    let input: EgoAssessmentInput =
+        match serde_json::from_str(&json) {
+            Ok(v) => v, Err(_) => return -2,
+        };
+    let result = derive_ego_assessment(
+        input.assessment_id,
+        &input.tri_scores,
+        &input.candidates,
+        &input.veto_marks);
+    let out_json = match serde_json::to_string(&result) {
+        Ok(s) => s, Err(_) => return -3,
+    };
+    unsafe {
+        write_output_json(out_ptr, out_capacity, &out_json)
+    }
+}
+
+/// Derive superego judgment via bulk-serialize FFI。
+#[no_mangle]
+pub unsafe extern "C" fn
+    bas_tribunal_court_derive_superego_judgment(
+        input_ptr: *const c_char,
+        input_len: i32,
+        out_ptr: *mut c_char,
+        out_capacity: i32,
+) -> i32 {
+    let json = match unsafe {
+        read_input_json(input_ptr, input_len)
+    } {
+        Some(s) => s, None => return -1,
+    };
+    let input: SuperegoJudgmentInput =
+        match serde_json::from_str(&json) {
+            Ok(v) => v, Err(_) => return -2,
+        };
+    let result = derive_superego_judgment(
+        input.judgment_id,
+        &input.veto_marks);
+    let out_json = match serde_json::to_string(&result) {
+        Ok(s) => s, Err(_) => return -3,
+    };
+    unsafe {
+        write_output_json(out_ptr, out_capacity, &out_json)
+    }
+}
+
 // MARK: - Tests
 
 #[cfg(test)]

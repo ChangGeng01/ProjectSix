@@ -61,15 +61,20 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_permit_policy::risk_plane
             ::bas_permit_policy_risk_band_to_next_mode(
                 0, 0, 0));
+    // chapter 七百四十 第二刀 / M2372 — force-link the L10
+    // tribunal-court ABI version。 Cheapest anchor。
+    total = total.wrapping_add(
+        bas_tribunal_court::bas_tribunal_court_abi_version());
     total
 }
 
-/// Returns the count of bundled crates (currently 8:the host
+/// Returns the count of bundled crates (currently 9:the host
 /// `bas-memory-usage-tracker` + 6 chapter-七百三 siblings +
-/// `bas-tokenizer` added at chapter 七百二十二 第二刀)。
+/// `bas-tokenizer` added at chapter 七百二十二 第二刀 +
+/// `bas-tribunal-court` added at chapter 七百四十 第二刀)。
 /// Swift consumers use this for hygiene assertions in their
 /// drift tests。
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    8
+    9
 }

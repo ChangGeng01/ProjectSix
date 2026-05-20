@@ -41,3 +41,8 @@ bas-runtime-frame     = { path = "../bas-runtime-frame" }
 # crate into the same staticlib so Swift hosts can call
 # bas_tokenizer_* symbols via `import BASRustMemoryTrackerBinary`。
 bas-tokenizer         = { path = "../bas-tokenizer" }
+# chapter 七百四十 第二刀 / M2372 — bundle the L10 tribunal-court
+# crate so Swift can call bas_tribunal_court_derive_* via the
+# XCFramework。 Pairs with the chapter 七百三十九 layer-migration
+# arc Rust-port idiom。
+bas-tribunal-court    = { path = "../bas-tribunal-court" }
