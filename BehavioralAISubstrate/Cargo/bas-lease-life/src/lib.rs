@@ -278,6 +278,64 @@ pub fn breath_validate(
     }
 }
 
+// MARK: - BreathScheduler reconcile pure-fn (knife 二 / M2462)
+
+/// Classify whether a scheduled breath of the given maintenance
+/// class should be CANCELLED when the thermal guard level escalates
+/// to `new_guard_level`。 Mirrors the cancellation branches in Swift
+/// `BASBreathScheduler.reconcile(with:)` line 153-171。
+///
+/// Returns:
+///   true  = cancel this breath
+///   false = keep this breath scheduled
+///
+/// Pure function:no I/O,no shared state,no allocations。 Hosts
+/// pass each scheduled breath's class through this in a loop;the
+/// Rust path is the cheapest possible「is this still allowed?」
+/// check (one match cascade,no exp / log / hash work)。
+///
+/// Cancellation matrix:
+///   - Emergency     : cancel ALL classes (matches Swift cancelAll)
+///   - Throttle      : cancel Standard + Deferred (matches Swift
+///                     line 161-167 filter for `!= .light && != .none`)
+///   - Watch/Nominal : cancel NOTHING (matches Swift line 168-169
+///                     `case .watch, .nominal: break`)
+///
+/// chapter 七百六十二 第二刀 / M2462。
+pub fn breath_should_cancel_on_reconcile(
+    breath_class: MaintenanceClass,
+    new_guard_level: ThermalGuardLevel,
+) -> bool {
+    match new_guard_level {
+        ThermalGuardLevel::Emergency => true,
+        ThermalGuardLevel::Throttle => {
+            // Cancel everything that's not Light or None
+            !matches!(breath_class,
+                MaintenanceClass::Light | MaintenanceClass::None)
+        }
+        ThermalGuardLevel::Watch | ThermalGuardLevel::Nominal => false,
+    }
+}
+
+/// Batch reconcile:given a list of (id, class) pairs + new
+/// guard level,return the count of breaths that would be
+/// cancelled。 Useful for telemetry and pre-flight estimation
+/// before the actor commits to the cancellation。
+///
+/// Pure function:single-pass over the input slice。
+pub fn breath_reconcile_cancellation_count(
+    breaths: &[(u32, MaintenanceClass)],
+    new_guard_level: ThermalGuardLevel,
+) -> u32 {
+    let mut count: u32 = 0;
+    for &(_id, class) in breaths {
+        if breath_should_cancel_on_reconcile(class, new_guard_level) {
+            count += 1;
+        }
+    }
+    count
+}
+
 // MARK: - ABI version
 
 pub const ABI_VERSION: i32 = 1;
@@ -561,5 +619,105 @@ mod tests {
     fn test_default_time_constant_pinned_at_180_seconds() {
         assert_eq!(DEFAULT_TIME_CONSTANT_SECONDS, 180.0,
             "180s default mirrors Swift line 38 default");
+    }
+
+    // MARK: - BreathScheduler reconcile (knife 二 / M2462)
+
+    #[test]
+    fn test_should_cancel_on_emergency_all_classes() {
+        for &c in &MaintenanceClass::ALL {
+            assert!(
+                breath_should_cancel_on_reconcile(
+                    c, ThermalGuardLevel::Emergency),
+                "Emergency cancels ALL classes — {:?} should cancel",
+                c);
+        }
+    }
+
+    #[test]
+    fn test_should_cancel_on_throttle_only_standard_and_deferred() {
+        assert!(!breath_should_cancel_on_reconcile(
+            MaintenanceClass::None, ThermalGuardLevel::Throttle));
+        assert!(!breath_should_cancel_on_reconcile(
+            MaintenanceClass::Light, ThermalGuardLevel::Throttle));
+        assert!(breath_should_cancel_on_reconcile(
+            MaintenanceClass::Standard, ThermalGuardLevel::Throttle));
+        assert!(breath_should_cancel_on_reconcile(
+            MaintenanceClass::Deferred, ThermalGuardLevel::Throttle));
+    }
+
+    #[test]
+    fn test_should_cancel_on_watch_keeps_all_classes() {
+        for &c in &MaintenanceClass::ALL {
+            assert!(
+                !breath_should_cancel_on_reconcile(
+                    c, ThermalGuardLevel::Watch),
+                "Watch keeps ALL classes — {:?} should NOT cancel",
+                c);
+        }
+    }
+
+    #[test]
+    fn test_should_cancel_on_nominal_keeps_all_classes() {
+        for &c in &MaintenanceClass::ALL {
+            assert!(
+                !breath_should_cancel_on_reconcile(
+                    c, ThermalGuardLevel::Nominal),
+                "Nominal keeps ALL classes — {:?} should NOT cancel",
+                c);
+        }
+    }
+
+    #[test]
+    fn test_batch_reconcile_emergency_cancels_all() {
+        let breaths = vec![
+            (1, MaintenanceClass::None),
+            (2, MaintenanceClass::Light),
+            (3, MaintenanceClass::Standard),
+            (4, MaintenanceClass::Deferred),
+        ];
+        assert_eq!(
+            breath_reconcile_cancellation_count(&breaths,
+                ThermalGuardLevel::Emergency),
+            4,
+            "Emergency cancels all 4 breaths");
+    }
+
+    #[test]
+    fn test_batch_reconcile_throttle_cancels_standard_and_deferred() {
+        let breaths = vec![
+            (1, MaintenanceClass::None),
+            (2, MaintenanceClass::Light),
+            (3, MaintenanceClass::Standard),
+            (4, MaintenanceClass::Deferred),
+        ];
+        assert_eq!(
+            breath_reconcile_cancellation_count(&breaths,
+                ThermalGuardLevel::Throttle),
+            2,
+            "Throttle cancels Standard + Deferred (2 of 4)");
+    }
+
+    #[test]
+    fn test_batch_reconcile_watch_cancels_nothing() {
+        let breaths = vec![
+            (1, MaintenanceClass::Standard),
+            (2, MaintenanceClass::Deferred),
+            (3, MaintenanceClass::Light),
+        ];
+        assert_eq!(
+            breath_reconcile_cancellation_count(&breaths,
+                ThermalGuardLevel::Watch),
+            0,
+            "Watch keeps everything");
+    }
+
+    #[test]
+    fn test_batch_reconcile_empty_input() {
+        let breaths: Vec<(u32, MaintenanceClass)> = vec![];
+        assert_eq!(
+            breath_reconcile_cancellation_count(&breaths,
+                ThermalGuardLevel::Emergency),
+            0);
     }
 }
