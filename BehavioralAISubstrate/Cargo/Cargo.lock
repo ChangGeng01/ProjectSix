@@ -55,6 +55,7 @@ dependencies = [
  "bas-permit-policy",
  "bas-retrieval-ranker",
  "bas-runtime-frame",
+ "bas-sovereign-c-abi",
  "bas-substrate-core",
  "bas-tokenizer",
  "bas-tribunal-court",

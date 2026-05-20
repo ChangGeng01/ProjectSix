@@ -189,16 +189,71 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
                 out.as_mut_ptr())
     };
     total = total.wrapping_add(batched_rc);
+    // chapter 七百五十八 第四刀 / M2444 — force-link the L14
+    // sovereign-c-abi public wrapper crate's symbols so the
+    // staticlib bundles them。 4 cheapest anchors:
+    //   1. ABI version probe
+    //   2. halt_signal_encode (sentinel inputs)
+    //   3. integrity_scan (empty claims + empty trust → 0 bits)
+    //   4. tamper_proof_audit (composite,exercises both paths)
+    total = total.wrapping_add(
+        bas_sovereign_c_abi::bas_sovereign_c_abi_version());
+    let mut halt_token = [0u8; 32];
+    let halt_rc = unsafe {
+        bas_sovereign_c_abi::bas_sovereign_halt_signal_encode(
+            0, 0, halt_token.as_mut_ptr())
+    };
+    total = total.wrapping_add(halt_rc);
+    // integrity_scan with empty buffers → returns 0 + writes
+    // 0 bits。 Buffers are non-null pointers to 4-byte
+    // count-prefix zero buffers per the wire format。
+    let empty_claims: [u8; 4] = [0, 0, 0, 0];
+    let empty_trust: [u8; 4] = [0, 0, 0, 0];
+    let mut hard_bits: u16 = 0;
+    let integrity_rc = unsafe {
+        bas_sovereign_c_abi::bas_sovereign_integrity_scan(
+            empty_claims.as_ptr(), empty_claims.len() as i32,
+            empty_trust.as_ptr(),  empty_trust.len() as i32,
+            0,
+            &mut hard_bits)
+    };
+    total = total.wrapping_add(integrity_rc);
+    // tamper_proof_audit with empty chain (4-byte BE count=0)
+    // + matching initial==expected (both all-zero) → chain
+    // valid (1) + clean composite (0)。
+    let init32 = [0u8; 32];
+    let expected32 = [0u8; 32];
+    let entries_buf: [u8; 4] = [0, 0, 0, 0];  // BE count=0
+    let mut verification: i32 = 0;
+    let mut tamper_mask: u64 = 0;
+    let tamper_rc = unsafe {
+        bas_sovereign_c_abi::bas_sovereign_tamper_proof_audit(
+            init32.as_ptr(),
+            entries_buf.as_ptr(), entries_buf.len() as i32,
+            expected32.as_ptr(),
+            empty_claims.as_ptr(), empty_claims.len() as i32,
+            empty_trust.as_ptr(),  empty_trust.len() as i32,
+            0,
+            &mut verification, &mut tamper_mask)
+    };
+    total = total.wrapping_add(tamper_rc);
     total
 }
 
-/// Returns the count of bundled crates (currently 9:the host
-/// `bas-memory-usage-tracker` + 6 chapter-七百三 siblings +
-/// `bas-tokenizer` added at chapter 七百二十二 第二刀 +
-/// `bas-tribunal-court` added at chapter 七百四十 第二刀)。
-/// Swift consumers use this for hygiene assertions in their
-/// drift tests。
+/// Returns the count of bundled crates。 Swift consumers use this
+/// for hygiene assertions in their drift tests (chapter 七百四 /
+/// 七百五 `BASChapter704PerformanceBenchTests.testRustBundleManifest`
+/// + `BASChapter705IntegrationTests.testChapter705AbiBundleVersionsMatch`,
+/// both converted to `>= count` floor assertions in chapter
+/// 七百五十七 第三刀 so growth doesn't break the gate)。
+///
+/// History:
+///   - 9 = post-chapter-七百四十 (host + 6 七百三 siblings + tokenizer + tribunal-court)
+///   - 13 = chapter 七百五十八 第四刀 / M2444 (+sovereign-c-abi,
+///         AND backfill organ-router from chapter 七百四十七 + dream-loop
+///         from chapter 七百四十八 that were added as deps but not
+///         counted in the static return)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    9
+    13
 }

@@ -57,3 +57,11 @@ bas-organ-router      = { path = "../bas-organ-router" }
 # 「candidate simulation、future projection、batch scoring
 # 适合 Rust/Metal。」
 bas-dream-loop        = { path = "../bas-dream-loop" }
+# chapter 七百五十八 第一刀 / M2441 — bundle the L14
+# sovereign-c-abi public wrapper crate so Swift host
+# (via XCFramework) + watchOS / 3rd-party C consumers
+# (via the hand-curated header) both see the same symbol
+# table for halt_signal_encode / integrity_scan /
+# tamper_proof_audit。 Per user 严苛 table 「L14 极值得」
+# DEEPER LAYER-MIGRATION ARC。
+bas-sovereign-c-abi   = { path = "../bas-sovereign-c-abi" }
