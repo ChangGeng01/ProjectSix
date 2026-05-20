@@ -61,6 +61,7 @@
 
 use crate::enums::RiskClimate;
 use serde::{Deserialize, Serialize};
+use std::os::raw::c_char;
 
 // MARK: - BrainRiskLevel (mirrors BASBrainRiskLevel)
 
@@ -248,6 +249,173 @@ pub fn monotonic_version_compare(
         return None;
     }
     Some(proposed > current)
+}
+
+// MARK: - C ABI exports (chapter 七百三十九 第二刀)
+//
+// Stable C ABI surface for Swift to call into via the
+// BASRustMemoryTracker XCFramework。 Wire encoding pinned
+// here is the SINGLE SOURCE OF TRUTH for the Swift
+// bridge's integer constants。
+//
+// ## Wire encoding
+//
+// RiskBand   : 0=Low, 1=Medium, 2=High, 3=Critical
+// RiskClimate: 0=Calm, 1=Watchful, 2=Elevated, 3=Crisis
+// ActionPermitMode:
+//   0=Answer  1=Mirror   2=Compare 3=Delay
+//   4=DraftOnly 5=LocalOnly 6=Block 7=Replace 8=Escalate
+//
+// ## Fault encoding
+//
+// Functions returning `i32` return -1 on bad input (out-
+// of-range encoding) so the Swift bridge can fall back
+// to the V1 path without crashing。
+
+fn band_from_i32(v: i32) -> Option<RiskBand> {
+    match v {
+        0 => Some(RiskBand::Low),
+        1 => Some(RiskBand::Medium),
+        2 => Some(RiskBand::High),
+        3 => Some(RiskBand::Critical),
+        _ => None,
+    }
+}
+
+fn climate_from_i32(v: i32) -> Option<RiskClimate> {
+    match v {
+        0 => Some(RiskClimate::Calm),
+        1 => Some(RiskClimate::Watchful),
+        2 => Some(RiskClimate::Elevated),
+        3 => Some(RiskClimate::Crisis),
+        _ => None,
+    }
+}
+
+fn mode_from_i32(v: i32) -> Option<ActionPermitMode> {
+    match v {
+        0 => Some(ActionPermitMode::Answer),
+        1 => Some(ActionPermitMode::Mirror),
+        2 => Some(ActionPermitMode::Compare),
+        3 => Some(ActionPermitMode::Delay),
+        4 => Some(ActionPermitMode::DraftOnly),
+        5 => Some(ActionPermitMode::LocalOnly),
+        6 => Some(ActionPermitMode::Block),
+        7 => Some(ActionPermitMode::Replace),
+        8 => Some(ActionPermitMode::Escalate),
+        _ => None,
+    }
+}
+
+fn mode_to_i32(m: ActionPermitMode) -> i32 {
+    match m {
+        ActionPermitMode::Answer => 0,
+        ActionPermitMode::Mirror => 1,
+        ActionPermitMode::Compare => 2,
+        ActionPermitMode::Delay => 3,
+        ActionPermitMode::DraftOnly => 4,
+        ActionPermitMode::LocalOnly => 5,
+        ActionPermitMode::Block => 6,
+        ActionPermitMode::Replace => 7,
+        ActionPermitMode::Escalate => 8,
+    }
+}
+
+/// L11 risk-plane classifier C ABI。
+///
+/// Parameters:
+///   band:    RiskBand encoding (0-3)
+///   climate: RiskClimate encoding (0-3)
+///   current: ActionPermitMode encoding (0-8)
+///
+/// Returns: next ActionPermitMode encoding (0-8),or -1
+/// if any input is out of range。 Swift bridge falls back
+/// to V1 on -1。
+#[no_mangle]
+pub extern "C" fn bas_permit_policy_risk_band_to_next_mode(
+    band: i32,
+    climate: i32,
+    current: i32,
+) -> i32 {
+    let b = match band_from_i32(band) {
+        Some(b) => b, None => return -1,
+    };
+    let c = match climate_from_i32(climate) {
+        Some(c) => c, None => return -1,
+    };
+    let m = match mode_from_i32(current) {
+        Some(m) => m, None => return -1,
+    };
+    mode_to_i32(risk_band_to_next_mode(b, c, m))
+}
+
+/// Effective threshold C ABI。 Same shape as
+/// effective_threshold;NaN guarded;clamped [0,1]。
+#[no_mangle]
+pub extern "C" fn bas_permit_policy_effective_threshold(
+    base: f64,
+    delta: f64,
+) -> f64 {
+    effective_threshold(base, delta)
+}
+
+/// Monotonic version comparator C ABI。
+///
+/// Pointer-based to permit borrowing Swift String bytes
+/// without an extra copy。 Lengths in bytes (UTF-8)。
+///
+/// Returns:
+///   1  if proposed > current
+///   0  if proposed <= current
+///   -1 if either string is empty or pointer is null
+///
+/// SAFETY: Caller must ensure `current_ptr` points to a
+/// valid UTF-8 byte sequence of `current_len` bytes and
+/// `proposed_ptr` likewise。 The Swift bridge enforces
+/// this by passing `String.utf8` count and pointer。
+#[no_mangle]
+pub unsafe extern "C" fn
+    bas_permit_policy_monotonic_version_compare(
+        current_ptr: *const c_char,
+        current_len: i32,
+        proposed_ptr: *const c_char,
+        proposed_len: i32,
+) -> i32 {
+    if current_ptr.is_null()
+        || proposed_ptr.is_null()
+        || current_len <= 0
+        || proposed_len <= 0
+    {
+        return -1;
+    }
+    // SAFETY:caller pins ptr+len validity per the
+    // function's safety contract above。
+    let current_bytes = unsafe {
+        std::slice::from_raw_parts(
+            current_ptr as *const u8,
+            current_len as usize)
+    };
+    let proposed_bytes = unsafe {
+        std::slice::from_raw_parts(
+            proposed_ptr as *const u8,
+            proposed_len as usize)
+    };
+    let current_str = match std::str::from_utf8(current_bytes)
+    {
+        Ok(s) => s, Err(_) => return -1,
+    };
+    let proposed_str = match
+        std::str::from_utf8(proposed_bytes)
+    {
+        Ok(s) => s, Err(_) => return -1,
+    };
+    match monotonic_version_compare(
+        current_str, proposed_str)
+    {
+        Some(true) => 1,
+        Some(false) => 0,
+        None => -1,
+    }
 }
 
 // MARK: - Tests

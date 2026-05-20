@@ -441,6 +441,53 @@ int32_t bas_permit_policy_abi_version(void);
 int32_t bas_event_log_abi_version(void);
 int32_t bas_runtime_frame_abi_version(void);
 
+// MARK: - bas-permit-policy risk_plane (chapter 七百三十九 第二刀 / M2367)
+//
+// L11 Wind Gate state-machine port。 LAYER-MIGRATION ARC。
+//
+// Wire encoding:
+//   RiskBand   : 0=Low, 1=Medium, 2=High, 3=Critical
+//   RiskClimate: 0=Calm, 1=Watchful, 2=Elevated, 3=Crisis
+//   ActionPermitMode:
+//     0=Answer  1=Mirror   2=Compare 3=Delay
+//     4=DraftOnly 5=LocalOnly 6=Block 7=Replace 8=Escalate
+//
+// Mirrors Swift BASBrainRiskLevel / BASActionPermitMode raw
+// values verbatim (chapter 一百八十五 single source of truth)。
+//
+// All functions are PURE — no shared state,no allocation,no
+// failure modes other than out-of-range encodings → -1 sentinel。
+
+/// L11 classifier:given a per-observation risk_band + the
+/// session's current climate + the gate's current mode,
+/// produce the next mode the gate should advance to。
+///
+/// Returns next ActionPermitMode encoding (0-8) or -1 if
+/// any input is out of range。 Swift bridge falls back to
+/// V1 on -1 (graceful degradation,not crash)。
+int32_t bas_permit_policy_risk_band_to_next_mode(
+    int32_t band, int32_t climate, int32_t current);
+
+/// Apply per-stratum threshold delta + clamp to [0, 1]。
+/// NaN inputs → 0 (matches Swift clamp01 behavior)。
+double bas_permit_policy_effective_threshold(
+    double base, double delta);
+
+/// Monotonic bundle-version comparator。 Pointer-based to
+/// avoid an extra copy of the Swift String bytes。
+///
+/// Returns:
+///   1  if proposed > current  (replace permitted)
+///   0  if proposed <= current (replace rejected)
+///   -1 if either string is empty / pointer is null
+///
+/// Caller must ensure the byte ranges are valid UTF-8 of
+/// the declared length。 The Swift bridge enforces by
+/// passing `String.utf8` count + base pointer。
+int32_t bas_permit_policy_monotonic_version_compare(
+    const char *current_ptr, int32_t current_len,
+    const char *proposed_ptr, int32_t proposed_len);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

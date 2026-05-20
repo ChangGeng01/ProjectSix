@@ -52,6 +52,15 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
     // tests automatically。
     total = total.wrapping_add(
         bas_tokenizer::bas_tokenizer_abi_version());
+    // chapter 七百三十九 第二刀 / M2367 — force-link the
+    // L11 risk_plane C ABI exports so the staticlib
+    // bundles them。 Cheapest anchor:invoke the pure
+    // classifier with sentinel inputs (returns 0 → Answer
+    // mode,no observable side-effect)。
+    total = total.wrapping_add(
+        bas_permit_policy::risk_plane
+            ::bas_permit_policy_risk_band_to_next_mode(
+                0, 0, 0));
     total
 }
 
