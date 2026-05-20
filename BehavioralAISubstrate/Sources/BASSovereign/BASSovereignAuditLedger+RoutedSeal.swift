@@ -32,17 +32,30 @@ extension BASSovereignAuditLedger {
     /// whether `append()` uses the Rust-routed seal path。
     ///
     /// Default `false` preserves the chapter 七百十二 第四刀
-    /// ADR-014 OPT-IN discipline:V1 byte-pinned CryptoKit
-    /// path remains the production default until the
-    /// chapter 七百十六 第四刀 perf test confirms the 5-8×
-    /// speedup AND the user explicitly approves the flip。
+    /// Default-flip history:
+    ///   chapter 七百十六 (default `false`) — V1 CryptoKit
+    ///     path remained default while routed path shipped
+    ///     opt-in。 50-entry byte-equality test passed。
+    ///   chapter 七百四十一 (perf measured 1.24× Rust win
+    ///     on chain seal — Axis 1 perf strictly-better;
+    ///     Axis 5 replay byte-equality already pinned;
+    ///     Axis 3 state-machine guarantees TIE)。
+    ///   **chapter 七百五十一 第一刀 (default flipped to
+    ///     `true`) — per user directive 2026-05-20
+    ///     「L14 / L11 / L10 这些 Rust port 接到真实 runtime
+    ///     path」 + 5-axis rule (≥ 3 axes Rust strictly-
+    ///     better AND no axis worse-by-1.5×)。 The routed
+    ///     seal path is now the production default;hosts
+    ///     who require the legacy CryptoKit path can opt
+    ///     OUT by setting this to `false` at host startup
+    ///     before constructing the ledger。**
     ///
-    /// Hosts that want the routed path today can set this to
-    /// `true` at host startup before constructing the ledger;
-    /// the byte-equality test in Knife 1 guarantees no chain
-    /// of custody is broken。
+    /// Byte-equality preserved — the Rust seal produces
+    /// byte-identical chain hashes to CryptoKit per the
+    /// chapter 七百十六 第一刀 50-entry test。 No chain of
+    /// custody is broken by this flip。
     public nonisolated(unsafe) static var useRoutedSeal: Bool
-        = false
+        = true
 
     /// Routed seal — hashes the canonical bytes via
     /// BASAutoRouteRanker.ledgerSeal (Rust SHA256) and
