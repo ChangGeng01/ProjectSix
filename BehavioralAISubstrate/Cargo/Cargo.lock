@@ -61,6 +61,7 @@ dependencies = [
  "bas-integrity-sentinel",
  "bas-lease-life",
  "bas-memory-atom-store",
+ "bas-mirror-blade",
  "bas-organ-router",
  "bas-permit-policy",
  "bas-red-team-bench",
@@ -72,6 +73,10 @@ dependencies = [
  "bas-tribunal-court",
  "sha2",
 ]
+
+[[package]]
+name = "bas-mirror-blade"
+version = "0.1.0"
 
 [[package]]
 name = "bas-organ-router"

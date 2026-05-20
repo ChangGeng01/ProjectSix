@@ -89,3 +89,9 @@ bas-integrity-sentinel = { path = "../bas-integrity-sentinel" }
 # 「L1 部分值得」 — Apple thermal pipe stays Swift,Rust
 # owns the deterministic decay + validation pure fns。
 bas-lease-life        = { path = "../bas-lease-life" }
+# chapter 七百六十四 / M2471 — bundle the L7 mirror-blade
+# crate so Swift host sees the decomposition state
+# classifier (bas_mirror_blade_classify,abi_version)。
+# Per user 严苛 table 「L7 很值得」 — pure threshold
+# decision tree maps cleanly to Rust enum + match。
+bas-mirror-blade      = { path = "../bas-mirror-blade" }

@@ -293,6 +293,16 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
     total = total.wrapping_add(
         bas_permit_policy::rule_judgment
             ::bas_rule_judgment_allow_action(0x0F, 0));
+    // chapter 七百六十四 / M2471 — force-link the L7
+    // mirror-blade classifier。 Two cheapest anchors:
+    //   1. ABI version probe
+    //   2. classify with all-zero (clean) → returns FactShard bit
+    //      cast to i32 for the running total
+    total = total.wrapping_add(
+        bas_mirror_blade::bas_mirror_blade_abi_version());
+    total = total.wrapping_add(
+        bas_mirror_blade::bas_mirror_blade_classify(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0, 0) as i32);
     total
 }
 
@@ -312,7 +322,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 14 = chapter 七百五十九 第三刀 / M2448 (+red-team-bench)
 ///   - 15 = chapter 七百六十 第三刀 / M2453 (+integrity-sentinel)
 ///   - 16 = chapter 七百六十二 第三刀 / M2463 (+lease-life)
+///   - 17 = chapter 七百六十四 / M2471 (+mirror-blade)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    16
+    17
 }
