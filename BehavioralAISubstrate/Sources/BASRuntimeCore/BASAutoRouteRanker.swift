@@ -2994,6 +2994,61 @@ public enum BASAutoRouteRanker {
         return !tiebreakKeepsExisting
         #endif
     }
+
+    // MARK: - L8 Memory Atom Reducer batched
+    //         (chapter 七百五十三 第二刀 / M2434)
+    //
+    // Batched admission-tiebreak — N decisions in a single FFI
+    // call (per chapter 七百十八 batched-cosine pattern)。
+    // Designed to cross the 1.5× threshold by amortizing FFI
+    // overhead across the batch。
+
+    /// Compute the admission-tiebreak decision for N
+    /// (existing,new) confidence pairs in a single FFI call。
+    /// All N pairs share the same `tiebreakKeepsExisting`
+    /// flag (the substrate-wide chapter 一百八十五 invariant)。
+    ///
+    /// Returns `[Bool]` of length N where `true` means the
+    /// fresh event should REPLACE the existing atom。
+    /// Returns `nil` on FFI fault (null pointer / shape mismatch)
+    /// or array-length mismatch between existing and new。
+    public static func atomReducerBatchedShouldReplaceAdmitted(
+        existing: [Double],
+        new: [Double],
+        tiebreakKeepsExisting: Bool
+    ) -> [Bool]? {
+        guard existing.count == new.count else { return nil }
+        let n = existing.count
+        if n == 0 { return [] }
+        #if os(iOS) || os(macOS)
+        var out = [Int32](repeating: 0, count: n)
+        let flag: Int32 = tiebreakKeepsExisting ? 1 : 0
+        let rc = existing.withUnsafeBufferPointer {
+            eb -> Int32 in
+            new.withUnsafeBufferPointer {
+                nb -> Int32 in
+                out.withUnsafeMutableBufferPointer {
+                    ob -> Int32 in
+                    bas_atom_reducer_batched_should_replace_admitted(
+                        eb.baseAddress,
+                        nb.baseAddress,
+                        Int32(n),
+                        flag,
+                        ob.baseAddress)
+                }
+            }
+        }
+        if rc != 0 { return nil }
+        return out.map { $0 != 0 }
+        #else
+        // watchOS fallback — loop the Swift logic
+        return zip(existing, new).map { (e, nv) in
+            if e > nv { return false }
+            if e < nv { return true }
+            return !tiebreakKeepsExisting
+        }
+        #endif
+    }
 }
 
 // MARK: - BASBpeTokenizerHandle (chapter 七百二十二 第二刀 / M2282)

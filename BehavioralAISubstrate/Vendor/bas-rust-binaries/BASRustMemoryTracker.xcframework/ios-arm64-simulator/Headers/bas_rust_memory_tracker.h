@@ -1263,6 +1263,21 @@ int32_t bas_atom_reducer_should_replace_admitted(
     double new_confidence,
     int32_t tiebreak_keeps_existing);
 
+// MARK: - bas-memory-atom-store::reducer batched API
+//                          (chapter 七百五十三 第二刀 / M2434)
+//
+// Batched admission-tiebreak — processes N pairs in a single FFI
+// call to amortize per-call FFI overhead (per chapter 七百十八
+// batched-cosine pattern)。 Returns 0 on success,-1 on null /
+// negative n。 All N pairs share the same tiebreak flag。
+
+int32_t bas_atom_reducer_batched_should_replace_admitted(
+    const double* existing_ptr,
+    const double* new_ptr,
+    int32_t n,
+    int32_t tiebreak_keeps_existing,
+    int32_t* out_decisions);
+
 #ifdef __cplusplus
 }
 #endif

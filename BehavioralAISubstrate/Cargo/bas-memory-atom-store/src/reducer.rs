@@ -75,9 +75,79 @@ pub extern "C" fn bas_atom_reducer_should_replace_admitted(
 }
 
 /// ABI version pin for the reducer module。
+/// chapter 七百五十一 第二刀:initial admission-tiebreak only
+/// chapter 七百五十三 第二刀:batched admission-tiebreak added
 #[no_mangle]
 pub extern "C" fn bas_atom_reducer_abi_version() -> i32 {
-    1
+    2
+}
+
+// MARK: - Batched admission-tiebreak (chapter 七百五十三 第二刀 / M2434)
+//
+// Per chapter 七百十八 batched-cosine pattern,a single FFI call
+// that processes N decisions in one trip amortizes the FFI
+// overhead far better than per-call。 The chapter 七百五十一 第二刀
+// per-call tiebreak landed at 1.08× (marginal — FFI overhead
+// dominates tiny work)。 This batched variant is designed to
+// cross the 1.5× threshold by amortizing across N。
+//
+// Use case:event-log replay against an atom store。 Hundreds/
+// thousands of `.admitted` events flow through the reducer per
+// session;each event needs the tiebreak decision when its
+// atom_id is already in the projection。 Batching all decisions
+// into a single FFI call is what production replay should use。
+
+/// Compute the tiebreak decision for N (existing, new) pairs in
+/// a single call。 Writes N i32 results into `out_decisions`
+/// (0 = keep existing,1 = replace)。 Returns 0 on success or
+/// -1 on null pointer / capacity mismatch。
+///
+/// All N pairs share the same `tiebreak_keeps_existing` flag
+/// (the chapter 一百八十五 anti-magic-number rule is a substrate
+/// invariant,not per-event)。
+///
+/// # Safety
+///
+/// - `existing_ptr` / `new_ptr` MUST point to readable f64
+///   buffers of length ≥ n
+/// - `out_decisions` MUST point to writable i32 buffer of
+///   length ≥ n
+#[no_mangle]
+pub unsafe extern "C" fn
+    bas_atom_reducer_batched_should_replace_admitted(
+        existing_ptr: *const f64,
+        new_ptr: *const f64,
+        n: i32,
+        tiebreak_keeps_existing: i32,
+        out_decisions: *mut i32,
+    ) -> i32 {
+    if existing_ptr.is_null()
+        || new_ptr.is_null()
+        || out_decisions.is_null()
+        || n < 0
+    {
+        return -1;
+    }
+    let count = n as usize;
+    let tiebreak_existing = tiebreak_keeps_existing != 0;
+    let existing_slice = unsafe {
+        std::slice::from_raw_parts(existing_ptr, count)
+    };
+    let new_slice = unsafe {
+        std::slice::from_raw_parts(new_ptr, count)
+    };
+    let out_slice = unsafe {
+        std::slice::from_raw_parts_mut(out_decisions, count)
+    };
+    for i in 0..count {
+        let replace = should_replace_admitted(
+            existing_slice[i],
+            new_slice[i],
+            tiebreak_existing,
+        );
+        out_slice[i] = if replace { 1 } else { 0 };
+    }
+    0
 }
 
 // MARK: - Unit tests
@@ -150,7 +220,83 @@ mod tests {
     }
 
     #[test]
-    fn abi_version_is_one() {
-        assert_eq!(bas_atom_reducer_abi_version(), 1);
+    fn abi_version_is_two() {
+        // Bumped from 1 → 2 at chapter 七百五十三 第二刀 when
+        // the batched API landed。
+        assert_eq!(bas_atom_reducer_abi_version(), 2);
+    }
+
+    // MARK: - Batched API tests (chapter 七百五十三 第二刀)
+
+    #[test]
+    fn batched_matches_per_call_for_n_pairs() {
+        let existing = vec![0.9, 0.5, 0.7, 0.0, 1.0];
+        let new      = vec![0.5, 0.9, 0.7, 1.0, 0.0];
+        // Expected per-call decisions:
+        //   (0.9, 0.5) → 0 keep existing (existing higher)
+        //   (0.5, 0.9) → 1 replace (new higher)
+        //   (0.7, 0.7) → 0 keep existing (tie + flag=1)
+        //   (0.0, 1.0) → 1 replace
+        //   (1.0, 0.0) → 0 keep existing
+        let expected = [0_i32, 1, 0, 1, 0];
+
+        let mut out = [0_i32; 5];
+        let rc = unsafe {
+            bas_atom_reducer_batched_should_replace_admitted(
+                existing.as_ptr(),
+                new.as_ptr(),
+                5,
+                1, // tiebreak_keeps_existing
+                out.as_mut_ptr())
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn batched_returns_neg1_on_null() {
+        let mut out = [0_i32; 1];
+        let rc = unsafe {
+            bas_atom_reducer_batched_should_replace_admitted(
+                std::ptr::null(),
+                std::ptr::null(),
+                1,
+                1,
+                out.as_mut_ptr())
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn batched_returns_neg1_on_negative_n() {
+        let existing = [0.5_f64];
+        let new = [0.5_f64];
+        let mut out = [0_i32; 1];
+        let rc = unsafe {
+            bas_atom_reducer_batched_should_replace_admitted(
+                existing.as_ptr(),
+                new.as_ptr(),
+                -1,
+                1,
+                out.as_mut_ptr())
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn batched_zero_n_succeeds_no_writes() {
+        let existing = [0.5_f64];
+        let new = [0.5_f64];
+        let mut out = [42_i32; 1]; // sentinel
+        let rc = unsafe {
+            bas_atom_reducer_batched_should_replace_admitted(
+                existing.as_ptr(),
+                new.as_ptr(),
+                0,
+                1,
+                out.as_mut_ptr())
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(out[0], 42); // unchanged
     }
 }

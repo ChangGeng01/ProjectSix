@@ -174,6 +174,21 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             ::bas_atom_reducer_should_replace_admitted(
                 0.0, 0.0, 1);
     total = total.wrapping_add(reducer_rc);
+    // chapter 七百五十三 第二刀 / M2434 — force-link the
+    // batched admission-tiebreak。 Sentinel:n=0,no writes。
+    let existing: [f64; 0] = [];
+    let new_arr: [f64; 0] = [];
+    let mut out: [i32; 0] = [];
+    let batched_rc = unsafe {
+        bas_memory_atom_store::reducer
+            ::bas_atom_reducer_batched_should_replace_admitted(
+                existing.as_ptr(),
+                new_arr.as_ptr(),
+                0,
+                1,
+                out.as_mut_ptr())
+    };
+    total = total.wrapping_add(batched_rc);
     total
 }
 
