@@ -588,6 +588,38 @@ int32_t bas_sovereign_verify_chain(
     int32_t entries_buffer_len,
     const uint8_t *expected_final32);
 
+// MARK: - bas-verdict-decisions (chapter 七百四十二 第二刀 / M2382)
+//
+// L14 Sovereign Verdict Engine pure-decision-tree port。
+// 3-stage non-compensatory evaluation in ONE Rust call:
+//
+//   1. Hard rules — 12 boolean observations (BR-001..BR-012)
+//      encoded as a u16 bitfield (LSB = BR-001)
+//   2. Soft signals — 7 doubles in §12.2 order
+//   3. Evidence-insufficient upgrade — irreversible
+//      domains promote to toolCut when evidence flag = 0
+//
+// Wire encoding:
+//   hard_bits: u16 bitfield (LSB = BR-001 ... bit 11 = BR-012)
+//   soft_ptr:  pointer to 7 f64 values in this order:
+//              [integrity, privilege_violation, self_mod,
+//               memory_contamination, irreversible_harm,
+//               runtime_instability, manipulation_intrusion]
+//   domain_raw: 0=PureInference 1=ToolRead 2=ToolWrite
+//               3=HostMutate 4=MemoryPromote 5=RulePromotion
+//   evidence_sufficient: 0=false, 1=true
+//
+// Returns: verdict level rank (0=pass..7=deadStop) or
+//          -1 on bad input (null softs / unknown domain)
+
+int32_t bas_verdict_decisions_abi_version(void);
+
+int32_t bas_verdict_derive(
+    uint16_t hard_bits,
+    const double *soft_ptr,
+    int32_t domain_raw,
+    int32_t evidence_sufficient);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is
