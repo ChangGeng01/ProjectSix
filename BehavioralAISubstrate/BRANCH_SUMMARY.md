@@ -155,7 +155,7 @@ The biggest contribution is **NOT the count of flips** — it's the **measuremen
 - PQ speed: 78× at 5K corpus (crossover much earlier than plan's 100k)
 - BPE pre-tokenization: 28× speedup (5.7× above plan's "shippable" bar)
 
-## 30-chapter branch arc statistics
+## 30-chapter snapshot (chapter 七百三十 close-out)
 
 ```
 Chapters:                       30
@@ -246,7 +246,7 @@ The chapter 七百二十二 第三刀 documented O(N²) merge-loop limitation is
 - **Output**: byte-identical to the legacy algo (all 21 Rust + 27 Swift tests still green)
 - **Side effect**: chapter 七百二十二 第四刀 pre-tokenization workaround is now slower than raw — the workaround became redundant once the limitation was fixed (a beautiful substrate-shape moment documented honestly)
 
-## Final 37-chapter statistics
+## 37-chapter snapshot (chapter 七百三十七 close-out)
 
 ```
 Chapters:                       37
@@ -267,8 +267,111 @@ Total Swift source LOC:    ~293,000
 Total Swift test LOC:      ~273,000
 ```
 
-## Branch arc SEALED
+## chapters 七百三十八-七百四十九 — Layer migration arc
 
-37 chapters delivered under measurement-first discipline. Honest landings,
-substrate shape preserved. The TIERED-COMPRESSION IDIOM formalized as the
-arc's organizing principle. Branch ready for merge or downstream arc.
+After the 37-chapter substrate-maturation arc sealed,a 12-chapter layer-migration arc
+landed under the user directive 「完全 移植 if WHOLE is better」 — Rust takes hot paths
++ state machines + persistence + audit math, Swift retains façade / Apple-glue / public API.
+
+| Chapter | Layer | Theme | Outcome |
+|---|---|---|---|
+| 七百三十八 | L11 | Risk-plane SQL schema | 3 net-new tables (risk_observations, permit_escalation_ledger, permit_escalation_steps) |
+| 七百三十九 | L11 | Wind Gate Rust state machine | risk_plane.rs port + 1.12× Rust win on classifier |
+| 七百四十   | L10 | Tri-Self Court pure-fn port | New `bas-tribunal-court` crate (3 derive fns) + 1.06× (TIE) |
+| 七百四十一 | L14 | Sovereign chain core | seal/verify primitives in bas-substrate-core + sovereign_tokens SQL schema + 1.24× Rust |
+| 七百四十二 | L14 | Verdict engine port | verdict_decisions.rs + verdict_decisions SQL schema + **13.84× Rust win (biggest)** |
+| 七百四十三 | L14 | Token authority + turn verifier | L14 sub-arc close-out |
+| 七百四十四 | L3  | KG storage binary codec | knowledge_graph_codec.rs + 030_knowledge_graph_v2_migration + 29.6% storage shrink |
+| 七百四十五 | L3  | Event extractor port | event_extractor.rs + 0.13× Rust LOSS (only loss — String FFI copies dominate tiny work) |
+| 七百四十六 | L3  | Thought-fold obs derive + L3 close | derive_observation extension + L3 sub-arc close-out |
+| 七百四十七 | L2  | Neural Organ Metal+Rust router | New `bas-organ-router` crate (kernel-family routing policy) |
+| 七百四十八 | L9  | Dream Loop batch-scoring | New `bas-dream-loop` crate (cosine + benefit-cost batch scoring) |
+| 七百四十九 | —   | 12-chapter arc close-out | Final cross-layer matrix scorecard + 49-chapter branch arc seal |
+
+### Layer-migration pattern findings
+
+**WHEN Rust wins per-call**:
+- Primitive-arg classifiers (`i32` / `f64` args) — L11 classifier
+- SHA256-heavy + canonical-bytes assembly — L14 chain seal
+- Branchy match cascades — **L14 verdict engine (13.84×, biggest win of arc)**
+- Bulk-serialize JSON FFI for non-trivial payloads — L10 tribunal derives
+
+**WHEN Rust LOSES per-call**:
+- Multiple `String` FFI string-copy round-trips ON tiny inner work — L3 event extractor (0.13×)
+
+**Mitigation pattern** (for batched call shapes): batched fast-path FFI (1 FFI per N inputs) — chapter 七百十八 batched cosine, chapter 七百二十三 第二刀 single-FFI bulk-serialize.
+
+### 5-axis comparison framework
+
+Introduced in this arc as the decision rule for 「完全 移植 if WHOLE is better」:
+
+| Axis | Metric |
+|---|---|
+| 1. Per-call walltime | 1000-iter grid × 3 size cells |
+| 2. Memory footprint | peak RSS via dump-allocator hooks |
+| 3. State-machine guarantees | Swift `@unknown default` vs Rust exhaustive enum |
+| 4. Persistence | SQL schema durability + replay survives process restart |
+| 5. Replay byte-equality | 50-fixture run-against-baseline assert |
+
+**Decision rule**: ≥ 3 of 5 axes Rust-strictly-better AND no axis Rust-worse-by-more-than-1.5× → **FLIP DEFAULT**。 Else Rust ships opt-in via `BASAutoRouteRanker.*` and Swift legacy body stays commented adjacent to the routed call site per 「依旧 不删除 只 comment」.
+
+## 49-chapter snapshot (chapter 七百四十九 close-out — current state)
+
+```
+Chapters:                       49
+Knives:                       ~245 (5 per chapter averaged)
+Commits ahead of branch:      ~912
+Rust crates:                    12 (added bas-tribunal-court,
+                                     bas-organ-router,
+                                     bas-dream-loop)
+Rust LOC:                  ~16,500 (chain.rs + verdict_decisions.rs +
+                                     risk_plane.rs + knowledge_graph_codec.rs +
+                                     event_extractor.rs +
+                                     thought_fold.rs derive_observation +
+                                     3 new crates)
+Auto-router families:           25 (unchanged — layer ports are
+                                     stateful actors, not auto-router
+                                     primitives)
+Production-default flips:        9 (unchanged — layer ports ship
+                                     opt-in pending host-side
+                                     measurement)
+Layer ports (forward-looking):   6 (L11/L10/L14/L3/L2/L9 —
+                                     0 Swift production code lines
+                                     touched per 「依旧 不删除 只 comment」)
+Net-new SQL schemas:             6 (006_risk_observations,
+                                     007_permit_escalation_ledger,
+                                     008_permit_escalation_steps,
+                                     009_sovereign_tokens,
+                                     010_verdict_decisions,
+                                     030_knowledge_graph_v2_migration)
+Sub-arcs sealed in this arc:     6 (L11 + L10 + L14 + L3 + L2 + L9)
+Layer EXCLUDED (user directive): 1 (L13 Evolution Furnace — no
+                                     actor coordination to port yet)
+Plan-agent gaps still deferred:  3 (Float16 path — partially closed
+                                     by chapter 七百三十三, full 89-site
+                                     JSON Codable sweep, audit ledger
+                                     wire format — already pure SQL)
+Tests added this arc (Rust):  ~100
+Tests added this arc (Swift): ~200
+Total tests this arc:         ~331
+Total Swift source LOC:    ~295,000 (estimate)
+Total Swift test LOC:      ~278,000 (estimate)
+```
+
+## Branch arc SEALED — 49 chapters delivered
+
+49 chapters delivered under measurement-first discipline + 「完全 移植 if WHOLE is better」
+discipline (the layer-migration arc).
+
+- **Original 5-language scaffold** (chapter 七百二-七百六) — SHIPPED ✅
+- **Per-primitive auto-router buildout** (chapter 七百七-七百二十) — SHIPPED ✅
+- **Aggressive evolution** (chapter 七百二十一-七百三十) — SHIPPED ✅
+- **Quality refinement + tiered-compression idiom** (chapter 七百三十一-七百三十七) — SHIPPED ✅
+- **Layer migration** (chapter 七百三十八-七百四十九) — **SHIPPED ✅**
+
+Honest landings, substrate shape preserved. The TIERED-COMPRESSION IDIOM remains the
+mid-arc organizing principle;the LAYER-MIGRATION 5-axis comparison framework is the
+late-arc organizing principle. Both formalized as repeatable patterns for downstream
+arcs.
+
+**Branch ready for downstream consumption / merge / next-arc spinout.**
