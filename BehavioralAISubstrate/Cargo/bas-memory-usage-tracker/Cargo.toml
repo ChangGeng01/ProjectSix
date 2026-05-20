@@ -81,3 +81,11 @@ bas-red-team-bench    = { path = "../bas-red-team-bench" }
 # bas-sovereign-c-abi thin wrapper which only returns
 # 4-bit hard_bits — this exposes full structured report。
 bas-integrity-sentinel = { path = "../bas-integrity-sentinel" }
+# chapter 七百六十二 第三刀 / M2463 — bundle the L1
+# lease-life crate so Swift host (via XCFramework) sees
+# the pure-fn surface (lung_state_decay,
+# lung_state_record_turn,breath_validate,
+# breath_should_cancel_on_reconcile)。 Per user 严苛 table
+# 「L1 部分值得」 — Apple thermal pipe stays Swift,Rust
+# owns the deterministic decay + validation pure fns。
+bas-lease-life        = { path = "../bas-lease-life" }

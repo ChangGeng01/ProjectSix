@@ -274,6 +274,18 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             core::ptr::null_mut(), 0)
     };
     total = total.wrapping_add(sentinel_rc);
+    // chapter 七百六十二 第三刀 / M2463 — force-link the L1
+    // lease-life crate symbols。 Three cheapest anchors:
+    //   1. ABI version probe
+    //   2. breath_validate with allowed (Nominal/None) → 0
+    //   3. should_cancel with Watch/Light → 0 (keep)
+    // All scalar in / scalar out,zero side-effect。
+    total = total.wrapping_add(
+        bas_lease_life::bas_lease_life_abi_version());
+    total = total.wrapping_add(
+        bas_lease_life::bas_breath_validate(0, 0));
+    total = total.wrapping_add(
+        bas_lease_life::bas_breath_should_cancel_on_reconcile(0, 0));
     total
 }
 
@@ -292,7 +304,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///         counted in the static return)
 ///   - 14 = chapter 七百五十九 第三刀 / M2448 (+red-team-bench)
 ///   - 15 = chapter 七百六十 第三刀 / M2453 (+integrity-sentinel)
+///   - 16 = chapter 七百六十二 第三刀 / M2463 (+lease-life)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    15
+    16
 }

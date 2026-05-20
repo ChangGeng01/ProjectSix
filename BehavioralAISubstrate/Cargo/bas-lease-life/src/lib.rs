@@ -336,6 +336,97 @@ pub fn breath_reconcile_cancellation_count(
     count
 }
 
+// MARK: - C ABI exports (chapter 七百六十二 第三刀 / M2463)
+//
+// Thin extern "C" wrappers over the pure-fn surface。 No wire-
+// format complexity — these are pure scalar in / scalar out
+// calls,parallel to chapter 七百四十 / 七百四十七 / 七百四十八
+// patterns。
+
+/// C ABI:lung_state_decay。 Returns the new pressure value
+/// (decayed from prev_pressure by idle_seconds with the given
+/// time_constant)。 Pure fn,no error path。
+#[no_mangle]
+pub extern "C" fn bas_lung_state_decay(
+    prev_pressure: f64,
+    idle_seconds: f64,
+    time_constant_seconds: f64,
+) -> f64 {
+    lung_state_decay(prev_pressure, idle_seconds, time_constant_seconds)
+}
+
+/// C ABI:lung_state_record_turn。 Combined decay + turn-record
+/// step。 Pure fn,no error path。
+///
+/// `run_mode` is a u8 wire byte mapping to `RunMode` discriminants
+/// (0..9)。 Out-of-range values are treated as Dormant (load 0.01)
+/// to provide a sensible defensive default。
+#[no_mangle]
+pub extern "C" fn bas_lung_state_record_turn(
+    prev_pressure: f64,
+    idle_seconds: f64,
+    time_constant_seconds: f64,
+    run_mode: u8,
+    duration_seconds: f64,
+) -> f64 {
+    let mode = RunMode::from_u8(run_mode).unwrap_or(RunMode::Dormant);
+    lung_state_record_turn(
+        prev_pressure,
+        idle_seconds,
+        time_constant_seconds,
+        mode,
+        duration_seconds,
+    )
+}
+
+/// C ABI:breath_validate。 Returns:
+///   0 — allowed
+///   1 — ScheduleError::ThermalEmergencyRejectsAll
+///   2 — ScheduleError::ClassRejectedAtGuard
+///  -1 — invalid class or guard byte (out of u8 enum range)
+///
+/// Pure fn,no allocation。
+#[no_mangle]
+pub extern "C" fn bas_breath_validate(
+    class_byte: u8,
+    guard_level_byte: u8,
+) -> i32 {
+    let class = match MaintenanceClass::from_u8(class_byte) {
+        Some(c) => c,
+        None => return -1,
+    };
+    let guard = match ThermalGuardLevel::from_u8(guard_level_byte) {
+        Some(g) => g,
+        None => return -1,
+    };
+    match breath_validate(class, guard) {
+        Ok(()) => 0,
+        Err(e) => e as i32,
+    }
+}
+
+/// C ABI:should_cancel_on_reconcile。 Returns:
+///   1 — cancel this breath
+///   0 — keep this breath
+///  -1 — invalid class or guard byte
+///
+/// Pure fn,no allocation。
+#[no_mangle]
+pub extern "C" fn bas_breath_should_cancel_on_reconcile(
+    class_byte: u8,
+    new_guard_level_byte: u8,
+) -> i32 {
+    let class = match MaintenanceClass::from_u8(class_byte) {
+        Some(c) => c,
+        None => return -1,
+    };
+    let guard = match ThermalGuardLevel::from_u8(new_guard_level_byte) {
+        Some(g) => g,
+        None => return -1,
+    };
+    if breath_should_cancel_on_reconcile(class, guard) { 1 } else { 0 }
+}
+
 // MARK: - ABI version
 
 pub const ABI_VERSION: i32 = 1;
@@ -719,5 +810,97 @@ mod tests {
             breath_reconcile_cancellation_count(&breaths,
                 ThermalGuardLevel::Emergency),
             0);
+    }
+
+    // MARK: - C ABI tests (knife 三 / M2463)
+
+    #[test]
+    fn test_c_abi_lung_state_decay() {
+        // ε = 1e-6
+        let result = bas_lung_state_decay(1.0, 180.0, 180.0);
+        assert!((result - (-1.0_f64).exp()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_c_abi_lung_state_record_turn() {
+        // Empty accumulator,1 second engage (load 0.05) → 0.05。
+        let result = bas_lung_state_record_turn(
+            0.0, 0.0, 180.0, RunMode::Engage as u8, 1.0);
+        assert!((result - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_c_abi_lung_state_record_turn_invalid_run_mode_defaults_to_dormant() {
+        // Out-of-range run_mode → Dormant (load 0.01)。
+        let result = bas_lung_state_record_turn(
+            0.0, 0.0, 180.0, 255, 1.0);
+        assert!((result - 0.01).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_c_abi_breath_validate_allowed() {
+        assert_eq!(
+            bas_breath_validate(
+                MaintenanceClass::Light as u8,
+                ThermalGuardLevel::Nominal as u8),
+            0);
+    }
+
+    #[test]
+    fn test_c_abi_breath_validate_emergency_rejects() {
+        assert_eq!(
+            bas_breath_validate(
+                MaintenanceClass::Light as u8,
+                ThermalGuardLevel::Emergency as u8),
+            1, // ThermalEmergencyRejectsAll
+        );
+    }
+
+    #[test]
+    fn test_c_abi_breath_validate_throttle_rejects_standard() {
+        assert_eq!(
+            bas_breath_validate(
+                MaintenanceClass::Standard as u8,
+                ThermalGuardLevel::Throttle as u8),
+            2, // ClassRejectedAtGuard
+        );
+    }
+
+    #[test]
+    fn test_c_abi_breath_validate_invalid_byte_returns_minus_1() {
+        assert_eq!(
+            bas_breath_validate(99, ThermalGuardLevel::Nominal as u8),
+            -1);
+        assert_eq!(
+            bas_breath_validate(MaintenanceClass::Light as u8, 99),
+            -1);
+    }
+
+    #[test]
+    fn test_c_abi_should_cancel_emergency() {
+        assert_eq!(
+            bas_breath_should_cancel_on_reconcile(
+                MaintenanceClass::None as u8,
+                ThermalGuardLevel::Emergency as u8),
+            1);
+    }
+
+    #[test]
+    fn test_c_abi_should_cancel_watch_keeps_all() {
+        for &c in &MaintenanceClass::ALL {
+            assert_eq!(
+                bas_breath_should_cancel_on_reconcile(
+                    c as u8,
+                    ThermalGuardLevel::Watch as u8),
+                0);
+        }
+    }
+
+    #[test]
+    fn test_c_abi_should_cancel_invalid_byte_returns_minus_1() {
+        assert_eq!(
+            bas_breath_should_cancel_on_reconcile(
+                99, ThermalGuardLevel::Nominal as u8),
+            -1);
     }
 }
