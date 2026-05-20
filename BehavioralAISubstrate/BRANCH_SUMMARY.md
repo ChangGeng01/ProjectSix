@@ -1,17 +1,19 @@
 # BehavioralAISubstrate — phase-4-chapter-721-aggressive-evolution
 
-**Branch arc:** chapter 七百二/ M2167 → chapter 七百三十 / M2325
-**Status:** SEALED — 30 chapters, 150 knives, ~858 commits
+**Branch arc:** chapter 七百二 / M2167 → chapter 七百三十七 / M2360
+**Status:** SEALED — 37 chapters, 185 knives, ~880 commits
 
 ## Arc trajectory
 
-This branch covers **two contiguous arcs** that landed together:
+This branch covers **five contiguous sub-arcs** that landed together:
 
 | Sub-arc | Chapters | Theme |
 |---|---|---|
 | Multi-language augmentation | 七百二-七百六 | 5-language scaffold (SQL + C + Metal + C++ + Rust) |
 | Substrate maturation | 七百七-七百二十 | Per-primitive auto-router buildouts |
 | Aggressive evolution | 七百二十一-七百三十 | Memory-priority + quality-gated extensions |
+| Quality refinement | 七百三十一-七百三十二 | Scope-gap closure (autoregressive drift, BPE optims) + deferred-migration (event log binary wiring) |
+| Tiered-compression idiom | 七百三十三-七百三十七 | Float16 KV, unified sum-types, tier auto-routers (KV/Vector/EventLog), abstract protocol |
 
 ## Native % trajectory
 
@@ -186,7 +188,86 @@ Total Swift test LOC:      ~269,784
 - **「不要 计算 commented 代码」** — comment-aware LOC counting
 - **「不要 json 可以的话 就 sql」** — SQL preferred over JSON for new schemas
 
+## chapters 七百三十一-七百三十七 — Quality refinement + Tiered-compression idiom
+
+After chapter 七百三十 sealed the original 30-chapter arc,seven more chapters
+landed under the same measurement-first discipline:
+
+| Chapter | Theme | Outcome |
+|---|---|---|
+| 七百三十一 | Quality refinement | PQ K-means++ init, configurable K, autoregressive KV drift (5e-6 max across 100 steps), recall + scorecard updates |
+| 七百三十二 | Event log binary wiring | Closes chapter 七百二十四 deferred-migration: schema v1→v2 + dual-read codec + 50-entry byte-equality. Storage 1.23×, speed TIED |
+| 七百三十三 | Float16 KV cache | Closes Plan-agent gap. ARM NEON FP16, 2× shrink, **17.7× more precise than int8** |
+| 七百三十四 | Unified KV sum-type | `BASKVCacheCompressedToken` enum over (Float32/Float16/int8). Single typed API, Codable, exhaustive switch |
+| 七百三十五 | KV tier auto-router | `BASKVCacheTierSelector` — host-facing decision API. Memory + accuracy priority enums |
+| 七百三十六 | Vector tier auto-router | Mirror pattern for vector storage (Float32/int8/PQ) |
+| 七百三十七 | EventLog selector + TIERED-COMPRESSION protocol + BPE PQ algo | Apply idiom to event log + abstract `BASTieredCompressionTier` protocol + close BPE O(N²) → O(N log N) |
+
+## The TIERED-COMPRESSION IDIOM
+
+Across chapters 七百三十五-七百三十七 the substrate organically converged on a
+reusable pattern formalized in chapter 七百三十七 第二刀:
+
+```swift
+protocol BASTieredCompressionTier:
+    RawRepresentable, Codable, Equatable, Hashable,
+    Sendable, CaseIterable
+    where RawValue == String {
+    var asymptoticShrinkRatio: Double { get }
+}
+
+protocol BASTieredCompressionSelection:
+    Equatable, Hashable, Sendable {
+    associatedtype Tier: BASTieredCompressionTier
+    var tier: Tier { get }
+    var bytesUsed: Int { get }
+    var fitsInBudget: Bool { get }
+    var reason: String { get }
+}
+```
+
+**Three concrete substacks conform:**
+
+| Substack | Tier enum | Selector | Estimator |
+|---|---|---|---|
+| KV cache | Float32 / Float16 / int8 | `BASKVCacheTierSelector` | `BASKVCacheBudgetEstimator` |
+| Vector storage | Float32 / int8 / PQ | `BASVectorStorageSelector` | `BASVectorStorageEstimator` |
+| Event log | JSON v1 / binary v2 | `BASEventLogStorageSelector` | `BASEventLogStorageEstimator` |
+
+Each selector returns a typed `Selection` struct with `(tier, bytesUsed, fitsInBudget, reason)`.
+
+## BPE algorithmic refinement (chapter 七百三十七 第三刀)
+
+The chapter 七百二十二 第三刀 documented O(N²) merge-loop limitation is now CLOSED:
+
+- **Algorithm**: BinaryHeap + doubly-linked list (standard BPE acceleration)
+- **Complexity**: O(N log N) amortized (vs O(N²) linear-scan)
+- **Output**: byte-identical to the legacy algo (all 21 Rust + 27 Swift tests still green)
+- **Side effect**: chapter 七百二十二 第四刀 pre-tokenization workaround is now slower than raw — the workaround became redundant once the limitation was fixed (a beautiful substrate-shape moment documented honestly)
+
+## Final 37-chapter statistics
+
+```
+Chapters:                       37
+Knives:                        185
+Commits ahead of branch:      ~880
+Rust crates:                     9
+Rust LOC:                  ~14,500
+Auto-router families:           25
+Production-default flips:        9
+Net-new opt-in capabilities:    12
+Quality-gated capabilities:      4
+TIERED-COMPRESSION substacks:    3 (KV / Vector / EventLog)
+TIERED-COMPRESSION protocol:     1 (formalized at chapter 七百三十七)
+Plan-agent gaps RESOLVED:        3
+Deferred capabilities CLOSED:    2
+Algorithmic limitations CLOSED:  1 (BPE O(N²) → O(N log N))
+Total Swift source LOC:    ~293,000
+Total Swift test LOC:      ~273,000
+```
+
 ## Branch arc SEALED
 
-30 chapters delivered under measurement-first discipline. Honest landings,
-substrate shape preserved. Branch ready for merge or downstream arc.
+37 chapters delivered under measurement-first discipline. Honest landings,
+substrate shape preserved. The TIERED-COMPRESSION IDIOM formalized as the
+arc's organizing principle. Branch ready for merge or downstream arc.
