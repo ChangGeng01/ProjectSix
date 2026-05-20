@@ -732,6 +732,30 @@ int32_t bas_organ_router_select(
     int32_t shape_size,
     int32_t budget_raw);
 
+// MARK: - bas-dream-loop (chapter 七百四十八 第一刀 / M2411)
+//
+// L9 Dream Loop batch-scoring kernel。 Per user L9 sub-
+// directive 「candidate simulation、future projection、
+// batch scoring 适合 Rust/Metal」。
+//
+// Composite score per candidate:
+//   score[i] = 0.6 * cosine(query, cand[i])
+//            + 0.4 * (benefit[i] - cost[i])
+//
+// Returns top-K candidate indices (descending by score)。
+
+int32_t bas_dream_loop_abi_version(void);
+
+int32_t bas_dream_loop_batch_score(
+    const float *query_ptr, int32_t query_dim,
+    const float *candidates_flat_ptr,
+    int32_t candidate_count,
+    const double *benefits_ptr,
+    const double *costs_ptr,
+    int32_t k,
+    int32_t *out_indices_ptr,
+    int32_t out_capacity);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

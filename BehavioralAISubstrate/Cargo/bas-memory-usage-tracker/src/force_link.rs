@@ -146,6 +146,25 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_organ_router::bas_organ_router_select(
             0, 64, 0);
     total = total.wrapping_add(router_rc);
+    // chapter 七百四十八 第一刀 / M2411 — force-link the L9
+    // dream-loop batch-scoring kernel。 Sentinel inputs:
+    // zero-size corpus → returns 0 (no indices written,
+    // no observable side-effect)。
+    let query: [f32; 1] = [0.0];
+    let cands: [f32; 0] = [];
+    let benefits: [f64; 0] = [];
+    let costs: [f64; 0] = [];
+    let mut out: [i32; 0] = [];
+    let dl_rc = unsafe {
+        bas_dream_loop::bas_dream_loop_batch_score(
+            query.as_ptr(), 1,
+            cands.as_ptr(), 0,
+            benefits.as_ptr(),
+            costs.as_ptr(),
+            0,
+            out.as_mut_ptr(), 0)
+    };
+    total = total.wrapping_add(dl_rc);
     total
 }
 

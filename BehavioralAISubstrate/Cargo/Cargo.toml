@@ -29,6 +29,7 @@ members = [
     "bas-tokenizer",               # chapter 七百二十二 第一刀 / M2281
     "bas-tribunal-court",          # chapter 七百四十 第一刀 / M2371
     "bas-organ-router",            # chapter 七百四十七 第一刀 / M2406
+    "bas-dream-loop",              # chapter 七百四十八 第一刀 / M2411
 ]
 resolver = "2"
 

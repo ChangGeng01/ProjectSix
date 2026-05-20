@@ -2866,6 +2866,70 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - L9 Dream Loop batch-scoring (chapter 七百四十八 第一刀 / M2411)
+    //
+    // LAYER-MIGRATION ARC Swift bridge for L9 Dream Loop
+    // batch-scoring kernel (Cargo/bas-dream-loop/src/lib.rs)。
+
+    /// Returns the bas-dream-loop ABI version。
+    public static func dreamLoopABIVersion() -> Int32 {
+        #if os(iOS) || os(macOS)
+        return bas_dream_loop_abi_version()
+        #else
+        return 0
+        #endif
+    }
+
+    /// Batch-score candidates against a query via the L9
+    /// Rust kernel。 Returns top-K candidate indices
+    /// (descending by composite score),or nil on FFI
+    /// fault (null pointer / bad shape)。
+    public static func dreamLoopBatchScore(
+        query: [Float],
+        candidates: [[Float]],
+        benefits: [Double],
+        costs: [Double],
+        topK: Int
+    ) -> [Int32]? {
+        #if os(iOS) || os(macOS)
+        let n = candidates.count
+        guard n == benefits.count, n == costs.count
+        else { return nil }
+        // Flatten candidates row-major
+        var flat: [Float] = []
+        flat.reserveCapacity(n * query.count)
+        for c in candidates {
+            flat.append(contentsOf: c)
+        }
+        var out = [Int32](repeating: -1, count: topK)
+        let written = query.withUnsafeBufferPointer { qp -> Int32 in
+            flat.withUnsafeBufferPointer { fp in
+                benefits.withUnsafeBufferPointer { bp in
+                    costs.withUnsafeBufferPointer { cp in
+                        out.withUnsafeMutableBufferPointer {
+                            op in
+                            return bas_dream_loop_batch_score(
+                                qp.baseAddress,
+                                Int32(query.count),
+                                fp.baseAddress,
+                                Int32(n),
+                                bp.baseAddress,
+                                cp.baseAddress,
+                                Int32(topK),
+                                op.baseAddress,
+                                Int32(topK))
+                        }
+                    }
+                }
+            }
+        }
+        if written < 0 { return nil }
+        return Array(out.prefix(Int(written)))
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(

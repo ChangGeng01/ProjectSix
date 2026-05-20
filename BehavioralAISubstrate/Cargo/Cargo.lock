@@ -22,6 +22,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bas-dream-loop"
+version = "0.1.0"
+
+[[package]]
 name = "bas-event-log-codec"
 version = "0.1.0"
 dependencies = [
@@ -44,6 +48,7 @@ name = "bas-memory-usage-tracker"
 version = "0.1.0"
 dependencies = [
  "bas-canonical-bytes",
+ "bas-dream-loop",
  "bas-event-log-codec",
  "bas-memory-atom-store",
  "bas-organ-router",

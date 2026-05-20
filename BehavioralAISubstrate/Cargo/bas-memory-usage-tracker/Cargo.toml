@@ -52,3 +52,8 @@ bas-tribunal-court    = { path = "../bas-tribunal-court" }
 # Rust 管 routing/adapter policy。」 The policy lives here;
 # kernels stay Metal + Swift。
 bas-organ-router      = { path = "../bas-organ-router" }
+# chapter 七百四十八 第一刀 / M2411 — bundle the L9 dream-
+# loop batch-scoring kernel。 Per user L9 sub-directive
+# 「candidate simulation、future projection、batch scoring
+# 适合 Rust/Metal。」
+bas-dream-loop        = { path = "../bas-dream-loop" }

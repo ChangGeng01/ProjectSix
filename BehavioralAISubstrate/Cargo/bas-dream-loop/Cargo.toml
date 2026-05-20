@@ -1,0 +1,26 @@
+# Cargo manifest for bas-dream-loop
+# chapter 七百四十八 第一刀 / M2411 — LAYER-MIGRATION ARC
+#
+# L9 Dream Loop batch-scoring kernel。 Per user directive
+# L9 sub-directive:
+#
+#   「candidate simulation、future projection、batch scoring
+#    适合 Rust/Metal。」
+#
+# Direct re-use of chapter 七百十五 batched-cosine SIMD
+# pattern。 The Dream Loop simulates candidate paths in
+# bulk;the hot path is scoring a batch of N candidates
+# against a single query vector + aggregating into a
+# top-K result。
+
+[package]
+name = "bas-dream-loop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_dream_loop"
+path = "src/lib.rs"
