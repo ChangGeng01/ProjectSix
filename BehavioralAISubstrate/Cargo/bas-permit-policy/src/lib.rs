@@ -12,6 +12,13 @@
 pub mod decision;
 pub mod enums;
 pub mod risk;
+// chapter 七百三十九 第一刀 / M2366 — L11 Wind Gate state-
+// machine port (LAYER-MIGRATION ARC)。 Pairs with chapter
+// 七百三十八 net-new SQL persistence layer (006/007/008
+// schemas)。 Pure deterministic classifier + threshold
+// + version comparator。 See risk_plane.rs header for the
+// 「完全 移植 if WHOLE is better」 directive context。
+pub mod risk_plane;
 
 pub const ABI_VERSION: i32 = 1;
 
