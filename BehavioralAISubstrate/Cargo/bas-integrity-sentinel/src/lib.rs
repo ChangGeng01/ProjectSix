@@ -220,31 +220,83 @@ impl ScanReport {
 }
 
 // MARK: - scan_artifacts pure fn (knife 二 / M2452)
-//
-// Knife 一 ships ONLY the types + scaffolding。 Knife 二 fleshes
-// out the scan_artifacts function。 We provide a stub here that
-// returns `ScanReport::clean()` so the crate compiles + tests can
-// import the symbol;the real logic lands at knife 二。
 
 /// Pure-fn verifier:given a `ScanRequest` + trusted fingerprint
-/// map,produces a `ScanReport`。
+/// map,produces a `ScanReport`。 Mirrors the Swift
+/// `BASSovereignIntegritySentinel.scan(_:)` method line-for-line。
 ///
-/// **NOTE (knife 一 stub)**:returns an empty clean report for
-/// now。 Knife 二 / M2452 ships the real claim-walking logic
-/// mirroring the Swift `scan(_:)` method。
+/// Behavior:
+///   1. Iterate over `request.claims` in INSERTION ORDER
+///      (preserves Swift's `failedIDs` ordering)
+///   2. For each claim:
+///      a. Look up `trusted[claim.id]`
+///      b. UNKNOWN id (no entry) → claim FAILS (conservative
+///         per Swift line 162-163 + Swift fail-when-trusted-nil)
+///      c. KNOWN id → compare `claim.claimed_hash` to the
+///         stored hash CASE-INSENSITIVELY (both sides lowercased
+///         before compare,defensive vs Swift's pre-lowercased
+///         storage assumption)
+///   3. Forward `observed_self_mutation` from the request to the
+///      report verbatim (Swift line 172)
 ///
-/// Fingerprint map ordering:caller passes a `BTreeMap` so the
-/// scan loop iterates in deterministic id-string order when
-/// reading expected hashes。 (HashMap would still produce the same
-/// ScanReport because the loop iterates over `request.claims`,
-/// not over the trusted map,but BTreeMap signals the intent that
-/// the trusted set is deterministically-ordered storage。)
+/// Fingerprint map type:`BTreeMap<String, String>` provides
+/// deterministic id-string iteration order。 Used here mainly as
+/// the recommended caller-side storage type — the scan loop
+/// iterates over `request.claims` (not over the trusted map) so
+/// the report's `failed_artifact_ids` ordering depends on claim
+/// order,not trusted-map order。
+///
+/// Output ordering pins:
+///   - `failed_artifact_ids` = insertion order of failed claims
+///   - `failed_kinds` = ascending discriminant order (BTreeSet)
+///   - `observed_self_mutation` = pass-through
+///
+/// Pure function:no I/O,no shared state,no panics on any input。
+/// chapter 七百六十 第二刀 / M2452。
 pub fn scan_artifacts(
-    _request: &ScanRequest,
-    _trusted: &BTreeMap<String, String>,
+    request: &ScanRequest,
+    trusted: &BTreeMap<String, String>,
 ) -> ScanReport {
-    // Knife 二 placeholder — real implementation lands at M2452。
-    ScanReport::clean()
+    let mut failed_ids: Vec<String> = Vec::new();
+    let mut failed_kinds: BTreeSet<ArtifactKind> = BTreeSet::new();
+
+    for claim in &request.claims {
+        let claimed_lower = claim.claimed_hash.to_ascii_lowercase();
+        let matches = match trusted.get(&claim.id) {
+            Some(expected) => expected.to_ascii_lowercase() == claimed_lower,
+            None => false, // unknown artifact → conservative fail
+        };
+        if !matches {
+            failed_ids.push(claim.id.clone());
+            failed_kinds.insert(claim.kind);
+        }
+    }
+
+    ScanReport {
+        failed_artifact_ids: failed_ids,
+        failed_kinds,
+        observed_self_mutation: request.observed_self_mutation,
+    }
+}
+
+/// Convenience builder:produce a trusted-fingerprint `BTreeMap`
+/// from `(id, hash)` pairs。 Stores values already-lowercased so
+/// repeated scans don't pay the lowercase cost twice。
+///
+/// Mirrors the Swift `registerFingerprints(_ pairs: [String:String])`
+/// bulk-load method。 Useful for test fixtures + bootstrap from a
+/// signed manifest。
+pub fn build_trusted_fingerprints<I, S1, S2>(pairs: I) -> BTreeMap<String, String>
+where
+    I: IntoIterator<Item = (S1, S2)>,
+    S1: Into<String>,
+    S2: AsRef<str>,
+{
+    let mut map = BTreeMap::new();
+    for (id, hash) in pairs {
+        map.insert(id.into(), hash.as_ref().to_ascii_lowercase());
+    }
+    map
 }
 
 // MARK: - ABI version
@@ -415,14 +467,244 @@ mod tests {
         ]);
     }
 
+    // MARK: - scan_artifacts knife 二 / M2452 tests
+
     #[test]
-    fn test_scan_artifacts_knife_one_stub_returns_clean() {
-        // Knife 一 stub:always returns clean。 Knife 二 will
-        // replace this with the real walk + this test will be
-        // rewritten to verify failure detection。
+    fn test_scan_empty_claims_empty_trusted_returns_clean() {
         let req = ScanRequest::new(Vec::new(), false);
         let trusted: BTreeMap<String, String> = BTreeMap::new();
         let report = scan_artifacts(&req, &trusted);
         assert_eq!(report, ScanReport::clean());
+    }
+
+    #[test]
+    fn test_scan_empty_claims_with_self_mutation_forwards_flag() {
+        let req = ScanRequest::new(Vec::new(), true);
+        let trusted: BTreeMap<String, String> = BTreeMap::new();
+        let report = scan_artifacts(&req, &trusted);
+        assert!(report.observed_self_mutation,
+            "observed_self_mutation must pass through to report");
+        assert!(report.failed_artifact_ids.is_empty());
+        assert!(report.failed_kinds.is_empty());
+    }
+
+    #[test]
+    fn test_scan_known_artifact_matching_hash_passes() {
+        let trusted = build_trusted_fingerprints(vec![
+            ("model.weights", "deadbeef"),
+        ]);
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "model.weights",
+                "deadbeef",
+                ArtifactKind::ModelOrPolicyArtifact),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert!(report.failed_artifact_ids.is_empty(),
+            "matching hash → no failures");
+        assert!(report.failed_kinds.is_empty());
+    }
+
+    #[test]
+    fn test_scan_known_artifact_mismatched_hash_fails() {
+        let trusted = build_trusted_fingerprints(vec![
+            ("model.weights", "deadbeef"),
+        ]);
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "model.weights",
+                "cafef00d",  // ≠ trusted "deadbeef"
+                ArtifactKind::ModelOrPolicyArtifact),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert_eq!(report.failed_artifact_ids,
+            vec!["model.weights".to_string()]);
+        assert!(report.failed_kinds.contains(
+            &ArtifactKind::ModelOrPolicyArtifact));
+        assert_eq!(report.as_hard_bits(), 0x0001,
+            "BR-001 bit lit on model-artifact failure");
+    }
+
+    #[test]
+    fn test_scan_unknown_artifact_fails_conservatively() {
+        // Per Swift line 162-163:unknown artifact (no entry in
+        // trusted) MUST count as a failure。 The sentinel cannot
+        // vouch for what it has no ground truth for。
+        let trusted: BTreeMap<String, String> = BTreeMap::new();
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "mystery.artifact",
+                "deadbeef",
+                ArtifactKind::SovereignPolicyBundle),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert_eq!(report.failed_artifact_ids,
+            vec!["mystery.artifact".to_string()]);
+        assert!(report.failed_kinds.contains(
+            &ArtifactKind::SovereignPolicyBundle));
+        assert_eq!(report.as_hard_bits(), 0x0020,
+            "BR-006 bit lit on policy-bundle failure");
+    }
+
+    #[test]
+    fn test_scan_case_insensitive_hash_compare_uppercase_claim() {
+        // Trusted stored lowercase;claim hash UPPERCASE;match。
+        let trusted = build_trusted_fingerprints(vec![
+            ("policy.bundle", "abcdef0123456789"),
+        ]);
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "policy.bundle",
+                "ABCDEF0123456789",
+                ArtifactKind::SovereignPolicyBundle),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert!(report.failed_artifact_ids.is_empty(),
+            "uppercase claim must match lowercase trusted");
+    }
+
+    #[test]
+    fn test_scan_case_insensitive_hash_compare_uppercase_trusted() {
+        // Defensive:trusted stored mixed-case;claim hash lowercase;
+        // match。 build_trusted_fingerprints already lowercases on
+        // insertion,but scan_artifacts must defensively lowercase
+        // both sides too。
+        let mut trusted: BTreeMap<String, String> = BTreeMap::new();
+        trusted.insert(
+            "thought.fold".to_string(),
+            "ABCDEF0123456789".to_string()); // NOT lowercased
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "thought.fold",
+                "abcdef0123456789",
+                ArtifactKind::ThoughtFoldOrCache),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert!(report.failed_artifact_ids.is_empty(),
+            "defensive both-sides-lowercase compare must match");
+    }
+
+    #[test]
+    fn test_scan_observed_self_mutation_alone_lights_br_007() {
+        // No failed kinds,but self-mutation flag set → BR-007 lit。
+        let trusted = build_trusted_fingerprints(vec![
+            ("runtime.image", "abc"),
+        ]);
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "runtime.image",
+                "abc",
+                ArtifactKind::RuntimeImage),
+        ], true);
+        let report = scan_artifacts(&req, &trusted);
+        assert!(report.failed_artifact_ids.is_empty(),
+            "runtime image claim must pass (matches trusted)");
+        assert!(report.failed_kinds.is_empty(),
+            "no kind failed,but self_mutation still flips BR-007");
+        assert!(report.observed_self_mutation);
+        assert_eq!(report.as_hard_bits(), 0x0040,
+            "BR-007 lit via observed_self_mutation alone");
+    }
+
+    #[test]
+    fn test_scan_failed_ids_preserve_claim_insertion_order() {
+        // Claims iterated in insertion order;failedIDs accumulated
+        // in same order。 Verify ordering by failing claims at
+        // positions 0,2,3 in a 4-claim batch。
+        let trusted = build_trusted_fingerprints(vec![
+            ("a", "match_a"),
+            ("b", "match_b"),
+            ("c", "match_c"),
+            ("d", "match_d"),
+        ]);
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "a", "WRONG", ArtifactKind::ModelOrPolicyArtifact), // FAIL[0]
+            ArtifactClaim::new(
+                "b", "match_b", ArtifactKind::ModelOrPolicyArtifact),
+            ArtifactClaim::new(
+                "c", "WRONG", ArtifactKind::ThoughtFoldOrCache), // FAIL[2]
+            ArtifactClaim::new(
+                "d", "WRONG", ArtifactKind::RuntimeImage), // FAIL[3]
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert_eq!(report.failed_artifact_ids,
+            vec!["a".to_string(), "c".to_string(), "d".to_string()],
+            "failed_ids preserves claim insertion order");
+    }
+
+    #[test]
+    fn test_scan_failed_kinds_deduped_in_set() {
+        // 3 claims of the same kind fail → failed_kinds set has 1 entry。
+        let trusted: BTreeMap<String, String> = BTreeMap::new();
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "a", "0", ArtifactKind::ModelOrPolicyArtifact),
+            ArtifactClaim::new(
+                "b", "0", ArtifactKind::ModelOrPolicyArtifact),
+            ArtifactClaim::new(
+                "c", "0", ArtifactKind::ModelOrPolicyArtifact),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert_eq!(report.failed_artifact_ids.len(), 3);
+        assert_eq!(report.failed_kinds.len(), 1,
+            "BTreeSet dedupes repeated kind");
+    }
+
+    #[test]
+    fn test_scan_all_4_kinds_failed_combined_hard_bits() {
+        // One claim of each kind,all unknown → all 4 BR bits lit。
+        let trusted: BTreeMap<String, String> = BTreeMap::new();
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "a", "x", ArtifactKind::ModelOrPolicyArtifact),
+            ArtifactClaim::new(
+                "b", "x", ArtifactKind::SovereignPolicyBundle),
+            ArtifactClaim::new(
+                "c", "x", ArtifactKind::ThoughtFoldOrCache),
+            ArtifactClaim::new(
+                "d", "x", ArtifactKind::RuntimeImage),
+        ], false);
+        let report = scan_artifacts(&req, &trusted);
+        assert_eq!(report.failed_artifact_ids.len(), 4);
+        assert_eq!(report.failed_kinds.len(), 4);
+        assert_eq!(report.as_hard_bits(),
+            0x0001 | 0x0002 | 0x0020 | 0x0040);
+    }
+
+    #[test]
+    fn test_build_trusted_fingerprints_lowercases_on_insert() {
+        let trusted = build_trusted_fingerprints(vec![
+            ("id1", "DEADBEEF"),
+            ("id2", "MixedCASE"),
+        ]);
+        assert_eq!(trusted.get("id1"), Some(&"deadbeef".to_string()));
+        assert_eq!(trusted.get("id2"), Some(&"mixedcase".to_string()));
+    }
+
+    #[test]
+    fn test_scan_self_mutation_does_not_promote_passed_image_to_id_failure() {
+        // Self-mutation flag lights BR-007 but does NOT add the
+        // runtime.image claim to failed_artifact_ids when that
+        // claim itself passed verification。 Per Swift behavior:
+        // failed_ids = ID-level failures only;BR-007 bit = OR
+        // of kind-failure + self-mutation。
+        let trusted = build_trusted_fingerprints(vec![
+            ("runtime.image", "good_hash"),
+        ]);
+        let req = ScanRequest::new(vec![
+            ArtifactClaim::new(
+                "runtime.image",
+                "good_hash",
+                ArtifactKind::RuntimeImage),
+        ], true);
+        let report = scan_artifacts(&req, &trusted);
+        assert!(report.failed_artifact_ids.is_empty(),
+            "passing claim must NOT appear in failed_artifact_ids");
+        assert!(!report.failed_kinds.contains(&ArtifactKind::RuntimeImage),
+            "passing claim must NOT appear in failed_kinds");
+        assert!(report.observed_self_mutation);
+        assert_eq!(report.as_hard_bits(), 0x0040,
+            "BR-007 lit only via observed_self_mutation");
     }
 }
