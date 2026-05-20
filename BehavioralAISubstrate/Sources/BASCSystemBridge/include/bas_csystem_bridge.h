@@ -273,6 +273,78 @@ int32_t bas_memory_vm_stats(
     int64_t *out_page_size);
 int32_t bas_memory_pressure_percent(int32_t *out_pct);
 
+// MARK: - chapter 七百六十一 — L1 partial C system probes
+//
+// New probes added in this chapter:
+//   - bas_wallclock_nanos      : sleep-INCLUSIVE clock via
+//                                 mach_absolute_time + timebase
+//   - bas_task_phys_footprint  : richer memory probe via
+//                                 TASK_VM_INFO (phys_footprint +
+//                                 compressed memory)
+
+/// chapter 七百六十一 第一刀 — sleep-INCLUSIVE monotonic clock
+/// via `mach_absolute_time()` + Mach timebase scaling。
+/// Counterpart to `bas_monotonic_nanos` (CLOCK_UPTIME_RAW
+/// which EXCLUDES sleep)。 The L1 thermal scheduler uses BOTH
+/// values:turn duration via the sleep-excluded clock,sleep-
+/// latency via this sleep-included clock。
+///
+/// **Apple platforms only**:Non-Apple fallback returns -3。
+///
+/// - Parameter out:non-null pointer to receive nanoseconds since
+///   boot (sleep-included)。
+/// - Returns:0 on success,negative on error。
+///   - -1 = null `out` pointer
+///   - -2 = `mach_timebase_info` initialization failed
+///   - -3 = unsupported platform
+///
+/// **Thread-safety**:reentrant + lock-free。 The timebase
+/// cache is racily initialized to the SAME constant value by
+/// multiple threads — write-write tear is benign。
+int32_t bas_wallclock_nanos(uint64_t *out);
+
+/// ABI / behavior version pin for `bas_wallclock_nanos`。
+/// Currently 1。
+int32_t bas_wallclock_nanos_version(void);
+
+/// chapter 七百六十一 第二刀 — richer memory probe via
+/// `task_info(TASK_VM_INFO)`。 Counterpart to
+/// `bas_process_resident_memory_bytes` (which uses the simpler
+/// `mach_task_basic_info` and only returns RSS)。 This entry
+/// exposes:
+///   - phys_footprint   : OS-tracked「memory footprint」 used
+///                         by jetsam pressure decisions
+///   - compressed       : pages compressed by the VM compressor
+///   - internal         : private (anonymous) memory
+///
+/// All values are in BYTES。 Used by chapter L1 thermal +
+/// memory schedulers to detect approaching jetsam thresholds
+/// before the kernel kills the process。
+///
+/// **Apple platforms only**:Non-Apple fallback returns -3。
+///
+/// - Parameters:
+///   - out_phys_footprint :non-null pointer to receive
+///     phys_footprint bytes
+///   - out_compressed     :non-null pointer to receive
+///     compressed bytes
+///   - out_internal       :non-null pointer to receive
+///     internal (anonymous) bytes
+/// - Returns:0 on success,negative on error。
+///   - -1 = null out pointer
+///   - -2 = `task_info` Mach call failed
+///   - -3 = unsupported platform
+///
+/// **Thread-safety**:reentrant + lock-free。
+int32_t bas_task_phys_footprint(
+    uint64_t *out_phys_footprint,
+    uint64_t *out_compressed,
+    uint64_t *out_internal);
+
+/// ABI / behavior version pin for `bas_task_phys_footprint`。
+/// Currently 1。
+int32_t bas_task_phys_footprint_version(void);
+
 #ifdef __cplusplus
 }
 #endif

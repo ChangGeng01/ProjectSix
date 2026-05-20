@@ -343,3 +343,90 @@ int32_t bas_process_disk_io_blocks(
 int32_t bas_process_disk_io_blocks_version(void) {
     return 1;
 }
+
+// MARK: - bas_wallclock_nanos (chapter 七百六十一 第一刀 / M2456)
+//
+// Sleep-INCLUSIVE monotonic timestamp via `mach_absolute_time()`
+// + Mach timebase scaling。 Counterpart to `bas_monotonic_nanos`
+// (CLOCK_UPTIME_RAW which EXCLUDES sleep)。
+//
+// Why two clocks
+// --------------
+//
+// Apple's runtime distinguishes:
+//   - CLOCK_UPTIME_RAW :time since boot,EXCLUDING sleep intervals
+//                       (useful for turn-duration measurement —
+//                        sleep doesn't「count」 against your CPU)
+//   - mach_absolute_time:time since boot,INCLUDING sleep intervals
+//                       (useful for detecting how long the device
+//                        was asleep between two timestamps —
+//                        thermal management,attestation freshness)
+//
+// The substrate's chapter 一 (L1) thermal scheduler needs BOTH
+// values:turn duration to gate inferences,sleep latency to
+// detect attestation-stale states across resume from background。
+// Per the chapter 七百六十一 plan「L1 部分值得」 verdict — these
+// are the kind of platform-specific calls C handles better than
+// Swift's DispatchTime wrapper。
+//
+// Mach timebase conversion
+// ------------------------
+//
+// mach_absolute_time returns「abs time units」 not nanoseconds。
+// On Apple Silicon devices the units are typically 1 ns each
+// (numer=1,denom=1)。 On older Intel Macs they were ~24.x ns
+// per unit。 The proper conversion multiplies by the host
+// timebase:nsec = abs * numer / denom。 We query the timebase
+// ONCE per process via static cache to keep the call cheap。
+
+#if __APPLE__
+#include <mach/mach_time.h>
+
+static mach_timebase_info_data_t bas_timebase_cache = { 0, 0 };
+#endif
+
+int32_t bas_wallclock_nanos(uint64_t *out) {
+    if (out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    // Lazy-init Mach timebase。 mach_timebase_info is cheap but
+    // non-zero;caching shaves the call from the hot path of the
+    // thermal scheduler。 Thread-safety:two threads racing here
+    // will both write the same constant timebase values,which is
+    // safe (write-write tear is fine when both writes have the
+    // same value)。
+    if (bas_timebase_cache.denom == 0) {
+        if (mach_timebase_info(&bas_timebase_cache)
+            != KERN_SUCCESS) {
+            *out = 0;
+            return -2;
+        }
+    }
+    uint64_t abs = mach_absolute_time();
+    // Apply timebase scaling:nsec = abs * numer / denom。
+    // On Apple Silicon both are 1 so this collapses to abs。
+    if (bas_timebase_cache.numer == bas_timebase_cache.denom) {
+        *out = abs;
+    } else {
+        // Use 128-bit-ish split to avoid overflow on devices
+        // where abs is large + numer > denom。
+        *out = (abs / bas_timebase_cache.denom)
+               * bas_timebase_cache.numer
+             + ((abs % bas_timebase_cache.denom)
+                * bas_timebase_cache.numer)
+               / bas_timebase_cache.denom;
+    }
+    return 0;
+#else
+    // Non-Apple fallback:CLOCK_BOOTTIME (Linux) covers sleep
+    // semantics。 Substrate ships Apple-only so this is
+    // documentation。 On non-Linux fallback,return -3。
+    (void)out;
+    return -3;
+#endif
+}
+
+int32_t bas_wallclock_nanos_version(void) {
+    return 1;
+}
