@@ -9,6 +9,123 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
+## [0.57.0] — 2026-05-21 — DEEPER LAYER-MIGRATION ARC SEAL
+
+Tag covers chapters 七百五十八 → 七百七十三 / M2441-M2520 (16-chapter
+arc executing the 严苛结论 table per layer for the 9 remaining
+migration items not covered by the prior LAYER-MIGRATION ARC)。
+
+### Added — 8 new Rust crates
+
+- `bas-sovereign-c-abi` (chapter 七百五十八) — public C ABI wrapper
+  for L14 halt signal + integrity scan + tamper-proof audit。 First
+  hand-curated C header (`include/bas_sovereign_c_abi.h`) for
+  watchOS + 3rd-party C consumers。
+- `bas-red-team-bench` (chapter 七百五十九) — batch adversarial-
+  prompt classifier (24 red lines / 70 patterns)。 Measured 33-67×
+  speedup vs Swift single-threaded baseline。 Wire-format
+  `bas_red_team_classify_batch` C ABI。
+- `bas-integrity-sentinel` (chapter 七百六十) — typed Rust port of
+  BASSovereignIntegritySentinel with structured ScanReport output
+  (richer than the bas-sovereign-c-abi thin wrapper)。
+- `bas-lease-life` (chapter 七百六十二) — L1 LungStateAccumulator
+  pressure decay + BreathScheduler reconcile pure-fn surface。
+- `bas-mirror-blade` (chapter 七百六十四) — L7 decomposition state
+  classifier (DecomposeState enum + threshold-based emit rules)。
+- `bas-presence-eye` (chapter 七百六十六) — L6 signal-fusion
+  classifier (5-channel salience × confidence aggregator with
+  doctrine-pinned per-channel weights)。
+- `bas-host-constitution` (chapter 七百六十八 + 七百六十九) — L5
+  host-profile merge logic + deletion manifest classifier (6
+  MergeStrategy enums + 11 FieldKind discriminants)。
+- `bas-world-prior` (chapter 七百七十一) — L4 typed surface +
+  evidence propagation / reversibility / latency aggregation pure
+  fns (companion to 4 new SQL schemas)。
+
+### Added — extension to existing crate
+
+- `bas-permit-policy::rule_judgment` module (chapter 七百六十三) —
+  L12 BASHostUpdatePolicy port + UpdateAction allow checks。
+
+### Added — 2 new C system bridge probes
+
+- `bas_wallclock_nanos` (chapter 七百六十一) — sleep-INCLUSIVE
+  monotonic clock via `mach_absolute_time` + Mach timebase。
+  Counterpart to existing `bas_monotonic_nanos` (sleep-excluded
+  via CLOCK_UPTIME_RAW)。 Perf TIE measured (0.96-1.04× vs Swift)
+  — ships opt-in via `cBridgeEnabled` flag。
+- `bas_task_phys_footprint` (chapter 七百六十一) — richer
+  per-process memory probe via `task_info(TASK_VM_INFO)` returning
+  phys_footprint + compressed + internal bytes (no Swift V1
+  equivalent)。
+
+### Added — 9 new SQL schemas
+
+- `011_unknown_ledger_records.sql` — L7 unknown-ledger
+- `012_contradiction_ledger_records.sql` — L7 contradiction-ledger
+- `013_presence_observations.sql` — L6 multi-channel signal
+  persistence
+- `014_host_constitution_version_tree.sql` — L5 version lineage
+- `015_host_constitution_deletion_manifest.sql` — L5 deletion audit
+- `016_world_priors_axioms.sql` — L4 axiom storage
+- `017_world_priors_templates.sql` — L4 action template storage
+- `018_world_priors_bridges.sql` — L4 cross-domain bridges
+- `019_world_priors_domains.sql` — L4 custom domain registry
+
+Total:9 schemas / 31 statements / 25 indexes。
+
+### Added — L13 Phase 1 Swift refactor
+
+- `BASShadowTrialPhase` enum (4 cases) + `BASShadowTrialStateMachine`
+  protocol + `BASShadowTrialStateMachineCore` default impl
+  (chapter 七百七十二)。 Extracts the L13 state-graph from the 687
+  LOC BASShadowTrialCoordinator into a swappable protocol seam。
+  Phase 2 Rust port deferred to a future arc;the coordinator
+  body stays Swift through Phase 1。
+
+### Changed
+
+- `Cargo/Cargo.toml` workspace gained 8 new members
+- `bas-memory-usage-tracker::force_link` extends with anchors for
+  each new crate;`bas_substrate_bundle_crate_count()` bumped
+  12 → 20。
+
+### Architecture milestones
+
+- **16-chapter DEEPER LAYER-MIGRATION ARC sealed** — branch
+  trajectory:chapters 七百五十八-七百七十三 / M2441-M2520。
+  All 9 remaining migration items from the 严苛结论 table addressed。
+- **Rust crate count:12 → 20** (+8)
+- **SQL schema count:10 → 19** (+9)
+- **L11 sub-arc DEEPER** (red-team + GSI) shipped Rust crates +
+  Swift bridges deactivated via `#if BAS_*_RUST_PATH_ACTIVE` flags
+  awaiting XCFramework rebuild。
+- **L1 partial sub-arc** measured perf TIE (0.96-1.04×) per
+  「亏的不要硬上」 — C probes ship opt-in。
+
+### Honest negative results (held to record)
+
+- L1 C probes perf measurement:TIE (1.2-1.5× was the plan
+  estimate;actual ranged 0.96-1.04×)。 Result:OPT-IN ship,
+  not production-default flip。
+- L12 rule-judgment ports kept tiny per 「L12 不适合大迁」 —
+  documented as TINY scope (just BASHostUpdatePolicy port,
+  4-bool struct + per-action allow check)。
+
+### Deferred to future arcs
+
+- **L13 Phase 2 Rust port** of ShadowTrialCoordinator state machine
+  + 3 SQL schemas (shadow_trial_records / evolution_seals /
+  retraction_orders) — user-chosen scope cut at plan time。
+- **XCFramework rebuild** wave to activate Swift bridges that
+  consume the 8 new crates。 Crates are linked into the staticlib
+  via force-link anchors,but the XCFramework headers/ subdirectory
+  needs maintenance-side rebuild via
+  `scripts/build-rust-xcframework.sh` before Swift hosts can call
+  the new C ABI symbols directly。
+
+---
+
 ## [0.56.0] — 2026-05-20 — MATURATION ARC SEAL + post-severance polish
 
 Tag covers chapters 七百二 → 七百五十七 (the full branch arc that delivered the

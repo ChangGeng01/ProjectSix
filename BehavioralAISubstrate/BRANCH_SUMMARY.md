@@ -1,11 +1,11 @@
 # BehavioralAISubstrate — phase-4-chapter-721-aggressive-evolution
 
-**Branch arc:** chapter 七百二 / M2167 → chapter 七百五十六 / M2437
-**Status:** SEALED — 56 chapter-shaped tags, ~261 knives, ~960 commits
+**Branch arc:** chapter 七百二 / M2167 → chapter 七百七十三 / M2520
+**Status:** SEALED — 72 chapter-shaped tags, ~341 knives, ~1010 commits
 
 ## Arc trajectory
 
-This branch covers **SIX contiguous sub-arcs** that landed together:
+This branch covers **SEVEN contiguous sub-arcs** that landed together:
 
 | Sub-arc | Chapters | Theme |
 |---|---|---|
@@ -14,7 +14,9 @@ This branch covers **SIX contiguous sub-arcs** that landed together:
 | Aggressive evolution | 七百二十一-七百三十 | Memory-priority + quality-gated extensions |
 | Quality refinement | 七百三十一-七百三十二 | Scope-gap closure (autoregressive drift, BPE optims) + deferred-migration (event log binary wiring) |
 | Tiered-compression idiom | 七百三十三-七百三十七 | Float16 KV, unified sum-types, tier auto-routers (KV/Vector/EventLog), abstract protocol |
-| **Layer migration** | **七百三十八-七百四十九** | **6 layer sub-arcs (L11/L10/L14/L3/L2/L9) per user directive 「完全 移植 if WHOLE is better」 — Rust takes hot paths + state machines + persistence + audit math, Swift retains façade / Apple-glue / public API. 5-axis comparison framework + forward-looking ports (no Swift production code touched).** |
+| Layer migration | 七百三十八-七百四十九 | 6 layer sub-arcs (L11/L10/L14/L3/L2/L9) per user directive 「完全 移植 if WHOLE is better」 — Rust takes hot paths + state machines + persistence + audit math, Swift retains façade / Apple-glue / public API. 5-axis comparison framework + forward-looking ports (no Swift production code touched). |
+| Maturation | 七百五十-七百五十七 | Production-default Rust flips (L14 chain seal + verdict engine) + SDK-readiness polish + crash contracts + per-file god-files override |
+| **Deeper layer migration** | **七百五十八-七百七十三** | **16-chapter arc executing the 严苛结论 table for 9 remaining migration items: L11 deeper (red-team batch + GSI sentinel), L1 partial (C probes + Rust budget), L12 rule-judgment, L7 Mirror Blade (state machine + SQL ledgers), L6 Presence Eye (fusion classifier + SQL), L5 Host Constitution (version tree + deletion manifest), L4 World Prior (4 SQL + Rust loader), L13 Phase 1 Swift refactor, L14 C ABI deeper. 8 new Rust crates, 9 new SQL schemas, 1 protocol-extraction refactor.** |
 
 ## Native % trajectory
 
