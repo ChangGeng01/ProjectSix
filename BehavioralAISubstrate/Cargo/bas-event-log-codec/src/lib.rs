@@ -13,6 +13,13 @@
 
 use serde::{Deserialize, Serialize};
 
+// chapter 七百四十四 第一刀 / M2391 — L3 Knowledge Graph
+// storage codec port。 Adds knowledge_graph_codec module to
+// this crate so the existing bas-event-log-codec staticlib
+// (already wired to BASRustMemoryTrackerBinary) gains the
+// L3 node/edge encode+decode primitives without a new crate。
+pub mod knowledge_graph_codec;
+
 pub const ABI_VERSION: i32 = 1;
 
 #[no_mangle]
