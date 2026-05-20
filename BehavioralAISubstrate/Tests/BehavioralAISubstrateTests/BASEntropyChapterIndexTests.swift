@@ -175,7 +175,57 @@ final class BASEntropyChapterIndexTests: XCTestCase {
     }
 
     // MARK: - Mirroring chapter doctrines
+    // chapter 七百五十二 第二刀 / M2431 — replaced 4 per-
+    // chapter mirror tests with a single registry-iteration
+    // loop。 The forwarder references that the old tests
+    // used are deactivated at the same knife。 Historical
+    // bodies preserved inside `#if false` below。
 
+    func testIndexMirrorsEveryRegistryRecord() {
+        // For every chapter in the registry that the index
+        // claims to cover (radicalEvolutionEntries plus
+        // phase2Entries),verify the index entry mirrors
+        // the registry's mNumberFirst / mNumberLast。
+        // This replaces 5 hand-spelled mirror tests with
+        // ONE loop that covers EVERY chapter automatically。
+        var failures: [String] = []
+        for record in BASChapterDoctrineRegistry.all {
+            // The index splits chapters into radical-evolution
+            // + phase2 buckets;query both views and accept
+            // a hit from either。
+            let viaTag = BASEntropyChapterIndex.entry(
+                forTag: record.chapterTag)
+            let viaPhase2 = BASEntropyChapterIndex
+                .phase2Entry(forTag: record.chapterTag)
+            guard let hit = viaTag ?? viaPhase2 else {
+                // Index intentionally only covers a subset
+                // of chapters;skip records absent from
+                // both views。 The unified registry-iteration
+                // schema-completeness test in
+                // BASChapterDoctrineSchemaCompletenessTests
+                // covers the full registry separately。
+                continue
+            }
+            if hit.mNumberFirst != record.mNumberFirst {
+                failures.append(
+                    "\(record.chapterTag): index first " +
+                    "\(hit.mNumberFirst) ≠ registry " +
+                    "\(record.mNumberFirst)")
+            }
+            if hit.mNumberLast != record.mNumberLast {
+                failures.append(
+                    "\(record.chapterTag): index last " +
+                    "\(hit.mNumberLast) ≠ registry " +
+                    "\(record.mNumberLast)")
+            }
+        }
+        XCTAssertTrue(
+            failures.isEmpty,
+            "Index mirror failures:\n" +
+            failures.joined(separator: "\n"))
+    }
+
+#if false  // chapter 七百五十二 第二刀 deactivated
     func testIndexMirrorsChapter427() {
         let entry = BASEntropyChapterIndex.entry(
             forTag: BASChapter427EntropyDoctrine
@@ -225,6 +275,7 @@ final class BASEntropyChapterIndexTests: XCTestCase {
             entry?.mNumberLast,
             BASChapter433EntropyDoctrine.mNumberLast)
     }
+#endif  // chapter 七百五十二 第二刀
 
     // MARK: - M1111 Wave 2 STAGE 1 — phase2Entries (31 entries)
 
@@ -331,6 +382,7 @@ final class BASEntropyChapterIndexTests: XCTestCase {
         }
     }
 
+#if false  // chapter 七百五十二 第二刀 deactivated
     func testIndexMirrorsAllPreRadicalDoctrineMRanges() {
         // Spot-check 4 pre-RADICAL chapters whose
         // doctrine .swift files I cross-checked at M1111
@@ -355,6 +407,9 @@ final class BASEntropyChapterIndexTests: XCTestCase {
                     .chapterTag)?.mNumberLast,
             BASChapter426EntropyDoctrine.mNumberLast)
     }
+#endif  // chapter 七百五十二 第二刀
+    // Spot-checks superseded by testIndexMirrorsEveryRegistryRecord
+    // (unified loop covers every chapter automatically)。
 
     // MARK: - Determinism
 

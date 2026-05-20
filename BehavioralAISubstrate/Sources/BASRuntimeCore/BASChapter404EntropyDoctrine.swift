@@ -1,15 +1,13 @@
-// MARK: - BASChapter404EntropyDoctrine — forwarder
-// chapter 四百六十六 / M1242 — Phase 3 of doctrine collapse。
-//
-// The original ~150-265 LOC doctrine file was REPLACED
-// with this thin forwarder。 All doctrine data now lives
-// in BASChapterDoctrineRegistry / BASChapterDoctrine
-// RegistryAllLiterals。 This forwarder preserves the
-// existing static-surface API so per-chapter tests +
-// cross-doctrine tests continue to compile unchanged。
-
 import Foundation
 
+// chapter 七百五十二 第二刀 / M2431 — thin forwarder
+// DEACTIVATED per user directive 「大幅度 缩减 doctrine。
+// 对比 之后 有必要的 全面 comment」。 All consumers
+// (per-chapter tests + mirror tests) refactored to use
+// BASChapterDoctrineRegistry directly。 Forwarder body
+// preserved verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十二 第二刀 deactivated
 public enum BASChapter404EntropyDoctrine {
 
     private static var record: BASChapterDoctrineRecord {
@@ -63,3 +61,5 @@ public enum BASChapter404EntropyDoctrine {
     public static let v4MilestoneStatus: String =
         "chapter-404-v4-complete-audit-projection-comprehensive"
 }
+
+#endif  // chapter 七百五十二 第二刀
