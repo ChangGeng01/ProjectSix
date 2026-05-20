@@ -191,7 +191,16 @@ let package = Package(
         // depends only on BASRuntimeCore schema. Neither the sovereign
         // kernel nor memory/policy layers depend on it (world priors
         // are consumed upstream, not produced from host state).
-        .target(name: "BASWorldPrior", dependencies: ["BASRuntimeCore"]),
+        //
+        // chapter 七百七十 / M2501 adds the SQL/ subdirectory + plugin
+        // for the 4 net-new world-prior schemas (axioms / templates /
+        // bridges / domains)。
+        .target(
+            name: "BASWorldPrior",
+            dependencies: ["BASRuntimeCore"],
+            resources: [.process("SQL")],
+            plugins: [.plugin(name: "BASSQLSchemaGen")]
+        ),
         // BASLeaseLife (L1) — thermal/pressure observation + breath
         // scheduling + long-session accumulation. Leaf module: depends
         // only on BASRuntimeCore schema (BASThermalLevel /
