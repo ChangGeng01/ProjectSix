@@ -33,6 +33,7 @@ members = [
     "bas-sovereign-c-abi",         # chapter 七百五十八 第一刀 / M2441 — public C ABI wrapper for watchOS + 3rd-party C consumers
     "bas-red-team-bench",          # chapter 七百五十九 第一刀 / M2446 — batch adversarial-prompt classifier (24 red lines)
     "bas-integrity-sentinel",      # chapter 七百六十 第一刀 / M2451 — typed Rust port of BASSovereignIntegritySentinel
+    "bas-lease-life",              # chapter 七百六十二 第一刀 / M2461 — L1 lung-state + breath-scheduler pure-fn port
 ]
 resolver = "2"
 

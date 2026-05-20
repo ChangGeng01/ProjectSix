@@ -1,0 +1,46 @@
+# Cargo manifest for bas-lease-life
+# chapter 七百六十二 第一刀 / M2461 — DEEPER LAYER-MIGRATION ARC
+#
+# Rust port of the L1 LungStateAccumulator + BreathScheduler pure
+# fn surface:
+#   - BASLungStateAccumulator.swift (~150 LOC) — pressure decay
+#     + per-mode load weights + record accumulation
+#   - BASBreathScheduler.swift (~190 LOC) — guard-level x maintenance-
+#     class allowance matrix
+#
+# Per user 严苛 table「L1 部分值得」 + chapter 七百六十一 perf TIE
+# result:Apple thermal STATE pipe stays Swift (BASThermalTwin
+# reads ProcessInfo)。 Only the deterministic decay math + the
+# state machine validate() move to Rust。
+#
+# Rationale:
+#   - Exponential decay math is a leaf compute (one f64 exp call)
+#     — Rust can deliver vs Swift modest win OR match,depending
+#     on host compiler
+#   - State machine validate() is pure fn with finite enum cases
+#     — Rust enum exhaustiveness is strictly stronger than Swift
+#     @unknown default (chapter 七百四十九 axis 3)
+#   - The mutable accumulator state (turn count + last decay)
+#     stays Swift on the host side for chapter 392 replay-
+#     determinism contracts;Rust owns the per-call PURE math
+#
+# Stability tier:TIER 2 (matches the existing Swift contract,
+# not a wire format that ships to 3rd-party C consumers)。
+# Bumping requires updating BASLungStateAccumulator + 100-turn
+# byte-equality fixture simultaneously。
+
+[package]
+name = "bas-lease-life"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_lease_life"
+path = "src/lib.rs"
+
+[dependencies]
+# No external dependencies。 libm via std for exp() — no need
+# to vendor a math library for one transcendental call。
