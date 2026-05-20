@@ -903,4 +903,106 @@ mod tests {
                 99, ThermalGuardLevel::Nominal as u8),
             -1);
     }
+
+    // MARK: - 100-turn byte-equality fixture
+    //         (chapter 七百六十二 第四刀 / M2464)
+
+    /// FNV-1a 64-bit hash for fixture pinning。
+    fn fnv1a_64(bytes: &[u8]) -> u64 {
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for &b in bytes {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100_0000_01b3);
+        }
+        h
+    }
+
+    /// Build the i-th turn fixture (0..=99) deterministically。
+    /// Each turn carries:
+    ///   - prev_pressure (varies 0.0..1.0)
+    ///   - idle_seconds (varies 0..600)
+    ///   - run_mode (cycles through ALL 10 modes)
+    ///   - duration_seconds (varies 0.1..10.0)
+    fn build_fixture_turn(i: usize) -> (f64, f64, RunMode, f64) {
+        let prev = (i as f64 * 0.0123).fract();
+        let idle = (i as f64 * 6.0) % 600.0;
+        let mode = RunMode::ALL[i % RunMode::ALL.len()];
+        let dur = 0.1 + (i as f64 * 0.097) % 9.9;
+        (prev, idle, mode, dur)
+    }
+
+    /// Run one fixture turn through record_turn + return the
+    /// resulting pressure as 8 bytes for hash compositioning。
+    fn run_fixture_turn(i: usize) -> [u8; 8] {
+        let (prev, idle, mode, dur) = build_fixture_turn(i);
+        let result = lung_state_record_turn(
+            prev, idle, DEFAULT_TIME_CONSTANT_SECONDS, mode, dur);
+        result.to_le_bytes()
+    }
+
+    #[test]
+    fn test_fixture_grid_deterministic() {
+        let a: Vec<[u8; 8]> = (0..100).map(run_fixture_turn).collect();
+        let b: Vec<[u8; 8]> = (0..100).map(run_fixture_turn).collect();
+        assert_eq!(a, b,
+            "100-turn fixture grid must be deterministic");
+    }
+
+    #[test]
+    fn test_fixture_grid_canonical_hash_pinned() {
+        // ********************************************************
+        // BYTE-EQUALITY DISCIPLINE PIN (chapter 七百十六 + 七百六十二)
+        // ********************************************************
+        //
+        // 100-turn fixture → record_turn → 8-byte LE pressure
+        // values concatenated → FNV-1a 64-bit hash
+        //
+        // ANY drift in:
+        //   - RunMode discriminant values
+        //   - load_per_second values per RunMode
+        //   - decay formula (exp + clamp + tau defaults)
+        //   - record_turn order of operations (decay-then-add)
+        //
+        // ...will flip this hash。 If intentional,re-capture +
+        // bump ABI_VERSION;if unintentional,fail the build。
+        //
+        // ********************************************************
+
+        let mut all_bytes = Vec::with_capacity(800);
+        for i in 0..100 {
+            all_bytes.extend(run_fixture_turn(i));
+        }
+        let hash = fnv1a_64(&all_bytes);
+
+        // Pinned baseline (captured chapter 七百六十二 第四刀 / M2464)
+        assert_eq!(
+            hash,
+            0x3520_2448_B786_EC0C,
+            "100-turn lease-life fixture hash drifted — ABI BREAK \
+             requiring ABI_VERSION bump + Swift fixture re-capture"
+        );
+    }
+
+    #[test]
+    fn test_fixture_grid_every_turn_produces_valid_pressure() {
+        // Every fixture turn must produce pressure in [0, 1]。
+        for i in 0..100 {
+            let bytes = run_fixture_turn(i);
+            let p = f64::from_le_bytes(bytes);
+            assert!(p >= 0.0 && p <= 1.0,
+                "fixture turn {} pressure out of [0,1]:{}",i, p);
+        }
+    }
+
+    #[test]
+    fn test_fixture_grid_run_modes_covered() {
+        // 100 turns over 10 RunModes → each mode hit ~10 times。
+        let mut seen = std::collections::HashSet::new();
+        for i in 0..100 {
+            let (_, _, mode, _) = build_fixture_turn(i);
+            seen.insert(mode as u8);
+        }
+        assert_eq!(seen.len(), 10,
+            "all 10 RunModes must be exercised by the fixture");
+    }
 }
