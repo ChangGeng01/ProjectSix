@@ -237,6 +237,23 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             &mut verification, &mut tamper_mask)
     };
     total = total.wrapping_add(tamper_rc);
+    // chapter 七百五十九 第三刀 / M2448 — force-link the L11
+    // red-team-bench batch classifier symbols。 Two cheapest
+    // anchors:
+    //   1. ABI version probe (constant return,zero side-effect)
+    //   2. classify_batch with empty prompts wire (4-byte count=0
+    //      prefix) + null output buffer → returns 4 = required
+    //      prefix size for empty match list,no observable side-
+    //      effect since out_matches_buf is null
+    total = total.wrapping_add(
+        bas_red_team_bench::bas_red_team_bench_abi_version());
+    let empty_prompts: [u8; 4] = [0, 0, 0, 0]; // u32 LE count=0
+    let red_team_rc = unsafe {
+        bas_red_team_bench::bas_red_team_classify_batch(
+            empty_prompts.as_ptr(), empty_prompts.len() as i32,
+            core::ptr::null_mut(), 0)
+    };
+    total = total.wrapping_add(red_team_rc);
     total
 }
 
@@ -253,7 +270,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///         AND backfill organ-router from chapter 七百四十七 + dream-loop
 ///         from chapter 七百四十八 that were added as deps but not
 ///         counted in the static return)
+///   - 14 = chapter 七百五十九 第三刀 / M2448 (+red-team-bench)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    13
+    14
 }

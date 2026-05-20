@@ -53,6 +53,7 @@ dependencies = [
  "bas-memory-atom-store",
  "bas-organ-router",
  "bas-permit-policy",
+ "bas-red-team-bench",
  "bas-retrieval-ranker",
  "bas-runtime-frame",
  "bas-sovereign-c-abi",

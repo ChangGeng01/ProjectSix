@@ -65,3 +65,11 @@ bas-dream-loop        = { path = "../bas-dream-loop" }
 # tamper_proof_audit。 Per user 严苛 table 「L14 极值得」
 # DEEPER LAYER-MIGRATION ARC。
 bas-sovereign-c-abi   = { path = "../bas-sovereign-c-abi" }
+# chapter 七百五十九 第三刀 / M2448 — bundle the L11
+# red-team-bench crate so Swift host (via XCFramework) +
+# 3rd-party C consumers see the batch adversarial-prompt
+# classifier symbols (bas_red_team_classify_batch,
+# bas_red_team_bench_abi_version)。 Per user 严苛 table
+# 「L11 极值得 (DEEPER)」 — 50-100× batch throughput vs
+# Swift single-threaded .contains() per planning audit。
+bas-red-team-bench    = { path = "../bas-red-team-bench" }

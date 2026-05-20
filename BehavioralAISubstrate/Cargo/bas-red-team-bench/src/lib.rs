@@ -420,6 +420,233 @@ pub extern "C" fn bas_red_team_bench_abi_version() -> i32 {
     ABI_VERSION
 }
 
+// MARK: - C ABI batch classifier (chapter 七百五十九 第三刀 / M2448)
+//
+// Wire format design notes
+// ------------------------
+//
+// Goal:single-call entry point so a C consumer (watchOS,3rd-party
+// game engine,attestation chain) can hand over an array of prompts
+// + a result buffer and get back a flat match array — no per-prompt
+// round-trips,no string ownership transfer。
+//
+// Endianness:little-endian throughout。 Apple silicon + Intel are
+// both LE;wire format documents this explicitly so a future big-
+// endian consumer can byte-swap rather than guess。
+//
+// Per-match record:12 bytes,naturally 4-aligned at every field:
+//
+//   offset 0..3  : prompt_index   (u32 LE)
+//   offset 4..5  : red_line_id    (u16 LE,RedLineId discriminant)
+//   offset 6..7  : reserved/zero  (padding for u32 alignment below)
+//   offset 8..11 : pattern_index  (u32 LE)
+//
+// The 2-byte padding pinned to ZERO means strict-alignment platforms
+// (ARMv7 without unaligned-access enabled,MIPS,SPARC) can load the
+// trailing u32 with a natural-aligned LDR rather than a byte-by-byte
+// fallback。 The cost is 17% wire-size overhead vs 10 bytes packed;
+// the win is no UB on every consumer architecture。
+
+/// Per-match wire-format size in bytes (chapter 七百五十九 V1 ABI)。
+pub const C_ABI_MATCH_WIRE_SIZE: usize = 12;
+
+/// Output buffer prefix size:4 bytes for the u32-LE match count。
+/// Even a zero-match call writes this header,so the minimum
+/// `required` return value is 4。
+pub const C_ABI_OUT_PREFIX_SIZE: usize = 4;
+
+/// C ABI batch classifier。 Reads prompts from `prompts_buf` (length-
+/// prefixed UTF-8 wire format),classifies each via
+/// `classify_prompt_batch`,writes results into `out_matches_buf`。
+///
+/// Prompts wire format (little-endian):
+///
+///   count       : u32 LE
+///   per prompt:
+///     prompt_len  : u32 LE  (byte length of UTF-8 prompt body)
+///     prompt_bytes: utf-8 (no NUL terminator,exactly prompt_len bytes)
+///
+/// Output wire format (little-endian):
+///
+///   match_count : u32 LE
+///   per match (12 bytes):
+///     prompt_index  : u32 LE
+///     red_line_id   : u16 LE (RedLineId discriminant)
+///     _reserved     : u16 LE (always zero)
+///     pattern_index : u32 LE
+///
+/// Two-phase capacity discovery:
+///   1. Call with `out_matches_buf=NULL,out_matches_capacity=0`
+///      → returns required size in bytes (≥ 4 even for empty)
+///   2. Allocate `required` bytes;call again with that buffer →
+///      returns same value,writes count + match records
+///
+/// Returns:
+///   ≥ 0 : required/written byte count
+///   -1  : null `prompts_buf` with non-zero `prompts_len`,or any
+///         negative length argument
+///   -2  : wire-format parse failure (truncated buffer,non-UTF-8,
+///         declared length exceeds buffer)
+///
+/// Reentrant:yes。 No global state。
+///
+/// # Safety
+///
+/// Caller MUST ensure:
+///   - `prompts_buf` (when non-null) is readable for `prompts_len`
+///     bytes
+///   - `out_matches_buf` (when non-null) is writable for
+///     `out_matches_capacity` bytes
+///   - Neither pointer aliases the other
+///
+/// chapter 七百五十九 第三刀 / M2448。
+#[no_mangle]
+pub unsafe extern "C" fn bas_red_team_classify_batch(
+    prompts_buf: *const u8,
+    prompts_len: i32,
+    out_matches_buf: *mut u8,
+    out_matches_capacity: i32,
+) -> i32 {
+    // 1. Validate scalar inputs。 Negative lengths are a programming
+    //    error in the consumer (signed-int wire to mirror Swift Int32
+    //    bridging,but the value space must stay non-negative)。
+    if prompts_len < 0 || out_matches_capacity < 0 {
+        return -1;
+    }
+
+    // 2. Null pointer + non-zero length combination is a category-1
+    //    consumer bug (would otherwise UB on the slice read)。
+    //    Null + zero length is a valid「empty batch」 form。
+    if prompts_buf.is_null() && prompts_len != 0 {
+        return -1;
+    }
+
+    // 3. Materialise the input slice。
+    let bytes: &[u8] = if prompts_len == 0 {
+        &[]
+    } else {
+        // SAFETY:caller's contract guarantees readability for
+        // prompts_len bytes;we validated non-null above。
+        core::slice::from_raw_parts(prompts_buf, prompts_len as usize)
+    };
+
+    // 4. Parse the prompts wire format into &str refs borrowing from
+    //    `bytes`。 No allocation other than the small Vec<&str> spine。
+    let prompts = match parse_prompts_wire(bytes) {
+        Ok(p) => p,
+        Err(()) => return -2,
+    };
+
+    // 5. Run the batch classifier。
+    let matches = classify_prompt_batch(&prompts);
+
+    // 6. Compute the required output buffer size。 Guard against
+    //    i32 overflow (a u32 match_count near 2^28 would overflow
+    //    i32 once multiplied by 12 + 4)。
+    let required_usize = C_ABI_OUT_PREFIX_SIZE
+        + matches.len().saturating_mul(C_ABI_MATCH_WIRE_SIZE);
+    if required_usize > i32::MAX as usize {
+        return -2;
+    }
+    let required = required_usize as i32;
+
+    // 7. Two-phase write:only emit when buffer non-null AND capacity
+    //    sufficient。 Caller treats `required > capacity` as「allocate
+    //    bigger and retry」 (the canonical two-phase capacity flow)。
+    if !out_matches_buf.is_null() && out_matches_capacity >= required {
+        // SAFETY:caller guarantees writability for out_matches_capacity
+        // bytes;we proved required ≤ capacity above。
+        let out = core::slice::from_raw_parts_mut(
+            out_matches_buf,
+            required_usize,
+        );
+
+        let count = matches.len() as u32;
+        out[0..4].copy_from_slice(&count.to_le_bytes());
+
+        let mut off = C_ABI_OUT_PREFIX_SIZE;
+        for m in &matches {
+            // prompt_index (u32 LE)
+            out[off..off + 4].copy_from_slice(&m.prompt_index.to_le_bytes());
+            // red_line_id (u16 LE)
+            let id_u16: u16 = m.id as u16;
+            out[off + 4..off + 6].copy_from_slice(&id_u16.to_le_bytes());
+            // 2-byte reserved padding (must be zero per ABI v1)
+            out[off + 6] = 0;
+            out[off + 7] = 0;
+            // pattern_index (u32 LE)
+            out[off + 8..off + 12].copy_from_slice(&m.pattern_index.to_le_bytes());
+            off += C_ABI_MATCH_WIRE_SIZE;
+        }
+    }
+
+    required
+}
+
+/// Parse the prompts wire format into a Vec of &str borrowing from
+/// `bytes`。 Returns `Err(())` on any structural issue (truncated
+/// buffer,declared length exceeds remaining,non-UTF-8 body)。
+///
+/// Internal helper for `bas_red_team_classify_batch` — kept private
+/// so the wire-format parser stays a single decision site。
+fn parse_prompts_wire(bytes: &[u8]) -> Result<Vec<&str>, ()> {
+    // Empty buffer = empty batch。 Spec allows passing prompts_len=0
+    // with a null pointer,which materialises as the empty slice here。
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
+    if bytes.len() < 4 {
+        return Err(());
+    }
+
+    let count = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+
+    let mut off: usize = 4;
+    let mut prompts: Vec<&str> = Vec::with_capacity(count);
+
+    for _ in 0..count {
+        if off.saturating_add(4) > bytes.len() {
+            return Err(());
+        }
+        let plen = u32::from_le_bytes([
+            bytes[off],
+            bytes[off + 1],
+            bytes[off + 2],
+            bytes[off + 3],
+        ]) as usize;
+        off += 4;
+
+        if off.saturating_add(plen) > bytes.len() {
+            return Err(());
+        }
+        let s = core::str::from_utf8(&bytes[off..off + plen]).map_err(|_| ())?;
+        prompts.push(s);
+        off += plen;
+    }
+
+    Ok(prompts)
+}
+
+/// Build a prompts wire-format buffer from a slice of &str。 NOT a
+/// C-ABI symbol — internal helper for tests + Swift bridge (when
+/// knife 五 wires the Swift consumer side,it can use this layout
+/// directly via Data() encoding)。 Public so integration tests in
+/// downstream crates can construct the wire format without re-
+/// implementing the encoder。
+pub fn encode_prompts_wire(prompts: &[&str]) -> Vec<u8> {
+    let mut total = 4;
+    for p in prompts {
+        total += 4 + p.len();
+    }
+    let mut buf = Vec::with_capacity(total);
+    buf.extend_from_slice(&(prompts.len() as u32).to_le_bytes());
+    for p in prompts {
+        buf.extend_from_slice(&(p.len() as u32).to_le_bytes());
+        buf.extend_from_slice(p.as_bytes());
+    }
+    buf
+}
+
 // MARK: - Tests
 
 #[cfg(test)]
@@ -752,6 +979,378 @@ mod tests {
             assert_eq!(m.id, RedLineId::CthulhuForbidOracular);
             assert_eq!(m.pattern_index, 0);
         }
+    }
+
+    // MARK: - C ABI batch classifier tests (chapter 七百五十九 第三刀 / M2448)
+
+    /// Read a u32 LE at the given offset。 Test-only helper。
+    fn read_u32_le(buf: &[u8], off: usize) -> u32 {
+        u32::from_le_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+    }
+
+    /// Read a u16 LE at the given offset。 Test-only helper。
+    fn read_u16_le(buf: &[u8], off: usize) -> u16 {
+        u16::from_le_bytes([buf[off], buf[off+1]])
+    }
+
+    /// Decode an output buffer into the same shape as
+    /// `classify_prompt_batch`'s return,so tests can assert on
+    /// match content without sweating wire-format byte offsets。
+    fn decode_matches_wire(buf: &[u8]) -> Vec<BatchRedLineMatch> {
+        let count = read_u32_le(buf, 0) as usize;
+        let mut out = Vec::with_capacity(count);
+        for i in 0..count {
+            let off = 4 + i * C_ABI_MATCH_WIRE_SIZE;
+            let prompt_index = read_u32_le(buf, off);
+            let id_u16 = read_u16_le(buf, off + 4);
+            // padding bytes at off+6..off+8 must be zero
+            assert_eq!(buf[off+6], 0, "ABI v1 reserves padding bytes as zero");
+            assert_eq!(buf[off+7], 0, "ABI v1 reserves padding bytes as zero");
+            let pattern_index = read_u32_le(buf, off + 8);
+            // Convert id_u16 back to RedLineId via ALL lookup。
+            let id = RedLineId::ALL.iter()
+                .find(|i| **i as u16 == id_u16)
+                .copied()
+                .expect("decoded id_u16 must match a known RedLineId");
+            out.push(BatchRedLineMatch {
+                prompt_index,
+                id,
+                pattern_index,
+            });
+        }
+        out
+    }
+
+    #[test]
+    fn test_c_abi_empty_batch_returns_prefix_only() {
+        // Empty batch:wire format = [0,0,0,0] (count=0)。
+        // Probe call (null buf,zero capacity) must report required=4。
+        let wire = encode_prompts_wire(&[]);
+        let required = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(required, 4, "empty batch requires only 4-byte count prefix");
+
+        // Allocated call must write [0,0,0,0]。
+        let mut out = vec![0u8; required as usize];
+        let written = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+        assert_eq!(written, 4);
+        assert_eq!(out, vec![0u8; 4]);
+    }
+
+    #[test]
+    fn test_c_abi_null_pointer_with_zero_len_is_valid_empty_batch() {
+        // Null pointer + zero length = valid empty batch (per spec)。
+        let required = unsafe {
+            bas_red_team_classify_batch(
+                core::ptr::null(),
+                0,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(required, 4, "null + zero len must behave as empty batch");
+    }
+
+    #[test]
+    fn test_c_abi_null_pointer_with_nonzero_len_returns_minus_1() {
+        let rc = unsafe {
+            bas_red_team_classify_batch(
+                core::ptr::null(),
+                42,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(rc, -1, "null prompts_buf with non-zero len must return -1");
+    }
+
+    #[test]
+    fn test_c_abi_negative_lengths_return_minus_1() {
+        // Negative prompts_len → -1
+        let rc1 = unsafe {
+            bas_red_team_classify_batch(
+                core::ptr::null(),
+                -1,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(rc1, -1);
+
+        // Negative out_matches_capacity → -1
+        let wire = encode_prompts_wire(&[]);
+        let rc2 = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                core::ptr::null_mut(),
+                -1,
+            )
+        };
+        assert_eq!(rc2, -1);
+    }
+
+    #[test]
+    fn test_c_abi_truncated_count_prefix_returns_minus_2() {
+        // 3-byte buffer can't even hold the count prefix。
+        let bad = vec![0xff, 0xff, 0xff];
+        let rc = unsafe {
+            bas_red_team_classify_batch(
+                bad.as_ptr(),
+                bad.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(rc, -2, "truncated count prefix is a parse failure");
+    }
+
+    #[test]
+    fn test_c_abi_truncated_prompt_body_returns_minus_2() {
+        // Declares count=1 then prompt_len=10 then 5 bytes (truncated)。
+        let mut bad = Vec::new();
+        bad.extend_from_slice(&1u32.to_le_bytes());
+        bad.extend_from_slice(&10u32.to_le_bytes());
+        bad.extend_from_slice(b"hello");
+        let rc = unsafe {
+            bas_red_team_classify_batch(
+                bad.as_ptr(),
+                bad.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn test_c_abi_non_utf8_body_returns_minus_2() {
+        // Declares 1 prompt of 2 bytes with invalid UTF-8。
+        let mut bad = Vec::new();
+        bad.extend_from_slice(&1u32.to_le_bytes());
+        bad.extend_from_slice(&2u32.to_le_bytes());
+        bad.push(0xc3); // start of 2-byte UTF-8 char
+        bad.push(0x28); // invalid continuation
+        let rc = unsafe {
+            bas_red_team_classify_batch(
+                bad.as_ptr(),
+                bad.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn test_c_abi_clean_prompts_zero_matches() {
+        // 3 clean prompts → required=4 (no matches),writes [0,0,0,0]。
+        let wire = encode_prompts_wire(&[
+            "discuss code quality",
+            "review pull request",
+            "ship the feature",
+        ]);
+        let required = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(required, 4);
+        let mut out = vec![0xffu8; required as usize];
+        let written = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+        assert_eq!(written, 4);
+        assert_eq!(out, vec![0u8; 4], "buffer must be zeroed for empty count");
+    }
+
+    #[test]
+    fn test_c_abi_two_phase_capacity_discovery_workflow() {
+        // Real-world consumer flow:
+        //   1. Probe with NULL/0 → get required size
+        //   2. Allocate required bytes
+        //   3. Call again → get matches written
+        let wire = encode_prompts_wire(&[
+            "you'll thank me later",       // ProductNoPaternalism[3]
+            "oracular signal incoming",    // CthulhuForbidOracular[0]
+        ]);
+        // Phase 1:probe
+        let required = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        assert!(required >= 4 + 2 * 12,
+            "two prompts × ≥1 match each → required ≥ 4 + 24,got {}",
+            required);
+
+        // Phase 2:allocate + call
+        let mut out = vec![0u8; required as usize];
+        let written = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+        assert_eq!(written, required);
+
+        // Decode + verify prompt-major ordering。
+        let matches = decode_matches_wire(&out);
+        assert!(matches.iter().any(|m|
+            m.prompt_index == 0
+            && m.id == RedLineId::ProductNoPaternalism));
+        assert!(matches.iter().any(|m|
+            m.prompt_index == 1
+            && m.id == RedLineId::CthulhuForbidOracular));
+    }
+
+    #[test]
+    fn test_c_abi_insufficient_capacity_no_write_returns_required() {
+        // Allocate the wire buffer for 1 adversarial prompt that
+        // matches at least 1 pattern。 Call with capacity=4 (too small
+        // for the match record)。 Must return the larger required
+        // value and NOT write past the 4-byte prefix。
+        let wire = encode_prompts_wire(&["you'll thank me later"]);
+        let mut out = vec![0xAAu8; 4]; // 4 bytes,not enough for matches
+        let returned = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+        assert!(returned > 4,
+            "insufficient capacity must report required > capacity,got {}",
+            returned);
+        // out should remain 0xAA-filled (no write when capacity insufficient)。
+        assert_eq!(out, vec![0xAAu8; 4],
+            "no write must occur when capacity < required");
+    }
+
+    #[test]
+    fn test_c_abi_roundtrip_matches_classify_prompt_batch() {
+        // Definitive byte-equality pin:wire-format round-trip must
+        // produce IDENTICAL matches to the direct in-Rust call,
+        // including order。
+        let prompts_strs = vec![
+            "you'll thank me later",
+            "totally clean code",
+            "oracular vibes ahead",
+            "this is just routine",
+            "the bond is sacred",
+        ];
+        let prompts: Vec<&str> = prompts_strs.iter().map(|s| s.as_ref()).collect();
+        let expected = classify_prompt_batch(&prompts);
+
+        let wire = encode_prompts_wire(&prompts);
+        let required = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        let mut out = vec![0u8; required as usize];
+        let _ = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+        let decoded = decode_matches_wire(&out);
+        assert_eq!(decoded, expected,
+            "wire-format round-trip must byte-equal direct classify_prompt_batch");
+    }
+
+    #[test]
+    fn test_c_abi_padding_bytes_pinned_to_zero() {
+        // ABI contract pin:bytes 6..8 of every match record MUST
+        // be zero。 Strict-alignment platforms read the trailing
+        // u32 from offset 8 (4-aligned) — corrupting padding could
+        // hide endian bugs or unaligned-load fallbacks。
+        let wire = encode_prompts_wire(&["you'll thank me later"]);
+        let required = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                core::ptr::null_mut(),
+                0,
+            )
+        };
+        let mut out = vec![0xFFu8; required as usize]; // pre-fill with non-zero
+        let _ = unsafe {
+            bas_red_team_classify_batch(
+                wire.as_ptr(),
+                wire.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+        // count prefix
+        let count = read_u32_le(&out, 0) as usize;
+        assert!(count >= 1);
+        // verify padding pinned zero on every match record
+        for i in 0..count {
+            let off = 4 + i * C_ABI_MATCH_WIRE_SIZE;
+            assert_eq!(out[off+6], 0,
+                "ABI v1 match {} byte 6 must be zero (padding)",i);
+            assert_eq!(out[off+7], 0,
+                "ABI v1 match {} byte 7 must be zero (padding)",i);
+        }
+    }
+
+    #[test]
+    fn test_c_abi_match_wire_size_pinned_at_12() {
+        // ABI v1 byte-equality pin。 Changing this constant is an
+        // ABI BREAK that requires header + Swift drift-test sync。
+        assert_eq!(C_ABI_MATCH_WIRE_SIZE, 12);
+        assert_eq!(C_ABI_OUT_PREFIX_SIZE, 4);
+    }
+
+    #[test]
+    fn test_encode_prompts_wire_round_trip() {
+        // encode_prompts_wire output MUST round-trip through
+        // parse_prompts_wire identical to the input。
+        let inputs: Vec<&str> = vec![
+            "",                    // empty prompt allowed
+            "simple",
+            "with spaces",
+            "with newlines\nyes",
+            "unicode 你好世界",    // multi-byte UTF-8
+        ];
+        let buf = encode_prompts_wire(&inputs);
+        let parsed = parse_prompts_wire(&buf).expect("round-trip parse");
+        assert_eq!(parsed, inputs);
     }
 
     #[test]
