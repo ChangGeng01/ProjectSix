@@ -94,6 +94,67 @@ int32_t bas_memory_pressure_percent(int32_t *out_pct) {
     return 0;
 }
 
+// MARK: - bas_task_phys_footprint (chapter 七百六十一 第二刀 / M2457)
+//
+// Richer per-process memory probe via `task_info(TASK_VM_INFO)`。
+// Counterpart to `bas_process_resident_memory_bytes` (which uses
+// the simpler `mach_task_basic_info` and only returns RSS)。
+//
+// Why three values
+// ----------------
+//
+// - phys_footprint:the OS's official「memory footprint」 number
+//                   used by jetsam pressure decisions。 Different
+//                   from RSS in that it counts compressed memory
+//                   AND excludes shared-clean pages。 Hosts use
+//                   this to detect approaching jetsam thresholds
+//                   BEFORE the kernel decides to kill the process。
+// - compressed    :bytes of memory the VM compressor has compressed
+//                   (effectively swap on iOS,which doesn't have
+//                   traditional swap files)。 Growth here is a
+//                   leading indicator of pressure。
+// - internal      :private anonymous memory (heap allocations,
+//                   stack pages)。 Useful for leak detection in
+//                   long-running brain hosts。
+//
+// All values in BYTES。 Thread-safe + lock-free per Mach
+// documentation。
+
+#include <mach/task_info.h>
+
+int32_t bas_task_phys_footprint(
+    uint64_t *out_phys_footprint,
+    uint64_t *out_compressed,
+    uint64_t *out_internal
+) {
+    if (out_phys_footprint == NULL
+        || out_compressed == NULL
+        || out_internal == NULL) {
+        return -1;
+    }
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    kern_return_t kr = task_info(
+        mach_task_self(),
+        TASK_VM_INFO,
+        (task_info_t)&info,
+        &count);
+    if (kr != KERN_SUCCESS) {
+        *out_phys_footprint = 0;
+        *out_compressed = 0;
+        *out_internal = 0;
+        return -2;
+    }
+    *out_phys_footprint = (uint64_t)info.phys_footprint;
+    *out_compressed     = (uint64_t)info.compressed;
+    *out_internal       = (uint64_t)info.internal;
+    return 0;
+}
+
+int32_t bas_task_phys_footprint_version(void) {
+    return 1;
+}
+
 #else
 
 int32_t bas_memory_total_bytes(int64_t *out_bytes) {
@@ -117,6 +178,21 @@ int32_t bas_memory_vm_stats(
 int32_t bas_memory_pressure_percent(int32_t *out_pct) {
     if (out_pct) { *out_pct = -1; }
     return -1;
+}
+
+int32_t bas_task_phys_footprint(
+    uint64_t *out_phys_footprint,
+    uint64_t *out_compressed,
+    uint64_t *out_internal
+) {
+    if (out_phys_footprint) { *out_phys_footprint = 0; }
+    if (out_compressed)     { *out_compressed     = 0; }
+    if (out_internal)       { *out_internal       = 0; }
+    return -3;
+}
+
+int32_t bas_task_phys_footprint_version(void) {
+    return 1;
 }
 
 #endif
