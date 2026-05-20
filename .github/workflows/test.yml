@@ -33,26 +33,43 @@ jobs:
         working-directory: QinaoRuntimeSDK
         run: swift test
 
-  samplehost-tests:
-    name: SampleHost iOS XCTest
-    runs-on: macos-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build for testing
-        run: |
-          xcodebuild -project Before.xcodeproj \
-            -scheme SampleHost \
-            -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17e' \
-            build-for-testing
-      - name: Test
-        run: |
-          xcodebuild -project Before.xcodeproj \
-            -scheme SampleHost \
-            -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17e' \
-            test-without-building
+  # samplehost-tests — DISABLED 2026-05-20 (Before severance)
+  #
+  # SampleHost was previously built via the `SampleHost` scheme inside
+  # `Before.xcodeproj`. The Before iOS app was severed to Archive/Legacy/
+  # per user directive 「我想要 把 before 完全 断绝」,so the project
+  # file is no longer at the repo root。 SampleHost itself has no
+  # standalone Package.swift or .xcodeproj yet — it needs reconstitution
+  # as either:
+  #   (a) its own Xcode project (`SampleHost/SampleHost.xcodeproj`),
+  #   (b) an SPM executable target with a separate test target,or
+  #   (c) absorbed into BehavioralAISubstrate as an example target。
+  #
+  # Until then,SampleHost CI is disabled。 swift-test on the main
+  # substrate (bas-tests job) + qinao-tests job + boundary-checks job
+  # continue to gate CI。 See follow-up spawn_task for the standalone-
+  # build-path reconstitution work。
+  #
+  # samplehost-tests:
+  #   name: SampleHost iOS XCTest
+  #   runs-on: macos-latest
+  #   timeout-minutes: 45
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Build for testing
+  #       run: |
+  #         xcodebuild -project Archive/Legacy/Before.xcodeproj \
+  #           -scheme SampleHost \
+  #           -configuration Debug \
+  #           -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  #           build-for-testing
+  #     - name: Test
+  #       run: |
+  #         xcodebuild -project Archive/Legacy/Before.xcodeproj \
+  #           -scheme SampleHost \
+  #           -configuration Debug \
+  #           -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  #           test-without-building
 
   boundary-checks:
     name: 4 boundary scripts + schema parity

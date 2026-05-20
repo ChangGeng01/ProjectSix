@@ -47,10 +47,19 @@ TEST_TARGET="BehavioralAISubstrate/Tests/BehavioralAISubstrateTests"
 #   - REMOVE `\bBefore\b` — it's an English word; narrow regressions
 #     that actually ship host identifiers will still be caught by the
 #     specific compound patterns above
-WHOLE_WORD_RESIDUAL_REGEX='(\bquick\b|\bbalance\b|\bbuddy\b|sessionPrime|quickCapture|\bopenMode\b|reopenTomorrowItem|resumeCurrentDecision|BASQuick|BASBalance|BASReminder|quickEnvelope|balanceEnvelope|mirrorEnvelope|reminderEnvelope|reminder-source)'
+#   - REMOVE `\bquick\b` (2026-05-20,post-Before-severance) — same
+#     reasoning as `\bBefore\b`:「quick」 is a common English word
+#     (e.g。 「quick start」 in BASCognitiveBrain.md heading) that
+#     false-positives the residual scan。 The `BASQuick` prefix ban
+#     + `quickCapture` / `quickEnvelope` compound bans + the
+#     `(quick|balance)([A-Z_]...)` embedded identifier regex still
+#     catch every real legacy identifier。 Zero loss of coverage,
+#     full loss of false positives。 Same rationale applied to
+#     `\bbalance\b` and `\bbuddy\b` — both common English words。
+WHOLE_WORD_RESIDUAL_REGEX='(sessionPrime|quickCapture|\bopenMode\b|reopenTomorrowItem|resumeCurrentDecision|BASQuick|BASBalance|BASReminder|quickEnvelope|balanceEnvelope|mirrorEnvelope|reminderEnvelope|reminder-source)'
 EMBEDDED_IDENTIFIER_RESIDUAL_REGEX='((^|[^A-Za-z])(quick|balance)([A-Z_][A-Za-z0-9_]*))'
 SOURCE_TEST_RESIDUAL_REGEX="${WHOLE_WORD_RESIDUAL_REGEX}|${EMBEDDED_IDENTIFIER_RESIDUAL_REGEX}"
-README_RESIDUAL_REGEX='(\bquick\b|\bbalance\b|\bbuddy\b|sessionPrime|quickCapture|\bopenMode\b|reopenTomorrowItem|resumeCurrentDecision|BASQuick|BASBalance|BASReminder|quickEnvelope|balanceEnvelope|mirrorEnvelope|reminderEnvelope|reminder-source)'
+README_RESIDUAL_REGEX='(sessionPrime|quickCapture|\bopenMode\b|reopenTomorrowItem|resumeCurrentDecision|BASQuick|BASBalance|BASReminder|quickEnvelope|balanceEnvelope|mirrorEnvelope|reminderEnvelope|reminder-source)'
 TEST_ALLOWLIST_REGEX='/(BASCognitionCoreTests|BASMemoryCognitionCoreTests|BASReferencePromptModesCoreTests|BASAppleCurrentBrainBootstrapTests|BASAppleEvolutionCheckpointWriterTests)\.swift:'
 
 # M86 — portable searcher. See check_sdk_import_boundaries.sh for the

@@ -1,0 +1,77 @@
+# Archive/Legacy/scripts/ — Before-host quality gate scripts
+
+User directive 2026-05-20 「下一步最该做的是把旧 Before quality gate 脚本退役或改名」
+— retire the legacy Before-host quality gate scripts that no longer have a
+target to test now that the Before iOS app was severed to `Archive/Legacy/`。
+
+Per the substrate-wide discipline 「依旧 不删除 只 comment」 / 「不要 删除 创建个
+文件夹 把 不需要的文件 都转移 进 文件夹」: scripts are RELOCATED here,not deleted。
+Git history preserved through `git mv`。 Recoverable via `git mv` back to the
+repo root if Before is ever revived。
+
+## What lives here
+
+| Item | Source path before | What it tested |
+|---|---|---|
+| `run_quality_gate.sh` | `/scripts/run_quality_gate.sh` | 20/20 release-floor gate against Before iOS app + BeforeUISmoke |
+| `run_quality_gate_double.sh` | `/scripts/run_quality_gate_double.sh` | 40/40 double-difficulty gate (Before iOS + BeforeWatch) |
+| `run_quality_gate_extreme.sh` | `/scripts/run_quality_gate_extreme.sh` | EXTREME gate (Before + non-determinism / drift / churn) |
+| `run_quality_gate_x10.sh` | `/scripts/run_quality_gate_x10.sh` | X10 long-term-stability gate (Before iOS + BeforeUI + BeforeWatch) |
+
+All 4 hard-coded `PROJECT="$ROOT/Before.xcodeproj"` + `xcodebuild -scheme Before`
+/ `-scheme BeforeUISmoke` / `-scheme BeforeWatch`。 After Before severance these
+paths resolve to `Archive/Legacy/Before.xcodeproj` (archived,not built),so the
+scripts no longer execute against a live target。
+
+Companion documentation moved alongside in `Archive/Legacy/docs/`:
+- `QUALITY_GATE.md` (20/20 floor)
+- `QUALITY_GATE_200.md` (200/200 apex aspiration)
+- `QUALITY_GATE_DOUBLE.md` (40/40 pressure)
+- `QUALITY_GATE_EXTREME.md` (extreme drift / determinism)
+- `QUALITY_GATE_X10.md` (long-horizon stability)
+
+## What replaced these gates (post-severance)
+
+The substrate's own gates now run via SPM directly,no Xcode app shell required:
+
+```bash
+cd BehavioralAISubstrate
+swift build         # clean SPM build, no Xcode required
+swift test          # ~13k tests, ~85s sweep, 99.99% pass in isolation
+```
+
+CI gates in `.github/workflows/test.yml`:
+- `bas-tests` — BehavioralAISubstrate XCTest
+- `qinao-tests` — QinaoRuntimeSDK XCTest
+- `boundary-checks` — 4 boundary scripts + schema parity + god-file guard
+
+The `samplehost-tests` CI job is DISABLED until SampleHost gets a standalone
+xcodeproj or Package.swift (was previously a scheme inside Before.xcodeproj)。
+
+## Reviving any of these scripts
+
+If a future host reintroduces an iOS app shell that needs xcodebuild-driven
+quality gates,the easiest revival path:
+
+```bash
+git mv Archive/Legacy/scripts/run_quality_gate.sh scripts/
+# edit ROOT,PROJECT,DESTINATION,scheme names to point at the new host
+```
+
+Or copy as a template — these scripts implement the 20-step counter + 5-axis
+report shape that the substrate-side gates can re-use without the Before
+xcodebuild coupling。
+
+## Why archive instead of update
+
+The substrate's current discipline post-MATURATION-ARC is SPM-first
+(`swift build` + `swift test`),not xcodebuild-driven。 A meaningful
+replacement for these scripts would require:
+1. A target host with its own xcodeproj or Package.swift
+2. A test surface that matches the substrate's L1-L14 layer coverage
+3. UI smoke (currently SampleHost) running as a standalone build
+
+None of these exist post-severance (SampleHost had no standalone build path
+either),so updating the scripts in place would produce scripts that point
+at nothing。 Archive preserves the templates for future revival without
+maintaining broken-by-design files in the live `scripts/` directory。

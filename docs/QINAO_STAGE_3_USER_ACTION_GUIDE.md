@@ -1,5 +1,17 @@
 # 附录 V Stage 3 — Real Bench Data User-Action Guide
 
+> **⚠ Stale workflow notice (2026-05-20)** — this guide describes the
+> Before-era SampleHost bench workflow,which built via
+> `xcodebuild -project Before.xcodeproj -scheme SampleHost ...`。 After
+> Before severance (see `/Archive/Legacy/README.md.archive-notice`) the
+> `Before.xcodeproj` file is at `Archive/Legacy/Before.xcodeproj/`
+> (archived,not actively built) and SampleHost has no standalone
+> xcodeproj or Package.swift yet。 **The commands below will not
+> execute as-written until SampleHost is reconstituted as a standalone
+> build target**。 The data-pipeline scripts (`scripts/bench_to_train.py`
+> etc.) remain operational once the on-device JSONL has been collected
+> through some other path。
+
 **chapter 二百五十六 / M751** — operator-facing procedure document.
 
 This document explains what the user must do to feed the附录 V

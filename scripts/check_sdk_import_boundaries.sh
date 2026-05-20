@@ -4,12 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Live host targets that must NOT import low-level BAS modules directly。
+# Hosts go through BASHostKit / BASAdmin (latter only in debug/inspection)。
+#
+# Before host was severed 2026-05-20 (see /Archive/Legacy/README.md.archive-notice)。
+# The original TARGETS list included Before/App,Before/Shared,BeforeTests,
+# BeforeWatch,BeforeWidgetExtension。 These are now under Archive/Legacy/ and
+# excluded from import-boundary enforcement per the 不删除 only relocate
+# discipline — historical Before vocabulary is preserved but no longer
+# constrains the substrate's evolving import surface。
 TARGETS=(
-  "Before/App"
-  "Before/Shared"
-  "BeforeTests"
-  "BeforeWatch"
-  "BeforeWidgetExtension"
   "SampleHost"
   "SampleHostTests"
 )

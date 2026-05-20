@@ -9,7 +9,11 @@
 #      Combine, Observation, os, BackgroundTasks (for L1 maintenance
 #      bridge — wrapped in canImport), BAS*, and sibling Qinao* modules.
 #   2. Qinao module sources must NOT import host-level packages
-#      (Before, SampleHost, etc.) — façades flow downward only.
+#      (SampleHost, etc.) — façades flow downward only。 (Pre-2026-05-20
+#      this list included Before / BeforeWatch / BeforeWidgetExtension;
+#      those hosts were severed to Archive/Legacy/ and are no longer
+#      reachable as Swift imports, but the regex keeps them as a belt-
+#      and-suspenders ban against future re-introduction。)
 #   3. Qinao tests may use @testable import Qinao* and may import BAS*
 #      as part of substrate fixtures; they must not import host code.
 #   4. The package builds green and the symbol-graph based redaction
