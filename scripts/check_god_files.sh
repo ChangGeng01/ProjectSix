@@ -32,6 +32,38 @@ BAS_WARN=3000
 BAS_MAX=6000  # accommodates EBrainCognitionPlaneCore 5347
 QINAO_SAMPLE_HOST_MAX=9000  # main.swift 8224 (8 demo modes accumulated)
 
+# Per-file pinned-at-current-size overrides (M762 doctrine 「legacy god
+# files PINNED at current size + 10% headroom」)。 Two substrate files
+# are intentionally large because they hold consolidated data:
+#   - BASChapterDoctrineRegistry.swift = registry of ALL chapter doctrine
+#     records (sole-source-of-truth per chapter 七百五十二 大幅度 缩减)。
+#     25,146 LOC of typed records + commented-out legacy paths per
+#     「依旧 不删除 只 comment」 discipline。 Splitting would multiply
+#     per-chapter file ceremony without reducing surface area。
+#   - BASEntropyChapterIndex.swift = registry of entropy chapter indices。
+#     7,276 LOC of similar consolidated structure。
+#
+# Both are tracked architectural debt with documented rationale。 The
+# pinned ceiling (+10% headroom of current size) prevents UNBOUNDED
+# growth while allowing the documented size。 Adding ~2.5K lines of
+# headroom each gives room for chapter additions before requiring an
+# explicit split refactor。
+#
+# Implemented as a function (not associative array) for portability —
+# macOS ships bash 3.2 which lacks `declare -A`。
+per_file_max_override() {
+    # Returns the override max for the file path on stdout,or empty
+    # string if no override exists。
+    case "$1" in
+        BehavioralAISubstrate/Sources/BASRuntimeCore/BASChapterDoctrineRegistry.swift)
+            echo 28000 ;;
+        BehavioralAISubstrate/Sources/BASRuntimeCore/BASEntropyChapterIndex.swift)
+            echo 8000 ;;
+        *)
+            echo "" ;;
+    esac
+}
+
 check_file() {
     local file=$1
     local warn_at=$2
@@ -39,6 +71,14 @@ check_file() {
     local lines
     lines=$(wc -l < "$file" 2>/dev/null | tr -d ' ')
     if [ -z "$lines" ]; then return; fi
+    # Per-file override:if this file has a pinned max,use it instead
+    # of the default max。 Allows documented-large legacy god files to
+    # pass while still enforcing the default ceiling on new files。
+    local override
+    override=$(per_file_max_override "$file")
+    if [ -n "$override" ]; then
+        max_at="$override"
+    fi
     if [ "$lines" -gt "$max_at" ]; then
         echo "ERROR  $file: $lines lines (max $max_at) — extract a module"
         ERRORS=$((ERRORS + 1))
@@ -50,8 +90,11 @@ check_file() {
 
 echo "=== check_god_files (M762 chapter 二百三) ==="
 
-# SampleHost layer
-for f in SampleHost/*.swift SampleHostTests/*.swift; do
+# SampleHost layer。 Note:SampleHostTests/ at repo root was relocated
+# to SampleHost/Tests/SampleHostTests/ on 2026-05-21 (SampleHost
+# reconstitution as standalone SPM package)。 Glob updated to reflect
+# the new SPM-canonical Tests/ subdirectory layout。
+for f in SampleHost/*.swift SampleHost/Tests/SampleHostTests/*.swift; do
     [ -f "$f" ] || continue
     check_file "$f" "$SAMPLE_HOST_WARN" "$SAMPLE_HOST_MAX"
 done
