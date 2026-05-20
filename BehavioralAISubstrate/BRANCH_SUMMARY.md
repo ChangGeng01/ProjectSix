@@ -1,11 +1,11 @@
 # BehavioralAISubstrate — phase-4-chapter-721-aggressive-evolution
 
-**Branch arc:** chapter 七百二 / M2167 → chapter 七百三十七 / M2360
-**Status:** SEALED — 37 chapters, 185 knives, ~880 commits
+**Branch arc:** chapter 七百二 / M2167 → chapter 七百四十九 / M2420
+**Status:** SEALED — 49 chapters, ~245 knives, ~912 commits
 
 ## Arc trajectory
 
-This branch covers **five contiguous sub-arcs** that landed together:
+This branch covers **SIX contiguous sub-arcs** that landed together:
 
 | Sub-arc | Chapters | Theme |
 |---|---|---|
@@ -14,6 +14,7 @@ This branch covers **five contiguous sub-arcs** that landed together:
 | Aggressive evolution | 七百二十一-七百三十 | Memory-priority + quality-gated extensions |
 | Quality refinement | 七百三十一-七百三十二 | Scope-gap closure (autoregressive drift, BPE optims) + deferred-migration (event log binary wiring) |
 | Tiered-compression idiom | 七百三十三-七百三十七 | Float16 KV, unified sum-types, tier auto-routers (KV/Vector/EventLog), abstract protocol |
+| **Layer migration** | **七百三十八-七百四十九** | **6 layer sub-arcs (L11/L10/L14/L3/L2/L9) per user directive 「完全 移植 if WHOLE is better」 — Rust takes hot paths + state machines + persistence + audit math, Swift retains façade / Apple-glue / public API. 5-axis comparison framework + forward-looking ports (no Swift production code touched).** |
 
 ## Native % trajectory
 
