@@ -399,7 +399,15 @@ let package = Package(
                 // in-process telemetry without SQLite
                 // durability。
                 "BASRustCoreBridge"
-            ]
+            ],
+            // chapter 七百五十 第一刀 follow-up — silence
+            // the pre-existing SPM `unhandled` warning
+            // for BASCognitiveBrain.md (an in-source
+            // README markdown that ships alongside the
+            // public BASCognitiveBrain facade)。 The .md
+            // is documentation,not a SPM resource —
+            // explicit exclude is the canonical fix。
+            exclude: ["BASCognitiveBrain.md"]
         ),
         // M2167 chapter 七百一 第一刀 — MULTI-LANGUAGE
         // AUGMENTATION ARC scaffold (per user directive
