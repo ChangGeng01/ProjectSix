@@ -587,3 +587,70 @@ user directive:
 2. ▷ Finish 14-layer 电子脑 (active — next steps TBD)
 3. ⏳ Decide next major direction (deferred per user)
 
+---
+
+## SDK readiness audit (2026-05-20,user directive 「严查」)
+
+User asked **「14层 电子脑 作为 sdk 完全 没有 问题 是吗 严查」** post-severance。
+Strict 5-axis audit:architecture solid,but contract NOT ship-ready as a stable SDK。
+
+Strengths (genuine,not aspirational)
+────────────────────────────────────
+
+- **14 layers all implemented** — including L13 Evolution Furnace (was wrongly marked "deferred" in root README,fixed in this commit)。 L13 lives in BASHostKit (`EBrainRuntimeCoordinator+EvolutionGovernance.swift` + `BASEBrainTurnResultEvolutionBundle.swift` — nursery + shadow trial + seal + retraction)。
+- **Build clean** — 2-3s incremental
+- **12,964 / 12,965 tests pass in isolation** (99.99%)
+- **3 production-default Rust flips** measured + sealed (L14 chain seal 1.24×,L14 verdict 13.84×,L11 SQL persistence)
+- **5-axis comparison framework + byte-equality discipline** consistently applied across 56 chapters
+- **QinaoRuntimeSDK** substantial — 14 target modules,100+ tests,2 runnable executables (CLI + macOS GUI)
+
+Gaps that block 「完全 没有 问题」 SDK ship claim
+─────────────────────────────────────────────
+
+1. **README products list stale** — `BehavioralAISubstrate/README.md` lists 9 products,
+   Package.swift exports 16。 Missing from README:`BASLeaseLife`,`BASOrgan`,
+   `BASChatCompletionsAdapter`,`BASMLXAdapter`,`BASMetalSubstrate`,`BASSovereign`,
+   `BASWorldPrior`。 Consumer reading docs will miss whole subsystems。
+
+2. **No versioning policy** — Package.swift has no version field,no CHANGELOG,no
+   semver tag,no migration guide for schema bumps (e.g。 the chapter 七百三十 calibrator
+   schemaVersion bump silently invalidates existing-host calibration files → 10-30s
+   recalibration on cold start after substrate update)。 README explicitly says
+   「fast-evolving contract」 — honest for private use,disqualifying for external SDK ship。
+
+3. **Hidden crash contracts** — 14 `precondition(...)` / `fatalError(...)` sites in
+   BASHostKit + BASSovereign。 Init-time guards (e.g。 `precondition(stateFoldInterval > 0)`,
+   four `fatalError("Unavailable")` in `HostPresentationConfigurationsCore.swift`,
+   one `fatalError` in `BASSovereignAuditLedger.swift:308`)。 No consumer-facing doc
+   warns about them。 SDK consumer passes `0` → app crashes in production。
+
+4. **Test-order fragility (real bug,not just stale fixtures)** — at least 2 tests
+   pass in isolation but fail in full sweep,proving global static state bleeds
+   across tests。 Fixed:L14 routedSeal tearDown bleed (chapter 七百五十七 第三刀+)。
+   Still outstanding:`BASProductionAdoptionSmokeTests.testCanonicalAuditComplianceHostAdoption`
+   cross-store atomID parity (spawn_task flagged for follow-up)。 SDK risk:long-running
+   consumer apps with multiple subsystem inits could see similar state contamination。
+
+5. **Reference integration too shallow** — Before severed (was the only deep host)。
+   SampleHost is façade-only:does NOT exercise L14 sovereign verdict / L11 risk
+   permit / L9 dream loop / L8 memory pruning。 Cannot claim "production-shaped
+   integration demo"。 QinaoRuntimeSDK is substantial but it's another SDK wrapper,
+   not a consumer reference。
+
+Verdict
+───────
+
+**Private substrate ✅ / Public SDK ❌。**
+
+For ship to external host as a 「SDK 给 第三方」,the substrate needs:
+- README correction (products list + L13)
+- Versioning policy (semver / changelog / breaking-change story)
+- Public-API crash-contract docs (precondition foot-guns)
+- Resolve test-order static-state bleed (atomID parity)
+- A real production-shaped reference host (SampleHost ≠ enough)
+
+For ship to your own next host as 「private 14层 substrate」,the substrate is
+**SOLID right now** — 56 chapters of measurement-first discipline, comment-aware
+LOC discipline, byte-equality + 5-axis comparison gates, 99.99% test pass in
+isolation, 3 production Rust flips with honest perf measurements。
+

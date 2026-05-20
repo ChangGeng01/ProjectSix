@@ -50,7 +50,7 @@ swift test       # ~13k tests,~85s sweep
 | L10 | Tri-self court (id/ego/superego derive) | BASOrchestration |
 | L11 | Risk plane + permit escalation | BASPolicy |
 | L12 | Audit projections | BASRuntimeCore |
-| L13 | Evolution furnace (deferred) | — |
+| L13 | Evolution furnace (nursery + shadow trial + seal + retraction) | BASHostKit |
 | L14 | Sovereign verdict + ledger | BASSovereign |
 
 ## Hybrid implementation (Swift / Rust / SQL / Metal)
