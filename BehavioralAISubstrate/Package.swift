@@ -147,7 +147,24 @@ let package = Package(
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
             ]),
-        .target(name: "BASPolicy", dependencies: ["BASRuntimeCore", "BASMemory"]),
+        // chapter 七百三十八 第一刀 / M2361 — BASPolicy grows a
+        // `SQL/` subdirectory (006_risk_observations_schema.sql)
+        // + attaches the BASSQLSchemaGen build plugin to emit
+        // RiskObservationsSchema at build time。 Schema-First
+        // pattern per the LAYER-MIGRATION ARC plan:net-new SQL
+        // persistence for L11 Wind Gate risk observations lands
+        // unconditionally;the Rust state-machine port lands at
+        // chapter 七百三十九。 ADR-014 OPT-IN preserved — the
+        // generated enum is built but unused by the V1
+        // in-memory ring actor (BASRiskObservationLedger)。
+        // Chapter 七百三十九 wires consumer behind
+        // `useRoutedRiskPlane: Bool = false` flag。
+        .target(
+            name: "BASPolicy",
+            dependencies: ["BASRuntimeCore", "BASMemory"],
+            plugins: [
+                .plugin(name: "BASSQLSchemaGen")
+            ]),
         // BASSovereign (L14) — isolated microkernel. Depends only on BASRuntimeCore
         // schema types. Never depends on Memory/Policy/Orchestration (prevents
         // downstream layers from influencing sovereign decisions).
