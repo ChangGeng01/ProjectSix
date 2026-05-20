@@ -1,7 +1,7 @@
 # BehavioralAISubstrate — phase-4-chapter-721-aggressive-evolution
 
-**Branch arc:** chapter 七百二 / M2167 → chapter 七百四十九 / M2420
-**Status:** SEALED — 49 chapters, ~245 knives, ~912 commits
+**Branch arc:** chapter 七百二 / M2167 → chapter 七百五十六 / M2437
+**Status:** SEALED — 56 chapter-shaped tags, ~261 knives, ~960 commits
 
 ## Arc trajectory
 
@@ -412,5 +412,118 @@ Honest landings, substrate shape preserved. The TIERED-COMPRESSION IDIOM remains
 mid-arc organizing principle;the LAYER-MIGRATION 5-axis comparison framework is the
 late-arc organizing principle. Both formalized as repeatable patterns for downstream
 arcs.
+
+**Branch ready for downstream consumption / merge / next-arc spinout.**
+
+## chapters 七百五十一-七百五十六 — MATURATION ARC
+
+After the 49-chapter branch arc + chapter 七百五十 ad-hoc gap triage sealed,user
+directives 2026-05-20 framed a 6-chapter MATURATION ARC focused on real production
+wiring + perf-driven default flips。 Four directives received together:
+
+  1. L14 / L11 / L10 Rust ports → real runtime path
+  2. 5-axis perf/correctness scorecard per port,「亏的不要硬上」
+  3. SQL 不要只做 schema — 接入真实持久化和 replay
+  4. L8 仍然要回到主战场,因为 Memory 是所有层的共同底座
+
+### Per-chapter outcomes
+
+| Chapter | Theme | Outcome |
+|---|---|---|
+| 七百五十一 | L14 seal + L8 reducer + L11 SQL go-live | 1.24× L14 chain seal flipped default-on;L8 1.08× opt-in;L11 storage actor live |
+| 七百五十二 | DOCTRINE 大幅度 缩减 | -11,389 active LOC (38 per-chapter tests + 61 forwarders + schema test reduction) |
+| 七百五十三 | L14 verdict flip + L8 batched | **13.84× L14 verdict engine flipped default-on (biggest single win of arc)**;L8 batched 0.82× LOSS opt-in |
+| 七百五十四 | L11 production swap | SQL persistence wired through `BASRiskObservationLedger.sharedStorage` slot;cold-restart replay verified |
+| 七百五十五 | L10 production-swap DECISION | 1.06× TIE → opt-in only,Swift `.derive(...)` stays default per 「亏的不要硬上」 |
+| 七百五十六 | MATURATION ARC FINAL SEAL | 7-chapter close-out scorecard test |
+
+### Production-default flips this arc (3 total)
+
+| Layer | Site | Speedup | Chapter |
+|---|---|---:|---|
+| L14 | chain seal (`useRoutedSeal`) | **1.24×** | 七百五十一 第一刀 |
+| L14 | verdict engine Stage 2+3 (`useRoutedVerdictLevel`) | **13.84×** | 七百五十三 第一刀 |
+| L11 | SQL persistence wire (`sharedStorage` slot) | n/a (SQL go-live) | 七百五十四 第一刀 |
+
+### Opt-in honest landings (亏的不要硬上 enforced)
+
+| Layer | Site | Measurement | Chapter |
+|---|---|---:|---|
+| L8 | atomReducer per-call | 1.08× marginal | 七百五十一 第二刀 |
+| L8 | atomReducer batched | **0.82× LOSS** | 七百五十三 第二刀 |
+| L10 | tribunal derive ×3 | 1.06× TIE | 七百五十五 第一刀 |
+
+5 of 6 measured ports stayed opt-in because the 5-axis measurement didn't justify
+production flip。 Honest empirical truth:Swift-side `[Int32]` buffer allocation +
+FFI overhead beats Rust on tiny primitive math (batched reducer LOSS demonstrates
+this clearly)。
+
+### Pattern findings (substrate empirical truth)
+
+**When batching wins** (chapter 七百十八 cosine pattern):
+- Per-element work is non-trivial (dim-D float math)
+- Per-element work matches a Rust SIMD intrinsic
+- Per-element work involves multiple FFI string copies
+
+**When batching LOSES** (chapter 七百五十三 第二刀 demonstration):
+- Per-element work is trivial primitive math (one f64 compare)
+- Swift caller already has data in arrays
+- Rust function is already short-lived per call
+- Buffer-allocation overhead dominates
+
+### Doctrine 大幅度 缩减 detail (chapter 七百五十二)
+
+| Wave | Target | Active LOC removed |
+|---|---|---:|
+| Wave 1 | `BASChapterDoctrineSchemaCompletenessTests` 5513 LOC → 181-LOC registry loop | **5,332** |
+| Wave 2 | 38 per-chapter `BASChapter###EntropyDoctrineTests` files | **3,534** |
+| Wave 3 | 61 thin-forwarder doctrine bodies | **2,523** |
+| **Total** | 104 files modified | **~11,389** |
+
+All deactivated bodies preserved inside `#if false ... #endif` per 「依旧 不删除 只
+comment」 — recoverable by flipping the compile-conditional。 Registry remains the
+SOLE source-of-truth for chapter doctrine data。
+
+## 56-chapter snapshot (chapter 七百五十六 close-out — current state)
+
+```
+Chapter-shaped tags:           56 (chapters 七百二 → 七百五十六)
+Knives:                       ~261 (5/chapter avg + ad-hoc variation)
+Commits ahead of branch:      ~960
+Rust crates:                   12 (unchanged from 七百四十九)
+Auto-router families:          25
+Production-default flips:      12 (was 9 at 七百四十九; +3 in MATURATION ARC)
+                                  - L14 chain seal (chapter 七百五十一)
+                                  - L14 verdict engine (chapter 七百五十三)
+                                  - L11 SQL persistence wire (chapter 七百五十四)
+Layer ports (forward-looking):  6 (L11 / L10 / L14 / L3 / L2 / L9)
+                                  unchanged from layer-migration arc
+Net-new SQL schemas:            6 (006-010 + 030 KG v2)
+                                  unchanged — schemas were landed at 七百三十八
+                                  arc;production-wired this arc at 七百五十四
+Opt-in fallback capabilities:  15+ (added L8 per-call + L8 batched + L10 ×3
+                                  this arc)
+Doctrine active LOC delta:    -11,389 (chapter 七百五十二 大幅度 缩减 wave)
+Production code touched:       ~0 lines this arc (forward-looking)
+Tests added this arc:         ~30 test files,~80 test methods
+```
+
+## Branch arc SEALED — 56 chapter-shaped tags delivered
+
+The branch now spans 6 sealed sub-arcs across 55 chapters + 1 ad-hoc plus the
+final MATURATION ARC:
+
+- **Original 5-language scaffold** (chapter 七百二-七百六) — SHIPPED ✅
+- **Per-primitive auto-router buildout** (chapter 七百七-七百二十) — SHIPPED ✅
+- **Aggressive evolution** (chapter 七百二十一-七百三十) — SHIPPED ✅
+- **Quality refinement + tiered-compression idiom** (chapter 七百三十一-七百三十七) — SHIPPED ✅
+- **Layer migration** (chapter 七百三十八-七百四十九) — SHIPPED ✅
+- **Plan-agent gap triage** (chapter 七百五十,ad-hoc) — SHIPPED ✅
+- **MATURATION ARC** (chapter 七百五十一-七百五十六) — **SHIPPED ✅**
+
+Honest landings,substrate shape preserved。 The 5-axis comparison framework
+formalized at the layer-migration arc was applied measurement-first this arc:
+3 production-default flips landed (1.24× / 13.84× / SQL go-live);3 opt-in
+ports preserved per 「亏的不要硬上」 (1.08× / 0.82× LOSS / 1.06× TIE)。
 
 **Branch ready for downstream consumption / merge / next-arc spinout.**
