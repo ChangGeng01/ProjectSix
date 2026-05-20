@@ -95,3 +95,9 @@ bas-lease-life        = { path = "../bas-lease-life" }
 # Per user 严苛 table 「L7 很值得」 — pure threshold
 # decision tree maps cleanly to Rust enum + match。
 bas-mirror-blade      = { path = "../bas-mirror-blade" }
+# chapter 七百六十六 / M2481 — bundle the L6 presence-eye
+# crate so Swift host sees the signal-fusion classifier
+# (bas_presence_eye_fuse,abi_version)。 Per user 严苛
+# table 「L6 部分值得」 — Apple sensor pipe stays Swift,
+# Rust owns the deterministic fusion math。
+bas-presence-eye      = { path = "../bas-presence-eye" }

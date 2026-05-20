@@ -35,6 +35,7 @@ members = [
     "bas-integrity-sentinel",      # chapter 七百六十 第一刀 / M2451 — typed Rust port of BASSovereignIntegritySentinel
     "bas-lease-life",              # chapter 七百六十二 第一刀 / M2461 — L1 lung-state + breath-scheduler pure-fn port
     "bas-mirror-blade",            # chapter 七百六十四 / M2471 — L7 decomposition state classifier
+    "bas-presence-eye",            # chapter 七百六十六 / M2481 — L6 signal-fusion classifier
 ]
 resolver = "2"
 

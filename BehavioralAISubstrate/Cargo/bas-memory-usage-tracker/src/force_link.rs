@@ -303,6 +303,16 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
     total = total.wrapping_add(
         bas_mirror_blade::bas_mirror_blade_classify(
             0.0, 0.0, 0.0, 0.0, 0.0, 0, 0) as i32);
+    // chapter 七百六十六 / M2481 — force-link the L6
+    // presence-eye classifier。 Two cheapest anchors:
+    //   1. ABI version probe
+    //   2. fuse with all-zero (clean) → returns 0.0
+    //      (cast to f64 result is 0.0; we discard,but the
+    //      symbol reference keeps the linker happy)
+    total = total.wrapping_add(
+        bas_presence_eye::bas_presence_eye_abi_version());
+    let _presence_unified = bas_presence_eye::bas_presence_eye_fuse(
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     total
 }
 
@@ -323,7 +333,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 15 = chapter 七百六十 第三刀 / M2453 (+integrity-sentinel)
 ///   - 16 = chapter 七百六十二 第三刀 / M2463 (+lease-life)
 ///   - 17 = chapter 七百六十四 / M2471 (+mirror-blade)
+///   - 18 = chapter 七百六十六 / M2481 (+presence-eye)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    17
+    18
 }

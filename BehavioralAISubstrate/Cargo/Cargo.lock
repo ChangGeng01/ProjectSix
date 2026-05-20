@@ -64,6 +64,7 @@ dependencies = [
  "bas-mirror-blade",
  "bas-organ-router",
  "bas-permit-policy",
+ "bas-presence-eye",
  "bas-red-team-bench",
  "bas-retrieval-ranker",
  "bas-runtime-frame",
@@ -89,6 +90,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "bas-presence-eye"
+version = "0.1.0"
 
 [[package]]
 name = "bas-red-team-bench"
