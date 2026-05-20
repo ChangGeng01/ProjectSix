@@ -94,7 +94,28 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         case corruptedRow(eventID: String, reason: String)
     }
 
-    public static let schemaVersion: Int = 1
+    /// chapter 七百三十二 第一刀 / M2331 — schema bumped 1 → 2。
+    /// V2 adds two columns to `event_log`:
+    ///   - payload_format INTEGER NOT NULL DEFAULT 1
+    ///     1 = JSON (legacy v1 rows + default for new rows
+    ///         when useBinaryPayload flag is OFF)
+    ///     2 = binary (chapter 七百二十四 wire format,when
+    ///         useBinaryPayload is ON)
+    ///   - payload_blob BLOB (nullable;populated for v=2 rows)
+    ///
+    /// Lazy migration:`ALTER TABLE` runs on first open after the
+    /// bump。 Existing rows keep payload_format=1 + payload_json,
+    /// no row-level rewrite needed。 Read path detects format via
+    /// the payload_format column。
+    public static let schemaVersion: Int = 2
+
+    /// chapter 七百三十二 第三刀 — opt-in feature flag controlling
+    /// whether NEW writes go through the binary path。 Default
+    /// OFF until chapter 七百三十二 第四刀 measurement decides。
+    /// Reads always handle both formats via the payload_format
+    /// dispatch — flag affects writes only。
+    public nonisolated(unsafe) static var useBinaryPayload:
+        Bool = false
 
     // MARK: - Stored state
 
@@ -145,6 +166,19 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         let existingVersion = try Self.readUserVersion(
             db: handle)
         if existingVersion == 0 {
+            // Fresh DB — set straight to current version
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+        } else if existingVersion == 1
+                  && Self.schemaVersion == 2
+        {
+            // chapter 七百三十二 第一刀 — v1 → v2 migration
+            // path。 ensureSchema() runs ensureV2Columns() which
+            // ALTER TABLE-adds the missing columns。 After the
+            // ALTER completes,bump user_version to 2 to mark
+            // the migration done。
+            try Self.ensureSchema(db: handle)
             try Self.runExec(
                 db: handle,
                 sql: "PRAGMA user_version=\(Self.schemaVersion);")
@@ -311,6 +345,69 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 event_log_kind_idx
                 ON event_log(kind);
             """)
+        // chapter 七百三十二 第一刀 — lazy ALTER TABLE migration
+        // for v2 columns。 PRAGMA-checked first so we don't try
+        // to add columns that already exist on a freshly-created
+        // database that ran the CREATE TABLE above。 SQLite's
+        // ALTER TABLE ... ADD COLUMN is O(1) on append-only
+        // tables (no row rewrite),so this is safe on large logs。
+        try ensureV2Columns(db: db)
+    }
+
+    /// chapter 七百三十二 第一刀 — idempotent column-add for v2。
+    /// Inspects `PRAGMA table_info(event_log)` to detect which
+    /// columns are already present,then ALTERs in the missing
+    /// ones。 Safe to call on:
+    ///   - fresh v1 DBs (adds both v2 columns)
+    ///   - already-v2 DBs (no-op)
+    ///   - DBs partially upgraded (adds only the missing column)
+    fileprivate static func ensureV2Columns(
+        db: OpaquePointer
+    ) throws {
+        let existing = try columnsOf(
+            table: "event_log", db: db)
+        if !existing.contains("payload_format") {
+            try runExec(db: db, sql: """
+                ALTER TABLE event_log
+                ADD COLUMN payload_format INTEGER NOT NULL
+                DEFAULT 1;
+                """)
+        }
+        if !existing.contains("payload_blob") {
+            try runExec(db: db, sql: """
+                ALTER TABLE event_log
+                ADD COLUMN payload_blob BLOB;
+                """)
+        }
+    }
+
+    /// PRAGMA table_info reader。 Returns the set of column
+    /// names。 Throws on prepare/step failure。
+    fileprivate static func columnsOf(
+        table: String, db: OpaquePointer
+    ) throws -> Set<String> {
+        let sql = "PRAGMA table_info(\(table));"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var out: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            // PRAGMA table_info columns:
+            //   0=cid, 1=name, 2=type, 3=notnull,
+            //   4=dflt_value, 5=pk
+            if let cstr = sqlite3_column_text(stmt, 1) {
+                out.insert(String(
+                    cString: cstr))
+            }
+        }
+        return out
     }
 
     fileprivate static func verifySchemaVersion(
@@ -353,11 +450,19 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         db: OpaquePointer,
         entry: BASEventLogEntry
     ) throws {
+        // chapter 七百三十二 第三刀 — dual-format insert。 Selects
+        // JSON v1 (legacy) or binary v2 path based on the
+        // useBinaryPayload feature flag。 Wire layout for v2:
+        // payload_format = 2,payload_blob populated,payload_json
+        // empty string (NOT NULL satisfied)。 For v1:
+        // payload_format = 1,payload_json populated,payload_blob
+        // NULL。
         let sql = """
             INSERT INTO event_log (
                 event_id, session_id, sequence_number,
-                timestamp_ms, kind, risk_band, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                timestamp_ms, kind, risk_band, payload_json,
+                payload_format, payload_blob
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
@@ -369,23 +474,41 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
-        let payloadJson: String
-        do {
-            let data = try JSONEncoder().encode(entry)
-            guard let s = String(data: data, encoding: .utf8)
-            else {
+
+        let useBinary = useBinaryPayload
+        var payloadJson: String = ""
+        var payloadBlob: Data? = nil
+        var format: Int32 = 1
+
+        if useBinary,
+           let blob = encodeEntryAsBinary(entry)
+        {
+            // Binary path:payload_blob populated,payload_json
+            // is empty string (NOT NULL constraint)
+            payloadBlob = blob
+            format = 2
+        } else {
+            // Legacy JSON path (also fallback if binary fails)
+            do {
+                let data = try JSONEncoder().encode(entry)
+                guard let s = String(
+                    data: data, encoding: .utf8)
+                else {
+                    throw StorageError.encodeFailed(
+                        eventID: entry.eventID,
+                        message: "encoder produced non-UTF-8 data")
+                }
+                payloadJson = s
+            } catch let err as StorageError {
+                throw err
+            } catch {
                 throw StorageError.encodeFailed(
                     eventID: entry.eventID,
-                    message: "encoder produced non-UTF-8 data")
+                    message: "\(error)")
             }
-            payloadJson = s
-        } catch let err as StorageError {
-            throw err
-        } catch {
-            throw StorageError.encodeFailed(
-                eventID: entry.eventID,
-                message: "\(error)")
+            format = 1
         }
+
         bindText(stmt, 1, entry.eventID)
         bindText(stmt, 2, entry.sessionID)
         sqlite3_bind_int64(stmt, 3, entry.sequenceNumber)
@@ -393,6 +516,18 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         bindText(stmt, 5, entry.kind.rawValue)
         bindText(stmt, 6, entry.riskBand.rawValue)
         bindText(stmt, 7, payloadJson)
+        sqlite3_bind_int(stmt, 8, format)
+        if let blob = payloadBlob {
+            _ = blob.withUnsafeBytes { rb -> Int32 in
+                return sqlite3_bind_blob(
+                    stmt, 9,
+                    rb.baseAddress,
+                    Int32(blob.count),
+                    SQLITE_TRANSIENT)
+            }
+        } else {
+            sqlite3_bind_null(stmt, 9)
+        }
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw StorageError.stepFailed(
                 sql: sql,
@@ -400,12 +535,146 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
     }
 
+    /// chapter 七百三十二 第二刀 / M2332 — encode the full
+    /// BASEventLogEntry to binary。 Maps the 5 core fields
+    /// (entryID,kind,sessionRef,turnRef,timestamp) directly
+    /// to the chapter 七百二十二 BPE-style wire,then carries
+    /// the rest of the BASEventLogEntry shape (riskBand,source,
+    /// rawInputDigest,intent,emotion,project,memoryRefs,...)
+    /// as a JSON payload INSIDE the binary wire's payload_json
+    /// field。 Total: still gets the 30%+ storage shrink that
+    /// chapter 七百二十四 measured (the savings come from int64
+    /// timestamps,enum discriminants,and length-prefix overhead
+    /// vs JSON object syntax/whitespace)。
+    fileprivate static func encodeEntryAsBinary(
+        _ entry: BASEventLogEntry
+    ) -> Data? {
+        // Map BASEventLogKind → BASBinaryEventLogKind (best-
+        // effort — both have overlapping cases)。 Fall back to
+        // .internalSignal for unknown kinds (rare edge case)。
+        let kind: BASBinaryEventLogKind
+        switch entry.kind {
+        case .substrateAudit:
+            kind = .sovereignVerdict
+        case .internalSignal:
+            kind = .internalSignal
+        default:
+            // appBehavior,sessionLifecycle,toolInvocation,
+            // image,file,web,calendar,health,…
+            kind = .hostInput
+        }
+        // Build payloadJson with all the "extra" fields the
+        // binary wire doesn't natively carry。 Decoded on read。
+        let payloadEnvelope: [String: String] = [
+            "riskBand":       entry.riskBand.rawValue,
+            "source":         entry.source ?? "",
+            "rawInputDigest": entry.rawInputDigest ?? "",
+            "intent":         entry.intent ?? "",
+            "emotion":        entry.emotion ?? "",
+            "project":        entry.project ?? "",
+            "memoryRefs":
+                entry.memoryRefs.joined(separator: ","),
+        ]
+        let payloadJson: String
+        do {
+            let data = try JSONEncoder().encode(payloadEnvelope)
+            payloadJson = String(
+                data: data, encoding: .utf8) ?? ""
+        } catch {
+            return nil
+        }
+        let binaryEntry = BASBinaryEventLogEntry(
+            entryID:           entry.eventID,
+            kind:              kind,
+            sessionRef:        entry.sessionID,
+            turnRef:           entry.turnRef ?? "",
+            timestampMs:       entry.timestampMs,
+            payloadJson:       payloadJson,
+            provenanceSummary: nil)
+        return try? BASEventLogBinaryCodec.encode(
+            binaryEntry)
+    }
+
+    /// chapter 七百三十二 第二刀 — inverse of encodeEntryAsBinary。
+    /// Decodes a v=2 binary blob back to BASEventLogEntry。
+    /// Returns nil if the blob is malformed or the embedded
+    /// payload_json envelope is unparseable。
+    fileprivate static func decodeEntryFromBinary(
+        _ data: Data,
+        kindRaw: String,
+        riskBandRaw: String,
+        sessionID: String,
+        sequenceNumber: Int64
+    ) -> BASEventLogEntry? {
+        guard let binary = try? BASEventLogBinaryCodec
+            .decode(data)
+        else { return nil }
+        // Unwrap the payload envelope
+        var riskBand: BASEventLogRiskBand =
+            BASEventLogRiskBand(rawValue: riskBandRaw)
+            ?? .unknown
+        var source: String? = nil
+        var rawInputDigest: String? = nil
+        var intent: String? = nil
+        var emotion: String? = nil
+        var project: String? = nil
+        var memoryRefs: [String] = []
+        if let payloadStr = binary.payloadJson,
+           let payloadData = payloadStr.data(using: .utf8),
+           let env = try? JSONDecoder().decode(
+            [String: String].self, from: payloadData)
+        {
+            if let rb = env["riskBand"],
+               let parsed = BASEventLogRiskBand(rawValue: rb)
+            { riskBand = parsed }
+            source         = env["source"].flatMap {
+                $0.isEmpty ? nil : $0 }
+            rawInputDigest = env["rawInputDigest"].flatMap {
+                $0.isEmpty ? nil : $0 }
+            intent         = env["intent"].flatMap {
+                $0.isEmpty ? nil : $0 }
+            emotion        = env["emotion"].flatMap {
+                $0.isEmpty ? nil : $0 }
+            project        = env["project"].flatMap {
+                $0.isEmpty ? nil : $0 }
+            if let refs = env["memoryRefs"],
+               !refs.isEmpty
+            {
+                memoryRefs = refs.split(separator: ",")
+                    .map { String($0) }
+            }
+        }
+        let kindParsed: BASEventLogKind =
+            BASEventLogKind(rawValue: kindRaw)
+            ?? .internalSignal
+        return BASEventLogEntry(
+            eventID:        binary.entryID,
+            timestampMs:    binary.timestampMs,
+            kind:           kindParsed,
+            sessionID:      sessionID,
+            sequenceNumber: sequenceNumber,
+            source:         source,
+            turnRef:        binary.turnRef.isEmpty
+                            ? nil : binary.turnRef,
+            rawInputDigest: rawInputDigest,
+            intent:         intent,
+            emotion:        emotion,
+            riskBand:       riskBand,
+            project:        project,
+            memoryRefs:     memoryRefs)
+    }
+
     fileprivate static func fetchEntry(
         db: OpaquePointer,
         eventID: String
     ) throws -> BASEventLogEntry? {
+        // chapter 七百三十二 第三刀 — dual-read。 SELECT extra
+        // columns so the read path can dispatch on
+        // payload_format (1=JSON,2=binary)。
         let sql = """
-            SELECT payload_json FROM event_log
+            SELECT payload_json, payload_format, payload_blob,
+                   kind, risk_band, session_id, sequence_number
+            FROM event_log
             WHERE event_id = ?
             """
         var stmt: OpaquePointer?
@@ -426,6 +695,39 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 sql: sql,
                 message: String(cString: sqlite3_errmsg(db)))
         }
+        let format = sqlite3_column_int(stmt, 1)
+        if format == 2 {
+            // v2 binary path
+            let blobLen = sqlite3_column_bytes(stmt, 2)
+            guard let blobPtr = sqlite3_column_blob(
+                stmt, 2),
+                  blobLen > 0
+            else {
+                throw StorageError.corruptedRow(
+                    eventID: eventID,
+                    reason: "format=2 but payload_blob empty")
+            }
+            let data = Data(bytes: blobPtr,
+                count: Int(blobLen))
+            let kindRaw = readText(stmt, 3)
+            let riskBandRaw = readText(stmt, 4)
+            let sessionID = readText(stmt, 5)
+            let sequenceNumber = sqlite3_column_int64(
+                stmt, 6)
+            guard let recovered = decodeEntryFromBinary(
+                data,
+                kindRaw: kindRaw,
+                riskBandRaw: riskBandRaw,
+                sessionID: sessionID,
+                sequenceNumber: sequenceNumber)
+            else {
+                throw StorageError.decodeFailed(
+                    eventID: eventID,
+                    message: "v2 binary decode failed")
+            }
+            return recovered
+        }
+        // v1 JSON path (legacy + default)
         let json = readText(stmt, 0)
         return try decode(eventID: eventID, json: json)
     }
@@ -462,8 +764,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         db: OpaquePointer,
         sessionID: String
     ) throws -> [BASEventLogEntry] {
+        // chapter 七百三十二 第三刀 — dual-read。 SELECT extra
+        // columns so the read path dispatches on payload_format。
         let sql = """
-            SELECT event_id, payload_json FROM event_log
+            SELECT event_id, payload_json, payload_format,
+                   payload_blob, kind, risk_band, sequence_number
+            FROM event_log
             WHERE session_id = ?
             ORDER BY sequence_number ASC
             """
@@ -481,8 +787,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         var out: [BASEventLogEntry] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             let id = readText(stmt, 0)
-            let json = readText(stmt, 1)
-            let entry = try decode(eventID: id, json: json)
+            let entry = try decodeRowDualFormat(
+                stmt: stmt,
+                eventID: id,
+                sessionID: sessionID,
+                seqCol: 6, kindCol: 4, riskBandCol: 5,
+                jsonCol: 1, formatCol: 2, blobCol: 3)
             out.append(entry)
         }
         return out
@@ -493,8 +803,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         since: Int64,
         limit: Int
     ) throws -> [BASEventLogEntry] {
+        // chapter 七百三十二 第三刀 — dual-read across all sessions
         let sql = """
-            SELECT event_id, payload_json FROM event_log
+            SELECT event_id, payload_json, payload_format,
+                   payload_blob, kind, risk_band, session_id,
+                   sequence_number
+            FROM event_log
             WHERE timestamp_ms >= ?
             ORDER BY timestamp_ms ASC, sequence_number ASC
             LIMIT ?
@@ -514,11 +828,63 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         var out: [BASEventLogEntry] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             let id = readText(stmt, 0)
-            let json = readText(stmt, 1)
-            let entry = try decode(eventID: id, json: json)
+            let sessionID = readText(stmt, 6)
+            let entry = try decodeRowDualFormat(
+                stmt: stmt,
+                eventID: id,
+                sessionID: sessionID,
+                seqCol: 7, kindCol: 4, riskBandCol: 5,
+                jsonCol: 1, formatCol: 2, blobCol: 3)
             out.append(entry)
         }
         return out
+    }
+
+    /// chapter 七百三十二 第三刀 — shared dual-format row
+    /// decoder。 Inspects the payload_format column,dispatches
+    /// to JSON or binary decoder accordingly。
+    fileprivate static func decodeRowDualFormat(
+        stmt: OpaquePointer,
+        eventID: String,
+        sessionID: String,
+        seqCol: Int32,
+        kindCol: Int32,
+        riskBandCol: Int32,
+        jsonCol: Int32,
+        formatCol: Int32,
+        blobCol: Int32
+    ) throws -> BASEventLogEntry {
+        let format = sqlite3_column_int(stmt, formatCol)
+        if format == 2 {
+            let blobLen = sqlite3_column_bytes(stmt, blobCol)
+            guard let blobPtr = sqlite3_column_blob(
+                stmt, blobCol),
+                  blobLen > 0
+            else {
+                throw StorageError.corruptedRow(
+                    eventID: eventID,
+                    reason: "format=2 but payload_blob empty")
+            }
+            let data = Data(bytes: blobPtr,
+                count: Int(blobLen))
+            let kindRaw = readText(stmt, kindCol)
+            let riskBandRaw = readText(stmt, riskBandCol)
+            let seq = sqlite3_column_int64(stmt, seqCol)
+            guard let recovered = decodeEntryFromBinary(
+                data,
+                kindRaw: kindRaw,
+                riskBandRaw: riskBandRaw,
+                sessionID: sessionID,
+                sequenceNumber: seq)
+            else {
+                throw StorageError.decodeFailed(
+                    eventID: eventID,
+                    message: "v2 binary decode failed")
+            }
+            return recovered
+        }
+        let json = readText(stmt, jsonCol)
+        return try decode(eventID: eventID, json: json)
     }
 
     fileprivate static func countAll(
