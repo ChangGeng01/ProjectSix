@@ -24,7 +24,12 @@ final class BASChapter710CalibrationTests: XCTestCase {
             deviceFingerprint: "test-host",
             substrateVersion: "1.0.0")
 
-        XCTAssertEqual(report.schemaVersion, 1)
+        // chapter 七百五十七 第三刀 / M2440 — schemaVersion default bumped
+        // 1 → 2 (in BASAutoRouteCalibrator.swift init) to match the store's
+        // currentSchemaVersion = 2 (chapter 七百三十 第三刀)。 Pin updated。
+        // Floor-shape (>= currentSchemaVersion) would also work but explicit
+        // equality preserves the bump-triggers-migration-review intent。
+        XCTAssertEqual(report.schemaVersion, 2)
         XCTAssertEqual(report.deviceFingerprint,
             "test-host")
         XCTAssertEqual(report.substrateVersion, "1.0.0")
