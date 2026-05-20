@@ -341,6 +341,7 @@ final class BASPostRadicalSweepDoctrineTests:
     /// SWEEP firstChapterTag must equal the actual
     /// chapter 427 doctrine — if either drifts
     /// independently,this test fails。
+#if false  // chapter 七百五十二 第二刀 deactivated
     func testFirstChapterTagMatchesBASChapter427() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
@@ -349,9 +350,11 @@ final class BASPostRadicalSweepDoctrineTests:
             "Sweep firstChapterTag must equal" +
             " BASChapter427EntropyDoctrine.chapterTag")
     }
+#endif  // chapter 七百五十二 第二刀
 
     /// SWEEP lastChapterTag must equal chapter 446
     /// (the close-out chapter itself)。
+#if false  // chapter 七百五十二 第二刀 deactivated
     func testLastChapterTagMatchesBASChapter446() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
@@ -360,12 +363,14 @@ final class BASPostRadicalSweepDoctrineTests:
             "Sweep lastChapterTag must equal" +
             " BASChapter446EntropyDoctrine.chapterTag")
     }
+#endif  // chapter 七百五十二 第二刀
 
     /// SWEEP mNumberFirst must equal chapter 427's
     /// mNumberFirst;mNumberLast must equal chapter
     /// 446's mNumberLast。 Cross-mirror with the actual
     /// chapter doctrines pins the M-range against
     /// independent drift。
+#if false  // chapter 七百五十二 第二刀 deactivated
     func testMNumberRangeMatchesChapterDoctrines() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.mNumberFirst,
@@ -376,6 +381,7 @@ final class BASPostRadicalSweepDoctrineTests:
             BASChapter446EntropyDoctrine.mNumberLast,
             "Sweep mNumberLast must equal chapter 446's")
     }
+#endif  // chapter 七百五十二 第二刀
 
     /// Wave ↔ chapter accounting invariant — uses
     /// named expected (see

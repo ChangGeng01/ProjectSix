@@ -55,7 +55,20 @@ final class BASChapterDoctrineRegistryTests:
     }
 
     // MARK: - Byte-mirror each entry vs source
+    // chapter 七百五十二 第二刀 / M2431 — DEACTIVATED。
+    // These mirror tests pre-dated the chapter 七百五十二
+    // doctrine 大幅度 缩减 wave。 They compared the registry
+    // against the per-chapter forwarder types
+    // (BASChapter###EntropyDoctrine),which are now wrapped
+    // in `#if false`。 The unified registry-iteration
+    // mirror test `testIndexMirrorsEveryRegistryRecord` in
+    // BASEntropyChapterIndexTests covers the same invariant
+    // for EVERY chapter automatically — strictly broader
+    // coverage than these 3 hand-spelled tests provided。
+    // Historical bodies preserved verbatim per
+    // 「依旧 不删除 只 comment」。
 
+#if false  // chapter 七百五十二 第二刀 deactivated
     func testChapter453EntryMirrorsSource() {
         let record = BASChapterDoctrineRegistry
             .recordFor(chapterTag: "chapter 四百五十三")
@@ -445,6 +458,7 @@ final class BASChapterDoctrineRegistryTests:
                 sourceKnives[i].concept)
         }
     }
+#endif  // chapter 七百五十二 第二刀
 
     // MARK: - Lookup API
 
