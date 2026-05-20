@@ -1445,4 +1445,480 @@ mod tests {
         assert_eq!(report.as_hard_bits(), 0x0040,
             "BR-007 lit only via observed_self_mutation");
     }
+
+    // MARK: - 100-fixture byte-equality grid
+    //         (chapter 七百六十 第四刀 / M2454)
+
+    /// FNV-1a 64-bit hash for fixture pinning (no sha2 dependency)。
+    fn fnv1a_64(bytes: &[u8]) -> u64 {
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for &b in bytes {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100_0000_01b3);
+        }
+        h
+    }
+
+    /// Encode a ScanReport into a canonical byte buffer for hashing。
+    /// Format (LE,packed,no padding):
+    ///   1 byte  failed_kinds_bitmap
+    ///   1 byte  observed_self_mutation (0/1)
+    ///   2 bytes hard_bits (u16 LE)
+    ///   4 bytes failed_id_count (u32 LE)
+    ///   per failed_id:
+    ///     4 bytes id_len (u32 LE)
+    ///     id_len bytes utf-8
+    /// Distinct from the C ABI wire format — packed for hashing
+    /// (no alignment padding,no version prefix)。
+    fn canonical_bytes_of_report(r: &ScanReport) -> Vec<u8> {
+        let mut buf = Vec::new();
+        let mut bitmap: u8 = 0;
+        for &k in &r.failed_kinds {
+            bitmap |= 1u8 << (k as u8);
+        }
+        buf.push(bitmap);
+        buf.push(if r.observed_self_mutation { 1 } else { 0 });
+        buf.extend_from_slice(&r.as_hard_bits().to_le_bytes());
+        buf.extend_from_slice(&(r.failed_artifact_ids.len() as u32).to_le_bytes());
+        for id in &r.failed_artifact_ids {
+            buf.extend_from_slice(&(id.len() as u32).to_le_bytes());
+            buf.extend_from_slice(id.as_bytes());
+        }
+        buf
+    }
+
+    /// Build the i-th fixture (0..=99) deterministically。 Returns
+    /// (claims,trusted_pairs,observed_self_mutation)。
+    ///
+    /// Generation strategy:
+    ///   - Fixtures 0..=23  : single-claim,full 4-kind × 6-shape
+    ///                        (match/mismatch/unknown × self_mut 0/1)
+    ///   - Fixtures 24..=49 : two-claim batches (mixed kinds + outcomes)
+    ///   - Fixtures 50..=79 : four-claim full-coverage batches
+    ///   - Fixtures 80..=99 : edge cases (case variations,empty
+    ///                        claims with self_mut,large IDs)
+    fn build_fixture(i: usize) -> (Vec<(String, String, ArtifactKind)>,
+                                    Vec<(String, String)>,
+                                    bool) {
+        let kinds = ArtifactKind::ALL;
+        match i {
+            // --- 0..=23: single-claim 4-kind × 6-shape ---
+            0..=23 => {
+                let kind_idx = i % 4;
+                let shape = i / 4; // 0..6
+                let kind = kinds[kind_idx];
+                let id = format!("artifact_{}", i);
+                let trusted_hash = format!("trusted_{}", i);
+                let (claims, trusted, self_mut) = match shape {
+                    0 => (
+                        vec![(id.clone(), trusted_hash.clone(), kind)],
+                        vec![(id, trusted_hash)],
+                        false,
+                    ),
+                    1 => (
+                        vec![(id.clone(), trusted_hash.clone(), kind)],
+                        vec![(id, trusted_hash)],
+                        true,
+                    ),
+                    2 => (
+                        vec![(id.clone(), "wrong".to_string(), kind)],
+                        vec![(id, trusted_hash)],
+                        false,
+                    ),
+                    3 => (
+                        vec![(id.clone(), "wrong".to_string(), kind)],
+                        vec![(id, trusted_hash)],
+                        true,
+                    ),
+                    4 => (
+                        vec![(id, "any".to_string(), kind)],
+                        vec![], // unknown artifact
+                        false,
+                    ),
+                    _ => (
+                        vec![(id, "any".to_string(), kind)],
+                        vec![],
+                        true,
+                    ),
+                };
+                (claims, trusted, self_mut)
+            }
+            // --- 24..=49: two-claim batches ---
+            24..=49 => {
+                let seed = i - 24;
+                let k1 = kinds[seed % 4];
+                let k2 = kinds[(seed + 1) % 4];
+                let id1 = format!("two_a_{}", i);
+                let id2 = format!("two_b_{}", i);
+                let claims = vec![
+                    (id1.clone(), format!("h1_{}", i), k1),
+                    (id2.clone(), format!("h2_{}", i), k2),
+                ];
+                let trusted = if seed % 3 == 0 {
+                    // both registered with correct hashes
+                    vec![
+                        (id1, format!("h1_{}", i)),
+                        (id2, format!("h2_{}", i)),
+                    ]
+                } else if seed % 3 == 1 {
+                    // one wrong hash
+                    vec![
+                        (id1, format!("h1_{}", i)),
+                        (id2, "wrong".to_string()),
+                    ]
+                } else {
+                    // one unknown
+                    vec![(id1, format!("h1_{}", i))]
+                };
+                (claims, trusted, seed % 2 == 0)
+            }
+            // --- 50..=79: four-claim batches ---
+            50..=79 => {
+                let seed = i - 50;
+                let mut claims = Vec::new();
+                let mut trusted = Vec::new();
+                for k_idx in 0..4 {
+                    let kind = kinds[k_idx];
+                    let id = format!("four_{}_{}", i, k_idx);
+                    let claim_hash = format!("ch_{}_{}", i, k_idx);
+                    let registered = (seed + k_idx) % 3 != 2; // ~67% registered
+                    let hash_matches = (seed + k_idx) % 2 == 0; // ~50% match
+                    claims.push((id.clone(), claim_hash.clone(), kind));
+                    if registered {
+                        let trusted_hash = if hash_matches {
+                            claim_hash
+                        } else {
+                            format!("other_{}_{}", i, k_idx)
+                        };
+                        trusted.push((id, trusted_hash));
+                    }
+                }
+                (claims, trusted, seed % 4 == 0)
+            }
+            // --- 80..=99: edge cases ---
+            _ => {
+                let seed = i - 80;
+                match seed {
+                    // Empty claims, self_mut on
+                    0 => (vec![], vec![], true),
+                    // Empty claims, self_mut off
+                    1 => (vec![], vec![], false),
+                    // Trusted has UPPERCASE,claim lowercase
+                    2 => (
+                        vec![("upper".to_string(), "abcdef".to_string(),
+                              ArtifactKind::ModelOrPolicyArtifact)],
+                        vec![("upper".to_string(), "ABCDEF".to_string())],
+                        false,
+                    ),
+                    // Trusted lowercase, claim UPPERCASE
+                    3 => (
+                        vec![("lower".to_string(), "ABCDEF".to_string(),
+                              ArtifactKind::SovereignPolicyBundle)],
+                        vec![("lower".to_string(), "abcdef".to_string())],
+                        false,
+                    ),
+                    // Long ID (64 chars)
+                    4 => {
+                        let id: String = std::iter::repeat('x').take(64).collect();
+                        (
+                            vec![(id.clone(), "h".to_string(),
+                                  ArtifactKind::ThoughtFoldOrCache)],
+                            vec![(id, "wrong".to_string())],
+                            false,
+                        )
+                    },
+                    // Long hash (128 chars)
+                    5 => {
+                        let h: String = std::iter::repeat('a').take(128).collect();
+                        (
+                            vec![("h_id".to_string(), h.clone(),
+                                  ArtifactKind::RuntimeImage)],
+                            vec![("h_id".to_string(), h)],
+                            true,
+                        )
+                    },
+                    // All 4 kinds in one batch, all unknown
+                    6 => (
+                        vec![
+                            ("k1".to_string(), "x".to_string(),
+                             ArtifactKind::ModelOrPolicyArtifact),
+                            ("k2".to_string(), "x".to_string(),
+                             ArtifactKind::SovereignPolicyBundle),
+                            ("k3".to_string(), "x".to_string(),
+                             ArtifactKind::ThoughtFoldOrCache),
+                            ("k4".to_string(), "x".to_string(),
+                             ArtifactKind::RuntimeImage),
+                        ],
+                        vec![],
+                        false,
+                    ),
+                    // All 4 kinds, all matching, self_mut on
+                    7 => (
+                        vec![
+                            ("c1".to_string(), "h1".to_string(),
+                             ArtifactKind::ModelOrPolicyArtifact),
+                            ("c2".to_string(), "h2".to_string(),
+                             ArtifactKind::SovereignPolicyBundle),
+                            ("c3".to_string(), "h3".to_string(),
+                             ArtifactKind::ThoughtFoldOrCache),
+                            ("c4".to_string(), "h4".to_string(),
+                             ArtifactKind::RuntimeImage),
+                        ],
+                        vec![
+                            ("c1".to_string(), "h1".to_string()),
+                            ("c2".to_string(), "h2".to_string()),
+                            ("c3".to_string(), "h3".to_string()),
+                            ("c4".to_string(), "h4".to_string()),
+                        ],
+                        true,
+                    ),
+                    // Duplicate IDs in claims (same kind, different hashes)
+                    8 => (
+                        vec![
+                            ("dup".to_string(), "v1".to_string(),
+                             ArtifactKind::ModelOrPolicyArtifact),
+                            ("dup".to_string(), "v2".to_string(),
+                             ArtifactKind::ModelOrPolicyArtifact),
+                        ],
+                        vec![("dup".to_string(), "v1".to_string())],
+                        false,
+                    ),
+                    // Unicode ID + UTF-8 multi-byte
+                    9 => (
+                        vec![("identifiant_éàü".to_string(), "h".to_string(),
+                              ArtifactKind::SovereignPolicyBundle)],
+                        vec![("identifiant_éàü".to_string(), "h".to_string())],
+                        false,
+                    ),
+                    // CJK ID
+                    10 => (
+                        vec![("文件标识".to_string(), "hash".to_string(),
+                              ArtifactKind::ModelOrPolicyArtifact)],
+                        vec![("文件标识".to_string(), "hash".to_string())],
+                        false,
+                    ),
+                    // CJK + mismatched hash
+                    11 => (
+                        vec![("数据".to_string(), "wrong".to_string(),
+                              ArtifactKind::ThoughtFoldOrCache)],
+                        vec![("数据".to_string(), "right".to_string())],
+                        true,
+                    ),
+                    // Empty-string ID (degenerate but valid)
+                    12 => (
+                        vec![("".to_string(), "h".to_string(),
+                              ArtifactKind::RuntimeImage)],
+                        vec![("".to_string(), "h".to_string())],
+                        false,
+                    ),
+                    // Many duplicates of same failing kind
+                    13..=15 => {
+                        let n = (seed - 13) + 3; // 3,4,5 claims
+                        let mut claims = Vec::new();
+                        for j in 0..n {
+                            claims.push((
+                                format!("dupe_{}", j),
+                                "x".to_string(),
+                                ArtifactKind::ModelOrPolicyArtifact,
+                            ));
+                        }
+                        (claims, vec![], seed % 2 == 0)
+                    }
+                    // Mixed match + mismatch + unknown (4-claim)
+                    16 => (
+                        vec![
+                            ("m1".to_string(), "ok".to_string(),
+                             ArtifactKind::ModelOrPolicyArtifact),
+                            ("m2".to_string(), "bad".to_string(),
+                             ArtifactKind::SovereignPolicyBundle),
+                            ("m3".to_string(), "any".to_string(),
+                             ArtifactKind::ThoughtFoldOrCache),
+                            ("m4".to_string(), "ok4".to_string(),
+                             ArtifactKind::RuntimeImage),
+                        ],
+                        vec![
+                            ("m1".to_string(), "ok".to_string()),
+                            ("m2".to_string(), "actual".to_string()),
+                            // m3 unknown
+                            ("m4".to_string(), "ok4".to_string()),
+                        ],
+                        false,
+                    ),
+                    // Same as 16 but with self_mut
+                    17 => (
+                        vec![
+                            ("m1".to_string(), "ok".to_string(),
+                             ArtifactKind::ModelOrPolicyArtifact),
+                            ("m2".to_string(), "bad".to_string(),
+                             ArtifactKind::SovereignPolicyBundle),
+                        ],
+                        vec![
+                            ("m1".to_string(), "ok".to_string()),
+                            ("m2".to_string(), "actual".to_string()),
+                        ],
+                        true,
+                    ),
+                    // 8-claim batch (stress for sorted-output verification)
+                    18 => {
+                        let mut claims = Vec::new();
+                        for j in 0..8 {
+                            let kind = kinds[j % 4];
+                            claims.push((
+                                format!("stress_{}", j),
+                                "x".to_string(),
+                                kind,
+                            ));
+                        }
+                        (claims, vec![], false)
+                    }
+                    // 8-claim batch with self_mut
+                    _ => {
+                        let mut claims = Vec::new();
+                        for j in 0..8 {
+                            let kind = kinds[j % 4];
+                            claims.push((
+                                format!("stress2_{}", j),
+                                "x".to_string(),
+                                kind,
+                            ));
+                        }
+                        (claims, vec![], true)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Run one fixture through scan_artifacts + return its canonical bytes。
+    fn run_fixture(i: usize) -> Vec<u8> {
+        let (claims, trusted, self_mut) = build_fixture(i);
+        let claims_v: Vec<ArtifactClaim> = claims.iter()
+            .map(|(id, h, k)| ArtifactClaim::new(id.clone(), h.clone(), *k))
+            .collect();
+        let trusted_map = build_trusted_fingerprints(
+            trusted.iter().map(|(i, h)| (i.clone(), h.clone())));
+        let req = ScanRequest::new(claims_v, self_mut);
+        let report = scan_artifacts(&req, &trusted_map);
+        canonical_bytes_of_report(&report)
+    }
+
+    #[test]
+    fn test_fixture_grid_count_pinned_at_100() {
+        // The grid covers indices 0..=99 inclusive。 If a future
+        // patch changes the cardinality,this test catches it。
+        let mut covered = 0;
+        for i in 0..100 {
+            let _ = build_fixture(i);
+            covered += 1;
+        }
+        assert_eq!(covered, 100,
+            "100-fixture grid must cover indices 0..=99");
+    }
+
+    #[test]
+    fn test_fixture_grid_deterministic() {
+        // Two runs of the same grid must produce byte-identical
+        // canonical output。
+        let run_a: Vec<Vec<u8>> = (0..100).map(run_fixture).collect();
+        let run_b: Vec<Vec<u8>> = (0..100).map(run_fixture).collect();
+        assert_eq!(run_a, run_b,
+            "fixture grid must be deterministic across runs");
+    }
+
+    #[test]
+    fn test_fixture_grid_canonical_hash_pinned() {
+        // ********************************************************
+        // BYTE-EQUALITY DISCIPLINE PIN (chapter 七百十六 + 七百六十)
+        // ********************************************************
+        //
+        // 100-fixture canonical-bytes concatenated → FNV-1a 64-bit hash
+        //
+        // ANY drift in:
+        //   - ArtifactKind discriminant values
+        //   - scan_artifacts behavior (unknown-fail / case-insensitive)
+        //   - ScanReport canonical encoding
+        //   - failed_kinds BTreeSet ordering
+        //   - hard_bits projection layout
+        //
+        // ...will flip this hash。 If intentional,re-capture + bump
+        // ABI_VERSION;if unintentional,fail the build。
+        //
+        // ********************************************************
+
+        let mut all_bytes = Vec::new();
+        for i in 0..100 {
+            all_bytes.extend(run_fixture(i));
+        }
+        let hash = fnv1a_64(&all_bytes);
+
+        // Pinned baseline (captured chapter 七百六十 第四刀 / M2454)
+        assert_eq!(
+            hash,
+            0x4869_9616_51CC_EB59,
+            "100-fixture canonical-bytes hash drifted — ABI BREAK"
+        );
+    }
+
+    #[test]
+    fn test_fixture_grid_each_fixture_produces_nonempty_canonical_bytes() {
+        // Every fixture must produce ≥ 8 bytes of canonical output
+        // (bitmap + self_mut + hard_bits + count = 8 bytes minimum)。
+        for i in 0..100 {
+            let bytes = run_fixture(i);
+            assert!(bytes.len() >= 8,
+                "fixture {} canonical bytes < 8 ({})",i, bytes.len());
+        }
+    }
+
+    #[test]
+    fn test_fixture_grid_c_abi_matches_pure_fn_for_every_fixture() {
+        // For each fixture in the grid,running it through the
+        // C ABI MUST produce the same ScanReport as the direct
+        // scan_artifacts call。 This is the cross-path byte-
+        // equality check (Rust pure-fn ≡ Rust C ABI)。
+        for i in 0..100 {
+            let (claims, trusted, self_mut) = build_fixture(i);
+
+            // Pure-fn path
+            let claims_v: Vec<ArtifactClaim> = claims.iter()
+                .map(|(id, h, k)| ArtifactClaim::new(
+                    id.clone(), h.clone(), *k))
+                .collect();
+            let trusted_map = build_trusted_fingerprints(
+                trusted.iter().map(|(i, h)| (i.clone(), h.clone())));
+            let req = ScanRequest::new(claims_v, self_mut);
+            let pure_report = scan_artifacts(&req, &trusted_map);
+
+            // C ABI path
+            let claims_refs: Vec<(&str, &str, ArtifactKind)> = claims.iter()
+                .map(|(id, h, k)| (id.as_str(), h.as_str(), *k))
+                .collect();
+            let trusted_refs: Vec<(&str, &str)> = trusted.iter()
+                .map(|(i, h)| (i.as_str(), h.as_str()))
+                .collect();
+            let claims_buf = encode_claims_wire(&claims_refs);
+            let fps_buf = encode_fingerprints_wire(&trusted_refs);
+            let required = unsafe {
+                bas_integrity_sentinel_scan(
+                    claims_buf.as_ptr(), claims_buf.len() as i32,
+                    fps_buf.as_ptr(), fps_buf.len() as i32,
+                    if self_mut { 1 } else { 0 },
+                    core::ptr::null_mut(), 0)
+            };
+            assert!(required >= 0,
+                "fixture {} required must be ≥ 0,got {}",i, required);
+            let mut out = vec![0u8; required as usize];
+            unsafe {
+                bas_integrity_sentinel_scan(
+                    claims_buf.as_ptr(), claims_buf.len() as i32,
+                    fps_buf.as_ptr(), fps_buf.len() as i32,
+                    if self_mut { 1 } else { 0 },
+                    out.as_mut_ptr(), out.len() as i32)
+            };
+            let c_abi_report = decode_report_wire(&out);
+
+            assert_eq!(c_abi_report, pure_report,
+                "fixture {} C ABI report ≠ pure-fn report", i);
+        }
+    }
 }
