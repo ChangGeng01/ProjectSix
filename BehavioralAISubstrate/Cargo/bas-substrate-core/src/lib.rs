@@ -60,6 +60,12 @@ pub mod chain;
 pub mod hmac_mod;
 pub mod sha256;
 pub mod signing;
+// chapter 七百四十二 第一刀 / M2381 — L14 Sovereign Verdict
+// Engine port。 Pure 3-stage decision tree (hard rules +
+// lexicographic soft signals + evidence-insufficient upgrade)。
+// See verdict_decisions.rs header for the LAYER-MIGRATION ARC
+// context。
+pub mod verdict_decisions;
 
 // MARK: - ABI version
 

@@ -87,6 +87,16 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             core::ptr::null_mut(), 0)
     };
     total = total.wrapping_add(needed);
+    // chapter 七百四十二 第一刀 / M2381 — force-link the L14
+    // verdict-decisions Rust port。 Invoke with all-clean
+    // inputs (returns Pass rank 0,no observable effect)。
+    let softs = [0.0_f64; 7];
+    let verdict_rank = unsafe {
+        bas_substrate_core::verdict_decisions
+            ::bas_verdict_derive(
+                0, softs.as_ptr(), 0, 1)
+    };
+    total = total.wrapping_add(verdict_rank);
     total
 }
 
