@@ -286,6 +286,13 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_lease_life::bas_breath_validate(0, 0));
     total = total.wrapping_add(
         bas_lease_life::bas_breath_should_cancel_on_reconcile(0, 0));
+    // chapter 七百六十三 / M2466 — force-link the L12
+    // rule-judgment module (extends bas-permit-policy)。
+    // Cheapest anchor:allow_action with permissive policy +
+    // InPlaceEdit action → 0 (denied because requires_review=true)。
+    total = total.wrapping_add(
+        bas_permit_policy::rule_judgment
+            ::bas_rule_judgment_allow_action(0x0F, 0));
     total
 }
 

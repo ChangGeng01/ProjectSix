@@ -19,6 +19,12 @@ pub mod risk;
 // + version comparator。 See risk_plane.rs header for the
 // 「完全 移植 if WHOLE is better」 directive context。
 pub mod risk_plane;
+// chapter 七百六十三 / M2466-M2470 — L12 rule-judgment small port
+// (DEEPER LAYER-MIGRATION ARC)。 Per 严苛 table「L12 不适合大迁
+// — UI 边界留 Swift,Rust 只做规则判定」 verdict。 Extends this
+// crate rather than spinning up a new one (too small to justify
+// crate boundary per plan)。
+pub mod rule_judgment;
 
 pub const ABI_VERSION: i32 = 1;
 
