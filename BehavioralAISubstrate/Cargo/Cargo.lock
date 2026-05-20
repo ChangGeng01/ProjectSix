@@ -77,6 +77,7 @@ dependencies = [
  "bas-substrate-core",
  "bas-tokenizer",
  "bas-tribunal-court",
+ "bas-world-prior",
  "sha2",
 ]
 
@@ -154,6 +155,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "bas-world-prior"
+version = "0.1.0"
 
 [[package]]
 name = "base64ct"

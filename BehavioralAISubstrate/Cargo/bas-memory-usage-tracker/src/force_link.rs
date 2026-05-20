@@ -330,6 +330,21 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
     total = total.wrapping_add(
         bas_host_constitution::deletion_manifest
             ::bas_host_constitution_classify_deletion(0, 0, 0, 0));
+    // chapter 七百七十一 / M2506 — force-link the L4
+    // world-prior pure fns。 Three cheapest anchors:
+    //   1. ABI version probe
+    //   2. propagate_evidence(empty) → Anecdotal (0)
+    //   3. worst_reversibility(empty) → Easy (3)
+    total = total.wrapping_add(
+        bas_world_prior::bas_world_prior_abi_version());
+    total = total.wrapping_add(unsafe {
+        bas_world_prior::bas_world_prior_propagate_evidence(
+            core::ptr::null(), 0)
+    });
+    total = total.wrapping_add(unsafe {
+        bas_world_prior::bas_world_prior_worst_reversibility(
+            core::ptr::null(), 0)
+    });
     total
 }
 
@@ -352,7 +367,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 17 = chapter 七百六十四 / M2471 (+mirror-blade)
 ///   - 18 = chapter 七百六十六 / M2481 (+presence-eye)
 ///   - 19 = chapter 七百六十八 / M2491 (+host-constitution)
+///   - 20 = chapter 七百七十一 / M2506 (+world-prior)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    19
+    20
 }

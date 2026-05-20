@@ -107,3 +107,10 @@ bas-presence-eye      = { path = "../bas-presence-eye" }
 # abi_version)。 Per user 严苛 table 「L5 很值得」 — SQLite
 # stays Swift,Rust owns deterministic per-field merge。
 bas-host-constitution = { path = "../bas-host-constitution" }
+# chapter 七百七十一 / M2506 — bundle the L4 world-prior
+# crate so Swift host sees the typed surface + evidence
+# propagation pure fns (bas_world_prior_propagate_evidence,
+# aggregate_latency,worst_reversibility,abi_version)。
+# Per user 严苛 table 「L4 值得」 — SQLite stays Swift,
+# Rust owns the deterministic typed surface。
+bas-world-prior       = { path = "../bas-world-prior" }
