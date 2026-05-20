@@ -4,18 +4,29 @@ A private,Apple-only substrate for behavior-aware host apps。 14-layer
 electronic brain (L1-L14) with measurement-driven Swift + Rust + SQL +
 Metal hybrid implementation。
 
-## Repo layout (post-Before-severance)
+**Current release:[`v0.56.0`](https://github.com/ChangGeng01/ProjectSix/releases/tag/v0.56.0)** — first
+semver tag,covers chapters 七百二 → 七百五十七 (MATURATION ARC SEAL +
+post-severance polish + SDK readiness docs)。 See
+`BehavioralAISubstrate/CHANGELOG.md` for full release notes,
+`BehavioralAISubstrate/VERSIONING.md` for stability policy,
+`BehavioralAISubstrate/MIGRATING.md` for upgrade steps,
+`BehavioralAISubstrate/INTEGRATION.md` for 5-step host-adoption walkthrough。
+
+## Repo layout (post-severance,post-reconstitution)
 
 ```
 BehavioralAISubstrate/    ← canonical substrate (14-layer 电子脑)
+                            CHANGELOG / VERSIONING / MIGRATING / INTEGRATION docs at root
 QinaoRuntimeSDK/          ← substrate-related runtime SDK
-SampleHost/               ← minimal substrate-using sample app
-SampleHostTests/
-bench-baselines/          ← performance baselines
+SampleHost/               ← standalone SPM iOS package — reference host
+└── Tests/SampleHostTests/  ← SPM-canonical test layout (relocated 2026-05-21)
+bench-baselines/          ← performance baselines (sha256,hmac,audit ledger,etc.)
 docs/                     ← substrate documentation
-scripts/                  ← repo-wide tooling (XCFramework build,LOC counter)
+scripts/                  ← repo-wide tooling (XCFramework build,LOC counter,
+                            redaction + boundary checks)
 Archive/
-├── Legacy/               ← severed Before iOS app (preserved per
+├── Legacy/               ← severed Before iOS app + retired quality-gate scripts
+│                          + retired quality-gate docs (preserved per
 │                          「依旧 不删除 只 comment」 discipline)
 └── (BehavioralAISubstrate/Archive/Deactivated/ — substrate-internal
     deactivations from chapter 七百五十二 + 七百五十七 cleanup arcs)

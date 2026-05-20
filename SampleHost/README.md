@@ -18,6 +18,22 @@ xcodebuild build \
     CODE_SIGNING_ALLOWED=NO
 ```
 
+### Local prerequisites
+
+1. **Xcode 16+** with Swift 6.0 toolchain
+2. **iOS 18+ Simulator** runtime (`xcrun simctl list runtimes` to verify)
+3. **Metal Toolchain for iOS** — `xcodebuild -downloadComponent MetalToolchain`
+   (one-time download,~500 MB)。 MLX-swift is a transitive dep through
+   BASMLXAdapter,and its CMlx target compiles Metal shaders during
+   iOS builds。 Missing toolchain manifests as「cannot execute tool 'metal'」
+   error during the mlx-swift_Cmlx build phase。
+4. **First-time builds take 5-10 minutes** — Vendor packages (mlx-swift,
+   swift-nio,swift-crypto,etc.) need to compile for iOS Simulator first。
+   Subsequent builds are incremental。
+
+CI runners (macos-latest with full Xcode) ship the Metal toolchain
+pre-installed,so CI doesn't need the explicit download step。
+
 For real-device deployment:
 
 ```sh
