@@ -122,6 +122,22 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
                 core::ptr::null_mut(), 0)
     };
     total = total.wrapping_add(kg_needed);
+    // chapter 七百四十五 第一刀 / M2396 — force-link the L3
+    // event extractor classifier。 Sentinel inputs (empty
+    // action → returns 0 = None edge,no observable
+    // side-effect)。
+    let mut ek: i32 = 0;
+    let mut ew: f64 = 0.0;
+    let mut am: i32 = 0;
+    let ext_rc = unsafe {
+        bas_event_log_codec::event_extractor
+            ::bas_event_extractor_classify(
+                core::ptr::null(), 0,
+                core::ptr::null(), 0,
+                core::ptr::null(), 0,
+                &mut ek, &mut ew, &mut am)
+    };
+    total = total.wrapping_add(ext_rc);
     total
 }
 

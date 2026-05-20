@@ -683,6 +683,31 @@ int32_t bas_kg_codec_encode_edge(
     int64_t created_at_ms,
     char *out_buf, int32_t out_capacity);
 
+// MARK: - bas-event-extractor (chapter 七百四十五 第一刀 / M2396)
+//
+// L3 Event Extractor per-event classification HOT PATH。
+// Given an event's (action, source, memory_atom_event_tag),
+// decide what edge to emit linking the event to its project。
+//
+// Returns the result via out pointers:
+//   out_edge_kind:    0=None 1=Causes 2=Delays 3=Contradicts
+//                     4=Mentions
+//   out_edge_weight:  f64 in [0, 1]
+//   out_is_memory_atom: 0=false 1=true
+//
+// Function returns 0 on success, -1 on null pointer or
+// invalid UTF-8。
+
+int32_t bas_event_extractor_abi_version(void);
+
+int32_t bas_event_extractor_classify(
+    const char *action_ptr, int32_t action_len,
+    const char *source_ptr, int32_t source_len,
+    const char *tag_ptr, int32_t tag_len,
+    int32_t *out_edge_kind,
+    double *out_edge_weight,
+    int32_t *out_is_memory_atom);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

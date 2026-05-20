@@ -20,6 +20,13 @@ use serde::{Deserialize, Serialize};
 // L3 node/edge encode+decode primitives without a new crate。
 pub mod knowledge_graph_codec;
 
+// chapter 七百四十五 第一刀 / M2396 — L3 Event Extractor port。
+// Ports the per-event classification hot-path
+// (action/source → edge_kind+weight+memory_atom_flag)。 Full
+// Swift orchestrator stays Swift;Rust handles the branchy
+// per-event classification only。
+pub mod event_extractor;
+
 pub const ABI_VERSION: i32 = 1;
 
 #[no_mangle]
