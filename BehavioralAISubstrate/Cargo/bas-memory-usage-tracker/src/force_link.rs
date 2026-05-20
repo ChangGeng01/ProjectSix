@@ -313,6 +313,18 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_presence_eye::bas_presence_eye_abi_version());
     let _presence_unified = bas_presence_eye::bas_presence_eye_fuse(
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    // chapter 七百六十八 / M2491 — force-link the L5
+    // host-constitution merge logic。 Three cheapest anchors:
+    //   1. ABI version probe
+    //   2. resolve_field with equal values + no rollback → 0
+    //   3. default_strategy(IdentityTags=0) → 2 (Union)
+    total = total.wrapping_add(
+        bas_host_constitution::bas_host_constitution_abi_version());
+    total = total.wrapping_add(
+        bas_host_constitution::bas_host_constitution_resolve_field(
+            0, 1, 0, 0));
+    total = total.wrapping_add(
+        bas_host_constitution::bas_host_constitution_default_strategy(0));
     total
 }
 
@@ -334,7 +346,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 16 = chapter 七百六十二 第三刀 / M2463 (+lease-life)
 ///   - 17 = chapter 七百六十四 / M2471 (+mirror-blade)
 ///   - 18 = chapter 七百六十六 / M2481 (+presence-eye)
+///   - 19 = chapter 七百六十八 / M2491 (+host-constitution)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    18
+    19
 }

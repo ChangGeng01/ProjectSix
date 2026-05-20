@@ -101,3 +101,9 @@ bas-mirror-blade      = { path = "../bas-mirror-blade" }
 # table 「L6 部分值得」 — Apple sensor pipe stays Swift,
 # Rust owns the deterministic fusion math。
 bas-presence-eye      = { path = "../bas-presence-eye" }
+# chapter 七百六十八 / M2491 — bundle the L5 host-constitution
+# crate so Swift host sees the merge-decision pure fns
+# (bas_host_constitution_resolve_field,default_strategy,
+# abi_version)。 Per user 严苛 table 「L5 很值得」 — SQLite
+# stays Swift,Rust owns deterministic per-field merge。
+bas-host-constitution = { path = "../bas-host-constitution" }

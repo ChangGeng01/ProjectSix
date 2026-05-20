@@ -34,6 +34,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bas-host-constitution"
+version = "0.1.0"
+
+[[package]]
 name = "bas-integrity-sentinel"
 version = "0.1.0"
 
@@ -58,6 +62,7 @@ dependencies = [
  "bas-canonical-bytes",
  "bas-dream-loop",
  "bas-event-log-codec",
+ "bas-host-constitution",
  "bas-integrity-sentinel",
  "bas-lease-life",
  "bas-memory-atom-store",
