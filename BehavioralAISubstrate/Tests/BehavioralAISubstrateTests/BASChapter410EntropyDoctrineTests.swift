@@ -1,8 +1,15 @@
-// MARK: - BASChapter410EntropyDoctrineTests — chapter 四百十 / M1013
-
 import XCTest
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十二 第一刀 / M2430 — per-chapter test
+// REDUCED per user directive 「大幅度 缩减 doctrine。
+// 对比 之后 有必要的 全面 comment」。 The unified
+// BASChapterDoctrineSchemaCompletenessTests registry-iteration
+// test now covers the same invariants for every chapter。
+// Historical body preserved verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十二 第一刀 deactivated
 final class BASChapter410EntropyDoctrineTests: XCTestCase {
 
     func testChapterTag() {
@@ -88,3 +95,5 @@ final class BASChapter410EntropyDoctrineTests: XCTestCase {
             "chapter 四百十")
     }
 }
+
+#endif  // chapter 七百五十二 第一刀

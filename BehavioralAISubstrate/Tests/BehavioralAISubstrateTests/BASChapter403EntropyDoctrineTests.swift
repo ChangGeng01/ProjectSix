@@ -1,9 +1,3 @@
-// MARK: - BASChapter403EntropyDoctrineTests — chapter 四百三 / M962
-//
-// Locks the chapter 四百三 system-entropy reduction work as a
-// single grep-able landmark。Mirrors M951 + M952 chapter 四百二
-// closure pattern。
-
 import XCTest
 @testable import BASHostKit
 @testable import BASMemory
@@ -11,6 +5,15 @@ import XCTest
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
+
+// chapter 七百五十二 第一刀 / M2430 — per-chapter test
+// REDUCED per user directive 「大幅度 缩减 doctrine。
+// 对比 之后 有必要的 全面 comment」。 The unified
+// BASChapterDoctrineSchemaCompletenessTests registry-iteration
+// test now covers the same invariants for every chapter。
+// Historical body preserved verbatim per 「依旧 不删除 只 comment」。
+
+#if false  // chapter 七百五十二 第一刀 deactivated
 final class BASChapter403EntropyDoctrineTests: XCTestCase {
 
     // MARK: - Doctrine constants
@@ -109,3 +112,5 @@ final class BASChapter403EntropyDoctrineTests: XCTestCase {
         XCTAssertEqual(builder.frameContext, ctx)
     }
 }
+
+#endif  // chapter 七百五十二 第一刀
