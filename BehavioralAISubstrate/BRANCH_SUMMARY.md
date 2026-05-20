@@ -358,10 +358,49 @@ Total Swift source LOC:    ~295,000 (estimate)
 Total Swift test LOC:      ~278,000 (estimate)
 ```
 
-## Branch arc SEALED — 49 chapters delivered
+## chapter 七百五十 / M2421-M2425 — Plan-agent gap triage ad-hoc close-out
+
+After the 49-chapter arc sealed,user directive 2026-05-20 「剩余 一次性 解决掉」
+triggered a comprehensive triage of the three deferred Plan-agent gaps:
+
+| Gap | Status | Closure mechanism |
+|---|---|---|
+| 1. Float16 path | **ALREADY CLOSED** | Misread as "deferred" — actually shipped via chapter 七百三十三 (`BASKVCacheFloat16Token`) + 七百三十四 (`BASKVCacheCompressedToken` sum-type) + 七百三十五 (`BASKVCacheTierSelector`)。 First-class substrate support since chapter 七百三十三。 |
+| 2. Audit ledger SQL wire format | **MISFRAMED** | Audit ledger (`BASSovereignLedgerStorage` M91) ships pure SQL with typed columns since pre-arc — `audit_entries` + `segments` tables。 No JSON payload column exists to migrate。 Gap was a misread of the subsystem。 |
+| 3. Full 89-site JSON Codable sweep | **PINNED VIA INVENTORY** | Honest count: 48 production `.swift` JSON sites (89 was an overcount of `.md` fragments + SQL schema files mentioning "JSONEncoder" in leading comments)。 Classified into 7 deliberate substrate-design categories — most STAY JSON BY DESIGN (event payload trace,observability,doctrine literals,external interop,Codable public wire contract,typed wrapper over binary,SQLite dual-read / type-variant)。 |
+
+### 7-category JSON site histogram (from `BASPlanAgentGapTriageDoctrine`)
+
+| Category | Sites | Why JSON stays appropriate |
+|---|---:|---|
+| `codablePublicWireContract` | 13 | Substrate-public Codable surface is the wire contract — changing would break downstream consumers |
+| `eventPayloadTrace` | 9 | Observability + debuggability for tracing,not a hot path |
+| `sqliteStorageDualReadOrTypeVariant` | 9 | Already migrated to dual-read OR uses JSON within a TEXT column for heterogeneous-payload variant |
+| `doctrineLiteralOrProofFixture` | 7 | Chapter records + proof fixtures require JSON output stability by design |
+| `typedWrapperOverBinary` | 4 | JSON wraps metadata of a typed wrapper whose blob is already binary |
+| `externalInterop` | 3 | JSON is the protocol with an external system (host app,training pipeline,foundation models) |
+| `cliOrDebugTooling` | 1 | Human-readable JSON for CLI inspection;binary would defeat the tool |
+| **Total** | **48** | |
+
+### Ad-hoc deliverables
+
+- `+ Sources/BASRuntimeCore/BASPlanAgentGapTriageDoctrine.swift` — typed triage doctrine
+  pinning all 3 gap statuses + 48-site inventory + 7-category classification +
+  user directive provenance
+- `+ Tests/BehavioralAISubstrateTests/BASPlanAgentGapTriageDoctrineTests.swift` —
+  21 anti-drift tests covering milestone tags,gap statuses,inventory integrity
+  (no duplicates,every path starts with `Sources/` + ends with `.swift`),category
+  histogram sum == inventory count,every category ≥ 1 site,user directive pinned
+
+This ad-hoc 5-milestone close-out is NOT a 5-knife chapter — it's a typed triage
+of three orphan questions that didn't warrant their own arc。 Per chapter 698
+discipline-gate option-b,explicit user directive authorized the new doctrine。
+
+## Branch arc SEALED — 49 chapters + 1 ad-hoc close-out
 
 49 chapters delivered under measurement-first discipline + 「完全 移植 if WHOLE is better」
-discipline (the layer-migration arc).
+discipline (the layer-migration arc),plus ad-hoc chapter 七百五十 / M2421-M2425
+typed Plan-agent gap triage close-out per user directive 「剩余 一次性 解决掉」.
 
 - **Original 5-language scaffold** (chapter 七百二-七百六) — SHIPPED ✅
 - **Per-primitive auto-router buildout** (chapter 七百七-七百二十) — SHIPPED ✅
