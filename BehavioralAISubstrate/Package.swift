@@ -168,7 +168,18 @@ let package = Package(
         // BASSovereign (L14) — isolated microkernel. Depends only on BASRuntimeCore
         // schema types. Never depends on Memory/Policy/Orchestration (prevents
         // downstream layers from influencing sovereign decisions).
-        .target(name: "BASSovereign", dependencies: ["BASRuntimeCore"]),
+        //
+        // chapter 七百四十一 第三刀 / M2378 — BASSovereign gains
+        // a SQL/ subdirectory (009_sovereign_tokens.sql) +
+        // attaches the BASSQLSchemaGen build plugin。 Net-new
+        // L14 token authority persistence layer。 Pairs with the
+        // chapter 七百四十一 第一/二刀 Rust seal/verify primitives。
+        .target(
+            name: "BASSovereign",
+            dependencies: ["BASRuntimeCore"],
+            plugins: [
+                .plugin(name: "BASSQLSchemaGen")
+            ]),
         // BASWorldPrior (L4) — world-knowledge layer. A leaf module:
         // depends only on BASRuntimeCore schema. Neither the sovereign
         // kernel nor memory/policy layers depend on it (world priors
