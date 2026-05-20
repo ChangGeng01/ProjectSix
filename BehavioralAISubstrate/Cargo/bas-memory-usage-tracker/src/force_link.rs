@@ -65,6 +65,28 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
     // tribunal-court ABI version。 Cheapest anchor。
     total = total.wrapping_add(
         bas_tribunal_court::bas_tribunal_court_abi_version());
+    // chapter 七百四十一 第二刀 / M2377 — force-link the L14
+    // sovereign seal/verify entry points so the staticlib
+    // bundles them。 Invoke with sentinel inputs (zero hash,
+    // zero payload → produces a valid sealed hash;dropped
+    // since we only need the symbol reference for the
+    // linker)。 The capacity-discovery phase return value
+    // (canonical bytes required size) is wrapped into the
+    // running ABI total。
+    let prior = [0u8; 32];
+    let mut next = [0u8; 32];
+    let needed = unsafe {
+        bas_substrate_core::bas_sovereign_seal_entry(
+            prior.as_ptr(),
+            core::ptr::null(), 0,
+            core::ptr::null(), 0,
+            core::ptr::null(), 0,
+            0,
+            core::ptr::null(), 0,
+            next.as_mut_ptr(),
+            core::ptr::null_mut(), 0)
+    };
+    total = total.wrapping_add(needed);
     total
 }
 

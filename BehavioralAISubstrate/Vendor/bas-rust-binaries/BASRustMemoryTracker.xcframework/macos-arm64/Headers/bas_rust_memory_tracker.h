@@ -538,6 +538,56 @@ int32_t bas_tribunal_court_derive_superego_judgment(
     const char *input_ptr, int32_t input_len,
     char *out_ptr, int32_t out_capacity);
 
+// MARK: - bas-sovereign seal/verify (chapter 七百四十一 第二刀 / M2377)
+//
+// L14 Sovereign audit-ledger seal + chain replay-verify
+// C ABI。 Higher-level than bas_substrate_chain_step:
+// encapsulates the L14 canonical-bytes layout (prior_hash
+// + length-prefixed audit_id/session_id/verdict_ref +
+// timestamp_ms + length-prefixed payload) plus the SHA256
+// in ONE Rust call。 Mirrors Swift BASSovereignAuditLedger
+// .canonicalBytes(for:priorHash:) + sealing。
+//
+// Two-phase capacity pattern (bas_tokenizer ergonomics):
+// caller invokes with out_canonical_capacity=0 to discover
+// required canonical size,then realloc + retry。 The
+// out_next_hash32 is ALWAYS written on capacity-discovery
+// phase too (the hash is cheap;the canonical buffer may
+// not fit caller's pre-allocated buffer)。
+
+/// Seal one L14 sovereign audit entry。
+///
+/// Returns:
+///   ≥ 0  — bytes written to out_canonical (or required if
+///          capacity was 0)
+///   -1   — null required pointer
+///   -2   — would-truncate canonical (capacity > 0 but
+///          smaller than needed)
+int32_t bas_sovereign_seal_entry(
+    const uint8_t *prior_hash32,
+    const uint8_t *audit_id, int32_t audit_id_len,
+    const uint8_t *session_id, int32_t session_id_len,
+    const uint8_t *verdict_ref, int32_t verdict_ref_len,
+    int64_t timestamp_ms,
+    const uint8_t *payload, int32_t payload_len,
+    uint8_t *out_next_hash32,
+    uint8_t *out_canonical, int32_t out_canonical_capacity);
+
+/// Verify an L14 audit chain。
+///
+/// entries_buffer wire format:
+///   u32_be(count) || [u32_be(entry_len) || entry_bytes]*
+///
+/// Returns:
+///   1  — chain verifies
+///   0  — chain BROKEN (mismatch detected)
+///   -1 — null pointer or malformed buffer
+int32_t bas_sovereign_verify_chain(
+    const uint8_t *initial32,
+    const uint8_t *entries_buffer,
+    int32_t entries_buffer_len,
+    const uint8_t *expected_final32);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

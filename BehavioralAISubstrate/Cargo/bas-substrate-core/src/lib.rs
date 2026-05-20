@@ -227,3 +227,168 @@ pub unsafe extern "C" fn bas_substrate_ed25519_verify(
         false => 0,
     }
 }
+
+// MARK: - L14 Sovereign seal/verify C ABI
+//         (chapter 七百四十一 第二刀 / M2377)
+
+/// Build canonical bytes + seal one L14 entry。 Two-phase
+/// capacity pattern matches bas_tokenizer:caller invokes
+/// with out_canonical_capacity=0 to discover required size,
+/// then realloc + retry。
+///
+/// `out_next_hash32` is ALWAYS written (32 bytes) if the call
+/// succeeds — even on the capacity-discovery phase。
+///
+/// Returns:
+///   ≥ 0  — bytes that WERE written to out_canonical (or
+///          required if capacity was 0)
+///   -1   — null required pointer (prior_hash32 / out_next_hash32
+///          or non-empty payload with null pointer)
+///   -2   — would-truncate canonical (out_canonical_capacity
+///          smaller than needed but > 0;caller should retry
+///          with the returned size)。 NOT a fatal error。
+///
+/// SAFETY: all input pointers must point to N bytes of
+/// readable memory matching the declared length;output
+/// pointers must point to writable memory of declared
+/// capacity。
+#[no_mangle]
+pub unsafe extern "C" fn bas_sovereign_seal_entry(
+    prior_hash32: *const u8,
+    audit_id: *const u8, audit_id_len: i32,
+    session_id: *const u8, session_id_len: i32,
+    verdict_ref: *const u8, verdict_ref_len: i32,
+    timestamp_ms: i64,
+    payload: *const u8, payload_len: i32,
+    out_next_hash32: *mut u8,
+    out_canonical: *mut u8,
+    out_canonical_capacity: i32,
+) -> i32 {
+    if prior_hash32.is_null() || out_next_hash32.is_null() {
+        return -1;
+    }
+    // SAFETY:caller pins prior_hash32 to 32 bytes
+    let prior_slice = unsafe {
+        core::slice::from_raw_parts(prior_hash32, 32)
+    };
+    let mut prior_arr = [0u8; 32];
+    prior_arr.copy_from_slice(prior_slice);
+
+    let audit_slice = match read_byte_slice(
+        audit_id, audit_id_len) {
+        Some(s) => s, None => return -1,
+    };
+    let session_slice = match read_byte_slice(
+        session_id, session_id_len) {
+        Some(s) => s, None => return -1,
+    };
+    let verdict_slice = match read_byte_slice(
+        verdict_ref, verdict_ref_len) {
+        Some(s) => s, None => return -1,
+    };
+    let payload_slice = match read_byte_slice(
+        payload, payload_len) {
+        Some(s) => s, None => return -1,
+    };
+
+    let (next, canonical) = chain::seal_sovereign_entry(
+        &prior_arr,
+        audit_slice, session_slice, verdict_slice,
+        timestamp_ms, payload_slice);
+
+    // SAFETY:caller pins out_next_hash32 to 32 bytes
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            next.as_ptr(), out_next_hash32, 32);
+    }
+
+    let needed = canonical.len() as i32;
+    if out_canonical_capacity == 0 || out_canonical.is_null()
+    {
+        return needed;
+    }
+    if needed > out_canonical_capacity {
+        return -2;
+    }
+    // SAFETY:caller pins out_canonical to capacity bytes;
+    // needed ≤ capacity here
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            canonical.as_ptr(),
+            out_canonical, canonical.len());
+    }
+    needed
+}
+
+/// Verify an L14 audit chain by replaying entries from the
+/// initial hash through each canonical-bytes blob and
+/// asserting the final hash matches expected_final32。
+///
+/// `entries_buffer` carries N entries length-prefixed:
+///   u32_be(count) || [u32_be(entry_len) || entry_bytes]*
+///
+/// Returns:
+///   1  — chain verifies (final hash matches expected)
+///   0  — chain BROKEN (mismatch detected)
+///   -1 — null pointer or malformed buffer
+#[no_mangle]
+pub unsafe extern "C" fn bas_sovereign_verify_chain(
+    initial32: *const u8,
+    entries_buffer: *const u8,
+    entries_buffer_len: i32,
+    expected_final32: *const u8,
+) -> i32 {
+    if initial32.is_null()
+        || entries_buffer.is_null()
+        || expected_final32.is_null()
+        || entries_buffer_len < 4
+    {
+        return -1;
+    }
+    // SAFETY:caller pins pointer lengths per the FFI contract
+    let initial_slice = unsafe {
+        core::slice::from_raw_parts(initial32, 32)
+    };
+    let buf = unsafe {
+        core::slice::from_raw_parts(
+            entries_buffer, entries_buffer_len as usize)
+    };
+    let expected_slice = unsafe {
+        core::slice::from_raw_parts(expected_final32, 32)
+    };
+    let mut initial_arr = [0u8; 32];
+    initial_arr.copy_from_slice(initial_slice);
+    let mut expected_arr = [0u8; 32];
+    expected_arr.copy_from_slice(expected_slice);
+
+    // Parse length-prefixed entries buffer
+    let count = u32::from_be_bytes(
+        [buf[0], buf[1], buf[2], buf[3]]) as usize;
+    let mut entries: Vec<&[u8]> = Vec::with_capacity(count);
+    let mut off = 4_usize;
+    for _ in 0..count {
+        if off + 4 > buf.len() { return -1; }
+        let elen = u32::from_be_bytes([
+            buf[off], buf[off + 1],
+            buf[off + 2], buf[off + 3]]) as usize;
+        off += 4;
+        if off + elen > buf.len() { return -1; }
+        entries.push(&buf[off..off + elen]);
+        off += elen;
+    }
+    if chain::verify_sovereign_chain(
+        &initial_arr, &entries, &expected_arr)
+    { 1 } else { 0 }
+}
+
+fn read_byte_slice<'a>(
+    ptr: *const u8, len: i32
+) -> Option<&'a [u8]> {
+    if len < 0 { return None; }
+    if len == 0 { return Some(&[]); }
+    if ptr.is_null() { return None; }
+    // SAFETY:caller pins ptr to len bytes per the FFI contract
+    Some(unsafe {
+        core::slice::from_raw_parts(ptr, len as usize)
+    })
+}
