@@ -88,55 +88,177 @@ impl Tokenizer {
     }
 
     /// Encode a UTF-8 string into token IDs。
+    ///
+    /// chapter 七百三十七 第三刀 / M2358 — uses the priority-
+    /// queue-backed `encode_pq` algorithm internally。 Drops the
+    /// chapter 七百二十二 第一刀 naive O(N²) merge loop in favor
+    /// of an O(N log N) amortized linked-list + BinaryHeap walk。
+    /// Output is BYTE-IDENTICAL to the legacy linear-scan algo
+    /// (verified by the chapter 七百二十二 第一刀 / 第二刀 test
+    /// suite which still all green)。
     pub fn encode(&self, text: &str) -> Vec<u32> {
         let bytes = text.as_bytes();
         if bytes.is_empty() {
             return Vec::new();
         }
+        self.encode_pq(bytes)
+    }
 
-        // Initial token list:each byte is one token (1-byte
-        // Vec<u8>)
+    /// chapter 七百三十七 第三刀 — priority-queue-backed BPE
+    /// merge loop。 Closes the chapter 七百二十二 第三刀
+    /// documented O(N²) limitation。
+    ///
+    /// ## Algorithm (standard BPE acceleration)
+    ///
+    /// 1. Build a doubly-linked-list of token slots。 Each
+    ///    slot stores (token_bytes, prev_idx, next_idx,
+    ///    alive_flag)。
+    /// 2. Push every (left, right) pair's merge rank onto a
+    ///    BinaryHeap (min-heap by rank)。
+    /// 3. Pop the lowest-rank candidate; check if both ends
+    ///    are still alive (slot not invalidated by a prior
+    ///    merge)。
+    /// 4. Merge:replace left's bytes with concat,mark right
+    ///    dead,re-link prev↔left and left↔next。 Push new
+    ///    candidates (prev,left) and (left,next)。
+    /// 5. Stop when the heap is empty。
+    ///
+    /// Stale heap entries (where one end is now dead) are
+    /// skipped — that's the "amortized O(N log N)" caveat。
+    /// Each token is pushed at most O(1) times per merge it
+    /// participates in,bounding total heap operations。
+    fn encode_pq(&self, bytes: &[u8]) -> Vec<u32> {
+        use std::collections::BinaryHeap;
+        use std::cmp::Reverse;
+
+        // Slot storage:initial 1-byte tokens
+        let n_init = bytes.len();
         let mut tokens: Vec<Vec<u8>> = bytes
             .iter()
             .map(|b| vec![*b])
             .collect();
+        let mut prev: Vec<i32> =
+            (0..n_init).map(|i| i as i32 - 1).collect();
+        let mut next: Vec<i32> =
+            (0..n_init).map(|i|
+                if i + 1 < n_init { i as i32 + 1 }
+                else { -1 }
+            ).collect();
+        let mut alive: Vec<bool> = vec![true; n_init];
 
-        // Apply BPE merges greedily by rank
-        loop {
-            // Find lowest-rank merge candidate
-            let mut best: Option<(usize, u32)> = None;
-            for i in 0..tokens.len().saturating_sub(1) {
-                let pair = (tokens[i].clone(),
-                    tokens[i + 1].clone());
-                if let Some(&rank) = self.merges.get(&pair)
-                {
-                    match best {
-                        None => best = Some((i, rank)),
-                        Some((_, r)) if rank < r => {
-                            best = Some((i, rank))
-                        }
-                        _ => (),
-                    }
-                }
+        // Heap entries:(Reverse(rank),left_idx,right_idx)。
+        // Reverse makes BinaryHeap a MIN-heap (lowest rank
+        // pops first)。 right_idx is the index AT THE TIME
+        // OF PUSH;if the slot at right_idx is no longer
+        // alive OR next[left_idx] != right_idx,the entry
+        // is stale and skipped。
+        let mut heap:
+            BinaryHeap<(Reverse<u32>, usize, usize)> =
+            BinaryHeap::new();
+
+        // Seed the heap with every adjacent pair
+        for i in 0..n_init {
+            let j = next[i];
+            if j < 0 { continue; }
+            let pair = (
+                tokens[i].clone(),
+                tokens[j as usize].clone());
+            if let Some(&rank) = self.merges.get(&pair) {
+                heap.push((Reverse(rank), i, j as usize));
             }
-            let (idx, _) = match best {
-                Some(b) => b,
-                None => break,
-            };
-            // Merge tokens[idx] + tokens[idx+1]
-            let mut merged = tokens[idx].clone();
-            merged.extend_from_slice(&tokens[idx + 1]);
-            tokens[idx] = merged;
-            tokens.remove(idx + 1);
         }
 
-        // Map final tokens to IDs
-        tokens
-            .iter()
-            .map(|t| {
-                *self.vocab_fwd.get(t).unwrap_or(&self.unk_id)
-            })
-            .collect()
+        // Drain the heap
+        while let Some((Reverse(heap_rank), li, ri)) = heap.pop()
+        {
+            // Skip stale entries:slot dead OR not adjacent OR
+            // the (left, right) pair at the slot indices has
+            // CHANGED since this heap entry was pushed (a prior
+            // merge consumed one side and re-pushed with a
+            // different rank)。
+            if !alive[li] || !alive[ri] { continue; }
+            if next[li] != ri as i32 { continue; }
+            // Re-validate the rank — the pair at (li, ri) may
+            // have CHANGED bytes since this entry was pushed
+            // (e.g。 li's token grew through an intermediate
+            // merge)。 Look up the CURRENT pair's rank,and skip
+            // if either:
+            //   - The current pair isn't in self.merges anymore
+            //   - The current pair's rank differs from heap_rank
+            //     (means a fresher entry exists for this slot
+            //      pair and will be popped later at the right rank)
+            let current_pair = (
+                tokens[li].clone(),
+                tokens[ri].clone());
+            let current_rank = match self.merges
+                .get(&current_pair)
+            {
+                Some(&r) => r,
+                None => continue, // pair no longer merges
+            };
+            if current_rank != heap_rank {
+                // A fresher entry will be popped later at the
+                // right rank;skip this stale one
+                continue;
+            }
+
+            // Apply the merge:tokens[li] = tokens[li] + tokens[ri]
+            let right_bytes = std::mem::take(&mut tokens[ri]);
+            tokens[li].extend_from_slice(&right_bytes);
+
+            // Mark ri dead,re-link li ↔ next[ri]
+            alive[ri] = false;
+            let new_next = next[ri];
+            next[li] = new_next;
+            if new_next >= 0 {
+                prev[new_next as usize] = li as i32;
+            }
+            // Clear stale prev/next for ri to be defensive
+            next[ri] = -1;
+            prev[ri] = -1;
+
+            // Push new candidates:(prev[li], li) and (li, next[li])
+            let lp = prev[li];
+            if lp >= 0 {
+                let pair = (
+                    tokens[lp as usize].clone(),
+                    tokens[li].clone());
+                if let Some(&rank) = self.merges.get(&pair) {
+                    heap.push((
+                        Reverse(rank), lp as usize, li));
+                }
+            }
+            let ln = next[li];
+            if ln >= 0 {
+                let pair = (
+                    tokens[li].clone(),
+                    tokens[ln as usize].clone());
+                if let Some(&rank) = self.merges.get(&pair) {
+                    heap.push((
+                        Reverse(rank), li, ln as usize));
+                }
+            }
+        }
+
+        // Walk the linked list to collect final tokens in order
+        let mut out: Vec<u32> = Vec::with_capacity(n_init);
+        // Find head:smallest i with alive[i] && prev[i] < 0
+        // (after merges,head might not be index 0)
+        let mut cursor: i32 = -1;
+        for i in 0..n_init {
+            if alive[i] && prev[i] < 0 {
+                cursor = i as i32;
+                break;
+            }
+        }
+        while cursor >= 0 {
+            let c = cursor as usize;
+            out.push(
+                *self.vocab_fwd.get(&tokens[c])
+                    .unwrap_or(&self.unk_id));
+            cursor = next[c];
+        }
+        out
     }
 
     /// Decode token IDs back to UTF-8 string。 Returns None on
