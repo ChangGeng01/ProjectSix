@@ -2947,6 +2947,53 @@ public enum BASAutoRouteRanker {
         return dot
             / (na.squareRoot() * nb.squareRoot())
     }
+
+    // MARK: - L8 Memory Atom Reducer
+    //         (chapter 七百五十一 第二刀 / M2427)
+    //
+    // MATURATION ARC L8 Memory port — admission-confidence
+    // tiebreak rule from BASMemoryAtomReducer.applyAdmitted。
+    // Primitive-arg classifier matching chapter 七百三十九 risk_plane
+    // winning pattern (small-arg classifiers WIN on FFI overhead)。
+
+    /// Returns the bas-atom-reducer ABI version。
+    public static func atomReducerABIVersion() -> Int32 {
+        #if os(iOS) || os(macOS)
+        return bas_atom_reducer_abi_version()
+        #else
+        return 0
+        #endif
+    }
+
+    /// Routed implementation of `BASMemoryAtomReducer` admission-
+    /// confidence tiebreak rule。 Returns `true` if a fresh
+    /// `.admitted` event should REPLACE the existing atom,`false`
+    /// if existing should be kept (no-op)。
+    ///
+    /// Byte-identical to the Swift switch ladder at
+    /// `BASMemoryAtomReducer.swift` lines 170-186 per the
+    /// chapter 七百五十一 第二刀 byte-equality test。
+    public static func atomReducerShouldReplaceAdmitted(
+        existingConfidence: Double,
+        newConfidence: Double,
+        tiebreakKeepsExisting: Bool
+    ) -> Bool {
+        #if os(iOS) || os(macOS)
+        let flag: Int32 = tiebreakKeepsExisting ? 1 : 0
+        let rc = bas_atom_reducer_should_replace_admitted(
+            existingConfidence,
+            newConfidence,
+            flag)
+        return rc != 0
+        #else
+        // Non-Apple platforms (watchOS) — fall back to the
+        // Swift logic byte-for-byte so the routed helper is
+        // safe to call from any code path。
+        if existingConfidence > newConfidence { return false }
+        if existingConfidence < newConfidence { return true }
+        return !tiebreakKeepsExisting
+        #endif
+    }
 }
 
 // MARK: - BASBpeTokenizerHandle (chapter 七百二十二 第二刀 / M2282)

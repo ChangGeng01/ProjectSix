@@ -46,6 +46,7 @@
 
 pub mod event_payload;
 pub mod kv_cache;
+pub mod reducer;
 pub mod tracker;
 
 /// ABI version pin。 Returned by `bas_mas_abi_version`。

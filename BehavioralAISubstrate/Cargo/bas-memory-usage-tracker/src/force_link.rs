@@ -165,6 +165,15 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             out.as_mut_ptr(), 0)
     };
     total = total.wrapping_add(dl_rc);
+    // chapter 七百五十一 第二刀 / M2427 — force-link the L8
+    // memory-atom-reducer admission-confidence tiebreak rule。
+    // Sentinel inputs:existing 0.0 / new 0.0 / tiebreak=keep → 0
+    // (no observable side-effect)。
+    let reducer_rc =
+        bas_memory_atom_store::reducer
+            ::bas_atom_reducer_should_replace_admitted(
+                0.0, 0.0, 1);
+    total = total.wrapping_add(reducer_rc);
     total
 }
 

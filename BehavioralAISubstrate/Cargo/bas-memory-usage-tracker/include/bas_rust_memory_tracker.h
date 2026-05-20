@@ -1241,6 +1241,28 @@ int64_t bas_event_log_encode_binary(
     const uint8_t* provenance, size_t provenance_len,
     uint8_t* out_buf, size_t out_capacity);
 
+// MARK: - bas-memory-atom-store::reducer
+//                          (chapter 七百五十一 第二刀 / M2427)
+//
+// L8 Memory hot-path port — admission-confidence tiebreak rule
+// from `BASMemoryAtomReducer.applyAdmitted`。 Pure primitive-arg
+// decision function matching the chapter 七百三十九 risk_plane
+// winning pattern (small-arg classifiers WIN on FFI overhead)。
+
+int32_t bas_atom_reducer_abi_version(void);
+
+// Returns 1 if a fresh `.admitted` event SHOULD replace the
+// existing atom,0 if existing should be kept (no-op)。 Mirrors
+// `BASMemoryAtomReducer.swift` lines 170-186 byte for byte。
+//
+// `tiebreak_keeps_existing`:0 = false (newcomer wins ties),
+// nonzero = true (existing wins ties — substrate default
+// `admissionConfidenceTiebreakKeepsExisting`)。
+int32_t bas_atom_reducer_should_replace_admitted(
+    double existing_confidence,
+    double new_confidence,
+    int32_t tiebreak_keeps_existing);
+
 #ifdef __cplusplus
 }
 #endif
