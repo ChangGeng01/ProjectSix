@@ -67,6 +67,113 @@ impl ThoughtFold {
     }
 }
 
+// MARK: - L3 thought-fold observation derivation
+//         (chapter 七百四十六 第一刀 / M2401)
+
+/// Derived observation reference。 Deterministic projection
+/// from (fold_id, observation_kind, timestamp_ms) — used by
+/// the L3 thought-fold observation pipeline to produce
+/// stable IDs that replay byte-identical across runs。
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ObservationDerivation {
+    pub observation_id: String,
+    /// Canonical bytes that the audit chain seals over。
+    /// Used by replay verification to confirm the observation
+    /// stays byte-stable。
+    pub canonical_payload: Vec<u8>,
+}
+
+/// Pure derivation:given a fold + observation kind +
+/// timestamp,produce a deterministic observation_id and
+/// canonical bytes。
+///
+/// observation_id format:
+///   "obs-{session_id}-{turn_id}-{kind}-{timestamp_ms}"
+///
+/// canonical_payload:
+///   u32_be(fold_id_len) || fold_id_utf8
+///   u32_be(kind_len)    || kind_utf8
+///   i64_be(timestamp_ms)
+///
+/// This is the chapter 七百四十一 canonical-bytes pattern
+/// reused for L3 observations。 Replay determinism preserved
+/// by construction (no randomness,no clock dependency)。
+pub fn derive_observation(
+    fold: &ThoughtFold,
+    observation_kind_raw: &str,
+    timestamp_ms: i64,
+) -> ObservationDerivation {
+    let observation_id = format!(
+        "obs-{}-{}-{}-{}",
+        fold.session_id,
+        fold.turn_id,
+        observation_kind_raw,
+        timestamp_ms);
+    let mut buf: Vec<u8> = Vec::with_capacity(
+        4 + fold.fold_id.len()
+        + 4 + observation_kind_raw.len()
+        + 8);
+    let fid_bytes = fold.fold_id.as_bytes();
+    buf.extend_from_slice(
+        &(fid_bytes.len() as u32).to_be_bytes());
+    buf.extend_from_slice(fid_bytes);
+    let kind_bytes = observation_kind_raw.as_bytes();
+    buf.extend_from_slice(
+        &(kind_bytes.len() as u32).to_be_bytes());
+    buf.extend_from_slice(kind_bytes);
+    buf.extend_from_slice(&timestamp_ms.to_be_bytes());
+    ObservationDerivation {
+        observation_id,
+        canonical_payload: buf,
+    }
+}
+
+#[cfg(test)]
+mod observation_tests {
+    use super::*;
+
+    fn sample() -> ThoughtFold {
+        ThoughtFold::new(
+            "fold-001", "sess-A", "turn-7",
+            "tf-x", "bf-y", "chk-z", 100)
+    }
+
+    #[test]
+    fn observation_id_format() {
+        let f = sample();
+        let d = derive_observation(&f, "intent", 1000);
+        assert_eq!(
+            d.observation_id,
+            "obs-sess-A-turn-7-intent-1000");
+    }
+
+    #[test]
+    fn observation_canonical_has_expected_length() {
+        let f = sample();
+        let d = derive_observation(&f, "intent", 1000);
+        // 4 + 8 (fold_id "fold-001") + 4 + 6 ("intent") + 8
+        assert_eq!(d.canonical_payload.len(),
+            4 + 8 + 4 + 6 + 8);
+    }
+
+    #[test]
+    fn observation_determinism() {
+        let f = sample();
+        let a = derive_observation(&f, "intent", 1000);
+        let b = derive_observation(&f, "intent", 1000);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn distinct_kinds_distinct_canonical() {
+        let f = sample();
+        let a = derive_observation(&f, "intent", 1000);
+        let b = derive_observation(&f, "veto", 1000);
+        assert_ne!(a.canonical_payload, b.canonical_payload);
+        assert_ne!(a.observation_id, b.observation_id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
