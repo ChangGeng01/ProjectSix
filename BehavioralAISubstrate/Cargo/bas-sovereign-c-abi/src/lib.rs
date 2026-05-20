@@ -355,6 +355,136 @@ fn parse_fingerprints(buf: &[u8]) -> Option<std::collections::BTreeMap<String, S
     Some(map)
 }
 
+// MARK: - Tamper-proof audit (composite of chain + integrity)
+
+/// chapter 七百五十八 第三刀 / M2443 — NEW composite C ABI entry point。
+///
+/// Combines L14 chain replay + integrity sentinel scan into a SINGLE
+/// call,detecting mid-chain artifact mutations。 The motivating use
+/// case:a C consumer (watchOS,attestation hook,3rd-party C runtime)
+/// wants「is this audit trail intact AND are all the artifacts it
+/// references still trustworthy」 answered in one round-trip。
+///
+/// Without this composite,a C caller would have to invoke chain
+/// verify + integrity scan separately and zip the results;the
+/// composite does it atomically + writes a unified `out_tamper_mask`
+/// summarizing both checks。
+///
+/// Output `out_tamper_mask` layout (u64):
+///   bits 0..15  — integrity hard_bits (from bas_sovereign_integrity_scan)
+///                 0x0001 = BR-001,0x0002 = BR-002,
+///                 0x0020 = BR-006,0x0040 = BR-007
+///   bit 32     — chain mismatch flag (0 = chain valid,1 = chain
+///                replay produced a different final hash than expected)
+///   bits 16..31 — reserved (zero on this ABI version)
+///   bits 33..63 — reserved (zero on this ABI version)
+///
+/// Output `out_verification` is the i32 return code of the embedded
+/// `bas_sovereign_verify_chain`:
+///   1 = chain valid (replay produced expected_final32)
+///   0 = chain invalid (mismatch or malformed entry)
+///   -1 = error (null pointer or buffer too short — `entries_buffer_len`
+///        MUST be ≥ 4 to hold the wire-format count prefix)
+/// Provided as a separate output for callers that want the granular
+/// result without unpacking the bitmask。
+///
+/// Parameters:
+/// * `initial_hash32`        — 32-byte starting hash for chain replay
+/// * `entries_buffer`        — chain entries wire-format
+///                             (4-byte BE length prefix per entry per
+///                             bas_substrate_core convention)
+/// * `entries_buffer_len`    — buffer byte length (i32)
+/// * `expected_final32`      — 32-byte hash the chain must end at
+/// * `artifacts_buf`         — claims wire format per integrity_scan
+/// * `artifacts_len`         — buffer byte length (i32)
+/// * `fingerprints_buf`      — trusted fingerprints wire format per
+///                             integrity_scan
+/// * `fingerprints_len`      — buffer byte length (i32)
+/// * `observed_self_mutation` — 0 = clean,non-zero = self-mutation flag
+/// * `out_verification`      — writable i32 (chain replay result)
+/// * `out_tamper_mask`       — writable u64 (composite bitmask)
+///
+/// Returns:0 on success,-1 if any required pointer is null,-2 if
+/// wire format parse fails for the integrity portion (chain replay
+/// errors are reported via out_verification,not the return code,so
+/// the caller can still see the integrity result if the chain failed)。
+///
+/// Thread-safety:fully reentrant,no shared state。 Composes two pure
+/// functions sequentially。
+#[no_mangle]
+pub unsafe extern "C" fn bas_sovereign_tamper_proof_audit(
+    initial_hash32: *const u8,
+    entries_buffer: *const u8,
+    entries_buffer_len: i32,
+    expected_final32: *const u8,
+    artifacts_buf: *const u8,
+    artifacts_len: i32,
+    fingerprints_buf: *const u8,
+    fingerprints_len: i32,
+    observed_self_mutation: i32,
+    out_verification: *mut i32,
+    out_tamper_mask: *mut u64,
+) -> i32 {
+    if out_verification.is_null() || out_tamper_mask.is_null() {
+        return -1;
+    }
+
+    // Step 1:integrity scan。 Run first so even if chain replay
+    // somehow fails to write its output,the integrity portion of the
+    // tamper mask is still meaningful。
+    let mut hard_bits: u16 = 0;
+    // SAFETY:we forward to integrity_scan,which validates its own
+    // inputs。 We only forward pointers + lengths verbatim。
+    let integrity_rc = unsafe {
+        bas_sovereign_integrity_scan(
+            artifacts_buf, artifacts_len,
+            fingerprints_buf, fingerprints_len,
+            observed_self_mutation,
+            &mut hard_bits,
+        )
+    };
+    if integrity_rc != 0 {
+        // Wire-format parse failure or null pointer in integrity
+        // portion。 Surface to caller via -2 (parse failure) since the
+        // caller's wire format is the immediately-fixable issue。
+        // Note we still write to out_tamper_mask + out_verification
+        // with zero values to keep the C ABI's output contract clean
+        // (no undefined values on error)。
+        unsafe {
+            *out_verification = 0;
+            *out_tamper_mask = 0;
+        }
+        return -2;
+    }
+
+    // Step 2:chain replay。 Caller-pinned 32-byte hashes;
+    // entries_buffer follows bas_substrate_core wire format。
+    // SAFETY:caller contract per bas_substrate_core::bas_sovereign_verify_chain。
+    let chain_rc = unsafe {
+        bas_substrate_core::bas_sovereign_verify_chain(
+            initial_hash32,
+            entries_buffer,
+            entries_buffer_len,
+            expected_final32,
+        )
+    };
+
+    // Compose output bitmask:
+    //   bits 0..15  = integrity hard_bits
+    //   bit 32      = chain mismatch flag (1 when chain_rc != 1,i.e。
+    //                 NOT-valid;chain_rc of 1 means valid per
+    //                 bas_sovereign_verify_chain semantics)
+    let chain_mismatch_bit: u64 = if chain_rc != 1 { 1u64 << 32 } else { 0 };
+    let composite: u64 = (hard_bits as u64) | chain_mismatch_bit;
+
+    // SAFETY:both pointers validated non-null at function entry。
+    unsafe {
+        *out_verification = chain_rc;
+        *out_tamper_mask = composite;
+    }
+    0
+}
+
 // MARK: - Re-exports (forwarders to bas-substrate-core)
 
 /// Re-export of `bas_substrate_core::bas_sovereign_seal_entry`。
@@ -730,6 +860,238 @@ mod tests {
                 0, &mut hard_bits)
         };
         assert_eq!(rc, -2);
+    }
+
+    // MARK: - Tamper-proof audit tests (chapter 七百五十八 第三刀)
+
+    /// Build a chain entries wire-format buffer with ZERO entries。
+    /// Per bas_substrate_core::bas_sovereign_verify_chain wire format,
+    /// the buffer always starts with a 4-byte BE count prefix。 For a
+    /// zero-entry chain,that's just `0u32.to_be_bytes()` = 4 bytes。
+    /// verify_chain will then accept it and check `initial == expected`
+    /// (since 0 entries means no chain steps run)。
+    fn build_zero_entry_chain_buf() -> Vec<u8> {
+        0u32.to_be_bytes().to_vec()
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_all_clean_zero_mask() {
+        // Composite happy path:0 chain entries (final == initial),
+        // 0 claims,0 trust → both checks pass。 out_tamper_mask = 0。
+        let initial = [0u8; 32];
+        let expected_final = initial;  // 0 entries means final == initial
+        let entries = build_zero_entry_chain_buf();
+        let claims = build_claims_buf(&[]);
+        let trust = build_fingerprints_buf(&[]);
+
+        let mut verification: i32 = 999;
+        let mut tamper_mask: u64 = u64::MAX;
+        let rc = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0,
+                &mut verification, &mut tamper_mask)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(verification, 1, "chain match expected on empty chain (verify_chain returns 1=valid)");
+        assert_eq!(tamper_mask, 0,
+            "all clean → tamper_mask must be all-zeros");
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_integrity_fail_only() {
+        // Chain is fine (0 entries,final == initial) but a claim fails
+        // → integrity hard_bits show in low 32 bits,chain flag (bit 32)
+        // stays 0。
+        let initial = [0u8; 32];
+        let expected_final = initial;
+        let entries = build_zero_entry_chain_buf();
+        let trust = build_fingerprints_buf(&[("model.bin", "good")]);
+        let claims = build_claims_buf(&[
+            ("model.bin", "tampered", 0),  // BR-001 fail
+        ]);
+
+        let mut verification: i32 = 999;
+        let mut tamper_mask: u64 = 0;
+        let rc = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0,
+                &mut verification, &mut tamper_mask)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(verification, 1, "chain still valid (verify_chain returns 1=valid)");
+        assert_eq!(tamper_mask & 0xFFFF, 0x0001,
+            "BR-001 fail must light bit 0 of low 16");
+        assert_eq!(tamper_mask & (1u64 << 32), 0,
+            "chain ok → bit 32 must be clear");
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_chain_fail_only() {
+        // Chain replay fails (wrong expected_final) but integrity clean
+        // → integrity bits stay 0,chain flag (bit 32) sets to 1。
+        let initial = [0u8; 32];
+        // Use a deliberately-wrong expected_final (all 0xFF) so chain
+        // replay reports mismatch。
+        let expected_final = [0xFFu8; 32];
+        let entries = build_zero_entry_chain_buf();
+        let claims = build_claims_buf(&[]);
+        let trust = build_fingerprints_buf(&[]);
+
+        let mut verification: i32 = 999;
+        let mut tamper_mask: u64 = 0;
+        let rc = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0,
+                &mut verification, &mut tamper_mask)
+        };
+        assert_eq!(rc, 0);
+        assert_ne!(verification, 1,
+            "chain mismatch expected (initial all-zeros ≠ expected all-FFs; verify_chain returns 0=invalid)");
+        assert_eq!(tamper_mask & 0xFFFF, 0,
+            "no claims → integrity bits stay clear");
+        assert_eq!(tamper_mask & (1u64 << 32), 1u64 << 32,
+            "chain mismatch must light bit 32");
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_both_fail_composite_mask() {
+        // Both chain AND integrity fail。 Composite mask has both
+        // integrity bits in low 16 AND chain flag in bit 32。
+        let initial = [0u8; 32];
+        let expected_final = [0xFFu8; 32];  // wrong → chain fails
+        let entries = build_zero_entry_chain_buf();
+        let trust = build_fingerprints_buf(&[]);  // empty trust
+        let claims = build_claims_buf(&[
+            ("unknown.policy", "anyhash", 1),  // unknown → BR-006 fail
+        ]);
+
+        let mut verification: i32 = 999;
+        let mut tamper_mask: u64 = 0;
+        let rc = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0,
+                &mut verification, &mut tamper_mask)
+        };
+        assert_eq!(rc, 0);
+        assert_ne!(verification, 1,
+            "chain mismatch expected (verify_chain returns 0=invalid)");
+        // 0x0020 (BR-006) low + (1 << 32) high
+        let expected_mask: u64 = 0x0020 | (1u64 << 32);
+        assert_eq!(tamper_mask, expected_mask,
+            "both-fail composite: BR-006 (0x20) + chain bit 32");
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_observed_self_mutation_propagates() {
+        // observed_self_mutation=1 should propagate into the integrity
+        // hard_bits via BR-007 (bit 6 = 0x0040)。
+        let initial = [0u8; 32];
+        let expected_final = initial;
+        let entries = build_zero_entry_chain_buf();
+        let claims = build_claims_buf(&[]);
+        let trust = build_fingerprints_buf(&[]);
+
+        let mut verification: i32 = 999;
+        let mut tamper_mask: u64 = 0;
+        let rc = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                1,                                  // observed_self_mutation
+                &mut verification, &mut tamper_mask)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(verification, 1);
+        assert_eq!(tamper_mask & 0xFFFF, 0x0040,
+            "observed_self_mutation must propagate to BR-007 (0x40)");
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_null_output_returns_minus_one() {
+        // Either out_verification or out_tamper_mask null → -1。
+        let initial = [0u8; 32];
+        let expected_final = initial;
+        let entries = build_zero_entry_chain_buf();
+        let claims = build_claims_buf(&[]);
+        let trust = build_fingerprints_buf(&[]);
+        let mut verification: i32 = 0;
+        let mut tamper_mask: u64 = 0;
+
+        let rc1 = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0,
+                core::ptr::null_mut(), &mut tamper_mask)
+        };
+        assert_eq!(rc1, -1);
+
+        let rc2 = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0,
+                &mut verification, core::ptr::null_mut())
+        };
+        assert_eq!(rc2, -1);
+    }
+
+    #[test]
+    fn test_tamper_proof_audit_integrity_parse_fail_returns_minus_two() {
+        // Integrity wire-format parse failure (truncated claims buf)
+        // must bubble up as -2 + zero outputs。
+        let initial = [0u8; 32];
+        let expected_final = initial;
+        let entries = build_zero_entry_chain_buf();
+        let truncated_claims = vec![99u8, 0, 0, 0];  // count=99,no payload
+        let trust = build_fingerprints_buf(&[]);
+
+        let mut verification: i32 = 999;
+        let mut tamper_mask: u64 = u64::MAX;
+        let rc = unsafe {
+            bas_sovereign_tamper_proof_audit(
+                initial.as_ptr(),
+                entries.as_ptr(), entries.len() as i32,
+                expected_final.as_ptr(),
+                truncated_claims.as_ptr(), truncated_claims.len() as i32,
+                trust.as_ptr(), trust.len() as i32,
+                0,
+                &mut verification, &mut tamper_mask)
+        };
+        assert_eq!(rc, -2);
+        // Documented contract:on parse fail outputs are zeroed for clean
+        // C-side state。
+        assert_eq!(verification, 0);
+        assert_eq!(tamper_mask, 0);
     }
 
     #[test]
