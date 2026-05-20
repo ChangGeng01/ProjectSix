@@ -30,6 +30,7 @@ members = [
     "bas-tribunal-court",          # chapter 七百四十 第一刀 / M2371
     "bas-organ-router",            # chapter 七百四十七 第一刀 / M2406
     "bas-dream-loop",              # chapter 七百四十八 第一刀 / M2411
+    "bas-sovereign-c-abi",         # chapter 七百五十八 第一刀 / M2441 — public C ABI wrapper for watchOS + 3rd-party C consumers
 ]
 resolver = "2"
 

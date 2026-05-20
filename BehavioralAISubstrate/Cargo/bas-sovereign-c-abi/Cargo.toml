@@ -1,0 +1,67 @@
+# Cargo manifest for bas-sovereign-c-abi
+# chapter 七百五十八 第一刀 / M2441 — DEEPER LAYER-MIGRATION ARC
+#
+# Public C ABI wrapper around L14 Sovereign primitives that
+# already live in `bas-substrate-core` (chain seal + chain
+# verify) + adds L14 halt / integrity / tamper-proof entry
+# points specifically shaped for third-party C consumers
+# and watchOS (where Rust std isn't well-supported but C
+# linking IS)。
+#
+# Rationale per chapter 七百五十七 audit + user 严苛 table
+# (L14 「极值得」):
+#
+#   - watchOS runtime cannot easily link Rust staticlib due
+#     to runtime_config + allocator feature gaps,but CAN
+#     link a C library
+#   - Third-party non-Rust C consumers (embedded,game
+#     engines,legacy C runtimes) need BASSovereign as a
+#     hermetic C library
+#   - Attestation chains (ARM TrustZone etc.) hook function
+#     pointers in C ABI,not Rust trait objects
+#   - Rust ABI has no stability guarantee across compiler
+#     versions;C ABI is the substrate's sole public surface
+#     for non-Apple-platform users
+#
+# This crate is a THIN wrapper:re-exports already-verified
+# primitives from `bas-substrate-core` and adds three NEW
+# entry points (halt_signal_encode,integrity_scan,
+# tamper_proof_audit)。 No new crypto,no new state machine,
+# no new SQL — only widening the public surface。
+#
+# Mirrors `bas-canonical-bytes` + `bas-tribunal-court` shape:
+# pure-function entry points,value-type returns,no shared
+# state,deterministic output。
+
+[package]
+name = "bas-sovereign-c-abi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_sovereign_c_abi"
+path = "src/lib.rs"
+
+[dependencies]
+# Pure-Rust SHA256 for the halt_signal_encode opaque
+# token derivation。 Same crate version as
+# bas-substrate-core to avoid duplicate symbols at link
+# time。 No HMAC / Ed25519 needed at this layer — those
+# operations stay in bas-substrate-core and this crate
+# only re-exposes them via re-export shims if needed by
+# the C header consumer。
+sha2 = "0.10"
+
+# Sibling crate dependency。 bas-substrate-core hosts the
+# verified chain seal + verify primitives (chapter 七百四
+# + 七百四十一 + 七百四十二)。 We re-export selected
+# symbols via #[no_mangle] forwarders rather than recompile
+# the primitives;keeps byte-equality with the chain.rs
+# implementation byte-pinned at chapter 七百十六。
+bas-substrate-core = { path = "../bas-substrate-core" }
+
+[dev-dependencies]
+hex = "0.4"
