@@ -527,3 +527,63 @@ formalized at the layer-migration arc was applied measurement-first this arc:
 ports preserved per 「亏的不要硬上」 (1.08× / 0.82× LOSS / 1.06× TIE)。
 
 **Branch ready for downstream consumption / merge / next-arc spinout.**
+
+---
+
+## Post-arc structural inflection — Before severance (2026-05-20)
+
+After the MATURATION ARC SEAL, the user issued a fresh structural directive:
+
+> **「我想 先 完成 14层电子脑 再 决定 但是 首先 我想要 把 before 完全 断绝」**
+> — first sever Before completely,then finish the 14-layer 电子脑,
+> then decide next direction.
+
+The repo root is now substrate-only。 The legacy `Before` iOS app + its 5
+sibling directories (Before.xcodeproj / BeforeTests / BeforeUITests /
+BeforeWatch / BeforeWidgetExtension) + the XcodeGen `project.yml` + the
+Before-era root README were `git mv`'d to `Archive/Legacy/` preserving full
+history per 「依旧 不删除 只 comment」 / 「不要 删除。 创建个 文件夹 把 不需要的
+文件 都转移 进 文件夹」 discipline pins.
+
+Severance landing
+─────────────────
+
+| Item | Before | After |
+|---|---|---|
+| Repo-root README | Before-era host README | substrate-focused 14-layer L1-L14 README |
+| Reference hosts | Before + SampleHost | SampleHost only |
+| BehavioralAISubstrate/README.md | "Before is the first reference host" | "legacy Before host severed 2026-05-20" |
+| Build verification | xcodebuild test -scheme Before | swift build + swift test (SPM only) |
+| 14-layer module table | (not on README) | full L1-L14 table at root README |
+| 3 production Rust flips | (BRANCH_SUMMARY only) | called out on root README |
+
+Build verification post-severance
+─────────────────────────────────
+
+```
+cd BehavioralAISubstrate && swift build  → Build complete! (3.17s)
+```
+
+No Swift target depends on `Archive/Legacy/`。 SwiftPM ignores the Archive
+directory automatically since it lives outside the package's Sources/。
+
+Commit + push
+─────────────
+
+- Commit `f2d980ca` — chore(before severance): sever legacy Before iOS app
+  to Archive/Legacy/ — substrate stands alone
+- 370 files renamed (Before content + XcodeGen + Before-era README)
+- 4 new artifacts (substrate root README + archive notice + 2 README mods)
+- .gitignore extended to keep 3.6 GB Gemma weights out of git at new path
+- Pushed to `phase-8-before-severed-substrate-standalone`
+
+Going forward
+─────────────
+
+Substrate work resumes free of Before coupling。 Active sequencing per
+user directive:
+
+1. ✅ Sever Before completely (this milestone)
+2. ▷ Finish 14-layer 电子脑 (active — next steps TBD)
+3. ⏳ Decide next major direction (deferred per user)
+

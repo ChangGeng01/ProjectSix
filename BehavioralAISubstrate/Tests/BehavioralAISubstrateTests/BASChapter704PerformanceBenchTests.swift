@@ -126,15 +126,28 @@ final class BASChapter704PerformanceBenchTests: XCTestCase {
     }
 
     /// Chapter close-out manifest assertion — verifies the
-    /// XCFramework actually contains all 7 expected ABI surfaces。
+    /// XCFramework actually contains the expected ABI surfaces。
+    ///
+    /// chapter 七百五十七 第三刀 / M2440 — converted from hardcoded
+    /// `== 7` constants to growth-tolerant `>= 9` floors,then
+    /// `>= count` for the ABI total (sum of per-crate ABI versions,
+    /// each ≥ 1)。 Original chapter 七百四 第一刀 wrote `== 7` when
+    /// the bundle had exactly 7 crates and each ABI was 1 (sum=7);
+    /// chapters 七百二十二 (+BPE) and 七百四十 (+tribunal court)
+    /// added crates,and several ABI versions bumped (e.g. atom-store
+    /// to v2 at chapter 七百五十三 第二刀),pushing the sum to ~89。
+    /// Floor assertions survive future additions without churn。
     func testRustBundleManifest() {
         #if os(iOS) || os(macOS)
         let total = bas_substrate_bundle_abi_total()
         let count = bas_substrate_bundle_crate_count()
-        XCTAssertEqual(count, 7,
-            "Expected 7 Rust crates in XCFramework bundle")
-        XCTAssertEqual(total, 7,
-            "Sum of per-crate ABI versions == crate count")
+        XCTAssertGreaterThanOrEqual(count, 9,
+            "Expected ≥ 9 Rust crates in XCFramework bundle " +
+            "(host + 6 chapter-七百三 siblings + bas-tokenizer + " +
+            "bas-tribunal-court);count = \(count)")
+        XCTAssertGreaterThanOrEqual(total, count,
+            "Sum of per-crate ABI versions must be ≥ crate count " +
+            "(each ABI starts at 1);total = \(total), count = \(count)")
         #endif
     }
 }

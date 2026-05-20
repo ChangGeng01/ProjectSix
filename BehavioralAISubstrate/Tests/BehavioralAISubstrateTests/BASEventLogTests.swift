@@ -280,10 +280,17 @@ final class BASEventLogTests: XCTestCase {
     }
 
     func testSQLiteSchemaVersionPin() {
+        // chapter 七百三十二 第一刀 / M2330 bumped event_log schema 1 → 2
+        // (added `payload_format INTEGER NOT NULL DEFAULT 1` column for
+        // dual-read JSON ↔ binary payload codec)。 The pin's intent stays
+        // the same:any bump triggers an explicit migration review for
+        // production event_log databases on disk。
         XCTAssertEqual(
-            BASSQLiteEventLogStorage.schemaVersion, 1,
+            BASSQLiteEventLogStorage.schemaVersion, 2,
             "Schema version pin: bump triggers explicit migration " +
-            "review for any production event_log databases on disk")
+            "review for any production event_log databases on disk。" +
+            " chapter 七百三十二 第一刀 / M2330 bumped 1 → 2 for the " +
+            "payload_format dual-read column")
     }
 
     // MARK: - M896 retention policy (chapter 三百九七)

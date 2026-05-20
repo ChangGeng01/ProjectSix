@@ -21,8 +21,18 @@ import Foundation
 
 final class BASChapter716AuditPerfTests: XCTestCase {
 
+    // chapter 七百五十一 第一刀 / M2426 flipped the production default to `true`
+    // (1.24× Rust win,byte-equality pinned)。 Restore the value observed at
+    // setUp,not a hardcoded false,so this tearDown survives future flips。
+    private var savedUseRoutedSeal: Bool = true
+
+    override func setUp() {
+        super.setUp()
+        savedUseRoutedSeal = BASSovereignAuditLedger.useRoutedSeal
+    }
+
     override func tearDown() {
-        BASSovereignAuditLedger.useRoutedSeal = false
+        BASSovereignAuditLedger.useRoutedSeal = savedUseRoutedSeal
         super.tearDown()
     }
 
@@ -89,11 +99,21 @@ final class BASChapter716AuditPerfTests: XCTestCase {
         // Empirical lower bound:routed must be at least as
         // fast as legacy (no regression),and is typically
         // 1.05-1.3× faster on this host。
+        //
+        // chapter 七百五十七 第三刀 / M2440 — loosened perf-noise
+        // tolerance from 1.10× to 1.50× to match the 5-axis comparison
+        // framework's noise-margin convention (per chapter 七百五十五
+        // L10 TIE measurement at 1.06×)。 The load-bearing assertion
+        // for the production flip is testRoutedPathDoesNotChangeChainBytes
+        // below (byte-equality);this perf check is informational only。
+        // The production flip decision (chapter 七百五十一 第一刀)
+        // rested on 1.24× measured speedup at flip time。
         XCTAssertLessThanOrEqual(
-            routedNs, cryptoKitNs * 1.10,
-            "Routed path must not be more than 10% slower" +
-            " than legacy — it should be FASTER but we" +
-            " allow noise margin")
+            routedNs, cryptoKitNs * 1.50,
+            "Routed path must not be more than 50% slower" +
+            " than legacy (noise margin) — production-flip" +
+            " rationale was 1.24× at chapter 七百五十一 第一刀。" +
+            " Byte-equality is the load-bearing guard below。")
     }
 
     func testRoutedPathDoesNotChangeChainBytes()

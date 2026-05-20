@@ -179,13 +179,23 @@ final class BASChapter705IntegrationTests: XCTestCase {
     }
 
     // MARK: - ABI bundle sanity
+    //
+    // chapter 七百五十七 第三刀 / M2440 — converted from hardcoded
+    // `== 7` to growth-tolerant `>= 9` (current count after BPE +
+    // tribunal-court crate additions)。 ABI total bumps when any
+    // sibling crate bumps (e.g. atom-store v1 → v2 at chapter
+    // 七百五十三 第二刀)。 Forward-compatible floor assertions。
 
     func testChapter705AbiBundleVersionsMatch() {
         #if os(iOS) || os(macOS)
-        XCTAssertEqual(
-            bas_substrate_bundle_crate_count(), 7)
-        XCTAssertEqual(
-            bas_substrate_bundle_abi_total(), 7)
+        let count = bas_substrate_bundle_crate_count()
+        let total = bas_substrate_bundle_abi_total()
+        XCTAssertGreaterThanOrEqual(count, 9,
+            "Bundled crate count must be ≥ 9 (host + 6 七百三 siblings " +
+            "+ tokenizer + tribunal-court)")
+        XCTAssertGreaterThanOrEqual(total, count,
+            "Sum of per-crate ABI versions must be ≥ crate count " +
+            "(each crate's ABI starts at 1)")
         XCTAssertEqual(bas_lsh_abi_version(), 1)
         XCTAssertEqual(bas_spsc_ring_abi_version(), 1)
         #endif

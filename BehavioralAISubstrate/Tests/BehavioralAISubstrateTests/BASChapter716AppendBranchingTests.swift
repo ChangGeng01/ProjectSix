@@ -22,9 +22,22 @@ import Foundation
 
 final class BASChapter716AppendBranchingTests: XCTestCase {
 
+    // chapter 七百五十一 第一刀 / M2426 flipped the production default to `true`
+    // (1.24× Rust win,byte-equality pinned)。 tearDown must restore the
+    // CURRENT production default,not the chapter-七百十六-era false value,
+    // or it bleeds into BASChapter756MaturationArcSealTests.testL14ChainSealRoutedDefaultOn
+    // and BASChapter751MaturationArcOpenerTests.testL14RoutedSealIsNowDefaultOn。
+    private var savedUseRoutedSeal: Bool = true
+
+    override func setUp() {
+        super.setUp()
+        savedUseRoutedSeal = BASSovereignAuditLedger.useRoutedSeal
+    }
+
     override func tearDown() {
-        // Test isolation:always restore default at teardown
-        BASSovereignAuditLedger.useRoutedSeal = false
+        // Test isolation:restore the value observed at setUp,not a hardcoded
+        // constant。 Survives future default flips automatically。
+        BASSovereignAuditLedger.useRoutedSeal = savedUseRoutedSeal
         super.tearDown()
     }
 
@@ -50,13 +63,22 @@ final class BASChapter716AppendBranchingTests: XCTestCase {
     }
 
     // MARK: - Default flag preserves V1 behavior
-
+    //
+    // chapter 七百五十一 第一刀 / M2426 flipped useRoutedSeal default-on
+    // (1.24× Rust win,byte-equality pinned)。 The chapter 七百十六-era
+    // assertion "Default must be OFF" is now contradicted by the production
+    // flip。 Test deactivated per 「依旧 不删除 只 comment」 — kept as a
+    // historical record of the pre-flip invariant。 The new default-on
+    // invariant lives in BASChapter751MaturationArcOpenerTests.testL14RoutedSealIsNowDefaultOn
+    // and BASChapter756MaturationArcSealTests.testL14ChainSealRoutedDefaultOn。
+#if false  // chapter 七百五十一 第一刀 invalidated this assertion
     func testDefaultFlagIsFalse() {
         BASSovereignAuditLedger.useRoutedSeal = false
         XCTAssertFalse(
             BASSovereignAuditLedger.useRoutedSeal,
             "Default must be OFF per ADR-014 OPT-IN")
     }
+#endif
 
     // MARK: - Single-entry parity
 

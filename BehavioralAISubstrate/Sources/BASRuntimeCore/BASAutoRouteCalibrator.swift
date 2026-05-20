@@ -77,7 +77,16 @@ public struct BASAutoRouteCalibrationReport:
     public let thresholds: BASAutoRouteThresholds
 
     public init(
-        schemaVersion: Int = 1,
+        // chapter 七百三十 第三刀 / M2323 bumped store-side
+        // expectedSchemaVersion to 2 (new auto-router families
+        // landed at chapter 七百二十一-七百二十九 — BPE / int8 / PQ)。
+        // The init default must match the store's
+        // `currentSchemaVersion` or freshly-calibrated reports get
+        // rejected by validate() on the very next loadOrCalibrate
+        // call,defeating the cache。 chapter 七百五十七 第三刀 /
+        // M2440 — sync default 1 → 2 to fix
+        // BASChapter710CalibrationTests.testLoadOrCalibrateUsesCacheOnSecondCall。
+        schemaVersion: Int = 2,
         measuredAtEpochSec: Int64,
         substrateVersion: String,
         deviceFingerprint: String,
