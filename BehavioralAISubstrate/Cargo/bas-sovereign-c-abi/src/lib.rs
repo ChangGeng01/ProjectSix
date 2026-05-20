@@ -119,6 +119,242 @@ pub unsafe extern "C" fn bas_sovereign_halt_signal_encode(
     0
 }
 
+// MARK: - Integrity scan (BR-001 / BR-002 / BR-006 / BR-007 derivation)
+
+/// chapter 七百五十八 第二刀 / M2442 — NEW C ABI entry point。
+///
+/// Pure function:given a list of artifact claims + a trusted-
+/// fingerprint map + an observed-self-mutation bit,produce the
+/// 4-bit subset of `HardObservations` that integrity sentinel
+/// owns:
+///
+///   bit 0  (0x0001) = BR-001 artifact_signature_invalid
+///                     (any modelOrPolicyArtifact failed verification)
+///   bit 1  (0x0002) = BR-002 thought_fold_checksum_broken
+///                     (any thoughtFoldOrCache failed verification)
+///   bit 5  (0x0020) = BR-006 policy_bundle_tampered
+///                     (any sovereignPolicyBundle failed verification)
+///   bit 6  (0x0040) = BR-007 unauthorized_self_mutation
+///                     (any runtimeImage failed verification OR
+///                      observed_self_mutation flag set)
+///
+/// Bit positions match `bas_substrate_core::verdict_decisions`
+/// HardObservations decoding (line ~429 of verdict_decisions.rs)。
+/// The output `*out_hard_bits` is a u16 — caller can OR these into
+/// the same 16-bit field consumed by `bas_verdict_derive(...)`。
+///
+/// Mirrors `BASSovereignIntegritySentinel.swift` semantics
+/// (Sources/BASSovereign/BASSovereignIntegritySentinel.swift),
+/// specifically:
+///   - Unknown artifact (no entry in trusted_fps) counts as failure
+///     per the「conservative if no ground truth,cannot vouch」 rule
+///   - Trusted hash comparison is case-insensitive (compared
+///     lowercase-to-lowercase per Swift impl)
+///
+/// Wire format for `artifacts_buf`:
+///   count:   u32 little-endian
+///   per claim:
+///     id_len:    u16 little-endian
+///     id_bytes:  utf-8
+///     hash_len:  u16 little-endian
+///     hash_bytes:utf-8 (hex string)
+///     kind:      u8
+///       0 = modelOrPolicyArtifact
+///       1 = sovereignPolicyBundle
+///       2 = thoughtFoldOrCache
+///       3 = runtimeImage
+///
+/// Wire format for `fingerprints_buf`:
+///   count:   u32 little-endian
+///   per fingerprint:
+///     id_len:    u16 little-endian
+///     id_bytes:  utf-8
+///     hash_len:  u16 little-endian
+///     hash_bytes:utf-8 (hex string)
+///
+/// Parameters:
+/// * `artifacts_buf`        — packed claims per above format
+/// * `artifacts_len`        — buffer byte length (i32)
+/// * `fingerprints_buf`     — packed trusted fingerprints per above
+/// * `fingerprints_len`     — buffer byte length (i32)
+/// * `observed_self_mutation` — 0 = clean,non-zero = self-mutation observed
+/// * `out_hard_bits`        — writable u16 pointer for the output bitfield
+///
+/// Returns:0 on success,-1 if any required pointer is null,-2 if
+/// wire format parse fails (truncated buffer / impossible length)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_sovereign_integrity_scan(
+    artifacts_buf: *const u8,
+    artifacts_len: i32,
+    fingerprints_buf: *const u8,
+    fingerprints_len: i32,
+    observed_self_mutation: i32,
+    out_hard_bits: *mut u16,
+) -> i32 {
+    if out_hard_bits.is_null() {
+        return -1;
+    }
+    if artifacts_len < 0 || fingerprints_len < 0 {
+        return -2;
+    }
+    // SAFETY:caller guarantees buf points to artifacts_len readable
+    // bytes (artifacts_len may be 0 for empty claim list)。
+    let artifacts_slice: &[u8] = if artifacts_len == 0 {
+        &[]
+    } else if artifacts_buf.is_null() {
+        return -1;
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                artifacts_buf, artifacts_len as usize)
+        }
+    };
+    let fingerprints_slice: &[u8] = if fingerprints_len == 0 {
+        &[]
+    } else if fingerprints_buf.is_null() {
+        return -1;
+    } else {
+        unsafe {
+            core::slice::from_raw_parts(
+                fingerprints_buf, fingerprints_len as usize)
+        }
+    };
+
+    // Parse trusted fingerprints into BTreeMap for deterministic
+    // lookups (HashMap would also work,but BTreeMap pin matches
+    // the planned-chapter-七百六十 GSI crate convention)。
+    let trusted = match parse_fingerprints(fingerprints_slice) {
+        Some(t) => t,
+        None => return -2,
+    };
+
+    // Parse claims + accumulate failed kinds bitfield。 Walk in array
+    // order to match Swift's iteration order (only affects
+    // failedArtifactIDs ordering — which the C ABI doesn't expose
+    // here — but pinning the walk order makes the implementation
+    // explicit)。
+    let claims = match parse_claims(artifacts_slice) {
+        Some(c) => c,
+        None => return -2,
+    };
+
+    let mut hard_bits: u16 = 0;
+    for claim in claims {
+        let claim_hash_lower = claim.hash.to_ascii_lowercase();
+        let expected = trusted.get(claim.id);
+        let failed = match expected {
+            None => true,                       // unknown artifact → fail
+            Some(t) => t != &claim_hash_lower,  // mismatch → fail
+        };
+        if failed {
+            match claim.kind {
+                0 => hard_bits |= 0x0001,       // BR-001
+                2 => hard_bits |= 0x0002,       // BR-002
+                1 => hard_bits |= 0x0020,       // BR-006
+                3 => hard_bits |= 0x0040,       // BR-007
+                _ => return -2,                  // unknown kind code
+            }
+        }
+    }
+
+    // observed_self_mutation flag OR's into BR-007 per Swift impl:
+    //   if failedKinds.contains(.runtimeImage) || observedSelfMutation {
+    //       obs.unauthorizedSelfMutation = true
+    //   }
+    if observed_self_mutation != 0 {
+        hard_bits |= 0x0040;
+    }
+
+    // SAFETY:caller guarantees out_hard_bits points to a writable
+    // u16 per the function contract above。
+    unsafe { *out_hard_bits = hard_bits; }
+    0
+}
+
+// MARK: - Wire-format parsers (internal helpers)
+
+/// Parsed artifact claim (intermediate representation for
+/// integrity_scan)。 Lifetime tied to the input buffer's lifetime
+/// — we hand back `&str` slices into the caller's buffer rather
+/// than allocating。
+struct ParsedClaim<'a> {
+    id: &'a str,
+    hash: &'a str,
+    kind: u8,
+}
+
+/// Parse the artifacts wire format described in
+/// `bas_sovereign_integrity_scan` doc comment。 Returns None on
+/// truncated buffer / non-UTF-8 / impossible length。
+fn parse_claims(buf: &[u8]) -> Option<Vec<ParsedClaim<'_>>> {
+    if buf.is_empty() {
+        return Some(Vec::new());
+    }
+    if buf.len() < 4 {
+        return None;
+    }
+    let count = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+    let mut offset = 4usize;
+    let mut claims = Vec::with_capacity(count);
+    for _ in 0..count {
+        if buf.len() < offset + 2 { return None; }
+        let id_len = u16::from_le_bytes([buf[offset], buf[offset + 1]]) as usize;
+        offset += 2;
+        if buf.len() < offset + id_len { return None; }
+        let id = core::str::from_utf8(&buf[offset..offset + id_len]).ok()?;
+        offset += id_len;
+
+        if buf.len() < offset + 2 { return None; }
+        let hash_len = u16::from_le_bytes([buf[offset], buf[offset + 1]]) as usize;
+        offset += 2;
+        if buf.len() < offset + hash_len { return None; }
+        let hash = core::str::from_utf8(&buf[offset..offset + hash_len]).ok()?;
+        offset += hash_len;
+
+        if buf.len() < offset + 1 { return None; }
+        let kind = buf[offset];
+        offset += 1;
+
+        claims.push(ParsedClaim { id, hash, kind });
+    }
+    Some(claims)
+}
+
+/// Parse the fingerprints wire format into a deterministic
+/// id → lowercase-hex BTreeMap。 Returns None on truncated buffer
+/// or non-UTF-8 input。
+fn parse_fingerprints(buf: &[u8]) -> Option<std::collections::BTreeMap<String, String>> {
+    if buf.is_empty() {
+        return Some(std::collections::BTreeMap::new());
+    }
+    if buf.len() < 4 {
+        return None;
+    }
+    let count = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+    let mut offset = 4usize;
+    let mut map = std::collections::BTreeMap::new();
+    for _ in 0..count {
+        if buf.len() < offset + 2 { return None; }
+        let id_len = u16::from_le_bytes([buf[offset], buf[offset + 1]]) as usize;
+        offset += 2;
+        if buf.len() < offset + id_len { return None; }
+        let id = core::str::from_utf8(&buf[offset..offset + id_len]).ok()?
+            .to_string();
+        offset += id_len;
+
+        if buf.len() < offset + 2 { return None; }
+        let hash_len = u16::from_le_bytes([buf[offset], buf[offset + 1]]) as usize;
+        offset += 2;
+        if buf.len() < offset + hash_len { return None; }
+        let hash = core::str::from_utf8(&buf[offset..offset + hash_len]).ok()?
+            .to_ascii_lowercase();
+        offset += hash_len;
+
+        map.insert(id, hash);
+    }
+    Some(map)
+}
+
 // MARK: - Re-exports (forwarders to bas-substrate-core)
 
 /// Re-export of `bas_substrate_core::bas_sovereign_seal_entry`。
@@ -262,6 +498,238 @@ mod tests {
                 0, 0, core::ptr::null_mut())
         };
         assert_eq!(rc, -1);
+    }
+
+    // MARK: - Integrity scan tests (chapter 七百五十八 第二刀)
+
+    /// Wire-format helper for tests:build a claim buffer。 Mirrors the
+    /// wire format described in `bas_sovereign_integrity_scan` doc
+    /// comment so test setup mirrors what a Swift consumer would emit。
+    fn build_claims_buf(claims: &[(&str, &str, u8)]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(claims.len() as u32).to_le_bytes());
+        for (id, hash, kind) in claims {
+            buf.extend_from_slice(&(id.len() as u16).to_le_bytes());
+            buf.extend_from_slice(id.as_bytes());
+            buf.extend_from_slice(&(hash.len() as u16).to_le_bytes());
+            buf.extend_from_slice(hash.as_bytes());
+            buf.push(*kind);
+        }
+        buf
+    }
+
+    fn build_fingerprints_buf(fps: &[(&str, &str)]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(fps.len() as u32).to_le_bytes());
+        for (id, hash) in fps {
+            buf.extend_from_slice(&(id.len() as u16).to_le_bytes());
+            buf.extend_from_slice(id.as_bytes());
+            buf.extend_from_slice(&(hash.len() as u16).to_le_bytes());
+            buf.extend_from_slice(hash.as_bytes());
+        }
+        buf
+    }
+
+    #[test]
+    fn test_integrity_scan_clean_all_match() {
+        // 4 claims,one per ArtifactKind,all match trusted。 Expect 0x0000。
+        let trust = build_fingerprints_buf(&[
+            ("model.bin", "aaaa"),
+            ("policy.bundle", "bbbb"),
+            ("cache.fold", "cccc"),
+            ("runtime.image", "dddd"),
+        ]);
+        let claims = build_claims_buf(&[
+            ("model.bin", "aaaa", 0),     // modelOrPolicyArtifact
+            ("policy.bundle", "bbbb", 1), // sovereignPolicyBundle
+            ("cache.fold", "cccc", 2),    // thoughtFoldOrCache
+            ("runtime.image", "dddd", 3), // runtimeImage
+        ]);
+        let mut hard_bits: u16 = 0xFFFF;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(hard_bits, 0x0000,
+            "all claims match trusted → no integrity bits set");
+    }
+
+    #[test]
+    fn test_integrity_scan_each_kind_to_correct_bit() {
+        // Each ArtifactKind that fails MUST light the correct bit:
+        // BR-001 (0x01) for modelOrPolicyArtifact (kind=0)
+        // BR-002 (0x02) for thoughtFoldOrCache (kind=2)
+        // BR-006 (0x20) for sovereignPolicyBundle (kind=1)
+        // BR-007 (0x40) for runtimeImage (kind=3)
+        for (kind, expected_bit) in &[
+            (0u8, 0x0001u16),  // BR-001
+            (2u8, 0x0002u16),  // BR-002
+            (1u8, 0x0020u16),  // BR-006
+            (3u8, 0x0040u16),  // BR-007
+        ] {
+            let trust = build_fingerprints_buf(&[("art.x", "trusted")]);
+            let claims = build_claims_buf(&[("art.x", "tampered", *kind)]);
+            let mut hard_bits: u16 = 0;
+            let rc = unsafe {
+                bas_sovereign_integrity_scan(
+                    claims.as_ptr(), claims.len() as i32,
+                    trust.as_ptr(),  trust.len() as i32,
+                    0, &mut hard_bits)
+            };
+            assert_eq!(rc, 0);
+            assert_eq!(hard_bits, *expected_bit,
+                "kind {} expected bit {:#x},got {:#x}",
+                kind, expected_bit, hard_bits);
+        }
+    }
+
+    #[test]
+    fn test_integrity_scan_observed_self_mutation_sets_br_007() {
+        // observed_self_mutation flag OR's into BR-007 even if all
+        // claims pass。 Mirrors Swift's:
+        //   if failedKinds.contains(.runtimeImage) || observedSelfMutation
+        let trust = build_fingerprints_buf(&[("runtime.image", "dddd")]);
+        let claims = build_claims_buf(&[("runtime.image", "dddd", 3)]);
+        let mut hard_bits: u16 = 0;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                1,                                  // observed_self_mutation
+                &mut hard_bits)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(hard_bits, 0x0040,
+            "observed_self_mutation alone must set BR-007 (0x40)");
+    }
+
+    #[test]
+    fn test_integrity_scan_unknown_artifact_fails_conservatively() {
+        // Per Swift impl:「Unknown artifacts count as failures
+        // (conservative — if the sentinel has no ground truth for
+        // something,it cannot vouch for it)」
+        let trust = build_fingerprints_buf(&[]);  // empty trusted set
+        let claims = build_claims_buf(&[
+            ("unknown.policy", "anyhash", 1),  // sovereignPolicyBundle
+        ]);
+        let mut hard_bits: u16 = 0;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(hard_bits, 0x0020,
+            "unknown sovereignPolicyBundle artifact must fail → BR-006");
+    }
+
+    #[test]
+    fn test_integrity_scan_case_insensitive_hash_compare() {
+        // Per Swift: trusted hashes stored lowercased,claim hashes
+        // lowercased before comparison。 UPPERCASE claim must still match。
+        let trust = build_fingerprints_buf(&[("model.bin", "abcdef")]);
+        let claims = build_claims_buf(&[
+            ("model.bin", "ABCDEF", 0),  // uppercase claimed
+        ]);
+        let mut hard_bits: u16 = 0xFFFF;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(hard_bits, 0x0000,
+            "case-insensitive hash comparison must accept UPPERCASE claim");
+    }
+
+    #[test]
+    fn test_integrity_scan_multiple_failures_set_combined_bits() {
+        // 3 failures across 3 different kinds → bitfield is the OR
+        // of all 3 bits。 Mirrors Swift's failedKinds Set semantics。
+        let trust = build_fingerprints_buf(&[
+            ("model.bin",     "model_good"),
+            ("policy.bundle", "policy_good"),
+            ("cache.fold",    "cache_good"),
+        ]);
+        let claims = build_claims_buf(&[
+            ("model.bin",     "model_bad",  0),  // BR-001
+            ("policy.bundle", "policy_bad", 1),  // BR-006
+            ("cache.fold",    "cache_bad",  2),  // BR-002
+        ]);
+        let mut hard_bits: u16 = 0;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, 0);
+        // 0x0001 | 0x0020 | 0x0002 = 0x0023
+        assert_eq!(hard_bits, 0x0023,
+            "3 failed kinds must OR into combined bitfield 0x0023");
+    }
+
+    #[test]
+    fn test_integrity_scan_empty_inputs_clean_zero() {
+        // 0 claims + 0 trusted + no self-mutation = 0x0000 (clean)。
+        let mut hard_bits: u16 = 0xFFFF;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                core::ptr::null(), 0,
+                core::ptr::null(), 0,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, 0);
+        assert_eq!(hard_bits, 0x0000);
+    }
+
+    #[test]
+    fn test_integrity_scan_null_out_returns_minus_one() {
+        let claims = build_claims_buf(&[]);
+        let trust = build_fingerprints_buf(&[]);
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0, core::ptr::null_mut())
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn test_integrity_scan_invalid_kind_returns_minus_two() {
+        // Kind byte 4..255 is undefined。 Implementation returns -2
+        // (parse error) per the contract documented above。
+        let trust = build_fingerprints_buf(&[("art.x", "good")]);
+        let claims = build_claims_buf(&[("art.x", "bad", 99)]);
+        let mut hard_bits: u16 = 0;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                claims.as_ptr(), claims.len() as i32,
+                trust.as_ptr(),  trust.len() as i32,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn test_integrity_scan_truncated_buffer_returns_minus_two() {
+        // Truncated buffer (4-byte count says 5 claims but buffer has none)。
+        let truncated = vec![5u8, 0, 0, 0];  // count=5,no claim bytes follow
+        let trust = build_fingerprints_buf(&[]);
+        let mut hard_bits: u16 = 0;
+        let rc = unsafe {
+            bas_sovereign_integrity_scan(
+                truncated.as_ptr(), truncated.len() as i32,
+                trust.as_ptr(),     trust.len() as i32,
+                0, &mut hard_bits)
+        };
+        assert_eq!(rc, -2);
     }
 
     #[test]
