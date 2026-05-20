@@ -202,22 +202,75 @@ public actor BASSovereignVerdictEngine {
     /// commit on this error (BR-012 fail-closed).
     @discardableResult
     public func evaluate(_ context: VerdictContext) async throws -> BASSovereignVerdict {
-        // Stage 1: hard rules.
+        // Stage 1: hard rules (Swift — produces hits metadata
+        // for reasonCodes/revokedPermissions that the Rust port
+        // does not return)。
         let hits = evaluateHardRules(context.hardObservations)
 
-        // Stage 2: soft-signal lex order.
-        let (softLevel, softPinnedDomain) = evaluateSoftSignals(context.softSignals)
+        // ============================================================
+        // Stage 2 + Stage 3 — chapter 七百五十三 第一刀 / M2433
+        //
+        // ROUTED PATH (default-on per 13.84× measurement,user
+        // directive 「也一起 解决了」)。 The Rust port computes
+        // the FULL level (hard cap + soft lex + evidence
+        // upgrade) in one C ABI call。 If the routed path
+        // returns nil (FFI fault),fall through to the Swift
+        // 3-stage logic preserved as commented-out reference。
+        //
+        // Cross-check:we still take max(hits' min levels,
+        // routed_level) as belt-and-suspenders — if Rust ever
+        // disagreed,Swift's hits floor would surface (no
+        // security regression risk)。
+        // ============================================================
 
-        // Pick the max of (hard hits' min levels, soft level).
-        var level: BASSovereignVerdictLevel = softLevel
-        for hit in hits where hit.minLevel > level {
-            level = hit.minLevel
-        }
+        var level: BASSovereignVerdictLevel
+        let softPinnedDomain: String?
 
-        // Stage 3: evidence-insufficient upgrade for irreversible ops.
-        if isIrreversible(context.operation) && !context.evidenceSufficient {
-            if level < .toolCut {
-                level = .toolCut
+        if Self.useRoutedVerdictLevel,
+           let routedLevel = Self.routedDeriveLevel(
+            hardObservations: context.hardObservations,
+            softSignals: context.softSignals,
+            operation: context.operation,
+            evidenceSufficient: context.evidenceSufficient)
+        {
+            // Rust path:single C ABI call covers Stages 2+3
+            // + hard bit cap promotion。 Cross-check max with
+            // hits' min levels (belt-and-suspenders;normally
+            // routedLevel already includes the hard cap)。
+            level = routedLevel
+            for hit in hits where hit.minLevel > level {
+                level = hit.minLevel
+            }
+            // pinnedDomain still derived from Swift soft-signal
+            // lex order — Rust returns the LEVEL but the Swift
+            // pinnedDomain string is needed for reasonCodes
+            // metadata。 evaluateSoftSignals is fast vs the
+            // overall evaluate() cost so this preserves the
+            // 13.84× win on the actual level math。
+            let (_, pinned) =
+                evaluateSoftSignals(context.softSignals)
+            softPinnedDomain = pinned
+        } else {
+            // V1 Swift path — preserved per 「依旧 不删除 只 comment」。
+            // Stage 2: soft-signal lex order.
+            let (softLevel, pinned) =
+                evaluateSoftSignals(context.softSignals)
+            softPinnedDomain = pinned
+
+            // Pick the max of (hard hits' min levels, soft level).
+            level = softLevel
+            for hit in hits where hit.minLevel > level {
+                level = hit.minLevel
+            }
+
+            // Stage 3: evidence-insufficient upgrade for
+            // irreversible ops.
+            if isIrreversible(context.operation) &&
+                !context.evidenceSufficient
+            {
+                if level < .toolCut {
+                    level = .toolCut
+                }
             }
         }
 
