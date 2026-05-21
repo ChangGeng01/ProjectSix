@@ -9,6 +9,72 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
+## [Unreleased] — RECORDING ACTIVATION MINI-ARC
+
+Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百二 /
+M2641-M2665 (5-chapter mini-arc activating the 6 storage adapters
+shipped in v0.59.0 — turns them from「protocol exists」 into
+「production-default-ready opt-in side channels」)。
+
+### Added — 4 routed-recorder utilities (29 new tests)
+
+Each recorder pairs a substrate runtime surface with a host-
+supplied storage conformer。 「依旧 不删除 只 comment」 — original
+runtime paths untouched;recorders are purely additive opt-in seams。
+
+| Recorder | Pairs with | Tests |
+|---|---|---|
+| BASRoutedPresenceFusionRecording | L6 fuse + BASPresenceObservationStore (013) | 5 |
+| BASRoutedMirrorBladeRecording | L7 BASUnknownSet/BASContradictionRecord + 011/012 stores | 8 |
+| BASRoutedAtomLifecycleRecording | L8 BASAtomLifecycleBridge + 023 store | 7 |
+| BASRoutedHostConstitutionRecording | L5 host-constitution mutation + 014/015 stores | 9 |
+
+Common shape across all 4 recorders:
+- Pure `record...(...)` entry point (all platforms,no Rust dep)
+- Composite `...andRecord(...)` entry point where applicable
+  (iOS/macOS only when paired with Rust bridge invocation)
+- SQLite cold-restart proven (write → close → reopen → match)
+- Doctrine-pinned defaults (per-category confidence,salience
+  semantics,refs JSON encoding,etc。)
+
+### Added — Schema-aligned enums + helpers
+
+- `BASRoutedPresenceFusion.channelKindByByte` — schema-013 string
+  array indexed by Rust `PresenceChannel` byte (task / risk /
+  manipulation / environment / bodyRhythm)
+- `BASRoutedMirrorBladeRecording.UnknownRecordingConfig` —
+  per-category confidence overrides + init-time clamp01
+- `BASRoutedMirrorBladeRecording.ContradictionRecordingConfig` —
+  defaultConfidence + inlineRefs knobs
+- `BASRoutedAtomLifecycleRecording.RecordingError.invalidTransitionByte`
+  — fail-fast on out-of-range bridge input,store stays clean
+- `BASRoutedHostConstitutionRecording.DeletionType` — schema-015
+  CHECK literal enum (cascade / selective / rollback) pinned via
+  rawValue mapping + exhaustive-case test
+
+### Doctrine pins preserved
+
+- 不要 删除 只能 comment — every recorder lives in a new file;
+  no edit to existing routed paths or storage adapters
+- ADR-014 OPT-IN — host supplies the store conformer (InMemory
+  reference or SQLite-backed);substrate default behavior unchanged
+- 不要 json 可以的话 就 sql — typed columns + JSON only for
+  variadic ref arrays (target_refs / cascaded_refs / merged_from)
+- 整体 性能 效果 一定要 更好 — CryptoKit SHA-256 default for L5
+  signature_hash (hardware-accelerated AMX engine,~34× faster
+  than software Rust path per chapter 七百四 measurement)
+- 亏的不要硬上 — composite Rust+record path platform-gated to
+  iOS/macOS;pure recordTransition entry point available
+  cross-platform
+
+### Test sweep
+
+29 new tests across 4 chapter-XYZ files,all green。 No existing
+test touched。 Storage adapters from v0.59.0 are now exercised
+through realistic write paths,not just unit-tested scaffold。
+
+---
+
 ## [0.59.0] — 2026-05-21 — STORAGE COMPLETION ARC
 
 Tag covers chapters 七百八十七 → 七百九十七 / M2586-M2640
