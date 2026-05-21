@@ -174,6 +174,92 @@ pub unsafe extern "C" fn bas_dream_loop_batch_score(
     count
 }
 
+// MARK: - L9 dominance ordering (chapter 八百三十五 / M2826)
+//
+// Companion to batch_score_top_k: given a flat array of per-
+// candidate dominance scores, return the indices sorted in
+// DESCENDING order (highest score first)。 This mirrors the
+// Swift `buildCandidateFrontier.dominanceOrder` computation
+// pattern in BASHostKit (EBrainRuntimeCoordinator+Candidates.swift)
+// which sorts candidates by `candidateDominanceScore` and emits
+// the resulting candidateID list。
+//
+// Why a separate primitive (not part of batch_score):
+//   - `batch_score_top_k` returns top-K (truncated)
+//   - `dominance_order_indices` returns ALL N indices sorted
+//     (full frontier ordering,not truncated)
+//   - Swift host code needs the full ordering for frontier
+//     composition (dominance order + reversible filter + guard
+//     filter all derive from the same input scores)
+//
+// Determinism:stable sort on (-score, index) so ties resolve
+// by input order (matches Swift `.sorted { lhs, rhs in score(lhs)
+// > score(rhs) }` behavior for equal-score pairs)。
+
+/// Sort indices [0, n) by `scores[i]` descending, stable on
+/// ties。 Pure-fn, no allocation beyond the output Vec。
+pub fn dominance_order_indices(scores: &[f32]) -> Vec<i32> {
+    let n = scores.len();
+    let mut indices: Vec<i32> = (0..n as i32).collect();
+    indices.sort_by(|&a, &b| {
+        // Descending by score; NaN sorts last (treated as -inf)
+        let sa = scores[a as usize];
+        let sb = scores[b as usize];
+        match sb.partial_cmp(&sa) {
+            Some(o) => o,
+            None => {
+                // Handle NaN:non-NaN < NaN (push NaN to end)
+                if sa.is_nan() && !sb.is_nan() {
+                    std::cmp::Ordering::Greater
+                } else if !sa.is_nan() && sb.is_nan() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            }
+        }
+    });
+    indices
+}
+
+/// C ABI:dominance order indices。 Caller supplies `scores`
+/// (length n) and an output buffer (length ≥ n)。 Writes the
+/// descending-sorted indices to `out_indices`,returns n
+/// (number written) or -1 on bad input。
+///
+/// # Safety
+///
+/// `scores_ptr` MUST point to a readable Float32 buffer of
+/// length ≥ `n`。 `out_indices_ptr` MUST point to a writable
+/// Int32 buffer of length ≥ `n`。 Pointer-len pairs are pinned
+/// by the FFI contract,not validated here。
+#[no_mangle]
+pub unsafe extern "C" fn bas_dream_loop_dominance_order(
+    scores_ptr: *const f32,
+    n: i32,
+    out_indices_ptr: *mut i32,
+    out_capacity: i32,
+) -> i32 {
+    if scores_ptr.is_null()
+        || out_indices_ptr.is_null()
+        || n < 0
+        || out_capacity < n
+    {
+        return -1;
+    }
+    let len = n as usize;
+    let scores = unsafe {
+        std::slice::from_raw_parts(scores_ptr, len)
+    };
+    let result = dominance_order_indices(scores);
+    unsafe {
+        for (i, idx) in result.iter().enumerate() {
+            *out_indices_ptr.add(i) = *idx;
+        }
+    }
+    n
+}
+
 // MARK: - Unused c_char import suppression
 const _: *const c_char = std::ptr::null();
 
@@ -197,6 +283,102 @@ mod tests {
         let b: Vec<f32> = vec![1.0, 2.0, 3.0];
         assert!((cosine_similarity(&a, &b) - 1.0).abs()
             < 1e-6);
+    }
+
+    // MARK: - dominance_order_indices tests (chapter 八百三十五)
+
+    #[test]
+    fn dominance_order_empty_yields_empty() {
+        let result = dominance_order_indices(&[]);
+        assert_eq!(result, Vec::<i32>::new());
+    }
+
+    #[test]
+    fn dominance_order_descending_by_score() {
+        let scores = [0.3_f32, 0.9, 0.1, 0.7];
+        let result = dominance_order_indices(&scores);
+        // 0.9 (idx 1), 0.7 (idx 3), 0.3 (idx 0), 0.1 (idx 2)
+        assert_eq!(result, vec![1, 3, 0, 2]);
+    }
+
+    #[test]
+    fn dominance_order_stable_on_ties() {
+        // Ties resolve by input order (stable sort)。 Indices
+        // 0, 1, 2 all have score 0.5;they stay in 0, 1, 2 order
+        let scores = [0.5_f32, 0.5, 0.5, 0.9];
+        let result = dominance_order_indices(&scores);
+        assert_eq!(result, vec![3, 0, 1, 2]);
+    }
+
+    #[test]
+    fn dominance_order_pushes_nan_to_end() {
+        let scores = [0.5_f32, f32::NAN, 0.9, f32::NAN];
+        let result = dominance_order_indices(&scores);
+        // 0.9 (idx 2), 0.5 (idx 0), then NaNs (idx 1, 3 stable)
+        assert_eq!(result, vec![2, 0, 1, 3]);
+    }
+
+    #[test]
+    fn dominance_order_single_element() {
+        let scores = [0.42_f32];
+        let result = dominance_order_indices(&scores);
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn dominance_order_already_sorted_descending_stays() {
+        let scores = [1.0_f32, 0.8, 0.6, 0.4, 0.2];
+        let result = dominance_order_indices(&scores);
+        assert_eq!(result, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn dominance_order_ascending_input_reverses() {
+        let scores = [0.1_f32, 0.2, 0.3, 0.4, 0.5];
+        let result = dominance_order_indices(&scores);
+        assert_eq!(result, vec![4, 3, 2, 1, 0]);
+    }
+
+    #[test]
+    fn dominance_order_c_abi_writes_correct_indices() {
+        let scores = vec![0.3_f32, 0.9, 0.1, 0.7];
+        let mut out = vec![-1_i32; 4];
+        let written = unsafe {
+            bas_dream_loop_dominance_order(
+                scores.as_ptr(),
+                scores.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32)
+        };
+        assert_eq!(written, 4);
+        assert_eq!(out, vec![1, 3, 0, 2]);
+    }
+
+    #[test]
+    fn dominance_order_c_abi_rejects_too_small_capacity() {
+        let scores = vec![0.5_f32; 4];
+        let mut out = vec![-1_i32; 2];  // cap < n
+        let result = unsafe {
+            bas_dream_loop_dominance_order(
+                scores.as_ptr(),
+                scores.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32)
+        };
+        assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn dominance_order_c_abi_rejects_null_ptr() {
+        let mut out = vec![-1_i32; 4];
+        let result = unsafe {
+            bas_dream_loop_dominance_order(
+                std::ptr::null(),
+                4,
+                out.as_mut_ptr(),
+                out.len() as i32)
+        };
+        assert_eq!(result, -1);
     }
 
     #[test]
