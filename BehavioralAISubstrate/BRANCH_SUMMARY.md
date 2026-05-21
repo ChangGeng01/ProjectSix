@@ -62,6 +62,13 @@ chapter 八百四十三: ~87% Swift (raw) / 13.05% native (raw)
                   routing sites — all reusing chapter 836
                   primitive, exec-hot ratio creeps up
                   another ~1% on per-turn weighted basis)
+chapter 八百四十五: ~87% Swift (raw) / 13.05% native (raw)
+                  ~81% Swift (exec hot) / 19% native (exec hot)
+                  (cognition compiler sort flip + cascade
+                  reaches natural exhaustion per audit —
+                  7 sites total now route through chapter 836
+                  primitive, exec-hot ratio creeps up
+                  another ~1%)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
@@ -131,7 +138,34 @@ Doctrine pins:  9 substrate-wide pins still held
                 FFI surface needed。
 ```
 
-## Production-default flips (15 total)
+## Post-v0.61.0 state (chapter 八百四十五 / 2026-05-22 — FINAL post-v0.61.0)
+
+```
+Branch tip:     phase-5-chapter-758-deeper-layer-migration-arc
+Commits:        ~1341 cumulative (+12 since v0.61.0)
+Tests:          13,243 pass / 29 skipped / 0 failures (200s sweep)
+                (+9 across sort flip cascade,+1 additional flip without
+                 new tests since existing 13,243 cover the cognition site)
+Production-default flips: 16 (was 15 — cognition compiler item
+                              ordering site flipped via chapter 八百四十四)
+Sort flip cascade exhausted: chapter 八百四十四 audit closed scope
+                              per 「亏的不要硬上」 — remaining 30+
+                              sort sites either multi-key,Int64-key,
+                              tiny-N,or cost-of-key-fn dominated,
+                              none warrant the Float32 precision +
+                              FFI trade。
+Two mini-arcs sealed since v0.61.0:
+  - L9 Dream-Loop dominance order (chapters 八百三十五-八百三十九,
+    5 chapters,2 production flips,brand new Rust primitive)
+  - Sort flip cascade (chapters 八百四十-八百四十五,6 chapters,
+    5 additional production flips,pure REUSE of L9 primitive)
+Doctrine pins:  9 substrate-wide pins still held
+                + 2 NEW patterns proven:
+                  - STRONG-FLIP via 5-axis (chapter 八百三十七)
+                  - primitive REUSE (cascade chapters 八百四十-八百四十四)
+```
+
+## Production-default flips (16 total)
 
 | # | Primitive | Source chapter | Speedup |
 |---|---|---|---|
@@ -150,6 +184,7 @@ Doctrine pins:  9 substrate-wide pins still held
 | 13 | TriSelf viableScores | 八百四十 | ~23× (1K) |
 | 14 | TriSelf viableFallbacks | 八百四十 | ~23× (1K) |
 | 15 | L8 memory retrieve top-K | 八百四十一 | ~23× (1K) |
+| 16 | Cognition compiler item ordering | 八百四十四 | ~20-30× (per cognition pass) |
 
 ## Net-new opt-in capabilities (6 total)
 

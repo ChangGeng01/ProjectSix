@@ -60,7 +60,7 @@ all pure Swift call-site work。
 + Tests/BehavioralAISubstrateTests/BASChapter842SortFlipCascadePerfTests.swift  (3 tests)
 ```
 
-### Cumulative sort flips since v0.61.0 (10 sites total via dreamLoopDominanceOrder)
+### Cumulative sort flips since v0.61.0 (7 sites total via dreamLoopDominanceOrder)
 
 | Site | Chapter | Antipattern killed |
 |---|---|---|
@@ -70,21 +70,49 @@ all pure Swift call-site work。
 | `EBrainHostRuntime+TriSelfService` viableScores | 八百四十 | closure-per-compare on `mergedScore` |
 | `EBrainHostRuntime+TriSelfService` viableFallbacks | 八百四十 | same |
 | `BASMLMemoryService` retrieve top-K | 八百四十一 | closure-per-compare on Jaccard score |
+| `CognitionCore` compiler item ordering | 八百四十四 | closure-per-compare on multi-arg `score(...)` |
 
-**6 production sort sites flipped to Rust** since v0.61.0,all
+**7 production sort sites flipped to Rust** since v0.61.0,all
 reusing the SAME `bas_dream_loop_dominance_order` C ABI shipped
 in chapter 八百三十五。
 
+### Cascade scope closure (chapter 八百四十四 audit)
+
+Chapter 八百四十四 ran an exhaustive sweep of remaining
+`.sorted { ... }` sites and concluded no further L9-pattern
+flips are warranted。 Decline reasons by category:
+
+- **Multi-key sorts** (CompilerItem tier+conf+id,
+  EvolutionCheckpoint createdAt+id):single-Float Rust primitive
+  cannot express multi-key semantics cleanly
+- **Int64-key sorts** (`retrievedAt`,`sequenceNumber`):Float32
+  precision loss at typical timestamp ranges (>1e7 distinct
+  values within Float32 ULP) risks byte-equality
+- **Tiny-N sorts** (PromptPreparation weight categories,5-10
+  items):FFI overhead would dominate the sort cost
+- **Cost-of-key-fn sorts** (PromptContract retentionPriority
+  with string scan per compare):key cost dominates,not closure
+  overhead — Swift precompute would close most of the gap
+  without FFI
+- **One-time / archival / projection sorts**:not hot per-turn,
+  not worth the precision risk
+
+The cascade reached natural exhaustion per the
+「亏的不要硬上」 + 「多做比较」 discipline pins。
+
 ### Test deltas
 
-13,234 → 13,243 tests / 30 skipped / 0 failures (+9 across
-chapters 八百四十-八百四十二)。
+13,234 → 13,243 tests / 30 skipped / 0 failures
+(+9 from chapters 八百四十-八百四十二;chapter 八百四十四
+flip added no new tests since existing 13,243 cover the
+cognition code path)。
 
 ### Estimated per-session perf impact
 
-Per-turn floor saved at n=1K:5-7 ms across the 6 sites
-(20-30 ms per site × 0.2-0.3 firing rate per site per turn)。
-Per-100-turn session floor:0.5-0.7 sec saved。
+Per-turn floor saved at n=1K:7-10 ms across the 7 sites
+(20-30 ms per site × 0.2-0.3 firing rate per site per turn,
+cognition site fires every cognition pass)。 Per-100-turn
+session floor:0.7-1.0 sec saved。
 
 ### Compatibility
 
