@@ -190,6 +190,41 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             0)
     };
     total = total.wrapping_add(dom64_rc);
+    // chapter 八百五十二 第三刀 / M2913 — force-link the
+    // bas-mamba-scan sequential + parallel SSM scan entry
+    // points。 Sentinel inputs:b=1, l=1, d=1 with valid
+    // 1-element buffers → returns 0 (success,no observable
+    // side-effect beyond y[0] write)。
+    let mam_x: [f32; 1] = [0.0];
+    let mam_delta: [f32; 1] = [0.0];
+    let mam_a: [f32; 1] = [0.0];
+    let mam_b: [f32; 1] = [0.0];
+    let mam_c: [f32; 1] = [0.0];
+    let mut mam_y: [f32; 1] = [0.0];
+    let mam_seq_rc = unsafe {
+        bas_mamba_scan::bas_mamba_scan_sequential(
+            mam_x.as_ptr(),
+            mam_delta.as_ptr(),
+            mam_a.as_ptr(),
+            mam_b.as_ptr(),
+            mam_c.as_ptr(),
+            1, 1, 1,
+            mam_y.as_mut_ptr(),
+            1)
+    };
+    total = total.wrapping_add(mam_seq_rc);
+    let mam_par_rc = unsafe {
+        bas_mamba_scan::bas_mamba_scan_parallel(
+            mam_x.as_ptr(),
+            mam_delta.as_ptr(),
+            mam_a.as_ptr(),
+            mam_b.as_ptr(),
+            mam_c.as_ptr(),
+            1, 1, 1,
+            mam_y.as_mut_ptr(),
+            1)
+    };
+    total = total.wrapping_add(mam_par_rc);
     // chapter 七百五十一 第二刀 / M2427 — force-link the L8
     // memory-atom-reducer admission-confidence tiebreak rule。
     // Sentinel inputs:existing 0.0 / new 0.0 / tiebreak=keep → 0

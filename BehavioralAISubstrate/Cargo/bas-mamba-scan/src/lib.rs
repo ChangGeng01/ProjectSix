@@ -301,10 +301,137 @@ pub fn scan_parallel(
     Ok(y)
 }
 
-// MARK: - C ABI scaffolding (full C ABI lands in knife 3)
+// MARK: - C ABI (chapter 八百五十二 第三刀 / M2913)
+//
+// Three entry points:
+//   - bas_mamba_scan_sequential(...) — sequential CPU path
+//   - bas_mamba_scan_parallel(...)   — rayon parallel CPU path
+//
+// Both take 5 input buffers (x, delta, A, B, C) + a shape triple
+// (b, l, d) + a writable output buffer (y) + its capacity in
+// bytes (which must be ≥ element_count() × sizeof(f32))。 Return
+// `0` on success, `-1` on any input mismatch (caller routes to
+// Swift fallback)。
 
-/// Suppress unused c_char warning until knife 3 wires
-/// the full C ABI surface。
+/// Sequential dispatch C ABI。 See `scan_sequential` for math。
+///
+/// # Safety
+///
+/// All input pointers MUST be non-null and point to readable
+/// Float32 buffers of the correct element count:
+///   - x, delta, B, C: length b*l*d (each)
+///   - A: length d
+/// `out_y_ptr` MUST point to a writable Float32 buffer of length
+/// ≥ b*l*d。 The pointer-length contract is pinned by the FFI
+/// caller (the Swift wrapper owns all buffers and sizes them
+/// from the shape struct)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_mamba_scan_sequential(
+    x_ptr: *const f32,
+    delta_ptr: *const f32,
+    a_ptr: *const f32,
+    b_proj_ptr: *const f32,
+    c_proj_ptr: *const f32,
+    b: i32,
+    l: i32,
+    d: i32,
+    out_y_ptr: *mut f32,
+    out_capacity: i32,
+) -> i32 {
+    // Input validation
+    if x_ptr.is_null() || delta_ptr.is_null() || a_ptr.is_null()
+        || b_proj_ptr.is_null() || c_proj_ptr.is_null()
+        || out_y_ptr.is_null()
+        || b <= 0 || l <= 0 || d <= 0
+    {
+        return -1;
+    }
+    let bld = (b as i64) * (l as i64) * (d as i64);
+    if bld < 0 || bld > (i32::MAX as i64) {
+        return -1; // overflow guard
+    }
+    let bld = bld as usize;
+    if out_capacity < bld as i32 {
+        return -1;
+    }
+
+    let shape = MambaScanShape {
+        b: b as u32, l: l as u32, d: d as u32,
+    };
+    let x = unsafe { std::slice::from_raw_parts(x_ptr, bld) };
+    let delta = unsafe { std::slice::from_raw_parts(delta_ptr, bld) };
+    let a = unsafe { std::slice::from_raw_parts(a_ptr, d as usize) };
+    let b_proj = unsafe { std::slice::from_raw_parts(b_proj_ptr, bld) };
+    let c_proj = unsafe { std::slice::from_raw_parts(c_proj_ptr, bld) };
+
+    match scan_sequential(x, delta, a, b_proj, c_proj, shape) {
+        Ok(y) => {
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    y.as_ptr(), out_y_ptr, bld);
+            }
+            0
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Parallel dispatch C ABI。 Same shape as sequential。
+///
+/// # Safety
+///
+/// Same safety requirements as `bas_mamba_scan_sequential`。
+#[no_mangle]
+pub unsafe extern "C" fn bas_mamba_scan_parallel(
+    x_ptr: *const f32,
+    delta_ptr: *const f32,
+    a_ptr: *const f32,
+    b_proj_ptr: *const f32,
+    c_proj_ptr: *const f32,
+    b: i32,
+    l: i32,
+    d: i32,
+    out_y_ptr: *mut f32,
+    out_capacity: i32,
+) -> i32 {
+    if x_ptr.is_null() || delta_ptr.is_null() || a_ptr.is_null()
+        || b_proj_ptr.is_null() || c_proj_ptr.is_null()
+        || out_y_ptr.is_null()
+        || b <= 0 || l <= 0 || d <= 0
+    {
+        return -1;
+    }
+    let bld = (b as i64) * (l as i64) * (d as i64);
+    if bld < 0 || bld > (i32::MAX as i64) {
+        return -1;
+    }
+    let bld = bld as usize;
+    if out_capacity < bld as i32 {
+        return -1;
+    }
+
+    let shape = MambaScanShape {
+        b: b as u32, l: l as u32, d: d as u32,
+    };
+    let x = unsafe { std::slice::from_raw_parts(x_ptr, bld) };
+    let delta = unsafe { std::slice::from_raw_parts(delta_ptr, bld) };
+    let a = unsafe { std::slice::from_raw_parts(a_ptr, d as usize) };
+    let b_proj = unsafe { std::slice::from_raw_parts(b_proj_ptr, bld) };
+    let c_proj = unsafe { std::slice::from_raw_parts(c_proj_ptr, bld) };
+
+    match scan_parallel(x, delta, a, b_proj, c_proj, shape) {
+        Ok(y) => {
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    y.as_ptr(), out_y_ptr, bld);
+            }
+            0
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Suppress unused c_char warning。
 const _: *const c_char = std::ptr::null();
 
 // MARK: - Tests
@@ -589,6 +716,106 @@ mod tests {
                 "Trial {}: parallel must be bit-equal to sequential for shape ({}, {}, {})",
                 trial, b, l, d);
         }
+    }
+
+    // MARK: - C ABI tests (chapter 八百五十二 第三刀 / M2913)
+
+    #[test]
+    fn c_abi_sequential_minimal_round_trip() {
+        let x = vec![2.0_f32];
+        let delta = vec![0.5_f32];
+        let a = vec![-1.0_f32];
+        let b_proj = vec![3.0_f32];
+        let c_proj = vec![4.0_f32];
+        let mut out = vec![-99.0_f32; 1];
+        let rc = unsafe {
+            bas_mamba_scan_sequential(
+                x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+                b_proj.as_ptr(), c_proj.as_ptr(),
+                1, 1, 1,
+                out.as_mut_ptr(), 1)
+        };
+        assert_eq!(rc, 0, "C ABI must succeed");
+        let expected = 4.0_f32 * 0.5 * 3.0 * 2.0;
+        assert!((out[0] - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn c_abi_parallel_matches_sequential_at_shape_4_8_4() {
+        let shape = make_shape(4, 8, 4);
+        let bld = shape.element_count();
+        let x: Vec<f32> = (0..bld).map(|i| (i as f32) * 0.013).collect();
+        let delta: Vec<f32> = (0..bld).map(|i| 0.05 + (i as f32) * 0.001).collect();
+        let a: Vec<f32> = (0..4).map(|i| -0.5 - (i as f32) * 0.1).collect();
+        let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + (i as f32) * 0.007).collect();
+        let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + (i as f32) * 0.005).collect();
+
+        let mut out_seq = vec![-99.0_f32; bld];
+        let mut out_par = vec![-99.0_f32; bld];
+
+        let rc_seq = unsafe {
+            bas_mamba_scan_sequential(
+                x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+                b_proj.as_ptr(), c_proj.as_ptr(),
+                4, 8, 4,
+                out_seq.as_mut_ptr(), bld as i32)
+        };
+        let rc_par = unsafe {
+            bas_mamba_scan_parallel(
+                x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+                b_proj.as_ptr(), c_proj.as_ptr(),
+                4, 8, 4,
+                out_par.as_mut_ptr(), bld as i32)
+        };
+        assert_eq!(rc_seq, 0);
+        assert_eq!(rc_par, 0);
+        assert_eq!(out_seq, out_par,
+            "C ABI parallel must byte-equal C ABI sequential");
+    }
+
+    #[test]
+    fn c_abi_rejects_null_pointers() {
+        let mut out = vec![0.0_f32; 1];
+        let rc = unsafe {
+            bas_mamba_scan_sequential(
+                std::ptr::null(), std::ptr::null(), std::ptr::null(),
+                std::ptr::null(), std::ptr::null(),
+                1, 1, 1,
+                out.as_mut_ptr(), 1)
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn c_abi_rejects_zero_dimensions() {
+        let dummy = vec![1.0_f32; 4];
+        let mut out = vec![0.0_f32; 4];
+        let rc = unsafe {
+            bas_mamba_scan_sequential(
+                dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+                dummy.as_ptr(), dummy.as_ptr(),
+                0, 1, 1,
+                out.as_mut_ptr(), 4)
+        };
+        assert_eq!(rc, -1, "b=0 must reject");
+    }
+
+    #[test]
+    fn c_abi_rejects_insufficient_out_capacity() {
+        let x = vec![1.0_f32; 4];  // b=1, l=2, d=2 = 4 elements
+        let delta = vec![0.1_f32; 4];
+        let a = vec![-1.0_f32; 2];
+        let b_proj = vec![1.0_f32; 4];
+        let c_proj = vec![1.0_f32; 4];
+        let mut out = vec![0.0_f32; 2];  // too small
+        let rc = unsafe {
+            bas_mamba_scan_sequential(
+                x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+                b_proj.as_ptr(), c_proj.as_ptr(),
+                1, 2, 2,
+                out.as_mut_ptr(), 2)
+        };
+        assert_eq!(rc, -1, "out_capacity < bld must reject");
     }
 
     // MARK: - Original sequential tests continue

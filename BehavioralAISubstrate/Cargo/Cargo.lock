@@ -77,6 +77,7 @@ dependencies = [
  "bas-host-constitution",
  "bas-integrity-sentinel",
  "bas-lease-life",
+ "bas-mamba-scan",
  "bas-memory-atom-store",
  "bas-mirror-blade",
  "bas-organ-router",

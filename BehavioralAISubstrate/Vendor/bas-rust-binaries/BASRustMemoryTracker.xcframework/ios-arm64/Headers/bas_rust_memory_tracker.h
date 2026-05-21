@@ -789,6 +789,51 @@ int32_t bas_dream_loop_dominance_order_f64(
     int32_t *out_indices_ptr,
     int32_t out_capacity);
 
+// chapter 八百五十二 第三刀 / M2913 — Mamba SSM selective scan
+//
+// Two entry points (sequential + rayon parallel) for the
+// chapter 六百七十七 SSMScan recurrence, ported from Swift
+// `BASSSMScanCPUReference`。 Math:
+//   for each (b, d) thread:
+//     h = 0
+//     for t in 0..l:
+//       A_bar = exp(delta_t * A[d])
+//       B_bar = delta_t * B_t
+//       h = A_bar * h + B_bar * x_t
+//       y_t = C_t * h
+//
+// Layout: x, delta, B, C are (b, l, d) row-major Float32。
+// A is per-channel Float32 of length d。 y is (b, l, d)
+// row-major Float32 output。
+//
+// All buffer lengths MUST equal:
+//   - x, delta, B, C, y: b*l*d each
+//   - A:                  d
+// out_capacity is the y buffer's element count (≥ b*l*d)。
+//
+// Returns 0 on success, -1 on any input mismatch
+// (null ptr, zero dim, insufficient capacity)。
+
+int32_t bas_mamba_scan_sequential(
+    const float *x_ptr,
+    const float *delta_ptr,
+    const float *a_ptr,
+    const float *b_proj_ptr,
+    const float *c_proj_ptr,
+    int32_t b, int32_t l, int32_t d,
+    float *out_y_ptr,
+    int32_t out_capacity);
+
+int32_t bas_mamba_scan_parallel(
+    const float *x_ptr,
+    const float *delta_ptr,
+    const float *a_ptr,
+    const float *b_proj_ptr,
+    const float *c_proj_ptr,
+    int32_t b, int32_t l, int32_t d,
+    float *out_y_ptr,
+    int32_t out_capacity);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is
