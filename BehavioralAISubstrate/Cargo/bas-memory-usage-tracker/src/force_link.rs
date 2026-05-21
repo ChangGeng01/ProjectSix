@@ -356,6 +356,15 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_shadow_trial::bas_shadow_trial_abi_version());
     total = total.wrapping_add(
         bas_shadow_trial::bas_shadow_trial_transition(2_i32, 0_i32));
+    // chapter 七百八十二 / M2561 — force-link the L8 atom-lifecycle
+    // state machine。 Two anchors:
+    //   1. ABI version probe
+    //   2. transition(Tombstoned=4, Admit=0) → packed reject-terminal
+    //      = 0x42 = 66 (Tombstoned is terminal)
+    total = total.wrapping_add(
+        bas_atom_lifecycle::bas_atom_lifecycle_abi_version());
+    total = total.wrapping_add(
+        bas_atom_lifecycle::bas_atom_lifecycle_transition(4_i32, 0_i32));
     total
 }
 
@@ -380,7 +389,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 19 = chapter 七百六十八 / M2491 (+host-constitution)
 ///   - 20 = chapter 七百七十一 / M2506 (+world-prior)
 ///   - 21 = chapter 七百七十四 / M2521 (+shadow-trial L13 Phase 2)
+///   - 22 = chapter 七百八十二 / M2561 (+atom-lifecycle L8)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    21
+    22
 }

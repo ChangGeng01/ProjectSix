@@ -443,4 +443,53 @@ public enum BASWorldPriorBridge {
     }
 }
 
+// MARK: - bas-atom-lifecycle (L8 memory atom state machine)
+// chapter 七百八十三 / M2566
+
+@_silgen_name("bas_atom_lifecycle_abi_version")
+private func _bas_atom_lifecycle_abi_version() -> Int32
+
+@_silgen_name("bas_atom_lifecycle_transition")
+private func _bas_atom_lifecycle_transition(
+    _ currentPhase: Int32,
+    _ action: Int32
+) -> Int32
+
+public enum BASAtomLifecycleBridge {
+    public static let abiVersion: Int32 = 1
+
+    public static func liveAbiVersion() -> Int32 {
+        return _bas_atom_lifecycle_abi_version()
+    }
+
+    public struct Result: Equatable, Hashable, Sendable {
+        /// 0=AdvanceTo / 1=RejectedIllegal / 2=RejectedTerminal
+        public let outcome: Int32
+        /// Next phase byte (0..4 per AtomPhase discriminants)。
+        public let nextPhaseByte: UInt8
+        public var advanced: Bool { outcome == 0 }
+    }
+
+    /// Invoke the Rust atom-lifecycle state-machine transition。
+    ///
+    /// Phase discriminants:0=Created / 1=Admitted / 2=Linked /
+    /// 3=Archived / 4=Tombstoned。
+    /// Action discriminants:0=Admit / 1=Link / 2=Archive / 3=Tombstone。
+    ///
+    /// Returns Result(outcome: -1, nextPhaseByte: 0) on invalid byte。
+    public static func transition(
+        currentPhaseByte: UInt8,
+        actionByte: UInt8
+    ) -> Result {
+        let packed = _bas_atom_lifecycle_transition(
+            Int32(currentPhaseByte), Int32(actionByte))
+        if packed < 0 {
+            return Result(outcome: -1, nextPhaseByte: 0)
+        }
+        let outcome = packed & 0x0F
+        let nextPhase = UInt8((packed >> 4) & 0x0F)
+        return Result(outcome: outcome, nextPhaseByte: nextPhase)
+    }
+}
+
 #endif  // os(iOS) || os(macOS)

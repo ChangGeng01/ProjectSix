@@ -118,17 +118,17 @@ public enum BASRustCoreBridge {
     ///   - chapter 七百七十四 第一刀: 20 → 21 crate bundle
     ///     (+ bas-shadow-trial L13 Phase 2 first cut)
     public static let macosArm64SliceSHA256: String =
-        "5f8ac96dd7046f3d93720979c3fd748be255b6a04390ecb33affe05b0286b387"
+        "5e5bb95fa794acb8529c41903d1174f44e666c7ec17fede2564896c28811c281"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
-    /// Bumped at chapter 七百七十四 第一刀。
+    /// Bumped at chapter 七百八十三 / M2566 (+atom-lifecycle)。
     public static let iosArm64SliceSHA256: String =
-        "04937c03a3e80395d322c7fb815492ec70994bd506be2cde847d018d4884cf73"
+        "e7f22d412c0ffabd0f17c408fb218b537106ae72b802c03fb1f6c5a89067cf7d"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
-    /// SHA256。 Bumped at chapter 七百七十四 第一刀。
+    /// SHA256。 Bumped at chapter 七百八十三 / M2566。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "ad0ad44498c3ad0427492bc9ae67bc41eeef78f4dfd2641c14f30079abbc2df0"
+        "c0d0f70538353f9a28f96d7188af6d388da3c2a62006c6f757c8f6ea13eafec5"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

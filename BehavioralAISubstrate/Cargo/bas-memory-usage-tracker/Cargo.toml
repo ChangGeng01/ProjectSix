@@ -119,3 +119,6 @@ bas-world-prior       = { path = "../bas-world-prior" }
 # Phase 1, chapter 七百七十二)。 Mirrors
 # BASShadowTrialStateMachineCore byte-for-byte。
 bas-shadow-trial      = { path = "../bas-shadow-trial" }
+# chapter 七百八十二 / M2561 — bundle the L8 atom-lifecycle
+# crate (memory-atom 5-phase state machine)。
+bas-atom-lifecycle    = { path = "../bas-atom-lifecycle" }

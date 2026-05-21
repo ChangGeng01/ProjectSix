@@ -302,6 +302,65 @@ final class BASInternalRustBridgesTests: XCTestCase {
             3) // Easy
     }
 
+    // MARK: - bas-atom-lifecycle bridge (chapter 七百八十三)
+
+    func testAtomLifecycleAbiVersionPinned() {
+        XCTAssertEqual(BASAtomLifecycleBridge.abiVersion, 1)
+        XCTAssertEqual(
+            BASAtomLifecycleBridge.liveAbiVersion(),
+            BASAtomLifecycleBridge.abiVersion)
+    }
+
+    func testAtomLifecycleCreatedAdmitAdvances() {
+        let r = BASAtomLifecycleBridge.transition(
+            currentPhaseByte: 0, actionByte: 0) // Created + Admit
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 1) // Admitted
+    }
+
+    func testAtomLifecycleAdmittedLinkAdvances() {
+        let r = BASAtomLifecycleBridge.transition(
+            currentPhaseByte: 1, actionByte: 1) // Admitted + Link
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 2) // Linked
+    }
+
+    func testAtomLifecycleLinkedArchiveAdvances() {
+        let r = BASAtomLifecycleBridge.transition(
+            currentPhaseByte: 2, actionByte: 2) // Linked + Archive
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 3) // Archived
+    }
+
+    func testAtomLifecycleArchivedTombstoneAdvances() {
+        let r = BASAtomLifecycleBridge.transition(
+            currentPhaseByte: 3, actionByte: 3) // Archived + Tombstone
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 4) // Tombstoned
+    }
+
+    func testAtomLifecycleTombstonedRejectsAll() {
+        for a: UInt8 in [0, 1, 2, 3] {
+            let r = BASAtomLifecycleBridge.transition(
+                currentPhaseByte: 4, actionByte: a)
+            XCTAssertFalse(r.advanced)
+            XCTAssertEqual(r.outcome, 2) // RejectedTerminal
+        }
+    }
+
+    func testAtomLifecycleCreatedLinkRejected() {
+        let r = BASAtomLifecycleBridge.transition(
+            currentPhaseByte: 0, actionByte: 1) // Created + Link
+        XCTAssertFalse(r.advanced)
+        XCTAssertEqual(r.outcome, 1) // RejectedIllegal
+    }
+
+    func testAtomLifecycleInvalidByteReturnsOutcomeMinus1() {
+        let r = BASAtomLifecycleBridge.transition(
+            currentPhaseByte: 99, actionByte: 0)
+        XCTAssertEqual(r.outcome, -1)
+    }
+
     // MARK: - bas-shadow-trial bridge (L13 Phase 2)
 
     func testShadowTrialAbiVersionPinned() {
