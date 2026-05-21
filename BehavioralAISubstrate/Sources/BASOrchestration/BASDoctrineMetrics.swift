@@ -2,6 +2,31 @@
 // M576 (chapter 一百五十一) — 6 typed doctrine metric value types
 // per master plan v1.0 §13.2 "新增 doctrine 指标".
 //
+// ## chapter 八百三十 naming clarification (post-审查)
+//
+// The word 「Doctrine」 in this file's name refers to the master-
+// plan §13.2 metric group「new doctrine metrics」 (most prominently
+// `BASDoctrineHarmonyScore` below),NOT to historical chapter-pin
+// doctrine from the dormant chapter registry。
+//
+// These two semantic spaces are unrelated:
+//   - `BASDoctrineMetrics` (this file)        = FUNCTIONAL, active
+//   - `BASChapterDoctrineRegistry` (dormant)  = HISTORICAL, read-only
+//
+// `BASDoctrineHarmonyScore` measures how coherent the host's red-
+// line outputs are (BASAbyssalDoctrineRedLine + BASKunlunDoctrineRedLine
+// — i.e。 the host's CURRENT policy doctrine),NOT a chapter-pin
+// lookup。
+//
+// Rename to BASGovernanceMetrics? Considered at chapter 八百二十四
+// 全量 审查 + chapter 八百二十九 operational polish,DECLINED:
+// 5 of the 6 metrics (AxisStability, GateFidelity, OriginTrace
+// Completeness, SanctumLeakRate, HumanAnchorRetention) would lose
+// their direct §13.2 mapping;DoctrineHarmonyScore's literal
+// master-plan name is「doctrine」,not「governance」。 Kept the
+// name + added this clarification block instead per 「不要 删除
+// 只能 comment」。
+//
 // ## Why this exists
 //
 // User pasted master plan v1.0 (《宿基双生·主权第二大脑平台》) which

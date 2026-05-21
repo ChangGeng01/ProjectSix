@@ -9,15 +9,15 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — v0.61.0 candidate / STORAGE ACTIVATION + AUDIT REPLAY + 严查 + 极致 轻量化
+## [Unreleased] — v0.61.0 candidate / STORAGE ACTIVATION + AUDIT REPLAY + 严查 + 极致 轻量化 + adopter docs
 
-Tag candidate: v0.61.0。 Covers chapters 七百九十八 → 八百二十九 /
-M2641-M2800 (32-chapter combined mini-arc completing storage adapter
+Tag candidate: v0.61.0。 Covers chapters 七百九十八 → 八百三十 /
+M2641-M2805 (33-chapter combined mini-arc completing storage adapter
 activation,batch optimization,audit replay/diff/archive evolution,
 sequential 全量审查 + 严查 reviews + remediation,doctrine cluster
-archival,operational polish)。
+archival,operational polish,host adopter documentation)。
 
-### Six sub-arcs
+### Seven sub-arcs
 
 1. **Recording activation** (chapters 七百九十八-八百二):4 routed-
    recorder utilities turn v0.59.0 storage adapters into production-
@@ -71,6 +71,22 @@ archival,operational polish)。
      `bas-retrieval-ranker`)
    - Consolidated 3 prior [Unreleased] headers into this one
      (was reader-confusing dual-snapshot structure)
+
+7. **Adopter documentation + naming clarification** (chapter 八百三十):
+   - Wrote `INTEGRATION_AUDIT.md` — host adopter guide for the
+     audit pipeline (5-line setup,architecture diagram,5 audit
+     dimensions table,InMemory-vs-SQLite + batch throughput
+     scorecard,replay/diff/archive examples,cold-restart
+     semantics,cross-platform notes,error semantics,doctrine
+     pin map,chapter pin map)
+   - Added `BASDoctrineMetrics` naming clarification block:
+     the「Doctrine」 in this file's name = §13.2 functional
+     metric group (DoctrineHarmonyScore et al),NOT the dormant
+     chapter-pin registry。 Rename to BASGovernanceMetrics was
+     declined with rationale documented inline。
+   - Documents the clean separation:historical doctrine =
+     read-only registry / functional doctrine = active §13.2
+     metrics。
 
 ### Cumulative measurements
 
