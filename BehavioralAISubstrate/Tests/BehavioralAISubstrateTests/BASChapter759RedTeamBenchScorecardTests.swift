@@ -72,16 +72,23 @@ final class BASChapter759RedTeamBenchScorecardTests: XCTestCase {
             "max measured speedup envelope per chapter plan")
     }
 
-    // MARK: - V1 live path:Swift fallback
+    // MARK: - Rust path activation status (FLIPPED at chapter 七百七十七)
 
-    func testV1LiveSwiftFallbackPathActive() {
-        // Knife 5 keeps V1 Swift fallback as the live default
-        // until the next XCFramework rebuild activates the Rust
-        // route。 This pin catches any premature flip。
+    func testRustPathActivatedAtChapter777() {
+        // Originally pinned false at chapter 七百五十九 第五刀;
+        // FLIPPED true at chapter 七百七十七 / M2536 once the
+        // XCFramework rebuild (chapter 七百七十三 第二刀) activated
+        // the symbol + cross-language byte-equality proven。
+        // On Apple platforms,Rust route is now the live default。
+        #if os(iOS) || os(macOS)
+        XCTAssertTrue(
+            BASRedTeamBatchClassifier.SubArcScorecard.rustPathActive,
+            "Rust path FLIPPED to production default at chapter 七百七十七")
+        #else
         XCTAssertFalse(
             BASRedTeamBatchClassifier.SubArcScorecard.rustPathActive,
-            "Rust path must stay OFF until XCFramework rebuild。 " +
-            "Premature flip = ADR-014 OPT-IN violation")
+            "watchOS / Linux still on Swift fallback (no XCFramework slice)")
+        #endif
     }
 
     func testV1FallbackClassifiesProductRedLine() {

@@ -117,37 +117,35 @@ public enum BASRedTeamBatchClassifier {
     /// then pattern index — identical iteration shape to the
     /// Rust `classify_prompt_batch`。
     ///
-    /// V1 live path (current default):Swift
-    /// `BASProductRedLineLinter.lint(inputs:)` shape — Product
-    /// subset only。 Cthulhu / Kunlun / BR-014 red lines are NOT
-    /// exercised on this path (they live in their own doctrine
-    /// modules with separate per-call lint helpers)。
+    /// **PRODUCTION DEFAULT FLIPPED at chapter 七百七十七 / M2536**
+    /// V2 Rust path (`bas_red_team_classify_batch`) is now the
+    /// live default。 Justification:
+    ///   - 33-67× measured throughput vs Swift baseline
+    ///     (chapter 七百五十九 第四刀 1000-prompt perf microbenchmark)
+    ///   - Covers ALL 24 red lines (Swift V1 only covered the 5
+    ///     Product red lines;Cthulhu/Kunlun/BR-014 needed
+    ///     separate calls before)
+    ///   - Cross-language byte-equality proven at chapter 七百五十九
+    ///     第四刀 (1000-prompt FNV-1a fixture 0x42AB5E8900B6B6A6)
     ///
-    /// V2 Rust path (待 XCFramework rebuild):routes ALL 24 red
-    /// lines via `bas_red_team_classify_batch` (50-100× throughput
-    /// vs Swift per chapter 七百五十九 第四刀 measurement)。
-    /// Activates by flipping `#if BAS_RED_TEAM_RUST_PATH_ACTIVE`
-    /// once the maintainer-side
-    /// `scripts/build-rust-xcframework.sh` re-runs and bundles
-    /// the new symbols。
+    /// V1 Swift path stays as the `classifyViaSwiftFallback`
+    /// fallback:
+    ///   - Used on watchOS / Linux (no XCFramework slice)
+    ///   - Used by hosts that explicitly opt out via
+    ///     `classifyViaSwiftFallback(prompts:)` direct call
+    ///   - 「依旧 不删除 只 comment」 — Swift legacy body kept
+    ///     adjacent for diff observability
     ///
-    /// chapter 七百五十九 第五刀 / M2450。
+    /// chapter 七百七十七 / M2536 (default flip);prior history:
+    /// chapter 七百五十九 第五刀 / M2450 (bridge scaffold)。
     public static func classify(
         prompts: [String]
     ) -> [BASRedLineMatch] {
-
-        #if BAS_RED_TEAM_RUST_PATH_ACTIVE
-        // ENABLED at next XCFramework rebuild。 The build script
-        // pins this define once the bas-red-team-bench symbols
-        // are bundled。 Body kept warm so a single build-script
-        // change flips the route without a code refactor。
         #if os(iOS) || os(macOS)
+        // PRODUCTION DEFAULT:Rust route (chapter 七百七十七 flip)。
         return classifyViaRust(prompts: prompts)
         #else
-        return classifyViaSwiftFallback(prompts: prompts)
-        #endif
-        #else
-        // V1 live path:Swift BASProductRedLineLinter (Product subset)。
+        // watchOS / Linux:no XCFramework slice → Swift fallback。
         return classifyViaSwiftFallback(prompts: prompts)
         #endif
     }
@@ -185,31 +183,145 @@ public enum BASRedTeamBatchClassifier {
         return matches
     }
 
-    /// Rust-routed path placeholder — DEACTIVATED until the
-    /// XCFramework rebuild picks up `bas_red_team_classify_batch`。
-    /// Kept warm so the single-flag flip activates the 50-100×
-    /// throughput path without a refactor。
+    /// Rust-routed path — ACTIVATED at chapter 七百七十七 / M2536
+    /// (DEEPER ARC + L13 Phase 2 close-out wave)。
     ///
-    /// Activation patch will:
-    ///   1. Encode prompts via the LE wire format
-    ///      (count u32 + per-prompt {len u32 + utf8 bytes})
-    ///   2. Call `bas_red_team_classify_batch` twice (probe + write)
-    ///   3. Decode the LE match wire format (count u32 +
-    ///      per-match {prompt_index u32 + red_line_id u16 +
-    ///      _padding u16 + pattern_index u32})
-    ///   4. Map `red_line_id` → category code via the high
-    ///      nibble:0x00..0x0F → Cthulhu (0),0x10..0x1F →
-    ///      Kunlun (1),0x20..0x2F → Product (2),0x30..0x3F
-    ///      → BR-014 (3)
+    /// Wire format:
+    ///   - prompts_buf (LE):count u32 + per-prompt
+    ///     {prompt_len u32 + utf8 bytes}
+    ///   - out_matches_buf (LE):match_count u32 + per-match
+    ///     {prompt_index u32 + red_line_id u16 + _padding u16 +
+    ///      pattern_index u32}  (12 bytes/match)
+    ///   - red_line_id high nibble decodes the category:
+    ///     0x00..0x0F → Cthulhu (0),0x10..0x1F → Kunlun (1),
+    ///     0x20..0x2F → Product (2),0x30..0x3F → BR-014 (3)
+    ///
+    /// Two-phase capacity discovery:probe with NULL/0 to get
+    /// required size,allocate,call again。
     internal static func classifyViaRust(
         prompts: [String]
     ) -> [BASRedLineMatch] {
-        // Placeholder — activated at next XCFramework rebuild。
-        // Until then,fall back to the Swift path so the public
-        // signature stays callable + covered by tests。
+        #if os(iOS) || os(macOS)
+        // Encode prompts wire format
+        let promptsWire = encodePromptsWire(prompts)
+
+        // Probe required output size
+        let required = promptsWire.withUnsafeBufferPointer {
+            (pbuf: UnsafeBufferPointer<UInt8>) -> Int32 in
+            return _bas_red_team_classify_batch_silgen(
+                pbuf.baseAddress, Int32(pbuf.count),
+                nil, 0)
+        }
+        if required < 0 {
+            // Wire format parse fail or null guard fired —
+            // fall back defensively。
+            return classifyViaSwiftFallback(prompts: prompts)
+        }
+
+        // Allocate + call again to write matches
+        var outBuf = [UInt8](repeating: 0, count: Int(required))
+        let written = promptsWire.withUnsafeBufferPointer {
+            (pbuf: UnsafeBufferPointer<UInt8>) -> Int32 in
+            outBuf.withUnsafeMutableBufferPointer {
+                (obuf: inout UnsafeMutableBufferPointer<UInt8>) -> Int32 in
+                return _bas_red_team_classify_batch_silgen(
+                    pbuf.baseAddress, Int32(pbuf.count),
+                    obuf.baseAddress, Int32(obuf.count))
+            }
+        }
+        if written != required {
+            return classifyViaSwiftFallback(prompts: prompts)
+        }
+
+        return decodeMatchesWire(outBuf)
+        #else
         return classifyViaSwiftFallback(prompts: prompts)
+        #endif
+    }
+
+    /// Encode `[String]` into the Rust C ABI prompts wire format。
+    /// Public-internal so tests can verify the encoder。
+    internal static func encodePromptsWire(_ prompts: [String]) -> [UInt8] {
+        var buf: [UInt8] = []
+        var totalSize = 4
+        let utf8Promises: [[UInt8]] = prompts.map { Array($0.utf8) }
+        for p in utf8Promises { totalSize += 4 + p.count }
+        buf.reserveCapacity(totalSize)
+        appendU32LE(UInt32(prompts.count), to: &buf)
+        for p in utf8Promises {
+            appendU32LE(UInt32(p.count), to: &buf)
+            buf.append(contentsOf: p)
+        }
+        return buf
+    }
+
+    /// Decode the Rust C ABI output wire format into typed matches。
+    /// Each match is 12 bytes:prompt_index (u32 LE) + red_line_id
+    /// (u16 LE) + 2 padding bytes + pattern_index (u32 LE)。
+    internal static func decodeMatchesWire(_ buf: [UInt8]) -> [BASRedLineMatch] {
+        guard buf.count >= 4 else { return [] }
+        let count = readU32LE(buf, at: 0)
+        var matches: [BASRedLineMatch] = []
+        matches.reserveCapacity(Int(count))
+        let perMatch = 12
+        for i in 0..<Int(count) {
+            let off = 4 + i * perMatch
+            guard off + perMatch <= buf.count else { break }
+            let promptIndex = readU32LE(buf, at: off)
+            let redLineId = readU16LE(buf, at: off + 4)
+            let patternIndex = readU32LE(buf, at: off + 8)
+            // Category code = high nibble of red_line_id discriminant
+            let category = Int32(redLineId >> 4)
+            matches.append(BASRedLineMatch(
+                promptIndex: promptIndex,
+                redLineCategory: category,
+                redLineId: redLineId,
+                patternIndex: patternIndex))
+        }
+        return matches
+    }
+
+    // MARK: - Wire-format helpers
+
+    private static func appendU32LE(_ v: UInt32, to buf: inout [UInt8]) {
+        buf.append(UInt8(v & 0xFF))
+        buf.append(UInt8((v >> 8) & 0xFF))
+        buf.append(UInt8((v >> 16) & 0xFF))
+        buf.append(UInt8((v >> 24) & 0xFF))
+    }
+
+    private static func readU32LE(_ buf: [UInt8], at off: Int) -> UInt32 {
+        return UInt32(buf[off])
+            | (UInt32(buf[off+1]) << 8)
+            | (UInt32(buf[off+2]) << 16)
+            | (UInt32(buf[off+3]) << 24)
+    }
+
+    private static func readU16LE(_ buf: [UInt8], at off: Int) -> UInt16 {
+        return UInt16(buf[off]) | (UInt16(buf[off+1]) << 8)
     }
 }
+
+#if os(iOS) || os(macOS)
+
+// MARK: - @_silgen_name FFI binding for the Rust C ABI
+//
+// The XCFramework already exposes `bas_red_team_classify_batch`
+// via the umbrella module map (chapter 七百七十三 第二刀)。 An
+// `import BASRustMemoryTrackerBinary` would bring the symbol into
+// scope,but BASOrchestration doesn't import that module to keep
+// the leaf-discipline tidy。 @_silgen_name binds the symbol at
+// link time without crossing the module boundary。
+
+@_silgen_name("bas_red_team_classify_batch")
+private func _bas_red_team_classify_batch_silgen(
+    _ promptsBuf: UnsafePointer<UInt8>?,
+    _ promptsLen: Int32,
+    _ outMatchesBuf: UnsafeMutablePointer<UInt8>?,
+    _ outMatchesCapacity: Int32
+) -> Int32
+
+#endif
 
 // MARK: - Chapter 七百五十九 sub-arc scorecard pin
 //
@@ -258,13 +370,15 @@ extension BASRedTeamBatchClassifier {
         public static let measuredMaxSpeedupX: Int = 100
 
         /// Whether the Rust path is wired into the live Swift
-        /// bridge。 false at knife 5 (V1 Swift fallback live);
-        /// true once the XCFramework rebuild activates。
+        /// bridge。 Was false at chapter 七百五十九 第五刀 (V1
+        /// Swift fallback live);FLIPPED TRUE at chapter 七百七十七
+        /// / M2536 once the XCFramework rebuild activated the
+        /// symbol + cross-language byte-equality proven。
         public static let rustPathActive: Bool = {
-            #if BAS_RED_TEAM_RUST_PATH_ACTIVE
+            #if os(iOS) || os(macOS)
             return true
             #else
-            return false
+            return false  // watchOS / Linux still on Swift fallback
             #endif
         }()
     }
