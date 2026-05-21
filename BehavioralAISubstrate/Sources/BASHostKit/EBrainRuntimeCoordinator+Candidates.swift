@@ -22,11 +22,36 @@ extension BASEBrainRuntimeCoordinator {
         }
 
         let candidateIDs = thoughtFrame.candidates.map(\.candidateID)
-        let dominanceOrder = thoughtFrame.candidates
-            .sorted { lhs, rhs in
-                candidateDominanceScore(lhs) > candidateDominanceScore(rhs)
+        // chapter 八百三十八 / M2842 — L9 dominance order routed to
+        // Rust per chapter 837 5-axis verdict (Rust ~100× faster
+        // at 1K-10K scale,no axis worse-by->1.5×)。 The Swift
+        // legacy sort remains as the FALLBACK path (executed when
+        // Rust FFI unavailable on non-iOS/macOS or returns fault),
+        // honoring 「依旧 不删除 只 comment」 — body kept active for
+        // determinism contract,not just commented out。
+        let dominanceOrder: [String] = {
+            let scores: [Float] = thoughtFrame.candidates.map {
+                Float(candidateDominanceScore($0))
             }
-            .map(\.candidateID)
+            if let indices = BASAutoRouteRanker
+                .dreamLoopDominanceOrder(scores: scores) {
+                return indices.compactMap { idx -> String? in
+                    let i = Int(idx)
+                    guard i >= 0,
+                          i < thoughtFrame.candidates.count
+                    else { return nil }
+                    return thoughtFrame.candidates[i].candidateID
+                }
+            }
+            // Swift legacy fallback (V1 implementation,kept active
+            // per 「依旧 不删除 只 comment」 + cross-platform safety)
+            return thoughtFrame.candidates
+                .sorted { lhs, rhs in
+                    candidateDominanceScore(lhs)
+                        > candidateDominanceScore(rhs)
+                }
+                .map(\.candidateID)
+        }()
         let reversiblePaths = thoughtFrame.candidates
             .filter { $0.reversibility >= 0.6 }
             .map(\.candidateID)
