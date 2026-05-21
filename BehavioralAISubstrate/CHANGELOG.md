@@ -9,6 +9,77 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
+## [0.59.0] — 2026-05-21 — STORAGE COMPLETION ARC
+
+Tag covers chapters 七百八十七 → 七百九十七 / M2586-M2640
+(11-chapter arc completing the full L5/L6/L7/L8 SQLite-backed
+storage adapter stack)。
+
+### Added — 6 storage adapter pairs (12 actors total)
+
+For each of 6 ledger schemas:protocol seam +
+BASInMemory*Store reference actor + BASSQLite*Store production
+conformer:
+
+| Schema | Layer | Adapter pair |
+|--------|-------|--------------|
+| 011_unknown_ledger_records      | L7 | unknown |
+| 012_contradiction_ledger_records | L7 | contradiction |
+| 013_presence_observations       | L6 | presence |
+| 014_host_constitution_version_tree | L5 | version-tree |
+| 015_host_constitution_deletion_manifest | L5 | deletion-manifest |
+| 023_atom_lifecycle_events       | L8 | atom-lifecycle |
+
+All SQLite stores share:
+- Owned SQLite handle in actor (WAL + sync NORMAL)
+- PRAGMA user_version schemaVersion branch
+- Auto-applied schema from BASSQLSchemaGen-emitted constant
+  (whole-blob exec to handle comment-embedded semicolons)
+- Insertion-order queries (ORDER BY timestamp ASC, rowid ASC)
+- Typed StorageError enum + duplicate ID detection
+- Cross-mirror equivalence with InMemory reference proven
+
+### Added — L8 atom-lifecycle storage adapter end-to-end
+
+Built on the chapter 七百八十二-七百八十四 Rust crate + bridge +
+SQL schema foundation:
+- Cold-restart replay integration test through JSON snapshot
+- Cold-restart through SQLite real DB (write → close → reopen
+  → reconstruct identical state)
+
+### Added — 5-axis perf framework + scale-test cascade
+
+- BASCrossLanguagePerfHarness (chapter 七百七十八):reusable
+  STRONG-FLIP/MODEST-FLIP/TIE/LOSS verdict harness
+- Chapter 七百八十七 ran the 3 TIE crates from 七百七十九 at
+  N=100/1000/10000:**honest negative — no new flip signals**
+
+### Honest negative results held
+
+- TIE re-measure at scale (chapter 七百八十七):no reproducible
+  flip signal for host-constitution / lease-life / mirror-blade
+  beyond noise jitter
+- bas-atom-lifecycle showed 3.48× at N=100 but TIE at larger N
+  → likely cache warmup,not real signal → stays opt-in
+
+### Bug fix
+
+- SQLite store schema-exec splitter:was using
+  `.split(separator: ";")` which broke when schema comment
+  headers embed semicolons in narrative text (e.g。 "Default 0;
+  flipped to 1 when…")。 All 6 stores now use `sqlite3_exec` on
+  the whole multi-statement blob — SQLite handles it natively。
+
+### Architecture milestones
+
+- **Storage adapter pairs:** 0 → 6 (full L5/L6/L7/L8 coverage)
+- **SQLite-backed actors:** 0 → 6
+- **Cumulative storage test surface:** 48 tests
+- **「不要 删除 只能 comment」 doctrine** held throughout:
+  6 InMemory reference impls remain the documented live defaults
+
+---
+
 ## [Unreleased] — Post-v0.58.0 (chapters 七百八十七-七百九十一)
 
 ### Added
