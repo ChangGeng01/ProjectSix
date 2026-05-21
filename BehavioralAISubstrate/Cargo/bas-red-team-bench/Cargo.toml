@@ -39,9 +39,10 @@ name = "bas_red_team_bench"
 path = "src/lib.rs"
 
 [dependencies]
-# No external dependencies。 Pure substring matching against
-# compile-time patterns。 Future SIMD ports can adopt the
-# `aho-corasick` crate (already used by ripgrep) for a single
-# pass over each prompt;deferred to knife 四 (perf measurement)
-# pending evidence that the naive .contains()-per-pattern path
-# isn't fast enough。
+# chapter 八百五十四 / M2921 — rayon for parallel batch classify。
+# Per Phase A measurement (chapter 八百五十二),rayon scatter
+# patterns can be costly。 For red-team-bench the parallelism is
+# CLEANER:each prompt is independently classified into its own
+# Vec of matches,then concat。 No shared mutable state,no
+# per-task heap reuse needed beyond what rayon already does。
+rayon = "1.10"
