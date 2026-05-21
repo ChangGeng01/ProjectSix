@@ -97,14 +97,12 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
         }
 
         // Run schema 023 CREATE statements (idempotent — IF NOT EXISTS)。
-        for stmtSQL in
-            AtomLifecycleEventsSchema.allStatementsSQL.split(
-                separator: ";"
-            ).map({ String($0).trimmingCharacters(
-                in: .whitespacesAndNewlines)
-            }).filter({ !$0.isEmpty }) {
-            try Self.runExec(db: handle, sql: stmtSQL + ";")
-        }
+        // sqlite3_exec handles multi-statement SQL natively;don't
+        // split on `;` because schema comment headers may embed
+        // semicolons in narrative text (e.g。 "default 0;flipped to
+        // 1 when…")。
+        try Self.runExec(db: handle,
+            sql: AtomLifecycleEventsSchema.allStatementsSQL)
     }
 
     deinit {
