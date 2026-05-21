@@ -11,6 +11,99 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Mamba SSM scan multi-thread mini-arc (chapter 八百五十二 / M2911-M2915)
+
+User directive 「全面 开发 mamba 多线程」 — Phase A of the
+multi-phase arc per plan /Users/changgeng/.claude/plans/wild-rolling-meerkat.md。
+
+Audit finding (chapter 八百五十 prep work): the chapter 六百七十七-六百八十二
+Mamba SSM scan kernel was already production-shipped — Metal GPU + Swift
+CPU reference + 194 tests passing。 **CPU fallback was single-threaded
+only.** This mini-arc adds a Rust mirror (sequential + rayon-parallel)
+as a faster CPU alternative。
+
+### What shipped
+
+```
++ Cargo/bas-mamba-scan/                                          (NEW crate)
+  - Cargo.toml + rayon = "1.10"
+  - src/lib.rs (~600 LOC):
+    - MambaScanShape + scan_sequential + scan_parallel
+    - bas_mamba_scan_sequential + bas_mamba_scan_parallel C ABI
+    - 26 Rust unit tests (11 sequential + 5 parallel + 5 C ABI
+      + 5 edge cases)
+~ Cargo/Cargo.toml                                               (workspace member)
+~ Cargo/bas-memory-usage-tracker/Cargo.toml                      (+dep)
+~ Cargo/bas-memory-usage-tracker/include/bas_rust_memory_tracker.h (+2 C decls)
+~ Cargo/bas-memory-usage-tracker/src/force_link.rs               (+2 anchors)
+~ Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework/     (3 slices rebuilt)
+~ Sources/BASRuntimeCore/BASAutoRouteRanker.swift                (+2 bridges)
+
++ Tests/BehavioralAISubstrateTests/BASChapter852MambaScanBridgeTests.swift  (6 tests)
++ Tests/BehavioralAISubstrateTests/BASChapter852MambaScanPerfTests.swift    (4 tests)
+```
+
+### Honest measurement verdict
+
+Chapter 852 第四刀 measured at 3 scales (B=1/4/8 × L=64/128/256 × D=32/128/256):
+
+| Scale | Cells | Swift CPU | Rust Seq | Rust Par | Winner |
+|---|---|---:|---:|---:|---|
+| tiny | 2,048 | 401.6 µs | **9.4 µs** | 1,764 µs | Rust Seq (42×) |
+| medium | 65,536 | 12,502 µs | **913 µs** | 4,026 µs | Rust Seq (14×) |
+| large | 524,288 | 107,658 µs | **6,837 µs** | 10,827 µs | Rust Seq (16×) |
+
+Two findings:
+
+1. **Rust sequential is 14-42× faster than Swift CPU reference**
+   — STRONG-FLIP candidate for the SSM CPU fallback path。 Swift's
+   `expf` call + small-loop overhead is genuinely worse than Rust's
+   optimized release build。
+
+2. **Rust parallel-as-implemented is SLOWER than Rust sequential
+   at all scales** — the chapter 852/2 scatter algorithm uses
+   `Vec<((usize, usize), Vec<(usize, f32)>)>` per-task heap allocation
+   which dominates inner-loop work。 The parallel impl needs rework
+   (unsafe direct writes via rayon::scope, OR channel-major layout
+   transpose) before flipping to default。
+
+### Recommendation per 5-axis framework
+
+   - **`BASAutoRouteRanker.mambaScanSequential`** — production-ready,
+     opt-in default exposed via Swift API。 14-42× faster than Swift
+     CPU reference at all measured scales。 Byte-equal to Swift
+     reference within 1e-5 (chapter 392 IEEE tolerance)。
+   - **`BASAutoRouteRanker.mambaScanParallel`** — kept opt-in but
+     documented as「needs rework」。 Current scatter algorithm
+     dominates inner-loop work。 Future chapter triggers:
+       (a) when MambaScan is invoked at very large B × D
+       (b) when a host requires CPU-only execution at scale
+       (c) when rayon::scope-based direct-write refactor is funded
+   - **Metal GPU path** (chapter 六百七十七 `BASMetalSSMScanKernel`)
+     remains the primary production runtime on Apple Silicon。
+   - **Swift CPU reference** (chapter 六百七十八 `BASSSMScanCPUReference`)
+     remains as byte-equality oracle + non-Apple fallback。
+
+### Test deltas
+
+13,272 → **13,287** Swift tests (+15 across chapters 852 第三刀 + 第四刀)。
+Cargo workspace: 29 → 50 Rust unit tests (+21 from bas-mamba-scan)。
+
+### Discipline pins held
+
+- 不变量 #1/#2/#3 preserved every knife
+- 红线 7 — additive crate + bridges,Swift CPU reference unchanged
+- 不要 删除 只能 comment — no deletions
+- ADR-014 OPT-IN — both Rust paths exposed via opt-in API,
+  Swift CPU reference still the default for that code path
+- 整体 性能 效果 一定要 更好 — Rust seq STRONG WIN (14-42×)
+- 多做比较 — 3-scale grid × 3 implementations + 6 byte-eq tests
+- 亏的不要硬上 — Rust parallel correctly declined for default flip
+  given current scatter implementation
+- god-file pinned override — no new files past warn
+
+---
+
 ### Close remaining Agent-B-review gaps + concurrent-safety bug fix (chapter 八百五十一 / M2906-M2910)
 
 Per 「尽力 开发」 directive,close the 3 remaining gaps from

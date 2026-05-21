@@ -94,6 +94,14 @@ chapter 八百四十八: ~87% Swift (raw) / 13.1% native (raw)
                   per-turn claim from chapter 八百四十二 was
                   conservative at large scale, overstated at
                   small/medium scale — corrected in CHANGELOG)
+chapter 八百五十二: ~87% Swift (raw) / 13.3% native (raw)
+                  (NEW bas-mamba-scan Rust crate ~600 LOC +
+                  21 Rust unit tests + 10 Swift bridge tests.
+                  Rust sequential measured 14-42× faster than
+                  Swift CPU reference at all scales tested.
+                  Rust parallel-as-implemented declined per
+                  「亏的不要硬上」 — scatter algorithm has wrong
+                  memory pattern, needs rework before flip.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
