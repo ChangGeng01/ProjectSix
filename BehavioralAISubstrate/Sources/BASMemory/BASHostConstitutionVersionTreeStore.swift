@@ -105,6 +105,18 @@ public actor BASInMemoryHostConstitutionVersionTreeStore:
     }
 
     public func count() async -> Int { versions.count }
+
+    // MARK: - Batch append (chapter 八百六 — API symmetry)
+
+    @discardableResult
+    public func appendBatch(
+        _ versions: [BASHostConstitutionVersionRecord]
+    ) async throws -> [BASHostConstitutionVersionRecord] {
+        for version in versions {
+            _ = try await appendVersion(version)
+        }
+        return versions
+    }
 }
 
 // MARK: - SQLite-backed conformer
@@ -251,6 +263,74 @@ public actor BASSQLiteHostConstitutionVersionTreeStore:
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
         return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    // MARK: - Batch append (chapter 八百六)
+
+    @discardableResult
+    public func appendBatch(
+        _ versions: [BASHostConstitutionVersionRecord]
+    ) async throws -> [BASHostConstitutionVersionRecord] {
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1, message: "db handle nil")
+        }
+        if versions.isEmpty { return [] }
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        let sql = """
+            INSERT INTO host_constitution_version_tree (
+                version_id, vault_id, parent_version_id,
+                created_at_ms, signature_hash, is_rollback_point,
+                merged_from_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+                == SQLITE_OK, let stmt else {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        for version in versions {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            Self.bindText(stmt, 1, version.versionID)
+            Self.bindText(stmt, 2, version.vaultID)
+            if let parent = version.parentVersionID {
+                Self.bindText(stmt, 3, parent)
+            } else {
+                sqlite3_bind_null(stmt, 3)
+            }
+            sqlite3_bind_int64(stmt, 4, version.createdAtMs)
+            version.signatureHash.withUnsafeBytes { bytes in
+                sqlite3_bind_blob(stmt, 5,
+                    bytes.baseAddress,
+                    Int32(version.signatureHash.count),
+                    Self.SQLITE_TRANSIENT)
+            }
+            sqlite3_bind_int(stmt, 6,
+                version.isRollbackPoint ? 1 : 0)
+            if let merged = version.mergedFromJson {
+                Self.bindText(stmt, 7, merged)
+            } else {
+                sqlite3_bind_null(stmt, 7)
+            }
+            let rc = sqlite3_step(stmt)
+            if rc != SQLITE_DONE {
+                try? Self.runExec(db: db, sql: "ROLLBACK;")
+                if rc == SQLITE_CONSTRAINT {
+                    throw StorageError.duplicateVersionID(
+                        version.versionID)
+                }
+                throw StorageError.stepFailed(
+                    sql: sql,
+                    message: String(cString: sqlite3_errmsg(db)))
+            }
+        }
+        try Self.runExec(db: db, sql: "COMMIT;")
+        return versions
     }
 
     private func queryVersions(

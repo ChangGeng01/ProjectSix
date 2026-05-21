@@ -91,6 +91,18 @@ public actor BASInMemoryPresenceObservationStore:
     }
 
     public func count() async -> Int { records.count }
+
+    // MARK: - Batch append (chapter 八百六 — API symmetry)
+
+    @discardableResult
+    public func appendBatch(
+        _ records: [BASPresenceObservationRecord]
+    ) async throws -> [BASPresenceObservationRecord] {
+        for record in records {
+            _ = try await appendRecord(record)
+        }
+        return records
+    }
 }
 
 // MARK: - SQLite-backed conformer
@@ -212,6 +224,59 @@ public actor BASSQLitePresenceObservationStore:
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
         return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    // MARK: - Batch append (chapter 八百六)
+
+    @discardableResult
+    public func appendBatch(
+        _ records: [BASPresenceObservationRecord]
+    ) async throws -> [BASPresenceObservationRecord] {
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1, message: "db handle nil")
+        }
+        if records.isEmpty { return [] }
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        let sql = """
+            INSERT INTO presence_observations (
+                event_id, session_id, turn_id, channel_kind,
+                salience, confidence, observed_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+                == SQLITE_OK, let stmt else {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        for record in records {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            Self.bindText(stmt, 1, record.eventID)
+            Self.bindText(stmt, 2, record.sessionID)
+            Self.bindText(stmt, 3, record.turnID)
+            Self.bindText(stmt, 4, record.channelKind)
+            sqlite3_bind_double(stmt, 5, record.salience)
+            sqlite3_bind_double(stmt, 6, record.confidence)
+            sqlite3_bind_int64(stmt, 7, record.observedAtMs)
+            let rc = sqlite3_step(stmt)
+            if rc != SQLITE_DONE {
+                try? Self.runExec(db: db, sql: "ROLLBACK;")
+                if rc == SQLITE_CONSTRAINT {
+                    throw StorageError.duplicateEventID(
+                        record.eventID)
+                }
+                throw StorageError.stepFailed(
+                    sql: sql,
+                    message: String(cString: sqlite3_errmsg(db)))
+            }
+        }
+        try Self.runExec(db: db, sql: "COMMIT;")
+        return records
     }
 
     private func queryRecords(
