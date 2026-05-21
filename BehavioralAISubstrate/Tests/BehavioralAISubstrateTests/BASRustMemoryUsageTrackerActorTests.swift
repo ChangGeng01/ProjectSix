@@ -114,14 +114,13 @@ final class BASRustMemoryUsageTrackerActorTests:
     }
 
     func testMacosArm64SliceSHA256Pin() {
-        // M2191 chapter 七百七 第一刀 — bumped because
-        // build script switched Homebrew rustc (1.95.0)
-        // → rustup-managed stable rustc。 Reproducibility
-        // invariant within the new toolchain preserved
-        // (2 clean rebuilds yield byte-identical .a)。
+        // History:
+        //   - M2191 chapter 七百七 第一刀: rustup toolchain switch
+        //   - chapter 七百七十三 第二刀: 12 → 20 crate bundle
+        //     (DEEPER LAYER-MIGRATION ARC XCFramework rebuild)
         XCTAssertEqual(
             BASRustCoreBridge.macosArm64SliceSHA256,
-            "9abcda722a4abb23b6607375004c82c62f12ff75b495e87ed69c6d1c9cd4f3aa",
+            "b75b149b6788b7df3d7d92687ede344e859601e6acc41c033c52ff1f2e61ad64",
             "Chapter 七百一 RED FLAG #1 reproducibility-" +
             "verification pin。 If this hash changes," +
             "a future commit rebuilt the XCFramework " +
@@ -129,19 +128,20 @@ final class BASRustMemoryUsageTrackerActorTests:
             "a doctrine review trigger。")
     }
 
-    // MARK: - M2191 NEW iOS-slice pins (chapter 七百七)
+    // MARK: - M2191 NEW iOS-slice pins (chapter 七百七);
+    //         bumped again at chapter 七百七十三 第二刀
 
     func testIosArm64SliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SliceSHA256,
-            "57a30761eb30bebec1666563736594d5f72e61ff09749f57509e711ddfa7aa0f",
+            "9e475199ef6ecb12c399f849808600483faf9eab984a351ed4624df9281e6b02",
             "iOS device slice byte-equality pin。")
     }
 
     func testIosArm64SimulatorSliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
-            "ed329d3fc2d60609dbda10f04226b3d2848d2e53b687bba071cd264f8f198702",
+            "77b45954a2a1ca7ba184b78ff2968262c2a1256fa7d2423b8b840e4f0183bb39",
             "iOS simulator slice byte-equality pin。")
     }
 

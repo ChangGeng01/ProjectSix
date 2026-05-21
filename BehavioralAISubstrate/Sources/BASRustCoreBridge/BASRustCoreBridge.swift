@@ -111,30 +111,27 @@ public enum BASRustCoreBridge {
     ]
 
     /// XCFramework macos-arm64 slice byte-equality
-    /// SHA256。 Bumped at M2191 chapter 七百七 第一刀
-    /// because the build script switched from Homebrew
-    /// rustc (1.95.0) to rustup-managed stable rustc
-    /// (the only path that has the iOS cross-compile
-    /// targets installed)。 Reproducibility invariant
-    /// preserved within the new toolchain (2 clean
-    /// rebuilds yield byte-identical .a)。
+    /// SHA256。 Bumped at chapter 七百七十三 第二刀 during
+    /// the DEEPER LAYER-MIGRATION ARC XCFramework rebuild
+    /// activation (bundles 8 new Rust crates + 3 new C
+    /// headers into the staticlib)。
+    ///
+    /// History:
+    ///   - M2191 chapter 七百七 第一刀: rustup toolchain switch
+    ///   - chapter 七百七十三 第二刀: 12 → 20 crate bundle
     public static let macosArm64SliceSHA256: String =
-        "9abcda722a4abb23b6607375004c82c62f12ff75b495e87ed69c6d1c9cd4f3aa"
+        "b75b149b6788b7df3d7d92687ede344e859601e6acc41c033c52ff1f2e61ad64"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
-    /// Captured at M2191 chapter 七百七 第一刀 during
-    /// the 3-slice rebuild via the rustup-managed stable
-    /// rustc toolchain。 Reproducibility verified across
-    /// 2 clean rebuilds。
+    /// Bumped at chapter 七百七十三 第二刀 (same rebuild as
+    /// macos-arm64 above)。
     public static let iosArm64SliceSHA256: String =
-        "57a30761eb30bebec1666563736594d5f72e61ff09749f57509e711ddfa7aa0f"
+        "9e475199ef6ecb12c399f849808600483faf9eab984a351ed4624df9281e6b02"
 
     /// XCFramework ios-arm64-simulator slice byte-
-    /// equality SHA256。 Captured at M2191 chapter 七百七
-    /// 第一刀。 Reproducibility verified across 2 clean
-    /// rebuilds。
+    /// equality SHA256。 Bumped at chapter 七百七十三 第二刀。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "ed329d3fc2d60609dbda10f04226b3d2848d2e53b687bba071cd264f8f198702"
+        "77b45954a2a1ca7ba184b78ff2968262c2a1256fa7d2423b8b840e4f0183bb39"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests
