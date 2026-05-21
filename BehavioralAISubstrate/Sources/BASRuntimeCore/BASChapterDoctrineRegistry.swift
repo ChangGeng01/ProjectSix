@@ -71,6 +71,75 @@ public enum BASChapterDoctrineRegistry {
     // is PRESERVED below as `// `-prefixed line comments per
     // 「目前 千万不要 删除 只能 commented 代码」 directive。
 
+    // MARK: - chapter 八百二十五 / M2776-M2780 — REGISTRY DORMANCY NOTICE
+    //
+    // ## What happened
+    //
+    // The chapter doctrine registry has been dormant since
+    // **chapter 七百三十四** (commit 7b3141a0,「13-file sync +
+    // 10th actor-contract pillar sealed」)。 No new chapter has
+    // been added to either:
+    //
+    //   - this Swift file's inline records (last live entry was
+    //     chapter 466 — entries 464/465/466 ship as 内联 literals
+    //     above; everything between 467 and 734 lives in SQL data)
+    //   - `SQL/012_chapter_doctrine_phase2_data.sql` (last entry
+    //     row_id=268,chapter 七百三十四)
+    //
+    // Between chapter 七百三十五 and the chapter 八百二十五 (this
+    // note) the project shipped 4 release tags (v0.56.0 / v0.57.0
+    // / v0.58.0 / v0.59.0) and is now building a v0.60.0 / v0.61.0
+    // candidate — none of which restored the per-chapter
+    // registry-pin discipline。
+    //
+    // ## Why this is documented but NOT「fixed」
+    //
+    // The wild-rolling-meerkat plan called this registry「sole
+    // source-of-truth」 — but the actual project trajectory has
+    // moved most chapter pinning into:
+    //
+    //   - CHANGELOG.md `[Unreleased]` + `[X.Y.Z]` sections
+    //   - per-commit Conventional-Commit bodies
+    //     (`feat(chapter 八百二十一 / M2756-M2760): ...`)
+    //   - per-file MARK comments
+    //     (`// MARK: - BASRoutedAuditReplayEngine\n// chapter ...`)
+    //
+    // These three locations carry the practical doctrine surface
+    // for chapters 七百三十五-八百二十四。 The SQL-backed
+    // `chapterDoctrineCollections` is consumed by `Registry.all`
+    // (line 78) for the audit-trail use case;but no production
+    // code currently reads doctrine for chapters past 七百三十四,
+    // so the dormancy hasn't broken any consumer。
+    //
+    // Adding 87+ retroactive entries would require ~2500 SQL
+    // INSERT statements (per-chapter records + knives + entropy
+    // classes + pins + planned_cuts) AND would force re-validation
+    // against `phase2ChapterCount = 330` expectation in
+    // `BASSweepDoctrineExpectations.swift` which currently
+    // matches reality with 269 SQL rows + Swift literals;a
+    // mismatched count breaks proof tests。
+    //
+    // ## Restoration path (when someone wants to revive)
+    //
+    //   1. Confirm `phase2ChapterCount` expectation is still
+    //      accurate vs `BASChapterDoctrineSQLLoader
+    //      .chapterDoctrineCollections.phase2.count`。
+    //   2. Decide:back-fill 87 missing chapters OR start fresh
+    //      at the next chapter going forward。
+    //   3. If back-filling:write Python extractor that scrapes
+    //      per-commit body + CHANGELOG entries to auto-generate
+    //      SQL INSERTs。 Update `phase2ChapterCount` accordingly。
+    //   4. If starting fresh:add `INSERT INTO chapter_doctrine_
+    //      records VALUES (1, 269, 'phase2', ...)` for the
+    //      current chapter,bump `phase2ChapterCount`,and
+    //      establish a per-chapter close-out discipline going
+    //      forward。
+    //
+    // 严查 chapter 八百二十五 verdict:dormancy is REAL but
+    // ACCEPTED — substituted by CHANGELOG + Conventional-Commit
+    // + per-file MARK discipline。 Production functionality
+    // unaffected。 Restoration is OPTIONAL,not blocking。
+
     /// chapter 七百二 第二刀 active surface — SQL-backed (literals + phase2)。
     public static let all: [BASChapterDoctrineRecord] = {
         let p = BASChapterDoctrineSQLLoader
