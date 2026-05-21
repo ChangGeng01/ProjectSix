@@ -9,15 +9,24 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — v0.61.0 candidate / STORAGE ACTIVATION + AUDIT REPLAY + 严查 + 极致 轻量化 + adopter docs
+## [Unreleased]
 
-Tag candidate: v0.61.0。 Covers chapters 七百九十八 → 八百三十 /
-M2641-M2805 (33-chapter combined mini-arc completing storage adapter
-activation,batch optimization,audit replay/diff/archive evolution,
-sequential 全量审查 + 严查 reviews + remediation,doctrine cluster
-archival,operational polish,host adopter documentation)。
+(post-v0.61.0 work lands here)
 
-### Seven sub-arcs
+---
+
+## [0.61.0] — 2026-05-21 — STORAGE ACTIVATION + AUDIT REPLAY + 严查 + 极致 轻量化 + forwarder migration + adopter docs
+
+Tag covers chapters 七百九十八 → 八百三十三 / M2641-M2820
+(36-chapter combined arc completing storage adapter activation,
+batch optimization,audit replay/diff/archive evolution,
+sequential 全量审查 + 严查 reviews + remediation,doctrine
+cluster archival (~45.6K LOC moved to Archive/Deactivated/),
+forwarder migration (9/9 chapter forwarders archived),
+operational polish (CI hook + CONTRIBUTING),host adopter
+documentation,final ship)。
+
+### Eight sub-arcs
 
 1. **Recording activation** (chapters 七百九十八-八百二):4 routed-
    recorder utilities turn v0.59.0 storage adapters into production-
@@ -88,18 +97,39 @@ archival,operational polish,host adopter documentation)。
      read-only registry / functional doctrine = active §13.2
      metrics。
 
+8. **Forwarder migration mini-arc 5 + final ship** (chapters
+   八百三十一-八百三十三):
+   - Chapter 八百三十一: audit revealed 3/9 forwarders truly
+     orphan after filtering SQL data file text mentions (vs the
+     initial 3-6 real-src-ref headline)。 Archived
+     BASChapter527 / BASChapter511To520 / BASChapter511To522
+     (802 LOC)。
+   - Chapter 八百三十二: BREAKTHROUGH — the remaining 6
+     forwarders' refs turned out to be STRING-LITERAL mentions
+     only (consumers list typename in pin-arrays as strings,
+     never invoke the static surface)。 All 6 archive-safe via
+     `git mv`:BASChapter677 / 678 / 679 / 680 / 681 / 683
+     (2,133 LOC)。 Mini-arc 5 100% complete:9/9 forwarders
+     retired from Sources/+Tests/。
+   - Chapter 八百三十三 (this seal):promote [Unreleased] →
+     [0.61.0],extend BRANCH_SUMMARY.md through chapter 832,
+     final full sweep verification,annotated v0.61.0 tag
+     creation + push。
+
 ### Cumulative measurements
 
 | Metric | Pre-v0.59.0 | Now | Δ |
 |---|---:|---:|---|
-| Sources/ LOC | ~300K | 264K | -35K (-12%) |
+| Sources/ LOC | ~300K | 262,535 | -37,453 (-12.5%) |
 | Top god-file LOC | 25,215 | 3,603 | -21,612 |
+| Active *Doctrine* sources | 193 | 184 | -9 (mini-arc 5) |
 | Native % (raw LOC) | 11.67% | 13.01% | +1.34pp |
 | Native % (exec-LOC) | 16.16% | 16.12% | -0.04pp (stable in honest range) |
 | Rust crates | 12 | 22 | +10 |
 | SQL schemas | 10 | 29 | +19 |
-| Tests (full sweep) | ~13,170 | 13,408 | +238 |
+| Tests (full sweep) | ~13,170 | 13,211 | +41 net (recorders +95,docs archive -54) |
 | 0-failure sweep | yes | yes | preserved |
+| Archive/Deactivated/ LOC | 0 | ~45.6K | dormancy moved out |
 | Cargo warnings | 5 (pre-existing) | 0 | -5 |
 | Production-default Rust flips | 12 | 14-16 | +2-4 |
 | CI gates | 0 (planned, not shipped) | 3 (wired) | +3 |

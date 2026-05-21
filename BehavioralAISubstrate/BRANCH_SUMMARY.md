@@ -23,6 +23,13 @@ This branch covers **SEVEN contiguous sub-arcs** that landed together:
 | Layer migration | 七百三十八-七百四十九 | 6 layer sub-arcs (L11/L10/L14/L3/L2/L9) per user directive 「完全 移植 if WHOLE is better」 — Rust takes hot paths + state machines + persistence + audit math, Swift retains façade / Apple-glue / public API. 5-axis comparison framework + forward-looking ports (no Swift production code touched). |
 | Maturation | 七百五十-七百五十七 | Production-default Rust flips (L14 chain seal + verdict engine) + SDK-readiness polish + crash contracts + per-file god-files override |
 | **Deeper layer migration** | **七百五十八-七百七十三** | **16-chapter arc executing the 严苛结论 table for 9 remaining migration items: L11 deeper (red-team batch + GSI sentinel), L1 partial (C probes + Rust budget), L12 rule-judgment, L7 Mirror Blade (state machine + SQL ledgers), L6 Presence Eye (fusion classifier + SQL), L5 Host Constitution (version tree + deletion manifest), L4 World Prior (4 SQL + Rust loader), L13 Phase 1 Swift refactor, L14 C ABI deeper. 8 new Rust crates, 9 new SQL schemas, 1 protocol-extraction refactor.** |
+| Post-flip production activation | 七百七十四-七百八十六 | bas-shadow-trial Rust port (L13 Phase 2), production-default Rust flips (red-team + presence + world-prior + shadow-trial), bas-atom-lifecycle (L8 hot path), cross-platform fallback validation, v0.58.0 |
+| Storage completion | 七百八十七-七百九十七 | 6 SQLite-backed storage adapters (L5/L6/L7/L8), schema 011/012/013/014/015/023 actors, cold-restart proven across all 6, v0.59.0 |
+| Recording activation | 七百九十八-八百二 | 4 routed-recorder utilities (L5/L6/L7/L8) turning storage adapters into production-ready opt-in side channels; v0.60.0 candidate |
+| Storage batch optimization | 八百三-八百七 | Transaction-wrapped appendBatch on all 6 SQLite stores (3-38× speedup measured); InMemory vs SQLite perf scorecard |
+| Audit replay evolution | 八百八-八百二十 | BASAuditPipeline composition root + BASAuditReplayEngine + cross-session diff + per-turn compression + 100-turn stress + per-session aggregation + time-window helpers |
+| 严查 整改 + 极致 轻量化 | 八百二十一-八百二十九 | Sequential 全量审查 + 严查 reviews + 4 HIGH + 6 MEDIUM remediation; ~43K LOC dormant doctrine archived (registry literal block + #if false dead bodies); 3 CI gates restored + git pre-commit hook + CONTRIBUTING.md |
+| **v0.61.0 final ship** | **八百三十-八百三十三** | **INTEGRATION_AUDIT.md adopter doc + naming clarification + forwarder migration (9/9 archived via string-literal-ref breakthrough) + v0.61.0 tag** |
 
 ## Native % trajectory
 
@@ -34,6 +41,35 @@ chapter 七百十五: ~90% Swift / 10% native (Metal batched)
 chapter 七百二十: ~89.5% Swift / 10.5% native (hex coverage)
 chapter 七百三十: ~89.5% Swift / 10.5% native (aggressive arc
                   added capabilities, not raw LOC)
+chapter 七百八十:  ~85% Swift / 15% native (12 Rust crates + 11 SQL)
+chapter 七百九十七: ~86% Swift / 14% native (storage adapters
+                  expanded SQL %, v0.59.0)
+chapter 八百二十:  ~84% Swift / 16% native (audit pipeline
+                  + recorders shipped, v0.61.0 candidate)
+chapter 八百三十三: ~87% Swift (raw) / 13.01% native (raw)
+                  ~84% Swift (exec) / 16.12% native (exec)
+                  (post 极致 轻量化 archive — Swift % bumped
+                  via comment-cleanup, exec ratio stable
+                  in the honest 16-18% range)
+```
+
+## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
+
+```
+Branch tip:    phase-5-chapter-758-deeper-layer-migration-arc
+Commits:       ~1330 cumulative (~36 since v0.59.0)
+Tests:         13,211 pass / 30 skipped / 0 failures (92s sweep)
+Sources LOC:   262,535 (was 299,988 — 12.5% slimmer via archive)
+Rust crates:   22 (was 12 at v0.56.0)
+SQL schemas:   29 (was 10 at v0.56.0)
+CI gates:      3 (wired as git pre-commit hook)
+Archive/:      ~45.6K LOC dormant doctrine moved out of live tree
+Top god-file:  BASCognitiveBrain @ 3,603 LOC (was 25,215 LOC
+               BASChapterDoctrineRegistry pre-archive)
+Doctrine pins: 9 substrate-wide pins held (不变量 #1/#2/#3,
+               红线 7, ADR-014 OPT-IN, 不要 删除 只能 comment /
+               不要 的 部分 都 archive, 不要 json 可以的话 就 sql,
+               整体 性能 效果 一定要 更好, 亏的不要硬上, 多做比较)
 ```
 
 ## Production-default flips (9 total)
