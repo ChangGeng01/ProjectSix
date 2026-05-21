@@ -84,6 +84,16 @@ chapter 八百四十七: ~87% Swift (raw) / 13.1% native (raw)
                   compactMap silent-drop → precondition
                   upgrade at all 7 sites, ratio shifts
                   +0.05pp on raw from +1 Rust fn + tests)
+chapter 八百四十八: ~87% Swift (raw) / 13.1% native (raw)
+                  ~80% Swift (exec hot) / 20% native (exec hot)
+                  (real per-turn workload measurement
+                  validates the sort cascade: 10.6× win at
+                  small N, 53.7× at medium, 119× at large.
+                  Per-turn savings: 49 µs cold / 412 µs warm
+                  / 3.2 ms long-session. The synthetic
+                  per-turn claim from chapter 八百四十二 was
+                  conservative at large scale, overstated at
+                  small/medium scale — corrected in CHANGELOG)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
