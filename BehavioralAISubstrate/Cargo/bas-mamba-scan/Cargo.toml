@@ -57,3 +57,10 @@ rust-version.workspace = true
 crate-type = ["staticlib", "rlib"]
 name = "bas_mamba_scan"
 path = "src/lib.rs"
+
+# chapter 八百五十二 第二刀 / M2912 — rayon for outer (b, d)
+# parallelism。 Mirrors the Metal GPU dispatch grid (B, D, 1)
+# where each thread independently handles one (batch, channel)
+# pair。 The inner L-recurrence stays sequential per thread。
+[dependencies]
+rayon = "1.10"

@@ -177,6 +177,130 @@ pub fn scan_sequential(
     Ok(y)
 }
 
+// MARK: - Parallel scan (knife 2 — rayon over (b, d))
+
+/// Same math as `scan_sequential` but parallel over the
+/// outer `(b, d)` loop via rayon。 Each `(b, d)` pair is
+/// an independent rayon task running the inner L
+/// recurrence sequentially。 Mirror of the Metal GPU
+/// dispatch grid `(B, D, 1)`。
+///
+/// Byte-equality with `scan_sequential` is GUARANTEED by
+/// construction:
+///   - No cross-thread reductions (each output cell
+///     depends only on its own (b, d) thread's h state)
+///   - Sequential reduction over time within each thread
+///     (FP order preserved per cell)
+///   - Output cells written to disjoint indices (no
+///     racing,no atomic merge)
+///
+/// FMA-reorder concern: none。 The inner-loop math
+/// `h = exp(δ·A) · h + (δ·B) · x` is the same in both
+/// paths,executed in the same order per cell。
+///
+/// Performance:embarrassingly parallel across (B × D)
+/// independent threads。 Real speedup measured in knife 4
+/// at various B/D/L sizes。
+pub fn scan_parallel(
+    x: &[f32],
+    delta: &[f32],
+    a: &[f32],
+    b_proj: &[f32],
+    c_proj: &[f32],
+    shape: MambaScanShape,
+) -> Result<Vec<f32>, MambaScanError> {
+    use rayon::prelude::*;
+
+    let bld = shape.element_count();
+    let d_count = shape.d as usize;
+
+    // Validation — identical to sequential path
+    if x.len() != bld {
+        return Err(MambaScanError::PayloadCountMismatch {
+            name: "x", expected: bld, actual: x.len(),
+        });
+    }
+    if delta.len() != bld {
+        return Err(MambaScanError::PayloadCountMismatch {
+            name: "delta", expected: bld, actual: delta.len(),
+        });
+    }
+    if a.len() != d_count {
+        return Err(MambaScanError::PayloadCountMismatch {
+            name: "A", expected: d_count, actual: a.len(),
+        });
+    }
+    if b_proj.len() != bld {
+        return Err(MambaScanError::PayloadCountMismatch {
+            name: "B", expected: bld, actual: b_proj.len(),
+        });
+    }
+    if c_proj.len() != bld {
+        return Err(MambaScanError::PayloadCountMismatch {
+            name: "C", expected: bld, actual: c_proj.len(),
+        });
+    }
+
+    let batch = shape.b as usize;
+    let length = shape.l as usize;
+    let channels = shape.d as usize;
+
+    // Each (b, d) thread writes to `length` disjoint indices
+    // in `y` — `idx = ((b * L) + t) * D + d`。 Different (b, d)
+    // pairs produce different idx for every t,so write
+    // disjointness is guaranteed。
+    //
+    // Strategy:produce a Vec of (idx, value) pairs in
+    // parallel,then scatter into y。 This avoids needing
+    // unsafe interior mutability。 For B × D × L cells the
+    // scatter is O(N) and runs sequentially。 Alternative:
+    // chunk y by (b, d) stride and let each task write its
+    // chunk — but stride is D (the channel dim) which means
+    // each cell of y is at index `b*L*D + t*D + d` and the
+    // task's cells are NON-CONTIGUOUS。 So scatter is the
+    // simplest correct approach for arbitrary shapes。
+    //
+    // For real-world shapes (B ≥ 4, D ≥ 32, L ≥ 64) the
+    // parallel benefit easily outweighs the scatter cost。
+
+    // Build a vector of (b, d) pairs and process in parallel
+    let total_threads = batch * channels;
+    let cells: Vec<((usize, usize), Vec<(usize, f32)>)> =
+        (0..total_threads)
+            .into_par_iter()
+            .map(|tid| {
+                let b_i = tid / channels;
+                let d_i = tid % channels;
+                let a_d = a[d_i];
+                let mut h: f32 = 0.0;
+                let mut local: Vec<(usize, f32)> =
+                    Vec::with_capacity(length);
+                for t in 0..length {
+                    let idx = shape.linear_index(b_i, t, d_i);
+                    let x_t = x[idx];
+                    let delta_t = delta[idx];
+                    let b_t = b_proj[idx];
+                    let c_t = c_proj[idx];
+
+                    let a_bar = (delta_t * a_d).exp();
+                    let b_bar = delta_t * b_t;
+                    h = a_bar * h + b_bar * x_t;
+                    local.push((idx, c_t * h));
+                }
+                ((b_i, d_i), local)
+            })
+            .collect();
+
+    // Scatter (sequential — disjoint writes,no racing)
+    let mut y = vec![0.0_f32; bld];
+    for (_bd, locals) in cells {
+        for (idx, v) in locals {
+            y[idx] = v;
+        }
+    }
+    Ok(y)
+}
+
 // MARK: - C ABI scaffolding (full C ABI lands in knife 3)
 
 /// Suppress unused c_char warning until knife 3 wires
@@ -368,6 +492,106 @@ mod tests {
             assert!(v.is_finite(), "all outputs must be finite");
         }
     }
+
+    // MARK: - Parallel scan tests (knife 2 — chapter 八百五十二 / M2912)
+
+    #[test]
+    fn scan_parallel_matches_sequential_b1_l1_d1() {
+        let shape = make_shape(1, 1, 1);
+        let x = vec![2.0_f32];
+        let delta = vec![0.5_f32];
+        let a = vec![-1.0_f32];
+        let b_proj = vec![3.0_f32];
+        let c_proj = vec![4.0_f32];
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(seq, par,
+            "Minimal shape: parallel must be bit-equal to sequential");
+    }
+
+    #[test]
+    fn scan_parallel_matches_sequential_b4_l32_d16() {
+        // Larger shape exercising real rayon parallelism
+        let shape = make_shape(4, 32, 16);
+        let bld = shape.element_count();
+        let d_count = shape.d as usize;
+        let x: Vec<f32> = (0..bld).map(|i| ((i % 23) as f32) * 0.013).collect();
+        let delta: Vec<f32> = (0..bld).map(|i| 0.05 + ((i % 17) as f32) * 0.001).collect();
+        let a: Vec<f32> = (0..d_count).map(|i| -0.5 - (i as f32) * 0.1).collect();
+        let b_proj: Vec<f32> = (0..bld).map(|i| 0.3 + ((i % 11) as f32) * 0.007).collect();
+        let c_proj: Vec<f32> = (0..bld).map(|i| 1.1 + ((i % 13) as f32) * 0.005).collect();
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(seq, par,
+            "Larger shape (4, 32, 16): parallel must be bit-equal to sequential");
+    }
+
+    #[test]
+    fn scan_parallel_handles_strong_decay() {
+        // Verify NaN/Inf-safe path
+        let shape = make_shape(2, 8, 4);
+        let bld = shape.element_count();
+        let d_count = shape.d as usize;
+        let x = vec![1.0_f32; bld];
+        let delta = vec![1.0_f32; bld];
+        let a = vec![-50.0_f32; d_count];  // strong decay
+        let b_proj = vec![1.0_f32; bld];
+        let c_proj = vec![1.0_f32; bld];
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(seq, par);
+        for v in &par {
+            assert!(v.is_finite(), "All outputs must be finite under strong decay");
+        }
+    }
+
+    #[test]
+    fn scan_parallel_rejects_x_count_mismatch() {
+        let shape = make_shape(1, 2, 1);
+        let x = vec![1.0_f32];  // too short
+        let delta = vec![0.1_f32, 0.1];
+        let a = vec![-1.0_f32];
+        let b_proj = vec![1.0_f32, 1.0];
+        let c_proj = vec![1.0_f32, 1.0];
+        let err = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap_err();
+        match err {
+            MambaScanError::PayloadCountMismatch { name, .. } => {
+                assert_eq!(name, "x");
+            }
+        }
+    }
+
+    #[test]
+    fn scan_parallel_byte_equality_grid_random_inputs() {
+        // 50-fixture randomized grid pinning parallel ≡ sequential
+        for trial in 0..50_u64 {
+            let b = 1 + (trial % 4) as usize;
+            let l = 4 + (trial % 16) as usize;
+            let d = 1 + (trial % 8) as usize;
+            let shape = make_shape(b as u32, l as u32, d as u32);
+            let bld = shape.element_count();
+            // xorshift64 deterministic pseudo-random
+            let mut state: u64 = trial.wrapping_mul(0x9E37).wrapping_add(0x12345);
+            let mut next = || {
+                state ^= state.wrapping_shl(13);
+                state ^= state.wrapping_shr(7);
+                state ^= state.wrapping_shl(17);
+                ((state % 1000) as f32) / 1000.0
+            };
+            let x: Vec<f32> = (0..bld).map(|_| next()).collect();
+            let delta: Vec<f32> = (0..bld).map(|_| 0.01 + 0.1 * next()).collect();
+            let a: Vec<f32> = (0..d).map(|_| -1.0 - next()).collect();
+            let b_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+            let c_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+            let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            let par = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            assert_eq!(seq, par,
+                "Trial {}: parallel must be bit-equal to sequential for shape ({}, {}, {})",
+                trial, b, l, d);
+        }
+    }
+
+    // MARK: - Original sequential tests continue
 
     #[test]
     fn scan_deterministic_repeats_yield_byte_equal_outputs() {
