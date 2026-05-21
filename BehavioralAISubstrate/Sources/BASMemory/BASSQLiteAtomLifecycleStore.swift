@@ -195,6 +195,92 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
         return Int(sqlite3_column_int64(stmt, 0))
     }
 
+    // MARK: - Batch append optimization (chapter 八百四)
+
+    /// Append many events in a single SQLite transaction with a
+    /// single re-used prepared statement。 Cuts per-event overhead
+    /// from ~60 μs (one fsync each) to ~1-3 μs (amortized fsync
+    /// at COMMIT) per the chapter 八百三 measurement。
+    ///
+    /// Atomicity:on the first error the whole batch is ROLLBACK
+    /// and NO records are persisted。 Caller sees either all
+    /// events or none — matches the「append-only audit log」
+    /// semantic for the schema 023 ledger。
+    ///
+    /// - Parameter events: events to append in insertion order
+    /// - Returns: the same array (call site convenience),OR
+    ///   throws if any event fails the CHECK / PK constraints
+    ///
+    /// Empty input is a no-op (returns []),no transaction opened。
+    @discardableResult
+    public func appendEventBatch(
+        _ events: [BASAtomLifecycleEvent]
+    ) async throws -> [BASAtomLifecycleEvent] {
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1, message: "db handle nil")
+        }
+        if events.isEmpty { return [] }
+
+        // BEGIN IMMEDIATE acquires the writer lock up-front so
+        // mid-batch contention can't surface as SQLITE_BUSY half
+        // way through。 IMMEDIATE matches WAL journal semantics
+        // (chapter 七百九十二 PRAGMA pin)。
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
+
+        let sql = """
+            INSERT INTO atom_lifecycle_events (
+                event_id, atom_id, session_id,
+                from_phase, to_phase, action, outcome,
+                recorded_at_ms, actor_ref
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+                == SQLITE_OK, let stmt else {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        for event in events {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            Self.bindText(stmt, 1, event.eventID)
+            Self.bindText(stmt, 2, event.atomID)
+            Self.bindText(stmt, 3, event.sessionID)
+            Self.bindText(stmt, 4,
+                Self.phaseString(forByte: event.fromPhaseByte))
+            Self.bindText(stmt, 5,
+                Self.phaseString(forByte: event.toPhaseByte))
+            Self.bindText(stmt, 6,
+                Self.actionString(forByte: event.actionByte))
+            Self.bindText(stmt, 7,
+                Self.outcomeString(forInt32: event.outcome))
+            sqlite3_bind_int64(stmt, 8, event.recordedAtMs)
+            if let actorRef = event.actorRef {
+                Self.bindText(stmt, 9, actorRef)
+            } else {
+                sqlite3_bind_null(stmt, 9)
+            }
+            let rc = sqlite3_step(stmt)
+            if rc != SQLITE_DONE {
+                try? Self.runExec(db: db, sql: "ROLLBACK;")
+                if rc == SQLITE_CONSTRAINT {
+                    throw StorageError.duplicateEventID(
+                        event.eventID)
+                }
+                throw StorageError.stepFailed(
+                    sql: sql,
+                    message: String(cString: sqlite3_errmsg(db)))
+            }
+        }
+        try Self.runExec(db: db, sql: "COMMIT;")
+        return events
+    }
+
     // MARK: - Query helpers
 
     private func queryEvents(

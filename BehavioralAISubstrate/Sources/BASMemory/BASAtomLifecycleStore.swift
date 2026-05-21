@@ -158,6 +158,29 @@ public actor BASInMemoryAtomLifecycleStore: BASAtomLifecycleStore {
             _ = try await appendEvent(event)
         }
     }
+
+    // MARK: - Batch append (chapter 八百四 — API symmetry with
+    // BASSQLiteAtomLifecycleStore's transaction-wrapped fast path)
+
+    /// Append many events in insertion order。 For the in-memory
+    /// store this is functionally equivalent to a per-event loop —
+    /// no transaction is needed because the actor isolation
+    /// already serializes mutations。 Returns the same input array。
+    ///
+    /// API symmetry with `BASSQLiteAtomLifecycleStore.appendEventBatch`
+    /// lets recorder utilities (chapter 八百) call the same surface
+    /// regardless of which store conformer is plugged in。
+    ///
+    /// Empty input is a no-op (returns [])。
+    @discardableResult
+    public func appendEventBatch(
+        _ events: [BASAtomLifecycleEvent]
+    ) async throws -> [BASAtomLifecycleEvent] {
+        for event in events {
+            _ = try await appendEvent(event)
+        }
+        return events
+    }
 }
 
 // MARK: - Reconstruction helpers (cold-restart support)
