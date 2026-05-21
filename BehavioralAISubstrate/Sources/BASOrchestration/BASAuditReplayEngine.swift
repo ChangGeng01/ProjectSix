@@ -64,7 +64,7 @@ public struct BASAuditReplayEngine: Sendable {
     /// storage stores at the moment `loadSession` was called。
     /// Records arrive in insertion order per the underlying store
     /// query contract (ORDER BY timestamp ASC,rowid ASC)。
-    public struct SessionAuditTrail: Sendable, Equatable {
+    public struct SessionAuditTrail: Sendable, Equatable, Codable {
         public let sessionID: String
         /// Optional vault ID (only populated when versions are loaded)。
         public let vaultID: String?
@@ -178,7 +178,7 @@ public struct BASAuditReplayEngine: Sendable {
     }
 
     /// Bundle:trail + the 3 aggregation summaries。
-    public struct SessionAuditSummary: Sendable, Equatable {
+    public struct SessionAuditSummary: Sendable, Equatable, Codable {
         public let trail: SessionAuditTrail
         public let presence: BASRoutedAuditAggregation.PresenceSessionSummary
         public let unknowns: BASRoutedAuditAggregation.UnknownSessionSummary

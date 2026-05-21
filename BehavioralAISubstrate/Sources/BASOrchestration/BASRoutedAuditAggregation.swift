@@ -33,7 +33,7 @@ public enum BASRoutedAuditAggregation {
 
     /// Roll-up of multi-turn L6 presence observations。 Fed to
     /// dashboards or replay-driven diagnostics。
-    public struct PresenceSessionSummary: Sendable, Equatable {
+    public struct PresenceSessionSummary: Sendable, Equatable, Codable {
         public let sessionID: String
         /// Total observation rows in the session (across all turns)。
         public let totalObservations: Int
@@ -110,7 +110,7 @@ public enum BASRoutedAuditAggregation {
     /// Roll-up of multi-turn L7 unknown records。 Categories
     /// match the chapter 七百九十九 prefix encoding (fact /
     /// role / constraint / permission / ambiguity)。
-    public struct UnknownSessionSummary: Sendable, Equatable {
+    public struct UnknownSessionSummary: Sendable, Equatable, Codable {
         public let sessionID: String
         public let totalRecords: Int
         public let turnCount: Int
@@ -151,16 +151,18 @@ public enum BASRoutedAuditAggregation {
         records: [BASUnknownLedgerRecord],
         sessionID: String
     ) -> UnknownSessionSummary {
-        var counts = [
-            "fact": 0, "role": 0, "constraint": 0,
-            "permission": 0, "ambiguity": 0,
-        ]
+        var perKind: [BASRoutedMirrorBladeRecording.UnknownKind: Int]
+            = [:]
         var unparseable = 0
         var turnSet: Set<String> = []
         for r in records {
             turnSet.insert(r.turnID)
-            if let kind = prefixKind(of: r.unknownText) {
-                counts[kind, default: 0] += 1
+            // chapter 八百二十一: switched to shared parseUnknownText
+            // helper from BASRoutedMirrorBladeRecording (dedup with
+            // BASAuditTrailArchive per 全量 审查 finding)。
+            if let parsed = BASRoutedMirrorBladeRecording
+                .parseUnknownText(r.unknownText) {
+                perKind[parsed.kind, default: 0] += 1
             } else {
                 unparseable += 1
             }
@@ -169,31 +171,19 @@ public enum BASRoutedAuditAggregation {
             sessionID: sessionID,
             totalRecords: records.count,
             turnCount: turnSet.count,
-            factCount: counts["fact"] ?? 0,
-            roleCount: counts["role"] ?? 0,
-            constraintCount: counts["constraint"] ?? 0,
-            permissionCount: counts["permission"] ?? 0,
-            ambiguityCount: counts["ambiguity"] ?? 0,
+            factCount: perKind[.fact] ?? 0,
+            roleCount: perKind[.role] ?? 0,
+            constraintCount: perKind[.constraint] ?? 0,
+            permissionCount: perKind[.permission] ?? 0,
+            ambiguityCount: perKind[.ambiguity] ?? 0,
             unparseableCount: unparseable)
-    }
-
-    /// Extract the prefix kind from an `unknownText` field。
-    /// Returns nil for unparseable rows (defensive)。
-    private static func prefixKind(of text: String) -> String? {
-        for kind in ["fact", "role", "constraint",
-                     "permission", "ambiguity"] {
-            if text.hasPrefix("\(kind): ") {
-                return kind
-            }
-        }
-        return nil
     }
 
     // MARK: - L7 contradiction summary
 
     /// Roll-up of multi-turn L7 contradiction records。
     public struct ContradictionSessionSummary:
-        Sendable, Equatable
+        Sendable, Equatable, Codable
     {
         public let sessionID: String
         public let totalRecords: Int

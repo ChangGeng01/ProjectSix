@@ -135,6 +135,23 @@ final class BASChapter819RoundTripRestoreTests: XCTestCase {
         XCTAssertEqual(postTrail.atomEvents.count,
                        preTrail.atomEvents.count)
 
+        // === Invariant 3b (chapter 八百二十一 strengthening):
+        // PAYLOAD identity, not just ID-set identity。 Catches
+        // schema-write/read bugs where a Double salience gets
+        // truncated, actorRef is dropped, or BLOB signature_hash
+        // loses bytes。 The chapter 819 commit message claimed
+        // "preserves everything";the 全量 审查 review surfaced
+        // that ID-only assertions don't actually verify that。
+        XCTAssertEqual(postTrail.presence, preTrail.presence,
+            "Presence records byte-identical after cold restart")
+        XCTAssertEqual(postTrail.unknowns, preTrail.unknowns,
+            "Unknown records byte-identical after cold restart")
+        XCTAssertEqual(postTrail.contradictions,
+                       preTrail.contradictions,
+            "Contradiction records byte-identical after cold restart")
+        XCTAssertEqual(postTrail.atomEvents, preTrail.atomEvents,
+            "Atom events byte-identical after cold restart")
+
         // === Invariant 4: archive identical pre vs post ===
         XCTAssertEqual(postArchive.turnCount, preArchive.turnCount)
         XCTAssertEqual(postArchive.atomEventCount,

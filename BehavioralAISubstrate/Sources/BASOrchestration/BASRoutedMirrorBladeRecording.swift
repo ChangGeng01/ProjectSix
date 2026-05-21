@@ -53,6 +53,53 @@ import BASSovereign
 
 public enum BASRoutedMirrorBladeRecording {
 
+    // MARK: - Shared kind discriminator (chapter 八百二十一 dedup)
+
+    /// Pinned 5-case enum mirroring the `BASUnknownSet` typed
+    /// arrays。 Used as the single source of truth for the
+    /// "<kind>: <text>" prefix encoding across recorder + replay
+    /// + archive + aggregation。 Eliminates the 3-way duplication
+    /// flagged by the chapter 八百二十一 全量 审查 review。
+    public enum UnknownKind: String, Sendable, CaseIterable,
+        Codable, Hashable
+    {
+        case fact
+        case role
+        case constraint
+        case permission
+        case ambiguity
+
+        /// Schema-011-row prefix that flags this kind in the
+        /// `unknown_text` column (e.g。 `"fact: "`)。
+        public var prefix: String { "\(rawValue): " }
+    }
+
+    /// Strict prefix parser。 Returns the matched kind + the
+    /// remaining body,or nil if no recognized prefix matches。
+    /// Used by replay + archive + aggregation。
+    ///
+    /// ## Known lossy edge case (chapter 八百二十一 documented)
+    ///
+    /// If a user supplies a `missingFact` value that itself starts
+    /// with another kind's prefix (e.g。 `missingFacts: ["role: missing actor"]`),
+    /// replay will re-bucketize it AS `missingRoles: ["missing actor"]`。
+    /// The encoder is intentionally textual + non-escaping for
+    /// human-readability and SQLite full-text query friendliness。
+    /// Hosts that need strict round-trip identity should treat
+    /// `BASUnknownSet` string fields as「authored content,not
+    /// machine-tokenized payload」 and avoid embedding `<kind>: `
+    /// patterns at position 0 of their values。 The chapter 八百
+    /// 二十一 review-remediation test demonstrates this edge case
+    /// explicitly so hosts can see + acknowledge the constraint。
+    public static func parseUnknownText(
+        _ text: String
+    ) -> (kind: UnknownKind, body: String)? {
+        for kind in UnknownKind.allCases where text.hasPrefix(kind.prefix) {
+            return (kind, String(text.dropFirst(kind.prefix.count)))
+        }
+        return nil
+    }
+
     // MARK: - Configuration
 
     /// Per-category confidence + kind-prefix overrides for the
@@ -246,21 +293,17 @@ public enum BASRoutedMirrorBladeRecording {
         var permissions: [String] = []
         var ambiguities: [String] = []
         for record in records {
-            if let stripped = stripped(record.unknownText,
-                                       prefix: "fact: ") {
-                facts.append(stripped)
-            } else if let stripped = stripped(record.unknownText,
-                                              prefix: "role: ") {
-                roles.append(stripped)
-            } else if let stripped = stripped(record.unknownText,
-                                              prefix: "constraint: ") {
-                constraints.append(stripped)
-            } else if let stripped = stripped(record.unknownText,
-                                              prefix: "permission: ") {
-                permissions.append(stripped)
-            } else if let stripped = stripped(record.unknownText,
-                                              prefix: "ambiguity: ") {
-                ambiguities.append(stripped)
+            // chapter 八百二十一: switched to shared parseUnknownText
+            // helper (dedup with BASAuditTrailArchive +
+            // BASRoutedAuditAggregation per 全量 审查 finding)。
+            guard let parsed = parseUnknownText(record.unknownText)
+            else { continue }
+            switch parsed.kind {
+            case .fact:        facts.append(parsed.body)
+            case .role:        roles.append(parsed.body)
+            case .constraint:  constraints.append(parsed.body)
+            case .permission:  permissions.append(parsed.body)
+            case .ambiguity:   ambiguities.append(parsed.body)
             }
         }
         return BASUnknownSet(

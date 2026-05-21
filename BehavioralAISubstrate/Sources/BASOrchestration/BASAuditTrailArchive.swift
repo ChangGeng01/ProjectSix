@@ -63,7 +63,7 @@ public enum BASAuditTrailArchive {
 
     /// Compressed summary for one turn — replaces N raw records
     /// with one aggregate row per dimension。
-    public struct ArchivedTurn: Sendable, Equatable {
+    public struct ArchivedTurn: Sendable, Equatable, Codable {
         public let sessionID: String
         public let turnID: String
         public let firstTimestampMs: Int64
@@ -133,7 +133,7 @@ public enum BASAuditTrailArchive {
     /// Whole-session archive。 Contains per-turn rows + session-
     /// level L8 atom + L5 version summaries (which aren't
     /// turn-keyed)。
-    public struct ArchivedTrail: Sendable, Equatable {
+    public struct ArchivedTrail: Sendable, Equatable, Codable {
         public let sessionID: String
         public let turns: [ArchivedTurn]
         public let atomEventCount: Int
@@ -255,17 +255,22 @@ public enum BASAuditTrailArchive {
         mutating func addUnknown(
             _ r: BASUnknownLedgerRecord
         ) {
-            if r.unknownText.hasPrefix("fact: ") {
-                factCount += 1
-            } else if r.unknownText.hasPrefix("role: ") {
-                roleCount += 1
-            } else if r.unknownText.hasPrefix("constraint: ") {
-                constraintCount += 1
-            } else if r.unknownText.hasPrefix("permission: ") {
-                permissionCount += 1
-            } else if r.unknownText.hasPrefix("ambiguity: ") {
-                ambiguityCount += 1
+            // chapter 八百二十一: switched to shared parseUnknownText
+            // helper (dedup with BASRoutedMirrorBladeRecording +
+            // BASRoutedAuditAggregation per 全量 审查 finding)。
+            if let parsed = BASRoutedMirrorBladeRecording
+                .parseUnknownText(r.unknownText) {
+                switch parsed.kind {
+                case .fact:        factCount += 1
+                case .role:        roleCount += 1
+                case .constraint:  constraintCount += 1
+                case .permission:  permissionCount += 1
+                case .ambiguity:   ambiguityCount += 1
+                }
             }
+            // Unparseable rows silently dropped from per-kind
+            // counts;the chapter 八百十 aggregation summary
+            // surfaces them via UnknownSessionSummary.unparseableCount。
             updateTimestamps(r.discoveredAtMs)
         }
 
