@@ -9,13 +9,35 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — RECORDING ACTIVATION + STORAGE BATCH MINI-ARC
+## [Unreleased] — RECORDING ACTIVATION + STORAGE BATCH + AUDIT LOOP
 
-Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百七 /
-M2641-M2690 (10-chapter combined mini-arc:5 chapters activating
-the v0.59.0 storage adapters as opt-in side channels + 5 chapters
-adding transaction-wrapped batch fast paths to all 6 SQLite
-stores + InMemory vs SQLite informational perf scorecard)。
+Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百十一 /
+M2641-M2710 (14-chapter combined mini-arc completing the
+storage-adapter activation + analysis pipeline)。 Three sub-arcs:
+
+ 1. Chapters 七百九十八-八百二:Recording activation — 4 recorder
+    utilities turn the v0.59.0 storage adapters from「protocol
+    exists」 into「production-default-ready opt-in side channels」。
+ 2. Chapters 八百三-八百七:Storage batch optimization — transaction-
+    wrapped appendBatch on all 6 SQLite stores + InMemory vs SQLite
+    informational perf scorecard。
+ 3. Chapters 八百八-八百十一:Audit-loop completion — per-turn
+    integration test + recorder replay helpers + per-session
+    aggregation primitives + CHANGELOG seal。
+
+### Added — Audit loop closure (chapters 八百八 → 八百十)
+
+The recording loop is now FULLY CLOSED:host → recorder → store
+→ query → replay → aggregate → host。 Hosts can persist audit
+trails through SQLite,survive cold restart,reconstruct runtime
+types,and roll up into per-session summaries without
+substrate-side code paths needing modification。
+
+| Chapter | What |
+|---------|------|
+| 八百八 | Per-turn integration test exercising all 4 recorders + 6 stores end-to-end (4 tests) |
+| 八百九 | Recorder replay helpers — inverse functions of the encoding (channelByte↔kind,reconstructUnknownSet,reconstructContradictions) (11 tests) |
+| 八百十 | Per-session aggregation primitives (PresenceSessionSummary / UnknownSessionSummary / ContradictionSessionSummary) (8 tests) |
 
 ### Added — Storage batch optimization (chapters 八百三 → 八百七)
 
