@@ -2930,6 +2930,46 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - L9 Dominance order (chapter 八百三十五 / M2826)
+    //
+    // Sorts indices [0, n) by `scores[i]` DESCENDING, stable on
+    // ties。 Mirror of Swift `EBrainRuntimeCoordinator+
+    // Candidates.swift` `candidateDominanceScore` sort —
+    // returns ALL n indices (not truncated like batch-score top-K)。
+    //
+    // Use when the host needs the full frontier ordering for
+    // composition (dominance order + reversible filter + guard
+    // filter all derive from the same input scores)。 V1 Swift
+    // path remains the production default;this opt-in routes
+    // through the Rust SIMD-friendly sort when explicitly invoked。
+
+    /// Sort indices [0, scores.count) descending by score, stable
+    /// on ties。 Returns nil on FFI fault (currently impossible
+    /// since this allocates its own buffer)。 Empty input returns
+    /// an empty array。
+    public static func dreamLoopDominanceOrder(
+        scores: [Float]
+    ) -> [Int32]? {
+        #if os(iOS) || os(macOS)
+        let n = scores.count
+        if n == 0 { return [] }
+        var out = [Int32](repeating: -1, count: n)
+        let written = scores.withUnsafeBufferPointer { sp -> Int32 in
+            out.withUnsafeMutableBufferPointer { op in
+                return bas_dream_loop_dominance_order(
+                    sp.baseAddress,
+                    Int32(n),
+                    op.baseAddress,
+                    Int32(n))
+            }
+        }
+        if written < 0 { return nil }
+        return Array(out.prefix(Int(written)))
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(

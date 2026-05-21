@@ -756,6 +756,22 @@ int32_t bas_dream_loop_batch_score(
     int32_t *out_indices_ptr,
     int32_t out_capacity);
 
+// chapter 八百三十五 / M2826 — L9 dominance order primitive
+//
+// Sorts indices [0, n) by `scores[i]` descending, stable on ties。
+// Mirror of Swift `EBrainRuntimeCoordinator+Candidates.swift`
+// `candidateDominanceScore` sort。 Returns ALL n indices (not
+// truncated)。 Caller supplies an output buffer of capacity ≥ n。
+//
+// Returns `n` (count written) on success, or -1 on bad input
+// (null ptrs, n < 0, or out_capacity < n)。
+
+int32_t bas_dream_loop_dominance_order(
+    const float *scores_ptr,
+    int32_t n,
+    int32_t *out_indices_ptr,
+    int32_t out_capacity);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is
