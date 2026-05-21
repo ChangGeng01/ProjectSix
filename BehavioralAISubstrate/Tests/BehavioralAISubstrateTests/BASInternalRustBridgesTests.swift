@@ -7,6 +7,9 @@
 
 import XCTest
 @testable import BASRuntimeCore
+// chapter 七百七十四 cross-language Phase 1 ≡ Phase 2 byte-equality
+// test needs the Swift Phase 1 protocol types defined in BASMemory。
+@testable import BASMemory
 
 #if os(iOS) || os(macOS)
 
@@ -297,6 +300,130 @@ final class BASInternalRustBridgesTests: XCTestCase {
         XCTAssertEqual(
             BASWorldPriorBridge.worstReversibility(values: []),
             3) // Easy
+    }
+
+    // MARK: - bas-shadow-trial bridge (L13 Phase 2)
+
+    func testShadowTrialAbiVersionPinned() {
+        XCTAssertEqual(BASShadowTrialBridge.abiVersion, 1)
+        XCTAssertEqual(
+            BASShadowTrialBridge.liveAbiVersion(),
+            BASShadowTrialBridge.abiVersion)
+    }
+
+    func testShadowTrialNurseryAdvancesToTrialInFlight() {
+        // Nursery=0 + Nil verdict=3 → AdvanceTo(0) + TrialInFlight(1)
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 0, verdictByte: 3)
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.outcome, 0)
+        XCTAssertEqual(r.nextPhaseByte, 1)
+    }
+
+    func testShadowTrialInFlightPassedYieldsSealed() {
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 1, verdictByte: 0) // InFlight + Passed
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 2) // Sealed
+    }
+
+    func testShadowTrialInFlightFailedYieldsRetracted() {
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 1, verdictByte: 1) // InFlight + Failed
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 3) // Retracted
+    }
+
+    func testShadowTrialInFlightBlockedYieldsRetracted() {
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 1, verdictByte: 2) // InFlight + Blocked
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 3) // Retracted
+    }
+
+    func testShadowTrialInFlightNilStaysInFlight() {
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 1, verdictByte: 3) // InFlight + Nil
+        XCTAssertTrue(r.advanced)
+        XCTAssertEqual(r.nextPhaseByte, 1) // TrialInFlight
+    }
+
+    func testShadowTrialInFlightUnknownRejected() {
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 1, verdictByte: 99) // InFlight + Unknown
+        XCTAssertFalse(r.advanced)
+        XCTAssertEqual(r.outcome, 2) // RejectedUnknownVerdict
+    }
+
+    func testShadowTrialSealedRejectsAll() {
+        for v: UInt8 in [0, 1, 2, 3, 99] {
+            let r = BASShadowTrialBridge.transition(
+                currentPhaseByte: 2, verdictByte: v) // Sealed
+            XCTAssertFalse(r.advanced, "Sealed must reject verdict \(v)")
+            XCTAssertEqual(r.outcome, 1) // RejectedTerminal
+        }
+    }
+
+    func testShadowTrialRetractedRejectsAll() {
+        for v: UInt8 in [0, 1, 2, 3, 99] {
+            let r = BASShadowTrialBridge.transition(
+                currentPhaseByte: 3, verdictByte: v) // Retracted
+            XCTAssertFalse(r.advanced)
+            XCTAssertEqual(r.outcome, 1) // RejectedTerminal
+        }
+    }
+
+    func testShadowTrialInvalidPhaseReturnsOutcomeMinus1() {
+        let r = BASShadowTrialBridge.transition(
+            currentPhaseByte: 99, verdictByte: 0)
+        XCTAssertEqual(r.outcome, -1)
+    }
+
+    // MARK: - Phase 1 (Swift) ≡ Phase 2 (Rust) byte-equality
+
+    func testShadowTrialRustMatchesSwiftCoreByteForByte() {
+        // Cross-language byte-equality:every (phase, verdict)
+        // input must produce identical (outcome, next_phase) on
+        // both the Phase 1 Swift impl and the Phase 2 Rust impl。
+        let swiftCore = BASShadowTrialStateMachineCore()
+
+        // Map between Phase 1 enum (verdictRaw String?) and
+        // Phase 2 byte encoding。
+        let cases: [(BASShadowTrialPhase, String?, UInt8, UInt8)] = [
+            (.nursery, nil, 0, 3),
+            (.nursery, "passed", 0, 0),
+            (.trialInFlight, "passed", 1, 0),
+            (.trialInFlight, "failed", 1, 1),
+            (.trialInFlight, "blocked", 1, 2),
+            (.trialInFlight, nil, 1, 3),
+            (.trialInFlight, "mysterious", 1, 99), // unknown
+            (.sealed, "passed", 2, 0),
+            (.sealed, nil, 2, 3),
+            (.retracted, "failed", 3, 1),
+        ]
+        for (phase, verdict, phaseByte, verdictByte) in cases {
+            // Swift Phase 1 result
+            let req = BASShadowTrialTransitionRequest(
+                currentPhase: phase, verdictRaw: verdict)
+            let swiftOutcome = swiftCore.transition(req)
+
+            // Rust Phase 2 result
+            let rustResult = BASShadowTrialBridge.transition(
+                currentPhaseByte: phaseByte, verdictByte: verdictByte)
+
+            // Compare outcomes
+            switch swiftOutcome {
+            case .advanceTo(let nextPhase):
+                XCTAssertTrue(rustResult.advanced,
+                    "Swift advanced but Rust didn't for (\(phase),\(verdict ?? "nil"))")
+                XCTAssertEqual(rustResult.nextPhaseByte,
+                    UInt8(nextPhase.rawValue),
+                    "next phase mismatch for (\(phase),\(verdict ?? "nil"))")
+            case .rejected:
+                XCTAssertFalse(rustResult.advanced,
+                    "Swift rejected but Rust advanced for (\(phase),\(verdict ?? "nil"))")
+            }
+        }
     }
 }
 

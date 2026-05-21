@@ -120,7 +120,7 @@ final class BASRustMemoryUsageTrackerActorTests:
         //     (DEEPER LAYER-MIGRATION ARC XCFramework rebuild)
         XCTAssertEqual(
             BASRustCoreBridge.macosArm64SliceSHA256,
-            "b75b149b6788b7df3d7d92687ede344e859601e6acc41c033c52ff1f2e61ad64",
+            "5f8ac96dd7046f3d93720979c3fd748be255b6a04390ecb33affe05b0286b387",
             "Chapter 七百一 RED FLAG #1 reproducibility-" +
             "verification pin。 If this hash changes," +
             "a future commit rebuilt the XCFramework " +
@@ -129,19 +129,19 @@ final class BASRustMemoryUsageTrackerActorTests:
     }
 
     // MARK: - M2191 NEW iOS-slice pins (chapter 七百七);
-    //         bumped again at chapter 七百七十三 第二刀
+    //         bumped at chapter 七百七十三 第二刀 + 七百七十四 第一刀
 
     func testIosArm64SliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SliceSHA256,
-            "9e475199ef6ecb12c399f849808600483faf9eab984a351ed4624df9281e6b02",
+            "04937c03a3e80395d322c7fb815492ec70994bd506be2cde847d018d4884cf73",
             "iOS device slice byte-equality pin。")
     }
 
     func testIosArm64SimulatorSliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
-            "77b45954a2a1ca7ba184b78ff2968262c2a1256fa7d2423b8b840e4f0183bb39",
+            "ad0ad44498c3ad0427492bc9ae67bc41eeef78f4dfd2641c14f30079abbc2df0",
             "iOS simulator slice byte-equality pin。")
     }
 

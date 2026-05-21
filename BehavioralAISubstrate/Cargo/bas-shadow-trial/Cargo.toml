@@ -1,0 +1,26 @@
+# Cargo manifest for bas-shadow-trial
+# chapter 七百七十四 / M2521-M2525 — L13 PHASE 2 first cut
+#
+# Rust port of the L13 shadow-trial state machine。 Mirrors the
+# Phase 1 Swift protocol seam shipped at chapter 七百七十二
+# (BASShadowTrialStateMachineCore)。
+#
+# Per the DEEPER LAYER-MIGRATION ARC plan,L13 Phase 2 ports
+# the state-graph transitions to Rust while the orchestrator
+# (ledger I/O,async actor) stays Swift。 The Swift coordinator
+# will swap in this Rust impl via its init param + the existing
+# BASShadowTrialStateMachine protocol seam — no public API change。
+
+[package]
+name = "bas-shadow-trial"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_shadow_trial"
+path = "src/lib.rs"
+
+[dependencies]

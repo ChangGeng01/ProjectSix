@@ -110,28 +110,25 @@ public enum BASRustCoreBridge {
         "macos-arm64"
     ]
 
-    /// XCFramework macos-arm64 slice byte-equality
-    /// SHA256。 Bumped at chapter 七百七十三 第二刀 during
-    /// the DEEPER LAYER-MIGRATION ARC XCFramework rebuild
-    /// activation (bundles 8 new Rust crates + 3 new C
-    /// headers into the staticlib)。
+    /// XCFramework macos-arm64 slice byte-equality SHA256。
     ///
     /// History:
     ///   - M2191 chapter 七百七 第一刀: rustup toolchain switch
     ///   - chapter 七百七十三 第二刀: 12 → 20 crate bundle
+    ///   - chapter 七百七十四 第一刀: 20 → 21 crate bundle
+    ///     (+ bas-shadow-trial L13 Phase 2 first cut)
     public static let macosArm64SliceSHA256: String =
-        "b75b149b6788b7df3d7d92687ede344e859601e6acc41c033c52ff1f2e61ad64"
+        "5f8ac96dd7046f3d93720979c3fd748be255b6a04390ecb33affe05b0286b387"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
-    /// Bumped at chapter 七百七十三 第二刀 (same rebuild as
-    /// macos-arm64 above)。
+    /// Bumped at chapter 七百七十四 第一刀。
     public static let iosArm64SliceSHA256: String =
-        "9e475199ef6ecb12c399f849808600483faf9eab984a351ed4624df9281e6b02"
+        "04937c03a3e80395d322c7fb815492ec70994bd506be2cde847d018d4884cf73"
 
-    /// XCFramework ios-arm64-simulator slice byte-
-    /// equality SHA256。 Bumped at chapter 七百七十三 第二刀。
+    /// XCFramework ios-arm64-simulator slice byte-equality
+    /// SHA256。 Bumped at chapter 七百七十四 第一刀。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "77b45954a2a1ca7ba184b78ff2968262c2a1256fa7d2423b8b840e4f0183bb39"
+        "ad0ad44498c3ad0427492bc9ae67bc41eeef78f4dfd2641c14f30079abbc2df0"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

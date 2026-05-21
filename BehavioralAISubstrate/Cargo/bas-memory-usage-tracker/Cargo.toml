@@ -114,3 +114,8 @@ bas-host-constitution = { path = "../bas-host-constitution" }
 # Per user 严苛 table 「L4 值得」 — SQLite stays Swift,
 # Rust owns the deterministic typed surface。
 bas-world-prior       = { path = "../bas-world-prior" }
+# chapter 七百七十四 / M2521 — bundle the L13 shadow-trial
+# crate (Phase 2 Rust port of the state machine extracted at
+# Phase 1, chapter 七百七十二)。 Mirrors
+# BASShadowTrialStateMachineCore byte-for-byte。
+bas-shadow-trial      = { path = "../bas-shadow-trial" }

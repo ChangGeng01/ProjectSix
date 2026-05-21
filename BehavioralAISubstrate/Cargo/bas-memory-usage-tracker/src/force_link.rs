@@ -345,6 +345,17 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_world_prior::bas_world_prior_worst_reversibility(
             core::ptr::null(), 0)
     });
+    // chapter 七百七十四 / M2521 — force-link the L13 Phase 2
+    // shadow-trial state machine。 Two cheapest anchors:
+    //   1. ABI version probe
+    //   2. transition(Sealed=2, Passed=0) → packed reject-terminal
+    //      = 0x21 = 33 (rejected because Sealed is terminal)
+    // Args are i32 (not u8) per the Swift @_silgen_name calling
+    // convention workaround documented in lib.rs。
+    total = total.wrapping_add(
+        bas_shadow_trial::bas_shadow_trial_abi_version());
+    total = total.wrapping_add(
+        bas_shadow_trial::bas_shadow_trial_transition(2_i32, 0_i32));
     total
 }
 
@@ -368,7 +379,8 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 18 = chapter 七百六十六 / M2481 (+presence-eye)
 ///   - 19 = chapter 七百六十八 / M2491 (+host-constitution)
 ///   - 20 = chapter 七百七十一 / M2506 (+world-prior)
+///   - 21 = chapter 七百七十四 / M2521 (+shadow-trial L13 Phase 2)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    20
+    21
 }

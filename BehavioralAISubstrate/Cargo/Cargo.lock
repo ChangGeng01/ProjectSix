@@ -73,6 +73,7 @@ dependencies = [
  "bas-red-team-bench",
  "bas-retrieval-ranker",
  "bas-runtime-frame",
+ "bas-shadow-trial",
  "bas-sovereign-c-abi",
  "bas-substrate-core",
  "bas-tokenizer",
@@ -120,6 +121,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "bas-shadow-trial"
+version = "0.1.0"
 
 [[package]]
 name = "bas-sovereign-c-abi"

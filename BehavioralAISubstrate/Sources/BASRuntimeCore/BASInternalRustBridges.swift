@@ -327,6 +327,67 @@ private func _bas_world_prior_worst_reversibility(
     _ len: Int32
 ) -> Int32
 
+// MARK: - bas-shadow-trial (L13 Phase 2 state machine)
+
+@_silgen_name("bas_shadow_trial_abi_version")
+private func _bas_shadow_trial_abi_version() -> Int32
+
+/// chapter 七百七十四 ABI note:Rust signature takes i32 (not u8)
+/// to sidestep a Swift @_silgen_name calling-convention quirk
+/// where two consecutive variable UInt8 args don't reliably
+/// zero-extend across registers on ARM64。 The Swift wrapper
+/// converts UInt8 → Int32 at the call site to keep the public
+/// surface byte-shaped。
+@_silgen_name("bas_shadow_trial_transition")
+private func _bas_shadow_trial_transition(
+    _ currentPhase: Int32,
+    _ verdict: Int32
+) -> Int32
+
+public enum BASShadowTrialBridge {
+    public static let abiVersion: Int32 = 1
+
+    public static func liveAbiVersion() -> Int32 {
+        return _bas_shadow_trial_abi_version()
+    }
+
+    /// Decoded transition result。 Mirrors Rust's `TransitionResult`
+    /// struct,but unpacks the packed-i32 wire format。
+    public struct Result: Equatable, Hashable, Sendable {
+        /// 0=AdvanceTo / 1=RejectedTerminal / 2=RejectedUnknownVerdict
+        public let outcome: Int32
+        /// Next phase byte (0..3 per ShadowTrialPhase discriminants)
+        public let nextPhaseByte: UInt8
+        /// True iff outcome == 0 (AdvanceTo)。
+        public var advanced: Bool { outcome == 0 }
+    }
+
+    /// Invoke the Rust state-machine transition。
+    ///
+    /// Phase discriminants:0=Nursery / 1=TrialInFlight /
+    /// 2=Sealed / 3=Retracted。
+    /// Verdict discriminants:0=Passed / 1=Failed / 2=Blocked /
+    /// 3=Nil (no verdict) / any-other=Unknown。
+    ///
+    /// Returns Result(outcome: -1, nextPhaseByte: 0) on invalid
+    /// phase byte。
+    public static func transition(
+        currentPhaseByte: UInt8,
+        verdictByte: UInt8
+    ) -> Result {
+        let packed = _bas_shadow_trial_transition(
+            Int32(currentPhaseByte), Int32(verdictByte))
+        if packed < 0 {
+            return Result(outcome: -1, nextPhaseByte: 0)
+        }
+        let outcome = packed & 0x0F
+        let nextPhase = UInt8((packed >> 4) & 0x0F)
+        return Result(outcome: outcome, nextPhaseByte: nextPhase)
+    }
+}
+
+// MARK: - bas-world-prior (L4 typed surface + pure fns)
+
 public enum BASWorldPriorBridge {
     public static let abiVersion: Int32 = 1
 
