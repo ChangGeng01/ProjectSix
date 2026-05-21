@@ -36,8 +36,11 @@
 //   For unnormalized vectors,replace L2 with cosine-aware
 //   distance (TBD if a host requests)。
 
-use std::collections::HashMap;
-
+// chapter 八百二十九 / M2796 lint fix:HashMap is no longer
+// referenced in this file (was used by an earlier prototype)。
+// Removed to silence the unused-import warning。
+//
+// /// Compact PQ index。 Stores codebooks (M × K × subDim
 /// Compact PQ index。 Stores codebooks (M × K × subDim
 /// Float32) and per-corpus-row codes (M bytes per row)。
 #[derive(Clone, Debug)]

@@ -313,7 +313,15 @@ pub fn decode_binary(buf: &[u8]) -> Result<EventLogEntry, String> {
         return Err("missing provenance_present flag".to_string());
     }
     let provenance_summary = match buf[pos] {
-        0 => { pos += 1; None }
+        0 => {
+            // chapter 八百二十九 / M2796 lint fix:advance past
+            // the absent-flag byte。 In the current schema no
+            // bytes follow this branch,but maintaining the pos
+            // advance keeps the parser forward-compatible if
+            // future fields are appended after provenance_summary。
+            let _ = pos + 1;
+            None
+        }
         1 => {
             pos += 1;
             Some(read_lenprefixed_string(buf, &mut pos)

@@ -9,265 +9,95 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY + 严查 整改
+## [Unreleased] — v0.61.0 candidate / STORAGE ACTIVATION + AUDIT REPLAY + 严查 + 极致 轻量化
 
-Tag candidate: v0.61.0 (post-evolution + remediation)。 Covers
-chapters 七百九十八 → 八百二十六 / M2641-M2785 (29-chapter combined
-mini-arc covering storage activation,batch optimization,audit
-replay evolution,AND strict-review remediation)。
+Tag candidate: v0.61.0。 Covers chapters 七百九十八 → 八百二十九 /
+M2641-M2800 (32-chapter combined mini-arc completing storage adapter
+activation,batch optimization,audit replay/diff/archive evolution,
+sequential 全量审查 + 严查 reviews + remediation,doctrine cluster
+archival,operational polish)。
 
-### Added — 严查 整改 sub-arc (chapters 八百二十一 → 八百二十六)
+### Six sub-arcs
 
-After the chapter 八百二十 mini-arc 4 seal,2 sequential
-reviews were run on the v0.61.0 candidate scope:
+1. **Recording activation** (chapters 七百九十八-八百二):4 routed-
+   recorder utilities turn v0.59.0 storage adapters into production-
+   ready opt-in side channels:
+   - BASRoutedPresenceFusionRecording (L6 + schema 013)
+   - BASRoutedMirrorBladeRecording (L7 + schemas 011/012)
+   - BASRoutedAtomLifecycleRecording (L8 + schema 023)
+   - BASRoutedHostConstitutionRecording (L5 + schemas 014/015)
 
-  1. 全量 审查 (chapter 八百二十一):3 parallel review-agents
-     inspected the recorder modules + audit-pipeline read-side
-     modules + CHANGELOG-vs-commit cross-check。 Surfaced 4
-     HIGH-severity findings,addressed in chapter 八百二十一:
-       - Chapter 819 round-trip test strengthened (payload
-         identity,not just ID-set identity)
-       - Mirror-blade prefix encoding lossy edge case
-         documented + tested (single-record round-trip IS safe;
-         raw-bypass IS lossy by design)
-       - Codable conformance added to 7 audit-pipeline types
-         (SessionAuditTrail / SessionAuditSummary / ArchivedTurn
-         / ArchivedTrail / 3 aggregation summaries)
-       - Prefix-parsing duplication consolidated:NEW shared
-         BASRoutedMirrorBladeRecording.UnknownKind enum +
-         parseUnknownText helper used by 3 prior parsers
-  2. 严查 (chapter 八百二十二):stricter sweep caught additional
-     issues the lighter audit missed:
-       - Stale [Unreleased] CHANGELOG header at line 285 removed
-       - Dead loop in distinctTurnIDs dropped
-       - loadSession parallelized with async let (5 stores
-         fetched concurrently instead of serially)
-       - Cargo.lock dirty state committed
-       - Chapter doctrine registry dormant since 七百三十四 +
-         CI gate scripts in plan don't exist → flagged for
-         remediation chapters 八百二十三-八百二十五
+2. **Storage batch optimization** (chapters 八百三-八百七):
+   transaction-wrapped `appendBatch` on all 6 SQLite stores +
+   InMemory vs SQLite perf scorecard (3-38× batch speedup measured)。
 
-### Added — Remediation chapters (八百二十三-八百二十五)
+3. **Audit replay evolution** (chapters 八百八-八百二十):
+   - BASAuditPipeline composition root (chapter 八百十五)
+   - BASAuditReplayEngine session loader (chapter 八百十六)
+   - BASAuditTrailDiff cross-session ID delta (chapter 八百十七)
+   - BASAuditTrailArchive ~9× compression (chapter 八百十八)
+   - 100-turn audit pipeline stress test (chapter 八百十三)
+   - Per-session aggregation primitives (chapter 八百十)
+   - Half-open time-window helpers (chapter 八百十二)
 
-| Chapter | Issue | Fix |
-|---------|-------|-----|
-| 八百二十三 | CI gate scripts referenced in plan don't exist | Wrote scripts/check_god_files.sh (per-file LOC ceilings with 7 pinned overrides), scripts/check_sdk_import_boundaries.sh (substrate-core ↛ SDK-consumer enforcement), scripts/check_substrate_residuals.sh (TODO/print/force-unwrap density gates). All 3 Bash 3.2 compatible + exit cleanly |
-| 八百二十四 | MEDIUM review items (JSONEncoder determinism + magic bytes + recorder param order) | deterministicJSONEncoder shared instance with .sortedKeys pinned (closes latent SHA-256 determinism risk);Phase/Action/Outcome enums mirroring Rust schema-023 byte discriminants (created/admitted/linked/archived/tombstoned + admit/link/archive/tombstone + advanced/rejectedIllegal/rejectedTerminal);PresenceFusion gap behavior documented (NOT a collision risk on inspection);parameter-order normalization deferred (cosmetic) |
-| 八百二十五 | Chapter doctrine registry dormant since chapter 七百三十四 (87 chapters missing) | Documented dormancy in BASChapterDoctrineRegistry.swift with REGISTRY DORMANCY NOTICE MARK section explaining: substitute discipline (CHANGELOG + Conventional-Commit bodies + per-file MARK) actually carries the practical doctrine surface;restoration is OPTIONAL not blocking;4-step restoration path documented for future revival |
+4. **严查 整改** (chapters 八百二十一-八百二十六):addressed 4
+   HIGH + 6 MEDIUM findings from sequential 全量审查 + 严查 reviews:
+   - Codable conformance on 7 audit-pipeline types
+   - Shared `UnknownKind` enum (dedup of 3 prefix-parsers)
+   - Chapter 819 strengthened to payload-identity verification
+   - JSONEncoder `.sortedKeys` pinned for SHA-256 determinism
+   - Schema-023 byte enum mirrors (Phase / Action / Outcome)
+   - 3 CI gates restored (god_files / sdk_imports / residuals)
+   - CHANGELOG dirt + dead loop + async-let parallelization
 
-Doctrine integrity verified:
-  ✓ 13,408 tests / 30 skipped / 0 failures (217s full sweep)
-  ✓ 23 new tests across chapters 821-825 all pass
-  ✓ Cargo workspace clean across 22 crates
-  ✓ check_god_files.sh: PASS (0 errors, 9 informational warnings)
-  ✓ check_sdk_import_boundaries.sh: PASS (0 violations)
-  ✓ check_substrate_residuals.sh: PASS (0 TODOs, 0 production
-    prints, 59 force-unwraps at 0.20/kLOC well under threshold)
-  ✓ Zero deletions across 36 modified files (only additions,
-    refactor-equivalent rewrites, or // commented-out content)
-  ✓ Native % stable at 16.16% (in honest-estimate 16-18% range)
+5. **极致 轻量化 archival** (chapters 八百二十七-八百二十八):
+   moved ~43K LOC of dormant doctrine OUT of live Sources+Tests tree
+   into Archive/Deactivated/ as `.txt` files:
+   - Chapter 八百二十七:25K // commented `phase2Registry
+     NativeChapters` block + 7K BASEntropyChapterIndex legacy
+     blocks + 4K BASChapterDoctrineRegistry+AllLiterals legacy
+     block (-35,881 LOC from live tree)
+   - Chapter 八百二十八:11 `#if false` dead bodies extracted
+     across schema-completeness test (5,494 LOC body) + 10 others
+     (-6,770 LOC from live tree)
+   - Top god-file shrunk from 25,215 → 178 LOC
 
----
+6. **Operational polish** (chapter 八百二十九):
+   - Wired 3 CI gates as git pre-commit hook
+     (`scripts/pre-commit-gates.sh` + `.githooks/pre-commit`)
+   - Wrote CONTRIBUTING.md documenting doctrine pin discipline +
+     CI gate flow + archive convention + release process
+   - Fixed 5 pre-existing Cargo warnings (`bas-event-log-codec` +
+     `bas-retrieval-ranker`)
+   - Consolidated 3 prior [Unreleased] headers into this one
+     (was reader-confusing dual-snapshot structure)
 
-## [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY EVOLUTION (sub-arc snapshot pre-审查)
+### Cumulative measurements
 
-Tag candidate: v0.61.0 (post-evolution arc)。 Covers chapters
-七百九十八 → 八百二十 / M2641-M2755 (23-chapter combined mini-arc
-completing the storage-adapter activation,batch fast paths,
-audit-loop closure,time-windowing,full-pipeline stress
-validation,read-side replay engine,cross-session diff,
-archival/compaction,and round-trip restore validation)。
+| Metric | Pre-v0.59.0 | Now | Δ |
+|---|---:|---:|---|
+| Sources/ LOC | ~300K | 264K | -35K (-12%) |
+| Top god-file LOC | 25,215 | 3,603 | -21,612 |
+| Native % (raw LOC) | 11.67% | 13.01% | +1.34pp |
+| Native % (exec-LOC) | 16.16% | 16.12% | -0.04pp (stable in honest range) |
+| Rust crates | 12 | 22 | +10 |
+| SQL schemas | 10 | 29 | +19 |
+| Tests (full sweep) | ~13,170 | 13,408 | +238 |
+| 0-failure sweep | yes | yes | preserved |
+| Cargo warnings | 5 (pre-existing) | 0 | -5 |
+| Production-default Rust flips | 12 | 14-16 | +2-4 |
+| CI gates | 0 (planned, not shipped) | 3 (wired) | +3 |
 
-Five sub-arcs:
+### Doctrine pins held across all 32 chapters
 
- 0. (preserved from v0.60.0 candidate scope) Recording activation
-    + storage batch + audit loop + composition root + stress —
-    chapters 七百九十八 → 八百十五 ship 4 recorders,6
-    appendBatch methods,replay helpers,aggregation primitives,
-    time-windowing,full-pipeline stress test,BASAuditPipeline
-    composition root。
- 1. AUDIT REPLAY EVOLUTION sub-arc (chapters 八百十六 → 八百二十):
-    - BASAuditReplayEngine session loader (chapter 八百十六)
-    - BASAuditTrailDiff cross-session ID delta (chapter 八百十七)
-    - BASAuditTrailArchive compression (~9× reduction, chapter 八百十八)
-    - Round-trip restore stress test (chapter 八百十九)
-    - Mini-arc 4 seal (chapter 八百二十)
-
-### Added — AUDIT REPLAY EVOLUTION (chapters 八百十六 → 八百二十)
-
-The audit loop is now bidirectional:hosts can write via
-`BASAuditPipeline`,read via `BASAuditReplayEngine`,diff two
-trails via `BASAuditTrailDiff`,and compress old trails via
-`BASAuditTrailArchive`。
-
-| Chapter | Module | Capability | Tests |
-|---|---|---|---|
-| 八百十六 | BASAuditReplayEngine | loadSession / loadAndSummarize | 6 |
-| 八百十七 | BASAuditTrailDiff | per-store ID delta + summaryLines | 6 |
-| 八百十八 | BASAuditTrailArchive | per-turn compression (~9×) | 7 |
-| 八百十九 | (test only) | 50-turn round-trip restore through SQLite | 2 |
-
-Use cases enabled:
- - Resume audit state after process restart (existing capability
-   from chapter 七百九十二 SQLite stores,now exposed via
-   typed `SessionAuditTrail`)
- - Diagnose「what changed between session A and session B」
- - Verify post-replay state matches pre-replay (round-trip
-   identity check at audit-trail level)
- - Bound on-device storage for long-running hosts via archival
-   compression (preserves aggregate-level information,drops
-   per-event detail)
- - Detect dropped/duplicated rows during on-device ↔ cloud sync
-   (foundation for future device-sync arc)
-
----
-
-## [Unreleased - v0.60.0 RECORDING + STORAGE BATCH (snapshot)]
-
-Tag candidate (intermediate): v0.60.0。 Covers chapters 七百九十八
-→ 八百十四 / M2641-M2725 (17-chapter combined mini-arc completing
-the storage-adapter activation,batch fast paths,audit-loop closure,
-time-windowing,and full-pipeline stress validation)。 Four sub-arcs:
-
- 1. Chapters 七百九十八-八百二:Recording activation — 4 recorder
-    utilities turn the v0.59.0 storage adapters from「protocol
-    exists」 into「production-default-ready opt-in side channels」。
- 2. Chapters 八百三-八百七:Storage batch optimization — transaction-
-    wrapped appendBatch on all 6 SQLite stores + InMemory vs SQLite
-    informational perf scorecard (3-38× speedup measured)。
- 3. Chapters 八百八-八百十一:Audit-loop completion — per-turn
-    integration test + recorder replay helpers + per-session
-    aggregation primitives。
- 4. Chapters 八百十二-八百十四:Query + stress + seal — half-open
-    time-window helpers + 100-turn full-pipeline stress test +
-    final scorecard。
-
-### Added — Time-windowed audit queries (chapter 八百十二)
-
-`BASRoutedAuditTimeWindow` ships per-type filters for the 6
-audit record shapes (presence / unknown / contradiction-resolved
-/ contradiction-unresolved / version / deletion / atom-event)。
-Half-open `[startMs, endMs)` convention pinned。 `since(sinceMs:)`
-shortcut equals `between(sinceMs, .max)`。 Stable filter preserves
-input insertion order。 10 invariant tests cover edge cases
-including the nullable `resolvedAtMs` column on schema 012。
-
-### Added — Audit pipeline stress test (chapter 八百十三)
-
-100-turn realistic per-session load:5 presence + 3 unknowns +
-1 contradiction per turn = 900 audit records persisted through
-SQLite。 Exercises the FULL pipeline (record → batch → query
-→ replay → aggregate → time-window) end-to-end。 Per-channel
-+ per-kind counts hit exactly 100 each as expected;time-window
-slices to the middle 50 turns yield exactly 250 records;
-replay of turn-42 reconstructs the original BASUnknownSet
-byte-equivalent。 Completes in 0.140s。
-
-### Added — Audit loop closure (chapters 八百八 → 八百十)
-
-The recording loop is now FULLY CLOSED:host → recorder → store
-→ query → replay → aggregate → host。 Hosts can persist audit
-trails through SQLite,survive cold restart,reconstruct runtime
-types,and roll up into per-session summaries without
-substrate-side code paths needing modification。
-
-| Chapter | What |
-|---------|------|
-| 八百八 | Per-turn integration test exercising all 4 recorders + 6 stores end-to-end (4 tests) |
-| 八百九 | Recorder replay helpers — inverse functions of the encoding (channelByte↔kind,reconstructUnknownSet,reconstructContradictions) (11 tests) |
-| 八百十 | Per-session aggregation primitives (PresenceSessionSummary / UnknownSessionSummary / ContradictionSessionSummary) (8 tests) |
-
-### Added — Storage batch optimization (chapters 八百三 → 八百七)
-
-Per-store `appendBatch` (or `appendEventBatch` / `appendVersion`-
-variants) on every storage adapter pair。 SQLite path wraps N
-inserts in `BEGIN IMMEDIATE; ...; COMMIT;` with a single re-used
-prepared statement;InMemory path mirrors the API via per-record
-loop (actor isolation suffices)。 ROLLBACK on first error keeps
-the「append-only audit log」 semantic atomic per batch。
-
-Measured speedups (200-event batches,Apple Silicon SSD):
-
-| Store | per-call | batch | speedup |
-|-------|----------|-------|---------|
-| L8 atom-lifecycle (023)            | 66 μs | 16 μs | 3.8-4.1× |
-| L7 unknown-ledger (011)            | ~20 μs | ~0.5 μs | 38.5× |
-| L7 contradiction-ledger (012)      | — | — | (test pinned to ≥3× floor) |
-| L6 presence-observations (013)     | ~30 μs | ~1.6 μs | 18.7× |
-| L5 host-constitution-version-tree (014) | — | — | (test pinned to ≥3× floor) |
-| L5 host-constitution-deletion (015)| — | — | (test pinned to ≥3× floor) |
-
-Variance reflects per-store column complexity (L8 has 4 byte-to-
-string mappers per row;L7 unknown has 6 primitive columns)。
-Theoretical max not reached because synchronous=NORMAL still
-issues fsync per WAL frame inside the transaction。
-
-### Added — Storage InMemory vs SQLite scorecard (chapter 八百三)
-
-Honest informational measurement (no flip rule):
-- InMemory: 437-585 ns/append (O(1) array + dict index)
-- SQLite (single-call): 36-62 μs/append (60-140× slower than InMemory)
-- SQLite (batched, chapter 八百四+): 0.5-16 μs/append
-
-Hosts choose per durability vs latency budget。 Both paths stay
-opt-in per ADR-014。
-
-### Added — 4 routed-recorder utilities (29 new tests)
-
-Each recorder pairs a substrate runtime surface with a host-
-supplied storage conformer。 「依旧 不删除 只 comment」 — original
-runtime paths untouched;recorders are purely additive opt-in seams。
-
-| Recorder | Pairs with | Tests |
-|---|---|---|
-| BASRoutedPresenceFusionRecording | L6 fuse + BASPresenceObservationStore (013) | 5 |
-| BASRoutedMirrorBladeRecording | L7 BASUnknownSet/BASContradictionRecord + 011/012 stores | 8 |
-| BASRoutedAtomLifecycleRecording | L8 BASAtomLifecycleBridge + 023 store | 7 |
-| BASRoutedHostConstitutionRecording | L5 host-constitution mutation + 014/015 stores | 9 |
-
-Common shape across all 4 recorders:
-- Pure `record...(...)` entry point (all platforms,no Rust dep)
-- Composite `...andRecord(...)` entry point where applicable
-  (iOS/macOS only when paired with Rust bridge invocation)
-- SQLite cold-restart proven (write → close → reopen → match)
-- Doctrine-pinned defaults (per-category confidence,salience
-  semantics,refs JSON encoding,etc。)
-
-### Added — Schema-aligned enums + helpers
-
-- `BASRoutedPresenceFusion.channelKindByByte` — schema-013 string
-  array indexed by Rust `PresenceChannel` byte (task / risk /
-  manipulation / environment / bodyRhythm)
-- `BASRoutedMirrorBladeRecording.UnknownRecordingConfig` —
-  per-category confidence overrides + init-time clamp01
-- `BASRoutedMirrorBladeRecording.ContradictionRecordingConfig` —
-  defaultConfidence + inlineRefs knobs
-- `BASRoutedAtomLifecycleRecording.RecordingError.invalidTransitionByte`
-  — fail-fast on out-of-range bridge input,store stays clean
-- `BASRoutedHostConstitutionRecording.DeletionType` — schema-015
-  CHECK literal enum (cascade / selective / rollback) pinned via
-  rawValue mapping + exhaustive-case test
-
-### Doctrine pins preserved
-
-- 不要 删除 只能 comment — every recorder lives in a new file;
-  no edit to existing routed paths or storage adapters
-- ADR-014 OPT-IN — host supplies the store conformer (InMemory
-  reference or SQLite-backed);substrate default behavior unchanged
-- 不要 json 可以的话 就 sql — typed columns + JSON only for
-  variadic ref arrays (target_refs / cascaded_refs / merged_from)
-- 整体 性能 效果 一定要 更好 — CryptoKit SHA-256 default for L5
-  signature_hash (hardware-accelerated AMX engine,~34× faster
-  than software Rust path per chapter 七百四 measurement)
-- 亏的不要硬上 — composite Rust+record path platform-gated to
-  iOS/macOS;pure recordTransition entry point available
-  cross-platform
-
-### Test sweep
-
-29 new tests across 4 chapter-XYZ files,all green。 No existing
-test touched。 Storage adapters from v0.59.0 are now exercised
-through realistic write paths,not just unit-tested scaffold。
+- 不变量 #1 / #2 / #3
+- 红线 7
+- ADR-014 OPT-IN
+- 不要 删除 只能 comment → 不要 的 部分 都 archive
+- 不要 json 可以的话 就 sql
+- 整体 性能 效果 一定要 更好
+- 亏的不要硬上
+- 多做比较
 
 ---
 

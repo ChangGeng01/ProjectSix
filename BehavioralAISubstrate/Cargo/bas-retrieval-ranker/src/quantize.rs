@@ -235,7 +235,7 @@ mod tests {
     fn quantize_round_trip_typical_embedding_values() {
         // Typical embedding values in [-1, 1]
         let x: Vec<f32> = (0..100)
-            .map(|i| ((i as f32) / 50.0 - 1.0))
+            .map(|i| (i as f32) / 50.0 - 1.0)
             .collect();
         let y = quantize_dequantize_roundtrip(&x);
         // Error per element ≤ scale / 2 = 1/254 ≈ 0.004
@@ -350,7 +350,7 @@ mod tests {
         // 1024 Float32 → 1024 int8 + 1 scale = 1029 bytes
         // vs 4096 bytes Float32。 ~3.98× savings。
         let x: Vec<f32> = (0..1024)
-            .map(|i| (i as f32 / 1024.0))
+            .map(|i| i as f32 / 1024.0)
             .collect();
         let (q, _) = quantize_int8(&x);
         let f32_bytes = x.len() * 4;

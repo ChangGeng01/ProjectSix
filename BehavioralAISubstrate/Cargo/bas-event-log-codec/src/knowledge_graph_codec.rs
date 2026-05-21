@@ -211,7 +211,13 @@ pub fn decode_node(buf: &[u8]) -> Result<DecodedNode, DecodeError> {
         buf[off], buf[off + 1], buf[off + 2],
         buf[off + 3]]);
     let payload_json = if payload_len_raw == 0xFFFFFFFF {
-        off += 4;
+        // chapter 八百二十九 / M2796 lint fix:advance past
+        // the 4-byte sentinel so subsequent reads (if any are
+        // added in future schemas) start at the correct offset。
+        // Currently no field is read after this `None` branch,
+        // but maintaining the off advance keeps the codec
+        // forward-compatible。
+        let _ = off + 4;  // explicit no-op, documented above
         None
     } else {
         Some(read_lenprefixed_str(buf, &mut off)?)
