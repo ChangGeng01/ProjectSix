@@ -1,7 +1,13 @@
-# BehavioralAISubstrate — phase-4-chapter-721-aggressive-evolution
+# BehavioralAISubstrate — phase-5-chapter-758-deeper-layer-migration-arc
 
-**Branch arc:** chapter 七百二 / M2167 → chapter 七百七十三 / M2520
-**Status:** SEALED — 72 chapter-shaped tags, ~341 knives, ~1010 commits
+**Branch arc:** chapter 七百二 / M2167 → chapter 七百八十六 / M2585
+**Status:** ACTIVE — 85 chapter-shaped tags, ~406 knives, ~1075 commits
+
+**This branch (phase-5)** opened at chapter 七百七十四 / M2521 with the
+L13 Phase 2 first cut + L13 SQL ledgers + L13 close-out + production-default
+Rust flips (red-team / presence / world-prior / shadow-trial) + L8 memory
+hot-path migration (atom-lifecycle) + cross-platform fallback validation
++ v0.58.0 prep.
 
 ## Arc trajectory
 

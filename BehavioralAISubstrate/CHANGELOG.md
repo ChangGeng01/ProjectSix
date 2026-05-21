@@ -9,6 +9,112 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
+## [0.58.0] — 2026-05-21 — POST-FLIP PRODUCTION ACTIVATION ARC
+
+Tag covers chapters 七百七十四 → 七百八十六 / M2521-M2585
+(13 follow-on chapters after v0.57.0 sealed). Theme:translate
+the v0.57.0 byte-equality groundwork into actual production
+defaults via empirical 5-axis perf measurement,then close the
+loop with the L13 Phase 2 + L8 mini-arcs。
+
+### Added — 2 new Rust crates (22 total)
+
+- `bas-shadow-trial` (chapter 七百七十四) — L13 Phase 2 state
+  machine port mirroring BASShadowTrialStateMachineCore byte-for-
+  byte。 Adapter `BASShadowTrialRustStateMachine` conforms to
+  Phase 1 protocol seam,injectable via
+  `BASShadowTrialCoordinator.makeWithDefaultStateMachine`。
+- `bas-atom-lifecycle` (chapter 七百八十二) — L8 memory atom
+  5-phase state machine (Created → Admitted → Linked → Archived →
+  Tombstoned) with 20-cell transition matrix。
+
+### Added — 4 new SQL schemas (24 total)
+
+- `020_shadow_trial_records` (chapter 七百七十五) — L13 trial
+  audit ledger
+- `021_evolution_seals` (chapter 七百七十五) — L13 seal records
+- `022_retraction_orders` (chapter 七百七十五) — L13 retraction
+  audit
+- `023_atom_lifecycle_events` (chapter 七百八十四) — L8 atom
+  phase transition event log
+
+### Added — Swift bridge surface
+
+- `BASInternalRustBridges.swift` (post-arc activation B,
+  chapter 七百七十四 + 七百八十三):@_silgen_name bindings for
+  6 internal-only crates — lease-life,mirror-blade,
+  presence-eye,host-constitution,world-prior,shadow-trial,
+  atom-lifecycle (+ red-team-bench via module map)
+- `BASShadowTrialRustStateMachine` adapter +
+  `makeWithDefaultStateMachine` factory (chapters 七百七十六 +
+  七百八十一) — Rust state machine pluggable into the existing
+  Swift coordinator via init param
+
+### Added — Production-default Rust flips (4 measured-flip routes)
+
+3 STRONG-FLIP (≥2× speedup) + 1 MODEST-FLIP (≥1.2×) — empirically
+justified per the chapter 七百七十八 BASCrossLanguagePerfHarness
++ chapter 七百七十九 cascade measurement:
+
+| Path                                    | Speedup |
+|-----------------------------------------|--------:|
+| `BASRedTeamBatchClassifier.classify`    | 8.71×   |
+| `BASRoutedPresenceFusion.fuse`          | 7.51×   |
+| `BASRoutedWorldPriorAggregation.*`      | 5.12×   |
+| `BASShadowTrialCoordinator.makeWith*`   | 1.24×   |
+
+All flips on iOS / macOS only;watchOS / Linux automatically
+falls back to Swift V1 path (chapter 七百八十五 cross-platform
+validation suite proves the fallbacks remain byte-equal)。
+
+### Added — Cross-platform validation discipline
+
+- `BASCrossLanguagePerfHarness` (chapter 七百七十八):reusable
+  perf framework with typed verdict enum (STRONG-FLIP ≥2× /
+  MODEST-FLIP ≥1.2× / TIE 0.83×-1.2× / LOSS <0.83×)
+- 47-fixture cross-language equivalence suite (chapter 七百八十五)
+  asserts Swift fallback ≡ Rust route for every production-flip
+  routed path
+
+### Changed
+
+- XCFramework rebuilt 3 times across the arc to bundle progressively
+  more crates:
+  - chapter 七百七十三 第二刀:12 → 20 crates (DEEPER ARC close-out)
+  - chapter 七百七十四 第一刀:20 → 21 crates (+shadow-trial)
+  - chapter 七百八十三:21 → 22 crates (+atom-lifecycle)
+- Final macos-arm64 slice SHA:
+  `5e5bb95fa794acb8529c41903d1174f44e666c7ec17fede2564896c28811c281`
+- All 3 SHA pins (BASRustCoreBridge constants + matching tests)
+  bumped + tracked in commit history
+
+### Honest negative results (held to record)
+
+- bas-host-constitution measured **PERFECT TIE (1.00×)** at chapter
+  七百七十九 — FFI overhead exactly cancels Rust compute savings。
+  Stays opt-in per 「亏的不要硬上」。
+- bas-lease-life (1.18×) and bas-mirror-blade (0.99×) also TIE —
+  not flipped。
+- Plan-agent estimates predicted TIE-or-modest for presence-eye
+  and world-prior;actual measurements showed STRONG-FLIP (7.51×
+  and 5.12×)。 Honest「surprise」 captured in chapter 七百七十九
+  commit log。
+
+### Architecture milestones
+
+- **Rust crate count:** 20 → 22 (+2)
+- **SQL schema count:** 19 → 24 (+5 across L13 + L8 sub-arcs)
+- **Production-default Rust paths:** 12 (pre-arc) → 16
+  (+4 from this arc:red-team + presence + world-prior +
+   shadow-trial production factory)
+- **Bridge tests:** 86 cross-language tests (52 internal +
+  34 SHA pin) + 16 strong-flip equivalence + 47 cross-platform
+  fallback = 149 cross-language assertions
+- **「依旧 不删除 只 comment」 doctrine** held throughout:
+  every Swift V1 path preserved as fallback,not deleted
+
+---
+
 ## [0.57.0] — 2026-05-21 — DEEPER LAYER-MIGRATION ARC SEAL
 
 Tag covers chapters 七百五十八 → 七百七十三 / M2441-M2520 (16-chapter
