@@ -1,0 +1,122 @@
+# ARCHIVED #if false BODY — chapter 八百二十八 / M2791-M2795
+#
+# 「不要 删除 只能 comment」 → 「不要 的 部分 都 archive」 evolution
+# (extending chapter 八百二十七's // commented-block pattern to
+#  #if false / #endif wrapped dead bodies)。
+#
+# ## Where this came from
+#
+#   Source: Tests/BehavioralAISubstrateTests/BASChapter753VerdictEngineFlipTests.swift
+#   Block:  #if false ... #endif at lines 171-259
+#   Size:   89 LOC
+#
+# ## Why it's archived
+#
+# This block was wrapped in #if false ... #endif per the earlier
+# 「依旧 不删除 只 comment」 discipline。 It's Swift code that
+# compiled BEFORE deactivation,but is now dead — SPM skips it
+# entirely because of the false conditional。 Per the chapter 八百
+# 二十七 pattern,we now archive dead bodies out of the live tree
+# rather than leaving them lurking in source files。
+#
+# ## How to restore (if ever needed)
+#
+#   1. Strip the leading 「# 」 from each line of this header
+#   2. Drop the trailing wrapper lines that are now just bookends
+#   3. Paste the Swift body back into the original source file at
+#      the extracted-lines range above
+#   4. Wrap with #if true (or remove the wrapping entirely)
+#
+# .txt extension ensures Swift Package Manager does NOT compile
+# this content。 Original body preserved verbatim below。
+#
+# ============================================================
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
+    func testPrintChapter753VerdictFlipScorecard() {
+        print("")
+        print("=================================================================")
+        print(
+            "  CHAPTER 七百五十三 第一刀 / M2433 — L14 VERDICT FLIP")
+        print("=================================================================")
+        print("")
+        print("### User directive 2026-05-20")
+        print("")
+        print(
+            "  「chapter 七百五十二 (L14 Verdict engine flip —")
+        print(
+            "   13.84× win) ready as next step。 也一起 解决了」")
+        print("")
+        print("### Default flipped")
+        print("")
+        print(
+            "  BASSovereignVerdictEngine.useRoutedVerdictLevel")
+        print(
+            "    false → true")
+        print("")
+        print("### Measured baseline (chapter 七百四十二 第四刀)")
+        print("")
+        print(
+            "  Axis 1 perf:           13.84× Rust ✅ (BIGGEST)")
+        print(
+            "  Axis 2 memory:         TIED (no alloc)")
+        print(
+            "  Axis 3 state-machine:  TIED (both exhaustive 8 levels)")
+        print(
+            "  Axis 4 persistence:    N/A (pure compute)")
+        print(
+            "  Axis 5 byte-equality:  ✅ pinned at chapter 七百四十二")
+        print("")
+        print("### What moves to Rust at this knife")
+        print("")
+        print(
+            "  - Stage 2:soft-signal lex-order → level")
+        print(
+            "  - Stage 3:evidence-insufficient toolCut upgrade")
+        print(
+            "  - Hard bitfield → level cap fusion")
+        print("")
+        print("### What stays in Swift")
+        print("")
+        print(
+            "  - Stage 1:evaluateHardRules → [HardRuleHit]")
+        print(
+            "    (needed for reasonCodes / revokedPermissions")
+        print(
+            "     metadata — Rust does not return these)")
+        print(
+            "  - Audit ledger append (CryptoKit + actor)")
+        print(
+            "  - pinnedDomain string (lex-order metadata)")
+        print("")
+        print("### Verification")
+        print("")
+        print(
+            "  24/24 BASSovereignVerdictEngineTests pass ✅")
+        print(
+            "  100-case random byte-equality test pass ✅")
+        print(
+            "  Build clean,zero warnings ✅")
+        print("")
+        print("### MATURATION ARC progress")
+        print("")
+        print(
+            "  chapter 七百五十:    Plan-agent gap triage")
+        print(
+            "  chapter 七百五十一:  L14 seal + L8 reducer + L11 SQL")
+        print(
+            "  chapter 七百五十二:  doctrine 大幅度 缩减 (-11k LOC)")
+        print(
+            "  chapter 七百五十三:  ✅ L14 verdict flip (THIS)")
+        print(
+            "  chapter 七百五十四:  L11 EBrainRiskPlaneCore swap (next)")
+        print(
+            "  chapter 七百五十五:  L10 BASTribunalFullBody swap")
+        print(
+            "  chapter 七百五十六:  Arc seal + scorecard")
+        print("")
+
+        // Smoke assertions
+        XCTAssertTrue(
+            BASSovereignVerdictEngine.useRoutedVerdictLevel)
+    }
+#endif  // chapter 七百五十七 第三刀

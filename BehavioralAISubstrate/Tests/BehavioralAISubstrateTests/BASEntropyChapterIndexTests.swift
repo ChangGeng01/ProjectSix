@@ -225,57 +225,7 @@ final class BASEntropyChapterIndexTests: XCTestCase {
             failures.joined(separator: "\n"))
     }
 
-#if false  // chapter 七百五十二 第二刀 deactivated
-    func testIndexMirrorsChapter427() {
-        let entry = BASEntropyChapterIndex.entry(
-            forTag: BASChapter427EntropyDoctrine
-                .chapterTag)
-        XCTAssertEqual(
-            entry?.mNumberFirst,
-            BASChapter427EntropyDoctrine.mNumberFirst)
-        XCTAssertEqual(
-            entry?.mNumberLast,
-            BASChapter427EntropyDoctrine.mNumberLast)
-    }
-
-    func testIndexMirrorsChapter432() {
-        let entry = BASEntropyChapterIndex.entry(
-            forTag: BASChapter432EntropyDoctrine
-                .chapterTag)
-        XCTAssertEqual(
-            entry?.mNumberFirst,
-            BASChapter432EntropyDoctrine.mNumberFirst)
-        XCTAssertEqual(
-            entry?.mNumberLast,
-            BASChapter432EntropyDoctrine.mNumberLast)
-    }
-
-    // MARK: - M1108 deep-review extension cross-mirror
-
-    func testIndexMirrorsChapter430() {
-        let entry = BASEntropyChapterIndex.entry(
-            forTag: BASChapter430EntropyDoctrine
-                .chapterTag)
-        XCTAssertEqual(
-            entry?.mNumberFirst,
-            BASChapter430EntropyDoctrine.mNumberFirst)
-        XCTAssertEqual(
-            entry?.mNumberLast,
-            BASChapter430EntropyDoctrine.mNumberLast)
-    }
-
-    func testIndexMirrorsChapter433() {
-        let entry = BASEntropyChapterIndex.entry(
-            forTag: BASChapter433EntropyDoctrine
-                .chapterTag)
-        XCTAssertEqual(
-            entry?.mNumberFirst,
-            BASChapter433EntropyDoctrine.mNumberFirst)
-        XCTAssertEqual(
-            entry?.mNumberLast,
-            BASChapter433EntropyDoctrine.mNumberLast)
-    }
-#endif  // chapter 七百五十二 第二刀
+// chapter 八百二十八 / M2791-M2795 — #if false BODY ARCHIVED (was 51 LOC) → Archive/Deactivated/Tests/BehavioralAISubstrateTests/BASEntropyChapterIndexTests_IfFalseBody.txt
 
     // MARK: - M1111 Wave 2 STAGE 1 — phase2Entries (31 entries)
 

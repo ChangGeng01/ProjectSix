@@ -248,56 +248,5 @@ final class BASChapter751RiskObservationsReplayTests: XCTestCase {
 
     // MARK: - 7. Scorecard print
 
-#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
-    func testPrintChapter751ThirdKnifeScorecard() {
-        print("")
-        print("=================================================================")
-        print(
-            "  CHAPTER 七百五十一 第三刀 / M2428 — L11 SQL go-live")
-        print("=================================================================")
-        print("")
-        print("### User directive 2026-05-20")
-        print("")
-        print(
-            "  「SQL 不要只做 schema,继续接入真实持久化和 replay」")
-        print("")
-        print("### What lands")
-        print("")
-        print(
-            "  + Sources/BASPolicy/BASRiskObservationsSQLiteStorage.swift")
-        print(
-            "    - persistObservation(...)        write path")
-        print(
-            "    - loadObservations(sessionID:)   read path")
-        print(
-            "    - countObservations(band:since:) indexed COUNT")
-        print(
-            "    - schema applied on first open (idempotent)")
-        print("")
-        print("### Replay test coverage")
-        print("")
-        print(
-            "  1. Schema applies on first open ✅")
-        print(
-            "  2. Single observation round-trip ✅")
-        print(
-            "  3. 20-observation cold-restart replay ✅")
-        print(
-            "  4. ON CONFLICT idempotency ✅")
-        print(
-            "  5. Indexed COUNT by band + time-range ✅")
-        print(
-            "  6. Cross-session isolation ✅")
-        print("")
-        print("### Status")
-        print("")
-        print(
-            "  L11 SQL schema 七百三十八 → LIVE PERSISTENCE")
-        print(
-            "  Cold-restart replay verified deterministic")
-        print(
-            "  Chapter 七百三十八 第一刀 preamble queries are NOW REACHABLE")
-        print("")
-    }
-#endif  // chapter 七百五十七 第三刀
+// chapter 八百二十八 / M2791-M2795 — #if false BODY ARCHIVED (was 52 LOC) → Archive/Deactivated/Tests/BehavioralAISubstrateTests/BASChapter751RiskObservationsReplayTests_IfFalseBody.txt
 }

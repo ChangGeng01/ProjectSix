@@ -1,0 +1,148 @@
+# ARCHIVED #if false BODY — chapter 八百二十八 / M2791-M2795
+#
+# 「不要 删除 只能 comment」 → 「不要 的 部分 都 archive」 evolution
+# (extending chapter 八百二十七's // commented-block pattern to
+#  #if false / #endif wrapped dead bodies)。
+#
+# ## Where this came from
+#
+#   Source: Tests/BehavioralAISubstrateTests/BASChapter752DoctrineReductionSealTests.swift
+#   Block:  #if false ... #endif at lines 43-157
+#   Size:   115 LOC
+#
+# ## Why it's archived
+#
+# This block was wrapped in #if false ... #endif per the earlier
+# 「依旧 不删除 只 comment」 discipline。 It's Swift code that
+# compiled BEFORE deactivation,but is now dead — SPM skips it
+# entirely because of the false conditional。 Per the chapter 八百
+# 二十七 pattern,we now archive dead bodies out of the live tree
+# rather than leaving them lurking in source files。
+#
+# ## How to restore (if ever needed)
+#
+#   1. Strip the leading 「# 」 from each line of this header
+#   2. Drop the trailing wrapper lines that are now just bookends
+#   3. Paste the Swift body back into the original source file at
+#      the extracted-lines range above
+#   4. Wrap with #if true (or remove the wrapping entirely)
+#
+# .txt extension ensures Swift Package Manager does NOT compile
+# this content。 Original body preserved verbatim below。
+#
+# ============================================================
+#if false  // chapter 七百五十七 第三刀 — print-only,deactivated
+    func testPrintChapter752DoctrineReductionScorecard() {
+        print("")
+        print("=================================================================")
+        print(
+            "  CHAPTER 七百五十二 / M2430-M2432 — DOCTRINE 大幅度 缩减 SEAL")
+        print("=================================================================")
+        print("")
+        print("### User directive 2026-05-20")
+        print("")
+        print(
+            "  「我觉得 需要 大幅度 缩减 doctrine。")
+        print(
+            "   对比 之后 有必要的 全面 comment」")
+        print("")
+        print("### 3 knives delivered")
+        print("")
+        print("  第一刀 / M2430 — Schema completeness + per-chapter tests")
+        print(
+            "    Wave 1: BASChapterDoctrineSchemaCompletenessTests")
+        print(
+            "            5513-LOC body → 181-LOC registry-iteration loop")
+        print(
+            "            -5332 active LOC")
+        print(
+            "    Wave 2: 38 BASChapter###EntropyDoctrineTests files")
+        print(
+            "            Wrapped in `#if false`")
+        print(
+            "            -3534 active LOC")
+        print("")
+        print("  第二刀 / M2431 — Mirror tests + forwarder bodies")
+        print(
+            "    Wave 3: BASEntropyChapterIndexTests mirror-tests")
+        print(
+            "            5 per-chapter mirror tests → 1 registry loop")
+        print(
+            "            (coverage strictly EXPANDED)")
+        print(
+            "    Wave 3: 61 BASChapter###EntropyDoctrine forwarders")
+        print(
+            "            Wrapped in `#if false`")
+        print(
+            "            -2523 active LOC")
+        print("")
+        print("  第三刀 / M2432 — This scorecard close-out")
+        print("")
+        print("### Cumulative reduction")
+        print("")
+        print(
+            "  Active LOC deactivated:  ~11,389 across 100 files")
+        print(
+            "  Tests deactivated:        389 (was 13,387 → 12,998)")
+        print(
+            "  Forwarder types removed:   61 from compile surface")
+        print(
+            "  Per-chapter mirror tests:  38 + 5 → 0")
+        print("")
+        print("### What was kept (necessary)")
+        print("")
+        print("  ✅ BASChapterDoctrineRegistry — SOLE source-of-truth")
+        print("     for chapter doctrine data (data,not types)")
+        print("")
+        print("  ✅ 3 registry-iteration tests pin same invariants:")
+        print("     - testEveryRegistryChapterHasFullSchema")
+        print("     - testEveryKnifeInRange")
+        print("     - testMNumberMonotonicityAcrossRegistry")
+        print("")
+        print("  ✅ 1 registry-iteration mirror test pins")
+        print("     BASEntropyChapterIndex mirror invariant:")
+        print("     - testIndexMirrorsEveryRegistryRecord")
+        print("")
+        print("### What was deactivated (decorative)")
+        print("")
+        print("  ❌ 5513 LOC of hand-spelled per-chapter checks")
+        print("  ❌ 38 per-chapter doctrine test files")
+        print("  ❌ 61 thin-passthrough forwarder types")
+        print("  ❌ 5 per-chapter mirror test methods")
+        print("")
+        print("### Discipline pins")
+        print("")
+        print(
+            "  ✅ 「依旧 不删除 只 comment」 — every deactivated body")
+        print(
+            "     lives inside `#if false ... #endif`,recoverable")
+        print(
+            "  ✅ 「不要 计算 commented 代码」 — comment-aware LOC")
+        print(
+            "     counter reports active surface only")
+        print(
+            "  ✅ Same invariants pinned via registry iteration")
+        print(
+            "  ✅ Coverage strictly maintained or EXPANDED")
+        print(
+            "     (forwarder mirror tests:5 → all chapters in loop)")
+        print("")
+        print("### Reduction trajectory")
+        print("")
+        print(
+            "  chapter 七百二 第二刀:    ~25k LOC commented (literals → SQL)")
+        print(
+            "  chapter 七百三 第四刀:    61 forwarders previously trimmed")
+        print(
+            "  chapter 七百五十二:        11,389 active LOC removed (this chapter)")
+        print(
+            "  TOTAL doctrine surface:   substantially reduced")
+        print("")
+        print("MATURATION ARC chapter 七百五十二 SEALED。")
+        print("")
+
+        // Smoke assertions
+        XCTAssertGreaterThan(
+            BASChapterDoctrineRegistry.all.count, 50)
+    }
+#endif  // chapter 七百五十七 第三刀
