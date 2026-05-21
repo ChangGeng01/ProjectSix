@@ -160,12 +160,28 @@ public enum BASRoutedHostConstitutionRecording {
         return Data(digest)
     }
 
+    /// Deterministic JSON encoder shared by all ref-list encoders。
+    /// chapter 八百二十四 review fix:was creating a fresh
+    /// `JSONEncoder()` per call (allocation churn) AND it didn't
+    /// pin `.sortedKeys` output formatting — latent SHA-256
+    /// determinism risk if a future caller passes a struct (rather
+    /// than `[String]`) and expects byte-stable output across runs
+    /// or hosts。 `.sortedKeys` makes the output 字典 序 stable for
+    /// any object encoding。
+    public static let deterministicJSONEncoder: JSONEncoder = {
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        return enc
+    }()
+
     /// JSON-encode a list of refs as a stable array literal。
     /// Empty list → "[]" (still a valid JSON array)。
+    /// Reuses `deterministicJSONEncoder` (chapter 八百二十四) for
+    /// allocation efficiency + future-proof sorted-keys output。
     public static func encodeRefList(
         _ refs: [String]
     ) throws -> String {
-        let data = try JSONEncoder().encode(refs)
+        let data = try deterministicJSONEncoder.encode(refs)
         return String(decoding: data, as: UTF8.self)
     }
 

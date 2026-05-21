@@ -38,6 +38,65 @@ import BASRuntimeCore
 
 public enum BASRoutedAtomLifecycleRecording {
 
+    // MARK: - Schema 023 byte ↔ enum mirrors (chapter 八百二十四)
+    //
+    // The Rust `bas-atom-lifecycle` crate uses these byte
+    // discriminants for its state machine。 Until chapter 八百二十四
+    // the Swift side carried them as magic numbers + docstring
+    // notes (e.g。 "0=Created / 1=Admitted / 2=Linked / 3=Archived
+    // / 4=Tombstoned")。 These enums lift the contract into the
+    // type system so a misaligned byte fails at COMPILE time,
+    // not at runtime via wrong-phase persistence。
+    //
+    // ## Migration note
+    //
+    // Existing call sites still take raw `UInt8` parameters for
+    // back-compat with the Rust bridge's i32 ABI。 The enums are
+    // additive — hosts can either pass `.created.byteValue` or
+    // continue passing `0` directly。
+
+    /// Atom lifecycle phase (matches Rust `AtomPhase` discriminants)。
+    public enum Phase: UInt8, Sendable, CaseIterable, Codable {
+        case created = 0
+        case admitted = 1
+        case linked = 2
+        case archived = 3
+        case tombstoned = 4
+
+        public var byteValue: UInt8 { rawValue }
+
+        public static func from(byte: UInt8) -> Phase? {
+            return Phase(rawValue: byte)
+        }
+    }
+
+    /// Atom lifecycle action (matches Rust `AtomAction`)。
+    public enum Action: UInt8, Sendable, CaseIterable, Codable {
+        case admit = 0
+        case link = 1
+        case archive = 2
+        case tombstone = 3
+
+        public var byteValue: UInt8 { rawValue }
+
+        public static func from(byte: UInt8) -> Action? {
+            return Action(rawValue: byte)
+        }
+    }
+
+    /// Transition outcome (matches Rust outcome enum)。
+    public enum Outcome: Int32, Sendable, CaseIterable, Codable {
+        case advanced = 0
+        case rejectedIllegal = 1
+        case rejectedTerminal = 2
+
+        public var int32Value: Int32 { rawValue }
+
+        public static func from(int32: Int32) -> Outcome? {
+            return Outcome(rawValue: int32)
+        }
+    }
+
     // MARK: - Pure recorder (all platforms)
 
     /// Persist one atom-lifecycle event。 Caller has already

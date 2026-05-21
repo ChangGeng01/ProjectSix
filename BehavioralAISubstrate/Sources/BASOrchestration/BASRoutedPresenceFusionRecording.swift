@@ -98,6 +98,23 @@ extension BASRoutedPresenceFusion {
         // Append records in input order with stable index-suffixed
         // event IDs。 Each record carries the same observed_at_ms
         // because they share the same fusion-call timestamp。
+        //
+        // chapter 八百二十四 review note:the index suffix here
+        // encodes the ORIGINAL input position (not the persisted
+        // position)。 Out-of-range observations leave GAPS in the
+        // suffix sequence — that's the deliberate「traceability」
+        // contract pinned by chapter 798's
+        // testFuseAndRecordSkipsOutOfRangeChannelByte (the
+        // recovered eventIDs are `[ev-skip-0, ev-skip-2]` for an
+        // input `[valid, invalid, valid]`)。 The 严查 review
+        // agent flagged a「collision risk」 that on closer
+        // inspection does NOT exist:hosts who reuse the same
+        // `eventIDPrefix` across calls collide on the SAME
+        // suffix (e.g。 two calls with `[valid]` both write
+        // `prefix-0`),which surfaces as the store's
+        // `duplicateEventID` throw — exactly the documented
+        // contract。 Hosts must use a unique prefix per call
+        // (e.g。 `"p-turn-\(turnID)"` or UUID-based)。
         for (idx, obs) in observations.enumerated() {
             guard let kind = channelKind(forByte: obs.channelByte)
             else { continue }
