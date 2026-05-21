@@ -9,12 +9,48 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — RECORDING ACTIVATION MINI-ARC
+## [Unreleased] — RECORDING ACTIVATION + STORAGE BATCH MINI-ARC
 
-Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百二 /
-M2641-M2665 (5-chapter mini-arc activating the 6 storage adapters
-shipped in v0.59.0 — turns them from「protocol exists」 into
-「production-default-ready opt-in side channels」)。
+Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百七 /
+M2641-M2690 (10-chapter combined mini-arc:5 chapters activating
+the v0.59.0 storage adapters as opt-in side channels + 5 chapters
+adding transaction-wrapped batch fast paths to all 6 SQLite
+stores + InMemory vs SQLite informational perf scorecard)。
+
+### Added — Storage batch optimization (chapters 八百三 → 八百七)
+
+Per-store `appendBatch` (or `appendEventBatch` / `appendVersion`-
+variants) on every storage adapter pair。 SQLite path wraps N
+inserts in `BEGIN IMMEDIATE; ...; COMMIT;` with a single re-used
+prepared statement;InMemory path mirrors the API via per-record
+loop (actor isolation suffices)。 ROLLBACK on first error keeps
+the「append-only audit log」 semantic atomic per batch。
+
+Measured speedups (200-event batches,Apple Silicon SSD):
+
+| Store | per-call | batch | speedup |
+|-------|----------|-------|---------|
+| L8 atom-lifecycle (023)            | 66 μs | 16 μs | 3.8-4.1× |
+| L7 unknown-ledger (011)            | ~20 μs | ~0.5 μs | 38.5× |
+| L7 contradiction-ledger (012)      | — | — | (test pinned to ≥3× floor) |
+| L6 presence-observations (013)     | ~30 μs | ~1.6 μs | 18.7× |
+| L5 host-constitution-version-tree (014) | — | — | (test pinned to ≥3× floor) |
+| L5 host-constitution-deletion (015)| — | — | (test pinned to ≥3× floor) |
+
+Variance reflects per-store column complexity (L8 has 4 byte-to-
+string mappers per row;L7 unknown has 6 primitive columns)。
+Theoretical max not reached because synchronous=NORMAL still
+issues fsync per WAL frame inside the transaction。
+
+### Added — Storage InMemory vs SQLite scorecard (chapter 八百三)
+
+Honest informational measurement (no flip rule):
+- InMemory: 437-585 ns/append (O(1) array + dict index)
+- SQLite (single-call): 36-62 μs/append (60-140× slower than InMemory)
+- SQLite (batched, chapter 八百四+): 0.5-16 μs/append
+
+Hosts choose per durability vs latency budget。 Both paths stay
+opt-in per ADR-014。
 
 ### Added — 4 routed-recorder utilities (29 new tests)
 
