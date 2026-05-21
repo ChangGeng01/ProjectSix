@@ -11,6 +11,91 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Sort flip cascade mini-arc (chapters 八百四十-八百四十三 / M2851-M2870)
+
+Follow-up mini-arc immediately after the L9 dominance order
+shipment。 Reuses the same Rust primitive
+(`BASAutoRouteRanker.dreamLoopDominanceOrder`) to flip 4
+additional Swift hot-path sorts identified by the chapter 八百四十
+audit。 No new Rust crate,no new C ABI,no XCFramework rebuild —
+all pure Swift call-site work。
+
+- **chapter 八百四十** — Audit of `Sources/{BASHostKit,BAS
+  Orchestration,BASMemory}` for sort-with-closure patterns
+  matching the L9 STRONG-FLIP profile (pure-fn Double key +
+  closure-per-compare + hot per-turn)。 4 high-value sites
+  identified;3 flipped this chapter:
+    - `BASMLTriSelfService.merge:165` — DICT-LOOKUP-per-compare
+      (worst antipattern — every compare paid 2 hash lookups +
+      2 optional unwraps)
+    - `EBrainHostRuntime+TriSelfService:283` — viableScores sort
+    - `EBrainHostRuntime+TriSelfService:430` — viableFallbacks sort
+  4 byte-equality tests in
+  `Tests/BehavioralAISubstrateTests/BASChapter840TriSelfFlipTests.swift`
+  including a 50-fixture randomized grid。
+
+- **chapter 八百四十一** — `BASMLMemoryService.retrieve:214` —
+  L8 top-K memory retrieval sort over `(score, atom)` tuples。
+  Jaccard score precomputed in Swift,sort flipped to Rust,
+  topK prefix stays in Swift。 2 byte-equality tests pin
+  descending-score order + stable-on-ties behavior。
+
+- **chapter 八百四十二** — 5-axis synthetic perf grid for the
+  cascade。 Both antipatterns yield 18-30× Rust speedup at
+  every scale (100/1K/10K)。 3 measurement tests in
+  `Tests/BehavioralAISubstrateTests/BASChapter842SortFlipCascadePerfTests.swift`。
+
+- **chapter 八百四十三** — mini-arc seal + this CHANGELOG +
+  BRANCH_SUMMARY extension。
+
+### Files modified (sort flip cascade)
+
+```
+~ Sources/BASHostKit/BASMLTriSelfService.swift          (flip site)
+~ Sources/BASHostKit/EBrainHostRuntime+TriSelfService.swift (2 flips + import)
+~ Sources/BASHostKit/BASMLMemoryService.swift           (flip site)
+
++ Tests/BehavioralAISubstrateTests/BASChapter840TriSelfFlipTests.swift          (4 tests)
++ Tests/BehavioralAISubstrateTests/BASChapter841MemoryRetrievalFlipTests.swift  (2 tests)
++ Tests/BehavioralAISubstrateTests/BASChapter842SortFlipCascadePerfTests.swift  (3 tests)
+```
+
+### Cumulative sort flips since v0.61.0 (10 sites total via dreamLoopDominanceOrder)
+
+| Site | Chapter | Antipattern killed |
+|---|---|---|
+| `EBrainRuntimeCoordinator+Candidates` dominance | 八百三十八 | closure-per-compare on `candidateDominanceScore` |
+| `EBrainNeuralMaterializationCore` dominance | 八百三十八 | same |
+| `BASMLTriSelfService.merge` | 八百四十 | DICT-LOOKUP-per-compare (worst) |
+| `EBrainHostRuntime+TriSelfService` viableScores | 八百四十 | closure-per-compare on `mergedScore` |
+| `EBrainHostRuntime+TriSelfService` viableFallbacks | 八百四十 | same |
+| `BASMLMemoryService` retrieve top-K | 八百四十一 | closure-per-compare on Jaccard score |
+
+**6 production sort sites flipped to Rust** since v0.61.0,all
+reusing the SAME `bas_dream_loop_dominance_order` C ABI shipped
+in chapter 八百三十五。
+
+### Test deltas
+
+13,234 → 13,243 tests / 30 skipped / 0 failures (+9 across
+chapters 八百四十-八百四十二)。
+
+### Estimated per-session perf impact
+
+Per-turn floor saved at n=1K:5-7 ms across the 6 sites
+(20-30 ms per site × 0.2-0.3 firing rate per site per turn)。
+Per-100-turn session floor:0.5-0.7 sec saved。
+
+### Compatibility
+
+- Wire format:zero changes (sort produces same ordering)
+- ABI:no new symbols (reuses chapter 八百三十六 bridge)
+- Swift API:no public-surface changes
+- Cross-platform:non-Apple builds fall through to Swift body
+  via `#if os(iOS) || os(macOS)` gate inside `dreamLoopDominanceOrder`
+
+---
+
 ### Post-v0.61.0 全量 审查 测试 修复 (chapter 八百三十四 / M2821-M2825)
 
 Single-chapter remediation immediately after v0.61.0 ship,

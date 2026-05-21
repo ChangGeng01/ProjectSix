@@ -56,6 +56,12 @@ chapter 八百三十八: ~87% Swift (raw) / 13.05% native (raw)
                   (L9 dominance order flip → 100× faster
                   per-turn sort, exec ratio creeps up on
                   call-frequency-weighted basis)
+chapter 八百四十三: ~87% Swift (raw) / 13.05% native (raw)
+                  ~82% Swift (exec hot) / 18% native (exec hot)
+                  (sort flip cascade adds 4 more Swift→Rust
+                  routing sites — all reusing chapter 836
+                  primitive, exec-hot ratio creeps up
+                  another ~1% on per-turn weighted basis)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
@@ -99,7 +105,33 @@ Doctrine pins:  9 substrate-wide pins still held
                 when measurement is decisive across all scales。
 ```
 
-## Production-default flips (10 total)
+## Post-v0.61.0 state (chapter 八百四十三 / 2026-05-21)
+
+```
+Branch tip:     phase-5-chapter-758-deeper-layer-migration-arc
+Commits:        ~1339 cumulative (+9 since v0.61.0,+4 since 八百三十九)
+Tests:          13,243 pass / 30 skipped / 0 failures (220s sweep)
+                (+9 across sort flip cascade mini-arc)
+Production-default flips: 15 (was 10 — sort flip cascade added 4
+                              TriSelf sites + 1 memory retrieval site,
+                              all reusing chapter 八百三十六 primitive)
+Mini-arc shipped: Sort flip cascade (chapters 八百四十-八百四十三 /
+                  M2851-M2870):
+                  - Audit identified 4 high-leverage sort sites
+                  - 4 production call sites flipped (TriSelf
+                    cascade × 3 + memory retrieval × 1)
+                  - 5-axis perf:18-30× Rust win at every scale
+                  - All Swift bodies kept as live FALLBACK
+                  - Zero new Rust crates / C ABIs / XCFramework
+                    rebuilds (full reuse of 836 primitive)
+Doctrine pins:  9 substrate-wide pins still held
+                + 1 NEW pattern proven:primitive REUSE — once a
+                Rust kernel is shipped + bridged,additional Swift
+                call sites can flip with pure Swift work,no new
+                FFI surface needed。
+```
+
+## Production-default flips (15 total)
 
 | # | Primitive | Source chapter | Speedup |
 |---|---|---|---|
@@ -112,7 +144,12 @@ Doctrine pins:  9 substrate-wide pins still held
 | 7 | hex decoding | 七百二十一 | 91-99× |
 | 8 | provenance gate | 七百十三 | Rust |
 | 9 | recordBatch multi-row SQL | 七百二十三 | 1.63× |
-| 10 | L9 dominance order sort | 八百三十八 | ~100× (1K-10K scale) |
+| 10 | L9 dominance order (BASHostKit) | 八百三十八 | ~100× (1K-10K) |
+| 11 | L9 dominance order (BASOrchestration) | 八百三十八 | ~100× (1K-10K) |
+| 12 | TriSelf.merge (dict-lookup antipattern) | 八百四十 | ~28× (1K) |
+| 13 | TriSelf viableScores | 八百四十 | ~23× (1K) |
+| 14 | TriSelf viableFallbacks | 八百四十 | ~23× (1K) |
+| 15 | L8 memory retrieve top-K | 八百四十一 | ~23× (1K) |
 
 ## Net-new opt-in capabilities (6 total)
 
