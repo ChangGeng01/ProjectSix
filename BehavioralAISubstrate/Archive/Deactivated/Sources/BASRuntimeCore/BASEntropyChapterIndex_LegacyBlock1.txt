@@ -1,0 +1,374 @@
+# ARCHIVED LEGACY BLOCK — chapter 八百二十七 / M2786-M2790
+#
+# 「不要 删除 只能 comment」 → 「不要 的 部分 都 archive」 evolution。
+#
+# ## Where this came from
+#
+#   Source: Sources/BASRuntimeCore/BASEntropyChapterIndex.swift
+#   Block: radicalEvolutionEntries (7-chapter) Swift literal block
+#   Extracted lines: 164-499 (336 lines)
+#
+# ## Why it's archived
+#
+# This block was a // -prefixed Swift literal block preserved per the
+# earlier 「千万不要 删除 只能 commented 代码」 discipline。 At chapter
+# 七百二 第一/二/三刀 the live surface migrated to SQL-backed loaders;
+# the literal block stayed as // commented prose,growing the source
+# file to 99%-dormant LOC。
+#
+# Chapter 八百二十七 archives the block out of the live Sources/ tree
+# per user directive 「极致 优雅 轻量化 doctrine。 不要 的 部分 都 archive」。
+# Substrate dropped ~36K LOC (12% of total Sources/) without losing
+# any historical content。
+#
+# ## How to restore (if ever needed)
+#
+#   1. Strip the leading 「# 」 from each line of this header (lines
+#      starting with #)
+#   2. Strip the per-line 「// 」 prefix from the body below — that's
+#      the original Swift literal text
+#   3. Paste the result back into the original source file at the
+#      extracted-lines range above
+#   4. Re-validate against the SQL-backed surface to ensure parity
+#
+# .txt extension ensures Swift Package Manager does NOT compile this
+# content。 The body below is preserved verbatim — every line of the
+# original // commented block is here。
+#
+# ============================================================
+    // chapter 七百二 第三刀 LEGACY BLOCK — preserved per
+    // 「千万不要 删除」 directive。 The literal definition
+    // below is functionally equivalent to the SQL-backed
+    // computed property above (byte-equal via Codable
+    // round-trip)。 Per-line `// ` prefix avoids the
+    // nested-block-comment trap from string literals
+    // containing `/*` patterns。
+//     public static let radicalEvolutionEntries:
+//         [BASEntropyChapterEntry] =
+//     [
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百二十七",
+//             mNumberFirst: 1080,
+//             mNumberLast: 1083,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 13,
+//             futureCutsCount: 6,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP Phase A entry " +
+//                 "— V2 RUNTIME COMPOSITION SURFACE"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百二十八",
+//             mNumberFirst: 1084,
+//             mNumberLast: 1087,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 7,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP Phase B " +
+//                 "backfill — UNIFIED EVENT LOG PAYLOAD-" +
+//                 "KINDS BACKBONE"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百二十九",
+//             mNumberFirst: 1088,
+//             mNumberLast: 1091,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 3,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP Phase C " +
+//                 "backfill — LOW-ENTROPY GENERIC " +
+//                 "PRIMITIVES"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十",
+//             mNumberFirst: 1092,
+//             mNumberLast: 1095,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 5,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP Phase D " +
+//                 "backfill — CONSOLIDATION SCAFFOLDING"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十一",
+//             mNumberFirst: 1096,
+//             mNumberLast: 1099,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP Phase E entry " +
+//                 "— NATIVE APPLE SILICON FOUNDATION"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十二",
+//             mNumberFirst: 1100,
+//             mNumberLast: 1103,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 5,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP Phase F entry " +
+//                 "— HARDWARE-AWARE SCHEDULER COMPOSITION"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十三",
+//             mNumberFirst: 1104,
+//             mNumberLast: 1109,
+//             knivesCount: 6,
+//             entropyClassesCount: 6,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "RADICAL EVOLUTION SWEEP final close-" +
+//                 "out — sidecar + cumulative sweep " +
+//                 "doctrine + 2 deep-review remediation " +
+//                 "rounds (M1108 + M1109) + ADR-016 → " +
+//                 "M1107 → M1109 advance。 Loop closed"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十四",
+//             mNumberFirst: 1110,
+//             mNumberLast: 1115,
+//             knivesCount: 6,
+//             entropyClassesCount: 6,
+//             pinsCount: 11,
+//             futureCutsCount: 6,
+//             summary:
+//                 "POST-RADICAL safety substrate +" +
+//                 " canonical60 driver — external" +
+//                 " consumer audit (Qinao SDK reality" +
+//                 " reflected) + BASEntropyChapterIndex" +
+//                 " extended to 31 chapters +" +
+//                 " BASStressSweepCanonical60Driver" +
+//                 " (typed 60-fixture set + identity/" +
+//                 "divergence stub runners) + ADR-016 →" +
+//                 " M1115 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十五",
+//             mNumberFirst: 1116,
+//             mNumberLast: 1119,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 6 entry — FIRST" +
+//                 " production scheduler consumption。" +
+//                 " BASTurnRuntimeEngine.runWithPlan(...)" +
+//                 " now calls scheduler.assign(...) per" +
+//                 " stage step + captures decisions into" +
+//                 " typed BASTurnRuntimePlanAssignmentLedger。" +
+//                 " ADR-016 → M1119 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十六",
+//             mNumberFirst: 1120,
+//             mNumberLast: 1123,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 7 entry — FIRST" +
+//                 " ledger-driven dispatch。 BASNativeStage" +
+//                 "Executor.executePlanWithAssignments(...)" +
+//                 " reads assignment ledger + routes each" +
+//                 " stage via RoutedStageExecutor closure +" +
+//                 " captures honored vs fall-through into" +
+//                 " BASNativeStageDispatchLedger。 ADR-016" +
+//                 " → M1123 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十七",
+//             mNumberFirst: 1124,
+//             mNumberLast: 1127,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 8 entry — END-TO-END" +
+//                 " routed dispatch。 BASRuntimeInternal" +
+//                 "Delegate.runScaffoldedWithAssignments" +
+//                 "(...) bridges executor's routed path +" +
+//                 " engine.runWithPlan(...) branches on" +
+//                 " assignment ledger + captures dispatch" +
+//                 " ledger。 ADR-016 → M1127 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十八",
+//             mNumberFirst: 1128,
+//             mNumberLast: 1131,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 9 entry — HOST-SIDE" +
+//                 " INJECTION。 BASTurnRuntimeEngine" +
+//                 "Configuration gains routedStageExecutor" +
+//                 " + fallbackStageExecutor optional slots;" +
+//                 " engine threads them through to delegate" +
+//                 " automatically。 Substrate-side end-to-end" +
+//                 " is now COMPLETE — Qinao SDK can wire" +
+//                 " real backend dispatch via single config" +
+//                 " slot。 ADR-016 → M1131 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百三十九",
+//             mNumberFirst: 1132,
+//             mNumberLast: 1135,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 10 entry — DISPATCH" +
+//                 " ↔ EVENT LOG BRIDGE。 5th typed payload" +
+//                 " kind (.nativeStageDispatch) connects" +
+//                 " chapter 436 BASNativeStageDispatchLedger" +
+//                 " to Phase B's chapter 428 unified event" +
+//                 " log。 Replay surface complete — no more" +
+//                 " blackbox actor state for runtime" +
+//                 " decisions。 ADR-016 → M1135 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十",
+//             mNumberFirst: 1136,
+//             mNumberLast: 1139,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 11 entry — DISPATCH" +
+//                 " AUTO-EMIT。 BASTurnRuntimeEngine.run" +
+//                 "WithPlan(...) auto-emits dispatch event" +
+//                 " to configured event log when ledger" +
+//                 " non-empty。 Substrate-side autonomy" +
+//                 " COMPLETE — hosts only wire event log。" +
+//                 " ADR-016 → M1139 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十一",
+//             mNumberFirst: 1140,
+//             mNumberLast: 1143,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 12 entry — PLAN-" +
+//                 "ASSIGNMENT EVENT TYPE。 6th typed event" +
+//                 " payload kind on the unified event log;" +
+//                 " engine auto-emits captured scheduler" +
+//                 " decisions after dispatch event so" +
+//                 " capture → honor temporal order is" +
+//                 " replay-deterministic。 Substrate-side" +
+//                 " replay surface COMPLETE — full routed-" +
+//                 "dispatch story event-replayable from one" +
+//                 " canonical stream。 ADR-016 → M1143 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十二",
+//             mNumberFirst: 1144,
+//             mNumberLast: 1147,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 13 entry — REPLAY-" +
+//                 "REBUILD INTEGRATION。 BASEventLogReplay" +
+//                 "Bundle typed Sendable + Equatable +" +
+//                 " Hashable struct aggregates all 6" +
+//                 " projector outputs;13 round-trip" +
+//                 " integration tests prove byte-equal" +
+//                 " round-trip through real BASInMemoryEvent" +
+//                 "LogStorage + cross-kind isolation +" +
+//                 " sequenceNumber ordering preservation。" +
+//                 " Replay surface is PROVEN end-to-end。" +
+//                 " ADR-016 → M1147 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十三",
+//             mNumberFirst: 1148,
+//             mNumberLast: 1151,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 14 entry — CROSS-" +
+//                 "SESSION REPLAY ASSEMBLY。 BASEventLog" +
+//                 "ReplayBundle.merging(_:) + .combining(_:)" +
+//                 " typed composition + BASEventLogProjectors" +
+//                 ".projectAcrossAllSessions(from:" +
+//                 "sinceTimestampMs:limit:) async factory" +
+//                 " pulling events globally-time-ordered" +
+//                 " from storage。 14 cross-session" +
+//                 " integration tests。 Replay surface" +
+//                 " offers complete typed API for distributed" +
+//                 " consumers without boilerplate。 ADR-016" +
+//                 " → M1151 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十四",
+//             mNumberFirst: 1152,
+//             mNumberLast: 1155,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 15 entry — PER-STAGE" +
+//                 " EVENT PAYLOAD。 BASNativeStagePerStepEvent" +
+//                 "Payload typed Codable + 8 fields +" +
+//                 " factory bridging from chapter 439" +
+//                 " per-turn record + 7th BASEventPayloadKind" +
+//                 " case + EXTENDED BASEventLogReplayBundle" +
+//                 " to 7 fields。 Sibling of chapter 439" +
+//                 " per-turn dispatch event for fine-grained" +
+//                 " causal-graph extraction。 Engine does" +
+//                 " NOT auto-emit per-step events;hosts" +
+//                 " opt-in directly。 ADR-016 → M1155 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十五",
+//             mNumberFirst: 1156,
+//             mNumberLast: 1159,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 16 entry — FEDERATED" +
+//                 " EVENT LOG MULTI-BACKEND。 BASFederated" +
+//                 "EventLogStorage actor wraps N backend" +
+//                 " conformers + presents them as ONE" +
+//                 " unified event log via the existing" +
+//                 " BASEventLogStorage protocol。 Chapter" +
+//                 " 443 projectAcrossAllSessions(from:)" +
+//                 " accepts it as drop-in。 15 integration" +
+//                 " tests prove construction + routing +" +
+//                 " global ordering + propagation +" +
+//                 " determinism。 ADR-016 → M1159 advance"),
+//         BASEntropyChapterEntry(
+//             chapterTag: "chapter 四百四十六",
+//             mNumberFirst: 1160,
+//             mNumberLast: 1163,
+//             knivesCount: 4,
+//             entropyClassesCount: 4,
+//             pinsCount: 11,
+//             futureCutsCount: 4,
+//             summary:
+//                 "POST-RADICAL Wave 17 entry — POST-" +
+//                 "RADICAL EVOLUTION SWEEP CLOSE-OUT" +
+//                 " meta-doctrine。 BASPostRadicalSweep" +
+//                 "Doctrine typed namespace summarizes" +
+//                 " cumulative achievement (Waves 1-17," +
+//                 " chapters 427-446,M1080-M1163,84" +
+//                 " commits) + 8 substrate-side" +
+//                 " achievements + 5 explicitly deferred" +
+//                 " items + 10 doctrine pins held" +
+//                 " throughout。 Anchor for future" +
+//                 " chapter narratives。 ADR-016 → M1163" +
+//                 " advance"),
+//     ]
+
+    /// Number of RADICAL EVOLUTION chapters indexed
+    /// (7 after M1108 extension covering all 6 phase
+    /// chapters + the chapter 四百三十三 final close-out)。

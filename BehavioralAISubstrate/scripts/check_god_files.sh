@@ -40,9 +40,12 @@ DEFAULT_ERROR=3000
 # --- Pinned overrides ---
 # Format: each entry is "relative_path|max_loc|justification"
 PINS=(
-    "Sources/BASRuntimeCore/BASChapterDoctrineRegistry.swift|28000|chapter 466 doctrine registry — 61 historical literals + phase2 inline records (Phase-3 single source-of-truth)"
-    "Sources/BASRuntimeCore/BASEntropyChapterIndex.swift|8000|chapter 466 entropy index — 1 entry per chapter, SQL-backed"
-    "Sources/BASRuntimeCore/BASChapterDoctrineRegistry+AllLiterals.swift|5000|auto-extracted literals for 61 historical chapters per chapter 466"
+    # chapter 八百二十七 / M2786-M2790 — 3 former god-files archived
+    # to Archive/Deactivated/Sources/BASRuntimeCore/*_LegacyBlock.txt:
+    #   - BASChapterDoctrineRegistry.swift:        25,215 → 178 LOC
+    #   - BASEntropyChapterIndex.swift:             7,276 → 310 LOC
+    #   - BASChapterDoctrineRegistry+AllLiterals:   3,940 →  62 LOC
+    # All three now fall under the default warn threshold;no pin needed。
     "Sources/BASHostKit/BASCognitiveBrain.swift|4500|HostKit composition root — coordinates 10+ subsystems"
     "Sources/BASRuntimeCore/BASAutoRouteRanker.swift|4000|chapter 七百四 auto-routing thresholds + 5-axis verdict matrix"
     "Sources/BASMemory/BASMemoryUsageTracker.swift|3000|L8 usage tracker — 4 tier × 3 lifecycle × 5 capacity-bucket matrix"
