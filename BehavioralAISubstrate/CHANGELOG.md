@@ -9,21 +9,46 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — RECORDING ACTIVATION + STORAGE BATCH + AUDIT LOOP
+## [Unreleased] — STORAGE ACTIVATION + AUDIT LOOP COMPLETION
 
-Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百十一 /
-M2641-M2710 (14-chapter combined mini-arc completing the
-storage-adapter activation + analysis pipeline)。 Three sub-arcs:
+Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百十四 /
+M2641-M2725 (17-chapter combined mini-arc completing the
+storage-adapter activation,batch fast paths,audit-loop closure,
+time-windowing,and full-pipeline stress validation)。 Four sub-arcs:
 
  1. Chapters 七百九十八-八百二:Recording activation — 4 recorder
     utilities turn the v0.59.0 storage adapters from「protocol
     exists」 into「production-default-ready opt-in side channels」。
  2. Chapters 八百三-八百七:Storage batch optimization — transaction-
     wrapped appendBatch on all 6 SQLite stores + InMemory vs SQLite
-    informational perf scorecard。
+    informational perf scorecard (3-38× speedup measured)。
  3. Chapters 八百八-八百十一:Audit-loop completion — per-turn
     integration test + recorder replay helpers + per-session
-    aggregation primitives + CHANGELOG seal。
+    aggregation primitives。
+ 4. Chapters 八百十二-八百十四:Query + stress + seal — half-open
+    time-window helpers + 100-turn full-pipeline stress test +
+    final scorecard。
+
+### Added — Time-windowed audit queries (chapter 八百十二)
+
+`BASRoutedAuditTimeWindow` ships per-type filters for the 6
+audit record shapes (presence / unknown / contradiction-resolved
+/ contradiction-unresolved / version / deletion / atom-event)。
+Half-open `[startMs, endMs)` convention pinned。 `since(sinceMs:)`
+shortcut equals `between(sinceMs, .max)`。 Stable filter preserves
+input insertion order。 10 invariant tests cover edge cases
+including the nullable `resolvedAtMs` column on schema 012。
+
+### Added — Audit pipeline stress test (chapter 八百十三)
+
+100-turn realistic per-session load:5 presence + 3 unknowns +
+1 contradiction per turn = 900 audit records persisted through
+SQLite。 Exercises the FULL pipeline (record → batch → query
+→ replay → aggregate → time-window) end-to-end。 Per-channel
++ per-kind counts hit exactly 100 each as expected;time-window
+slices to the middle 50 turns yield exactly 250 records;
+replay of turn-42 reconstructs the original BASUnknownSet
+byte-equivalent。 Completes in 0.140s。
 
 ### Added — Audit loop closure (chapters 八百八 → 八百十)
 
