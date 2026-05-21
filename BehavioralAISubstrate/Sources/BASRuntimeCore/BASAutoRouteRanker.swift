@@ -2944,9 +2944,24 @@ public enum BASAutoRouteRanker {
     // through the Rust SIMD-friendly sort when explicitly invoked。
 
     /// Sort indices [0, scores.count) descending by score, stable
-    /// on ties。 Returns nil on FFI fault (currently impossible
-    /// since this allocates its own buffer)。 Empty input returns
-    /// an empty array。
+    /// on ties。
+    ///
+    /// Empty input returns `[]` on iOS/macOS,`nil` on non-Apple
+    /// platforms (Linux,etc.) where the FFI is unavailable。
+    /// Non-empty input on non-Apple returns `nil`,routing callers
+    /// to their Swift fallback path。 On iOS/macOS,returns `nil`
+    /// only if the C ABI reports fault (`bas_dream_loop_dominance_order`
+    /// returns negative — currently unreachable from this wrapper
+    /// since we own both the input slice and output buffer,but the
+    /// nil branch is preserved for forward-compat with future
+    /// fault modes)。
+    ///
+    /// chapter 八百四十六 / M2883 — doc-comment corrected per
+    /// post-v0.61.0 review finding L1。 The earlier wording claimed
+    /// "nil impossible" but the C ABI does return -1 in some cases;
+    /// the wrapper's own input invariants make those unreachable
+    /// FROM THIS CALLER,but the nil signal is still semantically
+    /// meaningful for cross-platform fallback dispatch。
     public static func dreamLoopDominanceOrder(
         scores: [Float]
     ) -> [Int32]? {

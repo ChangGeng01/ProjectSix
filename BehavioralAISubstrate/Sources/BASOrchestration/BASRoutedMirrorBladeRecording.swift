@@ -265,7 +265,23 @@ public enum BASRoutedMirrorBladeRecording {
                 // joiner can no longer be parsed,but this format
                 // was only shipped in v0.61.0 candidate -- no
                 // production data depends on the old format yet。
-                text += " (refs: \(node.refs.joined(separator: "; ")))"
+                // chapter 八百四十六 / M2881 — joiner switched
+                // from "; " to "\u{1F}" (ASCII Unit Separator)
+                // per post-v0.61.0 全量 review finding。 The
+                // chapter 八百三十四 fix changed `, ` → `; ` to
+                // dodge the bug for refs containing commas,but
+                // the same bug class still triggered for refs
+                // containing semicolons (e.g. free-text actor
+                // labels like "actor A; mode-B")。 Switching to
+                // 0x1F (ASCII US) eliminates the bug class
+                // entirely:US is unprintable + never appears in
+                // any legitimate ref encoding (UUIDs,timestamps,
+                // turn IDs,paragraph IDs,free-text strings)。
+                // The parser accepts all three joiners
+                // (US new,"; " chapter 八百三十四,", " legacy)
+                // for backward compat。
+                let joiner = "\u{1F}"
+                text += " (refs: \(node.refs.joined(separator: joiner)))"
             }
             let resolved = !node.unresolved
             let record = BASContradictionLedgerRecord(
@@ -376,10 +392,20 @@ public enum BASRoutedMirrorBladeRecording {
                body.hasSuffix(")") {
                 let summary = String(body[..<range.lowerBound])
                 let refsBody = body[range.upperBound..<body.index(before: body.endIndex)]
-                // Prefer new "; " joiner;fall back to legacy ", "
-                // for backward compat with pre-v0.61.0 records。
-                let separator: String =
-                    refsBody.contains("; ") ? "; " : ", "
+                // chapter 八百四十六 / M2881 — triple-fallback
+                // joiner detection。 Prefer "\u{1F}" (ASCII US,
+                // new — eliminates bug class for refs containing
+                // delimiters)。 Fall back to "; " (chapter 八百三十四
+                // joiner)。 Fall back to ", " (legacy pre-八百三十四
+                // joiner)。 First match wins。
+                let separator: String
+                if refsBody.contains("\u{1F}") {
+                    separator = "\u{1F}"
+                } else if refsBody.contains("; ") {
+                    separator = "; "
+                } else {
+                    separator = ", "
+                }
                 let refs = refsBody
                     .components(separatedBy: separator)
                     .filter { !$0.isEmpty }

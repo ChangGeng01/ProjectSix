@@ -11,7 +11,65 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
-### Sort flip cascade mini-arc (chapters 八百四十-八百四十三 / M2851-M2870)
+### Post-v0.61.0 全量 review remediation (chapter 八百四十六 / M2881-M2885)
+
+Single chapter addressing items raised by a 3-agent parallel review
+of the post-v0.61.0 work (chapters 八百三十四-八百四十五):
+
+- **HIGH**:refs joiner bug class eliminated entirely。 Chapter
+  八百三十四 changed `, ` → `; ` to dodge refs containing commas,
+  but the same bug class re-surfaced for refs containing literal
+  semicolons (e.g. `"actor A; mode-B"`)。 Chapter 八百四十六
+  switches the joiner to `\u{1F}` (ASCII Unit Separator,
+  unprintable,cannot appear in any legitimate ref encoding)。
+  Parser triple-fallback (`\u{1F}` → `"; "` → `", "`) preserves
+  backward compat with chapter 八百三十四 records (post-v0.61.0
+  brief window) AND pre-v0.61.0 legacy records。 Pinned in
+  `Tests/BehavioralAISubstrateTests/BASChapter846PostReviewRemediationTests.swift`。
+
+- **HIGH**:byte-equality test gaps for chapter 八百四十四 cognition
+  flip + chapter 八百四十 TriSelfService direct sites
+  (`viableScores` + `viableFallbacks`)。 Chapter 八百四十六 adds a
+  50-fixture randomized grid for the precompute-Float-sort
+  invariant covering both sites。
+
+- **HIGH**:Float32 narrowing precision boundary pinned as
+  documented behavior。 Two Doubles that round to the same Float32
+  tie under the routed path (stable sort by input order)。 This
+  was implicit before;now explicit + tested。
+
+- **MEDIUM**:renamed `_allItems` → `allItems` in `CognitionCore.swift`
+  (underscore prefix misled readers since the variable IS used)。
+
+- **MEDIUM**:added `Self.` qualifier on `score(...)` calls in
+  `CognitionCore.swift` for consistency with
+  `EBrainNeuralMaterializationCore.swift`'s `Self.candidateDominanceScore`。
+
+- **LOW**:corrected doc-comment on `BASAutoRouteRanker
+  .dreamLoopDominanceOrder` — earlier wording claimed
+  "nil impossible" but the nil signal is semantically meaningful
+  for cross-platform fallback dispatch (non-Apple builds return
+  nil to route callers to their Swift fallback path)。
+
+### Files modified
+
+```
+~ Sources/BASOrchestration/BASRoutedMirrorBladeRecording.swift  (joiner \u{1F} + triple-fallback parser)
+~ Sources/BASMemory/CognitionCore.swift                          (rename + Self. qualifier)
+~ Sources/BASRuntimeCore/BASAutoRouteRanker.swift                (doc-comment fix)
+~ Tests/BehavioralAISubstrateTests/BASChapter799L7MirrorBladeRecordingActivationTests.swift  (joiner string update)
+
++ Tests/BehavioralAISubstrateTests/BASChapter846PostReviewRemediationTests.swift  (7 tests)
+```
+
+### Test deltas
+
+13,243 → 13,250 tests / 30 skipped / 0 failures (+7 from
+chapter 八百四十六)。
+
+---
+
+### Sort flip cascade mini-arc (chapters 八百四十-八百四十五 / M2851-M2880)
 
 Follow-up mini-arc immediately after the L9 dominance order
 shipment。 Reuses the same Rust primitive
@@ -102,10 +160,12 @@ The cascade reached natural exhaustion per the
 
 ### Test deltas
 
-13,234 → 13,243 tests / 30 skipped / 0 failures
-(+9 from chapters 八百四十-八百四十二;chapter 八百四十四
-flip added no new tests since existing 13,243 cover the
-cognition code path)。
+13,234 → 13,243 tests / 29-30 skipped / 0 failures
+(+9 from chapters 八百四十-八百四十二;skipped count flutters
+±1 across runs from platform-conditional test gating; chapter
+八百四十四 flip added no new dedicated tests at the time — see
+chapter 八百四十六 for the gap-closing 50-fixture cognition-style
+byte-equality grid added after parallel-agent review)。
 
 ### Estimated per-session perf impact
 

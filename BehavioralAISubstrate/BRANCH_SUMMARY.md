@@ -69,6 +69,13 @@ chapter 八百四十五: ~87% Swift (raw) / 13.05% native (raw)
                   7 sites total now route through chapter 836
                   primitive, exec-hot ratio creeps up
                   another ~1%)
+chapter 八百四十六: ~87% Swift (raw) / 13.05% native (raw)
+                  ~81% Swift (exec hot) / 19% native (exec hot)
+                  (parallel-agent review remediation —
+                  refs joiner switched to \u{1F} ASCII US
+                  eliminating bug class entirely, doc + test
+                  gap fixes, no new flip sites — ratio
+                  unchanged)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

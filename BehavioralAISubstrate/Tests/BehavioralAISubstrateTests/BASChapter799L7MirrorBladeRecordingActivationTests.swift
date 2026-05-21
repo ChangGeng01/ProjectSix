@@ -183,9 +183,14 @@ final class BASChapter799L7MirrorBladeRecordingActivationTests: XCTestCase {
         XCTAssertNil(written[0].resolvedAtMs)
 
         XCTAssertEqual(written[1].contradictionText,
-            // chapter 八百三十四 / M2823 — refs joiner switched
-            // from ", " to "; " to survive refs containing commas。
-            "historical: earlier vs later turn (refs: t-5; t-9)")
+            // chapter 八百四十六 / M2881 — refs joiner switched from
+            // "; " to "\u{1F}" (ASCII Unit Separator) to eliminate
+            // the bug class entirely (chapter 八百三十四 "; " still
+            // collided with refs containing literal semicolons)。
+            // \u{1F} is unprintable and cannot appear in any
+            // legitimate ref encoding。 Parser still accepts the
+            // chapter 八百三十四 "; " joiner for backward compat。
+            "historical: earlier vs later turn (refs: t-5\u{1F}t-9)")
         XCTAssertEqual(written[1].salience, 0.9, accuracy: 1e-12)
         XCTAssertTrue(written[1].resolved,
             "unresolved=false → ledger.resolved=true")

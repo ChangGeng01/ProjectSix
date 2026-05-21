@@ -841,10 +841,14 @@ public enum BASDecisionBrainCompiler {
         // Pre-compute scores into [Float] once,then route the
         // sort through Rust。 Swift body kept as live FALLBACK
         // per 「依旧 不删除 只 comment」。
-        let _allItems = compilerItems + compilerCandidates
+        // chapter 八百四十六 / M2883 — renamed `_allItems` →
+        // `allItems` (review finding M4 — underscore prefix
+        // misleads readers since the variable IS used twice
+        // below)。
+        let allItems = compilerItems + compilerCandidates
         let orderedItems: [CompilerItem] = {
-            let scoreValues: [Float] = _allItems.map {
-                Float(score(
+            let scoreValues: [Float] = allItems.map {
+                Float(Self.score(
                     $0,
                     mode: request.mode,
                     queryTags: queryTags,
@@ -857,23 +861,23 @@ public enum BASDecisionBrainCompiler {
                 .dreamLoopDominanceOrder(scores: scoreValues) {
                 return indices.compactMap { idx -> CompilerItem? in
                     let i = Int(idx)
-                    guard i >= 0, i < _allItems.count else {
+                    guard i >= 0, i < allItems.count else {
                         return nil
                     }
-                    return _allItems[i]
+                    return allItems[i]
                 }
             }
             // Swift legacy fallback (V1 implementation,kept active
             // per 「依旧 不删除 只 comment」 + cross-platform safety)
-            return _allItems.sorted { lhs, rhs in
-                score(
+            return allItems.sorted { lhs, rhs in
+                Self.score(
                     lhs,
                     mode: request.mode,
                     queryTags: queryTags,
                     embeddingScores: projection.embeddingScoresByID,
                     now: request.now,
                     behavior: brainCompilation
-                ) > score(
+                ) > Self.score(
                     rhs,
                     mode: request.mode,
                     queryTags: queryTags,
