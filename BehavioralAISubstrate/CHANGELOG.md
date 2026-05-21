@@ -9,11 +9,64 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — STORAGE ACTIVATION + AUDIT LOOP COMPLETION
+## [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY EVOLUTION
 
-Tag candidate: v0.60.0。 Covers chapters 七百九十八 → 八百十四 /
-M2641-M2725 (17-chapter combined mini-arc completing the
-storage-adapter activation,batch fast paths,audit-loop closure,
+Tag candidate: v0.61.0 (post-evolution arc)。 Covers chapters
+七百九十八 → 八百二十 / M2641-M2755 (23-chapter combined mini-arc
+completing the storage-adapter activation,batch fast paths,
+audit-loop closure,time-windowing,full-pipeline stress
+validation,read-side replay engine,cross-session diff,
+archival/compaction,and round-trip restore validation)。
+
+Five sub-arcs:
+
+ 0. (preserved from v0.60.0 candidate scope) Recording activation
+    + storage batch + audit loop + composition root + stress —
+    chapters 七百九十八 → 八百十五 ship 4 recorders,6
+    appendBatch methods,replay helpers,aggregation primitives,
+    time-windowing,full-pipeline stress test,BASAuditPipeline
+    composition root。
+ 1. AUDIT REPLAY EVOLUTION sub-arc (chapters 八百十六 → 八百二十):
+    - BASAuditReplayEngine session loader (chapter 八百十六)
+    - BASAuditTrailDiff cross-session ID delta (chapter 八百十七)
+    - BASAuditTrailArchive compression (~9× reduction, chapter 八百十八)
+    - Round-trip restore stress test (chapter 八百十九)
+    - Mini-arc 4 seal (chapter 八百二十)
+
+### Added — AUDIT REPLAY EVOLUTION (chapters 八百十六 → 八百二十)
+
+The audit loop is now bidirectional:hosts can write via
+`BASAuditPipeline`,read via `BASAuditReplayEngine`,diff two
+trails via `BASAuditTrailDiff`,and compress old trails via
+`BASAuditTrailArchive`。
+
+| Chapter | Module | Capability | Tests |
+|---|---|---|---|
+| 八百十六 | BASAuditReplayEngine | loadSession / loadAndSummarize | 6 |
+| 八百十七 | BASAuditTrailDiff | per-store ID delta + summaryLines | 6 |
+| 八百十八 | BASAuditTrailArchive | per-turn compression (~9×) | 7 |
+| 八百十九 | (test only) | 50-turn round-trip restore through SQLite | 2 |
+
+Use cases enabled:
+ - Resume audit state after process restart (existing capability
+   from chapter 七百九十二 SQLite stores,now exposed via
+   typed `SessionAuditTrail`)
+ - Diagnose「what changed between session A and session B」
+ - Verify post-replay state matches pre-replay (round-trip
+   identity check at audit-trail level)
+ - Bound on-device storage for long-running hosts via archival
+   compression (preserves aggregate-level information,drops
+   per-event detail)
+ - Detect dropped/duplicated rows during on-device ↔ cloud sync
+   (foundation for future device-sync arc)
+
+---
+
+## [Unreleased - v0.60.0 RECORDING + STORAGE BATCH (snapshot)]
+
+Tag candidate (intermediate): v0.60.0。 Covers chapters 七百九十八
+→ 八百十四 / M2641-M2725 (17-chapter combined mini-arc completing
+the storage-adapter activation,batch fast paths,audit-loop closure,
 time-windowing,and full-pipeline stress validation)。 Four sub-arcs:
 
  1. Chapters 七百九十八-八百二:Recording activation — 4 recorder
