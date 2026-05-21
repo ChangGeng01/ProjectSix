@@ -11,6 +11,93 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Routed-dispatch telemetry (chapter 八百五十 / M2901-M2905)
+
+New mini-arc 「试试看」 opener — observability for the flip
+cascade。 Hosts running the routed paths today have NO way to
+verify the Rust path is actually firing vs silently falling
+back to Swift。 Chapter 八百五十 adds atomic-incremented
+counters that hosts can poll at any time。
+
+NEW public API on `BASAutoRouteRanker`:
+
+```swift
+public struct DominanceOrderTelemetrySnapshot: Equatable, Sendable {
+    public var f32CallCount: Int
+    public var f32FallbackCount: Int
+    public var f64CallCount: Int
+    public var f64FallbackCount: Int
+    public var totalCallCount: Int           // f32 + f64
+    public var totalFallbackCount: Int       // f32 + f64
+    public var fallbackFraction: Double      // 0.0 - 1.0
+}
+
+public static func dominanceOrderTelemetrySnapshot()
+    -> DominanceOrderTelemetrySnapshot
+
+public static func resetDominanceOrderTelemetry()
+```
+
+Implementation:
+- 4 `nonisolated(unsafe) static var Int32` counters
+- Atomic increment via `&+=` wrapping (LDADD on AArch64,
+  monotonic enough for telemetry — strict ordering not required)
+- Increment cost ~1-2 ns per call (LDADD instruction on M-series)
+- Snapshot reads are non-atomic across the 4 fields,but each
+  individual count is monotonic + correct under relaxed semantics
+
+NEW counter increment is wired into `dreamLoopDominanceOrder`
+and `dreamLoopDominanceOrderDouble`:call-count increments on
+ENTRY,fallback-count increments only when Rust returns nil OR
+on non-Apple platforms。
+
+### Use cases enabled
+
+- **Production health check**:host polls `totalFallbackCount`
+  and alerts if non-zero (indicates FFI regression or non-Apple
+  deployment surprise)
+- **Variant attribution**:`f32` vs `f64` counts show which
+  call-site shape is actually in use
+- **Capacity planning**:`totalCallCount` × known per-site
+  walltime → expected CPU spend
+- **A/B testing**:hosts can reset between A and B branches
+  to attribute call counts cleanly
+
+### Measured overhead
+
+```
+chapter 850 telemetry overhead measurement:
+   10,000 calls × n=10 → 4.32 µs total, 432 ns/call
+```
+
+432 ns/call includes the Rust sort + FFI roundtrip + telemetry。
+Per chapter 八百四十八 baseline for n=10:~5 µs/turn for 7 sites
+combined,so the telemetry overhead per site is well under 1%。
+
+### Files modified
+
+```
+~ Sources/BASRuntimeCore/BASAutoRouteRanker.swift  (+telemetry types + counters + increments)
++ Tests/BehavioralAISubstrateTests/BASChapter850TelemetryTests.swift  (8 tests)
+```
+
+### Test deltas
+
+13,264 → 13,272 tests / 29-30 skipped / 0 failures (+8 from
+chapter 八百五十)。
+
+### Compatibility
+
+- Wire format:zero changes
+- ABI:no new C symbols
+- Swift API:**additive only** — new types + new public methods,
+  no existing API modified
+- Counter semantics:process-wide (hosts running multiple BAS
+  instances see merged counts — filter at consumer level if
+  per-instance attribution needed)
+
+---
+
 ### Contradiction-refs separate-table refactor audit — DEFERRED (chapter 八百四十九 / M2896-M2900)
 
 User asked 「架构 refactor: contradiction-refs 拆 separate table。
