@@ -150,7 +150,11 @@ final class BASChapter809ReplayHelpersTests: XCTestCase {
         let records = [
             BASContradictionLedgerRecord(
                 eventID: "c-0", sessionID: "s", turnID: "t",
-                contradictionText: "historical: earlier vs later turn (refs: t-5, t-9)",
+                // chapter 八百三十四 / M2823 — refs joiner uses "; "
+                // (post-bugfix from `", "` which corrupted refs
+                // containing commas)。 Parser also accepts legacy
+                // `", "` for backward compat。
+                contradictionText: "historical: earlier vs later turn (refs: t-5; t-9)",
                 salience: 0.9, confidence: 1.0,
                 resolved: true, resolvedAtMs: 100),
         ]

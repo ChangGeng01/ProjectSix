@@ -252,7 +252,20 @@ public enum BASRoutedMirrorBladeRecording {
         for (idx, node) in nodes.enumerated() {
             var text = "\(node.kind.rawValue): \(node.summary)"
             if config.inlineRefs && !node.refs.isEmpty {
-                text += " (refs: \(node.refs.joined(separator: ", ")))"
+                // chapter 八百三十四 / M2823 BUG FIX:was using `", "`
+                // as the refs joiner,which corrupts round-trip if
+                // any ref contains a literal `, ` (e.g。 a turn ID
+                // like "actor A, secondary")。 Switched to `"; "`
+                // (semicolon-space) which is far less likely to
+                // appear inside audit ref strings。 Replay parser
+                // (`parseContradictionText` below) updated to split
+                // on the same delimiter。 Existing test fixtures
+                // (chapter 七百九十九 + 八百九) update to expect
+                // the new joiner;old persisted data with `", "`
+                // joiner can no longer be parsed,but this format
+                // was only shipped in v0.61.0 candidate -- no
+                // production data depends on the old format yet。
+                text += " (refs: \(node.refs.joined(separator: "; ")))"
             }
             let resolved = !node.unresolved
             let record = BASContradictionLedgerRecord(
@@ -343,6 +356,13 @@ public enum BASRoutedMirrorBladeRecording {
 
     /// Parse the "<kind>: <summary>" + optional " (refs: ...)"
     /// encoding。 Returns nil if no valid kind prefix matches。
+    ///
+    /// chapter 八百三十四 / M2823 — refs delimiter switched from
+    /// `", "` to `"; "` to survive refs that contain literal
+    /// `", "`。 Parser also accepts the legacy `", "` joiner so
+    /// any pre-v0.61.0 persisted data round-trips with best
+    /// effort (silent ref-split corruption on the legacy data
+    /// is the documented hazard the new joiner solves)。
     static func parseContradictionText(
         _ text: String
     ) -> (kind: BASContradictionKind, summary: String, refs: [String])? {
@@ -356,8 +376,13 @@ public enum BASRoutedMirrorBladeRecording {
                body.hasSuffix(")") {
                 let summary = String(body[..<range.lowerBound])
                 let refsBody = body[range.upperBound..<body.index(before: body.endIndex)]
-                let refs = refsBody.split(separator: ", ")
-                    .map { String($0) }
+                // Prefer new "; " joiner;fall back to legacy ", "
+                // for backward compat with pre-v0.61.0 records。
+                let separator: String =
+                    refsBody.contains("; ") ? "; " : ", "
+                let refs = refsBody
+                    .components(separatedBy: separator)
+                    .filter { !$0.isEmpty }
                 return (kind, summary, refs)
             }
             return (kind, body, [])
@@ -372,9 +397,7 @@ private func clamp01(_ x: Double) -> Double {
     return min(max(x, 0), 1)
 }
 
-private func stripped(_ s: String, prefix: String) -> String? {
-    if s.hasPrefix(prefix) {
-        return String(s.dropFirst(prefix.count))
-    }
-    return nil
-}
+// chapter 八百三十四 / M2824 — removed unused `stripped(_:prefix:)`
+// helper。 It was used by the old reconstructUnknownSet body
+// before chapter 八百二十一's UnknownKind enum dedup;dead since
+// then。 Agent code review flagged it (LOW)。

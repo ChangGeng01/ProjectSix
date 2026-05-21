@@ -183,7 +183,9 @@ final class BASChapter799L7MirrorBladeRecordingActivationTests: XCTestCase {
         XCTAssertNil(written[0].resolvedAtMs)
 
         XCTAssertEqual(written[1].contradictionText,
-            "historical: earlier vs later turn (refs: t-5, t-9)")
+            // chapter 八百三十四 / M2823 — refs joiner switched
+            // from ", " to "; " to survive refs containing commas。
+            "historical: earlier vs later turn (refs: t-5; t-9)")
         XCTAssertEqual(written[1].salience, 0.9, accuracy: 1e-12)
         XCTAssertTrue(written[1].resolved,
             "unresolved=false → ledger.resolved=true")
