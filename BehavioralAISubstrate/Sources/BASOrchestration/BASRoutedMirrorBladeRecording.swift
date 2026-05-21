@@ -222,10 +222,116 @@ public enum BASRoutedMirrorBladeRecording {
         }
         return written
     }
+
+    // MARK: - Replay helpers (chapter 八百九)
+
+    /// Reconstruct a `BASUnknownSet` from previously persisted
+    /// `BASUnknownLedgerRecord` rows。 Inverse of
+    /// `recordUnknownSet(...)`:reads back the "<kind>: <text>"
+    /// prefix encoding and bucketizes into the 5 typed arrays。
+    ///
+    /// Records whose unknownText doesn't match any of the 5
+    /// kind prefixes are silently DROPPED (defensive — should
+    /// not occur for valid persisted rows)。
+    ///
+    /// Order within each bucket follows the records' insertion
+    /// order (chapter 七百九十四 store contract: ORDER BY
+    /// discovered_at_ms ASC,rowid ASC)。
+    public static func reconstructUnknownSet(
+        from records: [BASUnknownLedgerRecord]
+    ) -> BASUnknownSet {
+        var facts: [String] = []
+        var roles: [String] = []
+        var constraints: [String] = []
+        var permissions: [String] = []
+        var ambiguities: [String] = []
+        for record in records {
+            if let stripped = stripped(record.unknownText,
+                                       prefix: "fact: ") {
+                facts.append(stripped)
+            } else if let stripped = stripped(record.unknownText,
+                                              prefix: "role: ") {
+                roles.append(stripped)
+            } else if let stripped = stripped(record.unknownText,
+                                              prefix: "constraint: ") {
+                constraints.append(stripped)
+            } else if let stripped = stripped(record.unknownText,
+                                              prefix: "permission: ") {
+                permissions.append(stripped)
+            } else if let stripped = stripped(record.unknownText,
+                                              prefix: "ambiguity: ") {
+                ambiguities.append(stripped)
+            }
+        }
+        return BASUnknownSet(
+            missingFacts: facts,
+            missingRoles: roles,
+            missingConstraints: constraints,
+            unresolvedPermissions: permissions,
+            ambiguityNotes: ambiguities)
+    }
+
+    /// Reconstruct an array of `BASContradictionRecord` from
+    /// persisted `BASContradictionLedgerRecord` rows。 Reverses
+    /// the "<kind>: <summary>" / " (refs: a, b, c)" encoding。
+    ///
+    /// Records whose `contradictionText` doesn't carry a valid
+    /// `BASContradictionKind` prefix are silently DROPPED。
+    ///
+    /// Order follows the records' insertion order。
+    public static func reconstructContradictions(
+        from records: [BASContradictionLedgerRecord]
+    ) -> [BASContradictionRecord] {
+        var nodes: [BASContradictionRecord] = []
+        for (idx, record) in records.enumerated() {
+            guard let parsed = parseContradictionText(
+                record.contradictionText)
+            else { continue }
+            nodes.append(BASContradictionRecord(
+                nodeID: "replay-\(idx)",
+                kind: parsed.kind,
+                summary: parsed.summary,
+                refs: parsed.refs,
+                severity: record.salience,
+                unresolved: !record.resolved))
+        }
+        return nodes
+    }
+
+    /// Parse the "<kind>: <summary>" + optional " (refs: ...)"
+    /// encoding。 Returns nil if no valid kind prefix matches。
+    static func parseContradictionText(
+        _ text: String
+    ) -> (kind: BASContradictionKind, summary: String, refs: [String])? {
+        for kind in BASContradictionKind.allCases {
+            let prefix = "\(kind.rawValue): "
+            guard text.hasPrefix(prefix) else { continue }
+            let body = String(text.dropFirst(prefix.count))
+            // Split off optional " (refs: ...)" suffix
+            let refsMarker = " (refs: "
+            if let range = body.range(of: refsMarker),
+               body.hasSuffix(")") {
+                let summary = String(body[..<range.lowerBound])
+                let refsBody = body[range.upperBound..<body.index(before: body.endIndex)]
+                let refs = refsBody.split(separator: ", ")
+                    .map { String($0) }
+                return (kind, summary, refs)
+            }
+            return (kind, body, [])
+        }
+        return nil
+    }
 }
 
 // MARK: - Helpers
 
 private func clamp01(_ x: Double) -> Double {
     return min(max(x, 0), 1)
+}
+
+private func stripped(_ s: String, prefix: String) -> String? {
+    if s.hasPrefix(prefix) {
+        return String(s.dropFirst(prefix.count))
+    }
+    return nil
 }

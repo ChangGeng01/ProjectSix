@@ -113,4 +113,34 @@ extension BASRoutedPresenceFusion {
         }
         return fused
     }
+
+    // MARK: - Replay helper (chapter 八百九)
+
+    /// Map a `BASPresenceObservationRecord` back into the
+    /// `BASChannelObservationInput` runtime form。 Closes the
+    /// recording loop for hosts that want to resume presence
+    /// state on cold start。 Returns nil for records whose
+    /// `channelKind` doesn't match any schema-013 CHECK literal
+    /// (defensive — should not happen for valid persisted rows)。
+    public static func observationInput(
+        from record: BASPresenceObservationRecord
+    ) -> BASChannelObservationInput? {
+        guard let byte = channelByte(forKind: record.channelKind)
+        else { return nil }
+        return BASChannelObservationInput(
+            channelByte: byte,
+            salience: record.salience,
+            confidence: record.confidence)
+    }
+
+    /// Inverse of `channelKind(forByte:)` — schema-013 string →
+    /// Rust `PresenceChannel` byte。 Returns nil for unrecognized
+    /// strings。 Linear scan since there are only 5 entries。
+    public static func channelByte(forKind kind: String) -> UInt8? {
+        for (idx, k) in channelKindByByte.enumerated()
+            where k == kind {
+            return UInt8(idx)
+        }
+        return nil
+    }
 }
