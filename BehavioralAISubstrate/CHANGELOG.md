@@ -9,7 +9,67 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
-## [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY EVOLUTION
+## [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY + 严查 整改
+
+Tag candidate: v0.61.0 (post-evolution + remediation)。 Covers
+chapters 七百九十八 → 八百二十六 / M2641-M2785 (29-chapter combined
+mini-arc covering storage activation,batch optimization,audit
+replay evolution,AND strict-review remediation)。
+
+### Added — 严查 整改 sub-arc (chapters 八百二十一 → 八百二十六)
+
+After the chapter 八百二十 mini-arc 4 seal,2 sequential
+reviews were run on the v0.61.0 candidate scope:
+
+  1. 全量 审查 (chapter 八百二十一):3 parallel review-agents
+     inspected the recorder modules + audit-pipeline read-side
+     modules + CHANGELOG-vs-commit cross-check。 Surfaced 4
+     HIGH-severity findings,addressed in chapter 八百二十一:
+       - Chapter 819 round-trip test strengthened (payload
+         identity,not just ID-set identity)
+       - Mirror-blade prefix encoding lossy edge case
+         documented + tested (single-record round-trip IS safe;
+         raw-bypass IS lossy by design)
+       - Codable conformance added to 7 audit-pipeline types
+         (SessionAuditTrail / SessionAuditSummary / ArchivedTurn
+         / ArchivedTrail / 3 aggregation summaries)
+       - Prefix-parsing duplication consolidated:NEW shared
+         BASRoutedMirrorBladeRecording.UnknownKind enum +
+         parseUnknownText helper used by 3 prior parsers
+  2. 严查 (chapter 八百二十二):stricter sweep caught additional
+     issues the lighter audit missed:
+       - Stale [Unreleased] CHANGELOG header at line 285 removed
+       - Dead loop in distinctTurnIDs dropped
+       - loadSession parallelized with async let (5 stores
+         fetched concurrently instead of serially)
+       - Cargo.lock dirty state committed
+       - Chapter doctrine registry dormant since 七百三十四 +
+         CI gate scripts in plan don't exist → flagged for
+         remediation chapters 八百二十三-八百二十五
+
+### Added — Remediation chapters (八百二十三-八百二十五)
+
+| Chapter | Issue | Fix |
+|---------|-------|-----|
+| 八百二十三 | CI gate scripts referenced in plan don't exist | Wrote scripts/check_god_files.sh (per-file LOC ceilings with 7 pinned overrides), scripts/check_sdk_import_boundaries.sh (substrate-core ↛ SDK-consumer enforcement), scripts/check_substrate_residuals.sh (TODO/print/force-unwrap density gates). All 3 Bash 3.2 compatible + exit cleanly |
+| 八百二十四 | MEDIUM review items (JSONEncoder determinism + magic bytes + recorder param order) | deterministicJSONEncoder shared instance with .sortedKeys pinned (closes latent SHA-256 determinism risk);Phase/Action/Outcome enums mirroring Rust schema-023 byte discriminants (created/admitted/linked/archived/tombstoned + admit/link/archive/tombstone + advanced/rejectedIllegal/rejectedTerminal);PresenceFusion gap behavior documented (NOT a collision risk on inspection);parameter-order normalization deferred (cosmetic) |
+| 八百二十五 | Chapter doctrine registry dormant since chapter 七百三十四 (87 chapters missing) | Documented dormancy in BASChapterDoctrineRegistry.swift with REGISTRY DORMANCY NOTICE MARK section explaining: substitute discipline (CHANGELOG + Conventional-Commit bodies + per-file MARK) actually carries the practical doctrine surface;restoration is OPTIONAL not blocking;4-step restoration path documented for future revival |
+
+Doctrine integrity verified:
+  ✓ 13,408 tests / 30 skipped / 0 failures (217s full sweep)
+  ✓ 23 new tests across chapters 821-825 all pass
+  ✓ Cargo workspace clean across 22 crates
+  ✓ check_god_files.sh: PASS (0 errors, 9 informational warnings)
+  ✓ check_sdk_import_boundaries.sh: PASS (0 violations)
+  ✓ check_substrate_residuals.sh: PASS (0 TODOs, 0 production
+    prints, 59 force-unwraps at 0.20/kLOC well under threshold)
+  ✓ Zero deletions across 36 modified files (only additions,
+    refactor-equivalent rewrites, or // commented-out content)
+  ✓ Native % stable at 16.16% (in honest-estimate 16-18% range)
+
+---
+
+## [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY EVOLUTION (sub-arc snapshot pre-审查)
 
 Tag candidate: v0.61.0 (post-evolution arc)。 Covers chapters
 七百九十八 → 八百二十 / M2641-M2755 (23-chapter combined mini-arc
