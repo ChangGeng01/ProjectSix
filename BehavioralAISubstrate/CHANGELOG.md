@@ -11,6 +11,77 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Contradiction-refs separate-table refactor audit — DEFERRED (chapter 八百四十九 / M2896-M2900)
+
+User asked 「架构 refactor: contradiction-refs 拆 separate table。
+收益大 就继续」 — proceed IF the gain is large。
+
+Audit verdict:**NOT 收益大,DEFERRED**。 The chapter 八百四十六
+`\u{1F}` ASCII Unit Separator joiner already eliminates the
+bug class definitively (US is unprintable + cannot appear in
+any legitimate ref encoding)。 The separate-table refactor
+would deliver:
+
+- ✅ **Queryable refs** via SQL `WHERE ref_text = X`
+- ⚠️ but **NO consumer needs this today**
+- ✅ **Cleaner architecture** (refs as first-class table)
+- ⚠️ but marginal — the bug class is already closed
+- ✅ **Future-proof** (schema can grow ref_kind / ref_weight / etc.)
+- ⚠️ but speculative — can be added later if needed
+
+Costs of proceeding:
+
+- ❌ NEW SQL schema (013_contradiction_refs.sql) + write path
+- ❌ NEW read path (JOIN or 2-query reconstruction)
+- ❌ Migration for hosts with on-disk data
+- ❌ Test gymnastics (verify both old TEXT-joined AND new
+  table-row formats reconstruct correctly)
+- ❌ 2-3 chapters of work + migration risk
+
+Per 「亏的不要硬上」 discipline pin:the refactor is
+architectural polish without a concrete consumer。 Defer
+until one of these triggers fires:
+
+1. A host needs to query contradictions by ref (no host does today)
+2. A new ref attribute (ref_kind / ref_weight / etc.) becomes necessary
+3. A new bug class found that the `\u{1F}` joiner doesn't cover
+   (extremely unlikely — US is unprintable)
+
+Audit ships as `Tests/BehavioralAISubstrateTests/
+BASChapter849ContradictionRefsRefactorAuditTests.swift` with 3
+tests that PIN the current encoding's robustness:
+
+- All printable ASCII + common Unicode (中文, émoji 😊, punctuation)
+  round-trips cleanly through `\u{1F}` joiner
+- Parser triple-fallback (`\u{1F}` → `; ` → `, `) accepts all
+  3 historical formats
+- The deferral decision itself is documented as a reviewable
+  audit-test rather than a buried comment
+
+### Test deltas
+
+13,261 → 13,264 tests / 30 skipped / 0 failures (+3 from
+chapter 八百四十九 audit)。
+
+### Decision boundary for next contradiction-refs work
+
+```
+┌────────────────────────────────┐
+│ Consumer needs queryable refs? │
+└────────────────────────────────┘
+                │
+        ┌───────┴───────┐
+        │               │
+       YES             NO
+        │               │
+        ▼               ▼
+   Proceed with    DEFER (current
+   refactor        state robust per
+   (full 2-3 chap) chapter 八百四十六 + 八百四十九)
+```
+
+---
+
 ### Real per-turn workload perf validation (chapter 八百四十八 / M2891-M2895)
 
 The strict review (chapter 八百四十五 self-review) flagged that
