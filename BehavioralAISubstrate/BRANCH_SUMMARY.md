@@ -51,6 +51,11 @@ chapter 八百三十三: ~87% Swift (raw) / 13.01% native (raw)
                   (post 极致 轻量化 archive — Swift % bumped
                   via comment-cleanup, exec ratio stable
                   in the honest 16-18% range)
+chapter 八百三十八: ~87% Swift (raw) / 13.05% native (raw)
+                  ~83% Swift (exec hot) / 17% native (exec hot)
+                  (L9 dominance order flip → 100× faster
+                  per-turn sort, exec ratio creeps up on
+                  call-frequency-weighted basis)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
@@ -72,7 +77,29 @@ Doctrine pins: 9 substrate-wide pins held (不变量 #1/#2/#3,
                整体 性能 效果 一定要 更好, 亏的不要硬上, 多做比较)
 ```
 
-## Production-default flips (9 total)
+## Post-v0.61.0 state (chapter 八百三十九 / 2026-05-21)
+
+```
+Branch tip:     phase-5-chapter-758-deeper-layer-migration-arc
+Commits:        ~1335 cumulative (+5 since v0.61.0)
+Tests:          13,234 pass / 31 skipped / 0 failures (148s sweep)
+                (+23 across post-ship review fixes + L9 mini-arc)
+Production-default flips: 10 (was 9 at v0.61.0 — L9 dominance
+                              order joined via chapter 八百三十八)
+Mini-arc shipped: L9 Dream-Loop dominance order (chapters
+                  八百三十五-八百三十九 / M2826-M2850):
+                  - Rust primitive + C ABI
+                  - Swift bridge in BASAutoRouteRanker
+                  - 5-axis perf:Rust ~100× faster at 1K-10K
+                  - 2 production call sites flipped
+                  - Swift body kept as live FALLBACK
+Doctrine pins:  9 substrate-wide pins still held
+                + 1 NEW pattern proven:STRONG-FLIP via 5-axis
+                supports first-shot flip without opt-in detour
+                when measurement is decisive across all scales。
+```
+
+## Production-default flips (10 total)
 
 | # | Primitive | Source chapter | Speedup |
 |---|---|---|---|
@@ -85,6 +112,7 @@ Doctrine pins: 9 substrate-wide pins held (不变量 #1/#2/#3,
 | 7 | hex decoding | 七百二十一 | 91-99× |
 | 8 | provenance gate | 七百十三 | Rust |
 | 9 | recordBatch multi-row SQL | 七百二十三 | 1.63× |
+| 10 | L9 dominance order sort | 八百三十八 | ~100× (1K-10K scale) |
 
 ## Net-new opt-in capabilities (6 total)
 
