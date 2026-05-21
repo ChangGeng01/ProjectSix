@@ -98,18 +98,18 @@ public struct BASAuditReplayEngine: Sendable {
                 + atomEvents.count + versions.count
         }
 
-        /// Distinct turnIDs seen across L6/L7/L8 records。 L5
-        /// versions are vault-scoped (no turnID) so excluded。
+        /// Distinct turnIDs seen across L6/L7 records。 L5 versions
+        /// are vault-scoped + L8 atom events don't carry a turnID
+        /// column per schema 023 (atoms span turns) — both excluded。
+        ///
+        /// 严查 chapter 八百二十二 cleanup:dropped dead
+        /// `for e in atomEvents { _ = e }` loop;the comment alone
+        /// suffices to document the exclusion。
         public var distinctTurnIDs: Set<String> {
             var s: Set<String> = []
             for r in presence { s.insert(r.turnID) }
             for r in unknowns { s.insert(r.turnID) }
             for r in contradictions { s.insert(r.turnID) }
-            for e in atomEvents {
-                // L8 events don't carry a turnID column per
-                // schema 023 — atoms can span turns。 Skipped。
-                _ = e
-            }
             return s
         }
     }
@@ -132,14 +132,27 @@ public struct BASAuditReplayEngine: Sendable {
         sessionID: String,
         vaultID: String? = nil
     ) async -> SessionAuditTrail {
-        let presence = await presenceStore.records(
+        // 严查 chapter 八百二十二 parallelization:5 store actors
+        // are independent — fetch concurrently via `async let`。
+        // Previously serial (1 store at a time);now amortizes
+        // disk I/O on slow storage backends (Linux/watchOS SQLite
+        // on cold cache). Order of completion doesn't matter
+        // since each result is collected explicitly。
+        async let presenceTask = presenceStore.records(
             forSession: sessionID)
-        let unknowns = await unknownStore.records(
+        async let unknownTask = unknownStore.records(
             forSession: sessionID)
-        let contradictions = await contradictionStore.records(
+        async let contradictionTask = contradictionStore.records(
             forSession: sessionID)
-        let atomEvents = await atomLifecycleStore.events(
+        async let atomTask = atomLifecycleStore.events(
             forSession: sessionID)
+        // L5 version fetch is conditional on vaultID。 Branch
+        // separately to avoid spawning the task when the caller
+        // didn't supply a vault。
+        let presence = await presenceTask
+        let unknowns = await unknownTask
+        let contradictions = await contradictionTask
+        let atomEvents = await atomTask
         var versions: [BASHostConstitutionVersionRecord] = []
         if let vault = vaultID {
             versions = await versionTreeStore.versions(

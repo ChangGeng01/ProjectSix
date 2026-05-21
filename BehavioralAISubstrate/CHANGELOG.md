@@ -280,40 +280,23 @@ SQL schema foundation:
 - **「不要 删除 只能 comment」 doctrine** held throughout:
   6 InMemory reference impls remain the documented live defaults
 
----
+<!--
+NOTE (chapter 八百二十二 / M2761-M2765 严查 cleanup):
+A stale `## [Unreleased] — Post-v0.58.0 (chapters 七百八十七-七百九十一)`
+section formerly lived here。 Its content (L8 storage adapter scaffold +
+TIE re-measure at scale honest-negative results + bas-atom-lifecycle
+3.48× flake notes) is already documented in the `[0.59.0]` section above
+(see lines「Added — 6 storage adapter pairs」 + 「Added — L8 atom-lifecycle
+storage adapter end-to-end」 + 「Honest negative results held」)。
 
-## [Unreleased] — Post-v0.58.0 (chapters 七百八十七-七百九十一)
-
-### Added
-
-- **5-knife L8 storage adapter scaffold** (chapter 七百八十九 + 七百九十):
-  `BASAtomLifecycleStore` protocol + `BASInMemoryAtomLifecycleStore`
-  reference actor + `BASAtomLifecycleEvent` typed event record。
-  Cold-restart replay integration test proves the chapter 392
-  replay-determinism invariant for the L8 atom-lifecycle event log。
-  Hosts can swap in a future SQLite-backed conformer (schema 023)
-  without changing call sites。
-- **Cross-platform Swift fallback transition table** for
-  bas-atom-lifecycle's 20-cell state machine — mirrors the Rust
-  transition fn byte-for-byte for watchOS / Linux builds (per
-  「不要 删除 只能 comment」 doctrine)。
-
-### Honest negative results (held to record)
-
-- **TIE re-measure at scale** (chapter 七百八十七):re-ran the
-  perf harness on the 3 TIE crates (host-constitution /
-  lease-life / mirror-blade) at N=100/1000/10000。 No reproducible
-  flip signal found:
-  - bas-host-constitution stays TIE (1.13× / 0.98× / 0.96×)
-  - bas-lease-life: 1.34× MODEST at N=1000 only — not reproducible
-    at adjacent N (likely noise)
-  - bas-mirror-blade: 0.81× LOSS at N=1000 — confirmed not worth
-    flipping
-  - bas-atom-lifecycle (new): 3.48× STRONG at N=100 but TIE at
-    N=1000/10000 — likely cache-warmup jitter,not real signal
-- Chapter 七百八十八 (apply scale-flip decisions) ABSORBED:
-  no flip applied,scale measurement doesn't change the
-  chapter 七百七十九 verdict matrix。
+Removed per 严查 finding:duplicate [Unreleased] header confused readers
+scanning for current unreleased scope。 The 4 [Unreleased]/[released] tags
+in this file are now (top → bottom):
+  1. [Unreleased] — STORAGE ACTIVATION + AUDIT REPLAY EVOLUTION (v0.61.0 candidate)
+  2. [Unreleased - v0.60.0 RECORDING + STORAGE BATCH (snapshot)] (intermediate)
+  3. [0.59.0] — STORAGE COMPLETION ARC (released)
+  4. [0.58.0] / [0.57.0] / [0.56.0] / [Pre-0.56.0] (released history)
+-->
 
 ---
 

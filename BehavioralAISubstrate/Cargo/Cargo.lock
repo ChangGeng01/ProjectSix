@@ -63,6 +63,7 @@ dependencies = [
 name = "bas-memory-usage-tracker"
 version = "0.1.0"
 dependencies = [
+ "bas-atom-lifecycle",
  "bas-canonical-bytes",
  "bas-dream-loop",
  "bas-event-log-codec",
