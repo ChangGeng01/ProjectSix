@@ -834,8 +834,38 @@ public enum BASDecisionBrainCompiler {
         let compilerCandidates = projection.candidates
             .map { CompilerItem(candidate: $0, trustBehavior: memoryTrust) }
             .sorted(by: memorySort)
-        let orderedItems = (compilerItems + compilerCandidates)
-            .sorted { lhs, rhs in
+        // chapter 八百四十四 / M2871 — cognition sort routed to
+        // Rust per chapter 837 STRONG-FLIP framework。 The score
+        // closure is moderately expensive (multi-arg pure fn)
+        // and the sort fires per turn in the cognition hot path。
+        // Pre-compute scores into [Float] once,then route the
+        // sort through Rust。 Swift body kept as live FALLBACK
+        // per 「依旧 不删除 只 comment」。
+        let _allItems = compilerItems + compilerCandidates
+        let orderedItems: [CompilerItem] = {
+            let scoreValues: [Float] = _allItems.map {
+                Float(score(
+                    $0,
+                    mode: request.mode,
+                    queryTags: queryTags,
+                    embeddingScores: projection.embeddingScoresByID,
+                    now: request.now,
+                    behavior: brainCompilation
+                ))
+            }
+            if let indices = BASAutoRouteRanker
+                .dreamLoopDominanceOrder(scores: scoreValues) {
+                return indices.compactMap { idx -> CompilerItem? in
+                    let i = Int(idx)
+                    guard i >= 0, i < _allItems.count else {
+                        return nil
+                    }
+                    return _allItems[i]
+                }
+            }
+            // Swift legacy fallback (V1 implementation,kept active
+            // per 「依旧 不删除 只 comment」 + cross-platform safety)
+            return _allItems.sorted { lhs, rhs in
                 score(
                     lhs,
                     mode: request.mode,
@@ -852,6 +882,7 @@ public enum BASDecisionBrainCompiler {
                     behavior: brainCompilation
                 )
             }
+        }()
         let retrievalPool = orderedItems.filter {
             retrievalPlan.includesPendingCandidates || !$0.isPending
         }
