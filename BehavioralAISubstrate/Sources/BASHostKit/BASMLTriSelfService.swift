@@ -162,13 +162,39 @@ public struct BASMLTriSelfService: BASTriSelfServicing,
         let working = allCandidatesVeto
             ? candidates
             : viable
-        let sorted = working.sorted { a, b in
-            let aScore = scoreByID[a.candidateID]?
-                .mergedScore ?? 0
-            let bScore = scoreByID[b.candidateID]?
-                .mergedScore ?? 0
-            return aScore > bScore
-        }
+        // chapter 八百四十 / M2851 — sort routed to Rust per
+        // chapter 837 STRONG-FLIP framework (Rust ~100× faster on
+        // closure-heavy sorts)。 This site has the
+        // dict-lookup-per-compare antipattern (scoreByID[id])
+        // making Swift closure overhead exceptionally expensive —
+        // primary motivation for the flip cascade in chapters
+        // 八百四十-八百四十二。 The Swift body remains as the
+        // FALLBACK path per 「依旧 不删除 只 comment」。
+        let sorted: [BASCandidatePath] = {
+            let scores: [Float] = working.map {
+                Float(scoreByID[$0.candidateID]?
+                    .mergedScore ?? 0)
+            }
+            if let indices = BASAutoRouteRanker
+                .dreamLoopDominanceOrder(scores: scores) {
+                return indices.compactMap { idx -> BASCandidatePath? in
+                    let i = Int(idx)
+                    guard i >= 0, i < working.count else {
+                        return nil
+                    }
+                    return working[i]
+                }
+            }
+            // Swift legacy fallback (V1 implementation,kept active
+            // per 「依旧 不删除 只 comment」 + cross-platform safety)
+            return working.sorted { a, b in
+                let aScore = scoreByID[a.candidateID]?
+                    .mergedScore ?? 0
+                let bScore = scoreByID[b.candidateID]?
+                    .mergedScore ?? 0
+                return aScore > bScore
+            }
+        }()
         let pick = sorted.first ?? candidates[0]
         let vetoReasonCodes: [String] = allCandidatesVeto
             ? [Self.allVetoFallbackReasonCode]

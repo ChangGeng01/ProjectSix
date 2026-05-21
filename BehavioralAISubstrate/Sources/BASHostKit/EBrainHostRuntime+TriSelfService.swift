@@ -4,6 +4,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASRuntimeCore
 
 // MARK: - M72 split — BASHostRuntimeEBrainTriSelfService extracted from the 5039-line
 // EBrainHostRuntimeSynthesis.swift.  Previously file-scope `private`, now
@@ -278,9 +279,29 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
             }
         }
 
-        let viableScores = scores
-            .filter { !$0.veto }
-            .sorted { $0.mergedScore > $1.mergedScore }
+        // chapter 八百四十 / M2852 — sort routed to Rust per
+        // chapter 837 STRONG-FLIP framework。 Swift body kept as
+        // FALLBACK per 「依旧 不删除 只 comment」。
+        let filtered = scores.filter { !$0.veto }
+        let viableScores: [BASTriSelfScore] = {
+            let scoreValues: [Float] = filtered.map {
+                Float($0.mergedScore)
+            }
+            if let indices = BASAutoRouteRanker
+                .dreamLoopDominanceOrder(scores: scoreValues) {
+                return indices.compactMap { idx -> BASTriSelfScore? in
+                    let i = Int(idx)
+                    guard i >= 0, i < filtered.count else {
+                        return nil
+                    }
+                    return filtered[i]
+                }
+            }
+            // Swift legacy fallback
+            return filtered.sorted {
+                $0.mergedScore > $1.mergedScore
+            }
+        }()
         guard viableScores.isEmpty == false else { return nil }
 
         let selectedForecast = thoughtFrame.forecasts.first {
@@ -425,10 +446,31 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
         remandOrders: [BASRemandOrder],
         thoughtFrame: BASThoughtFrame
     ) -> BASCourtDecisionDraft {
-        let viableFallbacks = scores
-            .filter { !$0.veto && $0.candidateID != selectedCandidate.candidateID }
-            .sorted { $0.mergedScore > $1.mergedScore }
-            .map(\.candidateID)
+        // chapter 八百四十 / M2853 — second TriSelf site flipped
+        // (court decision fallback ranking)。 Same pattern as
+        // M2852,Swift fallback preserved。
+        let filteredFallbacks = scores.filter {
+            !$0.veto
+                && $0.candidateID != selectedCandidate.candidateID
+        }
+        let viableFallbacks: [String] = {
+            let scoreValues: [Float] = filteredFallbacks.map {
+                Float($0.mergedScore)
+            }
+            if let indices = BASAutoRouteRanker
+                .dreamLoopDominanceOrder(scores: scoreValues) {
+                return indices.compactMap { idx -> String? in
+                    let i = Int(idx)
+                    guard i >= 0, i < filteredFallbacks.count
+                    else { return nil }
+                    return filteredFallbacks[i].candidateID
+                }
+            }
+            // Swift legacy fallback
+            return filteredFallbacks
+                .sorted { $0.mergedScore > $1.mergedScore }
+                .map(\.candidateID)
+        }()
         let selectedLedger = tradeoffLedgers.first {
             $0.candidateID == selectedCandidate.candidateID
         }
