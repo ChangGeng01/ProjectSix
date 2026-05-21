@@ -32,6 +32,9 @@ import Foundation
 import BASRustMemoryTrackerBinary
 #endif
 import CryptoKit
+#if canImport(Darwin)
+import Darwin  // OSAtomicAdd32 — chapter 八百五十一 / M2906 fix
+#endif
 
 /// Configuration for the auto-router。 Hosts that benched on
 /// non-M-series hardware can override these thresholds。
@@ -2967,6 +2970,13 @@ public enum BASAutoRouteRanker {
     ) -> [Int32]? {
         // chapter 八百五十 / M2901 — telemetry increment
         atomicAdd1(&_f32CallCount)
+        // chapter 八百五十一 / M2906 — test seam for forced fallback
+        #if DEBUG
+        if _testForceFallback {
+            atomicAdd1(&_f32FallbackCount)
+            return nil
+        }
+        #endif
         #if os(iOS) || os(macOS)
         let n = scores.count
         if n == 0 { return [] }
@@ -3068,25 +3078,29 @@ public enum BASAutoRouteRanker {
     nonisolated(unsafe) private static var _f64FallbackCount:
         Int32 = 0
 
-    /// Atomic increment helper (Apple-platform aware)。
-    /// Falls back to non-atomic increment on Linux — telemetry
-    /// is informational only,a missed count under contention
-    /// is acceptable per ADR-014's「telemetry is best-effort」
-    /// guideline。
+    /// Atomic increment helper。 Uses `OSAtomicAdd32` on Apple
+    /// platforms (compiles to LDADD on AArch64,a single
+    /// uncontended instruction)。 On non-Apple platforms,falls
+    /// back to non-atomic `&+= 1` — telemetry on Linux is
+    /// best-effort since BAS is Apple-platform-primary。
+    ///
+    /// chapter 八百五十一 / M2906 — original chapter 八百五十
+    /// implementation used naive `&+= 1` which is NOT atomic
+    /// (three-op read-modify-write,loses updates under
+    /// contention)。 The chapter 八百五十一 concurrent-call test
+    /// caught this:1000 parallel calls produced 988/1000
+    /// counter ticks (12 updates lost to race)。 Fixed by using
+    /// the system-level atomic-add intrinsic。
     @inline(__always)
     private static func atomicAdd1(_ ptr: UnsafeMutablePointer<Int32>) {
         #if canImport(Darwin)
-        // OSAtomic deprecated for ABI;use C11 atomic via raw pointer
-        // arithmetic。 The cast-to-volatile pattern is the standard
-        // Swift atomic-on-bare-Int32 trick that compiles to LDADD
-        // on AArch64。
-        _ = withUnsafeMutablePointer(to: &ptr.pointee) { p in
-            // Read-modify-write under release/acquire ordering
-            // approximated via volatile-style raw access。 For
-            // counter-style telemetry,relaxed ordering is sufficient;
-            // we just need monotonic increment-or-merge semantics。
-            p.pointee &+= 1
-        }
+        // OSAtomicAdd32 is API-deprecated but ABI-stable + still
+        // emits LDADD on ARMv8.1+ (which includes all Apple Silicon
+        // + iPhone XS / iPad Pro 2018 onward = all currently-
+        // supported Apple devices)。 Recommended replacement is
+        // C11 stdatomic via a C shim,but for a single relaxed-
+        // ordering counter increment OSAtomic is fully equivalent。
+        _ = OSAtomicAdd32(1, ptr)
         #else
         ptr.pointee &+= 1
         #endif
@@ -3115,6 +3129,41 @@ public enum BASAutoRouteRanker {
         _f64FallbackCount = 0
     }
 
+    // MARK: - Test seam: forced-fallback (chapter 八百五十一 / M2906)
+    //
+    // Debug-build-only seam that lets tests exercise the Swift
+    // fallback path on Apple platforms。 Agent-B review at chapter
+    // 八百四十五 flagged that the fallback is untested on Apple
+    // (CRITICAL-1) since the FFI never returns nil under current
+    // call-site invariants — the Swift `if let` branch always
+    // takes the Rust result。 Without a seam,a future FFI
+    // regression that DID return nil would activate Swift code
+    // paths that have no test coverage。
+    //
+    // The seam is `#if DEBUG`-gated so production builds skip
+    // the check entirely (zero overhead)。 Tests use the SPI to
+    // flip the flag,exercise the call,then reset。
+
+    #if DEBUG
+    nonisolated(unsafe) private static var _testForceFallback:
+        Bool = false
+
+    /// Set/clear the forced-fallback flag。 When `true`,both
+    /// `dreamLoopDominanceOrder` and
+    /// `dreamLoopDominanceOrderDouble` will return `nil` BEFORE
+    /// calling the FFI,as if the C ABI had reported fault。
+    /// Telemetry fallback-count still increments。
+    ///
+    /// PRODUCTION CODE MUST NEVER CALL THIS。 The flag is
+    /// `#if DEBUG`-gated and the method symbol does not exist
+    /// in Release builds。 Marked `@_spi(BASTestSeam)` to make
+    /// the testing-only intent visible at consumer call sites。
+    @_spi(BASTestSeam)
+    public static func _setForceFallbackForTesting(_ force: Bool) {
+        _testForceFallback = force
+    }
+    #endif
+
     // MARK: - L9 Dominance order (f64 — chapter 八百四十七 / M2886)
     //
     // Same as `dreamLoopDominanceOrder(scores:)` but accepts
@@ -3140,6 +3189,13 @@ public enum BASAutoRouteRanker {
     ) -> [Int32]? {
         // chapter 八百五十 / M2901 — telemetry increment
         atomicAdd1(&_f64CallCount)
+        // chapter 八百五十一 / M2906 — test seam for forced fallback
+        #if DEBUG
+        if _testForceFallback {
+            atomicAdd1(&_f64FallbackCount)
+            return nil
+        }
+        #endif
         #if os(iOS) || os(macOS)
         let n = scores.count
         if n == 0 { return [] }
