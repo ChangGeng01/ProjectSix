@@ -211,7 +211,31 @@ public final class BASMLMemoryService: BASMemoryServicing,
         let above = scored.filter {
             $0.score >= Parameters.relevanceFloor
         }
-        let sorted = above.sorted { $0.score > $1.score }
+        // chapter 八百四十一 / M2856 — L8 memory retrieval top-K
+        // sort routed to Rust per chapter 837 STRONG-FLIP framework
+        // (Rust ~100× faster on closure-heavy sorts)。 Pre-filter
+        // by relevance floor stays in Swift (single-pass);post-
+        // truncate by topK stays in Swift。 The Swift sort body
+        // is preserved as live FALLBACK per
+        // 「依旧 不删除 只 comment」。
+        let sorted: [(score: Double, stored: StoredAtom)] = {
+            let scoreValues: [Float] = above.map {
+                Float($0.score)
+            }
+            if let indices = BASAutoRouteRanker
+                .dreamLoopDominanceOrder(scores: scoreValues) {
+                return indices.compactMap { idx -> (score: Double, stored: StoredAtom)? in
+                    let i = Int(idx)
+                    guard i >= 0, i < above.count else {
+                        return nil
+                    }
+                    return above[i]
+                }
+            }
+            // Swift legacy fallback (V1 implementation,kept active
+            // per 「依旧 不删除 只 comment」 + cross-platform safety)
+            return above.sorted { $0.score > $1.score }
+        }()
         let top = sorted.prefix(Parameters.topK)
         return top.map { tuple in
             // Echo the Jaccard score as the atom's
