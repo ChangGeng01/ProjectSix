@@ -178,6 +178,18 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
             0)
     };
     total = total.wrapping_add(dom_rc);
+    // chapter 八百四十七 / M2886 — force-link the f64 variant。
+    // Same sentinel pattern,same n=0 no-op result。
+    let dom64_scores: [f64; 0] = [];
+    let mut dom64_out: [i32; 0] = [];
+    let dom64_rc = unsafe {
+        bas_dream_loop::bas_dream_loop_dominance_order_f64(
+            dom64_scores.as_ptr(),
+            0,
+            dom64_out.as_mut_ptr(),
+            0)
+    };
+    total = total.wrapping_add(dom64_rc);
     // chapter 七百五十一 第二刀 / M2427 — force-link the L8
     // memory-atom-reducer admission-confidence tiebreak rule。
     // Sentinel inputs:existing 0.0 / new 0.0 / tiebreak=keep → 0

@@ -218,17 +218,17 @@ public final class BASMLMemoryService: BASMemoryServicing,
         // truncate by topK stays in Swift。 The Swift sort body
         // is preserved as live FALLBACK per
         // 「依旧 不删除 只 comment」。
+        // chapter 八百四十七 / M2887 — f64 + precondition upgrade
         let sorted: [(score: Double, stored: StoredAtom)] = {
-            let scoreValues: [Float] = above.map {
-                Float($0.score)
-            }
+            let scoreValues: [Double] = above.map { $0.score }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scoreValues) {
-                return indices.compactMap { idx -> (score: Double, stored: StoredAtom)? in
+                .dreamLoopDominanceOrderDouble(scores: scoreValues) {
+                return indices.map { idx -> (score: Double, stored: StoredAtom) in
                     let i = Int(idx)
-                    guard i >= 0, i < above.count else {
-                        return nil
-                    }
+                    precondition(i >= 0 && i < above.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i) for n=" +
+                        "\(above.count)")
                     return above[i]
                 }
             }

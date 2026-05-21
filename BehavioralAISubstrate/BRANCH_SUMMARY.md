@@ -76,6 +76,14 @@ chapter 八百四十六: ~87% Swift (raw) / 13.05% native (raw)
                   eliminating bug class entirely, doc + test
                   gap fixes, no new flip sites — ratio
                   unchanged)
+chapter 八百四十七: ~87% Swift (raw) / 13.1% native (raw)
+                  ~81% Swift (exec hot) / 19% native (exec hot)
+                  (f64 dominance order primitive added,
+                  all 7 production sites migrated to Double
+                  path eliminating Float32 narrowing risk,
+                  compactMap silent-drop → precondition
+                  upgrade at all 7 sites, ratio shifts
+                  +0.05pp on raw from +1 Rust fn + tests)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

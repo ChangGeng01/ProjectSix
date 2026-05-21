@@ -2985,6 +2985,49 @@ public enum BASAutoRouteRanker {
         #endif
     }
 
+    // MARK: - L9 Dominance order (f64 — chapter 八百四十七 / M2886)
+    //
+    // Same as `dreamLoopDominanceOrder(scores:)` but accepts
+    // `[Double]` to eliminate the Float32 narrowing risk identified
+    // by the post-八百四十六 strict review。 Production call sites
+    // SHOULD prefer this variant whenever the source values are
+    // Double (which is every Swift call site since Swift's default
+    // numeric type is Double)。
+    //
+    // The Float32 variant remains for callers whose scores are
+    // already Float (e.g., the chapter 八百三十六 wrapper-invariant
+    // tests)。
+
+    /// Sort indices [0, scores.count) descending by Double score,
+    /// stable on ties。 Distinguishes Doubles that round to the
+    /// same Float32 (which the Float variant ties)。
+    ///
+    /// Empty input returns `[]` on iOS/macOS,`nil` on non-Apple
+    /// platforms where the FFI is unavailable (routing callers to
+    /// their Swift fallback path)。
+    public static func dreamLoopDominanceOrderDouble(
+        scores: [Double]
+    ) -> [Int32]? {
+        #if os(iOS) || os(macOS)
+        let n = scores.count
+        if n == 0 { return [] }
+        var out = [Int32](repeating: -1, count: n)
+        let written = scores.withUnsafeBufferPointer { sp -> Int32 in
+            out.withUnsafeMutableBufferPointer { op in
+                return bas_dream_loop_dominance_order_f64(
+                    sp.baseAddress,
+                    Int32(n),
+                    op.baseAddress,
+                    Int32(n))
+            }
+        }
+        if written < 0 { return nil }
+        return Array(out.prefix(Int(written)))
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Naive fallback
 
     private static func swiftNaiveCosine(

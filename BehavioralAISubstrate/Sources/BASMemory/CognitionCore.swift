@@ -846,24 +846,30 @@ public enum BASDecisionBrainCompiler {
         // misleads readers since the variable IS used twice
         // below)。
         let allItems = compilerItems + compilerCandidates
+        // chapter 八百四十七 / M2887 — upgraded to f64 + precondition
+        // per strict-review HIGH #1 + M1。 The cognition `score(...)`
+        // returns Double — preserving full precision through the
+        // Rust kernel eliminates any chance of routed path tying
+        // candidates that the V1 Double sort would order strictly。
         let orderedItems: [CompilerItem] = {
-            let scoreValues: [Float] = allItems.map {
-                Float(Self.score(
+            let scoreValues: [Double] = allItems.map {
+                Self.score(
                     $0,
                     mode: request.mode,
                     queryTags: queryTags,
                     embeddingScores: projection.embeddingScoresByID,
                     now: request.now,
                     behavior: brainCompilation
-                ))
+                )
             }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scoreValues) {
-                return indices.compactMap { idx -> CompilerItem? in
+                .dreamLoopDominanceOrderDouble(scores: scoreValues) {
+                return indices.map { idx -> CompilerItem in
                     let i = Int(idx)
-                    guard i >= 0, i < allItems.count else {
-                        return nil
-                    }
+                    precondition(i >= 0 && i < allItems.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i) for n=" +
+                        "\(allItems.count)")
                     return allItems[i]
                 }
             }

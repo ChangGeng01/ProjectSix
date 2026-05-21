@@ -170,18 +170,20 @@ public struct BASMLTriSelfService: BASTriSelfServicing,
         // primary motivation for the flip cascade in chapters
         // 八百四十-八百四十二。 The Swift body remains as the
         // FALLBACK path per 「依旧 不删除 只 comment」。
+        // chapter 八百四十七 / M2887 — upgraded to f64 + precondition
+        // per strict-review HIGH #1 + M1。
         let sorted: [BASCandidatePath] = {
-            let scores: [Float] = working.map {
-                Float(scoreByID[$0.candidateID]?
-                    .mergedScore ?? 0)
+            let scores: [Double] = working.map {
+                scoreByID[$0.candidateID]?.mergedScore ?? 0
             }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scores) {
-                return indices.compactMap { idx -> BASCandidatePath? in
+                .dreamLoopDominanceOrderDouble(scores: scores) {
+                return indices.map { idx -> BASCandidatePath in
                     let i = Int(idx)
-                    guard i >= 0, i < working.count else {
-                        return nil
-                    }
+                    precondition(i >= 0 && i < working.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i) for n=" +
+                        "\(working.count)")
                     return working[i]
                 }
             }

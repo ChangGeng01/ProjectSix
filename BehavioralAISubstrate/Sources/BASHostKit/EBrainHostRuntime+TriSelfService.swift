@@ -283,17 +283,18 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
         // chapter 837 STRONG-FLIP framework。 Swift body kept as
         // FALLBACK per 「依旧 不删除 只 comment」。
         let filtered = scores.filter { !$0.veto }
+        // chapter 八百四十七 / M2887 — f64 + precondition upgrade
         let viableScores: [BASTriSelfScore] = {
-            let scoreValues: [Float] = filtered.map {
-                Float($0.mergedScore)
+            let scoreValues: [Double] = filtered.map {
+                $0.mergedScore
             }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scoreValues) {
-                return indices.compactMap { idx -> BASTriSelfScore? in
+                .dreamLoopDominanceOrderDouble(scores: scoreValues) {
+                return indices.map { idx -> BASTriSelfScore in
                     let i = Int(idx)
-                    guard i >= 0, i < filtered.count else {
-                        return nil
-                    }
+                    precondition(i >= 0 && i < filtered.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i)")
                     return filtered[i]
                 }
             }
@@ -453,16 +454,19 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
             !$0.veto
                 && $0.candidateID != selectedCandidate.candidateID
         }
+        // chapter 八百四十七 / M2887 — f64 + precondition upgrade
         let viableFallbacks: [String] = {
-            let scoreValues: [Float] = filteredFallbacks.map {
-                Float($0.mergedScore)
+            let scoreValues: [Double] = filteredFallbacks.map {
+                $0.mergedScore
             }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scoreValues) {
-                return indices.compactMap { idx -> String? in
+                .dreamLoopDominanceOrderDouble(scores: scoreValues) {
+                return indices.map { idx -> String in
                     let i = Int(idx)
-                    guard i >= 0, i < filteredFallbacks.count
-                    else { return nil }
+                    precondition(i >= 0
+                        && i < filteredFallbacks.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i)")
                     return filteredFallbacks[i].candidateID
                 }
             }

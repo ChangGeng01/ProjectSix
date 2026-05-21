@@ -260,6 +260,79 @@ pub unsafe extern "C" fn bas_dream_loop_dominance_order(
     n
 }
 
+// MARK: - Dominance order indices (f64 — chapter 八百四十七)
+//
+// Same as `dominance_order_indices` but accepts `f64` scores
+// to eliminate the Float32 narrowing risk identified by the
+// post-八百四十六 strict review。 Swift's `Double` ≡ f64;passing
+// the Double directly avoids the precision-loss edge case where
+// two distinct Doubles round to the same Float32 and tie under
+// the routed path while the V1 Swift `.sorted` would compare
+// the full-precision Doubles and order them differently。
+//
+// Determinism:stable sort on (-score, index),NaN sorts to end。
+
+/// Sort indices [0, n) by `scores[i]` (f64) descending, stable
+/// on ties。 Pure-fn, no allocation beyond the output Vec。
+pub fn dominance_order_indices_f64(
+    scores: &[f64],
+) -> Vec<i32> {
+    let n = scores.len();
+    let mut indices: Vec<i32> = (0..n as i32).collect();
+    indices.sort_by(|&a, &b| {
+        let sa = scores[a as usize];
+        let sb = scores[b as usize];
+        match sb.partial_cmp(&sa) {
+            Some(o) => o,
+            None => {
+                // NaN handling mirrors the f32 path
+                if sa.is_nan() && !sb.is_nan() {
+                    std::cmp::Ordering::Greater
+                } else if !sa.is_nan() && sb.is_nan() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            }
+        }
+    });
+    indices
+}
+
+/// C ABI:f64-input dominance order indices。
+///
+/// # Safety
+///
+/// `scores_ptr` MUST point to a readable Float64 buffer of length
+/// ≥ `n`。 `out_indices_ptr` MUST point to a writable Int32 buffer
+/// of length ≥ `n`。
+#[no_mangle]
+pub unsafe extern "C" fn bas_dream_loop_dominance_order_f64(
+    scores_ptr: *const f64,
+    n: i32,
+    out_indices_ptr: *mut i32,
+    out_capacity: i32,
+) -> i32 {
+    if scores_ptr.is_null()
+        || out_indices_ptr.is_null()
+        || n < 0
+        || out_capacity < n
+    {
+        return -1;
+    }
+    let len = n as usize;
+    let scores = unsafe {
+        std::slice::from_raw_parts(scores_ptr, len)
+    };
+    let result = dominance_order_indices_f64(scores);
+    unsafe {
+        for (i, idx) in result.iter().enumerate() {
+            *out_indices_ptr.add(i) = *idx;
+        }
+    }
+    n
+}
+
 // MARK: - Unused c_char import suppression
 const _: *const c_char = std::ptr::null();
 
@@ -377,6 +450,94 @@ mod tests {
                 4,
                 out.as_mut_ptr(),
                 out.len() as i32)
+        };
+        assert_eq!(result, -1);
+    }
+
+    // MARK: - dominance_order_indices_f64 tests (chapter 八百四十七)
+
+    #[test]
+    fn dominance_order_f64_empty_yields_empty() {
+        let result = dominance_order_indices_f64(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn dominance_order_f64_descending() {
+        let scores = vec![0.1_f64, 0.9, 0.3, 0.7, 0.5];
+        let result = dominance_order_indices_f64(&scores);
+        assert_eq!(result, vec![1, 3, 4, 2, 0]);
+    }
+
+    #[test]
+    fn dominance_order_f64_stable_on_ties() {
+        let scores = vec![0.5_f64, 0.5, 0.5];
+        let result = dominance_order_indices_f64(&scores);
+        assert_eq!(result, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn dominance_order_f64_pushes_nan_to_end() {
+        let scores = vec![0.5_f64, f64::NAN, 0.9, 0.1];
+        let result = dominance_order_indices_f64(&scores);
+        assert_eq!(&result[..3], &[2_i32, 0, 3]);
+        assert_eq!(result[3], 1);
+    }
+
+    #[test]
+    fn dominance_order_f64_distinguishes_sub_float32_ulp_doubles() {
+        // The whole point of the f64 path:two Doubles that
+        // round to the same Float32 (and would tie under the
+        // f32 path) must be ordered correctly under f64。
+        let a = 0.1_f64;
+        let b = a + f64::EPSILON;
+        // Both round to the same Float32:
+        assert_eq!(a as f32, b as f32);
+        // But they differ as Doubles → f64 path must order them
+        let scores = vec![a, b]; // b > a as Double
+        let result = dominance_order_indices_f64(&scores);
+        assert_eq!(result, vec![1, 0],
+            "Index 1 (larger Double) must come first under f64 path");
+    }
+
+    #[test]
+    fn dominance_order_f64_c_abi_writes_correct_indices() {
+        let scores: Vec<f64> = vec![0.1, 0.9, 0.3, 0.7, 0.5];
+        let mut out = vec![-1_i32; 5];
+        let written = unsafe {
+            bas_dream_loop_dominance_order_f64(
+                scores.as_ptr(),
+                5,
+                out.as_mut_ptr(),
+                out.len() as i32)
+        };
+        assert_eq!(written, 5);
+        assert_eq!(out, vec![1, 3, 4, 2, 0]);
+    }
+
+    #[test]
+    fn dominance_order_f64_c_abi_rejects_null_ptr() {
+        let mut out = vec![-1_i32; 4];
+        let result = unsafe {
+            bas_dream_loop_dominance_order_f64(
+                std::ptr::null(),
+                4,
+                out.as_mut_ptr(),
+                out.len() as i32)
+        };
+        assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn dominance_order_f64_c_abi_rejects_too_small_capacity() {
+        let scores: Vec<f64> = vec![0.1, 0.9];
+        let mut out = vec![-1_i32; 1];  // capacity < n
+        let result = unsafe {
+            bas_dream_loop_dominance_order_f64(
+                scores.as_ptr(),
+                2,
+                out.as_mut_ptr(),
+                1)
         };
         assert_eq!(result, -1);
     }

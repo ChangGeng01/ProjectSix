@@ -29,17 +29,30 @@ extension BASEBrainRuntimeCoordinator {
         // Rust FFI unavailable on non-iOS/macOS or returns fault),
         // honoring 「依旧 不删除 只 comment」 — body kept active for
         // determinism contract,not just commented out。
+        // chapter 八百四十七 / M2887 — upgraded to f64 path per
+        // post-八百四十六 strict review HIGH #1。 The f32 path
+        // narrowed Double scores to Float,potentially tying
+        // candidates whose Doubles differed by < 2^-23 (real
+        // determinism risk vs V1 Swift `.sorted` over Doubles)。
+        // Switched to `dreamLoopDominanceOrderDouble` which
+        // preserves full Double precision through the Rust kernel。
+        // OOB guard upgraded to precondition() per review M1 —
+        // Rust kernel cannot return OOB by construction,so a
+        // bad index means the kernel is corrupted (fail loud
+        // rather than silently shortening the result)。
         let dominanceOrder: [String] = {
-            let scores: [Float] = thoughtFrame.candidates.map {
-                Float(candidateDominanceScore($0))
+            let scores: [Double] = thoughtFrame.candidates.map {
+                candidateDominanceScore($0)
             }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scores) {
-                return indices.compactMap { idx -> String? in
+                .dreamLoopDominanceOrderDouble(scores: scores) {
+                return indices.map { idx -> String in
                     let i = Int(idx)
-                    guard i >= 0,
-                          i < thoughtFrame.candidates.count
-                    else { return nil }
+                    precondition(i >= 0
+                        && i < thoughtFrame.candidates.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i) for n=" +
+                        "\(thoughtFrame.candidates.count)")
                     return thoughtFrame.candidates[i].candidateID
                 }
             }

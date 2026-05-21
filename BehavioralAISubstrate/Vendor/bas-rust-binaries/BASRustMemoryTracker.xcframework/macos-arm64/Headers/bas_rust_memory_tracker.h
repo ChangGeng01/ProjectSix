@@ -772,6 +772,23 @@ int32_t bas_dream_loop_dominance_order(
     int32_t *out_indices_ptr,
     int32_t out_capacity);
 
+// chapter 八百四十七 / M2886 — f64 variant eliminating the Float32
+// narrowing risk identified by the post-八百四十六 strict review。
+// Two distinct Doubles that round to the same Float32 are correctly
+// ordered by this path (the f32 variant ties them at Float
+// precision)。 Use this for any caller whose source values are
+// Double / f64 — which is every Swift call site since Swift's
+// numeric default is Double。
+//
+// Same semantics as the f32 variant otherwise:descending sort of
+// indices,stable on ties,NaN sorts to end。
+
+int32_t bas_dream_loop_dominance_order_f64(
+    const double *scores_ptr,
+    int32_t n,
+    int32_t *out_indices_ptr,
+    int32_t out_capacity);
+
 // MARK: - bas-tokenizer (chapter 七百二十二 第二刀 / M2282)
 //
 // Byte-level BPE tokenizer。 Opaque `Tokenizer` handle is

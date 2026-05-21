@@ -292,17 +292,22 @@ public enum BASNeuralMaterializationCompiler {
         // Rust FFI unavailable on non-iOS/macOS or returns fault),
         // honoring 「依旧 不删除 只 comment」 — body kept active for
         // determinism contract,not just commented out。
+        // chapter 八百四十七 / M2887 — upgraded to f64 + precondition
+        // per strict-review HIGH #1 + M1。 See sibling site at
+        // EBrainRuntimeCoordinator+Candidates.swift for rationale。
         let dominanceOrder: [String] = {
-            let scores: [Float] = thoughtFrame.candidates.map {
-                Float(Self.candidateDominanceScore($0))
+            let scores: [Double] = thoughtFrame.candidates.map {
+                Self.candidateDominanceScore($0)
             }
             if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrder(scores: scores) {
-                return indices.compactMap { idx -> String? in
+                .dreamLoopDominanceOrderDouble(scores: scores) {
+                return indices.map { idx -> String in
                     let i = Int(idx)
-                    guard i >= 0,
-                          i < thoughtFrame.candidates.count
-                    else { return nil }
+                    precondition(i >= 0
+                        && i < thoughtFrame.candidates.count,
+                        "Rust dominance_order_f64 returned " +
+                        "out-of-bounds index \(i) for n=" +
+                        "\(thoughtFrame.candidates.count)")
                     return thoughtFrame.candidates[i].candidateID
                 }
             }
