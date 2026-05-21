@@ -92,6 +92,56 @@ public struct BASShadowTrialRustStateMachine:
     }
 }
 
+// MARK: - chapter 七百八十一 第一刀 — production-default factory
+
+extension BASShadowTrialCoordinator {
+
+    /// Factory for production hosts that want the L13 Phase 2
+    /// Rust state machine (MODEST-FLIP per chapter 七百七十九
+    /// 5-axis measurement:1.24× speedup on transition cascade)。
+    ///
+    /// On Apple platforms (iOS / macOS):state machine is the
+    /// Rust adapter (`BASShadowTrialRustStateMachine`)。
+    /// On other platforms:Phase 1 Swift Core (no XCFramework slice)。
+    ///
+    /// All other init params have their existing defaults。
+    ///
+    /// ## ADR-014 OPT-IN preserved
+    ///
+    /// Hosts that want the Swift Core explicitly use the
+    /// 6-param `init(ledger:clock:...)` or the 7-param
+    /// `init(ledger:stateMachine:...)` with
+    /// `BASShadowTrialStateMachineCore()` passed in。 This
+    /// factory is the convenience entry that picks the
+    /// per-platform default for hosts that don't care about
+    /// the specifics。
+    ///
+    /// chapter 七百八十一 第一刀。
+    public static func makeWithDefaultStateMachine(
+        ledger: any BASShadowTrialLedger,
+        clock: @escaping @Sendable () -> Date = { Date() },
+        nextAuditID: @escaping @Sendable () -> String = { "audit-" + UUID().uuidString },
+        nextTrialID: @escaping @Sendable () -> String = { "trial-" + UUID().uuidString },
+        nextSealID: @escaping @Sendable () -> String = { "seal-" + UUID().uuidString },
+        nextRetractionID: @escaping @Sendable () -> String = { "retract-" + UUID().uuidString }
+    ) -> BASShadowTrialCoordinator {
+        let stateMachine: any BASShadowTrialStateMachine
+        #if os(iOS) || os(macOS)
+        stateMachine = BASShadowTrialRustStateMachine()
+        #else
+        stateMachine = BASShadowTrialStateMachineCore()
+        #endif
+        return BASShadowTrialCoordinator(
+            ledger: ledger,
+            stateMachine: stateMachine,
+            clock: clock,
+            nextAuditID: nextAuditID,
+            nextTrialID: nextTrialID,
+            nextSealID: nextSealID,
+            nextRetractionID: nextRetractionID)
+    }
+}
+
 // MARK: - Chapter 七百七十六 L13 Phase 2 sub-arc scorecard
 
 /// Static read-only scorecard for the complete L13 Phase 2 sub-arc。

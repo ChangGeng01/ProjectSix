@@ -145,6 +145,34 @@ public actor BASShadowTrialCoordinator {
     private let nextSealID: @Sendable () -> String
     private let nextRetractionID: @Sendable () -> String
 
+    // MARK: - chapter 七百八十一 第一刀 — STATE MACHINE INJECTION
+    //
+    // Phase 2 production-flip prep:the coordinator now exposes
+    // the injected `BASShadowTrialStateMachine` via an additive
+    // init overload。 Default per platform:
+    //   - iOS / macOS: composition layer (BASOrchestration) wires
+    //     the Rust adapter via `makeWithDefaults(...)`。 The
+    //     BASMemory-level default stays as the Swift Core so
+    //     this leaf module has no Rust dependency。
+    //   - Other platforms: BASShadowTrialStateMachineCore (Swift)
+    //
+    // EXISTING inline transitions in `submit` / `observe` /
+    // `finalize` REMAIN as-is for backward compatibility。 Hosts
+    // can NOW consult `self.stateMachine.transition(...)` for
+    // preview / validation purposes without touching the inline
+    // transition path。 Full inline-to-stateMachine migration
+    // lands in a SEPARATE chapter (deferred) so this commit stays
+    // a non-invasive seam expansion。
+    //
+    // 「不要 删除 只能 comment」 satisfied:no existing code
+    // deleted;new state machine property added alongside。
+
+    /// The state machine used for trial phase transitions。
+    /// Defaulted to `BASShadowTrialStateMachineCore` here;
+    /// composition layer (BASOrchestration) may inject the
+    /// Rust adapter for Apple-platform hosts。
+    public let stateMachine: any BASShadowTrialStateMachine
+
     public init(
         ledger: any BASShadowTrialLedger,
         clock: @escaping @Sendable () -> Date = { Date() },
@@ -159,6 +187,53 @@ public actor BASShadowTrialCoordinator {
         self.nextTrialID = nextTrialID
         self.nextSealID = nextSealID
         self.nextRetractionID = nextRetractionID
+        // chapter 七百八十一 第一刀 — default state machine is
+        // Phase 1 Swift Core。 Production hosts may use the
+        // explicit-stateMachine init overload below for Rust
+        // routing。
+        self.stateMachine = BASShadowTrialStateMachineCore()
+    }
+
+    /// chapter 七百八十一 第一刀 — explicit-stateMachine init
+    /// overload for production hosts that want to inject the
+    /// Rust adapter (or any custom state machine impl)。 The
+    /// existing 6-param init defaults to Swift Core;callers
+    /// using this 7-param init pick their own state machine。
+    public init(
+        ledger: any BASShadowTrialLedger,
+        stateMachine: any BASShadowTrialStateMachine,
+        clock: @escaping @Sendable () -> Date = { Date() },
+        nextAuditID: @escaping @Sendable () -> String = { "audit-" + UUID().uuidString },
+        nextTrialID: @escaping @Sendable () -> String = { "trial-" + UUID().uuidString },
+        nextSealID: @escaping @Sendable () -> String = { "seal-" + UUID().uuidString },
+        nextRetractionID: @escaping @Sendable () -> String = { "retract-" + UUID().uuidString }
+    ) {
+        self.ledger = ledger
+        self.stateMachine = stateMachine
+        self.clock = clock
+        self.nextAuditID = nextAuditID
+        self.nextTrialID = nextTrialID
+        self.nextSealID = nextSealID
+        self.nextRetractionID = nextRetractionID
+    }
+
+    /// chapter 七百八十一 第一刀 — preview the next phase the
+    /// injected state machine would compute for a given
+    /// (current phase, verdict) input WITHOUT mutating any
+    /// coordinator state。 Useful for:
+    ///   - Validating the state machine's behavior matches
+    ///     the inline transition expectations
+    ///   - Hosts that want to check whether a verdict WOULD
+    ///     advance a trial before committing the ledger I/O
+    ///   - Cross-language equivalence diagnostics (compare
+    ///     Swift Core vs Rust adapter on the same inputs)
+    public func previewTransition(
+        currentPhase: BASShadowTrialPhase,
+        verdictRaw: String?
+    ) -> BASShadowTrialTransitionOutcome {
+        let request = BASShadowTrialTransitionRequest(
+            currentPhase: currentPhase, verdictRaw: verdictRaw)
+        return stateMachine.transition(request)
     }
 
     // MARK: - Public transitions
