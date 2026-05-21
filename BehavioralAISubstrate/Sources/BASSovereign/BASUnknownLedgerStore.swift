@@ -97,6 +97,22 @@ public actor BASInMemoryUnknownLedgerStore:
     }
 
     public func count() async -> Int { records.count }
+
+    // MARK: - Batch append (chapter 八百五 — API symmetry)
+
+    /// Append many records in insertion order。 Actor isolation
+    /// already serializes mutations,so no transaction is needed
+    /// for the in-memory path。 API symmetry with the SQLite
+    /// store's transaction-wrapped fast path。
+    @discardableResult
+    public func appendBatch(
+        _ records: [BASUnknownLedgerRecord]
+    ) async throws -> [BASUnknownLedgerRecord] {
+        for record in records {
+            _ = try await appendRecord(record)
+        }
+        return records
+    }
 }
 
 // MARK: - SQLite-backed conformer
@@ -220,6 +236,64 @@ public actor BASSQLiteUnknownLedgerStore: BASUnknownLedgerStore {
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
         return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    // MARK: - Batch append optimization (chapter 八百五)
+
+    /// Append many records in a single SQLite transaction with a
+    /// re-used prepared statement。 Mirrors chapter 八百四's L8
+    /// batch pattern。 On the first error the whole batch ROLLS
+    /// BACK — no partial writes leak。
+    ///
+    /// Empty input is a no-op (returns []),no transaction opened。
+    @discardableResult
+    public func appendBatch(
+        _ records: [BASUnknownLedgerRecord]
+    ) async throws -> [BASUnknownLedgerRecord] {
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1, message: "db handle nil")
+        }
+        if records.isEmpty { return [] }
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        let sql = """
+            INSERT INTO unknown_ledger_records (
+                event_id, session_id, turn_id, unknown_text,
+                confidence, discovered_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+                == SQLITE_OK, let stmt else {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        for record in records {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            Self.bindText(stmt, 1, record.eventID)
+            Self.bindText(stmt, 2, record.sessionID)
+            Self.bindText(stmt, 3, record.turnID)
+            Self.bindText(stmt, 4, record.unknownText)
+            sqlite3_bind_double(stmt, 5, record.confidence)
+            sqlite3_bind_int64(stmt, 6, record.discoveredAtMs)
+            let rc = sqlite3_step(stmt)
+            if rc != SQLITE_DONE {
+                try? Self.runExec(db: db, sql: "ROLLBACK;")
+                if rc == SQLITE_CONSTRAINT {
+                    throw StorageError.duplicateEventID(
+                        record.eventID)
+                }
+                throw StorageError.stepFailed(
+                    sql: sql,
+                    message: String(cString: sqlite3_errmsg(db)))
+            }
+        }
+        try Self.runExec(db: db, sql: "COMMIT;")
+        return records
     }
 
     private func queryRecords(

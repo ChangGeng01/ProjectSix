@@ -97,6 +97,18 @@ public actor BASInMemoryContradictionLedgerStore:
     }
 
     public func count() async -> Int { records.count }
+
+    // MARK: - Batch append (chapter 八百五 — API symmetry)
+
+    @discardableResult
+    public func appendBatch(
+        _ records: [BASContradictionLedgerRecord]
+    ) async throws -> [BASContradictionLedgerRecord] {
+        for record in records {
+            _ = try await appendRecord(record)
+        }
+        return records
+    }
 }
 
 // MARK: - SQLite-backed conformer
@@ -226,6 +238,67 @@ public actor BASSQLiteContradictionLedgerStore:
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
         return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    // MARK: - Batch append optimization (chapter 八百五)
+
+    /// Append many records in a single SQLite transaction with a
+    /// re-used prepared statement。 Mirror of chapter 八百四 L8
+    /// batch pattern。 ROLLBACK on first error。
+    @discardableResult
+    public func appendBatch(
+        _ records: [BASContradictionLedgerRecord]
+    ) async throws -> [BASContradictionLedgerRecord] {
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1, message: "db handle nil")
+        }
+        if records.isEmpty { return [] }
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        let sql = """
+            INSERT INTO contradiction_ledger_records (
+                event_id, session_id, turn_id, contradiction_text,
+                salience, confidence, resolved, resolved_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+                == SQLITE_OK, let stmt else {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        for record in records {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            Self.bindText(stmt, 1, record.eventID)
+            Self.bindText(stmt, 2, record.sessionID)
+            Self.bindText(stmt, 3, record.turnID)
+            Self.bindText(stmt, 4, record.contradictionText)
+            sqlite3_bind_double(stmt, 5, record.salience)
+            sqlite3_bind_double(stmt, 6, record.confidence)
+            sqlite3_bind_int(stmt, 7, record.resolved ? 1 : 0)
+            if let resolvedAtMs = record.resolvedAtMs {
+                sqlite3_bind_int64(stmt, 8, resolvedAtMs)
+            } else {
+                sqlite3_bind_null(stmt, 8)
+            }
+            let rc = sqlite3_step(stmt)
+            if rc != SQLITE_DONE {
+                try? Self.runExec(db: db, sql: "ROLLBACK;")
+                if rc == SQLITE_CONSTRAINT {
+                    throw StorageError.duplicateEventID(
+                        record.eventID)
+                }
+                throw StorageError.stepFailed(
+                    sql: sql,
+                    message: String(cString: sqlite3_errmsg(db)))
+            }
+        }
+        try Self.runExec(db: db, sql: "COMMIT;")
+        return records
     }
 
     private func queryRecords(
