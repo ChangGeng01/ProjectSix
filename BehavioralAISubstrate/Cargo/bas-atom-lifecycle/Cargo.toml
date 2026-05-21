@@ -1,0 +1,25 @@
+# Cargo manifest for bas-atom-lifecycle
+# chapter 七百八十二 / M2561-M2565 — L8 memory hot-path migration
+#
+# L8 Memory Atom lifecycle state machine port。 Atoms transit
+# through 5 phases:
+#
+#   Created → Admitted → Linked → Archived → Tombstoned
+#
+# Pure-Rust state machine + deterministic transition table。 The
+# Swift actor (BASMemoryAtomStore) keeps owning the atom storage;
+# this crate provides the phase-decision pure fn。
+
+[package]
+name = "bas-atom-lifecycle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_atom_lifecycle"
+path = "src/lib.rs"
+
+[dependencies]
