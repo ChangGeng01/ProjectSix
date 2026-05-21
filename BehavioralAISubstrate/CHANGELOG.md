@@ -9,6 +9,41 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ---
 
+## [Unreleased] — Post-v0.58.0 (chapters 七百八十七-七百九十一)
+
+### Added
+
+- **5-knife L8 storage adapter scaffold** (chapter 七百八十九 + 七百九十):
+  `BASAtomLifecycleStore` protocol + `BASInMemoryAtomLifecycleStore`
+  reference actor + `BASAtomLifecycleEvent` typed event record。
+  Cold-restart replay integration test proves the chapter 392
+  replay-determinism invariant for the L8 atom-lifecycle event log。
+  Hosts can swap in a future SQLite-backed conformer (schema 023)
+  without changing call sites。
+- **Cross-platform Swift fallback transition table** for
+  bas-atom-lifecycle's 20-cell state machine — mirrors the Rust
+  transition fn byte-for-byte for watchOS / Linux builds (per
+  「不要 删除 只能 comment」 doctrine)。
+
+### Honest negative results (held to record)
+
+- **TIE re-measure at scale** (chapter 七百八十七):re-ran the
+  perf harness on the 3 TIE crates (host-constitution /
+  lease-life / mirror-blade) at N=100/1000/10000。 No reproducible
+  flip signal found:
+  - bas-host-constitution stays TIE (1.13× / 0.98× / 0.96×)
+  - bas-lease-life: 1.34× MODEST at N=1000 only — not reproducible
+    at adjacent N (likely noise)
+  - bas-mirror-blade: 0.81× LOSS at N=1000 — confirmed not worth
+    flipping
+  - bas-atom-lifecycle (new): 3.48× STRONG at N=100 but TIE at
+    N=1000/10000 — likely cache-warmup jitter,not real signal
+- Chapter 七百八十八 (apply scale-flip decisions) ABSORBED:
+  no flip applied,scale measurement doesn't change the
+  chapter 七百七十九 verdict matrix。
+
+---
+
 ## [0.58.0] — 2026-05-21 — POST-FLIP PRODUCTION ACTIVATION ARC
 
 Tag covers chapters 七百七十四 → 七百八十六 / M2521-M2585
