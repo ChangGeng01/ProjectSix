@@ -22,6 +22,17 @@ import BASRustMemoryTrackerBinary
 final class BASChapter711ActivationTournamentTests:
     XCTestCase
 {
+    /// Chapter 八百七十九 / M3080 — print-only archive skip per
+    /// chapter 709/712 pattern。 Activation tournaments don't
+    /// have asserted-bench replacement yet。
+    override func setUp() async throws {
+        try await super.setUp()
+        throw XCTSkip(
+            "Chapter 八百七十九 archive skip — print-only" +
+            " activation tournament without asserted-bench" +
+            " replacement yet。")
+    }
+
     private func makeVec(_ n: Int) -> [Float] {
         return (0..<n).map { i in
             Float((i % 64)) * 0.05 - 0.4

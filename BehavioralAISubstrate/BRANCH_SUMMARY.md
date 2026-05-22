@@ -504,6 +504,41 @@ chapter 八百七十八.5: ~87% Swift / 13.4% native
                   10 passes deep. Test count post-878.5:
                   13,376 / 45 skipped / 0 failures (+14
                   skipped from deprecation gates).)
+chapter 八百七十八.6: ~87% Swift / 13.4% native
+                  (Minimal-scope sweep-count fix per 11th-
+                  pass recommendation. Just 30→31 corrections
+                  at 3 sites in chapter 878.5 narrative.
+                  NO new CHANGELOG block, NO new BRANCH_SUMMARY
+                  row, NO new tests, NO code changes.
+                  Goal: experiment with「ZERO new narrative
+                  claims」 hypothesis. Outcome: 12th-pass
+                  found 0 HIGH + 0 MED + 2 LOW (philosophical
+                  only) → TRUE convergence on substantive
+                  scope. Recursion converged.)
+chapter 八百七十九: ~87% Swift / 13.4% native
+                  (RESOLVE ALL DEFERRED + v0.62.0 prep per
+                  「将 deferred 全面 解决掉 再打tag」. 7 knives:
+                  1. CHUNK_ROWS extracted to BASAutoRouteThresholds
+                     .batchedCosineRayonChunkRows (= 64 default)
+                  2. Calibrator forwards new field (chapter
+                     877 pattern)
+                  3. schemaVersion bumped 3→4 (synced 3 sites)
+                  4. Chapter 709 + 711 + 712 archived via
+                     setUp() XCTSkip (+30 skipped tests)
+                  5. NEW commit-message doctrine audit pin
+                     (Interpretation B: commit msgs OUT-OF-SCOPE)
+                  6. NEW BASCognitiveBrain LOC trajectory
+                     pin (3,836 pinned, 4,500 WARN, 5,000 HARD)
+                  7. 13th-pass review + v0.62.0 tag (next)
+                  Items still genuinely deferred (external):
+                  - 7 DECLINED-PENDING-CONSUMER kernels (need
+                    downstream consumer)
+                  - BASCognitiveBrain extraction (multi-chapter
+                    arc, chapter 八百八十+ scope)
+                  - Calibrator microbenchmarks (chapter 八百八十+
+                    scope when production data shows need)
+                  Substrate post-879 is genuinely v0.62.0-ready.
+                  Full sweep: 13,382 / 75 skipped / 0 failures.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

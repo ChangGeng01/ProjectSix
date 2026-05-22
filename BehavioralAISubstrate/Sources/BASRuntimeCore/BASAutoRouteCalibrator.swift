@@ -93,7 +93,7 @@ public struct BASAutoRouteCalibrationReport:
         // + batchedCosineRayonMinRows)。 Same fix shape as
         // chapter 七百五十七 第三刀 — both numbers must move
         // together or the cache invalidates every launch。
-        schemaVersion: Int = 3,
+        schemaVersion: Int = 4,
         measuredAtEpochSec: Int64,
         substrateVersion: String,
         deviceFingerprint: String,
@@ -169,7 +169,10 @@ public actor BASAutoRouteCalibrator {
             layerNormSIMDMinDim: layerNormSIMDMinDim,
             batchedCosineRayonMinRows:
                 BASAutoRouteThresholds.mSeriesDefault
-                    .batchedCosineRayonMinRows)
+                    .batchedCosineRayonMinRows,
+            batchedCosineRayonChunkRows:
+                BASAutoRouteThresholds.mSeriesDefault
+                    .batchedCosineRayonChunkRows)
 
         let fingerprint = deviceFingerprint.isEmpty
             ? Self.defaultDeviceFingerprint()

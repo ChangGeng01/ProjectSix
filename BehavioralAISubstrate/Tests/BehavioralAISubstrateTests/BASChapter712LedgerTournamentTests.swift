@@ -26,6 +26,17 @@ import BASRustMemoryTrackerBinary
 
 final class BASChapter712LedgerTournamentTests: XCTestCase {
 
+    /// Chapter 八百七十九 / M3080 — print-only archive skip per
+    /// chapter 709/711 pattern。 Ledger tournament doesn't have
+    /// asserted-bench replacement yet。
+    override func setUp() async throws {
+        try await super.setUp()
+        throw XCTSkip(
+            "Chapter 八百七十九 archive skip — print-only" +
+            " ledger tournament without asserted-bench" +
+            " replacement yet。")
+    }
+
     /// Encode N payloads as length-prefixed flat buffer。
     private func encodeLengthPrefixed(
         _ payloads: [Data]

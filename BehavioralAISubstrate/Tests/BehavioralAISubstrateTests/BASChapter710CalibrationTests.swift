@@ -30,7 +30,10 @@ final class BASChapter710CalibrationTests: XCTestCase {
         // chapter 八百七十七 / M3065 — bumped 2 → 3 for the 2 new threshold
         // fields added across chapters 871.5 + 872。 Same bump-triggers-
         // migration-review intent preserved with explicit equality。
-        XCTAssertEqual(report.schemaVersion, 3)
+        // Chapter 八百七十九 / M3080: bumped 3 → 4 for the
+        // new batchedCosineRayonChunkRows threshold field
+        // (same pattern chapter 八百七十七 used for the prior bump)。
+        XCTAssertEqual(report.schemaVersion, 4)
         XCTAssertEqual(report.deviceFingerprint,
             "test-host")
         XCTAssertEqual(report.substrateVersion, "1.0.0")

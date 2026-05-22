@@ -206,7 +206,7 @@ public actor BASAutoRouteCalibrationStore {
     /// batchedCosineRayon threshold additions。 (Chapter 八百七十八
     /// 9th-pass review caught「七百三 precedent」 typo — chapter 703
     /// doesn't exist;the actual precedent is chapter 730。)
-    public static let currentSchemaVersion: Int = 3
+    public static let currentSchemaVersion: Int = 4
 
     public static func loadOrCalibrate(
         cacheURL: URL,

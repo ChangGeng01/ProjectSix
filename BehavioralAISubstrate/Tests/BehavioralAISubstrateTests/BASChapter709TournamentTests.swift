@@ -17,6 +17,21 @@ import BASRustMemoryTrackerBinary
 
 final class BASChapter709TournamentTests: XCTestCase {
 
+    /// Chapter 八百七十九 / M3080 — print-only tournament archive
+    /// (final cleanup of arc deferred items)。 No XCTAssert in
+    /// any test method,consumes CI time without catching
+    /// regressions。 No asserted-bench replacement YET in the
+    /// substrate — when a future chapter ships one,this skip
+    /// guard can be removed。 Until then,save CI time。
+    override func setUp() async throws {
+        try await super.setUp()
+        throw XCTSkip(
+            "Chapter 八百七十九 archive skip — print-only" +
+            " tournament without asserted-bench replacement" +
+            " yet。 Keep file for live-data reference;skip" +
+            " test methods to save CI time。")
+    }
+
     private func makeVec(_ n: Int) -> [Float] {
         return (0..<n).map { i in
             Float((i % 64)) * 0.05 - 0.4

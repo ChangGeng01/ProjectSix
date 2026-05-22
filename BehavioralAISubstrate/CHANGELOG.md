@@ -11,6 +11,75 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Resolve all deferred items + v0.62.0 tag prep (chapter 八百七十九 / M3080)
+
+User directive 「将 deferred 全面 解决掉 再打tag」 — comprehensively
+resolve deferred items from arc 871-878.6 final state,then cut
+v0.62.0。
+
+#### Knives shipped
+
+1. **CHUNK_ROWS to BASAutoRouteThresholds field**: Extracted the
+   chapter 八百七十六.6 TODO — `batchedCosineRayonChunkRows: Int = 64`
+   field added。 Rust path still hardcodes 64;Swift field is
+   contract for future calibrator wiring。
+
+2. **Calibrator forwards new field**: BASAutoRouteCalibrator
+   passes `batchedCosineRayonChunkRows` from `.mSeriesDefault`
+   to preserve chapter 八百七十二 measured behavior post-calibration。
+
+3. **Codable schemaVersion 3→4 bump**: synced across Store +
+   Report.init + test pin per chapter 七百三十 / 八百七十七 precedent。
+
+4. **Archive 3 print-only tournaments (chapter 709 + 711 + 712)**:
+   `setUp() throws XCTSkip(...)` per chapter 八百七十八.5 pattern。
+   +30 tests now skipped → CI time saved。
+
+5. **Commit-message-as-narrative-claim doctrine pinned**: NEW
+   `BASChapter879CommitNarrativeDoctrineAuditTests.swift` resolves
+   the 11th-pass philosophical question with **Interpretation B
+   (practical)** — commit messages OUT-OF-SCOPE for narrative-
+   claim accounting。
+
+6. **BASCognitiveBrain LOC trajectory pin**: NEW
+   `BASChapter879BrainLOCTrajectoryAuditTests.swift` pins current
+   3,836 LOC + 4 triggers for extraction (4,500 WARN,5,000 HARD)。
+   Audit-only,no extraction (separate arc)。
+
+7. **13th-pass review + v0.62.0 tag** (next steps)
+
+#### Items NOT resolvable here (genuinely external)
+
+- **7 DECLINED-PENDING-CONSUMER kernels** — 「pull a consumer」
+  needs downstream caller,not substrate work。 Audit-trigger
+  tests already exist (chapters 八百五十七 / 八百七十四 / 八百七十五)。
+- **BASCognitiveBrain LOC actual extraction** — multi-chapter
+  arc, risky core actor。 Triggered by chapter 八百七十九 LOC pin
+  at 4,500 WARN / 5,000 HARD。
+- **Calibrator microbenchmarks** — chapter 八百八十+ scope when
+  production data shows defaults need tuning。 Default-forwarding
+  works for now per chapter 877+879 pattern。
+
+#### Verification
+
+   swift test BASChapter710Calibrat + 879:                    PASS
+   swift test (FULL SWEEP):           13,382 tests / 75 skipped / 0 failures
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from 八百七十八.6: +6 tests (3 + 3 audits) + 30 skipped (3 archives)。
+
+#### Post-chapter-879: substrate ready for v0.62.0 tag
+
+- 12-pass discipline ledger converged at 八百七十八.6
+- 13th-pass on 879 dispatched as final gate
+- All directly-resolvable deferred items addressed
+- Remaining deferred genuinely external (consumer pull) or
+  chapter 八百八十+ scope (extraction + microbenchmarks)
+- Full sweep clean (13,382 / 75 / 0 failures)
+
+---
+
 ### 10th-pass review fixes — sweep count + doctrine + deprecation skips (chapter 八百七十八.5 / M3076)
 
 User directive 「满意为止」 (keep going until satisfied)。 Per

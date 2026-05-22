@@ -106,6 +106,21 @@ public struct BASAutoRouteThresholds:
     /// lower this via calibration。
     public let batchedCosineRayonMinRows: Int
 
+    /// chapter 八百七十九 / M3080 — batched cosine rayon chunk
+    /// granularity per parallel task。 Default 64 (matches the
+    /// chapter 八百七十二 第二刀 Rust crate hardcoded value at
+    /// ~64μs/task at dim=384,well above rayon ~1μs scheduling
+    /// overhead)。 Configurable per chapter 871.5 lesson:device
+    /// with lower core count may want larger chunks,higher
+    /// core count may want smaller。 Exposing this field makes
+    /// future per-device calibration possible without re-shipping
+    /// the C ABI。 NOTE: the Rust path currently hardcodes 64
+    /// internally — this Swift-side field is the contract for
+    /// future calibrator wiring,not yet forwarded to the FFI
+    /// call (chapter 八百八十 future scope when calibration
+    /// actually measures the optimal value)。
+    public let batchedCosineRayonChunkRows: Int
+
     public init(
         cosineSIMDMinDim: Int = 64,
         sha256CryptoKitMinBytes: Int = 1024,
@@ -115,7 +130,8 @@ public struct BASAutoRouteThresholds:
         layerNormSIMDMinDim: Int = 128,
         geluTanhSIMDMinDim: Int = 256,
         batchedCosineMetalMinRows: Int = 16384,
-        batchedCosineRayonMinRows: Int = 3000
+        batchedCosineRayonMinRows: Int = 3000,
+        batchedCosineRayonChunkRows: Int = 64
     ) {
         self.cosineSIMDMinDim = max(1, cosineSIMDMinDim)
         self.sha256CryptoKitMinBytes =
@@ -134,6 +150,8 @@ public struct BASAutoRouteThresholds:
             max(1, batchedCosineMetalMinRows)
         self.batchedCosineRayonMinRows =
             max(1, batchedCosineRayonMinRows)
+        self.batchedCosineRayonChunkRows =
+            max(1, batchedCosineRayonChunkRows)
     }
 
     /// Default measured M-series thresholds。
