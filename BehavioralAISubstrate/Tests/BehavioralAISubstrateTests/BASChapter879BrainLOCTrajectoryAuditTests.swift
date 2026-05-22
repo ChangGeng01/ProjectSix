@@ -51,12 +51,15 @@ final class BASChapter879BrainLOCTrajectoryAuditTests:
         let extractionTrigger = 5000  // ~30% over current
         let warnAtTrigger = 4500       // intermediate warning
 
-        // Current state must be near the chapter 879 pin
-        // (allow ±10% drift for inline doc updates)
+        // Current state must be near the chapter 879 pin。
+        // Chapter 879 13th-pass LOW 1 fix: drift upper bound
+        // raised to warnAtTrigger (4,500) so the WARN print
+        // branch below is actually reachable before the hard
+        // test failure。 Drift floor stays at 90% (3,452) since
+        // shrinks are unusual。
         let lowerBound = Int(
             Double(pinnedAtChapter879) * 0.9)
-        let upperBound = Int(
-            Double(pinnedAtChapter879) * 1.1)
+        let upperBound = warnAtTrigger
         XCTAssertGreaterThanOrEqual(
             lineCount, lowerBound,
             "BASCognitiveBrain.swift LOC dropped below 90% " +
