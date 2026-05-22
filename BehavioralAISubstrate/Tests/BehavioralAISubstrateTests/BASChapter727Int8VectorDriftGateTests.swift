@@ -17,6 +17,20 @@ import Foundation
 
 final class BASChapter727Int8VectorDriftGateTests: XCTestCase {
 
+    override func tearDown() async throws {
+        // Chapter 八百七十八 / M3070 — 9th-pass review HIGH-1 caught
+        // that this THIRD chapter-727 file has the same tearDown
+        // leakage pattern as the Perf + PQ tests (chapters 727 +
+        // 729) that chapter 877 fixed。 In-body reset at line ~213
+        // only runs on success path — if any XCTAssert in lines
+        // 185-209 fails,useInt8VectorStorage stays true and
+        // contaminates subsequent test files。 Same chapter 876.5
+        // discipline applies: always restore production default
+        // in tearDown,not in-body。
+        BASVectorIndex.useInt8VectorStorage = false
+        try await super.tearDown()
+    }
+
     // MARK: - Deterministic generator
 
     /// SplitMix64 + L2 normalize → reproducible unit vectors。

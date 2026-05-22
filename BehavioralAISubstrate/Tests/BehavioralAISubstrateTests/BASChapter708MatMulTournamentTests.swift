@@ -1,6 +1,16 @@
 // MARK: - BASChapter708MatMulTournamentTests
 // chapter 七百八 第二刀 / M2212
 //
+// DEPRECATED post chapter 八百七十八 / M3070 — superseded by
+// `BASChapter871MatMul5WayBenchmarkTests` (5-way includes the
+// true MPSGraph actor path,not just MSL — fixes the naming-
+// legacy that chapter 七百八 baked in) + `BASChapter871BrainMPSGraphMatMulParityTests`
+// (asserted bounds + fence-post + cache reuse pins)。 This file's
+// 4 tests are print-only。 Same archive-candidate policy as
+// chapter 707 attention tournament — keep as live-data reference
+// until ~N stable CI runs of the chapter 871 asserted bench
+// confirm replacement is robust。
+//
 // Empirically measures which MatMul implementation wins at
 // each shape:
 //   - Rust naive (reference)

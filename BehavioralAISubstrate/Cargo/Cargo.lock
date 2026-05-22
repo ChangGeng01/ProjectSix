@@ -127,6 +127,7 @@ name = "bas-retrieval-ranker"
 version = "0.1.0"
 dependencies = [
  "bas-substrate-core",
+ "rayon",
  "serde",
 ]
 

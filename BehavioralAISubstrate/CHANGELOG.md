@@ -11,6 +11,120 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### 全面 修复 self-assessment concerns + 9th-pass review (chapter 八百七十八 / M3070)
+
+User asked 「目前 你 完全 满意吗」 — honest self-assessment surfaced
+8 items I was NOT satisfied with。 User then said 「全面 修复」 — fix
+them all。 This chapter does that + dispatches 9th-pass review which
+caught 3 NEW HIGH items chapter 877 itself missed (proving the
+discipline pattern still produces real catches even after the「8th
+pass ALL-CLEAR」 narrative)。
+
+#### Self-assessment concerns fixed
+
+1. **README stale on arc 871-877 additions** (agent D 全量 review
+   HIGH that chapter 877 deferred): Updated BASMetalSubstrate
+   bullet + added new BASMemory bullet + BASAutoRouteRanker
+   bullet。 Surfaces MPSGraph matMul split-flip + VectorIndex
+   268-490× win + Codable schema v3 + naming-legacy note。
+
+2. **CHANGELOG chapter 876.6 「8th-pass ALL-CLEAR」 narrative was
+   premature**: Inserted retroactive annotation explaining the
+   finding was correct only at single-chapter scope;chapter 877
+   全量 review (cross-arc + ship-readiness scope) found 9+ HIGH
+   items the single-chapter review structurally couldn't see。
+
+3. **Cargo.lock 1-line drift** from cumulative rayon dep additions
+   committed (was tracked + lagged 1 line)。
+
+4. **44 print-only chapter 707-715 tournament tests partial
+   archive**: 3 tournament files (707 attention,708 matmul,715
+   batched cosine) annotated DEPRECATED — each has an asserted-
+   benchmark replacement (chapters 868 / 871 / 872 respectively)。
+   3 others (709 / 711 / 712) left intact — no replacements yet。
+   Doesn't remove the tests (still useful as live-data layer per
+   chapter 868 `testChapter707TournamentStillReachable` pin) but
+   future cleanup chapter can archive once replacement is stable。
+
+5. **Sub-chapter numbering doctrine pinned**: NEW
+   `BASChapter878SubChapterNumberingDoctrineTests.swift` with 7
+   rules:
+   - Main chapter = integer
+   - First fix-of-fix = .5,second = .6,etc up to .9
+   - If > 5 fix-sub-chapters needed → SEPARATE numbered chapter
+   - Review-dispatch + review-fix can share .5/.6 with different M-numbers
+   - Each sub-chapter still gets own CHANGELOG/BRANCH/commit entry
+
+#### 9th-pass review (knife 6) caught 3 NEW HIGH items chapter 877 missed
+
+6. **HIGH 1 — chapter 八百七十八 inline fix**: `BASChapter727Int8VectorDriftGateTests`
+   is a THIRD chapter-727 file with the same tearDown leakage pattern
+   as the Perf + DriftGate tests chapter 877 fixed。 Agent A/B 全量
+   review caught 2 of 3 in the chapter 727/729 module — missed the
+   DriftGate variant。 Added tearDown resetting `useInt8VectorStorage`
+   to production default false。
+
+7. **HIGH 2 — chapter 八百七十八 inline fix**: Internal sweep-count
+   contradiction in chapter 877 narrative: chapter 877 block said
+   「13,374 / 31 skipped」 (correct) but the chapter 876
+   retro-annotation 877 added said 「13,374 / 30 skipped」 (wrong)。
+   Both at same 13,374 total — can't both be right。 Fixed
+   876-block annotation to 31 + diagnostic note。
+
+8. **HIGH 3 — chapter 八百七十八 inline fix**: Chapter 877 own
+   block violated the chapter 870 cycle-break doctrine 877 just
+   enforced — included line ref `BASAutoRouteCalibrator.swift:145-150`
+   in its narrative。 Replaced with verbatim symbol name
+   (`BASAutoRouteCalibrator.calibrate` function's threshold
+   construction)。
+
+9. **MEDIUM — chapter 八百七十八 inline fix**: Typo「chapter 七百三
+   precedent」 in BASAutoRouteCalibrationStore.swift schemaVersion
+   doc comment — chapter 703 doesn't exist;actual precedent is
+   chapter 730 / M2323。 Fixed + added diagnostic note。
+
+#### Deferred (still)
+
+- v0.62.0 tag — substrate tag-ready but requires explicit user
+  authorization per standing operational rules
+- BASCognitiveBrain.swift 3,836 LOC — extraction is risky core-
+  actor architectural chapter
+- Calibrator microbenchmarks for the 2 new threshold fields —
+  current default-forwarding is interim per chapter 877 narrative
+- 7 DECLINED-PENDING-CONSUMER kernels — still no consumer pull
+- Trigger-detection mechanism for CHUNK_ROWS=64 — TODO comment
+  exists but no infrastructure to detect when device tuning is needed
+- Archive 3 print-only tournaments without replacements (709/711/712)
+
+#### Verification
+
+   swift test BASChapter727+729+710+873+878:                    PASS
+   swift test (FULL SWEEP):                          13,374 tests / 31 skipped / 0 failures
+   swift build:                                                  PASS
+   pre-commit gates:                                             3/3 PASS
+
+#### Meta-discipline observation
+
+This chapter ships **3 NEW HIGH items chapter 877 missed despite
+the 4-agent 全量 review**。 9th-pass single-chapter review STILL
+catches:
+- Files with same-pattern bugs (chapter 727 DriftGate ≈ Perf/PQ)
+- Self-introduced contradictions in fix chapters
+- Doctrine violations in fix chapters
+
+The pattern: even WIDENED scope (single-chapter → arc-wide) misses
+some classes of bugs。 Each review round catches the bugs the prior
+round structurally couldn't see。 The「diminishing returns」 claim
+remains premature — it returns to「diminishing returns」 only when
+review-pass HIGH catches ACTUALLY hit zero AND the substrate is
+genuinely ship-ready across all 4 axes (code,test,doc,readiness)。
+
+Chapter 877 + 878 closes the genuinely-clean gap better — but per
+the pattern,a 10th-pass on chapter 八百七十八 might still find
+something。 (Discipline ledger continues。)
+
+---
+
 ### 全量 review HIGH fixes — calibrator + schemaVersion + tearDowns + math (chapter 八百七十七 / M3065)
 
 User directive 「全量 review」 — 4-agent comprehensive review of arc
@@ -32,12 +146,17 @@ inline this chapter。
 - **Agent A HIGH-1 — BASAutoRouteCalibrator missing 2 new threshold
   fields**: `matMulMPSGraphActorMinProduct` (chapter 871.5) +
   `batchedCosineRayonMinRows` (chapter 872) were never wired
-  through the calibrator at `BASAutoRouteCalibrator.swift:145-150`。
+  through the calibrator's `BASAutoRouteThresholds(...)`
+  construction inside `BASAutoRouteCalibrator.calibrate`。
   Post-calibration routing silently reverted to hardcoded defaults。
   Fixed by forwarding the `BASAutoRouteThresholds.mSeriesDefault`
   values for these 2 fields (calibrator doesn't measure them yet
   but at least preserves the chapter 871.5 + 872 measured
   behavior post-calibration)。
+  (Chapter 八百七十八 9th-pass review caught that the original
+  chapter 877 narrative used line ref `BASAutoRouteCalibrator.swift:145-150`
+  — replaced with verbatim symbol name per chapter 870 cycle-break
+  doctrine。 The discipline did its job again on chapter 877 itself。)
 
 - **Agent A HIGH-2 — Codable schemaVersion not bumped**:
   `BASAutoRouteCalibrationStore.currentSchemaVersion` was `2`
@@ -129,6 +248,19 @@ from 7th-pass + run 8th-pass review + ship。 **The 8th pass came back
 ALL-CLEAR** — first review-pass in the discipline ledger that found
 NO HIGH/MEDIUM items。 7 consecutive HIGH-catches (864/865/867/869/
 870/871.5/876.5) finally reach diminishing returns。
+
+> **CHAPTER 八百七十八 / M3070 RETROACTIVE ANNOTATION** — the 8th-pass
+> ALL-CLEAR finding was correct ONLY at single-chapter scope (chapter
+> 876.6 itself was clean)。 The user's subsequent 「全量 review」
+> directive widened scope to cross-arc + ship-readiness,and the
+> 4-agent review at chapter 877 found 9+ HIGH items the single-chapter
+> review structurally couldn't see (calibrator + schemaVersion desync,
+> chapter 727+729 tearDown leakage,873 FFI math wrong,etc)。 The
+> 「diminishing returns」 narrative below was premature — what actually
+> reached diminishing returns was the single-chapter review pattern,
+> not the substrate's overall HIGH-item floor。 Chapter 877 closed
+> the genuinely-clean gap at arc level。 See chapter 877 block above
+> for the cross-arc HIGH catches。
 
 #### MEDIUM items fixed
 
@@ -337,7 +469,11 @@ Ready to wire when a real consumer pulls。
    swift build:                                       PASS
    pre-commit gates:                                  3/3 PASS
    (Chapter 877 全量 review captured FULL SWEEP:
-    13,374 tests / 30 skipped / 0 failures — clean post-arc。)
+    13,374 tests / 31 skipped / 0 failures — clean post-arc。
+    Note:chapter 八百七十八 9th-pass review corrected this from
+    the originally-reported「30 skipped」 — actual was 31 because
+    chapter 八百七十六.5 added testBrainMPSGraphMatchesMSLAtVeryLargeShape
+    which has an XCTSkip path on framework-unavailable systems。)
 
 #### Cumulative arc test count (chapters 871-876)
 

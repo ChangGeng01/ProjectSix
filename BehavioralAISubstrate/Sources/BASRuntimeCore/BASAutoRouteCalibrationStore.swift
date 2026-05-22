@@ -200,9 +200,12 @@ public actor BASAutoRouteCalibrationStore {
     /// Codable synthesis would fail to decode existing v2 caches
     /// without explicit version bump → silent re-calibrate on
     /// next launch (acceptable on-device,but the schemaVersion
-    /// = 2 contract was broken)。 Per chapter 七百三 precedent
-    /// of bumping 1 → 2 for new families,arc 871-876 must
-    /// bump 2 → 3。
+    /// = 2 contract was broken)。 Per chapter 七百三十 precedent
+    /// (M2323 first bumped 1 → 2 for new BPE/int8/PQ families),
+    /// arc 871-876 must bump 2 → 3 for the matMulMPSGraphActor +
+    /// batchedCosineRayon threshold additions。 (Chapter 八百七十八
+    /// 9th-pass review caught「七百三 precedent」 typo — chapter 703
+    /// doesn't exist;the actual precedent is chapter 730。)
     public static let currentSchemaVersion: Int = 3
 
     public static func loadOrCalibrate(

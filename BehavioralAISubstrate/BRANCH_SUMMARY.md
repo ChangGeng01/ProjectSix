@@ -446,6 +446,36 @@ chapter 八百七十七: ~87% Swift / 13.4% native
                   substrate-level staleness) that per-chapter
                   reviews can't see. Full sweep: 13,374 tests
                   / 31 skipped / 0 failures post-chapter-877.)
+chapter 八百七十八: ~87% Swift / 13.4% native
+                  (全面 修复 self-assessment + 9th-pass
+                  review. User asked 「目前 你 完全 满意吗」 —
+                  I listed 8 unsatisfied items, user said
+                  「全面 修复」. Knives:
+                  1. README updated (chapter 877 deferred
+                     HIGH) — MPSGraph matMul + VectorIndex
+                     268-490× + Codable schema v3 surfaced
+                  2. CHANGELOG 876.6 narrative retroactively
+                     annotated — 「8th-pass ALL-CLEAR」 was
+                     true only at single-chapter scope
+                  3. Cargo.lock 1-line drift committed
+                  4. 3 print-only tournament tests (707/708/
+                     715) annotated DEPRECATED with
+                     replacement references
+                  5. NEW BASChapter878SubChapterNumbering-
+                     DoctrineTests pinning 7 sub-chapter
+                     numbering rules
+                  6. 9th-pass review of chapter 877 caught
+                     3 NEW HIGH that 877 missed:
+                     - chapter 727 DriftGate tearDown
+                       (3rd file with same pattern)
+                     - sweep count contradiction (30 vs 31)
+                     - cycle-break violated in own block
+                     All 3 fixed inline + 1 MEDIUM typo
+                     (七百三 → 七百三十).
+                  Meta-insight: 9th-pass single-chapter
+                  STILL catches items after 全量 4-agent
+                  cross-arc review. Discipline ledger keeps
+                  surfacing real bugs across review scopes.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

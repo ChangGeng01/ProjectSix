@@ -1,6 +1,14 @@
 // MARK: - BASChapter715BatchedCosineTournamentTests
 // chapter 七百十五 第三刀 / M2248
 //
+// DEPRECATED post chapter 八百七十八 / M3070 — superseded by
+// `BASChapter872BatchedCosineRayonTests` which has ASSERTED
+// 3-way bench (Swift per-pair vs Rust seq SIMD vs Rust rayon
+// chunked v2) at production corpus shapes (1K + 5K rows)。
+// The chapter 872 bench wins live measurement 268-490× over
+// Swift baseline and is the production routing source。
+// Chapter 715 stays in tree as live-data reference layer。
+//
 // Tournament across (Rust SIMD batched_cosine,Metal batched
 // cosine) at the (corpus_rows × dim) grid。 Output identifies
 // the empirical crossover where Metal pipeline-launch overhead

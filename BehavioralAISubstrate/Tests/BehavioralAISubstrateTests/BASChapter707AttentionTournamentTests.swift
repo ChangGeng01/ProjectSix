@@ -1,6 +1,17 @@
 // MARK: - BASChapter707AttentionTournamentTests
 // chapter 七百七 第二刀 / M2207
 //
+// DEPRECATED post chapter 八百七十八 / M3070 — superseded by
+// `BASChapter868FlashAttentionAssertedBenchmarkTests` which has
+// ASSERTED bounds (≥2× over Swift,≤1.4×/1.3× FA vs std)。 This
+// file's 4 tests are print-only (zero XCTAssert) so consume CI
+// time without catching regressions。 Kept in tree as the live-
+// data reference layer below the asserted layer per chapter 868
+// `testChapter707TournamentStillReachable` pin。 Consider
+// archiving in a future cleanup chapter once the chapter 868
+// asserted bench has been stable across N CI runs (currently
+// stable for ~10 runs as of chapter 877)。
+//
 // Empirically measures which attention implementation wins at
 // each (M, N, D) configuration:
 //

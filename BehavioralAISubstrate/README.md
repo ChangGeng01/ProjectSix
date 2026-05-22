@@ -46,8 +46,30 @@ documented at the bottom of this README。
 - `BASChatCompletionsAdapter`: generic remote-LLM organ (HTTP / chat
   completions API)
 - `BASMLXAdapter`: on-device MLX-Swift adapter (Gemma + similar local models)
-- `BASMetalSubstrate`: Metal kernels — SSM scan,batched cosine,FlashAttention,
-  RMSNorm,etc.
+- `BASMetalSubstrate`: Metal kernels — SSM scan,batched cosine,
+  FlashAttention,scaled-dot-product attention (MSL),MPSGraph
+  attention (chapter 八百七十 wire,2.31-3.09× faster than FA at
+  production attention shapes),MPSGraph MatMul actor (chapter
+  八百七十一 split-flip,1.07-1.38× over MSL at workProduct ≥ 256³,
+  default ON via `BASCognitiveBrain.mpsGraphMatMul` + auto-routed
+  `BASCognitiveBrain.matMulAuto`),RoPE,RMSNorm,etc.
+  (Note:`.metalMatMulMPSGraph` enum case is a historical naming
+  legacy and actually routes to MSL,not MPSGraph — see chapter
+  八百七十一 narrative;the true MPSGraph path is
+  `.metalMatMulMPSGraphActor`。)
+
+- `BASMemory`: in-memory atom store + vector retrieval。
+  `BASVectorIndex.topK` (chapter 七百十八 + chapter 八百七十二) now
+  default-routes through Rust+rayon batched cosine — **268× faster
+  at 1K corpus,490× faster at 5K corpus** vs the Swift per-pair
+  loop。 Auto-selects between sequential SIMD (corpus < 3000) and
+  rayon-parallel chunked v2 (corpus ≥ 3000) per
+  `BASAutoRouteThresholds.batchedCosineRayonMinRows`。
+
+- `BASRuntimeCore.BASAutoRouteRanker`: per-op routing decisions
+  with measured M-series defaults。 Public threshold struct
+  `BASAutoRouteThresholds` (Codable schema v3 post chapter 八百七十七)
+  is host-overridable for per-device tuning。
 
 ### Admin + debug surfaces (opt-in)
 
