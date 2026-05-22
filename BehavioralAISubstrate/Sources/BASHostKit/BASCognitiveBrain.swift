@@ -94,6 +94,28 @@ public enum BASCognitiveBrainAttentionError:
     case mpsGraphKernelUnavailable
 }
 
+/// chapter 八百七十一.5 / M3025 — Brain-level errors for the
+/// MPSGraph matMul dispatch path。 Separate enum from
+/// BASMetalMatMulDispatcherError (used by brain.matmul → MSL
+/// dispatcher) because the MPSGraph path is direct kernel-driven,
+/// not dispatcher-wrapped — matches chapter 870 attention's
+/// BASCognitiveBrainAttentionError precedent。 6th-pass review
+/// (agent A MED) caught that reusing the dispatcher-named error
+/// would surprise callers expecting it to mean MSL failed。
+public enum BASCognitiveBrainMatMulError:
+    Error, Sendable, Equatable, Hashable
+{
+    /// Shape mismatch: aCols must equal bRows for matMul。
+    case shapeMismatch(aCols: Int, bRows: Int)
+    /// Any of aRows / aCols / bCols was zero or negative。
+    case zeroDimension(
+        aRows: Int, aCols: Int, bCols: Int)
+    /// MPSGraph kernel lazy-init returned nil (shouldn't
+    /// happen post-init — guards against future refactor
+    /// that races the lazy-init)。
+    case mpsGraphKernelUnavailable
+}
+
 public actor BASCognitiveBrain {
 
     /// The wrapped V2 turn runtime engine。 All `process`
@@ -2519,23 +2541,25 @@ extension BASCognitiveBrain {
         b: [Float], bRows: Int, bCols: Int
     ) async throws -> [Float] {
         guard aCols == bRows else {
-            throw BASMetalMatMulDispatcherError
+            // chapter 八百七十一.5 — use Brain-scoped error,not
+            // dispatcher-scoped (the MPSGraph path doesn't go
+            // through BASMetalMatMulDispatcher)
+            throw BASCognitiveBrainMatMulError
                 .shapeMismatch(
-                    message: "mpsGraphMatMul: aCols " +
-                        "(\(aCols)) != bRows (\(bRows))")
+                    aCols: aCols, bRows: bRows)
         }
         guard aRows > 0, aCols > 0, bCols > 0 else {
-            throw BASMetalMatMulDispatcherError
-                .zeroDimension
+            throw BASCognitiveBrainMatMulError
+                .zeroDimension(
+                    aRows: aRows, aCols: aCols, bCols: bCols)
         }
         if mpsGraphMatMulKernel == nil {
             mpsGraphMatMulKernel =
                 try BASMPSGraphMatMulKernel()
         }
         guard let kernel = mpsGraphMatMulKernel else {
-            throw BASMetalMatMulDispatcherError
-                .libraryUnavailable(
-                    message: "mpsGraphMatMulKernel nil")
+            throw BASCognitiveBrainMatMulError
+                .mpsGraphKernelUnavailable
         }
         let inputs = BASCanonicalKernelInputBuilders
             .matMul(a: a, b: b,

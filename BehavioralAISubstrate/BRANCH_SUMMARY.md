@@ -273,6 +273,26 @@ chapter 八百七十一: ~87% Swift (raw) / 13.3% native (raw)
                      unchanged — 128³ still pins MSL
                      correctly since it's below new 16M cut.
                   No ratio change.)
+chapter 八百七十一.5: ~87% Swift (raw) / 13.3% native (raw)
+                  (6th-pass review fixes for chapter 871.
+                  Agent C clean (no fabrication); agents A+B
+                  caught 3 HIGH + 2 MED items, all fixed
+                  inline:
+                  - 16M threshold moved to BASAutoRouteThresholds
+                    field (per-device configurable)
+                  - NEW fence-post tests (16M-1/exact/16M+1)
+                  - NEW pin: 128³ → .metalMatMulMPSGraph
+                    via brain.matMulAuto (catches future
+                    naming-cleanup that would silently slow
+                    small shapes 1.89×)
+                  - NEW BASCognitiveBrainMatMulError enum per
+                    chapter 870 precedent (shapeMismatch +
+                    zeroDimension + mpsGraphKernelUnavailable)
+                  - NEW 4-way numerical agreement at 256³
+                    (Rust naive ≡ blocked ≡ MSL ≡ MPSGraph
+                    within 1e-2 at K=256)
+                  Test count: chapter 871 6 → 871+871.5 10
+                  parity tests.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

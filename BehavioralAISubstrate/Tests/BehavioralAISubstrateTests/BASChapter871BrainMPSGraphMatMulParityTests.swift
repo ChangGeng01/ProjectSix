@@ -25,6 +25,10 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if os(iOS) || os(macOS)
+import BASRustMemoryTrackerBinary
+#endif
+
 final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
 
     private func makeMatrices(
@@ -186,6 +190,184 @@ final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
             "512³ workProduct=134M → MPSGraph actor")
     }
 
+    /// Chapter 八百七十一.5 / M3025 — fence-post pins at the
+    /// EXACT 16M threshold boundary。 6th-pass review (agent B
+    /// HIGH-1) caught that workProduct = 16_777_215 (one below)
+    /// and 16_777_217 (one above) were unpinned。 A future
+    /// off-by-one (>=  ↔  >) at the ranker rule would slip
+    /// past the existing 128/256/512 cube-shape pins。 Use
+    /// non-cube shapes to hit exact workProduct values。
+    func testMatMulChoiceFencePostAt16MBoundary() {
+        // 16,777,215 = exactly 1 below threshold → MSL
+        // Choose M=1023, N=1, K=16403 → 1023*1*16403=16,780,269
+        // (overshoots) — instead use direct constructor。
+        // 4097*4097*1 = 16,785,409 — too big。
+        // Cleanest: 16_777_215 prime factors are 3*5*17*257*257 - too messy
+        // Use 4095*4097*1 = 16,777,215 (exact)
+        let justBelow = BASAutoRouteRanker.matMulChoice(
+            shape: BASMatMulShape(
+                M: 4095, N: 4097, K: 1),
+            thresholds: .mSeriesDefault)
+        // workProduct = 4095 * 4097 * 1 = 16,777,215
+        XCTAssertEqual(justBelow.rawValue, "metalMatMulMPSGraph",
+            "workProduct=16,777,215 (1 below 16M cap) " +
+            "must stay on MSL legacy enum")
+
+        // 4096*4096*1 = 16_777_216 (= 16M exactly) → MPSGraph
+        let exactlyAt = BASAutoRouteRanker.matMulChoice(
+            shape: BASMatMulShape(
+                M: 4096, N: 4096, K: 1),
+            thresholds: .mSeriesDefault)
+        XCTAssertEqual(exactlyAt,
+            .metalMatMulMPSGraphActor,
+            "workProduct=16,777,216 (= 16M cap exactly) " +
+            "must flip to MPSGraph actor")
+
+        // 4097*4097*1 = 16_785_409 → MPSGraph
+        let justAbove = BASAutoRouteRanker.matMulChoice(
+            shape: BASMatMulShape(
+                M: 4097, N: 4097, K: 1),
+            thresholds: .mSeriesDefault)
+        XCTAssertEqual(justAbove,
+            .metalMatMulMPSGraphActor,
+            "workProduct=16,785,409 (just above 16M) " +
+            "must route MPSGraph actor")
+    }
+
+    /// Chapter 八百七十一.5 — pin that brain.matMulAuto with
+    /// 128³ actually dispatches MSL (the legacy enum case)。
+    /// 6th-pass review (agent B HIGH-2) caught that only the
+    /// pure ranker test pinned this — no end-to-end pin via
+    /// matMulAuto。 A future「fix the misnaming」 refactor that
+    /// re-routes .metalMatMulMPSGraph to the MPSGraph actor
+    /// would silently slow small-shape production 1.89× with
+    /// zero CI signal。 This test catches that。
+    func testMatMulAutoDispatchesMSLAt128() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithAllPilots()
+        let (M, N, K) = (128, 128, 128)
+        let (a, b) = makeMatrices(M: M, N: N, K: K)
+        let result: BASAutoRouteResult<[Float]>
+        do {
+            result = try await brain.matMulAuto(
+                a: a, aRows: M, aCols: K,
+                b: b, bRows: K, bCols: N)
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal unavailable")
+        }
+        XCTAssertEqual(result.choice,
+            .metalMatMulMPSGraph,
+            "128³ must dispatch .metalMatMulMPSGraph (MSL " +
+            "kernel,legacy enum name) — chapter 八百七十一 " +
+            "data measured MSL beats MPSGraph 1.89× here。 " +
+            "If this test flips,verify the naming-legacy " +
+            "routing wasn't accidentally `fixed` to use " +
+            "the actual MPSGraph actor at small shapes。")
+        XCTAssertEqual(result.value.count, M * N)
+    }
+
+    /// Chapter 八百七十一.5 — 4-way numerical agreement pin at
+    /// 256³ (the routing flip threshold)。 6th-pass review
+    /// (agent A LOW-3 + agent B HIGH overflow) noted that only
+    /// 128³ had 4-way pin。 At 256³ MPSGraph and MSL agree per
+    /// existing parity test,but Rust naive + Rust blocked
+    /// transitively need pinning too — if Rust naive drifts
+    /// (e.g. accumulation order change),only this test catches
+    /// it。 1e-2 tolerance because K=256 accumulation。
+    func testFourWayNumericalAgreementAt256() async throws {
+        let kernel: BASMPSGraphMatMulKernel
+        do {
+            kernel = try BASMPSGraphMatMulKernel()
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal unavailable")
+        }
+        let brain = try await BASCognitiveBrain
+            .makeWithAllPilots()
+        let (M, N, K) = (256, 256, 256)
+        let (a, b) = makeMatrices(M: M, N: N, K: K)
+
+        var cNaive = [Float](repeating: 0, count: M * N)
+        let rcNaive = a.withUnsafeBufferPointer { ap in
+            b.withUnsafeBufferPointer { bp in
+                cNaive.withUnsafeMutableBufferPointer { cp in
+                    bas_ranker_matmul_naive(
+                        ap.baseAddress, a.count,
+                        bp.baseAddress, b.count,
+                        cp.baseAddress, cp.count,
+                        M, N, K)
+                }
+            }
+        }
+        XCTAssertEqual(rcNaive, 0)
+
+        var cBlocked = [Float](repeating: 0, count: M * N)
+        let rcBlocked = a.withUnsafeBufferPointer { ap in
+            b.withUnsafeBufferPointer { bp in
+                cBlocked.withUnsafeMutableBufferPointer { cp in
+                    bas_ranker_matmul_blocked(
+                        ap.baseAddress, a.count,
+                        bp.baseAddress, b.count,
+                        cp.baseAddress, cp.count,
+                        M, N, K)
+                }
+            }
+        }
+        XCTAssertEqual(rcBlocked, 0)
+
+        let cMSL = try await brain.matmul(
+            a: a, aRows: M, aCols: K,
+            b: b, bRows: K, bCols: N)
+        let inputs = BASCanonicalKernelInputBuilders.matMul(
+            a: a, b: b, M: M, K: K, N: N)
+        let mpsOut = try await kernel.evaluate(inputs: inputs)
+        let cMPS = BASCanonicalKernelInputBuilders
+            .dataToFloatArray(
+                mpsOut.payloads[0], elementCount: M * N)
+
+        // K=256 accumulation → looser 1e-2 tolerance
+        for i in 0..<cNaive.count {
+            XCTAssertEqual(cNaive[i], cBlocked[i],
+                accuracy: 1e-2,
+                "naive ≡ blocked idx \(i) at 256³")
+            XCTAssertEqual(cNaive[i], cMSL[i],
+                accuracy: 1e-2,
+                "naive ≡ MSL idx \(i) at 256³")
+            XCTAssertEqual(cNaive[i], cMPS[i],
+                accuracy: 1e-2,
+                "naive ≡ MPSGraph idx \(i) at 256³")
+        }
+    }
+
+    /// Chapter 八百七十一.5 — pin the new `matMulMPSGraphActorMinProduct`
+    /// threshold field exists in BASAutoRouteThresholds AND can
+    /// be overridden per-device。 Verifies host-side configurability
+    /// per chapter 八百七十一.5 agent A HIGH-1。
+    func testThresholdsMatMulMPSGraphActorMinProductConfigurable() {
+        let defaultThresholds = BASAutoRouteThresholds
+            .mSeriesDefault
+        XCTAssertEqual(
+            defaultThresholds.matMulMPSGraphActorMinProduct,
+            16_777_216,
+            "Default M-series threshold is 16M (= 256³)")
+
+        // Override to higher value (e.g. for iPhone where
+        // MPSGraph dispatch overhead may dominate longer)
+        let custom = BASAutoRouteThresholds(
+            matMulMPSGraphActorMinProduct: 134_217_728)  // 512³
+        XCTAssertEqual(
+            custom.matMulMPSGraphActorMinProduct,
+            134_217_728,
+            "Custom threshold must be honored")
+
+        // 256³ shape with the custom (higher) threshold →
+        // stays on MSL legacy enum,not MPSGraph
+        let choice = BASAutoRouteRanker.matMulChoice(
+            shape: BASMatMulShape(M: 256, N: 256, K: 256),
+            thresholds: custom)
+        XCTAssertEqual(choice, .metalMatMulMPSGraph,
+            "With higher threshold,256³ stays on MSL")
+    }
+
     /// brain.matMulAuto with shape at 256³ must actually route
     /// the call through the MPSGraph actor + return matching
     /// BASAutoRouteResult choice tag。
@@ -213,7 +395,10 @@ final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
     // MARK: - Shape constraint
 
     /// brain.mpsGraphMatMul with aCols ≠ bRows must throw
-    /// .shapeMismatch (not silently produce wrong output)
+    /// BASCognitiveBrainMatMulError.shapeMismatch (not silently
+    /// produce wrong output)。 Chapter 八百七十一.5 / M3025
+    /// migrated this error from BASMetalMatMulDispatcherError
+    /// to the Brain-scoped enum per chapter 870 attention precedent。
     func testBrainMPSGraphMatMulThrowsOnShapeMismatch()
         async throws
     {
@@ -227,8 +412,11 @@ final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
                 a: a, aRows: 2, aCols: 4,
                 b: b, bRows: 8, bCols: 2)
             XCTFail("Expected shapeMismatch throw")
-        } catch BASMetalMatMulDispatcherError.shapeMismatch {
-            // expected
+        } catch BASCognitiveBrainMatMulError
+            .shapeMismatch(let aC, let bR)
+        {
+            XCTAssertEqual(aC, 4)
+            XCTAssertEqual(bR, 8)
         } catch BASKernelError.frameworkUnavailable {
             throw XCTSkip("Metal unavailable")
         }

@@ -11,6 +11,60 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### 6th-pass review fixes for chapter 八百七十一 (chapter 八百七十一.5 / M3025)
+
+3-agent review of chapter 八百七十一 caught 3 HIGH + 2 MED items that
+land inline this sub-chapter。 Agent C (doc consistency) reported
+ALL-CLEAR — chapter 八百七十一's narrative was faithful,no fabricated
+claims (chapter 869 knife 3 anti-pattern did NOT recur)。
+
+#### HIGH items fixed
+
+- **Agent A HIGH-1: 16M threshold to BASAutoRouteThresholds**:
+  Chapter 871 hardcoded `16_777_216` inline。 Added
+  `matMulMPSGraphActorMinProduct: Int = 16_777_216` field
+  + init param + ranker reads from it (per-device override).
+
+- **Agent B HIGH-1: Fence-post unpinned**: NEW
+  `testMatMulChoiceFencePostAt16MBoundary` uses non-cube shapes
+  (4095×4097×1=16,777,215 below;4096×4096×1=16M exact;
+  4097×4097×1 above) to pin the cap fence-post both directions.
+
+- **Agent B HIGH-2: `.metalMatMulMPSGraph` (MSL legacy) routing
+  never asserted via matMulAuto**: NEW `testMatMulAutoDispatchesMSLAt128`
+  pins 128³ → .metalMatMulMPSGraph via full brain.matMulAuto。
+  Catches future「fix the naming」 refactors that would silently
+  slow small shapes 1.89×。
+
+#### MEDIUM items fixed
+
+- **Agent A MED-1: New `BASCognitiveBrainMatMulError` enum**
+  (shapeMismatch / zeroDimension / mpsGraphKernelUnavailable)
+  per chapter 870 precedent。 Replaces dispatcher-named error
+  reuse in `brain.mpsGraphMatMul`。 Test updated to catch new
+  type + verify field values。
+
+- **4-way numerical agreement at 256³**: NEW
+  `testFourWayNumericalAgreementAt256` pins Rust naive ≡ Rust
+  blocked ≡ MSL ≡ MPSGraph within 1e-2 (looser at K=256
+  accumulation per agent A LOW-3)。
+
+#### Items deferred
+
+- Agent A MED-2 deprecated annotation on legacy enum case →
+  dedicated naming-cleanup chapter
+- Asymmetric shape tests → chapter 871.6 if review re-catches
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                            37/37 PASS (unchanged)
+   swift test BASChapter871BrainMPSGraphMatMulParity:        10/10 PASS (was 6,+4)
+   swift test BASChapter871MatMul5WayBenchmark:               4/4 PASS (unchanged)
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+---
+
 ### MPSGraph matMul split-flip + naming-legacy correction (chapter 八百七十一 / M3021)
 
 Continuation of arc 八百七十一-八百七十六 per user 「目前 还有 哪些 部分

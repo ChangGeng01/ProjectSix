@@ -58,6 +58,18 @@ public struct BASAutoRouteThresholds:
     /// Rust, 128³ wins Metal — crossover sits between)。
     public let matMulMetalMinProduct: Int
 
+    /// chapter 八百七十一.5 / M3025 — second crossover for matMul:
+    /// at workProduct ≥ this threshold,route to true MPSGraph
+    /// actor (.metalMatMulMPSGraphActor) instead of MSL kernel
+    /// (.metalMatMulMPSGraph legacy enum)。 Measured M-series
+    /// (Mac mini) crossover at 16M = 256³ — MPSGraph warm wins
+    /// 1.07-1.38× over MSL at 256³+。 Configurable per device
+    /// because iPhone A-series + iPad M-series have different
+    /// MPSGraph dispatch overhead; the chapter 八百七十一 hardcoded
+    /// 16M was flagged by 6th-pass review (agent A HIGH-1) as
+    /// needing this configurability。
+    public let matMulMPSGraphActorMinProduct: Int
+
     /// LayerNorm: use Rust naive below this dim,affine SIMD at
     /// or above。 Measured M-series crossover ≈ 128。
     public let layerNormSIMDMinDim: Int
@@ -84,6 +96,7 @@ public struct BASAutoRouteThresholds:
         sha256CryptoKitMinBytes: Int = 1024,
         attentionMetalMinProduct: Int = 64,
         matMulMetalMinProduct: Int = 262_144,
+        matMulMPSGraphActorMinProduct: Int = 16_777_216,
         layerNormSIMDMinDim: Int = 128,
         geluTanhSIMDMinDim: Int = 256,
         batchedCosineMetalMinRows: Int = 16384
@@ -95,6 +108,8 @@ public struct BASAutoRouteThresholds:
             max(1, attentionMetalMinProduct)
         self.matMulMetalMinProduct =
             max(1, matMulMetalMinProduct)
+        self.matMulMPSGraphActorMinProduct =
+            max(1, matMulMPSGraphActorMinProduct)
         self.layerNormSIMDMinDim =
             max(1, layerNormSIMDMinDim)
         self.geluTanhSIMDMinDim =
@@ -766,23 +781,24 @@ public enum BASAutoRouteRanker {
         thresholds: BASAutoRouteThresholds = .mSeriesDefault
     ) -> BASAutoRouteChoice {
         let prod = shape.workProduct
-        // chapter 八百七十一 / M3021 — split-flip based on live
-        // 5-way measurement at Mac mini:
-        //   prod ≥ 16M → MPSGraph actor (warm) beats MSL 1.38×
-        //                at 512³ (workProduct=134M),narrow win
-        //                at 256³ (workProduct=16.7M,1.07× tie)
-        //   prod ≥ 262144 + < 16M → MSL custom kernel still
-        //                wins (1.89× faster than MPSGraph at 128³)
-        //   prod < 262144 → Rust paths win,Metal dispatch
-        //                overhead too high
+        // chapter 八百七十一 split-flip (refactored at chapter
+        // 八百七十一.5 / M3025 to read threshold from
+        // BASAutoRouteThresholds for per-device configurability):
+        //   prod ≥ thresholds.matMulMPSGraphActorMinProduct
+        //     → MPSGraph actor (default 16M = 256³,where Mac
+        //        mini measured MPSGraph warm wins 1.07-1.38× at
+        //        256³+)
+        //   prod ≥ thresholds.matMulMetalMinProduct + < the above
+        //     → MSL custom kernel (.metalMatMulMPSGraph legacy
+        //        enum,1.89× faster than MPSGraph at 128³)
+        //   prod < 262144 → Rust paths win
         //
-        // 16M threshold = 256³ — at exactly the crossover point
-        // both are within noise,but the trend at larger shapes
-        // is decisively MPSGraph,so cut at 16M。 Could be tuned
-        // higher (e.g. 32M = 320³) if production data shows
-        // 256³ shapes are actually faster on MSL on different
-        // hardware。
-        if prod >= 16_777_216 {  // 256³ workProduct = 16,777,216
+        // The 16M default sits exactly at 256³ where MPSGraph
+        // first wins by a narrow margin。 iPhone/iPad with
+        // different MPSGraph overhead can raise this via the
+        // thresholds init parameter without touching the ranker
+        // (agent A 6th-pass review HIGH-1)。
+        if prod >= thresholds.matMulMPSGraphActorMinProduct {
             return .metalMatMulMPSGraphActor
         }
         if prod >= thresholds.matMulMetalMinProduct {
