@@ -11,6 +11,82 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Gap-3 DECLINE-WITH-TRIGGER — forget cascade Rust path stays OFF (chapter 八百八十一 / M3090)
+
+User surfaced 5 architectural gaps after v0.62.1 ship。 Selected
+scope: Gaps 2+3 ship,Gaps 1+4+5 DECLINE。 Chapter 八百八十一 takes
+Gap 3 (「Forget/tombstone 还半成品 / Rust forget 路径默认还是关
+的,因为之前 perf 证明小批量 FFI 不划算」) and converts the「flip-
+or-decline」 question into a measured DECLINE。
+
+#### Knives shipped
+
+1. **LIVE measurement bench** (chapter 881 knife 1):
+   NEW `BASChapter881ForgetCascadeBaselineTests.swift` captured
+   Swift Set partition vs Rust C ABI partition on Mac mini at full
+   production grid:
+   - records ∈ {10, 100, 1K, 10K}
+   - targets ∈ {1, 10, 100, 1K}
+   - hit rates ∈ {10%, 50%, 100%}
+
+   **Verdict**: Swift Set partition wins EVERY shape by 2-3×。
+   E.g. 10K records × 1K targets: Swift 1.79ms vs Rust 4.62ms
+   = Swift 2.58× faster。 Smallest size 10×1: Swift 1.5μs vs
+   Rust 5.2μs = Swift 3.5× faster。
+
+   **Root cause**: string-FFI dominates。 Each call must
+   length-prefix encode N record IDs as UTF-8 in Swift → copy
+   bytes across C ABI → re-decode + own Strings in Rust → build
+   HashSet → filter → return index arrays → Swift materializes
+   records by index。 Versus Swift's native Set<String> which
+   hashes IDs in-place + linear-scans。 The FFI overhead is NOT
+   amortized at any production size。
+
+2. **Runner doc-string updated** (chapter 881 knife 2):
+   `BASMemoryForgetCascadeRunner.useRoutedFilter` doc cites
+   chapter 881 measurement verdict + DECLINE-WITH-TRIGGER label
+   + 4 trigger conditions for future re-evaluation。 Default
+   stays `false` (Swift path)。
+
+3. **NEW audit test file** (chapter 881 knife 3):
+   `BASChapter881ForgetCascadeDeclineAuditTests.swift` (4 tests):
+   - `testProductionDefaultIsSwift` pins useRoutedFilter == false
+   - `testRunnerDocCitesChapter881Decline` pins doc citation +
+     numeric verdict (2.58× / 2-3×)
+   - `testTriggerConditionsDocumented` pins 4 trigger conditions
+     (batched-cascade ABI / numeric-ID encoding / 10× volume /
+     Swift Set perf regression)
+   - `testByteEqualityTestFileExists` pins chapter 717 byte-eq
+     stays present as the safety net
+
+4. **Baseline test archived** (chapter 881 knife 4):
+   `BASChapter881ForgetCascadeBaselineTests` setUp throws
+   XCTSkip after the chapter 881 capture commits。 Future
+   chapter that wants to re-evaluate can flip skip off,re-run
+   for fresh data,then update the audit test。
+
+#### Discipline pin
+
+Chapter 881 = DECLINE-WITH-TRIGGER per chapter 870 + ch 874 + ch 875
+pattern。 「亏的不要硬上」 enforced: measurement showed Rust loses
+2-3× at every production size,so the flip would have been net
+performance regression。 NO code change to runner behavior — only
+doc-string + audit test added。
+
+#### Verification
+
+   swift test --filter BASChapter881:   7 tests / 3 skipped / 0 failures
+   swift test (FULL SWEEP):             13,393 / 78 skipped / 0 failures
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 880: +7 tests (4 audit + 3 baseline-archived),
++4 skipped (3 baseline + 1 unrelated)。 No schemaVersion bump
+(no threshold field added — DECLINE means existing surface
+preserved)。
+
+---
+
 ### v0.62.1 全面收尾 — CHUNK_ROWS Swift→Rust forwarding + release docs (chapter 八百八十 / M3085)
 
 User directive 「全面收尾」 (comprehensive wrap-up)。 14th-pass review

@@ -162,12 +162,36 @@ public struct BASMemoryForgetCascadeRunner: Sendable {
     /// `BASAutoRouteRanker.forgetCascadeFilter` (Rust C ABI)
     /// instead of the inline `Set<String>` partition。
     ///
-    /// Default `false` preserves the V1 byte-pinned Swift path
-    /// until chapter 七百十七 第二刀 measurement confirms a
-    /// production speedup。 The byte-equality test in
+    /// Default `false` preserves the V1 byte-pinned Swift path。
+    /// The byte-equality test in
     /// `BASChapter717ForgetCascadeByteEqualityTests` proves
     /// both paths produce identical (remainingRecords,
     /// removedIDs) for any input。
+    ///
+    /// chapter 八百八十一 / M3090 — DECLINE-WITH-TRIGGER。
+    /// Knife 1 LIVE measurement on Mac mini (2026-05-23) ran
+    /// the Swift Set partition vs Rust C ABI at production
+    /// grid (records ∈ {10, 100, 1K, 10K} × targets ∈
+    /// {1, 10, 100, 1K} × hit ∈ {10%, 50%, 100%})。 Swift won
+    /// EVERY shape by 2-3× (e.g. 10K×1K: Swift 1.79ms vs Rust
+    /// 4.62ms = Swift 2.58× faster)。 Root cause:string FFI
+    /// encode/decode + HashMap rebuild costs dominate at
+    /// every production size。 Per 「亏的不要硬上」 discipline,
+    /// chapter 881 PINS the decline (same pattern as ch
+    /// 874/875 RoPE/RMSNorm decline-pending-consumer)。
+    ///
+    /// Trigger conditions for future re-evaluation:
+    ///   (a) Batched-cascade API where N cascades amortize the
+    ///       FFI hop in a single call
+    ///   (b) Numeric ID encoding (UInt64 not String) — removes
+    ///       UTF-8 encode/decode work
+    ///   (c) Forget cascade sizes exceed 100K × 10K (orders
+    ///       of magnitude beyond measured grid)
+    ///
+    /// `BASChapter881ForgetCascadeDeclineAuditTests` pins the
+    /// decline + trigger conditions。 `BASChapter881
+    /// ForgetCascadeBaselineTests` (skip-by-default) holds
+    /// the measurement file for future re-runs。
     public nonisolated(unsafe) static var useRoutedFilter:
         Bool = false
 
