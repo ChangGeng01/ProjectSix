@@ -11,6 +11,76 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Arc seal: Mamba + Rayon + Metal + RL (chapters 八百五十二-八百六十二 / M2911-M2961)
+
+User directive 「全面 开发 mamba 多线程 和 强化学习 提高 Metal
+rust c c++」 — full 4-phase arc per plan
+/Users/changgeng/.claude/plans/wild-rolling-meerkat.md。
+
+**Arc landing:**
+
+| Phase | Theme | Outcome | Chapters |
+|---|---|---|---|
+| **A** | Mamba CPU multi-threading | SHIPPED — Rust seq 14-42× faster than Swift CPU reference at all 3 scales。 Rust parallel kept opt-in but documented as needing-rework (scatter algorithm dominates inner-loop)。 | 八百五十二 (5 knives) |
+| **C** | Rust rayon cascade | 2 sites flipped (red-team batch + tokenizer batch);2 sites declined (memory reducer too-light + importance scorer Swift-wins) | 八百五十四 + 八百五十五 + 八百五十六 |
+| **B** | Metal kernel activation cascade | **DECLINED-PENDING-CONSUMER** — all 6 gated Metal kernels (FlashAttention/Conv/LayerNorm/Softmax/Activation/Reduce) are SCAFFOLDING with zero Swift production consumers。 Activating without consumer pull is busy-work。 | 八百五十七 (audit only) |
+| **D** | RL feasibility audit | **DEFERRED** — substrate is frozen-weight inference + governance engine,not a learning system。 No reward,no learner,no gradient flow。 3 minimal-scope RL shapes documented (bandit advisor / LoRA adapter / reward-shaped re-rank) with triggers for future revisit。 | 八百六十二 (audit only) |
+
+### Why declines = discipline
+
+Same pattern as chapter 八百四十九 (contradiction-refs separate-table) and chapter 八百五十六 (memory scoring rayon):**audit-driven decline IS the engineering discipline,not the failure**。 The arc shipped real wins where measurement supported the work,and honestly declined the rest with documented triggers for future revisit。
+
+### Files added / modified
+
+```
++ Cargo/bas-mamba-scan/                                  (Phase A — NEW crate, ~600 LOC, 21 Rust tests)
++ rayon dep in Cargo/bas-mamba-scan + bas-red-team-bench + bas-tokenizer
++ bas_mamba_scan_sequential/parallel C ABI + Swift bridge in BASAutoRouteRanker
++ Tests/BehavioralAISubstrateTests/
+   BASChapter852MambaScanBridgeTests.swift   (6 tests — Swift ≡ Rust seq ≡ Rust par)
+   BASChapter852MambaScanPerfTests.swift     (4 tests — 5-axis perf grid)
+   BASChapter856MemoryScoringRayonAuditTests.swift  (3 audit tests)
+   BASChapter857MetalKernelActivationAuditTests.swift (3 audit tests)
+   BASChapter862RLFeasibilityAuditTests.swift (5 audit tests)
+~ Cargo/bas-memory-usage-tracker/  (force-link anchors + C header decls)
+~ Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework/  (3 slices rebuilt)
+```
+
+### Test deltas (arc cumulative)
+
+Rust workspace: +21 (bas-mamba-scan new crate) +5 (tokenizer) +4 (red-team) = **+30 Rust unit tests**。
+Swift tests: +21 across chapters 852 (10) + 856 (3) + 857 (3) + 862 (5)。
+
+### Headline measurement
+
+Phase A bas-mamba-scan sequential CPU path measured **14-42× faster than Swift CPU reference** at the planned grid (B=1/4/8 × L=64/128/256 × D=32/128/256)。 Rust parallel-as-implemented slower than sequential due to scatter algorithm — documented + declined as production default,kept as opt-in。
+
+### Discipline pins held across all 4 phases
+
+- 不变量 #1/#2/#3 preserved every chapter
+- 红线 7 — every flip + audit additive
+- 不要 删除 只能 comment — no deletions
+- ADR-014 OPT-IN — Phase A Rust paths opt-in via BASAutoRouteRanker;
+  Phase C parallel paths opt-in via crate-level API
+- 整体 性能 效果 一定要 更好 — Phase A measured 14-42× win;
+  Phase C sites measured cleanly;Phase B + D declines protect
+  production from negative-ROI work
+- 多做比较 — Phase A 3-scale grid + Phase C byte-eq + audit tests
+- 亏的不要硬上 — Phase B + Phase D + 2 of 4 Phase C sites all
+  declined honestly with documented triggers
+- 不要 json 可以的话 就 sql — N/A (no SQL changes this arc)
+- god-file pinned override — no new files past warn
+
+### Standing — 28 commits ahead of v0.61.0
+
+Branch in CLEAN state on both:
+- `phase-5-chapter-758-deeper-layer-migration-arc`
+- `phase-5-chapter-834-post-v0.61.0-cascade-arc`
+
+Ready for v0.62.0 candidate tag when authorized。
+
+---
+
 ### Phase C: Rust rayon parallelism cascade (chapters 八百五十四-八百五十六 / M2921-M2923)
 
 User directive 「全面 开发」 Phase C of the multi-thread arc。 Add
