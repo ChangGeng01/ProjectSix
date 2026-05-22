@@ -44,7 +44,8 @@
 /// which downstream observability / verdict bit gets lit when a
 /// match is recorded — knives 三/四/五 wire this)。
 ///
-/// Wire encoding for C ABI:u8 with values 0..3 (knife 三)。
+/// Wire encoding for C ABI:u8 with values 0..4 (knife 三 +
+/// chapter 八百八十七 BadTone extension)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum RedLineCategory {
@@ -56,6 +57,11 @@ pub enum RedLineCategory {
     Product = 2,
     /// `BASSovereignDomainScope.forbiddenSubstrings` (1 red line)。
     Br014SovereignDomainScope = 3,
+    /// chapter 八百八十七 / M3125 — `BASBadToneLintRule` cases
+    /// (6 lint rules)。 Discovery agent found this had identical
+    /// structure to Product (already Rust-wired chapter 七百五十九 +
+    /// 七百七十七)。 Extension target per chapter 870 discipline。
+    BadTone = 4,
 }
 
 // MARK: - RedLineId enum (24 variants)
@@ -69,6 +75,7 @@ pub enum RedLineCategory {
 ///   0x10-0x17 — Kunlun (8 variants)
 ///   0x20-0x24 — Product (5 variants)
 ///   0x30      — BR-014 (1 variant)
+///   0x40-0x45 — BadTone (6 variants, chapter 八百八十七)
 ///
 /// Gaps in the discriminant space (e.g。 0x0A-0x0F unused) reserve
 /// future patches without breaking existing wire encodings — any
@@ -107,6 +114,23 @@ pub enum RedLineId {
 
     // --- BR-014 (1) ---
     Br014SovereignDomainScope            = 0x30,
+
+    // --- BadTone (6) — chapter 八百八十七 / M3125 ---
+    /// `BASBadToneLintRule.oracular` — false-prophecy framing。
+    BadToneOracular                      = 0x40,
+    /// `BASBadToneLintRule.cult` — cult-like in-group framing。
+    BadToneCult                          = 0x41,
+    /// `BASBadToneLintRule.horrorWhisper` — horror-whisper
+    /// atmosphere。
+    BadToneHorrorWhisper                 = 0x42,
+    /// `BASBadToneLintRule.chosenOne` — chosen-one framing。
+    BadToneChosenOne                     = 0x43,
+    /// `BASBadToneLintRule.abyssGazing` — Nietzsche-quote
+    /// gravitas。
+    BadToneAbyssGazing                   = 0x44,
+    /// `BASBadToneLintRule.mindReader` — paternalistic
+    /// mind-reading。
+    BadToneMindReader                    = 0x45,
 }
 
 impl RedLineId {
@@ -140,14 +164,22 @@ impl RedLineId {
             | RedLineId::ProductNoCosmicColdness => RedLineCategory::Product,
 
             RedLineId::Br014SovereignDomainScope => RedLineCategory::Br014SovereignDomainScope,
+
+            RedLineId::BadToneOracular
+            | RedLineId::BadToneCult
+            | RedLineId::BadToneHorrorWhisper
+            | RedLineId::BadToneChosenOne
+            | RedLineId::BadToneAbyssGazing
+            | RedLineId::BadToneMindReader => RedLineCategory::BadTone,
         }
     }
 
-    /// All 24 red lines in deterministic discriminant order。 The
+    /// All 30 red lines in deterministic discriminant order。 The
     /// order pin matters for the byte-equality test (knife 四) —
     /// matches MUST be reported in the same sequence Swift would
     /// emit them given identical input。
-    pub const ALL: [RedLineId; 24] = [
+    /// chapter 八百八十七 bumped from 24 → 30 (added 6 BadTone)。
+    pub const ALL: [RedLineId; 30] = [
         // Cthulhu
         RedLineId::CthulhuForbidShockHorror,
         RedLineId::CthulhuForbidOracular,
@@ -176,6 +208,13 @@ impl RedLineId {
         RedLineId::ProductNoCosmicColdness,
         // BR-014
         RedLineId::Br014SovereignDomainScope,
+        // BadTone (chapter 八百八十七)
+        RedLineId::BadToneOracular,
+        RedLineId::BadToneCult,
+        RedLineId::BadToneHorrorWhisper,
+        RedLineId::BadToneChosenOne,
+        RedLineId::BadToneAbyssGazing,
+        RedLineId::BadToneMindReader,
     ];
 }
 
@@ -286,6 +325,39 @@ pub const fn forbidden_substrings_for(id: RedLineId) -> &'static [&'static str] 
             "tool-routine",
             "ux-polish",
             "compare-mode-pick"],
+
+        // --- BadTone (6) — chapter 八百八十七 / M3125 ---
+        // Mirrors Sources/BASOrchestration/BASBadToneLintRule.swift:
+        // forbiddenSubstrings (pre-lowercased per same convention)。
+        RedLineId::BadToneOracular => &[
+            "the universe has decreed",
+            "fate has spoken",
+            "destined to",
+            "prophesied"],
+        RedLineId::BadToneCult => &[
+            "join us",
+            "we who know",
+            "the chosen few",
+            "initiated few"],
+        RedLineId::BadToneHorrorWhisper => &[
+            "something stirs",
+            "they're watching",
+            "shadows whisper",
+            "darkness creeps"],
+        RedLineId::BadToneChosenOne => &[
+            "you have been chosen",
+            "you are the one",
+            "you alone can",
+            "destined for greatness"],
+        RedLineId::BadToneAbyssGazing => &[
+            "gaze into the abyss",
+            "abyss gazes back",
+            "stare into the void"],
+        RedLineId::BadToneMindReader => &[
+            "i see what you really want",
+            "you don't realize",
+            "what you truly need",
+            "deep down you know"],
     }
 }
 
@@ -717,10 +789,12 @@ mod tests {
 
     #[test]
     fn test_all_24_red_lines_present() {
-        // Knife 一 sanity:24 distinct red-line IDs。
-        assert_eq!(RedLineId::ALL.len(), 24,
-            "chapter 七百五十九 corpus must contain exactly 24 red lines \
-             (10 Cthulhu + 8 Kunlun + 5 Product + 1 BR-014)");
+        // Knife 一 sanity (chapter 七百五十九 = 24,bumped to 30 by
+        // chapter 八百八十七 BadTone extension)。
+        assert_eq!(RedLineId::ALL.len(), 30,
+            "chapter 七百五十九 corpus + chapter 八百八十七 BadTone \
+             extension = 30 red lines (10 Cthulhu + 8 Kunlun + 5 \
+             Product + 1 BR-014 + 6 BadTone)");
 
         // Each ID maps to non-empty pattern list (per Swift
         // assertion「RL X MUST have ≥1 forbidden substring」)。
@@ -745,18 +819,23 @@ mod tests {
         let mut kunlun = 0;
         let mut product = 0;
         let mut br_014 = 0;
+        let mut bad_tone = 0;
         for &id in &RedLineId::ALL {
             match id.category() {
                 RedLineCategory::Cthulhu => cthulhu += 1,
                 RedLineCategory::Kunlun => kunlun += 1,
                 RedLineCategory::Product => product += 1,
                 RedLineCategory::Br014SovereignDomainScope => br_014 += 1,
+                RedLineCategory::BadTone => bad_tone += 1,
             }
         }
         assert_eq!(cthulhu, 10);
         assert_eq!(kunlun, 8);
         assert_eq!(product, 5);
         assert_eq!(br_014, 1);
+        // chapter 八百八十七 / M3125 — BadTone extension。
+        assert_eq!(bad_tone, 6,
+            "BadTone category must have 6 variants per BASBadToneLintRule's 6 cases");
     }
 
     #[test]
@@ -1725,17 +1804,20 @@ mod tests {
     fn test_total_pattern_count_at_least_60() {
         // Sanity guard:if a future patch deletes a pattern,this
         // count drops,catching the regression。 Initial corpus
-        // count (computed at chapter 七百五十九 第一刀):
+        // count (chapter 七百五十九 第一刀):
         //   Cthulhu  = 2+2+2+2+2+2+2+2+2+2 = 20
         //   Kunlun   = 2+3+2+3+3+3+2+3      = 21
         //   Product  = 6+5+4+4+4            = 23
         //   BR-014   = 6
-        //   Total    = 70
+        //   Subtotal = 70
+        // chapter 八百八十七 / M3125 BadTone extension:
+        //   BadTone  = 4+4+4+4+3+4          = 23
+        //   Total    = 70 + 23              = 93
         let count = total_pattern_count();
-        assert_eq!(count, 70,
-            "chapter 七百五十九 第一刀 corpus must contain exactly \
-             70 patterns (Cthulhu 20 + Kunlun 21 + Product 23 + \
-             BR-014 6)");
+        assert_eq!(count, 93,
+            "chapter 七百五十九 第一刀 + 八百八十七 BadTone corpus \
+             must contain exactly 93 patterns (Cthulhu 20 + Kunlun \
+             21 + Product 23 + BR-014 6 + BadTone 23)");
     }
 
     // MARK: - chapter 八百五十四 / M2921 parallel batch tests

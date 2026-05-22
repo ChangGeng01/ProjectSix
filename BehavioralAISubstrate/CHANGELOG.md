@@ -11,6 +11,99 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### BASBadToneLinter Rust foundation — bas-red-team-bench extended with BadTone category (chapter 八百八十七 / M3125)
+
+Discovery agent dispatched post-chapter 884 found `BASBadToneLinter
+.lint(inputs:)` at `Sources/BASOrchestration/BASBadToneLintRule
+.swift:171-189` has STRUCTURALLY IDENTICAL shape to
+`BASProductRedLineLinter` which was Rust-migrated via
+`bas-red-team-bench` crate at chapter 七百五十九 + default-flipped at
+chapter 七百七十七 (measured 33-67× speedup at production scale)。
+
+Chapter 八百八十七 implements the migration as foundation per
+chapter 870 cycle-break discipline (small steps,each with
+review)。 Chapter 八百八十八 will add the Swift bridge + flip default。
+
+#### Knives shipped (chapter 887 — Rust foundation)
+
+1. **RedLineCategory enum extended**: `BadTone = 4` added
+   alongside existing `Cthulhu = 0`,`Kunlun = 1`,`Product = 2`,
+   `Br014SovereignDomainScope = 3`。
+
+2. **RedLineId enum extended**: 6 new variants for the 6
+   `BASBadToneLintRule` cases at discriminants 0x40-0x45:
+   - `BadToneOracular = 0x40` (false-prophecy)
+   - `BadToneCult = 0x41` (cult-like in-group)
+   - `BadToneHorrorWhisper = 0x42` (horror-whisper)
+   - `BadToneChosenOne = 0x43` (chosen-one)
+   - `BadToneAbyssGazing = 0x44` (Nietzsche gravitas)
+   - `BadToneMindReader = 0x45` (paternalistic mind-reading)
+
+3. **RedLineId::ALL bumped 24 → 30**: deterministic discriminant
+   order preserved。 Cthulhu+Kunlun+Product+BR-014 still first
+   (chapter 七百五十九 wire-format compat),BadTone variants
+   appended。
+
+4. **`category()` method updated**: 6 new match arms mapping
+   BadTone variants to `RedLineCategory::BadTone`。
+
+5. **`forbidden_substrings_for()` extended**: 23 BadTone
+   substring patterns added (mirroring Swift's
+   `BASBadToneLintRule.forbiddenSubstrings`,pre-lowercased
+   per same convention as Cthulhu/Kunlun/Product/BR-014)。
+   - oracular: 4 patterns
+   - cult: 4 patterns
+   - horrorWhisper: 4 patterns
+   - chosenOne: 4 patterns
+   - abyssGazing: 3 patterns
+   - mindReader: 4 patterns
+
+6. **Pre-existing tests updated**:
+   - `test_all_24_red_lines_present` → 30 (chapter 887 bump
+     documented)
+   - `test_total_pattern_count_at_least_60`: 70 → 93 (added
+     BadTone's 23 patterns)
+   - `test_category_distribution`: new BadTone arm + assert
+     `bad_tone == 6`
+
+7. **XCFramework rebuilt** (3 slices): macOS-arm64 + ios-arm64
+   + ios-arm64-simulator。 SHA256 fresh per build。 New BadTone
+   classifiers ship to Swift consumers via static link。
+
+8. **NEW chapter 887 audit test**:
+   `BASChapter887BadToneRustFoundationTests.swift` (4 tests):
+   - Rust crate has BadTone foundation pinned
+   - Substrings mirror Swift (6 representative anchors)
+   - BadToneLinter still uses Swift path (no flip in 887)
+   - Chapter 888 triggers documented
+
+#### What chapter 887 does NOT change
+
+- `BASBadToneLinter.lint(inputs:)` — STILL pure-Swift。 Chapter
+  888 will add the Rust bridge + flip default。
+- `BASRedTeamBatchClassifier` — UNCHANGED (still handles the
+  24 Cthulhu/Kunlun/Product/BR-014 IDs)。 Chapter 888 adds a
+  SEPARATE `BASBadToneLintBatchClassifier` mirroring this
+  pattern (lower coupling than overloading the existing one)。
+- Existing Swift consumers — ZERO behavior change。 Rust corpus
+  bumped 24 → 30 IDs is additive;callers parsing matches by
+  ID nibble already handle unknown high nibbles defensively。
+
+#### Verification
+
+   cargo test -p bas-red-team-bench --lib: 42/42 PASS (+2 ignored)
+   cargo test --workspace:                 ALL crates PASS
+   swift test --filter BASChapter887:      4/4 PASS
+   swift build:                            PASS
+   pre-commit gates:                       3/3 PASS
+
+Delta from chapter 886: +6 RedLineId variants + 1 RedLineCategory
+variant + 23 substring patterns + 4 audit tests + 3 pre-existing
+test updates。 Additive foundation only — chapter 888 ships the
+flip。
+
+---
+
 ### Chapter 883 Trigger C — sync resolveCandidatesSync helper shipped (chapter 八百八十六 / M3120)
 
 Chapter 八百八十三 DECLINED wiring the full async `BASRAGRetriever
