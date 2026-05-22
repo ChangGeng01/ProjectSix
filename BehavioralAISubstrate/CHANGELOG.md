@@ -11,6 +11,75 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### RoPE + RMSNorm DECLINE-PENDING-CONSUMER (chapters 八百七十四 + 八百七十五 / M3036+M3041)
+
+Two MPSGraph kernels exist + ship (since chapter 四百三十一 RoPE +
+chapter 四百四十七 RMSNorm) but neither is wired through
+BASCognitiveBrain。 Same DECLINED-PENDING-CONSUMER pattern as
+chapter 八百五十七's 5 scaffolding `.metal` kernels。 Both
+chapters land as audit-with-decline + future triggers。
+
+#### LIVE 2-way measurements on Mac mini
+
+**Chapter 874 — RoPE**:
+
+| Shape (seq, h, hd) | Swift naive | MPSGraph warm | Verdict |
+|---|---|---|---|
+| (64, 1, 64) — 4K | 412 μs | 8,206 μs | MPSGraph 19.91× SLOWER |
+| (256, 4, 64) — 65K | 6,336 μs | 8,340 μs | MPSGraph 1.32× SLOWER |
+| (512, 8, 128) — 524K | 53,239 μs | 9,614 μs | **MPSGraph 5.54× FASTER** |
+
+**Chapter 875 — RMSNorm**:
+
+| Shape (batchSeq, hiddenDim) | Swift naive | MPSGraph warm | Verdict |
+|---|---|---|---|
+| (64, 128) — 8K | 3,853 μs | 19,150 μs | MPSGraph 4.97× SLOWER |
+| (128, 512) — 65K | 34,491 μs | 16,570 μs | **MPSGraph 2.08× FASTER** |
+| (256, 2048) — 524K | 424,905 μs | 24,555 μs | **MPSGraph 17.3× FASTER** |
+
+#### Decline rationale
+
+Both show split-flip pattern (Swift wins small,MPSGraph wins large
+— same shape as chapter 八百七十一 matMul)。 BUT no production
+consumer in BASCognitiveBrain for either。 Mamba SSM uses neither
+RoPE nor RMSNorm。 Current attention paths don't apply positional
+encoding。 Activating routing without consumer = busy-work per
+chapter 八百五十六/八百五十七 discipline。 Kernels stay shipping +
+tested (correctness pins from chapter 四百三十一+四百四十七) — ready
+to wire when consumer materializes。
+
+#### Triggers (chapter 874 RoPE)
+
+1. BASCognitiveBrain gains method needing RoPE
+2. Production shapes ≥ 500K cells where MPSGraph wins ≥1.3×
+3. Mamba+RoPE hybrid model added
+
+#### Triggers (chapter 875 RMSNorm)
+
+1. BASCognitiveBrain gains method needing RMSNorm
+2. Production hiddenDim ≥ 512 where MPSGraph wins
+3. Pre-norm RMSNorm decoder/encoder architecture added
+
+#### Discovery note (chapter 874)
+
+Architectural inconsistency caught:`BASCanonicalKernelInputBuilders.rotaryEmbedding(...)`
+creates rank-3 [seqLen, heads, headDim] but
+`BASMPSGraphRotaryEmbeddingKernel.evaluate` rejects rank-3,
+expects rank-2。 Documented in test file。 NOT fixed (no
+consumer needs rank-3)。 Future RoPE consumer should reconcile。
+
+#### Verification
+
+   swift test BASChapter874RoPEFlipOrDecline:       4/4 PASS
+   swift test BASChapter875RMSNormFlipOrDecline:    4/4 PASS
+   swift build:                                      PASS
+   pre-commit gates:                                 3/3 PASS
+
+Same「亏的不要硬上」 discipline as chapters 八百四十九/八百五十六/
+八百五十七/八百六十二/八百六十六/八百六十八/八百七十三。
+
+---
+
 ### BASRoutedAuditAggregation DECLINE-WITH-TRIGGER (chapter 八百七十三 / M3031)
 
 Arc 871-876 plan slotted as「Rust+rayon for 3 aggregation loops,

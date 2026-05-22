@@ -340,6 +340,26 @@ chapter 八百七十三: ~87% Swift (raw) / 13.4% native (raw)
                   chapters 八百五十六/八百五十七/八百六十二/八百六十六/
                   八百六十八 — measurement-driven declines
                   preserve substrate simplicity.)
+chapter 八百七十四+五: ~87% Swift / 13.4% native
+                  (RoPE + RMSNorm DECLINE-PENDING-CONSUMER.
+                  Live 2-way bench on Mac mini showed split-
+                  flip pattern (same as 八百七十一 matMul):
+                    RoPE small (4K cells):  MPS 19.91× SLOWER
+                    RoPE large (524K):     MPS 5.54× FASTER
+                    RMSNorm small (8K):    MPS 4.97× SLOWER
+                    RMSNorm large (524K):  MPS 17.3× FASTER
+                  BUT no production consumer in
+                  BASCognitiveBrain for either — Mamba SSM
+                  uses neither, current attention paths
+                  don't apply positional encoding. Same
+                  DECLINED-PENDING-CONSUMER pattern as
+                  chapter 八百五十七's 5 .metal scaffold
+                  kernels. 8 audit tests (4 per chapter)
+                  pinning measurements + 3 triggers each.
+                  Kernels stay shipping for future consumer
+                  pull. Also caught canonical-builder vs
+                  kernel rank-2/rank-3 inconsistency in
+                  RoPE — documented, not fixed.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
