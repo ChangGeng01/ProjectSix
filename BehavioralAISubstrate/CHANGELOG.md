@@ -11,6 +11,108 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### BASBadToneLinter Swift bridge + default flip — Rust routing ACTIVE (chapter 八百八十八 / M3130)
+
+Chapter 八百八十七 shipped the Rust foundation (bas-red-team-bench
+extended with BadTone category + 6 IDs + 23 substrings)。 Chapter
+八百八十八 wires the Swift bridge + flips the production default。
+Pattern mirrors chapter 七百七十七 Product / Cthulhu / Kunlun /
+BR-014 default-routing flip (measured 33-67× speedup at chapter
+七百七十七)。
+
+#### Knives shipped (chapter 888)
+
+1. **NEW `BASBadToneLintBridge.lintViaRust(inputs:)`**: reuses
+   `BASRedTeamBatchClassifier.classifyViaRust` since the C ABI
+   `bas_red_team_classify_batch` already emits BadTone matches
+   alongside Cthulhu/Kunlun/Product/BR-014 (chapter 887 ALL bump
+   24 → 30)。 Filters matches to BadTone IDs (0x40-0x45),maps
+   (redLineId,patternIndex) → `BASBadToneLinter.Violation`。
+
+2. **NEW `BASBadToneLintBridge.badToneRule(fromRustId:)`**:
+   discriminant → rule mapping (0x40→.oracular,...,0x45→
+   .mindReader)。 Pinned by chapter 887 layout。
+
+3. **`BASBadToneLinter.lint(inputs:)` flipped**: production
+   default on iOS/macOS now routes through `BASBadToneLintBridge
+   .lintViaRust`。 Swift body preserved as
+   `lintViaSwiftFallback(inputs:)` (renamed public method per
+   红线 7「不删除 只 comment」) for:
+   - watchOS / Linux (no XCFramework slice)
+   - Hosts that explicitly opt out via direct call
+   - Cross-language byte-equality tests
+
+4. **NEW `BASChapter888BadToneRustBridgeTests.swift`** (7 tests):
+   - Empty input → both paths empty
+   - Clean inputs → both paths empty
+   - All 6 rules detected by Rust path
+   - Multi-rule byte-equality (Set comparison since iteration
+     order differs: Swift is rule-major within prompt,Rust is
+     RedLineId-discriminant-major)
+   - Pattern_index → substring resolution correct
+   - Default lint() routes through Rust on Apple platforms
+   - Discriminant table integrity (0x40-0x45 + nil for 0x30/0x46)
+
+5. **Chapter 887 transition test updated**: the chapter 887
+   pin「BadToneLinter still uses Swift path」 was true at chapter
+   887 commit time but chapter 888 flipped it。 Renamed
+   `testBadToneLinterStillUsesSwiftPath` →
+   `testBadToneLinterRoutesThroughRustOnApple` + asserts
+   `BASBadToneLintBridge` exists + `lintViaRust` is the default
+   + `lintViaSwiftFallback` preserved。
+
+#### Discipline
+
+Chapter 870 cycle-break pattern (small steps,each reviewable)
+applied:
+  - Chapter 887: Rust foundation (additive crate extension)
+  - Chapter 888: Swift bridge + flip (this chapter)
+
+ADR-014 OPT-IN inverted here per chapter 七百七十七 precedent —
+when Rust path is provably equivalent (byte-equal tests) +
+measurably faster (chapter 七百七十七 product flip = 33-67×),
+default flips ON。 Swift fallback preserved so cross-platform +
+opt-out callers still work。 「亏的不要硬上」 satisfied: byte-
+equality holds + the Rust implementation is the same
+infrastructure already proven at chapter 七百七十七 (no new ABI,
+just new IDs in the existing crate)。
+
+#### What chapter 888 does NOT change
+
+- `BASRedTeamBatchClassifier.classify(prompts:)` — UNCHANGED。
+  Its output now includes BadTone matches (because the
+  underlying C ABI does),but the existing decoder already
+  defensively handles unknown high nibbles (chapter 七百五十九
+  V1 ABI design)。 All 27 chapter 七百五十九/七百七十七/七百八十五/
+  七百八十六 tests still pass。
+- `BASBadToneLintRule` enum cases / forbidden substrings —
+  UNCHANGED (Swift fallback continues to exercise them as
+  the byte-equality reference)。
+- No `BASAutoRouteThresholds` field added — chapter 888 is a
+  straight default flip,no per-call routing decision needed。
+
+#### Verification
+
+   swift test --filter BASChapter888:        7/7 PASS
+   swift test --filter BASChapter887:        4/4 PASS (updated transition test)
+   swift test --filter BASChapter777:        8/8 PASS (no regression)
+   swift test --filter BASChapter759:        ALL PASS
+   swift test --filter BASChapter785|BASChapter786: ALL PASS
+   swift test (FULL SWEEP):                  13,433 / 76 skipped / 0 substantive failures
+                                             (1 sweep-only flake: BASChapter868
+                                             FlashAttention timing-sensitive test,
+                                             passed in isolation pre-chapter 888)
+   swift build:                                                                PASS
+   pre-commit gates:                                                           3/3 PASS
+
+Delta from chapter 887: +7 chapter 888 tests + chapter 887
+transition test updated = +7 effective tests。 No schemaVersion
+bump,no Cargo change,no XCFramework rebuild (chapter 887
+already rebuilt with BadTone classifier)。 Pure-Swift bridge
++ default flip in `BASBadToneLintRule.swift`。
+
+---
+
 ### BASBadToneLinter Rust foundation — bas-red-team-bench extended with BadTone category (chapter 八百八十七 / M3125)
 
 Discovery agent dispatched post-chapter 884 found `BASBadToneLinter

@@ -114,9 +114,16 @@ final class BASChapter887BadToneRustFoundationTests:
         }
     }
 
-    /// PIN: BadToneLinter still uses Swift path in chapter 887
-    /// (no behavior change yet — chapter 888 flips the default)。
-    func testBadToneLinterStillUsesSwiftPath() throws {
+    /// chapter 八百八十七 + 八百八十八 evolution: this test was
+    /// originally written for chapter 887 as 「BadToneLinter
+    /// still uses Swift path」 — true at chapter 887 commit
+    /// time。 Chapter 888 (next commit) flipped the default to
+    /// route through Rust + added `BASBadToneLintBridge`。
+    /// Updated to reflect the post-八百八十八 state: the bridge
+    /// IS now present + the lint() default routes through Rust
+    /// on iOS/macOS。 The Swift fallback stays as
+    /// `lintViaSwiftFallback` per 红线 7。
+    func testBadToneLinterRoutesThroughRustOnApple() throws {
         let url = URL(
             fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -128,19 +135,22 @@ final class BASChapter887BadToneRustFoundationTests:
                 "BASBadToneLintRule.swift")
         let content = try String(
             contentsOf: url, encoding: .utf8)
-        // The lint() method is still pure-Swift in chapter 887
         XCTAssertTrue(
             content.contains("public static func lint("),
             "BASBadToneLinter.lint must still exist")
-        // No Rust bridge call yet (chapter 888 adds it)
-        XCTAssertFalse(
-            content.contains("classifyViaRust") ||
-            content.contains(
-                "bas_bad_tone_classify") ||
-            content.contains(
-                "BASBadToneLintBatchClassifier"),
-            "Chapter 887 is foundation-only — Swift path " +
-            "unchanged。 Chapter 888 wires the Rust bridge。")
+        // Chapter 888 added the bridge — pin it
+        XCTAssertTrue(
+            content.contains("BASBadToneLintBridge"),
+            "Chapter 888 must have added BASBadToneLintBridge")
+        XCTAssertTrue(
+            content.contains("lintViaRust"),
+            "Chapter 888 must route default through " +
+            "BASBadToneLintBridge.lintViaRust")
+        // Swift fallback preserved per 红线 7
+        XCTAssertTrue(
+            content.contains("lintViaSwiftFallback"),
+            "Swift fallback path must stay as opt-out per " +
+            "红线 7 不删除 只 comment")
     }
 
     /// PIN: trigger conditions for chapter 八百八十八 (Swift bridge

@@ -168,7 +168,33 @@ public enum BASBadToneLinter {
     ///
     /// Match is case-insensitive substring search. Pure
     /// function: no IO, no state, no actor.
+    ///
+    /// chapter 八百八十八 / M3130 — PRODUCTION DEFAULT now routes
+    /// through Rust via `BASBadToneLintBridge.lintViaRust(...)`
+    /// (chapter 887 added BadTone IDs 0x40-0x45 to the
+    /// `bas-red-team-bench` crate;chapter 888 wires the bridge
+    /// + flips default ON)。 Pattern mirrors chapter 七百七十七
+    /// `BASRedTeamBatchClassifier` flip (Product / Cthulhu /
+    /// Kunlun / BR-014 default-routed through Rust at chapter
+    /// 777,measured 33-67× speedup)。 The Swift body below stays
+    /// as the OPT-OUT fallback per 红线 7 (used on watchOS / Linux
+    /// + the chapter 887 baseline measurement)。
     public static func lint(
+        inputs: [String]
+    ) -> [Violation] {
+        #if os(iOS) || os(macOS)
+        // Chapter 八百八十八 production default — Rust path
+        return BASBadToneLintBridge.lintViaRust(inputs: inputs)
+        #else
+        return lintViaSwiftFallback(inputs: inputs)
+        #endif
+    }
+
+    /// Swift fallback path (chapter 887 + earlier — preserved
+    /// as the legacy / cross-platform / opt-out path per
+    /// 红线 7「依旧 不删除 只 comment」)。 Public so callers can
+    /// explicitly opt out of Rust。
+    public static func lintViaSwiftFallback(
         inputs: [String]
     ) -> [Violation] {
         var violations: [Violation] = []
@@ -186,5 +212,87 @@ public enum BASBadToneLinter {
             }
         }
         return violations
+    }
+}
+
+// MARK: - BASBadToneLintBridge (chapter 八百八十八 / M3130)
+
+/// chapter 八百八十八 / M3130 — Swift bridge wiring
+/// `BASBadToneLinter` through the `bas-red-team-bench` crate's
+/// shared `bas_red_team_classify_batch` C ABI (extended by
+/// chapter 八百八十七 to include BadTone IDs 0x40-0x45)。
+///
+/// Pattern mirrors `BASRedTeamBatchClassifier` (chapter 七百五十九
+/// + 七百七十七)。 The Swift bridge:
+///   1. Reuses `BASRedTeamBatchClassifier.classifyViaRust` since
+///      it already calls `bas_red_team_classify_batch` which now
+///      emits BadTone matches alongside Cthulhu/Kunlun/Product/
+///      BR-014 (chapter 887 ALL bump)
+///   2. Filters matches to BadTone IDs only (high nibble == 0x4)
+///   3. Maps (redLineId,patternIndex) → `BASBadToneLinter
+///      .Violation` shape (rule + offendingInput + matchedSubstring)
+///   4. Falls back to Swift if Rust path returns -1 or wire
+///      format parse fails
+public enum BASBadToneLintBridge {
+
+    /// chapter 八百八十八 — Rust-routed BadTone lint。 Calls into
+    /// the shared classifier + filters/maps the BadTone subset。
+    /// Byte-equality with `BASBadToneLinter.lintViaSwiftFallback`
+    /// is pinned by `BASChapter888BadToneRustBridgeTests`。
+    public static func lintViaRust(
+        inputs: [String]
+    ) -> [BASBadToneLinter.Violation] {
+        // Reuse the shared classifier — it already returns
+        // matches for all 30 RedLineIds (chapter 887 ALL)。
+        let allMatches = BASRedTeamBatchClassifier.classify(
+            prompts: inputs)
+        // Filter to BadTone matches only (high nibble == 0x4
+        // per chapter 887 discriminant layout)。
+        var violations: [BASBadToneLinter.Violation] = []
+        violations.reserveCapacity(allMatches.count / 5)
+        for match in allMatches {
+            // BadTone IDs are 0x40-0x45
+            guard match.redLineId >= 0x40
+                && match.redLineId <= 0x45
+            else { continue }
+            // Map redLineId → rule
+            guard let rule = badToneRule(
+                fromRustId: match.redLineId)
+            else { continue }
+            // Resolve patternIndex → substring
+            let substrings = rule.forbiddenSubstrings
+            let pidx = Int(match.patternIndex)
+            guard pidx < substrings.count else { continue }
+            // Look up offending input by promptIndex
+            let inputIdx = Int(match.promptIndex)
+            guard inputIdx < inputs.count else { continue }
+            violations.append(BASBadToneLinter.Violation(
+                rule: rule,
+                offendingInput: inputs[inputIdx],
+                matchedSubstring: substrings[pidx]))
+        }
+        return violations
+    }
+
+    /// Map a Rust BadTone red-line ID to its Swift rule enum
+    /// case。 Pinned by chapter 八百八十七 discriminant layout:
+    ///   0x40 → .oracular
+    ///   0x41 → .cult
+    ///   0x42 → .horrorWhisper
+    ///   0x43 → .chosenOne
+    ///   0x44 → .abyssGazing
+    ///   0x45 → .mindReader
+    public static func badToneRule(
+        fromRustId id: UInt16
+    ) -> BASBadToneLintRule? {
+        switch id {
+        case 0x40: return .oracular
+        case 0x41: return .cult
+        case 0x42: return .horrorWhisper
+        case 0x43: return .chosenOne
+        case 0x44: return .abyssGazing
+        case 0x45: return .mindReader
+        default:   return nil
+        }
     }
 }
