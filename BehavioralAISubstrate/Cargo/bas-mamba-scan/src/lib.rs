@@ -418,10 +418,13 @@ pub fn scan_parallel_v2(
 //   - bas_mamba_scan_parallel(...)   — rayon parallel CPU path
 //
 // Both take 5 input buffers (x, delta, A, B, C) + a shape triple
-// (b, l, d) + a writable output buffer (y) + its capacity in
-// bytes (which must be ≥ element_count() × sizeof(f32))。 Return
-// `0` on success, `-1` on any input mismatch (caller routes to
-// Swift fallback)。
+// (b, l, d) + a writable output buffer (y) + its capacity AS
+// ELEMENT COUNT (must be ≥ element_count() = b*l*d float32 cells)。
+// chapter 八百六十四 / M2976 doc fix:earlier comment incorrectly
+// said "in bytes" — the code (lines 471 + 526) checks
+// `out_capacity < bld as i32` where bld is element count,not bytes。
+// Return `0` on success, `-1` on any input mismatch (caller
+// routes to Swift fallback)。
 
 /// Sequential dispatch C ABI。 See `scan_sequential` for math。
 ///
@@ -456,11 +459,18 @@ pub unsafe extern "C" fn bas_mamba_scan_sequential(
     {
         return -1;
     }
-    let bld = (b as i64) * (l as i64) * (d as i64);
-    if bld < 0 || bld > (i32::MAX as i64) {
-        return -1; // overflow guard
-    }
-    let bld = bld as usize;
+    // chapter 八百六十四 / M2976 — checked_mul protects against
+    // i64 overflow under adversarial inputs (b=l=d ≈ 2.1M cubes
+    // overflow i64 even though each fits in i32)。 Original
+    // `(b as i64) * (l as i64) * (d as i64)` could wrap to a
+    // positive value < i32::MAX and slip through the cap。
+    let bld_opt = (b as i64)
+        .checked_mul(l as i64)
+        .and_then(|x| x.checked_mul(d as i64));
+    let bld = match bld_opt {
+        Some(v) if v > 0 && v <= (i32::MAX as i64) => v as usize,
+        _ => return -1,
+    };
     if out_capacity < bld as i32 {
         return -1;
     }
@@ -971,13 +981,24 @@ mod tests {
         println!("   Rust par (v2):   {:.3} ms total (ratio vs seq {:.2}×)",
             v2_ms, v2_ms / seq_ms);
         println!("   v2 speedup vs v1: {:.2}×", par_ms / v2_ms);
-        // Don't assert a specific ratio — just print。 The fact
-        // that all 3 run + produce valid output is the
-        // correctness gate;measurement is for the human/CI to
-        // read。
         assert!(seq_ns > 0);
         assert!(par_ns > 0);
         assert!(v2_ns > 0);
+        // chapter 八百六十四 / M2976 review-remediation:
+        // assert the v2-vs-v1 win quantitatively。 Pre-fix this
+        // was print-only,so a future regression making v2 slower
+        // than v1 would not fail tests。 The chapter 八百六十三
+        // measurement showed v2 3.23× faster than v1 at this
+        // shape — guard against ≥1.5× regression with headroom
+        // for noisy CI hardware。
+        assert!(v2_ns < par_ns,
+            "v2 must outperform v1 at this shape \
+             (v2_ns={}, par_ns={}) — regression check",
+            v2_ns, par_ns);
+        assert!(v2_ns < seq_ns,
+            "v2 must outperform sequential at large shape \
+             (v2_ns={}, seq_ns={}) — Phase A rework regression check",
+            v2_ns, seq_ns);
     }
 
     // MARK: - C ABI tests (chapter 八百五十二 第三刀 / M2913)
@@ -1098,5 +1119,115 @@ mod tests {
         let y2 = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape)
             .expect("scan must succeed");
         assert_eq!(y1, y2, "Same inputs must produce bit-equal outputs");
+    }
+
+    // MARK: - chapter 八百六十四 / M2976 review-remediation tests
+
+    /// Pin: v1 scan_parallel (now Rust-only oracle) is bit-equal
+    /// to v2 scan_parallel_v2 (now C ABI-backed)。 Reviewer flagged
+    /// that the original test grid only verified v2 ≡ sequential,
+    /// not v2 ≡ v1。 Both must hold because v1 is the byte-equality
+    /// oracle for v2's transparent C ABI swap (chapter 八百六十三)。
+    #[test]
+    fn scan_parallel_v1_bit_equals_v2_over_30_fixture_grid() {
+        for trial in 0..30_u64 {
+            let b = 1 + (trial % 6) as usize;
+            let l = 4 + (trial % 14) as usize;
+            let d = 1 + (trial % 7) as usize;
+            let shape = make_shape(b as u32, l as u32, d as u32);
+            let bld = shape.element_count();
+            let mut state: u64 = trial.wrapping_mul(0xD00D).wrapping_add(0xFEED);
+            let mut next = || {
+                state ^= state.wrapping_shl(13);
+                state ^= state.wrapping_shr(7);
+                state ^= state.wrapping_shl(17);
+                ((state % 1000) as f32) / 1000.0
+            };
+            let x: Vec<f32> = (0..bld).map(|_| next()).collect();
+            let delta: Vec<f32> = (0..bld).map(|_| 0.01 + 0.1 * next()).collect();
+            let a: Vec<f32> = (0..d).map(|_| -1.0 - next()).collect();
+            let b_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+            let c_proj: Vec<f32> = (0..bld).map(|_| next()).collect();
+            let v1 = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            assert_eq!(v1, v2,
+                "Trial {} (b={}, l={}, d={}):v1 oracle MUST bit-equal v2",
+                trial, b, l, d);
+        }
+    }
+
+    /// Pin: NaN/Inf input handling propagates correctly。 The
+    /// recurrence `h = exp(δ·A)·h + (δ·B)·x` produces NaN when
+    /// any of A / B / x / δ is NaN at the corresponding (b, t, d)
+    /// cell。 IEEE-754 guarantees NaN propagation,but we PIN it
+    /// across all 3 paths (seq / v1 / v2) to catch any future
+    /// optimization that breaks NaN semantics。
+    #[test]
+    fn scan_handles_nan_inputs_consistently_across_paths() {
+        let shape = make_shape(1, 4, 2);
+        let mut x = vec![1.0_f32; 8];
+        x[2] = f32::NAN;  // inject NaN at idx 2 = (b=0,t=1,d=0)
+        let delta = vec![0.1_f32; 8];
+        let a = vec![-1.0_f32; 2];
+        let b_proj = vec![1.0_f32; 8];
+        let c_proj = vec![1.0_f32; 8];
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let v1 = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        // For NaN comparisons we need to check is_nan parity (NaN != NaN)
+        for i in 0..8 {
+            assert_eq!(seq[i].is_nan(), v1[i].is_nan(),
+                "idx {}: seq NaN-parity must match v1", i);
+            assert_eq!(seq[i].is_nan(), v2[i].is_nan(),
+                "idx {}: seq NaN-parity must match v2", i);
+            if !seq[i].is_nan() {
+                assert_eq!(seq[i], v1[i],
+                    "idx {}: non-NaN cells must bit-equal", i);
+                assert_eq!(seq[i], v2[i],
+                    "idx {}: non-NaN cells must bit-equal", i);
+            }
+        }
+    }
+
+    #[test]
+    fn scan_handles_inf_inputs_consistently_across_paths() {
+        let shape = make_shape(1, 2, 2);
+        let x = vec![f32::INFINITY, 1.0, 1.0, 1.0];
+        let delta = vec![0.1_f32; 4];
+        let a = vec![-1.0_f32; 2];
+        let b_proj = vec![1.0_f32; 4];
+        let c_proj = vec![1.0_f32; 4];
+        let seq = scan_sequential(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let v1 = scan_parallel(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        let v2 = scan_parallel_v2(&x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        for i in 0..4 {
+            assert_eq!(seq[i].is_finite(), v1[i].is_finite(),
+                "idx {}: seq finite-parity must match v1", i);
+            assert_eq!(seq[i].is_finite(), v2[i].is_finite(),
+                "idx {}: seq finite-parity must match v2", i);
+        }
+    }
+
+    /// Pin: C ABI overflow guard rejects adversarial dimensions
+    /// that would overflow i64 multiplication。 Pre-八百六十四
+    /// guard used naive `(b as i64) * (l as i64) * (d as i64)`
+    /// which wraps at b=l=d ≈ 2.1M cubes (i64::MAX ≈ 9.2e18,
+    /// 2.1e6³ ≈ 9.3e18)。 The chapter 八百六十四 fix uses
+    /// checked_mul which returns None on wrap → reject as -1。
+    #[test]
+    fn c_abi_rejects_adversarial_dimensions_via_checked_mul() {
+        let dummy = vec![1.0_f32; 1];
+        let mut out = vec![0.0_f32; 1];
+        // b=l=d=i32::MAX/2 → cube would overflow i64
+        let big = i32::MAX / 2;
+        let rc = unsafe {
+            bas_mamba_scan_sequential(
+                dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+                dummy.as_ptr(), dummy.as_ptr(),
+                big, big, big,
+                out.as_mut_ptr(), 1)
+        };
+        assert_eq!(rc, -1,
+            "Adversarial dims that overflow i64 must be rejected");
     }
 }

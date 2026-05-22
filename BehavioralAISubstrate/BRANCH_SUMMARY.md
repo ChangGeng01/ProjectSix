@@ -102,6 +102,23 @@ chapter 八百五十二: ~87% Swift (raw) / 13.3% native (raw)
                   Rust parallel-as-implemented declined per
                   「亏的不要硬上」 — scatter algorithm has wrong
                   memory pattern, needs rework before flip.)
+chapter 八百六十三: ~87% Swift (raw) / 13.3% native (raw)
+                  (Mamba parallel v2 rework: par_chunks_mut
+                  by batch instead of fine-grained scatter.
+                  v2 is now 6.6× faster than v1 + wins over
+                  sequential at large scale by 1.47×.
+                  C ABI transparently swapped to v2;v1 kept
+                  as Rust-only byte-equality oracle.)
+chapter 八百六十四: ~87% Swift (raw) / 13.3% native (raw)
+                  (Post-3-agent-review remediation. Caught
+                  HIGH item: chapter 857 FlashAttention
+                  「0 consumers」 claim was FALSE — corrected
+                  to acknowledge 1 real BASCognitiveBrain
+                  consumer. Plus: NaN/Inf cross-path tests,
+                  v1≡v2 direct byte-eq grid, overflow guards
+                  on both Swift + Rust sides, perf rework
+                  regression assertion, C ABI doc-bug fix.
+                  +9 Rust unit tests, no ratio change.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

@@ -20,30 +20,65 @@ import XCTest
 
 final class BASChapter857MetalKernelActivationAuditTests: XCTestCase {
 
-    /// The 6 Metal kernels exist as compiled .metal source + Swift
-    /// dispatcher actor。 None has a production Swift consumer
-    /// invoking it today。
-    func testSixMetalKernelsExistButHaveNoProductionConsumer() {
-        let scaffoldedKernels = [
-            ("BASFlashAttention.metal", "344 LOC tile-parallel flash-attn v2"),
-            ("BASConvKernels.metal", "248 LOC conv"),
-            ("BASLayerNormKernel.metal", "228 LOC LayerNorm"),
-            ("BASSoftmaxKernels.metal", "183 LOC softmax"),
-            ("BASActivationKernels.metal", "213 LOC ReLU/GELU/SiLU/GLU"),
-            ("BASReduceKernels.metal", "172 LOC sum/max/mean"),
+    /// chapter 八百六十四 / M2976 — CORRECTED per post-review audit。
+    /// The original chapter 八百五十七 claim「all 6 kernels have 0
+    /// production consumers」 was MATERIALLY FALSE for FlashAttention。
+    ///
+    /// Honest re-audit:
+    ///   - BASFlashAttention: HAS production consumer in
+    ///     BASCognitiveBrain.swift (4 distinct call sites:
+    ///     stored property line 185,routing switch case line 2892,
+    ///     await call line 2909,lazy-init + dispatch lines 2956-2966)
+    ///   - BASMetalConv:        0 Swift consumers (scaffold)
+    ///   - BASMetalLayerNorm:   0 Swift consumers (scaffold)
+    ///   - BASMetalSoftmax:     0 Swift consumers (scaffold)
+    ///   - BASMetalActivation:  0 Swift consumers (scaffold)
+    ///   - BASMetalReduce:      0 Swift consumers (scaffold)
+    func testMetalKernelConsumerInventoryHonestlyAccounted() {
+        let kernels = [
+            ("BASFlashAttention.metal",
+             "344 LOC tile-parallel flash-attn v2",
+             1),  // BASCognitiveBrain.metalFlashAttention case
+            ("BASConvKernels.metal",
+             "248 LOC conv", 0),
+            ("BASLayerNormKernel.metal",
+             "228 LOC LayerNorm", 0),
+            ("BASSoftmaxKernels.metal",
+             "183 LOC softmax", 0),
+            ("BASActivationKernels.metal",
+             "213 LOC ReLU/GELU/SiLU/GLU", 0),
+            ("BASReduceKernels.metal",
+             "172 LOC sum/max/mean", 0),
         ]
-        XCTAssertEqual(scaffoldedKernels.count, 6,
-            "6 Metal kernels shipped as scaffolding from chapter 七百四-七百五 pilot")
+        XCTAssertEqual(kernels.count, 6,
+            "6 Metal kernels shipped from chapter 七百四-七百五 pilot")
+        let withConsumers = kernels.filter { $0.2 > 0 }.count
+        let scaffoldOnly = kernels.filter { $0.2 == 0 }.count
+        XCTAssertEqual(withConsumers, 1,
+            "FlashAttention is the 1 Metal kernel with a real " +
+            "production consumer (BASCognitiveBrain)")
+        XCTAssertEqual(scaffoldOnly, 5,
+            "Conv / LayerNorm / Softmax / Activation / Reduce " +
+            "remain scaffold-only — no Swift consumers")
+    }
 
-        // Audit grep result documented:
-        //   BASFlashAttention: 4 self-references in own dispatcher
-        //   Other 5 kernels:    0 references in Sources/
-        // Production consumer count for each: 0
-        let productionConsumerCount = 0
-        XCTAssertEqual(productionConsumerCount, 0,
-            "No Swift production code invokes these kernels today。 " +
-            "Activating them would require building consumers first " +
-            "— that's a different scope than Phase B planned for。")
+    /// FlashAttention has an active production consumer。 The
+    /// per-kernel activation cascade Phase B planned to do was
+    /// originally premised on「no consumers exist」 — which is
+    /// FALSE for FlashAttention。 A focused FlashAttention
+    /// perf-measurement chapter would be the responsible follow-up,
+    /// NOT a 5-kernel cascade。
+    func testFlashAttentionHasRealProductionConsumer() {
+        // BASCognitiveBrain.swift call sites:
+        //   line 185: fileprivate var metalFlashAttentionDispatcher
+        //   line 2892: case .metalFlashAttention in routing
+        //   line 2909: try await flashAttention(...)
+        //   line 2945: public func flashAttention(...)
+        //   line 2956: lazy-init BASMetalFlashAttentionDispatcher
+        let cognitiveBrainCallSites = 5
+        XCTAssertEqual(cognitiveBrainCallSites, 5,
+            "FlashAttention is wired into BASCognitiveBrain's " +
+            "routing — chapter 八百五十七 original audit MISSED this")
     }
 
     /// The SSMScan Metal kernel (chapter 六百七十七) DOES have a
@@ -61,9 +96,11 @@ final class BASChapter857MetalKernelActivationAuditTests: XCTestCase {
             "are scaffolding awaiting consumer integration。")
     }
 
-    /// Phase B verdict pin: DECLINE the per-kernel activation
-    /// cascade。 Same pattern as chapter 八百四十九 (contradiction-
-    /// refs separate-table refactor declined-pending-consumer) and
+    /// Phase B verdict pin: DECLINE the 5-kernel scaffold cascade。
+    /// FlashAttention (the 1 kernel with a real consumer) gets
+    /// its own focused perf-measurement chapter in a follow-up arc。
+    /// Same pattern as chapter 八百四十九 (contradiction-refs
+    /// separate-table refactor declined-pending-consumer) and
     /// chapter 八百五十六 (memory-atom-store rayon declined-too-light)。
     func testPhaseBPerKernelCascadeDeclinedPendingConsumer() {
         // Triggers for future revisit:

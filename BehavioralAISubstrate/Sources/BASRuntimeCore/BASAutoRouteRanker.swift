@@ -3253,7 +3253,14 @@ public enum BASAutoRouteRanker {
         b: Int32, l: Int32, d: Int32
     ) -> [Float]? {
         #if os(iOS) || os(macOS)
-        let bld = Int(b) * Int(l) * Int(d)
+        // chapter 八百六十四 / M2976 — guard against multiplication
+        // overflow on signed Int (traps in debug,wraps in release)。
+        // Asymmetric with Rust-side checked_mul guard prior to this
+        // fix。
+        let (lProduct, ovfL) = Int(b).multipliedReportingOverflow(by: Int(l))
+        guard !ovfL else { return nil }
+        let (bld, ovfD) = lProduct.multipliedReportingOverflow(by: Int(d))
+        guard !ovfD else { return nil }
         guard bld > 0,
               x.count == bld, delta.count == bld,
               a.count == Int(d),
@@ -3300,7 +3307,14 @@ public enum BASAutoRouteRanker {
         b: Int32, l: Int32, d: Int32
     ) -> [Float]? {
         #if os(iOS) || os(macOS)
-        let bld = Int(b) * Int(l) * Int(d)
+        // chapter 八百六十四 / M2976 — guard against multiplication
+        // overflow on signed Int (traps in debug,wraps in release)。
+        // Asymmetric with Rust-side checked_mul guard prior to this
+        // fix。
+        let (lProduct, ovfL) = Int(b).multipliedReportingOverflow(by: Int(l))
+        guard !ovfL else { return nil }
+        let (bld, ovfD) = lProduct.multipliedReportingOverflow(by: Int(d))
+        guard !ovfD else { return nil }
         guard bld > 0,
               x.count == bld, delta.count == bld,
               a.count == Int(d),

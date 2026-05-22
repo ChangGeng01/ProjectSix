@@ -11,6 +11,113 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Post-review remediation of arc 八百五十二-八百六十三 (chapter 八百六十四 / M2976)
+
+3-agent strict review of the just-shipped arc caught real HIGH/MEDIUM items。
+This chapter fixes the actionable findings。
+
+#### HIGH items fixed
+
+- **Phase B FlashAttention claim was FALSE**: Chapter 八百五十七 audit
+  said all 6 Metal kernels have「0 production consumers」 but
+  FlashAttention IS wired into `BASCognitiveBrain.swift` (5 call sites:
+  stored property line 185,routing case line 2892,await call line 2909,
+  func declaration line 2945,dispatcher init lines 2956-2966)。 The
+  chapter 八百六十四 honest re-audit corrects this:
+    - FlashAttention:1 production consumer (BASCognitiveBrain)
+    - Conv / LayerNorm / Softmax / Activation / Reduce:0 consumers each
+  Phase B decline now correctly scoped to the 5 scaffold-only kernels。
+  A focused FlashAttention perf-measurement chapter is the responsible
+  follow-up — NOT a 5-kernel cascade。
+
+- **NaN/Inf input handling untested across paths**: No test verified
+  that sequential / parallel-v1 / parallel-v2 / Swift CPU reference
+  all propagate NaN + Inf consistently。 Added 2 Rust unit tests:
+    - `scan_handles_nan_inputs_consistently_across_paths` (NaN at
+      idx 2 of 8-cell tensor,verify NaN-parity across all 3 paths)
+    - `scan_handles_inf_inputs_consistently_across_paths` (Inf at
+      x[0],verify finite-parity across all 3 paths)
+
+- **Chapter 八百六十三 missing from CHANGELOG + BRANCH_SUMMARY**: The
+  v2 parallel rework was committed (commit 45b63527) but absent from
+  arc-seal documentation。 This chapter fixes both docs。
+
+#### MEDIUM items fixed
+
+- **v1 ≡ v2 byte-equality not directly pinned**: Tests verified
+  v2 ≡ sequential and v1 ≡ sequential separately,but not v1 ≡ v2
+  directly。 Since v1 is now the byte-equality oracle for v2 (which
+  backs the C ABI),this direct test matters。 Added
+  `scan_parallel_v1_bit_equals_v2_over_30_fixture_grid`。
+
+- **Chapter 八百六十三 perf rework win print-only**: The inline perf
+  test reported v2 vs v1 speedup but did not assert it。 A future
+  regression making v2 slower than v1 would not fail tests。 Now
+  asserts `v2_ns < par_ns` AND `v2_ns < seq_ns`。
+
+- **Swift bridge bld overflow asymmetry**: Bridge used
+  `Int(b) * Int(l) * Int(d)` which traps in debug,wraps in release。
+  Now uses `multipliedReportingOverflow` chain — symmetric with
+  Rust-side `checked_mul` guard。
+
+- **Rust C ABI overflow at adversarial dimensions**: Pre-fix guard
+  used `(b as i64) * (l as i64) * (d as i64)` which can wrap to
+  positive < i32::MAX at b=l=d ≈ 2.1M。 Now uses `checked_mul`。
+  Added `c_abi_rejects_adversarial_dimensions_via_checked_mul` test。
+
+- **Rust C ABI doc comment incorrectly said「out_capacity in bytes」**:
+  Code treats it as element count。 Doc fixed at lib.rs:420。
+
+#### Items NOT acted on (deliberate)
+
+- **Test count claims inconsistent in CHANGELOG** (reviewer noted):
+  Multiple test-count numbers appeared across CHANGELOG blocks。 The
+  authoritative numbers post-chapter 八百六十四 are:
+    - `bas-mamba-scan`: 30 Rust unit tests
+    - `bas-red-team-bench`: 42 Rust unit tests (was 38,+4 in chapter 854)
+    - `bas-tokenizer`: 26 Rust unit tests (was 21,+5 in chapter 855)
+  Updated trajectory:**arc total +35 Rust unit tests** (was「+30」 stale arithmetic)。
+
+- **bas-mamba-scan/src/lib.rs at ~1200 LOC past 800-line ceiling**:
+  Heavy content is 600+ LOC of tests。 Splitting tests/ integration
+  file is a follow-up cleanup,not a correctness issue。 Documented
+  as a known god-file exception per chapter 八百五十二 scope。
+
+- **Swift 20-fixture bridge grid maxes at b=3,l=15,d=6**: Reviewer
+  suggested grid expansion to production scales。 The Rust 30-fixture
+  v2 grid covers larger shapes (b up to 8,l up to 19,d up to 8)。
+  Combined coverage adequate;Swift-side grid expansion is
+  marginal-value follow-up。
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:   30/30 PASS (was 26;+4 review-remediation tests)
+   swift build:                    PASS
+   pre-commit gates:               PASS (3/3)
+
+---
+
+### Mamba parallel rework v2 (chapter 八百六十三 / M2971)
+
+Closes the chapter 八百五十二 第四刀 finding 「Rust parallel slower than
+sequential」 via a better algorithm (par_chunks_mut by batch instead
+of fine-grained scatter)。 v2 is bit-equal to v1 + sequential AND
+faster at all measured scales。
+
+**Production guidance** (post v2 upgrade):
+   - B×L×D ≤ ~64K  → use Rust sequential
+   - B×L×D > ~64K  → use Rust parallel (v2-backed,wins by 1.47× over seq at B=8 L=256 D=256)
+   - Always        → either Rust path is 23-43× faster than Swift CPU reference
+
+**Files**:
+   - `Cargo/bas-mamba-scan/src/lib.rs`:NEW `scan_parallel_v2(...)` + transparent C ABI swap
+   - `Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework/`:3 slices rebuilt
+
+**Tests**:5 new (v2 ≡ sequential at 4 shapes + inline perf comparison)。
+Total `bas-mamba-scan` tests:21 → 26 (further → 30 in chapter 864)。
+
+---
+
 ### Arc seal: Mamba + Rayon + Metal + RL (chapters 八百五十二-八百六十二 / M2911-M2961)
 
 User directive 「全面 开发 mamba 多线程 和 强化学习 提高 Metal
