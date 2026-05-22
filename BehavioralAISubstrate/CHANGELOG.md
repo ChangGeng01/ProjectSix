@@ -25,7 +25,7 @@ sweep-count contradiction it claimed to fix in chapter 877。
 - **HIGH 1 — chapter 878 own block sweep count wrong**: Chapter 878
   verification block reported「13,374 / 31 skipped」 but chapter 878
   added 2 new tests (sub-chapter doctrine pin),so post-878 count
-  is **13,376 / 30 skipped**。 Same「contradicting your own narrative」
+  is **13,376 / 31 skipped**。 Same「contradicting your own narrative」
   pattern the 9th-pass caught in chapter 877。 Fixed + diagnostic
   note explaining the recurrence。
 
@@ -84,9 +84,9 @@ sweep-count contradiction it claimed to fix in chapter 877。
 
    swift test (FULL SWEEP post-878.5):  13,376 tests / 45 skipped / 0 failures
 
-   Delta from post-878 (was 13,376 / 30 skipped):
+   Delta from post-878 (was 13,376 / 31 skipped):
    +14 skipped = 4 (chapter 707) + 4 (708) + 6 (715) deprecation skips
-   actually save CI time per MED 1 fix。
+   (31 + 14 = 45) actually save CI time per MED 1 fix。
 
 #### Meta-discipline observation (10 passes deep)
 
@@ -206,17 +206,17 @@ pass ALL-CLEAR」 narrative)。
 #### Verification
 
    swift test BASChapter727+729+710+873+878:                    PASS
-   swift test (FULL SWEEP post-878):              13,376 tests / 30 skipped / 0 failures
+   swift test (FULL SWEEP post-878):              13,376 tests / 31 skipped / 0 failures
    swift build:                                                  PASS
    pre-commit gates:                                             3/3 PASS
 
    (Note: chapter 八百七十八 originally wrote「13,374 tests / 31 skipped」
-   in this block — that was the PRE-878 count + a transient harness
-   noise count。 Chapter 八百七十八.5 10th-pass review caught the
-   contradiction: chapter 878 added 2 NEW tests (the sub-chapter
-   numbering doctrine pin tests),so post-878 sweep is 13,376 not
-   13,374。 The「same shoemaker's children」 pattern the 9th-pass
-   caught in chapter 877 recurred here — fixed at 八百七十八.5。)
+   in this block — the 13,374 was the PRE-878 count。 Chapter 八百七十八.5
+   10th-pass review caught the contradiction: chapter 878 added 2 NEW
+   tests (the sub-chapter numbering doctrine pin tests),so post-878
+   sweep is 13,376 / 31 skipped (not 13,374)。 The「same shoemaker's
+   children」 pattern the 9th-pass caught in chapter 877 recurred here
+   — fixed at 八百七十八.5。)
 
 #### Meta-discipline observation
 
