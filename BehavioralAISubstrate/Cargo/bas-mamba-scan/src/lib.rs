@@ -526,11 +526,19 @@ pub unsafe extern "C" fn bas_mamba_scan_parallel(
     {
         return -1;
     }
-    let bld = (b as i64) * (l as i64) * (d as i64);
-    if bld < 0 || bld > (i32::MAX as i64) {
-        return -1;
-    }
-    let bld = bld as usize;
+    // chapter 八百六十六 / M2986 — mirror sequential's chapter 八百六十四
+    // `checked_mul` overflow guard。 Both 3-agent review passes
+    // (code review + test coverage) independently caught that the
+    // parallel C ABI was missing the same guard,which would slip
+    // adversarial b=l=d ≈ 2.1M inputs (i64 wrap to positive < i32::MAX)
+    // through this entry point。 Now symmetric with sequential。
+    let bld_opt = (b as i64)
+        .checked_mul(l as i64)
+        .and_then(|x| x.checked_mul(d as i64));
+    let bld = match bld_opt {
+        Some(v) if v > 0 && v <= (i32::MAX as i64) => v as usize,
+        _ => return -1,
+    };
     if out_capacity < bld as i32 {
         return -1;
     }

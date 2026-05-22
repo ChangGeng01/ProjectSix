@@ -670,3 +670,146 @@ fn c_abi_rejects_adversarial_dimensions_via_checked_mul() {
     assert_eq!(rc, -1,
         "Adversarial dims that overflow i64 must be rejected");
 }
+
+// MARK: - Chapter 八百六十六 parallel C ABI guard parity tests
+//
+// 3-agent review of chapter 八百六十五 caught that all 4 chapter 八百六十四
+// C ABI guard regression tests exercised ONLY the sequential entry。
+// The parallel C ABI has its own near-duplicate guard block — a typo
+// or future regression in just one of the 5 null checks would slip
+// past every test prior to this chapter。 Mirror the suite onto the
+// parallel entry。 Same shape,same intent。
+
+#[test]
+fn c_abi_parallel_rejects_null_pointers() {
+    let mut out = vec![0.0_f32; 1];
+    let rc = unsafe {
+        bas_mamba_scan_parallel(
+            std::ptr::null(), std::ptr::null(), std::ptr::null(),
+            std::ptr::null(), std::ptr::null(),
+            1, 1, 1,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, -1, "Parallel C ABI must reject null inputs");
+}
+
+#[test]
+fn c_abi_parallel_rejects_zero_dimensions() {
+    let dummy = vec![1.0_f32; 4];
+    let mut out = vec![0.0_f32; 4];
+    let rc_b = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            0, 1, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_l = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 0, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_d = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 1, 0,
+            out.as_mut_ptr(), 4)
+    };
+    assert_eq!(rc_b, -1, "Parallel: b=0 must reject");
+    assert_eq!(rc_l, -1, "Parallel: l=0 must reject");
+    assert_eq!(rc_d, -1, "Parallel: d=0 must reject");
+}
+
+#[test]
+fn c_abi_parallel_rejects_insufficient_out_capacity() {
+    let x = vec![1.0_f32; 4];  // b=1, l=2, d=2 = 4 elements
+    let delta = vec![0.1_f32; 4];
+    let a = vec![-1.0_f32; 2];
+    let b_proj = vec![1.0_f32; 4];
+    let c_proj = vec![1.0_f32; 4];
+    let mut out = vec![0.0_f32; 2];  // too small
+    let rc = unsafe {
+        bas_mamba_scan_parallel(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            1, 2, 2,
+            out.as_mut_ptr(), 2)
+    };
+    assert_eq!(rc, -1,
+        "Parallel: out_capacity < bld must reject");
+}
+
+#[test]
+fn c_abi_parallel_rejects_adversarial_dimensions_via_checked_mul() {
+    // Pre-chapter 八百六十六 the parallel C ABI used naive
+    // `(b as i64) * (l as i64) * (d as i64)` overflow guard
+    // which would wrap b=l=d ≈ 2.1M to a positive value
+    // < i32::MAX,slipping through。 The chapter 八百六十六
+    // mirror to checked_mul closes the gap symmetric with
+    // chapter 八百六十四's sequential fix。
+    let dummy = vec![1.0_f32; 1];
+    let mut out = vec![0.0_f32; 1];
+    let big = i32::MAX / 2;
+    let rc = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            big, big, big,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc, -1,
+        "Parallel: adversarial dims overflowing i64 must reject");
+}
+
+// MARK: - Chapter 八百六十六 PayloadCountMismatch field coverage
+//
+// 3-agent review caught that PayloadCountMismatch existed for 5
+// fields (x, delta, A, B, C) but only x + A were directly tested。
+// A copy-paste swap of "B" / "C" / "delta" in error reporting
+// would compile and pass the prior test grid。 This parameterized
+// test exercises ALL 5 field name paths in scan_sequential。
+
+#[test]
+fn payload_count_mismatch_reports_each_field_name() {
+    let shape = make_shape(1, 2, 2);
+    let bld = shape.element_count();  // 4
+    let good_x = vec![1.0_f32; bld];
+    let good_delta = vec![0.1_f32; bld];
+    let good_a = vec![-1.0_f32; 2];
+    let good_b_proj = vec![1.0_f32; bld];
+    let good_c_proj = vec![1.0_f32; bld];
+    let short = vec![1.0_f32; bld - 1];
+
+    // Field name => mutating callback that produces the
+    // short-payload variant for that field only。
+    let cases: [(&'static str, &dyn Fn() -> MambaScanError); 5] = [
+        ("x", &|| scan_sequential(
+            &short, &good_delta, &good_a, &good_b_proj,
+            &good_c_proj, shape).unwrap_err()),
+        ("delta", &|| scan_sequential(
+            &good_x, &short, &good_a, &good_b_proj,
+            &good_c_proj, shape).unwrap_err()),
+        ("A", &|| scan_sequential(
+            &good_x, &good_delta, &vec![-1.0_f32; 1],
+            &good_b_proj, &good_c_proj, shape).unwrap_err()),
+        ("B", &|| scan_sequential(
+            &good_x, &good_delta, &good_a, &short,
+            &good_c_proj, shape).unwrap_err()),
+        ("C", &|| scan_sequential(
+            &good_x, &good_delta, &good_a, &good_b_proj,
+            &short, shape).unwrap_err()),
+    ];
+    for (expected_name, make_err) in cases.iter() {
+        let err = make_err();
+        match err {
+            MambaScanError::PayloadCountMismatch { name, .. } => {
+                assert_eq!(name, *expected_name,
+                    "Expected error.name = {:?}, got {:?}",
+                    expected_name, name);
+            }
+        }
+    }
+}

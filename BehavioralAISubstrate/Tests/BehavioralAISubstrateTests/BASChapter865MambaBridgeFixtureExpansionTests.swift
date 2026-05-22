@@ -80,6 +80,28 @@ final class BASChapter865MambaBridgeFixtureExpansionTests: XCTestCase {
         XCTAssertNil(r, "Parallel L=0 must be rejected too")
     }
 
+    // chapter 八百六十六 / M2986 — review caught that knife 3 only
+    // added one parallel-zero-dim test (L=0)。 Mirror sequential's
+    // full trio: B=0,L=0,D=0 — all 3 paths through the bld>0
+    // guard for the parallel bridge。
+
+    func testParallelBridgeRejectsZeroBatch() {
+        let r = BASAutoRouteRanker.mambaScanParallel(
+            x: [], delta: [],
+            a: [Float](repeating: -1, count: 4),
+            bProj: [], cProj: [],
+            b: 0, l: 8, d: 4)
+        XCTAssertNil(r, "Parallel B=0 must be rejected")
+    }
+
+    func testParallelBridgeRejectsZeroChannels() {
+        let r = BASAutoRouteRanker.mambaScanParallel(
+            x: [], delta: [], a: [],
+            bProj: [], cProj: [],
+            b: 2, l: 4, d: 0)
+        XCTAssertNil(r, "Parallel D=0 must be rejected")
+    }
+
     // MARK: - Production-scale shapes (B=8 L=64 D=128)
 
     func testRustParallelMatchesSwiftAtProductionScaleSmall() throws {

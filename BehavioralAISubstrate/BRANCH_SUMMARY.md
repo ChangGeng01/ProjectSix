@@ -123,7 +123,7 @@ chapter 八百六十五: ~87% Swift (raw) / 13.3% native (raw)
                   (Second post-review cleanup of arc
                   852-864 per 「剩余 一次性 解决掉」 directive.
                   5 knives:
-                  1. lib.rs 1,233→572 LOC (tests extracted
+                  1. lib.rs 1,233→577 LOC (tests extracted
                      to src/tests.rs, 800 ceiling restored)
                   2. v1 scatter intermediate type simplified
                      (drop unused (b_i,d_i) outer tuple)
@@ -136,6 +136,21 @@ chapter 八百六十五: ~87% Swift (raw) / 13.3% native (raw)
                   5. 3-agent parallel review of full
                      852-865 cumulative arc.
                   No ratio change — refactor + tests only.)
+chapter 八百六十六: ~87% Swift (raw) / 13.3% native (raw)
+                  (Third HIGH fix — 2/3 agents in the chapter
+                  八百六十五 review independently caught that
+                  chapter 八百六十四's checked_mul overflow guard
+                  was applied to bas_mamba_scan_sequential but
+                  not bas_mamba_scan_parallel. Mirrored the
+                  fix + added 4 parallel-ABI guard tests +
+                  parameterized PayloadCountMismatch field-name
+                  test + 2 Swift parallel zero-dim tests.
+                  Plus doc consistency fix: arc-seal Phase B
+                  row corrected to acknowledge FlashAttention
+                  has 1 real consumer (was contradicting the
+                  chapter 八百六十四 correction in same file).
+                  Cumulative arc tests: +7 (5 Rust + 2 Swift).
+                  No ratio change.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

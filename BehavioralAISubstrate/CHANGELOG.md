@@ -11,6 +11,98 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Third post-review HIGH fix — parallel C ABI overflow guard parity (chapter 八百六十六 / M2986)
+
+Chapter 八百六十五's 3-agent review (knife 5) dispatched Code review + Test
+coverage + Doc consistency in parallel。 Code review and Test coverage
+agents BOTH independently caught the SAME high-severity bug:
+`bas_mamba_scan_parallel` C ABI was missing the `checked_mul` overflow
+guard that chapter 八百六十四 added to `bas_mamba_scan_sequential`。 The
+chapter 八百六十四 remediation correctly fixed the Swift bridge AND the
+sequential Rust entry — but not the parallel Rust entry。 Plus the
+regression test (`c_abi_rejects_adversarial_dimensions_via_checked_mul`)
+only invoked the sequential ABI,masking the gap。 Doc consistency
+agent caught a contradictory FlashAttention claim in the same
+CHANGELOG。
+
+#### HIGH items fixed (caught by independent agents)
+
+- **`bas_mamba_scan_parallel` missing checked_mul overflow guard**: Line
+  529-532 still used naive `(b as i64) * (l as i64) * (d as i64)`
+  which can wrap b=l=d ≈ 2.1M cubes to a positive < i32::MAX value,
+  slipping past the cap check。 Now mirrors sequential's `checked_mul`
+  chain (lib.rs:467-478)。 Added 4 parallel C ABI guard parity tests
+  (`c_abi_parallel_rejects_*`)。
+
+- **CHANGELOG self-contradiction on FlashAttention**: Chapter 八百六十四's
+  HIGH-item correction (line 92-93)「FlashAttention has 1 production
+  consumer (BASCognitiveBrain)」 was contradicted by the arc-seal
+  Phase B row (line 198) which still said「all 6 gated Metal kernels
+  ... are SCAFFOLDING with zero Swift production consumers」。 Updated
+  the arc-seal row to「5 of 6 ... + FlashAttention has 1」 + explicit
+  reference to the chapter 八百六十四 correction。
+
+#### MEDIUM items fixed
+
+- **PayloadCountMismatch field name coverage**: Chapter 八百六十四 tests
+  exercised only the `x` + `A` field-mismatch paths。 A copy-paste swap
+  of error name strings (`"B"` ↔ `"C"`) would pass all prior tests。 New
+  parameterized `payload_count_mismatch_reports_each_field_name` test
+  exercises all 5 fields (x, delta, A, B, C) and asserts
+  `err.name == expected_name` for each。
+
+- **Parallel Swift bridge zero-dim guard parity**: Chapter 八百六十五
+  knife 3 only added one parallel-zero-dim test (L=0)。 Sequential
+  had B=0/L=0/D=0 trio。 Added matching `testParallelBridgeRejectsZeroBatch`
+  + `testParallelBridgeRejectsZeroChannels` for full parity。
+
+#### Items acknowledged but deferred
+
+- **Long-L byte-equality (L≥1024)**: Max L in test grid is 256
+  (chapter 865 `testLongSequenceL256`)。 Reviewer flagged adding L=1024
+  + L=2048。 Deferred — recurrence math is bounded-state (single `h`
+  scalar per (b, d) pair) and the 30-fixture grid + L=256 stress
+  adequately exercises the math。 Future Mamba block consumer at
+  longer sequence lengths can pin this。
+
+- **Subnormal/exp(±large) numerical edge tests**: Reviewer flagged
+  `f32::MIN_POSITIVE / 2.0` + `a = [+100.0; D]` (exp overflow)。
+  Deferred — Rust + Swift CPU reference share the same `f32::exp`
+  intrinsic via LLVM,so byte-equality structurally holds (not
+  platform-dependent)。 Adding tests would lock implementation
+  detail not user-observable behavior。
+
+- **`bas-red-team-bench` `classify_prompt_batch_parallel` N=1 test**:
+  Reviewer flagged absent N=1-via-parallel happy path。 Deferred —
+  parallel-batch is only invoked in code paths where batch ≥ 50 per
+  chapter 854 cutover decision,N=1 is never reached at production
+  consumer。 Adding test would lock implementation detail not user-facing。
+
+- **Perf assertion brittleness on CI**: `v2_ns < par_ns` + `v2_ns < seq_ns`
+  hard assertions may fail under thermal throttle / busy CI per
+  reviewer。 Deferred — CI runner is local Mac mini per
+  `pre-commit-gates.sh`,not containerized;observed 0 perf failures
+  across 3 chapters now。 If this flakes in future,convert to「v2 ≤ 1.2× seq」
+  with headroom。
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                                       35/35 PASS (was 30,+5 chapter 八百六十六)
+   swift test --filter BASChapter865MambaBridgeFixtureExpansionTests:  11/11 PASS (was 9,+2 zero-dim parity)
+   swift build:                                                         PASS
+   pre-commit gates:                                                    3/3 PASS
+
+#### Authoritative test counts post chapter 八百六十六
+
+| Component | Count | Delta vs 八百六十五 |
+|---|---|---|
+| `bas-mamba-scan` Rust unit tests       | 35 | +5 (4 parallel guard + 1 field-name) |
+| `bas-red-team-bench` Rust unit tests   | 42 | 0 |
+| `bas-tokenizer` Rust unit tests        | 26 | 0 |
+| Swift `BASChapter865...Expansion` tests | 11 | +2 (parallel B=0 + D=0) |
+
+---
+
 ### Second post-review cleanup of arc 八百五十二-八百六十四 (chapter 八百六十五 / M2981)
 
 User directive 「剩余 一次性 解决掉 再做 全量 审查」 — fix the remaining
@@ -23,9 +115,13 @@ second 3-agent full review。 5 knives,all small but high-leverage。
   was 1,233 LOC — past the 800-line god-file ceiling per
   coding-style.md。 Chapter 八百六十四 had documented this as a「known
   god-file exception」 deferral。 This chapter removes the exception:
-    - lib.rs:1233 → 572 LOC (extraction header preserved)
+    - lib.rs:1233 → 577 LOC (extraction header preserved)
     - NEW src/tests.rs:672 LOC (30 tests,clippy::needless_range_loop allow)
     - Verification:cargo test -p bas-mamba-scan → 30/30 PASS unchanged
+    - (Note: chapter 八百六十六 then added the parallel C ABI checked_mul
+      fix + 5 new tests,pushing lib.rs → 585 LOC and tests.rs → 815 LOC。
+      tests.rs is Cargo-tree so the Sources/-scoped god-file gate does
+      not apply。)
 
 - **Knife 2: Simplify v1 scatter intermediate type**: `scan_parallel` v1
   collected `Vec<((usize, usize), Vec<(usize, f32)>)>` but the outer
@@ -58,10 +154,10 @@ second 3-agent full review。 5 knives,all small but high-leverage。
 
 #### Verification
 
-   cargo test -p bas-mamba-scan:                            30/30 PASS (LOC moved, count unchanged)
+   cargo test -p bas-mamba-scan:                            30/30 PASS (LOC moved, count unchanged at 八百六十五 end)
    swift test --filter BASChapter865MambaBridgeFixtureExpansionTests:  9/9 PASS
    swift build:                                              PASS
-   wc -l bas-mamba-scan/src/lib.rs:                          572 (was 1,233, under 800 ceiling)
+   wc -l bas-mamba-scan/src/lib.rs:                          577 (was 1,233, under 800 ceiling)
    wc -l bas-mamba-scan/src/tests.rs:                        672 (new)
 
 #### Authoritative test counts post chapter 八百六十五
@@ -195,7 +291,7 @@ rust c c++」 — full 4-phase arc per plan
 |---|---|---|---|
 | **A** | Mamba CPU multi-threading | SHIPPED — Rust seq 14-42× faster than Swift CPU reference at all 3 scales。 Rust parallel kept opt-in but documented as needing-rework (scatter algorithm dominates inner-loop)。 | 八百五十二 (5 knives) |
 | **C** | Rust rayon cascade | 2 sites flipped (red-team batch + tokenizer batch);2 sites declined (memory reducer too-light + importance scorer Swift-wins) | 八百五十四 + 八百五十五 + 八百五十六 |
-| **B** | Metal kernel activation cascade | **DECLINED-PENDING-CONSUMER** — all 6 gated Metal kernels (FlashAttention/Conv/LayerNorm/Softmax/Activation/Reduce) are SCAFFOLDING with zero Swift production consumers。 Activating without consumer pull is busy-work。 | 八百五十七 (audit only) |
+| **B** | Metal kernel activation cascade | **DECLINED-PENDING-CONSUMER** — 5 of 6 gated Metal kernels (Conv/LayerNorm/Softmax/Activation/Reduce) are SCAFFOLDING with zero Swift production consumers。 FlashAttention has 1 real consumer (BASCognitiveBrain),tracked separately as a future per-kernel perf-measurement chapter。 Activating the 5 scaffold kernels without consumer pull is busy-work。 (Per chapter 八百六十四 correction — original audit at chapter 八百五十七 incorrectly claimed all 6 were scaffolding。) | 八百五十七 (audit) + 八百六十四 (correction) |
 | **D** | RL feasibility audit | **DEFERRED** — substrate is frozen-weight inference + governance engine,not a learning system。 No reward,no learner,no gradient flow。 3 minimal-scope RL shapes documented (bandit advisor / LoRA adapter / reward-shaped re-rank) with triggers for future revisit。 | 八百六十二 (audit only) |
 
 ### Why declines = discipline
