@@ -11,6 +11,77 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### canonicalEncoding migration DECLINE — string-FFI cost exceeds Swift total at every measured size (chapter 八百九十 / M3140)
+
+Discovery agent (post-chapter 884) flagged
+`BASEvolutionLifecycleStructuralFingerprint.canonicalEncoding`
+(BASMemory/...:250-273) as a MED-confidence migration candidate。
+Chapter 八百九十 ran the LIVE baseline + applied chapter 881
+string-FFI lessons → DECLINE。
+
+#### LIVE measurement (Mac mini M-series, 2026-05-23)
+
+| size | pairs (stages × actions) | Swift ns | est FFI ser ns |
+|---|---|---|---|
+| small  | 12 (4 × 3)    |  10,678 | ~15,000 |
+| medium | 48 (8 × 6)    |  37,887 | ~58,000 |
+| large  | 192 (16 × 12) | 173,453 | ~230,000 |
+
+**Verdict**: at EVERY measured size,the estimated FFI
+string-ser cost (extrapolated from chapter 881's ~600 ns/string
+overhead × 2N strings per call) exceeds Swift's TOTAL cost。
+Migration would be NET NEGATIVE before even counting the Rust
+compute itself。
+
+This is the SAME pattern as chapter 881 forget cascade DECLINE
+(Swift Set wins because string-FFI overhead dominates Rust's
+HashMap advantage)。 Per 「亏的不要硬上」 + chapter 870 cycle-break
+discipline,chapter 890 DECLINES without writing Rust code。
+
+#### Knives shipped
+
+1. **NEW `BASChapter890CanonicalEncodingBaselineTests.swift`**
+   (3 bench methods,skip-by-default after capture per ch 879/881
+   archive pattern)。
+2. **NEW `BASChapter890CanonicalEncodingDeclineAuditTests.swift`**
+   (4 tests):
+   - Baseline measurement is captured
+   - Decline reasoning stands up (per-string FFI math)
+   - 3 trigger conditions documented (flat-buffer L13 / numeric
+     ID encoding / production pressure)
+   - String-FFI decline is now a PATTERN across chapters (881 +
+     890 both declined on the same root cause)
+
+#### Discipline pin
+
+This is the **second** chapter to DECLINE based on string-FFI
+cost analysis (chapter 881 was first)。 The pattern is now
+documented as structural,not anomalous — string-heavy FFI
+crossings should default to「measure first」 with FFI cost
+estimated from chapter 881 baseline before writing any Rust。
+
+A future chapter that wants to migrate canonicalEncoding must
+satisfy at least one trigger:
+- **A**: substrate adopts a flat-buffer L13 fingerprint (no
+  per-string FFI)
+- **B**: numeric ID encoding extends to L13 fingerprints
+- **C**: production L13 volume grows such that canonicalEncoding
+  dominates profiling
+
+#### Verification
+
+   swift test --filter BASChapter890:    7 tests / 3 skipped / 0 failures
+   swift test (FULL SWEEP):              13,443 / 79 skipped / 0 failures
+   swift build:                                                    PASS
+   pre-commit gates:                                               3/3 PASS
+
+Delta from chapter 889: +7 tests (3 baseline skip-archived + 4
+audit)。 No source change — pure measurement + audit chapter,
+same shape as chapter 881。 No schemaVersion / Cargo / XCFramework
+changes。
+
+---
+
 ### LIVE perf bench confirms chapter 888 BadTone flip — Rust 7.32-7.45× faster (chapter 八百八十九 / M3135)
 
 Chapter 八百八十八 flipped `BASBadToneLinter.lint(inputs:)` to route
