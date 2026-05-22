@@ -11,6 +11,64 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Phase C: Rust rayon parallelism cascade (chapters 八百五十四-八百五十六 / M2921-M2923)
+
+User directive 「全面 开发」 Phase C of the multi-thread arc。 Add
+rayon parallelism to 3 candidate Rust crates identified by the
+chapter 八百五十 audit。 Honest scope landing:**2 sites flipped
++ 2 sites declined-with-rationale**。
+
+| Chapter | Site | Verdict | Tests |
+|---|---|---|---|
+| 八百五十四 | `bas-red-team-bench::classify_prompt_batch_parallel` | FLIPPED — clean rayon shape,no shared state | +4 Rust tests (38→42) |
+| 八百五十五 | `bas-tokenizer::encode_batch_parallel` | FLIPPED — per-text encode is moderately expensive (BPE merge),tokenizer read-only after construction | +5 Rust tests (21→26) |
+| 八百五十六 | `bas-memory-atom-store` reducer batch | **DECLINED** — work-per-pair is ~5 ns (2 f64 compares + branch),total 5 µs at N=1000;rayon overhead 10-30 µs would dominate | +3 audit tests |
+| 八百五十六 | `bas-memory-usage-tracker` importance scorer | **DECLINED** — chapter 七百二十五 already measured Swift 10× faster than Rust for this site;parallelizing the losing path doesn't help | (covered above) |
+
+### Why the declines are the discipline,not the failure
+
+Both declined sites have small per-element work or already-lost
+measurement evidence。 Per 「亏的不要硬上」 + 「整体 性能 效果 一定要
+更好」 — adding rayon to a losing path doesn't make it win,it
+just adds complexity。 The chapter 八百四十四 audit-driven scope
+closure (sort cascade exhausted at 7 sites) is the same pattern:
+the decline is the engineering discipline,not the failure。
+
+### Both flipped sites preserve byte-equality with sequential
+
+   - `bas-red-team-bench::classify_prompt_batch_parallel`:
+     `par_iter().enumerate().map(...).collect()` preserves prompt
+     index order;substring matching is integer-only (no FP reorder)。
+   - `bas-tokenizer::encode_batch_parallel`:
+     `par_iter().map().collect()` preserves text index order;
+     per-text encode is deterministic + side-effect-free;BPE
+     merge is integer-only。
+
+### Files modified (Phase C cumulative)
+
+```
+~ Cargo/bas-red-team-bench/Cargo.toml + src/lib.rs  (rayon + parallel + 4 tests)
+~ Cargo/bas-tokenizer/Cargo.toml + src/lib.rs       (rayon + parallel + 5 tests)
++ Tests/BehavioralAISubstrateTests/
+   BASChapter856MemoryScoringRayonAuditTests.swift   (3 audit tests pinning the decline decision)
+```
+
+### Test deltas (Phase C cumulative)
+
+Rust: +9 unit tests across red-team + tokenizer。
+Swift: +3 audit tests in chapter 八百五十六 pinning the decline。
+
+### Standing
+
+Phase C closed at chapter 八百五十六。 Per plan,Phase B (Metal
+kernel activation cascade) is next。 Then Phase D (RL feasibility
+audit) closes the arc。 RL has explicit user directive but per
+agent audit is architectural anti-fit;the responsible Phase D
+deliverable is an honest feasibility decision with documented
+triggers,not a half-baked RL stack。
+
+---
+
 ### Mamba SSM scan multi-thread mini-arc (chapter 八百五十二 / M2911-M2915)
 
 User directive 「全面 开发 mamba 多线程」 — Phase A of the
