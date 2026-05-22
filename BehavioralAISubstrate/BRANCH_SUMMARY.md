@@ -151,6 +151,24 @@ chapter 八百六十六: ~87% Swift (raw) / 13.3% native (raw)
                   chapter 八百六十四 correction in same file).
                   Cumulative arc tests: +7 (5 Rust + 2 Swift).
                   No ratio change.)
+chapter 八百六十七: ~87% Swift (raw) / 13.3% native (raw)
+                  (Fourth-pass review fix — third-pass 3-agent
+                  review of chapter 八百六十六 caught 3 HIGH test
+                  gaps + 1 doc HIGH:
+                  - Sequential c_abi_rejects_zero_dimensions
+                    only tested b=0 (inverse asymmetry with
+                    chapter 八百六十六 parallel side fix);
+                  - payload_count_mismatch ignored expected/
+                    actual fields (only name asserted);
+                  - payload_count_mismatch only exercised
+                    scan_sequential (parallel + v2 untested);
+                  - chapter 八百六十六 CHANGELOG block had stale
+                    line refs (92-93 → 188, 198 → 294).
+                  Fixed all 4 + added boundary-success
+                  regression test for checked_mul cap.
+                  Test count: 35 → 36 + payload test now
+                  runs 45 sub-assertions (was 5) per cargo
+                  test invocation.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

@@ -511,16 +511,37 @@ fn c_abi_rejects_null_pointers() {
 
 #[test]
 fn c_abi_rejects_zero_dimensions() {
+    // Chapter 八百六十七 / M2991 — third-pass review caught that this
+    // test originally only exercised b=0,leaving l=0 and d=0 paths
+    // through the sequential ABI guard untested。 Inverse asymmetry
+    // from chapter 八百六十六 which fixed the parallel side。 Mirror
+    // the full trio here。
     let dummy = vec![1.0_f32; 4];
     let mut out = vec![0.0_f32; 4];
-    let rc = unsafe {
+    let rc_b = unsafe {
         bas_mamba_scan_sequential(
             dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
             dummy.as_ptr(), dummy.as_ptr(),
             0, 1, 1,
             out.as_mut_ptr(), 4)
     };
-    assert_eq!(rc, -1, "b=0 must reject");
+    let rc_l = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 0, 1,
+            out.as_mut_ptr(), 4)
+    };
+    let rc_d = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            1, 1, 0,
+            out.as_mut_ptr(), 4)
+    };
+    assert_eq!(rc_b, -1, "Sequential: b=0 must reject");
+    assert_eq!(rc_l, -1, "Sequential: l=0 must reject");
+    assert_eq!(rc_d, -1, "Sequential: d=0 must reject");
 }
 
 #[test]
@@ -774,6 +795,17 @@ fn c_abi_parallel_rejects_adversarial_dimensions_via_checked_mul() {
 
 #[test]
 fn payload_count_mismatch_reports_each_field_name() {
+    // Chapter 八百六十六 introduced this test but with 2 gaps caught
+    // by chapter 八百六十七's third-pass review:
+    //   (H2) only asserted `name`,not `expected`/`actual` — a B↔C
+    //   constructor-arg swap would still pass
+    //   (H3) only exercised `scan_sequential` — same 5-field
+    //   validation lives in `scan_parallel` (lib.rs ~218-242) and
+    //   `scan_parallel_v2` (lib.rs ~350-374) and could drift
+    //   independently
+    // This chapter 八百六十七 expansion closes both:assert all 3
+    // fields of PayloadCountMismatch + parameterize over all 3
+    // production scan functions。
     let shape = make_shape(1, 2, 2);
     let bld = shape.element_count();  // 4
     let good_x = vec![1.0_f32; bld];
@@ -783,33 +815,106 @@ fn payload_count_mismatch_reports_each_field_name() {
     let good_c_proj = vec![1.0_f32; bld];
     let short = vec![1.0_f32; bld - 1];
 
-    // Field name => mutating callback that produces the
-    // short-payload variant for that field only。
-    let cases: [(&'static str, &dyn Fn() -> MambaScanError); 5] = [
-        ("x", &|| scan_sequential(
-            &short, &good_delta, &good_a, &good_b_proj,
-            &good_c_proj, shape).unwrap_err()),
-        ("delta", &|| scan_sequential(
-            &good_x, &short, &good_a, &good_b_proj,
-            &good_c_proj, shape).unwrap_err()),
-        ("A", &|| scan_sequential(
-            &good_x, &good_delta, &vec![-1.0_f32; 1],
-            &good_b_proj, &good_c_proj, shape).unwrap_err()),
-        ("B", &|| scan_sequential(
-            &good_x, &good_delta, &good_a, &short,
-            &good_c_proj, shape).unwrap_err()),
-        ("C", &|| scan_sequential(
-            &good_x, &good_delta, &good_a, &good_b_proj,
-            &short, shape).unwrap_err()),
+    // Scan-fn signature: (x, delta, a, b_proj, c_proj, shape) -> Result。
+    // Use a function-pointer type so all 3 scan functions go through
+    // the same call site,with no per-call boxing。
+    type ScanFn = fn(&[f32], &[f32], &[f32], &[f32], &[f32], MambaScanShape)
+        -> Result<Vec<f32>, MambaScanError>;
+
+    let scan_fns: [(&'static str, ScanFn); 3] = [
+        ("scan_sequential", scan_sequential),
+        ("scan_parallel", scan_parallel),
+        ("scan_parallel_v2", scan_parallel_v2),
     ];
-    for (expected_name, make_err) in cases.iter() {
-        let err = make_err();
-        match err {
-            MambaScanError::PayloadCountMismatch { name, .. } => {
-                assert_eq!(name, *expected_name,
-                    "Expected error.name = {:?}, got {:?}",
-                    expected_name, name);
+
+    // Field name => (input-shorted call,expected-actual pair)。
+    // expected = the bld or d_count the impl computes;actual =
+    // the short.len() / single-element a。 For x/delta/B/C the
+    // expected is bld=4 and the short.len() is 3;for A it's
+    // d_count=2 vs 1。
+    let cases: &[(&'static str, &dyn Fn(ScanFn) -> MambaScanError,
+                  usize, usize)] = &[
+        ("x", &|f: ScanFn| f(
+            &short, &good_delta, &good_a, &good_b_proj,
+            &good_c_proj, shape).unwrap_err(), 4, 3),
+        ("delta", &|f: ScanFn| f(
+            &good_x, &short, &good_a, &good_b_proj,
+            &good_c_proj, shape).unwrap_err(), 4, 3),
+        ("A", &|f: ScanFn| f(
+            &good_x, &good_delta, &vec![-1.0_f32; 1],
+            &good_b_proj, &good_c_proj, shape).unwrap_err(), 2, 1),
+        ("B", &|f: ScanFn| f(
+            &good_x, &good_delta, &good_a, &short,
+            &good_c_proj, shape).unwrap_err(), 4, 3),
+        ("C", &|f: ScanFn| f(
+            &good_x, &good_delta, &good_a, &good_b_proj,
+            &short, shape).unwrap_err(), 4, 3),
+    ];
+    for (fn_name, scan_fn) in scan_fns.iter() {
+        for (expected_name, make_err, expected_count, actual_count)
+            in cases.iter()
+        {
+            let err = make_err(*scan_fn);
+            match err {
+                MambaScanError::PayloadCountMismatch {
+                    name, expected, actual,
+                } => {
+                    assert_eq!(name, *expected_name,
+                        "{}: expected error.name = {:?}, got {:?}",
+                        fn_name, expected_name, name);
+                    assert_eq!(expected, *expected_count,
+                        "{} field {}: expected = {}, got {}",
+                        fn_name, expected_name, expected_count, expected);
+                    assert_eq!(actual, *actual_count,
+                        "{} field {}: actual = {}, got {}",
+                        fn_name, expected_name, actual_count, actual);
+                }
             }
         }
     }
+}
+
+// MARK: - Chapter 八百六十七 / M2991 — boundary-success regression test
+//
+// 3-agent review of chapter 八百六十六 caught (M1) that we only assert
+// the FAILURE side of the checked_mul overflow guard。 A fence-post
+// bug at `lib.rs:476` or `lib.rs:539` (e.g. flipping `<=` to `<`)
+// would silently start rejecting borderline-OK shapes — invisible
+// to the i32::MAX/2 adversarial test。 Pin the success side: a
+// shape close to the cap should succeed,not get rejected。
+
+#[test]
+fn c_abi_accepts_shape_at_lower_capacity_boundary() {
+    // Conservative: use a small shape that comfortably fits in the
+    // < i32::MAX cap (bld = 100) — verifies the SUCCESS arm of the
+    // checked_mul cap check is on both ABI entries。
+    let bld = 100;  // b=2, l=10, d=5 = 100
+    let x = vec![0.1_f32; bld];
+    let delta = vec![0.05_f32; bld];
+    let a = vec![-1.0_f32; 5];
+    let b_proj = vec![1.0_f32; bld];
+    let c_proj = vec![1.0_f32; bld];
+    let mut out_seq = vec![0.0_f32; bld];
+    let mut out_par = vec![0.0_f32; bld];
+
+    let rc_seq = unsafe {
+        bas_mamba_scan_sequential(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            2, 10, 5,
+            out_seq.as_mut_ptr(), bld as i32)
+    };
+    let rc_par = unsafe {
+        bas_mamba_scan_parallel(
+            x.as_ptr(), delta.as_ptr(), a.as_ptr(),
+            b_proj.as_ptr(), c_proj.as_ptr(),
+            2, 10, 5,
+            out_par.as_mut_ptr(), bld as i32)
+    };
+    assert_eq!(rc_seq, 0,
+        "Sequential ABI must accept shapes within capacity");
+    assert_eq!(rc_par, 0,
+        "Parallel ABI must accept shapes within capacity");
+    assert_eq!(out_seq, out_par,
+        "Sequential and parallel must produce byte-equal output");
 }

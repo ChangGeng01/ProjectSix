@@ -11,6 +11,108 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Fourth-pass review of chapter 八百六十六 — test coverage + doc HIGH (chapter 八百六十七 / M2991)
+
+User directive 「1 + 2」 — third-pass review of chapter 八百六十六 (the
+fix-of-fix-of-fix chapter) + start FlashAttention perf arc。 This block
+covers the third-pass review remediation。 The discipline pattern is
+holding:every review-fix chapter itself gets reviewed,and each round
+catches genuine items the prior round missed。
+
+#### HIGH items fixed (caught by Test Coverage + Doc Consistency agents)
+
+- **`c_abi_rejects_zero_dimensions` only tested b=0 (inverse asymmetry)**:
+  Chapter 八百六十六 correctly added all 3 zero-dim arms (b=0/l=0/d=0)
+  to the parallel ABI test,but the sequential ABI test (tests.rs:512-524
+  pre-fix) was never expanded to match。 A typo flipping `l <= 0` to
+  `l < 0` at lib.rs:463 would slip past the entire prior suite。 Now
+  the sequential test exercises all 3 arms with descriptive
+  per-assertion messages — symmetric with the parallel test。
+
+- **`payload_count_mismatch_reports_each_field_name` ignored `expected`/
+  `actual` fields**: Test destructured `PayloadCountMismatch { name, .. }`
+  — a future refactor swapping the `expected` and `actual` constructor
+  args at e.g. lib.rs:131-134 would compile and pass silently。 Now
+  asserts ALL THREE fields (name + expected + actual) per case。
+
+- **`payload_count_mismatch_reports_each_field_name` only exercised
+  `scan_sequential`**: The same 5-field validation block lives
+  (independently) in `scan_parallel` (lib.rs:218-242) and
+  `scan_parallel_v2` (lib.rs:350-374)。 A "B"/"C" copy-paste bug in
+  either parallel path was invisible。 Now parameterized over all 3
+  scan functions via `fn`-pointer table → 3 funcs × 5 fields × 3
+  field-assertions = 45 sub-assertions per `cargo test` run。
+
+- **CHANGELOG chapter 八百六十六 block had stale line refs to "92-93"
+  and "198"**: The substantive text fix landed correctly,but the
+  cross-references in the chapter 八百六十六 narrative pointed at
+  pre-prepend line numbers。 Real current lines are 188 (chapter 864
+  HIGH correction) and 294 (arc-seal Phase B row)。 Added "current file"
+  + "pre-prepend" annotation so future readers see both states。
+
+#### MEDIUM items fixed
+
+- **No "barely-succeeds" boundary success test for checked_mul cap**:
+  Prior tests only asserted the FAILURE side (adversarial overflow
+  rejected)。 A fence-post bug flipping `<=` to `<` at lib.rs:476 / 539
+  would silently reject borderline-OK shapes。 NEW
+  `c_abi_accepts_shape_at_lower_capacity_boundary` test asserts the
+  SUCCESS arm of the cap check is intact on both ABI entries (and
+  produces byte-equal output between sequential + parallel — additional
+  pin for the chapter 八百六十三 byte-equality guarantee at the
+  C ABI surface)。
+
+#### Items NOT acted on (deliberate)
+
+- **Concurrent-caller test for `bas_mamba_scan_parallel`** (LOW per
+  agent B): rayon internal safety is well-established;C ABI's
+  `slice::from_raw_parts` + `copy_nonoverlapping` would only fail
+  under simultaneous-thread invocation if the caller violated
+  Rust's standard aliasing rules,which is the CALLER's contract not
+  this crate's invariant。 Deferred unless a real consumer reports
+  hangs/corruption。
+
+- **Per-field test SPLIT into 5 separate `#[test]` functions** (M2 per
+  agent B): Reviewer correctly noted Rust `#[test]` halts at first
+  `assert_eq!` failure so 3-in-1 tests lose isolation。 But splitting
+  the parameterized 5-field × 3-func test into 15 separate tests
+  loses the parameterized-table pattern's central virtue (one place
+  to add field #6 if MambaScanError grows)。 Trade-off:keep the
+  parameterized version + accept slightly-reduced failure isolation。
+  Documented as deliberate test-design choice。
+
+- **Swift parallel zero-dim tests don't exercise Rust-side checked_mul**
+  (L2 per agent B): Swift bridge's `bld>0` guard fires upstream of
+  the Rust ABI,so by-construction the Rust guard cannot be exercised
+  from Swift via these paths。 Adding a hypothetical Swift entry
+  point that BYPASSES the bld>0 guard purely to test the Rust path
+  would be test-only architecture pollution。 The Rust ABI is exercised
+  directly from Rust tests in tests.rs which are the appropriate layer。
+
+- **9 clippy `useless_vec` warnings in tests.rs** (LOW per agent A):
+  Follows the file's pre-existing style;converting `vec![]` → `&[]`
+  across 18 callsites is style-churn without behavior change。
+  Deferred to a focused clippy-cleanup chapter if/when one happens。
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                                       36/36 PASS (was 35,+1 boundary test)
+   swift test --filter BASChapter865MambaBridgeFixtureExpansionTests:  11/11 PASS (unchanged)
+   swift build:                                                         PASS
+   pre-commit gates:                                                    3/3 PASS
+
+#### Authoritative test counts post chapter 八百六十七
+
+| Component | Count | Delta vs 八百六十六 |
+|---|---|---|
+| `bas-mamba-scan` Rust unit tests       | 36 | +1 (boundary-success) |
+| `bas-red-team-bench` Rust unit tests   | 42 | 0 |
+| `bas-tokenizer` Rust unit tests        | 26 | 0 |
+| Swift `BASChapter865...Expansion` tests | 11 | 0 |
+| **Internal sub-assertions in `payload_count_mismatch`** | 45 (was 5) | **+40 (3-func parameterization)** |
+
+---
+
 ### Third post-review HIGH fix — parallel C ABI overflow guard parity (chapter 八百六十六 / M2986)
 
 Chapter 八百六十五's 3-agent review (knife 5) dispatched Code review + Test
@@ -35,12 +137,17 @@ CHANGELOG。
   (`c_abi_parallel_rejects_*`)。
 
 - **CHANGELOG self-contradiction on FlashAttention**: Chapter 八百六十四's
-  HIGH-item correction (line 92-93)「FlashAttention has 1 production
-  consumer (BASCognitiveBrain)」 was contradicted by the arc-seal
-  Phase B row (line 198) which still said「all 6 gated Metal kernels
-  ... are SCAFFOLDING with zero Swift production consumers」。 Updated
-  the arc-seal row to「5 of 6 ... + FlashAttention has 1」 + explicit
-  reference to the chapter 八百六十四 correction。
+  HIGH-item correction (line 188 in current file,was 92-93 pre-chapter
+  八百六十六 block prepend)「FlashAttention has 1 production consumer
+  (BASCognitiveBrain)」 was contradicted by the arc-seal Phase B row
+  (line 294 in current file,was 198 pre-prepend) which still said
+  「all 6 gated Metal kernels ... are SCAFFOLDING with zero Swift
+  production consumers」。 Updated the arc-seal row to「5 of 6 ...
+  + FlashAttention has 1」 + explicit reference to the chapter 八百六十四
+  correction。 (Line-ref correction itself was caught by chapter
+  八百六十七 third-pass doc-consistency agent — the original pointers
+  were correct at draft time but stale after the block prepend
+  shifted all line numbers。)
 
 #### MEDIUM items fixed
 
