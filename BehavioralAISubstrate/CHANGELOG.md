@@ -11,6 +11,62 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### BASRoutedAuditAggregation DECLINE-WITH-TRIGGER (chapter 八百七十三 / M3031)
+
+Arc 871-876 plan slotted as「Rust+rayon for 3 aggregation loops,
+expected 2-4× win at batch ≥ 100」。 Live measurement of current
+Swift baseline reveals NO MIGRATION WARRANTED — chapter 八百四十九
+DECLINE-WITH-TRIGGER pattern applies。
+
+#### LIVE Swift baseline on Mac mini
+
+| Records | Swift aggregatePresence time |
+|---|---|
+| 100 | 37 μs |
+| 1K | 371 μs |
+| 5K | 1,848 μs (1.85 ms) |
+
+#### Decline rationale
+
+1. **FFI overhead dominates at small/medium sizes**: 3
+   aggregations × 3 FFI hops ≈ 600μs fixed cost。 At 100 records
+   that's 16× the Swift baseline itself。 At 1K records it's
+   roughly equal。 Only at ~5K+ records could Rust+rayon shave
+   30-50% of wall-clock。
+2. **Per-session-end,not per-turn**: Called ONCE at session
+   close。 Saving 1ms per session is invisible against multi-minute
+   sessions。
+3. **Swift code is simple + correct**: Adding ~500 LOC of
+   Rust+C ABI+Swift bridge infrastructure for ~1ms wall-clock
+   improvement on rare large sessions is bad ROI。
+
+#### Triggers for future revisit
+
+1. Session size routinely > 50K records (10× the 5K measured)
+2. Aggregation moves to a per-turn hot path
+3. Profiler shows aggregation > 5% of session-end CPU time
+
+#### Knives
+
+- **Knife 1**: NEW BASChapter873AuditAggregationMeasurementTests
+  (3 tests) — captures Swift baseline at 100/1K/5K
+- **Knife 2**: NEW BASChapter873AuditAggregationDeclineTests
+  (3 tests) — Swift-not-routed compile pin + 5K regression at
+  5× headroom + 3 trigger documentation pin
+
+Same discipline as chapters 八百四十九 / 八百五十六 / 八百五十七 /
+八百六十二 / 八百六十六 / 八百六十八 — measurement-driven decline
+preserves substrate simplicity per 「亏的不要硬上」。
+
+#### Verification
+
+   swift test BASChapter873AuditAggregationMeasurement:  3/3 PASS
+   swift test BASChapter873AuditAggregationDecline:       3/3 PASS
+   swift build:                                            PASS
+   pre-commit gates:                                       3/3 PASS
+
+---
+
 ### BASVectorIndex Rust+rayon completion + chunked v2 (chapter 八百七十二 / M3026)
 
 Continues arc 871-876 per 「全面 开发」 directive。 Second wiring chapter:

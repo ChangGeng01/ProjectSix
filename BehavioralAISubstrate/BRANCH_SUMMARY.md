@@ -321,6 +321,25 @@ chapter 八百七十二: ~87% Swift (raw) / 13.4% native (raw)
                   Test count: +6 chapter 872 + 3 Rust unit
                   tests. Chapter 718 + 727 + 729 vector
                   tests STILL PASS unchanged.)
+chapter 八百七十三: ~87% Swift (raw) / 13.4% native (raw)
+                  (BASRoutedAuditAggregation DECLINE-WITH-
+                  TRIGGER. Live measurement showed Swift
+                  baseline already fast:
+                    100 records  =    37 μs
+                    1K  records  =   371 μs
+                    5K  records  = 1,848 μs (1.85 ms)
+                  FFI overhead (3 aggregations × 3 hops =
+                  ~600μs fixed) would dominate at small/
+                  medium sizes. Per-session-end (not per-
+                  turn) so absolute savings invisible.
+                  DECLINE per 「亏的不要硬上」 — chapter 八百四十九
+                  pattern. 6 audit tests pinning decline +
+                  3 triggers for future revisit (50K+ session,
+                  per-turn hot path, profiler >5%). No code
+                  change beyond audit. Same discipline as
+                  chapters 八百五十六/八百五十七/八百六十二/八百六十六/
+                  八百六十八 — measurement-driven declines
+                  preserve substrate simplicity.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
