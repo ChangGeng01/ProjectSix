@@ -104,6 +104,36 @@ impl Tokenizer {
         self.encode_pq(bytes)
     }
 
+    /// chapter 八百五十五 第一刀 / M2922 — sequential batch encode。
+    ///
+    /// Convenience wrapper that encodes N texts and returns their
+    /// per-text token-id Vecs。 Equivalent to
+    /// `texts.iter().map(|t| self.encode(t)).collect()` but provides
+    /// a named entry point that can be flipped to the parallel impl
+    /// via the BASAutoRouteRanker bridge (knife 2 of this chapter)。
+    pub fn encode_batch(&self, texts: &[&str]) -> Vec<Vec<u32>> {
+        texts.iter().map(|t| self.encode(t)).collect()
+    }
+
+    /// chapter 八百五十五 第二刀 / M2922 — rayon parallel batch encode。
+    ///
+    /// Same semantics + same byte-equal output as `encode_batch`。
+    /// Each text in the batch is independently encoded — the
+    /// Tokenizer is read-only after construction so no shared
+    /// mutable state crosses tasks。
+    ///
+    /// Byte-equality with sequential is GUARANTEED:
+    ///   - `par_iter().map(...).collect()` preserves input order
+    ///   - Per-text `encode` is deterministic + side-effect-free
+    ///   - No FP arithmetic involved (BPE merge is integer-only)
+    ///
+    /// Use when batch size ≥ ~16 texts (typical rayon crossover);
+    /// below that,sequential is faster due to thread-pool overhead。
+    pub fn encode_batch_parallel(&self, texts: &[&str]) -> Vec<Vec<u32>> {
+        use rayon::prelude::*;
+        texts.par_iter().map(|t| self.encode(t)).collect()
+    }
+
     /// chapter 七百三十七 第三刀 — priority-queue-backed BPE
     /// merge loop。 Closes the chapter 七百二十二 第三刀
     /// documented O(N²) limitation。
@@ -1049,6 +1079,64 @@ mod tests {
                 mb.as_ptr(), mb.len(),
                 0);
             assert!(tok.is_null());
+        }
+    }
+
+    // MARK: - chapter 八百五十五 / M2922 batch encode tests
+
+    #[test]
+    fn encode_batch_sequential_matches_per_text_encode() {
+        let tok = synthetic_tokenizer();
+        let texts = ["the", "in", "theme", "the cat", ""];
+        let batch = tok.encode_batch(&texts);
+        let per_text: Vec<Vec<u32>> = texts.iter().map(|t| tok.encode(t)).collect();
+        assert_eq!(batch, per_text);
+    }
+
+    #[test]
+    fn encode_batch_parallel_matches_sequential_simple() {
+        let tok = synthetic_tokenizer();
+        let texts = ["the", "in", "theme", "the cat", "x", "the cat sat"];
+        let seq = tok.encode_batch(&texts);
+        let par = tok.encode_batch_parallel(&texts);
+        assert_eq!(seq, par,
+            "Parallel batch must byte-equal sequential batch");
+    }
+
+    #[test]
+    fn encode_batch_parallel_matches_sequential_empty_input() {
+        let tok = synthetic_tokenizer();
+        let texts: [&str; 0] = [];
+        let seq = tok.encode_batch(&texts);
+        let par = tok.encode_batch_parallel(&texts);
+        assert_eq!(seq, par);
+        assert!(par.is_empty());
+    }
+
+    #[test]
+    fn encode_batch_parallel_matches_sequential_large_batch() {
+        let tok = synthetic_tokenizer();
+        let templates = ["the", "in", "theme", "the cat", "the cat sat in the hat", "🎉"];
+        let mut texts: Vec<String> = Vec::with_capacity(120);
+        for i in 0..120 {
+            texts.push(format!("{} #{}", templates[i % templates.len()], i));
+        }
+        let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let seq = tok.encode_batch(&refs);
+        let par = tok.encode_batch_parallel(&refs);
+        assert_eq!(seq, par,
+            "120-text batch:parallel must byte-equal sequential");
+    }
+
+    #[test]
+    fn encode_batch_parallel_preserves_input_order() {
+        let tok = synthetic_tokenizer();
+        let texts = ["zzz", "aaa", "mmm", "bbb"];
+        let par = tok.encode_batch_parallel(&texts);
+        assert_eq!(par.len(), 4);
+        for (i, t) in texts.iter().enumerate() {
+            assert_eq!(par[i], tok.encode(t),
+                "Output index {} must correspond to input text", i);
         }
     }
 }

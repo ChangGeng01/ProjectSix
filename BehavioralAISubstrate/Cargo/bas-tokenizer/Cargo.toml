@@ -11,3 +11,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+# chapter 八百五十五 / M2922 — rayon for batch encode parallelism。
+# Each input text in a batch is independently encoded;no shared
+# state across tasks (the tokenizer is read-only after construction)。
+rayon = "1.10"
