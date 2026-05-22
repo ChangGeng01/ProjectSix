@@ -81,9 +81,145 @@ pub fn forget_cascade_filter_strings(
     (kept, removed)
 }
 
+/// chapter 八百八十五 / M3115 — batched rayon variant for
+/// chapter 881 Trigger A experiment。 Processes N cascades in
+/// parallel via rayon::par_iter,returning one (kept,removed)
+/// tuple per cascade in input order。
+///
+/// HYPOTHESIS being tested: if batching N cascades amortizes the
+/// per-cascade HashSet rebuild cost across multiple workers,Rust
+/// might finally beat Swift's native Set<String> per-cascade win
+/// established in chapter 881。
+///
+/// Empty input (no cascades) → empty output。 Each cascade is
+/// processed independently — no cross-cascade state sharing。
+pub fn forget_cascade_filter_batch_rayon(
+    cascades: &[(Vec<String>, Vec<String>)],
+) -> Vec<(Vec<usize>, Vec<usize>)> {
+    use rayon::prelude::*;
+    cascades.par_iter()
+        .map(|(records, targets)| {
+            forget_cascade_filter_strings(records, targets)
+        })
+        .collect()
+}
+
+/// Sequential batched variant — same shape as
+/// `forget_cascade_filter_batch_rayon` but no rayon。 Comparison
+/// baseline to isolate rayon overhead from batching gain。
+pub fn forget_cascade_filter_batch_sequential(
+    cascades: &[(Vec<String>, Vec<String>)],
+) -> Vec<(Vec<usize>, Vec<usize>)> {
+    cascades.iter()
+        .map(|(records, targets)| {
+            forget_cascade_filter_strings(records, targets)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
+
+    /// chapter 八百八十五 / M3115 — batched-cascade Trigger A
+    /// experiment。 Measures whether batching N cascades via
+    /// rayon amortizes the per-cascade HashSet rebuild enough
+    /// to beat Swift's measured 1.5μs per-cascade win at small
+    /// shapes (from chapter 881 baseline)。
+    ///
+    /// Uses #[ignore] so it doesn't run by default — invoke via
+    /// `cargo test forget_cascade::tests::bench_batched_vs_per_call
+    /// --release -- --ignored --nocapture` to capture data。
+    #[test]
+    #[ignore]
+    fn bench_batched_vs_per_call() {
+        let record_count = 100;
+        let target_count = 10;
+        let make_cascade = || {
+            let records: Vec<String> = (0..record_count)
+                .map(|i| format!("rec-{}", i))
+                .collect();
+            let targets: Vec<String> = (0..target_count)
+                .map(|i| format!("rec-{}", (i * 7) % record_count))
+                .collect();
+            (records, targets)
+        };
+        let batch_sizes = [1usize, 4, 16, 64, 256, 1024];
+        let iters = 1000usize;
+        println!(
+            "\n=== chapter 八百八十五 batched-cascade rayon \
+             experiment ===");
+        println!(
+            "Per-cascade shape: {} records × {} targets",
+            record_count, target_count);
+        println!(
+            "Iterations per batch size: {}", iters);
+        for &batch in &batch_sizes {
+            let cascades: Vec<_> =
+                (0..batch).map(|_| make_cascade()).collect();
+            // Warm
+            for _ in 0..50 {
+                let _ = forget_cascade_filter_batch_rayon(
+                    &cascades);
+            }
+            // Sequential per-call baseline
+            let t0 = Instant::now();
+            for _ in 0..iters {
+                let _ = forget_cascade_filter_batch_sequential(
+                    &cascades);
+            }
+            let seq_ns = t0.elapsed().as_nanos() / iters as u128;
+            let seq_per_cascade = seq_ns / batch as u128;
+            // Rayon batched
+            let t1 = Instant::now();
+            for _ in 0..iters {
+                let _ = forget_cascade_filter_batch_rayon(
+                    &cascades);
+            }
+            let rayon_ns = t1.elapsed().as_nanos() / iters as u128;
+            let rayon_per_cascade = rayon_ns / batch as u128;
+            println!(
+                "  batch={:5} sequential={:8}ns rayon={:8}ns  \
+                 per-cascade seq={:7}ns rayon={:7}ns  \
+                 speedup={:.2}×",
+                batch, seq_ns, rayon_ns,
+                seq_per_cascade, rayon_per_cascade,
+                seq_ns as f64 / rayon_ns.max(1) as f64);
+        }
+    }
+
+    /// Byte-equality:rayon batched MUST produce identical
+    /// (kept,removed) per cascade as the sequential batched
+    /// variant (order-preserved per cascade since rayon's
+    /// collect preserves index)。
+    #[test]
+    fn batched_rayon_byte_equal_to_sequential() {
+        let make_cascade = |seed: usize| {
+            let records: Vec<String> = (0..50)
+                .map(|i| format!("rec-{}-{}", seed, i))
+                .collect();
+            let targets: Vec<String> = (0..10)
+                .map(|i| format!("rec-{}-{}",
+                    seed, (i * 5) % 50))
+                .collect();
+            (records, targets)
+        };
+        let cascades: Vec<_> = (0..16)
+            .map(make_cascade).collect();
+        let seq = forget_cascade_filter_batch_sequential(
+            &cascades);
+        let par = forget_cascade_filter_batch_rayon(&cascades);
+        assert_eq!(seq.len(), par.len());
+        for (i, (s, p)) in seq.iter().zip(par.iter())
+            .enumerate()
+        {
+            assert_eq!(s.0, p.0,
+                "cascade {} kept indices differ", i);
+            assert_eq!(s.1, p.1,
+                "cascade {} removed indices differ", i);
+        }
+    }
 
     #[test]
     fn empty_targets_keeps_everything() {

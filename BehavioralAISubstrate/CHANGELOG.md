@@ -11,6 +11,92 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 881 Trigger A experiment — batched-cascade rayon CAN win at batch ≥ 1024, DECLINE-PENDING-CONSUMER (chapter 八百八十五 / M3115)
+
+Chapter 881 DECLINED the forget cascade Rust path because Swift
+Set partition won 2-3× at every measured production size。 One of
+the 4 trigger conditions documented was 「Trigger A: NEW
+batched-cascade C ABI amortizing string-FFI hop」。 Chapter 八百八十五
+IMPLEMENTS Trigger A as an experiment to test the hypothesis。
+
+#### Knives shipped
+
+1. **Rust batched variant** (NEW): `forget_cascade_filter_batch_
+   rayon` + `forget_cascade_filter_batch_sequential` in
+   `bas-retrieval-ranker/src/forget_cascade.rs`。 Process N
+   (records, targets) cascade tuples in one call,with rayon
+   parallelism across cascades。 Pure Rust crate-level (NO FFI
+   surface yet — chapter 885 measurement-first per chapter 881
+   pattern)。
+
+2. **Byte-equality unit test**:
+   `batched_rayon_byte_equal_to_sequential` — proves rayon
+   batched produces identical (kept,removed) per cascade as
+   sequential batched。 Order preserved per cascade via collect
+   semantics + per-cascade independence (no cross-cascade
+   accumulator)。
+
+3. **LIVE Rust bench** (ignored-by-default):
+   `bench_batched_vs_per_call` — captures per-cascade timing
+   across batch sizes [1, 4, 16, 64, 256, 1024]。 Skip-by-default
+   so it doesn't slow CI;invoke via `cargo test ... --ignored
+   --nocapture` for fresh data。
+
+4. **Measurement verdict** (Mac mini 2026-05-23, 100 records ×
+   10 targets per cascade):
+
+   | batch | sequential | rayon | rayon vs seq |
+   |---|---|---|---|
+   | 1 | 1333 ns | 1563 ns | 0.85× (loses) |
+   | 4 | 1321 ns | 15170 ns | 0.09× (rayon overhead dominates) |
+   | 16 | 1450 ns | 12467 ns | 0.12× |
+   | 64 | 1596 ns | 7174 ns | 0.22× |
+   | 256 | 2135 ns | 1905 ns | 1.12× (marginal win) |
+   | **1024** | 1767 ns | **657 ns** | **2.69× (real win)** |
+
+   vs chapter 881 Swift baseline (1500 ns / cascade):
+   - Rust rayon @ batch=256: 1905 ns → 1.27× SLOWER than Swift
+   - Rust rayon @ batch=1024: 657 ns → **2.28× FASTER than Swift**
+
+5. **NEW audit test** (chapter 885):
+   `BASChapter885BatchedCascadePendingConsumerAuditTests.swift`
+   (4 tests):
+   - Single-cascade verdict from chapter 881 still holds
+   - Batched breakeven is around 512 cascades
+   - 3 trigger conditions for actual wiring (consumer must
+     accumulate ≥ 512 cascades per call)
+   - Rust batched variant + byte-eq test present in crate
+
+#### Verdict + discipline
+
+**Rust batched rayon CAN win at batch ≥ ~512 cascades per call,
+hitting 2.28× speedup vs Swift at batch=1024。 BUT** the substrate
+currently processes ONE cascade per turn — no natural batching
+consumer exists。 Per chapter 874/875 decline-pending-consumer
+pattern,chapter 885 SHIPS the Rust variant + audits the
+measurement,but does NOT wire FFI/Swift surface (no consumer to
+pay the wiring cost)。
+
+If a future host pattern emerges that batches 512+ cascades per
+call (e.g.,bulk-retraction or audit-replay flow),the next
+chapter can wire `forget_cascade_filter_batch_rayon` through C
+ABI + Swift bridge + ship the flip。 Crate-level work is done。
+
+#### Verification
+
+   cargo test -p bas-retrieval-ranker --lib: 196/196 PASS (+1 ignored bench)
+   swift test --filter BASChapter885:        4/4 PASS
+   swift test (FULL SWEEP):                  13,416 / 77 skipped / 0 failures
+   swift build:                                                       PASS
+   pre-commit gates:                                                  3/3 PASS
+
+Delta from chapter 884: +1 Rust test (byte-eq) + +1 ignored bench +
++4 Swift audit tests = +5 effective tests。 NO schemaVersion bump,
+NO FFI surface change,NO XCFramework rebuild。 Pure crate-level
+additive work + audit pin。
+
+---
+
 ### Gaps 1+4+5 DECLINE-WITH-TRIGGER + Gap 2 Part 2 DECLINE — arc seal (chapters 八百八十三 + 八百八十四 / M3100+M3105)
 
 Audit close-out for the user's 5-gap arc per selected scope
