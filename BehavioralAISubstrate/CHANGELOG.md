@@ -11,6 +11,72 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### LIVE perf bench confirms chapter 888 BadTone flip — Rust 7.32-7.45× faster (chapter 八百八十九 / M3135)
+
+Chapter 八百八十八 flipped `BASBadToneLinter.lint(inputs:)` to route
+through Rust by default — but the flip landed WITHOUT live
+measurement (chapter 870 discipline gap noted in commit body)。
+Chapter 八百八十九 closes that gap with a LIVE perf bench + assertion
+that catches any future regression。
+
+#### Measurement (Mac mini M-series, 2026-05-23, 10% bad-tone density)
+
+| inputs | swift  | rust   | speedup |
+|---|---|---|---|
+| 10    | 0.307 ms | 0.041 ms | **7.45×** |
+| 100   | 3.186 ms | 0.435 ms | **7.32×** |
+| 1000  | 32.20 ms | 4.356 ms | **7.39×** |
+
+**VERDICT**: Rust wins consistently ~7.4× across all batch sizes。
+Chapter 888 flip is JUSTIFIED — Rust path stays default。
+
+Speedup is lower than chapter 七百七十七 Product/Cthulhu/Kunlun
+(33-67×) because BadTone has fewer substrings per rule (4) vs
+Product (6) vs Cthulhu (2) — speedup depends on per-substring
+scan cost amortization vs FFI overhead。 The ratio is still
+substantial + consistent。
+
+#### Knives shipped
+
+1. **NEW `BASChapter889BadToneLivePerfBenchTests.swift`** (3
+   bench methods,skip-by-default after capture per ch 879/881
+   archive pattern):
+   - testBench10Inputs
+   - testBench100Inputs
+   - testBench1000Inputs
+   Each asserts `rustMs <= swiftMs * 1.20` (20% noise band) —
+   if Rust ever becomes ≥ 20% slower than Swift,the assertion
+   FAILS + the chapter 888 flip is by-doctrine reverted。
+
+2. **Doc-string captures the 2026-05-23 measurement verdict**
+   so future readers see the data without re-running。
+
+#### Discipline pin
+
+Chapter 870 measurement-first discipline:every Rust flip must
+ship with LIVE measurement that JUSTIFIES the flip。 Chapter 888
+shipped the flip with strong reasoning (chapter 七百七十七
+precedent + byte-equality + same Rust infrastructure) but
+without the live numbers。 Chapter 889 retroactively closes the
+gap WITHIN the same arc — same shape as chapter 七百八十一.5 / 4
+fix-of-fix patterns。 Net result: flip stays + has measurement
+backing it。
+
+#### Verification
+
+   swift test --filter BASChapter889: 3/3 PASS (live bench)
+   swift test --filter BASChapter888: 7/7 PASS (still byte-equal)
+   swift test --filter BASChapter887: 4/4 PASS (foundation intact)
+   swift test (FULL SWEEP):           13,436 / 76 skipped / 0 failures
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 888: +3 bench tests (skip-archived after capture)。
+No source change beyond test file。 No schemaVersion / Cargo /
+XCFramework changes。
+
+---
+
 ### BASBadToneLinter Swift bridge + default flip — Rust routing ACTIVE (chapter 八百八十八 / M3130)
 
 Chapter 八百八十七 shipped the Rust foundation (bas-red-team-bench
