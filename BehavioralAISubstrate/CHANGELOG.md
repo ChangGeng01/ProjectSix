@@ -11,6 +11,135 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### 16th-pass + doc cohesion review fixes — 6 HIGH + 7 MED + LOWs (chapter 八百九十一 / M3145)
+
+User invoked 「全面一次性 解决掉」 + 「全量 review 要求 最 优雅
+最 极致」 (one-shot fix-all,full review demands most elegant +
+most extreme)。 5 parallel agents dispatched,2 returned with
+substantive findings,3 still in flight。
+
+#### Code fixes (from 16th-pass review of ch 885-889)
+
+1. **HIGH-1 FIXED**: `BASBadToneLintBridge.lintViaRust` was
+   silently dropping ALL BadTone violations on Rust C ABI
+   failure (legacy `classifyViaSwiftFallback` returns
+   Product-only matches → BadTone 0x40-0x45 filter discards
+   everything = data loss)。 Refactored
+   `BASRedTeamBatchClassifier.classifyViaRust` → exposed NEW
+   public `classifyViaRustOrNil(prompts:)` returning Optional
+   so callers can detect Rust failure + choose their own
+   fallback。 Bridge now calls `classifyViaRustOrNil` + falls
+   back to `BASBadToneLinter.lintViaSwiftFallback` (the
+   BadTone-aware path) on nil。
+
+2. **HIGH-2 FIXED**: `BASRAGRetriever.resolveCandidatesSync`
+   was TRAPPING on negative k via `candidates.prefix(k)`
+   (Swift error:「Can't take a prefix of negative length」)。
+   Added `let safeK = max(0, k)` clamp + emits new reason
+   code `rag:k-clamped-from-negative` so audit trail
+   captures the bad input。
+
+3. **MEDIUM-2 FIXED**: `resolveCandidatesSync` was emitting
+   misleading `rag:no-candidates` when caller passed k=0 with
+   non-empty candidates。 Added distinct `rag:k-zero-truncated`
+   reason code + explicit guard so audit can distinguish
+   「host passed empty candidates」 from「host passed safeK=0」。
+
+4. **MEDIUM-3 FIXED**: ch 888 byte-equality only covered
+   ~13/23 BadTone substrings。 Chapter 891 adds
+   `testMEDIUM3_AllTwentyThreeSubstringsByteEqual` exhaustively
+   testing every substring in every rule。
+
+5. **LOW-3 DOC pinned**: chapter 759 SubArcScorecard
+   doc-string assertion that totalRedLines=24 is historical
+   (post-ch 887 actual = 30)。 Test asserts doc-string makes
+   the historical nature clear。
+
+#### Doc fixes (from doc cohesion review)
+
+6. **HIGH H1 FIXED**: CHANGELOG `[Unreleased]` had 10 chapter
+   entries spanning 3 tagged releases (v0.62.1/.2/.3) +
+   1 untagged (ch 890)。 Split into proper release sections
+   per keep-a-changelog convention this chapter does inline。
+
+7. **HIGH H2 FIXED**: RELEASE_NOTES.md stopped at v0.62.1
+   (UNRELEASED label) — added v0.62.2 + v0.62.3 entries with
+   consumer-shaped change summaries (including the 7.4× BadTone
+   flip which deserves consumer visibility)。
+
+8. **HIGH H3 FIXED**: BRANCH_SUMMARY.md trajectory stopped at
+   chapter 880 — added rows for chapters 881-890 + bumped the
+   「production-default flips」 table to row 17 (BadTone @ 7.4×)。
+
+9. **HIGH H4 FIXED**: `BASEvolutionLifecycleStructural
+   Fingerprint.canonicalEncoding` had no DECLINE doc-string
+   (chapter 890 audit + decline test were external to the
+   source)。 Added inline DECLINE-WITH-TRIGGER comment citing
+   chapter 890 measurement + 3 triggers — matches chapter 881
+   inline doc shape on
+   `BASMemoryForgetCascadeRunner.useRoutedFilter`。
+
+10. **MEDIUM M1 FIXED**: ch 881 `useRoutedFilter` doc-string
+    lists「Trigger A: batched-cascade API」 as future — but ch
+    885 actually implemented + measured + audit-pinned it。
+    Doc-string updated to acknowledge ch 885 result。
+
+11. **MEDIUM M2 FIXED**: ch 888 `BASBadToneLinter.lint`
+    doc-string cites ch 七百七十七 precedent but didn't cite
+    ch 889's LIVE measurement (7.32-7.45×)。 Doc-string
+    updated with the measurement citation。
+
+12. **MEDIUM M3 FIXED**: MIGRATION_GUIDE.md Step 3 had
+    literal `(See chapter 八百七十八 in CHANGELOG for the exact
+    list)` placeholder in both columns。 Replaced with the
+    actual deprecated-paths enumeration so consumers can grep。
+
+13. **MEDIUM M4 PARTIAL**: MIGRATION_GUIDE.md was titled
+    「v0.61 → v0.62.x」 but only covered v0.62.0 deltas。 Added
+    new section「Step 5: v0.62.0 → v0.62.3 patch deltas」
+    listing the consumer-visible changes per patch tag。
+
+14. **LOW L1+L2 FIXED**: NEW doctrine file
+    `Docs/DECLINE_PATTERNS.md` explaining DECLINE-WITH-TRIGGER
+    vs DECLINE-PENDING-CONSUMER + string-FFI structural rule
+    (established by chapters 881 + 890)。
+
+#### NEW chapter 891 tests
+
+`BASChapter891ReviewFixTests.swift` (9 tests):
+- 3 tests pinning HIGH-1 fix (bridge uses RustOrNil,
+  classifyViaRustOrNil exists with right signature,happy path
+  still works)
+- 2 tests pinning HIGH-2 fix (negative k + Int.min/2 handled)
+- 2 tests pinning MEDIUM-2 fix (k=0 distinct reason code,
+  empty candidates still emits no-candidates)
+- 1 test pinning MEDIUM-3 fix (all 23 BadTone substrings byte-
+  equal across Rust + Swift)
+- 1 test pinning LOW-3 fix (SubArcScorecard doc-string
+  clarity)
+
+#### Discipline
+
+Same「shoemaker's children」 pattern caught again — chapter 888
+made the SAME silent-fallback bug pattern it was supposed to
+prevent (called wrong layer + filtered + lost data)。 The
+16th-pass review caught it before any consumer hit it。 This
+is the 8th time the review discipline has caught a real HIGH
+in the chapters 八百六十七 → 八百九十一 arc。
+
+#### Verification (will update post other-agent findings)
+
+   swift test --filter BASChapter891: 9/9 PASS
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 890: +9 tests + 2 HIGH code fixes + 5 MEDIUM
+code+doc fixes + 4 doc fixes + 2 new doctrine doc entries (+1
+new file)。 NO Cargo / Rust / XCFramework changes。 Pure-Swift
++ doc work。
+
+---
+
 ### canonicalEncoding migration DECLINE — string-FFI cost exceeds Swift total at every measured size (chapter 八百九十 / M3140)
 
 Discovery agent (post-chapter 884) flagged
@@ -396,7 +525,7 @@ change)。
 #### Verification
 
    swift test --filter BASChapter886: 6/6 PASS
-   swift test (FULL SWEEP):           13,422 / 105 skipped / 0 failures
+   swift test (FULL SWEEP):           13,422 / 76 skipped / 0 failures
    swift build:                                                PASS
    pre-commit gates:                                           3/3 PASS
 
@@ -405,6 +534,17 @@ Cargo/Rust change,no XCFramework rebuild。 Pure-Swift additive
 expansion of `BASRAGRetriever` namespace。
 
 ---
+
+---
+
+## [0.62.3] — 2026-05-23 — DISCOVERY-DRIVEN EXTENSIONS + BadTone FLIP
+
+Tag commit: `d9948733` (chapter 八百八十九)。 5 chapters since v0.62.2:
+discovery agent surfaced BASBadToneLinter as HIGH-confidence flip
+candidate → ch 887 Rust foundation → ch 888 Swift bridge + default
+flip → ch 889 LIVE bench (Rust 7.32-7.45× faster)。 Plus ch 885
+batched cascade Rust SHIPPED + DECLINE-PENDING-CONSUMER wiring +
+ch 886 sync resolveCandidatesSync helper (chapter 883 Trigger C)。
 
 ### Chapter 881 Trigger A experiment — batched-cascade rayon CAN win at batch ≥ 1024, DECLINE-PENDING-CONSUMER (chapter 八百八十五 / M3115)
 
@@ -481,7 +621,10 @@ ABI + Swift bridge + ship the flip。 Crate-level work is done。
 
    cargo test -p bas-retrieval-ranker --lib: 196/196 PASS (+1 ignored bench)
    swift test --filter BASChapter885:        4/4 PASS
-   swift test (FULL SWEEP):                  13,416 / 77 skipped / 0 failures
+   swift test (FULL SWEEP):                  13,416 / 105 skipped / 0 failures
+                                             (chapter 八百九十一 corrected
+                                             swapped ch 885/886 counts —
+                                             commit b2d7ddf4 was authoritative)
    swift build:                                                       PASS
    pre-commit gates:                                                  3/3 PASS
 
@@ -663,6 +806,17 @@ defaults),so existing call sites compile unchanged。
 
 ---
 
+---
+
+## [0.62.2] — 2026-05-23 — 5-GAP ARC + Gap 2 CARRIER
+
+Tag commit: `72657cca` (chapter 八百八十四)。 4 chapters since v0.62.1
+addressing user's 5-gap architectural audit:Gap 3 DECLINED
+(forget Rust path,Swift 2-3× faster) → Gap 2 carrier SHIPPED
+(Bundle/Builder embedding provider slots) → Gap 2 wiring +
+Gaps 1+4+5 audit-only DECLINE (async-protocol + SQLite-Rust +
+provenance + sharded multi-writer all decline-with-trigger)。
+
 ### Gap-3 DECLINE-WITH-TRIGGER — forget cascade Rust path stays OFF (chapter 八百八十一 / M3090)
 
 User surfaced 5 architectural gaps after v0.62.1 ship。 Selected
@@ -738,6 +892,17 @@ Delta from chapter 880: +7 tests (4 audit + 3 baseline-archived),
 preserved)。
 
 ---
+
+---
+
+## [0.62.1] — 2026-05-23 — 全面收尾 — CHUNK_ROWS WIRING + RELEASE DOCS
+
+Tag commit: `41ecaf83` (chapter 八百八十)。 Single-chapter patch
+delivering the chapter 879 promised contract:`BASAutoRouteThresholds
+.batchedCosineRayonChunkRows` field now wired through Rust C ABI
++ Swift bridge。 Default chunk_rows=64 preserves chapter 872
+byte-equality。 RELEASE_NOTES.md + MIGRATION_GUIDE_v0.61_to_v0.62.md
+shipped as consumer-shaped release docs。
 
 ### v0.62.1 全面收尾 — CHUNK_ROWS Swift→Rust forwarding + release docs (chapter 八百八十 / M3085)
 

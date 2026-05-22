@@ -176,9 +176,29 @@ public enum BASBadToneLinter {
     /// + flips default ON)。 Pattern mirrors chapter 七百七十七
     /// `BASRedTeamBatchClassifier` flip (Product / Cthulhu /
     /// Kunlun / BR-014 default-routed through Rust at chapter
-    /// 777,measured 33-67× speedup)。 The Swift body below stays
-    /// as the OPT-OUT fallback per 红线 7 (used on watchOS / Linux
-    /// + the chapter 887 baseline measurement)。
+    /// 777,measured 33-67× speedup)。
+    ///
+    /// chapter 八百八十九 / M3135 — LIVE measurement on Mac mini
+    /// 2026-05-23 (10% bad-tone density):
+    ///   inputs=10:   Swift 0.307 ms  Rust 0.041 ms  =  7.45× faster
+    ///   inputs=100:  Swift 3.186 ms  Rust 0.435 ms  =  7.32× faster
+    ///   inputs=1000: Swift 32.20 ms  Rust 4.356 ms  =  7.39× faster
+    /// Asserted in `BASChapter889BadToneLivePerfBenchTests` with
+    /// 20% noise-band tripwire: if Rust ever becomes ≥ 20%
+    /// slower than Swift,chapter 888 flip is by-doctrine
+    /// reverted。
+    ///
+    /// chapter 八百九十一 / M3145 HIGH-1 fix: bridge now uses
+    /// `BASRedTeamBatchClassifier.classifyViaRustOrNil` so Rust
+    /// C ABI failures route to the BadTone-aware
+    /// `lintViaSwiftFallback` (the legacy
+    /// `classifyViaSwiftFallback` only emits Product matches
+    /// = silent data loss for BadTone — caught by 16th-pass
+    /// review)。
+    ///
+    /// The Swift body below stays as the OPT-OUT fallback per
+    /// 红线 7 (used on watchOS / Linux + the chapter 887
+    /// baseline measurement + chapter 891 Rust-failure fallback)。
     public static func lint(
         inputs: [String]
     ) -> [Violation] {
@@ -239,15 +259,32 @@ public enum BASBadToneLintBridge {
     /// the shared classifier + filters/maps the BadTone subset。
     /// Byte-equality with `BASBadToneLinter.lintViaSwiftFallback`
     /// is pinned by `BASChapter888BadToneRustBridgeTests`。
+    ///
+    /// chapter 八百九十一 / M3145 — HIGH-1 fix from 16th-pass
+    /// review: route through `classifyViaRustOrNil` instead of
+    /// `classify` so we can detect Rust failure + run the
+    /// BadTone-AWARE Swift fallback (the legacy
+    /// `classifyViaSwiftFallback` inside BASRedTeamBatchClassifier
+    /// only emits Product matches — piping that into a BadTone
+    /// filter silently drops every BadTone violation)。
+    /// Pre-chapter-891 behavior: silent data loss on Rust failure。
     public static func lintViaRust(
         inputs: [String]
     ) -> [BASBadToneLinter.Violation] {
-        // Reuse the shared classifier — it already returns
-        // matches for all 30 RedLineIds (chapter 887 ALL)。
-        let allMatches = BASRedTeamBatchClassifier.classify(
-            prompts: inputs)
-        // Filter to BadTone matches only (high nibble == 0x4
-        // per chapter 887 discriminant layout)。
+        // chapter 891 HIGH-1 fix: call Rust-only variant so we
+        // can detect failure。
+        guard let allMatches =
+            BASRedTeamBatchClassifier
+                .classifyViaRustOrNil(prompts: inputs)
+        else {
+            // Rust C ABI failed (wire parse fail / unavailable
+            // / non-Apple)。 The BadTone-aware Swift fallback
+            // owns the correct behavior for THIS lint surface。
+            return BASBadToneLinter.lintViaSwiftFallback(
+                inputs: inputs)
+        }
+        // Rust succeeded — filter to BadTone matches only
+        // (high nibble == 0x4 per chapter 887 discriminant)。
         var violations: [BASBadToneLinter.Violation] = []
         violations.reserveCapacity(allMatches.count / 5)
         for match in allMatches {

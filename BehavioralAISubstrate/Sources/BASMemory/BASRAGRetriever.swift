@@ -296,14 +296,49 @@ public enum BASRAGRetriever {
         k: Int = BASRAGRetriever.defaultTopK,
         extraReasonCodes: [String] = []
     ) -> BASRAGResult {
+        // chapter 八百九十一 / M3145 HIGH-2 fix:`candidates.prefix(
+        // k)` TRAPS on negative k with「Can't take a prefix of
+        // negative length」。 Clamp + emit a distinct reason code
+        // so audit trails can distinguish「host passed bad k」 from
+        // 「no candidates」。
+        let safeK = max(0, k)
         var reasonCodes: [String] = [
             "\(reasonCodePrefix):sync-resolve",
-            "\(reasonCodePrefix):k:\(k)"
+            "\(reasonCodePrefix):k:\(safeK)"
         ]
+        if k < 0 {
+            reasonCodes.append(
+                "\(reasonCodePrefix):k-clamped-from-negative")
+        }
         reasonCodes.append(contentsOf: extraReasonCodes)
-        // Apply k limit
-        let selected = candidates.prefix(k)
+        // chapter 八百九十一 / M3145 MEDIUM-2 fix:distinguish
+        // 「caller passed empty candidates」 from 「caller passed
+        // safeK == 0 with non-empty candidates」 so the audit
+        // surface can tell them apart。
+        if candidates.isEmpty {
+            reasonCodes.append(
+                "\(reasonCodePrefix):no-candidates")
+            return BASRAGResult(
+                atoms: [],
+                scores: [:],
+                staleAtomIDs: [],
+                reasonCodes: reasonCodes)
+        }
+        if safeK == 0 {
+            reasonCodes.append(
+                "\(reasonCodePrefix):k-zero-truncated")
+            return BASRAGResult(
+                atoms: [],
+                scores: [:],
+                staleAtomIDs: [],
+                reasonCodes: reasonCodes)
+        }
+        // Apply k limit (safe — both bounds positive)
+        let selected = candidates.prefix(safeK)
         if selected.isEmpty {
+            // Shouldn't reach here given the two guards above,
+            // but defensive: any future code change that breaks
+            // the invariant falls through to this same surface。
             reasonCodes.append(
                 "\(reasonCodePrefix):no-candidates")
             return BASRAGResult(

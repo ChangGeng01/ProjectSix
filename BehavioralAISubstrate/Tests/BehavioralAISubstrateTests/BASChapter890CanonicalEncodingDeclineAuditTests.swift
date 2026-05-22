@@ -49,11 +49,29 @@ final class BASChapter890CanonicalEncodingDeclineAuditTests:
 
     /// PIN: the decline reasoning is correct per chapter 881
     /// string-FFI cost lessons。
+    ///
+    /// chapter 八百九十一 / M3145 HIGH-3 fix from cross-arc
+    /// review:the prior「chapter 881 measured ~600 ns per
+    /// string」 citation was a FABRICATED number — chapter 881's
+    /// commit body + audit tests never establish that figure,
+    /// only the qualitative「Swift wins 2-3×」 verdict。 Honest
+    /// fix:rename to `extrapolatedFFICostHeuristic` + document
+    /// it as a rough estimate divided down from ch 881's
+    /// 10K×1K=4.62ms total (4.62ms / 11K strings ≈ 420 ns/string,
+    /// rounded conservatively to 600 ns/string for the
+    /// extrapolation),NOT a measured chapter 881 number。
     func testDeclineReasoningStandsUp() {
-        // Chapter 881 measured ~600 ns per string FFI encode/decode
-        // at typical sizes (extrapolated from 10K×1K = 4.62ms
-        // for ~11K strings)。
-        let chapter881FFIPerString: Double = 600.0
+        // EXTRAPOLATED heuristic (not measured in ch 881):
+        // 10K records × 1K targets ≈ 11K total strings
+        // ÷ Rust path total 4.62ms ≈ 420 ns/string min
+        // → rounded conservatively to 600 ns/string for
+        //   the chapter 890 cost-comparison heuristic。
+        // A future chapter that wants tight numbers should
+        // run a dedicated per-string-FFI bench (currently no
+        // such measurement exists in the substrate)。
+        let extrapolatedFFIPerStringHeuristic: Double = 600.0
+        let chapter881FFIPerString =
+            extrapolatedFFIPerStringHeuristic
         // canonicalEncoding has 2N strings per call where N =
         // pairs (outer keys + inner keys × values are all
         // serialized)。 Roughly 2 strings per pair (key + value)

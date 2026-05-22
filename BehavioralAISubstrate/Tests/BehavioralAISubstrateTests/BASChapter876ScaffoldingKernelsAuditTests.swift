@@ -30,6 +30,19 @@ import XCTest
 
 final class BASChapter876ScaffoldingKernelsAuditTests: XCTestCase {
 
+    /// chapter 八百九十一 / M3145 SERIOUS-3 fix from self-assess
+    /// review: in-body mutation of `BASVectorIndex.useBatchedTopK
+    /// = false / = true` without tearDown is the same anti-pattern
+    /// chapters 718/729/727 explicitly fixed。 If any XCTAssert
+    /// between the toggles traps,the global static leaks `false`
+    /// into the rest of the sweep。 Defensive tearDown restores
+    /// the production default (true) so subsequent tests are
+    /// unaffected。
+    override func tearDown() async throws {
+        BASVectorIndex.useBatchedTopK = true
+        try await super.tearDown()
+    }
+
     // MARK: - Arc 871-876 outcome summary pin
 
     /// Pins the arc's chapter-by-chapter outcome。 Future

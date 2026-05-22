@@ -247,6 +247,27 @@ public struct BASEvolutionLifecycleStructuralFingerprint:
 
     /// Canonical encoding for hashing. Sorted by stage then action
     /// to be order-independent.
+    ///
+    /// chapter 八百九十 / M3140 — DECLINE-WITH-TRIGGER: discovery
+    /// agent flagged this function as a MED-confidence Rust
+    /// migration candidate。 LIVE measurement on Mac mini
+    /// 2026-05-23:
+    ///   small  (4 × 3 = 12 pairs):   10,678 ns (~10.7 μs)
+    ///   medium (8 × 6 = 48 pairs):   37,887 ns (~37.9 μs)
+    ///   large  (16 × 12 = 192 pairs): 173,453 ns (~173 μs)
+    /// Verdict: DECLINE per chapter 881 string-FFI cost pattern。
+    /// Migrating would require serializing nested
+    /// [String:[String:String]] dict across FFI = 2N string
+    /// encodings;extrapolated FFI ser cost (heuristic from ch
+    /// 881 Rust 4.62ms / 11K strings) exceeds Swift TOTAL at
+    /// every measured size。 Migration would be NET NEGATIVE。
+    ///
+    /// Trigger conditions for future re-eval (per
+    /// `BASChapter890CanonicalEncodingDeclineAuditTests`):
+    ///   - A: flat-buffer L13 fingerprint representation (no
+    ///     per-string FFI)
+    ///   - B: numeric ID encoding extends to L13 fingerprints
+    ///   - C: production L13 volume dominates turn-loop profiling
     public static func canonicalEncoding(
         matrix: [String: [String: String]]
     ) -> String {

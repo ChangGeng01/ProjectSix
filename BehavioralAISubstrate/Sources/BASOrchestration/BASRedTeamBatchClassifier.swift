@@ -194,13 +194,40 @@ public enum BASRedTeamBatchClassifier {
     ///      pattern_index u32}  (12 bytes/match)
     ///   - red_line_id high nibble decodes the category:
     ///     0x00..0x0F → Cthulhu (0),0x10..0x1F → Kunlun (1),
-    ///     0x20..0x2F → Product (2),0x30..0x3F → BR-014 (3)
+    ///     0x20..0x2F → Product (2),0x30..0x3F → BR-014 (3),
+    ///     0x40..0x4F → BadTone (4,chapter 八百八十七)
     ///
     /// Two-phase capacity discovery:probe with NULL/0 to get
     /// required size,allocate,call again。
     internal static func classifyViaRust(
         prompts: [String]
     ) -> [BASRedLineMatch] {
+        if let rustOnly =
+            classifyViaRustOrNil(prompts: prompts)
+        {
+            return rustOnly
+        }
+        return classifyViaSwiftFallback(prompts: prompts)
+    }
+
+    /// chapter 八百九十一 / M3145 — Rust-only variant returning
+    /// nil on FAILURE (Rust C ABI unavailable / wire parse fail /
+    /// short write)。 Caller can then choose its own fallback path
+    /// — critically important for callers like
+    /// `BASBadToneLintBridge` (chapter 888) whose Swift fallback
+    /// must include BadTone IDs (the legacy
+    /// `classifyViaSwiftFallback` only emits Product matches,so
+    /// piping it into a BadTone-only filter silently drops every
+    /// BadTone violation — HIGH-1 from chapter 891 16th-pass
+    /// review)。
+    ///
+    /// Returns:
+    ///   - non-nil `[BASRedLineMatch]` on Rust success (may be
+    ///     empty if no violations)
+    ///   - nil on Rust failure or non-Apple platforms
+    public static func classifyViaRustOrNil(
+        prompts: [String]
+    ) -> [BASRedLineMatch]? {
         #if os(iOS) || os(macOS)
         // Encode prompts wire format
         let promptsWire = encodePromptsWire(prompts)
@@ -213,9 +240,8 @@ public enum BASRedTeamBatchClassifier {
                 nil, 0)
         }
         if required < 0 {
-            // Wire format parse fail or null guard fired —
-            // fall back defensively。
-            return classifyViaSwiftFallback(prompts: prompts)
+            // Wire format parse fail or null guard fired
+            return nil
         }
 
         // Allocate + call again to write matches
@@ -230,12 +256,11 @@ public enum BASRedTeamBatchClassifier {
             }
         }
         if written != required {
-            return classifyViaSwiftFallback(prompts: prompts)
+            return nil
         }
-
         return decodeMatchesWire(outBuf)
         #else
-        return classifyViaSwiftFallback(prompts: prompts)
+        return nil
         #endif
     }
 

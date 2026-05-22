@@ -133,6 +133,70 @@ public struct BASCognitiveOSBundleOptions: Codable, Sendable, Equatable {
     /// Default options:everything disabled (ADR-014 OPT-IN
     /// — pre-M859 hosts see this as zero behavior change)。
     public static let allDisabled = BASCognitiveOSBundleOptions()
+
+    // MARK: - Backward-compat Codable (chapter 八百九十一 / M3145
+    //         HIGH-1 fix from cross-arc review)
+
+    /// chapter 八百九十一 / M3145 HIGH-1 fix:chapter 882 added
+    /// `enableRAGRetrieval: Bool` as a non-Optional field with
+    /// `= false` default ONLY on the manual init。 The synthesized
+    /// `Codable.init(from:)` ignores manual-init defaults + would
+    /// THROW `keyNotFound("enableRAGRetrieval")` decoding any
+    /// pre-ch-882 persisted Options JSON — a real backward-compat
+    /// break for hosts that serialize Options (e.g。 chapter
+    /// 七百三十 BASHostKitNonProjectionCodableExtensionArcSealed
+    /// Doctrine surface)。
+    ///
+    /// This custom decoder uses `decodeIfPresent(...) ?? defaultValue`
+    /// for every field so:
+    ///   - Pre-ch-882 JSON (missing enableRAGRetrieval) → field
+    ///     defaults to false。 Loads cleanly,zero behavior change。
+    ///   - Future ch added fields → same pattern,no synthesized
+    ///     decoder needed,no schemaVersion bump for additive flags。
+    private enum CodingKeys: String, CodingKey {
+        case enableEventLog
+        case eventLogSQLiteURL
+        case enableUserState
+        case userStateSQLiteURL
+        case enableVectorIndex
+        case vectorIndexSQLiteURL
+        case enableKnowledgeGraph
+        case knowledgeGraphSQLiteURL
+        case enableRAGRetrieval
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(
+            keyedBy: CodingKeys.self)
+        self.enableEventLog = try c.decodeIfPresent(
+            Bool.self,
+            forKey: .enableEventLog) ?? false
+        self.eventLogSQLiteURL = try c.decodeIfPresent(
+            URL.self,
+            forKey: .eventLogSQLiteURL)
+        self.enableUserState = try c.decodeIfPresent(
+            Bool.self,
+            forKey: .enableUserState) ?? false
+        self.userStateSQLiteURL = try c.decodeIfPresent(
+            URL.self,
+            forKey: .userStateSQLiteURL)
+        self.enableVectorIndex = try c.decodeIfPresent(
+            Bool.self,
+            forKey: .enableVectorIndex) ?? false
+        self.vectorIndexSQLiteURL = try c.decodeIfPresent(
+            URL.self,
+            forKey: .vectorIndexSQLiteURL)
+        self.enableKnowledgeGraph = try c.decodeIfPresent(
+            Bool.self,
+            forKey: .enableKnowledgeGraph) ?? false
+        self.knowledgeGraphSQLiteURL =
+            try c.decodeIfPresent(
+                URL.self,
+                forKey: .knowledgeGraphSQLiteURL)
+        self.enableRAGRetrieval = try c.decodeIfPresent(
+            Bool.self,
+            forKey: .enableRAGRetrieval) ?? false
+    }
 }
 
 // MARK: - Bundle

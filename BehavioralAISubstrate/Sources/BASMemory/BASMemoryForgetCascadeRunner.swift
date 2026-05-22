@@ -182,7 +182,21 @@ public struct BASMemoryForgetCascadeRunner: Sendable {
     ///
     /// Trigger conditions for future re-evaluation:
     ///   (a) Batched-cascade API where N cascades amortize the
-    ///       FFI hop in a single call
+    ///       FFI hop in a single call。
+    ///       **Chapter 八百八十五 / M3115 status update**:
+    ///       implemented as `forget_cascade_filter_batch_rayon`
+    ///       in `bas-retrieval-ranker/src/forget_cascade.rs`
+    ///       (pure-Rust crate-level)。 Measurement: rayon CAN win
+    ///       at batch ≥ ~512 cascades per call (2.69× over
+    ///       sequential at batch=1024,2.28× over Swift)。 But
+    ///       the substrate processes ONE cascade per turn — no
+    ///       batching consumer exists。 Crate-level Rust kernel
+    ///       SHIPPED + audit pin + 3 consumer-side triggers
+    ///       documented (see `BASChapter885
+    ///       BatchedCascadePendingConsumerAuditTests`)。 Net
+    ///       result for trigger (a):partially satisfied (Rust
+    ///       infra exists) but consumer-pressure trigger not
+    ///       fired,so per-call default stays Swift。
     ///   (b) Numeric ID encoding (UInt64 not String) — removes
     ///       UTF-8 encode/decode work
     ///   (c) Forget cascade sizes exceed 100K × 10K (orders

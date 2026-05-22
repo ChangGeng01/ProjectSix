@@ -7,7 +7,95 @@ Consumer-shaped release notes。 For substrate-internal chapter history see
 
 ---
 
-## v0.62.1 (UNRELEASED, on `main` post-tag `v0.62.0`)
+## v0.62.3 — 2026-05-23 — Discovery-driven extensions + BadTone Rust flip
+
+**Theme**: Discovery agent post-v0.62.2 surfaced
+`BASBadToneLinter` as the HIGH-confidence remaining Swift→Rust
+migration candidate。 Chapters 八百八十五-八百八十九 ship the flip。
+
+### What changed for consumers
+
+- **BASBadToneLinter.lint() routes through Rust by default**
+  (chapter 888): on iOS / macOS the production default is now
+  the Rust path via `BASBadToneLintBridge.lintViaRust`。 LIVE
+  measurement (chapter 889): Rust 7.32-7.45× faster than Swift
+  across input batch sizes 10/100/1000。 Swift fallback preserved
+  as `lintViaSwiftFallback` for watchOS / Linux + opt-out。
+- **NEW `BASRAGRetriever.resolveCandidatesSync(...)`** (chapter
+  886): sync Stage-4 helper for the RAG pipeline。 Hosts that
+  pre-compute embeddings + top-k candidates can resolve atoms
+  synchronously without async boundaries (closes chapter 883
+  Trigger C decline)。
+- **NEW Rust crate-level `forget_cascade_filter_batch_rayon`**
+  (chapter 885): pure-Rust batched cascade kernel for future
+  consumers that batch ≥ 512 cascades per call。 No FFI yet —
+  awaits consumer pressure (DECLINE-PENDING-CONSUMER per
+  ch 874/875 pattern)。
+- **`bas-red-team-bench` extended with BadTone category**
+  (chapter 887): RedLineId::ALL bumped 24 → 30, +23 forbidden
+  substrings, XCFramework rebuilt。
+
+### Action required for upgrade
+
+- **None for default callers** — Rust + Swift produce byte-
+  equal violations (pinned by chapter 891 全23 substring test)。
+- **For callers who depend on Swift iteration order** (rule-
+  major within prompt): switch from
+  `BASBadToneLinter.lint(...)` to `BASBadToneLinter
+  .lintViaSwiftFallback(...)` explicitly。
+- **For callers of `BASRedTeamBatchClassifier.classify(...)`**:
+  output now also includes BadTone matches (0x40-0x45)。 The
+  decoder defensively handles unknown IDs (chapter 759 V1 ABI
+  design),so this is non-breaking,but add a `default:` or
+  `case 0x40 ... 0x45:` arm if you switch on `redLineId`。
+
+---
+
+## v0.62.2 — 2026-05-23 — 5-gap audit + Gap 2 RAG carrier
+
+**Theme**: User-surfaced 5 architectural gaps after v0.62.1
+ship。 User-selected scope:「Gaps 2+3 ship,Gaps 1+4+5 DECLINE」。
+
+### What changed for consumers
+
+- **NEW `BASCognitiveOSBundleOptions.enableRAGRetrieval: Bool
+  = false`** flag + **NEW `BASCognitiveOSBundle.embeddingProvider:
+  (any BASMemory.BASEmbeddingProvider)?`** slot (chapter 882
+  Gap 2 carrier)。 ADR-014 OPT-IN — default false preserves
+  pre-v0.62.2 behavior。
+- **NEW `BASCognitiveOSBuilder.build(options:embeddingProvider:)`**
+  overload accepts host-supplied embedding provider。 Existing
+  `build(options:)` overload preserved + delegates with `nil`。
+- **Gap 3 forget cascade Rust path stays OFF** (chapter 881
+  measured DECLINE — Swift Set wins 2-3× at every production
+  size 10×1 → 10K×1K)。 No consumer change required。
+- **Gap 2 wiring deferred** (chapter 883 DECLINE — async/sync
+  protocol mismatch requires substrate-wide refactor;chapter
+  886's `resolveCandidatesSync` is the side-step path)。
+- **Gaps 1+4+5 DECLINE-WITH-TRIGGER** (chapter 884 audit —
+  Rust SQLite ownership + Provenance lineage ledger + Sharded
+  multi-writer all declined with per-gap trigger conditions
+  documented)。
+
+### Action required for upgrade
+
+- **None for default callers** — all changes additive。
+- **For callers that persist `BASCognitiveOSBundleOptions`
+  as JSON** (e.g。 chapter 七百三十 Codable surface): chapter
+  891 added a custom `init(from:)` using `decodeIfPresent ??
+  false` for every field — pre-v0.62.2 JSON loads cleanly。
+  Pre-chapter-891 had a backward-compat bug (synthesized
+  decoder would throw `keyNotFound("enableRAGRetrieval")` on
+  old payloads)。 Upgrade to v0.62.3+ to get the fix。
+
+---
+
+## v0.62.1 — 2026-05-23 — 全面收尾 — CHUNK_ROWS wiring + release docs
+
+**Theme**: Deliver the chapter 879 promised CHUNK_ROWS contract
++ ship consumer-shaped release docs。
+
+### What changed for consumers
 
 **Theme**: 全面收尾 — fulfill chapter 八百七十九's CHUNK_ROWS forwarding
 promise + ship release docs。
