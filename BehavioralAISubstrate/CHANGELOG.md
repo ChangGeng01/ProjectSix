@@ -11,6 +11,69 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 883 Trigger C — sync resolveCandidatesSync helper shipped (chapter 八百八十六 / M3120)
+
+Chapter 八百八十三 DECLINED wiring the full async `BASRAGRetriever
+.retrieve(...)` through `BASHostRuntimeEBrainMemoryService
+.retrieve()` because the substrate contract is sync (chain:
+sync MemoryServicing → async RAGRetriever → sync runTurn = breaking
+substrate-wide refactor)。
+
+Chapter 883 Trigger C said: 「BASRAGRetriever ships a SYNC variant」
+that removes the async dependency from the substrate side。 Chapter
+八百八十六 SHIPS that variant — `resolveCandidatesSync` — covering
+RAG Stage 4 (atom-ID → atom materialization) synchronously。
+
+#### Knives shipped
+
+1. **NEW `BASRAGRetriever.resolveCandidatesSync(...)`**: takes
+   precomputed `[BASVectorTopKResult]` candidates + a sync
+   `(String) -> BASMemoryAtom?` atom lookup closure + `k` limit
+   + extra reason codes。 Returns `BASRAGResult` with atoms +
+   scores + staleAtomIDs + reason codes。 Caller is responsible
+   for Stages 1-3 (async: embed query + topK vector search +
+   rerank);chapter 886 owns Stage 4 sync resolution。
+
+2. **NEW `BASChapter886SyncResolveCandidatesTests.swift`** (6
+   tests):
+   - Atoms + scores populated from candidate list
+   - Stale IDs captured when lookup returns nil
+   - k limit truncates correctly
+   - Empty candidates → empty result + no-candidates reason code
+   - Reason codes shape (sync-resolve + k:N + resolved:N + stale:N
+     + extraReasonCodes propagation)
+   - Determinism across invocations (byte-equal)
+
+#### What chapter 886 unblocks
+
+Chapter 八百八十七 can now wire `BASHostRuntimeEBrainMemoryService
+.retrieve()` through `resolveCandidatesSync(...)` when:
+1. `bundle.embeddingProvider != nil` (chapter 882 carrier)
+2. `bundle.vectorIndex != nil`
+3. `bundle.enableRAGRetrieval == true`
+4. A future `BASEBrainTurnRequest.precomputedRAGCandidates` field
+   carries the pre-computed candidates (host owns the async work)
+
+The async Stage 1+2 (embed + topK) happen OUTSIDE the sync
+MemoryService — host calls embed + topK before runTurn,passes
+candidates into the request,MemoryService.retrieve() calls the
+sync Stage 4 helper。 Chapter 883 DECLINE remains for the full
+async-chain refactor (still not worth substrate-wide breaking
+change)。
+
+#### Verification
+
+   swift test --filter BASChapter886: 6/6 PASS
+   swift test (FULL SWEEP):           13,422 / 105 skipped / 0 failures
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 885: +6 tests,no schemaVersion bump,no
+Cargo/Rust change,no XCFramework rebuild。 Pure-Swift additive
+expansion of `BASRAGRetriever` namespace。
+
+---
+
 ### Chapter 881 Trigger A experiment — batched-cascade rayon CAN win at batch ≥ 1024, DECLINE-PENDING-CONSUMER (chapter 八百八十五 / M3115)
 
 Chapter 881 DECLINED the forget cascade Rust path because Swift

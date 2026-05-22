@@ -251,4 +251,91 @@ public enum BASRAGRetriever {
             staleAtomIDs: stale,
             reasonCodes: reasonCodes)
     }
+
+    // MARK: - chapter 八百八十六 / M3120 — sync resolution helper
+    //         (chapter 883 Trigger C path)
+
+    /// chapter 八百八十六 / M3120 — sync resolution helper that
+    /// completes Stage 4 of the RAG pipeline (atom ID → atom
+    /// materialization) WITHOUT requiring async boundaries。
+    ///
+    /// Purpose: chapter 八百八十三 DECLINED wiring the full async
+    /// `retrieve(...)` method through `BASHostRuntimeEBrainMemory
+    /// Service.retrieve()` because that contract is sync。 Trigger
+    /// C from chapter 883 said 「BASRAGRetriever ships a SYNC
+    /// variant」 → this is that ship。
+    ///
+    /// The caller (host or runtime composition root) is responsible
+    /// for the async stages:
+    ///   - Stage 1: embed query (async via `BASEmbeddingProvider`)
+    ///   - Stage 2: top-k vector search (async via `BASVectorIndex`
+    ///              actor's `topK`)
+    ///   - Stage 3: rerank (optional;async if learned)
+    ///
+    /// This helper does ONLY:
+    ///   - Stage 4 sync atom-ID → atom resolution via a sync closure
+    ///     (caller supplies a `Dictionary<String, BASMemoryAtom>`
+    ///     wrapper or any other sync lookup)
+    ///   - Stale atom tracking
+    ///   - Reason-code emission
+    ///   - BASRAGResult construction
+    ///
+    /// Byte-equality with the full async `retrieve(...)` is held
+    /// WHEN the caller passes the same precomputed candidates +
+    /// the same atom lookup (sync wrapper that returns the same
+    /// values the async lookup would have)。 The candidate order +
+    /// score map + stale tracking + reasonCodes shape match。
+    ///
+    /// Use case: substrate's `BASHostRuntimeEBrainMemoryService.
+    /// retrieve()` can call this once the carrier (chapter 882)
+    /// + a future precomputed-candidates request field (chapter
+    /// 八百八十七 scope) are wired through。
+    public static func resolveCandidatesSync(
+        candidates: [BASVectorTopKResult],
+        atomLookupSync: (String) -> BASMemoryAtom?,
+        k: Int = BASRAGRetriever.defaultTopK,
+        extraReasonCodes: [String] = []
+    ) -> BASRAGResult {
+        var reasonCodes: [String] = [
+            "\(reasonCodePrefix):sync-resolve",
+            "\(reasonCodePrefix):k:\(k)"
+        ]
+        reasonCodes.append(contentsOf: extraReasonCodes)
+        // Apply k limit
+        let selected = candidates.prefix(k)
+        if selected.isEmpty {
+            reasonCodes.append(
+                "\(reasonCodePrefix):no-candidates")
+            return BASRAGResult(
+                atoms: [],
+                scores: [:],
+                staleAtomIDs: [],
+                reasonCodes: reasonCodes)
+        }
+        // Stage 4: sync atom-ID resolution
+        var atoms: [BASMemoryAtom] = []
+        var scoreMap: [String: Float] = [:]
+        var stale: [String] = []
+        atoms.reserveCapacity(selected.count)
+        scoreMap.reserveCapacity(selected.count)
+        for candidate in selected {
+            if let atom = atomLookupSync(candidate.atomID) {
+                atoms.append(atom)
+                scoreMap[candidate.atomID] = candidate.score
+            } else {
+                stale.append(candidate.atomID)
+            }
+        }
+        reasonCodes.append(
+            "\(reasonCodePrefix):resolved:\(atoms.count)")
+        if !stale.isEmpty {
+            reasonCodes.append(
+                "\(reasonCodePrefix):stale:\(stale.count)")
+        }
+        return BASRAGResult(
+            atoms: atoms,
+            scores: scoreMap,
+            staleAtomIDs: stale,
+            reasonCodes: reasonCodes)
+    }
 }
