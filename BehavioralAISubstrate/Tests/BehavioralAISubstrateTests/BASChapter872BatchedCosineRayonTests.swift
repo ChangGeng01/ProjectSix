@@ -1,11 +1,19 @@
 // MARK: - BASChapter872BatchedCosineRayonTests
 // chapter 八百七十二 / M3026 — BASVectorIndex Rust+rayon completion。
 //
-// Closes the chapter 七百十八 partial migration:
-//   - Per-pair scoring still in Swift loop (BASVectorIndex.topK
-//     when useBatchedTopK=false,which is current default)
-//   - Batched fast-path is opt-in (useBatchedTopK=true) and uses
-//     sequential SIMD bas_ranker_batched_cosine_simd
+// Closes the chapter 七百十八 partial migration (PRE-chapter 872
+// state — useBatchedTopK was false default,batched path was
+// opt-in。 Chapter 872 itself FLIPPED default to true post-knife-6
+// — see history below):
+//   - Per-pair scoring (pre-chapter-872 default) was Swift loop
+//     (BASVectorIndex.topK,O(N) FFI hops via per-pair Rust call)
+//   - Batched fast-path was opt-in,used sequential SIMD
+//     bas_ranker_batched_cosine_simd
+//   - Chapter 八百七十八.5 retroactive doc fix:original file
+//     header said「useBatchedTopK=false,which is current default」
+//     — that was true at draft time but stale immediately when
+//     chapter 872 knife 6 flipped the default to true。 Now
+//     describes the PRE-chapter-872 state explicitly。
 //
 // Chapter 八百七十二 adds the rayon parallel path:
 //   - NEW bas_ranker_batched_cosine_simd_rayon C ABI (par_chunks

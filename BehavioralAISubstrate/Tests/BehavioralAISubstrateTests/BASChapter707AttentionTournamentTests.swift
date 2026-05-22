@@ -32,6 +32,22 @@ final class BASChapter707AttentionTournamentTests:
     XCTestCase
 {
 
+    /// Chapter 八百七十八.5 / M3076 — actually save CI time by
+    /// skipping all tests in this class (chapter 八百六十八 has
+    /// asserted-bench replacement;keeping file for historical
+    /// reference per chapter 868 testChapter707TournamentStillReachable
+    /// pin)。 Tests are now no-op skips — print-only output that
+    /// the chapter 七百七 narrative documented is preserved in
+    /// the source code but no longer consumes CI runtime。
+    /// Future cleanup chapter can fully archive。
+    override func setUp() async throws {
+        try await super.setUp()
+        throw XCTSkip(
+            "Chapter 八百七十八.5 deprecation skip — " +
+            "superseded by BASChapter868FlashAttentionAssertedBenchmarkTests。" +
+            " Print-only output not asserting anything,no CI value。")
+    }
+
     /// Swift CPU reference — naive O(M*N*D) implementation。
     /// Used as the "always correct, but slow" contestant in
     /// the tournament + as the verification ground truth。

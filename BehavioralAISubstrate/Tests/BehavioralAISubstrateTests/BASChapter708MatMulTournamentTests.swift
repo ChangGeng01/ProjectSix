@@ -33,6 +33,17 @@ final class BASChapter708MatMulTournamentTests:
     XCTestCase
 {
 
+    /// Chapter 八百七十八.5 / M3076 — deprecation-skip per chapter
+    /// 707 pattern。 Chapter 871 has asserted-bench replacement
+    /// (BASChapter871MatMul5WayBenchmarkTests + parity tests)。
+    override func setUp() async throws {
+        try await super.setUp()
+        throw XCTSkip(
+            "Chapter 八百七十八.5 deprecation skip — " +
+            "superseded by BASChapter871MatMul5WayBenchmarkTests" +
+            " + BASChapter871BrainMPSGraphMatMulParityTests。")
+    }
+
     /// Generate deterministic pseudo-random matrices for the
     /// tournament。 Same seed → same matrices,so re-runs are
     /// stable。

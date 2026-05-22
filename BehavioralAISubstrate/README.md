@@ -69,7 +69,14 @@ documented at the bottom of this README。
 - `BASRuntimeCore.BASAutoRouteRanker`: per-op routing decisions
   with measured M-series defaults。 Public threshold struct
   `BASAutoRouteThresholds` (Codable schema v3 post chapter 八百七十七)
-  is host-overridable for per-device tuning。
+  is host-overridable for per-device tuning。 **Migration note:**
+  existing v2 on-device calibration caches are NOT breaking-
+  upgraded — the v3 schema decoder rejects v2 with
+  `.staleCache(reason: "schema version mismatch")` and the host
+  re-calibrates on next launch (graceful degradation per
+  `BASAutoRouteCalibrationStore.validate(...)`)。 No host-code
+  change required;the first post-upgrade launch is slightly
+  slower while calibration runs。
 
 ### Admin + debug surfaces (opt-in)
 

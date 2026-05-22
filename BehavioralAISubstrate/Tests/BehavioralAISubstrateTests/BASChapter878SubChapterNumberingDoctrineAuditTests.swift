@@ -1,4 +1,4 @@
-// MARK: - BASChapter878SubChapterNumberingDoctrineTests
+// MARK: - BASChapter878SubChapterNumberingDoctrineAuditTests
 // chapter 八百七十八 / M3070 — sub-chapter (decimal) numbering
 // doctrine pin。
 //
@@ -20,10 +20,17 @@
 // 2. First fix-of-fix sub-chapter = .5 (chapter 877.5)
 // 3. Second fix-of-fix sub-chapter = .6 (chapter 877.6)
 // 4. Third+ = .7,.8,etc — DON'T go past .9
-// 5. If the discipline calls for >5 fix-sub-chapters,that's a
-//    signal to ship them as a SEPARATE numbered chapter
-//    (e.g. chapter 878 for arc 877 fixes,not 877.5 + 877.6 +
-//    877.7 + 877.8 + 877.9)
+// 5. If the discipline needs MORE THAN .9 worth of fix-sub-chapters
+//    (i.e. would require .a or .b suffix in hex,or >5 .5/.6/.7/
+//    .8/.9 sub-chapters),that's a signal to ship as a SEPARATE
+//    numbered chapter (e.g. chapter 878 for arc 877 cross-arc
+//    review fixes,not 877.5 + 877.6 + 877.7 + 877.8 + 877.9 +
+//    877.a)。 This applies to SUB-CHAPTER COUNT not fix-item count
+//    within a single chapter — chapter 878 itself is allowed to
+//    ship 8 self-assessment fixes + 3 9th-pass HIGHs inline because
+//    those are SINGLE-CHAPTER scope items,not separate sub-chapters。
+//    Chapter 八百七十八.5 10th-pass review caught this ambiguity in
+//    the original Rule 5 wording。
 // 6. Review-dispatch and review-fix can share the same .5/.6
 //    suffix BUT must have different M-numbers (e.g. M3051 for
 //    the review dispatch,M3055 for the fixes that result)
@@ -36,7 +43,7 @@
 
 import XCTest
 
-final class BASChapter878SubChapterNumberingDoctrineTests:
+final class BASChapter878SubChapterNumberingDoctrineAuditTests:
     XCTestCase
 {
 
@@ -50,9 +57,13 @@ final class BASChapter878SubChapterNumberingDoctrineTests:
             "Rule 3: Second fix-of-fix sub-chapter = .6 " +
                 "(chapter 877.6)",
             "Rule 4: Third+ = .7, .8, etc — DON'T go past .9",
-            "Rule 5: If discipline needs > 5 fix-sub-chapters, " +
-                "ship as SEPARATE numbered chapter (878 not " +
-                "877.5+877.6+877.7+877.8+877.9)",
+            "Rule 5: If discipline needs more than .9 worth of " +
+                "fix-sub-chapters (more than 5 sub-suffixes for " +
+                "one parent chapter), ship as SEPARATE numbered " +
+                "chapter (chapter 878 for arc 877 cross-arc " +
+                "review fixes, not 877.5+877.6+877.7+877.8+" +
+                "877.9+877.a). Applies to SUB-CHAPTER COUNT, " +
+                "not fix-item count within one chapter.",
             "Rule 6: Review-dispatch + review-fix can share " +
                 ".5/.6 suffix but must have different M-numbers",
             "Rule 7: Each sub-chapter still gets own ledger " +

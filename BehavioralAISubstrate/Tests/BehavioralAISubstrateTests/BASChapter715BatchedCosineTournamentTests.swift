@@ -38,6 +38,18 @@ import BASRustMemoryTrackerBinary
 final class BASChapter715BatchedCosineTournamentTests:
     XCTestCase
 {
+    /// Chapter 八百七十八.5 / M3076 — deprecation-skip per chapter
+    /// 707 pattern。 Chapter 872 has asserted-bench replacement
+    /// (BASChapter872BatchedCosineRayonTests with 268-490× win
+    /// over Swift per-pair)。
+    override func setUp() async throws {
+        try await super.setUp()
+        throw XCTSkip(
+            "Chapter 八百七十八.5 deprecation skip — " +
+            "superseded by BASChapter872BatchedCosineRayonTests" +
+            " (asserted 3-way bench with rayon chunked v2)。")
+    }
+
     #if os(iOS) || os(macOS)
 
     private static func makeDispatcher()

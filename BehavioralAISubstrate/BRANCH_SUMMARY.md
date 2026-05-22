@@ -476,6 +476,34 @@ chapter 八百七十八: ~87% Swift / 13.4% native
                   STILL catches items after 全量 4-agent
                   cross-arc review. Discipline ledger keeps
                   surfacing real bugs across review scopes.)
+chapter 八百七十八.5: ~87% Swift / 13.4% native
+                  (10th-pass review fixes per 「满意为止」.
+                  10th-pass on chapter 878 caught 2 NEW
+                  HIGH + 3 MED + 4 LOW:
+                  - HIGH 1: chapter 878 sweep count
+                    contradiction (claimed 13,374 but
+                    actual post-878 is 13,376 — same
+                    pattern 9th-pass caught in 877)
+                  - HIGH 2: doctrine Rule 5 trigger
+                    ambiguity (retro-legitimized wrong
+                    behavior)
+                  - MED 1: DEPRECATED annotations were
+                    no-op — added setUp() XCTSkip to
+                    chapter 707/708/715 → 14 print-only
+                    tests actually skip now (CI time saved)
+                  - MED 2: renamed sub-chapter doctrine
+                    test file to match *AuditTests pattern
+                  - MED 3: README schema v3 migration
+                    note added
+                  - LOW 1: chapter 872 file header
+                    stale comment fixed
+                  「Shoemaker's children」 pattern: 3rd
+                  round in a row a fix chapter made the
+                  same kind of error it was fixing. The
+                  discipline IS catching real bugs even
+                  10 passes deep. Test count post-878.5:
+                  13,376 / 45 skipped / 0 failures (+14
+                  skipped from deprecation gates).)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
