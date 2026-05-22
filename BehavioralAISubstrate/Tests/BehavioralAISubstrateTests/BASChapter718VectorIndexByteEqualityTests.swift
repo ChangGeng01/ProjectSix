@@ -27,8 +27,14 @@ final class BASChapter718VectorIndexByteEqualityTests:
     XCTestCase
 {
     override func tearDown() async throws {
+        // Chapter 八百七十六.5 / M3055 — restore production default
+        // (chapter 八百七十二 flipped useBatchedTopK to true)。
+        // The in-body cases that mutate these flags still set
+        // them explicitly within each test for byte-eq exercise,
+        // but tearDown must leave the GLOBAL default intact for
+        // subsequent test files。
         BASVectorIndex.useRoutedCosine = false
-        BASVectorIndex.useBatchedTopK = false
+        BASVectorIndex.useBatchedTopK = true
         try await super.tearDown()
     }
 

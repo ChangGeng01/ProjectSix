@@ -26,6 +26,7 @@
 import XCTest
 @testable import BASRuntimeCore
 @testable import BASHostKit
+@testable import BASMemory
 
 final class BASChapter876ScaffoldingKernelsAuditTests: XCTestCase {
 
@@ -160,11 +161,18 @@ final class BASChapter876ScaffoldingKernelsAuditTests: XCTestCase {
     }
 
     func testChapter872VectorIndexUseBatchedTopKDefaultsTrue() {
-        // Chapter 872 flipped useBatchedTopK default false→true
-        // Verify via the public static var
-        // (use full namespace to avoid pulling BASMemory import)
-        // Check via Mirror reflection or just by attempted use
-        // — for now,test the routing default
+        // Chapter 八百七十六.5 / M3055 — agent B 7th-pass review
+        // HIGH-1 caught that the prior test only pinned
+        // thresholds,not the actual default-flip。 Now pins
+        // BASVectorIndex.useBatchedTopK == true explicitly。
+        XCTAssertTrue(
+            BASVectorIndex.useBatchedTopK,
+            "Chapter 八百七十二 flipped BASVectorIndex." +
+            "useBatchedTopK default false→true (Rust batched " +
+            "is 268-490× faster than Swift per-pair)。 " +
+            "If this fails,verify the default wasn't " +
+            "reverted + that no stale tearDown in chapter " +
+            "718/729 tests is leaking false state。")
         let thresholds = BASAutoRouteThresholds.mSeriesDefault
         XCTAssertEqual(
             thresholds.batchedCosineRayonMinRows, 3000,
@@ -174,5 +182,71 @@ final class BASChapter876ScaffoldingKernelsAuditTests: XCTestCase {
             16_777_216,
             "Chapter 871 default MPSGraph actor threshold " +
             "= 16M (256³)")
+    }
+
+    // MARK: - Chapter 八百七十六.5 — VectorIndex end-to-end pin
+    //
+    // Agent B 7th-pass HIGH-3:chapter 872 byte-equality
+    // only verified raw C ABI parity at 1K corpus,which is
+    // BELOW the 3000 rayon threshold。 The public consumer-
+    // facing BASVectorIndex.topK with corpus ≥ 3000 was
+    // unverified end-to-end through the rayon path。
+
+    func testVectorIndexTopKByteEqAtRayonThresholdCorpus()
+        async throws
+    {
+        let dim = 64
+        let rows = 3500  // above 3000 rayon threshold
+        let k = 5
+        var rng: UInt32 = 0xCAFE_BABE
+        func next() -> Float {
+            rng = rng &* 1664525 &+ 1013904223
+            return Float(rng & 0xFFFF)
+                / Float(0xFFFF) - 0.5
+        }
+        let queryVec = (0..<dim).map { _ in next() }
+        let queryEmb = BASEmbedding(
+            vector: queryVec,
+            dimension: dim,
+            providerVersion: "test").normalized
+
+        let index = BASVectorIndex()
+        for i in 0..<rows {
+            let v = (0..<dim).map { _ in next() }
+            let e = BASEmbedding(
+                vector: v,
+                dimension: dim,
+                providerVersion: "test").normalized
+            try await index.insert(
+                BASVectorIndexEntry(
+                    atomID: "atom-\(i)",
+                    normalizedEmbedding: e,
+                    domain: "default"))
+        }
+
+        // Run with sequential (force off + then back to true)
+        BASVectorIndex.useBatchedTopK = false
+        let seqResults = await index.topK(
+            query: queryEmb, k: k)
+        BASVectorIndex.useBatchedTopK = true
+        let rayonResults = await index.topK(
+            query: queryEmb, k: k)
+
+        XCTAssertEqual(seqResults.count, k)
+        XCTAssertEqual(rayonResults.count, k)
+        // Same top-K atomIDs in same order
+        for i in 0..<k {
+            XCTAssertEqual(
+                seqResults[i].atomID,
+                rayonResults[i].atomID,
+                "top-\(i) atomID must match between seq " +
+                "and rayon paths at 3500-corpus")
+            XCTAssertEqual(
+                seqResults[i].score,
+                rayonResults[i].score,
+                accuracy: 1e-5,
+                "top-\(i) score must match within 1e-5 " +
+                "(byte-equal per chapter 872 guarantee)")
+        }
     }
 }

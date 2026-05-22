@@ -218,11 +218,14 @@ public enum BASAutoRouteChoice:
     /// chapter 七百十五 第四刀 — Batched cosine similarity。
     case rustBatchedCosine
     case metalBatchedCosine
-    /// chapter 八百七十二 / M3026 — rayon-parallel batched cosine
-    /// per row。 Auto-selected at corpus rows ≥
+    /// chapter 八百七十二 / M3026 — rayon-parallel batched cosine。
+    /// Auto-selected at corpus rows ≥
     /// `BASAutoRouteThresholds.batchedCosineRayonMinRows` (default
-    /// 500)。 Byte-equal with `.rustBatchedCosine` (par_chunks
-    /// preserves collect order per chapter 八百六十三 pattern)。
+    /// 3000 per chapter 八百七十二 第二刀 chunked-v2 measurement —
+    /// initially set 500 in 第一刀 but raised to 3000 after live
+    /// data showed v1 lost at 1K rows;chunked v2 wins at ≥3K)。
+    /// Byte-equal with `.rustBatchedCosine` (par_chunks preserves
+    /// collect order per chapter 八百六十三 pattern)。
     case rustBatchedCosineRayon
 }
 

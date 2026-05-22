@@ -213,7 +213,9 @@ final class BASChapter729PQIndexQualityAndPerfTests: XCTestCase {
             memoryRatio, 10.0,
             "PQ should shrink memory by at least 10×")
 
-        BASVectorIndex.useBatchedTopK = false
+        // Chapter 八百七十六.5 / M3055 — restore production
+        // default (chapter 八百七十二 flipped to true), not false
+        BASVectorIndex.useBatchedTopK = true
         #endif
     }
 }

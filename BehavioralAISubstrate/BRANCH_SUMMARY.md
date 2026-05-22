@@ -376,6 +376,23 @@ chapter 八百七十六: ~87% Swift / 13.4% native
                   2 unwired MPSGraph). 「亏的不要硬上」
                   discipline shipped 3 declines vs 2 wirings —
                   measurement-first culture preserved.)
+chapter 八百七十六.5: ~87% Swift / 13.4% native
+                  (7th-pass review fix for arc 871-876.
+                  Agent A caught 1 HIGH (stale tearDowns
+                  in chapter 718/729 leaking false useBatchedTopK
+                  state). Agent B caught 3 HIGH (useBatchedTopK
+                  == true pin absent, K=1024 matmul parity gap,
+                  VectorIndex.topK e2e byte-eq with rayon
+                  unverified ≥3000 corpus). 1 MEDIUM doc mismatch.
+                  All 4 HIGH + 1 MED fixed inline:
+                  - 3 tearDown sites flipped false→true
+                  - NEW pin: useBatchedTopK == true in seal
+                  - NEW K=1024 parity test (1e-1 tolerance)
+                  - NEW VectorIndex.topK byte-eq at 3500-corpus
+                  - doc fixed: default 500 → 3000 + rationale
+                  Test count: 871 parity 10→11, 876 audit 6→7.
+                  7 consecutive review-pass HIGH catches —
+                  meta-discipline holds.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

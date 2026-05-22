@@ -79,6 +79,48 @@ final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
         }
     }
 
+    /// Chapter 八百七十六.5 — agent B 7th-pass HIGH-2: K=1024
+    /// accumulation drift parity at very large shape。 The
+    /// split-flip routes 1024³ + 2048³ to MPSGraph actor,
+    /// but no test exercises those shapes — drift compounds
+    /// linearly with K so K=1024 might exceed 1e-3 tolerance
+    /// of smaller shapes。 Use looser 1e-1 tolerance (K=1024 ×
+    /// random [-0.5, 0.5] inputs → expected magnitudes ~50,
+    /// drift ~1e-3 = ~0.002% relative)。
+    func testBrainMPSGraphMatchesMSLAtVeryLargeShape()
+        async throws
+    {
+        let brain = try await BASCognitiveBrain
+            .makeWithAllPilots()
+        let (M, N, K) = (1024, 1024, 1024)
+        let (a, b) = makeMatrices(M: M, N: N, K: K)
+        let mpsOut: [Float]
+        do {
+            mpsOut = try await brain.mpsGraphMatMul(
+                a: a, aRows: M, aCols: K,
+                b: b, bRows: K, bCols: N)
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal unavailable")
+        }
+        let mslOut = try await brain.matmul(
+            a: a, aRows: M, aCols: K,
+            b: b, bRows: K, bCols: N)
+        XCTAssertEqual(mpsOut.count, mslOut.count)
+        XCTAssertEqual(mpsOut.count, M * N)
+        // K=1024 accumulation tolerance — agent B 7th-pass
+        // noted this scales linearly with K。 Random unit
+        // inputs at K=1024 can drift ~1e-1 in worst case;
+        // typical drift much smaller。 Pin at 1e-1 for
+        // borderline catch + still tight enough to flag
+        // a real precision regression。
+        for i in 0..<mpsOut.count {
+            XCTAssertEqual(mpsOut[i], mslOut[i],
+                accuracy: 1e-1,
+                "idx \(i): MPSGraph ≡ MSL at K=1024 within " +
+                "1e-1 (K-accumulation drift tolerance)")
+        }
+    }
+
     /// Same parity at larger shape (512³) where MPSGraph is
     /// the clear winner per chapter 八百七十一 data。
     func testBrainMPSGraphMatchesMSLAtLargeShape() async throws {

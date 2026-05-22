@@ -22,8 +22,15 @@ import Foundation
 final class BASChapter718VectorIndexPerfTests: XCTestCase {
 
     override func tearDown() async throws {
+        // Chapter 八百七十六.5 / M3055 — restore to the production
+        // default (NOT to false)。 Chapter 八百七十二 flipped
+        // useBatchedTopK default false → true based on 268-490×
+        // measured win。 Hard-resetting to false here would
+        // leak the wrong state to subsequent test files,
+        // silently slowing any consumer that runs after this
+        // test (per agent A 7th-pass review HIGH finding)。
         BASVectorIndex.useRoutedCosine = false
-        BASVectorIndex.useBatchedTopK = false
+        BASVectorIndex.useBatchedTopK = true
         try await super.tearDown()
     }
 

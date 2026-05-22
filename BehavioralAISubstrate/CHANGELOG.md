@@ -11,6 +11,72 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### 7th-pass review HIGH fixes for arc 871-876 (chapter 八百七十六.5 / M3055)
+
+3-agent 7th-pass review caught 1 HIGH (agent A test-state leakage)
++ 3 HIGH (agent B pin gaps) + 1 MEDIUM (doc/code mismatch)。 All
+4 HIGH + 1 MEDIUM fixed inline。
+
+#### HIGH items fixed
+
+- **Agent A HIGH — stale tearDowns leak false useBatchedTopK**:
+  3 sites in chapters 718 + 729 reset `BASVectorIndex.useBatchedTopK`
+  to `false` (the pre-chapter-872 default) after each test,
+  silently contaminating any subsequent test。 Order-dependent
+  CI flake risk。 Fixed all 3 to reset to `true` (production
+  default per chapter 872)。
+  - BASChapter718VectorIndexPerfTests.swift:26
+  - BASChapter718VectorIndexByteEqualityTests.swift:31
+  - BASChapter729PQIndexQualityAndPerfTests.swift:216
+
+- **Agent B HIGH-1 — useBatchedTopK==true pin absent in seal**:
+  Chapter 876 only pinned thresholds,not the actual static var。
+  NEW `XCTAssertTrue(BASVectorIndex.useBatchedTopK)` in
+  testChapter872VectorIndexUseBatchedTopKDefaultsTrue catches a
+  future revert + diagnostic message points at chapter 718/729
+  tearDowns as likely failure source。
+
+- **Agent B HIGH-2 — K=1024 matmul parity gap**: Chapter 871
+  parity topped at 512³ but split-flip routes 1024³+ to MPSGraph。
+  NEW `testBrainMPSGraphMatchesMSLAtVeryLargeShape` (M=N=K=1024)
+  pins MPSGraph ≡ MSL within 1e-1 (K-accumulation drift scales
+  with K)。
+
+- **Agent B HIGH-3 — VectorIndex.topK end-to-end byte-eq with
+  rayon unverified ≥3000 corpus**: Chapter 872 only verified raw
+  C ABI parity at 1K (below rayon threshold)。 NEW
+  `testVectorIndexTopKByteEqAtRayonThresholdCorpus` builds
+  3500-row corpus,asserts seq vs rayon paths produce identical
+  top-K atomIDs + scores within 1e-5。
+
+#### MEDIUM items fixed
+
+- **Doc/code mismatch on batchedCosineRayonMinRows default**:
+  Enum docstring said「default 500」 but actual (post chapter 八百七十二
+  第二刀 chunked-v2 rework) is 3000。 Updated doc with rework
+  rationale inline。
+
+#### Deferred
+
+- Agent A MED-2 triple-allocation in batched_cosine_simd_rayon (490× win still)
+- Agent A MED-3 CHUNK_ROWS=64 device-tunable threshold field
+- Agent B granular per-shape measurement + concurrent rayon test
+
+#### Verification
+
+   swift test BASChapter871BrainMPSGraphMatMul:        11/11 PASS (was 10,+1 K=1024)
+   swift test BASChapter876:                            7/7 PASS (was 6,+1 e2e)
+   swift test BASChapter718Vector*:                     4/4 PASS unchanged
+   swift test BASChapter729PQ*:                         1/1 PASS unchanged
+   swift build:                                          PASS
+   pre-commit gates:                                     3/3 PASS
+
+7 consecutive review-pass HIGH catches: 864/865/867/869/870/871.5/876.5。
+The meta-discipline keeps finding real items — each fix sub-chapter
+preserves the substrate's discipline ledger。
+
+---
+
 ### Arc 871-876 ARC SEAL + scaffolding kernels re-audit (chapter 八百七十六 / M3046)
 
 Final chapter of arc 871-876 per user 「目前 还有 哪些 部分 可以
