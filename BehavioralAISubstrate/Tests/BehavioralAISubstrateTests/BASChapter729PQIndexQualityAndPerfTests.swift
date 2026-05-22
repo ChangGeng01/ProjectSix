@@ -13,6 +13,20 @@ import Foundation
 
 final class BASChapter729PQIndexQualityAndPerfTests: XCTestCase {
 
+    override func tearDown() async throws {
+        // Chapter 八百七十七 / M3065 — agent A/B 全量 review HIGH
+        // caught that chapter 729 mutates BASVectorIndex
+        // .useBatchedTopK in test body but had no tearDown
+        // override (only an in-body reset at one exit path,
+        // which doesn't run if an XCTAssert fails before it)。
+        // Per chapter 876.5 leakage-fix discipline,every
+        // test class touching this static needs a tearDown
+        // that restores the production default (true,per
+        // chapter 872 flip)。
+        BASVectorIndex.useBatchedTopK = true
+        try await super.tearDown()
+    }
+
     private func unitVector(
         seed: UInt64, dim: Int
     ) -> [Float] {

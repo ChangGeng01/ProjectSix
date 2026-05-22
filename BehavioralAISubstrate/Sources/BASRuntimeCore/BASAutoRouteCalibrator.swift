@@ -86,7 +86,14 @@ public struct BASAutoRouteCalibrationReport:
         // call,defeating the cache。 chapter 七百五十七 第三刀 /
         // M2440 — sync default 1 → 2 to fix
         // BASChapter710CalibrationTests.testLoadOrCalibrateUsesCacheOnSecondCall。
-        schemaVersion: Int = 2,
+        // chapter 八百七十七 / M3065 — sync default 2 → 3 to
+        // match BASAutoRouteCalibrationStore.currentSchemaVersion
+        // bump for the 2 new threshold fields added across
+        // chapters 871.5 + 872 (matMulMPSGraphActorMinProduct
+        // + batchedCosineRayonMinRows)。 Same fix shape as
+        // chapter 七百五十七 第三刀 — both numbers must move
+        // together or the cache invalidates every launch。
+        schemaVersion: Int = 3,
         measuredAtEpochSec: Int64,
         substrateVersion: String,
         deviceFingerprint: String,
@@ -142,12 +149,27 @@ public actor BASAutoRouteCalibrator {
             calibrateLayerNormCrossover(
                 depth: depth, into: &measurements)
 
+        // chapter 八百七十七 / M3065 — agent A cross-arc 全量 review
+        // HIGH-1:calibrator was missing the chapter 871.5 +
+        // 872 new threshold fields (matMulMPSGraphActorMinProduct
+        // + batchedCosineRayonMinRows),causing post-calibration
+        // routing to silently revert to hardcoded defaults。 The
+        // calibrator currently doesn't measure these thresholds
+        // (would need new microbenchmarks),so explicitly forward
+        // the BASAutoRouteThresholds defaults — preserves the
+        // chapter 871.5 + 872 measured behavior post-calibration。
         let thresholds = BASAutoRouteThresholds(
             cosineSIMDMinDim: cosineSIMDMinDim,
             sha256CryptoKitMinBytes: sha256MinBytes,
             attentionMetalMinProduct: attentionMinProduct,
             matMulMetalMinProduct: matMulMinProduct,
-            layerNormSIMDMinDim: layerNormSIMDMinDim)
+            matMulMPSGraphActorMinProduct:
+                BASAutoRouteThresholds.mSeriesDefault
+                    .matMulMPSGraphActorMinProduct,
+            layerNormSIMDMinDim: layerNormSIMDMinDim,
+            batchedCosineRayonMinRows:
+                BASAutoRouteThresholds.mSeriesDefault
+                    .batchedCosineRayonMinRows)
 
         let fingerprint = deviceFingerprint.isEmpty
             ? Self.defaultDeviceFingerprint()

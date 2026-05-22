@@ -367,7 +367,10 @@ chapter 八百七十六: ~87% Swift / 13.4% native
                     Wirings:  2 (matMul + vector index)
                     Declines: 3 (audit agg + RoPE + RMSNorm)
                     Audit:    2 (871.5 review-fix + 876 seal)
-                  Cumulative arc tests: +40 Swift + 3 Rust.
+                  Cumulative arc tests AT CHAPTER 876:
+                    +40 Swift + 3 Rust (extended to +43
+                    Swift after chapters 876.5 + 876.6
+                    added 2 + 1 more tests).
                   Biggest production win: VectorIndex topK
                   now 268-490× faster than Swift per-pair
                   (called hundreds of times per session).
@@ -416,6 +419,33 @@ chapter 八百七十六.6: ~87% Swift / 13.4% native
                   meta-discipline reaches diminishing
                   returns. Arc 871-876+.5+.6 SEALED with
                   measurement-driven discipline throughout.)
+chapter 八百七十七: ~87% Swift / 13.4% native
+                  (全量 4-agent review fix. User directive
+                  「全量 review」 widened review scope from
+                  single-chapter to cross-arc + ship-readiness.
+                  Found 9+ HIGH items that 8th-pass single-
+                  chapter review on 876.6 had missed:
+                  Agent A: calibrator missing 2 new threshold
+                          fields + Codable schemaVersion not
+                          bumped 2→3
+                  Agent B: chapter 727+729 tearDown leakage
+                          (same pattern 876.5 caught for 718)
+                  Agent C: 873 FFI math wrong (600μs should
+                          be 200μs), full-sweep counts missing,
+                          chapter 870 cycle-break violated 2×
+                  Agent D: README stale, v0.62.0 overdue,
+                          BASCognitiveBrain LOC growth
+                  Fixed 8 HIGH inline (calibrator + schemaVersion
+                  + 873 math + tearDowns + cycle-break + stale
+                  +40 + sweep counts). README + tag + LOC
+                  growth deferred (separate concerns).
+                  Meta-insight: 「8th-pass ALL-CLEAR」 was true
+                  for single-chapter scope but premature for
+                  arc-wide scope. 全量 review caught new bug
+                  CLASSES (cross-chapter inconsistency +
+                  substrate-level staleness) that per-chapter
+                  reviews can't see. Full sweep: 13,374 tests
+                  / 31 skipped / 0 failures post-chapter-877.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

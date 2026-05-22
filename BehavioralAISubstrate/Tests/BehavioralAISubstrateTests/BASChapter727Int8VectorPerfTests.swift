@@ -11,6 +11,18 @@ import Foundation
 
 final class BASChapter727Int8VectorPerfTests: XCTestCase {
 
+    override func tearDown() async throws {
+        // Chapter 八百七十七 / M3065 — agent A/B 全量 review HIGH
+        // caught that chapter 727 mutates BASVectorIndex.useBatchedTopK
+        // + .useInt8VectorStorage in test body but had no tearDown
+        // to restore production defaults。 Same leakage pattern
+        // chapter 876.5 caught for chapter 718。 Restore both to
+        // post-chapter-872 production state。
+        BASVectorIndex.useBatchedTopK = true
+        BASVectorIndex.useInt8VectorStorage = false
+        try await super.tearDown()
+    }
+
     private func unitVector(
         seed: UInt64, dim: Int
     ) -> [Float] {

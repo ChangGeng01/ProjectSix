@@ -13,10 +13,13 @@
 //   5K records   = 1,848 μs (1.85 ms)
 //
 // FFI overhead for a Rust+rayon path is typically 50-200μs per
-// call (3 separate aggregations × 3 FFI hops = ~600μs minimum
-// fixed cost)。 At 100 records this fixed cost is 16× the entire
-// Swift baseline。 At 1K records it's roughly equal。 At 5K
-// records the Rust path could shave 30-50% off — but the
+// call。 Per chapter 八百七十七 / M3065 全量 review math correction:
+// each aggregation function is 1 FFI hop,so 3 aggregations =
+// 3 hops total ≈ 200μs (NOT 600μs as the original chapter 873
+// CHANGELOG claimed — that was a「× 3」 multiplicative arithmetic
+// error)。 At 100 records this 200μs is 5× the 37μs Swift
+// baseline。 At 1K records it's 54% of the 371μs budget。 At
+// 5K records the Rust path could shave 30-50% off — but the
 // aggregation is called ONCE PER SESSION END,not per turn,so
 // absolute wall-clock savings of ~1ms per session are negligible。
 //

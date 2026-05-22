@@ -192,7 +192,18 @@ public actor BASAutoRouteCalibrationStore {
     /// represented in v1 caches。 Re-calibration on next launch
     /// captures them honestly per the chapter 七百十 measurement
     /// -first discipline。
-    public static let currentSchemaVersion: Int = 2
+    ///
+    /// chapter 八百七十七 / M3065 — bumped v2 → v3 per agent A
+    /// 全量 review HIGH-2: chapter 871.5 + 872 added 2 new
+    /// non-optional fields to BASAutoRouteThresholds
+    /// (matMulMPSGraphActorMinProduct + batchedCosineRayonMinRows)。
+    /// Codable synthesis would fail to decode existing v2 caches
+    /// without explicit version bump → silent re-calibrate on
+    /// next launch (acceptable on-device,but the schemaVersion
+    /// = 2 contract was broken)。 Per chapter 七百三 precedent
+    /// of bumping 1 → 2 for new families,arc 871-876 must
+    /// bump 2 → 3。
+    public static let currentSchemaVersion: Int = 3
 
     public static func loadOrCalibrate(
         cacheURL: URL,

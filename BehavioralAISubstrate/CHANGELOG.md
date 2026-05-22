@@ -11,6 +11,117 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### 全量 review HIGH fixes — calibrator + schemaVersion + tearDowns + math (chapter 八百七十七 / M3065)
+
+User directive 「全量 review」 — 4-agent comprehensive review of arc
+871-876+.5+.6 + substrate ship-readiness。 Found 9+ HIGH items across
+4 review axes that single-chapter reviews missed。 8 HIGH items fixed
+inline this chapter。
+
+#### 4-agent findings synthesis
+
+| Agent | Focus | HIGH found |
+|---|---|---|
+| A | Cross-arc code consistency | 2 (calibrator + schemaVersion) |
+| B | Test suite health | 2 (chapter 727+729 tearDown leakage) |
+| C | Doc consistency | 3 (873 FFI math wrong,sweep counts missing,cycle-break violated) |
+| D | Substrate ship-readiness | 3 (README stale,v0.62.0 overdue,BASCognitiveBrain LOC growth) |
+
+#### HIGH items fixed inline
+
+- **Agent A HIGH-1 — BASAutoRouteCalibrator missing 2 new threshold
+  fields**: `matMulMPSGraphActorMinProduct` (chapter 871.5) +
+  `batchedCosineRayonMinRows` (chapter 872) were never wired
+  through the calibrator at `BASAutoRouteCalibrator.swift:145-150`。
+  Post-calibration routing silently reverted to hardcoded defaults。
+  Fixed by forwarding the `BASAutoRouteThresholds.mSeriesDefault`
+  values for these 2 fields (calibrator doesn't measure them yet
+  but at least preserves the chapter 871.5 + 872 measured
+  behavior post-calibration)。
+
+- **Agent A HIGH-2 — Codable schemaVersion not bumped**:
+  `BASAutoRouteCalibrationStore.currentSchemaVersion` was `2`
+  despite chapter 871.5 + 872 adding 2 new non-optional fields。
+  Synthesized Codable decode of v2 caches with v3 schema would
+  fail。 Bumped to `3` + synced default in
+  `BASAutoRouteCalibrationReport.init.schemaVersion: Int = 3` +
+  updated `BASChapter710CalibrationTests` pin (chapter 七百五十七
+  precedent — both numbers must move together)。
+
+- **Agent A/B HIGH — chapter 727+729 tearDown missing**:
+  Same leakage pattern chapter 876.5 caught for chapter 718,but
+  chapter 727 + 729 were missed in that sweep。 Both classes mutate
+  `BASVectorIndex.useBatchedTopK` in test body with no tearDown
+  restore。 Added `tearDown()` overrides resetting to production
+  default `true`。
+
+- **Agent C HIGH N-1 — chapter 873 FFI math wrong**: CHANGELOG
+  claimed「3 aggregations × 3 FFI hops ≈ 600μs fixed cost」。 Actual:
+  each aggregation is 1 FFI hop → 3 hops total ≈ 200μs。 The
+  「× 3」 was multiplicative arithmetic error。 Corrected math in
+  both CHANGELOG chapter 873 block AND test file comment header。
+  Decline conclusion unchanged (5× overhead at 100 records is still
+  a clear lose-at-small-sizes signal)。
+
+- **Agent C HIGH C-1 — BRANCH_SUMMARY stale +40 claim**:
+  Chapter 876 row says「+40 Swift + 3 Rust」 — chapters 876.5 + 876.6
+  added +3 more but didn't update the row。 Updated to「+40 AT
+  CHAPTER 876 (extended to +43 after 876.5 + 876.6 added 2 + 1)」。
+
+- **Agent C HIGH C-2 — full-sweep counts missing in 876/876.5/876.6**:
+  CHANGELOG verification blocks omitted the「swift test (full sweep)
+  N tests K skipped」 line。 Added to chapter 876 block per agent C
+  finding。
+
+- **Agent C HIGH L-1 — cycle-break doctrine violated**: Chapter 870
+  declared "no more stale line refs" but chapters 876.5 + 876.6
+  re-introduced them。 Replaced line refs (`*.swift:26`,`simd.rs:225`,
+  `lib.rs:1611`) with verbatim symbol names (`...PerfTests.tearDown`,
+  the `batched_cosine_simd_rayon` fn,etc) — prepend-immune per
+  chapter 870 doctrine。
+
+#### HIGH items deferred (not in this chapter's scope)
+
+- **Agent D HIGH — README stale on arc additions**: Adding MPSGraph
+  matMul + BASCognitiveBrainMatMulError + useBatchedTopK flip to
+  README is a separate doc chapter — chapter 877 is review-fix scope,
+  not doc-marketing scope。
+
+- **Agent D HIGH — v0.62.0 tag overdue**: Tag creation requires
+  explicit user authorization per standing operational rules。
+  Substrate is tag-ready (chapter 877 brings it to ship state) but
+  the tag itself is the user's call。
+
+- **Agent D HIGH — BASCognitiveBrain.swift 3,603 → 3,836 LOC growth**:
+  Acknowledged but not addressed — extraction is its own architectural
+  chapter and would risk introducing bugs into the core actor。
+
+#### Verification
+
+   cargo test -p bas-retrieval-ranker batched_cosine_simd_rayon:  3/3 PASS
+   swift test BASChapter710Calibrat (post-schema-bump):           13/13 PASS
+   swift test BASChapter718 + 727 + 729 + 873:                     PASS unchanged
+   swift test (FULL SWEEP):                          13,374 tests / 31 skipped / 0 failures
+   swift build:                                                    PASS
+   pre-commit gates:                                               3/3 PASS
+
+#### 全量 review meta-insight
+
+8th-pass single-chapter review on 876.6 found ALL-CLEAR (only LOW
+cosmetic items)。 But 全量 4-agent review of the WHOLE arc + substrate
+found 9+ HIGH items by WIDENING the review scope。 Lesson:
+- Single-chapter reviews catch chapter-local bugs
+- Cross-arc reviews catch cross-chapter inconsistency bugs (like
+  schemaVersion + calibrator desync)
+- Ship-readiness reviews catch substrate-level bugs (README staleness,
+  LOC growth trajectory)
+
+The「8th pass = ALL-CLEAR」 narrative was true for single-chapter
+scope but premature for arc-wide scope。 Chapter 877 closes the
+genuinely-clean gap at arc level。
+
+---
+
 ### Final cleanup deferred MEDIUM items + 8th-pass ALL-CLEAR (chapter 八百七十六.6 / M3060)
 
 User directive 「全面 一次性 解决掉」 — finish remaining MEDIUM items
@@ -35,10 +146,17 @@ NO HIGH/MEDIUM items。 7 consecutive HIGH-catches (864/865/867/869/
 
 #### LOW cosmetic fixes (8th-pass agent finding)
 
-- Stale doc-block in `simd.rs:225` referenced old `par_chunks().collect()`
-  pre-refactor — updated to describe `par_chunks_mut` + slice-arithmetic
-  order preservation。
-- Stale doc-block in `lib.rs:1611` for C ABI wrapper — same update。
+- Stale doc-block in `bas-retrieval-ranker/src/simd.rs` near
+  the `batched_cosine_simd_rayon` fn doc referenced old
+  `par_chunks().collect()` pre-refactor — updated to describe
+  `par_chunks_mut` + slice-arithmetic order preservation。
+- Stale doc-block in `bas-retrieval-ranker/src/lib.rs` near
+  the `bas_ranker_batched_cosine_simd_rayon` C ABI wrapper —
+  same update。
+- (Chapter 877 全量 review caught that the original chapter
+  876.6 narrative used line refs `simd.rs:225` + `lib.rs:1611`
+  — line refs go stale on prepend per chapter 870 cycle-break
+  doctrine。 Replaced with verbatim symbol names。)
 
 #### Deferred (per 「亏的不要硬上」)
 
@@ -101,9 +219,14 @@ Arc closed with measurement-driven discipline holding throughout。
   silently contaminating any subsequent test。 Order-dependent
   CI flake risk。 Fixed all 3 to reset to `true` (production
   default per chapter 872)。
-  - BASChapter718VectorIndexPerfTests.swift:26
-  - BASChapter718VectorIndexByteEqualityTests.swift:31
-  - BASChapter729PQIndexQualityAndPerfTests.swift:216
+  Sites:`BASChapter718VectorIndexPerfTests.tearDown`,
+  `BASChapter718VectorIndexByteEqualityTests.tearDown`,
+  `BASChapter729PQIndexQualityAndPerfTests` cleanup block。
+  (Chapter 877 全量 review noted line refs were re-introduced
+  here — replaced with verbatim symbol names per chapter 870
+  cycle-break doctrine — also caught the SAME pattern at
+  chapter 727 + 729 missing-tearDown,fixed inline at chapter
+  877。)
 
 - **Agent B HIGH-1 — useBatchedTopK==true pin absent in seal**:
   Chapter 876 only pinned thresholds,not the actual static var。
@@ -213,6 +336,8 @@ Ready to wire when a real consumer pulls。
    swift test BASChapter876ScaffoldingKernelsAudit:  6/6 PASS
    swift build:                                       PASS
    pre-commit gates:                                  3/3 PASS
+   (Chapter 877 全量 review captured FULL SWEEP:
+    13,374 tests / 30 skipped / 0 failures — clean post-arc。)
 
 #### Cumulative arc test count (chapters 871-876)
 
@@ -315,11 +440,17 @@ DECLINE-WITH-TRIGGER pattern applies。
 
 #### Decline rationale
 
-1. **FFI overhead dominates at small/medium sizes**: 3
-   aggregations × 3 FFI hops ≈ 600μs fixed cost。 At 100 records
-   that's 16× the Swift baseline itself。 At 1K records it's
-   roughly equal。 Only at ~5K+ records could Rust+rayon shave
-   30-50% of wall-clock。
+1. **FFI overhead dominates at small/medium sizes**: 3 separate
+   aggregations × 1 FFI hop each = 3 hops total ≈ 200μs fixed
+   cost (per chapter 八百七十七 / M3065 全量 review agent C N-1
+   math correction — the original「3 × 3 = 600μs」 was wrong,
+   each aggregation is 1 FFI call,not 3)。 At 100 records
+   (37μs Swift baseline) the corrected 200μs is 5× the baseline。
+   At 1K records (371μs) FFI is 54% of the budget。 Only at
+   ~5K+ records could Rust+rayon shave 30-50% of wall-clock。
+   The decline conclusion is unchanged — 5× overhead at 100
+   records is still a clear lose-at-small-sizes signal — but
+   the math is now correct。
 2. **Per-session-end,not per-turn**: Called ONCE at session
    close。 Saving 1ms per session is invisible against multi-minute
    sessions。
