@@ -770,12 +770,39 @@ public enum BASAutoRouteRanker {
         {
             return .swiftCPUAttention
         }
-        // FlashAttention dominates the standard kernel at
-        // every shape where Metal beats CPU,so always pick
-        // it when going to GPU。 Head-dim cap (64) is enforced
-        // by the dispatcher;callers exceeding it should
-        // explicitly use .metalStandardAttention via the
-        // standard `brain.attention(...)` entry。
+        // chapter 八百六十九 / M3006 CORRECTION — the prior claim
+        // 「FlashAttention dominates the standard kernel at every
+        // shape where Metal beats CPU」 was the SAME false-claim
+        // class chapter 八百六十八 caught in BASCognitiveBrain.swift
+        // (and chapter 八百六十六 caught for FlashAttention's
+        // 「0 consumers」 audit)。 Live 4-way measurement on Mac
+        // mini at chapter 八百六十九:
+        //
+        //   Shape (M, N, D)   std ns      Flash ns    MPSGraph(warm)
+        //   (32, 64, 32)      1,105,000   1,081,500   477,334  ← MPS 2.31× faster
+        //   (32, 256, 32)     3,266,125   3,449,334   1,057,250 ← MPS 3.09× faster
+        //
+        // MPSGraph (warm,cached executable) is 2.3-3.1× FASTER
+        // than BOTH FlashAttention AND scaled_dot_product at
+        // production shapes。 FlashAttention is ~at-parity with
+        // std (chapter 八百六十八 measured 1.07-1.09× SLOWER;this
+        // chapter measured 0.98-1.06× across the same shapes —
+        // jitter within margin)。
+        //
+        // The routing rule should be M*N≥64 → MPSGraph (cached),
+        // NOT → FlashAttention。 BUT flipping requires:
+        //   (a) wiring a shared BASMPSGraphAttentionKernel + cache
+        //       through BASCognitiveBrain (per-call new kernel
+        //       defeats the 30× cache speedup)
+        //   (b) Dv ≠ D fallback (MPSGraph requires Dv == D per
+        //       chapter 八百六十九 agent D scout)
+        //   (c) routing-test pin update + new BASAutoRouteChoice
+        //       case `.metalMPSGraphAttention`
+        // — all of which is chapter 八百七十's scope。 For now,
+        // routing stays as FA per 「亏的不要硬上」 (don't flip half-
+        // way without the wiring),but doc is honest about the
+        // true winner。 See BASChapter869MPSGraphContestantAndPinsTests
+        // for the pinned 4-way data。
         return .metalFlashAttention
     }
 

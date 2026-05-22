@@ -187,6 +187,32 @@ chapter 八百六十八: ~87% Swift (raw) / 13.3% native (raw)
                   contestant + routing-rule reconsider.
                   No routing change THIS chapter — data
                   first, decision second per "多做比较".)
+chapter 八百六十九: ~87% Swift (raw) / 13.3% native (raw)
+                  (MPSGraph 4th contestant + 4th-pass
+                  review fixes. 5 knives:
+                  1. Tightened chapter 868 perf bands
+                     (2× → 1.4×, 1.5× → 1.3×) + NEW Rust
+                     near-cap fence-post test (+1 Rust)
+                  2. Std + FA correctness pin at 4
+                     benchmarked shapes (1e-4) + routing
+                     choice pin
+                  3. CHANGELOG/BRANCH doc fixes (deferred-
+                     items count alignment, numerical
+                     range floor, cascading stale-ref note)
+                  4. MPSGraph 4th contestant wired —
+                     LIVE DATA: MPSGraph (warm cache) is
+                     2.31× faster than std + 2.27× faster
+                     than Flash at (32,64,32); 3.09× /
+                     3.26× at (32,256,32). Cache cold→warm
+                     is 30.48× speedup. 7 NEW Swift tests.
+                  5. Fixed SECOND false-claim site at
+                     BASAutoRouteRanker.swift:773-779
+                     (chapter 868 only fixed one site).
+                  Routing FLIP itself DEFERRED to 八百七十
+                  because it needs shared cache wiring +
+                  Dv≠D fallback + new BASAutoRouteChoice
+                  case. 「亏的不要硬上」 — data first, then
+                  the wiring chapter.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

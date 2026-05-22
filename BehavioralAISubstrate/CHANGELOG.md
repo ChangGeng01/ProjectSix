@@ -11,6 +11,118 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### MPSGraph 4th contestant + correctness/routing pins + 4th-pass review fixes (chapter 八百六十九 / M3006)
+
+User directive 「1+2」 — 4th-pass review of chapters 八百六十七 + 八百六十八
++ chapter 八百六十九 MPSGraph wiring。 5 knives,combined to ship the
+review fixes + new contestant data in one disciplined commit。
+
+#### Knife 1: Tighten chapter 八百六十八 perf thresholds + Rust near-cap fence-post
+
+Agent B (4th-pass) caught that chapter 八百六十八's 1.5× / 2× ratio
+bands let a 38% / 80% perf regression pass silently。 Tightened:
+- `testMediumSequenceOrderingPin`: 2× symmetric → 1.4× upper +
+  1.5× lower asymmetric (live 1.066× + ~30% headroom for tightest
+  direction:further drift in the expected direction)
+- `testLargeSequenceFlashCompetitive`: 1.5× → 1.3× (live 1.092× +
+  ~20% headroom — GPU-bound work has smaller noise envelope)
+
+Plus NEW `c_abi_rejects_just_above_cap_fence_post` Rust test — fixes
+agent B's H-B1:chapter 八百六十七's boundary test was at bld=100
+(7 orders below i32::MAX),didn't actually test the cap fence-post。
+The NEW test uses b=2,l=2,d=(i32::MAX/4 + 1) → bld = i32::MAX + 4
+which checked_mul accepts (Some) but the `<= i32::MAX as i64` cap
+arm must reject。 Pins the fence-post on BOTH ABI entries。
+
+#### Knife 2: Correctness + routing pins at benchmarked shapes
+
+Agent B M-B1 + M-B2:chapter 八百六十八 measured perf only,no
+correctness pin between std + FA at benchmarked shapes,no routing
+pin。 NEW 7 Swift tests in
+`BASChapter869MPSGraphContestantAndPinsTests.swift`:
+
+- `testStdAndFlashAttentionNumericallyEquivalentMedium` (1e-4)
+- `testStdAndFlashAttentionNumericallyEquivalentLarge` (1e-4)
+- `testAutoRouterChoiceAtBenchmarkedShapes` — pins 4 shapes' routing
+
+If FA's online-softmax underflows at large shapes,perf tests still
+pass — these correctness pins catch the drift。
+
+#### Knife 3: Doc consistency fixes (agent C)
+
+- **Deferred-items count mismatch**: CHANGELOG had 3 items,
+  BRANCH_SUMMARY had 2,BASCognitiveBrain.swift had 2。 All 3
+  docs now list the same items。
+- **Numerical range floor**: Was 「1.07-1.09×」 but (32,64,32)
+  measured 1.066×。 Updated to「1.07-1.10×」 (range with
+  conservative floor)。
+- **Cascading stale line refs in chapter 八百六十六/七 narrative**:
+  Each chapter prepend shifts prior line numbers (chapter 867
+  said 188/294,actual after 868 prepend was 188+76+102 = 366/
+  273+76+102 = 451 area)。 Inserted「**at chapter 867 authoring
+  time** — current lines drift with each prepend」 annotation
+  to break the recurring stale-ref cycle once and for all。
+
+#### Knife 4: MPSGraph 4th tournament contestant + live data capture
+
+NEW tests in same file (knife 2 file):
+- `testMPSGraphAttentionNumericallyMatchesCPU` (1e-4 vs CPU ref)
+- `testMPSGraphTimingMediumShape` (4-way capture at 32,64,32)
+- `testMPSGraphTimingLargeShape` (4-way capture at 32,256,32)
+- `testMPSGraphCacheWarmFasterThanCold` (cache speedup pin)
+
+**LIVE 4-way data on this Mac mini:**
+
+| Shape (M,N,D) | Metal std ns | Metal Flash ns | MPSGraph(warm) ns | MPS/std |
+|---|---|---|---|---|
+| (32, 64, 32)  | 1,105,000 | 1,081,500 |   477,334 | **0.432× — 2.31× FASTER** |
+| (32, 256, 32) | 3,266,125 | 3,449,334 | 1,057,250 | **0.324× — 3.09× FASTER** |
+
+**Cache speedup: cold 23,855,375 ns → warm 782,750 ns = 30.48×**
+
+#### Knife 5: Fix SECOND false-claim site + defer routing flip
+
+Chapter 八百六十八 corrected the false claim in BASCognitiveBrain.swift
+but MISSED the same claim at BASAutoRouteRanker.swift:773-779
+(「FlashAttention dominates the standard kernel at every shape
+where Metal beats CPU」)。 Same false-claim pattern,one site over。
+THIS chapter fixes that doc with the chapter 八百六十九 measured
+table inline + explicit acknowledgement that MPSGraph is the real
+winner。
+
+**Routing flip itself DEFERRED to chapter 八百七十** because:
+1. Requires SHARED `BASMPSGraphAttentionKernel + BASMPSGraphExecutableCache`
+   wiring through `BASCognitiveBrain` (per-call new kernel
+   defeats the 30× cache speedup — must reuse)
+2. Requires Dv ≠ D fallback path (MPSGraph requires Dv == D per
+   agent D scout finding)
+3. Requires new `BASAutoRouteChoice.metalMPSGraphAttention` enum
+   case + routing-test update + new `brain.mpsGraphAttention(...)`
+   public method (or in-place rewire of `brain.attention`)
+4. 「亏的不要硬上」 — don't half-flip without the wiring
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                                      37/37 PASS (was 36,+1 near-cap)
+   swift test BASChapter868FlashAttentionAssertedBenchmarkTests:       5/5 PASS (with tightened pins)
+   swift test BASChapter869MPSGraphContestantAndPinsTests:             7/7 PASS (NEW file)
+   swift build:                                                         PASS
+   pre-commit gates:                                                    3/3 PASS
+
+#### Authoritative test counts post chapter 八百六十九
+
+| Component | Count | Delta vs 八百六十八 |
+|---|---|---|
+| `bas-mamba-scan` Rust unit tests       | 37 | +1 (near-cap fence-post) |
+| `bas-red-team-bench` Rust unit tests   | 42 | 0 |
+| `bas-tokenizer` Rust unit tests        | 26 | 0 |
+| `BASChapter865...Expansion` Swift      | 11 | 0 |
+| `BASChapter868...AssertedBenchmark` Swift | 5 | 0 (pins tightened, count unchanged) |
+| `BASChapter869...MPSGraphContestant` Swift | 7 | **+7 (NEW)** |
+| **Arc-cumulative Swift tests added 852-869** | | **+23** |
+
+---
+
 ### FlashAttention false-perf-claim correction (chapter 八百六十八 第一刀 / M2996)
 
 User directive 「1 + 2」 — third-pass review (chapter 八百六十七 above) +

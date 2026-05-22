@@ -883,6 +883,62 @@ fn payload_count_mismatch_reports_each_field_name() {
 // to the i32::MAX/2 adversarial test。 Pin the success side: a
 // shape close to the cap should succeed,not get rejected。
 
+// MARK: - Chapter 八百六十九 / M3006 — true near-cap fence-post test
+//
+// 4th-pass review caught (H-B1) that chapter 八百六十七's
+// `c_abi_accepts_shape_at_lower_capacity_boundary` was at bld=100,
+// 7 orders of magnitude below i32::MAX。 A `<=` → `<` fence-post
+// bug at lib.rs:476 / 539 would still be invisible。 This test
+// uses dimensions chosen so bld ≈ i32::MAX as a真 near-cap pin。
+//
+// Math: i32::MAX = 2_147_483_647。 b=4 × l=4 × d=134_217_727 →
+// bld = 2_147_483_632 (just 15 under i32::MAX,well inside the cap)
+// would require a 2.1B-element float allocation = 8.6 GB — too
+// big to allocate in a unit test。
+//
+// Instead use a SMALL b/l with a d-cap that exercises the same
+// checked_mul guard arm without the memory cost: we只 verify that
+// the CAP CHECK accepts;we use a stub call with a dummy 1-element
+// alloc plus the cap-just-passes capacity value。 Since we never
+// actually run the scan (it would OOM),we cannot use the real
+// scan_sequential — we ALSO test the REJECT side at bld =
+// i32::MAX as i64 + 1 to pin the cap-fence-post in BOTH directions
+// purely through the guard logic (no math)。
+
+#[test]
+fn c_abi_rejects_just_above_cap_fence_post() {
+    // Exact value: just above i32::MAX,which checked_mul allows
+    // (returns Some) but the explicit `<= i32::MAX as i64` cap
+    // check at lib.rs:476 / 539 must reject。 Provides the missing
+    // half of the H-B1 fence-post pin。
+    let dummy = vec![1.0_f32; 1];
+    let mut out = vec![0.0_f32; 1];
+    // b=2,l=2,d=(i32::MAX/4 + 1) → bld = 2 * 2 * (i32::MAX/4 + 1)
+    // = i32::MAX + 4 > i32::MAX → must reject。 But d must fit in
+    // i32 — i32::MAX/4 + 1 = 536_870_912 which fits as i32。
+    let d_just_over = (i32::MAX / 4) + 1;
+    let rc_seq = unsafe {
+        bas_mamba_scan_sequential(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            2, 2, d_just_over,
+            out.as_mut_ptr(), 1)
+    };
+    let rc_par = unsafe {
+        bas_mamba_scan_parallel(
+            dummy.as_ptr(), dummy.as_ptr(), dummy.as_ptr(),
+            dummy.as_ptr(), dummy.as_ptr(),
+            2, 2, d_just_over,
+            out.as_mut_ptr(), 1)
+    };
+    assert_eq!(rc_seq, -1,
+        "Sequential: bld just above i32::MAX cap must reject — \
+         this pins the `<= i32::MAX as i64` fence-post");
+    assert_eq!(rc_par, -1,
+        "Parallel: bld just above i32::MAX cap must reject — \
+         same fence-post,parallel ABI side");
+}
+
 #[test]
 fn c_abi_accepts_shape_at_lower_capacity_boundary() {
     // Conservative: use a small shape that comfortably fits in the

@@ -129,15 +129,25 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
                 v: v, vCols: Dv)
         }
 
-        // Both should be in the same ballpark (within 2× of each
-        // other);neither should be a complete cliff
-        XCTAssertLessThan(flashNs, stdNs * 2.0,
-            "FA should not be more than 2× slower than std " +
-            "at medium shape (M=\(M),N=\(N),D=\(D)) — " +
+        // Chapter 八百六十九 / M3006 tightening — chapter 八百六十八's
+        // original 2× pin was too loose vs the live 1.066× ratio
+        // at this shape (agent B caught: a 1.9× regression — 80%
+        // perf loss — would silently pass)。 Tighter band:asymmetric
+        // 1.4× upper (catches >30% degradation) + symmetric 1.5×
+        // lower (absorbs CI thermal + cold-pipeline jitter)。
+        // Asymmetric because the documented expectation IS that FA
+        // is slightly slower than std at this shape — the test
+        // should be tightest in the direction of further drift。
+        XCTAssertLessThan(flashNs, stdNs * 1.4,
+            "FA should not exceed 1.4× of std at medium shape " +
+            "(M=\(M),N=\(N),D=\(D)) — live 1.066× + ~30% headroom。 " +
+            "std=\(stdNs) ns flash=\(flashNs) ns " +
+            "ratio=\(flashNs/stdNs)")
+        XCTAssertLessThan(stdNs, flashNs * 1.5,
+            "Std should not be more than 1.5× slower than FA " +
+            "at medium shape (would indicate FA suddenly got much " +
+            "faster — also a regression to investigate)。 " +
             "std=\(stdNs) ns flash=\(flashNs) ns")
-        XCTAssertLessThan(stdNs, flashNs * 2.0,
-            "Std should not be more than 2× slower than FA " +
-            "at medium shape — std=\(stdNs) ns flash=\(flashNs) ns")
     }
 
     /// At large-sequence shape (M=32, N=256, D=32) where FA's
@@ -168,13 +178,17 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
                 v: v, vCols: Dv)
         }
 
-        // Live measurement: flash is 1.092× of std at this shape。
-        // Allow up to 1.5× to absorb CI thermal variance + cold
-        // pipeline jitter。
-        XCTAssertLessThan(flashNs, stdNs * 1.5,
-            "FA should be within 1.5× of std at large shape " +
-            "(M=\(M),N=\(N),D=\(D)) — std=\(stdNs) ns " +
-            "flash=\(flashNs) ns ratio=\(flashNs/stdNs)")
+        // Chapter 八百六十九 / M3006 tightening — chapter 八百六十八's
+        // 1.5× pin let a 38% perf regression slip past undetected
+        // (agent B finding)。 Live ratio is 1.092× — tighten to
+        // 1.30× (live + ~20% headroom for CI thermal/jitter on
+        // longer sequences where wall-time is dominated by GPU work
+        // not dispatch overhead,so noise envelope is smaller)。
+        XCTAssertLessThan(flashNs, stdNs * 1.3,
+            "FA should be within 1.3× of std at large shape " +
+            "(M=\(M),N=\(N),D=\(D)) — live 1.092× + ~20% headroom。 " +
+            "std=\(stdNs) ns flash=\(flashNs) ns " +
+            "ratio=\(flashNs/stdNs)")
     }
 
     /// At tiny shape (M=4, N=4, D=8) Metal pipeline overhead
