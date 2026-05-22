@@ -11,6 +11,100 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Gaps 1+4+5 DECLINE-WITH-TRIGGER + Gap 2 Part 2 DECLINE — arc seal (chapters 八百八十三 + 八百八十四 / M3100+M3105)
+
+Audit close-out for the user's 5-gap arc per selected scope
+「Gaps 2+3 + DECLINE doc for 1/4/5」。 Same DECLINE-WITH-TRIGGER
+pattern as chapters 八百四十九 / 八百五十六 / 八百五十七 / 八百七十四 /
+八百七十五 / 八百八十一。 NO source-code change in either chapter —
+audit-only。
+
+#### Chapter 八百八十三 (Gap 2 Part 2 — RAG MemoryService wiring DECLINE)
+
+During chapter 882 carrier implementation,a substrate-wide
+async/sync mismatch surfaced:
+- `BASMemoryServicing.retrieve` is SYNC (-> BASMemoryBundle)
+- `BASRAGRetriever.retrieve` is ASYNC (embed + atomLookup are
+  async closures)
+- `EBrainRuntimeCoordinator.runTurn()` is SYNC
+  (-> BASEBrainTurnResult)
+
+Making the chain async = breaking change across:
+1. BASMemoryServicing protocol signature → async throws
+2. All conformers (BASHostRuntimeEBrainMemoryService + 5+ stubs +
+   BASMLMemoryService scaffolding)
+3. runTurn() sync contract (host-facing breaking change)
+4. Every test that synchronously invokes runTurn
+
+Per 「亏的不要硬上」 + chapter 882's carrier-as-foundation,
+chapter 883 PINS the DECLINE with 4 triggers:
+- **Trigger A**: production host measures > 20% retrieval quality
+  improvement from semantic vs prefix-filter
+- **Trigger B**: BASMemoryServicing goes async for another reason
+  (gap 1 SQLite-Rust migration would amortize the cost)
+- **Trigger C**: BASRAGRetriever ships a SYNC variant (precomputed
+  embeddings + actor-isolated atomLookup facade)
+- **Trigger D**: runTurn() goes async for OTHER reasons (MPSGraph
+  await beyond chapter 870),amortizing the migration
+
+NEW `BASChapter883RAGAsyncProtocolDeclineAuditTests.swift` (4
+tests pinning carrier-in-place + MemoryServicing-is-sync + trigger
+docs + wiring-path-is-carrier)。
+
+#### Chapter 八百八十四 (Gaps 1+4+5 DECLINE)
+
+**Gap 1 — Rust SQLite ownership**: Grounded against codebase:
+all SQLite handles in Swift actors (BASSQLiteMemoryAtomStore:90,
+BASSQLiteAtomLifecycleStore:33,etc),Rust crate
+bas-memory-atom-store has zero rusqlite/sqlite3 dep (pure
+in-memory)。 3 triggers (10K atoms/sec writes + multi-process
+distributed SQLite + actor scheduling dominates IO)。
+
+**Gap 4 — Provenance lineage ledger**: Grounded: only
+BASProvenanceGateDecision (8-case permit/reject at
+BASAutoRouteRanker:256) + BASProvenanceTier (4-tier classifier
+at line 292)。 Zero hits for ProvenanceLedger / LineageLedger /
+ProvenanceLog。 3 triggers (compliance attestation + production
+「why is this atom here」 bug + multi-host lineage merge)。
+
+**Gap 5 — Sharded multi-writer**: Grounded: all stores are
+`actor` (single-writer serial),WAL on for read-concurrency in
+4+ stores,zero hits for shard/Shard/writerPool/multiWriter。
+3 triggers (>1K writes/sec with actor contention + multi-domain
+shard requirement + p99 > 50ms attributable to serialization)。
+
+NEW `BASChapter884GapsDeclineAuditTests.swift` (8 tests:
+3 current-state pins + 3 trigger pins + 1 arc-closeout + 1
+no-substantive-code-change pin)。
+
+#### Arc seal — chapters 八百八十一 → 八百八十四
+
+| Chapter | Gap | Shipped | Doctrine |
+|---|---|---|---|
+| 881 | Gap 3 (forget Rust) | Measurement + DECLINE doc + audit test | 「亏的不要硬上」 — Swift wins 2-3× |
+| 882 | Gap 2 Part 1 (RAG carrier) | Bundle + Builder + Options + 7 tests | Additive,zero-behavior-change foundation |
+| 883 | Gap 2 Part 2 (RAG wiring) | DECLINE-WITH-TRIGGER doc + 4 audit tests | Async-protocol mismatch defers cost |
+| 884 | Gaps 1+4+5 | DECLINE-WITH-TRIGGER for 3 gaps + 8 audit tests | Per-gap trigger conditions pinned |
+
+User's 5-gap arc is now FULLY ADDRESSED: 1 gap shipped as
+foundation (gap 2 Part 1),4 gaps declined-with-trigger
+(gaps 1,2 Part 2,3,4,5)。 v0.62.2 candidate is this arc
++ chapter 八百八十二 carrier (additive Bundle/Builder slot)。
+
+#### Verification
+
+   swift test --filter BASChapter883: 4/4 PASS
+   swift test --filter BASChapter884: 8/8 PASS
+   swift test (FULL SWEEP):           13,412 / 77 skipped / 0 failures
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 882: +12 tests (4 chapter 883 + 8 chapter 884),
+no source change,no schemaVersion bump,no Cargo change,no
+XCFramework rebuild。
+
+---
+
 ### Gap-2 Part 1: RAG carrier wired into Bundle + Builder (chapter 八百八十二 / M3095)
 
 User surfaced gap 2 「RAG retrieval 还偏 facade。 BASRAGRetriever
