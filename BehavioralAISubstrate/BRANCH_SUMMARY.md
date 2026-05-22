@@ -175,7 +175,7 @@ chapter 八百六十八: ~87% Swift (raw) / 13.3% native (raw)
                   tournament was print-only + BASCognitiveBrain
                   doc claim「FA is 1.24-1.62× faster」 was
                   UNBACKED. Live measurement on Mac mini
-                  showed FA is actually 1.07-1.09× SLOWER
+                  showed FA is actually 1.07-1.10× SLOWER
                   than scaled_dot_product at every shape
                   ≥ small. Same false-claim pattern as the
                   chapter 八百五十七 audit (caught by 八百六十四) —
@@ -213,6 +213,29 @@ chapter 八百六十九: ~87% Swift (raw) / 13.3% native (raw)
                   Dv≠D fallback + new BASAutoRouteChoice
                   case. 「亏的不要硬上」 — data first, then
                   the wiring chapter.)
+chapter 八百七十: ~87% Swift (raw) / 13.3% native (raw)
+                  (Routing FLIP shipped + 5th-pass review
+                  fixes. 10 knives: knives 1-4 fix the
+                  chapter 八百六十九 review HIGH items
+                  (incl. agent C catastrophic finding that
+                  chapter 869 knife 3 narrative was
+                  FABRICATED — claimed 3 doc fixes but ZERO
+                  edits landed; this chapter ACTUALLY applies
+                  them + DELETES the cascading line refs
+                  permanently to break the recurring stale-
+                  ref bug class). Knives 5-10 deliver the
+                  flip: NEW .metalMPSGraphAttention enum case
+                  + NEW brain.mpsGraphAttention(...) method +
+                  brain-owned shared kernel+cache + flipped
+                  attentionChoice rule (M*N≥64+Dv=D → MPSGraph,
+                  Dv≠D → std fallback) + new switch arm +
+                  routing pin updates across 3 test files +
+                  NEW BASChapter870 parity test file (6 tests).
+                  LIVE perf measurement post-flip: Brain
+                  cache speedup 62.78× (better than 八百六十九's
+                  30.48× direct — brain reuse is even more
+                  efficient). Full test sweep: 13,331 tests,
+                  29 skipped, 0 failures. No ratio change.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

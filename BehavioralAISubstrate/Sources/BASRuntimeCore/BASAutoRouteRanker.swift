@@ -123,6 +123,14 @@ public enum BASAutoRouteChoice:
     case swiftCPUAttention
     case metalStandardAttention
     case metalFlashAttention
+    /// chapter 八百七十 / M3016 — MPSGraph attention added as
+    /// auto-router destination per chapter 八百六十九 measurement
+    /// (2.31-3.09× faster than std/FA at production shapes when
+    /// cache is warm)。 Routing flip from .metalFlashAttention
+    /// happens at attentionChoice when shape.Dv == shape.D
+    /// (MPSGraph requires Dv == D — Dv≠D shapes fall back to
+    /// .metalStandardAttention which has no such constraint)。
+    case metalMPSGraphAttention
     /// chapter 七百七 第四刀 — HMAC routing。
     case swiftCryptoKitHMAC
     case rustHMAC
@@ -770,40 +778,35 @@ public enum BASAutoRouteRanker {
         {
             return .swiftCPUAttention
         }
-        // chapter 八百六十九 / M3006 CORRECTION — the prior claim
-        // 「FlashAttention dominates the standard kernel at every
-        // shape where Metal beats CPU」 was the SAME false-claim
-        // class chapter 八百六十八 caught in BASCognitiveBrain.swift
-        // (and chapter 八百六十六 caught for FlashAttention's
-        // 「0 consumers」 audit)。 Live 4-way measurement on Mac
-        // mini at chapter 八百六十九:
+        // chapter 八百七十 / M3016 FLIP — chapter 八百六十九 measured
+        // MPSGraph (warm) at 2.31-3.09× faster than scaled_dot_product
+        // AND FlashAttention at production shapes:
         //
         //   Shape (M, N, D)   std ns      Flash ns    MPSGraph(warm)
-        //   (32, 64, 32)      1,105,000   1,081,500   477,334  ← MPS 2.31× faster
-        //   (32, 256, 32)     3,266,125   3,449,334   1,057,250 ← MPS 3.09× faster
+        //   (32, 64, 32)      1,105,000   1,081,500   477,334  ← MPS 2.31×
+        //   (32, 256, 32)     3,266,125   3,449,334   1,057,250 ← MPS 3.09×
         //
-        // MPSGraph (warm,cached executable) is 2.3-3.1× FASTER
-        // than BOTH FlashAttention AND scaled_dot_product at
-        // production shapes。 FlashAttention is ~at-parity with
-        // std (chapter 八百六十八 measured 1.07-1.09× SLOWER;this
-        // chapter measured 0.98-1.06× across the same shapes —
-        // jitter within margin)。
+        // Cache cold→warm speedup is 30.48× (the kernel + executable
+        // cache must be SHARED across calls — per-call new kernel
+        // loses the speedup)。 Chapter 八百七十 wires that sharing
+        // through BASCognitiveBrain (kernel + cache stored props,
+        // lazy-init,actor-isolated)。
         //
-        // The routing rule should be M*N≥64 → MPSGraph (cached),
-        // NOT → FlashAttention。 BUT flipping requires:
-        //   (a) wiring a shared BASMPSGraphAttentionKernel + cache
-        //       through BASCognitiveBrain (per-call new kernel
-        //       defeats the 30× cache speedup)
-        //   (b) Dv ≠ D fallback (MPSGraph requires Dv == D per
-        //       chapter 八百六十九 agent D scout)
-        //   (c) routing-test pin update + new BASAutoRouteChoice
-        //       case `.metalMPSGraphAttention`
-        // — all of which is chapter 八百七十's scope。 For now,
-        // routing stays as FA per 「亏的不要硬上」 (don't flip half-
-        // way without the wiring),but doc is honest about the
-        // true winner。 See BASChapter869MPSGraphContestantAndPinsTests
-        // for the pinned 4-way data。
-        return .metalFlashAttention
+        // CONSTRAINT — MPSGraph requires shape.Dv == shape.D。 For
+        // Dv ≠ D shapes,fall back to .metalStandardAttention (NOT
+        // .metalFlashAttention — chapter 八百六十八 measured FA as
+        // 1.07-1.10× slower than std,routing fallback to slower
+        // option is wrong)。
+        //
+        // The fallback gate happens HERE in the ranker rather than
+        // in the brain because the choice IS what gets routed —
+        // brain just executes the ranker's pick。 Caller code is
+        // simpler this way (single switch, no second branch on
+        // shape.Dv at the brain layer)。
+        if shape.Dv != shape.D {
+            return .metalStandardAttention
+        }
+        return .metalMPSGraphAttention
     }
 
     /// CPU reference attention — pure-function。 Provides the

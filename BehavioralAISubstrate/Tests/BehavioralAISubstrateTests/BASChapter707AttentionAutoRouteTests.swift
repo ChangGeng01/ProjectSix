@@ -43,31 +43,37 @@ final class BASChapter707AttentionAutoRouteTests:
         XCTAssertEqual(r.value.count, 4 * 8)
     }
 
-    func testMediumShapePicksFlash() async throws {
+    /// Renamed in chapter 八百七十 / M3016 — routing flipped from
+    /// .metalFlashAttention to .metalMPSGraphAttention based on
+    /// chapter 八百六十九 measured 2.31-3.09× MPSGraph advantage。
+    /// Keeping the test under its original public name would be
+    /// misleading;the new name reflects the actual routing。
+    func testMediumShapePicksMPSGraph() async throws {
         let brain = try await BASCognitiveBrain
             .makeWithAllPilots()
         let (q, k, v) = sampleInputs(
             M: 16, N: 16, D: 16, Dv: 16)
-        // 16*16 = 256 >= 64 → Metal Flash (D ≤ 64)
+        // 16*16 = 256 >= 64 + Dv == D → MPSGraph (chapter 870)
         let r = try await brain.attentionAuto(
             q: q, qRows: 16, qCols: 16,
             k: k, kRows: 16,
             v: v, vCols: 16)
-        XCTAssertEqual(r.choice, .metalFlashAttention)
+        XCTAssertEqual(r.choice, .metalMPSGraphAttention)
         XCTAssertEqual(r.value.count, 16 * 16)
     }
 
-    func testLargeHeadDimFallsBackToStandard() async throws {
+    /// Chapter 八百七十 / M3016 — D=128 means Dv=D so MPSGraph
+    /// would normally route here,but MPSGraph doesn't have a
+    /// dimension cap so it CAN handle D=128。 The chapter 707
+    /// original assumption was that D>64 needed std fallback
+    /// (FA's tile cap)。 With MPSGraph as the new GPU path,
+    /// D>64 just routes to MPSGraph。 Test renamed + updated。
+    func testLargeHeadDimRoutesMPSGraph() async throws {
         let brain = try await BASCognitiveBrain
             .makeWithAllPilots()
-        // D=128 exceeds FlashAttention's tile cap (64)。 Auto
-        // should fall back to the standard kernel。
         let D = 128
         let (q, k, v) = sampleInputs(
             M: 4, N: 4, D: D, Dv: D)
-        // 4*4 = 16 < threshold → ROUTER would pick CPU。
-        // But the test wants to verify Metal-standard fallback,
-        // so we override the threshold to force the Metal branch。
         let t = BASAutoRouteThresholds(
             cosineSIMDMinDim: 64,
             sha256CryptoKitMinBytes: 1024,
@@ -77,26 +83,25 @@ final class BASChapter707AttentionAutoRouteTests:
             k: k, kRows: 4,
             v: v, vCols: D,
             thresholds: t)
-        // Auto chose Flash but the D cap forced the standard
-        // fallback path internally
-        XCTAssertEqual(r.choice, .metalStandardAttention)
+        // MPSGraph doesn't have a D cap — handles D=128 fine
+        XCTAssertEqual(r.choice, .metalMPSGraphAttention)
     }
 
     /// Cross-impl agreement — auto-routed output matches the
     /// CPU reference within float32 tolerance for a shape
-    /// that picks Metal Flash。
-    func testAutoFlashMatchesCPUWithinTolerance() async throws {
+    /// that picks the GPU path (post-chapter 八百七十:MPSGraph)。
+    func testAutoMPSGraphMatchesCPUWithinTolerance() async throws {
         let brain = try await BASCognitiveBrain
             .makeWithAllPilots()
         let M = 8, N = 8, D = 16, Dv = 16
         let (q, k, v) = sampleInputs(
             M: M, N: N, D: D, Dv: Dv)
-        // M*N = 64 >= threshold → Metal Flash
+        // M*N = 64 >= threshold + Dv == D → MPSGraph (chapter 870)
         let auto = try await brain.attentionAuto(
             q: q, qRows: M, qCols: D,
             k: k, kRows: N,
             v: v, vCols: Dv)
-        XCTAssertEqual(auto.choice, .metalFlashAttention)
+        XCTAssertEqual(auto.choice, .metalMPSGraphAttention)
         let cpu = BASAutoRouteRanker.cpuAttention(
             q: q, M: M, D: D,
             k: k, N: N,
@@ -153,6 +158,8 @@ final class BASChapter707AttentionAutoRouteTests:
             k: k, kRows: 4,
             v: v, vCols: 8,
             thresholds: t)
-        XCTAssertEqual(r.choice, .metalFlashAttention)
+        // Post-chapter 八百七十:custom threshold routes M*N=16
+        // to the GPU path → MPSGraph (Dv == D)
+        XCTAssertEqual(r.choice, .metalMPSGraphAttention)
     }
 }

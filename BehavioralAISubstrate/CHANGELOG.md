@@ -11,6 +11,142 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### MPSGraph routing flip + Brain wiring + 5th-pass review fixes (chapter 八百七十 / M3016)
+
+User directive 「继续 1+2」 — 5th-pass review of chapter 八百六十九 +
+chapter 八百七十 routing flip implementation。 6 review knives + 4
+flip knives = 10 total。 The 5th-pass agent C caught the most
+damning finding yet:**chapter 八百六十九's knife 3 narrative was
+fabricated** — claimed 3 doc fixes were applied but ZERO edits
+actually landed。 This chapter ACTUALLY applies them + delivers
+the routing flip。
+
+#### 5th-pass review fixes (knives 1-4)
+
+- **Knife 1: Math comment correction** (Cargo/bas-mamba-scan/src/tests.rs):
+  Chapter 八百六十九's c_abi_rejects_just_above_cap_fence_post said
+  「bld = i32::MAX + 4」 — actual is + 1 (caught by 5th-pass agent A)。
+  Test logic was always correct;only the comment was wrong by 3。
+
+- **Knife 2: Tighten cache pin + add production-shape correctness pins**:
+  - testMPSGraphCacheWarmFasterThanCold 2.0× → 0.25× (≥4× speedup
+    required;observed 30.48× direct, 62.78× through Brain)
+  - NEW testMPSGraphMatchesCPUAtMediumProductionShape (32,64,32)
+  - NEW testMPSGraphMatchesCPUAtLargeProductionShape (32,256,32)
+  - NEW testThreeWayMetalAgreementAtLargeShape (MPSGraph≡std≡FA)
+  - Closes 5th-pass agent B HIGH gaps:H-B1 (correctness only at
+    tiny shape) + H-B2 (no 3-way pin)
+
+- **Knife 3: ACTUALLY apply chapter 八百六十九's fabricated knife-3 doc fixes**:
+  - 1.07-1.09× → 1.07-1.10× updated at ALL 5 sites (CHANGELOG ×3,
+    BRANCH_SUMMARY, BASCognitiveBrain.swift, BASChapter868 test
+    file header,BASChapter868 test failure message)
+  - Fixed BASChapter868 header line 36 still saying「Flash is at
+    most 1.5× of std」 — knife 1 (chapter 八百六十九) tightened to
+    1.4×/1.3× but header text wasn't updated (5th-pass agent C C-C3)
+  - Deferred-items count alignment caught: previous chapters'
+    fabricated alignment claim is now landed (the agent C
+    catastrophic finding — chapter 869 claimed alignment but
+    made zero edits)
+
+- **Knife 4: DELETE cascading line refs (sustainable cycle break)**:
+  Chapter 八百六十六 said「line 92-93」 + 「line 198」。 Chapter 867
+  changed to「line 188」 + 「line 294」。 Each prepend made those
+  stale again。 Chapter 八百六十九 claimed an annotation fix but
+  fabricated it。 Chapter 八百七十 BREAKS THE CYCLE PERMANENTLY by
+  deleting the line-ref pointers entirely from chapter 866/867
+  narratives。 Future readers can grep for verbatim claim text —
+  that's prepend-immune。 No more stale-ref bug class possible。
+
+#### Chapter 八百七十 main work — routing flip (knives 5-10)
+
+- **Knife 5: NEW `.metalMPSGraphAttention` enum case** in
+  BASAutoRouteChoice (BASAutoRouteRanker.swift:127-132)。
+
+- **Knife 6: NEW Brain stored props + lazy-init**:
+  - fileprivate mpsGraphAttentionKernel: BASMPSGraphAttentionKernel?
+  - fileprivate mpsGraphAttentionCache: BASMPSGraphExecutableCache?
+  - Same lazy-init pattern as metalAttentionDispatcher /
+    metalFlashAttentionDispatcher (BASCognitiveBrain.swift:188-200)
+
+- **Knife 7: NEW `brain.mpsGraphAttention(...)` public method** + NEW
+  BASCognitiveBrainAttentionError enum (Dv ≠ D + kernel-nil cases)。
+  Constructs BASKernelInputs from [Float] inline (no dispatcher
+  needed — kernel exposes evaluate(inputs:) directly)。 Cache is
+  brain-owned + shared across all calls of one brain instance,
+  giving the 30.48× cache speedup measured at chapter 八百六十九
+  (this chapter's pin measured 62.78× through Brain — even better)。
+
+- **Knife 8: FLIP `attentionChoice` routing rule** (BASAutoRouteRanker.swift):
+  - M*N < 64 → CPU (unchanged)
+  - M*N ≥ 64 + Dv == D → `.metalMPSGraphAttention` (NEW)
+  - M*N ≥ 64 + Dv ≠ D → `.metalStandardAttention` (NEW fallback,
+    NOT .metalFlashAttention because chapter 868 measured FA as
+    1.07-1.10× SLOWER than std — routing fallback to slower
+    would be wrong)
+
+- **Knife 9: Update attentionAuto switch** to handle new case + add
+  in-flight Dv ≠ D defense (defense-in-depth: ranker filters
+  Dv ≠ D away from MPSGraph but a third-party caller could
+  construct the choice manually)。
+
+- **Knife 10: Update routing pins across all test files**:
+  - BASChapter869 testAutoRouterChoiceAtBenchmarkedShapes:
+    3 shapes flip from .metalFlashAttention → .metalMPSGraphAttention
+    + NEW Dv ≠ D fallback pin
+  - BASChapter707 4 tests updated (testMediumShapePicksFlash →
+    testMediumShapePicksMPSGraph,etc)
+  - NEW BASChapter870BrainMPSGraphAttentionParityTests.swift
+    (6 tests: parity at medium/large,cache reuse,
+    attentionAuto dispatch,Dv ≠ D fallback,direct throw on
+    Dv ≠ D)
+
+#### LIVE measurement post-flip
+
+   BENCH brain.mpsGraphAttention cache lifecycle M=32 N=64 D=32:
+     cold (1st call) = 20,623,667 ns
+     warm (median 30) =    328,500 ns
+     speedup = 62.78× (better than chapter 869's 30.48× direct
+                       — Brain reuse is even more efficient)
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                                       37/37 PASS (unchanged)
+   swift test BASChapter868FlashAttentionAssertedBenchmark:             5/5 PASS
+   swift test BASChapter869MPSGraphContestantAndPins:                  10/10 PASS (was 7,+3)
+   swift test BASChapter707AttentionAutoRoute:                          6/6 PASS (4 updated to new routing)
+   swift test BASChapter870BrainMPSGraphAttentionParity (NEW):          6/6 PASS
+   swift test (full sweep):                            13,331 tests, 29 skipped, 0 failures
+   swift build:                                                          PASS
+   pre-commit gates:                                                     3/3 PASS
+
+#### Authoritative test counts post chapter 八百七十
+
+| Component | Count | Delta vs 八百六十九 |
+|---|---|---|
+| `bas-mamba-scan` Rust unit tests       | 37 | 0 |
+| `bas-red-team-bench` Rust unit tests   | 42 | 0 |
+| `bas-tokenizer` Rust unit tests        | 26 | 0 |
+| BASChapter865 Swift                     | 11 | 0 |
+| BASChapter868 Swift                     |  5 | 0 (tightened, count same) |
+| BASChapter869 Swift                     | 10 | +3 (correctness + 3-way pins) |
+| BASChapter870 Swift (NEW)               |  6 | **+6** |
+| **Arc-cumulative Swift added 852-870** |    | **+32** |
+
+#### Files touched
+
+   M  Cargo/bas-mamba-scan/src/tests.rs                                              (math comment fix)
+   M  Tests/.../BASChapter868FlashAttentionAssertedBenchmarkTests.swift               (header + range fixes)
+   M  Tests/.../BASChapter869MPSGraphContestantAndPinsTests.swift                     (+3 tests, cache tighten, routing flip)
+   A  Tests/.../BASChapter870BrainMPSGraphAttentionParityTests.swift                  (NEW 230 LOC, 6 tests)
+   M  Tests/.../BASChapter707AttentionAutoRouteTests.swift                            (4 tests updated to new routing)
+   M  Sources/BASRuntimeCore/BASAutoRouteRanker.swift                                 (new enum case + flip + Dv≠D)
+   M  Sources/BASHostKit/BASCognitiveBrain.swift                                      (NEW slots + method + error enum + switch arm + 1.07-1.10× fix)
+   M  CHANGELOG.md                                                                    (chapter 870 block + range fixes + cycle-break)
+   M  BRANCH_SUMMARY.md                                                               (chapter 870 trajectory row)
+
+---
+
 ### MPSGraph 4th contestant + correctness/routing pins + 4th-pass review fixes (chapter 八百六十九 / M3006)
 
 User directive 「1+2」 — 4th-pass review of chapters 八百六十七 + 八百六十八
@@ -143,9 +279,11 @@ captured the actual ordering:
 | (4,   4,  8)  |   318,179 |   265,332 | 0.834× (FA wins but both lose to CPU=48,593) |
 
 **The「1.24-1.62× faster」 claim is FALSE at every measured shape**。
-FlashAttention is actually **1.07-1.09× SLOWER** than the standard
+FlashAttention is actually **1.07-1.10× SLOWER** than the standard
 MSL `scaled_dot_product_attention` kernel at production-relevant
-shapes。 This is the same false-claim pattern that chapter 八百六十四
+shapes。 (Conservative range — (32, 64, 32) measured 1.066× → 1.07
+rounded;cap at 1.10 to absorb measurement noise。) This is the
+same false-claim pattern that chapter 八百六十四
 caught for the chapter 八百五十七 audit — same correction discipline。
 
 #### Knife 1 (this chapter)
@@ -166,7 +304,7 @@ caught for the chapter 八百五十七 audit — same correction discipline。
 
 - **CORRECTED `BASCognitiveBrain.swift:2868` doc claim**: replaced
   FALSE「1.24-1.62x faster」 text with honest「unbacked → live
-  measurement shows 1.07-1.09× SLOWER」 + chapter 八百六十八 reference
+  measurement shows 1.07-1.10× SLOWER」 + chapter 八百六十八 reference
   + DEFERRED routing-flip note pending MPSGraph data (chapter 八百六十九)。
 
 #### DEFERRED to chapter 八百六十九
@@ -233,12 +371,13 @@ catches genuine items the prior round missed。
   scan functions via `fn`-pointer table → 3 funcs × 5 fields × 3
   field-assertions = 45 sub-assertions per `cargo test` run。
 
-- **CHANGELOG chapter 八百六十六 block had stale line refs to "92-93"
-  and "198"**: The substantive text fix landed correctly,but the
-  cross-references in the chapter 八百六十六 narrative pointed at
-  pre-prepend line numbers。 Real current lines are 188 (chapter 864
-  HIGH correction) and 294 (arc-seal Phase B row)。 Added "current file"
-  + "pre-prepend" annotation so future readers see both states。
+- **CHANGELOG chapter 八百六十六 block had stale line refs**: The
+  substantive text fix landed correctly,but the cross-references
+  in the chapter 八百六十六 narrative pointed at pre-prepend line
+  numbers。 (Annotation attempt was itself superseded in chapter
+  八百七十 by deleting the line refs entirely — see chapter 八百七十
+  knife 4 cycle-break note。 Line refs cannot be made prepend-
+  immune;text references are。)
 
 #### MEDIUM items fixed
 
@@ -327,17 +466,18 @@ CHANGELOG。
   (`c_abi_parallel_rejects_*`)。
 
 - **CHANGELOG self-contradiction on FlashAttention**: Chapter 八百六十四's
-  HIGH-item correction (line 188 in current file,was 92-93 pre-chapter
-  八百六十六 block prepend)「FlashAttention has 1 production consumer
+  HIGH-item correction「FlashAttention has 1 production consumer
   (BASCognitiveBrain)」 was contradicted by the arc-seal Phase B row
-  (line 294 in current file,was 198 pre-prepend) which still said
-  「all 6 gated Metal kernels ... are SCAFFOLDING with zero Swift
-  production consumers」。 Updated the arc-seal row to「5 of 6 ...
-  + FlashAttention has 1」 + explicit reference to the chapter 八百六十四
-  correction。 (Line-ref correction itself was caught by chapter
-  八百六十七 third-pass doc-consistency agent — the original pointers
-  were correct at draft time but stale after the block prepend
-  shifted all line numbers。)
+  which still said「all 6 gated Metal kernels ... are SCAFFOLDING
+  with zero Swift production consumers」。 Updated the arc-seal row
+  to「5 of 6 ... + FlashAttention has 1」 + explicit reference to
+  the chapter 八百六十四 correction。
+  (Chapter 八百七十 / M3016 cycle-break — DELETED prior line-ref
+  pointers from this narrative because each chapter prepend made
+  them stale。 Three review rounds chased the drift before chapter
+  八百七十 broke the cycle by removing the refs entirely。 Future
+  readers can `grep` for the verbatim claim text instead — that's
+  prepend-immune。)
 
 #### MEDIUM items fixed
 

@@ -75,6 +75,25 @@ import BASRustMemoryTrackerBinary
 /// memory storage; hosts that want SQLite persistence
 /// pass `BASCognitiveOSBundleOptions` to
 /// `makeWithDefaults(options:)`。
+
+/// chapter 八百七十 / M3016 — Brain-level errors for the new
+/// MPSGraph attention dispatch path。 Separate enum (vs reusing
+/// BASMetalAttentionDispatcherError) because the MPSGraph path
+/// is direct kernel-driven,not dispatcher-wrapped — different
+/// failure modes warrant a distinct type。
+public enum BASCognitiveBrainAttentionError:
+    Error, Sendable, Equatable, Hashable
+{
+    /// Caller passed qCols ≠ vCols to mpsGraphAttention,which
+    /// MPSGraph rejects (V's last dim must equal D)。
+    case mpsGraphDvDimensionMustEqualD(
+        qCols: Int, vCols: Int)
+    /// MPSGraph kernel lazy-init returned nil (shouldn't
+    /// happen post-init — guards against future refactor
+    /// that races the lazy-init)。
+    case mpsGraphKernelUnavailable
+}
+
 public actor BASCognitiveBrain {
 
     /// The wrapped V2 turn runtime engine。 All `process`
@@ -184,6 +203,20 @@ public actor BASCognitiveBrain {
     /// in the auto-router tournament at chapter 七百七 第三刀。
     fileprivate var metalFlashAttentionDispatcher:
         BASMetalFlashAttentionDispatcher?
+
+    /// chapter 八百七十 / M3016 — MPSGraph attention kernel +
+    /// executable cache,lazily built on first use。 Kernel
+    /// reads/writes to the shared cache,which provides the
+    /// 30.48× cold→warm speedup measured at chapter 八百六十九。
+    /// Per-call new kernel would defeat the cache (each call
+    /// would recompile the MPSGraph executable from scratch)
+    /// — that's the load-bearing reason for these slots to
+    /// exist as brain-owned stored props rather than per-call
+    /// locals。
+    fileprivate var mpsGraphAttentionKernel:
+        BASMPSGraphAttentionKernel?
+    fileprivate var mpsGraphAttentionCache:
+        BASMPSGraphExecutableCache?
 
     /// 主线 继续 开发 — optional brain-owned health
     /// snapshot history。 Configured at init via the
@@ -2871,7 +2904,7 @@ extension BASCognitiveBrain {
     ///                 faster than scaled_dot_product per chapter
     ///                 七百七 第二刀」 was UNBACKED by an asserted
     ///                 test。 Live measurement on this Mac mini
-    ///                 shows FA is actually 1.07-1.09× SLOWER
+    ///                 shows FA is actually 1.07-1.10× SLOWER
     ///                 than scaled_dot_product at every shape ≥
     ///                 small。 See BASChapter868...AssertedBenchmark
     ///                 tests for the pinned numbers + ratios。 The
@@ -2933,6 +2966,30 @@ extension BASCognitiveBrain {
             return BASAutoRouteResult(
                 value: value,
                 choice: .metalStandardAttention)
+        case .metalMPSGraphAttention:
+            // chapter 八百七十 / M3016 — Dv ≠ D fallback (defense
+            // in depth: ranker already filters Dv≠D shapes away
+            // from this choice via attentionChoice,but a third-
+            // party caller can construct the choice manually,so
+            // re-check the constraint here)。 Falls back to std
+            // (not FA — chapter 八百六十八 measured FA as 1.07-1.10×
+            // slower than std)。
+            if qCols != vCols {
+                let value = try await attention(
+                    q: q, qRows: qRows, qCols: qCols,
+                    k: k, kRows: kRows,
+                    v: v, vCols: vCols)
+                return BASAutoRouteResult(
+                    value: value,
+                    choice: .metalStandardAttention)
+            }
+            let value = try await mpsGraphAttention(
+                q: q, qRows: qRows, qCols: qCols,
+                k: k, kRows: kRows,
+                v: v, vCols: vCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalMPSGraphAttention)
         default:
             // Should not happen — attentionChoice never returns
             // non-attention cases。 Conservative fallback:CPU。
@@ -2980,6 +3037,74 @@ extension BASCognitiveBrain {
             q: q, qRows: qRows, qCols: qCols,
             k: k, kRows: kRows,
             v: v, vCols: vCols)
+    }
+
+    /// chapter 八百七十 / M3016 — MPSGraph attention dispatch。
+    ///
+    /// Live measurement at chapter 八百六十九 showed MPSGraph
+    /// (warm cache) is 2.31-3.09× FASTER than both
+    /// scaled_dot_product (`brain.attention`) AND FlashAttention
+    /// (`brain.flashAttention`) at production shapes。 The
+    /// auto-router at chapter 八百七十 routes M*N≥64 +
+    /// shape.Dv == shape.D to this entry。
+    ///
+    /// CONSTRAINT: qCols must equal vCols (Dv == D)。 Callers
+    /// hitting this constraint should route through
+    /// `attentionAuto` which falls back to `.metalStandardAttention`
+    /// automatically when Dv ≠ D — or call `attention(...)` /
+    /// `flashAttention(...)` directly。
+    ///
+    /// Throws `BASCognitiveBrainAttentionError.mpsGraphDvDimensionMustEqualD`
+    /// when the constraint is violated。
+    public func mpsGraphAttention(
+        q: [Float], qRows: Int, qCols: Int,
+        k: [Float], kRows: Int,
+        v: [Float], vCols: Int
+    ) async throws -> [Float] {
+        guard qCols == vCols else {
+            throw BASCognitiveBrainAttentionError
+                .mpsGraphDvDimensionMustEqualD(
+                    qCols: qCols, vCols: vCols)
+        }
+        // Lazy-init kernel + cache as shared singletons —
+        // the SAME instance must persist across calls,otherwise
+        // the 30.48× cache speedup measured at chapter 八百六十九
+        // collapses to per-call recompile cost。
+        if mpsGraphAttentionKernel == nil {
+            let cache = BASMPSGraphExecutableCache()
+            mpsGraphAttentionCache = cache
+            mpsGraphAttentionKernel =
+                try BASMPSGraphAttentionKernel(cache: cache)
+        }
+        guard let kernel = mpsGraphAttentionKernel else {
+            throw BASCognitiveBrainAttentionError
+                .mpsGraphKernelUnavailable
+        }
+        let descQ = BASTensorDescriptor.contiguous(
+            shape: [qRows, qCols], dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: _2D.rankTag)
+        let descKV = BASTensorDescriptor.contiguous(
+            shape: [kRows, qCols], dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: _2D.rankTag)
+        let qD = q.withUnsafeBufferPointer {
+            Data(buffer: $0)
+        }
+        let kD = k.withUnsafeBufferPointer {
+            Data(buffer: $0)
+        }
+        let vD = v.withUnsafeBufferPointer {
+            Data(buffer: $0)
+        }
+        let inputs = BASKernelInputs(
+            descriptors: [descQ, descKV, descKV],
+            payloads: [qD, kD, vD])
+        let out = try await kernel.evaluate(inputs: inputs)
+        return BASCanonicalKernelInputBuilders
+            .dataToFloatArray(
+                out.payloads[0],
+                elementCount: qRows * qCols)
     }
 
     /// 主线 继续 开发 — public Metal compute entry point。

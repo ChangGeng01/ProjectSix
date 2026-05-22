@@ -33,11 +33,15 @@
 //   1. Pin the actual measured ordering as asserted invariants:
 //        - At shapes ≥ small,Metal std BEATS Metal Flash
 //        - At ALL shapes,Swift CPU loses to Metal std at medium+
-//        - Flash is at most 1.5× of std (catches major regression)
+//        - Flash is at most 1.4× of std at medium (live ratio
+//          1.066× + ~30% headroom),at most 1.3× at large (live
+//          1.092× + ~20% headroom) — tightened in chapter 八百七十
+//          from chapter 八百六十八's original 2.0× / 1.5× bands
+//          which let 38-80% perf regressions pass silently
 //   2. Correct the BASCognitiveBrain.swift:2868 doc claim
-//   3. Defer routing-flip decision (M*N≥64 still goes to Flash by
-//      default — flipping it is chapter 八百六十九's call after
-//      MPSGraph 4th contestant data lands)
+//   3. Defer routing-flip decision (M*N≥64 went to Flash through
+//      chapter 八百六十九;chapter 八百七十 flips to MPSGraph based
+//      on chapter 八百六十九's measured 2.31-3.09× MPSGraph advantage)
 //
 // WHY ratios not absolute ns: CI runs (Mac mini,iOS sim,thermal
 // throttle) produce different absolute numbers but the ORDERING
@@ -254,7 +258,7 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
             "1.24-1.62x faster"),
             "BASCognitiveBrain.swift must not re-introduce the " +
             "FALSE「1.24-1.62x faster」 FA claim — chapter 八百六十八 " +
-            "measured FA as 1.07-1.09× SLOWER at production shapes")
+            "measured FA as 1.07-1.10× SLOWER at production shapes")
         XCTAssertFalse(content.contains(
             "1.24-1.62× faster"),  // unicode variant
             "BASCognitiveBrain.swift must not re-introduce the " +

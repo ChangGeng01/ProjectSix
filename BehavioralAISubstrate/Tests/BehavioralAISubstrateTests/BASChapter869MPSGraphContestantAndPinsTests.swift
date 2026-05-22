@@ -147,17 +147,15 @@ final class BASChapter869MPSGraphContestantAndPinsTests:
 
     // MARK: - Knife 2 part B: auto-router choice pin
 
-    /// Pin the auto-router's current routing decisions at the
-    /// chapter 868 / 869 benchmarked shapes。 A future router
-    /// refactor that silently changes which path a shape gets
-    /// will fail this test。 Per agent B (M-B2)。
-    ///
-    /// Current rule (per BASCognitiveBrain.swift:2868 + chapter 868
-    /// honest-correction): M*N<64 → CPU,M*N≥64 → FA。 Chapter 869
-    /// MAY flip this rule after MPSGraph data lands (knife 5)。 If
-    /// it does,this test gets updated。
+    /// Pin the auto-router's routing decisions at the chapter
+    /// 868 / 869 benchmarked shapes。 Chapter 八百七十 / M3016
+    /// FLIPPED the M*N≥64 rule from .metalFlashAttention →
+    /// .metalMPSGraphAttention based on chapter 八百六十九's
+    /// measured 2.31-3.09× MPSGraph advantage。 Dv ≠ D shapes
+    /// fall back to .metalStandardAttention (MPSGraph requires
+    /// Dv == D)。
     func testAutoRouterChoiceAtBenchmarkedShapes() {
-        // Tiny: M*N = 16 < 64 → CPU
+        // Tiny: M*N = 16 < 64 → CPU (unchanged)
         XCTAssertEqual(
             BASAutoRouteRanker.attentionChoice(
                 shape: BASAttentionShape(M: 4, N: 4, D: 8, Dv: 8),
@@ -165,32 +163,42 @@ final class BASChapter869MPSGraphContestantAndPinsTests:
             .swiftCPUAttention,
             "Shape (4, 4, 8) — M*N=16 < 64 must route CPU")
 
-        // Small: M*N = 256 ≥ 64 → FA (currently)
+        // Small: M*N = 256 ≥ 64,Dv=D → MPSGraph (chapter 870 flip)
         XCTAssertEqual(
             BASAutoRouteRanker.attentionChoice(
                 shape: BASAttentionShape(M: 16, N: 16, D: 16, Dv: 16),
                 thresholds: .mSeriesDefault),
-            .metalFlashAttention,
-            "Shape (16, 16, 16) — M*N=256 ≥ 64 must route FA " +
-            "(current rule;may flip in chapter 八百六十九 knife 5)")
+            .metalMPSGraphAttention,
+            "Shape (16, 16, 16) — M*N=256 ≥ 64 + Dv=D must " +
+            "route MPSGraph (chapter 八百七十 flip)")
 
-        // Medium: M*N = 2048 ≥ 64 → FA
+        // Medium: M*N = 2048,Dv=D → MPSGraph
         XCTAssertEqual(
             BASAutoRouteRanker.attentionChoice(
                 shape: BASAttentionShape(M: 32, N: 64, D: 32, Dv: 32),
                 thresholds: .mSeriesDefault),
-            .metalFlashAttention,
-            "Shape (32, 64, 32) — M*N=2048 ≥ 64 must route FA " +
-            "(current rule)")
+            .metalMPSGraphAttention,
+            "Shape (32, 64, 32) — must route MPSGraph (chapter 八百七十)")
 
-        // Large: M*N = 8192 ≥ 64 → FA
+        // Large: M*N = 8192,Dv=D → MPSGraph
         XCTAssertEqual(
             BASAutoRouteRanker.attentionChoice(
                 shape: BASAttentionShape(M: 32, N: 256, D: 32, Dv: 32),
                 thresholds: .mSeriesDefault),
-            .metalFlashAttention,
-            "Shape (32, 256, 32) — M*N=8192 ≥ 64 must route FA " +
-            "(current rule)")
+            .metalMPSGraphAttention,
+            "Shape (32, 256, 32) — must route MPSGraph (chapter 八百七十)")
+
+        // chapter 八百七十 NEW pin: Dv ≠ D fallback at production
+        // shape → MPSGraph constraint pushes routing to std
+        XCTAssertEqual(
+            BASAutoRouteRanker.attentionChoice(
+                shape: BASAttentionShape(M: 32, N: 64, D: 32, Dv: 16),
+                thresholds: .mSeriesDefault),
+            .metalStandardAttention,
+            "Shape (32, 64, 32, Dv=16) — Dv ≠ D must fall back " +
+            "to .metalStandardAttention (NOT .metalFlashAttention " +
+            "— chapter 八百六十八 measured FA as 1.07-1.10× slower " +
+            "than std,fallback to slower would be wrong)")
     }
 
     // MARK: - Knife 4: MPSGraph 4th tournament contestant
@@ -451,13 +459,122 @@ final class BASChapter869MPSGraphContestantAndPinsTests:
             "  warm = %10.0f ns (speedup=%.2fx)",
             M, N, D, coldNs, warmNs, coldNs / warmNs))
 
-        // Cache should provide meaningful speedup。 Weak pin:
-        // warm at most 2× of cold (if cache is broken,both
-        // are equal so warm/cold ≈ 1.0)。 The真 expected
-        // behavior is warm << cold so warm < cold * 0.5 would
-        // be the strong pin。 Use weak pin first round。
-        XCTAssertLessThan(warmNs, coldNs * 2.0,
-            "Warm MPSGraph should not be SLOWER than cold + " +
-            "headroom — coldNs=\(coldNs) warmNs=\(warmNs)")
+        // Chapter 八百七十 / M3016 tightening — chapter 八百六十九 used
+        // weak `warm < cold * 2.0` despite observed 30.48× speedup。
+        // Agent A 5th-pass: a cache-broken regression (1.5× speedup)
+        // would slip past。 Tightened to `warm < cold * 0.25`
+        // (i.e. ≥4× speedup) — still 7× headroom from observed
+        // 30.48×。 Catches the「cache silently disabled」 regression。
+        XCTAssertLessThan(warmNs, coldNs * 0.25,
+            "Warm MPSGraph must be ≥4× faster than cold to " +
+            "indicate cache is actually working — coldNs=\(coldNs) " +
+            "warmNs=\(warmNs) speedup=\(coldNs/warmNs)x。 " +
+            "Observed 30.48× at chapter 八百六十九 measurement。")
+    }
+
+    // MARK: - Chapter 八百七十 / M3016 — production-shape correctness pins
+    //
+    // 5th-pass agent B (H-B1) caught that chapter 八百六十九's MPSGraph
+    // correctness pin tested only TINY shape (3, 5, 8) but routing
+    // flip targets large shapes (32, 64, 32) + (32, 256, 32)。
+    // Online-matmul precision tends to drift at LARGER N。 Pinning
+    // BEFORE chapter 八百七十 flips routing。
+
+    func testMPSGraphMatchesCPUAtMediumProductionShape()
+        async throws
+    {
+        let kernel: BASMPSGraphAttentionKernel
+        do {
+            kernel = try BASMPSGraphAttentionKernel(
+                cache: BASMPSGraphExecutableCache())
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal framework unavailable")
+        }
+        let (M, N, D) = (32, 64, 32)
+        let (q, k, v) = makeAttentionInputs(
+            M: M, N: N, D: D, Dv: D)
+        let mpsOut = try await mpsGraphAttention(
+            kernel, q: q, M: M, D: D, k: k, N: N, v: v)
+        let cpuOut = BASAutoRouteRanker.cpuAttention(
+            q: q, M: M, D: D, k: k, N: N, v: v, Dv: D)
+        XCTAssertEqual(mpsOut.count, M * D)
+        for i in 0..<mpsOut.count {
+            XCTAssertEqual(mpsOut[i], cpuOut[i],
+                accuracy: 1e-4,
+                "idx \(i) at medium production shape " +
+                "(M=\(M),N=\(N),D=\(D)): MPSGraph must " +
+                "match CPU within 1e-4")
+        }
+    }
+
+    func testMPSGraphMatchesCPUAtLargeProductionShape()
+        async throws
+    {
+        let kernel: BASMPSGraphAttentionKernel
+        do {
+            kernel = try BASMPSGraphAttentionKernel(
+                cache: BASMPSGraphExecutableCache())
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal framework unavailable")
+        }
+        let (M, N, D) = (32, 256, 32)
+        let (q, k, v) = makeAttentionInputs(
+            M: M, N: N, D: D, Dv: D)
+        let mpsOut = try await mpsGraphAttention(
+            kernel, q: q, M: M, D: D, k: k, N: N, v: v)
+        let cpuOut = BASAutoRouteRanker.cpuAttention(
+            q: q, M: M, D: D, k: k, N: N, v: v, Dv: D)
+        XCTAssertEqual(mpsOut.count, M * D)
+        for i in 0..<mpsOut.count {
+            XCTAssertEqual(mpsOut[i], cpuOut[i],
+                accuracy: 1e-4,
+                "idx \(i) at large production shape " +
+                "(M=\(M),N=\(N),D=\(D)): MPSGraph must " +
+                "match CPU within 1e-4 — online-matmul " +
+                "precision should not drift at large N")
+        }
+    }
+
+    /// 3-way pin: MPSGraph ≡ std ≡ FA at large production shape。
+    /// 5th-pass agent B (H-B2) caught that no test pinned all 3
+    /// Metal implementations against each other — drift between
+    /// any pair would slip past the existing pairwise tests。
+    func testThreeWayMetalAgreementAtLargeShape() async throws {
+        let kernel: BASMPSGraphAttentionKernel
+        do {
+            kernel = try BASMPSGraphAttentionKernel(
+                cache: BASMPSGraphExecutableCache())
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal framework unavailable")
+        }
+        let brain = try await BASCognitiveBrain
+            .makeWithAllPilots()
+        let (M, N, D, Dv) = (32, 256, 32, 32)
+        let (q, k, v) = makeAttentionInputs(
+            M: M, N: N, D: D, Dv: Dv)
+        let mpsOut = try await mpsGraphAttention(
+            kernel, q: q, M: M, D: D, k: k, N: N, v: v)
+        let stdOut = try await brain.attention(
+            q: q, qRows: M, qCols: D,
+            k: k, kRows: N,
+            v: v, vCols: Dv)
+        let flashOut = try await brain.flashAttention(
+            q: q, qRows: M, qCols: D,
+            k: k, kRows: N,
+            v: v, vCols: Dv)
+        XCTAssertEqual(mpsOut.count, M * Dv)
+        XCTAssertEqual(stdOut.count, M * Dv)
+        XCTAssertEqual(flashOut.count, M * Dv)
+        for i in 0..<mpsOut.count {
+            XCTAssertEqual(mpsOut[i], stdOut[i],
+                accuracy: 1e-4,
+                "idx \(i): MPSGraph ≡ std at (\(M),\(N),\(D))")
+            XCTAssertEqual(stdOut[i], flashOut[i],
+                accuracy: 1e-4,
+                "idx \(i): std ≡ FA at (\(M),\(N),\(D))")
+            XCTAssertEqual(mpsOut[i], flashOut[i],
+                accuracy: 1e-4,
+                "idx \(i): MPSGraph ≡ FA at (\(M),\(N),\(D))")
+        }
     }
 }

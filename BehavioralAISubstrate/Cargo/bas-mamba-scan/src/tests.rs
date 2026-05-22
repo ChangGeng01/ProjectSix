@@ -911,11 +911,20 @@ fn c_abi_rejects_just_above_cap_fence_post() {
     // (returns Some) but the explicit `<= i32::MAX as i64` cap
     // check at lib.rs:476 / 539 must reject。 Provides the missing
     // half of the H-B1 fence-post pin。
+    //
+    // Chapter 八百七十 / M3016 — corrects chapter 八百六十九's math
+    // comment which said「= i32::MAX + 4」 but actual is + 1:
+    //   i32::MAX = 2_147_483_647
+    //   i32::MAX / 4 = 536_870_911 (integer div truncates)
+    //   d = (i32::MAX/4) + 1 = 536_870_912
+    //   bld = 2 * 2 * 536_870_912 = 2_147_483_648 = i32::MAX + 1
+    // The test still works (any value > cap rejects),only the
+    // math comment was off by 3 (caught by 5th-pass agent A)。
     let dummy = vec![1.0_f32; 1];
     let mut out = vec![0.0_f32; 1];
     // b=2,l=2,d=(i32::MAX/4 + 1) → bld = 2 * 2 * (i32::MAX/4 + 1)
-    // = i32::MAX + 4 > i32::MAX → must reject。 But d must fit in
-    // i32 — i32::MAX/4 + 1 = 536_870_912 which fits as i32。
+    // = i32::MAX + 1 > i32::MAX → must reject。 d=536_870_912
+    // fits as i32 (i32::MAX/4 + 1)。
     let d_just_over = (i32::MAX / 4) + 1;
     let rc_seq = unsafe {
         bas_mamba_scan_sequential(
