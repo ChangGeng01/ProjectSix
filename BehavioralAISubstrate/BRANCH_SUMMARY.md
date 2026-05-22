@@ -360,6 +360,22 @@ chapter 八百七十四+五: ~87% Swift / 13.4% native
                   pull. Also caught canonical-builder vs
                   kernel rank-2/rank-3 inconsistency in
                   RoPE — documented, not fixed.)
+chapter 八百七十六: ~87% Swift / 13.4% native
+                  (ARC 871-876 SEAL + scaffolding kernels
+                  re-audit. Final chapter of arc per
+                  「全面 开发」 directive. Tally:
+                    Wirings:  2 (matMul + vector index)
+                    Declines: 3 (audit agg + RoPE + RMSNorm)
+                    Audit:    2 (871.5 review-fix + 876 seal)
+                  Cumulative arc tests: +40 Swift + 3 Rust.
+                  Biggest production win: VectorIndex topK
+                  now 268-490× faster than Swift per-pair
+                  (called hundreds of times per session).
+                  All 7 DECLINED-PENDING-CONSUMER kernels
+                  re-verified present (5 .metal scaffolds +
+                  2 unwired MPSGraph). 「亏的不要硬上」
+                  discipline shipped 3 declines vs 2 wirings —
+                  measurement-first culture preserved.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

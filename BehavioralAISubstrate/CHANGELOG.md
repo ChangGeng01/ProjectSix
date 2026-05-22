@@ -11,6 +11,82 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Arc 871-876 ARC SEAL + scaffolding kernels re-audit (chapter 八百七十六 / M3046)
+
+Final chapter of arc 871-876 per user 「目前 还有 哪些 部分 可以
+swift 移植 其他 语言 / 最极致 最优雅 / 有收益 不会亏 多做比较
+灵活变通」 directive。 Re-verifies DECLINED-PENDING-CONSUMER set
+from chapters 八百五十七+八百七十四+八百七十五 + pins arc outcome tally。
+
+#### Arc 871-876 final tally
+
+| Chapter | Outcome | Code change |
+|---|---|---|
+| 871 | **WIRED** — MatMul split-flip (MSL small,MPSGraph large ≥256³) | +200 LOC |
+| 871.5 | REVIEW-FIX — threshold field + fence-post + new error enum + 4-way pin | +120 LOC |
+| 872 | **WIRED** — VectorIndex Rust+rayon (chunked v2,268-490× over Swift) | +250 LOC |
+| 873 | DECLINED — AuditAggregation rayon (Swift baseline already <2ms) | audit-only |
+| 874 | DECLINED-PENDING-CONSUMER — RoPE MPSGraph (no Brain caller) | audit-only |
+| 875 | DECLINED-PENDING-CONSUMER — RMSNorm MPSGraph (no Brain caller) | audit-only |
+| 876 | ARC-SEAL — this chapter,re-verify + pin tally | audit-only |
+
+**Net wirings**: 2 (matMul MPSGraph actor + vector index rayon)
+**Net declines**: 3 (audit aggregation + RoPE + RMSNorm)
+**Audit/review chapters**: 2 (871.5 + 876)
+
+Production wins shipped:
+- matMul ≥ 256³ → MPSGraph actor (1.07-1.38× faster than MSL,
+  brain cache 14.20× cold→warm)
+- VectorIndex topK → Rust batched-cosine by default (**268× at 1K**,
+  **490× at 5K** vs Swift per-pair) — production retrieval calls
+  hundreds of times per session,arc's biggest measurable win
+
+#### DECLINED-PENDING-CONSUMER set (re-verified)
+
+7 kernels ship + tested but have 0 production consumers in
+BASCognitiveBrain。 Activating without real consumer = busy-work
+per chapter 八百五十六/八百五十七 discipline。
+
+5 `.metal` (chapter 857 set):
+BASConvKernels,BASLayerNormKernel,BASSoftmaxKernels,
+BASActivationKernels,BASReduceKernels
+
+2 MPSGraph `.swift` actors (chapters 874+875 set):
+BASMPSGraphRotaryEmbeddingKernel,BASMPSGraphRMSNormKernel
+
+All 7 still present in source (chapter 876 file-existence pin)。
+Ready to wire when a real consumer pulls。
+
+#### Discipline reflection
+
+「最极致 最优雅 / 有收益 不会亏 多做比较 灵活变通」 fully honored:
+- 最极致:wired biggest measurable production wins (vector index + matMul)
+- 最优雅:declined orphan kernels without busy-work activation
+- 有收益 不会亏:every wiring backed by 5-way live measurement
+- 多做比较:every chapter measured ≥ 2 paths
+- 灵活变通:split-flip thresholds where pattern warranted
+
+#### Verification
+
+   swift test BASChapter876ScaffoldingKernelsAudit:  6/6 PASS
+   swift build:                                       PASS
+   pre-commit gates:                                  3/3 PASS
+
+#### Cumulative arc test count (chapters 871-876)
+
+| Chapter | Swift tests added | Rust tests added |
+|---|---|---|
+| 871 | 10 | 0 |
+| 871.5 | 4 | 0 |
+| 872 | 6 | 3 |
+| 873 | 6 | 0 |
+| 874 | 4 | 0 |
+| 875 | 4 | 0 |
+| 876 | 6 | 0 |
+| **Total** | **+40 Swift** | **+3 Rust** |
+
+---
+
 ### RoPE + RMSNorm DECLINE-PENDING-CONSUMER (chapters 八百七十四 + 八百七十五 / M3036+M3041)
 
 Two MPSGraph kernels exist + ship (since chapter 四百三十一 RoPE +
