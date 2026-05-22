@@ -1607,8 +1607,10 @@ pub unsafe extern "C" fn bas_ranker_batched_cosine_simd(
 /// chapter 八百七十二 / M3026 — rayon parallel batched cosine via
 /// C ABI。 Same shape + same byte-equal guarantee as
 /// `bas_ranker_batched_cosine_simd` (sequential)。 Parallelism is
-/// across corpus rows;each row is scored independently so the
-/// rayon `par_chunks(dim).map().collect()` preserves output order。
+/// across corpus rows in chunks of 64 (CHUNK_ROWS const inside
+/// the Rust impl)。 Chapter 八百七十六.6 refactor wrote directly into
+/// the output via par_chunks_mut — byte-order preserved by slice
+/// arithmetic (chunk_idx * CHUNK_ROWS + r),not collect order。
 ///
 /// # Safety
 ///

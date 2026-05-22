@@ -393,6 +393,29 @@ chapter 八百七十六.5: ~87% Swift / 13.4% native
                   Test count: 871 parity 10→11, 876 audit 6→7.
                   7 consecutive review-pass HIGH catches —
                   meta-discipline holds.)
+chapter 八百七十六.6: ~87% Swift / 13.4% native
+                  (FINAL cleanup deferred items + 8th-pass
+                  review = ALL-CLEAR. Per user 「全面 一次性
+                  解决掉」 directive. Knives:
+                  - par_chunks_mut zero-copy refactor
+                    closes 7th-pass agent A MED-2 triple-
+                    allocation (byte-equality preserved
+                    3/3 Rust tests, perf noise-band-
+                    equivalent to original 1.74×)
+                  - NEW concurrent rayon test (8 invocations
+                    byte-equal — closes agent B MED-4)
+                  - 2 stale doc-blocks updated (LOW)
+                  - CHUNK_ROWS=64 documented as future tune
+                    point, NOT extracted to threshold per
+                    「亏的不要硬上」 — no production data
+                    warrants per-device tuning yet
+                  Test count: chapter 872 6→7.
+                  8 review-passes total: rounds 1-7 caught
+                  real HIGH every time, round 8 ALL-CLEAR
+                  (only 3 LOW cosmetic doc items) →
+                  meta-discipline reaches diminishing
+                  returns. Arc 871-876+.5+.6 SEALED with
+                  measurement-driven discipline throughout.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

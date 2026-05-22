@@ -217,11 +217,20 @@ pub fn batched_cosine_simd(
 /// 第二刀 v2 fix:par_chunks(CHUNK_ROWS * dim) batches 64 rows per
 /// task → ~64μs/task work vs ~1μs scheduling → real parallel win。
 ///
+/// chapter 八百七十六.6 / M3060:zero-copy refactor — replaced
+/// par_chunks + Vec<Vec<f32>> collect with par_chunks_mut writing
+/// directly into pre-sized output (closes 7th-pass agent A MED-2
+/// triple-allocation finding)。 Perf measurement post-refactor:
+/// 1.29-2.06× of sequential at 5K rows (noise-band-equivalent to
+/// the prior 1.74× single-run — chapter 872 ≥2× over Swift assertion
+/// satisfied with either version)。
+///
 /// Byte-equality with `batched_cosine_simd` is GUARANTEED because:
 ///   - Each row's dot+norm computation is independent of other rows
 ///     (no shared accumulator)
-///   - rayon's `par_chunks(CHUNK_ROWS * dim).flat_map(rows).map(...).collect()`
-///     preserves input order (collect into Vec maintains source order)
+///   - par_chunks_mut writes each row's score into its absolute
+///     output slot — order is preserved by slice arithmetic
+///     (chunk_idx * CHUNK_ROWS + r),not by collect order
 ///   - The same f64 promotion + manual 4-unrolled summation is used
 pub fn batched_cosine_simd_rayon(
     query: &[f32], corpus: &[f32], dim: usize,
@@ -249,19 +258,41 @@ pub fn batched_cosine_simd_rayon(
     // overhead。 Per-row parallelism (CHUNK_ROWS=1) measured 0.5×
     // slower than sequential at 1K rows;chunked v2 amortizes the
     // overhead properly。
+    //
+    // chapter 八百七十六.6 / M3060 zero-copy refactor:agent A
+    // 7th-pass MED-2 caught triple-allocation pattern (Vec<Vec<f32>>
+    // per task → extend_from_slice → C ABI copy)。 Replaced with
+    // par_chunks_mut writing directly into pre-sized output Vec —
+    // matches chapter 八百六十三 par_chunks_mut pattern。 Byte-equality
+    // preserved (same math,same chunk boundaries,same per-task
+    // tight loop)。
+    //
+    // TODO chapter 八百七十六.6: agent A MED-3 noted CHUNK_ROWS should
+    // be device-tunable (iPhone A-series may want larger,M-series
+    // Max may want smaller)。 Currently hardcoded at 64 per Mac mini
+    // measurement。 If/when host calibration shows a different
+    // optimum,refactor to take chunk_rows as a parameter +
+    // expose via BASAutoRouteThresholds.batchedCosineChunkRows。
+    // Not done here per 「亏的不要硬上」 — no production data shows
+    // 64 is wrong for any current target。
     const CHUNK_ROWS: usize = 64;
     use rayon::prelude::*;
-    let chunk_bytes = CHUNK_ROWS * dim;
-    let chunks: Vec<Vec<f32>> = corpus
-        .par_chunks(chunk_bytes)
-        .map(|chunk| {
-            // Process all rows in this chunk sequentially —
-            // tight inner loop with no rayon overhead per row。
-            let chunk_rows = chunk.len() / dim;
-            let mut out = Vec::with_capacity(chunk_rows);
+    let rows = corpus.len() / dim;
+    let mut out = vec![0.0_f32; rows];
+    // par_chunks_mut by row count (one slot per row in out) zipped
+    // with par_chunks by row content (CHUNK_ROWS × dim per chunk) —
+    // can't easily zip two par_chunks of different stride,so
+    // par_chunks_mut by CHUNK_ROWS slots,read corresponding corpus
+    // chunk by index calculation。
+    out.par_chunks_mut(CHUNK_ROWS)
+        .enumerate()
+        .for_each(|(chunk_idx, out_chunk)| {
+            let row_offset = chunk_idx * CHUNK_ROWS;
+            let chunk_rows = out_chunk.len();
             for r in 0..chunk_rows {
-                let row_start = r * dim;
-                let row = &chunk[row_start..row_start + dim];
+                let row_start = (row_offset + r) * dim;
+                let row =
+                    &corpus[row_start..row_start + dim];
                 let mut dot = 0.0_f64;
                 let mut nb_sq = 0.0_f64;
                 let mut i = 0;
@@ -288,22 +319,13 @@ pub fn batched_cosine_simd_rayon(
                     i += 1;
                 }
                 if nb_sq == 0.0 {
-                    out.push(0.0_f32);
+                    out_chunk[r] = 0.0_f32;
                 } else {
-                    out.push(
-                        (dot / (q_norm * nb_sq.sqrt())) as f32);
+                    out_chunk[r] =
+                        (dot / (q_norm * nb_sq.sqrt())) as f32;
                 }
             }
-            out
-        })
-        .collect();
-    // Flatten chunks into final output — preserves order because
-    // par_chunks emits chunks in index order and collect preserves
-    let total = corpus.len() / dim;
-    let mut out = Vec::with_capacity(total);
-    for chunk in chunks {
-        out.extend_from_slice(&chunk);
-    }
+        });
     out
 }
 

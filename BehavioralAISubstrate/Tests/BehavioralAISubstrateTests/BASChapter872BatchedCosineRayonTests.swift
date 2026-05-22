@@ -283,4 +283,91 @@ final class BASChapter872BatchedCosineRayonTests: XCTestCase {
     func testBench3WayAt5KCorpus() {
         bench3WayAt(rows: 5000, dim: 384, iterations: 10)
     }
+
+    // MARK: - Chapter 八百七十六.6 — concurrent rayon correctness
+    //
+    // Agent B 7th-pass MED-4 noted: bas_ranker_batched_cosine_simd_rayon
+    // uses the process-global rayon thread pool。 Multiple test
+    // classes / production callers invoking concurrently could
+    // exhibit thread-pool contention or — worse — race conditions
+    // if the C ABI's slice handling is unsafe under concurrent
+    // calls。 This test pins that 8 concurrent invocations produce
+    // BYTE-EQUAL output to a single sequential reference run。
+
+    func testConcurrentRayonInvocationByteEqual()
+        async throws
+    {
+        let dim = 64
+        let rows = 3500  // above rayon threshold
+        let (q, c) = makeQueryAndCorpus(
+            rows: rows, dim: dim)
+
+        // Reference single-call output
+        var refScores = [Float](repeating: 0, count: rows)
+        let rcRef = q.withUnsafeBufferPointer { qp in
+            c.withUnsafeBufferPointer { cp in
+                refScores
+                    .withUnsafeMutableBufferPointer { op in
+                    bas_ranker_batched_cosine_simd_rayon(
+                        qp.baseAddress, q.count,
+                        cp.baseAddress, c.count,
+                        dim, op.baseAddress)
+                }
+            }
+        }
+        XCTAssertEqual(rcRef, 0)
+
+        // 8 concurrent invocations via TaskGroup。 The for-await
+        // collection is sequential per Swift Concurrency design,
+        // so no shared mutable state — safe without locking。
+        let qLocal = q
+        let cLocal = c
+        var allResults: [[Float]] = []
+
+        try await withThrowingTaskGroup(
+            of: [Float].self
+        ) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    var scores = [Float](
+                        repeating: 0, count: rows)
+                    let rc = qLocal.withUnsafeBufferPointer
+                        { qp in
+                        cLocal.withUnsafeBufferPointer { cp in
+                            scores
+                                .withUnsafeMutableBufferPointer
+                                { op in
+                                bas_ranker_batched_cosine_simd_rayon(
+                                    qp.baseAddress,
+                                    qLocal.count,
+                                    cp.baseAddress,
+                                    cLocal.count,
+                                    dim, op.baseAddress)
+                            }
+                        }
+                    }
+                    XCTAssertEqual(rc, 0,
+                        "Concurrent invocation must succeed")
+                    return scores
+                }
+            }
+            for try await result in group {
+                allResults.append(result)
+            }
+        }
+
+        XCTAssertEqual(allResults.count, 8,
+            "8 concurrent invocations must complete")
+        for (idx, result) in allResults.enumerated() {
+            XCTAssertEqual(result.count, rows,
+                "Result \(idx) must have \(rows) scores")
+            for i in 0..<rows {
+                XCTAssertEqual(
+                    result[i].bitPattern,
+                    refScores[i].bitPattern,
+                    "Concurrent run \(idx) row \(i) " +
+                    "must byte-equal reference (no race)")
+            }
+        }
+    }
 }

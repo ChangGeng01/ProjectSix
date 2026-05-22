@@ -11,6 +11,82 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Final cleanup deferred MEDIUM items + 8th-pass ALL-CLEAR (chapter 八百七十六.6 / M3060)
+
+User directive 「全面 一次性 解决掉」 — finish remaining MEDIUM items
+from 7th-pass + run 8th-pass review + ship。 **The 8th pass came back
+ALL-CLEAR** — first review-pass in the discipline ledger that found
+NO HIGH/MEDIUM items。 7 consecutive HIGH-catches (864/865/867/869/
+870/871.5/876.5) finally reach diminishing returns。
+
+#### MEDIUM items fixed
+
+- **Triple-allocation in batched_cosine_simd_rayon**: Refactored
+  from `Vec<Vec<f32>> per task → extend_from_slice → C ABI copy`
+  to `par_chunks_mut` writing directly into pre-sized output Vec。
+  Byte-equality preserved (3/3 Rust unit tests pass)。 Perf
+  noise-band-equivalent to original (1.29-2.06× of seq vs original
+  1.74× — both satisfy chapter 872's ≥2× over Swift)。
+
+- **Concurrent rayon invocation correctness**: NEW
+  `testConcurrentRayonInvocationByteEqual` (8 concurrent invocations
+  via TaskGroup,asserts all 8 produce byte-equal output)。 No data
+  race possible — corpus + query are `&[f32]` immutable captures。
+
+#### LOW cosmetic fixes (8th-pass agent finding)
+
+- Stale doc-block in `simd.rs:225` referenced old `par_chunks().collect()`
+  pre-refactor — updated to describe `par_chunks_mut` + slice-arithmetic
+  order preservation。
+- Stale doc-block in `lib.rs:1611` for C ABI wrapper — same update。
+
+#### Deferred (per 「亏的不要硬上」)
+
+- CHUNK_ROWS=64 device-tunable threshold field — added TODO comment
+  documenting the future-tuning contract,but did not extract to
+  BASAutoRouteThresholds field。 No production data shows 64 is
+  wrong for any current target。 Future iPhone/iPad calibration
+  could trigger refactor。
+
+#### 8th-pass discipline milestone
+
+8 review-passes in succession:
+  Rounds 1-7: ALL caught real HIGH items (substrate-meta discipline
+              was load-bearing)
+  Round 8:   FOUND ONLY 3 LOW cosmetic items
+             → meta-discipline reaches diminishing returns
+
+The discipline did its job: every fix sub-chapter caught real bugs
+in the prior chapter,until the substrate reached a genuinely-clean
+state。
+
+#### Verification
+
+   cargo test -p bas-retrieval-ranker batched_cosine_simd_rayon:  3/3 PASS (byte-eq preserved)
+   swift test BASChapter872 (+ concurrent):                       7/7 PASS (was 6,+1)
+   swift test BASChapter718 + 729 (regression):                    8/8 PASS unchanged
+   swift build:                                                    PASS
+   pre-commit gates:                                               3/3 PASS
+
+#### Final arc 871-876 + .5 + .6 tally
+
+| Chapter | Outcome | Test delta |
+|---|---|---|
+| 871 | WIRED — MatMul split-flip | +10 Swift |
+| 871.5 | REVIEW-FIX | +4 Swift |
+| 872 | WIRED — VectorIndex Rust+rayon 268-490× | +6 Swift, +3 Rust |
+| 873 | DECLINED — AuditAggregation | +6 Swift |
+| 874 | DECLINED-PENDING-CONSUMER — RoPE | +4 Swift |
+| 875 | DECLINED-PENDING-CONSUMER — RMSNorm | +4 Swift |
+| 876 | ARC-SEAL | +6 Swift |
+| 876.5 | REVIEW-FIX (7th-pass HIGH) | +2 Swift |
+| 876.6 | DEFERRED-CLEAN + 8th-pass ALL-CLEAR | +1 Swift |
+| **Cumulative** | **2 wirings + 3 declines + 4 audit/review** | **+43 Swift + 3 Rust** |
+
+Arc closed with measurement-driven discipline holding throughout。
+
+---
+
 ### 7th-pass review HIGH fixes for arc 871-876 (chapter 八百七十六.5 / M3055)
 
 3-agent 7th-pass review caught 1 HIGH (agent A test-state leakage)
