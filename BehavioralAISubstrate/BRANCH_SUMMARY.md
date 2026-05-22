@@ -293,6 +293,34 @@ chapter 八百七十一.5: ~87% Swift (raw) / 13.3% native (raw)
                     within 1e-2 at K=256)
                   Test count: chapter 871 6 → 871+871.5 10
                   parity tests.)
+chapter 八百七十二: ~87% Swift (raw) / 13.4% native (raw)
+                  (BASVectorIndex Rust+rayon completion.
+                  Per「全面 开发」 directive. 6+1 knives:
+                  1. NEW batched_cosine_simd_rayon Rust
+                     fn + rayon=1.10 dep added
+                  2. First knife rayon v1 (par_chunks(dim)
+                     = 1 row/task) MEASURED SLOWER than
+                     sequential SIMD at 1K/5K (0.51-0.55×).
+                     Per-row work ~1μs below rayon overhead.
+                     Same scenario chapter 八百五十二 hit first.
+                  3. Rework as chunked v2 (CHUNK_ROWS=64 →
+                     ~64μs/task) — measured 1.74× faster
+                     than seq at 5K rows + 490× faster than
+                     Swift per-pair loop. WIN at corpus≥3K.
+                  4. NEW C ABI + Swift bridge with auto-
+                     routing via new batchedCosineRayonMinRows
+                     threshold (default 3000 — conservative
+                     middle of measured 1K-5K crossover).
+                  5. NEW .rustBatchedCosineRayon enum case.
+                  6. FLIP BASVectorIndex.useBatchedTopK
+                     default false→true (chapter 718 set
+                     opt-in based on per-pair-Rust vs
+                     batched-Rust which was close; chapter
+                     872 measures Swift loop vs Rust batched
+                     where Rust wins 268-490×).
+                  Test count: +6 chapter 872 + 3 Rust unit
+                  tests. Chapter 718 + 727 + 729 vector
+                  tests STILL PASS unchanged.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

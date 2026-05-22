@@ -11,6 +11,89 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### BASVectorIndex Rust+rayon completion + chunked v2 (chapter 八百七十二 / M3026)
+
+Continues arc 871-876 per 「全面 开发」 directive。 Second wiring chapter:
+**bas_ranker_batched_cosine_simd_rayon** + transparent auto-routing
+through `BASAutoRouteRanker.batchedCosineSimilarity` + flipped
+`BASVectorIndex.useBatchedTopK` default from false → true。
+
+#### Discovery flow (per 「亏的不要硬上」)
+
+**First knife** measured naive v1 rayon (par_chunks(dim) = 1 row per
+task) at 1K + 5K corpus:
+
+| Shape | Swift per-pair | Rust seq SIMD | Rust rayon v1 | Notes |
+|---|---|---|---|---|
+| 1K × 384 | 49,549,250 ns | **172,584 ns** | 325,375 ns | rayon v1 0.53× of seq — LOSES |
+| 5K × 384 | 270,035,834 ns | **1,056,458 ns** | 2,055,792 ns | rayon v1 0.51× of seq — LOSES |
+
+Per-row work (~1μs at dim=384) below rayon scheduling overhead
+(~1μs/task)。 Same scenario chapter 八百五十二 first hit。
+
+**Second knife** chunked v2 (par_chunks(CHUNK_ROWS=64 × dim) →
+~64μs per task,well above scheduling overhead):
+
+| Shape | Swift per-pair | Rust seq SIMD | Rust rayon v2 (chunked) | Verdict |
+|---|---|---|---|---|
+| 1K × 384 | 43,257,417 ns | **161,167 ns** | 294,000 ns (0.55× of seq) | seq still wins,corpus too small |
+| 5K × 384 | 243,923,042 ns | 864,375 ns | **497,250 ns (1.74× of seq)** | rayon v2 WINS,490× over Swift |
+
+#### Knives
+
+- **Knife 1**: Add `rayon = "1.10"` dep to bas-retrieval-ranker
+  Cargo.toml + NEW `batched_cosine_simd_rayon` Rust function +
+  3 byte-equality tests against sequential SIMD (passing at
+  100 + 1000 + edge-cases)。
+- **Knife 2**: Rework rayon function to use chunked granularity
+  (CHUNK_ROWS=64 per task) after first-knife measurement showed
+  v1 LOST at production shapes。 Byte-equality preserved。
+- **Knife 3**: NEW C ABI `bas_ranker_batched_cosine_simd_rayon`
+  + header export in bas-memory-usage-tracker。 Rebuilt XCFramework
+  (3 slices)。
+- **Knife 4**: NEW Swift bridge — `BASAutoRouteRanker.batchedCosineSimilarity`
+  now auto-routes to rayon when `nRows ≥ thresholds.batchedCosineRayonMinRows`
+  (default 3000)。 Added `.rustBatchedCosineRayon` enum case +
+  `batchedCosineRayonMinRows: Int = 3000` threshold field。
+- **Knife 5**: NEW `BASChapter872BatchedCosineRayonTests.swift`
+  (6 tests):
+  - Byte-equality between seq + rayon at 1K corpus
+  - Routing pin below threshold (100,2000 rows → seq)
+  - Routing pin at/above threshold (3000,10K rows → rayon)
+  - Custom-threshold override (5K rows + 50K threshold → seq)
+  - 3-way bench at 1K + 5K (printed + asserted ≥2× over Swift)
+
+- **Knife 6** (Brain integration): FLIP `BASVectorIndex.useBatchedTopK`
+  default `false → true`。 Per chapter 八百七十二 data,Rust batched
+  path is 268-490× FASTER than current Swift per-pair loop at
+  production shapes — the chapter 七百十八 「per-pair wins 2.5-7%」
+  finding measured Rust per-pair vs Rust batched,not Swift vs
+  Rust。 Chapter 七百十八 byte-equality tests + chapter 727 int8
+  tests still all PASS unchanged。
+
+- **Knife 7** (next): 3-agent review dispatch
+
+#### Verification
+
+   cargo test -p bas-retrieval-ranker batched_cosine_simd_rayon:  3/3 PASS
+   swift test BASChapter872BatchedCosineRayon:                    6/6 PASS
+   swift test BASChapter718Vector* (regression check):            5/5 PASS unchanged
+   swift test BASChapter727Int8Vector + BASChapter729PQIndex:      3/3 PASS unchanged
+   swift build:                                                    PASS
+   pre-commit gates:                                               3/3 PASS
+
+#### Production impact
+
+`BASVectorIndex.topK` (called every memory retrieval) now goes
+through Rust batched path by default:
+- Small corpora (< 3000 atoms): sequential SIMD (~268× faster than
+  Swift per-pair)
+- Production corpora (≥ 3000 atoms): rayon chunked v2 (~490× over
+  Swift,1.74× over sequential)
+- Adaptive — no manual flag,no config needed by callers。
+
+---
+
 ### 6th-pass review fixes for chapter 八百七十一 (chapter 八百七十一.5 / M3025)
 
 3-agent review of chapter 八百七十一 caught 3 HIGH + 2 MED items that

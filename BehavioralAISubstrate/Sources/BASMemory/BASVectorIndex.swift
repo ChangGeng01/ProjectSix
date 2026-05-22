@@ -138,21 +138,26 @@ public actor BASVectorIndex {
     public nonisolated(unsafe) static var useRoutedCosine:
         Bool = true
 
-    /// chapter 七百十八 第三刀 — second opt-in flag for the
-    /// BATCHED topK fast-path:builds a contiguous corpus
-    /// array once + single `bas_ranker_batched_cosine_simd`
+    /// chapter 七百十八 第三刀 — opt-in flag for the BATCHED
+    /// topK fast-path:builds a contiguous corpus array once
+    /// + single `bas_ranker_batched_cosine_simd` (or rayon)
     /// FFI hop。 Amortizes FFI overhead across all entries。
     ///
-    /// Default STAYS off per chapter 七百十八 第二刀:per-pair
-    /// Rust wins by 2.5-7% over batched at our measured sizes
-    /// (the O(N*dim) memcpy to build the contiguous corpus
-    /// cancels the FFI-amortization gain)。 Hosts with very
-    /// large stable corpora (≥ 10K entries × ≥ 768 dim) MAY
-    /// benefit from flipping this on,since the memcpy
-    /// amortizes across multiple queries against the same
-    /// corpus。
+    /// Chapter 八百七十二 / M3026 FLIP — default now TRUE。
+    /// Live measurement at chapter 八百七十二:
+    ///   - Rust seq SIMD batched at 1K corpus = **268× faster**
+    ///     than Swift per-pair loop (43.3ms → 161μs)
+    ///   - Rust rayon batched at 5K corpus = **490× faster**
+    ///     than Swift per-pair (244ms → 497μs,1.74× over seq)
+    /// Chapter 七百十八's「per-pair wins 2.5-7%」 measured PER-PAIR
+    /// Rust FFI vs BATCHED Rust FFI;chapter 八百七十二 measures
+    /// SWIFT loop (current default) vs Rust batched,where the
+    /// Rust path wins overwhelmingly at production shapes (1K+
+    /// atoms = standard memory-retrieval corpus size)。 The
+    /// chapter 八百七十二 rayon-auto threshold (corpus ≥ 3000) is
+    /// applied transparently inside batchedCosineSimilarity。
     public nonisolated(unsafe) static var useBatchedTopK:
-        Bool = false
+        Bool = true
 
     // MARK: - Errors
 

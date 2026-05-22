@@ -209,6 +209,104 @@ pub fn batched_cosine_simd(
     out
 }
 
+/// chapter 八百七十二 / M3026 — rayon-parallel batched cosine。
+/// First version (par_chunks(dim) = 1 row per task) MEASURED SLOWER
+/// than sequential SIMD at 1K/5K rows (chapter 八百七十二 first-knife
+/// data showed 0.51-0.53× of sequential — rayon scheduling overhead
+/// ~1μs/task dominates the ~1μs/row work at dim=384)。 Chapter 八百七十二
+/// 第二刀 v2 fix:par_chunks(CHUNK_ROWS * dim) batches 64 rows per
+/// task → ~64μs/task work vs ~1μs scheduling → real parallel win。
+///
+/// Byte-equality with `batched_cosine_simd` is GUARANTEED because:
+///   - Each row's dot+norm computation is independent of other rows
+///     (no shared accumulator)
+///   - rayon's `par_chunks(CHUNK_ROWS * dim).flat_map(rows).map(...).collect()`
+///     preserves input order (collect into Vec maintains source order)
+///   - The same f64 promotion + manual 4-unrolled summation is used
+pub fn batched_cosine_simd_rayon(
+    query: &[f32], corpus: &[f32], dim: usize,
+) -> Vec<f32> {
+    if dim == 0 || corpus.is_empty() || query.len() != dim {
+        return Vec::new();
+    }
+    let q_norm_sq = {
+        let mut s = 0.0_f64;
+        for i in 0..dim {
+            let q = query[i] as f64;
+            s += q * q;
+        }
+        s
+    };
+    if q_norm_sq == 0.0 {
+        let rows = corpus.len() / dim;
+        return vec![0.0; rows];
+    }
+    let q_norm = q_norm_sq.sqrt();
+
+    // chapter 八百七十二 第二刀 — CHUNKED parallelism。 CHUNK_ROWS=64
+    // means each rayon task processes 64 rows × dim work,giving
+    // ~64μs/task at dim=384 — well above rayon's ~1μs scheduling
+    // overhead。 Per-row parallelism (CHUNK_ROWS=1) measured 0.5×
+    // slower than sequential at 1K rows;chunked v2 amortizes the
+    // overhead properly。
+    const CHUNK_ROWS: usize = 64;
+    use rayon::prelude::*;
+    let chunk_bytes = CHUNK_ROWS * dim;
+    let chunks: Vec<Vec<f32>> = corpus
+        .par_chunks(chunk_bytes)
+        .map(|chunk| {
+            // Process all rows in this chunk sequentially —
+            // tight inner loop with no rayon overhead per row。
+            let chunk_rows = chunk.len() / dim;
+            let mut out = Vec::with_capacity(chunk_rows);
+            for r in 0..chunk_rows {
+                let row_start = r * dim;
+                let row = &chunk[row_start..row_start + dim];
+                let mut dot = 0.0_f64;
+                let mut nb_sq = 0.0_f64;
+                let mut i = 0;
+                while i + 4 <= dim {
+                    let q0 = query[i] as f64;
+                    let q1 = query[i + 1] as f64;
+                    let q2 = query[i + 2] as f64;
+                    let q3 = query[i + 3] as f64;
+                    let r0 = row[i] as f64;
+                    let r1 = row[i + 1] as f64;
+                    let r2 = row[i + 2] as f64;
+                    let r3 = row[i + 3] as f64;
+                    dot += q0 * r0 + q1 * r1
+                        + q2 * r2 + q3 * r3;
+                    nb_sq += r0 * r0 + r1 * r1
+                        + r2 * r2 + r3 * r3;
+                    i += 4;
+                }
+                while i < dim {
+                    let q = query[i] as f64;
+                    let rv = row[i] as f64;
+                    dot += q * rv;
+                    nb_sq += rv * rv;
+                    i += 1;
+                }
+                if nb_sq == 0.0 {
+                    out.push(0.0_f32);
+                } else {
+                    out.push(
+                        (dot / (q_norm * nb_sq.sqrt())) as f32);
+                }
+            }
+            out
+        })
+        .collect();
+    // Flatten chunks into final output — preserves order because
+    // par_chunks emits chunks in index order and collect preserves
+    let total = corpus.len() / dim;
+    let mut out = Vec::with_capacity(total);
+    for chunk in chunks {
+        out.extend_from_slice(&chunk);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,5 +433,75 @@ mod tests {
         let r3 = cosine_similarity_simd(&v, &v);
         assert_eq!(r1, r2);
         assert_eq!(r2, r3);
+    }
+
+    /// chapter 八百七十二 / M3026 — rayon parallel cosine batched
+    /// must produce BYTE-EQUAL output to sequential SIMD batched
+    /// per the chapter 八百六十三 par_chunks_mut ordering guarantee
+    /// (each row is independent,collect into Vec preserves order)。
+    #[test]
+    fn batched_cosine_simd_rayon_matches_sequential() {
+        let dim = 384;
+        let rows = 100;
+        let q: Vec<f32> = (0..dim).map(|i|
+            ((i as f32) * 0.03).sin()).collect();
+        let mut corpus: Vec<f32> = Vec::new();
+        for r in 0..rows {
+            for d in 0..dim {
+                corpus.push(
+                    (((r * dim + d) as f32) * 0.011).cos());
+            }
+        }
+        let seq = batched_cosine_simd(&q, &corpus, dim);
+        let par = batched_cosine_simd_rayon(&q, &corpus, dim);
+        assert_eq!(seq.len(), par.len());
+        // BYTE-EQUAL — same exact bit pattern,not just close
+        for i in 0..seq.len() {
+            assert_eq!(seq[i].to_bits(), par[i].to_bits(),
+                "row {} not byte-equal: seq={} par={}",
+                i, seq[i], par[i]);
+        }
+    }
+
+    #[test]
+    fn batched_cosine_simd_rayon_handles_edge_cases() {
+        // Empty corpus → empty output
+        assert!(batched_cosine_simd_rayon(
+            &[1.0, 2.0], &[], 2).is_empty());
+        // Query len ≠ dim → empty
+        assert!(batched_cosine_simd_rayon(
+            &[1.0, 2.0], &[1.0, 2.0, 3.0, 4.0], 3).is_empty());
+        // dim = 0 → empty
+        assert!(batched_cosine_simd_rayon(
+            &[1.0], &[1.0, 2.0], 0).is_empty());
+        // Zero query → all-zero output (same as sequential)
+        let q = vec![0.0_f32; 4];
+        let corpus = vec![1.0_f32; 8];
+        let out = batched_cosine_simd_rayon(&q, &corpus, 4);
+        assert_eq!(out, vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn batched_cosine_simd_rayon_large_corpus() {
+        // Stress test: 1000 rows × 384 dim — production scale
+        let dim = 384;
+        let rows = 1000;
+        let q: Vec<f32> = (0..dim).map(|i|
+            ((i as f32) * 0.007).sin()).collect();
+        let mut corpus: Vec<f32> = Vec::new();
+        for r in 0..rows {
+            for d in 0..dim {
+                corpus.push(
+                    (((r * dim + d) as f32) * 0.013).cos());
+            }
+        }
+        let seq = batched_cosine_simd(&q, &corpus, dim);
+        let par = batched_cosine_simd_rayon(&q, &corpus, dim);
+        assert_eq!(seq.len(), rows);
+        assert_eq!(par.len(), rows);
+        for i in 0..rows {
+            assert_eq!(seq[i].to_bits(), par[i].to_bits(),
+                "row {} drift at large corpus", i);
+        }
     }
 }

@@ -91,6 +91,21 @@ public struct BASAutoRouteThresholds:
     /// where the crossover shifts can lower this via calibration。
     public let batchedCosineMetalMinRows: Int
 
+    /// chapter 八百七十二 / M3026 — batched cosine Rust→rayon
+    /// parallel threshold。 Per chapter 八百七十二 第二刀 chunked
+    /// v2 LIVE measurement on Mac mini:
+    ///   - 1K rows × 384 dim: rayon 0.55× of seq (LOSES,
+    ///     chunk-64 batch still too small at this corpus)
+    ///   - 5K rows × 384 dim: rayon 1.74× of seq (WINS,
+    ///     chunk count amortizes scheduling)
+    /// Default 3000 sits in the conservative middle — at this
+    /// threshold parallel begins winning。 Production retrieval
+    /// typically operates on 1K-50K corpora so this default
+    /// favors sequential at the lower end + parallel at the
+    /// higher end。 Hosts with consistently large corpora can
+    /// lower this via calibration。
+    public let batchedCosineRayonMinRows: Int
+
     public init(
         cosineSIMDMinDim: Int = 64,
         sha256CryptoKitMinBytes: Int = 1024,
@@ -99,7 +114,8 @@ public struct BASAutoRouteThresholds:
         matMulMPSGraphActorMinProduct: Int = 16_777_216,
         layerNormSIMDMinDim: Int = 128,
         geluTanhSIMDMinDim: Int = 256,
-        batchedCosineMetalMinRows: Int = 16384
+        batchedCosineMetalMinRows: Int = 16384,
+        batchedCosineRayonMinRows: Int = 3000
     ) {
         self.cosineSIMDMinDim = max(1, cosineSIMDMinDim)
         self.sha256CryptoKitMinBytes =
@@ -116,6 +132,8 @@ public struct BASAutoRouteThresholds:
             max(1, geluTanhSIMDMinDim)
         self.batchedCosineMetalMinRows =
             max(1, batchedCosineMetalMinRows)
+        self.batchedCosineRayonMinRows =
+            max(1, batchedCosineRayonMinRows)
     }
 
     /// Default measured M-series thresholds。
@@ -200,6 +218,12 @@ public enum BASAutoRouteChoice:
     /// chapter 七百十五 第四刀 — Batched cosine similarity。
     case rustBatchedCosine
     case metalBatchedCosine
+    /// chapter 八百七十二 / M3026 — rayon-parallel batched cosine
+    /// per row。 Auto-selected at corpus rows ≥
+    /// `BASAutoRouteThresholds.batchedCosineRayonMinRows` (default
+    /// 500)。 Byte-equal with `.rustBatchedCosine` (par_chunks
+    /// preserves collect order per chapter 八百六十三 pattern)。
+    case rustBatchedCosineRayon
 }
 
 /// chapter 七百十三 第四刀 — provenance-gate decision codes
@@ -1128,6 +1152,13 @@ public enum BASAutoRouteRanker {
     /// callers wanting the Metal fallback must use the brain
     /// helper that takes a dispatcher (chapter 七百十五 第四刀
     /// `BASCognitiveBrain.batchedCosineAuto`)。
+    ///
+    /// chapter 八百七十二 / M3026 — adaptive parallel routing:
+    /// when corpus has ≥ `thresholds.batchedCosineRayonMinRows`
+    /// rows,routes to the rayon-parallel C ABI for ~core-count
+    /// speedup at large-batch FFI amortization。 Below threshold
+    /// the sequential SIMD path wins (FFI overhead < rayon
+    /// scheduling overhead at small batches)。
     public static func batchedCosineSimilarity(
         query: [Float],
         corpus: [Float],
@@ -1147,22 +1178,34 @@ public enum BASAutoRouteRanker {
         }
         var scores = [Float](repeating: 0, count: nRows)
         #if os(iOS) || os(macOS)
+        let useRayon = nRows >=
+            thresholds.batchedCosineRayonMinRows
         let rc = query.withUnsafeBufferPointer { qp in
             corpus.withUnsafeBufferPointer { cp in
                 scores
                     .withUnsafeMutableBufferPointer { op in
-                    bas_ranker_batched_cosine_simd(
-                        qp.baseAddress, query.count,
-                        cp.baseAddress, corpus.count,
-                        dim,
-                        op.baseAddress)
+                    if useRayon {
+                        bas_ranker_batched_cosine_simd_rayon(
+                            qp.baseAddress, query.count,
+                            cp.baseAddress, corpus.count,
+                            dim,
+                            op.baseAddress)
+                    } else {
+                        bas_ranker_batched_cosine_simd(
+                            qp.baseAddress, query.count,
+                            cp.baseAddress, corpus.count,
+                            dim,
+                            op.baseAddress)
+                    }
                 }
             }
         }
         if rc == 0 {
             return BASAutoRouteResult(
                 value: scores,
-                choice: .rustBatchedCosine)
+                choice: useRayon
+                    ? .rustBatchedCosineRayon
+                    : .rustBatchedCosine)
         }
         #endif
         // Pure-Swift fallback (no FFI hop)

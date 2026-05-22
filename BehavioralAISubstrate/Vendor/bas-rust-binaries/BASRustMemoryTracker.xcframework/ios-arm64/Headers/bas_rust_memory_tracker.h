@@ -964,6 +964,17 @@ int32_t bas_ranker_batched_cosine_simd(
     size_t dim,
     float* out_scores);
 
+// chapter 八百七十二 / M3026 — rayon parallel batched cosine。
+// Same shape + byte-equal guarantee as bas_ranker_batched_cosine_simd
+// but parallelized across corpus rows for large-batch FFI amortization。
+int32_t bas_ranker_batched_cosine_simd_rayon(
+    const float* query,
+    size_t query_len,
+    const float* corpus,
+    size_t corpus_total_len,
+    size_t dim,
+    float* out_scores);
+
 // MARK: - chapter 七百八 第一刀 MatMul ABI
 //
 // f32 matrix multiplication: A (M×K) × B (K×N) = C (M×N)

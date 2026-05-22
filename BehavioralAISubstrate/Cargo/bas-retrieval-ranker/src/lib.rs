@@ -1604,6 +1604,49 @@ pub unsafe extern "C" fn bas_ranker_batched_cosine_simd(
     0
 }
 
+/// chapter 八百七十二 / M3026 — rayon parallel batched cosine via
+/// C ABI。 Same shape + same byte-equal guarantee as
+/// `bas_ranker_batched_cosine_simd` (sequential)。 Parallelism is
+/// across corpus rows;each row is scored independently so the
+/// rayon `par_chunks(dim).map().collect()` preserves output order。
+///
+/// # Safety
+///
+/// Same as `bas_ranker_batched_cosine_simd`:caller must ensure
+/// `query` has `query_len` valid f32s,`corpus` has
+/// `corpus_total_len` valid f32s,and `out_scores` has at least
+/// `corpus_total_len / dim` writable f32 slots。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_batched_cosine_simd_rayon(
+    query: *const f32,
+    query_len: usize,
+    corpus: *const f32,
+    corpus_total_len: usize,
+    dim: usize,
+    out_scores: *mut f32,
+) -> i32 {
+    if query.is_null() || corpus.is_null()
+        || out_scores.is_null()
+    { return -1; }
+    if dim == 0 || query_len != dim { return -1; }
+    if corpus_total_len % dim != 0 { return -1; }
+    let rows = corpus_total_len / dim;
+    let q = unsafe {
+        core::slice::from_raw_parts(query, query_len)
+    };
+    let c = unsafe {
+        core::slice::from_raw_parts(corpus, corpus_total_len)
+    };
+    let scores = simd::batched_cosine_simd_rayon(q, c, dim);
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, rows)
+    };
+    for (i, s) in scores.iter().enumerate() {
+        out_slice[i] = *s;
+    }
+    0
+}
+
 /// Batched cosine — query × corpus (rows × dim row-major) →
 /// `out_scores` (length `corpus_rows`)。 Returns -1 on null
 /// pointer or invalid shapes, otherwise 0。
