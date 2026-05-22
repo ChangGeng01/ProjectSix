@@ -236,6 +236,43 @@ chapter 八百七十: ~87% Swift (raw) / 13.3% native (raw)
                   30.48× direct — brain reuse is even more
                   efficient). Full test sweep: 13,331 tests,
                   29 skipped, 0 failures. No ratio change.)
+chapter 八百七十一: ~87% Swift (raw) / 13.3% native (raw)
+                  (MPSGraph matMul SPLIT-FLIP + naming-
+                  legacy correction. First wiring of arc
+                  871-876 per user 「最极致 最优雅 / 有收益
+                  不会亏 多做比较 灵活变通」. 5 knives:
+                  1. LIVE 5-way matMul benchmark on Mac
+                     mini captured (Rust naive/blocked +
+                     Metal MSL + MPSGraph cold/warm at
+                     128/256/512 cube shapes)
+                  2. Discovered naming legacy: existing
+                     .metalMatMulMPSGraph enum case is
+                     misnamed — routes to MSL kernel,not
+                     MPSGraph actor. Same false-naming
+                     pattern as chapter 八百六十八 FlashAttention.
+                     Added NEW .metalMatMulMPSGraphActor
+                     case for the TRUE MPSGraph path.
+                  3. NEW brain.mpsGraphMatMul(...) method +
+                     mpsGraphMatMulKernel stored prop (no
+                     separate cache — kernel uses MPSGraph's
+                     own internal exec cache)
+                  4. SPLIT-FLIP routing rule (not wholesale —
+                     unlike chapter 八百七十 attention): small
+                     shapes (<16M workProduct) STAY on MSL
+                     where it wins 1.89×; large shapes (≥16M
+                     = 256³+) FLIP to MPSGraph actor where
+                     it wins 1.07-1.38×. 「亏的不要硬上」
+                     applied — wholesale flip would lose
+                     small shapes.
+                  5. NEW BASChapter871 parity tests (6) +
+                     5-way benchmark tests (4). brain cache
+                     speedup 14.20× measured (less than
+                     chapter 八百七十 attention 62.78× because
+                     matmul kernel is structurally simpler).
+                     Chapter 七百八 existing routing tests
+                     unchanged — 128³ still pins MSL
+                     correctly since it's below new 16M cut.
+                  No ratio change.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

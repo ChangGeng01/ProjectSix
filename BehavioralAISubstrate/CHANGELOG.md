@@ -11,6 +11,73 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### MPSGraph matMul split-flip + naming-legacy correction (chapter 八百七十一 / M3021)
+
+Continuation of arc 八百七十一-八百七十六 per user 「目前 还有 哪些 部分
+可以 swift 移植 其他 语言 / 最极致 最优雅 / 有收益 不会亏 多做比较
+灵活变通」 directive。 First wiring chapter:**BASMPSGraphMatMulKernel
+actor**。 Chapter 八百七十 attention pattern showed wholesale flip wins
+(2.31-3.09× at all production shapes)。 Chapter 八百七十一 measurement
+showed matMul is DIFFERENT — MPSGraph wins only at LARGE shapes,MSL
+beats MPSGraph at small。 Ships SPLIT-FLIP per 「亏的不要硬上」。
+
+#### LIVE 5-way measurement on Mac mini
+
+| Shape (M³) | Rust naive | Rust blocked | Metal MSL | MPSGraph cold | MPSGraph warm | Winner |
+|---|---|---|---|---|---|---|
+| 128³ | 1,739,208 | 917,250 | **509,292** | 2,527,875 | 962,500 | **MSL** (1.89× vs MPS warm) |
+| 256³ | 29,296,875 | 8,463,333 | 1,283,042 | 2,681,958 | **1,196,958** | **MPSGraph warm** (1.07× ~tie) |
+| 512³ | 448,742,000 | 111,368,500 | 3,224,500 | 6,366,375 | **2,337,125** | **MPSGraph warm** (1.38×) |
+
+#### Naming-legacy discovery
+
+`BASAutoRouteChoice.metalMatMulMPSGraph` (existing since chapter 七百八)
+is **misleadingly named** — it routes to MSL kernel `matmul_float32`
+via `BASMetalMatMulDispatcher`,NOT to `BASMPSGraphMatMulKernel` actor。
+Same false-naming pattern chapter 八百六十八 caught for FlashAttention's
+「1.24-1.62× faster」 doc claim。 Renaming in-place would break all
+callers + tests + doctrine SQL records,so chapter 八百七十一 keeps
+the existing case but ADDS a new case `.metalMatMulMPSGraphActor`
+for the true MPSGraph path — plus documents the naming legacy inline。
+
+#### Knives
+
+- **Knife 1**: NEW `BASChapter871MatMul5WayBenchmarkTests.swift`
+  (4 tests) capturing live 5-way data + numerical agreement pin
+- **Knife 2**: NEW `.metalMatMulMPSGraphActor` enum case + naming-legacy comment
+- **Knife 3**: NEW `brain.mpsGraphMatMul(...)` public method +
+  `mpsGraphMatMulKernel` stored prop (lazy-init,no separate cache
+  since the kernel uses MPSGraph's internal exec cache)
+- **Knife 4**: SPLIT-FLIP `matMulChoice` ranker rule:
+  - prod < 8,192 → rustMatMulNaive
+  - 8,192 ≤ prod < 262,144 → rustMatMulBlocked
+  - 262,144 ≤ prod < 16,777,216 (256³) → metalMatMulMPSGraph (MSL kernel,small)
+  - prod ≥ 16,777,216 → metalMatMulMPSGraphActor (TRUE MPSGraph,large)
+- **Knife 5**: NEW `BASChapter871BrainMPSGraphMatMulParityTests.swift`
+  (6 tests:parity at 256³+512³,cache reuse,routing split-flip,
+  end-to-end auto dispatch,shape-mismatch error path)
+- **Knife 6** (next): 3-agent review dispatch
+
+#### Cache lifecycle observed
+
+   BENCH brain.mpsGraphMatMul cache reuse M=N=K=256:
+     cold (1st)   = 4,800,291 ns
+     warm (med20) =   338,042 ns
+     speedup = 14.20× (MPSGraph internal exec cache amortizes)
+
+Less than chapter 八百七十 attention's 62.78× (matmul kernel is
+simpler so per-call non-cached cost is lower),still meaningful。
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                              37/37 PASS (unchanged)
+   swift test BASChapter871MatMul5WayBenchmark:                4/4 PASS (LIVE data + pin)
+   swift test BASChapter871BrainMPSGraphMatMulParity:           6/6 PASS (NEW)
+   swift test BASChapter708MatMulAutoRoute:                     unchanged PASS
+   swift build:                                                  PASS
+
+---
+
 ### MPSGraph routing flip + Brain wiring + 5th-pass review fixes (chapter 八百七十 / M3016)
 
 User directive 「继续 1+2」 — 5th-pass review of chapter 八百六十九 +

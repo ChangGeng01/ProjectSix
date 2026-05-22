@@ -135,9 +135,33 @@ public enum BASAutoRouteChoice:
     case swiftCryptoKitHMAC
     case rustHMAC
     /// chapter 七百八 第三刀 — MatMul routing。
+    ///
+    /// NAMING LEGACY note (chapter 八百七十一 / M3021):
+    /// `.metalMatMulMPSGraph` is misleadingly named — it routes
+    /// to the MSL custom kernel `matmul_float32` via
+    /// `BASMetalMatMulDispatcher`,NOT to `BASMPSGraphMatMulKernel`
+    /// actor。 The enum-name implies MPSGraph but the work is
+    /// done by custom MSL since chapter 七百八。 Same false-naming
+    /// pattern chapter 八百六十八 caught for FlashAttention's
+    /// 「1.24-1.62× faster」 claim。
+    /// Renaming this case in-place would break all routing
+    /// callers + tests + doctrine SQL records,so chapter 八百七十一
+    /// keeps the existing case as-is + ADDS a new case
+    /// `.metalMatMulMPSGraphActor` for the true MPSGraph path。
     case rustMatMulNaive
     case rustMatMulBlocked
     case metalMatMulMPSGraph
+    /// chapter 八百七十一 / M3021 — TRUE MPSGraph matMul via
+    /// `BASMPSGraphMatMulKernel` actor (chapter 870 attention
+    /// recipe applied to matmul)。 Live measurement on Mac
+    /// mini at chapter 八百七十一:
+    ///   - 128³: MSL beats MPSGraph warm 1.89×
+    ///   - 256³: MPSGraph warm beats MSL 1.07× (~tie)
+    ///   - 512³: MPSGraph warm beats MSL 1.38×
+    /// → Split-flip: stays MSL at small shapes,routes to
+    /// MPSGraph actor at large (workProduct ≥ 16M)。 See
+    /// `matMulChoice` for the threshold logic。
+    case metalMatMulMPSGraphActor
     /// chapter 七百九 第四刀 — Softmax routing。
     case rustSoftmaxScalar
     /// chapter 七百九 第四刀 — LayerNorm routing。
@@ -742,8 +766,27 @@ public enum BASAutoRouteRanker {
         thresholds: BASAutoRouteThresholds = .mSeriesDefault
     ) -> BASAutoRouteChoice {
         let prod = shape.workProduct
+        // chapter 八百七十一 / M3021 — split-flip based on live
+        // 5-way measurement at Mac mini:
+        //   prod ≥ 16M → MPSGraph actor (warm) beats MSL 1.38×
+        //                at 512³ (workProduct=134M),narrow win
+        //                at 256³ (workProduct=16.7M,1.07× tie)
+        //   prod ≥ 262144 + < 16M → MSL custom kernel still
+        //                wins (1.89× faster than MPSGraph at 128³)
+        //   prod < 262144 → Rust paths win,Metal dispatch
+        //                overhead too high
+        //
+        // 16M threshold = 256³ — at exactly the crossover point
+        // both are within noise,but the trend at larger shapes
+        // is decisively MPSGraph,so cut at 16M。 Could be tuned
+        // higher (e.g. 32M = 320³) if production data shows
+        // 256³ shapes are actually faster on MSL on different
+        // hardware。
+        if prod >= 16_777_216 {  // 256³ workProduct = 16,777,216
+            return .metalMatMulMPSGraphActor
+        }
         if prod >= thresholds.matMulMetalMinProduct {
-            return .metalMatMulMPSGraph
+            return .metalMatMulMPSGraph  // routes to MSL despite name
         }
         if prod < 8_192 {
             return .rustMatMulNaive

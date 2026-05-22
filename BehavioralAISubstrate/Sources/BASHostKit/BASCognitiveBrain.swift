@@ -218,6 +218,18 @@ public actor BASCognitiveBrain {
     fileprivate var mpsGraphAttentionCache:
         BASMPSGraphExecutableCache?
 
+    /// chapter 八百七十一 / M3021 — MPSGraph matMul kernel,
+    /// lazily built on first use。 NOTE: unlike the attention
+    /// kernel, BASMPSGraphMatMulKernel.init() does NOT accept
+    /// a BASMPSGraphExecutableCache parameter — the kernel
+    /// uses MPSGraph's internal executable caching on its own
+    /// device。 Reusing the SAME kernel instance across calls
+    /// is what amortizes the compile cost (chapter 八百七十一
+    /// measured ~2.6× difference between per-call new kernel
+    /// and shared-kernel for 512³ matMul)。
+    fileprivate var mpsGraphMatMulKernel:
+        BASMPSGraphMatMulKernel?
+
     /// 主线 继续 开发 — optional brain-owned health
     /// snapshot history。 Configured at init via the
     /// `healthSnapshotHistoryCapacity` parameter。 nil
@@ -2490,6 +2502,51 @@ extension BASCognitiveBrain {
             b: b, bRows: bRows, bCols: bCols)
     }
 
+    /// chapter 八百七十一 / M3021 — MPSGraph matMul dispatch via
+    /// `BASMPSGraphMatMulKernel` actor。 Distinct from
+    /// `brain.matmul(...)` which routes to the MSL custom kernel
+    /// `matmul_float32` (the confusingly-named
+    /// `.metalMatMulMPSGraph` enum case has historically routed
+    /// to MSL despite the name — see naming-legacy comment on
+    /// the BASAutoRouteChoice enum)。
+    ///
+    /// Live measurement at chapter 八百七十一 5-way benchmark:
+    /// MPSGraph (warm) wins at workProduct ≥ 16M (256³ ~tie,
+    /// 512³ 1.38× faster than MSL)。 The auto-router at
+    /// `matMulAuto` routes large shapes here。
+    public func mpsGraphMatMul(
+        a: [Float], aRows: Int, aCols: Int,
+        b: [Float], bRows: Int, bCols: Int
+    ) async throws -> [Float] {
+        guard aCols == bRows else {
+            throw BASMetalMatMulDispatcherError
+                .shapeMismatch(
+                    message: "mpsGraphMatMul: aCols " +
+                        "(\(aCols)) != bRows (\(bRows))")
+        }
+        guard aRows > 0, aCols > 0, bCols > 0 else {
+            throw BASMetalMatMulDispatcherError
+                .zeroDimension
+        }
+        if mpsGraphMatMulKernel == nil {
+            mpsGraphMatMulKernel =
+                try BASMPSGraphMatMulKernel()
+        }
+        guard let kernel = mpsGraphMatMulKernel else {
+            throw BASMetalMatMulDispatcherError
+                .libraryUnavailable(
+                    message: "mpsGraphMatMulKernel nil")
+        }
+        let inputs = BASCanonicalKernelInputBuilders
+            .matMul(a: a, b: b,
+                M: aRows, K: aCols, N: bCols)
+        let out = try await kernel.evaluate(inputs: inputs)
+        return BASCanonicalKernelInputBuilders
+            .dataToFloatArray(
+                out.payloads[0],
+                elementCount: aRows * bCols)
+    }
+
     /// 主线 全面 开发 — Metal single-head scaled-dot-
     /// product attention。 Per blueprint:Metal owns
     /// attention。 Computes softmax(Q · K^T / sqrt(D))
@@ -2837,12 +2894,27 @@ extension BASCognitiveBrain {
             shape: shape, thresholds: thresholds)
         switch choice {
         case .metalMatMulMPSGraph:
+            // Misleadingly-named case — routes to MSL kernel
+            // (matmul_float32) per the naming-legacy note on
+            // the enum。 brain.matmul calls
+            // BASMetalMatMulDispatcher,not BASMPSGraphMatMulKernel。
             let value = try await matmul(
                 a: a, aRows: aRows, aCols: aCols,
                 b: b, bRows: bRows, bCols: bCols)
             return BASAutoRouteResult(
                 value: value,
                 choice: .metalMatMulMPSGraph)
+        case .metalMatMulMPSGraphActor:
+            // chapter 八百七十一 / M3021 — TRUE MPSGraph actor
+            // path via shared kernel instance。 Routed by the
+            // ranker for workProduct ≥ 16M where chapter 八百七十一
+            // measured MPSGraph beats MSL 1.07-1.38×。
+            let value = try await mpsGraphMatMul(
+                a: a, aRows: aRows, aCols: aCols,
+                b: b, bRows: bRows, bCols: bCols)
+            return BASAutoRouteResult(
+                value: value,
+                choice: .metalMatMulMPSGraphActor)
         case .rustMatMulNaive, .rustMatMulBlocked:
             #if os(iOS) || os(macOS)
             var c = [Float](
