@@ -11,6 +11,84 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### FlashAttention false-perf-claim correction (chapter 八百六十八 第一刀 / M2996)
+
+User directive 「1 + 2」 — third-pass review (chapter 八百六十七 above) +
+FlashAttention perf-measurement arc opener (THIS chapter)。 Agent D
+scout report flagged that the chapter 七百七 attention tournament was
+print-only (no assertions),and the BASCognitiveBrain.swift:2868 doc
+claim「FlashAttention is 1.24-1.62× faster than scaled_dot_product」
+was UNBACKED by any pinned test。
+
+LIVE measurement on this Mac mini (run as part of chapter 八百六十八)
+captured the actual ordering:
+
+| Shape (M, N, D) | Metal std ns | Metal Flash ns | Flash/std ratio |
+|---|---|---|---|
+| (32, 256, 32) | 2,429,104 | 2,652,373 | **1.092× SLOWER** |
+| (32,  64, 32) |   795,911 |   848,563 | **1.066× SLOWER** |
+| (16,  16, 16) |   308,456 |   336,780 | **1.092× SLOWER** |
+| (4,   4,  8)  |   318,179 |   265,332 | 0.834× (FA wins but both lose to CPU=48,593) |
+
+**The「1.24-1.62× faster」 claim is FALSE at every measured shape**。
+FlashAttention is actually **1.07-1.09× SLOWER** than the standard
+MSL `scaled_dot_product_attention` kernel at production-relevant
+shapes。 This is the same false-claim pattern that chapter 八百六十四
+caught for the chapter 八百五十七 audit — same correction discipline。
+
+#### Knife 1 (this chapter)
+
+- **NEW `BASChapter868FlashAttentionAssertedBenchmarkTests.swift`**
+  (5 tests):
+    - `testMediumSequenceOrderingPin` — FA within 2× of std at
+      (M=32, N=64, D=32)
+    - `testLargeSequenceFlashCompetitive` — FA within 1.5× of std
+      at (M=32, N=256, D=32),the shape FA architecture should help most
+    - `testTinyShapeCPUBeatsBothMetalPaths` — CPU beats Metal std
+      by ≥3× at (M=4, N=4)。 Validates M*N<64→CPU routing
+    - `testBASCognitiveBrainDocClaimDoesNotAssertFAFaster` —
+      regression test:future re-introduction of「1.24-1.62x faster」
+      fires this test
+    - `testChapter707TournamentStillReachable` — original print-only
+      tournament file still exists as the live-data reference layer
+
+- **CORRECTED `BASCognitiveBrain.swift:2868` doc claim**: replaced
+  FALSE「1.24-1.62x faster」 text with honest「unbacked → live
+  measurement shows 1.07-1.09× SLOWER」 + chapter 八百六十八 reference
+  + DEFERRED routing-flip note pending MPSGraph data (chapter 八百六十九)。
+
+#### DEFERRED to chapter 八百六十九
+
+- **MPSGraph attention as 4th tournament contestant** (agent D
+  flagged): `BASMPSGraphAttentionKernel.swift` is a shipping
+  attention path that has NEVER been benchmarked。 Wiring it as
+  4th contestant could change the routing landscape。
+
+- **Routing rule flip (M*N≥64 → ???)**: Live data shows FA is
+  SLOWER at every shape ≥ 64,so current routing actively picks
+  the slower option。 But flipping before MPSGraph data lands
+  risks routing to second-worst。 Defer to chapter 八百六十九 final
+  knife after data is in。
+
+- **Numerical correctness at production scales**: Chapter 七百七
+  tests verify FA correctness at small shapes only。
+
+#### Why this is the LOWEST-RISK opener
+
+Same shape as chapter 八百五十二 第一刀:pin existing behavior +
+correct false claim,no new kernels,no routing change。 The 5-axis
+discipline ("整体 性能 效果 一定要 更好" + "亏的不要硬上" + "多做比较")
+demands measurement-first,decision-second。 Routing flip is
+chapter 八百六十九's call after the 4-way data is in。
+
+#### Verification
+
+   swift test --filter BASChapter868FlashAttentionAssertedBenchmarkTests:  5/5 PASS
+   swift build:                                                             PASS
+   pre-commit gates:                                                        3/3 PASS
+
+---
+
 ### Fourth-pass review of chapter 八百六十六 — test coverage + doc HIGH (chapter 八百六十七 / M2991)
 
 User directive 「1 + 2」 — third-pass review of chapter 八百六十六 (the

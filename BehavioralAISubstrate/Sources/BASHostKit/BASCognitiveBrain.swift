@@ -2865,9 +2865,21 @@ extension BASCognitiveBrain {
     /// Picks the empirically fastest implementation per shape:
     ///   M*N <  64  → CPU reference (Metal pipeline overhead
     ///                 dominates at tiny shapes)
-    ///   M*N >= 64  → Metal FlashAttention (1.24-1.62x faster
-    ///                 than scaled_dot_product per shapes
-    ///                 measured at chapter 七百七 第二刀)
+    ///   M*N >= 64  → Metal FlashAttention (CURRENT routing,but
+    ///                 see chapter 八百六十八 / M2996 correction
+    ///                 below — the original claim of 「1.24-1.62×
+    ///                 faster than scaled_dot_product per chapter
+    ///                 七百七 第二刀」 was UNBACKED by an asserted
+    ///                 test。 Live measurement on this Mac mini
+    ///                 shows FA is actually 1.07-1.09× SLOWER
+    ///                 than scaled_dot_product at every shape ≥
+    ///                 small。 See BASChapter868...AssertedBenchmark
+    ///                 tests for the pinned numbers + ratios。 The
+    ///                 routing rule is DEFERRED-PENDING data from
+    ///                 the 4th contestant (MPSGraph attention,
+    ///                 chapter 八百六十九 scope) — flipping the
+    ///                 routing before MPSGraph is measured risks
+    ///                 picking the second-worst option。)
     ///
     /// Returns BASAutoRouteResult so callers / telemetry can
     /// inspect which path actually executed。

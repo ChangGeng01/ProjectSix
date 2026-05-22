@@ -169,6 +169,24 @@ chapter 八百六十七: ~87% Swift (raw) / 13.3% native (raw)
                   Test count: 35 → 36 + payload test now
                   runs 45 sub-assertions (was 5) per cargo
                   test invocation.)
+chapter 八百六十八: ~87% Swift (raw) / 13.3% native (raw)
+                  (FlashAttention perf-measurement arc opener.
+                  Agent D scout found the chapter 707 attention
+                  tournament was print-only + BASCognitiveBrain
+                  doc claim「FA is 1.24-1.62× faster」 was
+                  UNBACKED. Live measurement on Mac mini
+                  showed FA is actually 1.07-1.09× SLOWER
+                  than scaled_dot_product at every shape
+                  ≥ small. Same false-claim pattern as the
+                  chapter 八百五十七 audit (caught by 八百六十四) —
+                  same correction discipline. Knife 1:
+                  pin actual ratios as asserted benchmark
+                  (+5 Swift tests) + correct false doc
+                  claim (BASCognitiveBrain.swift:2868).
+                  DEFERRED to 八百六十九: MPSGraph 4th
+                  contestant + routing-rule reconsider.
+                  No routing change THIS chapter — data
+                  first, decision second per "多做比较".)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
