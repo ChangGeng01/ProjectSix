@@ -11,6 +11,71 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Second post-review cleanup of arc 八百五十二-八百六十四 (chapter 八百六十五 / M2981)
+
+User directive 「剩余 一次性 解决掉 再做 全量 审查」 — fix the remaining
+known-deferred items from chapter 八百六十四's review,then dispatch a
+second 3-agent full review。 5 knives,all small but high-leverage。
+
+#### Knives
+
+- **Knife 1: Extract Rust tests to src/tests.rs**: `bas-mamba-scan/src/lib.rs`
+  was 1,233 LOC — past the 800-line god-file ceiling per
+  coding-style.md。 Chapter 八百六十四 had documented this as a「known
+  god-file exception」 deferral。 This chapter removes the exception:
+    - lib.rs:1233 → 572 LOC (extraction header preserved)
+    - NEW src/tests.rs:672 LOC (30 tests,clippy::needless_range_loop allow)
+    - Verification:cargo test -p bas-mamba-scan → 30/30 PASS unchanged
+
+- **Knife 2: Simplify v1 scatter intermediate type**: `scan_parallel` v1
+  collected `Vec<((usize, usize), Vec<(usize, f32)>)>` but the outer
+  `(b_i, d_i)` tuple was unused at scatter time (location already
+  encoded in `idx`)。 Simplified to `Vec<Vec<(usize, f32)>>` —
+  halves heap allocations per task。 v1 ≡ v2 byte-equality test
+  caught any drift (none — clean simplification)。 v1 remains for
+  the chapter 八百六十三 bit-equality oracle test only。
+
+- **Knife 3: Expand Swift bridge fixture grid to production scales**:
+  Chapter 八百六十四 documented this as「marginal-value follow-up」 — but
+  the user's「全量 审查」 directive made it worth doing。 NEW
+  `BASChapter865MambaBridgeFixtureExpansionTests.swift` (9 tests)
+  covering:
+    - Production-scale:B=8 L=64 D=128 (65,536 cells,crosses v2
+      cutover) + B=4 L=128 D=64 (32,768 cells,below cutover)
+    - Boundary:L=0,D=0,B=0 (all → nil per bld>0 guard)
+    - Asymmetric:B=32 L=8 D=1 (par-friendly) + B=1 L=8 D=64 (degenerate)
+    - Long sequence:L=256 (recurrence-length stress)
+  All 9 tests pass。 Byte-equality (Swift CPU ≡ Rust seq ≡ Rust par v2)
+  holds at every shape within chapter 392 1e-4 tolerance。
+
+- **Knife 4: This CHANGELOG + BRANCH_SUMMARY entry**: documenting
+  chapter 八百六十五 + reconciling test-count claims (post-八百六十五
+  authoritative counts in Verification block below)。
+
+- **Knife 5: 3-agent parallel review of cumulative arc 八百五十二-八百六十五**:
+  Per the user's「再做 全量 审查」 directive — Code review +
+  Test coverage + Doc consistency,parallel dispatch。
+
+#### Verification
+
+   cargo test -p bas-mamba-scan:                            30/30 PASS (LOC moved, count unchanged)
+   swift test --filter BASChapter865MambaBridgeFixtureExpansionTests:  9/9 PASS
+   swift build:                                              PASS
+   wc -l bas-mamba-scan/src/lib.rs:                          572 (was 1,233, under 800 ceiling)
+   wc -l bas-mamba-scan/src/tests.rs:                        672 (new)
+
+#### Authoritative test counts post chapter 八百六十五
+
+| Component | Count | Delta vs 八百六十四 |
+|---|---|---|
+| `bas-mamba-scan` Rust unit tests       | 30 | 0 (refactor, not new tests) |
+| `bas-red-team-bench` Rust unit tests   | 42 | 0 |
+| `bas-tokenizer` Rust unit tests        | 26 | 0 |
+| Swift `BASChapter865...Expansion` tests | 9 | +9 |
+| **Arc total Swift tests added 852-865** | | **+9 over 八百六十四** |
+
+---
+
 ### Post-review remediation of arc 八百五十二-八百六十三 (chapter 八百六十四 / M2976)
 
 3-agent strict review of the just-shipped arc caught real HIGH/MEDIUM items。

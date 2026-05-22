@@ -119,6 +119,23 @@ chapter 八百六十四: ~87% Swift (raw) / 13.3% native (raw)
                   on both Swift + Rust sides, perf rework
                   regression assertion, C ABI doc-bug fix.
                   +9 Rust unit tests, no ratio change.)
+chapter 八百六十五: ~87% Swift (raw) / 13.3% native (raw)
+                  (Second post-review cleanup of arc
+                  852-864 per 「剩余 一次性 解决掉」 directive.
+                  5 knives:
+                  1. lib.rs 1,233→572 LOC (tests extracted
+                     to src/tests.rs, 800 ceiling restored)
+                  2. v1 scatter intermediate type simplified
+                     (drop unused (b_i,d_i) outer tuple)
+                  3. Swift bridge fixture grid expanded:
+                     +9 tests (production B=8 L=64 D=128,
+                     zero-dim boundaries, asymmetric shapes,
+                     long-sequence L=256)
+                  4. Authoritative test count reconciliation
+                     in CHANGELOG (30/42/26 + 9 Swift)
+                  5. 3-agent parallel review of full
+                     852-865 cumulative arc.
+                  No ratio change — refactor + tests only.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)
