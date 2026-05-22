@@ -11,6 +11,102 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### v0.62.1 全面收尾 — CHUNK_ROWS Swift→Rust forwarding + release docs (chapter 八百八十 / M3085)
+
+User directive 「全面收尾」 (comprehensive wrap-up)。 14th-pass review
+of chapter 八百七十九.1 (the v0.62.0-tagged commit) recommended five
+v0.62.1 scope items + defer sample-integration to v0.62.2。 Chapter
+八百八十 ships items 1-4 inline。
+
+#### Knives shipped
+
+1. **LOW 1 fix — assertion message warn-threshold reference**:
+   chapter 八百七十九.1 LOW 1 reviewer caught a stale「110% of pin」
+   string in the failure message at
+   `BASChapter879BrainLOCTrajectoryAuditTests.swift:71-73`。 The
+   underlying value was changed to `warnAtTrigger` (= 4500) in
+   chapter 879.1 but the diagnostic string still referenced the
+   old「110% of pin」 derivation。 Replaced with explicit
+   「warn threshold (\(upperBound) = warnAtTrigger,from chapter
+   879 pin \(pinnedAtChapter879))」。 Same self-flagged drift my
+   chapter 879 self-assessment surfaced。
+
+2. **CHUNK_ROWS Swift→Rust forwarding (the chapter 879 promise
+   delivered)**:
+   - NEW `batched_cosine_simd_rayon_chunked(query, corpus, dim,
+     chunk_rows)` in `bas-retrieval-ranker/src/simd.rs` (Rust)。
+     Clamps `chunk_rows` to `[1, 4096]` for sanity。
+   - Existing `batched_cosine_simd_rayon` refactored to thin
+     wrapper delegating with `chunk_rows: 64` → byte-equality
+     preserved with chapter 872 result。
+   - NEW C ABI `bas_ranker_batched_cosine_simd_rayon_chunked`
+     in `bas-retrieval-ranker/src/lib.rs` + header export in
+     `bas-memory-usage-tracker/include/bas_rust_memory_tracker.h`。
+   - `BASAutoRouteRanker.batchedCosineSimilarity` now reads
+     `thresholds.batchedCosineRayonChunkRows` (chapter 879 field)
+     + calls the new C ABI。
+   - Doc-string on `batchedCosineRayonChunkRows` updated:
+     「chapter 879 contract」 → 「chapter 880 WIRED THROUGH」。
+   - NEW `BASChapter880ChunkRowsWiringTests.swift` (4 tests):
+     byte-equality across `[1, 8, 32, 64, 128, 512, 1024]` chunk
+     values + clamp invariants (0 → 1, > 4096 → 4096) + default
+     pin (=64)。
+   - XCFramework rebuilt (3 slices)。
+
+3. **NEW RELEASE_NOTES.md + MIGRATION_GUIDE_v0.61_to_v0.62.md**:
+   Consumer-shaped release docs (separate from CHANGELOG which is
+   substrate-history-shaped)。 Cross-links chapter doctrine ledger
+   for migration consumers who hit the schemaVersion 1 → 4 bump
+   chain。
+
+4. **CHANGELOG + BRANCH_SUMMARY arc-shift**: transitioned the
+   previous [Unreleased] block to [0.62.0] header + added fresh
+   [Unreleased] for chapter 880。
+
+#### Items DEFERRED to v0.62.2 (per 14th-pass reviewer recommendation)
+
+- **Sample integration** for RMSNorm or RoPE consumer。 Reviewer
+  noted: the DECLINE-PENDING-CONSUMER kernels need a downstream
+  consumer with measured pressure to flip,not substrate-side
+  busy-work — defer until production data surfaces such a
+  consumer。 Audit-trigger tests pin the decision until then。
+
+- **Chapter 879 audit tests tautology-shape refactor** (LOW 3
+  from 13th-pass)。 5/6 chapter 879 audit tests are essentially
+  「asserts the static array I just defined matches itself」 — not
+  failing,but low value-density。 Defer to a dedicated
+  test-quality chapter when a substantive new audit category
+  warrants the refactor pass。
+
+#### Verification
+
+   cargo test -p bas-retrieval-ranker:  195/195 PASS
+   swift test --filter BASChapter880:   4/4 PASS
+   swift test --filter BASChapter872:   7/7 PASS (byte-equality preserved)
+   swift test --filter BASChapter718|729|879|872: 21/21 PASS
+   swift test (FULL SWEEP):             13,386 tests / 74 skipped / 0 failures
+   swift build:                                                PASS
+   cargo check --workspace:                                    PASS (no Cargo.lock drift)
+   pre-commit gates:                                           3/3 PASS
+
+Delta from 八百七十九.1: +4 tests (chapter 880 wiring pin),no skip count
+change,no schemaVersion bump (chapter 879 field reused)。
+
+#### Cumulative discipline pin (chapters 八百六十七 → 八百八十)
+
+14 review-passes,each catching at least one real HIGH or LOW until
+chapter 879.1's 14th-pass converged to「0 CRITICAL / 0 HIGH / 0 MED
+/ 4 LOW (all cosmetic / promise-fulfilling)」。 Chapter 880 closes
+the loop by delivering on the chapter 879 contract instead of
+leaving it as a promise — converting deferred-item-debt into shipped
+code per 「将 deferred 全面 解决掉 再打tag」 evolved to 「全面收尾」 +
+「亏的不要硬上」 (this wiring measured byte-equal,zero perf regression,
+strictly additive parameter)。
+
+---
+
+## [0.62.0] — 2026-05-22 — MIGRATION ARC SEAL + DEFERRED RESOLUTION
+
 ### Resolve all deferred items + v0.62.0 tag prep (chapter 八百七十九 / M3080)
 
 User directive 「将 deferred 全面 解决掉 再打tag」 — comprehensively

@@ -112,13 +112,17 @@ public struct BASAutoRouteThresholds:
     /// ~64μs/task at dim=384,well above rayon ~1μs scheduling
     /// overhead)。 Configurable per chapter 871.5 lesson:device
     /// with lower core count may want larger chunks,higher
-    /// core count may want smaller。 Exposing this field makes
-    /// future per-device calibration possible without re-shipping
-    /// the C ABI。 NOTE: the Rust path currently hardcodes 64
-    /// internally — this Swift-side field is the contract for
-    /// future calibrator wiring,not yet forwarded to the FFI
-    /// call (chapter 八百八十 future scope when calibration
-    /// actually measures the optimal value)。
+    /// core count may want smaller。
+    ///
+    /// chapter 八百八十 / M3085 — WIRED THROUGH (the chapter 879
+    /// "future scope" promise delivered)。 Swift bridge in
+    /// `batchedCosineSimilarity` now reads this field + calls
+    /// `bas_ranker_batched_cosine_simd_rayon_chunked` C ABI which
+    /// passes it to `batched_cosine_simd_rayon_chunked` in Rust。
+    /// Default 64 → bit-identical to the chapter 872 result。
+    /// Rust impl clamps: 0 → 1 (sequential-degenerate but correct),
+    /// > 4096 → 4096 (sanity cap)。 Byte-equality across chunk_rows
+    /// values is pinned by `BASChapter880ChunkRowsWiringTests`。
     public let batchedCosineRayonChunkRows: Int
 
     public init(
@@ -1180,6 +1184,14 @@ public enum BASAutoRouteRanker {
     /// speedup at large-batch FFI amortization。 Below threshold
     /// the sequential SIMD path wins (FFI overhead < rayon
     /// scheduling overhead at small batches)。
+    ///
+    /// chapter 八百八十 / M3085 — wired the chapter 879 threshold
+    /// field `batchedCosineRayonChunkRows` through to the Rust
+    /// rayon worker chunk size via the new
+    /// `bas_ranker_batched_cosine_simd_rayon_chunked` C ABI。
+    /// Default 64 → byte-identical to the chapter 872 result;
+    /// host calibration can now legitimately tune chunk size per
+    /// device (was a chapter 八百七十六.6 TODO promoted here)。
     public static func batchedCosineSimilarity(
         query: [Float],
         corpus: [Float],
@@ -1201,15 +1213,18 @@ public enum BASAutoRouteRanker {
         #if os(iOS) || os(macOS)
         let useRayon = nRows >=
             thresholds.batchedCosineRayonMinRows
+        let chunkRows = thresholds
+            .batchedCosineRayonChunkRows
         let rc = query.withUnsafeBufferPointer { qp in
             corpus.withUnsafeBufferPointer { cp in
                 scores
                     .withUnsafeMutableBufferPointer { op in
                     if useRayon {
-                        bas_ranker_batched_cosine_simd_rayon(
+                        bas_ranker_batched_cosine_simd_rayon_chunked(
                             qp.baseAddress, query.count,
                             cp.baseAddress, corpus.count,
                             dim,
+                            chunkRows,
                             op.baseAddress)
                     } else {
                         bas_ranker_batched_cosine_simd(

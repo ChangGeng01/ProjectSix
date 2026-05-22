@@ -539,6 +539,59 @@ chapter 八百七十九: ~87% Swift / 13.4% native
                     scope when production data shows need)
                   Substrate post-879 is genuinely v0.62.0-ready.
                   Full sweep: 13,382 / 75 skipped / 0 failures.)
+chapter 八百七十九.1: ~87% Swift / 13.4% native
+                  (13th-pass LOW 1 fix: drift upper bound
+                  changed from 110% of pin → warnAtTrigger so
+                  the WARN print branch is actually reachable
+                  before hard test failure. 14th-pass converged:
+                  0 CRITICAL / 0 HIGH / 0 MED / 4 LOW (all
+                  cosmetic or promise-fulfilling). v0.62.0 tag
+                  cut at this commit.)
+chapter 八百八十:   ~87% Swift / 13.4% native
+                  (v0.62.1 全面收尾 per user directive 「全面收尾」 +
+                  14th-pass reviewer's v0.62.1 scope list. 4
+                  knives:
+                  1. LOW 1 fix: assertion message stale 「110%
+                     of pin」 → 「warn threshold = warnAtTrigger」
+                     (the doc drift I self-flagged in chapter
+                     879.1 self-assessment but didn't fix
+                     until 14th-pass confirmed)
+                  2. CHUNK_ROWS Swift→Rust forwarding — the
+                     chapter 879 「contract for future wiring」
+                     PROMISE DELIVERED. NEW Rust function
+                     batched_cosine_simd_rayon_chunked + NEW
+                     C ABI bas_ranker_batched_cosine_simd_
+                     rayon_chunked + header export + Swift
+                     bridge reads thresholds.batched
+                     CosineRayonChunkRows + NEW
+                     BASChapter880ChunkRowsWiringTests (4
+                     tests pinning byte-equality across
+                     [1,8,32,64,128,512,1024] + clamp 0→1
+                     + clamp 4096 cap + default=64 pin).
+                     XCFramework rebuilt (3 slices).
+                  3. NEW RELEASE_NOTES.md + MIGRATION_GUIDE_
+                     v0.61_to_v0.62.md (consumer-shaped
+                     release docs separate from substrate-
+                     history CHANGELOG).
+                  4. CHANGELOG transitioned [Unreleased] →
+                     [0.62.0] + fresh [Unreleased] for ch 880.
+                  v0.62.2 deferred (per 14th-pass reviewer):
+                  - Sample integration for RMSNorm/RoPE
+                    consumer (needs downstream pressure per
+                    亏的不要硬上)
+                  - Chapter 879 audit-test tautology refactor
+                    (LOW 3 — dedicated test-quality chapter)
+                  No schemaVersion bump (chapter 879 field
+                  reused). Cumulative discipline pin: 14
+                  review-passes chapters 八百六十七→八百八十,
+                  each caught real issues until 14th-pass
+                  converged. Chapter 880 closes the loop by
+                  shipping the chapter 879 promise instead of
+                  leaving it as a TODO.
+                  Full sweep: 13,386 tests / 74 skipped / 0
+                  failures. cargo test ranker: 195/195 PASS.
+                  swift test BASChapter880: 4/4 PASS.
+                  v0.62.1 tag pending user authorization.)
 ```
 
 ## Final v0.61.0 state (chapter 八百三十三 / 2026-05-21)

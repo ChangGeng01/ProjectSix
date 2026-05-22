@@ -975,6 +975,21 @@ int32_t bas_ranker_batched_cosine_simd_rayon(
     size_t dim,
     float* out_scores);
 
+// chapter 八百八十 / M3085 — chunked variant — same byte-equal
+// guarantee as bas_ranker_batched_cosine_simd_rayon when called
+// with chunk_rows == 64。 chunk_rows is wired from Swift via
+// BASAutoRouteThresholds.batchedCosineRayonChunkRows (chapter 879
+// field) so host calibration can tune per device。 Clamped inside
+// the Rust impl: 0 → 1, > 4096 → 4096, 1..=4096 → verbatim。
+int32_t bas_ranker_batched_cosine_simd_rayon_chunked(
+    const float* query,
+    size_t query_len,
+    const float* corpus,
+    size_t corpus_total_len,
+    size_t dim,
+    size_t chunk_rows,
+    float* out_scores);
+
 // MARK: - chapter 七百八 第一刀 MatMul ABI
 //
 // f32 matrix multiplication: A (M×K) × B (K×N) = C (M×N)

@@ -235,6 +235,51 @@ pub fn batched_cosine_simd(
 pub fn batched_cosine_simd_rayon(
     query: &[f32], corpus: &[f32], dim: usize,
 ) -> Vec<f32> {
+    // chapter 八百七十二 第二刀 — CHUNKED parallelism (CHUNK_ROWS=64,
+    // the original measurement target)。 chapter 八百七十六.6 zero-copy
+    // refactor used par_chunks_mut writing into pre-sized output。
+    //
+    // chapter 八百八十 / M3085 — 870.6 TODO promoted to a real wired
+    // parameter。 This function is now a thin wrapper preserving
+    // byte-equality with the historic chunk_rows=64 result;the new
+    // `batched_cosine_simd_rayon_chunked` takes chunk_rows from
+    // BASAutoRouteThresholds.batchedCosineRayonChunkRows (chapter 879
+    // field) so host calibration can tune per device。 Floor + ceiling
+    // are enforced inside the chunked variant (0 → 1 degenerate,
+    // 4096 cap)。 Edge cases (empty corpus,zero dim,query/dim
+    // mismatch,zero query norm) handled inside the chunked variant
+    // — kept consistent for both call paths。
+    batched_cosine_simd_rayon_chunked(query, corpus, dim, 64)
+}
+
+/// chapter 八百八十 / M3085 — parametrized batched-cosine SIMD rayon
+/// variant。 Wires the chapter 879 BASAutoRouteThresholds field
+/// `batchedCosineRayonChunkRows` through to the rayon worker chunk
+/// size。 The unparametrized `batched_cosine_simd_rayon` above
+/// delegates here with `chunk_rows: 64` (the historic constant) so
+/// existing call sites + byte-equality are preserved。
+///
+/// chunk_rows semantics:
+///   - chunk_rows == 0 → coerced to 1 (degenerate; rayon will run
+///     one row per task,which chapter 八百七十二 measured was 0.5×
+///     slower than sequential — but it's at least correct)。
+///   - chunk_rows > 4096 → clamped to 4096 (sanity cap;at typical
+///     dim=384 a single 4096-row chunk is ~6 MB of work,already
+///     well above any rayon scheduling break-even)。
+///   - chunk_rows in [1, 4096] → used verbatim。
+///
+/// Byte-equality with `batched_cosine_simd` (sequential) is
+/// preserved for ANY chunk_rows because:
+///   1. Each row's score is independent of other rows (no shared
+///      accumulator across rows)。
+///   2. Output slots are filled by absolute index
+///      (chunk_idx * effective_chunk_rows + r),not collect order。
+///   3. The same f64 promotion + manual 4-unrolled summation is
+///      used,bit-identical to the sequential path。
+pub fn batched_cosine_simd_rayon_chunked(
+    query: &[f32], corpus: &[f32], dim: usize,
+    chunk_rows: usize,
+) -> Vec<f32> {
     if dim == 0 || corpus.is_empty() || query.len() != dim {
         return Vec::new();
     }
@@ -252,44 +297,24 @@ pub fn batched_cosine_simd_rayon(
     }
     let q_norm = q_norm_sq.sqrt();
 
-    // chapter 八百七十二 第二刀 — CHUNKED parallelism。 CHUNK_ROWS=64
-    // means each rayon task processes 64 rows × dim work,giving
-    // ~64μs/task at dim=384 — well above rayon's ~1μs scheduling
-    // overhead。 Per-row parallelism (CHUNK_ROWS=1) measured 0.5×
-    // slower than sequential at 1K rows;chunked v2 amortizes the
-    // overhead properly。
-    //
-    // chapter 八百七十六.6 / M3060 zero-copy refactor:agent A
-    // 7th-pass MED-2 caught triple-allocation pattern (Vec<Vec<f32>>
-    // per task → extend_from_slice → C ABI copy)。 Replaced with
-    // par_chunks_mut writing directly into pre-sized output Vec —
-    // matches chapter 八百六十三 par_chunks_mut pattern。 Byte-equality
-    // preserved (same math,same chunk boundaries,same per-task
-    // tight loop)。
-    //
-    // TODO chapter 八百七十六.6: agent A MED-3 noted CHUNK_ROWS should
-    // be device-tunable (iPhone A-series may want larger,M-series
-    // Max may want smaller)。 Currently hardcoded at 64 per Mac mini
-    // measurement。 If/when host calibration shows a different
-    // optimum,refactor to take chunk_rows as a parameter +
-    // expose via BASAutoRouteThresholds.batchedCosineChunkRows。
-    // Not done here per 「亏的不要硬上」 — no production data shows
-    // 64 is wrong for any current target。
-    const CHUNK_ROWS: usize = 64;
+    // Clamp to sane bounds — preserve byte-equality for any choice。
+    let effective_chunk_rows: usize = if chunk_rows == 0 {
+        1
+    } else if chunk_rows > 4096 {
+        4096
+    } else {
+        chunk_rows
+    };
+
     use rayon::prelude::*;
     let rows = corpus.len() / dim;
     let mut out = vec![0.0_f32; rows];
-    // par_chunks_mut by row count (one slot per row in out) zipped
-    // with par_chunks by row content (CHUNK_ROWS × dim per chunk) —
-    // can't easily zip two par_chunks of different stride,so
-    // par_chunks_mut by CHUNK_ROWS slots,read corresponding corpus
-    // chunk by index calculation。
-    out.par_chunks_mut(CHUNK_ROWS)
+    out.par_chunks_mut(effective_chunk_rows)
         .enumerate()
         .for_each(|(chunk_idx, out_chunk)| {
-            let row_offset = chunk_idx * CHUNK_ROWS;
-            let chunk_rows = out_chunk.len();
-            for r in 0..chunk_rows {
+            let row_offset = chunk_idx * effective_chunk_rows;
+            let chunk_n = out_chunk.len();
+            for r in 0..chunk_n {
                 let row_start = (row_offset + r) * dim;
                 let row =
                     &corpus[row_start..row_start + dim];

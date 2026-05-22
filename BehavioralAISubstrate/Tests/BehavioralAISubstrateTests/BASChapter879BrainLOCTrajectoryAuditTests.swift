@@ -68,8 +68,9 @@ final class BASChapter879BrainLOCTrajectoryAuditTests:
             "this pin。 If file shrank organically,investigate。")
         XCTAssertLessThanOrEqual(
             lineCount, upperBound,
-            "BASCognitiveBrain.swift LOC grew above 110% of " +
-            "chapter 879 pin (\(pinnedAtChapter879)) — actual " +
+            "BASCognitiveBrain.swift LOC grew above warn " +
+            "threshold (\(upperBound) = warnAtTrigger,from " +
+            "chapter 879 pin \(pinnedAtChapter879)) — actual " +
             "\(lineCount)。 Update this pin in the growing chapter。")
 
         // Hard ceiling: extraction MUST happen before this

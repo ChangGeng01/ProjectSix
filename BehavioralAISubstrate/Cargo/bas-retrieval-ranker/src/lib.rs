@@ -1649,6 +1649,61 @@ pub unsafe extern "C" fn bas_ranker_batched_cosine_simd_rayon(
     0
 }
 
+/// chapter 八百八十 / M3085 — chunked rayon batched cosine C ABI。
+/// Same byte-equal guarantee as `bas_ranker_batched_cosine_simd`
+/// (sequential) and `bas_ranker_batched_cosine_simd_rayon`
+/// (chunk_rows = 64),BUT takes `chunk_rows` as a parameter wired
+/// from `BASAutoRouteThresholds.batchedCosineRayonChunkRows`
+/// (chapter 879 field)。
+///
+/// Calling with `chunk_rows == 64` is bit-identical to
+/// `bas_ranker_batched_cosine_simd_rayon` — that's the upstream
+/// invariant the chunked variant preserves。
+///
+/// `chunk_rows` semantics (clamped inside the Rust impl):
+///   - 0 → coerced to 1 (sequential-degenerate but correct)
+///   - 1..=4096 → used verbatim
+///   - > 4096 → clamped to 4096
+///
+/// # Safety
+///
+/// Same as `bas_ranker_batched_cosine_simd_rayon`:caller must
+/// ensure `query` has `query_len` valid f32s,`corpus` has
+/// `corpus_total_len` valid f32s,and `out_scores` has at least
+/// `corpus_total_len / dim` writable f32 slots。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_batched_cosine_simd_rayon_chunked(
+    query: *const f32,
+    query_len: usize,
+    corpus: *const f32,
+    corpus_total_len: usize,
+    dim: usize,
+    chunk_rows: usize,
+    out_scores: *mut f32,
+) -> i32 {
+    if query.is_null() || corpus.is_null()
+        || out_scores.is_null()
+    { return -1; }
+    if dim == 0 || query_len != dim { return -1; }
+    if corpus_total_len % dim != 0 { return -1; }
+    let rows = corpus_total_len / dim;
+    let q = unsafe {
+        core::slice::from_raw_parts(query, query_len)
+    };
+    let c = unsafe {
+        core::slice::from_raw_parts(corpus, corpus_total_len)
+    };
+    let scores = simd::batched_cosine_simd_rayon_chunked(
+        q, c, dim, chunk_rows);
+    let out_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, rows)
+    };
+    for (i, s) in scores.iter().enumerate() {
+        out_slice[i] = *s;
+    }
+    0
+}
+
 /// Batched cosine — query × corpus (rows × dim row-major) →
 /// `out_scores` (length `corpus_rows`)。 Returns -1 on null
 /// pointer or invalid shapes, otherwise 0。
