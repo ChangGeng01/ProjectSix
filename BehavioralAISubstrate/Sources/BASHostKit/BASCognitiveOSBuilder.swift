@@ -60,6 +60,31 @@ public enum BASCognitiveOSBuilder {
         if options == .allDisabled {
             return .empty
         }
+        return try build(
+            options: options, embeddingProvider: nil)
+    }
+
+    /// chapter 八百八十二 / M3095 — Gap 2 wiring。 Overload that
+    /// accepts a host-supplied embedding provider for the RAG
+    /// retrieval path。 The provider is carried through to
+    /// `bundle.embeddingProvider` for the runtime MemoryService
+    /// to pick up at turn time。 Pass `nil` (or call the
+    /// single-arg overload) to preserve v0.62.x behavior。
+    public static func build(
+        options: BASCognitiveOSBundleOptions,
+        embeddingProvider:
+            (any BASMemory.BASEmbeddingProvider)?
+    ) throws -> BASCognitiveOSBundle {
+        // Empty-options shortcut still works,but only if
+        // embeddingProvider is also nil + RAG flag is off。
+        // Otherwise the host wants RAG carrier even with no
+        // other primitives,so fall through to the full path。
+        if options == .allDisabled
+            && embeddingProvider == nil
+            && !options.enableRAGRetrieval
+        {
+            return .empty
+        }
 
         // Event log
         let eventLog: (any BASEventLogStorage)?
@@ -134,6 +159,13 @@ public enum BASCognitiveOSBuilder {
             vectorIndex: vectorIndex,
             vectorIndexStorage: vectorIndexStorage,
             knowledgeGraph: knowledgeGraph,
-            knowledgeGraphStorage: knowledgeGraphStorage)
+            knowledgeGraphStorage: knowledgeGraphStorage,
+            // chapter 八百八十二 / M3095 — Gap 2 wiring。 Forward
+            // the host-supplied embedding provider + RAG-enable
+            // flag through to the bundle so
+            // BASHostRuntimeEBrainMemoryService can read them at
+            // turn time without holding the options struct。
+            embeddingProvider: embeddingProvider,
+            enableRAGRetrieval: options.enableRAGRetrieval)
     }
 }

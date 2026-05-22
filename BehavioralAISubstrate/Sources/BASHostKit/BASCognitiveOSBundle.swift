@@ -87,6 +87,26 @@ public struct BASCognitiveOSBundleOptions: Codable, Sendable, Equatable {
     /// the graph from disk + write-throughs after each insert。
     public let knowledgeGraphSQLiteURL: URL?
 
+    // MARK: - RAG retrieval (chapter 八百八十二 / M3095, Gap 2)
+
+    /// chapter 八百八十二 / M3095 — when true + an embeddingProvider
+    /// is passed separately to `BASCognitiveOSBuilder.build(
+    /// options:embeddingProvider:)` + `enableVectorIndex` is also
+    /// true,the `EBrainHostRuntime` MemoryService routes through
+    /// `BASRAGRetriever.retrieve(...)` for semantic top-k retrieval
+    /// instead of the legacy prefix-filter path。 Default `false`
+    /// keeps the v0.62.x prefix-filter behavior for existing
+    /// hosts (ADR-014 OPT-IN doctrine)。 Setting this to true
+    /// without an embedding provider is a no-op (fallback path
+    /// triggers + an audit reason-code emits)。
+    ///
+    /// NOTE: the embedding provider itself lives on the Builder
+    /// signature (NOT this Options struct) because
+    /// `BASEmbeddingProvider` is a protocol existential which
+    /// breaks Options's Codable conformance。 This flag stays
+    /// Codable-safe。
+    public let enableRAGRetrieval: Bool
+
     public init(
         enableEventLog: Bool = false,
         eventLogSQLiteURL: URL? = nil,
@@ -95,7 +115,8 @@ public struct BASCognitiveOSBundleOptions: Codable, Sendable, Equatable {
         enableVectorIndex: Bool = false,
         vectorIndexSQLiteURL: URL? = nil,
         enableKnowledgeGraph: Bool = false,
-        knowledgeGraphSQLiteURL: URL? = nil
+        knowledgeGraphSQLiteURL: URL? = nil,
+        enableRAGRetrieval: Bool = false
     ) {
         self.enableEventLog = enableEventLog
         self.eventLogSQLiteURL = eventLogSQLiteURL
@@ -106,6 +127,7 @@ public struct BASCognitiveOSBundleOptions: Codable, Sendable, Equatable {
         self.enableKnowledgeGraph = enableKnowledgeGraph
         self.knowledgeGraphSQLiteURL =
             knowledgeGraphSQLiteURL
+        self.enableRAGRetrieval = enableRAGRetrieval
     }
 
     /// Default options:everything disabled (ADR-014 OPT-IN
@@ -178,6 +200,25 @@ public struct BASCognitiveOSBundle: Sendable {
     public let knowledgeGraphStorage:
         BASSQLiteKnowledgeGraphStorage?
 
+    /// chapter 八百八十二 / M3095 — Gap 2 wiring。 Embedding provider
+    /// supplied to the builder via `build(options:embeddingProvider:)`。
+    /// When non-nil + `enableRAGRetrieval == true` + `vectorIndex
+    /// != nil`,`BASHostRuntimeEBrainMemoryService.retrieve(...)`
+    /// will use `BASRAGRetriever` for semantic top-k retrieval。
+    /// Otherwise it falls back to the v0.62.x prefix-filter path
+    /// (zero behavior change for existing hosts)。 Module-qualified
+    /// (`BASMemory.BASEmbeddingProvider`) because both BASMemory
+    /// and BASRuntimeCore define the protocol — the BASMemory one
+    /// is the canonical chapter 三百六十 / M847 surface。
+    public let embeddingProvider:
+        (any BASMemory.BASEmbeddingProvider)?
+
+    /// chapter 八百八十二 / M3095 — companion flag for
+    /// `embeddingProvider`。 Mirrors `options.enableRAGRetrieval`
+    /// so the runtime can read it post-build without holding
+    /// the options。
+    public let enableRAGRetrieval: Bool
+
     public init(
         eventLog: (any BASEventLogStorage)? = nil,
         userStateStore: (any BASUserStateStorage)? = nil,
@@ -186,7 +227,10 @@ public struct BASCognitiveOSBundle: Sendable {
             BASSQLiteVectorIndexStorage? = nil,
         knowledgeGraph: BASKnowledgeGraph? = nil,
         knowledgeGraphStorage:
-            BASSQLiteKnowledgeGraphStorage? = nil
+            BASSQLiteKnowledgeGraphStorage? = nil,
+        embeddingProvider:
+            (any BASMemory.BASEmbeddingProvider)? = nil,
+        enableRAGRetrieval: Bool = false
     ) {
         self.eventLog = eventLog
         self.userStateStore = userStateStore
@@ -195,6 +239,8 @@ public struct BASCognitiveOSBundle: Sendable {
         self.knowledgeGraph = knowledgeGraph
         self.knowledgeGraphStorage =
             knowledgeGraphStorage
+        self.embeddingProvider = embeddingProvider
+        self.enableRAGRetrieval = enableRAGRetrieval
     }
 
     /// Empty bundle convenience。Used by builder when caller

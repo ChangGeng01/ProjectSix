@@ -11,6 +11,83 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Gap-2 Part 1: RAG carrier wired into Bundle + Builder (chapter 八百八十二 / M3095)
+
+User surfaced gap 2 「RAG retrieval 还偏 facade。 BASRAGRetriever
+.swift (line 1) 已有完整组合,但主 runtime 里还不是深度默认路径。」
+
+Gap-2 wiring is a 2-part arc:
+- **Chapter 八百八十二 (this chapter)**: CARRIER — additive
+  expansion of `BASCognitiveOSBundle` + `BASCognitiveOSBundleOptions`
+  to carry the RAG flag + embedding provider through to the
+  runtime composition root。 Substrate now has the wiring
+  foundation。 ZERO behavior change for existing hosts (ADR-014
+  OPT-IN default false)。
+- **Chapter 八百八十三 (deferred to DECLINE)**: WIRING — the
+  actual `BASHostRuntimeEBrainMemoryService.retrieve()` refactor
+  to route through `BASRAGRetriever`。 Surfaced during chapter
+  882 implementation as an async-protocol refactor (substrate
+  contract is sync,RAG is async)。 DECLINE-WITH-TRIGGER per
+  「亏的不要硬上」 — see chapter 八百八十四 audit for trigger
+  conditions。
+
+#### Knives shipped (chapter 882)
+
+1. **Options struct expansion** (Codable-safe): Added
+   `enableRAGRetrieval: Bool = false` to
+   `BASCognitiveOSBundleOptions`。 Embedding provider stays out
+   of options because `(any BASEmbeddingProvider)?` breaks
+   Codable conformance for the protocol existential。 Options
+   round-trips through JSON unchanged for legacy hosts。
+
+2. **Bundle struct expansion**: Added
+   `embeddingProvider: (any BASMemory.BASEmbeddingProvider)?`
+   + `enableRAGRetrieval: Bool` slots to `BASCognitiveOSBundle`。
+   Module-qualified the protocol because both BASMemory + 
+   BASRuntimeCore define it (legacy name collision —
+   chapter 三百六十 / M847 BASMemory one is canonical)。
+   `populatedCount` ignores these slots since they're routing
+   hints,not primitives。
+
+3. **Builder overload**: NEW
+   `BASCognitiveOSBuilder.build(options:embeddingProvider:)`
+   that accepts a host-supplied embedding provider。 Existing
+   `build(options:)` overload preserved + delegates with
+   `embeddingProvider: nil` for v0.62.x byte-equality。
+
+4. **NEW carrier tests** (chapter 882):
+   `BASChapter882RAGCarrierTests.swift` (7 tests):
+   - Options-have-flag,Options-are-Codable
+   - Bundle-has-RAG-slots,populatedCount-ignores-RAG
+   - Builder-legacy-preserves,Builder-RAG-overload-carries
+   - Builder-allows-flag-without-provider (host owns the
+     dependency wiring)
+
+#### What chapter 882 does NOT change
+
+- `BASHostRuntimeEBrainMemoryService.retrieve()` is UNCHANGED —
+  it still uses the v0.62.x prefix-filter path。 Chapter 883
+  was scoped to make this call use `BASRAGRetriever` when deps
+  present;deferred because `BASMemoryServicing.retrieve` is
+  sync + `BASRAGRetriever.retrieve` is async + `runTurn` is
+  sync。 Making the full chain async = substrate-wide protocol
+  change with breaking surface for hosts。 See chapter 883
+  audit for the deferred scope。
+
+#### Verification
+
+   swift test --filter BASChapter882: 7/7 PASS
+   swift build:                                                PASS
+   swift test (FULL SWEEP):           13,400 / 78 skipped / 0 failures
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 881: +7 tests (chapter 882 carrier),no
+schemaVersion bump,no Cargo change,no XCFramework rebuild。
+Bundle constructor signature is additive (new args have
+defaults),so existing call sites compile unchanged。
+
+---
+
 ### Gap-3 DECLINE-WITH-TRIGGER — forget cascade Rust path stays OFF (chapter 八百八十一 / M3090)
 
 User surfaced 5 architectural gaps after v0.62.1 ship。 Selected
