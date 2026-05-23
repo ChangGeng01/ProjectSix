@@ -1769,6 +1769,57 @@ int32_t bas_l8_memory_usage_tombstones_is_tombstoned(
     const L8Engine* engine,
     const char* record_id_utf8, size_t record_id_len);
 
+// MARK: - bas-l8-engine host_constitution_vault module
+// (chapter 九百三 / M3215 — HIGH-risk migration #3 final:
+//  single-table BASHostConstitutionSQLiteStorage with
+//  Codable JSON payload + 7 mirror columns)
+//
+// upsert returns 1 on insert, 0 on replace, -1/-2/-3 errors.
+// delete returns 1 on removed, 0 if vault_id unknown.
+// payload_for_id + first_payload_for_host use probe-mode
+// buffer read (null buf + 0 capacity → required size; -2 if
+// not found).
+
+int32_t bas_l8_host_constitution_vault_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_host_constitution_vault_upsert(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len,
+    const char* host_id_utf8, size_t host_id_len,
+    const char* constitution_id_utf8,
+    size_t constitution_id_len,
+    const char* active_version_utf8,
+    size_t active_version_len,
+    const char* schema_version_utf8,
+    size_t schema_version_len,
+    const char* version_signature_utf8,
+    size_t version_signature_len,
+    int64_t last_updated_at_ms,
+    const char* payload_json_utf8,
+    size_t payload_json_len);
+
+int32_t bas_l8_host_constitution_vault_payload_for_id(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len,
+    uint8_t* out_buf, size_t out_capacity);
+
+int32_t bas_l8_host_constitution_vault_first_payload_for_host(
+    const L8Engine* engine,
+    const char* host_id_utf8, size_t host_id_len,
+    uint8_t* out_buf, size_t out_capacity);
+
+int32_t bas_l8_host_constitution_vault_delete(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len);
+
+int64_t bas_l8_host_constitution_vault_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_host_constitution_vault_count_for_host(
+    const L8Engine* engine,
+    const char* host_id_utf8, size_t host_id_len);
+
 #ifdef __cplusplus
 }
 #endif

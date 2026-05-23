@@ -78,6 +78,11 @@ pub mod memory_usage_logs;
 //                            MemoryUsageTracker notes + bundles + tombstones
 //                            (closes out the 6-table port,FTS5 deferred)
 pub mod memory_usage_extras;
+// chapter 九百三 / M3215 — HIGH-risk migration #3:
+//                          BASHostConstitutionSQLiteStorage
+//                          (1 table,UPSERT updates ALL non-PK
+//                           columns,DELETE for remove)
+pub mod host_constitution_vault;
 
 // MARK: - ABI version
 
@@ -117,7 +122,10 @@ pub mod memory_usage_extras;
 ///   - 10 = chapter 九百二.6 / M3210 (+memory_usage_extras module:
 ///          notes [UPSERT] + bundles [composite PK] +
 ///          tombstones [INSERT OR REPLACE] — closes 6-table port)
-const ABI_VERSION: i32 = 10;
+///   - 11 = chapter 九百三 / M3215 (+host_constitution_vault module:
+///          init_schema + upsert + payload_for_id + first_payload_
+///          for_host + delete + count + count_for_host)
+const ABI_VERSION: i32 = 11;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -328,7 +336,8 @@ mod tests {
         // 902: 7→8 memory_usage_records (HIGH-risk #2 SCOPED).
         // 902.5: 8→9 memory_usage_logs (replay+audit append-only).
         // 902.6: 9→10 memory_usage_extras (notes+bundles+tombstones).
-        assert_eq!(bas_l8_engine_abi_version(), 10);
+        // 903: 10→11 host_constitution_vault (HIGH-risk #3 final).
+        assert_eq!(bas_l8_engine_abi_version(), 11);
     }
 
     #[test]
