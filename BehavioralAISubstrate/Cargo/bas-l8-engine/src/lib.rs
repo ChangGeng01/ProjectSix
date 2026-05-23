@@ -63,6 +63,9 @@ pub mod version_tree;
 // chapter 九百 / M3190 — MED-risk migration #5: vector index
 //                        (UPSERT + variable-size embedding BLOB)
 pub mod vector_index;
+// chapter 九百一 / M3195 — HIGH-risk migration #1: event log
+//                          (per-turn append + auto-sequence + prune)
+pub mod event_log;
 
 // MARK: - ABI version
 
@@ -87,7 +90,11 @@ pub mod vector_index;
 ///   - 6 = chapter 九百 / M3190 (+vector_index module:
 ///         init_schema + upsert + remove + count +
 ///         count_for_domain + count_for_provider)
-const ABI_VERSION: i32 = 6;
+///   - 7 = chapter 九百一 / M3195 (+event_log module:
+///         init_schema + append [auto-sequence + idempotent] +
+///         count + count_for_session + count_for_kind +
+///         next_sequence + prune_before)
+const ABI_VERSION: i32 = 7;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -294,7 +301,8 @@ mod tests {
         // 897: 2→3 atom_lifecycle, 898: 3→4 user_state,
         // 899: 4→5 version_tree (first BLOB FFI).
         // 900: 5→6 vector_index (UPSERT + variable BLOB).
-        assert_eq!(bas_l8_engine_abi_version(), 6);
+        // 901: 6→7 event_log (HIGH-risk first).
+        assert_eq!(bas_l8_engine_abi_version(), 7);
     }
 
     #[test]

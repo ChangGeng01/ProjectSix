@@ -1578,6 +1578,51 @@ int64_t bas_l8_vector_index_count_for_provider(
     const char* provider_version_utf8,
     size_t provider_version_len);
 
+// MARK: - bas-l8-engine event_log module
+//         (chapter 九百一 / M3195 — HIGH-risk migration #1)
+//
+// Per-event turn-loop hot path. Auto-sequence number assignment
+// per session (SELECT COALESCE(MAX+1, 0)). Idempotent append on
+// duplicate event_id. Prune-before deletes rows by timestamp_ms.
+//
+// payload_format: 1=json (payload_blob_len=0), 2=blob (payload_
+// json should be ""). Mirrors Swift M886 dual-payload encoding.
+//
+// append returns: assigned sequence_number on success (≥ 0),
+// or negative status: -1 null engine, -2 SQLite error, -3 UTF-8
+// decode. out_was_new is 1 if newly inserted, 0 if dup-no-op.
+
+int32_t bas_l8_event_log_init_schema(const L8Engine* engine);
+
+int64_t bas_l8_event_log_append(
+    const L8Engine* engine,
+    const char* event_id_utf8, size_t event_id_len,
+    const char* session_id_utf8, size_t session_id_len,
+    int64_t timestamp_ms,
+    const char* kind_utf8, size_t kind_len,
+    const char* risk_band_utf8, size_t risk_band_len,
+    const char* payload_json_utf8, size_t payload_json_len,
+    int32_t payload_format,
+    const uint8_t* payload_blob_bytes, size_t payload_blob_len,
+    int32_t* out_was_new);
+
+int64_t bas_l8_event_log_count(const L8Engine* engine);
+
+int64_t bas_l8_event_log_count_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len);
+
+int64_t bas_l8_event_log_count_for_kind(
+    const L8Engine* engine,
+    const char* kind_utf8, size_t kind_len);
+
+int64_t bas_l8_event_log_next_sequence(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len);
+
+int64_t bas_l8_event_log_prune_before(
+    const L8Engine* engine, int64_t cutoff_ms);
+
 #ifdef __cplusplus
 }
 #endif
