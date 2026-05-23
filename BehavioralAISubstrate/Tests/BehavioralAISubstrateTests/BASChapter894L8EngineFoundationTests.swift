@@ -37,13 +37,25 @@ final class BASChapter894L8EngineFoundationTests: XCTestCase {
     /// the deletion_manifest module additions)。
     /// Floor assertion per chapter 七百五十七 pattern — growth
     /// allowed,regression not。
+    ///
+    /// chapter 九百七 / M3240 review fix #5: bump floor to 13
+    /// (current chapter 906 ABI) + add reasonable upper bound
+    /// so a mismatched XCFramework rebuild surfaces here。
     func testL8EngineAbiVersionAtLeast2() {
         #if os(iOS) || os(macOS)
         let v = bas_l8_engine_abi_version()
-        XCTAssertGreaterThanOrEqual(v, 2,
-            "Chapter 895 bumped L8 engine ABI to ≥ 2 " +
-            "(added deletion_manifest module)。 If this " +
-            "fails,a regression dropped the ABI version。")
+        XCTAssertGreaterThanOrEqual(v, 13,
+            "Chapter 906 brought L8 engine ABI to ≥ 13 " +
+            "(added vector_index hot-path consolidation)。 " +
+            "If this fails,a regression dropped ABI OR the " +
+            "linked XCFramework is stale (re-run Scripts/" +
+            "build-rust-xcframework.sh)。")
+        // Upper bound: chapter 906 is the latest。 Future
+        // chapter authors bump this when adding new FFI;a
+        // surprise jump means an out-of-tree build。
+        XCTAssertLessThanOrEqual(v, 100,
+            "ABI version unexpectedly high — possible " +
+            "out-of-tree XCFramework or build cache drift")
         #endif
     }
 

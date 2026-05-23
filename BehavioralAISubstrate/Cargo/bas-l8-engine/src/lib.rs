@@ -301,11 +301,34 @@ pub unsafe extern "C" fn bas_l8_engine_db_path(
 
 // MARK: - CStr helper (for future migration chapter use)
 
+/// Decode a Swift-passed UTF-8 buffer into a `&str`。
+///
+/// # Semantics (chapter 九百七 / M3240 review fix #1)
+///
+/// - `len == 0` returns `Some("")` (the empty string is a
+///   VALID value for callers like event_log format=2 payload
+///   where the binary path passes `payload_json_len = 0`)
+/// - `ptr.is_null()` with `len > 0` returns `None` (contract
+///   violation — pointer can't be null when length claims data)
+/// - Invalid UTF-8 bytes return `None`
+///
+/// Callers that require non-empty values (e.g. PK columns)
+/// MUST validate `s.is_empty()` themselves after decoding。
+///
+/// Prior to chapter 九百七 this function rejected `len == 0`
+/// with `None`,which silently broke FFI callers attempting
+/// to pass legitimate empty strings (e.g. the event_log
+/// format=2 binary path)。
 pub(crate) fn cstr_to_str<'a>(
     ptr: *const c_char,
     len: usize,
 ) -> Option<&'a str> {
-    if ptr.is_null() || len == 0 {
+    if len == 0 {
+        // Empty string is a valid value。 The `ptr` may be
+        // null here because the slice is zero-length anyway。
+        return Some("");
+    }
+    if ptr.is_null() {
         return None;
     }
     let bytes = unsafe {
@@ -426,6 +449,29 @@ mod tests {
             bas_l8_engine_close(e1);
             bas_l8_engine_close(e2);
         }
+    }
+
+    #[test]
+    fn cstr_to_str_empty_string_returns_some() {
+        // chapter 九百七 review fix #1: empty string is valid。
+        // Prior behavior was Some/None confusion that silently
+        // broke event_log format=2 payload_json="" callers。
+        assert_eq!(
+            cstr_to_str(std::ptr::null(), 0),
+            Some(""),
+            "Empty string (len=0,ptr=null) returns Some(\"\")");
+        let bytes = b"hi";
+        assert_eq!(
+            cstr_to_str(bytes.as_ptr() as *const c_char, 0),
+            Some(""),
+            "len=0 wins regardless of ptr non-null");
+        assert_eq!(
+            cstr_to_str(std::ptr::null(), 5),
+            None,
+            "ptr=null with len>0 still returns None");
+        assert_eq!(
+            cstr_to_str(bytes.as_ptr() as *const c_char, 2),
+            Some("hi"));
     }
 
     #[test]

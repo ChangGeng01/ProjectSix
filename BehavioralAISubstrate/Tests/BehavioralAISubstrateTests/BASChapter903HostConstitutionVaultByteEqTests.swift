@@ -37,9 +37,9 @@ final class BASChapter903HostConstitutionVaultByteEqTests:
     private func cleanup(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(
-            at: url.appendingPathExtension("wal"))
+            at: URL(fileURLWithPath: url.path + "-wal"))
         try? FileManager.default.removeItem(
-            at: url.appendingPathExtension("shm"))
+            at: URL(fileURLWithPath: url.path + "-shm"))
     }
 
     private func makeVault(

@@ -50,9 +50,9 @@ final class BASChapter906HotPathConsolidationTests: XCTestCase
     private func cleanup(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(
-            at: url.appendingPathExtension("wal"))
+            at: URL(fileURLWithPath: url.path + "-wal"))
         try? FileManager.default.removeItem(
-            at: url.appendingPathExtension("shm"))
+            at: URL(fileURLWithPath: url.path + "-shm"))
     }
 
     private func packF32LE(_ values: [Float]) -> [UInt8] {
@@ -117,6 +117,62 @@ final class BASChapter906HotPathConsolidationTests: XCTestCase
     }
 
     // MARK: - Correctness pin
+
+    /// chapter 九百七 / M3240 review fix #10: explicitly pin
+    /// that integrated + orchestrated return the SAME ranked
+    /// rowids (not just identical scores)。 Use deterministic
+    /// embeddings with strictly distinct scores so ties don't
+    /// hide a swap。
+    func testCosineTopKMatchesOrchestratedRowIDs() async
+        throws
+    {
+        let url = makeTempDBURL()
+        defer { cleanup(url) }
+        let store = try BASRoutedVectorIndexStorage(
+            databaseURL: url)
+        let dim = 4
+        // 5 deterministic embeddings, monotonically aligned
+        // with the query so scores are STRICTLY distinct
+        let embeddings: [[Float]] = [
+            [0.1, 0.0, 0.0, 0.0],
+            [0.3, 0.0, 0.0, 0.0],
+            [0.5, 0.0, 0.0, 0.0],
+            [0.7, 0.0, 0.0, 0.0],
+            [0.9, 0.0, 0.0, 0.0],
+        ]
+        for (i, emb) in embeddings.enumerated() {
+            let entry = BASVectorIndexEntry(
+                atomID: "ord-\(i)",
+                normalizedEmbedding: BASEmbedding(
+                    vector: emb, dimension: dim,
+                    providerVersion: "p"),
+                domain: "ord-dom",
+                metadata: [:])
+            _ = try await store.upsert(entry)
+        }
+        let q: [Float] = [1.0, 0.0, 0.0, 0.0]
+        let qBytes = packF32LE(q)
+        let integrated = try await store.cosineTopK(
+            forDomain: "ord-dom",
+            queryBytes: qBytes,
+            k: 3)
+        XCTAssertEqual(integrated.count, 3)
+        // Expected ranking by score descending:
+        //   #0 = ord-4 (score 0.9)
+        //   #1 = ord-3 (score 0.7)
+        //   #2 = ord-2 (score 0.5)
+        XCTAssertEqual(integrated[0].score, 0.9,
+            accuracy: 1e-5)
+        XCTAssertEqual(integrated[1].score, 0.7,
+            accuracy: 1e-5)
+        XCTAssertEqual(integrated[2].score, 0.5,
+            accuracy: 1e-5)
+        // rowids are sqlite auto-assigned 1..5 in insert order
+        // so ord-4 = rowid 5, ord-3 = 4, ord-2 = 3
+        XCTAssertEqual(integrated[0].rowid, 5)
+        XCTAssertEqual(integrated[1].rowid, 4)
+        XCTAssertEqual(integrated[2].rowid, 3)
+    }
 
     func testCosineTopKMatchesOrchestratedScores() async
         throws

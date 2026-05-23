@@ -582,6 +582,74 @@ mod tests {
     }
 
     #[test]
+    fn cosine_topk_eviction_branch_exercised() {
+        // chapter 九百七 review fix #2:explicitly exercise
+        // the `top.len() >= k` eviction branch (previously
+        // untested,algorithm correct but coverage gap)。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // 5 embeddings,k=2 — eviction must drop the
+            // 3 worst,return only 2 highest
+            let scores: [f32; 5] = [0.1, 0.5, 0.9, 0.7, 0.3];
+            for (i, s) in scores.iter().enumerate() {
+                let e = pack_f32_le(&[*s]);
+                upsert_entry(conn, &format!("a-{}", i), 1,
+                    "p", &e, "dom", "{}").unwrap();
+            }
+            let q: Vec<f32> = vec![1.0];
+            let top = cosine_topk_for_domain(
+                conn, "dom", &q, 2).unwrap();
+            assert_eq!(top.len(), 2,
+                "Eviction must keep exactly k entries");
+            // Top 2 scores: 0.9, 0.7
+            assert!((top[0].1 - 0.9).abs() < 1e-5);
+            assert!((top[1].1 - 0.7).abs() < 1e-5);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn cosine_topk_returns_fewer_when_k_exceeds_corpus() {
+        // chapter 九百七 review fix #12 (MED → escalated):
+        // k > N must return N entries,not crash。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let e = pack_f32_le(&[1.0]);
+            upsert_entry(conn, "only-one", 1, "p", &e,
+                "dom", "{}").unwrap();
+            let q: Vec<f32> = vec![1.0];
+            let top = cosine_topk_for_domain(
+                conn, "dom", &q, 100).unwrap();
+            assert_eq!(top.len(), 1,
+                "k > corpus returns corpus.len() entries");
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn cosine_topk_empty_domain_returns_empty() {
+        // chapter 九百七 review fix #13 (MED → escalated):
+        // empty domain returns empty Vec,not error。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let q: Vec<f32> = vec![1.0];
+            let top = cosine_topk_for_domain(
+                conn, "empty-domain", &q, 10).unwrap();
+            assert_eq!(top.len(), 0);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
     fn cosine_topk_skips_dimension_mismatches() {
         let engine = make_engine();
         let _ = unsafe {

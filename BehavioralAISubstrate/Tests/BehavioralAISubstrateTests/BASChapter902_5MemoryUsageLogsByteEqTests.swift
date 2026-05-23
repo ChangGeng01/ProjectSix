@@ -29,9 +29,9 @@ final class BASChapter902_5MemoryUsageLogsByteEqTests:
     private func cleanup(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(
-            at: url.appendingPathExtension("wal"))
+            at: URL(fileURLWithPath: url.path + "-wal"))
         try? FileManager.default.removeItem(
-            at: url.appendingPathExtension("shm"))
+            at: URL(fileURLWithPath: url.path + "-shm"))
     }
 
     // MARK: - Native replay log

@@ -34,8 +34,8 @@ final class BASChapter896DeletionManifestByteEqTests:
     private func cleanup(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
         // Also remove WAL sidecar files
-        let wal = url.appendingPathExtension("wal")
-        let shm = url.appendingPathExtension("shm")
+        let wal = URL(fileURLWithPath: url.path + "-wal")
+        let shm = URL(fileURLWithPath: url.path + "-shm")
         try? FileManager.default.removeItem(at: wal)
         try? FileManager.default.removeItem(at: shm)
     }

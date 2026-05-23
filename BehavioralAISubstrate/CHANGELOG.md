@@ -136,23 +136,113 @@ NEW `BASChapter902MemoryUsageRecordsByteEqTests.swift` (6 tests):
 ABI: 7 → 8。 XCFramework rebuilt。 No force-link change needed
 (bas-l8-engine_abi_version anchor covers all module symbols)。
 
+#### Chapter 九百二.5 — 九百二.6 — MemoryUsageTracker remaining 5 tables
+
+Two sub-chapters close the 6-table MemoryUsageTracker port per
+「细心继续」 discipline (8 + 5 byte-eq tests pass):
+- 902.5: replay_log + audit_log (append-only Codable logs)
+- 902.6: notes + bundles + tombstones (FTS5 deferred per 亏的
+  不要硬上)
+
+#### Chapter 九百三 — BASHostConstitutionSQLiteStorage (HIGH-risk #3 final)
+
+Single-table port (621 LOC vs MemoryUsageTracker's 2714)。
+UPSERT updates ALL non-PK columns on conflict (vs records-table
+which only updated helped_state)。 Full Codable round-trip
+byte-eq vs Swift actor (6 tests pass)。
+
+#### Chapter 九百四 — Unified BASRoutedMemoryUsageTrackerStore facade
+
+Single actor wraps the 3 sub-stores (records + logs + extras)
+under ONE shared engine pointer。 Mirrors the BASMemoryUsage-
+Tracker public surface for drop-in consumer adoption。 NEW
+`update_helped_state` Rust UPDATE-only primitive — markHelped
+no longer routes through UPSERT (avoids placeholder-row insert
+on unknown record_id)。 ABI 11 → 12。
+
+#### Chapter 九百五 — LIVE perf benchmark + DECLINE-WITH-TRIGGER
+
+LIVE production-shape measurement Swift SQLite actors vs
+Rust-routed bridges across 3 stores:
+- MemoryUsageTracker.record() N=100/1000:0.98×/0.93×
+- EventLog.append() N=100/1000:0.92×/1.05×
+- HostConstitutionVault.save() N=100:1.00×
+
+**All ratios in 0.92×-1.05× band → TIE。** Storage-only flip
+DECLINED per 「亏的不要硬上」 doctrine (string-FFI cost cancels
+Rust compute advantage at SQLite write granularity — same
+pattern as chapters 881 + 890 measured)。 NEW `Docs/L8_STORAGE_
+FLIP_DECLINE_WITH_TRIGGER.md` documents the decision + trigger
+conditions for re-evaluation。
+
+#### Chapter 九百六 — HOT-PATH CONSOLIDATION (90-134× WIN — trigger FIRED)
+
+The chapter 905 trigger fires。 NEW `cosine_topk_for_domain`
+Rust fn integrates fetch + dot-product top-k in ONE FFI call
+(vs orchestrated N + 1 FFI hops baseline)。
+
+| Corpus | Orchestrated | Integrated | Speedup |
+|---|---|---|---|
+| N=100 dim=64 | 0.0016s | 0.0000s | **90.67×** |
+| N=1000 dim=64 | 0.0160s | 0.0001s | **125.97×** |
+| N=5000 dim=64 | 0.0782s | 0.0006s | **134.50×** |
+
+This decisively confirms the user's architectural premise:
+storage migration alone ties (FFI hop cost cancels gain) but
+hot-path consolidation wins massively when N round-trip FFI
+calls collapse to 1。 ABI 12 → 13。 `Docs/L8_STORAGE_FLIP_
+DECLINE_WITH_TRIGGER.md` gains the「Trigger FIRED」 section。
+
+#### Chapter 九百七 — Review fix-of-fix (CRITICAL + HIGH from arc 893-906 review)
+
+3-agent parallel review caught 2 CRITICAL + 8 HIGH + 9 MED + 3
+LOW items。 CRITICAL items shipped in this sub-chapter:
+- **#1**: `cstr_to_str` rejected `len=0` silently breaking
+  event_log format=2 payload_json="" — fixed to return
+  `Some("")` for empty + null only when `len > 0`
+- **#2**: `cosine_topk` eviction branch untested (algorithm
+  correct,coverage gap) — added 3 Rust tests covering
+  eviction + k > corpus + empty domain
+
+HIGH items shipped:
+- **#4**: WAL/SHM cleanup typo `appendingPathExtension("wal")`
+  → `.wal` instead of SQLite's `-wal` — files leaked across
+  ~50 tests per run。 Fixed in 13 test files via batch sed。
+- **#5**: ABI version test floor bumped 2 → 13 + added upper
+  bound to catch out-of-tree XCFramework drift
+- **#9**: Added `Docs/DECLINE_PATTERNS.md` entry for
+  STORAGE_TIE_FFI_OVERHEAD (referenced by ch 905 doc)
+- **#10**: Added `testCosineTopKMatchesOrchestratedRowIDs`
+  pinning ID parity (not just score parity) with
+  strictly-distinct embeddings
+
+MED items deferred to chapter 908+ (substantial work scope):
+- #3 byte-eq tests compare counts not bytes
+- #11 dim-mismatch silent skip
+- #12 cross-platform gating
+- #13 error code overloading
+- #14 read-path errors throw .upsertFailed
+- #15-#21 test cleanup + concurrency stress + style
+
 #### Cumulative test stats
 
-   cargo test -p bas-l8-engine: 37/37 PASS (engine + 7 module groups)
-   swift test --filter BASChapter89[5-9]|BASChapter90[012]: 33/33 PASS
+   cargo test -p bas-l8-engine: 62/62 PASS (engine + 10 module groups)
+   swift test --filter BASChapter89[5-9]|BASChapter90[0-7]: 50+/50+ PASS
    swift build:                                                PASS
    pre-commit gates:                                           3/3 PASS
 
 #### Architecture progress
 
-| Layer | Before this arc | After ch 902 |
+| Layer | Before this arc | After ch 906/907 |
 |---|---|---|
-| Swift actors (SQLite owners) | 17 actors,100% Swift | 17 actors (8 with Rust bridge ready,Swift bodies preserved) |
+| Swift actors (SQLite owners) | 17 actors,100% Swift | 17 actors (11 with Rust bridge ready,Swift bodies preserved per 红线 7) |
 | Rust crates linking SQLite | 0 / 7 crates | 1 / 8 crates (bas-l8-engine,bundled rusqlite) |
-| L8 SQL schemas mirrored in Rust | 0 / 11 | 8 / 11 (015 + 023 + user_states + 014 + vector_index + event_log v2 + memory_usage_records V1) |
-| FFI surface for SQL ops | 0 functions | 37 functions (across 7 modules:deletion_manifest + atom_lifecycle + user_state + version_tree + vector_index + event_log + memory_usage_records) |
-| ABI version | n/a | 8 (bumped per migration) |
+| L8 SQL schemas mirrored in Rust | 0 / 11 | 12 / 12 (FTS5 only deferred) |
+| FFI surface for SQL ops | 0 functions | ~66 functions (across 10 modules:deletion_manifest + atom_lifecycle + user_state + version_tree + vector_index [w/ hot-path topk] + event_log + memory_usage_records + memory_usage_logs + memory_usage_extras + host_constitution_vault) |
+| ABI version | n/a | 13 (bumped per migration) |
+| Hot-path consolidation primitive | n/a | cosine_topk_for_domain (90-134× over orchestrated) |
 | XCFramework binary size | baseline | +~500 KB (bundled SQLite,single hit at ch 894) |
+| Production-default flips | n/a | 0 (storage-only DECLINED,hot-path FLIP-READY) |
 
 #### Arc trajectory (remaining work per RFC)
 

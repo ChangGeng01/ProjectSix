@@ -27,6 +27,14 @@ decision。
 - 八百八十三:RAG MemoryService wiring decline (async/sync)
 - 八百八十四:Gaps 1+4+5 decline (3 gaps × 3 triggers each)
 - 八百九十:canonicalEncoding decline (string-FFI cost)
+- 九百五:L8 storage-only flip decline,**pattern: STORAGE_TIE_
+  FFI_OVERHEAD** — Swift SQLite actors vs Rust-routed bridges
+  measured TIE (0.92×-1.05× across 3 stores)。 String-FFI cost
+  cancels Rust compute advantage at SQLite write granularity。
+  Trigger FIRED in chapter 九百六:hot-path consolidation
+  (one FFI call combining fetch + compute) wins 90-134×。
+  Storage-only flip remains DECLINED;hot-path consolidation
+  flip-ready。 See `Docs/L8_STORAGE_FLIP_DECLINE_WITH_TRIGGER.md`
 
 **Chapter 八百九十一.5 / M3146 HIGH fix from 18th-pass review**:
 chapters 八百七十四 (RoPE) + 八百七十五 (RMSNorm) were previously
