@@ -51,12 +51,21 @@ use std::sync::Mutex;
 
 use rusqlite::Connection;
 
+// chapter 八百九十五 / M3165 — LOW-risk pilot migration module
+pub mod deletion_manifest;
+
 // MARK: - ABI version
 
 /// Bump this when the C ABI surface changes (add/remove/rename
 /// functions OR change parameter shapes)。 Swift consumers
 /// cross-check via `bas_l8_engine_abi_version()` at module init。
-const ABI_VERSION: i32 = 1;
+///
+/// History:
+///   - 1 = chapter 八百九十四 / M3160 (engine skeleton:
+///         abi_version + init + close + db_path)
+///   - 2 = chapter 八百九十五 / M3165 (+deletion_manifest module:
+///         init_schema + append + count + count_for_vault)
+const ABI_VERSION: i32 = 2;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -226,7 +235,6 @@ pub unsafe extern "C" fn bas_l8_engine_db_path(
 
 // MARK: - CStr helper (for future migration chapter use)
 
-#[allow(dead_code)]
 pub(crate) fn cstr_to_str<'a>(
     ptr: *const c_char,
     len: usize,
@@ -260,8 +268,9 @@ mod tests {
     #[test]
     fn abi_version_pinned() {
         // If this fails, ABI changed — bump version + update
-        // Swift cross-check pin。
-        assert_eq!(bas_l8_engine_abi_version(), 1);
+        // Swift cross-check pin。 Chapter 895 bumped 1 → 2 for
+        // the deletion_manifest module addition。
+        assert_eq!(bas_l8_engine_abi_version(), 2);
     }
 
     #[test]

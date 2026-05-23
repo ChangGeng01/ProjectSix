@@ -1409,6 +1409,45 @@ int32_t bas_l8_engine_db_path(
     uint8_t* out_buf,
     size_t out_capacity);
 
+// MARK: - bas-l8-engine deletion_manifest module
+//         (chapter 八百九十五 / M3165)
+//
+// LOW-risk pilot migration per RFC. Mirrors
+// BASSQLiteHostConstitutionDeletionManifestStore SQL surface
+// (schema 015, append-only forensic trail for L5 host
+// constitution deletes). Chapter 896 wires the Swift bridge
+// + byte-equality tests against the current Swift actor.
+//
+// All string args are length-prefixed UTF-8 (no NUL assumed).
+// Optional fields use `*_len == 0` to mean SQL NULL.
+//
+// Return code convention:
+//   0   → success
+//   -1  → null engine
+//   -2  → SQLite error (constraint violation, etc)
+//   -3  → UTF-8 decode failure
+//   >=0 (count fns) → count value
+
+int32_t bas_l8_deletion_manifest_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_deletion_manifest_append(
+    const L8Engine* engine,
+    const char* manifest_id_utf8, size_t manifest_id_len,
+    const char* vault_id_utf8, size_t vault_id_len,
+    const char* target_refs_json_utf8, size_t target_refs_json_len,
+    const char* deletion_type_utf8, size_t deletion_type_len,
+    int64_t applied_at_ms,
+    const char* cascaded_refs_json_utf8, size_t cascaded_refs_json_len,
+    const char* version_ref_utf8, size_t version_ref_len);
+
+int64_t bas_l8_deletion_manifest_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_deletion_manifest_count_for_vault(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len);
+
 #ifdef __cplusplus
 }
 #endif

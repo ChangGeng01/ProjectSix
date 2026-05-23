@@ -11,6 +11,120 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### L8 Rust unification arc start — RFC + bas-l8-engine + first pilot (chapters 八百九十三 + 八百九十四 + 八百九十五 / M3155+M3160+M3165)
+
+User directive: 「把 L8 统一成 SQL event log / atom lifecycle /
+tombstone 作为 source of truth,Rust retrieval / reducer / ranker /
+provenance / batch scoring 做热路径,Swift actor 只做 orchestration
+和 Apple 平台边界」。
+
+This is the chapter 884 Gap 1 trigger firing — user directive IS
+the consumer-pressure trigger that lifts the chapter 884 DECLINE。
+L8 Rust unification arc opens with 3 chapters this session,
+remaining 13+ chapters per RFC plan to ship across future sessions。
+
+#### Chapter 八百九十三 / M3155 — RFC
+
+NEW `Docs/L8_RUST_UNIFICATION_RFC.md` (277 lines) per 2 parallel
+discovery agents:
+- 17 SQLite-backed Swift actors inventoried (9 L8-core + 8 adjacent)
+- 11 SQL schemas in Sources/BASMemory/SQL/ catalogued
+- 7 existing Rust crates,ZERO link rusqlite (Swift owns ALL SQL today)
+- Recommendation: NEW `bas-l8-engine` crate depending on existing
+  crates + adds rusqlite (bundled feature)
+- Naming: `bas_l8_*` prefix (grep-clean today)
+- Migration sequence proposed: 16 chapters from RFC → audit seal
+
+#### Chapter 八百九十四 / M3160 — bas-l8-engine crate skeleton
+
+NEW `Cargo/bas-l8-engine/`:
+- Cargo.toml: rusqlite 0.32 (bundled) + 5 existing L8 crate deps
+- src/lib.rs: L8Engine struct + opaque pointer FFI:
+  - `bas_l8_engine_abi_version` → 1 (ch 894),bumped to 2 (ch 895)
+  - `bas_l8_engine_init(path_utf8, path_len) → *mut L8Engine`
+  - `bas_l8_engine_close(*mut L8Engine) → i32`
+  - `bas_l8_engine_db_path(engine, out_buf, out_capacity) → i32`
+- In-memory + on-disk variants both supported
+- WAL mode + synchronous=NORMAL + foreign_keys=ON on disk
+- Multi-engine support (test isolation per RFC q1)
+
+Workspace registration + force-linked into bas-memory-usage-tracker
+umbrella + bundle crate count bumped 22 → 23 + C header export +
+XCFramework rebuilt (3 slices,with bundled SQLite ~500 KB add)。
+
+NEW `BASChapter894L8EngineFoundationTests.swift` (7 tests pass)。
+
+#### Chapter 八百九十五 / M3165 — deletion_manifest Rust module + FFI
+
+LOW-risk pilot per RFC migration sequence。 Targets
+`BASSQLiteHostConstitutionDeletionManifestStore` (392 LOC,5 funcs,
+append-only,schema 015 isolated)。
+
+NEW `Cargo/bas-l8-engine/src/deletion_manifest.rs`:
+- Schema 015 embedded via const SCHEMA_015 (per RFC q4)
+- `init_schema(conn) -> rusqlite::Result<()>` idempotent
+- `append_manifest(conn, ...)` mirrors Swift INSERT shape
+- `count_manifests(conn)` + `count_manifests_for_vault(conn, vault)`
+- FFI: `bas_l8_deletion_manifest_init_schema/append/count/
+  count_for_vault` — return code convention:0/-1/-2/-3
+- 6 Rust unit tests (idempotent init,append,duplicate-id constraint,
+  CHECK constraint,FFI round-trip)
+
+NEW `BASChapter895DeletionManifestRustTests.swift` (5 tests):
+schema init idempotent + append+count round-trip + duplicate ID
+SQLite error + CHECK constraint enforcement + optional fields
+nullable。
+
+NO Swift bridge in this chapter — chapter 896 wires the
+byte-equality test suite against the current Swift actor +
+adds opt-in flag to flip default。
+
+#### Cumulative test stats
+
+   cargo test -p bas-l8-engine: 13/13 PASS (7 engine + 6 deletion_manifest)
+   swift test --filter BASChapter894|BASChapter895Deletion: 12/12 PASS
+   swift build:                                              PASS
+   pre-commit gates:                                         3/3 PASS
+
+#### Architecture progress
+
+| Layer | Before this arc | After ch 895 |
+|---|---|---|
+| Swift actors (SQLite owners) | 17 actors,100% Swift | 17 actors (unchanged — ch 896+ migrates) |
+| Rust crates linking SQLite | 0 / 7 crates | 1 / 8 crates (bas-l8-engine,bundled rusqlite) |
+| L8 SQL schemas mirrored in Rust | 0 / 11 | 1 / 11 (schema 015) |
+| FFI surface for SQL ops | 0 functions | 4 functions (init_schema + append + 2 counts) |
+| XCFramework binary size | baseline | +~500 KB (bundled SQLite,single hit) |
+
+#### Arc trajectory (remaining work per RFC)
+
+- chapter 896:DeletionManifest Swift bridge + byte-equality tests
+- chapter 897-九百: AtomLifecycle / MemoryAtom / UserState /
+  VersionTree MED-risk migrations (5 stores)
+- chapter 九百一-九百三: EventLog / MemoryUsageTracker / Host
+  ConstitutionVault HIGH-risk migrations (3 stores)
+- chapter 九百四-九百五: hot-path consolidation (retrieval +
+  reducer + ranker + batch scoring)
+- chapter 九百六-九百七: Swift actor thinning + Apple boundary cleanup
+- chapter 九百八: multi-pass review + arc seal
+
+Per chapter 870 cycle-break discipline:each migration ships with
+LIVE Swift baseline → Rust port → byte-equality test → opt-in
+flag → measurement → flip-or-decline。
+
+#### Discipline pins
+
+- Watch for chapter 881 + 890 string-FFI cost pattern at each
+  migration — if FFI ser cost > Swift total at production size,
+  that store DECLINES。 `Docs/DECLINE_PATTERNS.md` is the canonical
+  reference。
+- ADR-014 OPT-IN inverted at flip-time per chapter 七百七十七
+- Swift body preserved as fallback per 红线 7
+- N-pass review per chapter (1 pass min for arc-pace push;
+  3-pass at HIGH-risk chapters)
+
+---
+
 ### 18th-pass review fixes for chapter 891 + ch 892 bench-deferred (chapter 八百九十一.5 + 八百九十二 / M3146+M3150)
 
 User invoked 「全面 收尾」 (comprehensive wrap-up)。 18th-pass review

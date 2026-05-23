@@ -32,15 +32,18 @@ final class BASChapter894L8EngineFoundationTests: XCTestCase {
         #endif
     }
 
-    /// PIN: bas_l8_engine_abi_version returns 1 (chapter 894
-    /// initial ABI)。 Subsequent ABI changes must bump this。
-    func testL8EngineAbiVersionPinned() {
+    /// PIN: bas_l8_engine_abi_version returns the current ABI
+    /// (chapter 894 shipped v1,chapter 895 bumped to v2 for
+    /// the deletion_manifest module additions)。
+    /// Floor assertion per chapter 七百五十七 pattern — growth
+    /// allowed,regression not。
+    func testL8EngineAbiVersionAtLeast2() {
         #if os(iOS) || os(macOS)
         let v = bas_l8_engine_abi_version()
-        XCTAssertEqual(v, 1,
-            "Chapter 894 ships L8 engine ABI v1 — if " +
-            "this changes,bump version + update Swift " +
-            "cross-check pin")
+        XCTAssertGreaterThanOrEqual(v, 2,
+            "Chapter 895 bumped L8 engine ABI to ≥ 2 " +
+            "(added deletion_manifest module)。 If this " +
+            "fails,a regression dropped the ABI version。")
         #endif
     }
 
