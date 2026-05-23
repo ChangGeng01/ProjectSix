@@ -308,6 +308,31 @@ public actor BASRoutedVectorIndexStorage {
     /// INTEGRATED cosine top-k:fetches all embeddings for a
     /// domain + dot-product scores them against the query in
     /// ONE FFI call (vs N round-trip reads + Swift compute)。
+    /// chapter 九百二十一 / M3310 MED fix:ergonomic [Float]
+    /// overload that does the f32 → byte packing internally。
+    /// Most consumers have a `[Float]` query vector — making
+    /// them pack to `[UInt8]` themselves invites endian /
+    /// width-mismatch bugs。
+    public func cosineTopK(
+        forDomain domain: String,
+        query: [Float],
+        k: Int
+    ) async throws -> [(rowid: Int64, score: Float)] {
+        // Pack [Float] → [UInt8] little-endian
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(query.count * 4)
+        for v in query {
+            var x = v
+            withUnsafeBytes(of: &x) { raw in
+                bytes.append(contentsOf: raw)
+            }
+        }
+        return try await cosineTopK(
+            forDomain: domain,
+            queryBytes: bytes,
+            k: k)
+    }
+
     /// Returns top-k (rowid, score) pairs sorted descending
     /// by score。
     public func cosineTopK(

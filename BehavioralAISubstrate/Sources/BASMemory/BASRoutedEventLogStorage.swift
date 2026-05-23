@@ -159,7 +159,16 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         forSession sessionID: String
     ) async -> [BASEventLogEntry] {
         // Chapter 901 partial conformance — full row query
-        // deferred to chapter 901.5。
+        // deferred to chapter 901.5。 Chapter 九百二十一
+        // assertionFailure in DEBUG so consumers don't
+        // silently get [] back and ship a regression。 In
+        // RELEASE we still return [] (additive behavior)。
+        assertionFailure(
+            "BASRoutedEventLogStorage.events(forSession:) " +
+            "is partial conformance (returns []) — " +
+            "use BASSQLiteEventLogStorage if you need read " +
+            "methods,or wait for chapter 901.5 to ship " +
+            "full row query support")
         return []
     }
 
@@ -167,6 +176,11 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         sinceTimestampMs since: Int64,
         limit: Int
     ) async -> [BASEventLogEntry] {
+        // chapter 九百二十一 partial-conformance assertion
+        assertionFailure(
+            "BASRoutedEventLogStorage.events(sinceTimestampMs:limit:) " +
+            "is partial conformance (returns []) — see " +
+            "Docs/L8_ROUTED_OVERVIEW.md")
         return []
     }
 

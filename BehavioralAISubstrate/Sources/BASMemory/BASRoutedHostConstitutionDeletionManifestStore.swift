@@ -160,12 +160,25 @@ public actor BASRoutedHostConstitutionDeletionManifestStore:
         // empty until chapter 896.5 extends FFI。 Production
         // hosts that need query support stay on the legacy
         // Swift actor。
+        // chapter 九百二十一 partial-conformance assertion
+        // (DEBUG only;RELEASE returns [] as before)。
+        assertionFailure(
+            "BASRoutedHostConstitutionDeletionManifestStore." +
+            "manifests(forVault:) is partial conformance " +
+            "(returns []) — use BASSQLiteHostConstitution" +
+            "DeletionManifestStore for query support。 See " +
+            "Docs/L8_ROUTED_OVERVIEW.md")
         return []
     }
 
     public func manifests(
         forType deletionType: String
     ) async -> [BASHostConstitutionDeletionRecord] {
+        // chapter 九百二十一 partial-conformance assertion
+        assertionFailure(
+            "BASRoutedHostConstitutionDeletionManifestStore." +
+            "manifests(forType:) is partial conformance " +
+            "(returns []) — see Docs/L8_ROUTED_OVERVIEW.md")
         return []
     }
 
