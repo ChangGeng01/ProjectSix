@@ -1488,6 +1488,33 @@ int64_t bas_l8_atom_lifecycle_count_for_session(
     const L8Engine* engine,
     const char* session_id_utf8, size_t session_id_len);
 
+// MARK: - bas-l8-engine user_state module
+//         (chapter 八百九十八 / M3180)
+//
+// MED-risk migration #3. Schema user_states (4 cols + 1 index).
+// Append is idempotent on duplicate state_id: returns 1 on
+// insert, 0 on duplicate-no-op, -1 null engine, -2 SQLite
+// error, -3 UTF-8 decode failure.
+
+int32_t bas_l8_user_state_init_schema(const L8Engine* engine);
+
+int32_t bas_l8_user_state_append(
+    const L8Engine* engine,
+    const char* state_id_utf8, size_t state_id_len,
+    const char* session_id_utf8, size_t session_id_len,
+    int64_t generated_at_ms,
+    const char* payload_json_utf8, size_t payload_json_len);
+
+int64_t bas_l8_user_state_count(const L8Engine* engine);
+
+int64_t bas_l8_user_state_count_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len);
+
+int64_t bas_l8_user_state_latest_time_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len);
+
 #ifdef __cplusplus
 }
 #endif
