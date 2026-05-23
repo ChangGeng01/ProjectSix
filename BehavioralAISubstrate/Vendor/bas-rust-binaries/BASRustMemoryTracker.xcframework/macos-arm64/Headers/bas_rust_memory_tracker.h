@@ -1667,6 +1667,46 @@ int32_t bas_l8_memory_usage_records_helped_state_for_record(
     const char* record_id_utf8, size_t record_id_len,
     uint8_t* out_buf, size_t out_capacity);
 
+// MARK: - bas-l8-engine memory_usage_logs module
+// (chapter 九百二.5 / M3205 — replay_log + audit_log
+//  sub-chapter for MemoryUsageTracker, append-only tables)
+//
+// Both tables are pure INSERT (no UPSERT/UPDATE). Duplicate
+// PK returns -2 (SQLite UNIQUE constraint).
+
+int32_t bas_l8_memory_usage_replay_log_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_replay_log_append(
+    const L8Engine* engine,
+    const char* event_id_utf8, size_t event_id_len,
+    const char* event_type_utf8, size_t event_type_len,
+    const char* payload_utf8, size_t payload_len,
+    int64_t recorded_at_ms);
+
+int64_t bas_l8_memory_usage_replay_log_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_memory_usage_replay_log_latest_time(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_audit_log_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_audit_log_append(
+    const L8Engine* engine,
+    const char* entry_id_utf8, size_t entry_id_len,
+    const char* actor_utf8, size_t actor_len,
+    const char* action_utf8, size_t action_len,
+    const char* detail_utf8, size_t detail_len,
+    int64_t recorded_at_ms);
+
+int64_t bas_l8_memory_usage_audit_log_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_memory_usage_audit_log_latest_time(
+    const L8Engine* engine);
+
 #ifdef __cplusplus
 }
 #endif

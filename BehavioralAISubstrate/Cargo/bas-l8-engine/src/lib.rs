@@ -70,6 +70,10 @@ pub mod event_log;
 //                          MemoryUsageTracker records table only
 //                          (UPSERT-only-helped_state on conflict)
 pub mod memory_usage_records;
+// chapter 九百二.5 / M3205 — sub-chapter 2:
+//                            MemoryUsageTracker replay_log + audit_log
+//                            (append-only,2 tables in 1 module)
+pub mod memory_usage_logs;
 
 // MARK: - ABI version
 
@@ -103,7 +107,10 @@ pub mod memory_usage_records;
 ///         [helped_state-only on conflict] + count +
 ///         usage_count_for_atom + count_for_session +
 ///         helped_state_for_record)
-const ABI_VERSION: i32 = 8;
+///   - 9 = chapter 九百二.5 / M3205 (+memory_usage_logs module:
+///         replay_log + audit_log append-only tables —
+///         init_schema×2 + append×2 + count×2 + latest_time×2)
+const ABI_VERSION: i32 = 9;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -312,7 +319,8 @@ mod tests {
         // 900: 5→6 vector_index (UPSERT + variable BLOB).
         // 901: 6→7 event_log (HIGH-risk first).
         // 902: 7→8 memory_usage_records (HIGH-risk #2 SCOPED).
-        assert_eq!(bas_l8_engine_abi_version(), 8);
+        // 902.5: 8→9 memory_usage_logs (replay+audit append-only).
+        assert_eq!(bas_l8_engine_abi_version(), 9);
     }
 
     #[test]
