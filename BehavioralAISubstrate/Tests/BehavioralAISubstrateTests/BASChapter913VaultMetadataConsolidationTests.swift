@@ -161,8 +161,12 @@ final class BASChapter913VaultMetadataConsolidationTests:
         _ = try await store.allVaultMetadata(limit: n)
         _ = await store.vaultCount
 
-        // Orchestrated baseline: N vaultCount FFI calls
-        // (same FFI shape as a per-vault metadata read)
+        // chapter 九百十六 / M3285 honesty fix H3:
+        // ORCHESTRATED = N vaultCount FFI calls。 NOT
+        // apples-to-apples with「Swift would do N per-vault
+        // metadata reads」 — that alternative requires the
+        // chapter 906/909/911/913 integrated pattern。
+        // Measures FFI-hop reduction,not end-to-end speedup。
         let orchSec = try await timeit {
             for _ in 0..<n {
                 let _ = await store.vaultCount
@@ -177,10 +181,17 @@ final class BASChapter913VaultMetadataConsolidationTests:
             "ch913 vault.metadata N=\(n):" +
             " orch=\(String(format: "%.4f", orchSec))s" +
             " integrated=\(String(format: "%.4f", intSec))s" +
-            " orch/integrated=\(String(format: "%.2fx", ratio))")
-        // 2× regression guard
-        XCTAssertLessThan(intSec, orchSec * 2.0,
-            "Integrated >2× slower = regression")
+            " ffi-hop-reduction=\(String(format: "%.2fx", ratio))" +
+            " [measures FFI overhead × N collapsed to 1," +
+            " NOT end-to-end speedup]")
+        // chapter 九百十六 fix H11:absolute wall-clock guard
+        let absoluteBudgetSec: Double = n <= 50
+            ? 0.002 : 0.005
+        XCTAssertLessThan(intSec, absoluteBudgetSec,
+            "Integrated time \(intSec)s exceeds budget " +
+            "\(absoluteBudgetSec)s for N=\(n)")
+        XCTAssertLessThan(intSec, orchSec,
+            "Integrated must be faster than N FFI hops")
     }
 }
 #endif

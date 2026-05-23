@@ -155,9 +155,13 @@ final class BASChapter911RecordsConsolidationTests: XCTestCase
             forAtomID: atom, limit: k)
         _ = await store.usageCount(forAtomID: atom)
 
+        // chapter 九百十六 / M3285 honesty fix H3:
+        // ORCHESTRATED = N usageCount FFI hops。 NOT
+        // apples-to-apples with「Swift would do N per-row
+        // reads + compute」 — that alternative requires per-
+        // record read FFI which doesn't exist in the bridge。
+        // Measures FFI-hop reduction,not end-to-end speedup。
         let orchSec = try await timeit {
-            // Orchestrated baseline:N usageCount FFI hops
-            // (same FFI shape — the per-call cost matters)
             for _ in 0..<n {
                 let _ = await store.usageCount(
                     forAtomID: atom)
@@ -172,10 +176,17 @@ final class BASChapter911RecordsConsolidationTests: XCTestCase
             "ch911 records.recent N=\(n) k=\(k):" +
             " orch=\(String(format: "%.4f", orchSec))s" +
             " integrated=\(String(format: "%.4f", intSec))s" +
-            " orch/integrated=\(String(format: "%.2fx", ratio))")
-        // Catastrophic-regression guard
-        XCTAssertLessThan(intSec, orchSec * 2.0,
-            "Integrated >2× slower = regression")
+            " ffi-hop-reduction=\(String(format: "%.2fx", ratio))" +
+            " [measures FFI overhead × N collapsed to 1," +
+            " NOT end-to-end speedup]")
+        // chapter 九百十六 fix H11:absolute wall-clock guard
+        let absoluteBudgetSec: Double = n <= 100
+            ? 0.005 : 0.020
+        XCTAssertLessThan(intSec, absoluteBudgetSec,
+            "Integrated time \(intSec)s exceeds budget " +
+            "\(absoluteBudgetSec)s for N=\(n)")
+        XCTAssertLessThan(intSec, orchSec,
+            "Integrated must be faster than N FFI hops")
     }
 }
 #endif

@@ -6,16 +6,27 @@
 // events for a session vs the orchestrated baseline of N
 // round-trip count + read calls。
 //
-// # Hypothesis
+// # Honest measurement (chapter 九百十六 / M3285 fix H3)
 //
-// Per chapter 906 finding (90-134× win for vector_index),
-// event_log should show a similar win:
-//   - Orchestrated:Swift loops over events,does per-event
-//     timestamp lookups via FFI
-//   - Integrated:1 FFI call to recent_timestamps_for_session
-//     returns all N timestamps + sequences
+// The orchestrated baseline measures N+1 FFI hops via raw
+// countForSession() calls。 NO per-event read FFI exists in
+// the bridge,so the realistic consumer alternative is
+// either:
+//   (a) make N count-style FFI hops (this baseline)
+//   (b) do nothing (recentTimestamps isn't available without
+//       the chapter 909 FFI)
 //
-// Expected speedup similar to chapter 906 (>10× at N ≥ 100)。
+// The ratio we report is「FFI-hop reduction」(N+1 → 1)
+// NOT「Swift would have done X work,Rust does Y work,
+// here is the Rust:Swift speedup」。 That comparison is
+// not possible because option (b) means Swift can't do
+// the work at all。
+//
+// **Previously misreported as「17-102× speedup」** — the
+// chapter 九百十六 honesty fix renames the metric in test
+// output and the SEAL doc。 The underlying achievement
+// (collapsing N+1 FFI hops to 1) is real and valuable,
+// the「100×」 framing was misleading。
 //
 // # Correctness pin
 //
@@ -184,16 +195,19 @@ final class BASChapter909EventLogConsolidationTests:
             forSession: session, limit: k)
         _ = await store.countForSession(session)
 
-        // Orchestrated baseline:
-        //   1. countForSession (FFI hop) → returns N
-        //   2. then would need per-event reads to get
-        //      timestamps,but Rust bridge doesn't expose
-        //      per-event read FFI for event_log。
-        //      Approximate with N count calls (same FFI shape)
+        // chapter 九百十六 / M3285 honesty fix H3:
+        // ORCHESTRATED here = N+1 raw countForSession FFI hops
+        // (no per-event read FFI exists in the bridge,so the
+        // realistic consumer alternative WOULD be N COUNT-style
+        // hops or no-op)。 This baseline measures FFI-HOP
+        // REDUCTION,not end-to-end「Swift would have to do
+        // X work」 speedup — that comparison is impossible
+        // since the consumer's alternative IS more FFI hops。
+        // The previously-reported "17-102×" speedup framing
+        // was misleading; the honest framing is「N+1 FFI hops
+        // → 1 hop saves the FFI overhead × N」。
         let orchSec = try await timeit {
             let _ = await store.countForSession(session)
-            // Simulate N per-event FFI reads via N count calls
-            // (same FFI shape — the per-call cost matters)
             for _ in 0..<n {
                 let _ = await store.countForSession(session)
             }
@@ -207,11 +221,21 @@ final class BASChapter909EventLogConsolidationTests:
             "ch909 eventlog.recent N=\(n) k=\(k):" +
             " orch=\(String(format: "%.4f", orchSec))s" +
             " integrated=\(String(format: "%.4f", intSec))s" +
-            " orch/integrated=\(String(format: "%.2fx", ratio))")
-        // Catastrophic-regression guard:integrated must
-        // not be > 2× slower than orchestrated
-        XCTAssertLessThan(intSec, orchSec * 2.0,
-            "Integrated >2× slower than orchestrated baseline")
+            " ffi-hop-reduction=\(String(format: "%.2fx", ratio))" +
+            " [measures FFI overhead × N collapsed to 1," +
+            " NOT end-to-end speedup]")
+        // chapter 九百十六 fix H11:absolute wall-clock guard
+        // is more meaningful than「2× orch」 (orch is dominated
+        // by N FFI hops,so 2× of that is a huge band)。
+        let absoluteBudgetSec: Double = n <= 100
+            ? 0.005   // 5ms for N=100
+            : 0.020   // 20ms for N=1000
+        XCTAssertLessThan(intSec, absoluteBudgetSec,
+            "Integrated time \(intSec)s exceeds absolute " +
+            "budget \(absoluteBudgetSec)s for N=\(n)")
+        // Backstop:integrated must still be < orch (sanity)
+        XCTAssertLessThan(intSec, orchSec,
+            "Integrated must be faster than N+1 FFI hops")
     }
 }
 #endif
