@@ -66,6 +66,14 @@ CREATE INDEX IF NOT EXISTS event_log_timestamp_idx
   ON event_log(timestamp_ms);
 CREATE INDEX IF NOT EXISTS event_log_kind_idx
   ON event_log(kind);
+-- chapter 九百二十 / M3305 HIGH-4 fix:composite covering
+-- index for the recent-events-per-session hot path
+-- (chapter 909 recent_event_timestamps_for_session ORDER BY
+-- timestamp_ms DESC LIMIT N)。 Without this index SQLite
+-- filters by session_id then sorts in memory — at 100K
+-- events that's a multi-ms scan per query。
+CREATE INDEX IF NOT EXISTS event_log_session_time_idx
+  ON event_log(session_id, timestamp_ms DESC);
 "#;
 
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {

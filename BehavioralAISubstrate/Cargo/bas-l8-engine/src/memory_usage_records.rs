@@ -73,6 +73,15 @@ CREATE INDEX IF NOT EXISTS memory_usage_atom_idx
   ON memory_usage_records(atom_id);
 CREATE INDEX IF NOT EXISTS memory_usage_session_idx
   ON memory_usage_records(session_ref);
+-- chapter 九百二十 / M3305 HIGH-4 fix:composite covering
+-- index for chapter 911 recent_records_for_atom hot path
+-- (WHERE atom_id = ? ORDER BY retrieved_at_ms DESC LIMIT N)。
+-- Previously the schema relied on a「lazy」 Swift-side
+-- ensureCoveringIndex() that the Rust path never invokes,
+-- leaving the query at full-table-scan complexity for any
+-- atom with many records。 Now eagerly created at init。
+CREATE INDEX IF NOT EXISTS memory_usage_atom_time_idx
+  ON memory_usage_records(atom_id, retrieved_at_ms DESC);
 "#;
 
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {

@@ -172,6 +172,14 @@ impl L8Engine {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        // chapter 九百二十 / M3305 MED-17 fix:set
+        // wal_autocheckpoint to 1000 pages (~4MB) — SQLite's
+        // default,but explicitly pinning it ensures
+        // long-running sessions don't accumulate unbounded
+        // WAL growth。 At 1000 writes/sec for an hour without
+        // checkpoint,WAL can hit hundreds of MB on iOS。
+        conn.pragma_update(None,
+            "wal_autocheckpoint", 1000)?;
         Ok(L8Engine {
             conn: Mutex::new(conn),
             db_path: path,

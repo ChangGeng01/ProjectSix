@@ -61,6 +61,13 @@ CREATE TABLE IF NOT EXISTS host_constitution_vaults (
 );
 CREATE INDEX IF NOT EXISTS host_constitution_host_idx
   ON host_constitution_vaults(host_id);
+-- chapter 九百二十 / M3305 HIGH-4 fix:index for chapter 913
+-- all_vault_metadata hot path (ORDER BY last_updated_at_ms
+-- DESC LIMIT N)。 Previously no index → full table scan +
+-- sort。 At ~50 vaults today nobody notices,but at session
+-- boot with multi-host scenarios this scales linearly。
+CREATE INDEX IF NOT EXISTS host_constitution_updated_idx
+  ON host_constitution_vaults(last_updated_at_ms DESC);
 "#;
 
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {

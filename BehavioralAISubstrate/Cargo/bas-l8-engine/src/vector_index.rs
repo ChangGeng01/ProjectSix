@@ -251,6 +251,14 @@ pub unsafe extern "C" fn bas_l8_vector_index_upsert(
     metadata_json_utf8: *const c_char, metadata_json_len: usize,
 ) -> c_int {
     if engine.is_null() { return -1; }
+    // chapter 九百二十 / M3305 HIGH-5 fix:bound embedding
+    // size to prevent OOM-via-upsert。 4 bytes per f32 ×
+    // 16384 max dim = 65536 bytes per embedding。 Production
+    // embeddings are 384-1536 dim;the cap is generous。
+    const MAX_EMBEDDING_BYTES: usize = 65_536;
+    if embedding_len > MAX_EMBEDDING_BYTES {
+        return -3;  // oversized BLOB rejected
+    }
     let atom_id = match crate::cstr_to_str(
         atom_id_utf8, atom_id_len) {
         Some(s) => s, None => return -3,
