@@ -35,27 +35,30 @@ final class BASChapter894L8EngineFoundationTests: XCTestCase {
     /// PIN: bas_l8_engine_abi_version returns the current ABI
     /// (chapter 894 shipped v1,chapter 895 bumped to v2 for
     /// the deletion_manifest module additions)。
-    /// Floor assertion per chapter 七百五十七 pattern — growth
-    /// allowed,regression not。
     ///
-    /// chapter 九百七 / M3240 review fix #5: bump floor to 13
-    /// (current chapter 906 ABI) + add reasonable upper bound
-    /// so a mismatched XCFramework rebuild surfaces here。
+    /// chapter 九百七 / M3240 review fix #5: bumped floor to 13
+    /// (chapter 906 ABI) + reasonable upper bound so a
+    /// mismatched XCFramework rebuild surfaces here。
+    ///
+    /// chapter 九百二十七 / M3340 fix MED-4:tightened from
+    /// soft range to EXACT EQUALITY。 Soft range hid the
+    /// ABI 17 → 18 (ch 926) bump on stale XCFrameworks
+    /// because both values were ≥ 13 and ≤ 100。 Exact pin
+    /// forces every ABI bump to update this test in lock-
+    /// step,catching stale-binary drift immediately。 The
+    /// chapter author bumping ABI MUST update both the Rust
+    /// ABI_VERSION constant + this Swift pin in the same
+    /// commit。
     func testL8EngineAbiVersionAtLeast2() {
         #if os(iOS) || os(macOS)
         let v = bas_l8_engine_abi_version()
-        XCTAssertGreaterThanOrEqual(v, 13,
-            "Chapter 906 brought L8 engine ABI to ≥ 13 " +
-            "(added vector_index hot-path consolidation)。 " +
-            "If this fails,a regression dropped ABI OR the " +
-            "linked XCFramework is stale (re-run Scripts/" +
-            "build-rust-xcframework.sh)。")
-        // Upper bound: chapter 906 is the latest。 Future
-        // chapter authors bump this when adding new FFI;a
-        // surprise jump means an out-of-tree build。
-        XCTAssertLessThanOrEqual(v, 100,
-            "ABI version unexpectedly high — possible " +
-            "out-of-tree XCFramework or build cache drift")
+        XCTAssertEqual(v, 18,
+            "L8 engine ABI must be EXACTLY 18 (ch 926 " +
+            "added bas_l8_engine_pragma_value_i64)。 If this " +
+            "fails:(a) regression dropped ABI,(b) linked " +
+            "XCFramework is stale (re-run scripts/" +
+            "build-rust-xcframework.sh),OR (c) new chapter " +
+            "bumped ABI without updating this pin in lockstep。")
         #endif
     }
 

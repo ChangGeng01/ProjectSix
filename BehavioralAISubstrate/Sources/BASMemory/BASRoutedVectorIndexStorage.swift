@@ -122,6 +122,26 @@ public actor BASRoutedVectorIndexStorage {
     /// UPSERT。 Returns true on insert,false on replace
     /// (matches BASSQLiteVectorIndexStorage.upsert semantics)。
     @discardableResult
+    /// chapter 九百二十七 / M3340 fix HIGH-2 — extracted from
+    /// `upsert(_:)` body so tests can assert determinism on
+    /// the production encoder directly (the ch 926 test
+    /// asserted UPSERT-REPLACE semantics which hold whether
+    /// sortedKeys is active or not — fake coverage)。
+    ///
+    /// If `.sortedKeys` were removed,JSONEncoder emits keys
+    /// in hash-table-iteration order which is process-
+    /// random — the sibling test `testMetadataKeysAreSorted
+    /// Lexicographically` constructs a multi-key dict and
+    /// asserts exact JSON byte order,catching this。
+    internal static func encodeMetadata(
+        _ metadata: [String: String]
+    ) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(metadata)
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
     public func upsert(
         _ entry: BASVectorIndexEntry
     ) async throws -> Bool {
@@ -130,13 +150,15 @@ public actor BASRoutedVectorIndexStorage {
         // .sortedKeys for deterministic encoding (was the
         // ONE L8 routed bridge the chapter 919 C2 fix missed
         // — every other routed bridge already uses sorted)。
+        //
+        // chapter 九百二十七 / M3340 fix HIGH-2:extracted
+        // encoding to `encodeMetadata(_:)` static helper so
+        // tests can directly assert byte-order without going
+        // through round-trip storage layer。
         let metadataJson: String
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
-            let data = try encoder.encode(entry.metadata)
-            metadataJson = String(
-                data: data, encoding: .utf8) ?? "{}"
+            metadataJson = try Self.encodeMetadata(
+                entry.metadata)
         } catch {
             throw StoreError.metadataEncodingFailed
         }
@@ -412,8 +434,14 @@ public actor BASRoutedVectorIndexStorage {
                 bytes.append(contentsOf: raw)
             }
         }
-        return try await cosineTopK(
-            forDomain: domain,
+        // chapter 九百二十七 / M3340 fix MED-1:skip
+        // re-validation in the bytes path — the [Float]
+        // overload above already validated dim cap +
+        // NaN/Inf,re-decoding 16K floats from bytes for a
+        // second check inverts the hot-path win the ch 923
+        // arc fought for。 Internal entry trusts caller。
+        return try await _cosineTopKBytesUnchecked(
+            domain: domain,
             queryBytes: bytes,
             k: k)
     }
@@ -425,14 +453,34 @@ public actor BASRoutedVectorIndexStorage {
         queryBytes: [UInt8],
         k: Int
     ) async throws -> [(rowid: Int64, score: Float)] {
-        guard k > 0 && k <= Self.limitCap else {
-            throw StoreError.invalidArgument(
-                reason: "k must be in 1...\(Self.limitCap), got \(k)")
-        }
         // chapter 九百二十六 / M3335 fix HIGH-2:see overload
         // above — same dim-cap + NaN guard,extracted into
         // a shared helper to avoid drift between siblings。
         try Self.validateQueryBytes(queryBytes)
+        return try await _cosineTopKBytesUnchecked(
+            domain: domain,
+            queryBytes: queryBytes,
+            k: k)
+    }
+
+    /// chapter 九百二十七 / M3340 fix MED-1 — internal-entry
+    /// bytes path that skips Swift-side dim+NaN re-validation。
+    /// Used by:
+    ///   - public [Float] overload (already validated upstream)
+    ///   - public [UInt8] overload (validated via
+    ///     validateQueryBytes(_:) immediately above the call)
+    /// Both PUBLIC entrypoints validate; this private trampoline
+    /// is the only call site that skips the per-element scan,
+    /// preserving the chapter 923 hot-path perf win。
+    private func _cosineTopKBytesUnchecked(
+        domain: String,
+        queryBytes: [UInt8],
+        k: Int
+    ) async throws -> [(rowid: Int64, score: Float)] {
+        guard k > 0 && k <= Self.limitCap else {
+            throw StoreError.invalidArgument(
+                reason: "k must be in 1...\(Self.limitCap), got \(k)")
+        }
         let dom = Array(domain.utf8)
         var rowids = [Int64](repeating: 0, count: k)
         var scores = [Float](repeating: 0, count: k)

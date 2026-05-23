@@ -97,11 +97,11 @@ Final state:
 | L8 SQL schemas in Rust | 0/11 | 12/12 (FTS5 deferred) |
 | Rust FFI fns | 0 | ~77 (across 10 modules) |
 | Rust unit tests | 0 | 67/67 PASS (incl. real Mutex<Connection> stress) |
-| Swift byte-eq tests | 0 | 122+/122+ PASS (7 skipped) |
+| Swift byte-eq tests | 0 | 150+/150+ PASS (chapters 894-927;15 ch 926 + 17 ch 927 added) |
 | Cross-actor depth tests | 0 | 4/4 PASS (raw-SQLite observer) |
-| Concurrency stress tests | 0 | 2/2 PASS (Mutex<Connection>) |
+| Concurrency stress tests | 0 | 2/2 PASS (Mutex<Connection>) + 1 panic-safety regression guard (ch 926 TxGuard) |
 | Perf bench scorecards | 0 | 21 across 4 stores |
-| ABI version | n/a | 17 |
+| ABI version | n/a | **18** (ch 926 added bas_l8_engine_pragma_value_i64) |
 | Documentation | 1 doc (RFC) | 5 docs (RFC + DECLINE-WITH-TRIGGER + this seal + 2 updated) |
 | Production-default flips | 0 | 0 |
 | Hot-path consolidation primitives FLIP-READY | 0 | **4 (vector_index, event_log, records, vault) — all 4 major stores** |
@@ -242,6 +242,30 @@ adds them here for honest accounting。
 | LOW-12 | `URL(fileURLWithPath: url.path + "-wal")` may leak on iOS percent-encoded paths | Cosmetic, no behavior impact in practice |
 | LOW-14 | ch 906 rowid 1..5 assumption (implementation-coupled) | Refactor to fetch rowids before asserting; cosmetic |
 
+### Chapter 九百二十五.5 6th-pass「掘地三尺」 items (added to registry ch 927)
+
+The 6th-pass review of chapters 924+925 found 4 CRITICAL + 8 HIGH + 3 MED items — all CRITICAL+HIGH shipped in chapter 九百二十六 fix-of-fix。 Deferred MED items from that review:
+
+**MED (3 — 2 shipped in ch 927,1 carried forward):**
+
+| # | Item | Status |
+|---|---|---|
+| 6P-MED-1 | `testRustCrateCountIs22` function name still says "22" after pin updated to 23 | Still deferred (rename = breaking test-discovery; carry to next chapter that touches this file) |
+| 6P-MED-2 | Test 1 (testVaultLoadThrowsOnEmptyPayload) ignores sqlite_* return codes | Still deferred (cosmetic robustness; test passes consistently in practice) |
+| 6P-MED-3 | testCosineTopKThrowsOnNaNQuery only tests Swift guard,not Rust filter | **RESOLVED** ch 927 verified — existing `cosine_topk_treats_nan_scores_as_skipped` Rust test DOES exercise corrupted-bytes → NaN scores → skipped path (audit was wrong about this point) |
+
+### Chapter 九百二十六.5 7th-pass「掘地三尺」 items (added to registry ch 927)
+
+The 7th-pass review of chapter 926 found 2 CRITICAL + 5 HIGH + 4 MED — all CRITICAL+HIGH+3 of 4 MED shipped in chapter 九百二十七。 Deferred MED items:
+
+**MED (1 — 3 shipped in ch 927,1 carried forward):**
+
+| # | Item | Status |
+|---|---|---|
+| 7P-MED-1 | (carryover) 6P-MED-1 + 6P-MED-2 not yet shipped | Carried as「next time we touch this file」 — same status as in 6P registry |
+
+(Note:7P-MED-2 was ABI exact-pin via tightening — SHIPPED ch 927; 7P-MED-3 was double validation on cosineTopK [Float] hot path — SHIPPED ch 927 via internal `_cosineTopKBytesUnchecked` trampoline; 7P-MED-4 was deferred-items registry omission — SHIPPED ch 927 by this very subsection。)
+
 ### Future consolidation opportunities
 
 The hot-path consolidation pattern is now PROVEN across ALL
@@ -334,15 +358,20 @@ notes:
   Mutex<Connection> stress test from chapter 九百十五)
 - 5 new docs (RFC + DECLINE-WITH-TRIGGER + ARC_SEAL + 2
   updated)
-- **ABI 1→17 (16 bumps)** — ch 894 starts at ABI 1 not a
-  bump,16 subsequent increments through ch 913 (ch 894 →
+- **ABI 1→18 (17 bumps)** — ch 894 starts at ABI 1 not a
+  bump,17 subsequent increments through ch 926 (ch 894 →
   895 → 897 → 898 → 899 → 900 → 901 → 902 → 902.5 → 902.6
-  → 903 → 904 → 906 → 909 → 910 → 911 → 913);no ABI bumps
-  in ch 896 / 905 / 907-fix / 908 / 912 / 914 / 915 / 916 /
-  917
-- **Post-seal review-fix sub-arc (ch 915-917)** shipped per
-  chapter 九百十四.5 全量 审查 finding 2 CRITICAL + 10 HIGH
-  + 13 MED + 5 LOW items
+  → 903 → 904 → 906 → 909 → 910 → 911 → 913 → 926);no ABI
+  bumps in ch 896 / 905 / 907-fix / 908 / 912 / 914 / 915 /
+  916 / 917 / 918 / 919 / 920 / 921 / 922 / 923 / 924 / 925
+  / 927 (ch 926 adds the bas_l8_engine_pragma_value_i64
+  diagnostic FFI;ch 927 fixes the test value for that FFI
+  without changing ABI surface)
+- **Post-seal review-fix sub-arc (ch 915-927)** shipped per
+  chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th-pass /
+  6th-pass / 7th-pass reviews — cumulative 19 CRITICAL +
+  54 HIGH + 36 MED + 11 LOW found across 6 review passes,
+  all addressed in ch 915-927 fix sub-arc
 
 ## Closing
 

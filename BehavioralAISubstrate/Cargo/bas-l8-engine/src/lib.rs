@@ -179,13 +179,26 @@ impl L8Engine {
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         // chapter 九百二十 / M3305 MED-17 fix:set
-        // wal_autocheckpoint to 1000 pages (~4MB) — SQLite's
-        // default,but explicitly pinning it ensures
-        // long-running sessions don't accumulate unbounded
-        // WAL growth。 At 1000 writes/sec for an hour without
-        // checkpoint,WAL can hit hundreds of MB on iOS。
+        // wal_autocheckpoint to 1024 pages (~4 MB at 4KB
+        // pages) — long-running sessions don't accumulate
+        // unbounded WAL growth。 At 1000 writes/sec for an
+        // hour without checkpoint,WAL can hit hundreds of
+        // MB on iOS。
+        //
+        // chapter 九百二十七 / M3340 fix CRITICAL-1:value
+        // bumped 1000 → 1024 specifically to differ from
+        // SQLite's compile-time default。 The ch 925/926
+        // `testWalAutocheckpointReadFromEngineConnection`
+        // was fake-coverage when value matched default —
+        // test passed even if this pragma_update were
+        // reverted。 1024 is a power-of-2 sentinel that
+        // (a) keeps the「~4 MB WAL bound」 intent intact
+        // (1024 × 4 KB = 4 MiB,closer to the comment than
+        // 1000),(b) is detectably non-default so the test
+        // fails on revert,(c) has negligible production
+        // impact (24-page delta = ~96 KB at 4 KB pages)。
         conn.pragma_update(None,
-            "wal_autocheckpoint", 1000)?;
+            "wal_autocheckpoint", 1024)?;
         // chapter 九百二十二 / M3315 CRITICAL fix NC2:set
         // busy_timeout so multi-engine writes RETRY on
         // SQLITE_BUSY instead of failing immediately。 The
@@ -1060,15 +1073,21 @@ mod tests {
     // guard — verify the conditional UNIQUE index migration
     // produces correct index count on fresh AND legacy DBs。
     //
-    // Fresh DB: SCHEMA_EVENT_LOG creates table with
-    // UNIQUE(session_id, sequence_number) at line 61。 SQLite
-    // auto-creates sqlite_autoindex_event_log_2 for it。 The
-    // migration sees the UNIQUE in table SQL → does NOT
-    // create explicit `event_log_session_seq_uniq` → only
-    // 1 unique index on those columns。
+    // chapter 九百二十七 / M3340 fix CRITICAL-2 — superseded
+    // by `fresh_db_table_level_unique_constraint_intact` below
+    // which uses PRAGMA index_list origin='c' to distinguish
+    // table-level UNIQUE auto-index from migration-created
+    // explicit index。 The OLD test (kept below) is a
+    // tautology — passes whether table-level UNIQUE exists OR
+    // not,because the migration fallback creates an equivalent
+    // explicit index in either case。 User's 7th-pass
+    // reversibility experiment (removing UNIQUE constraint
+    // from table) proved this: 75/75 tests passed unchanged。
     //
-    // The ch 924 broken behavior would create BOTH (auto +
-    // explicit) on fresh DBs,inflating write cost。
+    // The OLD test is kept as a guard against the「2 unique
+    // indexes on fresh DB」 regression that ch 924 introduced
+    // (which the new test ALSO catches via auto-index check),
+    // but it cannot be the sole UNIQUE-constraint guard。
     #[test]
     fn fresh_db_has_exactly_one_unique_on_session_seq() {
         let engine = unsafe {
@@ -1138,6 +1157,221 @@ mod tests {
         unsafe { bas_l8_engine_close(engine); }
     }
 
+    // chapter 九百二十七 / M3340 fix CRITICAL-2 — REAL
+    // regression guard for the ch 919 C4 UNIQUE constraint。
+    // The old `fresh_db_has_exactly_one_unique_on_session_seq`
+    // is a tautology because the migration fallback creates
+    // an equivalent explicit index whenever the table-level
+    // UNIQUE is missing — so「exactly 1 unique index」 is
+    // true in BOTH (constraint present) AND (constraint
+    // absent + migration fallback) cases。
+    //
+    // This test specifically asserts that the unique index
+    // has origin='u' (created by a UNIQUE constraint,not by
+    // a user CREATE INDEX statement)。 PRAGMA index_list
+    // returns an origin column with values per SQLite docs
+    // (https://www.sqlite.org/pragma.html#pragma_index_list):
+    //   'c' = created by a CREATE INDEX statement
+    //         (including CREATE UNIQUE INDEX)
+    //   'u' = created by a UNIQUE constraint
+    //   'pk' = created by a PRIMARY KEY constraint
+    //
+    // If the table-level UNIQUE were removed,SQLite would
+    // not auto-create the 'u'-origin index,and migration
+    // would create a 'c'-origin index instead — this test
+    // would FAIL,catching the regression that ch 926's
+    // earlier test missed (verified empirically:user's
+    // 7th-pass reversibility experiment removed UNIQUE and
+    // old test still passed because migration fallback
+    // created a 'c'-origin explicit index)。
+    #[test]
+    fn fresh_db_table_level_unique_constraint_intact() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        let init_rc = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_init_schema(engine)
+        };
+        assert_eq!(init_rc, 0);
+        let engine_ref = unsafe { &*engine };
+
+        let has_constraint_unique: bool = engine_ref
+            .with_conn(|conn| {
+                // PRAGMA index_list returns:
+                //   seq | name | unique | origin | partial
+                let mut stmt = conn.prepare(
+                    "PRAGMA index_list('event_log')")?;
+                let rows: Vec<(String, bool, String)> = stmt
+                    .query_map([], |r| Ok((
+                        r.get::<_, String>(1)?,           // name
+                        r.get::<_, i64>(2)? != 0,         // unique
+                        r.get::<_, String>(3)?,           // origin
+                    )))?
+                    .filter_map(|r| r.ok())
+                    .collect();
+                let mut found = false;
+                for (name, is_unique, origin) in rows {
+                    if !is_unique || origin != "u" {
+                        continue;
+                    }
+                    let info_q = format!(
+                        "PRAGMA index_info('{}')", name);
+                    let mut info_stmt = conn.prepare(&info_q)?;
+                    let cols: Vec<String> = info_stmt
+                        .query_map([], |r|
+                            r.get::<_, String>(2))?
+                        .filter_map(|r| r.ok())
+                        .collect();
+                    if cols == vec![
+                        "session_id".to_string(),
+                        "sequence_number".to_string(),
+                    ] {
+                        found = true;
+                        break;
+                    }
+                }
+                Ok::<bool, rusqlite::Error>(found)
+            }).unwrap();
+
+        assert!(has_constraint_unique,
+            "fresh DB MUST have a UNIQUE-CONSTRAINT-origin \
+             (origin='u') unique index covering \
+             (session_id, sequence_number) — proves the \
+             table-level UNIQUE constraint exists at the \
+             schema level,not just via migration fallback \
+             (which would create 'c'-origin explicit index)");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百二十七 / M3340 fix CRITICAL-2 — functional
+    // test of the UNIQUE constraint via direct SQL insert。
+    // The previous tests check the schema invariant; this
+    // test checks the runtime invariant by attempting a
+    // duplicate insert via raw SQL (bypassing the FFI auto-
+    // increment that protects against accidental collisions)。
+    //
+    // Even with migration fallback (explicit index instead
+    // of table-level constraint),this test passes because
+    // BOTH paths create a unique index that rejects the
+    // duplicate。 So it's a positive-only guard — the
+    // table-level vs explicit distinction is enforced by
+    // the sibling `fresh_db_table_level_unique_constraint_
+    // intact` test above。
+    #[test]
+    fn fresh_db_rejects_duplicate_session_seq_via_direct_sql() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        let init_rc = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_init_schema(engine)
+        };
+        assert_eq!(init_rc, 0);
+        let engine_ref = unsafe { &*engine };
+
+        // First insert via direct SQL — succeeds
+        let result1 = engine_ref.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO event_log \
+                 (event_id, session_id, sequence_number, \
+                  timestamp_ms, kind, risk_band, payload_json) \
+                 VALUES ('evt-A', 'sess-X', 0, 100, \
+                         'k', 'low', '{}')",
+                [],
+            )
+        });
+        assert!(result1.is_ok(),
+            "first direct-SQL insert succeeds");
+
+        // Second insert with SAME (session_id, sequence_number)
+        // but DIFFERENT event_id — must FAIL via UNIQUE
+        // constraint (covers schema-level OR migration-explicit
+        // path; either enforces uniqueness)
+        let result2 = engine_ref.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO event_log \
+                 (event_id, session_id, sequence_number, \
+                  timestamp_ms, kind, risk_band, payload_json) \
+                 VALUES ('evt-B', 'sess-X', 0, 200, \
+                         'k', 'low', '{}')",
+                [],
+            )
+        });
+        assert!(result2.is_err(),
+            "duplicate (session_id, sequence_number) MUST be \
+             rejected by UNIQUE constraint when inserted via \
+             direct SQL — proves the runtime invariant beyond \
+             the FFI auto-increment that protects accidental \
+             collisions");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百二十七 / M3340 fix HIGH-1 — regression guard
+    // for the ch 926 HIGH-1 MAX_EMBEDDING_BYTES cap on the
+    // cosine_topk FFI's query_blob_len parameter。 The Swift
+    // test in ch 926 hits the Swift-side cap at 16384 floats
+    // BEFORE reaching the FFI,so the Rust cap was untested。
+    // This test calls the FFI directly with oversized input。
+    #[test]
+    fn cosine_topk_ffi_rejects_oversized_query_blob() {
+        use std::os::raw::c_char;
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        let init_rc = unsafe {
+            crate::vector_index
+                ::bas_l8_vector_index_init_schema(engine)
+        };
+        assert_eq!(init_rc, 0);
+
+        // 65540 bytes = 65536 cap + 4 — just over the cap
+        let oversize: Vec<u8> = vec![0u8; 65_540];
+        let domain = b"d1";
+        let mut out_rowids = vec![0i64; 5];
+        let mut out_scores = vec![0f32; 5];
+
+        let rc = unsafe {
+            crate::vector_index
+                ::bas_l8_vector_index_cosine_topk_for_domain(
+                    engine,
+                    domain.as_ptr() as *const c_char,
+                    domain.len(),
+                    oversize.as_ptr(),
+                    oversize.len(),
+                    5,
+                    out_rowids.as_mut_ptr(),
+                    out_scores.as_mut_ptr())
+        };
+        assert_eq!(rc, -3,
+            "oversized query_blob_len (> MAX_EMBEDDING_BYTES) \
+             MUST be rejected at FFI boundary with -3 — \
+             prevents Vec::with_capacity OOM-abort attack");
+
+        // Also test the with_skipped variant
+        let mut out_skipped: i64 = 0;
+        let rc2 = unsafe {
+            crate::vector_index
+                ::bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
+                    engine,
+                    domain.as_ptr() as *const c_char,
+                    domain.len(),
+                    oversize.as_ptr(),
+                    oversize.len(),
+                    5,
+                    out_rowids.as_mut_ptr(),
+                    out_scores.as_mut_ptr(),
+                    &mut out_skipped)
+        };
+        assert_eq!(rc2, -3,
+            "with_skipped variant must ALSO reject oversized \
+             query_blob_len");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
     // chapter 九百二十六 / M3335 — verify the diagnostic PRAGMA
     // helper reads the engine's OWN connection (not a fresh
     // connection that gets SQLite's compile-time default)。
@@ -1165,15 +1399,16 @@ mod tests {
                 name_bytes.as_ptr() as *const c_char,
                 name_bytes.len())
         };
-        // ch 920 PRAGMA wal_autocheckpoint=1000 was set on
-        // engine init。 This value must come from the engine's
-        // own connection,not a fresh raw connection。 Even
-        // though SQLite default is also 1000,exercising the
-        // pragma_value helper proves the test path works for
-        // future PRAGMA value asserts that DO differ from default。
-        assert_eq!(value, 1000,
-            "wal_autocheckpoint must be 1000 on engine \
-             connection (ch 920 fix verified via diagnostic FFI)");
+        // chapter 九百二十七 / M3340 fix CRITICAL-1 — value
+        // bumped from 1000 (SQLite default,was fake-coverage)
+        // to 1024 (power-of-2 sentinel,detectably non-default)。
+        // If someone reverts the ch 920 pragma_update call,
+        // this assertion fails — proving real revertibility
+        // guard。 See lib.rs:181-198 for the rationale。
+        assert_eq!(value, 1024,
+            "wal_autocheckpoint must be 1024 on engine \
+             connection (ch 920 fix verified via diagnostic FFI; \
+             ch 927 sentinel value differs from SQLite default 1000)");
 
         // Also verify busy_timeout (ch 922 NC2 fix) — this
         // one DIFFERS from SQLite's default (0)。 So if the

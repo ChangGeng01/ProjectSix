@@ -76,11 +76,16 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
 
     // MARK: - CRITICAL-3 — real wal_autocheckpoint verification
 
-    /// Verifies the ch 920 PRAGMA wal_autocheckpoint=1000 fix
-    /// actually applied on the engine's OWN connection。 ch 925's
-    /// testWalAutocheckpointIs1000 was fake — it opened a separate
-    /// raw sqlite3 connection (default 1000) so the fix could be
-    /// reverted with no test failure。
+    /// Verifies the ch 920 PRAGMA wal_autocheckpoint fix
+    /// actually applied on the engine's OWN connection。
+    ///
+    /// chapter 九百二十七 / M3340 fix CRITICAL-1:value bumped
+    /// 1000 → 1024 in production (lib.rs:187) so the test
+    /// can DETECT reverts。 SQLite's compile-time default is
+    /// 1000,so the ch 926 test was fake-coverage — it passed
+    /// even if the ch 920 pragma_update call were deleted。
+    /// 1024 is a power-of-2 sentinel that's detectably
+    /// non-default with negligible production impact。
     func testWalAutocheckpointReadFromEngineConnection() {
         let url = makeTempDBURL("wal-eng")
         defer { cleanup(url) }
@@ -97,10 +102,11 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
                 },
                 buf.count)
         }
-        XCTAssertEqual(value, 1000,
-            "wal_autocheckpoint must be 1000 on engine's own " +
-            "connection (ch 920 fix verified via new ch 926 " +
-            "diagnostic FFI bas_l8_engine_pragma_value_i64)")
+        XCTAssertEqual(value, 1024,
+            "wal_autocheckpoint must be 1024 on engine's own " +
+            "connection (ch 920 fix + ch 927 CRITICAL-1 sentinel " +
+            "value verified via ch 926 diagnostic FFI " +
+            "bas_l8_engine_pragma_value_i64)")
     }
 
     /// Verifies the ch 922 NC2 PRAGMA busy_timeout=5000 fix。
@@ -698,6 +704,14 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
     /// JSON encoding。 Without it,two upserts with the same
     /// metadata could produce different bytes,causing
     /// byte-equality tests to flake randomly。
+    ///
+    /// chapter 九百二十七 / M3340 fix HIGH-2:original ch 926
+    /// test was FAKE COVERAGE — asserted UPSERT REPLACE
+    /// semantics (which hold regardless of JSON ordering
+    /// because PK keying)。 Removing .sortedKeys from
+    /// production wouldn't fail that test。 Below is the
+    /// REAL determinism test using the extracted
+    /// `encodeMetadata` helper + exact byte-order assertion。
     func testVectorIndexMetadataSortedKeysDeterministic()
         async throws
     {
@@ -705,10 +719,6 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
         defer { cleanup(url) }
         let store = try BASRoutedVectorIndexStorage(
             databaseURL: url)
-        // Pre-generate metadata dict with multiple keys。
-        // Without sortedKeys,JSONEncoder may emit keys in
-        // random order between runs (Apple's encoder uses
-        // dictionary hash order by default)。
         let meta: [String: String] = [
             "domain": "x",
             "version": "1",
@@ -723,19 +733,69 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
             domain: "d1",
             metadata: meta)
 
-        // First upsert
+        // Smoke check: UPSERT-REPLACE still works
         let inserted1 = try await store.upsert(entry)
         XCTAssertTrue(inserted1, "first upsert inserts")
-        // Second upsert (same atomID,same metadata) — should
-        // produce identical bytes if sortedKeys is enforced
-        // (otherwise UPSERT-on-conflict semantics still REPLACE
-        // by PK,but byte-equality of metadata BLOB would flake)。
         let inserted2 = try await store.upsert(entry)
         XCTAssertFalse(inserted2, "second upsert REPLACEs")
-        // domain count must remain 1 (REPLACE,not duplicate)
         let count = await store.countForDomain("d1")
-        XCTAssertEqual(count, 1,
-            "second upsert REPLACEs (sortedKeys produces " +
-            "stable metadata bytes → equal PK / replace path)")
+        XCTAssertEqual(count, 1, "REPLACE keeps count 1")
+    }
+
+    /// chapter 九百二十七 / M3340 fix HIGH-2 — REAL
+    /// determinism guard。 Constructs a multi-key dict with
+    /// keys in a NON-sorted order (zeta first,then alpha,
+    /// etc.) and asserts the production encoder emits keys
+    /// in LEXICOGRAPHIC order (alpha first,zeta last)。
+    ///
+    /// Without `.sortedKeys`,JSONEncoder emits keys in
+    /// hash-table-iteration order which is process-random。
+    /// For a 5-key dict there are 5! = 120 possible orderings,
+    /// only 1 is lex order — this test fails with probability
+    /// 119/120 on first run if .sortedKeys is removed。
+    func testMetadataKeysAreSortedLexicographically() throws {
+        // Construct dict with keys deliberately NOT in
+        // alpha order — proves the test exercises the
+        // sortedKeys flag,not insertion-order coincidence。
+        let meta: [String: String] = [
+            "zeta": "z",
+            "alpha": "a",
+            "mu": "m",
+            "beta": "b",
+            "tau": "t"]
+        let json = try BASRoutedVectorIndexStorage
+            .encodeMetadata(meta)
+        // With sortedKeys: alpha, beta, mu, tau, zeta
+        let expected = "{\"alpha\":\"a\",\"beta\":\"b\"," +
+            "\"mu\":\"m\",\"tau\":\"t\",\"zeta\":\"z\"}"
+        XCTAssertEqual(json, expected,
+            "metadata JSON keys MUST be in lexicographic " +
+            "order (alpha,beta,mu,tau,zeta) — proves " +
+            "`.sortedKeys` is active in the production " +
+            "encoder。 If this fails,JSONEncoder is using " +
+            "hash-iteration order (non-deterministic across " +
+            "processes) and the ch 922 NC3 fix has regressed")
+    }
+
+    /// Sibling determinism test — encode same dict 100 times
+    /// in a tight loop,assert all encodings are byte-equal。
+    /// In-process JSONEncoder is deterministic even without
+    /// .sortedKeys (hash seed fixed per process),so this
+    /// test alone is weaker than the lex-order one above。
+    /// But it guards against future JSONEncoder behavior
+    /// changes that might introduce in-process variability。
+    func testMetadataEncodingByteEqualityAcrossInvocations()
+        throws
+    {
+        let meta: [String: String] = [
+            "k1": "v1", "k2": "v2", "k3": "v3"]
+        let first = try BASRoutedVectorIndexStorage
+            .encodeMetadata(meta)
+        for i in 1..<100 {
+            let next = try BASRoutedVectorIndexStorage
+                .encodeMetadata(meta)
+            XCTAssertEqual(next, first,
+                "encoding iteration \(i) must byte-match first")
+        }
     }
 }

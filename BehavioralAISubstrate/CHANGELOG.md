@@ -11,6 +11,66 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百二十七 / M3340 — comprehensive fix for 7th-pass 掘地三尺 review (2 CRITICAL + 5 HIGH + 4 MED — fake-coverage cascade break)
+
+User directive:「继续修复」 → 3-agent 7th-pass review of chapter 926。
+Stop threshold: 0 CRITICAL + ≤2 HIGH → arc-end。 Actual: **2C+5H+4M**。
+Plus user-injected reversibility experiment (removing UNIQUE constraint
+from event_log schema)proved test gap directly:75/75 Rust tests
+passed after removal,exposing the「fake-coverage cascade」 pattern
+where tests pattern-match the fix's incidental side effect rather than
+its guarantee。
+
+#### CRITICAL fixes (2)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | `testWalAutocheckpointReadFromEngineConnection` STILL FAKE COVERAGE — SQLite's compile-time default for wal_autocheckpoint IS 1000,so the test passed whether ch 920's pragma_update was applied or reverted。 ch 926's own test code admitted this honestly in a comment but shipped it anyway under the CRITICAL-3 banner | Production value bumped 1000 → **1024** (power-of-2 sentinel,detectably non-default,~96 KB WAL bound delta = negligible production impact)。 Rust test + Swift test both updated to assert == 1024 |
+| 2 | `fresh_db_has_exactly_one_unique_on_session_seq` was TAUTOLOGY — passed whether table-level UNIQUE was present (auto-index covers) OR removed (migration explicit-index fallback covers)。 User's reversibility experiment removed UNIQUE → all 75 tests passed unchanged。 Old test kept as guard against「2 unique indexes on fresh DB」 regression (ch 924 bug pattern),but cannot be sole UNIQUE-constraint guard | NEW `fresh_db_table_level_unique_constraint_intact` test uses PRAGMA index_list origin column:origin='u' for UNIQUE constraint auto-index,origin='c' for CREATE INDEX statement。 If table UNIQUE removed,no 'u'-origin index covers (session_id, sequence_number) → test FAILS。 Plus NEW `fresh_db_rejects_duplicate_session_seq_via_direct_sql` functional test that bypasses FFI auto-increment via raw SQL |
+
+#### HIGH fixes (5)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | Rust `MAX_EMBEDDING_BYTES` cap on cosine_topk FFI had NO regression guard — Swift test hit Swift-side queryDimCap (16_384) BEFORE reaching FFI,bypassing the Rust cap entirely。 75/75 Rust tests passed when cap was removed | NEW Rust unit test `cosine_topk_ffi_rejects_oversized_query_blob` calls FFI directly with `query_blob_len = MAX_EMBEDDING_BYTES + 4`,asserts -3 return code。 Covers BOTH `cosine_topk_for_domain` AND `cosine_topk_for_domain_with_skipped` variants |
+| 2 | `testVectorIndexMetadataSortedKeysDeterministic` was FAKE — asserted UPSERT-REPLACE semantics (true regardless of JSON ordering due to PK keying)。 Removing `.sortedKeys` would not fail the test | Extracted `encodeMetadata(_:)` static helper on `BASRoutedVectorIndexStorage` containing the production encoder。 NEW `testMetadataKeysAreSortedLexicographically` constructs 5-key dict with non-sorted insertion order,asserts JSON byte-for-byte matches expected lex-sorted output (5! = 120 orderings,only 1 is lex → fails with prob 119/120 if `.sortedKeys` removed)。 NEW `testMetadataEncodingByteEqualityAcrossInvocations` encodes 100x in loop,asserts byte-equality (guards against future JSONEncoder variability) |
+| 3 | `Docs/L8_ARC_SEAL.md` line 104 + line 337 still showed ABI 17 (16 bumps) — header was updated to 18 in ch 926 but body sections were not。 Exact「shoemaker's children」 pattern ch 926 CRITICAL-2 set out to eliminate,recurring on the very fix that should have eliminated it | Updated SEAL line 104 to「ABI version | n/a | 18 |」 + line 337 to「ABI 1→18 (17 bumps)」 with extended ABI bump chain including ch 926 |
+| 4 | `BRANCH_SUMMARY.md` had TWO competing「RE-SEALED」 rows — row 33 (post-ch-917) and row 34 (post-ch-926) both claimed seal status with inconsistent ABI counts and test counts。 Consumer reading the table saw conflicting facts | Consolidated to ONE row spanning 八百九十三-九百二十七 with final ABI 18 + 150+/78 test counts |
+| 5 | ch 926 CHANGELOG entry's debunking of ch 925's「NH1-NH6」 fabrication had its OWN off-by-one — ch 924 actually has NH1-**NH5** (5 HIGH per commit subject + event_log.rs fix NH5 comment),not NH1-NH4。 Fabrication-by-2 was「corrected」 by fabrication-by-1 | Corrected NH1-NH4 → NH1-NH5 throughout ch 926 entry。 OWNED the meta-failure (debunking a fabrication with another fabrication) — exactly the failure mode the「掘地三尺」 review is meant to catch |
+
+#### MED fixes (3 shipped + 1 carry-forward)
+
+| # | Issue | Status |
+|---|---|---|
+| 1 | Swift ABI cross-check pin used soft range `≥ 13` `≤ 100` — could not detect stale XCFramework that ships ABI 17 instead of current 18 | Tightened to **exact** `XCTAssertEqual(v, 18)` — every ABI bump must update this pin in lockstep with Rust ABI_VERSION constant |
+| 2 | ch 926 CHANGELOG verification block had placeholder text「will verify before commit」 that was never updated post-commit | Replaced with actual numbers (13591 tests,87 skipped,0 failures + 3/3 gates) |
+| 3 | Deferred items from 6th-pass (and now 7th-pass) review were not added to SEAL「Deferred items」 registry,breaking the registry pattern ch 918 established | Added new SEAL subsections「Chapter 九百二十五.5 6th-pass items」 + 「Chapter 九百二十六.5 7th-pass items」 |
+| 4 (deferred) | `testRustCrateCountIs22` function name still says "22" (carry-over from ch 925/926); Test 1 ignores sqlite_* return codes (carry-over from ch 926) | Carried forward as registered items in SEAL Deferred Items section — "next time we touch these files" |
+
+#### Self-assessment — 7th cascade-break attempt
+
+This is the SECOND attempt to break the cascade。 Ch 926 attempted but
+introduced its OWN cascade items (tautological tests + fake coverage +
+off-by-one debunking)。 Ch 927 is more honest:
+- Treats user's reversibility experiment as a GROUND-TRUTH probe
+- Uses SQLite-native distinguishers (PRAGMA index_list origin column,
+  exact-byte-order JSON assertion) instead of structural tests
+- Production sentinel value (1024) makes test fragility a feature
+
+Going forward,if 8th-pass surfaces more,that's its own decision — but
+the discipline pattern is now:**EVERY ASSERTION MUST FAIL ON REVERT**。
+Tests that pass「for any other reason」 are fake coverage and must be
+replaced。
+
+#### Verification
+
+- Rust:78/78 unit tests pass (3 NEW in ch 927:fresh_db_table_level_
+  unique_constraint_intact + fresh_db_rejects_duplicate_session_seq_
+  via_direct_sql + cosine_topk_ffi_rejects_oversized_query_blob)
+- Swift filtered:BASChapter926 → 17/17 pass (+2 NEW determinism tests) + BASChapter894 → 7/7 pass (tightened ABI pin)
+- Swift full sweep:**13593 tests,88 skipped,0 failures** (+2 from ch 926 baseline of 13591)
+- pre-commit-gates.sh:**3/3 pass**
+
 ### Chapter 九百二十六 / M3335 — comprehensive fix-of-fix for 6th-pass 掘地三尺 review (4 CRITICAL + 8 HIGH + 3 MED — cascade break)
 
 User directive: 「ship 6th-pass review with stop condition」 → 3-agent
@@ -41,7 +101,7 @@ own next-cascade decision。
 | 2 | `cosineTopK(forDomain:queryBytes:k:)` [UInt8] overload + WithSkipped variants had no NaN/Inf check — only [Float] overload had the ch 924 NH4 guard | NEW `Self.validateQueryBytes(_:)` Swift helper + Rust-side `query.iter().all(\|f\| f.is_finite())` check at FFI entry。 Tests `testCosineTopKBytesRejectsNaN` + `testCosineTopKWithSkippedBytesRejectsNaN` + `testCosineTopKFloatRejectsPositiveInfinity` + `testCosineTopKFloatRejectsNegativeInfinity` + `testCosineTopKFloatAcceptsNegativeZero` (boundary: -0.0 IS finite) |
 | 3 | CHANGELOG had NO entry for chapter 九百二十四 at all — 1 CRITICAL (TxGuard) + 5 HIGH fixes were invisible to consumers | Added the missing ch 924 CHANGELOG entry (below this one) |
 | 4 | ch 925 entry's range claim "11 of 18 fixes shipped in chapters 919-923" contradicted its own gap table (table cites ch 915 + ch 924) | Corrected to "915-924" (see updated ch 925 entry below) |
-| 5 | ch 925 entry's discipline-note pass numbering was off-by-one AND "1st pass:2 CRITICAL,7 HIGH" + "NH1-NH6" were FABRICATED numbers — actual ARC_SEAL ledger has ch 918.5 = 5C+15H,ch 924 has NH1-NH4 not NH1-NH6 | Removed fabricated numbers + replaced with reference to ARC_SEAL ledger (see updated ch 925 entry below) — and OWNED the fabrication in this entry |
+| 5 | ch 925 entry's discipline-note pass numbering was off-by-one AND "1st pass:2 CRITICAL,7 HIGH" + "NH1-NH6" were FABRICATED numbers — actual ARC_SEAL ledger has ch 918.5 = 5C+15H,ch 924 has **NH1-NH5** (5 HIGH per commit subject) — NOT NH1-NH4 as I originally wrote here (caught by 7th-pass review HIGH-3:my own debunking introduced a new off-by-one,fabrication-by-2 corrected with fabrication-by-1)。 Per chapter 九百二十七 fix HIGH-5:OWNED + corrected to NH1-NH5 throughout this entry | Removed fabricated numbers + replaced with reference to ARC_SEAL ledger (see updated ch 925 entry below) — and OWNED both the original fabrication AND the debunking-off-by-one in chapter 927 |
 | 6 | NH3 BLOB caps only had test for signature_hash — payload_blob (1 MiB) + payload_json (16 MiB) caps were untested | NEW tests `testEventLogPayloadBlobCapRejectsOversized` + `testEventLogPayloadJsonCapRejectsOversized` |
 | 7 | ch 924 NH2 coherence checks only tested format=2 + invalid format。 Inverse checks for format=1 (requires JSON,forbids blob) were untested | NEW tests `testEventLogFormat1RequiresJsonPresent` + `testEventLogFormat1RejectsBlobPresent` |
 | 8 | `testCosineTopKThrowsOnNaNQuery` only tested NaN — missing Inf,-Inf,-0.0 cases per the test review boundary check | NEW positive-Inf,negative-Inf,negative-zero (must accept) tests in ch 926 file |
@@ -70,12 +130,14 @@ Ch 926 OWNS each of these as failure modes,not just code bugs。 The
 N-pass review cascade is a real discipline tool — but only when each
 fix chapter is held to the SAME bar as the original code。
 
-#### Verification
+#### Verification (post-commit honesty update by ch 927 fix MED-2)
 
 - Rust:75/75 unit tests pass (6 NEW in ch 926)
 - Swift filtered:BASChapter926 → 15/15 pass + BASChapter925 → 11/11 pass + BASChapter786 → 10/10 pass
-- Swift full sweep:will verify before commit
-- pre-commit-gates.sh:will verify before commit
+- Swift full sweep:13591 tests,87 skipped,0 failures (+15 from ch 925 baseline of 13576)
+- pre-commit-gates.sh:3/3 pass
+
+(Original ch 926 entry shipped with placeholder text「will verify before commit」 that was never updated. Chapter 927 MED-2 fix backfills the actual numbers — the values WERE verified at commit time per the commit message,but the CHANGELOG copy was forgotten in the post-commit propagation. The「shoemaker's children」 pattern recurred at the doc-update step.)
 
 ### Chapter 九百二十四 / M3325 — code fixes from 5th-pass 掘地三尺 review (1 CRITICAL + 4 HIGH)
 
