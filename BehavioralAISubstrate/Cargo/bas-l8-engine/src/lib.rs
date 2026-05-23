@@ -74,6 +74,10 @@ pub mod memory_usage_records;
 //                            MemoryUsageTracker replay_log + audit_log
 //                            (append-only,2 tables in 1 module)
 pub mod memory_usage_logs;
+// chapter 九百二.6 / M3210 — sub-chapter 3:
+//                            MemoryUsageTracker notes + bundles + tombstones
+//                            (closes out the 6-table port,FTS5 deferred)
+pub mod memory_usage_extras;
 
 // MARK: - ABI version
 
@@ -110,7 +114,10 @@ pub mod memory_usage_logs;
 ///   - 9 = chapter 九百二.5 / M3205 (+memory_usage_logs module:
 ///         replay_log + audit_log append-only tables —
 ///         init_schema×2 + append×2 + count×2 + latest_time×2)
-const ABI_VERSION: i32 = 9;
+///   - 10 = chapter 九百二.6 / M3210 (+memory_usage_extras module:
+///          notes [UPSERT] + bundles [composite PK] +
+///          tombstones [INSERT OR REPLACE] — closes 6-table port)
+const ABI_VERSION: i32 = 10;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -320,7 +327,8 @@ mod tests {
         // 901: 6→7 event_log (HIGH-risk first).
         // 902: 7→8 memory_usage_records (HIGH-risk #2 SCOPED).
         // 902.5: 8→9 memory_usage_logs (replay+audit append-only).
-        assert_eq!(bas_l8_engine_abi_version(), 9);
+        // 902.6: 9→10 memory_usage_extras (notes+bundles+tombstones).
+        assert_eq!(bas_l8_engine_abi_version(), 10);
     }
 
     #[test]

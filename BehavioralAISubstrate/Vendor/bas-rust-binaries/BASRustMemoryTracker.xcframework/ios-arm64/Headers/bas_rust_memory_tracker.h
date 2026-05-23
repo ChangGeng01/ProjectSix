@@ -1707,6 +1707,68 @@ int64_t bas_l8_memory_usage_audit_log_count(
 int64_t bas_l8_memory_usage_audit_log_latest_time(
     const L8Engine* engine);
 
+// MARK: - bas-l8-engine memory_usage_extras module
+// (chapter 九百二.6 / M3210 — closes the 6-table port:
+//  notes [UPSERT] + bundles [composite PK] + tombstones)
+//
+// Notes: UPSERT-on-conflict updates the notes column.
+// Bundles: composite PK (bundle_id, record_id) — dup pair = -2.
+// Tombstones: INSERT OR REPLACE matches Swift insertTombstone.
+
+int32_t bas_l8_memory_usage_notes_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_notes_upsert(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len,
+    const char* notes_utf8, size_t notes_len);
+
+int64_t bas_l8_memory_usage_notes_count(
+    const L8Engine* engine);
+
+// Probe mode (null buf + zero capacity) returns required size.
+// -2 = record_id not found.
+int32_t bas_l8_memory_usage_notes_for_record(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len,
+    uint8_t* out_buf, size_t out_capacity);
+
+int32_t bas_l8_memory_usage_bundles_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_bundles_insert_row(
+    const L8Engine* engine,
+    const char* bundle_id_utf8, size_t bundle_id_len,
+    const char* record_id_utf8, size_t record_id_len,
+    int64_t position_in_bundle,
+    int64_t created_at_ms);
+
+int64_t bas_l8_memory_usage_bundles_total_rows(
+    const L8Engine* engine);
+
+int64_t bas_l8_memory_usage_bundles_distinct_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_memory_usage_bundles_count_in_bundle(
+    const L8Engine* engine,
+    const char* bundle_id_utf8, size_t bundle_id_len);
+
+int32_t bas_l8_memory_usage_tombstones_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_tombstones_upsert(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len,
+    int64_t tombstoned_at_ms);
+
+int64_t bas_l8_memory_usage_tombstones_count(
+    const L8Engine* engine);
+
+// Returns 1 if tombstoned, 0 otherwise.
+int32_t bas_l8_memory_usage_tombstones_is_tombstoned(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len);
+
 #ifdef __cplusplus
 }
 #endif
