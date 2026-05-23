@@ -193,6 +193,43 @@ hot-path consolidation wins massively when N round-trip FFI
 calls collapse to 1。 ABI 12 → 13。 `Docs/L8_STORAGE_FLIP_
 DECLINE_WITH_TRIGGER.md` gains the「Trigger FIRED」 section。
 
+#### Chapter 九百八 — Byte-eq DEPTH (raw-SQLite observer) + concurrency stress
+
+Addresses chapter 九百七 review MED #3 + #7。 NEW Tests/.../
+BASChapter908ByteEqDepthAndConcurrencyTests.swift (4 tests
+pass) uses external-observer pattern (opens both SQLite
+files directly via system framework) for disk-level byte-eq
+proof。 **REAL FINDING**:Swift's `JSONEncoder()` produces
+different key orderings between Swift actor and Rust bridge
+call-sites — classified as non-bug (round-trip equality
+holds) but documented for future content-hash work。
+Concurrency stress:100 concurrent Tasks × 10 appends pass +
+50R×50W mixed pass。 First-ever stress-tested validation of
+chapter 894 engine design。
+
+#### Chapter 九百九 — Hot-path consolidation #2 event_log (17-102× WIN)
+
+Extends chapter 906 pattern to event_log:NEW
+`recent_event_timestamps_for_session` Rust fn + FFI + Swift
+bridge。 Measured:N=100 → 17.05×, N=1000 → 102.61×。 Confirms
+the chapter 906 architectural finding generalizes across
+stores。 ABI 13 → 14。 5 tests pass。
+
+#### Chapter 九百十 — L8 arc final cleanup + seal (one-shot all remaining)
+
+Per 「剩下 全部 一次性 解决掉」 final cleanup:
+- Fix MED #11:NEW `cosine_topk_for_domain_with_skipped` Rust
+  fn variant surfaces dim-mismatched row count to callers
+  (additive — base variant preserved)。 ABI 14 → 15。 1 new
+  Rust unit test pins the skipped-counter contract。
+- NEW `Docs/L8_ARC_SEAL.md` — 17-chapter arc summary + per-
+  chapter timeline + architecture state + 4 key findings +
+  registry of 5 remaining MED + 3 LOW deferred items + future
+  consolidation opportunities + discipline reflection。
+
+Tag cut v0.62.5 deferred to user authorization per standing
+constraint。
+
 #### Chapter 九百七 — Review fix-of-fix (CRITICAL + HIGH from arc 893-906 review)
 
 3-agent parallel review caught 2 CRITICAL + 8 HIGH + 9 MED + 3

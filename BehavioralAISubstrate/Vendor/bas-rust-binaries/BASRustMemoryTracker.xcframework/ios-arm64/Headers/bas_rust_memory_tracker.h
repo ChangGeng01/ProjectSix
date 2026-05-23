@@ -1599,6 +1599,19 @@ int32_t bas_l8_vector_index_cosine_topk_for_domain(
     int64_t* out_rowids,
     float* out_scores);
 
+// chapter 九百十 / M3255 — same as above + writes the count
+// of dim-mismatched rows (silently skipped by the base
+// variant) to out_skipped。 Use for provider-upgrade
+// diagnostics where mixed-dim corpora may exist.
+int32_t bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
+    const L8Engine* engine,
+    const char* domain_utf8, size_t domain_len,
+    const uint8_t* query_blob, size_t query_blob_len,
+    size_t k,
+    int64_t* out_rowids,
+    float* out_scores,
+    int64_t* out_skipped);
+
 // MARK: - bas-l8-engine event_log module
 //         (chapter 九百一 / M3195 — HIGH-risk migration #1)
 //

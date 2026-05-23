@@ -134,7 +134,10 @@ pub mod host_constitution_vault;
 ///   - 14 = chapter 九百九 / M3250 (+event_log.recent_timestamps_
 ///          for_session — hot-path consolidation #2,extends
 ///          chapter 906 pattern to event_log)
-const ABI_VERSION: i32 = 14;
+///   - 15 = chapter 九百十 / M3255 (+vector_index.cosine_topk_for_
+///          domain_with_skipped — arc seal,surfaces dim-
+///          mismatch counter for provider-upgrade diagnostics)
+const ABI_VERSION: i32 = 15;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -374,7 +377,9 @@ mod tests {
         //            (hot-path consolidation per ch 905 trigger).
         // 909: 13→14 event_log.recent_timestamps_for_session
         //            (hot-path consolidation #2,extends ch 906).
-        assert_eq!(bas_l8_engine_abi_version(), 14);
+        // 910: 14→15 vector_index.cosine_topk_for_domain_with_
+        //            skipped (arc seal,surfaces dim-mismatch).
+        assert_eq!(bas_l8_engine_abi_version(), 15);
     }
 
     #[test]

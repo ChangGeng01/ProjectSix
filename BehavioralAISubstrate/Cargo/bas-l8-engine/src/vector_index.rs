@@ -121,24 +121,46 @@ pub fn read_embedding_for_atom(
 ///
 /// Returns a Vec of (rowid_in_domain, score) tuples sorted
 /// descending by score,length ≤ min(k, embedding_count)。
+///
+/// chapter 九百十 / M3255 review fix #11:dim-mismatched rows
+/// are SILENTLY SKIPPED for backward-compatibility,but the
+/// new `cosine_topk_for_domain_with_skipped` variant surfaces
+/// the skipped count to callers that need the diagnostic。
 pub fn cosine_topk_for_domain(
     conn: &Connection,
     domain: &str,
     query: &[f32],
     k: usize,
 ) -> rusqlite::Result<Vec<(i64, f32)>> {
+    let (top, _skipped) = cosine_topk_for_domain_with_skipped(
+        conn, domain, query, k)?;
+    Ok(top)
+}
+
+/// chapter 九百十 / M3255 review fix #11 — surfaces the count
+/// of dim-mismatched rows that the cosine_topk silently
+/// skipped。 Production consumers can detect provider upgrades
+/// that left mixed-dim corpora behind。
+pub fn cosine_topk_for_domain_with_skipped(
+    conn: &Connection,
+    domain: &str,
+    query: &[f32],
+    k: usize,
+) -> rusqlite::Result<(Vec<(i64, f32)>, usize)> {
     let mut stmt = conn.prepare(
         "SELECT rowid, embedding_blob FROM vector_index
          WHERE domain = ?"
     )?;
     let mut rows = stmt.query(params![domain])?;
     let mut top: Vec<(i64, f32)> = Vec::with_capacity(k);
+    let mut skipped: usize = 0;
     while let Some(row) = rows.next()? {
         let rowid: i64 = row.get(0)?;
         let blob: Vec<u8> = row.get(1)?;
         // Decode embedding_blob as little-endian f32 array
         let dim = blob.len() / 4;
         if dim != query.len() {
+            skipped += 1;
             continue;  // Skip dim mismatches
         }
         let mut score: f32 = 0.0;
@@ -167,7 +189,7 @@ pub fn cosine_topk_for_domain(
             }
         }
     }
-    Ok(top)
+    Ok((top, skipped))
 }
 
 pub fn count_entries_for_provider(
@@ -350,6 +372,69 @@ bas_l8_vector_index_read_embedding_for_atom(
             bytes.as_ptr(), out_buf, needed);
     }
     needed as i32
+}
+
+/// chapter 九百十 / M3255 review fix #11 — same as cosine_topk_
+/// for_domain but also writes the dim-mismatch skipped count
+/// to `out_skipped` (caller-allocated i64)。 Same return code
+/// space as the base variant。 Use this in production to
+/// detect mixed-dim corpora after provider upgrades。
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
+    engine: *const L8Engine,
+    domain_utf8: *const c_char, domain_len: usize,
+    query_blob: *const u8, query_blob_len: usize,
+    k: usize,
+    out_rowids: *mut i64,
+    out_scores: *mut f32,
+    out_skipped: *mut i64,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    if k == 0 { return -4; }
+    if out_rowids.is_null() || out_scores.is_null()
+        || out_skipped.is_null() {
+        return -3;
+    }
+    let domain = match crate::cstr_to_str(
+        domain_utf8, domain_len) {
+        Some(s) => s, None => return -3,
+    };
+    if query_blob.is_null() || query_blob_len == 0
+        || query_blob_len % 4 != 0 {
+        return -3;
+    }
+    let q_dim = query_blob_len / 4;
+    let mut query: Vec<f32> = Vec::with_capacity(q_dim);
+    let q_slice = unsafe {
+        core::slice::from_raw_parts(query_blob, query_blob_len)
+    };
+    for i in 0..q_dim {
+        let start = i * 4;
+        query.push(f32::from_le_bytes([
+            q_slice[start], q_slice[start + 1],
+            q_slice[start + 2], q_slice[start + 3]]));
+    }
+    let engine_ref = unsafe { &*engine };
+    let result = engine_ref.with_conn(|conn| {
+        cosine_topk_for_domain_with_skipped(
+            conn, domain, &query, k)
+    });
+    let (topk, skipped) = match result {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let n = topk.len();
+    let rowids_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_rowids, n) };
+    let scores_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, n) };
+    for (i, (rid, sc)) in topk.iter().enumerate() {
+        rowids_slice[i] = *rid;
+        scores_slice[i] = *sc;
+    }
+    unsafe { *out_skipped = skipped as i64; }
+    n as i32
 }
 
 /// INTEGRATED cosine top-k: reads all embeddings for a domain
@@ -645,6 +730,37 @@ mod tests {
             let top = cosine_topk_for_domain(
                 conn, "empty-domain", &q, 10).unwrap();
             assert_eq!(top.len(), 0);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn cosine_topk_with_skipped_returns_mismatch_count() {
+        // chapter 九百十 review fix #11:dim mismatches are
+        // counted instead of silently dropped。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // 1 good (dim=2) + 2 mismatched (dim=3)
+            let e_match = pack_f32_le(&[1.0, 0.0]);
+            let e_skip1 = pack_f32_le(&[1.0, 0.0, 0.0]);
+            let e_skip2 = pack_f32_le(&[0.5, 0.5, 0.5]);
+            upsert_entry(conn, "ok", 2, "p", &e_match,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "bad1", 3, "p", &e_skip1,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "bad2", 3, "p", &e_skip2,
+                "dom", "{}").unwrap();
+            let q = vec![1.0_f32, 0.0];
+            let (top, skipped) =
+                cosine_topk_for_domain_with_skipped(
+                    conn, "dom", &q, 5).unwrap();
+            assert_eq!(top.len(), 1,
+                "Only dim-matched row returned");
+            assert_eq!(skipped, 2,
+                "Skipped count surfaces dim-mismatched rows");
         });
         unsafe { bas_l8_engine_close(engine); }
     }
