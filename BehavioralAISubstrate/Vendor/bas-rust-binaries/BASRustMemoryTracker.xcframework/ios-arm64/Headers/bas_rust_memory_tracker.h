@@ -1515,6 +1515,36 @@ int64_t bas_l8_user_state_latest_time_for_session(
     const L8Engine* engine,
     const char* session_id_utf8, size_t session_id_len);
 
+// MARK: - bas-l8-engine version_tree module
+//         (chapter 八百九十九 / M3185)
+//
+// MED-risk migration #4. Schema 014 host_constitution_version_tree.
+// First BLOB FFI in the engine (signature_hash, typically 32-byte
+// SHA-256). is_rollback_point is u8 (0 or 1) matching SQL
+// INTEGER+CHECK convention.
+
+int32_t bas_l8_version_tree_init_schema(const L8Engine* engine);
+
+int32_t bas_l8_version_tree_append(
+    const L8Engine* engine,
+    const char* version_id_utf8, size_t version_id_len,
+    const char* vault_id_utf8, size_t vault_id_len,
+    const char* parent_version_id_utf8, size_t parent_version_id_len,
+    int64_t created_at_ms,
+    const uint8_t* signature_hash_bytes, size_t signature_hash_len,
+    uint8_t is_rollback_point,
+    const char* merged_from_json_utf8, size_t merged_from_json_len);
+
+int64_t bas_l8_version_tree_count(const L8Engine* engine);
+
+int64_t bas_l8_version_tree_count_for_vault(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len);
+
+int64_t bas_l8_version_tree_count_rollback_points(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len);
+
 #ifdef __cplusplus
 }
 #endif

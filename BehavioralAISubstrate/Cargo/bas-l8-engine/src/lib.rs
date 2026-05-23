@@ -57,6 +57,9 @@ pub mod deletion_manifest;
 pub mod atom_lifecycle;
 // chapter 八百九十八 / M3180 — MED-risk migration #3: user state
 pub mod user_state;
+// chapter 八百九十九 / M3185 — MED-risk migration #4: version tree
+//                              (adds first BLOB FFI support)
+pub mod version_tree;
 
 // MARK: - ABI version
 
@@ -75,7 +78,10 @@ pub mod user_state;
 ///   - 4 = chapter 八百九十八 / M3180 (+user_state module:
 ///         init_schema + append + count + count_for_session +
 ///         latest_time_for_session)
-const ABI_VERSION: i32 = 4;
+///   - 5 = chapter 八百九十九 / M3185 (+version_tree module:
+///         init_schema + append [first BLOB FFI] + count +
+///         count_for_vault + count_rollback_points)
+const ABI_VERSION: i32 = 5;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -278,9 +284,10 @@ mod tests {
     #[test]
     fn abi_version_pinned() {
         // If this fails, ABI changed — bump version + update
-        // Swift cross-check pin。 Chapter 895: 1→2 deletion_manifest,
-        // ch 897: 2→3 atom_lifecycle, ch 898: 3→4 user_state.
-        assert_eq!(bas_l8_engine_abi_version(), 4);
+        // Swift cross-check pin。 895: 1→2 deletion_manifest,
+        // 897: 2→3 atom_lifecycle, 898: 3→4 user_state,
+        // 899: 4→5 version_tree (first BLOB FFI).
+        assert_eq!(bas_l8_engine_abi_version(), 5);
     }
 
     #[test]
