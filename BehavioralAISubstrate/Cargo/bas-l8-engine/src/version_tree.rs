@@ -130,6 +130,11 @@ pub unsafe extern "C" fn bas_l8_version_tree_append(
     merged_from_json_len: usize,
 ) -> c_int {
     if engine.is_null() { return -1; }
+    // chapter 九百二十三 / M3320 NH3 fix:bound
+    // signature_hash size (32 SHA256 / 64 SHA512 — cap at 64)
+    if signature_hash_len > crate::MAX_SIGNATURE_HASH_BYTES {
+        return -3;
+    }
     let version_id = match crate::cstr_to_str(
         version_id_utf8, version_id_len) {
         Some(s) => s, None => return -3,

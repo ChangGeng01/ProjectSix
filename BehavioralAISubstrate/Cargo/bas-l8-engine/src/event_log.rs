@@ -60,8 +60,11 @@ CREATE TABLE IF NOT EXISTS event_log (
     -- failures instead of silently writing duplicate seqs
     UNIQUE(session_id, sequence_number)
 );
-CREATE INDEX IF NOT EXISTS event_log_session_seq_idx
-  ON event_log(session_id, sequence_number);
+-- chapter 九百二十三 / M3320 NH1 fix:dropped
+-- `event_log_session_seq_idx` — the UNIQUE(session_id,
+-- sequence_number) constraint (ch 919) auto-creates the
+-- equivalent index。 Keeping both inflates write cost
+-- (every INSERT updates 5 indexes instead of 4)。
 CREATE INDEX IF NOT EXISTS event_log_timestamp_idx
   ON event_log(timestamp_ms);
 CREATE INDEX IF NOT EXISTS event_log_kind_idx
@@ -275,6 +278,14 @@ pub unsafe extern "C" fn bas_l8_event_log_append(
     out_was_new: *mut i32,  // 1 if newly inserted, 0 if dup
 ) -> i64 {
     if engine.is_null() { return -1; }
+    // chapter 九百二十三 / M3320 NH3 fix:bound BLOB
+    // + JSON sizes to prevent OOM-via-upsert。
+    if payload_json_len > crate::MAX_PAYLOAD_JSON_BYTES {
+        return -3;
+    }
+    if payload_blob_len > crate::MAX_PAYLOAD_BLOB_BYTES {
+        return -3;
+    }
     let event_id = match crate::cstr_to_str(
         event_id_utf8, event_id_len) {
         Some(s) => s, None => return -3,

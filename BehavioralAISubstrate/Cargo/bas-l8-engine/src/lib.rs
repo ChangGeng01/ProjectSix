@@ -435,6 +435,19 @@ pub(crate) fn cstr_to_str_allowing_empty<'a>(
 /// protects Swift call sites)。
 pub(crate) const MAX_HOTPATH_LIMIT: usize = 100_000;
 
+/// chapter 九百二十三 / M3320 NH3 fix — BLOB upper bounds
+/// for the 3 OTHER blob-accepting FFIs that ch 920 missed
+/// (only vector_index.embedding_blob was capped previously)。
+///
+/// - signature_hash: 64 bytes covers SHA256 (32) and SHA512
+///   (64); SHA3-256/512 fit too
+/// - payload_blob (event_log binary format=2): 1 MiB —
+///   audit envelopes / replay frames are KB-scale today
+/// - payload_json: 16 MiB — SQLite default string limit
+pub(crate) const MAX_SIGNATURE_HASH_BYTES: usize = 64;
+pub(crate) const MAX_PAYLOAD_BLOB_BYTES: usize = 1_048_576;
+pub(crate) const MAX_PAYLOAD_JSON_BYTES: usize = 16_777_216;
+
 /// chapter 九百二十二 / M3315 CRITICAL fix NC1 — run a
 /// transactional body inside BEGIN IMMEDIATE + COMMIT,
 /// guaranteeing ROLLBACK on ANY error path including
@@ -661,6 +674,110 @@ mod tests {
         assert_eq!(mode.to_lowercase(), "wal",
             "WAL mode must be set on disk-backed engine");
         unsafe { bas_l8_engine_close(engine_ptr); }
+    }
+
+    #[test]
+    fn chapter_920_composite_indexes_are_actually_used() {
+        // chapter 九百二十三 / M3320 NH6 fix:verify the
+        // chapter 920 indexes are actually picked by SQLite's
+        // query planner for the hot-path queries that
+        // motivated them。 Without EXPLAIN QUERY PLAN
+        // verification,the indexes could exist but be
+        // ignored by the optimizer (wrong stats, wrong
+        // column order, etc.)。
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().to_str().unwrap();
+        let path_bytes = path.as_bytes();
+        let engine = unsafe {
+            bas_l8_engine_init(
+                path_bytes.as_ptr() as *const c_char,
+                path_bytes.len())
+        };
+        assert!(!engine.is_null());
+        let _ = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_init_schema(engine) };
+        let _ = unsafe {
+            crate::memory_usage_records
+                ::bas_l8_memory_usage_records_init_schema(
+                    engine) };
+        let _ = unsafe {
+            crate::host_constitution_vault
+                ::bas_l8_host_constitution_vault_init_schema(
+                    engine) };
+
+        let engine_ref = unsafe { &*engine };
+
+        // Verify event_log_session_time_idx for ch 909 hot path
+        let plan_event: String = engine_ref.with_conn(|c| {
+            let mut plan_strs = vec![];
+            let mut stmt = c.prepare(
+                "EXPLAIN QUERY PLAN
+                 SELECT timestamp_ms, sequence_number
+                   FROM event_log
+                  WHERE session_id = ?
+                  ORDER BY timestamp_ms DESC LIMIT 10"
+            ).unwrap();
+            let mut rows = stmt.query(["s"]).unwrap();
+            while let Ok(Some(r)) = rows.next() {
+                let detail: String = r.get(3).unwrap();
+                plan_strs.push(detail);
+            }
+            plan_strs.join(" | ")
+        });
+        assert!(
+            plan_event.contains("event_log_session_time_idx"),
+            "ch 920 event_log composite index not used by\
+             planner. EXPLAIN: {}",
+            plan_event);
+
+        // Verify memory_usage_atom_time_idx for ch 911 hot path
+        let plan_records: String = engine_ref.with_conn(|c| {
+            let mut plan_strs = vec![];
+            let mut stmt = c.prepare(
+                "EXPLAIN QUERY PLAN
+                 SELECT retrieved_at_ms, helped_state
+                   FROM memory_usage_records
+                  WHERE atom_id = ?
+                  ORDER BY retrieved_at_ms DESC LIMIT 10"
+            ).unwrap();
+            let mut rows = stmt.query(["a"]).unwrap();
+            while let Ok(Some(r)) = rows.next() {
+                let detail: String = r.get(3).unwrap();
+                plan_strs.push(detail);
+            }
+            plan_strs.join(" | ")
+        });
+        assert!(
+            plan_records.contains(
+                "memory_usage_atom_time_idx"),
+            "ch 920 records composite index not used by\
+             planner. EXPLAIN: {}",
+            plan_records);
+
+        // Verify host_constitution_updated_idx for ch 913
+        let plan_vault: String = engine_ref.with_conn(|c| {
+            let mut plan_strs = vec![];
+            let mut stmt = c.prepare(
+                "EXPLAIN QUERY PLAN
+                 SELECT rowid, last_updated_at_ms
+                   FROM host_constitution_vaults
+                  ORDER BY last_updated_at_ms DESC LIMIT 10"
+            ).unwrap();
+            let mut rows = stmt.query([]).unwrap();
+            while let Ok(Some(r)) = rows.next() {
+                let detail: String = r.get(3).unwrap();
+                plan_strs.push(detail);
+            }
+            plan_strs.join(" | ")
+        });
+        assert!(
+            plan_vault.contains(
+                "host_constitution_updated_idx"),
+            "ch 920 vault timestamp index not used by\
+             planner. EXPLAIN: {}",
+            plan_vault);
+        unsafe { bas_l8_engine_close(engine); }
     }
 
     #[test]

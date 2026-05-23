@@ -1,10 +1,8 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百十七 (RFC + 24 implementation
-chapters, extended past initial seal at ch 910 + post-seal
-review-fix sub-arc 915-917 per user's「Defer — keep developing
-first」 election + 全量 审查 finding 2 CRITICAL + 10 HIGH +
-13 MED + 5 LOW)
+**Span**: Chapters 八百九十三 — 九百二十三 (RFC + 30 implementation
+chapters, extended past 2 prior「seals」 + 4-pass review
+discipline finding more CRITICAL items each pass)
 **ABI evolution**: 1 → 17 (**16 bumps** — ch 894 starts at
 ABI 1 not a bump,16 subsequent increments)
 **Initial seal**: chapter 九百十 / M3255
@@ -71,6 +69,14 @@ Final state:
 | 九百十五 | 2026-05-23 | CRITICAL fixes:cstr_to_str empty PK loophole + vault readDecodedPayload masking + Mutex<Connection> real stress test | (no ABI) |
 | 九百十六 | 2026-05-23 | Perf honesty:rename「speedup」→「ffi-hop-reduction」 in ch 909/911/913 + absolute wall-clock guards | (no ABI) |
 | 九百十七 | 2026-05-23 | Doc drift fixes (CHANGELOG order + SEAL stale claims + DECLINE docs missing ch 911/913 trigger firings + ABI bump count) | (no ABI) |
+| 九百十八 | 2026-05-23 | Registry extension + 5 safe MED fixes (precondition→throw, NaN filter, limitCap, .utf8.count) | (no ABI) |
+| 九百十八.5 (review) | 2026-05-23 | 3-agent 全量 结构 review of arc 907-918 | 5 CRITICAL + 15 HIGH + 12 MED + 5 LOW |
+| 九百十九 | 2026-05-23 | CRITICAL fixes:readFailed enum + sortedKeys vault + BEGIN IMMEDIATE × 4 + UNIQUE constraint + Mutex poison recovery | (no ABI) |
+| 九百二十 | 2026-05-23 | HIGH data-model:composite indexes + BLOB cap (vector_index) + wal_autocheckpoint | (no ABI) |
+| 九百二十一 | 2026-05-23 | HIGH API:NEW L8_ROUTED_OVERVIEW.md + cosineTopK[Float] overload + partial-conformance assertions | (no ABI) |
+| 九百二十一.5 (review) | 2026-05-24 | 3-agent 最最严苛 4th-pass review of arc 915-921 | 5 NEW CRITICAL + 8 NEW HIGH + 9 NEW MED + 1 NEW LOW |
+| 九百二十二 | 2026-05-24 | 5 NEW CRITICAL fixes:transactional helper + busy_timeout + complete sortedKeys + Rust limit cap + dim/blob validation | (no ABI) |
+| 九百二十三 | 2026-05-24 | 8 NEW HIGH fixes:dedup indexes + BLOB caps (signature_hash/payload_blob/payload_json) + EXPLAIN QUERY PLAN test + ... | (no ABI) |
 
 ## Architecture state at seal
 
@@ -336,4 +342,4 @@ wins validate the user's original architectural premise:
 **Rust hot paths beat Swift round-trips by orders of
 magnitude when round-trip FFI hops can be collapsed**。
 
-Re-sealed at chapter 九百十七 (post-全量-审查 fix-sub-arc complete). ✓
+Re-sealed at chapter 九百二十三 (post-4th-pass 最最严苛 review fix-sub-arc complete; 4 review passes total + 24 fix chapters). ✓

@@ -69,17 +69,19 @@ CREATE TABLE IF NOT EXISTS memory_usage_records (
     permit_mode TEXT NOT NULL,
     helped_state TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS memory_usage_atom_idx
-  ON memory_usage_records(atom_id);
+-- chapter 九百二十三 / M3320 NH1 fix:dropped
+-- `memory_usage_atom_idx` — the composite
+-- `memory_usage_atom_time_idx(atom_id, retrieved_at_ms DESC)`
+-- below is a SUPERSET (SQLite uses the leading prefix for
+-- `WHERE atom_id = ?` queries)。 Two indexes serving the
+-- same lookup inflate write cost for every record。
 CREATE INDEX IF NOT EXISTS memory_usage_session_idx
   ON memory_usage_records(session_ref);
 -- chapter 九百二十 / M3305 HIGH-4 fix:composite covering
 -- index for chapter 911 recent_records_for_atom hot path
 -- (WHERE atom_id = ? ORDER BY retrieved_at_ms DESC LIMIT N)。
--- Previously the schema relied on a「lazy」 Swift-side
--- ensureCoveringIndex() that the Rust path never invokes,
--- leaving the query at full-table-scan complexity for any
--- atom with many records。 Now eagerly created at init。
+-- Also serves WHERE atom_id = ? queries via leading-prefix
+-- index usage (subsumes the dropped memory_usage_atom_idx)。
 CREATE INDEX IF NOT EXISTS memory_usage_atom_time_idx
   ON memory_usage_records(atom_id, retrieved_at_ms DESC);
 "#;
