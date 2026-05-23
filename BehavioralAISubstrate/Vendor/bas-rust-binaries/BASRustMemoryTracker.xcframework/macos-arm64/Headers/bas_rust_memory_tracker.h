@@ -1545,6 +1545,39 @@ int64_t bas_l8_version_tree_count_rollback_points(
     const L8Engine* engine,
     const char* vault_id_utf8, size_t vault_id_len);
 
+// MARK: - bas-l8-engine vector_index module
+//         (chapter 九百 / M3190)
+//
+// MED-risk migration #5. Schema vector_index. UPSERT semantics:
+// upsert returns 1 on insert, 0 on replace. embedding_blob is
+// variable size (dim × 4 bytes for f32 normalized vectors).
+
+int32_t bas_l8_vector_index_init_schema(const L8Engine* engine);
+
+int32_t bas_l8_vector_index_upsert(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len,
+    int64_t dimension,
+    const char* provider_version_utf8, size_t provider_version_len,
+    const uint8_t* embedding_bytes, size_t embedding_len,
+    const char* domain_utf8, size_t domain_len,
+    const char* metadata_json_utf8, size_t metadata_json_len);
+
+int32_t bas_l8_vector_index_remove(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len);
+
+int64_t bas_l8_vector_index_count(const L8Engine* engine);
+
+int64_t bas_l8_vector_index_count_for_domain(
+    const L8Engine* engine,
+    const char* domain_utf8, size_t domain_len);
+
+int64_t bas_l8_vector_index_count_for_provider(
+    const L8Engine* engine,
+    const char* provider_version_utf8,
+    size_t provider_version_len);
+
 #ifdef __cplusplus
 }
 #endif

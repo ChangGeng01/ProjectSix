@@ -60,6 +60,9 @@ pub mod user_state;
 // chapter 八百九十九 / M3185 — MED-risk migration #4: version tree
 //                              (adds first BLOB FFI support)
 pub mod version_tree;
+// chapter 九百 / M3190 — MED-risk migration #5: vector index
+//                        (UPSERT + variable-size embedding BLOB)
+pub mod vector_index;
 
 // MARK: - ABI version
 
@@ -81,7 +84,10 @@ pub mod version_tree;
 ///   - 5 = chapter 八百九十九 / M3185 (+version_tree module:
 ///         init_schema + append [first BLOB FFI] + count +
 ///         count_for_vault + count_rollback_points)
-const ABI_VERSION: i32 = 5;
+///   - 6 = chapter 九百 / M3190 (+vector_index module:
+///         init_schema + upsert + remove + count +
+///         count_for_domain + count_for_provider)
+const ABI_VERSION: i32 = 6;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -287,7 +293,8 @@ mod tests {
         // Swift cross-check pin。 895: 1→2 deletion_manifest,
         // 897: 2→3 atom_lifecycle, 898: 3→4 user_state,
         // 899: 4→5 version_tree (first BLOB FFI).
-        assert_eq!(bas_l8_engine_abi_version(), 5);
+        // 900: 5→6 vector_index (UPSERT + variable BLOB).
+        assert_eq!(bas_l8_engine_abi_version(), 6);
     }
 
     #[test]
