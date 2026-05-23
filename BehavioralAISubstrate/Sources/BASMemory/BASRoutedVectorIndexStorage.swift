@@ -75,10 +75,15 @@ public actor BASRoutedVectorIndexStorage {
         _ entry: BASVectorIndexEntry
     ) async throws -> Bool {
         // Encode metadata as JSON via Apple boundary
+        // chapter 九百二十二 / M3315 CRITICAL fix NC3:
+        // .sortedKeys for deterministic encoding (was the
+        // ONE L8 routed bridge the chapter 919 C2 fix missed
+        // — every other routed bridge already uses sorted)。
         let metadataJson: String
         do {
-            let data = try JSONEncoder()
-                .encode(entry.metadata)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(entry.metadata)
             metadataJson = String(
                 data: data, encoding: .utf8) ?? "{}"
         } catch {

@@ -108,43 +108,38 @@ pub fn upsert_record(
     permit_mode: &str,
     helped_state: &str,
 ) -> rusqlite::Result<bool> {
-    // chapter 九百十九 / M3300 CRITICAL fix C3:wrap the
-    // pre-check + INSERT chain in BEGIN IMMEDIATE so that
-    // multi-engine race conditions on the same DB file
-    // can't produce「both callers see wasNew=true」 from a
-    // concurrent pre-check race。 Within a single engine
-    // the outer Mutex<Connection> already serializes,but
-    // the RFC explicitly supports multi-engine (lib.rs:36-38)
-    // and the only defense against cross-engine races is
-    // SQLite's transaction layer。
-    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
-    let existed: bool = conn.query_row(
-        "SELECT 1 FROM memory_usage_records
-         WHERE record_id = ? LIMIT 1",
-        params![record_id],
-        |_| Ok(true),
-    ).unwrap_or(false);
-    let insert_result = conn.execute(
-        "INSERT INTO memory_usage_records (
-            record_id, atom_id, retrieved_at_ms,
-            session_ref, turn_ref, permit_mode, helped_state
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(record_id) DO UPDATE SET
-            helped_state = excluded.helped_state",
-        params![
-            record_id, atom_id, retrieved_at_ms,
-            session_ref, turn_ref, permit_mode, helped_state],
-    );
-    match insert_result {
-        Ok(_) => {
-            conn.execute("COMMIT", [])?;
-            Ok(!existed)
-        }
-        Err(e) => {
-            let _ = conn.execute("ROLLBACK", []);
-            Err(e)
-        }
-    }
+    // chapter 九百二十二 / M3315 CRITICAL fix NC1:use
+    // `transactional` helper + explicit-match on SELECT
+    // result instead of `.unwrap_or(false)` which swallowed
+    // real I/O errors and returned wrong wasNew value。
+    crate::transactional(conn, |conn| {
+        let existed = match conn.query_row(
+            "SELECT 1 FROM memory_usage_records
+             WHERE record_id = ? LIMIT 1",
+            params![record_id],
+            |_| Ok(true),
+        ) {
+            Ok(true) => true,
+            Err(rusqlite::Error::QueryReturnedNoRows) => false,
+            // SQLite returned a real error (busy, corrupt,
+            // I/O) — propagate so caller knows the read
+            // failed, don't pretend the row was absent
+            Err(e) => return Err(e),
+            Ok(false) => false,  // unreachable in practice
+        };
+        conn.execute(
+            "INSERT INTO memory_usage_records (
+                record_id, atom_id, retrieved_at_ms,
+                session_ref, turn_ref, permit_mode, helped_state
+             ) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(record_id) DO UPDATE SET
+                helped_state = excluded.helped_state",
+            params![
+                record_id, atom_id, retrieved_at_ms,
+                session_ref, turn_ref, permit_mode, helped_state],
+        )?;
+        Ok(!existed)
+    })
 }
 
 pub fn count_records(
@@ -472,7 +467,7 @@ bas_l8_memory_usage_records_recent_for_atom(
     out_helped_codes: *mut i64,
 ) -> c_int {
     if engine.is_null() { return -1; }
-    if limit == 0 { return -4; }
+    if limit == 0 || limit > crate::MAX_HOTPATH_LIMIT { return -4; }
     if out_timestamps.is_null() || out_helped_codes.is_null() {
         return -3;
     }

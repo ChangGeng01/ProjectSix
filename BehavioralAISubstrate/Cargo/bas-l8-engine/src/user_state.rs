@@ -42,33 +42,29 @@ pub fn append_state(
     generated_at_ms: i64,
     payload_json: &str,
 ) -> rusqlite::Result<bool> {
-    // chapter 九百十九 / M3300 CRITICAL fix C3 (user_state)
-    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
-    let exists: bool = conn.query_row(
-        "SELECT 1 FROM user_states WHERE state_id = ? LIMIT 1",
-        params![state_id],
-        |_| Ok(true),
-    ).unwrap_or(false);
-    if exists {
-        conn.execute("COMMIT", [])?;
-        return Ok(false);
-    }
-    let insert_result = conn.execute(
-        "INSERT INTO user_states (
-            state_id, session_id, generated_at_ms, payload_json
-         ) VALUES (?, ?, ?, ?)",
-        params![state_id, session_id, generated_at_ms, payload_json],
-    );
-    match insert_result {
-        Ok(_) => {
-            conn.execute("COMMIT", [])?;
-            Ok(true)
+    // chapter 九百二十二 / M3315 CRITICAL fix NC1 (user_state)
+    crate::transactional(conn, |conn| {
+        let exists = match conn.query_row(
+            "SELECT 1 FROM user_states WHERE state_id = ? LIMIT 1",
+            params![state_id],
+            |_| Ok(true),
+        ) {
+            Ok(true) => true,
+            Err(rusqlite::Error::QueryReturnedNoRows) => false,
+            Err(e) => return Err(e),
+            Ok(false) => false,
+        };
+        if exists {
+            return Ok(false);
         }
-        Err(e) => {
-            let _ = conn.execute("ROLLBACK", []);
-            Err(e)
-        }
-    }
+        conn.execute(
+            "INSERT INTO user_states (
+                state_id, session_id, generated_at_ms, payload_json
+             ) VALUES (?, ?, ?, ?)",
+            params![state_id, session_id, generated_at_ms, payload_json],
+        )?;
+        Ok(true)
+    })
 }
 
 pub fn count_states(

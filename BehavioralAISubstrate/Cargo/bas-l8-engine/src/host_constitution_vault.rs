@@ -89,45 +89,42 @@ pub fn upsert_vault(
     last_updated_at_ms: i64,
     payload_json: &str,
 ) -> rusqlite::Result<bool> {
-    // chapter 九百十九 / M3300 CRITICAL fix C3 (vault)
-    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
-    let existed: bool = conn.query_row(
-        "SELECT 1 FROM host_constitution_vaults
-         WHERE vault_id = ? LIMIT 1",
-        params![vault_id],
-        |_| Ok(true),
-    ).unwrap_or(false);
-    let insert_result = conn.execute(
-        "INSERT INTO host_constitution_vaults (
-            vault_id, host_id, constitution_id,
-            active_version, schema_version,
-            version_signature, last_updated_at_ms,
-            payload_json
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(vault_id) DO UPDATE SET
-            host_id = excluded.host_id,
-            constitution_id = excluded.constitution_id,
-            active_version = excluded.active_version,
-            schema_version = excluded.schema_version,
-            version_signature = excluded.version_signature,
-            last_updated_at_ms = excluded.last_updated_at_ms,
-            payload_json = excluded.payload_json",
-        params![
-            vault_id, host_id, constitution_id,
-            active_version, schema_version,
-            version_signature, last_updated_at_ms,
-            payload_json],
-    );
-    match insert_result {
-        Ok(_) => {
-            conn.execute("COMMIT", [])?;
-            Ok(!existed)
-        }
-        Err(e) => {
-            let _ = conn.execute("ROLLBACK", []);
-            Err(e)
-        }
-    }
+    // chapter 九百二十二 / M3315 CRITICAL fix NC1 (vault)
+    crate::transactional(conn, |conn| {
+        let existed = match conn.query_row(
+            "SELECT 1 FROM host_constitution_vaults
+             WHERE vault_id = ? LIMIT 1",
+            params![vault_id],
+            |_| Ok(true),
+        ) {
+            Ok(true) => true,
+            Err(rusqlite::Error::QueryReturnedNoRows) => false,
+            Err(e) => return Err(e),
+            Ok(false) => false,
+        };
+        conn.execute(
+            "INSERT INTO host_constitution_vaults (
+                vault_id, host_id, constitution_id,
+                active_version, schema_version,
+                version_signature, last_updated_at_ms,
+                payload_json
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(vault_id) DO UPDATE SET
+                host_id = excluded.host_id,
+                constitution_id = excluded.constitution_id,
+                active_version = excluded.active_version,
+                schema_version = excluded.schema_version,
+                version_signature = excluded.version_signature,
+                last_updated_at_ms = excluded.last_updated_at_ms,
+                payload_json = excluded.payload_json",
+            params![
+                vault_id, host_id, constitution_id,
+                active_version, schema_version,
+                version_signature, last_updated_at_ms,
+                payload_json],
+        )?;
+        Ok(!existed)
+    })
 }
 
 /// Returns the payload_json for a vault_id,or None if absent。
@@ -447,7 +444,7 @@ bas_l8_host_constitution_vault_all_metadata(
     out_timestamps: *mut i64,
 ) -> c_int {
     if engine.is_null() { return -1; }
-    if limit == 0 { return -4; }
+    if limit == 0 || limit > crate::MAX_HOTPATH_LIMIT { return -4; }
     if out_rowids.is_null() || out_timestamps.is_null() {
         return -3;
     }

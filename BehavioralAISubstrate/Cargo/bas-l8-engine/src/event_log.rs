@@ -128,44 +128,33 @@ pub fn append_event(
     payload_format: i32,
     payload_blob: Option<&[u8]>,
 ) -> rusqlite::Result<(bool, i64)> {
-    // chapter 九百十九 / M3300 CRITICAL fix C4:wrap the
-    // 3-statement chain (idempotent-check + MAX-sequence +
-    // INSERT) in BEGIN IMMEDIATE so multi-engine race
-    // conditions can't produce duplicate sequence numbers。
-    // The UNIQUE(session_id, sequence_number) constraint
-    // (schema fix) catches any race that slips through,but
-    // the transaction is the primary defense。
-    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
-    // Idempotent retry: if event_id exists, return existing seq
-    if let Some(existing_seq) = fetch_existing_sequence(
-        conn, event_id)?
-    {
-        conn.execute("COMMIT", [])?;
-        return Ok((false, existing_seq));
-    }
-    let assigned = next_sequence_number(conn, session_id)?;
-    let insert_result = conn.execute(
-        "INSERT INTO event_log (
-            event_id, session_id, sequence_number,
-            timestamp_ms, kind, risk_band, payload_json,
-            payload_format, payload_blob
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        params![
-            event_id, session_id, assigned,
-            timestamp_ms, kind, risk_band, payload_json,
-            payload_format, payload_blob,
-        ],
-    );
-    match insert_result {
-        Ok(_) => {
-            conn.execute("COMMIT", [])?;
-            Ok((true, assigned))
+    // chapter 九百二十二 / M3315 CRITICAL fix NC1:use the
+    // centralized `transactional` helper to guarantee
+    // ROLLBACK on ALL error paths,not just INSERT failure。
+    // Previously the chapter 919 wrap had open-transaction
+    // leaks on read-step errors (fetch_existing_sequence,
+    // next_sequence_number returning Err)。
+    crate::transactional(conn, |conn| {
+        if let Some(existing_seq) =
+            fetch_existing_sequence(conn, event_id)?
+        {
+            return Ok((false, existing_seq));
         }
-        Err(e) => {
-            let _ = conn.execute("ROLLBACK", []);
-            Err(e)
-        }
-    }
+        let assigned = next_sequence_number(conn, session_id)?;
+        conn.execute(
+            "INSERT INTO event_log (
+                event_id, session_id, sequence_number,
+                timestamp_ms, kind, risk_band, payload_json,
+                payload_format, payload_blob
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                event_id, session_id, assigned,
+                timestamp_ms, kind, risk_band, payload_json,
+                payload_format, payload_blob,
+            ],
+        )?;
+        Ok((true, assigned))
+    })
 }
 
 pub fn count_events(
@@ -435,7 +424,7 @@ bas_l8_event_log_recent_timestamps_for_session(
     out_sequences: *mut i64,
 ) -> i32 {
     if engine.is_null() { return -1; }
-    if limit == 0 { return -4; }
+    if limit == 0 || limit > crate::MAX_HOTPATH_LIMIT { return -4; }
     if out_timestamps.is_null() || out_sequences.is_null() {
         return -3;
     }

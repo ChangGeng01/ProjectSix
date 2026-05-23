@@ -180,6 +180,26 @@ impl L8Engine {
         // checkpoint,WAL can hit hundreds of MB on iOS。
         conn.pragma_update(None,
             "wal_autocheckpoint", 1000)?;
+        // chapter 九百二十二 / M3315 CRITICAL fix NC2:set
+        // busy_timeout so multi-engine writes RETRY on
+        // SQLITE_BUSY instead of failing immediately。 The
+        // chapter 919 BEGIN IMMEDIATE wraps assume callers
+        // will block briefly when another engine holds the
+        // RESERVED lock。 Without busy_timeout,every
+        // concurrent multi-engine write returns -2 instantly
+        // — degrading the multi-engine race protection to
+        // race-fails-loudly-and-often。
+        conn.busy_timeout(
+            std::time::Duration::from_millis(5000))?;
+        // chapter 九百二十三 fix NH7:verify journal_mode
+        // actually became WAL,not silently fall through to
+        // delete mode on a read-only filesystem。
+        let mode: String = conn.query_row(
+            "PRAGMA journal_mode", [],
+            |row| row.get(0))?;
+        if mode.to_lowercase() != "wal" {
+            return Err(rusqlite::Error::SqliteSingleThreadedMode);
+        }
         Ok(L8Engine {
             conn: Mutex::new(conn),
             db_path: path,
@@ -192,6 +212,11 @@ impl L8Engine {
         let conn = Connection::open_in_memory()?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        // chapter 九百二十二 fix NC2:busy_timeout for
+        // consistency with disk-backed engine (in-memory
+        // can still see contention between threads)。
+        conn.busy_timeout(
+            std::time::Duration::from_millis(5000))?;
         Ok(L8Engine {
             conn: Mutex::new(conn),
             db_path: PathBuf::from(":memory:"),
@@ -397,6 +422,55 @@ pub(crate) fn cstr_to_str_allowing_empty<'a>(
         core::slice::from_raw_parts(ptr as *const u8, len)
     };
     std::str::from_utf8(bytes).ok()
+}
+
+/// chapter 九百二十二 / M3315 CRITICAL fix NC4 — shared
+/// upper bound for any caller-supplied limit parameter
+/// across the 4 hot-path consolidation FFIs。 100k entries
+/// × 16 bytes = ~1.6 MB worst-case allocation,well within
+/// safe production bounds for top-k / recent-N queries。
+/// Without this bound,a direct-FFI consumer passing
+/// `limit = usize::MAX` triggers `Vec::with_capacity` abort
+/// — bypassing the Swift-side `limitCap` (which only
+/// protects Swift call sites)。
+pub(crate) const MAX_HOTPATH_LIMIT: usize = 100_000;
+
+/// chapter 九百二十二 / M3315 CRITICAL fix NC1 — run a
+/// transactional body inside BEGIN IMMEDIATE + COMMIT,
+/// guaranteeing ROLLBACK on ANY error path including
+/// errors from intermediate `?` operators in the body。
+/// Previously the chapter 919 wraps had open-transaction
+/// leaks on read-step errors (fetch_existing_sequence,
+/// SELECT pre-check) that didn't go through the final
+/// match block。 Centralizing the pattern here avoids
+/// repeating the bug across 5 modules。
+pub(crate) fn transactional<F, T>(
+    conn: &Connection,
+    body: F,
+) -> rusqlite::Result<T>
+where
+    F: FnOnce(&Connection) -> rusqlite::Result<T>,
+{
+    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
+    let result = body(conn);
+    match result {
+        Ok(v) => {
+            match conn.execute("COMMIT", []) {
+                Ok(_) => Ok(v),
+                Err(e) => {
+                    // COMMIT failed — try ROLLBACK to
+                    // leave connection in clean state
+                    let _ = conn.execute("ROLLBACK", []);
+                    Err(e)
+                }
+            }
+        }
+        Err(e) => {
+            // Body returned Err — ALWAYS rollback
+            let _ = conn.execute("ROLLBACK", []);
+            Err(e)
+        }
+    }
 }
 
 #[allow(dead_code)]

@@ -48,32 +48,29 @@ pub fn upsert_entry(
     domain: &str,
     metadata_json: &str,
 ) -> rusqlite::Result<bool> {
-    // chapter 九百十九 / M3300 CRITICAL fix C3 (vector_index)
-    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
-    let existed: bool = conn.query_row(
-        "SELECT 1 FROM vector_index WHERE atom_id = ? LIMIT 1",
-        params![atom_id], |_| Ok(true),
-    ).unwrap_or(false);
-    let insert_result = conn.execute(
-        "INSERT OR REPLACE INTO vector_index (
-            atom_id, dimension, provider_version,
-            embedding_blob, domain, metadata_json
-         ) VALUES (?, ?, ?, ?, ?, ?)",
-        params![
-            atom_id, dimension, provider_version,
-            embedding_blob, domain, metadata_json,
-        ],
-    );
-    match insert_result {
-        Ok(_) => {
-            conn.execute("COMMIT", [])?;
-            Ok(!existed)
-        }
-        Err(e) => {
-            let _ = conn.execute("ROLLBACK", []);
-            Err(e)
-        }
-    }
+    // chapter 九百二十二 / M3315 CRITICAL fix NC1 (vector_index)
+    crate::transactional(conn, |conn| {
+        let existed = match conn.query_row(
+            "SELECT 1 FROM vector_index WHERE atom_id = ? LIMIT 1",
+            params![atom_id], |_| Ok(true),
+        ) {
+            Ok(true) => true,
+            Err(rusqlite::Error::QueryReturnedNoRows) => false,
+            Err(e) => return Err(e),
+            Ok(false) => false,
+        };
+        conn.execute(
+            "INSERT OR REPLACE INTO vector_index (
+                atom_id, dimension, provider_version,
+                embedding_blob, domain, metadata_json
+             ) VALUES (?, ?, ?, ?, ?, ?)",
+            params![
+                atom_id, dimension, provider_version,
+                embedding_blob, domain, metadata_json,
+            ],
+        )?;
+        Ok(!existed)
+    })
 }
 
 pub fn remove_entry(
@@ -259,6 +256,19 @@ pub unsafe extern "C" fn bas_l8_vector_index_upsert(
     if embedding_len > MAX_EMBEDDING_BYTES {
         return -3;  // oversized BLOB rejected
     }
+    // chapter 九百二十二 / M3315 CRITICAL fix NC5:enforce
+    // that declared dimension matches actual BLOB byte
+    // length。 Without this,stored `dimension` column can
+    // lie about BLOB size,and cosine_topk derives
+    // dim = blob.len() / 4 ignoring the stored dimension。
+    // Non-4-aligned BLOB lengths also rejected here so
+    // cosine_topk doesn't silently truncate corrupted rows。
+    if embedding_len % 4 != 0 {
+        return -3;  // BLOB length not 4-aligned
+    }
+    if (dimension as usize).saturating_mul(4) != embedding_len {
+        return -3;  // dimension/blob length mismatch
+    }
     let atom_id = match crate::cstr_to_str(
         atom_id_utf8, atom_id_len) {
         Some(s) => s, None => return -3,
@@ -418,7 +428,7 @@ bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
     out_skipped: *mut i64,
 ) -> i32 {
     if engine.is_null() { return -1; }
-    if k == 0 { return -4; }
+    if k == 0 || k > crate::MAX_HOTPATH_LIMIT { return -4; }
     if out_rowids.is_null() || out_scores.is_null()
         || out_skipped.is_null() {
         return -3;
@@ -491,7 +501,7 @@ bas_l8_vector_index_cosine_topk_for_domain(
     out_scores: *mut f32,
 ) -> i32 {
     if engine.is_null() { return -1; }
-    if k == 0 { return -4; }
+    if k == 0 || k > crate::MAX_HOTPATH_LIMIT { return -4; }
     if out_rowids.is_null() || out_scores.is_null() {
         return -3;
     }
