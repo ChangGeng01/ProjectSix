@@ -11,6 +11,68 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百二十五 / M3330 — Test backfill for 11+1 uncovered fixes from 5th-pass 掘地三尺 audit (TEST-COVERAGE-CLOSURE)
+
+User directive:「Ship chapter 九百二十四 code fixes + chapter 九百二十五
+test backfill (the brutal 11 gaps)」 — chapter 921.5's test audit
+revealed that 11 of 18 fixes shipped in chapters 919-923 had ZERO
+test coverage despite landing in production code paths。
+
+This chapter closes those 11 gaps + 1 stale-pin gap surfaced by the
+full-sweep run (chapter 786's `testRustCrateCountIs22` never updated
+after `bas-l8-engine` was added at chapter 894 — all prior `--filter`
+runs hid the failure)。
+
+#### NEW `BASChapter925FixCoverageBackfillTests.swift` (11 tests)
+
+Each test targets a specific previously-uncovered fix by bypassing
+Swift wrapper layers and exercising the underlying Rust guard or
+SQLite invariant directly:
+
+| Gap | Origin | Test |
+|---|---|---|
+| 1 | ch 915 C2 — vault empty payload throw | `testVaultLoadThrowsOnEmptyPayload` (direct SQLite UPDATE → empty payload → load() throws) |
+| 2 | ch 922 NC4 — Rust limit cap | `testRustLimitCapRejectsOversizedLimit` (FFI hot-path with limit=200_000 → returns -3) |
+| 3a | ch 922 NC5 — dim×4 mismatch | `testDimensionMismatchRejected` (embedding_len=16,dim=8 → -3) |
+| 3b | ch 922 NC5 — non-4-aligned blob | `testNonFourAlignedEmbeddingRejected` (blob_len=15 → -3) |
+| 4 | ch 920 H5 — oversized embedding | `testOversizedEmbeddingRejected` (blob 65540 bytes → -3) |
+| 5 | ch 920 MED-17 — WAL autocheckpoint | `testWalAutocheckpointIs1000` (PRAGMA query → ≥ 1 verified positive) |
+| 6 | ch 923 NH3 — signature_hash cap | `testOversizedSignatureHashRejected` (128-byte signature → -3,covers SHA512 too) |
+| 7 | ch 924 NH4 — NaN cosineTopK | `testCosineTopKThrowsOnNaNQuery` ([Float] overload + Float.nan → throw invalidArgument) |
+| 8 | ch 924 NH4 — oversized query dim | `testCosineTopKThrowsOnOversizedQueryDim` (20_000-dim query → throw,error reason mentions cap) |
+| 9 | ch 924 NH2 — format=2 requires blob | `testEventLogFormat2RequiresBlob` (format=2 + zero-len blob → -3) |
+| 10 | ch 924 NH2 — invalid format rejected | `testEventLogInvalidFormatRejected` (format=5 → -3) |
+
+All 11 backfill tests pass first run after the FFI symbol name fix
+(`bas_l8_host_constitution_version_tree_init_schema` →
+`bas_l8_version_tree_init_schema` per actual module export)。
+
+#### Stale-pin fix:`BASChapter786ArcSealTests.swift`
+
+`testRustCrateCountIs22` was pinned at 22 but actual count is 23
+since chapter 894 added `bas-l8-engine`。 Updated pin + extended
+comment trail attributing the bump。 Fixes the 1 full-sweep failure
+that all `--filter` runs had hidden through chapters 894-924。
+
+#### Discipline note
+
+The 5th-pass「掘地三尺」 audit pattern caught real items every cycle:
+- 1st pass:2 CRITICAL,7 HIGH
+- 2nd pass:5 CRITICAL (ch 922),8 HIGH (ch 923)
+- 3rd pass:1 CRITICAL (ch 924 NC1 RAII),5 HIGH (ch 924 NH1-NH6)
+- 4th pass:11 missing-test gaps + 1 stale pin = chapter 九百二十五
+
+Pattern: each fix layer creates new surface for the next pass to
+audit。 Chapter 九百二十六 will be the 6th pass to audit chapter 924+925
+themselves — but only if it surfaces real findings,not pro forma。
+
+#### Verification
+
+- Rust: 69/69 tests pass (no change since ch 924)
+- Swift filtered: BASChapter925 → 11/11 pass + BASChapter786ArcSealTests → 10/10 pass
+- Swift full sweep: 13576 tests,88 skipped,0 failures
+- pre-commit-gates.sh: 3/3 pass
+
 ### L8 Rust unification arc start — RFC + bas-l8-engine + first pilot (chapters 八百九十三 + 八百九十四 + 八百九十五 / M3155+M3160+M3165)
 
 User directive: 「把 L8 统一成 SQL event log / atom lifecycle /

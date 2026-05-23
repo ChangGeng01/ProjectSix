@@ -21,10 +21,19 @@ final class BASChapter786ArcSealTests: XCTestCase {
     func testRustCrateCountIs22() {
         // Pre-arc (v0.57.0): 20 crates。 Post-arc: 22 crates
         // (+bas-shadow-trial, +bas-atom-lifecycle)。
+        //
+        // chapter 八百九十四 / M3160 (L8 RUST UNIFICATION arc start):
+        // bumped to 23 crates (+bas-l8-engine — SQL source-of-truth
+        // + Rust hot paths)。 chapter 九百二十五 / M3330: pin updated
+        // here after 5th-pass full-sweep test surfaced the stale pin
+        // (testRustCrateCountIs22) that all prior `--filter` runs
+        // had hidden — see chapter 921.5 audit:gap 12。
         #if canImport(BASRustMemoryTrackerBinary)
         let bundleCount = bas_substrate_bundle_crate_count()
-        XCTAssertEqual(bundleCount, 22,
-            "Post-arc bundle should be 22 crates")
+        XCTAssertEqual(bundleCount, 23,
+            "Post-arc bundle should be 23 crates " +
+            "(20 pre-arc + shadow-trial + atom-lifecycle + " +
+            "l8-engine at chapter 八百九十四)")
         #endif
     }
 
