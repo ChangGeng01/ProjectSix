@@ -173,6 +173,14 @@ pub fn cosine_topk_for_domain_with_skipped(
             let v = f32::from_le_bytes([b0, b1, b2, b3]);
             score += v * query[i];
         }
+        // chapter 九百十八 / M3295 fix:NaN/Inf scores indicate
+        // corrupted embedding bytes (e.g. byte-level disk
+        // corruption,bit-flipped storage)。 Treat as dim-
+        // mismatch:count as skipped + don't pollute top-k。
+        if !score.is_finite() {
+            skipped += 1;
+            continue;
+        }
         // Insertion into top-k heap (k is small,linear insert OK)
         if top.len() < k {
             top.push((rowid, score));
@@ -730,6 +738,41 @@ mod tests {
             let top = cosine_topk_for_domain(
                 conn, "empty-domain", &q, 10).unwrap();
             assert_eq!(top.len(), 0);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn cosine_topk_treats_nan_scores_as_skipped() {
+        // chapter 九百十八 / M3295 fix:NaN scores from corrupt
+        // embedding bytes don't pollute top-k results。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // dim=2 embeddings
+            let clean = pack_f32_le(&[1.0, 0.0]);
+            // Construct NaN-bearing bytes (0x7F_C0_00_00 LE)
+            let mut nan_bytes: Vec<u8> = vec![0, 0, 0xC0, 0x7F];
+            nan_bytes.extend_from_slice(&[0, 0, 0, 0]);
+            assert!(f32::from_le_bytes(
+                [nan_bytes[0], nan_bytes[1],
+                 nan_bytes[2], nan_bytes[3]]).is_nan());
+            upsert_entry(conn, "clean", 2, "p", &clean,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "nan", 2, "p", &nan_bytes,
+                "dom", "{}").unwrap();
+            let q = vec![1.0_f32, 0.0];
+            let (top, skipped) =
+                cosine_topk_for_domain_with_skipped(
+                    conn, "dom", &q, 5).unwrap();
+            assert_eq!(top.len(), 1,
+                "NaN row excluded from top-k");
+            assert_eq!(skipped, 1,
+                "NaN row counted as skipped");
+            // The one returned score is finite
+            assert!(top[0].1.is_finite());
         });
         unsafe { bas_l8_engine_close(engine); }
     }

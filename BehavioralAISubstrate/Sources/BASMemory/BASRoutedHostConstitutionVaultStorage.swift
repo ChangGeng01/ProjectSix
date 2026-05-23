@@ -39,7 +39,13 @@ public actor BASRoutedHostConstitutionVaultStorage {
         case payloadReadFailed(code: Int32)
         case payloadEncodeFailed(reason: String)
         case payloadDecodeFailed(reason: String)
+        /// chapter 九百十八 / M3295 fix
+        case invalidArgument(reason: String)
     }
+
+    /// chapter 九百十八 / M3295 fix:upper bound on limit
+    /// to prevent OOM via [Int64] allocation。
+    public static let limitCap: Int = 100_000
 
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
@@ -352,7 +358,10 @@ public actor BASRoutedHostConstitutionVaultStorage {
     ) async throws
         -> [(rowid: Int64, lastUpdatedAtMs: Int64)]
     {
-        precondition(limit > 0, "limit must be positive")
+        guard limit > 0 && limit <= Self.limitCap else {
+            throw StoreError.invalidArgument(
+                reason: "limit must be in 1...\(Self.limitCap), got \(limit)")
+        }
         var rowids = [Int64](repeating: 0, count: limit)
         var timestamps = [Int64](repeating: 0, count: limit)
         let n = rowids.withUnsafeMutableBufferPointer { rBuf in

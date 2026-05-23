@@ -19,7 +19,19 @@ public actor BASRoutedVectorIndexStorage {
         case upsertFailed(code: Int32)
         case removeFailed(code: Int32)
         case metadataEncodingFailed
+        /// chapter 九百十八 / M3295 fix:reject invalid
+        /// limit values (k ≤ 0 or k > LIMIT_CAP) via throw
+        /// instead of `precondition` (which aborts the
+        /// process in release builds)。
+        case invalidArgument(reason: String)
     }
+
+    /// chapter 九百十八 / M3295 fix:upper bound on k/limit
+    /// to prevent OOM via `[Int64](repeating: 0, count: k)`
+    /// when caller passes `k = Int.max`。 100k entries × 16
+    /// bytes (i64+f32+pad) = ~2MB allocation,well within
+    /// safe production bounds for top-k queries。
+    public static let limitCap: Int = 100_000
 
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
@@ -245,7 +257,10 @@ public actor BASRoutedVectorIndexStorage {
         results: [(rowid: Int64, score: Float)],
         skipped: Int
     ) {
-        precondition(k > 0, "Top-k must be positive")
+        guard k > 0 && k <= Self.limitCap else {
+            throw StoreError.invalidArgument(
+                reason: "k must be in 1...\(Self.limitCap), got \(k)")
+        }
         let dom = Array(domain.utf8)
         var rowids = [Int64](repeating: 0, count: k)
         var scores = [Float](repeating: 0, count: k)
@@ -293,8 +308,10 @@ public actor BASRoutedVectorIndexStorage {
         queryBytes: [UInt8],
         k: Int
     ) async throws -> [(rowid: Int64, score: Float)] {
-        precondition(k > 0,
-            "Top-k must be positive")
+        guard k > 0 && k <= Self.limitCap else {
+            throw StoreError.invalidArgument(
+                reason: "k must be in 1...\(Self.limitCap), got \(k)")
+        }
         let dom = Array(domain.utf8)
         var rowids = [Int64](repeating: 0, count: k)
         var scores = [Float](repeating: 0, count: k)

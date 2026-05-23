@@ -43,7 +43,13 @@ public actor BASRoutedMemoryUsageRecordsStore {
         case upsertFailed(code: Int32)
         case recordNotFound(recordID: String)
         case helpedStateReadFailed(code: Int32)
+        /// chapter 九百十八 / M3295 fix
+        case invalidArgument(reason: String)
     }
+
+    /// chapter 九百十八 / M3295 fix:upper bound on limit
+    /// to prevent OOM via [Int64] allocation。
+    public static let limitCap: Int = 100_000
 
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
@@ -250,7 +256,10 @@ public actor BASRoutedMemoryUsageRecordsStore {
     ) async throws
         -> [(timestampMs: Int64, helped: String)]
     {
-        precondition(limit > 0, "limit must be positive")
+        guard limit > 0 && limit <= Self.limitCap else {
+            throw StoreError.invalidArgument(
+                reason: "limit must be in 1...\(Self.limitCap), got \(limit)")
+        }
         let bytes = Array(atomID.utf8)
         var timestamps = [Int64](repeating: 0, count: limit)
         var helpedCodes = [Int64](repeating: 0, count: limit)

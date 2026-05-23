@@ -277,8 +277,12 @@ final class BASChapter908ByteEqDepthAndConcurrencyTests:
             databaseURL: swiftURL, sql: sql)
         let r = try dumpAllRows(
             databaseURL: rustURL, sql: sql)
-        let sLen = "\(s[0]["payload_json"] ?? "")".count
-        let rLen = "\(r[0]["payload_json"] ?? "")".count
+        // chapter 九百十八 / M3295 fix A2.6:use .utf8.count
+        // (bytes) not .count (grapheme clusters)。 ASCII JSON
+        // they happen to match,but future non-ASCII embedded
+        // in Codable structs would diverge spuriously。
+        let sLen = "\(s[0]["payload_json"] ?? "")".utf8.count
+        let rLen = "\(r[0]["payload_json"] ?? "")".utf8.count
         XCTAssertEqual(sLen, rLen,
             "Payload length parity (same data, may differ in " +
             "key ordering — see test comment for chapter 九百八 " +

@@ -172,7 +172,7 @@ the substrate's concurrency model.
 
 ## Deferred items (registry for future chapters)
 
-### MED items from chapter 907 review (5 remaining as of ch 917)
+### MED items from chapter 907 review (5 remaining as of ch 918)
 
 | # | Item | Why deferred |
 |---|---|---|
@@ -184,13 +184,45 @@ the substrate's concurrency model.
 | #17 | N=50k perf bench (PERF_LONG env-gated) | Infrastructure — needs CI gating decision |
 | #18 | ~~Soft 5× perf guards mask 4× drops~~ | **SHIPPED ch 912** (tightened to 2×) |
 
-### LOW items from chapter 907 review (3 remaining)
+### Chapter 九百十四.5 全量 审查 items (added to registry ch 918)
+
+The chapter 914.5 3-agent review found additional items beyond
+the chapter 907 list。 Chapter 九百十七 omitted these from the
+registry (doc-drift bug in the doc-drift fix itself) — ch 918
+adds them here for honest accounting。
+
+**HIGH (1 deferred):**
+
+| # | Item | Why deferred |
+|---|---|---|
+| H10 | `markHelped` Swift synthesizes fake `-2` sentinel rather than typed `.recordNotFound` error | Cosmetic but should be typed; defer to consumer-driven enum refactor |
+
+**MED (10 — 5 SHIPPED in ch 918,5 still deferred):**
 
 | # | Item | Status |
 |---|---|---|
-| - | Chapter ID style mixed (CJK vs Arabic) | Stylistic, no behavior impact |
-| - | ABI floor pattern vs Rust exact-pin | Defensible either way |
-| - | Test naming inconsistency | Cosmetic |
+| A1.4 | `-2` overloaded in vault.allVaultMetadata throws `.deleteFailed` | Still deferred (linked to MED #13 breaking change) |
+| A1.5 | `helped_state` code `3 = "other"` loses info silently | Still deferred (needs logging primitive decision) |
+| A1.6 | `precondition(limit > 0)` aborts process | **SHIPPED ch 918** — replaced with throw `.invalidArgument` across all 4 bridges |
+| A1.7 | `[Int64](repeating: 0, count: limit)` OOM on `Int.max` | **SHIPPED ch 918** — added `limitCap = 100_000` across all 4 bridges |
+| A1.8 | `cosine_topk` may include NaN scores silently | **SHIPPED ch 918** — added `score.is_finite()` filter; NaN rows now counted as skipped |
+| A2.5 | ch 912 mixed-corpus parity test (skipped > 0) missing | Still deferred (additive test, future polish) |
+| A2.6 | ch 908 vault byte-eq uses `String.count` not `.utf8.count` | **SHIPPED ch 918** — bytes-not-graphemes fix |
+| A2.7 | ch 911 production N=10000 missing | Still deferred (PERF_LONG infrastructure question) |
+| A2.8 | ch 913 `Task.sleep(2ms)` flaky on CI | Still deferred (needs ts-injection FFI) |
+| A2.9 | ch 908 concurrency asserts only TOTAL not every write | Still deferred (linked to bigger concurrency test refactor) |
+| A2.10 | ch 908 raw-SQLite no WAL checkpoint | Still deferred (needs checkpoint FFI) |
+| A2.11 | Missing 0-row edge case FFI tests for ch 909/911 | Still deferred (small Rust tests, future polish) |
+
+**LOW (5 — 0 shipped, 5 deferred):**
+
+| # | Item | Status |
+|---|---|---|
+| LOW-1 | Chapter ID style mixed (CJK vs Arabic) | Stylistic |
+| LOW-2 | ABI floor pattern vs Rust exact-pin | Defensible either way |
+| LOW-3 | Test naming inconsistency | Cosmetic |
+| LOW-12 | `URL(fileURLWithPath: url.path + "-wal")` may leak on iOS percent-encoded paths | Cosmetic, no behavior impact in practice |
+| LOW-14 | ch 906 rowid 1..5 assumption (implementation-coupled) | Refactor to fetch rowids before asserting; cosmetic |
 
 ### Future consolidation opportunities
 
