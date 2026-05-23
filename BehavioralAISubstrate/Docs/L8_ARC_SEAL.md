@@ -1,11 +1,17 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百十四 (RFC + 21 implementation
-chapters,extended past initial seal at ch 910 per user's
-「Defer — keep developing first」 election)
-**ABI evolution**: 1 → 17 (17 bumps)
+**Span**: Chapters 八百九十三 — 九百十七 (RFC + 24 implementation
+chapters, extended past initial seal at ch 910 + post-seal
+review-fix sub-arc 915-917 per user's「Defer — keep developing
+first」 election + 全量 审查 finding 2 CRITICAL + 10 HIGH +
+13 MED + 5 LOW)
+**ABI evolution**: 1 → 17 (**16 bumps** — ch 894 starts at
+ABI 1 not a bump,16 subsequent increments)
 **Initial seal**: chapter 九百十 / M3255
-**Final extension**: chapter 九百十四 / M3275 (doc drift fix)
+**First extension**: chapter 九百十四 / M3275 (doc drift fix)
+**Post-review extension**: chapters 九百十五-九百十七 (CRITICAL
+correctness fixes + perf honesty + doc drift fixes from 全量
+审查)
 **Decision date**: 2026-05-23
 
 ## TL;DR
@@ -61,6 +67,10 @@ Final state:
 | 九百十二 | 2026-05-23 | Swift wrapper for ch 910 with_skipped + tighten ch 905 guards | (no ABI) |
 | 九百十三 | 2026-05-23 | Hot-path consolidation #4 vault (3.75-4.34×) — pattern proven across all 4 stores | ABI 17 |
 | 九百十四 | 2026-05-23 | Doc drift fix (CHANGELOG + SEAL + BRANCH_SUMMARY past ch 910) | (no ABI) |
+| 九百十四.5 (review) | 2026-05-23 | 3-agent 全量 审查 of arc 907-914 | 2 CRITICAL + 10 HIGH + 13 MED + 5 LOW |
+| 九百十五 | 2026-05-23 | CRITICAL fixes:cstr_to_str empty PK loophole + vault readDecodedPayload masking + Mutex<Connection> real stress test | (no ABI) |
+| 九百十六 | 2026-05-23 | Perf honesty:rename「speedup」→「ffi-hop-reduction」 in ch 909/911/913 + absolute wall-clock guards | (no ABI) |
+| 九百十七 | 2026-05-23 | Doc drift fixes (CHANGELOG order + SEAL stale claims + DECLINE docs missing ch 911/913 trigger firings + ABI bump count) | (no ABI) |
 
 ## Architecture state at seal
 
@@ -68,8 +78,8 @@ Final state:
 |---|---|---|
 | L8 SQL schemas in Rust | 0/11 | 12/12 (FTS5 deferred) |
 | Rust FFI fns | 0 | ~77 (across 10 modules) |
-| Rust unit tests | 0 | 65/65 PASS |
-| Swift byte-eq tests | 0 | 115+/115+ PASS (7 skipped) |
+| Rust unit tests | 0 | 67/67 PASS (incl. real Mutex<Connection> stress) |
+| Swift byte-eq tests | 0 | 122+/122+ PASS (7 skipped) |
 | Cross-actor depth tests | 0 | 4/4 PASS (raw-SQLite observer) |
 | Concurrency stress tests | 0 | 2/2 PASS (Mutex<Connection>) |
 | Perf bench scorecards | 0 | 21 across 4 stores |
@@ -99,33 +109,39 @@ flip ships.
 doctrine — both paths I/O-bound on SQLite WAL writes; Rust
 adds per-op FFI overhead that cancels its compute advantage.
 
-### Finding #2: Hot-path consolidation wins massively — ALL 4 stores
+### Finding #2: Hot-path consolidation reduces FFI overhead — ALL 4 stores
 
 Chapter 九百六 introduced `cosine_topk_for_domain` — ONE FFI
 call combining fetch + compute。 Chapters 九百九 / 九百十一 /
 九百十三 generalized the pattern to event_log, records, and
 vault respectively。 The pattern is now PROVEN across ALL 4
-major L8 stores:
+major L8 stores。
 
-| Store | Workload | Speedup |
-|---|---|---|
-| vector_index.cosine_topk N=100/1000/5000 dim=64 k=10 | 90.67× / 125.97× / 134.50× |
-| event_log.recent_timestamps N=100/1000 k=10 | 17.05× / 102.61× |
-| records.recent_for_atom N=100/1000 k=10 | 15.95× / 111.93× |
-| vault.all_metadata N=50/200 | 3.75× / 4.34× |
+**Chapter 九百十六 / M3285 honesty fix**:the speedups
+originally reported as「17-134× speedup」 were measured by
+comparing `N count() FFI calls` vs `1 integrated FFI call`。
+This ratio measures FFI-hop reduction,not end-to-end
+speedup (since the orchestrated baseline isn't a realistic
+consumer workload — there's no per-row read FFI for
+event_log / records / vault that a hypothetical Swift
+consumer could call instead)。 The honest framing:
 
-**Why the spread**: vault baseline is fastest (vaultCount
-returns a single int) + typical N for vault is small (1-10
-per device,not 100-5000) so the FFI-hop savings have less
-to compound against。 The other 3 stores have heavier
-per-FFI baselines + larger production N。
+| Store | Workload | FFI-hop reduction | Why |
+|---|---|---|---|
+| vector_index.cosine_topk N=100/1000/5000 | 90.67× / 125.97× / 134.50× | **Real compute consolidation** — baseline does N embedding reads + Swift dot-product compute (apples-to-apples) |
+| event_log.recent_timestamps N=100/1000 | 17.39× / 107.59× | FFI-hop reduction only — no per-event read FFI for fair baseline |
+| records.recent_for_atom N=100/1000 | 16.66× / 110.52× | FFI-hop reduction only — no per-record read FFI for fair baseline |
+| vault.all_metadata N=50/200 | 3.45× / 4.52× | FFI-hop reduction only — vault baseline (vaultCount) already cheap, plus N small (1-10 vaults typical) |
 
-**Why this wins universally**:collapses N round-trip FFI
-hops to 1。 The win scales with both N (more hops to skip)
-AND per-FFI baseline cost (each saved hop is heavier)。
-Confirms the user's original architectural premise about
-Rust hot paths beyond a shadow of a doubt — pattern works
-across every L8 store measured。
+**The architectural win is real**:collapsing N round-trip
+FFI hops to 1 saves ~16μs per skipped hop。 At production N
+this compounds to ms-scale savings per query。 But the
+「100× speedup」 framing was misleading — the underlying
+work the integrated path does is roughly comparable to
+the work the COUNT calls would do,just batched。 The
+chapter 906 vector_index number is the only one where the
+ratio reflects genuine compute consolidation (Rust scoring
+N embeddings vs Swift scoring N embeddings via FFI per-row)。
 
 ### Finding #3: JSON key ordering non-determinism
 
@@ -156,7 +172,7 @@ the substrate's concurrency model.
 
 ## Deferred items (registry for future chapters)
 
-### MED items from chapter 907 review (5 remaining after ch 910 + 912 fixes)
+### MED items from chapter 907 review (5 remaining as of ch 917)
 
 | # | Item | Why deferred |
 |---|---|---|
@@ -208,8 +224,9 @@ flip** would re-open if:
    compounds to ≥ 1.3× per-turn benefit
 3. Cold-start parity issue surfaces (currently unmeasured)
 
-**Hot-path consolidation primitives** (chapters 906 + 909)
-are FLIP-READY today but not wired into production consumers.
+**Hot-path consolidation primitives** (chapters 906 + 909 +
+911 + 913) are FLIP-READY today but not wired into production
+consumers.
 Trigger for wiring: consumer pressure (e.g., per-turn
 latency budget tightens, request volume crosses threshold).
 
@@ -249,17 +266,33 @@ the standing constraint that tag creation requires explicit
 user authorization,this doc lays out the proposed release
 notes:
 
-**v0.62.5 — L8 Rust Unification Arc**:
+**v0.62.5 — L8 Rust Unification Arc** (post-ch917 state):
 - 8 Swift SQLite actors gain Rust-backed bridges (additive,
   opt-in)
-- 2 hot-path consolidation primitives ship FLIP-READY
+- **4 hot-path consolidation primitives** ship FLIP-READY
+  across all 4 major stores (vector_index / event_log /
+  records / vault)
 - 0 production-default flips (additive only)
 - Storage migration measured TIE → DECLINE-WITH-TRIGGER
-- Hot-path consolidation measured 17-134× win → FLIP-READY
-- 105+ new Swift byte-eq + perf + concurrency tests
-- 63 new Rust unit tests
-- 5 new docs (RFC + DECLINE + 3 updated)
-- ABI 1→15 (12 bumps)
+- Hot-path consolidation FFI-hop reduction:90-134× for
+  vector_index (real compute consolidation),3-110× for
+  the other 3 stores (FFI-hop reduction only,not
+  end-to-end speedup — see Finding #2 for the chapter
+  九百十六 honesty correction)
+- **122+ new Swift byte-eq + perf + concurrency tests**
+- **67 new Rust unit tests** (incl. 16-thread × 25-write
+  Mutex<Connection> stress test from chapter 九百十五)
+- 5 new docs (RFC + DECLINE-WITH-TRIGGER + ARC_SEAL + 2
+  updated)
+- **ABI 1→17 (16 bumps)** — ch 894 starts at ABI 1 not a
+  bump,16 subsequent increments through ch 913 (ch 894 →
+  895 → 897 → 898 → 899 → 900 → 901 → 902 → 902.5 → 902.6
+  → 903 → 904 → 906 → 909 → 910 → 911 → 913);no ABI bumps
+  in ch 896 / 905 / 907-fix / 908 / 912 / 914 / 915 / 916 /
+  917
+- **Post-seal review-fix sub-arc (ch 915-917)** shipped per
+  chapter 九百十四.5 全量 审查 finding 2 CRITICAL + 10 HIGH
+  + 13 MED + 5 LOW items
 
 ## Closing
 
@@ -271,4 +304,4 @@ wins validate the user's original architectural premise:
 **Rust hot paths beat Swift round-trips by orders of
 magnitude when round-trip FFI hops can be collapsed**。
 
-Sealed. ✓
+Re-sealed at chapter 九百十七 (post-全量-审查 fix-sub-arc complete). ✓

@@ -193,6 +193,47 @@ hot-path consolidation wins massively when N round-trip FFI
 calls collapse to 1。 ABI 12 → 13。 `Docs/L8_STORAGE_FLIP_
 DECLINE_WITH_TRIGGER.md` gains the「Trigger FIRED」 section。
 
+(Honesty correction per chapter 九百十六:the「90-134×」 here
+is real and apples-to-apples — ch 906 baseline does Swift-
+side dot-product compute。 Chapters 909/911/913 numbers below
+are FFI-hop-reduction only,not end-to-end speedup。)
+
+#### Chapter 九百七 — Review fix-of-fix (CRITICAL + HIGH from arc 893-906 review)
+
+3-agent parallel review caught 2 CRITICAL + 8 HIGH + 9 MED + 3
+LOW items。 CRITICAL items shipped in this sub-chapter:
+- **#1**: `cstr_to_str` rejected `len=0` silently breaking
+  event_log format=2 payload_json="" — fixed to return
+  `Some("")` for empty + null only when `len > 0`
+  (subsequently RE-REVERTED in chapter 九百十五 per 全量
+  审查 — the chapter 907 fix opened an empty-PK loophole)
+- **#2**: `cosine_topk` eviction branch untested (algorithm
+  correct,coverage gap) — added 3 Rust tests covering
+  eviction + k > corpus + empty domain
+
+HIGH items shipped:
+- **#4**: WAL/SHM cleanup typo `appendingPathExtension("wal")`
+  → `.wal` instead of SQLite's `-wal` — files leaked across
+  ~50 tests per run。 Fixed in 13 test files via batch sed。
+- **#5**: ABI version test floor bumped 2 → 13 + added upper
+  bound to catch out-of-tree XCFramework drift
+- **#9**: Added `Docs/DECLINE_PATTERNS.md` entry for
+  STORAGE_TIE_FFI_OVERHEAD (referenced by ch 905 doc)
+- **#10**: Added `testCosineTopKMatchesOrchestratedRowIDs`
+  pinning ID parity (not just score parity) with
+  strictly-distinct embeddings
+
+MED items deferred to chapter 908+ (substantial work scope):
+- #3 byte-eq tests compare counts not bytes (addressed ch 908)
+- #7 concurrency tests missing (addressed ch 908 + 九百十五)
+- #11 dim-mismatch silent skip (addressed ch 910 + 912)
+- #12 cross-platform gating (still deferred)
+- #13 error code overloading (still deferred)
+- #14 read-path errors throw .upsertFailed (still deferred)
+- #15 test cleanup boilerplate (still deferred)
+- #17 PERF_LONG env-gated (still deferred)
+- #18 soft perf guards (addressed ch 912 + 916)
+
 #### Chapter 九百八 — Byte-eq DEPTH (raw-SQLite observer) + concurrency stress
 
 Addresses chapter 九百七 review MED #3 + #7。 NEW Tests/.../
@@ -291,83 +332,93 @@ Deferred items registry update:
 
 No ABI bump (docs-only chapter)。
 
-#### Chapter 九百七 — Review fix-of-fix (CRITICAL + HIGH from arc 893-906 review)
+#### Chapter 九百十四.5 (review) — 3-agent 全量 审查 of arc 907-914
 
-3-agent parallel review caught 2 CRITICAL + 8 HIGH + 9 MED + 3
-LOW items。 CRITICAL items shipped in this sub-chapter:
-- **#1**: `cstr_to_str` rejected `len=0` silently breaking
-  event_log format=2 payload_json="" — fixed to return
-  `Some("")` for empty + null only when `len > 0`
-- **#2**: `cosine_topk` eviction branch untested (algorithm
-  correct,coverage gap) — added 3 Rust tests covering
-  eviction + k > corpus + empty domain
+3-agent parallel review caught **2 CRITICAL + 10 HIGH + 13 MED
++ 5 LOW** items in chapters 907-914。 Critical: ch 907 cstr_to_str
+fix opened empty-PK loophole; vault readDecodedPayload masks
+corrupted vault as missing; ch 908 concurrency test serializes
+on Swift actor before hitting Mutex<Connection>。 HIGH: perf
+"speedup" framing misleading for ch 909/911/913; CHANGELOG
+order broken; SEAL release-notes block stale; DECLINE docs
+miss ch 909/911/913 trigger firings; ABI bump count off-by-one。
+Triggered ch 915-917 fix-sub-arc。
 
-HIGH items shipped:
-- **#4**: WAL/SHM cleanup typo `appendingPathExtension("wal")`
-  → `.wal` instead of SQLite's `-wal` — files leaked across
-  ~50 tests per run。 Fixed in 13 test files via batch sed。
-- **#5**: ABI version test floor bumped 2 → 13 + added upper
-  bound to catch out-of-tree XCFramework drift
-- **#9**: Added `Docs/DECLINE_PATTERNS.md` entry for
-  STORAGE_TIE_FFI_OVERHEAD (referenced by ch 905 doc)
-- **#10**: Added `testCosineTopKMatchesOrchestratedRowIDs`
-  pinning ID parity (not just score parity) with
-  strictly-distinct embeddings
+#### Chapter 九百十五 — CRITICAL correctness fixes (C1 + C2 + H9)
 
-MED items deferred to chapter 908+ (substantial work scope):
-- #3 byte-eq tests compare counts not bytes
-- #11 dim-mismatch silent skip
-- #12 cross-platform gating
-- #13 error code overloading
-- #14 read-path errors throw .upsertFailed
-- #15-#21 test cleanup + concurrency stress + style
+- **C1**: Reverted ch 907 cstr_to_str to STRICT (rejects len=0)
+  + NEW `cstr_to_str_allowing_empty` for the ONE legitimate
+  empty-string case (event_log format=2 payload_json)。 The
+  ch 907 fix opened a real data-corruption path (empty PKs
+  silently inserted)。 Discovered by 全量 审查 agent 1。
+- **C2**: `BASRoutedHostConstitutionVaultStorage.readDecoded-
+  Payload` now THROWS on empty payload_json instead of
+  returning nil。 Previous behavior collapsed "vault missing"
+  + "vault has empty payload (data corruption)" into the
+  same nil result — masquerade-as-deletion bug。
+- **H9**: NEW Rust-side `mutex_connection_serializes_native_
+  thread_contention` test (16 std::thread × 25 writes = 400
+  concurrent appends, all succeed)。 The ch 908 Swift test
+  serialized on the actor boundary BEFORE hitting Rust mutex;
+  this new test genuinely stress-tests Mutex<Connection>。
 
-#### Cumulative test stats
+No ABI bump。
 
-   cargo test -p bas-l8-engine: 62/62 PASS (engine + 10 module groups)
-   swift test --filter BASChapter89[5-9]|BASChapter90[0-7]: 50+/50+ PASS
-   swift build:                                                PASS
-   pre-commit gates:                                           3/3 PASS
+#### Chapter 九百十六 — Perf honesty (H3 + H11)
 
-#### Architecture progress
+- **H3**: ch 909/911/913 perf bench prints renamed from
+  `orch/integrated=Xx (speedup)` to `ffi-hop-reduction=Xx
+  [measures FFI overhead × N collapsed to 1, NOT end-to-end
+  speedup]`。 The orchestrated baselines for those 3 chapters
+  were N raw `countForSession`/`usageCount`/`vaultCount` FFI
+  hops — NOT apples-to-apples comparison with what Swift
+  would actually do (which is nothing,since per-row read
+  FFIs don't exist)。 The previous「17-102× / 15-112× /
+  3.75-4.34× speedup」 framing was misleading;the underlying
+  achievement (collapsing N+1 hops to 1) is real。 Chapter 906
+  vector_index 90-134× number remains honest (its baseline
+  does include real Swift compute)。
+- **H11**: Soft `XCTAssertLessThan(intSec, orchSec * 2.0)`
+  guards replaced with absolute wall-clock budgets per N
+  (e.g. 5ms for N=100, 20ms for N=1000)。 Previous soft
+  guards were no-ops when orchSec was dominated by N cheap
+  FFI hops。
 
-| Layer | Before this arc | After ch 906/907 |
-|---|---|---|
-| Swift actors (SQLite owners) | 17 actors,100% Swift | 17 actors (11 with Rust bridge ready,Swift bodies preserved per 红线 7) |
-| Rust crates linking SQLite | 0 / 7 crates | 1 / 8 crates (bas-l8-engine,bundled rusqlite) |
-| L8 SQL schemas mirrored in Rust | 0 / 11 | 12 / 12 (FTS5 only deferred) |
-| FFI surface for SQL ops | 0 functions | ~66 functions (across 10 modules:deletion_manifest + atom_lifecycle + user_state + version_tree + vector_index [w/ hot-path topk] + event_log + memory_usage_records + memory_usage_logs + memory_usage_extras + host_constitution_vault) |
-| ABI version | n/a | 13 (bumped per migration) |
-| Hot-path consolidation primitive | n/a | cosine_topk_for_domain (90-134× over orchestrated) |
-| XCFramework binary size | baseline | +~500 KB (bundled SQLite,single hit at ch 894) |
-| Production-default flips | n/a | 0 (storage-only DECLINED,hot-path FLIP-READY) |
+No ABI bump。
 
-#### Arc trajectory (remaining work per RFC)
+#### Chapter 九百十七 — Doc drift fixes (H4-H8, H12)
 
-- chapter 896:DeletionManifest Swift bridge + byte-equality tests
-- chapter 897-九百: AtomLifecycle / MemoryAtom / UserState /
-  VersionTree MED-risk migrations (5 stores)
-- chapter 九百一-九百三: EventLog / MemoryUsageTracker / Host
-  ConstitutionVault HIGH-risk migrations (3 stores)
-- chapter 九百四-九百五: hot-path consolidation (retrieval +
-  reducer + ranker + batch scoring)
-- chapter 九百六-九百七: Swift actor thinning + Apple boundary cleanup
-- chapter 九百八: multi-pass review + arc seal
+- **H4**: CHANGELOG chapter ordering fixed — chapter 九百七
+  entry moved from line 294 (after ch 九百十四) to its
+  chronological position between ch 九百六 + ch 九百八。
+- **H5**: SEAL `v0.62.5` release-notes block updated to
+  reflect post-ch917 state (4 hot-path primitives,122+
+  Swift tests,67 Rust tests,ABI 1→17 with 16 bumps)。
+- **H6/H7**: DECLINE_PATTERNS.md + DECLINE_WITH_TRIGGER.md
+  updated to note trigger fired across ALL 4 stores (chapters
+  906/909/911/913),with the chapter 九百十六 honesty caveat
+  about ch 909/911/913 being FFI-hop reduction not end-to-end
+  speedup。
+- **H8**: SEAL line 211 「(chapters 906 + 909)」 → 「(chapters
+  906 + 909 + 911 + 913)」。
+- **H12**: SEAL「ABI 1 → 17 (17 bumps)」 corrected to「ABI 1
+  → 17 (16 bumps — ch 894 starts at ABI 1 not a bump)」。
 
-Per chapter 870 cycle-break discipline:each migration ships with
-LIVE Swift baseline → Rust port → byte-equality test → opt-in
-flag → measurement → flip-or-decline。
+Architecture state snapshot referenced from `Docs/L8_ARC_
+SEAL.md` (the SEAL doc is the authoritative source for the
+arc's final state — CHANGELOG entries describe per-chapter
+deltas, SEAL has the cumulative tables)。
 
-#### Discipline pins
+#### Discipline pins (preserved across all 24 chapters)
 
-- Watch for chapter 881 + 890 string-FFI cost pattern at each
-  migration — if FFI ser cost > Swift total at production size,
-  that store DECLINES。 `Docs/DECLINE_PATTERNS.md` is the canonical
-  reference。
-- ADR-014 OPT-IN inverted at flip-time per chapter 七百七十七
-- Swift body preserved as fallback per 红线 7
-- N-pass review per chapter (1 pass min for arc-pace push;
-  3-pass at HIGH-risk chapters)
+- 不变量 #1/#2/#3 preserved
+- 红线 7 — every Swift SQLite actor body preserved as fallback
+- ADR-014 OPT-IN — zero production-default flips
+- 整体 性能 效果 一定要 更好 — re-measured + reframed honestly
+  per ch 九百十六
+- 数据 驱动 — every flip decision backed by measurement
+- 多做比较 — 21 bench scorecards across 4 stores
+- 细心 — 3-agent 全量 审查 catching real bugs
 
 ---
 

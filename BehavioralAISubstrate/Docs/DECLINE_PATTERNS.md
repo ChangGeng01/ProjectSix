@@ -31,10 +31,16 @@ decision。
   FFI_OVERHEAD** — Swift SQLite actors vs Rust-routed bridges
   measured TIE (0.92×-1.05× across 3 stores)。 String-FFI cost
   cancels Rust compute advantage at SQLite write granularity。
-  Trigger FIRED in chapter 九百六:hot-path consolidation
-  (one FFI call combining fetch + compute) wins 90-134×。
-  Storage-only flip remains DECLINED;hot-path consolidation
-  flip-ready。 See `Docs/L8_STORAGE_FLIP_DECLINE_WITH_TRIGGER.md`
+  Trigger FIRED in chapters 九百六 / 九百九 / 九百十一 / 九百十三:
+  hot-path consolidation (one FFI call combining fetch + compute)
+  measured across all 4 major stores。 Chapter 906 vector_index
+  shows real 90-134× compute consolidation (apples-to-apples
+  with Swift baseline)。 Chapters 909/911/913 show 3-110× FFI-
+  hop reduction (per chapter 九百十六 honesty correction:not
+  apples-to-apples since per-row read FFI doesn't exist for
+  the orchestrated baseline)。 Storage-only flip remains
+  DECLINED;all 4 hot-path consolidation primitives FLIP-READY。
+  See `Docs/L8_STORAGE_FLIP_DECLINE_WITH_TRIGGER.md`
 
 **Chapter 八百九十一.5 / M3146 HIGH fix from 18th-pass review**:
 chapters 八百七十四 (RoPE) + 八百七十五 (RMSNorm) were previously

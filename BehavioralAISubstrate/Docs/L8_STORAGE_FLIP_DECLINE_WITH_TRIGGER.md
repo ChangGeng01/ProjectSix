@@ -141,3 +141,39 @@ massively**,while storage-only migration was a tie。
 - Future consolidation work (other hot-path read patterns
   like batch-tier-update,bundle-recall) will likely show
   similar wins。 Measure each before flipping per discipline
+
+## Trigger FIRED across ALL 4 stores — chapters 九百九 / 九百十一 / 九百十三
+
+Chapters 九百九 / 九百十一 / 九百十三 extended the chapter 906
+hot-path consolidation pattern to event_log, records, and
+vault stores respectively。 **Per chapter 九百十六 / M3285
+honesty fix**:these three baselines compare against N raw
+`countForSession`/`usageCount`/`vaultCount` FFI calls (no
+per-row read FFI exists in those bridges to provide an
+apples-to-apples baseline)。 So the「ratio」 measures
+FFI-hop reduction,not end-to-end speedup:
+
+| Store | Workload | FFI-hop reduction | Apples-to-apples? |
+|---|---|---|---|
+| vector_index.cosine_topk (ch 906) | N=100/1000/5000 | 90.67× / 125.97× / 134.50× | **YES** — orch baseline does real Swift dot-product compute |
+| event_log.recent_timestamps (ch 909) | N=100/1000 | 17.39× / 107.59× | NO — orch = N countForSession() hops |
+| records.recent_for_atom (ch 911) | N=100/1000 | 16.66× / 110.52× | NO — orch = N usageCount() hops |
+| vault.all_metadata (ch 913) | N=50/200 | 3.45× / 4.52× | NO — orch = N vaultCount hops |
+
+### What this means concretely
+
+- **All 4 stores have FLIP-READY hot-path consolidation
+  primitives** in the Swift bridge — chapter 906 vector_index
+  cosine_topk + chapter 909 event_log recent_timestamps +
+  chapter 911 records recent_for_atom + chapter 913 vault
+  all_metadata。 The architectural win the user directed in
+  the original directive (Rust hot paths read DIRECTLY from
+  Rust storage,no Swift round-trip) is realized across all 4
+  stores。
+- **The「100×」 numbers should not be read as「Swift would
+  do X work, Rust does X/100 work」**。 They measure「N+1
+  FFI hops → 1 FFI hop saves the per-hop overhead」。 Real,
+  but a smaller story than the original framing suggested。
+- **Storage-only flip still DECLINED** — chapter 905
+  measurement unchanged。 The honesty correction is about
+  the hot-path framing,not the storage decision。
