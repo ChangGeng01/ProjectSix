@@ -171,6 +171,40 @@ pub fn count_for_host(
         params![host_id], |row| row.get(0))
 }
 
+/// chapter 九百十三 / M3270 — hot-path consolidation #4
+/// (extending chapters 906 + 909 + 911 pattern to vault)。
+///
+/// Returns all vaults' (rowid, last_updated_at_ms) tuples
+/// sorted DESC by last_updated_at_ms。 Boot-time loadAll
+/// metadata path:caller can iterate all vaults' update
+/// timestamps in ONE FFI call (vs N round-trip rowid + ts
+/// fetches in the orchestrated baseline)。
+///
+/// Does NOT load full payloads — those are big JSON blobs,
+/// caller fetches by rowid as needed via existing per-vault
+/// FFIs。 The win comes from skipping N FFI hops on the
+/// metadata scan that drives「which vaults need refresh」
+/// decisions at session boot。
+pub fn all_vault_metadata(
+    conn: &Connection,
+    limit: usize,
+) -> rusqlite::Result<Vec<(i64, i64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT rowid, last_updated_at_ms
+           FROM host_constitution_vaults
+          ORDER BY last_updated_at_ms DESC
+          LIMIT ?"
+    )?;
+    let mut rows = stmt.query(params![limit as i64])?;
+    let mut out: Vec<(i64, i64)> = Vec::with_capacity(limit);
+    while let Some(row) = rows.next()? {
+        let rowid: i64 = row.get(0)?;
+        let ts: i64 = row.get(1)?;
+        out.push((rowid, ts));
+    }
+    Ok(out)
+}
+
 // MARK: - FFI
 
 #[no_mangle]
@@ -378,6 +412,49 @@ bas_l8_host_constitution_vault_count_for_host(
     })
 }
 
+/// chapter 九百十三 / M3270 hot-path consolidation FFI #4:
+/// fetch all vaults' (rowid, last_updated_at_ms) tuples
+/// DESC by ts in ONE FFI call。 Returns count written
+/// (≤ limit),or:
+///   -1 → null engine
+///   -2 → SQLite error
+///   -3 → null buffers
+///   -4 → limit == 0
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_host_constitution_vault_all_metadata(
+    engine: *const L8Engine,
+    limit: usize,
+    out_rowids: *mut i64,
+    out_timestamps: *mut i64,
+) -> c_int {
+    if engine.is_null() { return -1; }
+    if limit == 0 { return -4; }
+    if out_rowids.is_null() || out_timestamps.is_null() {
+        return -3;
+    }
+    let engine_ref = unsafe { &*engine };
+    let result = engine_ref.with_conn(|conn| {
+        all_vault_metadata(conn, limit)
+    });
+    let rows = match result {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let n = rows.len();
+    let rid_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_rowids, n)
+    };
+    let ts_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_timestamps, n)
+    };
+    for (i, (rid, ts)) in rows.iter().enumerate() {
+        rid_slice[i] = *rid;
+        ts_slice[i] = *ts;
+    }
+    n as c_int
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,6 +577,34 @@ mod tests {
                 1);
             assert_eq!(count_for_host(conn, "h-B").unwrap(),
                 1);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn all_vault_metadata_returns_desc_by_ts() {
+        // chapter 九百十三:integrated hot-path consolidation
+        // for vault。 Verify DESC ordering + multi-vault scan。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_host_constitution_vault_init_schema(
+                engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // 4 vaults with varying last_updated_at_ms
+            upsert_vault(conn, "v1", "h", "c", "av", "sv",
+                "sig", 300, "{}").unwrap();
+            upsert_vault(conn, "v2", "h", "c", "av", "sv",
+                "sig", 100, "{}").unwrap();
+            upsert_vault(conn, "v3", "h", "c", "av", "sv",
+                "sig", 500, "{}").unwrap();
+            upsert_vault(conn, "v4", "h", "c", "av", "sv",
+                "sig", 200, "{}").unwrap();
+            let meta = all_vault_metadata(conn, 3).unwrap();
+            assert_eq!(meta.len(), 3);
+            assert_eq!(meta[0].1, 500);
+            assert_eq!(meta[1].1, 300);
+            assert_eq!(meta[2].1, 200);
         });
         unsafe { bas_l8_engine_close(engine); }
     }

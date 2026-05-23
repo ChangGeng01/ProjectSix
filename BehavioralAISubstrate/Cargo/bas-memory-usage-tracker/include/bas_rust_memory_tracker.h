@@ -1887,6 +1887,16 @@ int64_t bas_l8_host_constitution_vault_count_for_host(
     const L8Engine* engine,
     const char* host_id_utf8, size_t host_id_len);
 
+// chapter 九百十三 / M3270 — hot-path consolidation #4:
+// ONE FFI call returns all vaults' (rowid, last_updated_at_ms)
+// tuples DESC by ts。 Returns count written (≤ limit) or
+// -1/-2/-3/-4。 Boot-time loadAll metadata scan primitive。
+int32_t bas_l8_host_constitution_vault_all_metadata(
+    const L8Engine* engine,
+    size_t limit,
+    int64_t* out_rowids,
+    int64_t* out_timestamps);
+
 #ifdef __cplusplus
 }
 #endif

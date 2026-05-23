@@ -324,5 +324,42 @@ public actor BASRoutedHostConstitutionVaultStorage {
         }
         return c < 0 ? 0 : Int(c)
     }
+
+    // MARK: - chapter 九百十三 hot-path consolidation #4
+
+    /// INTEGRATED bulk metadata fetch:returns all vaults'
+    /// (rowid, lastUpdatedAtMs) tuples DESC by ts in ONE FFI
+    /// call。 Boot-time loadAll-metadata pattern — caller
+    /// decides which vaults need refresh without round-trips
+    /// per vault。
+    public func allVaultMetadata(
+        limit: Int
+    ) async throws
+        -> [(rowid: Int64, lastUpdatedAtMs: Int64)]
+    {
+        precondition(limit > 0, "limit must be positive")
+        var rowids = [Int64](repeating: 0, count: limit)
+        var timestamps = [Int64](repeating: 0, count: limit)
+        let n = rowids.withUnsafeMutableBufferPointer { rBuf in
+            timestamps.withUnsafeMutableBufferPointer { tBuf in
+                bas_l8_host_constitution_vault_all_metadata(
+                    enginePtr,
+                    limit,
+                    rBuf.baseAddress,
+                    tBuf.baseAddress)
+            }
+        }
+        guard n >= 0 else {
+            throw StoreError.deleteFailed(code: n)
+        }
+        var out: [(rowid: Int64, lastUpdatedAtMs: Int64)] = []
+        out.reserveCapacity(Int(n))
+        for i in 0..<Int(n) {
+            out.append((
+                rowid: rowids[i],
+                lastUpdatedAtMs: timestamps[i]))
+        }
+        return out
+    }
 }
 #endif
