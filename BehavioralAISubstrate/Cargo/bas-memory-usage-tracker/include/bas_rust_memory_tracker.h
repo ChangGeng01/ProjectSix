@@ -1448,6 +1448,46 @@ int64_t bas_l8_deletion_manifest_count_for_vault(
     const L8Engine* engine,
     const char* vault_id_utf8, size_t vault_id_len);
 
+// MARK: - bas-l8-engine atom_lifecycle module
+//         (chapter 八百九十七 / M3175)
+//
+// MED-risk migration #2. Schema 023 atom_lifecycle_events.
+// Phase / Action / Outcome stored as TEXT in SQL (per CHECK
+// constraints) but as u8/i32 in the FFI (matches Swift
+// BASAtomLifecycleEvent struct shape).
+//
+// Phase byte mapping: 0=created, 1=admitted, 2=linked,
+//                     3=archived, 4=tombstoned.
+// Action byte mapping: 0=admit, 1=link, 2=archive, 3=tombstone.
+// Outcome int mapping: 0=advanced, 1=rejected_illegal,
+//                      2=rejected_terminal.
+
+int32_t bas_l8_atom_lifecycle_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_atom_lifecycle_append(
+    const L8Engine* engine,
+    const char* event_id_utf8, size_t event_id_len,
+    const char* atom_id_utf8, size_t atom_id_len,
+    const char* session_id_utf8, size_t session_id_len,
+    uint8_t from_phase_byte,
+    uint8_t to_phase_byte,
+    uint8_t action_byte,
+    int32_t outcome,
+    int64_t recorded_at_ms,
+    const char* actor_ref_utf8, size_t actor_ref_len);
+
+int64_t bas_l8_atom_lifecycle_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_atom_lifecycle_count_for_atom(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len);
+
+int64_t bas_l8_atom_lifecycle_count_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len);
+
 #ifdef __cplusplus
 }
 #endif

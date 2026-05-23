@@ -53,6 +53,8 @@ use rusqlite::Connection;
 
 // chapter 八百九十五 / M3165 — LOW-risk pilot migration module
 pub mod deletion_manifest;
+// chapter 八百九十七 / M3175 — MED-risk migration #2: atom lifecycle
+pub mod atom_lifecycle;
 
 // MARK: - ABI version
 
@@ -65,7 +67,10 @@ pub mod deletion_manifest;
 ///         abi_version + init + close + db_path)
 ///   - 2 = chapter 八百九十五 / M3165 (+deletion_manifest module:
 ///         init_schema + append + count + count_for_vault)
-const ABI_VERSION: i32 = 2;
+///   - 3 = chapter 八百九十七 / M3175 (+atom_lifecycle module:
+///         init_schema + append + count + count_for_atom +
+///         count_for_session)
+const ABI_VERSION: i32 = 3;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -269,8 +274,9 @@ mod tests {
     fn abi_version_pinned() {
         // If this fails, ABI changed — bump version + update
         // Swift cross-check pin。 Chapter 895 bumped 1 → 2 for
-        // the deletion_manifest module addition。
-        assert_eq!(bas_l8_engine_abi_version(), 2);
+        // deletion_manifest. Chapter 897 bumped 2 → 3 for
+        // atom_lifecycle.
+        assert_eq!(bas_l8_engine_abi_version(), 3);
     }
 
     #[test]
