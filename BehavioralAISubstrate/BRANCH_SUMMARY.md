@@ -30,6 +30,7 @@ This branch covers **SEVEN contiguous sub-arcs** that landed together:
 | Audit replay evolution | 八百八-八百二十 | BASAuditPipeline composition root + BASAuditReplayEngine + cross-session diff + per-turn compression + 100-turn stress + per-session aggregation + time-window helpers |
 | 严查 整改 + 极致 轻量化 | 八百二十一-八百二十九 | Sequential 全量审查 + 严查 reviews + 4 HIGH + 6 MEDIUM remediation; ~43K LOC dormant doctrine archived (registry literal block + #if false dead bodies); 3 CI gates restored + git pre-commit hook + CONTRIBUTING.md |
 | **v0.61.0 final ship** | **八百三十-八百三十三** | **INTEGRATION_AUDIT.md adopter doc + naming clarification + forwarder migration (9/9 archived via string-literal-ref breakthrough) + v0.61.0 tag** |
+| **L8 Rust unification arc** | **八百九十三-九百二+** | **User directive 「把 L8 统一成 SQL = source of truth + Rust = hot path + Swift = orchestration」。 RFC + bas-l8-engine skeleton (chapter 894) + 8 stores migrated (DeletionManifest LOW + AtomLifecycle/UserState/VersionTree/VectorIndex MED + EventLog HIGH + MemoryUsageTracker-records SCOPED HIGH)。 7 Rust modules + 37 FFI fns + 8 SQL schemas in Rust + 33 Swift byte-eq tests pass + ABI 1→8。 HIGH-risk migrations adopt 「细心继续」 discipline (more tests,smaller scope,table-scoped where appropriate)。** |
 
 ## Native % trajectory
 

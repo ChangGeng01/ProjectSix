@@ -1623,6 +1623,50 @@ int64_t bas_l8_event_log_next_sequence(
 int64_t bas_l8_event_log_prune_before(
     const L8Engine* engine, int64_t cutoff_ms);
 
+// MARK: - bas-l8-engine memory_usage_records module
+// (chapter 九百二 / M3200 — HIGH-risk migration #2 SCOPED:
+//  records-table-only subset of BASMemoryUsageTracker)
+//
+// UPSERT semantics: INSERT new row or, on record_id conflict,
+// UPDATE ONLY helped_state column. All other columns preserved
+// from original insert (mirrors Swift `upsertRecord` exactly).
+//
+// upsert returns: 1 inserted, 0 updated (existing record_id),
+// -1 null engine, -2 SQLite error, -3 UTF-8 decode failure.
+
+int32_t bas_l8_memory_usage_records_init_schema(
+    const L8Engine* engine);
+
+int32_t bas_l8_memory_usage_records_upsert(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len,
+    const char* atom_id_utf8, size_t atom_id_len,
+    int64_t retrieved_at_ms,
+    const char* session_ref_utf8, size_t session_ref_len,
+    const char* turn_ref_utf8, size_t turn_ref_len,
+    const char* permit_mode_utf8, size_t permit_mode_len,
+    const char* helped_state_utf8, size_t helped_state_len);
+
+int64_t bas_l8_memory_usage_records_count(
+    const L8Engine* engine);
+
+int64_t bas_l8_memory_usage_records_usage_count_for_atom(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len);
+
+int64_t bas_l8_memory_usage_records_count_for_session(
+    const L8Engine* engine,
+    const char* session_ref_utf8, size_t session_ref_len);
+
+// Returns helped_state byte length (write into out_buf up to
+// out_capacity). Probe mode (null buf + zero capacity) returns
+// required size. -2 = record not found, -1 = null engine,
+// -3 = UTF-8 decode failure.
+int32_t bas_l8_memory_usage_records_helped_state_for_record(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len,
+    uint8_t* out_buf, size_t out_capacity);
+
 #ifdef __cplusplus
 }
 #endif

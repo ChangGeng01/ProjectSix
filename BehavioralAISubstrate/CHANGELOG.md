@@ -79,22 +79,80 @@ NO Swift bridge in this chapter — chapter 896 wires the
 byte-equality test suite against the current Swift actor +
 adds opt-in flag to flip default。
 
+#### Chapters 八百九十六 — 九百一 (M3170 — M3195) — 6 stores shipped
+
+Consolidated entry。 Per the「Push through all chapters」election
+each chapter shipped its own Rust module + FFI + Swift bridge +
+byte-eq tests + commit + push to both branches:
+
+| Chapter | Store | Risk | New tests | Key technique |
+|---|---|---|---|---|
+| 896 | DeletionManifest bridge | LOW | 4 | Swift bridge proves end-to-end ↔ Rust |
+| 897 | AtomLifecycle | MED | 4 | Phase/action/outcome enum byte ↔ TEXT mapping |
+| 898 | UserState | MED | 2 | Idempotent append (pre-check existence) |
+| 899 | VersionTree | MED | 3 | FIRST BLOB FFI (`*const u8, usize`) |
+| 900 | VectorIndex | MED | 3 | UPSERT + variable-size embedding BLOB |
+| 901 | EventLog | HIGH | 6 | Auto-sequence + idempotent dup + prune-count |
+
+Per chapter 901「细心开发」discipline (HIGH-risk migration #1)
+shipped 6 Rust + 6 Swift tests instead of MED's standard 3+3 —
+covers auto-sequence-starts-at-zero,per-session sequence
+isolation,dup-event-id returns existing sequence,prune row-count
+return,full byte-eq vs Swift SQLite actor at all-4 append +
+dup + prune paths。
+
+#### Chapter 九百二 / M3200 — MemoryUsageTracker SCOPED migration (HIGH-risk #2)
+
+Per 「细心继续」 discipline,BASMemoryUsageTracker (2,714 LOC,
+32 funcs,6 tables) is split per-table。 Chapter 九百二 ships
+ONLY the `memory_usage_records` table (per-retrieval write hot
+path)。 Remaining 5 tables (replay_log,audit_log,record_notes,
+bundles,tombstones) ship in sub-chapters 902.5 / 902.6 / 903。
+
+NEW `Cargo/bas-l8-engine/src/memory_usage_records.rs`:
+- Schema V1 byte-equality preserved from chapter 二百四十八
+  (record_id PK + 6 cols + atom_idx + session_idx indexes)
+- `upsert_record` returns `Ok(true)` on INSERT, `Ok(false)`
+  on UPSERT-only-helped_state on conflict (mirrors Swift
+  `upsertRecord` exactly)
+- Critical: ONLY helped_state column updated on conflict —
+  Rust + Swift parity proved by `upsert_only_updates_helped_
+  state_on_conflict` Rust unit test
+- 5 FFI fns: init_schema + upsert + count + usage_count_for_atom
+  + count_for_session + helped_state_for_record (probe-mode)
+- 5 Rust unit tests pass (37 total in bas-l8-engine)
+
+NEW `Sources/BASMemory/BASRoutedMemoryUsageRecordsStore.swift`:
+- Apple-boundary Date → epoch ms cast matches Swift actor
+  `Int64(retrievedAt.timeIntervalSince1970 * 1000)` exactly
+- `helpedState(forRecordID:)` probe-mode buffer read pattern
+
+NEW `BASChapter902MemoryUsageRecordsByteEqTests.swift` (6 tests):
+- Insert-then-UPSERT idempotency
+- UPSERT-preserves-other-columns (the CRITICAL Swift parity)
+- Per-atom + per-session count parity
+- Full record-count + markHelped byte-eq vs BASMemoryUsageTracker
+
+ABI: 7 → 8。 XCFramework rebuilt。 No force-link change needed
+(bas-l8-engine_abi_version anchor covers all module symbols)。
+
 #### Cumulative test stats
 
-   cargo test -p bas-l8-engine: 13/13 PASS (7 engine + 6 deletion_manifest)
-   swift test --filter BASChapter894|BASChapter895Deletion: 12/12 PASS
-   swift build:                                              PASS
-   pre-commit gates:                                         3/3 PASS
+   cargo test -p bas-l8-engine: 37/37 PASS (engine + 7 module groups)
+   swift test --filter BASChapter89[5-9]|BASChapter90[012]: 33/33 PASS
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
 
 #### Architecture progress
 
-| Layer | Before this arc | After ch 895 |
+| Layer | Before this arc | After ch 902 |
 |---|---|---|
-| Swift actors (SQLite owners) | 17 actors,100% Swift | 17 actors (unchanged — ch 896+ migrates) |
+| Swift actors (SQLite owners) | 17 actors,100% Swift | 17 actors (8 with Rust bridge ready,Swift bodies preserved) |
 | Rust crates linking SQLite | 0 / 7 crates | 1 / 8 crates (bas-l8-engine,bundled rusqlite) |
-| L8 SQL schemas mirrored in Rust | 0 / 11 | 1 / 11 (schema 015) |
-| FFI surface for SQL ops | 0 functions | 4 functions (init_schema + append + 2 counts) |
-| XCFramework binary size | baseline | +~500 KB (bundled SQLite,single hit) |
+| L8 SQL schemas mirrored in Rust | 0 / 11 | 8 / 11 (015 + 023 + user_states + 014 + vector_index + event_log v2 + memory_usage_records V1) |
+| FFI surface for SQL ops | 0 functions | 37 functions (across 7 modules:deletion_manifest + atom_lifecycle + user_state + version_tree + vector_index + event_log + memory_usage_records) |
+| ABI version | n/a | 8 (bumped per migration) |
+| XCFramework binary size | baseline | +~500 KB (bundled SQLite,single hit at ch 894) |
 
 #### Arc trajectory (remaining work per RFC)
 

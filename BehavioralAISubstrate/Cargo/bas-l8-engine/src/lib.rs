@@ -66,6 +66,10 @@ pub mod vector_index;
 // chapter 九百一 / M3195 — HIGH-risk migration #1: event log
 //                          (per-turn append + auto-sequence + prune)
 pub mod event_log;
+// chapter 九百二 / M3200 — HIGH-risk migration #2 SCOPED:
+//                          MemoryUsageTracker records table only
+//                          (UPSERT-only-helped_state on conflict)
+pub mod memory_usage_records;
 
 // MARK: - ABI version
 
@@ -94,7 +98,12 @@ pub mod event_log;
 ///         init_schema + append [auto-sequence + idempotent] +
 ///         count + count_for_session + count_for_kind +
 ///         next_sequence + prune_before)
-const ABI_VERSION: i32 = 7;
+///   - 8 = chapter 九百二 / M3200 (+memory_usage_records module
+///         SCOPED to records table only:init_schema + upsert
+///         [helped_state-only on conflict] + count +
+///         usage_count_for_atom + count_for_session +
+///         helped_state_for_record)
+const ABI_VERSION: i32 = 8;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -302,7 +311,8 @@ mod tests {
         // 899: 4→5 version_tree (first BLOB FFI).
         // 900: 5→6 vector_index (UPSERT + variable BLOB).
         // 901: 6→7 event_log (HIGH-risk first).
-        assert_eq!(bas_l8_engine_abi_version(), 7);
+        // 902: 7→8 memory_usage_records (HIGH-risk #2 SCOPED).
+        assert_eq!(bas_l8_engine_abi_version(), 8);
     }
 
     #[test]
