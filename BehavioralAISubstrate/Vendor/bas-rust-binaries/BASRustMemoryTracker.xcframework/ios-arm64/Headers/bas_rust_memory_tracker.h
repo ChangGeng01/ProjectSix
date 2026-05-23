@@ -1382,6 +1382,33 @@ int32_t bas_atom_reducer_batched_should_replace_admitted(
     int32_t tiebreak_keeps_existing,
     int32_t* out_decisions);
 
+// MARK: - bas-l8-engine ABI (chapter 八百九十四 / M3160)
+//
+// L8 Rust unification per Docs/L8_RUST_UNIFICATION_RFC.md:
+// SQL = source of truth, Rust owns hot paths, Swift = thin
+// orchestration + Apple boundary. This chapter ships the
+// SKELETON (open/close + ABI version). Subsequent chapters
+// (八百九十五+) add per-store FFI surfaces.
+//
+// The opaque *L8Engine pointer must NOT be dereferenced by C
+// consumers; only passed back to bas_l8_* functions. Swift
+// hosts manage lifecycle via init/close in an actor.
+
+typedef struct L8Engine L8Engine;
+
+int32_t bas_l8_engine_abi_version(void);
+
+L8Engine* bas_l8_engine_init(
+    const char* path_utf8,
+    size_t path_len);
+
+int32_t bas_l8_engine_close(L8Engine* engine);
+
+int32_t bas_l8_engine_db_path(
+    const L8Engine* engine,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 #ifdef __cplusplus
 }
 #endif

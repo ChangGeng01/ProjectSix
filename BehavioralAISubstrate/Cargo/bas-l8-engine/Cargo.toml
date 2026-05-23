@@ -1,0 +1,48 @@
+# Cargo manifest for bas-l8-engine
+# chapter 八百九十四 / M3160 — L8 RUST UNIFICATION ARC
+#
+# Per chapter 八百九十三 RFC (Docs/L8_RUST_UNIFICATION_RFC.md):
+# this crate makes SQL the source of truth for L8 (memory /
+# atom lifecycle / tombstone / provenance) via rusqlite,with
+# Rust owning the hot paths (retrieval / reducer / ranker /
+# batch scoring) and Swift actors becoming thin orchestration
+# + Apple-boundary wrappers。
+#
+# Depends on the existing 6 L8-related crates to compose their
+# pure-compute primitives with SQL persistence。 Force-linked
+# into bas-memory-usage-tracker umbrella so it ships in the
+# existing XCFramework without rebuilding the build pipeline。
+#
+# rusqlite: bundled feature compiles SQLite C from source into
+# the same .a — avoids host-SDK SQLite version pinning + keeps
+# XCFramework reproducible。 Sync API matches Swift actor
+# sync-from-isolated-context semantics (no tokio needed)。
+
+[package]
+name = "bas-l8-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "bas_l8_engine"
+path = "src/lib.rs"
+
+[dependencies]
+# Existing L8-related crates (pure-compute primitives) that
+# the engine composes with SQL persistence。
+bas-substrate-core = { path = "../bas-substrate-core" }
+bas-memory-atom-store = { path = "../bas-memory-atom-store" }
+bas-event-log-codec = { path = "../bas-event-log-codec" }
+bas-atom-lifecycle = { path = "../bas-atom-lifecycle" }
+bas-retrieval-ranker = { path = "../bas-retrieval-ranker" }
+
+# rusqlite with bundled SQLite — self-contained build, sync
+# API matches Swift actor sync semantics, ~500 KB binary
+# growth (single hit, umbrella shipping).
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -425,6 +425,13 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_atom_lifecycle::bas_atom_lifecycle_abi_version());
     total = total.wrapping_add(
         bas_atom_lifecycle::bas_atom_lifecycle_transition(4_i32, 0_i32));
+    // chapter 八百九十四 / M3160 — bundle the L8 Rust unification
+    // engine。 Anchor on `bas_l8_engine_abi_version` (pure
+    // constant,no side effects,cheapest anchor)。 The engine
+    // owns rusqlite + the SQL hot paths per Docs/L8_RUST_
+    // UNIFICATION_RFC.md。
+    total = total.wrapping_add(
+        bas_l8_engine::bas_l8_engine_abi_version());
     total
 }
 
@@ -450,7 +457,9 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 20 = chapter 七百七十一 / M2506 (+world-prior)
 ///   - 21 = chapter 七百七十四 / M2521 (+shadow-trial L13 Phase 2)
 ///   - 22 = chapter 七百八十二 / M2561 (+atom-lifecycle L8)
+///   - 23 = chapter 八百九十四 / M3160 (+l8-engine — L8 RUST UNIFICATION
+///         arc start, SQL source-of-truth + Rust hot paths)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    22
+    23
 }

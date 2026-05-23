@@ -1,0 +1,367 @@
+// SPDX:internal
+//
+// bas-l8-engine — chapter 八百九十四 / M3160
+//
+// L8 Rust unification per Docs/L8_RUST_UNIFICATION_RFC.md
+// (chapter 八百九十三 RFC)。 SQL = source of truth + Rust = hot
+// path + Swift = orchestration + Apple boundary。
+//
+// This crate is the SKELETON shipping the engine handle +
+// abi_version + open/close lifecycle。 Subsequent chapters
+// (八百九十五+) migrate individual Swift SQLite actors to use
+// this engine via per-store FFI surfaces。
+//
+// # Architecture
+//
+//   Swift actor (orchestration)
+//        ↓ FFI
+//   bas_l8_engine_init(path) → *mut L8Engine
+//        ↓ owns
+//   rusqlite::Connection
+//        ↓ owns
+//   SQLite WAL-mode DB on disk
+//
+// # ABI stability
+//
+// All public functions return i32 status codes (mirrors the
+// existing bas_rust_tracker_* idiom):
+//   0  → success
+//   -1 → null pointer / invalid input
+//   -2 → SQLite error (check engine's last_error_code)
+//   -3 → string encoding error (UTF-8 / length)
+//   -4 → schema migration failure
+//
+// # Multi-engine support
+//
+// Per RFC open question 1:multiple engines are supported (test
+// isolation matters)。 Each `bas_l8_engine_init` returns a
+// distinct handle;the caller manages lifecycle via close。
+//
+// # Schema migrations
+//
+// Per RFC open question 4:schemas are embedded via include_str!
+// at build time (no IO at init)。 This skeleton ships ZERO
+// schemas — subsequent migration chapters add per-store
+// schemas as needed。
+
+use std::ffi::CStr;
+use std::os::raw::{c_char, c_int};
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use rusqlite::Connection;
+
+// MARK: - ABI version
+
+/// Bump this when the C ABI surface changes (add/remove/rename
+/// functions OR change parameter shapes)。 Swift consumers
+/// cross-check via `bas_l8_engine_abi_version()` at module init。
+const ABI_VERSION: i32 = 1;
+
+/// Return the current ABI version for cross-checking by Swift
+/// consumers。
+#[no_mangle]
+pub extern "C" fn bas_l8_engine_abi_version() -> i32 {
+    ABI_VERSION
+}
+
+// MARK: - Engine handle (opaque from Swift's perspective)
+
+/// Engine handle wrapping a rusqlite Connection。 The Mutex
+/// guards the connection for thread-safe access from any Swift
+/// actor isolation context。 Per RFC: Swift never sees the
+/// internal Connection,only the opaque *mut L8Engine pointer。
+pub struct L8Engine {
+    conn: Mutex<Connection>,
+    db_path: PathBuf,
+}
+
+impl L8Engine {
+    /// Open a new SQLite connection at the given path with
+    /// WAL journal mode + synchronous=NORMAL + foreign_keys=ON
+    /// per substrate's existing Swift actor conventions。
+    fn open(path: PathBuf) -> Result<Self, rusqlite::Error> {
+        let conn = Connection::open(&path)?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        Ok(L8Engine {
+            conn: Mutex::new(conn),
+            db_path: path,
+        })
+    }
+
+    /// Open in-memory connection (test isolation per RFC
+    /// open question 1)。
+    fn open_in_memory() -> Result<Self, rusqlite::Error> {
+        let conn = Connection::open_in_memory()?;
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        Ok(L8Engine {
+            conn: Mutex::new(conn),
+            db_path: PathBuf::from(":memory:"),
+        })
+    }
+
+    /// Access the connection under the mutex (subsequent
+    /// chapter migration functions use this)。
+    pub fn with_conn<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Connection) -> R,
+    {
+        let guard = self.conn.lock().unwrap();
+        f(&guard)
+    }
+
+    /// Path the engine was opened at (or ":memory:")。 Used by
+    /// diagnostics + Swift-side audit trails。
+    pub fn db_path(&self) -> &PathBuf {
+        &self.db_path
+    }
+}
+
+// MARK: - FFI: engine open / close
+
+/// Open a new L8 engine backed by SQLite at the given path。
+/// Path is UTF-8 encoded with explicit length (no NUL terminator
+/// assumed — matches the existing `bas_rust_tracker_init` idiom)。
+///
+/// Returns a non-null `*mut L8Engine` on success,or null on
+/// failure (caller can probe `bas_l8_engine_last_error_code` for
+/// the SQLite error code)。
+///
+/// The caller is responsible for eventually calling
+/// `bas_l8_engine_close` to release the connection + file handle。
+/// Failure to do so leaks SQLite resources but does NOT corrupt
+/// the database file (WAL handles unclean shutdown gracefully)。
+///
+/// # Safety
+///
+/// `path_utf8` must point to `path_len` valid UTF-8 bytes。
+/// Caller must NOT pass `path_utf8: null` if `path_len > 0`。
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_engine_init(
+    path_utf8: *const c_char,
+    path_len: usize,
+) -> *mut L8Engine {
+    // Empty path → in-memory engine (test convenience)
+    if path_len == 0 || path_utf8.is_null() {
+        return match L8Engine::open_in_memory() {
+            Ok(engine) => Box::into_raw(Box::new(engine)),
+            Err(_) => std::ptr::null_mut(),
+        };
+    }
+    let bytes = unsafe {
+        core::slice::from_raw_parts(
+            path_utf8 as *const u8, path_len)
+    };
+    let path_str = match std::str::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let path_buf = PathBuf::from(path_str);
+    match L8Engine::open(path_buf) {
+        Ok(engine) => Box::into_raw(Box::new(engine)),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Close an L8 engine + release its SQLite connection + file
+/// handle。 Idempotent on null。 The engine pointer MUST NOT be
+/// used after this call。
+///
+/// Returns 0 on success,-1 if `engine` is null (treated as
+/// already-closed,not an error)。
+///
+/// # Safety
+///
+/// `engine` must be a pointer returned by a prior
+/// `bas_l8_engine_init` call,or null。
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_engine_close(
+    engine: *mut L8Engine,
+) -> c_int {
+    if engine.is_null() {
+        return -1;
+    }
+    // Take ownership + drop — releases Mutex + Connection +
+    // file handle + flushes WAL。
+    let _ = unsafe { Box::from_raw(engine) };
+    0
+}
+
+/// Returns the engine's db path as a length-prefixed UTF-8
+/// buffer。 Caller passes a `*mut u8` buffer of at least
+/// `out_capacity` bytes;function writes path bytes + returns
+/// the byte count written (or -1 if buffer too small / engine
+/// null)。 Diagnostic helper — Swift-side audit trails use this。
+///
+/// # Safety
+///
+/// `engine` must be valid + non-null。 `out_buf` must point to
+/// `out_capacity` writable bytes (or null with `out_capacity==0`
+/// to probe required size)。
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_engine_db_path(
+    engine: *const L8Engine,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    if engine.is_null() {
+        return -1;
+    }
+    let engine_ref = unsafe { &*engine };
+    let path_str = engine_ref.db_path.to_string_lossy();
+    let bytes = path_str.as_bytes();
+    let needed = bytes.len();
+    if out_buf.is_null() || out_capacity < needed {
+        return needed as i32;
+    }
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            bytes.as_ptr(), out_buf, needed);
+    }
+    needed as i32
+}
+
+// MARK: - CStr helper (for future migration chapter use)
+
+#[allow(dead_code)]
+pub(crate) fn cstr_to_str<'a>(
+    ptr: *const c_char,
+    len: usize,
+) -> Option<&'a str> {
+    if ptr.is_null() || len == 0 {
+        return None;
+    }
+    let bytes = unsafe {
+        core::slice::from_raw_parts(ptr as *const u8, len)
+    };
+    std::str::from_utf8(bytes).ok()
+}
+
+#[allow(dead_code)]
+pub(crate) fn cstr_terminated_to_string(
+    ptr: *const c_char,
+) -> Option<String> {
+    if ptr.is_null() {
+        return None;
+    }
+    let cs = unsafe { CStr::from_ptr(ptr) };
+    cs.to_str().ok().map(|s| s.to_string())
+}
+
+// MARK: - Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn abi_version_pinned() {
+        // If this fails, ABI changed — bump version + update
+        // Swift cross-check pin。
+        assert_eq!(bas_l8_engine_abi_version(), 1);
+    }
+
+    #[test]
+    fn open_in_memory_engine_succeeds() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        assert!(!engine.is_null(),
+            "in-memory engine init must succeed");
+        // Close should succeed
+        let rc = unsafe { bas_l8_engine_close(engine) };
+        assert_eq!(rc, 0);
+    }
+
+    #[test]
+    fn close_on_null_returns_minus_one() {
+        let rc = unsafe {
+            bas_l8_engine_close(std::ptr::null_mut())
+        };
+        assert_eq!(rc, -1);
+    }
+
+    #[test]
+    fn open_on_disk_with_path_succeeds() {
+        let tmp = tempfile::NamedTempFile::new()
+            .expect("tmp file");
+        let path = tmp.path().to_str().unwrap();
+        let path_bytes = path.as_bytes();
+        let engine = unsafe {
+            bas_l8_engine_init(
+                path_bytes.as_ptr() as *const c_char,
+                path_bytes.len())
+        };
+        assert!(!engine.is_null(),
+            "on-disk engine init at {:?} must succeed", path);
+        // Verify db_path round-trips
+        let mut buf = vec![0u8; path_bytes.len()];
+        let written = unsafe {
+            bas_l8_engine_db_path(
+                engine, buf.as_mut_ptr(), buf.len())
+        };
+        assert_eq!(written as usize, path_bytes.len());
+        assert_eq!(&buf[..], path_bytes);
+        let rc = unsafe { bas_l8_engine_close(engine) };
+        assert_eq!(rc, 0);
+    }
+
+    #[test]
+    fn db_path_probe_returns_required_size() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        // Probe with null buf + 0 capacity → returns required
+        let needed = unsafe {
+            bas_l8_engine_db_path(
+                engine, std::ptr::null_mut(), 0)
+        };
+        assert!(needed > 0,
+            "probe must return positive byte count");
+        assert_eq!(needed as usize, ":memory:".len());
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn multiple_engines_are_independent() {
+        // Test isolation per RFC open question 1
+        let e1 = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        let e2 = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        assert!(!e1.is_null() && !e2.is_null());
+        assert!(e1 != e2,
+            "Each init must return distinct handle");
+        unsafe {
+            bas_l8_engine_close(e1);
+            bas_l8_engine_close(e2);
+        }
+    }
+
+    #[test]
+    fn wal_mode_is_set_on_disk_engine() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().to_str().unwrap();
+        let path_bytes = path.as_bytes();
+        let engine_ptr = unsafe {
+            bas_l8_engine_init(
+                path_bytes.as_ptr() as *const c_char,
+                path_bytes.len())
+        };
+        assert!(!engine_ptr.is_null());
+        let engine = unsafe { &*engine_ptr };
+        let mode: String = engine.with_conn(|conn| {
+            conn.query_row(
+                "PRAGMA journal_mode", [],
+                |row| row.get(0)).unwrap()
+        });
+        assert_eq!(mode.to_lowercase(), "wal",
+            "WAL mode must be set on disk-backed engine");
+        unsafe { bas_l8_engine_close(engine_ptr); }
+    }
+}

@@ -41,6 +41,7 @@ members = [
     "bas-shadow-trial",            # chapter 七百七十四 / M2521 — L13 Phase 2 state machine port
     "bas-atom-lifecycle",          # chapter 七百八十二 / M2561 — L8 memory atom lifecycle state machine
     "bas-mamba-scan",              # chapter 八百五十二 / M2911 — Mamba SSM selective-scan CPU mirror + rayon parallelism setup
+    "bas-l8-engine",               # chapter 八百九十四 / M3160 — L8 Rust unification: SQL source-of-truth + Rust hot paths
 ]
 resolver = "2"
 

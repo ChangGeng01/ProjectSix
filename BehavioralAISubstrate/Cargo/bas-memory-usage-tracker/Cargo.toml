@@ -125,3 +125,6 @@ bas-atom-lifecycle    = { path = "../bas-atom-lifecycle" }
 # chapter 八百五十二 / M2913 — bundle the Mamba SSM scan
 # crate (sequential + rayon parallel CPU paths)。
 bas-mamba-scan        = { path = "../bas-mamba-scan" }
+# chapter 八百九十四 / M3160 — bundle the L8 Rust unification
+# engine (SQL source-of-truth + Rust hot paths, owns rusqlite)。
+bas-l8-engine         = { path = "../bas-l8-engine" }
