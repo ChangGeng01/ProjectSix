@@ -318,11 +318,32 @@ public actor BASRoutedVectorIndexStorage {
     /// Most consumers have a `[Float]` query vector — making
     /// them pack to `[UInt8]` themselves invites endian /
     /// width-mismatch bugs。
+    ///
+    /// chapter 九百二十四 / M3325 fix NH4:reject queries
+    /// containing NaN/Inf — they cause every score to be
+    /// non-finite,which the chapter 918 NaN filter rejects,
+    /// returning an empty result with no diagnostic。 Surface
+    /// the bad query as an error instead of silent empty。
     public func cosineTopK(
         forDomain domain: String,
         query: [Float],
         k: Int
     ) async throws -> [(rowid: Int64, score: Float)] {
+        // Bound query dimension — same cap as stored
+        // embeddings to prevent OOM via huge Vec allocation
+        guard query.count <= 16_384 else {
+            throw StoreError.invalidArgument(
+                reason: "query dimension \(query.count) " +
+                "exceeds cap 16384 (4 bytes × 16K floats = " +
+                "64 KB,matching stored embedding cap)")
+        }
+        // Reject NaN/Inf — chapter 918 NaN filter on the
+        // Rust side would silently drop every row otherwise
+        guard query.allSatisfy({ $0.isFinite }) else {
+            throw StoreError.invalidArgument(
+                reason: "query contains non-finite values " +
+                "(NaN or Inf) — would corrupt cosine scores")
+        }
         // Pack [Float] → [UInt8] little-endian
         var bytes: [UInt8] = []
         bytes.reserveCapacity(query.count * 4)

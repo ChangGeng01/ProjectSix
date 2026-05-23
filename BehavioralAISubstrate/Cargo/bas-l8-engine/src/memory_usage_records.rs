@@ -84,6 +84,13 @@ CREATE INDEX IF NOT EXISTS memory_usage_session_idx
 -- index usage (subsumes the dropped memory_usage_atom_idx)。
 CREATE INDEX IF NOT EXISTS memory_usage_atom_time_idx
   ON memory_usage_records(atom_id, retrieved_at_ms DESC);
+-- chapter 九百二十四 / M3325 fix NH1:DROP the redundant
+-- single-column atom_id index that pre-ch-923 schemas
+-- created。 The composite memory_usage_atom_time_idx above
+-- is a SUPERSET (SQLite uses leading-prefix for
+-- `WHERE atom_id = ?`)。 Existing DBs upgraded from ch
+-- 901-922 still have the redundant index until this DROP。
+DROP INDEX IF EXISTS memory_usage_atom_idx;
 "#;
 
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {

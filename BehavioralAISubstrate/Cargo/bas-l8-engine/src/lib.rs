@@ -194,11 +194,22 @@ impl L8Engine {
         // chapter 九百二十三 fix NH7:verify journal_mode
         // actually became WAL,not silently fall through to
         // delete mode on a read-only filesystem。
+        // chapter 九百二十四 / M3325 fix NH3:use a more
+        // accurate rusqlite::Error variant。 The previous
+        // SqliteSingleThreadedMode was semantically unrelated
+        // to journal mode and misled debuggers。 SqliteFailure
+        // with a descriptive error message is the right shape。
         let mode: String = conn.query_row(
             "PRAGMA journal_mode", [],
             |row| row.get(0))?;
         if mode.to_lowercase() != "wal" {
-            return Err(rusqlite::Error::SqliteSingleThreadedMode);
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(
+                    rusqlite::ffi::SQLITE_ERROR),
+                Some(format!(
+                    "expected journal_mode=WAL after PRAGMA,\
+                     got {:?}",
+                    mode))));
         }
         Ok(L8Engine {
             conn: Mutex::new(conn),
@@ -448,15 +459,61 @@ pub(crate) const MAX_SIGNATURE_HASH_BYTES: usize = 64;
 pub(crate) const MAX_PAYLOAD_BLOB_BYTES: usize = 1_048_576;
 pub(crate) const MAX_PAYLOAD_JSON_BYTES: usize = 16_777_216;
 
-/// chapter 九百二十二 / M3315 CRITICAL fix NC1 — run a
-/// transactional body inside BEGIN IMMEDIATE + COMMIT,
-/// guaranteeing ROLLBACK on ANY error path including
-/// errors from intermediate `?` operators in the body。
-/// Previously the chapter 919 wraps had open-transaction
-/// leaks on read-step errors (fetch_existing_sequence,
-/// SELECT pre-check) that didn't go through the final
-/// match block。 Centralizing the pattern here avoids
-/// repeating the bug across 5 modules。
+/// chapter 九百二十四 / M3325 CRITICAL fix — RAII guard for
+/// transactional state。 The ch 922 `transactional` helper
+/// covered the Err-return path of the body closure,but the
+/// panic-unwind path between BEGIN IMMEDIATE and the match
+/// block left the Connection with an open transaction +
+/// poisoned the Mutex,wedging the engine on next access。
+///
+/// In DEBUG builds (panic = unwind),Drop runs during stack
+/// unwinding,so this guard's Drop impl runs ROLLBACK even
+/// when the closure panicked。 In RELEASE (panic = abort),
+/// the process exits immediately on panic so engine-wedge
+/// can't happen — but the guard is still correct discipline。
+struct TxGuard<'a> {
+    conn: &'a Connection,
+    committed: bool,
+}
+
+impl<'a> Drop for TxGuard<'a> {
+    fn drop(&mut self) {
+        if !self.committed {
+            // Best-effort ROLLBACK。 If the connection is
+            // in a bad state,we can't do better than this。
+            let _ = self.conn.execute("ROLLBACK", []);
+        }
+    }
+}
+
+impl<'a> TxGuard<'a> {
+    fn new(conn: &'a Connection) -> rusqlite::Result<Self> {
+        conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
+        Ok(TxGuard { conn, committed: false })
+    }
+
+    fn commit(mut self) -> rusqlite::Result<()> {
+        self.conn.execute("COMMIT", [])?;
+        self.committed = true;
+        // Drop will run but `committed` is now true so
+        // no ROLLBACK
+        Ok(())
+    }
+}
+
+/// chapter 九百二十四 / M3325 CRITICAL fix — RAII-guarded
+/// transactional helper。 Replaces the ch 922 match-based
+/// version with a TxGuard that guarantees ROLLBACK on ANY
+/// error path INCLUDING panic-unwind (in DEBUG builds)。
+///
+/// Behavior:
+/// - body returns Ok → COMMIT → return Ok(value)
+/// - body returns Err → guard Drop runs ROLLBACK → return Err
+/// - body panics → guard Drop runs ROLLBACK → unwind continues
+/// - COMMIT fails → guard Drop runs ROLLBACK → return Err
+///
+/// Previously the panic-unwind path leaked the transaction
+/// and wedged the engine on next caller's BEGIN IMMEDIATE。
 pub(crate) fn transactional<F, T>(
     conn: &Connection,
     body: F,
@@ -464,26 +521,10 @@ pub(crate) fn transactional<F, T>(
 where
     F: FnOnce(&Connection) -> rusqlite::Result<T>,
 {
-    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
-    let result = body(conn);
-    match result {
-        Ok(v) => {
-            match conn.execute("COMMIT", []) {
-                Ok(_) => Ok(v),
-                Err(e) => {
-                    // COMMIT failed — try ROLLBACK to
-                    // leave connection in clean state
-                    let _ = conn.execute("ROLLBACK", []);
-                    Err(e)
-                }
-            }
-        }
-        Err(e) => {
-            // Body returned Err — ALWAYS rollback
-            let _ = conn.execute("ROLLBACK", []);
-            Err(e)
-        }
-    }
+    let guard = TxGuard::new(conn)?;
+    let result = body(conn)?;
+    guard.commit()?;
+    Ok(result)
 }
 
 #[allow(dead_code)]

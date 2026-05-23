@@ -77,6 +77,24 @@ CREATE INDEX IF NOT EXISTS event_log_kind_idx
 -- events that's a multi-ms scan per query。
 CREATE INDEX IF NOT EXISTS event_log_session_time_idx
   ON event_log(session_id, timestamp_ms DESC);
+-- chapter 九百二十四 / M3325 fix NH1:explicit migration to
+-- DROP the redundant index that pre-ch-923 schema strings
+-- created。 `CREATE TABLE IF NOT EXISTS` doesn't remove old
+-- indexes,so existing DBs upgraded from ch 901-922 still
+-- carry `event_log_session_seq_idx` — DROP it explicitly
+-- so the「~20% write-cost reduction」 chapter 923 promised
+-- actually lands on upgraded DBs (not just fresh installs)。
+DROP INDEX IF EXISTS event_log_session_seq_idx;
+-- chapter 九百二十四 / M3325 fix NH5:ensure the ch 919
+-- UNIQUE(session_id, sequence_number) constraint applies
+-- to existing DBs too。 The CREATE TABLE IF NOT EXISTS
+-- only adds the constraint for NEW tables;upgraded DBs
+-- need a separate UNIQUE INDEX to enforce the same
+-- invariant。 If existing data has duplicates this will
+-- fail (intentional — surface corruption instead of
+-- silently degrading defense)。
+CREATE UNIQUE INDEX IF NOT EXISTS event_log_session_seq_uniq
+  ON event_log(session_id, sequence_number);
 "#;
 
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
@@ -284,6 +302,25 @@ pub unsafe extern "C" fn bas_l8_event_log_append(
         return -3;
     }
     if payload_blob_len > crate::MAX_PAYLOAD_BLOB_BYTES {
+        return -3;
+    }
+    // chapter 九百二十四 / M3325 NH2 fix:enforce
+    // payload_format / payload presence coherence。 The schema
+    // says 1=json, 2=blob, 3+=reserved — but the FFI accepted
+    // arbitrary integers + arbitrary payload presence。 Now:
+    //   format=1 → payload_json must be non-empty,blob must be empty
+    //   format=2 → payload_blob must be non-empty,json must be empty
+    if payload_format != 1 && payload_format != 2 {
+        return -3;
+    }
+    if payload_format == 1
+        && (payload_json_len == 0 || payload_blob_len > 0)
+    {
+        return -3;
+    }
+    if payload_format == 2
+        && (payload_blob_len == 0 || payload_json_len > 0)
+    {
         return -3;
     }
     let event_id = match crate::cstr_to_str(
