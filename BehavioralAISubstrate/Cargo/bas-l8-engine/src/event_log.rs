@@ -271,7 +271,12 @@ pub unsafe extern "C" fn bas_l8_event_log_append(
         risk_band_utf8, risk_band_len) {
         Some(s) => s, None => return -3,
     };
-    let payload_json = match crate::cstr_to_str(
+    // chapter 九百十五 / M3280 fix C1:payload_json may be
+    // legitimately empty (format=2 binary path stores data
+    // in payload_blob),so use the empty-allowing variant
+    // for this ONE field。 All other string fields use the
+    // strict cstr_to_str。
+    let payload_json = match crate::cstr_to_str_allowing_empty(
         payload_json_utf8, payload_json_len) {
         Some(s) => s, None => return -3,
     };

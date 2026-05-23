@@ -315,29 +315,58 @@ pub unsafe extern "C" fn bas_l8_engine_db_path(
 
 /// Decode a Swift-passed UTF-8 buffer into a `&str`。
 ///
-/// # Semantics (chapter 九百七 / M3240 review fix #1)
+/// # Semantics (chapter 九百十五 / M3280 correctness fix C1)
 ///
-/// - `len == 0` returns `Some("")` (the empty string is a
-///   VALID value for callers like event_log format=2 payload
-///   where the binary path passes `payload_json_len = 0`)
-/// - `ptr.is_null()` with `len > 0` returns `None` (contract
-///   violation — pointer can't be null when length claims data)
-/// - Invalid UTF-8 bytes return `None`
+/// REJECTS `len == 0` with `None` — empty strings are NOT
+/// valid for PK / required-field columns。 The previous
+/// chapter 九百七 behavior (returning `Some("")` for `len==0`)
+/// opened a real data-corruption path:`record_id=""`,
+/// `vault_id=""`, etc. silently landed as real SQLite rows
+/// because no caller picked up the validation responsibility
+/// the doc said callers MUST take。
 ///
-/// Callers that require non-empty values (e.g. PK columns)
-/// MUST validate `s.is_empty()` themselves after decoding。
+/// For the ONE legitimate empty-string case (event_log
+/// format=2 binary path's `payload_json_len = 0`),use the
+/// sibling `cstr_to_str_allowing_empty` helper at that
+/// specific call site only。
 ///
-/// Prior to chapter 九百七 this function rejected `len == 0`
-/// with `None`,which silently broke FFI callers attempting
-/// to pass legitimate empty strings (e.g. the event_log
-/// format=2 binary path)。
+/// Return codes:
+/// - `len == 0` → `None` (rejected as required-field violation)
+/// - `ptr.is_null()` with `len > 0` → `None` (contract violation)
+/// - Valid UTF-8 → `Some(s)`
+/// - Invalid UTF-8 → `None`
 pub(crate) fn cstr_to_str<'a>(
     ptr: *const c_char,
     len: usize,
 ) -> Option<&'a str> {
+    if ptr.is_null() || len == 0 {
+        return None;
+    }
+    let bytes = unsafe {
+        core::slice::from_raw_parts(ptr as *const u8, len)
+    };
+    std::str::from_utf8(bytes).ok()
+}
+
+/// chapter 九百十五 / M3280 review fix C1 — explicit
+/// empty-allowing variant for ONE use case:event_log
+/// format=2 binary payloads where `payload_json_len = 0`
+/// is semantically valid (the data lives in the BLOB)。
+///
+/// Returns:
+/// - `len == 0` → `Some("")` (legitimate empty payload)
+/// - `ptr.is_null()` with `len > 0` → `None`
+/// - Valid UTF-8 → `Some(s)`
+/// - Invalid UTF-8 → `None`
+///
+/// Use this ONLY where the schema column accepts empty
+/// strings as semantically meaningful。 All PK columns must
+/// use the strict `cstr_to_str` instead。
+pub(crate) fn cstr_to_str_allowing_empty<'a>(
+    ptr: *const c_char,
+    len: usize,
+) -> Option<&'a str> {
     if len == 0 {
-        // Empty string is a valid value。 The `ptr` may be
-        // null here because the slice is zero-length anyway。
         return Some("");
     }
     if ptr.is_null() {
@@ -470,25 +499,50 @@ mod tests {
     }
 
     #[test]
-    fn cstr_to_str_empty_string_returns_some() {
-        // chapter 九百七 review fix #1: empty string is valid。
-        // Prior behavior was Some/None confusion that silently
-        // broke event_log format=2 payload_json="" callers。
+    fn cstr_to_str_rejects_empty_and_null() {
+        // chapter 九百十五 / M3280 fix C1:cstr_to_str is now
+        // STRICT — rejects len=0 with None。 The chapter 907
+        // empty-string-permissive behavior opened a real data-
+        // corruption path (empty PKs silently inserted)。
         assert_eq!(
             cstr_to_str(std::ptr::null(), 0),
-            Some(""),
-            "Empty string (len=0,ptr=null) returns Some(\"\")");
+            None,
+            "len=0 rejected (was Some(\"\") in ch 907)");
         let bytes = b"hi";
         assert_eq!(
             cstr_to_str(bytes.as_ptr() as *const c_char, 0),
-            Some(""),
-            "len=0 wins regardless of ptr non-null");
+            None,
+            "len=0 rejected regardless of ptr non-null");
         assert_eq!(
             cstr_to_str(std::ptr::null(), 5),
             None,
             "ptr=null with len>0 still returns None");
         assert_eq!(
             cstr_to_str(bytes.as_ptr() as *const c_char, 2),
+            Some("hi"));
+    }
+
+    #[test]
+    fn cstr_to_str_allowing_empty_accepts_empty() {
+        // chapter 九百十五 / M3280 fix C1:opt-in helper for
+        // the ONE legitimate empty-string case (event_log
+        // format=2 binary payload)。 PK fields use the strict
+        // cstr_to_str instead。
+        assert_eq!(
+            cstr_to_str_allowing_empty(std::ptr::null(), 0),
+            Some(""));
+        let bytes = b"hi";
+        assert_eq!(
+            cstr_to_str_allowing_empty(
+                bytes.as_ptr() as *const c_char, 0),
+            Some(""));
+        assert_eq!(
+            cstr_to_str_allowing_empty(std::ptr::null(), 5),
+            None,
+            "ptr=null with len>0 still returns None even in lenient mode");
+        assert_eq!(
+            cstr_to_str_allowing_empty(
+                bytes.as_ptr() as *const c_char, 2),
             Some("hi"));
     }
 
@@ -511,6 +565,113 @@ mod tests {
         });
         assert_eq!(mode.to_lowercase(), "wal",
             "WAL mode must be set on disk-backed engine");
+        unsafe { bas_l8_engine_close(engine_ptr); }
+    }
+
+    #[test]
+    fn mutex_connection_serializes_native_thread_contention() {
+        // chapter 九百十五 / M3280 fix H9 — true Mutex<Connection>
+        // stress test。 The chapter 908 Swift test serialized on
+        // the Swift actor boundary BEFORE hitting Mutex<Connection>,
+        // so the Rust mutex was never actually stress-tested。
+        //
+        // This test bypasses Swift entirely:N std::thread workers
+        // share an Arc<&L8Engine> via raw pointer + Mutex protection。
+        // Each thread does K reads + K writes against the same
+        // engine。 Asserts no lost writes,no deadlock。
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicI32, Ordering};
+        use std::thread;
+
+        // Use a disk-backed engine so threads share a real SQLite
+        // file (in-memory engines can be quirky under MT)
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().to_str().unwrap();
+        let path_bytes = path.as_bytes();
+        let engine_ptr = unsafe {
+            bas_l8_engine_init(
+                path_bytes.as_ptr() as *const c_char,
+                path_bytes.len())
+        };
+        assert!(!engine_ptr.is_null());
+
+        // Init schemas via the modules we'll exercise
+        let init_rc = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_init_schema(engine_ptr)
+        };
+        assert_eq!(init_rc, 0);
+
+        // Wrap the engine ptr in a struct that's Send + Sync for
+        // the thread::spawn boundary。 Engine internally uses
+        // Mutex<Connection> so this is safe。
+        struct EnginePtr(*const L8Engine);
+        unsafe impl Send for EnginePtr {}
+        unsafe impl Sync for EnginePtr {}
+        let shared = Arc::new(EnginePtr(engine_ptr));
+
+        const N_THREADS: usize = 16;
+        const K_OPS_PER_THREAD: usize = 25;
+        let succeeded = Arc::new(AtomicI32::new(0));
+
+        let mut handles = vec![];
+        for tid in 0..N_THREADS {
+            let s = Arc::clone(&shared);
+            let counter = Arc::clone(&succeeded);
+            handles.push(thread::spawn(move || {
+                for i in 0..K_OPS_PER_THREAD {
+                    let event_id =
+                        format!("mt-{}-{}", tid, i);
+                    let session_id =
+                        format!("sess-{}", tid % 4);
+                    let kind = "chat";
+                    let risk = "low";
+                    let pj = "{}";
+                    let mut was_new: i32 = -1;
+                    let seq = unsafe {
+                        crate::event_log
+                            ::bas_l8_event_log_append(
+                            s.0,
+                            event_id.as_ptr() as *const c_char,
+                            event_id.len(),
+                            session_id.as_ptr()
+                                as *const c_char,
+                            session_id.len(),
+                            (tid * 1000 + i) as i64,
+                            kind.as_ptr() as *const c_char,
+                            kind.len(),
+                            risk.as_ptr() as *const c_char,
+                            risk.len(),
+                            pj.as_ptr() as *const c_char,
+                            pj.len(),
+                            1,
+                            std::ptr::null(), 0,
+                            &mut was_new)
+                    };
+                    if seq >= 0 && was_new == 1 {
+                        counter.fetch_add(1, Ordering::SeqCst);
+                    }
+                }
+            }));
+        }
+        for h in handles { h.join().unwrap(); }
+
+        // Expected: N_THREADS × K_OPS_PER_THREAD = 400 distinct
+        // event_ids,all newly inserted (no lost writes)
+        let total = succeeded.load(Ordering::SeqCst);
+        assert_eq!(total,
+            (N_THREADS * K_OPS_PER_THREAD) as i32,
+            "All concurrent writes must succeed under Mutex<Connection>");
+
+        // Verify SQLite agrees
+        let final_count = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_count(engine_ptr)
+        };
+        assert_eq!(final_count,
+            (N_THREADS * K_OPS_PER_THREAD) as i64,
+            "SQLite count matches successful appends");
+
         unsafe { bas_l8_engine_close(engine_ptr); }
     }
 }

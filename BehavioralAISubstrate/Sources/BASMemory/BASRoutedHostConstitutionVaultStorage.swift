@@ -241,7 +241,22 @@ public actor BASRoutedHostConstitutionVaultStorage {
         withVaultIDBytes bytes: [UInt8],
         useByHost: Bool
     ) throws -> BASHostConstitutionVault? {
-        if needed == 0 { return nil }
+        // chapter 九百十五 / M3280 fix C2:throw on empty
+        // payload instead of returning nil。 The previous
+        // `needed == 0 → return nil` collapsed two distinct
+        // error states:(a) vault missing,handled earlier
+        // by needed == -2 check upstream;(b) vault EXISTS
+        // but has empty payload_json (data corruption from
+        // the chapter 907 cstr_to_str loophole or a manual
+        // SQL UPDATE)。 Returning nil for case (b) masquerades
+        // corruption as missing → consumers think the vault
+        // was deleted。 Surface as decode error instead。
+        if needed == 0 {
+            throw StoreError.payloadDecodeFailed(
+                reason: "Empty payload_json — vault row " +
+                "exists but payload column is empty " +
+                "(possible data corruption)")
+        }
         var outBuf = [UInt8](repeating: 0, count: Int(needed))
         let written = bytes.withUnsafeBufferPointer { buf in
             outBuf.withUnsafeMutableBufferPointer { ob in
