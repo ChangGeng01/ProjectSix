@@ -16,6 +16,17 @@ use rusqlite::params;
 
 use crate::L8Engine;
 
+/// chapter 九百二十六 / M3335 fix HIGH-1 — module-level cap
+/// for embedding/query BLOB byte length。 Previously this
+/// constant was local to `bas_l8_vector_index_upsert` at
+/// line 255,which left the two cosine_topk FFIs with
+/// ZERO upper bound on `query_blob_len` — a direct-FFI
+/// caller passing 10 GB triggered `Vec::with_capacity`
+/// abort,bypassing the Swift-side dim cap (which only
+/// protects Swift call sites)。 Same OOM-via-untrusted-len
+/// class as the chapter 922 NC4 `MAX_HOTPATH_LIMIT` fix。
+pub(crate) const MAX_EMBEDDING_BYTES: usize = 65_536;
+
 const SCHEMA_VECTOR_INDEX: &str = r#"
 CREATE TABLE IF NOT EXISTS vector_index (
     atom_id TEXT PRIMARY KEY NOT NULL,
@@ -252,7 +263,11 @@ pub unsafe extern "C" fn bas_l8_vector_index_upsert(
     // size to prevent OOM-via-upsert。 4 bytes per f32 ×
     // 16384 max dim = 65536 bytes per embedding。 Production
     // embeddings are 384-1536 dim;the cap is generous。
-    const MAX_EMBEDDING_BYTES: usize = 65_536;
+    //
+    // chapter 九百二十六 / M3335 fix HIGH-1:moved to module-
+    // level `MAX_EMBEDDING_BYTES` so cosine_topk FFI variants
+    // can reuse the same cap on the QUERY blob path (see
+    // bas_l8_vector_index_cosine_topk_for_domain*)。
     if embedding_len > MAX_EMBEDDING_BYTES {
         return -3;  // oversized BLOB rejected
     }
@@ -441,6 +456,15 @@ bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
         || query_blob_len % 4 != 0 {
         return -3;
     }
+    // chapter 九百二十六 / M3335 fix HIGH-1:cap query blob
+    // size — without this a direct-FFI caller passing
+    // query_blob_len = 10_000_000_000 triggers
+    // Vec::with_capacity(2.5B) abort,bypassing the
+    // Swift-side 16384-float dim cap (only protects
+    // BASRoutedVectorIndexStorage call sites)。
+    if query_blob_len > MAX_EMBEDDING_BYTES {
+        return -3;
+    }
     let q_dim = query_blob_len / 4;
     let mut query: Vec<f32> = Vec::with_capacity(q_dim);
     let q_slice = unsafe {
@@ -451,6 +475,15 @@ bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
         query.push(f32::from_le_bytes([
             q_slice[start], q_slice[start + 1],
             q_slice[start + 2], q_slice[start + 3]]));
+    }
+    // chapter 九百二十六 / M3335 fix HIGH-2:Rust-side NaN/
+    // Inf guard for direct-FFI callers (the ch 924 NH4
+    // Swift-side check at BASRoutedVectorIndexStorage.
+    // swift:342 only protects the [Float] overload — the
+    // [UInt8] queryBytes overload and non-Swift FFI
+    // consumers reach this path without prior validation)。
+    if !query.iter().all(|f| f.is_finite()) {
+        return -3;
     }
     let engine_ref = unsafe { &*engine };
     let result = engine_ref.with_conn(|conn| {
@@ -514,6 +547,12 @@ bas_l8_vector_index_cosine_topk_for_domain(
     {
         return -3;
     }
+    // chapter 九百二十六 / M3335 fix HIGH-1 (mirrors variant
+    // above):cap query blob size to prevent OOM via
+    // direct-FFI consumer passing untrusted len。
+    if query_blob_len > MAX_EMBEDDING_BYTES {
+        return -3;
+    }
     // Decode query bytes as f32 little-endian
     let q_dim = query_blob_len / 4;
     let mut query: Vec<f32> = Vec::with_capacity(q_dim);
@@ -527,6 +566,12 @@ bas_l8_vector_index_cosine_topk_for_domain(
         let b2 = q_slice[start + 2];
         let b3 = q_slice[start + 3];
         query.push(f32::from_le_bytes([b0, b1, b2, b3]));
+    }
+    // chapter 九百二十六 / M3335 fix HIGH-2 (mirrors variant
+    // above):Rust-side NaN/Inf guard for direct-FFI
+    // callers that bypass the [Float] Swift overload。
+    if !query.iter().all(|f| f.is_finite()) {
+        return -3;
     }
     let engine_ref = unsafe { &*engine };
     let topk: Result<Vec<(i64, f32)>, rusqlite::Error> =

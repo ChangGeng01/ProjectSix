@@ -1409,6 +1409,29 @@ int32_t bas_l8_engine_db_path(
     uint8_t* out_buf,
     size_t out_capacity);
 
+// chapter 九百二十六 / M3335 fix CRITICAL-3 — diagnostic
+// helper to read PRAGMA values from the engine's OWN
+// connection。 ch 925's testWalAutocheckpointIs1000 opened
+// a separate raw sqlite3 connection and read the pragma
+// there — but wal_autocheckpoint is per-connection,so
+// the test passed for the wrong reason。 Now tests can
+// verify pragmas were actually applied via this helper。
+//
+// Whitelisted pragmas only (returns -3 on others):
+//   wal_autocheckpoint, busy_timeout, synchronous,
+//   journal_size_limit, page_size, cache_size,
+//   user_version, max_page_count。
+//
+// Returns:
+//   -1 → null engine
+//   -3 → null name / invalid UTF-8 / pragma not whitelisted
+//   -2 → SQLite error
+//   ≥0 → the PRAGMA's integer value
+int64_t bas_l8_engine_pragma_value_i64(
+    const L8Engine* engine,
+    const char* name_utf8,
+    size_t name_len);
+
 // MARK: - bas-l8-engine deletion_manifest module
 //         (chapter 八百九十五 / M3165)
 //

@@ -1,16 +1,24 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百二十三 (RFC + 30 implementation
-chapters, extended past 2 prior「seals」 + 4-pass review
-discipline finding more CRITICAL items each pass)
-**ABI evolution**: 1 → 17 (**16 bumps** — ch 894 starts at
-ABI 1 not a bump,16 subsequent increments)
+**Span**: Chapters 八百九十三 — 九百二十六 (RFC + 33 implementation
+chapters, extended past 3 prior「seals」 + 6-pass review
+discipline finding real CRITICAL items each pass through pass 6)
+**ABI evolution**: 1 → 18 (**17 bumps** — ch 894 starts at
+ABI 1 not a bump,17 subsequent increments,latest ch 926
+adds bas_l8_engine_pragma_value_i64 diagnostic helper)
 **Initial seal**: chapter 九百十 / M3255
 **First extension**: chapter 九百十四 / M3275 (doc drift fix)
-**Post-review extension**: chapters 九百十五-九百十七 (CRITICAL
+**3rd-pass extension**: chapters 九百十五-九百十七 (CRITICAL
 correctness fixes + perf honesty + doc drift fixes from 全量
 审查)
-**Decision date**: 2026-05-23
+**4th-pass extension**: chapters 九百十八-九百二十一 (registry +
+5 CRITICAL fixes + HIGH data-model + HIGH API)
+**5th-pass extension**: chapters 九百二十二-九百二十三 (5 CRITICAL +
+8 HIGH from「最最严苛」 review)
+**6th-pass「掘地三尺」 extension**: chapters 九百二十四-九百二十六
+(1 CRITICAL + 4 HIGH code + 11 test backfill + 6th-pass
+fix-of-fix breaking the cascade)
+**Decision date**: 2026-05-24 (extended re-seal)
 
 ## TL;DR
 
@@ -77,6 +85,10 @@ Final state:
 | 九百二十一.5 (review) | 2026-05-24 | 3-agent 最最严苛 4th-pass review of arc 915-921 | 5 NEW CRITICAL + 8 NEW HIGH + 9 NEW MED + 1 NEW LOW |
 | 九百二十二 | 2026-05-24 | 5 NEW CRITICAL fixes:transactional helper + busy_timeout + complete sortedKeys + Rust limit cap + dim/blob validation | (no ABI) |
 | 九百二十三 | 2026-05-24 | 8 NEW HIGH fixes:dedup indexes + BLOB caps (signature_hash/payload_blob/payload_json) + EXPLAIN QUERY PLAN test + ... | (no ABI) |
+| 九百二十四 | 2026-05-24 | 5th-pass「掘地三尺」 1 CRITICAL TxGuard RAII (panic-safe transactional) + 4 HIGH NH1-NH4 (schema migration + payload_format coherence + journal_mode error + cosineTopK [Float] NaN/dim guard) | (no ABI) |
+| 九百二十五 | 2026-05-24 | Test backfill — delivered 6 of 11 promised gaps + 1 stale-pin fix (testRustCrateCountIs22 22→23 surfaced by full-sweep,hidden by prior --filter runs)。 5 gaps DEFERRED to ch 926 + 1 fake-coverage test (testWalAutocheckpointIs1000 read separate raw sqlite3 connection → SQLite default 1000 → passed for wrong reason) | (no ABI) |
+| 九百二十五.5 (review) | 2026-05-24 | 3-agent 6th-pass「掘地三尺」 review of ch 924+925 | 4 NEW CRITICAL + 8 NEW HIGH + 3 NEW MED |
+| 九百二十六 | 2026-05-24 | Comprehensive fix-of-fix:CRITICAL-1 conditional UNIQUE index migration (replaced botched ch 924 NH5) + CRITICAL-2 BRANCH_SUMMARY+SEAL doc updates + CRITICAL-3 NEW pragma_value_i64 diagnostic FFI + CRITICAL-4 6 NEW Rust tests + 15 NEW Swift tests (panic-safety + schema migration + poison recovery + transactional rollback + real wal_autocheckpoint + busy_timeout + payload_blob/json caps + format=1 inverse coherence + bytes-form NaN guard + Inf/-Inf/-0 boundary) + HIGH-1 query_blob_len cap + HIGH-2 shared validateQueryBytes helper for both [UInt8] overloads + HIGH-3..5 doc fixes including ownership of fabricated commit numbers in ch 925 | ABI 17 → 18 |
 
 ## Architecture state at seal
 
@@ -343,3 +355,28 @@ wins validate the user's original architectural premise:
 magnitude when round-trip FFI hops can be collapsed**。
 
 Re-sealed at chapter 九百二十三 (post-4th-pass 最最严苛 review fix-sub-arc complete; 4 review passes total + 24 fix chapters). ✓
+
+**Final re-seal at chapter 九百二十六** (post-6th-pass「掘地三尺」
+review fix-of-fix; **6 review passes total** + **33 chapters in arc**)。
+The 6th pass found `4 CRITICAL + 8 HIGH + 3 MED` — confirming the
+N-pass cascade pattern but with diminishing-but-real returns each
+cycle:
+
+| Pass | CRITICAL | HIGH | Fix chapter |
+|---|---|---|---|
+| Pass 1 (ch 907 review) | 2 | 8 | ch 908 |
+| Pass 2 (ch 914.5) | 2 | 10 | ch 915-917 |
+| Pass 3 (ch 918.5) | 5 | 15 | ch 919-921 |
+| Pass 4 (ch 921.5) | 5 | 8 | ch 922-923 |
+| Pass 5 (5th-pass「掘地三尺」) | 1 | 5 | ch 924 |
+| Pass 6 (6th-pass「掘地三尺」 of ch 924+925) | 4 | 8 | ch 926 |
+
+Pattern observation: ch 924 itself introduced a NEW CRITICAL
+(duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%
+write-cost reduction promise) while attempting to FIX a CRITICAL
+— validating the「shoemaker's children」 pattern recurs at each
+review-fix layer。 Ch 926 explicitly BROKE the cascade by shipping
+ALL identified fixes in ONE comprehensive commit + OWNING the
+self-inflicted defects (including fabricated commit-message
+numbers in ch 925)。 If a 7th pass surfaces real items,that
+becomes its own cascade decision — not a foregone next-chapter。 ✓

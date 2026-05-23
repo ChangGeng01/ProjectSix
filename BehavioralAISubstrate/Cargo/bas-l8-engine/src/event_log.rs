@@ -85,20 +85,83 @@ CREATE INDEX IF NOT EXISTS event_log_session_time_idx
 -- so the「~20% write-cost reduction」 chapter 923 promised
 -- actually lands on upgraded DBs (not just fresh installs)。
 DROP INDEX IF EXISTS event_log_session_seq_idx;
--- chapter 九百二十四 / M3325 fix NH5:ensure the ch 919
--- UNIQUE(session_id, sequence_number) constraint applies
--- to existing DBs too。 The CREATE TABLE IF NOT EXISTS
--- only adds the constraint for NEW tables;upgraded DBs
--- need a separate UNIQUE INDEX to enforce the same
--- invariant。 If existing data has duplicates this will
--- fail (intentional — surface corruption instead of
--- silently degrading defense)。
-CREATE UNIQUE INDEX IF NOT EXISTS event_log_session_seq_uniq
-  ON event_log(session_id, sequence_number);
+-- chapter 九百二十六 / M3335 fix CRITICAL-1:the previous
+-- ch 924 NH5 fix unconditionally CREATEd a UNIQUE INDEX
+-- here even on fresh DBs — but the table-level UNIQUE
+-- constraint at line 61 auto-creates sqlite_autoindex_
+-- event_log_2 covering the same columns。 Fresh DBs ended
+-- up with TWO unique indexes,inverting the ch 923 ~20%
+-- write-cost-reduction promise。 The conditional migration
+-- now lives in `init_schema` (Rust) instead of being
+-- baked into this constant — see comment there。
 "#;
 
 pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(SCHEMA_EVENT_LOG)?;
+    migrate_unique_session_seq(conn)?;
+    Ok(())
+}
+
+/// chapter 九百二十六 / M3335 fix CRITICAL-1 — conditional
+/// migration for the explicit unique index that the ch 924
+/// NH5 fix tried (but botched) to ship。 Reads the table's
+/// own CREATE TABLE SQL from `sqlite_master`:
+///   - if it contains「UNIQUE(session_id, sequence_number)」
+///     (== created at or after ch 919) → DO NOTHING (the
+///     table-level constraint already auto-creates the
+///     equivalent index; adding another would be wasteful)
+///   - if it does NOT contain that phrase (== legacy pre-
+///     ch-919 schema) → CREATE the explicit unique index
+///     so the invariant is retroactively enforced
+///
+/// Idempotent on both fresh and legacy DBs。 Also DROPs the
+/// stale `event_log_session_seq_uniq` index if a previous
+/// (broken) ch 924 init had created it on a fresh DB —
+/// that's the cleanup path for anyone whose binary upgrade
+/// crossed the broken ch 924 → fixed ch 926 boundary。
+fn migrate_unique_session_seq(
+    conn: &Connection,
+) -> rusqlite::Result<()> {
+    let table_sql: Option<String> = conn.query_row(
+        "SELECT sql FROM sqlite_master
+         WHERE type='table' AND name='event_log'",
+        [],
+        |row| row.get(0),
+    ).ok();
+    let has_table_constraint = table_sql
+        .as_deref()
+        .map(|s| {
+            // case-insensitive substring; SQLite preserves
+            // original casing but defensive lowercasing
+            // covers any normalizer differences
+            let lower = s.to_lowercase();
+            lower.contains("unique(session_id, sequence_number)")
+                || lower.contains(
+                    "unique (session_id, sequence_number)")
+                || lower.contains(
+                    "unique(session_id,sequence_number)")
+        })
+        .unwrap_or(false);
+    if has_table_constraint {
+        // Fresh / post-ch-919 DB: drop the redundant
+        // explicit index if a buggy ch 924 binary added it。
+        conn.execute(
+            "DROP INDEX IF EXISTS event_log_session_seq_uniq",
+            [],
+        )?;
+    } else {
+        // Legacy pre-ch-919 DB: the table lacks the UNIQUE
+        // constraint at the schema level,so we add an
+        // explicit unique index to enforce it。 If existing
+        // data violates uniqueness this will fail loudly
+        // (intentional — surface corruption,don't hide it)。
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \
+             event_log_session_seq_uniq \
+             ON event_log(session_id, sequence_number)",
+            [],
+        )?;
+    }
     Ok(())
 }
 

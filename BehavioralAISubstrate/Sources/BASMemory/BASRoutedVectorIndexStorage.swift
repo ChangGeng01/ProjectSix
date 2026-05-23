@@ -40,6 +40,57 @@ public actor BASRoutedVectorIndexStorage {
     /// safe production bounds for top-k queries。
     public static let limitCap: Int = 100_000
 
+    /// chapter 九百二十六 / M3335 fix HIGH-2 — Swift-side
+    /// dim cap (matches Rust MAX_EMBEDDING_BYTES = 65_536
+    /// = 16384 × 4 bytes per f32)。 Surfaces the bound at
+    /// the Swift API boundary instead of relying on the
+    /// FFI to return -3 with no diagnostic。
+    public static let queryDimCap: Int = 16_384
+
+    /// chapter 九百二十六 / M3335 fix HIGH-2 — shared
+    /// validator for [UInt8] query bytes,used by both
+    /// `cosineTopK` and `cosineTopKWithSkipped` [UInt8]
+    /// overloads。 Decodes bytes as f32 LE,verifies dim
+    /// cap and NaN/Inf-freeness。 Without this both [UInt8]
+    /// overloads bypassed the ch 924 NH4 guard which only
+    /// covered the [Float] overload。
+    fileprivate static func validateQueryBytes(
+        _ bytes: [UInt8]
+    ) throws {
+        guard !bytes.isEmpty else {
+            throw StoreError.invalidArgument(
+                reason: "query bytes empty")
+        }
+        guard bytes.count % 4 == 0 else {
+            throw StoreError.invalidArgument(
+                reason: "query bytes length " +
+                "\(bytes.count) not divisible by 4")
+        }
+        let dim = bytes.count / 4
+        guard dim <= queryDimCap else {
+            throw StoreError.invalidArgument(
+                reason: "query dimension \(dim) exceeds " +
+                "cap \(queryDimCap) (matches Rust " +
+                "MAX_EMBEDDING_BYTES = \(queryDimCap * 4))")
+        }
+        // Decode + check NaN/Inf。 Per-element decode rather
+        // than withMemoryRebound to avoid alignment assumption
+        // on caller's [UInt8] storage。
+        for i in 0..<dim {
+            let start = i * 4
+            let f = Float(bitPattern: UInt32(bytes[start])
+                | (UInt32(bytes[start + 1]) << 8)
+                | (UInt32(bytes[start + 2]) << 16)
+                | (UInt32(bytes[start + 3]) << 24))
+            guard f.isFinite else {
+                throw StoreError.invalidArgument(
+                    reason: "query bytes contain non-finite " +
+                    "value at index \(i) (NaN or Inf — would " +
+                    "corrupt cosine scores)")
+            }
+        }
+    }
+
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
 
@@ -273,6 +324,11 @@ public actor BASRoutedVectorIndexStorage {
             throw StoreError.invalidArgument(
                 reason: "k must be in 1...\(Self.limitCap), got \(k)")
         }
+        // chapter 九百二十六 / M3335 fix HIGH-2:Swift-side
+        // dim cap + NaN/Inf guard for the [UInt8] overload
+        // — ch 924 NH4 added these only to the [Float]
+        // overload,leaving direct-bytes callers unprotected。
+        try Self.validateQueryBytes(queryBytes)
         let dom = Array(domain.utf8)
         var rowids = [Int64](repeating: 0, count: k)
         var scores = [Float](repeating: 0, count: k)
@@ -330,12 +386,15 @@ public actor BASRoutedVectorIndexStorage {
         k: Int
     ) async throws -> [(rowid: Int64, score: Float)] {
         // Bound query dimension — same cap as stored
-        // embeddings to prevent OOM via huge Vec allocation
-        guard query.count <= 16_384 else {
+        // embeddings to prevent OOM via huge Vec allocation。
+        // chapter 九百二十六 / M3335 fix HIGH-2:use shared
+        // `queryDimCap` constant (was magic 16_384 here)。
+        guard query.count <= Self.queryDimCap else {
             throw StoreError.invalidArgument(
                 reason: "query dimension \(query.count) " +
-                "exceeds cap 16384 (4 bytes × 16K floats = " +
-                "64 KB,matching stored embedding cap)")
+                "exceeds cap \(Self.queryDimCap) " +
+                "(4 bytes × \(Self.queryDimCap / 1024)K " +
+                "floats,matching stored embedding cap)")
         }
         // Reject NaN/Inf — chapter 918 NaN filter on the
         // Rust side would silently drop every row otherwise
@@ -370,6 +429,10 @@ public actor BASRoutedVectorIndexStorage {
             throw StoreError.invalidArgument(
                 reason: "k must be in 1...\(Self.limitCap), got \(k)")
         }
+        // chapter 九百二十六 / M3335 fix HIGH-2:see overload
+        // above — same dim-cap + NaN guard,extracted into
+        // a shared helper to avoid drift between siblings。
+        try Self.validateQueryBytes(queryBytes)
         let dom = Array(domain.utf8)
         var rowids = [Int64](repeating: 0, count: k)
         var scores = [Float](repeating: 0, count: k)

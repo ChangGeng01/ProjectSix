@@ -143,7 +143,13 @@ pub mod host_constitution_vault;
 ///   - 17 = chapter 九百十三 / M3270 (+host_constitution_vault.
 ///          all_metadata — hot-path consolidation #4,
 ///          completes the pattern across all 4 major stores)
-const ABI_VERSION: i32 = 17;
+///   - 18 = chapter 九百二十六 / M3335 (+bas_l8_engine_pragma_
+///          value_i64 — diagnostic FFI required by 6th-pass
+///          review fix CRITICAL-3:enables tests to verify
+///          PRAGMA values were actually applied on the
+///          engine's OWN connection,not a separate raw
+///          sqlite3 connection that returns SQLite defaults)
+const ABI_VERSION: i32 = 18;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -392,6 +398,56 @@ pub unsafe extern "C" fn bas_l8_engine_db_path(
 /// - `ptr.is_null()` with `len > 0` → `None` (contract violation)
 /// - Valid UTF-8 → `Some(s)`
 /// - Invalid UTF-8 → `None`
+/// chapter 九百二十六 / M3335 fix CRITICAL-3 — diagnostic
+/// FFI helper that reads a PRAGMA value from the engine's
+/// OWN connection。 The ch 925 `testWalAutocheckpointIs1000`
+/// test opened a separate raw sqlite3 connection and read
+/// the PRAGMA there — but PRAGMA wal_autocheckpoint is
+/// per-connection (SQLite's compile-time default is 1000),
+/// so the test passed even if the ch 920 fix were reverted。
+///
+/// This helper enables tests to verify PRAGMA values that
+/// were actually applied on the engine's connection。 Returns:
+///   -1 → null engine
+///   -3 → null name or invalid UTF-8
+///   -2 → SQLite error
+///   ≥0 → the PRAGMA's integer value
+///
+/// SAFETY:caller must pass valid pointers + lengths。
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_engine_pragma_value_i64(
+    engine: *const L8Engine,
+    name_utf8: *const c_char,
+    name_len: usize,
+) -> i64 {
+    if engine.is_null() { return -1; }
+    let name = match cstr_to_str(name_utf8, name_len) {
+        Some(s) => s,
+        None => return -3,
+    };
+    // Whitelist of pragmas we expose for test diagnostics。
+    // Restricted to integer pragmas with no side effects。
+    let allowed = ["wal_autocheckpoint", "busy_timeout",
+        "synchronous", "journal_size_limit", "page_size",
+        "cache_size", "user_version", "max_page_count"];
+    if !allowed.contains(&name) {
+        return -3;
+    }
+    let engine_ref = unsafe { &*engine };
+    let val: Result<i64, rusqlite::Error> =
+        engine_ref.with_conn(|conn| {
+            conn.query_row(
+                &format!("PRAGMA {}", name),
+                [],
+                |row| row.get(0),
+            )
+        });
+    match val {
+        Ok(v) => v,
+        Err(_) => -2,
+    }
+}
+
 pub(crate) fn cstr_to_str<'a>(
     ptr: *const c_char,
     len: usize,
@@ -565,7 +621,11 @@ mod tests {
         //            skipped (arc seal,surfaces dim-mismatch).
         // 911: 15→16 records.recent_for_atom hot-path #3.
         // 913: 16→17 vault.all_metadata hot-path #4.
-        assert_eq!(bas_l8_engine_abi_version(), 17);
+        // 926: 17→18 +bas_l8_engine_pragma_value_i64
+        //            (diagnostic FFI per 6th-pass review CRITICAL-3
+        //             — enables real wal_autocheckpoint test
+        //             that doesn't open separate raw connection).
+        assert_eq!(bas_l8_engine_abi_version(), 18);
     }
 
     #[test]
@@ -926,5 +986,367 @@ mod tests {
             "SQLite count matches successful appends");
 
         unsafe { bas_l8_engine_close(engine_ptr); }
+    }
+
+    // chapter 九百二十六 / M3335 fix CRITICAL-4 — panic-safety
+    // regression guard for the ch 924 NC1 TxGuard RAII fix。
+    //
+    // Without the guard:a closure that panics between
+    // `BEGIN IMMEDIATE` and `COMMIT` leaves the connection
+    // in transactional state forever。 With the guard:Drop
+    // runs during unwind and ROLLBACK fires。 The next
+    // `transactional` call on the same connection must be
+    // able to BEGIN IMMEDIATE again。
+    //
+    // Test strategy:
+    //  1. Open in-memory engine + init event_log schema
+    //  2. Call `transactional(conn, |conn| { panic!() })`
+    //     inside catch_unwind — guard's Drop must fire
+    //  3. Call `transactional(conn, |conn| { Ok(...) })`
+    //     immediately after — must succeed (engine not wedged)
+    //
+    // Without TxGuard the third step would fail with
+    // "cannot start a transaction within a transaction"。
+    //
+    // NOTE: Cargo.toml release profile uses panic=abort,so
+    // this test only validates DEBUG semantics。 But Drop is
+    // the intended correctness guarantor even in release —
+    // we just can't observe it via panic in release builds。
+    #[test]
+    fn tx_guard_rollback_on_panic_unwinds_cleanly() {
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        assert!(!engine.is_null());
+        let init_rc = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_init_schema(engine)
+        };
+        assert_eq!(init_rc, 0);
+        let engine_ref = unsafe { &*engine };
+
+        // Step 1: cause a panic INSIDE transactional body
+        let panic_result = catch_unwind(AssertUnwindSafe(|| {
+            let _: rusqlite::Result<i64> = engine_ref
+                .with_conn(|conn| {
+                    transactional(conn, |_inner_conn| {
+                        panic!("intentional panic mid-tx");
+                    })
+                });
+        }));
+        assert!(panic_result.is_err(),
+            "panic must propagate out of transactional");
+
+        // Step 2: next transactional must succeed (engine
+        // not wedged in BEGIN-without-COMMIT state)。 If
+        // TxGuard Drop didn't fire,this would fail with
+        // "cannot start a transaction within a transaction"。
+        let recovery_result: rusqlite::Result<i64> =
+            engine_ref.with_conn(|conn| {
+                transactional(conn, |c2| {
+                    c2.query_row(
+                        "SELECT 42", [], |r| r.get(0))
+                })
+            });
+        assert_eq!(recovery_result.unwrap(), 42,
+            "engine must not be wedged after panicking tx");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百二十六 / M3335 fix CRITICAL-1 regression
+    // guard — verify the conditional UNIQUE index migration
+    // produces correct index count on fresh AND legacy DBs。
+    //
+    // Fresh DB: SCHEMA_EVENT_LOG creates table with
+    // UNIQUE(session_id, sequence_number) at line 61。 SQLite
+    // auto-creates sqlite_autoindex_event_log_2 for it。 The
+    // migration sees the UNIQUE in table SQL → does NOT
+    // create explicit `event_log_session_seq_uniq` → only
+    // 1 unique index on those columns。
+    //
+    // The ch 924 broken behavior would create BOTH (auto +
+    // explicit) on fresh DBs,inflating write cost。
+    #[test]
+    fn fresh_db_has_exactly_one_unique_on_session_seq() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        let init_rc = unsafe {
+            crate::event_log
+                ::bas_l8_event_log_init_schema(engine)
+        };
+        assert_eq!(init_rc, 0);
+        let engine_ref = unsafe { &*engine };
+
+        // Count unique indexes on event_log(session_id,
+        // sequence_number)。 We query sqlite_master + filter
+        // index_list to find UNIQUE indexes spanning exactly
+        // those two columns。
+        let count: i64 = engine_ref.with_conn(|conn| {
+            // Get all indexes for event_log
+            let mut stmt = conn.prepare(
+                "SELECT name FROM sqlite_master \
+                 WHERE type='index' AND tbl_name='event_log'")?;
+            let names: Vec<String> = stmt
+                .query_map([], |r| r.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            // Count UNIQUE indexes where the columns are
+            // exactly [session_id, sequence_number] in order
+            let mut count: i64 = 0;
+            for name in &names {
+                // Skip non-unique indexes
+                let info_q = format!(
+                    "PRAGMA index_info('{}')", name);
+                let list_q = format!(
+                    "PRAGMA index_list('event_log')");
+                // Check unique flag
+                let mut unique_stmt = conn.prepare(&list_q)?;
+                let is_unique: bool = unique_stmt
+                    .query_map([], |r| Ok((
+                        r.get::<_, String>(1)?,
+                        r.get::<_, i64>(2)? != 0)))?
+                    .filter_map(|r| r.ok())
+                    .find(|(n, _)| n == name)
+                    .map(|(_, u)| u)
+                    .unwrap_or(false);
+                if !is_unique { continue; }
+                // Check columns are exactly [session_id,
+                // sequence_number]
+                let mut info_stmt = conn.prepare(&info_q)?;
+                let cols: Vec<String> = info_stmt
+                    .query_map([], |r| r.get::<_, String>(2))?
+                    .filter_map(|r| r.ok())
+                    .collect();
+                if cols == vec!["session_id".to_string(),
+                    "sequence_number".to_string()] {
+                    count += 1;
+                }
+            }
+            Ok::<i64, rusqlite::Error>(count)
+        }).unwrap();
+
+        assert_eq!(count, 1,
+            "fresh DB must have EXACTLY 1 unique index on \
+             (session_id, sequence_number) — auto-index from \
+             table-level UNIQUE constraint。 ch 926 fixed the \
+             ch 924 bug that created 2 (auto + explicit)");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百二十六 / M3335 — verify the diagnostic PRAGMA
+    // helper reads the engine's OWN connection (not a fresh
+    // connection that gets SQLite's compile-time default)。
+    //
+    // ch 920 set wal_autocheckpoint=1000 on the engine's
+    // connection。 ch 925's fake test opened a separate raw
+    // sqlite3 connection (default 1000) so the assertion
+    // passed for the wrong reason。 This test reads from the
+    // engine's OWN connection via the new FFI helper。
+    #[test]
+    fn pragma_value_helper_reads_engine_connection() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().to_str().unwrap();
+        let path_bytes = path.as_bytes();
+        let engine = unsafe {
+            bas_l8_engine_init(
+                path_bytes.as_ptr() as *const c_char,
+                path_bytes.len())
+        };
+        let name = "wal_autocheckpoint";
+        let name_bytes = name.as_bytes();
+        let value = unsafe {
+            bas_l8_engine_pragma_value_i64(
+                engine,
+                name_bytes.as_ptr() as *const c_char,
+                name_bytes.len())
+        };
+        // ch 920 PRAGMA wal_autocheckpoint=1000 was set on
+        // engine init。 This value must come from the engine's
+        // own connection,not a fresh raw connection。 Even
+        // though SQLite default is also 1000,exercising the
+        // pragma_value helper proves the test path works for
+        // future PRAGMA value asserts that DO differ from default。
+        assert_eq!(value, 1000,
+            "wal_autocheckpoint must be 1000 on engine \
+             connection (ch 920 fix verified via diagnostic FFI)");
+
+        // Also verify busy_timeout (ch 922 NC2 fix) — this
+        // one DIFFERS from SQLite's default (0)。 So if the
+        // helper accidentally read a fresh connection,this
+        // assertion would catch it。
+        let busy_name = "busy_timeout";
+        let busy_bytes = busy_name.as_bytes();
+        let busy = unsafe {
+            bas_l8_engine_pragma_value_i64(
+                engine,
+                busy_bytes.as_ptr() as *const c_char,
+                busy_bytes.len())
+        };
+        assert_eq!(busy, 5000,
+            "busy_timeout must be 5000 ms on engine \
+             connection (ch 922 NC2 fix — SQLite default is 0)");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百二十六 / M3335 fix CRITICAL-4 (NH1 schema
+    // migration regression guard) — verify the conditional
+    // migration adds the explicit unique index to a LEGACY
+    // pre-ch-919 DB that lacks the table-level UNIQUE。
+    //
+    // Strategy: create a connection,manually create the
+    // event_log table with the PRE-ch-919 schema (no UNIQUE
+    // constraint),then call init_schema and verify the
+    // explicit index got added。
+    #[test]
+    fn legacy_db_gets_explicit_unique_index_added() {
+        let conn = rusqlite::Connection::open_in_memory()
+            .unwrap();
+        // Pre-ch-919 schema: no UNIQUE constraint
+        conn.execute_batch(r#"
+            CREATE TABLE event_log (
+                event_id TEXT PRIMARY KEY NOT NULL,
+                session_id TEXT NOT NULL,
+                sequence_number INTEGER NOT NULL,
+                timestamp_ms INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                risk_band TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                payload_format INTEGER NOT NULL DEFAULT 1,
+                payload_blob BLOB
+            );
+        "#).unwrap();
+        // Verify pre-state: no explicit unique index yet
+        let pre_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master \
+             WHERE type='index' \
+               AND name='event_log_session_seq_uniq'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(pre_count, 0,
+            "legacy DB starts without explicit unique index");
+
+        // Run init_schema (which runs the migration)
+        crate::event_log::init_schema(&conn).unwrap();
+
+        // Post-state: explicit unique index MUST exist
+        let post_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master \
+             WHERE type='index' \
+               AND name='event_log_session_seq_uniq'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(post_count, 1,
+            "legacy DB migration must create \
+             event_log_session_seq_uniq explicit index");
+
+        // Verify uniqueness is now enforced: insert two
+        // rows with same (session_id, sequence_number)
+        // — the second must fail with constraint error
+        conn.execute(
+            "INSERT INTO event_log (event_id, session_id, \
+             sequence_number, timestamp_ms, kind, risk_band, \
+             payload_json) VALUES \
+             ('e1', 's1', 0, 100, 'k', 'low', '{}')",
+            [],
+        ).unwrap();
+        let err = conn.execute(
+            "INSERT INTO event_log (event_id, session_id, \
+             sequence_number, timestamp_ms, kind, risk_band, \
+             payload_json) VALUES \
+             ('e2', 's1', 0, 200, 'k', 'low', '{}')",
+            [],
+        );
+        assert!(err.is_err(),
+            "duplicate (session_id, sequence_number) must \
+             be rejected after migration");
+    }
+
+    // chapter 九百二十六 / M3335 — explicit Mutex poison recovery
+    // regression guard for ch 919 C5 fix。
+    //
+    // The `tx_guard_rollback_on_panic` test above implicitly
+    // exercises this (panic poisons mutex,subsequent with_conn
+    // must succeed),but this test is SCOPED to the C5 fix
+    // alone — no transactional semantics involved。 If someone
+    // reverts the `.unwrap_or_else(|p| p.into_inner())` back to
+    // `.unwrap()`,this test fails while tx_guard_rollback might
+    // still pass for unrelated reasons。
+    #[test]
+    fn mutex_poison_recovery_keeps_engine_usable() {
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0)
+        };
+        let engine_ref = unsafe { &*engine };
+
+        // Trigger a panic while the mutex is held — poisons it
+        let panic_result = catch_unwind(AssertUnwindSafe(|| {
+            let _: i64 = engine_ref.with_conn(|_conn| {
+                panic!("intentional panic inside with_conn");
+            });
+        }));
+        assert!(panic_result.is_err());
+
+        // Next with_conn MUST succeed (poison recovery via
+        // into_inner)。 If C5 were reverted,this would panic
+        // with PoisonError unwrap。
+        let value: i64 = engine_ref.with_conn(|conn| {
+            conn.query_row("SELECT 7", [], |r| r.get(0))
+                .unwrap_or(-1)
+        });
+        assert_eq!(value, 7,
+            "with_conn must succeed after mutex poison \
+             (ch 919 C5 fix unwrap_or_else(into_inner))");
+
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百二十六 / M3335 — explicit transactional rollback
+    // test for ch 922 NC1 fix。 The `tx_guard_rollback_on_panic`
+    // test covers the panic-unwind path,but the Err-return
+    // path of the closure also needs a regression guard。
+    #[test]
+    fn transactional_rolls_back_on_err_return() {
+        let conn = rusqlite::Connection::open_in_memory()
+            .unwrap();
+        conn.execute_batch(
+            "CREATE TABLE t (id INT PRIMARY KEY, v INT);"
+        ).unwrap();
+        conn.execute("INSERT INTO t VALUES (1, 100)", [])
+            .unwrap();
+
+        // Body that inserts a row,then returns Err — must
+        // rollback so the insert does NOT persist
+        let result: rusqlite::Result<()> = transactional(
+            &conn,
+            |c| {
+                c.execute("INSERT INTO t VALUES (2, 200)", [])?;
+                Err(rusqlite::Error::QueryReturnedNoRows)
+            });
+        assert!(result.is_err());
+
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM t", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1,
+            "transactional must ROLLBACK on Err return — \
+             without ch 922 NC1 fix the INSERT 2,200 would \
+             persist as a non-transactional partial write");
+
+        // Verify next transactional still works (engine
+        // not wedged in BEGIN-without-COMMIT state)
+        let success: rusqlite::Result<i64> = transactional(
+            &conn,
+            |c| c.query_row("SELECT 99", [], |r| r.get(0)));
+        assert_eq!(success.unwrap(), 99);
     }
 }
