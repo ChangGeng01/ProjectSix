@@ -45,6 +45,8 @@ public actor BASRoutedMemoryUsageRecordsStore {
         case helpedStateReadFailed(code: Int32)
         /// chapter 九百十八 / M3295 fix
         case invalidArgument(reason: String)
+        /// chapter 九百十九 / M3300 CRITICAL fix C1
+        case readFailed(code: Int32)
     }
 
     /// chapter 九百十八 / M3295 fix:upper bound on limit
@@ -281,7 +283,8 @@ public actor BASRoutedMemoryUsageRecordsStore {
             }
         }
         guard n >= 0 else {
-            throw StoreError.upsertFailed(code: n)
+            // chapter 九百十九 / M3300 fix C1 — this is a READ
+            throw StoreError.readFailed(code: n)
         }
         var out: [(timestampMs: Int64, helped: String)] = []
         out.reserveCapacity(Int(n))

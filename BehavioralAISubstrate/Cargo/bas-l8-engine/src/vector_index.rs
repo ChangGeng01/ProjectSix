@@ -48,11 +48,13 @@ pub fn upsert_entry(
     domain: &str,
     metadata_json: &str,
 ) -> rusqlite::Result<bool> {
+    // chapter 九百十九 / M3300 CRITICAL fix C3 (vector_index)
+    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
     let existed: bool = conn.query_row(
         "SELECT 1 FROM vector_index WHERE atom_id = ? LIMIT 1",
         params![atom_id], |_| Ok(true),
     ).unwrap_or(false);
-    conn.execute(
+    let insert_result = conn.execute(
         "INSERT OR REPLACE INTO vector_index (
             atom_id, dimension, provider_version,
             embedding_blob, domain, metadata_json
@@ -61,8 +63,17 @@ pub fn upsert_entry(
             atom_id, dimension, provider_version,
             embedding_blob, domain, metadata_json,
         ],
-    )?;
-    Ok(!existed)
+    );
+    match insert_result {
+        Ok(_) => {
+            conn.execute("COMMIT", [])?;
+            Ok(!existed)
+        }
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", []);
+            Err(e)
+        }
+    }
 }
 
 pub fn remove_entry(

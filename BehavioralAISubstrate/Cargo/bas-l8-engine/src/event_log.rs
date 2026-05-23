@@ -53,7 +53,12 @@ CREATE TABLE IF NOT EXISTS event_log (
     risk_band TEXT NOT NULL,
     payload_json TEXT NOT NULL,
     payload_format INTEGER NOT NULL DEFAULT 1,
-    payload_blob BLOB
+    payload_blob BLOB,
+    -- chapter 九百十九 / M3300 CRITICAL fix C4:enforce
+    -- per-session sequence uniqueness at the schema level
+    -- so multi-engine race conditions surface as constraint
+    -- failures instead of silently writing duplicate seqs
+    UNIQUE(session_id, sequence_number)
 );
 CREATE INDEX IF NOT EXISTS event_log_session_seq_idx
   ON event_log(session_id, sequence_number);
@@ -115,14 +120,23 @@ pub fn append_event(
     payload_format: i32,
     payload_blob: Option<&[u8]>,
 ) -> rusqlite::Result<(bool, i64)> {
+    // chapter 九百十九 / M3300 CRITICAL fix C4:wrap the
+    // 3-statement chain (idempotent-check + MAX-sequence +
+    // INSERT) in BEGIN IMMEDIATE so multi-engine race
+    // conditions can't produce duplicate sequence numbers。
+    // The UNIQUE(session_id, sequence_number) constraint
+    // (schema fix) catches any race that slips through,but
+    // the transaction is the primary defense。
+    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
     // Idempotent retry: if event_id exists, return existing seq
     if let Some(existing_seq) = fetch_existing_sequence(
         conn, event_id)?
     {
+        conn.execute("COMMIT", [])?;
         return Ok((false, existing_seq));
     }
     let assigned = next_sequence_number(conn, session_id)?;
-    conn.execute(
+    let insert_result = conn.execute(
         "INSERT INTO event_log (
             event_id, session_id, sequence_number,
             timestamp_ms, kind, risk_band, payload_json,
@@ -133,8 +147,17 @@ pub fn append_event(
             timestamp_ms, kind, risk_band, payload_json,
             payload_format, payload_blob,
         ],
-    )?;
-    Ok((true, assigned))
+    );
+    match insert_result {
+        Ok(_) => {
+            conn.execute("COMMIT", [])?;
+            Ok((true, assigned))
+        }
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", []);
+            Err(e)
+        }
+    }
 }
 
 pub fn count_events(

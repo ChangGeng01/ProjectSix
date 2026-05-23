@@ -39,6 +39,8 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         case pruneFailed(code: Int64)
         /// chapter 九百十八 / M3295 fix
         case invalidArgument(reason: String)
+        /// chapter 九百十九 / M3300 CRITICAL fix C1
+        case readFailed(code: Int32)
     }
 
     /// chapter 九百十八 / M3295 fix:upper bound on limit
@@ -269,7 +271,11 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
             }
         }
         guard n >= 0 else {
-            throw StoreError.appendFailed(code: Int64(n))
+            // chapter 九百十九 / M3300 CRITICAL fix C1:
+            // this is a READ path,not an append。 The
+            // misleading `.appendFailed` previously triggered
+            // wrong catch-by-case logic in consumers。
+            throw StoreError.readFailed(code: n)
         }
         var out: [(timestampMs: Int64, seq: Int64)] = []
         out.reserveCapacity(Int(n))

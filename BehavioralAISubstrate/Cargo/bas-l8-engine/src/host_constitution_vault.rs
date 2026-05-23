@@ -82,13 +82,15 @@ pub fn upsert_vault(
     last_updated_at_ms: i64,
     payload_json: &str,
 ) -> rusqlite::Result<bool> {
+    // chapter 九百十九 / M3300 CRITICAL fix C3 (vault)
+    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
     let existed: bool = conn.query_row(
         "SELECT 1 FROM host_constitution_vaults
          WHERE vault_id = ? LIMIT 1",
         params![vault_id],
         |_| Ok(true),
     ).unwrap_or(false);
-    conn.execute(
+    let insert_result = conn.execute(
         "INSERT INTO host_constitution_vaults (
             vault_id, host_id, constitution_id,
             active_version, schema_version,
@@ -108,8 +110,17 @@ pub fn upsert_vault(
             active_version, schema_version,
             version_signature, last_updated_at_ms,
             payload_json],
-    )?;
-    Ok(!existed)
+    );
+    match insert_result {
+        Ok(_) => {
+            conn.execute("COMMIT", [])?;
+            Ok(!existed)
+        }
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", []);
+            Err(e)
+        }
+    }
 }
 
 /// Returns the payload_json for a vault_id,or None if absent。

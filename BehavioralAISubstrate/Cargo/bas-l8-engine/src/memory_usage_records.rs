@@ -99,15 +99,23 @@ pub fn upsert_record(
     permit_mode: &str,
     helped_state: &str,
 ) -> rusqlite::Result<bool> {
-    // Pre-check existence to mirror Swift wasNew-on-insert
-    // semantics (Swift insert/upsert distinction)。
+    // chapter 九百十九 / M3300 CRITICAL fix C3:wrap the
+    // pre-check + INSERT chain in BEGIN IMMEDIATE so that
+    // multi-engine race conditions on the same DB file
+    // can't produce「both callers see wasNew=true」 from a
+    // concurrent pre-check race。 Within a single engine
+    // the outer Mutex<Connection> already serializes,but
+    // the RFC explicitly supports multi-engine (lib.rs:36-38)
+    // and the only defense against cross-engine races is
+    // SQLite's transaction layer。
+    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
     let existed: bool = conn.query_row(
         "SELECT 1 FROM memory_usage_records
          WHERE record_id = ? LIMIT 1",
         params![record_id],
         |_| Ok(true),
     ).unwrap_or(false);
-    conn.execute(
+    let insert_result = conn.execute(
         "INSERT INTO memory_usage_records (
             record_id, atom_id, retrieved_at_ms,
             session_ref, turn_ref, permit_mode, helped_state
@@ -117,8 +125,17 @@ pub fn upsert_record(
         params![
             record_id, atom_id, retrieved_at_ms,
             session_ref, turn_ref, permit_mode, helped_state],
-    )?;
-    Ok(!existed)
+    );
+    match insert_result {
+        Ok(_) => {
+            conn.execute("COMMIT", [])?;
+            Ok(!existed)
+        }
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", []);
+            Err(e)
+        }
+    }
 }
 
 pub fn count_records(

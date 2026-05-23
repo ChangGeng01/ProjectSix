@@ -24,6 +24,13 @@ public actor BASRoutedVectorIndexStorage {
         /// instead of `precondition` (which aborts the
         /// process in release builds)。
         case invalidArgument(reason: String)
+        /// chapter 九百十九 / M3300 CRITICAL fix C1:read
+        /// operations (cosineTopK,readEmbeddingBytes) now
+        /// throw `.readFailed` instead of misleading
+        /// `.upsertFailed`,which previously triggered
+        /// rollback logic in consumer catch-by-case handlers
+        /// for a read that had no transaction to roll back。
+        case readFailed(code: Int32)
     }
 
     /// chapter 九百十八 / M3295 fix:upper bound on k/limit
@@ -220,7 +227,7 @@ public actor BASRoutedVectorIndexStorage {
         }
         if needed == -2 { return nil }
         if needed < 0 {
-            throw StoreError.upsertFailed(code: needed)
+            throw StoreError.readFailed(code: needed)
         }
         if needed == 0 { return [] }
         var outBuf = [UInt8](repeating: 0, count: Int(needed))
@@ -238,7 +245,7 @@ public actor BASRoutedVectorIndexStorage {
             }
         }
         guard written == needed else {
-            throw StoreError.upsertFailed(code: written)
+            throw StoreError.readFailed(code: written)
         }
         return outBuf
     }
@@ -288,7 +295,7 @@ public actor BASRoutedVectorIndexStorage {
             }
         }
         guard n >= 0 else {
-            throw StoreError.upsertFailed(code: n)
+            throw StoreError.readFailed(code: n)
         }
         var out: [(rowid: Int64, score: Float)] = []
         out.reserveCapacity(Int(n))
@@ -337,7 +344,7 @@ public actor BASRoutedVectorIndexStorage {
             }
         }
         guard n >= 0 else {
-            throw StoreError.upsertFailed(code: n)
+            throw StoreError.readFailed(code: n)
         }
         var out: [(rowid: Int64, score: Float)] = []
         out.reserveCapacity(Int(n))

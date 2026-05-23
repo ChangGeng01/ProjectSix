@@ -192,11 +192,24 @@ impl L8Engine {
 
     /// Access the connection under the mutex (subsequent
     /// chapter migration functions use this)。
+    ///
+    /// chapter 九百十九 / M3300 CRITICAL fix C5:recover from
+    /// `PoisonError` instead of `.unwrap()` (which panics)。
+    /// Previously,a single rusqlite panic between statements
+    /// would poison the Mutex,then every subsequent FFI call
+    /// would panic on `.unwrap()` — engine wedged forever
+    /// until process restart (no recovery path,deinit only
+    /// runs at app exit)。 With `unwrap_or_else(|p| p.into_
+    /// inner())` we accept the poisoned state and continue
+    /// — the underlying SQLite Connection is generally
+    /// recoverable;rusqlite handles statement-level errors
+    /// internally。
     pub fn with_conn<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&Connection) -> R,
     {
-        let guard = self.conn.lock().unwrap();
+        let guard = self.conn.lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         f(&guard)
     }
 

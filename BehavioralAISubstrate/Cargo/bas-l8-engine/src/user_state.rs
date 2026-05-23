@@ -42,23 +42,33 @@ pub fn append_state(
     generated_at_ms: i64,
     payload_json: &str,
 ) -> rusqlite::Result<bool> {
-    // Pre-check existence to match Swift idempotency semantics
-    // (returns false on duplicate,doesn't throw)。
+    // chapter 九百十九 / M3300 CRITICAL fix C3 (user_state)
+    conn.execute("BEGIN IMMEDIATE TRANSACTION", [])?;
     let exists: bool = conn.query_row(
         "SELECT 1 FROM user_states WHERE state_id = ? LIMIT 1",
         params![state_id],
         |_| Ok(true),
     ).unwrap_or(false);
     if exists {
+        conn.execute("COMMIT", [])?;
         return Ok(false);
     }
-    conn.execute(
+    let insert_result = conn.execute(
         "INSERT INTO user_states (
             state_id, session_id, generated_at_ms, payload_json
          ) VALUES (?, ?, ?, ?)",
         params![state_id, session_id, generated_at_ms, payload_json],
-    )?;
-    Ok(true)
+    );
+    match insert_result {
+        Ok(_) => {
+            conn.execute("COMMIT", [])?;
+            Ok(true)
+        }
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", []);
+            Err(e)
+        }
+    }
 }
 
 pub fn count_states(

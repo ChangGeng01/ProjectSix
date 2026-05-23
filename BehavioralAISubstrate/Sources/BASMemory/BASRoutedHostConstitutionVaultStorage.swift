@@ -41,6 +41,8 @@ public actor BASRoutedHostConstitutionVaultStorage {
         case payloadDecodeFailed(reason: String)
         /// chapter 九百十八 / M3295 fix
         case invalidArgument(reason: String)
+        /// chapter 九百十九 / M3300 CRITICAL fix C1
+        case readFailed(code: Int32)
     }
 
     /// chapter 九百十八 / M3295 fix:upper bound on limit
@@ -88,9 +90,19 @@ public actor BASRoutedHostConstitutionVaultStorage {
         _ vault: BASHostConstitutionVault
     ) async throws -> Bool {
         // Apple boundary:JSONEncoder
+        // chapter 九百十九 / M3300 CRITICAL fix C2:enforce
+        // `.sortedKeys` so payload bytes are deterministic
+        // across runs。 Previously this bridge was the ONLY
+        // outlier among 4 vault-style bridges (event_log,
+        // user_state, host_constitution_recording all use
+        // sortedKeys)。 Non-deterministic key order breaks
+        // any content-hash work — including future signing
+        // or replication checks that compare payload bytes。
         let json: String
         do {
-            let data = try JSONEncoder().encode(vault)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(vault)
             guard let s = String(data: data, encoding: .utf8)
             else {
                 throw StoreError.payloadEncodeFailed(
@@ -374,7 +386,8 @@ public actor BASRoutedHostConstitutionVaultStorage {
             }
         }
         guard n >= 0 else {
-            throw StoreError.deleteFailed(code: n)
+            // chapter 九百十九 / M3300 fix C1 — this is a READ
+            throw StoreError.readFailed(code: n)
         }
         var out: [(rowid: Int64, lastUpdatedAtMs: Int64)] = []
         out.reserveCapacity(Int(n))
