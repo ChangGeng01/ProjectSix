@@ -125,7 +125,10 @@ pub mod host_constitution_vault;
 ///   - 11 = chapter 九百三 / M3215 (+host_constitution_vault module:
 ///          init_schema + upsert + payload_for_id + first_payload_
 ///          for_host + delete + count + count_for_host)
-const ABI_VERSION: i32 = 11;
+///   - 12 = chapter 九百四 / M3220 (+memory_usage_records.update_
+///          helped_state — markHelped UPDATE-only primitive that
+///          does NOT insert placeholder rows on unknown record_id)
+const ABI_VERSION: i32 = 12;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -337,7 +340,8 @@ mod tests {
         // 902.5: 8→9 memory_usage_logs (replay+audit append-only).
         // 902.6: 9→10 memory_usage_extras (notes+bundles+tombstones).
         // 903: 10→11 host_constitution_vault (HIGH-risk #3 final).
-        assert_eq!(bas_l8_engine_abi_version(), 11);
+        // 904: 11→12 records.update_helped_state for markHelped.
+        assert_eq!(bas_l8_engine_abi_version(), 12);
     }
 
     #[test]

@@ -1667,6 +1667,16 @@ int32_t bas_l8_memory_usage_records_helped_state_for_record(
     const char* record_id_utf8, size_t record_id_len,
     uint8_t* out_buf, size_t out_capacity);
 
+// UPDATE only helped_state for existing record_id (markHelped
+// primitive — never inserts placeholder rows). Returns:
+//   1 → row updated
+//   0 → record_id unknown
+//   -1 null engine, -2 SQLite error, -3 UTF-8 decode failure.
+int32_t bas_l8_memory_usage_records_update_helped_state(
+    const L8Engine* engine,
+    const char* record_id_utf8, size_t record_id_len,
+    const char* helped_state_utf8, size_t helped_state_len);
+
 // MARK: - bas-l8-engine memory_usage_logs module
 // (chapter 九百二.5 / M3205 — replay_log + audit_log
 //  sub-chapter for MemoryUsageTracker, append-only tables)

@@ -149,6 +149,25 @@ pub fn count_for_session(
         params![session_ref], |row| row.get(0))
 }
 
+/// UPDATE only the helped_state column for an existing record。
+/// Returns Ok(true) if a row was updated,Ok(false) if record_id
+/// is unknown (does NOT insert a placeholder row)。 This is the
+/// markHelped primitive — distinct from upsert_record because
+/// markHelped pre-checks existence and only writes one column。
+pub fn update_helped_state(
+    conn: &Connection,
+    record_id: &str,
+    helped_state: &str,
+) -> rusqlite::Result<bool> {
+    let n = conn.execute(
+        "UPDATE memory_usage_records
+         SET helped_state = ?
+         WHERE record_id = ?",
+        params![helped_state, record_id],
+    )?;
+    Ok(n > 0)
+}
+
 /// Returns the current `helped_state` for the given record_id,
 /// or None if the record_id is unknown。 Used by tests to verify
 /// markHelped UPSERT semantics propagate through Rust。
@@ -229,6 +248,40 @@ bas_l8_memory_usage_records_upsert(
         match upsert_record(
             conn, record_id, atom_id, retrieved_at_ms,
             session_ref, turn_ref, permit_mode, helped_state)
+        {
+            Ok(true) => 1,
+            Ok(false) => 0,
+            Err(_) => -2,
+        }
+    })
+}
+
+/// UPDATE helped_state only for existing record_id。 Returns:
+///   1  → row updated
+///   0  → record_id unknown (no row inserted)
+///   -1 → null engine
+///   -2 → SQLite error
+///   -3 → UTF-8 decode failure
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_memory_usage_records_update_helped_state(
+    engine: *const L8Engine,
+    record_id_utf8: *const c_char, record_id_len: usize,
+    helped_state_utf8: *const c_char, helped_state_len: usize,
+) -> c_int {
+    if engine.is_null() { return -1; }
+    let record_id = match crate::cstr_to_str(
+        record_id_utf8, record_id_len) {
+        Some(s) => s, None => return -3,
+    };
+    let helped_state = match crate::cstr_to_str(
+        helped_state_utf8, helped_state_len) {
+        Some(s) => s, None => return -3,
+    };
+    let engine_ref = unsafe { &*engine };
+    engine_ref.with_conn(|conn| {
+        match update_helped_state(
+            conn, record_id, helped_state)
         {
             Ok(true) => 1,
             Ok(false) => 0,
@@ -354,6 +407,39 @@ mod tests {
             assert_eq!(
                 helped_state_for_record(conn, "r1").unwrap(),
                 Some("helped".to_string()));
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn update_helped_state_does_not_insert_placeholder() {
+        // markHelped semantics:if record_id is unknown,
+        // return Ok(false) — DO NOT insert a placeholder row。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_memory_usage_records_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // No record_id "rA" exists yet
+            assert_eq!(update_helped_state(
+                conn, "rA", "helped").unwrap(), false,
+                "Update on missing record returns false");
+            assert_eq!(count_records(conn).unwrap(), 0,
+                "No placeholder row inserted");
+            // Insert then update succeeds
+            upsert_record(conn, "rA", "a", 100, "s", "t",
+                "p", "unknown").unwrap();
+            assert_eq!(update_helped_state(
+                conn, "rA", "helped").unwrap(), true);
+            assert_eq!(
+                helped_state_for_record(conn, "rA").unwrap(),
+                Some("helped".to_string()));
+            // Re-update changes value
+            assert_eq!(update_helped_state(
+                conn, "rA", "notHelped").unwrap(), true);
+            assert_eq!(
+                helped_state_for_record(conn, "rA").unwrap(),
+                Some("notHelped".to_string()));
         });
         unsafe { bas_l8_engine_close(engine); }
     }
