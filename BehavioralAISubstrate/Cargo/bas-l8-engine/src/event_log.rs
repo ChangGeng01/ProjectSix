@@ -176,6 +176,42 @@ pub fn prune_events_before(
     Ok(n as i64)
 }
 
+/// chapter 九百九 / M3250 — hot-path consolidation #2
+/// (extending chapter 906 cosine_topk pattern to event_log)。
+///
+/// Returns the N most-recent events for a session as parallel
+/// (timestamp_ms, sequence_number) tuples sorted descending
+/// by timestamp。 ONE FFI call replaces:
+///   1. count_events_for_session (N == ? lookup)
+///   2. N × single-event reads to gather timestamps + seqs
+///
+/// Used by consumers that need to find「recent event window」
+/// for retention or replay decisions。 Production sessions
+/// often have 100-1000 events;the orchestrated baseline
+/// would do that many FFI hops。
+pub fn recent_event_timestamps_for_session(
+    conn: &Connection,
+    session_id: &str,
+    limit: usize,
+) -> rusqlite::Result<Vec<(i64, i64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT timestamp_ms, sequence_number
+           FROM event_log
+          WHERE session_id = ?
+          ORDER BY timestamp_ms DESC
+          LIMIT ?"
+    )?;
+    let mut rows = stmt.query(params![
+        session_id, limit as i64])?;
+    let mut out: Vec<(i64, i64)> = Vec::with_capacity(limit);
+    while let Some(row) = rows.next()? {
+        let ts: i64 = row.get(0)?;
+        let seq: i64 = row.get(1)?;
+        out.push((ts, seq));
+    }
+    Ok(out)
+}
+
 // MARK: - FFI
 
 #[no_mangle]
@@ -339,6 +375,59 @@ pub unsafe extern "C" fn bas_l8_event_log_prune_before(
     engine_ref.with_conn(|conn| {
         prune_events_before(conn, cutoff_ms).unwrap_or(-2)
     })
+}
+
+/// chapter 九百九 / M3250 hot-path consolidation FFI:fetches
+/// the N most-recent events for a session in ONE FFI call。
+/// Returns count written (≤ limit),or:
+///   -1 → null engine
+///   -2 → SQLite error
+///   -3 → UTF-8 decode failure / null buffers
+///   -4 → limit == 0
+///
+/// Caller provides 2 parallel buffers:
+///   out_timestamps: [i64; limit]
+///   out_sequences:  [i64; limit]
+/// Both filled in DESC-by-timestamp order。
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_event_log_recent_timestamps_for_session(
+    engine: *const L8Engine,
+    session_id_utf8: *const c_char, session_id_len: usize,
+    limit: usize,
+    out_timestamps: *mut i64,
+    out_sequences: *mut i64,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    if limit == 0 { return -4; }
+    if out_timestamps.is_null() || out_sequences.is_null() {
+        return -3;
+    }
+    let session_id = match crate::cstr_to_str(
+        session_id_utf8, session_id_len) {
+        Some(s) => s, None => return -3,
+    };
+    let engine_ref = unsafe { &*engine };
+    let result = engine_ref.with_conn(|conn| {
+        recent_event_timestamps_for_session(
+            conn, session_id, limit)
+    });
+    let rows = match result {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let n = rows.len();
+    let ts_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_timestamps, n)
+    };
+    let seq_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_sequences, n)
+    };
+    for (i, (ts, seq)) in rows.iter().enumerate() {
+        ts_slice[i] = *ts;
+        seq_slice[i] = *seq;
+    }
+    n as i32
 }
 
 // MARK: - Tests (careful coverage of HIGH-risk semantics)

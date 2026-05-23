@@ -1644,6 +1644,18 @@ int64_t bas_l8_event_log_next_sequence(
 int64_t bas_l8_event_log_prune_before(
     const L8Engine* engine, int64_t cutoff_ms);
 
+// chapter 九百九 / M3250 — hot-path consolidation #2 for
+// event_log。 ONE FFI call returns N most-recent events for
+// a session as parallel timestamps + sequences buffers
+// (caller-allocated). Returns count written (≤ limit),
+// or -1/-2/-3/-4 (see implementation comment).
+int32_t bas_l8_event_log_recent_timestamps_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len,
+    size_t limit,
+    int64_t* out_timestamps,
+    int64_t* out_sequences);
+
 // MARK: - bas-l8-engine memory_usage_records module
 // (chapter 九百二 / M3200 — HIGH-risk migration #2 SCOPED:
 //  records-table-only subset of BASMemoryUsageTracker)

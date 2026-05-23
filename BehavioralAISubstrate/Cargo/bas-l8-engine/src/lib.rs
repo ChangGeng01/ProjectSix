@@ -131,7 +131,10 @@ pub mod host_constitution_vault;
 ///   - 13 = chapter 九百六 / M3230 (+vector_index.read_embedding_
 ///          for_atom + cosine_topk_for_domain — hot-path
 ///          consolidation primitives for chapter 905 trigger)
-const ABI_VERSION: i32 = 13;
+///   - 14 = chapter 九百九 / M3250 (+event_log.recent_timestamps_
+///          for_session — hot-path consolidation #2,extends
+///          chapter 906 pattern to event_log)
+const ABI_VERSION: i32 = 14;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -369,7 +372,9 @@ mod tests {
         // 904: 11→12 records.update_helped_state for markHelped.
         // 906: 12→13 vector_index.cosine_topk_for_domain
         //            (hot-path consolidation per ch 905 trigger).
-        assert_eq!(bas_l8_engine_abi_version(), 13);
+        // 909: 13→14 event_log.recent_timestamps_for_session
+        //            (hot-path consolidation #2,extends ch 906).
+        assert_eq!(bas_l8_engine_abi_version(), 14);
     }
 
     #[test]

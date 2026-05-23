@@ -226,5 +226,50 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         }
         return n
     }
+
+    // MARK: - chapter 九百九 / M3250 hot-path consolidation #2
+
+    /// INTEGRATED fetch of the N most-recent events for a
+    /// session — returns parallel (timestampMs, sequence)
+    /// tuples sorted DESC by timestamp in ONE FFI call。
+    /// Extends the chapter 906 cosine_topk consolidation
+    /// pattern to event_log。
+    public func recentTimestamps(
+        forSession sessionID: String,
+        limit: Int
+    ) async throws -> [(timestampMs: Int64, seq: Int64)] {
+        precondition(limit > 0, "limit must be positive")
+        let bytes = Array(sessionID.utf8)
+        var timestamps = [Int64](repeating: 0, count: limit)
+        var sequences = [Int64](repeating: 0, count: limit)
+        let n = bytes.withUnsafeBufferPointer { sidBuf in
+            timestamps.withUnsafeMutableBufferPointer { tBuf in
+                sequences.withUnsafeMutableBufferPointer { sBuf in
+                    bas_l8_event_log_recent_timestamps_for_session(
+                        enginePtr,
+                        sidBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        sidBuf.count,
+                        limit,
+                        tBuf.baseAddress,
+                        sBuf.baseAddress)
+                }
+            }
+        }
+        guard n >= 0 else {
+            throw StoreError.appendFailed(code: Int64(n))
+        }
+        var out: [(timestampMs: Int64, seq: Int64)] = []
+        out.reserveCapacity(Int(n))
+        for i in 0..<Int(n) {
+            out.append((
+                timestampMs: timestamps[i],
+                seq: sequences[i]))
+        }
+        return out
+    }
 }
 #endif
