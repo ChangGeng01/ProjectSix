@@ -106,3 +106,38 @@ model** as classified in `Docs/DECLINE_PATTERNS.md`:
   per-turn integrated measurement ≥ 1.3× win
 - Re-evaluation cadence: each chapter that consolidates a Rust
   hot-path read into bas-l8-engine
+
+## Trigger FIRED — chapter 九百六 / M3230
+
+**Date**: 2026-05-23
+**Trigger source**: Chapter 906 hot-path consolidation probe
+
+Chapter 906 added `bas_l8_vector_index_cosine_topk_for_domain`
+— a Rust function that fetches all embeddings for a domain +
+computes dot-product top-k in ONE FFI call。 Compared to the
+orchestrated baseline (N round-trip reads + Swift compute):
+
+| Corpus | Orchestrated | Integrated | Speedup |
+|---|---|---|---|
+| N=100 dim=64 | 0.0016s | 0.0000s | **90.67×** |
+| N=1000 dim=64 | 0.0160s | 0.0001s | **125.97×** |
+| N=5000 dim=64 | 0.0782s | 0.0006s | **134.50×** |
+
+The integrated path is **90-134× faster** across all measured
+corpus sizes。 This decisively confirms the user's original
+architectural premise:**hot-path consolidation wins
+massively**,while storage-only migration was a tie。
+
+### What the trigger means
+
+- The vector_index cosine_topk path is FLIP-READY today
+  (chapter 906 ships the FFI primitive + correctness pin)
+- Production consumers can opt-in via `BASRoutedVector-
+  IndexStorage.cosineTopK(forDomain:queryBytes:k:)`
+- The STORAGE-only flip remains DECLINED — that comparison
+  was apples-to-apples (both paths fetch+write SQLite),and
+  the FFI cost dominated。 The hot-path consolidation path
+  saves N FFI hops which is where the gain comes from
+- Future consolidation work (other hot-path read patterns
+  like batch-tier-update,bundle-recall) will likely show
+  similar wins。 Measure each before flipping per discipline

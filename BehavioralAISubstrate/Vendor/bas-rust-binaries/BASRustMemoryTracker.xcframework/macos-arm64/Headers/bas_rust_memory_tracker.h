@@ -1578,6 +1578,27 @@ int64_t bas_l8_vector_index_count_for_provider(
     const char* provider_version_utf8,
     size_t provider_version_len);
 
+// chapter 九百六 / M3230 hot-path consolidation primitives。
+// Probe mode (null buf + 0 capacity) returns required size。
+// -2 = atom_id not found, -1 = null engine, -3 = UTF-8 fail.
+int32_t bas_l8_vector_index_read_embedding_for_atom(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len,
+    uint8_t* out_buf, size_t out_capacity);
+
+// INTEGRATED cosine top-k: reads all embeddings for a domain
+// + dot-product against query + returns top-k via 2 caller-
+// allocated buffers (out_rowids: i64[k], out_scores: f32[k]).
+// Returns actual count written (≤ k), or -1/-2/-3/-4 errors
+// (see implementation comment for codes).
+int32_t bas_l8_vector_index_cosine_topk_for_domain(
+    const L8Engine* engine,
+    const char* domain_utf8, size_t domain_len,
+    const uint8_t* query_blob, size_t query_blob_len,
+    size_t k,
+    int64_t* out_rowids,
+    float* out_scores);
+
 // MARK: - bas-l8-engine event_log module
 //         (chapter 九百一 / M3195 — HIGH-risk migration #1)
 //

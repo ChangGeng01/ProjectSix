@@ -128,7 +128,10 @@ pub mod host_constitution_vault;
 ///   - 12 = chapter 九百四 / M3220 (+memory_usage_records.update_
 ///          helped_state — markHelped UPDATE-only primitive that
 ///          does NOT insert placeholder rows on unknown record_id)
-const ABI_VERSION: i32 = 12;
+///   - 13 = chapter 九百六 / M3230 (+vector_index.read_embedding_
+///          for_atom + cosine_topk_for_domain — hot-path
+///          consolidation primitives for chapter 905 trigger)
+const ABI_VERSION: i32 = 13;
 
 /// Return the current ABI version for cross-checking by Swift
 /// consumers。
@@ -341,7 +344,9 @@ mod tests {
         // 902.6: 9→10 memory_usage_extras (notes+bundles+tombstones).
         // 903: 10→11 host_constitution_vault (HIGH-risk #3 final).
         // 904: 11→12 records.update_helped_state for markHelped.
-        assert_eq!(bas_l8_engine_abi_version(), 12);
+        // 906: 12→13 vector_index.cosine_topk_for_domain
+        //            (hot-path consolidation per ch 905 trigger).
+        assert_eq!(bas_l8_engine_abi_version(), 13);
     }
 
     #[test]

@@ -92,6 +92,84 @@ pub fn count_entries_for_domain(
         params![domain], |row| row.get(0))
 }
 
+/// chapter 九百六 / M3230 — hot-path read primitive。 Returns
+/// the embedding_blob for an atom_id,or None if absent。 Used
+/// by the orchestrated baseline (N round-trip FFI reads)。
+pub fn read_embedding_for_atom(
+    conn: &Connection,
+    atom_id: &str,
+) -> rusqlite::Result<Option<Vec<u8>>> {
+    let r: Option<Vec<u8>> = conn.query_row(
+        "SELECT embedding_blob FROM vector_index
+         WHERE atom_id = ? LIMIT 1",
+        params![atom_id], |row| row.get(0)
+    ).ok();
+    Ok(r)
+}
+
+/// chapter 九百六 / M3230 — INTEGRATED hot-path consolidation。
+/// Reads all embeddings for a domain + computes cosine
+/// similarity against the query + returns top-k scores in
+/// ONE FFI call (vs the orchestrated baseline that needs
+/// N + 1 FFI hops:N reads + 1 compute)。
+///
+/// Cosine similarity is computed via dot product on
+/// PRE-NORMALIZED embeddings (matches Swift convention from
+/// chapter 872 BASAutoRouteRanker.cosineTopKBatch)。 If the
+/// caller's query is not normalized,results are dot-product
+/// rather than cosine — the consumer's contract。
+///
+/// Returns a Vec of (rowid_in_domain, score) tuples sorted
+/// descending by score,length ≤ min(k, embedding_count)。
+pub fn cosine_topk_for_domain(
+    conn: &Connection,
+    domain: &str,
+    query: &[f32],
+    k: usize,
+) -> rusqlite::Result<Vec<(i64, f32)>> {
+    let mut stmt = conn.prepare(
+        "SELECT rowid, embedding_blob FROM vector_index
+         WHERE domain = ?"
+    )?;
+    let mut rows = stmt.query(params![domain])?;
+    let mut top: Vec<(i64, f32)> = Vec::with_capacity(k);
+    while let Some(row) = rows.next()? {
+        let rowid: i64 = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        // Decode embedding_blob as little-endian f32 array
+        let dim = blob.len() / 4;
+        if dim != query.len() {
+            continue;  // Skip dim mismatches
+        }
+        let mut score: f32 = 0.0;
+        for i in 0..dim {
+            let start = i * 4;
+            let b0 = blob[start];
+            let b1 = blob[start + 1];
+            let b2 = blob[start + 2];
+            let b3 = blob[start + 3];
+            let v = f32::from_le_bytes([b0, b1, b2, b3]);
+            score += v * query[i];
+        }
+        // Insertion into top-k heap (k is small,linear insert OK)
+        if top.len() < k {
+            top.push((rowid, score));
+            top.sort_unstable_by(|a, b|
+                b.1.partial_cmp(&a.1)
+                    .unwrap_or(std::cmp::Ordering::Equal));
+        } else if let Some(min) = top.last() {
+            if score > min.1 {
+                top.pop();
+                top.push((rowid, score));
+                top.sort_unstable_by(|a, b|
+                    b.1.partial_cmp(&a.1)
+                        .unwrap_or(std::cmp::Ordering::Equal));
+            }
+        }
+    }
+    Ok(top)
+}
+
 pub fn count_entries_for_provider(
     conn: &Connection,
     provider_version: &str,
@@ -237,6 +315,120 @@ pub unsafe extern "C" fn bas_l8_vector_index_count_for_provider(
     })
 }
 
+// MARK: - chapter 九百六 / M3230 hot-path consolidation FFI
+
+/// Read one embedding_blob for an atom_id (probe-mode buffer
+/// read)。 Probe (null buf + 0 capacity) returns required size。
+/// -2 = atom_id not found,-1 = null engine,-3 = UTF-8 fail。
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_vector_index_read_embedding_for_atom(
+    engine: *const L8Engine,
+    atom_id_utf8: *const c_char, atom_id_len: usize,
+    out_buf: *mut u8, out_capacity: usize,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    let atom_id = match crate::cstr_to_str(
+        atom_id_utf8, atom_id_len) {
+        Some(s) => s, None => return -3,
+    };
+    let engine_ref = unsafe { &*engine };
+    let blob: Option<Vec<u8>> = engine_ref.with_conn(|conn| {
+        read_embedding_for_atom(conn, atom_id)
+            .unwrap_or(None)
+    });
+    let bytes = match blob {
+        Some(v) => v,
+        None => return -2,
+    };
+    let needed = bytes.len();
+    if out_buf.is_null() || out_capacity < needed {
+        return needed as i32;
+    }
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            bytes.as_ptr(), out_buf, needed);
+    }
+    needed as i32
+}
+
+/// INTEGRATED cosine top-k: reads all embeddings for a domain
+/// + computes dot-product score against the query + returns
+/// top-k in ONE FFI call。 The caller provides:
+///   - query_blob: query embedding as f32 little-endian bytes
+///   - k: desired top-k count
+///   - out_rowids: caller-allocated [i64; k] buffer for rowids
+///   - out_scores: caller-allocated [f32; k] buffer for scores
+///
+/// Returns the actual count written (≤ k),or:
+///   -1 → null engine
+///   -2 → SQLite error
+///   -3 → UTF-8 decode failure / query alignment / null buffers
+///   -4 → k == 0
+///
+/// Buffers MUST be valid for at least k * sizeof(i64) / f32
+/// bytes respectively。
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_vector_index_cosine_topk_for_domain(
+    engine: *const L8Engine,
+    domain_utf8: *const c_char, domain_len: usize,
+    query_blob: *const u8, query_blob_len: usize,
+    k: usize,
+    out_rowids: *mut i64,
+    out_scores: *mut f32,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    if k == 0 { return -4; }
+    if out_rowids.is_null() || out_scores.is_null() {
+        return -3;
+    }
+    let domain = match crate::cstr_to_str(
+        domain_utf8, domain_len) {
+        Some(s) => s, None => return -3,
+    };
+    if query_blob.is_null() || query_blob_len == 0
+        || query_blob_len % 4 != 0
+    {
+        return -3;
+    }
+    // Decode query bytes as f32 little-endian
+    let q_dim = query_blob_len / 4;
+    let mut query: Vec<f32> = Vec::with_capacity(q_dim);
+    let q_slice = unsafe {
+        core::slice::from_raw_parts(query_blob, query_blob_len)
+    };
+    for i in 0..q_dim {
+        let start = i * 4;
+        let b0 = q_slice[start];
+        let b1 = q_slice[start + 1];
+        let b2 = q_slice[start + 2];
+        let b3 = q_slice[start + 3];
+        query.push(f32::from_le_bytes([b0, b1, b2, b3]));
+    }
+    let engine_ref = unsafe { &*engine };
+    let topk: Result<Vec<(i64, f32)>, rusqlite::Error> =
+        engine_ref.with_conn(|conn| {
+            cosine_topk_for_domain(conn, domain, &query, k)
+        });
+    let topk = match topk {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let n = topk.len();
+    let rowids_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_rowids, n)
+    };
+    let scores_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_scores, n)
+    };
+    for (i, (rid, sc)) in topk.iter().enumerate() {
+        rowids_slice[i] = *rid;
+        scores_slice[i] = *sc;
+    }
+    n as i32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,6 +507,133 @@ mod tests {
                 count_entries_for_provider(
                     conn, "p-v2").unwrap(), 1);
         });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百六 / M3230 hot-path consolidation tests
+
+    fn pack_f32_le(values: &[f32]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(values.len() * 4);
+        for v in values {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        bytes
+    }
+
+    #[test]
+    fn read_embedding_for_atom_round_trips_bytes() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let emb = pack_f32_le(&[1.0, 2.0, 3.0, 4.0]);
+            upsert_entry(conn, "a-1", 4, "p", &emb,
+                "d", "{}").unwrap();
+            let read = read_embedding_for_atom(
+                conn, "a-1").unwrap();
+            assert_eq!(read, Some(emb.clone()));
+            let miss = read_embedding_for_atom(
+                conn, "missing").unwrap();
+            assert_eq!(miss, None);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn cosine_topk_returns_ordered_scores() {
+        // Construct 3 embeddings + a query that ranks them
+        // unambiguously。 Verify top-k returns in descending
+        // score order。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // dim=4 embeddings
+            // a-1: aligned with query → highest score
+            // a-2: half-aligned
+            // a-3: orthogonal → zero score
+            let e1 = pack_f32_le(&[1.0, 0.0, 0.0, 0.0]);
+            let e2 = pack_f32_le(&[0.5, 0.0, 0.0, 0.0]);
+            let e3 = pack_f32_le(&[0.0, 1.0, 0.0, 0.0]);
+            upsert_entry(conn, "a-1", 4, "p", &e1,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "a-2", 4, "p", &e2,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "a-3", 4, "p", &e3,
+                "dom", "{}").unwrap();
+            let query: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0];
+            let top = cosine_topk_for_domain(
+                conn, "dom", &query, 3).unwrap();
+            assert_eq!(top.len(), 3);
+            // Top score = 1.0 (a-1), then 0.5 (a-2), then 0.0 (a-3)
+            assert!(
+                (top[0].1 - 1.0).abs() < 1e-5,
+                "Top score expected ~1.0, got {}", top[0].1);
+            assert!(
+                (top[1].1 - 0.5).abs() < 1e-5,
+                "2nd score expected ~0.5, got {}", top[1].1);
+            assert!(
+                top[2].1.abs() < 1e-5,
+                "3rd score expected ~0.0, got {}", top[2].1);
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn cosine_topk_skips_dimension_mismatches() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let e_match = pack_f32_le(&[1.0, 0.0]);
+            let e_skip = pack_f32_le(&[1.0, 0.0, 0.0]);
+            upsert_entry(conn, "good", 2, "p", &e_match,
+                "dom", "{}").unwrap();
+            upsert_entry(conn, "bad-dim", 3, "p", &e_skip,
+                "dom", "{}").unwrap();
+            let q = vec![1.0_f32, 0.0];
+            let top = cosine_topk_for_domain(
+                conn, "dom", &q, 5).unwrap();
+            assert_eq!(top.len(), 1,
+                "Only dim-matched row returned");
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn ffi_cosine_topk_writes_results() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_vector_index_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let e1 = pack_f32_le(&[1.0, 0.0]);
+            let e2 = pack_f32_le(&[0.0, 1.0]);
+            upsert_entry(conn, "x", 2, "p", &e1,
+                "ffidom", "{}").unwrap();
+            upsert_entry(conn, "y", 2, "p", &e2,
+                "ffidom", "{}").unwrap();
+        });
+        let dom = "ffidom";
+        let q = pack_f32_le(&[1.0, 0.0]);
+        let mut rowids = [0i64; 2];
+        let mut scores = [0f32; 2];
+        let n = unsafe {
+            bas_l8_vector_index_cosine_topk_for_domain(
+                engine,
+                dom.as_ptr() as *const c_char, dom.len(),
+                q.as_ptr(), q.len(),
+                2,
+                rowids.as_mut_ptr(),
+                scores.as_mut_ptr())
+        };
+        assert_eq!(n, 2);
+        // First score = 1.0 (perfect match), second ~0.0
+        assert!((scores[0] - 1.0).abs() < 1e-5);
+        assert!(scores[1].abs() < 1e-5);
         unsafe { bas_l8_engine_close(engine); }
     }
 }

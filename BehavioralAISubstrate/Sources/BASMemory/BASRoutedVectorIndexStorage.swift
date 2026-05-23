@@ -185,5 +185,97 @@ public actor BASRoutedVectorIndexStorage {
         }
         return c < 0 ? 0 : Int(c)
     }
+
+    // MARK: - chapter 九百六 hot-path consolidation primitives
+
+    /// Read one embedding_blob for an atom_id。 Returns nil
+    /// if absent。 Used as the orchestrated baseline in
+    /// chapter 906 perf bench (N round-trip FFI reads vs the
+    /// integrated cosine-topk single-hop path)。
+    public func readEmbeddingBytes(
+        forAtomID atomID: String
+    ) async throws -> [UInt8]? {
+        let bytes = Array(atomID.utf8)
+        let needed = bytes.withUnsafeBufferPointer { buf in
+            bas_l8_vector_index_read_embedding_for_atom(
+                enginePtr,
+                buf.baseAddress.map {
+                    UnsafeRawPointer($0)
+                        .assumingMemoryBound(to: CChar.self)
+                },
+                buf.count,
+                nil, 0)
+        }
+        if needed == -2 { return nil }
+        if needed < 0 {
+            throw StoreError.upsertFailed(code: needed)
+        }
+        if needed == 0 { return [] }
+        var outBuf = [UInt8](repeating: 0, count: Int(needed))
+        let written = bytes.withUnsafeBufferPointer { buf in
+            outBuf.withUnsafeMutableBufferPointer { ob in
+                bas_l8_vector_index_read_embedding_for_atom(
+                    enginePtr,
+                    buf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(
+                                to: CChar.self)
+                    },
+                    buf.count,
+                    ob.baseAddress, ob.count)
+            }
+        }
+        guard written == needed else {
+            throw StoreError.upsertFailed(code: written)
+        }
+        return outBuf
+    }
+
+    /// INTEGRATED cosine top-k:fetches all embeddings for a
+    /// domain + dot-product scores them against the query in
+    /// ONE FFI call (vs N round-trip reads + Swift compute)。
+    /// Returns top-k (rowid, score) pairs sorted descending
+    /// by score。
+    public func cosineTopK(
+        forDomain domain: String,
+        queryBytes: [UInt8],
+        k: Int
+    ) async throws -> [(rowid: Int64, score: Float)] {
+        precondition(k > 0,
+            "Top-k must be positive")
+        let dom = Array(domain.utf8)
+        var rowids = [Int64](repeating: 0, count: k)
+        var scores = [Float](repeating: 0, count: k)
+        let n = dom.withUnsafeBufferPointer { domBuf in
+            queryBytes.withUnsafeBufferPointer { qBuf in
+                rowids.withUnsafeMutableBufferPointer { rBuf in
+                    scores.withUnsafeMutableBufferPointer { sBuf in
+                        bas_l8_vector_index_cosine_topk_for_domain(
+                            enginePtr,
+                            domBuf.baseAddress.map {
+                                UnsafeRawPointer($0)
+                                    .assumingMemoryBound(
+                                        to: CChar.self)
+                            },
+                            domBuf.count,
+                            qBuf.baseAddress,
+                            qBuf.count,
+                            k,
+                            rBuf.baseAddress,
+                            sBuf.baseAddress)
+                    }
+                }
+            }
+        }
+        guard n >= 0 else {
+            throw StoreError.upsertFailed(code: n)
+        }
+        var out: [(rowid: Int64, score: Float)] = []
+        out.reserveCapacity(Int(n))
+        for i in 0..<Int(n) {
+            out.append((rowid: rowids[i], score: scores[i]))
+        }
+        return out
+    }
 }
 #endif
