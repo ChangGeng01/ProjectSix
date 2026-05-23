@@ -237,5 +237,58 @@ public actor BASRoutedMemoryUsageRecordsStore {
         }
         return String(bytes: outBuf, encoding: .utf8)
     }
+
+    // MARK: - chapter 九百十一 hot-path consolidation #3
+
+    /// INTEGRATED fetch of N most-recent records for an atom_id。
+    /// Returns parallel (timestampMs, helpedFlag) tuples sorted
+    /// DESC by timestamp in ONE FFI call。 Extends the chapter
+    /// 906/909 hot-path consolidation pattern to records table。
+    public func recentRecords(
+        forAtomID atomID: String,
+        limit: Int
+    ) async throws
+        -> [(timestampMs: Int64, helped: String)]
+    {
+        precondition(limit > 0, "limit must be positive")
+        let bytes = Array(atomID.utf8)
+        var timestamps = [Int64](repeating: 0, count: limit)
+        var helpedCodes = [Int64](repeating: 0, count: limit)
+        let n = bytes.withUnsafeBufferPointer { aidBuf in
+            timestamps.withUnsafeMutableBufferPointer { tBuf in
+                helpedCodes.withUnsafeMutableBufferPointer { hBuf in
+                    bas_l8_memory_usage_records_recent_for_atom(
+                        enginePtr,
+                        aidBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        aidBuf.count,
+                        limit,
+                        tBuf.baseAddress,
+                        hBuf.baseAddress)
+                }
+            }
+        }
+        guard n >= 0 else {
+            throw StoreError.upsertFailed(code: n)
+        }
+        var out: [(timestampMs: Int64, helped: String)] = []
+        out.reserveCapacity(Int(n))
+        for i in 0..<Int(n) {
+            let helpedStr: String
+            switch helpedCodes[i] {
+            case 0: helpedStr = "unknown"
+            case 1: helpedStr = "helped"
+            case 2: helpedStr = "notHelped"
+            default: helpedStr = "other"
+            }
+            out.append((
+                timestampMs: timestamps[i],
+                helped: helpedStr))
+        }
+        return out
+    }
 }
 #endif

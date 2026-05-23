@@ -1723,6 +1723,17 @@ int32_t bas_l8_memory_usage_records_update_helped_state(
     const char* record_id_utf8, size_t record_id_len,
     const char* helped_state_utf8, size_t helped_state_len);
 
+// chapter 九百十一 / M3260 — hot-path consolidation #3:
+// fetches N most-recent records for an atom_id in ONE FFI
+// call. Returns count written (≤ limit), or -1/-2/-3/-4.
+// out_helped_codes: 0=unknown, 1=helped, 2=notHelped, 3=other.
+int32_t bas_l8_memory_usage_records_recent_for_atom(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len,
+    size_t limit,
+    int64_t* out_timestamps,
+    int64_t* out_helped_codes);
+
 // MARK: - bas-l8-engine memory_usage_logs module
 // (chapter 九百二.5 / M3205 — replay_log + audit_log
 //  sub-chapter for MemoryUsageTracker, append-only tables)

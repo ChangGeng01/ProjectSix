@@ -168,6 +168,51 @@ pub fn update_helped_state(
     Ok(n > 0)
 }
 
+/// chapter 九百十一 / M3260 — hot-path consolidation #3
+/// (extending chapters 906 + 909 pattern to memory_usage_records)。
+///
+/// Returns the N most-recent records for an atom_id as
+/// (retrieved_at_ms, helped_state_code) tuples sorted DESC
+/// by retrieved_at_ms。 ONE FFI call replaces the orchestrated
+/// baseline of N count + per-record fetches。
+///
+/// helped_state_code:
+///   0 = "unknown"
+///   1 = "helped"
+///   2 = "notHelped"
+///   3 = unknown rawValue (defensive)
+///
+/// The encoding keeps the wire format scalar — no string
+/// FFI per row, just i64 pairs。
+pub fn recent_records_for_atom(
+    conn: &Connection,
+    atom_id: &str,
+    limit: usize,
+) -> rusqlite::Result<Vec<(i64, i64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT retrieved_at_ms, helped_state
+           FROM memory_usage_records
+          WHERE atom_id = ?
+          ORDER BY retrieved_at_ms DESC
+          LIMIT ?"
+    )?;
+    let mut rows = stmt.query(params![
+        atom_id, limit as i64])?;
+    let mut out: Vec<(i64, i64)> = Vec::with_capacity(limit);
+    while let Some(row) = rows.next()? {
+        let ts: i64 = row.get(0)?;
+        let helped: String = row.get(1)?;
+        let code: i64 = match helped.as_str() {
+            "unknown" => 0,
+            "helped" => 1,
+            "notHelped" => 2,
+            _ => 3,
+        };
+        out.push((ts, code));
+    }
+    Ok(out)
+}
+
 /// Returns the current `helped_state` for the given record_id,
 /// or None if the record_id is unknown。 Used by tests to verify
 /// markHelped UPSERT semantics propagate through Rust。
@@ -378,6 +423,59 @@ bas_l8_memory_usage_records_helped_state_for_record(
     needed as i32
 }
 
+/// chapter 九百十一 / M3260 hot-path consolidation FFI:fetch
+/// the N most-recent records for an atom_id in ONE FFI call。
+/// Returns count written (≤ limit),or:
+///   -1 → null engine
+///   -2 → SQLite error
+///   -3 → UTF-8 decode failure / null buffers
+///   -4 → limit == 0
+///
+/// Caller provides 2 parallel buffers:
+///   out_timestamps:   [i64; limit]
+///   out_helped_codes: [i64; limit] (0=unknown, 1=helped,
+///                                   2=notHelped, 3=other)
+/// Both filled DESC by retrieved_at_ms。
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_memory_usage_records_recent_for_atom(
+    engine: *const L8Engine,
+    atom_id_utf8: *const c_char, atom_id_len: usize,
+    limit: usize,
+    out_timestamps: *mut i64,
+    out_helped_codes: *mut i64,
+) -> c_int {
+    if engine.is_null() { return -1; }
+    if limit == 0 { return -4; }
+    if out_timestamps.is_null() || out_helped_codes.is_null() {
+        return -3;
+    }
+    let atom_id = match crate::cstr_to_str(
+        atom_id_utf8, atom_id_len) {
+        Some(s) => s, None => return -3,
+    };
+    let engine_ref = unsafe { &*engine };
+    let result = engine_ref.with_conn(|conn| {
+        recent_records_for_atom(conn, atom_id, limit)
+    });
+    let rows = match result {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let n = rows.len();
+    let ts_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_timestamps, n)
+    };
+    let hc_slice = unsafe {
+        core::slice::from_raw_parts_mut(out_helped_codes, n)
+    };
+    for (i, (ts, code)) in rows.iter().enumerate() {
+        ts_slice[i] = *ts;
+        hc_slice[i] = *code;
+    }
+    n as c_int
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,6 +505,52 @@ mod tests {
             assert_eq!(
                 helped_state_for_record(conn, "r1").unwrap(),
                 Some("helped".to_string()));
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn recent_records_for_atom_returns_desc_by_ts() {
+        // chapter 九百十一:integrated hot-path consolidation
+        // for memory_usage_records。 Verify DESC ordering +
+        // helped_state code encoding + cross-atom isolation。
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_memory_usage_records_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // 4 records for atom-X with varying ts + helped
+            upsert_record(conn, "r1", "atom-X", 100, "s",
+                "t", "p", "unknown").unwrap();
+            upsert_record(conn, "r2", "atom-X", 300, "s",
+                "t", "p", "helped").unwrap();
+            upsert_record(conn, "r3", "atom-X", 200, "s",
+                "t", "p", "notHelped").unwrap();
+            upsert_record(conn, "r4", "atom-X", 500, "s",
+                "t", "p", "helped").unwrap();
+            // 1 record for atom-Y (must not bleed)
+            upsert_record(conn, "y1", "atom-Y", 999, "s",
+                "t", "p", "unknown").unwrap();
+            // Top 3 for atom-X DESC by ts: 500/h, 300/h, 200/nh
+            let top = recent_records_for_atom(
+                conn, "atom-X", 3).unwrap();
+            assert_eq!(top.len(), 3);
+            assert_eq!(top[0].0, 500);
+            assert_eq!(top[0].1, 1); // helped
+            assert_eq!(top[1].0, 300);
+            assert_eq!(top[1].1, 1); // helped
+            assert_eq!(top[2].0, 200);
+            assert_eq!(top[2].1, 2); // notHelped
+            // atom-Y isolated
+            let y = recent_records_for_atom(
+                conn, "atom-Y", 5).unwrap();
+            assert_eq!(y.len(), 1);
+            assert_eq!(y[0].0, 999);
+            assert_eq!(y[0].1, 0); // unknown
+            // missing atom
+            let m = recent_records_for_atom(
+                conn, "atom-missing", 5).unwrap();
+            assert_eq!(m.len(), 0);
         });
         unsafe { bas_l8_engine_close(engine); }
     }
