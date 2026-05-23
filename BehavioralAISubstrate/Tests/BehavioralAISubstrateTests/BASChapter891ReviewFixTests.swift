@@ -385,6 +385,116 @@ final class BASChapter891ReviewFixTests: XCTestCase {
 
     // MARK: - Doctrine doc verification (LOW-L1+L2 fix)
 
+    // MARK: - chapter 891.5 / M3146 fixes (18th-pass review
+    //         of chapter 891 itself)
+
+    /// PIN HIGH from 18th-pass: chapters 874+875 must appear
+    /// ONLY in DECLINE-PENDING-CONSUMER,not in
+    /// DECLINE-WITH-TRIGGER。 Pre-ch-891.5 they were
+    /// double-listed — the very doc shipped to DEFINE the
+    /// patterns mis-tagged its canonical examples (textbook
+    /// shoemaker's children)。
+    func testChapter891_5_HIGH_DeclinePatternsCanonicalTagsCorrect() throws {
+        let url = URL(
+            fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Docs")
+            .appendingPathComponent(
+                "DECLINE_PATTERNS.md")
+        let content = try String(
+            contentsOf: url, encoding: .utf8)
+        // Find DECLINE-WITH-TRIGGER section
+        guard let triggerRange = content.range(
+            of: "## DECLINE-WITH-TRIGGER"),
+              let pendingRange = content.range(
+                of: "## DECLINE-PENDING-CONSUMER")
+        else {
+            XCTFail("Both sections must exist")
+            return
+        }
+        let triggerLower = triggerRange.lowerBound
+        let pendingLower = pendingRange.lowerBound
+        let triggerSection = String(
+            content[triggerLower..<pendingLower])
+        let pendingSection = String(
+            content[pendingLower...])
+        // Ch 874 + 875 should NOT appear in DECLINE-WITH-TRIGGER
+        XCTAssertFalse(
+            triggerSection.contains("八百七十四:"),
+            "Chapter 874 must NOT be in DECLINE-WITH-TRIGGER " +
+            "section (it shipped Rust kernel → " +
+            "DECLINE-PENDING-CONSUMER)")
+        XCTAssertFalse(
+            triggerSection.contains("八百七十五:"),
+            "Chapter 875 must NOT be in DECLINE-WITH-TRIGGER " +
+            "section (it shipped MPSGraph kernel → " +
+            "DECLINE-PENDING-CONSUMER)")
+        // Ch 874 + 875 SHOULD appear in DECLINE-PENDING-CONSUMER
+        XCTAssertTrue(
+            pendingSection.contains("八百七十四:"),
+            "Chapter 874 must be in DECLINE-PENDING-CONSUMER")
+        XCTAssertTrue(
+            pendingSection.contains("八百七十五:"),
+            "Chapter 875 must be in DECLINE-PENDING-CONSUMER")
+    }
+
+    /// PIN MED-2 from 18th-pass: ch 868 large-shape now has
+    /// an inverse band (symmetric protection)。
+    func testChapter891_5_MED2_LargeShapeInverseBandAdded() throws {
+        let url = URL(
+            fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent(
+                "BASChapter868FlashAttention" +
+                "AssertedBenchmarkTests.swift")
+        let content = try String(
+            contentsOf: url, encoding: .utf8)
+        // Large shape function must contain BOTH bands
+        guard let largeFuncRange = content.range(
+            of: "testLargeSequenceFlashCompetitive")
+        else {
+            XCTFail("Large-shape test must exist")
+            return
+        }
+        let largeFunc = String(
+            content[largeFuncRange.lowerBound...])
+            .prefix(2000)
+        XCTAssertTrue(
+            largeFunc.contains("stdNs * 1.6"),
+            "Large-shape upper band stays at 1.6× (ch 891 widen)")
+        XCTAssertTrue(
+            largeFunc.contains("flashNs * 1.5"),
+            "Large-shape inverse band added at 1.5× " +
+            "(ch 891.5 MED-2 fix)")
+    }
+
+    /// PIN MED-1 from 18th-pass + ch 891.5 honest correction:
+    /// MIGRATION_GUIDE Step 3 now correctly cites chapter 八百三十一
+    /// (the actual forwarder-removal chapter) instead of chapter
+    /// 八百七十八 (which didn't remove forwarders)。
+    func testChapter891_5_MED1_MigrationGuideCorrectChapter() throws {
+        let url = URL(
+            fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent(
+                "MIGRATION_GUIDE_v0.61_to_v0.62.md")
+        let content = try String(
+            contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(
+            content.contains("chapter 八百三十一"),
+            "Step 3 must cite chapter 八百三十一 (actual " +
+            "forwarder removal,v0.61.0 mini-arc 5)")
+        XCTAssertTrue(
+            content.contains("NO net removals in v0.61.0 → v0.62.x")
+            || content.contains(
+                "v0.62.0 → v0.62.3 removed NOTHING"),
+            "Step 3 must honestly clarify v0.62.x removed nothing")
+    }
+
     /// PIN: Docs/DECLINE_PATTERNS.md exists + explains both
     /// patterns + the string-FFI doctrine。
     func testDeclinePatternsDocExists() throws {

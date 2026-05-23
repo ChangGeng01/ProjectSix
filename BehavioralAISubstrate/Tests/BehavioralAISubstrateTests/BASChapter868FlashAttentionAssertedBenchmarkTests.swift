@@ -199,6 +199,17 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
             "(M=\(M),N=\(N),D=\(D)) — live 1.092× + thermal " +
             "envelope。 std=\(stdNs) ns flash=\(flashNs) ns " +
             "ratio=\(flashNs/stdNs)")
+        // chapter 八百九十一.5 / M3146 MED-2 fix from 18th-pass
+        // review:add the inverse band so a suspicious ≥ 1.5×
+        // FA speedup (would indicate std regression or
+        // bench-measurement anomaly) also trips。 Mirrors the
+        // medium-shape symmetric protection at lines 150-154。
+        XCTAssertLessThan(stdNs, flashNs * 1.5,
+            "Std should not be more than 1.5× slower than FA " +
+            "at large shape — a suspicious ≥ 1.5× FA speedup " +
+            "warrants investigation (likely std regression OR " +
+            "bench anomaly)。 std=\(stdNs) ns flash=\(flashNs) " +
+            "ns")
     }
 
     /// At tiny shape (M=4, N=4, D=8) Metal pipeline overhead

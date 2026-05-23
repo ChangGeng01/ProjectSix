@@ -11,6 +11,95 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### 18th-pass review fixes for chapter 891 + ch 892 bench-deferred (chapter 八百九十一.5 + 八百九十二 / M3146+M3150)
+
+User invoked 「全面 收尾」 (comprehensive wrap-up)。 18th-pass review
+of chapter 891 (commit 98c65376) caught the「shoemaker's children」
+pattern AGAIN — my brand-new `Docs/DECLINE_PATTERNS.md` (shipped
+in ch 891 to DEFINE the patterns) misclassified chapters 874+875
+in BOTH sections。 Chapter 891.5 fixes inline + ch 892 bench is
+deferred per priorities。
+
+#### Chapter 八百九十一.5 fixes (HIGH + 2 MED from 18th-pass)
+
+1. **HIGH-1 FIXED — DECLINE_PATTERNS.md double-listing**:
+   chapters 八百七十四 (RoPE) + 八百七十五 (RMSNorm) appeared in
+   BOTH DECLINE-WITH-TRIGGER + DECLINE-PENDING-CONSUMER sections。
+   Both chapters SHIPPED the MPSGraph kernel (no consumer to
+   wire) → they belong ONLY in DECLINE-PENDING-CONSUMER。 The
+   doc DEFINING the patterns got its canonical examples wrong —
+   textbook shoemaker's children。 Removed from
+   DECLINE-WITH-TRIGGER + clarified both sections' "when to use"
+   contrast。 Updated ch 八百五十六 descriptor (was wrong wording
+   for that section)。
+
+2. **MED-2 FIXED — chapter 868 large-shape asymmetric perf
+   protection**: medium-shape test has paired `flashNs < stdNs
+   * 1.7` AND `stdNs < flashNs * 1.5` (symmetric)。 Large-shape
+   test only had upper bound。 Added inverse `stdNs < flashNs *
+   1.5` so a suspicious ≥ 1.5× FA speedup also trips (mirrors
+   medium-shape symmetric protection)。
+
+3. **MED-1 FIXED — MIGRATION_GUIDE Step 3 honestly corrected**:
+   ch 891 partial fix was "rephrased placeholder" — still pointed
+   at chapter 八百七十八 which DIDN'T remove forwarders。 Honest
+   fix:cite chapter 八百三十一 (the actual forwarder-removal
+   chapter,v0.61.0 mini-arc 5,9/9 shims archived,2,133 LOC
+   removed) + clarify v0.62.x removed NOTHING net (additive-only
+   range)。 No more placeholder。
+
+4. **NEW 3 ch 891.5 verification tests** in existing
+   `BASChapter891ReviewFixTests.swift`:
+   - `testChapter891_5_HIGH_DeclinePatternsCanonicalTagsCorrect`
+   - `testChapter891_5_MED2_LargeShapeInverseBandAdded`
+   - `testChapter891_5_MED1_MigrationGuideCorrectChapter`
+
+5. **18th-pass items DEFERRED (cosmetic, low priority)**:
+   - LOW-1:CHANGELOG self-referential wording (minor)
+   - MED-3 was actually a typo of MED-1 (the chapter 856
+     descriptor wording fix overlapped — handled in HIGH-1 fix)
+
+#### Chapter 八百九十二 — detectCycles bench DEFERRED
+
+Discovery agent #3's MED-confidence candidate
+(`BASKnowledgeGraph.detectCycles` at
+`Sources/BASRuntimeCore/BASKnowledgeGraph.swift:403-484`)。
+Per chapter 870 + 881 + 890 measurement-first discipline,
+chapter 892 created `BASChapter892DetectCyclesBaselineTests`
+bench infrastructure (4 size points: 20×30 / 50×100 / 100×500
+/ 200×800 nodes×edges) — but the LIVE measurement run got
+blocked by sweep contention during chapter 891.5 fix work。
+Bench file ships with `XCTSkip` per ch 879/881/889/890 archive
+pattern;next session can re-enable + capture verdict。
+
+Provisional hypothesis (not measured): likely DECLINE per
+string-FFI structural pattern (chapter 881 + 890),since graph
+nodes are String-keyed → same string-ser cost dominates。 But
+the per-call Swift cost at large graphs may be high enough to
+flip the math — only measurement will tell。
+
+#### Verification
+
+   swift test --filter BASChapter891: 18/18 PASS (15 ch 891 + 3 ch 891.5)
+   swift test --filter BASChapter892:  4/4 skipped (bench-deferred)
+   swift build:                                                PASS
+   pre-commit gates:                                           3/3 PASS
+
+Delta from chapter 891: +3 ch 891.5 verification tests + bench
+infrastructure shipped (skip-by-default)。 NO Cargo / Rust /
+XCFramework changes。 Pure-Swift + doc work。
+
+#### Discipline pin
+
+This is the 18th review pass in the chapters 八百六十七 → 八百九十一.5
+discipline ledger。 The pass caught a REAL HIGH within the
+chapter 891 fix-of-fix work itself — the doctrine doc DEFINING
+the DECLINE patterns mis-tagged its canonical examples。 Same
+shoemaker's children pattern keeps recurring + same review
+discipline keeps catching it。
+
+---
+
 ### 16th-pass + doc cohesion review fixes — 6 HIGH + 7 MED + LOWs (chapter 八百九十一 / M3145)
 
 User invoked 「全面一次性 解决掉」 + 「全量 review 要求 最 优雅

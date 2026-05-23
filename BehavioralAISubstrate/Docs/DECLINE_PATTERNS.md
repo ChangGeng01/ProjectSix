@@ -20,19 +20,30 @@ decision。
 
 **Chapters using this pattern**:
 - 八百四十九:Mamba flip-or-decline
-- 八百五十六:Activation kernels decline-pending-consumer
+- 八百五十六:Activation kernels DECLINED outright (per-pair
+  work too small for rayon overhead)
 - 八百五十七:Reduce/Conv kernels audit
-- 八百七十四:BASMPSGraphRotaryEmbedding decline
-- 八百七十五:BASMPSGraphRMSNorm decline
 - 八百八十一:Forget cascade decline (Swift Set 2-3× faster)
 - 八百八十三:RAG MemoryService wiring decline (async/sync)
 - 八百八十四:Gaps 1+4+5 decline (3 gaps × 3 triggers each)
 - 八百九十:canonicalEncoding decline (string-FFI cost)
 
-**When to use**: the kernel can be written + has a plausible
-benefit at SOME scale,but at the CURRENT substrate workload
-the math doesn't work yet。 Trigger conditions specify the
-workload/measurement that would flip the decision。
+**Chapter 八百九十一.5 / M3146 HIGH fix from 18th-pass review**:
+chapters 八百七十四 (RoPE) + 八百七十五 (RMSNorm) were previously
+listed here AND in DECLINE-PENDING-CONSUMER below — incorrect
+double-listing。 Both chapters SHIPPED the Rust/MPSGraph kernel
++ then declined wiring pending consumer pressure,so they
+belong ONLY in DECLINE-PENDING-CONSUMER。 This was the
+shoemaker's-children pattern recurring AGAIN — the doc
+defining the patterns got the patterns wrong。 Chapter 891.5
+fix removes the incorrect entries here。
+
+**When to use**: the kernel WAS NOT written (or won't be
+written),because measurement shows it can't win at any
+plausible scale。 Trigger conditions specify the
+workload/measurement that would re-open the decision。 Contrast
+with DECLINE-PENDING-CONSUMER below where the kernel IS shipped
+but waits for consumer pressure。
 
 ---
 
@@ -45,9 +56,12 @@ FFI hop。 The Rust infrastructure is ready;the wiring waits for
 a consumer to materialize。
 
 **Chapters using this pattern**:
-- 八百七十四:RoPE (kernel exists,no consumer pressure)
-- 八百七十五:RMSNorm (kernel exists)
+- 八百七十四:BASMPSGraphRotaryEmbedding (MPSGraph kernel exists,
+  no consumer pressure to wire)
+- 八百七十五:BASMPSGraphRMSNorm (MPSGraph kernel exists,no
+  consumer pressure)
 - 八百七十六:5 scaffolding `.metal` kernels + 2 unwired MPSGraph
+  re-audited as still no consumer
 - 八百八十五:Batched forget cascade (Rust rayon variant SHIPPED,
   awaits consumer batching ≥ 512 cascades per call)
 

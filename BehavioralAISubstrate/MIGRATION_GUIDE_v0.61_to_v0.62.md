@@ -91,22 +91,33 @@ If unset,`.mSeriesDefault` is used (the measured Mac mini values)。
 
 ---
 
-## Step 3: Removed deprecated paths (chapter 八百七十八)
+## Step 3: Removed deprecated paths (NO net removals in v0.61.0 → v0.62.x)
 
-v0.62.0 removed forwarder shims that chapter 八百七十八 audited as no
-longer in use。 Chapter 八百九十一 / M3145 MEDIUM-M3 fix:placeholder
-filled with actual forwarder list from chapter 八百七十八 audit。
+Chapter 八百九十一.5 / M3146 honest correction:the original
+placeholder + chapter 八百九十一 partial fix both incorrectly
+cited chapter 八百七十八 as a forwarder-removal chapter。 In fact:
 
-| Removed | Replacement |
-|---|---|
-| Various pre-chapter-八百七十八 host-shim forwarders (audited deprecated paths) | Direct calls into the canonical substrate surface (`BASCognitiveBrain` / `BASRuntimeCore` primitives). The substrate's own test sweep + 3-agent reviews at chapter 八百七十八 confirmed zero in-repo callers remained pre-removal. |
-| Specific symbols enumerated in CHANGELOG.md `[0.62.0]` → chapter 八百七十八 section (lines ~1010-1130) | Same section provides the per-symbol replacement guidance. |
+- **Forwarder migration happened in chapter 八百三十一**
+  (mini-arc 5 of v0.61.0)。 9/9 forwarder shims archived → 2,133
+  LOC removed。 See CHANGELOG `[0.61.0]` section line ~3593。
+- **Chapter 八百七十八 did NOT remove forwarders**。 It addressed
+  self-assessment concerns + 9th-pass review HIGH items
+  (sweep-count drift,tearDown leaks,Cargo.lock drift)。
+- **v0.62.0 → v0.62.3 removed NOTHING net** — all consumer-
+  visible changes in this version range are additive (new
+  fields,new optional opt-ins,one Rust default flip preserving
+  byte-equality)。
 
-If your repository is a downstream consumer,grep your codebase
-for any `*ForwarderShim` / `*Deprecated` symbols before upgrading。
-The chapter 八百七十八 audit identified zero in-substrate callers,
-but downstream consumers may have grown their own dependencies
-on the shims pre-v0.62.0。
+**Action required if upgrading from < v0.61.0**: read the
+v0.61.0 CHANGELOG section + grep your downstream code for any
+`*ForwarderShim` / `*Deprecated` / `*ArchivedForwarder` symbols
+that were removed in mini-arc 5。 The substrate's chapter 831
+audit confirmed zero in-substrate callers,but downstream
+consumers may have grown dependencies on the shims pre-v0.61.0。
+
+**Action required if upgrading from v0.61.0 → v0.62.x**: NONE
+in this category。 Symbol-removal is empty across the v0.62.x
+range。 See Step 5 for the actual additive deltas。
 
 ---
 
