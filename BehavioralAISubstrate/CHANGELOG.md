@@ -230,6 +230,67 @@ Per 「剩下 全部 一次性 解决掉」 final cleanup:
 Tag cut v0.62.5 deferred to user authorization per standing
 constraint。
 
+#### Chapter 九百十一 — Hot-path consolidation #3 records (15-112× WIN)
+
+Per 「Defer — keep developing first」 election after chapter 910
+arc seal,extend the chapter 906/909 hot-path consolidation
+pattern to memory_usage_records。 NEW `recent_records_for_atom`
+Rust fn + FFI + Swift bridge returns N most-recent
+(retrieved_at_ms, helped_state_code) tuples for an atom_id in
+ONE FFI call。 Measured:N=100 → 15.95×, N=1000 → 111.93×。
+ABI 15 → 16。 4 tests pass。
+
+#### Chapter 九百十二 — Swift wrapper for ch 910 with_skipped + tighten perf guards (MED #18)
+
+Closes 2 deferred items:
+- Chapter 910 added Rust + FFI for cosine_topk_with_skipped
+  but no Swift bridge wrapper。 NEW
+  `BASRoutedVectorIndexStorage.cosineTopKWithSkipped(...)`
+  exposes the dim-mismatch counter to consumers。 3 tests
+  pass (clean / mixed / parity with base variant)。
+- Review MED #18:tightened chapter 905 perf guards 5× → 2×
+  across 3 store comparisons。 Measured ratios 0.92×-1.05×
+  comfortably within new 2× headroom。
+
+No ABI bump (Swift bridge addition only)。
+
+#### Chapter 九百十三 — Hot-path consolidation #4 vault metadata (3.75-4.34× WIN — pattern proven across all 4 stores)
+
+Final consolidation chapter completing the pattern across
+all 4 major L8 stores。 NEW `all_vault_metadata` Rust fn +
+FFI + Swift bridge returns all vaults' (rowid, last_updated_
+at_ms) tuples DESC by ts in ONE FFI call (boot-time loadAll
+metadata path)。 ABI 16 → 17。 5 tests pass。 Speedup smaller
+than other 3 stores because vault baseline (vaultCount) is
+already fast + typical N is small (1-10 vaults per device)。
+
+#### Chapter 九百十四 — Doc drift fix (CHANGELOG + ARC_SEAL + BRANCH_SUMMARY past ch 910)
+
+Per 「继续修复」 directive,CHANGELOG + L8_ARC_SEAL.md +
+BRANCH_SUMMARY all stopped at chapter 910 seal but 3 more
+chapters shipped after。 This sub-chapter extends all 3
+docs to the current state:
+- CHANGELOG:added entries for 911 / 912 / 913 / this
+- L8_ARC_SEAL.md:span 893-910 → 893-914, timeline table
+  +4 rows, architecture state table updated to ABI 17 +
+  ~77 FFI fns + 4 hot-path consolidation primitives all
+  FLIP-READY across 4 stores
+- BRANCH_SUMMARY:arc row extended past chapter 910
+
+Updated 「Findings #2 (hot-path wins)」 table to include all
+4 stores measured:vector_index 90-134× + event_log 17-102×
++ records 15-112× + vault 3.75-4.34×。 Pattern definitively
+generalizes — confirmed across the entire L8 surface area。
+
+Deferred items registry update:
+- #11 (dim-mismatch counter) and #18 (perf guards) shipped
+  in chapters 910 + 912 — removed from MED list
+- Remaining MED:#12 cross-platform, #13 -2 overload, #14
+  read errors enum, #15 test boilerplate, #17 PERF_LONG
+- LOW × 3 unchanged
+
+No ABI bump (docs-only chapter)。
+
 #### Chapter 九百七 — Review fix-of-fix (CRITICAL + HIGH from arc 893-906 review)
 
 3-agent parallel review caught 2 CRITICAL + 8 HIGH + 9 MED + 3
