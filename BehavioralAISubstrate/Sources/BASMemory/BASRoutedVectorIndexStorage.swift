@@ -231,6 +231,58 @@ public actor BASRoutedVectorIndexStorage {
         return outBuf
     }
 
+    /// chapter 九百十二 / M3265 — Swift wrapper for the chapter
+    /// 九百十 `with_skipped` FFI variant。 Same as cosineTopK
+    /// but also returns the count of dim-mismatched rows
+    /// silently skipped during the scan。 Production consumers
+    /// can detect provider upgrades that left mixed-dim
+    /// corpora behind。
+    public func cosineTopKWithSkipped(
+        forDomain domain: String,
+        queryBytes: [UInt8],
+        k: Int
+    ) async throws -> (
+        results: [(rowid: Int64, score: Float)],
+        skipped: Int
+    ) {
+        precondition(k > 0, "Top-k must be positive")
+        let dom = Array(domain.utf8)
+        var rowids = [Int64](repeating: 0, count: k)
+        var scores = [Float](repeating: 0, count: k)
+        var skipped: Int64 = 0
+        let n = dom.withUnsafeBufferPointer { domBuf in
+            queryBytes.withUnsafeBufferPointer { qBuf in
+                rowids.withUnsafeMutableBufferPointer { rBuf in
+                    scores.withUnsafeMutableBufferPointer { sBuf in
+                        bas_l8_vector_index_cosine_topk_for_domain_with_skipped(
+                            enginePtr,
+                            domBuf.baseAddress.map {
+                                UnsafeRawPointer($0)
+                                    .assumingMemoryBound(
+                                        to: CChar.self)
+                            },
+                            domBuf.count,
+                            qBuf.baseAddress,
+                            qBuf.count,
+                            k,
+                            rBuf.baseAddress,
+                            sBuf.baseAddress,
+                            &skipped)
+                    }
+                }
+            }
+        }
+        guard n >= 0 else {
+            throw StoreError.upsertFailed(code: n)
+        }
+        var out: [(rowid: Int64, score: Float)] = []
+        out.reserveCapacity(Int(n))
+        for i in 0..<Int(n) {
+            out.append((rowid: rowids[i], score: scores[i]))
+        }
+        return (results: out, skipped: Int(skipped))
+    }
+
     /// INTEGRATED cosine top-k:fetches all embeddings for a
     /// domain + dot-product scores them against the query in
     /// ONE FFI call (vs N round-trip reads + Swift compute)。

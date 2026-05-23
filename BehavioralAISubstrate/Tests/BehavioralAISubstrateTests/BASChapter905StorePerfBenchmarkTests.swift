@@ -17,12 +17,12 @@
 //     HostConstitutionVaultStorage.save() (per-vault snapshot)
 //
 // At each workload N ∈ {100, 1000} the test prints a perf
-// scorecard and asserts the result is NOT silently regressed
-// (Rust within 5× of Swift either way is considered OK for
-// chapter 905 — we only DECLINE-WITH-TRIGGER if Rust is
-// catastrophically slower)。 Chapter 906 uses these numbers
-// to make the flip-or-decline decision per the chapter 870
-// 整体 性能 一定要 更好 discipline。
+// scorecard and asserts the result is NOT silently regressed。
+// chapter 九百十二 / M3265 review fix MED #18:tightened from
+// soft 5× to harder 2× — measured ratios are 0.92×-1.05× so
+// 2× is a meaningful regression band。 Chapter 906 uses these
+// numbers to make the flip-or-decline decision per chapter
+// 870 整体 性能 一定要 更好 discipline。
 //
 // # Discipline pins
 //
@@ -126,11 +126,11 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
             " swift=\(String(format: "%.4f", swiftSec))s" +
             " rust=\(String(format: "%.4f", rustSec))s" +
             " swift/rust=\(String(format: "%.2fx", ratio))")
-        // Soft assertion:Rust must not be catastrophically
-        // slower (>5×) at production sizes。 If this fails,
-        // DECLINE-WITH-TRIGGER doc per chapter 881 + 890 model。
-        XCTAssertLessThan(rustSec, swiftSec * 5.0,
-            "Rust >5x slower than Swift = catastrophic regression")
+        // Tightened guard (ch 九百十二 review fix MED #18):
+        // Rust must not be >2× slower。 Measured ratios are
+        // 0.92×-1.05× so 2× is a meaningful regression band。
+        XCTAssertLessThan(rustSec, swiftSec * 2.0,
+            "Rust >2x slower than Swift = real regression")
     }
 
     // MARK: - EventLog.append() throughput
@@ -188,7 +188,7 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
             " swift=\(String(format: "%.4f", swiftSec))s" +
             " rust=\(String(format: "%.4f", rustSec))s" +
             " swift/rust=\(String(format: "%.2fx", ratio))")
-        XCTAssertLessThan(rustSec, swiftSec * 5.0)
+        XCTAssertLessThan(rustSec, swiftSec * 2.0)
     }
 
     // MARK: - HostConstitution.save() throughput
@@ -240,7 +240,7 @@ final class BASChapter905StorePerfBenchmarkTests: XCTestCase {
             " swift=\(String(format: "%.4f", swiftSec))s" +
             " rust=\(String(format: "%.4f", rustSec))s" +
             " swift/rust=\(String(format: "%.2fx", ratio))")
-        XCTAssertLessThan(rustSec, swiftSec * 5.0)
+        XCTAssertLessThan(rustSec, swiftSec * 2.0)
     }
 }
 #endif
