@@ -11,6 +11,29 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十三.2 / M3420.2 — Self-audit followup corrigendum (4 more stale numeric references ch 943.1 missed)
+
+After ch 943.1 corrigendum, a self-audit looking for remaining stale references found that the corrigendum itself missed 4 sites — same defect class (partial-update-of-same-row anti-pattern):
+
+1. SEAL :140 Architecture state table: `**105/105 PASS**` → `**109/109 PASS**` (ch 943 added 4 splicer tests for HIGH-6/7: overwrite_idempotent + empty_string + non_json + unbalanced_brace)
+2. SEAL :597 v0.62.5 block: `**105 Rust unit tests**` → `**109 Rust unit tests**`
+3. BRANCH_SUMMARY:33 body early: `**105 Rust unit tests**` → `**109 Rust unit tests**`
+4. BRANCH_SUMMARY:33 tail: `Final ABI 18 + **105 Rust + 173+ Swift tests + 13 meta passes**` → `Final ABI 18 + **109 Rust + 173+ Swift tests + 15 meta passes** + 1 USER-PASS + 1 USER-PASS-2 + 1 USER-PASS-2 followup`
+
+#### Discipline meta-finding
+
+**Partial-update-of-same-row anti-pattern**: ch 943.1 corrigendum updated some text in BRANCH_SUMMARY:33 but missed adjacent stale numbers in the SAME ROW (the「Final ABI 18 + ...」 tail). The corrigendum itself became a target for the next corrigendum, confirming the cascade pattern extends to corrigenda — not just pass reviews. New discipline: **when updating ANY part of a row, scan the ENTIRE row for adjacent stale state, not just the part being updated**.
+
+#### Verification
+
+- python3 arithmetic still C=53, H=113 (no per-pass changes)
+- `grep -c "105 Rust\|13 meta passes\|13-pass meta" Docs/L8_ARC_SEAL.md BRANCH_SUMMARY.md` (excluding historical-narration context) → all 0
+- pre-commit-gates.sh: TBD
+
+#### Up next
+
+If user does another USER-PASS-N audit, expect to find more partial-update defects (the cascade continues at the corrigendum layer too).
+
 ### Chapter 九百四十三.1 / M3420.1 — USER-PASS-2 arithmetic + state-block corrigendum (no new pass review,no new code)
 
 User directive 「先不要继续加新 pass，把 L8_ARC_SEAL.md 里 ch943 相关内容改成 FOUND / OPEN / proposed，或者真正落完 ch943 对应的 CHANGELOG、BRANCH_SUMMARY、测试/源码修改后再声明 SHIPPED。当前这份 doc 不能算干净。」
