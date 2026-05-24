@@ -1511,6 +1511,36 @@ int64_t bas_l8_atom_lifecycle_count_for_session(
     const L8Engine* engine,
     const char* session_id_utf8, size_t session_id_len);
 
+// chapter 九百三十四 / M3375 — full-row events JSON FFI
+// (USER-PASS fix for ch 933 finding that the bridge was labeled
+//「Full」 but shipped `return []` stubs)。 Probe + fill pattern:
+//   - If out_buf is null and out_capacity is 0:returns the
+//     bytes needed for the JSON output (probe call)
+//   - Otherwise:writes UTF-8 JSON-encoded events into out_buf,
+//     returns bytes written (≤ out_capacity)
+// Return codes:
+//   -1 → null engine
+//   -3 → null/invalid UTF-8 input OR out_capacity < needed (fill)
+//   -2 → SQLite error
+//   ≥0 → bytes needed (probe) or bytes written (fill)
+//
+// JSON shape:array of BASAtomLifecycleEvent Codable objects:
+//   [{"eventID":"...","atomID":"...","sessionID":"...",
+//     "fromPhaseByte":0..4,"toPhaseByte":0..4,"actionByte":0..3,
+//     "outcome":0..2,"recordedAtMs":<i64>,
+//     "actorRef":"..." | null}, ...]
+int32_t bas_l8_atom_lifecycle_events_for_atom(
+    const L8Engine* engine,
+    const char* atom_id_utf8, size_t atom_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+int32_t bas_l8_atom_lifecycle_events_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 // MARK: - bas-l8-engine user_state module
 //         (chapter 八百九十八 / M3180)
 //

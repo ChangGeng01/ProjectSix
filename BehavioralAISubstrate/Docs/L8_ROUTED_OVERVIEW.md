@@ -28,7 +28,7 @@ routed path」 below)。
 | Legacy Swift actor (production default) | Rust-backed bridge | Schema | Status (chapter 九百三十三 / M3370 honesty pass) |
 |---|---|---|---|
 | `BASSQLiteHostConstitutionDeletionManifestStore` | `BASRoutedHostConstitutionDeletionManifestStore` | 015 | **Partial** (append+count Full;`manifests(forVault:)` + `manifests(forType:)` stubbed `return []` per 896.5 deferral — see Partial-conformance list below) |
-| `BASSQLiteAtomLifecycleStorage` | `BASRoutedAtomLifecycleStore` | 023 | **Partial** (append+count Full;`events(forAtom:)` + `events(forSession:)` stubbed `return []` per 897.5 deferral) |
+| `BASSQLiteAtomLifecycleStorage` | `BASRoutedAtomLifecycleStore` | 023 | **Full** (ch 934 implemented `events(forAtom:)` + `events(forSession:)` via NEW probe+fill JSON FFI — round-trip verified by BASChapter934 tests) |
 | `BASSQLiteUserStateStorage` | `BASRoutedUserStateStore` | user_states | **Partial** (append+count Full;`state(forID:)` + `latestState` stubbed `return nil` per 898.5 deferral) |
 | `BASSQLiteHostConstitutionVersionTreeStore` | `BASRoutedHostConstitutionVersionTreeStore` | 014 | **Partial** (append+count Full;`versions(forVault:)` + `rollbackPoints(forVault:)` + `version(forID:)` stubbed per 899.5 deferral) |
 | `BASSQLiteVectorIndexStorage` | `BASRoutedVectorIndexStorage` | vector_index | Full + hot-path `cosineTopK` |
@@ -44,8 +44,8 @@ These methods exist in the Routed bridge's protocol surface but return empty/nil
 |---|---|---|---|
 | DeletionManifest | `manifests(forVault: String) async -> [BASHostConstitutionDeletionManifest]` | `[]` | ch 896.5 |
 | DeletionManifest | `manifests(forType: BASDeletionType) async -> [...]` | `[]` | ch 896.5 |
-| AtomLifecycle | `events(forAtom: String) async -> [BASAtomLifecycleEvent]` | `[]` | ch 897.5 |
-| AtomLifecycle | `events(forSession: String) async -> [...]` | `[]` | ch 897.5 |
+| ~~AtomLifecycle~~ | ~~`events(forAtom: String) async -> [BASAtomLifecycleEvent]`~~ | **SHIPPED ch 934** | ✓ |
+| ~~AtomLifecycle~~ | ~~`events(forSession: String) async -> [...]`~~ | **SHIPPED ch 934** | ✓ |
 | UserState | `state(forID: String) async -> BASUserState?` | `nil` | ch 898.5 |
 | UserState | `latestState(forSession: String) async -> BASUserState?` | `nil` | ch 898.5 |
 | VersionTree | `versions(forVault: String) async -> [BASHostConstitutionVersionRecord]` | `[]` | ch 899.5 |

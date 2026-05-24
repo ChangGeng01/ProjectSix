@@ -118,15 +118,88 @@ public actor BASRoutedAtomLifecycleStore: BASAtomLifecycleStore {
     public func events(
         forAtom atomID: String
     ) async -> [BASAtomLifecycleEvent] {
-        // Chapter 897 partial conformance — full row return
-        // requires Rust FFI extension (chapter 897.5)。
-        return []
+        // chapter 九百三十四 / M3375 — USER-PASS fix for ch 933
+        // finding: this method used to `return []` despite the
+        // L8_ROUTED_OVERVIEW.md table labeling the bridge「Full」。
+        // Now uses probe + fill pattern against the new
+        // `bas_l8_atom_lifecycle_events_for_atom` FFI which
+        // returns a JSON array of Codable BASAtomLifecycleEvent。
+        return Self.eventsViaJsonFfi(
+            engine: enginePtr, key: atomID, byAtom: true)
     }
 
     public func events(
         forSession sessionID: String
     ) async -> [BASAtomLifecycleEvent] {
-        return []
+        // chapter 九百三十四 / M3375 — see events(forAtom:) above
+        return Self.eventsViaJsonFfi(
+            engine: enginePtr, key: sessionID, byAtom: false)
+    }
+
+    /// chapter 九百三十四 / M3375 — shared probe+fill helper for
+    /// the new full-row JSON FFI。 Returns empty array on any
+    /// error path so callers get the same shape as the pre-ch-934
+    /// stub for forward-compat。
+    private static func eventsViaJsonFfi(
+        engine: OpaquePointer,
+        key: String,
+        byAtom: Bool
+    ) -> [BASAtomLifecycleEvent] {
+        let keyBytes = Array(key.utf8)
+        // Probe call:out_buf=null + out_capacity=0
+        let needed = keyBytes.withUnsafeBufferPointer { kBuf in
+            byAtom
+                ? bas_l8_atom_lifecycle_events_for_atom(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+                : bas_l8_atom_lifecycle_events_for_session(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+        }
+        guard needed >= 0 else { return [] }
+        // Special case: empty result「[]」 = 2 bytes,still need
+        // the probe-fill cycle to actually receive them
+        guard needed >= 2 else { return [] }
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let written = keyBytes.withUnsafeBufferPointer { kBuf in
+            buf.withUnsafeMutableBufferPointer { outBuf in
+                byAtom
+                    ? bas_l8_atom_lifecycle_events_for_atom(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress,
+                        outBuf.count)
+                    : bas_l8_atom_lifecycle_events_for_session(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress,
+                        outBuf.count)
+            }
+        }
+        guard written >= 0 else { return [] }
+        let json = Data(buf.prefix(Int(written)))
+        return (try? JSONDecoder().decode(
+            [BASAtomLifecycleEvent].self, from: json)) ?? []
     }
 
     public func count() async -> Int {

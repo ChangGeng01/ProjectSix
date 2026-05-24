@@ -11,6 +11,63 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十四 / M3375 — SUBSTANCE chapter:atom_lifecycle full-row FFI implemented (was「Full」 lie since ch 897)
+
+User directive:好 (after ch 933 USER-PASS exposed 4 bridges as stubbed-but-labeled-Full)。 Ch 934 is the FIRST substance chapter delivering one of the 4 missing implementations。
+
+**Scope:** AtomLifecycle `events(forAtom:)` + `events(forSession:)` had been `return []` stubs since chapter 897 (3 months ago at this point in the L8 arc),while L8_ROUTED_OVERVIEW.md labeled the bridge「Full」。
+
+#### What shipped
+
+1. **Rust FFI** — NEW `bas_l8_atom_lifecycle_events_for_atom` + `bas_l8_atom_lifecycle_events_for_session` using probe+fill pattern (matches `bas_l8_engine_db_path` + ch 906/909 hot-path consolidation primitives)
+   - Returns UTF-8 JSON array of Codable `BASAtomLifecycleEvent` objects
+   - Schema TEXT columns (phase/action/outcome) mapped back to u8/i32 codes to match Swift struct exactly
+   - JSON encoding manual (no serde dep — minimal-dep footprint per ch 894 doctrine)
+   - Escape logic for `"`,`\`,`\n`,`\t`,`\r`,control chars
+
+2. **Swift bridge** — both `events(forAtom:)` + `events(forSession:)` rewritten via shared `eventsViaJsonFfi` helper:
+   - Probe call (out_buf=null) → returns bytes needed
+   - Fill call → caller-allocated [UInt8] buffer
+   - JSONDecoder reconstructs `[BASAtomLifecycleEvent]`
+   - Empty result on any error path (forward-compat with prior stub shape)
+
+3. **Tests** — `BASChapter934AtomLifecycleFullRowTests.swift` (4 tests, all passing):
+   - Round-trip:append 2 events,read back via events(forAtom:),assert full field equality + ordering
+   - Empty result:unknown atomID returns empty array (not error)
+   - forSession parallel test:3 events across 2 sessions,assert correct partitioning
+   - JSON escape correctness:actorRef with `"`,`\`,`\n`,`\t` round-trips byte-for-byte
+   
+   Plus 3 NEW Rust unit tests in `atom_lifecycle.rs`:
+   - `events_for_atom_json_round_trip` — direct JSON construction verification
+   - `events_for_atom_ffi_probe_fill` — FFI-layer probe+fill + too-small-buffer rejection
+   - `events_json_escapes_special_chars` — escape correctness at the SQL layer
+
+4. **L8_ROUTED_OVERVIEW.md** — AtomLifecycle row relabeled「Partial」 → 「**Full** (ch 934 implemented...)」 + stub-list rows for AtomLifecycle marked SHIPPED with strikethrough
+
+#### Discipline applied
+
+- **SUBSTANCE-vs-source-code** check (ch 933 discipline):the「Full」 claim now backed by both Rust unit test + Swift round-trip test + verified via grep that no `return []` stubs remain in BASRoutedAtomLifecycleStore
+- **fail-on-revert** (ch 927):if `events(forAtom:)` is reverted to `return []`,testEventsForAtomRoundTrip fails with「returned 0, expected 2」 — real coverage
+- **python3 / grep / awk** (ch 929-931):all numeric+text claims verified
+
+#### Verification
+
+- Rust:**81/81 unit tests pass** (+3 NEW:events_for_atom_json_round_trip + events_for_atom_ffi_probe_fill + events_json_escapes_special_chars)
+- Swift filtered:**BASChapter934 → 4/4 pass** + BASChapter926 → 15/15 pass
+- Swift full sweep:**13595 tests,87 skipped,0 failures** (+4 from ch 933 baseline of 13591)
+- pre-commit-gates.sh:**3/3 pass**
+- XCFramework rebuilt with new FFI symbols
+
+#### Remaining substance work
+
+4 bridges still partial (per ch 933 stub list):
+- DeletionManifest:`manifests(forVault:)` + `manifests(forType:)` — ch 935 candidate
+- UserState:`state(forID:)` + `latestState(forSession:)` — ch 936 candidate
+- VersionTree:`versions(forVault:)` + `rollbackPoints(forVault:)` + `version(forID:)` — ch 937 candidate
+- EventLog:`events(forSession:)` + `events(sinceTimestampMs:limit:)` — ch 938 candidate
+
+Each follows the now-proven ch 934 recipe (probe+fill JSON FFI + JSONDecoder)。
+
 ### Chapter 九百三十三 / M3370 — USER caught what 12 review passes ALL missed: 4 bridges labeled「Full」 but stubbed (4 CRITICAL + 2 HIGH)
 
 User pointed at specific source-code lines that contradict L8_ROUTED_OVERVIEW.md「Full」 claims。 This is the most damning finding of the arc — **12 meta-cascade review passes ALL MISSED** that 4 production-shipped bridges are FALSELY labeled「Full」 while shipping stubbed `return []` / `return nil` methods。
