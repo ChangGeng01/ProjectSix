@@ -114,6 +114,136 @@ pub fn count_manifests_for_vault(
     )
 }
 
+// MARK: - chapter 九百三十五 / M3380 — full-row manifests query
+//
+// USER-PASS finding (ch 933) #2 substance fix:the ch 896 bridge
+// labeled this「Full」 in L8_ROUTED_OVERVIEW.md but shipped
+// `return []` + assertionFailure() stubs。 Recipe matches ch 934
+// (atom_lifecycle):manual JSON construction + probe+fill FFI。
+//
+// JSON shape:array of `BASHostConstitutionDeletionRecord` Codable
+// objects — manifestID,vaultID,targetRefsJson,deletionType,
+// appliedAtMs,cascadedRefsJson (optional),versionRef (optional)。
+
+fn escape_json(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            c if (c as u32) < 0x20 => {
+                out.push_str(&format!(
+                    "\\u{:04x}", c as u32));
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn row_to_json(
+    manifest_id: &str,
+    vault_id: &str,
+    target_refs_json: &str,
+    deletion_type: &str,
+    applied_at_ms: i64,
+    cascaded_refs_json: Option<String>,
+    version_ref: Option<String>,
+) -> String {
+    let mut out = String::from("{");
+    out.push_str(&format!(
+        "\"manifestID\":\"{}\",", escape_json(manifest_id)));
+    out.push_str(&format!(
+        "\"vaultID\":\"{}\",", escape_json(vault_id)));
+    out.push_str(&format!(
+        "\"targetRefsJson\":\"{}\",",
+        escape_json(target_refs_json)));
+    out.push_str(&format!(
+        "\"deletionType\":\"{}\",",
+        escape_json(deletion_type)));
+    out.push_str(&format!(
+        "\"appliedAtMs\":{}", applied_at_ms));
+    match cascaded_refs_json {
+        Some(s) => out.push_str(&format!(
+            ",\"cascadedRefsJson\":\"{}\"", escape_json(&s))),
+        None => out.push_str(",\"cascadedRefsJson\":null"),
+    }
+    match version_ref {
+        Some(s) => out.push_str(&format!(
+            ",\"versionRef\":\"{}\"", escape_json(&s))),
+        None => out.push_str(",\"versionRef\":null"),
+    }
+    out.push('}');
+    out
+}
+
+pub fn manifests_for_vault_json(
+    conn: &Connection,
+    vault_id: &str,
+) -> rusqlite::Result<String> {
+    let mut stmt = conn.prepare(
+        "SELECT manifest_id, vault_id, target_refs_json, \
+                deletion_type, applied_at_ms, \
+                cascaded_refs_json, version_ref \
+         FROM host_constitution_deletion_manifest \
+         WHERE vault_id = ? \
+         ORDER BY applied_at_ms")?;
+    let mut rows = stmt.query(params![vault_id])?;
+    let mut out = String::from("[");
+    let mut first = true;
+    while let Some(row) = rows.next()? {
+        if !first { out.push(','); }
+        first = false;
+        let json = row_to_json(
+            &row.get::<_, String>(0)?,
+            &row.get::<_, String>(1)?,
+            &row.get::<_, String>(2)?,
+            &row.get::<_, String>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, Option<String>>(5)?,
+            row.get::<_, Option<String>>(6)?,
+        );
+        out.push_str(&json);
+    }
+    out.push(']');
+    Ok(out)
+}
+
+pub fn manifests_for_type_json(
+    conn: &Connection,
+    deletion_type: &str,
+) -> rusqlite::Result<String> {
+    let mut stmt = conn.prepare(
+        "SELECT manifest_id, vault_id, target_refs_json, \
+                deletion_type, applied_at_ms, \
+                cascaded_refs_json, version_ref \
+         FROM host_constitution_deletion_manifest \
+         WHERE deletion_type = ? \
+         ORDER BY applied_at_ms")?;
+    let mut rows = stmt.query(params![deletion_type])?;
+    let mut out = String::from("[");
+    let mut first = true;
+    while let Some(row) = rows.next()? {
+        if !first { out.push(','); }
+        first = false;
+        let json = row_to_json(
+            &row.get::<_, String>(0)?,
+            &row.get::<_, String>(1)?,
+            &row.get::<_, String>(2)?,
+            &row.get::<_, String>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, Option<String>>(5)?,
+            row.get::<_, Option<String>>(6)?,
+        );
+        out.push_str(&json);
+    }
+    out.push(']');
+    Ok(out)
+}
+
 // MARK: - FFI surface
 
 /// Initialize schema 015 on the engine's connection。
@@ -269,6 +399,73 @@ pub unsafe extern "C" fn bas_l8_deletion_manifest_count_for_vault(
     engine_ref.with_conn(|conn| {
         count_manifests_for_vault(conn, vault_id).unwrap_or(-2)
     })
+}
+
+// chapter 九百三十五 / M3380 — full-row manifests JSON FFI
+// USER-PASS substance fix #2 (ch 933 follow-through)。
+// Probe + fill pattern matching ch 934 atom_lifecycle FFI。
+
+unsafe fn manifests_json_ffi(
+    engine: *const L8Engine,
+    key_utf8: *const c_char,
+    key_len: usize,
+    out_buf: *mut u8,
+    out_capacity: usize,
+    by_vault: bool,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    let key = match crate::cstr_to_str(key_utf8, key_len) {
+        Some(s) => s, None => return -3,
+    };
+    let engine_ref = unsafe { &*engine };
+    let json_result = engine_ref.with_conn(|conn| {
+        if by_vault {
+            manifests_for_vault_json(conn, key)
+        } else {
+            manifests_for_type_json(conn, key)
+        }
+    });
+    let json = match json_result {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let bytes = json.as_bytes();
+    let needed = bytes.len();
+    if out_buf.is_null() || out_capacity == 0 {
+        return needed as i32;
+    }
+    if out_capacity < needed {
+        return -3;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            bytes.as_ptr(), out_buf, needed);
+    }
+    needed as i32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_deletion_manifest_for_vault(
+    engine: *const L8Engine,
+    vault_id_utf8: *const c_char, vault_id_len: usize,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    manifests_json_ffi(
+        engine, vault_id_utf8, vault_id_len,
+        out_buf, out_capacity, true)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_deletion_manifest_for_type(
+    engine: *const L8Engine,
+    deletion_type_utf8: *const c_char, deletion_type_len: usize,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    manifests_json_ffi(
+        engine, deletion_type_utf8, deletion_type_len,
+        out_buf, out_capacity, false)
 }
 
 // MARK: - Tests
@@ -441,6 +638,97 @@ mod tests {
         };
         assert_eq!(rc, -2,
             "Invalid deletion_type must trip CHECK constraint");
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百三十五 / M3380 — full-row JSON round-trip
+    #[test]
+    fn manifests_for_vault_json_round_trip() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_deletion_manifest_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            append_manifest(
+                conn, "m1", "vault-RT",
+                "[\"atom-1\"]", "cascade",
+                1_700_000_000_000,
+                Some("[\"cascade-A\"]"),
+                Some("v1")).unwrap();
+            append_manifest(
+                conn, "m2", "vault-RT",
+                "[\"atom-2\"]", "selective",
+                1_700_000_001_000,
+                None, None).unwrap();
+            let json = manifests_for_vault_json(
+                conn, "vault-RT").unwrap();
+            // Both manifests present
+            assert!(json.contains("\"manifestID\":\"m1\""));
+            assert!(json.contains("\"manifestID\":\"m2\""));
+            // Type strings present
+            assert!(json.contains("\"deletionType\":\"cascade\""));
+            assert!(json.contains("\"deletionType\":\"selective\""));
+            // Optional fields:both present + null
+            assert!(json.contains("\"cascadedRefsJson\":\"[\\\"cascade-A\\\"]\""));
+            assert!(json.contains("\"cascadedRefsJson\":null"));
+            assert!(json.contains("\"versionRef\":\"v1\""));
+            assert!(json.contains("\"versionRef\":null"));
+            // Ordering: applied_at_ms ASC → m1 before m2
+            let p1 = json.find("\"manifestID\":\"m1\"").unwrap();
+            let p2 = json.find("\"manifestID\":\"m2\"").unwrap();
+            assert!(p1 < p2);
+            // Empty vault case
+            let empty = manifests_for_vault_json(
+                conn, "vault-NONE").unwrap();
+            assert_eq!(empty, "[]");
+            // forType query
+            let cascade_json = manifests_for_type_json(
+                conn, "cascade").unwrap();
+            assert!(cascade_json.contains("\"manifestID\":\"m1\""));
+            assert!(!cascade_json.contains("\"manifestID\":\"m2\""));
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn manifests_for_vault_ffi_probe_fill() {
+        let engine = make_engine();
+        let _ = unsafe {
+            bas_l8_deletion_manifest_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            append_manifest(
+                conn, "ffi-m1", "ffi-vault",
+                "[]", "cascade",
+                1_700_000_000_000, None, None).unwrap();
+        });
+        let vid = "ffi-vault";
+        let needed = unsafe {
+            bas_l8_deletion_manifest_for_vault(
+                engine,
+                vid.as_ptr() as *const c_char, vid.len(),
+                std::ptr::null_mut(), 0)
+        };
+        assert!(needed > 0);
+        let mut buf = vec![0u8; needed as usize];
+        let written = unsafe {
+            bas_l8_deletion_manifest_for_vault(
+                engine,
+                vid.as_ptr() as *const c_char, vid.len(),
+                buf.as_mut_ptr(), buf.len())
+        };
+        assert_eq!(written, needed);
+        let json = std::str::from_utf8(&buf).unwrap();
+        assert!(json.contains("\"manifestID\":\"ffi-m1\""));
+        // too-small buffer rejected
+        let mut tiny = vec![0u8; 1];
+        let rc = unsafe {
+            bas_l8_deletion_manifest_for_vault(
+                engine,
+                vid.as_ptr() as *const c_char, vid.len(),
+                tiny.as_mut_ptr(), tiny.len())
+        };
+        assert_eq!(rc, -3);
         unsafe { bas_l8_engine_close(engine); }
     }
 }

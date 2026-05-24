@@ -156,30 +156,83 @@ public actor BASRoutedHostConstitutionDeletionManifestStore:
     public func manifests(
         forVault vaultID: String
     ) async -> [BASHostConstitutionDeletionRecord] {
-        // Chapter 896 partial conformance — query returns
-        // empty until chapter 896.5 extends FFI。 Production
-        // hosts that need query support stay on the legacy
-        // Swift actor。
-        // chapter 九百二十一 partial-conformance assertion
-        // (DEBUG only;RELEASE returns [] as before)。
-        assertionFailure(
-            "BASRoutedHostConstitutionDeletionManifestStore." +
-            "manifests(forVault:) is partial conformance " +
-            "(returns []) — use BASSQLiteHostConstitution" +
-            "DeletionManifestStore for query support。 See " +
-            "Docs/L8_ROUTED_OVERVIEW.md")
-        return []
+        // chapter 九百三十五 / M3380 — USER-PASS substance fix #2
+        // (ch 933 follow-through)。 Previously this method had:
+        //   - assertionFailure() warning in DEBUG
+        //   - return [] in RELEASE
+        // Now wired to the new bas_l8_deletion_manifest_for_vault
+        // probe+fill FFI returning JSON array of Codable records。
+        return Self.manifestsViaJsonFfi(
+            engine: enginePtr, key: vaultID, byVault: true)
     }
 
     public func manifests(
         forType deletionType: String
     ) async -> [BASHostConstitutionDeletionRecord] {
-        // chapter 九百二十一 partial-conformance assertion
-        assertionFailure(
-            "BASRoutedHostConstitutionDeletionManifestStore." +
-            "manifests(forType:) is partial conformance " +
-            "(returns []) — see Docs/L8_ROUTED_OVERVIEW.md")
-        return []
+        // chapter 九百三十五 / M3380 — see manifests(forVault:)
+        return Self.manifestsViaJsonFfi(
+            engine: enginePtr, key: deletionType, byVault: false)
+    }
+
+    /// chapter 九百三十五 / M3380 — shared probe+fill helper
+    /// matching ch 934 atom_lifecycle pattern。
+    private static func manifestsViaJsonFfi(
+        engine: OpaquePointer,
+        key: String,
+        byVault: Bool
+    ) -> [BASHostConstitutionDeletionRecord] {
+        let keyBytes = Array(key.utf8)
+        let needed = keyBytes.withUnsafeBufferPointer { kBuf in
+            byVault
+                ? bas_l8_deletion_manifest_for_vault(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+                : bas_l8_deletion_manifest_for_type(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+        }
+        guard needed >= 2 else { return [] }
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let written = keyBytes.withUnsafeBufferPointer { kBuf in
+            buf.withUnsafeMutableBufferPointer { outBuf in
+                byVault
+                    ? bas_l8_deletion_manifest_for_vault(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress,
+                        outBuf.count)
+                    : bas_l8_deletion_manifest_for_type(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress,
+                        outBuf.count)
+            }
+        }
+        guard written >= 0 else { return [] }
+        let json = Data(buf.prefix(Int(written)))
+        return (try? JSONDecoder().decode(
+            [BASHostConstitutionDeletionRecord].self,
+            from: json)) ?? []
     }
 
     public func count() async -> Int {

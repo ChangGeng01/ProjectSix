@@ -1471,6 +1471,28 @@ int64_t bas_l8_deletion_manifest_count_for_vault(
     const L8Engine* engine,
     const char* vault_id_utf8, size_t vault_id_len);
 
+// chapter 九百三十五 / M3380 — full-row manifests JSON FFI
+// (USER-PASS substance fix #2 for ch 933 finding)。
+// Probe + fill pattern matching atom_lifecycle (ch 934)。
+//
+// JSON shape:array of BASHostConstitutionDeletionRecord Codable:
+//   [{"manifestID":"...","vaultID":"...","targetRefsJson":"...",
+//     "deletionType":"cascade|selective|rollback",
+//     "appliedAtMs":<i64>,
+//     "cascadedRefsJson":"..." | null,
+//     "versionRef":"..." | null}, ...]
+int32_t bas_l8_deletion_manifest_for_vault(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+int32_t bas_l8_deletion_manifest_for_type(
+    const L8Engine* engine,
+    const char* deletion_type_utf8, size_t deletion_type_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 // MARK: - bas-l8-engine atom_lifecycle module
 //         (chapter 八百九十七 / M3175)
 //

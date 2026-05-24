@@ -11,6 +11,30 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十五 / M3380 — SUBSTANCE chapter #2:deletion_manifest full-row FFI implemented (was「Full」 lie since ch 896)
+
+User directive:继续。 2nd substance chapter using ch 934 proven recipe (probe+fill JSON FFI + JSONDecoder)。
+
+#### What shipped
+
+1. **Rust FFI** — NEW `bas_l8_deletion_manifest_for_vault` + `bas_l8_deletion_manifest_for_type` (probe+fill pattern)
+2. **Swift bridge** — `manifests(forVault:)` + `manifests(forType:)` rewritten:removed `assertionFailure()` + replaced `return []` with shared `manifestsViaJsonFfi` helper
+3. **Tests** — `BASChapter935DeletionManifestFullRowTests.swift` (4 Swift tests) + 2 NEW Rust unit tests (`manifests_for_vault_json_round_trip` + `manifests_for_vault_ffi_probe_fill`)
+4. **L8_ROUTED_OVERVIEW.md** — DeletionManifest row relabeled「Partial」 → 「Full (ch 935 implemented...)」 + stub-list rows marked SHIPPED
+
+#### Verification
+
+- Rust:**83/83 unit tests pass** (+2 NEW)
+- Swift filtered:**BASChapter935 → 4/4 pass** + BASChapter934 → 4/4 pass + BASChapter926 → 15/15 pass
+- Swift full sweep:**13599 tests,87 skipped,0 failures** (+4 from ch 934 baseline of 13595)
+- pre-commit-gates.sh:**3/3 pass**
+
+#### Remaining substance work (3 bridges left)
+
+- UserState (ch 936 candidate)
+- VersionTree (ch 937 candidate)
+- EventLog (ch 938 candidate)
+
 ### Chapter 九百三十四 / M3375 — SUBSTANCE chapter:atom_lifecycle full-row FFI implemented (was「Full」 lie since ch 897)
 
 User directive:好 (after ch 933 USER-PASS exposed 4 bridges as stubbed-but-labeled-Full)。 Ch 934 is the FIRST substance chapter delivering one of the 4 missing implementations。
