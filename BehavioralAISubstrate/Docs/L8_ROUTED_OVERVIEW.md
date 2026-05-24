@@ -25,16 +25,42 @@ routed path」 below)。
 
 ## Which routed bridge maps to which legacy actor
 
-| Legacy Swift actor (production default) | Rust-backed bridge | Schema | Status |
+| Legacy Swift actor (production default) | Rust-backed bridge | Schema | Status (chapter 九百三十三 / M3370 honesty pass) |
 |---|---|---|---|
-| `BASSQLiteHostConstitutionDeletionManifestStore` | `BASRoutedHostConstitutionDeletionManifestStore` | 015 | Full |
-| `BASSQLiteAtomLifecycleStorage` | `BASRoutedAtomLifecycleStore` | 023 | Full |
-| `BASSQLiteUserStateStorage` | `BASRoutedUserStateStore` | user_states | Full |
-| `BASSQLiteHostConstitutionVersionTreeStore` | `BASRoutedHostConstitutionVersionTreeStore` | 014 | Full |
+| `BASSQLiteHostConstitutionDeletionManifestStore` | `BASRoutedHostConstitutionDeletionManifestStore` | 015 | **Partial** (append+count Full;`manifests(forVault:)` + `manifests(forType:)` stubbed `return []` per 896.5 deferral — see Partial-conformance list below) |
+| `BASSQLiteAtomLifecycleStorage` | `BASRoutedAtomLifecycleStore` | 023 | **Partial** (append+count Full;`events(forAtom:)` + `events(forSession:)` stubbed `return []` per 897.5 deferral) |
+| `BASSQLiteUserStateStorage` | `BASRoutedUserStateStore` | user_states | **Partial** (append+count Full;`state(forID:)` + `latestState` stubbed `return nil` per 898.5 deferral) |
+| `BASSQLiteHostConstitutionVersionTreeStore` | `BASRoutedHostConstitutionVersionTreeStore` | 014 | **Partial** (append+count Full;`versions(forVault:)` + `rollbackPoints(forVault:)` + `version(forID:)` stubbed per 899.5 deferral) |
 | `BASSQLiteVectorIndexStorage` | `BASRoutedVectorIndexStorage` | vector_index | Full + hot-path `cosineTopK` |
-| `BASSQLiteEventLogStorage` | `BASRoutedEventLogStorage` | event_log v2 | Partial (read methods return `[]` — see below) |
+| `BASSQLiteEventLogStorage` | `BASRoutedEventLogStorage` | event_log v2 | **Partial** (append Full;`events(forSession:)` + `events(sinceTimestampMs:limit:)` stubbed `return []` per 901.5 deferral) |
 | `BASMemoryUsageTracker` (6 tables) | 3 sub-stores + 1 unified facade (below) | records / replay+audit / notes+bundles+tombstones | Full via facade |
 | `BASHostConstitutionSQLiteStorage` | `BASRoutedHostConstitutionVaultStorage` | host_constitution_vaults | Full |
+
+### Partial-conformance stub list — what's still NOT implemented
+
+These methods exist in the Routed bridge's protocol surface but return empty/nil regardless of stored data。 Full-row queries require Rust FFI extensions per the deferred 「.5」 chapters。 Consumers calling these methods today silently get empty results:
+
+| Bridge | Stubbed method | Returns | Deferred to |
+|---|---|---|---|
+| DeletionManifest | `manifests(forVault: String) async -> [BASHostConstitutionDeletionManifest]` | `[]` | ch 896.5 |
+| DeletionManifest | `manifests(forType: BASDeletionType) async -> [...]` | `[]` | ch 896.5 |
+| AtomLifecycle | `events(forAtom: String) async -> [BASAtomLifecycleEvent]` | `[]` | ch 897.5 |
+| AtomLifecycle | `events(forSession: String) async -> [...]` | `[]` | ch 897.5 |
+| UserState | `state(forID: String) async -> BASUserState?` | `nil` | ch 898.5 |
+| UserState | `latestState(forSession: String) async -> BASUserState?` | `nil` | ch 898.5 |
+| VersionTree | `versions(forVault: String) async -> [BASHostConstitutionVersionRecord]` | `[]` | ch 899.5 |
+| VersionTree | `rollbackPoints(forVault: String) async -> [...]` | `[]` | ch 899.5 |
+| VersionTree | `version(forID: String) async -> BASHostConstitutionVersionRecord?` | `nil` | ch 899.5 |
+| EventLog | `events(forSession: String) async -> [BASEventLogEntry]` | `[]` | ch 901.5 (per existing OVERVIEW doc) |
+| EventLog | `events(sinceTimestampMs: Int64, limit: Int) async -> [...]` | `[]` | ch 901.5 |
+
+**Why deferred**:full-row queries require Rust FFI primitives that decode TEXT/BLOB columns + reconstruct typed Swift structs。 Per ADR-014 OPT-IN doctrine,Routed bridges ship append/count first (which the Swift fallback ALSO supports) and add read-paths only when consumer pressure warrants the FFI work。
+
+**Currently** no consumer calls these methods AT the Routed bridge layer — all read-path consumers go through the legacy Swift actor。 The partial-conformance stub satisfies the protocol contract for compile-time substitutability without doing the FFI work prematurely。
+
+**What this means for you**:if you swap a `BASSQLite*` actor for its `BASRouted*` bridge in production,**APPEND/COUNT will work but READ will silently return empty**。 Per ADR-014 OPT-IN,no Routed bridge is production-default for this exact reason。
+
+**chapter 九百三十三 / M3370 fix**:this section + the「Partial」 status labels above were missing from the OVERVIEW table。 12 review passes audited cumulative numbers and discipline meta but did NOT verify the OVERVIEW table's substantive claims against actual source code。 User caught this gap by reading the linked file。 Discipline meta-lesson: doc complexity reviews need to include SUBSTANCE-vs-source-code checks,not just cross-doc consistency。
 
 ## The MemoryUsageTracker family
 

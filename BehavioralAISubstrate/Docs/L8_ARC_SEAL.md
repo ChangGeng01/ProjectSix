@@ -29,7 +29,7 @@ recurrence of the pattern)
 
 ## TL;DR
 
-The L8 Rust unification arc shipped 21 implementation chapters
+The L8 Rust unification arc shipped 39 implementation chapters (894-932 + ch 933 substance-honesty pass)
 fulfilling the user directive 「把 L8 统一成：SQL event log /
 atom lifecycle / tombstone 作为 source of truth，Rust retrieval
 / reducer / ranker / provenance / batch scoring 做热路径，Swift
@@ -106,6 +106,10 @@ Final state:
 | 九百三十 | 2026-05-24 | 10th-pass fix:CRITICAL-1 SEAL row 98 was structurally corrupt (7 pipes + spliced ch 928 content + internal「TRULY SEALED retracted」 vs「cascade BROKEN」 contradiction in same row) + CRITICAL-2 BRANCH_SUMMARY row had stale「34 chapters (894-927)」 + 「6 review passes」 inside「9 review passes total」 row + HIGH-1..8 various doc fixes (registry completeness,off-by-one fabrication-recurrence pass enumeration,CHANGELOG MED count 4 vs 6 inconsistency,stop-condition logic「2>2」 wrong,etc.) + DELETED testMetadataEncodingByteEqualityAcrossInvocations (empirically proven FAKE COVERAGE for sortedKeys — passes regardless of revert)。 5th fabrication recurrence proves doc-text edits without grep/python3 verification keep introducing defects | (no ABI) |
 | 九百三十.5 (review) | 2026-05-24 | 3-agent 11th-pass foreground review of ch 930 | 6 NEW CRITICAL + 8 NEW HIGH + 1 NEW MED + 2 NEW fake-coverage CLASSES (rusqlite-default coincidence + misnamed test) |
 | 九百三十一 | 2026-05-24 | 11th-pass fix:CRITICAL-1..6:SEAL stale 894-929/9 passes/67 Rust/36 chapters in 9 places (ch 930 discipline only updated BRANCH_SUMMARY,didn't apply grep -c to SEAL surface) + busy_timeout fake coverage (rusqlite 0.32 sets sqlite3_busy_timeout(db, 5000) auto in open_with_flags → both Swift + Rust busy_timeout tests passed even if conn.busy_timeout removed entirely) + misnamed testEventLogUniqueConstraintRejectsDuplicateSeq (admits in docstring tests FFI auto-increment not UNIQUE constraint)。 HIGH-1..8:registry compression violation (10P-HIGH-1..8 as 1 row vs 8 per ch 918 pattern),9P MED count inconsistent 4 vs 6 across surfaces,various smaller。 Fixes:busy_timeout 5000 → 4500 sentinel (rusqlite default is 5000),RENAMED test → testEventLogFfiAutoIncrementSequenceNumber (honest name),SEAL global grep -c update for 894-931/11 passes/78 Rust/38 chapters,Pass 11 row added,30C+79H total verified python3,registry expanded per ch 918 pattern。 6th fabrication recurrence + 2 NEW fake-coverage classes = pattern「each cascade-break attempt becomes next pass's target」 holds | (no ABI) |
+| 九百三十一.5 (review) | 2026-05-24 | 3-agent 12th-pass foreground review of ch 931 | 2 NEW CRITICAL + 5 NEW HIGH + 3 NEW MED |
+| 九百三十二 | 2026-05-24 | 12th-pass fix:CRITICAL-1 SEAL line 433「9 review passes」 stale + CRITICAL-2 SEAL line 473「all 36 chapters」 stale + HIGH-1 foreign_keys post-pragma read-back (3rd rusqlite-default coincidence) + HIGH-2/3 10P+11P registry expansion + canonical「Review-pass discipline registry」 subsection + verify-AFTER-edit discipline introduced。 First downward trajectory since pass 8 (C:6→2, H:8→5) | (no ABI) |
+| 九百三十二.5 (USER-PASS) | 2026-05-24 | **USER caught what 12 review passes missed** — substance-vs-source-code review of L8_ROUTED_OVERVIEW.md table claims | **4 CRITICAL (4 bridges labeled「Full」 but stubbed) + 2 HIGH (over-strong foreign_keys validation claim + SEAL TL;DR「21 chapters」 stale)** |
+| 九百三十三 | 2026-05-24 | USER-PASS fix:CRITICAL-1..4 L8_ROUTED_OVERVIEW.md table corrected — 4 bridges (DeletionManifest, AtomLifecycle, UserState, VersionTree) relabeled「Full」 → 「Partial (read methods stubbed per N.5 deferral)」 + NEW「Partial-conformance stub list」 section enumerating ALL 11 stubbed methods across 5 bridges + HIGH-1 CHANGELOG「foreign_keys read-back validated」 tone-down (runtime defense not test-revert-detect) + HIGH-2 SEAL TL;DR「21 implementation chapters」 → 「39 chapters (894-932 + 933)」。 NEW DISCIPLINE:**SUBSTANCE-vs-source-code check** (not just cross-doc consistency) added to canonical registry。 The 12-pass meta-cascade had blinded reviewers to actual functional lies in shipped doc | (no ABI) |
 
 ## Architecture state at seal
 
@@ -385,6 +389,8 @@ NEW canonical home for the disciplines that have accreted across the 12 review-p
 | **SEAL-global discipline application** (not just BRANCH_SUMMARY) | ch 931 (11P) | EVERY doc edit must touch ALL 3 surfaces consistently |
 | **Verify-AFTER-edit** (not just before) — grep the file post-edit to confirm change actually applied | ch 932 (12P) | EVERY claim「fix shipped」 — verify by grep AFTER the edit |
 | **Apply EACH prior discipline to ch N's own changes before commit** | ch 932 (12P) per pattern | EVERY chapter — discipline accumulator,not narrow scope |
+| **SUBSTANCE-vs-source-code check** (NOT just cross-doc consistency) | ch 933 (USER-PASS) | Doc tables claiming「Full」/「Partial」 status — `grep -n "return \[\]\|return nil\|stub\|partial conformance" Sources/` BEFORE accepting Full claim |
+| **「文档复杂度反咬」 anti-pattern recognition** | ch 933 (USER-PASS) | When meta-cascade (counts/discipline/registry) exceeds N=10 passes,SCHEDULE a substance-only pass that reads doc-claim-vs-source-code (skipping meta entirely) |
 
 ### Future consolidation opportunities
 
@@ -555,7 +561,8 @@ cycle:
 | Pass 10 (10th-pass foreground 3-agent of ch 929) | 2 | 8 | ch 930 |
 | Pass 11 (11th-pass foreground 3-agent of ch 930) | 6 | 8 | ch 931 |
 | Pass 12 (12th-pass foreground 3-agent of ch 931) | 2 | 5 | ch 932 |
-| **TOTAL (python3-verified ch 932)** | **32** | **84** | **(stop NOT met at pass 12 — 7th fabrication recurrence + 3rd rusqlite-default coincidence + canonical discipline registry introduced)** |
+| **USER-PASS** (substance-vs-source-code check, NOT cascade meta) | 4 | 2 | ch 933 |
+| **TOTAL (python3-verified ch 933)** | **36** | **86** | **(stop NOT met — but USER-PASS is fundamentally different class: substance not meta — see ch 933 narrative)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%

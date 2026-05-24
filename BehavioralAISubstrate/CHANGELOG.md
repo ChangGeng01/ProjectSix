@@ -11,6 +11,71 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十三 / M3370 — USER caught what 12 review passes ALL missed: 4 bridges labeled「Full」 but stubbed (4 CRITICAL + 2 HIGH)
+
+User pointed at specific source-code lines that contradict L8_ROUTED_OVERVIEW.md「Full」 claims。 This is the most damning finding of the arc — **12 meta-cascade review passes ALL MISSED** that 4 production-shipped bridges are FALSELY labeled「Full」 while shipping stubbed `return []` / `return nil` methods。
+
+User framing exactly:**「文档复杂度已经开始反咬」** — doc complexity has begun to bite back。 12 passes optimized META (cumulative numbers / discipline registry / fabrication detection) but never audited SUBSTANCE (does the bridge actually do what doc says?)。
+
+#### User-found CRITICAL (4)
+
+| # | File:line | What user found | Reality |
+|---|---|---|---|
+| 1 | `Docs/L8_ROUTED_OVERVIEW.md:30-33` | 4 bridges labeled「Full」 | All 4 have stubbed methods |
+| 2 | `Sources/BASMemory/BASRoutedAtomLifecycleStore.swift:118` | `events(forAtom:)` / `events(forSession:)` | Both `return []` per chapter 897.5 deferral |
+| 3 | `Sources/BASMemory/BASRoutedUserStateStore.swift:115` | `state(forID:)` / `latestState` | Both `return nil` per chapter 898.5 deferral |
+| 4 | `Sources/BASMemory/BASRoutedHostConstitutionVersionTreeStore.swift:110` | `versions(forVault:)` / `rollbackPoints(forVault:)` / `version(forID:)` | All `return []` / `nil` per chapter 899.5 deferral |
+
+Plus `BASRoutedHostConstitutionDeletionManifestStore` (which IS in same Full list but has same stub pattern) — total **5 bridges affected,11 stubbed methods**。
+
+#### User-found HIGH (2)
+
+| # | File:line | Issue |
+|---|---|---|
+| 1 | `Cargo/bas-l8-engine/src/lib.rs:180 + CHANGELOG.md:69` | foreign_keys read-back is ADDED correctly (runtime guard), but CHANGELOG「foreign_keys read-back validated」 is over-strong — the diagnostic FFI whitelist does NOT include foreign_keys, so test path can't revert-detect like busy_timeout=4500 sentinel does。 Different defensive mechanism — should be honestly distinguished |
+| 2 | `Docs/L8_ARC_SEAL.md:31` | TL;DR still says「21 implementation chapters」 — same file head + Authoritative state block now says 39 chapters。 12 passes' grep-c discipline applied to closing block but missed TL;DR section。 **9th place stale SEAL value found,after 12 review passes** |
+
+#### Fixes shipped in ch 933
+
+1. **L8_ROUTED_OVERVIEW.md table** — 4 bridges relabeled「Full」 → 「**Partial** (append+count Full; `<methods>` stubbed per N.5 deferral)」 + EventLog row tightened with specific method names + NEW「Partial-conformance stub list」 section enumerating all 11 stubbed methods across 5 bridges + explicit「APPEND/COUNT works but READ silently returns empty if you swap actor for routed bridge in production」 warning。
+2. CHANGELOG「foreign_keys read-back validated」 corrected to distinguish runtime defense (engine init Err if !=1) from test-revert-detect (which the diagnostic FFI whitelist doesn't support for foreign_keys)。
+3. SEAL TL;DR「21 implementation chapters」 → 「39 chapters (894-932 + 933)」。
+
+#### NEW disciplines (2)
+
+Added to canonical「Review-pass discipline registry」 in SEAL:
+
+| Discipline | Trigger |
+|---|---|
+| **SUBSTANCE-vs-source-code check** (NOT just cross-doc consistency) | Doc tables claiming「Full」/「Partial」 status — run `grep -n "return \[\]\|return nil\|stub\|partial conformance" Sources/` BEFORE accepting Full claim |
+| **「文档复杂度反咬」 anti-pattern recognition** | When meta-cascade exceeds N=10 passes,SCHEDULE a substance-only pass that reads doc-claim-vs-source-code (skipping meta entirely) |
+
+#### Discipline meta-lesson — most important of the entire arc
+
+The 12 review passes generated:
+- 32 CRITICAL + 84 HIGH meta findings
+- 7 doc-discipline additions (python3/grep/awk/empirical-revert/rusqlite-default/misnamed-test/verify-AFTER-edit)
+- A canonical registry of disciplines
+- ZERO substance audits of doc claims vs source code
+
+User caught what no review pass could:**meta-cascade is self-perpetuating but blind to substance**。 The fabrication-recurrence pattern at meta level masked the fact that substance lies (Full = []) had been shipping since chapter 895 unchanged。
+
+For ch 934+: every doc that makes claims about source code must have a「SUBSTANCE check」 entry in the chapter's commit message showing the `grep`/`Read` commands that verified the claim against actual code。
+
+#### Note on counts
+
+USER-PASS finding adds 4 CRITICAL + 2 HIGH to the cumulative。 Cumulative now **36 CRITICAL + 86 HIGH** through pass 12 + USER-PASS。 Verified python3: `(32+4)C + (84+2)H = 36C + 86H ✓`。
+
+But the USER-PASS is fundamentally DIFFERENT class from meta passes — substance not meta。 The continuous-improvement state per ch 929 doctrine still holds: arc cannot truly seal until 0C/≤2H on BOTH meta AND substance dimensions。
+
+#### Verification
+
+- Rust:78/78 unit tests pass
+- Swift filtered:BASChapter926 → 15/15 pass
+- pre-commit-gates.sh:**3/3 pass**
+- Arithmetic:`python3 -c "print(32+4, 84+2)"` → 36 86 ✓
+- Post-edit grep: stale「Full」 in OVERVIEW table = 0 (was 4); stale「21 implementation chapters」 in SEAL = 0 (was 1); OVERVIEW table awk pipe-count = 6 ✓ (verified post-edit per ch 932 discipline)
+
 ### Chapter 九百三十二 / M3365 — 12th-pass caught 7th fabrication recurrence + 3rd rusqlite-default coincidence (2C + 5H + 3M)
 
 User directive:继续 check → 12th-pass foreground 3-agent review of
@@ -66,7 +131,7 @@ CRITICAL count finally DECREASING (6→2)。 H count also down (8→5)。 First 
 
 #### Verification
 
-- Rust:78/78 unit tests pass (foreign_keys read-back validated)
+- Rust:78/78 unit tests pass (foreign_keys read-back COMPILES + runs in production code path on every engine open; however the diagnostic FFI whitelist `bas_l8_engine_pragma_value_i64` does NOT include `foreign_keys`,so the test path cannot revert-detect like busy_timeout=4500 sentinel does。 Ch 933 fix:tone-down corrected — the read-back is RUNTIME defense (engine init fails if foreign_keys != 1),not test-revert-detection。 Different defensive mechanism than the sentinel discipline。)
 - Swift filtered:BASChapter926 → 15/15 pass
 - Swift full sweep:**13591 tests,86 skipped,0 failures**
 - pre-commit-gates.sh:**3/3 pass**
