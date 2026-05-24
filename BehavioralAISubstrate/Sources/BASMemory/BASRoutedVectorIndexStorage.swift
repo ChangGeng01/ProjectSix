@@ -440,7 +440,7 @@ public actor BASRoutedVectorIndexStorage {
         // NaN/Inf,re-decoding 16K floats from bytes for a
         // second check inverts the hot-path win the ch 923
         // arc fought for。 Internal entry trusts caller。
-        return try await _cosineTopKBytesUnchecked(
+        return try await _cosineTopKBytesAfterValidation(
             domain: domain,
             queryBytes: bytes,
             k: k)
@@ -457,7 +457,7 @@ public actor BASRoutedVectorIndexStorage {
         // above — same dim-cap + NaN guard,extracted into
         // a shared helper to avoid drift between siblings。
         try Self.validateQueryBytes(queryBytes)
-        return try await _cosineTopKBytesUnchecked(
+        return try await _cosineTopKBytesAfterValidation(
             domain: domain,
             queryBytes: queryBytes,
             k: k)
@@ -472,7 +472,16 @@ public actor BASRoutedVectorIndexStorage {
     /// Both PUBLIC entrypoints validate; this private trampoline
     /// is the only call site that skips the per-element scan,
     /// preserving the chapter 923 hot-path perf win。
-    private func _cosineTopKBytesUnchecked(
+    ///
+    /// chapter 九百二十八 / M3345 fix MED-1:renamed from
+    /// `_cosineTopKBytesUnchecked` → `_cosineTopKBytesAfter
+    /// Validation` to make the contract explicit at the call
+    /// site。「Unchecked」 invited「seems safe,let me skip
+    /// validation」 misreadings;「AfterValidation」 documents
+    /// that the caller MUST have already validated。 If a new
+    /// caller adds itself,the name forces them to think about
+    /// the validation contract。
+    private func _cosineTopKBytesAfterValidation(
         domain: String,
         queryBytes: [UInt8],
         k: Int

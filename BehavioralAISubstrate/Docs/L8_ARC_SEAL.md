@@ -89,6 +89,10 @@ Final state:
 | 九百二十五 | 2026-05-24 | Test backfill — delivered 6 of 11 promised gaps + 1 stale-pin fix (testRustCrateCountIs22 22→23 surfaced by full-sweep,hidden by prior --filter runs)。 5 gaps DEFERRED to ch 926 + 1 fake-coverage test (testWalAutocheckpointIs1000 read separate raw sqlite3 connection → SQLite default 1000 → passed for wrong reason) | (no ABI) |
 | 九百二十五.5 (review) | 2026-05-24 | 3-agent 6th-pass「掘地三尺」 review of ch 924+925 | 4 NEW CRITICAL + 8 NEW HIGH + 3 NEW MED |
 | 九百二十六 | 2026-05-24 | Comprehensive fix-of-fix:CRITICAL-1 conditional UNIQUE index migration (replaced botched ch 924 NH5) + CRITICAL-2 BRANCH_SUMMARY+SEAL doc updates + CRITICAL-3 NEW pragma_value_i64 diagnostic FFI + CRITICAL-4 6 NEW Rust tests + 15 NEW Swift tests (panic-safety + schema migration + poison recovery + transactional rollback + real wal_autocheckpoint + busy_timeout + payload_blob/json caps + format=1 inverse coherence + bytes-form NaN guard + Inf/-Inf/-0 boundary) + HIGH-1 query_blob_len cap + HIGH-2 shared validateQueryBytes helper for both [UInt8] overloads + HIGH-3..5 doc fixes including ownership of fabricated commit numbers in ch 925 | ABI 17 → 18 |
+| 九百二十六.5 (review) | 2026-05-24 | 3-agent 7th-pass「掘地三尺」 review of ch 926 | 2 NEW CRITICAL + 5 NEW HIGH + 4 NEW MED |
+| 九百二十七 | 2026-05-24 | 7th-pass cascade-break:CRITICAL-1 wal_autocheckpoint sentinel 1000→1024 (real revertibility) + CRITICAL-2 PRAGMA index_list origin='u' UNIQUE constraint test + HIGH-1 cosine_topk FFI cap Rust unit test + HIGH-2 encodeMetadata extracted helper + lex-order test + 3 doc HIGH (ABI 17→18 in SEAL body,BRANCH_SUMMARY single row,NH1-NH4 → NH1-NH5 correction)+ MED tightened Swift ABI pin to exact == 18 | (no ABI) |
+| 九百二十七.5 (review) | 2026-05-24 | 8th-pass MANUAL audit (3 agents dispatched but died after 12h idle;empirical verification done in-conversation) | 0 NEW CRITICAL + 2 NEW HIGH + 2 NEW MED |
+| 九百二十八 | 2026-05-24 | **ARC TRULY SEALED** — final fix-of-fix:HIGH-1 BRANCH_SUMMARY「6 passes / 19C / 54H」 was off-by-one in pass count + fabricated MED/LOW numbers (actual 7 passes / 21C / 59H) + HIGH-2 DELETED fake `testVectorIndexMetadataSortedKeysDeterministic` (still in file with「marked fake」 docstring,risk of misread) + MED-1 renamed `_cosineTopKBytesUnchecked` → `_cosineTopKBytesAfterValidation` (explicit contract) + MED-2 relocated `testMetadataEncodingByteEqualityAcrossInvocations` to「in-process stability」 section (NOT sortedKeys regression guard)。 Stop condition (0C + ≤2H) MET on pass 8 → cascade BROKEN | (no ABI) |
 
 ## Architecture state at seal
 
@@ -399,6 +403,9 @@ cycle:
 | Pass 4 (ch 921.5) | 5 | 8 | ch 922-923 |
 | Pass 5 (5th-pass「掘地三尺」) | 1 | 5 | ch 924 |
 | Pass 6 (6th-pass「掘地三尺」 of ch 924+925) | 4 | 8 | ch 926 |
+| Pass 7 (7th-pass「掘地三尺」 of ch 926) | 2 | 5 | ch 927 |
+| Pass 8 (8th-pass manual, 3 agents died) of ch 927 | 0 | 2 | ch 928 |
+| **TOTAL** | **21** | **59** | **(stop met at pass 8: 0C + ≤2H)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%

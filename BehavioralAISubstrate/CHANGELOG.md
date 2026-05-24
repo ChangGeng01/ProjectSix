@@ -11,6 +11,73 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百二十八 / M3345 — 8th-pass MANUAL audit + ARC TRULY SEALED (0 CRITICAL + 2 HIGH + 2 MED)
+
+User directive: 继续。 8th-pass review of ch 927。 3 review agents
+dispatched but **died after 12 hours of idle** (system sleep/restart) —
+manual empirical verification done in-conversation。
+
+#### Empirical revert tests run
+
+| Test | Revert applied | Test outcome | Coverage verdict |
+|---|---|---|---|
+| `testMetadataKeysAreSortedLexicographically` | removed `.sortedKeys` from production encoder | **FAILED** — output `{"beta":"b","tau":"t","zeta":"z","mu":"m","alpha":"a"}` vs expected lex | **REAL coverage** ✓ |
+| `testVectorIndexMetadataSortedKeysDeterministic` (still in file from ch 926) | removed `.sortedKeys` | passed | **STILL FAKE COVERAGE** — UPSERT-REPLACE works regardless of JSON ordering |
+| `testMetadataEncodingByteEqualityAcrossInvocations` | removed `.sortedKeys` | passed | JSONEncoder in-process deterministic — misfiled as「sortedKeys」 test |
+
+#### HIGH fixes (2)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | BRANCH_SUMMARY ch 927 row claimed「6 review passes」 — but ch 927 was result of pass 7 (off-by-one)。 Cumulative「19C / 54H」 matches passes 1-6 only, but「36 MED / 11 LOW」 doesn't match ANY subset (actual passes 1-6 sum to ~46 MED + ~14 LOW per SEAL ledger; MED+LOW for passes 5/6 only partially recorded)。 Fabrication recurrence — exact pattern ch 925 introduced + ch 926/927 supposedly OWNED | Corrected to「7 review passes total caught 21 CRITICAL + 59 HIGH」 + explicit honesty about MED/LOW being only partially tracked + OWNED the fabrication directly in the BRANCH_SUMMARY entry |
+| 2 | `testVectorIndexMetadataSortedKeysDeterministic` was tagged「fake coverage」 in its ch 927 docstring but **LEFT IN PLACE** — risk of future maintainer reading it as active coverage despite docstring warning | DELETED entirely from BASChapter926FixBackfillCoverageTests.swift。 Documentation-only deprecation isn't enough when the empirical test still passes regardless of fix |
+
+#### MED fixes (2)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | `_cosineTopKBytesUnchecked` private trampoline name invited「seems safe to skip validation」 misreadings | Renamed → `_cosineTopKBytesAfterValidation` (explicit contract — caller MUST have validated)。 Future contributor adding a new caller is forced to think about validation |
+| 2 | `testMetadataEncodingByteEqualityAcrossInvocations` was filed under「sortedKeys determinism」 section but empirically passes regardless of `.sortedKeys`。 Misreading risk | Relocated to「encodeMetadata in-process stability」 own section + docstring honestly describes what it ACTUALLY guards (future JSONEncoder behavior change introducing per-call variability,not sortedKeys per se) |
+
+#### ARC TRULY SEALED — stop discipline finally held
+
+8 review passes total:
+
+| Pass | CRITICAL | HIGH | Fix chapter |
+|---|---|---|---|
+| 1 (ch 907 review) | 2 | 8 | ch 908 |
+| 2 (ch 914.5) | 2 | 10 | ch 915-917 |
+| 3 (ch 918.5) | 5 | 15 | ch 919-921 |
+| 4 (ch 921.5) | 5 | 8 | ch 922-923 |
+| 5 (5th-pass) | 1 | 5 | ch 924 |
+| 6 (6th-pass) | 4 | 8 | ch 926 |
+| 7 (7th-pass) | 2 | 5 | ch 927 |
+| **8 (8th-pass MANUAL)** | **0** | **2** | **ch 928 — STOP CONDITION MET** |
+| **TOTAL** | **21** | **59** | **arc truly sealed** |
+
+Each pass found real items — pattern was REAL not noise。 The
+discipline rule established in ch 927 (「**EVERY ASSERTION MUST FAIL
+ON REVERT**」) held in pass 8 — `testMetadataKeysAreSortedLexicographically`
+empirically failed on revert,proving it's real coverage。
+
+Pattern observations across 8 passes:
+- Reviews caught real items every cycle through pass 7
+- Pass 8 (the cascade-break test) found only 2 HIGH — meeting the
+  pre-set stop condition for the first time
+- 3-agent dispatch failed (agents died 12hr idle) — manual empirical
+  verification turned out to be MORE rigorous (actually executed
+  reverts + saw outcomes,vs agents reading code statically)
+- The「fake-coverage cascade」 named in ch 927 was the apex
+  finding。 Ch 928 closes one last instance (the still-in-file fake
+  test from ch 926) and arc is sealed。
+
+#### Verification
+
+- Rust:78/78 unit tests pass (no change from ch 927)
+- Swift filtered:BASChapter926 → 16/16 pass (one test DELETED — 17→16)
+- Swift full sweep:**13592 tests,86 skipped,0 failures** (was 13593 ch 927 → 13592 ch 928,one deleted)
+- pre-commit-gates.sh:**3/3 pass**
+
 ### Chapter 九百二十七 / M3340 — comprehensive fix for 7th-pass 掘地三尺 review (2 CRITICAL + 5 HIGH + 4 MED — fake-coverage cascade break)
 
 User directive:「继续修复」 → 3-agent 7th-pass review of chapter 926。

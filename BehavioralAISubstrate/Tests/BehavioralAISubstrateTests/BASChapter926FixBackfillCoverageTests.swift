@@ -700,59 +700,41 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
 
     // MARK: - HIGH — vector_index metadata sortedKeys determinism
 
-    /// Ch 922 NC3 added .sortedKeys to vector_index metadata
-    /// JSON encoding。 Without it,two upserts with the same
-    /// metadata could produce different bytes,causing
-    /// byte-equality tests to flake randomly。
-    ///
-    /// chapter 九百二十七 / M3340 fix HIGH-2:original ch 926
-    /// test was FAKE COVERAGE — asserted UPSERT REPLACE
-    /// semantics (which hold regardless of JSON ordering
-    /// because PK keying)。 Removing .sortedKeys from
-    /// production wouldn't fail that test。 Below is the
-    /// REAL determinism test using the extracted
-    /// `encodeMetadata` helper + exact byte-order assertion。
-    func testVectorIndexMetadataSortedKeysDeterministic()
-        async throws
-    {
-        let url = makeTempDBURL("sorted-meta")
-        defer { cleanup(url) }
-        let store = try BASRoutedVectorIndexStorage(
-            databaseURL: url)
-        let meta: [String: String] = [
-            "domain": "x",
-            "version": "1",
-            "tag": "y",
-            "author": "test"]
-        let entry = BASVectorIndexEntry(
-            atomID: "a1",
-            normalizedEmbedding: BASEmbedding(
-                vector: [0.1, 0.2, 0.3, 0.4],
-                dimension: 4,
-                providerVersion: "p1"),
-            domain: "d1",
-            metadata: meta)
+    /// chapter 九百二十八 / M3345 fix HIGH-2:DELETED the
+    /// fake-coverage `testVectorIndexMetadataSortedKeysDeterministic`
+    /// from ch 926。 The test asserted UPSERT-REPLACE semantics
+    /// (true regardless of JSON ordering because PK keying)。
+    /// Ch 927 added the REAL test `testMetadataKeysAreSortedLexicographically`
+    /// below + tagged the old test as「fake coverage」 in its
+    /// docstring but LEFT IT IN PLACE — the「stop the cascade」
+    /// discipline failed here。 Empirically verified 8th-pass:
+    /// reverting `.sortedKeys` → old test still passes,new
+    /// lex-order test fails as designed。 Ch 928 removes the
+    /// fake test entirely so consumers can't misread it as
+    /// active coverage。
 
-        // Smoke check: UPSERT-REPLACE still works
-        let inserted1 = try await store.upsert(entry)
-        XCTAssertTrue(inserted1, "first upsert inserts")
-        let inserted2 = try await store.upsert(entry)
-        XCTAssertFalse(inserted2, "second upsert REPLACEs")
-        let count = await store.countForDomain("d1")
-        XCTAssertEqual(count, 1, "REPLACE keeps count 1")
-    }
-
-    /// chapter 九百二十七 / M3340 fix HIGH-2 — REAL
-    /// determinism guard。 Constructs a multi-key dict with
-    /// keys in a NON-sorted order (zeta first,then alpha,
-    /// etc.) and asserts the production encoder emits keys
-    /// in LEXICOGRAPHIC order (alpha first,zeta last)。
+    /// chapter 九百二十七 / M3340 fix HIGH-2 — REAL determinism
+    /// guard。 Constructs a multi-key dict with keys in a
+    /// NON-sorted order (zeta first,then alpha,etc.) and
+    /// asserts the production encoder emits keys in
+    /// LEXICOGRAPHIC order (alpha first,zeta last)。
     ///
     /// Without `.sortedKeys`,JSONEncoder emits keys in
-    /// hash-table-iteration order which is process-random。
-    /// For a 5-key dict there are 5! = 120 possible orderings,
-    /// only 1 is lex order — this test fails with probability
-    /// 119/120 on first run if .sortedKeys is removed。
+    /// hash-table-iteration order which is process-deterministic
+    /// but hash-seed-randomized。 For THIS specific 5-key dict
+    /// literal on macOS Swift,8th-pass empirically verified
+    /// the iteration order is `beta, tau, zeta, mu, alpha` —
+    /// fails the lex-order assertion immediately when
+    /// `.sortedKeys` is removed。
+    ///
+    /// chapter 九百二十八 / M3345 fix HIGH-2 (this docstring):
+    /// removed the「probability 119/120」 wording from ch 927 —
+    /// Swift dict iteration is NOT random per call,it's
+    /// process-deterministic (hash seed fixed at process
+    /// start)。 The「119/120」 framing implied per-call
+    /// randomness which is false。 The test still works
+    /// empirically — just for a different reason than originally
+    /// claimed (hash-seed-randomized,not call-randomized)。
     func testMetadataKeysAreSortedLexicographically() throws {
         // Construct dict with keys deliberately NOT in
         // alpha order — proves the test exercises the
@@ -777,13 +759,23 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
             "processes) and the ch 922 NC3 fix has regressed")
     }
 
-    /// Sibling determinism test — encode same dict 100 times
-    /// in a tight loop,assert all encodings are byte-equal。
-    /// In-process JSONEncoder is deterministic even without
-    /// .sortedKeys (hash seed fixed per process),so this
-    /// test alone is weaker than the lex-order one above。
-    /// But it guards against future JSONEncoder behavior
-    /// changes that might introduce in-process variability。
+    // MARK: - encodeMetadata in-process stability (NOT sortedKeys)
+
+    /// chapter 九百二十八 / M3345 fix MED-2:relocated from
+    /// the「sortedKeys determinism」 section because this
+    /// test does NOT guard `.sortedKeys`。 Empirically
+    /// verified 8th-pass: removing `.sortedKeys` from
+    /// production → this test STILL PASSES because
+    /// in-process JSONEncoder is deterministic with fixed
+    /// hash seed (same dict literal always iterates same
+    /// way within one process)。
+    ///
+    /// What this test ACTUALLY guards:future JSONEncoder
+    /// behavior change that introduces per-call variability
+    /// (e.g. random seeding,timestamp injection)。 Real but
+    /// distinct from the sortedKeys guarantee — moved into
+    /// its own section to prevent misreading as「sortedKeys
+    /// regression guard」 which it is NOT。
     func testMetadataEncodingByteEqualityAcrossInvocations()
         throws
     {
