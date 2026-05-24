@@ -303,6 +303,316 @@ public enum BASFuzzShapes {
     }
 }
 
+// MARK: - Per-layer part-level shape generators (ch 952)
+// chapter 九百五十二 / M3465 — user directive
+// 「14层 每层 每个部分都经历冒烟测试」 — every part of every layer
+// gets its own boundary-biased generator。
+//
+// Layer mapping (from L8_ROUTED_OVERVIEW.md + M603 fourteen-layer
+// smoke):
+//   L1 wake + lease-life (presence.coverage, leaseLife.coverage)
+//   L2 decomposition + neuralOrgan (decomposition.coverage,
+//      neuralOrgan.coverage)
+//   L3 thoughtFold (thoughtFold.coverage)
+//   L4 worldPrior (worldPrior.coverage)
+//   L5 hostConstitution (hostConstitution.coverage)
+//   L6 cortexCheck (cortexCheck.coverage)
+//   L7 dopamine + ledger (dopamine.coverage, ledger.coverage)
+//   L8 hippocampal (hippocampal.coverage) — substance L8
+//   L9 dominance (dominance.coverage)
+//   L10 wakePolicy (wakePolicy.coverage)
+//   L11 risk (risk.coverage)
+//   L12 softHand (softHand.coverage)
+//   L13 updateTicket (updateTicket.coverage)
+//   L14 reconciliation (reconciliation.severity, reconciliation.observed)
+
+/// Per-layer prompt + shape generation。 Each layer accepts certain
+/// prompt patterns + shape configurations。 These generators emit
+/// VALID prompts paired with shape params that exercise that layer's
+/// configuration space。
+public enum BASFuzzPerLayer {
+
+    // MARK: L1 wake + lease-life
+
+    /// L1 wake threshold — boundary biased (0, 1 fire most)。
+    public static func l1WakeThreshold(
+        rng: inout BASFuzzRng
+    ) -> Float {
+        BASFuzzShapes.wakeThreshold(rng: &rng)
+    }
+
+    /// L1 lease quota — typical {0, 1, 64, 1024, max}。
+    public static func l1LeaseQuotaBytes(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 64, 1024, 1_048_576, 16_777_216],
+            boundaryP: 0.4)
+    }
+
+    /// L1 thermal pressure level — {0=cool, 1=warm, 2=hot, 3=critical}。
+    public static func l1ThermalLevel(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased([0, 1, 2, 3], boundaryP: 0.5)
+    }
+
+    // MARK: L2 decomposition + neural organ
+
+    /// L2 sense coverage count — how many sensory channels active。
+    public static func l2SenseCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        BASFuzzShapes.senseCount(rng: &rng)
+    }
+
+    /// L2 organ activation fan-out。 Boundary {1, fan-out limit}。
+    public static func l2OrganFanOut(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [1, 2, 4, 8, 16], boundaryP: 0.4)
+    }
+
+    // MARK: L3 thoughtFold
+
+    /// L3 fold depth — recursion / chain length。
+    public static func l3FoldDepth(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [1, 2, 4, 8, 16, 32], boundaryP: 0.4)
+    }
+
+    /// L3 fold branching factor。
+    public static func l3FoldBranching(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased([1, 2, 3, 5, 8], boundaryP: 0.3)
+    }
+
+    // MARK: L4 worldPrior
+
+    /// L4 prior dim — common embedding dims。
+    public static func l4PriorDim(rng: inout BASFuzzRng) -> Int {
+        BASFuzzShapes.priorDim(rng: &rng)
+    }
+
+    /// L4 prior sample count (corpus size to score against)。
+    public static func l4SampleCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 10, 100, 1_000], boundaryP: 0.5)
+    }
+
+    // MARK: L5 hostConstitution
+
+    /// L5 constitution rule count — number of guardrails active。
+    public static func l5RuleCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 5, 20, 100], boundaryP: 0.5)
+    }
+
+    /// L5 risk-band escalation level。
+    public static func l5EscalationLevel(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased([0, 1, 2, 3, 4], boundaryP: 0.4)
+    }
+
+    // MARK: L6 cortexCheck
+
+    /// L6 contradiction count seen during reasoning。
+    public static func l6ContradictionCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 3, 10, 50], boundaryP: 0.5)
+    }
+
+    // MARK: L7 dopamine + ledger
+
+    /// L7 reward magnitude (-1 to +1 normalized)。
+    public static func l7RewardMagnitude(
+        rng: inout BASFuzzRng
+    ) -> Float {
+        rng.pickBoundaryBiased(
+            [-1.0, -0.5, 0.0, 0.5, 1.0], boundaryP: 0.5)
+    }
+
+    /// L7 ledger entry count per session。
+    public static func l7LedgerEntryCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 10, 100, 1_000], boundaryP: 0.4)
+    }
+
+    // MARK: L8 hippocampal (substance)
+
+    /// L8 memory atom count — see BASFuzzShapes.memoryAtomCount。
+    public static func l8AtomCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        BASFuzzShapes.memoryAtomCount(rng: &rng)
+    }
+
+    /// L8 retrieval top-k value — {0 (empty), 1, 10, 100, 1000}。
+    public static func l8RetrievalTopK(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 5, 10, 50, 100, 1_000], boundaryP: 0.4)
+    }
+
+    /// L8 episodic memory retention window (ms)。
+    public static func l8RetentionWindowMs(
+        rng: inout BASFuzzRng
+    ) -> Int64 {
+        Int64(rng.pickBoundaryBiased(
+            [0, 1_000, 60_000, 3_600_000, 86_400_000],
+            boundaryP: 0.4))
+    }
+
+    // MARK: L9 dominance
+
+    /// L9 dominance bucket count。
+    public static func l9DominanceBucketCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        BASFuzzShapes.dominanceBucketCount(rng: &rng)
+    }
+
+    /// L9 dominance ordering top-K。
+    public static func l9OrderingTopK(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [1, 3, 5, 10, 25], boundaryP: 0.3)
+    }
+
+    // MARK: L10 wakePolicy
+
+    /// L10 wake gate decision (0=allow / 1=deny / 2=defer)。
+    public static func l10WakeGate(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased([0, 1, 2], boundaryP: 0.5)
+    }
+
+    /// L10 wake budget remaining (0-100% as int)。
+    public static func l10WakeBudgetPercent(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 25, 50, 75, 100], boundaryP: 0.5)
+    }
+
+    // MARK: L11 risk
+
+    /// L11 risk confidence ∈ [0, 1]。
+    public static func l11RiskConfidence(
+        rng: inout BASFuzzRng
+    ) -> Float {
+        BASFuzzShapes.riskConfidence(rng: &rng)
+    }
+
+    /// L11 risk band byte 0=low / 1=medium / 2=high。
+    public static func l11RiskBand(
+        rng: inout BASFuzzRng
+    ) -> UInt8 {
+        rng.pickBoundaryBiased([0, 1, 2], boundaryP: 0.5)
+    }
+
+    // MARK: L12 softHand
+
+    /// L12 hand sensitivity (0 = none, max = aggressive)。
+    public static func l12HandSensitivity(
+        rng: inout BASFuzzRng
+    ) -> Float {
+        rng.pickBoundaryBiased(
+            [0.0, 0.1, 0.5, 0.9, 1.0], boundaryP: 0.5)
+    }
+
+    // MARK: L13 updateTicket
+
+    /// L13 ticket size — see BASFuzzShapes.ticketSize。
+    public static func l13TicketSize(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        BASFuzzShapes.ticketSize(rng: &rng)
+    }
+
+    /// L13 ticket priority byte (0=low / 1=normal / 2=urgent)。
+    public static func l13TicketPriority(
+        rng: inout BASFuzzRng
+    ) -> UInt8 {
+        rng.pickBoundaryBiased([0, 1, 2], boundaryP: 0.5)
+    }
+
+    // MARK: L14 reconciliation
+
+    /// L14 reconciliation severity byte (0=none, 4=critical)。
+    public static func l14ReconciliationSeverity(
+        rng: inout BASFuzzRng
+    ) -> UInt8 {
+        rng.pickBoundaryBiased([0, 1, 2, 3, 4], boundaryP: 0.5)
+    }
+
+    /// L14 observed divergence count — how many cross-layer
+    /// discrepancies the reconciler saw this turn。
+    public static func l14ObservedCount(
+        rng: inout BASFuzzRng
+    ) -> Int {
+        rng.pickBoundaryBiased(
+            [0, 1, 3, 10, 50], boundaryP: 0.5)
+    }
+}
+
+// MARK: - Prompt template generators (ch 952)
+
+/// Topic seed for fuzz-prompt generation。 Many real fuzz-finding
+/// inputs aren't pure garbage — they look like real prompts but
+/// stress specific axes (length / encoding / risk keywords)。
+public enum BASFuzzPromptTemplate {
+    /// Generate a procedural prompt that follows ONE template
+    /// (chat-like / code-like / question / multi-line / empty / huge)。
+    /// Boundary-biased — empty and huge fire most often。
+    public static func prompt(
+        rng: inout BASFuzzRng
+    ) -> String {
+        // chapter 952 — bound max length to 4096 chars。 chapter 948
+        // iOS jetsam finding showed 10K+ repeated chars blow past
+        // sim memory budget。 Real device has more headroom but
+        // still want a cap so 14-layer × N-iter doesn't OOM。
+        let shapes = [0, 1, 16, 256, 1024, 4096]
+        let promptLen = rng.pickBoundaryBiased(shapes, boundaryP: 0.5)
+        let templates = [
+            "",
+            "?",
+            "tell me about \(rng.next())",
+            "what is the meaning of \(rng.next())?",
+            "code: let x = \(rng.next())\nlet y = x * 2",
+            "line1\nline2\nline3 \(rng.next())",
+            "high risk transaction \(rng.next())",
+            "👋 emoji \u{1F4A9} unicode \(rng.next())",
+            "tab\there\nnewline\rprompt \(rng.next())",
+            "quoted \"prompt\" \\backslash \(rng.next())",
+        ]
+        let template = rng.pick(templates)
+        if promptLen <= template.utf8.count { return template }
+        // Pad to promptLen with template-repeating fill
+        var out = template
+        while out.utf8.count < promptLen {
+            out.append(template)
+        }
+        return String(out.prefix(promptLen))
+    }
+}
+
 // MARK: - Test-side helpers
 
 /// Stable test seed derived from a function name。 Same function

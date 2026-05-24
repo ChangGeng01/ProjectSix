@@ -145,3 +145,21 @@ targets:
         # Auto-generate Info.plist for the test bundle (xcodebuild
         # signs unit-test bundles which need an Info.plist)
         GENERATE_INFOPLIST_FILE: YES
+
+# chapter 九百五十二 / M3465 — explicit scheme declaration with test
+# plan reference。 The Device2HrFuzz.xctestplan sets env vars for
+# extended on-device fuzz iter counts (BAS_FUZZ_ITER etc) that
+# can't be passed via xcodebuild CLI on iOS device runs。
+schemes:
+  BASDeviceTestApp:
+    build:
+      targets:
+        BASDeviceTestApp: all
+        BASDeviceTests: [test]
+    test:
+      gatherCoverageData: false
+      targets:
+        - BASDeviceTests
+      testPlans:
+        - path: Device2HrFuzz.xctestplan
+          defaultPlan: false

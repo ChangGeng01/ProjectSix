@@ -1,0 +1,59 @@
+{
+  "configurations" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000952",
+      "name" : "Device2HrFuzz",
+      "options" : {
+        "environmentVariableEntries" : [
+          {
+            "key" : "BAS_FUZZ_BENCH_RUN",
+            "value" : "1"
+          },
+          {
+            "key" : "BAS_FUZZ_BENCH_ITER",
+            "value" : "1000"
+          },
+          {
+            "key" : "BAS_FUZZ_RUNTIME_ITER",
+            "value" : "100"
+          },
+          {
+            "key" : "BAS_FUZZ_ITER",
+            "value" : "500"
+          },
+          {
+            "key" : "BAS_FUZZ_EVOL_GEN",
+            "value" : "5"
+          },
+          {
+            "key" : "BAS_FUZZ_EVOL_CHILD",
+            "value" : "8"
+          }
+        ]
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:BASDeviceTest.xcodeproj",
+      "identifier" : "BASDeviceTestApp",
+      "name" : "BASDeviceTestApp"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "BASChapter946FourteenLayerFuzzSmokeTests",
+        "BASChapter952BenchmarkRegressionFuzzTests",
+        "BASChapter952ExtremeFuzzTests",
+        "BASChapter952ProcGenSisterTests"
+      ],
+      "target" : {
+        "containerPath" : "container:BASDeviceTest.xcodeproj",
+        "identifier" : "BASDeviceTests",
+        "name" : "BASDeviceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

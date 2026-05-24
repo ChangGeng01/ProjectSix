@@ -207,6 +207,272 @@ public enum BASStringMutator {
     }
 }
 
+// MARK: - Crossover operators
+// chapter 九百五十二 / M3465 — user directive 「进化 算法 加强」
+//
+// Crossover combines two parents into a child by mixing their
+// content。 Compared to mutation,crossover preserves「good blocks」
+// from both parents — important for evolving structured inputs
+// where multiple parents may have discovered different bug-finding
+// fragments。
+//
+// All crossovers are deterministic given an inout BASFuzzRng so the
+// same seed produces identical children — required for CI
+// reproducibility per chapter 946 fuzz protocol。
+
+/// Byte-array crossover operators。
+public enum BASByteCrossover {
+    /// Single-point crossover: pick split point,take prefix from A,
+    /// suffix from B (output length = midpoint(A.count, B.count))。
+    public static func singlePoint(
+        _ a: [UInt8],
+        _ b: [UInt8],
+        rng: inout BASFuzzRng
+    ) -> [UInt8] {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let minLen = min(a.count, b.count)
+        let split = rng.nextInt(upTo: minLen)
+        return Array(a.prefix(split)) + Array(b.suffix(from: split))
+    }
+
+    /// Uniform crossover: per-byte coin flip choosing parent。
+    /// Output length = min(A.count, B.count)。 More aggressive mixing
+    /// than single-point — useful when bug-triggering inputs are
+    /// distributed across many byte positions。
+    public static func uniform(
+        _ a: [UInt8],
+        _ b: [UInt8],
+        rng: inout BASFuzzRng
+    ) -> [UInt8] {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let len = min(a.count, b.count)
+        var out: [UInt8] = []
+        out.reserveCapacity(len)
+        for i in 0..<len {
+            out.append(rng.nextBool() ? a[i] : b[i])
+        }
+        return out
+    }
+
+    /// Two-point crossover: pick two split points,middle segment
+    /// comes from B,outer from A。 Preserves block structure better
+    /// than uniform for inputs where contiguous regions matter
+    /// (e.g. JSON,serialized structs)。
+    public static func twoPoint(
+        _ a: [UInt8],
+        _ b: [UInt8],
+        rng: inout BASFuzzRng
+    ) -> [UInt8] {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let minLen = min(a.count, b.count)
+        if minLen < 3 { return singlePoint(a, b, rng: &rng) }
+        let p1 = rng.nextInt(upTo: minLen)
+        let p2 = rng.nextInt(in: p1...(minLen - 1))
+        var out: [UInt8] = []
+        out.reserveCapacity(a.count)
+        out.append(contentsOf: a.prefix(p1))
+        out.append(contentsOf: b[p1..<p2])
+        out.append(contentsOf: a.suffix(from: p2))
+        return out
+    }
+
+    /// Pick a random crossover (1 of 3)。
+    public static func cross(
+        _ a: [UInt8],
+        _ b: [UInt8],
+        rng: inout BASFuzzRng
+    ) -> [UInt8] {
+        switch rng.nextInt(upTo: 3) {
+        case 0: return singlePoint(a, b, rng: &rng)
+        case 1: return uniform(a, b, rng: &rng)
+        default: return twoPoint(a, b, rng: &rng)
+        }
+    }
+}
+
+/// Float-vector crossover operators。
+public enum BASFloatVectorCrossover {
+    /// Uniform crossover — per-element coin flip。
+    public static func uniform(
+        _ a: [Float],
+        _ b: [Float],
+        rng: inout BASFuzzRng
+    ) -> [Float] {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let len = min(a.count, b.count)
+        var out: [Float] = []
+        out.reserveCapacity(len)
+        for i in 0..<len {
+            out.append(rng.nextBool() ? a[i] : b[i])
+        }
+        return out
+    }
+
+    /// Arithmetic crossover — weighted average per element。
+    /// Useful for numerical inputs where averaging makes sense
+    /// (smooth function inputs,probability distributions)。
+    public static func arithmetic(
+        _ a: [Float],
+        _ b: [Float],
+        rng: inout BASFuzzRng
+    ) -> [Float] {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let len = min(a.count, b.count)
+        let alpha = rng.nextFloat(in: 0...1)
+        var out: [Float] = []
+        out.reserveCapacity(len)
+        for i in 0..<len {
+            out.append(a[i] * alpha + b[i] * (1 - alpha))
+        }
+        return out
+    }
+
+    /// Pick a random crossover (1 of 2)。
+    public static func cross(
+        _ a: [Float],
+        _ b: [Float],
+        rng: inout BASFuzzRng
+    ) -> [Float] {
+        rng.nextBool()
+            ? uniform(a, b, rng: &rng)
+            : arithmetic(a, b, rng: &rng)
+    }
+}
+
+/// String crossover operators。
+public enum BASStringCrossover {
+    /// Single-point crossover on Unicode scalars (NOT UTF-8 bytes,
+    /// to avoid splitting a multi-byte char mid-encoding)。
+    public static func singlePoint(
+        _ a: String,
+        _ b: String,
+        rng: inout BASFuzzRng
+    ) -> String {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let aScalars = Array(a.unicodeScalars)
+        let bScalars = Array(b.unicodeScalars)
+        let splitA = rng.nextInt(upTo: aScalars.count + 1)
+        let splitB = rng.nextInt(upTo: bScalars.count + 1)
+        var out = String()
+        for i in 0..<splitA { out.unicodeScalars.append(aScalars[i]) }
+        for i in splitB..<bScalars.count {
+            out.unicodeScalars.append(bScalars[i])
+        }
+        return out
+    }
+
+    /// Interleave by Unicode scalar — pull alternating scalars。
+    public static func interleave(
+        _ a: String,
+        _ b: String,
+        rng: inout BASFuzzRng
+    ) -> String {
+        if a.isEmpty { return b }
+        if b.isEmpty { return a }
+        let aScalars = Array(a.unicodeScalars)
+        let bScalars = Array(b.unicodeScalars)
+        let len = min(aScalars.count, bScalars.count)
+        var out = String()
+        for i in 0..<len {
+            out.unicodeScalars.append(
+                rng.nextBool() ? aScalars[i] : bScalars[i])
+        }
+        return out
+    }
+
+    /// Pick a random crossover (1 of 2)。
+    public static func cross(
+        _ a: String,
+        _ b: String,
+        rng: inout BASFuzzRng
+    ) -> String {
+        rng.nextBool()
+            ? singlePoint(a, b, rng: &rng)
+            : interleave(a, b, rng: &rng)
+    }
+}
+
+// MARK: - Multi-objective fitness
+
+/// Multi-objective fitness composition。 Per ch 952 user directive
+/// 「极致 找到 所有 缺陷 bug 不足」 — single-axis fitness can converge
+/// on local optima。 Real-world fuzz wants to balance:
+///   - coverage (did we hit new code paths?)
+///   - latency (do slow inputs reveal perf bugs?)
+///   - shape diversity (don't get stuck on one length / one type)
+///   - failure rate (did inputs CRASH or just succeed?)
+public struct BASMultiObjectiveFitness {
+    public let coverageScore: Double      // higher = more code paths hit
+    public let latencyMs: Double          // higher = slower (perf bug bait)
+    public let diversityScore: Double     // higher = different from prior
+    public let failureFlag: Double        // 1.0 if input crashed,0 otherwise
+
+    public init(
+        coverageScore: Double,
+        latencyMs: Double,
+        diversityScore: Double,
+        failureFlag: Double
+    ) {
+        self.coverageScore = coverageScore
+        self.latencyMs = latencyMs
+        self.diversityScore = diversityScore
+        self.failureFlag = failureFlag
+    }
+
+    /// Weighted-sum scalarization。 Caller picks weights。 Default
+    /// emphasizes coverage + failures (the two clearest bug signals)。
+    public func weightedSum(
+        wCoverage: Double = 1.0,
+        wLatency: Double = 0.1,
+        wDiversity: Double = 0.5,
+        wFailure: Double = 10.0
+    ) -> Double {
+        return wCoverage * coverageScore +
+               wLatency * latencyMs +
+               wDiversity * diversityScore +
+               wFailure * failureFlag
+    }
+}
+
+/// Pareto dominance check。 A dominates B if A is ≥ B on every
+/// dimension AND > B on at least one。 Pareto-best individuals
+/// are non-dominated。
+public enum BASParetoDominance {
+    public static func dominates(
+        _ a: BASMultiObjectiveFitness,
+        _ b: BASMultiObjectiveFitness
+    ) -> Bool {
+        let aDims = [a.coverageScore, a.latencyMs,
+                     a.diversityScore, a.failureFlag]
+        let bDims = [b.coverageScore, b.latencyMs,
+                     b.diversityScore, b.failureFlag]
+        var atLeastOneStrict = false
+        for i in 0..<aDims.count {
+            if aDims[i] < bDims[i] { return false }
+            if aDims[i] > bDims[i] { atLeastOneStrict = true }
+        }
+        return atLeastOneStrict
+    }
+
+    /// Find non-dominated subset (Pareto front) of a population。
+    public static func paretoFront<T>(
+        _ population: [(T, BASMultiObjectiveFitness)]
+    ) -> [(T, BASMultiObjectiveFitness)] {
+        return population.enumerated().compactMap { (idx, item) in
+            let dominated = population.enumerated().contains { (j, other) in
+                j != idx && dominates(other.1, item.1)
+            }
+            return dominated ? nil : item
+        }
+    }
+}
+
 /// Evolutionary loop — given a seed input and a fitness function,
 /// runs N generations producing G children each,keeping the best
 /// K survivors per generation。 Returns the best individual found
@@ -273,5 +539,88 @@ public enum BASEvolutionarySearch {
             }
         }
         return bestEver
+    }
+
+    /// Evolutionary loop WITH crossover + tournament selection。
+    /// chapter 九百五十二 — extends `evolve` with:
+    ///   - Multiple seeds to start (more genetic diversity)
+    ///   - Crossover between top parents (combine good blocks)
+    ///   - Tournament selection (random pairs compete,winner reproduces)
+    ///   - Elitism (best-ever always survives — prevents regression)
+    public static func evolveWithCrossover<T>(
+        seeds: [T],
+        generations: Int = 5,
+        childrenPerGen: Int = 8,
+        survivors: Int = 2,
+        crossover: (T, T, inout BASFuzzRng) -> T,
+        mutate: (T, inout BASFuzzRng) -> T,
+        fitness: (T) -> Double,
+        rng: inout BASFuzzRng
+    ) -> Individual<T> {
+        precondition(!seeds.isEmpty, "seeds must be non-empty")
+        var population: [Individual<T>] = seeds.map { seed in
+            Individual(value: seed,
+                       fitness: fitness(seed),
+                       generation: 0,
+                       seed: rng.state)
+        }
+        // Sort initial population so bestEver is correct
+        population.sort { $0.fitness > $1.fitness }
+        var bestEver = population[0]
+        for gen in 1...generations {
+            var children: [Individual<T>] = []
+            for _ in 0..<childrenPerGen {
+                // Tournament selection: pick 2 random parents,
+                // mate them or just mutate the winner。
+                let p1 = population.randomTournament(rng: &rng)
+                let p2 = population.randomTournament(rng: &rng)
+                let parentSeed = rng.state
+                let child: T
+                if rng.nextBool(p: 0.6) {
+                    // 60% crossover-then-mutate
+                    let crossed = crossover(p1.value, p2.value, &rng)
+                    child = mutate(crossed, &rng)
+                } else {
+                    // 40% pure mutation
+                    child = mutate(p1.value, &rng)
+                }
+                children.append(Individual(
+                    value: child,
+                    fitness: fitness(child),
+                    generation: gen,
+                    seed: parentSeed))
+            }
+            children.sort { $0.fitness > $1.fitness }
+            // Elitism: bestEver always survives
+            var nextPop = Array(children.prefix(survivors))
+            if !nextPop.contains(where: { $0.fitness >= bestEver.fitness }) {
+                nextPop.append(bestEver)
+            }
+            population = nextPop
+            if let topChild = children.first,
+               topChild.fitness > bestEver.fitness {
+                bestEver = topChild
+            }
+        }
+        return bestEver
+    }
+}
+
+// MARK: - Helpers for tournament selection
+
+extension Array {
+    /// Tournament selection — pick 2 random elements,return the
+    /// one with higher fitness (assumes Element is Individual<T>)。
+    /// Deterministic via inout RNG。
+    func randomTournament<T>(
+        rng: inout BASFuzzRng
+    ) -> BASEvolutionarySearch.Individual<T>
+        where Element == BASEvolutionarySearch.Individual<T>
+    {
+        precondition(!isEmpty, "tournament needs ≥ 1 individual")
+        if count == 1 { return self[0] }
+        let a = self[rng.nextInt(upTo: count)]
+        let b = self[rng.nextInt(upTo: count)]
+        return a.fitness >= b.fitness ? a : b
     }
 }
