@@ -109,10 +109,20 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
             "bas_l8_engine_pragma_value_i64)")
     }
 
-    /// Verifies the ch 922 NC2 PRAGMA busy_timeout=5000 fix。
-    /// busy_timeout's SQLite default is 0,so this test would
-    /// fail if the fix were reverted — unlike wal_autocheckpoint
-    /// where default coincidentally matches the desired value。
+    /// Verifies the ch 922 NC2 PRAGMA busy_timeout fix。
+    ///
+    /// chapter 九百三十一 / M3360 fix CRITICAL-3:value
+    /// bumped 5000 → 4500 because rusqlite 0.32 sets
+    /// sqlite3_busy_timeout(db, 5000) AUTOMATICALLY in
+    /// InnerConnection::open_with_flags。 Previous「SQLite
+    /// default is 0,so this catches revert」 comment was
+    /// WRONG — rusqlite intercepts the SQLite default,
+    /// presenting 5000 to any caller that opens via the
+    /// rusqlite API。 The test passed even if conn.busy_
+    /// timeout were deleted entirely (verified empirically
+    /// in 11th-pass test review)。 4500 is non-rusqlite-
+    /// default sentinel that makes the test real revert-
+    /// detector for the ch 922 NC2 fix。
     func testBusyTimeoutReadFromEngineConnection() {
         let engine = openEngine()
         defer { _ = bas_l8_engine_close(engine) }
@@ -127,9 +137,11 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
                 },
                 buf.count)
         }
-        XCTAssertEqual(value, 5000,
-            "busy_timeout must be 5000 ms (ch 922 NC2 fix) — " +
-            "SQLite default is 0,so this catches revert")
+        XCTAssertEqual(value, 4500,
+            "busy_timeout must be 4500 ms (ch 922 NC2 fix + " +
+            "ch 931 sentinel) — rusqlite default is 5000," +
+            "so 4500 is the only value that proves OUR " +
+            "pragma_update ran (NOT rusqlite's default)")
     }
 
     /// Verifies the diagnostic FFI is whitelisted — passing
@@ -598,7 +610,23 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
     /// constraint to event_log table。 Without test:reverting
     /// would silently allow duplicate sequence numbers per
     /// session,corrupting the audit replay invariant。
-    func testEventLogUniqueConstraintRejectsDuplicateSeq() {
+    // chapter 九百三十一 / M3360 fix CRITICAL-4 — renamed
+    // from `testEventLogUniqueConstraintRejectsDuplicateSeq`
+    // → `testEventLogFfiAutoIncrementSequenceNumber` because
+    // the original name was MISLEADING — it claimed to test
+    // the UNIQUE constraint but actually tests FFI auto-
+    // increment behavior。 11th-pass empirical revert
+    // verified:removing UNIQUE constraint → test still
+    // passes (since FFI auto-increment protects against
+    // duplicate-seq attempts before reaching schema layer)。
+    // Per ch 928 discipline (DELETED fake test with admission-
+    // docstring),admission isn't enough — rename to honest
+    // name so future readers know what's actually tested。
+    //
+    // Real UNIQUE-constraint regression guard lives in Rust
+    // `fresh_db_rejects_duplicate_session_seq_via_direct_sql`
+    // (lib.rs) which inserts via raw SQL bypassing the FFI。
+    func testEventLogFfiAutoIncrementSequenceNumber() {
         let engine = openEngine()
         defer { _ = bas_l8_engine_close(engine) }
         _ = bas_l8_event_log_init_schema(engine)

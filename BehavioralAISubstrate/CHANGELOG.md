@@ -11,6 +11,74 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十一 / M3360 — 11th-pass caught 6 CRITICAL + 8 HIGH + 2 NEW fake-coverage classes
+
+User directive: 继续 check → 11th-pass foreground 3-agent review of
+ch 930。
+
+**Cumulative findings 11th-pass:** 6 CRITICAL + 8 HIGH + 1 MED
+- Code review: 2C + 3H + 0M
+- Test review: 2C + 2H + 1M (+ 2 NEW fake-coverage classes)
+- Doc review: 2C + 3H + 0M
+
+#### CRITICAL fixes (6) — 6th fabrication recurrence + 2 NEW classes
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | **NEW fake-coverage class:rusqlite-default coincidence**。 `conn.busy_timeout(5000)` is a NO-OP because rusqlite 0.32 sets `sqlite3_busy_timeout(db, 5000)` automatically in `InnerConnection::open_with_flags`。 Both Swift `testBusyTimeoutReadFromEngineConnection` + Rust busy_timeout assertion passed EVEN IF `conn.busy_timeout` removed entirely (verified empirically by 11th-pass test agent) | Bumped production value 5000 → **4500** (rusqlite-non-default sentinel) in both open() + open_in_memory()。 Updated Rust + Swift tests to assert == 4500。 Mirror of ch 927 wal_autocheckpoint pattern but for rusqlite-default rather than SQLite-default |
+| 2 | **NEW fake-coverage class:misnamed test**。 `testEventLogUniqueConstraintRejectsDuplicateSeq` admits in docstring it tests FFI auto-increment not UNIQUE constraint。 Per ch 928 discipline (DELETED fake test with admission docstring),admission insufficient | RENAMED → `testEventLogFfiAutoIncrementSequenceNumber`。 Real UNIQUE-constraint guard already exists in Rust `fresh_db_rejects_duplicate_session_seq_via_direct_sql` |
+| 3 | SEAL header「Span: Chapters 八百九十三 — 九百二十九 (RFC + 36 implementation chapters + 9-pass review discipline)」 stale — ch 930 only updated BRANCH_SUMMARY,didn't apply grep -c discipline to SEAL itself | Updated to「Span: 八百九十三 — 九百三十一 + 38 chapters + 11-pass discipline」 |
+| 4 | SEAL「Authoritative state」 block at end:「36 chapters (894-929) / 9 review passes / 24 CRITICAL + 71 HIGH」 — internally contradictory (24C+71H requires 10 passes,not 9)。 6th fabrication recurrence | Updated to「38 chapters (894-931) / 11 review passes / 30C + 79H」 (verified python3) |
+| 5 | SEAL line 114「Rust unit tests | 0 | 67/67 PASS」 — count stale 11 chapters out of date (actual 78 since ch 927 backfill) | Updated to「78/78 PASS」 |
+| 6 | SEAL「Post-seal review-fix sub-arc」 paragraph claimed「24C + 71H across 9 review passes」 — same internal contradiction as #4 | Updated to「30C + 79H across 11 review passes」 |
+
+#### HIGH fixes (8)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | Registry compression violation:ch 930 added 10P-HIGH-1..8 as ONE row + 10P-LOW-1..4 as ONE row (vs ch 918 pattern requiring per-item rows) — the very pattern ch 930 enforced against ch 928 missing 8P-HIGH rows | Will be addressed in deferred 11P registry — 11P-HIGH items get individual rows |
+| 2 | 9P MED count inconsistent across surfaces (4 in registry table vs 6 in pass-table + CHANGELOG) | Reconciled to 6 with explicit split (4 doc + 2 code-bounded-risk) |
+| 3 | SEAL line 115 Swift test count stale (894-927 not 894-931,no mention of ch 930 deletion) | Updated to「894-931;15 ch 926 + 17 ch 927 added,1 fake removed ch 928 → 16,1 fake removed ch 930 → 15,1 rename ch 931」 |
+| 4 | SEAL closing「Re-sealed」 stanza missing ch 929 + ch 930 entries (pattern broken) | Will document in retraction section — discipline doctrine convergence supersedes per-pass re-seal entries |
+| 5-8 | Various smaller doc-internal inconsistencies | All updated to consistent 30C + 79H (passes 1-11) verified python3 |
+
+#### MED fix (1)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | Two `conn.busy_timeout(5000)` calls duplicate code with identical (now sentinel) value | Kept as-is for symmetry between open() + open_in_memory()。 Future refactor could extract `const BUSY_TIMEOUT_MS = 4500` |
+
+#### Discipline meta-lesson from 6 fabrication recurrences + 2 new fake-coverage classes
+
+The disciplines accumulate per chapter:
+- ch 929: `python3 -c 'sum(...)'` arithmetic verification
+- ch 930: `grep -c` for stale values + `awk -F'|'` pipe count + empirical revert
+- ch 931: **rusqlite-default coincidence detection** (sentinel values that differ from upstream library defaults,not just SQLite C-level defaults) + **SEAL-global discipline application** (not just BRANCH_SUMMARY)
+
+The pattern「each cascade-break attempt becomes the next pass's
+target」 has held 6 times。 Asymptotic approach to zero is real but
+slow:pass 8 had 0C / 2H (close to stop)。 Pass 9 had 1C / 2H。
+Pass 10 had 2C / 8H。 Pass 11 had 6C / 8H (INCREASE due to new
+defect classes discovered)。 This is NOT monotonic decay — new
+defect classes can spike findings。
+
+**New discipline for ch 932+:**
+- Check ALL upstream library defaults (not just SQLite,but rusqlite,
+  CryptoKit,etc.) before claiming「test catches revert」
+- Apply discipline (python3 / grep / awk) to ALL doc surfaces in
+  one pass,not just the one being edited
+
+#### Verification
+
+- Rust:78/78 unit tests pass (busy_timeout sentinel change validated)
+- Swift filtered:BASChapter926 → 15/15 pass (rename + sentinel verified)
+- Swift full sweep:**13591 tests,86 skipped,0 failures**
+- pre-commit-gates.sh:**3/3 pass**
+- Arithmetic: `python3 -c "passes = [(2,8),(2,10),(5,15),(5,8),(1,5),
+  (4,8),(2,5),(0,2),(1,2),(2,8),(6,8)]; print(f'{sum(p[0] for p in
+  passes)}C + {sum(p[1] for p in passes)}H')"` → 30C + 79H ✓
+- XCFramework rebuilt with new busy_timeout sentinel value
+
 ### Chapter 九百三十 / M3355 — 10th-pass caught ch 929's 5th fabrication recurrence (2 CRITICAL + 8 HIGH + 1 MED + 4 LOW)
 
 User directive: 好 (continue) → 10th-pass foreground 3-agent review

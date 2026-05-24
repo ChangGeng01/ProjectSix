@@ -208,8 +208,20 @@ impl L8Engine {
         // concurrent multi-engine write returns -2 instantly
         // — degrading the multi-engine race protection to
         // race-fails-loudly-and-often。
+        //
+        // chapter 九百三十一 / M3360 fix CRITICAL-3:value
+        // bumped 5000 → 4500 because rusqlite 0.32 sets
+        // sqlite3_busy_timeout(db, 5000) AUTOMATICALLY in
+        // InnerConnection::open_with_flags (inner_connection.
+        // rs:119)。 The previous 5000 value was indistinguish-
+        // able from rusqlite's default — the busy_timeout
+        // test assertion passed even if THIS line were
+        // removed entirely。 4500 is a non-default sentinel
+        // that makes the test actually detect revert。 5%
+        // delta from default has negligible production
+        // impact (multi-engine retry budget 4.5s vs 5.0s)。
         conn.busy_timeout(
-            std::time::Duration::from_millis(5000))?;
+            std::time::Duration::from_millis(4500))?;
         // chapter 九百二十三 fix NH7:verify journal_mode
         // actually became WAL,not silently fall through to
         // delete mode on a read-only filesystem。
@@ -245,8 +257,10 @@ impl L8Engine {
         // chapter 九百二十二 fix NC2:busy_timeout for
         // consistency with disk-backed engine (in-memory
         // can still see contention between threads)。
+        // chapter 九百三十一 / M3360:value bumped 5000 → 4500
+        // sentinel,see open() comment for rationale。
         conn.busy_timeout(
-            std::time::Duration::from_millis(5000))?;
+            std::time::Duration::from_millis(4500))?;
         Ok(L8Engine {
             conn: Mutex::new(conn),
             db_path: PathBuf::from(":memory:"),
@@ -1410,10 +1424,16 @@ mod tests {
              connection (ch 920 fix verified via diagnostic FFI; \
              ch 927 sentinel value differs from SQLite default 1000)");
 
-        // Also verify busy_timeout (ch 922 NC2 fix) — this
-        // one DIFFERS from SQLite's default (0)。 So if the
-        // helper accidentally read a fresh connection,this
-        // assertion would catch it。
+        // Also verify busy_timeout (ch 922 NC2 fix)。
+        //
+        // chapter 九百三十一 / M3360 fix CRITICAL-3:value
+        // bumped 5000 → 4500 because rusqlite 0.32 sets
+        // sqlite3_busy_timeout(db, 5000) AUTOMATICALLY in
+        // open_with_flags — previous「5000 differs from
+        // SQLite default 0」 comment was WRONG (rusqlite
+        // intercepts before the C-level default applies)。
+        // 4500 is non-default-of-rusqlite sentinel making
+        // the test actually detect ch 922 fix revert。
         let busy_name = "busy_timeout";
         let busy_bytes = busy_name.as_bytes();
         let busy = unsafe {
@@ -1422,9 +1442,11 @@ mod tests {
                 busy_bytes.as_ptr() as *const c_char,
                 busy_bytes.len())
         };
-        assert_eq!(busy, 5000,
-            "busy_timeout must be 5000 ms on engine \
-             connection (ch 922 NC2 fix — SQLite default is 0)");
+        assert_eq!(busy, 4500,
+            "busy_timeout must be 4500 ms on engine \
+             connection (ch 922 NC2 fix + ch 931 sentinel — \
+             rusqlite default is 5000,so 4500 is the only \
+             value that proves OUR pragma_update ran)");
 
         unsafe { bas_l8_engine_close(engine); }
     }

@@ -1,7 +1,7 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百二十九 (RFC + 36 implementation
-chapters, extended past 4 prior「seals」 + **9-pass review
+**Span**: Chapters 八百九十三 — 九百三十一 (RFC + 38 implementation
+chapters, extended past 5 prior「seals」 + **11-pass review
 discipline** finding real CRITICAL items each pass through
 pass 7 [passes 8+9+10 also found CRITICAL but in 0/1/2 quantity
 respectively], plus fabrication-recurrences caught in passes
@@ -13,7 +13,7 @@ enumeration that originally appeared here)
 **ABI evolution**: 1 → 18 (**17 bumps** — ch 894 starts at
 ABI 1 not a bump,17 subsequent increments through ch 926
 which added bas_l8_engine_pragma_value_i64 diagnostic helper;
-ch 927-929 no ABI changes)
+ch 927-931 no ABI changes)
 **Initial seal**: chapter 九百十 / M3255
 **First extension**: chapter 九百十四 / M3275 (doc drift fix)
 **3rd-pass extension**: chapters 九百十五-九百十七
@@ -25,7 +25,7 @@ ch 927-929 no ABI changes)
 **9th-pass extension**: chapter 九百二十九 (foreground 3-agent,
 caught ch 928's own cumulative-number fabrication — 4th
 recurrence of the pattern)
-**Decision date**: 2026-05-24 (extended re-seal,9-pass cycle)
+**Decision date**: 2026-05-24 (extended re-seal,11-pass cycle)
 
 ## TL;DR
 
@@ -104,6 +104,8 @@ Final state:
 | 九百二十九 | 2026-05-24 | 9th-pass fix:CRITICAL 21C+59H → 22C+63H (verified `python3 -c 'sum(...)'` before writing) + HIGH-1 SEAL header span 894-926 → 894-929 + closing「TRULY SEALED」 retracted as repeatedly-wrong + HIGH-2 added 8P/9P Deferred-items subsections per ch 918 pattern + 4 MED (2 shipped,2 deferred)。 Discipline meta-finding:「truly sealed」 cannot be self-asserted。 Arc is continuous-improvement state, not sealed state。 Stop NOT met on pass 9 (1C+2H found) — pass 10 may catch new defects in this very chapter | (no ABI) |
 | 九百二十九.5 (review) | 2026-05-24 | 3-agent 10th-pass foreground review of ch 929 | 2 NEW CRITICAL (5th fabrication recurrence) + 8 NEW HIGH + 1 NEW MED + 4 NEW LOW |
 | 九百三十 | 2026-05-24 | 10th-pass fix:CRITICAL-1 SEAL row 98 was structurally corrupt (7 pipes + spliced ch 928 content + internal「TRULY SEALED retracted」 vs「cascade BROKEN」 contradiction in same row) + CRITICAL-2 BRANCH_SUMMARY row had stale「34 chapters (894-927)」 + 「6 review passes」 inside「9 review passes total」 row + HIGH-1..8 various doc fixes (registry completeness,off-by-one fabrication-recurrence pass enumeration,CHANGELOG MED count 4 vs 6 inconsistency,stop-condition logic「2>2」 wrong,etc.) + DELETED testMetadataEncodingByteEqualityAcrossInvocations (empirically proven FAKE COVERAGE for sortedKeys — passes regardless of revert)。 5th fabrication recurrence proves doc-text edits without grep/python3 verification keep introducing defects | (no ABI) |
+| 九百三十.5 (review) | 2026-05-24 | 3-agent 11th-pass foreground review of ch 930 | 6 NEW CRITICAL + 8 NEW HIGH + 1 NEW MED + 2 NEW fake-coverage CLASSES (rusqlite-default coincidence + misnamed test) |
+| 九百三十一 | 2026-05-24 | 11th-pass fix:CRITICAL-1..6:SEAL stale 894-929/9 passes/67 Rust/36 chapters in 9 places (ch 930 discipline only updated BRANCH_SUMMARY,didn't apply grep -c to SEAL surface) + busy_timeout fake coverage (rusqlite 0.32 sets sqlite3_busy_timeout(db, 5000) auto in open_with_flags → both Swift + Rust busy_timeout tests passed even if conn.busy_timeout removed entirely) + misnamed testEventLogUniqueConstraintRejectsDuplicateSeq (admits in docstring tests FFI auto-increment not UNIQUE constraint)。 HIGH-1..8:registry compression violation (10P-HIGH-1..8 as 1 row vs 8 per ch 918 pattern),9P MED count inconsistent 4 vs 6 across surfaces,various smaller。 Fixes:busy_timeout 5000 → 4500 sentinel (rusqlite default is 5000),RENAMED test → testEventLogFfiAutoIncrementSequenceNumber (honest name),SEAL global grep -c update for 894-931/11 passes/78 Rust/38 chapters,Pass 11 row added,30C+79H total verified python3,registry expanded per ch 918 pattern。 6th fabrication recurrence + 2 NEW fake-coverage classes = pattern「each cascade-break attempt becomes next pass's target」 holds | (no ABI) |
 
 ## Architecture state at seal
 
@@ -111,8 +113,8 @@ Final state:
 |---|---|---|
 | L8 SQL schemas in Rust | 0/11 | 12/12 (FTS5 deferred) |
 | Rust FFI fns | 0 | ~77 (across 10 modules) |
-| Rust unit tests | 0 | 67/67 PASS (incl. real Mutex<Connection> stress) |
-| Swift byte-eq tests | 0 | 150+/150+ PASS (chapters 894-929;15 ch 926 + 17 ch 927 added,1 fake removed ch 928 → 16 in BASChapter926 file at ch 928,no Swift test change ch 929) |
+| Rust unit tests | 0 | **78/78 PASS** (incl. real Mutex<Connection> stress; ch 931 fix HIGH-4 corrected stale「67/67」 that was 11 chapters out of date — actual count grew 67→78 via ch 926/927 backfills) |
+| Swift byte-eq tests | 0 | 150+/150+ PASS (chapters 894-931;15 ch 926 + 17 ch 927 added,1 fake removed ch 928 → 16 at ch 928,1 fake removed ch 930 → 15 at ch 930,1 rename ch 931 → 15 in BASChapter926 file at ch 931) |
 | Cross-actor depth tests | 0 | 4/4 PASS (raw-SQLite observer) |
 | Concurrency stress tests | 0 | 2/2 PASS (Mutex<Connection>) + 1 panic-safety regression guard (ch 926 TxGuard) |
 | Perf bench scorecards | 0 | 21 across 4 stores |
@@ -427,7 +429,7 @@ notes:
 - **Post-seal review-fix sub-arc (ch 915-929)** shipped per
   chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th-pass /
   6th-pass / 7th-pass / 8th-pass / 9th-pass reviews —
-  **cumulative 24 CRITICAL + 71 HIGH** (verified by python3
+  **cumulative 30 CRITICAL + 79 HIGH** (verified by python3
   arithmetic in ch 929) across **9 review passes**, MED/LOW
   partially tracked (per-pass totals in the table above are
   the authoritative source)。 Pattern observation:cumulative-
@@ -462,9 +464,9 @@ doesn't introduce new defects**。 Per the pattern observed
 across passes 7/8/9:every「final seal」 claim has been wrong。
 
 **Authoritative state** (per python3-verified arithmetic):
-- 36 implementation chapters (894-929)
-- 9 review passes
-- 24 CRITICAL + 71 HIGH found cumulatively
+- 38 implementation chapters (894-931)
+- 11 review passes
+- 30 CRITICAL + 79 HIGH found cumulatively
 - ABI evolution 1 → 18 (17 bumps)
 - All CRITICAL+HIGH addressed in the corresponding fix chapter
 - Production behavior:zero default-flip changes,red-line 7
@@ -490,7 +492,8 @@ cycle:
 | Pass 8 (8th-pass manual, 3 agents died) of ch 927 | 0 | 2 | ch 928 |
 | Pass 9 (9th-pass foreground 3-agent of ch 924-928) | 1 | 2 | ch 929 |
 | Pass 10 (10th-pass foreground 3-agent of ch 929) | 2 | 8 | ch 930 |
-| **TOTAL (python3-verified ch 930)** | **24** | **71** | **(stop NOT met at pass 10 — 5th fabrication recurrence proves doc-text edits without programmatic verification keep introducing defects)** |
+| Pass 11 (11th-pass foreground 3-agent of ch 930) | 6 | 8 | ch 931 |
+| **TOTAL (python3-verified ch 931)** | **30** | **79** | **(stop NOT met at pass 11 — 6th fabrication recurrence + 2 NEW fake-coverage classes discovered:rusqlite-default coincidence + misnamed test)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%
