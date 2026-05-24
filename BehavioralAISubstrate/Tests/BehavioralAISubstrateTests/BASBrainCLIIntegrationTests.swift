@@ -4,6 +4,8 @@
 // stdout/stderr/exit-code. NOT tautological — this is
 // end-to-end product surface verification.
 
+// chapter 九百四十七 / M3440 — Foundation.Process unavailable on iOS
+#if os(macOS)
 import XCTest
 import Foundation
 
@@ -636,3 +638,5 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
             " input")
     }
 }
+
+#endif

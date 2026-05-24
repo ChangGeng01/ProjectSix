@@ -1,3 +1,5 @@
+// chapter 九百四十七 / M3440 — Foundation.Process unavailable on iOS
+#if os(macOS)
 import XCTest
 @testable import BASRuntimeCore
 
@@ -221,3 +223,5 @@ final class BASDoctrineStateAndGrowthTests: XCTestCase {
         }
     }
 }
+
+#endif

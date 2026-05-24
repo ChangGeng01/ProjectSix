@@ -487,7 +487,15 @@ final class BASChapter946FourteenLayerFuzzSmokeTests:
     /// Fitness function = (success ? 1.0 : 0.0) + 0.1 * promptLength
     /// to bias toward longer/weirder prompts that still succeed
     /// (catches more boundary cases)。
+    ///
+    /// chapter 九百四十八 / M3445 — iPhone Air simulator SIGKILL
+    /// (jetsam) finding:original 3 generations × 4 children = 12
+    /// BASHostRuntime creations + multi-MB mutated prompts exceeded
+    /// iOS sim memory budget。 Now gated under requireRuntimeFuzz +
+    /// uses small generations (1) + small children (2) by default,
+    /// caller can scale up via env vars。
     func testEvolutionaryPromptSearchAllLayersSurvive() throws {
+        try requireRuntimeFuzz()
         var rng = BASFuzzRng(seed: testSeed())
         let mutate: (String, inout BASFuzzRng) -> String = {
             seed, r in
@@ -515,11 +523,21 @@ final class BASChapter946FourteenLayerFuzzSmokeTests:
                 return -1.0  // failure penalty
             }
         }
+        // chapter 九百四十八 — iPhone Air simulator jetsam fix:
+        // reduce default budget to fit in iOS memory ceiling。
+        // Original 3×4=12 invocations + 100-char-repeat-100=10K-char
+        // mutated prompts exceeded iOS sim app memory budget。 Now
+        // default 1×2=2 invocations,can scale via BAS_FUZZ_EVOL_GEN
+        // + BAS_FUZZ_EVOL_CHILD env vars for explicit larger runs。
+        let gens = Int(ProcessInfo.processInfo
+            .environment["BAS_FUZZ_EVOL_GEN"] ?? "1") ?? 1
+        let chld = Int(ProcessInfo.processInfo
+            .environment["BAS_FUZZ_EVOL_CHILD"] ?? "2") ?? 2
         let best = BASEvolutionarySearch.evolve(
             seed: "evolutionary baseline prompt",
-            generations: 3,  // keep budget small for default run
-            childrenPerGen: 4,
-            survivors: 2,
+            generations: gens,
+            childrenPerGen: chld,
+            survivors: 1,
             mutate: mutate,
             fitness: fitness,
             rng: &rng)

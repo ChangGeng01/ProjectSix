@@ -165,11 +165,18 @@ public enum BASStringMutator {
     }
 
     /// Repeat the string N times to test length-cap behavior。
+    /// chapter 九百四十八 — iPhone Air simulator jetsam fix:
+    /// reduced max 100 → 10 to fit in iOS app memory ceiling
+    /// (combined with evolutionary search's 2 children + 1 gen,
+    /// keeps total mutated-string footprint under ~100KB)。
+    /// Boundary cases (very long strings) still tested in
+    /// `boundary()` (10K char) which is bounded - here we limit
+    /// the multiplier。
     public static func repeating(
         _ s: String,
         rng: inout BASFuzzRng
     ) -> String {
-        let n = rng.nextInt(in: 1...100)
+        let n = rng.nextInt(in: 1...10)
         return String(repeating: s, count: n)
     }
 

@@ -11,6 +11,8 @@
 //   - SQLite event log round-trip (3)
 //   - lastReplayedSequenceNumber monotonicity (3)
 
+// chapter 九百四十七 / M3440 — Foundation.Process unavailable on iOS
+#if os(macOS)
 import Foundation
 import XCTest
 @testable import BASMemory
@@ -537,3 +539,5 @@ final class BASEventSourcedMemoryAtomStoreTests: XCTestCase {
         XCTAssertGreaterThan(s3!, s2!)
     }
 }
+
+#endif
