@@ -11,6 +11,40 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十六 / M3385 — SUBSTANCE chapter #3:user_state full-row FFI (was「Full」 lie since ch 898)
+
+User directive:继续。 3rd substance chapter。 Variation from ch 934/935 recipe:schema stores opaque `payload_json` so FFI just returns the bytes as-is — no per-column JSON construction needed。 Simpler than ch 934/935。
+
+#### What shipped
+
+1. **Rust FFI** — NEW `bas_l8_user_state_payload_for_id` + `bas_l8_user_state_latest_payload_for_session` (probe+fill,returns 0 on not-found per Optional<T> semantics)
+2. **Swift bridge** — `state(forID:)` + `latestState(forSession:)` rewritten via shared `stateViaPayloadFfi` helper → JSONDecoder reconstructs `BASUserState`
+3. **Tests** — `BASChapter936UserStateFullRowTests.swift` (5 Swift tests) + 2 NEW Rust unit tests (`payload_for_state_id_round_trip` + `payload_ffi_probe_fill`)
+4. **L8_ROUTED_OVERVIEW.md** — UserState row「Partial」 → 「Full」 + stub-list marked SHIPPED
+
+#### Recipe variation noted
+
+| Recipe step | ch 934/935 (array return) | ch 936 (Optional return) |
+|---|---|---|
+| Rust JSON construction | Manual per-column (atom_lifecycle/deletion_manifest schemas) | NOT NEEDED — payload_json is already serialized |
+| FFI return value | Always JSON array (`[]` if empty) | Bytes count (probe/fill) OR 0 (not found) |
+| Swift bridge `guard needed >= 2` | Yes (empty array = 2 bytes) | `guard needed > 0` (not-found = 0) |
+| JSONDecoder type | `[BASRecord].self` | `BASUserState.self` (single object) |
+
+Pattern generalizes:both shapes work,Optional case is even simpler due to opaque payload。
+
+#### Verification
+
+- Rust:**85/85 unit tests pass** (+2 NEW)
+- Swift filtered:**BASChapter936 → 5/5 pass** + BASChapter935 → 4/4 pass + BASChapter934 → 4/4 pass + BASChapter926 → 15/15 pass
+- Swift full sweep:**13604 tests,88 skipped,0 failures** (+5 from ch 935 baseline)
+- pre-commit-gates.sh:**3/3 pass**
+
+#### Remaining (2 bridges left)
+
+- VersionTree (ch 937)
+- EventLog (ch 938)
+
 ### Chapter 九百三十五 / M3380 — SUBSTANCE chapter #2:deletion_manifest full-row FFI implemented (was「Full」 lie since ch 896)
 
 User directive:继续。 2nd substance chapter using ch 934 proven recipe (probe+fill JSON FFI + JSONDecoder)。

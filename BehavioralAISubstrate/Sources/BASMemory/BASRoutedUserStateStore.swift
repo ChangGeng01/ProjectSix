@@ -115,15 +115,81 @@ public actor BASRoutedUserStateStore: BASUserStateStorage {
     public func state(
         forID stateID: String
     ) async -> BASUserState? {
-        // chapter 898 partial conformance — full-row query
-        // requires Rust FFI extension (chapter 898.5)。
-        return nil
+        // chapter 九百三十六 / M3385 — USER-PASS substance fix #3。
+        // Schema stores payload_json opaquely;return raw bytes
+        // to JSONDecoder for round-trip。
+        return Self.stateViaPayloadFfi(
+            engine: enginePtr, key: stateID, byID: true)
     }
 
     public func latestState(
         forSession sessionID: String
     ) async -> BASUserState? {
-        return nil
+        // chapter 九百三十六 / M3385 — see state(forID:) above
+        return Self.stateViaPayloadFfi(
+            engine: enginePtr, key: sessionID, byID: false)
+    }
+
+    /// chapter 九百三十六 / M3385 — shared probe+fill helper。
+    /// Returns nil on:not-found (FFI returns 0), error path,
+    /// or JSON decode failure。
+    private static func stateViaPayloadFfi(
+        engine: OpaquePointer,
+        key: String,
+        byID: Bool
+    ) -> BASUserState? {
+        let keyBytes = Array(key.utf8)
+        let needed = keyBytes.withUnsafeBufferPointer { kBuf in
+            byID
+                ? bas_l8_user_state_payload_for_id(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+                : bas_l8_user_state_latest_payload_for_session(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+        }
+        // 0 = not found (no row);negative = error → nil
+        guard needed > 0 else { return nil }
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let written = keyBytes.withUnsafeBufferPointer { kBuf in
+            buf.withUnsafeMutableBufferPointer { outBuf in
+                byID
+                    ? bas_l8_user_state_payload_for_id(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress,
+                        outBuf.count)
+                    : bas_l8_user_state_latest_payload_for_session(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress,
+                        outBuf.count)
+            }
+        }
+        guard written > 0 else { return nil }
+        let json = Data(buf.prefix(Int(written)))
+        return try? JSONDecoder().decode(
+            BASUserState.self, from: json)
     }
 
     public var totalCount: Int {

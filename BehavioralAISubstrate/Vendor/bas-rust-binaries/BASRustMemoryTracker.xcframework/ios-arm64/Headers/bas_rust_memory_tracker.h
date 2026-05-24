@@ -1590,6 +1590,27 @@ int64_t bas_l8_user_state_latest_time_for_session(
     const L8Engine* engine,
     const char* session_id_utf8, size_t session_id_len);
 
+// chapter 九百三十六 / M3385 — payload_json FFI (USER-PASS #3)
+// Schema stores BASUserState as opaque payload_json — just return
+// the bytes as-is to Swift which JSONDecodes back to BASUserState。
+// Return codes:
+//   ≥0 → bytes needed (probe) or written (fill)
+//    0 → row not found (Swift treats as nil)
+//   -1 → null engine
+//   -2 → SQLite error
+//   -3 → invalid UTF-8 input / out_capacity < needed (fill)
+int32_t bas_l8_user_state_payload_for_id(
+    const L8Engine* engine,
+    const char* state_id_utf8, size_t state_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+int32_t bas_l8_user_state_latest_payload_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 // MARK: - bas-l8-engine version_tree module
 //         (chapter 八百九十九 / M3185)
 //
