@@ -55,7 +55,9 @@
         "BASChapter952BenchmarkRegressionFuzzTests",
         "BASChapter952ExtremeFuzzTests",
         "BASChapter952ProcGenSisterTests",
-        "BASChapter952RealMLXOnDeviceTests"
+        "BASChapter952RealMLXOnDeviceTests",
+        "BASChapter952_2InfiniteLoopRegressionTests",
+        "BASChapter952_4HighBarBenchmarkTests"
       ],
       "target" : {
         "containerPath" : "container:BASDeviceTest.xcodeproj",
