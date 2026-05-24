@@ -35,6 +35,7 @@
 		057DA9B31992068C23F79566 /* BASEvalRunStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF2EDD4D7BC72E4C41371D9 /* BASEvalRunStorageTests.swift */; };
 		05DBAD6DEF395C2F756D4E5C /* BASEBrainTurnResultDeviceLifecycleBundleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5BA37B57AD81583AE38E0E /* BASEBrainTurnResultDeviceLifecycleBundleTests.swift */; };
 		05E544B0F7228E6DB5400E2B /* BASADR019TierCProposalDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8775EAD0B6477BE7C66BDA0 /* BASADR019TierCProposalDoctrineTests.swift */; };
+		05F9708E293D3A58D325118E /* BASLeaseLife in Frameworks */ = {isa = PBXBuildFile; productRef = 5BC28893D5AC4356D059F7E7 /* BASLeaseLife */; };
 		05FD5944155AEDC8379D6A73 /* BASV2FoundationsRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DD3686148EDFCBA8F7DBC55 /* BASV2FoundationsRegistryTests.swift */; };
 		0610F101AB0D63780AA82F36 /* BASHostRuntimeMeshSweepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 350C0183F96828F4A090FDB9 /* BASHostRuntimeMeshSweepTests.swift */; };
 		0633434BF9F544F82B13A754 /* BASANELiveReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0440EB01413A082DEA1B65C /* BASANELiveReaderTests.swift */; };
@@ -149,6 +150,7 @@
 		1E5B088E49848C2E03B1E32C /* BASChapter618OrganCodableWaveFiveProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C050269E2DC253F9A5494422 /* BASChapter618OrganCodableWaveFiveProofTests.swift */; };
 		1F13C6D50FA4264B023AB42E /* BASChapter646SovereignTrustRecordTrioProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF35FE0EA1A519DE5E6DAF9 /* BASChapter646SovereignTrustRecordTrioProofTests.swift */; };
 		1F6D54C919FE118D55F19EC8 /* BASThermalTwinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB67626CE148A0338CC3E7D3 /* BASThermalTwinTests.swift */; };
+		1F82AF3E882F9DAA8D0C1AEB /* BASEvaluation in Frameworks */ = {isa = PBXBuildFile; productRef = 040E06F2A9EBCB7E13EB49DB /* BASEvaluation */; };
 		1F84494EF7C0D99E95FF53FD /* BASANEKernelEligibilityClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F467DE3B490383DB3A93F754 /* BASANEKernelEligibilityClassifierTests.swift */; };
 		202B26871971FDD7081EAE3D /* BASTurnRuntimePlanLedgerCoherenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D929FFB834AEB33F162FBD7E /* BASTurnRuntimePlanLedgerCoherenceTests.swift */; };
 		20301B0916F4A14FE37B7240 /* BASChapter815AuditPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B116F044324C1ECCD39983 /* BASChapter815AuditPipelineTests.swift */; };
@@ -157,6 +159,7 @@
 		20C8E4544D35A1DE2EE2B9A8 /* BASRealHotPathAttackEvaluationDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C5D920C12567008888E7D4 /* BASRealHotPathAttackEvaluationDoctrineTests.swift */; };
 		20D5548572F8FF435AC3C793 /* BASOrganCurriculumTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C2B7236530EE6C9EF5A240 /* BASOrganCurriculumTests.swift */; };
 		21567DAB4DC09CEB85181E7B /* BASUpdateTicketLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2918C296736A37D74041BF02 /* BASUpdateTicketLifecycleTests.swift */; };
+		217BF1E74A6FAC623C9354F8 /* BASSovereign in Frameworks */ = {isa = PBXBuildFile; productRef = D28FA94BC4BCD0638A5B6AE7 /* BASSovereign */; };
 		21E378802B9B75EF6EDCC29B /* BASCProbesExtendedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54E06E0B90D14F1C68AFD83 /* BASCProbesExtendedTests.swift */; };
 		221DD8560EB38A203FC14665 /* BASSovereignFragmentMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8440C49B0E51A5D9D07FDA3 /* BASSovereignFragmentMergerTests.swift */; };
 		22371C4978E007D0C2DEA94A /* BASChapter751RiskObservationsReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E64BB1E7964DE177B6B7E49 /* BASChapter751RiskObservationsReplayTests.swift */; };
@@ -215,6 +218,7 @@
 		2BB85AE249409089B113D4CF /* BASFivePilotEndToEndIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE989935DE5AA5032FCB8B1B /* BASFivePilotEndToEndIntegrationTests.swift */; };
 		2CA474860D470A405299DBD3 /* BASMostExtremeDirectiveStatusDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F753E1318CC4F77343F6CD /* BASMostExtremeDirectiveStatusDoctrineTests.swift */; };
 		2CB3D4083DB2C5C7FE543087 /* BASChapter723ImportanceScorerByteEqualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C9EE063C938B60523097676 /* BASChapter723ImportanceScorerByteEqualityTests.swift */; };
+		2CDC14FA458E445B939B9AC7 /* BASAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 0E27F74B10ED1E0E8A47CD07 /* BASAdmin */; };
 		2CDE7EA3E642701F9278C1A8 /* BASRuntimeModeOverrideEnvVarProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA8785D6C32B7B9FE8932976 /* BASRuntimeModeOverrideEnvVarProofTests.swift */; };
 		2CED264CE76E6CFEA9654DA8 /* BASCodableExtensionHeptaMilestoneCompletionDoctrineWireInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4FB5FE60306688FB9E1AD00 /* BASCodableExtensionHeptaMilestoneCompletionDoctrineWireInTests.swift */; };
 		2D0F4A43FDD118A854FCF288 /* BASStageAcceleratorAssignmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FCD73F1541A2C6000DCAB86 /* BASStageAcceleratorAssignmentTests.swift */; };
@@ -529,6 +533,7 @@
 		69B4569D454733F8EA5A7C15 /* BASChapter735TierSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A56FFB84C781B626B21AD700 /* BASChapter735TierSelectorTests.swift */; };
 		69B87EAB6B50D0088CF2D39E /* BASAuditProjectionsBundleEndToEndJsonProofDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3566A278CDCCCA51CAC439C /* BASAuditProjectionsBundleEndToEndJsonProofDoctrineTests.swift */; };
 		69CEF6EA9545511A8304E88C /* BASChapter925FixCoverageBackfillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B542C204DA7D59699A5979E /* BASChapter925FixCoverageBackfillTests.swift */; };
+		69D8E6EE0A5AC7D9704FDA08 /* BASChatCompletionsAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = 1717670A45572DC9B7442A4A /* BASChatCompletionsAdapter */; };
 		69FB229141930B1F72F583AA /* BASV1MonolithProjectionsFoldDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBA057A959B622C196A5AB48 /* BASV1MonolithProjectionsFoldDoctrineTests.swift */; };
 		69FBA155D17140A63F7F9A4F /* BASChapter578OrchestrationCodablePostArcWaveThreeProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BF2AB1895C92BFA3D0C817 /* BASChapter578OrchestrationCodablePostArcWaveThreeProofTests.swift */; };
 		6A2CFCD16E0CA1BFF287D2ED /* BASHostKitNonProjectionCodableExtensionArcSealedWireInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F62CAC44C462D8E7D58863F /* BASHostKitNonProjectionCodableExtensionArcSealedWireInTests.swift */; };
@@ -598,6 +603,7 @@
 		74B9845C36C6D6FFCB86D96A /* BASAppleInspectionBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97310AB88CEE929DFABC4E63 /* BASAppleInspectionBridgeTests.swift */; };
 		7507171579B6D2EAF4A299E6 /* M404M405KunlunJadeRiverAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914E13D3A1D57F774909C5C9 /* M404M405KunlunJadeRiverAuditTests.swift */; };
 		7523B21731B88898336205F6 /* BASApplePredictiveInterventionLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D811B1448FD9A55AC291530 /* BASApplePredictiveInterventionLifecycleTests.swift */; };
+		7526E5CD0606983D3D1E9FD4 /* BASObservability in Frameworks */ = {isa = PBXBuildFile; productRef = C7DA5EB589016FF8C1096194 /* BASObservability */; };
 		7540B138247C15A226DC683D /* BASChapter611SovereignCodableWaveTwoProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69E98BDCC15F3969C997FD5 /* BASChapter611SovereignCodableWaveTwoProofTests.swift */; };
 		7575F48510D550FB36CADC57 /* BASSoftHandModeSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC836E4C2EF9CD46A412451 /* BASSoftHandModeSelectorTests.swift */; };
 		76A3A0EFDF8F5707D26632E2 /* BASWorldPriorBuiltInLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C386AD7C929B1A81F330E26 /* BASWorldPriorBuiltInLibraryTests.swift */; };
@@ -638,6 +644,7 @@
 		7C6DE34B4F17024237717F1A /* BASMPSGraphCacheBenchmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8341173CDE903B54B152A0A /* BASMPSGraphCacheBenchmarkTests.swift */; };
 		7D048C1E6C6BE0D338EB4D75 /* BASWorldPriorCoreMLErrorTrioCodableExtensionDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6263DEFFCA3079C8A5AB43 /* BASWorldPriorCoreMLErrorTrioCodableExtensionDoctrineTests.swift */; };
 		7D09FD8E2F2B689486E83C37 /* BASPhaseJKLCompletionHexaCatalogDoctrineWireInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F630D6E20BED91C567150D7D /* BASPhaseJKLCompletionHexaCatalogDoctrineWireInTests.swift */; };
+		7D307D8EA0360B81CE992822 /* BASAppleAdapters in Frameworks */ = {isa = PBXBuildFile; productRef = BA03030D1C67891763697739 /* BASAppleAdapters */; };
 		7D3B583994A70395C480C262 /* BASCandidateObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A1DA603D79EBC5C73E983C /* BASCandidateObservationTests.swift */; };
 		7D6B1A8B1DCC8978E7E3AF5F /* BASEBrainTurnResultClusterBundleCodableRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9FBE6388840B63CA6B1C9F /* BASEBrainTurnResultClusterBundleCodableRoundTripTests.swift */; };
 		7D713CAA1AFC78502355C013 /* BASPolicyCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEC319088CFAC89B492B87C /* BASPolicyCoreTests.swift */; };
@@ -698,6 +705,7 @@
 		89807AB0BC4647F11F809076 /* BASLLMPromptCompilerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2789054656CD2A0E737CAF /* BASLLMPromptCompilerTests.swift */; };
 		89A68124EEC71C0DDB93BDC7 /* BASTurnRuntimeAuditEnvelopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACCE898692B497636872F16C /* BASTurnRuntimeAuditEnvelopeTests.swift */; };
 		89B0627FCF5CA58E8BF809A4 /* BASHierarchicalPredictiveCodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40B64D6D4E6B719E84E605E /* BASHierarchicalPredictiveCodingTests.swift */; };
+		89CDA33812904659CE9BDEAB /* BASOrgan in Frameworks */ = {isa = PBXBuildFile; productRef = 18B8CA8AD2A285C6C50A6BC0 /* BASOrgan */; };
 		89D10C695F751A82C994BED2 /* BASGapFillHexaFiveCompletionDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB3E06847677004AC0805A3 /* BASGapFillHexaFiveCompletionDoctrineTests.swift */; };
 		89EA987680811062F4AFC582 /* BASSessionMilestoneDoctrineCatalogueDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48E73EFCFC8CBDE90EF975F /* BASSessionMilestoneDoctrineCatalogueDoctrineTests.swift */; };
 		8A395E816E5E52084A9DA268 /* BASMambaTrainingCorpusSchemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42CA8CDB99BBC7A81C566BE /* BASMambaTrainingCorpusSchemaTests.swift */; };
@@ -822,6 +830,7 @@
 		A1DACDB2E5E9C07C85D68EBA /* BASBundleIDProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A23C3067CAF7E9CE3F9B3A /* BASBundleIDProtocolTests.swift */; };
 		A23CD82AE75472168A77D53E /* BASCurrentBrainPersistenceCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D0325BFCCC243E6C5734C9 /* BASCurrentBrainPersistenceCoreTests.swift */; };
 		A243E9C6A143550FCDB7434A /* BASTurnRuntimeEnginePermitLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0954FE43ACB71E2FC36F9D39 /* BASTurnRuntimeEnginePermitLedgerTests.swift */; };
+		A270575C9CD48AB73C875041 /* BASMetalSubstrate in Frameworks */ = {isa = PBXBuildFile; productRef = AEC10CDDFC81241B20C1B6D3 /* BASMetalSubstrate */; };
 		A2BC5B44A681DFD162B89C41 /* BASEventLogCrossSessionReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3050400DF31C6E6FDD3D136F /* BASEventLogCrossSessionReplayTests.swift */; };
 		A2C89B015D9377BE67E8BD39 /* BASChapter781ShadowTrialInjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1EBC741375C06DB0199BDB /* BASChapter781ShadowTrialInjectTests.swift */; };
 		A3073392ADC8A8D46609CD6D /* BASPromptContractCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398F7DD9AC1DE29FCE031099 /* BASPromptContractCoreTests.swift */; };
@@ -879,6 +888,7 @@
 		ACCC5F474E3608470A57841A /* BASChapter633SovereignErrorTrioProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EF680F01B87506FEF7A17C3 /* BASChapter633SovereignErrorTrioProofTests.swift */; };
 		ACCE4F124F8F9D02E37F5477 /* BASChapter708MatMulTournamentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D2AA8B8E7544664DF4D239 /* BASChapter708MatMulTournamentTests.swift */; };
 		ACDA18CB3B6F66E014574082 /* BASChapter761CSystemProbesPerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2805C8BA14CDD96350DF972 /* BASChapter761CSystemProbesPerfTests.swift */; };
+		ACE0DD568116D3629C10A341 /* BASPolicy in Frameworks */ = {isa = PBXBuildFile; productRef = 6DD1EB7BF07707EBBBED4979 /* BASPolicy */; };
 		ACED1791E0FCE2D55F1F1297 /* BASBiomimeticObservationTrioCodableExtensionDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A63A01AE4EC9A4B228E76E0A /* BASBiomimeticObservationTrioCodableExtensionDoctrineTests.swift */; };
 		ACF9659481829FF0FE1B30CD /* BASChapter640RuntimeStepEnumTrioProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD87B9AE370CB382E70DD454 /* BASChapter640RuntimeStepEnumTrioProofTests.swift */; };
 		ACF991F37F60AB811CA5FCFA /* BASMetalAttentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3C9F706ACAC27188203DB9 /* BASMetalAttentionTests.swift */; };
@@ -1089,6 +1099,7 @@
 		D44FD974212A94306DE28221 /* BASBadToneLintRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE5CDDE1A5D9725F963A711 /* BASBadToneLintRuleTests.swift */; };
 		D4C0B83E68B6D68F96015982 /* BASSovereignMultiValueRegisterStrategyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B83225B3DCC5F197FB42031 /* BASSovereignMultiValueRegisterStrategyTests.swift */; };
 		D4CAF85466FFDCFD966C0683 /* BASTurnRuntimeDefaultModeFlipReadinessGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72C8CAC517B6760FB04656A9 /* BASTurnRuntimeDefaultModeFlipReadinessGateTests.swift */; };
+		D4E884AC5D94E505361302B3 /* BASMLXAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = 55AA48D815873D6E192F9890 /* BASMLXAdapter */; };
 		D4EA52D2C6210E0C68AFBCE4 /* BehavioralAISubstrateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2D91836E2F6DA85EAC425C /* BehavioralAISubstrateTests.swift */; };
 		D59159A5A98A29FF0F4833EC /* BASKVCacheTTLEvictorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84F162CB10450C760BCD52F /* BASKVCacheTTLEvictorTests.swift */; };
 		D5D370E4BDDB8BEB52C81893 /* BASContextClassifierMLAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE855A9FAD6614B4F4290CEB /* BASContextClassifierMLAdapterTests.swift */; };
@@ -2595,6 +2606,17 @@
 				9E05FB2F17CCBC6511FC9967 /* BASMemory in Frameworks */,
 				8CC3F2C040C0FDA44200C964 /* BASRuntimeCore in Frameworks */,
 				6AD4E8994CE5090DBE6C056C /* BASOrchestration in Frameworks */,
+				2CDC14FA458E445B939B9AC7 /* BASAdmin in Frameworks */,
+				7D307D8EA0360B81CE992822 /* BASAppleAdapters in Frameworks */,
+				69D8E6EE0A5AC7D9704FDA08 /* BASChatCompletionsAdapter in Frameworks */,
+				1F82AF3E882F9DAA8D0C1AEB /* BASEvaluation in Frameworks */,
+				05F9708E293D3A58D325118E /* BASLeaseLife in Frameworks */,
+				D4E884AC5D94E505361302B3 /* BASMLXAdapter in Frameworks */,
+				A270575C9CD48AB73C875041 /* BASMetalSubstrate in Frameworks */,
+				7526E5CD0606983D3D1E9FD4 /* BASObservability in Frameworks */,
+				89CDA33812904659CE9BDEAB /* BASOrgan in Frameworks */,
+				ACE0DD568116D3629C10A341 /* BASPolicy in Frameworks */,
+				217BF1E74A6FAC623C9354F8 /* BASSovereign in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3973,6 +3995,17 @@
 				3D8517A1A917DE35EBBCFB8C /* BASMemory */,
 				7000A468DF6A308DE3DDF451 /* BASRuntimeCore */,
 				1E0890BE6C7C90EE804CF9E7 /* BASOrchestration */,
+				0E27F74B10ED1E0E8A47CD07 /* BASAdmin */,
+				BA03030D1C67891763697739 /* BASAppleAdapters */,
+				1717670A45572DC9B7442A4A /* BASChatCompletionsAdapter */,
+				040E06F2A9EBCB7E13EB49DB /* BASEvaluation */,
+				5BC28893D5AC4356D059F7E7 /* BASLeaseLife */,
+				55AA48D815873D6E192F9890 /* BASMLXAdapter */,
+				AEC10CDDFC81241B20C1B6D3 /* BASMetalSubstrate */,
+				C7DA5EB589016FF8C1096194 /* BASObservability */,
+				18B8CA8AD2A285C6C50A6BC0 /* BASOrgan */,
+				6DD1EB7BF07707EBBBED4979 /* BASPolicy */,
+				D28FA94BC4BCD0638A5B6AE7 /* BASSovereign */,
 			);
 			productName = BASDeviceTests;
 			productReference = CD63489DE542AC08975D8031 /* BASDeviceTests.xctest */;
@@ -5566,6 +5599,22 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		040E06F2A9EBCB7E13EB49DB /* BASEvaluation */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASEvaluation;
+		};
+		0E27F74B10ED1E0E8A47CD07 /* BASAdmin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASAdmin;
+		};
+		1717670A45572DC9B7442A4A /* BASChatCompletionsAdapter */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASChatCompletionsAdapter;
+		};
+		18B8CA8AD2A285C6C50A6BC0 /* BASOrgan */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASOrgan;
+		};
 		1E0890BE6C7C90EE804CF9E7 /* BASOrchestration */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BASOrchestration;
@@ -5578,6 +5627,18 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = BASHostKit;
 		};
+		55AA48D815873D6E192F9890 /* BASMLXAdapter */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASMLXAdapter;
+		};
+		5BC28893D5AC4356D059F7E7 /* BASLeaseLife */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASLeaseLife;
+		};
+		6DD1EB7BF07707EBBBED4979 /* BASPolicy */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASPolicy;
+		};
 		7000A468DF6A308DE3DDF451 /* BASRuntimeCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BASRuntimeCore;
@@ -5586,9 +5647,25 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = BASRuntimeCore;
 		};
+		AEC10CDDFC81241B20C1B6D3 /* BASMetalSubstrate */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASMetalSubstrate;
+		};
 		B4D00164781A58BE2007311B /* BASHostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BASHostKit;
+		};
+		BA03030D1C67891763697739 /* BASAppleAdapters */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASAppleAdapters;
+		};
+		C7DA5EB589016FF8C1096194 /* BASObservability */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASObservability;
+		};
+		D28FA94BC4BCD0638A5B6AE7 /* BASSovereign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASSovereign;
 		};
 		DED654648C160FDB8E44EE58 /* BASMemory */ = {
 			isa = XCSwiftPackageProductDependency;

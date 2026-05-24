@@ -113,6 +113,28 @@ targets:
         product: BASRuntimeCore
       - package: BehavioralAISubstrate
         product: BASOrchestration
+      - package: BehavioralAISubstrate
+        product: BASAdmin
+      - package: BehavioralAISubstrate
+        product: BASAppleAdapters
+      - package: BehavioralAISubstrate
+        product: BASChatCompletionsAdapter
+      - package: BehavioralAISubstrate
+        product: BASEvaluation
+      - package: BehavioralAISubstrate
+        product: BASLeaseLife
+      - package: BehavioralAISubstrate
+        product: BASMLXAdapter
+      - package: BehavioralAISubstrate
+        product: BASMetalSubstrate
+      - package: BehavioralAISubstrate
+        product: BASObservability
+      - package: BehavioralAISubstrate
+        product: BASOrgan
+      - package: BehavioralAISubstrate
+        product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASSovereign
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.basdevicetests

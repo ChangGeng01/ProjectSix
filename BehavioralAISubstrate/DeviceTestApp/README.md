@@ -98,7 +98,69 @@ xcodebuild test \
 | 14-layer fuzz (ch 946 + M603) | ✓ pass | TBD — real iOS jetsam + memory pressure |
 | Evolutionary search (ch 948 fix) | ✓ pass | TBD — real A18 chip core scheduling |
 
-## ⚠️ Known blocker (chapter 九百五十 finding)
+## ✅ Working device test command (chapter 九百五十一 confirmed)
+
+After all pre-flight steps:
+```bash
+cd /Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate
+
+# Phase 1: First-time build (will print "BUILD SUCCEEDED" but
+# generated SQL files only land in Index.noindex due to Xcode
+# 26.5 plugin invocation asymmetry on iphoneos)
+xcodebuild build \
+    -project DeviceTestApp/BASDeviceTest.xcodeproj \
+    -scheme BASDeviceTestApp \
+    -destination "platform=iOS,id=9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6" \
+    -allowProvisioningUpdates \
+    -skipPackagePluginValidation
+
+# Phase 2: Copy generated files from Index to Build (workaround)
+DD=~/Library/Developer/Xcode/DerivedData/BASDeviceTest-dpqdvfgyojguleeuilerivazpqtg
+for d in BASMemory BASSovereign BASWorldPrior BASPolicy; do
+    mkdir -p "$DD/Build/Intermediates.noindex/BuildToolPluginIntermediates/behavioralaisubstrate.output/$d/BASSQLSchemaGen"
+    cp "$DD/Index.noindex/Build/Intermediates.noindex/BuildToolPluginIntermediates/behavioralaisubstrate.output/$d/BASSQLSchemaGen"/*.generated.swift \
+       "$DD/Build/Intermediates.noindex/BuildToolPluginIntermediates/behavioralaisubstrate.output/$d/BASSQLSchemaGen/" 2>/dev/null
+done
+
+# Phase 3: Run tests (build resumes, picks up files, ships to device)
+xcodebuild test \
+    -project DeviceTestApp/BASDeviceTest.xcodeproj \
+    -scheme BASDeviceTestApp \
+    -destination "platform=iOS,id=9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6" \
+    -only-testing:BASDeviceTests/BASChapter934AtomLifecycleFullRowTests \
+    -only-testing:BASDeviceTests/BASChapter935DeletionManifestFullRowTests \
+    -only-testing:BASDeviceTests/BASChapter936UserStateFullRowTests \
+    -only-testing:BASDeviceTests/BASChapter937VersionTreeFullRowTests \
+    -only-testing:BASDeviceTests/BASChapter938EventLogFullRowTests \
+    -only-testing:BASDeviceTests/BASChapter926FixBackfillCoverageTests \
+    -allowProvisioningUpdates \
+    -skipPackagePluginValidation
+```
+
+**ch 951 confirmed result:** iPhone Air iOS 26.5 arm64,**40/40 PASS** on first device run。
+
+### After pre-flight (one-time iPhone Air setup)
+
+In addition to Steps 1-3 in pre-flight,you must also:
+
+### Step 4:Trust developer cert on iPhone Air (one-time per cert refresh,~weekly for personal Apple ID)
+
+After running xcodebuild test for the first time,iOS will report
+「Unable to launch ... invalid code signature ... profile has not
+been explicitly trusted by the user」 — this is iOS's required user
+consent for sideloaded apps from non-App-Store developers。
+
+1. iPhone Air:**设置 (Settings)** → **通用 (General)** →
+   **VPN与设备管理 (VPN & Device Management)**
+2. Tap **「Apple Development: <your-email>」** under「开发者 App」
+3. Tap **「信任 "Apple Development:..."」** (Trust button)
+4. Confirm in popup
+5. Re-run xcodebuild test — app will now launch on device
+
+This trust persists for ~7 days (personal Apple ID cert TTL)。
+After expiry,re-trust required。
+
+## ⚠️ Known blocker (chapter 九百五十 finding,now worked around)
 
 After completing Step 1-3 above + running:
 ```bash
