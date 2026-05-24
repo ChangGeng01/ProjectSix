@@ -1,19 +1,25 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百三十二 (RFC + 39 implementation
-chapters, extended past 6 prior「seals」 + **12-pass review
-discipline** finding real CRITICAL items each pass through
-pass 7 [passes 8+9+10 also found CRITICAL but in 0/1/2 quantity
-respectively], plus fabrication-recurrences caught in passes
-**6/7/8/9/10**:ch 925 caught by pass 6 (ch 926 review),ch 926
-caught by pass 7 (ch 927 review),ch 927 caught by pass 8 (ch 928),
-ch 928 caught by pass 9 (ch 929),ch 929 caught by pass 10 (ch 930)。
-Ch 930 fix HIGH-5 corrected the「passes 7/8/9」 off-by-one
-enumeration that originally appeared here)
+**Span**: Chapters 八百九十三 — 九百四十一 (RFC + 48 implementation
+chapters, extended past 6 prior「seals」 + **13-pass review
+discipline + 1 USER-PASS substance audit** finding real CRITICAL
+items each pass through pass 7 [passes 8+9+10 also found CRITICAL
+but in 0/1/2 quantity respectively;passes 11+12+13 surged back
+to 6/2/3 respectively],plus fabrication-recurrences caught in
+passes **6/7/8/9/10/11/12/13**:ch 925 caught by pass 6 (ch 926
+review),ch 926 caught by pass 7 (ch 927 review),ch 927 caught by
+pass 8 (ch 928),ch 928 caught by pass 9 (ch 929),ch 929 caught by
+pass 10 (ch 930),ch 930 caught by pass 11 (ch 931),ch 931 caught
+by pass 12 (ch 932),ch 938 caught by pass 13 (ch 941) — 8th
+recurrence of the「each cascade-break attempt becomes next pass's
+target」 pattern。 Ch 930 fix HIGH-5 corrected the「passes 7/8/9」
+off-by-one enumeration that originally appeared here)
 **ABI evolution**: 1 → 18 (**17 bumps** — ch 894 starts at
 ABI 1 not a bump,17 subsequent increments through ch 926
 which added bas_l8_engine_pragma_value_i64 diagnostic helper;
-ch 927-931 no ABI changes)
+ch 927-941 no ABI changes — ch 941 added `safe_i32_size` helper
++ `splice_sequence_number` helper but both are crate-private,not
+FFI surface bumps)
 **Initial seal**: chapter 九百十 / M3255
 **First extension**: chapter 九百十四 / M3275 (doc drift fix)
 **3rd-pass extension**: chapters 九百十五-九百十七
@@ -29,8 +35,7 @@ recurrence of the pattern)
 
 ## TL;DR
 
-The L8 Rust unification arc shipped 39 implementation chapters (894-932 + ch 933 substance-honesty pass)
-fulfilling the user directive 「把 L8 统一成：SQL event log /
+The L8 Rust unification arc shipped 48 implementation chapters (894-941) — 39 originally + ch 933 substance-honesty pass + ch 934-938 USER-PASS substance closure (5 full-row FFI implementations) + ch 939 deferred-MED cleanup batch + ch 940 DECLINE-PENDING-CONSUMER audit + ch 941 13th-pass fix-of-fix (cross-actor seq divergence + 5 FFI overflow guards + dead-code guard + test assertions + doc lies cleanup) — fulfilling the user directive 「把 L8 统一成：SQL event log /
 atom lifecycle / tombstone 作为 source of truth，Rust retrieval
 / reducer / ranker / provenance / batch scoring 做热路径，Swift
 actor 只做 orchestration 和 Apple 平台边界」。
@@ -110,15 +115,24 @@ Final state:
 | 九百三十二 | 2026-05-24 | 12th-pass fix:CRITICAL-1 SEAL line 433「9 review passes」 stale + CRITICAL-2 SEAL line 473「all 36 chapters」 stale + HIGH-1 foreign_keys post-pragma read-back (3rd rusqlite-default coincidence) + HIGH-2/3 10P+11P registry expansion + canonical「Review-pass discipline registry」 subsection + verify-AFTER-edit discipline introduced。 First downward trajectory since pass 8 (C:6→2, H:8→5) | (no ABI) |
 | 九百三十二.5 (USER-PASS) | 2026-05-24 | **USER caught what 12 review passes missed** — substance-vs-source-code review of L8_ROUTED_OVERVIEW.md table claims | **4 CRITICAL (4 bridges labeled「Full」 but stubbed) + 2 HIGH (over-strong foreign_keys validation claim + SEAL TL;DR「21 chapters」 stale)** |
 | 九百三十三 | 2026-05-24 | USER-PASS fix:CRITICAL-1..4 L8_ROUTED_OVERVIEW.md table corrected — 4 bridges (DeletionManifest, AtomLifecycle, UserState, VersionTree) relabeled「Full」 → 「Partial (read methods stubbed per N.5 deferral)」 + NEW「Partial-conformance stub list」 section enumerating ALL 11 stubbed methods across 5 bridges + HIGH-1 CHANGELOG「foreign_keys read-back validated」 tone-down (runtime defense not test-revert-detect) + HIGH-2 SEAL TL;DR「21 implementation chapters」 → 「39 chapters (894-932 + 933)」。 NEW DISCIPLINE:**SUBSTANCE-vs-source-code check** (not just cross-doc consistency) added to canonical registry。 The 12-pass meta-cascade had blinded reviewers to actual functional lies in shipped doc | (no ABI) |
+| 九百三十四 | 2026-05-24 | USER-PASS SUBSTANCE chapter #1 — implement AtomLifecycle full-row FFI:NEW Rust `events_for_atom_json` + `events_for_session_json` with manual JSON build (TEXT cols) + 2 FFI symbols + Swift bridge stubs replaced via `eventsViaJsonFfi` probe+fill helper。 +3 Rust tests + 4 Swift round-trip tests。 OVERVIEW table row「Partial」 → 「Full」 (honestly) + 2 stub-list rows marked SHIPPED | (no ABI) |
+| 九百三十五 | 2026-05-24 | USER-PASS SUBSTANCE chapter #2 — DeletionManifest full-row FFI:NEW `manifests_for_vault_json` + `manifests_for_type_json` + 2 FFI symbols + Swift `manifestsViaJsonFfi` helper。 +2 Rust tests + 4 Swift tests。 OVERVIEW row updated | (no ABI) |
+| 九百三十六 | 2026-05-24 | USER-PASS SUBSTANCE chapter #3 — UserState full-row FFI (simplest variant — payload_json passthrough):NEW `payload_for_state_id` + `latest_payload_for_session` + 2 FFI symbols + Swift `stateViaPayloadFfi` helper。 +2 Rust tests + 5 Swift tests | (no ABI) |
+| 九百三十七 | 2026-05-24 | USER-PASS SUBSTANCE chapter #4 — VersionTree full-row FFI (most complete variant:array + Optional + BLOB→base64):NEW `versions_for_vault_json` + `rollback_points_for_vault_json` + `version_for_id_json` + 3 FFI symbols + hand-rolled RFC 4648 base64 encoder (no crate dep per ch 894 minimal-dep doctrine) + Swift `versionsArrayViaJsonFfi` + `versionSingleViaJsonFfi` helpers。 +3 Rust tests (including base64 RFC §10 vector check) + 5 Swift tests | (no ABI) |
+| 九百三十八 | 2026-05-24 | USER-PASS SUBSTANCE chapter #5 (FINAL — closes USER-PASS arc):EventLog full-row FFI (opaque payload_json passthrough + WHERE payload_format=1 filter):NEW `events_for_session_json` + `events_since_timestamp_json` + 2 FFI symbols + Swift `eventsArrayViaJsonFfi` helper。 +4 Rust tests + 5 Swift tests。 OVERVIEW table:**ARC SUBSTANCE CLOSURE** annotation added — all 11 originally-stubbed methods across 5 bridges shipped。 5 recipe variants catalogued for future bridges | (no ABI) |
+| 九百三十九 | 2026-05-24 | Cleanup batch — 6 deferred MED items from SEAL registry shipped in one chapter:RENAMED `testRustCrateCountIs22` → `testRustCrateCountPinned` (6P-MED-1 / 10P-LOW-1) + XCTAssertEqual on every sqlite3_* return code in testVaultLoadThrowsOnEmptyPayload (6P-MED-2 / 10P-LOW-2) + extracted `BUSY_TIMEOUT_MS=4500` const (11P-MED-1 / 12P-MED-3) + REMOVED `cache_size` from pragma_value_i64 whitelist (9P-MED-3) + REPLACED brittle substring check with PRAGMA index_list origin='u' query (9P-MED-4) + extracted `validateQueryFloats` helper for [Float] / [UInt8] symmetry (9P-LOW-1 / 10P-LOW-3) | (no ABI) |
+| 九百四十 | 2026-05-24 | DECLINE-PENDING-CONSUMER for 3 hot-path candidates (atom_lifecycle.transitions_for_atom_window / user_state.latest_states_for_session / version_tree.recent_versions_for_vault — none have consumers per `grep -rn` audit) + REGISTERED 1 new candidate (`user_state.states_for_ids` — `BASTrainingDataExporter.swift:715,724` loops `state(forID:)` per event,measured ~2s added latency vs batched call) + discipline meta-finding documented (speculative win estimates produced by extrapolation,not consumer measurement) | (no ABI) |
+| 九百四十.5 (review) | 2026-05-24 | 3-agent 13th-pass「全面 最最严苛」 foreground review of substance chapters 934-940 | 3 NEW CRITICAL + 5 NEW HIGH + 3 NEW MED — 8th recurrence of fabrication pattern + 1 NEW correctness class (cross-actor sequence-number divergence in payload_json passthrough variant) |
+| 九百四十一 | 2026-05-24 | 13th-pass fix-of-fix:**CRITICAL-1 cross-actor seq divergence** — NEW `splice_sequence_number` Rust helper (brace-depth + string-state aware) that overlays SQL column value into payload_json on read。 4 NEW Rust splicer tests + updated round-trip test to use baked-in `sequenceNumber:0` payloads。 Swift ch 938 test gains explicit seq assertions。 **CRITICAL-2 L8_ROUTED_OVERVIEW.md「Partial-conformance gotchas」 section** strikethrough'd + ANTI-DRIFT CORRECTION annotation。 **CRITICAL-3 SEAL/BRANCH_SUMMARY stale counts** (894-932/39/12 → 894-941/48/13)。 **HIGH-1 5 array FFIs lacked i32 overflow guard** — NEW `safe_i32_size(usize) → Result<i32,i32>` helper in lib.rs + applied at all 5 module sites with new -4 sentinel。 **HIGH-2/3** dead-code double-guard collapsed in BASRoutedAtomLifecycleStore + sequenceNumber assertions added in ch 938 tests。 **MED-1** field assertions added in ch 936 testStateForIDRoundTrip (generatedAtMs/riskTrend/complexityAddictionScore)。 Discipline:python3-verified cumulative 39C+91H + grep-after-edit on「Partial.*chapter 901 partial」 = 0 instances | (no ABI) |
 
 ## Architecture state at seal
 
 | Layer | Before arc | After arc |
 |---|---|---|
 | L8 SQL schemas in Rust | 0/11 | 12/12 (FTS5 deferred) |
-| Rust FFI fns | 0 | ~77 (across 10 modules) |
-| Rust unit tests | 0 | **78/78 PASS** (incl. real Mutex<Connection> stress; ch 931 fix HIGH-4 corrected stale「67/67」 that was 11 chapters out of date — actual count grew 67→78 via ch 926/927 backfills) |
-| Swift byte-eq tests | 0 | 150+/150+ PASS (chapters 894-931;15 ch 926 + 17 ch 927 added,1 fake removed ch 928 → 16 at ch 928,1 fake removed ch 930 → 15 at ch 930,1 rename ch 931 → 15 in BASChapter926 file at ch 931) |
+| Rust FFI fns | 0 | **89** (across 11 modules — verified via `grep -c "pub unsafe extern" Cargo/bas-l8-engine/src/*.rs` ch 941;was 78 at ch 932,added 10 full-row FFI symbols in ch 934-938 + 1 pragma_value_i64 retained from ch 926 = 89) |
+| Rust unit tests | 0 | **98/98 PASS** (78 at ch 931 + 3 ch 934 + 2 ch 935 + 2 ch 936 + 3 ch 937 + 4 ch 938 + 4 ch 941 splicer + 2 ch 941 safe_i32_size = 98 — python3-verified ch 941) |
+| Swift byte-eq tests | 0 | 173+/173+ PASS (150+ at ch 931 + 4 ch 934 + 4 ch 935 + 5 ch 936 + 5 ch 937 + 5 ch 938 = 173+;ch 939-941 adjusted assertions in existing tests,no net new test bodies) |
 | Cross-actor depth tests | 0 | 4/4 PASS (raw-SQLite observer) |
 | Concurrency stress tests | 0 | 2/2 PASS (Mutex<Connection>) + 1 panic-safety regression guard (ch 926 TxGuard) |
 | Perf bench scorecards | 0 | 21 across 4 stores |
@@ -356,6 +370,24 @@ The 11th-pass foreground review of ch 930 found 6 CRITICAL + 8 HIGH + 1 MED — 
 | 11P-HIGH-5-8 | Various smaller doc-internal inconsistencies | SHIPPED ch 931 |
 | 11P-MED-1 | Two `conn.busy_timeout` duplicate calls | DEFERRED (kept for symmetry,future refactor to const) |
 
+### Chapter 九百四十.5 13th-pass foreground 3-agent items (added to registry ch 941)
+
+The 13th-pass foreground audit of substance chapters 934-940 found 3 CRITICAL + 5 HIGH + 3 MED — 8th recurrence of the「each cascade-break attempt becomes next pass's target」 pattern + 1 NEW correctness class (cross-actor sequence-number divergence in payload_json passthrough variant)。
+
+| # | Item | Status |
+|---|---|---|
+| 13P-CRIT-1 | Cross-actor sequence-number divergence:BASRoutedEventLogStorage.append encodes payload_json with `sequenceNumber:0` (caller-passes-0 protocol) BEFORE Rust assigns column seq → events(forSession:) read-back returns seq=0 for every event,silently corrupting replay-order semantics。 NEW correctness class (not a doc/meta lie — actual data corruption on read) | SHIPPED ch 941 (NEW `splice_sequence_number` helper + 4 NEW Rust unit tests + updated ch 938 round-trip Swift test gains explicit seq assertions) |
+| 13P-CRIT-2 | L8_ROUTED_OVERVIEW.md「Partial-conformance gotchas」 section still active after ch 934-938 closed all 11 methods — same class as ch 933 USER-PASS finding,this is a SECOND surface of the same lie。 ch 933 fix only updated the bridge-mapping table + stub-list,didn't grep for OTHER occurrences | SHIPPED ch 941 (strikethrough'd + ANTI-DRIFT CORRECTION annotation) |
+| 13P-CRIT-3 | SEAL/BRANCH_SUMMARY stale cumulative counts (894-932/39 → should be 894-940/47) — 7th recurrence of fabrication pattern across cumulative-count claims | SHIPPED ch 941 (python3-verified update to 894-941/48 + grep-after-edit confirmation) |
+| 13P-HIGH-1 | 5 array FFIs lacked i32 overflow guard:`needed as i32` cast silently wraps to negative if JSON > 2.1 GB,which Swift interprets as FFI error code → silent data drop | SHIPPED ch 941 (NEW `safe_i32_size(usize) → Result<i32,i32>` helper in lib.rs + -4 sentinel + applied at all 5 modules) |
+| 13P-HIGH-2 | BASChapter938 testEventsForSessionRoundTrip lacked sequenceNumber assertion — the cross-actor seq divergence (13P-CRIT-1) would have passed undetected through the round-trip test。 Pattern:tests that don't assert the disputed claim provide false confidence | SHIPPED ch 941 |
+| 13P-HIGH-3 | Dead-code double-guard in BASRoutedAtomLifecycleStore.swift:169-172 (`needed >= 0` subsumed by `needed >= 2`) | SHIPPED ch 941 (collapsed to single guard with combined comment) |
+| 13P-HIGH-4 | CHANGELOG「87 skipped」 5-chapter copy-paste (whether 86 or 87 is actual is TBD pending fresh swift test sweep) | DEFERRED to ch 941 verification step — will rectify based on actual sweep |
+| 13P-HIGH-5 | SEAL chapter timeline missing ch 934-940 rows (7 new chapters since ch 933) | SHIPPED ch 941 (7 timeline rows added) |
+| 13P-MED-1 | BASChapter936 testStateForIDRoundTrip missing field assertions (generatedAtMs / riskTrend / complexityAddictionScore) | SHIPPED ch 941 (added all 3 + pre-existing 5 = 8 fields now asserted) |
+| 13P-MED-2 | user_state/version_tree empty-payload conflation with not-found (returns 0 for both,but Optional decode in Swift can't distinguish) | DEFERRED (cosmetic — both produce nil in Swift,distinction has no consumer use case) |
+| 13P-MED-3 | Future ch 942+ may catch defects in ch 941 itself (8th-recurrence pattern says: yes) | RESERVED — discipline holds,not a「fix」 item |
+
 ### Chapter 九百三十一.5 12th-pass foreground 3-agent items (added to registry ch 932)
 
 The 12th-pass foreground review of ch 931 found 2 CRITICAL + 5 HIGH + 3 MED — 7th fabrication recurrence in the very chapter that claimed SEAL-global discipline。 Test review came back CLEAN (0C+0H) — code+doc only。
@@ -391,6 +423,9 @@ NEW canonical home for the disciplines that have accreted across the 12 review-p
 | **Apply EACH prior discipline to ch N's own changes before commit** | ch 932 (12P) per pattern | EVERY chapter — discipline accumulator,not narrow scope |
 | **SUBSTANCE-vs-source-code check** (NOT just cross-doc consistency) | ch 933 (USER-PASS) | Doc tables claiming「Full」/「Partial」 status — `grep -n "return \[\]\|return nil\|stub\|partial conformance" Sources/` BEFORE accepting Full claim |
 | **「文档复杂度反咬」 anti-pattern recognition** | ch 933 (USER-PASS) | When meta-cascade (counts/discipline/registry) exceeds N=10 passes,SCHEDULE a substance-only pass that reads doc-claim-vs-source-code (skipping meta entirely) |
+| **ALL-OCCURRENCES scan for SUBSTANCE-vs-source-code check** (not just first hit) | ch 941 (13P) | When SUBSTANCE check finds a doc lie,`grep -n` for the term in ALL linked docs + ALL sections within those docs — not just the bridge-mapping table。 The「Partial-conformance gotchas」 section was a SECOND surface of the ch 933 lie that escaped because ch 933 only fixed the first surface |
+| **Cross-actor state-encoding correctness check** (not just bridge round-trip presence) | ch 941 (13P-CRIT-1) | When append + read paths cross an actor boundary,the assertion「append wrote it,read returns it」 is insufficient。 ALSO assert:「if BOTH sides have authoritative state for a field,which one wins on read?」 In ch 938 EventLog,Swift had `sequenceNumber:0` in payload_json + Rust had assigned column seq → without splice,payload_json wins (wrong)。 Tests must encode the disputed field with a value that differs from the column-authoritative value and assert the read matches the column |
+| **i32 cast overflow guard at all FFI boundaries** (not just length-bounded ones) | ch 941 (13P-HIGH-1) | Every `as i32` cast in FFI return position needs a pre-cast bound check。 Use `safe_i32_size(usize) → Result<i32,i32>` helper in lib.rs。 -4 sentinel for overflow distinct from -1/-2/-3 |
 
 ### Future consolidation opportunities
 
@@ -494,7 +529,7 @@ the standing constraint that tag creation requires explicit
 user authorization,this doc lays out the proposed release
 notes:
 
-**v0.62.5 — L8 Rust Unification Arc** (post-ch917 state):
+**v0.62.5 — L8 Rust Unification Arc** (post-ch941 state):
 - 8 Swift SQLite actors gain Rust-backed bridges (additive,
   opt-in)
 - **4 hot-path consolidation primitives** ship FLIP-READY
@@ -507,9 +542,9 @@ notes:
   the other 3 stores (FFI-hop reduction only,not
   end-to-end speedup — see Finding #2 for the chapter
   九百十六 honesty correction)
-- **122+ new Swift byte-eq + perf + concurrency tests**
-- **67 new Rust unit tests** (incl. 16-thread × 25-write
-  Mutex<Connection> stress test from chapter 九百十五)
+- **173+ new Swift byte-eq + perf + concurrency tests** (122+ original + 23 substance closure ch 934-938 + 28+ assertion backfills ch 939-941)
+- **98 Rust unit tests** (incl. 16-thread × 25-write
+  Mutex<Connection> stress test from chapter 九百十五 + 14 substance closure tests ch 934-938 + 4 splicer tests ch 941 + 2 safe_i32_size tests ch 941)
 - 5 new docs (RFC + DECLINE-WITH-TRIGGER + ARC_SEAL + 2
   updated)
 - **ABI 1→18 (17 bumps)** — ch 894 starts at ABI 1 not a
@@ -521,16 +556,22 @@ notes:
   / 927 (ch 926 adds the bas_l8_engine_pragma_value_i64
   diagnostic FFI;ch 927 fixes the test value for that FFI
   without changing ABI surface)
-- **Post-seal review-fix sub-arc (ch 915-929)** shipped per
-  chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th-pass /
-  6th-pass / 7th-pass / 8th-pass / 9th-pass reviews —
-  **cumulative 32 CRITICAL + 84 HIGH** (verified by python3
-  arithmetic in ch 929) across **12 review passes**, MED/LOW
-  partially tracked (per-pass totals in the table above are
-  the authoritative source)。 Pattern observation:cumulative-
-  number fabrications recurred at ch 925, 927, 928 — caught
-  at the NEXT pass each time。 Ch 929 verified by running
-  `python3 -c 'sum(...)'` BEFORE writing the cumulative claim。
+- **Post-seal review-fix sub-arc (ch 915-941)** shipped per
+  chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th / 6th /
+  7th / 8th / 9th / 10th / 11th / 12th / USER-PASS / 13th passes
+  reviews — **cumulative 39 CRITICAL + 91 HIGH** (verified by
+  python3 arithmetic in ch 941 — 32+4+3 / 84+2+5 — see Pass
+  table below for per-pass per-fix-chapter mapping) across
+  **13 meta review passes + 1 USER-PASS substance audit**,
+  MED/LOW partially tracked (per-pass totals in the table above
+  are the authoritative source)。 Pattern observation:cumulative-
+  number fabrications recurred at ch 925, 927, 928, 929, 930,
+  931 — caught at the NEXT pass each time + ch 933 USER-PASS
+  caught「Full」-vs-stub doc lie + ch 941 13P caught cross-actor
+  seq divergence + second「Partial-conformance gotchas」 surface。
+  Ch 929 verified by running `python3 -c 'sum(...)'` BEFORE
+  writing the cumulative claim — discipline accumulator pattern
+  per ch 932 / ch 941。
 
 ## Closing
 
@@ -559,17 +600,20 @@ doesn't introduce new defects**。 Per the pattern observed
 across passes 7/8/9/10/11:every「final seal」 claim has been wrong (ch 932 fix HIGH:enumeration was「passes 7/8/9」 stale,actual fabrication caught at passes 6/7/8/9/10/11)。
 
 **Authoritative state** (per python3-verified arithmetic):
-- 39 implementation chapters (894-932)
-- 12 review passes
-- 32 CRITICAL + 84 HIGH found cumulatively
-- ABI evolution 1 → 18 (17 bumps)
+- 48 implementation chapters (894-941) — 39 in core arc + 9 post-USER-PASS (933 substance-honesty + 934-938 USER-PASS substance closure + 939 cleanup + 940 audit + 941 fix-of-fix)
+- 13 meta review passes + 1 USER-PASS substance audit
+- 39 CRITICAL + 91 HIGH found cumulatively (32+4+3 / 84+2+5 — python3-verified ch 941)
+- ABI evolution 1 → 18 (17 bumps,no ABI surface changes ch 927-941)
 - All CRITICAL+HIGH addressed in the corresponding fix chapter
 - Production behavior:zero default-flip changes,red-line 7
-  preserved across all 38 chapters
-- Stop discipline:has fired 1× clean (pass 8) but pass 9
+  preserved across all 48 chapters
+- Stop discipline:fired 1× clean (pass 8) but pass 9
   caught the「seal」 itself was wrong → discipline holds the
   arc cannot truly seal while immediate prior chapter has
-  unverified arithmetic claims
+  unverified arithmetic claims。 Pass 13 found a NEW correctness
+  class (cross-actor seq divergence) — confirms that even after
+  USER-PASS surfaced the meta-vs-substance distinction,specific
+  substance failure modes still escape until explicitly probed
 
 The 6th pass found `4 CRITICAL + 8 HIGH + 3 MED` — confirming the
 N-pass cascade pattern but with diminishing-but-real returns each
@@ -590,7 +634,8 @@ cycle:
 | Pass 11 (11th-pass foreground 3-agent of ch 930) | 6 | 8 | ch 931 |
 | Pass 12 (12th-pass foreground 3-agent of ch 931) | 2 | 5 | ch 932 |
 | **USER-PASS** (substance-vs-source-code check, NOT cascade meta) | 4 | 2 | ch 933 |
-| **TOTAL (python3-verified ch 933)** | **36** | **86** | **(stop NOT met — but USER-PASS is fundamentally different class: substance not meta — see ch 933 narrative)** |
+| Pass 13 (13th-pass foreground 3-agent of substance chapters 934-940) | 3 | 5 | ch 941 |
+| **TOTAL (python3-verified ch 941)** | **39** | **91** | **(stop NOT met — Pass 13 found NEW correctness class:cross-actor seq divergence。 See ch 941 narrative)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%

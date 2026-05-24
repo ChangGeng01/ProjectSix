@@ -609,12 +609,81 @@ bas_l8_event_log_recent_timestamps_for_session(
 // format=2 rows (which would not Codable-decode to BASEventLogEntry
 // anyway since they're binary)。
 
+/// chapter 九百四十一 / M3410 fix CRITICAL — splice the
+/// SQL-assigned `sequence_number` into a payload_json object's
+/// top-level `"sequenceNumber"` field。 Cross-actor bug: ch 938
+/// stored the entire BASEventLogEntry (with `sequenceNumber: 0`
+/// per caller-passes-0 protocol) as payload_json,but Rust
+/// assigns its own sequence_number in the column。 Read-back
+/// via payload_json would return `sequenceNumber=0` for every
+/// event,silently corrupting replay-order semantics。
+///
+/// Brace-depth + string-state aware (handles nested objects
+/// and escaped quotes correctly — only replaces TOP-LEVEL
+/// `"sequenceNumber"` field,not occurrences inside nested
+/// values or string literals)。 If no top-level match found,
+/// returns input unchanged (defensive — never duplicates the
+/// field)。
+fn splice_sequence_number(pj: &str, seq: i64) -> String {
+    let bytes = pj.as_bytes();
+    let needle = b"\"sequenceNumber\":";
+    let mut depth: i32 = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_string {
+            if escape { escape = false; }
+            else if b == b'\\' { escape = true; }
+            else if b == b'"' { in_string = false; }
+            i += 1;
+            continue;
+        }
+        // CRITICAL ORDERING:check needle BEFORE the `b == b'"'`
+        // string-entry case。 The needle starts with `"`,so we
+        // must compare it as a whole at non-in-string positions
+        // before letting the `"` flip us into string mode (which
+        // would skip the rest of the key)。
+        if depth == 1
+            && i + needle.len() <= bytes.len()
+            && &bytes[i..i + needle.len()] == needle
+        {
+            let after = i + needle.len();
+            let mut digit_end = after;
+            if digit_end < bytes.len()
+                && bytes[digit_end] == b'-'
+            {
+                digit_end += 1;
+            }
+            while digit_end < bytes.len()
+                && bytes[digit_end].is_ascii_digit()
+            {
+                digit_end += 1;
+            }
+            let mut out = String::with_capacity(pj.len() + 20);
+            out.push_str(&pj[..after]);
+            out.push_str(&seq.to_string());
+            out.push_str(&pj[digit_end..]);
+            return out;
+        }
+        if b == b'"' { in_string = true; }
+        else if b == b'{' { depth += 1; }
+        else if b == b'}' { depth -= 1; }
+        i += 1;
+    }
+    pj.to_string()
+}
+
 pub fn events_for_session_json(
     conn: &Connection,
     session_id: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十一 / M3410 fix CRITICAL — also SELECT
+    // sequence_number,splice into payload_json on each row
+    // so read-back returns correct (column-authoritative) seq。
     let mut stmt = conn.prepare(
-        "SELECT payload_json FROM event_log \
+        "SELECT payload_json, sequence_number FROM event_log \
          WHERE session_id = ? AND payload_format = 1 \
          ORDER BY sequence_number")?;
     let mut rows = stmt.query(params![session_id])?;
@@ -622,10 +691,11 @@ pub fn events_for_session_json(
     let mut first = true;
     while let Some(row) = rows.next()? {
         let pj: String = row.get(0)?;
+        let seq: i64 = row.get(1)?;
         if pj.is_empty() { continue; }  // defensive skip
         if !first { out.push(','); }
         first = false;
-        out.push_str(&pj);
+        out.push_str(&splice_sequence_number(&pj, seq));
     }
     out.push(']');
     Ok(out)
@@ -642,8 +712,10 @@ pub fn events_since_timestamp_json(
         else if limit as usize > crate::MAX_HOTPATH_LIMIT {
             crate::MAX_HOTPATH_LIMIT as i64
         } else { limit };
+    // chapter 九百四十一 / M3410 fix CRITICAL — also SELECT
+    // sequence_number, splice into payload_json on each row。
     let mut stmt = conn.prepare(
-        "SELECT payload_json FROM event_log \
+        "SELECT payload_json, sequence_number FROM event_log \
          WHERE timestamp_ms >= ? AND payload_format = 1 \
          ORDER BY timestamp_ms, sequence_number \
          LIMIT ?")?;
@@ -652,10 +724,11 @@ pub fn events_since_timestamp_json(
     let mut first = true;
     while let Some(row) = rows.next()? {
         let pj: String = row.get(0)?;
+        let seq: i64 = row.get(1)?;
         if pj.is_empty() { continue; }
         if !first { out.push(','); }
         first = false;
-        out.push_str(&pj);
+        out.push_str(&splice_sequence_number(&pj, seq));
     }
     out.push(']');
     Ok(out)
@@ -690,15 +763,19 @@ unsafe fn events_json_ffi(
     };
     let bytes = json.as_bytes();
     let needed = bytes.len();
+    // chapter 九百四十一 / M3410 fix HIGH — i32 overflow guard
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     if out_buf.is_null() || out_capacity == 0 {
-        return needed as i32;
+        return safe_needed;
     }
     if out_capacity < needed { return -3; }
     unsafe {
         std::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 #[no_mangle]
@@ -908,6 +985,9 @@ mod tests {
     }
 
     // chapter 九百三十八 / M3395 — full-row events round-trip
+    // chapter 九百四十一 / M3410 — updated to assert sequence
+    // splice (payload had sequenceNumber:0,Rust column assigns
+    // 0/1,splice should put correct values in read-back JSON)
     #[test]
     fn events_for_session_json_round_trip() {
         let engine = unsafe {
@@ -915,8 +995,10 @@ mod tests {
         let _ = unsafe { bas_l8_event_log_init_schema(engine) };
         let engine_ref = unsafe { &*engine };
         engine_ref.with_conn(|conn| {
-            let pl1 = "{\"eventID\":\"e1\",\"x\":1}";
-            let pl2 = "{\"eventID\":\"e2\",\"x\":2}";
+            // Payloads contain `sequenceNumber:0` to mimic
+            // Swift-side encoding (caller passes 0 per protocol)。
+            let pl1 = "{\"eventID\":\"e1\",\"sequenceNumber\":0,\"x\":1}";
+            let pl2 = "{\"eventID\":\"e2\",\"sequenceNumber\":0,\"x\":2}";
             // append 2 format=1 entries
             append_event(conn, "e1", "sess-RT", 100,
                 "user.input", "low", pl1, 1, None).unwrap();
@@ -924,15 +1006,61 @@ mod tests {
                 "user.input", "low", pl2, 1, None).unwrap();
             let json = events_for_session_json(
                 conn, "sess-RT").unwrap();
-            // Should be valid JSON array of the 2 payloads
+            // SQL-assigned seqs are 0, 1 (per session)。 Splice
+            // overlays the correct values in read-back JSON。
+            let expected_pl1 = "{\"eventID\":\"e1\",\"sequenceNumber\":0,\"x\":1}";
+            let expected_pl2 = "{\"eventID\":\"e2\",\"sequenceNumber\":1,\"x\":2}";
             assert_eq!(json,
-                format!("[{},{}]", pl1, pl2));
+                format!("[{},{}]", expected_pl1, expected_pl2));
             // Empty session case
             let empty = events_for_session_json(
                 conn, "sess-NONE").unwrap();
             assert_eq!(empty, "[]");
         });
         unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百四十一 / M3410 — explicit splicer correctness
+    // tests (unit tests for the helper itself)
+    #[test]
+    fn splice_sequence_number_replaces_top_level_field() {
+        // Replaces existing value
+        let pj = "{\"a\":1,\"sequenceNumber\":0,\"b\":2}";
+        let out = splice_sequence_number(pj, 42);
+        assert_eq!(out, "{\"a\":1,\"sequenceNumber\":42,\"b\":2}");
+        // Replaces negative existing value
+        let pj2 = "{\"sequenceNumber\":-5}";
+        let out2 = splice_sequence_number(pj2, 7);
+        assert_eq!(out2, "{\"sequenceNumber\":7}");
+    }
+
+    #[test]
+    fn splice_sequence_number_skips_nested_occurrence() {
+        // sequenceNumber inside a nested object MUST NOT be
+        // replaced — only top-level (depth=1)。
+        let pj = "{\"nested\":{\"sequenceNumber\":99},\"sequenceNumber\":0}";
+        let out = splice_sequence_number(pj, 5);
+        // Top-level seq replaced,nested preserved
+        assert_eq!(out,
+            "{\"nested\":{\"sequenceNumber\":99},\"sequenceNumber\":5}");
+    }
+
+    #[test]
+    fn splice_sequence_number_skips_string_literal() {
+        // sequenceNumber inside a string value MUST NOT match
+        let pj = "{\"note\":\"contains \\\"sequenceNumber\\\":99 text\",\"sequenceNumber\":0}";
+        let out = splice_sequence_number(pj, 3);
+        // String preserved,top-level replaced
+        assert!(out.contains("\\\"sequenceNumber\\\":99 text"));
+        assert!(out.contains("\"sequenceNumber\":3"));
+    }
+
+    #[test]
+    fn splice_sequence_number_no_field_returns_unchanged() {
+        // No sequenceNumber field at top level → no-op
+        let pj = "{\"a\":1,\"b\":2}";
+        let out = splice_sequence_number(pj, 99);
+        assert_eq!(out, pj);
     }
 
     #[test]

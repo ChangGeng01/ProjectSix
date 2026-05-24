@@ -109,22 +109,35 @@ measured speedups:
 These are **the reason the routed path exists**。 If your
 consumer doesn't need one of these,the legacy actor is fine。
 
-## Partial-conformance gotchas
+## Partial-conformance gotchas — HISTORICAL (resolved ch 934-938)
 
-Some routed bridges silently return empty arrays for read
-methods that the corresponding Swift actor implements。 If you
-hit one of these,fall back to the legacy actor:
+~~Some routed bridges silently return empty arrays for read~~
+~~methods that the corresponding Swift actor implements。 If you~~
+~~hit one of these,fall back to the legacy actor:~~
 
-| Routed bridge | Partial method | Returns |
-|---|---|---|
-| `BASRoutedEventLogStorage` | `events(forSession:)` | `[]` (chapter 901 partial conformance, full impl deferred) |
-| `BASRoutedEventLogStorage` | `events(sinceTimestampMs:limit:)` | `[]` |
-| `BASRoutedHostConstitutionDeletionManifestStore` | `manifests(forVault:)` | `[]` |
+~~| Routed bridge | Partial method | Returns |~~
+~~|---|---|---|~~
+~~| `BASRoutedEventLogStorage` | `events(forSession:)` | `[]` (chapter 901 partial conformance, full impl deferred) |~~
+~~| `BASRoutedEventLogStorage` | `events(sinceTimestampMs:limit:)` | `[]` |~~
+~~| `BASRoutedHostConstitutionDeletionManifestStore` | `manifests(forVault:)` | `[]` |~~
 
-In DEBUG builds (chapter 九百二十一 fix),these now trigger
-`assertionFailure` to surface the partial conformance instead
-of silently returning empty。 In RELEASE they still return
-empty,but the bridge documentation now reflects this。
+~~In DEBUG builds (chapter 九百二十一 fix),these now trigger~~
+~~`assertionFailure` to surface the partial conformance instead~~
+~~of silently returning empty。 In RELEASE they still return~~
+~~empty,but the bridge documentation now reflects this。~~
+
+**chapter 九百四十一 / M3410 ANTI-DRIFT CORRECTION (13th-pass review CRITICAL-1)**:
+The above table was STILL LIVE after ch 934-938 shipped the full implementations。
+This is the same class of doc-vs-source lie that the ch 933 USER-PASS caught:
+12 review passes cascaded across cumulative numbers but didn't re-grep this exact
+section against current source code。 Section retained as strikethrough for
+git-archeology readers — the actual current status is **「Full」** for all 11
+methods per the bridge-mapping table at the top of this doc + the
+「Partial-conformance stub list」 with all 11 rows marked ✓ SHIPPED。
+
+If you encounter a Routed bridge READ method that returns empty for non-empty
+storage,that is a regression — please file a bug + check the BASChapter934-938
+round-trip tests are still passing。
 
 ## How to opt-in
 

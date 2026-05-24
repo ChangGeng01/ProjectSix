@@ -166,9 +166,13 @@ public actor BASRoutedAtomLifecycleStore: BASAtomLifecycleStore {
                     kBuf.count,
                     nil, 0)
         }
-        guard needed >= 0 else { return [] }
-        // Special case: empty result「[]」 = 2 bytes,still need
-        // the probe-fill cycle to actually receive them
+        // chapter 九百四十一 / M3410 fix HIGH:collapsed dead-code
+        // double-guard (`needed >= 0` was subsumed by `needed >= 2`,
+        // since the latter rejects negative values too — Int32 >= 2
+        // implies Int32 >= 0)。 Single guard covers both cases:
+        //   - needed < 0 → FFI error (return [] defensively)
+        //   - needed in {0, 1} → impossible JSON (smallest valid
+        //     is「[]」 = 2 bytes),return [] defensively
         guard needed >= 2 else { return [] }
         var buf = [UInt8](repeating: 0, count: Int(needed))
         let written = keyBytes.withUnsafeBufferPointer { kBuf in

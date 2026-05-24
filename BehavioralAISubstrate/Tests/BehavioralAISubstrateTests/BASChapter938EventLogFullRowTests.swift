@@ -56,7 +56,12 @@ final class BASChapter938EventLogFullRowTests: XCTestCase {
     }
 
     /// events(forSession:) round-trip — if reverted to stub,
-    /// fails on count assertion
+    /// fails on count assertion。 chapter 九百四十一 / M3410 fix
+    /// HIGH:added sequenceNumber assertions to catch the
+    /// cross-actor seq divergence (Rust assigns seq column,
+    /// payload_json had「sequenceNumber:0」 baked in → without
+    /// the ch 941 splice fix,read-back would return seq=0 for
+    /// every event)。
     func testEventsForSessionRoundTrip() async throws {
         let url = makeTempDBURL()
         defer { cleanup(url) }
@@ -66,8 +71,11 @@ final class BASChapter938EventLogFullRowTests: XCTestCase {
             sessionID: "sess-A", timestampMs: 1_000)
         let e2 = makeEntry("rt-2",
             sessionID: "sess-A", timestampMs: 2_000)
-        _ = try await store.append(e1)
-        _ = try await store.append(e2)
+        let r1 = try await store.append(e1)
+        let r2 = try await store.append(e2)
+        // Append return assigns Rust-side seqs 0 and 1
+        XCTAssertEqual(r1.assignedSequenceNumber, 0)
+        XCTAssertEqual(r2.assignedSequenceNumber, 1)
 
         let read = await store.events(forSession: "sess-A")
         XCTAssertEqual(read.count, 2,
@@ -80,6 +88,17 @@ final class BASChapter938EventLogFullRowTests: XCTestCase {
         XCTAssertEqual(read[0].memoryRefs, ["atom-1", "atom-2"])
         XCTAssertEqual(read[0].actions, ["permit:answer"])
         XCTAssertEqual(read[0].confidence, 0.85, accuracy: 0.001)
+        // chapter 九百四十一 / M3410 — splice-correctness
+        // assertions。 Without the ch 941 splice fix,both
+        // entries would have sequenceNumber=0 (baked in at
+        // encode time)。
+        XCTAssertEqual(read[0].sequenceNumber, 0,
+            "rt-1 must report its Rust-assigned seq=0 " +
+            "(REGRESSION: ch 941 splice missing)")
+        XCTAssertEqual(read[1].sequenceNumber, 1,
+            "rt-2 must report its Rust-assigned seq=1 " +
+            "(REGRESSION: ch 941 splice missing — payload_json " +
+            "still has sequenceNumber:0 baked in at encode time)")
     }
 
     func testEventsForSessionEmpty() async throws {

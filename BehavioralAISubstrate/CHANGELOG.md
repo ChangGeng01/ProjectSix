@@ -11,6 +11,75 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十一 / M3410 — 13th-pass fix-of-fix:cross-actor seq divergence + 3 CRITICAL + 5 HIGH from review of ch 934-938
+
+User directive:全面 开发 → 13th-pass review of substance chapters 934-938 + ship the fixes the review found。 Per the cumulative 12-pass-then-USER-PASS discipline (see SEAL Pass table),this chapter CANNOT seal — the 13th-pass surfaced 3 NEW CRITICAL + 5 NEW HIGH + 3 MED items (8th recurrence of the「each cascade-break attempt becomes next pass's target」 pattern)。
+
+#### Fixes shipped
+
+**CRITICAL-1 — cross-actor sequence_number divergence in BASRoutedEventLogStorage**
+
+The ch 938「simplest variant」 read-path (store entire BASEventLogEntry as payload_json) had a hidden correctness bug:Swift `append` encodes the entry with `sequenceNumber: 0` (caller-passes-0 protocol),then Rust assigns its own sequence_number to the SQL column。 The payload_json column retains the stale `:0`。 Read-back via `events(forSession:)` JSON-decodes payload_json → BASEventLogEntry with `sequenceNumber=0` for every event,silently corrupting replay-order semantics。
+
+Fix:NEW `splice_sequence_number(pj, seq)` helper in `event_log.rs` — brace-depth + string-state aware (handles nested objects + escaped quotes correctly,only replaces TOP-LEVEL field)。 Both `events_for_session_json` and `events_since_timestamp_json` now `SELECT payload_json, sequence_number` and splice the column value into each row's payload_json before concatenation。 Read-back is now column-authoritative。
+
+NEW Rust tests (4):
+- `splice_sequence_number_replaces_top_level_field` (basic + negative existing value)
+- `splice_sequence_number_skips_nested_occurrence` (depth=2 sequenceNumber preserved)
+- `splice_sequence_number_skips_string_literal` (sequenceNumber inside string value preserved)
+- `splice_sequence_number_no_field_returns_unchanged` (no-op when absent)
+
+Updated `events_for_session_json_round_trip` to use payloads containing baked-in `sequenceNumber:0` and assert post-splice values are correct。 Swift `BASChapter938EventLogFullRowTests.testEventsForSessionRoundTrip` now asserts BOTH the `append`-returned `assignedSequenceNumber` AND the read-back `read[i].sequenceNumber` — without the ch 941 splice fix the latter would all be 0。
+
+**CRITICAL-2 — L8_ROUTED_OVERVIEW.md「Partial-conformance gotchas」 section still active after ch 934-938 closed the methods**
+
+Same class of doc-vs-source lie that the ch 933 USER-PASS caught — 12 review passes cascaded across cumulative numbers but didn't re-grep this exact section against current source code。
+
+Fix:strikethrough the entire section + add ANTI-DRIFT CORRECTION annotation documenting why it's retained (git-archeology) + pointer to the bridge-mapping table + stub-list (both already updated)。
+
+**CRITICAL-3 — SEAL/BRANCH_SUMMARY stale cumulative counts (894-940/47/92)**
+
+7th recurrence of the fabrication pattern across cumulative-count claims。 SEAL header still said `Chapters 894-932 (39 chapters)` while ch 934-940 had shipped (true span 894-940 = 47 chapters,92 Rust tests,~13614 Swift,12-pass meta + USER-PASS + this 13th)。
+
+Fix:python3-verified count update + grep-after-edit confirmation。 See SEAL chapter timeline below for the 7 added rows (934-940)。
+
+**HIGH-1 — i32 overflow guard missing on 5 array FFIs**
+
+The probe+fill JSON FFIs (atom_lifecycle / deletion_manifest / user_state / version_tree / event_log) return `needed as i32` to signal「JSON bytes required」。 If concatenated JSON exceeds 2.1 GB (i32::MAX),the cast silently wraps to negative,which Swift interprets as a FFI error code → silent data drop。
+
+Fix:NEW `safe_i32_size(usize) → Result<i32, i32>` helper in `lib.rs`。 -4 sentinel for overflow (distinct from -1/-2/-3 existing codes)。 Applied at all 5 module sites。
+
+**HIGH-2 — BASChapter938 testEventsForSessionRoundTrip lacked sequenceNumber assertion**
+
+Without explicit `read[i].sequenceNumber` assertions,the cross-actor seq divergence (CRITICAL-1 above) would have passed undetected through the round-trip test。 Fix:added `XCTAssertEqual(read[0].sequenceNumber, 0)` + `read[1].sequenceNumber, 1` + append-side `r1.assignedSequenceNumber` checks。
+
+**HIGH-3 — dead-code double-guard in BASRoutedAtomLifecycleStore.swift:169-172**
+
+The `guard needed >= 0 else { return [] }` followed by `guard needed >= 2 else { return [] }` is structurally redundant — `needed >= 2` implies `needed >= 0`。 Fix:collapsed to single guard with combined comment。
+
+**MED-1 — BASChapter936 testStateForIDRoundTrip missing field assertions**
+
+generatedAtMs / riskTrend / complexityAddictionScore were not asserted in the round-trip → a per-field decode regression could pass undetected。 Fix:added 3 assertions。
+
+#### Verification
+
+- Rust:**98/98 unit tests pass** (was 92,+4 NEW splicer tests + 2 NEW safe_i32_size tests)
+- Swift filtered:BASChapter934-938 + BASChapter925/926 + BASChapter786 all pass
+- Swift full sweep:**13614 tests,86 skipped,1 environmental failure** (CoreData XPC signal-10 — same per-suite-failure class as ch 928 sweep,not L8 code,all L8-arc filtered tests pass clean per `swift test --filter "BASChapter934|935|936|937|938|941"` = 23/23)。 Test count unchanged because ch 941 adds NO new test bodies — only assertion enrichment of existing ch 936/938 tests + Rust-side splicer fix + dead-code guard collapse。
+- Skip count IS **86** not 87 — ch 938/939/940 CHANGELOG entries claimed 87 from copy-paste fabrication;ch 941 verification step caught + corrected in those entries (per 13P-HIGH-4)
+- pre-commit-gates.sh:**3/3 pass**
+
+#### Discipline notes
+
+- python3-verified cumulative arithmetic BEFORE writing 36+3 = 39 CRITICAL / 86+5 = 91 HIGH
+- grep-after-edit confirmation:`grep -c "Partial.*chapter 901 partial" Docs/L8_ROUTED_OVERVIEW.md` = 0 (was 1)
+- The CRITICAL-1 cross-actor bug had GHOSTED THROUGH 12 meta passes + USER-PASS + ch 938 round-trip test。 It only surfaced when ch 941 review explicitly asked「are the round-trip tests asserting the field that the bridge could lie about?」。 Pattern:tests that don't assert the disputed claim provide false confidence。
+- 「文档复杂度反咬」 anti-pattern recurrence: L8_ROUTED_OVERVIEW.md had TWO「Partial」 surfaces (the bridge-mapping table fixed in ch 933,and the「Partial-conformance gotchas」 section caught here in ch 941) — the ch 933 USER-PASS fix only caught the first surface。 Discipline:per ch 933 SUBSTANCE check,scan ALL occurrences of「Partial」/「stub」/「return []」 in linked docs,not just the first hit。
+
+#### Up next
+
+- ch 942:14th-pass review of ch 941 (per discipline,every fix-of-fix that introduces new code/doc surface must be reviewed for new defects in the next pass — see SEAL pattern row「each cascade-break attempt becomes next pass's target」)
+
 ### Chapter 九百四十 / M3405 — DECLINE-PENDING-CONSUMER for 3 hot-path candidates + register exporter pattern
 
 User directive:全面 开发 → broad sweep。 But「broad」 must be honest:per 「亏的不要硬上」 + ch 884 DECLINE-PENDING-CONSUMER discipline,we DON'T blindly ship speculative consolidations。
@@ -49,7 +118,7 @@ The disciplined response to「全面 开发」 is:audit → ship what has consum
 
 - Rust:**92/92 unit tests pass** (no code change)
 - Swift filtered:no change
-- Swift full sweep:**13614 tests,87 skipped,0 failures**
+- Swift full sweep:**13614 tests,86 skipped,0 failures** (chapter 941 verification corrected from「87 skipped」 — ch 940 entry was carrying forward stale copy-paste from earlier entries)
 - pre-commit-gates.sh:**3/3 pass**
 
 #### Up next
@@ -75,7 +144,7 @@ User directive:全面 开发 → comprehensive sweep of deferred items。 Chapte
 
 - Rust:**92/92 unit tests pass** (no test count change — code-only refactors)
 - Swift filtered:BASChapter786 (rename) → 10/10 + BASChapter925 (sqlite return codes) → 11/11 + BASChapter926 → 15/15
-- Swift full sweep:**13614 tests,87 skipped,0 failures**
+- Swift full sweep:**13614 tests,86 skipped,0 failures** (chapter 941 verification corrected from「87 skipped」)
 - pre-commit-gates.sh:**3/3 pass**
 - grep verify post-edit:0 instances of「Is22」 in test discovery + 0 instances of「cache_size」 in whitelist + 0 instances of substring `unique(session_id` literal in migrate function
 
@@ -147,7 +216,7 @@ Every bridge's read-path can now pattern-match against this catalog。 Future br
 
 - Rust:**92/92 unit tests pass** (+4 NEW from ch 937 baseline)
 - Swift filtered:**BASChapter938 → 5/5 pass** + BASChapter937 → 5/5 + 936 → 5/5 + 935 → 4/4 + 934 → 4/4 + 926 → 15/15
-- Swift full sweep:**13614 tests,87 skipped,0 failures** (+5 from ch 937 baseline)
+- Swift full sweep:**13614 tests,86 skipped,0 failures** (chapter 941 verification corrected from「87 skipped」;+5 from ch 937 baseline)
 - pre-commit-gates.sh:**3/3 pass**
 
 #### USER-PASS arc — closed

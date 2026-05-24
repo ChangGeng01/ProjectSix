@@ -48,7 +48,10 @@ final class BASChapter936UserStateFullRowTests: XCTestCase {
     }
 
     /// state(forID:) round-trip — if reverted to `return nil`,
-    /// XCTAssertNotNil fails immediately
+    /// XCTAssertNotNil fails immediately。 chapter 九百四十一 /
+    /// M3410 fix MED:added missing field assertions for
+    /// generatedAtMs + riskTrend + complexityAddictionScore so
+    /// a per-field decode regression surfaces here。
     func testStateForIDRoundTrip() async throws {
         let url = makeTempDBURL()
         defer { cleanup(url) }
@@ -61,9 +64,13 @@ final class BASChapter936UserStateFullRowTests: XCTestCase {
             "state(forID:) must return appended state " +
             "(REGRESSION:if nil, ch 936 fix reverted to stub)")
         XCTAssertEqual(read?.stateID, "rt-1")
+        // chapter 九百四十一 / M3410 — backfilled missing fields
+        XCTAssertEqual(read?.generatedAtMs, 1_000)
         XCTAssertEqual(read?.emotionalTrend, 0.5)
         XCTAssertEqual(read?.projectMomentum, -0.3)
         XCTAssertEqual(read?.memoryHeat, 0.8)
+        XCTAssertEqual(read?.riskTrend, 0.2)
+        XCTAssertEqual(read?.complexityAddictionScore, 0.1)
         XCTAssertEqual(read?.agentRouteHistory,
                        ["single-llm", "local-only"])
         XCTAssertEqual(read?.lastNEventKinds,

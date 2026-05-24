@@ -292,8 +292,12 @@ unsafe fn payload_json_ffi(
     // Edge case:payload is empty string → return 0 (Swift can't
     // decode empty JSON anyway,treat as not-found)
     if needed == 0 { return 0; }
+    // chapter 九百四十一 / M3410 fix HIGH — i32 overflow guard
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     if out_buf.is_null() || out_capacity == 0 {
-        return needed as i32;
+        return safe_needed;
     }
     if out_capacity < needed {
         return -3;
@@ -302,7 +306,7 @@ unsafe fn payload_json_ffi(
         std::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 #[no_mangle]

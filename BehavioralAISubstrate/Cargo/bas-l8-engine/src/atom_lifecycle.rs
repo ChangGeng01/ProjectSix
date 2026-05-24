@@ -489,9 +489,13 @@ unsafe fn events_json_ffi(
     };
     let bytes = json.as_bytes();
     let needed = bytes.len();
+    // chapter 九百四十一 / M3410 fix HIGH — i32 overflow guard
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     // probe call:return required size
     if out_buf.is_null() || out_capacity == 0 {
-        return needed as i32;
+        return safe_needed;
     }
     // fill call:write up to capacity
     if out_capacity < needed {
@@ -501,7 +505,7 @@ unsafe fn events_json_ffi(
         std::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 #[no_mangle]

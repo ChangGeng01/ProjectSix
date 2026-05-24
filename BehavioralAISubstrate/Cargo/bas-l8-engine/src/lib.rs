@@ -606,6 +606,33 @@ pub(crate) const MAX_SIGNATURE_HASH_BYTES: usize = 64;
 pub(crate) const MAX_PAYLOAD_BLOB_BYTES: usize = 1_048_576;
 pub(crate) const MAX_PAYLOAD_JSON_BYTES: usize = 16_777_216;
 
+/// chapter 九百四十一 / M3410 fix HIGH — i32 overflow guard
+/// for probe+fill JSON FFIs。 The 5 substance bridges
+/// (atom_lifecycle / deletion_manifest / user_state /
+/// version_tree / event_log) return `needed as i32` to
+/// signal「JSON bytes required」 to Swift。 If the JSON
+/// concatenation exceeds 2.1 GB (i32::MAX),the cast
+/// silently wraps to negative,which Swift interprets as
+/// a FFI error code,silently dropping the read。
+///
+/// Callers should call this helper before `as i32` casts
+/// — returns Err(-4) when the size would overflow,Ok(value)
+/// when safe。 -4 is a new sentinel distinct from -1 (null)
+/// / -2 (SQLite error) / -3 (UTF-8 / buffer-too-small)。
+///
+/// Usage:
+/// ```ignore
+/// let needed = bytes.len();
+/// let n = match safe_i32_size(needed) { Ok(n) => n, Err(c) => return c };
+/// ```
+pub(crate) fn safe_i32_size(needed: usize) -> Result<i32, i32> {
+    if needed > i32::MAX as usize {
+        Err(-4)
+    } else {
+        Ok(needed as i32)
+    }
+}
+
 /// chapter 九百二十四 / M3325 CRITICAL fix — RAII guard for
 /// transactional state。 The ch 922 `transactional` helper
 /// covered the Err-return path of the body closure,but the
@@ -690,6 +717,27 @@ pub(crate) fn cstr_terminated_to_string(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // chapter 九百四十一 / M3410 — verify the new overflow
+    // guard works correctly:both boundary cases (i32::MAX
+    // boundary + just-over-boundary) + happy path。
+    #[test]
+    fn safe_i32_size_returns_value_below_boundary() {
+        assert_eq!(safe_i32_size(0), Ok(0));
+        assert_eq!(safe_i32_size(100), Ok(100));
+        assert_eq!(safe_i32_size(i32::MAX as usize), Ok(i32::MAX));
+    }
+
+    #[test]
+    fn safe_i32_size_rejects_overflow() {
+        // Just past i32::MAX → returns -4 sentinel
+        assert_eq!(
+            safe_i32_size(i32::MAX as usize + 1),
+            Err(-4));
+        assert_eq!(
+            safe_i32_size(usize::MAX),
+            Err(-4));
+    }
 
     #[test]
     fn abi_version_pinned() {
