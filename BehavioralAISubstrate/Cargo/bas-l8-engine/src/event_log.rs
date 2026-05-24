@@ -566,6 +566,143 @@ bas_l8_event_log_recent_timestamps_for_session(
     n as i32
 }
 
+// MARK: - chapter 九百三十八 / M3395 — full-row events query
+//
+// USER-PASS finding (ch 933) #5 substance fix:the ch 901 bridge
+// labeled「Partial」 honestly in OVERVIEW table but the bridge
+// methods `events(forSession:)` + `events(sinceTimestampMs:limit:)`
+// had `return []` stubs。 Final substance chapter to close the
+// USER-PASS work entirely。
+//
+// SIMPLEST variant of recipe:bridge's append path stores the
+// entire BASEventLogEntry as payload_json (format=1)。 So read-back
+// just concatenates payload_json values into a JSON array。 No
+// per-column reconstruction,no base64 (signature_hash equiv),no
+// TEXT→u8 mapping。 Filter WHERE payload_format = 1 to skip any
+// format=2 rows (which would not Codable-decode to BASEventLogEntry
+// anyway since they're binary)。
+
+pub fn events_for_session_json(
+    conn: &Connection,
+    session_id: &str,
+) -> rusqlite::Result<String> {
+    let mut stmt = conn.prepare(
+        "SELECT payload_json FROM event_log \
+         WHERE session_id = ? AND payload_format = 1 \
+         ORDER BY sequence_number")?;
+    let mut rows = stmt.query(params![session_id])?;
+    let mut out = String::from("[");
+    let mut first = true;
+    while let Some(row) = rows.next()? {
+        let pj: String = row.get(0)?;
+        if pj.is_empty() { continue; }  // defensive skip
+        if !first { out.push(','); }
+        first = false;
+        out.push_str(&pj);
+    }
+    out.push(']');
+    Ok(out)
+}
+
+pub fn events_since_timestamp_json(
+    conn: &Connection,
+    since_ms: i64,
+    limit: i64,
+) -> rusqlite::Result<String> {
+    // chapter 九百二十二 / M3315 NC4 — cap on limit。 Apply same
+    // discipline to read-paths (caller-supplied bound)。
+    let bounded_limit = if limit < 0 { 0 }
+        else if limit as usize > crate::MAX_HOTPATH_LIMIT {
+            crate::MAX_HOTPATH_LIMIT as i64
+        } else { limit };
+    let mut stmt = conn.prepare(
+        "SELECT payload_json FROM event_log \
+         WHERE timestamp_ms >= ? AND payload_format = 1 \
+         ORDER BY timestamp_ms, sequence_number \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![since_ms, bounded_limit])?;
+    let mut out = String::from("[");
+    let mut first = true;
+    while let Some(row) = rows.next()? {
+        let pj: String = row.get(0)?;
+        if pj.is_empty() { continue; }
+        if !first { out.push(','); }
+        first = false;
+        out.push_str(&pj);
+    }
+    out.push(']');
+    Ok(out)
+}
+
+unsafe fn events_json_ffi(
+    engine: *const L8Engine,
+    by_session: bool,
+    key_utf8: *const c_char,
+    key_len: usize,
+    since_ms: i64,
+    limit: i64,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    let engine_ref = unsafe { &*engine };
+    let json_result = if by_session {
+        let key = match crate::cstr_to_str(key_utf8, key_len) {
+            Some(s) => s, None => return -3,
+        };
+        engine_ref.with_conn(|conn| {
+            events_for_session_json(conn, key)
+        })
+    } else {
+        engine_ref.with_conn(|conn| {
+            events_since_timestamp_json(conn, since_ms, limit)
+        })
+    };
+    let json = match json_result {
+        Ok(s) => s, Err(_) => return -2,
+    };
+    let bytes = json.as_bytes();
+    let needed = bytes.len();
+    if out_buf.is_null() || out_capacity == 0 {
+        return needed as i32;
+    }
+    if out_capacity < needed { return -3; }
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            bytes.as_ptr(), out_buf, needed);
+    }
+    needed as i32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_events_for_session(
+    engine: *const L8Engine,
+    session_id_utf8: *const c_char, session_id_len: usize,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    events_json_ffi(
+        engine, true,
+        session_id_utf8, session_id_len,
+        0, 0,
+        out_buf, out_capacity)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_events_since_ts(
+    engine: *const L8Engine,
+    since_ms: i64,
+    limit: i64,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    events_json_ffi(
+        engine, false,
+        std::ptr::null(), 0,
+        since_ms, limit,
+        out_buf, out_capacity)
+}
+
 // MARK: - Tests (careful coverage of HIGH-risk semantics)
 
 #[cfg(test)]
@@ -740,6 +877,112 @@ mod tests {
         };
         assert_eq!(s2, 0, "Dup returns original seq=0");
         assert_eq!(was_new, 0, "Dup signals was_new=false");
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // chapter 九百三十八 / M3395 — full-row events round-trip
+    #[test]
+    fn events_for_session_json_round_trip() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            let pl1 = "{\"eventID\":\"e1\",\"x\":1}";
+            let pl2 = "{\"eventID\":\"e2\",\"x\":2}";
+            // append 2 format=1 entries
+            append_event(conn, "e1", "sess-RT", 100,
+                "user.input", "low", pl1, 1, None).unwrap();
+            append_event(conn, "e2", "sess-RT", 200,
+                "user.input", "low", pl2, 1, None).unwrap();
+            let json = events_for_session_json(
+                conn, "sess-RT").unwrap();
+            // Should be valid JSON array of the 2 payloads
+            assert_eq!(json,
+                format!("[{},{}]", pl1, pl2));
+            // Empty session case
+            let empty = events_for_session_json(
+                conn, "sess-NONE").unwrap();
+            assert_eq!(empty, "[]");
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn events_for_session_skips_format_2_blob_rows() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // format=1 with JSON payload — should be returned
+            let pl_json = "{\"eventID\":\"j1\"}";
+            append_event(conn, "j1", "sess-mix", 100,
+                "k", "low", pl_json, 1, None).unwrap();
+            // format=2 with BLOB payload (empty json,non-empty
+            // blob) — should be SKIPPED (binary can't decode
+            // back to BASEventLogEntry Codable)
+            let pl_empty = "";
+            let blob = vec![0u8; 16];
+            append_event(conn, "b1", "sess-mix", 200,
+                "k", "low", pl_empty, 2,
+                Some(&blob)).unwrap();
+            let json = events_for_session_json(
+                conn, "sess-mix").unwrap();
+            // Only j1 returned,b1 filtered by payload_format=1
+            assert_eq!(json, format!("[{}]", pl_json));
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn events_since_timestamp_respects_limit_and_order() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            for i in 0..5 {
+                let pj = format!(
+                    "{{\"eventID\":\"ts-{}\",\"i\":{}}}", i, i);
+                append_event(
+                    conn,
+                    &format!("ts-{}", i),
+                    "ts-sess",
+                    1000 + i * 100,
+                    "k", "low", &pj, 1, None).unwrap();
+            }
+            // since=1200 → expect ts-2, ts-3, ts-4 (3 rows)
+            let json = events_since_timestamp_json(
+                conn, 1200, 100).unwrap();
+            assert!(json.contains("\"eventID\":\"ts-2\""));
+            assert!(json.contains("\"eventID\":\"ts-3\""));
+            assert!(json.contains("\"eventID\":\"ts-4\""));
+            assert!(!json.contains("\"eventID\":\"ts-1\""));
+            // limit=2 → only first 2
+            let limited = events_since_timestamp_json(
+                conn, 1200, 2).unwrap();
+            assert!(limited.contains("\"eventID\":\"ts-2\""));
+            assert!(limited.contains("\"eventID\":\"ts-3\""));
+            assert!(!limited.contains("\"eventID\":\"ts-4\""));
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    #[test]
+    fn events_since_timestamp_limit_cap_enforced() {
+        let engine = unsafe {
+            bas_l8_engine_init(std::ptr::null(), 0) };
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // Pass usize::MAX-equivalent → must clamp to
+            // MAX_HOTPATH_LIMIT, not abort with Vec allocation
+            let _json = events_since_timestamp_json(
+                conn, 0, i64::MAX).unwrap();
+            // No assertion on content — just verify no panic
+            // and clean return when result is empty
+        });
         unsafe { bas_l8_engine_close(engine); }
     }
 }

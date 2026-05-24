@@ -158,30 +158,27 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
     public func events(
         forSession sessionID: String
     ) async -> [BASEventLogEntry] {
-        // Chapter 901 partial conformance — full row query
-        // deferred to chapter 901.5。 Chapter 九百二十一
-        // assertionFailure in DEBUG so consumers don't
-        // silently get [] back and ship a regression。 In
-        // RELEASE we still return [] (additive behavior)。
-        assertionFailure(
-            "BASRoutedEventLogStorage.events(forSession:) " +
-            "is partial conformance (returns []) — " +
-            "use BASSQLiteEventLogStorage if you need read " +
-            "methods,or wait for chapter 901.5 to ship " +
-            "full row query support")
-        return []
+        // chapter 九百三十八 / M3395 — USER-PASS substance fix #5
+        // (FINAL — closes the USER-PASS arc)。 Append stores full
+        // BASEventLogEntry as payload_json (format=1) so read-back
+        // just concatenates payload_json bytes into JSON array。
+        return Self.eventsArrayViaJsonFfi(
+            engine: enginePtr,
+            sessionID: sessionID,
+            sinceMs: nil,
+            limit: nil)
     }
 
     public func events(
         sinceTimestampMs since: Int64,
         limit: Int
     ) async -> [BASEventLogEntry] {
-        // chapter 九百二十一 partial-conformance assertion
-        assertionFailure(
-            "BASRoutedEventLogStorage.events(sinceTimestampMs:limit:) " +
-            "is partial conformance (returns []) — see " +
-            "Docs/L8_ROUTED_OVERVIEW.md")
-        return []
+        // chapter 九百三十八 / M3395 — see events(forSession:)
+        return Self.eventsArrayViaJsonFfi(
+            engine: enginePtr,
+            sessionID: nil,
+            sinceMs: since,
+            limit: limit)
     }
 
     public var totalCount: Int {
@@ -299,6 +296,75 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
                 seq: sequences[i]))
         }
         return out
+    }
+
+    /// chapter 九百三十八 / M3395 — shared probe+fill helper for
+    /// the two events query variants。 `sessionID` non-nil →
+    /// session-filtered;`sinceMs` non-nil → timestamp+limit
+    /// filtered。 Mutually exclusive (helper enforces by
+    /// dispatching to the correct FFI symbol)。
+    private static func eventsArrayViaJsonFfi(
+        engine: OpaquePointer,
+        sessionID: String?,
+        sinceMs: Int64?,
+        limit: Int?
+    ) -> [BASEventLogEntry] {
+        // Probe (out_buf=null,out_capacity=0)
+        let needed: Int32 = {
+            if let sid = sessionID {
+                let bytes = Array(sid.utf8)
+                return bytes.withUnsafeBufferPointer { kBuf in
+                    bas_l8_event_log_events_for_session(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        nil, 0)
+                }
+            } else {
+                return bas_l8_event_log_events_since_ts(
+                    engine,
+                    sinceMs ?? 0,
+                    Int64(limit ?? 0),
+                    nil, 0)
+            }
+        }()
+        guard needed >= 2 else { return [] }
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let written: Int32 = {
+            if let sid = sessionID {
+                let bytes = Array(sid.utf8)
+                return bytes.withUnsafeBufferPointer { kBuf in
+                    buf.withUnsafeMutableBufferPointer { oBuf in
+                        bas_l8_event_log_events_for_session(
+                            engine,
+                            kBuf.baseAddress.map {
+                                UnsafeRawPointer($0)
+                                    .assumingMemoryBound(
+                                        to: CChar.self)
+                            },
+                            kBuf.count,
+                            oBuf.baseAddress,
+                            oBuf.count)
+                    }
+                }
+            } else {
+                return buf.withUnsafeMutableBufferPointer { oBuf in
+                    bas_l8_event_log_events_since_ts(
+                        engine,
+                        sinceMs ?? 0,
+                        Int64(limit ?? 0),
+                        oBuf.baseAddress, oBuf.count)
+                }
+            }
+        }()
+        guard written >= 0 else { return [] }
+        let json = Data(buf.prefix(Int(written)))
+        return (try? JSONDecoder().decode(
+            [BASEventLogEntry].self, from: json)) ?? []
     }
 }
 #endif

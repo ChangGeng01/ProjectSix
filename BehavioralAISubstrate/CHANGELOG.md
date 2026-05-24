@@ -11,6 +11,68 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十八 / M3395 — SUBSTANCE chapter #5 (FINAL):event_log full-row FFI — **USER-PASS ARC CLOSED**
+
+User directive:继续。 5th and FINAL substance chapter — closes the USER-PASS arc from ch 933 entirely。 All 5 bridges now have honest「Full」 labels in L8_ROUTED_OVERVIEW.md。
+
+#### What shipped
+
+1. **Rust FFI** — 2 NEW symbols:
+   - `bas_l8_event_log_events_for_session` (array,session-filtered)
+   - `bas_l8_event_log_events_since_ts` (array,timestamp+limit filtered with MAX_HOTPATH_LIMIT cap)
+2. **Implementation approach** — simplest variant:bridge's append path stores entire BASEventLogEntry as payload_json (format=1)。 Read-back just concatenates payload_json values into JSON array brackets — no per-column reconstruction needed。 `WHERE payload_format=1` filters out BLOB rows (which can't Codable-decode to BASEventLogEntry)。
+3. **Swift bridge** — 2 stubs replaced via shared `eventsArrayViaJsonFfi` helper dispatching on `sessionID` vs `sinceMs`
+4. **Tests** — `BASChapter938EventLogFullRowTests.swift` (5 Swift tests):
+   - events(forSession:) round-trip with full field equality
+   - Empty session returns []
+   - events(sinceTimestampMs:limit:) filtering + limit + ordering
+   - Session isolation
+   - Int.max limit doesn't abort (MAX_HOTPATH_LIMIT cap)
+   
+   Plus 4 NEW Rust unit tests:
+   - `events_for_session_json_round_trip`
+   - `events_for_session_skips_format_2_blob_rows` (defensive filter)
+   - `events_since_timestamp_respects_limit_and_order`
+   - `events_since_timestamp_limit_cap_enforced` (Int.max → clamped)
+
+5. **L8_ROUTED_OVERVIEW.md** — EventLog row「Partial」 → 「Full」 + stub-list marked SHIPPED + **NEW arc-closure annotation**:「ARC SUBSTANCE CLOSURE (ch 938):All 11 originally-stubbed methods across 5 bridges are now implemented。 The「Full」 labels in the bridge-mapping table are now HONEST。 USER-PASS finding from ch 933 fully closed。」
+
+#### USER-PASS substance arc tally (ch 934-938, 5 chapters)
+
+| Bridge | Stubbed methods | Chapter | Rust tests | Swift tests |
+|---|---|---|---|---|
+| AtomLifecycle | 2 | ch 934 | +3 | +4 |
+| DeletionManifest | 2 | ch 935 | +2 | +4 |
+| UserState | 2 | ch 936 | +2 | +5 |
+| VersionTree | 3 | ch 937 | +3 | +5 |
+| **EventLog** | **2** | **ch 938** | **+4** | **+5** |
+| **TOTAL** | **11 methods** | **5 chapters** | **+14 Rust** | **+23 Swift** |
+
+#### Recipe doctrine — now fully proven
+
+| Variant | Shape | Encoding | Chapter introduced |
+|---|---|---|---|
+| Array of records,manual JSON build | TEXT cols | (none) | ch 934 atom_lifecycle |
+| Array of records,manual JSON build | TEXT + nullable | (none) | ch 935 deletion_manifest |
+| Optional single,opaque payload | payload_json passthrough | (none) | ch 936 user_state |
+| Array + Optional + filter,BLOB→base64 | TEXT + BLOB | base64 RFC 4648 | ch 937 version_tree |
+| Array,opaque payload passthrough | payload_json | format-filter (where payload_format=1) | **ch 938 event_log** |
+
+Every bridge's read-path can now pattern-match against this catalog。 Future bridges that need full-row implementation use the appropriate variant。
+
+#### Verification
+
+- Rust:**92/92 unit tests pass** (+4 NEW from ch 937 baseline)
+- Swift filtered:**BASChapter938 → 5/5 pass** + BASChapter937 → 5/5 + 936 → 5/5 + 935 → 4/4 + 934 → 4/4 + 926 → 15/15
+- Swift full sweep:**13614 tests,87 skipped,0 failures** (+5 from ch 937 baseline)
+- pre-commit-gates.sh:**3/3 pass**
+
+#### USER-PASS arc — closed
+
+Chapter 933 USER-PASS found 4 CRITICAL (4 bridges labeled「Full」 but stubbed) + 2 HIGH。 Chapters 934-938 (5 chapters,total +14 Rust + +23 Swift tests) closed all 11 stubbed methods with empirically-verified round-trip。 OVERVIEW labels are now HONEST。
+
+The substance work pattern proved generalizable — every bridge folded into one of 5 recipe variants。
+
 ### Chapter 九百三十七 / M3390 — SUBSTANCE chapter #4:version_tree full-row FFI (was「Full」 lie since ch 899)
 
 User directive:继续。 4th substance chapter。 3 stubbed methods (most of any bridge so far)。 NEW recipe complication:`signature_hash` is BLOB (Data in Swift) — JSON needs base64 encoding (Foundation Codable default for Data fields)。

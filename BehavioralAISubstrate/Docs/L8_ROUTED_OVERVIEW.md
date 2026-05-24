@@ -32,7 +32,7 @@ routed path」 below)。
 | `BASSQLiteUserStateStorage` | `BASRoutedUserStateStore` | user_states | **Full** (ch 936 implemented `state(forID:)` + `latestState(forSession:)` via probe+fill payload_json FFI — round-trip verified by BASChapter936 tests) |
 | `BASSQLiteHostConstitutionVersionTreeStore` | `BASRoutedHostConstitutionVersionTreeStore` | 014 | **Full** (ch 937 implemented `versions(forVault:)` + `rollbackPoints(forVault:)` + `version(forID:)` via probe+fill JSON FFI;signature_hash BLOB → base64 string in JSON — round-trip verified by BASChapter937 tests) |
 | `BASSQLiteVectorIndexStorage` | `BASRoutedVectorIndexStorage` | vector_index | Full + hot-path `cosineTopK` |
-| `BASSQLiteEventLogStorage` | `BASRoutedEventLogStorage` | event_log v2 | **Partial** (append Full;`events(forSession:)` + `events(sinceTimestampMs:limit:)` stubbed `return []` per 901.5 deferral) |
+| `BASSQLiteEventLogStorage` | `BASRoutedEventLogStorage` | event_log v2 | **Full** (ch 938 implemented `events(forSession:)` + `events(sinceTimestampMs:limit:)` via probe+fill JSON FFI;payload_json passthrough with `WHERE payload_format=1` filter — round-trip verified by BASChapter938 tests) |
 | `BASMemoryUsageTracker` (6 tables) | 3 sub-stores + 1 unified facade (below) | records / replay+audit / notes+bundles+tombstones | Full via facade |
 | `BASHostConstitutionSQLiteStorage` | `BASRoutedHostConstitutionVaultStorage` | host_constitution_vaults | Full |
 
@@ -51,8 +51,10 @@ These methods exist in the Routed bridge's protocol surface but return empty/nil
 | ~~VersionTree~~ | ~~`versions(forVault: String) async -> [BASHostConstitutionVersionRecord]`~~ | **SHIPPED ch 937** | ✓ |
 | ~~VersionTree~~ | ~~`rollbackPoints(forVault: String) async -> [...]`~~ | **SHIPPED ch 937** | ✓ |
 | ~~VersionTree~~ | ~~`version(forID: String) async -> BASHostConstitutionVersionRecord?`~~ | **SHIPPED ch 937** | ✓ |
-| EventLog | `events(forSession: String) async -> [BASEventLogEntry]` | `[]` | ch 901.5 (per existing OVERVIEW doc) |
-| EventLog | `events(sinceTimestampMs: Int64, limit: Int) async -> [...]` | `[]` | ch 901.5 |
+| ~~EventLog~~ | ~~`events(forSession: String) async -> [BASEventLogEntry]`~~ | **SHIPPED ch 938** | ✓ |
+| ~~EventLog~~ | ~~`events(sinceTimestampMs: Int64, limit: Int) async -> [...]`~~ | **SHIPPED ch 938** | ✓ |
+
+**ARC SUBSTANCE CLOSURE (ch 938)**:All 11 originally-stubbed methods across 5 bridges are now implemented。 The「Full」 labels in the bridge-mapping table are now HONEST。 USER-PASS finding from ch 933 fully closed。
 
 **Why deferred**:full-row queries require Rust FFI primitives that decode TEXT/BLOB columns + reconstruct typed Swift structs。 Per ADR-014 OPT-IN doctrine,Routed bridges ship append/count first (which the Swift fallback ALSO supports) and add read-paths only when consumer pressure warrants the FFI work。
 

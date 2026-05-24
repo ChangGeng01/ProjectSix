@@ -1798,6 +1798,28 @@ int32_t bas_l8_event_log_recent_timestamps_for_session(
     int64_t* out_timestamps,
     int64_t* out_sequences);
 
+// chapter 九百三十八 / M3395 — full-row events JSON FFI
+// (USER-PASS substance fix #5 — final, closes the USER-PASS arc)
+// Probe + fill pattern。 Output is JSON array of payload_json
+// values (each is a complete BASEventLogEntry Codable JSON)。
+// Filters WHERE payload_format=1 — format=2 BLOB rows skipped。
+//
+// events_for_session: ORDER BY sequence_number ASC
+// events_since_ts:   ORDER BY timestamp_ms ASC, sequence_number
+//                    LIMIT clamped to MAX_HOTPATH_LIMIT (100_000)
+int32_t bas_l8_event_log_events_for_session(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+int32_t bas_l8_event_log_events_since_ts(
+    const L8Engine* engine,
+    int64_t since_ms,
+    int64_t limit,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 // MARK: - bas-l8-engine memory_usage_records module
 // (chapter 九百二 / M3200 — HIGH-risk migration #2 SCOPED:
 //  records-table-only subset of BASMemoryUsageTracker)
