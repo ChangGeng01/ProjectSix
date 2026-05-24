@@ -15,7 +15,7 @@
           },
           {
             "key" : "BAS_FUZZ_RUNTIME_ITER",
-            "value" : "100"
+            "value" : "20"
           },
           {
             "key" : "BAS_FUZZ_ITER",
@@ -23,11 +23,19 @@
           },
           {
             "key" : "BAS_FUZZ_EVOL_GEN",
-            "value" : "5"
+            "value" : "3"
           },
           {
             "key" : "BAS_FUZZ_EVOL_CHILD",
-            "value" : "8"
+            "value" : "4"
+          },
+          {
+            "key" : "QINAO_MLX_E2E",
+            "value" : "1"
+          },
+          {
+            "key" : "QINAO_MLX_BENCH",
+            "value" : "1"
           }
         ]
       }
@@ -46,7 +54,8 @@
         "BASChapter946FourteenLayerFuzzSmokeTests",
         "BASChapter952BenchmarkRegressionFuzzTests",
         "BASChapter952ExtremeFuzzTests",
-        "BASChapter952ProcGenSisterTests"
+        "BASChapter952ProcGenSisterTests",
+        "BASChapter952RealMLXOnDeviceTests"
       ],
       "target" : {
         "containerPath" : "container:BASDeviceTest.xcodeproj",

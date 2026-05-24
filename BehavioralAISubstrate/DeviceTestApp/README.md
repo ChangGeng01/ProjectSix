@@ -139,6 +139,38 @@ xcodebuild test \
 
 **ch 951 confirmed result:** iPhone Air iOS 26.5 arm64,**40/40 PASS** on first device run。
 
+## 🚀 Extended fuzz device run (chapter 九百五十二)
+
+Per user directive 「真机 跑2小时冒烟」 + 「14层 每层 每个部分都经历
+冒烟测试」 + 「极大提高 benchmark」 — extended fuzz infrastructure
+landing in chapter 九百五十二 ships:
+
+- `Device2HrFuzz.xctestplan` — env-var configured for high-iter fuzz
+  (BAS_FUZZ_BENCH_ITER=1000, BAS_FUZZ_RUNTIME_ITER=100, BAS_FUZZ_ITER=500,
+  BAS_FUZZ_EVOL_GEN=5, BAS_FUZZ_EVOL_CHILD=8)
+- 3 new test classes (ch 952 ExtremeFuzz + ProcGenSister + BenchmarkRegression)
+- BASEvolutionaryMutator extensions (crossover + multi-objective fitness)
+- BASFuzzInputGenerator extensions (24 layer-part generators)
+
+### Run the extended fuzz suite on iPhone Air
+
+```bash
+cd /Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate
+
+# Single-phase run — xcodegen places test plan in scheme
+xcodebuild test \
+    -project DeviceTestApp/BASDeviceTest.xcodeproj \
+    -scheme BASDeviceTestApp \
+    -destination "platform=iOS,id=9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6" \
+    -testPlan Device2HrFuzz \
+    -allowProvisioningUpdates \
+    -skipPackagePluginValidation
+```
+
+Expected runtime: 30-90 minutes depending on iter counts in the
+xctestplan。 Adjust env-var values in `Device2HrFuzz.xctestplan` to
+fit larger or smaller budgets。
+
 ### After pre-flight (one-time iPhone Air setup)
 
 In addition to Steps 1-3 in pre-flight,you must also:

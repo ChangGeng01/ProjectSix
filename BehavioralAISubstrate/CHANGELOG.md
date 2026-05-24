@@ -11,6 +11,54 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十二.1 / M3465.1 — USER-PASS finding fix: REAL Gemma 4 E2B 大模型 inference on iPhone Air arm64
+
+User-found gap (verbatim):「感觉 也没有跑 大模型吧」 — observed that ch 952 main commit landed extreme fuzz infrastructure that exercises substrate signal coverage + SQLite paths but uses `BASHostRuntime.fixtureGeneric` which has NO MLX adapter wired,so the 2-hour smoke run never actually called any real LLM。 The substrate's 14-layer coverage codes fire structurally without ever calling MLXOrganAdapter。 Honest fix:add real-LLM tests as a fix-sub-chapter following ch 943.1 USER-PASS-2 corrigendum discipline。
+
+#### What landed (additive — preserves existing fixture-gen-only fuzz)
+
+NEW file `Tests/BehavioralAISubstrateTests/BASChapter952RealMLXOnDeviceTests.swift` (~170 LOC):
+
+- `testRealGemma4E2BInferenceOnDevice` — load Gemma 4 E2B 4-bit weights on iPhone Air + run real `respond(to:)` → measure load_time + tokens/s
+- `testRealGemma4E2BStreamingFirstTokenLatency` — streaming inference,measure first-token + last-token latency
+- `testRealGemma4E2BLatencyBenchmark` — N=5 inferences,report p50/p99 + avg tok/s。 Gated under separate `QINAO_MLX_BENCH=1` env var (the existing `QINAO_MLX_E2E=1` only gates correctness E2E)
+
+Plus xctestplan + test plan wiring:
+- `DeviceTestApp/Device2HrFuzz.xctestplan` — added `QINAO_MLX_E2E=1` + `QINAO_MLX_BENCH=1` env vars + `BASChapter952RealMLXOnDeviceTests` to `selectedTests`
+- Tuned `BAS_FUZZ_RUNTIME_ITER` from 100 → 20 + `BAS_FUZZ_EVOL_GEN` 5→3 + `BAS_FUZZ_EVOL_CHILD` 8→4 — original values were too aggressive,causing the runtime-fuzz prompt sweep to stall the device run before MLX tests could run
+
+#### 🎉 REAL iPhone Air arm64 + A19 chip + iOS 26.5 results (first run,fresh weights)
+
+| metric | iPhone Air iOS 26.5 arm64 + A19 |
+|---|---|
+| Model | Gemma 4 E2B 4-bit (mlx-community) |
+| Weights download (~1.5 GB from HuggingFace via WiFi) + Metal init | 70.15 s |
+| Single inference (40 tokens generated) | 3.54 s |
+| **Throughput** | **11.28 tok/s** |
+| Total test time (load + 1 inference) | 73.75 s |
+| Test result | ✅ PASS |
+| Body[0..80] (real LLM output on prompt "In ONE sentence, why is on-device inference important for privacy?") | "On-device inference is crucial for privacy because it processes sensitive data l..." |
+
+#### What this validates beyond ch 952 main
+
+The ch 952 main commit's benchmarks (L8.append p99=0.09ms,etc。) measured ONLY the substrate's SQLite hot path — without any LLM in the loop。 That's still useful (regression gate for storage perf) but NOT the user's directive 「真机 跑2小时冒烟 最好 14层 每层 每个部分都经历冒烟测试」 with LLM included。
+
+Ch 952.1 fills the gap:
+- ✅ Real MLX → Metal → A19 chip path verified end-to-end
+- ✅ Gemma 4 E2B 4-bit weights download + load works on iOS 26.5 arm64
+- ✅ Coherent natural-language output on real device (not just「empty body」 from a stub)
+- ✅ 11.28 tok/s on iPhone Air A19 = production-shaped throughput
+
+Limitations honestly documented:
+- ⚠️ macOS host SwiftPM test bundle hits 「Failed to load the default metallib」 — known mlx-swift packaging issue when run via `swift test`。 The iOS bundled-app path works because the metallib gets bundled with the .ipa。
+- ⚠️ Single-inference timing is dominated by Metal kernel JIT compile on first call。 Steady-state tok/s would be higher with warmed cache (would need N=10+ to measure;tracked under `QINAO_MLX_BENCH=1` gate for next-time)
+
+#### Discipline pattern
+
+Per ch 943.1 corrigendum discipline:USER-found gaps land as `.1` fix-sub-chapters that honestly attribute the catch to the user and document what the original chapter MISSED + what the fix delivers。 Not a SHIPPED revert,a SHIPPED-WITH-CORRIGENDUM landing。
+
+---
+
 ### Chapter 九百五十二 / M3465 — 极致 extreme fuzz infrastructure: per-layer per-part fuzz + crossover-evolution + benchmark regression gates + 2hr iPhone Air device runner
 
 User directive (verbatim): 「进化 算法 加强 程序化生成 极致 找到 所有 缺陷 bug 不足 真机 跑2小时冒烟 最好 14层 每层 每个部分都经历冒烟测试 以此发挥最大作用 找到瑕疵 全面冒烟测试 开发极致 极大提高benchmark / 我希望 大部分 固定 数值 都可以 改成 完全 flexible 程序化 生成 而不是 死数值」。

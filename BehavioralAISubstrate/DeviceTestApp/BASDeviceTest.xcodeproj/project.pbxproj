@@ -1170,6 +1170,7 @@
 		E16DDA55F6246D8234F9BFC4 /* BASChapter906HotPathConsolidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948D53CF9C5F3423302E06C3 /* BASChapter906HotPathConsolidationTests.swift */; };
 		E2C11C2DEC87AB4B0FC57A76 /* BASMPSGraphConv2DIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BDFCE76D254CE22710733C9 /* BASMPSGraphConv2DIntegrationTests.swift */; };
 		E2DC0E70594BA59C0E1193FC /* BASTurnRuntimeEngineConfigurationPhaseFTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8FE55D98D7696673F4E1E5 /* BASTurnRuntimeEngineConfigurationPhaseFTests.swift */; };
+		E315A71A7DEBE65872A53FFD /* BASChapter952RealMLXOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30E3A0F521BB151990CCA67 /* BASChapter952RealMLXOnDeviceTests.swift */; };
 		E318D85E16DE888BD9D351DE /* BASHostProjectionTrioCodableExtensionDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315B1E47C4B0768CF78B7834 /* BASHostProjectionTrioCodableExtensionDoctrineTests.swift */; };
 		E33D1647F482B9798A8C4342 /* BASAppleCurrentBrainHostLifecycleRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B4EC81A93BEC59A6265003 /* BASAppleCurrentBrainHostLifecycleRuntimeTests.swift */; };
 		E357E1160CE5FE5E5EB68BCA /* BASChapter708MatMulAutoRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CF2BEC88F7E277B9D4B432 /* BASChapter708MatMulAutoRouteTests.swift */; };
@@ -2528,6 +2529,7 @@
 		F2CAB926EA59CE5A543C6354 /* BASRuntimeAuditEmissionSummaryStageLedgerCompleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASRuntimeAuditEmissionSummaryStageLedgerCompleteTests.swift; sourceTree = "<group>"; };
 		F2DEA1A4C98E10AE61A93246 /* BASReferenceProviderCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASReferenceProviderCatalogTests.swift; sourceTree = "<group>"; };
 		F301293C0E7ECA67841673D0 /* BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrineTests.swift; sourceTree = "<group>"; };
+		F30E3A0F521BB151990CCA67 /* BASChapter952RealMLXOnDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter952RealMLXOnDeviceTests.swift; sourceTree = "<group>"; };
 		F32506263A0237DAA1194929 /* BASAuditObservationProjectionsObservationBundlesBlockConvenienceInitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAuditObservationProjectionsObservationBundlesBlockConvenienceInitTests.swift; sourceTree = "<group>"; };
 		F333111B6AEAF5D8C3E5C8FC /* M413KunlunCthulhuComposabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M413KunlunCthulhuComposabilityTests.swift; sourceTree = "<group>"; };
 		F33CB0C6C20E7CF800A0C050 /* BASCognitiveBrainConfigSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASCognitiveBrainConfigSnapshotTests.swift; sourceTree = "<group>"; };
@@ -3102,6 +3104,7 @@
 				9E2E0862DD5E298B341AF9DD /* BASChapter952BenchmarkRegressionFuzzTests.swift */,
 				7FE4C08E0B000BD9E59A9127 /* BASChapter952ExtremeFuzzTests.swift */,
 				9CDB7D25C000F081D01EBFD6 /* BASChapter952ProcGenSisterTests.swift */,
+				F30E3A0F521BB151990CCA67 /* BASChapter952RealMLXOnDeviceTests.swift */,
 				996B349E6555D2711A3D5B8A /* BASChapterDoctrineRegistryTests.swift */,
 				8195E3E965E925670996A3B7 /* BASChapterDoctrineSchemaCompletenessTests.swift */,
 				50AD95F7266364A12C3ED48E /* BASChatCompletionsOrganAdapterTests.swift */,
@@ -4519,6 +4522,7 @@
 				949FD6F6BF21FB0803E9820E /* BASChapter952BenchmarkRegressionFuzzTests.swift in Sources */,
 				FE853FAA1953B38E862761A1 /* BASChapter952ExtremeFuzzTests.swift in Sources */,
 				1078D4DC639284BDD52D26FB /* BASChapter952ProcGenSisterTests.swift in Sources */,
+				E315A71A7DEBE65872A53FFD /* BASChapter952RealMLXOnDeviceTests.swift in Sources */,
 				705B0613FE9DCC74A4A408F8 /* BASChapterDoctrineRegistryTests.swift in Sources */,
 				54B4E1F6969EA3AB0000F458 /* BASChapterDoctrineSchemaCompletenessTests.swift in Sources */,
 				422E9B9E24704609A9B3B299 /* BASChatCompletionsOrganAdapterTests.swift in Sources */,
