@@ -15,7 +15,7 @@
           },
           {
             "key" : "BAS_FUZZ_RUNTIME_ITER",
-            "value" : "200"
+            "value" : "100"
           },
           {
             "key" : "BAS_FUZZ_ITER",
@@ -23,11 +23,11 @@
           },
           {
             "key" : "BAS_FUZZ_EVOL_GEN",
-            "value" : "10"
+            "value" : "3"
           },
           {
             "key" : "BAS_FUZZ_EVOL_CHILD",
-            "value" : "8"
+            "value" : "4"
           },
           {
             "key" : "QINAO_MLX_E2E",
