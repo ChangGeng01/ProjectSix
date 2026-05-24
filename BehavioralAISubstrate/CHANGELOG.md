@@ -11,6 +11,72 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十 / M3455 — First real iPhone Air device test attempted:signing CLEARED + plugin blocker discovered
+
+User directive 「好了」 (Xcode GUI prereqs done). First real-device test attempt with full app target + signing.
+
+#### Progress through build pipeline
+
+| Stage | Status |
+|---|---|
+| Apple ID account (Xcode → Settings → Accounts) | ✓ user completed |
+| iPhone Air device registration in team U4ZLQM8399 | ✓ user completed via Xcode → Devices |
+| Code signing cert match | ✓ (cert: Apple Development team U4ZLQM8399) |
+| Provisioning profile auto-generation via -allowProvisioningUpdates | ✓ |
+| Info.plist for app target | ✓ |
+| Info.plist for test bundle (GENERATE_INFOPLIST_FILE: YES) | ✓ |
+| Plugin trust (defaults write IDEPackageSupportTrustedPluginValidation) | ✓ |
+| BASSQLSchemaGen plugin compiles | ✓ "Compile plug-in 'BASSQLSchemaGen' in package 'behavioralaisubstrate'" |
+| BASSQLSchemaGen applies to BASSovereign target | ✓ |
+| BASSQLSchemaGen applies to **BASMemory** target | ❌ **silently skipped** |
+| Swift compile of BASMemory | ❌ build input files not found |
+
+#### Blocker — Xcode 26.5 SwiftPM plugin invocation asymmetry
+
+The BASSQLSchemaGen build tool plugin compiles successfully AND runs for the BASSovereign target,but is silently skipped for BASMemory target on `iphoneos` platform。 BASMemory swiftc invocation then fails:
+
+```
+error: Build input files cannot be found:
+'.../BuildToolPluginIntermediates/behavioralaisubstrate.output/BASMemory/
+BASSQLSchemaGen/001_memory_usage_records.generated.swift'
+... (in target 'BASMemory' from project 'BehavioralAISubstrate')
+```
+
+**Asymmetry verification:** identical project + plugin + targets DOES work on iOS Simulator (ch 948 ran 41/42 tests successfully)。 Only `iphoneos` platform target trips the plugin invocation tracking bug。
+
+Attempted workarounds (all unsuccessful):
+- `-allowProvisioningUpdates` ✓ (different prior blocker)
+- `-skipPackagePluginValidation` ❌ (plugin still skipped)
+- `-skipMacroValidation` ❌ (different concern)
+- `defaults write com.apple.dt.Xcode IDEPackageSupportTrustedPluginValidation YES` ❌
+
+#### Recommended path forward
+
+Per chapter README's「Recommended for now」 block:**use iPhone Air iOS Simulator** (ch 948 path) which captures ~80% of device validation value without host app + plugin invocation infrastructure。 Same iOS arm64 binary,same APFS + SQLite,same NSFileManager paths。 The 20% gap (real A18 cores,real memory ceiling,real Metal hardware) was historically the source of bugs that the cascade meta couldn't see — but the ch 948 jetsam bug WAS caught despite simulator's relaxed memory limits,validating the approach。
+
+If real-device coverage becomes critical,the plugin invocation issue can be worked around by:
+1. Pre-generating SQL → .swift files via standalone tool + committing as source,gating plugin to on-demand re-run (~hours of refactoring Package.swift + Plugins/)
+2. Switching to Tuist (different plugin handling may avoid the bug)
+3. File a radar with Apple
+
+None of these are scope-appropriate for ch 950 — documented as discovered blocker for future work。
+
+#### Infrastructure shipped despite blocker
+
+The DeviceTestApp infrastructure is genuinely valuable even without immediate device-test capability:
+- xcodegen spec proven to handle the substrate's complex package structure (MLX deps,Metal toolchain,Rust XCFramework)
+- Apple Developer signing pipeline validated end-to-end (Apple ID → team → device registration → cert match → profile generation)
+- iOS host app target pattern documented for future device test work
+- ch 948 simulator path + ch 950 device infrastructure together = comprehensive iOS validation toolkit
+
+#### Verification
+
+- macOS host:no changes (existing tests still pass)
+- iOS Simulator iPhone Air (ch 948 path):41/42 still passing
+- iOS device (real iPhone Air):**blocked on Xcode 26.5 plugin bug,not on signing/infrastructure**
+- All ch 947 macOS gates still in place
+- pre-commit-gates.sh:no relevant changes
+
 ### Chapter 九百四十九 / M3450 — Xcode iOS host app target (DeviceTestApp) for real iPhone Air device testing
 
 User directive (option 2 from ch 948 follow-up):set up Xcode iOS host app target so xcodebuild test can run on real iPhone Air device。 SwiftPM-generated tests cannot host on iOS device per `Cannot test target ... on iOS device:Tool-hosted testing is unavailable on device destinations. Select a host application for the test target` blocker。

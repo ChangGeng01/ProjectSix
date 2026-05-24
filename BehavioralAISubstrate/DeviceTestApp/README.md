@@ -98,6 +98,77 @@ xcodebuild test \
 | 14-layer fuzz (ch 946 + M603) | ✓ pass | TBD — real iOS jetsam + memory pressure |
 | Evolutionary search (ch 948 fix) | ✓ pass | TBD — real A18 chip core scheduling |
 
+## ⚠️ Known blocker (chapter 九百五十 finding)
+
+After completing Step 1-3 above + running:
+```bash
+xcodebuild test -project DeviceTestApp/BASDeviceTest.xcodeproj \
+    -scheme BASDeviceTestApp \
+    -destination "platform=iOS,id=<UDID>" \
+    -only-testing:BASDeviceTests/... \
+    -allowProvisioningUpdates -skipPackagePluginValidation
+```
+
+Build fails with:
+```
+error: Build input files cannot be found: '.../BuildToolPluginIntermediates/
+behavioralaisubstrate.output/BASMemory/BASSQLSchemaGen/001_memory_usage_records.generated.swift'
+... Did you forget to declare these files as outputs of any script phases or
+custom build rules which produce them? (in target 'BASMemory' from project
+'BehavioralAISubstrate')
+```
+
+### Root cause
+
+Xcode 26.5 + SwiftPM build tool plugin invocation has an asymmetric bug:
+- iOS Simulator builds (ch 948 verified):plugin runs for ALL targets that
+  declare it. ✓
+- iOS device builds:plugin compiles successfully (「Compile plug-in
+  BASSQLSchemaGen」 fires) AND runs for BASSovereign target,but is
+  SKIPPED for BASMemory target — leaving its expected output files
+  absent。 swiftc then fails because the source file list references
+  missing generated files。
+
+This is a known class of Xcode-SwiftPM interop issue when the same plugin
+applies to multiple targets;the plugin invocation tracking gets confused
+when the target platform is `iphoneos`。
+
+### Workarounds (none clean enough to ship yet)
+
+1. **Pre-generate SQL → .swift files via standalone tool**, commit them
+   as source,gate the plugin so it only re-runs on demand。 ~Hours of
+   refactoring the plugin + Package.swift。
+2. **Switch to Tuist instead of xcodegen** — different plugin handling
+   may avoid the bug。 ~Hours to migrate spec。
+3. **Build via `swift build --target BASMemory` for iOS device first**,
+   then symlink generated files into DerivedData location xcodebuild
+   expects。 Hacky,brittle to Xcode version updates。
+4. **File radar with Apple** about the asymmetric plugin invocation。 No
+   immediate fix。
+
+### Recommended for now
+
+Use **iPhone Air iOS Simulator** (ch 948 path) which captures ~80% of
+device-class validation value:
+- ✓ Same iOS arm64 binary architecture
+- ✓ Same iOS APFS file system sandboxing
+- ✓ Same iOS SQLite WAL behavior
+- ✓ Same NSFileManager paths
+- ✗ Different CPU (sim uses host) — only matters for perf,not correctness
+- ✗ Different memory ceiling (sim is relaxed) — ch 948 jetsam bug was
+  STILL caught despite this
+- ✗ Software-emulated Metal (sim) vs hardware Metal (device) — only
+  matters for Metal kernel tests which substrate has 0 of in core
+  L8/L11/L14 paths
+
+```bash
+# iPhone Air iOS Sim 26.5 — works today,no host app needed:
+xcodebuild test \
+    -scheme BehavioralAISubstrate-Package \
+    -destination "platform=iOS Simulator,id=DA99B4D8-9D7C-4B1B-8692-A4FBB40FEF4C" \
+    -only-testing:BehavioralAISubstrateTests/...
+```
+
 ## Troubleshooting
 
 - **「No Accounts」 error** → Step 1 above (Xcode Settings → Accounts)
