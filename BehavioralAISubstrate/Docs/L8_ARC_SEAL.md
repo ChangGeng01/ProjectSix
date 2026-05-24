@@ -394,25 +394,53 @@ NEW canonical home for the disciplines that have accreted across the 12 review-p
 
 ### Future consolidation opportunities
 
-The hot-path consolidation pattern is now PROVEN across ALL
-4 major stores (chapters 906/909/911/913) with measured wins
-3.75-134.50×。 Remaining candidates for future chapters:
+The hot-path consolidation pattern is PROVEN across ALL 4
+major stores (chapters 906/909/911/913) with measured wins
+3.75-134.50×。 Status of remaining candidates as of ch 940:
+
+**SHIPPED:**
 - ~~`memory_usage_records.recent_for_atom_id`~~ **SHIPPED ch 911**
 - ~~`host_constitution_vault.all_metadata`~~ **SHIPPED ch 913**
-- `atom_lifecycle.transitions_for_atom_window` (lifecycle
-  audit query — likely 15-50× win at production session sizes)
-- `user_state.latest_states_for_session` (similar shape to
-  event_log,likely 17-100× win)
-- `version_tree.recent_versions_for_vault` (boot-time scan,
-  likely 5-30× win)
 
-Each follows the now-proven chapter 906/909/911/913 recipe:
+**chapter 九百四十 / M3405 audit:**
+
+Per the 884 + 890 + 891 DECLINE-WITH-TRIGGER doctrine + the
+「亏的不要硬上」 user directive,we GREP'd `Sources/` for actual
+consumers of the 3 remaining speculative candidates。 Result:
+**2 of 3 have NO consumer** — shipping consolidation primitives
+without consumer pressure is busy-work that adds maintenance
+surface without measured win。
+
+| Candidate | Consumer found? | Status |
+|---|---|---|
+| `atom_lifecycle.transitions_for_atom_window` (windowed query — would need new protocol method `transitions(forAtom:since:until:)`) | NO existing caller — current protocol doesn't have windowed variant + grep on `Sources/` finds zero call sites for such pattern | **DECLINE-PENDING-CONSUMER** (per ch 884 doctrine) — trigger condition: any consumer adds windowed-replay need |
+| `user_state.latest_states_for_session` (plural — would need new method `latestStates(forSession:limit:)`) | NO existing caller — protocol has only singular `latestState(forSession:)` shipped ch 936 | **DECLINE-PENDING-CONSUMER** — trigger:any consumer needs N-recent-states without per-call FFI |
+| `version_tree.recent_versions_for_vault` (windowed — would need new method `recentVersions(forVault:limit:)`) | NO existing caller — protocol has unbounded `versions(forVault:)` shipped ch 937 which serves current callers fine | **DECLINE-PENDING-CONSUMER** — trigger:vault grows to N > 1000 versions where unbounded scan becomes slow |
+
+**NEW candidate discovered in ch 940 audit:**
+
+| Candidate | Consumer found | Status |
+|---|---|---|
+| `user_state.states_for_ids` (BATCHED — accepts `[String]` ids,returns `[String: BASUserState]`) | YES — `Sources/BASHostKit/BASTrainingDataExporter.swift:715,724` loops `state(forID:)` per event (stateBeforeID + stateAfterID),total 2N FFI calls per training export。 At 10K-event exports this is 20K FFI hops ≈ 2 seconds added latency vs estimated 1 batched call。 | **REGISTERED-CANDIDATE-PENDING-MEASUREMENT** (next consumer-driven chapter ships if measured win ≥ 3×) |
+
+Each future shipped candidate follows the proven chapter
+906/909/911/913 recipe:
 1. Add `<stuff>_integrated` Rust fn
 2. Add FFI variant with caller-allocated output buffers
 3. Add Swift bridge wrapper
 4. Bench vs orchestrated baseline (expect win per pattern)
 5. Flip-or-decline based on data (every measurement so far
    has WON,but discipline still requires per-chapter bench)
+
+**Discipline meta-finding (ch 940):** The original「likely
+15-50× / 17-100× / 5-30×」 win estimates in this section were
+SPECULATIVE — produced by extrapolating from ch 906/909/911/913
+patterns without checking whether any actual consumer would
+exercise the new primitive。 Per 9-pass review discipline + ch
+927 fail-on-revert + ch 884 consumer-pressure trigger,a
+primitive with no consumer cannot be measured for revert-detect
+because nothing exercises it。 Updated status above reflects
+honest assessment。
 
 ## Trigger conditions for future re-evaluation
 

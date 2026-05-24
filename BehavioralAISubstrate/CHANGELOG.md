@@ -11,6 +11,51 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十 / M3405 — DECLINE-PENDING-CONSUMER for 3 hot-path candidates + register exporter pattern
+
+User directive:全面 开发 → broad sweep。 But「broad」 must be honest:per 「亏的不要硬上」 + ch 884 DECLINE-PENDING-CONSUMER discipline,we DON'T blindly ship speculative consolidations。
+
+#### Audit performed
+
+`grep -rn` on `Sources/` for actual consumers of the 3 speculative candidates from SEAL「Future consolidation opportunities」 section。 Result:**2 of 3 have NO consumer**。
+
+#### Decisions
+
+| Candidate | Consumer? | Decision |
+|---|---|---|
+| `atom_lifecycle.transitions_for_atom_window` | NO (protocol doesn't have windowed variant) | **DECLINE-PENDING-CONSUMER** |
+| `user_state.latest_states_for_session` (plural) | NO (only singular shipped) | **DECLINE-PENDING-CONSUMER** |
+| `version_tree.recent_versions_for_vault` | NO (unbounded scan serves callers fine) | **DECLINE-PENDING-CONSUMER** |
+| `user_state.states_for_ids` (BATCHED) | **YES** — `BASTrainingDataExporter.swift:715,724` loops `state(forID:)` per event (2N FFI calls per export) | **REGISTERED-CANDIDATE-PENDING-MEASUREMENT** |
+
+#### What shipped (doc-only chapter)
+
+- `Docs/L8_ARC_SEAL.md` 「Future consolidation opportunities」 section restructured:
+  - 3 SPECULATIVE candidates → DECLINE-PENDING-CONSUMER with explicit trigger conditions
+  - 1 NEW REGISTERED candidate (states_for_ids) with measured baseline (~20K FFI calls per 10K-event export ≈ 2s added latency vs 1 batched call)
+- Discipline meta-finding documented:the original「likely 15-50× / 17-100× / 5-30×」 win estimates were SPECULATIVE — produced by extrapolating from 906/909/911/913 patterns WITHOUT checking actual consumer would exercise the primitive
+
+#### Discipline conformance
+
+This is consistent with:
+- chapter 884 Gap 1 DECLINE pattern (consumer-pressure trigger)
+- chapter 891 / `Docs/DECLINE_PATTERNS.md` doctrine
+- ch 927 fail-on-revert (a primitive with no consumer cannot have its revert detected because nothing exercises it)
+- user instruction「亏的不要硬上」 (don't ship things without measured justification)
+
+The disciplined response to「全面 开发」 is:audit → ship what has consumers,decline what doesn't,register baselines so future consumer pressure quickly validates。 NOT「ship 3 speculative chapters」。
+
+#### Verification
+
+- Rust:**92/92 unit tests pass** (no code change)
+- Swift filtered:no change
+- Swift full sweep:**13614 tests,87 skipped,0 failures**
+- pre-commit-gates.sh:**3/3 pass**
+
+#### Up next
+
+- ch 941:13th-pass review of substance chapters 934-938 + arc seal (if review clean)
+
 ### Chapter 九百三十九 / M3400 — cleanup batch:6 deferred MED items from SEAL registry in one chapter
 
 User directive:全面 开发 → comprehensive sweep of deferred items。 Chapter 939 closes 6 carryover/bounded-risk MED items from the SEAL「Deferred items (registry for future chapters)」 section that have been accumulating since 6P。
