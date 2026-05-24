@@ -11,6 +11,69 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十二 / M3365 — 12th-pass caught 7th fabrication recurrence + 3rd rusqlite-default coincidence (2C + 5H + 3M)
+
+User directive:继续 check → 12th-pass foreground 3-agent review of
+ch 931。 Test review came back CLEAN (0C+0H)。 Code+Doc found:
+- **7th fabrication recurrence** — ch 931 claimed「SEAL global grep -c update」 but missed SEAL line 433 (still「9 review passes」) + line 473 (still「all 36 chapters」) + line 464 (still「passes 7/8/9」)
+- **3rd rusqlite-default coincidence** — `foreign_keys = "ON"` pragma_update is NO-OP because rusqlite-bundled SQLite 3.46 sets `SQLITE_DEFAULT_FOREIGN_KEYS=1`。 Currently no test asserts this so not active fake-coverage,but pragma_update is a no-op coincidence
+- **10P-HIGH-1..8 STILL compressed** in registry,despite ch 931 commit explicitly saying it was fixed
+
+#### CRITICAL fixes (2)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | SEAL line 433「9 review passes」 stale within sub-arc paragraph | Updated → 11 review passes (verified via grep -n AFTER edit) |
+| 2 | SEAL line 473「all 36 chapters」 stale within Authoritative state block (内部矛盾 with line 467「38 chapters」) | Updated → 38 chapters |
+
+#### HIGH fixes (5)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | foreign_keys=ON is 3rd rusqlite-default coincidence — pragma_update no-op since SQLITE_DEFAULT_FOREIGN_KEYS=1 in bundled SQLite | Added post-pragma read-back guard (matching ch 923 NH7 journal_mode pattern) — surfaces silent regression if libsqlite3-sys version flips default |
+| 2 | 10P-HIGH-1..8 STILL compressed as 1 row despite ch 931 claim of「registry expanded per ch 918 pattern」 | EXPANDED to 8 individual rows + 10P-LOW-1..4 expanded to 4 rows |
+| 3 | No 11P registry subsection at all despite ch 931 same claim | ADDED「Chapter 九百三十.5 11th-pass」 subsection with per-finding rows |
+| 4 | SEAL line 464「passes 7/8/9」 stale enumeration (actual passes 7-11 caught fabrication) | Updated → 7/8/9/10/11 |
+| 5 | Stale roll-up「67 Rust / ABI 1→17」 in CHANGELOG historical paragraph | DEFERRED — historical context |
+
+#### MED fixes (1 shipped + 2 deferred)
+
+| # | Issue | Status |
+|---|---|---|
+| 1 | Accreted disciplines scattered across narratives — no canonical home | SHIPPED ch 932:added「Review-pass discipline registry」 section in SEAL listing ALL disciplines (python3 / grep / awk / empirical revert / rusqlite-default / misnamed-test / SEAL-global / verify-AFTER-edit) |
+| 2 | Renamed-test docstring lacks audit trail | DEFERRED (CHANGELOG rationale covers it) |
+| 3 | busy_timeout=4500 duplicate sites not extracted to const | DEFERRED (cosmetic refactor) |
+
+#### NEW discipline introduced (added to registry)
+
+**Verify-AFTER-edit** — `grep` the file POST-edit to confirm change actually applied。 Ch 931 introduced「verify before writing」 but didn't verify AFTER editing → 7th recurrence。 New rule:every「fix shipped」 claim requires post-edit grep confirmation showing 0 stale instances。
+
+#### 12th-pass meta-finding
+
+Discipline registry was scattered across 4 narratives (BRANCH_SUMMARY giant paragraph + 4 CHANGELOG ch 929-932 entries)。 Future N-pass agents had to RE-DERIVE the discipline list by reading multiple paragraphs。 This GUARANTEES a future pass misses applying one。 SEAL「Review-pass discipline registry」 subsection now makes the list canonical + actionable。
+
+#### Pattern at 12 passes
+
+| Pass | C | H | new defect class |
+|---|---|---|---|
+| 8 | 0 | 2 | (cascade-break tested) |
+| 9 | 1 | 2 | python3-discipline introduced |
+| 10 | 2 | 8 | grep+awk+revert disciplines introduced |
+| 11 | 6 | 8 | **rusqlite-default class A + misnamed class B** |
+| **12** | **2** | **5** | **verify-after-edit + canonical registry** |
+
+CRITICAL count finally DECREASING (6→2)。 H count also down (8→5)。 First time since pass 8 we see real downward trajectory。 But still NOT at 0C/≤2H stop threshold — pass 13 needed。
+
+#### Verification
+
+- Rust:78/78 unit tests pass (foreign_keys read-back validated)
+- Swift filtered:BASChapter926 → 15/15 pass
+- Swift full sweep:**13591 tests,86 skipped,0 failures**
+- pre-commit-gates.sh:**3/3 pass**
+- Arithmetic:`python3 -c "passes=[(2,8),(2,10),(5,15),(5,8),(1,5),
+  (4,8),(2,5),(0,2),(1,2),(2,8),(6,8),(2,5)]; print(...)"` → 32C + 84H ✓
+- Post-edit grep confirmed:0 stale「9 review passes」「all 36 chapters」「passes 7/8/9」 as authoritative claims
+
 ### Chapter 九百三十一 / M3360 — 11th-pass caught 6 CRITICAL + 8 HIGH + 2 NEW fake-coverage classes
 
 User directive: 继续 check → 11th-pass foreground 3-agent review of

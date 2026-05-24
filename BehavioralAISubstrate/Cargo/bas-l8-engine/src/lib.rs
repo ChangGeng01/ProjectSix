@@ -177,7 +177,27 @@ impl L8Engine {
         let conn = Connection::open(&path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
+        // chapter 九百三十二 / M3365 fix HIGH-1 — foreign_keys
+        // is a 3rd-instance rusqlite-default coincidence (the
+        // bundled SQLite 3.46 is compiled with `SQLITE_DEFAULT_
+        // FOREIGN_KEYS=1`,so this pragma_update is a no-op on
+        // the current build)。 Pragma_update kept for explicit
+        // intent + as a guard against future libsqlite3-sys
+        // version bumps flipping the compile-time default。
+        // Post-pragma read-back hardening matches journal_mode
+        // verification pattern (NH7 / ch 923) — surface silent
+        // regression instead of relying on default coincidence。
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        let fk_on: i64 = conn.query_row(
+            "PRAGMA foreign_keys", [], |row| row.get(0))?;
+        if fk_on != 1 {
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(
+                    rusqlite::ffi::SQLITE_ERROR),
+                Some(format!(
+                    "expected foreign_keys=1 after PRAGMA, \
+                     got {}", fk_on))));
+        }
         // chapter 九百二十 / M3305 MED-17 fix:set
         // wal_autocheckpoint to 1024 pages (~4 MB at 4KB
         // pages) — long-running sessions don't accumulate
@@ -253,7 +273,22 @@ impl L8Engine {
     fn open_in_memory() -> Result<Self, rusqlite::Error> {
         let conn = Connection::open_in_memory()?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
+        // chapter 九百三十二 / M3365 fix HIGH-1 — same
+        // foreign_keys post-pragma read-back as open() to
+        // surface silent regression on libsqlite3-sys default
+        // flips。 See open() comment for 3rd-rusqlite-default
+        // coincidence rationale。
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        let fk_on: i64 = conn.query_row(
+            "PRAGMA foreign_keys", [], |row| row.get(0))?;
+        if fk_on != 1 {
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(
+                    rusqlite::ffi::SQLITE_ERROR),
+                Some(format!(
+                    "expected foreign_keys=1 after PRAGMA, \
+                     got {}", fk_on))));
+        }
         // chapter 九百二十二 fix NC2:busy_timeout for
         // consistency with disk-backed engine (in-memory
         // can still see contention between threads)。

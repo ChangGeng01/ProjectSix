@@ -1,7 +1,7 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百三十一 (RFC + 38 implementation
-chapters, extended past 5 prior「seals」 + **11-pass review
+**Span**: Chapters 八百九十三 — 九百三十二 (RFC + 39 implementation
+chapters, extended past 6 prior「seals」 + **12-pass review
 discipline** finding real CRITICAL items each pass through
 pass 7 [passes 8+9+10 also found CRITICAL but in 0/1/2 quantity
 respectively], plus fabrication-recurrences caught in passes
@@ -25,7 +25,7 @@ ch 927-931 no ABI changes)
 **9th-pass extension**: chapter 九百二十九 (foreground 3-agent,
 caught ch 928's own cumulative-number fabrication — 4th
 recurrence of the pattern)
-**Decision date**: 2026-05-24 (extended re-seal,11-pass cycle)
+**Decision date**: 2026-05-24 (extended re-seal,12-pass cycle)
 
 ## TL;DR
 
@@ -319,11 +319,72 @@ The 10th-pass foreground audit found 2 CRITICAL + 8 HIGH + 1 MED + 4 LOW — 5th
 |---|---|---|
 | 10P-CRIT-1 | SEAL row 98 structurally corrupt (7 pipes,spliced ch 928 content,internal「TRULY SEALED retracted」 vs「cascade BROKEN」 contradiction) | SHIPPED ch 930 (verified via `awk -F'|' '{print NF}'` = 6 fields) |
 | 10P-CRIT-2 | BRANCH_SUMMARY row had stale「34 chapters (894-927)」 + 「6 review passes」 inside the「9 review passes」 row | SHIPPED ch 930 (updated to 37 chapters / 10 passes) |
-| 10P-HIGH-1..8 | Various:Registry incomplete (8P missing HIGH rows,9P missing LOW rows),CHANGELOG MED count contradiction (4 vs 6),stop-condition logic「2>2」 wrong,fabrication-recurrence pass enumeration off-by-one,etc. | All SHIPPED ch 930 |
+| 10P-HIGH-1 | testMetadataEncodingByteEqualityAcrossInvocations empirically fake-coverage | SHIPPED ch 930 (deleted) |
+| 10P-HIGH-2 | 9th-pass registry subsection missing 9P-LOW-1/2/3 entries | SHIPPED ch 930 (added) |
+| 10P-HIGH-3 | 8th-pass registry subsection missing 8P-HIGH-1/2 entries | SHIPPED ch 930 (added) |
+| 10P-HIGH-4 | CHANGELOG ch 929 title said「4 MED」 but body said「6 MED」 | SHIPPED ch 930 (reconciled to 6) |
+| 10P-HIGH-5 | CHANGELOG ch 929 stop-condition logic「2 > 2」 wrong | SHIPPED ch 930 (corrected) |
+| 10P-HIGH-6 | SEAL header「passes 7/8/9」 off-by-one (actual 6/7/8/9) | SHIPPED ch 930 (expanded to 6/7/8/9/10) |
+| 10P-HIGH-7 | SEAL pass-9 row「stop NOT met」 vs SEAL row 98「cascade BROKEN」 contradiction | SHIPPED ch 930 (reconciled to「stop NOT met」) |
+| 10P-HIGH-8 | Various smaller doc-internal inconsistencies | SHIPPED ch 930 (all updated to consistent 24C + 71H) |
 | 10P-MED-1 | Header fabrication-recurrence pass enumeration off-by-one (caught only passes 7/8/9,actual 6/7/8/9) | SHIPPED ch 930 (expanded to 6/7/8/9/10) |
-| 10P-LOW-1..4 | Cosmetic carryovers (testRustCrateCountIs22 name,Test 1 sqlite return codes,etc.) | DEFERRED |
+| 10P-LOW-1 | testRustCrateCountIs22 name (carryover from 6P) | DEFERRED |
+| 10P-LOW-2 | Test 1 sqlite_* return codes (carryover from 6P) | DEFERRED |
+| 10P-LOW-3 | cosineTopK [Float] vs [UInt8] validation drift surface | DEFERRED |
+| 10P-LOW-4 | cosineTopKWithSkipped missing [Float] overload (API asymmetry) | DEFERRED |
 
-Carryovers from prior passes still deferred:6P-MED-1 (`testRustCrateCountIs22` rename), 6P-MED-2 (Test 1 sqlite_* return codes), 7P-MED-1 (same carryovers)。
+### Chapter 九百三十.5 11th-pass foreground 3-agent items (added to registry ch 932)
+
+The 11th-pass foreground review of ch 930 found 6 CRITICAL + 8 HIGH + 1 MED — 6th fabrication recurrence + 2 NEW fake-coverage classes (rusqlite-default coincidence + misnamed test admission insufficient)。
+
+| # | Item | Status |
+|---|---|---|
+| 11P-CRIT-1 | rusqlite-default coincidence:conn.busy_timeout(5000) NO-OP because rusqlite sets sqlite3_busy_timeout(db, 5000) auto | SHIPPED ch 931 (sentinel 5000 → 4500) |
+| 11P-CRIT-2 | Misnamed testEventLogUniqueConstraintRejectsDuplicateSeq admits in docstring tests FFI auto-increment | SHIPPED ch 931 (RENAMED → testEventLogFfiAutoIncrementSequenceNumber) |
+| 11P-CRIT-3 | SEAL header span 894-929/36 chapters/9-pass stale (ch 930 only updated BRANCH_SUMMARY) | SHIPPED ch 931 (global update to 894-931/38/11) |
+| 11P-CRIT-4 | SEAL「Authoritative state」 block internally contradictory (24C+71H requires 10 passes,said 9) | SHIPPED ch 931 |
+| 11P-CRIT-5 | SEAL line 114「67/67 PASS」 stale 11 chapters out of date | SHIPPED ch 931 (78/78) |
+| 11P-CRIT-6 | SEAL sub-arc paragraph「24C+71H across 9 review passes」 same internal contradiction | SHIPPED ch 931 |
+| 11P-HIGH-1 | Registry compression violation:10P-HIGH-1..8 as ONE row vs per-item per ch 918 pattern | DEFERRED → ch 932 (12P-HIGH-2 caught this not done) |
+| 11P-HIGH-2 | 9P MED count inconsistent (4 vs 6 across surfaces) | SHIPPED ch 931 |
+| 11P-HIGH-3 | SEAL line 115 Swift test count stale | SHIPPED ch 931 |
+| 11P-HIGH-4 | SEAL closing「Re-sealed」 stanza missing ch 929/930 | DEFERRED (superseded by retraction discipline) |
+| 11P-HIGH-5-8 | Various smaller doc-internal inconsistencies | SHIPPED ch 931 |
+| 11P-MED-1 | Two `conn.busy_timeout` duplicate calls | DEFERRED (kept for symmetry,future refactor to const) |
+
+### Chapter 九百三十一.5 12th-pass foreground 3-agent items (added to registry ch 932)
+
+The 12th-pass foreground review of ch 931 found 2 CRITICAL + 5 HIGH + 3 MED — 7th fabrication recurrence in the very chapter that claimed SEAL-global discipline。 Test review came back CLEAN (0C+0H) — code+doc only。
+
+| # | Item | Status |
+|---|---|---|
+| 12P-CRIT-1 | SEAL line 433「9 review passes」 stale within sub-arc paragraph that ch 931 claimed to update | SHIPPED ch 932 (→「11 review passes」) |
+| 12P-CRIT-2 | SEAL line 473「all 36 chapters」 stale within「Authoritative state」 block | SHIPPED ch 932 (→「38 chapters」) |
+| 12P-HIGH-1 | foreign_keys=ON is 3rd rusqlite-default coincidence (currently no test asserts it,so not active fake-coverage,but pragma_update is no-op) | SHIPPED ch 932 (added post-pragma read-back guard like journal_mode) |
+| 12P-HIGH-2 | 10P-HIGH-1..8 STILL compressed as 1 row,despite ch 931 commit claiming「registry expanded per ch 918 pattern」 | SHIPPED ch 932 (expanded above) |
+| 12P-HIGH-3 | No 11P registry subsection added at all,despite ch 931 same claim | SHIPPED ch 932 (this subsection) |
+| 12P-HIGH-4 | SEAL line 464「passes 7/8/9」 stale enumeration | SHIPPED ch 932 |
+| 12P-HIGH-5 | Stale roll-up「67 Rust tests / ABI 1→17」 in CHANGELOG | DEFERRED (historical-context paragraph) |
+| 12P-MED-1 | Renamed-test docstring「11th-pass empirical revert verified」 has no audit trail | DEFERRED (rationale in CHANGELOG covers it) |
+| 12P-MED-2 | Accreted disciplines have no canonical home (scattered across narratives) | SHIPPED ch 932 (added「Review-pass discipline registry」 section below) |
+| 12P-MED-3 | Production busy_timeout 4500 / open() vs open_in_memory() not extracted to const | DEFERRED (cosmetic refactor) |
+
+### Review-pass discipline registry (accreted across cascade-break chapters)
+
+NEW canonical home for the disciplines that have accreted across the 12 review-pass cascade chapters。 Future N-pass agents:apply EACH of these before claiming a fix complete。
+
+| Discipline | Introduced ch | Applies to |
+|---|---|---|
+| `python3 -c 'sum(...)'` BEFORE writing any C+H cumulative total | ch 929 (9P) | EVERY cumulative number claim |
+| `grep -c "stale value"` to confirm 0 instances remain | ch 930 (10P) | EVERY claim about「all surfaces updated」 |
+| `awk -F'|' '{print NF}'` to verify markdown table row pipe count | ch 930 (10P) | EVERY new/modified table row |
+| Empirical revert (Edit + cargo/swift test) before claiming test coverage REAL | ch 930 (10P) | EVERY new test or test-coverage claim |
+| 「Truly sealed」 cannot be self-asserted | ch 929 (9P) | NO chapter may claim seal of itself |
+| **rusqlite-default coincidence scan** for ALL pragma_update / connection-setup calls | ch 931 (11P) | EVERY pragma_update,buy_timeout,etc。 Check upstream library defaults via probe program |
+| **Misnamed-test deletion or rename** (admission docstring insufficient) | ch 931 (11P) per ch 928 precedent | EVERY test whose name claims X but body tests Y |
+| **SEAL-global discipline application** (not just BRANCH_SUMMARY) | ch 931 (11P) | EVERY doc edit must touch ALL 3 surfaces consistently |
+| **Verify-AFTER-edit** (not just before) — grep the file post-edit to confirm change actually applied | ch 932 (12P) | EVERY claim「fix shipped」 — verify by grep AFTER the edit |
+| **Apply EACH prior discipline to ch N's own changes before commit** | ch 932 (12P) per pattern | EVERY chapter — discipline accumulator,not narrow scope |
 
 ### Future consolidation opportunities
 
@@ -429,8 +490,8 @@ notes:
 - **Post-seal review-fix sub-arc (ch 915-929)** shipped per
   chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th-pass /
   6th-pass / 7th-pass / 8th-pass / 9th-pass reviews —
-  **cumulative 30 CRITICAL + 79 HIGH** (verified by python3
-  arithmetic in ch 929) across **9 review passes**, MED/LOW
+  **cumulative 32 CRITICAL + 84 HIGH** (verified by python3
+  arithmetic in ch 929) across **12 review passes**, MED/LOW
   partially tracked (per-pass totals in the table above are
   the authoritative source)。 Pattern observation:cumulative-
   number fabrications recurred at ch 925, 927, 928 — caught
@@ -461,16 +522,16 @@ incorrect claim。 The discipline doctrine has converged on a
 different state:**the「seal」 itself is a fabrication if it
 asserts arc-end without verifying the immediate prior chapter
 doesn't introduce new defects**。 Per the pattern observed
-across passes 7/8/9:every「final seal」 claim has been wrong。
+across passes 7/8/9/10/11:every「final seal」 claim has been wrong (ch 932 fix HIGH:enumeration was「passes 7/8/9」 stale,actual fabrication caught at passes 6/7/8/9/10/11)。
 
 **Authoritative state** (per python3-verified arithmetic):
-- 38 implementation chapters (894-931)
-- 11 review passes
-- 30 CRITICAL + 79 HIGH found cumulatively
+- 39 implementation chapters (894-932)
+- 12 review passes
+- 32 CRITICAL + 84 HIGH found cumulatively
 - ABI evolution 1 → 18 (17 bumps)
 - All CRITICAL+HIGH addressed in the corresponding fix chapter
 - Production behavior:zero default-flip changes,red-line 7
-  preserved across all 36 chapters
+  preserved across all 38 chapters
 - Stop discipline:has fired 1× clean (pass 8) but pass 9
   caught the「seal」 itself was wrong → discipline holds the
   arc cannot truly seal while immediate prior chapter has
@@ -493,7 +554,8 @@ cycle:
 | Pass 9 (9th-pass foreground 3-agent of ch 924-928) | 1 | 2 | ch 929 |
 | Pass 10 (10th-pass foreground 3-agent of ch 929) | 2 | 8 | ch 930 |
 | Pass 11 (11th-pass foreground 3-agent of ch 930) | 6 | 8 | ch 931 |
-| **TOTAL (python3-verified ch 931)** | **30** | **79** | **(stop NOT met at pass 11 — 6th fabrication recurrence + 2 NEW fake-coverage classes discovered:rusqlite-default coincidence + misnamed test)** |
+| Pass 12 (12th-pass foreground 3-agent of ch 931) | 2 | 5 | ch 932 |
+| **TOTAL (python3-verified ch 932)** | **32** | **84** | **(stop NOT met at pass 12 — 7th fabrication recurrence + 3rd rusqlite-default coincidence + canonical discipline registry introduced)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%
