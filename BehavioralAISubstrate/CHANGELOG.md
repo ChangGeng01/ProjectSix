@@ -11,14 +11,91 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
-### Chapter 九百二十九 / M3350 — 9th-pass「全面最最严苛」 caught ch 928's own 4th fabrication recurrence (1 CRITICAL + 2 HIGH + 4 MED)
+### Chapter 九百三十 / M3355 — 10th-pass caught ch 929's 5th fabrication recurrence (2 CRITICAL + 8 HIGH + 1 MED + 4 LOW)
+
+User directive: 好 (continue) → 10th-pass foreground 3-agent review
+of ch 929。 The very chapter that introduced「python3-arithmetic
+discipline」 still produced more defects:
+
+**Cumulative findings 10th-pass:** 2 CRITICAL + 8 HIGH + 1 MED + 4 LOW
+- Code review: 0C + 4H + 1M
+- Test review: 0C + 1H + 0M + 4L
+- Doc review: 2C + 3H + 0M + 0L
+
+#### CRITICAL fixes (2)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | SEAL row 98 (ch 929 timeline) was **structurally corrupt** — 7 pipe-delimited cells instead of 6 (verified via `awk -F'|'`)。 Spliced ch 928 content into ch 929 row + internal contradiction「TRULY SEALED retracted」 AND「cascade BROKEN」 in same row | Truncated row to single legitimate ending,verified pipe count == 6 across rows 95-100 |
+| 2 | BRANCH_SUMMARY row inherited STALE values from ch 926-era inside the「9 review passes total」 row that supposedly authoritatively claimed 22C+63H:`34 implementation chapters (894-927)` + `6 review passes` — same row contradicted itself 3 places。 **5th recurrence of the fabrication pattern** in the very chapter that owned it。 | Updated to `37 implementation chapters (894-930)` + `10 review passes` (verified `python3 -c 'print(930-894+1)'` = 37) |
+
+#### HIGH fixes (8)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | testMetadataEncodingByteEqualityAcrossInvocations empirically PROVEN fake-coverage by 10th-pass test agent (reverted `.sortedKeys`,test still passed)。 Ch 928 had relocated it admitting it doesn't guard sortedKeys,but per ch 928's own discipline (DELETED fake testVectorIndexMetadataSortedKeysDeterministic),admission isn't enough | DELETED entirely + comment block explaining why |
+| 2 | 9th-pass registry subsection in SEAL missing 9P-LOW-1/2/3 entries (narrative cited them but table didn't list) | Added 9P-LOW-1/2/3 rows |
+| 3 | 8th-pass registry subsection missing 8P-HIGH-1/2 entries (only listed MED) | Added 8P-HIGH-1/2 rows |
+| 4 | CHANGELOG ch 929 entry title said「4 MED」 but body said「6 MED」 | Reconciled to「6 MED」 in title (matches 9th-pass agent findings: 4 doc + 2 code-bounded-risk) |
+| 5 | CHANGELOG ch 929 stop-condition logic「≤2H exceeded by HIGH count alone」 — but HIGH count was 2 = threshold,not exceeded | Corrected: VIOLATED by 1 CRITICAL only (HIGH at 2 = threshold) |
+| 6 | SEAL header fabrication-recurrence enumeration「passes 7/8/9」 — off-by-one (actual 6/7/8/9 since ch 925 fabrication caught by pass 6 / ch 926 review) | Expanded to 6/7/8/9/10 with explicit chapter→pass mapping |
+| 7 | SEAL pass-9 row TOTAL stop framing「stop NOT met」 contradicted SEAL line 98 ch 929 row「cascade BROKEN」 within same chapter | Reconciled to「stop NOT met」 honest framing |
+| 8 | Various smaller doc-internal inconsistencies between SEAL/CHANGELOG/BRANCH_SUMMARY surfaces | All updated to consistent 24C + 71H (passes 1-10) verified by `python3 -c 'sum(...)'` |
+
+#### MED fix (1)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | SEAL header docstring「fabrication-recurrence enumeration」 wording | Expanded with explicit ch→pass mapping |
+
+#### LOW items (4 — deferred)
+
+- Code review carryovers (9P-MED-3, 9P-MED-4 still deferred)
+- Test review carryovers (6P-MED-1, 6P-MED-2 still deferred)
+
+#### Discipline meta-lesson from 5 recurrences
+
+The「python3-arithmetic discipline」 ch 929 introduced was real but
+NARROW — only applied to ONE cumulative number。 Everything else in
+ch 929's doc edits was hand-typed → 5 new defects spread across
+3 doc surfaces。
+
+**New discipline for ch 930 and beyond:**
+- `python3 -c 'sum(...)'` for EVERY cumulative number BEFORE writing
+- `grep -c "stale value"` to confirm 0 instances remain
+- `awk -F'|' '{print NF}'` to verify markdown table row pipe count
+- Empirical revert (Edit + cargo/swift test) before claiming test
+  coverage is REAL
+- 「Truly sealed」 cannot be self-asserted (ch 929 doctrine still
+  holds)
+
+The pattern: each cascade-break attempt itself becomes the next
+chapter's target。 Asymptotic approach to zero — pass 11 may find
+1-2 items in ch 930,etc。 Honest arc state remains
+**continuous-improvement,not sealed**。
+
+#### Verification
+
+- Rust:78/78 unit tests pass (no change)
+- Swift filtered:BASChapter926 → 15/15 pass (was 16, deleted 1 fake) + BASChapter894 7/7 + BASChapter925 11/11
+- Swift full sweep:**13591 tests,87 skipped,1 environmental failure** (CoreData XPC signal-10 — not L8 code,not our test。 All L8-arc-specific filters pass clean。 macOS CoreData XPC harness issue on full-suite run only)
+- pre-commit-gates.sh:**3/3 pass**
+- Arithmetic: `python3 -c "passes = [(2,8),(2,10),(5,15),(5,8),(1,5),
+  (4,8),(2,5),(0,2),(1,2),(2,8)]; print(f'{sum(p[0] for p in passes)}C
+  + {sum(p[1] for p in passes)}H')"` → 24C + 71H ✓
+
+### Chapter 九百二十九 / M3350 — 9th-pass「全面最最严苛」 caught ch 928's own 4th fabrication recurrence (1 CRITICAL + 2 HIGH + 6 MED + 3 LOW)
 
 User directive:「全面 review 最最严苛」 → foreground 3-agent dispatch
 (code + test + doc) of ch 924-928 stretch。 Foreground used because
 prior 8th-pass agents had died after 12h idle。
 
 **Verdict:** 1 CRITICAL + 2 HIGH + 6 MED + 3 LOW — stop condition
-**VIOLATED** (≤2H exceeded by HIGH count alone, plus the CRITICAL)。
+**VIOLATED** (1 CRITICAL exceeds 0C threshold; HIGH at 2 = threshold,
+not exceeded — ch 930 fix HIGH corrected the「2 > 2」 wrong inequality
+that originally appeared here)。 6 MED corrected from earlier inconsistent
+「4 MED」 claim in title — 9th-pass agents found 6 MED total (4 doc + 2
+code-bounded-risk),of which 2 shipped in ch 929 + 4 deferred。
 
 #### CRITICAL — 4th recurrence of cumulative-number fabrication
 

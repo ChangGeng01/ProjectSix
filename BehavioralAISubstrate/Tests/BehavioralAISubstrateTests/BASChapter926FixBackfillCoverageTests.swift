@@ -759,35 +759,26 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
             "processes) and the ch 922 NC3 fix has regressed")
     }
 
-    // MARK: - encodeMetadata in-process stability (NOT sortedKeys)
-
-    /// chapter 九百二十八 / M3345 fix MED-2:relocated from
-    /// the「sortedKeys determinism」 section because this
-    /// test does NOT guard `.sortedKeys`。 Empirically
-    /// verified 8th-pass: removing `.sortedKeys` from
-    /// production → this test STILL PASSES because
-    /// in-process JSONEncoder is deterministic with fixed
-    /// hash seed (same dict literal always iterates same
-    /// way within one process)。
-    ///
-    /// What this test ACTUALLY guards:future JSONEncoder
-    /// behavior change that introduces per-call variability
-    /// (e.g. random seeding,timestamp injection)。 Real but
-    /// distinct from the sortedKeys guarantee — moved into
-    /// its own section to prevent misreading as「sortedKeys
-    /// regression guard」 which it is NOT。
-    func testMetadataEncodingByteEqualityAcrossInvocations()
-        throws
-    {
-        let meta: [String: String] = [
-            "k1": "v1", "k2": "v2", "k3": "v3"]
-        let first = try BASRoutedVectorIndexStorage
-            .encodeMetadata(meta)
-        for i in 1..<100 {
-            let next = try BASRoutedVectorIndexStorage
-                .encodeMetadata(meta)
-            XCTAssertEqual(next, first,
-                "encoding iteration \(i) must byte-match first")
-        }
-    }
+    // chapter 九百三十 / M3355 fix HIGH-test-1 — DELETED
+    // `testMetadataEncodingByteEqualityAcrossInvocations`
+    // 10th-pass test agent empirically verified this test
+    // is FAKE COVERAGE:reverted `.sortedKeys` from
+    // production encoder → test STILL PASSED。 In-process
+    // JSONEncoder is deterministic with fixed hash seed,so
+    // 100-iteration loop trivially passes regardless of
+    // `.sortedKeys` flag。 Ch 928 had relocated this test
+    // to「in-process stability」 section + admitted it
+    // doesn't guard sortedKeys — but per ch 928 discipline
+    // (DELETED fake `testVectorIndexMetadataSortedKeysDeterministic`
+    // for same reason),admission-only is insufficient when
+    // future maintainer might re-add it as「coverage」 for
+    // wrong invariant。
+    //
+    // The「future JSONEncoder per-call randomness」 future-
+    // guard claim ch 928 made is speculative — Apple is
+    // extremely unlikely to ship that breaking change
+    // without flag/deprecation cycle giving us time to
+    // re-add a properly-designed test。 For now: deleted as
+    // weak-coverage that overlaps fully-realized lex-order
+    // test (testMetadataKeysAreSortedLexicographically)。
 }

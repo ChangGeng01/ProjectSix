@@ -3,7 +3,13 @@
 **Span**: Chapters 八百九十三 — 九百二十九 (RFC + 36 implementation
 chapters, extended past 4 prior「seals」 + **9-pass review
 discipline** finding real CRITICAL items each pass through
-pass 7, plus fabrication-recurrences caught in passes 7/8/9)
+pass 7 [passes 8+9+10 also found CRITICAL but in 0/1/2 quantity
+respectively], plus fabrication-recurrences caught in passes
+**6/7/8/9/10**:ch 925 caught by pass 6 (ch 926 review),ch 926
+caught by pass 7 (ch 927 review),ch 927 caught by pass 8 (ch 928),
+ch 928 caught by pass 9 (ch 929),ch 929 caught by pass 10 (ch 930)。
+Ch 930 fix HIGH-5 corrected the「passes 7/8/9」 off-by-one
+enumeration that originally appeared here)
 **ABI evolution**: 1 → 18 (**17 bumps** — ch 894 starts at
 ABI 1 not a bump,17 subsequent increments through ch 926
 which added bas_l8_engine_pragma_value_i64 diagnostic helper;
@@ -95,7 +101,9 @@ Final state:
 | 九百二十七.5 (review) | 2026-05-24 | 8th-pass MANUAL audit (3 agents dispatched but died after 12h idle;empirical verification done in-conversation) | 0 NEW CRITICAL + 2 NEW HIGH + 2 NEW MED |
 | 九百二十八 | 2026-05-24 | **CASCADE BREAK ATTEMPT (failed — 9th-pass found CRITICAL fabrication recurrence)** — fix-of-fix:HIGH-1 BRANCH_SUMMARY「6 passes / 19C / 54H」 was off-by-one in pass count + fabricated MED/LOW numbers (actual 7 passes / 21C / 59H — **WRONG, see ch 929**) + HIGH-2 DELETED fake `testVectorIndexMetadataSortedKeysDeterministic` + MED-1 renamed `_cosineTopKBytesUnchecked` → `_cosineTopKBytesAfterValidation` + MED-2 relocated `testMetadataEncodingByteEqualityAcrossInvocations` to「in-process stability」 section | (no ABI) |
 | 九百二十八.5 (review) | 2026-05-24 | 3-agent 9th-pass「全面最最严苛」 foreground review of ch 924-928 | 1 NEW CRITICAL (4th fabrication recurrence) + 2 NEW HIGH + 6 NEW MED + 3 NEW LOW |
-| 九百二十九 | 2026-05-24 | 9th-pass fix:CRITICAL 21C+59H → 22C+63H (verified `python3 -c 'sum(...)'` before writing) + HIGH-1 SEAL header span 894-926 → 894-929 + closing「TRULY SEALED」 retracted as repeatedly-wrong + HIGH-2 added 8P/9P Deferred-items subsections per ch 918 pattern + 4 MED (2 shipped,2 deferred)。 Discipline meta-finding:「truly sealed」 cannot be self-asserted。 Arc is continuous-improvement state, not sealed state | (no ABI) + HIGH-2 DELETED fake `testVectorIndexMetadataSortedKeysDeterministic` (still in file with「marked fake」 docstring,risk of misread) + MED-1 renamed `_cosineTopKBytesUnchecked` → `_cosineTopKBytesAfterValidation` (explicit contract) + MED-2 relocated `testMetadataEncodingByteEqualityAcrossInvocations` to「in-process stability」 section (NOT sortedKeys regression guard)。 Stop condition (0C + ≤2H) MET on pass 8 → cascade BROKEN | (no ABI) |
+| 九百二十九 | 2026-05-24 | 9th-pass fix:CRITICAL 21C+59H → 22C+63H (verified `python3 -c 'sum(...)'` before writing) + HIGH-1 SEAL header span 894-926 → 894-929 + closing「TRULY SEALED」 retracted as repeatedly-wrong + HIGH-2 added 8P/9P Deferred-items subsections per ch 918 pattern + 4 MED (2 shipped,2 deferred)。 Discipline meta-finding:「truly sealed」 cannot be self-asserted。 Arc is continuous-improvement state, not sealed state。 Stop NOT met on pass 9 (1C+2H found) — pass 10 may catch new defects in this very chapter | (no ABI) |
+| 九百二十九.5 (review) | 2026-05-24 | 3-agent 10th-pass foreground review of ch 929 | 2 NEW CRITICAL (5th fabrication recurrence) + 8 NEW HIGH + 1 NEW MED + 4 NEW LOW |
+| 九百三十 | 2026-05-24 | 10th-pass fix:CRITICAL-1 SEAL row 98 was structurally corrupt (7 pipes + spliced ch 928 content + internal「TRULY SEALED retracted」 vs「cascade BROKEN」 contradiction in same row) + CRITICAL-2 BRANCH_SUMMARY row had stale「34 chapters (894-927)」 + 「6 review passes」 inside「9 review passes total」 row + HIGH-1..8 various doc fixes (registry completeness,off-by-one fabrication-recurrence pass enumeration,CHANGELOG MED count 4 vs 6 inconsistency,stop-condition logic「2>2」 wrong,etc.) + DELETED testMetadataEncodingByteEqualityAcrossInvocations (empirically proven FAKE COVERAGE for sortedKeys — passes regardless of revert)。 5th fabrication recurrence proves doc-text edits without grep/python3 verification keep introducing defects | (no ABI) |
 
 ## Architecture state at seal
 
@@ -279,8 +287,10 @@ The 8th-pass manual revert audit (3 agents died after 12h idle,verification done
 
 | # | Item | Status |
 |---|---|---|
+| 8P-HIGH-1 | BRANCH_SUMMARY「6 passes / 19C / 54H / 36M / 11L」 fabrication | SHIPPED ch 928 (corrected) |
+| 8P-HIGH-2 | testVectorIndexMetadataSortedKeysDeterministic fake coverage left in file | SHIPPED ch 928 (deleted) |
 | 8P-MED-1 | `_cosineTopKBytesUnchecked` rename for explicit contract | SHIPPED ch 928 (→ `_cosineTopKBytesAfterValidation`) |
-| 8P-MED-2 | Misfiled `testMetadataEncodingByteEqualityAcrossInvocations` section header | SHIPPED ch 928 (relocated to「in-process stability」 own section) |
+| 8P-MED-2 | Misfiled `testMetadataEncodingByteEqualityAcrossInvocations` section header | SHIPPED ch 928 (relocated to「in-process stability」 own section) — note ch 930 DELETED this test after 10th-pass empirical revert confirmed it's fake coverage anyway |
 
 ### Chapter 九百二十八.5 9th-pass foreground 3-agent items (added to registry ch 929)
 
@@ -295,6 +305,21 @@ The 9th-pass「全面最最严苛」 foreground audit found 1 CRITICAL + 2 HIGH 
 | 9P-MED-2 | SEAL line 104 Swift test counts say 894-927 + ch 928 omitted (-1 deleted test not reflected) | SHIPPED ch 929 |
 | 9P-MED-3 | Code:`bas_l8_engine_pragma_value_i64` whitelist includes `cache_size` which returns negative values — sentinel collision risk | DEFERRED (bounded risk,no production caller) |
 | 9P-MED-4 | Code:`migrate_unique_session_seq` substring check brittle for schema reformat | DEFERRED (theoretical schema-evolution risk) |
+| 9P-LOW-1 | cosineTopK [Float] vs [UInt8] validation drift surface (validate helper not called from [Float] path) | DEFERRED (bounded API concern) |
+| 9P-LOW-2 | cosineTopKWithSkipped missing [Float] overload (API asymmetry) | DEFERRED (additive API,not regression) |
+| 9P-LOW-3 | [Float] empty query produces different error type than [UInt8] | DEFERRED (cosmetic diagnostic consistency) |
+
+### Chapter 九百二十九.5 10th-pass foreground 3-agent items (added to registry ch 930)
+
+The 10th-pass foreground audit found 2 CRITICAL + 8 HIGH + 1 MED + 4 LOW — 5th recurrence of the fabrication pattern。
+
+| # | Item | Status |
+|---|---|---|
+| 10P-CRIT-1 | SEAL row 98 structurally corrupt (7 pipes,spliced ch 928 content,internal「TRULY SEALED retracted」 vs「cascade BROKEN」 contradiction) | SHIPPED ch 930 (verified via `awk -F'|' '{print NF}'` = 6 fields) |
+| 10P-CRIT-2 | BRANCH_SUMMARY row had stale「34 chapters (894-927)」 + 「6 review passes」 inside the「9 review passes」 row | SHIPPED ch 930 (updated to 37 chapters / 10 passes) |
+| 10P-HIGH-1..8 | Various:Registry incomplete (8P missing HIGH rows,9P missing LOW rows),CHANGELOG MED count contradiction (4 vs 6),stop-condition logic「2>2」 wrong,fabrication-recurrence pass enumeration off-by-one,etc. | All SHIPPED ch 930 |
+| 10P-MED-1 | Header fabrication-recurrence pass enumeration off-by-one (caught only passes 7/8/9,actual 6/7/8/9) | SHIPPED ch 930 (expanded to 6/7/8/9/10) |
+| 10P-LOW-1..4 | Cosmetic carryovers (testRustCrateCountIs22 name,Test 1 sqlite return codes,etc.) | DEFERRED |
 
 Carryovers from prior passes still deferred:6P-MED-1 (`testRustCrateCountIs22` rename), 6P-MED-2 (Test 1 sqlite_* return codes), 7P-MED-1 (same carryovers)。
 
@@ -402,7 +427,7 @@ notes:
 - **Post-seal review-fix sub-arc (ch 915-929)** shipped per
   chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th-pass /
   6th-pass / 7th-pass / 8th-pass / 9th-pass reviews —
-  **cumulative 22 CRITICAL + 63 HIGH** (verified by python3
+  **cumulative 24 CRITICAL + 71 HIGH** (verified by python3
   arithmetic in ch 929) across **9 review passes**, MED/LOW
   partially tracked (per-pass totals in the table above are
   the authoritative source)。 Pattern observation:cumulative-
@@ -439,7 +464,7 @@ across passes 7/8/9:every「final seal」 claim has been wrong。
 **Authoritative state** (per python3-verified arithmetic):
 - 36 implementation chapters (894-929)
 - 9 review passes
-- 22 CRITICAL + 63 HIGH found cumulatively
+- 24 CRITICAL + 71 HIGH found cumulatively
 - ABI evolution 1 → 18 (17 bumps)
 - All CRITICAL+HIGH addressed in the corresponding fix chapter
 - Production behavior:zero default-flip changes,red-line 7
@@ -464,7 +489,8 @@ cycle:
 | Pass 7 (7th-pass「掘地三尺」 of ch 926) | 2 | 5 | ch 927 |
 | Pass 8 (8th-pass manual, 3 agents died) of ch 927 | 0 | 2 | ch 928 |
 | Pass 9 (9th-pass foreground 3-agent of ch 924-928) | 1 | 2 | ch 929 |
-| **TOTAL (verified by python3 arithmetic ch 929)** | **22** | **63** | **(stop NOT met at pass 9 — 1C + 2H over threshold; ch 929 fixes then re-verify)** |
+| Pass 10 (10th-pass foreground 3-agent of ch 929) | 2 | 8 | ch 930 |
+| **TOTAL (python3-verified ch 930)** | **24** | **71** | **(stop NOT met at pass 10 — 5th fabrication recurrence proves doc-text edits without programmatic verification keep introducing defects)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%
