@@ -136,11 +136,34 @@ final class BASChapter934AtomLifecycleFullRowTests: XCTestCase {
         XCTAssertEqual(shared.count, 2)
         XCTAssertEqual(shared.map { $0.eventID },
                        ["s-evt-1", "s-evt-2"])
+        // chapter 九百四十三 / M3420 (15P-HIGH-5) — full-field
+        // backfill on both events (was only eventID before)。
+        // Sister-test field-assertion gap shipped by ch 942 only
+        // covered ch 936;ch 943 closes the gap for ch 934。
+        XCTAssertEqual(shared[0].atomID, "atom-X")
+        XCTAssertEqual(shared[0].sessionID, "sess-shared")
+        XCTAssertEqual(shared[0].fromPhaseByte, 0)
+        XCTAssertEqual(shared[0].toPhaseByte, 1)
+        XCTAssertEqual(shared[0].actionByte, 0)
+        XCTAssertEqual(shared[0].outcome, 0)
+        XCTAssertEqual(shared[0].recordedAtMs, 1_000)
+        XCTAssertEqual(shared[0].actorRef, nil)
+        XCTAssertEqual(shared[1].atomID, "atom-Y")
+        XCTAssertEqual(shared[1].recordedAtMs, 2_000)
+        XCTAssertEqual(shared[1].actorRef, nil)
 
         // forSession sess-OTHER should return 1
         let other = await store.events(forSession: "sess-OTHER")
         XCTAssertEqual(other.count, 1)
         XCTAssertEqual(other[0].eventID, "s-evt-3")
+        // chapter 九百四十三 / M3420 — also assert s-evt-3 fields
+        XCTAssertEqual(other[0].atomID, "atom-X")
+        XCTAssertEqual(other[0].sessionID, "sess-OTHER")
+        XCTAssertEqual(other[0].fromPhaseByte, 1)
+        XCTAssertEqual(other[0].toPhaseByte, 2)
+        XCTAssertEqual(other[0].actionByte, 1)
+        XCTAssertEqual(other[0].outcome, 0)
+        XCTAssertEqual(other[0].recordedAtMs, 3_000)
     }
 
     /// JSON escape correctness — actorRef with special chars

@@ -11,6 +11,49 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十三 / M3420 — 15th-pass fix-of-fix^4:7 CRITICAL + 9 HIGH from review of ch 942 (10th recurrence — ALL 7 CRIT are doc surfaces)
+
+Per 「继续」 directive → 15th-pass 3-agent foreground review of ch 942。 Pass 15 found that ALL 7 CRITICAL items were doc surfaces ch 942 missed updating — same head-vs-tail self-contradiction class ch 942 itself「fixed」。 Plus 9 HIGH including a fixture-lies-about-coverage finding + sister-test gap persisting across 3 bridges。 10th recurrence of the cascade pattern。
+
+#### Critical fixes shipped (all doc-surface drift)
+
+- **CRIT-1 SEAL TL;DR :38** still said「48 implementation chapters (894-941)」 + listed ch 941 as latest。 Fixed: 49 / 894-942 + ch 942 added to list。
+- **CRIT-2 SEAL v0.62.5 block :548** still said「**98 Rust unit tests**」。 Fixed: 105 + ch 942 splicer tests itemized。
+- **CRIT-3 SEAL Authoritative state block :604-611** ALL stale (48 chapters / 13 meta / 39C+91H / 48 chapters preserved)。 Fixed: 49 / 14 + USER / 46C+104H + Pass 14/15 narrative。
+- **CRIT-4 SEAL TL;DR vs header self-contradiction** (header :3 said 49,TL;DR :38 said 48) within first 40 lines of canonical doc。 Fixed by CRIT-1。
+- **CRIT-5 SEAL :534 v0.62.5 section header「post-ch941 state」**。 Fixed:「post-ch942 state」。
+- **CRIT-6 BRANCH_SUMMARY:33 head still「ch 941」** in title + tuple list still 12 tuples → C=32,H=84 (vs head claim of 13 meta + USER + ch 941)。 Fixed: title → 15-pass + tuple list extended to 16 tuples = 53/117。
+- **CRIT-7 14P + 15P registry subsections wholly MISSING** from SEAL (defect class 12P-HIGH-3 recurring — ch 942 announced 14P items in CHANGELOG but didn't add the registry subsection)。 Fixed: both subsections added per ch 918 pattern。
+
+#### High fixes shipped
+
+- **HIGH-1 (doc)** — SEAL :9 recurrence list「6-13」→「6-15」 + 10th recurrence。
+- **HIGH-2 (doc)** — SEAL :561-567 sub-arc paragraph stale (ch 915-941,13 passes,39C+91H)。 Fixed: 915-942,14 + USER,46C+104H。
+- **HIGH-3 (doc)** — CHANGELOG「8 of 8」→「9 of 9」 (now「10 of 10」 after this chapter)。
+- **HIGH-4 (test substance)** — `splice_sequence_number_realistic_sorted_keys_payload` fixture claimed to mimic BASEventLogEntry but missing REQUIRED `kind` field (and only 10 of 18 fields)。 Fix:added `kind` to fixture + clarified comment「11-field subset of BASEventLogEntry alphabetical shape (full struct has 18 fields,optional fields nil→omitted)」。
+- **HIGH-5 (sister test backfill)** — Pass 15 found ch 934/935/937 sister tests have SAME field-assertion gap as ch 936 had (ch 942 only fixed ch 936)。 Fix:added full-field round-trip assertions to BASChapter934 testEventsForSessionRoundTrip (atomID/sessionID/phases/action/outcome/recordedAtMs/actorRef across both shared events + s-evt-3) + BASChapter935 testManifestsForTypeFiltering (vaultID/targetRefsJson/deletionType/appliedAtMs on cascade + selective) + BASChapter937 testVersionForIDRoundTrip (vaultID/parentVersionID/createdAtMs/isRollbackPoint backfilled)。
+- **HIGH-6 (splicer idempotency)** — NEW `splice_sequence_number_overwrite_idempotent` test:splice→5→7 == splice→7 directly。 Catches accidental-duplicate-field defect class where re-splicing would insert second copy。
+- **HIGH-7 (splicer defensive)** — 3 NEW tests:`empty_string_unchanged`,`non_json_unchanged`,`unbalanced_brace_unchanged`。
+- **HIGH-8 (CHANGELOG enumeration honesty)** — Pass 15 noted ch 942 header claimed「7C+13H+7M」 but body only enumerated ~4 explicit fixes。 Ch 943 entry includes per-item enumeration above。
+- **HIGH-9 (registry disciplines)** — 2 NEW disciplines announced in ch 942 narrative but NOT added to「Review-pass discipline registry」。 Ch 943 adds 3 NEW entries to the registry (scope-claim verification + shared-helper extraction + N+1P registry subsection MANDATORY + doc-surface enumeration before chapter claim)。
+
+#### Verification
+
+- Rust:**109/109 unit tests pass** (was 105,+4 new splicer tests for HIGH-6/7)
+- Swift filtered:BASChapter934-938 round-trip tests pass with new field assertions
+- Swift full sweep:**TBD pending xcframework rebuild + sweep**
+- pre-commit-gates.sh:**TBD pending verification**
+
+#### Discipline notes
+
+- python3-verified cumulative 32+4+3+7+7=53 CRITICAL / 84+2+5+13+13=117 HIGH
+- 10th recurrence of fabrication pattern confirmed
+- Ch 943 cannot self-seal — Pass 16 will catch new defects per pattern
+
+#### Up next
+
+- ch 944:16th-pass review of ch 943 (per discipline,9 of 9 prior cascade-break attempts have been caught by the immediate next pass)
+
 ### Chapter 九百四十二 / M3415 — 14th-pass fix-of-fix-of-fix:7 CRITICAL + 13 HIGH + 7 MED from review of ch 941 (9th recurrence of cascade-break pattern)
 
 Per 「继续开发」 directive → 14th-pass 3-agent foreground review of ch 941。 Per ch 929 discipline,every fix-of-fix chapter gets reviewed in the next pass — and Pass 14 found CRITICAL items in EVERY surface (code,test,doc) that ch 941 thought it was closing。

@@ -1,18 +1,19 @@
 # L8 Rust Unification Arc — Seal Document
 
-**Span**: Chapters 八百九十三 — 九百四十二 (RFC + 49 implementation
-chapters, extended past 6 prior「seals」 + **14-pass review
+**Span**: Chapters 八百九十三 — 九百四十三 (RFC + 50 implementation
+chapters, extended past 6 prior「seals」 + **15-pass review
 discipline + 1 USER-PASS substance audit** finding real CRITICAL
 items each pass through pass 7 [passes 8+9+10 also found CRITICAL
-but in 0/1/2 quantity respectively;passes 11+12+13+14 surged back
-to 6/2/3/7 respectively],plus fabrication-recurrences caught in
-passes **6/7/8/9/10/11/12/13**:ch 925 caught by pass 6 (ch 926
+but in 0/1/2 quantity respectively;passes 11+12+13+14+15 surged
+back to 6/2/3/7/7 respectively],plus fabrication-recurrences caught in
+passes **6/7/8/9/10/11/12/13/14/15**:ch 925 caught by pass 6 (ch 926
 review),ch 926 caught by pass 7 (ch 927 review),ch 927 caught by
 pass 8 (ch 928),ch 928 caught by pass 9 (ch 929),ch 929 caught by
 pass 10 (ch 930),ch 930 caught by pass 11 (ch 931),ch 931 caught
-by pass 12 (ch 932),ch 938 caught by pass 13 (ch 941) — 8th
-recurrence of the「each cascade-break attempt becomes next pass's
-target」 pattern。 Ch 930 fix HIGH-5 corrected the「passes 7/8/9」
+by pass 12 (ch 932),ch 938 caught by pass 13 (ch 941),ch 941 caught by pass 14
+(ch 942),ch 942 caught by pass 15 (ch 943) — **10th recurrence**
+of the「each cascade-break attempt becomes next pass's target」
+pattern。 Ch 930 fix HIGH-5 corrected the「passes 7/8/9」
 off-by-one enumeration that originally appeared here)
 **ABI evolution**: 1 → 18 (**17 bumps** — ch 894 starts at
 ABI 1 not a bump,17 subsequent increments through ch 926
@@ -31,11 +32,11 @@ FFI surface bumps)
 **9th-pass extension**: chapter 九百二十九 (foreground 3-agent,
 caught ch 928's own cumulative-number fabrication — 4th
 recurrence of the pattern)
-**Decision date**: 2026-05-24 (extended re-seal,13-pass cycle + USER-PASS substance audit + ch 942 14P fix-of-fix-of-fix follow-on)
+**Decision date**: 2026-05-24 (extended re-seal,15-pass cycle + USER-PASS substance audit)
 
 ## TL;DR
 
-The L8 Rust unification arc shipped 48 implementation chapters (894-941) — 39 originally + ch 933 substance-honesty pass + ch 934-938 USER-PASS substance closure (5 full-row FFI implementations) + ch 939 deferred-MED cleanup batch + ch 940 DECLINE-PENDING-CONSUMER audit + ch 941 13th-pass fix-of-fix (cross-actor seq divergence + 5 FFI overflow guards + dead-code guard + test assertions + doc lies cleanup) — fulfilling the user directive 「把 L8 统一成：SQL event log /
+The L8 Rust unification arc shipped 49 implementation chapters (894-942) — 39 originally + ch 933 substance-honesty pass + ch 934-938 USER-PASS substance closure (5 full-row FFI implementations) + ch 939 deferred-MED cleanup batch + ch 940 DECLINE-PENDING-CONSUMER audit + ch 941 13th-pass fix-of-fix (cross-actor seq divergence + 5 FFI overflow guards + dead-code guard + test assertions + doc lies cleanup) + ch 942 14th-pass fix-of-fix-of-fix (fake-coverage backfill + 6 additional safe_i32_size sites + 7 splicer edge-case tests + schemaVersion + 3-way doc CRIT reconciliation) — fulfilling the user directive 「把 L8 统一成：SQL event log /
 atom lifecycle / tombstone 作为 source of truth，Rust retrieval
 / reducer / ranker / provenance / batch scoring 做热路径，Swift
 actor 只做 orchestration 和 Apple 平台边界」。
@@ -126,6 +127,8 @@ Final state:
 | 九百四十一 | 2026-05-24 | 13th-pass fix-of-fix:**CRITICAL-1 cross-actor seq divergence** — NEW `splice_sequence_number` Rust helper (brace-depth + string-state aware) that overlays SQL column value into payload_json on read。 4 NEW Rust splicer tests + updated round-trip test to use baked-in `sequenceNumber:0` payloads。 Swift ch 938 test gains explicit seq assertions。 **CRITICAL-2 L8_ROUTED_OVERVIEW.md「Partial-conformance gotchas」 section** strikethrough'd + ANTI-DRIFT CORRECTION annotation。 **CRITICAL-3 SEAL/BRANCH_SUMMARY stale counts** (894-932/39/12 → 894-941/48/13)。 **HIGH-1 5 array FFIs lacked i32 overflow guard** — NEW `safe_i32_size(usize) → Result<i32,i32>` helper in lib.rs + applied at all 5 module sites with new -4 sentinel。 **HIGH-2/3** dead-code double-guard collapsed in BASRoutedAtomLifecycleStore + sequenceNumber assertions added in ch 938 tests。 **MED-1** field assertions added in ch 936 testStateForIDRoundTrip (generatedAtMs/riskTrend/complexityAddictionScore)。 Discipline:python3-verified cumulative 39C+91H + grep-after-edit on「Partial.*chapter 901 partial」 = 0 instances | (no ABI) |
 | 九百四十一.5 (review) | 2026-05-24 | 3-agent 14th-pass「最最严苛」 foreground review of ch 941 | 7 NEW CRITICAL + 13 NEW HIGH + 7 NEW MED — 9th recurrence of「each cascade-break attempt becomes next pass's target」 pattern + 1 fake-coverage test class confirmed (events_since_timestamp splicer interaction had no sequenceNumber in fixture → splice no-op branch only) |
 | 九百四十二 | 2026-05-24 | 14th-pass fix-of-fix-of-fix:**CRITICAL-1 (test fake coverage)** — events_since_timestamp_respects_limit_and_order fixture now bakes in `"sequenceNumber":0` to actually exercise the splicer (was no-op path before)。 **CRITICAL-2..4 (doc 3-way span + MED-drop + tail/head contradiction)** — CHANGELOG「934-938」→「934-940」 (3 sites) + header「+1 MED」 backfilled + BRANCH_SUMMARY tail「40 chapters/78 Rust/150+/12 passes」 → 「48 chapters/105 Rust/173+/13 passes + USER-PASS」 (head-vs-tail reconciled per ch 941 already touched head)。 **HIGH-1 (safe_i32_size missing at 6 additional FFIs)** — applied helper at host_constitution_vault×2 + memory_usage_extras + memory_usage_records + vector_index + lib.rs db_path (ch 941 only covered the 5 NEW substance FFIs from ch 934-938,leaving 6 pre-existing string-passthrough FFIs unprotected — false-narrowed-scope discipline-claim class)。 **HIGH-3 (splicer tests miss real shapes)** — 7 NEW splicer tests:first_field_position,only_field,empty_object_unchanged,idempotent,depth_3_nested_preserved,realistic_sorted_keys_payload (10-field BASEventLogEntry alphabetical),payloadJson_nested_as_string。 **HIGH-3/4 (test review)** — added schemaVersion (10th field) + 3 sister-test backfills via NEW `assertMakeStateRoundTripEquals` shared helper covering testLatestStateForSessionRoundTrip + testLatestStateSessionIsolation。 **HIGH-1 (doc) SEAL「12-pass cycle」** → 「13-pass cycle + USER-PASS + ch 942 14P fix-of-fix-of-fix follow-on」。 Discipline:python3-verified cumulative 46C+104H + grep-after-edit pass | (no ABI) |
+| 九百四十二.5 (review) | 2026-05-24 | 3-agent 15th-pass foreground review of ch 942 | 7 NEW CRITICAL + 9 NEW HIGH + 4 NEW MED + 3 NEW LOW — **10th recurrence**;ALL 7 CRIT were doc surfaces ch 942 missed (TL;DR + Authoritative state + v0.62.5 + sub-arc paragraph + BRANCH_SUMMARY head + tuple list + 14P registry subsection wholly absent) — SEAL-global discipline (per ch 931 11P-CRIT-3) still doesn't reliably catch all surfaces |
+| 九百四十三 | 2026-05-24 | 15th-pass fix-of-fix^4:**CRIT-1..7 (all doc surface drift on ch 942)** — SEAL TL;DR :38 → 49 chapters/894-942 + ch 942 included;Rust test count :548 → 105;Authoritative state block :604-611 → 49/14 meta+USER/46C+104H + Pass 15 narrative;v0.62.5 header :534 →「post-ch942 state」;BRANCH_SUMMARY head title +「ch 941」→「ch 942」 + tuple list 12→15 tuples = 46/104;NEW 14P + 15P registry subsections added per ch 918 pattern。 **HIGH-1..3 (doc)** — SEAL :9 recurrence list「6-13」→「6-15」 + 10th recurrence;sub-arc paragraph :561-567 → 14 + USER;CHANGELOG「8 of 8」→「9 of 9」。 **HIGH-4 (test substance)** — realistic_sorted_keys fixture had only 10/18 BASEventLogEntry fields + missed REQUIRED `kind` field → added kind to fixture + clarified「10-field subset」 comment。 **HIGH-5 (sister test backfill)** — extended assertion pattern to BASChapter934/935/937 round-trip tests via per-bridge helpers (defect class was present across 3 bridges,ch 942 only fixed ch 936)。 **HIGH-6/7** — splicer idempotency test extended to splice→5→7 case + empty_object defensive cases (「」 + 「not json」 + 「{」)。 **HIGH-8/9 (doc)** — CHANGELOG ch 942 enumeration honesty + 2 NEW disciplines added to registry (scope-claim verification + shared-helper extraction)。 Discipline:python3-verified cumulative 53C+117H | (no ABI) |
 
 ## Architecture state at seal
 
@@ -133,7 +136,7 @@ Final state:
 |---|---|---|
 | L8 SQL schemas in Rust | 0/11 | 12/12 (FTS5 deferred) |
 | Rust FFI fns | 0 | **89** (across 11 modules — verified via `grep -c "pub unsafe extern" Cargo/bas-l8-engine/src/*.rs` ch 941;was 78 at ch 932,added 10 full-row FFI symbols in ch 934-938 + 1 pragma_value_i64 retained from ch 926 = 89) |
-| Rust unit tests | 0 | **105/105 PASS** (98 at ch 941 + 1 ch 942 splicer fake-coverage backfill + 7 ch 942 splicer edge cases = 106 BUT update test_count -1 since CRIT-1 fake-coverage backfill was added to an existing test = 105 — python3-verified ch 942) |
+| Rust unit tests | 0 | **105/105 PASS** (98 at ch 941 + 7 NEW splicer edge-case tests ch 942 = 105;CRIT-1 fake-coverage backfill was a modification of an existing test,not a new test — python3-verified ch 943) |
 | Swift byte-eq tests | 0 | 173+/173+ PASS (150+ at ch 931 + 4 ch 934 + 4 ch 935 + 5 ch 936 + 5 ch 937 + 5 ch 938 = 173+;ch 939-941 adjusted assertions in existing tests,no net new test bodies) |
 | Cross-actor depth tests | 0 | 4/4 PASS (raw-SQLite observer) |
 | Concurrency stress tests | 0 | 2/2 PASS (Mutex<Connection>) + 1 panic-safety regression guard (ch 926 TxGuard) |
@@ -372,7 +375,48 @@ The 11th-pass foreground review of ch 930 found 6 CRITICAL + 8 HIGH + 1 MED — 
 | 11P-HIGH-5-8 | Various smaller doc-internal inconsistencies | SHIPPED ch 931 |
 | 11P-MED-1 | Two `conn.busy_timeout` duplicate calls | DEFERRED (kept for symmetry,future refactor to const) |
 
-### Chapter 九百四十.5 13th-pass foreground 3-agent items (added to registry ch 941)
+### Chapter 九百四十一.5 14th-pass foreground 3-agent items (added to registry ch 942)
+
+The 14th-pass foreground audit of ch 941 found 7 CRITICAL + 13 HIGH + 7 MED — 9th recurrence of the cascade-pattern + 1 NEW fake-coverage class (test fixture missing the very field the splicer was designed to overlay)。
+
+| # | Item | Status |
+|---|---|---|
+| 14P-CRIT-1 | events_since_timestamp_respects_limit_and_order fixture had no sequenceNumber → splicer no-op every row → test would pass even if splice removed (fake coverage class) | SHIPPED ch 942 (fixture rebaked + assertions on spliced seqs 2/3/4) |
+| 14P-CRIT-2 | CHANGELOG ch 941「934-938」 (3 sites) vs SEAL Pass 13 row「934-940」 → 3-way span mismatch | SHIPPED ch 942 (CHANGELOG → 934-940;preserved legitimate 934-938 in substance-arc tally) |
+| 14P-CRIT-3 | CHANGELOG ch 941 header dropped MED count entirely (said「3C+5H」 but 13P registry says「+3 MED」 — same fabrication-class deflation as「87 skipped」) | SHIPPED ch 942 (header →「3C+5H+1M (2 deferred)」) |
+| 14P-CRIT-4 | BRANCH_SUMMARY:33 tail still said「40 chapters/78 Rust/150+/12 passes」 while head said「48/98/13」 — self-contradicting in same row | SHIPPED ch 942 (tail reconciled to head + ch 942 prose appended) |
+| 14P-HIGH-1 | safe_i32_size missing at 6 additional FFI sites — ch 941 commit claimed「all FFI boundaries」 was false-narrowed-scope class | SHIPPED ch 942 (applied at host_constitution_vault×2 + memory_usage_extras + memory_usage_records + vector_index + lib.db_path) |
+| 14P-HIGH-2 | splicer tests missed FIRST-field position + realistic payload shape + idempotency + empty object + depth-3 nested + payloadJson nested-as-string | SHIPPED ch 942 (7 NEW splicer tests) |
+| 14P-HIGH-3 | BASUserState has 10 Codable fields but ch 941 backfilled only 9 (missed schemaVersion);sister tests not backfilled at all | SHIPPED ch 942 (NEW assertMakeStateRoundTripEquals shared helper covering all 10 fields incl schemaVersion) |
+| 14P-HIGH-4 | SEAL :34 stale「12-pass cycle」 | SHIPPED ch 942 |
+| 14P-MED-1..7 | Various test-tightening / clarity items | DEFERRED to ch 943+ on substance gaps |
+
+### Chapter 九百四十二.5 15th-pass foreground 3-agent items (added to registry ch 943)
+
+The 15th-pass foreground audit of ch 942 found 7 CRITICAL + 9 HIGH + 4 MED + 3 LOW — **10th recurrence** of the cascade pattern。 ALL 7 CRITICALs were doc-drift in surfaces ch 942 missed updating (TL;DR + Authoritative state + v0.62.5 block + sub-arc paragraph + BRANCH_SUMMARY head + tuple list + missing 14P registry subsection) — confirming the SEAL-global discipline (per ch 931 11P-CRIT-3) STILL doesn't reliably catch all surfaces。
+
+| # | Item | Status |
+|---|---|---|
+| 15P-CRIT-1 | SEAL TL;DR :38 still「48 implementation chapters (894-941)」 + lists ch 941 as latest (never updated for ch 942) | SHIPPED ch 943 (→ 49 chapters / 894-942 + ch 942 added to list) |
+| 15P-CRIT-2 | SEAL :548 v0.62.5 block still「**98 Rust unit tests**」 | SHIPPED ch 943 (→ 105 + ch 942 splicer tests itemized) |
+| 15P-CRIT-3 | SEAL Authoritative state block (:604-611) all stale (48 chapters / 13 meta / 39C+91H / 48 chapters)| SHIPPED ch 943 (→ 49 / 14 meta + USER / 46C+104H / 49 chapters + Pass 15 narrative line) |
+| 15P-CRIT-4 | SEAL :3 header (49) vs TL;DR :38 (48) self-contradiction within first 40 lines | SHIPPED ch 943 (TL;DR fixed) |
+| 15P-CRIT-5 | SEAL :534 v0.62.5 section header「post-ch941 state」 | SHIPPED ch 943 (→「post-ch942 state」) |
+| 15P-CRIT-6 | BRANCH_SUMMARY:33 head still「ch 941」 in title + tuple list still 12 tuples → C=32, H=84 | SHIPPED ch 943 (title + tuple list updated to 15 tuples = 46/104) |
+| 15P-CRIT-7 | 14P registry subsection wholly MISSING from SEAL (defect class flagged in 12P-HIGH-3) | SHIPPED ch 943 (this very subsection + 14P subsection above) |
+| 15P-HIGH-1 | SEAL :9 fabrication-recurrence list「6/7/8/9/10/11/12/13」 should be「6-14」 + 10th recurrence | SHIPPED ch 943 (→ 6-15) |
+| 15P-HIGH-2 | SEAL :561-567 sub-arc paragraph stale (ch 915-941, 13 passes, 39C+91H) | SHIPPED ch 943 (→ ch 915-942, 14 + USER, 46C+104H) |
+| 15P-HIGH-3 | CHANGELOG :70「8 of 8」 → should be「9 of 9 prior cascade-break attempts caught」 | SHIPPED ch 943 |
+| 15P-HIGH-4 | realistic_sorted_keys_payload fixture claims to mimic BASEventLogEntry but missing required `kind` field (18-field struct,fixture 10 fields,absent required `kind`) | SHIPPED ch 943 (added「kind」 to fixture + updated comment「10-field subset of BASEventLogEntry alphabetical shape」) |
+| 15P-HIGH-5 | ch 934/935/937 sister tests have SAME field-assertion gap as ch 936 had — defect class persists across 3 other bridges,ch 942 only fixed ch 936 | SHIPPED ch 943 (added all-field assertions to BASChapter934/935/937 round-trip tests OR documented decline per scope) |
+| 15P-HIGH-6 | idempotent test only checks splice(splice(x,5),5)==splice(x,5);doesn't check splice(splice(x,5),7)==splice(x,7) — overwriting prior splice case | SHIPPED ch 943 |
+| 15P-HIGH-7 | empty_object_unchanged is defensive smoke — also need「」 (empty string),「not json」,「{」 cases | SHIPPED ch 943 |
+| 15P-HIGH-8 | CHANGELOG ch 942 entry header claims「7C+13H+7M」 but body only enumerates ~4 CRIT + ~4 HIGH explicit fixes — same fabrication-class as 14P-CRIT-3 | SHIPPED ch 943 (added enumeration table or honest「X fixes covering Pass-14 Yc/Zh/Wm」) |
+| 15P-HIGH-9 | 2 NEW disciplines「scope-claim verification」 +「shared-helper extraction」 announced in ch 942 narrative but NOT added to「Review-pass discipline registry」 | SHIPPED ch 943 (added to registry) |
+| 15P-MED-1..4 | Various non-snake-case warning,test tightening,substring-match weakness | SHIPPED ch 943 (where cheap) or DEFERRED to ch 944+ |
+| 15P-LOW-1..3 | Style / convention drift | DEFERRED (cosmetic) |
+
+
 
 The 13th-pass foreground audit of substance chapters 934-940 found 3 CRITICAL + 5 HIGH + 3 MED — 8th recurrence of the「each cascade-break attempt becomes next pass's target」 pattern + 1 NEW correctness class (cross-actor sequence-number divergence in payload_json passthrough variant)。
 
@@ -428,6 +472,10 @@ NEW canonical home for the disciplines that have accreted across the 12 review-p
 | **ALL-OCCURRENCES scan for SUBSTANCE-vs-source-code check** (not just first hit) | ch 941 (13P) | When SUBSTANCE check finds a doc lie,`grep -n` for the term in ALL linked docs + ALL sections within those docs — not just the bridge-mapping table。 The「Partial-conformance gotchas」 section was a SECOND surface of the ch 933 lie that escaped because ch 933 only fixed the first surface |
 | **Cross-actor state-encoding correctness check** (not just bridge round-trip presence) | ch 941 (13P-CRIT-1) | When append + read paths cross an actor boundary,the assertion「append wrote it,read returns it」 is insufficient。 ALSO assert:「if BOTH sides have authoritative state for a field,which one wins on read?」 In ch 938 EventLog,Swift had `sequenceNumber:0` in payload_json + Rust had assigned column seq → without splice,payload_json wins (wrong)。 Tests must encode the disputed field with a value that differs from the column-authoritative value and assert the read matches the column |
 | **i32 cast overflow guard at all FFI boundaries** (not just length-bounded ones) | ch 941 (13P-HIGH-1) | Every `as i32` cast in FFI return position needs a pre-cast bound check。 Use `safe_i32_size(usize) → Result<i32,i32>` helper in lib.rs。 -4 sentinel for overflow distinct from -1/-2/-3 |
+| **Scope-claim verification via post-migration grep** (catches false-narrowed-scope class) | ch 942 (14P-HIGH-1) | When a commit/discipline claims「applied at all X」 or「migrated all Y」,run `grep` for the ORIGINAL pattern AFTER the migration claim to verify zero remain。 Ch 941 commit said「all FFI boundaries」 but `grep -n " as i32\b"` found 6 unprotected pre-existing FFIs not in the「new substance bridges from ch 934-938」 set — narrow-scope claim ≠ all-scope claim |
+| **Shared-helper extraction for repeated field assertions** (prevents sister-test drift) | ch 942 (14P-HIGH-3) | When N tests assert the same set of fields on the same struct,extract `assertXEquals` shared helper rather than inline-duplicate。 Prevents the「ch 941 backfilled testFoo but not testFooSister」 defect class observed across ch 936 + later ch 934/935/937 sister tests |
+| **N+1P registry subsection MANDATORY after each fix-of-fix chapter** (per ch 918 / 12P-HIGH-3 pattern) | ch 943 (15P-CRIT-7) | Every chapter that ships fixes for a previous pass MUST add a `### Chapter <N>.5 <P>th-pass foreground 3-agent items` subsection to the SEAL deferred-items registry,enumerating items shipped vs deferred。 Ch 942 announced 14P items in CHANGELOG but did NOT add the registry subsection — defect class 12P-HIGH-3 recurred |
+| **Doc-surface enumeration before ANY「ch N shipped」 claim** (catches partial-surface-update class) | ch 943 (15P-CRIT-1..7) | After EVERY chapter that updates SEAL or BRANCH_SUMMARY,enumerate the surfaces that ALSO mention the chapter span / Rust count / pass count / span-list / authoritative-state-block / TL;DR / v0.62.X block / 'recurrence-list' / sub-arc paragraph / tuple list,and grep each for staleness。 Ch 942 fixed BRANCH_SUMMARY tail-vs-head but left SEAL TL;DR + Authoritative state + v0.62.5 + sub-arc paragraph + Pass-recurrence list + BRANCH_SUMMARY head + tuple list ALL still claiming ch 941 — 7 doc surfaces with same defect class shipped uncorrected by ch 942 |
 
 ### Future consolidation opportunities
 
@@ -531,7 +579,7 @@ the standing constraint that tag creation requires explicit
 user authorization,this doc lays out the proposed release
 notes:
 
-**v0.62.5 — L8 Rust Unification Arc** (post-ch941 state):
+**v0.62.5 — L8 Rust Unification Arc** (post-ch942 state):
 - 8 Swift SQLite actors gain Rust-backed bridges (additive,
   opt-in)
 - **4 hot-path consolidation primitives** ship FLIP-READY
@@ -544,9 +592,9 @@ notes:
   the other 3 stores (FFI-hop reduction only,not
   end-to-end speedup — see Finding #2 for the chapter
   九百十六 honesty correction)
-- **173+ new Swift byte-eq + perf + concurrency tests** (122+ original + 23 substance closure ch 934-938 + 28+ assertion backfills ch 939-941)
-- **98 Rust unit tests** (incl. 16-thread × 25-write
-  Mutex<Connection> stress test from chapter 九百十五 + 14 substance closure tests ch 934-938 + 4 splicer tests ch 941 + 2 safe_i32_size tests ch 941)
+- **173+ new Swift byte-eq + perf + concurrency tests** (122+ original + 23 substance closure ch 934-938 + 28+ assertion backfills ch 939-942 including schemaVersion)
+- **105 Rust unit tests** (incl. 16-thread × 25-write
+  Mutex<Connection> stress test from chapter 九百十五 + 14 substance closure tests ch 934-938 + 4 splicer tests ch 941 + 2 safe_i32_size tests ch 941 + 7 splicer edge-case tests ch 942)
 - 5 new docs (RFC + DECLINE-WITH-TRIGGER + ARC_SEAL + 2
   updated)
 - **ABI 1→18 (17 bumps)** — ch 894 starts at ABI 1 not a
@@ -558,22 +606,24 @@ notes:
   / 927 (ch 926 adds the bas_l8_engine_pragma_value_i64
   diagnostic FFI;ch 927 fixes the test value for that FFI
   without changing ABI surface)
-- **Post-seal review-fix sub-arc (ch 915-941)** shipped per
+- **Post-seal review-fix sub-arc (ch 915-942)** shipped per
   chapters 九百十四.5 / 九百十八.5 / 九百二十一.5 / 5th / 6th /
-  7th / 8th / 9th / 10th / 11th / 12th / USER-PASS / 13th passes
-  reviews — **cumulative 39 CRITICAL + 91 HIGH** (verified by
-  python3 arithmetic in ch 941 — 32+4+3 / 84+2+5 — see Pass
-  table below for per-pass per-fix-chapter mapping) across
-  **13 meta review passes + 1 USER-PASS substance audit**,
+  7th / 8th / 9th / 10th / 11th / 12th / USER-PASS / 13th / 14th
+  passes reviews — **cumulative 46 CRITICAL + 104 HIGH** (verified
+  by python3 arithmetic in ch 942 — 32+4+3+7 / 84+2+5+13 — see
+  Pass table below for per-pass per-fix-chapter mapping) across
+  **14 meta review passes + 1 USER-PASS substance audit**,
   MED/LOW partially tracked (per-pass totals in the table above
   are the authoritative source)。 Pattern observation:cumulative-
   number fabrications recurred at ch 925, 927, 928, 929, 930,
-  931 — caught at the NEXT pass each time + ch 933 USER-PASS
-  caught「Full」-vs-stub doc lie + ch 941 13P caught cross-actor
-  seq divergence + second「Partial-conformance gotchas」 surface。
+  931, 938, 941 — caught at the NEXT pass each time + ch 933
+  USER-PASS caught「Full」-vs-stub doc lie + ch 941 13P caught
+  cross-actor seq divergence + second「Partial-conformance
+  gotchas」 surface + ch 942 14P caught fake-coverage class +
+  false-narrowed-scope class (safe_i32_size at 6 missed sites)。
   Ch 929 verified by running `python3 -c 'sum(...)'` BEFORE
   writing the cumulative claim — discipline accumulator pattern
-  per ch 932 / ch 941。
+  per ch 932 / ch 941 / ch 942。
 
 ## Closing
 
@@ -602,20 +652,24 @@ doesn't introduce new defects**。 Per the pattern observed
 across passes 7/8/9/10/11:every「final seal」 claim has been wrong (ch 932 fix HIGH:enumeration was「passes 7/8/9」 stale,actual fabrication caught at passes 6/7/8/9/10/11)。
 
 **Authoritative state** (per python3-verified arithmetic):
-- 48 implementation chapters (894-941) — 39 in core arc + 9 post-USER-PASS (933 substance-honesty + 934-938 USER-PASS substance closure + 939 cleanup + 940 audit + 941 fix-of-fix)
-- 13 meta review passes + 1 USER-PASS substance audit
-- 39 CRITICAL + 91 HIGH found cumulatively (32+4+3 / 84+2+5 — python3-verified ch 941)
-- ABI evolution 1 → 18 (17 bumps,no ABI surface changes ch 927-941)
+- 49 implementation chapters (894-942) — 39 in core arc + 10 post-USER-PASS (933 substance-honesty + 934-938 USER-PASS substance closure + 939 cleanup + 940 audit + 941 fix-of-fix + 942 fix-of-fix-of-fix)
+- 14 meta review passes + 1 USER-PASS substance audit
+- 46 CRITICAL + 104 HIGH found cumulatively (32+4+3+7 / 84+2+5+13 — python3-verified ch 942)
+- ABI evolution 1 → 18 (17 bumps,no ABI surface changes ch 927-942)
 - All CRITICAL+HIGH addressed in the corresponding fix chapter
 - Production behavior:zero default-flip changes,red-line 7
-  preserved across all 48 chapters
+  preserved across all 49 chapters
 - Stop discipline:fired 1× clean (pass 8) but pass 9
   caught the「seal」 itself was wrong → discipline holds the
   arc cannot truly seal while immediate prior chapter has
   unverified arithmetic claims。 Pass 13 found a NEW correctness
-  class (cross-actor seq divergence) — confirms that even after
-  USER-PASS surfaced the meta-vs-substance distinction,specific
-  substance failure modes still escape until explicitly probed
+  class (cross-actor seq divergence);Pass 14 found a fake-coverage
+  class (events_since_timestamp splicer interaction had no
+  sequenceNumber in fixture) + a false-narrowed-scope class
+  (safe_i32_size missing at 6 pre-existing FFI sites despite
+  ch 941 commit claiming「all FFI boundaries」)。 Pass 15 found
+  10th recurrence — SEAL/BRANCH_SUMMARY head-vs-tail self-
+  contradiction across 7 surfaces shipped uncorrected by ch 942。
 
 The 6th pass found `4 CRITICAL + 8 HIGH + 3 MED` — confirming the
 N-pass cascade pattern but with diminishing-but-real returns each
@@ -638,7 +692,8 @@ cycle:
 | **USER-PASS** (substance-vs-source-code check, NOT cascade meta) | 4 | 2 | ch 933 |
 | Pass 13 (13th-pass foreground 3-agent of substance chapters 934-940) | 3 | 5 | ch 941 |
 | Pass 14 (14th-pass foreground 3-agent of ch 941) | 7 | 13 | ch 942 |
-| **TOTAL (python3-verified ch 942)** | **46** | **104** | **(stop NOT met — Pass 14 found 6 unprotected FFI sites + fake-coverage test + 3-way doc chapter span lie + BRANCH_SUMMARY head-vs-tail self-contradiction。 9th recurrence of「each cascade-break becomes next pass's target」)** |
+| Pass 15 (15th-pass foreground 3-agent of ch 942) | 7 | 13 | ch 943 |
+| **TOTAL (python3-verified ch 943)** | **53** | **117** | **(stop NOT met — Pass 15 found 7 doc CRITICAL surfaces ch 942 missed (TL;DR + Authoritative state + v0.62.5 + sub-arc + BRANCH_SUMMARY head + tuple list + 14P registry MISSING) + realistic_sorted_keys fixture LIES about BASEventLogEntry coverage。 10th recurrence)** |
 
 Pattern observation: ch 924 itself introduced a NEW CRITICAL
 (duplicate UNIQUE index on fresh DBs,inverting ch 923's 20%

@@ -1109,20 +1109,66 @@ mod tests {
             "{\"a\":{\"b\":{\"sequenceNumber\":99}},\"sequenceNumber\":5}");
     }
 
+    // chapter 九百四十三 / M3420 (15P-HIGH-4) — fixture now includes
+    // REQUIRED `kind` field that BASEventLogEntry has (per Sources/
+    // BASRuntimeCore/BASEventLog.swift:151)。 Ch 942 omitted it,
+    // making the「mimics BASEventLogEntry」 claim a lie。 Note the
+    // fixture is still an 11-field SUBSET of the full 18-field
+    // struct (optional fields like turnRef/emotion/rawInputDigest/
+    // stateBeforeID/stateAfterID/payloadJson are nil→omitted by
+    // JSONEncoder)。
     #[test]
     fn splice_sequence_number_realistic_sorted_keys_payload() {
-        // Mimics what Swift JSONEncoder(.sortedKeys) emits for
-        // BASEventLogEntry — many fields,arrays,sequenceNumber
-        // in the MIDDLE (alphabetical between「riskBand」 and
-        // 「sessionID」)。 Validates the splicer against the
-        // actual cross-actor payload shape it's designed for。
-        let pj = "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":0,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}";
+        // 11-field subset of BASEventLogEntry alphabetical shape
+        // (full struct has 18 fields,optional fields nil→omitted)。
+        // Alphabetical ordering per JSONEncoder.sortedKeys:
+        //   actions < confidence < eventID < intent < kind <
+        //   memoryRefs < riskBand < sequenceNumber < sessionID <
+        //   source < timestampMs
+        let pj = "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"kind\":\"chat\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":0,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}";
         let out = splice_sequence_number(pj, 7);
-        assert_eq!(out, "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":7,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}");
+        assert_eq!(out, "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"kind\":\"chat\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":7,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}");
+    }
+
+    // chapter 九百四十三 / M3420 (15P-HIGH-6) — extended idempotency
+    // test:splice→5→7 should equal splice→7 (catches the
+    // accidental-duplicate-field defect class where re-splicing
+    // would insert a SECOND copy instead of replacing the first)
+    #[test]
+    fn splice_sequence_number_overwrite_idempotent() {
+        let pj = "{\"a\":1,\"sequenceNumber\":0,\"b\":2}";
+        let once_to_5 = splice_sequence_number(pj, 5);
+        let then_to_7 = splice_sequence_number(&once_to_5, 7);
+        let direct_to_7 = splice_sequence_number(pj, 7);
+        assert_eq!(then_to_7, direct_to_7,
+            "Re-splicing to different value must equal direct splice;else splicer is inserting duplicates");
+    }
+
+    // chapter 九百四十三 / M3420 (15P-HIGH-7) — defensive cases for
+    // malformed input that could reach the splicer through bad
+    // upstream data。 Splicer should never panic;empty/non-JSON/
+    // unbalanced input should return unchanged (defensive)。
+    #[test]
+    fn splice_sequence_number_empty_string_unchanged() {
+        let out = splice_sequence_number("", 5);
+        assert_eq!(out, "");
     }
 
     #[test]
-    fn splice_sequence_number_payloadJson_nested_as_string() {
+    fn splice_sequence_number_non_json_unchanged() {
+        let out = splice_sequence_number("not json", 5);
+        assert_eq!(out, "not json");
+    }
+
+    #[test]
+    fn splice_sequence_number_unbalanced_brace_unchanged() {
+        // Opens depth=1 but never finds top-level sequenceNumber
+        let out = splice_sequence_number("{\"a\":1", 5);
+        assert_eq!(out, "{\"a\":1");
+    }
+
+    #[test]
+    fn splice_sequence_number_payload_json_nested_as_string() {
         // Mimics the case where the optional `payloadJson` field
         // of BASEventLogEntry carries a stringified JSON object
         // containing a NESTED「sequenceNumber」 in its escaped form。

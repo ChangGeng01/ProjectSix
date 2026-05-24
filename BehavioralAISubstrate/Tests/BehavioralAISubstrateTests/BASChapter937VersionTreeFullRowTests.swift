@@ -153,6 +153,15 @@ final class BASChapter937VersionTreeFullRowTests: XCTestCase {
         XCTAssertNotNil(found)
         XCTAssertEqual(found?.versionID, "single-v")
         XCTAssertEqual(found?.signatureHash, sig)
+        // chapter 九百四十三 / M3420 (15P-HIGH-5) — full-field
+        // backfill on found (was only versionID + signatureHash
+        // before)。 Validates that vaultID + parentVersionID +
+        // createdAtMs + isRollbackPoint all round-trip correctly。
+        XCTAssertEqual(found?.vaultID, "single-vlt")
+        XCTAssertEqual(found?.parentVersionID, nil,
+            "nil parentVersionID must round-trip as nil")
+        XCTAssertEqual(found?.createdAtMs, 1234)
+        XCTAssertEqual(found?.isRollbackPoint, false)
 
         let missing = await store.version(forID: "no-such")
         XCTAssertNil(missing,

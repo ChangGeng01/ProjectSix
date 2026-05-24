@@ -118,10 +118,27 @@ final class BASChapter935DeletionManifestFullRowTests: XCTestCase {
         XCTAssertEqual(cascade.count, 2)
         XCTAssertEqual(Set(cascade.map { $0.manifestID }),
                        Set(["t-c1", "t-c2"]))
+        // chapter 九百四十三 / M3420 (15P-HIGH-5) — full-field
+        // backfill (was only count + manifestID set before)。
+        // Validates that vaultID,targetRefsJson,deletionType,
+        // appliedAtMs all round-trip correctly through the FFI。
+        let cascadeByID = Dictionary(
+            uniqueKeysWithValues: cascade.map { ($0.manifestID, $0) })
+        XCTAssertEqual(cascadeByID["t-c1"]?.vaultID, "v")
+        XCTAssertEqual(cascadeByID["t-c1"]?.targetRefsJson, "[]")
+        XCTAssertEqual(cascadeByID["t-c1"]?.deletionType, "cascade")
+        XCTAssertEqual(cascadeByID["t-c1"]?.appliedAtMs, 1_000)
+        XCTAssertEqual(cascadeByID["t-c2"]?.deletionType, "cascade")
+        XCTAssertEqual(cascadeByID["t-c2"]?.appliedAtMs, 3_000)
 
         let selective = await store.manifests(forType: "selective")
         XCTAssertEqual(selective.count, 1)
         XCTAssertEqual(selective[0].manifestID, "t-s1")
+        // chapter 九百四十三 / M3420 — single-result field backfill
+        XCTAssertEqual(selective[0].vaultID, "v")
+        XCTAssertEqual(selective[0].targetRefsJson, "[]")
+        XCTAssertEqual(selective[0].deletionType, "selective")
+        XCTAssertEqual(selective[0].appliedAtMs, 2_000)
 
         let rollback = await store.manifests(forType: "rollback")
         XCTAssertEqual(rollback.count, 0)
