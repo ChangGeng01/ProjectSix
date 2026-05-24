@@ -110,19 +110,126 @@ public actor BASRoutedHostConstitutionVersionTreeStore:
     public func versions(
         forVault vaultID: String
     ) async -> [BASHostConstitutionVersionRecord] {
-        return []  // full-row query deferred to 899.5
+        // chapter 九百三十七 / M3390 — USER-PASS substance fix #4
+        return Self.versionsArrayViaJsonFfi(
+            engine: enginePtr, key: vaultID, rollbackOnly: false)
     }
 
     public func rollbackPoints(
         forVault vaultID: String
     ) async -> [BASHostConstitutionVersionRecord] {
-        return []  // full-row query deferred to 899.5
+        // chapter 九百三十七 / M3390 — same FFI with rollback filter
+        return Self.versionsArrayViaJsonFfi(
+            engine: enginePtr, key: vaultID, rollbackOnly: true)
     }
 
     public func version(
         forID versionID: String
     ) async -> BASHostConstitutionVersionRecord? {
-        return nil  // deferred
+        // chapter 九百三十七 / M3390 — Optional-shaped FFI like ch 936
+        return Self.versionSingleViaJsonFfi(
+            engine: enginePtr, versionID: versionID)
+    }
+
+    /// chapter 九百三十七 / M3390 — shared probe+fill helper for
+    /// array-shaped queries (versions / rollbackPoints)。
+    /// signature_hash arrives as base64 string in JSON;
+    /// Foundation JSONDecoder default decodes Data from base64
+    /// automatically so no per-field handling needed。
+    private static func versionsArrayViaJsonFfi(
+        engine: OpaquePointer,
+        key: String,
+        rollbackOnly: Bool
+    ) -> [BASHostConstitutionVersionRecord] {
+        let keyBytes = Array(key.utf8)
+        let needed = keyBytes.withUnsafeBufferPointer { kBuf in
+            rollbackOnly
+                ? bas_l8_version_tree_rollback_points_for_vault(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+                : bas_l8_version_tree_versions_for_vault(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(to: CChar.self)
+                    },
+                    kBuf.count,
+                    nil, 0)
+        }
+        guard needed >= 2 else { return [] }
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let written = keyBytes.withUnsafeBufferPointer { kBuf in
+            buf.withUnsafeMutableBufferPointer { outBuf in
+                rollbackOnly
+                    ? bas_l8_version_tree_rollback_points_for_vault(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress, outBuf.count)
+                    : bas_l8_version_tree_versions_for_vault(
+                        engine,
+                        kBuf.baseAddress.map {
+                            UnsafeRawPointer($0)
+                                .assumingMemoryBound(
+                                    to: CChar.self)
+                        },
+                        kBuf.count,
+                        outBuf.baseAddress, outBuf.count)
+            }
+        }
+        guard written >= 0 else { return [] }
+        let json = Data(buf.prefix(Int(written)))
+        return (try? JSONDecoder().decode(
+            [BASHostConstitutionVersionRecord].self,
+            from: json)) ?? []
+    }
+
+    /// chapter 九百三十七 / M3390 — Optional-shaped helper for
+    /// version(forID:)。 Returns nil on not-found (FFI returns 0)。
+    private static func versionSingleViaJsonFfi(
+        engine: OpaquePointer,
+        versionID: String
+    ) -> BASHostConstitutionVersionRecord? {
+        let keyBytes = Array(versionID.utf8)
+        let needed = keyBytes.withUnsafeBufferPointer { kBuf in
+            bas_l8_version_tree_for_id(
+                engine,
+                kBuf.baseAddress.map {
+                    UnsafeRawPointer($0)
+                        .assumingMemoryBound(to: CChar.self)
+                },
+                kBuf.count,
+                nil, 0)
+        }
+        guard needed > 0 else { return nil }
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let written = keyBytes.withUnsafeBufferPointer { kBuf in
+            buf.withUnsafeMutableBufferPointer { outBuf in
+                bas_l8_version_tree_for_id(
+                    engine,
+                    kBuf.baseAddress.map {
+                        UnsafeRawPointer($0)
+                            .assumingMemoryBound(
+                                to: CChar.self)
+                    },
+                    kBuf.count,
+                    outBuf.baseAddress, outBuf.count)
+            }
+        }
+        guard written > 0 else { return nil }
+        let json = Data(buf.prefix(Int(written)))
+        return try? JSONDecoder().decode(
+            BASHostConstitutionVersionRecord.self,
+            from: json)
     }
 
     public func count() async -> Int {

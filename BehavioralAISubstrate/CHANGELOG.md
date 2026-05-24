@@ -11,6 +11,52 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十七 / M3390 — SUBSTANCE chapter #4:version_tree full-row FFI (was「Full」 lie since ch 899)
+
+User directive:继续。 4th substance chapter。 3 stubbed methods (most of any bridge so far)。 NEW recipe complication:`signature_hash` is BLOB (Data in Swift) — JSON needs base64 encoding (Foundation Codable default for Data fields)。
+
+#### What shipped
+
+1. **Rust FFI** — 3 NEW symbols:
+   - `bas_l8_version_tree_versions_for_vault` (array, by vault)
+   - `bas_l8_version_tree_rollback_points_for_vault` (array, filtered by is_rollback_point=1)
+   - `bas_l8_version_tree_for_id` (Optional, returns 0 on not-found)
+2. **Hand-rolled base64 encoder** (no crate dep per ch 894 minimal-dep doctrine) — RFC 4648 standard encoder,unit-tested against published test vectors (`""` → `""`,`"foo"` → `"Zm9v"`,etc.)
+3. **Swift bridge** — 3 stubs replaced via 2 shared helpers (`versionsArrayViaJsonFfi` + `versionSingleViaJsonFfi`) — Foundation JSONDecoder auto-decodes base64 → Data so no per-field handling needed
+4. **Tests** — `BASChapter937VersionTreeFullRowTests.swift` (5 Swift tests):
+   - Round-trip with signature_hash base64 + optional fields
+   - Empty vault returns []
+   - rollbackPoints filter (3 versions,2 rollback)
+   - version(forID:) found + not-found
+   - Vault isolation
+   Plus 3 NEW Rust unit tests:
+   - `base64_encode_matches_rfc4648` (RFC §10 test vectors)
+   - `versions_for_vault_json_round_trip`
+   - `version_for_id_ffi_probe_fill`
+5. **L8_ROUTED_OVERVIEW.md** — VersionTree row「Partial」 → 「Full」 + 3 stub-list entries marked SHIPPED
+
+#### Recipe at chapter 937
+
+| Variant | Shape | base64? |
+|---|---|---|
+| AtomLifecycle (ch 934) | array | no (TEXT cols only) |
+| DeletionManifest (ch 935) | array | no (TEXT cols only) |
+| UserState (ch 936) | Optional opaque | no (payload_json passthrough) |
+| **VersionTree (ch 937)** | **array + Optional + BLOB→base64** | **yes** |
+
+Most complete variant yet — covers all 3 dimensions (collection shape + Optional return + BLOB encoding)。 Future bridges can pattern-match。
+
+#### Verification
+
+- Rust:**88/88 unit tests pass** (+3 NEW)
+- Swift filtered:**BASChapter937 → 5/5 pass** + BASChapter936 → 5/5 + 935 → 4/4 + 934 → 4/4 + 926 → 15/15
+- Swift full sweep:**13609 tests,88 skipped,0 failures** (+5 from ch 936 baseline)
+- pre-commit-gates.sh:**3/3 pass**
+
+#### Remaining (1 bridge left)
+
+- EventLog:`events(forSession:)` + `events(sinceTimestampMs:limit:)` — ch 938 closes the USER-PASS substance work entirely
+
 ### Chapter 九百三十六 / M3385 — SUBSTANCE chapter #3:user_state full-row FFI (was「Full」 lie since ch 898)
 
 User directive:继续。 3rd substance chapter。 Variation from ch 934/935 recipe:schema stores opaque `payload_json` so FFI just returns the bytes as-is — no per-column JSON construction needed。 Simpler than ch 934/935。

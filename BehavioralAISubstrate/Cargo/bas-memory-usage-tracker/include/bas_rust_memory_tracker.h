@@ -1641,6 +1641,39 @@ int64_t bas_l8_version_tree_count_rollback_points(
     const L8Engine* engine,
     const char* vault_id_utf8, size_t vault_id_len);
 
+// chapter 九百三十七 / M3390 — full-row version JSON FFI
+// USER-PASS substance fix #4。 Probe + fill pattern。
+// signature_hash BLOB → base64 string in JSON (Foundation
+// JSONEncoder default for Data fields)。 mergedFromJson is
+// nullable (NULL → JSON null)。
+//
+// JSON shape per BASHostConstitutionVersionRecord Codable:
+//   [{"versionID":"...","vaultID":"...",
+//     "parentVersionID":"..." | null,
+//     "createdAtMs":<i64>,
+//     "signatureHash":"<base64>",
+//     "isRollbackPoint":true|false,
+//     "mergedFromJson":"..." | null}, ...]
+//
+// version_for_id returns 0 on not-found (Optional<T> semantics)。
+int32_t bas_l8_version_tree_versions_for_vault(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+int32_t bas_l8_version_tree_rollback_points_for_vault(
+    const L8Engine* engine,
+    const char* vault_id_utf8, size_t vault_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
+int32_t bas_l8_version_tree_for_id(
+    const L8Engine* engine,
+    const char* version_id_utf8, size_t version_id_len,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 // MARK: - bas-l8-engine vector_index module
 //         (chapter 九百 / M3190)
 //
