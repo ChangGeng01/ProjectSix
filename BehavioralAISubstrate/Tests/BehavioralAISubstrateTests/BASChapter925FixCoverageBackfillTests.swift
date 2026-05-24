@@ -377,38 +377,22 @@ final class BASChapter925FixCoverageBackfillTests: XCTestCase {
     }
 
     // MARK: - Gap 11: MED-17 wal_autocheckpoint value
-
-    func testWalAutocheckpointIs1000() async throws {
-        let url = makeTempDBURL()
-        defer { cleanup(url) }
-        // Open via Rust bridge → triggers ch 920 PRAGMA
-        _ = try BASRoutedEventLogStorage(databaseURL: url)
-        // Now open ANOTHER connection via raw SQLite + verify
-        // the PRAGMA value persists on the file。 (PRAGMAs in
-        // SQLite are per-connection so the value should be
-        // re-read on the second open — actually wal_auto
-        // checkpoint is per-connection-on-write,but the
-        // PRAGMA returns the current value if queried)
-        var db: OpaquePointer?
-        sqlite3_open_v2(url.path, &db,
-            SQLITE_OPEN_READONLY, nil)
-        var stmt: OpaquePointer?
-        sqlite3_prepare_v2(db,
-            "PRAGMA wal_autocheckpoint", -1, &stmt, nil)
-        sqlite3_step(stmt)
-        let value = sqlite3_column_int64(stmt, 0)
-        sqlite3_finalize(stmt)
-        sqlite3_close_v2(db)
-        // SQLite default is 1000;ch 920 explicitly pins it。
-        // The raw reader's value reflects the default if the
-        // pragma is per-connection (which it is for setting
-        // — but the value persisted from the ch 920 init
-        // call is on a different connection)。 What we can
-        // verify:the value is in a reasonable range (default
-        // OR our explicit value)。
-        XCTAssertGreaterThan(value, 0,
-            "wal_autocheckpoint must be positive")
-    }
+    //
+    // chapter 九百四十四 / M3425 fix HIGH (16P-test-1) — DELETED
+    // the testWalAutocheckpointIs1000 test that lived here。
+    // The test was fake coverage on 3 axes:
+    //   (a) name lied:said「Is1000」 but engine pins 1024 since
+    //       ch 927 7P-CRIT-1 sentinel break
+    //   (b) opened READONLY raw-SQLite connection that gets the
+    //       default 1000,not the engine's connection's 1024
+    //   (c) assertion was tautology `XCTAssertGreaterThan(value, 0)`
+    //       which passes for ANY positive value including a
+    //       fully-removed pragma_update
+    // Test BASChapter926.testWalAutocheckpointReadFromEngineConnection
+    // (lines 89-110) does this correctly via engine's own
+    // bas_l8_engine_pragma_value_i64 FFI + asserts == 1024。
+    // Per ch 928 / ch 930 / ch 931 misnamed-test-deletion
+    // discipline,fake-coverage tests are deleted not renamed。
 
     // MARK: - Gap 10: NH3 BLOB caps for signature_hash
 

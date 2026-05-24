@@ -682,11 +682,19 @@ pub fn events_for_session_json(
     // chapter 九百四十一 / M3410 fix CRITICAL — also SELECT
     // sequence_number,splice into payload_json on each row
     // so read-back returns correct (column-authoritative) seq。
+    // chapter 九百四十四 / M3425 fix HIGH (16P-code-1) — implicit
+    // MAX_HOTPATH_LIMIT cap per ch 922 NC4 discipline。 The sister
+    // function events_since_timestamp_json had the cap (caller-
+    // supplied limit + clamp);this session-filtered variant did
+    // not — a session with millions of events could OOM the FFI
+    // via unbounded String alloc。
     let mut stmt = conn.prepare(
         "SELECT payload_json, sequence_number FROM event_log \
          WHERE session_id = ? AND payload_format = 1 \
-         ORDER BY sequence_number")?;
-    let mut rows = stmt.query(params![session_id])?;
+         ORDER BY sequence_number \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        session_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {

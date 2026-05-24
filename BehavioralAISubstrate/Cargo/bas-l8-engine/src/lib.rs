@@ -522,9 +522,12 @@ pub unsafe extern "C" fn bas_l8_engine_pragma_value_i64(
     //   page_size: bytes (positive power of 2)
     //   user_version: caller-stamped (positive by convention)
     //   max_page_count: positive
+    //   foreign_keys: 0/1 (added ch 944 per 16P-test-3 — gives
+    //     ch 932 12P-HIGH-1 post-pragma read-back guard a
+    //     diagnostic test backing it)
     let allowed = ["wal_autocheckpoint", "busy_timeout",
         "synchronous", "journal_size_limit", "page_size",
-        "user_version", "max_page_count"];
+        "user_version", "max_page_count", "foreign_keys"];
     if !allowed.contains(&name) {
         return -3;
     }

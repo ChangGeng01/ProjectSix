@@ -208,14 +208,17 @@ pub fn versions_for_vault_json(
     conn: &Connection,
     vault_id: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十四 / M3425 fix HIGH — implicit MAX_HOTPATH_LIMIT cap
     let mut stmt = conn.prepare(
         "SELECT version_id, vault_id, parent_version_id, \
                 created_at_ms, signature_hash, \
                 is_rollback_point, merged_from_json \
          FROM host_constitution_version_tree \
          WHERE vault_id = ? \
-         ORDER BY created_at_ms")?;
-    let mut rows = stmt.query(params![vault_id])?;
+         ORDER BY created_at_ms \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        vault_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {
@@ -240,14 +243,17 @@ pub fn rollback_points_for_vault_json(
     conn: &Connection,
     vault_id: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十四 / M3425 fix HIGH — implicit MAX_HOTPATH_LIMIT cap
     let mut stmt = conn.prepare(
         "SELECT version_id, vault_id, parent_version_id, \
                 created_at_ms, signature_hash, \
                 is_rollback_point, merged_from_json \
          FROM host_constitution_version_tree \
          WHERE vault_id = ? AND is_rollback_point = 1 \
-         ORDER BY created_at_ms")?;
-    let mut rows = stmt.query(params![vault_id])?;
+         ORDER BY created_at_ms \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        vault_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {

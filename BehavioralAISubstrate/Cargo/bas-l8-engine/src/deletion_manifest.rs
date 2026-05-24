@@ -184,14 +184,17 @@ pub fn manifests_for_vault_json(
     conn: &Connection,
     vault_id: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十四 / M3425 fix HIGH — implicit MAX_HOTPATH_LIMIT cap
     let mut stmt = conn.prepare(
         "SELECT manifest_id, vault_id, target_refs_json, \
                 deletion_type, applied_at_ms, \
                 cascaded_refs_json, version_ref \
          FROM host_constitution_deletion_manifest \
          WHERE vault_id = ? \
-         ORDER BY applied_at_ms")?;
-    let mut rows = stmt.query(params![vault_id])?;
+         ORDER BY applied_at_ms \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        vault_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {
@@ -216,14 +219,17 @@ pub fn manifests_for_type_json(
     conn: &Connection,
     deletion_type: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十四 / M3425 fix HIGH — implicit MAX_HOTPATH_LIMIT cap
     let mut stmt = conn.prepare(
         "SELECT manifest_id, vault_id, target_refs_json, \
                 deletion_type, applied_at_ms, \
                 cascaded_refs_json, version_ref \
          FROM host_constitution_deletion_manifest \
          WHERE deletion_type = ? \
-         ORDER BY applied_at_ms")?;
-    let mut rows = stmt.query(params![deletion_type])?;
+         ORDER BY applied_at_ms \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        deletion_type, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {

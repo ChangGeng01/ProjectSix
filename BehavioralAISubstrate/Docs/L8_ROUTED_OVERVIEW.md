@@ -62,7 +62,7 @@ These methods exist in the Routed bridge's protocol surface but return empty/nil
 
 **What this means for you**:if you swap a `BASSQLite*` actor for its `BASRouted*` bridge in production,**APPEND/COUNT will work but READ will silently return empty**。 Per ADR-014 OPT-IN,no Routed bridge is production-default for this exact reason。
 
-**chapter 九百三十三 / M3370 fix**:this section + the「Partial」 status labels above were missing from the OVERVIEW table。 12 review passes audited cumulative numbers and discipline meta but did NOT verify the OVERVIEW table's substantive claims against actual source code。 User caught this gap by reading the linked file。 Discipline meta-lesson: doc complexity reviews need to include SUBSTANCE-vs-source-code checks,not just cross-doc consistency。
+**chapter 九百三十三 / M3370 fix** (as of ch 933 — subsequently extended through ch 944 with 15 meta passes + USER-PASS + 2 USER-PASS-2 catches):this section + the「Partial」 status labels above were missing from the OVERVIEW table。 12 review passes audited cumulative numbers and discipline meta but did NOT verify the OVERVIEW table's substantive claims against actual source code。 User caught this gap by reading the linked file。 Discipline meta-lesson: doc complexity reviews need to include SUBSTANCE-vs-source-code checks,not just cross-doc consistency。 (ch 944 16P-doc-CRIT-1 found a SECOND substance lie in this same OVERVIEW doc — wal_autocheckpoint=1000 was stale,actual source is 1024。 Same SUBSTANCE-vs-source-code class — fix shipped ch 944。)
 
 ## The MemoryUsageTracker family
 
@@ -183,9 +183,15 @@ would have rolled back a transaction that never happened
   their OWN Mutex — see chapter 九百十九 CRITICAL fix C3 for
   the multi-engine race protection (BEGIN IMMEDIATE around
   UPSERT pre-check + INSERT)。
-- WAL autocheckpoint is set to 1000 pages (~4MB,SQLite
-  default,explicitly pinned in ch 920)。 Long sessions
-  won't accumulate unbounded WAL。
+- WAL autocheckpoint is set to **1024 pages** (~4 MB at 4KB
+  page size) — sentinel value distinct from SQLite default 1000,
+  pinned in ch 920 + corrected to 1024 in ch 927 (per 7P-CRIT-1
+  cascade-break:1000 matched the rusqlite/SQLite default which
+  made the「explicit pin」 test fake coverage — see ch 931
+  rusqlite-default-coincidence discipline)。 Long sessions
+  won't accumulate unbounded WAL。 Source-of-truth:
+  `Cargo/bas-l8-engine/src/lib.rs:228` (`pragma_update(..., "wal_autocheckpoint", 1024)`) +
+  `lib.rs:1539` assertion `wal_autocheckpoint must be 1024 on engine`。
 
 ## Where the database lives
 

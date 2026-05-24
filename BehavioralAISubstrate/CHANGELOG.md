@@ -11,6 +11,65 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十四 / M3425 — 全面 review + 测试 + 修复:1 CRIT (doc substance lie) + 4 HIGH-code (unbounded read FFIs) + 3 HIGH-test (fake coverage + 2 NEW tests) + 3 HIGH-doc
+
+User directive 「全面 review + 测试 + 修复」 triggered comprehensive 3-agent (code + test + doc) review of post-943.2 state。 Found 1 CRIT + 10 HIGH + 8 MED + 5 LOW。 All CRITs + HIGHs shipped here。
+
+#### CRITICAL — L8_ROUTED_OVERVIEW.md substance lie
+
+**16P-doc-CRIT-1**:`Docs/L8_ROUTED_OVERVIEW.md:186` claimed `WAL autocheckpoint is set to 1000 pages (~4MB,SQLite default,explicitly pinned in ch 920)` — but actual source is **1024** (sentinel value from ch 927 7P-CRIT-1,distinct from SQLite default 1000)。 Same class as ch 933 USER-PASS substance lie:consumer doc says one thing,source code has different value。 The ch 933 USER-PASS only fixed the「Full」 bridge-mapping table — this PRAGMA narrative was a SECOND substance lie in the same OVERVIEW doc that survived 11 review passes。
+
+Fix:OVERVIEW :186 corrected to「1024 pages」 + added source-of-truth pointers (`lib.rs:228` setter + `lib.rs:1539` assertion `wal_autocheckpoint must be 1024 on engine`)。 Annotated ch 933 narrative to note ch 944 found the SECOND substance lie in same doc。
+
+#### HIGH (code) — 7 unbounded read FFIs
+
+**16P-code-1..4**:ch 934-938 closed the USER-PASS arc by implementing 7 array-shaped full-row read FFIs,but ALL 7 missed the ch 922 NC4 `MAX_HOTPATH_LIMIT` discipline (sister `events_since_timestamp_json` had the cap because its SQL already had `LIMIT ?`)。 An atom/session/vault with millions of rows could OOM the FFI via unbounded `String` alloc。
+
+Fix:added `LIMIT ?` clause + bound `MAX_HOTPATH_LIMIT as i64` to all 7 SQL queries:
+- `events_for_atom_json` + `events_for_session_json` (atom_lifecycle.rs)
+- `manifests_for_vault_json` + `manifests_for_type_json` (deletion_manifest.rs)
+- `versions_for_vault_json` + `rollback_points_for_vault_json` (version_tree.rs)
+- `events_for_session_json` (event_log.rs)
+
+#### HIGH (test) — fake coverage cleanup + 2 NEW tests
+
+**16P-test-1 (fake coverage DELETED)**:`BASChapter925.testWalAutocheckpointIs1000` had 3 fake-coverage axes:
+(a) name lied — engine pins 1024 since ch 927 sentinel
+(b) opened READONLY raw-SQLite connection returning the default 1000
+(c) assertion was tautology `XCTAssertGreaterThan(value, 0)`
+
+Per ch 928/930/931 misnamed-test-deletion discipline,DELETED the test。 `BASChapter926.testWalAutocheckpointReadFromEngineConnection` is the real coverage。
+
+**16P-test-2 (NEW cross-engine race test)**:`testCrossEngineSameFileRaceSerializes` in BASChapter926 — 2 BASRoutedEventLogStorage instances on SAME DB file,async concurrent appends to same session,asserts BEGIN IMMEDIATE + UNIQUE(session_id, sequence_number) serializes them into distinct {0, 1} seqs。 First END-TO-END coverage of the ch 919 multi-engine safety story that was MISSING for 25+ chapters。
+
+**16P-test-3 (NEW foreign_keys diagnostic)**:`testForeignKeysPragmaReadsAsOne` via `bas_l8_engine_pragma_value_i64("foreign_keys")` returns 1 — gives ch 932 12P-HIGH-1 post-pragma read-back guard a diagnostic test backing it。 Required adding `foreign_keys` to `pragma_value_i64` whitelist in `lib.rs:525-528`。
+
+#### HIGH (doc) — 3 stale references
+
+**16P-doc-H1**:`BRANCH_SUMMARY.md:33` tail still said「ALL 48 chapters」 (Pass 14 era value despite head saying 50)。 Fixed → 「ALL 50 chapters」 with attribution to ch 944 reconciliation。
+
+**16P-doc-H2**:`Docs/L8_ROUTED_OVERVIEW.md:65` 「12 review passes」 stale narrative。 Annotated as「as of ch 933;subsequently extended through ch 944」 for historical honesty。
+
+**16P-doc-H3**:SEAL ch 940.5 13P registry subsection was orphan content without `### Chapter` H3 header (violated ch 918 / 15P-CRIT-7 pattern)。 Backfilled the H3 header。
+
+#### Verification
+
+- Rust:**109/109 unit tests pass** (whitelist addition included `foreign_keys`,which makes the existing whitelist-rejects-unknown test still pass)
+- Swift filtered (BASChapter925/926/934-938):**50/50 pass** including the 2 NEW ch 944 tests
+- Swift full sweep:**13614 tests,87 skipped,0 failures** (run before ch 944 changes — post-ch944 should show 13615 tests with +2 new tests - 1 deleted = +1)
+- pre-commit-gates.sh:**3/3 pass**
+- python3-verified cumulative arithmetic unchanged at 53C+113H — the ch 944 substance fixes are NOT counted as「new pass-found CRIT/HIGH」 because this is a different class of work (user-directed 全面 review with shipping,not a stop-discipline pass review)
+
+#### Discipline notes
+
+- This is the 11th class of doc-vs-substance lie:CONSUMER-doc tells one story,SOURCE-CODE says another。 First class (ch 933) was「Full」/「Partial」 bridge mapping;this class is PRAGMA value documentation。
+- The「全面 review + 测试 + 修复」 directive triggered a different class of work than the 15-pass cascade:user-DIRECTED comprehensive substance audit + ship,vs cascade-discipline next-pass review。 The cumulative C+H tally stays at 53+113 because the substance items here are NEW fixes,not items missed by prior cascade meta passes (they were systemic gaps the cascade was structurally blind to)。
+- ch 944 itself is a target for future user-pass or 16P review。 The 「safe_i32_size 3 sites」 MED item from code review (vector_index + event_log row-count casts) was DEFERRED as safe-in-practice (bounded by MAX_HOTPATH_LIMIT)。
+
+#### Up next
+
+- ch 945+:if user does another 全面 review,expect more SUBSTANCE class items in consumer docs / cross-actor encoding / test coverage gaps that the 15-pass cascade meta missed structurally
+
 ### Chapter 九百四十三.2 / M3420.2 — Self-audit followup corrigendum (4 more stale numeric references ch 943.1 missed)
 
 After ch 943.1 corrigendum, a self-audit looking for remaining stale references found that the corrigendum itself missed 4 sites — same defect class (partial-update-of-same-row anti-pattern):

@@ -266,14 +266,20 @@ pub fn events_for_atom_json(
     conn: &Connection,
     atom_id: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十四 / M3425 fix HIGH (16P-code-2):add implicit
+    // MAX_HOTPATH_LIMIT cap per ch 922 NC4 discipline。 The ch 934
+    // implementation missed this cap — an atom with millions of
+    // events could OOM the FFI via unbounded JSON String alloc。
     let mut stmt = conn.prepare(
         "SELECT event_id, atom_id, session_id, from_phase, \
                 to_phase, action, outcome, recorded_at_ms, \
                 actor_ref \
          FROM atom_lifecycle_events \
          WHERE atom_id = ? \
-         ORDER BY recorded_at_ms")?;
-    let mut rows = stmt.query(params![atom_id])?;
+         ORDER BY recorded_at_ms \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        atom_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {
@@ -300,14 +306,17 @@ pub fn events_for_session_json(
     conn: &Connection,
     session_id: &str,
 ) -> rusqlite::Result<String> {
+    // chapter 九百四十四 / M3425 fix HIGH — implicit MAX_HOTPATH_LIMIT
     let mut stmt = conn.prepare(
         "SELECT event_id, atom_id, session_id, from_phase, \
                 to_phase, action, outcome, recorded_at_ms, \
                 actor_ref \
          FROM atom_lifecycle_events \
          WHERE session_id = ? \
-         ORDER BY recorded_at_ms")?;
-    let mut rows = stmt.query(params![session_id])?;
+         ORDER BY recorded_at_ms \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![
+        session_id, crate::MAX_HOTPATH_LIMIT as i64])?;
     let mut out = String::from("[");
     let mut first = true;
     while let Some(row) = rows.next()? {

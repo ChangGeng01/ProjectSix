@@ -21,6 +21,7 @@
 // covers the Swift-reachable backfill。
 
 import XCTest
+import BASRuntimeCore
 @testable import BASMemory
 #if canImport(BASRustMemoryTrackerBinary)
 import BASRustMemoryTrackerBinary
@@ -163,6 +164,95 @@ final class BASChapter926FixBackfillCoverageTests: XCTestCase {
         }
         XCTAssertEqual(value, -3,
             "non-whitelisted pragma must return -3")
+    }
+
+    /// chapter 九百四十四 / M3425 fix HIGH (16P-test-3) — verify
+    /// foreign_keys pragma reads back as 1 from engine connection。
+    /// ch 932 12P-HIGH-1 added the post-pragma read-back guard to
+    /// detect rusqlite-default coincidence,but no Swift test
+    /// actually called pragma_value_i64("foreign_keys") to verify
+    /// the FFI's whitelist + read path works for this pragma。
+    /// If a future libsqlite3-sys flip makes pragma_update silently
+    /// no-op AND the read-back skips (defect class ch 931 surfaced),
+    /// nothing else catches it。
+    func testForeignKeysPragmaReadsAsOne() {
+        let engine = openEngine()
+        defer { _ = bas_l8_engine_close(engine) }
+
+        let name = Array("foreign_keys".utf8)
+        let value = name.withUnsafeBufferPointer { buf in
+            bas_l8_engine_pragma_value_i64(
+                engine,
+                buf.baseAddress.map {
+                    UnsafeRawPointer($0)
+                        .assumingMemoryBound(to: CChar.self)
+                },
+                buf.count)
+        }
+        XCTAssertEqual(value, 1,
+            "foreign_keys must be 1 on engine connection " +
+            "(ch 932 pragma_update + post-pragma read-back guard);" +
+            " if 0 returned,either pragma_update was no-op or " +
+            "the read-back guard silently passed")
+    }
+
+    /// chapter 九百四十四 / M3425 fix HIGH (16P-test-2) — verify
+    /// cross-engine same-file race: 2 L8Engine instances pointing
+    /// at the same DB file should NOT both win an INSERT with the
+    /// same (session_id, sequence_number) primary key。 ch 919
+    /// added BEGIN IMMEDIATE + UNIQUE constraint for this exact
+    /// race protection,but the existing
+    /// `multiple_engines_are_independent` Rust test only verifies
+    /// distinct handles for in-memory engines。 End-to-end coverage
+    /// on a real same-file race was missing for 25+ chapters。
+    func testCrossEngineSameFileRaceSerializes() async throws {
+        let url = makeTempDBURL("xrace")
+        defer { cleanup(url) }
+        // 2 engines pointing at SAME file
+        let engineA = try BASRoutedEventLogStorage(
+            databaseURL: url)
+        let engineB = try BASRoutedEventLogStorage(
+            databaseURL: url)
+        // Both attempt to append events to same session
+        // simultaneously。 The engine's BEGIN IMMEDIATE +
+        // busy_timeout=4500 should serialize them — one wins,
+        // the other gets a new sequence_number。 NOT both seq=0。
+        let entryA = BASEventLogEntry(
+            eventID: "xrace-A",
+            timestampMs: 1_000,
+            kind: .chat,
+            sessionID: "race-sess",
+            sequenceNumber: 0,
+            riskBand: .low)
+        let entryB = BASEventLogEntry(
+            eventID: "xrace-B",
+            timestampMs: 2_000,
+            kind: .chat,
+            sessionID: "race-sess",
+            sequenceNumber: 0,
+            riskBand: .low)
+        async let r1 = try engineA.append(entryA)
+        async let r2 = try engineB.append(entryB)
+        let a = try await r1
+        let b = try await r2
+        // Both events got assigned seqs — distinct (cross-engine
+        // serialization worked)
+        XCTAssertNotEqual(
+            a.assignedSequenceNumber,
+            b.assignedSequenceNumber,
+            "BEGIN IMMEDIATE + UNIQUE(session_id,seq) must " +
+            "serialize concurrent cross-engine appends — both " +
+            "wrote with assigned distinct seqs。 If equal,either " +
+            "BEGIN IMMEDIATE was bypassed (no row lock) or " +
+            "UNIQUE constraint was dropped。")
+        // Combined seqs are {0, 1} (in some order)
+        let seqs: Set<Int64> = [
+            a.assignedSequenceNumber,
+            b.assignedSequenceNumber,
+        ]
+        XCTAssertEqual(seqs, Set<Int64>([0, 1]),
+            "Cross-engine appends must produce contiguous {0, 1} " +
+            "seq pair (ch 919 BEGIN IMMEDIATE invariant)")
     }
 
     // MARK: - HIGH-2 — [UInt8] cosineTopK NaN/Inf/dim guard
