@@ -330,14 +330,20 @@ bas_l8_host_constitution_vault_payload_for_id(
     };
     let bytes = payload_str.as_bytes();
     let needed = bytes.len();
+    // chapter 九百四十二 / M3415 fix HIGH-1 (14P) — i32 overflow
+    // guard (ch 941 helper applied at ch 941 missed 6 additional
+    // FFI sites including this one)
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     if out_buf.is_null() || out_capacity < needed {
-        return needed as i32;
+        return safe_needed;
     }
     unsafe {
         core::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 /// Probe-mode buffer read of first vault's payload_json for
@@ -365,14 +371,19 @@ bas_l8_host_constitution_vault_first_payload_for_host(
     };
     let bytes = payload_str.as_bytes();
     let needed = bytes.len();
+    // chapter 九百四十二 / M3415 fix HIGH-1 (14P) — i32 overflow
+    // guard
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     if out_buf.is_null() || out_capacity < needed {
-        return needed as i32;
+        return safe_needed;
     }
     unsafe {
         core::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 /// Returns 1 if vault was removed, 0 if vault_id was unknown,

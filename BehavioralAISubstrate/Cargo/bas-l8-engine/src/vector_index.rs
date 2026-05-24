@@ -416,14 +416,18 @@ bas_l8_vector_index_read_embedding_for_atom(
         None => return -2,
     };
     let needed = bytes.len();
+    // chapter 九百四十二 / M3415 fix HIGH-1 (14P) — i32 overflow guard
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     if out_buf.is_null() || out_capacity < needed {
-        return needed as i32;
+        return safe_needed;
     }
     unsafe {
         core::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 /// chapter 九百十 / M3255 review fix #11 — same as cosine_topk_

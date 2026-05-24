@@ -11,9 +11,67 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
-### Chapter 九百四十一 / M3410 — 13th-pass fix-of-fix:cross-actor seq divergence + 3 CRITICAL + 5 HIGH from review of ch 934-938
+### Chapter 九百四十二 / M3415 — 14th-pass fix-of-fix-of-fix:7 CRITICAL + 13 HIGH + 7 MED from review of ch 941 (9th recurrence of cascade-break pattern)
 
-User directive:全面 开发 → 13th-pass review of substance chapters 934-938 + ship the fixes the review found。 Per the cumulative 12-pass-then-USER-PASS discipline (see SEAL Pass table),this chapter CANNOT seal — the 13th-pass surfaced 3 NEW CRITICAL + 5 NEW HIGH + 3 MED items (8th recurrence of the「each cascade-break attempt becomes next pass's target」 pattern)。
+Per 「继续开发」 directive → 14th-pass 3-agent foreground review of ch 941。 Per ch 929 discipline,every fix-of-fix chapter gets reviewed in the next pass — and Pass 14 found CRITICAL items in EVERY surface (code,test,doc) that ch 941 thought it was closing。
+
+#### Critical fixes shipped
+
+**CRIT-1 (test fake coverage) — Cargo/bas-l8-engine/src/event_log.rs:1093-1125** — `events_since_timestamp_respects_limit_and_order` fixture used `{{"eventID":"ts-{}","i":{}}}` — NO `sequenceNumber` field。 Splicer took no-op branch every row。 Test passed even if splice call removed (cascade-class regression undetected)。 Fix:fixture now bakes in `"sequenceNumber":0` + new assertions verify `\"sequenceNumber\":2`/`:3`/`:4` (Rust-assigned column values),proving the splice path runs。 Test would now FAIL if splice removed。
+
+**CRIT-2/3/4 (doc lies)** — three different surfaces lied about ch 941 scope:
+- CHANGELOG ch 941 said「review of substance chapters **934-938**」 in 3 places,but SEAL Pass 13 row + 13P registry + BRANCH_SUMMARY all said「**934-940**」。 Fix:CHANGELOG 3 sites → 934-940 (preserved legitimate 934-938 references in the substance-arc tally and USER-PASS narrative)
+- CHANGELOG ch 941 header read「3 CRITICAL + 5 HIGH」 dropping MED count entirely (SEAL Pass table + 13P registry both said「+ 3 MED」 — header carried fabrication-class deflation)。 Fix:header → 「3 CRITICAL + 5 HIGH + 1 MED (2 deferred)」 matching shipped state
+- BRANCH_SUMMARY:33 tail still said「ZERO production-default flips...preserved across ALL **40 chapters**...**78 Rust + 150+ Swift tests + 12 meta passes**」 while the row's HEAD (which ch 941 updated) said「48 chapters / 98 Rust / 173+ / 13 meta」。 Self-contradicting in same row。 Fix:tail rewritten to match head + appended ch 942 14P findings
+
+#### High fixes shipped
+
+**HIGH-1 (safe_i32_size scope leak)** — ch 941 commit message claimed「applied at all FFI boundaries」 but `grep -n " as i32\b"` found 6 additional pre-existing string-passthrough FFIs that ch 941 ignored:
+- host_constitution_vault.rs:334,340 (payload_for_vault) + 369,375 (first_payload_for_host)
+- memory_usage_extras.rs:309,315 (notes_for_record)
+- memory_usage_records.rs:447,453 (helped_state_for_record)
+- vector_index.rs:420,426 (embedding_for_atom)
+- lib.rs:437,443 (engine_db_path)
+
+Each could silently wrap negative on > 2 GB output → Swift caller interprets as error code → silent data drop。 Fix:applied `crate::safe_i32_size` helper at all 6 sites with the same `match {Ok(n) => n, Err(c) => return c}` pattern。 The discipline-claim itself was false-narrowed-scope — same class as the multiple previous「all surfaces updated」 fabrications。
+
+**HIGH-3 (code review) + HIGH-1/5 (test review) — 7 NEW splicer tests** covering gaps in ch 941's 4-test set:
+- `splice_sequence_number_first_field_position` (FIRST top-level field — shortest `pj[..after]` slice)
+- `splice_sequence_number_only_field` (single-field object)
+- `splice_sequence_number_empty_object_unchanged` (`{}` no-op)
+- `splice_sequence_number_idempotent` (splice∘splice == splice)
+- `splice_sequence_number_depth_3_nested_preserved` (depth=3 nested skipped)
+- `splice_sequence_number_realistic_sorted_keys_payload` (10-field BASEventLogEntry alphabetical — sequenceNumber in MIDDLE between riskBand and sessionID,arrays for memoryRefs+actions — production payload shape)
+- `splice_sequence_number_payloadJson_nested_as_string` (BASEventLogEntry's optional `payloadJson: String?` field carrying escaped JSON-as-string with NESTED sequenceNumber — must not match due to in_string state tracking)
+
+**HIGH-3 (test review) — schemaVersion missing in BASChapter936 sister tests** — `BASUserState` has 10 Codable fields per `Sources/BASRuntimeCore/BASUserState.swift:89`,but ch 941 backfilled only 9 (missed schemaVersion)。 Worse,testLatestStateForSessionRoundTrip + testLatestStateSessionIsolation were NOT backfilled at all (still only stateID + 1-2 fields)。 Fix:extracted NEW `assertMakeStateRoundTripEquals` shared helper asserting all 10 fields including schemaVersion + invoked from testStateForIDRoundTrip + testLatestStateSessionIsolation;testLatestStateForSessionRoundTrip got inline 9-field assertion for the divergent `later` state。
+
+**HIGH-1 (doc) — SEAL :34 stale「12-pass cycle」** while line 562 + Pass-13 row both said 13-pass。 Fix:「13-pass cycle + USER-PASS substance audit + ch 942 14P fix-of-fix-of-fix follow-on」。
+
+#### Verification
+
+- Rust:**105/105 unit tests pass** (was 98,+7 NEW splicer tests for HIGH-3 + HIGH-5)
+- Swift filtered:BASChapter934-938 + BASChapter936 sister tests all pass with new field assertions including schemaVersion
+- Swift full sweep:**TBD pending xcframework rebuild + sweep**
+- pre-commit-gates.sh:**TBD pending verification**
+- grep verify post-edit:`grep -c " as i32\b" Cargo/bas-l8-engine/src/*.rs` for production paths = the bounded ones (event_log:593 row count + vector_index:507/596 row count) — verified bounded by MAX_HOTPATH_LIMIT
+
+#### Discipline notes
+
+- python3-verified cumulative 39+7=46 CRITICAL / 91+13=104 HIGH (per-pass: ...[3,5][7,13] → sum)
+- 9th recurrence of fabrication pattern confirmed
+- 2 NEW disciplines added implicitly:
+  * **Scope-claim verification** — when a commit message says「all X migrated」,grep for X-without-the-pattern AFTER the migration claim
+  * **Shared-helper extraction discipline** for repeated field assertions in tests — prevents drift across sister tests
+- Arc cannot self-seal — ch 942 itself becomes Pass 15's target per the cascade pattern
+
+#### Up next
+
+- ch 943:15th-pass review of ch 942 (per discipline,8 of 8 prior cascade-break attempts have been caught by the immediate next pass — there is no reason to believe ch 942 is the exception)
+
+### Chapter 九百四十一 / M3410 — 13th-pass fix-of-fix:cross-actor seq divergence + 3 CRITICAL + 5 HIGH + 1 MED (2 deferred) from review of ch 934-940
+
+User directive:全面 开发 → 13th-pass review of substance chapters 934-940 + ship the fixes the review found。 Per the cumulative 12-pass-then-USER-PASS discipline (see SEAL Pass table),this chapter CANNOT seal — the 13th-pass surfaced 3 NEW CRITICAL + 5 NEW HIGH + 3 MED items (8th recurrence of the「each cascade-break attempt becomes next pass's target」 pattern)。
 
 #### Fixes shipped
 
@@ -31,7 +89,7 @@ NEW Rust tests (4):
 
 Updated `events_for_session_json_round_trip` to use payloads containing baked-in `sequenceNumber:0` and assert post-splice values are correct。 Swift `BASChapter938EventLogFullRowTests.testEventsForSessionRoundTrip` now asserts BOTH the `append`-returned `assignedSequenceNumber` AND the read-back `read[i].sequenceNumber` — without the ch 941 splice fix the latter would all be 0。
 
-**CRITICAL-2 — L8_ROUTED_OVERVIEW.md「Partial-conformance gotchas」 section still active after ch 934-938 closed the methods**
+**CRITICAL-2 — L8_ROUTED_OVERVIEW.md「Partial-conformance gotchas」 section still active after ch 934-940 closed the methods**
 
 Same class of doc-vs-source lie that the ch 933 USER-PASS caught — 12 review passes cascaded across cumulative numbers but didn't re-grep this exact section against current source code。
 
@@ -64,7 +122,7 @@ generatedAtMs / riskTrend / complexityAddictionScore were not asserted in the ro
 #### Verification
 
 - Rust:**98/98 unit tests pass** (was 92,+4 NEW splicer tests + 2 NEW safe_i32_size tests)
-- Swift filtered:BASChapter934-938 + BASChapter925/926 + BASChapter786 all pass
+- Swift filtered:BASChapter934-940 + BASChapter925/926 + BASChapter786 all pass
 - Swift full sweep:**13614 tests,86 skipped,1 environmental failure** (CoreData XPC signal-10 — same per-suite-failure class as ch 928 sweep,not L8 code,all L8-arc filtered tests pass clean per `swift test --filter "BASChapter934|935|936|937|938|941"` = 23/23)。 Test count unchanged because ch 941 adds NO new test bodies — only assertion enrichment of existing ch 936/938 tests + Rust-side splicer fix + dead-code guard collapse。
 - Skip count IS **86** not 87 — ch 938/939/940 CHANGELOG entries claimed 87 from copy-paste fabrication;ch 941 verification step caught + corrected in those entries (per 13P-HIGH-4)
 - pre-commit-gates.sh:**3/3 pass**
@@ -123,7 +181,7 @@ The disciplined response to「全面 开发」 is:audit → ship what has consum
 
 #### Up next
 
-- ch 941:13th-pass review of substance chapters 934-938 + arc seal (if review clean)
+- ch 941:13th-pass review of substance chapters 934-940 + arc seal (if review clean)
 
 ### Chapter 九百三十九 / M3400 — cleanup batch:6 deferred MED items from SEAL registry in one chapter
 

@@ -433,14 +433,18 @@ pub unsafe extern "C" fn bas_l8_engine_db_path(
     let path_str = engine_ref.db_path.to_string_lossy();
     let bytes = path_str.as_bytes();
     let needed = bytes.len();
+    // chapter 九百四十二 / M3415 fix HIGH-1 (14P) — i32 overflow guard
+    let safe_needed = match safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
     if out_buf.is_null() || out_capacity < needed {
-        return needed as i32;
+        return safe_needed;
     }
     unsafe {
         core::ptr::copy_nonoverlapping(
             bytes.as_ptr(), out_buf, needed);
     }
-    needed as i32
+    safe_needed
 }
 
 // MARK: - CStr helper (for future migration chapter use)

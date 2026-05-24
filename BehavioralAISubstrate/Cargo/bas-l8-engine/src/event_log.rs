@@ -1063,6 +1063,81 @@ mod tests {
         assert_eq!(out, pj);
     }
 
+    // chapter 九百四十二 / M3415 (14P-H3 code review + H5 test review)
+    // Backfilled splicer coverage gaps:FIRST-field position,
+    // empty object,idempotency,depth-3 nesting,realistic sortedKeys
+    // payload shape with payloadJson nested-as-string field。
+
+    #[test]
+    fn splice_sequence_number_first_field_position() {
+        // sequenceNumber as FIRST top-level field (shortest pj[..after])
+        let pj = "{\"sequenceNumber\":0,\"x\":1,\"y\":2}";
+        let out = splice_sequence_number(pj, 99);
+        assert_eq!(out, "{\"sequenceNumber\":99,\"x\":1,\"y\":2}");
+    }
+
+    #[test]
+    fn splice_sequence_number_only_field() {
+        // sequenceNumber as the ONLY field
+        let pj = "{\"sequenceNumber\":0}";
+        let out = splice_sequence_number(pj, 42);
+        assert_eq!(out, "{\"sequenceNumber\":42}");
+    }
+
+    #[test]
+    fn splice_sequence_number_empty_object_unchanged() {
+        // Empty object → no-op
+        let out = splice_sequence_number("{}", 99);
+        assert_eq!(out, "{}");
+    }
+
+    #[test]
+    fn splice_sequence_number_idempotent() {
+        // splice(splice(x, 5), 5) == splice(x, 5)
+        let pj = "{\"a\":1,\"sequenceNumber\":0,\"b\":2}";
+        let once = splice_sequence_number(pj, 5);
+        let twice = splice_sequence_number(&once, 5);
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn splice_sequence_number_depth_3_nested_preserved() {
+        // depth=3 nested sequenceNumber must be preserved
+        let pj = "{\"a\":{\"b\":{\"sequenceNumber\":99}},\"sequenceNumber\":0}";
+        let out = splice_sequence_number(pj, 5);
+        assert_eq!(out,
+            "{\"a\":{\"b\":{\"sequenceNumber\":99}},\"sequenceNumber\":5}");
+    }
+
+    #[test]
+    fn splice_sequence_number_realistic_sorted_keys_payload() {
+        // Mimics what Swift JSONEncoder(.sortedKeys) emits for
+        // BASEventLogEntry — many fields,arrays,sequenceNumber
+        // in the MIDDLE (alphabetical between「riskBand」 and
+        // 「sessionID」)。 Validates the splicer against the
+        // actual cross-actor payload shape it's designed for。
+        let pj = "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":0,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}";
+        let out = splice_sequence_number(pj, 7);
+        assert_eq!(out, "{\"actions\":[\"permit:answer\"],\"confidence\":0.85,\"eventID\":\"rt-1\",\"intent\":\"ask_question\",\"memoryRefs\":[\"atom-1\",\"atom-2\"],\"riskBand\":\"low\",\"sequenceNumber\":7,\"sessionID\":\"sess-A\",\"source\":\"test\",\"timestampMs\":1000}");
+    }
+
+    #[test]
+    fn splice_sequence_number_payloadJson_nested_as_string() {
+        // Mimics the case where the optional `payloadJson` field
+        // of BASEventLogEntry carries a stringified JSON object
+        // containing a NESTED「sequenceNumber」 in its escaped form。
+        // Must not match — depth=1 + in_string=true throughout the
+        // inner content。
+        let pj = "{\"payloadJson\":\"{\\\"sequenceNumber\\\":99}\",\"sequenceNumber\":0}";
+        let out = splice_sequence_number(pj, 5);
+        // Top-level sequenceNumber replaced;nested-string content
+        // preserved byte-for-byte
+        assert!(out.contains("\\\"sequenceNumber\\\":99"),
+            "nested-string-as-payload must NOT be replaced");
+        assert!(out.contains("\"sequenceNumber\":5}"),
+            "top-level sequenceNumber must be replaced");
+    }
+
     #[test]
     fn events_for_session_skips_format_2_blob_rows() {
         let engine = unsafe {
@@ -1090,6 +1165,12 @@ mod tests {
         unsafe { bas_l8_engine_close(engine); }
     }
 
+    // chapter 九百四十二 / M3415 fix CRITICAL-1 — payload now includes
+    // baked-in `"sequenceNumber":0` to exercise the splicer path。
+    // Previously these payloads had no sequenceNumber field,so the
+    // splicer took the no-op branch — meaning if the splice call at
+    // line 731 were removed,this test still passed (fake coverage
+    // for events_since_timestamp_json+splicer interaction)。
     #[test]
     fn events_since_timestamp_respects_limit_and_order() {
         let engine = unsafe {
@@ -1099,7 +1180,8 @@ mod tests {
         engine_ref.with_conn(|conn| {
             for i in 0..5 {
                 let pj = format!(
-                    "{{\"eventID\":\"ts-{}\",\"i\":{}}}", i, i);
+                    "{{\"eventID\":\"ts-{}\",\"sequenceNumber\":0,\"i\":{}}}",
+                    i, i);
                 append_event(
                     conn,
                     &format!("ts-{}", i),
@@ -1114,12 +1196,21 @@ mod tests {
             assert!(json.contains("\"eventID\":\"ts-3\""));
             assert!(json.contains("\"eventID\":\"ts-4\""));
             assert!(!json.contains("\"eventID\":\"ts-1\""));
+            // chapter 九百四十二 — splicer overlays SQL seq:
+            // ts-0/1/2/3/4 got assigned 0/1/2/3/4 by Rust。
+            // Without splice they'd ALL show「sequenceNumber:0」。
+            assert!(json.contains("\"sequenceNumber\":2"),
+                "ts-2 must have spliced seq=2 (REGRESSION: if splice removed, all show seq=0)");
+            assert!(json.contains("\"sequenceNumber\":3"));
+            assert!(json.contains("\"sequenceNumber\":4"));
             // limit=2 → only first 2
             let limited = events_since_timestamp_json(
                 conn, 1200, 2).unwrap();
             assert!(limited.contains("\"eventID\":\"ts-2\""));
             assert!(limited.contains("\"eventID\":\"ts-3\""));
             assert!(!limited.contains("\"eventID\":\"ts-4\""));
+            assert!(limited.contains("\"sequenceNumber\":2"));
+            assert!(limited.contains("\"sequenceNumber\":3"));
         });
         unsafe { bas_l8_engine_close(engine); }
     }
