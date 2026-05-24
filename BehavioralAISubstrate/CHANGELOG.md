@@ -11,6 +11,68 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十九 / M3450 — Xcode iOS host app target (DeviceTestApp) for real iPhone Air device testing
+
+User directive (option 2 from ch 948 follow-up):set up Xcode iOS host app target so xcodebuild test can run on real iPhone Air device。 SwiftPM-generated tests cannot host on iOS device per `Cannot test target ... on iOS device:Tool-hosted testing is unavailable on device destinations. Select a host application for the test target` blocker。
+
+#### What shipped (4 new files)
+
+1. **`DeviceTestApp/project.yml`** — xcodegen spec (commit-tracked source of truth);regenerate `.xcodeproj` via `xcodegen generate`
+2. **`DeviceTestApp/Sources/App/BASDeviceTestApp.swift`** — minimal SwiftUI app target with `@main` + `WindowGroup`,just hosts the test bundle (no UI matters,app exits when tests finish)
+3. **`DeviceTestApp/Resources/Info.plist`** — bundle metadata (iOS 18 deployment target,portrait-only,iPhone+iPad,armv7 capability)
+4. **`DeviceTestApp/BASDeviceTest.xcodeproj/`** — generated Xcode project (committed for CI reproducibility,but DO NOT edit by hand — regenerate via xcodegen)
+5. **`DeviceTestApp/README.md`** — pre-flight setup guide (Xcode Accounts + Devices registration) + run commands + troubleshooting
+
+#### Project structure
+
+- **BASDeviceTestApp** (iOS app target):empty SwiftUI app + dependencies on BASHostKit / BASMemory / BASRuntimeCore
+- **BASDeviceTests** (unit-test bundle):hosted in app via `TEST_HOST` + `BUNDLE_LOADER` build settings,sources pulled from `../Tests/BehavioralAISubstrateTests/` (excluding the 3 Process-using macOS-only files gated in ch 947)
+- Team `U4ZLQM8399` (the team that signed the existing keychain cert — discovered via cert subject inspection,not `C58N7PYMN6` which is the cert's OU identifier — KEY FINDING during dev)
+
+#### Discovery findings during setup
+
+1. `xcrun xctrace list devices` reports iPhone Air as「Offline」 BUT `xcrun devicectl list devices` reports「available (paired)」 — devicectl is the modern truth source。 2 paired iPhone Airs present:UDIDs `9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6` (Chang's iPhone) + `5E5C3C5C-A327-5971-93A5-A3E27A3FDF57` (just「iPhone」)。
+2. Signing identity in keychain:「Apple Development: gengdashen200315@icloud.com (C58N7PYMN6)」 — cert OU is C58N7PYMN6 but cert subject reveals **TeamIdentifier = U4ZLQM8399** (different field)。 Initial attempt with team C58N7PYMN6 failed with「No signing certificate」 — correct team is U4ZLQM8399。
+3. Existing provisioning profiles at `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` all team U4ZLQM8399 including a wildcard profile (`iOS Team Provisioning Profile: *` for `U4ZLQM8399.*`)。
+
+#### Build blockers requiring user Xcode GUI action (cannot be fixed via CLI)
+
+Two prereqs surfaced when first device test attempted:
+
+1. **「No Accounts: Add a new account in Accounts settings」** — Xcode requires the Apple ID to be actively logged into Xcode → Settings → Accounts。 Cert in keychain alone is NOT enough — Xcode needs the live Apple ID account to manage auto-provisioning。
+2. **「Provisioning profile 'iOS Team Provisioning Profile: \*' doesn't include the currently selected device」** — iPhone Air UDID `00008150-00163C6A3E38401C` not yet registered in team U4ZLQM8399's device list。 Need Xcode → Window → Devices and Simulators → click「Use for Development」 to auto-register。
+
+Both are documented in `DeviceTestApp/README.md` with explicit click-by-click steps。
+
+#### Run command (after user completes Xcode GUI prereqs)
+
+```bash
+xcodebuild test \
+    -project DeviceTestApp/BASDeviceTest.xcodeproj \
+    -scheme BASDeviceTestApp \
+    -destination "platform=iOS,id=9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6" \
+    -only-testing:BASDeviceTests/BASChapter946FourteenLayerFuzzSmokeTests/testL8AtomLifecycleFuzzRoundTrip \
+    -allowProvisioningUpdates
+```
+
+#### Verification
+
+- xcodegen spec parses cleanly + generates Xcode project ✓
+- Device discovery via devicectl ✓
+- Team / bundle-id alignment verified vs existing provisioning profile ✓
+- Build attempt reaches code-signing stage cleanly (no source/compile errors) — blocked only on Apple ID + device registration prereqs
+- Symbolic test source reference from `../Tests/BehavioralAISubstrateTests/` works (xcodegen resolves)
+- Process-using test files (BASBrainCLIIntegrationTests / BASDoctrineStateAndGrowthTests / BASEventSourcedMemoryAtomStoreTests) excluded via `project.yml` `excludes` block (already #if os(macOS) gated in source per ch 947,but explicit exclude for cleaner build output)
+
+#### Production value
+
+Once user completes the 3-step Xcode GUI setup (one-time), the infrastructure for **real iPhone Air device testing** is in place。 Subsequent test runs are pure CLI。 This complements ch 948's iPhone Air Simulator validation:simulator gives ~80% device coverage (same iOS arm64,same APFS,same SQLite),real device additionally validates:
+- A18 chip core scheduling vs simulator's host CPU
+- Real iOS memory pressure / jetsam thresholds (different from sim's relaxed simulator process)
+- Real iOS file system flash semantics (sim uses macOS-virtualized APFS)
+- Real device thermal throttling
+- Metal hardware (sim Metal is software-emulated for some paths)
+
 ### Chapter 九百四十八 / M3445 — iPhone Air iOS Simulator first run:41/42 pass + 1 REAL iOS-specific bug found (jetsam SIGKILL on evolutionary search) + fix shipped
 
 User directive 「好 iPhone air 已经连上了」 — first ever BAS test run on iPhone Air iOS arm64。
