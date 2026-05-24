@@ -11,6 +11,102 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十二.2 / M3465.2 — 🐛 CRITICAL infinite-loop bug found by iPhone Air full device run (fuzz infrastructure caught its own bug)
+
+iPhone Air full ch 952 device run (BAS_FUZZ_RUNTIME_ITER=20 + all 5 test classes) hung for 60+ minutes on `BASChapter952ExtremeFuzzTests/testAllSignalPrefixesFireAcrossFuzzedPromptSweep`。 User killed it after asking「怎么样了」 multiple times。
+
+#### Root cause
+
+`Tests/BehavioralAISubstrateTests/BASFuzzInputGenerator.swift` lines 608-611 (pre-fix):
+
+```swift
+var out = template
+while out.utf8.count < promptLen {
+    out.append(template)
+}
+```
+
+If `template = ""` (first entry in `templates` list,~10% rng pick rate) AND `promptLen > 0` (~83% of `pickBoundaryBiased` shapes via boundaryP=0.5),then `out.append("")` is a no-op,`out.utf8.count` stays 0 forever,loop never terminates。
+
+#### Probability of hitting it
+
+| Setup | per-iter | at iter | joint hit |
+|---|---|---|---|
+| macOS host default (iter=3) | ~8% | 3 | **22%** (missed by RNG luck) |
+| iPhone Air ch 952 device run (iter=20) | ~8% | 20 | **81%** (hit deterministically) |
+
+#### Why ch 952 main passed macOS but hung iPhone Air
+
+- macOS host `swift test` uses default `iterCount = 3` for ch 952 ExtremeFuzz tests → 22% hit rate
+- Our specific seed (`testSeed(#function)` deterministic) happened to land in the lucky 78%
+- iPhone Air `BAS_FUZZ_RUNTIME_ITER=20` set via xctestplan env vars → 81% hit rate,deterministically hit
+
+#### Fix
+
+```swift
+let template = rng.pick(templates)
+if promptLen <= template.utf8.count { return template }
+// chapter 九百五十二.2 / M3465.2 — CRITICAL FIX from
+// iPhone Air device run:if template is empty and
+// promptLen > 0,the while-loop below grew 0 bytes per
+// iteration forever。
+if template.isEmpty { return template }  // ← NEW guard
+// Pad to promptLen with template-repeating fill
+var out = template
+while out.utf8.count < promptLen { out.append(template) }
+return String(out.prefix(promptLen))
+```
+
+#### Regression test (NEW `BASChapter952_2InfiniteLoopRegressionTests.swift`,~85 LOC,3 tests)
+
+- `testPromptTerminatesAcrossOneThousandFuzzSeeds` — N=1000 calls,asserts total time < 5s (pre-fix hung forever even with N=1)
+- `testEmptyTemplateNonzeroPromptLenReturnsEmpty` — empirical 100-seed sweep,asserts ≥ 1 hits the empty case + returns deterministic empty (no hang)
+- `testPromptCanBeCalledRepeatedlyInTightLoop` — 50 sequential calls,no degradation
+
+All 3 pass on macOS in 0.013s total。
+
+#### Discipline + meta-finding
+
+This is **THE highest-value finding of the entire ch 952 arc** — the fuzz infrastructure caught its OWN bug。 Pre-fix it would have shipped to production undetected (passed `swift test` cleanly,passed iOS Simulator,passed first iPhone Air run with iter=1 single test)。 The 81% hit rate on iter=20 device run forced it into the open。
+
+Validates:
+- ✓ The「真机 跑」 directive was correct — iOS Simulator + macOS host both missed this
+- ✓ Fuzz iter count matters for bug-finding (iter=20 not iter=3)
+- ✓ Procedural test generation works as intended — found a bug the test author didn't see
+
+Per chapter 八百五十六 audit discipline:bugs that DON'T fail loud are the dangerous ones。 Infinite loops on iOS would have:
+- Caused jetsam SIGKILL with no indication of the cause
+- Looked like「test took forever」 + flaky failures
+- Possibly slipped to production as「sometimes the runtime hangs」
+
+#### What was confirmed before the hang (rescued from full-run.log)
+
+| Suite | Result | Detail |
+|---|---|---|
+| ch 946 (14-layer fuzz) | ✅ 13/13 in 5.5s | All layers green on iPhone Air |
+| ch 952 Benchmark (n=1000) | ✅ 5/5 in 0.57s | Even better p99 than ch 952.1 first run (L8.append 0.07ms vs 0.09ms) |
+| ch 952 ExtremeFuzz | ⚠️ 1/11 passed before hang | `testAllLayerSignalsAcrossEveryWorkflowRiskCell` passed in 0.026s |
+| ch 952 ProcGenSister | ⏭️ blocked by hang | (re-runs after fix) |
+| ch 952 RealMLX (cached) | ⏭️ blocked by hang | (re-runs after fix) |
+
+#### Real iPhone Air arm64 benchmark numbers (n=1000,run 2)
+
+| op | p50 | p95 | p99 | ceiling | margin |
+|---|---|---|---|---|---|
+| L8.append | 0.03ms | 0.04ms | 0.07ms | 50ms | **714×** |
+| L8.events(forAtom:) | 0.39ms | 0.44ms | 0.45ms | 100ms | 222× |
+| UserState.append | 0.02ms | 0.03ms | 0.05ms | 50ms | **1000×** |
+| EventLog.append | 0.04ms | 0.05ms | 0.08ms | 50ms | 625× |
+
+(Improvement over first run is likely SQLite + page-cache warmup,not iPhone Air variance — iPhone hardware is the same。)
+
+#### Next steps (deferred)
+
+- Re-run full ch 952 device suite with the fix (ProcGen sister + remaining 9 ExtremeFuzz + 3 MLX with warmed cache)
+- Investigate if any OTHER generators have similar infinite-loop guard misses (e.g. BASStringMutator.repeating with n=0 case)
+
+---
+
 ### Chapter 九百五十二.1 / M3465.1 — USER-PASS finding fix: REAL Gemma 4 E2B 大模型 inference on iPhone Air arm64
 
 User-found gap (verbatim):「感觉 也没有跑 大模型吧」 — observed that ch 952 main commit landed extreme fuzz infrastructure that exercises substrate signal coverage + SQLite paths but uses `BASHostRuntime.fixtureGeneric` which has NO MLX adapter wired,so the 2-hour smoke run never actually called any real LLM。 The substrate's 14-layer coverage codes fire structurally without ever calling MLXOrganAdapter。 Honest fix:add real-LLM tests as a fix-sub-chapter following ch 943.1 USER-PASS-2 corrigendum discipline。

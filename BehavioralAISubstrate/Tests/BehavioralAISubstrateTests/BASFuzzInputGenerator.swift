@@ -604,6 +604,19 @@ public enum BASFuzzPromptTemplate {
         ]
         let template = rng.pick(templates)
         if promptLen <= template.utf8.count { return template }
+        // chapter 九百五十二.2 / M3465.2 — CRITICAL FIX from
+        // iPhone Air device run:if template is empty and
+        // promptLen > 0,the while-loop below grew 0 bytes per
+        // iteration forever (out.append("") is no-op)。 iPhone Air
+        // device run hung 60+ min on testAllSignalPrefixesFire-
+        // AcrossFuzzedPromptSweep because of this。
+        //
+        // Fix:short-circuit empty template — caller wanted any
+        // string of promptLen but template choice was「empty」,
+        // so honor that by returning empty (skip padding)。
+        // Equivalent options would be:returning「x」 × promptLen,
+        // but empty preserves the template's intent。
+        if template.isEmpty { return template }
         // Pad to promptLen with template-repeating fill
         var out = template
         while out.utf8.count < promptLen {
