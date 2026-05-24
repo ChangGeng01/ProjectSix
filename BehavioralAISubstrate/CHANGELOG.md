@@ -11,6 +11,48 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十三.1 / M3420.1 — USER-PASS-2 arithmetic + state-block corrigendum (no new pass review,no new code)
+
+User directive 「先不要继续加新 pass，把 L8_ARC_SEAL.md 里 ch943 相关内容改成 FOUND / OPEN / proposed，或者真正落完 ch943 对应的 CHANGELOG、BRANCH_SUMMARY、测试/源码修改后再声明 SHIPPED。当前这份 doc 不能算干净。」
+
+#### What user caught (USER-PASS-2)
+
+1. **Arithmetic inflation in 15P count**:CHANGELOG ch 943 entry header said「7C + 9H」 (honest count matching the enumerated 15P registry items),but SEAL Pass row + cumulative TOTAL + CHANGELOG arithmetic line + BRANCH_SUMMARY tuple list ALL said「7C + 13H」 / 「117 HIGH」 (inflated)。 If 15P=9H,then 84+2+5+13+9=113,not 117。
+2. **SEAL Authoritative state + sub-arc paragraph + TL;DR**:claimed「SHIPPED ch 943」 in the 15P registry,but the actual values in those sections were still Pass 14 era (46C+104H,49 chapters / 894-942,14 meta passes) — the「SHIPPED」 claim itself was fabricated。
+3. **15P-CRIT-1 / 15P-CRIT-3 / 15P-HIGH-2 status entries**:said「SHIPPED ch 943」 with the Pass 14 era values inline — those values were NOT actually the Pass 15 era values the items required。
+4. (User also noted git log perception — verified empirically:`e414b7ad` IS on origin/phase-5-chapter-834-post-v0.61.0-cascade-arc,but user's view may have been stale。 Regardless,arithmetic + state-block issues above are real。)
+
+#### Fixes shipped (doc-only,no code,no new pass review)
+
+- SEAL Pass 15 row:「7 | 13」 → 「7 | 9」 (matches CHANGELOG header + enumerated 15P registry items)
+- SEAL TOTAL row:「53 | 117」 → 「53 | 113」
+- SEAL ch 943 timeline row cumulative:「53C+117H」 → 「53C+113H」 + corrigendum note
+- SEAL TL;DR :39 paragraph:added ch 943 to the chapter list (was stuck at「+ ch 942」 final)
+- SEAL sub-arc paragraph:「ch 915-942 / 14 meta + USER / 46C+104H」 → 「ch 915-943 / 15 meta + USER / 53C+113H」 + per-pass `[8,10,15,8,5,8,5,2,2,8,8,5,2,5,13,9]` literal verifiable via `python3`
+- SEAL Authoritative state block:「49 chapters / 14 meta + USER / 46C+104H / 49 chapters preserved」 → 「50 / 15 meta + USER / 53C+113H / 50 chapters preserved」
+- SEAL 15P registry CRIT-1 / CRIT-3 / HIGH-2 status:「SHIPPED ch 943 (Pass 14 era values)」 → 「PARTIAL SHIPPED ch 943,FULLY SHIPPED ch 943.1 (Pass 15 era values)」 — honest about what was actually completed when
+- SEAL NEW timeline row 九百四十三.1 (corrigendum) added
+- BRANCH_SUMMARY:33 body:「**53 CRITICAL + 117 HIGH**」 → 「**53 CRITICAL + 113 HIGH**」 + tuple list last entry `(7,13)` → `(7,9)` + USER-PASS-2 acknowledgement
+- CHANGELOG ch 943 entry:「84+2+5+13+13=117 HIGH」 → 「84+2+5+13+9=113 HIGH」 + 「16 tuples = 53/117」 → 「16 tuples = 53/113」
+
+#### What this is NOT
+
+- NOT a new pass review (per user instruction「先不要继续加新 pass」)
+- NOT new substance code or tests
+- NOT a claim that the cascade has converged — Pass 16 may still find new defects in the actual code/tests of ch 943
+- NOT amending the ch 943 commit (preserves audit trail)
+
+#### Verification
+
+- python3:`python3 -c "C=[2,2,5,5,1,4,2,0,1,2,6,2,4,3,7,7]; H=[8,10,15,8,5,8,5,2,2,8,8,5,2,5,13,9]; print(sum(C), sum(H))"` → **53 113** ✓
+- grep:`grep -c " 117 \|53C+117H\|+13H,15th" Docs/L8_ARC_SEAL.md BRANCH_SUMMARY.md CHANGELOG.md` after edit → all should be 0 except in historical-narration contexts
+- pre-commit-gates.sh:**TBD pending verification**
+
+#### Discipline meta-finding (USER-PASS-2)
+
+- The 「SHIPPED ch N」 status entry in the SEAL registry must reflect what was ACTUALLY written into the doc surfaces at the time of the chapter's commit,not what was「intended to be shipped」。 When ch 943 wrote「SHIPPED ch 943 (→ 49 / 14 meta + USER / 46C+104H)」 in 15P-CRIT-3,that string was technically what got written — but it represented Pass 14 era values,not Pass 15 era values。 The user catching this is the 11th class of doc-vs-substance lie。
+- Asymmetry observation:CHANGELOG header was honest (9H) but Pass row + cumulative were inflated (13H,117H)。 Copy-paste from prior Pass 14 row「7 | 13」 propagated the wrong H count even though the ch 943 work enumerated only 9。 NEW discipline implicit:**when adding a new Pass row,COMPUTE H from the enumerated registry items,don't copy from prior Pass row**。
+
 ### Chapter 九百四十三 / M3420 — 15th-pass fix-of-fix^4:7 CRITICAL + 9 HIGH from review of ch 942 (10th recurrence — ALL 7 CRIT are doc surfaces)
 
 Per 「继续」 directive → 15th-pass 3-agent foreground review of ch 942。 Pass 15 found that ALL 7 CRITICAL items were doc surfaces ch 942 missed updating — same head-vs-tail self-contradiction class ch 942 itself「fixed」。 Plus 9 HIGH including a fixture-lies-about-coverage finding + sister-test gap persisting across 3 bridges。 10th recurrence of the cascade pattern。
@@ -22,7 +64,7 @@ Per 「继续」 directive → 15th-pass 3-agent foreground review of ch 942。 
 - **CRIT-3 SEAL Authoritative state block :604-611** ALL stale (48 chapters / 13 meta / 39C+91H / 48 chapters preserved)。 Fixed: 49 / 14 + USER / 46C+104H + Pass 14/15 narrative。
 - **CRIT-4 SEAL TL;DR vs header self-contradiction** (header :3 said 49,TL;DR :38 said 48) within first 40 lines of canonical doc。 Fixed by CRIT-1。
 - **CRIT-5 SEAL :534 v0.62.5 section header「post-ch941 state」**。 Fixed:「post-ch942 state」。
-- **CRIT-6 BRANCH_SUMMARY:33 head still「ch 941」** in title + tuple list still 12 tuples → C=32,H=84 (vs head claim of 13 meta + USER + ch 941)。 Fixed: title → 15-pass + tuple list extended to 16 tuples = 53/117。
+- **CRIT-6 BRANCH_SUMMARY:33 head still「ch 941」** in title + tuple list still 12 tuples → C=32,H=84 (vs head claim of 13 meta + USER + ch 941)。 Fixed: title → 15-pass + tuple list extended to 16 tuples = 53/113 (was inflated to 117 in ch 943 commit body,corrected ch 943.1 corrigendum per USER catch)。
 - **CRIT-7 14P + 15P registry subsections wholly MISSING** from SEAL (defect class 12P-HIGH-3 recurring — ch 942 announced 14P items in CHANGELOG but didn't add the registry subsection)。 Fixed: both subsections added per ch 918 pattern。
 
 #### High fixes shipped
@@ -46,7 +88,7 @@ Per 「继续」 directive → 15th-pass 3-agent foreground review of ch 942。 
 
 #### Discipline notes
 
-- python3-verified cumulative 32+4+3+7+7=53 CRITICAL / 84+2+5+13+13=117 HIGH
+- python3-verified cumulative 32+4+3+7+7=53 CRITICAL / 84+2+5+13+9=113 HIGH (was inflated to 117 from 15P=13H copy-paste; corrected to 9H matching enumerated 15P registry items per USER-PASS-2 in ch 943.1 corrigendum)
 - 10th recurrence of fabrication pattern confirmed
 - Ch 943 cannot self-seal — Pass 16 will catch new defects per pattern
 
