@@ -11,6 +11,44 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百三十九 / M3400 — cleanup batch:6 deferred MED items from SEAL registry in one chapter
+
+User directive:全面 开发 → comprehensive sweep of deferred items。 Chapter 939 closes 6 carryover/bounded-risk MED items from the SEAL「Deferred items (registry for future chapters)」 section that have been accumulating since 6P。
+
+#### Fixes shipped
+
+| # | Item | SEAL item ID | Fix |
+|---|---|---|---|
+| 1 | `testRustCrateCountIs22` function name lies (says 22,asserts 23) | 6P-MED-1 / 10P-LOW-1 | RENAMED → `testRustCrateCountPinned`,refreshed doc with bump-on-add doctrine |
+| 2 | `testVaultLoadThrowsOnEmptyPayload` ignores sqlite_* return codes | 6P-MED-2 / 10P-LOW-2 | Added XCTAssertEqual on every sqlite3_open/prepare/bind/step/finalize/close + post-corruption verify (SELECT length(payload_json) == 0) — surfaces silent test fragility |
+| 3 | Two `conn.busy_timeout(4500)` duplicate sites | 11P-MED-1 / 12P-MED-3 | Extracted to `pub(crate) const BUSY_TIMEOUT_MS: u64 = 4500` in lib.rs,both open() + open_in_memory() use the const |
+| 4 | `bas_l8_engine_pragma_value_i64` whitelist includes `cache_size` (returns negative → -1/-2/-3 sentinel collision) | 9P-MED-3 | REMOVED `cache_size` from whitelist。 No production caller。 Whitelist now restricted to pragmas returning non-negative values only。 Doc updated with per-pragma return-range table |
+| 5 | `migrate_unique_session_seq` substring check brittle for schema reformat | 9P-MED-4 | REPLACED substring-against-table-SQL with structural `PRAGMA index_list` origin='u' query。 Same query used by `fresh_db_table_level_unique_constraint_intact` test (ch 927) — robust against quoted columns,whitespace variants,column reorder,future schema reformats |
+| 6 | cosineTopK [Float] vs [UInt8] validation drift surface | 9P-LOW-1 / 10P-LOW-3 | Extracted `validateQueryFloats` companion to `validateQueryBytes` — both apply SAME logical checks (dim cap + finiteness)。 Drift surface now concentrated to ONE pair of methods in ONE file。 Discipline documented in both docstrings |
+
+#### Verification
+
+- Rust:**92/92 unit tests pass** (no test count change — code-only refactors)
+- Swift filtered:BASChapter786 (rename) → 10/10 + BASChapter925 (sqlite return codes) → 11/11 + BASChapter926 → 15/15
+- Swift full sweep:**13614 tests,87 skipped,0 failures**
+- pre-commit-gates.sh:**3/3 pass**
+- grep verify post-edit:0 instances of「Is22」 in test discovery + 0 instances of「cache_size」 in whitelist + 0 instances of substring `unique(session_id` literal in migrate function
+
+#### Remaining deferred items (intentionally still open)
+
+These items are architectural / breaking / require platform-specific decisions — not「whoops missed it」 cleanup material:
+- #12 cross-platform test gating (tvOS/watchOS/visionOS L8 support) — needs platform decision
+- #13 `-2` sentinel overloaded between「not found」 and「SQLite error」 — breaking API change
+- #14 read errors throw `.upsertFailed` — enum case rename,breaks consumer code
+- #15 test setup boilerplate dup across 14 files — mechanical refactor,substantial diff
+- #17 N=50K perf bench (PERF_LONG env-gated) — CI infrastructure decision
+- H10 markHelped synthesizes fake -2 sentinel — linked to #13
+- A1.4 / A1.5 / A2.5 / A2.7-A2.11 — various test/architectural items
+- 9P-LOW-2 cosineTopKWithSkipped missing [Float] overload — additive API surface
+- 9P-LOW-3 [Float] empty query different error type — cosmetic diagnostic
+
+Plus 11P-HIGH-4 (SEAL「Re-sealed」 stanza missing ch 929/930) — superseded by retraction discipline in ch 929。
+
 ### Chapter 九百三十八 / M3395 — SUBSTANCE chapter #5 (FINAL):event_log full-row FFI — **USER-PASS ARC CLOSED**
 
 User directive:继续。 5th and FINAL substance chapter — closes the USER-PASS arc from ch 933 entirely。 All 5 bridges now have honest「Full」 labels in L8_ROUTED_OVERVIEW.md。

@@ -47,6 +47,34 @@ public actor BASRoutedVectorIndexStorage {
     /// FFI to return -3 with no diagnostic。
     public static let queryDimCap: Int = 16_384
 
+    /// chapter 九百三十九 / M3400 fix MED-6 — companion to
+    /// `validateQueryBytes` for the [Float] cosineTopK overload。
+    /// Both validators apply the SAME logical checks (dim cap +
+    /// finiteness)。 Discipline:any change to one MUST be
+    /// mirrored in the other (drift surface concentrated to
+    /// this pair)。 Tests should exercise both paths with
+    /// equivalent inputs (10P-LOW-3 carryover fix)。
+    fileprivate static func validateQueryFloats(
+        _ query: [Float]
+    ) throws {
+        guard !query.isEmpty else {
+            throw StoreError.invalidArgument(
+                reason: "query is empty")
+        }
+        guard query.count <= queryDimCap else {
+            throw StoreError.invalidArgument(
+                reason: "query dimension \(query.count) " +
+                "exceeds cap \(queryDimCap) " +
+                "(matches Rust MAX_EMBEDDING_BYTES = " +
+                "\(queryDimCap * 4))")
+        }
+        guard query.allSatisfy({ $0.isFinite }) else {
+            throw StoreError.invalidArgument(
+                reason: "query contains non-finite values " +
+                "(NaN or Inf) — would corrupt cosine scores")
+        }
+    }
+
     /// chapter 九百二十六 / M3335 fix HIGH-2 — shared
     /// validator for [UInt8] query bytes,used by both
     /// `cosineTopK` and `cosineTopKWithSkipped` [UInt8]
@@ -54,6 +82,11 @@ public actor BASRoutedVectorIndexStorage {
     /// cap and NaN/Inf-freeness。 Without this both [UInt8]
     /// overloads bypassed the ch 924 NH4 guard which only
     /// covered the [Float] overload。
+    ///
+    /// chapter 九百三十九 / M3400 fix MED-6:companion
+    /// `validateQueryFloats` added above — both validators
+    /// MUST apply same logical checks (drift surface
+    /// concentrated to this pair)。
     fileprivate static func validateQueryBytes(
         _ bytes: [UInt8]
     ) throws {
@@ -407,24 +440,14 @@ public actor BASRoutedVectorIndexStorage {
         query: [Float],
         k: Int
     ) async throws -> [(rowid: Int64, score: Float)] {
-        // Bound query dimension — same cap as stored
-        // embeddings to prevent OOM via huge Vec allocation。
-        // chapter 九百二十六 / M3335 fix HIGH-2:use shared
-        // `queryDimCap` constant (was magic 16_384 here)。
-        guard query.count <= Self.queryDimCap else {
-            throw StoreError.invalidArgument(
-                reason: "query dimension \(query.count) " +
-                "exceeds cap \(Self.queryDimCap) " +
-                "(4 bytes × \(Self.queryDimCap / 1024)K " +
-                "floats,matching stored embedding cap)")
-        }
-        // Reject NaN/Inf — chapter 918 NaN filter on the
-        // Rust side would silently drop every row otherwise
-        guard query.allSatisfy({ $0.isFinite }) else {
-            throw StoreError.invalidArgument(
-                reason: "query contains non-finite values " +
-                "(NaN or Inf) — would corrupt cosine scores")
-        }
+        // chapter 九百三十九 / M3400 fix MED-6 (10P-LOW-3
+        // carryover):use shared `validateQueryFloats` helper
+        // — companion to `validateQueryBytes`,both apply the
+        // SAME logical checks (dim cap + finiteness)。 Reduces
+        // drift surface to ONE pair of validators in ONE file
+        // (previously [Float] inline,[UInt8] via helper —
+        // changes to one didn't propagate to the other)。
+        try Self.validateQueryFloats(query)
         // Pack [Float] → [UInt8] little-endian
         var bytes: [UInt8] = []
         bytes.reserveCapacity(query.count * 4)

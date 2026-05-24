@@ -122,26 +122,53 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
 fn migrate_unique_session_seq(
     conn: &Connection,
 ) -> rusqlite::Result<()> {
-    let table_sql: Option<String> = conn.query_row(
-        "SELECT sql FROM sqlite_master
-         WHERE type='table' AND name='event_log'",
-        [],
-        |row| row.get(0),
-    ).ok();
-    let has_table_constraint = table_sql
-        .as_deref()
-        .map(|s| {
-            // case-insensitive substring; SQLite preserves
-            // original casing but defensive lowercasing
-            // covers any normalizer differences
-            let lower = s.to_lowercase();
-            lower.contains("unique(session_id, sequence_number)")
-                || lower.contains(
-                    "unique (session_id, sequence_number)")
-                || lower.contains(
-                    "unique(session_id,sequence_number)")
-        })
-        .unwrap_or(false);
+    // chapter 九百三十九 / M3400 fix MED-5 (9P-MED-4 carryover):
+    // REPLACED brittle substring-against-table-SQL check with
+    // structural PRAGMA index_list query that asks SQLite
+    // directly:「is there a UNIQUE-constraint-origin index
+    // covering (session_id, sequence_number)?」
+    //
+    // The old substring check was vulnerable to:
+    //   - Quoted column names: UNIQUE("session_id", ...)
+    //   - Column reorder: UNIQUE(sequence_number, session_id)
+    //   - Whitespace variants: UNIQUE  (col, col) with double-space
+    //   - Future schema reformat: any non-canonical UNIQUE syntax
+    // would silently fall through to legacy-DB path → create
+    // explicit index → 2 unique indexes (the ch 926 bug class)。
+    //
+    // Structural query asks SQLite itself via PRAGMA — robust
+    // against any future schema-text reformatting。 Same query
+    // used by `fresh_db_table_level_unique_constraint_intact`
+    // test (ch 927)。
+    let mut stmt = conn.prepare(
+        "PRAGMA index_list('event_log')")?;
+    let mut rows = stmt.query([])?;
+    let mut has_table_constraint = false;
+    while let Some(row) = rows.next()? {
+        let name: String = row.get(1)?;
+        let is_unique: bool = row.get::<_, i64>(2)? != 0;
+        let origin: String = row.get(3)?;
+        // origin='u' means「created by UNIQUE constraint」
+        // (per SQLite docs)。 origin='c' would mean a manually-
+        // created CREATE UNIQUE INDEX。
+        if !is_unique || origin != "u" {
+            continue;
+        }
+        let info_q = format!(
+            "PRAGMA index_info('{}')", name);
+        let mut info_stmt = conn.prepare(&info_q)?;
+        let cols: Vec<String> = info_stmt
+            .query_map([], |r| r.get::<_, String>(2))?
+            .filter_map(|r| r.ok())
+            .collect();
+        if cols == vec![
+            "session_id".to_string(),
+            "sequence_number".to_string(),
+        ] {
+            has_table_constraint = true;
+            break;
+        }
+    }
     if has_table_constraint {
         // Fresh / post-ch-919 DB: drop the redundant
         // explicit index if a buggy ch 924 binary added it。

@@ -158,6 +158,13 @@ pub extern "C" fn bas_l8_engine_abi_version() -> i32 {
     ABI_VERSION
 }
 
+/// chapter 九百三十九 / M3400 fix MED-3 — extracted from
+/// open() + open_in_memory() duplicate `conn.busy_timeout(4500)`
+/// call sites per 11P-MED-1 / 12P-MED-3 deferred items。 Sentinel
+/// 4500 ms differs from rusqlite 0.32 default (5000) so revert
+/// detection works (see ch 931 rusqlite-default coincidence fix)。
+pub(crate) const BUSY_TIMEOUT_MS: u64 = 4500;
+
 // MARK: - Engine handle (opaque from Swift's perspective)
 
 /// Engine handle wrapping a rusqlite Connection。 The Mutex
@@ -241,7 +248,7 @@ impl L8Engine {
         // delta from default has negligible production
         // impact (multi-engine retry budget 4.5s vs 5.0s)。
         conn.busy_timeout(
-            std::time::Duration::from_millis(4500))?;
+            std::time::Duration::from_millis(BUSY_TIMEOUT_MS))?;
         // chapter 九百二十三 fix NH7:verify journal_mode
         // actually became WAL,not silently fall through to
         // delete mode on a read-only filesystem。
@@ -295,7 +302,7 @@ impl L8Engine {
         // chapter 九百三十一 / M3360:value bumped 5000 → 4500
         // sentinel,see open() comment for rationale。
         conn.busy_timeout(
-            std::time::Duration::from_millis(4500))?;
+            std::time::Duration::from_millis(BUSY_TIMEOUT_MS))?;
         Ok(L8Engine {
             conn: Mutex::new(conn),
             db_path: PathBuf::from(":memory:"),
@@ -488,10 +495,32 @@ pub unsafe extern "C" fn bas_l8_engine_pragma_value_i64(
         None => return -3,
     };
     // Whitelist of pragmas we expose for test diagnostics。
-    // Restricted to integer pragmas with no side effects。
+    // Restricted to integer pragmas that return NON-NEGATIVE
+    // values only。
+    //
+    // chapter 九百三十九 / M3400 fix MED-4 (9P-MED-3 carryover):
+    // REMOVED `cache_size` from whitelist because PRAGMA
+    // cache_size can return NEGATIVE values (negative = number
+    // of KiB to use,positive = number of pages)。 Negative
+    // returns collide with -1/-2/-3 error sentinels making the
+    // value indistinguishable from null-engine/SQLite-error/
+    // invalid-name。 No production code reads cache_size via
+    // this FFI today,so removal is safe。 Future need:
+    // re-add with separate out-parameter for value.
+    //
+    // All remaining whitelist entries are documented as
+    // returning non-negative values:
+    //   wal_autocheckpoint: pages (≥ 0)
+    //   busy_timeout: ms (≥ 0)
+    //   synchronous: 0..3 enum
+    //   journal_size_limit: bytes (≥ 0, -1 means no limit but
+    //     that's the SET-only form; query returns positive)
+    //   page_size: bytes (positive power of 2)
+    //   user_version: caller-stamped (positive by convention)
+    //   max_page_count: positive
     let allowed = ["wal_autocheckpoint", "busy_timeout",
         "synchronous", "journal_size_limit", "page_size",
-        "cache_size", "user_version", "max_page_count"];
+        "user_version", "max_page_count"];
     if !allowed.contains(&name) {
         return -3;
     }

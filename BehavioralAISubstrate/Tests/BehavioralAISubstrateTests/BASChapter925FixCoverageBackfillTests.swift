@@ -66,19 +66,57 @@ final class BASChapter925FixCoverageBackfillTests: XCTestCase {
             deviceConsistencyReport: report)
         _ = try await store.save(vault)
         // Now corrupt the payload_json column directly via SQLite
-        // to simulate the empty-payload corruption scenario
+        // to simulate the empty-payload corruption scenario。
+        // chapter 九百三十九 / M3400 fix MED-2:check every
+        // sqlite_* return code per 6P-MED-2 / 10P-LOW-2 carryover。
+        // Previously these were ignored — a silent failure would
+        // cause the test to fail for the wrong reason (corruption
+        // never applied → loadVault returns normal → XCTFail fires)。
         var db: OpaquePointer?
-        sqlite3_open_v2(url.path, &db,
+        let openRc = sqlite3_open_v2(url.path, &db,
             SQLITE_OPEN_READWRITE, nil)
+        XCTAssertEqual(openRc, SQLITE_OK,
+            "sqlite3_open_v2 must succeed (rc=\(openRc))")
         let sql = "UPDATE host_constitution_vaults " +
             "SET payload_json = '' WHERE vault_id = ?"
         var stmt: OpaquePointer?
-        sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
-        sqlite3_bind_text(stmt, 1, "test-vault", -1,
+        let prepRc = sqlite3_prepare_v2(
+            db, sql, -1, &stmt, nil)
+        XCTAssertEqual(prepRc, SQLITE_OK,
+            "sqlite3_prepare_v2 must succeed (rc=\(prepRc))")
+        let bindRc = sqlite3_bind_text(stmt, 1, "test-vault", -1,
             unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-        sqlite3_step(stmt)
-        sqlite3_finalize(stmt)
-        sqlite3_close_v2(db)
+        XCTAssertEqual(bindRc, SQLITE_OK,
+            "sqlite3_bind_text must succeed (rc=\(bindRc))")
+        let stepRc = sqlite3_step(stmt)
+        XCTAssertEqual(stepRc, SQLITE_DONE,
+            "sqlite3_step must return DONE (rc=\(stepRc))")
+        let finRc = sqlite3_finalize(stmt)
+        XCTAssertEqual(finRc, SQLITE_OK,
+            "sqlite3_finalize must succeed (rc=\(finRc))")
+        // Verify the corruption actually applied:read back
+        // payload_json length on a fresh statement (post-edit
+        // verification per ch 932 discipline)
+        var verifyStmt: OpaquePointer?
+        let verifySql = "SELECT length(payload_json) FROM " +
+            "host_constitution_vaults WHERE vault_id = ?"
+        _ = sqlite3_prepare_v2(
+            db, verifySql, -1, &verifyStmt, nil)
+        _ = sqlite3_bind_text(verifyStmt, 1, "test-vault", -1,
+            unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        XCTAssertEqual(sqlite3_step(verifyStmt), SQLITE_ROW,
+            "SELECT length(payload_json) must return a row")
+        let lengthAfterCorruption = sqlite3_column_int(
+            verifyStmt, 0)
+        XCTAssertEqual(lengthAfterCorruption, 0,
+            "payload_json must be empty after corruption " +
+            "UPDATE — if length > 0,the UPDATE did not " +
+            "apply and the subsequent test would pass for " +
+            "the wrong reason")
+        sqlite3_finalize(verifyStmt)
+        let closeRc = sqlite3_close_v2(db)
+        XCTAssertEqual(closeRc, SQLITE_OK,
+            "sqlite3_close_v2 must succeed (rc=\(closeRc))")
         // Now loadVault should THROW (not return nil)
         // because the row exists but payload is empty
         do {

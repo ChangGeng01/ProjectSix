@@ -18,22 +18,32 @@ final class BASChapter786ArcSealTests: XCTestCase {
 
     // MARK: - Post-arc Rust crate count
 
-    func testRustCrateCountIs22() {
+    func testRustCrateCountPinned() {
         // Pre-arc (v0.57.0): 20 crates。 Post-arc: 22 crates
         // (+bas-shadow-trial, +bas-atom-lifecycle)。
         //
         // chapter 八百九十四 / M3160 (L8 RUST UNIFICATION arc start):
         // bumped to 23 crates (+bas-l8-engine — SQL source-of-truth
-        // + Rust hot paths)。 chapter 九百二十五 / M3330: pin updated
-        // here after 5th-pass full-sweep test surfaced the stale pin
-        // (testRustCrateCountIs22) that all prior `--filter` runs
-        // had hidden — see chapter 921.5 audit:gap 12。
+        // + Rust hot paths)。
+        //
+        // chapter 九百三十九 / M3400 fix MED-1:RENAMED from
+        // `testRustCrateCountIs22` (which lied about the asserted
+        // value across chapters 894-925)。 The「Is22」 anti-pattern
+        // was specifically flagged by 6P-MED-1 / 10P-LOW-1 in the
+        // SEAL deferred-items registry as「next time we touch this
+        // file」 — ch 939 is that time。 Pinned doctrine remains:
+        // every crate addition MUST bump both this assertion AND
+        // bas_substrate_bundle_crate_count() in
+        // bas-memory-usage-tracker/src/force_link.rs。
         #if canImport(BASRustMemoryTrackerBinary)
         let bundleCount = bas_substrate_bundle_crate_count()
         XCTAssertEqual(bundleCount, 23,
-            "Post-arc bundle should be 23 crates " +
+            "Bundle crate count must be 23 " +
             "(20 pre-arc + shadow-trial + atom-lifecycle + " +
-            "l8-engine at chapter 八百九十四)")
+            "l8-engine at chapter 八百九十四)。 If you added a " +
+            "new crate,bump BOTH this assertion AND " +
+            "bas_substrate_bundle_crate_count() in " +
+            "bas-memory-usage-tracker/src/force_link.rs。")
         #endif
     }
 
