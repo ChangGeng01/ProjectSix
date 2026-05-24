@@ -983,3 +983,121 @@ fn c_abi_accepts_shape_at_lower_capacity_boundary() {
     assert_eq!(out_seq, out_par,
         "Sequential and parallel must produce byte-equal output");
 }
+
+// MARK: - chapter 九百四十五 / M3430 — race-detection stress tests
+//
+// Per ch 944 16P discipline:rayon parallel paths claim「race-free
+// by construction」 in code comments,but had NO empirical test
+// that would FAIL if the disjoint-write invariant were violated。
+//
+// These tests follow the ch 944 cross-engine race test pattern:
+// actually TRY to trigger nondeterminism / cross-call contamination
+// / data races,assert the path is robust。
+
+#[test]
+fn scan_parallel_v2_determinism_across_repeated_runs() {
+    // Run scan_parallel_v2 100 times with the SAME inputs。
+    // Assert ALL 100 outputs are byte-equal。
+    // If there were a data race / rayon work-stealing nondeterminism,
+    // outputs would differ across runs。
+    let shape = make_shape(8, 64, 32);
+    let bld = shape.element_count();
+    // Deterministic pseudo-random inputs via xorshift32
+    let mut state: u32 = 0xDEADBEEF;
+    let mut rand_f32 = || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        (state as f32 / u32::MAX as f32 - 0.5) * 2.0
+    };
+    let x: Vec<f32> = (0..bld).map(|_| rand_f32()).collect();
+    let delta: Vec<f32> =
+        (0..bld).map(|_| rand_f32().abs() * 0.1).collect();
+    let a: Vec<f32> =
+        (0..shape.d as usize).map(|_| -rand_f32().abs()).collect();
+    let b_proj: Vec<f32> = (0..bld).map(|_| rand_f32()).collect();
+    let c_proj: Vec<f32> = (0..bld).map(|_| rand_f32()).collect();
+
+    let baseline = scan_parallel_v2(
+        &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+    for run in 1..100 {
+        let result = scan_parallel_v2(
+            &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+        assert_eq!(result, baseline,
+            "scan_parallel_v2 run {} diverged from baseline —              rayon work-stealing nondeterminism or data race",
+            run);
+    }
+}
+
+#[test]
+fn scan_parallel_v2_concurrent_multi_call_no_cross_contamination() {
+    // Spawn 8 std::thread,each calls scan_parallel_v2 with its
+    // OWN distinct inputs。 Each thread asserts its own output
+    // matches the sequential reference for its inputs。
+    // If rayon's thread pool leaked state across calls,outputs
+    // would be wrong (some thread would get another thread's result)。
+    use std::thread;
+    use std::sync::Arc;
+
+    let shape = make_shape(2, 16, 8);
+    let bld = shape.element_count();
+    let n_threads = 8;
+
+    // Each thread has distinct delta multiplier so its expected
+    // output is unique。
+    let handles: Vec<_> = (0..n_threads).map(|tid| {
+        let scale = (tid + 1) as f32 * 0.1;
+        thread::spawn(move || {
+            let x: Vec<f32> = (0..bld)
+                .map(|i| (i as f32 * scale).sin()).collect();
+            let delta: Vec<f32> = vec![scale; bld];
+            let a: Vec<f32> =
+                vec![-(tid as f32 + 1.0); shape.d as usize];
+            let b_proj: Vec<f32> = vec![scale * 2.0; bld];
+            let c_proj: Vec<f32> = vec![1.0; bld];
+
+            let seq = scan_sequential(
+                &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            let par = scan_parallel_v2(
+                &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+            (tid, seq, par)
+        })
+    }).collect();
+
+    for h in handles {
+        let (tid, seq, par) = h.join().unwrap();
+        assert_eq!(seq, par,
+            "Thread {} got cross-contaminated output — rayon              pool leaked state across concurrent v2 calls", tid);
+    }
+}
+
+#[test]
+fn scan_parallel_v2_byte_equality_holds_under_concurrent_rayon_load() {
+    // Run scan_parallel_v2 INSIDE a rayon par_iter to verify
+    // nested rayon scopes don't deadlock or corrupt output。
+    // (Common failure mode of nested rayon if pool config is wrong。)
+    use rayon::prelude::*;
+    let shape = make_shape(4, 16, 8);
+    let bld = shape.element_count();
+    let x: Vec<f32> = (0..bld).map(|i| (i as f32 * 0.01).cos()).collect();
+    let delta: Vec<f32> = vec![0.05; bld];
+    let a: Vec<f32> = vec![-1.0; shape.d as usize];
+    let b_proj: Vec<f32> = vec![1.0; bld];
+    let c_proj: Vec<f32> = vec![1.0; bld];
+
+    let expected = scan_sequential(
+        &x, &delta, &a, &b_proj, &c_proj, shape).unwrap();
+
+    // 16 concurrent invocations through rayon::par_iter
+    let results: Vec<Vec<f32>> = (0..16usize)
+        .into_par_iter()
+        .map(|_| scan_parallel_v2(
+            &x, &delta, &a, &b_proj, &c_proj, shape).unwrap())
+        .collect();
+
+    for (i, result) in results.iter().enumerate() {
+        assert_eq!(result, &expected,
+            "Nested rayon invocation {} corrupted output", i);
+    }
+}
+

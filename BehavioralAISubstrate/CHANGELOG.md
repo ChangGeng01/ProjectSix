@@ -11,6 +11,49 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百四十五 / M3430 — Mamba + 多线程 development:8 NEW race-trigger stress tests across 3 rayon crates
+
+User directive 「继续开发 mamba 和 多线程」 → 3 rayon-parallel crates (bas-mamba-scan,bas-retrieval-ranker,bas-red-team-bench) all claimed「race-free by construction」 in code comments but had NO empirical test that would FAIL if the disjoint-write invariant or work-stealing determinism were violated。 Per ch 944 16P-test-2 cross-engine-race discipline pattern,added 8 stress tests that actually TRY to trigger nondeterminism / cross-call contamination。
+
+#### bas-mamba-scan — 3 NEW tests (37 → 40)
+
+- `scan_parallel_v2_determinism_across_repeated_runs`:100 invocations same inputs,assert byte-equality across all 100 — catches rayon work-stealing nondeterminism or data race that would scatter output bits
+- `scan_parallel_v2_concurrent_multi_call_no_cross_contamination`:8 std::thread spawn,each calls v2 with DISTINCT inputs,asserts each thread's output byte-equals its sequential reference — catches rayon thread pool leaking state across calls
+- `scan_parallel_v2_byte_equality_holds_under_concurrent_rayon_load`:16 concurrent invocations via outer rayon par_iter — catches nested rayon scope deadlock / corruption
+
+#### bas-retrieval-ranker — 3 NEW tests (196 → 199)
+
+- `batched_cosine_rayon_determinism_across_repeated_runs`:100 invocations same query+corpus,bit-equal across all 100
+- `batched_cosine_rayon_concurrent_multi_call_no_cross_contamination`:8 std::thread,distinct inputs,no leak
+- `batched_cosine_rayon_chunked_byte_equality_across_chunk_sizes`:verifies doc claim「chunk_rows preserves byte-equality」 across {1, 2, 7, 16, 64, 256, 1024, 4096, 5000} — would FAIL if chunk slicing introduced FP-order drift
+
+#### bas-red-team-bench — 2 NEW tests (42 → 44)
+
+- `parallel_batch_classify_determinism_across_repeated_runs`:100 invocations,80-prompt batch,assert prompt_index + pattern_index byte-equal across all 100
+- `parallel_batch_classify_concurrent_no_cross_contamination`:8 std::thread,distinct prompts per thread,each thread asserts par == seq for its own input
+
+#### Discipline pattern (ch 944 + ch 945)
+
+Per ch 944 16P-test-2 (cross-engine race) + this chapter:**code comment「race-free by construction」 is INSUFFICIENT — must have empirical test that TRIES to trigger the failure mode**。 The 3 invariants tested:
+1. **Determinism**:repeated identical-input invocations produce identical outputs (catches work-stealing nondeterminism + accumulator order drift)
+2. **No cross-call leak**:concurrent distinct-input invocations don't contaminate each other (catches thread pool state leak)
+3. **Parameter equivalence**:tunable parameters (chunk_rows, batch size) that doc claims are byte-equivalent ACTUALLY are (catches subtle FP-order subtlety)
+
+#### Verification
+
+- Rust:**bas-mamba-scan 40/40 + bas-retrieval-ranker 199/199 + bas-red-team-bench 44/44 = 283/283 pass** (was 196+42+37=275,+8 NEW)
+- Swift:no Swift-side changes,no rebuild needed
+- pre-commit-gates.sh:3/3 pass (no doc/source-file additions)
+
+#### Production value
+
+The 3 rayon crates are core hot-path infrastructure:
+- bas-mamba-scan: Mamba SSM kernel (per ch 八百五十二 arc — production-wired via BASAutoRouteRanker)
+- bas-retrieval-ranker: batched cosine similarity (per ch 八百七十二/八百七十六/八百八十 — production-wired through BASVectorIndex)
+- bas-red-team-bench: prompt safety classification (per ch 854 arc)
+
+If any of these had a latent race that survived because "designed to be race-free" was self-attested but never tested,the stress test would have surfaced it。 All 3 passed cleanly,validating the disjoint-write invariants are actually held。
+
 ### Chapter 九百四十四 / M3425 — 全面 review + 测试 + 修复:1 CRIT (doc substance lie) + 4 HIGH-code (unbounded read FFIs) + 3 HIGH-test (fake coverage + 2 NEW tests) + 3 HIGH-doc
 
 User directive 「全面 review + 测试 + 修复」 triggered comprehensive 3-agent (code + test + doc) review of post-943.2 state。 Found 1 CRIT + 10 HIGH + 8 MED + 5 LOW。 All CRITs + HIGHs shipped here。

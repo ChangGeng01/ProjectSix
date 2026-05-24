@@ -551,4 +551,119 @@ mod tests {
                 "row {} drift at large corpus", i);
         }
     }
+
+    // chapter 九百四十五 / M3430 — race-detection stress tests
+    //
+    // Per ch 944 16P discipline: rayon parallel paths claim
+    // "race-free by construction" in code comments, but had NO
+    // empirical test that would FAIL if the disjoint-write
+    // invariant were violated. These tests follow the ch 944
+    // cross-engine race test pattern: actually TRY to trigger
+    // nondeterminism / cross-call contamination.
+
+    #[test]
+    fn batched_cosine_rayon_determinism_across_repeated_runs() {
+        // Run batched_cosine_simd_rayon 100 times with the SAME
+        // inputs. Assert ALL 100 outputs byte-equal. If rayon
+        // work-stealing introduced nondeterminism, outputs would
+        // differ.
+        let dim = 64;
+        let rows = 500;
+        let q: Vec<f32> = (0..dim)
+            .map(|i| ((i as f32) * 0.013).sin()).collect();
+        let mut corpus: Vec<f32> = Vec::with_capacity(rows * dim);
+        for r in 0..rows {
+            for d in 0..dim {
+                corpus.push(
+                    (((r * dim + d) as f32) * 0.007).cos());
+            }
+        }
+        let baseline = batched_cosine_simd_rayon(
+            &q, &corpus, dim);
+        for run in 1..100 {
+            let result = batched_cosine_simd_rayon(
+                &q, &corpus, dim);
+            for i in 0..rows {
+                assert_eq!(
+                    result[i].to_bits(),
+                    baseline[i].to_bits(),
+                    "Run {} row {} diverged from baseline — \
+                     rayon work-stealing nondeterminism",
+                    run, i);
+            }
+        }
+    }
+
+    #[test]
+    fn batched_cosine_rayon_concurrent_multi_call_no_cross_contamination() {
+        // Spawn 8 std::thread, each calls batched_cosine_simd_rayon
+        // with its OWN distinct query + corpus. Each thread
+        // asserts its output byte-equals its sequential reference.
+        // If the rayon thread pool leaked state, one thread would
+        // get another thread's result (wrong row count or values).
+        use std::thread;
+        let dim = 32;
+        let rows = 100;
+        let n_threads = 8;
+        let handles: Vec<_> = (0..n_threads).map(|tid| {
+            thread::spawn(move || {
+                let scale = (tid as f32 + 1.0) * 0.1;
+                let q: Vec<f32> = (0..dim)
+                    .map(|i| ((i as f32) * scale).sin()).collect();
+                let mut corpus: Vec<f32> =
+                    Vec::with_capacity(rows * dim);
+                for r in 0..rows {
+                    for d in 0..dim {
+                        corpus.push(
+                            (((r * dim + d) as f32) * scale)
+                                .cos());
+                    }
+                }
+                let seq = batched_cosine_simd(&q, &corpus, dim);
+                let par = batched_cosine_simd_rayon(
+                    &q, &corpus, dim);
+                (tid, seq, par)
+            })
+        }).collect();
+        for h in handles {
+            let (tid, seq, par) = h.join().unwrap();
+            assert_eq!(seq.len(), par.len(),
+                "Thread {} row count mismatch", tid);
+            for i in 0..seq.len() {
+                assert_eq!(seq[i].to_bits(), par[i].to_bits(),
+                    "Thread {} row {} cross-contaminated", tid, i);
+            }
+        }
+    }
+
+    #[test]
+    fn batched_cosine_rayon_chunked_byte_equality_across_chunk_sizes() {
+        // chapter 九百四十五 — Verify byte-equality holds across
+        // ALL chunk_rows in {1, 2, 7, 16, 64, 256, 1024, 4096,
+        // 5000 (clamps to 4096)}. The doc claim is that chunk_rows
+        // does not affect output bits; this empirically tests it.
+        let dim = 48;
+        let rows = 200;
+        let q: Vec<f32> = (0..dim)
+            .map(|i| ((i as f32) * 0.019).sin()).collect();
+        let mut corpus: Vec<f32> = Vec::with_capacity(rows * dim);
+        for r in 0..rows {
+            for d in 0..dim {
+                corpus.push(
+                    (((r * dim + d) as f32) * 0.011).cos());
+            }
+        }
+        let seq = batched_cosine_simd(&q, &corpus, dim);
+        for &chunk in &[1usize, 2, 7, 16, 64, 256, 1024, 4096,
+                        5000] {
+            let par = batched_cosine_simd_rayon_chunked(
+                &q, &corpus, dim, chunk);
+            for i in 0..rows {
+                assert_eq!(seq[i].to_bits(), par[i].to_bits(),
+                    "chunk_rows={} row {} drift — claim that \
+                     chunk_rows preserves byte-equality FALSIFIED",
+                    chunk, i);
+            }
+        }
+    }
 }
