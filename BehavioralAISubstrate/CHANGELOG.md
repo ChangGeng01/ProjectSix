@@ -11,6 +11,67 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十三 / M3470 — Agent Fabric Phase 0 ch1: 8 core schemas + 5 enums + property tests
+
+Opens the Agent Fabric arc (chapters 953-981+,8 phases,~30 chapters) per user's full design doc preserved in conversation。 Phase 0 lays pure-data foundation before any service wiring in Phase 1+。
+
+#### User design alignment
+
+User's Section 7 specifies 8 core schemas + supporting enums for the Agent Fabric。 This chapter ships all 8 as Sendable / Equatable / Hashable / Codable value-structs in `Sources/BASMemory/`,with property tests using ch 952.2 fuzz generators。
+
+#### Files (NEW,9 source + 1 test = 10 files)
+
+**Schemas (`Sources/BASMemory/`):**
+- `BASAgentFabricEnums.swift` — 6 enums (BASAgentRole 20 cases / BASAgentVisibility 3 / BASStateDomain 9 / BASAgentProposalType 7 / BASAgentDeltaType 5 / BASAgentLeaseProfile 4)
+- `BASAgentSpec.swift` — agent identity + capability declaration (agentID,role,layerAffinity[],read/write/propose/forbidden domains,leaseProfile,personaRef?,visibility,commitCapability)
+- `BASAgentLease.swift` — per-turn budget (leaseID,agentID,turnID,maxMs,maxTokens,maxStateReads,maxDeltaWrites,allowedDomains[],expiresAtMs,priority)
+- `BASAgentObservation.swift` — typed read result (observationID,agentID,sourceRefs[],observedDomain,summary,confidence,flags[])
+- `BASAgentDelta.swift` — proposed state change (deltaID,agentID,targetObjectRef,deltaType,patchJson,confidence,reasonCodes[],dependencies[],conflictRefs[])
+- `BASAgentProposal.swift` — structured request (proposalID,agentID,proposalType,payloadRef,requiredDomains[],riskNotes[],sovereignNotes[])
+- `BASAgentMergeResult.swift` — merge engine output (mergeID,accepted/rejectedDeltaIDs,conflictResolution[],resultingStateRef,mergeReasonCodes[])
+- `BASAgentTrace.swift` — per-agent-per-turn execution trace (traceID,agentID,leaseRef,read/writeRefs,proposalIDs,accepted,rejectedReason,latencyMs)
+- `BASAgentPersonaSpec.swift` — user persona overlay (personaID,agentID,tone,warmth,directness,skepticism,structure/creativity/challenge/comparison/guard biases,visibility,host/risk/sovereign constraint refs,versionRef)
+
+**Tests:**
+- `Tests/BehavioralAISubstrateTests/BASChapter953AgentFabricSchemaPropertyTests.swift` — 16 tests covering:
+  - Enum raw-value Codable round-trip (6 enums)
+  - Enum count invariants (pin user's design counts)
+  - 8 schema Codable round-trip (default + populated)
+  - BASFuzzRng-driven 100-iter fuzz round-trip for 4 main schemas (Spec/Lease/Delta/Persona)
+  - Sendable cross-actor-boundary check (Swift 5.10 strict concurrency compile-time invariant)
+
+#### Verification
+
+```
+swift build  → clean (60.74s)
+swift test --filter BASChapter953  → 16 PASSED / 0 FAILED in 0.027s
+```
+
+Zero runtime touched。 No coordinator changes。 No SDK surface changes。 Existing tests byte-equal。
+
+#### Why this matters
+
+This is the foundation for the entire Agent Fabric arc (Phases 0-8,~30 chapters,6-12 months)。 Per plan:
+- ch 953 (THIS) — schemas + enums
+- ch 954 — `BASSharedStateGraph` actor (typed accessors,Single-Writer-Per-Domain runtime enforcement)
+- ch 955 — `BASAgentMergeEngine` pure-fn (Sovereign > Risk > Host > Evidence > Agent > Recency priority)
+- ch 956-959 (Phase 1) — first end-to-end 3-seat closure: Scout + Planner + Risk + Surface
+- ch 960-962 (Phase 2) — +Memory + Critic
+- ch 963-965 (Phase 3) — +HostAlignment + SovereignSentinel + EvolutionShadow
+- ch 966-969 (Phase 4) — Persona Studio (user's original ask,now built atop fabric)
+- ch 970-972 (Phase 5) — 7 Watcher agents
+- ch 973-975 (Phase 6) — SDK productization + skill agents
+- ch 976-978 (Phase 7) — MCP + A2A external interop
+- ch 979-981 (Phase 8) — End-side perf optimization + arc-seal
+
+Per Root Law 7 (可回放):every schema is Codable so traces persist via `BASRoutedEventLogStorage` event-sourced log (Phase 0 ch 959)。
+
+Per Single-Writer-Per-Domain (Root Law 3):enforcement happens in `BASSharedStateGraph` (ch 954),but `BASAgentSpec.writeDomains` / `proposeDomains` / `forbiddenDomains` fields encode the per-agent authority at type level — caught at compile time + runtime + audit。
+
+LOW risk: pure data,no integration。 Revert = delete 10 files。
+
+---
+
 ### Chapter 九百五十二.8 / M3465.8 — 全面 improvements batch (8 of 11 deferred items shipped)
 
 User directive: 「全面开发」 — comprehensive development of deferred items from ch 952.7 audit。 Ships 8 of 11 items in a single chapter for efficient verification + commit。
