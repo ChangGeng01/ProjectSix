@@ -120,6 +120,20 @@ public struct BASEBrainRuntimeCoordinator {
             (BASAuditObservationProjectionsBundleObservation)
             -> Void)?
 
+    /// chapter 九百六十 / M3505 — Phase 2 ch1:Agent Fabric
+    /// runtime bundle。 OPT-IN per ADR-014 — default nil means
+    /// no fabric per-turn touch,coordinator behavior byte-equal
+    /// to pre-ch-960 (红线 7 preserved)。 When set,callers can
+    /// invoke `runAgentFabricObservation(...)` to run the 4-seat
+    /// dispatcher alongside the existing turn flow。
+    ///
+    /// Observation-only mode (this chapter):the dispatcher's
+    /// `BASAgentTurnResult` is returned to the caller but does
+    /// NOT mutate any existing coordinator output。 Future
+    /// fabric-authoritative mode (ch 961+) lets accepted deltas
+    /// drive coordinator output。
+    public var agentFabric: BASAgentFabricRuntime?
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -144,7 +158,13 @@ public struct BASEBrainRuntimeCoordinator {
         projectionBlockEmissionHandler:
             (@Sendable
                 (BASAuditObservationProjectionsBundleObservation)
-                -> Void)? = nil
+                -> Void)? = nil,
+        // chapter 九百六十 / M3505 — Phase 2 ch1 OPT-IN slot。
+        // Default nil preserves V1 byte-equality per 红线 7 +
+        // ADR-014。 Setting this param activates the Agent Fabric
+        // observation surface (call `runAgentFabricObservation`)
+        // — does NOT change existing runTurn behavior。
+        agentFabric: BASAgentFabricRuntime? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -168,6 +188,51 @@ public struct BASEBrainRuntimeCoordinator {
             memoryMutationEventEmitter
         self.projectionBlockEmissionHandler =
             projectionBlockEmissionHandler
+        self.agentFabric = agentFabric
+    }
+
+    // MARK: - Agent Fabric observation (ch 960)
+
+    /// chapter 九百六十 / M3505 — observation-only fabric dispatch。
+    /// Per ADR-014 + 红线 7,this method is the ONLY agent-fabric
+    /// per-turn touch in ch 960 — callers explicitly invoke it,
+    /// `runTurn` does NOT call it implicitly。 If `agentFabric`
+    /// is nil,returns nil (no-op,zero overhead)。
+    ///
+    /// What this does when fabric is set:
+    ///   1. Build the 4 seat DTOs from the supplied L7 frame +
+    ///      L9 candidate paths (via `BASAgentFabricAdapters`)
+    ///   2. Call `BASAgentTurnDispatcher.dispatch(...)` which runs
+    ///      Scout → Planner → Risk → Surface,merges deltas,
+    ///      applies accepted deltas to the shared state graph,
+    ///      writes events to the trace log if configured
+    ///   3. Return the `BASAgentTurnResult` — caller decides
+    ///      what (if anything) to do with it
+    ///
+    /// In ch 960 observation mode the result is recorded for
+    /// audit + replay (via the optional trace log) but is NOT
+    /// used to mutate any existing coordinator output。 Future
+    /// chapter 961+ (fabric-authoritative mode) wires the
+    /// dispatcher's surface delta into the actual render frame
+    /// + risk gate。
+    public func runAgentFabricObservation(
+        turnID: String,
+        decomposeFrame: BASDecomposeFrame,
+        candidatePaths: [BASCandidatePath],
+        acceptedCandidateID: String? = nil,
+        priorityContext: BASMergePriorityContext =
+            BASMergePriorityContext(),
+        nowNanos: Int64 = 0
+    ) async -> BASAgentTurnResult? {
+        guard let agentFabric else { return nil }
+        let input = BASAgentFabricAdapters.turnInput(
+            turnID: turnID,
+            decomposeFrame: decomposeFrame,
+            candidatePaths: candidatePaths,
+            acceptedCandidateID: acceptedCandidateID,
+            priorityContext: priorityContext,
+            nowNanos: nowNanos)
+        return await agentFabric.dispatchTurn(input: input)
     }
 
     // chapter 六百二 / M1785 — V1 fold Phase I continuation

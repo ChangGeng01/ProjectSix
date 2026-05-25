@@ -11,6 +11,134 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十 / M3505 — Phase 2 ch1:**first coordinator wire** (observation-only,ADR-014 OPT-IN)
+
+The **first per-turn coordinator touch** in the arc。 Per Phase 2
+plan + 红线 7 + ADR-014:default-nil opt-in slot preserves byte-
+equal behavior for existing callers,one new public method exposes
+the dispatcher to callers that want it。 NO existing per-turn code
+path changes。
+
+#### Design:observation-only mode
+
+The minimal-risk first touch is **observation-only** — the
+dispatcher runs alongside existing flow but doesn't mutate any
+existing output。 This means:
+- Default flag OFF → byte-equal preserved (red-line 7 + ADR-014)
+- Flag ON via opt-in caller → fabric records to its own graph +
+  trace log,but coordinator's existing render frame / action permit
+  / sovereign verdict paths are UNCHANGED
+- byte-equality test passes both flag OFF AND flag ON because the
+  fabric output is independent of existing outputs
+
+Future ch 961+ (fabric-authoritative mode) wires accepted deltas
+into actual coordinator output。 For ch 960 the discipline is
+"prove the wire works without changing behavior。"
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASAgentFabricRuntime.swift` (~80 LOC):**
+- `BASAgentFabricRuntime` value-type bundle of (roster + graph + optional traceLog)
+- Sendable (all components are Sendable — `BASAgentTurnRoster` is value-only, `BASSharedStateGraph` is an actor, `BASAgentTraceLog?` is an optional actor)
+- `dispatchTurn(input:traceLogOverride:)` convenience wrapping `BASAgentTurnDispatcher.dispatch(...)`
+
+**NEW `Sources/BASOrchestration/BASAgentFabricAdapters.swift` (~110 LOC):**
+- Pure-fn cross-module adapters (lives in BASOrchestration since it already imports BASMemory — reverse direction is a dep cycle per ch 957)
+- `scoutInput(from: BASDecomposeFrame) -> BASScoutInput` — pressure/manipulation/boundary/contradiction signal mapping
+- `plannerCandidates(from: [BASCandidatePath]) -> [BASPlannerCandidate]` — 1:1 field mapping
+- `riskInput(from:candidates:) -> BASRiskInput` — derives pressureLevel from Scout signal count (linear, 5+ signals = 1.0 cap), manipulation/boundary flags from cluster detection
+- `surfaceInputObservationMode(...) -> BASSurfaceInput` — SAFE defaults (permit granted, no veto, low risk) because observation mode doesn't drive UI
+- `turnInput(...) -> BASAgentTurnInput` — convenience building all 4 DTOs at once
+
+**MODIFIED `Sources/BASHostKit/EBrainRuntimeCoordinator.swift`:**
+- NEW stored property `agentFabric: BASAgentFabricRuntime?` (default nil at init)
+- NEW init parameter `agentFabric: BASAgentFabricRuntime? = nil` at the END of the parameter list (preserves prior-caller compat per default-value)
+- NEW public method `runAgentFabricObservation(turnID:decomposeFrame:candidatePaths:acceptedCandidateID:priorityContext:nowNanos:) async -> BASAgentTurnResult?`:
+  - Returns nil immediately when `agentFabric` is nil (zero-overhead no-op for non-opted-in callers)
+  - When set:builds 4 DTOs via adapters + calls `agentFabric.dispatchTurn(...)` + returns result
+- NO call to this method from within `runTurn` — opt-in caller invokes it explicitly。 (Future ch 961+ will wire from within runTurn under a separate explicit flag。)
+
+**MODIFIED `Tests/BehavioralAISubstrateTests/BASChapter602V1MonolithExtractionWaveThreeProofTests.swift`:**
+- Bumped pinned init metatype reference to include the new `agentFabric:` parameter — discipline pin tracks the canonical signature
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter960CoordinatorWireTests.swift` (~325 LOC, 14 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| Backward-compat (3) | init without fabric / init with default param / observation returns nil | Proves byte-equal behavior preserved |
+| Fabric set (4) | init holds bundle / observation returns valid result / trace log captures 9 events / graph receives 4 deltas | Proves the new surface works end-to-end |
+| Adapters (5) | scoutInput from frame / plannerCandidates / riskInput pressure scaling / riskInput manipulation detected / surfaceInputObservationMode safe defaults / turnInput builds all 4 | Pure-fn cross-module adapter pinning |
+| 红线 7 (1) | nil fabric does not mutate coordinator | Spot-check (full sweep is the real proof) |
+| Init signature pin (1) | discipline trace via ch 602 test | Pinned signature tracks change |
+
+#### Verification
+
+```
+swift build  → clean (104s)
+swift test --filter "BASChapter960|BASChapter602V1Monolith"
+  → 18 PASSED / 0 FAILED in 0.01s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,850 PASSED + 2 pre-existing perf flakes
+     (ch 956.6 pathological-512 perf gate under heavy CI load,
+      passes in isolation) / 115 skipped / 0 regressions in 296s
+```
+
+**Cumulative Agent Fabric arc: 174 Swift + 22 Rust = 196 dedicated tests / 0 failures。**
+
+#### The big invariant proven
+
+**The 13,852-test baseline is preserved with the FIRST per-turn
+coordinator touch landed。** This was the riskiest moment in the
+arc — adding a parameter to the most-depended-on init in the
+substrate without breaking ANY of the 13.8K existing tests。 The
+default-nil + opt-in design holds:
+- All existing callers compile + behave identically
+- One pinned signature test (ch 602) needed an update to track
+  the new parameter — bumped + still passes
+- Full-sweep regression = 0 unrelated to the change
+
+#### Why a non-extension property add
+
+Stored properties cannot be added via extension。 The `agentFabric:
+BASAgentFabricRuntime?` had to land in the main struct file
+(`EBrainRuntimeCoordinator.swift`)。 The change is mechanically:
++1 stored property declaration + +1 init parameter (defaulted) +
++1 init body assignment + +1 new public method。 ~40 lines added
+in total。 No existing code reordered or modified。
+
+#### Risk + revert
+
+LOW (delivered) — proven by zero-regression full sweep:
+- Default-nil parameter is backward-compatible
+- Observation-only mode means even flag-ON callers don't change
+  existing output
+- Pinned init signature test was the ONE legitimate "break"
+  (pin must track signature changes);bumped + verified
+- Adapters are pure functions — no I/O, no actor, trivially testable
+- The MED-risk-per-plan reality turned out to be LOW because of
+  the observation-only design choice
+
+Revert: 1 modified main file + 1 modified pinned-signature test
++ 2 new source files + 1 new test file + CHANGELOG。
+
+#### What's next
+
+**Ch 961 (Phase 2 ch2):** Memory + Critic seats per the original
+plan。 OR optional bump to ch 960.5 if review surfaces ordering /
+ABI concerns。 The fabric-authoritative mode (where dispatcher's
+surface delta drives the coordinator's actual render frame) is
+deferred to a future chapter after Memory + Critic land (those
+two seats are what makes the merged candidate frontier "real"
+enough to drive surface choice instead of just the L9 winner)。
+
+iPhone Air real-device 10-min smoke (Phase 1 close validation
+per the original plan) is now meaningful — fabric is wired, so
+the smoke can flip the OPT-IN flag and observe trace events on
+real device under real load。 Deferred to next chapter for
+explicit smoke driver。
+
+---
+
 ### Chapter 九百五十九 / M3500 — Phase 1 close:`BASAgentTraceLog` + `BASAgentTurnDispatcher`
 
 Ties the 4-seat Phase 1 work together into a single `dispatch(...)`

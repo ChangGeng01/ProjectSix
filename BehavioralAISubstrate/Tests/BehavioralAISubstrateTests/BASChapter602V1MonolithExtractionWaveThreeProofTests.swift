@@ -86,7 +86,13 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 hostForgetRequest:
                 memoryEventLog:
                 memoryMutationEventEmitter:
-                projectionBlockEmissionHandler:)
+                projectionBlockEmissionHandler:
+                // chapter 九百六十 / M3505 — Phase 2 ch1 Agent
+                // Fabric OPT-IN slot added。 Default-nil
+                // preserves all prior caller compat per 红线 7
+                // + ADR-014;this pin is updated to track the
+                // canonical signature。
+                agentFabric:)
         XCTAssertNotNil(initRef)
     }
 
