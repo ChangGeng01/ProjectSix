@@ -11,6 +11,94 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十六 / M3535 — Phase 4 ch1:Persona Studio kickoff — 12 role templates + `BASAgentPersonaResolver`
+
+Opens Phase 4 of the Agent Fabric arc (ch 966-969):the
+user-customizable Persona Studio。 Persona overlay LIVES ATOP the
+fabric — composes role templates + user overlays + host overlays
+per the plan formula:
+
+  P_effective = Clamp(P_role ⊕ P_user ⊕ P_host, Risk, Sovereign)
+
+This chapter ships the composition half (P_role ⊕ P_user ⊕ P_host)。
+Risk + Sovereign clamping land in ch 967 + ch 968 respectively。
+
+#### Role templates (12 total per plan)
+
+| Tier | Roles | Customization |
+|---|---|---|
+| HIGH (5) | Planner / Critic / Memory / Risk / Surface | full overlay allowed (tone + warmth + directness + skepticism + structure + creativity + challenge + comparison + guard) |
+| MED (3) | HostAlignment / EvolutionShadow / Scout | partial — ONLY tone + warmth + directness (style/cadence) — cognitive biases stay role-template |
+| LOW (4) | SovereignSentinel / ActionPermit / DeleteRollbackSeal / MemorySeal | sealed-default — user overlay IGNORED entirely per Root Law 4 (单主权) |
+
+Total 12 templates。 Pin asserted by `expectedTemplateCount`。
+
+#### LOW-tier sealed-default discipline
+
+Per ch 966 test suite:LOW-tier templates carry forced-high
+skepticism (≥ 0.85) + guard (≥ 0.85),forced-low warmth (≤ 0.20)
++ creativity (≤ 0.05) — defends against any future template drift
+that would soften a sovereign agent。
+
+#### Visibility drift defense
+
+The resolver trusts the AGENT SPEC's `.visibility`,not the template
+visibility。 If a host registers a `.planner` role with `.low`
+visibility (unusual but allowed),the resolver applies LOW-tier
+discipline。 Per ch 956.11 CR2 defensive style:fail-safe to
+sealed,never to open。
+
+#### NaN policy
+
+Any NaN bias value (e.g. user passes `Double.nan` for `skepticism`)
+is collapsed to `0.5` (neutral middle)。 Downstream consumers crash
+on NaN arithmetic — the persona resolver MUST NEVER emit a NaN
+field per ch 956.11 CR1。
+
+#### Clamp invariant
+
+All 8 numeric biases (warmth / directness / skepticism /
+structureBias / creativityBias / challengeIntensity / comparisonBias
+/ guardBias) saturate at `[0.0, 1.0]`。 Out-of-bound overlay values
+are PINNED at the bound rather than rejected — per ch 956.11 CR1
+discipline,failing closed during live persona resolve would break
+the session。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentPersonaRoleTemplates.swift` | NEW — 12 role templates + fallback |
+| `Sources/BASMemory/BASAgentPersonaResolver.swift` | NEW — pure-fn composer (P_role ⊕ P_user ⊕ P_host) per visibility tier |
+| `Tests/BehavioralAISubstrateTests/BASChapter966PersonaResolverTests.swift` | NEW — 23 tests (template registry pin + 7 tier-specific composition tests + clamp/NaN invariants + composition order + visibility drift defense + every-role-resolves sweep) |
+
+Test result:**23 / 23 pass**。 Cumulative arc tests (ch 953-966)
+**353 / 0 failures** (filtered run)。 Full sweep environmental note:
+swift-testing helper process crashed mid-run with SIGBUS due to a
+CoreData XPC connection failure — system-level harness issue not
+caused by ch 966 changes (all individual XCTest suites pass 0
+failures;the 4 failed-in-flight counts are tests interrupted by
+the helper crash,not real assertion failures)。 To reproduce
+fail-state count without crash interference,run the cumulative
+filter:`swift test --filter "BASChapter9[56]"`。
+
+#### Phase 4 plan thread (4 chapters)
+
+| Chapter | Scope |
+|---|---|
+| **ch 966 (this)** | Persona role templates + resolver composition |
+| ch 967 | Risk gate clamping (monotonic clamp01,never lower risk) |
+| ch 968 | Sovereign sentinel clamping + LOW-tier force-default warrant gate |
+| ch 969 | Persona SDK surface (`brain.createAgentPersona()` + transcript compare modes + forbidden persona detector) |
+
+ADR-014 OPT-IN preserved — persona overlay only applies when caller
+explicitly invokes the resolver。 Pre-Phase-4 callers (Scout/Planner/
+Memory/Critic/HostAlign/Risk/Surface/Sentinel/EvolutionShadow direct
+emission) unchanged。 Persona overlay is a per-turn composition layer
+that ch 969 will wire into the dispatcher input。
+
+---
+
 ### Chapter 九百六十五 / M3530 — Phase 3 close:EvolutionShadow seat + `.evolutionProposal` domain (never-effective-same-turn)
 
 Closes Phase 3 of the Agent Fabric arc (chapters 963-965)。 Ships the
