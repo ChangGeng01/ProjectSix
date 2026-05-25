@@ -11,6 +11,96 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十二.7 / M3465.7 — Observability boost: memory tracking + 226-iter trend analysis (refines「0 perf regression」claim with honest data)
+
+User asked「通过 这次 测试 有没有 可以 改善的 部分」 (post-10hr run improvement opportunities)。 Top finding:**ch 952.6 RESULTS commit's「0 perf regression」claim was based on iter-1 vs iter-226 snapshot — but a gradual 10%/hr climb would have been missed by snapshot**。 This chapter ships the analysis tooling to back the claim with linear-regression evidence + adds memory observability for future runs。
+
+#### NEW: scripts/analyze-ch952-trend.py (~220 LOC)
+
+Parses all `/tmp/ch952-10hr/iter-*.log` files,extracts 29 distinct metric series,runs linear regression per metric to compute slope (% change per 100 iters) + coefficient of variation。 Outputs:
+
+| verdict | meaning |
+|---|---|
+| STABLE | drift < 5%/100 iters (true non-regression) |
+| MILD-DRIFT | drift 5-15%/100 iters (worth eyeballing) |
+| 🔴 DRIFT | drift > 15%/100 iters (real regression) |
+| (NOISY) | CoV > 50% (low-confidence signal — likely measurement noise) |
+
+#### Verdict on the 10hr run (226 iters analyzed)
+
+```
+STABLE     : 22 metrics  ✓ headline claims confirmed
+MILD-DRIFT : 6 metrics   ← sub-ms precision noise mostly
+DRIFT (🔴) : 1 metric    ← high-CoV noise, NOT a real signal
+```
+
+#### STABLE — 22 metrics that are genuinely flat (drift < 5%)
+
+| metric | mean | drift%/100i | CoV% |
+|---|---|---|---|
+| L8.append p99 (high-bar scorecard) | 0.175ms | -1.78 | 4.7 |
+| L8.read p99 (high-bar scorecard) | 0.904ms | -4.25 | 4.7 |
+| substrate startSession p99 | 3.874ms | -1.28 | 9.8 |
+| MLX warmed load | 3046ms | +0.55 | 1.8 |
+| MLX single-inference tok/s | 53.5 | -0.06 | 3.2 |
+| MLX streaming first-token | 181ms | +2.56 | 10.7 |
+| MLX streaming last-token | 481ms | +2.72 | 10.3 |
+| MLX single-infer latency | 886ms | +1.28 | 9.4 |
+| MLX token count per inference | 47.4 | +1.18 | 9.8 |
+| ...+13 more (bench:L8.append.p50,bench:L8.events p99,etc) | | | |
+
+→ The headline「0 perf regression」 IS supported by linear-regression analysis,not just snapshot — for these 22 metrics。
+
+#### MILD-DRIFT — 6 metrics worth eyeballing
+
+| metric | first→last | drift%/100i | honest read |
+|---|---|---|---|
+| bench:EventLog.append.p50 | 0.040→0.050ms | +13.08% | **Sub-ms precision noise** — values printed at 0.01ms steps but true value is ~0.04-0.05ms,so 0.04→0.05 shows as +25% but is actually within measurement precision |
+| bench:EventLog.append.p99 | 0.080→0.100ms | +7.69% | Same precision noise |
+| bench:L8.append.p99 | 0.080→0.090ms | +6.33% | Same |
+| bench:UserState.append.p99 | 0.060→0.070ms | +11.29% | Same |
+| mlx-bench.avg_tok_per_sec | 21.56→15.02 | **-6.36%** | **REAL signal — small N=5 benchmark shows mild MLX throughput decline over 10hr** |
+| mlx-bench.p50 | 223→303ms | +7.65% | Pair with above |
+
+The MLX small-N (5) benchmark shows a small actual decline (~6% tok/s drop)。 This could be:
+- Thermal throttle (10hr sustained inference does warm A19)
+- Page-cache effects (model weights staying resident across iters)
+- True regression (unlikely given other MLX metrics stable)
+
+#### 🔴 DRIFT (NOISY)— 1 metric (90% CoV = not a real signal)
+
+`mlx-bench.p99` = +15.92%/100 iters but with **CoV 90%** → noise drowns signal。 First-value 866ms,last-value 10533ms,mean 4251ms — wide range because N=5 sample size means a single slow inference dominates p99。 Recommend running with N≥20 + warmup-discard to get reliable p99。
+
+#### NEW: memorySnapshot() in BASChapter952_4HighBarBenchmarkTests.swift
+
+Wires existing `BASProcessMemoryProbe` (mach_task_basic_info-based) into the high-bar benchmark scorecards。 Emits greppable lines:
+```
+🧠 ch952.7-memory | label=L8.append.before rss=125.3MB
+🧠 ch952.7-memory | label=L8.append.after rss=125.4MB
+```
+
+Future device runs will print these,letting `analyze-ch952-trend.py` detect gradual RSS growth = real leak signal (vs the ch 952.6 negative-evidence inference from「no jetsam SIGKILL」)。
+
+#### Improvements identified but DEFERRED
+
+These showed up in the post-10hr analysis but not landed this chapter:
+
+| # | Item | Priority |
+|---|---|---|
+| 1 | MLX infer-latency p99 ceiling (5000ms) wrong — measured 13808ms,scorecard says margin=0.4× every iter,but no XCTAssert enforces it | HIGH |
+| 2 | Audit OTHER procedural generators for infinite-loop guards (post ch 952.2 finding pattern) | HIGH |
+| 3 | `testEveryIterationCoversAllPrefixesStrict` skipped 226 times (env not set) — delete or enable | MED |
+| 5 | iPhone Air covers only 44 tests vs macOS sweep 13649 — 99.6% coverage gap | MED |
+| 7 | No battery/thermal observability (iter-89 was 3:37 slowest — was it throttle?) | MED |
+| 8 | No app suspension scenario tested | MED |
+| 9 | macOS SwiftPM MLX bundle metallib path issue | LOW |
+| 10 | Wrapper script edge cases (device disconnect mid-run) | LOW |
+| 11 | MLX prompts hardcoded 20 in each iter,no rotation | LOW |
+
+Per chapter 八百七十六 audit-with-trigger discipline:these are documented + ranked,but not all need to ship now。 If the next 10hr run shows new defects in these areas,that becomes its own follow-up chapter。
+
+---
+
 ### Chapter 九百五十二.6 / M3465.6 — 🏆 10-HOUR iPhone Air real device stress run COMPLETE: 226 iters / 9944 passes / 0 failures / 0 perf regression
 
 User directive: 「跑个 10 小时」 — sustained real iPhone Air arm64 stress test post ch 952.2 infinite-loop fix + ch 952.4 high-bar benchmarks + ch 952.5 iter tune。

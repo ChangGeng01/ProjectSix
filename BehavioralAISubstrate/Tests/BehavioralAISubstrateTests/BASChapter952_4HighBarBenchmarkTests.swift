@@ -132,6 +132,24 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
               "n=\(n)")
     }
 
+    /// chapter 九百五十二.7 — emit greppable memory snapshot via
+    /// existing BASProcessMemoryProbe (mach_task_basic_info)。
+    /// Lets trend-analysis script detect gradual RSS growth across
+    /// iters (= leak)。 Both endpoints printed (before/after)
+    /// because tests do work between them — delta is the signal。
+    private func memorySnapshot(label: String) async {
+        let probe = BASProcessMemoryProbe(useCBridge: true)
+        do {
+            let bytes = try await probe.current()
+            let mb = Double(bytes) / 1_048_576.0
+            let mbStr = String(format: "%.1f", mb)
+            print("🧠 ch952.7-memory | label=\(label) rss=\(mbStr)MB")
+        } catch {
+            print("🧠 ch952.7-memory | label=\(label) " +
+                  "rss=ERR(\(error))")
+        }
+    }
+
     // MARK: - TIGHT L8 substrate benchmarks (sub-ms ceilings)
 
     /// Platform-tuned ceilings — iPhone Air A19 with internal NVMe
@@ -161,6 +179,7 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
     /// iPhone Air's internal NVMe + APFS。
     func testL8AtomLifecycleAppendP99SubMillisecond() async throws {
         try requireBenchmarkRun()
+        await memorySnapshot(label: "L8.append.before")
         let url = tempURL("l8-append-tight")
         defer { cleanup(url) }
         let store = try BASRoutedAtomLifecycleStore(databaseURL: url)
@@ -174,6 +193,7 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
             samples.append(msFromDuration(
                 ContinuousClock().now - t0))
         }
+        await memorySnapshot(label: "L8.append.after")
         let p50 = percentile(samples, 0.50)
         let p99 = percentile(samples, 0.99)
         scorecard(suite: "L8", op: "AtomLifecycle.append",
