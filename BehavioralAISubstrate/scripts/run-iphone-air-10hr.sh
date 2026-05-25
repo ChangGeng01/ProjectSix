@@ -37,8 +37,11 @@ fi
 
 SUBSTRATE_DIR="/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate"
 DEVICE_ID="9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6"
-LOG_DIR="/tmp/ch952-10hr"
-MAX_SEC=$((10 * 3600))   # 10 hours = 36000 seconds
+LOG_DIR="${BAS_DEVICE_LOG_DIR:-/tmp/ch952-10hr}"
+# chapter 九百五十二.8.1 — MAX_SEC env override (e.g.
+# MAX_SEC=600 bash scripts/run-iphone-air-10hr.sh for 10-min smoke
+# vs the 10hr default)
+MAX_SEC=${MAX_SEC:-$((10 * 3600))}   # default 10 hours
 
 mkdir -p "$LOG_DIR"
 echo "ch952.3+952.6 10hr run starting at $(date)" > "$LOG_DIR/summary.txt"
