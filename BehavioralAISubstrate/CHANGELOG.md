@@ -11,6 +11,98 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十八 / M3495 — Phase 1 ch3:Risk + Surface seats (same pure-fn pattern)
+
+Second pair of seat wrappers,extending the ch 957 pattern。 Risk
++ Surface complete the 4-seat MED-band activation set per the
+Agent Fabric router design (Scout + Planner + Risk + Surface)。
+
+#### Design
+
+Same as ch 957:pure static `emit()` functions + slim DTO inputs +
+shared per-turn seq counter + no coordinator wire yet。 Both
+Risk + Surface enforce Single-Writer-Per-Domain (Risk owns
+`.riskField`,Surface owns `.renderFrame`)。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASRiskSeat.swift` (~205 LOC):**
+- `BASRiskCandidate` DTO (candidateID + reversibility + benefit + cost)
+- `BASRiskInput` DTO (candidates + pressureLevel + manipulationDetected + boundaryTouched)
+- `BASRiskAssessmentBand` enum (.low / .medium / .high)
+- `BASRiskSeat.emit()` → one `.riskField` delta per candidate
+- 6-rule risk assessment (manipulation always-high / boundary-irreversible / boundary-med / pressure-irreversible / reversibility-low / baseline-clear)
+- Confidence by band:HIGH=0.95 / MEDIUM=0.75 / LOW=0.55
+- Reason codes accumulate evidence prefixes (`risk.manipulation-detected`,`risk.elevation=*`,`risk.reversibility-low`)
+
+**NEW `Sources/BASMemory/BASSurfaceSeat.swift` (~215 LOC):**
+- `BASSurfaceSeatMode` enum (8 modes per Section 9.6:answer / compare / delay / draftOnly / localOnly / block / replace / silentStub) — named with `Seat` suffix to avoid colliding with the existing 5-case `BASSurfaceMode` in `BASOrchestration/BASSurfaceMatrix.swift`
+- `BASSurfaceInput` DTO (acceptedCandidateID + permit + riskBand + reversibility + sovereignVetoed + userRequestsCompare)
+- `BASSurfaceSeat.emit()` → ALWAYS exactly ONE `.renderFrame` delta (`.silentStub` for nothing-to-surface)
+- 7-rule mode picker with explicit priority:sovereign > permit > high-risk-irreversible > high-risk-reversible > med-irreversible > user-compare > accepted > no-candidate
+- DeltaType is `.replace` (render frame is per-turn singleton)
+- Confidence by mode:block/silentStub=0.95 / compare=0.85 / delay etc=0.8 / answer=0.7
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter958RiskSurfaceSeatTests.swift` (~360 LOC,19 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| Risk (9) | empty / 6 rule branches / multi-candidate / determinism | All 6 risk-assessment paths + sequence preservation |
+| Surface (9) | 7 mode branches + always-1-delta invariant + payload | All 7 mode-picker paths + .replace deltaType invariant |
+| Combined (1) | All 4 seats (Scout+Planner+Risk+Surface) in one turn | End-to-end through merge engine + applier → 4 state objects in 4 domains,each agent claims its expected writer slot |
+
+The combined test is the strongest end-to-end signal yet:**4 different agents,4 different domains,1 shared sequence space → merge engine accepts all,applier writes all,Single-Writer-Per-Domain registry shows all 4 expected writers** — Phase 1 seat layer fully composes。
+
+#### Type-collision note (caught at build time)
+
+Initial design used `BASSurfaceMode` name → build error because
+`BASOrchestration/BASSurfaceMatrix.swift` has a 5-case enum by
+that name with different rawValues (comparePanel / draftShell /
+delayPacket / boundaryScript / silentStub) for the L12 surface
+mount system。 Renamed to `BASSurfaceSeatMode` — seat-specific
+8-mode semantics remain separate from L12 mount surface set。
+Future revision could harmonize the two,but no behavior dep
+exists today so keeping them distinct is safe。
+
+#### Verification
+
+```
+swift build  → clean (83s)
+swift test --filter BASChapter958  → 19 PASSED / 0 FAILED in 0.02s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,821 PASSED + 2 perf flakes under load (BASChapter868
+     FlashAttention + BASChapter873 Audit aggregation;both pass
+     in isolation) / 114 skipped / 0 regressions in 443s
+```
+
+Cumulative Agent Fabric arc count:**145 Swift tests + 22 Rust
+tests = 167 dedicated arc tests / 0 failures**。
+
+#### Risk + revert
+
+LOW:
+- Two new source files + one new test file,zero touches to existing files
+- No coordinator integration → ZERO impact on 13.8K test baseline
+- Pure-fn + DTO design has no actor,no async,no I/O
+- Type collision caught at build → renamed enum → no behavior conflict
+- The two failures during full sweep were pre-existing perf flakes
+  in ch 868 + ch 873 under heavy concurrent test load,verified
+  passing in isolation (`swift test --filter` shows 0 failures)
+
+Revert:revert this single commit (2 new source + 1 new test + CHANGELOG)。
+
+#### What's next
+
+Phase 1 close (ch 959 candidate):wire all 4 seats into
+`EBrainRuntimeCoordinator` via:
+- ADR-014 OPT-IN flag (default OFF for byte-equal preservation)
+- Per-turn dispatcher that builds the 4 DTOs from existing L7 / L9
+  outputs + Risk gate state + sovereign sentinel state
+- `BASAgentTraceLog` event-sourced replay log
+- iPhone Air 10-min real-device smoke for Phase 1 closure
+
+---
+
 ### Chapter 九百五十七 / M3490 — Phase 1 ch2:Scout + Planner seats (pure-fn wrappers)
 
 First step toward per-turn Agent Fabric integration。 Per the
