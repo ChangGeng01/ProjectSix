@@ -11,6 +11,135 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十九 / M3500 — Phase 1 close:`BASAgentTraceLog` + `BASAgentTurnDispatcher`
+
+Ties the 4-seat Phase 1 work together into a single `dispatch(...)`
+entry point that ANY future coordinator wiring can call。 Also
+introduces event-sourced trace logging per Root Law 7 (可回放)。
+Still NO coordinator wire — that's deliberately deferred to
+Phase 2 ch 960 with explicit ADR-014 OPT-IN flag + iPhone Air
+validation per the plan。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASAgentTraceLog.swift` (~225 LOC):**
+- `BASAgentTraceEvent` Codable+Sendable struct (sequenceNumber +
+  turnID + createdAtNanos + kind + agentID? + deltaID? +
+  payloadJson)
+- `BASAgentTraceEventKind` enum (`.deltaEmitted` / `.mergeCompleted` /
+  `.deltaApplied`)
+- `BASAgentTraceLog` actor — append-only, per-turn seq counter,
+  ring-buffer (default cap 10K, ch 956.11 H2-style DoS bound)
+- `events(forTurn:)` / `allEvents()` / `turnIDs()` introspection
+- Respects caller-passed sequenceNumber for replay scenarios
+  (high-water mark preserved)
+- `BASAgentTraceEventBuilder` helpers with deterministic payloads
+  (`%.6f` for doubles, same `eForJ` JSON escape pattern as seats)
+
+**NEW `Sources/BASMemory/BASAgentTurnDispatcher.swift` (~165 LOC):**
+- `BASAgentTurnInput` — bundle of 4 seat DTOs + priorityContext + nowNanos
+- `BASAgentTurnRoster` — 4 agentSpecs (scout/planner/risk/surface) + agentMap
+- `BASAgentTurnResult` — emittedDeltas + mergeResult + applyOutcomes + finalSeq
+- `BASAgentTurnDispatcher.dispatch(input:roster:graph:traceLog:)` async fn
+  - Phase A: emit from Scout → Planner → Risk → Surface with shared seq
+  - Phase B: merge engine resolution
+  - Phase C: applier writes to graph
+  - All 3 phases optionally write to trace log when provided
+- Pure orchestration — no actor state, no I/O beyond delegated calls
+- Safe to call concurrently for different turns (graph actor serializes)
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter959TraceLogDispatcherTests.swift` (~340 LOC, 15 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| TraceLog (5) | append/seq, caller-seq high-water, sorted reads, ring-buffer, turnIDs | All actor invariants pinned |
+| Builder (3) | deltaEmitted/mergeCompleted/deltaApplied payload determinism | Critical for Root Law 7 byte-equal replay |
+| Dispatcher (7) | no-trace, with-trace 9-event capture, determinism, empty input, sovereign-blocked, finalSeq scaling, graph object count | All major code paths + edge cases |
+
+The strongest test:`testDispatcher_WithTraceLogCapturesEverything` —
+one `dispatch(...)` call emits exactly **9 trace events** for a
+typical turn (4 deltaEmitted + 1 mergeCompleted + 4 deltaApplied),
+sequence numbers monotonically increasing。 This is the Phase 1
+contract:**a future coordinator that wants full Agent Fabric
+behavior calls `dispatch(...)` ONCE and gets emission + merge +
+apply + replay log in one async call**。
+
+#### Why a separate trace log type vs reusing `BASEventLogStorage`
+
+The L8 `BASEventLogStorage` protocol has a broader shape (intent /
+emotion / riskBand / memoryRefs / stateBefore/AfterID / etc.) mostly
+nil for agent-trace events。 Could wrap it but the seat layer is
+per-turn (4-32 events) with different retention semantics from L8。
+Phase 2+ can add a `BASEventLogStorage`-backed `BASAgentTraceLog`
+adapter without changing the public surface,when the use cases
+that need cross-system replay actually appear。
+
+#### Verification
+
+```
+swift build  → clean (198s)
+swift test --filter BASChapter959  → 15 PASSED / 0 FAILED in 0.18s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,837 PASSED + 1 pre-existing ch 868 perf flake (passes in
+     isolation,unrelated to ch 959) / 115 skipped /
+     0 regressions in 536s
+```
+
+Cumulative Agent Fabric arc count:**160 Swift tests + 22 Rust tests
+= 182 dedicated arc tests / 0 failures**。
+
+#### Phase 1 status — substrate complete,wire deferred
+
+**Phase 1 closed at the substrate level:**
+
+| Phase 1 ch | Status | Deliverable |
+|---|---|---|
+| 956 | ✓ | Registry + Router + LeaseManager |
+| 957 | ✓ | Scout + Planner seats |
+| 958 | ✓ | Risk + Surface seats |
+| 959 | ✓ | **Dispatcher + TraceLog (this chapter)** |
+| 960+ | next | Coordinator wire with ADR-014 OPT-IN + iPhone Air smoke |
+
+**Deferred per ch 957 commit log:** "First per-turn coordinator
+touch — MED risk per plan。 ADR-014 OPT-IN flag,default OFF。
+Needs careful regression checking against existing 13,790-test
+baseline."
+
+The substrate primitives are now complete — coordinator wire is
+deferred to Phase 2 (ch 960) for two reasons:
+1. **Risk isolation:** all ch 956-959 work is additive,zero
+   touches to existing files,zero impact on the 13.8K baseline。
+   The coordinator wire IS the first per-turn touch and warrants
+   its own dedicated chapter with explicit OPT-IN flag + smoke。
+2. **Substrate-first discipline:** with dispatcher + trace log
+   landed,any future coordinator wire is now a 1-line call
+   (`await BASAgentTurnDispatcher.dispatch(...)`) plus DTO
+   construction adapter,not a deep integration。
+
+#### Risk + revert
+
+LOW:
+- 2 new source files + 1 new test file,zero touches to existing
+- TraceLog is opt-in (dispatcher passes nil → no overhead)
+- Dispatcher is opt-in (no caller invokes it yet outside tests)
+- Ring-buffer cap prevents unbounded memory growth on long sessions
+- Per-turn seq scoping prevents cross-turn collisions even when
+  multiple turns share a log (production multi-turn pattern)
+
+Revert: this single commit (2 new source + 1 new test + CHANGELOG)。
+
+#### What's next
+
+**Ch 960 (Phase 2 ch1):** Coordinator wire with ADR-014 OPT-IN flag。
+Add `agentFabric: BASAgentFabric? = nil` slot to
+`EBrainRuntimeCoordinator.init` (default nil = byte-equal preserved
+per 红线 7)。 When set,coordinator builds the 4 DTOs from existing
+L7/L9 outputs + calls `dispatch(...)` once per turn。 iPhone Air
+10-min smoke validates byte-equality (flag OFF) + functional
+correctness (flag ON)。
+
+---
+
 ### Chapter 九百五十八 / M3495 — Phase 1 ch3:Risk + Surface seats (same pure-fn pattern)
 
 Second pair of seat wrappers,extending the ch 957 pattern。 Risk
