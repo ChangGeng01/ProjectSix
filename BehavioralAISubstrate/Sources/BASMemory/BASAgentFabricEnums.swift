@@ -115,6 +115,7 @@ public enum BASStateDomain: String, Codable,
     case memoryBundle
     case candidateFrontier
     case critiqueField
+    case alignmentField  // chapter 九百六十三 — HostAlignment owns
     case riskField
     case actionPermit
     case renderFrame

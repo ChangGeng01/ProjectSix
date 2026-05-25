@@ -50,6 +50,10 @@ public struct BASAgentTurnInput: Sendable {
     /// NEW ch 961:Critic seat input。 Nil = skip Critic emission
     /// (4-seat backward compat)。
     public let critic: BASCriticSeatInput?
+    /// NEW ch 963:HostAlignment seat input。 Nil = skip
+    /// HostAlignment emission (6-seat backward compat for ch
+    /// 961-962 callers)。
+    public let hostAlignment: BASHostAlignmentInput?
     public let priorityContext: BASMergePriorityContext
     /// Monotonic nanosecond timestamp for ch 956.5 USER-PASS gap #5
     /// recency tie-break。 0 = unknown (merge engine falls back to
@@ -64,6 +68,7 @@ public struct BASAgentTurnInput: Sendable {
         surface: BASSurfaceInput = BASSurfaceInput(),
         memory: BASMemorySeatInput? = nil,
         critic: BASCriticSeatInput? = nil,
+        hostAlignment: BASHostAlignmentInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -75,6 +80,7 @@ public struct BASAgentTurnInput: Sendable {
         self.surface = surface
         self.memory = memory
         self.critic = critic
+        self.hostAlignment = hostAlignment
         self.priorityContext = priorityContext
         self.nowNanos = nowNanos
     }
@@ -136,6 +142,8 @@ public struct BASAgentTurnRoster: Sendable {
     public let memory: BASAgentSpec?
     /// NEW ch 961:Critic agent。 Nil = no Critic seat。
     public let critic: BASAgentSpec?
+    /// NEW ch 963:HostAlignment agent。 Nil = no HostAlignment seat。
+    public let hostAlignment: BASAgentSpec?
 
     public init(
         scout: BASAgentSpec,
@@ -143,7 +151,8 @@ public struct BASAgentTurnRoster: Sendable {
         risk: BASAgentSpec,
         surface: BASAgentSpec,
         memory: BASAgentSpec? = nil,
-        critic: BASAgentSpec? = nil
+        critic: BASAgentSpec? = nil,
+        hostAlignment: BASAgentSpec? = nil
     ) {
         self.scout = scout
         self.planner = planner
@@ -151,11 +160,11 @@ public struct BASAgentTurnRoster: Sendable {
         self.surface = surface
         self.memory = memory
         self.critic = critic
+        self.hostAlignment = hostAlignment
     }
 
-    /// `[agentID: spec]` map used by the applier (which needs
-    /// to look up agent by ID to check writeDomains)。 Includes
-    /// Memory / Critic when present。
+    /// `[agentID: spec]` map used by the applier。 Includes
+    /// Memory / Critic / HostAlignment when present。
     public var agentMap: [String: BASAgentSpec] {
         var m: [String: BASAgentSpec] = [
             scout.agentID: scout,
@@ -165,6 +174,9 @@ public struct BASAgentTurnRoster: Sendable {
         ]
         if let memory { m[memory.agentID] = memory }
         if let critic { m[critic.agentID] = critic }
+        if let hostAlignment {
+            m[hostAlignment.agentID] = hostAlignment
+        }
         return m
     }
 }
@@ -235,6 +247,19 @@ public enum BASAgentTurnDispatcher {
                 agentSpec: criticAgent,
                 seq: &seq,
                 nowNanos: input.nowNanos))
+        }
+        // chapter 九百六十三:HostAlignment seat — invoked after
+        // Critic + before Risk per canonical order (alignment
+        // concerns inform Risk's escalation logic when both wired)。
+        if let alignAgent = roster.hostAlignment,
+           let alignInput = input.hostAlignment {
+            emitted.append(
+                contentsOf: BASHostAlignmentSeat.emit(
+                    from: alignInput,
+                    turnID: input.turnID,
+                    agentSpec: alignAgent,
+                    seq: &seq,
+                    nowNanos: input.nowNanos))
         }
         emitted.append(contentsOf: BASRiskSeat.emit(
             from: input.risk,

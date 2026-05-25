@@ -11,6 +11,114 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十三 / M3520 — Phase 3 ch1:HostAlignment seat + `.alignmentField` domain
+
+Phase 3 opens — first of 3 chapters wiring the sovereign-adjacent
+seats (HostAlignment / SovereignSentinel / EvolutionShadow)。
+HostAlignment introduces the L5 host-constitution boundary into
+the fabric while strictly respecting the sovereign-locked domains
+(`.hostVersion` + `.sovereignVerdict` per the Single-Writer table)。
+
+#### What landed
+
+**MODIFIED `Sources/BASMemory/BASAgentFabricEnums.swift`:**
+- Added `.alignmentField` to `BASStateDomain` (count 10 → 11)
+- Updated header comment to document HostAlignment as sole writer
+
+**NEW `Sources/BASMemory/BASHostAlignmentSeat.swift` (~225 LOC):**
+- `BASHostAlignmentCandidate` DTO (candidateID + title + touchesAxes)
+- `BASHostAlignmentInput` DTO (candidates + hostBoundaryAxes + styleStrictness + hostID)
+- `BASHostAlignmentSeverity` enum (`.aligned` / `.styleNote` / `.axisTouch` / `.multiAxisTouch`)
+- `BASHostAlignmentSeat.emit()` → 1 delta per concerning candidate for `.alignmentField`
+- 4-rule alignment ladder:
+  1. Candidate touches ≥2 host boundary axes → MULTI_AXIS_TOUCH (severe, conf=0.95)
+  2. Candidate touches 1 boundary axis → AXIS_TOUCH (conf=0.80)
+  3. No boundary touch + strictness ≥ 0.7 → STYLE_NOTE (mild audit, conf=0.50)
+  4. Otherwise → ALIGNED (no delta)
+- Deterministic JSON payload with sorted touched_axes
+- File-scope `escapeForJSONHA()` per ch 957/958/961/962 disambiguation pattern
+
+**MODIFIED `Sources/BASMemory/BASAgentTurnDispatcher.swift`:**
+- `BASAgentTurnInput.hostAlignment: BASHostAlignmentInput?` (default nil)
+- `BASAgentTurnRoster.hostAlignment: BASAgentSpec?` (default nil)
+- `agentMap` includes hostAlignment when present (4 → 5 → 6 → 7 entries possible)
+- `dispatch()` invokes HostAlignment AFTER Critic, BEFORE Risk (canonical 7-seat order: Scout → Planner → Memory → Critic → **HostAlign** → Risk → Surface)
+
+**MODIFIED `Tests/.../BASChapter953AgentFabricSchemaPropertyTests.swift`:**
+- Domain enum count pin bumped 10 → 11 per ch 953 discipline
+
+**NEW `Tests/.../BASChapter963HostAlignmentSeatTests.swift` (~330 LOC, 13 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| Alignment seat (8) | empty / no-boundaries / single-axis / multi-axis / strict-style / non-strict / multi-candidate filter / sorted determinism | All 4 rule branches + edge cases |
+| 7-seat dispatcher (1) | all 7 seats emit + 7 accepted + HostAlign writer registered | End-to-end 7-seat |
+| Backward compat (1) | 6-seat roster still works without hostAlignment | ADR-014 OPT-IN preserved |
+| **CRITICAL Single-Writer** (3) | HostAlign CANNOT write .hostVersion (sovereign-locked) / CANNOT write .sovereignVerdict / .alignmentField domain exists at count 11 | The Phase 3 sovereign-boundary invariant pinned |
+
+#### Strongest tests:critical sovereign-lock invariants
+
+`testHostAlignCannotWriteHostVersion` + `testHostAlignCannotWriteSovereignVerdict`:
+
+These pin **the Phase 3 critical invariant** that HostAlignment
+(and any future Phase 3+ seat) MUST NOT write to sovereign-locked
+domains。 The plan's Single-Writer table says:
+
+  `hostVersion → L5 + L14 (L13 proposes only)`
+  `sovereignVerdict → L14 SovereignSentinel (NO write,ever)`
+
+HostAlignment is neither L5 nor L14;it's an L13-ish observer。
+The tests verify:
+- `align.writeDomains.contains(.hostVersion)` is FALSE
+- Attempting to write `.hostVersion` directly throws `unauthorizedWriter`
+- Same for `.sovereignVerdict`
+
+This is the LOAD-BEARING boundary in Phase 3。 If a future review
+finds a seat that violates it,that's a CRITICAL bug — fix
+immediately + audit all other Phase 3+ seats。
+
+#### Verification
+
+```
+swift build  → clean (133s)
+swift test --filter BASChapter963  → 13 PASSED / 0 FAILED in 0.01s
+swift test --filter "BASChapter95[3-9]|BASChapter96"
+  → 242 PASSED / 0 FAILED in 3s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,903 PASSED / 113 skipped / 0 failures in 284s
+```
+
+**Cumulative Agent Fabric arc:242 Swift tests + 22 Rust tests
+= 264 dedicated arc tests / 0 failures。**
+
+#### Risk + revert
+
+LOW (delivered):
+- 1 enum case + 1 new seat file + 4 new optional fields +
+  1 enum-count pin bump + 1 new test file
+- 6-seat callers (ch 957-962) all still pass unchanged
+- Same default-nil pattern as ch 960/961 (proven safe)
+- Sovereign-lock invariant explicitly tested (NOT just implied)
+
+Revert: this single commit (1 modified enum + 1 modified
+dispatcher + 1 new src + 1 modified test pin + 1 new test +
+CHANGELOG)。
+
+#### What's next
+
+**Ch 964 (Phase 3 ch2):** SovereignSentinel seat。 Thin wrapper
+over `BASSovereignVerdictEngine.raise()` (the existing L14 lambda)。
+Sealed-LOW tier per visibility table — NO user customization。
+HIGH stakes,LOW risk (wrap only,doesn't introduce new logic)。
+
+**Ch 965 (Phase 3 close):** EvolutionShadow seat。 Wraps
+`evolutionService`,emits `UpdateTicket` / `RuleCandidate` /
+`HostChangeCandidate` / `ShadowTrial` deltas。 Never effective
+same turn,always routes to ShadowTrial。 Plus iPhone Air 2-hour
+real-device smoke per plan Phase 3 close。
+
+---
+
 ### Chapter 九百六十二 / M3515 — Phase 2 close:cross-agent evidence-debt + adversarial fuzz scenarios
 
 Phase 2 close per plan。 Adds the cross-agent evidence-debt

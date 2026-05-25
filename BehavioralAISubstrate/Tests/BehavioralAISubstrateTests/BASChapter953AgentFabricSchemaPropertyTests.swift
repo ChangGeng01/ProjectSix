@@ -68,9 +68,12 @@ final class BASChapter953AgentFabricSchemaPropertyTests:
             "(9 core + 7 watcher + 4 sealed)")
         XCTAssertEqual(BASAgentVisibility.allCases.count, 3)
         // chapter 九百六十一 / M3510:bumped 9 → 10 with
-        // addition of `.critiqueField` (Critic seat's domain
-        // per Single-Writer-Per-Domain — see ch 961 design)
-        XCTAssertEqual(BASStateDomain.allCases.count, 10)
+        // addition of `.critiqueField` (Critic seat's domain)
+        // chapter 九百六十三 / M3520:bumped 10 → 11 with
+        // addition of `.alignmentField` (HostAlignment seat
+        // owns this — CANNOT write .hostVersion which is
+        // sovereign-locked per Single-Writer table)
+        XCTAssertEqual(BASStateDomain.allCases.count, 11)
         XCTAssertEqual(BASAgentProposalType.allCases.count, 7)
         XCTAssertEqual(BASAgentDeltaType.allCases.count, 5)
         XCTAssertEqual(BASAgentLeaseProfile.allCases.count, 4)
