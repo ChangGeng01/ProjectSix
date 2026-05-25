@@ -54,6 +54,13 @@ public struct BASAgentTurnInput: Sendable {
     /// HostAlignment emission (6-seat backward compat for ch
     /// 961-962 callers)。
     public let hostAlignment: BASHostAlignmentInput?
+    /// NEW ch 964:SovereignSentinel seat input。 Nil = skip
+    /// (7-seat backward compat)。 The sentinel is the
+    /// load-bearing sealed-LOW seat — when wired it ALWAYS
+    /// runs (no opt-out per-turn);nil only means caller
+    /// hasn't wired it at all yet。
+    public let sovereignSentinel:
+        BASSovereignSentinelInput?
     public let priorityContext: BASMergePriorityContext
     /// Monotonic nanosecond timestamp for ch 956.5 USER-PASS gap #5
     /// recency tie-break。 0 = unknown (merge engine falls back to
@@ -69,6 +76,8 @@ public struct BASAgentTurnInput: Sendable {
         memory: BASMemorySeatInput? = nil,
         critic: BASCriticSeatInput? = nil,
         hostAlignment: BASHostAlignmentInput? = nil,
+        sovereignSentinel:
+            BASSovereignSentinelInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -81,6 +90,7 @@ public struct BASAgentTurnInput: Sendable {
         self.memory = memory
         self.critic = critic
         self.hostAlignment = hostAlignment
+        self.sovereignSentinel = sovereignSentinel
         self.priorityContext = priorityContext
         self.nowNanos = nowNanos
     }
@@ -144,6 +154,10 @@ public struct BASAgentTurnRoster: Sendable {
     public let critic: BASAgentSpec?
     /// NEW ch 963:HostAlignment agent。 Nil = no HostAlignment seat。
     public let hostAlignment: BASAgentSpec?
+    /// NEW ch 964:SovereignSentinel agent。 Nil = no sentinel
+    /// (TURN BEHAVIOR UNCHANGED — but per ADR-014 + plan,
+    /// production hosts SHOULD always wire the sentinel)。
+    public let sovereignSentinel: BASAgentSpec?
 
     public init(
         scout: BASAgentSpec,
@@ -152,7 +166,8 @@ public struct BASAgentTurnRoster: Sendable {
         surface: BASAgentSpec,
         memory: BASAgentSpec? = nil,
         critic: BASAgentSpec? = nil,
-        hostAlignment: BASAgentSpec? = nil
+        hostAlignment: BASAgentSpec? = nil,
+        sovereignSentinel: BASAgentSpec? = nil
     ) {
         self.scout = scout
         self.planner = planner
@@ -161,10 +176,12 @@ public struct BASAgentTurnRoster: Sendable {
         self.memory = memory
         self.critic = critic
         self.hostAlignment = hostAlignment
+        self.sovereignSentinel = sovereignSentinel
     }
 
     /// `[agentID: spec]` map used by the applier。 Includes
-    /// Memory / Critic / HostAlignment when present。
+    /// Memory / Critic / HostAlignment / SovereignSentinel
+    /// when present。
     public var agentMap: [String: BASAgentSpec] {
         var m: [String: BASAgentSpec] = [
             scout.agentID: scout,
@@ -176,6 +193,9 @@ public struct BASAgentTurnRoster: Sendable {
         if let critic { m[critic.agentID] = critic }
         if let hostAlignment {
             m[hostAlignment.agentID] = hostAlignment
+        }
+        if let sovereignSentinel {
+            m[sovereignSentinel.agentID] = sovereignSentinel
         }
         return m
     }
@@ -273,6 +293,21 @@ public enum BASAgentTurnDispatcher {
             agentSpec: roster.surface,
             seq: &seq,
             nowNanos: input.nowNanos))
+        // chapter 九百六十四:SovereignSentinel emits LAST per
+        // Root Law 4 (单主权) — sees everything other seats
+        // emitted this turn,issues final veto verdict。 Order:
+        // scout→planner→memory→critic→hostalign→risk→surface→
+        // SOVEREIGN (canonical 8-seat order)
+        if let sovAgent = roster.sovereignSentinel,
+           let sovInput = input.sovereignSentinel {
+            emitted.append(
+                contentsOf: BASSovereignSentinelSeat.emit(
+                    from: sovInput,
+                    turnID: input.turnID,
+                    agentSpec: sovAgent,
+                    seq: &seq,
+                    nowNanos: input.nowNanos))
+        }
 
         // Trace each emitted delta
         if let traceLog {

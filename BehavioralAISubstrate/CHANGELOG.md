@@ -11,6 +11,126 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十四 / M3525 — Phase 3 ch2:**SovereignSentinel seat** (sealed-LOW, sole writer of `.sovereignVerdict`)
+
+The most LOAD-BEARING seat in the arc。 Per Root Law 4 (单主权)
+the SovereignSentinel is the SOLE writer of `.sovereignVerdict`
++ has the final say on per-turn veto。 Per visibility table:
+sealed-LOW — NO user customization,thresholds are static
+constants (not runtime-tunable)。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASSovereignSentinelSeat.swift` (~260 LOC):**
+- `BASSovereignSentinelCandidate` DTO (id + title + reversibility + touchesAxesCount + touchesSovereignLockedAxis)
+- `BASSovereignSentinelInput` DTO (candidates + manipulationDetected + boundaryTouched + heightenedProtection)
+- `BASSovereignVetoSeverity` enum (`.clear` / `.escalate` / `.veto` / `.lockdown`)
+- **SEALED static constants** (NOT input-tunable per LOW-tier discipline):
+  - `multiAxisVetoCount: Int = 2`
+  - `irreversibilityFloor: Double = 0.2`
+- `BASSovereignSentinelSeat.emit()` → veto deltas for `.sovereignVerdict`
+- 6-rule veto ladder (priority order):
+  1. `touchesSovereignLockedAxis` → LOCKDOWN (conf=1.0) + emits TURN-LEVEL lockdown delta
+  2. `heightenedProtection` AND (manipulation OR boundary) → VETO (conf=0.97)
+  3. `manipulationDetected` AND `reversibility < 0.2` → VETO
+  4. `touchesAxesCount ≥ 2` → VETO
+  5. `manipulationDetected` OR `boundaryTouched` → ESCALATE (conf=0.85)
+  6. Otherwise → CLEAR (no delta)
+- **Turn-level lockdown delta** auto-emitted when ANY candidate triggers `.lockdown` — gives downstream gates ONE clear signal that the WHOLE TURN is sovereign-blocked
+
+**MODIFIED `Sources/BASMemory/BASAgentTurnDispatcher.swift`:**
+- `BASAgentTurnInput.sovereignSentinel: BASSovereignSentinelInput?` (default nil)
+- `BASAgentTurnRoster.sovereignSentinel: BASAgentSpec?` (default nil)
+- `agentMap` includes sentinel when present
+- `dispatch()` invokes sentinel LAST (after Surface) per Root Law 4 ordering — the sentinel sees everything other seats emitted this turn before issuing its veto verdict
+- Canonical 8-seat order:scout → planner → memory → critic → hostalign → risk → surface → **SOVEREIGN**
+
+**NEW `Tests/.../BASChapter964SovereignSentinelSeatTests.swift` (~340 LOC, 14 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| Veto ladder (8) | empty / 6-rule branches (lockdown/heightened/manip-irrev/multi-axis/escalate/clear) + turn-level lockdown emission | All 6 rules + turn-level invariant |
+| **CRITICAL Single-Writer** (2) | sentinel CAN write `.sovereignVerdict` / 3 imposter agents CANNOT (planner/risk/hostalign) | The Phase 3 LOAD-BEARING invariant |
+| Sealed-LOW invariants (2) | thresholds are static constants / sentinel `.visibility == .low` | NO user customization enforcement |
+| 8-seat dispatcher (1) | all 8 seats emit + sentinel claims sovereignVerdict writer registry | End-to-end |
+| Backward compat (1) | 7-seat roster works without sentinel | ADR-014 OPT-IN |
+
+#### Strongest tests:`testCRITICAL_*`
+
+The two CRITICAL Single-Writer tests pin **the Root Law 4 (单主权)
+invariant** that NO agent except SovereignSentinel may write
+`.sovereignVerdict`:
+
+```
+testCRITICAL_SentinelIsSoleWriterOfSovereignVerdict
+  → sentinel.writeDomains.contains(.sovereignVerdict) == true
+  → graph.writeObject(.sovereignVerdict, byAgent: sentinel) succeeds
+
+testCRITICAL_NoOtherAgentCanWriteSovereignVerdict
+  → for imp in [planner, risk, hostAlign]:
+       graph.writeObject(.sovereignVerdict, byAgent: imp)
+         throws unauthorizedWriter ← MUST hold
+```
+
+Combined with ch 963's `testHostAlignCannotWriteHostVersion` /
+`testHostAlignCannotWriteSovereignVerdict`,Phase 3 now has
+DOUBLE protection on the sovereign-locked domains:
+1. Each seat's `writeDomains` does NOT include sovereign-locked domains
+2. Even if a future bug added them,the graph actor's
+   `unauthorizedWriter` enforcement catches at write time
+
+#### Sealed-LOW discipline enforcement
+
+Per the 3-tier visibility table:
+- HIGH tier:user-customizable (Planner/Critic/Memory/Risk/Surface)
+- MED tier:partial (HostAlignment/CompareModerator/Reflector)
+- **LOW tier:sealed (SovereignSentinel/ActionPermit/...)**
+
+The seat enforces this in two ways:
+1. **Thresholds are `static let` constants** — `multiAxisVetoCount`
+   + `irreversibilityFloor` cannot be overridden per-turn or
+   per-host。 No input field exposes a way to bump them。
+2. **Test pins `sentinel.visibility == .low`** — any future
+   refactor that accidentally changes the sentinel's visibility
+   tier fails the test (per registry-discipline pin pattern)
+
+#### Verification
+
+```
+swift build  → clean (81s)
+swift test --filter BASChapter964  → 14 PASSED / 0 FAILED in 0.02s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,917 PASSED / 113 skipped / 0 failures in 254s
+```
+
+**Cumulative Agent Fabric arc:256 Swift tests + 22 Rust tests
+= 278 dedicated arc tests / 0 failures。**
+
+#### Risk + revert
+
+LOW (delivered):
+- 1 new seat file + 4 new optional dispatcher fields + 1 new test
+- Same default-nil pattern as ch 960/961/963 (proven safe across
+  5 chapters now)
+- Sovereign-lock invariant explicitly DOUBLE-tested (writeDomains
+  check + graph actor enforcement)
+- 7-seat callers (ch 957-963) all still pass unchanged
+- Static-constant thresholds prevent runtime tuning by mistake
+
+Revert: this single commit (1 modified dispatcher + 1 new src +
+1 new test + CHANGELOG)。
+
+#### What's next
+
+**Ch 965 (Phase 3 close):** EvolutionShadow seat。 Wraps the
+existing `evolutionService` conceptually,emits `UpdateTicket` /
+`RuleCandidate` / `HostChangeCandidate` / `ShadowTrial` deltas
+that are NEVER effective same turn — always route to ShadowTrial
+for deferred evaluation。 Plus iPhone Air 2-hour real-device
+smoke per plan Phase 3 close。
+
+---
+
 ### Chapter 九百六十三 / M3520 — Phase 3 ch1:HostAlignment seat + `.alignmentField` domain
 
 Phase 3 opens — first of 3 chapters wiring the sovereign-adjacent
