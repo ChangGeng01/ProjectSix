@@ -136,7 +136,52 @@ public actor BASSharedStateGraph {
     /// (b) global registry has this agentID as the domain's writer。
     private var domainWriters: [BASStateDomain: String] = [:]
 
-    public init() {}
+    /// chapter 九百五十六.7 / M3485.7 — optional persistence。
+    /// When non-nil,every successful `writeObject` + `registerWriter`
+    /// (and auto-claim) is write-through to the storage adapter。
+    /// `hydrate()` reloads state from the adapter at startup。 Nil
+    /// = in-memory only (default,preserves byte-equal call-site
+    /// behavior per 红线 7 + ADR-014 OPT-IN)。
+    private let storage: (any BASSharedStateGraphStorage)?
+
+    public init(
+        storage: (any BASSharedStateGraphStorage)? = nil
+    ) {
+        self.storage = storage
+    }
+
+    // MARK: - Hydration (USER-PASS gap #6 / ch 956.7 SQL persistence)
+
+    /// chapter 九百五十六.7 — rebuild the in-memory state from the
+    /// storage adapter at session boot。 No-op if no storage was
+    /// provided。 Per Root Law 7 (可回放),this together with the
+    /// event-sourced trace log (Phase 1 ch 959) gives full session
+    /// resumption after a restart。
+    ///
+    /// Idempotent:calling `hydrate()` multiple times reloads from
+    /// disk each time and overwrites in-memory state with the
+    /// persisted snapshot。 Caller should hydrate ONCE at startup
+    /// and not again during a session。
+    public func hydrate() async throws {
+        guard let storage else { return }
+        let objects = try await storage.loadAllObjects()
+        var newObjects: [String: BASStateGraphObject] = [:]
+        newObjects.reserveCapacity(objects.count)
+        var newVersions: [BASStateDomain: Int64] = [:]
+        for obj in objects {
+            newObjects[obj.ref] = obj
+            let cur = newVersions[obj.domain] ?? 0
+            if obj.version > cur {
+                newVersions[obj.domain] = obj.version
+            }
+        }
+        self.objects = newObjects
+        self.domainVersions = newVersions
+        let writers = try await storage.loadAllWriters()
+        var newWriters: [BASStateDomain: String] = [:]
+        for w in writers { newWriters[w.domain] = w.agentID }
+        self.domainWriters = newWriters
+    }
 
     // MARK: - Writer registration (USER-PASS gap #1 fix)
 
@@ -155,7 +200,7 @@ public actor BASSharedStateGraph {
     public func registerWriter(
         agentID: String,
         domain: BASStateDomain
-    ) throws {
+    ) async throws {
         if let existing = domainWriters[domain] {
             if existing == agentID {
                 return  // idempotent re-register
@@ -166,6 +211,9 @@ public actor BASSharedStateGraph {
                 newWriterAgentID: agentID)
         }
         domainWriters[domain] = agentID
+        // chapter 九百五十六.7 SQL write-through
+        try await storage?.upsertWriter(
+            domain: domain, agentID: agentID)
     }
 
     /// Read accessor for the registry — used by tests + audit + the
@@ -194,7 +242,7 @@ public actor BASSharedStateGraph {
         objectID: String,
         payloadJson: String,
         byAgent agent: BASAgentSpec
-    ) throws -> BASStateGraphObject {
+    ) async throws -> BASStateGraphObject {
         // Forbidden-domains check wins regardless of write rights
         if agent.forbiddenDomains.contains(domain) {
             throw BASSharedStateGraphError.forbiddenDomain(
@@ -225,6 +273,9 @@ public actor BASSharedStateGraph {
             // system level without forcing explicit registerWriter
             // call upfront。
             domainWriters[domain] = agent.agentID
+            // chapter 九百五十六.7 SQL write-through (auto-claim)
+            try await storage?.upsertWriter(
+                domain: domain, agentID: agent.agentID)
         }
         let nextVersion = (domainVersions[domain] ?? 0) + 1
         domainVersions[domain] = nextVersion
@@ -235,6 +286,8 @@ public actor BASSharedStateGraph {
             lastWriterAgentID: agent.agentID,
             version: nextVersion)
         objects[obj.ref] = obj
+        // chapter 九百五十六.7 SQL write-through (object)
+        try await storage?.upsertObject(obj)
         return obj
     }
 

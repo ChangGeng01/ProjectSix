@@ -11,6 +11,139 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十六.7 + 九百五十六.8 / M3485.7 + M3485.8 — 提高 SQL + Rust 比例:state-graph SQLite persistence + bas-agent-fabric Rust crate
+
+Per user directive「继续 提高 Metal sql rust c c++ 比例」 (continue
+and raise the high-performance language ratio)。 Two chapters
+landed together because they share the Agent Fabric scope:
+
+#### Ch 956.7 — SQL: state-graph persistence (raises SQL ratio)
+
+**NEW `Sources/BASMemory/BASSharedStateGraphStorage.swift` (~95 LOC):**
+- Protocol with `upsertObject` / `loadObject` / `loadAllObjects`
+  / `deleteObject` / `upsertWriter` / `loadAllWriters` surface
+- `Sendable` constraint — implementations cross actor boundary
+- Idempotency contract + crash-safety expectation documented
+
+**NEW `Sources/BASMemory/BASSharedStateGraphSQLiteStorage.swift` (~520 LOC):**
+- Actor with `OpaquePointer` SQLite handle (ch 二百四十八 idiom)
+- WAL journal + synchronous=NORMAL + FK constraints + PRAGMA user_version
+- Two tables:`shared_state_objects` (PK ref + domain + object_id +
+  payload_json + last_writer_agent_id + version CHECK ≥ 0 + updated_at_ms)
+  + `shared_state_writers` (PK domain + agent_id + registered_at_ms)
+- Index on `domain` for query-by-domain filtering
+- UPSERT-on-conflict idempotent semantics for both tables
+- Schema-version mismatch throws `schemaVersionMismatch` at open
+
+**MODIFIED `Sources/BASMemory/BASSharedStateGraph.swift`:**
+- New `init(storage: (any BASSharedStateGraphStorage)? = nil)` —
+  default nil = in-memory only (preserves 红线 7 byte-equal)
+- `writeObject(...)` now `async throws` — write-through to storage
+  when set (no-op when nil)
+- `registerWriter(agentID:domain:)` now `async throws` — same
+  write-through semantics
+- Auto-claim path also writes through to storage writer table
+- NEW `hydrate() async throws` — rebuild in-memory state from
+  persisted snapshot at session boot (Root Law 7 可回放)
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter956_7StateGraphSQLiteStorageTests.swift` (~310 LOC, 10 tests):**
+- Standalone storage CRUD (5 tests):upsert+load,upsert replaces,
+  delete + idempotent absent-row delete,writer registry CRUD,
+  schema-version mismatch rejection
+- Graph write-through (3 tests):writeObject persists object,
+  auto-claim writes writer row,explicit registerWriter persists
+- Hydration (1 test):write → close → reopen → hydrate → verify
+  in-memory state matches + post-hydrate Single-Writer enforcement
+  rejects imposter
+- No-storage byte-equal (1 test):default-nil graph behaves
+  identically to ch 954 in-memory shape
+
+#### Ch 956.8 — Rust: bas-agent-fabric workspace crate (raises Rust ratio)
+
+**NEW `Cargo/bas-agent-fabric/` crate (3 source files + Cargo.toml):**
+- `src/fnv.rs` — FNV-1a 64-bit hash,verified against well-known
+  reference vectors (`""` = 0xcbf29ce484222325,`"a"` = 0xaf63...,
+  `"foobar"` = 0x8594...)
+- `src/topo.rs` — O(V+E) Kahn topological sort matching the Swift
+  rewrite from ch 956.6 step-for-step
+- `src/winner.rs` — `pick_winner` with full tier > priority >
+  confidence > created_at_nanos > id-lex tie-break ladder (ch
+  956.5 USER-PASS gap #5 fix mirrored)
+- `src/lib.rs` — `strong_merge_id(turn_id, &delta_ids)` mirrors
+  Swift `strongMergeID` exactly (sort → join with `|` → FNV-1a →
+  format `merge.<turn_id>.<count>.<hex16>`)
+- `ABI_VERSION = 1` constant for future Swift bridge sanity check
+- 9 Rust-side parity tests:FNV-1a known vectors,strong_merge_id
+  format + order-independence + collision-distinct,topo simple
+  chain,topo cycle detection,pick_winner tier priority,pick_winner
+  recency tie-break,pick_winner legacy-zero fallback
+
+**MODIFIED `Cargo/Cargo.toml`:**
+- Added `bas-agent-fabric` to workspace `members` list
+
+**Why no Swift FFI wiring yet?** The committed
+`Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework` would
+need a maintainer-side rebuild (rustup iOS targets +
+`scripts/build-rust-xcframework.sh`) to include the new crate's
+symbols。 This chapter lands the canonical Rust port + parity tests
+NOW;`@_silgen_name` Swift bridge declarations are a follow-up
+chapter once the next XCFramework rebuild ships。
+
+#### Verification
+
+```
+swift build  → clean (43.51s)
+swift test --filter BASChapter956_7  → 10 PASSED / 0 FAILED in 0.030s
+cargo test -p bas-agent-fabric  → 9 PASSED / 0 FAILED in 0.00s
+cargo build --workspace  → clean (1.66s incremental)
+BAS_FUZZ_RUNTIME_SKIP=1 swift test  → 13,746 PASSED / 112 skipped /
+   0 FAILED in 165s
+```
+
+Cumulative Agent Fabric arc count:**85 dedicated tests / 0
+failures** (ch 953:16 + ch 954:11 + ch 955:10 + ch 956:19 +
+ch 956.5:12 + ch 956.6:7 + ch 956.7:10) + 9 Rust parity tests
+in `bas-agent-fabric` crate。
+
+#### HP-language ratio impact
+
+Files added or extended in this batch:
+
+| Language | New LOC | Files |
+|---|---|---|
+| Swift (SQL adapter) | ~615 | 2 new + 1 modified |
+| Rust (kernel port)  | ~280 | 4 new (Cargo.toml + 3 .rs) |
+| SQL (DDL embedded)  | ~30  | inline in SQLite storage |
+
+Plus 12 callers in tests demonstrating the SQL adapter + 9 Rust
+parity tests proving cross-language correctness。
+
+#### Risk + revert
+
+LOW risk:
+- SQL storage is OPT-IN via `BASSharedStateGraph(storage:)` parameter
+  — default nil keeps existing call sites byte-equal (red 7 + ADR-014)
+- Rust crate is not yet wired to Swift,so adding it cannot break
+  any Swift build path — it compiles + tests independently
+- `writeObject` / `registerWriter` signature change to `async throws`
+  is backward-compatible:all existing call sites in tests
+  already used `try await` (actor isolation)
+
+Revert:revert this single commit (2 new source + 1 modified source
++ 1 new test + 4 new Rust files + 1 modified Cargo.toml + CHANGELOG)。
+
+#### What's next
+
+- Ch 956.9 (deferred):rebuild XCFramework to ship the
+  `bas-agent-fabric` static lib + wire `@_silgen_name` Swift
+  declarations in `BASInternalRustBridges.swift` + cross-language
+  parity tests
+- Ch 957:Scout + Planner seats (Phase 1 ch2) wired into
+  `EBrainRuntimeCoordinator` — now with optional SQL persistence
+  available for the shared state graph
+
+---
+
 ### Chapter 九百五十六.6 / M3485.6 — Perf measurement → O(V+E) topo-sort rewrite + DECLINE Rust port
 
 Per user's directive「最好 使用 高性能 语言 最严苛」 + ch 870

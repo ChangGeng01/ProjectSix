@@ -1,0 +1,19 @@
+[package]
+name = "bas-agent-fabric"
+description = "chapter 九百五十六.8 / M3485.8 — Rust port of BASAgentMergeEngine logic (FNV-1a hash, topological sort, conflict-resolution pickWinner) per user directive「继续 提高 ... rust ... 比例」"
+license.workspace = true
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+# No serde / rayon — pure compute kernels, no allocation pressure
+# beyond ports of the Swift impl。 FFI surface (added in a follow-up
+# chapter post-XCFramework rebuild) will use raw u8 buffers, not
+# JSON。
+
+[dev-dependencies]
+# No dev deps either — parity tests use only std::collections。

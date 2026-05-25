@@ -42,6 +42,7 @@ members = [
     "bas-atom-lifecycle",          # chapter 七百八十二 / M2561 — L8 memory atom lifecycle state machine
     "bas-mamba-scan",              # chapter 八百五十二 / M2911 — Mamba SSM selective-scan CPU mirror + rayon parallelism setup
     "bas-l8-engine",               # chapter 八百九十四 / M3160 — L8 Rust unification: SQL source-of-truth + Rust hot paths
+    "bas-agent-fabric",            # chapter 九百五十六.8 / M3485.8 — Agent Fabric merge engine kernels (FNV1a / topo sort / pick_winner) per "提高 rust 比例"
 ]
 resolver = "2"
 
