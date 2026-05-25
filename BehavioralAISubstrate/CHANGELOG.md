@@ -11,6 +11,147 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十一 / M3510 — Phase 2 ch2:Memory + Critic seats (with optional roster slots)
+
+Second pair of seats in Phase 2,bringing the dispatcher from 4 to
+**6 seats** while preserving backward compat for the existing
+4-seat callers via optional roster slots。
+
+#### Design
+
+Same pure-fn + slim-DTO pattern as ch 957/958。 Two new design
+calls this chapter:
+
+1. **`.critiqueField` is a NEW state domain** owned by Critic alone。
+   Original plan said "Critic emits CritiqueDelta against Planner's
+   CandidateFrontier" — but Single-Writer-Per-Domain (ch 956.5
+   USER-PASS gap #1) forbids two writers on `.candidateFrontier`。
+   Cleanest fix:Critic gets its own domain;Planner reads from
+   it next-turn when re-proposing。 No proposal-routing complexity
+   needed in the merge engine。
+
+2. **Optional roster + input slots preserve compat**。 `BASAgentTurnRoster`
+   gains `memory: BASAgentSpec?` + `critic: BASAgentSpec?` (default nil)。
+   `BASAgentTurnInput` gains `memory: BASMemorySeatInput?` +
+   `critic: BASCriticSeatInput?` (default nil)。 Dispatcher invokes
+   each seat only when BOTH the roster slot AND input DTO are
+   non-nil。 Existing ch 957-960 4-seat callers compile + behave
+   identically per 红线 7。
+
+#### What landed
+
+**MODIFIED `Sources/BASMemory/BASAgentFabricEnums.swift`:**
+- Added `.critiqueField` to `BASStateDomain` (count 9 → 10)
+- Updated header comment to document the Single-Writer rationale
+
+**NEW `Sources/BASMemory/BASMemorySeat.swift` (~190 LOC):**
+- `BASMemorySeatInput` DTO with episodeArcs + conflictClusters + continuityAnchors + recallStrength + `isEmpty`
+- `BASMemorySeat.emit()` → 0-3 deltas (one per non-empty cluster) for `.memoryBundle` domain
+- Confidence:`recallStrength + per-cluster-bump × count`,capped at 1.0
+- Reason codes:`memory.{episodes,conflicts,anchors}` + `evidence.count=N`
+- Deterministic JSON payload with sorted IDs for ch 956.5 strong-mergeID invariance
+
+**NEW `Sources/BASMemory/BASCriticSeat.swift` (~205 LOC):**
+- `BASCriticCandidate` DTO (id + title + benefit + cost + reversibility)
+- `BASCriticSeatInput` DTO (candidates + superegoActiveLevel ∈ [0,1])
+- `BASCriticConcernSeverity` enum (`.none` / `.mild` / `.strong` / `.severe`)
+- `BASCriticSeat.emit()` → 1 delta per candidate with non-none severity for `.critiqueField` domain (deltaType=.merge)
+- 5-rule critique ladder (first match wins):
+  1. cost > 2× benefit → SEVERE
+  2. reversibility < 0.2 AND benefit < 0.5 → SEVERE
+  3. cost > benefit → STRONG
+  4. reversibility < 0.4 → STRONG
+  5. superego ≥ 0.7 AND cost > 0.5 → MILD
+- Confidence by severity:severe=0.95 / strong=0.80 / mild=0.60
+
+**MODIFIED `Sources/BASMemory/BASAgentTurnDispatcher.swift`:**
+- `BASAgentTurnInput.memory` + `.critic` optional fields (default nil)
+- `BASAgentTurnRoster.memory` + `.critic` optional fields (default nil)
+- `agentMap` includes memory/critic when present (4 or 6 entries)
+- `dispatch()` invokes Memory + Critic between Planner and Risk in canonical order (deterministic trace), only when BOTH slot + input are non-nil
+
+**MODIFIED `Tests/.../BASChapter953AgentFabricSchemaPropertyTests.swift`:**
+- `BASStateDomain.allCases.count` pin bumped 9 → 10 per ch 953 discipline (CHANGELOG drift forcing)
+
+**NEW `Tests/.../BASChapter961MemoryCriticSeatTests.swift` (~340 LOC, 21 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| Memory (6) | empty / 1-cluster / all-3-clusters / confidence-cap / determinism / isEmpty rule | Memory seat invariants + payload semantics |
+| Critic (8) | empty / 4 severity branches / mild-strict / no-concern / multi-cand | All 5 critique rules + multi-candidate filtering |
+| Backward compat (2) | 4-seat roster still works / nil memory + critic still works | Existing callers unchanged |
+| Dispatcher 6-seat (3) | all 6 emit / roster has memory but input nil → skip / input has memory but roster nil → skip | Optional slot semantics symmetric |
+| Single-Writer (2) | .critiqueField distinct from .candidateFrontier / Critic CANNOT write candidateFrontier | Domain invariant proven |
+
+#### Strongest test:`testDispatcher_SixSeats_AllEmit`
+
+```
+6-seat roster + 6 inputs (scout pressure + 1 candidate + memory
+arc + critic concern + risk + surface) → dispatch()
+  → 6 deltas emitted in canonical order (scout → planner →
+     memory → critic → risk → surface)
+  → all 6 accepted (different target refs across 6 different
+     domains → no conflict)
+  → applier writes 6 state objects in 6 domains
+  → all 6 Single-Writer registry entries claimed
+  → graph.writerForDomain(.critiqueField) == "critic.1" ✓
+```
+
+#### Verification
+
+```
+swift build  → clean (95s)
+swift test --filter BASChapter961  → 21 PASSED / 0 FAILED in 0.02s
+swift test --filter "BASChapter95[3-9]|BASChapter96"
+  → 212 PASSED / 0 FAILED in 2.8s (cumulative Agent Fabric arc)
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,873 PASSED / 114 skipped / 0 failures in 306s
+```
+
+**Cumulative Agent Fabric arc:212 Swift tests + 22 Rust tests
+= 234 dedicated arc tests / 0 failures。**
+
+#### Single-Writer-Per-Domain re-verified
+
+The 9th + 10th domains (`.critiqueField` just added) prove the
+ch 956.5 USER-PASS gap #1 + ch 956.11 CR2 invariants still hold
+at scale:
+- Critic's `BASAgentSpec.writeDomains` contains ONLY `.critiqueField`,
+  NOT `.candidateFrontier` (test pins this explicitly)
+- Attempt by Critic to write `.candidateFrontier` directly throws
+  `BASSharedStateGraphError.unauthorizedWriter` (test pins)
+- 6-seat dispatch ends with 6 distinct writers claimed in the
+  registry — no domain has more than 1 writer
+
+#### Risk + revert
+
+LOW:
+- All changes additive: 1 enum case, 2 new source files,
+  4 new optional fields, 1 new test file
+- 4-seat callers (ch 957-960 tests) all still pass unchanged
+- Default-nil slot pattern is the same shape as ch 960's
+  agentFabric slot (proven safe)
+- Enum count pin caught the `.critiqueField` addition → bumped
+  + test passes (discipline working)
+
+Revert: this single commit (1 modified enum + 2 new src + 1 modified
+dispatcher + 1 modified test pin + 1 new test + CHANGELOG)。
+
+#### What's next
+
+**Ch 962 (Phase 2 close):**
+- Cross-agent evidence-debt tracking — Planner reads from Memory's
+  `.memoryBundle` + Critic's `.critiqueField` when re-proposing
+- ch 952.x fuzz harness extension for Memory/Critic interactions
+  (procedural generation of realistic critique scenarios)
+- iPhone Air 30-min real-device smoke per plan Phase 2 close
+
+**Ch 963 (Phase 3 ch1):**
+- HostAlignment seat (reads BASHostConstitution,emits alignment-deltas;
+  cannot write hostVersion — sovereign-locked)
+
+---
+
 ### Chapter 九百六十 / M3505 — Phase 2 ch1:**first coordinator wire** (observation-only,ADR-014 OPT-IN)
 
 The **first per-turn coordinator touch** in the arc。 Per Phase 2

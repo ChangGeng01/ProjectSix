@@ -90,11 +90,23 @@ public enum BASAgentVisibility: String, Codable,
 ///   - canonicalCognitiveFrame → L7 thoughtFold
 ///   - memoryBundle → Memory agent (L8)
 ///   - candidateFrontier → Planner agent (L9)
+///   - critiqueField → Critic agent (NEW ch 961 — see below)
 ///   - riskField → Risk agent (L11)
 ///   - actionPermit → Risk + L11 windGate
 ///   - renderFrame → Surface agent (L12)
 ///   - sovereignVerdict → L14 SovereignSentinel (NO write,ever)
 ///   - hostVersion → L5 + L14 (L13 proposes only)
+///
+/// chapter 九百六十一 / M3510:`critiqueField` added。 Original
+/// plan said "Critic emits CritiqueDelta against Planner's
+/// CandidateFrontier" — but Single-Writer-Per-Domain (ch 956.5
+/// USER-PASS gap #1) says only Planner can write to
+/// `.candidateFrontier`。 Two clean fixes:
+///   (a) proposal-routing (deferred to Phase 2+)
+///   (b) Critic owns own domain `.critiqueField`,Planner reads
+/// Phase 2 ch2 takes (b) — cleaner separation, no merge-engine
+/// proposal-routing complexity, future Planner v2 reads critiques
+/// from this domain when re-proposing candidates next turn。
 public enum BASStateDomain: String, Codable,
     Sendable, Equatable, Hashable, CaseIterable
 {
@@ -102,6 +114,7 @@ public enum BASStateDomain: String, Codable,
     case canonicalCognitiveFrame
     case memoryBundle
     case candidateFrontier
+    case critiqueField
     case riskField
     case actionPermit
     case renderFrame

@@ -34,12 +34,22 @@ import Foundation
 /// coordinator adapter in ch 960+) builds this from the existing
 /// L7 decompose frame + L9 candidate paths + risk gate state +
 /// sovereign sentinel state + user preferences。
+///
+/// chapter 九百六十一 / M3510:added optional `memory` + `critic`
+/// inputs。 Default-nil preserves 4-seat caller compat per the
+/// same red-line 7 + ADR-014 discipline as ch 960 coordinator wire。
 public struct BASAgentTurnInput: Sendable {
     public let turnID: String
     public let scout: BASScoutInput
     public let plannerCandidates: [BASPlannerCandidate]
     public let risk: BASRiskInput
     public let surface: BASSurfaceInput
+    /// NEW ch 961:Memory seat input。 Nil = skip Memory emission
+    /// (4-seat backward compat for ch 957-960 callers)。
+    public let memory: BASMemorySeatInput?
+    /// NEW ch 961:Critic seat input。 Nil = skip Critic emission
+    /// (4-seat backward compat)。
+    public let critic: BASCriticSeatInput?
     public let priorityContext: BASMergePriorityContext
     /// Monotonic nanosecond timestamp for ch 956.5 USER-PASS gap #5
     /// recency tie-break。 0 = unknown (merge engine falls back to
@@ -52,6 +62,8 @@ public struct BASAgentTurnInput: Sendable {
         plannerCandidates: [BASPlannerCandidate] = [],
         risk: BASRiskInput = BASRiskInput(),
         surface: BASSurfaceInput = BASSurfaceInput(),
+        memory: BASMemorySeatInput? = nil,
+        critic: BASCriticSeatInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -61,6 +73,8 @@ public struct BASAgentTurnInput: Sendable {
         self.plannerCandidates = plannerCandidates
         self.risk = risk
         self.surface = surface
+        self.memory = memory
+        self.critic = critic
         self.priorityContext = priorityContext
         self.nowNanos = nowNanos
     }
@@ -96,33 +110,51 @@ public struct BASAgentTurnResult: Sendable, Equatable {
 /// dispatcher uses agentID for delta authorship + writeDomains
 /// for the apply step。 Per Single-Writer-Per-Domain each role
 /// has a SINGLE registered agent。
+///
+/// chapter 九百六十一 / M3510:added optional `memory` + `critic`
+/// slots。 Default-nil preserves 4-seat caller compat。 If a
+/// seat's roster slot is nil,its input is ignored even when
+/// non-nil (no agent = no emission)。
 public struct BASAgentTurnRoster: Sendable {
     public let scout: BASAgentSpec
     public let planner: BASAgentSpec
     public let risk: BASAgentSpec
     public let surface: BASAgentSpec
+    /// NEW ch 961:Memory agent。 Nil = no Memory seat in this
+    /// roster (4-seat backward compat)。
+    public let memory: BASAgentSpec?
+    /// NEW ch 961:Critic agent。 Nil = no Critic seat。
+    public let critic: BASAgentSpec?
 
     public init(
         scout: BASAgentSpec,
         planner: BASAgentSpec,
         risk: BASAgentSpec,
-        surface: BASAgentSpec
+        surface: BASAgentSpec,
+        memory: BASAgentSpec? = nil,
+        critic: BASAgentSpec? = nil
     ) {
         self.scout = scout
         self.planner = planner
         self.risk = risk
         self.surface = surface
+        self.memory = memory
+        self.critic = critic
     }
 
     /// `[agentID: spec]` map used by the applier (which needs
-    /// to look up agent by ID to check writeDomains)。
+    /// to look up agent by ID to check writeDomains)。 Includes
+    /// Memory / Critic when present。
     public var agentMap: [String: BASAgentSpec] {
-        [
+        var m: [String: BASAgentSpec] = [
             scout.agentID: scout,
             planner.agentID: planner,
             risk.agentID: risk,
             surface.agentID: surface,
         ]
+        if let memory { m[memory.agentID] = memory }
+        if let critic { m[critic.agentID] = critic }
+        return m
     }
 }
 
@@ -168,6 +200,31 @@ public enum BASAgentTurnDispatcher {
             agentSpec: roster.planner,
             seq: &seq,
             nowNanos: input.nowNanos))
+        // chapter 九百六十一:Memory + Critic seats — invoked
+        // only when BOTH roster slot AND input DTO are present。
+        // Ordered AFTER Planner so deltaIDs read in conceptual
+        // order (scout → planner → memory → critic → risk →
+        // surface)。 Order doesn't affect merge resolution
+        // (different targets → no conflict) but stable order
+        // makes trace logs reproducible per ch 959 design。
+        if let memoryAgent = roster.memory,
+           let memoryInput = input.memory {
+            emitted.append(contentsOf: BASMemorySeat.emit(
+                from: memoryInput,
+                turnID: input.turnID,
+                agentSpec: memoryAgent,
+                seq: &seq,
+                nowNanos: input.nowNanos))
+        }
+        if let criticAgent = roster.critic,
+           let criticInput = input.critic {
+            emitted.append(contentsOf: BASCriticSeat.emit(
+                from: criticInput,
+                turnID: input.turnID,
+                agentSpec: criticAgent,
+                seq: &seq,
+                nowNanos: input.nowNanos))
+        }
         emitted.append(contentsOf: BASRiskSeat.emit(
             from: input.risk,
             turnID: input.turnID,

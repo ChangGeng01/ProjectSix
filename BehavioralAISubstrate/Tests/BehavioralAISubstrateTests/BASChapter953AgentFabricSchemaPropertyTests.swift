@@ -67,7 +67,10 @@ final class BASChapter953AgentFabricSchemaPropertyTests:
             "BASAgentRole count drift — expected 20 " +
             "(9 core + 7 watcher + 4 sealed)")
         XCTAssertEqual(BASAgentVisibility.allCases.count, 3)
-        XCTAssertEqual(BASStateDomain.allCases.count, 9)
+        // chapter 九百六十一 / M3510:bumped 9 → 10 with
+        // addition of `.critiqueField` (Critic seat's domain
+        // per Single-Writer-Per-Domain — see ch 961 design)
+        XCTAssertEqual(BASStateDomain.allCases.count, 10)
         XCTAssertEqual(BASAgentProposalType.allCases.count, 7)
         XCTAssertEqual(BASAgentDeltaType.allCases.count, 5)
         XCTAssertEqual(BASAgentLeaseProfile.allCases.count, 4)
