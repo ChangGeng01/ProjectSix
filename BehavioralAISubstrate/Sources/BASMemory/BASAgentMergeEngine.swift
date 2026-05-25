@@ -424,8 +424,14 @@ public enum BASAgentMergeEngine {
         let canonical = turnID + "|" + deltaIDs.sorted()
             .joined(separator: ",")
         let hash = fnv1a64(canonical)
+        // chapter 九百五十六.9 — MUST use %016llx,not %016x:Swift
+        // `String(format:)` follows C printf conventions where `%x`
+        // reads variadic arg as `unsigned int` (32-bit) → upper
+        // 32 bits of UInt64 silently truncated。 Caught by ch 956.9
+        // cross-language Rust parity test。 Previously every mergeID
+        // had only 32 bits of entropy,not 64。
         return "merge.\(turnID).\(deltaIDs.count)." +
-               String(format: "%016x", hash)
+               String(format: "%016llx", hash)
     }
 
     /// FNV-1a 64-bit hash。 Standard non-cryptographic hash,

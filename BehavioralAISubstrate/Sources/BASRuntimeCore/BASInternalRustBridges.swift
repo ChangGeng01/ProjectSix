@@ -492,4 +492,142 @@ public enum BASAtomLifecycleBridge {
     }
 }
 
+// MARK: - bas-agent-fabric (Agent Fabric merge engine kernels)
+// chapter 九百五十六.9 / M3485.9 — wire the Rust crate into Swift。
+// Per user directive「继续 提高 ... rust ... 比例」。
+
+@_silgen_name("bas_agent_fabric_abi_version")
+private func _bas_agent_fabric_abi_version() -> Int32
+
+@_silgen_name("bas_agent_fabric_fnv1a64")
+private func _bas_agent_fabric_fnv1a64(
+    _ ptr: UnsafePointer<UInt8>?,
+    _ len: Int
+) -> UInt64
+
+@_silgen_name("bas_agent_fabric_strong_merge_id")
+private func _bas_agent_fabric_strong_merge_id(
+    _ turnIDPtr: UnsafePointer<Int8>?,
+    _ turnIDLen: Int,
+    _ deltaIDsConcatPtr: UnsafePointer<Int8>?,
+    _ deltaIDsConcatLen: Int,
+    _ deltaCount: Int,
+    _ outPtr: UnsafeMutablePointer<UInt8>?,
+    _ outCap: Int,
+    _ outRequired: UnsafeMutablePointer<Int>?
+) -> Int
+
+/// Typed Swift wrappers for the bas-agent-fabric crate。 All
+/// methods are pure-fn pass-throughs。 Production use sites can
+/// flip from the Swift body to the Rust body by changing the
+/// caller (the Swift body is preserved in the call site per 红线
+/// 7 + ADR-014 OPT-IN)。
+public enum BASAgentFabricBridge {
+    /// Pinned ABI version。 Swift-side sanity check that the
+    /// XCFramework binary's ABI matches what this Swift bridge
+    /// expects。 Mismatch ⇒ rebuild XCFramework OR roll Swift back。
+    public static let abiVersion: Int32 = 1
+
+    /// Read the ABI version actually compiled into the linked
+    /// Rust staticlib。 Test code asserts `abiVersion == liveAbiVersion()`。
+    public static func liveAbiVersion() -> Int32 {
+        return _bas_agent_fabric_abi_version()
+    }
+
+    /// FNV-1a 64-bit hash of arbitrary bytes via the Rust kernel。
+    /// Byte-identical to Swift's private `BASAgentMergeEngine
+    /// .fnv1a64` (ch 九百五十六.5 USER-PASS gap #4 fix) for any
+    /// input — verified by cross-language parity tests in
+    /// `BASChapter956_9AgentFabricBridgeParityTests`。
+    ///
+    /// Empty input returns the FNV-1a offset basis
+    /// (0xcbf29ce484222325)。
+    public static func fnv1a64(_ data: Data) -> UInt64 {
+        data.withUnsafeBytes { raw in
+            let ptr = raw.bindMemory(to: UInt8.self).baseAddress
+            return _bas_agent_fabric_fnv1a64(ptr, data.count)
+        }
+    }
+
+    public static func fnv1a64(_ s: String) -> UInt64 {
+        return fnv1a64(Data(s.utf8))
+    }
+
+    /// Build the canonical mergeID via the Rust kernel。
+    /// Byte-identical to Swift's private `BASAgentMergeEngine
+    /// .strongMergeID(turnID:deltaIDs:)` (ch 九百五十六.5 USER-PASS
+    /// gap #4 fix)。 Returns `merge.<turnID>.<count>.<hex16>`。
+    ///
+    /// Returns nil on UTF-8 error in inputs (impossible for Swift
+    /// String inputs — guard exists for FFI safety)。
+    public static func strongMergeID(
+        turnID: String,
+        deltaIDs: [String]
+    ) -> String? {
+        let turnBytes = Array(turnID.utf8)
+        // Build null-byte separated concat of delta IDs
+        var concat: [UInt8] = []
+        concat.reserveCapacity(
+            deltaIDs.reduce(0) { $0 + $1.utf8.count + 1 })
+        for (i, id) in deltaIDs.enumerated() {
+            concat.append(contentsOf: id.utf8)
+            if i < deltaIDs.count - 1 {
+                concat.append(0)
+            }
+        }
+        // First call: discover required capacity
+        var required: Int = 0
+        let probe = turnBytes.withUnsafeBufferPointer { tb in
+            concat.withUnsafeBufferPointer { cb in
+                tb.baseAddress!.withMemoryRebound(
+                    to: Int8.self, capacity: tb.count
+                ) { tbi8 in
+                    cb.baseAddress?.withMemoryRebound(
+                        to: Int8.self, capacity: cb.count
+                    ) { cbi8 in
+                        _bas_agent_fabric_strong_merge_id(
+                            tbi8, tb.count,
+                            cbi8, cb.count, deltaIDs.count,
+                            nil, 0, &required)
+                    } ?? _bas_agent_fabric_strong_merge_id(
+                        tbi8, tb.count,
+                        nil, 0, 0,
+                        nil, 0, &required)
+                }
+            }
+        }
+        if probe == -2 { return nil }  // UTF-8 error
+        guard required > 0 else { return nil }
+        // Second call: allocate + fill
+        var out = [UInt8](repeating: 0, count: required)
+        let written = out.withUnsafeMutableBufferPointer { ob in
+            turnBytes.withUnsafeBufferPointer { tb in
+                concat.withUnsafeBufferPointer { cb in
+                    tb.baseAddress!.withMemoryRebound(
+                        to: Int8.self, capacity: tb.count
+                    ) { tbi8 in
+                        cb.baseAddress?.withMemoryRebound(
+                            to: Int8.self, capacity: cb.count
+                        ) { cbi8 in
+                            _bas_agent_fabric_strong_merge_id(
+                                tbi8, tb.count,
+                                cbi8, cb.count,
+                                deltaIDs.count,
+                                ob.baseAddress, ob.count,
+                                nil)
+                        } ?? _bas_agent_fabric_strong_merge_id(
+                            tbi8, tb.count,
+                            nil, 0, 0,
+                            ob.baseAddress, ob.count,
+                            nil)
+                    }
+                }
+            }
+        }
+        guard written >= 0 else { return nil }
+        return String(
+            bytes: out[..<written], encoding: .utf8)
+    }
+}
+
 #endif  // os(iOS) || os(macOS)

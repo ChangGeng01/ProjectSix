@@ -432,6 +432,22 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
     // UNIFICATION_RFC.md。
     total = total.wrapping_add(
         bas_l8_engine::bas_l8_engine_abi_version());
+    // chapter 九百五十六.9 / M3485.9 — bundle the Agent Fabric
+    // merge engine kernels。 Anchor on the FFI ABI version + an
+    // FNV-1a hash of one byte (cheapest computational anchor that
+    // exercises the FFI path)。 Both symbols are #[no_mangle]
+    // extern "C" so the linker preserves them when this chain
+    // sees them used。
+    total = total.wrapping_add(
+        bas_agent_fabric::ffi::bas_agent_fabric_abi_version());
+    // Sentinel FNV-1a call:zero-length input → returns offset
+    // basis (0xcbf29ce484222325)。 Cast lower 32 bits into i32
+    // (intentional wrap)。 The CALL is the linker anchor — the
+    // value is dropped。
+    let _anchor_hash = unsafe {
+        bas_agent_fabric::ffi::bas_agent_fabric_fnv1a64(
+            std::ptr::null(), 0)
+    };
     total
 }
 
@@ -459,7 +475,10 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
 ///   - 22 = chapter 七百八十二 / M2561 (+atom-lifecycle L8)
 ///   - 23 = chapter 八百九十四 / M3160 (+l8-engine — L8 RUST UNIFICATION
 ///         arc start, SQL source-of-truth + Rust hot paths)
+///   - 24 = chapter 九百五十六.9 / M3485.9 (+agent-fabric — Agent
+///         Fabric arc Phase 0 merge engine kernels per
+///         「继续 提高 ... rust ... 比例」 directive)
 #[no_mangle]
 pub extern "C" fn bas_substrate_bundle_crate_count() -> i32 {
-    23
+    24
 }

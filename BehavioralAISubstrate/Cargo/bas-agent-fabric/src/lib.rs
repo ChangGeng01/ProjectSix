@@ -47,6 +47,7 @@ use std::vec::Vec;
 pub mod fnv;
 pub mod topo;
 pub mod winner;
+pub mod ffi;
 
 // Re-export the most-used items at crate root for ergonomic FFI
 pub use fnv::fnv1a64;

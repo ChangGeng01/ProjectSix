@@ -26,6 +26,11 @@ final class BASChapter786ArcSealTests: XCTestCase {
         // bumped to 23 crates (+bas-l8-engine — SQL source-of-truth
         // + Rust hot paths)。
         //
+        // chapter 九百五十六.9 / M3485.9 (Agent Fabric arc 提高 rust
+        // 比例): bumped to 24 crates (+bas-agent-fabric — Agent
+        // Fabric merge engine kernels:FNV-1a hash + O(V+E) Kahn
+        // topo sort + pickWinner per ch 956.5/956.6/956.8 Rust port)
+        //
         // chapter 九百三十九 / M3400 fix MED-1:RENAMED from
         // `testRustCrateCountIs22` (which lied about the asserted
         // value across chapters 894-925)。 The「Is22」 anti-pattern
@@ -37,13 +42,13 @@ final class BASChapter786ArcSealTests: XCTestCase {
         // bas-memory-usage-tracker/src/force_link.rs。
         #if canImport(BASRustMemoryTrackerBinary)
         let bundleCount = bas_substrate_bundle_crate_count()
-        XCTAssertEqual(bundleCount, 23,
-            "Bundle crate count must be 23 " +
+        XCTAssertEqual(bundleCount, 24,
+            "Bundle crate count must be 24 " +
             "(20 pre-arc + shadow-trial + atom-lifecycle + " +
-            "l8-engine at chapter 八百九十四)。 If you added a " +
-            "new crate,bump BOTH this assertion AND " +
-            "bas_substrate_bundle_crate_count() in " +
-            "bas-memory-usage-tracker/src/force_link.rs。")
+            "l8-engine at ch 八百九十四 + agent-fabric at ch " +
+            "九百五十六.9)。 If you added a new crate,bump BOTH " +
+            "this assertion AND bas_substrate_bundle_crate_count() " +
+            "in bas-memory-usage-tracker/src/force_link.rs。")
         #endif
     }
 

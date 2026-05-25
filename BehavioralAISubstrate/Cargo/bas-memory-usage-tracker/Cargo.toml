@@ -128,3 +128,8 @@ bas-mamba-scan        = { path = "../bas-mamba-scan" }
 # chapter 八百九十四 / M3160 — bundle the L8 Rust unification
 # engine (SQL source-of-truth + Rust hot paths, owns rusqlite)。
 bas-l8-engine         = { path = "../bas-l8-engine" }
+# chapter 九百五十六.9 / M3485.9 — bundle the Agent Fabric merge
+# engine kernels (FNV-1a hash + topo sort + pick_winner) so Swift
+# host can call bas_agent_fabric_* symbols via the XCFramework。
+# Per user directive「继续 提高 ... rust ... 比例」。
+bas-agent-fabric      = { path = "../bas-agent-fabric" }
