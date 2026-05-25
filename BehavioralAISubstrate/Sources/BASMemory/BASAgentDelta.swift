@@ -51,20 +51,34 @@ public struct BASAgentDelta:
     /// for evidence-tier conflict resolution (Phase 0 ch 955)。
     public let confidence: Double
 
+    /// chapter 九百五十六.5 / M3485.5 USER-PASS gap #5 fix:
+    /// real timestamp for recency tie-break。 Previously merge engine
+    /// claimed "Recency" tie-break but used lex deltaID — only worked
+    /// when caller chose lex-ordered IDs。 Now this field is the
+    /// authoritative recency signal: nanoseconds since unix epoch when
+    /// the delta was emitted。 0 = unknown (back-compat / legacy),
+    /// merge engine falls back to deltaID lex order in that case。
+    public let createdAtNanos: Int64
+
     /// Why this delta — short codes for the audit ledger。 Example:
     /// `["evidence.recent", "user.boundary.respect"]`。 Drives the
     /// SovereignAuditEntry `signalRefs` emission downstream。
     public let reasonCodes: [String]
 
     /// References to other deltas this one depends on。 Format:
-    /// `delta:<deltaID>`。 Merge engine respects DAG ordering — a
-    /// delta with unsatisfied dependencies gets queued or rejected。
+    /// `delta:<deltaID>`。 Merge engine processes deltas in topological
+    /// order — a delta with unsatisfied dependencies (target dep delta
+    /// rejected) gets rejected with reason `dependency-unsatisfied`。
+    /// chapter 九百五十六.5 USER-PASS gap #3:previously declared but
+    /// not consumed by merge engine。 Now wired in `merge()`。
     public let dependencies: [String]
 
     /// References to other deltas this one explicitly conflicts with。
-    /// Format: `delta:<deltaID>`。 Merge engine uses this to break
-    /// ties in evidence-tier conflicts。 Empty = no known conflicts
-    /// (merge engine still detects implicit conflicts at write time)。
+    /// Format: `delta:<deltaID>`。 Merge engine treats these as
+    /// adversarial pairs — if BOTH appear in the same turn,exactly
+    /// one wins per the priority tier system,the other is rejected
+    /// with reason `explicit-conflict`。
+    /// chapter 九百五十六.5 USER-PASS gap #3 fix:wired in `merge()`。
     public let conflictRefs: [String]
 
     public init(
@@ -74,6 +88,7 @@ public struct BASAgentDelta:
         deltaType: BASAgentDeltaType,
         patchJson: String = "",
         confidence: Double,
+        createdAtNanos: Int64 = 0,
         reasonCodes: [String] = [],
         dependencies: [String] = [],
         conflictRefs: [String] = []
@@ -84,6 +99,7 @@ public struct BASAgentDelta:
         self.deltaType = deltaType
         self.patchJson = patchJson
         self.confidence = confidence
+        self.createdAtNanos = createdAtNanos
         self.reasonCodes = reasonCodes
         self.dependencies = dependencies
         self.conflictRefs = conflictRefs

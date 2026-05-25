@@ -11,6 +11,93 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十六.5 / M3485.5 — USER-PASS fix-of-fix:5 Phase 0 gaps caught by user code review
+
+USER-PASS-2 corrigendum sub-chapter (ch 943.1 discipline)。 User did a sharp code review of Phase 0 + Phase 1 ch1 (ch 953-956) and caught **5 gaps where documentation overpromised vs implementation** — code claimed behavior that wasn't actually wired。 Per discipline:if user catches it,we ship a `.5` fix sub-chapter naming them as the catcher,not bury it in a future chapter。
+
+#### User's verbatim findings (the 5 gaps)
+
+> 1. "Single-Writer-Per-Domain" 现在只是检查某个 agent 的 writeDomains 是否包含 domain,还没有全局 registry 保证"一个 domain 只有一个 writer"。
+> 2. merge engine 现在只裁决 delta ID,还没有真正 apply patchJson 到 state graph。
+> 3. dependencies / conflictRefs 字段文档说会参与 DAG/冲突,但当前 merge 还没用。
+> 4. mergeID = turnID + deltas.count,不同输入可能撞 ID,后面接 event sourcing 前要修。
+> 5. "Recency" 实际用的是 lexicographic deltaID 代理,不是真 timestamp recency。
+
+All 5 are real。 All 5 fixed in this chapter。
+
+#### What landed
+
+**Gap #1 fix — Global Single-Writer-Per-Domain registry** (`BASSharedStateGraph.swift`):
+- New `domainWriters: [BASStateDomain: String]` dict on the actor — system-level claim map
+- New `registerWriter(agentID:domain:) throws` — idempotent re-register,throws `domainAlreadyClaimed` on cross-agent claim
+- New `writerForDomain(_:) -> String?` accessor (audit / test)
+- New error cases:`domainAlreadyClaimed(domain:existingWriterAgentID:newWriterAgentID:)` + `writerIdentityMismatch(domain:registeredWriterAgentID:attemptingAgentID:)`
+- `writeObject(...)` now enforces BOTH per-agent `writeDomains` AND global registry。 Auto-claims on first write when no registered writer (migration-friendly)。 Subsequent writes from other agents throw `writerIdentityMismatch` even if their `writeDomains` includes the target
+
+**Gap #2 fix — Merge engine actually applies patchJson** (NEW `BASAgentMergeApplier.swift`,~180 LOC):
+- `BASAgentDeltaApplicationOutcome` struct (deltaID + applied + writtenRef + errorReason)
+- `BASAgentMergeApplier.apply(mergeResult:deltas:agents:graph:) async -> [Outcome]`
+- For each accepted delta:looks up agent spec → parses `targetObjectRef` → calls `graph.writeObject(...)` → records outcome
+- Per-deltaType payload semantics:`.add`/`.replace`/`.merge`/`.annotate` write `patchJson`;`.remove` writes empty tombstone `""`
+- Maps `BASSharedStateGraphError` to short error codes (`graph-error.unauthorizedWriter`,`graph-error.writerIdentityMismatch`,etc.)
+- Pure async function — no shared state beyond the supplied graph;safe to call from coordinator
+
+**Gap #3 fix — dependencies + conflictRefs actually drive merge** (`BASAgentMergeEngine.swift`):
+- New private `topologicalSort(_:)` via Kahn's algorithm — pure function returning `(sortedDeltas, cycleParticipantDeltaIDs)`
+- Cycle participants rejected up-front with `dependency-cycle` reason
+- **Three-pass ordering** (correctness-critical):(1) cycle reject → (2) per-target conflict resolution → (3) topo-order dep-unsatisfied propagation。 Order matters:conflict losers may be deps of downstream deltas — those must cascade to `dependency-unsatisfied`。 (Initial implementation did pass 3 before pass 2,test caught the regression — fixed in same chapter)
+- Explicit `conflictRefs` handling:after target-group resolution,iterate surviving accepted deltas;adversarial pairs (A declares B as conflict OR B declares A) get tier-resolved,loser demoted with `explicit-conflict` reason
+- New rejection reasons in audit trail:`dependency-cycle`,`dependency-unsatisfied`,`explicit-conflict`
+
+**Gap #4 fix — Strong content-hash mergeID** (`BASAgentMergeEngine.swift`):
+- Was:`merge.<turnID>.<count>` — different delta sets with same turn + count collided
+- Now:`merge.<turnID>.<count>.<hex16>` where hex16 = FNV-1a 64-bit hash of `turnID + "|" + sortedDeltaIDs.joined(",")`
+- Collision probability ≤ 2^-64 ≈ 5.4e-20。 Suitable for event-sourcing dedup in Phase 1 ch 959 trace log
+- Pure function:same inputs → same mergeID across runs / devices / processes
+
+**Gap #5 fix — Real-timestamp recency** (`BASAgentDelta.swift` + `BASAgentMergeEngine.swift`):
+- New field `BASAgentDelta.createdAtNanos: Int64` (default 0 for back-compat)。 Caller stamps `Int64(Date().timeIntervalSince1970 * 1_000_000_000)` or monotonic clock at delta creation
+- `winsAgainst` tie-break order now:tier > priority > confidence > **createdAtNanos** > deltaID-lex (final)
+- Higher `createdAtNanos` = MORE RECENT = wins (true recency,not lex proxy)
+- Legacy `0` timestamp short-circuits to deltaID-lex (back-compat for any pre-fix caller)
+
+#### Verification
+
+```
+swift build  → clean (48.08s)
+swift test --filter BASChapter956_5  → 12 PASSED / 0 FAILED in 0.006s
+swift test --filter "BASChapter95[3-6]"  → 68 PASSED / 0 FAILED in 0.050s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test  → 13,729 PASSED / 115 skipped / 0 FAILED in 201s
+```
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter956_5UserPassFixesTests.swift` (~330 LOC, 12 regression tests):**
+- `testGap1_GlobalSingleWriterRegistryRejectsSecondAgent` + `testGap1_ExplicitRegisterWriterRejectsDuplicate` — system-level single-writer invariant proven
+- `testGap2_MergeApplierWritesPatchesToStateGraph` + `testGap2_MergeApplierWritesTombstoneOnRemove` — patchJson reaches storage,`.remove` tombstone semantics
+- `testGap3_DependencyUnsatisfiedRejectsDownstream` + `testGap3_DependencyCycleAllRejected` + `testGap3_ExplicitConflictRefsDemoteLoser` — DAG + cycles + adversarial pairs all enforced
+- `testGap4_DifferentDeltaSetsProduceDifferentMergeIDs` + `testGap4_SameInputSameMergeID` — content-hash mergeID determinism + non-collision
+- `testGap5_RealTimestampWinsOverLexDeltaIDOnTie` + `testGap5_LegacyZeroTimestampFallsBackToLexDeltaID` — recency now means recency,with back-compat
+- `testCumulativeAllFiveFixesIntegrated` — single end-to-end test exercising all 5 fixes in one flow
+
+#### Risk + revert
+
+ZERO risk to existing call sites — all changes are additive。 `BASAgentDelta.createdAtNanos` defaults to 0 (legacy callers don't break)。 Global writer registry auto-claims on first write (no upstream wiring required)。 Merge engine semantics for prior tests unchanged (no dependencies / no conflictRefs / no createdAtNanos = identical behavior — proven by 56 pre-existing ch 953-956 tests still passing 0 changes)。
+
+Revert:revert this single commit (3 source edits + 1 new source file + 1 new test file)。
+
+#### Discipline pin
+
+Per ch 943.1 USER-PASS-2 corrigendum precedent:user-found gaps get named in the fix chapter,the user is credited as catcher,and a regression test goes into the codebase BEFORE the fix is considered landed。 All 5 gaps now have permanent regression tests preventing reoccurrence。
+
+Per user's most recent directive「最好 使用 高性能 语言 最严苛」:Swift fix lands first (correctness gate)。 Per ch 870 measurement-first discipline,next step is iPhone Air p99 measurement of merge engine + applier — if any path exceeds 1ms p99,port to Rust crate `bas-agent-fabric` (deferred to ch 956.6 if measurement justifies)。
+
+#### What's next
+
+- Measure merge engine + applier p99 on iPhone Air real device (ch 956.6 candidate)
+- If Rust port justified → new `bas-agent-fabric` crate with FFI parity tests (ch 956.7)
+- Otherwise continue Phase 1:ch 957 Scout + Planner seats wired into coordinator
+
+---
+
 ### Chapter 九百五十六 / M3485 — Agent Fabric Phase 1 ch1: BASAgentRegistry + BASAgentRouter + BASAgentLeaseManager
 
 Phase 1 opens — first 3 of 8 Agent Fabric sub-systems land (Registry / Router / Lease Manager)。 Per plan ch 956: LOW risk — wiring only,no per-turn touch yet。

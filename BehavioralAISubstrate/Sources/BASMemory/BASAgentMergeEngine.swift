@@ -118,16 +118,29 @@ public enum BASAgentMergeEngine {
     }
 
     /// Pure-function merge:resolve conflicts between deltas
-    /// targeting the same `targetObjectRef` using priority。
+    /// targeting the same `targetObjectRef` using priority + handle
+    /// explicit `dependencies` + `conflictRefs` per chapter 956.5
+    /// USER-PASS gap #3 fix。
     ///
-    /// Deltas targeting different refs never conflict — they're all
-    /// accepted。 Within a conflict group:
-    ///   1. Highest tier wins
-    ///   2. Tie at tier → higher agentPriority wins
-    ///   3. Tie at priority → higher delta.confidence wins
-    ///   4. Tie at confidence → lexicographic deltaID for determinism
-    ///      (recency would require timestamps;deltaID order acts as
-    ///      proxy when caller chooses lex-ordered IDs)
+    /// Processing order (chapter 956.5 strict mode):
+    ///   1. Topological sort by `dependencies` — a delta D depends on
+    ///      [d1, d2] means D is processed AFTER d1 and d2。 Cycles
+    ///      caught by sort,reject all participants with reason
+    ///      `dependency-cycle`。
+    ///   2. For each delta in topo order:if any of its dependencies
+    ///      was rejected → reject with reason `dependency-unsatisfied`。
+    ///   3. Group surviving deltas by `targetObjectRef`。 Singleton
+    ///      groups → accept。 Multi-delta groups → conflict resolution。
+    ///   4. Within conflict group OR for explicit conflictRefs pairs:
+    ///      a. Highest tier wins (sovereign > risk > host > evidence >
+    ///         agentPriority > recency)
+    ///      b. Tie at tier → higher agentPriority wins
+    ///      c. Tie at priority → higher delta.confidence wins
+    ///      d. Tie at confidence → **higher createdAtNanos wins**
+    ///         (chapter 956.5 USER-PASS gap #5 fix: real timestamp
+    ///         recency, was lex deltaID proxy)
+    ///      e. Tie at recency (or both 0) → lex-smaller deltaID
+    ///         (final deterministic break)
     ///
     /// - Parameters:
     ///   - deltas: input deltas from this turn
@@ -142,26 +155,49 @@ public enum BASAgentMergeEngine {
         context ctx: BASMergePriorityContext,
         turnID: String
     ) -> BASAgentMergeResult {
-        // Group by target ref
+        // chapter 九百五十六.5 USER-PASS gap #3: topo-sort with
+        // dependencies + reject cycles + propagate
+        // dependency-unsatisfied。
+        //
+        // Three-pass ordering (correct propagation):
+        //   1. Cycle participants → reject up-front。
+        //   2. Per-target conflict resolution → winners tentatively
+        //      accepted,losers rejected。 Run BEFORE dep propagation
+        //      because losers may be deps of downstream deltas — those
+        //      downstream deltas must then reject too。
+        //   3. Re-iterate sortedDeltas in TOPO ORDER and propagate:
+        //      any accepted delta whose dependency is now in
+        //      rejectedSet → demote with dependency-unsatisfied。
+        //      Topo order ensures chain rejection (d4 loses → d1
+        //      depends on d4 → d3 depends on d1 all cascade)。
+        let topoResult = topologicalSort(deltas)
+        var acceptedSet = Set<String>()
+        var rejectedSet = Set<String>()
+        var conflictAudits: [String] = []
+        // Pass 1: cycle participants
+        for cycleID in topoResult.cycleParticipantDeltaIDs {
+            rejectedSet.insert(cycleID)
+            conflictAudits.append(
+                "delta:\(cycleID) rejected reason=dependency-cycle")
+        }
+        let sortableDeltas = topoResult.sortedDeltas
+        // Pass 2: per-target conflict resolution。 Skip cycle
+        // participants (already rejected)。
         var byTarget: [String: [BASAgentDelta]] = [:]
-        for d in deltas {
+        for d in sortableDeltas {
             byTarget[d.targetObjectRef, default: []].append(d)
         }
-        var accepted: [String] = []
-        var rejected: [String] = []
-        var conflictAudits: [String] = []
         for (ref, group) in byTarget {
             if group.count == 1 {
-                accepted.append("delta:\(group[0].deltaID)")
+                acceptedSet.insert(group[0].deltaID)
                 continue
             }
-            // Score each delta in the conflict group
             let winner = pickWinner(group: group, context: ctx)
             for d in group {
                 if d.deltaID == winner.deltaID {
-                    accepted.append("delta:\(d.deltaID)")
+                    acceptedSet.insert(d.deltaID)
                 } else {
-                    rejected.append("delta:\(d.deltaID)")
+                    rejectedSet.insert(d.deltaID)
                 }
             }
             let winnerTier = tier(for: winner, in: ctx)
@@ -170,10 +206,82 @@ public enum BASAgentMergeEngine {
                 "winner=delta:\(winner.deltaID) " +
                 "tier=\(winnerTier)")
         }
-        accepted.sort()
-        rejected.sort()
+        // Pass 3: dep-unsatisfied propagation in TOPO ORDER。 Any
+        // accepted delta whose dep was rejected (cycle / conflict /
+        // earlier chain) is demoted with dependency-unsatisfied
+        // reason。 Topo order guarantees chain cascade。
+        for d in sortableDeltas {
+            guard acceptedSet.contains(d.deltaID) else { continue }
+            let depRejected = d.dependencies.contains { depRef in
+                let depID = depRef.hasPrefix("delta:")
+                    ? String(depRef.dropFirst("delta:".count))
+                    : depRef
+                return rejectedSet.contains(depID)
+            }
+            if depRejected {
+                acceptedSet.remove(d.deltaID)
+                rejectedSet.insert(d.deltaID)
+                conflictAudits.append(
+                    "delta:\(d.deltaID) rejected " +
+                    "reason=dependency-unsatisfied")
+            }
+        }
+        // chapter 九百五十六.5 USER-PASS gap #3 fix: also enforce
+        // explicit conflictRefs across surviving accepted deltas。
+        // If delta A is accepted but conflicts with delta B that's
+        // also accepted (no target-ref collision but declared
+        // adversarial),tier-resolve the pair and reject the loser。
+        let surviving = sortableDeltas.filter {
+            acceptedSet.contains($0.deltaID)
+        }
+        let acceptedByID = Dictionary(
+            uniqueKeysWithValues: surviving.map { ($0.deltaID, $0) })
+        var explicitConflictDemotions = Set<String>()
+        for d in surviving {
+            for conflictRef in d.conflictRefs {
+                let conflictID = conflictRef.hasPrefix("delta:")
+                    ? String(
+                        conflictRef.dropFirst("delta:".count))
+                    : conflictRef
+                guard let other =
+                    acceptedByID[conflictID],
+                    !explicitConflictDemotions
+                        .contains(d.deltaID),
+                    !explicitConflictDemotions
+                        .contains(conflictID)
+                else { continue }
+                // Tier-resolve the explicit pair
+                let pair = [d, other]
+                let pairWinner = pickWinner(
+                    group: pair, context: ctx)
+                let pairLoser = pairWinner.deltaID == d.deltaID
+                    ? other : d
+                explicitConflictDemotions
+                    .insert(pairLoser.deltaID)
+                conflictAudits.append(
+                    "explicit-conflict " +
+                    "winner=delta:\(pairWinner.deltaID) " +
+                    "loser=delta:\(pairLoser.deltaID) " +
+                    "reason=explicit-conflict")
+            }
+        }
+        for demoted in explicitConflictDemotions {
+            acceptedSet.remove(demoted)
+            rejectedSet.insert(demoted)
+        }
+        let accepted = acceptedSet
+            .map { "delta:\($0)" }.sorted()
+        let rejected = rejectedSet
+            .map { "delta:\($0)" }.sorted()
         conflictAudits.sort()
-        let mergeID = "merge.\(turnID).\(deltas.count)"
+        // chapter 九百五十六.5 USER-PASS gap #4 fix: strong mergeID
+        // via deterministic content hash of (turnID + sorted delta
+        // IDs)。 Previously `merge.<turnID>.<count>` collided when
+        // two merges in same turn produced same delta count。 Now
+        // FNV-1a 64-bit hex over canonical inputs gives ≤2^-64
+        // collision probability。
+        let mergeID = strongMergeID(
+            turnID: turnID, deltaIDs: deltas.map { $0.deltaID })
         let reasonCodes = conflictAudits.isEmpty
             ? ["merge.no-conflicts"]
             : [
@@ -191,10 +299,107 @@ public enum BASAgentMergeEngine {
             mergeReasonCodes: reasonCodes)
     }
 
+    // MARK: - Topological sort (USER-PASS gap #3 fix)
+
+    /// chapter 九百五十六.5 USER-PASS gap #3 fix: topo sort by
+    /// `dependencies`。 Returns sorted deltas + cycle participants
+    /// (deltas in a dependency cycle,must be rejected)。 Uses
+    /// Kahn's algorithm — pure function。
+    private struct TopoResult {
+        let sortedDeltas: [BASAgentDelta]
+        let cycleParticipantDeltaIDs: Set<String>
+    }
+
+    private static func topologicalSort(
+        _ deltas: [BASAgentDelta]
+    ) -> TopoResult {
+        var sorted: [BASAgentDelta] = []
+        var byID = Dictionary(
+            uniqueKeysWithValues: deltas.map { ($0.deltaID, $0) })
+        // Build inverse dep map (who depends on me)
+        var inDegree: [String: Int] = [:]
+        for d in deltas { inDegree[d.deltaID] = 0 }
+        for d in deltas {
+            for depRef in d.dependencies {
+                let depID = depRef.hasPrefix("delta:")
+                    ? String(depRef.dropFirst("delta:".count))
+                    : depRef
+                // Only count dependencies that ARE in the input
+                // (external deps are caller's responsibility to
+                // satisfy before submission)
+                if byID[depID] != nil {
+                    inDegree[d.deltaID, default: 0] += 1
+                }
+            }
+        }
+        var queue = deltas.filter { (inDegree[$0.deltaID] ?? 0) == 0 }
+            .sorted { $0.deltaID < $1.deltaID }
+        while !queue.isEmpty {
+            let current = queue.removeFirst()
+            sorted.append(current)
+            byID.removeValue(forKey: current.deltaID)
+            // Decrement in-degree of dependents
+            for d in deltas {
+                if d.dependencies.contains(where: {
+                    let depID = $0.hasPrefix("delta:")
+                        ? String($0.dropFirst("delta:".count))
+                        : $0
+                    return depID == current.deltaID
+                }) {
+                    inDegree[d.deltaID, default: 0] -= 1
+                    if inDegree[d.deltaID] == 0,
+                       byID[d.deltaID] != nil
+                    {
+                        queue.append(d)
+                        queue.sort { $0.deltaID < $1.deltaID }
+                    }
+                }
+            }
+        }
+        let cycleIDs = Set(byID.keys)
+        return TopoResult(
+            sortedDeltas: sorted,
+            cycleParticipantDeltaIDs: cycleIDs)
+    }
+
+    // MARK: - Strong mergeID (USER-PASS gap #4 fix)
+
+    /// chapter 九百五十六.5 USER-PASS gap #4 fix: strong mergeID via
+    /// FNV-1a 64-bit hash over canonical inputs。 Format:
+    /// `merge.<turnID>.<count>.<hex16>`。 Two merges with same
+    /// turnID + count but different delta IDs get different mergeIDs
+    /// (collision probability ≤ 2^-64 ≈ 5.4e-20)。
+    private static func strongMergeID(
+        turnID: String,
+        deltaIDs: [String]
+    ) -> String {
+        let canonical = turnID + "|" + deltaIDs.sorted()
+            .joined(separator: ",")
+        let hash = fnv1a64(canonical)
+        return "merge.\(turnID).\(deltaIDs.count)." +
+               String(format: "%016x", hash)
+    }
+
+    /// FNV-1a 64-bit hash。 Standard non-cryptographic hash,
+    /// strong enough for content-id deduplication at our scale。
+    /// For cryptographic strength,future revision can swap to
+    /// SHA-256 via CryptoKit (sub-ms on iPhone Air for our payload
+    /// sizes per ch 952.4 measurements)。
+    private static func fnv1a64(_ s: String) -> UInt64 {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in s.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 0x100000001b3
+        }
+        return hash
+    }
+
     // MARK: - Internal helpers
 
-    /// Tie-breaker order:tier → agentPriority → confidence →
-    /// deltaID (lex)。 Returns the winning delta from a non-empty group。
+    /// Tie-breaker order per ch 956.5:tier → agentPriority →
+    /// confidence → **createdAtNanos** (USER-PASS gap #5 fix:
+    /// real timestamp,was lex deltaID proxy) → deltaID (lex,
+    /// final deterministic break)
     private static func pickWinner(
         group: [BASAgentDelta],
         context ctx: BASMergePriorityContext
@@ -222,7 +427,9 @@ public enum BASAgentMergeEngine {
         return best
     }
 
-    /// Strict greater-than under (tier > priority > confidence > id-lex)
+    /// Strict greater-than under
+    /// (tier > priority > confidence > recency-timestamp > id-lex)
+    /// per chapter 九百五十六.5 USER-PASS gap #5 fix。
     private static func winsAgainst(
         candidate: BASAgentDelta,
         candidateTier: BASMergePriorityTier,
@@ -239,6 +446,16 @@ public enum BASAgentMergeEngine {
         }
         if candidate.confidence != best.confidence {
             return candidate.confidence > best.confidence
+        }
+        // chapter 九百五十六.5 USER-PASS gap #5 fix:real timestamp
+        // recency。 0 = unknown timestamp (skip — fall through to
+        // lex deltaID tie-break)。 Higher createdAtNanos = MORE
+        // RECENT = wins。
+        if candidate.createdAtNanos != 0
+            || best.createdAtNanos != 0,
+           candidate.createdAtNanos != best.createdAtNanos
+        {
+            return candidate.createdAtNanos > best.createdAtNanos
         }
         // Final tie-breaker:lex-ascending deltaID。 Smaller ID wins。
         return candidate.deltaID < best.deltaID

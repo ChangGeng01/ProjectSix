@@ -35,6 +35,26 @@ public enum BASSharedStateGraphError: Error, Equatable, Sendable {
         agentID: String, domain: BASStateDomain)
     case objectNotFound(ref: String)
     case malformedObjectRef(ref: String)
+    /// chapter 九百五十六.5 / M3485.5 USER-PASS gap #1 fix:
+    /// global Single-Writer-Per-Domain registry。 Previously only
+    /// per-agent writeDomains was checked — two different agents
+    /// could both have `.candidateFrontier` in their writeDomains
+    /// and both successfully write,violating the invariant at the
+    /// system level。 Now `registerWriter(role:domain:)` enforces
+    /// ONE agentID per domain at registration time。 Attempting to
+    /// register a second agentID for the same domain throws this case。
+    case domainAlreadyClaimed(
+        domain: BASStateDomain,
+        existingWriterAgentID: String,
+        newWriterAgentID: String)
+    /// chapter 九百五十六.5 USER-PASS gap #1: write attempt by agent
+    /// whose ID does not match the registered writer for the domain。
+    /// Per-agent `writeDomains` is necessary but not sufficient — the
+    /// global registry is the final authority。
+    case writerIdentityMismatch(
+        domain: BASStateDomain,
+        registeredWriterAgentID: String,
+        attemptingAgentID: String)
 }
 
 /// A single state-graph object — opaque JSON-encoded payload + the
@@ -105,17 +125,70 @@ public actor BASSharedStateGraph {
     /// to detect intra-turn interleaving。
     private var domainVersions: [BASStateDomain: Int64] = [:]
 
+    /// chapter 九百五十六.5 / M3485.5 USER-PASS gap #1 fix:
+    /// global Single-Writer-Per-Domain registry。 Maps each
+    /// `BASStateDomain` to the SINGLE registered writer agentID
+    /// (NOT role — agentID,because two agents could share a role
+    /// in non-strict registry mode but still must not share a
+    /// write domain)。 Empty initially; populated via
+    /// `registerWriter(agentID:domain:)`。
+    /// Writes succeed ONLY if (a) per-agent writeDomains allows AND
+    /// (b) global registry has this agentID as the domain's writer。
+    private var domainWriters: [BASStateDomain: String] = [:]
+
     public init() {}
 
-    // MARK: - Write (single-writer-enforced)
+    // MARK: - Writer registration (USER-PASS gap #1 fix)
+
+    /// chapter 九百五十六.5 USER-PASS gap #1 fix:register an agent
+    /// as the SOLE writer for a domain。 Per Single-Writer-Per-Domain
+    /// invariant,at most ONE agent (by agentID) may be the writer
+    /// of a given `BASStateDomain` system-wide。 Throws
+    /// `domainAlreadyClaimed` if a different agent already owns it。
+    /// Re-registering the SAME agent for the SAME domain is a no-op
+    /// (idempotent),supporting hot-reload patterns。
+    ///
+    /// Should be called at agent-registry build time (Phase 1 ch 956
+    /// `BASAgentRegistry`)。 Per design intent the wiring is:
+    /// `BASAgentRegistry.register(spec)` → for each domain in
+    /// `spec.writeDomains`,call `graph.registerWriter(agentID:domain:)`。
+    public func registerWriter(
+        agentID: String,
+        domain: BASStateDomain
+    ) throws {
+        if let existing = domainWriters[domain] {
+            if existing == agentID {
+                return  // idempotent re-register
+            }
+            throw BASSharedStateGraphError.domainAlreadyClaimed(
+                domain: domain,
+                existingWriterAgentID: existing,
+                newWriterAgentID: agentID)
+        }
+        domainWriters[domain] = agentID
+    }
+
+    /// Read accessor for the registry — used by tests + audit + the
+    /// merge engine apply step to verify writer identity matches
+    /// before applying patches。 nil = no writer registered yet。
+    public func writerForDomain(_ domain: BASStateDomain) -> String? {
+        domainWriters[domain]
+    }
+
+    // MARK: - Write (single-writer-enforced + global registry)
 
     /// Write a state object on behalf of `agent`。 Enforces
-    /// Single-Writer-Per-Domain: agent.writeDomains MUST contain
-    /// the object's domain,and forbiddenDomains MUST NOT contain
-    /// it (forbidden wins on conflict)。
-    ///
-    /// Returns the stored object with version incremented。 Throws
-    /// on authorization failure (caught at audit-time)。
+    /// Single-Writer-Per-Domain at TWO levels per ch 956.5
+    /// USER-PASS gap #1 fix:
+    ///   1. Per-agent: `agent.writeDomains` MUST contain target domain
+    ///   2. Global registry: `domainWriters[domain]` MUST equal
+    ///      `agent.agentID` (if registry has been populated for this
+    ///      domain)。 If domain has no registered writer,registry
+    ///      check is skipped — but `writeObject` IS the canonical
+    ///      writer-claiming operation when caller has not called
+    ///      `registerWriter` explicitly (auto-claim on first write
+    ///      to keep migration simple)。
+    /// Also enforces `forbiddenDomains` (defense in depth)。
     public func writeObject(
         domain: BASStateDomain,
         objectID: String,
@@ -127,9 +200,31 @@ public actor BASSharedStateGraph {
             throw BASSharedStateGraphError.forbiddenDomain(
                 agentID: agent.agentID, domain: domain)
         }
+        // Per-agent writeDomains check
         guard agent.writeDomains.contains(domain) else {
             throw BASSharedStateGraphError.unauthorizedWriter(
                 agentID: agent.agentID, domain: domain)
+        }
+        // chapter 九百五十六.5 USER-PASS gap #1 fix: global registry
+        // check。 If domain has a registered writer that's NOT this
+        // agent,reject with writerIdentityMismatch。 If no registered
+        // writer yet,auto-claim on this first write (migration-friendly)。
+        if let registered = domainWriters[domain] {
+            if registered != agent.agentID {
+                throw BASSharedStateGraphError
+                    .writerIdentityMismatch(
+                        domain: domain,
+                        registeredWriterAgentID: registered,
+                        attemptingAgentID: agent.agentID)
+            }
+        } else {
+            // Auto-claim: this agent becomes the canonical writer。
+            // Subsequent writes from other agents will throw
+            // writerIdentityMismatch even if their writeDomains
+            // includes this domain — preserves Single-Writer at
+            // system level without forcing explicit registerWriter
+            // call upfront。
+            domainWriters[domain] = agent.agentID
         }
         let nextVersion = (domainVersions[domain] ?? 0) + 1
         domainVersions[domain] = nextVersion
