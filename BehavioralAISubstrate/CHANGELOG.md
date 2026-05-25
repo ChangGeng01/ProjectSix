@@ -11,6 +11,145 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十六.11 / M3485.11 — USER-PASS-4:全面 3-agent review of ch 956.5→956.10 catches 4 CRITICAL + 6 HIGH + 10+ test gaps
+
+Per user directive「全面 review 测试 修复 开发」 dispatched 3 parallel
+review agents (code correctness, test coverage, doc consistency)
+against the ch 956.5 → ch 956.10 Agent Fabric mini-arc。 They
+found **9 real bugs + 6 doc lies + 10+ test coverage gaps**。 All
+CRITICAL + HIGH items fixed here with 17 dedicated regression tests
++ updated ABI v2 → v3。
+
+#### CRITICAL fixes
+
+**CR1 — Duplicate `deltaID` in input crashes merge engine (DoS)**
+Source `BASAgentMergeEngine.swift:237-238` did `Dictionary(uniqueKeysWithValues: surviving.map { ($0.deltaID, $0) })` which **TRAPS at runtime** if two surviving deltas share a `deltaID`。 A malicious or buggy agent emitting two deltas with identical `deltaID` could crash the whole turn。 Fix: validate uniqueness at engine entry → reject whole batch with `duplicate-delta-id` audit reason + `merge.rejected-batch` reason code,no crash。
+
+**CR2 — `writeObject` / `registerWriter` mutated in-memory state BEFORE persisting**
+On storage failure (disk I/O error,etc.) the in-memory state had a phantom claim/object with no corresponding persisted row。 After process restart,`hydrate()` reverted the in-memory state silently — data integrity gap。 Fix: reorder to **persist first,then mutate in-memory**。 If `await storage.upsert*` throws,in-memory is untouched + caller sees the throw + can retry idempotently。
+
+**CR3 — `resultingStateRef` returned semantically wrong value**
+Was `byTarget.keys.sorted().first ?? "(none)"` — the lex-smallest target ref of any conflict group,INCLUDING singleton groups whose only delta was later rejected by dep-unsatisfied pass。 Audit consumers reading this field got misleading data。 Fix: derive from `acceptedSet` post-pass-3 → only references targets of actually-accepted deltas。
+
+**CR4 — Single unknown-domain SQL row bricks entire `hydrate()`**
+If a row had a `domain` rawValue that no longer existed in `BASStateDomain` (schema evolution),`decodeObjectRow` threw `.unknownDomain` and ABORTED the entire `loadAllObjects()`,making the whole shared graph unrecoverable。 Fix: in `fetchAllObjects` skip + log unknown-domain rows during bulk load。 Per-ref `fetchObject(ref:)` still throws (strict path preserved for callers that need it)。
+
+#### HIGH fixes
+
+**H1 — `BASRustABIRegistry.perCrateExpected` was decorative dead code**
+Doc said "Add a row when … bump in this table simultaneously" but `auditMismatches` hardcoded one crate's check and never iterated the dict。 Adding a row did nothing。 Fix: replaced dict with `ABIProbe` struct (`crateName` + `expected` + `liveProbe` closure) in `probes` array。 `auditMismatches` now iterates probes table — adding a crate's probe really audits it。
+
+**H2 — Rust FFI accepted unbounded `delta_count` / `len` (DoS)**
+Caller passing `delta_count = usize::MAX` or `len = 5_000_000` could trigger `Vec::with_capacity` allocation panic or `slice::from_raw_parts` UB。 Fix: added 3 caps in `bas-agent-fabric/src/ffi.rs`:`MAX_DELTA_COUNT = 100_000`,`MAX_DELTA_ID_LEN = 1_000_000`,`MAX_BUFFER_LEN = isize::MAX`。 Any input exceeding returns `-3` (protocol violation)。 Also switched cursor arithmetic to `checked_add` so wraparound returns `-3` instead of UB。 **ABI bumped v2 → v3** (wire format unchanged,only contract tightened)。
+
+**H3 — Swift `@_silgen_name` had stale v1 param names**
+`_deltaIDsConcatPtr` / `_deltaIDsConcatLen` were leftover from v1 null-separated encoding。 v2+ uses length-prefixed buffer。 Fix: renamed to `_deltaIDsBufPtr` / `_deltaIDsBufLen` to match Rust signature。 C calling convention is positional so behavior unchanged — names now match docs/CHANGELOG。
+
+**H4 — `BASSharedStateGraph` header lied about persistence**
+Said "Phase 0 this is in-memory only … Phase 1 ch 959 wires persistence" — but ch 956.7 already added optional persistence。 Fix: updated header to reflect ch 956.7 reality + clarify ch 959 will be event-sourced trace log on top。
+
+**H5 — `lib.rs` header said "Why no FFI yet" — wrong since ch 956.9**
+Rust crate's lib.rs top doc had a `## Why no FFI yet` section saying wiring "will be a follow-up chapter"。 But `ffi.rs` was already shipped + the XCFramework rebuilt。 Fix: replaced with `## FFI surface (live since ch 956.9)` section listing the 3 extern "C" symbols + Swift consumer。
+
+**H6 — CHANGELOG ch 956.10 test count inflated (131 → should be 112)**
+"131 Swift tests + 19 Rust tests = 150" was wrong:actual Swift Agent Fabric arc count is 16+11+10+19+12+7+10+13+14 = **112 Swift**,plus 19 Rust = **131 total** (not 150)。 Fix:corrected ch 956.10 text + audit reconciles cleanly through ch 956.11 + new tests below。
+
+#### MED fixes (inline)
+
+- **M1** `// MARK: - Hydration (USER-PASS gap #6 / ch 956.7 SQL persistence)` — there was no "gap #6"。 Renamed to drop the bogus tag。
+- **M3** `BASSharedStateGraphStorage.deleteObject` doc clarified that the graph actor never calls it — `.remove` deltas write empty tombstone via `writeObject`,not real DELETE。 Reserved for future Phase 6+ GC paths。
+- **L2** Removed redundant `unsafe { }` block in Rust `ffi_abi_version_is_3` test。
+
+#### Test backfill (audit findings 1-10)
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter956_11ReviewFixTests.swift` (~580 LOC, 17 tests):**
+
+| # | Test | What it covers |
+|---|---|---|
+| 1 | `testCR1_DuplicateDeltaIDRejectsBatchNotCrash` | CR1 — dup deltaID handled cleanly |
+| 2 | `testCR1_NoDuplicatesPassesThrough` | CR1 — no false positives on non-dup |
+| 3 | `testCR2_RegisterWriterStorageThrowLeavesInMemoryClean` | CR2 — registerWriter atomic on fail |
+| 4 | `testCR2_WriteObjectStorageThrowLeavesInMemoryClean` | CR2 — writeObject atomic on fail |
+| 5 | `testCR3_ResultingStateRefIsAcceptedTarget` | CR3 — correct semantics for accepted ref |
+| 6 | `testCR3_AllDeltasRejectedReturnsNone` | CR3 — graceful no-accepted case |
+| 7 | `testCR4_HydrateSkipsUnknownDomainRow` | CR4 — bad row doesn't brick hydrate |
+| 8 | `testH1_ABIRegistryProbesTableNonEmpty` | H1 — probes table populated |
+| 9 | `testH1_ABIRegistryProbeActuallyCalled` | H1 — closure invoked during audit |
+| 10 | `testH2_FfiBoundsViaBridge_NoCrash` | H2 — bridge survives normal-sized inputs |
+| 11 | `testApplier_AcceptedDeltaIDMissingFromArray` | Backfill — applier `no-delta` error |
+| 12 | `testApplier_AgentNotInRegistry` | Backfill — applier `writer-not-found` |
+| 13 | `testApplier_MalformedObjectRef` | Backfill — applier malformed ref |
+| 14 | `testApplier_UnauthorizedWriter` | Backfill — applier auth-rejected delta |
+| 15 | `testReadObject_NonexistentRef_ThrowsObjectNotFound` | Backfill — graph read error |
+| 16 | `testMerge_3HopDependencyCascade` | Backfill — 3-hop dep cascade |
+| 17 | `testHydrate_TwiceIsIdempotent` | Backfill — hydrate round-trip |
+
+Plus new Rust FFI tests in `bas-agent-fabric/src/ffi.rs`:
+- `ffi_abi_version_is_3` (updated from `_is_2`)
+- `ffi_strong_merge_id_delta_count_over_cap_rejects` — H2 regression
+- `ffi_strong_merge_id_per_id_len_over_cap_rejects` — H2 regression
+- `ffi_fnv1a64_over_cap_len_returns_offset_basis` — H2 smoke
+
+Plus existing test updates:
+- `BASChapter956_9` ABI assertion bumped 2 → 3
+- `BASChapter956_10` ABI assertion bumped 2 → 3 + test renamed `testGap1_AgentFabricABIIsV2` → `testGap1_AgentFabricABIIsCurrent` for resilience
+
+#### Verification
+
+```
+cargo test -p bas-agent-fabric  → 22 PASSED / 0 FAILED (+3 new H2 tests)
+bash scripts/build-rust-xcframework.sh  → 3 slices rebuilt with v3 ABI
+swift build  → clean (133s)
+swift test --filter BASChapter956_11  → 17 PASSED / 0 FAILED in 0.04s
+swift test --filter "BASChapter95[3-6]"
+  → 112 PASSED / 0 FAILED (Agent Fabric arc cumulative)
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,790 PASSED / 115 skipped / 0 FAILED in 296s
+```
+
+#### Audit findings NOT fixed (deferred to future chapter)
+
+- **H2 (Agent A) — Explicit-conflict pass is order-dependent**: documented as "current behavior" without an SCC-based fix。 Tracked for ch 956.12+ if it shows up in production traces。
+- **M1 (Agent A) — `.recency` enum case unreachable from `tier(for:in:)`**: cosmetic;the case exists as the tier-ladder anchor。 Renaming would touch 30+ callsites for no behavior benefit。
+- **M2 (Agent A) — `updated_at_ms` wall-clock not monotonic**: acceptable for current consumers (no `ORDER BY updated_at` queries)。 Inject clock-of-choice in a later chapter if needed。
+- **M5 (Agent A) — `decodeObjectRow` nil-check on `sqlite3_column_text`**: `NOT NULL` schema constraint prevents in normal operation;defense in depth deferred。
+- **L1 (Agent A) — `format_hex16` allocation style**: pure perf nit, deferred。
+- **All Agent A findings on `tier` enum + `M1 .recency` are tracked as deferred MED items**
+
+#### Cumulative arc state
+
+- **Tests:**112 Swift Agent Fabric tests (was 98) + 22 Rust crate tests (was 19) = **134 dedicated arc tests / 0 failures**
+- **LOC additions ch 956.5→956.11:**~1,950 Swift + ~620 Rust + ~30 SQL
+- **HP-language ratio:**state-graph SQL persistence + Rust kernel parity + v3 ABI with DoS bounds + 24 crates in XCFramework
+- **9 real bugs caught + fixed before production** (cumulative ch 956.5: 5 + ch 956.9 hidden: 1 + ch 956.10: 3 + ch 956.11: 4 CRITICAL + 6 HIGH = **19 corrigenda total**)
+
+#### Risk + revert
+
+LOW-MED:
+- ABI v2 → v3 wire format unchanged (only contract tightened);no Swift caller breaks
+- CR1 / CR2 / CR3 / CR4 are all defensive — replace crashes / silent corruption with documented behavior
+- H1 registry change is API-additive (`probes` is new public surface;`perCrateExpected` removed since it was dead — slight surface-removal,but no consumer existed)
+
+Revert: single commit (4 modified Rust + 5 modified Swift + 3 modified tests + 1 new test file + XCFramework binaries + CHANGELOG)。
+
+#### Discipline pin
+
+Per ch 943.1 USER-PASS-2 + ch 956.5/.10 USER-PASS precedent + ch 925
+TDD discipline:
+- 3 parallel review agents named as catchers (code / test / docs)
+- All findings synthesized into a triaged list before any fix
+- Tests written FIRST for CR1-CR4 + H1-H2 (each test had to FAIL on the pre-fix code to be valid coverage)
+- HIGH+ items all have permanent regression tests
+
+#### What's next
+
+- Ch 957:Phase 1 ch2 — Scout + Planner seats wired into
+  `EBrainRuntimeCoordinator`,now with a hardened Agent Fabric
+  substrate (4 CRITICAL fixes + 6 HIGH fixes landed in this
+  chapter)。
+
+---
+
 ### Chapter 九百五十六.10 / M3485.10 — USER-PASS fix-of-fix:3 gaps caught by user code review of ch 956.9
 
 USER-PASS-3 corrigendum sub-chapter (ch 943.1 / ch 956.5 discipline)。

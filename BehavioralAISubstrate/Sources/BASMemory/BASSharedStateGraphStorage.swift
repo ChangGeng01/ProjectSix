@@ -66,6 +66,16 @@ public protocol BASSharedStateGraphStorage: Sendable {
     func loadAllObjects() async throws -> [BASStateGraphObject]
 
     /// Real DELETE by ref。 Idempotent — absent row is success。
+    ///
+    /// chapter 九百五十六.11 USER-PASS-4 M3 doc fix:as of this
+    /// chapter the graph actor `BASSharedStateGraph` NEVER invokes
+    /// `deleteObject` — `.remove` deltas are processed by
+    /// `BASAgentMergeApplier` which writes a tombstone empty-payload
+    /// `""` via `writeObject`,preserving the row for event-sourcing
+    /// + replayability per Root Law 7。 `deleteObject` is reserved
+    /// for FUTURE explicit GC paths (Phase 6+ snapshot compaction)
+    /// + tests + manual ops。 Adapter implementations MUST still
+    /// honor the contract for those future + test callers。
     func deleteObject(ref: String) async throws
 
     // MARK: - Writer-registry persistence (USER-PASS gap #1)

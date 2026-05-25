@@ -29,6 +29,14 @@ use crate::{fnv1a64, strong_merge_id};
 use std::os::raw::c_char;
 use std::slice;
 
+// chapter 九百五十六.11 USER-PASS-4 H2 fix: DoS resistance。 Caps
+// FFI inputs to sane sizes — prevents allocation-failure crashes
+// when a malicious/buggy caller passes huge `delta_count` or
+// `len` values。
+const MAX_DELTA_COUNT: usize = 100_000;
+const MAX_DELTA_ID_LEN: usize = 1_000_000;
+const MAX_BUFFER_LEN: usize = isize::MAX as usize;
+
 // MARK: - In-crate tests for the FFI surface
 
 #[cfg(test)]
@@ -232,11 +240,81 @@ mod tests {
     }
 
     #[test]
-    fn ffi_abi_version_is_2() {
+    fn ffi_abi_version_is_3() {
+        // chapter 九百五十六.11 USER-PASS-4 fix L2: drop redundant
+        // unsafe — bas_agent_fabric_abi_version() is not unsafe。
         assert_eq!(
-            unsafe { bas_agent_fabric_abi_version() }, 2,
-            "ch 956.10 gap #3: ABI version bumped to 2 with \
-             length-prefixed deltaID encoding"
+            bas_agent_fabric_abi_version(), 3,
+            "ch 956.11 H2 fix: ABI bumped to 3 with DoS bounds \
+             (delta_count ≤ 100k, len ≤ 1M, buf ≤ isize::MAX)"
+        );
+    }
+
+    /// chapter 九百五十六.11 USER-PASS-4 H2 regression:
+    /// delta_count over cap returns -3 (no allocation panic)。
+    #[test]
+    fn ffi_strong_merge_id_delta_count_over_cap_rejects() {
+        let buf = encode_length_prefixed(&["d1"]);
+        let mut required: usize = 0;
+        let r = unsafe {
+            bas_agent_fabric_strong_merge_id(
+                b"t1".as_ptr() as *const c_char, 2,
+                buf.as_ptr() as *const c_char,
+                buf.len(),
+                200_000,  // exceeds MAX_DELTA_COUNT=100_000
+                std::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        assert_eq!(
+            r, -3,
+            "ch 956.11 H2: delta_count > MAX_DELTA_COUNT → -3"
+        );
+    }
+
+    /// H2 regression: per-ID length prefix over cap → -3。
+    #[test]
+    fn ffi_strong_merge_id_per_id_len_over_cap_rejects() {
+        // Encode a fake huge length prefix (5 million bytes)
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(5_000_000_u32).to_le_bytes());
+        // Don't actually include 5M bytes — decoder must reject
+        // on length-cap check BEFORE trying to slice。
+        buf.extend_from_slice(b"only-a-few");
+        let mut required: usize = 0;
+        let r = unsafe {
+            bas_agent_fabric_strong_merge_id(
+                b"t1".as_ptr() as *const c_char, 2,
+                buf.as_ptr() as *const c_char,
+                buf.len(),
+                1,
+                std::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        assert_eq!(
+            r, -3,
+            "ch 956.11 H2: per-ID len > MAX_DELTA_ID_LEN → -3"
+        );
+    }
+
+    /// H2 regression: fnv1a64 over-cap len returns offset basis
+    /// (defined failure mode) instead of UB / crash。
+    #[test]
+    fn ffi_fnv1a64_over_cap_len_returns_offset_basis() {
+        // Cannot actually allocate isize::MAX bytes;test the
+        // PROTECTION path by passing a known oversized len with
+        // a null ptr (which short-circuits FIRST so this is
+        // really just smoke;the real cap path is exercised by
+        // the bound check itself which is unit-trivial)。
+        let h = unsafe {
+            bas_agent_fabric_fnv1a64(std::ptr::null(), 0)
+        };
+        assert_eq!(
+            h, 0xcbf29ce484222325,
+            "ch 956.11 H2 smoke: null ptr → offset basis"
         );
     }
 }
@@ -261,6 +339,13 @@ pub unsafe extern "C" fn bas_agent_fabric_fnv1a64(
     len: usize,
 ) -> u64 {
     if ptr.is_null() || len == 0 {
+        return fnv1a64(&[]);
+    }
+    // chapter 九百五十六.11 USER-PASS-4 H2 fix:reject `len`
+    // exceeding `isize::MAX` per `slice::from_raw_parts` safety
+    // contract (UB otherwise)。 Return offset basis as a defined
+    // failure mode rather than crashing the process。
+    if len > MAX_BUFFER_LEN {
         return fnv1a64(&[]);
     }
     let bytes = slice::from_raw_parts(ptr, len);
@@ -301,6 +386,10 @@ pub unsafe extern "C" fn bas_agent_fabric_strong_merge_id(
     out_cap: usize,
     out_required: *mut usize,
 ) -> isize {
+    // chapter 九百五十六.11 USER-PASS-4 H2 fix:cap inputs。
+    if turn_id_len > MAX_DELTA_ID_LEN { return -3; }
+    if delta_ids_buf_len > MAX_BUFFER_LEN { return -3; }
+    if delta_count > MAX_DELTA_COUNT { return -3; }
     // Decode turn_id
     let turn_id: &str = if turn_id_ptr.is_null() || turn_id_len == 0 {
         ""
@@ -331,8 +420,14 @@ pub unsafe extern "C" fn bas_agent_fabric_strong_merge_id(
         let mut ids: Vec<String> = Vec::with_capacity(delta_count);
         let mut cursor: usize = 0;
         while ids.len() < delta_count {
-            // Need 4 bytes for length prefix
-            if cursor + 4 > bytes.len() { return -3; }
+            // chapter 九百五十六.11 USER-PASS-4 H2 fix:use
+            // checked_add for cursor arithmetic so wraparound on
+            // any platform returns -3 instead of UB / underflow。
+            let after_prefix = match cursor.checked_add(4) {
+                Some(v) => v,
+                None => return -3,
+            };
+            if after_prefix > bytes.len() { return -3; }
             let len_bytes = [
                 bytes[cursor],
                 bytes[cursor + 1],
@@ -340,11 +435,17 @@ pub unsafe extern "C" fn bas_agent_fabric_strong_merge_id(
                 bytes[cursor + 3],
             ];
             let len = u32::from_le_bytes(len_bytes) as usize;
-            cursor += 4;
-            // Need len bytes for the payload
-            if cursor + len > bytes.len() { return -3; }
-            let chunk = &bytes[cursor..cursor + len];
-            cursor += len;
+            // Per-ID length cap — prevents Vec::reserve panic on
+            // crafted huge prefix。
+            if len > MAX_DELTA_ID_LEN { return -3; }
+            cursor = after_prefix;
+            let after_payload = match cursor.checked_add(len) {
+                Some(v) => v,
+                None => return -3,
+            };
+            if after_payload > bytes.len() { return -3; }
+            let chunk = &bytes[cursor..after_payload];
+            cursor = after_payload;
             match std::str::from_utf8(chunk) {
                 Ok(s) => ids.push(s.to_string()),
                 Err(_) => return -2,

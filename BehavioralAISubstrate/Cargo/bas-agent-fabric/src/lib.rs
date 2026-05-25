@@ -20,14 +20,19 @@
 //     USER-PASS gap #5 fix in Swift)
 //   - `MergePriorityTier` + `Delta` + `PriorityContext` types
 //
-// ## Why no FFI yet
+// ## FFI surface (live since ch 956.9 — UPDATED ch 956.11)
 //
-// The Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework
-// is committed (binary) and rebuilding it requires the maintainer
-// to run scripts/build-rust-xcframework.sh with rustup iOS targets
-// installed。 This crate lands NOW with full Rust-side coverage so
-// the work is ready;wiring to Swift via @_silgen_name will be a
-// follow-up chapter after the next XCFramework rebuild。
+// `src/ffi.rs` exposes 3 `extern "C"` symbols force-linked into
+// `BASRustMemoryTracker.xcframework` via `bas-memory-usage-tracker`
+// umbrella crate (ch 956.9 wiring):
+//   - `bas_agent_fabric_abi_version() -> i32`
+//   - `bas_agent_fabric_fnv1a64(ptr, len) -> u64`
+//   - `bas_agent_fabric_strong_merge_id(...) -> isize`
+// Swift consumer surface: `BASAgentFabricBridge` in
+// `Sources/BASRuntimeCore/BASInternalRustBridges.swift`。
+// Wire format: ABI v3 — length-prefixed deltaID encoding with
+// DoS bounds (`delta_count ≤ 100_000`,`len ≤ 1_000_000`,
+// `buffer ≤ isize::MAX`)。
 //
 // ## Parity discipline
 //
@@ -56,7 +61,8 @@ pub use winner::{pick_winner, Delta, MergePriorityTier, PriorityContext};
 
 /// ABI version surfaced for the Swift bridge sanity check。 Bump
 /// when the public Rust surface changes in a way that breaks the
-/// Swift-side @_silgen_name declarations。
+/// Swift-side @_silgen_name declarations OR tightens contract
+/// (DoS bounds,extra error codes,etc.)。
 ///
 /// History:
 ///   - 1 = chapter 九百五十六.9 / M3485.9 initial (null-separated
@@ -65,7 +71,12 @@ pub use winner::{pick_winner, Delta, MergePriorityTier, PriorityContext};
 ///         (length-prefixed deltaID encoding: NUL bytes inside
 ///         deltaIDs no longer cause split ambiguity)。 Caller now
 ///         passes u32 little-endian length prefix per deltaID。
-pub const ABI_VERSION: i32 = 2;
+///   - 3 = chapter 九百五十六.11 / M3485.11 USER-PASS-4 H2 fix
+///         (DoS resistance:caps on `delta_count` ≤ 100_000,
+///         per-ID `len` ≤ 1_000_000,buffer length ≤ isize::MAX;
+///         checked_add for cursor arithmetic)。 Wire format
+///         unchanged from v2 — only contract is tighter。
+pub const ABI_VERSION: i32 = 3;
 
 // MARK: - Strong mergeID helper
 

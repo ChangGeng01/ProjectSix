@@ -509,8 +509,12 @@ private func _bas_agent_fabric_fnv1a64(
 private func _bas_agent_fabric_strong_merge_id(
     _ turnIDPtr: UnsafePointer<Int8>?,
     _ turnIDLen: Int,
-    _ deltaIDsConcatPtr: UnsafePointer<Int8>?,
-    _ deltaIDsConcatLen: Int,
+    // chapter 九百五十六.11 USER-PASS-4 H3 fix:renamed from
+    // `deltaIDsConcatPtr` / `*Len` (v1 null-separated leftover)。
+    // v2+ uses length-prefixed buffer encoding。 Names now match
+    // Rust signature `delta_ids_buf_ptr` / `delta_ids_buf_len`。
+    _ deltaIDsBufPtr: UnsafePointer<Int8>?,
+    _ deltaIDsBufLen: Int,
     _ deltaCount: Int,
     _ outPtr: UnsafeMutablePointer<UInt8>?,
     _ outCap: Int,
@@ -532,7 +536,10 @@ public enum BASAgentFabricBridge {
     ///   - 2 = ch 956.10 USER-PASS gap #3 fix (length-prefixed
     ///         deltaID encoding,admits any byte sequence including
     ///         embedded NUL bytes)
-    public static let abiVersion: Int32 = 2
+    ///   - 3 = ch 956.11 USER-PASS-4 H2 fix (DoS bounds:
+    ///         delta_count ≤ 100k,per-ID len ≤ 1M,
+    ///         buf ≤ isize::MAX,checked_add cursor arithmetic)
+    public static let abiVersion: Int32 = 3
 
     /// Read the ABI version actually compiled into the linked
     /// Rust staticlib。 Test code asserts `abiVersion == liveAbiVersion()`。
@@ -764,16 +771,36 @@ public enum BASRustABIRegistry {
         return _bas_substrate_bundle_crate_count()
     }
 
-    /// Registered per-crate expected ABI versions。 Add a row
-    /// when a crate's `bas_<name>_abi_version()` value would
+    /// One per-crate ABI-version probe — pairs a Swift-side
+    /// expected value with a closure that reads the live value
+    /// from the linked Rust staticlib。 chapter 九百五十六.11
+    /// USER-PASS-4 H1 fix:turn the previously decorative
+    /// `perCrateExpected` dict into an actual table that
+    /// `auditMismatches()` iterates。 Without closures the dict
+    /// was useless — adding a row did nothing。
+    public struct ABIProbe: Sendable {
+        public let crateName: String
+        public let expected: Int32
+        public let liveProbe: @Sendable () -> Int32
+    }
+
+    /// Registered per-crate expected ABI versions + live probes。
+    /// Add a row when a crate's `bas_<name>_abi_version()` would
     /// CHANGE — bump in Rust + bump in this table simultaneously。
-    /// Currently tracked:bas-agent-fabric (ch 956.9 + 956.10)。
-    /// Other crates' ABI versions are tracked locally in their
-    /// respective Swift bridge enums (e.g.
-    /// `BASLeaseLifeBridge.abiVersion`)。 Future:absorb all into
-    /// this registry for one-place audit。
-    public static let perCrateExpected: [String: Int32] = [
-        "bas-agent-fabric": BASAgentFabricBridge.abiVersion,
+    /// Each row's `liveProbe` MUST point at the corresponding
+    /// Swift bridge's `liveAbiVersion()` (which calls the
+    /// `@_silgen_name`-declared extern "C" symbol)。
+    ///
+    /// Currently tracked:bas-agent-fabric。 Future revisions can
+    /// absorb other crates (bas-lease-life,bas-mirror-blade,etc.)
+    /// when their Swift bridge enums expose `liveAbiVersion()`。
+    public static let probes: [ABIProbe] = [
+        ABIProbe(
+            crateName: "bas-agent-fabric",
+            expected: BASAgentFabricBridge.abiVersion,
+            liveProbe: {
+                BASAgentFabricBridge.liveAbiVersion()
+            }),
     ]
 
     /// Run ALL registered ABI probes,return mismatches。 Empty
@@ -786,21 +813,26 @@ public enum BASRustABIRegistry {
                 "bundle.crate_count expected=" +
                 "\(expectedBundleCrateCount) live=\(liveBundle)")
         }
-        let liveAgentFabric =
-            BASAgentFabricBridge.liveAbiVersion()
-        if liveAgentFabric != BASAgentFabricBridge.abiVersion {
-            mismatches.append(
-                "bas-agent-fabric expected=" +
-                "\(BASAgentFabricBridge.abiVersion) " +
-                "live=\(liveAgentFabric)")
+        // chapter 九百五十六.11 USER-PASS-4 H1 fix:actually
+        // iterate the probes table。 Previously hardcoded one
+        // crate's check;the `perCrateExpected` dict was dead
+        // code。
+        for probe in probes {
+            let live = probe.liveProbe()
+            if live != probe.expected {
+                mismatches.append(
+                    "\(probe.crateName) expected=" +
+                    "\(probe.expected) live=\(live)")
+            }
         }
         return mismatches
     }
 
     /// Soft budget for the XCFramework staticlib slice in bytes。
-    /// Currently ~30 MB per slice (measured 2026-05-25)。 Test
-    /// asserts each slice ≤ this。 Bump when crate growth is
-    /// JUSTIFIED;catches accidental ballooning。
+    /// chapter 九百五十六.11 USER-PASS-4 H4 fix:corrected from
+    /// stale "~30 MB" doc — actual measured size is ~22 MB per
+    /// slice (post ch 956.11)。 60 MB ceiling gives ~2.7× headroom
+    /// for crate growth + catches accidental ballooning。
     public static let perSliceBytesBudget: Int = 60 * 1024 * 1024
 }
 

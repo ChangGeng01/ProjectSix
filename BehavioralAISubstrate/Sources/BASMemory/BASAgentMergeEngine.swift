@@ -155,6 +155,40 @@ public enum BASAgentMergeEngine {
         context ctx: BASMergePriorityContext,
         turnID: String
     ) -> BASAgentMergeResult {
+        // chapter 九百五十六.11 USER-PASS-4 CR1 fix:reject duplicate
+        // deltaIDs at engine entry。 Without this guard,downstream
+        // `Dictionary(uniqueKeysWithValues:)` calls at lines below
+        // (surviving deltas) would TRAP at runtime — DoS via crafted
+        // input。 Reject the WHOLE batch with `duplicate-delta-id`
+        // reason so callers can audit + retry without crash。
+        var seenIDs = Set<String>()
+        var duplicateIDs: [String] = []
+        for d in deltas {
+            if !seenIDs.insert(d.deltaID).inserted {
+                duplicateIDs.append(d.deltaID)
+            }
+        }
+        if !duplicateIDs.isEmpty {
+            let dupSorted = Array(Set(duplicateIDs)).sorted()
+            let rejected = deltas.map { "delta:\($0.deltaID)" }
+                .sorted()
+            let audit = dupSorted.map {
+                "delta:\($0) rejected reason=duplicate-delta-id"
+            }
+            return BASAgentMergeResult(
+                mergeID: strongMergeID(
+                    turnID: turnID,
+                    deltaIDs: deltas.map { $0.deltaID }),
+                acceptedDeltaIDs: [],
+                rejectedDeltaIDs: rejected,
+                conflictResolution: audit,
+                resultingStateRef: "(none)",
+                mergeReasonCodes: [
+                    "merge.rejected-batch",
+                    "merge.duplicate-delta-ids=" +
+                        "\(dupSorted.count)",
+                ])
+        }
         // chapter 九百五十六.5 USER-PASS gap #3: topo-sort with
         // dependencies + reject cycles + propagate
         // dependency-unsatisfied。
@@ -289,13 +323,26 @@ public enum BASAgentMergeEngine {
                 "merge.priority=sovereign-risk-host-evidence-" +
                 "agent-recency",
             ]
+        // chapter 九百五十六.11 USER-PASS-4 CR3 fix:resultingStateRef
+        // must reference an ACCEPTED delta's target,not just any
+        // group key。 Previously returned the lex-smallest target of
+        // any conflict group including those whose winner was later
+        // demoted by dep-unsatisfied or explicit-conflict passes,
+        // misleading audit consumers。 Now: derived from the
+        // post-pass-3 + post-explicit-conflict accepted set。
+        let deltasByID = Dictionary(
+            uniqueKeysWithValues:
+                deltas.map { ($0.deltaID, $0) })
+        let acceptedTargets = acceptedSet
+            .compactMap { deltasByID[$0]?.targetObjectRef }
+        let resultingRef = acceptedTargets.sorted().first
+            ?? "(none)"
         return BASAgentMergeResult(
             mergeID: mergeID,
             acceptedDeltaIDs: accepted,
             rejectedDeltaIDs: rejected,
             conflictResolution: conflictAudits,
-            resultingStateRef: byTarget.keys.sorted()
-                .first ?? "(none)",
+            resultingStateRef: resultingRef,
             mergeReasonCodes: reasonCodes)
     }
 

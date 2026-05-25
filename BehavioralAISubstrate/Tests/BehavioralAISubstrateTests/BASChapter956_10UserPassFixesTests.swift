@@ -52,15 +52,16 @@ final class BASChapter956_10UserPassFixesTests: XCTestCase {
             "ch 956.10 gap #1: live count must match")
     }
 
-    func testGap1_AgentFabricABIIsV2() {
+    func testGap1_AgentFabricABIIsCurrent() {
+        // ch 956.11 USER-PASS-4 H2 fix: ABI bumped 2 → 3
+        // (length-prefixed encoding unchanged from v2; only the
+        // contract tightened with DoS bounds)
         XCTAssertEqual(
-            BASAgentFabricBridge.abiVersion, 2,
-            "ch 956.10 gap #3 + gap #1: ABI bumped to v2 with " +
-            "length-prefixed deltaID encoding")
+            BASAgentFabricBridge.abiVersion, 3,
+            "ch 956.11: ABI bumped to v3 with DoS bounds")
         XCTAssertEqual(
-            BASAgentFabricBridge.liveAbiVersion(), 2,
-            "ch 956.10: live Rust ABI must agree with Swift " +
-            "expected")
+            BASAgentFabricBridge.liveAbiVersion(), 3,
+            "ch 956.11: live Rust ABI must agree with Swift expected")
     }
 
     func testGap1_BinarySizeBudget() {

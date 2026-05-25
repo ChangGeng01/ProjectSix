@@ -19,10 +19,14 @@
 //     read + write throw — defense in depth (even if write/read
 //     domains accidentally include it)。
 //
-// State storage:in Phase 0 this is in-memory only (Dictionary keyed
-// by `<domain>#<objectID>`)。 Phase 1 ch 959 wires persistence via
-// `BASRoutedEventLogStorage` for the trace log。 Phase 6+ may add
-// snapshot/restore for app-suspension scenarios。
+// State storage:Phase 0 was in-memory only (Dictionary keyed by
+// `<domain>#<objectID>`)。 chapter 九百五十六.7 added optional
+// persistence via `BASSharedStateGraphStorage` adapter (default nil
+// preserves byte-equal Phase 0 behavior per 红线 7 + ADR-014)。
+// SQLite impl lives in `BASSharedStateGraphSQLiteStorage`。 Phase 1
+// ch 959 will add a separate event-sourced trace log on top via
+// `BASRoutedEventLogStorage` for full turn-level replay。 Phase 6+
+// may add snapshot/restore for app-suspension scenarios。
 
 import Foundation
 
@@ -150,7 +154,7 @@ public actor BASSharedStateGraph {
         self.storage = storage
     }
 
-    // MARK: - Hydration (USER-PASS gap #6 / ch 956.7 SQL persistence)
+    // MARK: - Hydration (ch 956.7 SQL persistence)
 
     /// chapter 九百五十六.7 — rebuild the in-memory state from the
     /// storage adapter at session boot。 No-op if no storage was
@@ -210,10 +214,18 @@ public actor BASSharedStateGraph {
                 existingWriterAgentID: existing,
                 newWriterAgentID: agentID)
         }
-        domainWriters[domain] = agentID
-        // chapter 九百五十六.7 SQL write-through
+        // chapter 九百五十六.11 USER-PASS-4 CR2 fix:persist BEFORE
+        // mutating in-memory state。 Previously the order was:
+        //   1. mutate in-memory `domainWriters[domain] = agentID`
+        //   2. await storage.upsertWriter (suspension point)
+        // If step 2 threw,in-memory state had a phantom claim with
+        // no corresponding persisted row — `hydrate()` after restart
+        // would revert the in-memory state silently。 New order is
+        // SQL-first:if persistence fails,in-memory is untouched
+        // and caller sees the throw + can retry idempotently。
         try await storage?.upsertWriter(
             domain: domain, agentID: agentID)
+        domainWriters[domain] = agentID
     }
 
     /// Read accessor for the registry — used by tests + audit + the
@@ -267,27 +279,29 @@ public actor BASSharedStateGraph {
             }
         } else {
             // Auto-claim: this agent becomes the canonical writer。
-            // Subsequent writes from other agents will throw
-            // writerIdentityMismatch even if their writeDomains
-            // includes this domain — preserves Single-Writer at
-            // system level without forcing explicit registerWriter
-            // call upfront。
-            domainWriters[domain] = agent.agentID
-            // chapter 九百五十六.7 SQL write-through (auto-claim)
+            // chapter 九百五十六.11 USER-PASS-4 CR2 fix:persist
+            // BEFORE mutating in-memory state — same rationale as
+            // registerWriter above。 If `upsertWriter` throws,no
+            // phantom in-memory claim is left behind。
             try await storage?.upsertWriter(
                 domain: domain, agentID: agent.agentID)
+            domainWriters[domain] = agent.agentID
         }
+        // chapter 九百五十六.11 USER-PASS-4 CR2 fix:persist object
+        // BEFORE bumping in-memory state + version counter。 If
+        // `upsertObject` throws,no phantom version increment is
+        // left behind (`domainVersions[domain]` stays at its prior
+        // value;next successful write continues from there)。
         let nextVersion = (domainVersions[domain] ?? 0) + 1
-        domainVersions[domain] = nextVersion
         let obj = BASStateGraphObject(
             domain: domain,
             objectID: objectID,
             payloadJson: payloadJson,
             lastWriterAgentID: agent.agentID,
             version: nextVersion)
-        objects[obj.ref] = obj
-        // chapter 九百五十六.7 SQL write-through (object)
         try await storage?.upsertObject(obj)
+        domainVersions[domain] = nextVersion
+        objects[obj.ref] = obj
         return obj
     }
 

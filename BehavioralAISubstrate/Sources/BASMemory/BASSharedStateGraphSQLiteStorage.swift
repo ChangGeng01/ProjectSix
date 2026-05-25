@@ -349,7 +349,31 @@ public actor BASSharedStateGraphSQLiteStorage:
                     sql: sql,
                     message: String(cString: sqlite3_errmsg(db)))
             }
-            out.append(try decodeObjectRow(stmt: stmt))
+            // chapter 九百五十六.11 USER-PASS-4 CR4 fix:tolerate
+            // unknown-domain rows during bulk load。 Previously a
+            // single legacy row whose `domain` rawValue no longer
+            // existed in `BASStateDomain` would throw and ABORT
+            // the entire `loadAllObjects()`,bricking session
+            // hydration on schema evolution。 Now we skip + log
+            // unknown rows + continue。 Callers that need strict
+            // schema enforcement can iterate `fetchObject(ref:)`
+            // per ref which still throws on unknown domain。
+            do {
+                out.append(try decodeObjectRow(stmt: stmt))
+            } catch StorageError.unknownDomain(let raw) {
+                // Skip + emit visible signal。 Logging via print
+                // is intentional — no structured logger in this
+                // module yet。
+                print(
+                    "[BASSharedStateGraphSQLiteStorage] " +
+                    "WARN ch956.11 CR4: skipping row with " +
+                    "unknown domain rawValue=\(raw) " +
+                    "during loadAllObjects()")
+                continue
+            }
+            // Other decode errors (corruptedRow etc.) still
+            // propagate — those are real corruption,not
+            // schema-evolution forward-compat。
         }
         return out
     }
