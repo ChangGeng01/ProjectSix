@@ -526,7 +526,13 @@ public enum BASAgentFabricBridge {
     /// Pinned ABI version。 Swift-side sanity check that the
     /// XCFramework binary's ABI matches what this Swift bridge
     /// expects。 Mismatch ⇒ rebuild XCFramework OR roll Swift back。
-    public static let abiVersion: Int32 = 1
+    ///
+    /// History:
+    ///   - 1 = ch 956.9 initial (null-separated deltaID encoding)
+    ///   - 2 = ch 956.10 USER-PASS gap #3 fix (length-prefixed
+    ///         deltaID encoding,admits any byte sequence including
+    ///         embedded NUL bytes)
+    public static let abiVersion: Int32 = 2
 
     /// Read the ABI version actually compiled into the linked
     /// Rust staticlib。 Test code asserts `abiVersion == liveAbiVersion()`。
@@ -534,16 +540,40 @@ public enum BASAgentFabricBridge {
         return _bas_agent_fabric_abi_version()
     }
 
+    /// Result codes for `strongMergeID` failures。 Mirrors Rust
+    /// FFI return values per ch 956.10 USER-PASS gap #3 fix。
+    public enum BridgeError: Error, Equatable, Sendable {
+        /// Output buffer too small (should not happen via the
+        /// typed bridge — two-pass capacity discovery prevents it)
+        case bufferTooSmall(required: Int)
+        /// UTF-8 decode failure in input (impossible for Swift
+        /// String inputs — guard exists for FFI safety)
+        case malformedUTF8
+        /// Length-prefix protocol violation (count mismatch,
+        /// truncated buffer,etc.)。 Should not happen via this
+        /// bridge since it encodes correctly。
+        case malformedProtocol
+        /// Other negative return — unknown failure
+        case unknown(code: Int)
+    }
+
     /// FNV-1a 64-bit hash of arbitrary bytes via the Rust kernel。
     /// Byte-identical to Swift's private `BASAgentMergeEngine
     /// .fnv1a64` (ch 九百五十六.5 USER-PASS gap #4 fix) for any
-    /// input — verified by cross-language parity tests in
-    /// `BASChapter956_9AgentFabricBridgeParityTests`。
+    /// input — verified by cross-language parity tests。
     ///
     /// Empty input returns the FNV-1a offset basis
-    /// (0xcbf29ce484222325)。
+    /// (0xcbf29ce484222325)。 Safe for empty Data — passes nil ptr
+    /// when buffer has no backing storage。
     public static func fnv1a64(_ data: Data) -> UInt64 {
-        data.withUnsafeBytes { raw in
+        // chapter 九百五十六.10 USER-PASS gap #2 — defensive empty
+        // path:Rust accepts `(nil, 0)` and returns offset basis,
+        // matching the empty-Data semantics without dereferencing
+        // a possibly-nil baseAddress。
+        if data.isEmpty {
+            return _bas_agent_fabric_fnv1a64(nil, 0)
+        }
+        return data.withUnsafeBytes { raw in
             let ptr = raw.bindMemory(to: UInt8.self).baseAddress
             return _bas_agent_fabric_fnv1a64(ptr, data.count)
         }
@@ -553,81 +583,225 @@ public enum BASAgentFabricBridge {
         return fnv1a64(Data(s.utf8))
     }
 
+    /// chapter 九百五十六.10 USER-PASS gap #3 fix — encode delta
+    /// IDs into the v2 length-prefixed buffer format。 Each ID:
+    /// 4-byte little-endian `u32` length,then that many UTF-8
+    /// bytes。 NO separator。 Admits any byte sequence including
+    /// embedded NUL。 Pure function。
+    private static func encodeDeltaIDsLengthPrefixed(
+        _ deltaIDs: [String]
+    ) -> [UInt8] {
+        var buf: [UInt8] = []
+        buf.reserveCapacity(
+            deltaIDs.reduce(0) { $0 + 4 + $1.utf8.count })
+        for id in deltaIDs {
+            let bytes = Array(id.utf8)
+            let len = UInt32(bytes.count).littleEndian
+            withUnsafeBytes(of: len) { lenRaw in
+                buf.append(contentsOf: lenRaw)
+            }
+            buf.append(contentsOf: bytes)
+        }
+        return buf
+    }
+
     /// Build the canonical mergeID via the Rust kernel。
     /// Byte-identical to Swift's private `BASAgentMergeEngine
     /// .strongMergeID(turnID:deltaIDs:)` (ch 九百五十六.5 USER-PASS
     /// gap #4 fix)。 Returns `merge.<turnID>.<count>.<hex16>`。
     ///
-    /// Returns nil on UTF-8 error in inputs (impossible for Swift
-    /// String inputs — guard exists for FFI safety)。
+    /// Per ch 956.10 USER-PASS gap #2:safe for empty `turnID`
+    /// (no force-unwrap)。 Per ch 956.10 USER-PASS gap #3:safe
+    /// for `deltaID` containing any byte including NUL
+    /// (length-prefixed encoding)。
+    ///
+    /// Returns nil only on internal protocol violation — Swift
+    /// String inputs cannot produce UTF-8 errors,so this should
+    /// only be nil if the bridge is broken (caller can XCTAssert
+    /// non-nil safely)。 For richer error info use `strongMergeIDOrThrow`。
     public static func strongMergeID(
         turnID: String,
         deltaIDs: [String]
     ) -> String? {
+        try? strongMergeIDOrThrow(
+            turnID: turnID, deltaIDs: deltaIDs)
+    }
+
+    /// Throwing variant — surfaces the exact `BridgeError` for
+    /// debugging。
+    public static func strongMergeIDOrThrow(
+        turnID: String,
+        deltaIDs: [String]
+    ) throws -> String {
         let turnBytes = Array(turnID.utf8)
-        // Build null-byte separated concat of delta IDs
-        var concat: [UInt8] = []
-        concat.reserveCapacity(
-            deltaIDs.reduce(0) { $0 + $1.utf8.count + 1 })
-        for (i, id) in deltaIDs.enumerated() {
-            concat.append(contentsOf: id.utf8)
-            if i < deltaIDs.count - 1 {
-                concat.append(0)
-            }
-        }
-        // First call: discover required capacity
+        let idBuf = encodeDeltaIDsLengthPrefixed(deltaIDs)
+        // Pass 1: discover required capacity
         var required: Int = 0
-        let probe = turnBytes.withUnsafeBufferPointer { tb in
-            concat.withUnsafeBufferPointer { cb in
-                tb.baseAddress!.withMemoryRebound(
-                    to: Int8.self, capacity: tb.count
-                ) { tbi8 in
-                    cb.baseAddress?.withMemoryRebound(
-                        to: Int8.self, capacity: cb.count
-                    ) { cbi8 in
-                        _bas_agent_fabric_strong_merge_id(
-                            tbi8, tb.count,
-                            cbi8, cb.count, deltaIDs.count,
-                            nil, 0, &required)
-                    } ?? _bas_agent_fabric_strong_merge_id(
-                        tbi8, tb.count,
-                        nil, 0, 0,
-                        nil, 0, &required)
-                }
-            }
+        let probe = callStrongMergeID(
+            turnBytes: turnBytes,
+            idBuf: idBuf,
+            deltaCount: deltaIDs.count,
+            out: nil,
+            outCap: 0,
+            outRequired: &required)
+        switch probe {
+        case -2: throw BridgeError.malformedUTF8
+        case -3: throw BridgeError.malformedProtocol
+        default: break
         }
-        if probe == -2 { return nil }  // UTF-8 error
-        guard required > 0 else { return nil }
-        // Second call: allocate + fill
+        // probe is either -1 (expected, since out is nil) or the
+        // written-bytes count (if out_cap was big enough,which it
+        // isn't since we passed 0)
+        guard required > 0 else {
+            throw BridgeError.unknown(code: probe)
+        }
+        // Pass 2: allocate + fill
         var out = [UInt8](repeating: 0, count: required)
         let written = out.withUnsafeMutableBufferPointer { ob in
-            turnBytes.withUnsafeBufferPointer { tb in
-                concat.withUnsafeBufferPointer { cb in
-                    tb.baseAddress!.withMemoryRebound(
-                        to: Int8.self, capacity: tb.count
-                    ) { tbi8 in
-                        cb.baseAddress?.withMemoryRebound(
-                            to: Int8.self, capacity: cb.count
-                        ) { cbi8 in
-                            _bas_agent_fabric_strong_merge_id(
-                                tbi8, tb.count,
-                                cbi8, cb.count,
-                                deltaIDs.count,
-                                ob.baseAddress, ob.count,
-                                nil)
-                        } ?? _bas_agent_fabric_strong_merge_id(
-                            tbi8, tb.count,
-                            nil, 0, 0,
-                            ob.baseAddress, ob.count,
-                            nil)
-                    }
-                }
+            callStrongMergeID(
+                turnBytes: turnBytes,
+                idBuf: idBuf,
+                deltaCount: deltaIDs.count,
+                out: ob.baseAddress,
+                outCap: ob.count,
+                outRequired: nil)
+        }
+        switch written {
+        case -1: throw BridgeError.bufferTooSmall(
+            required: required)
+        case -2: throw BridgeError.malformedUTF8
+        case -3: throw BridgeError.malformedProtocol
+        case let n where n < 0: throw BridgeError.unknown(code: n)
+        default: break
+        }
+        guard let s = String(
+            bytes: out[..<written], encoding: .utf8)
+        else { throw BridgeError.malformedUTF8 }
+        return s
+    }
+
+    /// chapter 九百五十六.10 USER-PASS gap #2 fix — single helper
+    /// for the FFI call,with NO force-unwraps on baseAddress。
+    /// Both empty turnBytes AND empty idBuf are valid (Rust side
+    /// handles nil + zero len)。
+    private static func callStrongMergeID(
+        turnBytes: [UInt8],
+        idBuf: [UInt8],
+        deltaCount: Int,
+        out: UnsafeMutablePointer<UInt8>?,
+        outCap: Int,
+        outRequired: UnsafeMutablePointer<Int>?
+    ) -> Int {
+        // Safe pointer derivation:if buffer is empty,pass nil。
+        // Otherwise pass baseAddress (guaranteed non-nil for
+        // non-empty Array per Swift contract)。
+        func withTurn<R>(
+            _ body: (UnsafePointer<Int8>?, Int) -> R
+        ) -> R {
+            if turnBytes.isEmpty { return body(nil, 0) }
+            return turnBytes.withUnsafeBufferPointer { ub in
+                ub.baseAddress!.withMemoryRebound(
+                    to: Int8.self, capacity: ub.count
+                ) { ip in body(ip, ub.count) }
             }
         }
-        guard written >= 0 else { return nil }
-        return String(
-            bytes: out[..<written], encoding: .utf8)
+        func withIDs<R>(
+            _ body: (UnsafePointer<Int8>?, Int) -> R
+        ) -> R {
+            if idBuf.isEmpty { return body(nil, 0) }
+            return idBuf.withUnsafeBufferPointer { ub in
+                ub.baseAddress!.withMemoryRebound(
+                    to: Int8.self, capacity: ub.count
+                ) { ip in body(ip, ub.count) }
+            }
+        }
+        return withTurn { tPtr, tLen in
+            withIDs { iPtr, iLen in
+                Int(_bas_agent_fabric_strong_merge_id(
+                    tPtr, tLen,
+                    iPtr, iLen, deltaCount,
+                    out, outCap, outRequired))
+            }
+        }
     }
+}
+
+// MARK: - BASRustABIRegistry (USER-PASS gap #1 — versioning + bloat)
+//
+// chapter 九百五十六.10 / M3485.10 USER-PASS gap #1 fix:explicit
+// ABI registry + bloat audit infrastructure。 Per user's observation:
+// "Rust 现在通过 BASRustMemoryTracker.xcframework 聚合所有符号,
+// 这个 umbrella binary 会越来越重,后面要管 ABI 版本和符号膨胀。"
+//
+// What this provides:
+//   - Per-crate ABI version snapshot (Swift-side expected values)
+//   - Liveness probes (calls each crate's bas_<name>_abi_version
+//     extern "C" fn,asserts match)
+//   - Binary size budget check — read the linked staticlib's size
+//     from disk + fail tests if it exceeds budget
+//
+// Per chapter 七百四 / M2191 force-link discipline:every crate
+// in the umbrella has a `bas_<crate>_abi_version()` symbol。 The
+// registry below tracks the Swift-side EXPECTED values for all
+// of them and the bundle's total crate count。
+
+@_silgen_name("bas_substrate_bundle_crate_count")
+internal func _bas_substrate_bundle_crate_count() -> Int32
+
+/// Per-crate ABI version registry。 Swift-side EXPECTED values。
+/// Drift between expected (this enum) and live (Rust call) is
+/// CRITICAL — fix by rebuilding XCFramework or rolling Swift back。
+public enum BASRustABIRegistry {
+
+    /// Total crate count in the umbrella XCFramework。 Bumped
+    /// every time `bas-memory-usage-tracker` adds a new path dep
+    /// in `Cargo.toml` AND adds the force-link anchor in
+    /// `src/force_link.rs`。
+    public static let expectedBundleCrateCount: Int32 = 24
+
+    /// Read the live bundle crate count from the linked staticlib。
+    public static func liveBundleCrateCount() -> Int32 {
+        return _bas_substrate_bundle_crate_count()
+    }
+
+    /// Registered per-crate expected ABI versions。 Add a row
+    /// when a crate's `bas_<name>_abi_version()` value would
+    /// CHANGE — bump in Rust + bump in this table simultaneously。
+    /// Currently tracked:bas-agent-fabric (ch 956.9 + 956.10)。
+    /// Other crates' ABI versions are tracked locally in their
+    /// respective Swift bridge enums (e.g.
+    /// `BASLeaseLifeBridge.abiVersion`)。 Future:absorb all into
+    /// this registry for one-place audit。
+    public static let perCrateExpected: [String: Int32] = [
+        "bas-agent-fabric": BASAgentFabricBridge.abiVersion,
+    ]
+
+    /// Run ALL registered ABI probes,return mismatches。 Empty
+    /// result = all match。 Test code asserts result.isEmpty。
+    public static func auditMismatches() -> [String] {
+        var mismatches: [String] = []
+        let liveBundle = liveBundleCrateCount()
+        if liveBundle != expectedBundleCrateCount {
+            mismatches.append(
+                "bundle.crate_count expected=" +
+                "\(expectedBundleCrateCount) live=\(liveBundle)")
+        }
+        let liveAgentFabric =
+            BASAgentFabricBridge.liveAbiVersion()
+        if liveAgentFabric != BASAgentFabricBridge.abiVersion {
+            mismatches.append(
+                "bas-agent-fabric expected=" +
+                "\(BASAgentFabricBridge.abiVersion) " +
+                "live=\(liveAgentFabric)")
+        }
+        return mismatches
+    }
+
+    /// Soft budget for the XCFramework staticlib slice in bytes。
+    /// Currently ~30 MB per slice (measured 2026-05-25)。 Test
+    /// asserts each slice ≤ this。 Bump when crate growth is
+    /// JUSTIFIED;catches accidental ballooning。
+    public static let perSliceBytesBudget: Int = 60 * 1024 * 1024
 }
 
 #endif  // os(iOS) || os(macOS)

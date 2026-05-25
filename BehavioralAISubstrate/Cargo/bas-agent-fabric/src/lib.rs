@@ -54,10 +54,18 @@ pub use fnv::fnv1a64;
 pub use topo::{topological_sort, TopoOutcome};
 pub use winner::{pick_winner, Delta, MergePriorityTier, PriorityContext};
 
-/// ABI version surfaced for the Swift bridge sanity check (once
-/// FFI wiring lands)。 Bump when the public Rust surface changes
-/// in a way that breaks the Swift-side @_silgen_name declarations。
-pub const ABI_VERSION: i32 = 1;
+/// ABI version surfaced for the Swift bridge sanity check。 Bump
+/// when the public Rust surface changes in a way that breaks the
+/// Swift-side @_silgen_name declarations。
+///
+/// History:
+///   - 1 = chapter 九百五十六.9 / M3485.9 initial (null-separated
+///         deltaID encoding for strong_merge_id)
+///   - 2 = chapter 九百五十六.10 / M3485.10 USER-PASS gap #3 fix
+///         (length-prefixed deltaID encoding: NUL bytes inside
+///         deltaIDs no longer cause split ambiguity)。 Caller now
+///         passes u32 little-endian length prefix per deltaID。
+pub const ABI_VERSION: i32 = 2;
 
 // MARK: - Strong mergeID helper
 

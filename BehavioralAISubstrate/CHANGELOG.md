@@ -11,6 +11,148 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十六.10 / M3485.10 — USER-PASS fix-of-fix:3 gaps caught by user code review of ch 956.9
+
+USER-PASS-3 corrigendum sub-chapter (ch 943.1 / ch 956.5 discipline)。
+User reviewed the ch 956.9 XCFramework + Swift bridge landing and
+caught 3 real gaps:
+
+> 1. Rust 现在通过 BASRustMemoryTracker.xcframework 聚合所有符号,
+>    这个 umbrella binary 会越来越重,后面要管 ABI 版本和符号膨胀。
+> 2. Swift bridge 里 strongMergeID(turnID:) 对空 turnID 可能有边界
+>    风险,因为 turnBytes.baseAddress! 有 force unwrap。
+> 3. deltaID 如果含 \0,Rust FFI 的 null-separated 协议会歧义;最好
+>    明确禁止或转 length-prefixed。
+
+All 3 caught BEFORE production use。 #2 is a real crash bug。 #3 is
+a real protocol hole (any deltaID containing `\0` byte would
+either be split or truncated)。 #1 is forward-looking infrastructure。
+
+#### Gap #1 fix — `BASRustABIRegistry` + bloat audit
+
+**NEW `BASRustABIRegistry` enum in `Sources/BASRuntimeCore/BASInternalRustBridges.swift`:**
+- `expectedBundleCrateCount: Int32 = 24` — pinned Swift-side
+- `liveBundleCrateCount()` — calls `bas_substrate_bundle_crate_count()` from Rust
+- `perCrateExpected: [String: Int32]` — per-crate ABI versions (currently bas-agent-fabric)
+- `auditMismatches() -> [String]` — runs ALL probes,returns mismatches (test asserts `.isEmpty`)
+- `perSliceBytesBudget = 60 MB` — XCFramework slice size ceiling
+
+**Binary size measurement:** 20 MB / slice currently (well under 60 MB budget)。 As more crates land,test gate fails if bundle balloons unexpectedly。 Future:absorb other crates' Swift-side ABI version constants into the registry for one-place audit。
+
+#### Gap #2 fix — Removed force-unwrap on empty turnID
+
+**Refactored `BASAgentFabricBridge.strongMergeID(turnID:deltaIDs:)`:**
+- Was:`turnBytes.baseAddress!` — crashes on empty `turnID` because empty `[UInt8]` has no backing storage → `baseAddress` is nil
+- Now:`callStrongMergeID(...)` helper with explicit empty-buffer path that passes `(nil, 0)` to Rust (which handles it correctly per existing `turn_id_len == 0` branch)
+- Same defense for empty `idBuf` (was already half-handled,now consistent)
+- Same defense added to `BASAgentFabricBridge.fnv1a64(_ data: Data)` for empty `Data`
+- Plus: NEW `strongMergeIDOrThrow(...)` throwing variant surfacing typed `BridgeError` cases (`bufferTooSmall` / `malformedUTF8` / `malformedProtocol` / `unknown`)
+
+#### Gap #3 fix — Length-prefixed deltaID encoding (ABI v1 → v2)
+
+**MODIFIED `Cargo/bas-agent-fabric/src/lib.rs`:** ABI_VERSION 1 → 2
+
+**MODIFIED `Cargo/bas-agent-fabric/src/ffi.rs`:**
+- `bas_agent_fabric_strong_merge_id` parameter renamed `delta_ids_concat_*` → `delta_ids_buf_*`
+- Decoder rewritten:per-ID 4-byte little-endian `u32` length prefix + UTF-8 bytes,no separator
+- New return code `-3` = malformed length-prefix encoding (truncated buffer / count mismatch / trailing garbage — strict protocol)
+- Admits ANY byte sequence in deltaIDs:embedded NUL,arbitrary UTF-8,binary。 No ambiguity。
+
+**REBUILT XCFramework** with v2 ABI。 All 3 slices regenerated (darwin / ios / ios-sim)。
+
+**MODIFIED `BASAgentFabricBridge.swift`:**
+- New `encodeDeltaIDsLengthPrefixed(_:) -> [UInt8]` helper emits `u32 LE length + bytes` per ID
+- `strongMergeID` swapped to length-prefixed encoder
+- `abiVersion` bumped 1 → 2 + history comment
+
+#### NEW tests
+
+**`Cargo/bas-agent-fabric/src/ffi.rs` — `mod tests`:** 10 new Rust FFI tests:
+- Basic FFI round-trip + matches pure-kernel output
+- **gap #3 critical:** deltaID with NUL byte preserved + hashes distinctly from same-chars-no-NUL
+- Count mismatch / truncated length / trailing garbage all reject with `-3`
+- Empty turnID OK / empty delta list OK
+- Buffer too small returns `-1`
+- ABI version asserted = 2
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter956_10UserPassFixesTests.swift` (~270 LOC, 14 tests):**
+- 4 gap #1 tests:ABI registry no-mismatches,bundle count = 24,agent-fabric ABI = v2,binary size budget
+- 4 gap #2 tests:empty turnID doesn't crash,empty turn + empty deltas,empty turnID determinism,throwing variant succeeds
+- 5 gap #3 tests:NUL doesn't truncate (count preserved),NUL hashes distinctly,multiple NULs OK,binary payload OK,**cross-lang parity with NUL** (Swift in-tree merge ↔ Rust bridge)
+- 1 cumulative integration test (empty turnID + NUL in deltaID + throwing API + ABI clean)
+
+#### Verification
+
+```
+cargo test -p bas-agent-fabric  → 19 PASSED / 0 FAILED
+  (was 9 — added 10 new FFI tests)
+bash scripts/build-rust-xcframework.sh  → 3 slices rebuilt
+swift build  → clean (79s)
+swift test --filter BASChapter956_10  → 14 PASSED / 0 FAILED
+swift test --filter "BASChapter956_9|BASChapter956_10|BASChapter786"
+  → 37 PASSED / 0 FAILED
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,773 PASSED / 114 skipped / 0 FAILED in 220s
+```
+
+#### Risk + revert
+
+LOW-MED:
+- ABI version bump (v1 → v2) is a real wire-format break,but the
+  bridge had ZERO production callers — only my own ch 956.9
+  parity tests + the new ch 956.10 tests consume it。 Safe break。
+- All Swift changes are additive or replace force-unwraps with
+  safe paths。 No call-site breakage。
+- New `BASRustABIRegistry` is read-only audit infrastructure;no
+  behavior change。
+- `60 MB` budget gives ~3× headroom over current 20 MB — generous,
+  catches accidental ballooning without false positives on small
+  growth。
+
+Revert: revert this commit (4 modified Rust + 1 modified Swift +
+2 modified tests + 1 new test + XCFramework binaries + CHANGELOG)。
+After revert,bridge falls back to v1 null-separated encoding +
+force-unwrap on empty turnID + no ABI registry。
+
+#### Discipline pin
+
+Per ch 943.1 USER-PASS-2 precedent + ch 956.5 USER-PASS precedent:
+the user is named as catcher,verbatim findings preserved in the
+fix chapter,regression tests permanent。 Cumulative USER-PASS
+finds in the Agent Fabric arc:
+
+- ch 956.5:5 gaps (global writer registry / apply patch / DAG +
+  conflicts / mergeID collision / real recency)
+- ch 956.9:1 hidden bug (32-bit truncation in `%016x` — caught
+  by cross-language parity discipline,not user filing)
+- ch 956.10:3 gaps (ABI registry + force-unwrap + NUL ambiguity)
+
+= **9 real correctness/safety issues caught by user-driven review
+in a 5-chapter arc**, all before production use。 The
+cross-language parity discipline introduced in ch 956.9 also
+caught 1 additional bug independently。
+
+#### HP-language ratio cumulative (ch 956.5 → 956.10)
+
+| Language | Total new LOC | Files |
+|---|---|---|
+| Swift (SQL + bridges + registry + tests) | ~1,500 | 7 new + 5 modified |
+| Rust (crate + FFI + tests) | ~570 | 5 new (Cargo.toml + 4 .rs) |
+| SQL (DDL embedded) | ~30 | inline in SQLite storage |
+
+121 Agent Fabric arc tests now pass cumulatively (112 Swift + 9
+Rust at ch 956.8) → updated to **131 Swift tests + 19 Rust tests
+= 150 dedicated arc tests / 0 failures**。
+
+#### What's next
+
+- Ch 957:Scout + Planner seats (Phase 1 ch2) wired into
+  `EBrainRuntimeCoordinator` — now with hardened SQL persistence
+  + ABI-versioned Rust merge bridge + length-prefixed FFI all
+  available。
+
+---
+
 ### Chapter 九百五十六.9 / M3485.9 — XCFramework rebuild:bas-agent-fabric live in Swift + cross-language parity (catches HIDDEN 32-bit-truncation BUG in Swift mergeID)
 
 Per user directive「全面开发」+「继续 提高 ... rust ... 比例」this

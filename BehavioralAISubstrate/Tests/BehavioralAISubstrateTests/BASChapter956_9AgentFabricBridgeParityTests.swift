@@ -39,9 +39,10 @@ final class BASChapter956_9AgentFabricBridgeParityTests:
             "ch 956.9: Swift-side ABI expectation MUST match " +
             "linked Rust staticlib's actual ABI")
         XCTAssertEqual(
-            BASAgentFabricBridge.liveAbiVersion(), 1,
-            "ch 956.9: Rust crate ABI pinned at v1 — bump " +
-            "requires updating Swift bridge in tandem")
+            BASAgentFabricBridge.liveAbiVersion(), 2,
+            "ch 956.10: Rust crate ABI bumped to v2 with " +
+            "length-prefixed deltaID encoding (gap #3 fix) — " +
+            "bump requires updating Swift bridge in tandem")
     }
 
     // MARK: - FNV-1a canonical vectors
