@@ -11,6 +11,119 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十七 / M3490 — Phase 1 ch2:Scout + Planner seats (pure-fn wrappers)
+
+First step toward per-turn Agent Fabric integration。 Per the
+Phase 1 plan,Scout (front-edge L1/L6 observer) and Planner
+(L9 candidate proposer) are the smallest pair that proves the
+seat wrapper pattern works end-to-end on the merge engine + state
+graph plumbing landed in Phase 0 + ch 956.x。
+
+#### Design choice:pure-fn seats taking slim DTOs
+
+The plan called for "thin wrappers over L1/L6 (Scout) and L9
+loopService (Planner) that read shared state graph + write
+`BASAgentDelta`"。 Concrete shape chosen:
+
+- **Pure static `emit()` functions** — no actor isolation hop,
+  no I/O,trivially testable + fastest possible per-turn path
+- **Slim DTO inputs** (`BASScoutInput`,`BASPlannerCandidate`) —
+  decoupled from `BASOrchestration` types (which already import
+  `BASMemory`,so we cannot import back)。 Coordinator adapter
+  (ch 958+) builds these DTOs from the live L7 / L9 outputs in
+  one line
+- **Per-turn seq counter (inout Int)** — both seats share the
+  same per-turn `seq` space so deltaIDs are unique across seats
+  in the same turn
+- **No coordinator wire yet** — `EBrainRuntimeCoordinator` is
+  not touched in this chapter。 Phase 1 ch3 (or ch 958) wires
+  the full per-turn dispatcher
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASScoutSeat.swift` (~245 LOC):**
+- `BASScoutInput` Sendable + Equatable + Codable DTO with
+  pressure / manipulation / boundary / contradiction signal
+  fields + `isEmpty` convenience
+- `BASScoutSeat.emit(from:turnID:agentSpec:seq:nowNanos:)` pure
+  fn:emits 0-4 `BASAgentDelta` (one per active signal cluster)
+  for `.situationField` domain
+- Cluster confidence scales by signal count,capped at 1.0
+- Reason codes accumulate evidence prefixes
+  (`scout.pressure`,`evidence.signal-count=N`,etc.) for the
+  audit ledger
+- Deterministic JSON payload encoding (sorted signals,no Date
+  stamps) for ch 956.5 strong-mergeID hash invariance
+- Private file-scope `String.escapeForJSON()` extension for
+  quote / backslash / newline / tab handling
+
+**NEW `Sources/BASMemory/BASPlannerSeat.swift` (~190 LOC):**
+- `BASPlannerCandidate` Sendable + Equatable + Codable DTO
+  mirroring `BASCandidatePath` (without the BASOrchestration dep)
+- `BASPlannerSeat.emit(from:turnID:agentSpec:seq:nowNanos:)` pure
+  fn:emits 1 delta per candidate (`type=.add`) for
+  `.candidateFrontier` domain
+- Confidence flows directly from candidate (clamped to [0,1])
+- Reason codes:`planner.propose` always + conditional
+  `planner.reversible-high` (≥0.7) + `planner.net-positive`
+  (benefit>cost)
+- `formatDouble(_:)` uses `%.6f` for stable cross-run formatting
+  (critical for byte-equal payloads)
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter957ScoutPlannerSeatTests.swift` (~340 LOC, 14 tests):**
+
+| Test | What it pins |
+|---|---|
+| `testScout_EmptyInputEmitsZeroDeltas` | zero-emission path + `isEmpty` |
+| `testScout_PressureClusterEmitsOneDelta` | 1 active cluster → 1 delta, full payload shape |
+| `testScout_AllFourClustersEmitFourDeltas` | 4 simultaneous clusters,seq counter preserved mid-stream |
+| `testScout_DeterministicPayloadAcrossCalls` | byte-equal output for mergeID invariance |
+| `testScout_CreatedAtNanosPropagates` | ch 956.5 gap #5 recency tie-break wiring |
+| `testScout_JSONEscapeHandlesQuotesAndBackslash` | parseable JSON with weird input |
+| `testScout_ConfidenceCappedAt1` | confidence ceiling honored |
+| `testPlanner_EmptyFrontierEmitsZero` | zero-candidate turn OK |
+| `testPlanner_OneCandidateOneDelta` | full delta shape with all reason codes |
+| `testPlanner_ConfidenceClampedToZeroOne` | bad upstream confidence handled |
+| `testPlanner_NoReversibleHighWhenLow` | reason-code threshold |
+| `testPlanner_DeterministicPayload` | byte-equal payload incl. `%.6f` formatting |
+| `testPlanner_PayloadIsValidJSON` | escape handles quotes / backslash / newline |
+| `testCombined_ScoutAndPlannerInSameTurn` | shared seq counter + end-to-end merge + apply to graph (1 scout + 2 planner = 3 deltas accepted + 3 state objects) |
+
+#### Verification
+
+```
+swift build  → clean (86s)
+swift test --filter BASChapter957  → 14 PASSED / 0 FAILED in 0.02s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,803 PASSED + 1 known flake (BASChapter869 MPSGraph warm-cache,
+     re-run in isolation: 10 PASSED) / 115 skipped / 0 regressions in 380s
+```
+
+Cumulative Agent Fabric arc count:**126 Swift tests + 22 Rust tests
+= 148 dedicated arc tests / 0 failures**。
+
+#### Risk + revert
+
+LOW:
+- Two new source files,zero touches to existing files
+- No coordinator integration → no per-turn touch → ZERO impact
+  on existing 13.8K test baseline (the 1 failure was a pre-existing
+  perf flake unrelated to ch 957)
+- DTO + pure-fn design has no actor surface,no async,no I/O,no
+  shared state — easiest possible code to reason about
+
+Revert:revert this single commit (2 new source files + 1 new test
+file + CHANGELOG)。
+
+#### What's next
+
+Phase 1 ch3 (ch 958 candidate) wires Risk + Surface seats with the
+same pure-fn pattern,then ch 959 lands the coordinator integration
++ `BASAgentTraceLog` (event-sourced replay log) + ADR-014 OPT-IN
+flag + iPhone Air 10-min smoke for Phase 1 close。
+
+---
+
 ### Chapter 九百五十六.11 / M3485.11 — USER-PASS-4:全面 3-agent review of ch 956.5→956.10 catches 4 CRITICAL + 6 HIGH + 10+ test gaps
 
 Per user directive「全面 review 测试 修复 开发」 dispatched 3 parallel
