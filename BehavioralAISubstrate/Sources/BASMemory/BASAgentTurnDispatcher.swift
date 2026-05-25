@@ -203,9 +203,17 @@ public struct BASAgentTurnRoster: Sendable {
 
 public enum BASAgentTurnDispatcher {
 
-    /// Dispatch one turn:invoke all 4 seats with a shared seq
+    /// Dispatch one turn:invoke UP TO 8 SEATS with a shared seq
     /// counter,merge their deltas,apply accepted deltas to the
     /// state graph,optionally record events to the trace log。
+    ///
+    /// chapter 九百六十四.5 USER-PASS-5 D3 doc-fix:was "all 4
+    /// seats" — ch 961 added Memory + Critic,ch 963 added
+    /// HostAlignment,ch 964 added SovereignSentinel。 Canonical
+    /// 8-seat order is Scout → Planner → Memory → Critic →
+    /// HostAlign → Risk → Surface → SovereignSentinel (sentinel
+    /// LAST per Root Law 4)。 Seats are invoked only when BOTH
+    /// the roster slot AND the input DTO are non-nil。
     ///
     /// - Parameters:
     ///   - input: per-turn DTO bundle
@@ -226,11 +234,15 @@ public enum BASAgentTurnDispatcher {
         var seq = 0
         var emitted: [BASAgentDelta] = []
 
-        // Phase A: emit deltas from all 4 seats in canonical order
-        // (Scout → Planner → Risk → Surface)。 The seat ORDER
-        // doesn't affect merge result — merge engine sorts /
-        // resolves by priority + recency,not by emission order —
-        // but a stable order makes the trace log reproducible。
+        // Phase A: emit deltas from up to 8 seats in canonical order
+        // (Scout → Planner → Memory → Critic → HostAlign → Risk →
+        // Surface → SovereignSentinel)。 The seat ORDER doesn't
+        // affect merge result — merge engine sorts / resolves by
+        // priority + recency,not by emission order — but a stable
+        // order makes the trace log reproducible。 Sentinel runs
+        // LAST per Root Law 4 (单主权)。
+        // chapter 九百六十四.5 USER-PASS-5 D3 fix:corrected stale
+        // "4 seats" comment that ch 961/963/964 never updated。
         emitted.append(contentsOf: BASScoutSeat.emit(
             from: input.scout,
             turnID: input.turnID,

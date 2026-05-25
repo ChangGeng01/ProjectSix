@@ -30,6 +30,12 @@ import Foundation
 /// coordinator needs to dispatch one turn。 Value-type wrapper
 /// over (roster + graph + optional trace log)。
 ///
+/// chapter 九百六十四.5 USER-PASS-5 D1 doc-fix:was "4-seat
+/// roster" from ch 960 — ch 961 added Memory + Critic,ch 963
+/// added HostAlignment,ch 964 added SovereignSentinel。 Roster
+/// now carries UP TO 8 agents (4 mandatory + 4 optional via
+/// roster's defaulted-nil slots)。
+///
 /// chapter 九百六十 USER-PASS-N reminder:if a future review flags
 /// "the bundle hides which agent is the writer" — that's by
 /// design;the dispatcher passes the roster + agent map to the

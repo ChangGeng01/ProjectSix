@@ -143,7 +143,21 @@ public actor BASAgentTraceLog {
     public func append(_ event: BASAgentTraceEvent) -> Int64 {
         let assignedSeq: Int64
         if event.sequenceNumber == 0 {
-            let next = (nextSeqByTurn[event.turnID] ?? 0) + 1
+            // chapter 九百六十四.5 USER-PASS-5 H4 fix:guard against
+            // Int64 overflow on the `+1` after `Int64.max`。 Caller
+            // injecting `sequenceNumber: Int64.max` via the replay
+            // path would pin the high-water mark + subsequent
+            // auto-increments would trap。 Saturate at Int64.max
+            // instead — caller's downstream consumer sees a
+            // duplicate-seq event (audit-detectable) rather than
+            // a crash。
+            let curr = nextSeqByTurn[event.turnID] ?? 0
+            let next: Int64
+            if curr == Int64.max {
+                next = Int64.max
+            } else {
+                next = curr + 1
+            }
             nextSeqByTurn[event.turnID] = next
             assignedSeq = next
         } else {
@@ -166,6 +180,17 @@ public actor BASAgentTraceLog {
         if events.count > maxEvents {
             let drop = events.count - maxEvents
             events.removeFirst(drop)
+            // chapter 九百六十四.5 USER-PASS-5 H2 fix:prune
+            // nextSeqByTurn entries whose turnID no longer appears
+            // in any surviving event。 Without this prune,a
+            // long-running session that issues many distinct
+            // turnIDs leaks unbounded memory into the map even as
+            // the events array stays capped — violates ch 956.11
+            // H2 DoS-bound discipline。
+            let survivingTurnIDs = Set(events.map { $0.turnID })
+            nextSeqByTurn = nextSeqByTurn.filter { kv in
+                survivingTurnIDs.contains(kv.key)
+            }
         }
         return assignedSeq
     }

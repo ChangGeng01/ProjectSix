@@ -276,7 +276,7 @@ final class BASChapter962EvidenceDebtFuzzTests: XCTestCase {
             graph: BASSharedStateGraph())
         // Critic MUST flag SEVERE
         let critic = result.evidenceDebt
-            .critiqueByCandidateID["highstakes-1"]
+            .critiqueByCandidateID["highstakes1"]
         XCTAssertEqual(
             critic, .severe,
             "ch 962: cost>2×benefit + low reversibility → SEVERE")
@@ -300,7 +300,7 @@ final class BASChapter962EvidenceDebtFuzzTests: XCTestCase {
         // Safe candidate has NO entry in the map
         XCTAssertNil(
             result.evidenceDebt
-                .critiqueByCandidateID["c-safe"])
+                .critiqueByCandidateID["csafe"])
     }
 
     func testScenario_MemoryConflictRecall() async {
@@ -334,7 +334,7 @@ final class BASChapter962EvidenceDebtFuzzTests: XCTestCase {
             graph: BASSharedStateGraph())
         XCTAssertEqual(
             result.evidenceDebt
-                .critiqueByCandidateID["mild-1"],
+                .critiqueByCandidateID["mild1"],
             .mild,
             "ch 962: strict superego + cost>0.5 → MILD")
     }
@@ -378,14 +378,14 @@ final class BASChapter962EvidenceDebtFuzzTests: XCTestCase {
             roster: roster, graph: graph)
         XCTAssertEqual(
             t1Result.evidenceDebt
-                .critiqueByCandidateID["highstakes-1"],
+                .critiqueByCandidateID["highstakes1"],
             .severe)
         // Turn 2: simulated re-proposal of same candidate
         // (in real ch 963+ Planner-v2 would have read t1's
         // evidence-debt + decided NOT to re-propose, but here
         // we just verify the debt is queryable for the decision)
         let t1CritiqueForCand = t1Result.evidenceDebt
-            .critiqueByCandidateID["highstakes-1"]
+            .critiqueByCandidateID["highstakes1"]
         XCTAssertNotNil(t1CritiqueForCand,
             "ch 962: turn-2 caller CAN query turn-1's critique " +
             "by candidate ID — cross-turn evidence flow ready")

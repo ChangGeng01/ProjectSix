@@ -187,8 +187,17 @@ public enum BASSovereignSentinelSeat {
                 deltaID:
                     "delta.\(turnID).sovereign.\(seq)",
                 agentID: agentSpec.agentID,
+                // chapter 九百六十四.5 USER-PASS-5 H3 fix:reserved
+                // turn-level objectID uses a control character (\u{1F})
+                // unit-separator prefix that NO valid candidateID can
+                // contain (per-seat candidate IDs are caller-supplied
+                // user-space strings;control chars are not used by
+                // any existing emit path)。 Previously the literal
+                // suffix "TURN-LOCKDOWN" could collide with a
+                // candidate of that exact ID。
                 targetObjectRef:
-                    "sovereignVerdict#sv-\(turnID)-TURN-LOCKDOWN",
+                    "sovereignVerdict#sv-\(turnID)-" +
+                    "\u{001F}TURN-LOCKDOWN",
                 deltaType: .merge,
                 patchJson:
                     "{\"scope\":\"turn\"," +
@@ -203,6 +212,14 @@ public enum BASSovereignSentinelSeat {
         }
         return out
     }
+
+    /// chapter 九百六十四.5 — substring tests + ref consumers can
+    /// recognize the reserved turn-level lockdown marker via this
+    /// constant。 No caller can produce this byte sequence in a
+    /// candidateID since the seat-emit path doesn't accept control
+    /// chars + the marker starts with U+001F unit separator。
+    public static let turnLockdownRefSuffix: String =
+        "-\u{001F}TURN-LOCKDOWN"
 
     // MARK: - Veto assessment rule
 

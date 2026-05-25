@@ -111,11 +111,26 @@ public enum BASAgentFabricAdapters {
     /// turn metadata。 Convenience over the per-seat adapters。
     /// `acceptedCandidateID` is typically the L9 winner's id (or
     /// nil for turns with no candidate)。
+    ///
+    /// chapter 九百六十四.5 USER-PASS-5 D2 fix:added optional
+    /// `memory`,`critic`,`hostAlignment`,`sovereignSentinel`
+    /// parameters。 Previously the coordinator's
+    /// `runAgentFabricObservation` could only wire 4 seats —
+    /// Memory/Critic/HostAlign/Sovereign were unreachable through
+    /// the coordinator even when their roster slots were set。
+    /// Now coordinators can pass pre-built DTOs from their L8/
+    /// triSelf/host-constitution/sovereign-state adapters。
+    /// Defaulted nil preserves prior 4-seat caller compat。
     public static func turnInput(
         turnID: String,
         decomposeFrame: BASDecomposeFrame,
         candidatePaths: [BASCandidatePath],
         acceptedCandidateID: String?,
+        memory: BASMemorySeatInput? = nil,
+        critic: BASCriticSeatInput? = nil,
+        hostAlignment: BASHostAlignmentInput? = nil,
+        sovereignSentinel:
+            BASSovereignSentinelInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -130,7 +145,31 @@ public enum BASAgentFabricAdapters {
                 candidates: candidatePaths),
             surface: surfaceInputObservationMode(
                 acceptedCandidateID: acceptedCandidateID),
+            memory: memory,
+            critic: critic,
+            hostAlignment: hostAlignment,
+            sovereignSentinel: sovereignSentinel,
             priorityContext: priorityContext,
             nowNanos: nowNanos)
+    }
+
+    /// Build a `BASCriticSeatInput` from candidate paths + a
+    /// caller-supplied superego activity level。 Maps 1:1 from
+    /// `BASCandidatePath` benefit/cost/reversibility to
+    /// `BASCriticCandidate` fields。
+    public static func criticInput(
+        from paths: [BASCandidatePath],
+        superegoActiveLevel: Double = 0.5
+    ) -> BASCriticSeatInput {
+        BASCriticSeatInput(
+            candidates: paths.map { p in
+                BASCriticCandidate(
+                    candidateID: p.candidateID,
+                    title: p.title,
+                    expectedBenefit: p.expectedBenefit,
+                    expectedCost: p.expectedCost,
+                    reversibility: p.reversibility)
+            },
+            superegoActiveLevel: superegoActiveLevel)
     }
 }

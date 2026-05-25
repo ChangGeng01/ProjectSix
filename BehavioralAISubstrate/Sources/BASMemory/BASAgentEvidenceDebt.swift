@@ -183,18 +183,26 @@ public struct BASAgentEvidenceDebt:
 
     /// Parse `candidateID` out of `"critiqueField#cf-<turnID>-<candID>"`。
     /// Returns nil if the ref doesn't match the expected shape。
+    ///
+    /// chapter 九百六十四.5 USER-PASS-5 C1 fix:was buggy split on
+    /// FIRST dash — broke whenever turnID contained a dash (which
+    /// is the production-typical pattern for timestamp/ULID/UUID
+    /// turnIDs)。 silent corruption of `critiqueByCandidateID` map
+    /// keying。 Now splits on LAST dash:turnID may contain any
+    /// number of dashes,candidateID must not contain any (which
+    /// is the seat-emit invariant since `BASCriticSeat.swift` builds
+    /// refs as `"critiqueField#cf-\(turnID)-\(candidateID)"`)。
+    /// Per ch 964.5 doc:**candidateID MUST NOT contain `-`** to
+    /// preserve round-trip;seats will document this constraint。
     private static func extractCandidateID(
         fromCritiqueRef ref: String
     ) -> String? {
-        // Strip "critiqueField#cf-" prefix
         let prefix = "critiqueField#cf-"
         guard ref.hasPrefix(prefix) else { return nil }
         let after = String(ref.dropFirst(prefix.count))
-        // After is "<turnID>-<candID>" — turnID is single dash-free
-        // token in our seat impl,but candID itself may contain
-        // dashes。 Heuristic:split on FIRST dash from left,take
-        // everything after as candID。
-        guard let dash = after.firstIndex(of: "-")
+        // Split on LAST dash — turnID may contain dashes,
+        // candidateID may not (seat-emit invariant)。
+        guard let dash = after.lastIndex(of: "-")
         else { return nil }
         let candID = String(after[
             after.index(after: dash)...])

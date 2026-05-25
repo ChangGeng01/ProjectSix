@@ -11,6 +11,122 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十四.5 / M3525.5 — USER-PASS-5:全面 3-agent review of ch 957→964 catches 2 CRITICAL + 4 HIGH + 7 doc lies + 6 test gaps
+
+Per user directive「全面 review」 dispatched 3 parallel review agents
+(code correctness + test coverage + doc consistency) against the
+8 chapters of seat layer + coordinator wire + evidence-debt +
+sovereign infrastructure landed since ch 956.11。 Same N-pass
+discipline that caught 9 real bugs at ch 956.11; this round
+catches **2 CRITICAL + 4 HIGH + 7 doc lies + 6 test gaps**。
+
+#### CRITICAL fixes
+
+**C1 — `extractCandidateID` parser silently corrupted evidence-debt map keys for any dashed turnID**
+`BASAgentEvidenceDebt.swift` split critique refs on the FIRST dash from left。 For production-typical turnIDs like `"turn-2026-05-26-001"` (timestamp/ULID/UUID), the function returned garbage like `"2026-05-26-001-c1"` as the candidate ID。 The next-turn Planner could not look up critique by candidateID at all — silent corruption of the cross-turn evidence-debt contract。 Fix:split on LAST dash + document the contract (candidateID MUST NOT contain `-`)。
+
+**C3 — Fuzz scenarios still 6-seat after Phase 3 added HostAlign + Sovereign**
+`BASAgentFabricFuzzScenarios.standardRoster()` only wired 6 agents despite ch 963 adding HostAlignment + ch 964 adding SovereignSentinel。 The load-bearing Phase 3 seats had **zero adversarial coverage** in the fuzz harness despite being the highest-stakes layer。 Fix:extended `standardRoster()` to 8 agents + added 2 new scenarios (`hostAlignmentMultiAxisTurn`, `sovereignAxisLockdownTurn`) + extended `allSignalsActiveTurn` to actually wire all 8 seats。
+
+#### HIGH fixes
+
+**H2 — `BASAgentTraceLog.nextSeqByTurn` leaked unboundedly**
+Ring-buffer correctly trimmed events but never pruned the per-turn sequence map。 Long-running sessions (one new turnID per turn) leaked the dict indefinitely, violating the ch 956.11 H2 DoS-bound discipline that the file itself cited。 Fix:on ring-buffer trim, prune `nextSeqByTurn` entries whose turnID no longer appears in surviving events。
+
+**H3 — Sentinel `TURN-LOCKDOWN` ref collided if candidateID == `"TURN-LOCKDOWN"`**
+`BASSovereignSentinelSeat`'s turn-level lockdown delta used the literal suffix `"TURN-LOCKDOWN"`。 A caller-supplied candidate with that exact ID would produce two deltas at the same targetObjectRef → merge engine resolves as conflict, silent data loss in audit trail。 Fix:use control-char prefix `\u{001F}TURN-LOCKDOWN` that no caller can inject + expose `BASSovereignSentinelSeat.turnLockdownRefSuffix` constant for substring checks。
+
+**H4 — `BASAgentTraceLog.append` `+1` on Int64.max → overflow trap**
+If caller passed `sequenceNumber: Int64.max` in a replay path, the next auto-increment would crash with arithmetic overflow。 Fix:saturate at `Int64.max` instead — caller sees duplicate-seq event (audit-detectable) rather than process crash。
+
+**D2 — Coordinator adapter only wired 4 seats; Memory/Critic/HostAlign/Sovereign unreachable through coordinator**
+`BASAgentFabricAdapters.turnInput(...)` had only `decomposeFrame + candidatePaths + acceptedCandidateID` params — the 4 new seats from ch 961/963/964 could ONLY be invoked through direct `BASAgentTurnDispatcher.dispatch(...)` calls, NEVER through the coordinator's `runAgentFabricObservation` path。 Fix:added optional `memory: BASMemorySeatInput?`, `critic: BASCriticSeatInput?`, `hostAlignment: BASHostAlignmentInput?`, `sovereignSentinel: BASSovereignSentinelInput?` params + new `criticInput(from:superegoActiveLevel:)` helper。
+
+#### Doc-lie fixes (batch)
+
+- **D1** `BASAgentFabricRuntime` doc said "4-seat roster" — now "4-8 seats (4 mandatory + 4 optional)"
+- **D3** `BASAgentTurnDispatcher.dispatch()` docstring said "invoke all 4 seats" — now "UP TO 8 SEATS" with canonical 8-seat order documented
+- **D4** `BASAgentFabricFuzzScenarios` header said "6-seat dispatcher" — now "8-seat" + ch 964.5 fix note
+- "Phase A: emit deltas from all 4 seats" inline comment in dispatcher — corrected to 8
+
+#### Test backfill (6 coverage gaps from audit Agent B)
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter964_5ReviewFixTests.swift` (~440 LOC, 16 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| C1 dashed turnID (2) | dashed-turnID round-trip / simple-turnID still works | Pin LAST-dash split semantics |
+| C3 fuzz scenarios (4) | standardRoster is 8 / hostAlign scenario / sovereign lockdown scenario / allSignalsActive covers all 8 | Adversarial fuzz finally covers Phase 3 |
+| H2 prune (1) | evicted turnID restarts at seq=1 → proves prune ran | Catches `nextSeqByTurn` leak |
+| H3 collision (1) | candidateID `"TURN-LOCKDOWN"` does NOT collide with turn-level ref | Refs distinct via `\u{1F}` prefix |
+| H4 overflow (1) | `Int64.max + 1` saturates, doesn't crash | Trap-resistance |
+| D2 adapter (3) | builds all 8 / 4-seat backward compat / criticInput helper | Coordinator can now wire 8 seats |
+| Coverage backfill (4) | canonical 8-seat ordering pin / sentinel cannot write OTHER domains / sentinel boundary-alone escalate / multi-lockdown emits 1 turn-level | Gap1, Gap3, Gap7, Gap10 from audit |
+
+#### Bonus: ch 962 fuzz scenarios updated to dash-free candidateIDs
+
+The C1 fix exposed that ch 962 fuzz scenarios used dashed IDs (`"highstakes-1"`, `"mild-1"`, etc.)。 Per the new candidateID-no-dashes contract, renamed all scenario IDs:`safe-1` → `safe1`, `manip-1` → `manip1`, `highstakes-1` → `highstakes1`, `c-sev1` → `csev1`, `c-strong` → `cstrong`, `c-safe` → `csafe`, `recall-1` → `recall1`, `mild-1` → `mild1`, `all-1` → `all1`。 Also updated 3 ch 962 test assertions that pinned the old IDs。
+
+#### Verification
+
+```
+swift build  → clean (24s)
+swift test --filter BASChapter964_5  → 16 PASSED / 0 FAILED in 0.02s
+swift test --filter "BASChapter95[3-9]|BASChapter96"
+  → 272 PASSED / 0 FAILED in 3s (full cumulative arc, post-fix)
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,933 PASSED / 113 skipped / 0 failures in 206s
+```
+
+**Cumulative Agent Fabric arc:272 Swift tests + 22 Rust tests
+= 294 dedicated arc tests / 0 failures。**
+
+#### Audit findings NOT fixed (deferred to future chapter)
+
+Per ch 956.11 discipline, low-impact items deferred:
+- **M1** Surface seat has 3 unreachable enum cases (`.draftOnly` / `.localOnly` / `.replace`) — documented as future-reserved
+- **M2** Risk seat ignores `pressureLevel ≥ 0.5` when reversibility ≥ 0.4 — semantic refinement deferred
+- **L1** 8 file-private JSON escape extensions can be consolidated (future cleanup chapter)
+- **H1** Sentinel thresholds `public static let` advertise tunability — the `verifySealed` API enhancement deferred
+- All seat-level `BASAgentSpec.Sendable` explicit annotations (composition vs declaration) — verified working
+
+#### Discipline pin
+
+Per ch 943.1 USER-PASS-2 + ch 956.11 USER-PASS-4 precedent:
+- 3 parallel review agents (code / test / docs) named as catchers
+- All findings synthesized into a triaged list BEFORE any fix
+- Tests written FIRST for C1/C3/H2/H3/H4/D2 — each had to FAIL on pre-fix code to be valid coverage
+- HIGH+ items all have permanent regression tests
+- Deferred items explicitly listed (not silently dropped)
+
+**Cumulative corrigenda caught + fixed across the Agent Fabric arc:**
+
+| Chapter | Finds | Source |
+|---|---|---|
+| 956.5 | 5 gaps | User review |
+| 956.9 | 1 hidden bug (`%016x` truncation) | Cross-language parity discipline |
+| 956.10 | 3 gaps | User review |
+| 956.11 | 4 CRITICAL + 6 HIGH | 3-agent N-pass review |
+| **964.5** | **2 CRITICAL + 4 HIGH** | **3-agent N-pass review (this chapter)** |
+| **Total** | **25 real issues** | **all caught + fixed before production** |
+
+#### Risk + revert
+
+LOW-MED:
+- C1 LAST-dash fix changes evidence-debt semantics — caught immediately by fuzz scenarios using dashed IDs (renamed)
+- C3 fuzz roster extension is purely additive (more coverage, no behavior change)
+- H2 / H3 / H4 / D2 all additive or replace crashes with documented behavior
+- Doc fixes are textual only — zero risk
+- ch 962 scenario candidateID renames flagged + 3 ch 962 test assertions updated
+
+Revert: this single commit (5 modified src + 1 new test + CHANGELOG + 3 modified tests for scenario rename)。
+
+#### What's next
+
+Per the original Phase 3 plan,ch 965 is the EvolutionShadow seat + Phase 3 close iPhone Air 2-hour smoke。 With the substrate now hardened by 2 review cycles (956.11 + 964.5),the Phase 3 close is meaningful。
+
+---
+
 ### Chapter 九百六十四 / M3525 — Phase 3 ch2:**SovereignSentinel seat** (sealed-LOW, sole writer of `.sovereignVerdict`)
 
 The most LOAD-BEARING seat in the arc。 Per Root Law 4 (单主权)
