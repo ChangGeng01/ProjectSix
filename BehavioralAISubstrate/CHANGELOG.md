@@ -11,6 +11,103 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十五 / M3480 — Agent Fabric Phase 0 ch3: BASAgentMergeEngine pure-fn + priority resolution + **Phase 0 CLOSE** iPhone Air smoke
+
+Pure-function merge engine resolving `[BASAgentDelta]` → `BASAgentMergeResult` per user's Section 9.4 priority order: **Sovereign > Risk > Host > Evidence > Agent priority > Recency**。 Sub-system #6 (Merge & Arbitration Engine) of the Agent Fabric architecture。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASAgentMergeEngine.swift` (~190 LOC):**
+- `BASMergePriorityTier` enum (sovereign=5 > risk=4 > host=3 > evidence=2 > agentPriority=1 > recency=0)
+- `BASMergePriorityContext` struct (sovereignAgentIDs / riskAgentIDs / hostAgentIDs / agentPriorities / evidenceConfidenceFloor)
+- `BASAgentMergeEngine.tier(for:in:)` pure-fn deriving priority
+- `BASAgentMergeEngine.merge(_:context:turnID:)` pure-fn resolving conflicts:
+  - Groups deltas by `targetObjectRef`
+  - Non-conflicting (single-target) → accepted
+  - Conflicting (same-target) → highest tier wins,then agentPriority,then confidence,then lex-smaller deltaID
+- Audit trail: `mergeReasonCodes` + `conflictResolution` strings
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter955AgentMergeEnginePropertyTests.swift` (~290 LOC, 10 tests):**
+1. Determinism — same input → same output (purity)
+2. Sovereign beats all other tiers
+3. Higher agentPriority wins within tier
+4. Higher confidence wins within priority
+5. Lex-smaller deltaID wins on full tie
+6. Non-conflicting deltas all accepted
+7. Empty input → empty result
+8. Single delta → accepted
+9. Fuzz: 100-iter (env-scalable to 10K) random conflict groups,asserts accepted delta has tier ≥ every competitor
+10. mergeReasonCodes format + conflictResolution emission
+
+#### Verification
+
+```
+swift test --filter BASChapter955  → 10 PASSED / 0 FAILED in 0.009s
+swift test --filter "BASChapter95[3-5]"  → 37 PASSED / 0 FAILED in 0.037s
+xcodebuild build iPhone Air arm64  → BUILD SUCCEEDED
+xcodebuild test iPhone Air (ch 953+954+955)  → ** TEST SUCCEEDED ** (37/37)
+```
+
+#### 🎯 PHASE 0 CLOSE — ALL PHASE 0 PROVEN ON IPHONE AIR ARM64
+
+3 chapters landed in Phase 0:
+- ch 953 — 8 schemas + 5 enums (Sendable / Codable value types) — 16 tests
+- ch 954 — `BASSharedStateGraph` actor + Single-Writer-Per-Domain runtime — 11 tests
+- ch 955 — `BASAgentMergeEngine` pure-fn + priority resolution — 10 tests
+
+**TOTAL: 37 tests / 0 failures / iPhone Air real device VALIDATED**
+
+Per-iter perf (iPhone Air arm64,sub-second smoke): no measurable impact on existing test paths — Phase 0 is **pure data + pure actor + pure function**,zero runtime touched per ADR-014 OPT-IN。
+
+Per plan ch 955 close criteria:✅ "no behavior change yet,proves schemas + State Graph + Merge Engine compile + don't impact perf"。
+
+#### What Phase 0 unblocks (next: Phase 1 ch 956)
+
+Phase 1 ch 956 will build `BASAgentRegistry` actor + `BASAgentRouter` + `BASAgentLeaseManager` on top of Phase 0 primitives,enabling the first end-to-end fabric loop in ch 957-959 (Scout + Planner + Risk + Surface)。
+
+---
+
+### Chapter 九百五十四 / M3475 — Agent Fabric Phase 0 ch2: BASSharedStateGraph actor + Single-Writer-Per-Domain enforcement
+
+Per Root Law 3 (单状态图) — all agents operate on ONE typed state graph,not per-agent forks。 This actor IS that graph,with runtime enforcement of Single-Writer-Per-Domain invariant。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASSharedStateGraph.swift` (~150 LOC):**
+- `BASSharedStateGraph` actor — typed accessors for state objects keyed by `<domain>#<objectID>`
+- `BASStateGraphObject` value struct — domain + objectID + payloadJson + lastWriterAgentID + version
+- `BASSharedStateGraphError` enum — `unauthorizedWriter` / `unauthorizedReader` / `forbiddenDomain` / `objectNotFound` / `malformedObjectRef`
+- Per-domain monotonic version counter (detects intra-turn interleaving for merge engine)
+- `BASStateGraphObject.parse(ref:)` round-trip validation
+
+Authorization model (defense in depth):
+- WRITE: agent.writeDomains must contain target domain
+- READ: agent.readDomains OR writeDomains must contain target domain
+- FORBIDDEN domain wins regardless (even if agent has write/read rights)
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter954SharedStateGraphTests.swift` (~280 LOC, 11 tests):**
+1. Happy path write-then-read
+2. Read-only agent cannot write → throws unauthorizedWriter
+3. Agent without read access throws unauthorizedReader
+4. Forbidden wins over write permission
+5. Forbidden wins over read permission
+6. Version increments per domain
+7. Per-domain versions are independent
+8. Object ref parse round-trip for all 9 domains
+9. Malformed refs throw `malformedObjectRef`
+10. Cross-agent read after write (Memory writes → Planner reads)
+11. Fuzz: 100-iter random (agent, domain, write-attempt) tuples,assert every authorization mismatch throws,every authorized op succeeds
+
+#### Verification
+
+```
+swift test --filter BASChapter954  → 11 PASSED / 0 FAILED in 0.008s
+```
+
+LOW risk — pure actor wrapping Dictionary,Sendable + ADR-014 OPT-IN holds。 Revert = delete 2 files。
+
+---
+
 ### Chapter 九百五十三 / M3470 — Agent Fabric Phase 0 ch1: 8 core schemas + 5 enums + property tests
 
 Opens the Agent Fabric arc (chapters 953-981+,8 phases,~30 chapters) per user's full design doc preserved in conversation。 Phase 0 lays pure-data foundation before any service wiring in Phase 1+。
