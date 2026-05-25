@@ -117,4 +117,90 @@ final class BASChapter952_2InfiniteLoopRegressionTests:
                 "ch 952.2 — tight-loop iter=\(i) survived")
         }
     }
+
+    // MARK: - chapter 九百五十二.8 audit — full generator sweep
+
+    /// chapter 九百五十二.8 / M3465.8 — AUDIT all procedural
+    /// generators for similar infinite-loop guard misses (the bug
+    /// pattern ch 952.2 caught)。 Calls each generator with edge-
+    /// case inputs (empty arrays,zero-length strings) under a
+    /// hard wallclock budget。 Audit found 0 additional bugs
+    /// beyond the already-fixed PromptTemplate — but the test
+    /// stays here to PIN that conclusion against regressions in
+    /// the generators themselves。
+    ///
+    /// Coverage:
+    ///   - BASByteCrossover.singlePoint / uniform / twoPoint
+    ///     with various (a, b) size combinations
+    ///   - BASStringCrossover.singlePoint / interleave
+    ///   - BASFloatVectorCrossover.uniform / arithmetic
+    ///   - BASStringMutator.repeating with empty input
+    ///   - BASByteMutator.byteInsert with empty input
+    ///   - BASFloatVectorMutator.injectExtreme with single element
+    func testGeneratorAuditNoOtherInfiniteLoops() {
+        let t0 = Date()
+        var rng = BASFuzzRng(seed: 1)
+
+        // ---- ByteCrossover ----
+        for size in [0, 1, 5, 50] {
+            let a = Array(repeating: UInt8(0xAA), count: size)
+            let b = Array(repeating: UInt8(0xBB), count: size)
+            _ = BASByteCrossover.singlePoint(a, b, rng: &rng)
+            _ = BASByteCrossover.uniform(a, b, rng: &rng)
+            _ = BASByteCrossover.twoPoint(a, b, rng: &rng)
+        }
+        // Asymmetric sizes
+        _ = BASByteCrossover.uniform([1, 2], [3, 4, 5, 6, 7],
+                                     rng: &rng)
+        _ = BASByteCrossover.twoPoint([], [1, 2, 3], rng: &rng)
+        _ = BASByteCrossover.twoPoint([1, 2], [], rng: &rng)
+
+        // ---- StringCrossover ----
+        _ = BASStringCrossover.singlePoint("", "abc", rng: &rng)
+        _ = BASStringCrossover.singlePoint("abc", "", rng: &rng)
+        _ = BASStringCrossover.interleave("", "", rng: &rng)
+        _ = BASStringCrossover.interleave("你好", "🌍✨", rng: &rng)
+
+        // ---- FloatVectorCrossover ----
+        _ = BASFloatVectorCrossover.uniform([], [], rng: &rng)
+        _ = BASFloatVectorCrossover.arithmetic(
+            [], [1.0, 2.0], rng: &rng)
+        _ = BASFloatVectorCrossover.arithmetic(
+            [Float.nan, Float.infinity, -Float.infinity, 0.0],
+            [0.0, 1.0, -1.0, 0.5], rng: &rng)
+
+        // ---- Mutators with empty / single inputs ----
+        _ = BASByteMutator.byteInsert([], rng: &rng)
+        _ = BASByteMutator.byteDelete([], rng: &rng)
+        _ = BASByteMutator.byteDelete([42], rng: &rng)
+        _ = BASByteMutator.bitFlip([], rng: &rng)
+        _ = BASStringMutator.repeating("", rng: &rng)
+        _ = BASStringMutator.repeating("xxxxxxxxxx", rng: &rng)
+        _ = BASStringMutator.injectSpecial("", rng: &rng)
+        _ = BASFloatVectorMutator.injectExtreme([], rng: &rng)
+        _ = BASFloatVectorMutator.injectExtreme([1.0], rng: &rng)
+        _ = BASFloatVectorMutator.addNoise([], rng: &rng)
+
+        // ---- Shape generators with extreme RNG state ----
+        // (force boundary picks ≥10 times each)
+        for _ in 0..<20 {
+            _ = BASFuzzShapes.wakeThreshold(rng: &rng)
+            _ = BASFuzzShapes.senseCount(rng: &rng)
+            _ = BASFuzzShapes.priorDim(rng: &rng)
+            _ = BASFuzzShapes.memoryAtomCount(rng: &rng)
+            _ = BASFuzzShapes.mambaShape(rng: &rng)
+            _ = BASFuzzShapes.ticketSize(rng: &rng)
+            _ = BASFuzzShapes.riskConfidence(rng: &rng)
+            _ = BASFuzzShapes.dominanceBucketCount(rng: &rng)
+        }
+
+        // Hard wallclock budget:5 seconds (these are all
+        // trivially-bounded;if any hang,we want to fail fast)
+        let elapsed = Date().timeIntervalSince(t0)
+        XCTAssertLessThan(
+            elapsed, 5.0,
+            "ch 952.8 — generator audit took \(elapsed)s " +
+            "(> 5s) — possible infinite-loop regression in " +
+            "one of the audited generators")
+    }
 }

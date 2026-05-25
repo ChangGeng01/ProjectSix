@@ -62,12 +62,31 @@ trap cleanup INT TERM
 
 cd "$SUBSTRATE_DIR"
 
+# chapter 九百五十二.8 — pre-iter device-presence check helper。
+# Previous wrapper:if iPhone disconnected mid-run,xcodebuild would
+# fail every iter until script exit。 Now we fail-fast within 1 iter
+# and report DEVICE_DISCONNECTED rather than masquerading as test fail。
+check_device_connected() {
+    if xcrun devicectl list devices 2>/dev/null | \
+        grep -q "$DEVICE_ID.*connected"; then
+        return 0
+    fi
+    return 1
+}
+
 # Main loop — no bash -c nesting, ITER properly local
 while true; do
     NOW=$(date +%s)
     ELAPSED=$((NOW - START_TS))
     if [ $ELAPSED -ge $MAX_SEC ]; then
         echo "$(date) 10hr cap hit — stopping (iter=$ITER)" \
+            >> "$LOG_DIR/summary.txt"
+        break
+    fi
+    # chapter 九百五十二.8 — fail-fast if iPhone disconnected
+    if ! check_device_connected; then
+        echo "$(date) DEVICE_DISCONNECTED — iPhone Air not in " \
+            "xcrun devicectl list — stopping at iter=$ITER" \
             >> "$LOG_DIR/summary.txt"
         break
     fi
@@ -92,10 +111,19 @@ while true; do
     TOTAL_SKIPPED=$((TOTAL_SKIPPED + SKIPPED))
     echo "$(date) iter=$ITER done exit=$EXIT passed=$PASSED failed=$FAILED skipped=$SKIPPED" \
         >> "$LOG_DIR/summary.txt"
+    # chapter 九百五十二.8 — sanity check:passed=0 + failed=0
+    # = empty iter (likely xcodebuild error) → don't masquerade as success
     if [ $FAILED -gt 0 ] || [ $EXIT -ne 0 ]; then
         echo "$(date) FAILURE detected — preserving log + stopping" \
             >> "$LOG_DIR/summary.txt"
         echo "see $LOG_FILE for failure detail" >> "$LOG_DIR/summary.txt"
+        break
+    fi
+    if [ $PASSED -eq 0 ] && [ $SKIPPED -eq 0 ]; then
+        echo "$(date) EMPTY iter (passed=0 skipped=0) — likely " \
+            "xcodebuild setup error,stopping at iter=$ITER" \
+            >> "$LOG_DIR/summary.txt"
+        echo "see $LOG_FILE for cause" >> "$LOG_DIR/summary.txt"
         break
     fi
 done

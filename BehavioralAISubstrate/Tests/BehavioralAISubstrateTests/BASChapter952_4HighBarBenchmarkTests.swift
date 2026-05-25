@@ -150,6 +150,27 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
         }
     }
 
+    /// chapter 九百五十二.8 — emit greppable thermal state via
+    /// `ProcessInfo.thermalState` (iOS+macOS supported)。 4 states:
+    /// nominal / fair / serious / critical。 If iter-89 of the 10hr
+    /// run was 3:37 (slowest),we couldn't explain it (thermal? IO?
+    /// jetsam?) — this metric makes thermal explicit。
+    /// Trend analysis can correlate slow iters with thermal state
+    /// changes。
+    private func thermalSnapshot(label: String) {
+        let state = ProcessInfo.processInfo.thermalState
+        let stateName: String
+        switch state {
+        case .nominal: stateName = "nominal"
+        case .fair: stateName = "fair"
+        case .serious: stateName = "serious"
+        case .critical: stateName = "critical"
+        @unknown default: stateName = "unknown"
+        }
+        print("🌡️ ch952.8-thermal | label=\(label) " +
+              "state=\(stateName)")
+    }
+
     // MARK: - TIGHT L8 substrate benchmarks (sub-ms ceilings)
 
     /// Platform-tuned ceilings — iPhone Air A19 with internal NVMe
@@ -299,32 +320,58 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
         async throws
     {
         try requireMLXBench()
+        // chapter 九百五十二.8 — thermal snapshot before MLX bench
+        // (lets trend analysis correlate slow iters with thermal)
+        thermalSnapshot(label: "MLX-throughput.before")
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E2B_4bit)
         try await adapter.loadModel()
 
-        let prompts = [
-            "Say hi in one word.",
-            "Pick a color.",
-            "Pick a fruit.",
-            "Yes or no?",
-            "Count to 3.",
-            "Name a planet.",
-            "Pick a number 1-10.",
-            "Say goodbye.",
-            "What is 1+1?",
-            "Pick an animal.",
-            "True or false: sky is blue.",
-            "Name a country.",
-            "Pick a vehicle type.",
-            "Name a month.",
-            "Pick a music genre.",
-            "Name a programming language.",
-            "Pick a season.",
-            "Name a fruit color.",
-            "Pick a sport.",
-            "Name a beverage.",
+        // chapter 九百五十二.8 — pool of 50+ prompts, shuffle 20
+        // per invocation using process-derived seed。 Previously 20
+        // hardcoded prompts were used in same order each iter →
+        // no fuzz breadth growth across 226 device iters。 Now
+        // each iter uses different 20-prompt subset。
+        let promptPool = [
+            "Say hi in one word.", "Pick a color.", "Pick a fruit.",
+            "Yes or no?", "Count to 3.", "Name a planet.",
+            "Pick a number 1-10.", "Say goodbye.", "What is 1+1?",
+            "Pick an animal.", "True or false: sky is blue.",
+            "Name a country.", "Pick a vehicle type.",
+            "Name a month.", "Pick a music genre.",
+            "Name a programming language.", "Pick a season.",
+            "Name a fruit color.", "Pick a sport.",
+            "Name a beverage.", "Name an instrument.",
+            "Pick a star.", "Name a vegetable.",
+            "Name a programming concept.", "Pick a day of week.",
+            "Name a body part.", "Pick an emotion.",
+            "Name a kitchen tool.", "Pick a number 1-100.",
+            "Name a metal.", "Pick a weather word.",
+            "Name a hobby.", "Pick a verb.",
+            "Name a tree.", "Pick a board game.",
+            "Name a science term.", "Pick a math operation.",
+            "Name a continent.", "Pick a job.",
+            "Name a building type.", "Pick a flower.",
+            "Name an insect.", "Pick a bird.",
+            "Name a holiday.", "Pick a tool.",
+            "Name an ocean.", "Pick a clothing item.",
+            "Name a school subject.", "Pick a dance type.",
+            "Name a herb.", "Pick a spice.",
         ]
+        // Per-invocation shuffle seed:Date().timeIntervalSince1970
+        // varies between invocations so different iter sees
+        // different prompt subset。
+        let seed = UInt32(
+            truncatingIfNeeded:
+                UInt64(Date().timeIntervalSince1970 * 1000))
+        var shuffleRng = BASFuzzRng(seed: seed)
+        var shuffled = promptPool
+        // Fisher-Yates shuffle (deterministic via rng)
+        for i in (1..<shuffled.count).reversed() {
+            let j = shuffleRng.nextInt(upTo: i + 1)
+            shuffled.swapAt(i, j)
+        }
+        let prompts = Array(shuffled.prefix(20))
         // Warmup discard
         let warmupCount = 3
         var latencies: [Double] = []
@@ -359,10 +406,19 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
         let avgTps = throughputs.reduce(0, +) /
             Double(throughputs.count)
 
-        // Scorecard with 2 metrics (latency AND throughput)
+        // chapter 九百五十二.8 / M3465.8 — latency ceiling fix:
+        // 10hr trend analysis measured p99 mean=13808ms (CoV 18.8%)
+        // so 5000ms ceiling was wrong by 2.76× — scorecard reported
+        // margin=0.4× every iter but no XCTAssert enforced it。 Two
+        // honest options:(a) raise ceiling + ADD assertion or
+        // (b) remove the scorecard line。 Choosing (a) — enforce a
+        // realistic ceiling so scorecard becomes a real gate。
+        // New ceiling: 20s p99 (measured 14s with 1.4× safety margin)。
+        let inferLatencyCeilingMs: Double = 20_000
         scorecard(suite: "MLX-Gemma4E2B",
                   op: "infer-latency",
-                  p50: p50Lat, p99: p99Lat, ceiling: 5_000,
+                  p50: p50Lat, p99: p99Lat,
+                  ceiling: inferLatencyCeilingMs,
                   n: latencies.count)
         let p50TpsStr = String(format: "%.2f", p50Tps)
         let p99TpsStr = String(format: "%.2f", p99Tps)
@@ -378,6 +434,16 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
             "🔥 ch952.4 HIGH BAR: Gemma 4 E2B p50=\(p50Tps)tok/s " +
             "fell below 5 tok/s floor — iPhone Air A19 MLX " +
             "throughput regression")
+
+        // chapter 九百五十二.8 — NEW assertion so the scorecard
+        // ceiling actually gates (was informational-only pre-fix)。
+        XCTAssertLessThan(
+            p99Lat, inferLatencyCeilingMs,
+            "🔥 ch952.8 HIGH BAR: Gemma 4 E2B infer p99=" +
+            "\(p99Lat)ms exceeded \(inferLatencyCeilingMs)ms " +
+            "ceiling — MLX latency regression")
+        // chapter 九百五十二.8 — thermal snapshot after MLX bench
+        thermalSnapshot(label: "MLX-throughput.after")
     }
 
     /// HIGH BAR: streaming inference first-token latency ≤ 500ms。

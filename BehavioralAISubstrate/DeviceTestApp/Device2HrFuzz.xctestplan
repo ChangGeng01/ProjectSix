@@ -36,6 +36,10 @@
           {
             "key" : "QINAO_MLX_BENCH",
             "value" : "1"
+          },
+          {
+            "key" : "BAS_FUZZ_STRICT_COVERAGE",
+            "value" : "1"
           }
         ]
       }
@@ -57,7 +61,13 @@
         "BASChapter952ProcGenSisterTests",
         "BASChapter952RealMLXOnDeviceTests",
         "BASChapter952_2InfiniteLoopRegressionTests",
-        "BASChapter952_4HighBarBenchmarkTests"
+        "BASChapter952_4HighBarBenchmarkTests",
+        "BASChapter934AtomLifecycleFullRowTests",
+        "BASChapter935DeletionManifestFullRowTests",
+        "BASChapter936UserStateFullRowTests",
+        "BASChapter937VersionTreeFullRowTests",
+        "BASChapter938EventLogFullRowTests",
+        "BASChapter926FixBackfillCoverageTests"
       ],
       "target" : {
         "containerPath" : "container:BASDeviceTest.xcodeproj",
