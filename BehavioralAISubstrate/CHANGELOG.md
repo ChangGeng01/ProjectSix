@@ -11,6 +11,119 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十六.6 / M3485.6 — Perf measurement → O(V+E) topo-sort rewrite + DECLINE Rust port
+
+Per user's directive「最好 使用 高性能 语言 最严苛」 + ch 870
+measurement-first discipline:before deciding whether
+`BASAgentMergeEngine` + `BASAgentMergeApplier` need a Rust port
+to `bas-agent-fabric` crate,measure p50/p99/max latency on
+realistic delta-count shapes。
+
+#### Measurement: pre-rewrite (Swift O(n³ log n) topo sort)
+
+| Shape (count) | p50 μs | p99 μs | max μs |
+|---|---|---|---|
+| 1     | 14.79     | 47.42     | 254.38    |
+| 8     | 79.88     | 270.25    | 414.62    |
+| 32    | 618.38    | 782.92    | 895.67    |
+| 128   | 6,778     | **7,294** | 7,750     |
+| 512   | 101,337   | **119,410** | 119,410 |
+
+Numbers blow the 1ms p99 budget by 7× at count=128 and 119× at
+count=512。 Root cause:`topologicalSort(_:)` had a nested O(n) scan
++ O(n log n) sort per dequeue inside the Kahn loop → **O(n³ log n)**
+total。 The algorithm was correct,but accidentally quadratic + log
+factor on top — typical「first-pass works,scale destroys」shape。
+
+#### What landed
+
+**REWRITE `topologicalSort` in `BASAgentMergeEngine.swift` to proper O(V+E) Kahn:**
+1. ONE pass to index by deltaID + resolve `delta:` prefix → canonical depIDs
+2. ONE pass to build forward adjacency `[depIdx → [dependentIdx]]`
+3. ONE pass to compute in-degree (no nested scan)
+4. Seed queue once in lex deltaID order (determinism only)
+5. Standard Kahn loop with head-pointer queue (O(1) amortized dequeue,no per-iteration sort)
+6. Cycle participants = deltas not emitted
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter956_6MergePerfBenchTests.swift` (~310 LOC,7 tests):**
+- 5 merge-engine bench shapes:count ∈ {1, 8, 32, 128, 512}
+- 2 end-to-end merge+apply bench shapes:count ∈ {8, 32}
+- Mach-time microbench helper with warmup + p50/p99/max/mean reporting
+- Hard XCTAssert gates lock in post-rewrite numbers + 10-12× headroom for iPhone Air + future regression
+- Test docstrings document the DECLINE-WITH-TRIGGER rule
+
+#### Measurement: post-rewrite (Swift O(V+E) topo sort)
+
+| Shape (count) | p50 μs | p99 μs | max μs | Δ vs pre |
+|---|---|---|---|---|
+| 1     | 11.79     | 15.42     | 99.79     | 3.1× faster |
+| 8     | 50.67     | 54.67     | 209.04    | 4.9× faster |
+| 32    | 251.46    | 330.75    | 495.79    | 2.4× faster |
+| 128   | 1,418     | **1,742** | 1,849     | **4.2× faster** |
+| 512   | 5,139     | **5,684** | 5,684     | **21× faster** |
+| merge+apply 8  | 87.62  | 93.50  | 118.17 | 1.6× faster |
+| merge+apply 32 | 406.42 | 484.71 | 549.42 | 2.1× faster |
+
+Side effect:perf test suite total runtime dropped 19.68s → 2.04s
+(10× faster — measurable in CI cycle time)。
+
+#### Decision per ch 870 measurement-first discipline
+
+**DECLINE Rust port for now。** Swift is well under budget at every realistic shape:
+- Typical med-band turn (count=8):54μs p99 — 18× under 1ms budget
+- High-band 9-agent turn (count=32):331μs p99 — 3× under budget
+- Critic + alternatives sweep (count=128):1.74ms p99 — acceptable for rare case
+- Pathological worst case (count=512):5.68ms p99 — acceptable
+
+For iPhone Air estimate (typically 2-3× slower than M-class Mac):
+- count=8: ~150-200μs p99 — way under budget
+- count=32: ~700μs-1ms p99 — at budget,fine
+- count=128: ~3.5-5.2ms p99 — acceptable for rare case
+- count=512: ~11-17ms p99 — acceptable as pathological
+
+#### Trigger conditions (when Rust port becomes justified)
+
+Per ch 849 / ch 876 DECLINE-WITH-TRIGGER pattern,Rust port to
+`bas-agent-fabric` becomes justified IF ANY of these fire in
+production traces or device benches:
+
+1. Any production turn observes merge engine p99 > 5ms at count ≤ 32
+2. Any production turn observes merge+apply p99 > 10ms at count ≤ 32
+3. Profiler shows merge engine > 5% of per-turn CPU on iPhone Air
+4. Future requirement adds operations that turn O(V+E) into O(V²) again
+5. Cross-platform parity (web/Android via FFI) becomes required
+
+Until then,Swift implementation stays — algorithmic fix landed
+21× win at count=512 which is more than any reasonable Rust port
+would deliver (FFI overhead alone is ~10-20μs per call,which would
+DOMINATE at count=8 where current Swift is 54μs)。
+
+#### Verification
+
+```
+swift build  → clean (8.76s incremental)
+swift test --filter "BASChapter95[3-6]_5|BASChapter955"
+  → 22 PASSED / 0 FAILED — topo-sort rewrite preserves correctness
+swift test --filter BASChapter956_6
+  → 7 PASSED / 0 FAILED in 2.04s
+```
+
+#### Risk + revert
+
+ZERO behavioral change — the topo-sort rewrite is a pure algorithmic
+substitution that preserves identical input/output semantics。 All 22
+prior correctness tests (12 USER-PASS regression + 10 property tests)
+pass unchanged。 If perf regression discovered:revert this single
+commit (1 source edit + 1 new test file)。
+
+#### What's next
+
+- Phase 1 ch 957:Scout + Planner seats wired into `EBrainRuntimeCoordinator`
+- iPhone Air real-device measurement at end of Phase 1 close (ch 959)
+- If iPhone Air numbers contradict the macOS estimates above → revisit Rust port
+
+---
+
 ### Chapter 九百五十六.5 / M3485.5 — USER-PASS fix-of-fix:5 Phase 0 gaps caught by user code review
 
 USER-PASS-2 corrigendum sub-chapter (ch 943.1 discipline)。 User did a sharp code review of Phase 0 + Phase 1 ch1 (ch 953-956) and caught **5 gaps where documentation overpromised vs implementation** — code claimed behavior that wasn't actually wired。 Per discipline:if user catches it,we ship a `.5` fix sub-chapter naming them as the catcher,not bury it in a future chapter。

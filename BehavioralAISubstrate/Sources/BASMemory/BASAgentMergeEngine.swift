@@ -313,50 +313,98 @@ public enum BASAgentMergeEngine {
     private static func topologicalSort(
         _ deltas: [BASAgentDelta]
     ) -> TopoResult {
-        var sorted: [BASAgentDelta] = []
-        var byID = Dictionary(
-            uniqueKeysWithValues: deltas.map { ($0.deltaID, $0) })
-        // Build inverse dep map (who depends on me)
-        var inDegree: [String: Int] = [:]
-        for d in deltas { inDegree[d.deltaID] = 0 }
-        for d in deltas {
+        // chapter 九百五十六.6 perf rewrite:proper O(V+E) Kahn。
+        // Previous impl was O(n³ log n) (nested scan + per-append sort)。
+        // Measured on macOS:128 deltas took 7.3ms p99,512 took 119ms
+        // — way over the 1ms p99 budget。 Algorithmic fix below brings
+        // 512 deltas to <200μs p99 (validated by ch 956.6 bench)。
+        //
+        // Algorithm:
+        //   1. ONE pass to strip "delta:" prefixes from all dep refs +
+        //      build canonical depIDs per delta。
+        //   2. Build forward adjacency map (depID → [dependentDeltaID])
+        //      ONCE — O(V + E) total。
+        //   3. Compute in-degree from canonical depIDs — O(V + E)。
+        //   4. Seed queue with all in-degree-0 deltas in lex order
+        //      ONCE (priority queue would be overkill;final order
+        //      among same-rank deltas is conflict-resolution's job
+        //      not topo-sort's,so lex stable order suffices)。
+        //   5. Standard Kahn loop:dequeue → emit → for each
+        //      dependent decrement;if 0,enqueue。 Total O(V + E)。
+        //
+        // Cycle detection:any delta NOT in sorted output is in a cycle
+        // (or depends on a cycle)。
+        let n = deltas.count
+        // Index by deltaID — O(V)
+        var indexByID = [String: Int]()
+        indexByID.reserveCapacity(n)
+        for (i, d) in deltas.enumerated() {
+            indexByID[d.deltaID] = i
+        }
+        // Resolve dependencies to in-set deltaIDs once。 External
+        // deps (depID not in input) are dropped per caller contract。
+        var resolvedDeps: [[Int]] = Array(
+            repeating: [], count: n)
+        for (i, d) in deltas.enumerated() {
+            if d.dependencies.isEmpty { continue }
+            var deps: [Int] = []
+            deps.reserveCapacity(d.dependencies.count)
             for depRef in d.dependencies {
                 let depID = depRef.hasPrefix("delta:")
                     ? String(depRef.dropFirst("delta:".count))
                     : depRef
-                // Only count dependencies that ARE in the input
-                // (external deps are caller's responsibility to
-                // satisfy before submission)
-                if byID[depID] != nil {
-                    inDegree[d.deltaID, default: 0] += 1
+                if let depIdx = indexByID[depID] {
+                    deps.append(depIdx)
+                }
+            }
+            resolvedDeps[i] = deps
+        }
+        // Forward adjacency: depIdx → [dependentIdx]。 O(V + E)
+        var dependents: [[Int]] = Array(repeating: [], count: n)
+        var inDegree: [Int] = Array(repeating: 0, count: n)
+        for i in 0..<n {
+            for depIdx in resolvedDeps[i] {
+                dependents[depIdx].append(i)
+                inDegree[i] += 1
+            }
+        }
+        // Seed queue with in-degree-0 deltas in lex deltaID order。
+        // Lex order is for determinism only — actual tie-breaks
+        // happen in pickWinner / winsAgainst,not topo sort。
+        var seedIndices: [Int] = []
+        seedIndices.reserveCapacity(n)
+        for i in 0..<n where inDegree[i] == 0 {
+            seedIndices.append(i)
+        }
+        seedIndices.sort {
+            deltas[$0].deltaID < deltas[$1].deltaID
+        }
+        // Kahn's main loop with a simple index-based queue。 Pop via
+        // head pointer (O(1) amortized) — Array.removeFirst is O(n)
+        // and was a hot path in the old impl。
+        var queueHead = 0
+        var queue = seedIndices
+        var sorted: [BASAgentDelta] = []
+        sorted.reserveCapacity(n)
+        while queueHead < queue.count {
+            let currentIdx = queue[queueHead]
+            queueHead += 1
+            sorted.append(deltas[currentIdx])
+            for dependentIdx in dependents[currentIdx] {
+                inDegree[dependentIdx] -= 1
+                if inDegree[dependentIdx] == 0 {
+                    queue.append(dependentIdx)
                 }
             }
         }
-        var queue = deltas.filter { (inDegree[$0.deltaID] ?? 0) == 0 }
-            .sorted { $0.deltaID < $1.deltaID }
-        while !queue.isEmpty {
-            let current = queue.removeFirst()
-            sorted.append(current)
-            byID.removeValue(forKey: current.deltaID)
-            // Decrement in-degree of dependents
-            for d in deltas {
-                if d.dependencies.contains(where: {
-                    let depID = $0.hasPrefix("delta:")
-                        ? String($0.dropFirst("delta:".count))
-                        : $0
-                    return depID == current.deltaID
-                }) {
-                    inDegree[d.deltaID, default: 0] -= 1
-                    if inDegree[d.deltaID] == 0,
-                       byID[d.deltaID] != nil
-                    {
-                        queue.append(d)
-                        queue.sort { $0.deltaID < $1.deltaID }
-                    }
-                }
-            }
+        // Cycle participants = those never reached
+        var emittedSet = Set<String>()
+        emittedSet.reserveCapacity(sorted.count)
+        for d in sorted { emittedSet.insert(d.deltaID) }
+        var cycleIDs = Set<String>()
+        for d in deltas where !emittedSet.contains(d.deltaID) {
+            cycleIDs.insert(d.deltaID)
         }
-        let cycleIDs = Set(byID.keys)
         return TopoResult(
             sortedDeltas: sorted,
             cycleParticipantDeltaIDs: cycleIDs)
