@@ -11,6 +11,60 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百五十六 / M3485 — Agent Fabric Phase 1 ch1: BASAgentRegistry + BASAgentRouter + BASAgentLeaseManager
+
+Phase 1 opens — first 3 of 8 Agent Fabric sub-systems land (Registry / Router / Lease Manager)。 Per plan ch 956: LOW risk — wiring only,no per-turn touch yet。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASAgentRegistry.swift` (~90 LOC)** — Sub-system #1:
+- `BASAgentRegistry` actor mirroring `BASOrganRegistry` pattern (Sources/BASOrgan/BASOrganRegistry.swift:22)
+- Register / unregister / lookup by agentID + by role
+- Optional `strictRoleUniqueness` mode rejects duplicate role registration (for core agents); non-strict mode allows multiple instances (for watchers)
+- Append-only registration order preserved for deterministic resolution
+
+**NEW `Sources/BASMemory/BASAgentRouter.swift` (~140 LOC)** — Sub-system #2:
+- `BASAgentRouterContext` (riskBand: low/med/high + effortPreference: shallow/standard/deep + intentLayers[] + requestedAgentIDs[])
+- `BASAgentActivationPlan` (activeAgentIDs[] + per-agent activationReasons + skippedReasons)
+- `BASAgentRouter.route(allSpecs:context:)` pure function:
+  - LOW-tier sovereign + watcher agents always activated
+  - Per-band activation per user's Section 9.2: low (Scout+Surface) / med (+Planner+Risk) / high (+Memory+Critic+HostAlignment+SovereignSentinel)
+  - Deep effort wakes cold-seat agents regardless of band
+  - Caller override (requestedAgentIDs) wins last
+
+**NEW `Sources/BASMemory/BASAgentLeaseManager.swift` (~190 LOC)** — Sub-system #3:
+- `BASAgentLeaseBaseBudget` config (hotSeatBaseMs=200,hotSeatBaseTokens=1024,shallow=0.5×/standard=1.0×/deep=3.0×)
+- Profile multipliers: hotSeat=1.0×,coldSeat=5.0×,watcher=0.1×,sovereign=10.0×
+- `materialize(spec:turnID:effort:turnStartMs:)` pure-fn produces `BASAgentLease` per agent
+- `materializeAll(plan:registry:turnID:effort:turnStartMs:)` batch materialization for active plan
+- Allowed domains = (read ∪ write) − forbidden (defense in depth)
+- Sovereign agents get priority `Int.max`,watchers get `0` delta-write ceiling
+
+**NEW `Tests/BehavioralAISubstrateTests/BASChapter956AgentRegistryRouterLeaseTests.swift` (~340 LOC, 19 tests):**
+- Registry: append+lookup,re-register overwrites,unknown unregister throws,strict mode rejects duplicate role,non-strict allows multiple watchers (5 tests)
+- Router: low/med/high band activation,deep effort wakes cold,caller override,unknown override ignored,empty pool (7 tests)
+- LeaseManager: hot-seat standard,deep scales up,cold larger budget,watcher tiny budget,sovereign headroom,forbidden excluded from allowed,materializeAll batch (7 tests)
+
+#### Verification
+
+```
+swift build  → clean (47.75s)
+swift test --filter BASChapter956  → 19 PASSED / 0 FAILED in 0.010s
+swift test --filter "BASChapter95[3-6]"  → 56 PASSED / 0 FAILED in 0.050s
+```
+
+Cumulative Phase 0 + Phase 1 ch1: **56 tests / 0 failures**。
+
+#### What's next per plan (Phase 1)
+
+- ch 957 — Scout + Planner seats (thin wrappers over L1/L6 + L9 loopService,read shared state graph + write BASAgentDelta)
+- ch 958 — Risk + Surface seats (wrappers over riskService + actionService)
+- ch 959 — Capability Gateway + BASAgentTraceLog (Phase 1 close + iPhone Air 10-min smoke)
+
+LOW risk — Registry + Router + LeaseManager are all pure-data / pure-actor / pure-function。 No coordinator integration yet (that's ch 957)。 Revert = delete 3 source files + test file。
+
+---
+
 ### Chapter 九百五十五 / M3480 — Agent Fabric Phase 0 ch3: BASAgentMergeEngine pure-fn + priority resolution + **Phase 0 CLOSE** iPhone Air smoke
 
 Pure-function merge engine resolving `[BASAgentDelta]` → `BASAgentMergeResult` per user's Section 9.4 priority order: **Sovereign > Risk > Host > Evidence > Agent priority > Recency**。 Sub-system #6 (Merge & Arbitration Engine) of the Agent Fabric architecture。
