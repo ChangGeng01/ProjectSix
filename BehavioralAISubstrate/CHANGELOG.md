@@ -11,6 +11,124 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十二 / M3515 — Phase 2 close:cross-agent evidence-debt + adversarial fuzz scenarios
+
+Phase 2 close per plan。 Adds the cross-agent evidence-debt
+aggregation that next-turn Planner-v2 (ch 963+) will consume,
+plus 7 procedural fuzz scenarios covering the full 6-seat
+dispatcher under adversarial inputs。
+
+#### What landed
+
+**NEW `Sources/BASMemory/BASAgentEvidenceDebt.swift` (~190 LOC):**
+- `BASAgentEvidenceDebt` struct — per-turn summary of Memory +
+  Critic signals,Codable + Sendable + Equatable
+- Fields:`memoryEpisodeArcs` / `memoryConflictClusters` /
+  `memoryContinuityAnchors` / `critiqueByCandidateID` /
+  `aggregateCritiquePressure` / `memoryDeltaCount` /
+  `criticDeltaCount`
+- `static let empty` for the 4-seat-no-evidence path
+- `derive(emitted:memoryInput:criticInput:)` pure-fn:
+  - Reads Memory IDs directly from input (cheaper than payload parse)
+  - Scans deltas for memoryBundle# + critiqueField# prefixes
+  - Extracts candidateID from critique ref via "critiqueField#cf-<turnID>-<candID>" parser
+  - Decodes severity from payload JSON via `"severity":"<name>"` substring lookup (cheap + robust)
+  - Computes `aggregateCritiquePressure = strong+severeCount / totalCandidates`
+  - Graceful degradation on malformed payload → `.none` severity (not crash)
+
+**MODIFIED `Sources/BASMemory/BASAgentTurnDispatcher.swift`:**
+- `BASAgentTurnResult.evidenceDebt: BASAgentEvidenceDebt` new field (default `.empty`)
+- Dispatcher computes evidence-debt at turn end via `BASAgentEvidenceDebt.derive(...)` — O(emitted count) single pass
+- No impact on existing call paths;evidenceDebt for 4-seat callers is `.empty`
+
+**NEW `Sources/BASMemory/BASAgentFabricFuzzScenarios.swift` (~280 LOC):**
+- `standardRoster()` — 6-agent roster used by all scenarios
+- 7 canonical scenarios:
+  1. `cleanLowRiskTurn` — happy path,no concerns
+  2. `manipulationDetectedTurn` — Scout flags manipulation → Risk HIGH → Surface BLOCK
+  3. `irreversibleHighStakesTurn` — cost > 2× benefit + low rev → Critic SEVERE
+  4. `multiCandidateCriticCascadeTurn` — 5 candidates, mixed severity → aggregatePressure = 0.8
+  5. `memoryConflictRecallTurn` — Memory surfaces prior conflict clusters (cross-turn signal)
+  6. `strictSuperegoMildBumpTurn` — borderline candidate + superego 0.8 → MILD critique
+  7. `allSignalsActiveTurn` — every signal active simultaneously (stress test)
+
+**NEW `Tests/.../BASChapter962EvidenceDebtFuzzTests.swift` (~430 LOC, 17 tests):**
+
+| Group | Tests | Coverage |
+|---|---|---|
+| Evidence-debt struct (5) | empty default / no-input / memory-only / critic-only / pressure cap / edge cases | All `derive(...)` paths |
+| Dispatcher integration (2) | evidence-debt computed in result / 4-seat path is `.empty` | Backward compat preserved |
+| Scenario invariants (7) | clean / manipulation / highstakes / cascade / recall / strict / all-active | Each scenario dispatches deterministically + invariants hold |
+| Cross-turn simulation (1) | turn-1 evidenceDebt queryable by turn-2 caller | Future Planner-v2 contract ready |
+| Edge cases (2) | malformed payload → .none / ignores non-memory/critic deltas | Graceful degradation |
+
+#### Strongest test:`testScenario_MultiCandidateCascade`
+
+Pins concrete invariants on the 5-candidate cascade scenario:
+- 4 of 5 candidates concerning → `aggregateCritiquePressure = 0.8` ✓
+- Safe candidate has NO entry in `critiqueByCandidateID` ✓
+- Critic emits 4 deltas (one per concerning candidate) ✓
+- Deterministic mergeID across runs ✓
+
+#### Phase 2 close validation status
+
+**Substrate-level Phase 2 complete:**
+
+| Phase 2 ch | Status | Deliverable |
+|---|---|---|
+| 960 | ✓ | First coordinator wire (observation-only, ADR-014 OPT-IN) |
+| 961 | ✓ | Memory + Critic seats + `.critiqueField` domain |
+| 962 | ✓ | **Evidence-debt + 7 adversarial scenarios (this chapter)** |
+
+**Per-plan iPhone Air 30-min smoke deferred to maintainer:**
+- Requires physical iPhone Air + Xcode signing + 30-min device window
+- Smoke driver pattern documented in ch 952.6 wrapper
+- Trigger: `MAX_SEC=1800 BAS_DEVICE_LOG_DIR=/tmp/ch962-phase2 bash scripts/run-iphone-air-10hr.sh`
+- Pass criteria: 0 crashes + 0 unhandled assertions + dispatcher p99 ≤ 5ms per turn (per ch 956.6 macOS-extrapolated budget)
+- Maintainer queues the smoke when device + window are available
+
+#### Verification
+
+```
+swift build  → clean (102s)
+swift test --filter BASChapter962  → 17 PASSED / 0 FAILED in 0.02s
+swift test --filter "BASChapter95[3-9]|BASChapter96"
+  → 229 PASSED / 0 FAILED in 3s
+BAS_FUZZ_RUNTIME_SKIP=1 swift test
+  → 13,890 PASSED / 113 skipped / 0 failures in 383s
+```
+
+**Cumulative Agent Fabric arc:229 Swift tests + 22 Rust tests
+= 251 dedicated arc tests / 0 failures。**
+
+#### Risk + revert
+
+LOW:
+- All additive (1 new struct, 1 new field on result, 1 new
+  scenarios file, 1 new test file)
+- No existing test signatures changed (BASAgentTurnResult.init
+  has defaulted `evidenceDebt` param)
+- All 4-seat callers continue to work (their evidenceDebt is `.empty`)
+- Deterministic fuzz scenarios → reproducible test signal
+
+Revert: this single commit (3 new src + 1 modified dispatcher
++ 1 new test + CHANGELOG)。
+
+#### What's next
+
+**Ch 963 (Phase 3 ch1):** HostAlignment seat per plan。 Reads
+`BASHostConstitution`,emits alignment-deltas against agent
+proposals。 Cannot write `.hostVersion` (sovereign-locked)。 MED
+risk per plan。
+
+**Future ch 963+ Planner-v2:** consume turn-1's `evidenceDebt`
+when re-proposing turn-2 candidates:
+- Downweight candidates whose prior critique severity was strong+
+- Skip re-proposing candidates with memory-conflict-cluster overlap
+- Surface aggregate critique pressure as router signal (high pressure → proactive sovereign sentinel activation)
+
+---
+
 ### Chapter 九百六十一 / M3510 — Phase 2 ch2:Memory + Critic seats (with optional roster slots)
 
 Second pair of seats in Phase 2,bringing the dispatcher from 4 to

@@ -82,6 +82,9 @@ public struct BASAgentTurnInput: Sendable {
 
 /// Output of one per-turn dispatch。 Captures everything a
 /// caller / replay / audit needs to reconstruct the turn。
+///
+/// chapter 九百六十二 / M3515:added `evidenceDebt` per-turn
+/// summary for cross-agent / cross-turn evidence flow。
 public struct BASAgentTurnResult: Sendable, Equatable {
     /// All deltas emitted in this turn (before merge resolution)。
     public let emittedDeltas: [BASAgentDelta]
@@ -92,17 +95,25 @@ public struct BASAgentTurnResult: Sendable, Equatable {
     /// Final per-turn seq counter value (useful for caller's
     /// next-turn ID generation)。
     public let finalSeq: Int
+    /// chapter 九百六十二 — per-turn aggregation of Memory +
+    /// Critic signals。 `.empty` when neither seat was wired
+    /// (4-seat backward-compat preserves existing semantics)。
+    /// Future ch 963+ Planner-v2 will read this for cross-turn
+    /// evidence weighting。
+    public let evidenceDebt: BASAgentEvidenceDebt
 
     public init(
         emittedDeltas: [BASAgentDelta],
         mergeResult: BASAgentMergeResult,
         applyOutcomes: [BASAgentDeltaApplicationOutcome],
-        finalSeq: Int
+        finalSeq: Int,
+        evidenceDebt: BASAgentEvidenceDebt = .empty
     ) {
         self.emittedDeltas = emittedDeltas
         self.mergeResult = mergeResult
         self.applyOutcomes = applyOutcomes
         self.finalSeq = finalSeq
+        self.evidenceDebt = evidenceDebt
     }
 }
 
@@ -278,10 +289,19 @@ public enum BASAgentTurnDispatcher {
             }
         }
 
+        // chapter 九百六十二 / M3515:derive evidence-debt summary
+        // from the emitted Memory + Critic deltas + the inputs。
+        // O(emitted-count) single pass — minimal added cost。
+        let evidence = BASAgentEvidenceDebt.derive(
+            emitted: emitted,
+            memoryInput: input.memory,
+            criticInput: input.critic)
+
         return BASAgentTurnResult(
             emittedDeltas: emitted,
             mergeResult: mergeResult,
             applyOutcomes: outcomes,
-            finalSeq: seq)
+            finalSeq: seq,
+            evidenceDebt: evidence)
     }
 }
