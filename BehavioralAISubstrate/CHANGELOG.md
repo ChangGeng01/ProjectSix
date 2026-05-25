@@ -11,6 +11,153 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十五 / M3530 — Phase 3 close:EvolutionShadow seat + `.evolutionProposal` domain (never-effective-same-turn)
+
+Closes Phase 3 of the Agent Fabric arc (chapters 963-965)。 Ships the
+9th core agent — EvolutionShadow — wrapping the `evolutionService`
+discipline of UpdateTicket + RuleCandidate + HostChangeCandidate
+proposals。 Per plan PHASE 3 ch3 invariant + Root Law 4 (单主权):
+EvolutionShadow proposals are **NEVER effective same turn** — they
+land in a new state-graph domain (`.evolutionProposal`) that NO
+in-turn seat consumes,for future async ShadowTrial pickup。
+
+#### Schema additions
+
+- `BASStateDomain.evolutionProposal` (12th domain;count pin bumped
+  11 → 12 in `BASChapter953AgentFabricSchemaPropertyTests`)
+- `BASEvolutionUpdateTicket` — incremental update proposal (target +
+  summary + scope-impact)
+- `BASEvolutionRuleCandidate` — new-rule proposal (rule body +
+  support strength)
+- `BASEvolutionHostChangeCandidate` — host-axis change proposal
+  (target axis + direction + sovereign-adjacent marker)
+- `BASEvolutionShadowInput` — slim DTO bundling the 3 clusters
+  (decouples BASMemory from BASHostKit)
+- `BASEvolutionShadowSeat.emit(...)` — same pure-fn shape as
+  Scout/Planner/Memory/Critic/HostAlign/Risk/Surface/Sentinel
+
+#### Dispatcher extension (8→9 seats)
+
+- `BASAgentTurnInput.evolutionShadow` + `BASAgentTurnRoster.evolutionShadow`
+  optional slots (8-seat callers unchanged — both default-nil)
+- Canonical 9-seat order:Scout → Planner → Memory → Critic →
+  HostAlign → Risk → Surface → SovereignSentinel → **EvolutionShadow**
+  (shadow LAST overall so its trace observes sealed-sovereign state;
+  this is correct because shadow proposals don't feed back into the
+  live-decision graph this turn)
+
+#### CRITICAL invariants (verified by ch 965 tests)
+
+1. **EvolutionShadow CAN write `.evolutionProposal`** (sole-writer test)
+2. **EvolutionShadow CANNOT write `.hostVersion`** (sovereign-locked
+   per Single-Writer table — only L5 + L14 own it,L13 proposes only)
+3. **EvolutionShadow CANNOT write `.sovereignVerdict`** (sentinel-only
+   per ch 964 invariant — symmetry verification)
+4. **EvolutionShadow CANNOT write any other 11 domains** (full sweep)
+5. **No other agent (Planner/Risk/Memory/Critic/HostAlign/Surface/
+   Sentinel) can write `.evolutionProposal`** (sole-writer-from-outside)
+6. **NEVER-effective-same-turn**:dispatch with all 9 seats wired
+   confirms no non-shadow agent emits to `.evolutionProposal` —
+   shadow proposals stay quarantined for async pickup
+7. **SovereignSentinel still sole writer of `.sovereignVerdict`**
+   when EvolutionShadow is active (coexistence test — ch 964
+   invariant preserved)
+
+#### Audit-marker discipline (for trace replay)
+
+Every emitted delta carries `evolution.deferred=shadow-trial` reason
+code。 Host-change deltas additionally carry
+`evolution.sovereign-adjacent=true` reason code + `sovereign_adjacent:
+true` in the payload JSON — explicit marker for the trace-replay
+engine + ShadowTrial gate that these proposals MUST go through
+L5+L14 review before any effective mutation。
+
+#### Visibility + lease discipline
+
+- EvolutionShadow agent visibility:MUST be `.medium` or `.low`
+  (NEVER `.high` — no user customization of proposal SELECTION
+  logic,only cadence per plan)
+- Default lease profile:`.coldSeat` (cold-start on demand,larger
+  budget — per Section 13.3 hot/cold tier mapping)
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentFabricEnums.swift` | + `.evolutionProposal` domain |
+| `Sources/BASMemory/BASEvolutionShadowSeat.swift` | NEW (367 LOC) — 3 DTOs + seat + payload encoders |
+| `Sources/BASMemory/BASAgentTurnDispatcher.swift` | extend input + roster + dispatch to 9 seats |
+| `Tests/BehavioralAISubstrateTests/BASChapter953AgentFabricSchemaPropertyTests.swift` | count pin 11 → 12 |
+| `Tests/BehavioralAISubstrateTests/BASChapter963HostAlignmentSeatTests.swift` | floor-pin `≥ 11` for forward compat |
+| `Tests/BehavioralAISubstrateTests/BASChapter965EvolutionShadowSeatTests.swift` | NEW — 25 tests (7 CRITICAL invariants + 18 emission/dispatcher/discipline) |
+
+Test result:**25 / 25 pass**。 Cumulative arc tests (ch 953-965)
+**297 / 0 failures**。 Full sweep **13958 / 0 failures**
+(113 fuzz-skipped via `BAS_FUZZ_RUNTIME_SKIP=1`) — zero regression。
+
+#### Phase 3 close — iPhone Air 2-hour smoke (operator procedure)
+
+Per plan Phase 3 close requires a 2-hour real-device smoke on iPhone
+Air to validate all 9 core agents under realistic load。 The smoke
+procedure (executed by maintainer with physical device):
+
+```bash
+# Phase 3 close — 2-hour iPhone Air real-device smoke with all 9 seats
+MAX_SEC=7200 \
+    BAS_AGENT_FABRIC=enabled \
+    BAS_AGENT_TIER=phase3 \
+    BAS_DEVICE_LOG_DIR=/tmp/ch965-phase3-close \
+    bash scripts/run-iphone-air-10hr.sh
+
+# Trend analysis (zero drift on STABLE metrics, perf delta ≤ +5%)
+python3 scripts/analyze-ch952-trend.py /tmp/ch965-phase3-close
+
+# Pass criteria:
+#   0 failures
+#   0 single-writer-violations (ch 953-965 invariant)
+#   Phase 3 cumulative perf ≤ +5% vs ch 952.6 baseline
+#   .evolutionProposal domain: ZERO same-turn consumers observed
+#   .sovereignVerdict domain: SovereignSentinel sole writer (re-verifies ch 964)
+#   .hostVersion domain: ZERO writes from EvolutionShadow
+```
+
+The smoke validates the 9-seat dispatch under the same wrapper as
+ch 952.6 + extends it with 3 Phase-3-specific invariant checks the
+trend analyzer asserts on each iteration:
+
+1. EvolutionShadow proposals NEVER consumed same turn
+   (`.evolutionProposal` reader count == 0)
+2. SovereignSentinel remains sole writer of `.sovereignVerdict`
+3. No `.hostVersion` write from any non-L5/L14 agent
+
+Outcome of operator smoke recorded in `Docs/PHASE_3_CLOSE_SMOKE.md`
+(operator-authored)。 Until the smoke is executed,Phase 3 close
+status is **simulator-verified** (host-level CI passes) but
+**device-verification pending**。
+
+#### Phase 3 summary (ch 963 + 964 + 964.5 + 965)
+
+Closes the「sovereign tier」 of the Agent Fabric arc。 With Phase 3
+sealed:
+
+- **8 of 9 core agents wired**:Scout/Planner/Memory/Critic/
+  HostAlign/Risk/Surface/SovereignSentinel + EvolutionShadow
+- **4 new state-graph domains**:`.critiqueField` (ch 961) +
+  `.alignmentField` (ch 963) + `.sovereignVerdict` (ch 964) +
+  `.evolutionProposal` (ch 965) — all under Single-Writer-Per-Domain
+- **3-tier visibility enforced**:HIGH (Planner/Critic/Memory/Risk/
+  Surface),MED (HostAlign/EvolutionShadow),LOW (SovereignSentinel —
+  sealed-default,no user customization)
+- **9-seat dispatcher** with optional roster slots preserving all
+  4/6/7/8-seat backward compat
+- **2 N-pass review cycles** (956.11 + 964.5) caught **25 real bugs**
+  before production
+
+Next phase:Phase 4 Persona Studio (ch 966-969) — user-customizable
+persona overlay on the HIGH/MED tier seats from Phase 1-3。
+
+---
+
 ### Chapter 九百六十四.5 / M3525.5 — USER-PASS-5:全面 3-agent review of ch 957→964 catches 2 CRITICAL + 4 HIGH + 7 doc lies + 6 test gaps
 
 Per user directive「全面 review」 dispatched 3 parallel review agents

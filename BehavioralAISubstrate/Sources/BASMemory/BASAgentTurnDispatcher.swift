@@ -61,6 +61,12 @@ public struct BASAgentTurnInput: Sendable {
     /// hasn't wired it at all yet。
     public let sovereignSentinel:
         BASSovereignSentinelInput?
+    /// NEW ch 965:EvolutionShadow seat input。 Nil = skip
+    /// (8-seat backward compat)。 Per plan invariant proposals
+    /// emitted here are NEVER effective same turn — they go
+    /// to `.evolutionProposal` for async ShadowTrial pickup。
+    public let evolutionShadow:
+        BASEvolutionShadowInput?
     public let priorityContext: BASMergePriorityContext
     /// Monotonic nanosecond timestamp for ch 956.5 USER-PASS gap #5
     /// recency tie-break。 0 = unknown (merge engine falls back to
@@ -78,6 +84,8 @@ public struct BASAgentTurnInput: Sendable {
         hostAlignment: BASHostAlignmentInput? = nil,
         sovereignSentinel:
             BASSovereignSentinelInput? = nil,
+        evolutionShadow:
+            BASEvolutionShadowInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -91,6 +99,7 @@ public struct BASAgentTurnInput: Sendable {
         self.critic = critic
         self.hostAlignment = hostAlignment
         self.sovereignSentinel = sovereignSentinel
+        self.evolutionShadow = evolutionShadow
         self.priorityContext = priorityContext
         self.nowNanos = nowNanos
     }
@@ -158,6 +167,13 @@ public struct BASAgentTurnRoster: Sendable {
     /// (TURN BEHAVIOR UNCHANGED — but per ADR-014 + plan,
     /// production hosts SHOULD always wire the sentinel)。
     public let sovereignSentinel: BASAgentSpec?
+    /// NEW ch 965:EvolutionShadow agent。 Nil = no shadow
+    /// (8-seat backward compat)。 The shadow seat is OPT-IN
+    /// per Phase 3 ch3 plan — most production hosts will
+    /// enable it once the ShadowTrial consumer pipeline ships
+    /// in a later phase。 Until then,its deltas land in
+    /// `.evolutionProposal` and stay there for audit / replay。
+    public let evolutionShadow: BASAgentSpec?
 
     public init(
         scout: BASAgentSpec,
@@ -167,7 +183,8 @@ public struct BASAgentTurnRoster: Sendable {
         memory: BASAgentSpec? = nil,
         critic: BASAgentSpec? = nil,
         hostAlignment: BASAgentSpec? = nil,
-        sovereignSentinel: BASAgentSpec? = nil
+        sovereignSentinel: BASAgentSpec? = nil,
+        evolutionShadow: BASAgentSpec? = nil
     ) {
         self.scout = scout
         self.planner = planner
@@ -177,11 +194,12 @@ public struct BASAgentTurnRoster: Sendable {
         self.critic = critic
         self.hostAlignment = hostAlignment
         self.sovereignSentinel = sovereignSentinel
+        self.evolutionShadow = evolutionShadow
     }
 
     /// `[agentID: spec]` map used by the applier。 Includes
-    /// Memory / Critic / HostAlignment / SovereignSentinel
-    /// when present。
+    /// Memory / Critic / HostAlignment / SovereignSentinel /
+    /// EvolutionShadow when present。
     public var agentMap: [String: BASAgentSpec] {
         var m: [String: BASAgentSpec] = [
             scout.agentID: scout,
@@ -197,22 +215,28 @@ public struct BASAgentTurnRoster: Sendable {
         if let sovereignSentinel {
             m[sovereignSentinel.agentID] = sovereignSentinel
         }
+        if let evolutionShadow {
+            m[evolutionShadow.agentID] = evolutionShadow
+        }
         return m
     }
 }
 
 public enum BASAgentTurnDispatcher {
 
-    /// Dispatch one turn:invoke UP TO 8 SEATS with a shared seq
+    /// Dispatch one turn:invoke UP TO 9 SEATS with a shared seq
     /// counter,merge their deltas,apply accepted deltas to the
     /// state graph,optionally record events to the trace log。
     ///
-    /// chapter 九百六十四.5 USER-PASS-5 D3 doc-fix:was "all 4
-    /// seats" — ch 961 added Memory + Critic,ch 963 added
-    /// HostAlignment,ch 964 added SovereignSentinel。 Canonical
-    /// 8-seat order is Scout → Planner → Memory → Critic →
-    /// HostAlign → Risk → Surface → SovereignSentinel (sentinel
-    /// LAST per Root Law 4)。 Seats are invoked only when BOTH
+    /// chapter 九百六十五 / M3530 doc:was "8 seats" — ch 965
+    /// added EvolutionShadow as the 9th seat。 Canonical 9-seat
+    /// order is Scout → Planner → Memory → Critic → HostAlign →
+    /// Risk → Surface → SovereignSentinel → EvolutionShadow
+    /// (sentinel LAST among live-decision seats per Root Law 4,
+    /// EvolutionShadow AFTER sentinel because its proposals are
+    /// NEVER effective same turn — they go to `.evolutionProposal`
+    /// for async ShadowTrial pickup,so seeing sealed sovereign
+    /// state first is correct)。 Seats are invoked only when BOTH
     /// the roster slot AND the input DTO are non-nil。
     ///
     /// - Parameters:
@@ -305,9 +329,10 @@ public enum BASAgentTurnDispatcher {
             agentSpec: roster.surface,
             seq: &seq,
             nowNanos: input.nowNanos))
-        // chapter 九百六十四:SovereignSentinel emits LAST per
-        // Root Law 4 (单主权) — sees everything other seats
-        // emitted this turn,issues final veto verdict。 Order:
+        // chapter 九百六十四:SovereignSentinel emits LAST among
+        // live-decision seats per Root Law 4 (单主权) — sees
+        // everything other seats emitted this turn,issues final
+        // veto verdict。 Order:
         // scout→planner→memory→critic→hostalign→risk→surface→
         // SOVEREIGN (canonical 8-seat order)
         if let sovAgent = roster.sovereignSentinel,
@@ -317,6 +342,27 @@ public enum BASAgentTurnDispatcher {
                     from: sovInput,
                     turnID: input.turnID,
                     agentSpec: sovAgent,
+                    seq: &seq,
+                    nowNanos: input.nowNanos))
+        }
+        // chapter 九百六十五:EvolutionShadow emits LAST overall。
+        // Per plan Phase 3 ch3 invariant the shadow's proposals
+        // are NEVER effective same turn — they land in the new
+        // `.evolutionProposal` domain and stay there for async
+        // ShadowTrial pickup。 We place the shadow AFTER the
+        // sovereign sentinel so the shadow trace records observe
+        // a sealed-sovereign view of this turn (any later debug
+        // / replay sees the full live-decision context that
+        // produced the proposal)。 No other in-turn seat reads
+        // `.evolutionProposal` — invariant verified by ch 965
+        // tests via dispatcher inspection。
+        if let evoAgent = roster.evolutionShadow,
+           let evoInput = input.evolutionShadow {
+            emitted.append(
+                contentsOf: BASEvolutionShadowSeat.emit(
+                    from: evoInput,
+                    turnID: input.turnID,
+                    agentSpec: evoAgent,
                     seq: &seq,
                     nowNanos: input.nowNanos))
         }

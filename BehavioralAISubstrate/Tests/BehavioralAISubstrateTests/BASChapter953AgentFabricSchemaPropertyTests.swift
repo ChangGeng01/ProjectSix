@@ -73,7 +73,13 @@ final class BASChapter953AgentFabricSchemaPropertyTests:
         // addition of `.alignmentField` (HostAlignment seat
         // owns this — CANNOT write .hostVersion which is
         // sovereign-locked per Single-Writer table)
-        XCTAssertEqual(BASStateDomain.allCases.count, 11)
+        // chapter 九百六十五 / M3530:bumped 11 → 12 with
+        // addition of `.evolutionProposal` (EvolutionShadow
+        // seat owns this — CANNOT write .hostVersion which
+        // remains sovereign-locked per Single-Writer table;
+        // EvolutionShadow's proposals are NEVER effective same
+        // turn per plan Phase 3 ch3 invariant)
+        XCTAssertEqual(BASStateDomain.allCases.count, 12)
         XCTAssertEqual(BASAgentProposalType.allCases.count, 7)
         XCTAssertEqual(BASAgentDeltaType.allCases.count, 5)
         XCTAssertEqual(BASAgentLeaseProfile.allCases.count, 4)

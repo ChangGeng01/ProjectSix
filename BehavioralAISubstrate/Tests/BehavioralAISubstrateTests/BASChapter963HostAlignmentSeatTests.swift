@@ -360,10 +360,16 @@ final class BASChapter963HostAlignmentSeatTests: XCTestCase {
         XCTAssertTrue(
             BASStateDomain.allCases.contains(.alignmentField),
             "ch 963: .alignmentField domain must exist")
-        // Count: 11 (10 from ch 961 + 1 from ch 963)
-        XCTAssertEqual(
+        // chapter 九百六十三 baseline was 11 (10 from ch 961 +
+        // 1 from ch 963)。 chapter 九百六十五 / M3530 bumped
+        // 11 → 12 with addition of `.evolutionProposal`。 The
+        // pin still verifies `.alignmentField` is present —
+        // count assertion floor-checks the cumulative domain
+        // count so any future regression is caught。
+        XCTAssertGreaterThanOrEqual(
             BASStateDomain.allCases.count, 11,
-            "ch 963: domain count is 11 after .alignmentField add")
+            "ch 963: domain count must remain ≥ 11 after " +
+            "ch 963 added .alignmentField (ch 965 bumped to 12)")
     }
 
     // MARK: - Helpers

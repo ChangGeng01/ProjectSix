@@ -96,6 +96,7 @@ public enum BASAgentVisibility: String, Codable,
 ///   - renderFrame → Surface agent (L12)
 ///   - sovereignVerdict → L14 SovereignSentinel (NO write,ever)
 ///   - hostVersion → L5 + L14 (L13 proposes only)
+///   - evolutionProposal → EvolutionShadow (NEW ch 965 — see below)
 ///
 /// chapter 九百六十一 / M3510:`critiqueField` added。 Original
 /// plan said "Critic emits CritiqueDelta against Planner's
@@ -107,6 +108,18 @@ public enum BASAgentVisibility: String, Codable,
 /// Phase 2 ch2 takes (b) — cleaner separation, no merge-engine
 /// proposal-routing complexity, future Planner v2 reads critiques
 /// from this domain when re-proposing candidates next turn。
+///
+/// chapter 九百六十五 / M3530:`evolutionProposal` added。 Phase 3
+/// close — EvolutionShadow owns this domain。 CRITICAL invariant:
+/// EvolutionShadow CANNOT write `.hostVersion` (sovereign-locked
+/// per Single-Writer table — only L5 + L14 own it,L13 proposes
+/// only)。 The EvolutionShadow seat proposes UpdateTicket +
+/// RuleCandidate + HostChangeCandidate via `.evolutionProposal`,
+/// which Phase 3+ ShadowTrial pipeline consumes — NEVER effective
+/// same turn (consumer is the future async ShadowTrial,not any
+/// in-turn seat)。 Per plan Phase 3 ch3:never-effective-same-turn
+/// invariant prevents evolution candidates from racing the live
+/// decision graph。
 public enum BASStateDomain: String, Codable,
     Sendable, Equatable, Hashable, CaseIterable
 {
@@ -121,6 +134,7 @@ public enum BASStateDomain: String, Codable,
     case renderFrame
     case sovereignVerdict
     case hostVersion
+    case evolutionProposal  // chapter 九百六十五 — EvolutionShadow owns
 }
 
 // MARK: - BASAgentProposalType
