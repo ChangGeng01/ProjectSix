@@ -11,6 +11,142 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百七十九-九百八十一 / M3600-M3610 — Phase 8 close + ARC SEAL (ch 953-981)
+
+**This commit closes the Agent Fabric arc** (chapters 953-981 + 5
+USER-PASS sub-chapters)。 29 chapters across 8 phases shipped over
+the past development cycle。
+
+#### Ch 979 — Shared latent spine
+
+`BASLatentSpine` + `BASCandidateSeed` + `BASLatentConcernSeed` —
+per-turn cache for encoded inputs so N agents share ONE encode
+pass instead of N。 Expected 5-10× speedup on compare mode (3+
+active agents)。
+
+Key types:
+- `BASCandidateSeed` — per-candidate cached encoding (token count
+  + embedding digest + encoder confidence + coverage notes)
+- `BASLatentConcernSeed` — per-concern cached encoding
+- `BASLatentSpine` — per-turn shared cache (auto-sorted by ID)
+- `BASLatentSpineBuilder` — pure-fn builder (caller supplies
+  encoder output;builder does NOT call encoder itself)
+- `BASLatentSpineReuseStat` — per-agent reuse statistics for
+  ch 980 hot/cold decisions
+
+This layer does NOT call the ML encoder — host's L6/L7/MLX pass
+runs once,then this cache lets agents read from it。
+
+#### Ch 980 — Hot/cold agent tier
+
+`BASAgentTier` enum (3 cases:hot/cold/sealed) + per-role tier
+assignments + activation planner。
+
+Reference assignments:
+- **HOT** (4 core + 7 watcher,~5ms wake cost):Scout / Risk /
+  Surface / SovereignSentinel + all 7 watchers
+- **COLD** (5,~50-200ms wake cost):Planner / Memory / Critic /
+  HostAlignment / EvolutionShadow
+- **SEALED** (4,~0ms wake cost,pre-init once per session):
+  ActionPermit / DeleteRollbackSeal / MemorySeal / CompareModerator
+
+`BASAgentTierActivationPlanner.plan(...)` computes per-turn
+activation:
+- LOW risk:hot only
+- MED risk:hot + Planner + Memory
+- HIGH risk:all 9 core + 7 watchers
+- Cache-hit short-circuit:LOW risk + spine hit ratio ≥ 0.7 →
+  skip ALL cold agents (audit-trail-logged)
+- Budget exceeded → skip cold agents one-by-one + audit-trail
+- Force-activate honored even on LOW risk
+
+#### Ch 981 — Speculative parallelism + zero-copy state bus + ARC SEAL
+
+`BASSpeculativeTask` + `BASSpeculativePrefetcher` — pure-fn
+speculation policy。 Caller fires concurrent prefetches while
+L6/L7 in flight。 Default tasks (memory recall / compare shell /
+guard templates / watcher warmup) vary by risk band。 Discipline:
+- ONLY idempotent + safe-on-abandon tasks fire
+- Sorted by `confidence / cost` heuristic (highest payoff first)
+- Greedy fill within wake budget,audit-trail for skips
+
+`BASZeroCopyStateRef` — slim 4-field ref (domain + objectID +
+versionAtRead + nanos) for passing between agents WITHOUT
+re-serializing payload。 NO payload + NO agentID = NO write
+capability。 Stale-ref detection via versionAtRead comparison。
+
+**CRITICAL invariant** (verified by `testCRITICAL_ZeroCopyRefIsReadOnlyPointer`):
+zero-copy ref carries no impersonation surface — agents MUST
+go through `BASSharedStateGraph.writeObject(...)` for actual
+writes (Single-Writer-Per-Domain preserved across Phase 8 perf
+optimizations)。
+
+#### Docs
+
+- **`Docs/ARC_SEAL_953_981.md`** (NEW) — comprehensive arc-level
+  declaration:
+  - 29-chapter trajectory across 8 phases
+  - Final invariants list (7 Root Laws + 12 domain ownership
+    + pipeline invariants + 9 reserved signalRefs prefixes)
+  - Test totals (580+ arc tests + 14,150+ full sweep,0 failures)
+  - 3-round N-pass review track record (35+ real bugs caught)
+  - 8 deferred items routed to Phase 9+ (round-table /
+    sovereign warrant infra / app-suspend persistence / env-var
+    gate / fuzz determinism / etc.)
+  - Operator arc seal procedure (3-mode 2hr iPhone Air smoke)
+
+- **`Docs/PHASE_8_CLOSE_SMOKE.md`** (NEW) — Phase 8 close +
+  arc seal operator procedure with 8 invariants verified across
+  all 3 smoke modes。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASLatentSpine.swift` | NEW — spine + seed types + builder + reuse stats (ch 979) |
+| `Sources/BASMemory/BASAgentHotColdTier.swift` | NEW — tier enum + assignments + activation planner (ch 980) |
+| `Sources/BASMemory/BASSpeculativePrefetcher.swift` | NEW — speculation task + planner + zero-copy ref + bus stats (ch 981) |
+| `Tests/BehavioralAISubstrateTests/BASChapter979_980_981Phase8CloseTests.swift` | NEW — 31 tests covering all 3 chapters + arc-seal cross-cuts |
+| `Docs/ARC_SEAL_953_981.md` | NEW — arc-level seal declaration |
+| `Docs/PHASE_8_CLOSE_SMOKE.md` | NEW — operator 2hr 3-mode smoke procedure |
+
+#### Results (FINAL)
+
+| Metric | Value |
+|---|---|
+| Phase 8 tests (ch 979-981) | 31 / 0 failures |
+| Cumulative arc tests (ch 953-981) | 617 / 0 failures |
+| Full sweep | 14,245 / 0 unexpected failures (1 swift-testing helper SIGBUS — environmental CoreData XPC crash, not caused by Phase 8 changes;reproduced without ch 979-981 in baseline) |
+
+#### Arc 953-981 SEALED (substrate side)
+
+Per the discipline this arc has held to:
+- Red-line 7 additive-only,byte-equal when fabric unconfigured
+- 3-agent N-pass review every ~8 chapters with 35+ real bugs caught
+- Pure-fn + slim-DTO seat layer for 8 of 9 core agents
+- Sovereign-locked external surfaces (Phase 7)
+- 3-tier stability contract declared (Phase 6 ch 974)
+
+**The Agent Fabric arc 953-981 is hereby SUBSTRATE-SEALED at the
+simulator level**。 Device verification via 3-mode 2-hour iPhone
+Air smoke documented in `Docs/PHASE_8_CLOSE_SMOKE.md` — pending
+operator execution。
+
+#### Forward-looking deferred items (Phase 9+ scope)
+
+8 items deferred to post-arc work,documented in
+`Docs/ARC_SEAL_953_981.md`:
+1. Round-table mode (.roundtable) — N-way agent collaboration
+2. Persona marketplace / sharing (out of substrate scope)
+3. App-suspension state persistence
+4. Multi-tenant sovereign (forbidden by Root Law 1)
+5. Sovereign warrant infrastructure for collaborator tier upgrade
+6. Env-var gate wiring (BAS_PERSONA_ENABLED etc.)
+7. Ch 967 risk fuzz determinism
+8. 8 file-private escapeForJSON consolidation
+
+---
+
 ### Chapter 九百七十六-九百七十八 / M3585-M3595 — Phase 7 close:MCP + A2A external interop (HIGH-risk)
 
 Closes Phase 7 of the Agent Fabric arc — the highest-risk phase
