@@ -80,6 +80,13 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
     /// Defense:after wire,distinct writeDomains install
     /// without conflict (global registry is now non-empty for
     /// subsequent writes' single-writer enforcement)。
+    ///
+    /// chapter 九百九十六.7 META-REVIEW Round-16 CRITICAL-1 fix:
+    /// pre-fix used `XCTAssertNoThrow(Task { try await ... })`
+    /// which is VACUOUSLY GREEN — Task init never throws
+    /// synchronously,so XCTAssertNoThrow checks the Task value
+    /// (not its async body)。 Now awaits directly so a throw
+    /// from wire propagates + fails the test。
     func testCRITICAL_C1_DistinctWriteDomains_AllRegistered()
         async throws
     {
@@ -100,16 +107,17 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
             visibility: .high)
         try await registry.register(scout)
         try await registry.register(planner)
-        // No overlap → wire succeeds (no throw)
-        XCTAssertNoThrow(
-            Task {
-                try await registry.wire(toGraph: graph)
-            })
+        // No overlap → wire MUST succeed (any throw fails test)
+        try await registry.wire(toGraph: graph)
     }
 
     /// Defense:wire is IDEMPOTENT — re-wiring same registry +
     /// graph pair does not throw (per registerWriter contract:
     /// re-register same agentID for same domain is a no-op)。
+    ///
+    /// chapter 九百九十六.7 META-REVIEW Round-16 CRITICAL-1 fix:
+    /// same Task-wrapper bug as DistinctWriteDomains test —
+    /// now awaits directly so a throw propagates。
     func testC1_Idempotent_ReWireSameRegistry() async throws {
         let registry = BASAgentRegistry()
         let graph = BASSharedStateGraph()
@@ -121,13 +129,8 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
             visibility: .high)
         try await registry.register(agent)
         try await registry.wire(toGraph: graph)
-        // Re-wire same pair — must not throw
-        XCTAssertNoThrow(
-            Task {
-                try await registry.wire(toGraph: graph)
-            },
-            "ch 996.5 CRITICAL-1: re-wiring is idempotent " +
-            "(per registerWriter same-agent contract)")
+        // Re-wire same pair — MUST not throw (any throw fails test)
+        try await registry.wire(toGraph: graph)
     }
 
     // MARK: - CRITICAL-2: 6 audit-entry call sites use "1.1.0"

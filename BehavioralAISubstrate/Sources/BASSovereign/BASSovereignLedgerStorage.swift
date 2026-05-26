@@ -194,22 +194,30 @@ public final class BASSovereignLedgerSQLiteStorage:
         }
         self.db = handle
 
-        // chapter 九百九十五.5 META-REVIEW Round-12 HIGH-2 fix:
-        // set busy_timeout BEFORE any other pragmas so
-        // concurrent first-open of a fresh DB doesn't hit
-        // SQLITE_BUSY on journal_mode/foreign_keys writes。
-        // Round-11 HIGH-2 fix had set busy_timeout ONLY inside
-        // the v1→v2 migration branch — Round-12 caught the
-        // remaining gap at WAL setup。
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA busy_timeout=5000;")
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA journal_mode=WAL;")
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA foreign_keys=ON;")
+        // chapter 九百九十六.7 META-REVIEW Round-16 MED-1 fix:
+        // Swift does NOT call deinit on a class whose init
+        // throws,so any throw after `sqlite3_open_v2` succeeded
+        // but before init returns LEAKS the open SQLite handle
+        // (deinit at line 314 never fires)。 Wrap all post-open
+        // setup in a do-catch that closes the handle on any
+        // throw,then rethrows the original error。
+        do {
+            // chapter 九百九十五.5 Round-12 HIGH-2 fix:set
+            // busy_timeout BEFORE any other pragmas so concurrent
+            // first-open of a fresh DB doesn't hit SQLITE_BUSY
+            // on journal_mode/foreign_keys writes。 Round-11
+            // HIGH-2 had set busy_timeout ONLY inside the
+            // v1→v2 migration branch — Round-12 caught the
+            // remaining gap at WAL setup。
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA busy_timeout=5000;")
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA journal_mode=WAL;")
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA foreign_keys=ON;")
 
         // M886 backport (M882 audit fix):read user_version FIRST,
         // branch 0 → write current,equal → accept,mismatch → throw。
@@ -297,9 +305,27 @@ public final class BASSovereignLedgerSQLiteStorage:
             } catch {
                 // Roll back on any migration step error so
                 // user_version stays at 1 + retry is safe。
-                try? Self.runExec(
-                    db: handle,
-                    sql: "ROLLBACK;")
+                // chapter 九百九十六.7 META-REVIEW Round-16 MED-2
+                // fix:pre-fix used bare `try?` which silently
+                // swallowed ROLLBACK failures (violates user's
+                // coding-style.md "Never silently swallow
+                // errors")。 Now logs the rollback failure to
+                // stderr before propagating the original error,
+                // so the original cause is preserved but the
+                // rollback-failure-additional-context isn't
+                // lost。
+                do {
+                    try Self.runExec(
+                        db: handle,
+                        sql: "ROLLBACK;")
+                } catch let rollbackError {
+                    FileHandle.standardError.write(Data(
+                        ("ch 996.7 MED-2: ROLLBACK after " +
+                         "migration error itself failed:" +
+                         " \(rollbackError) (original error: " +
+                         "\(error)) — DB may be in " +
+                         "indeterminate state\n").utf8))
+                }
                 throw error
             }
         } else if existingVersion != Self.schemaVersion {
@@ -309,6 +335,14 @@ public final class BASSovereignLedgerSQLiteStorage:
         }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
+        } catch {
+            // chapter 九百九十六.7 META-REVIEW Round-16 MED-1:
+            // close the SQLite handle before rethrowing so the
+            // throwing init doesn't leak the open handle (Swift
+            // does NOT call deinit on classes whose init throws)。
+            sqlite3_close_v2(handle)
+            throw error
+        }
     }
 
     deinit {

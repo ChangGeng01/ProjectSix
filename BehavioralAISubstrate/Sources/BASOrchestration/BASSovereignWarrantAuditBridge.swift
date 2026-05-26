@@ -151,6 +151,16 @@ public enum BASSovereignWarrantAuditBridge {
     /// `buildEntry(...)` always produces non-empty `auditID` +
     /// `verdictRef`,so the only realistic throw path is empty
     /// `sessionID` — caller's responsibility per host contract。
+    ///
+    /// chapter 九百九十六.7 META-REVIEW Round-16 HIGH-1 doc-fix:
+    /// `BASSovereignAuditLedger.append` is **actor-isolated
+    /// synchronous-throw** (declared `throws -> ...` not `async
+    /// throws`)。 From outside-the-actor callers it APPEARS async
+    /// at the call site (actor hop adds implicit await),but the
+    /// declaration itself isn't async。 Pre-fix this docstring
+    /// said "async" which read as "uses cooperative suspension
+    /// internally" — false。 No code change needed,just honest
+    /// doc。
     @discardableResult
     public static func appendToLedger(
         validationResult: BASWarrantValidationResult,

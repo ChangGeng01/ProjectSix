@@ -124,6 +124,26 @@ public actor BASAgentTraceLogEventLogBridge {
     ///
     /// Returns the count of (was-new) writes to the event log。
     /// Does NOT modify the trace log。
+    ///
+    /// **Concurrency contract** (chapter 九百九十六.7 META-REVIEW
+    /// Round-16 HIGH-2 disclosure):this method takes a
+    /// SNAPSHOT of `traceLog.events(forTurn:)` once + iterates
+    /// with per-event `await eventLog.append(...)` calls。
+    /// Between the snapshot and any iteration step,OTHER tasks
+    /// may call `traceLog.append` or `recordEvent` for the same
+    /// turn — those late events will NOT be in this flush。 They
+    /// land in the trace log normally + can be picked up by a
+    /// subsequent `flush(forTurn:)` call。 But if the host calls
+    /// flush at turn-end then immediately tears down the bridge,
+    /// late events are silently dropped from the event log。
+    ///
+    /// **Caller contract**:invoke `flush(forTurn:)` ONLY after
+    /// all seats for the given turn have completed emitting。
+    /// The dispatcher's own emission path completes synchronously
+    /// within `dispatchTurn(...)` so this is satisfied by calling
+    /// flush AFTER `dispatchTurn`。 Custom watchers / late
+    /// emissions outside the dispatcher path are the host's
+    /// responsibility to sequence。
     @discardableResult
     public func flush(
         forTurn turnID: String

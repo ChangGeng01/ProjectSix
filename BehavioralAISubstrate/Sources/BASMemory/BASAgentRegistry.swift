@@ -113,16 +113,84 @@ public actor BASAgentRegistry {
     public func wire(
         toGraph graph: BASSharedStateGraph
     ) async throws {
-        // Iterate in registration order so the conflict resolution
-        // is deterministic — earlier-registered agent wins the
-        // domain claim,later-registered agents throw on conflict。
+        // chapter 九百九十六.7 META-REVIEW Round-16 CRITICAL-2 fix:
+        // pre-fix this loop did registerWriter inline + threw on
+        // first conflict,leaving partial claims in the graph
+        // (agent A's [X,Y] claimed,then B's Y throws,then B's
+        // Z never gets claimed → silent auto-claim race for Z)。
+        // The thrown error implied atomic failure but graph was
+        // in inconsistent partial state。 Same class as the
+        // auto-claim race the registry was meant to prevent。
+        //
+        // Fix:two-phase commit。
+        //   Phase 1 (validation):collect all (agentID, domain)
+        //     pairs in registration order。 Check intra-batch
+        //     conflicts (same domain claimed by two different
+        //     agents in our batch) AND existing-graph conflicts
+        //     (graph already claimed this domain by a different
+        //     agent)。 If ANY conflict → throw BEFORE any
+        //     registerWriter calls。
+        //   Phase 2 (commit):only if Phase 1 passes,call
+        //     registerWriter for each pair。 Per registerWriter's
+        //     own idempotency contract this still works for
+        //     re-wire of the same (registry,graph) pair。
+        //
+        // Atomic w.r.t. domain claims:either ALL claims install
+        // or NONE do。 If two concurrent `wire()` calls run on
+        // the same graph from different registries,each is
+        // atomic individually but the second may see Phase-1
+        // conflicts created by the first;both still fail-closed
+        // cleanly (no silent partial state)。
+
+        // Phase 1A:gather batch + check intra-batch conflicts
+        var batch: [(agentID: String, domain: BASStateDomain)] =
+            []
+        var batchClaimed: [BASStateDomain: String] = [:]
         for agentID in registrationOrder {
             guard let entry = entries[agentID] else { continue }
             for domain in entry.spec.writeDomains {
-                try await graph.registerWriter(
-                    agentID: entry.spec.agentID,
-                    domain: domain)
+                if let existing = batchClaimed[domain],
+                   existing != entry.spec.agentID
+                {
+                    throw BASSharedStateGraphError
+                        .domainAlreadyClaimed(
+                            domain: domain,
+                            existingWriterAgentID: existing,
+                            newWriterAgentID: entry.spec.agentID)
+                }
+                batchClaimed[domain] = entry.spec.agentID
+                batch.append(
+                    (agentID: entry.spec.agentID,
+                     domain: domain))
             }
+        }
+
+        // Phase 1B:check existing-graph conflicts。 The graph
+        // exposes a `existingWriter(forDomain:)` style lookup
+        // via writerForDomain。 We probe each batch domain
+        // before committing。 If the graph reports a DIFFERENT
+        // agentID already claiming the domain,throw early。
+        for (agentID, domain) in batch {
+            if let existing = await graph
+                .writerForDomain(domain),
+               existing != agentID
+            {
+                throw BASSharedStateGraphError
+                    .domainAlreadyClaimed(
+                        domain: domain,
+                        existingWriterAgentID: existing,
+                        newWriterAgentID: agentID)
+            }
+        }
+
+        // Phase 2 (commit):all-or-nothing。 registerWriter is
+        // idempotent for same-agent same-domain claims,so
+        // re-wire is safe even if Phase 1 saw existing claims
+        // we ourselves installed previously。
+        for (agentID, domain) in batch {
+            try await graph.registerWriter(
+                agentID: agentID,
+                domain: domain)
         }
     }
 
