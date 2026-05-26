@@ -224,6 +224,28 @@ public enum BASAgentFabricFullTurnAdapter {
             riskOverride = nil
         }
 
+        // chapter 九百九十七 / M3690 — wire roster-to-graph BEFORE
+        // first dispatch。 If the coordinator's fabric has not
+        // been wired yet,this is a no-op (no agents registered),
+        // BUT if the host built the runtime with a 9-seat roster
+        // expecting SWPD enforcement,we need to PRE-INSTALL the
+        // writer claims so the graph's auto-claim race window
+        // (writeObject line 394-403) doesn't open。
+        //
+        // Idempotent:registerWriterBatch is no-op for already-
+        // claimed same-agent same-domain pairs。 Safe to call
+        // before every dispatch (no per-turn cost beyond the
+        // intra-batch dict check)。
+        //
+        // chapter 九百九十七 honest disclosure:per ch 996
+        // SCAFFOLD_VS_WIRED.md doctrine,prior to this chapter
+        // the roster-graph wiring was at TEST scope only。 This
+        // is the first chapter that performs the wiring on the
+        // production dispatch path。
+        if let fabric = coordinator.agentFabric {
+            try await fabric.wireRosterToGraph()
+        }
+
         // Step 2:dispatch through coordinator
         // chapter 九百九十四.7 META-REVIEW Round-11 CRITICAL-1 fix:
         // wire `liveInputs.priorityContext` through to the

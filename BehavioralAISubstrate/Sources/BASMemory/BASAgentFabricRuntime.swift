@@ -146,6 +146,64 @@ public struct BASAgentFabricRuntime: Sendable {
         self.mode = mode
     }
 
+    /// chapter 九百九十七 / M3690 — production wire-up of
+    /// Single-Writer-Per-Domain。 Closes the final invariant gap
+    /// that 17 N-pass review rounds missed:`BASAgentRegistry` is
+    /// orphan from production (dispatcher uses
+    /// `BASAgentTurnRoster` directly,never the registry),so
+    /// `registry.wire(toGraph:)` only enforced SWPD at TEST
+    /// scope。 Production write path relied on `writeObject`'s
+    /// AUTO-CLAIM behavior (`BASSharedStateGraph` line 394-403)
+    /// → first-writer-wins race。
+    ///
+    /// This method bypasses the registry entirely and wires the
+    /// ROSTER's writeDomains directly into the graph via the
+    /// atomic `registerWriterBatch(claims:)` API (ch 996.9)。
+    /// Hosts call this ONCE after constructing the runtime,
+    /// BEFORE first dispatch。 Idempotent for same-agent same-
+    /// domain claims per registerWriterBatch's contract。
+    ///
+    /// `BASAgentFabricHostPipeline.runTurn(...)` calls this
+    /// automatically on first dispatch (lazy-once,gated by
+    /// `wiredFlag`)。 Hosts that bypass the pipeline can call
+    /// it explicitly。
+    ///
+    /// Throws if any roster seats have overlapping
+    /// writeDomains — the dispatcher would later auto-claim
+    /// race so failing-fast at setup is correct。
+    public func wireRosterToGraph() async throws {
+        var claims:
+            [(agentID: String, domain: BASStateDomain)] = []
+        // 4 mandatory seats
+        let mandatory: [BASAgentSpec] = [
+            roster.scout,
+            roster.planner,
+            roster.risk,
+            roster.surface,
+        ]
+        for spec in mandatory {
+            for domain in spec.writeDomains {
+                claims.append(
+                    (agentID: spec.agentID, domain: domain))
+            }
+        }
+        // 5 optional seats
+        for optSpec in [
+            roster.memory,
+            roster.critic,
+            roster.hostAlignment,
+            roster.sovereignSentinel,
+            roster.evolutionShadow,
+        ] {
+            guard let spec = optSpec else { continue }
+            for domain in spec.writeDomains {
+                claims.append(
+                    (agentID: spec.agentID, domain: domain))
+            }
+        }
+        try await graph.registerWriterBatch(claims: claims)
+    }
+
     /// Convenience:dispatch one turn through this runtime。 The
     /// coordinator's per-turn helper calls this。 Defaults to
     /// using the runtime's `traceLog` (caller can override by
