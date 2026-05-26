@@ -11,6 +11,212 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十九 / M3550 — Phase 4 close:Persona SDK surface + forbidden persona detector + compare modes
+
+Closes Phase 4 of the Agent Fabric arc (ch 966-969)。 Final chapter
+delivers the public-facing SDK surface that wraps the full Phase 4
+pipeline + ships the safety filter that catches harmful persona
+patterns + defines the transcript compare modes for ch 970+ hosts。
+
+#### `BASAgentPersonaForbiddenDetector`
+
+Pattern-based safety filter — **deterministic + auditable +
+explainable** per ch 944 H2 discipline。 4 forbidden patterns:
+
+| Pattern | Trigger conditions (all 4 contribute 0.25 to score) |
+|---|---|
+| **shame** | challenge ≥ 0.75, warmth ≤ 0.20, guard ≤ 0.20, cold tone |
+| **gaslight** | directness ≥ 0.80, skepticism ≥ 0.80, warmth ≤ 0.15, comparison ≤ 0.15 |
+| **absolutePaternal** | challenge ≥ 0.65, comparison ≤ 0.20, creativity ≤ 0.20, warm tone or warmth ≥ 0.65 |
+| **controlling** | comparison ≤ 0.20, creativity ≤ 0.20, challenge ≥ 0.70, guard ≤ 0.20 |
+
+Default report threshold 0.6 (3-of-4 contributors → reported)。
+Pattern count pinned at 4 by `allCases.count` test。 Per pattern
+ch 944 H2 — pattern-based + not ML — 100% replayable + auditable。
+
+#### `BASAgentPersonaSDK` (full Phase 4 pipeline)
+
+`BASAgentPersonaSDK.resolve(...)` orchestrates the complete chain
+in one call:
+
+```
+INPUT validation (detector on user + host overlays)
+    ↓ reject if either input matches forbidden
+COMPOSE (ch 966 resolver)
+    ↓
+RISK CLAMP (ch 967 — monotonic raise)
+    ↓
+SOVEREIGN CLAMP (ch 968 — LOW force-default + lockdown + heightened)
+    ↓
+OUTPUT validation (detector on composed persona)
+    ↓ reject if composition matches forbidden (sandwich-attack catch)
+RETURN result with persona + outcomes + findings
+```
+
+When rejected,`result.persona = nil` — dispatcher MUST NOT use a
+nil persona。 Caller's audit ledger gets BOTH input findings AND
+output findings to distinguish "user supplied harmful overlay"
+from "harmless inputs composed into harmful output"。
+
+#### `BASAgentPersonaTranscriptMode` (3 modes per plan)
+
+- `.singleAgent` — show one agent's answer (default)
+- `.compareAll` — side-by-side all active agents
+- `.compareSelected` — caller-selected subset
+
+Count pinned at 3 by test。 Mode enum lives in SDK module for
+ch 970+ host wiring。 The dispatcher integration (per-mode roster
+shaping) is deferred to Phase 6 SDK productization (ch 973-975)。
+
+#### Tests
+
+| Suite | Tests | Coverage |
+|---|---|---|
+| `BASChapter969PersonaSDKTests` | 20 | 4 patterns + threshold + anyForbidden + SDK clean/reject/lockdown/full-pipeline + validateOverlays + de-dup + 2 critical fuzz (textbook always detected + clean never reported) |
+
+Plus the chained tests in 966/967/968 prove the chain composes:
+**ch 953-969 cumulative arc 408 / 0 failures**。
+
+#### Phase 4 close (ch 966 + 967 + 968 + 969) summary
+
+| ch | Module | LOC (Sources) | Tests |
+|---|---|---|---|
+| 966 | Resolver + 12 role templates | ~580 | 23 |
+| 967 | Risk clamp (monotonic) | ~270 | 18 |
+| 968 | Sovereign clamp + warrant gate | ~410 | 17 |
+| 969 | Forbidden detector + SDK + compare modes | ~390 | 20 |
+| **Total** | | **~1650 LOC** | **78 tests** |
+
+Phase 4 plan formula `P_effective = Clamp(P_role ⊕ P_user ⊕ P_host,
+Risk, Sovereign)` fully shipped。 4 forbidden patterns gate
+sandwich-attacks。 3 compare modes defined for ch 970+ wiring。
+ADR-014 OPT-IN preserved throughout — pre-Phase-4 callers unchanged。
+
+Phase 4 close iPhone Air 30-min smoke procedure (3 transcript modes)
+documented in `Docs/PHASE_4_CLOSE_SMOKE.md`。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentPersonaForbiddenDetector.swift` | NEW — 4 patterns + scan + anyForbidden |
+| `Sources/BASMemory/BASAgentPersonaSDK.swift` | NEW — full pipeline orchestration + transcript modes |
+| `Tests/BehavioralAISubstrateTests/BASChapter969PersonaSDKTests.swift` | NEW — 20 tests |
+| `Docs/PHASE_4_CLOSE_SMOKE.md` | NEW — operator smoke procedure |
+
+#### Next phase
+
+Phase 5 (Watchers, ch 970-972):7 quiet-observer agents emit hints
+(no direct action) — Anomaly / Gaslight / MemoryPollution / HostDrift
+/ ToolInjection / AxisDeviation / SanctumLeak。 Watchers can use the
+Phase 4 persona pipeline if they need user-tunable observation
+cadence。
+
+---
+
+### Chapter 九百六十八 / M3545 — Phase 4 ch3:Sovereign sentinel clamping + LOW-tier warrant gate
+
+Adds the second + final clamp arm of the Phase 4 formula。 Sovereign
+clamp runs AFTER Risk clamp per Root Law 4 (单主权) — sovereign
+always wins, never overruled。
+
+#### Three sovereign rules
+
+1. **LOCKDOWN** — every agent regardless of tier force-defaults to
+   template (no agent deviates during sovereign lockdown)
+2. **LOW tier WITHOUT warrant** — force-default per field (template
+   defaults restored for any field not explicitly granted by the
+   warrant)
+3. **HEIGHTENED PROTECTION** — creativity + challenge capped at 0.30
+   for ALL tiers (prevents novel-but-dangerous candidates in
+   vulnerable state)。 Skepticism + guard untouched (Risk arm
+   already handled those)。
+
+#### `BASAgentPersonaSovereignWarrant` (slim warrant DTO)
+
+```swift
+public struct BASAgentPersonaSovereignWarrant {
+    public let warrantID: String
+    public let grantedFields: [String]  // sorted
+    public let reason: String
+    public func grants(_ field: String) -> Bool { ... }
+}
+```
+
+Warrant fields are auto-sorted in init for deterministic
+fingerprint。 Inert for HIGH + MED tiers (no warrant needed for
+those tiers since they already allow overlay per ch 966)。
+
+#### CRITICAL invariants (verified by 17 tests + 1 fuzz suite)
+
+- LOW tier WITHOUT warrant → force-default to template (100% of cases)
+- LOW tier WITH partial warrant → only granted fields survive
+- LOCKDOWN overrides warrant (even granted fields force-default)
+- HEIGHTENED PROTECTION caps creativity + challenge but leaves
+  defensive biases untouched
+- **CRITICAL FUZZ:** 1000 random LOW-tier personas with attempted
+  softening → output matches template 100% of the time when no
+  warrant supplied
+- Full chain integration (ch 966 + 967 + 968) preserves monotonic
+  raise: risk-floor skepticism NOT lowered by subsequent sovereign
+  clamp
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentPersonaSovereignClamp.swift` | NEW — warrant DTO + sovereign context + clamp |
+| `Tests/BehavioralAISubstrateTests/BASChapter968PersonaSovereignClampTests.swift` | NEW — 17 tests |
+
+---
+
+### Chapter 九百六十七 / M3540 — Phase 4 ch2:Risk gate clamping (monotonic clamp01)
+
+Adds the Risk arm of the Phase 4 formula。 Mirrors the proven
+monotonic clamp pattern from `BASRiskCalibrationGate.clamp01`
+(Sources/BASPolicy/BASRiskCalibrationGate.swift:271) + L14 sovereign
+verdict `raise()` lambda discipline。
+
+#### Monotonic raise — never lower risk
+
+Risk clamp can ONLY:
+- **RAISE** `skepticism` / `guardBias` / `directness` / `comparisonBias`
+- **CAP** `challengeIntensity` / `creativityBias`
+- **PASS THROUGH** `tone` / `warmth` / `structureBias` (Risk is risk-only)
+
+`BASAgentPersonaRiskContext` carries floors + ceilings:
+- `skepticismFloor` / `guardFloor` / `directnessFloor` /
+  `comparisonFloor` (raise targets)
+- `challengeCeiling` / `creativityCeiling` (cap targets)
+- `BASAgentPersonaRiskContext.identity` = all-noop default for
+  routine turns
+
+#### CRITICAL fuzz invariants (verified by 3 × 1000-iter suites)
+
+- `testCRITICAL_SkepticismNeverLowersAcrossManyInputs` — 1000 random
+  (persona-skep, floor) pairs → outcome's skep MUST be ≥ persona-skep
+- `testCRITICAL_GuardNeverLowersAcrossManyInputs` — same for guard
+- `testCRITICAL_ChallengeNeverRaisesAcrossManyInputs` — 1000 random
+  (persona-challenge, ceiling) pairs → outcome's challenge MUST be
+  ≤ persona-challenge
+
+These three property tests defend the Root Law 4 (单主权)
+invariant that ANY user override CANNOT defeat a risk-required
+defensive floor — even by accident。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentPersonaRiskClamp.swift` | NEW — risk context + outcome + clamp |
+| `Tests/BehavioralAISubstrateTests/BASChapter967PersonaRiskClampTests.swift` | NEW — 18 tests (incl. 3 × 1000-iter fuzz) |
+
+Audit notes format `risk.raise.skepticism:0.300→0.700(risk-floor)`
++ `risk.cap.challenge:0.850→0.400(risk-ceiling)` — sorted for
+deterministic trace replay。
+
+---
+
 ### Chapter 九百六十六 / M3535 — Phase 4 ch1:Persona Studio kickoff — 12 role templates + `BASAgentPersonaResolver`
 
 Opens Phase 4 of the Agent Fabric arc (ch 966-969):the
