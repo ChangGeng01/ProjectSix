@@ -11,6 +11,151 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百九十四.5 / M3675.5 — META-REVIEW Round-10 cascade fixes (CRITICAL ledger-integrity break caught)
+
+Round-10 N-pass review of ch 992 + 993 + 994 caught **1 CRITICAL +
+1 HIGH + 2 MED + 2 LOW** findings。 Per ch 943 cascade discipline,
+every review round in this arc has caught real bugs。 Round 10 was
+no exception — and the CRITICAL finding was especially significant
+because it would have shipped a real ledger-integrity break to
+production。
+
+#### CRITICAL-1 (Reviewer R10) — SQLite storage drops entry.schemaVersion
+
+`BASSovereignLedgerSQLiteStorage` (M91 — `Sources/BASSovereign
+/BASSovereignLedgerStorage.swift`) had 14 columns in the
+`audit_entries` table but NO `entry_schema_version` column。
+`persistAppended(...)` did not bind `entry.schemaVersion`;
+`loadEntries(...)` called `BASSovereignAuditEntry.init(...)`
+without `schemaVersion:`,so every reloaded entry defaulted to
+`"1.0.0"`。
+
+Combined with ch 993's schema-version-gated canonical-bytes
+function (`if entry.schemaVersion == "1.0.0" { OLD `,`/`|` } else
+{ NEW U+001F/U+001E }`),this meant:
+1. Host opens persistent ledger,appends a warrant entry (ch 983
+   defaults to `"1.1.0"` per ch 993 hardened format)。
+2. Entry signed with U+001F-separator canonical bytes,persisted。
+3. Process restart → ledger rehydrates → entry resurrects with
+   `schemaVersion = "1.0.0"` (column missing)。
+4. `verifyChainIntegrity()` recomputes canonical bytes with `,`/
+   `|` separators → signature mismatch → `LedgerError
+   .chainIntegrityBroken` → **every 1.1.0 entry permanently fails
+   verification + ledger flagged corrupt**。
+
+**Real ledger-integrity break I introduced at ch 993 by bumping
+the warrant bridge default to 1.1.0 without checking SQLite
+persistence path**。
+
+**Fix**:schema migration v1 → v2:
+- DDL adds `entry_schema_version TEXT NOT NULL DEFAULT '1.0.0'`
+  column
+- Migration path:if existing DB at user_version=1,run `ALTER
+  TABLE audit_entries ADD COLUMN entry_schema_version TEXT NOT
+  NULL DEFAULT '1.0.0';` then bump to user_version=2。 Existing
+  rows auto-fill with the safe default,preserving signature
+  verification for pre-fix 1.0.0 entries。
+- `persistAppended(...)` binds `entry.schemaVersion` as column 14
+- `loadEntries(...)` reads the column + passes to
+  `BASSovereignAuditEntry.init(schemaVersion: ..., ...)`
+- `BASSovereignLedgerSQLiteStorage.schemaVersion` bumped 1 → 2
+
+Regression test:`testCRITICAL_C1_SchemaVersionPersistsAcross
+SQLiteRestart` writes mixed 1.0.0 + 1.1.0 entries,reloads,
+verifies both entries' schemaVersions preserved。
+
+Plus the M91 schema-version pin test (`testSqliteSchemaVersion
+IsStable`) updated from `1` → `2` with documentation of the
+breaking change rationale。
+
+#### HIGH-1 (Reviewer R10) — riskCard silently dead in full-turn adapter
+
+`BASAgentFabricFullTurnAdapter.run(...)` accepted
+`liveInputs.riskCard` but the body NEVER used it。 The inline
+comment claimed "risk enrichment happens inside coordinator
+path indirectly" — false。 `coordinator.runAgentFabricObservation`
+delegated to `BASAgentFabricAdapters.turnInput(...)` which built
+risk input from L7 frame only,bypassing ch 987 `enrichRiskInput`
+entirely。
+
+Result:every host using the convenience adapter got the L7-only
+risk derivation,not the BASRiskCard-enriched version。 The
+ch 987 Gap 3 close (monotonic-raise risk via live BASRiskCard)
+was UNREACHABLE through the canonical host call-site。
+
+**Fix**:added `riskOverride: BASRiskInput?` parameter to:
+1. `BASAgentFabricAdapters.turnInput(...)` — when supplied,
+   replaces the default L7-only `riskInput(...)` call
+2. `EBrainRuntimeCoordinator.runAgentFabricObservation(...)` —
+   propagates through
+3. `BASAgentFabricFullTurnAdapter.run(...)` — builds the enriched
+   input via `enrichRiskInput(from: card, baseRiskInput: ...)`
+   when `liveInputs.riskCard` is supplied
+
+Default nil preserves byte-equality for all existing callers。
+
+Regression test:`testCRITICAL_H1_RiskCardEnrichmentReachesSeat`
+constructs empty L7 frame + high-risk card → verifies Risk seat
+emits a delta proving the path reached the seat。
+
+#### MED-1 — docstring underdeclared throw paths
+`run(...)` docstring claimed only warrant audit could throw,but
+`bridge.flush(forTurn:)` also throws。 Updated to enumerate both。
+
+#### MED-2 — coordinator mode-inspection untested
+ch 994 shipped `BASAgentFabricMode` but no test verified host
+can inspect via `coordinator.agentFabric?.mode`。 Added pin。
+
+**Substrate state at ch 994.5 close**:
+- 1 CRITICAL real-ledger-corruption fix
+- 1 HIGH adapter-silent-bypass fix
+- 14,442 substrate-wide tests / 0 failures (including pre-existing
+  M91 SQLite tests, all updated for the v1→v2 migration)
+- 10th N-pass review cycle complete
+
+This is why the cascade discipline exists。 The Round-10 CRITICAL
+caught a bug I would have shipped to production — a real ledger
+that resurrects from disk would have rejected every warrant
+entry signed under the ch 993 hardened format。 The fix is now
+in place + regression-defended。
+
+### Chapter 九百九十四 / M3675 — fabric-authoritative mode scaffold + SDK API stability declarations
+
+Plan section 9.1-9.7 "future fabric-authoritative mode" had been
+deferred since ch 960 observation-only launch。 Ch 994 ships the
+SUBSTRATE-SIDE SCAFFOLD:
+
+- New `BASAgentFabricMode` enum (`.observationOnly` (default) /
+  `.authoritative`)。 Codable + Sendable + CaseIterable for
+  future wire-format stability。
+- `BASAgentFabricRuntime.mode` field added with default
+  `.observationOnly` preserving ADR-014 OPT-IN + red-line 7
+  byte-equality。
+- Dispatcher is mode-AGNOSTIC at the substrate level — same
+  emitted-delta count regardless of mode。 Mode is a host-side
+  signal about how to consume the result,not a switch that
+  changes substrate behavior。 The actual per-state-domain
+  replacement logic (e.g. fabric's `.renderFrame` REPLACES
+  coordinator's existing render frame) is host-side
+  responsibility since each host has different downstream
+  consumers。
+
+Plus comprehensive SDK_API_STABILITY.md updates:
+- Added `BASAgentFabricMode` enum to API-STABLE declarations
+- Added `BASAgentFabricRuntime.init(...)` updated signature
+- Added ALL 9 cross-module adapters from ch 983-993 to API-STABLE
+- Added 2 cross-module bridges (`BASSovereignWarrantAuditBridge`,
+  `BASAgentTraceLogEventLogBridge`)
+- Added host-integration convenience (`BASAgentFabricFullTurnAdapter`,
+  `BASAgentFabricGate`)
+- Added 11th reserved L14 prefix `agentMCP.permit:` (the new prefix
+  shipped at ch 990 was previously undocumented)
+- "7 in-use + 4 future-allocation" tally for reserved prefixes
+
+6 regression tests:default mode + explicit `.authoritative` mode
+flow-through + enum cases pin (2 only) + raw-value stability +
+Codable round-trip + dispatcher mode-agnosticism。
+
 ### Chapter 九百九十三 / M3670 — host-integration convenience + cross-arc separator hardening:「全部 剩余 部分 一次性 解决掉」
 
 Three substantive substrate-side items shipped in one chapter — every remaining work item that the substrate can do itself。 Anything after ch 993 is either host application code (not substrate) or physical device verification (operator-only)。

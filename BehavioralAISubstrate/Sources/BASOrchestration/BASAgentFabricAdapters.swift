@@ -142,18 +142,29 @@ public enum BASAgentFabricAdapters {
             BASSovereignSentinelInput? = nil,
         evolutionShadow:
             BASEvolutionShadowInput? = nil,
+        riskOverride: BASRiskInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
     ) -> BASAgentTurnInput {
-        BASAgentTurnInput(
+        // chapter 九百九十四.5 META-REVIEW Round-10 HIGH-1 fix:
+        // accept optional `riskOverride` so callers (e.g.
+        // BASAgentFabricFullTurnAdapter) can supply a
+        // BASRiskCard-enriched BASRiskInput per ch 987 monotonic
+        // raise。 Pre-fix the L7-only default path always ran,
+        // bypassing ch 987 enrichment when called through the
+        // host-integration convenience adapter。 Default nil
+        // preserves byte-equality for existing callers。
+        let resolvedRisk =
+            riskOverride ?? riskInput(
+                from: decomposeFrame,
+                candidates: candidatePaths)
+        return BASAgentTurnInput(
             turnID: turnID,
             scout: scoutInput(from: decomposeFrame),
             plannerCandidates: plannerCandidates(
                 from: candidatePaths),
-            risk: riskInput(
-                from: decomposeFrame,
-                candidates: candidatePaths),
+            risk: resolvedRisk,
             surface: surfaceInputObservationMode(
                 acceptedCandidateID: acceptedCandidateID),
             memory: memory,

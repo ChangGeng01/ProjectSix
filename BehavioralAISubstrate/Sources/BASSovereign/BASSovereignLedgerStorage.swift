@@ -159,7 +159,23 @@ public final class BASSovereignLedgerSQLiteStorage:
         case corruptedRow(table: String, reason: String)
     }
 
-    public static let schemaVersion: Int = 1
+    /// chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1 fix:
+    /// bumped from 1 → 2 to add `entry_schema_version` column to
+    /// `audit_entries`。 Pre-ch-994.5 schema dropped per-entry
+    /// schemaVersion on persist + reload,so ch 993's hardened
+    /// "1.1.0" warrant entries (which use U+001F separators in
+    /// canonical bytes) would resurrect with the default "1.0.0"
+    /// schemaVersion on restart → canonical-bytes recomputation
+    /// picks the OLD `,`/`|` separators → signature verification
+    /// fails for every reloaded 1.1.0 entry → ledger flagged
+    /// corrupt。 Real ledger-integrity break。
+    ///
+    /// Migration: schema 1 → 2 adds `entry_schema_version TEXT
+    /// NOT NULL DEFAULT '1.0.0'` column。 SQLite ALTER TABLE ADD
+    /// COLUMN auto-fills existing rows with the default,
+    /// preserving signature verification for pre-ch-994.5 1.0.0
+    /// entries。 New writes bind `entry.schemaVersion` explicitly。
+    public static let schemaVersion: Int = 2
 
     private var db: OpaquePointer?
     private let path: String
@@ -187,9 +203,34 @@ public final class BASSovereignLedgerSQLiteStorage:
 
         // M886 backport (M882 audit fix):read user_version FIRST,
         // branch 0 → write current,equal → accept,mismatch → throw。
+        //
+        // chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1
+        // migration:schema 1 → 2 adds entry_schema_version column。
+        // Migration path:read pre-existing v1 DB → ALTER TABLE ADD
+        // COLUMN with safe default → bump user_version。
         let existingVersion = try Self.readUserVersion(
             db: handle)
         if existingVersion == 0 {
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+        } else if existingVersion == 1 &&
+                  Self.schemaVersion == 2
+        {
+            // ch 994.5 CRITICAL-1 migration:v1 → v2 adds
+            // entry_schema_version column with DEFAULT '1.0.0'。
+            // SQLite ALTER TABLE ADD COLUMN auto-fills existing
+            // rows,preserving signature verification for old
+            // 1.0.0 entries (canonical-bytes still picks OLD
+            // separator for them per the per-entry schemaVersion
+            // gate in basSovereignAuditCanonicalBytes)。
+            try Self.runExec(
+                db: handle,
+                sql: """
+                ALTER TABLE audit_entries
+                ADD COLUMN entry_schema_version TEXT
+                NOT NULL DEFAULT '1.0.0';
+                """)
             try Self.runExec(
                 db: handle,
                 sql: "PRAGMA user_version=\(Self.schemaVersion);")
@@ -221,13 +262,20 @@ public final class BASSovereignLedgerSQLiteStorage:
         _ appended: BASSovereignAuditLedger.AppendedEntry
     ) throws {
         guard let db else { return }
+        // chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1:
+        // bind entry_schema_version so per-entry schemaVersion
+        // round-trips through SQLite persist + reload。 Without
+        // this,ch 993's "1.1.0" warrant entries lose their
+        // version on restart → canonical-bytes recomputation
+        // picks wrong separator → signature mismatch。
         let sql = """
             INSERT INTO audit_entries (
                 audit_id, session_id, turn_id, verdict_ref,
                 rule_ids, signal_refs, action_refs,
                 snapshot_ref, actor, signature, appended_at_ms,
-                prior_hash, self_hash, insertion_order
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                prior_hash, self_hash, entry_schema_version,
+                insertion_order
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 (SELECT IFNULL(MAX(insertion_order), -1) + 1
                    FROM audit_entries))
             """
@@ -257,6 +305,8 @@ public final class BASSovereignLedgerSQLiteStorage:
             Int64(e.appendedAt.timeIntervalSince1970 * 1000))
         Self.bindText(stmt, 12, appended.priorHash)
         Self.bindText(stmt, 13, appended.selfHash)
+        // ch 994.5 CRITICAL-1 fix:bind entry.schemaVersion
+        Self.bindText(stmt, 14, e.schemaVersion)
 
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw StorageError.stepFailed(
@@ -341,11 +391,15 @@ public final class BASSovereignLedgerSQLiteStorage:
         -> [BASSovereignAuditLedger.AppendedEntry]
     {
         guard let db else { return [] }
+        // chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1:
+        // read entry_schema_version + propagate into
+        // BASSovereignAuditEntry init。 Pre-fix this SELECT
+        // dropped the field on reload。
         let sql = """
             SELECT audit_id, session_id, turn_id, verdict_ref,
                    rule_ids, signal_refs, action_refs,
                    snapshot_ref, actor, signature, appended_at_ms,
-                   prior_hash, self_hash
+                   prior_hash, self_hash, entry_schema_version
               FROM audit_entries
              ORDER BY insertion_order ASC
             """
@@ -377,6 +431,8 @@ public final class BASSovereignLedgerSQLiteStorage:
             let appendedAtMs = sqlite3_column_int64(stmt, 10)
             let priorHash = Self.readText(stmt, 11)
             let selfHash = Self.readText(stmt, 12)
+            // ch 994.5 CRITICAL-1 fix:read entry_schema_version
+            let entrySchemaVersion = Self.readText(stmt, 13)
 
             guard let actor = BASSovereignAuditActor(rawValue: actorRaw)
             else {
@@ -385,6 +441,7 @@ public final class BASSovereignLedgerSQLiteStorage:
                     reason: "unknown actor rawValue '\(actorRaw)' for \(auditID)")
             }
             let entry = BASSovereignAuditEntry(
+                schemaVersion: entrySchemaVersion,
                 auditID: auditID,
                 sessionID: sessionID,
                 turnID: turnID,
@@ -476,6 +533,10 @@ public final class BASSovereignLedgerSQLiteStorage:
     // MARK: - Schema setup
 
     private static func ensureSchema(db: OpaquePointer) throws {
+        // chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1:
+        // entry_schema_version column added。 Fresh DBs get it
+        // directly from CREATE TABLE;upgraded DBs get it via the
+        // ALTER TABLE migration path in init。
         try runExec(db: db, sql: """
             CREATE TABLE IF NOT EXISTS audit_entries (
                 audit_id TEXT PRIMARY KEY,
@@ -491,7 +552,8 @@ public final class BASSovereignLedgerSQLiteStorage:
                 appended_at_ms INTEGER NOT NULL,
                 prior_hash TEXT NOT NULL,
                 self_hash TEXT NOT NULL,
-                insertion_order INTEGER NOT NULL UNIQUE
+                insertion_order INTEGER NOT NULL UNIQUE,
+                entry_schema_version TEXT NOT NULL DEFAULT '1.0.0'
             );
             """)
         try runExec(db: db, sql: """

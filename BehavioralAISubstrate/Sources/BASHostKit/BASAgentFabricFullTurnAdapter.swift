@@ -148,8 +148,14 @@ public enum BASAgentFabricFullTurnAdapter {
     ///     for ch 984 trace flush (nil = skip flush)
     /// - Returns: full-turn result bundle,or nil if coordinator
     ///   doesn't have fabric configured
-    /// - Throws: only if warrant audit append fails (ledger
-    ///   validation:empty sessionID etc.)
+    /// - Throws:
+    ///   - if warrant audit append fails (ledger validation:
+    ///     empty sessionID etc.)
+    ///   - if trace flush fails (event-log storage append throw)
+    ///   chapter 九百九十四.5 META-REVIEW Round-10 MED-1 fix:
+    ///   pre-fix docstring underdeclared throw paths (claimed
+    ///   only warrant could throw)。 Both warrant + flush can
+    ///   throw,so calling code MUST handle both。
     public static func run(
         sessionID: String,
         turnID: String,
@@ -183,9 +189,27 @@ public enum BASAgentFabricFullTurnAdapter {
             criticInput = nil
         }
 
-        // risk enrichment happens inside coordinator path indirectly
-        // — but we also project the frontier here from the planner
-        // candidates for post-turn use regardless of fabric outcome
+        // chapter 九百九十四.5 META-REVIEW Round-10 HIGH-1 fix:
+        // risk enrichment was previously documented as "happens
+        // inside coordinator path indirectly" — but that was
+        // false。 `coordinator.runAgentFabricObservation` built
+        // risk input from L7 frame only,bypassing ch 987 card
+        // enrichment。 Fix:build the enriched risk input HERE
+        // and pass it via the new `riskOverride` parameter when
+        // a card is supplied。 Default L7-only path preserved
+        // when no card present。
+        let riskOverride: BASRiskInput?
+        if let card = liveInputs.riskCard {
+            let baseRisk = BASAgentFabricAdapters.riskInput(
+                from: liveInputs.frame,
+                candidates: liveInputs.candidatePaths)
+            riskOverride = BASAgentFabricAdapters
+                .enrichRiskInput(
+                    from: card,
+                    baseRiskInput: baseRisk)
+        } else {
+            riskOverride = nil
+        }
 
         // Step 2:dispatch through coordinator
         let turnResult = await coordinator
@@ -202,6 +226,7 @@ public enum BASAgentFabricFullTurnAdapter {
                     liveInputs.sovereignSentinelInput,
                 evolutionShadow:
                     liveInputs.evolutionShadowInput,
+                riskOverride: riskOverride,
                 nowNanos: liveInputs.nowNanos)
         guard let turnResult else { return nil }
 

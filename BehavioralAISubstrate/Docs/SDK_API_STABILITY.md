@@ -168,6 +168,32 @@ This document declares which Agent Fabric types are **wire-format stable** (Coda
 - `BASAgentTurnDispatcher.dispatch(...)` ← canonical turn-level entry
 - `BASAgentTurnRoster.init(...)` (constructor stable)
 - `BASAgentTurnInput.init(...)` (constructor stable — new optional params added in 961/963/964/965)
+- `BASAgentFabricRuntime.init(...)` (constructor stable — new `mode:` param added ch 994 with default `.observationOnly` for byte-equality)
+- `BASAgentFabricMode` (ch 994 NEW) — enum: `.observationOnly` / `.authoritative`
+
+### Cross-module integration adapters (ch 983-993 — NEW at this declaration)
+
+All in `BASAgentFabricAdapters` (BASOrchestration module). Pure-fn deterministic given inputs. Monotonic-raise discipline (never lowers risk/concern signals) on every enrichment adapter.
+
+- `BASAgentFabricAdapters.hostAlignmentInput(from:candidates:styleStrictnessOverride:includeSoftAxes:)` ← ch 986 + ch 992 MED-3 `includeSoftAxes` flag
+- `BASAgentFabricAdapters.enrichRiskInput(from:baseRiskInput:)` ← ch 987 monotonic-raise + ch 992 MED-1 merged-result clamp
+- `BASAgentFabricAdapters.enrichCriticInput(from:baseCriticInput:)` ← ch 988 + ch 991.5 HIGH-1 fraction-vetoed semantic fix
+- `BASAgentFabricAdapters.candidateFrontierProjection(from:)` ← ch 989 deterministic projection
+- `BASAgentFabricAdapters.validateMCPInvocation(_:against:)` ← ch 990 + ch 991.5 CRITICAL-1 deny-scope set extended
+- `BASAgentFabricAdapters.turnInput(...)` ← ch 985 + ch 992 `evolutionShadow:` param
+
+### Cross-module bridges (ch 983-984 + ch 993 — NEW)
+
+- `BASSovereignWarrantAuditBridge.buildEntry(...)` + `.appendToLedger(...)` ← ch 983 + ch 993 defaults to hardened `1.1.0` canonical-bytes format
+- `BASAgentTraceLogEventLogBridge.recordEvent(...)` + `.flush(forTurn:)` + `.synthesizeEventLogEntry(...)` ← ch 984 write-through
+
+### Host-integration convenience (ch 993 — NEW)
+
+- `BASAgentFabricFullTurnAdapter.run(...)` ← canonical host call-site for full 9-seat turn
+- `BASAgentFabricLiveInputs.init(...)` (constructor stable)
+- `BASAgentFabricFullTurnResult` (struct, Sendable)
+- `BASAgentFabricGate.activationFromEnvironment(_:)` ← env-var probing
+- `BASAgentFabricGate.Activation` / `.Tier` / `.TranscriptMode` (nested types)
 
 ### Audit-ledger signal-ref reserved prefixes
 
@@ -185,8 +211,9 @@ These string prefixes are reserved for the agent fabric subsystem. Other subsyst
 | `agentExternal.tier:` | A2A external gateway (Phase 7) | in-use | `agentExternal.tier:<externalID>:<effectiveTier>` |
 | `agentExternal.trust:` | A2A external gateway (Phase 7) | in-use | `agentExternal.trust:<externalID>:<trustScore>` |
 | `agentExternal.warrant:` | Sovereign warrant chain (ch 981.7 ARC FINALIZE) | in-use | `agentExternal.warrant:<status>:<detail>` (granted/rejected/per-agent/none-supplied) |
+| `agentMCP.permit:` | MCP permit validation (ch 990 Cross-Module Integration Arc) | in-use | `agentMCP.permit:<status>:server=<id>:tool=<id>:scope=<scope>` |
 
-Per ch 981.6 USER-PASS-8 D1 fix + ch 981.7 ARC FINALIZE:**10 prefixes reserved**。 **6 in-use today** (watcher.flag / watcher.count / external.proposal / external.tier / external.trust / external.warrant);4 future-allocation (fabric.activated / fabric.merged / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。 The `agentFabric.merged:` prefix was misclassified "in-use" in ch 981.5 DH3 but verified by grep to only appear in a doc comment (`BASAgentMergeResult.swift:57`),NOT in any source-side emit path。
+Per ch 981.6 USER-PASS-8 D1 fix + ch 981.7 ARC FINALIZE + ch 990 Cross-Module Integration Arc:**11 prefixes reserved**。 **7 in-use today** (watcher.flag / watcher.count / external.proposal / external.tier / external.trust / external.warrant / **mcp.permit** new at ch 990);4 future-allocation (fabric.activated / fabric.merged / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。 The `agentFabric.merged:` prefix was misclassified "in-use" in ch 981.5 DH3 but verified by grep to only appear in a doc comment (`BASAgentMergeResult.swift:57`),NOT in any source-side emit path。
 
 ---
 

@@ -239,10 +239,16 @@ public struct BASEBrainRuntimeCoordinator {
             BASSovereignSentinelInput? = nil,
         evolutionShadow:
             BASEvolutionShadowInput? = nil,
+        riskOverride: BASRiskInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
     ) async -> BASAgentTurnResult? {
+        // chapter 九百九十四.5 META-REVIEW Round-10 HIGH-1 fix:
+        // added `riskOverride` to plumb BASRiskCard enrichment
+        // through coordinator。 Pre-fix the L7-only path always
+        // ran;ch 987 enrichment was unreachable through this
+        // entry point。 Default nil preserves byte-equality。
         guard let agentFabric else { return nil }
         let input = BASAgentFabricAdapters.turnInput(
             turnID: turnID,
@@ -254,6 +260,7 @@ public struct BASEBrainRuntimeCoordinator {
             hostAlignment: hostAlignment,
             sovereignSentinel: sovereignSentinel,
             evolutionShadow: evolutionShadow,
+            riskOverride: riskOverride,
             priorityContext: priorityContext,
             nowNanos: nowNanos)
         return await agentFabric.dispatchTurn(input: input)

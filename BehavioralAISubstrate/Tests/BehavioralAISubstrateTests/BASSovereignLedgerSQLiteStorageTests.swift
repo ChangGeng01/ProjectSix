@@ -276,10 +276,23 @@ final class BASSovereignLedgerSQLiteStorageTests: XCTestCase {
     // MARK: - 6. Schema version contract
 
     func testSqliteSchemaVersionIsStable() throws {
+        // chapter 九百九十四.5 META-REVIEW Round-10 CRITICAL-1
+        // update:bumped from 1 → 2 to add the
+        // entry_schema_version column。 Pre-fix v1 schema dropped
+        // BASSovereignAuditEntry.schemaVersion on persist + reload
+        // → ch 993 hardened "1.1.0" warrant entries failed
+        // signature verification after restart → ledger flagged
+        // corrupt。 v2 schema preserves per-entry schemaVersion
+        // via ALTER TABLE ADD COLUMN with safe default,migrating
+        // existing v1 DBs automatically on first open。 ANY
+        // further bump from 2 → 3 IS a breaking M91 format change
+        // requiring new migration code。
         XCTAssertEqual(
             BASSovereignLedgerSQLiteStorage.schemaVersion,
-            1,
-            "bumping schemaVersion is a breaking M91 format change")
+            2,
+            "ch 994.5 CRITICAL-1: schemaVersion at 2 since the " +
+            "Round-10 ledger-integrity fix。 Bumping past 2 is a " +
+            "breaking M91 format change requiring new migration")
     }
 
     // MARK: - 7. Parallel storages (coverage + obs bundles) stay in-memory

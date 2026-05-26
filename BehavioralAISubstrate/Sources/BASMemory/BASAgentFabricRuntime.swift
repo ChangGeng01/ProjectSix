@@ -50,6 +50,44 @@ import Foundation
 /// design;the dispatcher passes the roster + agent map to the
 /// merge applier which enforces Single-Writer-Per-Domain per
 /// ch 956.5 USER-PASS gap #1 + ch 956.11 CR2 atomic-on-failure。
+/// chapter 九百九十四 / M3675 — fabric-authoritative mode scaffold:
+/// closes plan section 9.1-9.7 "future fabric-authoritative mode"
+/// gap deferred since ch 960 observation-only launch。
+///
+/// The plan specified two modes:
+///   - `.observationOnly` (current default since ch 960):dispatcher
+///     result is RETURNED to caller but does NOT drive coordinator
+///     output。 Caller can record/replay/audit but coordinator's
+///     existing per-turn render+risk pipeline is unchanged。
+///   - `.authoritative` (future,opt-in):accepted dispatcher
+///     deltas drive coordinator output paths。 The fabric's
+///     `.renderFrame` delta becomes the actual render frame;
+///     the fabric's `.riskField` delta drives the risk gate;
+///     etc。 Plan section 9 calls this "Phase 9+" scope。
+///
+/// Default `.observationOnly` preserves ADR-014 OPT-IN +
+/// red-line 7 (byte-equal when fabric unconfigured or in
+/// observation mode)。 Setting `.authoritative` requires the
+/// host to explicitly opt in。 The substrate scaffolding is
+/// shipped here so future host code has a stable entry point;
+/// the actual per-mode behavioral wiring (e.g. fabric's
+/// `.renderFrame` REPLACES coordinator's existing render frame)
+/// is per-consumer host integration work since each host has
+/// different downstream consumers of those state objects。
+public enum BASAgentFabricMode: String,
+    Sendable, Equatable, Codable, CaseIterable
+{
+    /// Default mode since ch 960。 Dispatcher runs,result is
+    /// returned to caller,coordinator output unchanged。
+    case observationOnly
+
+    /// Future mode (substrate-side scaffold ship at ch 994)。
+    /// Accepted deltas drive coordinator output。 Host implements
+    /// the actual per-state-domain replacement logic at its
+    /// `BASAgentFabricFullTurnResult` consumer site。
+    case authoritative
+}
+
 public struct BASAgentFabricRuntime: Sendable {
 
     /// Up-to-9-seat roster:4 mandatory (Scout / Planner / Risk /
@@ -74,14 +112,26 @@ public struct BASAgentFabricRuntime: Sendable {
     /// typical turn,~9 events × ~250 bytes = ~2.3 KB / turn)。
     public let traceLog: BASAgentTraceLog?
 
+    /// chapter 九百九十四 / M3675 — fabric-authoritative mode
+    /// scaffold。 Default `.observationOnly` preserves ADR-014
+    /// OPT-IN + ch 960 + red-line 7 byte-equality。 Setting
+    /// `.authoritative` signals to the host that accepted
+    /// dispatcher deltas SHOULD drive coordinator output paths
+    /// — but the actual per-state-domain replacement logic is
+    /// host-side responsibility since each host has different
+    /// downstream consumers。
+    public let mode: BASAgentFabricMode
+
     public init(
         roster: BASAgentTurnRoster,
         graph: BASSharedStateGraph,
-        traceLog: BASAgentTraceLog? = nil
+        traceLog: BASAgentTraceLog? = nil,
+        mode: BASAgentFabricMode = .observationOnly
     ) {
         self.roster = roster
         self.graph = graph
         self.traceLog = traceLog
+        self.mode = mode
     }
 
     /// Convenience:dispatch one turn through this runtime。 The
