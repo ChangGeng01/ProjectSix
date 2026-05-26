@@ -185,6 +185,112 @@ public enum BASAgentFabricAdapters {
             superegoActiveLevel: superegoActiveLevel)
     }
 
+    // MARK: - chapter 九百八十九 / M3650 — Cross-Module Integration
+    //                                       Arc ch7:Gap 5 close
+    //
+    // Project the fabric's per-candidate accepted deltas back into
+    // a host-shape `BASCandidateFrontier` summary。 Was:
+    // `BASPlannerSeat.emit(...)` produced `.candidateFrontier`
+    // state-graph deltas with refs like `candidateFrontier#cf-
+    // <turnID>-<candidateID>` and per-candidate JSON payloads (one
+    // delta per candidate)。 But the host's existing
+    // `BASCandidateFrontier` (L9 dream loop) is an AGGREGATE
+    // structure with candidateIDs / dominanceOrder /
+    // reversiblePaths / guardPaths / frontierWidth /
+    // diversityScore。 The two abstractions were disjoint — no
+    // path projected the fabric's per-candidate deltas back into
+    // a host-consumable aggregate frontier。
+    //
+    // This adapter closes Gap 5:given the fabric's planner
+    // candidates list (input to the Planner seat) the adapter
+    // computes the corresponding host-shape `BASCandidateFrontier`
+    // summary。 The host can then:
+    //   - Read the fabric's planner output as a familiar
+    //     aggregate structure
+    //   - Compare fabric-derived dominanceOrder against the host's
+    //     own L9 dominance computation (sanity check)
+    //   - Feed the projection back into the next turn's L9
+    //     planning if desired
+    //
+    // Projection rules (pure-fn):
+    //   - `candidateIDs` = input order (preserves the host's
+    //     original candidate enumeration)
+    //   - `dominanceOrder` = candidates sorted by confidence
+    //     DESCENDING (ties broken by candidateID lex ascending
+    //     for determinism)
+    //   - `reversiblePaths` = candidates with `reversibility >= 0.7`
+    //     (matches the ch 967 high-reversibility band)
+    //   - `guardPaths` = candidates with `reversibility < 0.3`
+    //     (matches the ch 958 low-reversibility / guard-needed band)
+    //   - `frontierWidth` = candidate count
+    //   - `diversityScore` = `1 - <std-dev of confidence>` clamped
+    //     to [0,1] (high diversity = low std-dev across confidences
+    //     = candidates are spread, not clustered)
+    //   - `delayedPaths` = empty (delay-classification is L11
+    //     domain, not derivable from planner output alone)
+
+    /// Project a list of `BASPlannerCandidate` (the fabric's
+    /// planner input) into a host-shape `BASCandidateFrontier`
+    /// summary。 Closes ch 982.5 META-REVIEW Gap 5
+    /// (fabric `.candidateFrontier` disjoint from host
+    /// `BASCandidateFrontier`)。
+    ///
+    /// Pure-fn deterministic — same input always produces
+    /// byte-equal output。
+    ///
+    /// - Parameter candidates: the list passed to Planner seat
+    /// - Returns: host-shape aggregate frontier projection
+    public static func candidateFrontierProjection(
+        from candidates: [BASPlannerCandidate]
+    ) -> BASCandidateFrontier {
+        let candidateIDs = candidates.map { $0.candidateID }
+        // Dominance order:confidence descending,ties broken by
+        // candidateID lex ascending for determinism。
+        let dominanceOrder = candidates
+            .sorted { a, b in
+                if a.confidence != b.confidence {
+                    return a.confidence > b.confidence
+                }
+                return a.candidateID < b.candidateID
+            }
+            .map { $0.candidateID }
+        // Reversibility-band classification per ch 958 + ch 967
+        // bands。
+        let reversiblePaths = candidates
+            .filter { $0.reversibility >= 0.7 }
+            .map { $0.candidateID }
+        let guardPaths = candidates
+            .filter { $0.reversibility < 0.3 }
+            .map { $0.candidateID }
+        // Diversity score = 1 - std-dev(confidence),clamped。
+        // Empty / single-candidate case is "perfectly diverse"
+        // by convention (no variance possible)。
+        let diversity: Double
+        if candidates.count < 2 {
+            diversity = 1.0
+        } else {
+            let confs = candidates.map { $0.confidence }
+            let mean = confs.reduce(0.0, +)
+                / Double(confs.count)
+            let variance = confs.map { ($0 - mean) * ($0 - mean) }
+                .reduce(0.0, +) / Double(confs.count)
+            let stdDev = variance.squareRoot()
+            // std-dev is in [0, 0.5] for confidence ∈ [0,1] when
+            // the distribution is bimodal extremes;normalize
+            // by 0.5 to map to [0,1] then invert
+            let normalized = min(1.0, stdDev / 0.5)
+            diversity = max(0.0, min(1.0, 1.0 - normalized))
+        }
+        return BASCandidateFrontier(
+            candidateIDs: candidateIDs,
+            dominanceOrder: dominanceOrder,
+            reversiblePaths: reversiblePaths,
+            guardPaths: guardPaths,
+            frontierWidth: candidates.count,
+            diversityScore: diversity,
+            delayedPaths: [])
+    }
+
     // MARK: - chapter 九百八十八 / M3645 — Cross-Module Integration
     //                                       Arc ch6:Gap 4 close
     //
