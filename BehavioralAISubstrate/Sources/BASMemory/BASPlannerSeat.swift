@@ -179,20 +179,15 @@ public enum BASPlannerSeat {
 // BASScoutSeat's to avoid an internal-visibility helper that
 // could leak)
 
+// chapter 九百八十一.9 USER-PASS-10 ARC FINALIZE item 8
+// migration:was an inlined 13-line escape implementation;
+// now delegates to the shared `BASAgentFabricJSONEscape`
+// helper (ch 981.7 deferred item 8)。 Byte-equal output
+// to the prior inlined version。 The thin wrapper preserves
+// the existing call-site syntax `s.escapeForJSON()` so no
+// other lines in this file change。
 private extension String {
     func escapeForJSON() -> String {
-        var out = ""
-        out.reserveCapacity(self.count)
-        for ch in self {
-            switch ch {
-            case "\\": out.append("\\\\")
-            case "\"": out.append("\\\"")
-            case "\n": out.append("\\n")
-            case "\r": out.append("\\r")
-            case "\t": out.append("\\t")
-            default: out.append(ch)
-            }
-        }
-        return out
+        BASAgentFabricJSONEscape.escape(self)
     }
 }

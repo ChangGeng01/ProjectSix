@@ -11,6 +11,159 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百八十一.9 / M3610.9 — 全面修复:Round 7 fix^11 + SIGBUS root cause + test count reconcile + seat migration (item 8 properly closed)
+
+**4 parallel tracks executed:** Round 7 N-pass review + swift-testing
+SIGBUS investigation + test count reconciliation + 9-seat migration
+to shared `BASAgentFabricJSONEscape` helper。
+
+#### Round 7 findings (1 CRITICAL + 2 HIGH + MED)
+
+**C1 CRITICAL — Ch 981.8 HIGH-4 fix RE-INTRODUCED the very ambiguity it claimed to fix.**
+
+Round 6 had merged two audit refs into one
+`agentExternal.warrant:granted:host-root=<id>:per-agent=<id>` —
+but warrant IDs are caller-supplied opaque strings that legitimately
+contain `:` per the documented format
+(`host-warrant:<hostID>:<sessionID>:<expires>`)。 An L14 parser
+splitting on `:` cannot unambiguously locate the per-agent boundary
+when host-root value contains `:`。
+
+**Fix**:use U+001F unit-separator (control character no caller can
+produce per the format spec) between the host-root and per-agent
+fields。 Matches the ch 964.5 sentinel TURN-LOCKDOWN discipline
+that solved an identical class of problem。 L14 parser splits
+unambiguously regardless of `:` content。 Stress test pins this
+with `host:warrant:nested:colon:hell` ID。
+
+**H1 HIGH — Round-table dedup key collision via `|`**
+
+`BASRoundTableSession.consense` used string concatenation
+`"\(agentID)|\(proposalID)"` as dictionary key。 Two legitimate
+distinct (agent,proposal) pairs could collide:agentID="A|B" +
+proposalID="C" produces key "A|B|C" identical to agentID="A" +
+proposalID="B|C"。 Caller-supplied opaque strings have no
+character constraint → ballot stuffing via ID-collision rather
+than repeat-voting。
+
+**Fix**:struct-typed `DedupKey: Hashable` with `agentID` +
+`proposalID` fields。 Swift's Hashable for structs uses
+field-by-field hashing — collision impossible regardless of
+character content。
+
+**MED2 — Warrant corruption check now runs BEFORE identity check**
+
+Defense-in-depth discipline:most-fundamental defect surfaces first。
+A corrupted warrant intended for agent B submitted with agent A's
+ref previously emitted `identity-mismatch`,hiding the corruption
+signal。 Re-ordered Rules 3 + 4 so corruption check runs first。
+
+#### SIGBUS root cause investigation
+
+The recurring `swift-testing helper exited with unexpected signal
+code 10` was tracked to `BASAppleConsoleSnapshotBuilderTests` +
+`BASAppleInspectionBridgeTests` + `BASAppleProviderHostBridgeTests`
+— Apple-platform-specific CoreData/NSXPC test infrastructure that
+fails to bring up an XPC connection in headless SPM test environments。
+**NOT caused by the Agent Fabric arc** — pre-existing environmental
+issue。 Documented for posterity:no fix from our side。
+
+#### Test count reconciliation
+
+Actual: `grep -c "func test" Tests/BehavioralAISubstrateTests/
+BASChapter9[5-8]*.swift` = **690 functions** at ch 981.8。 CHANGELOG
+ch 981.8 claimed "689 / 0 failures" — off by 1 due to a subtle
+discrepancy between `swift test` runtime count vs grep-count
+(some test files have helper-functions that match `func test`
+heuristic but aren't actual `XCTestCase` methods)。 Within
+tolerance;documenting the reconcile method for future audits。
+
+#### Item 8 properly closed:9-seat migration to shared helper
+
+Ch 981.7 had shipped `BASAgentFabricJSONEscape.swift` but explicitly
+deferred the per-seat migration to avoid scope creep on the arc
+seal。 Ch 981.9 now migrates all 9 seats:
+
+| Seat | Suffix | Lines removed |
+|---|---|---|
+| BASPlannerSeat | (none) | 13 |
+| BASScoutSeat | (none) | 13 |
+| BASRiskSeat | (none) | 13 |
+| BASSurfaceSeat | (none) | 13 |
+| BASCriticSeat | CS | 13 |
+| BASMemorySeat | MS | 13 |
+| BASHostAlignmentSeat | HA | 13 |
+| BASSovereignSentinelSeat | SS | 13 |
+| BASEvolutionShadowSeat | ES | 13 |
+| **Total** | | **~117 LOC** |
+
+Each seat keeps its thin private extension wrapper preserving the
+existing call-site syntax (e.g. `s.escapeForJSONHA()`),delegating
+to `BASAgentFabricJSONEscape.escape(s)`。 Byte-equal output verified
+by `testARC_Item8_PlannerSeatStillEscapesCorrectly`。 Item 8 now
+TRULY closed — there are no longer 10 copies of the escape
+implementation。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASSovereignWarrantChain.swift` | + C1 unit-separator + MED2 corruption-check ordering |
+| `Sources/BASMemory/BASAgentRoundTable.swift` | + H1 struct-typed DedupKey |
+| `Sources/BASMemory/BAS{Planner,Scout,Risk,Surface,Critic,Memory,HostAlignment,SovereignSentinel,EvolutionShadow}Seat.swift` | + item 8 migration (9 files,~117 LOC total) |
+| `Tests/BehavioralAISubstrateTests/BASChapter981_9UserPass10Tests.swift` | NEW — 7 regression tests pinning all 4 fixes |
+| `CHANGELOG.md` | + this entry |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| USER-PASS-10 regression tests (ch 981.9) | 7 / 0 failures |
+| Cumulative arc tests (ch 953-981.9) | 696 / 0 failures |
+
+#### N-pass discipline track record (7 rounds — cascade not yet terminated)
+
+| Round | Sub-ch | Real bugs |
+|---|---|---|
+| 1 | 956.11 | 10+ |
+| 2 | 964.5 | 15+ |
+| 3 | 969.5 | 10+ |
+| 4 | 981.5 | 15+ |
+| 5 | 981.6 | 8+ (from round 4 fixes) |
+| 6 | 981.8 | 8+ (from round 5 new modules) |
+| **7** | **981.9** (this) | **1C + 2H + MED (from round 6 fixes)** |
+| **TOTAL** | **7 rounds** | **70+ real bugs caught** |
+
+Round 7's C1 finding is particularly damning:the ch 981.8 HIGH-4
+fix specifically aimed to fix audit-format ambiguity,but the
+"fix" REINTRODUCED the same class of ambiguity via different
+characters。 Pure-fn discipline notwithstanding,**audit format
+design requires explicit character-class analysis** — colons in
+caller-supplied opaque strings is a real concern。
+
+#### Substrate-side completion (4 items truly closed)
+
+After 7 review rounds + 4 deferred-item closures + 1 seat migration,
+the substrate-side work is genuinely done:
+- Item 1 (round-table scaffold) — closed at 981.7,fixed in 981.8 + 981.9
+- Item 3 (cold-restart) — closed at 981.5,fixed in 981.6
+- Item 5 (warrant chain) — closed at 981.7,fixed in 981.8 + 981.9
+- Item 7 (fuzz determinism) — closed at 981.5,fixed in 981.6
+- Item 8 (escapeForJSON) — closed at 981.7,**migration completed in 981.9**
+
+#### Honest meta-finding
+
+The cascade has STILL not terminated。 Round 7 caught 1 CRITICAL +
+2 HIGH bugs in fixes that landed 1 day earlier。 Each round's claim
+of "this round closes the cascade" has been falsified by the next
+round。 The substrate is well-tested per the simulator-level
+discipline,but device verification remains pending and round 8 might
+still find issues — particularly around the U+001F separator (does
+it survive serialization through the L14 audit ledger? Pure-fn here,
+but L14 may use a different char-set).
+
+---
+
 ### Chapter 九百八十一.8 / M3610.8 — USER-PASS-9:6th N-pass review catches 4 HIGH + 4 critical test gaps + 1 doc lie in ch 981.7 ARC FINALIZE batch
 
 **The "diminishing returns" hypothesis was WRONG。** Per ch 943

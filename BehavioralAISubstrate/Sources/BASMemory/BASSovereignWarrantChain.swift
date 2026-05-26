@@ -167,7 +167,24 @@ public enum BASSovereignWarrantValidator {
                 valid: false, auditRefs: refs)
         }
 
-        // Rule 3: identity match (chain's externalAgentID
+        // Rule 3 (ch 981.9 USER-PASS-10 MED2-fix:moved
+        // BEFORE identity check):corruption detection。
+        // expiresAtNanos == 0 is either uninitialized or
+        // zeroed,both indicate corruption。 Per defense-in-
+        // depth discipline,corruption is more fundamental
+        // than an identity mismatch — a corrupted warrant
+        // alongside an identity mismatch should surface the
+        // corruption signal (most-fundamental defect first)
+        // rather than mask it behind identity-mismatch。
+        if chain.expiresAtNanos == 0 {
+            refs.append(
+                "agentExternal.warrant:rejected:" +
+                "corrupted-expires-at-zero")
+            return BASWarrantValidationResult(
+                valid: false, auditRefs: refs)
+        }
+
+        // Rule 4: identity match (chain's externalAgentID
         // must equal the supplied ref's ID — defends against
         // an attacker submitting a valid warrant for agent A
         // alongside a proposal from agent B)
@@ -175,20 +192,6 @@ public enum BASSovereignWarrantValidator {
             refs.append(
                 "agentExternal.warrant:rejected:" +
                 "identity-mismatch")
-            return BASWarrantValidationResult(
-                valid: false, auditRefs: refs)
-        }
-
-        // Rule 4 (ch 981.8 USER-PASS-9 MED-corruption fix):
-        // explicit corruption check。 expiresAtNanos == 0 is
-        // either uninitialized or zeroed,both indicate
-        // corruption。 This check runs BEFORE the age check
-        // so that even when nowNanos = 0 (caller skips age
-        // check) we still catch corruption。
-        if chain.expiresAtNanos == 0 {
-            refs.append(
-                "agentExternal.warrant:rejected:" +
-                "corrupted-expires-at-zero")
             return BASWarrantValidationResult(
                 valid: false, auditRefs: refs)
         }
@@ -206,11 +209,32 @@ public enum BASSovereignWarrantValidator {
         }
 
         // Granted — emit SINGLE audit ref matching the
-        // documented <status>:<detail> format。 host-root +
-        // per-agent both encoded into the detail part。
+        // documented <status>:<detail> format。
+        //
+        // chapter 九百八十一.9 USER-PASS-10 C1 fix:warrant
+        // IDs are caller-supplied opaque strings that CAN
+        // contain `:` (e.g. `host-warrant:hostA:sess1:expires`
+        // per the documented format on lines 60-65)。
+        // Round 6's "single-ref" fix used `=` + `:` as field
+        // separators which were AMBIGUOUS — a parser could
+        // not unambiguously locate the per-agent boundary
+        // when warrant IDs contained colons。 Round 7 caught
+        // that the fix reintroduced the very class of
+        // ambiguity it claimed to fix。
+        //
+        // Final fix:use U+001F unit-separator (control
+        // character that no caller can produce in a warrant
+        // ID per the format spec) as the field separator。
+        // Matches the ch 964.5 sentinel TURN-LOCKDOWN
+        // discipline that solved an identical class of issue。
+        // L14 parser splits the ref on `\u{001F}` to recover
+        // the host-root and per-agent values verbatim,no
+        // ambiguity regardless of `:` content in IDs。
+        let unitSep = "\u{001F}"
         refs.append(
             "agentExternal.warrant:granted:" +
-            "host-root=\(chain.hostRootWarrantID):" +
+            "host-root=\(chain.hostRootWarrantID)" +
+            "\(unitSep)" +
             "per-agent=\(chain.perAgentWarrantID)")
         return BASWarrantValidationResult(
             valid: true, auditRefs: refs)

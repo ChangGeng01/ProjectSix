@@ -229,6 +229,17 @@ public struct BASRoundTableDissent:
 
 // MARK: - Round-table session (pure-fn)
 
+/// Internal dedup key for ballot-stuffing prevention per
+/// ch 981.9 USER-PASS-10 H1 fix。 Was previously a string
+/// concatenation `"<agent>|<proposal>"` which COLLIDED when
+/// either ID contained `|`。 Struct-typed key prevents
+/// collision regardless of character content in caller-
+/// supplied opaque ID strings。
+fileprivate struct DedupKey: Hashable {
+    let agentID: String
+    let proposalID: String
+}
+
 public enum BASRoundTableSession {
 
     /// FP-equality epsilon for tie-detection on proposal
@@ -278,17 +289,27 @@ public enum BASRoundTableSession {
         _ quorum: BASRoundTableQuorum
     ) -> BASRoundTableConsensus {
         // HIGH-1 FIX:dedup votes by (agentID, proposalID)
-        // keeping only highest-confidence per pair。 If same
-        // agent voted N times for the same proposal,only the
-        // most-confident vote counts。 Different-proposal
-        // votes from same agent still all count (an agent
-        // CAN have an opinion on each proposal,but only
-        // ONE opinion per proposal)。
+        // keeping only highest-confidence per pair。
+        //
+        // chapter 九百八十一.9 USER-PASS-10 H1 fix:was using
+        // `"\(agent)|\(proposal)"` string concatenation as
+        // dictionary key,which COLLIDED when agentID or
+        // proposalID contained `|`。 E.g. agentID="A|B" +
+        // proposalID="C" produced key "A|B|C" identical to
+        // agentID="A" + proposalID="B|C"。 Caller-supplied
+        // opaque strings have no character constraint,so
+        // collisions were a real risk → ballot stuffing via
+        // ID-collision rather than repeat-voting。
+        //
+        // Final fix:use struct-typed key (Hashable tuple)
+        // so collision is impossible regardless of character
+        // content in IDs。
         var dedupedVotes:
-            [String: BASRoundTableVote] = [:]
+            [DedupKey: BASRoundTableVote] = [:]
         for vote in quorum.votes {
-            let key =
-                "\(vote.votingAgentID)|\(vote.proposalID)"
+            let key = DedupKey(
+                agentID: vote.votingAgentID,
+                proposalID: vote.proposalID)
             if let existing = dedupedVotes[key] {
                 if vote.confidence > existing.confidence {
                     dedupedVotes[key] = vote

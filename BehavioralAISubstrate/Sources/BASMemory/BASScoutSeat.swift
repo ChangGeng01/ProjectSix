@@ -295,22 +295,10 @@ public enum BASScoutSeat {
 // MARK: - JSON escape helper (private to this file)
 
 private extension String {
-    /// Minimal JSON-string escape:backslash + double-quote。
-    /// Sufficient for ASCII-safe substrate-internal signal IDs。
-    /// For arbitrary user input,upgrade to full JSON encode。
+    /// chapter 九百八十一.9 USER-PASS-10 ARC FINALIZE item 8
+    /// migration:delegates to shared `BASAgentFabricJSONEscape`。
+    /// Byte-equal output to the prior inlined version。
     func escapeForJSON() -> String {
-        var out = ""
-        out.reserveCapacity(self.count)
-        for ch in self {
-            switch ch {
-            case "\\": out.append("\\\\")
-            case "\"": out.append("\\\"")
-            case "\n": out.append("\\n")
-            case "\r": out.append("\\r")
-            case "\t": out.append("\\t")
-            default: out.append(ch)
-            }
-        }
-        return out
+        BASAgentFabricJSONEscape.escape(self)
     }
 }
