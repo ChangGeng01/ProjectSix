@@ -11,6 +11,153 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百七十三-九百七十五 / M3570-M3580 — Phase 6 close:SDK productization (skill agents + API stability + DeviceTestApp sample)
+
+Closes Phase 6 of the Agent Fabric arc。 Ships the public SDK
+surface for external consumers (Qinao runtime,3rd-party hosts)
+on top of Phase 1-5 fabric。
+
+#### Ch 973 — `BASSkillAgent` protocol + 4 reference skill agents
+
+Skill agents are SDK-PRODUCT-ATTACHED agents — N per SDK consumer
+per plan Section 5.3。 Each scoped to a CAPABILITY DOMAIN +
+PERMIT DOMAIN + MEMORY DOMAIN + TOOL DOMAIN quad,unlike core
+agents which serve the full host。
+
+**4 reference capabilities + agents (count pinned)**:
+
+| Capability | Agent ID | Visibility | Read access |
+|---|---|---|---|
+| `.writing` | `skill.writing.reference.v1` | high | candidateFrontier + memoryBundle + renderFrame |
+| `.code` | `skill.code.reference.v1` | high | candidateFrontier + memoryBundle + **critiqueField** |
+| `.research` | `skill.research.reference.v1` | high | candidateFrontier + memoryBundle + **situationField** |
+| `.scheduling` | `skill.scheduling.reference.v1` | **medium** | candidateFrontier + memoryBundle + renderFrame |
+
+Scheduling agent gets MED visibility (limited persona
+customization) because `schedule-delete` is high-risk。
+
+**CRITICAL invariants** (verified by 24 ch 973 tests):
+- Skill agents have `writeDomains: []` (read-only,never own a
+  domain per Single-Writer-Per-Domain invariant)
+- `forbiddenDomains` includes `.hostVersion` + `.sovereignVerdict`
+  + `.actionPermit` + `.evolutionProposal` (Root Law 4 sovereign-
+  locked domains)
+- 3 dedicated CRITICAL tests verify skill agents cannot write
+  `.hostVersion` / `.sovereignVerdict` / `.evolutionProposal`
+  via the state graph at runtime
+
+**Pipeline** (`BASSkillAgentInvoker.invoke(...)`):
+1. Validate descriptor (empty agentID / turnID → fast reject)
+2. Build `BASAgentSpec` from descriptor (role
+   `.compareModerator`,readDomains from descriptor,no write/
+   propose)
+3. Resolve persona via Phase 4 SDK
+4. Return `BASSkillAgentInvocationResult` with persona + spec
+   + outcomes + error
+
+#### Ch 974 — SDK API Stability surface + audit + pin tests
+
+`Docs/SDK_API_STABILITY.md` declares the SDK's contract with
+external consumers across 3 stability tiers:
+
+| Tier | Promise |
+|---|---|
+| **WIRE-STABLE** | Codable schema frozen within SDK v1;new optional fields allowed,renames/removals are BREAKING |
+| **API-STABLE** | Swift public API backward-compatible within SDK v1 |
+| **INTERNAL** | May change without notice |
+
+Lists every wire-stable type:8 core schemas (ch 953) + 6
+enums + 12 Phase 4 persona types + 4 Phase 5 watcher types +
+4 Phase 6 skill agent types。 Documents the 6 reserved
+`signalRefs` prefixes (`agentFabric.*` + `agentPersona.*` +
+`agentWatcher.*`) used across phases。 Declares SDK v1
+versioning policy + breaking-change audit trail for the
+`BASStateDomain` count migration (9→10→11→12 across ch 953/961/
+963/965)。
+
+`BASChapter974_975SDKStabilityTests` (22 tests) PINS the
+stability contract:
+- 12 enum count pins (forces CHANGELOG entry if bumped)
+- Reserved `agentWatcher.` prefix discipline
+- Codable round-trip stability for 5 representative types
+  (AgentSpec / PersonaSpec / WatcherHint / SkillDescriptor /
+  WatcherAggregate)
+- Backward-compat smoke (4-seat dispatcher still works at
+  pre-ch-961 shape)
+- Reference skill agent IDs are SDK contract (stable across
+  versions)
+- Regression-defense:ch 969.5 CG1 (LOW-tier SDK exemption) +
+  ch 967 monotonic-raise invariants STILL hold across the full
+  agent fabric surface
+
+#### Ch 975 — DeviceTestApp sample integration
+
+`Docs/PHASE_6_CLOSE_SMOKE.md` documents the 1-hour iPhone Air
+soak procedure:
+- Pre-flight checks (clean build + Phase 5-6 tests pass)
+- DeviceTestApp sample integration code (~15 lines exercising
+  all 4 reference skill agents via `BASSkillAgentInvoker`)
+- 1-hour soak via existing `scripts/run-iphone-air-10hr.sh`
+  wrapper with `MAX_SEC=3600`
+- Pass criteria including Codable drift = 0, invocation success
+  rate = 100%, watcher signalRef prefix compliance = 100%
+- Deferred items routed to Phase 7 (MCP/A2A adapters, env-var
+  gate, real consumer integration)
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASSkillAgent.swift` | NEW — capability enum + descriptor + registry + invocation envelope + result + invoker (ch 973) |
+| `Tests/BehavioralAISubstrateTests/BASChapter973SkillAgentTests.swift` | NEW — 24 tests (incl. 3 CRITICAL sovereign-lock + 21 functional/Codable/regression) |
+| `Tests/BehavioralAISubstrateTests/BASChapter974_975SDKStabilityTests.swift` | NEW — 22 tests pinning the SDK v1 stability contract |
+| `Docs/SDK_API_STABILITY.md` | NEW — comprehensive SDK contract (ch 974) |
+| `Docs/PHASE_6_CLOSE_SMOKE.md` | NEW — operator 1-hour soak procedure (ch 975) |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| Phase 6 tests (ch 973-975) | 46 / 0 failures |
+| Cumulative arc tests (ch 953-975) | 530 / 0 failures |
+| Full sweep | 14,158 / 0 failures (113 fuzz-skipped via env var) |
+
+#### Phase 6 summary
+
+- **Skill agent SDK surface** complete — 4 reference agents
+  pinned + general descriptor/invocation/invoker pure-fns
+- **3-tier stability contract** declared (WIRE-STABLE /
+  API-STABLE / INTERNAL) with comprehensive type list
+- **22 stability pin tests** catch any future SDK contract
+  break at CI time
+- **DeviceTestApp sample integration** documented for operator
+  smoke (~15 LOC sample code in PHASE_6_CLOSE_SMOKE.md)
+- ADR-014 OPT-IN preserved — skill agents not invoked unless
+  caller explicitly calls the invoker
+
+#### Phase 6 plan thread (3 chapters)
+
+| ch | Scope |
+|---|---|
+| 973 | BASSkillAgent protocol + 4 reference skill agents |
+| 974 | SDK API stability declaration + pin tests + audit trail |
+| 975 | DeviceTestApp sample integration + 1-hour iPhone Air soak doc |
+
+#### Next phase
+
+Phase 7 (MCP + A2A external,ch 976-978):
+- ch 976: MCP adapter into Capability Gateway (tools/data/prompt/
+  resource adapters route through `BASActionPermit` + provenance
+  seal) — MED risk
+- ch 977: A2A adapter as `BASExternalAgentRef` (external agents
+  proposal-only,tool-domain-scoped,no direct write,subject to
+  provenance + sandbox) — HIGH risk (must not let external
+  override sovereign)
+- ch 978: End-to-end MCP+A2A test on iPhone Air with real
+  Gemma 4 E2B internal + mock external agent — Phase 7 close
+
+---
+
 ### Chapter 九百七十-九百七十二 / M3555-M3565 — Phase 5 close:7 watcher agents + L14 audit aggregator + adversarial fuzz
 
 Closes Phase 5 of the Agent Fabric arc:user design Section 9.8
