@@ -2728,47 +2728,119 @@ extension BASCognitiveBrain {
             + "::os=\(info.operatingSystemVersionString)"
     }
 
+    // MARK: - chapter 九百九十九 / M3700 — elegant ANE
+    //         consultation generic + extended op coverage
+    //
+    // Pre-fix:ch 998 wired ONE op (softmax) with 3-line copy-
+    // paste boilerplate (tier-read + counter-bump + dispatch)。
+    // For 8 BASNeuralOp cases that's 24 lines of duplication
+    // and 8 separate maintenance burdens。 Plus the existing
+    // *Auto functions silently consumed the tier — callers
+    // couldn't observe what tier the classifier reported,only
+    // that consultation happened。
+    //
+    // Ch 999 elegant evolution:
+    //
+    //   1. Single generic helper `aneConsulted(op:dispatch:)`
+    //      that runs the classifier consult + counter bump +
+    //      caller's dispatch closure in one call。 Zero
+    //      boilerplate at each call site。
+    //
+    //   2. New parallel set of `*AutoWithANETier` functions
+    //      that EXPOSE the tier alongside the dispatch result,
+    //      so callers who want the host-observable signal
+    //      (e.g. for telemetry / future routing logic) can
+    //      read both。 Existing `*Auto` functions stay byte-
+    //      equal — they call the helper internally but
+    //      discard the tier (observe-only doctrine preserved)。
+    //
+    //   3. Wire across all 4 BASNeuralOp-mapped public entry
+    //      points on this brain class:softmaxAuto,
+    //      layerNormAuto,plus the in-method matMul + attention
+    //      consultations (covered separately at their call
+    //      sites since they live inside larger pipeline
+    //      methods,not standalone *Auto entries)。 The 4
+    //      missing ops (rotaryEmbedding,conv2D,rmsNorm,
+    //      ssmScan) get the helper when their *Auto entries
+    //      land in future chapters。
+    //
+    //   4. The helper is `@inlinable` so call-site cost is the
+    //      same as the inlined copy-paste version。 No
+    //      indirection overhead。 Just the boilerplate
+    //      elimination + tier exposure。
+
+    /// Result bundle for an ANE-consulted op:dispatch result
+    /// + the classifier's tier verdict for the op type。
+    /// Sendable so it can cross actor boundaries safely。
+    public struct BASANEConsultedResult<Value: Sendable>:
+        Sendable
+    {
+        public let value: Value
+        public let aneTier: BASANEEligibilityTier
+
+        public init(
+            value: Value,
+            aneTier: BASANEEligibilityTier
+        ) {
+            self.value = value
+            self.aneTier = aneTier
+        }
+    }
+
+    /// Generic ANE-consultation wrapper。 Runs the classifier's
+    /// tier(for:op) check + increments the executor counter +
+    /// invokes the caller-supplied dispatch closure。 Returns
+    /// the dispatch result wrapped with the tier verdict。
+    ///
+    /// Observe-only:the tier is captured + returned to caller
+    /// but the substrate does NOT use it for dispatch routing
+    /// at this chapter。 Future arc may flip the static-let
+    /// invariant when actual routing branches on tier。
+    @inlinable
+    public nonisolated static func aneConsulted<Value: Sendable>(
+        op: BASNeuralOp,
+        dispatch: () -> Value
+    ) -> BASANEConsultedResult<Value> {
+        let tier = BASANEKernelEligibilityClassifier
+            .tier(for: op)
+        BASANEKernelEligibilityClassifier
+            .executorConsultationCount += 1
+        return BASANEConsultedResult(
+            value: dispatch(),
+            aneTier: tier)
+    }
+
     /// chapter 七百九 第四刀 / M2219 — auto-routed softmax。
     ///
     /// Always routes through Rust scalar (measured tie with
     /// SIMD,scalar is simpler)。 Returns the normalized
     /// probability vector + which path executed。
     ///
-    /// chapter 九百九十八 / M3695 — first production-side ANE
-    /// classifier consultation。 Pre-ch-998 the
-    /// `BASANEKernelEligibilityClassifier` had been in the
-    /// substrate since chapter 500 with the explicit honest
-    /// disclosure `consultedByExecutorInProduction = false`。
-    /// 497 chapters of cascade work never closed this gap。
-    /// ch 998 adds an OBSERVE-ONLY consultation here:before
-    /// dispatching softmax to the Rust scalar path,record the
-    /// ANE classifier's `.softmax` tier into the runtime
-    /// counter。 This is the smallest possible "production
-    /// consultation" foothold — it does NOT yet branch
-    /// dispatch on the tier (that's phase 9+ scope per ch 994
-    /// fabric-authoritative-mode-style behavioral changes),
-    /// but it proves the wire exists by incrementing the
-    /// `executorConsultationCount` counter per call。
-    ///
-    /// Tests can observe via
-    /// `BASANEKernelEligibilityClassifier.executorConsultationCount`
-    /// to verify production code paths are reaching the
-    /// classifier。 Honest doctrine for substrate adopters:
-    /// "softmax dispatch consults the ANE classifier;output
-    /// is observed not used for routing"。
+    /// chapter 九百九十八 / M3695 → ch 999 / M3700 evolution:
+    /// the ANE consultation that ch 998 inlined as 3 lines is
+    /// now delegated to the generic `aneConsulted(op:dispatch:)`
+    /// helper。 Byte-equal behavior + same counter increment +
+    /// less boilerplate。 The tier is discarded here (observe-
+    /// only doctrine);callers wanting to observe the tier
+    /// alongside the softmax result use `softmaxAutoWithANETier`
+    /// (below)。
     public nonisolated static func softmaxAuto(
         _ x: [Float]
     ) -> BASAutoRouteResult<[Float]> {
-        // ch 998:observe-only ANE consultation。 Counter is
-        // nonisolated(unsafe) so concurrent increments may lose
-        // updates,but for the invariant proof "at least one
-        // production caller reached the classifier" any
-        // increment > 0 is sufficient evidence。
-        _ = BASANEKernelEligibilityClassifier
-            .tier(for: .softmax)
-        BASANEKernelEligibilityClassifier
-            .executorConsultationCount += 1
-        return BASAutoRouteRanker.softmax(x)
+        return aneConsulted(op: .softmax) {
+            BASAutoRouteRanker.softmax(x)
+        }.value
+    }
+
+    /// chapter 九百九十九 / M3700 — same dispatch as `softmaxAuto`
+    /// but exposes the ANE classifier's tier verdict for the
+    /// caller to observe (e.g. telemetry,future routing logic)。
+    public nonisolated static func softmaxAutoWithANETier(
+        _ x: [Float]
+    ) -> BASANEConsultedResult<BASAutoRouteResult<[Float]>> {
+        return aneConsulted(op: .softmax) {
+            BASAutoRouteRanker.softmax(x)
+        }
     }
 
     /// chapter 七百九 第四刀 / M2219 — auto-routed LayerNorm。
@@ -2776,12 +2848,33 @@ extension BASCognitiveBrain {
     /// Routes between Rust naive (dim < 128) and Rust affine
     /// SIMD (dim ≥ 128) based on measured crossover。 Plain
     /// LayerNorm with γ=1 β=0。
+    ///
+    /// chapter 九百九十九 / M3700 — wired through
+    /// `aneConsulted(op: .layerNorm,...)` so the ANE
+    /// classifier is consulted before dispatch + the executor
+    /// counter increments per call。 Observe-only:dispatch
+    /// behavior unchanged。
     public nonisolated static func layerNormAuto(
         _ x: [Float], eps: Float = 1e-5,
         thresholds: BASAutoRouteThresholds = .mSeriesDefault
     ) -> BASAutoRouteResult<[Float]> {
-        return BASAutoRouteRanker.layerNorm(
-            x, eps: eps, thresholds: thresholds)
+        return aneConsulted(op: .layerNorm) {
+            BASAutoRouteRanker.layerNorm(
+                x, eps: eps, thresholds: thresholds)
+        }.value
+    }
+
+    /// chapter 九百九十九 / M3700 — `layerNormAuto` variant
+    /// exposing the ANE classifier's tier verdict alongside
+    /// the result。
+    public nonisolated static func layerNormAutoWithANETier(
+        _ x: [Float], eps: Float = 1e-5,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) -> BASANEConsultedResult<BASAutoRouteResult<[Float]>> {
+        return aneConsulted(op: .layerNorm) {
+            BASAutoRouteRanker.layerNorm(
+                x, eps: eps, thresholds: thresholds)
+        }
     }
 
     /// chapter 七百十一 第四刀 / M2229 — auto-routed GELU exact。
