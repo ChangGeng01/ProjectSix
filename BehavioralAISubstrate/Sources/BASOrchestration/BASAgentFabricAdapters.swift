@@ -185,6 +185,85 @@ public enum BASAgentFabricAdapters {
             superegoActiveLevel: superegoActiveLevel)
     }
 
+    // MARK: - chapter 九百八十八 / M3645 — Cross-Module Integration
+    //                                       Arc ch6:Gap 4 close
+    //
+    // Enrich BASCriticSeatInput from live BASTriSelfScore[]。 Was:
+    // `BASCriticSeat` consumed a `superegoActiveLevel: Double`
+    // parameter that callers had to provide manually — but ch 953
+    // plan section 9 + the L10 tribunal design intent specifically
+    // requires the Critic seat to WRAP `triSelfService.superego
+    // (judgement)`。 Without this wire,the fabric Critic was a
+    // pure-function on candidate paths,disconnected from the L10
+    // 三我庭's id/ego/superego scoring。 Two parallel critique
+    // computations,no path connecting them。
+    //
+    // Per ch 956 plan + the L10 design,the fabric Critic seat is
+    // invoked BEFORE the live triSelf service (so the fabric's
+    // critique informs triSelf's id/ego/superego scoring,not the
+    // other way around)。 This adapter is for the COMPLEMENTARY
+    // case:after triSelf has scored,enrich the NEXT turn's
+    // Critic input with the prior turn's superego signal,so the
+    // fabric Critic seat reflects the host's previously-computed
+    // superego concern level。
+    //
+    // Computation:
+    //   - `superegoActiveLevel` raised (max) to the average
+    //     `superegoScore` across non-vetoed candidates in the
+    //     prior turn's tri-self output
+    //   - Per ch 967 monotonic raise — never lowers the
+    //     superegoActiveLevel
+    //   - Empty triScores leaves the base input unchanged
+    //
+    // Pure-fn deterministic given inputs。
+
+    /// Enrich a `BASCriticSeatInput` with signals from the prior
+    /// turn's live `BASTriSelfScore[]`。 Closes ch 982.5
+    /// META-REVIEW Gap 4 (fabric Critic seat orthogonal to live
+    /// BASMLTriSelfService)。
+    ///
+    /// Monotonic raise:`superegoActiveLevel` only goes UP per
+    /// ch 967。 Empty triScores produces a no-op (returns base
+    /// unchanged)。
+    ///
+    /// - Parameters:
+    ///   - triScores: live `BASTriSelfScore[]` from the prior
+    ///     turn's `triSelfService.mergeChoice(...)` output
+    ///   - baseCriticInput: existing `BASCriticSeatInput` built
+    ///     by `criticInput(from:superegoActiveLevel:)` or directly
+    /// - Returns: enriched `BASCriticSeatInput` with the
+    ///   superego signal raised (max) to the prior turn's
+    ///   average superego score
+    public static func enrichCriticInput(
+        from triScores: [BASTriSelfScore],
+        baseCriticInput: BASCriticSeatInput
+    ) -> BASCriticSeatInput {
+        // No prior tri scores → return base unchanged
+        guard !triScores.isEmpty else { return baseCriticInput }
+        // Average superegoScore across non-vetoed candidates only
+        // (vetoed candidates already failed at L10 — their
+        // superego score is not informative about general
+        // superego concern level)
+        let nonVetoed = triScores.filter { !$0.veto }
+        guard !nonVetoed.isEmpty else {
+            // All vetoed = MAXIMUM superego concern。 Raise to 1.0
+            // per monotonic raise + worst-case-honesty discipline。
+            return BASCriticSeatInput(
+                candidates: baseCriticInput.candidates,
+                superegoActiveLevel: max(
+                    baseCriticInput.superegoActiveLevel, 1.0))
+        }
+        let avgSuperego = nonVetoed.map { $0.superegoScore }
+            .reduce(0.0, +) / Double(nonVetoed.count)
+        // Defensive clamp + monotonic raise
+        let clamped = max(0.0, min(1.0, avgSuperego))
+        let mergedLevel = max(
+            baseCriticInput.superegoActiveLevel, clamped)
+        return BASCriticSeatInput(
+            candidates: baseCriticInput.candidates,
+            superegoActiveLevel: mergedLevel)
+    }
+
     // MARK: - chapter 九百八十六 / M3635 — Cross-Module Integration
     //                                       Arc ch4:Gap 1 close
     //
