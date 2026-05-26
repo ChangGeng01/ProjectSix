@@ -151,6 +151,28 @@ public enum BASAgentMergeApplier {
     }
 
     /// Per-deltaType payload semantics。 See `apply(_:...)` doc。
+    ///
+    /// chapter 九百九十五.9 META-REVIEW Round-14 HIGH-1 doctrine:
+    /// the applier intentionally collapses `.add` / `.replace` /
+    /// `.merge` / `.annotate` into one identical branch (all
+    /// return `delta.patchJson`)。 The deltaType is preserved in
+    /// the delta itself + stored alongside the graph write as a
+    /// SEMANTIC TAG consumed downstream by audit/replay/diff
+    /// tooling — not a behavioral switch at apply time。 The
+    /// applier's responsibility is "write the payload";
+    /// type-distinction is consumer-side semantics。
+    ///
+    /// Round-14 audit notes that **`.annotate` is currently
+    /// emitted by NO seat in `Sources/BASMemory/BAS*Seat.swift`**
+    /// (grep confirms zero emit sites)。 Other 3 cases are alive:
+    ///   - `.add`:Planner + EvolutionShadow (new candidates)
+    ///   - `.merge`:Scout + Memory + Critic + Risk + HostAlign
+    ///   - `.replace`:Surface + SovereignSentinel
+    ///   - `.remove`:tombstone path (`""` payload)
+    ///   - `.annotate`:reserved for future audit-only seats
+    ///     (e.g. a future "trace seat" that annotates without
+    ///     mutating)。 Preserved here for forward-compat;not
+    ///     marked deprecated。
     private static func effectivePayload(
         for delta: BASAgentDelta
     ) -> String {

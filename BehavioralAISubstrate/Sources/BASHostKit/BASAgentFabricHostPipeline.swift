@@ -73,6 +73,18 @@ import BASSovereign
 /// ?? "")`)。 Now host writes `if outcome.fabricMode ==
 /// .authoritative { ... }` directly。 Diagnostics dict preserved
 /// as supplementary string view per Round-12 doctrine。
+///
+/// chapter 九百九十五.9 META-REVIEW Round-14 CRITICAL-2 honest
+/// disclosure:as of ch 995.9 these typed fields (activation +
+/// fabricMode) have ZERO consumers in `Sources/`。 They are
+/// SDK observability surfaces for HOST applications to inspect。
+/// The substrate itself does NOT branch on them — that's per
+/// the ch 994 scaffold doctrine (mode is a signal,not a behavior
+/// switch;tier/transcriptMode are advisory only)。 Round-14
+/// caught that this matches the SAME class of issue as Round-12's
+/// `BASAgentFabricMode` dead-code finding,one layer deeper。
+/// Disclosure preserved:these fields are PUBLIC API for host
+/// consumers,not internal substrate plumbing。
 public struct BASAgentFabricHostOutcome: Sendable {
     /// The fabric's turn result (deltas + merge + apply)。 Nil
     /// when fabric was disabled by env-var gate or coordinator
@@ -317,10 +329,18 @@ public struct BASAgentFabricHostPipeline {
         diagnostics["risk.card-supplied"] =
             riskCard != nil ? "yes" : "no"
         // chapter 九百九十五.7 Round-13 HIGH-1 fix:emit the
-        // numeric risk.totalRisk that the pre-fix docstring
-        // promised as "card.totalRisk" but never produced。
+        // numeric risk card totalRisk that the pre-fix docstring
+        // promised but never produced。
+        // chapter 九百九十五.9 Round-14 MED-2 fix:renamed key
+        // from "risk.totalRisk" to "risk.cardTotalRisk" to be
+        // explicit that this is the INPUT card value,not the
+        // enriched merged pressure that reaches the Risk seat。
+        // (The enriched value is computed inside
+        // BASAgentFabricFullTurnAdapter and isn't currently
+        // plumbed back — host inspecting "what reached the seat"
+        // would need separate plumbing。)
         if let card = riskCard {
-            diagnostics["risk.totalRisk"] =
+            diagnostics["risk.cardTotalRisk"] =
                 String(format: "%.4f", card.totalRisk)
         }
         diagnostics["tri.scores-count"] =

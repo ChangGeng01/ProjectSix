@@ -73,7 +73,21 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
             conflictClusters: [],
             continuityAnchors: ["anc.1"],
             recallStrength: 0.7)
-        let sentinel = BASSovereignSentinelInput(candidates: [])
+        // chapter 九百九十五.9 META-REVIEW Round-14 CRITICAL-1
+        // fix:Round-13 used `candidates: []` which made sovereign
+        // seat silently emit zero deltas — test claimed to verify
+        // sovereign-orphan-fix but really only verified the input
+        // was non-nil。 Now populate a real sovereign candidate
+        // with touchesSovereignLockedAxis=true so the seat
+        // ACTUALLY emits a sovereignVerdict delta we can assert。
+        let sentinel = BASSovereignSentinelInput(
+            candidates: [
+                BASSovereignSentinelCandidate(
+                    candidateID: "c.1",
+                    title: "test sovereign",
+                    reversibility: 0.5,
+                    touchesAxesCount: 1,
+                    touchesSovereignLockedAxis: true)])
         let evolution = BASEvolutionShadowInput(
             updateTickets: [
                 BASEvolutionUpdateTicket(
@@ -103,9 +117,12 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
         XCTAssertEqual(
             outcome.diagnostics["risk.card-supplied"], "yes")
         XCTAssertEqual(
-            outcome.diagnostics["risk.totalRisk"], "0.7000",
-            "ch 995.7 HIGH-1: numeric risk.totalRisk now emitted " +
-            "(was promised in pre-fix docstring but missing)")
+            outcome.diagnostics["risk.cardTotalRisk"], "0.7000",
+            "ch 995.7+995.9: numeric risk.cardTotalRisk now " +
+            "emitted。 Round-14 MED-2 renamed key from " +
+            "'risk.totalRisk' to 'risk.cardTotalRisk' to be " +
+            "honest about reporting input card value (NOT the " +
+            "merged enriched pressure that reaches the seat)。")
         XCTAssertEqual(
             outcome.diagnostics["tri.scores-count"], "2")
         XCTAssertEqual(
@@ -130,19 +147,37 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
             outcome.diagnostics["priority.tier-count"], "3",
             "ch 995.7 CRITICAL-1: priorityContext orphan " +
             "verifiable (3 agents tagged across tiers)")
-        // 9-seat roster actually emits deltas for the optional
-        // seats (closing Round-13 CRITICAL-1)
+        // chapter 九百九十五.9 META-REVIEW Round-14 CRITICAL-1
+        // fix:Round-13 asserted only 2 of 5 optional-seat
+        // emissions (memoryBundle + evolutionProposal),leaving
+        // sovereign / critic / hostAlignment unchecked。 Same
+        // orphan class — test claimed to verify all 6 orphan
+        // fixes but really only verified 2 of 5 downstream seats
+        // emitted。 Mutation that deleted sovereign-seat emit
+        // from dispatcher would have passed Round-13's test。
+        // Now assert all 5 optional-seat ref prefixes appear。
         let emittedRefs = outcome.result?.turnResult
             .emittedDeltas.map { $0.targetObjectRef } ?? []
         XCTAssertTrue(emittedRefs.contains {
             $0.hasPrefix("memoryBundle#")
-        }, "ch 995.7 CRITICAL-1: 9-seat roster + memory input " +
-           "MUST produce memoryBundle delta (pre-fix the " +
-           "4-seat roster silently dropped it)")
+        }, "ch 995.7+995.9: 9-seat roster + memory input " +
+           "MUST produce memoryBundle delta")
         XCTAssertTrue(emittedRefs.contains {
             $0.hasPrefix("evolutionProposal#")
-        }, "ch 995.7 CRITICAL-1: 9-seat roster + evolution " +
-           "input MUST produce evolutionProposal delta")
+        }, "ch 995.7+995.9: evolution input MUST produce " +
+           "evolutionProposal delta")
+        XCTAssertTrue(emittedRefs.contains {
+            $0.hasPrefix("sovereignVerdict#")
+        }, "ch 995.9 CRITICAL-1: sovereign input with " +
+           "touchesSovereignLockedAxis=true MUST produce " +
+           "sovereignVerdict delta。 Round-13 test asserted " +
+           "input was non-nil but NOT that seat emitted — " +
+           "same orphan class one layer deeper。")
+        XCTAssertTrue(emittedRefs.contains {
+            $0.hasPrefix("critiqueField#")
+        }, "ch 995.9 CRITICAL-1: critic input from triScores " +
+           "(2 candidates,1 vetoed) MUST produce critiqueField " +
+           "delta")
     }
 
     func testCRITICAL_C1_OmittedFields_NoneSupplied() async throws {
@@ -162,9 +197,10 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
         XCTAssertEqual(
             outcome.diagnostics["risk.card-supplied"], "no")
         XCTAssertNil(
-            outcome.diagnostics["risk.totalRisk"],
-            "ch 995.7 HIGH-1: risk.totalRisk key absent when " +
-            "no card supplied (numeric value would be meaningless)")
+            outcome.diagnostics["risk.cardTotalRisk"],
+            "ch 995.9 MED-2: risk.cardTotalRisk key absent " +
+            "when no card supplied (numeric value would be " +
+            "meaningless)")
         XCTAssertEqual(
             outcome.diagnostics["tri.veto-count"], "0")
         XCTAssertEqual(
@@ -175,8 +211,14 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
         XCTAssertEqual(
             outcome.diagnostics["evolution.input-supplied"],
             "no")
+        // chapter 九百九十五.9 META-REVIEW Round-14 MED-1 fix:
+        // Round-13 OmittedFields branch only asserted 5 keys,
+        // missing priority.tier-count parity with the
+        // AllSixFields branch。 Add it。
         XCTAssertEqual(
-            outcome.diagnostics["priority.tier-count"], "0")
+            outcome.diagnostics["priority.tier-count"], "0",
+            "ch 995.9 MED-1: priority.tier-count parity " +
+            "asserted in OmittedFields branch (Round-13 missed)")
     }
 
     // MARK: - MED-1: typed outcome fields
@@ -261,9 +303,12 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
     /// Defense:Round-12 fix moved busy_timeout BEFORE WAL
     /// pragma。 Round-13 caught that the ch 995.5 test only
     /// opened a SINGLE DB,never exercising the race。 This
-    /// test spawns 6 concurrent opens of the same path + asserts
-    /// all succeed (busy_timeout means contention waits,doesn't
-    /// throw)。
+    /// test spawns 4 concurrent reopens of the same path +
+    /// asserts all succeed (busy_timeout means contention
+    /// waits,doesn't throw)。 chapter 九百九十五.9 META-REVIEW
+    /// Round-14 HIGH-2 fix:docstring count "6" → "4" to match
+    /// the actual loop count (same doc/code drift class
+    /// Round-13 closed in 15 other places)。
     func testCRITICAL_HIGH2_ConcurrentReopens_AllSucceed()
         async throws
     {
@@ -419,12 +464,20 @@ final class BASChapter995_7Round13FixesTests: XCTestCase {
     }
 
     private func makeCand() -> BASCandidatePath {
+        // chapter 九百九十五.9 META-REVIEW Round-14 fix:set cost
+        // > benefit so BASCriticSeat rule 3 (cost > benefit →
+        // STRONG severity) triggers + the seat emits a
+        // critiqueField delta the test can assert on。 The
+        // pre-fix cost==benefit==0.5 missed all 5 critic rules
+        // → seat emitted nothing → critiqueField assertion
+        // would fail (which is what Round-14 caught when adding
+        // the assertion)。
         BASCandidatePath(
             candidateID: "c.1",
             title: "test",
             actionSummary: "a",
-            expectedBenefit: 0.5,
-            expectedCost: 0.5,
+            expectedBenefit: 0.3,
+            expectedCost: 0.6,  // cost > benefit triggers critic
             reversibility: 0.5,
             confidence: 0.5)
     }
