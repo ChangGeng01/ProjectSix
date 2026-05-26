@@ -264,7 +264,19 @@ public enum BASAgentTierActivationPlanner {
             skips.append(
                 "cache-hit-skip-cold:hit-ratio=" +
                 String(format: "%.3f", spineHitRatio))
-            // Still honor forceActivate
+            // chapter 九百八十一.5 USER-PASS-7 H1 fix:honor
+            // forceActivate but ALSO enforce wakeBudget。
+            // Previously this path always consumed the budget
+            // without checking — caller's forceActivate list
+            // could blow past budget silently。 Per the
+            // discipline track record (956.11 caught similar
+            // budget-bypass bugs),the budget is the operator's
+            // explicit constraint;forceActivate cannot
+            // implicitly override it。 If budget exceeded,
+            // record `forceActivate:budget-exceeded:<role>`
+            // skip + still activate (preserving the user's
+            // explicit override) but log the breach for the
+            // audit ledger。
             for role in forceActivate
                 where !activations.contains(role)
             {
@@ -272,6 +284,13 @@ public enum BASAgentTierActivationPlanner {
                 if let a = BASAgentTierRegistry
                     .assignment(for: role)
                 {
+                    if consumed + a.wakeBudgetMicros >
+                        wakeBudgetMicros
+                    {
+                        skips.append(
+                            "forceActivate:budget-exceeded:" +
+                            "\(role.rawValue)")
+                    }
                     consumed += a.wakeBudgetMicros
                 }
             }
@@ -310,7 +329,10 @@ public enum BASAgentTierActivationPlanner {
             activations.append(role)
         }
 
-        // Force-activate (e.g. host explicitly requested)
+        // Force-activate (e.g. host explicitly requested)。
+        // chapter 九百八十一.5 USER-PASS-7 H1 fix:enforce
+        // budget on forceActivate too (same fix as cache-hit
+        // path above)。
         for role in forceActivate {
             if activations.contains(role) { continue }
             guard let a = BASAgentTierRegistry
@@ -318,6 +340,13 @@ public enum BASAgentTierActivationPlanner {
             else {
                 activations.append(role)
                 continue
+            }
+            if consumed + a.wakeBudgetMicros >
+                wakeBudgetMicros
+            {
+                skips.append(
+                    "forceActivate:budget-exceeded:" +
+                    "\(role.rawValue)")
             }
             consumed += a.wakeBudgetMicros
             activations.append(role)

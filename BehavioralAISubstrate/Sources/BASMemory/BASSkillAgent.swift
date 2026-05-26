@@ -424,10 +424,7 @@ public enum BASSkillAgentInvoker {
     /// Convert a descriptor into a `BASAgentSpec` — bridges
     /// the SDK surface (Phase 6) to the core agent registry
     /// (ch 956)。 Skill agents:
-    ///   - role:`.compareModerator` placeholder (skill agents
-    ///     don't fit any of the 9 core roles;reusing the
-    ///     compareModerator role is the closest fit since both
-    ///     are SDK-driven peripheral agents)
+    ///   - role:`.compareModerator` (DESIGN CHOICE — see below)
     ///   - writeDomains:[] (skill agents never own a state
     ///     graph domain per Single-Writer-Per-Domain)
     ///   - readDomains:from descriptor
@@ -436,6 +433,46 @@ public enum BASSkillAgentInvoker {
     ///     directly to the state graph)
     ///   - leaseProfile:`.coldSeat` (skill agents cold-start on
     ///     demand)
+    ///
+    /// chapter 九百八十一.5 USER-PASS-7 H2 doc-fix:explicit
+    /// design note on the `.compareModerator` role choice。
+    /// This is INTENTIONAL,not a placeholder:
+    ///
+    /// 1. **Role discipline**:Phase 1-5 reserves 9 core roles
+    ///    (scout/planner/memory/critic/hostAlign/risk/surface/
+    ///    sovereignSentinel/evolutionShadow) for the substrate's
+    ///    own seats。 Skill agents are SDK-product-attached —
+    ///    they're peripheral by design,not core seats。
+    ///
+    /// 2. **Tier discipline** (ch 980):`.compareModerator` maps
+    ///    to `.sealed` tier in `BASAgentTierRegistry`,which
+    ///    means skill agents pre-initialize once per session +
+    ///    have ~0ms wake cost。 This is correct for SDK
+    ///    consumers:they want the skill agent ready when their
+    ///    capability is requested,not eating cold-start budget
+    ///    on every turn。
+    ///
+    /// 3. **Permit-domain discipline**:`allowedPermitDomains`
+    ///    on the descriptor (e.g. ["draft-compose", "code-write"])
+    ///    are STRING permit IDs,NOT `BASStateDomain` cases。
+    ///    They're consumed at runtime by L11 ActionPermit when
+    ///    a tool is invoked,NOT by the dispatcher's domain-
+    ///    write check (which uses `BASAgentSpec.writeDomains` /
+    ///    `proposeDomains`)。 So mapping them into
+    ///    `proposeDomains` would be a category error。 The
+    ///    silent drop is INTENTIONAL — the descriptor's
+    ///    permit-domains list survives in the audit ledger via
+    ///    invocation envelopes,not via the agent spec。
+    ///
+    /// 4. **`forbiddenDomains`** hard-coded list defends against
+    ///    descriptor-construction mistakes by the SDK consumer。
+    ///    Includes the 4 sovereign-locked domains
+    ///    (`hostVersion` / `sovereignVerdict` / `actionPermit` /
+    ///    `evolutionProposal`)。 Phase 7 ch 977 external
+    ///    gateway uses a STRICTER list (all 12 domains) since
+    ///    external is HIGH risk;skill agents are MED risk
+    ///    (internal SDK consumer) so only sovereign-adjacent
+    ///    domains are hard-forbidden。
     public static func buildAgentSpec(
         from descriptor: BASSkillAgentDescriptor
     ) -> BASAgentSpec {

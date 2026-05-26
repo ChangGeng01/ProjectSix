@@ -10,7 +10,7 @@
 ## Arc-level claims
 
 1. **Single sovereign host** preserved across 29 chapters. The 7 Root Laws are enforced at type-system level (Single-Writer-Per-Domain via `BASSharedStateGraph` + per-agent `writeDomains`/`forbiddenDomains`) AND at runtime via the graph actor's `writeObject(...)` check.
-2. **18 agents wired** (9 core + 7 watcher + 2 reference skill — see Phase 5 + Phase 6).
+2. **20 agents wired** (9 core + 7 watcher + 4 reference skill — see Phase 5 + Phase 6).
 3. **Every external surface** (MCP + A2A) routes through a dedicated gateway that degrades external code to proposal-only, tool-domain-scoped refs (see Phase 7).
 4. **Persona overlay** lives ATOP the fabric via the formula `P_effective = Clamp(P_role ⊕ P_user ⊕ P_host, Risk, Sovereign)` (see Phase 4).
 5. **3 N-pass review cycles** (956.11 + 964.5 + 969.5) caught **35+ real bugs** before production — including the CG1 sovereignty crisis at ch 969.5 that would have rejected the system's own sovereign agents at runtime.
@@ -72,19 +72,25 @@
 
 ### Reserved signalRefs prefixes (L14 absorption channel)
 
-| Prefix | Phase | Carries |
-|---|---|---|
-| `agentFabric.activated:` | 1+ | per-seat activation |
-| `agentFabric.merged:` | 0 | merge engine outcomes |
-| `agentPersona.applied:` | 4 | persona SDK applications |
-| `agentPersona.clamped:` | 4 | Risk + Sovereign clamps |
-| `agentWatcher.flag:` | 5 | per-hint at .alert/.veto |
-| `agentWatcher.count:` | 5 | per-severity totals |
-| `agentExternal.proposal:` | 7 | external proposal landed |
-| `agentExternal.tier:` | 7 | effective sandbox tier |
-| `agentExternal.trust:` | 7 | trust score after scans |
+Per ch 981.5 USER-PASS-7 DH3 doc-fix:9 prefixes are **reserved**
+for the agent fabric subsystem (no other substrate code may emit
+`signalRefs` starting with these prefixes)。 6 are **in-use today**
++ 3 are **future-allocation** (reserved but not yet emitted by any
+source path)。
 
-All Phase 1-7 audit signals absorb into the existing `SovereignAuditEntry.signalRefs [String]` array — **zero schema change** per ch 953 reuse pattern.
+| Prefix | Phase | Status | Carries |
+|---|---|---|---|
+| `agentFabric.activated:` | 1+ | future-allocation | per-seat activation (when coordinator wires) |
+| `agentFabric.merged:` | 0 | in-use | merge engine outcomes |
+| `agentPersona.applied:` | 4 | future-allocation | persona SDK applications (when coordinator emits) |
+| `agentPersona.clamped:` | 4 | future-allocation | Risk + Sovereign clamp outcomes (when emitted) |
+| `agentWatcher.flag:` | 5 | in-use | per-hint at .alert/.veto |
+| `agentWatcher.count:` | 5 | in-use | per-severity totals |
+| `agentExternal.proposal:` | 7 | in-use | external proposal landed |
+| `agentExternal.tier:` | 7 | in-use | effective sandbox tier |
+| `agentExternal.trust:` | 7 | in-use | trust score after scans |
+
+All Phase 1-7 audit signals absorb into the existing `SovereignAuditEntry.signalRefs [String]` array — **zero schema change** per ch 953 reuse pattern。 The 3 future-allocation prefixes are **reserved in this document** so future host-app integration cannot accidentally use them for another purpose — they will be filled in when the coordinator wires Phase 1-5 emission paths to the audit ledger (separate workstream beyond arc 953-981)。
 
 ## Performance posture (end of Phase 8)
 
@@ -127,16 +133,23 @@ Each round caught at least 1 CRITICAL bug that production-shape tests had missed
 
 ## Forward-looking deferred items
 
-The following items were identified across phases but deferred to post-arc work (Phase 9+ if/when scoped):
+Per ch 981.5 USER-PASS-7 fix^8, 2 of the original 8 deferred items
+have been **CLOSED**. 6 items remain deferred to post-arc work
+(Phase 9+ if/when scoped):
 
-1. **Round-table mode** (.roundtable) — N-way agent collaboration with quorum voting. Phase 4 ships compare mode; round-table is N²-coordination, deferred.
-2. **Persona marketplace / sharing** — out of substrate scope (host-app feature).
-3. **App-suspension state persistence** — Phase 4-5 personas + watcher hints don't persist across app cold start. Caller's responsibility today.
-4. **Multi-tenant sovereign** — explicitly forbidden by Root Law 1 (single host). Won't ship.
-5. **Sovereign warrant infrastructure for `.collaborator` external tier** — currently auto-downgraded to `.advisor` (ch 977). Full warrant chain deferred to Phase 9.
-6. **Env-var gate wiring** (`BAS_PERSONA_ENABLED` / `BAS_WATCHERS_ENABLED` / `BAS_TRANSCRIPT_MODE`) — documented in Phase 4-7 smoke docs but never wired to `run-iphone-air-10hr.sh` or dispatcher. Host-app integration responsibility.
-7. **Fuzz determinism for ch 967 risk tests** — uses `SystemRandomNumberGenerator` inside loop → non-reproducible. Property invariant holds but reproducibility is fuzz-only. Deferred.
-8. **8 file-private `escapeForJSON*` extension consolidation** — ch 964.5 L1 deferred. Cosmetic.
+1. **Round-table mode** (.roundtable) — N-way agent collaboration with quorum voting. Phase 4 ships compare mode; round-table is N²-coordination, deferred. **(deferred)**
+2. **Persona marketplace / sharing** — out of substrate scope (host-app feature). **(deferred)**
+3. ~~**App-suspension state persistence**~~ — **CLOSED at ch 981.5** by `BASAgentFabricColdRestart.swift` + `BASAgentFabricSessionSnapshot` Codable record + `BASColdRestartValidationResult` + `validate(...)` pure-fn with 5 validation rules (SDK version + age + forbidden persona drop + warrant corruption + orphan check). 11 regression tests pin the contract.
+4. **Multi-tenant sovereign** — explicitly forbidden by Root Law 1 (single host). Won't ship. **(forbidden — not deferred)**
+5. **Sovereign warrant infrastructure for `.collaborator` external tier** — currently auto-downgraded to `.advisor` (ch 977). Full warrant chain deferred to Phase 9. **(deferred)**
+6. **Env-var gate wiring** (`BAS_PERSONA_ENABLED` / `BAS_WATCHERS_ENABLED` / `BAS_TRANSCRIPT_MODE`) — documented in Phase 4-7 smoke docs but never wired to `run-iphone-air-10hr.sh` or dispatcher. Host-app integration responsibility. **(deferred)**
+7. ~~**Fuzz determinism for ch 967 risk tests**~~ — **CLOSED at ch 981.5**. Replaced `SystemRandomNumberGenerator` with deterministic LCG (Numerical Recipes constants matching ch 956.5 strong-mergeID discipline). Both inputs now seeded reproducibly. Plus 3 explicit edge cases (0.0 / 1.0 / threshold).
+8. **8 file-private `escapeForJSON*` extension consolidation** — ch 964.5 L1 deferred. Cosmetic. **(deferred)**
+
+### Closed items (ch 981.5 USER-PASS-7)
+
+- **DI3 — App-suspension state persistence**:`BASAgentFabricColdRestart.swift` + 11 regression tests
+- **DI7 — Ch 967 fuzz determinism**:deterministic LCG replaces `SystemRandomNumberGenerator`
 
 ## Push status
 
@@ -152,7 +165,7 @@ BAS_AGENT_FABRIC=disabled MAX_SEC=7200 \
     BAS_DEVICE_LOG_DIR=/tmp/ch981-fabric-off \
     bash scripts/run-iphone-air-10hr.sh
 
-# Mode 2: Fabric ON, all 18 agents
+# Mode 2: Fabric ON, all 20 agents
 BAS_AGENT_FABRIC=enabled BAS_AGENT_TIER=all MAX_SEC=7200 \
     BAS_DEVICE_LOG_DIR=/tmp/ch981-fabric-all \
     bash scripts/run-iphone-air-10hr.sh
@@ -172,7 +185,7 @@ Pass criteria for arc seal:
 - 0 failures across all 3 modes
 - 0 single-writer-per-domain violations
 - Cumulative perf delta ≤ +15% vs ch 952.6 baseline
-- All 18 agents respect sovereign-lock invariants
+- All 20 agents respect sovereign-lock invariants
 - All 4 sealed-LOW agents force-default through full chain
 
 > **Note**: Per the env-var deferred item above, the 3-mode operator procedure requires the BAS_AGENT_FABRIC env var to be wired into `scripts/run-iphone-air-10hr.sh` and the dispatcher. As of ch 981, this wiring is documented as future host-app integration work. Operator may either (a) wait for that integration, OR (b) run the baseline smoke as-is + manually exercise the 18-agent set through a test harness that calls `BASAgentTurnDispatcher.dispatch(...)` directly.

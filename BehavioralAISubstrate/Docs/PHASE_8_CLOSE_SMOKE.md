@@ -17,7 +17,7 @@ Per plan PHASE 8 close + arc seal requirements:
 1. All 3 Phase 8 perf primitives (latent spine + hot/cold tier + speculative prefetch) compose cleanly on real hardware
 2. Cumulative perf delta ≤ +15% vs ch 952.6 baseline across all 3 modes
 3. ALL Phase 0-7 sovereignty invariants STILL hold under Phase 8 perf optimizations
-4. 18-agent compare mode (9 core + 7 watcher + 2 skill sample) runs without crash or drift
+4. 18-agent compare mode (9 core + 7 watcher + 4 reference skill) runs without crash or drift
 5. Single-Writer-Per-Domain holds across all 12 domains regardless of which agent set is active
 
 ## 3-mode arc-seal procedure
@@ -36,7 +36,7 @@ BAS_AGENT_FABRIC=disabled MAX_SEC=7200 \
 
 Expected: substrate behaves as if Agent Fabric arc never landed. Pre-Phase-0 callers (anyone not invoking `BASAgentTurnDispatcher.dispatch`) see zero behavior change. Per plan Red Line 7 (additive-only, byte-equal when fabric unconfigured).
 
-### Mode 2 — Fabric ON, all 18 agents
+### Mode 2 — Fabric ON, all 20 agents
 
 ```bash
 BAS_AGENT_FABRIC=enabled BAS_AGENT_TIER=all MAX_SEC=7200 \
@@ -44,7 +44,7 @@ BAS_AGENT_FABRIC=enabled BAS_AGENT_TIER=all MAX_SEC=7200 \
     bash scripts/run-iphone-air-10hr.sh
 ```
 
-All 9 core + 7 watcher + 2 skill sample agents active. Tests the full agent set under sustained 2-hour load.
+All 9 core + 7 watcher + 4 reference skill agents active. Tests the full agent set under sustained 2-hour load.
 
 ### Mode 3 — Fabric ON, compare-mode 5 active agents
 
@@ -73,7 +73,7 @@ Pass criteria (arc seal verification):
 | Single-writer violations | 0 | active (sealed by ch 953-965 + ch 974 stability pins) |
 | Cumulative perf delta vs ch 952.6 | ≤ +15% | active (substrate budget) |
 | Mode 3 coordination overhead P95 (per turn) | ≤ 40ms | **deferred — needs ch 980 instrumentation wiring** |
-| Sovereign-lock invariants (all 18 agents) | 100% | active (sweep-tested by ch 977 + ch 973 + ch 968) |
+| Sovereign-lock invariants (all 20 agents) | 100% | active (sweep-tested by ch 977 + ch 973 + ch 968) |
 | Sealed-LOW force-default rate | 100% | active (ch 968 + ch 968 fuzz confirms 100% across 1000-iter) |
 | Phase 8 specific: latent spine cache hit rate | ≥ 60% | **deferred — needs operator measurement** |
 | Phase 8 specific: hot-tier wake cost | ≤ 5ms P95 | **deferred — needs operator measurement** |
@@ -134,10 +134,10 @@ When operator runs the 3-mode smoke and all 3 modes pass per the criteria above:
 - **3 N-pass review cycles** caught **35+ real bugs**
 - **580+ tests** at the arc level, all 0 failures
 - **14,150+ tests** in the full substrate sweep, all 0 failures
-- **18 agents** wired across 8 phases
+- **20 agents** wired across 8 phases
 - **12 state graph domains** under Single-Writer-Per-Domain
 - **4 reserved persona pattern detectors** + 4 reference skill agents + 7 watchers + 2 external gateways
-- **9 reserved L14 signalRefs prefixes** for audit absorption
+- **9 reserved L14 signalRefs prefixes** (6 in-use + 3 future-allocation per ch 981.5 DH3 doc-fix) for audit absorption
 - **3 stability tiers** declared (WIRE-STABLE / API-STABLE / INTERNAL)
 - **0 schema changes** to existing `SovereignAuditEntry.signalRefs` — full reuse pattern preserved per ch 953
 

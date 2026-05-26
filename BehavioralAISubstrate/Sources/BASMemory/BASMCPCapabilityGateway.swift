@@ -19,19 +19,30 @@
 //
 //   MCPInvocation
 //      ↓
-//   [Step 1] Provenance seal — tag every output with origin
-//            MCP server ID + tool ID + invocation ID
+//   [Step 1] Envelope validation — non-empty server/tool/
+//            invocation IDs
 //      ↓
-//   [Step 2] Tool-injection scan — reuse ch 971
+//   [Step 2] Tool-domain scope check — server MUST be in
+//            caller's allowedToolDomains + permitID non-empty
+//      ↓
+//   [Step 3] Tool-injection scan — reuse ch 971
 //            BASToolInjectionWatcher pattern set
 //      ↓
-//   [Step 3] Risk scan — check against caller's risk context
-//            (deferred to Phase 8 perf — for now,structural
-//            check only)
+//   [Step 4] Trust-threshold check — reject below 0.25
 //      ↓
-//   [Step 4] ActionPermit gate — wrap caller's BASActionPermit
-//            check (does the calling skill agent have the
-//            tool-domain permit?)
+//   [Step 5] Provenance seal — tag every accepted output with
+//            origin MCP server / tool / invocation / permit IDs
+//            + trust score + audit notes
+//      ↓
+//   [Step 6] Sanitization — strip injection markers from low-
+//            trust outputs (trust < 0.5 → sanitize;trust ≥ 0.5
+//            → pass-through)
+//
+// chapter 九百八十一.5 USER-PASS-7 DH6 doc-fix:step labels
+// normalized to monotonic 1-6 sequence。 Previously the header
+// used 1-4 but the implementation comments labeled them
+// 0/4/2/2.5/1/3 which contradicted the CHANGELOG and confused
+// trace replay attribution。
 //      ↓
 //   Accepted output → caller can proceed
 //   Rejected → return rejection reason + audit trail
@@ -77,7 +88,7 @@ public struct BASMCPInvocation:
     /// until the gateway runs all 4 pipeline steps。
     public let rawOutput: String
     /// Caller's BASActionPermit identifier (tool-domain scope)。
-    /// Empty = no permit declared (will be rejected by Step 4)。
+    /// Empty = no permit declared (will be rejected by Step 2)。
     public let permitID: String
     /// Calling skill-agent's allowedToolDomains (from
     /// `BASSkillAgentDescriptor`)。 If mcpServerID not in this
@@ -201,7 +212,7 @@ public enum BASMCPCapabilityGateway {
     public static func invoke(
         _ inv: BASMCPInvocation
     ) -> BASMCPGatewayResult {
-        // Step 0:envelope validation
+        // Step 1:envelope validation
         if inv.mcpServerID.isEmpty {
             return BASMCPGatewayResult(
                 accepted: false,
@@ -221,8 +232,8 @@ public enum BASMCPCapabilityGateway {
                     "empty-invocation-id")
         }
 
-        // Step 4 (early — fast reject):tool-domain scope check
-        // (caller's allowedToolDomains MUST contain mcpServerID)
+        // Step 2:tool-domain scope check (caller's
+        // allowedToolDomains MUST contain mcpServerID)
         if !inv.allowedToolDomains.contains(inv.mcpServerID) {
             return BASMCPGatewayResult(
                 accepted: false,
@@ -237,7 +248,7 @@ public enum BASMCPCapabilityGateway {
                 rejectReason: "mcp.no-permit:empty-permit-id")
         }
 
-        // Step 2:tool-injection scan via ch 971 watcher。
+        // Step 3:tool-injection scan via ch 971 watcher。
         // Build a synthetic observation containing the MCP
         // output as a pressure signal,then route through the
         // tool-injection watcher's pattern set。
@@ -271,7 +282,7 @@ public enum BASMCPCapabilityGateway {
         }
         trust = max(0.0, trust)
 
-        // Step 2.5:reject if below threshold
+        // Step 4:trust-threshold check — reject if below 0.25
         if trust < rejectTrustThreshold {
             return BASMCPGatewayResult(
                 accepted: false,
@@ -281,7 +292,7 @@ public enum BASMCPCapabilityGateway {
                     String(format: "%.3f", trust))
         }
 
-        // Step 1:provenance seal
+        // Step 5:provenance seal
         let seal = BASMCPProvenanceSeal(
             mcpServerID: inv.mcpServerID,
             toolID: inv.toolID,
@@ -292,7 +303,7 @@ public enum BASMCPCapabilityGateway {
             auditNotes: auditNotes +
                 ["mcp.sealed=\(inv.mcpServerID)"])
 
-        // Step 3:if trust low-but-acceptable (between
+        // Step 6:sanitize if trust low-but-acceptable (between
         // rejectTrustThreshold and 0.5),sanitize output by
         // stripping markers。 At trust ≥ 0.5,pass-through。
         let sealedOutput: String

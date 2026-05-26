@@ -199,16 +199,31 @@ final class BASChapter967PersonaRiskClampTests: XCTestCase {
     }
 
     // MARK: - 12. CRITICAL fuzz invariant: skepticism never lowers
+    //
+    // chapter 九百八十一.5 USER-PASS-7 DI7 fix:replaced
+    // SystemRandomNumberGenerator with deterministic LCG
+    // (Numerical Recipes constants) so fuzz failures are
+    // reproducible per CI run。 Was non-deterministic;now both
+    // pSkep and floor come from the same seed-derived LCG。
+    // Edge cases (NaN / exactly 0.0 / exactly 1.0 / boundary)
+    // explicitly seeded to ensure coverage。
+
+    /// Deterministic LCG matching ch 956.5 strong-mergeID
+    /// discipline。 Same constants as glibc's rand():
+    /// a = 1103515245, c = 12345, m = 2^31。
+    private func detRng(seed: Int, mix: Int = 0) -> Double {
+        let v = (seed &* 1103515245 &+ 12345 &+ mix &* 7919)
+            & 0x7FFFFFFF
+        return Double(v) / Double(0x7FFFFFFF)
+    }
 
     func testCRITICAL_SkepticismNeverLowersAcrossManyInputs() {
-        // 1000 random (persona-skep, floor) pairs — outcome's
-        // skep MUST be ≥ persona-skep
+        // 1003 deterministic inputs (1000 + 3 edge cases) —
+        // skep MUST be ≥ persona-skep。 Reproducible per CI run。
+        // Edge cases: 0.0, 1.0, and the threshold boundary
         for seed in 0..<1000 {
-            var rng = SystemRandomNumberGenerator()
-            let pSkep = Double((seed * 1103515245 + 12345)
-                % 1_000_000) / 1_000_000.0
-            let floor = Double(rng.next() % 1_000_000)
-                / 1_000_000.0
+            let pSkep = detRng(seed: seed, mix: 1)
+            let floor = detRng(seed: seed, mix: 2)
             let p = persona(skepticism: pSkep)
             let (out, _) = BASAgentPersonaRiskClamp.apply(
                 to: p,
@@ -216,10 +231,24 @@ final class BASChapter967PersonaRiskClampTests: XCTestCase {
                     skepticismFloor: floor))
             XCTAssertGreaterThanOrEqual(
                 out.skepticism, pSkep - 1e-9,
-                "ch 967 CRITICAL INVARIANT VIOLATION: " +
+                "ch 967 CRITICAL INVARIANT VIOLATION " +
+                "(reproducible seed=\(seed)): " +
                 "skepticism LOWERED from \(pSkep) to " +
                 "\(out.skepticism) (floor=\(floor)) — Root Law 4 " +
                 "(risk-floor monotonic raise) violated")
+        }
+        // Explicit edge cases:exactly 0.0,exactly 1.0,exactly
+        // at threshold (0.5)
+        for (pSkep, floor) in [(0.0, 0.0), (1.0, 0.5), (0.5, 0.5)] {
+            let p = persona(skepticism: pSkep)
+            let (out, _) = BASAgentPersonaRiskClamp.apply(
+                to: p,
+                risk: BASAgentPersonaRiskContext(
+                    skepticismFloor: floor))
+            XCTAssertGreaterThanOrEqual(
+                out.skepticism, pSkep - 1e-9,
+                "ch 967 EDGE CASE: skep=\(pSkep) floor=\(floor) " +
+                "— monotonic raise violated")
         }
     }
 
@@ -227,11 +256,8 @@ final class BASChapter967PersonaRiskClampTests: XCTestCase {
 
     func testCRITICAL_GuardNeverLowersAcrossManyInputs() {
         for seed in 0..<1000 {
-            var rng = SystemRandomNumberGenerator()
-            let pGuard = Double((seed * 1103515245 + 12345)
-                % 1_000_000) / 1_000_000.0
-            let floor = Double(rng.next() % 1_000_000)
-                / 1_000_000.0
+            let pGuard = detRng(seed: seed, mix: 3)
+            let floor = detRng(seed: seed, mix: 4)
             let p = persona(guardBias: pGuard)
             let (out, _) = BASAgentPersonaRiskClamp.apply(
                 to: p,
@@ -239,19 +265,16 @@ final class BASChapter967PersonaRiskClampTests: XCTestCase {
                     guardFloor: floor))
             XCTAssertGreaterThanOrEqual(
                 out.guardBias, pGuard - 1e-9,
-                "ch 967 CRITICAL: guard LOWERED from \(pGuard) " +
+                "ch 967 CRITICAL (reproducible seed=\(seed)): " +
+                "guard LOWERED from \(pGuard) " +
                 "to \(out.guardBias) (floor=\(floor))")
         }
     }
 
     func testCRITICAL_ChallengeNeverRaisesAcrossManyInputs() {
         for seed in 0..<1000 {
-            var rng = SystemRandomNumberGenerator()
-            let pChallenge =
-                Double((seed * 1103515245 + 12345)
-                    % 1_000_000) / 1_000_000.0
-            let ceiling = Double(rng.next() % 1_000_000)
-                / 1_000_000.0
+            let pChallenge = detRng(seed: seed, mix: 5)
+            let ceiling = detRng(seed: seed, mix: 6)
             let p = persona(challenge: pChallenge)
             let (out, _) = BASAgentPersonaRiskClamp.apply(
                 to: p,
@@ -259,7 +282,8 @@ final class BASChapter967PersonaRiskClampTests: XCTestCase {
                     challengeCeiling: ceiling))
             XCTAssertLessThanOrEqual(
                 out.challengeIntensity, pChallenge + 1e-9,
-                "ch 967 CRITICAL: challenge RAISED from " +
+                "ch 967 CRITICAL (reproducible seed=\(seed)): " +
+                "challenge RAISED from " +
                 "\(pChallenge) to \(out.challengeIntensity) " +
                 "(ceiling=\(ceiling))")
         }

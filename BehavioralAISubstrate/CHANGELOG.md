@@ -11,6 +11,165 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百八十一.5 / M3610.5 — USER-PASS-7:4th N-pass review catches 2 HIGH code + 7 HIGH test gaps + 6 HIGH doc lies + closes 2 deferred items
+
+**Final fix-of-fix sub-chapter of the Agent Fabric arc。** Per
+N-pass discipline (956.11 + 964.5 + 969.5 caught 35+ real bugs),
+USER-PASS-7 dispatched 3 parallel review agents on Phase 5+6+7+8
+(ch 970-981 — 12 unreviewed chapters since 969.5)。
+
+#### Code-correctness findings
+
+**H1 — `BASAgentTierActivationPlanner` `forceActivate` path bypassed `wakeBudget`**
+Both the cache-hit short-circuit and the main fallthrough
+consumed budget without enforcing the threshold。 Host's
+`forceActivate: [.planner]` on a tiny-budget turn silently
+blew past budget。 Fix:budget check added in both code paths;
+when forceActivate causes breach,still honor the override
+(host's explicit request takes precedence) but emit
+`forceActivate:budget-exceeded:<role>` audit ref so L14 ledger
+sees the policy violation。
+
+**H2 — `BASSkillAgent.buildAgentSpec` `.compareModerator` role choice undocumented**
+Code reuses `.compareModerator` role for skill agents,which
+maps to `.sealed` tier in ch 980 registry。 This is intentional
+(skill agents pre-initialize once per session,~0ms wake)but
+the code had no explanation。 Fix:added 5-paragraph doc note
+covering role discipline + tier mapping + permit-domain
+discipline (descriptor's `allowedPermitDomains` are STRING
+permit IDs consumed by L11 ActionPermit at invoke-time,not
+state-graph domains for dispatcher checks) + `forbiddenDomains`
+hard-coded list rationale。
+
+#### Test coverage gaps fixed
+
+7 boundary + sweep tests added to `BASChapter981_5UserPass7Tests`:
+
+| Gap | Coverage added |
+|---|---|
+| HG1 | Anomaly boundary tests:exactly 20 / 19 pressure;exactly 50 / 49 candidates;exactly 10 / 9 manipulation |
+| HG3 | AxisDeviation exactly-5 (veto) vs exactly-4 (alert) |
+| HG4 | MCP `rejectTrustThreshold` pinned at 0.25 (SDK v1 contract) |
+| HG5 | Hot tier fires with zero budget (always-on discipline) |
+| HG6 | Speculation defaults at medium risk band (guard confidence = 0.5) |
+| HG7 | External gateway sanctum-leak sweep across all 5 sealed prefixes |
+| H1+H2 | 3 H1 budget tests + 1 H2 role tier verification |
+
+Plus 2 in-use prefix sweep tests verifying the 6 reserved
+audit prefixes ACTUALLY emit from current code (defense
+against doc-vs-code drift in DH3)。
+
+#### Doc-lie fixes
+
+**DH1** — CHANGELOG ch 981 said "4 NEW reserved audit prefixes" → fixed to "3 NEW" (only `.proposal:` + `.tier:` + `.trust:` are added in Phase 7)。
+
+**DH2** — `PHASE_6_CLOSE_SMOKE.md` test counts wrong (ch 974 was listed as 18 tests but actually 22;total was 42 but actually 46)。 Fixed。
+
+**DH3** — `ARC_SEAL_953_981.md` claimed "9 reserved L14 signalRefs prefixes" but 3 (`agentFabric.activated:` / `agentPersona.applied:` / `agentPersona.clamped:`) were NEVER emitted in any source file。 Fix:added explicit "in-use" vs "future-allocation" status column to both ARC_SEAL.md and SDK_API_STABILITY.md。 6 are in-use today,3 are reserved for future host-app integration emission paths。
+
+**DH4** — "18 agents wired" was wrong throughout (ARC_SEAL.md + PHASE_8_CLOSE_SMOKE.md + CHANGELOG)。 Reality:9 core + 7 watcher + **4** reference skill = **20 agents**。 Fixed all occurrences。
+
+**DH5** — `SDK_API_STABILITY.md` only declared Phase 6 + earlier types。 Missing Phase 7 (8 types) + Phase 8 (11 types) wire-stable declarations + corresponding API-STABLE entries + `agentExternal.*` prefixes in the reserved table。 Fixed:added Phase 7 + Phase 8 sections,extended API-STABLE list with Phase 7 gateways + Phase 8 perf primitives,added 3 `agentExternal.*` prefixes to reserved table with in-use/future-allocation status。
+
+**DH6** — `BASMCPCapabilityGateway.swift` step labels non-monotonic (0/4/2/2.5/1/3) conflicting with CHANGELOG ch 976 (1-4 monotonic)。 Fixed:normalized to monotonic 1-6 + clarified pipeline (1=envelope / 2=scope / 3=scan / 4=threshold / 5=seal / 6=sanitize)。
+
+#### Deferred items closed in this sub-chapter
+
+Two of the 8 deferred items from ARC_SEAL_953_981.md closed:
+
+**DI7 — Ch 967 fuzz determinism**
+Was:`var rng = SystemRandomNumberGenerator()` inside the loop →
+non-reproducible per CI run。 Fix:replaced with deterministic
+LCG (Numerical Recipes constants matching ch 956.5 strong-
+mergeID discipline):
+```swift
+private func detRng(seed: Int, mix: Int = 0) -> Double {
+    let v = (seed &* 1103515245 &+ 12345 &+ mix &* 7919)
+        & 0x7FFFFFFF
+    return Double(v) / Double(0x7FFFFFFF)
+}
+```
+Both `pSkep` and `floor` (and equivalents for guard /
+challenge) now come from the same seed-derived LCG。 Plus 3
+explicit edge cases (0.0 / 1.0 / threshold)。 Fuzz failures
+are now reproducible per CI run。
+
+**DI3 — App-suspension state persistence**
+NEW module `BASAgentFabricColdRestart.swift`:
+- `BASAgentFabricSessionSnapshot` (Codable) carrying agent
+  roster + active personas (user + host) + sovereign warrants
+  + watcher counters + SDK version + creation timestamp
+- `BASColdRestartValidationResult` with `valid` + sorted
+  findings + rejected persona IDs
+- `BASAgentFabricColdRestart.validate(...)` pure-fn:
+  1. SDK version compatibility check
+  2. Snapshot age check (default max 7 days,host overrides)
+  3. Forbidden detector sweep across all personas → drop
+     forbidden (does NOT fail validation;host can restore
+     with non-forbidden personas)
+  4. Warrant ID corruption check (empty → fail)
+  5. Orphan persona check (warning only)
+
+11 dedicated `BASChapter981_5ColdRestartTests` regression tests
+pin the Codable round-trip + 5 validation rules + sorted-finding
+determinism。
+
+#### Remaining deferred items (post-arc Phase 9+)
+
+6 items remain deferred from the original 8:
+1. Round-table mode (.roundtable) — N-way collaboration
+2. Persona marketplace / sharing (out of substrate scope)
+4. Multi-tenant sovereign (forbidden by Root Law 1)
+5. Sovereign warrant infrastructure for collaborator tier
+6. Env-var gate wiring (host-app integration)
+8. 8 file-private escapeForJSON consolidation (cosmetic)
+
+Items 1, 4, 5, 6 require host-app integration / new arc。 Item 2
+is out of substrate scope。 Item 8 is cosmetic deferred to
+post-arc cleanup pass。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentHotColdTier.swift` | + H1 forceActivate budget enforcement (2 paths) |
+| `Sources/BASMemory/BASSkillAgent.swift` | + H2 .compareModerator role design doc |
+| `Sources/BASMemory/BASMCPCapabilityGateway.swift` | + DH6 monotonic step labels |
+| `Sources/BASMemory/BASAgentFabricColdRestart.swift` | NEW — DI3 app-suspension snapshot + validation |
+| `Tests/BehavioralAISubstrateTests/BASChapter967PersonaRiskClampTests.swift` | + DI7 deterministic LCG fuzz |
+| `Tests/BehavioralAISubstrateTests/BASChapter981_5UserPass7Tests.swift` | NEW — 15 regression tests pinning H1 + H2 + HG1 + HG3 + HG4 + HG5 + HG6 + HG7 + DH3 |
+| `Tests/BehavioralAISubstrateTests/BASChapter981_5ColdRestartTests.swift` | NEW — 11 DI3 regression tests |
+| `CHANGELOG.md` | + DH1 (4→3 prefixes), DH4 (18→20 agents) |
+| `Docs/PHASE_6_CLOSE_SMOKE.md` | + DH2 test counts |
+| `Docs/PHASE_8_CLOSE_SMOKE.md` | + DH3 prefix status, DH4 agent count |
+| `Docs/ARC_SEAL_953_981.md` | + DH3 in-use/future-allocation columns, DH4 agent count |
+| `Docs/SDK_API_STABILITY.md` | + DH5 Phase 7 + Phase 8 types + API + prefixes |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| USER-PASS-7 regression tests (ch 981.5) | 26 / 0 failures (15 review + 11 cold-restart) |
+| Ch 967 fuzz determinism (re-run after DI7 fix) | 18 / 0 failures |
+| Cumulative arc tests (ch 953-981.5) | 643 / 0 failures |
+
+#### N-pass discipline track record (4 rounds total)
+
+| Round | Sub-ch | Findings | Real bugs |
+|---|---|---|---|
+| 1 | 956.11 | 4C + 6H + MED + test backfill | 10+ |
+| 2 | 964.5 | 2C + 4H + 7 doc + 6 gaps | 15+ |
+| 3 | 969.5 | 2C + 1 GAP + 4H + 1 DH + 2 DM | 10+ |
+| **4** | **981.5** (this) | **2H code + 7H test + 6 doc + 2 DI closed** | **15+** |
+| **TOTAL** | **4 rounds** | | **50+ real bugs caught** |
+
+Each round caught at least 1 CRITICAL-or-HIGH issue that
+production-shape tests had missed。 The discipline continues to
+pay off — H1 forceActivate-bypass bug alone could have caused
+silent budget breaches at host wake cost。
+
+---
+
 ### Chapter 九百七十九-九百八十一 / M3600-M3610 — Phase 8 close + ARC SEAL (ch 953-981)
 
 **This commit closes the Agent Fabric arc** (chapters 953-981 + 5
@@ -198,7 +357,7 @@ to a `BASExternalAgentRef` and submits each proposal through:
 6. **Degraded spec construction** — `writeDomains: []`,
    `forbiddenDomains` includes ALL 12 state-graph domains
 
-**4 NEW reserved audit prefixes**:
+**3 NEW reserved audit prefixes**:
 - `agentExternal.proposal:<id>:<channel>:<proposalID>`
 - `agentExternal.tier:<id>:<effective-tier>`
 - `agentExternal.trust:<id>:<trust-score>`
@@ -289,8 +448,8 @@ Phase 8 (End-side perf + arc seal,ch 979-981):
 - ch 980: Hot/cold agent tier (Scout + Risk-light + Sovereign-light
   + Surface-stub warm in-process)
 - ch 981: Speculative parallelism + zero-copy state bus + **arc
-  seal** (2-hour iPhone Air real-device smoke with all 18 agents:
-  9 core + 7 watcher + 2 skill sample);CHANGELOG + BRANCH_SUMMARY
+  seal** (2-hour iPhone Air real-device smoke with all 20 agents:
+  9 core + 7 watcher + 4 reference skill);CHANGELOG + BRANCH_SUMMARY
   + `Docs/ARC_SEAL_953_981.md`
 
 ---

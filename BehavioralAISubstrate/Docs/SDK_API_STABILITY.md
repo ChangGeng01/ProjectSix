@@ -78,6 +78,35 @@ This document declares which Agent Fabric types are **wire-format stable** (Coda
 | `BASSkillAgentInvocation` | ↑ | invocation envelope |
 | `BASSkillAgentInvocationResult` | ↑ | result with persona + agentSpec + outcomes + error |
 
+### Phase 7 MCP + A2A types (ch 976-977 — added by ch 981.5 USER-PASS-7 DH5 doc-fix)
+
+| Type | Source | Stability note |
+|---|---|---|
+| `BASMCPInvocation` | `BASMCPCapabilityGateway.swift` | MCP server / tool / invocation / output / permit / allowedToolDomains + nowNanos |
+| `BASMCPProvenanceSeal` | ↑ | seal carries server / tool / invocation / permit / sealedAt + trustScore + sorted auditNotes |
+| `BASMCPGatewayResult` | ↑ | accepted + seal + sealedOutput + watcherHints + rejectReason |
+| `BASExternalAgentRef` | `BASExternalAgentA2A.swift` | external agent ID + protocol version + sorted allowed tool domains + sandbox tier + attestation token |
+| `BASExternalSandboxTier` | ↑ | 3 cases pinned (observer / advisor / collaborator) |
+| `BASExternalAgentProposal` | ↑ | proposal ID + external agent ID + turn ID + payloadJSON + target channel + tool domain + nowNanos |
+| `BASExternalProposalChannel` | ↑ | 4 cases pinned (candidateSuggestion / toolHint / memoryAnchor / advisoryNote) |
+| `BASExternalGatewayResult` | ↑ | accepted + degradedAgentSpec + sealedProposal + watcherHints + sorted auditRefs + rejectReason |
+
+### Phase 8 perf types (ch 979-981 — added by ch 981.5 USER-PASS-7 DH5 doc-fix)
+
+| Type | Source | Stability note |
+|---|---|---|
+| `BASCandidateSeed` | `BASLatentSpine.swift` | candidate ID + token count + digest + clamped encoder confidence + sorted coverage notes |
+| `BASLatentConcernSeed` | ↑ | concern ID + kind + token count + digest + clamped severity hint |
+| `BASLatentSpine` | ↑ | turn ID + input encoding + sorted candidate seeds + sorted concern seeds + built-at nanos |
+| `BASLatentSpineReuseStat` | ↑ | per-agent role + hit/miss counts |
+| `BASAgentTier` | `BASAgentHotColdTier.swift` | 3 cases pinned (hot / cold / sealed) |
+| `BASAgentTierAssignment` | ↑ | role + tier + wakeBudgetMicros + tokenBudgetHint |
+| `BASAgentTierActivationPlan` | ↑ | activations + sorted skips + estimatedWakeMicros |
+| `BASSpeculativeTask` | `BASSpeculativePrefetcher.swift` | task ID + workKind + cost + idempotent + safe-on-abandon + clamped confidence |
+| `BASSpeculationPlan` | ↑ | turn ID + fire list + sorted skipped + totalEstimatedCostMicros |
+| `BASZeroCopyStateRef` | ↑ | domain + objectID + versionAtRead + createdAtNanos (NO payload, NO agentID) |
+| `BASZeroCopyBusStat` | ↑ | per-turn ref count + stale refetches + bytes saved estimate |
+
 ---
 
 ## API-STABLE types (Swift API only)
@@ -105,6 +134,20 @@ This document declares which Agent Fabric types are **wire-format stable** (Coda
 - `BASSkillAgentRegistry.referenceFor(capability:)`
 - `BASSkillAgentRegistry.{writing, code, research, scheduling, all}`
 
+### Phase 7 gateways (ch 981.5 DH5 addition)
+
+- `BASMCPCapabilityGateway.invoke(...)` ← canonical MCP entry
+- `BASMCPCapabilityGateway.sanitize(...)` (helper exposed for callers writing custom marker sets)
+- `BASExternalAgentGateway.submit(...)` ← canonical A2A entry
+- `BASExternalAgentGateway.effectiveTier(for:)` (deterministic tier downgrade)
+
+### Phase 8 perf primitives (ch 981.5 DH5 addition)
+
+- `BASLatentSpineBuilder.build(...)` + `.buildFromCandidates(...)` + `.estimateTokenCount(...)` + `.placeholderDigest(...)`
+- `BASAgentTierRegistry.tier(for:)` + `.assignment(for:)` + `.defaultAssignments`
+- `BASAgentTierActivationPlanner.plan(...)`
+- `BASSpeculativePrefetcher.plan(...)` + `.defaultTasks(riskBand:)`
+
 ### Dispatcher
 
 - `BASAgentTurnDispatcher.dispatch(...)` ← canonical turn-level entry
@@ -115,14 +158,19 @@ This document declares which Agent Fabric types are **wire-format stable** (Coda
 
 These string prefixes are reserved for the agent fabric subsystem. Other subsystems MUST NOT emit `signalRefs` starting with these prefixes:
 
-| Prefix | Used by | Format |
-|---|---|---|
-| `agentFabric.activated:` | dispatcher (Phase 1+) | `agentFabric.activated:<role>:<agentID>` |
-| `agentFabric.merged:` | merge engine | `agentFabric.merged:<deltaID>:<status>` |
-| `agentPersona.applied:` | persona SDK | `agentPersona.applied:<personaID>:<changes>` |
-| `agentPersona.clamped:` | risk + sovereign clamps | `agentPersona.clamped:<source>:<field>:<value>` |
-| `agentWatcher.flag:` | watcher aggregator | `agentWatcher.flag:<role>:<category>:<hintID>` |
-| `agentWatcher.count:` | watcher aggregator | `agentWatcher.count:<severity>:<count>` |
+| Prefix | Used by | Status | Format |
+|---|---|---|---|
+| `agentFabric.activated:` | dispatcher (Phase 1+) | future-allocation | `agentFabric.activated:<role>:<agentID>` |
+| `agentFabric.merged:` | merge engine | in-use | `agentFabric.merged:<deltaID>:<status>` |
+| `agentPersona.applied:` | persona SDK | future-allocation | `agentPersona.applied:<personaID>:<changes>` |
+| `agentPersona.clamped:` | risk + sovereign clamps | future-allocation | `agentPersona.clamped:<source>:<field>:<value>` |
+| `agentWatcher.flag:` | watcher aggregator | in-use | `agentWatcher.flag:<role>:<category>:<hintID>` |
+| `agentWatcher.count:` | watcher aggregator | in-use | `agentWatcher.count:<severity>:<count>` |
+| `agentExternal.proposal:` | A2A external gateway (Phase 7) | in-use | `agentExternal.proposal:<externalID>:<channel>:<proposalID>` |
+| `agentExternal.tier:` | A2A external gateway (Phase 7) | in-use | `agentExternal.tier:<externalID>:<effectiveTier>` |
+| `agentExternal.trust:` | A2A external gateway (Phase 7) | in-use | `agentExternal.trust:<externalID>:<trustScore>` |
+
+Per ch 981.5 USER-PASS-7 DH3 doc-fix:9 prefixes are reserved。 6 are in-use today (merged / watcher.flag / watcher.count / external.proposal / external.tier / external.trust);3 are future-allocation (fabric.activated / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。
 
 ---
 

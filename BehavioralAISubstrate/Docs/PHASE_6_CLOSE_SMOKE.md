@@ -88,9 +88,9 @@ Phase 6 is fully ADR-014 OPT-IN — skill agents are not invoked unless caller e
 | ch | Module | LOC (Sources) | Tests |
 |---|---|---|---|
 | 973 | BASSkillAgent protocol + 4 reference agents | ~440 | 24 |
-| 974 | SDK API stability docs + pin tests | ~50 | 18 |
+| 974 | SDK API stability docs + pin tests | ~50 | 22 |
 | 975 | DeviceTestApp sample integration doc | (docs only) | — |
-| **Total** | | **~490 LOC** | **42 tests** |
+| **Total** | | **~490 LOC** | **46 tests** |
 
 Plus comprehensive `Docs/SDK_API_STABILITY.md` declaring 3 stability tiers (WIRE-STABLE / API-STABLE / INTERNAL) + the SDK versioning policy + the reserved signalRefs prefix list + Phase-by-phase audit trail of enum/type count pins.
 
