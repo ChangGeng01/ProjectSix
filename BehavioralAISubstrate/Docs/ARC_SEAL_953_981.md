@@ -217,7 +217,85 @@ but worth a dedicated fix arc。
 **Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening。
 Documented here so it doesn't slip through the cracks。
 
-## Cross-module integration gap (ch 982.5 META-REVIEW CRITICAL honest disclosure)
+## Cross-module integration arc (ch 983-990 — ALL 8 GAPS CLOSED)
+
+The ch 982.5 META-REVIEW Reviewer-4 surfaced 8 specific cross-module integration gaps documented in the next section。 Per user direction「全面 开发」at the META-REVIEW close,a follow-up arc 983-990 landed adapters closing every one of those gaps。 This section pins the closure status before the original META-REVIEW disclosure remains as the rationale + design history。
+
+### Closure summary (ch 983-990, 8 chapters, ALL ✅)
+
+| Gap | Chapter | Adapter | Tests | Discipline pin |
+|---|---|---|---|---|
+| **7** Warrant DEAD-LETTER → audit ledger | ch 983 | `BASSovereignWarrantAuditBridge` (in BASOrchestration) | 8 | U+001F sentinel preserved verbatim through bridge; idempotent on duplicate auditID |
+| **6** TraceLog → BASEventLogStorage | ch 984 | `BASAgentTraceLogEventLogBridge` (write-through + flush) | 9 | Idempotent flush via eventID uniqueness; payload U+001F preserved; Int64.max nanos saturates |
+| **8** Adapter 4-seat → 9-seat | ch 985 | `BASAgentFabricAdapters.turnInput` + coordinator `runAgentFabricObservation` extended | 5 | Default-nil preserves prior 4-seat caller compat byte-equal |
+| **1** HostConstitution read | ch 986 | `BASAgentFabricAdapters.hostAlignmentInput(from:candidates:styleStrictnessOverride:)` | 9 | Sorted union of valueAxes.axes + boundaryVeil.hardNoGo; defensive clamp; determinism |
+| **3** RiskCard → RiskInput | ch 987 | `BASAgentFabricAdapters.enrichRiskInput(from:baseRiskInput:)` | 9 | Monotonic raise (ch 967) — never lowers pressure or manipulation signals |
+| **4** TriSelf → CriticInput | ch 988 | `BASAgentFabricAdapters.enrichCriticInput(from:baseCriticInput:)` | 8 | Monotonic raise; vetoed candidates excluded; all-vetoed forces 1.0 worst-case-honesty |
+| **5** CandidateFrontier projection | ch 989 | `BASAgentFabricAdapters.candidateFrontierProjection(from:)` | 11 | Deterministic sort; band classification (>= 0.7 reversible, < 0.3 guard); order-invariant |
+| **2** MCP gateway → BASActionPermit | ch 990 | `BASAgentFabricAdapters.validateMCPInvocation(_:against:)` | 11 | 4-rule defense-in-depth; blocklist > allowlist priority; reserved `agentMCP.permit:` prefix |
+| **TOTAL** | **8 chapters** | **8 adapters / bridges** | **70 tests** | **all CRITICAL invariants pinned** |
+
+### What changed at the substrate level
+
+Before ch 983-990:
+- Fabric was a parallel island with 663 internally-consistent tests but no path into the production substrate's service plane
+- 7 of 8 cross-module gaps had ZERO wire-up code
+- 1 of 8 (Gap 8 — adapter) had a 4-seat stub but the 5 optional seats were unreachable
+
+After ch 983-990:
+- 8 additive adapters / bridges live in BASOrchestration (where module-graph permits importing both BASMemory + BASPolicy + BASRuntimeCore + BASSovereign types)
+- Host adapters can now build complete cross-module DTOs:
+  ```
+  // Example: 9-seat turn through coordinator
+  let permit: BASActionPermit = riskService.gateAction(...)
+  let card: BASRiskCard = riskService.calibrateRisk(...)
+  let triScores: [BASTriSelfScore] = triSelfService.mergeChoice(...)
+  let hostInput = BASAgentFabricAdapters.hostAlignmentInput(
+      from: hostConstitution, candidates: [...])
+  let riskInput = BASAgentFabricAdapters.enrichRiskInput(
+      from: card,
+      baseRiskInput: BASAgentFabricAdapters.riskInput(...))
+  let criticInput = BASAgentFabricAdapters.enrichCriticInput(
+      from: triScores,
+      baseCriticInput: BASAgentFabricAdapters.criticInput(...))
+  let result = await coordinator.runAgentFabricObservation(
+      turnID: ..., decomposeFrame: ..., candidatePaths: ...,
+      memory: ..., critic: criticInput,
+      hostAlignment: hostInput, sovereignSentinel: ...,
+      evolutionShadow: ...)
+  let warrantResult = BASSovereignWarrantValidator.validate(...)
+  try await BASSovereignWarrantAuditBridge.appendToLedger(
+      validationResult: warrantResult, sessionID: ..., turnID: ...,
+      externalAgentID: ..., ledger: sovereignAuditLedger)
+  try await traceLogEventBridge.flush(forTurn: ...)
+  ```
+- Per Root Law 7 (可回放),every adapter is pure-fn deterministic — re-running any adapter on the same input produces byte-equal output
+- Per Root Law 4 (单主权) + ch 967 monotonic-raise discipline,enrichment adapters NEVER lower risk / concern signals
+- Per red-line 7 additive-only,EVERY new adapter is opt-in; the 14,329 pre-Phase-0 tests still pass byte-equal because no existing call site is modified
+
+### What still requires host integration
+
+The substrate-side adapters are wired。 What the host application must still do:
+
+1. **Build the live service inputs** — pull `BASActionPermit` from `riskService.gateAction(...)`, `BASRiskCard` from `riskService.calibrateRisk(...)`, `BASTriSelfScore[]` from `triSelfService.mergeChoice(...)`, etc。 The adapters do not do the upstream service calls (that's host's per-turn pipeline)。
+2. **Call the adapters in the right order** — Risk + TriSelf enrichment happens BEFORE dispatch; Warrant audit + TraceLog flush happens AFTER dispatch。
+3. **Configure the fabric runtime** — set `coordinator.agentFabric = BASAgentFabricRuntime(...)` with the 9-seat roster + shared state graph + optional trace log。
+4. **Run device-side smoke** — the ch 952.6 baseline doesn't exercise these adapter paths; host needs to add fabric-on smoke iterations per `Docs/PHASE_8_CLOSE_SMOKE.md`。
+
+These are host-side responsibilities per ADR-014 OPT-IN + plan section 9 design intent。 The substrate ships the library; the host wires the pipeline。 But unlike before ch 983, EVERY connection point now exists and is tested。
+
+### Honest scope statement (revised at ch 990)
+
+| Surface | Status | Verified by |
+|---|---|---|
+| Fabric-island (dispatcher + seats + merge + audit) | ✅ SEALED | 663 + ch 982.5 = 663 tests at 0 failures |
+| **Cross-module adapter layer** (8 bridges/adapters) | ✅ **SHIPPED** (ch 983-990) | **70 new regression tests at 0 failures** |
+| Host-side wiring (caller builds DTOs + calls adapters) | ⏸️ HOST RESPONSIBILITY | Adapter contracts pinned; host's call-site is host-app concern |
+| Device verification (3-mode 2hr iPhone Air smoke) | ⏸️ PENDING OPERATOR | Substrate-side ch 952.6 baseline unchanged |
+
+The fabric is no longer a parallel island。 It is now a wired substrate adapter layer awaiting host integration + operator device verification。 The transition is one full arc smaller in scope than the cross-arc effort I had originally estimated at META-REVIEW close (multi-month vs single-session) because each gap turned out to be cleanly tractable as a pure-fn adapter in BASOrchestration with no protocol changes required upstream。
+
+## Cross-module integration gap (ch 982.5 META-REVIEW CRITICAL honest disclosure — KEPT FOR HISTORY)
 
 The ch 982.5 META-REVIEW Reviewer-4 (cross-module integration) pass produced the most architecturally significant finding of the arc:**the entire fabric ships as a parallel island that is internally consistent at the simulator level but is not yet wired into the production substrate's existing service plane**。 This section documents the gap honestly so a future arc can close it deliberately rather than discovering it as a runtime surprise。
 
@@ -310,15 +388,16 @@ Pass criteria for arc seal:
 
 ## Arc seal declaration (scope-honest)
 
-By the discipline this arc has held to (red-line 7 additive-only, byte-equality when fabric unconfigured, **9 N-pass review cycles + 1 META-REVIEW** every ~8 chapters with **70+ real bugs** caught, pure-fn + slim-DTO seat layer for 9 of 9 core agents, sovereign-locked external surfaces), the Agent Fabric arc 953-982.5 is hereby **FABRIC-ISLAND-SEALED** at the simulator level.
+By the discipline this arc has held to (red-line 7 additive-only, byte-equality when fabric unconfigured, **9 N-pass review cycles + 1 META-REVIEW + 8 cross-module integration chapters** spanning ch 953-990 with **70+ real bugs** caught + **all 8 META-REVIEW cross-module gaps closed**, pure-fn + slim-DTO seat layer for 9 of 9 core agents, sovereign-locked external surfaces, monotonic-raise discipline across every cross-module enrichment adapter), the Agent Fabric arc 953-990 is hereby **SUBSTRATE-COMPLETE** at the simulator level (transitioning from "FABRIC-ISLAND-SEALED" at ch 982.5 to "SUBSTRATE-COMPLETE" at ch 990).
 
-This is **NOT** the same as "substrate-sealed" — earlier versions of this declaration framed the arc as substrate-side complete, which over-claimed scope. The honest framing per ch 982.5 META-REVIEW:
+Honest framing at ch 990:
 
 | Surface | Status | Verified by |
 |---|---|---|
 | Fabric-island (dispatcher + seats + merge + audit) | ✅ SEALED | 663 tests at 0 failures |
-| Cross-module integration (8 gaps documented above) | ❌ NOT STARTED | Phase 9+ scope — separate arc |
-| Device verification (3-mode 2hr iPhone Air smoke) | ⏸️ PENDING OPERATOR | substrate-wide ch 952.6 baseline unchanged |
+| **Cross-module adapter layer** (8 bridges) | ✅ **SHIPPED** | 70 new tests at 0 failures (see ch 983-990 closure table above) |
+| Host-side wiring (caller builds DTOs + calls adapters) | ⏸️ HOST RESPONSIBILITY | adapter contracts pinned; host's call-site is host-app concern per ADR-014 OPT-IN |
+| Device verification (3-mode 2hr iPhone Air smoke) | ⏸️ PENDING OPERATOR | substrate-wide ch 952.6 baseline unchanged through arc |
 
 When operator runs the smoke and all 3 modes pass per the criteria above, the fabric-island portion is **DEVICE-CONFIRMED-NEUTRAL** (proves it doesn't regress existing code, NOT that it's wired through coordinator yet)。
 
