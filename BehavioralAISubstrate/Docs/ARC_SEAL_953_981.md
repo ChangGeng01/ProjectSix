@@ -217,11 +217,11 @@ but worth a dedicated fix arc。
 **Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening。
 Documented here so it doesn't slip through the cracks。
 
-## Cross-module integration arc (ch 983-990 — ALL 8 GAPS CLOSED)
+## Cross-module integration arc (ch 983-991.5 — ALL 8 GAPS CLOSED + N-pass review)
 
 The ch 982.5 META-REVIEW Reviewer-4 surfaced 8 specific cross-module integration gaps documented in the next section。 Per user direction「全面 开发」at the META-REVIEW close,a follow-up arc 983-990 landed adapters closing every one of those gaps。 This section pins the closure status before the original META-REVIEW disclosure remains as the rationale + design history。
 
-### Closure summary (ch 983-990, 8 chapters, ALL ✅)
+### Closure summary (ch 983-991.5, 10 chapters, ALL ✅ + N-pass review)
 
 | Gap | Chapter | Adapter | Tests | Discipline pin |
 |---|---|---|---|---|
@@ -232,8 +232,10 @@ The ch 982.5 META-REVIEW Reviewer-4 surfaced 8 specific cross-module integration
 | **3** RiskCard → RiskInput | ch 987 | `BASAgentFabricAdapters.enrichRiskInput(from:baseRiskInput:)` | 9 | Monotonic raise (ch 967) — never lowers pressure or manipulation signals |
 | **4** TriSelf → CriticInput | ch 988 | `BASAgentFabricAdapters.enrichCriticInput(from:baseCriticInput:)` | 8 | Monotonic raise; vetoed candidates excluded; all-vetoed forces 1.0 worst-case-honesty |
 | **5** CandidateFrontier projection | ch 989 | `BASAgentFabricAdapters.candidateFrontierProjection(from:)` | 11 | Deterministic sort; band classification (>= 0.7 reversible, < 0.3 guard); order-invariant |
-| **2** MCP gateway → BASActionPermit | ch 990 | `BASAgentFabricAdapters.validateMCPInvocation(_:against:)` | 11 | 4-rule defense-in-depth; blocklist > allowlist priority; reserved `agentMCP.permit:` prefix |
-| **TOTAL** | **8 chapters** | **8 adapters / bridges** | **70 tests** | **all CRITICAL invariants pinned** |
+| **2** MCP gateway → BASActionPermit | ch 990 | `BASAgentFabricAdapters.validateMCPInvocation(_:against:)` | 11 + 3 (ch 991.5) | 4-rule defense-in-depth; blocklist > allowlist priority; reserved `agentMCP.permit:` prefix; **CRITICAL-1 fix ch 991.5: deny-scope set extended to {denied, none, blocked} after Round-9 caught that production code uses "none"/"blocked", never "denied"** |
+| (coordinator E2E composition) | ch 991 | `BASChapter991CoordinatorIntegrationE2ETests` | 3 | proves 9-seat pipeline composes through coordinator with all 5 enrichment adapters + warrant audit + trace flush + frontier projection + MCP permit validation |
+| (N-pass review fix-of-fix) | ch 991.5 | adapters + tests + docs | 5 (added) | Round-9 cascade pattern: CRITICAL-1 (deny-scope set) + HIGH-1 (enrichCriticInput semantic inversion fixed to use fraction-vetoed) + GAP-1/2/7 mutation-safety pins |
+| **TOTAL** | **10 chapters** | **8 adapters / bridges + E2E + fix-batch** | **78 tests** | **all CRITICAL invariants pinned + 9th N-pass review cycle complete** |
 
 ### What changed at the substrate level
 

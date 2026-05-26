@@ -107,7 +107,7 @@ All 7 watchers read-only (writeDomains empty), pattern-based (no ML), severity-l
 
 ### Invariant 7 — Reserved signalRefs prefix discipline
 
-L14 audit absorption channel uses 10 reserved prefixes (`agentFabric.*` + `agentPersona.*` + `agentWatcher.*` + `agentExternal.*`). No other prefix overlaps. Verified by ch 974 + ch 977 prefix tests. Per ch 981.7 ARC FINALIZE Item 5 a 10th prefix `agentExternal.warrant:` was added for the sovereign warrant validation outcome — updated from "9 reserved" by ch 982.5 META-REVIEW.
+L14 audit absorption channel uses 11 reserved prefixes (`agentFabric.*` + `agentPersona.*` + `agentWatcher.*` + `agentExternal.*` + `agentMCP.*`). No other prefix overlaps. Verified by ch 974 + ch 977 prefix tests. Per ch 981.7 ARC FINALIZE Item 5 a 10th prefix `agentExternal.warrant:` was added for the sovereign warrant validation outcome — updated from "9 reserved" by ch 982.5 META-REVIEW。 Per ch 990 Cross-Module Integration Arc Gap 2 close the 11th prefix `agentMCP.permit:` was added for MCP-invocation permit validation outcomes (granted/rejected against the live `BASActionPermit`)。
 
 ### Invariant 8 — Zero-copy ref carries NO write capability
 
@@ -137,7 +137,7 @@ When operator runs the 3-mode smoke and all 3 modes pass per the criteria above:
 - **20 agents** wired across 8 phases
 - **12 state graph domains** under Single-Writer-Per-Domain
 - **4 reserved persona pattern detectors** + 4 reference skill agents + 7 watchers + 2 external gateways
-- **10 reserved L14 signalRefs prefixes** (6 in-use + 4 future-allocation per ch 981.7 ARC FINALIZE + ch 982.5 META-REVIEW) for audit absorption
+- **11 reserved L14 signalRefs prefixes** (7 in-use + 4 future-allocation per ch 981.7 ARC FINALIZE + ch 982.5 META-REVIEW + ch 990 cross-module integration arc — the 11th is `agentMCP.permit:`) for audit absorption
 - **3 stability tiers** declared (WIRE-STABLE / API-STABLE / INTERNAL)
 - **0 schema changes** to existing `SovereignAuditEntry.signalRefs` — full reuse pattern preserved per ch 953
 

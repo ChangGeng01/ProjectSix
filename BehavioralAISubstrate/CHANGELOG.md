@@ -11,6 +11,172 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百九十一.5 / M3660.5 — Cross-Module Integration Arc N-pass review (Round 9 cascade)
+
+Round-9 cascade review of ch 983-991 — the 9-chapter cross-module
+integration arc that landed in one session under「全面 开发」at
+ch 982.5 close。 Per ch 943 cascade discipline,every arc gets
+N-pass review even (especially) when it landed quickly。 3
+parallel reviewers (code / tests / docs) caught **2 CRITICAL
+bugs + 3 HIGH + 4 MED**。
+
+#### CRITICAL-1 — `validateMCPInvocation` deny-scope bypass
+Reviewer 1 caught that ch 990 only matched `toolScope == "denied"`
+but production code emits `"none"` (5 call sites in
+`EBrainRuntimeCoordinator+Permit.swift` + `EBrainHostRuntime
++RiskService.swift`) and `"blocked"` (`BASPolicy
+/EBrainRiskPlaneCore.swift` line 254)。 The literal `"denied"`
+appears NOWHERE in production — every live deny-scope permit
+was being ACCEPTED by the adapter,a real defense-in-depth bypass。
+
+**Fix**:extended deny-scope set to {"denied", "none", "blocked"}。
+Added 2 new tests pinning the canonical strings + 1 test
+verifying scope value lands in audit ref。
+
+#### HIGH-1 — `enrichCriticInput` SEMANTIC INVERSION
+Reviewer 1 caught that per `BASMLTriSelfService.swift:119-120`,
+`superegoScore = max(0, min(1, candidate.reversibility))` — so
+HIGH superegoScore = SAFE candidate (high reversibility)。 The
+pre-fix adapter averaged the non-vetoed (i.e. SAFE) candidates'
+superego scores and used the AVG as `superegoActiveLevel`
+(strictness) — inverting the intent。 Three safe candidates
+produced HIGH strictness。 And ch 991 E2E test asserted exactly
+this inverted behavior with `XCTAssertEqual(level, 0.8)`。
+
+**Fix**:replaced "average of non-vetoed superego" with
+"fraction vetoed" as the concern signal。 Now 0 vetoed = 0
+concern,N vetoed = 1.0 concern,fraction in-between
+monotone-continuous。 Updated ch 988 tests + ch 991 E2E to
+reflect corrected semantic (E2E uses 1-vetoed scenario to keep
+Critic seat reachable through the composition test)。 Closes
+HIGH-2 (all-vetoed discontinuity) by the same fix。
+
+#### GAP-1/2/7 (Reviewer 2) — mutation-safety coverage pins
+- `manipulationStrength >= 0.5` boundary (exact 0.5 → activates)
+- `validateMCPInvocation` rule-priority ordering (Rule 1 wins
+  even when all 4 rules trigger;ref must say "blocked-mode")
+- "equal stays equal" pin for both `enrichRiskInput` and
+  `enrichCriticInput` (mutation `max(a,b) → max(a, b-epsilon)`
+  now caught)
+
+#### Doc drift (Reviewer 3)
+- ARC_SEAL section title "ch 983-990" → "ch 983-991.5"
+- ARC_SEAL closure summary "8 chapters" → "10 chapters" + added
+  ch 991 / ch 991.5 rows
+- BASAgentFabricAdapters ch 990 MARK "(FINAL)" → "(final adapter
+  — ch 991 ships E2E test,ch 991.5 ships CRITICAL fix)"
+- PHASE_8_CLOSE_SMOKE Invariant 7:"10 reserved prefixes" → "11"
+  (the 11th is `agentMCP.permit:` from ch 990)
+- PHASE_8_CLOSE_SMOKE prefix summary: "10 (6 in-use + 4 future)"
+  → "11 (7 in-use + 4 future-allocation)"
+
+**Substrate state at ch 991.5 close**:14,329 + 78 cross-module
+arc tests / 0 failures。 9th N-pass review cycle complete。 The
+Round-9 cascade caught what would otherwise have been:
+1. A real defense bypass (CRITICAL-1)
+2. An inverted-semantic adapter that the E2E test had frozen
+   (HIGH-1)
+3. Mutation-fragile coverage in 3 separate adapters
+
+Per ch 943 cascade precedent + observation,EVERY review round
+in this arc has caught real bugs — Round 9 is no exception。
+
+### Chapter 九百九十一 / M3660 — Cross-Module Integration Arc ch9:Coordinator E2E composition test
+
+Closes ch 982.5 META-REVIEW Gap 8 sub-finding "ZERO integration
+tests through EBrainRuntimeCoordinator"。 Ch 985 extended the
+adapter API surface;ch 991 is the FIRST end-to-end test that
+exercises the full 9-seat pipeline through coordinator with all
+5 cross-module enrichment adapters + post-turn integration paths
+(warrant audit + trace flush + frontier projection + MCP permit
+validation)。
+
+3 CRITICAL E2E tests:
+- `testCRITICAL_FullNineSeatPipelineThroughCoordinator` — pins
+  all 5 optional seats reachable (memoryBundle#, critiqueField#,
+  alignmentField#, sovereignVerdict-adjacent, evolutionProposal#)
+  + verifies ch 986/987/988/989/990 adapter outputs land at
+  every composition boundary
+- `testCRITICAL_MonotonicRaiseHoldsAcrossPipeline` — defense:
+  empty L7 frame + high-risk card → ch 987 enrichment MUST
+  raise pressure 0→0.95
+- `testCRITICAL_U001F_SentinelRoundTripsThroughLedger` — end-to-
+  end cascade proof: ch 981.9 validator emits U+001F → ch 983
+  bridge preserves it → ch 982.5 C1 escape applies → audit
+  ledger preserves verbatim
+
+### Chapter 九百九十 / M3655 — Cross-Module Integration Arc ch8 (FINAL adapter):Gap 2 close
+MCP gateway ↔ BASPolicy.BASActionPermit。 4-rule defense-in-
+depth validator with priority ordering: blocked-mode > blocklist
+> allowlist > scope。 Reserved prefix `agentMCP.permit:` for L14
+absorption (11th prefix in the reserved set)。 11 tests at 0
+failures。
+
+### Chapter 九百八十九 / M3650 — Cross-Module Integration Arc ch7:Gap 5 close
+`BASPlannerCandidate[]` → `BASCandidateFrontier` projection
+adapter。 Confidence-descending sort with lex tie-break;
+reversibility-band classification (>= 0.7 reversiblePaths;
+< 0.3 STRICT guardPaths;ch 967 + ch 958 band semantics);
+diversity score from std-dev (empty/single → 1.0 by convention)。
+11 tests at 0 failures。
+
+### Chapter 九百八十八 / M3645 — Cross-Module Integration Arc ch6:Gap 4 close
+`BASTriSelfScore[]` → `BASCriticSeatInput` enrichment adapter。
+**(Round-9 fix at ch 991.5: semantic inversion of superegoScore
+caught + fixed — see ch 991.5 entry above.)** Original ch 988
+shipped 8 tests;ch 991.5 added 3 corrected-semantic tests +
+fixed 3 previously-frozen-wrong tests。
+
+### Chapter 九百八十七 / M3640 — Cross-Module Integration Arc ch5:Gap 3 close
+`BASRiskCard` → `BASRiskInput` enrichment adapter。 Monotonic
+raise (Root Law 4 + ch 967):pressureLevel only goes UP via
+max();manipulation flag only flips ON (`|| (card-strength >=
+0.5)`);boundaryTouched preserved from L7 base。 9 tests + 2 ch
+991.5 mutation-safety pins (exact 0.5 boundary + equal stays
+equal) = 11 tests at 0 failures。
+
+### Chapter 九百八十六 / M3635 — Cross-Module Integration Arc ch4:Gap 1 close
+`BASHostConstitution` → `BASHostAlignmentInput` adapter。 Sorted
+union of `valueAxes.axes + boundaryVeil.hardNoGo` (deterministic
++ de-duped per L5 whitepaper §6);styleStrictness derived from
+`styleGenome.structureBias` with caller override;defensive clamp
+at adapter boundary。 9 tests at 0 failures。
+
+### Chapter 九百八十五 / M3630 — Cross-Module Integration Arc ch3:Gap 8 close (adapter API)
+Extended `BASAgentFabricAdapters.turnInput(...)` with optional
+`evolutionShadow:` parameter (ch 965 9th seat,was never plumbed
+into adapter)。 Extended `EBrainRuntimeCoordinator
+.runAgentFabricObservation(...)` to accept all 5 optional pre-
+built DTOs (Memory / Critic / HostAlignment / SovereignSentinel
+/ EvolutionShadow)。 Defaulted nil preserves all 4-seat callers
+byte-equal。 5 tests at 0 failures + ch 991 E2E composition test
+proves wiring works end-to-end。
+
+### Chapter 九百八十四 / M3625 — Cross-Module Integration Arc ch2:Gap 6 close
+`BASAgentTraceLog` write-through to `BASEventLogStorage`。
+Per ch 953 plan section 8 design intent。 New
+`BASAgentTraceLogEventLogBridge` actor (in BASOrchestration)
+provides:
+- `synthesizeEventLogEntry(...)` — pure-fn lossless mapping
+  (preserves U+001F sentinels in payloadJson per ch 982.5 C1)
+- `recordEvent(...)` — write-through to both logs
+- `flush(forTurn:)` — batch idempotent via eventID uniqueness
+Int64.max nanos saturates at /1e6 boundary。 9 tests at 0
+failures。
+
+### Chapter 九百八十三 / M3620 — Cross-Module Integration Arc ch1:Gap 7 close (warrant DEAD-LETTER)
+`BASSovereignWarrantValidator` audit refs (with carefully-fixed
+U+001F sentinels from ch 981.7 + 982 + 982.5) were DEAD-LETTER
+— no consumer piped them into `BASSovereignAuditLedger`。
+New `BASSovereignWarrantAuditBridge` (in BASOrchestration where
+it can import both BASMemory + BASSovereign):
+- `buildEntry(...)` — pure-fn `BASSovereignAuditEntry`
+  synthesis;auditID/verdictRef carry outcome;signalRefs
+  preserve U+001F verbatim
+- `appendToLedger(...)` — async wrapper appending to ledger
+  (ledger auto-signs on empty signature per ch 716 第三刀)
+8 tests at 0 failures。
+
 ### Chapter 九百八十二.5 / M3615.5 — META-REVIEW (Round 9):arc-level integration audit + RFC 8259 critical fix + honest scope disclosure
 
 **Round 9 trigger**:user invoked「全面 审查 所有」asking for a

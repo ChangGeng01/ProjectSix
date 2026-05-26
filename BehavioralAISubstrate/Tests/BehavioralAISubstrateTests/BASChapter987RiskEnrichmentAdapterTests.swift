@@ -160,6 +160,45 @@ final class BASChapter987RiskEnrichmentAdapterTests: XCTestCase {
         XCTAssertEqual(enriched.candidates[0].candidateID, "c.1")
     }
 
+    // MARK: - chapter 九百九十一.5 META-REVIEW GAP-1 boundary tests
+
+    /// GAP-1 (Reviewer 2): mutation `>= → >` on
+    /// manipulationStrength threshold was not caught by tests
+    /// using 0.7 (above) or 0.3 (below)。 This pins the exact
+    /// boundary at 0.5。
+    func testCRITICAL_ManipulationThreshold_ExactBoundaryActivates() {
+        let base = BASRiskInput(
+            candidates: [],
+            pressureLevel: 0.0,
+            manipulationDetected: false,
+            boundaryTouched: false)
+        let card = sampleCard(
+            totalRisk: 0.0,
+            manipulationStrength: 0.5)  // exactly at boundary
+        let enriched = BASAgentFabricAdapters
+            .enrichRiskInput(from: card, baseRiskInput: base)
+        XCTAssertTrue(enriched.manipulationDetected,
+            "ch 991.5 GAP-1 CRITICAL: manipulationStrength == " +
+            "0.5 (exact boundary) MUST activate flag (>= 0.5 " +
+            "trigger,not > 0.5 — mutation-safety pin)")
+    }
+
+    /// Equal-stays-equal pin (Reviewer 2 GAP-7)
+    func testEqualBaseAndCardPressure_OutputExactlyEqual() {
+        let base = BASRiskInput(
+            candidates: [],
+            pressureLevel: 0.5,
+            manipulationDetected: false,
+            boundaryTouched: false)
+        let card = sampleCard(totalRisk: 0.5)
+        let enriched = BASAgentFabricAdapters
+            .enrichRiskInput(from: card, baseRiskInput: base)
+        XCTAssertEqual(enriched.pressureLevel, 0.5,
+            accuracy: 0.001,
+            "ch 991.5 GAP-7: base == card pressure MUST produce " +
+            "exact equality (mutation-safety pin for max())")
+    }
+
     // MARK: - Determinism
 
     func testAdapter_IsDeterministic() {

@@ -133,9 +133,56 @@ final class BASChapter990MCPPermitValidationTests: XCTestCase {
         })
     }
 
+    // MARK: - chapter 九百九十一.5 META-REVIEW CRITICAL-1 fix
+
+    /// CRITICAL-1 (Reviewer 1): ch 990 only matched literal
+    /// "denied" but production code emits "none" (5 call sites
+    /// in EBrainRuntimeCoordinator+Permit.swift +
+    /// EBrainHostRuntime+RiskService.swift) and "blocked"
+    /// (BASPolicy/EBrainRiskPlaneCore.swift:254)。 Real
+    /// defense-in-depth bypass — every live deny-scope permit
+    /// was being accepted。 This test pins the fix。
+    func testCRITICAL_991_5_NoneScope_AlsoRejected() {
+        let invocation = sampleInvocation(server: "mcp.fs")
+        let permit = BASActionPermit(
+            mode: .answer,
+            allowedDomains: ["mcp.fs"],
+            toolScope: "none")  // canonical production deny
+        let (accepted, refs) = BASAgentFabricAdapters
+            .validateMCPInvocation(invocation, against: permit)
+        XCTAssertFalse(accepted,
+            "ch 991.5 CRITICAL-1: toolScope='none' (canonical " +
+            "production deny used by riskService) MUST reject。 " +
+            "Pre-fix: ch 990 only checked 'denied' literal " +
+            "which appears NOWHERE in production code — every " +
+            "live deny-scope permit slipped through。")
+        XCTAssertTrue(refs.contains {
+            $0.contains("denied-tool-scope") &&
+            $0.contains("scope=none")
+        }, "ch 991.5 CRITICAL-1: audit ref MUST carry the " +
+           "exact rejected scope value")
+    }
+
+    func testCRITICAL_991_5_BlockedScope_AlsoRejected() {
+        let invocation = sampleInvocation(server: "mcp.fs")
+        let permit = BASActionPermit(
+            mode: .answer,
+            allowedDomains: ["mcp.fs"],
+            toolScope: "blocked")  // BASPolicy line 254 emits this
+        let (accepted, _) = BASAgentFabricAdapters
+            .validateMCPInvocation(invocation, against: permit)
+        XCTAssertFalse(accepted,
+            "ch 991.5 CRITICAL-1: toolScope='blocked' (BASPolicy " +
+            ".BASActionPermit.protectiveBlock line 254 emits) " +
+            "MUST reject")
+    }
+
     func testToolScope_OtherValuesPermit() {
+        // ch 991.5: updated permitted scopes list — only
+        // "denied"/"none"/"blocked" are deny scopes; everything
+        // else is a permit。
         for scope in ["bounded", "open", "restricted",
-                      "elevated"] {
+                      "elevated", "local_only", "standard"] {
             let invocation = sampleInvocation(server: "mcp.fs")
             let permit = BASActionPermit(
                 mode: .answer,
@@ -146,8 +193,33 @@ final class BASChapter990MCPPermitValidationTests: XCTestCase {
                     invocation, against: permit)
             XCTAssertTrue(accepted,
                 "ch 990 Gap 2: toolScope='\(scope)' MUST permit " +
-                "(only 'denied' rejects)")
+                "(only 'denied'/'none'/'blocked' reject)")
         }
+    }
+
+    /// GAP-2 (Reviewer 2): rule-priority ordering untested。
+    /// A permit triggering ALL 4 deny rules MUST report Rule 1
+    /// (blocked-mode) first per documented priority。 Re-ordering
+    /// the source's early-return rules would otherwise slip
+    /// past tests。
+    func testCRITICAL_991_5_RulePriority_BlockedModeWinsAll() {
+        let invocation = sampleInvocation(server: "mcp.malicious")
+        let permit = BASActionPermit(
+            mode: .block,  // Rule 1 trigger
+            allowedDomains: ["mcp.different"],  // Rule 3 trigger
+            blockedDomains: ["mcp.malicious"],  // Rule 2 trigger
+            toolScope: "none")  // Rule 4 trigger
+        let (accepted, refs) = BASAgentFabricAdapters
+            .validateMCPInvocation(invocation, against: permit)
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(refs.count, 1,
+            "ch 991.5 GAP-2: validator emits exactly ONE audit " +
+            "ref (early-return,first matching deny wins)")
+        XCTAssertTrue(refs.first?.contains("blocked-mode") ?? false,
+            "ch 991.5 GAP-2 CRITICAL: Rule 1 (blocked mode) " +
+            "MUST fire FIRST + emit blocked-mode audit ref even " +
+            "when Rules 2/3/4 would also trigger。 Mutation that " +
+            "swaps rule order would otherwise pass all tests。")
     }
 
     // MARK: - Audit ref discipline

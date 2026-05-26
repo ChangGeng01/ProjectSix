@@ -186,7 +186,11 @@ public enum BASAgentFabricAdapters {
     }
 
     // MARK: - chapter 九百九十 / M3655 — Cross-Module Integration
-    //                                     Arc ch8 (FINAL):Gap 2 close
+    //                                     Arc ch8 (final adapter
+    //                                     — ch 991 ships E2E test,
+    //                                     ch 991.5 ships CRITICAL
+    //                                     fix to Rule 4 deny-scope
+    //                                     string set):Gap 2 close
     //
     // Validate MCP invocation against a live `BASActionPermit`。
     // Was:`BASMCPCapabilityGateway` (BASMemory) checked
@@ -274,17 +278,28 @@ public enum BASAgentFabricAdapters {
                     "\(invocation.mcpServerID)",
                 ])
         }
-        // Rule 4:toolScope semantic deny → reject。 "denied"
-        // is the canonical sovereign-denied scope per BASPolicy
-        // convention。 Other scopes (bounded / open / restricted)
-        // permit the invocation。
-        if permit.toolScope == "denied" {
+        // Rule 4:toolScope semantic deny → reject。
+        // chapter 九百九十一.5 META-REVIEW CRITICAL-1 fix:
+        // Round-9-review caught that ch 990 only checked "denied",
+        // but production code emits "none" (5 call sites in
+        // EBrainRuntimeCoordinator+Permit.swift + EBrainHostRuntime
+        // +RiskService.swift) and "blocked" (BASPolicy
+        // /EBrainRiskPlaneCore.swift line 254) as the canonical
+        // deny scopes。 The string "denied" appears NOWHERE in
+        // production — so every live deny-scope permit was being
+        // ACCEPTED by the adapter,a real defense-in-depth bypass。
+        // Fix:accept all three canonical deny scopes。
+        let denyScopes: Set<String> = [
+            "none", "blocked", "denied",
+        ]
+        if denyScopes.contains(permit.toolScope) {
             return (
                 accepted: false,
                 auditRefs: [
                     "agentMCP.permit:rejected:" +
                     "reason=denied-tool-scope:server=" +
-                    "\(invocation.mcpServerID)",
+                    "\(invocation.mcpServerID):scope=" +
+                    "\(permit.toolScope)",
                 ])
         }
         // All rules passed — granted
@@ -441,41 +456,49 @@ public enum BASAgentFabricAdapters {
     /// META-REVIEW Gap 4 (fabric Critic seat orthogonal to live
     /// BASMLTriSelfService)。
     ///
-    /// Monotonic raise:`superegoActiveLevel` only goes UP per
-    /// ch 967。 Empty triScores produces a no-op (returns base
-    /// unchanged)。
+    /// chapter 九百九十一.5 META-REVIEW HIGH-1 fix:Round-9 review
+    /// caught CRITICAL SEMANTIC INVERSION。 Per `BASMLTriSelfService
+    /// .swift:119-120`,`superegoScore = clamp(reversibility)` —
+    /// HIGH score = SAFE candidate (high reversibility),LOW score
+    /// = UNSAFE candidate。 Veto fires when `superegoScore < threshold`。
+    /// The pre-fix adapter averaged the non-vetoed (i.e. SAFE)
+    /// candidates' superego scores and used the average AS
+    /// `superegoActiveLevel` — which means 3 safe candidates
+    /// produced a HIGH strictness reading (inverted!)。 Correct
+    /// semantic:`superegoActiveLevel` is CONCERN intensity,which
+    /// should RISE when candidates are UNSAFE,not safe。
+    ///
+    /// Fix:use FRACTION VETOED as the concern signal。
+    ///   - 0 vetoed / N total → 0 concern (all candidates safe)
+    ///   - N vetoed / N total → 1.0 concern (all unsafe)
+    ///   - Mixed → fraction in (0, 1) monotone-continuous
+    ///
+    /// Monotonic raise:`superegoActiveLevel = max(base,
+    /// fractionVetoed)` — never lowers per ch 967。 Empty triScores
+    /// produces a no-op (returns base unchanged)。
     ///
     /// - Parameters:
     ///   - triScores: live `BASTriSelfScore[]` from the prior
     ///     turn's `triSelfService.mergeChoice(...)` output
     ///   - baseCriticInput: existing `BASCriticSeatInput` built
     ///     by `criticInput(from:superegoActiveLevel:)` or directly
-    /// - Returns: enriched `BASCriticSeatInput` with the
-    ///   superego signal raised (max) to the prior turn's
-    ///   average superego score
+    /// - Returns: enriched `BASCriticSeatInput` with concern
+    ///   signal raised (max) to the prior turn's fraction-vetoed
     public static func enrichCriticInput(
         from triScores: [BASTriSelfScore],
         baseCriticInput: BASCriticSeatInput
     ) -> BASCriticSeatInput {
         // No prior tri scores → return base unchanged
         guard !triScores.isEmpty else { return baseCriticInput }
-        // Average superegoScore across non-vetoed candidates only
-        // (vetoed candidates already failed at L10 — their
-        // superego score is not informative about general
-        // superego concern level)
-        let nonVetoed = triScores.filter { !$0.veto }
-        guard !nonVetoed.isEmpty else {
-            // All vetoed = MAXIMUM superego concern。 Raise to 1.0
-            // per monotonic raise + worst-case-honesty discipline。
-            return BASCriticSeatInput(
-                candidates: baseCriticInput.candidates,
-                superegoActiveLevel: max(
-                    baseCriticInput.superegoActiveLevel, 1.0))
-        }
-        let avgSuperego = nonVetoed.map { $0.superegoScore }
-            .reduce(0.0, +) / Double(nonVetoed.count)
-        // Defensive clamp + monotonic raise
-        let clamped = max(0.0, min(1.0, avgSuperego))
+        // chapter 九百九十一.5 fix:fraction vetoed = concern
+        // signal。 Replaces the inverted "avg superego of
+        // non-vetoed" logic which raised strictness when
+        // candidates were SAFE。
+        let vetoedCount = triScores.filter { $0.veto }.count
+        let fractionVetoed =
+            Double(vetoedCount) / Double(triScores.count)
+        // Defensive clamp + monotonic raise (ch 967)
+        let clamped = max(0.0, min(1.0, fractionVetoed))
         let mergedLevel = max(
             baseCriticInput.superegoActiveLevel, clamped)
         return BASCriticSeatInput(

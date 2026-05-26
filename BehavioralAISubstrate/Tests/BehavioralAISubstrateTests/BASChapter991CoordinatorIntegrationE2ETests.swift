@@ -76,7 +76,15 @@ final class BASChapter991CoordinatorIntegrationE2ETests:
             toolScope: "bounded")
 
         // 4. Build a live BASTriSelfScore[] (simulating
-        // triSelfService.mergeChoice output)
+        // triSelfService.mergeChoice output)。
+        // chapter 九百九十一.5 HIGH-1 fix:was both non-vetoed,
+        // which after the semantic fix produces 0-concern (correct
+        // intent),but then the downstream Critic seat doesn't emit
+        // any delta (level stays at base 0.5)。 For the E2E
+        // composition test we want Critic to BE REACHABLE +
+        // emit ≥1 delta,so include 1 vetoed candidate to lift
+        // fraction-vetoed enough that the corrected adapter
+        // produces a non-trivial concern signal。
         let triScores = [
             BASTriSelfScore(
                 candidateID: "c1",
@@ -89,9 +97,9 @@ final class BASChapter991CoordinatorIntegrationE2ETests:
                 candidateID: "c2",
                 idScore: 0.3,
                 egoScore: 0.5,
-                superegoScore: 0.9,
-                mergedScore: 0.5,
-                veto: false),
+                superegoScore: 0.1,  // low safety
+                mergedScore: 0.2,
+                veto: true),  // vetoed (irreversible candidate)
         ]
 
         // 5. Build candidate paths (simulating
@@ -141,14 +149,21 @@ final class BASChapter991CoordinatorIntegrationE2ETests:
             .enrichCriticInput(
                 from: triScores,
                 baseCriticInput: baseCriticInput)
-        // ch 988: avg superego (0.7 + 0.9) / 2 = 0.8 raise above
-        // base 0.5
+        // chapter 九百九十一.5 META-REVIEW HIGH-1 fix:was
+        // asserting `superegoActiveLevel == 0.8` based on
+        // INVERTED semantics (average superego score of safe
+        // candidates)。 Round-9 caught the inversion。 Corrected:
+        // 1 vetoed / 2 total = 0.5 fraction → max with base 0.5
+        // = 0.5。 Mixed scenario (above) was changed from
+        // both-safe to 1-vetoed so Critic seat is reachable
+        // through this E2E composition test。
         XCTAssertEqual(
             enrichedCriticInput.superegoActiveLevel,
-            0.8,
+            0.5,
             accuracy: 0.001,
-            "ch 991 E2E: ch 988 enrichment averages non-vetoed " +
-            "superego scores")
+            "ch 991.5 HIGH-1 fix: 1 vetoed / 2 total = 0.5 " +
+            "fraction-vetoed → max(base 0.5, 0.5) = 0.5。 " +
+            "Pre-fix version froze inverted avg-superego at 0.8。")
 
         // 8. Build host alignment via ch 986 adapter
         let hostInput = BASAgentFabricAdapters

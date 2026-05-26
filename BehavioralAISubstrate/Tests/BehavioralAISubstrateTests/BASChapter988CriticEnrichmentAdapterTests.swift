@@ -44,9 +44,11 @@ final class BASChapter988CriticEnrichmentAdapterTests: XCTestCase {
         let base = BASCriticSeatInput(
             candidates: [],
             superegoActiveLevel: 0.9)
+        // None vetoed → fraction = 0 → adapter would NOT raise
+        // base; verify base is preserved (not lowered)。
         let lowScores = [
-            triScore(id: "c.1", superego: 0.2),
-            triScore(id: "c.2", superego: 0.1),
+            triScore(id: "c.1", superego: 0.2, veto: false),
+            triScore(id: "c.2", superego: 0.1, veto: false),
         ]
         let enriched = BASAgentFabricAdapters
             .enrichCriticInput(
@@ -54,32 +56,68 @@ final class BASChapter988CriticEnrichmentAdapterTests: XCTestCase {
                 baseCriticInput: base)
         XCTAssertEqual(enriched.superegoActiveLevel, 0.9,
             accuracy: 0.001,
-            "ch 988 CRITICAL Gap 4: lower tri scores MUST NOT " +
-            "lower base superegoActiveLevel (ch 967 monotonic)")
+            "ch 988 CRITICAL Gap 4: lower tri-derived concern " +
+            "MUST NOT lower base superegoActiveLevel (ch 967 " +
+            "monotonic raise — base 0.9 + tri-fraction 0 → stays 0.9)")
     }
 
-    func testMonotonicRaise_HigherTriRaisesBase() {
+    /// chapter 九百九十一.5 META-REVIEW GAP-7 (Reviewer 2):
+    /// "equal stays equal" mutation-safety pin。 If
+    /// `max(a, b)` were mutated to `max(a, b - epsilon)` no
+    /// existing test caught it。 This pins exactness。
+    func testCRITICAL_EqualBaseAndFraction_OutputExactlyEqual() {
         let base = BASCriticSeatInput(
             candidates: [],
-            superegoActiveLevel: 0.3)
-        let highScores = [
-            triScore(id: "c.1", superego: 0.8),
-            triScore(id: "c.2", superego: 0.9),
+            superegoActiveLevel: 0.5)
+        // 1 vetoed / 2 = 0.5 — equal to base
+        let scores = [
+            triScore(id: "c.1", veto: false),
+            triScore(id: "c.2", veto: true),
         ]
         let enriched = BASAgentFabricAdapters
             .enrichCriticInput(
-                from: highScores,
+                from: scores,
                 baseCriticInput: base)
-        // Avg = 0.85
-        XCTAssertEqual(enriched.superegoActiveLevel, 0.85,
+        XCTAssertEqual(enriched.superegoActiveLevel, 0.5,
             accuracy: 0.001,
-            "ch 988 Gap 4: higher tri scores MUST raise base " +
-            "to the non-vetoed average")
+            "ch 991.5 GAP-7: base == fraction-vetoed → output " +
+            "MUST be exactly equal (mutation-safety pin)")
     }
 
-    // MARK: - Veto handling
+    // chapter 九百九十一.5 META-REVIEW HIGH-1 fix:semantic
+    // inversion of superegoScore caught at Round 9。 The pre-fix
+    // adapter averaged non-vetoed superego scores and used the
+    // AVG as `superegoActiveLevel` — but superegoScore=safety,
+    // not concern,so avg=0.85 of two safe candidates produced
+    // strict critic next turn (inverted)。 Fix uses fraction-
+    // vetoed instead。 Tests below are updated for the corrected
+    // semantic — high-safety candidates produce LOW concern,
+    // any veto in the population raises concern。
 
-    func testVetoed_ExcludedFromAverage() {
+    func testCRITICAL_HighSafetyCandidatesProduceLowConcern() {
+        let base = BASCriticSeatInput(
+            candidates: [],
+            superegoActiveLevel: 0.0)
+        // Two SAFE candidates (high superego = high reversibility)
+        // → 0 vetoed / 2 total = 0 concern。 Adapter MUST NOT
+        // raise strictness when prior turn was all safe。
+        let safeScores = [
+            triScore(id: "c.1", superego: 0.8, veto: false),
+            triScore(id: "c.2", superego: 0.9, veto: false),
+        ]
+        let enriched = BASAgentFabricAdapters
+            .enrichCriticInput(
+                from: safeScores,
+                baseCriticInput: base)
+        XCTAssertEqual(enriched.superegoActiveLevel, 0.0,
+            accuracy: 0.001,
+            "ch 991.5 HIGH-1 CRITICAL: safe candidates (HIGH " +
+            "superegoScore,none vetoed) MUST produce LOW " +
+            "concern。 Pre-fix bug:adapter averaged safety " +
+            "scores and called the result strictness — inverted。")
+    }
+
+    func testFractionVetoed_HalfVetoedRaisesToHalf() {
         let base = BASCriticSeatInput(
             candidates: [],
             superegoActiveLevel: 0.0)
@@ -87,17 +125,17 @@ final class BASChapter988CriticEnrichmentAdapterTests: XCTestCase {
             triScore(id: "c.1", superego: 0.5, veto: false),
             triScore(id: "c.2", superego: 0.7, veto: false),
             triScore(id: "c.3", superego: 0.1, veto: true),
+            triScore(id: "c.4", superego: 0.15, veto: true),
         ]
+        // 2 vetoed / 4 total = 0.5 fraction
         let enriched = BASAgentFabricAdapters
             .enrichCriticInput(
                 from: scores,
                 baseCriticInput: base)
-        // Avg of non-vetoed (0.5 + 0.7) / 2 = 0.6
-        XCTAssertEqual(enriched.superegoActiveLevel, 0.6,
+        XCTAssertEqual(enriched.superegoActiveLevel, 0.5,
             accuracy: 0.001,
-            "ch 988 Gap 4: vetoed candidates MUST be excluded " +
-            "from superego average (their score is not " +
-            "informative about general concern)")
+            "ch 991.5 HIGH-1: fraction-vetoed MUST drive " +
+            "concern signal (2/4 = 0.5)")
     }
 
     func testCRITICAL_AllVetoed_ForcesMaximumConcern() {
@@ -190,7 +228,7 @@ final class BASChapter988CriticEnrichmentAdapterTests: XCTestCase {
 
     private func triScore(
         id: String,
-        superego: Double,
+        superego: Double = 0.5,
         veto: Bool = false
     ) -> BASTriSelfScore {
         BASTriSelfScore(
