@@ -220,7 +220,50 @@ public enum BASAgentPersonaSovereignClamp {
         // Rule 1:LOCKDOWN — every agent regardless of tier
         // force-defaults to template (no agent can deviate when
         // sovereign verdict says lockdown)
+        //
+        // chapter 九百六十九.5 USER-PASS-6 H3 fix:emit per-field
+        // notes for any value that actually CHANGED during the
+        // lockdown force-default,plus the lockdown-scope marker。
+        // Previously only the scope marker was emitted,so the
+        // audit ledger couldn't tell which fields the host's
+        // overlay had set vs which were already at template。
         if sovereign.lockdownTurn {
+            if tone != template.tone {
+                notes.append(formatForce(
+                    field: "tone", to: template.tone))
+            }
+            (warmth, _) = lockdownForceNumeric(
+                value: warmth,
+                template: template.warmth,
+                field: "warmth", notes: &notes)
+            (directness, _) = lockdownForceNumeric(
+                value: directness,
+                template: template.directness,
+                field: "directness", notes: &notes)
+            (skepticism, _) = lockdownForceNumeric(
+                value: skepticism,
+                template: template.skepticism,
+                field: "skepticism", notes: &notes)
+            (structureBias, _) = lockdownForceNumeric(
+                value: structureBias,
+                template: template.structureBias,
+                field: "structureBias", notes: &notes)
+            (creativityBias, _) = lockdownForceNumeric(
+                value: creativityBias,
+                template: template.creativityBias,
+                field: "creativityBias", notes: &notes)
+            (challengeIntensity, _) = lockdownForceNumeric(
+                value: challengeIntensity,
+                template: template.challengeIntensity,
+                field: "challengeIntensity", notes: &notes)
+            (comparisonBias, _) = lockdownForceNumeric(
+                value: comparisonBias,
+                template: template.comparisonBias,
+                field: "comparisonBias", notes: &notes)
+            (guardBias, _) = lockdownForceNumeric(
+                value: guardBias,
+                template: template.guardBias,
+                field: "guardBias", notes: &notes)
             tone = template.tone
             warmth = template.warmth
             directness = template.directness
@@ -238,77 +281,76 @@ public enum BASAgentPersonaSovereignClamp {
         // (LOW with warrant:caller's host overlay already
         // applied at ch 966 resolver;warrant decides whether
         // it SURVIVES here。 We use field-by-field grant.)
+        //
+        // chapter 九百六十九.5 USER-PASS-6 C1 fix:audit note
+        // now emitted UNCONDITIONALLY for every LOW-tier field
+        // that was RE-CHECKED (regardless of whether value
+        // already matched template)。 Previously the audit
+        // ledger had no record of which fields the sovereign
+        // gate considered — a trace replay couldn't distinguish
+        // "field happened to equal template" from "sovereign
+        // chose to skip the field" — INV8 violation。 Now the
+        // notes prefix `sovereign.check.<field>:<status>` for
+        // every field iteration,with `<status>` = `forced`
+        // (value changed) / `unchanged-but-checked` (value
+        // already matched) / `granted` (warrant overrode)。
         if !sovereign.lockdownTurn &&
            persona.visibility == .low {
             let warrant = sovereign.warrant
-            // For each field,if the warrant DOES NOT grant it,
-            // force-default。 No warrant at all = no grants = all
-            // fields force-default。
-            if !(warrant?.grants("tone") ?? false) &&
-               tone != template.tone {
-                tone = template.tone
-                notes.append(formatForce(
-                    field: "tone",
-                    to: template.tone))
-            }
-            if !(warrant?.grants("warmth") ?? false) &&
-               warmth != template.warmth {
-                warmth = template.warmth
-                notes.append(formatForceNumeric(
-                    field: "warmth",
-                    to: template.warmth))
-            }
-            if !(warrant?.grants("directness") ?? false) &&
-               directness != template.directness {
-                directness = template.directness
-                notes.append(formatForceNumeric(
-                    field: "directness",
-                    to: template.directness))
-            }
-            if !(warrant?.grants("skepticism") ?? false) &&
-               skepticism != template.skepticism {
-                skepticism = template.skepticism
-                notes.append(formatForceNumeric(
-                    field: "skepticism",
-                    to: template.skepticism))
-            }
-            if !(warrant?.grants("structureBias") ?? false) &&
-               structureBias != template.structureBias {
-                structureBias = template.structureBias
-                notes.append(formatForceNumeric(
-                    field: "structureBias",
-                    to: template.structureBias))
-            }
-            if !(warrant?.grants("creativityBias") ?? false) &&
-               creativityBias != template.creativityBias {
-                creativityBias = template.creativityBias
-                notes.append(formatForceNumeric(
-                    field: "creativityBias",
-                    to: template.creativityBias))
-            }
-            if !(warrant?.grants(
-                    "challengeIntensity") ?? false) &&
-               challengeIntensity != template.challengeIntensity
-            {
-                challengeIntensity = template.challengeIntensity
-                notes.append(formatForceNumeric(
-                    field: "challengeIntensity",
-                    to: template.challengeIntensity))
-            }
-            if !(warrant?.grants("comparisonBias") ?? false) &&
-               comparisonBias != template.comparisonBias {
-                comparisonBias = template.comparisonBias
-                notes.append(formatForceNumeric(
-                    field: "comparisonBias",
-                    to: template.comparisonBias))
-            }
-            if !(warrant?.grants("guardBias") ?? false) &&
-               guardBias != template.guardBias {
-                guardBias = template.guardBias
-                notes.append(formatForceNumeric(
-                    field: "guardBias",
-                    to: template.guardBias))
-            }
+            (tone, _) = forceFieldString(
+                value: tone,
+                template: template.tone,
+                field: "tone",
+                warrant: warrant,
+                notes: &notes)
+            (warmth, _) = forceFieldNumeric(
+                value: warmth,
+                template: template.warmth,
+                field: "warmth",
+                warrant: warrant,
+                notes: &notes)
+            (directness, _) = forceFieldNumeric(
+                value: directness,
+                template: template.directness,
+                field: "directness",
+                warrant: warrant,
+                notes: &notes)
+            (skepticism, _) = forceFieldNumeric(
+                value: skepticism,
+                template: template.skepticism,
+                field: "skepticism",
+                warrant: warrant,
+                notes: &notes)
+            (structureBias, _) = forceFieldNumeric(
+                value: structureBias,
+                template: template.structureBias,
+                field: "structureBias",
+                warrant: warrant,
+                notes: &notes)
+            (creativityBias, _) = forceFieldNumeric(
+                value: creativityBias,
+                template: template.creativityBias,
+                field: "creativityBias",
+                warrant: warrant,
+                notes: &notes)
+            (challengeIntensity, _) = forceFieldNumeric(
+                value: challengeIntensity,
+                template: template.challengeIntensity,
+                field: "challengeIntensity",
+                warrant: warrant,
+                notes: &notes)
+            (comparisonBias, _) = forceFieldNumeric(
+                value: comparisonBias,
+                template: template.comparisonBias,
+                field: "comparisonBias",
+                warrant: warrant,
+                notes: &notes)
+            (guardBias, _) = forceFieldNumeric(
+                value: guardBias,
+                template: template.guardBias,
+                field: "guardBias",
+                warrant: warrant,
+                notes: &notes)
             if let w = warrant {
                 notes.append(
                     "sovereign.warrant:\(w.warrantID)")
@@ -399,5 +441,74 @@ public enum BASAgentPersonaSovereignClamp {
     private static func clamp01(_ v: Double) -> Double {
         if v.isNaN { return 0.5 }
         return max(0.0, min(1.0, v))
+    }
+
+    // MARK: - LOW-tier force-default helpers (ch 969.5 C1 fix)
+
+    /// String-field force-default helper for LOW-tier per ch
+    /// 969.5 USER-PASS-6 C1 fix。 Emits audit note unconditionally
+    /// for every field that was re-checked,with status `forced`
+    /// / `unchanged-but-checked` / `granted`。 Returns the
+    /// possibly-replaced value + whether it changed。
+    private static func forceFieldString(
+        value: String, template: String,
+        field: String,
+        warrant: BASAgentPersonaSovereignWarrant?,
+        notes: inout [String]
+    ) -> (String, Bool) {
+        if warrant?.grants(field) == true {
+            notes.append(
+                "sovereign.check.\(field):granted")
+            return (value, false)
+        }
+        if value != template {
+            notes.append(formatForce(
+                field: field, to: template))
+            return (template, true)
+        }
+        notes.append(
+            "sovereign.check.\(field):unchanged-but-checked")
+        return (value, false)
+    }
+
+    /// Numeric-field force-default helper for LOW-tier per ch
+    /// 969.5 C1 fix。
+    private static func forceFieldNumeric(
+        value: Double, template: Double,
+        field: String,
+        warrant: BASAgentPersonaSovereignWarrant?,
+        notes: inout [String]
+    ) -> (Double, Bool) {
+        if warrant?.grants(field) == true {
+            notes.append(
+                "sovereign.check.\(field):granted")
+            return (value, false)
+        }
+        if value != template {
+            notes.append(formatForceNumeric(
+                field: field, to: template))
+            return (template, true)
+        }
+        notes.append(
+            "sovereign.check.\(field):unchanged-but-checked")
+        return (value, false)
+    }
+
+    /// Lockdown numeric-field force helper for ch 969.5 H3 fix。
+    /// Lockdown ALWAYS forces (no warrant respect),so this is
+    /// simpler than the LOW-tier per-field helper。 Audit note
+    /// is emitted only when the value actually changed (lockdown
+    /// audits are per-field-changed,not per-field-checked since
+    /// the scope marker already says "all" in the same outcome)。
+    private static func lockdownForceNumeric(
+        value: Double, template: Double, field: String,
+        notes: inout [String]
+    ) -> (Double, Bool) {
+        if value != template {
+            notes.append(formatForceNumeric(
+                field: field, to: template))
+            return (template, true)
+        }
+        return (value, false)
     }
 }

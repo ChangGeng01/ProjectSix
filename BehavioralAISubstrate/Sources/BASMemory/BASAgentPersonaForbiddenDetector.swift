@@ -229,11 +229,17 @@ public enum BASAgentPersonaForbiddenDetector {
             evidence.append(formatEv(
                 "creativity", p.creativityBias, "≤0.20"))
         }
-        if isWarmTone(p.tone) || p.warmth >= 0.65 {
+        // chapter 九百六十九.5 USER-PASS-6 H4 fix:absolute-
+        // paternal requires BOTH warm-tone AND high-warmth (the
+        // "warm voice giving rigid orders" pattern requires BOTH
+        // signals)。 Previously OR-logic produced false positives
+        // for tone="warm"/warmth=0.10 + tone="cool"/warmth=0.90
+        // mismatches。
+        if isWarmTone(p.tone) && p.warmth >= 0.5 {
             score += 0.25
             let evStr =
                 "tone=\(p.tone)/warmth=\(formatNum(p.warmth))"
-            evidence.append("\(evStr)(warm)")
+            evidence.append("\(evStr)(warm-AND-warmth)")
         }
         return BASAgentPersonaForbiddenFinding(
             pattern: .absolutePaternal,

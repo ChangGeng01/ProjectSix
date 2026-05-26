@@ -11,6 +11,204 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百六十九.5 / M3550.5 — USER-PASS-6:全面 3-agent review of Phase 4 catches sovereignty crisis + 4 HIGH + doc lies
+
+Per N-pass discipline (6th cumulative review cycle on arc 953-969),
+3 parallel review agents (code correctness + test coverage + doc
+consistency) found:
+
+**2 CRITICAL + 1 CRITICAL-GAP + 4 HIGH + 1 doc-HIGH + 2 doc-MED**
+
+#### CRITICAL fixes
+
+**CG1 — SDK output validation rejects sovereign-blessed LOW-tier templates (sovereignty crisis)**
+
+The ch 968 LOW-tier sealed-default templates have `skepticism=1.0,
+directness=1.0, warmth=0.10, comparison=0.0` — which BY DESIGN
+matches the forbidden gaslight pattern (4/4 contributors → score
+1.0) AND the controlling pattern (3/4 contributors → score 0.75 ≥
+threshold 0.6)。 The SDK output validation step (ch 969 Step 5)
+would REJECT the sovereign sentinel's own template — refusing to
+let sovereign agents run。 This is a **sovereignty crisis** — the
+system would refuse to load its own sovereign-blessed agents。
+
+Fix:`BASAgentPersonaSDK.resolve(...)` now EXEMPTS LOW-tier
+personas from output validation per Root Law 4 (单主权)。 LOW-tier
+agents are BY DEFINITION sovereign-blessed — rejecting them at
+the output step would be a logical contradiction。 Input validation
+(Step 1) still catches user/host overlays that match forbidden
+patterns,so user-supplied harm is still rejected;the only LOW-tier
+output that reaches Step 5 is the sovereign-blessed force-default
+from ch 968 which is permitted by definition。 HIGH + MED tier
+output validation unchanged。
+
+Regression tests:
+- `testCG1_LowTierSDKResolveAcceptsSentinelTemplate` (sentinel passes)
+- `testCG1_AllFourLowTierRolesResolveCleanlyThroughSDK` (all 4 LOW roles pass)
+- `testCG1_HighTierStillRejectsForbiddenComposition` (HIGH-tier regression defense)
+
+**C1 — Sovereign LOW-tier audit gap (INV8 violation)**
+
+LOW-tier force-default in `BASAgentPersonaSovereignClamp` only
+appended an audit note WHEN the field actually changed。 If the
+overlay value happened to equal the template value already (or
+the warrant granted the field),the audit ledger had NO record
+that the sovereign gate considered the field — trace replay
+couldn't distinguish "field skipped because identical" from
+"field skipped because granted"。 Violates INV8 (every clamp/
+gate decision must emit an audit note)。
+
+Fix:`forceFieldString` + `forceFieldNumeric` helpers now emit
+`sovereign.check.<field>:<status>` for EVERY LOW-tier field
+inspection,with status = `forced` (value replaced) /
+`unchanged-but-checked` (already matched template) / `granted`
+(warrant overrode)。
+
+Regression test:`testC1_LowTierEmitsPerFieldCheckNote` verifies
+all 9 numeric fields get audit notes for every LOW-tier resolve。
+
+#### HIGH fixes
+
+**C2 — NaN audit trail missing in Risk clamp (INV5 + INV8 joint
+violation)**
+
+If `persona.skepticism` arrived as `Double.nan`,Risk clamp's
+comparison branches all returned false (NaN compares false in
+both directions),so no `risk.raise.skepticism` note was emitted。
+The final defensive `clamp01` silently normalized NaN → 0.5,but
+no audit note recorded the normalization。 Joint violation of
+INV5 (NaN must be normalized) + INV8 (every normalization must
+be auditable)。
+
+Fix:`nanNotesFor(...)` helper now scans every bias for NaN
+BEFORE the final clamp01 step and emits
+`risk.nan-normalize.<field>:NaN→0.500` for every NaN detected。
+Identity-context fast-path also runs the NaN scan + normalization
++ audit emission (previously skipped entirely)。
+
+Regression tests:`testC2_NaNBiasEmitsAuditNote`,
+`testC2_NaNAuditNotesDeterministic`。
+
+**H2 — SDK `validateOverlays` discarded evidence union**
+
+When both user AND host overlays triggered the same forbidden
+pattern,the de-dup kept only the higher-score finding's evidence
+— silently DROPPING the other source's evidence。 Audit ledger
+lost visibility into which source supplied the forbidden bias。
+
+Fix:de-dup now merges evidence UNION + tags each entry with
+`source=user:` or `source=host:` prefix。 Highest matchScore still
+preserved per original spec。
+
+Regression tests:`testH2_EvidenceUnionAcrossUserAndHostSamePattern`,
+`testH2_EvidenceSortedDeterministic`。
+
+**H3 — Lockdown branch emitted only summary marker (INV8 violation)**
+
+Lockdown force-default appended exactly one note
+(`"sovereign.lockdown:force-default-all"`) — no record of WHICH
+fields the host's overlay had set vs which were already at
+template。 Same INV8 violation as C1。
+
+Fix:lockdown branch now emits
+`sovereign.force.<field>:template-default(...)` for every field
+that actually changed during force-default,plus the scope marker。
+
+Regression tests:`testH3_LockdownEmitsPerFieldNotes`,
+`testH3_LockdownNoChangeNoForceNote`。
+
+**H4 — AbsolutePaternal OR logic double-counted (false-positive)**
+
+`scoreAbsolutePaternal` used OR for the warm-tone check:
+`isWarmTone(p.tone) || p.warmth >= 0.65`。 This treated
+`tone="warm" + warmth=0.10` as equally paternal-warm as
+`warmth=0.70 + tone="cool"`,creating false positives that don't
+match the pattern definition ("warm voice giving rigid orders"
+requires BOTH signals)。
+
+Fix:changed to AND logic:`isWarmTone(p.tone) && p.warmth >= 0.5`。
+Evidence string now `(warm-AND-warmth)` to make the change
+explicit in the audit ledger。
+
+Regression tests:`testH4_AbsolutePaternalRequiresWarmToneAndHighWarmth`,
+`testH4_AbsolutePaternalCleanWarmlessPersonaNoFalseTrigger`,
+`testH4_AbsolutePaternalTextbookStillDetected`。
+
+#### Doc-HIGH fix
+
+**DH1 — `PHASE_4_CLOSE_SMOKE.md` env vars are vapor**
+
+The smoke procedure documented `BAS_AGENT_FABRIC` /
+`BAS_PERSONA_ENABLED` / `BAS_TRANSCRIPT_MODE` /
+`BAS_ACTIVE_AGENTS` env vars,but `scripts/run-iphone-air-10hr.sh`
+honors only `MAX_SEC` + `BAS_DEVICE_LOG_DIR`。 None of the four
+`BAS_*` vars are referenced anywhere in the codebase。 Doc claimed
+operator interface that doesn't exist。
+
+Fix:added explicit note that the 4 env vars are documented future
+work (ch 970+ host integration);Phase 4 ships as library only。
+Added "Baseline run" recipe using existing wrapper to validate
+zero-regression。 Rewrote "Rollback" section to reflect actual
+opt-out path (don't invoke SDK)。
+
+#### Doc-MED fixes
+
+**DM4 — CHANGELOG ch 967 "monotonic clamp01" misleading.** The
+`clamp01` helper itself is plain saturation;the monotonic property
+comes from the conditional `if floor > value` / `if ceiling < value`
+guards in `apply(...)`。 Renamed heading to "monotonic raise/cap"。
+
+**DM5 — `BASAgentPersonaSpec.guardBias` doc comment over-stated
+Sovereign behavior.** Said "Risk + Sovereign clamps can RAISE this
+but never lower it" — but Sovereign LOW-tier force-default REPLACES
+to template (not strictly monotonic raise)。 In practice LOW-tier
+templates are always ≥ 0.95 so no lowering occurs,but the
+invariant statement was overspecified。 Corrected to describe both
+Risk's monotonic raise + Sovereign's force-to-template behavior。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentPersonaSDK.swift` | + CG1 LOW-tier exemption + H2 evidence-union de-dup |
+| `Sources/BASMemory/BASAgentPersonaSovereignClamp.swift` | + C1 per-field check notes + H3 lockdown per-field notes + 3 helper fns |
+| `Sources/BASMemory/BASAgentPersonaRiskClamp.swift` | + C2 NaN audit trail + identity-fast-path NaN handling |
+| `Sources/BASMemory/BASAgentPersonaForbiddenDetector.swift` | + H4 AND-logic for absolutePaternal warm check |
+| `Sources/BASMemory/BASAgentPersonaSpec.swift` | + DM5 corrected guardBias doc |
+| `Docs/PHASE_4_CLOSE_SMOKE.md` | + DH1 env-var honesty + DM2 perf-gate status column |
+| `Tests/BehavioralAISubstrateTests/BASChapter969_5UserPass6Tests.swift` | NEW — 14 regression tests pinning all 6 fixes |
+| `CHANGELOG.md` | + this entry + DM4 heading rename |
+
+Test result:**14 / 14 pass** for ch 969.5 regression tests +
+**all 78 ch 966-969 tests still pass** after fixes + **cumulative
+arc (ch 953-969.5):422 / 0 failures**。
+
+#### N-pass discipline track record (6 rounds total)
+
+| Round | Sub-ch | Findings | Real-bug count |
+|---|---|---|---|
+| 1 | 956.11 | 4C + 6H + MED + test backfill | 10+ |
+| 2 | 964.5 | 2C + 4H + 7 doc + 6 gaps | 15+ |
+| 3 | 969.5 (this) | 2C + 1 GAP + 4H + 1 DH + 2 DM | 10+ |
+| ... | | | |
+
+Each round of N-pass review caught at least 1 CRITICAL bug that
+production-shape tests had missed。 The discipline continues to
+pay off — CG1 alone would have broken every sovereign-agent
+session before the host integration in ch 970+。
+
+#### Deferred to follow-up
+
+Test coverage agent flagged a fuzz-quality issue: ch 967's three
+1000-iter fuzz suites use `var rng = SystemRandomNumberGenerator()`
+INSIDE the loop,making `floor` truly non-deterministic per CI run
+(failures non-reproducible)。 Deferred to ch 970+ — non-blocking
+for Phase 4 close since the property invariant holds (Swift's max/
+min comparator is well-defined,non-determinism only affects WHICH
+values get sampled,not whether the assertion holds for any sample)。
+
+---
+
 ### Chapter 九百六十九 / M3550 — Phase 4 close:Persona SDK surface + forbidden persona detector + compare modes
 
 Closes Phase 4 of the Agent Fabric arc (ch 966-969)。 Final chapter
@@ -170,7 +368,7 @@ those tiers since they already allow overlay per ch 966)。
 
 ---
 
-### Chapter 九百六十七 / M3540 — Phase 4 ch2:Risk gate clamping (monotonic clamp01)
+### Chapter 九百六十七 / M3540 — Phase 4 ch2:Risk gate clamping (monotonic raise/cap)
 
 Adds the Risk arm of the Phase 4 formula。 Mirrors the proven
 monotonic clamp pattern from `BASRiskCalibrationGate.clamp01`

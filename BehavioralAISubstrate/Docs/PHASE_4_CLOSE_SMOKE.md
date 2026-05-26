@@ -30,9 +30,34 @@ swift test --filter "BASChapter9[56][0-9]" 2>&1 | grep "Executed [0-9]"  # 0 fai
 
 ## Run (3 modes per ch 969 transcript modes)
 
-### Mode 1 — singleAgent baseline
+> **ch 969.5 USER-PASS-6 DH1 fix:** the `BAS_AGENT_FABRIC` /
+> `BAS_PERSONA_ENABLED` / `BAS_TRANSCRIPT_MODE` / `BAS_ACTIVE_AGENTS`
+> env vars are **NOT YET WIRED** into either `scripts/run-iphone-air-10hr.sh`
+> or the SDK (Phase 4 ships as a library — no env-var gate)。
+> They're documented here as the **planned operator interface**
+> for the iPhone Air smoke that operator runs MANUALLY after wiring
+> them in a separate ch 970+ host-app integration commit。 In the
+> current build the smoke runs by invoking
+> `BASAgentPersonaSDK.resolve(...)` directly from a test harness
+> the operator writes per-session。 Operator may either:
+>   1. **Run the existing ch 952.6 smoke wrapper to validate that
+>      Phase 4 ships zero regression** (the smoke wrapper exercises
+>      the substrate without persona by default — confirms baseline)
+>   2. **Wire the env-var gate** in a separate commit before running
+>      the 3-mode persona smoke below
+
+### Baseline run (Phase 4 ships zero regression)
 
 ```bash
+MAX_SEC=1800 \
+    BAS_DEVICE_LOG_DIR=/tmp/ch969-phase4-baseline \
+    bash scripts/run-iphone-air-10hr.sh
+```
+
+### Mode 1 — singleAgent (requires future env-var wiring)
+
+```bash
+# After wiring BAS_PERSONA_ENABLED + BAS_TRANSCRIPT_MODE in ch 970+:
 MAX_SEC=1800 \
     BAS_AGENT_FABRIC=enabled \
     BAS_PERSONA_ENABLED=true \
@@ -41,7 +66,7 @@ MAX_SEC=1800 \
     bash scripts/run-iphone-air-10hr.sh
 ```
 
-### Mode 2 — compareAll (all 9 core agents)
+### Mode 2 — compareAll (requires future env-var wiring)
 
 ```bash
 MAX_SEC=1800 \
@@ -52,7 +77,7 @@ MAX_SEC=1800 \
     bash scripts/run-iphone-air-10hr.sh
 ```
 
-### Mode 3 — compareSelected (5 active agents)
+### Mode 3 — compareSelected (requires future env-var wiring)
 
 ```bash
 MAX_SEC=1800 \
@@ -74,18 +99,25 @@ python3 scripts/analyze-ch952-trend.py /tmp/ch969-phase4-compare
 
 Pass criteria:
 
-| Metric | Pass threshold |
-|---|---|
-| Total failures | 0 |
-| Persona resolve P95 latency | ≤ 5ms |
-| Risk clamp P95 latency | ≤ 1ms |
-| Sovereign clamp P95 latency | ≤ 1ms |
-| Forbidden detector P95 latency | ≤ 0.5ms |
-| Phase 4 cumulative perf delta vs ch 952.6 baseline | ≤ +5% |
-| Forbidden pattern detection rate (in adversarial fuzz) | ≥ 95% (textbook patterns) |
-| Forbidden false-positive rate (clean mid-range personas) | 0% |
-| LOW-tier force-default rate (no warrant) | 100% |
-| Monotonic-raise preservation (risk floor) | 100% — zero lowering observed |
+| Metric | Pass threshold | Status |
+|---|---|---|
+| Total failures | 0 | active |
+| Phase 4 cumulative perf delta vs ch 952.6 baseline | ≤ +5% | active |
+| Forbidden pattern detection rate (in adversarial fuzz) | ≥ 95% (textbook patterns) | active (ch 969 in-process tests confirm 100%) |
+| Forbidden false-positive rate (clean mid-range personas) | 0% | active (ch 969 in-process tests confirm 0%) |
+| LOW-tier force-default rate (no warrant) | 100% | active (ch 968 in-process tests confirm 100% over 1000-iter fuzz) |
+| Monotonic-raise preservation (risk floor) | 100% — zero lowering observed | active (ch 967 in-process tests confirm 100% over 3×1000-iter fuzz) |
+| Persona resolve P95 latency | ≤ 5ms | **deferred — instrumentation lands ch 970+** |
+| Risk clamp P95 latency | ≤ 1ms | **deferred — instrumentation lands ch 970+** |
+| Sovereign clamp P95 latency | ≤ 1ms | **deferred — instrumentation lands ch 970+** |
+| Forbidden detector P95 latency | ≤ 0.5ms | **deferred — instrumentation lands ch 970+** |
+
+> **ch 969.5 USER-PASS-6 DM2 note:** the 4 perf-latency rows above
+> require timing instrumentation that the persona modules don't
+> yet emit。 They land in ch 970+ as part of the host-app
+> integration that wires the env vars。 The in-process unit tests
+> validate the CORRECTNESS gates immediately;the device-side
+> PERF gates land later。
 
 ## Phase 4 invariants checked per iteration
 
@@ -131,10 +163,18 @@ EVERY agent regardless of:
 
 ## Rollback (if needed)
 
-Phase 4 is fully ADR-014 OPT-IN — `BAS_PERSONA_ENABLED=false` reverts
-to pre-ch-966 behavior (seats use role-template defaults without
-overlay)。 If smoke catches a regression,disable the flag and the
-issue is contained to the persona layer。
+Phase 4 is fully ADR-014 OPT-IN — pre-Phase-4 callers (direct
+seat emission without invoking `BASAgentPersonaSDK`) are
+unaffected。 In the current build there is **no env-var gate**
+(the `BAS_PERSONA_ENABLED` flag is documented future-work per
+DH1 above)。 Rollback is achieved by not invoking the SDK from
+the host wiring,which is the current default (Phase 4 ships as
+library — host integration is ch 970+ work)。
+
+If a regression is caught in the SDK pipeline itself,revert the
+ch 966-969 batch via `git revert` on the 2 commits (`b8cba5c6`
++ `389ea283`) — pre-Phase-4 substrate behavior fully restored
+without any host-side code change。
 
 ## Phase 4 summary
 

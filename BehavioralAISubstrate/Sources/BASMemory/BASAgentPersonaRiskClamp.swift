@@ -169,9 +169,51 @@ public enum BASAgentPersonaRiskClamp {
         risk: BASAgentPersonaRiskContext
     ) -> (BASAgentPersonaSpec,
           BASAgentPersonaRiskClampOutcome) {
-        // Fast path:identity context skips all logic
+        // Fast path:identity context skips all CLAMP logic,
+        // but we still need to detect + normalize NaN biases per
+        // ch 969.5 USER-PASS-6 C2 fix (INV5 + INV8 joint
+        // invariant — NaN MUST NEVER escape AND every
+        // normalization MUST be auditable)。
         if risk == .identity {
-            return (persona, .none)
+            let nanFields = nanNotesFor(
+                directness: persona.directness,
+                skepticism: persona.skepticism,
+                creativity: persona.creativityBias,
+                challenge: persona.challengeIntensity,
+                comparison: persona.comparisonBias,
+                guardBias: persona.guardBias)
+            if nanFields.isEmpty {
+                return (persona, .none)
+            }
+            // NaN detected in identity context — normalize +
+            // emit audit notes
+            let normalized = BASAgentPersonaSpec(
+                personaID: persona.personaID,
+                agentID: persona.agentID,
+                tone: persona.tone,
+                warmth: persona.warmth,
+                directness: clamp01(persona.directness),
+                skepticism: clamp01(persona.skepticism),
+                structureBias: persona.structureBias,
+                creativityBias: clamp01(
+                    persona.creativityBias),
+                challengeIntensity: clamp01(
+                    persona.challengeIntensity),
+                comparisonBias: clamp01(
+                    persona.comparisonBias),
+                guardBias: clamp01(persona.guardBias),
+                visibility: persona.visibility,
+                hostConstraintsRef:
+                    persona.hostConstraintsRef,
+                riskConstraintsRef:
+                    persona.riskConstraintsRef,
+                sovereignConstraintsRef:
+                    persona.sovereignConstraintsRef,
+                versionRef: persona.versionRef)
+            return (normalized,
+                    BASAgentPersonaRiskClampOutcome(
+                        didClamp: true,
+                        auditNotes: nanFields.sorted()))
         }
 
         var notes: [String] = []
@@ -234,10 +276,30 @@ public enum BASAgentPersonaRiskClamp {
             creativity = risk.creativityCeiling
         }
 
+        // chapter 九百六十九.5 USER-PASS-6 C2 fix:NaN audit
+        // trail。 If any persona bias arrived as NaN,it bypasses
+        // the comparison-based raise/cap branches (NaN compares
+        // false in both directions) but the defensive clamp01
+        // below silently normalizes to 0.5 — leaving INV5 + INV8
+        // jointly violated (NaN escaped detection,no audit trail
+        // recorded the normalization)。 Now we explicitly check
+        // each bias for NaN BEFORE clamping and emit a
+        // `risk.nan-normalize.<field>:NaN→0.500` audit note,so
+        // trace replay can attribute the normalization to this
+        // step。
+        let nanFields = nanNotesFor(
+            directness: directness,
+            skepticism: skepticism,
+            creativity: creativity,
+            challenge: challenge,
+            comparison: comparison,
+            guardBias: guardBias)
+        notes.append(contentsOf: nanFields)
+
         let didClamp = !notes.isEmpty
         // Final defensive clamp01 in case caller passed floors/
         // ceilings outside [0,1] — per ch 956.11 CR1 fail-safe
-        // discipline + ch 966 NaN policy
+        // discipline + ch 966 NaN policy。
         let clamped = BASAgentPersonaSpec(
             personaID: persona.personaID,
             agentID: persona.agentID,
@@ -260,6 +322,29 @@ public enum BASAgentPersonaRiskClamp {
         return (clamped, BASAgentPersonaRiskClampOutcome(
             didClamp: didClamp,
             auditNotes: notes.sorted()))
+    }
+
+    /// chapter 九百六十九.5 USER-PASS-6 C2 fix helper。 Returns
+    /// audit notes for every NaN bias detected,empty when none。
+    /// Per INV5 + INV8 — every clamp/normalization MUST be
+    /// auditable for trace replay。
+    private static func nanNotesFor(
+        directness: Double, skepticism: Double,
+        creativity: Double, challenge: Double,
+        comparison: Double, guardBias: Double
+    ) -> [String] {
+        var out: [String] = []
+        func note(_ field: String) {
+            out.append(
+                "risk.nan-normalize.\(field):NaN→0.500")
+        }
+        if directness.isNaN { note("directness") }
+        if skepticism.isNaN { note("skepticism") }
+        if creativity.isNaN { note("creativity") }
+        if challenge.isNaN { note("challenge") }
+        if comparison.isNaN { note("comparison") }
+        if guardBias.isNaN { note("guard") }
+        return out
     }
 
     // MARK: - Helpers

@@ -99,8 +99,15 @@ public struct BASAgentPersonaSpec:
     public let comparisonBias: Double
 
     /// Guard bias ∈ [0.0, 1.0]。 Preference for guarding (caution,
-    /// caveat,deferral) vs go-for-it。 Risk + Sovereign clamps
-    /// can RAISE this but never lower it。
+    /// caveat,deferral) vs go-for-it。 Risk clamp RAISES this
+    /// (monotonic per ch 967)。 Sovereign clamp may force-default
+    /// to the LOW-tier role template,which by template design is
+    /// always ≥ 0.95 (see `BASAgentPersonaRoleTemplates`)。 So in
+    /// practice no lowering occurs,but the invariant is
+    /// "force-to-template",not strict "monotonic raise"。
+    /// chapter 九百六十九.5 USER-PASS-6 DM5 doc-fix:was
+    /// "Risk + Sovereign clamps can RAISE this but never lower it"
+    /// which over-stated the Sovereign clamp behavior。
     public let guardBias: Double
 
     // MARK: - Visibility + constraint refs

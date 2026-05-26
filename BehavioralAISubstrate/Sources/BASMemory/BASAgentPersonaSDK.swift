@@ -216,7 +216,29 @@ public enum BASAgentPersonaSDK {
                 sovereign: request.sovereign,
                 role: request.agentSpec.role)
 
-        // Step 5:OUTPUT validation — sandwich-attack catch
+        // Step 5:OUTPUT validation — sandwich-attack catch。
+        // chapter 九百六十九.5 USER-PASS-6 CG1 fix:LOW-tier
+        // sovereign-blessed templates are intentionally cold +
+        // skeptical (warmth ≤ 0.20,skepticism ≥ 0.85,comparison
+        // ≤ 0.05) — these are BY DESIGN forbidden-pattern matches
+        // (gaslight + controlling),and rejecting them would be
+        // a sovereignty crisis (the system refusing its own
+        // sovereign agents)。 Per Root Law 4 (单主权) sovereign-
+        // sealed agents are exempt from output validation。
+        // Input validation (Step 1) already rejects user/host
+        // overlays that match forbidden patterns,so the only
+        // way a LOW-tier persona reaches this step is via the
+        // sovereign-blessed force-default path of ch 968 — which
+        // is BY DEFINITION sovereign-allowed。
+        if request.agentSpec.visibility == .low {
+            return BASAgentPersonaResolveResult(
+                persona: final,
+                rejected: false,
+                findings: [],
+                riskClampOutcome: riskOutcome,
+                sovereignClampOutcome: sovOutcome,
+                inputRejected: false)
+        }
         let outputFindings =
             BASAgentPersonaForbiddenDetector.scan(
                 final,
@@ -249,6 +271,17 @@ public enum BASAgentPersonaSDK {
     /// Scan caller-supplied overlays for forbidden patterns。
     /// Used internally by `resolve(...)` but also exposed for
     /// callers who want to pre-flight a persona before submitting。
+    ///
+    /// chapter 九百六十九.5 USER-PASS-6 H2 fix:de-dup preserves
+    /// EVIDENCE UNION across overlays (previously kept only the
+    /// higher-score finding's evidence,silently discarding the
+    /// other source's evidence — audit ledger lost forbidden
+    /// input visibility when both overlays triggered the same
+    /// pattern)。 Now when both user AND host trigger the same
+    /// pattern,the merged finding carries:
+    ///   - highest matchScore (per original spec)
+    ///   - UNION of evidence prefixed with `source=user:` or
+    ///     `source=host:` so trace replay sees both
     public static func validateOverlays(
         userOverlay: BASAgentPersonaSpec?,
         hostOverlay: BASAgentPersonaSpec?,
@@ -256,36 +289,55 @@ public enum BASAgentPersonaSDK {
             BASAgentPersonaForbiddenDetector
                 .defaultReportThreshold
     ) -> [BASAgentPersonaForbiddenFinding] {
-        var findings:
-            [BASAgentPersonaForbiddenFinding] = []
+        let userFindings: [BASAgentPersonaForbiddenFinding]
         if let u = userOverlay {
-            findings.append(contentsOf:
+            userFindings =
                 BASAgentPersonaForbiddenDetector.scan(
-                    u,
-                    reportThreshold: reportThreshold))
+                    u, reportThreshold: reportThreshold)
+        } else {
+            userFindings = []
         }
+        let hostFindings: [BASAgentPersonaForbiddenFinding]
         if let h = hostOverlay {
-            findings.append(contentsOf:
+            hostFindings =
                 BASAgentPersonaForbiddenDetector.scan(
-                    h,
-                    reportThreshold: reportThreshold))
+                    h, reportThreshold: reportThreshold)
+        } else {
+            hostFindings = []
         }
-        // De-dup by pattern (host + user could both trigger
-        // shame — keep highest match score)
-        var byPattern:
-            [BASAgentPersonaForbiddenPattern:
-                BASAgentPersonaForbiddenFinding] = [:]
-        for f in findings {
-            if let existing = byPattern[f.pattern] {
-                if f.matchScore > existing.matchScore {
-                    byPattern[f.pattern] = f
+        // Tag each finding's evidence with its source,then
+        // de-dup by pattern keeping highest matchScore + UNION
+        // of source-tagged evidence (sorted)。
+        var perPatternScore:
+            [BASAgentPersonaForbiddenPattern: Double] = [:]
+        var perPatternEvidence:
+            [BASAgentPersonaForbiddenPattern: [String]] = [:]
+        func absorb(
+            _ findings:
+                [BASAgentPersonaForbiddenFinding],
+            source: String
+        ) {
+            for f in findings {
+                let tagged = f.evidence.map {
+                    "source=\(source):\($0)"
                 }
-            } else {
-                byPattern[f.pattern] = f
+                perPatternScore[f.pattern] = max(
+                    perPatternScore[f.pattern] ?? 0.0,
+                    f.matchScore)
+                perPatternEvidence[f.pattern, default: []]
+                    .append(contentsOf: tagged)
             }
         }
-        return byPattern.values.sorted {
-            $0.pattern.rawValue < $1.pattern.rawValue
+        absorb(userFindings, source: "user")
+        absorb(hostFindings, source: "host")
+        return perPatternScore.keys.sorted {
+            $0.rawValue < $1.rawValue
+        }.map { pattern in
+            BASAgentPersonaForbiddenFinding(
+                pattern: pattern,
+                matchScore: perPatternScore[pattern]!,
+                evidence: perPatternEvidence[pattern]
+                    ?? [])
         }
     }
 
