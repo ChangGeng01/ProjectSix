@@ -119,18 +119,29 @@ public enum BASSovereignWarrantValidator {
     /// Validate a warrant chain for a specific external agent
     /// at a specific turn time。 Pure function。
     ///
-    /// Rules (all 4 must pass for valid==true):
+    /// Rules (all 5 must pass for valid==true):
     ///   1. `hostRootWarrantID` non-empty
     ///   2. `perAgentWarrantID` non-empty
     ///   3. `externalAgentID` matches the supplied ref's ID
     ///      (identity match)
-    ///   4. `expiresAtNanos` > `nowNanos` (not expired)
+    ///   4. `expiresAtNanos` > 0 (not corrupted — ch 981.8
+    ///      MED-corruption fix)
+    ///   5. `expiresAtNanos` > `nowNanos` (not expired) — only
+    ///      checked when `nowNanos > 0`
     ///
-    /// Any failure emits a structured audit ref with the
-    /// reserved `agentExternal.warrant:rejected:<reason>`
-    /// prefix。 Success emits
-    /// `agentExternal.warrant:granted:<chainID>` for the
-    /// audit ledger。
+    /// chapter 九百八十一.8 USER-PASS-9 HIGH-4 + DH1 fix:
+    /// audit ref format normalized to `<status>:<detail>`。
+    /// Previously emitted TWO refs on grant (`granted:<id>`
+    /// + `per-agent:<id>`),the second breaking the documented
+    /// format (per-agent is a stage marker,not a status)。
+    /// Now emits a SINGLE granted ref with combined detail:
+    /// `agentExternal.warrant:granted:host-root=<id>:per-agent=<id>`。
+    ///
+    /// chapter 九百八十一.8 USER-PASS-9 MED-corruption fix:
+    /// added Rule 4 explicit check that `expiresAtNanos > 0`
+    /// — defends against corrupted snapshots that bypass
+    /// expiration check when `nowNanos == 0` (caller skips
+    /// age check)。
     public static func validate(
         chain: BASSovereignWarrantChain,
         forExternalAgentID externalID: String,
@@ -168,7 +179,21 @@ public enum BASSovereignWarrantValidator {
                 valid: false, auditRefs: refs)
         }
 
-        // Rule 4: not expired
+        // Rule 4 (ch 981.8 USER-PASS-9 MED-corruption fix):
+        // explicit corruption check。 expiresAtNanos == 0 is
+        // either uninitialized or zeroed,both indicate
+        // corruption。 This check runs BEFORE the age check
+        // so that even when nowNanos = 0 (caller skips age
+        // check) we still catch corruption。
+        if chain.expiresAtNanos == 0 {
+            refs.append(
+                "agentExternal.warrant:rejected:" +
+                "corrupted-expires-at-zero")
+            return BASWarrantValidationResult(
+                valid: false, auditRefs: refs)
+        }
+
+        // Rule 5: not expired
         if nowNanos > 0 &&
            chain.expiresAtNanos <= nowNanos
         {
@@ -180,13 +205,13 @@ public enum BASSovereignWarrantValidator {
                 valid: false, auditRefs: refs)
         }
 
-        // Granted
+        // Granted — emit SINGLE audit ref matching the
+        // documented <status>:<detail> format。 host-root +
+        // per-agent both encoded into the detail part。
         refs.append(
             "agentExternal.warrant:granted:" +
-            "\(chain.hostRootWarrantID)")
-        refs.append(
-            "agentExternal.warrant:per-agent:" +
-            "\(chain.perAgentWarrantID)")
+            "host-root=\(chain.hostRootWarrantID):" +
+            "per-agent=\(chain.perAgentWarrantID)")
         return BASWarrantValidationResult(
             valid: true, auditRefs: refs)
     }
@@ -224,10 +249,16 @@ public extension BASExternalAgentGateway {
         let baseTier = effectiveTier(for: ref)
 
         // Step 2:if no warrant or declared tier is not
-        // .collaborator,just use base tier
-        guard let chain = warrantChain,
-              ref.sandboxTier == .collaborator
-        else {
+        // .collaborator,just use base tier。
+        //
+        // chapter 九百八十一.8 USER-PASS-9 HIGH-3 fix:audit
+        // ref now distinguishes between "no warrant supplied"
+        // and "warrant supplied but tier is not collaborator
+        // so no warrant needed"。 Previously both paths emitted
+        // `none-supplied` which lied to the L14 ledger when a
+        // warrant WAS supplied alongside a non-collaborator
+        // tier。
+        if warrantChain == nil {
             return (baseTier,
                 BASWarrantValidationResult(
                     valid: false,
@@ -235,6 +266,17 @@ public extension BASExternalAgentGateway {
                         "agentExternal.warrant:none-supplied",
                     ]))
         }
+        if ref.sandboxTier != .collaborator {
+            return (baseTier,
+                BASWarrantValidationResult(
+                    valid: false,
+                    auditRefs: [
+                        "agentExternal.warrant:" +
+                        "not-applicable:tier=" +
+                        "\(ref.sandboxTier.rawValue)",
+                    ]))
+        }
+        let chain = warrantChain!
 
         // Step 3:validate the warrant chain
         let result =

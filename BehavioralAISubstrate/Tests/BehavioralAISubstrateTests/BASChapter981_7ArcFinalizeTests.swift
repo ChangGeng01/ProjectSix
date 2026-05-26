@@ -394,11 +394,16 @@ final class BASChapter981_7ArcFinalizeTests: XCTestCase {
         XCTAssertEqual(tier, .advisor,
             "ch 981.7 Item 5: declared .advisor tier " +
             "unchanged by warrant supply (no escalation)")
-        // Warrant validation path NOT taken since base tier
-        // is already what was declared
+        // ch 981.8 USER-PASS-9 HIGH-3 fix:audit now
+        // distinguishes between "no warrant supplied" and
+        // "warrant supplied but tier is not collaborator"。
+        // Previously both emitted "none-supplied" which lied
+        // when warrant WAS supplied alongside .advisor。
         XCTAssertTrue(result.auditRefs.contains { ref in
-            ref.contains("none-supplied")
-        })
+            ref.contains("not-applicable:tier=advisor")
+        }, "ch 981.8 HIGH-3: when warrant IS supplied but " +
+           "tier is not collaborator,audit MUST emit " +
+           "'not-applicable:tier=<tier>' not 'none-supplied'")
     }
 
     func testWarrantChain_CodableRoundTrip() throws {

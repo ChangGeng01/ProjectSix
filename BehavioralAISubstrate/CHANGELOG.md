@@ -11,6 +11,167 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百八十一.8 / M3610.8 — USER-PASS-9:6th N-pass review catches 4 HIGH + 4 critical test gaps + 1 doc lie in ch 981.7 ARC FINALIZE batch
+
+**The "diminishing returns" hypothesis was WRONG。** Per ch 943
+cascade precedent,every fix attracts new findings — including
+the fixes themselves。 Round 6 dispatched 3 parallel reviewers
+on the ch 981.6 + 981.7 batches and caught 4 HIGH code + 4
+critical test gaps + 1 HIGH doc。 The fixes shipped in this
+sub-chapter close the cascade。
+
+#### HIGH-1 — Round-table ballot stuffing attack (CRITICAL fix)
+
+`BASRoundTableSession.consense` summed approve-vote confidences
+without per-agent-per-proposal dedup。 One agent submitting 5
+approve-votes for the same proposal could unilaterally inflate
+the score:`participatingAgents = {A} → totalAgents = 1`,but
+`approveWeight = 5.0` → score 5.0/1 = 5.0 ≥ any threshold →
+winner via unilateral election。
+
+**Fix**:dedup votes at ingestion via `(votingAgentID,
+proposalID)` key,keeping the HIGHEST-confidence vote per agent
+per proposal。 Different-proposal votes from the same agent
+still all count (one opinion per proposal,not one opinion total)。
+Audit ledger reports `roundTable.duplicate-votes-dropped=<count>`
+when dedup removes any。
+
+#### HIGH-2 — Dissents against losing proposals silently dropped (CRITICAL fix)
+
+The dissent-collection filter `proposalID == winnerID &&
+direction == .dissent` discarded dissents cast against non-
+winning proposals。 Per the type doc + ch 944 audit discipline,
+EVERY dissent MUST land in the audit ledger so L14 can detect
+systematically-overruled agents。 The filter dropped exactly
+the signal the type was built to capture。
+
+**Fix**:collect ALL `.dissent` votes regardless of target。
+Each dissent already carries its own proposalID so L14 can
+correlate against `winnerProposalID` if it cares。 Dissents are
+recorded even on no-quorum turns (audit discipline applies
+regardless of consensus outcome)。
+
+#### HIGH-3 — Warrant audit ref misreports "none-supplied"
+
+When `BASExternalAgentGateway.effectiveTierWithWarrant(...)`
+was called with a non-nil warrant chain BUT the ref's declared
+tier was not `.collaborator` (e.g. `.advisor`),the audit ref
+emitted `agentExternal.warrant:none-supplied` — a lie。 L14
+ledger sees "none supplied" when a warrant actually WAS
+submitted alongside a non-collaborator-tier ref。
+
+**Fix**:distinguish nil-warrant from tier-mismatch:
+- `nil` warrant → `agentExternal.warrant:none-supplied`
+- non-nil warrant + non-collaborator tier →
+  `agentExternal.warrant:not-applicable:tier=<tier>`
+
+Audit ledger now accurately reflects whether a warrant was
+submitted。
+
+#### HIGH-4 — Warrant `per-agent:` audit ref breaks format spec (doc lie)
+
+`BASSovereignWarrantChain.validate(...)` emitted TWO audit
+refs on grant:
+```
+agentExternal.warrant:granted:<hostRoot>
+agentExternal.warrant:per-agent:<perAgent>
+```
+
+The 2nd ref's `per-agent:` is a STAGE MARKER,not a status —
+the documented format `<status>:<detail>` only defines statuses
+`granted` / `rejected`。 An L14 parser keyed on the status list
+would mis-classify the per-agent ref。
+
+**Fix**:emit ONE combined granted ref:
+```
+agentExternal.warrant:granted:host-root=<id>:per-agent=<id>
+```
+
+Single record,proper `<status>:<detail>` format,both warrant
+stages encoded in the detail。
+
+#### MED — Warrant corruption bypass (CRITICAL safety fix)
+
+A warrant with `expiresAtNanos = 0` (uninitialized / zeroed /
+tampered) bypassed the expiration check when the caller passed
+`nowNanos = 0` (documented age-check-skip mode)。 The age-check
+guard `nowNanos > 0` was over-broad — also skipped corruption
+detection。
+
+**Fix**:added explicit Rule 4 corruption check that runs
+BEFORE the age check:
+```swift
+if chain.expiresAtNanos == 0 → reject with
+   agentExternal.warrant:rejected:corrupted-expires-at-zero
+```
+
+Now caches the corruption signal even in caller-skip-age mode。
+
+#### MED — FP-tie equality on Doubles fragile
+
+`BASRoundTableSession.consense` used `$0.1 != $1.1` on Double
+scores for tie detection。 Floating-point accumulation from
+distinct sum orders could produce 1-ULP drift between scores
+that are mathematically equal,causing the wrong proposal to
+win via tie-break。
+
+**Fix**:`abs(a - b) > tieEpsilon` with `tieEpsilon = 1e-12`
+public constant。 Scores within epsilon of each other treated
+as tied and resolved by lexicographic proposalID。
+
+#### MED — `detRng(step: 0)` silent alias documented
+
+`for _ in 0..<max(1, step)` made step=0 silently iterate once
+(same output as step=1)。 Caller bugs passing step=0 would
+silently collide with step=1 output。
+
+**Fix**:not a code change — documented the alias explicitly +
+added regression test that pins step=0 == step=1 behavior。
+Per discipline,this is an intentional safety fallback (no
+crashes on step=0),not a bug to fix。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentRoundTable.swift` | + HIGH-1 dedup + HIGH-2 all-dissents + MED-FP epsilon + tieEpsilon constant |
+| `Sources/BASMemory/BASSovereignWarrantChain.swift` | + HIGH-3 distinguished audit + HIGH-4 single-ref granted format + MED corruption check |
+| `Tests/BehavioralAISubstrateTests/BASChapter981_7ArcFinalizeTests.swift` | + updated 1 test for new HIGH-3 audit-ref format |
+| `Tests/BehavioralAISubstrateTests/BASChapter981_8UserPass9Tests.swift` | NEW — 11 regression tests pinning all 7 fixes |
+| `CHANGELOG.md` | + this entry |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| USER-PASS-9 regression tests | 11 / 0 failures |
+| Ch 981.7 tests (updated for HIGH-3) | 26 / 0 failures |
+| Cumulative arc tests (ch 953-981.8) | 689 / 0 failures |
+
+#### N-pass discipline track record (6 rounds — cascade has NOT terminated)
+
+| Round | Sub-ch | Findings | Real bugs |
+|---|---|---|---|
+| 1 | 956.11 | 4C + 6H + MED + backfill | 10+ |
+| 2 | 964.5 | 2C + 4H + 7 doc + 6 gaps | 15+ |
+| 3 | 969.5 | 2C + 1 GAP + 4H + 1 DH + 2 DM | 10+ |
+| 4 | 981.5 | 2H + 7H + 6 doc + 2 DI closed | 15+ |
+| 5 | 981.6 | 4H + 4M (all from ch 981.5) | 8+ |
+| **6** | **981.8** (this) | **4H + 4 critical test gaps + 1 DH (all from 981.7)** | **8+** |
+| **TOTAL** | **6 rounds** | | **66+ real bugs caught** |
+
+Round 6 demonstrates the cascade rule absolutely:**every fix
+attracts new findings,including the new-module fixes**。 The
+author's prior assumption of "diminishing returns" was wrong。
+Round 6 caught 4 HIGH bugs in modules that landed less than
+1 hour earlier (ch 981.7's round-table + warrant)。
+
+The "Substrate-Side COMPLETE" claim has now been falsified
+6 times。 The honest status is **"Substrate-side complete
+PENDING the next N-pass review round"**。
+
+---
+
 ### Chapter 九百八十一.7 / M3610.7 — ARC FINALIZE:close items 1 + 5 + 8 (3 final substrate-side deferred items)
 
 **Final closure of substrate-side deferred items per

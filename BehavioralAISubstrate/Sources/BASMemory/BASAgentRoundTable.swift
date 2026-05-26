@@ -231,28 +231,79 @@ public struct BASRoundTableDissent:
 
 public enum BASRoundTableSession {
 
+    /// FP-equality epsilon for tie-detection on proposal
+    /// scores。 Per ch 981.8 USER-PASS-9 MED-FP-tie fix:
+    /// using strict `!=` on Doubles was fragile when scores
+    /// derive from accumulated confidence sums (FP error can
+    /// produce 1-ULP drift between bit-identical-by-math
+    /// values)。
+    public static let tieEpsilon: Double = 1e-12
+
     /// Compute consensus from a quorum state。 Pure function。
     ///
-    /// Algorithm:
-    ///   1. Group votes by proposalID
-    ///   2. For each proposal,compute approve-weight as
-    ///      sum of approve-vote confidences,divided by total
-    ///      participating-agent count (number of distinct
-    ///      voting agent IDs across all votes)
-    ///   3. Highest-score proposal wins IFF its score ≥
-    ///      quorumThreshold
-    ///   4. Dissent records = all `.dissent` votes against
-    ///      the winning proposal
+    /// chapter 九百八十一.8 USER-PASS-9 algorithm fix:
+    /// addresses 2 HIGH bugs from round 6 review:
     ///
-    /// Per ch 981.6 USER-PASS-8 discipline,this is a fresh
-    /// module so no prior bugs to inherit — but we use the
-    /// same deterministic + auto-sort pattern。
+    ///   HIGH-1 BALLOT STUFFING — previously summed vote
+    ///   confidences without per-agent-per-proposal dedup,
+    ///   letting one agent submit multiple approve votes for
+    ///   the same proposal to unilaterally inflate score。
+    ///   Fix:dedupe at vote-ingestion via (agentID,
+    ///   proposalID) key,keeping only the HIGHEST-confidence
+    ///   vote per agent per proposal (matches typical voting
+    ///   systems where each voter casts one ballot per
+    ///   choice)。
+    ///
+    ///   HIGH-2 DROPPED DISSENTS — previously the dissent
+    ///   collection filtered `.proposalID == winnerID` so
+    ///   dissents against LOSING proposals were silently
+    ///   discarded。 Per the type doc + ch 944 audit
+    ///   discipline,every dissent MUST land in the audit
+    ///   ledger so L14 can detect systematically-overruled
+    ///   agents。 Fix:collect ALL `.dissent` votes,not just
+    ///   winner-targeted ones (each dissent carries its own
+    ///   proposalID so L14 can correlate)。
+    ///
+    /// Algorithm:
+    ///   1. **Dedup votes by (agentID, proposalID)** — keep
+    ///      highest-confidence vote per agent per proposal
+    ///   2. Group approve votes by proposalID,sum confidences
+    ///   3. For each proposal,score = sum / total participants
+    ///   4. Highest score IFF ≥ threshold → winner
+    ///      (lex tie-break by proposalID,using `tieEpsilon`
+    ///      for FP-equality)
+    ///   5. Dissent records = ALL `.dissent` votes (not just
+    ///      winner-targeted)
     public static func consense(
         _ quorum: BASRoundTableQuorum
     ) -> BASRoundTableConsensus {
-        // Count distinct participating agent IDs across all votes
+        // HIGH-1 FIX:dedup votes by (agentID, proposalID)
+        // keeping only highest-confidence per pair。 If same
+        // agent voted N times for the same proposal,only the
+        // most-confident vote counts。 Different-proposal
+        // votes from same agent still all count (an agent
+        // CAN have an opinion on each proposal,but only
+        // ONE opinion per proposal)。
+        var dedupedVotes:
+            [String: BASRoundTableVote] = [:]
+        for vote in quorum.votes {
+            let key =
+                "\(vote.votingAgentID)|\(vote.proposalID)"
+            if let existing = dedupedVotes[key] {
+                if vote.confidence > existing.confidence {
+                    dedupedVotes[key] = vote
+                }
+            } else {
+                dedupedVotes[key] = vote
+            }
+        }
+        let dedupedList =
+            Array(dedupedVotes.values)
+
+        // Count distinct participating agent IDs (from the
+        // deduped pool)
         let participatingAgents = Set(
-            quorum.votes.map { $0.votingAgentID })
+            dedupedList.map { $0.votingAgentID })
         let totalAgents = participatingAgents.count
         if totalAgents == 0 {
             return BASRoundTableConsensus(
@@ -267,9 +318,10 @@ public enum BASRoundTableSession {
                     "roundTable.votes=0",
                 ])
         }
+
         // Group approve votes by proposalID + sum confidences
         var approveWeight: [String: Double] = [:]
-        for vote in quorum.votes
+        for vote in dedupedList
             where vote.direction == .approve
         {
             approveWeight[vote.proposalID, default: 0.0]
@@ -284,39 +336,54 @@ public enum BASRoundTableSession {
             proposalScores.append(
                 (proposal.proposalID, score))
         }
-        // Sort by descending score then by proposalID
-        // (deterministic tie-break)
+        // MED-FP-tie fix:use epsilon-based equality for
+        // tie detection instead of strict !=。 Bitwise-equal
+        // scores via different summation orders could differ
+        // by 1-ULP in pathological cases。
         proposalScores.sort {
-            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            if abs($0.1 - $1.1) > tieEpsilon {
+                return $0.1 > $1.1
+            }
             return $0.0 < $1.0
         }
         let topProposalID = proposalScores.first?.0
         let topScore = proposalScores.first?.1 ?? 0.0
 
+        // HIGH-2 FIX:collect ALL dissents,not just winner-
+        // targeted。 Each dissent already carries its own
+        // proposalID — L14 can correlate against winner if
+        // it cares,but the audit ledger sees every dissent。
+        let allDissents = dedupedList
+            .filter { $0.direction == .dissent }
+            .map { vote in
+                BASRoundTableDissent(
+                    dissentingAgentID:
+                        vote.votingAgentID,
+                    proposalID: vote.proposalID,
+                    reason: vote.reason,
+                    confidence: vote.confidence)
+            }
+
+        // Dedup-audit:report how many votes were dropped by
+        // the ballot-stuffing dedup (audit-trail visibility)
+        let droppedDupCount =
+            quorum.votes.count - dedupedList.count
+
         var notes: [String] = [
             "roundTable.proposals=" +
                 "\(quorum.proposals.count)",
-            "roundTable.votes=\(quorum.votes.count)",
+            "roundTable.votes=\(dedupedList.count)",
             "roundTable.participants=\(totalAgents)",
         ]
+        if droppedDupCount > 0 {
+            notes.append(
+                "roundTable.duplicate-votes-dropped=" +
+                "\(droppedDupCount)")
+        }
         // Threshold check
         if topScore >= quorum.quorumThreshold,
            let winnerID = topProposalID
         {
-            // Collect dissents against the winner
-            let dissents = quorum.votes
-                .filter {
-                    $0.proposalID == winnerID &&
-                    $0.direction == .dissent
-                }
-                .map { vote in
-                    BASRoundTableDissent(
-                        dissentingAgentID:
-                            vote.votingAgentID,
-                        proposalID: vote.proposalID,
-                        reason: vote.reason,
-                        confidence: vote.confidence)
-                }
             notes.append(
                 "roundTable.winner=\(winnerID)")
             notes.append(
@@ -324,15 +391,17 @@ public enum BASRoundTableSession {
                 String(format: "%.3f", topScore))
             notes.append(
                 "roundTable.dissent.count=" +
-                "\(dissents.count)")
+                "\(allDissents.count)")
             return BASRoundTableConsensus(
                 turnID: quorum.turnID,
                 winnerProposalID: winnerID,
                 winnerScore: topScore,
-                dissents: dissents,
+                dissents: allDissents,
                 auditNotes: notes)
         } else {
-            // No quorum
+            // No quorum — but STILL record all dissents
+            // (HIGH-2 fix:audit captures dissents regardless
+            // of consensus outcome)
             notes.append("roundTable.no-quorum")
             notes.append(
                 "roundTable.top-score=" +
@@ -341,11 +410,14 @@ public enum BASRoundTableSession {
                 "roundTable.threshold=" +
                 String(format: "%.3f",
                     quorum.quorumThreshold))
+            notes.append(
+                "roundTable.dissent.count=" +
+                "\(allDissents.count)")
             return BASRoundTableConsensus(
                 turnID: quorum.turnID,
                 winnerProposalID: nil,
                 winnerScore: topScore,
-                dissents: [],
+                dissents: allDissents,
                 auditNotes: notes)
         }
     }
