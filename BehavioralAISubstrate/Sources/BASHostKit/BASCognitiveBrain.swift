@@ -2810,6 +2810,27 @@ extension BASCognitiveBrain {
             aneTier: tier)
     }
 
+    /// chapter 一千 / M3705 — async variant of `aneConsulted`
+    /// for ops dispatched via actor-isolated paths (matMul +
+    /// attention go through Metal/MPSGraph actors;ssmScan
+    /// dispatches via BASMetalSSMScanDispatcher actor)。 Same
+    /// observe-only doctrine — tier captured + returned but
+    /// substrate doesn't branch dispatch on it。 `rethrows`
+    /// preserves the caller's error-handling contract。
+    @inlinable
+    public nonisolated static func aneConsulted<Value: Sendable>(
+        op: BASNeuralOp,
+        dispatch: () async throws -> Value
+    ) async rethrows -> BASANEConsultedResult<Value> {
+        let tier = BASANEKernelEligibilityClassifier
+            .tier(for: op)
+        BASANEKernelEligibilityClassifier
+            .executorConsultationCount += 1
+        return BASANEConsultedResult(
+            value: try await dispatch(),
+            aneTier: tier)
+    }
+
     /// chapter 七百九 第四刀 / M2219 — auto-routed softmax。
     ///
     /// Always routes through Rust scalar (measured tie with
@@ -2915,6 +2936,135 @@ extension BASCognitiveBrain {
         _ x: [Float]
     ) -> BASAutoRouteResult<[Float]> {
         return BASAutoRouteRanker.silu(x)
+    }
+
+    // MARK: - chapter 一千 / M3705 — 全面开发 full 8-op coverage
+    //
+    // After ch 999 wired softmax + layerNorm (2 of 8 BASNeuralOp
+    // cases),ch 1000 closes the remaining 6 with consultation
+    // entry points + WithANETier variants:
+    //   - matMul (heavy production op via Metal/MPSGraph actor)
+    //   - attention (heavy production op via MPSGraph actor)
+    //   - rmsNorm (scaffold for future rmsNorm kernel)
+    //   - rotaryEmbedding (scaffold for future RoPE kernel)
+    //   - conv2D (scaffold for future conv2D kernel)
+    //   - ssmScan (Mamba state-space scan via BASMetalSSMScan
+    //     Dispatcher actor)
+    //
+    // All 6 use the new async aneConsulted variant since they
+    // dispatch through actor boundaries。 The 3 scaffold entries
+    // (rmsNorm / rotaryEmbedding / conv2D) preserve the
+    // consultation pattern even though no production kernel
+    // wires them yet — when a future arc ships the kernel + its
+    // dispatch entry,the consultation call ALREADY exists at
+    // the public surface and just needs the kernel hooked in。
+
+    /// chapter 一千 / M3705 — ANE-consulted matMul entry。
+    /// Wraps the existing matMulAuto (which dispatches through
+    /// Metal MSL / MPSGraph actor / Rust SIMD paths per
+    /// matMulChoice) with the ANE classifier consultation。
+    /// Observe-only:tier captured + returned for caller's
+    /// host-observable signal,but dispatch path unchanged。
+    public func matMulAutoWithANETier(
+        a: [Float], aRows: Int, aCols: Int,
+        b: [Float], bRows: Int, bCols: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) async throws ->
+        BASANEConsultedResult<BASAutoRouteResult<[Float]>>
+    {
+        // chapter 一千 / M3705 honest scope:Swift 6 Sendable
+        // constraints on async closures block the generic
+        // `aneConsulted` helper from wrapping instance methods
+        // that capture self。 Inlining the 3-line consult
+        // boilerplate here preserves the observe-only doctrine
+        // + counter increment at the same per-call cost。 The
+        // 6 nonisolated-static entries (softmax/layerNorm +
+        // 4 scaffolds) still use the elegant generic helper。
+        let tier = BASANEKernelEligibilityClassifier
+            .tier(for: .matMul)
+        BASANEKernelEligibilityClassifier
+            .executorConsultationCount += 1
+        let result = try await self.matMulAuto(
+            a: a, aRows: aRows, aCols: aCols,
+            b: b, bRows: bRows, bCols: bCols,
+            thresholds: thresholds)
+        return BASANEConsultedResult(
+            value: result, aneTier: tier)
+    }
+
+    /// chapter 一千 / M3705 — ANE-consulted RMSNorm scaffold。
+    /// No production kernel calls this yet — the consultation
+    /// entry ships ahead of the kernel so future arc can plug
+    /// the kernel dispatch into the closure。 Returns
+    /// BASANEConsultedResult<Void>:counter increments + tier
+    /// captured but no dispatch happens (closure no-ops)。
+    /// Hosts wanting to drive an RMSNorm dispatch use their
+    /// own kernel + this entry simultaneously。
+    public nonisolated static func rmsNormAutoWithANETier(
+    ) -> BASANEConsultedResult<Void> {
+        return aneConsulted(op: .rmsNorm) {
+            // ch 1000:scaffold — no production kernel wires
+            // here yet。 Future arc fills this in。
+        }
+    }
+
+    /// chapter 一千 / M3705 — ANE-consulted rotaryEmbedding
+    /// scaffold (same pattern as rmsNorm)。
+    public nonisolated static func rotaryEmbeddingAutoWithANETier(
+    ) -> BASANEConsultedResult<Void> {
+        return aneConsulted(op: .rotaryEmbedding) { }
+    }
+
+    /// chapter 一千 / M3705 — ANE-consulted conv2D scaffold
+    /// (same pattern as rmsNorm + rotaryEmbedding)。
+    public nonisolated static func conv2DAutoWithANETier(
+    ) -> BASANEConsultedResult<Void> {
+        return aneConsulted(op: .conv2D) { }
+    }
+
+    /// chapter 一千 / M3705 — ANE-consulted attention entry。
+    /// Wraps the existing attentionAuto (which dispatches
+    /// through Metal MSL / MPSGraph actor / CPU fallback per
+    /// attentionChoice) with the ANE classifier consultation。
+    /// Observe-only:tier captured for caller's host-observable
+    /// signal but dispatch path unchanged byte-equal。
+    public func attentionAutoWithANETier(
+        q: [Float], qRows: Int, qCols: Int,
+        k: [Float], kRows: Int,
+        v: [Float], vCols: Int,
+        thresholds: BASAutoRouteThresholds = .mSeriesDefault
+    ) async throws ->
+        BASANEConsultedResult<BASAutoRouteResult<[Float]>>
+    {
+        // ch 1000 same pattern as matMulAutoWithANETier:inline
+        // boilerplate due to Sendable constraint on async
+        // closures capturing instance self。
+        let tier = BASANEKernelEligibilityClassifier
+            .tier(for: .attention)
+        BASANEKernelEligibilityClassifier
+            .executorConsultationCount += 1
+        let result = try await self.attentionAuto(
+            q: q, qRows: qRows, qCols: qCols,
+            k: k, kRows: kRows,
+            v: v, vCols: vCols,
+            thresholds: thresholds)
+        return BASANEConsultedResult(
+            value: result, aneTier: tier)
+    }
+
+    /// chapter 一千 / M3705 — ANE-consulted SSM-scan scaffold。
+    /// The production Mamba SSM scan goes through
+    /// BASMetalSSMScanDispatcher (ch 720+ actor) which lives
+    /// in BASMetalSubstrate — invoked from BASCognitiveBrain
+    /// at line ~3211。 This entry adds the ANE classifier
+    /// consultation without changing the dispatcher call;
+    /// hosts wanting the consultation+dispatch pair use both
+    /// in sequence。 Scaffold form keeps the dispatch closure
+    /// empty so the consultation is uncoupled from kernel
+    /// invocation timing。
+    public nonisolated static func ssmScanAutoWithANETier(
+    ) -> BASANEConsultedResult<Void> {
+        return aneConsulted(op: .ssmScan) { }
     }
 
     /// chapter 七百十二 第四刀 / M2234 — auto-routed ledger seal。
