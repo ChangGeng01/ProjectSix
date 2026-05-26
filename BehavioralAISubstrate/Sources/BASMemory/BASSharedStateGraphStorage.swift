@@ -93,4 +93,29 @@ public protocol BASSharedStateGraphStorage: Sendable {
     /// time to rebuild the `domainWriters` dict。
     func loadAllWriters(
     ) async throws -> [(domain: BASStateDomain, agentID: String)]
+
+    /// chapter 九百九十六.9 META-REVIEW Round-17 CRITICAL-1 fix:
+    /// remove a writer registration so the domain becomes
+    /// available for re-binding。 Idempotent — deleting a domain
+    /// that has no writer is a no-op (NOT an error)。 Pre-fix
+    /// there was no tear-down path → `BASAgentRegistry
+    /// .unregister(agentID:)` removed the registry-side entry
+    /// but graph kept the stale claim → subsequent re-bind
+    /// failed with domainAlreadyClaimed against the dead agent。
+    ///
+    /// Default implementation (extension below) is a no-op so
+    /// existing storage adapters don't need to implement this
+    /// immediately;they CAN override for full persistence support。
+    func deleteWriter(
+        domain: BASStateDomain) async throws
+}
+
+/// chapter 九百九十六.9 Round-17 CRITICAL-1 default:no-op for
+/// in-memory / non-persistent storage adapters。 SQLite-backed
+/// adapters MUST override to actually delete the row。
+public extension BASSharedStateGraphStorage {
+    func deleteWriter(
+        domain: BASStateDomain) async throws {
+        // Default no-op — adapter that needs persistence overrides
+    }
 }

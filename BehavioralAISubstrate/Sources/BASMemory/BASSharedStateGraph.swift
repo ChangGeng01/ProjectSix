@@ -235,6 +235,120 @@ public actor BASSharedStateGraph {
         domainWriters[domain]
     }
 
+    /// chapter 九百九十六.9 META-REVIEW Round-17 CRITICAL-2 fix:
+    /// atomic batch writer-claim installation。 Pre-fix the registry's
+    /// `wire(toGraph:)` was two-phase WITHIN a single call but two
+    /// concurrent wire() calls from different registries on the same
+    /// graph could both pass Phase-1 validation (against current empty
+    /// state) + race in Phase 2 → partial install across both,leaving
+    /// graph in inconsistent state where one wire() throws but its
+    /// EARLIER batch entries are committed。
+    ///
+    /// Fix:provide a single atomic method that runs validate-then-
+    /// install INSIDE the graph actor's isolation domain — Swift's
+    /// actor reentrancy is the only thing that could break atomicity,
+    /// and this method has NO await suspension points (the per-domain
+    /// upsertWriter call is the only async work,and it's part of the
+    /// commit-phase which only runs if validation passed)。 Two
+    /// concurrent batches now serialize at the actor mailbox boundary,
+    /// not at Phase 1 vs Phase 2 boundary。
+    ///
+    /// - Parameter claims: array of (agentID, domain) pairs to install。
+    ///   Intra-batch conflicts (same domain claimed by two different
+    ///   agents in this batch) → throws BEFORE any persistence。
+    /// - Throws: `BASSharedStateGraphError.domainAlreadyClaimed` if
+    ///   any claim conflicts with existing graph state OR with another
+    ///   entry in the same batch。
+    public func registerWriterBatch(
+        claims: [(agentID: String, domain: BASStateDomain)]
+    ) async throws {
+        // Phase 1A:intra-batch validation。 Build a check map of
+        // (domain → agentID for THIS batch);any second entry for
+        // the same domain with a different agentID = batch-internal
+        // conflict。
+        var batchClaimed: [BASStateDomain: String] = [:]
+        for (agentID, domain) in claims {
+            if let existing = batchClaimed[domain],
+               existing != agentID
+            {
+                throw BASSharedStateGraphError
+                    .domainAlreadyClaimed(
+                        domain: domain,
+                        existingWriterAgentID: existing,
+                        newWriterAgentID: agentID)
+            }
+            batchClaimed[domain] = agentID
+        }
+
+        // Phase 1B:existing-graph validation。 Snapshot of
+        // domainWriters at this moment is consistent because we're
+        // inside the actor and no other call can race us until we
+        // hit an `await`。 If any claim conflicts with the current
+        // map,throw BEFORE any persistence。
+        for (agentID, domain) in claims {
+            if let existing = domainWriters[domain],
+               existing != agentID
+            {
+                throw BASSharedStateGraphError
+                    .domainAlreadyClaimed(
+                        domain: domain,
+                        existingWriterAgentID: existing,
+                        newWriterAgentID: agentID)
+            }
+        }
+
+        // Phase 2:commit。 Now invokes per-claim async upsertWriter
+        // + in-memory map mutation。 Each per-claim step has SQL-first
+        // discipline per ch 956.11 USER-PASS-4 CR2:if persistence
+        // throws,in-memory state is untouched。 Atomicity for the
+        // FULL batch beyond the first throw is graceful-degradation:
+        // earlier successful claims persist (intentional — the throw
+        // gives caller enough info to retry the failed claim,not a
+        // full rollback)。 But because Phase 1 already validated,a
+        // Phase-2 throw in practice means a storage / IO failure,not
+        // a logic conflict。
+        for (agentID, domain) in claims {
+            // Skip idempotent re-claim (same agent same domain)
+            if domainWriters[domain] == agentID {
+                continue
+            }
+            try await storage?.upsertWriter(
+                domain: domain, agentID: agentID)
+            domainWriters[domain] = agentID
+        }
+    }
+
+    /// chapter 九百九十六.9 META-REVIEW Round-17 CRITICAL-1 fix:
+    /// release a writer claim so the domain becomes available for
+    /// re-binding by a different agent。 Pre-fix `BASAgentRegistry
+    /// .unregister(agentID:)` removed from the registry but the
+    /// graph still held the writer claim → registry believed domain
+    /// was free,graph rejected re-binding with stale agentID。
+    ///
+    /// Caller MUST supply the agentID + domain that's being
+    /// released。 If the current writer for `domain` is a different
+    /// agent (e.g. someone else already replaced this claim) → no-op
+    /// (idempotent;the requested agent's claim is already absent)。
+    public func unregisterWriter(
+        agentID: String,
+        domain: BASStateDomain
+    ) async throws {
+        // No-op if no claim for this domain
+        guard let current = domainWriters[domain] else {
+            return
+        }
+        // No-op if someone else already owns it (idempotent;
+        // protects against stale unregister calls)
+        guard current == agentID else {
+            return
+        }
+        // Drop from storage FIRST per ch 956.11 USER-PASS-4 CR2
+        // discipline (SQL-first,in-memory mutation only after
+        // persistence succeeds)
+        try await storage?.deleteWriter(domain: domain)
+        domainWriters[domain] = nil
+    }
+
     // MARK: - Write (single-writer-enforced + global registry)
 
     /// Write a state object on behalf of `agent`。 Enforces

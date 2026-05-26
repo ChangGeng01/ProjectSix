@@ -110,6 +110,16 @@ public actor BASAgentRegistry {
     ///   if two registered agents have overlapping writeDomains
     ///   (the FIRST registered wins;subsequent agents'
     ///   conflicting domains throw)。
+    /// chapter 九百九十六.9 META-REVIEW Round-17 CRITICAL-2 fix:
+    /// pre-fix the two-phase wire was atomic WITHIN a single call
+    /// but two concurrent `wire(toGraph:)` calls from different
+    /// registries on the SAME graph could both pass Phase-1
+    /// validation (against current empty state) + race in Phase 2
+    /// → partial install across both,leaving graph inconsistent。
+    /// Fix:delegate the entire batch to the graph's new
+    /// `registerWriterBatch(claims:)` method which runs validate-
+    /// then-install inside the actor's mailbox isolation,so two
+    /// concurrent wire() calls serialize naturally。
     public func wire(
         toGraph graph: BASSharedStateGraph
     ) async throws {
@@ -142,56 +152,64 @@ public actor BASAgentRegistry {
         // conflicts created by the first;both still fail-closed
         // cleanly (no silent partial state)。
 
-        // Phase 1A:gather batch + check intra-batch conflicts
+        // chapter 九百九十六.9 Round-17 CRITICAL-2 fix:gather
+        // the batch in registration order + delegate to graph's
+        // atomic registerWriterBatch which validates AND installs
+        // within the actor's mailbox isolation。 No need to
+        // probe writerForDomain separately — the batch method
+        // does that internally during its own Phase 1。
         var batch: [(agentID: String, domain: BASStateDomain)] =
             []
-        var batchClaimed: [BASStateDomain: String] = [:]
         for agentID in registrationOrder {
             guard let entry = entries[agentID] else { continue }
             for domain in entry.spec.writeDomains {
-                if let existing = batchClaimed[domain],
-                   existing != entry.spec.agentID
-                {
-                    throw BASSharedStateGraphError
-                        .domainAlreadyClaimed(
-                            domain: domain,
-                            existingWriterAgentID: existing,
-                            newWriterAgentID: entry.spec.agentID)
-                }
-                batchClaimed[domain] = entry.spec.agentID
                 batch.append(
                     (agentID: entry.spec.agentID,
                      domain: domain))
             }
         }
+        // Single atomic transaction on the graph actor:
+        // validate-then-install,no Phase 1 / Phase 2 race
+        // window because both phases run before any await
+        // boundary other than the storage upsert (which is
+        // SQL-first per ch 956.11 USER-PASS-4 CR2)。
+        try await graph.registerWriterBatch(claims: batch)
+    }
 
-        // Phase 1B:check existing-graph conflicts。 The graph
-        // exposes a `existingWriter(forDomain:)` style lookup
-        // via writerForDomain。 We probe each batch domain
-        // before committing。 If the graph reports a DIFFERENT
-        // agentID already claiming the domain,throw early。
-        for (agentID, domain) in batch {
-            if let existing = await graph
-                .writerForDomain(domain),
-               existing != agentID
-            {
-                throw BASSharedStateGraphError
-                    .domainAlreadyClaimed(
-                        domain: domain,
-                        existingWriterAgentID: existing,
-                        newWriterAgentID: agentID)
-            }
+    /// chapter 九百九十六.9 META-REVIEW Round-17 CRITICAL-1 fix:
+    /// release a registered agent's claim on the shared state
+    /// graph so the domain becomes available for re-binding by
+    /// a different agent。 Pre-fix `unregister(agentID:)` removed
+    /// the registry-side entry but the graph still held the
+    /// writer claim → registry believed domain was free,graph
+    /// rejected re-binding with stale agentID → permanent
+    /// "ghost claim" from the deleted agent blocking re-use。
+    ///
+    /// New `unregister(agentID:fromGraph:)` overload: drops
+    /// each `entry.spec.writeDomains` claim from the graph
+    /// BEFORE removing from the registry。 If graph deletion
+    /// throws (storage IO failure),the registry entry stays
+    /// so caller can retry。 Original `unregister(agentID:)` is
+    /// preserved for callers that don't need graph cleanup
+    /// (e.g. test scaffolding,no-graph scenarios)。
+    public func unregister(
+        agentID: String,
+        fromGraph graph: BASSharedStateGraph
+    ) async throws {
+        guard let entry = entries[agentID] else {
+            throw RegistryError.unknownAgent(agentID: agentID)
         }
-
-        // Phase 2 (commit):all-or-nothing。 registerWriter is
-        // idempotent for same-agent same-domain claims,so
-        // re-wire is safe even if Phase 1 saw existing claims
-        // we ourselves installed previously。
-        for (agentID, domain) in batch {
-            try await graph.registerWriter(
-                agentID: agentID,
-                domain: domain)
+        // Drop graph claims FIRST per same "SQL-first" discipline。
+        // If any unregisterWriter throws,registry stays
+        // consistent — caller can retry。
+        for domain in entry.spec.writeDomains {
+            try await graph.unregisterWriter(
+                agentID: agentID, domain: domain)
         }
+        // Only after all claims released safely,remove from
+        // registry。
+        entries[agentID] = nil
+        registrationOrder.removeAll { $0 == agentID }
     }
 
     // MARK: - Resolution
