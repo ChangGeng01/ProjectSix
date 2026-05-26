@@ -94,6 +94,16 @@ public struct BASAgentFabricLiveInputs: Sendable {
     public let warrantValidation: (
         result: BASWarrantValidationResult,
         externalAgentID: String)?
+    /// chapter 九百九十四.7 META-REVIEW Round-11 CRITICAL-1 fix:
+    /// added `priorityContext` field。 Pre-fix the host-integration
+    /// adapter never plumbed `priorityContext` through to the
+    /// coordinator → default empty `BASMergePriorityContext()` was
+    /// used → `riskAgentIDs/sovereignAgentIDs/hostAgentIDs` empty
+    /// → Risk/Sovereign/HostAlign deltas never tier correctly
+    /// in the merge engine → sovereign vetoes lose to higher-
+    /// confidence non-sovereign deltas。 Same class as Round-10
+    /// HIGH-1 (orphan riskCard parameter)。
+    public let priorityContext: BASMergePriorityContext
     public let nowNanos: Int64
 
     public init(
@@ -111,6 +121,8 @@ public struct BASAgentFabricLiveInputs: Sendable {
         warrantValidation: (
             result: BASWarrantValidationResult,
             externalAgentID: String)? = nil,
+        priorityContext: BASMergePriorityContext =
+            BASMergePriorityContext(),
         nowNanos: Int64 = 0
     ) {
         self.frame = frame
@@ -123,6 +135,7 @@ public struct BASAgentFabricLiveInputs: Sendable {
         self.sovereignSentinelInput = sovereignSentinelInput
         self.evolutionShadowInput = evolutionShadowInput
         self.warrantValidation = warrantValidation
+        self.priorityContext = priorityContext
         self.nowNanos = nowNanos
     }
 }
@@ -212,6 +225,10 @@ public enum BASAgentFabricFullTurnAdapter {
         }
 
         // Step 2:dispatch through coordinator
+        // chapter 九百九十四.7 META-REVIEW Round-11 CRITICAL-1 fix:
+        // wire `liveInputs.priorityContext` through to the
+        // coordinator。 Pre-fix this was silently dropped,disabling
+        // sovereign-priority-tier classification at merge time。
         let turnResult = await coordinator
             .runAgentFabricObservation(
                 turnID: turnID,
@@ -227,6 +244,8 @@ public enum BASAgentFabricFullTurnAdapter {
                 evolutionShadow:
                     liveInputs.evolutionShadowInput,
                 riskOverride: riskOverride,
+                priorityContext:
+                    liveInputs.priorityContext,
                 nowNanos: liveInputs.nowNanos)
         guard let turnResult else { return nil }
 

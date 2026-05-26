@@ -224,16 +224,74 @@ public final class BASSovereignLedgerSQLiteStorage:
             // 1.0.0 entries (canonical-bytes still picks OLD
             // separator for them per the per-entry schemaVersion
             // gate in basSovereignAuditCanonicalBytes)。
+            //
+            // chapter 九百九十四.7 META-REVIEW Round-11 HIGH-2 fix:
+            // Round-11 caught 3 migration edge cases:
+            //   (a) crash between ALTER and PRAGMA → re-open
+            //       finds column-already-exists,ALTER throws
+            //       duplicate-column → unrecoverable
+            //   (b) ensureSchema runs AFTER migration → if
+            //       partial-init state has user_version=1 but
+            //       no audit_entries table,ALTER throws
+            //       no-such-table
+            //   (c) two concurrent processes both at v1 →
+            //       second ALTER fails with duplicate-column
+            //       (SQLite WAL serializes,no busy-handler)
+            //
+            // Fix:
+            //   1. Wrap migration in BEGIN IMMEDIATE / COMMIT
+            //      so ALTER + PRAGMA are atomic — crash between
+            //      them leaves user_version at 1 + column not
+            //      added,safe to retry
+            //   2. Idempotent column check via PRAGMA
+            //      table_info — skip ALTER if column exists
+            //   3. Skip ALTER if table doesn't exist
+            //      (ensureSchema will create it with v2 DDL)
+            //   4. busy_timeout for concurrent-process safety
             try Self.runExec(
                 db: handle,
-                sql: """
-                ALTER TABLE audit_entries
-                ADD COLUMN entry_schema_version TEXT
-                NOT NULL DEFAULT '1.0.0';
-                """)
+                sql: "PRAGMA busy_timeout = 5000;")
             try Self.runExec(
                 db: handle,
-                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+                sql: "BEGIN IMMEDIATE;")
+            do {
+                let tableExists = try Self.tableExists(
+                    db: handle, name: "audit_entries")
+                let columnExists: Bool
+                if tableExists {
+                    columnExists = try Self.columnExists(
+                        db: handle,
+                        table: "audit_entries",
+                        column: "entry_schema_version")
+                } else {
+                    columnExists = false
+                }
+                if tableExists && !columnExists {
+                    try Self.runExec(
+                        db: handle,
+                        sql: """
+                        ALTER TABLE audit_entries
+                        ADD COLUMN entry_schema_version TEXT
+                        NOT NULL DEFAULT '1.0.0';
+                        """)
+                }
+                // Even if table didn't exist or column already
+                // existed,bump the user_version so subsequent
+                // opens skip the migration check entirely。
+                try Self.runExec(
+                    db: handle,
+                    sql: "PRAGMA user_version=\(Self.schemaVersion);")
+                try Self.runExec(
+                    db: handle,
+                    sql: "COMMIT;")
+            } catch {
+                // Roll back on any migration step error so
+                // user_version stays at 1 + retry is safe。
+                try? Self.runExec(
+                    db: handle,
+                    sql: "ROLLBACK;")
+                throw error
+            }
         } else if existingVersion != Self.schemaVersion {
             throw StorageError.schemaVersionMismatch(
                 found: existingVersion,
@@ -615,6 +673,60 @@ public final class BASSovereignLedgerSQLiteStorage:
     }
 
     // MARK: - Utility
+
+    // chapter 九百九十四.7 META-REVIEW Round-11 HIGH-2 helpers:
+    // idempotent migration support。 PRAGMA table_info-based
+    // checks let us skip ALTER TABLE when the column already
+    // exists (e.g. after a crash-then-retry mid-migration)。
+
+    fileprivate static func tableExists(
+        db: OpaquePointer, name: String
+    ) throws -> Bool {
+        let sql = """
+            SELECT 1 FROM sqlite_master
+             WHERE type='table' AND name=?
+             LIMIT 1
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db, sql, -1, &stmt, nil) == SQLITE_OK,
+              let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, name)
+        return sqlite3_step(stmt) == SQLITE_ROW
+    }
+
+    fileprivate static func columnExists(
+        db: OpaquePointer, table: String, column: String
+    ) throws -> Bool {
+        // PRAGMA table_info doesn't accept parameter binding,
+        // so the table name is interpolated。 Safe because
+        // callers pass literal table names ("audit_entries" /
+        // "segments"),never user-controlled input。
+        let sql = "PRAGMA table_info(\(table));"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db, sql, -1, &stmt, nil) == SQLITE_OK,
+              let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            // table_info columns: cid, name, type, notnull,
+            // dflt_value, pk。 We want column 1 (name)。
+            let colName = readText(stmt, 1)
+            if colName == column { return true }
+        }
+        return false
+    }
 
     private static func runExec(
         db: OpaquePointer,
