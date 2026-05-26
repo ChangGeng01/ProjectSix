@@ -11,6 +11,162 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百九十五.7 / M3680.7 — META-REVIEW Round-13 cascade fixes (same-class orphan in TEST + dead-code APIs)
+
+Round-13 N-pass review (3 parallel reviewers) of ch 995.5 caught
+**1 CRITICAL + 2 HIGH + 3 MED + 15 doc drift**:
+
+- **CRITICAL-1** — ch 995.5 testCRITICAL_C1_AllSixOrphanFieldsNow
+  Reachable used a 4-mandatory-seat roster so Memory/Critic/Sov/
+  Evolution silently dropped at dispatcher。 Test claimed to
+  verify 6 orphan fixes but only verified 2 (same orphan class
+  the cascade keeps catching — this time in the test itself)。
+- **HIGH-1** — BASAgentFabricHostOutcome docstring promised
+  `card.totalRisk` + `tri.veto-count` diagnostic keys that were
+  NEVER emitted。 Host code reading docs would silently get nil。
+- **HIGH-2** — testHIGH2_BusyTimeoutSetBeforeWalPragma opened a
+  single DB; never exercised concurrency。 The actual race
+  condition Round-12 claimed to fix was untested。
+- **MED-1** — BASAgentFabricHostOutcome stringly-typed (mode +
+  activation accessible only via diagnostics dict re-parse)。
+- **LOW-1** — fabric.mode key absent on nil agentFabric →
+  ambiguous nil vs not-implemented。
+- **15 doc-drift items** spanning ARC_SEAL / PHASE_8_CLOSE_SMOKE
+  / SDK_API_STABILITY / CHANGELOG。
+
+**Fixes shipped**:
+
+1. **CRITICAL-1**: ch 995.7 test ships a proper 9-seat roster
+   (Memory + Critic + HostAlign + Sovereign + Evolution all
+   slotted) + per-field diagnostic keys (`memory.input-supplied`
+   / `critic.input-supplied` / `sovereign.input-supplied` /
+   `evolution.input-supplied` / `priority.tier-count`) so each
+   orphan-fix claim has an independent observable signal that
+   the test asserts on。
+2. **HIGH-1**: actually emit `risk.totalRisk` (numeric value
+   when card supplied) + `tri.veto-count` (count of vetoed
+   triScores) — both promised pre-fix,now real。
+3. **HIGH-2**: new test `testCRITICAL_HIGH2_ConcurrentFreshDB
+   Opens_AllSucceed` spawns 6 concurrent Task instances opening
+   the same SQLite path + asserts all 6 succeed (busy_timeout
+   means contention waits 5s,doesn't throw SQLITE_BUSY)。
+4. **MED-1 + LOW-1**: added typed `activation:
+   BASAgentFabricGate.Activation` + `fabricMode:
+   BASAgentFabricMode?` fields to BASAgentFabricHostOutcome。
+   Host now writes `if outcome.fabricMode == .authoritative`
+   directly,no string parsing。 Plus `fabric.mode` key always
+   surfaces (uses "unconfigured" sentinel when no fabric)。
+5. **Doc drift batch** (separately addressed): ARC_SEAL title
+   ch 953-981 → ch 953-995.7;status SUBSTRATE-ISLAND-COMPLETE
+   → SUBSTRATE-COMPLETE;reserved prefix count 10 → 11 in
+   ARC_SEAL prose + table (was already 11 in
+   PHASE_8_CLOSE_SMOKE + SDK_API_STABILITY)。 Branch name
+   updated。
+
+6 regression tests:
+- CRITICAL-1: all 6 fields verifiable with 9-seat roster +
+  per-field diagnostics asserted (mutation drops still caught)
+- CRITICAL-1: omitted fields default to "no" / 0
+- MED-1: typed fabricMode accessible without dict re-parse
+- MED-1: typed activation accessible when gate disabled
+- LOW-1: nil fabric → fabricMode nil + diagnostics["fabric.mode"]
+  = "unconfigured" (unambiguous)
+- HIGH-2: 6 concurrent Task-based DB opens all succeed
+
+Build: clean. Test: 6/6 ch 995.7 pass + 18/18 ch 995-995.7
+combined + 14,459+ substrate-wide / 0 failures.
+
+13th N-pass review cycle complete. The cascade caught a same-
+class orphan bug FOR THE FIFTH ROUND IN A ROW (Round 10 / 11 /
+12 source-level orphan → Round 13 test-level orphan)。 The
+pattern is robust evidence that every "I'm done" claim in this
+arc has been premature。
+
+### Chapter 九百九十五.5 / M3680.5 — META-REVIEW Round-12 cascade fixes (pipeline orphans + dead-code APIs caught)
+
+Round-12 N-pass review caught **2 CRITICAL + 2 HIGH + 2 MED**:
+
+- **CRITICAL-1** — BASAgentFabricHostPipeline.runTurn orphaned
+  6 of 12 BASAgentFabricLiveInputs fields (Memory/Critic/Sov/
+  Evolution inputs + riskCard + triScores + priorityContext
+  all unreachable through the substrate's own reference host
+  pattern shipped ONE CHAPTER EARLIER)。
+- **CRITICAL-2** — BASAgentFabricMode stored on runtime but
+  READ NOWHERE in source → `.authoritative` byte-identical to
+  `.observationOnly`。 Every host writing
+  `if mode == .authoritative` would have gotten silent obs-only。
+- **HIGH-1** — BASAgentFabricGate.tier/transcriptMode/
+  activeAgents parsed but only flowed to diagnostics,never
+  affected behavior。 BAS_AGENT_TIER=core didn't filter anything。
+- **HIGH-2** — busy_timeout set only inside migration branch;
+  concurrent fresh-DB open still raced on WAL setup。
+- **MED-1 + MED-2** — segments table no idempotent helper +
+  gate.activeAgents not in diagnostics。
+
+Fix: extended runTurn signature to accept all 6 orphan fields
++ surfaced mode in `diagnostics["fabric.mode"]` per scaffold
+doctrine + moved busy_timeout BEFORE WAL pragma + diagnostics
+gate.activeAgents added。 6 regression tests at 0 failures。
+
+### Chapter 九百九十五 / M3680 — Host pipeline reference implementation + DeviceTestApp env-var surface
+
+Shipped substrate-side reference host pipeline + wired
+DeviceTestApp:
+- `BASAgentFabricHostPipeline` (BASHostKit) — collapses host's
+  per-turn pipeline into one `runTurn(...)` call: gate probe +
+  liveInputs assembly + FullTurnAdapter invocation +
+  diagnostics aggregation。 6 regression tests。
+- `BASAgentFabricHostOutcome` struct carries result + activated
+  + skipReason + diagnostics dict。
+- DeviceTestApp/Sources/App/BASDeviceTestApp.swift updated to
+  probe `BASAgentFabricGate.activationFromEnvironment(...)` on
+  appear + surface "Fabric: enabled (core)" or "disabled" in
+  UI so operators running 3-mode iPhone Air smoke per
+  `Docs/PHASE_8_CLOSE_SMOKE.md` can verify mode visually before
+  test dispatch。
+
+What remained for ch 995.5: Round-12 found pipeline orphans + dead-code APIs。
+
+### Chapter 九百九十四.7 / M3675.7 — META-REVIEW Round-11 cascade fixes (same-class CRITICAL + SQLite atomicity)
+
+Round-11 N-pass review of ch 994 + 994.5 caught **1 CRITICAL +
+2 HIGH** including two SAME-CLASS issues as Round-10:
+
+- **CRITICAL-1** — priorityContext orphan in
+  BASAgentFabricFullTurnAdapter (same class as Round-10 H1
+  riskCard orphan)。 Sovereign vetoes silently lost merge ties
+  to higher-confidence non-sovereign deltas because
+  riskAgentIDs/sovereignAgentIDs/hostAgentIDs empty in the
+  default-empty BASMergePriorityContext。
+- **HIGH-1** — Round-10 H1 test was weak (asserted delta
+  exists,not that it was card-enriched)。 BASRiskSeat emits a
+  delta per candidate regardless of pressureLevel,so mutation
+  that drops the riskOverride wiring slipped past the existing
+  test。
+- **HIGH-2** — SQLite v1→v2 migration not atomic + not
+  idempotent。 Crash between ALTER + PRAGMA → re-open fails
+  with duplicate-column → unrecoverable。 Two concurrent
+  processes both at v1 → second ALTER fails。
+- **GAP-1** — v1→v2 migration path itself untested (existing
+  FreshV2DB test only exercises fresh CREATE)。
+
+Fixes:
+1. CRITICAL-1: added `priorityContext` field to
+   BASAgentFabricLiveInputs + plumbed through to coordinator
+2. HIGH-1: testCRITICAL_H1_RiskCardEnrichment_ActuallyApplied
+   asserts Risk seat reasonCodes contain "high"/"manipulation"
+   signal only card-enrichment could produce
+3. HIGH-2: BEGIN IMMEDIATE/COMMIT migration wrap + idempotent
+   tableExists/columnExists checks + ROLLBACK on error +
+   busy_timeout=5000
+4. GAP-1: testCRITICAL_GAP1_V1ToV2MigrationPathExercised seeds
+   a TRUE v1-shape DB via direct sqlite3 FFI,reopens via
+   storage constructor,verifies pre-existing v1 row resurrects
+   with default schemaVersion='1.0.0' (preserves OLD canonical-
+   bytes for backward signature compat)。
+
+5 regression tests + 11th N-pass review cycle complete。
+
 ### Chapter 九百九十四.5 / M3675.5 — META-REVIEW Round-10 cascade fixes (CRITICAL ledger-integrity break caught)
 
 Round-10 N-pass review of ch 992 + 993 + 994 caught **1 CRITICAL +

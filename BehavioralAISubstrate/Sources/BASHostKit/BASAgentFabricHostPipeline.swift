@@ -64,6 +64,15 @@ import BASSovereign
 /// Outcome bundle returned by `BASAgentFabricHostPipeline.runTurn`。
 /// Captures both the fabric result + structured diagnostics so a
 /// host can introspect the pipeline run。
+///
+/// chapter 九百九十五.7 META-REVIEW Round-13 MED-1 fix:added
+/// typed `activation` + `fabricMode` fields so host code can
+/// branch on them WITHOUT re-parsing strings from diagnostics dict。
+/// Pre-fix everything was stringly-typed (host had to do
+/// `BASAgentFabricMode(rawValue: outcome.diagnostics["fabric.mode"]
+/// ?? "")`)。 Now host writes `if outcome.fabricMode ==
+/// .authoritative { ... }` directly。 Diagnostics dict preserved
+/// as supplementary string view per Round-12 doctrine。
 public struct BASAgentFabricHostOutcome: Sendable {
     /// The fabric's turn result (deltas + merge + apply)。 Nil
     /// when fabric was disabled by env-var gate or coordinator
@@ -78,14 +87,56 @@ public struct BASAgentFabricHostOutcome: Sendable {
     /// Nil when activated。 Useful for host logging。
     public let skipReason: String?
 
-    /// Structured diagnostics for host logging:
+    /// chapter 九百九十五.7 Round-13 MED-1:typed env-var gate
+    /// activation。 Carries fabricEnabled / tier / transcriptMode /
+    /// activeAgents as typed values。 Always populated (even when
+    /// activated=false — host can inspect gate state)。
+    public let activation: BASAgentFabricGate.Activation
+
+    /// chapter 九百九十五.7 Round-13 MED-1 + LOW-1:typed fabric
+    /// mode (signal,not behavior switch — per scaffold doctrine
+    /// substrate doesn't branch on this)。 Nil only when
+    /// `coordinator.agentFabric == nil` (no fabric configured);
+    /// non-nil even when activated=false due to gate disabled,
+    /// so host can distinguish "fabric configured but gate off"
+    /// from "no fabric at all"。
+    public let fabricMode: BASAgentFabricMode?
+
+    /// Structured diagnostics for host logging。
+    ///
+    /// **Keys always present** (regardless of activated):
     ///   - "gate.fabric": "enabled"/"disabled"
-    ///   - "gate.tier": "core"/"all"
-    ///   - "card.totalRisk": "0.85"
-    ///   - "tri.veto-count": "1"
-    ///   - "deltas.emitted": "9"
+    ///   - "gate.tier": tier rawValue ("core"/"all")
+    ///   - "gate.transcriptMode": rawValue
+    ///   - "gate.activeAgents": csv of agent names
+    ///   - "fabric.mode": rawValue OR "unconfigured" when
+    ///     coordinator has no fabric
+    ///
+    /// **Keys present only when activated**:
+    ///   - "candidates.count": count of input candidatePaths
+    ///   - "risk.card-supplied": "yes"/"no"
+    ///   - "risk.totalRisk": numeric (when risk.card-supplied=yes)
+    ///     [chapter 九百九十五.7 Round-13 HIGH-1 fix:was promised
+    ///     in pre-fix docstring as "card.totalRisk" but never
+    ///     emitted — now actually emitted under the corrected key]
+    ///   - "tri.scores-count": count
+    ///   - "tri.veto-count": count of vetoed scores (HIGH-1
+    ///     fix:was promised but never emitted)
+    ///   - "memory.input-supplied": "yes"/"no"
+    ///   - "critic.input-supplied": "yes"/"no" (derived from
+    ///     non-empty triScores)
+    ///   - "sovereign.input-supplied": "yes"/"no"
+    ///   - "evolution.input-supplied": "yes"/"no"
+    ///   - "priority.tier-count": total agents tagged across
+    ///     sovereign + risk + host tiers in priorityContext
+    ///   - "host.id": from constitution
+    ///
+    /// **Keys present only when activated + result non-nil**:
+    ///   - "deltas.emitted" / "deltas.accepted"
     ///   - "warrant.audit": "appended"/"skipped"
-    ///   - "trace.flushed": "9"
+    ///   - "trace.flushed": count or "skipped"
+    ///   - "frontier.width" / "frontier.guarded"
+    ///
     /// Pure-fn assembled (no I/O at log site — host decides
     /// what to do with the diagnostics)。
     public let diagnostics: [String: String]
@@ -94,11 +145,16 @@ public struct BASAgentFabricHostOutcome: Sendable {
         result: BASAgentFabricFullTurnResult?,
         activated: Bool,
         skipReason: String? = nil,
+        activation: BASAgentFabricGate.Activation =
+            BASAgentFabricGate.Activation(),
+        fabricMode: BASAgentFabricMode? = nil,
         diagnostics: [String: String] = [:]
     ) {
         self.result = result
         self.activated = activated
         self.skipReason = skipReason
+        self.activation = activation
+        self.fabricMode = fabricMode
         self.diagnostics = diagnostics
     }
 }
@@ -195,29 +251,23 @@ public struct BASAgentFabricHostPipeline {
             activation.transcriptMode.rawValue
         // chapter 九百九十五.5 META-REVIEW Round-12 MED-2 fix:
         // gate.activeAgents was parsed but silently dropped。
-        // Now surfaces in diagnostics for host inspection。
         diagnostics["gate.activeAgents"] =
             activation.activeAgents.joined(separator: ",")
-        // chapter 九百九十五.5 META-REVIEW Round-12 CRITICAL-2
-        // fix:surface coordinator.agentFabric?.mode in
-        // diagnostics so host can observe which mode was active
-        // for this turn。 Note:per ch 994 scaffold doctrine,
-        // the substrate does NOT branch on mode itself — the
-        // mode is a signal for host's downstream consumer to
-        // decide whether to USE the dispatcher's deltas as
-        // observation-only or as authoritative replacements
-        // for coordinator output。 The diagnostic makes the
-        // signal observable so a host's branching logic
-        // (`if mode == .authoritative { replace render frame }`)
-        // has the right value to read。
-        if let mode = coordinator.agentFabric?.mode {
-            diagnostics["fabric.mode"] = mode.rawValue
-        }
+        // chapter 九百九十五.7 Round-13 LOW-1 fix:always surface
+        // fabric.mode even when coordinator.agentFabric == nil
+        // (use "unconfigured" sentinel)。 Pre-fix the key was
+        // omitted entirely on nil fabric → host couldn't
+        // distinguish "key not implemented" from "no fabric"。
+        let resolvedMode = coordinator.agentFabric?.mode
+        diagnostics["fabric.mode"] =
+            resolvedMode?.rawValue ?? "unconfigured"
         guard activation.fabricEnabled else {
             return BASAgentFabricHostOutcome(
                 result: nil,
                 activated: false,
                 skipReason: "env-var gate disabled fabric",
+                activation: activation,
+                fabricMode: resolvedMode,
                 diagnostics: diagnostics)
         }
         guard coordinator.agentFabric != nil else {
@@ -226,6 +276,8 @@ public struct BASAgentFabricHostPipeline {
                 activated: false,
                 skipReason:
                     "coordinator has no agentFabric configured",
+                activation: activation,
+                fabricMode: resolvedMode,
                 diagnostics: diagnostics)
         }
 
@@ -256,10 +308,45 @@ public struct BASAgentFabricHostPipeline {
         }
         diagnostics["candidates.count"] =
             "\(candidatePaths.count)"
+        // chapter 九百九十五.7 Round-13 CRITICAL-1 fix:emit a
+        // diagnostic key for EACH of the 6 orphan-fix fields so
+        // the regression tests can verify each path
+        // independently。 Pre-fix only risk + tri were emitted;
+        // memory/sovereign/evolution/priority orphans had no
+        // observable signal → tests couldn't verify them。
         diagnostics["risk.card-supplied"] =
             riskCard != nil ? "yes" : "no"
+        // chapter 九百九十五.7 Round-13 HIGH-1 fix:emit the
+        // numeric risk.totalRisk that the pre-fix docstring
+        // promised as "card.totalRisk" but never produced。
+        if let card = riskCard {
+            diagnostics["risk.totalRisk"] =
+                String(format: "%.4f", card.totalRisk)
+        }
         diagnostics["tri.scores-count"] =
             "\(triScores.count)"
+        // chapter 九百九十五.7 Round-13 HIGH-1 fix:emit
+        // tri.veto-count promised by pre-fix docstring but
+        // never produced。
+        diagnostics["tri.veto-count"] =
+            "\(triScores.filter { $0.veto }.count)"
+        // chapter 九百九十五.7 Round-13 CRITICAL-1 fix:
+        // diagnostics for the 4 previously-test-unverifiable
+        // orphan fields
+        diagnostics["memory.input-supplied"] =
+            memoryInput != nil ? "yes" : "no"
+        diagnostics["critic.input-supplied"] =
+            !triScores.isEmpty ? "yes" : "no"
+        diagnostics["sovereign.input-supplied"] =
+            sovereignSentinelInput != nil ? "yes" : "no"
+        diagnostics["evolution.input-supplied"] =
+            evolutionShadowInput != nil ? "yes" : "no"
+        let priorityTierTotal =
+            priorityContext.sovereignAgentIDs.count +
+            priorityContext.riskAgentIDs.count +
+            priorityContext.hostAgentIDs.count
+        diagnostics["priority.tier-count"] =
+            "\(priorityTierTotal)"
 
         // Step 3:invoke fabric through convenience adapter
         let result = try await BASAgentFabricFullTurnAdapter
@@ -294,6 +381,8 @@ public struct BASAgentFabricHostPipeline {
         return BASAgentFabricHostOutcome(
             result: result,
             activated: true,
+            activation: activation,
+            fabricMode: resolvedMode,
             diagnostics: diagnostics)
     }
 }

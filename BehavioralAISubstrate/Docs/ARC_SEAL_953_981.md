@@ -1,10 +1,12 @@
-# Agent Fabric Arc Seal — chapters 953-982 (substrate-island)
+# Agent Fabric Arc Seal — chapters 953-995.7
 
-**Arc**: Agent Fabric (chapters 953-982.5 + 10 USER-PASS / META-REVIEW sub-chapters)
+**Arc**: Agent Fabric (chapters 953-995.7 + 15+ USER-PASS / META-REVIEW + Cross-Module Integration sub-chapters)
 **Start**: ch 953 / M3470 (Phase 0 ch1)
-**End**: ch 982.5 / M3615.5 (META-REVIEW + honest-disclosure of cross-module gaps)
+**End**: ch 995.7 / M3680.7 (Round-13 META-REVIEW cascade fixes)
 **Substrate-island sealed**: ch 981 / M3610 (Phase 8 close + initial ARC SEAL)
-**Status**: SUBSTRATE-ISLAND COMPLETE — fabric is internally consistent at the simulator level, BUT cross-module wiring into existing host services (BASPolicy / BASHostKit / BASRiskServicing / BASRoutedEventLogStorage / BASSovereignAuditLedger / coordinator) is documented as a separate forward workstream (see "Cross-module integration gap" section below — added at ch 982.5 META-REVIEW). Device-verification (3-mode 2hr iPhone Air smoke) also PENDING per phase smoke docs.
+**Cross-module arc closed**: ch 990 / M3655 (8 cross-module gaps from ch 982.5 META-REVIEW)
+**Host integration shipped**: ch 995 / M3680 (BASAgentFabricHostPipeline + DeviceTestApp)
+**Status**: SUBSTRATE-COMPLETE — fabric is internally consistent + cross-module-wired + host-pipeline-shipped at the simulator level. Device-verification (3-mode 2hr iPhone Air smoke per `Docs/PHASE_8_CLOSE_SMOKE.md`) PENDING operator. 13 N-pass review rounds complete with 100+ real bugs caught. Latest substrate-wide test count: **14,459 / 0 failures**.
 
 ---
 
@@ -76,11 +78,14 @@
 ### Reserved signalRefs prefixes (L14 absorption channel)
 
 Per ch 981.5 USER-PASS-7 DH3 doc-fix + ch 981.6 USER-PASS-8 D1
-correction + ch 981.7 ARC FINALIZE Item 5:**10 prefixes are
-reserved** for the agent fabric subsystem (no other substrate
-code may emit `signalRefs` starting with these prefixes)。 **6 are
-in-use today + 4 are future-allocation** (reserved but not yet
-emitted by any source path)。
+correction + ch 981.7 ARC FINALIZE Item 5 + ch 990 Cross-Module
+Integration Arc Gap 2 close:**11 prefixes are reserved** for the
+agent fabric subsystem (no other substrate code may emit
+`signalRefs` starting with these prefixes)。 **7 are in-use today
++ 4 are future-allocation** (reserved but not yet emitted by any
+source path)。 The 11th `agentMCP.permit:` was added at ch 990
+for MCP-invocation permit validation outcomes — see closure
+summary table below。
 
 | Prefix | Phase | Status | Carries |
 |---|---|---|---|
@@ -94,6 +99,7 @@ emitted by any source path)。
 | `agentExternal.tier:` | 7 | in-use | effective sandbox tier |
 | `agentExternal.trust:` | 7 | in-use | trust score after scans |
 | `agentExternal.warrant:` | 8 (ch 981.7) | in-use | sovereign warrant validation outcome |
+| `agentMCP.permit:` | Cross-Module Arc (ch 990) | in-use | MCP-invocation permit validation outcome (`granted` / `rejected:reason=...`) |
 
 All Phase 1-7 audit signals absorb into the existing `SovereignAuditEntry.signalRefs [String]` array — **zero schema change** per ch 953 reuse pattern。 The 3 future-allocation prefixes are **reserved in this document** so future host-app integration cannot accidentally use them for another purpose — they will be filled in when the coordinator wires Phase 1-5 emission paths to the audit ledger (separate workstream beyond arc 953-981)。
 
@@ -353,7 +359,7 @@ Until that arc lands,**the fabric is correctly described as a parallel island th
 
 ## Push status
 
-As of arc seal at ch 981, the local branch `phase-5-chapter-952-iphone-air-10hr-validation` is 8+ commits ahead of `origin/phase-5-chapter-952-iphone-air-10hr-validation`. Push pending explicit user authorization per the standing instruction across this entire arc.
+As of ch 995.7, the active branch is `phase-5-chapter-981-agent-fabric-arc-seal`, pushed continuously through each chapter close. HEAD reflects all ch 953-995.7 work + 13 N-pass review cascade rounds。 Original ch 981 push status referred to a now-superseded branch `phase-5-chapter-952-iphone-air-10hr-validation`。
 
 ## Arc seal verification (operator procedure)
 

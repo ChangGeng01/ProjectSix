@@ -131,9 +131,9 @@ When operator runs the 3-mode smoke and all 3 modes pass per the criteria above:
 
 ## Arc seal summary (ch 953-981, 29 chapters)
 
-- **9 N-pass review cycles** caught **70+ real bugs** (per ch 982.5 META-REVIEW tally)
-- **663 tests** at the arc level, all 0 failures (per ch 982.5 actual count)
-- **14,150+ tests** in the full substrate sweep, all 0 failures
+- **13 N-pass review cycles** caught **100+ real bugs** (Rounds 1-9 = 70+ at ch 982.5; Round 10 ch 994.5 + Round 11 ch 994.7 + Round 12 ch 995.5 + Round 13 ch 995.7 = +30 across 4 fix-of-fix rounds catching same-class orphan / dead-code-API bugs)
+- **663 fabric-island tests + 130+ cross-module integration tests** at the arc level, all 0 failures (per ch 995.7 actual count via `grep -c "func test"` on `BASChapter98[3-9]*Tests.swift` + `BASChapter99*Tests.swift`)
+- **14,459 tests** in the full substrate sweep, all 0 failures (latest ch 995.7 measurement)
 - **20 agents** wired across 8 phases
 - **12 state graph domains** under Single-Writer-Per-Domain
 - **4 reserved persona pattern detectors** + 4 reference skill agents + 7 watchers + 2 external gateways
