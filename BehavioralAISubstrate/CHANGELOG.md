@@ -11,6 +11,97 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百九十二 / M3665 — Cross-Module Integration Arc residual findings sweep:「全面 剩余 一次性 解决掉」
+
+Closes ALL remaining MED + LOW findings from Round-9 reviewers
+that ch 991.5 did not address。 12 new tests + 3 adapter fixes
+land the arc in a state where every reviewer finding (CRITICAL +
+HIGH + MED + LOW) has either a fix or a regression test pinning
+the discipline。
+
+#### Adapter fixes
+
+**MED-1 (Reviewer 1) — enrichRiskInput defensive clamp**
+Was clamping `card.totalRisk` (already clamped by `BASRiskCard
+.init`),so the clamp was dead code。 `base.pressureLevel` was
+NOT clamped by `BASRiskInput.init` so out-of-range caller input
+would propagate。 Fix:clamp the MERGED RESULT at adapter
+boundary。 Test pins:base.pressureLevel=5.0 → enriched output
+clamped at 1.0。
+
+**MED-3 (Reviewer 1) — hostAlignmentInput broader fields**
+`BASBoundaryVeil` has 5 fields (hardNoGo,softCaution,
+confirmRequired,restrictedMemoryDomains,restrictedToolDomains)
+per L5 whitepaper §6,but ch 986 only unioned hardNoGo。
+Fix:new `includeSoftAxes: Bool = false` parameter。 Default
+false preserves ch 986 byte-equality。 Set true for hosts whose
+alignment policy is "warn about ANYTHING I've protected"。
+Test pins:default narrow union ["h.1", "v.1"] + flag=true
+broader union ["cf.1", "h.1", "rm.1", "rt.1", "s.1", "v.1"]。
+
+#### Test additions (12 new)
+
+**MED-2** — strengthened ch 988 weak `XCTAssertLessThanOrEqual`
+assertion with exact-equality pin。 All-vetoed scenario MUST
+produce exactly 1.0 (not "≤1.0" which would pass with broken
+0.5 impl)。
+
+**GAP-3 (Reviewer 2)** — concurrent recordEvent race test。
+50 concurrent recordEvent tasks via TaskGroup MUST produce
+exactly 50 distinct eventIDs with dense sequenceNumbers
+[1..50]。 Pins actor isolation under concurrent load。
+
+**GAP-4** — hostAlignmentInput styleStrictnessOverride
+out-of-range clamp (both upper 1.5 and lower -0.5)。
+
+**GAP-5** — enrichCriticInput negative base level → monotonic
+raise with clamped fraction (max(-0.5, 0.0) = 0.0)。
+
+**GAP-6 (CRITICAL coverage)** — U+001F sentinel in agentID +
+deltaID MUST survive verbatim through the synthesized event
+log entry's actions array + memoryRefs。 The ch 982.5 escape
+fix protected payloadJson but the actions list is built via
+string interpolation — needs explicit pin。
+
+**GAP-8** — synthesize with empty sessionID is pure-fn
+no-throw (downstream ledger validates non-empty)。
+
+**GAP-9** — diversityScore exact 0.0 at maximum confidence
+spread [0.0, 1.0]。 Mutation pin for /0.5 normalizer + 1-x
+inversion。
+
+**GAP-10** — delayedPaths always empty (L11 risk-domain
+semantics,not derivable from planner output)。
+
+**GAP-11** — E2E mixed agent/merge stream: 4 entries MUST
+have agent-prefix source + 1 entry MUST have "agentFabric
+.merge" source (not all incorrectly mapped to merge)。
+
+#### Doc drift
+
+**DRIFT-5 (Reviewer 3)** — ARC_SEAL "revised at ch 990" →
+"revised at ch 992 — full closure"。 Section title bumped
+from "ch 983-991.5" → "ch 983-992"。 Closure summary
+expanded from 10 chapters → 11 + new ch 992 row carrying
+the residual fixes。 TOTAL: 78 → 90 tests。
+
+**Substrate state at ch 992 close**:
+- 90 cross-module integration arc tests / 0 failures
+- 14,329 + 90 substrate-wide / 0 failures
+- ALL severity levels (CRITICAL + HIGH + MED + LOW) from Round-9
+  reviewers either have a fix landed or a regression test
+  pinning the discipline。
+- 9th N-pass review cycle fully consumed (Round-9 ch 991.5 +
+  ch 992 residual sweep)。
+
+This concludes the cross-module integration arc。 The fabric
+adapter layer is **provably wired + provably reviewed + provably
+mutation-safe** at the simulator level。 Remaining honest scope:
+host-side wiring (caller builds DTOs + invokes adapters per
+ADR-014 OPT-IN) + operator device verification (3-mode 2hr
+iPhone Air smoke per `Docs/PHASE_8_CLOSE_SMOKE.md`)。 Both are
+non-substrate work the substrate cannot do itself。
+
 ### Chapter 九百九十一.5 / M3660.5 — Cross-Module Integration Arc N-pass review (Round 9 cascade)
 
 Round-9 cascade review of ch 983-991 — the 9-chapter cross-module

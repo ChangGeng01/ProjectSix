@@ -586,10 +586,21 @@ public enum BASAgentFabricAdapters {
         from card: BASRiskCard,
         baseRiskInput: BASRiskInput
     ) -> BASRiskInput {
-        // Monotonic raise:risk only goes UP per ch 967。
-        let mergedPressure = max(
+        // chapter 九百九十二 / M3665 META-REVIEW MED-1 fix:was
+        // clamping only the card operand (`max(0, min(1, card
+        // .totalRisk))`),which is already clamped by
+        // `BASRiskCard.init` so that clamp was dead code。
+        // `base.pressureLevel` is NOT clamped by `BASRiskInput
+        // .init` so a caller passing pressureLevel=5.0 would
+        // propagate out-of-range。 Defense in the right place:
+        // clamp the MERGED RESULT at [0,1] so adapter boundary
+        // produces well-formed output regardless of input。
+        // Monotonic raise (Root Law 4 + ch 967) preserved:max()
+        // never lowers either operand。
+        let rawMerged = max(
             baseRiskInput.pressureLevel,
-            max(0.0, min(1.0, card.totalRisk)))
+            card.totalRisk)
+        let mergedPressure = max(0.0, min(1.0, rawMerged))
         // Card's manipulationStrength >= 0.5 considered triggering。
         let cardManipulationTrigger =
             card.manipulationStrength >= 0.5
@@ -607,6 +618,18 @@ public enum BASAgentFabricAdapters {
     /// `BASHostConstitution`。 Closes ch 982.5 META-REVIEW Gap 1
     /// (host alignment seat orthogonal to live host constitution)。
     ///
+    /// chapter 九百九十二 / M3665 META-REVIEW MED-3 fix:Round-9
+    /// caught that pre-fix adapter only unioned `hardNoGo` from
+    /// `BASBoundaryVeil`,but `BASBoundaryVeil` has 5 fields:
+    /// hardNoGo + softCaution + confirmRequired +
+    /// restrictedMemoryDomains + restrictedToolDomains。 Pre-fix
+    /// limited alignment surface to ONLY hardNoGo — missing 4
+    /// fields the host may have marked as protected。 New
+    /// `includeSoftAxes` flag (default false to preserve ch 986
+    /// byte-equality) opts in to the broader 5-field union for
+    /// hosts whose alignment policy is "warn me about anything
+    /// I've protected"。
+    ///
     /// - Parameters:
     ///   - constitution: live L5 host constitution from the
     ///     coordinator's `hostConstitution` slot
@@ -615,22 +638,39 @@ public enum BASAgentFabricAdapters {
     ///     semantics)
     ///   - styleStrictnessOverride: if non-nil,used instead of
     ///     the derived `styleGenome.structureBias` value
+    ///   - includeSoftAxes: if true,boundary axes include
+    ///     softCaution + confirmRequired + restrictedMemoryDomains
+    ///     + restrictedToolDomains。 Default false preserves ch 986
+    ///     byte-equality。 Set true for broader alignment surface。
     /// - Returns: well-formed `BASHostAlignmentInput`
     public static func hostAlignmentInput(
         from constitution: BASHostConstitution,
         candidates: [BASHostAlignmentCandidate] = [],
-        styleStrictnessOverride: Double? = nil
+        styleStrictnessOverride: Double? = nil,
+        includeSoftAxes: Bool = false
     ) -> BASHostAlignmentInput {
         // Boundary axes = union of valueAxes.axes + boundaryVeil
-        // .hardNoGo,sorted lex for determinism。 Per L5 whitepaper
-        // §6 these are the two distinct "what's protected"
-        // declarations:valueAxes carries the host's articulated
-        // value structure;boundaryVeil.hardNoGo is the explicit
-        // never-cross list。 Both qualify as alignment-significant
-        // axes per ch 963 design intent。
-        let unionAxes = Set(
-            constitution.valueAxes.axes +
+        // fields (hardNoGo always;softCaution/confirmRequired/
+        // restrictedMemoryDomains/restrictedToolDomains gated on
+        // includeSoftAxes flag),sorted lex for determinism。 Per
+        // L5 whitepaper §6 valueAxes carries the host's
+        // articulated value structure;boundaryVeil enumerates
+        // protection levels。 ch 992 MED-3:caller decides whether
+        // soft axes also count as alignment-significant。
+        var allAxes = constitution.valueAxes.axes
+        allAxes.append(contentsOf:
             constitution.boundaryVeil.hardNoGo)
+        if includeSoftAxes {
+            allAxes.append(contentsOf:
+                constitution.boundaryVeil.softCaution)
+            allAxes.append(contentsOf:
+                constitution.boundaryVeil.confirmRequired)
+            allAxes.append(contentsOf: constitution
+                .boundaryVeil.restrictedMemoryDomains)
+            allAxes.append(contentsOf: constitution
+                .boundaryVeil.restrictedToolDomains)
+        }
+        let unionAxes = Set(allAxes)
         let boundaryAxes = Array(unionAxes).sorted()
         // styleStrictness derived from structureBias which is
         // already in [0.0, 1.0] per BASStyleGenome contract。
