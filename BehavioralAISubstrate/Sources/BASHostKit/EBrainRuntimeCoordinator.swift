@@ -200,12 +200,13 @@ public struct BASEBrainRuntimeCoordinator {
     /// is nil,returns nil (no-op,zero overhead)。
     ///
     /// What this does when fabric is set:
-    ///   1. Build the 4 seat DTOs from the supplied L7 frame +
-    ///      L9 candidate paths (via `BASAgentFabricAdapters`)
+    ///   1. Build up to 9 seat DTOs from the supplied L7 frame +
+    ///      L9 candidate paths + 5 optional pre-built DTOs
+    ///      (memory / critic / hostAlignment / sovereignSentinel
+    ///      / evolutionShadow) via `BASAgentFabricAdapters`
     ///   2. Call `BASAgentTurnDispatcher.dispatch(...)` which runs
-    ///      Scout → Planner → Risk → Surface,merges deltas,
-    ///      applies accepted deltas to the shared state graph,
-    ///      writes events to the trace log if configured
+    ///      the configured seat set through the merge + apply
+    ///      pipeline,writes events to the trace log if configured
     ///   3. Return the `BASAgentTurnResult` — caller decides
     ///      what (if anything) to do with it
     ///
@@ -215,11 +216,29 @@ public struct BASEBrainRuntimeCoordinator {
     /// chapter 961+ (fabric-authoritative mode) wires the
     /// dispatcher's surface delta into the actual render frame
     /// + risk gate。
+    ///
+    /// chapter 九百八十五 / M3630 — Cross-Module Integration Arc
+    /// ch3 (closes ch 982.5 META-REVIEW Gap 8):the 5 optional
+    /// pre-built DTOs let callers wire the 5 optional seats
+    /// (Memory/Critic/HostAlignment/SovereignSentinel/
+    /// EvolutionShadow) through this entry point。 Previous
+    /// versions of `runAgentFabricObservation` only built DTOs
+    /// for Scout/Planner/Risk/Surface — the other 5 seats were
+    /// unreachable through coordinator even when their roster
+    /// slots were configured。 Defaulted nil preserves all prior
+    /// callers byte-equal。
     public func runAgentFabricObservation(
         turnID: String,
         decomposeFrame: BASDecomposeFrame,
         candidatePaths: [BASCandidatePath],
         acceptedCandidateID: String? = nil,
+        memory: BASMemorySeatInput? = nil,
+        critic: BASCriticSeatInput? = nil,
+        hostAlignment: BASHostAlignmentInput? = nil,
+        sovereignSentinel:
+            BASSovereignSentinelInput? = nil,
+        evolutionShadow:
+            BASEvolutionShadowInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -230,6 +249,11 @@ public struct BASEBrainRuntimeCoordinator {
             decomposeFrame: decomposeFrame,
             candidatePaths: candidatePaths,
             acceptedCandidateID: acceptedCandidateID,
+            memory: memory,
+            critic: critic,
+            hostAlignment: hostAlignment,
+            sovereignSentinel: sovereignSentinel,
+            evolutionShadow: evolutionShadow,
             priorityContext: priorityContext,
             nowNanos: nowNanos)
         return await agentFabric.dispatchTurn(input: input)

@@ -121,6 +121,14 @@ public enum BASAgentFabricAdapters {
     /// Now coordinators can pass pre-built DTOs from their L8/
     /// triSelf/host-constitution/sovereign-state adapters。
     /// Defaulted nil preserves prior 4-seat caller compat。
+    ///
+    /// chapter 九百八十五 / M3630 — Cross-Module Integration Arc ch3:
+    /// added optional `evolutionShadow` parameter,closing
+    /// ch 982.5 META-REVIEW Gap 8。 Before this chapter the
+    /// 9th seat (ch 965 EvolutionShadow) was unreachable
+    /// through coordinator adapter even when its roster slot
+    /// was set。 Defaulted nil preserves all prior callers
+    /// byte-equal。
     public static func turnInput(
         turnID: String,
         decomposeFrame: BASDecomposeFrame,
@@ -131,6 +139,8 @@ public enum BASAgentFabricAdapters {
         hostAlignment: BASHostAlignmentInput? = nil,
         sovereignSentinel:
             BASSovereignSentinelInput? = nil,
+        evolutionShadow:
+            BASEvolutionShadowInput? = nil,
         priorityContext: BASMergePriorityContext =
             BASMergePriorityContext(),
         nowNanos: Int64 = 0
@@ -149,6 +159,7 @@ public enum BASAgentFabricAdapters {
             critic: critic,
             hostAlignment: hostAlignment,
             sovereignSentinel: sovereignSentinel,
+            evolutionShadow: evolutionShadow,
             priorityContext: priorityContext,
             nowNanos: nowNanos)
     }
