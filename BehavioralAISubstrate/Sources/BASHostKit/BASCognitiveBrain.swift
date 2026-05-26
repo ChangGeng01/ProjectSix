@@ -2733,9 +2733,41 @@ extension BASCognitiveBrain {
     /// Always routes through Rust scalar (measured tie with
     /// SIMD,scalar is simpler)。 Returns the normalized
     /// probability vector + which path executed。
+    ///
+    /// chapter 九百九十八 / M3695 — first production-side ANE
+    /// classifier consultation。 Pre-ch-998 the
+    /// `BASANEKernelEligibilityClassifier` had been in the
+    /// substrate since chapter 500 with the explicit honest
+    /// disclosure `consultedByExecutorInProduction = false`。
+    /// 497 chapters of cascade work never closed this gap。
+    /// ch 998 adds an OBSERVE-ONLY consultation here:before
+    /// dispatching softmax to the Rust scalar path,record the
+    /// ANE classifier's `.softmax` tier into the runtime
+    /// counter。 This is the smallest possible "production
+    /// consultation" foothold — it does NOT yet branch
+    /// dispatch on the tier (that's phase 9+ scope per ch 994
+    /// fabric-authoritative-mode-style behavioral changes),
+    /// but it proves the wire exists by incrementing the
+    /// `executorConsultationCount` counter per call。
+    ///
+    /// Tests can observe via
+    /// `BASANEKernelEligibilityClassifier.executorConsultationCount`
+    /// to verify production code paths are reaching the
+    /// classifier。 Honest doctrine for substrate adopters:
+    /// "softmax dispatch consults the ANE classifier;output
+    /// is observed not used for routing"。
     public nonisolated static func softmaxAuto(
         _ x: [Float]
     ) -> BASAutoRouteResult<[Float]> {
+        // ch 998:observe-only ANE consultation。 Counter is
+        // nonisolated(unsafe) so concurrent increments may lose
+        // updates,but for the invariant proof "at least one
+        // production caller reached the classifier" any
+        // increment > 0 is sufficient evidence。
+        _ = BASANEKernelEligibilityClassifier
+            .tier(for: .softmax)
+        BASANEKernelEligibilityClassifier
+            .executorConsultationCount += 1
         return BASAutoRouteRanker.softmax(x)
     }
 

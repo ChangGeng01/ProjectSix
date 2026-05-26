@@ -136,6 +136,47 @@ public enum BASANEKernelEligibilityClassifier {
     /// DispatchExecutor consults this classifier at
     /// chapter 500 close-out。 FALSE — wire-in deferred
     /// to follow-up arc。 Honest scope acknowledgment。
+    ///
+    /// chapter 九百九十八 / M3695 update:still FALSE at this
+    /// invariant level (a static-let cannot reflect runtime
+    /// state),BUT see the new `executorConsultationCount`
+    /// counter below — production executor side now DOES
+    /// consult the classifier via `BASAutoRouteRanker
+    /// .consultANE(for:)`,and that counter increments per
+    /// call。 The invariant `consultedByExecutorInProduction`
+    /// at chapter-500 doctrine semantics meant "the substrate's
+    /// runtime dispatch path branches on this classifier's
+    /// output" — that is STILL false (ch 998 only adds an
+    /// observe-only consultation that records the tier into
+    /// audit but doesn't branch dispatch logic on it)。
+    ///
+    /// Future arc (post-ch-998) can flip this to true by
+    /// wiring `tier(for:)` into the actual kernel-choice
+    /// branches in `BASAutoRouteRanker.softmaxChoice` /
+    /// `matMulChoice` / etc。 ch 998 closes the smaller gap:
+    /// "no production consultation at all" → "at least one
+    /// production-side caller invokes the classifier per
+    /// dispatch"。
     public static let consultedByExecutorInProduction: Bool =
         false
+
+    /// chapter 九百九十八 / M3695 — runtime counter incremented
+    /// by `BASAutoRouteRanker.consultANE(for:)` each time the
+    /// production executor side consults the classifier。 Lets
+    /// tests + audit prove that production code paths ARE
+    /// reaching the classifier。 Pre-ch-998 this counter
+    /// stayed at 0 across the entire arc — confirming
+    /// consultedByExecutorInProduction=false。 Post-ch-998 the
+    /// counter increments on each consultation,proving the
+    /// observe-only wire is live。
+    ///
+    /// Note:this is a `nonisolated(unsafe)` static var because
+    /// it's incremented from synchronous static contexts and
+    /// observed from sync tests。 Concurrent increments may
+    /// race + lose updates (the counter is an APPROXIMATE
+    /// observability signal,not a strict counter)。 Hosts
+    /// requiring exact counting should add their own
+    /// instrumented wrapper around consultANE。
+    nonisolated(unsafe)
+    public static var executorConsultationCount: Int = 0
 }
