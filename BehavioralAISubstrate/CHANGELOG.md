@@ -11,6 +11,136 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百七十-九百七十二 / M3555-M3565 — Phase 5 close:7 watcher agents + L14 audit aggregator + adversarial fuzz
+
+Closes Phase 5 of the Agent Fabric arc:user design Section 9.8
+quiet-observer layer。 7 watcher agents per plan,each READ-ONLY
+(zero `writeDomains`),pattern-based (no ML per ch 944 H2 —
+100% replayable + auditable),emitting `BASAgentWatcherHint`
+records that aggregate into the L14 audit ledger via the
+existing `SovereignAuditEntry.signalRefs [String]` channel
+(zero schema change per ch 953 absorption contract)。
+
+#### 7 watchers shipped (3 chapters)
+
+| ch | Watcher | Severity ladder | Detects |
+|---|---|---|---|
+| 970 | **Anomaly** | watch / alert | candidate-count + pressure + manipulation surges |
+| 970 | **MemoryPollution** | watch / alert | duplicate arcs / fabrication-suspect / orphan conflicts |
+| 970 | **HostDrift** | watch | untracked-axis touches / surface-risk mismatch |
+| 971 | **Gaslight** | watch / alert / veto | 4 pattern categories (absolute / reality-denial / emotional-invalidation / trust-erosion) |
+| 971 | **ToolInjection** | alert / veto | OWASP LLM Top 10 injection markers |
+| 972 | **AxisDeviation** | alert / veto | coordinated boundary attacks (same axis ≥ 3 candidates) |
+| 972 | **SanctumLeak** | veto (always) | sealed prefixes leaked into non-sealed channels |
+
+#### Severity ladder
+
+`BASAgentWatcherSeverity` (4 cases pinned):
+- `.info` — observed,no concern (audit-only)
+- `.watch` — worth tracking (counter-incremented)
+- `.alert` — sovereign should know (surfaces next cycle)
+- `.veto` — escalate to L14 IMMEDIATELY (sentinel may emit
+  lockdown verdict in response)
+
+Sanctum leak is ALWAYS `.veto` (sealed data in non-sealed
+channel = Root Law 4 violation by definition)。 Gaslight at
+4/4 contributors → `.veto` (textbook attack)。 Tool injection
+at 3+ markers → `.veto` (coordinated attack)。 Axis deviation
+at 5+ candidates same axis → `.veto`。
+
+#### L14 audit aggregator
+
+`BASWatcherAuditAggregate` per-turn record carries:
+- `allHints: [BASAgentWatcherHint]` — full set,sorted by hintID
+- `bySeverity: [String: Int]` — counts per severity
+- `byRole: [String: Int]` — counts per watcher role
+- `signalRefs: [String]` — sorted refs ready to absorb into
+  L14 `SovereignAuditEntry.signalRefs` using:
+  - `agentWatcher.flag:<role>:<category>:<hintID>` per
+    `.alert` + `.veto` hint
+  - `agentWatcher.count:<severity>:<count>` per severity total
+- `anyVeto: Bool` — true if any hint reached `.veto`
+- `actionable: Bool` — true if any `.alert` or `.veto` present
+
+Caller decides whether to surface the aggregate to audit。
+Empty input or info/watch-only observations produce zero
+signalRefs (audit ledger stays quiet on noise-free turns)。
+
+#### Adversarial fuzz suite (Phase 5 close)
+
+Per plan,Phase 5 close ships an adversarial fuzz harness
+pinning that known-bad inputs trigger the right watchers:
+
+1. **Textbook gaslight (4/4 categories)** → GaslightWatcher `.veto`
+2. **Injection storm (3+ markers)** → ToolInjectionWatcher `.veto`
+3. **Sanctum leak (sealed prefix in planner)** → SanctumLeakWatcher `.veto`
+4. **Coordinated axis attack (6 candidates same axis)** → AxisDeviationWatcher `.veto`
+5. **Multi-vector (all 4 above)** → ≥ 3 distinct watchers fire `.veto` (defense in depth)
+
+All 5 attack scenarios pinned by `testCRITICAL_AdversarialFuzz_*` tests。
+
+#### Read-only invariants (CRITICAL)
+
+Per plan + Single-Writer-Per-Domain discipline,watchers MUST
+never write to the state graph。 Verified by:
+- Watcher agent specs constructed with `writeDomains: []` in
+  all ch 970-972 tests
+- `BASAgentWatcherHint` is a different type than `BASAgentDelta`
+  (no aliasing)
+- `BASAgentWatcherDispatch.runPhase5` returns
+  `BASWatcherAuditAggregate`,NOT `BASAgentTurnResult` (different
+  channel,never goes through merge engine)
+
+#### Files (ch 970 + 971 + 972)
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASAgentWatcher.swift` | NEW — protocol + hint DTO + 3 watchers (ch 970) |
+| `Sources/BASMemory/BASGaslightToolInjectionWatchers.swift` | NEW — 2 watchers (ch 971) |
+| `Sources/BASMemory/BASAxisSanctumWatchersAggregator.swift` | NEW — 2 watchers + L14 aggregator (ch 972) |
+| `Tests/BehavioralAISubstrateTests/BASChapter970WatcherTests.swift` | NEW — 21 tests |
+| `Tests/BehavioralAISubstrateTests/BASChapter971WatcherGaslightToolInjTests.swift` | NEW — 17 tests |
+| `Tests/BehavioralAISubstrateTests/BASChapter972WatcherPhase5CloseTests.swift` | NEW — 24 tests (incl. 5 adversarial fuzz CRITICAL tests) |
+| `Docs/PHASE_5_CLOSE_SMOKE.md` | NEW — operator smoke procedure + invariant list |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| Phase 5 tests (ch 970-972) | 62 / 0 failures |
+| Cumulative arc tests (ch 953-972) | 484 / 0 failures |
+| Full sweep | 14,112 / 0 failures (113 fuzz-skipped via env var) |
+
+#### Phase 5 summary
+
+- **7 watcher agents** wired (all 7 of the 7 watcher roles per plan)
+- **4 severity levels** with audit-trail discipline + sorted
+  signalRefs + agentWatcher.* reserved prefix
+- **Pattern-based detection** (no ML) — 100% deterministic +
+  replayable + explainable per ch 944 H2
+- **62 new tests** including 5 adversarial fuzz scenarios
+- ADR-014 OPT-IN preserved — pre-Phase-5 callers (direct seat
+  emission without watchers) unchanged
+
+#### Phase 5 plan thread (3 chapters)
+
+| Chapter | Scope |
+|---|---|
+| 970 | Watcher protocol + 3 watchers (Anomaly / MemoryPollution / HostDrift) |
+| 971 | 2 more watchers (Gaslight / ToolInjection) + prompt-injection scan |
+| 972 | Final 2 watchers (AxisDeviation / SanctumLeak) + L14 audit aggregator + adversarial fuzz suite |
+
+#### Next phase
+
+Phase 6 (SDK productization, ch 973-975):polish public SDK
+surface for external consumers (Qinao runtime,3rd-party hosts);
+skill agents framework;sample host integration in DeviceTestApp。
+The env-var gate documented across Phase 4/5 close docs
+(`BAS_PERSONA_ENABLED`,`BAS_WATCHERS_ENABLED`) lands in Phase 6
+as part of host-side integration。
+
+---
+
 ### Chapter 九百六十九.5 / M3550.5 — USER-PASS-6:全面 3-agent review of Phase 4 catches sovereignty crisis + 4 HIGH + doc lies
 
 Per N-pass discipline (6th cumulative review cycle on arc 953-969),
