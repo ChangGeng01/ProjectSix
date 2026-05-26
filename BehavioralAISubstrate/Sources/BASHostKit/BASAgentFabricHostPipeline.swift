@@ -158,11 +158,31 @@ public struct BASAgentFabricHostPipeline {
         decomposeFrame: BASDecomposeFrame,
         candidatePaths: [BASCandidatePath],
         acceptedCandidateID: String? = nil,
+        riskCard: BASRiskCard? = nil,
+        triScores: [BASTriSelfScore] = [],
+        memoryInput: BASMemorySeatInput? = nil,
+        sovereignSentinelInput:
+            BASSovereignSentinelInput? = nil,
+        evolutionShadowInput:
+            BASEvolutionShadowInput? = nil,
         warrantValidation: (
             result: BASWarrantValidationResult,
             externalAgentID: String)? = nil,
+        priorityContext: BASMergePriorityContext =
+            BASMergePriorityContext(),
         nowNanos: Int64 = 0
     ) async throws -> BASAgentFabricHostOutcome {
+        // chapter 九百九十五.5 META-REVIEW Round-12 CRITICAL-1
+        // fix:pre-fix this method accepted only 5 of 12
+        // BASAgentFabricLiveInputs fields as parameters → the
+        // other 6 enrichment inputs (riskCard / triScores /
+        // memoryInput / sovereignSentinelInput /
+        // evolutionShadowInput / priorityContext) were
+        // unreachable through the pipeline。 SAME CLASS as
+        // Round-10 riskCard and Round-11 priorityContext orphan
+        // catches — but at the wrapping layer。 Fix:extended
+        // signature to accept all 6 fields as defaulted-nil/
+        // -empty parameters。
         var diagnostics: [String: String] = [:]
 
         // Step 1:gate check
@@ -173,6 +193,26 @@ public struct BASAgentFabricHostPipeline {
         diagnostics["gate.tier"] = activation.tier.rawValue
         diagnostics["gate.transcriptMode"] =
             activation.transcriptMode.rawValue
+        // chapter 九百九十五.5 META-REVIEW Round-12 MED-2 fix:
+        // gate.activeAgents was parsed but silently dropped。
+        // Now surfaces in diagnostics for host inspection。
+        diagnostics["gate.activeAgents"] =
+            activation.activeAgents.joined(separator: ",")
+        // chapter 九百九十五.5 META-REVIEW Round-12 CRITICAL-2
+        // fix:surface coordinator.agentFabric?.mode in
+        // diagnostics so host can observe which mode was active
+        // for this turn。 Note:per ch 994 scaffold doctrine,
+        // the substrate does NOT branch on mode itself — the
+        // mode is a signal for host's downstream consumer to
+        // decide whether to USE the dispatcher's deltas as
+        // observation-only or as authoritative replacements
+        // for coordinator output。 The diagnostic makes the
+        // signal observable so a host's branching logic
+        // (`if mode == .authoritative { replace render frame }`)
+        // has the right value to read。
+        if let mode = coordinator.agentFabric?.mode {
+            diagnostics["fabric.mode"] = mode.rawValue
+        }
         guard activation.fabricEnabled else {
             return BASAgentFabricHostOutcome(
                 result: nil,
@@ -190,22 +230,25 @@ public struct BASAgentFabricHostPipeline {
         }
 
         // Step 2:assemble live inputs
-        // Note:in this reference implementation we don't pull
-        // BASRiskCard / BASTriSelfScore from services because
-        // doing so requires a fully-built thoughtFrame /
-        // contextFrame which the host's per-turn pipeline owns。
-        // Host implementations override `enrichLiveInputs(...)`
-        // by building their own pipeline subclass or by passing
-        // additional parameters。 The reference pipeline ships
-        // the GATE + ADAPTER WIRING;the host-specific service
-        // input building is per-host concern by design。
+        // chapter 九百九十五.5 Round-12 CRITICAL-1:all 12
+        // fields now flow through from the runTurn parameters
+        // (or coordinator.hostConstitution which the pipeline
+        // can read directly without per-call params)。
         let liveInputs = BASAgentFabricLiveInputs(
             frame: decomposeFrame,
             candidatePaths: candidatePaths,
             acceptedCandidateID: acceptedCandidateID,
             hostConstitution:
                 coordinator.hostConstitution,
+            riskCard: riskCard,
+            triScores: triScores,
+            memoryInput: memoryInput,
+            sovereignSentinelInput:
+                sovereignSentinelInput,
+            evolutionShadowInput:
+                evolutionShadowInput,
             warrantValidation: warrantValidation,
+            priorityContext: priorityContext,
             nowNanos: nowNanos)
 
         if let constitution = coordinator.hostConstitution {
@@ -213,6 +256,10 @@ public struct BASAgentFabricHostPipeline {
         }
         diagnostics["candidates.count"] =
             "\(candidatePaths.count)"
+        diagnostics["risk.card-supplied"] =
+            riskCard != nil ? "yes" : "no"
+        diagnostics["tri.scores-count"] =
+            "\(triScores.count)"
 
         // Step 3:invoke fabric through convenience adapter
         let result = try await BASAgentFabricFullTurnAdapter

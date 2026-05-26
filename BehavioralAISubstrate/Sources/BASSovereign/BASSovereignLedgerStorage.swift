@@ -194,6 +194,16 @@ public final class BASSovereignLedgerSQLiteStorage:
         }
         self.db = handle
 
+        // chapter 九百九十五.5 META-REVIEW Round-12 HIGH-2 fix:
+        // set busy_timeout BEFORE any other pragmas so
+        // concurrent first-open of a fresh DB doesn't hit
+        // SQLITE_BUSY on journal_mode/foreign_keys writes。
+        // Round-11 HIGH-2 fix had set busy_timeout ONLY inside
+        // the v1→v2 migration branch — Round-12 caught the
+        // remaining gap at WAL setup。
+        try Self.runExec(
+            db: handle,
+            sql: "PRAGMA busy_timeout=5000;")
         try Self.runExec(
             db: handle,
             sql: "PRAGMA journal_mode=WAL;")
