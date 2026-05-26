@@ -45,10 +45,20 @@ import Foundation
 
 // MARK: - Session snapshot
 
+/// Slim Codable record of one agent fabric session's persistent
+/// state for app-suspend/resume。 Host serializes this when iOS
+/// backgrounds the app and deserializes when relaunched。 Per
+/// ch 981.6 USER-PASS-8 doc fix:public type now has per-field
+/// doc comments matching the rest of the substrate's discipline。
 public struct BASAgentFabricSessionSnapshot:
     Sendable, Equatable, Hashable, Codable
 {
+    /// Unique snapshot ID (caller-supplied)。 Suggested format:
+    /// `snap.<sessionID>.<turnCount>.<nanos>`。
     public let snapshotID: String
+    /// Session this snapshot belongs to。 Used during restore
+    /// to ensure we're restoring into the right session
+    /// context。
     public let sessionID: String
     /// SDK version this snapshot was created under。 Caller
     /// (host) compares against current SDK version on restore
@@ -110,6 +120,12 @@ public struct BASAgentFabricSessionSnapshot:
 
 // MARK: - Restore validation
 
+/// Result of validating a deserialized snapshot before
+/// restoring。 Returned by `BASAgentFabricColdRestart
+/// .validate(...)` — caller uses `valid` to decide whether
+/// to restore at all,`rejectedPersonaIDs` to drop forbidden
+/// personas on restore,and `findings` for the L14 audit
+/// ledger。
 public struct BASColdRestartValidationResult:
     Sendable, Equatable, Hashable, Codable
 {
@@ -134,6 +150,12 @@ public struct BASColdRestartValidationResult:
     }
 }
 
+/// Namespace for cold-restart pure-fn surface。 All static
+/// members — caller does not instantiate。 The actual
+/// persistence I/O (write/read snapshot bytes to disk /
+/// keychain) is OUTSIDE this layer's scope — host's
+/// app-lifecycle code handles I/O,this layer just provides
+/// the Codable type + validation logic。
 public enum BASAgentFabricColdRestart {
 
     /// Maximum allowed snapshot age in nanoseconds。 Default
@@ -174,16 +196,32 @@ public enum BASAgentFabricColdRestart {
         }
 
         // Rule 2:age check (skip when currentNanos = 0,
-        // meaning caller wants to skip age check)
+        // meaning caller wants to skip age check)。
+        // chapter 九百八十一.6 USER-PASS-8 MED-future-date fix:
+        // also catch future-dated snapshots (createdAtNanos
+        // > currentNanos)。 A negative-age computation would
+        // silently bypass the age check before — could indicate
+        // clock skew or tampering。
         if currentNanos > 0 &&
            snapshot.createdAtNanos > 0
         {
-            let age = currentNanos - snapshot.createdAtNanos
-            if age > maxAgeNanos {
+            if snapshot.createdAtNanos > currentNanos {
                 findings.append(
-                    "coldRestart.snapshot-too-old:age-nanos=" +
-                    "\(age):max-nanos=\(maxAgeNanos)")
+                    "coldRestart.snapshot-future-dated:" +
+                    "snapshot-nanos=" +
+                    "\(snapshot.createdAtNanos):" +
+                    "current-nanos=\(currentNanos)")
                 valid = false
+            } else {
+                let age = currentNanos
+                    - snapshot.createdAtNanos
+                if age > maxAgeNanos {
+                    findings.append(
+                        "coldRestart.snapshot-too-old:" +
+                        "age-nanos=\(age):" +
+                        "max-nanos=\(maxAgeNanos)")
+                    valid = false
+                }
             }
         }
 

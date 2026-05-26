@@ -85,7 +85,7 @@ public struct BASMCPInvocation:
     /// Unique invocation ID per call。 Used for trace replay。
     public let invocationID: String
     /// The MCP server's raw output。 Treated as untrusted input
-    /// until the gateway runs all 4 pipeline steps。
+    /// until the gateway runs all 6 pipeline steps。
     public let rawOutput: String
     /// Caller's BASActionPermit identifier (tool-domain scope)。
     /// Empty = no permit declared (will be rejected by Step 2)。
@@ -165,7 +165,7 @@ public struct BASMCPProvenanceSeal:
 public struct BASMCPGatewayResult:
     Sendable, Equatable, Hashable, Codable
 {
-    /// True if the invocation passed all 4 pipeline steps。
+    /// True if the invocation passed all 6 pipeline steps。
     public let accepted: Bool
     /// Provenance seal IF accepted。 Nil when rejected。
     public let seal: BASMCPProvenanceSeal?
@@ -206,7 +206,7 @@ public enum BASMCPCapabilityGateway {
     /// = sovereign-significant threat,reject。
     public static let rejectTrustThreshold: Double = 0.25
 
-    /// Run the 4-step pipeline。 Pure function。 Returns
+    /// Run the 6-step pipeline。 Pure function。 Returns
     /// `BASMCPGatewayResult` with seal + sealed output OR
     /// rejection reason + watcher hints。
     public static func invoke(

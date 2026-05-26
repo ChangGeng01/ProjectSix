@@ -72,16 +72,19 @@
 
 ### Reserved signalRefs prefixes (L14 absorption channel)
 
-Per ch 981.5 USER-PASS-7 DH3 doc-fix:9 prefixes are **reserved**
-for the agent fabric subsystem (no other substrate code may emit
-`signalRefs` starting with these prefixes)。 6 are **in-use today**
-+ 3 are **future-allocation** (reserved but not yet emitted by any
-source path)。
+Per ch 981.5 USER-PASS-7 DH3 doc-fix + ch 981.6 USER-PASS-8 D1
+correction:9 prefixes are **reserved** for the agent fabric
+subsystem (no other substrate code may emit `signalRefs` starting
+with these prefixes)。 **5 are in-use today + 4 are
+future-allocation** (reserved but not yet emitted by any source
+path)。 `agentFabric.merged:` was mislabeled "in-use" in 981.5;
+verified by grep that it only appears in a doc comment in
+`BASAgentMergeResult.swift:57`,not in any actual emit path。
 
 | Prefix | Phase | Status | Carries |
 |---|---|---|---|
 | `agentFabric.activated:` | 1+ | future-allocation | per-seat activation (when coordinator wires) |
-| `agentFabric.merged:` | 0 | in-use | merge engine outcomes |
+| `agentFabric.merged:` | 0 | future-allocation | merge engine outcomes (when coordinator emits) |
 | `agentPersona.applied:` | 4 | future-allocation | persona SDK applications (when coordinator emits) |
 | `agentPersona.clamped:` | 4 | future-allocation | Risk + Sovereign clamp outcomes (when emitted) |
 | `agentWatcher.flag:` | 5 | in-use | per-hint at .alert/.veto |
@@ -188,7 +191,7 @@ Pass criteria for arc seal:
 - All 20 agents respect sovereign-lock invariants
 - All 4 sealed-LOW agents force-default through full chain
 
-> **Note**: Per the env-var deferred item above, the 3-mode operator procedure requires the BAS_AGENT_FABRIC env var to be wired into `scripts/run-iphone-air-10hr.sh` and the dispatcher. As of ch 981, this wiring is documented as future host-app integration work. Operator may either (a) wait for that integration, OR (b) run the baseline smoke as-is + manually exercise the 18-agent set through a test harness that calls `BASAgentTurnDispatcher.dispatch(...)` directly.
+> **Note**: Per the env-var deferred item above, the 3-mode operator procedure requires the BAS_AGENT_FABRIC env var to be wired into `scripts/run-iphone-air-10hr.sh` and the dispatcher. As of ch 981, this wiring is documented as future host-app integration work. Operator may either (a) wait for that integration, OR (b) run the baseline smoke as-is + manually exercise the 20-agent set through a test harness that calls `BASAgentTurnDispatcher.dispatch(...)` directly.
 
 ## Arc seal declaration
 

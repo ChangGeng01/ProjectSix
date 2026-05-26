@@ -161,7 +161,7 @@ These string prefixes are reserved for the agent fabric subsystem. Other subsyst
 | Prefix | Used by | Status | Format |
 |---|---|---|---|
 | `agentFabric.activated:` | dispatcher (Phase 1+) | future-allocation | `agentFabric.activated:<role>:<agentID>` |
-| `agentFabric.merged:` | merge engine | in-use | `agentFabric.merged:<deltaID>:<status>` |
+| `agentFabric.merged:` | merge engine | future-allocation | `agentFabric.merged:<deltaID>:<status>` |
 | `agentPersona.applied:` | persona SDK | future-allocation | `agentPersona.applied:<personaID>:<changes>` |
 | `agentPersona.clamped:` | risk + sovereign clamps | future-allocation | `agentPersona.clamped:<source>:<field>:<value>` |
 | `agentWatcher.flag:` | watcher aggregator | in-use | `agentWatcher.flag:<role>:<category>:<hintID>` |
@@ -170,7 +170,7 @@ These string prefixes are reserved for the agent fabric subsystem. Other subsyst
 | `agentExternal.tier:` | A2A external gateway (Phase 7) | in-use | `agentExternal.tier:<externalID>:<effectiveTier>` |
 | `agentExternal.trust:` | A2A external gateway (Phase 7) | in-use | `agentExternal.trust:<externalID>:<trustScore>` |
 
-Per ch 981.5 USER-PASS-7 DH3 doc-fix:9 prefixes are reserved。 6 are in-use today (merged / watcher.flag / watcher.count / external.proposal / external.tier / external.trust);3 are future-allocation (fabric.activated / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。
+Per ch 981.6 USER-PASS-8 D1 fix:9 prefixes reserved。 5 in-use today (watcher.flag / watcher.count / external.proposal / external.tier / external.trust);4 future-allocation (fabric.activated / fabric.merged / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。 The `agentFabric.merged:` prefix was misclassified "in-use" in ch 981.5 DH3 but verified by grep to only appear in a doc comment (`BASAgentMergeResult.swift:57`),NOT in any source-side emit path。
 
 ---
 

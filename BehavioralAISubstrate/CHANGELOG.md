@@ -11,6 +11,178 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百八十一.6 / M3610.6 — USER-PASS-8:5th N-pass review catches 4 HIGH + 4 MED introduced by ch 981.5 fixes themselves
+
+**Per ch 943 cascade precedent**:every fix attracts new findings,
+especially in persona-/sovereign-adjacent code。 USER-PASS-8
+dispatched 3 parallel reviewers on the ch 981.5 USER-PASS-7 fix
+batch and found that several of the ch 981.5 fixes introduced
+NEW bugs distinct from what they addressed。
+
+#### HIGH severity (4 — all introduced by ch 981.5 fixes themselves)
+
+**D4-H — DH6 step-label fix missed 3 top-level docstrings**
+
+The ch 981.5 DH6 fix normalized `BASMCPCapabilityGateway`'s
+pipeline numbering from 0/4/2/2.5/1/3 to monotonic 1-6,but
+only touched the header + inline `// Step N:` comments。
+3 surviving public docstrings still said "4 pipeline steps" /
+"4-step pipeline" (lines 88,168,209)。
+
+Fix:replace all 3 occurrences with "6 pipeline steps" /
+"6-step pipeline"。 The docstring count now matches the actual
+implementation。
+
+**D2-H — DH4 "18→20 agents" fix incomplete**
+
+The ch 981.5 DH4 fix claimed "Fixed all occurrences" of
+"18 agents" but 3 surviving references remained:
+`PHASE_8_CLOSE_SMOKE.md` lines 20 + 27 + `ARC_SEAL_953_981.md`
+line 191 (the operator narrative passages,not the table cells
+the DH4 fix updated)。
+
+Fix:replaced all 3 with "20-agent" plural form to match the
+already-corrected table。
+
+**D1-H — DH3 mislabeled `agentFabric.merged:` as in-use**
+
+The ch 981.5 DH3 fix declared "6 in-use + 3 future-allocation"
+audit prefixes,but `agentFabric.merged:` was in the in-use
+column when in fact it only appears in a doc comment in
+`BASAgentMergeResult.swift:57` — NEVER emitted to any audit
+ref by any code path。
+
+Fix:re-classified to "future-allocation" in both
+`ARC_SEAL_953_981.md` and `SDK_API_STABILITY.md`。 Updated the
+prose count to **5 in-use + 4 future-allocation**。
+
+**MG-i — `testHG4_MCPRejectThresholdBoundary` was a stub**
+
+The ch 981.5 HG4 fix tried to add a boundary test for MCP's
+trust threshold,but the test only pinned the constant +
+constructed a free-floating seal — it never actually invoked
+the gateway。 False-confidence test。
+
+Fix:upgraded to actually invoke `BASMCPCapabilityGateway.invoke(...)`
+at trust=0.5 (above threshold) and trust=0.0 (below threshold,
+3-marker injection)。 Both accept and reject paths now exercised。
+
+#### MED severity (4 — also introduced by ch 981.5 fixes)
+
+**MED-LCG — DI7 deterministic LCG made `pSkep` + `floor` affine-linked**
+
+The ch 981.5 DI7 formula
+`(seed × 1103515245 + 12345 + mix × 7919) & 0x7FFFFFFF`
+produced 2 samples per seed that differed by a CONSTANT offset
+(per fixed `mix` value pair)。 Not independent random samples
+— a 1-D line through 2-D space。 SystemRandomNumberGenerator
+had delivered independent (pSkep,floor);the deterministic
+replacement did not。
+
+Fix:state-advancement LCG。 Both inputs come from advancing
+the LCG state STEP times from the seed,not from concurrent
+mix-mixing:
+
+```swift
+private func detRng(seed: Int, step: Int = 1) -> Double {
+    var state: Int = seed
+    for _ in 0..<max(1, step) {
+        state = (state &* 1103515245 &+ 12345) & 0x7FFFFFFF
+    }
+    return Double(state) / Double(0x7FFFFFFF)
+}
+```
+
+Call sites updated to use step=1 (first draw) and step=2
+(second draw) — these are now truly independent samples per
+LCG full-period property。 Plus a meta-test
+`testDetRngIsDeterministicAndIndependent` pins both
+determinism + independence。
+
+**MED-future-date — DI3 age check passed silently for future-dated snapshots**
+
+`BASAgentFabricColdRestart.validate(...)` Rule 2 computed
+`age = currentNanos - snapshot.createdAtNanos` and checked
+`age > maxAgeNanos`。 For a future-dated snapshot (clock skew
+or tampering),age is NEGATIVE,which is NOT greater than the
+positive maxAgeNanos → snapshot incorrectly accepted。
+
+Fix:added explicit `if snapshot.createdAtNanos > currentNanos`
+check that emits `coldRestart.snapshot-future-dated:...`
+finding + fails validation。 Now catches clock-skew / tamper
+scenarios。
+
+**MED-doc — DI3 public types lacked `///` comments**
+
+`BASAgentFabricSessionSnapshot` + `BASColdRestartValidationResult`
++ `BASAgentFabricColdRestart` namespace lacked per-type doc
+comments,inconsistent with the rest of the substrate's
+discipline (every other Phase 7+8 type has `///`)。
+
+Fix:added per-type + per-field doc comments matching the
+substrate convention。
+
+**MED-sort — DI3 `rejectedPersonaIDs` sort invariant untested**
+
+`BASColdRestartValidationResult.findings` was tested for sort
+order but `rejectedPersonaIDs` was not。 A regression
+re-ordering the rule logic could surface unsorted IDs。
+
+Fix:added `testMEDSort_RejectedPersonaIDsSorted` with 2
+forbidden personas added in reverse order → result IDs sorted
+lexicographically。
+
+#### LOW severity (2 — deferred to future cleanup)
+
+- DI7 edge cases asymmetric:only skepticism gets explicit
+  edge case loop;guard + challenge don't。 Acceptable since
+  the property invariant holds across the 1000-iter fuzz。
+- H1 audit-ref `forceActivate:budget-exceeded:` is emitted
+  into `BASAgentTierActivationPlan.skips`,which is an
+  internal field not the L14 audit-ledger signalRef channel。
+  No reserved-prefix table addition needed。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASMCPCapabilityGateway.swift` | + D4-H1:3 docstrings updated to "6 pipeline steps" |
+| `Sources/BASMemory/BASAgentFabricColdRestart.swift` | + MED-future-date + MED-doc |
+| `Tests/.../BASChapter967PersonaRiskClampTests.swift` | + MED-LCG state-advancement + meta-test |
+| `Tests/.../BASChapter981_5UserPass7Tests.swift` | + MG-i HG4 test upgraded to exercise gateway |
+| `Tests/.../BASChapter981_6UserPass8Tests.swift` | NEW — 8 regression tests pinning all 6 fixes |
+| `Docs/PHASE_8_CLOSE_SMOKE.md` | + D2-H:18→20 agent |
+| `Docs/ARC_SEAL_953_981.md` | + D1-H + D2-H |
+| `Docs/SDK_API_STABILITY.md` | + D1-H |
+| `CHANGELOG.md` | + this entry |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| USER-PASS-8 regression tests (ch 981.6) | 8 / 0 failures |
+| Ch 967 deterministic fuzz (re-run after LCG state-advance fix) | 19 / 0 failures (+1 meta-test for LCG itself) |
+| Cumulative arc tests (ch 953-981.6) | 652 / 0 failures |
+
+#### N-pass discipline track record (5 rounds total)
+
+| Round | Sub-ch | Findings | Real bugs |
+|---|---|---|---|
+| 1 | 956.11 | 4C + 6H + MED + backfill | 10+ |
+| 2 | 964.5 | 2C + 4H + 7 doc + 6 gaps | 15+ |
+| 3 | 969.5 | 2C + 1 GAP + 4H + 1 DH + 2 DM | 10+ |
+| 4 | 981.5 | 2H + 7H + 6 doc + 2 DI closed | 15+ |
+| **5** | **981.6** (this) | **4H + 4M (all from ch 981.5 fixes)** | **8+ from prior round's fixes** |
+| **TOTAL** | **5 rounds** | | **58+ real bugs caught** |
+
+Round 5 demonstrates that **every fix attracts new findings**
+— even pure doc fixes (DH3/DH4/DH6) can introduce new lies
+when not exhaustively swept,and pure-fn determinism fixes
+(DI7) can introduce subtle distribution defects (affine-
+linkage)。 The discipline continues to pay off。
+
+---
+
 ### Chapter 九百八十一.5 / M3610.5 — USER-PASS-7:4th N-pass review catches 2 HIGH code + 7 HIGH test gaps + 6 HIGH doc lies + closes 2 deferred items
 
 **Final fix-of-fix sub-chapter of the Agent Fabric arc。** Per

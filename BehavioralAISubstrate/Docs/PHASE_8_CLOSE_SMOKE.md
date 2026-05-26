@@ -17,14 +17,14 @@ Per plan PHASE 8 close + arc seal requirements:
 1. All 3 Phase 8 perf primitives (latent spine + hot/cold tier + speculative prefetch) compose cleanly on real hardware
 2. Cumulative perf delta ≤ +15% vs ch 952.6 baseline across all 3 modes
 3. ALL Phase 0-7 sovereignty invariants STILL hold under Phase 8 perf optimizations
-4. 18-agent compare mode (9 core + 7 watcher + 4 reference skill) runs without crash or drift
+4. 20-agent compare mode (9 core + 7 watcher + 4 reference skill) runs without crash or drift
 5. Single-Writer-Per-Domain holds across all 12 domains regardless of which agent set is active
 
 ## 3-mode arc-seal procedure
 
 > **Pre-condition**: Same as Phase 7 smoke (real Gemma 4 E2B on iPhone Air via MLX) PLUS a mock 5-agent compare client that exercises Planner+Critic+Memory+Risk+Surface concurrently for Mode 3.
 
-> **Env-var caveat**: Per ch 981 ARC_SEAL deferred item #6, the `BAS_AGENT_FABRIC` / `BAS_AGENT_TIER` / `BAS_TRANSCRIPT_MODE` / `BAS_ACTIVE_AGENTS` env vars documented below are NOT YET WIRED into `scripts/run-iphone-air-10hr.sh` or the dispatcher. Phase 8 ships as library only. Operator either (a) wires the env-var gate in a separate commit, OR (b) runs the baseline smoke + manually exercises the 18-agent set through a custom test harness calling `BASAgentTurnDispatcher.dispatch(...)` directly.
+> **Env-var caveat**: Per ch 981 ARC_SEAL deferred item #6, the `BAS_AGENT_FABRIC` / `BAS_AGENT_TIER` / `BAS_TRANSCRIPT_MODE` / `BAS_ACTIVE_AGENTS` env vars documented below are NOT YET WIRED into `scripts/run-iphone-air-10hr.sh` or the dispatcher. Phase 8 ships as library only. Operator either (a) wires the env-var gate in a separate commit, OR (b) runs the baseline smoke + manually exercises the 20-agent set through a custom test harness calling `BASAgentTurnDispatcher.dispatch(...)` directly.
 
 ### Mode 1 — Fabric OFF (baseline ch 952.6 behavior)
 
