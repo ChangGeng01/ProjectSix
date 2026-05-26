@@ -118,6 +118,14 @@ public enum BASSovereignWarrantAuditBridge {
             "agentExternal.warrant:\(outcome):" +
             externalAgentID
         return BASSovereignAuditEntry(
+            // chapter 九百九十三 / M3670 — opt into hardened
+            // canonical-bytes format (U+001F inner / U+001E outer
+            // separators) per cross-arc separator-class fix。
+            // Warrant entries are the primary attack surface
+            // flagged at ch 982 Round-8 since signalRefs include
+            // caller-supplied opaque agentExternal.* strings that
+            // could legitimately contain `,`。
+            schemaVersion: "1.1.0",
             auditID: auditID,
             sessionID: sessionID,
             turnID: turnID,

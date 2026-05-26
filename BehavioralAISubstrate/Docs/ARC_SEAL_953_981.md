@@ -217,7 +217,7 @@ but worth a dedicated fix arc。
 **Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening。
 Documented here so it doesn't slip through the cracks。
 
-## Cross-module integration arc (ch 983-992 — ALL 8 GAPS CLOSED + N-pass review + residual sweep)
+## Cross-module integration arc (ch 983-993 — ALL 8 GAPS CLOSED + N-pass review + residual sweep + host-integration convenience + cross-arc separator hardening)
 
 The ch 982.5 META-REVIEW Reviewer-4 surfaced 8 specific cross-module integration gaps documented in the next section。 Per user direction「全面 开发」at the META-REVIEW close,a follow-up arc 983-990 landed adapters closing every one of those gaps。 This section pins the closure status before the original META-REVIEW disclosure remains as the rationale + design history。
 
@@ -236,7 +236,8 @@ The ch 982.5 META-REVIEW Reviewer-4 surfaced 8 specific cross-module integration
 | (coordinator E2E composition) | ch 991 | `BASChapter991CoordinatorIntegrationE2ETests` | 3 | proves 9-seat pipeline composes through coordinator with all 5 enrichment adapters + warrant audit + trace flush + frontier projection + MCP permit validation |
 | (N-pass review fix-of-fix) | ch 991.5 | adapters + tests + docs | 5 (added) | Round-9 cascade pattern: CRITICAL-1 (deny-scope set) + HIGH-1 (enrichCriticInput semantic inversion fixed to use fraction-vetoed) + GAP-1/2/7 mutation-safety pins |
 | (residual findings sweep) | ch 992 | adapters + tests | 12 (added) | **「全面 剩余 一次性 解决掉」**: MED-1 (enrichRiskInput merged-result clamp) + MED-2 (clamp test strengthening) + MED-3 (`includeSoftAxes` flag for 5-field BoundaryVeil union) + GAP-3 (concurrent recordEvent race) + GAP-4 (override clamp) + GAP-5 (negative-base clamp) + GAP-6 (U+001F in agentID/deltaID actions) + GAP-8 (empty sessionID synthesize) + GAP-9 (diversity exact 0.0) + GAP-10 (delayedPaths empty pin) + GAP-11 (source field per-entry correctness) |
-| **TOTAL** | **11 chapters** | **8 adapters / bridges + E2E + 2 fix-batches** | **91 tests** | **all CRITICAL + HIGH + MED + LOW invariants pinned + 9th N-pass review complete + residual findings closed** |
+| (host-integration + cross-arc hardening) | ch 993 | adapter + gate + canonical-bytes | 12 (added) | **「全部 剩余 部分 一次性 解决掉」**: A. `BASAgentFabricFullTurnAdapter.run(...)` collapses 14-step host pipeline to 1 call (closes UX gap) + B. `BASAgentFabricGate.activationFromEnvironment(...)` env-var probing (substrate-side of deferred item #6) + C. **CRITICAL cross-arc separator hardening** — `basSovereignAuditCanonicalBytes(...)` schema-gated U+001F/U+001E hardening for `1.1.0+` entries (closes ch 982 Round-8 cross-arc concern) + warrant bridge defaults to `1.1.0` hardened format |
+| **TOTAL** | **12 chapters** | **9 adapters / bridges + E2E + 2 fix-batches + host-integration + cross-arc hardening** | **103 tests** | **all CRITICAL + HIGH + MED + LOW invariants pinned + 9th N-pass review complete + residual findings closed + cross-arc concern closed + host-integration UX shipped** |
 
 ### What changed at the substrate level
 

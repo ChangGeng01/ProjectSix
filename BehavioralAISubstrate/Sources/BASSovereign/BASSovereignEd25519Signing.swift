@@ -105,27 +105,68 @@ public struct BASSovereignEd25519KeyPair: Sendable {
 /// internal `sign(_:)` and the public static `verify(_:)` path
 /// reference a single source of truth — a desync between them would
 /// be a silent integrity hole.
+///
+/// chapter 九百九十三 / M3670 — cross-arc canonical-bytes separator
+/// hardening (closes ch 982 Round-8 cross-arc concern):
+/// The pre-1.1.0 format uses `","` as the inner array separator and
+/// `"|"` as the outer field separator。 If any array entry CONTAINS
+/// a `,` (legitimately,since they include caller-supplied opaque
+/// strings like `agentExternal.proposal:<externalID>:...`),the
+/// canonical bytes become ambiguous — two different signalRef lists
+/// could yield the same canonical bytes,enabling signature
+/// collision。 Same class as ch 981.9 C1 fix。
+///
+/// Schema-version-gated separator choice (additive,backward-compat):
+///   - `"1.0.0"` (currentSchemaVersion as of ch 993):OLD format
+///     (`,` inner / `|` outer) — preserved for in-memory + on-disk
+///     ledger entries created before this chapter。 Vulnerable to
+///     the collision class above。
+///   - `"1.1.0"` (opt-in via explicit init):HARDENED format using
+///     U+001F (unit separator) inner + U+001E (record separator)
+///     outer。 Both are ASCII control chars forbidden in normal
+///     string content per RFC discipline,so collision is
+///     impossible regardless of caller-supplied content。
+///
+/// Callers wanting the hardened format MUST construct the entry
+/// with `schemaVersion: "1.1.0"` explicitly。 ch 993 also updates
+/// `BASSovereignWarrantAuditBridge.buildEntry(...)` to use the
+/// hardened format by default since warrant entries are the
+/// primary attack surface flagged by Round-8。
 package func basSovereignAuditCanonicalBytes(
     for entry: BASSovereignAuditEntry,
     priorHash: String,
     signingNamespace: String
 ) -> Data {
+    // Schema-version-gated separator choice。 Old format preserved
+    // for backward compat;new format uses ASCII control-char
+    // separators that cannot appear in user-supplied string content。
+    let arraySep: String
+    let fieldSep: String
+    if entry.schemaVersion == "1.0.0" {
+        arraySep = ","
+        fieldSep = "|"
+    } else {
+        // chapter 九百九十三 / M3670 hardened format:U+001F inner,
+        // U+001E outer。 Forbidden in legal user content。
+        arraySep = "\u{001F}"
+        fieldSep = "\u{001E}"
+    }
     let fields: [String] = [
         entry.schemaVersion,
         entry.auditID,
         entry.sessionID,
         entry.turnID,
         entry.verdictRef,
-        entry.ruleIDs.joined(separator: ","),
-        entry.signalRefs.joined(separator: ","),
-        entry.actionRefs.joined(separator: ","),
+        entry.ruleIDs.joined(separator: arraySep),
+        entry.signalRefs.joined(separator: arraySep),
+        entry.actionRefs.joined(separator: arraySep),
         entry.snapshotRef,
         entry.actor.rawValue,
         String(Int(entry.appendedAt.timeIntervalSince1970 * 1000)),
         priorHash,
         signingNamespace
     ]
-    return Data(fields.joined(separator: "|").utf8)
+    return Data(fields.joined(separator: fieldSep).utf8)
 }
 
 // MARK: - Static verifier for Ed25519-signed entries

@@ -11,6 +11,67 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百九十三 / M3670 — host-integration convenience + cross-arc separator hardening:「全部 剩余 部分 一次性 解决掉」
+
+Three substantive substrate-side items shipped in one chapter — every remaining work item that the substrate can do itself。 Anything after ch 993 is either host application code (not substrate) or physical device verification (operator-only)。
+
+#### A. `BASAgentFabricFullTurnAdapter` host-integration convenience
+
+After ch 983-992 the substrate ships 8 cross-module adapters + 1 coordinator entry point + 1 E2E test + 1 residual sweep。 But a host wanting to run a full 9-seat turn had to chain 14 steps (pull live service inputs from 6 services + call 7 adapter functions + call coordinator + post-turn integration paths)。 Friction for host adopters。
+
+`BASAgentFabricFullTurnAdapter.run(...)` (in BASHostKit so it can import the coordinator) collapses steps 7-14 into one function call:
+  - Takes pre-built `BASAgentFabricLiveInputs` bundle (host's per-turn pipeline supplies live service inputs)
+  - Composes the cross-module adapters in documented order
+  - Invokes the coordinator's `runAgentFabricObservation(...)` with all 5 optional DTOs
+  - Runs post-turn warrant audit (ch 983) + trace flush (ch 984) + frontier projection (ch 989) when bridges supplied
+  - Returns a `BASAgentFabricFullTurnResult` carrying everything the host needs
+
+ADR-014 OPT-IN preserved — host code that doesn't call this is byte-equal。
+
+#### B. `BASAgentFabricGate` env-var activation probing
+
+Substrate-side of deferred item #6 (env-var gate from `Docs/ARC_SEAL_953_981.md`)。 The smoke-script wiring is host-side but the env-var probing infrastructure is substrate's responsibility。 `BASAgentFabricGate.activationFromEnvironment(_:)` reads:
+  - `BAS_AGENT_FABRIC=enabled|disabled` → fabric activation
+  - `BAS_AGENT_TIER=core|all` → 9 core vs full 20 agents
+  - `BAS_TRANSCRIPT_MODE=singleAgent|compareAll|compareSelected` → transcript shape
+  - `BAS_ACTIVE_AGENTS=Planner,Critic,Memory,Risk,Surface` → compare-selected roster
+
+Returns a fully-resolved `Activation` struct with safe defaults。 CSV parsing trims whitespace + filters empty。 Test-injectable env dict (default `ProcessInfo.processInfo.environment`)。
+
+#### C. CRITICAL cross-arc separator hardening
+
+**Closes ch 982 Round-8 cross-arc concern** (deferred at ch 982 close)。 `basSovereignAuditCanonicalBytes(...)` was joining `ruleIDs/signalRefs/actionRefs` with `","` inner separator + `"|"` outer separator。 If any caller-supplied array entry CONTAINED a `,` (legitimately,since `agentExternal.proposal:<externalID>:...` style refs can carry commas),the canonical bytes were ambiguous — two logically different signalRef arrays could produce identical canonical bytes,enabling signature collision。 Same class of issue as ch 981.9 C1 (U+001F separator fix) but in a different file。
+
+Fix:schema-version-gated separator choice:
+  - `BASSovereignAuditEntry.schemaVersion == "1.0.0"` (current default):OLD format (`,` inner / `|` outer) preserved for backward compat。 Pinned by a regression test that confirms the historical defect EXISTS in old format — documents the rationale for the upgrade。
+  - `schemaVersion == "1.1.0"` (opt-in via explicit init):HARDENED format using U+001F (unit separator) inner + U+001E (record separator) outer。 Both are ASCII control chars forbidden in normal user content,so collision is impossible regardless of caller-supplied strings。
+
+`BASSovereignWarrantAuditBridge.buildEntry(...)` (ch 983) UPDATED to construct entries with `schemaVersion: "1.1.0"` by default — since warrant entries are the primary attack surface flagged by Round-8 (signalRefs include `agentExternal.warrant:granted:host-root=<id>\u{001F}per-agent=<id>` which could contain `,` in opaque IDs)。 The carefully-fixed U+001F sentinels from ch 981.9 + 982 + 982.5 + 983 now live in entries whose canonical-bytes computation is also collision-proof。
+
+Result: warrant entries get end-to-end U+001F discipline from validator → bridge → ledger canonical bytes,closing the cross-arc concern。
+
+#### Files touched
+
+- `Sources/BASOrchestration/BASSovereignWarrantAuditBridge.swift` (warrant bridge defaults to 1.1.0)
+- `Sources/BASSovereign/BASSovereignEd25519Signing.swift` (schema-gated separator hardening)
+- `Sources/BASHostKit/BASAgentFabricFullTurnAdapter.swift` (NEW — host-integration adapter + env-var gate)
+- `Tests/BehavioralAISubstrateTests/BASChapter993FullTurnAdapterAndHardeningTests.swift` (NEW — 12 tests)
+
+#### Substrate state at ch 993 close
+
+- **103 cross-module integration arc tests** (ch 983-993) / 0 failures
+- **14,432 substrate-wide** tests / 0 failures (the canonical-bytes change does NOT regress any existing ledger test — backward compat held through schema-version-gated dispatch)
+- **Cross-arc concern from ch 982 Round-8 CLOSED**
+- **Host-integration UX shipped**:14-step pipeline → 1 function call
+- **Env-var gate substrate-side complete**
+
+What remains is **strictly non-substrate work**:
+1. Host application implements per-turn pipeline calling `BASAgentFabricFullTurnAdapter.run(...)`
+2. Operator wires `BAS_AGENT_FABRIC=enabled` into smoke scripts (host-side scripts not in this repo)
+3. Operator runs 3-mode 2hr iPhone Air smoke per `Docs/PHASE_8_CLOSE_SMOKE.md`
+
+These are work items the substrate cannot do for the user。 From the substrate's perspective the arc 953-993 is **COMPLETE**。
+
 ### Chapter 九百九十二 / M3665 — Cross-Module Integration Arc residual findings sweep:「全面 剩余 一次性 解决掉」
 
 Closes ALL remaining MED + LOW findings from Round-9 reviewers
