@@ -175,10 +175,19 @@ public enum BASPlannerSeat {
     }
 }
 
-// MARK: - JSON escape helper (private to this file — duplicate of
-// BASScoutSeat's to avoid an internal-visibility helper that
-// could leak)
-
+// MARK: - JSON escape helper (thin wrapper around shared helper)
+//
+// chapter 九百八十一.10 USER-PASS-11 LOW-1 doc-fix:was
+// labeled "duplicate of BASScoutSeat's to avoid an internal-
+// visibility helper that could leak"。 After ch 981.9 ARC
+// FINALIZE item 8 migration,all 9 seat wrappers now delegate
+// to the SAME shared `BASAgentFabricJSONEscape.escape(...)`
+// helper — they're functionally identical thin wrappers,not
+// duplicates of each other。 The per-seat private extension
+// pattern is preserved (vs an internal-visibility shared
+// extension) so seat refactors can't accidentally leak the
+// shorthand into other modules。
+//
 // chapter 九百八十一.9 USER-PASS-10 ARC FINALIZE item 8
 // migration:was an inlined 13-line escape implementation;
 // now delegates to the shared `BASAgentFabricJSONEscape`

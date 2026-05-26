@@ -119,29 +119,57 @@ public enum BASSovereignWarrantValidator {
     /// Validate a warrant chain for a specific external agent
     /// at a specific turn time。 Pure function。
     ///
-    /// Rules (all 5 must pass for valid==true):
+    /// Rules in evaluation order (early-return on first
+    /// failure — see "Early-return doctrine" below):
     ///   1. `hostRootWarrantID` non-empty
     ///   2. `perAgentWarrantID` non-empty
-    ///   3. `externalAgentID` matches the supplied ref's ID
+    ///   3. `expiresAtNanos` > 0 (not corrupted) — moved
+    ///      BEFORE identity check at ch 981.9 USER-PASS-10
+    ///      MED2 fix per defense-in-depth doctrine
+    ///   4. `externalAgentID` matches the supplied ref's ID
     ///      (identity match)
-    ///   4. `expiresAtNanos` > 0 (not corrupted — ch 981.8
-    ///      MED-corruption fix)
-    ///   5. `expiresAtNanos` > `nowNanos` (not expired) — only
-    ///      checked when `nowNanos > 0`
+    ///   5. `expiresAtNanos` > `nowNanos` (not expired) —
+    ///      only checked when `nowNanos > 0`
     ///
-    /// chapter 九百八十一.8 USER-PASS-9 HIGH-4 + DH1 fix:
-    /// audit ref format normalized to `<status>:<detail>`。
-    /// Previously emitted TWO refs on grant (`granted:<id>`
-    /// + `per-agent:<id>`),the second breaking the documented
-    /// format (per-agent is a stage marker,not a status)。
-    /// Now emits a SINGLE granted ref with combined detail:
-    /// `agentExternal.warrant:granted:host-root=<id>:per-agent=<id>`。
+    /// chapter 九百八十一.10 doc-fix:rule numbering updated
+    /// to match ch 981.9 USER-PASS-10 MED2 implementation
+    /// reorder (corruption now at Rule 3,identity at Rule 4)。
+    /// Round 8 review caught the docstring still listed the
+    /// pre-reorder ordering。
     ///
-    /// chapter 九百八十一.8 USER-PASS-9 MED-corruption fix:
-    /// added Rule 4 explicit check that `expiresAtNanos > 0`
-    /// — defends against corrupted snapshots that bypass
-    /// expiration check when `nowNanos == 0` (caller skips
-    /// age check)。
+    /// ### Granted audit ref format (ch 981.9 USER-PASS-10 C1)
+    ///
+    /// On grant emits SINGLE audit ref:
+    /// ```
+    /// agentExternal.warrant:granted:host-root=<id>\u{001F}per-agent=<id>
+    /// ```
+    /// U+001F unit-separator between fields。 Required because
+    /// caller-supplied warrant IDs legitimately contain `:`
+    /// per the documented format
+    /// (`host-warrant:<hostID>:<sessionID>:<expires>`)。 An
+    /// L14 parser splitting on `:` cannot unambiguously
+    /// locate field boundaries when host-root contains `:`。
+    /// Round 7 caught that the previous `=`+`:` separator
+    /// reintroduced this ambiguity from ch 981.7。 The U+001F
+    /// separator matches the ch 964.5 sentinel TURN-LOCKDOWN
+    /// discipline (control char no caller can produce)。
+    ///
+    /// ### Early-return doctrine
+    ///
+    /// Validator EARLY-RETURNS on the first failing rule per
+    /// defense-in-depth "most-fundamental defect first" doctrine
+    /// (ch 981.9 MED2)。 A warrant with both corruption AND
+    /// identity-mismatch will report ONLY corruption。 The
+    /// identity-mismatch signal is intentionally suppressed
+    /// — corruption is structurally more fundamental than
+    /// identity (a corrupted warrant means we can't trust ANY
+    /// downstream fields,including the externalAgentID
+    /// declared in chain)。 Round 8 reviewer (MED-1) flagged
+    /// this as forensic information loss;the design choice
+    /// is preserved here because the alternative (accumulating
+    /// findings) would let an attacker submit deliberately-
+    /// corrupted-AND-identity-mismatched warrants to spam
+    /// the L14 audit ledger with multi-finding entries。
     public static func validate(
         chain: BASSovereignWarrantChain,
         forExternalAgentID externalID: String,

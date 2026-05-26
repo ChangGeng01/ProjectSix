@@ -11,6 +11,142 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百八十二 / M3615 — Round 8 USER-PASS-11 fix^12:doc-staleness only,cascade pressure shifting from algorithmic to doc
+
+**Round 8 verdict**:**cascade has clearly slowed**。 Reviewer
+found 1 HIGH + 1 MED design-choice + 1 LOW + 1 out-of-scope cross-
+arc flag — but **NONE are algorithmic bugs introduced by ch 981.9**。
+All are doc-staleness or pre-existing design choices。
+
+#### HIGH-1 — `BASSovereignWarrantValidator.validate` docstring stale
+
+After ch 981.9 USER-PASS-10 MED2 reorder (corruption check moved
+BEFORE identity check) + C1 separator change (U+001F replaced
+`:` between fields),the leading docstring at lines 122-138 still
+listed rules in PRE-reorder order (identity at Rule 3,corruption
+at Rule 4) AND documented the audit-ref format example with `:`
+separator instead of `\u{001F}`。 Same staleness class as ch 981.8
+HIGH-4 fix that round 7 caught — code changed,leading docstring
+didn't follow。
+
+**Fix**:rewrote validate() docstring to:
+1. List rules in evaluation order matching the new implementation
+   (1 host-root,2 per-agent,**3 corruption (moved up),4 identity,
+   5 expired**)
+2. Document audit-ref format with explicit U+001F unit-separator
+3. New "Early-return doctrine" section documenting MED-1 design
+   choice (one-finding-per-validation by design,defense-in-depth)
+4. Cross-reference all 3 chapter changes (981.8 HIGH-4 + 981.9
+   MED2 + 981.9 C1) in one canonical place
+
+#### MED-1 (design choice, preserved with rationale) — Early-return doctrine
+
+Round 8 reviewer flagged that `validate()` early-returns on the
+first failing rule,so corruption+identity-mismatch warrants only
+report corruption。 Identity-mismatch signal is "lost"。
+
+**Decision**:keep early-return behavior + add explicit doctrine
+to docstring。 Alternative (accumulating all findings) would let
+an attacker submit deliberately-corrupted-AND-identity-mismatched
+warrants to spam the L14 audit ledger with multi-finding entries。
+Defense-in-depth doctrine here is "most-fundamental defect first"
+not "report every defect" — a corrupted warrant means we can't
+trust ANY downstream field,including the declared externalAgentID。
+
+Documented in the new "Early-return doctrine" section of the
+validate() docstring。 Tests pinning this behavior
+(`testMED2_CorruptionCheckBeforeIdentityCheck`) unchanged。
+
+#### LOW-1 — Stale "duplicate of BASScoutSeat's" comment in planner
+
+`BASPlannerSeat.swift:178-180` claimed the escape extension is
+"duplicate of BASScoutSeat's"。 After ch 981.9 9-seat migration,
+all 9 wrappers delegate to the SAME `BASAgentFabricJSONEscape`
+helper — they're functionally identical thin wrappers,not
+duplicates of each other。
+
+**Fix**:rewrote MARK header to "thin wrapper around shared
+helper" with explicit explanation that per-seat private extension
+pattern is preserved (vs internal-visibility shared extension)
+to prevent shorthand from leaking to other modules。
+
+#### Cross-arc deferred concern (NOT FIXED — out of scope)
+
+Round 8 reviewer flagged a **same-class issue in BASSovereign**
+module:`BASSovereignEd25519Signing.swift:119-121` joins
+`signalRefs`/`ruleIDs`/`actionRefs` with `","` when building
+canonical bytes for ed25519 signing。 If those array entries
+contain `,` (legitimately,since `agentExternal.proposal:` audit
+refs contain caller-supplied `externalAgentID` opaque strings),
+the canonical-bytes serialization is ambiguous — two different
+signalRef lists could yield identical bytes,enabling signature
+collision。
+
+This is the SAME class of issue ch 981.9 C1 solved (with U+001F)
+but in a DIFFERENT module (BASSovereign,not Agent Fabric arc
+scope)。 The Agent Fabric arc's outputs are now more likely to
+contain `,` since they include caller-supplied opaque IDs。
+
+**Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening
+pass。 Documented in `Docs/ARC_SEAL_953_981.md` "Cross-arc
+deferred concern" section so it doesn't slip through the cracks。
+
+**Risk assessment**:to actually exploit,attacker needs
+host-side compromise of `externalAgentID` AND a target L14
+audit entry to collide with。 Per ch 977 external agents are
+tightly sandboxed,so this requires pre-existing host compromise
+to be relevant。 Not an immediate security crisis but warrants
+a dedicated fix arc。
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASSovereignWarrantChain.swift` | + HIGH-1 docstring rewrite (rule order + U+001F format + early-return doctrine) |
+| `Sources/BASMemory/BASPlannerSeat.swift` | + LOW-1 comment update (thin wrapper not duplicate) |
+| `Docs/ARC_SEAL_953_981.md` | + cross-arc deferred concern documented |
+| `CHANGELOG.md` | + this entry |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| Cumulative arc tests (ch 953-982) | 696 / 0 failures |
+| Tests affected by doc-only changes | 0 (no test changes) |
+
+#### N-pass discipline track record (8 rounds — cascade pressure shifting)
+
+| Round | Sub-ch | Real bugs | Class |
+|---|---|---|---|
+| 1 | 956.11 | 10+ | algorithmic |
+| 2 | 964.5 | 15+ | algorithmic + doc |
+| 3 | 969.5 | 10+ | algorithmic + doc |
+| 4 | 981.5 | 15+ | algorithmic + doc |
+| 5 | 981.6 | 8+ | algorithmic in round 4 fixes |
+| 6 | 981.8 | 8+ | algorithmic in round 5 modules |
+| 7 | 981.9 | 1C + 2H + MED | algorithmic in round 6 fixes |
+| **8** | **982** (this) | **1H + 1MED + 1LOW (all doc-staleness)** | **doc-only** |
+| **TOTAL** | **8 rounds** | **70+ real bugs caught** | |
+
+Round 8 marks a qualitative shift:**no new algorithmic bugs
+introduced by ch 981.9**。 Findings are doc-staleness or design-
+choice questions。 Reviewer's verdict:cascade slowed sufficiently
+that "one more round focused on doc-implementation sync" could
+plausibly terminate it。
+
+Round 8 effectively performed that doc-sync pass。 Round 9 might
+still find new issues (history shows the cascade always finds
+SOMETHING),but the remaining surface is now scoped to:
+- doc-implementation alignment (LOW priority)
+- cross-arc concerns in BASSovereign module (out of Agent Fabric
+  scope)
+
+The Agent Fabric arc 953-982 is now **substrate-side genuinely
+complete** within its scope。 Cross-module concerns documented +
+deferred to future arcs。
+
+---
+
 ### Chapter 九百八十一.9 / M3610.9 — 全面修复:Round 7 fix^11 + SIGBUS root cause + test count reconcile + seat migration (item 8 properly closed)
 
 **4 parallel tracks executed:** Round 7 N-pass review + swift-testing

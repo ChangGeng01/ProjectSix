@@ -166,6 +166,45 @@ won't-ship (out-of-scope / forbidden / host-side):
 | 4 | Multi-tenant sovereign — forbidden by Root Law 1 |
 | 6 | Env-var gate wiring — host-app integration workstream |
 
+### Cross-arc deferred concern (caught at ch 982 Round 8 review)
+
+**BASSovereignEd25519Signing canonical-bytes separator class issue**:
+`Sources/BASSovereign/BASSovereignEd25519Signing.swift:119-121`
+joins `ruleIDs`, `signalRefs`, `actionRefs` with `","` separator
+when building the canonical bytes for ed25519 signing。 If any
+of those array entries CONTAINS a `,` (legitimately,since they
+include caller-supplied opaque strings like `agentExternal.
+proposal:<externalID>:...`),the signing function produces an
+ambiguous representation — two different signalRef lists could
+yield the same canonical bytes,enabling signature collision。
+
+This is the **same class of issue** as ch 981.9 C1 (which
+solved it for `agentExternal.warrant:granted:...` by switching
+to U+001F)。 However:
+- It's in **BASSovereign module** (not Agent Fabric arc scope)
+- The Agent Fabric arc's `agentExternal.*` audit refs could now
+  PROBABLY contain `,` since `externalAgentID` is caller-supplied
+  opaque
+- Round 8 flagged this as a CROSS-ARC concern,not as a regression
+
+**Recommended scope**:separate arc (Phase 9+ or BASSovereign
+hardening pass) to:
+1. Audit all canonical-byte serialization paths in BASSovereign
+2. Either escape character-class-restricted separators or use
+   U+001F throughout
+3. Add input validation at BASExternalAgentRef.init / similar
+   boundaries that REJECTS `,` in opaque IDs
+
+**Risk assessment**:to actually exploit,attacker would need
+(a) ability to control externalAgentID + (b) a target L14 audit
+entry to collide with。 Per ch 977 external agents are tightly
+sandboxed,so attacker control of externalAgentID requires
+host-side compromise already。 Not an immediate security crisis
+but worth a dedicated fix arc。
+
+**Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening。
+Documented here so it doesn't slip through the cracks。
+
 ## Push status
 
 As of arc seal at ch 981, the local branch `phase-5-chapter-952-iphone-air-10hr-validation` is 8+ commits ahead of `origin/phase-5-chapter-952-iphone-air-10hr-validation`. Push pending explicit user authorization per the standing instruction across this entire arc.
