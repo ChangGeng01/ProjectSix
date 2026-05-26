@@ -11,6 +11,154 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百七十六-九百七十八 / M3585-M3595 — Phase 7 close:MCP + A2A external interop (HIGH-risk)
+
+Closes Phase 7 of the Agent Fabric arc — the highest-risk phase
+per plan。 Ships the two external surfaces (MCP for tool/data/
+prompt/resource adapters,A2A for external agents) WITHOUT
+letting external code bypass any Phase 0-6 sovereignty invariant。
+
+#### Ch 976 — MCP Capability Gateway
+
+`BASMCPCapabilityGateway.invoke(...)` runs a 4-step pipeline on
+every MCP server output before it can become a legal state object:
+
+1. **Envelope validation** — empty serverID/toolID/invocationID rejected
+2. **Tool-domain scope check** — server MUST be in caller's
+   `allowedToolDomains`
+3. **Tool-injection scan** — reuses ch 971 BASToolInjectionWatcher
+   pattern set; trust score drops by severity (info -0.05 / watch
+   -0.15 / alert -0.50 / veto -1.0); below 0.25 → REJECT
+4. **Provenance seal + sanitization** — accepted output wrapped
+   in `BASMCPProvenanceSeal` with server/tool/invocation/permit
+   IDs + trust score + sorted audit notes。 Low-trust (< 0.5)
+   outputs sanitized via `[REDACTED-MARKER]` substitution
+
+**CRITICAL invariants** (verified by 20 ch 976 tests):
+- Gateway returns `BASMCPGatewayResult`,NEVER writes directly to
+  state graph — caller plumbs sealed output through normal
+  Phase 1-5 pipeline
+- Rejection result has nil seal + nil sealedOutput (caller can't
+  accidentally persist nil)
+- Watcher hints propagate to caller for L14 audit even on accept
+
+#### Ch 977 — A2A External Agent Gateway (HIGH risk)
+
+`BASExternalAgentGateway.submit(...)` degrades every external agent
+to a `BASExternalAgentRef` and submits each proposal through:
+
+1. **Envelope validation** — empty IDs / identity-mismatch rejected
+2. **Tool-scope check** — tool-domain must be in ref's
+   `allowedToolDomains`
+3. **Effective sandbox tier downgrade** (non-optional):
+   - Unattested → `.observer` (most restrictive)
+   - Declared `.collaborator` → `.advisor` (without Phase 8
+     sovereign warrant infrastructure)
+4. **Tier-channel match** — observer cannot emit
+   `candidateSuggestion`; only `.collaborator` can emit
+   `memoryAnchor`
+5. **Tool-injection + sanctum-leak scans** — reuses ch 971 + ch 972
+   watcher pattern sets
+6. **Degraded spec construction** — `writeDomains: []`,
+   `forbiddenDomains` includes ALL 12 state-graph domains
+
+**4 NEW reserved audit prefixes**:
+- `agentExternal.proposal:<id>:<channel>:<proposalID>`
+- `agentExternal.tier:<id>:<effective-tier>`
+- `agentExternal.trust:<id>:<trust-score>`
+
+**Sandbox tiers** (3 pinned):
+- `.observer` (default for unattested)
+- `.advisor` (attested,can bid candidates)
+- `.collaborator` (currently downgraded — Phase 8 warrant work)
+
+**Proposal channels** (4 pinned):
+- `.candidateSuggestion` / `.toolHint` / `.memoryAnchor` /
+  `.advisoryNote`
+
+**CRITICAL sovereignty invariants** (verified by 26 ch 977 tests):
+- External agents CANNOT write any of 12 state graph domains
+  (sweep-tested at runtime via `testCRITICAL_ExternalCannotWriteAnyDomain`)
+- Identity mismatch caught BEFORE deeper scans (defense-in-depth)
+- Sanctum-leak attempts ALWAYS rejected at `.veto` severity
+- Unattested collaborator-claim caught by tier downgrade (cannot
+  escalate to candidateSuggestion or memoryAnchor)
+
+#### Ch 978 — Phase 7 close E2E
+
+10 cross-phase tests verifying:
+- MCP + A2A compose cleanly (external agent suggests tool,caller
+  invokes MCP)
+- External proposal triggers L14 audit via reserved prefixes
+- MCP-sealed output propagates watcher hints (defense-in-depth)
+- Defense-in-depth ordering — identity mismatch catches FIRST
+- Phase 4 monotonic-raise STILL holds through Phase 6 skill agent
+  pipeline
+- Phase 5 SanctumLeakWatcher pattern set reused by Phase 7
+  external gateway (cross-phase integration)
+- Phase 6 skill sovereign-lock STILL holds after Phase 7 lands
+  (regression defense)
+- Adversarial multi-vector attack (sanctum + injection + tier
+  escalation) all rejected at first-check
+- Determinism preserved end-to-end (MCP + external gateway both
+  byte-equal for same input)
+
+#### Files
+
+| File | Change |
+|---|---|
+| `Sources/BASMemory/BASMCPCapabilityGateway.swift` | NEW — invocation + provenance seal + result + 4-step gateway (ch 976) |
+| `Sources/BASMemory/BASExternalAgentA2A.swift` | NEW — ref + sandbox tier + proposal + channel + result + gateway (ch 977) |
+| `Tests/BehavioralAISubstrateTests/BASChapter976MCPCapabilityGatewayTests.swift` | NEW — 20 tests |
+| `Tests/BehavioralAISubstrateTests/BASChapter977ExternalAgentA2ATests.swift` | NEW — 26 tests (incl. 4 CRITICAL sovereignty + 3 adversarial fuzz) |
+| `Tests/BehavioralAISubstrateTests/BASChapter978Phase7CloseE2ETests.swift` | NEW — 10 cross-phase tests |
+| `Docs/PHASE_7_CLOSE_SMOKE.md` | NEW — operator 1hr smoke + 10 adversarial scenarios |
+
+#### Results
+
+| Metric | Value |
+|---|---|
+| Phase 7 tests (ch 976-978) | 56 / 0 failures |
+| Cumulative arc tests (ch 953-978) | 586 / 0 failures |
+
+#### Phase 7 summary
+
+- **MCP adapter** — single point of entry for ALL MCP server
+  outputs。 4-step pipeline + provenance seal。 Sanitization for
+  low-trust outputs (markers replaced with `[REDACTED-MARKER]`)
+- **A2A adapter** — external agents degraded to proposal-only,
+  tool-domain-scoped,sandbox-tiered references。 Non-optional
+  downgrades for unattested + collaborator-without-warrant
+- **Defense-in-depth** — identity mismatch caught FIRST,then
+  tool-scope,then tier-channel,then injection scan,then
+  sanctum-leak scan,then degraded-spec construction with all
+  12 domains forbidden
+- **Cross-phase integration** — Phase 4 (monotonic raise) +
+  Phase 5 (watchers) + Phase 6 (skill sovereign-lock) all still
+  hold through Phase 7 external surfaces
+
+#### Phase 7 plan thread (3 chapters)
+
+| ch | Risk | Scope |
+|---|---|---|
+| 976 | MED | MCP adapter + Capability Gateway |
+| 977 | HIGH | A2A external agent gateway (must not let external override sovereign) |
+| 978 | Phase 7 close | E2E + iPhone Air smoke doc (10 adversarial scenarios) |
+
+#### Next phase
+
+Phase 8 (End-side perf + arc seal,ch 979-981):
+- ch 979: Shared latent spine (one encode pass shared across
+  agents) — HIGH potential gain
+- ch 980: Hot/cold agent tier (Scout + Risk-light + Sovereign-light
+  + Surface-stub warm in-process)
+- ch 981: Speculative parallelism + zero-copy state bus + **arc
+  seal** (2-hour iPhone Air real-device smoke with all 18 agents:
+  9 core + 7 watcher + 2 skill sample);CHANGELOG + BRANCH_SUMMARY
+  + `Docs/ARC_SEAL_953_981.md`
+
+---
+
 ### Chapter 九百七十三-九百七十五 / M3570-M3580 — Phase 6 close:SDK productization (skill agents + API stability + DeviceTestApp sample)
 
 Closes Phase 6 of the Agent Fabric arc。 Ships the public SDK
