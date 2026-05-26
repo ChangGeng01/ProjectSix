@@ -223,6 +223,43 @@ but worth a dedicated fix arc。
 **Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening。
 Documented here so it doesn't slip through the cracks。
 
+## Gap-closure synthesis (ch 996 / 完全 收口)
+
+After 14 N-pass review rounds (the last 6 of which caught
+same-class orphan / dead-code bugs at every single round),the
+honest closure path was NOT to attempt Round-15 + Round-16 + ...
+to chase the next layer。 Instead:**explicitly classify every
+public API in the arc as 🪜 SCAFFOLD vs ✅ WIRED vs 💀 DEAD** so
+future reviewers + host adopters know what they're consuming。
+
+**Authoritative inventory**:`Docs/SCAFFOLD_VS_WIRED.md`。 Per
+that synthesis:
+- **~50 APIs ✅ WIRED** (67%) — substrate consumes,branches,
+  enforces。 Real behavior。
+- **~20 APIs 🪜 SCAFFOLD** (27%) — host-observable signals;
+  substrate stores + surfaces but does NOT branch on them。
+  Includes:`BASAgentFabricMode` (.observationOnly /
+  .authoritative),`Gate.Tier` (.core / .all),`Gate
+  .TranscriptMode`,`HostOutcome.fabricMode`,
+  `HostOutcome.activation`,`recordEvent` (vs `flush` which IS
+  wired),`validateMCPInvocation` (no host pipeline invokes
+  pre-MCP-dispatch yet)。
+- **~5 APIs 💀 DEAD** (6%) — reserved for future allocation /
+  future seat。 Includes 4 future-allocation L14 prefixes +
+  `BASAgentDeltaType.annotate`。
+
+This explicit doctrine is the closure。 Future arcs can move
+SCAFFOLD → WIRED by wiring downstream consumers (e.g. Phase 9+
+fabric-authoritative mode wires `.authoritative` to actually
+drive coordinator output)。 But the arc 953-996 ships these as
+honestly-labeled scaffold,not as silently-broken "looks complete
+but doesn't work" APIs。
+
+Source-side `🪜 SCAFFOLD` annotations on `BASAgentFabricMode`,
+`Gate.Tier`,`Gate.TranscriptMode`,and `💀 DEAD` annotation on
+`.annotate` case all point reviewers + host adopters to the
+synthesis doc。
+
 ## Cross-module integration arc (ch 983-993 — ALL 8 GAPS CLOSED + N-pass review + residual sweep + host-integration convenience + cross-arc separator hardening)
 
 The ch 982.5 META-REVIEW Reviewer-4 surfaced 8 specific cross-module integration gaps documented in the next section。 Per user direction「全面 开发」at the META-REVIEW close,a follow-up arc 983-990 landed adapters closing every one of those gaps。 This section pins the closure status before the original META-REVIEW disclosure remains as the rationale + design history。

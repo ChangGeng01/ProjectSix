@@ -74,6 +74,17 @@ import Foundation
 /// `.renderFrame` REPLACES coordinator's existing render frame)
 /// is per-consumer host integration work since each host has
 /// different downstream consumers of those state objects。
+/// **🪜 SCAFFOLD** per `Docs/SCAFFOLD_VS_WIRED.md` — `BASAgentFabricMode`
+/// is host-observable but substrate-side BRANCHES ON IT NOWHERE。
+/// `.observationOnly` and `.authoritative` produce byte-identical
+/// dispatcher / merge / apply outputs。 Per ch 994 + ch 995.9 +
+/// ch 996 doctrine,mode is a signal for host's downstream
+/// consumer (the code reading
+/// `BASAgentFabricHostOutcome.fabricMode`) to decide whether to
+/// USE the dispatcher's deltas as observation-only or as
+/// authoritative replacements for coordinator output。 The
+/// substrate intentionally doesn't switch behavior because
+/// per-state-domain replacement is per-host concern。
 public enum BASAgentFabricMode: String,
     Sendable, Equatable, Codable, CaseIterable
 {
@@ -82,9 +93,10 @@ public enum BASAgentFabricMode: String,
     case observationOnly
 
     /// Future mode (substrate-side scaffold ship at ch 994)。
-    /// Accepted deltas drive coordinator output。 Host implements
-    /// the actual per-state-domain replacement logic at its
-    /// `BASAgentFabricFullTurnResult` consumer site。
+    /// HOST-side semantic:"this turn's accepted deltas SHOULD
+    /// drive coordinator output"。 Substrate dispatcher behavior
+    /// IDENTICAL to `.observationOnly` — only host's downstream
+    /// consumer differs in how it reads the result。
     case authoritative
 }
 

@@ -327,11 +327,23 @@ public enum BASAgentFabricGate {
         }
     }
 
+    /// **🪜 SCAFFOLD** per `Docs/SCAFFOLD_VS_WIRED.md` —
+    /// `.core` vs `.all` parses from `BAS_AGENT_TIER` env var
+    /// and surfaces in `BASAgentFabricHostOutcome.activation.tier`
+    /// + `diagnostics["gate.tier"]`,but NO Sources/ code
+    /// BRANCHES on it。 Setting `BAS_AGENT_TIER=core` does NOT
+    /// remove the 5 optional seats from the dispatcher。 Full
+    /// behavioral wire (roster filter by tier) is phase 9+
+    /// scope。 Per ch 995.5 explicit doctrine。
     public enum Tier: String, Sendable, Equatable {
         case core
         case all
     }
 
+    /// **🪜 SCAFFOLD** per `Docs/SCAFFOLD_VS_WIRED.md` — same
+    /// scaffold doctrine as `Tier`:parses from env,surfaces in
+    /// outcome,no Sources/ branches。 Full per-agent-transcript
+    /// behavioral wire is phase 9+ scope。
     public enum TranscriptMode: String, Sendable, Equatable {
         case singleAgent
         case compareAll

@@ -162,9 +162,10 @@ public enum BASAgentMergeApplier {
     /// applier's responsibility is "write the payload";
     /// type-distinction is consumer-side semantics。
     ///
-    /// Round-14 audit notes that **`.annotate` is currently
-    /// emitted by NO seat in `Sources/BASMemory/BAS*Seat.swift`**
-    /// (grep confirms zero emit sites)。 Other 3 cases are alive:
+    /// **💀 DEAD** per `Docs/SCAFFOLD_VS_WIRED.md`:`.annotate` is
+    /// currently emitted by NO seat in `Sources/BASMemory
+    /// /BAS*Seat.swift` (grep confirms zero emit sites)。 Other 4
+    /// cases are alive:
     ///   - `.add`:Planner + EvolutionShadow (new candidates)
     ///   - `.merge`:Scout + Memory + Critic + Risk + HostAlign
     ///   - `.replace`:Surface + SovereignSentinel
@@ -172,7 +173,7 @@ public enum BASAgentMergeApplier {
     ///   - `.annotate`:reserved for future audit-only seats
     ///     (e.g. a future "trace seat" that annotates without
     ///     mutating)。 Preserved here for forward-compat;not
-    ///     marked deprecated。
+    ///     marked deprecated per ch 996 explicit doctrine。
     private static func effectivePayload(
         for delta: BASAgentDelta
     ) -> String {

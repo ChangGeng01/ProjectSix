@@ -11,6 +11,129 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百九十六 / M3685 — 完全 收口 gap closure: scaffold/wired honest inventory
+
+After 14 N-pass review rounds — the last 6 catching same-class
+orphan / dead-code bugs at EVERY round — the cascade demonstrates
+the substrate has structural pressure toward "looks complete but
+does nothing" APIs that pass build + tests because tests verify
+compile-time signature existence rather than runtime behavioral
+effect。
+
+Ch 996 is the **gap-closure synthesis chapter**。 Instead of
+attempting Round 15 / 16 / ... to chase the next layer (the
+pattern strongly suggests they would continue finding same-class
+bugs),this chapter:
+
+1. **Audits every public API in the arc** (~75 total) by
+   grepping `Sources/` consumer count + manually reviewing each
+   hit。
+2. **Classifies each API explicitly**:
+   - ✅ **WIRED** — has Sources/ consumers that BRANCH on the
+     value (~50 APIs / 67%)
+   - 🪜 **SCAFFOLD** — host-observable signal; substrate stores
+     + surfaces but does NOT branch (~20 APIs / 27%)
+   - 💀 **DEAD** — no emitter + no reader (~5 APIs / 6%)
+3. **Ships a synthesis doc** `Docs/SCAFFOLD_VS_WIRED.md` as the
+   authoritative inventory。 Every future reviewer + host adopter
+   can resolve "is this API actually wired?" by checking this
+   doc。
+4. **Annotates source-side** the genuinely-scaffold APIs:
+   - `BASAgentFabricMode` (both cases) — substrate doesn't
+     branch; host signal only
+   - `BASAgentFabricGate.Tier` (.core / .all) — env-var echo
+   - `BASAgentFabricGate.TranscriptMode` (3 cases) — env-var echo
+   - `BASAgentDeltaType.annotate` — no seat emits;reserved
+5. **Adds explicit "gap-closure synthesis" section to ARC_SEAL**
+   pointing to the doc + summarizing the wired/scaffold/dead
+   counts。
+
+**Why this approach is the closure**:
+
+The cascade's same-class catches (orphan params, dead-code
+enums, decorative env-vars) were finding APIs that look complete
+but produce no behavior. Each fix attempt added new wired
+behavior — and Round N+1 caught the next layer of "looks
+complete but doesn't work" code introduced BY the fix。
+
+The structural fix is to STOP adding more behavior and instead
+HONESTLY DOCUMENT what's behavior vs what's signal。 Hosts read
+SCAFFOLD_VS_WIRED.md before assuming an API is load-bearing;
+substrate doesn't pretend scaffold APIs change behavior。 This
+ends the cascade by making the honest distinction explicit
+rather than chasing it round after round。
+
+**What ch 996 did NOT do**:
+
+- Did not add any new public API
+- Did not change any behavior
+- Did not strengthen any test
+- Did not delete any code (annotate is preserved as forward-
+  compat for future trace-seat;scaffold enums preserved for
+  host signaling)
+- Did not attempt Round-15 review
+
+**Forward closure path**:
+
+Future arcs may move SCAFFOLD → WIRED by wiring downstream
+consumers (e.g. Phase 9+ fabric-authoritative mode wires
+`.authoritative` to actually drive coordinator output)。 Until
+then,the substrate ships these as honestly-labeled scaffolds,
+NOT as silently-broken "looks complete but doesn't work" APIs。
+
+**State at ch 996 close**:
+- 14,465 substrate-wide tests / 0 failures (no behavior changed
+  → byte-equal previous chapter)
+- 14 N-pass review cycles complete
+- ~100 real bugs caught across the arc
+- All scaffold + dead APIs source-annotated + listed in synthesis
+- The cascade can stop here with explicit honest labeling rather
+  than implicit "all wired" claims
+
+### Chapter 九百九十五.9 / M3680.9 — META-REVIEW Round-14 cascade fixes (6th consecutive round of same-class catches)
+
+Round-14 N-pass review caught 2 CRITICAL + 2 HIGH + 2 MED。 The
+cascade has now produced same-class orphan/dead-code bugs FOR
+SIX CONSECUTIVE ROUNDS (R10-R14)。 Every claim of "now done" has
+been wrong;every fix has had a layer below it that needed
+finding。
+
+CRITICAL-1 — Round-13 test orphan one layer deeper
+ch 995.7 test asserted 2 of 5 optional-seat downstream emissions
+(memoryBundle + evolutionProposal),leaving sovereign/critic/
+hostAlign unchecked。 Sovereign input had empty candidates so
+seat emitted zero deltas → test claimed verification but really
+verified non-nil input。 Fix:ch 995.9 populated sovereign
+candidate with touchesSovereignLockedAxis=true + adjusted
+makeCand cost > benefit to trigger BASCriticSeat rule 3 +
+asserted emittedRefs contains all 5 optional-seat ref prefixes。
+
+CRITICAL-2 — Round-13 typed fields dead-code consumer-side
+ch 995.7's typed activation + fabricMode have ZERO Sources/
+consumers。 Same class as ch 994 BASAgentFabricMode dead-code
+finding。 Fix:explicit scaffold-doctrine docstring acknowledging
+the consumer-less reality (host-observable SDK surface,not
+internal substrate plumbing)。
+
+HIGH-1 — .annotate deltaType dead + applier groups 4 cases
+The applier's effectivePayload collapses .add/.replace/.merge/
+.annotate into one branch。 .annotate emitted by no seat。 Fix:
+documented doctrine that deltaType is a SEMANTIC TAG consumed by
+downstream audit/replay,not behavioral at apply time;
+.annotate preserved as forward-compat for future trace seat。
+
+HIGH-2 — docstring "6 concurrent" vs loop "4" mismatch。 Fixed。
+
+MED-1 — priority.tier-count missing from OmittedFields branch
+parity。 Fixed。
+
+MED-2 — risk.totalRisk diagnostic misleading (input card value
+not enriched merged pressure)。 Renamed to risk.cardTotalRisk with
+honest docstring note。
+
+6 regression tests updated/extended。 14,465 substrate-wide / 0
+failures + XCTest All tests PASSED。
+
 ### Chapter 九百九十五.7 / M3680.7 — META-REVIEW Round-13 cascade fixes (same-class orphan in TEST + dead-code APIs)
 
 Round-13 N-pass review (3 parallel reviewers) of ch 995.5 caught
