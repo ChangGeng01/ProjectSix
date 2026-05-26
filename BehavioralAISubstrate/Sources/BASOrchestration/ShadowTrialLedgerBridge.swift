@@ -40,7 +40,12 @@ extension BASSovereignAuditLedger: BASShadowTrialLedger {
     public func appendShadowTrialEvent(
         _ entry: BASShadowTrialLedgerEntry
     ) async throws -> String {
+        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
+        // canonical-bytes — Shadow trial bridge re-wraps caller-
+        // supplied opaque ruleIDs/signalRefs/actionRefs which IS
+        // the exact comma-collision attack surface ch 993 patched
         let draft = BASSovereignAuditEntry(
+            schemaVersion: "1.1.0",
             auditID: entry.auditID,
             sessionID: entry.sessionID,
             turnID: entry.turnID,

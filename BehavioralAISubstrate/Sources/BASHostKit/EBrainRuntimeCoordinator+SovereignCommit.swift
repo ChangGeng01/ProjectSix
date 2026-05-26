@@ -1594,6 +1594,13 @@ extension BASEBrainRuntimeCoordinator {
         )
 
         return BASSovereignAuditEntry(
+            // chapter 九百九十六.5 META-REVIEW Round-15 CRITICAL-2
+            // fix:explicit "1.1.0" for hardened canonical-bytes
+            // separators (U+001F inner / U+001E outer) per ch 993
+            // cross-arc fix。 Round-15 caught ch 993 only bumped
+            // the warrant bridge — main commit emission was still
+            // using vulnerable "1.0.0" default separator class。
+            schemaVersion: "1.1.0",
             auditID: auditID,
             sessionID: runtimeTrace.sessionID,
             turnID: turnID,

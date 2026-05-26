@@ -312,7 +312,11 @@ public actor BASSovereignVerdictEngine {
             expiresAt: nil
         )
 
+        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
+        // canonical-bytes for verdict engine emission (main
+        // L14 audit emission point)
         let entry = BASSovereignAuditEntry(
+            schemaVersion: "1.1.0",
             auditID: auditID,
             sessionID: context.sessionID,
             turnID: context.turnID,

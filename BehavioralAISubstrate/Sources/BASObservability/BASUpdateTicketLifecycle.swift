@@ -488,7 +488,10 @@ public actor BASUpdateTicketLifecycleCoordinator {
         // entry passes ledger.append's contract.
         let verdictRef = entry.sovereignVerdictRef
             ?? "lifecycle.\(terminal.rawValue).\(ticketID)"
+        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
+        // canonical-bytes for update-ticket lifecycle audit
         let auditEntry = BASSovereignAuditEntry(
+            schemaVersion: "1.1.0",
             auditID: "lifecycle.\(terminal.rawValue)." +
                 "\(ticketID)",
             sessionID: entry.ticket.sessionRef.isEmpty

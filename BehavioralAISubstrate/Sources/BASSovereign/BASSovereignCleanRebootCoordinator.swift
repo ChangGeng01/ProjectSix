@@ -238,7 +238,10 @@ public actor BASSovereignCleanRebootCoordinator {
         // fatal to plan generation — the caller needs the plan even
         // if the ledger is degraded — but we attempt best-effort so
         // a successful plan ALWAYS has a trail.
+        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
+        // canonical-bytes for clean-reboot audit trail
         let entry = BASSovereignAuditEntry(
+            schemaVersion: "1.1.0",
             auditID: auditID,
             sessionID: sessionID,
             turnID: verdict.verdictID,

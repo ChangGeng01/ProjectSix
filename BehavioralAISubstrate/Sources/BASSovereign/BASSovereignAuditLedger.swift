@@ -1066,7 +1066,11 @@ public actor BASSovereignAuditLedger {
             protectedRuleIDs: request.protectedRuleIDs)
 
         let markerAuditID = "cut-\(request.cutID)"
+        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
+        // canonical-bytes for LINEAGE_CUT marker (signalRefs
+        // carry caller-supplied audit IDs which may contain `,`)
         let markerEntry = BASSovereignAuditEntry(
+            schemaVersion: "1.1.0",
             auditID: markerAuditID,
             sessionID: request.sessionID,
             turnID: "lineage-cut",

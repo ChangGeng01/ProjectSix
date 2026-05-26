@@ -82,6 +82,50 @@ public actor BASAgentRegistry {
         registrationOrder.removeAll { $0 == agentID }
     }
 
+    /// chapter 九百九十六.5 META-REVIEW Round-15 CRITICAL-1 fix:
+    /// Round-15 deep review caught that the Single-Writer-Per-
+    /// Domain global registry (per ch 956.5 USER-PASS gap #1)
+    /// was DOCUMENTED but UNWIRED in production。
+    /// `BASSharedStateGraph.registerWriter(...)` existed,but
+    /// `BASAgentRegistry.register(...)` never called it。 Effective
+    /// behavior:registry stayed empty in production →
+    /// `writeObject(...)` fell through the domainWriters check
+    /// + auto-claimed on first write → first-write-wins race。
+    /// Root Law 3 (Single-Writer-Per-Domain) was system-level
+    /// doctrine but enforced only at test scope。
+    ///
+    /// Fix:explicit wire-up method that callers invoke AFTER
+    /// registration to install the per-domain writer claims on
+    /// the shared state graph。 Throws if any spec's writeDomain
+    /// is already claimed by a DIFFERENT agent (genuine
+    /// single-writer enforcement)。
+    ///
+    /// Idempotent:re-wiring the same registry → graph pair
+    /// no-ops (the graph rejects re-claim with the SAME agentID
+    /// silently per registerWriter contract)。
+    ///
+    /// - Parameter graph: the BASSharedStateGraph instance that
+    ///   the dispatcher will write through。 ONE per coordinator。
+    /// - Throws: `BASSharedStateGraphError.domainAlreadyClaimed`
+    ///   if two registered agents have overlapping writeDomains
+    ///   (the FIRST registered wins;subsequent agents'
+    ///   conflicting domains throw)。
+    public func wire(
+        toGraph graph: BASSharedStateGraph
+    ) async throws {
+        // Iterate in registration order so the conflict resolution
+        // is deterministic — earlier-registered agent wins the
+        // domain claim,later-registered agents throw on conflict。
+        for agentID in registrationOrder {
+            guard let entry = entries[agentID] else { continue }
+            for domain in entry.spec.writeDomains {
+                try await graph.registerWriter(
+                    agentID: entry.spec.agentID,
+                    domain: domain)
+            }
+        }
+    }
+
     // MARK: - Resolution
 
     /// Get the spec for a specific agent ID。 Throws if not registered。
