@@ -15,6 +15,7 @@
 
 import Foundation
 import BASMemory
+import BASPolicy
 
 public enum BASAgentFabricAdapters {
 
@@ -212,6 +213,74 @@ public enum BASAgentFabricAdapters {
     //
     // Deterministic:`hostBoundaryAxes` sorted lex so two calls
     // with the same constitution produce byte-equal output。
+
+    // MARK: - chapter 九百八十七 / M3640 — Cross-Module Integration
+    //                                       Arc ch5:Gap 3 close
+    //
+    // Enrich BASRiskInput from a live BASRiskCard。 Was:
+    // `BASRiskSeat` consumed `BASRiskInput.pressureLevel /
+    // manipulationDetected / boundaryTouched` derived ONLY from
+    // L7 Scout output — completely orthogonal to the host's live
+    // `BASRiskServicing.calibrateRisk(...)` which produces a
+    // `BASRiskCard` with totalRisk / uncertainty / irreversibility
+    // / manipulationStrength / gsiScore。 Per ch 982.5 META-REVIEW
+    // Gap 3,this meant the substrate had TWO PARALLEL risk
+    // computations:the existing host risk service (L11) AND the
+    // fabric's risk seat,with no path connecting them。
+    //
+    // This adapter closes the gap:given a `BASRiskCard` produced
+    // by the live risk service,enrich an existing `BASRiskInput`:
+    //   - `pressureLevel` is RAISED (max) to the card's totalRisk
+    //     value。 Per ch 967 monotonic-raise discipline,risk
+    //     CANNOT be lowered by enrichment。
+    //   - `manipulationDetected` is OR-ed with the card's
+    //     manipulationStrength >= 0.5 trigger
+    //   - `boundaryTouched` is preserved as-is (the card doesn't
+    //     have a direct "boundary touched" signal — that signal
+    //     comes from L7 Scout's boundaryTouchCount per ch 957
+    //     design,which already feeds the base input)
+    //   - candidates pass through unchanged
+    //
+    // Per Root Law 4 (单主权) + ch 967 monotonic raise — the
+    // adapter NEVER reduces risk。 Enrichment is union not
+    // intersection。
+
+    /// Enrich a `BASRiskInput` with signals from a live
+    /// `BASRiskCard`。 Closes ch 982.5 META-REVIEW Gap 3
+    /// (fabric risk seat orthogonal to live BASRiskServicing)。
+    ///
+    /// Monotonic raise discipline:
+    ///   - `pressureLevel` only goes UP (max of input + card)
+    ///   - `manipulationDetected` only flips ON (input || card-signal)
+    ///   - `boundaryTouched` unchanged (signal source is L7 Scout)
+    ///
+    /// - Parameters:
+    ///   - card: live `BASRiskCard` from `BASRiskServicing
+    ///     .calibrateRisk(...)`
+    ///   - baseRiskInput: existing `BASRiskInput` built by
+    ///     `riskInput(from:candidates:)` from L7 decompose output
+    /// - Returns: enriched `BASRiskInput` with the union of
+    ///   risk signals
+    public static func enrichRiskInput(
+        from card: BASRiskCard,
+        baseRiskInput: BASRiskInput
+    ) -> BASRiskInput {
+        // Monotonic raise:risk only goes UP per ch 967。
+        let mergedPressure = max(
+            baseRiskInput.pressureLevel,
+            max(0.0, min(1.0, card.totalRisk)))
+        // Card's manipulationStrength >= 0.5 considered triggering。
+        let cardManipulationTrigger =
+            card.manipulationStrength >= 0.5
+        let mergedManipulation =
+            baseRiskInput.manipulationDetected ||
+            cardManipulationTrigger
+        return BASRiskInput(
+            candidates: baseRiskInput.candidates,
+            pressureLevel: mergedPressure,
+            manipulationDetected: mergedManipulation,
+            boundaryTouched: baseRiskInput.boundaryTouched)
+    }
 
     /// Build a `BASHostAlignmentInput` from a live
     /// `BASHostConstitution`。 Closes ch 982.5 META-REVIEW Gap 1
