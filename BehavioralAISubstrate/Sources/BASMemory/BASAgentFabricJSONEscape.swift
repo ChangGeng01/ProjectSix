@@ -46,12 +46,10 @@ import Foundation
 
 public enum BASAgentFabricJSONEscape {
 
-    /// Minimal JSON-string escape。 Byte-equal output to all
-    /// 9 file-private `escapeForJSON*` extensions across the
-    /// seat files (ch 957-965)。 Used internally during seat
-    /// emission to safely embed user-supplied strings (candidate
-    /// IDs,titles,axis names,etc.) into the seat's emitted
-    /// JSON payload。
+    /// Minimal JSON-string escape per RFC 8259 §7。 Used
+    /// internally during seat emission to safely embed
+    /// user-supplied strings (candidate IDs,titles,axis
+    /// names,etc.) into the seat's emitted JSON payload。
     ///
     /// Escape characters:
     ///   - `\\` → `\\\\`
@@ -59,11 +57,27 @@ public enum BASAgentFabricJSONEscape {
     ///   - `\n` → `\\n`
     ///   - `\r` → `\\r`
     ///   - `\t` → `\\t`
+    ///   - **All other control chars U+0000-U+001F** → `\\u00XX`
+    ///     (4-hex-digit form per RFC 8259)
     ///
-    /// All other characters (including unicode beyond ASCII)
-    /// pass through untouched。 This matches all existing
-    /// per-seat extensions byte-equally,so seats can migrate
-    /// to this helper without producing any payload diff。
+    /// chapter 九百八十二.5 META-REVIEW CRITICAL fix:
+    /// Round 9 meta-review caught that ch 964.5 (sentinel
+    /// `\u{001F}TURN-LOCKDOWN`) + ch 981.9 (warrant
+    /// `\u{001F}per-agent=...` separator) intentionally inject
+    /// U+001F as a sentinel character into ref strings。 But
+    /// the pre-meta escape function PASSED U+001F THROUGH
+    /// UNESCAPED — producing MALFORMED JSON per RFC 8259 §7
+    /// which requires ALL U+0000-U+001F control chars to be
+    /// escaped。 Any standards-conformant JSONDecoder
+    /// (`Foundation.JSONSerialization`) rejects unescaped
+    /// control chars in strings → every TURN-LOCKDOWN trace
+    /// event and every granted warrant audit ref produced
+    /// non-decodable JSON。
+    ///
+    /// Fix:added the catch-all `\\u00XX` branch for any char
+    /// whose unicode scalar value is < 0x20 and not one of
+    /// the 5 special-case escapes above。 All 9 seat-private
+    /// extensions delegating to this helper inherit the fix。
     public static func escape(_ input: String) -> String {
         var out = ""
         out.reserveCapacity(input.count)
@@ -74,7 +88,17 @@ public enum BASAgentFabricJSONEscape {
             case "\n": out.append("\\n")
             case "\r": out.append("\\r")
             case "\t": out.append("\\t")
-            default: out.append(ch)
+            default:
+                // ch 982.5 META-REVIEW CRITICAL fix:
+                // RFC 8259 requires U+0000-U+001F escaped。
+                if let scalar = ch.unicodeScalars.first,
+                   scalar.value < 0x20
+                {
+                    out.append(String(
+                        format: "\\u%04X", scalar.value))
+                } else {
+                    out.append(ch)
+                }
             }
         }
         return out

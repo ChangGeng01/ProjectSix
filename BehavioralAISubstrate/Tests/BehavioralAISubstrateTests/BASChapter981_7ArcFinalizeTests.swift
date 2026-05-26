@@ -476,6 +476,107 @@ final class BASChapter981_7ArcFinalizeTests: XCTestCase {
             "ch 981.7 Item 8: escape MUST be deterministic")
     }
 
+    // MARK: - ch 982.5 META-REVIEW C1:RFC 8259 control-char regression
+
+    /// CRITICAL: chapter 982.5 META-REVIEW caught that the
+    /// pre-meta `escape(_:)` PASSED U+001F (unit separator) THROUGH
+    /// UNESCAPED — but ch 964.5 + ch 981.9 BOTH inject U+001F as
+    /// a sentinel into ref strings (`\u{001F}TURN-LOCKDOWN` +
+    /// `\u{001F}per-agent=...`)。 RFC 8259 §7 mandates ALL
+    /// U+0000-U+001F control chars be escaped as `\uXXXX`,so
+    /// the pre-meta output was malformed JSON。 This test pins
+    /// the fix。
+    func testCRITICAL_EscapeJSON_U001F_SeparatorIsEscaped() {
+        // The exact sentinel pattern from ch 981.9 warrant ref:
+        let input = "host-root=h1\u{001F}per-agent=a1"
+        let result = BASAgentFabricJSONEscape.escape(input)
+        XCTAssertEqual(result,
+            "host-root=h1\\u001Fper-agent=a1",
+            "ch 982.5 META-REVIEW C1 CRITICAL: U+001F unit " +
+            "separator MUST escape to \\u001F per RFC 8259 §7")
+    }
+
+    /// CRITICAL: chapter 964.5 TURN-LOCKDOWN sentinel test。
+    /// Same control-char issue — was producing malformed JSON
+    /// for any audit trace event that carried the sentinel。
+    func testCRITICAL_EscapeJSON_U001F_TurnLockdownSentinel() {
+        let input = "\u{001F}TURN-LOCKDOWN"
+        let result = BASAgentFabricJSONEscape.escape(input)
+        XCTAssertEqual(result, "\\u001FTURN-LOCKDOWN",
+            "ch 982.5 META-REVIEW C1 CRITICAL: ch 964.5 " +
+            "TURN-LOCKDOWN sentinel MUST escape U+001F")
+    }
+
+    /// Sweep across ALL U+0000 - U+001F to guarantee RFC 8259
+    /// compliance。 The 5 special-case escapes (\\ " \n \r \t)
+    /// are routed first;every other code point < 0x20 falls
+    /// through to the catch-all。 This test pins the catch-all
+    /// covers ALL of them。
+    func testCRITICAL_EscapeJSON_AllControlCharsBelow0x20() {
+        for v in 0..<0x20 {
+            let scalar = Unicode.Scalar(v)!
+            let ch = Character(scalar)
+            let input = "x\(ch)y"
+            let result = BASAgentFabricJSONEscape.escape(input)
+            // Special-cases — these have shorter escapes
+            switch v {
+            case 0x08: // backspace — not specially handled,
+                       // catches the catch-all → 
+                XCTAssertEqual(result, "x\\u0008y")
+            case 0x09: // \t
+                XCTAssertEqual(result, "x\\ty")
+            case 0x0A: // \n
+                XCTAssertEqual(result, "x\\ny")
+            case 0x0C: // form feed — also catch-all →
+                XCTAssertEqual(result, "x\\u000Cy")
+            case 0x0D: // \r
+                XCTAssertEqual(result, "x\\ry")
+            default:
+                // Everything else MUST hit the catch-all
+                let hex = String(format: "%04X", v)
+                XCTAssertEqual(result, "x\\u\(hex)y",
+                    "ch 982.5 META-REVIEW C1: U+\(hex) MUST " +
+                    "escape per RFC 8259")
+            }
+        }
+    }
+
+    /// Higher control range (DEL = U+007F + C1 controls
+    /// U+0080-U+009F) — RFC 8259 does NOT require these to be
+    /// escaped。 The fix targets ONLY U+0000-U+001F per RFC 8259
+    /// §7 strict literal language。 This test pins the line so
+    /// future "be safer escape EVERYTHING" temptations have to
+    /// argue against documented scope。
+    func testEscapeJSON_HighControlRange_NotEscaped() {
+        let input = "x\u{007F}y\u{0080}z"
+        let result = BASAgentFabricJSONEscape.escape(input)
+        XCTAssertEqual(result, "x\u{007F}y\u{0080}z",
+            "ch 982.5 META-REVIEW C1: U+007F+ outside RFC 8259 " +
+            "mandatory-escape range — must pass through")
+    }
+
+    /// JSONSerialization round-trip — proves the fix produces
+    /// JSON that ACTUALLY decodes per Foundation。 This is the
+    /// strongest test:if any control char passes through
+    /// unescaped,`JSONSerialization.jsonObject(with:)` rejects
+    /// the input,so we'd see a throw here。
+    func testCRITICAL_EscapeJSON_RFC8259Decodable() throws {
+        let input =
+            "host-root=h1\u{001F}per-agent=a1\u{0001}with-control"
+        let escaped = BASAgentFabricJSONEscape.escape(input)
+        let json = "{\"k\":\"\(escaped)\"}"
+        let data = json.data(using: .utf8)!
+        // If escape failed,JSONSerialization throws here
+        let obj = try JSONSerialization.jsonObject(
+            with: data, options: []) as? [String: Any]
+        XCTAssertNotNil(obj,
+            "ch 982.5 META-REVIEW C1 CRITICAL: escaped output " +
+            "MUST round-trip through Foundation JSON decoder")
+        XCTAssertEqual(obj?["k"] as? String, input,
+            "ch 982.5 META-REVIEW C1: decoded value MUST equal " +
+            "the original input string byte-for-byte")
+    }
+
     // MARK: - Helpers
 
     private func proposal(

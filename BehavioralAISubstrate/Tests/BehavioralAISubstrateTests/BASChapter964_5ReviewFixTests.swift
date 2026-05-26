@@ -105,9 +105,13 @@ final class BASChapter964_5ReviewFixTests: XCTestCase {
         _ = criticDelta
     }
 
-    // MARK: - C3: fuzz scenarios + roster cover all 8 seats
+    // MARK: - C3: fuzz scenarios + roster cover all 9 seats
+    // chapter 九百八十二.5 META-REVIEW H1 update:was 8-seat pin
+    // — ch 965 added EvolutionShadow but this test's count
+    // assertion was never updated。 META-REVIEW caught the drift
+    // when standardRoster() expanded to 9 seats。
 
-    func testC3_StandardRosterIs8Seat() {
+    func testC3_StandardRosterIs9Seat() {
         let roster =
             BASAgentFabricFuzzScenarios.standardRoster()
         XCTAssertNotNil(roster.memory)
@@ -116,7 +120,12 @@ final class BASChapter964_5ReviewFixTests: XCTestCase {
             "ch 964.5 C3: roster MUST include HostAlign post-ch-963")
         XCTAssertNotNil(roster.sovereignSentinel,
             "ch 964.5 C3: roster MUST include Sentinel post-ch-964")
-        XCTAssertEqual(roster.agentMap.count, 8)
+        XCTAssertNotNil(roster.evolutionShadow,
+            "ch 982.5 META-REVIEW H1: roster MUST include " +
+            "EvolutionShadow post-ch-965 (was missing,now wired)")
+        XCTAssertEqual(roster.agentMap.count, 9,
+            "ch 982.5 META-REVIEW H1: roster is 9-seat after " +
+            "EvolutionShadow addition (was 8 in ch 964.5)")
     }
 
     func testC3_HostAlignmentScenarioExercisesNewSeat() async {

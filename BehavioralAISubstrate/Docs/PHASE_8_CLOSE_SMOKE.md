@@ -107,7 +107,7 @@ All 7 watchers read-only (writeDomains empty), pattern-based (no ML), severity-l
 
 ### Invariant 7 — Reserved signalRefs prefix discipline
 
-L14 audit absorption channel uses 9 reserved prefixes (`agentFabric.*` + `agentPersona.*` + `agentWatcher.*` + `agentExternal.*`). No other prefix overlaps. Verified by ch 974 + ch 977 prefix tests.
+L14 audit absorption channel uses 10 reserved prefixes (`agentFabric.*` + `agentPersona.*` + `agentWatcher.*` + `agentExternal.*`). No other prefix overlaps. Verified by ch 974 + ch 977 prefix tests. Per ch 981.7 ARC FINALIZE Item 5 a 10th prefix `agentExternal.warrant:` was added for the sovereign warrant validation outcome — updated from "9 reserved" by ch 982.5 META-REVIEW.
 
 ### Invariant 8 — Zero-copy ref carries NO write capability
 
@@ -131,14 +131,14 @@ When operator runs the 3-mode smoke and all 3 modes pass per the criteria above:
 
 ## Arc seal summary (ch 953-981, 29 chapters)
 
-- **3 N-pass review cycles** caught **35+ real bugs**
-- **580+ tests** at the arc level, all 0 failures
+- **9 N-pass review cycles** caught **70+ real bugs** (per ch 982.5 META-REVIEW tally)
+- **663 tests** at the arc level, all 0 failures (per ch 982.5 actual count)
 - **14,150+ tests** in the full substrate sweep, all 0 failures
 - **20 agents** wired across 8 phases
 - **12 state graph domains** under Single-Writer-Per-Domain
 - **4 reserved persona pattern detectors** + 4 reference skill agents + 7 watchers + 2 external gateways
-- **9 reserved L14 signalRefs prefixes** (6 in-use + 3 future-allocation per ch 981.5 DH3 doc-fix) for audit absorption
+- **10 reserved L14 signalRefs prefixes** (6 in-use + 4 future-allocation per ch 981.7 ARC FINALIZE + ch 982.5 META-REVIEW) for audit absorption
 - **3 stability tiers** declared (WIRE-STABLE / API-STABLE / INTERNAL)
 - **0 schema changes** to existing `SovereignAuditEntry.signalRefs` — full reuse pattern preserved per ch 953
 
-This is the **FINAL chapter** of the Agent Fabric arc. With operator's 3-mode device smoke, arc 953-981 is sealed end-to-end.
+This is the **FINAL chapter** of the Agent Fabric arc. With operator's 3-mode device smoke, arc 953-981 is sealed end-to-end (extended through ch 982.5 META-REVIEW for honest disclosure of cross-module integration gaps — see `Docs/ARC_SEAL_953_981.md`).

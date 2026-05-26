@@ -1,34 +1,37 @@
-# Agent Fabric Arc Seal — chapters 953-981
+# Agent Fabric Arc Seal — chapters 953-982 (substrate-island)
 
-**Arc**: Agent Fabric (chapters 953-981 + 5 USER-PASS sub-chapters)
+**Arc**: Agent Fabric (chapters 953-982.5 + 10 USER-PASS / META-REVIEW sub-chapters)
 **Start**: ch 953 / M3470 (Phase 0 ch1)
-**End**: ch 981 / M3610 (Phase 8 close + ARC SEAL)
-**Status**: SEALED at ch 981 — substrate-side complete, device-verification PENDING per phase smoke docs
+**End**: ch 982.5 / M3615.5 (META-REVIEW + honest-disclosure of cross-module gaps)
+**Substrate-island sealed**: ch 981 / M3610 (Phase 8 close + initial ARC SEAL)
+**Status**: SUBSTRATE-ISLAND COMPLETE — fabric is internally consistent at the simulator level, BUT cross-module wiring into existing host services (BASPolicy / BASHostKit / BASRiskServicing / BASRoutedEventLogStorage / BASSovereignAuditLedger / coordinator) is documented as a separate forward workstream (see "Cross-module integration gap" section below — added at ch 982.5 META-REVIEW). Device-verification (3-mode 2hr iPhone Air smoke) also PENDING per phase smoke docs.
 
 ---
 
-## Arc-level claims
+## Arc-level claims (scope-honest)
 
-1. **Single sovereign host** preserved across 29 chapters. The 7 Root Laws are enforced at type-system level (Single-Writer-Per-Domain via `BASSharedStateGraph` + per-agent `writeDomains`/`forbiddenDomains`) AND at runtime via the graph actor's `writeObject(...)` check.
-2. **20 agents wired** (9 core + 7 watcher + 4 reference skill — see Phase 5 + Phase 6).
-3. **Every external surface** (MCP + A2A) routes through a dedicated gateway that degrades external code to proposal-only, tool-domain-scoped refs (see Phase 7).
-4. **Persona overlay** lives ATOP the fabric via the formula `P_effective = Clamp(P_role ⊕ P_user ⊕ P_host, Risk, Sovereign)` (see Phase 4).
-5. **3 N-pass review cycles** (956.11 + 964.5 + 969.5) caught **35+ real bugs** before production — including the CG1 sovereignty crisis at ch 969.5 that would have rejected the system's own sovereign agents at runtime.
+1. **Single sovereign host** preserved across 29 chapters. The 7 Root Laws are enforced at type-system level (Single-Writer-Per-Domain via `BASSharedStateGraph` + per-agent `writeDomains`/`forbiddenDomains`) AND at runtime via the graph actor's `writeObject(...)` check — **within the fabric island**. The fabric does NOT yet read from or write into the host's existing L5 `BASHostConstitution` / L11 `BASRiskServicing` / L10 `BASMLTriSelfService` — see "Cross-module integration gap" section.
+2. **20 agents wired internally** (9 core + 7 watcher + 4 reference skill — see Phase 5 + Phase 6). All 20 dispatch through `BASAgentTurnDispatcher.dispatch(...)` end-to-end; none are wired through `EBrainRuntimeCoordinator`.
+3. **Every external surface** (MCP + A2A) routes through a dedicated gateway that degrades external code to proposal-only, tool-domain-scoped refs (see Phase 7). The gateway does NOT yet import `BASPolicy.BASActionPermit` — the cross-module integration is documented as forward work.
+4. **Persona overlay** lives ATOP the fabric via the formula `P_effective = Clamp(P_role ⊕ P_user ⊕ P_host, Risk, Sovereign)` (see Phase 4). The Risk + Sovereign clamp is a fabric-internal pure-fn; it does not delegate to the live host's risk/sovereign services.
+5. **9 N-pass review cycles** (956.11 + 964.5 + 969.5 + 981.5 + 981.6 + 981.7 + 981.8 + 981.9 + 982 + 982.5 META-REVIEW) caught **70+ real bugs** before production — including the CG1 sovereignty crisis at ch 969.5 that would have rejected the system's own sovereign agents at runtime, the SIGBUS root cause at ch 981.9, the U+001F malformed-JSON regression at ch 982.5, and the cross-module parallel-island finding at ch 982.5 META-REVIEW.
 
-## Arc trajectory (8 phases, 29 chapters)
+## Arc trajectory (8 phases + META-REVIEW, 29+10 sub-chapters)
 
-| Phase | Chapters | Theme | Tests added |
+| Phase | Chapters | Theme | Tests added (actual, per ch 982.5 audit) |
 |---|---|---|---|
-| **0** | 953-955 + 956.5 | Prototype (schemas + state graph + merge engine) | 65 |
-| **1** | 956-959 + 956.6-956.11 | 4-seat closure + Rust FFI + SQL + coordinator wire | 110 |
+| **0** | 953-955 + 956.5 | Prototype (schemas + state graph + merge engine) | 49 |
+| **1** | 956-959 + 956.6-956.11 | 4-seat closure + Rust FFI + SQL + coordinator wire | 128 |
 | **2** | 960-962 | Memory + Critic seats + evidence-debt + fuzz | 52 |
-| **3** | 963-965 + 964.5 | Host/Sovereign/Evolution (.alignmentField + .sovereignVerdict + .evolutionProposal) | 67 |
-| **4** | 966-969 + 969.5 | Persona Studio (resolver + Risk + Sovereign + SDK + forbidden detector) | 92 |
+| **3** | 963-965 + 964.5 | Host/Sovereign/Evolution (.alignmentField + .sovereignVerdict + .evolutionProposal) | 68 |
+| **4** | 966-969 + 969.5 | Persona Studio (resolver + Risk + Sovereign + SDK + forbidden detector) | 93 |
 | **5** | 970-972 | 7 watcher agents + L14 audit aggregator + adversarial fuzz | 62 |
 | **6** | 973-975 | SDK productization (skill agents + API stability + DeviceTestApp sample) | 46 |
 | **7** | 976-978 | MCP + A2A external interop (HIGH risk — sovereign-locked external surface) | 56 |
-| **8** | 979-981 | End-side perf (latent spine + hot/cold tier + speculative + zero-copy) + arc seal | 31 |
-| **TOTAL** | **29** | | **~580+ tests** |
+| **8** | 979-981 + 981.5-981.9 + 982 + 982.5 | End-side perf + ARC SEAL + 6 N-pass-review sub-chapters | 109 |
+| **TOTAL** | **29 + 10 sub** | | **663 tests** |
+
+> **chapter 九百八十二.5 META-REVIEW doc-fix**:earlier versions of this table claimed Phase 0=65 / Phase 1=110 / Phase 8=31 / TOTAL=580+。 Reality at sub-chapter cascade close is Phase 0=49 (over-stated 33%) / Phase 1=128 (under-stated 16%) / Phase 8=109 (under-stated 71% — the 981.5-981.9+982+982.5 sub-chapter tests were never aggregated into the Phase 8 row) / TOTAL=663 (under-stated 14%)。 The drift accumulated as each cascade fix landed without updating this aggregate table — caught only at the META-REVIEW pass。
 
 ## Final invariants list (sealed at ch 981)
 
@@ -104,34 +107,43 @@ Per plan PHASE 8 goals:
 
 **Cumulative perf budget**: ≤ +15% vs ch 952.6 baseline (per plan). Substrate-side: 0 regression measured at simulator level. Device-side: verified by operator running Phase 8 close 2-hour smoke per `Docs/PHASE_8_CLOSE_SMOKE.md`.
 
-## Test totals
+## Test totals (per ch 982.5 META-REVIEW actual count)
 
-| Source | Tests | Failures |
-|---|---|---|
-| Phase 0 (953-955 + 956.5) | 65 | 0 |
-| Phase 1 (956-959 + 956.6-956.11) | 110 | 0 |
-| Phase 2 (960-962) | 52 | 0 |
-| Phase 3 (963-965 + 964.5) | 67 | 0 |
-| Phase 4 (966-969 + 969.5) | 92 | 0 |
-| Phase 5 (970-972) | 62 | 0 |
-| Phase 6 (973-975) | 46 | 0 |
-| Phase 7 (976-978) | 56 | 0 |
-| Phase 8 (979-981) | 31 | 0 |
-| **Total arc** | **580+** | **0** |
-| Full sweep (substrate-wide) | 14,150+ | 0 |
+| Source | Tests (actual) | Tests (originally claimed) | Failures |
+|---|---|---|---|
+| Phase 0 (953-955 + 956.5) | 49 | 65 (over +33%) | 0 |
+| Phase 1 (956-959 + 956.6-956.11) | 128 | 110 (under -16%) | 0 |
+| Phase 2 (960-962) | 52 | 52 ✓ | 0 |
+| Phase 3 (963-965 + 964.5) | 68 | 67 (±1) | 0 |
+| Phase 4 (966-969 + 969.5) | 93 | 92 (±1) | 0 |
+| Phase 5 (970-972) | 62 | 62 ✓ | 0 |
+| Phase 6 (973-975) | 46 | 46 ✓ | 0 |
+| Phase 7 (976-978) | 56 | 56 ✓ | 0 |
+| Phase 8 (979-981 + 981.5-981.9 + 982 + 982.5) | 109 | 31 (under -71% — sub-chapter cascade tests never aggregated) | 0 |
+| **Total arc** | **663** | **580+ (under -14%)** | **0** |
+| Full sweep (substrate-wide) | 14,150+ | — | 0 |
 
-All tests pass with 0 unexpected failures. 113 fuzz-skipped tests via `BAS_FUZZ_RUNTIME_SKIP=1` env var (legitimate skips for long-running fuzz that the operator runs out-of-band per ch 952.x discipline).
+All tests pass with 0 unexpected failures. 113+ fuzz-skipped tests via `BAS_FUZZ_RUNTIME_SKIP=1` env var (legitimate skips for long-running fuzz that the operator runs out-of-band per ch 952.x discipline).
 
-## N-pass review track record
+The drift in the right column shows how doc-staleness accumulates during a long arc — every cascade sub-chapter shipped tests but the aggregate table was never re-totaled。 ch 982.5 META-REVIEW recomputed each row from `grep -c "func test"` against the actual files in `Tests/BehavioralAISubstrateTests/`。
+
+## N-pass review track record (updated at ch 982.5 META-REVIEW)
 
 | Round | Sub-ch | Findings | Real bugs caught |
 |---|---|---|---|
 | 1 | 956.11 | 4C + 6H + MED + test backfill | 10+ |
 | 2 | 964.5 | 2C + 4H + 7 doc + 6 gaps | 15+ |
 | 3 | 969.5 | 2C + 1 GAP + 4H + 1 DH + 2 DM | 10+ |
-| **Total** | **3 rounds** | | **35+ real bugs** |
+| 4 | 981.5 | 3C + 2 deferred-item closes (3 + 7) | 8+ |
+| 5 | 981.6 | 4H + 4M fix-of-fix bugs in ch 981.5 | 8+ |
+| 6 | 981.7 (ARC FINALIZE) | 3 deferred-item closes (1 + 5 + 8) + 4H + 4 test gaps | 8+ |
+| 7 | 981.8 | round-6 review caught 4H + 4 test gaps in 981.5/981.7 | 8+ |
+| 8 | 981.9 | round-7 + SIGBUS root cause + test count + 9-seat migration | 6+ |
+| 9 | 982 | round-8 doc-staleness only (cascade pressure shifting) | 3+ |
+| **10 (META)** | **982.5** | **2C (U+001F malformed-JSON + cross-module parallel-island) + multiple H + doc-drift correction** | **7+** |
+| **Total** | **10 rounds** | | **70+ real bugs** |
 
-Each round caught at least 1 CRITICAL bug that production-shape tests had missed. The CG1 sovereignty crisis fix at ch 969.5 alone would have rejected the substrate's own sovereign agents at runtime.
+Each round caught at least 1 CRITICAL bug that production-shape tests had missed. The CG1 sovereignty crisis fix at ch 969.5 alone would have rejected the substrate's own sovereign agents at runtime. The ch 982.5 META-REVIEW catch is the most architecturally significant — the parallel-island finding documents that the arc shipped 663 internally-consistent tests for an internally-consistent fabric that is NOT YET WIRED into the production substrate's existing service plane (see next section)。
 
 ## Forward-looking deferred items
 
@@ -205,6 +217,58 @@ but worth a dedicated fix arc。
 **Status**:DEFERRED to post-arc Phase 9+ BASSovereign hardening。
 Documented here so it doesn't slip through the cracks。
 
+## Cross-module integration gap (ch 982.5 META-REVIEW CRITICAL honest disclosure)
+
+The ch 982.5 META-REVIEW Reviewer-4 (cross-module integration) pass produced the most architecturally significant finding of the arc:**the entire fabric ships as a parallel island that is internally consistent at the simulator level but is not yet wired into the production substrate's existing service plane**。 This section documents the gap honestly so a future arc can close it deliberately rather than discovering it as a runtime surprise。
+
+### What "parallel island" means concretely
+
+The Agent Fabric arc 953-982.5 built a self-contained subsystem:13 seat files + 9 supporting modules + 663 tests,all dispatching through `BASAgentTurnDispatcher.dispatch(...)`。 But the existing pre-Phase-0 production substrate has its OWN service plane (`EBrainRuntimeCoordinator` + `BASRiskServicing` + `BASMLTriSelfService` + `BASRoutedEventLogStorage` + `BASSovereignAuditLedger` + `BASHostConstitution`)。 The fabric does NOT yet read from or write into ANY of these — it is a wholly disjoint code path that compiles + tests cleanly but is unreachable from any pre-Phase-0 caller。
+
+This was **by design** per plan red-line 7 (additive only,byte-equal when fabric unconfigured) + ADR-014 OPT-IN — the integration work was always intended as a separate workstream。 But earlier versions of this ARC_SEAL doc framed the arc as "substrate-side complete",which over-claims。 The fabric is **fabric-island complete**;the substrate integration is the next arc。
+
+### Specific integration gaps (Reviewer-4 enumerated)
+
+| # | What's NOT wired | What it would take to wire |
+|---|---|---|
+| 1 | `BASHostAlignmentSeat.hostConstraintsRef` is a free-form string parameter — it does not actually READ from the live `BASHostConstitution.styleGenome` / `routineSkeleton` / `valueAxes` | Coordinator adapter that converts the live `BASHostConstitution` into `BASHostAlignmentInput.hostBoundaryAxes` before dispatch |
+| 2 | `BASMCPCapabilityGateway` validates inputs but does NOT call into `BASPolicy.BASActionPermit` to enforce permits — the permit check is documented but unimported | Add `import BASPolicy` + wire MCP-tool calls through `BASActionPermit.grant(...)` per ch 953 design |
+| 3 | `BASRiskSeat` is a pure-function that emits `.riskField` deltas — it does NOT delegate to the host's live `BASRiskServicing` (used by `EBrainRuntimeCoordinator`) | Coordinator adapter that calls `riskService.evaluate(...)` and feeds the result into `BASRiskInput` before dispatch |
+| 4 | Fabric dispatch does NOT invoke `BASMLTriSelfService` (the 三我庭 id/ego/superego) — Critic seat is a thin pure-fn,not a wrapper around `triSelfService.guard` per ch 953 plan | Coordinator adapter calls `triSelfService.guard(...)` and feeds the result into `BASCriticSeatInput` before dispatch — must invoke BEFORE triSelf per ch 956 plan |
+| 5 | Fabric `.candidateFrontier` deltas are disjoint from the host's existing `BASCandidateFrontierSummary` (built by `loopService.proposePaths`) | Coordinator adapter builds `BASPlannerCandidate[]` from live `BASCandidatePath[]`,then writes accepted-deltas back to the live frontier |
+| 6 | `BASAgentTraceLog` is an in-memory actor — it does NOT use `BASRoutedEventLogStorage` (the existing event-sourced replay log) per ch 953 plan section 8 | Add a write-through path that fans every trace event into `BASRoutedEventLogStorage` |
+| 7 | `BASSovereignWarrantValidator.validate(...)` emits `agentExternal.warrant:granted:host-root=<id>\u{001F}per-agent=<id>` audit refs (ch 981.7 + 982 U+001F fix) — but NO in-substrate consumer pipes these refs into `BASSovereignAuditLedger`,so the carefully-fixed refs are currently **DEAD-LETTER** | Coordinator + `EBrainL14SovereignVerdictPlane` adapter that intercepts `effectiveTierWithWarrant` audit refs and appends them to the ledger via `signalRefs:`|
+| 8 | **Zero integration tests through `EBrainRuntimeCoordinator`** — all 663 tests dispatch directly through `BASAgentTurnDispatcher` | A new test class `BASChapter9XXCoordinatorIntegrationTests` that drives a coordinator-end turn through the fabric and asserts the fabric outputs reach the existing service plane outputs |
+
+### Why each gap was not closed in arc 953-982.5
+
+The arc plan (`/Users/changgeng/.claude/plans/wild-rolling-meerkat.md`) explicitly scoped the fabric as a multi-phase initiative where Phase 9+ (post-arc) would handle host-app integration。 Within the 8-phase scope of 953-981,every coordinator-side wire was deferred to "post-arc"。 This was deliberate:
+
+- It preserved red-line 7 (byte-equal when fabric unconfigured) — the fabric cannot regress existing code if existing code does not call it。
+- It bounded the per-phase risk to substrate-side additions only。
+- It allowed device-verification (ch 952.6 baseline) to remain valid throughout the arc because no per-turn path changed。
+
+But the over-claim is that "substrate-side complete" suggested the fabric is one operator-action away from production。 Realistically,closing the 8 integration gaps above is **its own multi-chapter arc** — likely Phase 9+ ch 983-990 or similar。
+
+### Honest scope statement
+
+The Agent Fabric arc 953-982.5 produced:
+
+- **Fabric-island**:internally-consistent multi-seat dispatcher with 663 tests at 0 failures。 ✅ **COMPLETE**
+- **Cross-module integration**:wiring the fabric into `EBrainRuntimeCoordinator` + existing L5/L7/L8/L9/L10/L11/L14 services。 ❌ **NOT STARTED** — Phase 9+ scope
+- **Device verification**:3-mode 2hr iPhone Air smoke per `Docs/PHASE_8_CLOSE_SMOKE.md`。 ⏸️ **PENDING OPERATOR** — substrate-side passes ch 952.6 baseline unchanged
+
+### Forward path
+
+A future arc 983-99X should:
+
+1. Land coordinator-side adapters for the 8 gaps in priority order (Gap 7 — warrant audit refs to ledger — is the highest-value since it closes a DEAD-LETTER condition shipped at ch 981.7;Gap 4 — triSelf wiring — is most architecturally risky)
+2. Add `BASChapter98XCoordinatorIntegrationTests` that asserts EACH gap's adapter produces the documented behavior
+3. Run the 3-mode device smoke documented in `Docs/PHASE_8_CLOSE_SMOKE.md` with the integration adapters live
+4. Update this section's table from ❌ → ✅ as each gap closes
+
+Until that arc lands,**the fabric is correctly described as a parallel island that compiles + tests + is dispatch-callable but is not part of the live per-turn path**。 Operators who want to invoke the fabric today MUST do so through a custom harness that calls `BASAgentTurnDispatcher.dispatch(...)` directly (per the env-var caveat in `Docs/PHASE_8_CLOSE_SMOKE.md`)。
+
 ## Push status
 
 As of arc seal at ch 981, the local branch `phase-5-chapter-952-iphone-air-10hr-validation` is 8+ commits ahead of `origin/phase-5-chapter-952-iphone-air-10hr-validation`. Push pending explicit user authorization per the standing instruction across this entire arc.
@@ -244,14 +308,25 @@ Pass criteria for arc seal:
 
 > **Note**: Per the env-var deferred item above, the 3-mode operator procedure requires the BAS_AGENT_FABRIC env var to be wired into `scripts/run-iphone-air-10hr.sh` and the dispatcher. As of ch 981, this wiring is documented as future host-app integration work. Operator may either (a) wait for that integration, OR (b) run the baseline smoke as-is + manually exercise the 20-agent set through a test harness that calls `BASAgentTurnDispatcher.dispatch(...)` directly.
 
-## Arc seal declaration
+## Arc seal declaration (scope-honest)
 
-By the discipline this arc has held to (red-line 7 additive-only, byte-equality when fabric unconfigured, 3-agent N-pass review every ~8 chapters with 35+ real bugs caught, pure-fn + slim-DTO seat layer for 8 of 9 core agents, sovereign-locked external surfaces), the Agent Fabric arc 953-981 is hereby **SUBSTRATE-SEALED** at the simulator level.
+By the discipline this arc has held to (red-line 7 additive-only, byte-equality when fabric unconfigured, **9 N-pass review cycles + 1 META-REVIEW** every ~8 chapters with **70+ real bugs** caught, pure-fn + slim-DTO seat layer for 9 of 9 core agents, sovereign-locked external surfaces), the Agent Fabric arc 953-982.5 is hereby **FABRIC-ISLAND-SEALED** at the simulator level.
 
-Device-verification (the 2-hour iPhone Air 3-mode smoke) is documented but pending operator execution. When operator runs the smoke and all 3 modes pass per the criteria above, this arc is **DEVICE-SEALED**.
+This is **NOT** the same as "substrate-sealed" — earlier versions of this declaration framed the arc as substrate-side complete, which over-claimed scope. The honest framing per ch 982.5 META-REVIEW:
 
-Next arc (post-981) scope:
-- Round-table mode (Phase 9+) — N-way agent collaboration
-- Sovereign warrant infrastructure (Phase 9+) — formal collaborator-tier upgrade chain
-- App-suspension state persistence (Phase 9+) — persona + watcher hint cold restart
-- Host-app integration (separate workstream) — env-var gate, DeviceTestApp wiring, Qinao runtime adoption
+| Surface | Status | Verified by |
+|---|---|---|
+| Fabric-island (dispatcher + seats + merge + audit) | ✅ SEALED | 663 tests at 0 failures |
+| Cross-module integration (8 gaps documented above) | ❌ NOT STARTED | Phase 9+ scope — separate arc |
+| Device verification (3-mode 2hr iPhone Air smoke) | ⏸️ PENDING OPERATOR | substrate-wide ch 952.6 baseline unchanged |
+
+When operator runs the smoke and all 3 modes pass per the criteria above, the fabric-island portion is **DEVICE-CONFIRMED-NEUTRAL** (proves it doesn't regress existing code, NOT that it's wired through coordinator yet)。
+
+Next arc (post-982.5) scope:
+- **Cross-module integration arc** — close the 8 parallel-island gaps documented above (estimated ch 983-990+, multi-month effort)
+- Round-table mode integration into the live dispatcher (scaffold shipped at ch 981.7;dispatcher integration deferred)
+- App-suspension state persistence runtime integration (validator shipped at ch 981.5;runtime read-back deferred)
+- Host-app surfaces (env-var gate, DeviceTestApp wiring, Qinao runtime adoption) — separate workstream
+- BASSovereign canonical-bytes hardening (cross-arc concern flagged at ch 982 Round 8 — separator class issue in ed25519 signing)
+
+The fabric-island is **the necessary first half** of "agents in the host"。 The cross-module integration arc is the second half。 Both halves together produce a production-shippable multi-agent runtime;the first half alone produces a tested library。

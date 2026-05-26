@@ -11,6 +11,192 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 九百八十二.5 / M3615.5 — META-REVIEW (Round 9):arc-level integration audit + RFC 8259 critical fix + honest scope disclosure
+
+**Round 9 trigger**:user invoked「全面 审查 所有」asking for a
+comprehensive arc-wide review。 Four parallel reviewers (code /
+tests / docs / cross-module-integration) ran against the entire
+arc 953-982 cumulative state。 **The cross-module review surfaced
+the most architecturally significant finding of the entire arc**。
+
+This round caught issues that ALL 8 prior N-pass rounds missed
+because each prior round scoped itself to the cascade delta;none
+asked "is this whole thing wired through the production substrate?"
+The answer turned out to be **no**,and the honest disclosure is
+the most important deliverable of this chapter。
+
+#### CRITICAL-1 — U+001F unit-separator passed through unescaped → MALFORMED JSON per RFC 8259
+
+**Finding**:`BASAgentFabricJSONEscape.escape(_:)` (shipped ch
+981.7,migrated 9 seats at ch 981.9) escaped `\\`,`"`,`\n`,`\r`,
+`\t` but PASSED EVERY OTHER U+0000-U+001F CONTROL CHAR THROUGH
+UNESCAPED。 RFC 8259 §7 mandates ALL control chars in this range
+MUST escape to `\uXXXX`。
+
+This intersected with **ch 964.5 + ch 981.9 BOTH using U+001F as
+a sentinel**:
+- ch 964.5 TURN-LOCKDOWN trace event:`\u{001F}TURN-LOCKDOWN`
+- ch 981.9 warrant audit ref:`host-root=<id>\u{001F}per-agent=<id>`
+
+Every TURN-LOCKDOWN event and every granted-warrant audit ref
+produced JSON that `Foundation.JSONSerialization.jsonObject(with:)`
+REJECTS as malformed — silently breaking the entire audit replay
+path for these signal types。
+
+**Fix**:added catch-all `\\u00XX` branch in `escape(_:)` for any
+char with `scalar.value < 0x20` that didn't match the 5 special-
+case escapes。 All 9 seat-private extensions delegating to this
+helper inherit the fix。 5 regression tests pin RFC 8259
+compliance:
+1. `testCRITICAL_EscapeJSON_U001F_SeparatorIsEscaped` — exact
+   ch 981.9 warrant pattern
+2. `testCRITICAL_EscapeJSON_U001F_TurnLockdownSentinel` — exact
+   ch 964.5 trace pattern
+3. `testCRITICAL_EscapeJSON_AllControlCharsBelow0x20` — sweep
+   across all 32 control chars
+4. `testEscapeJSON_HighControlRange_NotEscaped` — scope-pin:
+   U+007F+ NOT escaped (RFC 8259 mandates ONLY < 0x20)
+5. `testCRITICAL_EscapeJSON_RFC8259Decodable` — round-trip
+   through `JSONSerialization.jsonObject(with:)` proving the
+   escaped output is decodable
+
+#### CRITICAL-2 (META) — Cross-module parallel-island finding (honest scope disclosure)
+
+**The most architecturally significant finding of the entire arc**。
+
+Reviewer-4 (cross-module integration) enumerated **8 specific
+integration gaps** where the fabric does NOT YET wire into the
+production substrate's existing service plane:
+
+1. `BASHostAlignmentSeat.hostConstraintsRef` does NOT read live `BASHostConstitution`
+2. `BASMCPCapabilityGateway` does NOT call into `BASPolicy.BASActionPermit`
+3. `BASRiskSeat` does NOT delegate to host's live `BASRiskServicing`
+4. Fabric dispatch does NOT invoke `BASMLTriSelfService` (the 三我庭)
+5. Fabric `.candidateFrontier` deltas disjoint from host's `BASCandidateFrontierSummary`
+6. `BASAgentTraceLog` is in-memory only — does NOT use `BASRoutedEventLogStorage`
+7. Sovereign warrant audit refs are **DEAD-LETTER** — no consumer pipes the carefully-fixed `agentExternal.warrant:granted:host-root=<id>\u{001F}per-agent=<id>` refs (ch 981.7 + 982 + 982.5 C1) into `BASSovereignAuditLedger`
+8. **ZERO** integration tests through `EBrainRuntimeCoordinator` — all 663 arc tests dispatch directly through `BASAgentTurnDispatcher`
+
+**Decision**:these gaps are NOT "fixable" within ch 982.5 scope —
+each one requires a coordinator-side adapter that's its own
+multi-chapter workstream (estimated arc 983-990+,multi-month
+effort)。 What IS fixable today is the over-claim:earlier ARC_SEAL
+language called the arc "substrate-side complete",which suggested
+it's one operator-action away from production。 Reality is the arc
+is **fabric-island complete** but **NOT substrate-integration
+complete**。
+
+**Fix**:added comprehensive "Cross-module integration gap" section
+to `Docs/ARC_SEAL_953_981.md` with:
+- Concrete enumeration of all 8 gaps with what-it-would-take per row
+- Explanation of why each gap was deliberate per arc plan
+- Honest scope statement (fabric-island ✅ / cross-module ❌ /
+  device ⏸️ matrix)
+- Forward path for the cross-module integration arc
+
+#### HIGH-1 — Fuzz scenarios stuck at 8 seats (Reviewer 1)
+
+**Finding**:`BASAgentFabricFuzzScenarios.standardRoster()` was
+expanded from 6→8 seats at ch 964.5 (adding HostAlignment + 
+SovereignSentinel) but never updated for **ch 965 EvolutionShadow**
+— the 9th seat shipped at Phase 3 close but had ZERO adversarial
+fuzz coverage despite being load-bearing for the
+never-effective-same-turn invariant。
+
+**Fix**:
+1. Extended `standardRoster()` to include EvolutionShadow with
+   `.evolutionProposal` write domain + `.coldSeat` lease (matches
+   ch 965 tests)
+2. NEW `evolutionShadowProposalsTurn()` scenario exercises all 3
+   proposal clusters (tickets + rules + host-change candidates)
+3. Updated `allSignalsActiveTurn()` to include non-empty
+   EvolutionShadow input
+4. Updated ch 964.5 `testC3_StandardRosterIs8Seat` →
+   `testC3_StandardRosterIs9Seat` with explicit drift docstring
+5. Updated all roster-count assertions + docstrings throughout the
+   file
+
+#### MED-1 — `BASAgentFabricRuntime` "4-seat" docstring (Reviewer 3)
+
+**Finding**:two docstrings in `BASAgentFabricRuntime.swift`
+still said "4-seat roster" / "4 BASAgentSpecs" despite cascade
+from ch 961/963/964/965 expanding to 9。 Was partially updated at
+ch 964.5 to "8" but never reached "9"。
+
+**Fix**:both docstrings now say "up to 9 agents (4 mandatory + 5
+optional via defaulted-nil slots)" with chapter cross-references
+to ch 961/963/964/965。
+
+#### MED-2 — PHASE_8_CLOSE_SMOKE prefix count + arc summary stale
+
+**Finding**:`Docs/PHASE_8_CLOSE_SMOKE.md` Invariant 7 said "9
+reserved prefixes" + final summary said "9 reserved L14 signalRefs
+prefixes (6 in-use + 3 future-allocation)" — should be 10 (6
+in-use + 4 future-allocation per ch 981.7 ARC FINALIZE adding
+`agentExternal.warrant:`)。 Doc was updated at ARC_SEAL but
+PHASE_8_CLOSE not propagated。
+
+**Fix**:both locations updated to "10 reserved prefixes" + final
+summary tallies updated to "9 N-pass review cycles" + "70+ real
+bugs" + "663 tests at the arc level"。
+
+#### MED-3 — ARC_SEAL title + bug count + per-phase test counts stale
+
+**Finding** (multiple,aggregated):
+- Title:"chapters 953-981" → reality is 953-982.5
+- Bug count:"35+ real bugs" → reality is 70+ (across 9 N-pass +
+  1 META rounds)
+- Phase 0 test count:65 claimed,49 actual (over-stated 33%)
+- Phase 1 test count:110 claimed,128 actual (under-stated 16%)
+- Phase 8 test count:31 claimed,109 actual (under-stated 71%;
+  sub-chapter cascade tests never aggregated into row)
+- Total arc:580+ claimed,663 actual (under-stated 14%)
+- "3 N-pass review cycles" → reality is 9 + 1 META
+
+**Fix**:ARC_SEAL rewrites:
+1. Title now "chapters 953-982 (substrate-island)"
+2. Header status reframed:"SUBSTRATE-ISLAND COMPLETE" not
+   "substrate-sealed",with explicit cross-module gap reference
+3. Arc trajectory table:per-phase counts corrected to actual +
+   originally-claimed columns showing drift,with explanation note
+4. Test totals table:added "Tests (actual)" + "Tests (originally
+   claimed)" columns showing drift,with methodology note
+5. N-pass review track record:expanded from 3 rounds to 10 rounds
+   (956.11 + 964.5 + 969.5 + 981.5 + 981.6 + 981.7 + 981.8 + 981.9
+   + 982 + 982.5 META) with finding counts per round
+6. Arc seal declaration:replaced "SUBSTRATE-SEALED" with
+   "FABRIC-ISLAND-SEALED" + added scope matrix
+   (fabric-island ✅ / cross-module ❌ / device ⏸️) with explicit
+   pointer to the cross-module gap section
+
+#### Round 9 verdict
+
+**Cascade has shifted from algorithmic-bug catches to scope-honesty
+catches**。 The U+001F regression IS algorithmic (silent malformed-
+JSON for warrant + lockdown trace),and the cross-module gap is
+the highest-impact arc-level finding。 Combined,this round
+delivers:
+- 1 algorithmic CRITICAL fix (U+001F regression)
+- 1 META CRITICAL disclosure (8 integration gaps documented)
+- 1 HIGH algorithmic fix (fuzz scenarios + roster)
+- 3 MED doc-staleness fixes (4-seat docstrings + prefix counts +
+  arc-level tallies)
+- 5 new regression tests (RFC 8259 compliance suite)
+
+**Substrate state at ch 982.5 close**:14,329 tests / 0 failures /
+113 fuzz-skipped。 ARC_SEAL now honestly describes the fabric as a
+parallel island awaiting cross-module integration in arc 983+。
+
+#### Files touched
+
+- `Sources/BASMemory/BASAgentFabricJSONEscape.swift` — U+001F escape
+- `Sources/BASMemory/BASAgentFabricFuzzScenarios.swift` — 9-seat + new scenario
+- `Sources/BASMemory/BASAgentFabricRuntime.swift` — docstring fix
+- `Tests/BehavioralAISubstrateTests/BASChapter981_7ArcFinalizeTests.swift` — +5 RFC 8259 regression tests
+- `Tests/BehavioralAISubstrateTests/BASChapter964_5ReviewFixTests.swift` — 8-seat → 9-seat pin update
+- `Docs/ARC_SEAL_953_981.md` — comprehensive honest disclosure rewrite
+- `Docs/PHASE_8_CLOSE_SMOKE.md` — prefix count + summary tallies
+
 ### Chapter 九百八十二 / M3615 — Round 8 USER-PASS-11 fix^12:doc-staleness only,cascade pressure shifting from algorithmic to doc
 
 **Round 8 verdict**:**cascade has clearly slowed**。 Reviewer

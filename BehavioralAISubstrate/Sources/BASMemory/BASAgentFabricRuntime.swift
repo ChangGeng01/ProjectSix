@@ -19,10 +19,17 @@
 //
 // ## Sendable
 //
-// `BASAgentTurnRoster` is value-type (4 BASAgentSpecs)。
+// `BASAgentTurnRoster` is value-type (up to 9 BASAgentSpecs:4
+// mandatory + 5 optional via defaulted-nil slots,per ch 961 +
+// ch 963 + ch 964 + ch 965 additive expansions)。
 // `BASSharedStateGraph` is an actor (Sendable by construction)。
 // `BASAgentTraceLog?` is an optional actor。 The bundle itself
 // is Sendable because all components are Sendable。
+//
+// chapter 九百八十二.5 META-REVIEW MED1 doc-fix:was "4 BASAgentSpecs"
+// from ch 960 — never updated as ch 961/963/964/965 added the
+// 5 optional seats (Memory + Critic + HostAlignment +
+// SovereignSentinel + EvolutionShadow)。
 
 import Foundation
 
@@ -32,9 +39,11 @@ import Foundation
 ///
 /// chapter 九百六十四.5 USER-PASS-5 D1 doc-fix:was "4-seat
 /// roster" from ch 960 — ch 961 added Memory + Critic,ch 963
-/// added HostAlignment,ch 964 added SovereignSentinel。 Roster
-/// now carries UP TO 8 agents (4 mandatory + 4 optional via
-/// roster's defaulted-nil slots)。
+/// added HostAlignment,ch 964 added SovereignSentinel。
+/// chapter 九百八十二.5 META-REVIEW MED1 doc-fix:was "UP TO 8"
+/// — ch 965 added EvolutionShadow but this docstring was never
+/// updated。 Roster now carries UP TO 9 agents (4 mandatory + 5
+/// optional via roster's defaulted-nil slots)。
 ///
 /// chapter 九百六十 USER-PASS-N reminder:if a future review flags
 /// "the bundle hides which agent is the writer" — that's by
@@ -43,8 +52,13 @@ import Foundation
 /// ch 956.5 USER-PASS gap #1 + ch 956.11 CR2 atomic-on-failure。
 public struct BASAgentFabricRuntime: Sendable {
 
-    /// 4-seat roster:Scout / Planner / Risk / Surface。 Each
-    /// agent's `writeDomains` is enforced at apply time。
+    /// Up-to-9-seat roster:4 mandatory (Scout / Planner / Risk /
+    /// Surface) + 5 optional (Memory / Critic / HostAlignment /
+    /// SovereignSentinel / EvolutionShadow,each default-nil)。
+    /// Each agent's `writeDomains` is enforced at apply time。
+    /// chapter 九百八十二.5 META-REVIEW MED1 doc-fix:was "4-seat"
+    /// since ch 960 — never expanded as cascade added optional
+    /// slots。
     public let roster: BASAgentTurnRoster
 
     /// Shared state graph actor that accepted deltas write to。

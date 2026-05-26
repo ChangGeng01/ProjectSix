@@ -3,7 +3,7 @@
 //
 // Per ch 952.2 BASFuzzInputGenerator pattern + plan Phase 2 close
 // goal "fuzz harness extension for Memory/Critic interactions":
-// canonical adversarial scenarios that exercise the full 8-seat
+// canonical adversarial scenarios that exercise the full 9-seat
 // dispatcher under realistic + edge inputs。
 //
 // chapter 九百六十四.5 USER-PASS-5 C3+D4 fix:was "6-seat" — ch 963
@@ -12,6 +12,16 @@
 // with ZERO adversarial coverage despite being load-bearing。
 // Now `standardRoster()` includes all 8 + new scenarios exercise
 // the sovereign-axis-lockdown + multi-axis-boundary paths。
+//
+// chapter 九百八十二.5 META-REVIEW H1 fix:was "8-seat" — ch 965
+// added EvolutionShadow as the 9th seat,but this file's roster +
+// scenarios were never extended,leaving the shadow seat with ZERO
+// adversarial coverage despite being load-bearing for the
+// never-effective-same-turn invariant。 Now `standardRoster()`
+// includes all 9 + a new `evolutionShadowProposalsTurn` scenario
+// exercises the 3-cluster proposal path (tickets + rules +
+// host-change candidates),and `allSignalsActiveTurn` includes a
+// non-empty evolutionShadow input。
 //
 // Each scenario is a fully-formed `BASAgentTurnInput`。 Tests can
 // call `BASAgentTurnDispatcher.dispatch(...)` with these and assert
@@ -43,8 +53,10 @@ import Foundation
 public enum BASAgentFabricFuzzScenarios {
 
     /// Common roster used by all scenarios。 chapter 九百六十四.5
-    /// USER-PASS-5 C3 fix:was 6-seat — now extended to 8 to
+    /// USER-PASS-5 C3 fix:was 6-seat — extended to 8 to
     /// cover ch 963 HostAlignment + ch 964 SovereignSentinel。
+    /// chapter 九百八十二.5 META-REVIEW H1 fix:now 9-seat — adds
+    /// ch 965 EvolutionShadow which was missed during cascade。
     /// All writers distinct per Single-Writer-Per-Domain。
     public static func standardRoster() -> BASAgentTurnRoster {
         BASAgentTurnRoster(
@@ -77,7 +89,19 @@ public enum BASAgentFabricFuzzScenarios {
                 role: .sovereignSentinel,
                 writeDomains: [.sovereignVerdict],
                 defaultLeaseProfile: .sovereign,
-                visibility: .low))
+                visibility: .low),
+            // chapter 九百八十二.5 META-REVIEW H1:9th seat。 The
+            // shadow agent ONLY writes `.evolutionProposal` — never
+            // `.hostVersion`,never `.sovereignVerdict`。 The graph
+            // applier enforces this at write time。 LeaseProfile
+            // `.coldSeat` matches ch 965 EvolutionShadow tests since
+            // the shadow is debounced / slow per design。
+            evolutionShadow: BASAgentSpec(
+                agentID: "fuzz.evolution",
+                role: .evolutionShadow,
+                writeDomains: [.evolutionProposal],
+                defaultLeaseProfile: .coldSeat,
+                visibility: .medium))
     }
 
     private static func makeAgent(
@@ -426,10 +450,61 @@ public enum BASAgentFabricFuzzScenarios {
                                 true)]))
     }
 
+    /// chapter 九百八十二.5 META-REVIEW H1 NEW:evolution-shadow
+    /// proposal cluster — 1 update ticket + 1 rule candidate +
+    /// 1 host-change candidate。 Tests the ch 965 3-cluster
+    /// emission path + never-effective-same-turn invariant
+    /// (deltas land in `.evolutionProposal` only,never
+    /// `.hostVersion`)。
+    public static func evolutionShadowProposalsTurn(
+    ) -> BASAgentTurnInput {
+        let cand = BASPlannerCandidate(
+            candidateID: "evo1",
+            title: "ordinary candidate",
+            actionSummary: "a",
+            confidence: 0.6,
+            expectedBenefit: 0.5,
+            expectedCost: 0.3,
+            reversibility: 0.7)
+        return BASAgentTurnInput(
+            turnID: "fuzz.evolution",
+            plannerCandidates: [cand],
+            risk: BASRiskInput(candidates: [
+                BASRiskCandidate(
+                    candidateID: "evo1",
+                    reversibility: 0.7)]),
+            surface: BASSurfaceInput(
+                acceptedCandidateID: "evo1",
+                riskBand: .low,
+                reversibility: 0.7),
+            evolutionShadow: BASEvolutionShadowInput(
+                updateTickets: [
+                    BASEvolutionUpdateTicket(
+                        ticketID: "tk1",
+                        targetRef: "rule.skepticism.floor",
+                        summary: "raise floor by 0.05",
+                        scopeImpact: 0.4)],
+                ruleCandidates: [
+                    BASEvolutionRuleCandidate(
+                        candidateID: "rc1",
+                        ruleBody:
+                            "if pressure>0.7 then guard.bias+=0.2",
+                        supportStrength: 0.65)],
+                hostChangeCandidates: [
+                    BASEvolutionHostChangeCandidate(
+                        candidateID: "hc1",
+                        targetAxis: "valueAxis.balance",
+                        proposedSummary:
+                            "loosen by 0.03 toward exploration",
+                        directionScore: 0.3)]))
+    }
+
     /// Stress:every signal active simultaneously,now including
-    /// HostAlignment + Sovereign per ch 964.5 fix。 Tests that
-    /// the full 8-seat dispatcher handles maximum input without
-    /// crashing,deterministically,with sensible aggregation。
+    /// HostAlignment + Sovereign per ch 964.5 fix +
+    /// EvolutionShadow per ch 九百八十二.5 META-REVIEW H1。 Tests
+    /// that the full 9-seat dispatcher handles maximum input
+    /// without crashing,deterministically,with sensible
+    /// aggregation。
     public static func allSignalsActiveTurn(
     ) -> BASAgentTurnInput {
         let cand = BASPlannerCandidate(
@@ -506,6 +581,19 @@ public enum BASAgentFabricFuzzScenarios {
                                 false)],
                     manipulationDetected: true,
                     boundaryTouched: true,
-                    heightenedProtection: true))
+                    heightenedProtection: true),
+            // chapter 九百八十二.5 META-REVIEW H1:include the 9th
+            // seat's input。 Without this the "all signals active"
+            // scenario was misnamed since ch 965。 Minimal cluster
+            // (1 ticket only) keeps the scenario stable for any
+            // existing tests that pin delta counts but exercises
+            // the EvolutionShadow path under stress aggregation。
+            evolutionShadow: BASEvolutionShadowInput(
+                updateTickets: [
+                    BASEvolutionUpdateTicket(
+                        ticketID: "all-tk1",
+                        targetRef: "rule.stress.aggregation",
+                        summary: "stress-test entry",
+                        scopeImpact: 0.5)]))
     }
 }
