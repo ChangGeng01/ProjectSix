@@ -183,4 +183,76 @@ public enum BASAgentFabricAdapters {
             },
             superegoActiveLevel: superegoActiveLevel)
     }
+
+    // MARK: - chapter 九百八十六 / M3635 — Cross-Module Integration
+    //                                       Arc ch4:Gap 1 close
+    //
+    // BASHostAlignmentInput from live BASHostConstitution。 Was:
+    // `BASHostAlignmentSeat` had a free-form `hostConstraintsRef`
+    // String parameter — caller could pass any string,no validation,
+    // no actual coupling to the host's live L5 constitution。 Per
+    // ch 982.5 META-REVIEW Gap 1,this meant the fabric's host-
+    // alignment seat was orthogonal to the live host constitution
+    // — a major design intent violation。
+    //
+    // This adapter closes the gap:given a live `BASHostConstitution`
+    // (already available on the coordinator),build a
+    // `BASHostAlignmentInput` that:
+    //   - Derives `hostBoundaryAxes` from the union of
+    //     `valueAxes.axes` + `boundaryVeil.hardNoGo` (the two
+    //     fields that ARE the user's host-level "what's protected"
+    //     declarations per the L5 whitepaper)
+    //   - Pulls `hostID` directly from the constitution
+    //   - Derives `styleStrictness` from `styleGenome.structureBias`
+    //     (higher structureBias → stricter alignment) unless caller
+    //     overrides (host may have a more nuanced computed measure)
+    //   - Accepts caller-supplied `candidates` since the fabric
+    //     doesn't yet know which axes each candidate touches —
+    //     that semantic mapping is host-app responsibility
+    //
+    // Deterministic:`hostBoundaryAxes` sorted lex so two calls
+    // with the same constitution produce byte-equal output。
+
+    /// Build a `BASHostAlignmentInput` from a live
+    /// `BASHostConstitution`。 Closes ch 982.5 META-REVIEW Gap 1
+    /// (host alignment seat orthogonal to live host constitution)。
+    ///
+    /// - Parameters:
+    ///   - constitution: live L5 host constitution from the
+    ///     coordinator's `hostConstitution` slot
+    ///   - candidates: per-turn candidates with their axis touches
+    ///     (caller computes since axis-touch is host-app
+    ///     semantics)
+    ///   - styleStrictnessOverride: if non-nil,used instead of
+    ///     the derived `styleGenome.structureBias` value
+    /// - Returns: well-formed `BASHostAlignmentInput`
+    public static func hostAlignmentInput(
+        from constitution: BASHostConstitution,
+        candidates: [BASHostAlignmentCandidate] = [],
+        styleStrictnessOverride: Double? = nil
+    ) -> BASHostAlignmentInput {
+        // Boundary axes = union of valueAxes.axes + boundaryVeil
+        // .hardNoGo,sorted lex for determinism。 Per L5 whitepaper
+        // §6 these are the two distinct "what's protected"
+        // declarations:valueAxes carries the host's articulated
+        // value structure;boundaryVeil.hardNoGo is the explicit
+        // never-cross list。 Both qualify as alignment-significant
+        // axes per ch 963 design intent。
+        let unionAxes = Set(
+            constitution.valueAxes.axes +
+            constitution.boundaryVeil.hardNoGo)
+        let boundaryAxes = Array(unionAxes).sorted()
+        // styleStrictness derived from structureBias which is
+        // already in [0.0, 1.0] per BASStyleGenome contract。
+        // Defensive clamp anyway。
+        let derivedStrictness = max(0.0, min(1.0,
+            constitution.styleGenome.structureBias))
+        let strictness =
+            styleStrictnessOverride ?? derivedStrictness
+        return BASHostAlignmentInput(
+            candidates: candidates,
+            hostBoundaryAxes: boundaryAxes,
+            styleStrictness: max(0.0, min(1.0, strictness)),
+            hostID: constitution.hostID)
+    }
 }
