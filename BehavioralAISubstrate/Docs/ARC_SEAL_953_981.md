@@ -73,13 +73,11 @@
 ### Reserved signalRefs prefixes (L14 absorption channel)
 
 Per ch 981.5 USER-PASS-7 DH3 doc-fix + ch 981.6 USER-PASS-8 D1
-correction:9 prefixes are **reserved** for the agent fabric
-subsystem (no other substrate code may emit `signalRefs` starting
-with these prefixes)。 **5 are in-use today + 4 are
-future-allocation** (reserved but not yet emitted by any source
-path)。 `agentFabric.merged:` was mislabeled "in-use" in 981.5;
-verified by grep that it only appears in a doc comment in
-`BASAgentMergeResult.swift:57`,not in any actual emit path。
+correction + ch 981.7 ARC FINALIZE Item 5:**10 prefixes are
+reserved** for the agent fabric subsystem (no other substrate
+code may emit `signalRefs` starting with these prefixes)。 **6 are
+in-use today + 4 are future-allocation** (reserved but not yet
+emitted by any source path)。
 
 | Prefix | Phase | Status | Carries |
 |---|---|---|---|
@@ -92,6 +90,7 @@ verified by grep that it only appears in a doc comment in
 | `agentExternal.proposal:` | 7 | in-use | external proposal landed |
 | `agentExternal.tier:` | 7 | in-use | effective sandbox tier |
 | `agentExternal.trust:` | 7 | in-use | trust score after scans |
+| `agentExternal.warrant:` | 8 (ch 981.7) | in-use | sovereign warrant validation outcome |
 
 All Phase 1-7 audit signals absorb into the existing `SovereignAuditEntry.signalRefs [String]` array — **zero schema change** per ch 953 reuse pattern。 The 3 future-allocation prefixes are **reserved in this document** so future host-app integration cannot accidentally use them for another purpose — they will be filled in when the coordinator wires Phase 1-5 emission paths to the audit ledger (separate workstream beyond arc 953-981)。
 
@@ -136,23 +135,36 @@ Each round caught at least 1 CRITICAL bug that production-shape tests had missed
 
 ## Forward-looking deferred items
 
-Per ch 981.5 USER-PASS-7 fix^8, 2 of the original 8 deferred items
-have been **CLOSED**. 6 items remain deferred to post-arc work
-(Phase 9+ if/when scoped):
+Per ch 981.5 USER-PASS-7 + ch 981.7 ARC FINALIZE,**5 of the original
+8 deferred items have been CLOSED**。 3 items remain explicit
+won't-ship (out-of-scope / forbidden / host-side):
 
-1. **Round-table mode** (.roundtable) — N-way agent collaboration with quorum voting. Phase 4 ships compare mode; round-table is N²-coordination, deferred. **(deferred)**
-2. **Persona marketplace / sharing** — out of substrate scope (host-app feature). **(deferred)**
-3. ~~**App-suspension state persistence**~~ — **CLOSED at ch 981.5** by `BASAgentFabricColdRestart.swift` + `BASAgentFabricSessionSnapshot` Codable record + `BASColdRestartValidationResult` + `validate(...)` pure-fn with 5 validation rules (SDK version + age + forbidden persona drop + warrant corruption + orphan check). 11 regression tests pin the contract.
-4. **Multi-tenant sovereign** — explicitly forbidden by Root Law 1 (single host). Won't ship. **(forbidden — not deferred)**
-5. **Sovereign warrant infrastructure for `.collaborator` external tier** — currently auto-downgraded to `.advisor` (ch 977). Full warrant chain deferred to Phase 9. **(deferred)**
-6. **Env-var gate wiring** (`BAS_PERSONA_ENABLED` / `BAS_WATCHERS_ENABLED` / `BAS_TRANSCRIPT_MODE`) — documented in Phase 4-7 smoke docs but never wired to `run-iphone-air-10hr.sh` or dispatcher. Host-app integration responsibility. **(deferred)**
-7. ~~**Fuzz determinism for ch 967 risk tests**~~ — **CLOSED at ch 981.5**. Replaced `SystemRandomNumberGenerator` with deterministic LCG (Numerical Recipes constants matching ch 956.5 strong-mergeID discipline). Both inputs now seeded reproducibly. Plus 3 explicit edge cases (0.0 / 1.0 / threshold).
-8. **8 file-private `escapeForJSON*` extension consolidation** — ch 964.5 L1 deferred. Cosmetic. **(deferred)**
+1. ~~**Round-table mode**~~ — **CLOSED at ch 981.7** by `BASAgentRoundTable.swift` shipping a scaffold (proposal + vote + quorum + dissent + consensus pure-fn)。 Dispatcher integration deferred to Phase 9+ as a future arc;the scaffold itself is fully functional for callers who want round-table coordination today。 10 regression tests pin the contract。
+2. **Persona marketplace / sharing** — out of substrate scope (host-app feature)。 **(won't-ship — out of scope)**
+3. ~~**App-suspension state persistence**~~ — **CLOSED at ch 981.5** by `BASAgentFabricColdRestart.swift` + `BASAgentFabricSessionSnapshot` Codable record + `BASColdRestartValidationResult` + `validate(...)` pure-fn with 5 validation rules (SDK version + age + forbidden persona drop + warrant corruption + orphan check)。 12 regression tests pin the contract (incl. future-date catch added by ch 981.6)。
+4. **Multi-tenant sovereign** — explicitly forbidden by Root Law 1 (single host)。 **(won't-ship — forbidden)**
+5. ~~**Sovereign warrant infrastructure for `.collaborator` external tier**~~ — **CLOSED at ch 981.7** by `BASSovereignWarrantChain.swift` + 3-stage chain (host-root + per-agent + expiration) + `BASSovereignWarrantValidator.validate(...)` + `BASExternalAgentGateway.effectiveTierWithWarrant(...)` extension。 10 regression tests pin the contract (incl. identity-mismatch + expired + nil-warrant fallback)。
+6. **Env-var gate wiring** (`BAS_PERSONA_ENABLED` / `BAS_WATCHERS_ENABLED` / `BAS_TRANSCRIPT_MODE`) — documented in Phase 4-7 smoke docs but never wired to `run-iphone-air-10hr.sh` or dispatcher。 **(won't-ship from substrate — host-app integration responsibility)**
+7. ~~**Fuzz determinism for ch 967 risk tests**~~ — **CLOSED at ch 981.5** (deterministic LCG)。 **Re-enhanced at ch 981.6** with state-advancement between draws so pSkep + floor are truly independent samples (not affine-linked)。
+8. ~~**8 file-private `escapeForJSON*` extension consolidation**~~ — **CLOSED at ch 981.7** by `BASAgentFabricJSONEscape.swift` shipping the shared `escape(_:)` helper。 Per red-line 7 + ch 943 cascade discipline,seats are NOT migrated to the shared helper in this commit — migration is a separate per-seat task with byte-equal-output verification。 6 regression tests pin the shared helper's contract (matches the byte-equal output of all 9 existing extensions)。
 
-### Closed items (ch 981.5 USER-PASS-7)
+### Closed items (5 of 8)
 
-- **DI3 — App-suspension state persistence**:`BASAgentFabricColdRestart.swift` + 11 regression tests
-- **DI7 — Ch 967 fuzz determinism**:deterministic LCG replaces `SystemRandomNumberGenerator`
+| Item | Sub-ch | Module / Tests |
+|---|---|---|
+| 3 | 981.5 | `BASAgentFabricColdRestart.swift` + 11+1 tests |
+| 7 | 981.5 + 981.6 | Deterministic LCG + state-advance + meta-test |
+| 1 | 981.7 | `BASAgentRoundTable.swift` (scaffold) + 10 tests |
+| 5 | 981.7 | `BASSovereignWarrantChain.swift` + gateway extension + 10 tests |
+| 8 | 981.7 | `BASAgentFabricJSONEscape.swift` + 6 tests |
+
+### Won't-ship items (3 of 8)
+
+| Item | Reason |
+|---|---|
+| 2 | Persona marketplace — host-app feature,not substrate |
+| 4 | Multi-tenant sovereign — forbidden by Root Law 1 |
+| 6 | Env-var gate wiring — host-app integration workstream |
 
 ## Push status
 

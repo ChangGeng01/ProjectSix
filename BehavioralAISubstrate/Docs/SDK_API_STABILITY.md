@@ -107,6 +107,21 @@ This document declares which Agent Fabric types are **wire-format stable** (Coda
 | `BASZeroCopyStateRef` | ↑ | domain + objectID + versionAtRead + createdAtNanos (NO payload, NO agentID) |
 | `BASZeroCopyBusStat` | ↑ | per-turn ref count + stale refetches + bytes saved estimate |
 
+### Ch 981.7 ARC FINALIZE types (added by ARC FINALIZE — items 1 + 5 closed)
+
+| Type | Source | Stability note |
+|---|---|---|
+| `BASRoundTableProposal` | `BASAgentRoundTable.swift` | proposal ID + agent ID + summary + clamped confidence + optional source delta ref |
+| `BASRoundTableVote` | ↑ | voter + proposal + direction (3 cases pinned) + confidence + reason |
+| `BASRoundTableVote.Direction` | ↑ | 3 cases pinned (approve / dissent / abstain) |
+| `BASRoundTableQuorum` | ↑ | turn ID + sorted proposals + sorted votes + clamped threshold |
+| `BASRoundTableDissent` | ↑ | dissenting agent + proposal + reason + confidence |
+| `BASRoundTableConsensus` | ↑ | turn ID + optional winner + score + sorted dissents + sorted audit notes |
+| `BASSovereignWarrantChain` | `BASSovereignWarrantChain.swift` | host root + per-agent + expiresAt + external agent ID + reason |
+| `BASWarrantValidationResult` | ↑ | valid + sorted audit refs |
+| `BASAgentFabricSessionSnapshot` | `BASAgentFabricColdRestart.swift` (ch 981.5) | snapshotID + sessionID + sdkVersion + sorted roster + sorted personas + sorted warrants + watcher counters + nanos |
+| `BASColdRestartValidationResult` | ↑ | valid + sorted findings + sorted rejected persona IDs |
+
 ---
 
 ## API-STABLE types (Swift API only)
@@ -169,8 +184,9 @@ These string prefixes are reserved for the agent fabric subsystem. Other subsyst
 | `agentExternal.proposal:` | A2A external gateway (Phase 7) | in-use | `agentExternal.proposal:<externalID>:<channel>:<proposalID>` |
 | `agentExternal.tier:` | A2A external gateway (Phase 7) | in-use | `agentExternal.tier:<externalID>:<effectiveTier>` |
 | `agentExternal.trust:` | A2A external gateway (Phase 7) | in-use | `agentExternal.trust:<externalID>:<trustScore>` |
+| `agentExternal.warrant:` | Sovereign warrant chain (ch 981.7 ARC FINALIZE) | in-use | `agentExternal.warrant:<status>:<detail>` (granted/rejected/per-agent/none-supplied) |
 
-Per ch 981.6 USER-PASS-8 D1 fix:9 prefixes reserved。 5 in-use today (watcher.flag / watcher.count / external.proposal / external.tier / external.trust);4 future-allocation (fabric.activated / fabric.merged / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。 The `agentFabric.merged:` prefix was misclassified "in-use" in ch 981.5 DH3 but verified by grep to only appear in a doc comment (`BASAgentMergeResult.swift:57`),NOT in any source-side emit path。
+Per ch 981.6 USER-PASS-8 D1 fix + ch 981.7 ARC FINALIZE:**10 prefixes reserved**。 **6 in-use today** (watcher.flag / watcher.count / external.proposal / external.tier / external.trust / external.warrant);4 future-allocation (fabric.activated / fabric.merged / persona.applied / persona.clamped — reserved here so future host-app integration cannot accidentally use them for another purpose)。 The `agentFabric.merged:` prefix was misclassified "in-use" in ch 981.5 DH3 but verified by grep to only appear in a doc comment (`BASAgentMergeResult.swift:57`),NOT in any source-side emit path。
 
 ---
 
