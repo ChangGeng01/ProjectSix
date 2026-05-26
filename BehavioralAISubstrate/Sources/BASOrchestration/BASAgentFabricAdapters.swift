@@ -185,6 +185,119 @@ public enum BASAgentFabricAdapters {
             superegoActiveLevel: superegoActiveLevel)
     }
 
+    // MARK: - chapter 九百九十 / M3655 — Cross-Module Integration
+    //                                     Arc ch8 (FINAL):Gap 2 close
+    //
+    // Validate MCP invocation against a live `BASActionPermit`。
+    // Was:`BASMCPCapabilityGateway` (BASMemory) checked
+    // `permitID.isEmpty` and `allowedToolDomains.contains(...)`
+    // but the `permitID` was just a STRING — never validated
+    // against an actual `BASActionPermit` from `BASPolicy`。 The
+    // gateway claimed defense-in-depth but had no path to the
+    // live host's risk gate output。 Per ch 982.5 META-REVIEW
+    // Gap 2,this meant tools could be invoked with `permitID:
+    // "any-arbitrary-string"` and the gateway would accept them
+    // (because the string was non-empty)。
+    //
+    // This adapter (in BASOrchestration where it can import both
+    // BASMemory's MCP gateway types + BASPolicy's BASActionPermit)
+    // closes the gap:given a live `BASActionPermit` (from the
+    // host's `riskService.gateAction(...)` output),validate the
+    // MCP invocation against the permit's actual fields:
+    //   - Rule 1:permit.mode is NOT `.block` (blocked → reject)
+    //   - Rule 2:mcpServerID is in permit.allowedDomains
+    //     (whitelist match — required if allowedDomains non-empty)
+    //   - Rule 3:mcpServerID is NOT in permit.blockedDomains
+    //     (blocklist match — defense even if allowedDomains
+    //     empty)
+    //   - Rule 4:permit.toolScope is NOT "denied" (semantic
+    //     scope deny → reject)
+    //
+    // Returns a (Bool, [String]) — accepted flag + ordered
+    // audit refs for the L14 ledger pipeline (reserved prefix
+    // `agentMCP.permit:` per future allocation)。
+    //
+    // Early-return doctrine same as ch 981.9 warrant validator:
+    // first matching deny rule wins;defense-in-depth doctrine。
+
+    /// Validate an MCP invocation against a live `BASActionPermit`。
+    /// Closes ch 982.5 META-REVIEW Gap 2 (MCP gateway orthogonal
+    /// to BASPolicy.BASActionPermit)。
+    ///
+    /// - Parameters:
+    ///   - invocation: the MCP envelope the caller assembled
+    ///   - permit: live `BASActionPermit` from
+    ///     `riskService.gateAction(...)` for this turn
+    /// - Returns: `(accepted, auditRefs)` where `auditRefs`
+    ///   carry signals like `agentMCP.permit:granted:server=X`
+    ///   or `agentMCP.permit:rejected:reason=blocked-mode` ready
+    ///   to be appended to the L14 audit ledger
+    public static func validateMCPInvocation(
+        _ invocation: BASMCPInvocation,
+        against permit: BASActionPermit
+    ) -> (accepted: Bool, auditRefs: [String]) {
+        // Rule 1:permit mode block → reject (highest priority)
+        if permit.mode == .block {
+            return (
+                accepted: false,
+                auditRefs: [
+                    "agentMCP.permit:rejected:" +
+                    "reason=blocked-mode:server=" +
+                    "\(invocation.mcpServerID)",
+                ])
+        }
+        // Rule 2:blocklist match → reject (defense-in-depth
+        // checked BEFORE allowlist so a server can be explicitly
+        // forbidden even when allowedDomains is broad)
+        if permit.blockedDomains.contains(invocation.mcpServerID)
+        {
+            return (
+                accepted: false,
+                auditRefs: [
+                    "agentMCP.permit:rejected:" +
+                    "reason=in-blocked-domains:server=" +
+                    "\(invocation.mcpServerID)",
+                ])
+        }
+        // Rule 3:if allowedDomains is non-empty,it acts as
+        // whitelist — server MUST be in it。 Empty allowedDomains
+        // = permissive (anything not blocked is allowed)。
+        if !permit.allowedDomains.isEmpty &&
+           !permit.allowedDomains.contains(
+                invocation.mcpServerID)
+        {
+            return (
+                accepted: false,
+                auditRefs: [
+                    "agentMCP.permit:rejected:" +
+                    "reason=not-in-allowed-domains:server=" +
+                    "\(invocation.mcpServerID)",
+                ])
+        }
+        // Rule 4:toolScope semantic deny → reject。 "denied"
+        // is the canonical sovereign-denied scope per BASPolicy
+        // convention。 Other scopes (bounded / open / restricted)
+        // permit the invocation。
+        if permit.toolScope == "denied" {
+            return (
+                accepted: false,
+                auditRefs: [
+                    "agentMCP.permit:rejected:" +
+                    "reason=denied-tool-scope:server=" +
+                    "\(invocation.mcpServerID)",
+                ])
+        }
+        // All rules passed — granted
+        return (
+            accepted: true,
+            auditRefs: [
+                "agentMCP.permit:granted:server=" +
+                "\(invocation.mcpServerID):tool=" +
+                "\(invocation.toolID):scope=" +
+                "\(permit.toolScope)",
+            ])
+    }
+
     // MARK: - chapter 九百八十九 / M3650 — Cross-Module Integration
     //                                       Arc ch7:Gap 5 close
     //
