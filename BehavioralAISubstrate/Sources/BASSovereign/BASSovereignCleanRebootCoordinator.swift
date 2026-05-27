@@ -241,7 +241,9 @@ public actor BASSovereignCleanRebootCoordinator {
         // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
         // canonical-bytes for clean-reboot audit trail
         let entry = BASSovereignAuditEntry(
-            schemaVersion: "1.1.0",
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
             auditID: auditID,
             sessionID: sessionID,
             turnID: verdict.verdictID,

@@ -42,10 +42,15 @@ final class BASChapter983WarrantAuditBridgeTests: XCTestCase {
             now: Date(timeIntervalSince1970: 1_000_000))
         XCTAssertEqual(entry.sessionID, "sess.1")
         XCTAssertEqual(entry.turnID, "t.42")
+        // ch 1010.6 / M3765 — Round-21 CRITICAL-3 fix: U+001F
+        // separator between fixed-prefix CLASS and caller-supplied
+        // fields。 Pre-fix `.` and `:` joins were injection-prone
+        // when externalAgentID legitimately contained `.`。
         XCTAssertEqual(entry.auditID,
-            "agentExternal.warrant.audit.t.42.ext.alpha.granted")
+            "agentExternal.warrant.audit\u{001F}t.42" +
+            "\u{001F}ext.alpha\u{001F}granted")
         XCTAssertEqual(entry.verdictRef,
-            "agentExternal.warrant:granted:ext.alpha")
+            "agentExternal.warrant\u{001F}granted\u{001F}ext.alpha")
         XCTAssertEqual(entry.signalRefs,
             ["agentExternal.warrant:granted:" +
              "host-root=h1\u{001F}per-agent=a1"],
@@ -71,12 +76,16 @@ final class BASChapter983WarrantAuditBridgeTests: XCTestCase {
             turnID: "t.42",
             externalAgentID: "ext.beta",
             now: Date(timeIntervalSince1970: 2_000_000))
+        // ch 1010.6 / M3765 — Round-21 CRITICAL-3 fix: U+001F format
         XCTAssertEqual(entry.auditID,
-            "agentExternal.warrant.audit.t.42.ext.beta.rejected",
-            "ch 983 Gap 7: outcome MUST flow into auditID")
+            "agentExternal.warrant.audit\u{001F}t.42" +
+            "\u{001F}ext.beta\u{001F}rejected",
+            "ch 983 Gap 7 + ch 1010.6 CRITICAL-3: outcome MUST " +
+            "flow into auditID via U+001F discipline")
         XCTAssertEqual(entry.verdictRef,
-            "agentExternal.warrant:rejected:ext.beta",
-            "ch 983 Gap 7: outcome MUST flow into verdictRef")
+            "agentExternal.warrant\u{001F}rejected\u{001F}ext.beta",
+            "ch 983 Gap 7 + ch 1010.6: outcome MUST flow into " +
+            "verdictRef via U+001F discipline")
     }
 
     func testBuildEntry_IsDeterministicGivenInputs() {
@@ -121,7 +130,8 @@ final class BASChapter983WarrantAuditBridgeTests: XCTestCase {
                     externalAgentID: "ext.gamma",
                     ledger: ledger)
         XCTAssertEqual(appended.entry.auditID,
-            "agentExternal.warrant.audit.t.7.ext.gamma.granted")
+            "agentExternal.warrant.audit\u{001F}t.7" +
+            "\u{001F}ext.gamma\u{001F}granted")
         // Ledger auto-signed (signature was empty entering, must
         // be non-empty leaving)
         XCTAssertFalse(appended.entry.signature.isEmpty,
@@ -216,7 +226,8 @@ final class BASChapter983WarrantAuditBridgeTests: XCTestCase {
                     externalAgentID: "ext.delta",
                     ledger: ledger)
         XCTAssertEqual(appended.entry.auditID,
-            "agentExternal.warrant.audit.t.99.ext.delta.granted")
+            "agentExternal.warrant.audit\u{001F}t.99" +
+            "\u{001F}ext.delta\u{001F}granted")
         // Validator's audit ref made it through verbatim
         XCTAssertTrue(appended.entry.signalRefs.contains {
             $0.hasPrefix("agentExternal.warrant:granted:")
@@ -248,9 +259,11 @@ final class BASChapter983WarrantAuditBridgeTests: XCTestCase {
                     externalAgentID: "ext.B",
                     ledger: ledger)
         XCTAssertEqual(appended.entry.auditID,
-            "agentExternal.warrant.audit.t.42.ext.B.rejected",
-            "ch 983 E2E: identity-mismatch MUST land as " +
-            "rejected entry in ledger")
+            "agentExternal.warrant.audit\u{001F}t.42" +
+            "\u{001F}ext.B\u{001F}rejected",
+            "ch 983 E2E + ch 1010.6 CRITICAL-3: identity-" +
+            "mismatch MUST land as rejected entry with U+001F " +
+            "separator discipline")
         // identity-mismatch audit ref made it through
         XCTAssertTrue(appended.entry.signalRefs.contains {
             $0.contains("identity-mismatch")

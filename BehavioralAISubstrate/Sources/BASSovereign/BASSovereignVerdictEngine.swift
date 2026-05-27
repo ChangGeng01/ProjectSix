@@ -316,7 +316,9 @@ public actor BASSovereignVerdictEngine {
         // canonical-bytes for verdict engine emission (main
         // L14 audit emission point)
         let entry = BASSovereignAuditEntry(
-            schemaVersion: "1.1.0",
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
             auditID: auditID,
             sessionID: context.sessionID,
             turnID: context.turnID,

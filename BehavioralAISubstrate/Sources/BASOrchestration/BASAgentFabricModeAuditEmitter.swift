@@ -76,15 +76,25 @@ public enum BASAgentFabricModeAuditEmitter {
         now: Date = Date()
     ) -> BASSovereignAuditEntry {
         let modeStr = mode.rawValue
+        // chapter 一千零十.6 / M3765 — Round-21 CRITICAL-4 fix:
+        // separator-injection class。 turnID is caller-supplied
+        // (convention varies)。 Pre-fix `.` join → future
+        // replay parser couldn't recover boundaries when turnID
+        // contains `.`。 Post-fix U+001F between fixed-prefix
+        // CLASS and caller-supplied turnID + modeStr (modeStr
+        // is enum-constrained so safe,but symmetric format)。
+        let sep = "\u{001F}"
         let auditID =
-            "agentFabricMode.audit.\(turnID).\(modeStr)"
+            "agentFabricMode.audit\(sep)\(turnID)\(sep)\(modeStr)"
         let verdictRef =
-            "agentFabricMode:\(modeStr)"
+            "agentFabricMode\(sep)\(modeStr)"
         let signalRefs = [
             "agentFabric.mode=\(modeStr)",
         ]
         return BASSovereignAuditEntry(
-            schemaVersion: "1.1.0",
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
             auditID: auditID,
             sessionID: sessionID,
             turnID: turnID,

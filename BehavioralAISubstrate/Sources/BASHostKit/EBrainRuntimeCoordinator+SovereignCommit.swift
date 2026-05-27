@@ -1600,7 +1600,12 @@ extension BASEBrainRuntimeCoordinator {
             // cross-arc fix。 Round-15 caught ch 993 only bumped
             // the warrant bridge — main commit emission was still
             // using vulnerable "1.0.0" default separator class。
-            schemaVersion: "1.1.0",
+            // chapter 一千零十一 / M3770 — Round-21 HIGH-1 fix:
+            // reference shared constant instead of inlining the
+            // literal。 Future schema bump (e.g. 1.2.0) updates
+            // one place。
+            schemaVersion:
+                BASSovereignAuditEntry.hardenedSchemaVersion,
             auditID: auditID,
             sessionID: runtimeTrace.sessionID,
             turnID: turnID,

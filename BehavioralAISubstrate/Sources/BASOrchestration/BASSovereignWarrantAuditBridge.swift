@@ -111,11 +111,20 @@ public enum BASSovereignWarrantAuditBridge {
     ) -> BASSovereignAuditEntry {
         let outcome = validationResult.valid ?
             "granted" : "rejected"
+        // chapter 一千零十.6 / M3765 — Round-21 CRITICAL-3 fix:
+        // separator-injection class hardening。 turnID +
+        // externalAgentID are caller-supplied opaque strings —
+        // externalAgentID legitimately contains `.` (convention
+        // `<role>.<host>.v<N>`)。 Pre-fix `.` join → future
+        // replay parser couldn't recover boundaries。 Post-fix
+        // U+001F between fixed-prefix CLASS and caller-supplied
+        // values。 Symmetric to Round-21 ch 1003 fix。
+        let sep = "\u{001F}"
         let auditID =
-            "agentExternal.warrant.audit." +
-            "\(turnID).\(externalAgentID).\(outcome)"
+            "agentExternal.warrant.audit\(sep)" +
+            "\(turnID)\(sep)\(externalAgentID)\(sep)\(outcome)"
         let verdictRef =
-            "agentExternal.warrant:\(outcome):" +
+            "agentExternal.warrant\(sep)\(outcome)\(sep)" +
             externalAgentID
         return BASSovereignAuditEntry(
             // chapter 九百九十三 / M3670 — opt into hardened
@@ -125,7 +134,9 @@ public enum BASSovereignWarrantAuditBridge {
             // flagged at ch 982 Round-8 since signalRefs include
             // caller-supplied opaque agentExternal.* strings that
             // could legitimately contain `,`。
-            schemaVersion: "1.1.0",
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
             auditID: auditID,
             sessionID: sessionID,
             turnID: turnID,

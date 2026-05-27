@@ -138,14 +138,16 @@ public enum BASAgentObservationAuditEmitter {
         guard !input.isEmpty else { return [] }
         seq += 1
         let totalEmits = input.emittedDeltas.count
-        let agentSet = Set(input.emittedDeltas.map { $0.agentID })
-        // chapter 一千零十.5 / M3760 — Round-20 CRITICAL-1 fix:
-        // delegate to ch 1002 canonical confidence formula
-        // instead of inline-duplicating。 Was the EXACT same
-        // divergence-risk pattern ch 1000.5 found for ANE
-        // consult。 Future arc tuning the formula in one place
-        // now updates both projections of the "same signal"
-        // atomically。
+        // chapter 一千零十.6 / M3765 — Round-21 HIGH-4 fix:
+        // delegate agentSet extraction to ch 1002 canonical
+        // helper instead of inline-duplicating。 Same single-
+        // canonical doctrine as the Round-20 confidence-formula
+        // fix。 Future changes to how「agent set」 is computed
+        // (e.g. excluding system agents) now update one place。
+        let agentSet = BASTraceAnnotatorSeat
+            .distinctAgentSet(from: input.emittedDeltas)
+        // ch 1010.5 CRITICAL-1: delegate to single canonical
+        // formula instead of inline duplication
         let conf = BASTraceAnnotatorSeat
             .confidenceForAgentSet(count: agentSet.count)
         let flags: [String] = [
@@ -157,10 +159,16 @@ public enum BASAgentObservationAuditEmitter {
             "TraceAnnotator observed \(totalEmits) deltas " +
             "from \(agentSet.count) agents in turn " +
             "\(input.turnID)"
-        // Source refs:include refs back to each emitted delta
-        // so audit replay can reconstruct the originating turn
+        // chapter 一千零十.6 / M3765 — Round-21 CRITICAL-5 fix:
+        // `delta#<deltaID>` separator-injection class。 deltaID
+        // convention is `delta.<turnID>.<agentID>.<seq>` —
+        // contains `.` always,doesn't contain `#` by
+        // convention but caller-supplied free-form per
+        // BASAgentDelta schema。 Switch to U+001F separator
+        // for consistency with signalRefs (line ~85)。 Sorted
+        // for byte-equal output。
         let sourceRefs = input.emittedDeltas
-            .map { "delta#\($0.deltaID)" }
+            .map { "delta\u{001F}\($0.deltaID)" }
             .sorted()
         return [BASAgentObservation(
             observationID:

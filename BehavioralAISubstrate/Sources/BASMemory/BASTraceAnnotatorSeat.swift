@@ -107,6 +107,18 @@ public enum BASTraceAnnotatorSeat {
         min(1.0, 0.5 + (Double(count) * 0.1))
     }
 
+    /// chapter 一千零十.6 / M3765 — Round-21 HIGH-4 fix:
+    /// canonical「distinct agent set」 extraction from a list
+    /// of deltas。 Was duplicated inline at ch 1002 + ch 1006。
+    /// Future change to the agent-set semantics (e.g. excluding
+    /// system agents) now updates ONE place。
+    @inlinable
+    public static func distinctAgentSet(
+        from deltas: [BASAgentDelta]
+    ) -> Set<String> {
+        Set(deltas.map { $0.agentID })
+    }
+
     /// Pure function:read input + emit one `.annotate` delta。
     /// Returns empty array when input has no emitted deltas to
     /// annotate (annotating empty turns is wasted state-graph
@@ -132,7 +144,9 @@ public enum BASTraceAnnotatorSeat {
         let payload = encodeAnnotationPayload(
             from: input.emittedDeltas)
         let totalEmits = input.emittedDeltas.count
-        let agentSet = Set(input.emittedDeltas.map { $0.agentID })
+        // ch 1010.6 HIGH-4: delegate to canonical helper
+        let agentSet = Self.distinctAgentSet(
+            from: input.emittedDeltas)
         // ch 1010.5 CRITICAL-1: delegate to single canonical
         // formula instead of inline duplication
         let conf = Self.confidenceForAgentSet(

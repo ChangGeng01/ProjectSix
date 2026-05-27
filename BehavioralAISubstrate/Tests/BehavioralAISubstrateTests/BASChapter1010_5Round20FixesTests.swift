@@ -365,6 +365,11 @@ final class BASChapter1010_5Round20FixesTests: XCTestCase {
         // rejects empty sessionID。 Future hardening can flip
         // this to throw,but for now the test pins what
         // happens so the behavior is explicit。
+        //
+        // ch 1010.6 / M3765 — Round-21 CRITICAL-4 updated the
+        // separator format from `.` to U+001F。 Empty turnID
+        // now produces adjacent U+001F U+001F (two unit
+        // separators back-to-back) rather than `..`。
         let entry = BASAgentFabricModeAuditEmitter.buildEntry(
             mode: .authoritative,
             sessionID: "s",
@@ -373,15 +378,15 @@ final class BASChapter1010_5Round20FixesTests: XCTestCase {
             "ch 1010.5 MED-4: empty turnID still produces a " +
             "non-empty auditID (current pin — future arc may " +
             "harden to throw)")
-        // The auditID contains a `..` substring when turnID
-        // is empty — this is observable via grep so hosts can
-        // detect the case in audit replay
+        // The auditID contains adjacent U+001F U+001F when
+        // turnID is empty — observable via byte-grep so hosts
+        // can detect the case in audit replay
         XCTAssertTrue(
-            entry.auditID.contains(".."),
-            "ch 1010.5 MED-4: empty-turnID auditID is " +
-            "observable via `..` substring in replay — pin " +
-            "so future hardening (throw on empty turnID) " +
-            "fails this test explicitly")
+            entry.auditID.contains("\u{001F}\u{001F}"),
+            "ch 1010.5 MED-4 + ch 1010.6: empty-turnID auditID " +
+            "is observable via adjacent U+001F U+001F in " +
+            "replay — pin so future hardening (throw on empty " +
+            "turnID) fails this test explicitly")
     }
 
     // MARK: - Test fixtures (copied from ch 1001 pattern)

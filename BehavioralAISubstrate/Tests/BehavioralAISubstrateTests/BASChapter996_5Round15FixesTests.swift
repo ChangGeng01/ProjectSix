@@ -236,11 +236,25 @@ final class BASChapter996_5Round15FixesTests: XCTestCase {
                 // (CI tmp dirs etc.)。 Local dev catches this。
                 continue
             }
+            // ch 1011 / M3770 — Round-21 HIGH-1 evolution:
+            // post-ch-1011 the literal `"1.1.0"` is replaced
+            // by `BASSovereignAuditEntry.hardenedSchemaVersion`
+            // constant reference。 The discipline ch 996.5
+            // C2 was enforcing (hardened canonical-bytes
+            // opt-in at each site) is PRESERVED — the form
+            // just shifted from literal to canonical constant。
+            // Test now accepts either form。
             XCTAssertTrue(
-                content.contains("schemaVersion: \"1.1.0\""),
-                "ch 996.5 CRITICAL-2: \(relativePath) MUST " +
-                "contain explicit `schemaVersion: \"1.1.0\"` " +
-                "for hardened canonical-bytes — Round-15 fix。")
+                content.contains("schemaVersion: \"1.1.0\"") ||
+                content.contains(
+                    "BASSovereignAuditEntry") &&
+                content.contains(".hardenedSchemaVersion"),
+                "ch 996.5 CRITICAL-2 + ch 1011 HIGH-1: " +
+                "\(relativePath) MUST opt into the hardened " +
+                "canonical-bytes format — either via literal " +
+                "`schemaVersion: \"1.1.0\"` (pre-ch-1011) or " +
+                "via `BASSovereignAuditEntry" +
+                ".hardenedSchemaVersion` reference (post-ch-1011)")
         }
     }
 }

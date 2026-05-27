@@ -1070,7 +1070,9 @@ public actor BASSovereignAuditLedger {
         // canonical-bytes for LINEAGE_CUT marker (signalRefs
         // carry caller-supplied audit IDs which may contain `,`)
         let markerEntry = BASSovereignAuditEntry(
-            schemaVersion: "1.1.0",
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
             auditID: markerAuditID,
             sessionID: request.sessionID,
             turnID: "lineage-cut",

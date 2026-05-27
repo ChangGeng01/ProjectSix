@@ -11,6 +11,119 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十一 / M3770 — Round-21 HIGH-1 fix: schemaVersion canonicalization
+
+Round-21 audit identified 9 production sites hardcoding the
+literal `schemaVersion: "1.1.0"` when constructing
+`BASSovereignAuditEntry`。 Bumping the hardened schema to a
+future `"1.2.0"` would require updating all 9 in lockstep —
+textbook drift trap per ch 1000.5 single-canonical doctrine。
+
+**Shipped**:
+
+1. New `BASSovereignAuditEntry.hardenedSchemaVersion`
+   static constant = `"1.1.0"` (lives in
+   `BASRuntimeCore.EBrainControlPlaneCore.swift` alongside
+   the existing `currentSchemaVersion` constant)
+2. All 9 production sites migrated to reference the
+   canonical constant:
+   - `BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift`
+   - `BASSovereign/BASSovereignAuditLedger.swift`
+   - `BASSovereign/BASSovereignCleanRebootCoordinator.swift`
+   - `BASSovereign/BASSovereignVerdictEngine.swift`
+   - `BASOrchestration/ShadowTrialLedgerBridge.swift`
+   - `BASOrchestration/BASMCPInvocationAuditBridge.swift`
+   - `BASOrchestration/BASAgentFabricModeAuditEmitter.swift`
+   - `BASOrchestration/BASSovereignWarrantAuditBridge.swift`
+   - `BASObservability/BASUpdateTicketLifecycle.swift`
+3. 5 new tests in `BASChapter1011SchemaVersionCanonicalTests`:
+   - constant exists + value correct (1.1.0)
+   - distinct from `currentSchemaVersion` (1.0.0)
+   - CRITICAL grep test: NO production source contains the
+     raw literal anymore
+   - behavioral equivalence pin
+   - CRITICAL migration completeness pin: each of the 9
+     sites references the constant
+4. Updated ch 996.5 Round-15 fix test to accept either form
+   (literal OR canonical reference) — the discipline ch
+   996.5 enforced (hardened canonical-bytes opt-in) is
+   preserved,the form just shifted
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter "BASChapter1011|BASChapter996_5"` —
+  10/10 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,590/14,590
+  pass, 0 failures**
+
+### Chapter 一千零十.6 / M3765 — Round-21 self-audit fix-of-fix-of-fixes
+
+Round-21 audit (the cascade is escalating: Round-19 = 1 CRITICAL,
+Round-20 = 3, Round-21 = 5) caught that Round-20 only fixed 2 of
+4+ separator-injection sites。 Same-class vulnerability persisted
+at:
+
+- ch 1003 MCP `auditID` + `verdictRef` (CRITICAL-1 + CRITICAL-2)
+- ch 983 warrant `auditID` + `verdictRef` (CRITICAL-3)
+- ch 1007 fabric-mode `auditID` (CRITICAL-4)
+- ch 1006 sourceRefs `delta#<id>` (CRITICAL-5)
+
+**Fixes**:
+
+1. All 5 sites adopt U+001F separator discipline (per ch 982.5
+   doctrine + Round-20 ch 1006/1008 fixes,now uniformly applied
+   across ALL audit-bridge sites):
+   - `BASMCPInvocationAuditBridge` auditID + verdictRef
+   - `BASSovereignWarrantAuditBridge` auditID + verdictRef
+   - `BASAgentFabricModeAuditEmitter` auditID + verdictRef
+   - `BASAgentObservationAuditEmitter` sourceRefs
+2. HIGH-2: pipeline `gate.tierValidation` join changed from
+   `;` to U+001E (record separator) for symmetric discipline
+   with inner U+001F joins
+3. HIGH-4: extracted canonical
+   `BASTraceAnnotatorSeat.distinctAgentSet(from:)` helper —
+   eliminates the second-class duplication ch 1010.5
+   missed (Round-20 fixed the confidence formula but not the
+   agent-set extraction)
+4. MED-5: `BASMCPInvocationAuditBridge` dead-permit-parameter
+   replaced with behavioral precondition (accepted invocation
+   MUST produce non-empty auditRefs from gate)
+5. Updated affected tests:
+   - ch 983 auditID + verdictRef format pins (7 assertion
+     updates)
+   - ch 1010.5 MED-4 empty-turnID pin updated to detect
+     `U+001F U+001F` adjacency instead of `..`
+6. 7 new tests in `BASChapter1010_6Round21FixesTests`:
+   - CRITICAL-1/2 MCP auditID + verdictRef U+001F counts
+   - CRITICAL-3 warrant auditID + verdictRef U+001F counts
+   - CRITICAL-4 fabric-mode auditID + verdictRef U+001F
+   - CRITICAL-5 sourceRefs use U+001F (no legacy `#`)
+   - HIGH-2 pipeline diag joined with U+001E
+   - HIGH-4 distinctAgentSet canonical helper byte-equal
+     between ch 1002 + ch 1006 call sites
+   - MED-5 accepted invocation produces non-empty auditRefs
+
+**Cascade confirmation**:
+- Round-19: 1 CRITICAL (ANE consult 4-way dup)
+- Round-20: 3 CRITICAL (confidence dup + 2 separator)
+- Round-21: 5 CRITICAL (4 separator-injection + 1 sourceRefs)
+- Each pass finds new sites of the SAME bug class at fresh
+  files。 Cascade discipline genuinely catches drift。
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter BASChapter1010_6` — 7/7 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,590/14,590
+  pass, 0 failures**
+
+**Discipline pins held**:
+- 红线 7 additive only — format change is forward-only,no
+  existing call-site signature broken
+- U+001F discipline now uniform across ALL audit-bridge sites
+  (no asymmetric mix of `:`/`.`/U+001F)
+- Same-class hunting confirmed effective via escalating
+  catch count
+
 ### Chapter 一千零十.5 / M3760 — Round-20 self-audit fix-of-fixes
 
 User invoked「全面 audit test 修复 开发 最最 严苛 deep」 —

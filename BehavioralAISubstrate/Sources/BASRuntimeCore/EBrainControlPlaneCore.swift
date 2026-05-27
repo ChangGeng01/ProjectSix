@@ -1279,6 +1279,22 @@ public struct BASSovereignLock: BASSchemaVersioned {
 public struct BASSovereignAuditEntry: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
 
+    /// chapter 一千零十一 / M3770 — Round-21 HIGH-1 fix:
+    /// single canonical constant for the hardened canonical-
+    /// bytes format (U+001F inner / U+001E outer separators,
+    /// per ch 993 cross-arc separator-class fix)。 Pre-fix the
+    /// literal `"1.1.0"` was hardcoded across 10 production
+    /// sites — bumping the schema to a future `"1.2.0"`
+    /// required updating all 10 in lockstep。 Textbook drift
+    /// trap caught by Round-21 audit。
+    ///
+    /// All audit-entry construction sites that opt into the
+    /// hardened format MUST reference this constant instead
+    /// of inlining the literal。 The structural pin test in
+    /// ch 1011 verifies no `"1.1.0"` literal remains in
+    /// `schemaVersion:` argument positions across Sources/。
+    public static let hardenedSchemaVersion = "1.1.0"
+
     public var schemaVersion: String
     public var auditID: String
     public var sessionID: String

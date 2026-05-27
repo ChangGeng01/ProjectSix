@@ -275,8 +275,17 @@ public struct BASAgentFabricHostPipeline {
         // decisions without changing the validator semantics。
         let tierDiagnostics =
             BASAgentTierActivationValidator.validate(activation)
+        // chapter 一千零十.6 / M3765 — Round-21 HIGH-2 fix:
+        // join with U+001E (record separator) instead of `;`。
+        // Individual diagnostic strings use U+001F internally
+        // (per ch 1010.5 CRITICAL-3) — outer join with `;`
+        // would have created an asymmetric two-level structure
+        // where bare `;` could appear inside if a diagnostic
+        // class name ever contained `;`。 U+001E is the
+        // designated outer separator (same as ch 1006 flags
+        // inner-join uses U+001E)。
         diagnostics["gate.tierValidation"] =
-            tierDiagnostics.joined(separator: ";")
+            tierDiagnostics.joined(separator: "\u{001E}")
         // chapter 九百九十五.7 Round-13 LOW-1 fix:always surface
         // fabric.mode even when coordinator.agentFabric == nil
         // (use "unconfigured" sentinel)。 Pre-fix the key was

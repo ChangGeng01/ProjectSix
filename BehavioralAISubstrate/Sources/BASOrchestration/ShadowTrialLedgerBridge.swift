@@ -45,7 +45,9 @@ extension BASSovereignAuditLedger: BASShadowTrialLedger {
         // supplied opaque ruleIDs/signalRefs/actionRefs which IS
         // the exact comma-collision attack surface ch 993 patched
         let draft = BASSovereignAuditEntry(
-            schemaVersion: "1.1.0",
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
             auditID: entry.auditID,
             sessionID: entry.sessionID,
             turnID: entry.turnID,
