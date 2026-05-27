@@ -11,6 +11,87 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十二 / M3775 — Phase 9+ start: watcher pipeline integration
+
+User invoked「全部都要」 — covers Round-21 audit (ch 1010.6) +
+schemaVersion canonicalization (ch 1011) + Phase 9+ start (THIS
+chapter)。 Ch 1012 is the FIRST chapter where Phase 9+ work
+genuinely begins — `Gate.Tier.core` vs `.all` becomes a real
+behavioral distinction (not just validation).
+
+**The scaffold this closes**:
+
+Per `Docs/SCAFFOLD_VS_WIRED.md`:
+- `Gate.Tier.core` / `.all`: ch 1008 added VALIDATION wire
+  (catches inconsistent activeAgents combos) but tier still
+  did NOT change substrate runtime output。
+- 7 watcher implementations (`BASAnomalyWatcher` /
+  `BASMemoryPollutionWatcher` / `BASHostDriftWatcher` /
+  `BASGaslightWatcher` / `BASToolInjectionWatcher` /
+  `BASAxisDeviationWatcher` / `BASSanctumLeakWatcher`)
+  existed in BASMemory but were never invoked from any host
+  pipeline。
+
+**What ch 1012 ships**:
+
+New `BASAgentFabricWatcherCollector` in `BASOrchestration`:
+
+1. `collect(observation:seq:)` — pure-fn invokes all 7 watchers
+   against a `BASAgentWatcherObservation` (the canonical
+   per-turn DTO already provided by ch 970 watcher
+   infrastructure)。 Returns sorted `[BASAgentWatcherHint]`
+   for byte-equal determinism。
+2. `signalRefs(from:)` — serializer mirroring ch 1006
+   `BASAgentObservationAuditEmitter.signalRefs` shape。 U+001F
+   discipline per Round-21 doctrine。 Same confidence-band
+   thresholds (low <0.4 / med <0.7 / high >=0.7) per ch 1010.5
+   single-canonical doctrine。
+3. `buildAuditEntry(...)` — sovereign audit entry builder。
+   Empty hints array still produces a `clean` verdictRef
+   audit entry per ch 977 defense-in-depth (absence of hints
+   IS a signal worth auditing)。
+4. `collectAndAudit(...)` — one-call wrapper (mirrors ch
+   1003 / 1007 audit-bridge pattern)。
+5. Uses `BASSovereignAuditEntry.hardenedSchemaVersion` constant
+   (ch 1011 single-canonical doctrine).
+6. 7 new tests including CRITICAL pins for:
+   - clean turn → zero hints (watchers quiet observers)
+   - anomaly turn (60+ candidates) → anomaly hints fire
+   - signalRefs use U+001F (4 separators exactly)
+   - audit entry uses hardenedSchemaVersion constant
+   - zero-hint turns still write to ledger (defense-in-depth)
+   - byte-equal output for same input
+   - verdictRef varies by outcome (clean vs hints)
+
+**Phase 9+ scope honesty**:
+
+- This chapter ships the COLLECTOR + AUDIT-EMIT path。
+  Wiring it into `BASAgentFabricHostPipeline.runTurn` (so
+  `BAS_AGENT_TIER=all` actually invokes the collector during
+  a turn) is the NEXT chapter (ch 1013)。 Ch 1012 ships the
+  substrate-level building block;the pipeline integration
+  is a separate concern。
+- Full delta-merge path is NOT touched — watchers remain
+  hint-only observers per ch 970 doctrine。 They DO NOT
+  emit `BASAgentDelta` and CANNOT write state-graph domains。
+- The collector is pure-fn — no actor isolation,no I/O。
+  Same discipline as ch 957 seats and ch 1006/1007 emitters。
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter BASChapter1012` — 7/7 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,597 / 14,597
+  pass, 0 failures**
+- `bash scripts/pre-commit-gates.sh` — 3/3 gates clean
+
+**Discipline pins held**:
+- 红线 7 additive only — new helper,no existing API touched
+- ADR-014 OPT-IN — caller must explicitly invoke collector
+- Pure-fn + deterministic byte-equal output
+- U+001F separator discipline per Round-21
+- Shared `hardenedSchemaVersion` constant per ch 1011
+- Single-canonical confidence bands shared with ch 1006
+
 ### Chapter 一千零十一 / M3770 — Round-21 HIGH-1 fix: schemaVersion canonicalization
 
 Round-21 audit identified 9 production sites hardcoding the
