@@ -135,6 +135,12 @@ public enum BASStateDomain: String, Codable,
     case sovereignVerdict
     case hostVersion
     case evolutionProposal  // chapter 九百六十五 — EvolutionShadow owns
+    /// chapter 一千零二 / M3715 — TraceAnnotator owns (audit-only,
+    /// pure-annotation domain)。 Wires `.annotate` deltaType from
+    /// 💀 DEAD → ✅ WIRED per `Docs/SCAFFOLD_VS_WIRED.md`。 No
+    /// production seat reads from this domain; it exists for
+    /// per-turn provenance trails consumed by replay / audit tooling。
+    case traceAnnotation
 }
 
 // MARK: - BASAgentProposalType

@@ -79,7 +79,12 @@ final class BASChapter953AgentFabricSchemaPropertyTests:
         // remains sovereign-locked per Single-Writer table;
         // EvolutionShadow's proposals are NEVER effective same
         // turn per plan Phase 3 ch3 invariant)
-        XCTAssertEqual(BASStateDomain.allCases.count, 12)
+        // chapter 一千零二 / M3715:bumped 12 → 13 with
+        // addition of `.traceAnnotation` (TraceAnnotator
+        // seat owns this — audit-only domain that closes the
+        // `.annotate` 💀 DEAD case per
+        // `Docs/SCAFFOLD_VS_WIRED.md`)
+        XCTAssertEqual(BASStateDomain.allCases.count, 13)
         XCTAssertEqual(BASAgentProposalType.allCases.count, 7)
         XCTAssertEqual(BASAgentDeltaType.allCases.count, 5)
         XCTAssertEqual(BASAgentLeaseProfile.allCases.count, 4)

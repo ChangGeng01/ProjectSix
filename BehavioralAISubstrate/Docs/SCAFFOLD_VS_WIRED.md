@@ -155,17 +155,24 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 | `.replace` | ✅ WIRED (Surface + SovereignSentinel emit) |
 | `.merge` | ✅ WIRED (Scout + Memory + Critic + Risk + HostAlign emit) |
 | `.remove` | ✅ WIRED (tombstone path in applier) |
-| `.annotate` | 💀 emitted by no seat;applier groups with payload-bearing cases。 Reserved for future audit-only "trace seat" per ch 995.9 doctrine。 |
+| `.annotate` | ✅ WIRED (ch 1002 — `BASTraceAnnotatorSeat` emits one `.annotate` delta per turn against the new `.traceAnnotation` domain;applier writes the payload via the existing payload-bearing branch)。 |
 
 ## Honest summary
 
 **Total public APIs shipped in arc 953-995.9**: ~75 (including
 adapters / bridges / DTOs / enums)。
 
-**Status counts**:
-- ✅ WIRED: ~50 (67%)
+**Status counts** (post-ch 1002):
+- ✅ WIRED: ~52 (69%)
 - 🪜 SCAFFOLD: ~20 (27%)
-- 💀 DEAD / future-allocation: ~5 (6%)
+- 💀 DEAD / future-allocation: ~3 (4%)
+
+**Change vs ch 996 inventory**:
+- ch 998-1000.5 closed the chapter-500 ANE consultation gap (production
+  Brain now reads + counts via `BASCognitiveBrain.recordANEConsultation`)。
+- ch 1001 closed `BAS_ACTIVE_AGENTS` (decorative → genuine seat filter)。
+- ch 1002 closed `.annotate` deltaType (DEAD → WIRED via TraceAnnotator
+  + new `.traceAnnotation` domain)。
 
 **Reading**: 2/3 of the arc is genuinely-wired internal substrate
 infrastructure。 1/4 is host-observable scaffold (host SDK can
@@ -187,7 +194,11 @@ Future arcs may move SCAFFOLD APIs into WIRED by:
    any actual MCP tool dispatch + appends audit ref to ledger。
 5. **`recordEvent`** → host's per-event log consumer wires it
    into a streaming sink (currently only flush is used)。
-6. **`.annotate`** deltaType → future trace seat emits it。
+6. ~~**`.annotate`** deltaType → future trace seat emits it。~~
+   **CLOSED at ch 1002** — `BASTraceAnnotatorSeat` is that trace
+   seat。 Writes against the new `.traceAnnotation` domain (also
+   added at ch 1002)。 Production reads remain audit-only (no
+   in-turn seat consumes,by design)。
 
 These are explicitly post-arc-953-996 scope。 The substrate is
 correct to ship the API surfaces NOW so future hosts can adopt

@@ -33,9 +33,15 @@ final class BASChapter974_975SDKStabilityTests: XCTestCase {
     }
 
     func testStabilityPin_StateDomainCount() {
-        XCTAssertEqual(BASStateDomain.allCases.count, 12,
-            "ch 974 SDK-stability: BASStateDomain at 12 " +
-            "domains (ch 965 close). Adding a 13th domain " +
+        // chapter 一千零二 / M3715:bumped 12 → 13 with
+        // addition of `.traceAnnotation` (TraceAnnotator owns;
+        // closes the `.annotate` 💀 DEAD case per
+        // `Docs/SCAFFOLD_VS_WIRED.md`)。 Backward-compat additive
+        // — existing consumers untouched since the new domain has
+        // no production reader。
+        XCTAssertEqual(BASStateDomain.allCases.count, 13,
+            "ch 974 SDK-stability: BASStateDomain at 13 " +
+            "domains (ch 1002 close). Adding a 14th domain " +
             "in v1 is allowed (backward-compat) but bumps " +
             "this pin + the ch 953 schema test pin")
     }

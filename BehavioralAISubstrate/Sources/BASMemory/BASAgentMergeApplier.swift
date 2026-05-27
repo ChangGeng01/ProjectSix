@@ -162,18 +162,16 @@ public enum BASAgentMergeApplier {
     /// applier's responsibility is "write the payload";
     /// type-distinction is consumer-side semantics。
     ///
-    /// **💀 DEAD** per `Docs/SCAFFOLD_VS_WIRED.md`:`.annotate` is
-    /// currently emitted by NO seat in `Sources/BASMemory
-    /// /BAS*Seat.swift` (grep confirms zero emit sites)。 Other 4
-    /// cases are alive:
+    /// **✅ WIRED at ch 1002** per `Docs/SCAFFOLD_VS_WIRED.md`:
+    /// the `.annotate` case is now emitted by `BASTraceAnnotatorSeat`
+    /// (the audit-only "trace seat" anticipated by this comment)。
+    /// All 5 deltaType cases are alive:
     ///   - `.add`:Planner + EvolutionShadow (new candidates)
     ///   - `.merge`:Scout + Memory + Critic + Risk + HostAlign
     ///   - `.replace`:Surface + SovereignSentinel
     ///   - `.remove`:tombstone path (`""` payload)
-    ///   - `.annotate`:reserved for future audit-only seats
-    ///     (e.g. a future "trace seat" that annotates without
-    ///     mutating)。 Preserved here for forward-compat;not
-    ///     marked deprecated per ch 996 explicit doctrine。
+    ///   - `.annotate`:TraceAnnotator (new `.traceAnnotation`
+    ///      domain;closes the ch 996 💀 DEAD entry)。
     private static func effectivePayload(
         for delta: BASAgentDelta
     ) -> String {

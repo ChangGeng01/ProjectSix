@@ -11,6 +11,97 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零二 / M3715 — `.annotate` deltaType: 💀 DEAD → ✅ WIRED via TraceAnnotatorSeat
+
+Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 inventory,one of the
+three remaining 💀 DEAD entries was `BASAgentDeltaType.annotate`:
+shipped at ch 953,but emitted by NO seat in the entire
+substrate。 The ch 995.9 doctrine recorded the case as
+「reserved for future audit-only 'trace seat' that annotates
+without mutating」。 Ch 1002 ships exactly that trace seat。
+
+**What landed:**
+
+1. New `BASStateDomain.traceAnnotation` (12 → 13 domains)。
+   Dedicated single-writer domain for audit-only annotations。
+   No production seat reads from this domain by design — it
+   exists for per-turn provenance trails consumed by replay /
+   audit tooling。
+2. New `BASTraceAnnotatorSeat` pure-function seat。 Per turn,
+   reads a slim `BASTraceAnnotatorInput` (turnID + emitted-
+   deltas list) and emits ONE `.annotate` delta with a
+   deterministic minimal-JSON payload summarizing the turn
+   (total count + per-agent counts + delta-type set,sorted
+   alphabetically for byte-equal output across runs)。 Zero
+   emit on zero-signal turns (mirror of ch 957 Scout
+   doctrine)。 No actor isolation,no I/O,no shared state
+   beyond supplied input。
+3. The applier's payload-bearing branch (`.add / .replace /
+   .merge / .annotate`) already handles the write — no
+   applier change needed。 Source comment updated from
+   「💀 DEAD」 to 「✅ WIRED at ch 1002」。
+4. 7 new tests in
+   `BASChapter1002TraceAnnotatorSeatTests.swift`:
+   - `test_EmptyInput_EmitsZeroDeltas` — zero-signal short-circuit
+   - `test_NonEmptyInput_EmitsExactlyOneAnnotateDelta` — happy
+     path + deltaType / targetObjectRef pin
+   - `test_PayloadIsDeterministic_SortedAgents` — sort
+     invariant for strong-mergeID hash
+   - `test_PayloadIsByteEqual_ForSameInput` — same input ⇒
+     byte-equal payload + deltaID
+   - `testCRITICAL_AnnotateDelta_AppliesToTraceAnnotationDomain`
+     — end-to-end via `BASAgentMergeApplier.apply()`
+   - `testCRITICAL_NonAnnotator_CannotWriteTraceAnnotation`
+     — single-writer invariant pin
+   - `testCRITICAL_TraceAnnotation_OnlyOneProductionWriter`
+     — structural source-grep pin (catches future refactors
+     that accidentally hand write rights to another seat)
+5. 3 stability-pin bumps (12 → 13 domains):
+   - `BASChapter953AgentFabricSchemaPropertyTests
+     .testEnumCountInvariants`
+   - `BASChapter965EvolutionShadowSeatTests
+     .testCRITICAL_EvolutionShadowCannotWriteAnyOtherDomain`
+     — sweep now covers 12 forbidden domains (was 11)
+   - `BASChapter974_975SDKStabilityTests
+     .testStabilityPin_StateDomainCount`
+6. `Docs/SCAFFOLD_VS_WIRED.md`:
+   - `.annotate` row flipped 💀 → ✅
+   - Status counts updated (~50 → ~52 wired; ~5 → ~3 dead)
+   - Forward-closure-path item #6 marked CLOSED
+   - Change-vs-ch-996 inventory section added
+
+**Verification:**
+
+- `swift build` clean
+- `swift test --filter BASChapter1002TraceAnnotatorSeatTests` —
+  7 / 7 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,516 / 14,516 pass,
+  0 failures** (3 stability-pin bumps + 7 new tests folded in
+  without breaking any prior test)
+- `bash scripts/pre-commit-gates.sh` — 3 / 3 gates clean
+
+**Discipline pins held:**
+
+- 红线 7 (additive only) — existing seats unchanged; the only
+  enum-add is the new `.traceAnnotation` domain (backward-compat,
+  no consumer breaks)
+- Single-Writer-Per-Domain — enforced + tested for the new
+  domain
+- Pure-function seat doctrine (ch 957 precedent) — no actor,
+  no I/O,no shared state
+- Deterministic JSON encoding (ch 956.5 mergeID-hash invariance)
+
+**Scope honesty:**
+
+- The TraceAnnotator is shipped as an opt-in seat — full
+  integration with `BASAgentTurnRoster` + `BASAgentTurnDispatcher`
+  is deferred to a future chapter (the seat is pure-fn ready for
+  any host that wants to call it,but no fixed registration site
+  yet)。
+- The new domain has no in-turn production reader by design。
+  Audit / replay consumers can scope reads to one domain via
+  the storage layer。
+
 ### Chapter 九百九十六 / M3685 — 完全 收口 gap closure: scaffold/wired honest inventory
 
 After 14 N-pass review rounds — the last 6 catching same-class

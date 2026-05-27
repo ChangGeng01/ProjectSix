@@ -367,8 +367,12 @@ final class BASChapter965EvolutionShadowSeatTests: XCTestCase {
         let otherDomains = BASStateDomain.allCases.filter {
             $0 != .evolutionProposal
         }
-        XCTAssertEqual(otherDomains.count, 11,
-            "ch 965: 12 total domains - 1 (evolutionProposal) = 11")
+        // chapter 一千零二 / M3715:bumped 11 → 12 (13 total
+        // domains - 1 evolutionProposal = 12) after addition of
+        // `.traceAnnotation` (TraceAnnotator owns)。 Sweep still
+        // covers every domain EvolutionShadow is forbidden from。
+        XCTAssertEqual(otherDomains.count, 12,
+            "ch 965: 13 total domains - 1 (evolutionProposal) = 12")
         for domain in otherDomains {
             let graph = BASSharedStateGraph()
             do {
