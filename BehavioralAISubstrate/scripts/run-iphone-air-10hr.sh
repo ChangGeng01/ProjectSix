@@ -84,6 +84,36 @@ check_device_connected() {
     return 1
 }
 
+# chapter 一千零十五.6 / M3810 — pre-warm xcodebuild build to
+# materialize SwiftPM plugin outputs (BASSQLSchemaGen) BEFORE
+# the test loop。 Pre-fix:cold DerivedData caused xcodebuild
+# test to fail-fast on missing plugin-generated files at iter 1
+# (race between plugin command emission + Swift input-dependency
+# check)。 Post-fix:one-time build runs the plugin,materializes
+# the .generated.swift files into DerivedData,then test iters
+# find them as cached inputs。 Opt out via BAS_SKIP_PREWARM=1。
+if [ -z "${BAS_SKIP_PREWARM:-}" ]; then
+    echo "$(date) pre-warming xcodebuild build (plugin materialize)" \
+        >> "$LOG_DIR/summary.txt"
+    PREWARM_LOG="$LOG_DIR/prewarm.log"
+    xcodebuild build \
+        -project DeviceTestApp/BASDeviceTest.xcodeproj \
+        -scheme BASDeviceTestApp \
+        -destination "platform=iOS,id=$DEVICE_ID" \
+        -allowProvisioningUpdates \
+        -skipPackagePluginValidation \
+        > "$PREWARM_LOG" 2>&1
+    PREWARM_EXIT=$?
+    if [ $PREWARM_EXIT -ne 0 ]; then
+        echo "$(date) pre-warm FAILED (exit=$PREWARM_EXIT) — " \
+            "see $PREWARM_LOG。 Stopping before iter loop。" \
+            >> "$LOG_DIR/summary.txt"
+        exit 1
+    fi
+    echo "$(date) pre-warm OK — starting iter loop" \
+        >> "$LOG_DIR/summary.txt"
+fi
+
 # Main loop — no bash -c nesting, ITER properly local
 while true; do
     NOW=$(date +%s)
@@ -135,6 +165,22 @@ while true; do
             >> "$LOG_DIR/summary.txt"
         echo "see $LOG_FILE for cause" >> "$LOG_DIR/summary.txt"
         break
+    fi
+    # chapter 一千零十五.6 / M3810 — per-iter cooldown to let
+    # iPhone Air A19 thermal envelope recover between sustained-
+    # MLX-load iterations。 ch 1015.5 device-test run (iter 7)
+    # tripped the Gemma 4 E2B p99 latency ceiling (21.07s vs 20s)
+    # after ~25 min cumulative MLX load due to thermal throttling
+    # — not a substrate regression but a real thermal effect。
+    # Setting BAS_ITER_COOLDOWN_SEC=N inserts a sleep N between
+    # iterations so thermal can recover。 Default 0 preserves
+    # prior behavior (zero cooldown,thermal will trip ~iter 7
+    # under sustained load)。
+    COOLDOWN_SEC=${BAS_ITER_COOLDOWN_SEC:-0}
+    if [ $COOLDOWN_SEC -gt 0 ]; then
+        echo "$(date) iter=$ITER cooldown=${COOLDOWN_SEC}s — " \
+            "thermal recovery" >> "$LOG_DIR/summary.txt"
+        sleep $COOLDOWN_SEC
     fi
 done
 
