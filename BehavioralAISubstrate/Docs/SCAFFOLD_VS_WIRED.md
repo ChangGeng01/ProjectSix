@@ -120,7 +120,7 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 | `BASAgentFabricGate.Activation.fabricEnabled` | ✅ WIRED | pipeline guards on it |
 | `BASAgentFabricGate.Tier.core` / `.all` | 🪜 SCAFFOLD | parsed into Activation,surfaced in diagnostics,but NO Sources/ branches on it for roster filtering。 Decorative env-var echo per ch 995.5 doctrine。 Full tier-filter behavioral wire deferred to phase 9+ scope (would require new dispatcher behavior)。 |
 | `BASAgentFabricGate.TranscriptMode.singleAgent` / `.compareAll` / `.compareSelected` | 🪜 SCAFFOLD | same as Tier — parsed,surfaced,not branched on substrate-side |
-| `BASAgentFabricGate.Activation.activeAgents` | 🪜 SCAFFOLD | CSV from env,surfaced in diagnostics,no roster filter |
+| `BASAgentFabricGate.Activation.activeAgents` | ✅ WIRED (ch 1001) | CSV from env now drives optional-seat filtering in `BASAgentFabricHostPipeline`。 Memory / triScores / hostConstitution / sovereign / evolution seats are nil-filtered when `BAS_ACTIVE_AGENTS` is set + does not include their canonical role name。 Backward compat: empty CSV = no filter (preserves pre-ch-1001 behavior)。 |
 
 ### Audit + storage (ch 994.5-994.7)
 
@@ -239,3 +239,111 @@ fixes the claim。
 - No new public APIs added。 No behavioral change。 Genuine
   closure of the 6-round same-class cascade by making the
   scaffold/wired distinction EXPLICIT at the doctrine layer。
+
+## What chapters 1001-1005 closed (the「全面 完成 scaffold」arc)
+
+After ch 996 shipped the inventory,the user invoked a multi-
+chapter scaffold-pruning sweep。 Each chapter took ONE forward-
+closure item that was genuinely closable in a single-chapter
+scope。 Each shipped with the same discipline:
+  - additive only (red-line 7)
+  - opt-in (ADR-014)
+  - new tests pin the genuine wire
+  - existing tests preserved byte-equal
+  - doctrine row in this file flipped to ✅ WIRED
+
+### ch 1001 — `BAS_ACTIVE_AGENTS` activeAgents filter
+
+Pre-fix: env-var parsed into diagnostics, never affected behavior
+(decorative since ch 993)。
+Post-fix: `BASAgentFabricHostPipeline.runTurn` filters optional
+seats (memory/triScores/hostConstitution/sovereign/evolution)
+based on the activeAgents list。 Backward compat: empty CSV =
+no filter (matches pre-ch-1001 behavior)。
+
+### ch 1002 — `.annotate` deltaType WIRED via TraceAnnotatorSeat
+
+Pre-fix: case shipped at ch 953,emitted by NO seat。
+Post-fix: `BASTraceAnnotatorSeat` is the canonical emitter
+(audit-only,writes against new `.traceAnnotation` domain)。
+Applier's payload-bearing branch handles the write — no code
+change needed in applier。
+
+### ch 1003 — `validateMCPInvocation` SCAFFOLD → WIRED
+
+Pre-fix: gate shipped at ch 990,auditRefs dead-letter (no
+ledger consumer)。
+Post-fix: `BASMCPInvocationAuditBridge.validateAndAppend(...)`
+pipes both granted + rejected outcomes into L14 ledger,
+mirroring ch 983 warrant-bridge shape verbatim。
+
+### ch 1004 — `recordEvent` per-event streaming WIRED
+
+Pre-fix: API shipped at ch 984,no documented protocol for
+host streaming consumers。
+Post-fix: `BASAgentTraceStreamingSink` protocol + 
+`BASAgentTraceBufferingSink` reference impl + bridge
+`recordEvent(_:streamingTo:)` overload。 Hosts now have a
+contract + starting-point。 Both flush + per-event-stream
+remain first-class。
+
+### ch 1005 — Arc seal + remaining-scaffold honest pin
+
+This chapter (the synthesis):
+1. Closes the inventory drift caught at ch 1001-1004 (the
+   activeAgents row was missed when ch 1001 shipped — same
+   discipline failure ch 996 originally fixed,now caught
+   end-to-end with a structural test)
+2. Pins the REMAINING SCAFFOLDS as「correct as scaffold」by
+   doctrine — each one is genuinely multi-chapter scope:
+   - **`BASAgentFabricMode.authoritative`** — flipping behavior
+     requires Phase 9+ work (replace coordinator output paths
+     with fabric deltas)。 NOT closable in 1 chapter。
+   - **`Gate.Tier.core`/`.all`** — needs watcher + skill agent
+     integration into the pipeline first。 The 7 watchers + 4
+     reference skill agents exist as substrate APIs but aren't
+     wired into `BASAgentFabricHostPipeline`。 Until they are,
+     `.core` and `.all` are behaviorally equivalent。 NOT
+     closable in 1 chapter。
+   - **`Gate.TranscriptMode`** — requires new `BASRenderFrame`
+     variants for per-agent transcripts。 Architectural change。
+     NOT closable in 1 chapter。
+   - **`BASAgentFabricHostOutcome.{activation,fabricMode}`** —
+     host-observable SDK surface,read by code OUTSIDE this
+     repo。 Substrate's job is to provide the typed signal;
+     consumer's job is to branch on it。 CORRECT as scaffold
+     from substrate's perspective — the substrate cannot
+     reach into the host's code。
+   - **`consultedByExecutorInProduction = false`** — flipping
+     this static-let to `true` requires actual tier-based
+     dispatch (route through CoreML-on-ANE for `.aneNative`
+     tier ops instead of MSL)。 Multi-chapter ANE-dispatch arc
+     that the substrate ANE-consultation work (ch 998-1000.5)
+     deliberately scoped OUT。 CORRECT as scaffold per
+     chapter-500 invariant + ch 1000 honest-scope doctrine。
+   - **`BASAgentObservation`** — watcher hint surface;
+     substrate doesn't branch but the L14 audit reads。 The
+     genuine consumer (L14 audit ledger reader) lives in
+     host code — same dynamic as host-observable signals。
+     CORRECT as scaffold from substrate's perspective。
+3. Adds structural test `BASChapter1005ScaffoldInventoryPin`
+   that asserts: (a) `Docs/SCAFFOLD_VS_WIRED.md` and the
+   source-file docstrings remain consistent;(b) the count
+   of ✅ WIRED entries matches expected after this arc。
+
+### What we explicitly DID NOT do
+
+- No force-closing the remaining 🪜 SCAFFOLD items。 Each one
+  was triaged honestly with explicit rationale。
+- No silently flipping `consultedByExecutorInProduction` to
+  `true` — that would lie about substrate behavior。
+- No adding decorative dispatcher branches for `Gate.Tier`
+  that don't actually filter anything — that would just
+  shift the scaffold problem instead of closing it。
+
+The 4 closures in this arc were the genuinely-closable items
+identified by ch 996 forward-closure path。 The remaining items
+are correctly multi-chapter scope。 Future arcs will close them
+as their preconditions are met (watcher integration → tier wire;
+authoritative-mode wire → coordinator branch refactor;tier-
+based ANE dispatch → multi-chapter kernel arc)。

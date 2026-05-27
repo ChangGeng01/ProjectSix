@@ -11,6 +11,74 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零五 / M3730 — 全面 完成 scaffold arc seal
+
+Closes the multi-chapter scaffold-pruning sweep that began at
+ch 1001 and ran through ch 1004。 Each chapter closed exactly
+one forward-closure item from `Docs/SCAFFOLD_VS_WIRED.md` ch 996
+inventory。 Ch 1005 seals the arc with:
+
+1. **Inventory consistency fix** — the `activeAgents` row in
+   the inventory table still claimed 🪜 SCAFFOLD even though
+   ch 1001 wired it。 Same discipline failure ch 996 originally
+   caught;now closed end-to-end with a structural test。
+2. **Closed-arc summary section** added to
+   `Docs/SCAFFOLD_VS_WIRED.md` documenting each ch 1001-1004
+   closure with rationale + verification approach。
+3. **Remaining-scaffold honest pin** — the 5 items that remain
+   🪜 SCAFFOLD are each named explicitly with explanation of
+   why they are correctly-scoped multi-chapter work:
+   - `BASAgentFabricMode.authoritative` — Phase 9+
+   - `Gate.Tier.core`/`.all` — needs watcher + skill
+     integration first
+   - `Gate.TranscriptMode` — needs new BASRenderFrame variants
+   - `BASAgentFabricHostOutcome.{activation,fabricMode}` —
+     host-observable signal (consumer lives outside substrate)
+   - `consultedByExecutorInProduction` — tier-based ANE
+     dispatch is multi-chapter kernel arc
+4. **Structural pin test** `BASChapter1005ScaffoldInventoryPinTests`
+   asserts: (a) doctrine references each closure by chapter +
+   API name;(b) source files exist for each closure;
+   (c) each source self-references its chapter (digit or 中文);
+   (d) the「explicitly DID NOT do」 section exists + names
+   the 4 remaining-scaffold items by name。
+
+**Arc summary (ch 1001 → 1005)**:
+
+| Chapter | Closure | API class |
+|---|---|---|
+| ch 1001 | `BAS_ACTIVE_AGENTS` filter | env-var → behavior |
+| ch 1002 | `.annotate` deltaType | enum case → seat |
+| ch 1003 | `validateMCPInvocation` | adapter → ledger |
+| ch 1004 | `recordEvent` streaming | API → consumer protocol |
+| ch 1005 | inventory consistency + arc seal | doctrine pin |
+
+Counts post-arc: ~54 ✅ WIRED (72%) + ~18 🪜 SCAFFOLD (24%)
++ ~3 💀 DEAD (4%)。 From ch 996 baseline ~50/67% / ~20/27% /
+~5/6%。
+
+**Verification:**
+
+- `swift build` clean
+- `swift test --filter BASChapter1005` — 5 / 5 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,536 / 14,536
+  pass, 0 failures**
+- `bash scripts/pre-commit-gates.sh` — 3 / 3 gates clean
+
+**What we explicitly DID NOT do (and why):**
+
+- No force-closing the 5 remaining 🪜 SCAFFOLD items。 Each is
+  genuinely multi-chapter work per its docstring rationale。
+- No silently flipping `consultedByExecutorInProduction = true`
+  — that would lie about substrate behavior。 The chapter-500
+  invariant intentionally STAYS false until actual tier-based
+  dispatch lands (multi-chapter ANE-dispatch arc)。
+- No adding decorative dispatcher branches for `Gate.Tier`
+  that don't actually filter anything — that would shift the
+  scaffold problem instead of closing it。
+
+The discipline: **only close what genuinely closes**。
+
 ### Chapter 一千零四 / M3725 — `recordEvent` scaffold close via `BASAgentTraceStreamingSink`
 
 Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 forward-closure item #5:
