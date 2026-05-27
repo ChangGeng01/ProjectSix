@@ -11,6 +11,102 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十四.6 / M3795 — Round-23 fix-of-fix-of-fix-of-fix
+
+User invoked「跑个测试找找bug」 (run a test, find bugs)。 Triggered:
+1. Unrestricted test sweep (no BAS_FUZZ_RUNTIME_SKIP)
+2. Round-23 deep audit agent dispatch
+
+Sweep results: **14,615 / 14,615 substrate tests pass** + 1
+flaky ch 868 timing benchmark (pre-existing, outside scope)。
+
+Round-23 audit caught **5 CRITICAL + 7 HIGH + 9 MED + 2 LOW**
+findings — cascade still finding real bugs。 ch 1014.6 fixes
+the 5 CRITICAL + 3 HIGH:
+
+**CRITICAL-1 fix**: pipeline early-return paths now emit
+`inspector.*` keys via new shared `assembleOutcome(...)` helper。
+Pre-fix the CHANGELOG promised these keys per-turn but only
+the activated path emitted — skipped + unconfigured outcomes
+had no inspector signal。 Now uniform across all 3 return paths。
+
+**CRITICAL-3 fix**: `ShadowTrialCoordinator` 5 verdictRef sites
+(3 shadow_trial + 1 evolution_seal + 1 retraction) migrated
+from `:` to U+001F separator per Round-21 separator-injection
+doctrine。 Round-21 fixed audit-bridge sites but missed these 5
+seat-level call sites — Round-23 caught the gap。 Test updates
+in lockstep at `BASShadowTrialCoordinatorTests`。
+
+**CRITICAL-4 + CRITICAL-5 fix**: `BASTraceAnnotatorSeat.emit`
+deltaID + targetObjectRef AND `BASAgentObservationAuditEmitter
+.observationFromAnnotator` observationID now JSON-escape turnID。
+The ch 1014 LOW-1 fix only escaped the observation summary
+field but missed sibling interpolations in the same call site。
+Same JSON-corruption attack surface — `"` / `\n` in turnID
+would corrupt downstream consumers。
+
+**HIGH-1 fix**: `BASAgentObservationAuditEmitter` (ch 1006) was
+💀 DEAD in Sources/ per Round-23 grep — only tests consumed it。
+Pipeline now produces observations alongside trace deltas +
+emits their signalRefs as `observation.signalRefs` diagnostic。
+Substrate is genuinely consumer + producer。
+
+**HIGH-2 fix**: `BASAgentFabricWatcherCollector` had 3 of 4
+methods dead (only `collect()` was consumed)。 Pipeline now
+also calls `signalRefs(from:)` + emits as
+`watcher.signalRefs` diagnostic when `.all` tier runs。 The
+audit-emit methods (`buildAuditEntry`, `collectAndAudit`)
+remain dead but are reserved for ledger integration in a
+future arc — explicitly documented as deferred。
+
+**HIGH-3 fix**: `inspector.*` diagnostic keys were byte-equal
+aliases for existing diagnostics (`inspector.tier` ↔
+`gate.tier`, `inspector.deltaCount` ↔ `deltas.emitted`)。
+Hollow consumer pattern。 Post-fix the 3 alias keys are
+REPLACED with a single `inspector.summary` JSON-encoded key
+carrying the typed `BASAgentFabricHostOutcomeSummary` bundle。
+Genuinely-new typed signal vs the pre-existing string-typed
+diagnostics dict。
+
+**Cascade health**:
+
+| Round | CRITICAL | Pattern class |
+|---|---|---|
+| Round-19 | 1 | ANE consult 4-way dup |
+| Round-20 | 3 | Confidence dup + 2 separators |
+| Round-21 | 5 | 4 separator-injection + sourceRefs `#` |
+| Round-22 | 2 | Single-canonical sentinel + nil-result misclass |
+| **Round-23** | **5** | Inspector keys missing on early-return + ShadowTrial separators + JSON-escape siblings + dead-code emitters + alias-key bloat |
+
+Cascade is NOT yet asymptoting。 Round-23 surfaced new pattern
+classes (early-return paths + sibling JSON-escape misses +
+dead emitter wires) at fresh sites。
+
+**What stays MED/LOW (deferred)**:
+- MED-2/3/4: file-header docstrings reference old `.` / `:`
+  separator formats — Round-21 fixed code but missed docs。
+  Cosmetic, deferred (CHANGELOG entry is the canonical history)。
+- MED-5: `isCleanRun` only test-consumed — same dead-API
+  pattern as HIGH-1/2 but lower stakes (helper method)。
+- MED-6/7/8: weak test pins, env-var typo handling — small
+  cleanup, deferred。
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter BASChapter1014_6` — 7/7 pass
+- `swift test --filter "BASChapter101[01234]|BASShadowTrialCoordinatorTests"` — 67/67 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,622/14,622 pass, 0 failures**
+- `bash scripts/pre-commit-gates.sh` — 3/3 gates clean
+
+**Discipline pins held**:
+- 红线 7 additive only — no existing API signature touched
+- Single-canonical sentinel (Round-22) + helper (Round-23
+  `assembleOutcome`) — fresh canonical extractions per round
+- U+001F separator uniform across ALL audit-bridge sites +
+  ShadowTrialCoordinator (Round-21 + Round-23 lockstep)
+- JSON-escape uniform across ALL turnID interpolations in
+  ch 1002 + ch 1006 (Round-23 caught the sibling gap)
+
 ### Chapter 一千零十四 + 一千零十四.5 / M3785-M3790 — 全面 一次性 gap closure omnibus + Round-22 fixes
 
 User invoked「全面 一次性 完成 gap 最努力 最 wired 最 满意 诚实模式」

@@ -151,12 +151,20 @@ public enum BASTraceAnnotatorSeat {
         // formula instead of inline duplication
         let conf = Self.confidenceForAgentSet(
             count: agentSet.count)
+        // chapter 一千零十四.6 / M3795 — Round-23 CRITICAL-5 fix:
+        // JSON-escape turnID for deltaID + targetObjectRef
+        // interpolations。 ch 1014 LOW-1 fix only escaped the
+        // observation summary field but missed sibling
+        // interpolations in the same call site — same JSON-
+        // corruption attack surface。
+        let escapedTurnID =
+            BASAgentFabricJSONEscape.escape(input.turnID)
         return [BASAgentDelta(
             deltaID:
-                "delta.\(input.turnID).trace.\(seq)",
+                "delta.\(escapedTurnID).trace.\(seq)",
             agentID: agentSpec.agentID,
             targetObjectRef:
-                "traceAnnotation#turn-\(input.turnID)",
+                "traceAnnotation#turn-\(escapedTurnID)",
             deltaType: .annotate,
             patchJson: payload,
             confidence: conf,

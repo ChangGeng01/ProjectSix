@@ -280,7 +280,9 @@ public actor BASShadowTrialCoordinator {
             auditID: nextAuditID(),
             sessionID: sessionID,
             turnID: turnID,
-            verdictRef: "shadow_trial:\(trialID)",
+            // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix:
+            // U+001F separator (trialID may contain `:`)
+            verdictRef: "shadow_trial\u{001F}\(trialID)",
             ruleIDs: ["L13.shadow_trial_opened"],
             signalRefs: candidate.sourceRefs,
             actionRefs: [candidate.candidateID],
@@ -411,7 +413,9 @@ public actor BASShadowTrialCoordinator {
             auditID: nextAuditID(),
             sessionID: sessionID,
             turnID: turnID,
-            verdictRef: "shadow_trial:\(trialID)",
+            // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix:
+            // U+001F separator (trialID may contain `:`)
+            verdictRef: "shadow_trial\u{001F}\(trialID)",
             ruleIDs: ["L13." + outcome.eventKind],
             signalRefs: candidate.sourceRefs,
             actionRefs: [candidate.candidateID],
@@ -457,7 +461,9 @@ public actor BASShadowTrialCoordinator {
             auditID: nextAuditID(),
             sessionID: sessionID,
             turnID: turnID,
-            verdictRef: "evolution_seal:\(sealID)",
+            // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix:
+            // U+001F separator (sealID may contain `:`)
+            verdictRef: "evolution_seal\u{001F}\(sealID)",
             ruleIDs: ["L13." + sealEventKind],
             signalRefs: [trialID],
             actionRefs: [candidate.candidateID],
@@ -483,7 +489,10 @@ public actor BASShadowTrialCoordinator {
                 auditID: nextAuditID(),
                 sessionID: sessionID,
                 turnID: turnID,
-                verdictRef: "retraction:\(retractionID)",
+                // ch 1014.6 / M3795 — Round-23 CRITICAL-3:
+                // U+001F separator (retractionID may contain `:`)
+                verdictRef:
+                    "retraction\u{001F}\(retractionID)",
                 ruleIDs: ["L13.retraction_order_queued"],
                 signalRefs: [trialID],
                 actionRefs: [candidate.candidateID],
@@ -608,7 +617,9 @@ public actor BASShadowTrialCoordinator {
             auditID: nextAuditID(),
             sessionID: sessionID,
             turnID: turnID,
-            verdictRef: "shadow_trial:\(trialID)",
+            // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix:
+            // U+001F separator (trialID may contain `:`)
+            verdictRef: "shadow_trial\u{001F}\(trialID)",
             ruleIDs: [rule],
             signalRefs: candidate.sourceRefs,
             actionRefs: [candidate.candidateID],

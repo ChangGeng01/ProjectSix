@@ -105,7 +105,9 @@ final class BASShadowTrialCoordinatorTests: XCTestCase {
         XCTAssertEqual(entries[0].auditID, "a-1")
         XCTAssertEqual(entries[0].actionRefs, [candidate.candidateID])
         XCTAssertEqual(entries[0].snapshotRef, "scope.growth")
-        XCTAssertEqual(entries[0].verdictRef, "shadow_trial:t-1")
+        // ch 1014.6 / M3795 — Round-23 CRITICAL-3 fix: U+001F
+        XCTAssertEqual(entries[0].verdictRef,
+            "shadow_trial\u{001F}t-1")
         XCTAssertEqual(entries[0].ruleIDs, ["L13.shadow_trial_opened"])
         XCTAssertEqual(entries[0].signalRefs, candidate.sourceRefs)
     }
@@ -551,14 +553,16 @@ final class BASShadowTrialCoordinatorTests: XCTestCase {
 
         // Shadow-trial entries are present in the sovereign chain.
         let trialOpen = try await ledger.query(byAuditRef: "sov-trial-open")
-        XCTAssertEqual(trialOpen.entry.verdictRef, "shadow_trial:t-1")
+        XCTAssertEqual(trialOpen.entry.verdictRef,
+            "shadow_trial\u{001F}t-1")
         XCTAssertEqual(trialOpen.entry.actionRefs, [candidate.candidateID])
 
         let trialPass = try await ledger.query(byAuditRef: "sov-trial-pass")
         XCTAssertEqual(trialPass.entry.ruleIDs, ["L13.shadow_trial_passed"])
 
         let sealIssued = try await ledger.query(byAuditRef: "sov-seal-issued")
-        XCTAssertEqual(sealIssued.entry.verdictRef, "evolution_seal:seal-1")
+        XCTAssertEqual(sealIssued.entry.verdictRef,
+            "evolution_seal\u{001F}seal-1")
         XCTAssertEqual(sealIssued.entry.ruleIDs, ["L13.evolution_seal_issued"])
     }
 

@@ -221,6 +221,15 @@ final class BASChapter1014OmnibusGapClosureTests: XCTestCase {
     func testHIGH_1_SummaryConsumed_PipelineEmitsSummaryFields()
         async throws
     {
+        // ch 1014.6 / M3795 — Round-23 HIGH-3 evolved: pre-ch-
+        // 1014.6 the pipeline emitted 3 separate keys
+        // (inspector.tier / .deltaCount / .watcherHintCount)
+        // that were byte-equal aliases for existing diagnostics
+        // (gate.tier / deltas.emitted / watcher.hintCount) —
+        // hollow consumer。 Post-fix the pipeline emits a SINGLE
+        // `inspector.summary` JSON-encoded key carrying the
+        // typed Summary bundle。 Genuinely-new information vs
+        // existing diagnostics (the typed shape is the value-add)。
         let fabric = makeNineSeatFabric()
         let coordinator = makeCoordinator(fabric: fabric)
         let pipeline = BASAgentFabricHostPipeline(
@@ -233,21 +242,29 @@ final class BASChapter1014OmnibusGapClosureTests: XCTestCase {
             turnID: "t.summary",
             decomposeFrame: BASDecomposeFrame(),
             candidatePaths: [makeCand()])
-        // ch 1014.5 HIGH-1: pipeline now emits Summary fields
-        // as separate diagnostic keys — proves Summary is
-        // CONSUMED (not just produced as type)
+        // The Summary type IS consumed via JSON serialization
+        // to the inspector.summary diagnostic
+        let summaryJSON = outcome.diagnostics[
+            "inspector.summary"]
+        XCTAssertNotNil(summaryJSON,
+            "ch 1014.6 HIGH-3: pipeline MUST emit " +
+            "inspector.summary JSON-encoded key")
+        // Decode + verify Summary fields
+        let data = summaryJSON?.data(using: .utf8)
+        XCTAssertNotNil(data)
+        if let data {
+            let decoded = try? JSONDecoder().decode(
+                BASAgentFabricHostOutcomeSummary.self,
+                from: data)
+            XCTAssertNotNil(decoded,
+                "ch 1014.6 HIGH-3: inspector.summary MUST " +
+                "decode as canonical Summary type")
+            XCTAssertEqual(decoded?.tier, "core")
+            XCTAssertTrue(decoded?.activated ?? false)
+        }
+        // inspector.category still emitted as separate string
         XCTAssertNotNil(
-            outcome.diagnostics["inspector.tier"],
-            "ch 1014.5 HIGH-1: pipeline MUST emit inspector.tier")
-        XCTAssertNotNil(
-            outcome.diagnostics["inspector.deltaCount"],
-            "ch 1014.5 HIGH-1: pipeline MUST emit " +
-            "inspector.deltaCount")
-        XCTAssertNotNil(
-            outcome.diagnostics[
-                "inspector.watcherHintCount"],
-            "ch 1014.5 HIGH-1: pipeline MUST emit " +
-            "inspector.watcherHintCount")
+            outcome.diagnostics["inspector.category"])
     }
 
     // MARK: - 1b. Pipeline emits inspector.category diagnostic

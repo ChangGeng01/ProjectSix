@@ -180,9 +180,16 @@ public enum BASAgentObservationAuditEmitter {
         let sourceRefs = input.emittedDeltas
             .map { "delta\u{001F}\($0.deltaID)" }
             .sorted()
+        // chapter 一千零十四.6 / M3795 — Round-23 CRITICAL-4 fix:
+        // JSON-escape turnID for observationID interpolation。
+        // The summary field was escaped at ch 1014 LOW-1 fix,
+        // but the observationID at the same call site was
+        // missed。 Same JSON-corruption attack surface — `"` /
+        // `\n` in turnID would corrupt downstream consumers
+        // parsing the observationID。
         return [BASAgentObservation(
             observationID:
-                "obs.\(input.turnID).trace.\(seq)",
+                "obs.\(escapedTurnID).trace.\(seq)",
             agentID: agentSpec.agentID,
             sourceRefs: sourceRefs,
             observedDomain: .traceAnnotation,

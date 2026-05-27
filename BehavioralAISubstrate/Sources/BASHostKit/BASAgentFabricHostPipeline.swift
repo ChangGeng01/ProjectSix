@@ -294,24 +294,32 @@ public struct BASAgentFabricHostPipeline {
         let resolvedMode = coordinator.agentFabric?.mode
         diagnostics["fabric.mode"] =
             resolvedMode?.rawValue ?? "unconfigured"
+        // chapter 一千零十四.6 / M3795 — Round-23 CRITICAL-1 fix:
+        // emit inspector.* keys on EARLY-RETURN paths too。
+        // Pre-fix the inspector wire only ran on the activated
+        // path,so skipped + unconfigured outcomes had no
+        // inspector.category diagnostic — contradicted the
+        // CHANGELOG promise that「pipeline emits this key per
+        // turn」。 Now all 3 return paths invoke the inspector
+        // via the shared helper。
         guard activation.fabricEnabled else {
-            return BASAgentFabricHostOutcome(
+            return Self.assembleOutcome(
                 result: nil,
                 activated: false,
                 skipReason: "env-var gate disabled fabric",
                 activation: activation,
                 fabricMode: resolvedMode,
-                diagnostics: diagnostics)
+                diagnostics: &diagnostics)
         }
         guard coordinator.agentFabric != nil else {
-            return BASAgentFabricHostOutcome(
+            return Self.assembleOutcome(
                 result: nil,
                 activated: false,
                 skipReason:
                     "coordinator has no agentFabric configured",
                 activation: activation,
                 fabricMode: resolvedMode,
-                diagnostics: diagnostics)
+                diagnostics: &diagnostics)
         }
 
         // Step 2:assemble live inputs
@@ -536,70 +544,163 @@ public struct BASAgentFabricHostPipeline {
                         ? "(none)"
                         : rolesEncountered
                             .joined(separator: "\u{001E}")
+                // chapter 一千零十四.6 / M3795 — Round-23 HIGH-2
+                // fix:wire the watcher-collector audit-emit
+                // methods that were dead code (3 of 4 methods
+                // had no Sources/ consumer)。 Post-fix the
+                // pipeline ALSO emits the collector's signalRefs
+                // into the watcher.signalRefs diagnostic so
+                // hosts can audit-replay watcher activity per
+                // turn without writing their own serializer。
+                let watcherSigRefs =
+                    BASAgentFabricWatcherCollector
+                        .signalRefs(from: hints)
+                diagnostics["watcher.signalRefs"] =
+                    watcherSigRefs
+                        .joined(separator: "\u{001E}")
             } else {
-                // ch 1014.5 / M3790 — Round-22 CRITICAL-1 fix:
-                // reference shared sentinel constant instead of
-                // inlining the literal at two sites (Round-21
-                // single-canonical doctrine)
+                // .core tier — watchers NOT invoked
                 let sentinel = BASAgentFabricHostOutcomeInspector
                     .coreTierSentinel
                 diagnostics["watcher.hintCount"] = sentinel
                 diagnostics["watcher.rolesActive"] = sentinel
+                // ch 1014.6 / M3795 — Round-23 HIGH-2 fix:
+                // sentinel for the new signalRefs key too
+                diagnostics["watcher.signalRefs"] = sentinel
             }
         }
+        // chapter 一千零十四.6 / M3795 — Round-23 HIGH-1 fix:
+        // wire `BASAgentObservationAuditEmitter` to ALSO emit
+        // an observation-projection of the TraceAnnotator input
+        // when fabric ran。 Pre-fix BASAgentObservationAuditEmitter
+        // was 💀 DEAD (no Sources/ consumer despite ch 1006
+        // doctrine claim of「canonical producer」)。 Post-fix
+        // the pipeline produces observations alongside trace
+        // deltas + emits their signalRefs as
+        // `observation.signalRefs` diagnostic。
+        if activation.fabricEnabled,
+           coordinator.agentFabric != nil,
+           let result
+        {
+            let traceInput = BASTraceAnnotatorInput(
+                turnID: turnID,
+                emittedDeltas:
+                    result.turnResult.emittedDeltas)
+            if !traceInput.isEmpty {
+                let traceSpec = BASAgentSpec(
+                    agentID:
+                        "trace.pipeline.\(sessionID)",
+                    role: .scout,
+                    writeDomains: [.traceAnnotation],
+                    defaultLeaseProfile: .watcher,
+                    visibility: .low)
+                var traceSeq = 0
+                let observations =
+                    BASAgentObservationAuditEmitter
+                        .observationFromAnnotator(
+                            input: traceInput,
+                            agentSpec: traceSpec,
+                            seq: &traceSeq)
+                let obsRefs =
+                    BASAgentObservationAuditEmitter
+                        .signalRefs(from: observations)
+                diagnostics["observation.signalRefs"] =
+                    obsRefs.joined(separator: "\u{001E}")
+            } else {
+                diagnostics["observation.signalRefs"] =
+                    "(empty-turn)"
+            }
+        } else {
+            // Skipped fabric run — no observation projection
+            diagnostics["observation.signalRefs"] =
+                "(skipped)"
+        }
 
-        // chapter 一千零十四 / M3785 — substrate-side consumer
-        // wire for HostOutcome。 Pre-fix HostOutcome.activation +
-        // .fabricMode were declared as host-observable signals
-        // with NO substrate consumer (correct as scaffold per ch
-        // 1010 doctrine)。 Post-fix the substrate ships a
-        // canonical inspector that READS the outcome + produces
-        // a categorization — substrate is now CONSUMER as well
-        // as PRODUCER。 The category lands in diagnostics so
-        // hosts that don't write their own inspector get a
-        // useful signal for free。
-        //
-        // The inspector is called AFTER the outcome is fully
-        // built but BEFORE return,with a「partial」 outcome
-        // snapshot (we have all fields except the category
-        // itself)。 We build a provisional outcome, run the
-        // inspector, then construct the final outcome including
-        // the inspector's category。
-        let provisional = BASAgentFabricHostOutcome(
+        // chapter 一千零十四.6 / M3795 — Round-23 CRITICAL-1
+        // fix:delegate the inspector wiring to the shared
+        // `assembleOutcome` helper that ALL return paths use。
+        return Self.assembleOutcome(
             result: result,
             activated: true,
+            skipReason: nil,
             activation: activation,
             fabricMode: resolvedMode,
+            diagnostics: &diagnostics)
+    }
+
+    /// chapter 一千零十四.6 / M3795 — Round-23 CRITICAL-1 fix:
+    /// shared outcome assembler that invokes the inspector
+    /// uniformly across all return paths (activated / skipped /
+    /// unconfigured)。 Pre-fix inspector wire only fired on
+    /// the activated path → CHANGELOG-promised diagnostic keys
+    /// missing for skipped/unconfigured outcomes。
+    ///
+    /// chapter 一千零十四.6 / M3795 — Round-23 HIGH-3 fix:
+    /// the `inspector.*` diagnostic keys were byte-equal aliases
+    /// for existing diagnostics (`inspector.tier` ↔ `gate.tier`,
+    /// `inspector.deltaCount` ↔ `deltas.emitted`)。 Hollow
+    /// consumer。 Post-fix the inspector exposes a TYPED bundle
+    /// as `diagnostics["inspector.summary"]` carrying the full
+    /// Summary as canonical JSON — single key with all 6 fields
+    /// in a typed shape host SDKs can decode。 Plus
+    /// `inspector.category` (the categorization that ISN'T in
+    /// any other diagnostic)。 Both keys carry genuinely new
+    /// information vs the pre-existing diagnostic dict。
+    nonisolated static func assembleOutcome(
+        result: BASAgentFabricFullTurnResult?,
+        activated: Bool,
+        skipReason: String?,
+        activation: BASAgentFabricGate.Activation,
+        fabricMode: BASAgentFabricMode?,
+        diagnostics: inout [String: String]
+    ) -> BASAgentFabricHostOutcome {
+        let provisional = BASAgentFabricHostOutcome(
+            result: result,
+            activated: activated,
+            skipReason: skipReason,
+            activation: activation,
+            fabricMode: fabricMode,
             diagnostics: diagnostics)
+        // The category is the GENUINELY-NEW signal — not
+        // duplicated by any other diagnostic key
         let inspectorCategory =
             BASAgentFabricHostOutcomeInspector.category(
                 outcome: provisional)
         diagnostics["inspector.category"] = inspectorCategory
-        // ch 1014.5 / M3790 — Round-22 HIGH-1 fix: also consume
-        // `BASAgentFabricHostOutcomeSummary` (was shipped at ch
-        // 1014 but no Sources/ consumer existed — would have been
-        // labeled 💀 DEAD per ch 996 taxonomy)。 Pipeline now
-        // emits the summary's high-signal fields as separate
-        // diagnostic keys with `inspector.*` prefix。 Substrate
-        // is genuinely both producer + consumer of Summary now。
-        let inspectorSummary =
-            BASAgentFabricHostOutcomeInspector.summarize(
-                outcome: provisional)
-        diagnostics["inspector.tier"] = inspectorSummary.tier
-        diagnostics["inspector.deltaCount"] =
-            "\(inspectorSummary.deltaCount)"
-        diagnostics["inspector.watcherHintCount"] =
-            inspectorSummary.watcherHintCount.map {
-                "\($0)"
-            } ?? BASAgentFabricHostOutcomeInspector
-                .coreTierSentinel
-
+        // Serialize the full summary as canonical JSON — single
+        // diagnostic key vs three byte-equal-alias keys per
+        // Round-23 HIGH-3 critique。 Host SDKs that want typed
+        // access decode this string via JSONDecoder。
+        if let summaryJSON = Self
+            .encodeSummaryDiagnostic(provisional: provisional)
+        {
+            diagnostics["inspector.summary"] = summaryJSON
+        }
         return BASAgentFabricHostOutcome(
             result: result,
-            activated: true,
+            activated: activated,
+            skipReason: skipReason,
             activation: activation,
-            fabricMode: resolvedMode,
+            fabricMode: fabricMode,
             diagnostics: diagnostics)
+    }
+
+    /// JSON-encode the Summary for canonical typed signal
+    /// transport via the diagnostics dict。 Deterministic
+    /// byte-equal output for byte-equal input (JSONEncoder
+    /// with `.sortedKeys` opt-in)。 Returns nil on encode
+    /// failure (best-effort,not a transactional barrier)。
+    private static func encodeSummaryDiagnostic(
+        provisional: BASAgentFabricHostOutcome
+    ) -> String? {
+        let summary = BASAgentFabricHostOutcomeInspector
+            .summarize(outcome: provisional)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(summary),
+              let s = String(data: data, encoding: .utf8)
+        else { return nil }
+        return s
     }
 
     /// chapter 一千零一 / M3710 — normalize BAS_ACTIVE_AGENTS
