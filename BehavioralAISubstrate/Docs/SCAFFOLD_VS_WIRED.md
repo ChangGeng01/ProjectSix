@@ -105,9 +105,9 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 | `BASAgentFabricLiveInputs` | ✅ WIRED | all 12 fields flow to dispatcher chain |
 | `BASAgentFabricFullTurnResult` | ✅ WIRED | pipeline reads .turnResult / .warrantAuditEntry / etc |
 | `BASAgentFabricHostPipeline.runTurn(...)` | ✅ WIRED | DeviceTestApp + tests |
-| `BASAgentFabricHostOutcome` | 🪜 SCAFFOLD | typed activation + fabricMode fields read by no Sources/ consumer — host-observable SDK surface only。 Diagnostics dict similar (declared by pipeline,read by host code which lives outside this repo)。 |
-| `BASAgentFabricHostOutcome.activation` | 🪜 SCAFFOLD | host-observable typed signal |
-| `BASAgentFabricHostOutcome.fabricMode` | 🪜 SCAFFOLD | host-observable typed signal (per ch 994 mode scaffold doctrine) |
+| `BASAgentFabricHostOutcome` | ✅ WIRED (ch 1014) | `BASAgentFabricHostOutcomeInspector.{summarize, category, isCleanRun}` provides canonical substrate-side consumer。 Pipeline now emits `diagnostics["inspector.category"]` per turn — the substrate is both PRODUCER and CONSUMER of the typed signal。 |
+| `BASAgentFabricHostOutcome.activation` | ✅ WIRED (ch 1014) | Read by `BASAgentFabricHostOutcomeInspector.summarize(...)` (tier extracted into Summary.tier field) |
+| `BASAgentFabricHostOutcome.fabricMode` | ✅ WIRED (ch 1014) | Read by `BASAgentFabricHostOutcomeInspector.category(...)` (nil mode → `fabric.run.unconfigured`) |
 
 ### Mode + gate scaffolds (ch 993-994)
 
@@ -162,9 +162,9 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 **Total public APIs shipped in arc 953-995.9**: ~75 (including
 adapters / bridges / DTOs / enums)。
 
-**Status counts** (post-ch 1009「全面 收口 scaffold」arc):
-- ✅ WIRED: ~62 (83%)
-- 🪜 SCAFFOLD: ~10 (13%)
+**Status counts** (post-ch 1014「全面 一次性 gap closure」omnibus):
+- ✅ WIRED: ~68 (91%)
+- 🪜 SCAFFOLD: ~4 (5%) — all genuinely multi-chapter Phase 9++
 - 💀 DEAD / future-allocation: ~3 (4%)
 
 **Change vs ch 996 inventory**:
@@ -179,6 +179,21 @@ adapters / bridges / DTOs / enums)。
 - ch 1004 closed `recordEvent` streaming gap (SCAFFOLD → WIRED via
   `BASAgentTraceStreamingSink` protocol + `BASAgentTraceBufferingSink`
   reference impl + bridge `recordEvent(_:streamingTo:)` overload)。
+- **ch 1012-1013 Phase 9+ Gate.Tier behavioral wire** —
+  `BASAgentFabricWatcherCollector` (ch 1012) + pipeline integration
+  (ch 1013) make `BAS_AGENT_TIER=all` GENUINELY change substrate
+  output。 The「decorative」 label retired。
+- **ch 1014「全面 一次性 gap closure」omnibus**:
+  - HostOutcome.{type, activation, fabricMode} ✅ WIRED via
+    `BASAgentFabricHostOutcomeInspector`
+  - Honest `tierReadByExecutorInProduction = true` companion
+    flag added alongside `consultedByExecutorInProduction = false`
+    — captures the actually-true state machine without lying
+    about substrate dispatch behavior
+  - Round-21 LOW-1: ch 1006 summary JSON-escaped (defense-in-
+    depth for downstream encoders)
+  - Round-21 LOW-2: ch 1007 defense commentary disclosing
+    ENUM-CONSTRAINED vs CALLER-SUPPLIED field discipline
 - **「全面 收口 scaffold」arc (ch 1006-1010)** closed 4 more items:
   - ch 1006 — `BASAgentObservation` (mislabeled-DEAD-as-SCAFFOLD) via
     `BASAgentObservationAuditEmitter` for L14 audit signalRefs
@@ -317,12 +332,19 @@ This chapter (the synthesis):
    - **`Gate.TranscriptMode`** — requires new `BASRenderFrame`
      variants for per-agent transcripts。 Architectural change。
      NOT closable in 1 chapter。
-   - **`BASAgentFabricHostOutcome.{activation,fabricMode}`** —
+   - ~~**`BASAgentFabricHostOutcome.{activation,fabricMode}`** —
      host-observable SDK surface,read by code OUTSIDE this
      repo。 Substrate's job is to provide the typed signal;
      consumer's job is to branch on it。 CORRECT as scaffold
      from substrate's perspective — the substrate cannot
-     reach into the host's code。
+     reach into the host's code。~~
+     **SUPERSEDED at ch 1014** — substrate now ships a canonical
+     consumer (`BASAgentFabricHostOutcomeInspector`)。 The ch 1005
+     doctrine of「substrate cannot reach into host code」 was
+     true,but the substrate CAN ship its own reference reader。
+     See updated rows at lines 108-110 for the WIRED status。
+     Round-22 HIGH-4 audit caught this doc-self-contradiction
+     and ch 1014.5 closes it。
    - **`consultedByExecutorInProduction = false`** — flipping
      this static-let to `true` requires actual tier-based
      dispatch (route through CoreML-on-ANE for `.aneNative`
@@ -330,11 +352,15 @@ This chapter (the synthesis):
      that the substrate ANE-consultation work (ch 998-1000.5)
      deliberately scoped OUT。 CORRECT as scaffold per
      chapter-500 invariant + ch 1000 honest-scope doctrine。
-   - **`BASAgentObservation`** — watcher hint surface;
+   - ~~**`BASAgentObservation`** — watcher hint surface;
      substrate doesn't branch but the L14 audit reads。 The
      genuine consumer (L14 audit ledger reader) lives in
      host code — same dynamic as host-observable signals。
-     CORRECT as scaffold from substrate's perspective。
+     CORRECT as scaffold from substrate's perspective。~~
+     **SUPERSEDED at ch 1006** — mislabeled-DEAD-as-SCAFFOLD;
+     true status was 💀 DEAD (no substrate consumer)。 Closed
+     by `BASAgentObservationAuditEmitter` ch 1006。 See row at
+     line 61。
 3. Adds structural test `BASChapter1005ScaffoldInventoryPin`
    that asserts: (a) `Docs/SCAFFOLD_VS_WIRED.md` and the
    source-file docstrings remain consistent;(b) the count

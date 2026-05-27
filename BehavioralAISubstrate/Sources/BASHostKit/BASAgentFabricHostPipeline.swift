@@ -537,11 +537,62 @@ public struct BASAgentFabricHostPipeline {
                         : rolesEncountered
                             .joined(separator: "\u{001E}")
             } else {
-                diagnostics["watcher.hintCount"] = "(core-tier)"
-                diagnostics["watcher.rolesActive"] =
-                    "(core-tier)"
+                // ch 1014.5 / M3790 — Round-22 CRITICAL-1 fix:
+                // reference shared sentinel constant instead of
+                // inlining the literal at two sites (Round-21
+                // single-canonical doctrine)
+                let sentinel = BASAgentFabricHostOutcomeInspector
+                    .coreTierSentinel
+                diagnostics["watcher.hintCount"] = sentinel
+                diagnostics["watcher.rolesActive"] = sentinel
             }
         }
+
+        // chapter 一千零十四 / M3785 — substrate-side consumer
+        // wire for HostOutcome。 Pre-fix HostOutcome.activation +
+        // .fabricMode were declared as host-observable signals
+        // with NO substrate consumer (correct as scaffold per ch
+        // 1010 doctrine)。 Post-fix the substrate ships a
+        // canonical inspector that READS the outcome + produces
+        // a categorization — substrate is now CONSUMER as well
+        // as PRODUCER。 The category lands in diagnostics so
+        // hosts that don't write their own inspector get a
+        // useful signal for free。
+        //
+        // The inspector is called AFTER the outcome is fully
+        // built but BEFORE return,with a「partial」 outcome
+        // snapshot (we have all fields except the category
+        // itself)。 We build a provisional outcome, run the
+        // inspector, then construct the final outcome including
+        // the inspector's category。
+        let provisional = BASAgentFabricHostOutcome(
+            result: result,
+            activated: true,
+            activation: activation,
+            fabricMode: resolvedMode,
+            diagnostics: diagnostics)
+        let inspectorCategory =
+            BASAgentFabricHostOutcomeInspector.category(
+                outcome: provisional)
+        diagnostics["inspector.category"] = inspectorCategory
+        // ch 1014.5 / M3790 — Round-22 HIGH-1 fix: also consume
+        // `BASAgentFabricHostOutcomeSummary` (was shipped at ch
+        // 1014 but no Sources/ consumer existed — would have been
+        // labeled 💀 DEAD per ch 996 taxonomy)。 Pipeline now
+        // emits the summary's high-signal fields as separate
+        // diagnostic keys with `inspector.*` prefix。 Substrate
+        // is genuinely both producer + consumer of Summary now。
+        let inspectorSummary =
+            BASAgentFabricHostOutcomeInspector.summarize(
+                outcome: provisional)
+        diagnostics["inspector.tier"] = inspectorSummary.tier
+        diagnostics["inspector.deltaCount"] =
+            "\(inspectorSummary.deltaCount)"
+        diagnostics["inspector.watcherHintCount"] =
+            inspectorSummary.watcherHintCount.map {
+                "\($0)"
+            } ?? BASAgentFabricHostOutcomeInspector
+                .coreTierSentinel
 
         return BASAgentFabricHostOutcome(
             result: result,

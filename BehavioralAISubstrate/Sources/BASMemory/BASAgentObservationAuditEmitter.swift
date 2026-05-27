@@ -155,10 +155,20 @@ public enum BASAgentObservationAuditEmitter {
             "agent-count=\(agentSet.count)",
             "delta-count=\(totalEmits)",
         ]
+        // chapter 一千零十四 / M3785 — Round-21 LOW-1 fix:
+        // JSON-escape the turnID interpolation。 Pre-fix
+        // turnID containing `"` / `\` / newline would corrupt
+        // downstream JSON encoders。 ch 1002 TraceAnnotator
+        // already uses `BASAgentFabricJSONEscape` for its
+        // payload — ch 1006 now matches that discipline。
+        // Same single-canonical doctrine as Round-20 confidence
+        // formula。
+        let escapedTurnID =
+            BASAgentFabricJSONEscape.escape(input.turnID)
         let summary =
             "TraceAnnotator observed \(totalEmits) deltas " +
             "from \(agentSet.count) agents in turn " +
-            "\(input.turnID)"
+            "\(escapedTurnID)"
         // chapter 一千零十.6 / M3765 — Round-21 CRITICAL-5 fix:
         // `delta#<deltaID>` separator-injection class。 deltaID
         // convention is `delta.<turnID>.<agentID>.<seq>` —

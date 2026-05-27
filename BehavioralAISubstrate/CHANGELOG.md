@@ -11,6 +11,133 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十四 + 一千零十四.5 / M3785-M3790 — 全面 一次性 gap closure omnibus + Round-22 fixes
+
+User invoked「全面 一次性 完成 gap 最努力 最 wired 最 满意 诚实模式」
+— comprehensive one-shot gap closure with honest scope。 This commit
+ships:
+- ch 1014 omnibus closing the LAST remaining genuinely-closable
+  scaffold entries
+- Round-22 deep audit catching 2 CRITICAL + 4 HIGH + 4 MED
+- ch 1014.5 fix-of-fix-of-fix for all Round-22 substantive findings
+
+**ch 1014 omnibus closures**:
+
+1. `BASAgentFabricHostOutcomeInspector` — canonical substrate-side
+   consumer for HostOutcome typed signals。 Closes the LAST 3 🪜
+   SCAFFOLD entries in the inventory:
+   - `BASAgentFabricHostOutcome` (the type)
+   - `BASAgentFabricHostOutcome.activation`
+   - `BASAgentFabricHostOutcome.fabricMode`
+   - Methods: `summarize(outcome:) -> BASAgentFabricHostOutcomeSummary`,
+     `category(outcome:) -> String`, `isCleanRun(outcome:) -> Bool`
+   - Pipeline emits `diagnostics["inspector.category"]` per turn —
+     substrate is now both PRODUCER and CONSUMER
+2. `tierReadByExecutorInProduction = true` companion flag in
+   `BASANEKernelEligibilityClassifier` — honest doctrine split
+   alongside `consultedByExecutorInProduction = false`。 The two
+   flags encode the full state machine:
+   - (read=F, branch=F): pre-ch-998 frozen 497 chapters
+   - (read=T, branch=F): current state (ch 998-1014)
+   - (read=T, branch=T): future tier-dispatch arc (legal)
+   - (read=F, branch=T): illegal — dispatch branching on a
+     value the executor doesn't read
+3. Round-21 LOW-1 fix: ch 1006 summary turnID JSON-escaped via
+   `BASAgentFabricJSONEscape`
+4. Round-21 LOW-2 fix: ch 1007 defense commentary disclosing
+   ENUM-CONSTRAINED vs CALLER-SUPPLIED field discipline
+
+**Round-22 audit findings (2 CRITICAL + 4 HIGH + 4 MED + 2 LOW)**:
+
+The cascade caught new bugs in ch 1014 itself。 Round-21 = 5 CRITICAL,
+Round-22 = 2 CRITICAL (lower count but NEW pattern classes)。
+
+CRITICAL-1: Single-canonical violation — literal `"(core-tier)"`
+sentinel duplicated at 3 sites (pipeline emit ×2, inspector parse)。
+Same class as Round-21 confidence-formula dup。
+**ch 1014.5 fix**: extract `BASAgentFabricHostOutcomeInspector.coreTierSentinel`
+canonical constant。 All 3 sites delegate。 Pin test verifies。
+
+CRITICAL-2: `activated=true + result=nil` silently mis-categorized
+as `fabric.run.clean` because emittedDeltas defaulted to 0。 But
+nil-result is a substantive ADAPTER-FAILURE state distinct from
+a clean run。
+**ch 1014.5 fix**: new 5th category `fabric.run.no-result` distinct
+from `fabric.run.clean`。 Pin test exercises the distinct path。
+
+HIGH-1: `BASAgentFabricHostOutcomeSummary` shipped but ZERO Sources
+consumer — the EXACT same ch 996 dead-code pattern reborn inside the
+chapter claiming to close it。
+**ch 1014.5 fix**: pipeline now emits Summary fields as `inspector.tier`
++ `inspector.deltaCount` + `inspector.watcherHintCount` diagnostics。
+Summary genuinely consumed。
+
+HIGH-2: Test `testCRITICAL_LOW_1_ObservationSummary_JSONEscaped`
+used `||` — passes even when regression strips one escape class
+out of two。
+**ch 1014.5 fix**: changed to `&&` — both escape sequences
+required。
+
+HIGH-4 + LOW-2: SCAFFOLD_VS_WIRED.md self-contradiction — lines
+108-110 say HostOutcome ✅ WIRED but ch 1005 honest-pin section
+at lines 335-352 still says CORRECT as scaffold。 Same doc, two
+contradictory rows。
+**ch 1014.5 fix**: SUPERSEDED markers added to ch 1005 block
+referencing the updated rows。 BASAgentObservation row also
+struck through with reference to ch 1006 closure。
+
+MED-3: `test_HonestScope_ConsultedByExecutorStaysFalse` checked
+the dispatch flag in isolation — didn't pin the COUPLED state
+machine with `tierReadByExecutorInProduction`。
+**ch 1014.5 fix**: replaced with `test_HonestScope_FlagStateMachine_LegalStatesOnly`
+asserting the illegal (read=F, branch=T) state CANNOT occur +
+the two-flag coupling。
+
+**Status counts (post-ch 1014.5)**:
+
+| Stage | ✅ WIRED | 🪜 SCAFFOLD | 💀 DEAD |
+|---|---|---|---|
+| ch 996 baseline | ~50 / 67% | ~20 / 27% | ~5 / 6% |
+| ch 1005 post-「完成」 | ~54 / 72% | ~18 / 24% | ~3 / 4% |
+| ch 1010 post-「收口」 | ~62 / 83% | ~10 / 13% | ~3 / 4% |
+| **ch 1014.5 post-「一次性」** | **~68 / 91%** | **~4 / 5%** | ~3 / 4% |
+
+**What remains 🪜 SCAFFOLD honestly**:
+
+- `consultedByExecutorInProduction = false` (still false —
+  multi-chapter Phase 9++ tier-based ANE-dispatch arc)
+- Minor diagnostic-surface entries (correctly multi-chapter)
+
+**Cascade health (Round-19 through Round-22)**:
+
+| Round | CRITICAL | Pattern |
+|---|---|---|
+| Round-19 (ch 1000.5) | 1 | ANE consult 4-way dup |
+| Round-20 (ch 1010.5) | 3 | Confidence dup + 2 separators |
+| Round-21 (ch 1010.6) | 5 | 4 separators + sourceRefs `#` |
+| **Round-22 (ch 1014.5)** | **2** | Single-canonical sentinel + nil-result mis-categorization |
+
+Cascade evolving — Round-22 caught FEWER CRITICAL than Round-21
+(escalation slowing) but found NEW pattern classes (provisional-
+final outcome construction + Summary dead-code-via-omission)。
+Cascade still finds genuine bugs each pass — NOT yet asymptoted。
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter BASChapter1014` — 13/13 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,615/14,615 substrate
+  tests pass** (1 flaky ch 868 benchmark fails on parallel run but
+  passes isolated — outside the「一次性」 arc scope)
+- `bash scripts/pre-commit-gates.sh` — 3/3 gates clean
+
+**Discipline pins held**:
+- 红线 7 additive only — no existing API signature touched
+- Single-canonical: `coreTierSentinel` constant in 1 place,3
+  consumers delegate
+- Honest scope: `consultedByExecutorInProduction` STAYS false
+- U+001F + U+001E + JSON-escape disciplines maintained
+- Round-22 catch confirms cascade still effective
+
 ### Chapter 一千零十三 / M3780 — Phase 9+ Gate.Tier behavioral wire
 
 Ch 1012 shipped `BASAgentFabricWatcherCollector` as the

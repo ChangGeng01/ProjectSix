@@ -160,6 +160,38 @@ public enum BASANEKernelEligibilityClassifier {
     public static let consultedByExecutorInProduction: Bool =
         false
 
+    /// chapter 一千零十四 / M3785 — 全面 一次性 gap closure
+    /// HONEST SPLIT of the chapter-500 invariant。 The original
+    /// flag `consultedByExecutorInProduction` carries the
+    /// SEMANTIC「runtime dispatch path branches on tier」,which
+    /// is STILL false (ch 998-1000.5 added observe-only
+    /// counting,not dispatch branching)。
+    ///
+    /// But hosts reading this static-let directly via grep
+    /// have no easy way to distinguish:
+    ///   - "tier IS read by executor" (true since ch 998)
+    ///   - "tier IS NOT branched on by executor" (still true)
+    ///
+    /// This companion flag closes that doctrine gap honestly。
+    /// It DOES NOT change substrate behavior — substrate still
+    /// observe-only,dispatch still unchanged。 The flag exists
+    /// to make the actually-true state machine-readable for
+    /// audit + scaffold inventory replay。
+    ///
+    /// True since ch 998 (`BASCognitiveBrain.recordANEConsultation`
+    /// is the production read site)。 Future tier-based dispatch
+    /// arc (Phase 9++) will flip
+    /// `consultedByExecutorInProduction` to true ALONGSIDE
+    /// keeping `tierReadByExecutorInProduction` true。 The two
+    /// flags then encode the full state machine:
+    ///   - (read=F, branch=F) — pre-ch-998 (frozen 497 chapters)
+    ///   - (read=T, branch=F) — current state (ch 998-1014)
+    ///   - (read=T, branch=T) — future tier-dispatch arc
+    ///   - (read=F, branch=T) — illegal (would mean dispatch
+    ///     branches on a value the executor doesn't read)
+    public static let tierReadByExecutorInProduction: Bool =
+        true
+
     /// chapter 九百九十八 / M3695 — runtime counter incremented
     /// by `BASAutoRouteRanker.consultANE(for:)` each time the
     /// production executor side consults the classifier。 Lets

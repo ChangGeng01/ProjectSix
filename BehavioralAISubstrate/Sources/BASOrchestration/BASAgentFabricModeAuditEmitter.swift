@@ -83,6 +83,19 @@ public enum BASAgentFabricModeAuditEmitter {
         // contains `.`。 Post-fix U+001F between fixed-prefix
         // CLASS and caller-supplied turnID + modeStr (modeStr
         // is enum-constrained so safe,but symmetric format)。
+        //
+        // chapter 一千零十四 / M3785 — Round-21 LOW-2 fix:
+        // explicit defense commentary。 Mirrors ch 983
+        // `BASSovereignWarrantAuditBridge.buildEntry`
+        // doctrine at lines 119-127 (ch 993 hardened canonical-
+        // bytes opt-in disclosure)。 The two safe inputs here
+        // are:
+        //   - `modeStr`: ENUM-CONSTRAINED — safe from injection
+        //     since `BASAgentFabricMode.rawValue` is fixed-set
+        //     `observationOnly` or `authoritative`
+        //   - `turnID`: CALLER-SUPPLIED — could legitimately
+        //     contain `.` (host convention varies)。 Protected
+        //     by U+001F boundary discipline below
         let sep = "\u{001F}"
         let auditID =
             "agentFabricMode.audit\(sep)\(turnID)\(sep)\(modeStr)"
