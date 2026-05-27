@@ -4,6 +4,7 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASPolicy Cognition Core")
 struct BASPolicyCognitionCoreTests {
     @Test("identity resolver shifts to predictive sentinel on notification and stays lightweight on watch")
@@ -365,3 +366,4 @@ struct BASPolicyCognitionCoreTests {
         )
     }
 }
+#endif

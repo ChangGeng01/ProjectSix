@@ -8,6 +8,7 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLTriSelfServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -232,3 +233,4 @@ final class BASMLTriSelfServiceTests: XCTestCase {
         return xs.reduce(0, +) / Double(xs.count)
     }
 }
+#endif

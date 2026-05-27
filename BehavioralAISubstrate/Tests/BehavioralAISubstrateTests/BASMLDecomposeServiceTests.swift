@@ -26,6 +26,7 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLDecomposeServiceTests: XCTestCase {
 
     private func makeFrame(
@@ -257,3 +258,4 @@ final class BASMLDecomposeServiceTests: XCTestCase {
         XCTAssertTrue(frame.manipulationSignals.isEmpty)
     }
 }
+#endif

@@ -38,6 +38,7 @@
 import XCTest
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter881ForgetCascadeDeclineAuditTests:
     XCTestCase
 {
@@ -155,3 +156,4 @@ final class BASChapter881ForgetCascadeDeclineAuditTests:
             "default")
     }
 }
+#endif

@@ -2,6 +2,7 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Provider Host Bridge")
 struct BASAppleProviderHostBridgeTests {
     @Test("ordered provider ids follow substrate fallback ordering")
@@ -52,3 +53,4 @@ struct BASAppleProviderHostBridgeTests {
         #expect(records["beta"]?.detail == "Cooling down")
     }
 }
+#endif

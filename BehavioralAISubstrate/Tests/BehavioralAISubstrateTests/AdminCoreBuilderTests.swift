@@ -7,6 +7,7 @@ import Testing
 @testable import BASRuntimeCore
 @testable import BASEvaluation
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASAdmin")
 struct AdminCoreBuilderTests {
     private func legacyRuntimeSummary(killSwitchSummary: String? = nil) -> String {
@@ -330,3 +331,4 @@ struct AdminCoreBuilderTests {
         #expect(report.missingSummary.contains("Context: Consistency harness"))
     }
 }
+#endif

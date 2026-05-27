@@ -1,6 +1,7 @@
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Current Brain Projection Runtime")
 struct BASAppleCurrentBrainProjectionRuntimeTests {
     @Test("projection runtime prefers clean cache and avoids refresh")
@@ -76,3 +77,4 @@ struct BASAppleCurrentBrainProjectionRuntimeTests {
         #expect(refreshCount == 1)
     }
 }
+#endif

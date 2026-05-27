@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASCurrentBrain Persistence Core")
 struct BASCurrentBrainPersistenceCoreTests {
     @Test("update input derives canonical brain snapshot fields")
@@ -90,3 +91,4 @@ struct BASCurrentBrainPersistenceCoreTests {
         #expect(retained == [UUID(uuidString: "00000000-0000-0000-0000-000000000001")!])
     }
 }
+#endif

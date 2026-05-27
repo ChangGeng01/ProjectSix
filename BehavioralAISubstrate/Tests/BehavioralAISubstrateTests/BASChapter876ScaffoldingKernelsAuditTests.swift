@@ -28,6 +28,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter876ScaffoldingKernelsAuditTests: XCTestCase {
 
     /// chapter 八百九十一 / M3145 SERIOUS-3 fix from self-assess
@@ -263,3 +264,4 @@ final class BASChapter876ScaffoldingKernelsAuditTests: XCTestCase {
         }
     }
 }
+#endif

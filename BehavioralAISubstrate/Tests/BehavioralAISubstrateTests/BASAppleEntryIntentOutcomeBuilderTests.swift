@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Entry Intent Outcome Builder")
 struct BASAppleEntryIntentOutcomeBuilderTests {
     @Test("predictive intervention resolution synthesizes a suggestion and refresh trigger")
@@ -167,3 +168,4 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         ])
     }
 }
+#endif

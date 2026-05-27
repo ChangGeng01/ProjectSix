@@ -3,6 +3,7 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Bootstrap Strategy")
 struct BASAppleBootstrapStrategyTests {
     @Test("ordered template IDs use substrate ordering over host bootstrap inputs")
@@ -177,3 +178,4 @@ struct BASAppleBootstrapStrategyTests {
         #expect(orderedFailurePatternIDs == ["valid_failure"])
     }
 }
+#endif

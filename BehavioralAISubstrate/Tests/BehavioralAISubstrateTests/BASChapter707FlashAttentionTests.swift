@@ -9,6 +9,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter707FlashAttentionTests: XCTestCase {
 
     /// Compare FlashAttention output to standard scaled_dot_
@@ -132,3 +133,4 @@ final class BASChapter707FlashAttentionTests: XCTestCase {
         }
     }
 }
+#endif

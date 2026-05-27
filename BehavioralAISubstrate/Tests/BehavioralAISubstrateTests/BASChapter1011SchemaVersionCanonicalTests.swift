@@ -31,6 +31,7 @@ import Foundation
 @testable import BASRuntimeCore
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
 
     // MARK: - 1. Constant exists + value correct
@@ -182,3 +183,4 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
         }
     }
 }
+#endif

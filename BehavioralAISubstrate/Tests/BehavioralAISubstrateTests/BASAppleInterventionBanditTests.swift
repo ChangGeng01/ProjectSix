@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Intervention Bandit")
 struct BASAppleInterventionBanditTests {
     @Test("rewarded arm rises to the front of the bucket ordering")
@@ -120,3 +121,4 @@ struct BASAppleInterventionBanditTests {
         return components.date ?? .distantPast
     }
 }
+#endif

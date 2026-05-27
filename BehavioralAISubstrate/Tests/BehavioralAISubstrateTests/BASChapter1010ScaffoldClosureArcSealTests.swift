@@ -22,6 +22,7 @@
 import XCTest
 import Foundation
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter1010ScaffoldClosureArcSealTests:
     XCTestCase
 {
@@ -169,3 +170,4 @@ final class BASChapter1010ScaffoldClosureArcSealTests:
             "be a false claim")
     }
 }
+#endif

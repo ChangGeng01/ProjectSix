@@ -6,6 +6,7 @@ import Testing
 @testable import BASOrchestration
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASAppleInspectionBridge")
 struct BASAppleInspectionBridgeTests {
     @Test("runtime context builder compiles deterministic local runtime view")
@@ -226,3 +227,4 @@ struct BASAppleInspectionBridgeTests {
         #expect(snapshot.brainSummary?.contains("fp-123") == true)
     }
 }
+#endif

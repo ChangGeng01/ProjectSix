@@ -9,6 +9,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMetalCompiledFunctionsTests: XCTestCase {
 
     // MARK: - V1 path
@@ -105,3 +106,4 @@ final class BASMetalCompiledFunctionsTests: XCTestCase {
         XCTAssertEqual(second, third)
     }
 }
+#endif

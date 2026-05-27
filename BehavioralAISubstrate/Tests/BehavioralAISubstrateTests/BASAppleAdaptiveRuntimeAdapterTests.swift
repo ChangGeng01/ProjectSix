@@ -2,6 +2,7 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Adaptive Runtime Adapter")
 struct BASAppleAdaptiveRuntimeAdapterTests {
     @Test("matrix compilation keeps tier, device, and provider preference policy package-owned")
@@ -165,3 +166,4 @@ struct BASAppleAdaptiveRuntimeAdapterTests {
         #expect(adapted.retrievalItemBudget <= 2)
     }
 }
+#endif

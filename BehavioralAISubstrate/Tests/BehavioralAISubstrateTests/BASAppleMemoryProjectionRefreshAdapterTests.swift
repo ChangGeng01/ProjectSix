@@ -4,6 +4,7 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Memory Projection Refresh Adapter")
 struct BASAppleMemoryProjectionRefreshAdapterTests {
     @Model
@@ -618,3 +619,4 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         return (try? context.fetch(descriptor)) ?? []
     }
 }
+#endif

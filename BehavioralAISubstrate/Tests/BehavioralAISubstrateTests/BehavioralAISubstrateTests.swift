@@ -9,6 +9,7 @@ import Testing
 @testable import BASRuntimeCore
 @testable import BASEvaluation
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BehavioralAISubstrate")
 struct BehavioralAISubstrateTests {
     @Test("runtime local route helpers")
@@ -223,3 +224,4 @@ struct BehavioralAISubstrateTests {
         #expect(summary.detail.contains("risk high"))
     }
 }
+#endif

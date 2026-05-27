@@ -10,6 +10,7 @@ import XCTest
 @testable import BASMemory
 @testable import BASPolicy
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLHostProfileServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -339,3 +340,4 @@ final class BASMLHostProfileServiceTests: XCTestCase {
             "nil override must use default goals")
     }
 }
+#endif

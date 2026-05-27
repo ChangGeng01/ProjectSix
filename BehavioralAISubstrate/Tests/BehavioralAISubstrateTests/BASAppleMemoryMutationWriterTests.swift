@@ -3,6 +3,7 @@ import Testing
 @testable import BASMemory
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Memory Mutation Writer")
 struct BASAppleMemoryMutationWriterTests {
     @Test("writer mutates existing governed record with canonical stored fields")
@@ -186,3 +187,4 @@ struct BASAppleMemoryMutationWriterTests {
         #expect(deleted == nil)
     }
 }
+#endif

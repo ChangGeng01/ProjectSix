@@ -13,6 +13,7 @@
 import XCTest
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASContextClassifierMLAdapterTests: XCTestCase {
 
     // MARK: - Input encoder parity tests
@@ -431,3 +432,4 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
             " (got \(correct)/7)")
     }
 }
+#endif

@@ -16,6 +16,7 @@
 import XCTest
 @testable import BASHostKit
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainSafetyThresholdTests:
     XCTestCase
 {
@@ -184,3 +185,4 @@ final class BASCognitiveBrainSafetyThresholdTests:
             " single threshold value")
     }
 }
+#endif

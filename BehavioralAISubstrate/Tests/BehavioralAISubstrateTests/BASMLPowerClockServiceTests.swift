@@ -8,6 +8,7 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASPolicy
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLPowerClockServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -273,3 +274,4 @@ final class BASMLPowerClockServiceTests: XCTestCase {
             result.budgetFrame.maxLoops, 0)
     }
 }
+#endif

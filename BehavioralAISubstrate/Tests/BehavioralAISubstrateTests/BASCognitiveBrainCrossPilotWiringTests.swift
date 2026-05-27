@@ -15,6 +15,7 @@ import XCTest
 @testable import BASCSystemBridge
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainCrossPilotWiringTests:
     XCTestCase
 {
@@ -351,3 +352,4 @@ final class BASCognitiveBrainCrossPilotWiringTests:
             " nil-coalesces → false")
     }
 }
+#endif

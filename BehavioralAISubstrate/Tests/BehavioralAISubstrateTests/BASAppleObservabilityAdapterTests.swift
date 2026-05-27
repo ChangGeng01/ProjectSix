@@ -6,6 +6,7 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Observability Adapter")
 struct BASAppleObservabilityAdapterTests {
     @Test("trace compilation redacts live payloads outside testing context and builds canonical execution trace")
@@ -749,3 +750,4 @@ struct BASAppleObservabilityAdapterTests {
         #expect(source.runtimeInspection.semanticPromptFingerprint == "semantic_fp")
     }
 }
+#endif

@@ -2,6 +2,7 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Runtime Status Adapter")
 struct BASAppleRuntimeStatusAdapterTests {
     @Test("runtime status compiles package-owned active provider and detail")
@@ -104,3 +105,4 @@ struct BASAppleRuntimeStatusAdapterTests {
         #expect(output.orderedProviderIDs == ["custom-primary", "custom-fallback"])
     }
 }
+#endif

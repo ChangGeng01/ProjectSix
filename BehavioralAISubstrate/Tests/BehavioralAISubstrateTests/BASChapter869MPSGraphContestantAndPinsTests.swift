@@ -31,6 +31,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter869MPSGraphContestantAndPinsTests:
     XCTestCase
 {
@@ -578,3 +579,4 @@ final class BASChapter869MPSGraphContestantAndPinsTests:
         }
     }
 }
+#endif

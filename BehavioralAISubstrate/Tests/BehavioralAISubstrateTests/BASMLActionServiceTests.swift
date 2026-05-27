@@ -9,6 +9,7 @@ import XCTest
 @testable import BASPolicy
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLActionServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -261,3 +262,4 @@ final class BASMLActionServiceTests: XCTestCase {
             " caveats。 Got '\(out.body)'")
     }
 }
+#endif

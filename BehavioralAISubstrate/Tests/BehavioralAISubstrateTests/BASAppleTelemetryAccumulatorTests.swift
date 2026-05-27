@@ -3,6 +3,7 @@ import Testing
 @testable import BASObservability
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Telemetry Accumulator")
 struct BASAppleTelemetryAccumulatorTests {
     @Test("accumulator records compiled telemetry and produces summary snapshots")
@@ -107,3 +108,4 @@ struct BASAppleTelemetryAccumulatorTests {
         #expect(snapshot.summary.slowRequestRate == 0)
     }
 }
+#endif

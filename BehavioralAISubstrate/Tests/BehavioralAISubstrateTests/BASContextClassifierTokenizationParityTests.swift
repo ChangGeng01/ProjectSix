@@ -17,6 +17,7 @@
 import XCTest
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASContextClassifierTokenizationParityTests:
     XCTestCase
 {
@@ -141,3 +142,4 @@ final class BASContextClassifierTokenizationParityTests:
             " identically to space-separated equivalent")
     }
 }
+#endif

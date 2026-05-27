@@ -6,6 +6,7 @@ import Testing
 @testable import BASOrchestration
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASEBrain schemas")
 struct BASEBrainSchemaCoreTests {
     @Test("update ticket prioritizes structured constitution host change candidates and decodes legacy payloads")
@@ -4665,3 +4666,4 @@ private func makeL11RiskDecisionPackage(
         sovereignEscalationHint: sovereignEscalationHint
     )
 }
+#endif

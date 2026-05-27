@@ -10,6 +10,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASRustNativeAggregationTests: XCTestCase {
 
     // MARK: - ABI version pin
@@ -186,3 +187,4 @@ final class BASRustNativeAggregationTests: XCTestCase {
             agg.recordsByPermitMode["block"] ?? 0, 0)
     }
 }
+#endif

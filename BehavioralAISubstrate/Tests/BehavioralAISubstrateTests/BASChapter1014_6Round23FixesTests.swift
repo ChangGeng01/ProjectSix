@@ -108,6 +108,7 @@ final class BASChapter1014_6Round23FixesTests: XCTestCase {
 
     // MARK: - CRITICAL-3: ShadowTrial U+001F separator
 
+    #if !os(iOS)  // ch 1022 source-gate: reads Mac dev tree
     func testCRITICAL_3_ShadowTrial_VerdictRef_UsesUnitSeparator()
         throws
     {
@@ -146,6 +147,7 @@ final class BASChapter1014_6Round23FixesTests: XCTestCase {
             "ch 1014.6 CRITICAL-3: shadow_trial verdictRef MUST " +
             "use U+001F (escape sequence in source)")
     }
+    #endif
 
     // MARK: - CRITICAL-4 + CRITICAL-5: JSON-escape siblings
 

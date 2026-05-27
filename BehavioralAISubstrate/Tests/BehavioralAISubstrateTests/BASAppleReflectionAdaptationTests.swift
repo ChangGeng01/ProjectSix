@@ -1,6 +1,7 @@
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 struct BASAppleReflectionAdaptationTests {
     @Test("reward treats regretful outcomes as negative and steady outcomes as positive")
     func rewardSemantics() {
@@ -29,3 +30,4 @@ struct BASAppleReflectionAdaptationTests {
         #expect(BASAppleReflectionAdaptationAdvisor.riskLevel(finalActionID: "goAheadAnyway", outcomeID: "betterThanExpected") == .medium)
     }
 }
+#endif

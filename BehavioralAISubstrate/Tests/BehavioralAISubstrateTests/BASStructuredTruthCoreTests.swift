@@ -4,6 +4,7 @@ import Testing
 @testable import BASOrchestration
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASStructuredTruthCompiler")
 struct BASStructuredTruthCoreTests {
     @Test("governed truth state carries goal boundary and dominant reaction weight")
@@ -120,3 +121,4 @@ struct BASStructuredTruthCoreTests {
         )
     }
 }
+#endif

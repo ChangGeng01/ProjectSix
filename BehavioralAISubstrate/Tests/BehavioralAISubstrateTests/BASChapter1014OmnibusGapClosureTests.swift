@@ -369,6 +369,7 @@ final class BASChapter1014OmnibusGapClosureTests: XCTestCase {
 
     // MARK: - 4. Round-21 LOW-2 — ch 1007 defense commentary
 
+    #if !os(iOS)  // ch 1022 source-gate: reads Mac dev tree
     func test_LOW_2_FabricModeAuditEmitter_HasDefenseCommentary()
         throws
     {
@@ -393,6 +394,7 @@ final class BASChapter1014OmnibusGapClosureTests: XCTestCase {
             "turnID is caller-supplied (needs separator " +
             "discipline)")
     }
+    #endif
 
     // MARK: - 5. Honest scope pin — remaining items stay scaffold
 

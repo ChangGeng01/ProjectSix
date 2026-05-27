@@ -14,6 +14,7 @@ import XCTest
 @testable import BASRustCoreBridge
 @testable import BASMPSGraphExecutableCacheCxx
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMultiPilotQuadrupleTests: XCTestCase {
 
     private func makeTempDBURL() -> URL {
@@ -383,3 +384,4 @@ final class BASMultiPilotQuadrupleTests: XCTestCase {
         XCTAssertEqual(snap.pilotStatus.activeCount, 5)
     }
 }
+#endif

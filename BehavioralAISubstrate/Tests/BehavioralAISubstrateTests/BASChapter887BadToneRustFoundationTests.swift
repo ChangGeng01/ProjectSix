@@ -32,6 +32,7 @@
 
 import XCTest
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter887BadToneRustFoundationTests:
     XCTestCase
 {
@@ -178,3 +179,4 @@ final class BASChapter887BadToneRustFoundationTests:
         }
     }
 }
+#endif

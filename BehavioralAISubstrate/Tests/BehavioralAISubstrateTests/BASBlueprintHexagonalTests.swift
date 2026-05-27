@@ -15,6 +15,7 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASBlueprintHexagonalTests: XCTestCase {
 
     private func makeTempDBURL() -> URL {
@@ -486,3 +487,4 @@ final class BASBlueprintHexagonalTests: XCTestCase {
         XCTAssertEqual(decoded, r)
     }
 }
+#endif

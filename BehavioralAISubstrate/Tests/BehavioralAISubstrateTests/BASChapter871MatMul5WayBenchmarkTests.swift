@@ -49,6 +49,7 @@ import XCTest
 import BASRustMemoryTrackerBinary
 #endif
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter871MatMul5WayBenchmarkTests: XCTestCase {
 
     // MARK: - Fixture
@@ -322,3 +323,4 @@ final class BASChapter871MatMul5WayBenchmarkTests: XCTestCase {
             M: 512, N: 512, K: 512, iterations: 5)
     }
 }
+#endif

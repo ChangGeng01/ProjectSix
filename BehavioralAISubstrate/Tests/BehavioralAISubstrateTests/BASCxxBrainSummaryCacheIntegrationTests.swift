@@ -21,6 +21,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCxxBrainSummaryCacheIntegrationTests: XCTestCase {
 
     // Each test pulls in a fresh bridge then clears the
@@ -214,3 +215,4 @@ final class BASCxxBrainSummaryCacheIntegrationTests: XCTestCase {
         XCTAssertGreaterThan(s.latencyNanos, 0)
     }
 }
+#endif

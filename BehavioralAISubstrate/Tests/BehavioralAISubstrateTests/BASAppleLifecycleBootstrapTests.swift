@@ -1,6 +1,7 @@
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 struct BASAppleLifecycleBootstrapTests {
     @Test("initial appearance lifecycle plan keeps the minimal generic bootstrap order")
     func initialAppearanceLifecyclePlanKeepsTheMinimalGenericBootstrapOrder() {
@@ -109,3 +110,4 @@ struct BASAppleLifecycleBootstrapTests {
         #expect(plan.retrievalMode == "adaptive")
     }
 }
+#endif

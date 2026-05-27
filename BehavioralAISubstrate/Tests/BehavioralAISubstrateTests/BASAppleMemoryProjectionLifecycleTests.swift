@@ -1,6 +1,7 @@
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 struct BASAppleMemoryProjectionLifecycleTests {
     @Test("memory projection lifecycle refreshes when cache is dirty")
     func refreshesWhenCacheIsDirty() {
@@ -47,3 +48,4 @@ struct BASAppleMemoryProjectionLifecycleTests {
         #expect(result == "refreshed")
     }
 }
+#endif

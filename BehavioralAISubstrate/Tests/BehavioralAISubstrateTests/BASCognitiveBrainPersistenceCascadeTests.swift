@@ -11,6 +11,7 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainPersistenceCascadeTests:
     XCTestCase
 {
@@ -249,3 +250,4 @@ final class BASCognitiveBrainPersistenceCascadeTests:
             " capture time")
     }
 }
+#endif

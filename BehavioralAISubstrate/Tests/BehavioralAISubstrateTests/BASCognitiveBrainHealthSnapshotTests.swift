@@ -11,6 +11,7 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainHealthSnapshotTests: XCTestCase {
 
     // Helper: temp file URL for SQLite-backed tracker
@@ -238,3 +239,4 @@ final class BASCognitiveBrainHealthSnapshotTests: XCTestCase {
             oneSnap.populatedDeepTelemetryCount, 1)
     }
 }
+#endif

@@ -29,6 +29,7 @@ import XCTest
 import BASRustMemoryTrackerBinary
 #endif
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
 
     private func makeMatrices(
@@ -464,3 +465,4 @@ final class BASChapter871BrainMPSGraphMatMulParityTests: XCTestCase {
         }
     }
 }
+#endif

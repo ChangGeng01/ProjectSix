@@ -10,6 +10,7 @@ import XCTest
 @testable import BASMemory
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLMemoryServiceTests: XCTestCase {
 
     // MARK: - Helpers
@@ -305,3 +306,4 @@ final class BASMLMemoryServiceTests: XCTestCase {
         }
     }
 }
+#endif

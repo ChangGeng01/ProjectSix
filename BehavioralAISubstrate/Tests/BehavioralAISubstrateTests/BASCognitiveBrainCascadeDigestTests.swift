@@ -8,6 +8,7 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASPolicy
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainCascadeDigestTests:
     XCTestCase
 {
@@ -169,3 +170,4 @@ final class BASCognitiveBrainCascadeDigestTests:
             risk.recommendedMode)
     }
 }
+#endif

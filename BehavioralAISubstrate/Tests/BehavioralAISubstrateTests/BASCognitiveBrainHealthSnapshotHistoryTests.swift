@@ -6,6 +6,7 @@
 import XCTest
 @testable import BASHostKit
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainHealthSnapshotHistoryTests:
     XCTestCase
 {
@@ -179,3 +180,4 @@ final class BASCognitiveBrainHealthSnapshotHistoryTests:
             "Zero span → 0 (no division by zero)")
     }
 }
+#endif

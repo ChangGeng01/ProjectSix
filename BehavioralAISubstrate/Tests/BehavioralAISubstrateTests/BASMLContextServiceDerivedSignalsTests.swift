@@ -18,6 +18,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMLContextServiceDerivedSignalsTests:
     XCTestCase
 {
@@ -215,3 +216,4 @@ final class BASMLContextServiceDerivedSignalsTests:
             stakes.consequenceLevel)
     }
 }
+#endif

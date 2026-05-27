@@ -11,6 +11,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASSQLBrainHistoryStoreIntegrationTests: XCTestCase {
 
     // Helper: temp file URL for SQLite-backed tracker
@@ -162,3 +163,4 @@ final class BASSQLBrainHistoryStoreIntegrationTests: XCTestCase {
         XCTAssertEqual(s.input, "hello")
     }
 }
+#endif

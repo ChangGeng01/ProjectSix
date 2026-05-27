@@ -39,6 +39,7 @@ import XCTest
 @testable import BASMemory
 @testable import BASOrchestration
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter891ReviewFixTests: XCTestCase {
 
     // MARK: - HIGH-1 fix verification
@@ -554,3 +555,4 @@ final class BASChapter891ReviewFixTests: XCTestCase {
             "chapter 887 numbers (LOW-3 fix)")
     }
 }
+#endif

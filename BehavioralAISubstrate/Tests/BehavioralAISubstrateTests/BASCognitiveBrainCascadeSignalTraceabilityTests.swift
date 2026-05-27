@@ -27,6 +27,7 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASPolicy
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainCascadeSignalTraceabilityTests:
     XCTestCase
 {
@@ -274,3 +275,4 @@ final class BASCognitiveBrainCascadeSignalTraceabilityTests:
             .isEmpty)
     }
 }
+#endif

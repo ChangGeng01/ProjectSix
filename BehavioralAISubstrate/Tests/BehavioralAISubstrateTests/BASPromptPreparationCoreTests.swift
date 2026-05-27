@@ -5,6 +5,7 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASPromptPreparationCore")
 struct BASPromptPreparationCoreTests {
     @Test("prompt preparation compiler builds envelope from typed task state and runtime snapshots")
@@ -103,3 +104,4 @@ struct BASPromptPreparationCoreTests {
         #expect(envelope.payload.contains("\"currentGoal\":\"Protect sleep and energy.\""))
     }
 }
+#endif

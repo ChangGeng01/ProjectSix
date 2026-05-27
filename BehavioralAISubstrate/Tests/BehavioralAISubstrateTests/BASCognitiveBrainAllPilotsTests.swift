@@ -15,6 +15,7 @@ import XCTest
 @testable import BASRustCoreBridge
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainAllPilotsTests: XCTestCase {
 
     // MARK: - Default factory wires all 5
@@ -237,3 +238,4 @@ final class BASCognitiveBrainAllPilotsTests: XCTestCase {
         XCTAssertTrue(layered.crossSessionEcho)
     }
 }
+#endif

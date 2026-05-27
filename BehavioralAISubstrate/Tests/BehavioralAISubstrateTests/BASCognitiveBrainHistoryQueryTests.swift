@@ -19,6 +19,7 @@
 import XCTest
 @testable import BASHostKit
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASCognitiveBrainHistoryQueryTests: XCTestCase {
 
     // MARK: - clearSummaryHistory
@@ -214,3 +215,4 @@ final class BASCognitiveBrainHistoryQueryTests: XCTestCase {
         }
     }
 }
+#endif

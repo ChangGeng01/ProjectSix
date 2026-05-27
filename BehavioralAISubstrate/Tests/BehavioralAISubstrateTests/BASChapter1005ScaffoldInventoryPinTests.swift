@@ -25,6 +25,7 @@
 import XCTest
 import Foundation
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter1005ScaffoldInventoryPinTests: XCTestCase {
 
     // MARK: - Project root resolution
@@ -178,3 +179,4 @@ final class BASChapter1005ScaffoldInventoryPinTests: XCTestCase {
             "clean across the 4-chapter arc")
     }
 }
+#endif

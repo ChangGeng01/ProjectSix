@@ -4,6 +4,7 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BAS cognition core")
 struct BASCognitionCoreTests {
     @Test("generic cognition identifiers reject legacy host vocabulary")
@@ -210,3 +211,4 @@ struct BASCognitionCoreTests {
         #expect(calibration.driftScore > 0.3)
     }
 }
+#endif

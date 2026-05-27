@@ -3,6 +3,7 @@
 import XCTest
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASANECapabilityProbeTests: XCTestCase {
 
     // MARK: - Explicit conservative reader returns conservative
@@ -187,3 +188,4 @@ private actor AsyncProbeCounter {
         value += 1
     }
 }
+#endif

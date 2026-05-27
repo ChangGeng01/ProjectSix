@@ -52,6 +52,7 @@ import Foundation
 @testable import BASOrchestration
 @testable import BASHostKit
 
+#if !os(iOS)  // ch 1022 source-gate: file-tree audit only meaningful on Mac dev box
 final class BASChapter1015CascadeConsolidationTests: XCTestCase {
 
     // MARK: - 1. Canonical confidenceBandFor
@@ -254,3 +255,4 @@ final class BASChapter1015CascadeConsolidationTests: XCTestCase {
             "more code without referencing this asymptote。")
     }
 }
+#endif

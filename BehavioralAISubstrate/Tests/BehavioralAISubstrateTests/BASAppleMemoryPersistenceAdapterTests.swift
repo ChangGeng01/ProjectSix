@@ -3,6 +3,7 @@ import Testing
 @testable import BASMemory
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASApple Memory Persistence Adapter")
 struct BASAppleMemoryPersistenceAdapterTests {
     @Test("adapter compiles write mutations and canonical record ordering")
@@ -413,3 +414,4 @@ struct BASAppleMemoryPersistenceAdapterTests {
         #expect(fields.governanceReason.localizedCaseInsensitiveContains("evidence"))
     }
 }
+#endif

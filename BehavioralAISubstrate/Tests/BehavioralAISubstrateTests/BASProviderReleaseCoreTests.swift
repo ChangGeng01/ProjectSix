@@ -5,6 +5,7 @@ import Testing
 @testable import BASPolicy
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASProviderReleaseGate")
 struct BASProviderReleaseCoreTests {
     @Test("verdict rejects primary guidance when fallback truth state blocks local guidance")
@@ -178,3 +179,4 @@ struct BASProviderReleaseCoreTests {
         )
     }
 }
+#endif

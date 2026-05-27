@@ -20,6 +20,7 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASProductionAdoptionSmokeTests: XCTestCase {
 
     /// The canonical "child-safety host" adoption
@@ -256,3 +257,4 @@ final class BASProductionAdoptionSmokeTests: XCTestCase {
             " to match for cross-store join verification")
     }
 }
+#endif

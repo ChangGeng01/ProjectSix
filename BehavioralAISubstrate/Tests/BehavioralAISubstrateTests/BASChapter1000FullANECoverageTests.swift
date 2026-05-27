@@ -31,6 +31,7 @@ import XCTest
 @testable import BASRuntimeCore
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter1000FullANECoverageTests: XCTestCase {
 
     // MARK: - All 8 BASNeuralOp cases have consultation
@@ -181,3 +182,4 @@ final class BASChapter1000FullANECoverageTests: XCTestCase {
             "through CoreML-on-ANE path instead of MSL).")
     }
 }
+#endif

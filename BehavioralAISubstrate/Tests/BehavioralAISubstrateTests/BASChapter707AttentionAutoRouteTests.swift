@@ -10,6 +10,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter707AttentionAutoRouteTests:
     XCTestCase
 {
@@ -163,3 +164,4 @@ final class BASChapter707AttentionAutoRouteTests:
         XCTAssertEqual(r.choice, .metalMPSGraphAttention)
     }
 }
+#endif

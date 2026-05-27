@@ -32,6 +32,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASMetalSubstrate
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASChapter998ANEExecutorWireTests: XCTestCase {
 
     func testCRITICAL_SoftmaxAuto_IncrementsExecutorCounter() {
@@ -109,3 +110,4 @@ final class BASChapter998ANEExecutorWireTests: XCTestCase {
             "branching wires in。")
     }
 }
+#endif

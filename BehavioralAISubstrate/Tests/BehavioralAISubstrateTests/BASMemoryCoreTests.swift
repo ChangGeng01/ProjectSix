@@ -3,6 +3,7 @@ import Testing
 @testable import BASMemory
 import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASMemory")
 struct BASMemoryCoreTests {
     @Test("tier filter keeps frontstage memories only")
@@ -616,3 +617,4 @@ struct BASMemoryCoreTests {
         #expect(synchronized.verificationMarkers.contains("vault_migration_target:device.secondary") == false)
     }
 }
+#endif

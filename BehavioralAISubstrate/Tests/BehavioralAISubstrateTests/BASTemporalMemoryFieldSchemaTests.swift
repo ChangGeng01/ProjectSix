@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import BASMemory
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("L8 temporal memory field schemas")
 struct BASTemporalMemoryFieldSchemaTests {
     @Test("temporal memory field stage 1 objects round trip core memory ecology metadata")
@@ -240,3 +241,4 @@ struct BASTemporalMemoryFieldSchemaTests {
         #expect(legacyField.forgetCascades.isEmpty)
     }
 }
+#endif

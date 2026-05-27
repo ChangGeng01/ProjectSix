@@ -1,6 +1,7 @@
 import Testing
 @testable import BASAppleAdapters
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 struct BASAppleTaskGraphLifecycleTests {
     @Test("task graph lifecycle prefers primary over comparative and reflective snapshots")
     func taskGraphLifecyclePrefersPrimarySnapshot() {
@@ -38,3 +39,4 @@ struct BASAppleTaskGraphLifecycleTests {
         #expect(calls == ["clear"])
     }
 }
+#endif

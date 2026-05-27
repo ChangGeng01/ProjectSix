@@ -21,6 +21,7 @@ import XCTest
 @testable import BASMetalSubstrate
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASMetalPilotBrainAccessorTests: XCTestCase {
 
     // MARK: - Default state
@@ -120,3 +121,4 @@ final class BASMetalPilotBrainAccessorTests: XCTestCase {
             " alongside SQL + Rust stores")
     }
 }
+#endif

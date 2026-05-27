@@ -22,6 +22,7 @@ import CryptoKit
 /// 7. `trusts(_:)` returns false for a public key NOT in the
 ///    manifest, even if the root signature is valid (i.e. the
 ///    manifest is authentic but doesn't list that key).
+#if !os(iOS)  // ch 1022 source-gate
 final class BASSovereignFingerprintStoreTests: XCTestCase {
 
     // MARK: - Fixtures
@@ -383,3 +384,4 @@ final class BASSovereignFingerprintStoreTests: XCTestCase {
         _ = rootKey  // suppress warning
     }
 }
+#endif

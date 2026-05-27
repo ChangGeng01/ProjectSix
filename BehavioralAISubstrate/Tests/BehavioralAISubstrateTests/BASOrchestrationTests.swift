@@ -4,6 +4,7 @@ import Testing
 @testable import BASOrchestration
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
 @Suite("BASOrchestration")
 struct BASOrchestrationTests {
     @Test("intent envelope round trips and maps capture")
@@ -236,3 +237,4 @@ struct BASOrchestrationTests {
         )
     }
 }
+#endif

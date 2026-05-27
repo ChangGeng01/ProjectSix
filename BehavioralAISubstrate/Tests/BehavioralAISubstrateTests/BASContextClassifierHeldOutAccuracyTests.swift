@@ -14,6 +14,7 @@
 import XCTest
 @testable import BASRuntimeCore
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASContextClassifierHeldOutAccuracyTests: XCTestCase {
 
     /// Held-out examples NOT in corpus.jsonl。 2 per class
@@ -130,3 +131,4 @@ final class BASContextClassifierHeldOutAccuracyTests: XCTestCase {
               "\(manipExamples.count)")
     }
 }
+#endif

@@ -8,6 +8,7 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRustCoreBridge
 
+#if !os(iOS)  // ch 1022 source-gate
 final class BASRustIntegrityChainTests: XCTestCase {
 
     // MARK: - Determinism
@@ -215,3 +216,4 @@ final class BASRustIntegrityChainTests: XCTestCase {
         XCTAssertEqual(h2, h3)
     }
 }
+#endif
