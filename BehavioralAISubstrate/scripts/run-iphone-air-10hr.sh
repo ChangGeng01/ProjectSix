@@ -180,7 +180,21 @@ while true; do
     if [ $COOLDOWN_SEC -gt 0 ]; then
         echo "$(date) iter=$ITER cooldown=${COOLDOWN_SEC}s — " \
             "thermal recovery" >> "$LOG_DIR/summary.txt"
-        sleep $COOLDOWN_SEC
+        # chapter 一千零十五.7 / M3815 — heartbeat during cooldown
+        # to prevent harness GC of idle background tasks。 The
+        # ch 1015.6 run died at 15min during a 60s sleep because
+        # the harness reaped what looked like an idle process。
+        # Now emit a `.` to summary every 10s during cooldown so
+        # the file modification time keeps advancing。 The harness
+        # observability also sees the stdout heartbeat。
+        ELAPSED_COOL=0
+        while [ $ELAPSED_COOL -lt $COOLDOWN_SEC ]; do
+            sleep 10
+            ELAPSED_COOL=$((ELAPSED_COOL + 10))
+            echo "$(date) iter=$ITER cooldown-heartbeat " \
+                "${ELAPSED_COOL}s/${COOLDOWN_SEC}s" \
+                >> "$LOG_DIR/summary.txt"
+        done
     fi
 done
 
