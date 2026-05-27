@@ -11,6 +11,77 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零四 / M3725 — `recordEvent` scaffold close via `BASAgentTraceStreamingSink`
+
+Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 forward-closure item #5:
+the `BASAgentTraceLogEventLogBridge.recordEvent(...)` API
+shipped at ch 984 as per-event write-through,but production
+paths invoked `flush(forTurn:)` at turn-end batch instead。 No
+documented protocol existed for hosts wanting per-event
+streaming subscription — implementors had to invent integration
+on top of the bridge with no contract and no reference impl。
+
+**What landed:**
+
+1. New `BASAgentTraceStreamingSink` protocol (Sendable) in
+   `Sources/BASOrchestration/`:
+   - Single method `receive(_:eventLogResult:)` for per-event
+     notifications。 Fires AFTER both trace-log + event-log
+     writes complete。
+2. New `BASAgentTraceBufferingSink` actor — reference impl
+   that buffers received events for inspection。 Test fixture
+   + starting-point template for host implementors。 Production
+   hosts will swap in their own sinks (Kafka publishers,
+   websocket fanouts,observability streams)。
+3. New `BASAgentTraceLogEventLogBridge.recordEvent(_:streamingTo:)`
+   overload (extension)。 Wraps the existing `recordEvent(_:)`
+   path — same trace-log + event-log fan-out semantics — then
+   notifies the supplied sink with the stamped event + write
+   result。
+4. CRITICAL doctrine: **sink throwing does NOT roll back bridge
+   writes**。 Matches the bridge's existing eventLog-throw-
+   doesn't-roll-back-traceLog semantics。 Sink is best-effort
+   notification,not a transactional barrier。
+5. 7 new tests in
+   `BASChapter1004TraceStreamingSinkTests.swift`:
+   - Sink receives event on recordEvent(streamingTo:) call
+   - Stamped event has bridge-assigned sequenceNumber
+   - Sink receives eventLogResult tuple (wasNew + seq)
+   - 5 sequential records accumulate in buffering sink
+   - **CRITICAL: sink throw does NOT roll back bridge writes**
+   - Snapshot preserves insertion order
+   - Clear() resets buffer
+6. `Docs/SCAFFOLD_VS_WIRED.md`:
+   - `.recordEvent` row flipped 🪜 → ✅ WIRED (ch 1004)
+   - Forward-closure item #5 marked CLOSED
+   - ch-1003-1004 changes added to inventory section
+   - Status counts updated (~52 → ~54 wired; ~20 → ~18 scaffold)
+
+**Verification:**
+
+- `swift build` clean
+- `swift test --filter BASChapter1004` — 7 / 7 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,531 / 14,531
+  pass, 0 failures**
+
+**Discipline pins held:**
+
+- 红线 7 additive only — existing `recordEvent(_:)` + `flush`
+  callers byte-equal unchanged; sink integration is opt-in
+- ADR-014 OPT-IN — hosts must explicitly pass a sink
+- Protocol Sendable for cross-actor delivery
+- Actor-isolated reference impl for thread-safe buffering
+
+**Scope honesty:**
+
+- The substrate does NOT mandate that production code switch
+  from flush → per-event-stream — that's a per-host architectural
+  decision (latency vs throughput trade-off)。 Both paths
+  remain first-class。
+- The buffering sink grows unbounded by design — production
+  hosts wanting bounded retention implement their own sink
+  with ring-buffer or LRU eviction policy。
+
 ### Chapter 一千零三 / M3720 — `validateMCPInvocation` scaffold close via `BASMCPInvocationAuditBridge`
 
 Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 inventory forward-closure

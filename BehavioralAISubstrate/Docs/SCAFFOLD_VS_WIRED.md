@@ -90,10 +90,10 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 | `BASAgentFabricAdapters.enrichRiskInput(from:...)` | ✅ WIRED | full-turn adapter consumes |
 | `BASAgentFabricAdapters.enrichCriticInput(from:...)` | ✅ WIRED | full-turn adapter consumes |
 | `BASAgentFabricAdapters.candidateFrontierProjection(...)` | ✅ WIRED | full-turn adapter consumes |
-| `BASAgentFabricAdapters.validateMCPInvocation(_:against:)` | 🪜 SCAFFOLD | tests-only consumers as of ch 996 — no host pipeline integration calls validate before MCP invocation;the result + audit ref is read only by ch 990 tests。 Will move to ✅ WIRED when a host calls `validateMCPInvocation` before an actual MCP tool dispatch。 |
+| `BASAgentFabricAdapters.validateMCPInvocation(_:against:)` | ✅ WIRED (ch 1003) | `BASMCPInvocationAuditBridge.validateAndAppend(...)` is the canonical consumer — pipes the gate's auditRefs into the L14 ledger for both granted + rejected outcomes。 Pre-ch-1003 was tests-only。 |
 | `BASSovereignWarrantAuditBridge.buildEntry(...)` | ✅ WIRED | appendToLedger consumer |
 | `BASSovereignWarrantAuditBridge.appendToLedger(...)` | ✅ WIRED | pipeline consumer |
-| `BASAgentTraceLogEventLogBridge.recordEvent(...)` | 🪜 SCAFFOLD | API ships;pipeline doesn't call per-event recordEvent — uses flush(forTurn:) instead。 Available for future per-event hosts。 |
+| `BASAgentTraceLogEventLogBridge.recordEvent(...)` | ✅ WIRED (ch 1004) | Per-event API now has a streaming consumer contract: `BASAgentTraceStreamingSink` protocol + `BASAgentTraceBufferingSink` reference impl + `recordEvent(_:streamingTo:)` overload。 Both flush (batch) + per-event-streaming remain first-class — hosts pick per architecture。 |
 | `BASAgentTraceLogEventLogBridge.flush(forTurn:)` | ✅ WIRED | full-turn adapter consumer |
 | `BASAgentTraceLogEventLogBridge.synthesizeEventLogEntry(...)` | ✅ WIRED | flush + recordEvent both consume |
 
@@ -162,9 +162,9 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 **Total public APIs shipped in arc 953-995.9**: ~75 (including
 adapters / bridges / DTOs / enums)。
 
-**Status counts** (post-ch 1002):
-- ✅ WIRED: ~52 (69%)
-- 🪜 SCAFFOLD: ~20 (27%)
+**Status counts** (post-ch 1004):
+- ✅ WIRED: ~54 (72%)
+- 🪜 SCAFFOLD: ~18 (24%)
 - 💀 DEAD / future-allocation: ~3 (4%)
 
 **Change vs ch 996 inventory**:
@@ -176,6 +176,9 @@ adapters / bridges / DTOs / enums)。
 - ch 1003 closed `validateMCPInvocation` (SCAFFOLD → WIRED via
   `BASMCPInvocationAuditBridge` — granted + rejected both land in
   L14 ledger,mirroring ch 983 warrant-audit-bridge shape)。
+- ch 1004 closed `recordEvent` streaming gap (SCAFFOLD → WIRED via
+  `BASAgentTraceStreamingSink` protocol + `BASAgentTraceBufferingSink`
+  reference impl + bridge `recordEvent(_:streamingTo:)` overload)。
 
 **Reading**: 2/3 of the arc is genuinely-wired internal substrate
 infrastructure。 1/4 is host-observable scaffold (host SDK can
@@ -201,8 +204,16 @@ Future arcs may move SCAFFOLD APIs into WIRED by:
    Mirrors the ch 983 `BASSovereignWarrantAuditBridge` shape。
    Granted AND rejected outcomes both land in the L14 ledger
    per ch 977 defense-in-depth doctrine。
-5. **`recordEvent`** → host's per-event log consumer wires it
-   into a streaming sink (currently only flush is used)。
+5. ~~**`recordEvent`** → host's per-event log consumer wires it
+   into a streaming sink (currently only flush is used)。~~
+   **CLOSED at ch 1004** — `BASAgentTraceStreamingSink` protocol
+   shipped + `BASAgentTraceBufferingSink` reference impl +
+   `BASAgentTraceLogEventLogBridge.recordEvent(_:streamingTo:)`
+   integration overload。 Hosts implementing Kafka publishers /
+   websocket fanouts / observability streams now have a documented
+   contract and a starting-point template。 Both `flush` (batch)
+   and per-event-streaming paths remain first-class — substrate
+   doesn't force one over the other。
 6. ~~**`.annotate`** deltaType → future trace seat emits it。~~
    **CLOSED at ch 1002** — `BASTraceAnnotatorSeat` is that trace
    seat。 Writes against the new `.traceAnnotation` domain (also
