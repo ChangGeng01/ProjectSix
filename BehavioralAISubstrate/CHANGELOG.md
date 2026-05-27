@@ -11,6 +11,76 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零三 / M3720 — `validateMCPInvocation` scaffold close via `BASMCPInvocationAuditBridge`
+
+Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 inventory forward-closure
+item #4: the substrate shipped `BASAgentFabricAdapters
+.validateMCPInvocation(...)` at ch 990 returning
+`(accepted: Bool, auditRefs: [String])`,but NO in-substrate
+consumer piped those refs into `BASSovereignAuditLedger`。 The
+auditRefs were dead-letters — discarded after function return。
+Same dead-letter shape as ch 983's pre-fix warrant validation
+(closed by `BASSovereignWarrantAuditBridge`)。
+
+**What landed:**
+
+1. New `BASMCPInvocationAuditBridge` enum in
+   `Sources/BASOrchestration/`:
+   - `buildEntry(...)` — pure-fn that builds a
+     `BASSovereignAuditEntry` from invocation + permit +
+     validation tuple。 Deterministic byte-equal output for
+     same inputs (modulo caller-supplied `now`)。
+   - `validateAndAppend(...)` — one-call wrapper that runs
+     the gate + appends to ledger。 Returns
+     `(validation, appendedEntry)` tuple。
+   - `appendToLedger(...)` — append-only variant when caller
+     pre-validated (e.g. batch append of multiple decisions)。
+2. CRITICAL doctrine: **rejected outcomes ALSO write to ledger**
+   per ch 977 defense-in-depth — silently dropping denied calls
+   would lose attack-surface signal。 The auditID + verdictRef
+   encode `granted` vs `rejected` for replay clarity。
+3. 8 new tests in
+   `BASChapter1003MCPInvocationAuditBridgeTests.swift`:
+   - `buildEntry` produces valid sovereign-audit-entry shape
+   - Granted invocation encodes `granted` into auditID +
+     verdictRef
+   - Rejected invocation encodes `rejected` similarly
+   - signalRefs carries gate auditRefs verbatim (no transform)
+   - `validateAndAppend` end-to-end writes ledger on grant
+   - **CRITICAL: `validateAndAppend` also writes on reject**
+   - Empty sessionID throws (ledger contract)
+   - Pre-validated `appendToLedger` produces signed entry
+4. `Docs/SCAFFOLD_VS_WIRED.md` forward-closure item #4 marked
+   CLOSED;ch-998-1003 change inventory updated。
+
+**Verification:**
+
+- `swift build` clean
+- `swift test --filter BASChapter1003` — 8 / 8 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,524 / 14,524
+  pass, 0 failures**
+
+**Discipline pins held:**
+
+- 红线 7 additive only — existing `validateMCPInvocation`
+  callers byte-equal unchanged。 Bridge is opt-in。
+- ADR-014 OPT-IN — callers MUST explicitly invoke the bridge。
+- Pure-fn `buildEntry(...)` (no I/O,deterministic)
+- Mirror ch 983 warrant-bridge shape for cross-arc consistency
+
+**Scope honesty:**
+
+- The bridge is shipped at the substrate level。 Host
+  pipelines (Qinao runtime,3rd-party hosts) still need to
+  call `validateAndAppend` per MCP dispatch — this is the
+  documented integration point。
+- The MCP transport itself remains caller-side (ch 976
+  doctrine)。 The bridge only audits the permit-gate
+  decision,not the actual MCP-server roundtrip。
+- Hardened canonical-bytes format (`schemaVersion: 1.1.0`)
+  used — MCP refs include `=` + `:` + caller-supplied opaque
+  server / tool IDs that could legitimately contain `,`。
+
 ### Chapter 一千零二 / M3715 — `.annotate` deltaType: 💀 DEAD → ✅ WIRED via TraceAnnotatorSeat
 
 Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 inventory,one of the

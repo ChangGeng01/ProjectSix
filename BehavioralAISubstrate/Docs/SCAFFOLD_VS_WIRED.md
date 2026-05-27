@@ -173,6 +173,9 @@ adapters / bridges / DTOs / enums)。
 - ch 1001 closed `BAS_ACTIVE_AGENTS` (decorative → genuine seat filter)。
 - ch 1002 closed `.annotate` deltaType (DEAD → WIRED via TraceAnnotator
   + new `.traceAnnotation` domain)。
+- ch 1003 closed `validateMCPInvocation` (SCAFFOLD → WIRED via
+  `BASMCPInvocationAuditBridge` — granted + rejected both land in
+  L14 ledger,mirroring ch 983 warrant-audit-bridge shape)。
 
 **Reading**: 2/3 of the arc is genuinely-wired internal substrate
 infrastructure。 1/4 is host-observable scaffold (host SDK can
@@ -190,8 +193,14 @@ Future arcs may move SCAFFOLD APIs into WIRED by:
    skill agents to roster)。 Phase 9+ scope。
 3. **`Gate.TranscriptMode`** → wire surface seat to emit
    per-agent transcripts when `.compareAll`/`.compareSelected`。
-4. **`validateMCPInvocation`** → host pipeline calls it before
-   any actual MCP tool dispatch + appends audit ref to ledger。
+4. ~~**`validateMCPInvocation`** → host pipeline calls it before
+   any actual MCP tool dispatch + appends audit ref to ledger。~~
+   **CLOSED at ch 1003** — `BASMCPInvocationAuditBridge` ships
+   `validateAndAppend(...)` (one-call validate + ledger append)
+   and `appendToLedger(...)` (pre-validated batch append)。
+   Mirrors the ch 983 `BASSovereignWarrantAuditBridge` shape。
+   Granted AND rejected outcomes both land in the L14 ledger
+   per ch 977 defense-in-depth doctrine。
 5. **`recordEvent`** → host's per-event log consumer wires it
    into a streaming sink (currently only flush is used)。
 6. ~~**`.annotate`** deltaType → future trace seat emits it。~~
