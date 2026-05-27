@@ -40,6 +40,10 @@
           {
             "key" : "BAS_FUZZ_STRICT_COVERAGE",
             "value" : "1"
+          },
+          {
+            "key" : "BAS_FUZZ_INTENSITY",
+            "value" : "10"
           }
         ]
       }
@@ -67,7 +71,8 @@
         "BASChapter936UserStateFullRowTests",
         "BASChapter937VersionTreeFullRowTests",
         "BASChapter938EventLogFullRowTests",
-        "BASChapter926FixBackfillCoverageTests"
+        "BASChapter926FixBackfillCoverageTests",
+        "BASChapter1017FullyProceduralSmokeTests"
       ],
       "target" : {
         "containerPath" : "container:BASDeviceTest.xcodeproj",

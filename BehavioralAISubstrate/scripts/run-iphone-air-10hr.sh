@@ -71,14 +71,17 @@ cd "$SUBSTRATE_DIR"
 # and report DEVICE_DISCONNECTED rather than masquerading as test fail。
 check_device_connected() {
     # chapter 一千零十五.5 / M3805 — device-state grep widened
-    # to accept「available (paired)」 alongside「connected」。 The
-    # latter is the older devicectl status string;newer Xcode
-    # tools report「available (paired)」 for the same usable
-    # state。 Pre-fix the script bailed instantly with
-    # DEVICE_DISCONNECTED when iPhone Air was actually fine,
-    # just reported with the newer label。
+    # to accept「available (paired)」 alongside「connected」。
+    #
+    # chapter 一千零十七.5 / M3830 — Round-25 CRITICAL-1 fix:
+    # ch 1015.5 grep `available` matched「unavailable」 as a
+    # substring。 Live devicectl output:
+    #   「ChangGeng?iPhone ... unavailable iPhone 17e」
+    # matched the pre-fix grep,causing the script to proceed
+    # against an unusable device。 Post-fix uses whitespace
+    # anchors so「available」 must be a whole word。
     if xcrun devicectl list devices 2>/dev/null | \
-        grep -q "$DEVICE_ID.*\(connected\|available\)"; then
+        grep -Eq "$DEVICE_ID[[:space:]]+(connected|available)[[:space:]]"; then
         return 0
     fi
     return 1

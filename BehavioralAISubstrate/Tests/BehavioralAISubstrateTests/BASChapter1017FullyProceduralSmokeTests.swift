@@ -47,10 +47,17 @@
 // ## Discipline
 //
 // - 红线 7 additive only — no existing test changed
-// - All values procedural — readers grep this file and find ZERO
-//   hardcoded threshold / iter / timeout literals (except the
-//   BAS_FUZZ_INTENSITY intensity-band defaults,which themselves
-//   are the canonical proc-gen anchors)
+// - Iter counts driven by BAS_FUZZ_INTENSITY env var,scaling
+//   uniformly across all 14 layers per-test。
+// - Proc-gen value ranges via boundary-biased BASFuzzRng picks —
+//   the RANGES themselves are hardcoded anchors (e.g. 0...50,
+//   choices [0,1,5,50,500]) but per-iter values within those
+//   ranges vary by seed。 chapter 一千零十七.5 / M3830 Round-25
+//   HIGH-1 fix:pre-fix doctrine claimed「ZERO hardcoded numeric
+//   literals」 which was empirically false (~20 range bounds and
+//   choice arrays were hardcoded)。 Honest framing:proc-gen
+//   PICKS,not proc-gen RANGES。 Future arc could replace ranges
+//   with config-driven envelopes if value justifies。
 // - Single canonical seed scheme via `testSeed(#function,
 //   iteration:)` (existing ch 946 / ch 952 doctrine)
 
@@ -216,9 +223,21 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
                 let deltas = BASScoutSeat.emit(
                     from: input, turnID: "t.\(i)",
                     agentSpec: spec, seq: &seq)
-                // Scout MUST be deterministic + non-crashing
-                // across all proc-gen shapes
-                XCTAssertGreaterThanOrEqual(deltas.count, 0)
+                // chapter 一千零十七.5 / M3830 — Round-25
+                // CRITICAL-4 fix:vacuous `count >= 0` was
+                // always-true。 Real behavioral pin:Scout
+                // emits a delta IFF any signal is present。
+                let hasSignal = !input.isEmpty
+                XCTAssertEqual(deltas.count > 0, hasSignal,
+                    "L6 ch 1017.5: Scout MUST emit ≥1 delta " +
+                    "iff input has signal。 hasSignal=" +
+                    "\(hasSignal) deltaCount=\(deltas.count)")
+                // Every delta MUST carry the turnID we passed
+                for delta in deltas {
+                    XCTAssertTrue(
+                        delta.deltaID.contains("t.\(i)"),
+                        "L6: deltaID MUST embed turnID")
+                }
             },
             minMs: &minMs, maxMs: &maxMs, totalMs: &totalMs)
         }
@@ -317,7 +336,15 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
                     turnID: "t.\(i)",
                     agentSpec: spec,
                     seq: &seq)
-                XCTAssertGreaterThanOrEqual(deltas.count, 0)
+                // ch 1017.5 CRITICAL-4 fix: behavioral pin
+                XCTAssertEqual(deltas.count, candidates.count,
+                    "L10 ch 1017.5: Planner emits exactly 1 " +
+                    "delta per candidate。 candCount=" +
+                    "\(candidates.count) deltaCount=" +
+                    "\(deltas.count)")
+                // seq counter MUST advance by candidates.count
+                XCTAssertEqual(seq, candidates.count,
+                    "L10: seq advance = candidates.count")
             },
             minMs: &minMs, maxMs: &maxMs, totalMs: &totalMs)
         }
@@ -392,7 +419,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             let payload = String(
                 repeating: "p", count: payloadLen)
             let t0 = ContinuousClock().now
-            _ = try await graph.writeObject(
+            let written = try await graph.writeObject(
                 domain: .situationField,
                 objectID: objID,
                 payloadJson: payload,
@@ -404,9 +431,17 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             if ms < minMs { minMs = ms }
             if ms > maxMs { maxMs = ms }
             totalMs += ms
+            // ch 1017.5 MED-3 fix: write was unverified pre-fix。
+            // Now read it back + assert payload matches。
+            let readBack = try await graph.readObject(
+                ref: written.ref, byAgent: spec)
+            XCTAssertEqual(readBack.payloadJson, payload,
+                "L7 ch 1017.5: write-then-read MUST roundtrip " +
+                "payload byte-equal")
+            XCTAssertEqual(readBack.objectID, objID)
         }
         emitScorecard(
-            layer: 7, component: "SharedStateGraph.write",
+            layer: 7, component: "SharedStateGraph.writeRead",
             iters: n, durationMs: totalMs,
             minMs: minMs, maxMs: maxMs)
     }
@@ -502,24 +537,32 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
 
     // MARK: - Aggregate「all 14 layers green」 pin
 
-    /// Mandatory aggregate test — exercises each layer's smoke
-    /// quickly + asserts substrate-wide green light。
-    /// Per-layer detail tests above provide deeper coverage;
-    /// this is the「single red light fails everything」 gate。
-    func testCRITICAL_AllFourteenLayers_AggregateGreen() throws {
-        // Sub-test each layer with low iter count for quick
-        // aggregate signal。 Detail tests above run higher
-        // iter counts。
+    /// chapter 一千零十七.5 / M3830 — Round-25 CRITICAL-3 fix:
+    /// pre-fix this method named「AllFourteenLayers_Aggregate
+    /// Green」 but actually invoked only 6 layers (L1/L6/L9/
+    /// L10/L11/L14) + omitted L7。 The name lied。 Honest
+    /// rename + scope clarification。
+    ///
+    /// HONEST scope: this aggregate runs the 7 ch-1017-OWNED
+    /// layer tests (L1, L6, L7, L9, L10, L11, L14)。 ch 946
+    /// owns L2/L3/L4/L5/L8/L11(dup)/L12/L13/L14(dup)。 For
+    /// genuine「all 14 layers green」 verification,run BOTH
+    /// chapters via test plan inclusion (see Round-25
+    /// CRITICAL-2 fix to Device2HrFuzz.xctestplan)。
+    func testCRITICAL_Ch1017Layers_AggregateGreen() async throws {
         try testL1_AgentLease_AcrossBudgets()
         try testL6_ScoutDecomposeFrame_AcrossSignalCounts()
-        try testL10_PlannerSeat_AcrossCandidateShapes()
+        try await testL7_SharedStateGraph_WriteRead()
         try testL9_CandidateFrontier_AcrossWidths()
+        try testL10_PlannerSeat_AcrossCandidateShapes()
         try testL11_RiskInput_AcrossSeverities()
         try testL14_SovereignAuditEntry_AcrossSchemaVersions()
-        // ch 946 covers L2-L5 + L8 + L12-L13 — this aggregate
-        // adds the 3 missing layers (L6/L9/L10) + samples L1/
-        // L7/L11/L14 here
-        print("✅ ch1017 aggregate: all 14 layers covered at " +
+        let owned = "L1, L6, L7, L9, L10, L11, L14"
+        let ch946 =
+            "L2, L3, L4, L5, L8, L11, L12, L13, L14"
+        print("✅ ch1017 aggregate: 7 OWNED layers green " +
+              "(\(owned))。 Genuine 14-layer coverage " +
+              "requires + ch 946 (\(ch946))。 " +
               "intensity=\(intensity) iterCount=\(iterCount)")
     }
 }
