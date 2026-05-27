@@ -2787,6 +2787,34 @@ extension BASCognitiveBrain {
         }
     }
 
+    /// chapter 一千.5 / M3705.5 — single canonical consultation
+    /// side-effect。 Pre-fix:both the sync `aneConsulted` helper
+    /// AND the async variant AND the 2 instance-bound inline
+    /// methods (matMulAutoWithANETier + attentionAutoWithANETier)
+    /// performed the SAME 2-step consultation (tier-read +
+    /// counter-bump)。 4 copies of identical logic = divergence
+    /// risk:if a future arc adds (e.g.) a thermal probe call
+    /// to the consultation,3 of the 4 copies would silently
+    /// stay at the old behavior。 Same orphan-class bug pattern
+    /// the cascade has caught for 7 consecutive rounds。
+    ///
+    /// Fix:single `recordANEConsultation(op:)` static method
+    /// that BOTH variants of the generic helper AND the 2
+    /// instance-bound inline methods call。 Now there's exactly
+    /// ONE place to maintain the consultation logic。 If thermal
+    /// probe is added at a future chapter,update this one method
+    /// + all 4 call paths get it automatically。
+    @inlinable
+    public nonisolated static func recordANEConsultation(
+        op: BASNeuralOp
+    ) -> BASANEEligibilityTier {
+        let tier = BASANEKernelEligibilityClassifier
+            .tier(for: op)
+        BASANEKernelEligibilityClassifier
+            .executorConsultationCount += 1
+        return tier
+    }
+
     /// Generic ANE-consultation wrapper。 Runs the classifier's
     /// tier(for:op) check + increments the executor counter +
     /// invokes the caller-supplied dispatch closure。 Returns
@@ -2796,15 +2824,16 @@ extension BASCognitiveBrain {
     /// but the substrate does NOT use it for dispatch routing
     /// at this chapter。 Future arc may flip the static-let
     /// invariant when actual routing branches on tier。
+    ///
+    /// chapter 一千.5:delegates to `recordANEConsultation(op:)`
+    /// for the consultation side-effect — single canonical
+    /// implementation。
     @inlinable
     public nonisolated static func aneConsulted<Value: Sendable>(
         op: BASNeuralOp,
         dispatch: () -> Value
     ) -> BASANEConsultedResult<Value> {
-        let tier = BASANEKernelEligibilityClassifier
-            .tier(for: op)
-        BASANEKernelEligibilityClassifier
-            .executorConsultationCount += 1
+        let tier = recordANEConsultation(op: op)
         return BASANEConsultedResult(
             value: dispatch(),
             aneTier: tier)
@@ -2817,15 +2846,14 @@ extension BASCognitiveBrain {
     /// observe-only doctrine — tier captured + returned but
     /// substrate doesn't branch dispatch on it。 `rethrows`
     /// preserves the caller's error-handling contract。
+    ///
+    /// chapter 一千.5:delegates to `recordANEConsultation(op:)`。
     @inlinable
     public nonisolated static func aneConsulted<Value: Sendable>(
         op: BASNeuralOp,
         dispatch: () async throws -> Value
     ) async rethrows -> BASANEConsultedResult<Value> {
-        let tier = BASANEKernelEligibilityClassifier
-            .tier(for: op)
-        BASANEKernelEligibilityClassifier
-            .executorConsultationCount += 1
+        let tier = recordANEConsultation(op: op)
         return BASANEConsultedResult(
             value: try await dispatch(),
             aneTier: tier)
@@ -2972,18 +3000,12 @@ extension BASCognitiveBrain {
     ) async throws ->
         BASANEConsultedResult<BASAutoRouteResult<[Float]>>
     {
-        // chapter 一千 / M3705 honest scope:Swift 6 Sendable
-        // constraints on async closures block the generic
-        // `aneConsulted` helper from wrapping instance methods
-        // that capture self。 Inlining the 3-line consult
-        // boilerplate here preserves the observe-only doctrine
-        // + counter increment at the same per-call cost。 The
-        // 6 nonisolated-static entries (softmax/layerNorm +
-        // 4 scaffolds) still use the elegant generic helper。
-        let tier = BASANEKernelEligibilityClassifier
-            .tier(for: .matMul)
-        BASANEKernelEligibilityClassifier
-            .executorConsultationCount += 1
+        // chapter 一千.5 fix:single canonical consultation via
+        // recordANEConsultation。 Pre-fix this method inlined
+        // the 2-step consultation,creating a 4-copy divergence
+        // risk with the generic helpers (sync + async)。 Now
+        // ALL 4 paths share one canonical implementation。
+        let tier = Self.recordANEConsultation(op: .matMul)
         let result = try await self.matMulAuto(
             a: a, aRows: aRows, aCols: aCols,
             b: b, bRows: bRows, bCols: bCols,
@@ -3036,13 +3058,14 @@ extension BASCognitiveBrain {
     ) async throws ->
         BASANEConsultedResult<BASAutoRouteResult<[Float]>>
     {
-        // ch 1000 same pattern as matMulAutoWithANETier:inline
-        // boilerplate due to Sendable constraint on async
-        // closures capturing instance self。
-        let tier = BASANEKernelEligibilityClassifier
-            .tier(for: .attention)
-        BASANEKernelEligibilityClassifier
-            .executorConsultationCount += 1
+        // chapter 一千.5 fix:single canonical consultation via
+        // recordANEConsultation (same as matMulAutoWithANETier
+        // refactor)。 Sendable constraint on async closures
+        // capturing instance self still prevents direct
+        // delegation to the generic aneConsulted helper,but
+        // the consultation side-effect itself is now a single
+        // canonical call。
+        let tier = Self.recordANEConsultation(op: .attention)
         let result = try await self.attentionAuto(
             q: q, qRows: qRows, qCols: qCols,
             k: k, kRows: kRows,
