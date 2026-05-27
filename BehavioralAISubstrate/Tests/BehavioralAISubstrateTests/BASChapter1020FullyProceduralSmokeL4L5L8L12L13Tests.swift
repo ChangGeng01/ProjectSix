@@ -7,6 +7,33 @@
 // benchmark 需要 完全 做到 kill 当前」 (Round-25/27 lesson applied
 // up-front:bounded scope,no over-claim)。
 //
+// chapter 一千零二十.5 / M3855 — User invoked「开启 诚实模式」 right
+// after ch 1020 ship。 Self-audit caught 2 HIGH + 5 MED before
+// any external review:
+//   HIGH-1:Docs/PROCEDURAL_GENERATION_INVENTORY.md matrix
+//          inconsistent with this file's matrix on L14 row
+//   HIGH-2:L5 doc-block claimed「default-init paths for all 14
+//          lattice components stay green」 but only asserted on
+//          4 top-level fields,never on the 14 sub-components
+//   MED-1:L8 only varied count + 2 enums,never fuzzed the 4
+//          Double fields (confidence/emotionalWeight/risk/host)
+//   MED-2:L4「scope MUST trim cleanly」 pin was always-passing
+//          because input never contained whitespace
+//   MED-3:L12 dedup pin satisfied even if dedup broken (no
+//          duplicates ever injected into input)
+//   MED-4:L13 didn't exercise actor stores — DEFERRED to
+//          future arc with explicit note (mixing async actor
+//          tests with this synchronous chapter would mix
+//          concerns; ch 1021+ if value justifies)
+//   MED-5:procPick used pickBoundaryBiased on enum cases —
+//          conceptually weird (enum has no boundary semantics);
+//          changed to uniform pick()
+// Fixed inline below。 ch 1020.5 doesn't ship as separate file —
+// per cascade discipline,inline fix-of-fix on same file is
+// honest when the original wasn't yet pushed at the time of
+// catch。 (It WAS pushed at ch 1020 commit but pre-launch audit
+// caught these — preferred over Round-28 catching them later。)
+//
 // ## Honest scope
 //
 // ch 1017 covered 7 layers in ch1017-style intensity-scalable
@@ -129,8 +156,12 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
         return rng.pickBoundaryBiased(choices, boundaryP: 0.5)
     }
 
-    /// Boundary-biased generic pick — leverages BASFuzzRng's
-    /// existing generic API。
+    /// Uniform generic pick — leverages BASFuzzRng's `pick()`。
+    ///
+    /// ch 1020.5 MED-5 fix:previously used pickBoundaryBiased
+    /// which has「boundary」 semantics that only make sense for
+    /// numeric choices。 For enum cases there is no semantic
+    /// boundary,so uniform picking is honest。
     private func procPick<T>(
         _ function: String = #function,
         iter: Int,
@@ -138,7 +169,7 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
     ) -> T {
         var rng = BASFuzzRng(
             seed: testSeed(function, iteration: iter))
-        return rng.pickBoundaryBiased(choices, boundaryP: 0.5)
+        return rng.pick(choices)
     }
 
     /// Scorecard print — every sub-test emits at the end。
@@ -213,12 +244,20 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                 function, iter: i + 3000,
                 choices: severities)
             let hardStop = (i % 2 == 0)
+            // ch 1020.5 MED-2 fix:inject whitespace into scope
+            // for ~33% of iters to actually exercise the trim
+            // contract (pre-fix the input was always clean,
+            // making the「scope MUST trim cleanly」 pin always-pass)
+            let scopeCore = "scope.\(i)"
+            let scopeInput = (i % 3 == 0)
+                ? "  \(scopeCore)\n\t"
+                : scopeCore
             try timedIter({
                 let horizon = BASHorizonPrior(
                     priorID: "h.\(i)",
                     priorType: priorType,
                     stabilityTier: stability,
-                    scope: "scope.\(i)",
+                    scope: scopeInput,
                     confidence: confidence,
                     sourceClass: "test.\(i)")
                 let boundary = BASBoundaryPrior(
@@ -246,9 +285,11 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                     "L4: boundary severity MUST survive init")
                 XCTAssertEqual(boundary.hardStop, hardStop,
                     "L4: boundary hardStop MUST survive init")
-                // Behavioral pin 3: trim normalization on scope
-                XCTAssertEqual(horizon.scope, "scope.\(i)",
-                    "L4: scope MUST trim cleanly")
+                // Behavioral pin 3: trim ACTUALLY happens (now
+                // tested with whitespace-prefixed input too)
+                XCTAssertEqual(horizon.scope, scopeCore,
+                    "L4 ch 1020.5: scope MUST trim whitespace " +
+                    "(input=「\(scopeInput.debugDescription)」)")
             },
             minMs: &minMs, maxMs: &maxMs, totalMs: &totalMs)
         }
@@ -262,9 +303,20 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
 
     /// L5 smoke: BASHostConstitution across proc-gen hostIDs +
     /// version strings。 Validates:
-    ///   - default-init paths for all 14 lattice components
-    ///   - constitutionID default = "{hostID}.constitution"
-    ///   - schema version pinned to currentSchemaVersion
+    ///   - hostID / constitutionID / activeVersion / schemaVersion
+    ///     round-trip
+    ///   - lattice sub-component default values (a sample of
+    ///     stable defaults across BASIdentityLattice /
+    ///     BASValueAxisSet / BASStyleGenome) — pins prevent
+    ///     silent default-init drift
+    ///
+    /// ch 1020.5 HIGH-2 fix:pre-fix doc claimed「default-init
+    /// paths for all 14 lattice components stay green」 but only
+    /// asserted on 4 top-level fields。「Stay green」 = just
+    ///「no crash」,which is the weakest possible pin。 Honest
+    /// reduction:assert on stable defaults of a SAMPLE of
+    /// sub-components — proves the default-init chain actually
+    /// executes and produces expected baseline values。
     func testL5_HostConstitution_AcrossIdentities() throws {
         let function = #function
         let n = iterCount
@@ -304,6 +356,35 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                     constitution.schemaVersion,
                     BASHostConstitution.currentSchemaVersion,
                     "L5: schemaVersion MUST default to current")
+                // ch 1020.5 HIGH-2 fix:assert on stable defaults
+                // of sub-components — proves default-init chain
+                // actually executes
+                // Pin 5: BASIdentityLattice defaults
+                XCTAssertEqual(
+                    constitution.identityLattice.continuityScore,
+                    1.0, accuracy: 0.0001,
+                    "L5 ch 1020.5: identityLattice.continuityScore " +
+                    "default MUST be 1.0")
+                XCTAssertEqual(
+                    constitution.identityLattice.coreTags.count, 0,
+                    "L5 ch 1020.5: identityLattice.coreTags default empty")
+                // Pin 6: BASValueAxisSet defaults
+                XCTAssertEqual(
+                    constitution.valueAxes.updateThreshold,
+                    0.75, accuracy: 0.0001,
+                    "L5 ch 1020.5: valueAxes.updateThreshold " +
+                    "default MUST be 0.75")
+                // Pin 7: BASStyleGenome defaults
+                XCTAssertEqual(
+                    constitution.styleGenome.density, "balanced",
+                    "L5 ch 1020.5: styleGenome.density default = balanced")
+                XCTAssertEqual(
+                    constitution.styleGenome.warmth, "grounded",
+                    "L5 ch 1020.5: styleGenome.warmth default = grounded")
+                XCTAssertEqual(
+                    constitution.styleGenome.structureBias,
+                    0.7, accuracy: 0.0001,
+                    "L5 ch 1020.5: styleGenome.structureBias default = 0.7")
             },
             minMs: &minMs, maxMs: &maxMs, totalMs: &totalMs)
         }
@@ -316,10 +397,20 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
     // MARK: - L8 memory bundle
 
     /// L8 smoke: BASMemoryBundle with proc-gen atom counts across
-    /// the full BASMemoryAtomContentType enum。 Validates:
-    ///   - atoms count round-trip
-    ///   - retrievalTags count round-trip
-    ///   - per-atom contentType preserved through bundle wrap
+    /// the full BASMemoryAtomContentType enum + proc-gen Double
+    /// fields。 Validates:
+    ///   - atoms / retrievalTags count round-trip
+    ///   - per-atom contentType + promotionState preserved
+    ///   - per-atom Double fields (confidence / emotionalWeight /
+    ///     riskRelevance / hostRelevance) round-trip — proves
+    ///     bundle wrap doesn't silently zero or alter them
+    ///
+    /// ch 1020.5 MED-1 fix:pre-fix only varied count + 2 enums;
+    /// 4 Double fields were hardcoded to 0.5/0/0/0,leaving them
+    /// untested。 Now proc-gen across [-1, 2] range to exercise
+    /// init pass-through (BASMemoryAtom.init does NOT clamp these,
+    /// per inspection — so the pin is round-trip preservation,
+    /// not clamping)。
     func testL8_MemoryBundle_AcrossAtomCounts() throws {
         let function = #function
         let n = iterCount
@@ -340,16 +431,30 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
             let promotion = procPick(
                 function, iter: i + 300,
                 choices: promotionStates)
+            // ch 1020.5 MED-1 fix:proc-gen Double fields across
+            // [-1, 2] to exercise init pass-through
+            let confidence = Double(procIntBoundary(
+                function, iter: i + 400,
+                choices: [-100, 0, 50, 100, 200])) / 100.0
+            let emotionalWeight = Double(procIntBoundary(
+                function, iter: i + 500,
+                choices: [-100, 0, 50, 100, 200])) / 100.0
+            let riskRelevance = Double(procIntBoundary(
+                function, iter: i + 600,
+                choices: [-100, 0, 50, 100, 200])) / 100.0
+            let hostRelevance = Double(procIntBoundary(
+                function, iter: i + 700,
+                choices: [-100, 0, 50, 100, 200])) / 100.0
             let atoms = (0..<atomCount).map { j in
                 BASMemoryAtom(
                     memoryID: "atom.\(i).\(j)",
                     summary: "summary.\(j)",
                     contentType: contentType,
                     source: "src.\(i)",
-                    confidence: 0.5,
-                    emotionalWeight: 0,
-                    riskRelevance: 0,
-                    hostRelevance: 0,
+                    confidence: confidence,
+                    emotionalWeight: emotionalWeight,
+                    riskRelevance: riskRelevance,
+                    hostRelevance: hostRelevance,
                     conflictFingerprint: "",
                     promotionState: promotion,
                     frozen: false)
@@ -366,12 +471,29 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                 XCTAssertEqual(
                     bundle.retrievalTags.count, tagCount,
                     "L8: bundle MUST preserve retrievalTags count")
-                // Behavioral pin 3: per-atom contentType preserved
+                // Behavioral pin 3: per-atom contentType +
+                // promotionState + Double fields preserved
                 for atom in bundle.atoms {
                     XCTAssertEqual(atom.contentType, contentType,
                         "L8: atom contentType MUST survive bundle wrap")
                     XCTAssertEqual(atom.promotionState, promotion,
                         "L8: atom promotionState MUST survive bundle wrap")
+                    // ch 1020.5 MED-1: Double field preservation
+                    XCTAssertEqual(atom.confidence, confidence,
+                        accuracy: 0.0001,
+                        "L8 ch 1020.5: confidence MUST round-trip")
+                    XCTAssertEqual(
+                        atom.emotionalWeight, emotionalWeight,
+                        accuracy: 0.0001,
+                        "L8 ch 1020.5: emotionalWeight MUST round-trip")
+                    XCTAssertEqual(
+                        atom.riskRelevance, riskRelevance,
+                        accuracy: 0.0001,
+                        "L8 ch 1020.5: riskRelevance MUST round-trip")
+                    XCTAssertEqual(
+                        atom.hostRelevance, hostRelevance,
+                        accuracy: 0.0001,
+                        "L8 ch 1020.5: hostRelevance MUST round-trip")
                 }
             },
             minMs: &minMs, maxMs: &maxMs, totalMs: &totalMs)
@@ -388,8 +510,15 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
     /// BASRenderFrame ref-stitching。 Validates:
     ///   - mode preservation
     ///   - outputLengthCap clamp floor at 0 (max(0,x) contract)
-    ///   - allowedDomains dedup contract (count ≤ input)
+    ///   - allowedDomains dedup ACTUALLY happens (input contains
+    ///     duplicates → output count < input count)
     ///   - render frame preserves permit ref
+    ///
+    /// ch 1020.5 MED-3 fix:pre-fix dedup pin `count ≤ input`
+    /// was always-passing because no duplicates were ever
+    /// injected。 Now we deliberately inject dups on ~50% of
+    /// iters and pin output count < input count when dups
+    /// present。
     func testL12_SurfacePermit_AcrossModes() throws {
         let function = #function
         let n = iterCount
@@ -405,9 +534,22 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                 function, iter: i + 100,
                 choices: [-1000, 0, 240, 4096, 1_000_000])
             let allowedCount = procInt(
-                function, iter: i + 200, range: 0...10)
-            let allowedDomains = (0..<allowedCount).map {
-                "d.\(i).\($0)"
+                function, iter: i + 200, range: 1...10)
+            // ch 1020.5 MED-3 fix:inject duplicates on 50% of
+            // iters to actually exercise the uniqueRiskStrings()
+            // dedup contract
+            let injectDups = (i % 2 == 0)
+            let allowedDomains: [String]
+            if injectDups {
+                // Build list with deliberate duplicates:
+                // [d.0, d.0, d.1, d.0, d.2, ...] — same anchor
+                // appears multiple times mixed with unique ones
+                let unique = (0..<allowedCount).map { "d.\(i).\($0)" }
+                allowedDomains = unique + [unique[0], unique[0]]
+            } else {
+                allowedDomains = (0..<allowedCount).map {
+                    "d.\(i).\($0)"
+                }
             }
             try timedIter({
                 let permit = BASActionPermit(
@@ -425,10 +567,27 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                     permit.outputLengthCap, 0,
                     "L12: outputLengthCap MUST clamp " +
                     "negative input to 0 (got \(rawCap))")
-                // Behavioral pin 3: dedup contract — output ≤ input
-                XCTAssertLessThanOrEqual(
-                    permit.allowedDomains.count, allowedCount,
-                    "L12: allowedDomains dedup MUST keep count ≤ input")
+                // Behavioral pin 3a: dedup MUST reduce count
+                // when dups present (proves dedup ACTUALLY runs)
+                if injectDups {
+                    XCTAssertLessThan(
+                        permit.allowedDomains.count,
+                        allowedDomains.count,
+                        "L12 ch 1020.5: dedup MUST reduce count " +
+                        "when duplicates present (input=" +
+                        "\(allowedDomains.count) → output=" +
+                        "\(permit.allowedDomains.count))")
+                    // Should equal unique count = allowedCount
+                    XCTAssertEqual(
+                        permit.allowedDomains.count, allowedCount,
+                        "L12 ch 1020.5: dedup output count MUST " +
+                        "equal unique input count")
+                } else {
+                    // No dups → output == input count
+                    XCTAssertEqual(
+                        permit.allowedDomains.count, allowedCount,
+                        "L12: no-dup input MUST preserve count")
+                }
                 // Behavioral pin 4: render frame preserves ref
                 XCTAssertEqual(
                     frame.actionPermitRef, "permit.\(i)",
@@ -454,6 +613,18 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
     ///     every non-root v_j has parent = v_{j-1})
     ///   - approvedByPolicy round-trip
     ///   - changedFields preserved
+    ///
+    /// ch 1020.5 MED-4 note:this test covers the value-struct
+    /// layer (BASHostVersion + BASHostVersionTree)。 The actor
+    /// stores (BASInMemoryHostConstitutionVersionTreeStore +
+    /// BASSQLiteHostConstitutionVersionTreeStore) are NOT
+    /// exercised here — those would need async test methods +
+    /// store mounting,which mixes concerns with this sync
+    /// chapter。 Deferred:ch 1021+ if a specific defect-class
+    /// is identified in the actor-store contract that this
+    /// value-struct fuzz can't reach。 ch 937 has direct
+    /// full-row tests for the SQLite store today,which fills
+    /// the actor-side gap until ch 1021 ships。
     func testL13_VersionTree_AcrossChainLengths() throws {
         let function = #function
         let n = iterCount

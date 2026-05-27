@@ -68,6 +68,13 @@ of truth across both files)。 Scorecards emit with
 to fuzz in isolation,same reason ch 1017 didn't pull them
 in either)。 Combined coverage:
 
+chapter 一千零二十.5 / M3855 — HIGH-1 fix:pre-fix this matrix
+had the L14 row backwards (claimed ch 1017 doesn't cover L14
+and that ch 1020 covers it「via ch 1017」)。 Verified against
+ch 1017 source:`testL14_SovereignAuditEntry_AcrossSchemaVersions`
+exists and covers L14。 ch 1020 does NOT touch L14。 Honest
+matrix follows:
+
 | Layer | ch 946 (runtime) | ch 1017 (proc-gen) | ch 1020 (proc-gen) |
 |-------|------------------|--------------------|--------------------|
 | L1    | ✓                | ✓                  | —                  |
@@ -83,7 +90,7 @@ in either)。 Combined coverage:
 | L11   | ✓                | ✓                  | —                  |
 | L12   | ✓                | —                  | ✓                  |
 | L13   | ✓                | —                  | ✓                  |
-| L14   | ✓                | —                  | ✓ (via ch 1017)    |
+| L14   | ✓                | ✓                  | —                  |
 
 Empirical (iPhone Air A19,intensity=10):L4=0.0024ms,
 L5=0.0042ms,L8=0.0136ms,L12=0.0053ms,L13=0.0092ms avg
