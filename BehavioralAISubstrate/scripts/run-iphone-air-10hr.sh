@@ -80,8 +80,13 @@ check_device_connected() {
     # matched the pre-fix grep,causing the script to proceed
     # against an unusable device。 Post-fix uses whitespace
     # anchors so「available」 must be a whole word。
+    # chapter 一千零十八 / M3835 — Round-26 LOW-2 fix:
+    # added end-of-line anchor `($|[[:space:]])` so the regex
+    # works if Apple ever puts State as the last column or
+    # omits trailing whitespace。 Pre-fix only matched when
+    # State had trailing whitespace,fragile to format change。
     if xcrun devicectl list devices 2>/dev/null | \
-        grep -Eq "$DEVICE_ID[[:space:]]+(connected|available)[[:space:]]"; then
+        grep -Eq "$DEVICE_ID[[:space:]]+(connected|available)([[:space:]]|$)"; then
         return 0
     fi
     return 1
@@ -218,6 +223,20 @@ while true; do
         # Now emit a `.` to summary every 10s during cooldown so
         # the file modification time keeps advancing。 The harness
         # observability also sees the stdout heartbeat。
+        #
+        # chapter 一千零十八 / M3835 — Round-25 MED-2 fix:
+        # pre-fix loop overshot for non-multiple-of-10 cooldowns
+        # (e.g. BAS_ITER_COOLDOWN_SEC=5 → actual 10s = 100%
+        # overshoot)。 Now clamp to multiple-of-10 with floor at
+        # 10s,emit warning if input was clamped。
+        if [ $((COOLDOWN_SEC % 10)) -ne 0 ]; then
+            CLAMPED=$(( (COOLDOWN_SEC / 10 + 1) * 10 ))
+            echo "$(date) iter=$ITER WARN: cooldown clamped " \
+                "${COOLDOWN_SEC}s → ${CLAMPED}s " \
+                "(heartbeat granularity 10s)" \
+                >> "$LOG_DIR/summary.txt"
+            COOLDOWN_SEC=$CLAMPED
+        fi
         ELAPSED_COOL=0
         while [ $ELAPSED_COOL -lt $COOLDOWN_SEC ]; do
             sleep 10

@@ -415,24 +415,30 @@ final class BASChapter952_4HighBarBenchmarkTests: XCTestCase {
         // realistic ceiling so scorecard becomes a real gate。
         // Original ceiling: 20s p99 (measured 14s with 1.4× safety margin)。
         //
-        // chapter 一千零十六 / M3820 — thermal envelope honest fix:
-        // 3-run device dataset (v4/v7/v8) across 18 total iters
-        // showed iter 1-5 p99 stayed within 13-18s (cold/warm),
-        // but iter 6+ under SUSTAINED MLX load consistently
-        // creeped to 21-22s — this is REAL iPhone Air A19 thermal
-        // throttling,not substrate regression。 Original 20s
-        // ceiling was set from iter-1 baseline + 1.4× margin
-        // (cold-device assumption)。 Sustained-load reality is
-        // ~22s p99 envelope。 Honest evolution:bump ceiling to
-        // 25s (1.78× cold baseline) which:
-        //   - Still tight enough to catch genuine regressions
-        //     (any real MLX perf bug would push way above 25s)
-        //   - Accommodates measured thermal envelope under
-        //     sustained 20+ min load
-        //   - Lets endurance runs (1hr) actually complete vs
-        //     stopping at iter 6 due to physics-induced creep
-        // The thermal-throttle creep is honest device behavior —
-        // gating it as「regression」 produces false positives。
+        // chapter 一千零十六 / M3820 — thermal envelope evolution:
+        // chapter 一千零十八 / M3835 — Round-25 HIGH-4 fix:
+        // honest framing of empirical dataset (was overstated
+        // pre-fix as「consistently 21-22s」 with n=2 at iter 6
+        // and n=1 at iter 7)。 Actual data:
+        //   v4 iter 6: 16.9s · iter 7: 21.1s
+        //   v7 iter 4: 7.4s · iter 1: 18.1s (high run-to-run var)
+        //   v8 iter 6: 21.8s
+        // Statistical reasoning (cold baseline mean 13.8s
+        // with CoV 18.8% → ~21.6s as 3-sigma upper):the
+        // original 20s ceiling was below the natural-variation
+        // 3-sigma upper,so it caught false positives that
+        // weren't regressions。 25s = +1.3-sigma headroom (1.81×
+        // cold baseline),still tight enough that real MLX
+        // perf bugs would push way above。
+        //
+        // Empirical v9 run (1hr, 12 iter, ch 1018 release):
+        // 1,032 tests passed, 0 failures with 25s ceiling +
+        // adaptive 60-300s cooldown。 Honest envelope verified。
+        //
+        // The「raise ceiling vs cooldown longer」 tradeoff:
+        // 25s ceiling + adaptive cooldown together accommodate
+        // iPhone Air A19 sustained-load physics without losing
+        // regression-detection rigor。
         let inferLatencyCeilingMs: Double = 25_000
         scorecard(suite: "MLX-Gemma4E2B",
                   op: "infer-latency",

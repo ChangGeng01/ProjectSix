@@ -82,6 +82,27 @@ which manifests as 20-40% MLX inference latency increase。
 | Sustained (6-10 iters) | 60-120s adaptive | 25s |
 | Endurance (1hr+, 10+ iters) | 120-180s adaptive | 25s |
 
+## v9 empirical validation (ch 1018 update)
+
+After ch 1016 shipped,v9 device run (MAX_SEC=3600,
+BAS_ITER_COOLDOWN_SEC=60,adaptive cooldown active) achieved:
+
+- **12 complete iters** in 1:06:21 (66 min including final
+  iter-12 cooldown overshoot past MAX_SEC)
+- **1,032 tests passed,0 failures**
+- p99 latency: stayed within 25s ceiling across all 12 iters
+  even at thermal `serious` state
+- Stop reason: **MAX_SEC cap hit** (not thermal, not script,
+  not sandbox) — first 1-hour run to complete via natural cap
+
+**Round-25 HIGH-3 prediction WITHDRAWN**: Round-25 audit
+predicted adaptive cooldown math would prevent iter 11+ within
+MAX_SEC=3600。 Empirical v9 disproved this — iter 11-12 BOTH
+fit。 The audit's math was correct in arithmetic but missed
+that adaptive cooldown only adds the larger-base term in
+specific iter ranges,not all of them。 Honest correction:
+the schedule is tight but viable for 12 iter / 1hr。
+
 ## ch 1016 evolution
 
 Three honest fixes shipped to make 1hr+ runs achievable:

@@ -93,20 +93,13 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
         return max(10, intensity * 10)
     }
 
-    /// Lower iter count for heavy runtime-spinning tests。
-    /// Scales 3-30 across intensity 1-10。
-    private var heavyIterCount: Int {
-        return max(3, intensity * 3)
-    }
-
-    /// Skip-aware variant for `requireRuntimeFuzz`-like patterns。
-    private func requireIntensity(min: Int) throws {
-        if intensity < min {
-            throw XCTSkip(
-                "Skipped at intensity=\(intensity);set " +
-                "BAS_FUZZ_INTENSITY≥\(min) to enable")
-        }
-    }
+    // chapter 一千零十八 / M3835 — Round-26 LOW-1 fix:
+    // deleted unused helpers `heavyIterCount` and
+    // `requireIntensity(min:)` — both declared in ch 1017 but
+    // never referenced from any test。 Dead code preserved
+    // through ch 1017.5 honest-framing exercise but Round-26
+    // grep proved zero call sites。 Honest mode = delete what
+    // isn't used。
 
     // MARK: - Proc-gen value helpers
 
@@ -147,9 +140,17 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
         maxMs: Double
     ) {
         let avgMs = durationMs / Double(iters)
-        let avgStr = String(format: "%.2f", avgMs)
-        let minStr = String(format: "%.2f", minMs)
-        let maxStr = String(format: "%.2f", maxMs)
+        // chapter 一千零十八 / M3835 — Round-25 MED-1 fix:
+        // `%.2f` produced「avg=0.00ms」 for sub-millisecond
+        // operations (4 of 7 layer tests at intensity=10
+        // emitted all-zero scorecards),destroying trend
+        // signal。 Bumped to `%.4f` — 4-decimal-precision
+        // gives microsecond resolution。 Existing trend tools
+        // parse「N.NN」 format (number + unit) so 4-decimal
+        // works without trend-tool change。
+        let avgStr = String(format: "%.4f", avgMs)
+        let minStr = String(format: "%.4f", minMs)
+        let maxStr = String(format: "%.4f", maxMs)
         print("📊 ch1017-scorecard | layer=L\(layer) " +
               "component=\(component) iters=\(iters) " +
               "avg=\(avgStr)ms min=\(minStr)ms " +
@@ -440,8 +441,16 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
                 "payload byte-equal")
             XCTAssertEqual(readBack.objectID, objID)
         }
+        // chapter 一千零十八 / M3835 — Round-26 MED-1 fix:
+        // scorecard component name now matches what's MEASURED。
+        // ch 1017.5 renamed to「writeRead」 implying both ops
+        // timed,but the timing block only covers write — the
+        // readObject roundtrip is outside the t0/ms calc。
+        // Honest name reflects that timing measures write only;
+        // read provides behavioral assertion but not timing。
         emitScorecard(
-            layer: 7, component: "SharedStateGraph.writeRead",
+            layer: 7,
+            component: "SharedStateGraph.write[+verifyRead]",
             iters: n, durationMs: totalMs,
             minMs: minMs, maxMs: maxMs)
     }
@@ -537,32 +546,25 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
 
     // MARK: - Aggregate「all 14 layers green」 pin
 
-    /// chapter 一千零十七.5 / M3830 — Round-25 CRITICAL-3 fix:
-    /// pre-fix this method named「AllFourteenLayers_Aggregate
-    /// Green」 but actually invoked only 6 layers (L1/L6/L9/
-    /// L10/L11/L14) + omitted L7。 The name lied。 Honest
-    /// rename + scope clarification。
-    ///
-    /// HONEST scope: this aggregate runs the 7 ch-1017-OWNED
-    /// layer tests (L1, L6, L7, L9, L10, L11, L14)。 ch 946
-    /// owns L2/L3/L4/L5/L8/L11(dup)/L12/L13/L14(dup)。 For
-    /// genuine「all 14 layers green」 verification,run BOTH
-    /// chapters via test plan inclusion (see Round-25
-    /// CRITICAL-2 fix to Device2HrFuzz.xctestplan)。
-    func testCRITICAL_Ch1017Layers_AggregateGreen() async throws {
-        try testL1_AgentLease_AcrossBudgets()
-        try testL6_ScoutDecomposeFrame_AcrossSignalCounts()
-        try await testL7_SharedStateGraph_WriteRead()
-        try testL9_CandidateFrontier_AcrossWidths()
-        try testL10_PlannerSeat_AcrossCandidateShapes()
-        try testL11_RiskInput_AcrossSeverities()
-        try testL14_SovereignAuditEntry_AcrossSchemaVersions()
-        let owned = "L1, L6, L7, L9, L10, L11, L14"
-        let ch946 =
-            "L2, L3, L4, L5, L8, L11, L12, L13, L14"
-        print("✅ ch1017 aggregate: 7 OWNED layers green " +
-              "(\(owned))。 Genuine 14-layer coverage " +
-              "requires + ch 946 (\(ch946))。 " +
-              "intensity=\(intensity) iterCount=\(iterCount)")
-    }
+    // chapter 一千零十八 / M3835 — Round-26 MED-2 fix:
+    // aggregate test deleted。 XCTest auto-discovers EVERY
+    // `test*` method in this class + runs them as standalone
+    // tests。 The aggregate also called each layer test inline,
+    // causing **2× execution** (and 2× thermal load on device)
+    // per layer per run。 Round-26 caught this。
+    //
+    // Honest design: each layer test stands alone with full
+    // intensity-scaled iter coverage。 Test plan discovers
+    // them via class inclusion (Device2HrFuzz.xctestplan).
+    // No aggregate needed — XCTest's own run summary serves
+    // the「all green」 gate naturally。 If any layer's
+    // standalone run fails, the test class fails, which fails
+    // the build/CI/device-iter。 Same gate, half the work。
+    //
+    // chapter 一千零十八 / M3835 — Round-26 MED-3 fix:
+    // pre-fix doc claimed ch 946 owns
+    // 「L2/L3/L4/L5/L8/L11/L12/L13/L14」 — omitted that ch 946
+    // ALSO has L1 tests (testL1WakePolicyFuzz +
+    // testL1LeaseLifeCoverage)。 Removing aggregate also
+    // removes the misleading enumeration。
 }
