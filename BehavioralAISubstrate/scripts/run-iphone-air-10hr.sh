@@ -176,9 +176,37 @@ while true; do
     # iterations so thermal can recover。 Default 0 preserves
     # prior behavior (zero cooldown,thermal will trip ~iter 7
     # under sustained load)。
-    COOLDOWN_SEC=${BAS_ITER_COOLDOWN_SEC:-0}
+    # chapter 一千零十六 / M3820 — adaptive thermal cooldown。
+    # ch 1015.6 fixed cooldown at constant 60s。 But v8 device
+    # data showed thermal accumulates faster than 60s recovery
+    # at iter 6+ (sustained-load p99 still creeps despite
+    # cooldown)。 Honest fix:scale cooldown with iter count —
+    # thermal heat-soak grows with cumulative load,so recovery
+    # time should grow proportionally。 Schedule:
+    #   iter 1-2:  use BAS_ITER_COOLDOWN_SEC (default 0)
+    #   iter 3-5:  base + 30s (early thermal accumulation)
+    #   iter 6-10: base × 2 + 60s (sustained-load recovery)
+    #   iter 11+:  base × 3 + 120s (endurance-run recovery)
+    # Override via BAS_ADAPTIVE_COOLDOWN=0 to disable scaling
+    # (use only BAS_ITER_COOLDOWN_SEC verbatim)。
+    BASE_COOLDOWN=${BAS_ITER_COOLDOWN_SEC:-0}
+    ADAPTIVE=${BAS_ADAPTIVE_COOLDOWN:-1}
+    if [ $ADAPTIVE -eq 1 ] && [ $BASE_COOLDOWN -gt 0 ]; then
+        if [ $ITER -le 2 ]; then
+            COOLDOWN_SEC=$BASE_COOLDOWN
+        elif [ $ITER -le 5 ]; then
+            COOLDOWN_SEC=$((BASE_COOLDOWN + 30))
+        elif [ $ITER -le 10 ]; then
+            COOLDOWN_SEC=$((BASE_COOLDOWN * 2 + 60))
+        else
+            COOLDOWN_SEC=$((BASE_COOLDOWN * 3 + 120))
+        fi
+    else
+        COOLDOWN_SEC=$BASE_COOLDOWN
+    fi
     if [ $COOLDOWN_SEC -gt 0 ]; then
-        echo "$(date) iter=$ITER cooldown=${COOLDOWN_SEC}s — " \
+        echo "$(date) iter=$ITER cooldown=${COOLDOWN_SEC}s " \
+            "(base=${BASE_COOLDOWN}s adaptive=${ADAPTIVE}) — " \
             "thermal recovery" >> "$LOG_DIR/summary.txt"
         # chapter 一千零十五.7 / M3815 — heartbeat during cooldown
         # to prevent harness GC of idle background tasks。 The
