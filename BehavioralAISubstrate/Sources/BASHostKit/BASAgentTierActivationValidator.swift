@@ -68,29 +68,74 @@ import BASMemory
 
 public enum BASAgentTierActivationValidator {
 
-    /// Canonical core-tier seat role names (case-insensitive
-    /// match against `Activation.activeAgents`)。 These are the
-    /// 9 core seats per plan PHASE 1-3。
-    private static let coreSeatNames: Set<String> = [
-        "scout", "planner", "critic", "memory",
-        "hostalignment", "risk", "surface",
-        "sovereignsentinel", "evolutionshadow",
-    ]
+    /// chapter 一千零十.5 / M3760 — Round-20 HIGH-1 fix:derive
+    /// `coreSeatNames` and `watcherNames` structurally from
+    /// `BASAgentRole.allCases` via an EXHAUSTIVE switch。 Adding
+    /// a new role case fails compile here — forces explicit
+    /// categorization,preventing silent drift。
+    ///
+    /// Pre-fix:hardcoded String literal sets。 If `BASAgentRole`
+    /// added (say) a 10th core agent,this validator silently
+    /// classified it as "unknown" under `.all` tier → false
+    /// MISMATCH。 Same drift-class as ch 1000.5 single-canonical
+    /// doctrine。
+    private enum RoleCategory {
+        case core
+        case watcher
+        case sealed
+    }
 
-    /// Canonical watcher role names (when included in
-    /// activeAgents,implies `.all` tier)。 These are the 7
-    /// watchers per plan PHASE 5。
-    private static let watcherNames: Set<String> = [
-        "anomalywatcher", "gaslightwatcher",
-        "memorypollutionwatcher", "hostdriftwatcher",
-        "toolinjectionwatcher", "axisdeviationwatcher",
-        "sanctumleakwatcher",
-    ]
+    /// Exhaustive categorization。 Swift's exhaustivity check
+    /// fails compile if a new BASAgentRole case is added without
+    /// updating this switch — the canonical drift detector。
+    private static func category(
+        of role: BASAgentRole
+    ) -> RoleCategory {
+        switch role {
+        // Core 9 — always-available per plan PHASE 1-3
+        case .scout, .memory, .planner, .critic,
+             .hostAlignment, .risk, .surface,
+             .sovereignSentinel, .evolutionShadow:
+            return .core
+        // Watcher 7 — quiet observers per plan PHASE 5
+        case .anomalyWatcher, .gaslightWatcher,
+             .memoryPollutionWatcher, .hostDriftWatcher,
+             .toolInjectionWatcher, .axisDeviationWatcher,
+             .sanctumLeakWatcher:
+            return .watcher
+        // Sovereign-sealed 4 — LOW tier, no user customization
+        case .actionPermit, .deleteRollbackSeal,
+             .memorySeal, .compareModerator:
+            return .sealed
+        }
+    }
 
-    /// Canonical reference skill agent names (when included,
-    /// implies `.all` tier)。 The 4 reference skill agents per
-    /// plan PHASE 6 ch 973。
-    private static let skillNames: Set<String> = [
+    /// Canonical core-tier seat names — derived from
+    /// `BASAgentRole.allCases` at type-init time。 Lowercased
+    /// for case-insensitive match against
+    /// `Activation.activeAgents`。
+    internal static let coreSeatNames: Set<String> = {
+        Set(BASAgentRole.allCases
+            .filter { category(of: $0) == .core }
+            .map { $0.rawValue.lowercased() })
+    }()
+
+    /// Canonical watcher role names — derived from
+    /// `BASAgentRole.allCases`。 Pre-ch-1010.5 drift now
+    /// impossible:adding a watcher case bumps this set
+    /// automatically。
+    internal static let watcherNames: Set<String> = {
+        Set(BASAgentRole.allCases
+            .filter { category(of: $0) == .watcher }
+            .map { $0.rawValue.lowercased() })
+    }()
+
+    /// Canonical reference skill agent names — these have NO
+    /// `BASAgentRole` enum counterpart (per ch 1010.5 Round-20
+    /// LOW-3 audit observation;plan PHASE 6 ch 973 documents
+    /// them but no enum case shipped yet)。 Hardcoded set is
+    /// honest doctrine until the future arc adds the cases。
+    internal static let skillNames: Set<String> = [
         "writingskill", "codeskill",
         "researchskill", "schedulingskill",
     ]
@@ -99,6 +144,19 @@ public enum BASAgentTierActivationValidator {
     /// consistency。 Returns sorted list of diagnostic strings
     /// — empty when no inconsistencies detected (other than
     /// the informational consistency message)。
+    ///
+    /// chapter 一千零十.5 / M3760 — Round-20 CRITICAL-3 fix:
+    /// adopts U+001F unit-separator for diagnostic field
+    /// joining。 Pre-fix `:` + `=` separators were vulnerable
+    /// to injection — a host setting
+    /// `BAS_ACTIVE_AGENTS=foo:tier=all:agent=evil,Planner`
+    /// could inject a synthetic diagnostic that parsed as a
+    /// fake mismatch。 Post-fix U+001F is illegal in normal
+    /// text so collisions cannot happen。
+    ///
+    /// Diagnostic format (post-fix):
+    ///   `tier.mismatch\u{001F}tier=<tier>\u{001F}agent=<name>`
+    ///   `tier.consistent\u{001F}tier=<tier>\u{001F}agents=<count>`
     public static func validate(
         _ activation: BASAgentFabricGate.Activation
     ) -> [String] {
@@ -106,6 +164,7 @@ public enum BASAgentTierActivationValidator {
         let activeNames = activation.activeAgents.map {
             $0.lowercased()
         }
+        let sep = "\u{001F}"
         switch activation.tier {
         case .core:
             // Detect any watcher / skill names in activeAgents
@@ -115,7 +174,8 @@ public enum BASAgentTierActivationValidator {
                     skillNames.contains(name)
                 {
                     diagnostics.append(
-                        "tier.mismatch:tier=core:agent=\(name)")
+                        "tier.mismatch\(sep)tier=core" +
+                        "\(sep)agent=\(name)")
                 }
             }
         case .all:
@@ -127,7 +187,8 @@ public enum BASAgentTierActivationValidator {
                     !skillNames.contains(name)
                 {
                     diagnostics.append(
-                        "tier.mismatch:tier=all:agent=\(name)")
+                        "tier.mismatch\(sep)tier=all" +
+                        "\(sep)agent=\(name)")
                 }
             }
         }
@@ -135,8 +196,8 @@ public enum BASAgentTierActivationValidator {
         // mismatches were found (helps audit triage)
         if diagnostics.isEmpty {
             diagnostics.append(
-                "tier.consistent:tier=" +
-                "\(activation.tier.rawValue):agents=" +
+                "tier.consistent\(sep)tier=" +
+                "\(activation.tier.rawValue)\(sep)agents=" +
                 "\(activeNames.count)")
         }
         return diagnostics.sorted()

@@ -81,6 +81,32 @@ public struct BASTraceAnnotatorInput:
 
 public enum BASTraceAnnotatorSeat {
 
+    /// chapter 一千零十.5 / M3760 — Round-20 self-audit
+    /// CRITICAL-1 fix:single canonical confidence formula
+    /// for TraceAnnotator-derived signals。
+    ///
+    /// Pre-fix: ch 1002 `emit(...)` and ch 1006
+    /// `BASAgentObservationAuditEmitter.observationFromAnnotator(...)`
+    /// each computed `min(1.0, 0.5 + Double(agentSet.count) * 0.1)`
+    /// independently — EXACT same divergence-risk pattern as
+    /// the ch 1000.5 Round-19 ANE-consult 4-way duplication。
+    /// A future arc tuning the formula in one place silently
+    /// desynced the two projections of the "same signal"。
+    ///
+    /// Post-fix: ONE place computes the formula。 Both call
+    /// sites delegate。 Future tuning changes ONE line。
+    ///
+    /// Formula: starts at 0.5,adds 0.1 per distinct emitting
+    /// agent,clamps at 1.0。 Encodes the intuition that more
+    /// agents observed → higher confidence the turn was
+    /// substantively active。
+    @inlinable
+    public static func confidenceForAgentSet(
+        count: Int
+    ) -> Double {
+        min(1.0, 0.5 + (Double(count) * 0.1))
+    }
+
     /// Pure function:read input + emit one `.annotate` delta。
     /// Returns empty array when input has no emitted deltas to
     /// annotate (annotating empty turns is wasted state-graph
@@ -107,8 +133,10 @@ public enum BASTraceAnnotatorSeat {
             from: input.emittedDeltas)
         let totalEmits = input.emittedDeltas.count
         let agentSet = Set(input.emittedDeltas.map { $0.agentID })
-        let conf = min(
-            1.0, 0.5 + (Double(agentSet.count) * 0.1))
+        // ch 1010.5 CRITICAL-1: delegate to single canonical
+        // formula instead of inline duplication
+        let conf = Self.confidenceForAgentSet(
+            count: agentSet.count)
         return [BASAgentDelta(
             deltaID:
                 "delta.\(input.turnID).trace.\(seq)",

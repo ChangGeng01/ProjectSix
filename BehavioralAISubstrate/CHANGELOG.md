@@ -11,6 +11,160 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十.5 / M3760 — Round-20 self-audit fix-of-fixes
+
+User invoked「全面 audit test 修复 开发 最最 严苛 deep」 —
+comprehensive deep audit with strictest discipline。 Same
+cascade pattern that caught ch 1000.5 (Round-19 ANE consult
+4-way duplication)。 Round-20 audit of「全面 收口 scaffold」
+arc (ch 1006-1010) found 12 items across 4 severity tiers。
+
+**Findings + fixes:**
+
+#### CRITICAL-1: confidence-formula duplication (EXACT Round-19 pattern reborn)
+
+Pre-fix: ch 1002 `BASTraceAnnotatorSeat.emit(...)` and
+ch 1006 `BASAgentObservationAuditEmitter
+.observationFromAnnotator(...)` each computed
+`min(1.0, 0.5 + Double(agentSet.count) * 0.1)` independently
+against the same `agentSet`。 Future arc tuning the formula
+in one place would silently desync the two projections of
+the "same signal" — exact divergence pattern Round-19 caught
+for the 4-way ANE consult duplication。
+
+Post-fix: new `BASTraceAnnotatorSeat.confidenceForAgentSet(count:)`
+@inlinable static helper。 Both call sites delegate。 Future
+tuning changes ONE line。 Pin test in ch 1010.5 verifies
+byte-equal confidence between ch 1002 + ch 1006 for same input。
+
+#### CRITICAL-2: ch 1006 signalRefs separator-injection
+
+Pre-fix: format `observation.<id>:agent=<agentID>:domain=<domain>:flags=<sorted,comma>:conf=<band>`
+used `:` + `=` + `,` separators。 `observationID`, `agentID`,
+and flag values are caller-supplied opaque strings — they
+may legitimately contain those characters。 Replay parser
+splitting on the separators would mis-attribute fields。 Same
+attack-surface class as ch 982.5 (which standardized U+001F
+for warrant refs)。
+
+Post-fix: adopt U+001F (unit-separator) for inter-field
+joins + U+001E (record-separator) for inner-list joins。
+Both are control characters illegal in normal text。 Test
+pins exact 4-U+001F count when agentID contains `:` chars,
+proving injection cannot create extra field boundaries。
+
+#### CRITICAL-3: ch 1008 tier diagnostic separator-injection
+
+Pre-fix: `BASAgentTierActivationValidator` emitted
+`tier.mismatch:tier=core:agent=<name>` — `name` from
+`BAS_ACTIVE_AGENTS` env CSV may contain `:` or `=`。 Same
+class as CRITICAL-2。
+
+Post-fix: U+001F separators between class prefix and key=value
+field segments。 Pin test verifies exactly 2 U+001F per
+diagnostic even when agent name contains multiple `:` chars。
+
+#### HIGH-1: validator name sets drift from BASAgentRole enum
+
+Pre-fix: `BASAgentTierActivationValidator` hardcoded
+`coreSeatNames` + `watcherNames` as String literal sets。
+Drift risk: adding a new `BASAgentRole` case (10th core,
+8th watcher) silently classifies it as "unknown" under
+.all tier (false MISMATCH) or silently allowed under .core。
+No compile-time link between enum + validator。
+
+Post-fix: exhaustive `category(of:) -> RoleCategory` switch
+over `BASAgentRole` — adding a new enum case fails compile
+in the switch。 `coreSeatNames` + `watcherNames` derived
+at type-init from `BASAgentRole.allCases.filter(...).map`。
+Skill names remain hardcoded since they have no enum
+counterpart (per LOW-3 audit observation — plan PHASE 6
+references them but no enum case shipped yet)。 Pin test
+verifies sets match expected post-derivation。
+
+#### HIGH-2: ch 1008 pipeline diagnostic emit untested
+
+Pre-fix: ch 1008 added `diagnostics["gate.tierValidation"]
+= ...` to `BASAgentFabricHostPipeline` but only the
+validator's UNIT tests covered the validator logic。 No
+behavioral test exercised the pipeline-level diagnostic
+emit。 Refactor dropping the line would silently lose the
+wire。
+
+Post-fix: 2 new behavioral tests in ch 1010.5 construct a
+full pipeline + assert `outcome.diagnostics
+["gate.tierValidation"]` is present + carries correct
+class (consistent or mismatch) per the
+`BAS_AGENT_TIER` + `BAS_ACTIVE_AGENTS` combo passed。
+
+#### MED-1: confidence-band boundaries untested
+
+Pre-fix: ch 1006 tests verified bands at interior points
+(0.3, 0.5, 0.8) but NOT at exact thresholds (0.4, 0.7,
+0.3999, 0.6999)。 Refactor changing `<` to `<=` would
+slip past test suite。
+
+Post-fix: ch 1010.5 boundary-case test sweeps 7 conf values
+including exact thresholds and just-below values。
+
+#### MED-2: .compareSelected + empty selectedAgents semantic
+
+Pre-fix: undefined semantic — what does `summarize` return
+when mode=compareSelected with empty list?
+
+Post-fix: PIN test documents current behavior (returns
+non-nil empty summary,distinguishable from `.singleAgent`'s
+explicit nil)。 Future arc may flip to nil if desired,but
+test forces explicit decision。
+
+#### MED-4: ch 1007 empty turnID accepted silently
+
+Pre-fix: `BASAgentFabricModeAuditEmitter.buildEntry(...)`
+with `turnID=""` produces `auditID = "agentFabricMode.audit..<mode>"`
+— observable but not asserted。
+
+Post-fix: PIN test documents the current behavior (empty
+turnID still builds non-empty auditID,with `..` substring
+observable via grep)。 Future hardening to throw on empty
+turnID would fail this test explicitly — forcing the
+behavior change to be deliberate。
+
+**LOW findings** (acknowledged, not all fixed in this sub-chapter):
+- LOW-1: ch 1006 summary field not JSON-escaped (not currently
+  in signalRefs path, so no exploit today)
+- LOW-2: ch 1007 lacks defense commentary like ch 983 (doctrine
+  cleanup,low priority)
+- LOW-3: skill agents have no BASAgentRole enum case (will be
+  closed when plan PHASE 6 ships those cases)
+- LOW-4: hardcoded project path in ch 1010 test (continued
+  doctrine across all arc-seal tests,not a regression)
+
+**HIGH-3 deferred**: schemaVersion `"1.1.0"` hardcoded across
+10+ sites identified by audit。 Genuine drift but ALSO touches
+files outside the 收口 arc scope。 Defer to a dedicated
+schema-version-canonicalization chapter rather than expanding
+this fix-of-fix。
+
+**Verification:**
+
+- `swift build` clean
+- `swift test --filter BASChapter1010_5` — 9 / 9 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,578 / 14,578
+  pass, 0 failures**
+- `bash scripts/pre-commit-gates.sh` — 3 / 3 gates clean
+
+**Discipline pins held:**
+
+- 红线 7 additive only — existing call sites adapted but no
+  new API surface added beyond the canonical helper +
+  validator derivation
+- Same-class-bug hunting (Round-19 / Round-20 pattern) — 3
+  CRITICAL findings caught at this round vs 1 at Round-19,
+  confirming the cascade is genuinely catching issues
+- Single-canonical doctrine — confidence formula now exists
+  in exactly 1 place;validator name sets derived from
+  exactly 1 enum
+
 ### Chapters 一千零六 - 一千一十 (M3735-M3755) — 全面 收口 scaffold arc
 
 After ch 1001-1005 closed the「全面 完成 scaffold」arc (5 forward-

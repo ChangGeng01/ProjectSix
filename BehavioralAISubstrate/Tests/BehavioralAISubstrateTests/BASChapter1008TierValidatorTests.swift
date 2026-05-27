@@ -49,7 +49,7 @@ final class BASChapter1008TierValidatorTests: XCTestCase {
             .validate(activation)
         XCTAssertEqual(diag.count, 1)
         XCTAssertTrue(
-            diag[0].contains("tier.consistent:tier=core"),
+            diag[0].contains("tier.consistent\u{001F}tier=core"),
             "ch 1008: empty activeAgents + .core MUST be " +
             "consistent (default config)")
     }
@@ -102,7 +102,7 @@ final class BASChapter1008TierValidatorTests: XCTestCase {
             .validate(activation)
         XCTAssertEqual(diag.count, 1)
         XCTAssertTrue(
-            diag[0].contains("tier.mismatch:tier=core") &&
+            diag[0].contains("tier.mismatch\u{001F}tier=core") &&
             diag[0].contains("codeskill"))
     }
 
@@ -117,7 +117,7 @@ final class BASChapter1008TierValidatorTests: XCTestCase {
             .validate(activation)
         XCTAssertEqual(diag.count, 1)
         XCTAssertTrue(
-            diag[0].contains("tier.consistent:tier=all"),
+            diag[0].contains("tier.consistent\u{001F}tier=all"),
             "ch 1008: .all + watchers + core seats MUST be " +
             "consistent")
     }
@@ -132,7 +132,7 @@ final class BASChapter1008TierValidatorTests: XCTestCase {
             .validate(activation)
         XCTAssertEqual(diag.count, 1)
         XCTAssertTrue(
-            diag[0].contains("tier.mismatch:tier=all") &&
+            diag[0].contains("tier.mismatch\u{001F}tier=all") &&
             diag[0].contains("zorpagent"),
             "ch 1008 CRITICAL: unknown agent name MUST emit " +
             "mismatch in .all tier (catches typos)")

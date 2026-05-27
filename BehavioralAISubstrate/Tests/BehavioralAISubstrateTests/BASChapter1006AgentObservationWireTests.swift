@@ -178,11 +178,30 @@ final class BASChapter1006AgentObservationWireTests: XCTestCase {
         XCTAssertTrue(ref.contains("conf=high"),
             "ch 1006: ref MUST include confidence band " +
             "(>=0.7 → high)")
-        // Flags MUST be sorted
+        // ch 1010.5 CRITICAL-2 fix: flags use U+001E
+        // (record-separator) as inner join — `,` would
+        // legitimately appear in flag values
         XCTAssertTrue(
-            ref.contains("flags=agent-count=2,trace-summary"),
-            "ch 1006: flags MUST be sorted alphabetically " +
-            "for byte-equal output, got: \(ref)")
+            ref.contains(
+                "flags=agent-count=2\u{001E}trace-summary"),
+            "ch 1010.5: flags MUST be sorted alphabetically " +
+            "+ joined with U+001E (record separator),got: " +
+            "\(ref)")
+        // ch 1010.5 CRITICAL-2 fix: inter-field separator is
+        // U+001F (unit-separator),NOT `:` — `:` is legal in
+        // user-supplied IDs and would corrupt replay parser
+        XCTAssertTrue(
+            ref.contains("\u{001F}agent="),
+            "ch 1010.5: ref MUST use U+001F before `agent=`")
+        XCTAssertTrue(
+            ref.contains("\u{001F}domain="),
+            "ch 1010.5: ref MUST use U+001F before `domain=`")
+        XCTAssertTrue(
+            ref.contains("\u{001F}flags="),
+            "ch 1010.5: ref MUST use U+001F before `flags=`")
+        XCTAssertTrue(
+            ref.contains("\u{001F}conf="),
+            "ch 1010.5: ref MUST use U+001F before `conf=`")
     }
 
     // MARK: - 6. CRITICAL end-to-end via audit ledger

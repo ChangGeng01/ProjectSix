@@ -70,8 +70,16 @@ public enum BASAgentObservationAuditEmitter {
     /// the observation set without round-tripping the full
     /// observation payload。
     ///
-    /// Format per entry:
-    ///   `observation.<observationID>:agent=<agentID>:domain=<domain>:flags=<sorted,comma>:conf=<band>`
+    /// Format per entry (chapter 一千零十.5 / M3760 — Round-20
+    /// CRITICAL-2 fix:adopts the U+001F unit-separator + U+001E
+    /// record-separator discipline ch 982.5 already standardized
+    /// for warrant refs。 Pre-fix `:` + `=` + `,` separators
+    /// were vulnerable to injection — observationID,agentID,or
+    /// flags containing those characters silently corrupted the
+    /// replay parser。 Post-fix the U+001F sentinels are illegal
+    /// in normal text so collisions cannot happen):
+    ///
+    ///   `observation.<id>\u{001F}agent=<agentID>\u{001F}domain=<domain>\u{001F}flags=<sorted\u{001E}joined>\u{001F}conf=<band>`
     ///
     /// Confidence band:`low` (<0.4) / `med` (<0.7) / `high` (>=0.7)
     /// — keeps the ref length bounded across fuzz inputs while
@@ -85,15 +93,25 @@ public enum BASAgentObservationAuditEmitter {
         let sorted = observations.sorted {
             $0.observationID < $1.observationID
         }
+        let unitSep = "\u{001F}"
+        let recordSep = "\u{001E}"
         return sorted.map { obs in
             let band = confidenceBand(obs.confidence)
+            // ch 1010.5 CRITICAL-2: U+001E (record separator)
+            // for inner-list join — flag values may contain
+            // `,` legitimately,but U+001E is illegal in
+            // user-supplied text。
             let flagsStr = obs.flags.sorted()
-                .joined(separator: ",")
+                .joined(separator: recordSep)
+            // ch 1010.5 CRITICAL-2: U+001F (unit separator)
+            // for inter-field join — observationID / agentID
+            // may contain `:` or `=` legitimately,but U+001F
+            // is illegal in user-supplied text。
             return "observation.\(obs.observationID)" +
-                ":agent=\(obs.agentID)" +
-                ":domain=\(obs.observedDomain.rawValue)" +
-                ":flags=\(flagsStr)" +
-                ":conf=\(band)"
+                "\(unitSep)agent=\(obs.agentID)" +
+                "\(unitSep)domain=\(obs.observedDomain.rawValue)" +
+                "\(unitSep)flags=\(flagsStr)" +
+                "\(unitSep)conf=\(band)"
         }
     }
 
@@ -121,8 +139,15 @@ public enum BASAgentObservationAuditEmitter {
         seq += 1
         let totalEmits = input.emittedDeltas.count
         let agentSet = Set(input.emittedDeltas.map { $0.agentID })
-        let conf = min(
-            1.0, 0.5 + (Double(agentSet.count) * 0.1))
+        // chapter 一千零十.5 / M3760 — Round-20 CRITICAL-1 fix:
+        // delegate to ch 1002 canonical confidence formula
+        // instead of inline-duplicating。 Was the EXACT same
+        // divergence-risk pattern ch 1000.5 found for ANE
+        // consult。 Future arc tuning the formula in one place
+        // now updates both projections of the "same signal"
+        // atomically。
+        let conf = BASTraceAnnotatorSeat
+            .confidenceForAgentSet(count: agentSet.count)
         let flags: [String] = [
             "trace-summary",
             "agent-count=\(agentSet.count)",
