@@ -7,29 +7,43 @@
 // 我希望 大部分 固定 数值 都可以 改成 完全 flexible 程序化 生成
 // 而不是 死数值」
 //
-// Comprehensive evolution per user mandate:
+// chapter 一千零十八.5 / M3840 — Round-27 corrected the
+// chapter doctrine to match what the file ACTUALLY does:
 //
-//   1. PROCEDURAL VALUE GENERATION — all iteration counts,
-//      timeouts,thresholds derived from BAS_FUZZ_INTENSITY env
-//      var via deterministic BASFuzzRng seeded with test name +
-//      iter index。 No dead numbers in this file。
+//   1. PROCEDURAL value PICKS — per-iter values within ranges
+//      vary via deterministic BASFuzzRng seeded by (test-name,
+//      iter-index)。 The RANGES themselves and the intensity
+//      bands ARE hardcoded anchors (~20 dead numbers across
+//      the file)。 Honest framing:proc-gen picks,not proc-
+//      gen ranges。
 //
-//   2. 14-LAYER COMPLETE COVERAGE — ch 946 covered 11 of 14
-//      layers,missing L6 (cortexCheck),L9 (dreamLoop),
-//      L10 (triSelf)。 ch 1017 fills these gaps + adds per-
-//      component sub-smoke within each layer。
+//   2. PARTIAL LAYER COVERAGE — this file covers 7 layers
+//      (L1, L6, L7, L9, L10, L11, L14)。 ch 946 covers 10
+//      layers (L1, L2, L3, L4, L5, L8, L11, L12, L13, L14)。
+//      Union is 12 of 14 layers。 Missing in BOTH chapters:
+//      L6 (cortexCheck) is in ch 1017 only,L7 is in ch 1017
+//      only,L9 and L10 are in ch 1017 only。 So combined
+//      coverage IS 14 layers when both test classes run。
+//      But neither file alone covers all 14 — Round-26 + 27
+//      caught the「14-layer complete coverage」 over-claim。
 //
 //   3. INTENSITY SCALING — single env var BAS_FUZZ_INTENSITY
-//      scales ALL iter counts across all 14 layers uniformly:
+//      scales iter counts for THIS file's 7 layer tests:
 //        intensity=1 (smoke,default): 10 iter per sub-test
 //        intensity=5 (stress): 50 iter per sub-test
 //        intensity=10 (endurance,for 1hr device runs): 100 iter
 //        intensity=20 (max): 200 iter (~3-4hr device equivalent)
+//      ch 946 has its own BAS_FUZZ_ITER + BAS_FUZZ_RUNTIME_ITER
+//      scaling (different env var, different magnitude)。
 //
-//   4. AGGREGATE「ALL GREEN」 PIN — `testAllFourteenLayers_
-//      AggregateGreenScorecard` runs all per-layer tests +
-//      asserts each contributed ≥1 successful iter。 Single
-//      red light from any layer fails the aggregate。
+//   4. ~~AGGREGATE「ALL GREEN」 PIN~~ — chapter 一千零十八 /
+//      M3835 Round-26 MED-2 fix DELETED the aggregate test。
+//      Reason:XCTest auto-discovers each `test*` method +
+//      calling them via aggregate caused 2× execution。 Now
+//      each layer test stands alone — XCTest's own run
+//      summary serves the「all green」 gate。 If any layer
+//      fails standalone,the test class fails,which fails
+//      the build / device-iter。 Same gate,half the work。
 //
 //   5. BENCHMARK SCORECARD — each sub-test emits a「scorecard」
 //      print with op + iter-count + duration + per-iter
@@ -41,8 +55,9 @@
 // ch 946 was the original 14-layer smoke。 Over chapters
 // 947-1014 the substrate gained ~30 new public APIs,subsystems,
 // and behavior surfaces。 ch 946's coverage didn't grow with the
-// substrate。 ch 1017 is the「rebase」 — fully procedural,fully
-// intensity-scaled,fully 14-layer + per-component。
+// substrate。 ch 1017 is the「rebase」 for the 4 layers ch 946
+// missed (L6, L7, L9, L10) + adds proc-gen picks for layers
+// both chapters touch (L1, L11, L14)。
 //
 // ## Discipline
 //
@@ -544,27 +559,11 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             minMs: minMs, maxMs: maxMs)
     }
 
-    // MARK: - Aggregate「all 14 layers green」 pin
-
-    // chapter 一千零十八 / M3835 — Round-26 MED-2 fix:
-    // aggregate test deleted。 XCTest auto-discovers EVERY
-    // `test*` method in this class + runs them as standalone
-    // tests。 The aggregate also called each layer test inline,
-    // causing **2× execution** (and 2× thermal load on device)
-    // per layer per run。 Round-26 caught this。
-    //
-    // Honest design: each layer test stands alone with full
-    // intensity-scaled iter coverage。 Test plan discovers
-    // them via class inclusion (Device2HrFuzz.xctestplan).
-    // No aggregate needed — XCTest's own run summary serves
-    // the「all green」 gate naturally。 If any layer's
-    // standalone run fails, the test class fails, which fails
-    // the build/CI/device-iter。 Same gate, half the work。
-    //
-    // chapter 一千零十八 / M3835 — Round-26 MED-3 fix:
-    // pre-fix doc claimed ch 946 owns
-    // 「L2/L3/L4/L5/L8/L11/L12/L13/L14」 — omitted that ch 946
-    // ALSO has L1 tests (testL1WakePolicyFuzz +
-    // testL1LeaseLifeCoverage)。 Removing aggregate also
-    // removes the misleading enumeration。
+    // chapter 一千零十八.5 / M3840 — Round-27 LOW-2 fix:
+    // empty MARK section + comment-only placeholder removed。
+    // Aggregate test was deleted at ch 1018 (Round-26 MED-2)。
+    // XCTest auto-discovers each test* method standalone,so
+    // no aggregate needed。 See file header for the design
+    // doctrine — no need to repeat at the end-of-class
+    // placeholder。
 }

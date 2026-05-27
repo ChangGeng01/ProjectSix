@@ -212,6 +212,27 @@ while true; do
     else
         COOLDOWN_SEC=$BASE_COOLDOWN
     fi
+    # chapter 一千零十八.5 / M3840 — Round-27 MED-2 + MED-3 fix:
+    # clamp BEFORE the cooldown announcement (was AFTER pre-
+    # fix,creating two adjacent lines where the first lied
+    # about duration)。 Also: when user explicitly sets
+    # BAS_ITER_COOLDOWN_SEC to a non-multiple-of-10,we now
+    # FLOOR to nearest multiple (was ceiling pre-fix,which
+    # silently extended user's choice by up to 9s)。 Honest:
+    # user asked for 15s,gets 10s + 1 line WARN。
+    if [ $COOLDOWN_SEC -gt 0 ] \
+        && [ $((COOLDOWN_SEC % 10)) -ne 0 ]
+    then
+        FLOORED=$(( COOLDOWN_SEC / 10 * 10 ))
+        if [ $FLOORED -lt 10 ]; then
+            FLOORED=10  # min 10s for heartbeat
+        fi
+        echo "$(date) iter=$ITER WARN: cooldown floored " \
+            "${COOLDOWN_SEC}s → ${FLOORED}s " \
+            "(heartbeat granularity 10s)" \
+            >> "$LOG_DIR/summary.txt"
+        COOLDOWN_SEC=$FLOORED
+    fi
     if [ $COOLDOWN_SEC -gt 0 ]; then
         echo "$(date) iter=$ITER cooldown=${COOLDOWN_SEC}s " \
             "(base=${BASE_COOLDOWN}s adaptive=${ADAPTIVE}) — " \
@@ -224,19 +245,11 @@ while true; do
         # the file modification time keeps advancing。 The harness
         # observability also sees the stdout heartbeat。
         #
-        # chapter 一千零十八 / M3835 — Round-25 MED-2 fix:
-        # pre-fix loop overshot for non-multiple-of-10 cooldowns
-        # (e.g. BAS_ITER_COOLDOWN_SEC=5 → actual 10s = 100%
-        # overshoot)。 Now clamp to multiple-of-10 with floor at
-        # 10s,emit warning if input was clamped。
-        if [ $((COOLDOWN_SEC % 10)) -ne 0 ]; then
-            CLAMPED=$(( (COOLDOWN_SEC / 10 + 1) * 10 ))
-            echo "$(date) iter=$ITER WARN: cooldown clamped " \
-                "${COOLDOWN_SEC}s → ${CLAMPED}s " \
-                "(heartbeat granularity 10s)" \
-                >> "$LOG_DIR/summary.txt"
-            COOLDOWN_SEC=$CLAMPED
-        fi
+        # chapter 一千零十八.5 / M3840 — Round-27 MED-2/3 fix:
+        # this inner clamp block is now empty — the clamp was
+        # moved OUTSIDE the cooldown announcement (~10 lines
+        # above) so the WARN appears BEFORE the cooldown=
+        # announcement,not after。 Honest log ordering。
         ELAPSED_COOL=0
         while [ $ELAPSED_COOL -lt $COOLDOWN_SEC ]; do
             sleep 10

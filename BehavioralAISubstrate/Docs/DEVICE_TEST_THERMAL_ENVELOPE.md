@@ -29,11 +29,11 @@ choices are grounded in data。
 
 ### Run results
 
-| Run | Cooldown | Duration | Iters clean | First-failed iter | Why stopped |
-|---|---|---|---|---|---|
-| v4 (ch 1015.5) | 0s | 25:37 | 6 | iter 7 | p99=21.07s > 20s ceiling |
-| v7 (ch 1015.6) | 60s | 15:52 | 4 | n/a | harness GC during MLX silence |
-| v8 (ch 1015.7) | 60s + heartbeat | 21:30 | 5 | iter 6 | p99=21.77s > 20s ceiling |
+chapter 一千零十八.5 / M3840 — Round-27 MED-1 fix: previously
+this table listed only v4/v7/v8 — v9 was documented in a
+separate section below。 Now the canonical 4-run table is
+consolidated at the bottom of this doc (search「Run results
+(chronological)」)。
 
 ### Per-iter p99 latency observed
 
@@ -82,7 +82,16 @@ which manifests as 20-40% MLX inference latency increase。
 | Sustained (6-10 iters) | 60-120s adaptive | 25s |
 | Endurance (1hr+, 10+ iters) | 120-180s adaptive | 25s |
 
-## v9 empirical validation (ch 1018 update)
+## v9 empirical validation (validates ch 1016, not ch 1018)
+
+chapter 一千零十八.5 / M3840 — Round-27 HIGH-3 fix:
+clarifies what v9 actually validates。 Pre-fix this section
+claimed v9 validated「ch 1018 update」 but timestamp evidence:
+v9 ran 23:55:22 → 01:01:43,ch 1018 push at 01:09:06 (after
+v9 ended)。 v9's test plan never included any ch 1018 changes
+(verified via grep on iter-*.log: zero「FullyProcedural」
+references)。 v9 honestly validates **ch 1016 thermal envelope**
+(its actual contemporary scope)。
 
 After ch 1016 shipped,v9 device run (MAX_SEC=3600,
 BAS_ITER_COOLDOWN_SEC=60,adaptive cooldown active) achieved:
@@ -98,10 +107,34 @@ BAS_ITER_COOLDOWN_SEC=60,adaptive cooldown active) achieved:
 **Round-25 HIGH-3 prediction WITHDRAWN**: Round-25 audit
 predicted adaptive cooldown math would prevent iter 11+ within
 MAX_SEC=3600。 Empirical v9 disproved this — iter 11-12 BOTH
-fit。 The audit's math was correct in arithmetic but missed
-that adaptive cooldown only adds the larger-base term in
-specific iter ranges,not all of them。 Honest correction:
-the schedule is tight but viable for 12 iter / 1hr。
+fit。
+
+chapter 一千零十八.5 / M3840 — Round-27 HIGH-1 fix:
+the actual reason for the off-by-one (ch 1018 pre-fix gave
+wrong reason)。 Round-25's arithmetic assumed iter 11 uses
+the「iter 11+」 schedule (300s cooldown)。 But the script's
+schedule is:
+  - iter 6-10: base × 2 + 60 = 180s
+  - iter 11+:  base × 3 + 120 = 300s
+So iter 11 cooldown was 180s,iter 12 cooldown was 300s。
+Round-25 predicted「iter 11 cooldown = 300s」 → off-by-one。
+With actual 180s cooldown at iter 11,iter 12 starts at
+~3047s + 240s + 180s = ~3467s, well within MAX_SEC。 Then
+iter 12's 300s cooldown can complete (script checks MAX_SEC
+at top of loop, not during cooldown sleep — iter-12 cooldown
+finishes,then loop re-checks MAX_SEC + exits)。
+
+## Run results (chronological)
+
+chapter 一千零十八.5 / M3840 — Round-27 MED-1 fix:
+v9 was missing from this table。 Re-syncing with all 4 runs:
+
+| Run | Cooldown | Duration | Iters clean | First-failed iter | Why stopped |
+|---|---|---|---|---|---|
+| v4 (ch 1015.5) | 0s | 25:37 | 6 | iter 7 | p99=21.07s > 20s ceiling |
+| v7 (ch 1015.6) | 60s | 15:52 | 4 | n/a | harness GC during MLX silence |
+| v8 (ch 1015.7) | 60s + heartbeat | 21:30 | 5 | iter 6 | p99=21.77s > 20s ceiling |
+| **v9 (ch 1016)** | **60s adaptive + heartbeat + 25s ceiling** | **1:06:21** | **12** | **n/a** | **MAX_SEC cap hit naturally** |
 
 ## ch 1016 evolution
 
