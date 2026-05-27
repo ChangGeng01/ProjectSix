@@ -298,26 +298,97 @@ public struct BASAgentFabricHostPipeline {
         // fields now flow through from the runTurn parameters
         // (or coordinator.hostConstitution which the pipeline
         // can read directly without per-call params)。
+        //
+        // chapter 一千零一 / M3710 — wire BAS_ACTIVE_AGENTS env
+        // var to actually filter optional seats。 Pre-fix the
+        // env var was decorative (parsed into Activation,
+        // surfaced in diagnostics,never affected behavior per
+        // ch 995.5 SCAFFOLD doctrine)。 Now if BAS_ACTIVE_AGENTS
+        // is non-empty,nil out inputs for optional seats whose
+        // role is NOT in the active set。 Mandatory 4 seats
+        // (Scout/Planner/Risk/Surface) always run regardless —
+        // they're structurally required by BASAgentTurnInput
+        // shape。 Optional 5 (Memory/Critic/HostAlignment/
+        // SovereignSentinel/EvolutionShadow) gate on env-var
+        // inclusion。
+        //
+        // Role-name matching is case-insensitive。 The 5
+        // canonical role names are:
+        //   "memory" / "critic" / "hostAlignment" /
+        //   "sovereignSentinel" / "evolutionShadow"
+        let activeRoles =
+            Self.canonicalRoles(
+                fromActiveAgents: activation.activeAgents)
+        let effectiveMemory: BASMemorySeatInput? =
+            (activeRoles.isEmpty
+                || activeRoles.contains("memory"))
+                ? memoryInput : nil
+        // criticInput is BUILT from triScores inside FullTurn
+        // Adapter — to filter Critic,zero out triScores when
+        // not in activeRoles so the adapter's
+        // `triScores.isEmpty` check skips Critic enrichment
+        let effectiveTriScores: [BASTriSelfScore] =
+            (activeRoles.isEmpty
+                || activeRoles.contains("critic"))
+                ? triScores : []
+        // hostAlignment is BUILT from coordinator.hostConstitution
+        // inside FullTurnAdapter — but the pipeline passes the
+        // constitution implicitly via liveInputs.hostConstitution
+        // → adapter calls hostAlignmentInput(from:). To filter
+        // HostAlignment,nil the constitution in liveInputs
+        // (which suppresses the adapter's call)。 But hostID
+        // diagnostic still needs the original constitution if
+        // present。 Capture for diagnostics first,then
+        // conditionally nil。
+        let effectiveHostConstitution: BASHostConstitution? =
+            (activeRoles.isEmpty
+                || activeRoles.contains("hostAlignment"))
+                ? coordinator.hostConstitution : nil
+        let effectiveSovereignInput:
+            BASSovereignSentinelInput? =
+            (activeRoles.isEmpty
+                || activeRoles.contains("sovereignSentinel"))
+                ? sovereignSentinelInput : nil
+        let effectiveEvolutionInput:
+            BASEvolutionShadowInput? =
+            (activeRoles.isEmpty
+                || activeRoles.contains("evolutionShadow"))
+                ? evolutionShadowInput : nil
+
         let liveInputs = BASAgentFabricLiveInputs(
             frame: decomposeFrame,
             candidatePaths: candidatePaths,
             acceptedCandidateID: acceptedCandidateID,
-            hostConstitution:
-                coordinator.hostConstitution,
+            hostConstitution: effectiveHostConstitution,
             riskCard: riskCard,
-            triScores: triScores,
-            memoryInput: memoryInput,
+            triScores: effectiveTriScores,
+            memoryInput: effectiveMemory,
             sovereignSentinelInput:
-                sovereignSentinelInput,
+                effectiveSovereignInput,
             evolutionShadowInput:
-                evolutionShadowInput,
+                effectiveEvolutionInput,
             warrantValidation: warrantValidation,
             priorityContext: priorityContext,
             nowNanos: nowNanos)
 
         if let constitution = coordinator.hostConstitution {
+            // chapter 一千零一 / M3710:host.id always reads from
+            // the ORIGINAL coordinator constitution,not the
+            // post-filter effectiveHostConstitution (which may
+            // be nil when "hostAlignment" not in activeAgents)。
+            // Hosts always want to see WHO they are,regardless
+            // of whether the HostAlignment seat is filtered。
             diagnostics["host.id"] = constitution.hostID
         }
+        // chapter 一千零一 / M3710:expose the canonical-roles
+        // filter set so hosts can verify which optional seats
+        // were active for this turn。 Empty = no filter (all
+        // optional seats active);non-empty = the 5 optional-
+        // seat names that were INCLUDED。
+        diagnostics["filter.optionalSeatsActive"] =
+            activeRoles.isEmpty
+                ? "(no-filter)"
+                : activeRoles.sorted().joined(separator: ",")
         diagnostics["candidates.count"] =
             "\(candidatePaths.count)"
         // chapter 九百九十五.7 Round-13 CRITICAL-1 fix:emit a
@@ -404,5 +475,65 @@ public struct BASAgentFabricHostPipeline {
             activation: activation,
             fabricMode: resolvedMode,
             diagnostics: diagnostics)
+    }
+
+    /// chapter 一千零一 / M3710 — normalize BAS_ACTIVE_AGENTS
+    /// env var values to canonical role names。 Pre-fix the env
+    /// var was decorative — parsed into `Activation.activeAgents`
+    /// CSV but never affected behavior。 Now this helper maps the
+    /// CSV entries to the 5 optional-seat canonical role strings
+    /// so the pipeline can filter optional seats by inclusion。
+    ///
+    /// Mapping is case-insensitive。 Recognized inputs (and
+    /// canonical outputs):
+    ///   "Memory" / "memory" → "memory"
+    ///   "Critic" / "critic" → "critic"
+    ///   "HostAlignment" / "hostalignment" / "hostalign" →
+    ///     "hostAlignment"
+    ///   "SovereignSentinel" / "sentinel" / "sovereign" →
+    ///     "sovereignSentinel"
+    ///   "EvolutionShadow" / "evolution" / "evolutionshadow" →
+    ///     "evolutionShadow"
+    /// Unrecognized entries are silently dropped (they don't
+    /// correspond to optional seats)。
+    ///
+    /// Mandatory seats (Scout / Planner / Risk / Surface) are
+    /// NOT in this set — they always run regardless of
+    /// activeAgents per the doctrine "filtering only affects
+    /// optional seats since mandatory seats are structurally
+    /// required by BASAgentTurnInput"。 Entries like "Planner"
+    /// or "Risk" in BAS_ACTIVE_AGENTS are still parsed into
+    /// `Activation.activeAgents` for diagnostic visibility but
+    /// don't appear here because their corresponding seats
+    /// always run。
+    ///
+    /// Empty input array returns empty set;callers interpret
+    /// empty as "no filter — all optional seats active" per
+    /// the pipeline's `activeRoles.isEmpty || ...` check。
+    static func canonicalRoles(
+        fromActiveAgents agents: [String]
+    ) -> Set<String> {
+        var out: Set<String> = []
+        for raw in agents {
+            let normalized = raw
+                .trimmingCharacters(in: .whitespaces)
+                .lowercased()
+            switch normalized {
+            case "memory":
+                out.insert("memory")
+            case "critic":
+                out.insert("critic")
+            case "hostalignment", "hostalign":
+                out.insert("hostAlignment")
+            case "sovereignsentinel", "sentinel",
+                 "sovereign":
+                out.insert("sovereignSentinel")
+            case "evolutionshadow", "evolution":
+                out.insert("evolutionShadow")
+            default:
+                continue
+            }
+        }
+        return out
     }
 }
