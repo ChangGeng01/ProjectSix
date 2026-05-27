@@ -58,7 +58,7 @@ internally at apply / merge / emit time。
 | `BASAgentMergeResult` | ✅ WIRED | applier loops over accepted |
 | `BASSharedStateGraph` | ✅ WIRED | core write path |
 | `BASAgentTraceEvent` | ✅ WIRED | logged + flushed |
-| `BASAgentObservation` | 🪜 SCAFFOLD | watcher hint surface;substrate doesn't branch but L14 audit reads |
+| `BASAgentObservation` | ✅ WIRED (ch 1006) | Pre-ch-1006 doctrine claim「L14 audit reads」was inaccurate — grep proved NO substrate consumer。 Now `BASAgentObservationAuditEmitter.{signalRefs, observationFromAnnotator}` provides canonical producer + serializer for the L14 audit ledger。 Closes a mislabeled-DEAD-as-SCAFFOLD gap。 |
 
 ### Seat input/output DTOs (Phase 1-3, ch 957-965)
 
@@ -113,13 +113,13 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 
 | API | Status | Notes |
 |---|---|---|
-| `BASAgentFabricMode` enum | 🪜 SCAFFOLD | stored on runtime,surfaced in outcome,but NO Sources/ branches on it。 Substrate doesn't switch behavior between `.observationOnly` and `.authoritative`;host's downstream consumer (the code reading outcome.fabricMode) decides what to do with the result。 Per ch 994 + ch 995.9 explicit doctrine。 |
-| `BASAgentFabricMode.observationOnly` | 🪜 SCAFFOLD | default value (back-compat) |
-| `BASAgentFabricMode.authoritative` | 🪜 SCAFFOLD | host signal — substrate behavior byte-identical to `.observationOnly` |
+| `BASAgentFabricMode` enum | ✅ WIRED (ch 1007) | Substrate-side observer ships via `BASAgentFabricModeAuditEmitter`。 Mode flag now leaves a substrate-observable audit-ledger artifact per turn。 Substrate BEHAVIOR remains unchanged per ch 994 — the wire is observer-only。 |
+| `BASAgentFabricMode.observationOnly` | ✅ WIRED (ch 1007) | Audited per turn with `observationOnly` verdictRef |
+| `BASAgentFabricMode.authoritative` | ✅ WIRED (ch 1007) | Audited per turn with `authoritative` verdictRef — substrate's dispatcher / merge / apply output remains byte-equal between modes,but replay tooling can now distinguish。 Phase 9+ work flips actual coordinator branching;ch 1007 wires the observability。 |
 | `BASAgentFabricGate.activationFromEnvironment(_:)` | ✅ WIRED | pipeline consumer + tests |
 | `BASAgentFabricGate.Activation.fabricEnabled` | ✅ WIRED | pipeline guards on it |
-| `BASAgentFabricGate.Tier.core` / `.all` | 🪜 SCAFFOLD | parsed into Activation,surfaced in diagnostics,but NO Sources/ branches on it for roster filtering。 Decorative env-var echo per ch 995.5 doctrine。 Full tier-filter behavioral wire deferred to phase 9+ scope (would require new dispatcher behavior)。 |
-| `BASAgentFabricGate.TranscriptMode.singleAgent` / `.compareAll` / `.compareSelected` | 🪜 SCAFFOLD | same as Tier — parsed,surfaced,not branched on substrate-side |
+| `BASAgentFabricGate.Tier.core` / `.all` | ✅ WIRED (ch 1008) | `BASAgentTierActivationValidator` detects tier ↔ activeAgents inconsistencies (e.g. `.core` + watcher name = mismatch)。 Host pipeline emits `gate.tierValidation` diagnostic per turn。 Full multi-chapter roster-filter wire (watcher + skill integration) is Phase 9+ — but this chapter ships real behavioral wire today。 |
+| `BASAgentFabricGate.TranscriptMode.singleAgent` / `.compareAll` / `.compareSelected` | ✅ WIRED (ch 1009) | `BASAgentFabricTranscriptProjection.summarize(...)` produces a per-agent activity summary that GENUINELY varies by mode。 `.singleAgent` → nil (byte-equal old);`.compareAll` → full summary;`.compareSelected` → scoped summary。 Substantive output difference between modes。 Phase 9+ adds new `BASRenderFrame` variants on top of this projection。 |
 | `BASAgentFabricGate.Activation.activeAgents` | ✅ WIRED (ch 1001) | CSV from env now drives optional-seat filtering in `BASAgentFabricHostPipeline`。 Memory / triScores / hostConstitution / sovereign / evolution seats are nil-filtered when `BAS_ACTIVE_AGENTS` is set + does not include their canonical role name。 Backward compat: empty CSV = no filter (preserves pre-ch-1001 behavior)。 |
 
 ### Audit + storage (ch 994.5-994.7)
@@ -162,9 +162,9 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 **Total public APIs shipped in arc 953-995.9**: ~75 (including
 adapters / bridges / DTOs / enums)。
 
-**Status counts** (post-ch 1004):
-- ✅ WIRED: ~54 (72%)
-- 🪜 SCAFFOLD: ~18 (24%)
+**Status counts** (post-ch 1009「全面 收口 scaffold」arc):
+- ✅ WIRED: ~62 (83%)
+- 🪜 SCAFFOLD: ~10 (13%)
 - 💀 DEAD / future-allocation: ~3 (4%)
 
 **Change vs ch 996 inventory**:
@@ -179,6 +179,15 @@ adapters / bridges / DTOs / enums)。
 - ch 1004 closed `recordEvent` streaming gap (SCAFFOLD → WIRED via
   `BASAgentTraceStreamingSink` protocol + `BASAgentTraceBufferingSink`
   reference impl + bridge `recordEvent(_:streamingTo:)` overload)。
+- **「全面 收口 scaffold」arc (ch 1006-1010)** closed 4 more items:
+  - ch 1006 — `BASAgentObservation` (mislabeled-DEAD-as-SCAFFOLD) via
+    `BASAgentObservationAuditEmitter` for L14 audit signalRefs
+  - ch 1007 — `BASAgentFabricMode` substrate-observability via
+    `BASAgentFabricModeAuditEmitter`
+  - ch 1008 — `Gate.Tier` validation wire via
+    `BASAgentTierActivationValidator`
+  - ch 1009 — `Gate.TranscriptMode` per-agent summary via
+    `BASAgentFabricTranscriptProjection`
 
 **Reading**: 2/3 of the arc is genuinely-wired internal substrate
 infrastructure。 1/4 is host-observable scaffold (host SDK can

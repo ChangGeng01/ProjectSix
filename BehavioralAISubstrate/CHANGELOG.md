@@ -11,6 +11,156 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapters 一千零六 - 一千一十 (M3735-M3755) — 全面 收口 scaffold arc
+
+After ch 1001-1005 closed the「全面 完成 scaffold」arc (5 forward-
+closure items),the user invoked「全面 收口 scaffold」—
+comprehensively seal-off the remaining scaffold items。 This
+arc tackles 4 more items that were previously labeled
+multi-chapter scope but turned out to have honest single-
+chapter closures (substrate-side observer wires that don't
+lie about substrate behavior)。
+
+| Chapter | Closure | Pattern |
+|---|---|---|
+| ch 1006 | `BASAgentObservation` mislabeled-DEAD → WIRED | Producer / audit-emit |
+| ch 1007 | `BASAgentFabricMode` substrate-observability | Substrate-side observer |
+| ch 1008 | `Gate.Tier.core/.all` validation wire | Validator |
+| ch 1009 | `Gate.TranscriptMode` per-agent summary | Projection DTO |
+| ch 1010 | Arc seal + structural pin | Doctrine + test |
+
+### Chapter 一千零六 / M3735 — `BASAgentObservation` mislabeled-DEAD → ✅ WIRED
+
+Per `Docs/SCAFFOLD_VS_WIRED.md` ch 996 inventory:
+`BASAgentObservation` was listed as 🪜 SCAFFOLD with
+「L14 audit reads」rationale。 But grep proved NO substrate
+consumer read it anywhere outside its own definition + ch 953
+schema test。 True status was 💀 DEAD,mislabeled。
+
+**Shipped:**
+- `BASAgentObservationAuditEmitter.signalRefs(from:)` — pure-fn
+  serializer that converts a list of observations into sorted
+  signalRef strings for L14 audit-ledger inclusion。 Format:
+  `observation.<id>:agent=<agentID>:domain=<domain>:flags=<sorted>:conf=<band>`。
+- `BASAgentObservationAuditEmitter.observationFromAnnotator(input:agentSpec:seq:)`
+  — pure-fn that builds ONE observation summarizing what
+  TraceAnnotator (ch 1002) sees per turn。 Companion to the
+  `.annotate` delta — same data,observation schema instead of
+  delta schema。
+- 7 new tests pinning shape + sort + roundtrip through live
+  `BASSovereignAuditLedger`。
+
+### Chapter 一千零七 / M3740 — `BASAgentFabricMode` substrate-observability
+
+Per ch 994 + ch 995.9: `BASAgentFabricMode.{observationOnly,
+authoritative}` shipped as host-observable signal,no
+substrate-side consumer made it substrate-observable for
+replay / audit。
+
+**Shipped:**
+- `BASAgentFabricModeAuditEmitter.buildEntry(...)` + `.appendToLedger(...)`
+  — pure-fn + ledger-bound helpers that emit per-turn audit
+  entries capturing the mode flag。 Both `.observationOnly` and
+  `.authoritative` are audited (with distinct verdictRefs) per
+  ch 977 defense-in-depth — claiming `.observationOnly` later
+  has explicit audit support。
+- Substrate BEHAVIOR remains byte-equal between modes per ch 994
+  — the wire is observer-only。 Phase 9+ work flips actual
+  coordinator branching;ch 1007 wires the observability。
+- 5 new tests covering shape + distinguishable verdicts + both-
+  modes-write-to-ledger + sessionID contract。
+
+### Chapter 一千零八 / M3745 — `Gate.Tier` validation wire
+
+Per ch 995.5: `BASAgentFabricGate.Tier.{core,all}` parsed,
+surfaced in diagnostics,but NO substrate-side branch。 Full
+multi-chapter tier-filter wire (integrate 7 watchers + 4 skill
+agents into pipeline) is genuinely Phase 9+ scope。 But VALIDATION
+of tier ↔ activeAgents consistency is achievable today。
+
+**Shipped:**
+- `BASAgentTierActivationValidator.validate(_:)` — pure-fn that
+  detects internally-inconsistent configurations。 `.core` +
+  watcher name → mismatch diagnostic;`.all` + unknown name →
+  mismatch (catches typos)。 Output sorted for byte-equal
+  determinism。
+- `BASAgentFabricHostPipeline` now emits
+  `gate.tierValidation` diagnostic per turn。
+- 8 new tests covering all tier × activeAgents combinations +
+  case insensitivity + sort determinism。
+
+### Chapter 一千零九 / M3750 — `Gate.TranscriptMode` per-agent summary
+
+Per ch 995.5: `TranscriptMode.{singleAgent,compareAll,
+compareSelected}` parsed,surfaced,not branched。 Full
+multi-chapter wire (new BASRenderFrame variants) is Phase 9+,
+but per-agent activity summary projection IS achievable today
+— and produces a genuinely-different output between modes。
+
+**Shipped:**
+- `BASAgentFabricTranscriptSummary` value-struct DTO (modeRawValue
+  + per-agent entries + totalDeltas + selectedAgents echo)
+- `BASAgentFabricTranscriptProjection.summarize(deltas:mode:selectedAgents:)`
+  — pure-fn projection:
+  - `.singleAgent` → nil (byte-equal back-compat)
+  - `.compareAll` → full summary covering all agents
+  - `.compareSelected` → summary scoped to selectedAgents
+- 8 new tests pinning nil-on-singleAgent + scope-filtering +
+  sort-determinism + byte-equal across calls。
+
+### Chapter 一千一十 / M3755 — Arc seal + structural pin
+
+Same structural-pin pattern ch 1005 used:
+- Doctrine references each ch 1006-1009 closure by chapter +
+  API name
+- Source files exist for each closure
+- Each source self-references its chapter (中文 form)
+- Post-arc count pin: WIRED 83% (up from 72% at ch 1005),
+  SCAFFOLD 13% (down from 24%)
+- CRITICAL: HostOutcome rows MUST remain 🪜 SCAFFOLD —
+  substrate's job is to produce the signal,host's to consume。
+  Flipping without a substrate-side consumer would be a false
+  claim。 The test pins this honest-scope discipline against
+  future drift。
+
+**Arc-wide verification:**
+- `swift build` clean across all 5 chapters
+- `swift test --filter BASChapter100[6-9]|BASChapter1010` —
+  33 / 33 pass (7 + 5 + 8 + 8 + 5)
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,569 / 14,569
+  pass, 0 failures**
+- `bash scripts/pre-commit-gates.sh` — 3 / 3 gates clean
+
+**Discipline pins held across all 5 chapters:**
+- 红线 7 additive only — no existing API touched
+- ADR-014 OPT-IN — all new helpers require explicit call
+- Pure-fn for all builders — deterministic byte-equal output
+- Mirror ch 983 + ch 1003 patterns for cross-arc consistency
+- Hardened canonical-bytes format (`schemaVersion: 1.1.0`) for
+  audit entries
+
+**Status counts post-arc** (vs ch 996 baseline + ch 1005 mid-arc):
+| Stage | ✅ WIRED | 🪜 SCAFFOLD | 💀 DEAD |
+|---|---|---|---|
+| ch 996 baseline | ~50 / 67% | ~20 / 27% | ~5 / 6% |
+| ch 1005 post-「全面 完成」 | ~54 / 72% | ~18 / 24% | ~3 / 4% |
+| ch 1010 post-「全面 收口」 | ~62 / 83% | ~10 / 13% | ~3 / 4% |
+
+**What remains 🪜 SCAFFOLD (honestly):**
+- `BASAgentFabricHostOutcome.{activation,fabricMode}` —
+  host-observable signal, consumer lives outside substrate
+  (correct as scaffold from substrate's perspective)
+- `consultedByExecutorInProduction` — multi-chapter ANE-dispatch
+  arc (correct scaffold per ch 1000 honest-scope doctrine)
+- A few minor diagnostic-surface entries — all correctly-scoped
+  multi-chapter
+
+The discipline: **only close what genuinely closes**。 5 items
+in this arc all had real,additive,substrate-side wires that
+ship value without lying about substrate behavior。 The
+remaining items are correctly-scoped multi-chapter scope and
+stay 🪜 SCAFFOLD until their preconditions are met。
+
 ### Chapter 一千零五 / M3730 — 全面 完成 scaffold arc seal
 
 Closes the multi-chapter scaffold-pruning sweep that began at

@@ -265,6 +265,18 @@ public struct BASAgentFabricHostPipeline {
         // gate.activeAgents was parsed but silently dropped。
         diagnostics["gate.activeAgents"] =
             activation.activeAgents.joined(separator: ",")
+        // chapter 一千零八 / M3745 — Gate.Tier validation wire。
+        // The validator detects internally-inconsistent host
+        // configurations (e.g. `.core` tier with watcher names
+        // in activeAgents)。 Diagnostics are advisory — pipeline
+        // still runs per ADR-014 OPT-IN principle。 Future
+        // arcs that wire watcher / skill seats into the
+        // pipeline can promote these warnings to filtering
+        // decisions without changing the validator semantics。
+        let tierDiagnostics =
+            BASAgentTierActivationValidator.validate(activation)
+        diagnostics["gate.tierValidation"] =
+            tierDiagnostics.joined(separator: ";")
         // chapter 九百九十五.7 Round-13 LOW-1 fix:always surface
         // fabric.mode even when coordinator.agentFabric == nil
         // (use "unconfigured" sentinel)。 Pre-fix the key was
