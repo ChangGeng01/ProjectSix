@@ -40,15 +40,21 @@
 // ## Audit entry shape
 //
 // Per `BASSovereignAuditEntry` schema in BASRuntimeCore:
-//   - `auditID`:`agentMCP.invocation.audit.<turnID>
-//     .<serverID>.<toolID>.<outcome>` — uniquely identifies one
-//     MCP-permit decision within a (session,turn,server,tool)
+//   - `auditID`:`agentMCP.invocation.audit\u{001F}<turnID>
+//     \u{001F}<serverID>\u{001F}<toolID>\u{001F}<outcome>` —
+//     uniquely identifies one MCP-permit decision within a
+//     (session,turn,server,tool)。 chapter 一千零十五 /
+//     M3800 — Round-24 MED-2 fix:header doc was showing
+//     pre-Round-21 `.` separator format which contradicted
+//     the actual post-Round-21 U+001F format。 Doc now matches
+//     code at lines 108-115。
 //   - `sessionID`:caller-supplied (matches host's session)
 //   - `turnID`:caller-supplied (matches per-turn namespacing)
-//   - `verdictRef`:`agentMCP.invocation:<outcome>
-//     :<serverID>:<toolID>` — verdictRef is a free-form ref;
-//     prefix matches the reserved L14 `agentMCP.` prefix per
-//     ch 991 reserved-prefix discipline
+//   - `verdictRef`:`agentMCP.invocation\u{001F}<outcome>
+//     \u{001F}<serverID>\u{001F}<toolID>` — verdictRef is a
+//     free-form ref;prefix matches the reserved L14
+//     `agentMCP.` prefix per ch 991 reserved-prefix
+//     discipline + Round-21 CRITICAL-1/2 separator hardening
 //   - `ruleIDs`:empty (observability entry,no rule firings)
 //   - `signalRefs`:the `auditRefs` from `validateMCPInvocation`
 //     verbatim,carrying the gate's full granted/rejected

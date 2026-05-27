@@ -96,7 +96,11 @@ public enum BASAgentObservationAuditEmitter {
         let unitSep = "\u{001F}"
         let recordSep = "\u{001E}"
         return sorted.map { obs in
-            let band = confidenceBand(obs.confidence)
+            // ch 1015 / M3800 — Round-24 HIGH-1 fix:
+            // delegate to canonical helper (was duplicated
+            // inline at ch 1006 + ch 1012)
+            let band = BASTraceAnnotatorSeat
+                .confidenceBandFor(obs.confidence)
             // ch 1010.5 CRITICAL-2: U+001E (record separator)
             // for inner-list join — flag values may contain
             // `,` legitimately,but U+001E is illegal in
@@ -198,13 +202,8 @@ public enum BASAgentObservationAuditEmitter {
             flags: flags)]
     }
 
-    // MARK: - Internal
-
-    private static func confidenceBand(
-        _ conf: Double
-    ) -> String {
-        if conf < 0.4 { return "low" }
-        if conf < 0.7 { return "med" }
-        return "high"
-    }
+    // chapter 一千零十五 / M3800 — Round-24 HIGH-1 fix:
+    // private `confidenceBand` deleted。 Sole caller (line 99)
+    // now delegates to canonical
+    // `BASTraceAnnotatorSeat.confidenceBandFor(_:)`。
 }

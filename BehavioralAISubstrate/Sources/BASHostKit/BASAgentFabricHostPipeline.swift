@@ -578,10 +578,18 @@ public struct BASAgentFabricHostPipeline {
         // the pipeline produces observations alongside trace
         // deltas + emits their signalRefs as
         // `observation.signalRefs` diagnostic。
-        if activation.fabricEnabled,
-           coordinator.agentFabric != nil,
-           let result
-        {
+        // chapter 一千零十五 / M3800 — Round-24 CRITICAL-1 fix:
+        // pre-fix this block had an outer `if activation.fabricEnabled,
+        // coordinator.agentFabric != nil, let result` guard with an
+        // `else { "(skipped)" }` branch — but execution reaches this
+        // point ONLY past the line 305/314 early-return guards,which
+        // already prove `fabricEnabled` AND `agentFabric != nil`。 The
+        // `else` was structurally unreachable production code that
+        // misled fresh readers about the diagnostic's behavior。 Post-
+        // fix:guard only on `let result` (the genuinely-meaningful
+        // check)。 Skipped paths never reach this code at all (they
+        // exit at the assembleOutcome calls above)。
+        if let result {
             let traceInput = BASTraceAnnotatorInput(
                 turnID: turnID,
                 emittedDeltas:
@@ -610,11 +618,11 @@ public struct BASAgentFabricHostPipeline {
                 diagnostics["observation.signalRefs"] =
                     "(empty-turn)"
             }
-        } else {
-            // Skipped fabric run — no observation projection
-            diagnostics["observation.signalRefs"] =
-                "(skipped)"
         }
+        // Note: when `result == nil` (FullTurnAdapter.run returned
+        // nil),no observation projection is emitted。 This is
+        // honest:we don't know the turn's outcome, so we don't
+        // synthesize a diagnostic value for it。
 
         // chapter 一千零十四.6 / M3795 — Round-23 CRITICAL-1
         // fix:delegate the inspector wiring to the shared

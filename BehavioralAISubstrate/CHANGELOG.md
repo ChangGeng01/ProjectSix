@@ -11,6 +11,121 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十五 / M3800 — 诚实模式 cascade consolidation (SUBTRACTIVE)
+
+User invoked「诚实模式 全面 deep review 足够 优雅 极致」 — honest
+mode, comprehensive deep review, sufficiently elegant, ultimate。
+
+Round-24 audit delivered an HONEST META-ASSESSMENT:
+- Cascade catch counts:Round-19: 1 CRITICAL,Round-20: 3,
+  Round-21: 5,Round-22: 2,Round-23: 5,**Round-24: 1**
+- Round-24's lone CRITICAL was **class-h: cascade-induced
+  complexity** (unreachable code created BY a Round-23 fix)
+- HIGH-1 was a Round-20-class duplication recurrence
+- HIGH-2 + MED-1/2/3 were doc-drift items deferred from Round-23
+- HIGH-3 was about a defensive-but-unreachable category state
+- **Verdict**: cascade has asymptoted, stop extending, start
+  consolidating
+
+Ch 1015 is the FIRST cascade chapter that's SUBTRACTIVE rather
+than additive — net LOC delta is NEGATIVE。
+
+**Consolidations shipped**:
+
+1. **HIGH-1 fix** — extract canonical
+   `BASTraceAnnotatorSeat.confidenceBandFor(_:)` (Round-20 same-
+   canonical class recurrence at 3rd site)。 Both ch 1006
+   `BASAgentObservationAuditEmitter` and ch 1012
+   `BASAgentFabricWatcherCollector` had identical inline
+   `private static func confidenceBand(_:)`。 BOTH files
+   commented「same thresholds as ch 1006 — single canonical
+   doctrine」 yet violated it via duplicate impl。 Post-fix
+   the 2 private methods are DELETED + both consumers
+   delegate。
+
+2. **CRITICAL-1 fix** — delete unreachable `else` branch in
+   `BASAgentFabricHostPipeline.swift` observation-projection
+   wire。 Pre-fix the outer guard `if activation.fabricEnabled,
+   coordinator.agentFabric != nil, let result` had a redundant
+   first 2 conditions (early-returns at lines 305/314 already
+   guaranteed both)。 The `else { "(skipped)" }` branch was
+   structurally unreachable — class-h cascade complexity from
+   Round-23 HIGH-1 fix。 Post-fix:guard only on `let result`,
+   delete the unreachable else。
+
+3. **HIGH-2 fix** — `BASAgentFabricHostOutcomeInspector` file
+   header doc lists 4 categories,but ch 1014.5 added a 5th
+   (`fabric.run.no-result`)。 Round-23 deferred this doc-drift。
+   ch 1015 updates the header to list all 5 categories + adds
+   honest disclosure that `no-result` is defensive (reachable
+   only via test-constructed outcomes,not via `runTurn`)。
+
+4. **MED-1/2/3 fix** — 3 audit-bridge file headers
+   (`BASSovereignWarrantAuditBridge`,`BASMCPInvocationAuditBridge`,
+   `BASAgentFabricModeAuditEmitter`) all had pre-Round-21
+   separator format (`.` / `:`) in their `## Audit entry shape`
+   docstrings,contradicting the post-Round-21 U+001F code。
+   Doc-drift deferred Round-21 + Round-23。 ch 1015 syncs all 3。
+
+5. **Doctrine update** — `Docs/SCAFFOLD_VS_WIRED.md` adds
+   `## Cascade asymptote` section disclosing the Round-24
+   honest verdict + 4 Round-25 recommendations
+   (STOP extending,CONSOLIDATE,stop new prefixes,pivot to
+   Phase 9++)。
+
+**Net LOC delta**: NEGATIVE
+- HIGH-1: -12 (delete 2 duplicate private methods)
+- CRITICAL-1: -8 (delete unreachable else branch)
+- Plus doc-fix additions (~+30 doc lines)
+- Net source-code: -20 lines (first subtractive chapter in
+  the cascade)
+
+**7 new pin tests** in
+`BASChapter1015CascadeConsolidationTests.swift`:
+- Canonical `confidenceBandFor` boundary cases
+- Both ch 1006 + ch 1012 delegate (byte-equal output)
+- Inspector header lists 5 categories (grep pin)
+- Audit-bridge headers reflect U+001F (grep pin × 3)
+- Pipeline unreachable-else deleted (grep pin)
+- ch 1006 + ch 1012 private confidenceBand deleted (grep pin)
+- Meta-pin: doctrine acknowledges cascade asymptote
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter BASChapter1015` — 7/7 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,629/14,629 pass,
+  0 failures**
+- `bash scripts/pre-commit-gates.sh` — 3/3 gates clean
+
+**Honest mode disclosures**:
+
+- Round-24 was the LAST round where the catch count justified
+  the LOC cost。 Round-23 had 5 CRITICAL,Round-24 had 1
+  (and that 1 was cascade-self-induced)。
+- The substrate's defensive instincts (immutability,
+  single-canonical helpers,separator hygiene,signed audit
+  ledger,U+001F discipline) remain technically sound。
+- But the cumulative effect of 9 sub-chapter cascades has
+  produced `BASAgentFabricHostPipeline.swift` at 765 LOC with
+  28 distinct「chapter N」 comments inside one function。
+  Round-25 should refactor `runTurn` into 3-4 named helpers。
+- New diagnostic prefixes (`inspector.*`,`observation.*`,
+  `watcher.*`,`gate.*`) have ZERO `Sources/` consumers — they
+  are emitted for host SDK observability。 Continued
+  proliferation creates maintained surface without proportional
+  value。
+
+**Discipline pins held**:
+- 红线 7 additive only — at the API signature level,no
+  external surface changed
+- BUT internally,ch 1015 is the FIRST subtractive chapter —
+  honest pivot from「extend」 to「consolidate」
+- Canonical-helper doctrine: 3 canonical extractions across
+  4 rounds (confidence formula,sentinel,assembleOutcome,
+  confidenceBandFor) — Round-25 should consider whether
+  these belong in a shared `BASAgentFabricCanonical`
+  namespace
+
 ### Chapter 一千零十四.6 / M3795 — Round-23 fix-of-fix-of-fix-of-fix
 
 User invoked「跑个测试找找bug」 (run a test, find bugs)。 Triggered:

@@ -52,17 +52,22 @@
 // ## Audit entry shape
 //
 // Per `BASSovereignAuditEntry` schema in BASRuntimeCore:
-//   - `auditID`:`agentExternal.warrant.audit.<turnID>
-//     .<externalAgentID>.<outcome>` — uniquely identifies one
-//     validation outcome within a (session,turn)
+//   - `auditID`:`agentExternal.warrant.audit\u{001F}<turnID>
+//     \u{001F}<externalAgentID>\u{001F}<outcome>` — uniquely
+//     identifies one validation outcome within a
+//     (session,turn)。 chapter 一千零十五 / M3800 — Round-24
+//     MED-1 fix:header doc was showing pre-Round-21 `.` /
+//     `:` separator format which contradicted the actual
+//     post-Round-21 U+001F format。 Doc now matches code。
 //   - `sessionID`:caller-supplied (matches the host's
 //     session)
 //   - `turnID`:caller-supplied (matches the per-turn ref
 //     namespacing used throughout the fabric arc)
-//   - `verdictRef`:`agentExternal.warrant:<outcome>
-//     :<externalAgentID>` — verdictRef is a free-form ref;
-//     prefix matches the reserved L14 prefix per ch 981.5 DH3
-//     reserved-prefix discipline
+//   - `verdictRef`:`agentExternal.warrant\u{001F}<outcome>
+//     \u{001F}<externalAgentID>` — verdictRef is a free-form
+//     ref;prefix matches the reserved L14 prefix per ch
+//     981.5 DH3 reserved-prefix discipline + Round-21
+//     CRITICAL-3 separator hardening
 //   - `ruleIDs`:empty (this is an observability entry — no
 //     rule firings)
 //   - `signalRefs`:`validationResult.auditRefs` verbatim

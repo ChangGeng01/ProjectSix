@@ -119,6 +119,28 @@ public enum BASTraceAnnotatorSeat {
         Set(deltas.map { $0.agentID })
     }
 
+    /// chapter 一千零十五 / M3800 — Round-24 HIGH-1 fix:
+    /// canonical「confidence band」 categorization。 Was
+    /// duplicated as `private static confidenceBand(_:)` at
+    /// ch 1006 BASAgentObservationAuditEmitter + ch 1012
+    /// BASAgentFabricWatcherCollector — both files explicitly
+    /// commented「same thresholds as ch 1006 — single canonical
+    /// doctrine」 yet violated the doctrine。 EXACT same class
+    /// as Round-20 confidence-formula dup + Round-21
+    /// distinctAgentSet dup。
+    ///
+    /// Thresholds:`<0.4 → low`, `<0.7 → med`, `>=0.7 → high`。
+    /// Future tuning of bands updates ONE place + both
+    /// consumers pick up the change atomically。
+    @inlinable
+    public static func confidenceBandFor(
+        _ confidence: Double
+    ) -> String {
+        if confidence < 0.4 { return "low" }
+        if confidence < 0.7 { return "med" }
+        return "high"
+    }
+
     /// Pure function:read input + emit one `.annotate` delta。
     /// Returns empty array when input has no emitted deltas to
     /// annotate (annotating empty turns is wasted state-graph

@@ -32,8 +32,14 @@
 //
 // ## Audit entry shape
 //
-//   - `auditID`: `agentFabricMode.audit.<turnID>.<mode>`
-//   - `verdictRef`: `agentFabricMode:<mode>`
+// chapter 一千零十五 / M3800 — Round-24 MED-3 fix:header doc
+// was showing pre-Round-21 `.` / `:` separator format which
+// contradicted the actual post-Round-21 U+001F format。 Doc
+// now matches code at lines 101-103。
+//
+//   - `auditID`: `agentFabricMode.audit\u{001F}<turnID>
+//     \u{001F}<mode>`
+//   - `verdictRef`: `agentFabricMode\u{001F}<mode>`
 //   - `signalRefs`: `["agentFabric.mode=<mode>"]` (single ref,
 //     matches the reserved `agentFabric.*` prefix per ch 991
 //     reserved-prefix discipline)

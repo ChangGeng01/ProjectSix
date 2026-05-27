@@ -37,7 +37,16 @@
 //     delta counts)
 //   - `category(outcome:)` → audit-emit-ready category string
 //     (`fabric.run.clean` / `fabric.run.hints` /
-//     `fabric.run.skipped` / `fabric.run.unconfigured`)
+//     `fabric.run.skipped` / `fabric.run.unconfigured` /
+//     `fabric.run.no-result`)。 chapter 一千零十五 / M3800 —
+//     Round-24 HIGH-2 fix:header was 4 categories,actual
+//     code at line 184-191 had 5 since ch 1014.5 added
+//     `fabric.run.no-result`。 Doc now matches implementation。
+//     Note: `fabric.run.no-result` is defensive — `runTurn`
+//     early-returns before reaching the code path that
+//     produces this category;it fires only on hand-
+//     constructed outcomes (e.g. test fixtures) that bypass
+//     the pipeline guards。
 //   - `isCleanRun(outcome:)` → bool fast-check for hosts that
 //     just want a single happy-path signal
 //

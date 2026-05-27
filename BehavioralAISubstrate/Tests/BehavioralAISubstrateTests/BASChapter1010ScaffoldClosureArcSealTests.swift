@@ -124,6 +124,7 @@ final class BASChapter1010ScaffoldClosureArcSealTests:
         let validStateMarkers = [
             "post-ch 1009",  // ch 1010 original
             "post-ch 1014",  // ch 1014 omnibus
+            "post-ch 1015",  // ch 1015 cascade consolidation
         ]
         let hasMarker = validStateMarkers.contains {
             doc.contains($0)

@@ -162,10 +162,77 @@ All WIRED — each seat's input/output is consumed by its emit fn。
 **Total public APIs shipped in arc 953-995.9**: ~75 (including
 adapters / bridges / DTOs / enums)。
 
-**Status counts** (post-ch 1014「全面 一次性 gap closure」omnibus):
+**Status counts** (post-ch 1015 cascade consolidation):
 - ✅ WIRED: ~68 (91%)
 - 🪜 SCAFFOLD: ~4 (5%) — all genuinely multi-chapter Phase 9++
 - 💀 DEAD / future-allocation: ~3 (4%)
+
+## Cascade asymptote (Round-24 honest meta-assessment)
+
+After 5 fix-rounds (ch 1000.5 / 1010.5 / 1010.6 / 1014.5 /
+1014.6),Round-24 audit produced an HONEST meta-finding:
+
+| Round | CRITICAL | Catch class |
+|---|---|---|
+| 19 (ch 1000.5) | 1 | ANE consult 4-way dup |
+| 20 (ch 1010.5) | 3 | Confidence dup + 2 separator-injection |
+| 21 (ch 1010.6) | 5 | 4 separators + sourceRefs `#` |
+| 22 (ch 1014.5) | 2 | Sentinel dup + nil-result misclass |
+| 23 (ch 1014.6) | 5 | Early-return + ShadowTrial seps + JSON-escape siblings + dead emitters + alias keys |
+| **24 (this chapter)** | **1** | **Cascade-induced complexity (class h)** |
+
+Round-24's lone CRITICAL was the cascade itself — unreachable
+production code created BY a Round-23 fix。 The 3 HIGH items
+were:
+- HIGH-1: confidenceBand dup at 2 sites (Round-20-class
+  recurrence)
+- HIGH-2: inspector header doc lists 4 categories,actual is 5
+  (Round-22-class deferred)
+- HIGH-3: `fabric.run.no-result` category defensive but
+  unreachable through `runTurn`
+
+**Cascade health verdict (HONEST MODE)**:
+
+- Genuine catches dwindling at non-bookkeeping pattern classes
+- Pipeline grew from ~250 LOC at ch 995 to 765 LOC at ch 1014.6
+  (+513 net over 9 sub-chapters)
+- No prior fix REMOVED code;every fix ADDED
+- Architectural elegance has degraded — pipeline reads as
+  9 stratified geological layers,not as production code
+
+**ch 1015 = CONSOLIDATION (subtractive)**:
+
+- Extract canonical `BASTraceAnnotatorSeat.confidenceBandFor(_:)`
+  + delete 2 duplicate private impls (-12 LOC,+6 LOC = net -6)
+- Delete unreachable observation-projection `else` branch (-8 LOC)
+- Fix 3 audit-bridge file headers + inspector header doc
+  (no LOC change,doctrine-fix)
+- First chapter in the cascade with NEGATIVE net LOC delta
+
+**Round-25 recommendation**:
+
+The cascade should NOT be a permanent ongoing process。 Per
+Round-24 verdict,future rounds should:
+
+1. **STOP extending diagnostics.** If a finding suggests a new
+   diagnostic key,first ask:does any `Sources/` code branch on
+   it? If no → write a test instead, not a diagnostic。
+2. **CONSOLIDATE before extending.** Round-25 (if invoked)
+   should continue subtractive work — refactor
+   `BASAgentFabricHostPipeline.runTurn` (currently 406 lines)
+   into 3-4 named helpers。 Move inline「Round-N fix」 comments
+   into helper headers。
+3. **Stop new prefixes.** `inspector.*`,`observation.*`,
+   `watcher.*`,`gate.*` are not in any reserved-prefix
+   registry。 Either add them or stop emitting new ones。
+4. **Pivot to Phase 9++** instead of more cascade rounds。
+   Tier-based ANE-dispatch arc + authoritative mode wire are
+   the genuine next-arc work。
+
+This is the HONEST asymptote signal。 Each round caught fewer
+NEW pattern classes,more recurrences,more class-h cascade
+complexity。 Round-24's 1 CRITICAL was complexity caused BY
+Round-23 — the cascade is fighting itself。
 
 **Change vs ch 996 inventory**:
 - ch 998-1000.5 closed the chapter-500 ANE consultation gap (production

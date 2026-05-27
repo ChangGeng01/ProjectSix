@@ -115,7 +115,11 @@ public enum BASAgentFabricWatcherCollector {
         let sorted = hints.sorted { $0.hintID < $1.hintID }
         let sep = "\u{001F}"
         return sorted.map { hint in
-            let band = confidenceBand(hint.confidence)
+            // ch 1015 / M3800 — Round-24 HIGH-1 fix:
+            // delegate to canonical helper (was duplicated
+            // inline at ch 1006 + ch 1012)
+            let band = BASTraceAnnotatorSeat
+                .confidenceBandFor(hint.confidence)
             return "watcherHint.\(hint.hintID)" +
                 "\(sep)role=\(hint.watcherRole.rawValue)" +
                 "\(sep)severity=\(hint.severity.rawValue)" +
@@ -190,16 +194,10 @@ public enum BASAgentFabricWatcherCollector {
         return (hints: hints, appendedEntry: appended)
     }
 
-    // MARK: - Internal
-
-    /// Same band thresholds as ch 1006 — single canonical
-    /// doctrine。 If future arc tunes the bands,one place
-    /// updates。
-    private static func confidenceBand(
-        _ conf: Double
-    ) -> String {
-        if conf < 0.4 { return "low" }
-        if conf < 0.7 { return "med" }
-        return "high"
-    }
+    // chapter 一千零十五 / M3800 — Round-24 HIGH-1 fix:
+    // private `confidenceBand` deleted。 The pre-fix comment
+    // claimed「same thresholds as ch 1006 — single canonical
+    // doctrine」 yet violated it via duplicate inline impl。
+    // Sole caller (line 118) now delegates to canonical
+    // `BASTraceAnnotatorSeat.confidenceBandFor(_:)`。
 }
