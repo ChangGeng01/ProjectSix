@@ -72,7 +72,8 @@
         "BASChapter937VersionTreeFullRowTests",
         "BASChapter938EventLogFullRowTests",
         "BASChapter926FixBackfillCoverageTests",
-        "BASChapter1017FullyProceduralSmokeTests"
+        "BASChapter1017FullyProceduralSmokeTests",
+        "BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests"
       ],
       "target" : {
         "containerPath" : "container:BASDeviceTest.xcodeproj",

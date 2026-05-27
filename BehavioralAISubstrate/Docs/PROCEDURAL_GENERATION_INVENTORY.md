@@ -44,6 +44,51 @@ keeps asking for, already shipped)
 iteration: i)`。 Per-iter values within ranges (e.g. 0...50)
 vary by seed — same input always reproducible。
 
+Covered:L1, L6, L7, L9, L10, L11, L14。
+
+### ch 1020 — completes ch1017-style 12-layer coverage
+
+chapter 一千零二十 / M3850 — fills the per-layer proc-gen gap
+between ch 1017 (7 layers) and ch 946 (which covers L2/L3 via
+runtime spin)。 Adds 5 NEW ch1017-style intensity-scalable
+proc-gen layer tests:
+
+| Layer | Component | Behavioral pins |
+|---|---|---|
+| L4 | `BASHorizonPrior` + `BASBoundaryPrior` | confidence clamp into [0,1]; enum preservation; scope trim |
+| L5 | `BASHostConstitution` | hostID round-trip; constitutionID default; schema version pin |
+| L8 | `BASMemoryBundle` + `BASMemoryAtom` | atoms/tags count round-trip; per-atom contentType + promotionState preservation |
+| L12 | `BASActionPermit` + `BASRenderFrame` | mode preserve; outputLengthCap floor at 0; dedup contract; frame ref preserve |
+| L13 | `BASHostVersion` + `BASHostVersionTree` | active ID; parent-link chain; root nil parent; approval round-trip |
+
+Reuses ch 1017's `BAS_FUZZ_INTENSITY` env var (single source
+of truth across both files)。 Scorecards emit with
+`ch1020-scorecard` prefix。 L2/L3 stay covered by ch 946
+(runtime-bound — they have no clean single-struct surface
+to fuzz in isolation,same reason ch 1017 didn't pull them
+in either)。 Combined coverage:
+
+| Layer | ch 946 (runtime) | ch 1017 (proc-gen) | ch 1020 (proc-gen) |
+|-------|------------------|--------------------|--------------------|
+| L1    | ✓                | ✓                  | —                  |
+| L2    | ✓                | —                  | — (runtime-bound)  |
+| L3    | ✓                | —                  | — (runtime-bound)  |
+| L4    | ✓                | —                  | ✓                  |
+| L5    | ✓                | —                  | ✓                  |
+| L6    | —                | ✓                  | —                  |
+| L7    | —                | ✓                  | —                  |
+| L8    | ✓                | —                  | ✓                  |
+| L9    | —                | ✓                  | —                  |
+| L10   | —                | ✓                  | —                  |
+| L11   | ✓                | ✓                  | —                  |
+| L12   | ✓                | —                  | ✓                  |
+| L13   | ✓                | —                  | ✓                  |
+| L14   | ✓                | —                  | ✓ (via ch 1017)    |
+
+Empirical (iPhone Air A19,intensity=10):L4=0.0024ms,
+L5=0.0042ms,L8=0.0136ms,L12=0.0053ms,L13=0.0092ms avg
+per iter — sub-millisecond,doesn't shift thermal envelope。
+
 ### Per-iter procedural picks (BASFuzzRng)
 
 - `rng.nextInt(in: range)` — uniform pick within range

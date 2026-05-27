@@ -272,6 +272,7 @@
 		3434C2FFB6610074371307CB /* BASRealHotPathAttackTier2AchievementDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ADC641EF1DD24901DE72089 /* BASRealHotPathAttackTier2AchievementDoctrineTests.swift */; };
 		34B062C380EF2C4241E89312 /* BASHostKitConstitutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0405C823B289C8F86DEBEB6C /* BASHostKitConstitutionTests.swift */; };
 		34E51B5C9B4787D7A0DB5B45 /* BASChapter937VersionTreeFullRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A063268B7E26B626DB561B06 /* BASChapter937VersionTreeFullRowTests.swift */; };
+		34EA5D63606DAE83BCBD9A98 /* BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD7C34402EAE6E9BF452820 /* BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests.swift */; };
 		351A355078762D35C71985D0 /* BASAppleCurrentBrainBootstrapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05F80DD4B08D0B336C24852 /* BASAppleCurrentBrainBootstrapTests.swift */; };
 		351EA4AFBF2717F62012FF70 /* BASTurnRuntimeStressFixtureSetCanonicalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21616C502045A90A846D9355 /* BASTurnRuntimeStressFixtureSetCanonicalTests.swift */; };
 		3618CD68123550913FFC7685 /* BASChapter776L13Phase2CloseOutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2573559ED9F12C55C9221C /* BASChapter776L13Phase2CloseOutTests.swift */; };
@@ -2593,6 +2594,7 @@
 		DD59729C4301F0D8998C6DFC /* BASAppleAppLifecycleOrchestrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAppleAppLifecycleOrchestrationTests.swift; sourceTree = "<group>"; };
 		DDB2911E47AEB6954755DC15 /* BASAuditObservationProjectionsBundleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAuditObservationProjectionsBundleTests.swift; sourceTree = "<group>"; };
 		DDD65AF6A74DDBB503303309 /* BASPresenceObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASPresenceObservationTests.swift; sourceTree = "<group>"; };
+		DDD7C34402EAE6E9BF452820 /* BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests.swift; sourceTree = "<group>"; };
 		DE4D9D3D060FB6C52A59A9EE /* BASANECapabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASANECapabilityTests.swift; sourceTree = "<group>"; };
 		DED38589CB9CDE46FC88C025 /* BASEventLogReplayItemKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASEventLogReplayItemKindTests.swift; sourceTree = "<group>"; };
 		DEDBE608A09F8D5D0E0EAE49 /* BASChapter565InputsCodableExtensionProofTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter565InputsCodableExtensionProofTests.swift; sourceTree = "<group>"; };
@@ -3363,6 +3365,7 @@
 				04DC26314DB9BEBBC63F62BE /* BASChapter1014OmnibusGapClosureTests.swift */,
 				3181DF2981FFF7AAF3364FC1 /* BASChapter1015CascadeConsolidationTests.swift */,
 				4C946142A40B0371F68E885B /* BASChapter1017FullyProceduralSmokeTests.swift */,
+				DDD7C34402EAE6E9BF452820 /* BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests.swift */,
 				996B349E6555D2711A3D5B8A /* BASChapterDoctrineRegistryTests.swift */,
 				8195E3E965E925670996A3B7 /* BASChapterDoctrineSchemaCompletenessTests.swift */,
 				50AD95F7266364A12C3ED48E /* BASChatCompletionsOrganAdapterTests.swift */,
@@ -4484,6 +4487,7 @@
 				EA8D9C7262077A7FFC7F1417 /* BASChapter1014_6Round23FixesTests.swift in Sources */,
 				2539085215BF3E8C34127CA5 /* BASChapter1015CascadeConsolidationTests.swift in Sources */,
 				FAE1B325BEBDDDAFABF35079 /* BASChapter1017FullyProceduralSmokeTests.swift in Sources */,
+				34EA5D63606DAE83BCBD9A98 /* BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests.swift in Sources */,
 				81B40B43892DB7DF2FD25889 /* BASChapter402PhaseOneClosureTests.swift in Sources */,
 				E6F17ABDAB708B4992978F90 /* BASChapter464RegistryOnlyTests.swift in Sources */,
 				40FA863DD445C5A320E26269 /* BASChapter465LiteralPatternTests.swift in Sources */,
