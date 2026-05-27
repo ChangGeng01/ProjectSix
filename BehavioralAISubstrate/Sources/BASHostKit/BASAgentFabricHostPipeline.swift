@@ -488,6 +488,59 @@ public struct BASAgentFabricHostPipeline {
                 "\(result.frontierProjection.frontierWidth)"
             diagnostics["frontier.guarded"] =
                 "\(result.frontierProjection.guardPaths.count)"
+
+            // chapter 一千零十三 / M3780 — Phase 9+ Gate.Tier
+            // wire:`.all` tier invokes the 7 watchers via
+            // BASAgentFabricWatcherCollector;`.core` tier
+            // skips them entirely (byte-equal pre-ch-1013
+            // behavior preserved for default tier)。 Real
+            // behavioral wire — Gate.Tier now CHANGES
+            // substrate runtime output。
+            //
+            // Per ch 970 doctrine watchers are quiet observers:
+            // hints inform L14 audit but never block / modify
+            // the turn。 So invocation happens AFTER the turn
+            // ran (read-only over the result snapshot)。
+            if activation.tier == .all {
+                let watcherObs = BASAgentWatcherObservation(
+                    turnID: turnID,
+                    scout: BASScoutInput(),
+                    plannerCandidates:
+                        BASAgentFabricAdapters
+                            .plannerCandidates(
+                                from: candidatePaths),
+                    risk: BASRiskInput(),
+                    surface: BASSurfaceInput(),
+                    memory: memoryInput,
+                    critic: nil,
+                    hostAlignment: nil,
+                    sovereignSentinel:
+                        sovereignSentinelInput,
+                    evolutionShadow:
+                        evolutionShadowInput,
+                    emittedDeltas:
+                        result.turnResult.emittedDeltas,
+                    nowNanos: nowNanos)
+                var watcherSeq = 0
+                let hints = BASAgentFabricWatcherCollector
+                    .collect(
+                        observation: watcherObs,
+                        seq: &watcherSeq)
+                diagnostics["watcher.hintCount"] =
+                    "\(hints.count)"
+                let rolesEncountered = Set(hints.map {
+                    $0.watcherRole.rawValue
+                }).sorted()
+                diagnostics["watcher.rolesActive"] =
+                    rolesEncountered.isEmpty
+                        ? "(none)"
+                        : rolesEncountered
+                            .joined(separator: "\u{001E}")
+            } else {
+                diagnostics["watcher.hintCount"] = "(core-tier)"
+                diagnostics["watcher.rolesActive"] =
+                    "(core-tier)"
+            }
         }
 
         return BASAgentFabricHostOutcome(

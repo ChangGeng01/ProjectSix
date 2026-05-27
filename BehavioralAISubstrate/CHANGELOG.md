@@ -11,6 +11,89 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一千零十三 / M3780 — Phase 9+ Gate.Tier behavioral wire
+
+Ch 1012 shipped `BASAgentFabricWatcherCollector` as the
+substrate-level building block。 Ch 1013 wires it into
+`BASAgentFabricHostPipeline.runTurn` so the env var
+`BAS_AGENT_TIER` GENUINELY changes substrate runtime output for
+the first time。
+
+**What ships**:
+
+In `BASAgentFabricHostPipeline.swift` Step 4 (post-turn
+diagnostics), add tier-conditional watcher invocation:
+
+- `activation.tier == .all`:
+  - Build a `BASAgentWatcherObservation` from the turn's
+    emitted deltas + supplied seat inputs
+  - Invoke `BASAgentFabricWatcherCollector.collect(...)`
+  - Emit `diagnostics["watcher.hintCount"]` =
+    `<numeric>` count
+  - Emit `diagnostics["watcher.rolesActive"]` =
+    sorted distinct role names joined by U+001E (per
+    ch 1010.6 outer-separator doctrine) or `(none)`
+    sentinel for clean turns
+- `activation.tier == .core` (default):
+  - Skip watcher invocation entirely (byte-equal pre-ch-1013
+    behavior preserved per ADR-014 OPT-IN)
+  - Emit `(core-tier)` sentinel in both watcher diagnostics
+    so consumers can distinguish "watchers not invoked"
+    from "watchers invoked but no hints"
+
+5 new tests in `BASChapter1013WatcherPipelineWireTests`:
+- `.core` tier watchers NOT invoked (sentinel diagnostics)
+- `.all` tier watchers invoked (numeric hintCount)
+- `.all` default fixture → some rolesActive (acknowledges
+  HostDriftWatcher fires on .low riskBand + empty
+  acceptedCandidateID,which is correct watcher behavior)
+- `.all` + 60-candidate anomalous turn → anomalyWatcher
+  in rolesActive
+- multi-role join uses U+001E (matches pipeline format
+  pinned in source code)
+
+**Verification**:
+- `swift build` clean
+- `swift test --filter BASChapter1013` — 5/5 pass
+- `BAS_FUZZ_RUNTIME_SKIP=1 swift test` — **14,602/14,602
+  pass, 0 failures**
+
+**「全部都要」mandate complete**:
+
+| Component | Chapters | Status |
+|---|---|---|
+| Round-21 deep self-audit + fixes | ch 1010.6 | ✅ shipped |
+| HIGH-3 schemaVersion canonicalization | ch 1011 | ✅ shipped |
+| Phase 9+ start: watcher collector substrate building block | ch 1012 | ✅ shipped |
+| **Phase 9+ Gate.Tier behavioral wire (pipeline integration)** | **ch 1013** | **✅ shipped** |
+
+`Gate.Tier` evolution summary:
+- ch 993: parsed env var → Activation, no behavioral effect
+- ch 996: marked 🪜 SCAFFOLD in inventory
+- ch 1008: validation wire (catches inconsistent configs)
+- ch 1010.6: U+001F separator discipline applied
+- ch 1012: substrate-level collector + audit-emit
+- ch 1013: pipeline-level integration — tier **genuinely**
+  changes output
+
+The「decorative」label that lived on `Gate.Tier` since ch 995.5
+is officially retired with this chapter。
+
+**Discipline pins held across the「全部都要」arc**:
+
+- 红线 7 additive only — no existing API touched at the
+  signature level
+- ADR-014 OPT-IN — default tier (`.core`) preserves
+  pre-ch-1013 byte-equal behavior
+- Pure-fn collector building block (ch 1012);pipeline
+  integration is a single tier-guarded branch
+- U+001F separator discipline uniform across all audit
+  bridges + diagnostics + signalRefs
+- Shared `hardenedSchemaVersion` constant across 10+ call
+  sites
+- Single-canonical confidence-band thresholds shared
+  between ch 1006 + ch 1012
+
 ### Chapter 一千零十二 / M3775 — Phase 9+ start: watcher pipeline integration
 
 User invoked「全部都要」 — covers Round-21 audit (ch 1010.6) +
