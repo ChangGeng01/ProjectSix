@@ -70,8 +70,15 @@ cd "$SUBSTRATE_DIR"
 # fail every iter until script exit。 Now we fail-fast within 1 iter
 # and report DEVICE_DISCONNECTED rather than masquerading as test fail。
 check_device_connected() {
+    # chapter 一千零十五.5 / M3805 — device-state grep widened
+    # to accept「available (paired)」 alongside「connected」。 The
+    # latter is the older devicectl status string;newer Xcode
+    # tools report「available (paired)」 for the same usable
+    # state。 Pre-fix the script bailed instantly with
+    # DEVICE_DISCONNECTED when iPhone Air was actually fine,
+    # just reported with the newer label。
     if xcrun devicectl list devices 2>/dev/null | \
-        grep -q "$DEVICE_ID.*connected"; then
+        grep -q "$DEVICE_ID.*\(connected\|available\)"; then
         return 0
     fi
     return 1
