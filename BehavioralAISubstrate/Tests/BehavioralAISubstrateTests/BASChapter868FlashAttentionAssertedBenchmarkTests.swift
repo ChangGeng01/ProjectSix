@@ -3,6 +3,18 @@
 // print-only attention tournament to an ASSERTED benchmark + correct
 // the false doc claim at BASCognitiveBrain.swift:2868。
 //
+// ## Revision history
+//
+// - ch 868 第一刀 / M2996:initial asserted benchmark + doc fix
+// - ch 869 第一刀 / M3006:tighten Medium 2× band to 1.4× + Large 1.5× to 1.3×
+// - ch 870-871(MPSGraph 路径)
+// - ch 891 / M3145 MODERATE-4:widen Medium back to 1.7× / 1.5× for thermal
+// - **ch 1024.0 / M3880**: testTinyShapeCPUBeatsBothMetalPaths best-of-3
+//   trials(absorb Mac scheduling noise — 5 flakies in Mac v5+v6 endurance)
+// - **ch 1024.1 / M3881**: testMediumSequenceOrderingPin best-of-3 trials
+//   (1 flaky in Mac v6 endurance,same pattern as ch 1024.0)
+// - **ch 1024.7 / M3887**:全面 audit LOW-5 fix — header revision history
+//
 // CONTEXT:
 //
 // Chapter 七百七 第二刀 introduced the tournament across 3 attention
