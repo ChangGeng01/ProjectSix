@@ -233,7 +233,24 @@ final class M595CrossCallsiteAntiDriftTests: XCTestCase {
             """)
     }
 
-    // MARK: - M597 chapter 一百六十八 — Meta-tests of anti-drift tests
+}
+#endif  // !os(iOS) — file-tree audit class ends here
+
+// chapter 一千零二十四.6 / M3886 — 全面 audit MED-2 fix:
+// the 3 meta-tests below are PURE SIMULATION(inline string literals,
+// grep logic only,no FileManager / no Sources/ access)。 They were
+// over-gated under #if !os(iOS) by ch 1023.3,losing iOS coverage
+// for no semantic reason。 Split into separate ungated class so
+// they run on iPhone Air smoke too。
+
+/// **M597 chapter 一百六十八 — meta-tests of anti-drift tests**
+///
+/// These tests verify the anti-drift inline-literal detection
+/// mechanism using SIMULATED source strings (inline string
+/// literals)。 They don't touch the Sources/ directory and run
+/// equally on Mac + iOS device。 Gating them under #if !os(iOS)
+/// loses iOS coverage with no semantic benefit。
+final class M597AntiDriftMetaSimulationTests: XCTestCase {
 
     /// **M597 chapter 一百六十八 — meta-test**: verify the anti-
     /// drift inline-literal detection mechanism actually catches
@@ -315,4 +332,3 @@ final class M595CrossCallsiteAntiDriftTests: XCTestCase {
             """)
     }
 }
-#endif
