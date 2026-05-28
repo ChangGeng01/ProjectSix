@@ -1,6 +1,15 @@
 import XCTest
 @testable import BASHostKit
 
+// chapter 一千零二十三.3 / M3877 — source-gate file-tree audit。
+// This test class reads BASHostKit Sources/ directory to grep for
+// inline magic literals。 On iOS device sandbox the Sources/ tree
+// doesn't exist,so every test method skips with「Coordinator
+// source directory not found」。 Source-gating with #if !os(iOS)
+// is the right semantic — these tests are Mac dev-tree audits,
+// not substrate behavior tests。
+
+#if !os(iOS)
 /// **M595 chapter 一百六十六 + chapter 一百六十七 — cross-callsite
 /// anti-drift defensive tests**.
 ///
@@ -306,3 +315,4 @@ final class M595CrossCallsiteAntiDriftTests: XCTestCase {
             """)
     }
 }
+#endif
