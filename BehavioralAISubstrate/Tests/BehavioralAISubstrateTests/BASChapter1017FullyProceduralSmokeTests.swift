@@ -173,6 +173,10 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
     }
 
     /// Helper to time a closure and update min/max/total。
+    ///
+    /// ch 1024.8 / M3888 — 全面 audit LOW-3 fix:include
+    /// `.components.seconds` so any iter taking ≥1s gets correctly
+    /// accounted。 Pre-fix only counted sub-second attosecond portion。
     @discardableResult
     private func timedIter<T>(
         _ block: () throws -> T,
@@ -182,9 +186,9 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
     ) rethrows -> T {
         let t0 = ContinuousClock().now
         let result = try block()
-        let ms = Double(
-            (ContinuousClock().now - t0).components.attoseconds
-        ) / 1e15
+        let dur = ContinuousClock().now - t0
+        let ms = Double(dur.components.seconds) * 1000.0
+            + Double(dur.components.attoseconds) / 1e15
         if ms < minMs { minMs = ms }
         if ms > maxMs { maxMs = ms }
         totalMs += ms

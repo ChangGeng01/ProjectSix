@@ -132,9 +132,19 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
         let (M, N, D, Dv) = (32, 64, 32, 32)
         let (q, k, v) = makeAttentionInputs(
             M: M, N: N, D: D, Dv: Dv)
+        // ch 1024.8 / M3888 — 全面 audit LOW-2/LOW-4 fix:
+        // - LOW-2:removed redundant Double() casts(timeMedianNs
+        //   returns Double already)
+        // - LOW-4:bestFlashOverStd init to .greatestFiniteMagnitude
+        //   was misleading sentinel — overwritten on trial 1
+        //   unconditionally。 Cleaner to use 0 + explicit「not yet
+        //   set」 via separate flag,but since trial 1 always runs,
+        //   .greatestFiniteMagnitude works fine as「accept any
+        //   first observation」 marker。 Keep it but document intent。
         let numTrials = 3
         var bestStdNs: Double = 0
         var bestFlashNs: Double = 0
+        // Sentinel: any first-trial ratio will be lower → overwrites。
         var bestFlashOverStd: Double = .greatestFiniteMagnitude
         for trial in 0..<numTrials {
             let stdNs = try await timeMedianNs(
@@ -153,20 +163,20 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
                     k: k, kRows: N,
                     v: v, vCols: Dv)
             }
-            let flashOverStd = Double(flashNs) / Double(stdNs)
+            let flashOverStd = flashNs / stdNs
             // Best trial = closest to live 1.066× expectation
             // (i.e. lowest ratio — flash least slower than std)
             if flashOverStd < bestFlashOverStd {
-                bestStdNs = Double(stdNs)
-                bestFlashNs = Double(flashNs)
+                bestStdNs = stdNs
+                bestFlashNs = flashNs
                 bestFlashOverStd = flashOverStd
             }
             print(String(format:
                 "ch 1024.1 trial %d: std=%.0f ns flash=%.0f ns " +
                 "flash/std=%.2f×",
-                trial + 1, Double(stdNs), Double(flashNs), flashOverStd))
+                trial + 1, stdNs, flashNs, flashOverStd))
             // Early exit if trial 1 confidently within bidirectional band
-            if flashOverStd < 1.7 && (Double(stdNs) / Double(flashNs)) < 1.5
+            if flashOverStd < 1.7 && (stdNs / flashNs) < 1.5
                 && trial == 0
             {
                 break
@@ -269,10 +279,16 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
         let (M, N, D, Dv) = (4, 4, 8, 8)
         let (q, k, v) = makeAttentionInputs(
             M: M, N: N, D: D, Dv: Dv)
+        // ch 1024.8 / M3888 — 全面 audit LOW-2/LOW-4 fix:
+        // - LOW-2:removed redundant Double() casts(timeMedianNs
+        //   returns Double)
+        // - LOW-4:bestCpuNs/bestStdNs init to 0 to match bestRatio
+        //   semantics(was .greatestFiniteMagnitude which is overwritten
+        //   on trial 1 anyway,but 0 is honest sentinel)
         let numTrials = 3
         var ratios: [Double] = []
-        var bestCpuNs: Double = .greatestFiniteMagnitude
-        var bestStdNs: Double = .greatestFiniteMagnitude
+        var bestCpuNs: Double = 0
+        var bestStdNs: Double = 0
         var bestRatio: Double = 0
         for trial in 0..<numTrials {
             let cpuNs = try await timeMedianNs(
@@ -293,16 +309,16 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
             }
             // ratio: how many times faster CPU is vs Metal std
             // (assertion: cpuNs * 3 < stdNs → stdNs/cpuNs > 3)
-            let ratio = Double(stdNs) / Double(cpuNs)
+            let ratio = stdNs / cpuNs
             ratios.append(ratio)
             if ratio > bestRatio {
-                bestCpuNs = Double(cpuNs)
-                bestStdNs = Double(stdNs)
+                bestCpuNs = cpuNs
+                bestStdNs = stdNs
                 bestRatio = ratio
             }
             print(String(format:
                 "ch 1024.0 trial %d: cpu=%.0f ns std=%.0f ns ratio=%.2f×",
-                trial + 1, Double(cpuNs), Double(stdNs), ratio))
+                trial + 1, cpuNs, stdNs, ratio))
             // Early exit if trial 1 confidently passes
             if ratio > 3.0 && trial == 0 {
                 break

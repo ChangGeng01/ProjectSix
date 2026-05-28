@@ -207,11 +207,16 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
         maxMs: inout Double,
         totalMs: inout Double
     ) rethrows -> T {
+        // ch 1024.8 / M3888 — 全面 audit LOW-3 fix:pre-fix discarded
+        // `.components.seconds`,counting only attosecond portion。
+        // For sub-ms struct-init workloads this was harmless but the
+        // helper is reusable + bug-prone。 Post-fix:sum seconds*1000
+        // + attoseconds/1e15。
         let t0 = ContinuousClock().now
         let result = try block()
-        let ms = Double(
-            (ContinuousClock().now - t0).components.attoseconds
-        ) / 1e15
+        let dur = ContinuousClock().now - t0
+        let ms = Double(dur.components.seconds) * 1000.0
+            + Double(dur.components.attoseconds) / 1e15
         if ms < minMs { minMs = ms }
         if ms > maxMs { maxMs = ms }
         totalMs += ms
