@@ -65,6 +65,8 @@ import XCTest
 import Darwin
 @testable import BASHostKit
 @testable import BASMemory
+@testable import BASMLXAdapter
+@testable import BASOrgan
 @testable import BASRuntimeCore
 @testable import BASMetalSubstrate
 
@@ -249,16 +251,24 @@ final class BASChapter1025LongRunningEnduranceTests: XCTestCase {
         let initialSnapshot = snapshot()
         logSnapshot(initialSnapshot, iter: 0, phase: "initial")
 
-        // ─── ONE-TIME setup: brain + MLX model load ─────────
-        print("📍 ch1025 brain.makeWithAllPilots starting")
+        // ─── ONE-TIME setup: MLX model load ─────────────────
+        // Direct MLX adapter usage(ch 1025.2 fix:BASCognitiveBrainSummary
+        // is a classification DTO without body field — use MLXOrganAdapter
+        // directly for real LLM body inference,same path as ch 952.1)
+        print("📍 ch1025 MLXOrganAdapter loading Gemma 4 E2B")
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
         let brainLoadStart = Date()
-        let brain = try await BASCognitiveBrain
-            .makeWithAllPilots()
+        try await adapter.loadModel()
         let brainLoadMs = Date()
             .timeIntervalSince(brainLoadStart) * 1000
+        let isLoaded = await adapter.isModelLoaded()
+        XCTAssertTrue(isLoaded,
+            "ch 1025: MLX Gemma 4 E2B must load successfully")
         print(String(format:
-            "📍 ch1025 brain.makeWithAllPilots done load_ms=%.0f",
-            brainLoadMs))
+            "📍 ch1025 MLXOrganAdapter loaded load_ms=%.0f " +
+            "is_loaded=%@",
+            brainLoadMs, isLoaded ? "true" : "false"))
 
         let postLoadSnapshot = snapshot()
         logSnapshot(postLoadSnapshot, iter: 0, phase: "post_brain_load")
@@ -295,6 +305,8 @@ final class BASChapter1025LongRunningEnduranceTests: XCTestCase {
             iterLowPowerBefore.append(snapBefore.isLowPowerMode)
 
             // ─── MLX inference loop ─────────────────────
+            // ch 1025.2 fix:use MLXOrganAdapter.draft() directly
+            // (real body output + real token count)。
             var iterTokens = 0
             for p in 0..<mlxPrompts {
                 let prompt = promptPool[
@@ -303,15 +315,21 @@ final class BASChapter1025LongRunningEnduranceTests: XCTestCase {
 
                 let mlxPreSnap = snapshot()
                 let mlxStart = Date()
-                let summary = await brain.summary(prompt)
+                let request = BASOrganRequest(
+                    requestID: "ch1025-iter\(iter)-prompt\(p)",
+                    role: .core,
+                    preset: .core,
+                    instruction: prompt,
+                    context: [])
+                let draft = try await adapter.draft(request)
                 let mlxMs = Date()
                     .timeIntervalSince(mlxStart) * 1000
                 let mlxPostSnap = snapshot()
 
-                let bodyLen = summary
-                    .suggestedResponse.body.count
-                let tokens = max(1, bodyLen / 4) // rough estimate
-                let tps = Double(tokens) / (mlxMs / 1000.0)
+                let bodyLen = draft.body.count
+                let tokens = draft.outputTokensEstimated
+                let tps = mlxMs > 0
+                    ? Double(tokens) / (mlxMs / 1000.0) : 0
                 iterTokens += tokens
                 allMlxLatenciesMs.append(mlxMs)
 
