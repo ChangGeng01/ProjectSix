@@ -29,12 +29,6 @@
 
 set -uo pipefail
 
-# Re-exec under caffeinate so Mac stays awake — but only once
-if [ -z "${UNDER_CAFFEINATE:-}" ]; then
-    export UNDER_CAFFEINATE=1
-    exec caffeinate -dimsu "$0" "$@"
-fi
-
 SUBSTRATE_DIR="/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate"
 DEVICE_ID="9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6"
 LOG_DIR="${BAS_DEVICE_LOG_DIR:-/tmp/ch952-10hr}"
@@ -44,6 +38,93 @@ LOG_DIR="${BAS_DEVICE_LOG_DIR:-/tmp/ch952-10hr}"
 MAX_SEC=${MAX_SEC:-$((10 * 3600))}   # default 10 hours
 
 mkdir -p "$LOG_DIR"
+
+# chapter 一千零二十二.5 / M3870 — self-detach on first invocation
+# so caller (Claude harness, terminal, launchd, etc.) immediately
+# gets exit=0 and the smoke runs INDEPENDENTLY in its own session。
+#
+# Why this matters:
+#   - Claude Code harness kills background tasks after ~13-30 min
+#     based on session activity / idle timeout / resource pressure
+#   - v1 (10hr launch): killed at ~13 min,2 iter clean before kill
+#   - v2 (2hr launch):  killed at ~27 min,4 iter clean before kill
+#   - In BOTH cases the harness sent SIGTERM to the process tree
+#     (bash + caffeinate + xcodebuild all died together)
+#   - caffeinate prevents Mac sleep but does NOT prevent being
+#     killed by parent — it's itself a child process
+#
+# Fix: detach into its own session via `setsid nohup`。 The detached
+# child is no longer a descendant of Claude harness,so harness
+# SIGTERM never reaches it。 caffeinate still keeps Mac awake within
+# the detached session。
+#
+# Override:
+#   BAS_NO_DETACH=1 bash scripts/run-iphone-air-10hr.sh  # foreground (debug)
+#
+# Stop a detached smoke early:
+#   pkill -f 'run-iphone-air-10hr'
+#
+# Monitor a detached smoke:
+#   tail -f $LOG_DIR/summary.txt
+if [ -z "${BAS_DETACHED:-}" ] && [ -z "${BAS_NO_DETACH:-}" ]; then
+    export BAS_DETACHED=1
+    DETACH_LOG="$LOG_DIR/detach-bootstrap.log"
+    echo "$(date) [smoke] self-detaching via python3 fork+setsid" \
+        > "$DETACH_LOG"
+    echo "$(date) [smoke] args: $*" >> "$DETACH_LOG"
+    echo "$(date) [smoke] env: MAX_SEC=$MAX_SEC " \
+        "BAS_ITER_COOLDOWN_SEC=${BAS_ITER_COOLDOWN_SEC:-0} " \
+        "BAS_DEVICE_LOG_DIR=$LOG_DIR" >> "$DETACH_LOG"
+    # macOS doesn't ship the `setsid` binary,but it has the setsid()
+    # syscall via libc。 Use python3 to fork + setsid + exec child,
+    # making the smoke its own session leader + process group。 The
+    # child is no longer reachable from Claude harness's signal targets。
+    PYTHON=${PYTHON:-/usr/bin/env python3}
+    $PYTHON - "$0" "$@" <<'PYDETACH' >>"$DETACH_LOG" 2>&1 &
+import os, sys
+script = sys.argv[1]
+args = sys.argv[2:]
+# Double-fork pattern + setsid for full detach
+pid = os.fork()
+if pid > 0:
+    # First parent — wait for first child to exit (clean)
+    os.waitpid(pid, 0)
+    sys.exit(0)
+# First child — become new session leader,then fork again
+os.setsid()
+pid = os.fork()
+if pid > 0:
+    # First child exits; second child orphans to init/launchd
+    sys.exit(0)
+# Second child — fully detached,re-exec the smoke script
+# stdin/out/err already redirected to detach log by parent shell
+os.execvp(script, [script] + args)
+PYDETACH
+    PARENT_PID=$!
+    disown 2>/dev/null || true
+    # Give python wrapper a moment to fork the grandchild
+    sleep 1
+    echo "$(date) [smoke] detached parent PID=$PARENT_PID (exits after fork)" \
+        >> "$DETACH_LOG"
+    echo "═══════════════════════════════════════════════════════"
+    echo "Smoke DETACHED via python3 fork+setsid"
+    echo "  log dir:    $LOG_DIR"
+    echo "  summary:    tail -f $LOG_DIR/summary.txt"
+    echo "  detach log: $DETACH_LOG"
+    echo "  find PID:   pgrep -f run-iphone-air-10hr"
+    echo "  stop early: pkill -f 'run-iphone-air-10hr'"
+    echo "═══════════════════════════════════════════════════════"
+    echo "Parent exiting (smoke runs INDEPENDENTLY now)。"
+    exit 0
+fi
+
+# Re-exec under caffeinate so Mac stays awake — but only once。
+# Runs INSIDE the detached session so Mac sleep is held by the
+# detached process (not by Claude harness's caffeinate)。
+if [ -z "${UNDER_CAFFEINATE:-}" ]; then
+    export UNDER_CAFFEINATE=1
+    exec caffeinate -dimsu "$0" "$@"
+fi
 echo "ch952.3+952.6 10hr run starting at $(date)" > "$LOG_DIR/summary.txt"
 echo "device=$DEVICE_ID  max_sec=$MAX_SEC  pid=$$" >> "$LOG_DIR/summary.txt"
 echo "" >> "$LOG_DIR/summary.txt"
