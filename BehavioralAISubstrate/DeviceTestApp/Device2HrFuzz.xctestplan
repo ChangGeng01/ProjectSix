@@ -44,6 +44,18 @@
           {
             "key" : "BAS_FUZZ_INTENSITY",
             "value" : "10"
+          },
+          {
+            "key" : "BAS_AGENT_FABRIC",
+            "value" : "enabled"
+          },
+          {
+            "key" : "BAS_AGENT_TIER",
+            "value" : "all"
+          },
+          {
+            "key" : "BAS_TRANSCRIPT_MODE",
+            "value" : "compareAll"
           }
         ]
       }

@@ -115,7 +115,17 @@ while true; do
     # BAS_FUZZ_RUNTIME_SKIP=1 keeps the heavy runtime-spinning fuzz
     # tests from running EVERY iter — those are device-budget shapes,
     # not Mac iter-loop shapes。 Mac loop focuses on breadth coverage。
-    BAS_FUZZ_RUNTIME_SKIP=1 swift test 2>&1 > "$LOG_FILE"
+    #
+    # ch 1022.5 — env-var gate Agent Fabric ON (production path),
+    # tier=all (9 core + 7 watcher + 4 reference skill = 20 agents),
+    # transcriptMode=compareAll。 Without these,fabric defaults to
+    # `disabled` per ADR-014 OPT-IN — fabric production path
+    # untested。
+    BAS_FUZZ_RUNTIME_SKIP=1 \
+        BAS_AGENT_FABRIC=enabled \
+        BAS_AGENT_TIER=all \
+        BAS_TRANSCRIPT_MODE=compareAll \
+        swift test 2>&1 > "$LOG_FILE"
     EXIT=$?
     PASSED=$(grep -cE "Test Case.*passed" "$LOG_FILE" || true)
     FAILED=$(grep -cE "Test Case.*failed" "$LOG_FILE" || true)
