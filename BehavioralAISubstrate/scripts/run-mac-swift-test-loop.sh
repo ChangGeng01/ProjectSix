@@ -121,20 +121,24 @@ while true; do
     # transcriptMode=compareAll。 Without these,fabric defaults to
     # `disabled` per ADR-014 OPT-IN — fabric production path
     # untested。
-    # ch 1023.1 — QINAO_FM_E2E only on iPhone Air xctestplan,NOT on
-    # Mac loop。 Empirical:Mac swift test bundle + SwiftData @Model
-    # + Apple Foundation Models invocation causes massive NSXPCConnection
-    # errors,Swift Testing tests stall in「started」 state,iter passes
-    # drop from ~14600 → ~2875 due to incomplete enumeration。 The real
-    # Foundation Models LLM path stays validated on iPhone Air (where
-    # iOS 18+ system LLM runs natively without the Mac test-bundle
-    # NSXPCConnection isolation issue)。
+    # ch 1023.2 — also remove QINAO_MLX_E2E / QINAO_MLX_BENCH from Mac
+    # loop。 Empirical Mac v4 iter 1+2:`BASChapter952RealMLXOnDeviceTests`
+    # starts at line 8760 but NEVER PASSES OR FAILS — hangs in MLX REAL
+    # inference path within swift test bundle。 After hang,420 Swift
+    # Testing tests start but none complete (test runner state broken
+    # by MLX hang)。 Result:passes drop from ~14600 to ~2862。
+    #
+    # Same iOS-bundle-isolation issue as Foundation Models (ch 1023.1):
+    # Mac swift test bundle can't reliably host these LLM REAL invocations。
+    # MLX Gemma 4 E2B stays validated on iPhone Air real device (A19 GPU
+    # path,where MLX runs natively without the Mac test-bundle issue)。
+    #
+    # ch 1023.1 — QINAO_FM_E2E only on iPhone Air xctestplan,NOT here。
+    # ch 1023.2 — same for QINAO_MLX_E2E + QINAO_MLX_BENCH。
     BAS_FUZZ_RUNTIME_SKIP=1 \
         BAS_AGENT_FABRIC=enabled \
         BAS_AGENT_TIER=all \
         BAS_TRANSCRIPT_MODE=compareAll \
-        QINAO_MLX_E2E=1 \
-        QINAO_MLX_BENCH=1 \
         swift test 2>&1 > "$LOG_FILE"
     EXIT=$?
     PASSED=$(grep -cE "Test Case.*passed" "$LOG_FILE" || true)
