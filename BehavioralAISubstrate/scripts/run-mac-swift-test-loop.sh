@@ -139,7 +139,7 @@ while true; do
         BAS_AGENT_FABRIC=enabled \
         BAS_AGENT_TIER=all \
         BAS_TRANSCRIPT_MODE=compareAll \
-        swift test 2>&1 > "$LOG_FILE"
+        swift test > "$LOG_FILE" 2>&1
     EXIT=$?
     PASSED=$(grep -cE "Test Case.*passed" "$LOG_FILE" || true)
     FAILED=$(grep -cE "Test Case.*failed" "$LOG_FILE" || true)

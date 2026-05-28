@@ -19,12 +19,33 @@ honest multi-session execution。
 
 ## Endurance dataset used (2026-05-28)
 
-| Run | iter | passed | hard fail | soft fail | duration |
-|---|---|---|---|---|---|
-| Mac v5(ch 1022)| 45 | 655,157 | 0 | 13 | 2hr natural |
-| iPhone Air v9(ch 1023)| 13 | 175,152 | 0 | 0 | 2hr natural |
-| Mac v6(ch 1023.x parallel)| 19 | 276,701 | 0 | 4 | 1hr (user kill) |
-| **Total** | **77** | **1,106,010** | **0** | **17** | — |
+chapter 一千零二十四.5 / M3885 — 全面 audit HIGH-1 fix:pre-fix
+this table claimed「1.09M tests / 0 hard fail」 as headline。
+Audit caught:Mac iter logs have ZERO `✔ Test` (Swift Testing)
+completion lines — Swift Testing tests crashed via SIGBUS
+(`swiftpm-testing-helper exited with signal code 10`) every Mac
+iter,but the crash output went to `detach-bootstrap.log` instead
+of `iter-NNN.log` because of `swift test 2>&1 > "$LOG_FILE"`
+redirect-order bug (CRITICAL-1 fixed in this chapter)。
+
+Honest XCTest-only count (Mac Swift Testing all crashed):
+
+| Run | XCTest passed | Swift Testing | iter | hard fail | soft fail | duration |
+|---|---|---|---|---|---|---|
+| Mac v5(ch 1022)| 655,157 | **CRASH SIGBUS each iter** | 45 | 0 | 13 | 2hr natural |
+| iPhone Air v9(ch 1023)| 175,152 | ✓ ran(157 ✔ Test/iter)| 13 | 0 | 0 | 2hr natural |
+| Mac v6(ch 1023.x parallel)| 276,701 | **CRASH SIGBUS each iter** | 20 | 0 | 4 | 1hr user-killed |
+| **Total XCTest** | **1,107,010** | — | **78** | **0** | **17** | — |
+
+Real total when Mac Swift Testing SIGBUS is root-caused should
+add ~150K-300K(Mac has ~330 `@Suite` struct tests via swift-testing
+vs iPhone's ~165;Mac Swift Testing crashed 100% of iter)。
+
+ch 1024.5 fixed the Mac loop redirect-order bug。 ch 1025.x+ will
+investigate SIGBUS root cause once a clean iter log captures the
+full stderr。 The「0 hard fail」 claim stays valid for XCTest portion
+but SHOULD be qualified as「XCTest-only — Mac Swift Testing portion
+deferred to ch 1025+ root-cause investigation」。
 
 ## What ch 1024.0/1 already shipped
 
@@ -132,7 +153,7 @@ Future ch 1025+ chapters MUST follow:
 
 ## Verification artifacts kept
 
-- `/tmp/ch1022-mac-loop-2hr-v5-nomlxnofm/` — Mac v5 endurance log
+- `/tmp/ch1023-mac-loop-2hr-v5-nomlxnofm/` — Mac v5 endurance log
 - `/tmp/ch1023-2hr-iphone-v9/` — iPhone Air 2hr endurance log
 - `/tmp/ch1023-mac-loop-2hr-v6-parallel/` — Mac v6 partial endurance log
 

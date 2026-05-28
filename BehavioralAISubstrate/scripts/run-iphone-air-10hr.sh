@@ -137,7 +137,7 @@ TOTAL_SKIPPED=0
 
 cleanup() {
     echo "" >> "$LOG_DIR/summary.txt"
-    echo "STOPPED at $(date) (signal or 10hr cap)" >> "$LOG_DIR/summary.txt"
+    echo "STOPPED at $(date) (signal or MAX_SEC=${MAX_SEC}s cap)" >> "$LOG_DIR/summary.txt"
     echo "TOTAL: iter=$ITER passed=$TOTAL_PASSED failed=$TOTAL_FAILED skipped=$TOTAL_SKIPPED" \
         >> "$LOG_DIR/summary.txt"
     exit 0
@@ -208,7 +208,7 @@ while true; do
     NOW=$(date +%s)
     ELAPSED=$((NOW - START_TS))
     if [ $ELAPSED -ge $MAX_SEC ]; then
-        echo "$(date) 10hr cap hit — stopping (iter=$ITER)" \
+        echo "$(date) MAX_SEC=${MAX_SEC}s cap hit — stopping (iter=$ITER)" \
             >> "$LOG_DIR/summary.txt"
         break
     fi

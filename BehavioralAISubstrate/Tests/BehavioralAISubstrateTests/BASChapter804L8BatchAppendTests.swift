@@ -181,7 +181,12 @@ final class BASChapter804L8BatchAppendTests: XCTestCase {
                 "   trial %d: per-call=%.3f ms  batch=%.3f ms  speedup=%.1f×",
                 trial + 1, perCallMs, batchMs, ratio))
             // Early exit if a trial confidently passes
-            if ratio >= 3.0 && trial == 0 {
+            // ch 1024.5 MED-1 fix:strict `>` matches the final
+            // assert (XCTAssertGreaterThan,not GreaterThanOrEqual)。
+            // Pre-fix gate `>=` could early-exit on ratio=3.0 which
+            // then fails the strict assert below — floating-point
+            // edge case mismatch caught by全面 audit。
+            if ratio > 3.0 && trial == 0 {
                 print("== L8 BATCH SCORECARD: \(iters) events " +
                       "(trial 1 passed,skipping retries)")
                 XCTAssertGreaterThan(ratio, 3.0,

@@ -29,10 +29,17 @@
 //          conceptually weird (enum has no boundary semantics);
 //          changed to uniform pick()
 // Fixed inline below。 ch 1020.5 doesn't ship as separate file —
-// per cascade discipline,inline fix-of-fix on same file is
-// honest when the original wasn't yet pushed at the time of
-// catch。 (It WAS pushed at ch 1020 commit but pre-launch audit
-// caught these — preferred over Round-28 catching them later。)
+// per cascade discipline,inline fix-of-fix on same file IS
+// the honest dispatch path when self-audit catches issues post-
+// commit but pre-endurance-launch。 ch 1020 was pushed at commit
+// 2078011bb,then「开启 诚实模式」 self-audit caught 2 HIGH + 5
+// MED,ch 1020.5 fixed inline in same file at commit 65cb7fb41
+// (preserves ch 1020 git history,no force-push)。 This is
+// preferable to letting Round-28 catch them externally later。
+//
+// ch 1024.5 / M3885 — 全面 audit fix:pre-fix doc-block was
+// self-contradictory(claimed「wasn't yet pushed」 AND「WAS pushed」
+// in adjacent lines)。 Rewritten to honest single framing。
 //
 // ## Honest scope
 //
