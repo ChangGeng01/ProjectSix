@@ -121,13 +121,20 @@ while true; do
     # transcriptMode=compareAll。 Without these,fabric defaults to
     # `disabled` per ADR-014 OPT-IN — fabric production path
     # untested。
+    # ch 1023.1 — QINAO_FM_E2E only on iPhone Air xctestplan,NOT on
+    # Mac loop。 Empirical:Mac swift test bundle + SwiftData @Model
+    # + Apple Foundation Models invocation causes massive NSXPCConnection
+    # errors,Swift Testing tests stall in「started」 state,iter passes
+    # drop from ~14600 → ~2875 due to incomplete enumeration。 The real
+    # Foundation Models LLM path stays validated on iPhone Air (where
+    # iOS 18+ system LLM runs natively without the Mac test-bundle
+    # NSXPCConnection isolation issue)。
     BAS_FUZZ_RUNTIME_SKIP=1 \
         BAS_AGENT_FABRIC=enabled \
         BAS_AGENT_TIER=all \
         BAS_TRANSCRIPT_MODE=compareAll \
         QINAO_MLX_E2E=1 \
         QINAO_MLX_BENCH=1 \
-        QINAO_FM_E2E=1 \
         swift test 2>&1 > "$LOG_FILE"
     EXIT=$?
     PASSED=$(grep -cE "Test Case.*passed" "$LOG_FILE" || true)
