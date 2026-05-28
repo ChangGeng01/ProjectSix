@@ -211,15 +211,20 @@ final class BASChapter1025LongRunningEnduranceTests: XCTestCase {
     // MARK: - The single test method
 
     func testSingleLaunchLongRunningEndurance() async throws {
-        // Gate: skip unless explicitly enabled。
-        guard ProcessInfo.processInfo.environment[
-            "BAS_LONG_ENDURANCE_RUN"] == "1" else {
-            throw XCTSkip(
-                "Set BAS_LONG_ENDURANCE_RUN=1 to run ch 1025 " +
-                "single-launch internal-loop endurance test。 " +
-                "Default smokes skip(designed for dedicated " +
-                "10hr+ runs only)。")
-        }
+        // ch 1025.3 / M3898 — removed env-var gate。 Reason:
+        // bash `export BAS_LONG_ENDURANCE_RUN=1` doesn't propagate
+        // to iPhone test bundle process(xcodebuild iOS device tests
+        // only see env vars from xctestplan,not from shell)。 v3 launch
+        // triggered XCTSkip silently → 0 ch1025 logs emitted。
+        //
+        // Safety: this test is ONLY invoked via dedicated launch script
+        // `scripts/run-iphone-air-internal-loop-10hr.sh` which uses
+        // `-only-testing:.../testSingleLaunchLongRunningEndurance`。
+        // Default xctestplan smokes don't trigger it because the
+        // script is the only caller。
+        //
+        // If accidentally invoked via default `swift test`:will run
+        // for 10 hours,but that's the caller's mistake to recover from。
 
         let totalIters = internalIterCount
         let mlxPrompts = mlxPromptsPerIter
