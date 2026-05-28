@@ -46,6 +46,10 @@
             "value" : "10"
           },
           {
+            "key" : "QINAO_FM_E2E",
+            "value" : "1"
+          },
+          {
             "key" : "BAS_AGENT_FABRIC",
             "value" : "enabled"
           },
