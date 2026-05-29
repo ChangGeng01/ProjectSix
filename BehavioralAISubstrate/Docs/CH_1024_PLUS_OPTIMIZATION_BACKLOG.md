@@ -200,6 +200,77 @@ ONE PER CHAPTER with audit not bundled to avoid class-h trap。
 | 20 | ch 1030 arc | **MPSGraph kernel rotation** — substrate has 5+ MPSGraph kernel wires(ch 870/871: MatMul / Attention / RMSNorm / RotaryEmbedding / LayerNorm)but MLX framework bypasses substrate's dispatcher,calling Metal directly。 Endurance never exercises substrate-side `BASMetalLinearAlgebraDispatchers` kernel pool。 | MED — substrate has the wires,untested in app context | Per N iters,invoke `BASMetalLinearAlgebraDispatchers` with synthetic tensors hitting each kernel(matmul / attention / rmsnorm / rope)。 Log MPSGraph dispatch latency + cache stats。 Est ~200 LOC runner + 0 substrate change,~3-4 hr。 |
 | 21 | ch 1031.x arc | **Multi-organ rotation** — endurance uses MLXOrganAdapter(Gemma 4 E2B)only。 Substrate supports Foundation Models / Chat Completions / external adapters via `BASOrganAdapter` protocol。 Endurance never switches organs mid-run。 | LOW — single-organ stability already validated;multi-organ adds breadth not depth | Per N iters,call an alternate `BASOrganAdapter` if available(Foundation Models on iOS 26+ or Chat Completions if API key set)。 Log organ provider + draft outputs。 Est ~150 LOC + 4-6 hr(needs FM model availability check + Chat Completions API key handling)。 |
 
+## Pre-ship audit findings — ch 1027 / MPSGraph / ANE(2026-05-29)
+
+After the 10-hour ch 1025.7 endurance completed,3 parallel read-only
+audits摸排 the coverage-widening candidates BEFORE committing ship order
+(user mandate「先 audit 不盲目 ship」)。 **All 3 overturned the BACKLOG's
+original estimates。** This section is AUTHORITATIVE;Tier 3 #8 + Tier 5
+#18-21 rows are kept for history but their estimates are SUPERSEDED here。
+
+### Chapter-number collision fix
+
+Coverage-widening entries(Tier 5 #18-21)reused chapter numbers already
+claimed by Tier 3 #8-12 / Tier 4 #13 / Tier 5 #14-15。 Renumbered:
+
+| Coverage-widening work | OLD(collided)| NEW |
+|---|---|---|
+| Mamba SSM endurance | ch 1028(=Swift Testing bundle #9)| **ch 1033** |
+| MPSGraph kernel rotation | ch 1030(=Fabric authoritative #13)| **ch 1034** |
+| ANE rescoped | ch 1029(=kernel crash #10)| **ch 1035** |
+| Multi-organ rotation | ch 1031(=trend tooling #14)| **ch 1036** |
+
+### Audit 1 — ch 1027 iOS Rust:ALREADY DONE(verify-only)
+
+Tier 3 #8 said HIGH/multi-session/"major infra"。 **FALSE。** iOS arm64
+Rust slice already built,git-committed,wired:
+- `Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework/ios-arm64/libbas_memory_usage_tracker.a`(21.6 MB)committed,exports 250 `bas_` symbols(= macOS slice count)
+- `scripts/build-rust-xcframework.sh` TARGETS already includes `aarch64-apple-ios` + `-sim`
+- rayon/rusqlite cross-compile cleanly;no tokio/openssl/bindgen
+- "no .dylib in bundle" was a MISDIAGNOSIS — ships as static `.a` linked into the app's own Mach-O(correct iOS pattern,no embedded-dylib codesigning)
+- DeviceTestApp → BASRuntimeCore → transitively pulls XCFramework
+- Infra shipped at ch 707 / M2191,not pending
+
+**Revised:~0-50 LOC,2-5 hr,LOW risk,single session,verify-and-document。** Only unknown:SPM dead-strip of unreferenced static-archive symbols(`-force_load` mitigates;`force_link.rs` exists Rust-side)。
+
+### Audit 2 — ch 1034 MPSGraph kernel rotation:LOW risk,straightforward
+
+Tier 5 #20 conflated two layers。 `BASMetalLinearAlgebraDispatchers` is
+raw-MSL(only MatMul + RMSNorm)— NOT the MPSGraph cache the chapter names。
+The real ch 870/871 wires are 5 public actors in
+`Sources/BASMetalSubstrate/BASBuiltinKernels/`(`BASMPSGraph{MatMul,
+Attention,RMSNorm,RotaryEmbedding,LayerNorm}Kernel`),uniform
+`evaluate(inputs:) async throws -> BASKernelOutputs`。
+- Reuse template:`Tests/.../BASMPSGraphDispatchLatencyBenchmark.swift`
+- Public factory `BASCanonicalKernelInputBuilders`(matMul/rmsNorm/rotaryEmbedding have builders;attention + layerNorm need ~15 LOC hand-rolled descriptors each)
+- **GPU contention = LOW**:MPSGraph kernels share the singleton A19 MTLDevice with MLX but use own command queues — Metal's standard multi-queue model,no crash risk。 Contention is performance-only,sidestepped by SERIAL invocation in the existing sequential await loop(never concurrent with MLX draft)。
+- @testable NOT required(BASHostKit already plain-imports BASMetalSubstrate);needs 1-line project.yml dep + xcodegen regen
+- Warm-cache:pass shared `BASMPSGraphExecutableCache` or hoist kernels outside loop
+
+**Revised:~180-230 LOC,3-5 hr,LOW risk,0 substrate source change。**
+
+### Audit 3 — ch 1035 ANE utilization%:iOS sandbox DEAD-END
+
+Tier 5 #19 promised "per-iter ANE utilization %"。 **Impossible on
+non-jailbroken iOS。** ANE perf counters live behind private
+`H11ANE`/`AppleNeuralEngine` IOKit,gated by private entitlements Apple
+grants only to its own processes。 No public iOS API surfaces ANE busy-time。
+- `BASANELiveReader` reads NOTHING live — only `MLComputeDevice.allComputeDevices` static enumeration + hardcoded heuristic constants
+- `BASANEKernelEligibilityClassifier` is a static compile-time predictor,self-declares `consultedByExecutorInProduction=false`
+- No `MLModelConfiguration` constructed → CoreML defaults `.all`,but 18K-param MLP so small the scheduler likely keeps it on CPU/GPU(dispatch overhead > compute)
+- Only 1 real `.mlmodel`(two byte-identical copies);rotation needs net-new trained models
+
+**Rescoped ch 1035 = "multi-CoreML rotation + `.cpuAndNeuralEngine` REQUEST logging(request,NOT confirmation)+ static BASANELiveReader snapshot"。 ANE utilization% = WONT-DO(iOS sandbox),same honesty pattern as `consultedByExecutorInProduction=false`。 Realistic:~150-190 LOC + 2-4 trained models + 6-8 hr,HIGH/partially-blocked。**
+
+### Data-driven ship order(supersedes the generic Sequence list below)
+
+1. **ch 1027**(Rust verify)— cheapest,LOW,single-session,pure verify-and-document。 Ship first。
+2. **ch 1026**(thermal policy wire)— now has the 10hr ≥180s-recovery baseline as design input。 SCAFFOLD→WIRED,MED risk,ADR-014 OPT-IN default OFF,needs 5-axis perf at .nominal。
+3. **ch 1034**(MPSGraph rotation)— LOW risk,template exists,serial-loop sidesteps GPU contention。
+4. **ch 1033**(Mamba SSM)— confirm API first(`runMambaScan` lives in `BASMambaSSMState.swift`,NOT the dispatchers — Tier 5 #18 misattributed)。
+5. **ch 1035**(ANE rescoped)— rotation + request-log only;utilization% DECLINE-WITH-TRIGGER(revisit if Apple exposes public ANE counters)。
+6. **ch 1036**(multi-organ)— LOW priority,breadth not depth。
+
 ## Sequence recommendation
 
 **Honest pacing — ship one chapter per session,never bundle:**
