@@ -1,0 +1,861 @@
+// MARK: - BASEnduranceAppRunner
+// chapter 一千零二十五.4 / M3899 — in-app endurance entrypoint
+// chapter 一千零二十五.5 / M3899 — L1-L14 substrate cascade per prompt
+// chapter 一千零二十五.5.5 / M3899 — audit fix(UI honesty + conf=n/a)
+// chapter 一千零二十五.7 / M3899 — comprehensive turnResult instrumentation
+//
+// ch 1025.7 — user mandate「最最 严苛 全面 — 所有 组件 数据 都要记录」。
+// Each prompt now emits 8 additional log lines covering every public
+// field on `BASEBrainTurnResult` that ch 1025.5 did not surface:
+//   `ctx`        — L6 BASContextFrame full signal panel (emotionalLoad,
+//                  timePressure,ambiguityScore,consequenceLevel,
+//                  manipulationHints,sceneType)
+//   `decompose`  — L7 BASDecomposeFrame signal counts(emotions /
+//                  pressure / manipulation / unknowns / contradictions
+//                  / facts / goals)
+//   `risk`       — L11 BASRiskCard scalars(totalRisk,uncertainty,
+//                  irreversibility,manipulationStrength,gsiScore)
+//   `permit`     — L11 BASActionPermit(mode,reasonCodes,allowed/
+//                  blocked domains,toolScope,memoryScope,requireMirror)
+//   `mem`        — L8 BASMemoryBundle(atoms,retrievalTags,conflictRefs)
+//   `render`     — L12 BASRenderedOutput(headline / body / alts /
+//                  explanationCodes counts — body is rule-template,
+//                  NOT MLX tokens)
+//   `triself`    — L10 [BASTriSelfScore] per candidate(id/ego/super/
+//                  merged/veto)
+//   `candidates` — L9 per-BASCandidatePath(benefit / cost /
+//                  reversibility / confidence)
+//   `host_gate`  — L13 hostGateValue + emergencyBrake summary
+// Plus per-MLX-call:
+//   `mlx-detail` — sessionCount + currentCapacity from MLXOrganAdapter
+// Plus one-time boot inventory line listing NYI components(Mamba,ANE
+// direct,Rust crates,MPSGraph rotation,fabric.runTurn)so a future
+// operator reading the log knows EXACTLY what's tested vs not。
+// See Docs/CH_1024_PLUS_OPTIMIZATION_BACKLOG.md "ch 1025.5 endurance
+// coverage audit" section for the deferred-component arc plan。
+//
+// Bypass the xcodebuild test controller architecture so endurance
+// runs survive Mac-side controller preemption。 Background:
+// ch 1025 v4 endurance smoke (PID 73350) was killed at 01:38:35 AEST
+// May 29 2026 when a competing xcodebuild start (PID 79959,
+// ProjectEleven UITests on simulator DA99B4D8) triggered Xcode
+// CoreDevice test session cleanup of all running xcodebuild test
+// instances on the Mac (see Docs/CH_1024_PLUS_OPTIMIZATION_BACKLOG.md
+// "ch 1025 v4 internal-loop smoke" section)。 By running the endurance
+// loop inside the app process directly,Mac side can disconnect
+// without killing iPhone-side execution。
+//
+// ch 1025.5 — each prompt now invokes `brain.process()` (L1-L14
+// substrate classifier → decompose → memory → loop → triSelf →
+// risk → action render → evolution synthesis) BEFORE
+// `adapter.draft()` for MLX tokens。 The endurance loop now exercises
+// both the substrate cascade AND the LLM end-to-end,not just MLX。
+// Full `BASAgentFabricHostPipeline.runTurn()` integration is
+// deferred to ch 1025.6 — requires a substrate-side
+// `makeMinimalForEndurance(brain:adapter:)` factory that doesn't
+// exist yet (app target lacks zero-config fabric assembly entry)。
+//
+// ch 1025.5.5 — audit fix-of-fix。 HIGH-1: each prompt now emits
+// `🪧 ch1025 fabric_activation=bypassed reason=no_pipeline_in_runner`
+// so the syslog log honestly reflects that fabric.runTurn() does
+// NOT fire,even though the UI badge shows "Fabric: enabled (all)"
+// because BAS_AGENT_FABRIC=enabled is in launch env。 MED-2: brain
+// confidence band rendered `n/a` when nil instead of `0.00`
+// (which previously implied the classifier returned 0 confidence)。
+// MED-1 (operator-facing): brain singleton may stay resident on
+// MLX-load-failure path,non-issue for one-shot endurance binary。
+//
+// Launch from Mac:
+//
+//   xcrun devicectl device process launch \
+//     --device 9E9E3DEB-E9F5-5C2D-A6B1-9B31A70659D6 \
+//     --environment BAS_ENDURANCE_AUTOSTART=1 \
+//     --environment BAS_INTERNAL_ITER_COUNT=100 \
+//     --environment BAS_INTERNAL_MLX_PROMPTS=3 \
+//     --environment BAS_INTERNAL_COOLDOWN_SEC=60 \
+//     com.changgeng.basdevicetest
+//
+// Capture log on Mac:
+//
+//   idevicesyslog -u <UDID> | grep ch1025
+//
+// Or pull Documents/ post-run via Xcode Devices window
+// ("Container" → BASDeviceTestApp → Download)
+//
+// Env vars(read at app launch):
+//   BAS_ENDURANCE_AUTOSTART     1 = run; unset / other = idle
+//   BAS_INTERNAL_ITER_COUNT     default 100
+//   BAS_INTERNAL_COOLDOWN_SEC   default 60
+//   BAS_INTERNAL_ADAPTIVE       default 1
+//   BAS_INTERNAL_MLX_PROMPTS    default 3
+
+import Foundation
+import Darwin
+import UIKit
+import os
+import BASHostKit
+import BASMLXAdapter
+import BASOrgan
+
+// ch 1025.4 — Unified logging via `os.Logger`。 Swift `print()` does
+// NOT appear in iOS system log,which means `idevicesyslog` from
+// Mac cannot capture endurance progress。 By routing through
+// `Logger`,emit lines are visible to:
+//   - idevicesyslog -u <UDID>(real-time stream)
+//   - log show / log stream / Xcode Devices Console
+// while still also writing to Documents/ for post-run analysis。
+private let ch1025Log = Logger(
+    subsystem: "com.changgeng.basdevicetest",
+    category: "ch1025-endurance")
+
+@MainActor
+final class BASEnduranceAppController: ObservableObject {
+
+    // MARK: - Status surface
+
+    enum RunStatus {
+        case autostartOff
+        case starting
+        case running(iter: Int, totalIters: Int,
+                     cumulTokens: Int, thermal: String)
+        case completed(totalIters: Int, totalTokens: Int,
+                       runSec: Double)
+        case failed(message: String)
+
+        var label: String {
+            switch self {
+            case .autostartOff:
+                return "autostart=off (set BAS_ENDURANCE_AUTOSTART=1)"
+            case .starting:
+                return "starting…"
+            case .running(let i, let t, let n, let th):
+                return "iter \(i)/\(t)  tok=\(n)  th=\(th)"
+            case .completed(let t, let n, let s):
+                return "DONE iters=\(t) tokens=\(n) sec=\(Int(s))"
+            case .failed(let m):
+                return "FAILED: \(m)"
+            }
+        }
+    }
+
+    @Published var status: RunStatus = .autostartOff
+    static let shared = BASEnduranceAppController()
+
+    private var started = false
+    private var logFileHandle: FileHandle?
+    private var logFileURL: URL?
+
+    // MARK: - Autostart hook
+
+    func autostartIfEnabled() {
+        guard !started else { return }
+        let env = ProcessInfo.processInfo.environment
+        guard env["BAS_ENDURANCE_AUTOSTART"] == "1" else {
+            status = .autostartOff
+            return
+        }
+        started = true
+        status = .starting
+        // Prevent screen auto-lock during long endurance run。 The
+        // operator should also set Settings → Display & Brightness
+        // → Auto-Lock = Never on the device,and keep it charging。
+        UIApplication.shared.isIdleTimerDisabled = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.runEndurance()
+        }
+    }
+
+    // MARK: - System snapshot(parallel to ch 1025 test)
+
+    private struct SystemSnapshot {
+        let wallClock: Date
+        let monotonicNs: UInt64
+        let thermalState: String
+        let isLowPowerMode: Bool
+        let activeProcessors: Int
+        let totalProcessors: Int
+        let memoryRssMB: Double
+        let memoryFootprintMB: Double
+        let availableMemoryMB: Int
+    }
+
+    private nonisolated func snapshot() -> SystemSnapshot {
+        var info = mach_task_basic_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<mach_task_basic_info_data_t>.size
+            / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) { ptr in
+            ptr.withMemoryRebound(
+                to: integer_t.self, capacity: Int(count)
+            ) { iptr in
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(MACH_TASK_BASIC_INFO),
+                    iptr, &count)
+            }
+        }
+        let rssMB: Double
+        let footprintMB: Double
+        if result == KERN_SUCCESS {
+            rssMB = Double(info.resident_size)
+                / 1024.0 / 1024.0
+            footprintMB = Double(info.virtual_size)
+                / 1024.0 / 1024.0
+        } else {
+            rssMB = 0
+            footprintMB = 0
+        }
+        let availMB = Int(os_proc_available_memory())
+            / 1024 / 1024
+        return SystemSnapshot(
+            wallClock: Date(),
+            monotonicNs: DispatchTime.now().uptimeNanoseconds,
+            thermalState: Self.thermalStateString(),
+            isLowPowerMode: ProcessInfo.processInfo
+                .isLowPowerModeEnabled,
+            activeProcessors: ProcessInfo.processInfo
+                .activeProcessorCount,
+            totalProcessors: ProcessInfo.processInfo
+                .processorCount,
+            memoryRssMB: rssMB,
+            memoryFootprintMB: footprintMB,
+            availableMemoryMB: availMB)
+    }
+
+    private nonisolated static func thermalStateString() -> String {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal:  return "nominal"
+        case .fair:     return "fair"
+        case .serious:  return "serious"
+        case .critical: return "critical"
+        @unknown default: return "unknown"
+        }
+    }
+
+    // MARK: - Adaptive cooldown(matches ch 1025 schedule)
+
+    private nonisolated func cooldownSecFor(
+        iter: Int, base: Int, adaptive: Bool
+    ) -> Int {
+        guard adaptive else { return base }
+        switch iter {
+        case 1...2:   return base
+        case 3...5:   return base + 30
+        case 6...10:  return base * 2 + 60
+        default:      return base * 3 + 120
+        }
+    }
+
+    private nonisolated static let promptPool: [String] = [
+        "On-device inference matters for privacy. Why is this true?",
+        "Summarize:Swift actors prevent data races by isolation。",
+        "List 3 reasons MLX beats Core ML on iPhone Air A19 for LLM。",
+        "Explain thermal throttling on Apple Silicon under sustained load。",
+        "Generate a one-sentence intro for an LLM substrate test framework。",
+        "How does an attention head handle a 512-token context window?",
+        "What are the trade-offs between Q4 and Q8 quantization for Gemma?",
+        "Describe iPhone Air A19 ANE capacity for low-precision matmul。",
+    ]
+
+    // MARK: - Log destination(stdout + Documents file)
+
+    private func openLogFile() {
+        let docsRoot = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask).first
+        guard let docs = docsRoot else { return }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyyMMdd-HHmmss"
+        let stamp = fmt.string(from: Date())
+        let url = docs.appendingPathComponent(
+            "ch1025-endurance-\(stamp).log")
+        FileManager.default.createFile(
+            atPath: url.path, contents: nil)
+        if let fh = try? FileHandle(forWritingTo: url) {
+            logFileHandle = fh
+            logFileURL = url
+        }
+    }
+
+    private nonisolated func emit(_ line: String) {
+        // stdout — useful for Xcode console attach
+        print(line)
+        // os.Logger.notice — captured by idevicesyslog / log stream
+        // `\(line, privacy: .public)` marker required;default is
+        // `.auto` which redacts non-literal interpolations。
+        ch1025Log.notice("\(line, privacy: .public)")
+    }
+
+    @MainActor
+    private func writeToLogFile(_ line: String) {
+        guard let fh = logFileHandle else { return }
+        let withNL = line + "\n"
+        if let data = withNL.data(using: .utf8) {
+            try? fh.write(contentsOf: data)
+        }
+    }
+
+    @MainActor
+    private func closeLogFile() {
+        try? logFileHandle?.close()
+        logFileHandle = nil
+    }
+
+    // MARK: - Run loop
+
+    private func runEndurance() async {
+        let env = ProcessInfo.processInfo.environment
+        let totalIters = Int(
+            env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100
+        let mlxPrompts = Int(
+            env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3
+        let baseCooldown = Int(
+            env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
+        let adaptive = (
+            env["BAS_INTERNAL_ADAPTIVE"] ?? "1") == "1"
+        let runStart = Date()
+
+        await MainActor.run {
+            self.openLogFile()
+        }
+
+        await emitBoth(
+            "📊 ch1025 host config iters=\(totalIters) " +
+            "mlx_prompts=\(mlxPrompts) " +
+            "base_cooldown=\(baseCooldown)s " +
+            "adaptive=\(adaptive)")
+
+        var memsize: UInt64 = 0
+        var memsizeLen = MemoryLayout<UInt64>.size
+        sysctlbyname("hw.memsize", &memsize,
+                     &memsizeLen, nil, 0)
+        let physRamGB = Double(memsize)
+            / 1024.0 / 1024.0 / 1024.0
+
+        await emitBoth(String(format:
+            "📊 ch1025 host device phys_ram_gb=%.1f " +
+            "total_cpu=%d active_cpu=%d os=%@",
+            physRamGB,
+            ProcessInfo.processInfo.processorCount,
+            ProcessInfo.processInfo.activeProcessorCount,
+            ProcessInfo.processInfo
+                .operatingSystemVersionString))
+
+        let initialSnap = snapshot()
+        await emitBoth(formatSnap(initialSnap, iter: 0,
+                                  phase: "initial"))
+
+        // ch 1025.5 — L1-L14 brain cascade (real substrate, not just MLX)
+        await emitBoth(
+            "📍 ch1025 BASCognitiveBrain.makeWithDefaults loading")
+        let brain: BASCognitiveBrain
+        let cognitiveBrainStart = Date()
+        do {
+            brain = try await BASCognitiveBrain.makeWithDefaults()
+        } catch {
+            let msg = "Brain init failed: \(error)"
+            await emitBoth("⚠️ ch1025 \(msg)")
+            await MainActor.run {
+                self.status = .failed(message: msg)
+                self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+            return
+        }
+        let cognitiveBrainMs = Date()
+            .timeIntervalSince(cognitiveBrainStart) * 1000
+        await emitBoth(String(format:
+            "📍 ch1025 BASCognitiveBrain loaded load_ms=%.0f",
+            cognitiveBrainMs))
+
+        // MLX model load
+        await emitBoth(
+            "📍 ch1025 MLXOrganAdapter loading Gemma 4 E2B")
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        let brainLoadStart = Date()
+        do {
+            try await adapter.loadModel()
+        } catch {
+            let msg = "MLX load failed: \(error)"
+            await emitBoth("⚠️ ch1025 \(msg)")
+            await MainActor.run {
+                self.status = .failed(message: msg)
+                self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+            return
+        }
+        let brainLoadMs = Date()
+            .timeIntervalSince(brainLoadStart) * 1000
+        let isLoaded = await adapter.isModelLoaded()
+        await emitBoth(String(format:
+            "📍 ch1025 MLXOrganAdapter loaded load_ms=%.0f " +
+            "is_loaded=%@",
+            brainLoadMs, isLoaded ? "true" : "false"))
+
+        if !isLoaded {
+            let msg = "MLX not loaded post-loadModel"
+            await emitBoth("⚠️ ch1025 \(msg)")
+            await MainActor.run {
+                self.status = .failed(message: msg)
+                self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+            return
+        }
+
+        let postLoadSnap = snapshot()
+        await emitBoth(formatSnap(postLoadSnap, iter: 0,
+                                  phase: "post_brain_load"))
+
+        // ch 1025.7 — explicit coverage inventory in boot log so
+        // operators reading the syslog know EXACTLY what's exercised
+        // vs what's NYI(grep-able)。 See BACKLOG "ch 1025.5
+        // endurance coverage audit" section for the deferred arc。
+        await emitBoth(
+            "📊 ch1025 inventory " +
+            "exercised=mlx_gemma4_E2B_4bit+" +
+            "coreml_BASContextClassifier_18Kparams+" +
+            "L1_to_L14_cascade+L8_LRU_bounded " +
+            "nyi=fabric_runTurn(ch1025.6)+" +
+            "iOS_Rust_dylib(ch1027)+" +
+            "mamba_SSM_runMambaScan(ch1028)+" +
+            "ANE_direct_invocation(ch1029)+" +
+            "MPSGraph_kernel_rotation(ch1030)+" +
+            "multi_organ_rotation(ch1031)")
+
+        var iterDurationMs: [Double] = []
+        var iterMlxTokens: [Int] = []
+        var iterRssBefore: [Double] = []
+        var iterRssAfter: [Double] = []
+        var iterThermalBefore: [String] = []
+        var iterThermalAfter: [String] = []
+        var iterAvailMemBefore: [Int] = []
+        var iterAvailMemAfter: [Int] = []
+        var iterCooldownThermalRecovery: [String] = []
+        var allMlxLatenciesMs: [Double] = []
+        var totalTokens = 0
+
+        for iter in 1...totalIters {
+            let iterStart = Date()
+            let elapsedSec = Int(
+                iterStart.timeIntervalSince(runStart))
+            await emitBoth(
+                "📍 ch1025 internal-iter=\(iter) start " +
+                "elapsed=\(elapsedSec)s")
+
+            let snapBefore = snapshot()
+            await emitBoth(formatSnap(
+                snapBefore, iter: iter, phase: "before"))
+            iterRssBefore.append(snapBefore.memoryRssMB)
+            iterThermalBefore.append(snapBefore.thermalState)
+            iterAvailMemBefore.append(
+                snapBefore.availableMemoryMB)
+
+            var iterTokens = 0
+            for p in 0..<mlxPrompts {
+                let prompt = Self.promptPool[
+                    (iter * mlxPrompts + p)
+                    % Self.promptPool.count]
+                let promptLen = prompt.count
+
+                // ch 1025.5 — brain.process() exercises L1-L14 cascade
+                // (context classify → decompose → memory → loop → triSelf
+                // → risk → action render → evolution synthesis)。 This
+                // is REAL substrate work,not just MLX。 No fabric
+                // activation yet (pipeline.runTurn deferred to ch 1025.6
+                // — needs fabric+roster+graph build in app target)。
+                let brainStart = Date()
+                let turnResult = await brain.process(prompt)
+                let brainMs = Date()
+                    .timeIntervalSince(brainStart) * 1000
+                let taskType = turnResult.contextFrame.taskType
+                // ch 1025.5.5 audit MED-2:`confidenceBand` is
+                // `Optional<Double>` and the `brain.process` path
+                // (BASMLContextService) never sets it,so we always
+                // see nil。 Previously rendered as `conf=0.00` which
+                // implies the classifier returned 0 confidence —
+                // misleading。 Render `n/a` when nil so operators
+                // reading the log don't assume the model is broken。
+                let confStr = turnResult.contextFrame.confidenceBand
+                    .map { String(format: "%.2f", $0) } ?? "n/a"
+                let riskLevel = turnResult.riskCard.riskLevel
+                let candidateCount =
+                    turnResult.thoughtFrame.candidates.count
+                await emitBoth(String(format:
+                    "🧠 ch1025 brain iter=%d prompt=%d " +
+                    "latency_ms=%.0f task=%@ conf=%@ " +
+                    "risk=%@ candidates=%d",
+                    iter, p + 1, brainMs,
+                    String(describing: taskType),
+                    confStr,
+                    String(describing: riskLevel),
+                    candidateCount))
+                // ch 1025.5.5 audit HIGH-1:emit explicit fabric
+                // bypass marker per prompt so the syslog doesn't
+                // lie。 ContentView UI shows "Fabric: enabled (all)"
+                // because BAS_AGENT_FABRIC=enabled is in launch env,
+                // but `BASAgentFabricHostPipeline.runTurn` is NOT
+                // called from this runner — fabric coordination
+                // doesn't actually fire。 Pipeline integration is
+                // deferred to ch 1025.6(needs substrate
+                // `makeMinimalForEndurance(brain:adapter:)` factory
+                // — currently no public helper for app-target
+                // fabric assembly)。 Without this marker an operator
+                // reading the log would see "enabled" badge + brain
+                // lines and conclude fabric ran。 With this marker
+                // the truth is grep-able。
+                await emitBoth(String(format:
+                    "🪧 ch1025 fabric_activation=bypassed " +
+                    "iter=%d prompt=%d " +
+                    "reason=no_pipeline_in_runner " +
+                    "defer_to=ch_1025.6",
+                    iter, p + 1))
+
+                // ch 1025.7 — comprehensive turnResult instrumentation:
+                // emit 8+ detailed log lines covering all public
+                // fields the standard brain line doesn't surface。
+                await emitBrainDetail(
+                    turnResult, iter: iter, prompt: p + 1)
+
+                let mlxPreSnap = snapshot()
+                let mlxStart = Date()
+                let request = BASOrganRequest(
+                    requestID:
+                        "ch1025-iter\(iter)-prompt\(p)",
+                    role: .core,
+                    preset: .core,
+                    instruction: prompt,
+                    context: [])
+                do {
+                    let draft = try await adapter.draft(request)
+                    let mlxMs = Date()
+                        .timeIntervalSince(mlxStart) * 1000
+                    let mlxPostSnap = snapshot()
+                    let bodyLen = draft.body.count
+                    let tokens = draft.outputTokensEstimated
+                    let tps = mlxMs > 0
+                        ? Double(tokens) / (mlxMs / 1000.0)
+                        : 0
+                    iterTokens += tokens
+                    allMlxLatenciesMs.append(mlxMs)
+                    let rssDeltaMB = mlxPostSnap.memoryRssMB
+                        - mlxPreSnap.memoryRssMB
+                    await emitBoth(String(format:
+                        "🧠 ch1025 mlx iter=%d prompt=%d " +
+                        "prompt_len=%d resp_len=%d tokens=%d " +
+                        "latency_ms=%.0f tok_per_s=%.2f " +
+                        "rss_delta_mb=%.2f",
+                        iter, p + 1, promptLen, bodyLen,
+                        tokens, mlxMs, tps, rssDeltaMB))
+                    // ch 1025.7 — MLX adapter telemetry per prompt
+                    let sessions = await adapter.sessionCount()
+                    let capacity = await adapter.currentCapacity()
+                    await emitBoth(String(format:
+                        "🧠 ch1025 mlx-detail iter=%d prompt=%d " +
+                        "sessions=%d capacity=%@",
+                        iter, p + 1, sessions,
+                        String(describing: capacity)))
+                } catch {
+                    await emitBoth(
+                        "⚠️ ch1025 mlx iter=\(iter) " +
+                        "prompt=\(p+1) error=\(error)")
+                }
+            }
+            iterMlxTokens.append(iterTokens)
+            totalTokens += iterTokens
+
+            let snapAfter = snapshot()
+            await emitBoth(formatSnap(
+                snapAfter, iter: iter, phase: "after"))
+            iterRssAfter.append(snapAfter.memoryRssMB)
+            iterThermalAfter.append(snapAfter.thermalState)
+            iterAvailMemAfter.append(
+                snapAfter.availableMemoryMB)
+
+            let iterMs = Date()
+                .timeIntervalSince(iterStart) * 1000
+            iterDurationMs.append(iterMs)
+
+            await emitBoth(String(format:
+                "📊 ch1025 scorecard iter=%d iter_ms=%.0f " +
+                "tokens=%d cumul_tokens=%d " +
+                "thermal=%@→%@ rss_mb=%.1f→%.1f " +
+                "avail_mb=%d→%d",
+                iter, iterMs, iterTokens, totalTokens,
+                snapBefore.thermalState,
+                snapAfter.thermalState,
+                snapBefore.memoryRssMB,
+                snapAfter.memoryRssMB,
+                snapBefore.availableMemoryMB,
+                snapAfter.availableMemoryMB))
+
+            let updateThermal = snapAfter.thermalState
+            await MainActor.run {
+                self.status = .running(
+                    iter: iter, totalIters: totalIters,
+                    cumulTokens: totalTokens,
+                    thermal: updateThermal)
+            }
+
+            if iter < totalIters {
+                let cooldown = cooldownSecFor(
+                    iter: iter, base: baseCooldown,
+                    adaptive: adaptive)
+                await emitBoth(
+                    "⏸ ch1025 cooldown iter=\(iter) " +
+                    "duration_s=\(cooldown) starting")
+                let preCoolSnap = snapshot()
+                try? await Task.sleep(
+                    for: .seconds(cooldown))
+                let postCoolSnap = snapshot()
+                let recovery =
+                    "\(preCoolSnap.thermalState)" +
+                    "→\(postCoolSnap.thermalState)"
+                iterCooldownThermalRecovery.append(recovery)
+                await emitBoth(
+                    "⏸ ch1025 cooldown iter=\(iter) done " +
+                    "thermal_recovery=\(recovery) " +
+                    "rss_pre_mb=" +
+                    String(format: "%.1f",
+                           preCoolSnap.memoryRssMB) +
+                    " rss_post_mb=" +
+                    String(format: "%.1f",
+                           postCoolSnap.memoryRssMB))
+            }
+        }
+
+        let totalSec = Date().timeIntervalSince(runStart)
+        if !iterDurationMs.isEmpty {
+            let sortedDurMs = iterDurationMs.sorted()
+            let avgDurMs = iterDurationMs.reduce(0, +)
+                / Double(iterDurationMs.count)
+            let p50DurMs = sortedDurMs[sortedDurMs.count / 2]
+            let p99DurMs = sortedDurMs[min(
+                sortedDurMs.count - 1,
+                Int(Double(sortedDurMs.count) * 0.99))]
+            let sortedMlxLat = allMlxLatenciesMs.sorted()
+            let avgMlxMs = sortedMlxLat.isEmpty
+                ? 0
+                : allMlxLatenciesMs.reduce(0, +)
+                    / Double(allMlxLatenciesMs.count)
+            let p50MlxMs = sortedMlxLat.isEmpty
+                ? 0
+                : sortedMlxLat[sortedMlxLat.count / 2]
+            let p99MlxMs = sortedMlxLat.isEmpty
+                ? 0
+                : sortedMlxLat[min(
+                    sortedMlxLat.count - 1,
+                    Int(Double(sortedMlxLat.count) * 0.99))]
+            let avgRssBefore = iterRssBefore.reduce(0, +)
+                / Double(iterRssBefore.count)
+            let avgRssAfter = iterRssAfter.reduce(0, +)
+                / Double(iterRssAfter.count)
+            let rssGrowthMB = (iterRssAfter.last ?? 0)
+                - (iterRssBefore.first ?? 0)
+
+            await emitBoth(String(format:
+                "📊 ch1025 FINAL run_sec=%.0f iters=%d " +
+                "avg_iter_ms=%.0f p50_iter_ms=%.0f " +
+                "p99_iter_ms=%.0f",
+                totalSec, totalIters,
+                avgDurMs, p50DurMs, p99DurMs))
+            await emitBoth(String(format:
+                "📊 ch1025 FINAL mlx_total_inferences=%d " +
+                "avg_lat_ms=%.0f p50_lat_ms=%.0f " +
+                "p99_lat_ms=%.0f total_tokens=%d",
+                allMlxLatenciesMs.count, avgMlxMs,
+                p50MlxMs, p99MlxMs, totalTokens))
+            await emitBoth(String(format:
+                "📊 ch1025 FINAL memory " +
+                "avg_rss_before_mb=%.1f " +
+                "avg_rss_after_mb=%.1f " +
+                "total_rss_growth_mb=%.1f",
+                avgRssBefore, avgRssAfter, rssGrowthMB))
+            await emitBoth(
+                "📊 ch1025 FINAL thermal_trajectory=" +
+                iterThermalAfter.joined(separator: ","))
+            await emitBoth(
+                "📊 ch1025 FINAL cooldown_thermal_recovery=" +
+                iterCooldownThermalRecovery
+                    .joined(separator: ","))
+            await emitBoth(
+                "📊 ch1025 FINAL tokens_per_iter=" +
+                iterMlxTokens.map { String($0) }
+                    .joined(separator: ","))
+        }
+
+        await MainActor.run {
+            self.status = .completed(
+                totalIters: totalIters,
+                totalTokens: totalTokens,
+                runSec: totalSec)
+            self.closeLogFile()
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Emit to both stdout (for idevicesyslog) and the Documents log
+    /// file (for post-run pull via Xcode Devices)。
+    private func emitBoth(_ line: String) async {
+        emit(line)
+        await MainActor.run {
+            self.writeToLogFile(line)
+        }
+    }
+
+    private nonisolated func formatSnap(
+        _ s: SystemSnapshot, iter: Int, phase: String
+    ) -> String {
+        return String(format:
+            "📊 ch1025 sys iter=%d phase=%@ thermal=%@ " +
+            "low_power=%d active_cpu=%d/%d " +
+            "rss_mb=%.1f footprint_mb=%.1f " +
+            "avail_mb=%d mono_ns=%llu",
+            iter, phase, s.thermalState,
+            s.isLowPowerMode ? 1 : 0,
+            s.activeProcessors, s.totalProcessors,
+            s.memoryRssMB, s.memoryFootprintMB,
+            s.availableMemoryMB, s.monotonicNs)
+    }
+
+    // MARK: - ch 1025.7 comprehensive instrumentation
+
+    /// Emit 8+ detailed log lines covering every public field on
+    /// BASEBrainTurnResult that the standard `🧠 ch1025 brain ...`
+    /// line does not。 Operators can grep by sub-category(ctx /
+    /// decompose / risk / permit / mem / render / triself /
+    /// candidates / host_gate)to investigate specific substrate
+    /// layers under load。
+    private func emitBrainDetail(
+        _ tr: BASEBrainTurnResult, iter: Int, prompt: Int
+    ) async {
+        // ── L6 context frame full signal panel ─────────────────
+        let ctx = tr.contextFrame
+        await emitBoth(String(format:
+            "🧠 ch1025 ctx iter=%d prompt=%d " +
+            "emo_load=%.2f time_pres=%.2f ambig=%.2f " +
+            "conseq=%.2f manip_hints=%d host_rel=%.2f " +
+            "scene=%@",
+            iter, prompt,
+            ctx.emotionalLoad, ctx.timePressure,
+            ctx.ambiguityScore, ctx.consequenceLevel,
+            ctx.manipulationHints.count, ctx.hostRelevance,
+            String(describing: ctx.sceneType)))
+
+        // ── L7 decompose frame signal counts ───────────────────
+        let dec = tr.decomposeFrame
+        await emitBoth(String(format:
+            "🧠 ch1025 decompose iter=%d prompt=%d " +
+            "facts=%d goals=%d emotions=%d unknowns=%d " +
+            "contradictions=%d pressure=%d manip=%d " +
+            "fact_shards=%d claim_shards=%d",
+            iter, prompt,
+            dec.facts.count, dec.goals.count,
+            dec.emotions.count, dec.unknowns.count,
+            dec.contradictions.count,
+            dec.pressureSignals.count,
+            dec.manipulationSignals.count,
+            dec.factShards.count, dec.claimShards.count))
+
+        // ── L11 risk card scalars ──────────────────────────────
+        let rc = tr.riskCard
+        await emitBoth(String(format:
+            "🧠 ch1025 risk iter=%d prompt=%d " +
+            "total=%.2f uncertainty=%.2f irrev=%.2f " +
+            "manip_str=%.2f gsi=%.2f factors=%d " +
+            "rec_mode=%@ stacked=%d",
+            iter, prompt,
+            rc.totalRisk, rc.uncertainty,
+            rc.irreversibility, rc.manipulationStrength,
+            rc.gsiScore, rc.factors.count,
+            String(describing: rc.recommendedMode),
+            rc.stackedModes.count))
+
+        // ── L11 action permit ──────────────────────────────────
+        let ap = tr.actionPermit
+        await emitBoth(String(format:
+            "🧠 ch1025 permit iter=%d prompt=%d " +
+            "mode=%@ stacked=%d reason_codes=%d " +
+            "allowed_doms=%d blocked_doms=%d " +
+            "tool_scope=%@ memory_scope=%@ " +
+            "requires_mirror=%@",
+            iter, prompt,
+            String(describing: ap.mode),
+            ap.stackedModes.count,
+            ap.reasonCodes.count,
+            ap.allowedDomains.count, ap.blockedDomains.count,
+            ap.toolScope, ap.memoryScope,
+            ap.requireMirror ? "true" : "false"))
+
+        // ── L8 memory bundle ───────────────────────────────────
+        let mb = tr.memoryBundle
+        await emitBoth(String(format:
+            "🧠 ch1025 mem iter=%d prompt=%d " +
+            "atoms=%d tags=%d conflicts=%d",
+            iter, prompt,
+            mb.atoms.count, mb.retrievalTags.count,
+            mb.conflictRefs.count))
+
+        // ── L12 rendered output(rule-template,NOT MLX tokens)──
+        let ro = tr.renderedOutput
+        await emitBoth(String(format:
+            "🧠 ch1025 render iter=%d prompt=%d " +
+            "headline_len=%d body_len=%d " +
+            "alt_actions=%d explain_codes=%d " +
+            "mode=%@",
+            iter, prompt,
+            ro.headline.count, ro.body.count,
+            ro.alternativeActions.count,
+            ro.explanationCodes.count,
+            String(describing: ro.mode)))
+
+        // ── L10 triself scores per candidate ────────────────────
+        if !tr.triScores.isEmpty {
+            let preview = tr.triScores.prefix(3).map {
+                String(format:
+                    "id=%.2f/ego=%.2f/super=%.2f" +
+                    "/m=%.2f/v=%@",
+                    $0.idScore, $0.egoScore,
+                    $0.superegoScore, $0.mergedScore,
+                    $0.veto ? "y" : "n")
+            }.joined(separator: "|")
+            await emitBoth(String(format:
+                "🧠 ch1025 triself iter=%d prompt=%d " +
+                "count=%d scores=%@",
+                iter, prompt, tr.triScores.count, preview))
+        }
+
+        // ── L9 candidate paths detail ──────────────────────────
+        if !tr.thoughtFrame.candidates.isEmpty {
+            let preview = tr.thoughtFrame.candidates
+                .prefix(3).map {
+                    String(format:
+                        "b=%.2f/c=%.2f/r=%.2f/cf=%.2f",
+                        $0.expectedBenefit, $0.expectedCost,
+                        $0.reversibility, $0.confidence)
+                }.joined(separator: "|")
+            await emitBoth(String(format:
+                "🧠 ch1025 candidates iter=%d prompt=%d " +
+                "details=%@",
+                iter, prompt, preview))
+        }
+
+        // ── L13 host gate + emergency brake ────────────────────
+        let svPresent = tr.sovereignVerdict != nil
+            ? "true" : "false"
+        await emitBoth(String(format:
+            "🧠 ch1025 host_gate iter=%d prompt=%d " +
+            "value=%.2f sovereign_present=%@ " +
+            "warrants=%d commit_tokens=%d " +
+            "update_tickets=%d",
+            iter, prompt,
+            tr.hostGateValue, svPresent,
+            tr.sovereignWarrants.count,
+            tr.sovereignCommitTokens.count,
+            tr.updateTickets.count))
+    }
+}

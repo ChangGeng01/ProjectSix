@@ -245,12 +245,38 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     // MARK: - Construction
 
-    /// Load the .mlmodel from Bundle.module。 Compiles
-    /// + caches at construction time so prediction calls
-    /// are fast。
+    /// Load the model from Bundle.module。
+    ///
+    /// chapter 一千零二十五.5 / M3899 — dual lookup path:
+    /// - SPM `swift test` ships raw `.mlmodel` (Resources rule),so
+    ///   the adapter compiles at runtime via `MLModel.compileModel`。
+    /// - Xcode iOS app builds pre-compile `.mlmodel` → `.mlmodelc`
+    ///   at build time AND strip the raw source,so only the
+    ///   compiled artifact survives in the .app bundle。
+    /// Pre-1025.5 only checked `.mlmodel` → app-target init threw
+    /// `modelResourceMissing`,blocking `BASCognitiveBrain.
+    /// makeWithDefaults()` from any iOS app process。
+    /// Discovered by ch 1025.5 in-app endurance runner attempting
+    /// brain.process() per prompt。 Substrate fix prefers
+    /// pre-compiled `.mlmodelc` (Xcode path) and falls back to raw
+    /// `.mlmodel` + runtime compile (SPM path)。
     public init(cacheCapacity: Int = 256) throws {
         self.cacheCapacity = max(0, cacheCapacity)
-        guard let url = Bundle.module.url(
+        // Prefer pre-compiled .mlmodelc(Xcode iOS app bundle path)
+        if let compiledURL = Bundle.module.url(
+            forResource: "BASContextClassifier",
+            withExtension: "mlmodelc") {
+            do {
+                self.model = try MLModel(contentsOf: compiledURL)
+                return
+            } catch {
+                throw BASContextClassifierMLAdapterError
+                    .modelLoadFailed(message: "\(error)")
+            }
+        }
+        // Fall back to raw .mlmodel + runtime compile
+        // (SPM `swift test` path,Resources ship raw)
+        guard let rawURL = Bundle.module.url(
             forResource: "BASContextClassifier",
             withExtension: "mlmodel")
         else {
@@ -258,17 +284,11 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
                 .modelResourceMissing
         }
         do {
-            // .mlmodel must be compiled to .mlmodelc at
-            // runtime (Xcode would pre-compile in app
-            // builds, but SPM Resources ship raw .mlmodel)
-            let compiledURL = try MLModel.compileModel(
-                at: url)
-            self.model = try MLModel(
-                contentsOf: compiledURL)
+            let compiledURL = try MLModel.compileModel(at: rawURL)
+            self.model = try MLModel(contentsOf: compiledURL)
         } catch {
             throw BASContextClassifierMLAdapterError
-                .modelLoadFailed(
-                    message: "\(error)")
+                .modelLoadFailed(message: "\(error)")
         }
     }
 

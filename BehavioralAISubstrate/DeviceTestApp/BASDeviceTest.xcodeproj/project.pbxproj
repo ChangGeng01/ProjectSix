@@ -438,6 +438,7 @@
 		4E79DD9E217982BFF779A169 /* BASChapter897AtomLifecycleByteEqTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680E9191D28A4CDECE35A0E8 /* BASChapter897AtomLifecycleByteEqTests.swift */; };
 		4EB54B166D8AD3EBAA223969 /* BASChapter995_5Round12FixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59D77331FFE314CB75A7604 /* BASChapter995_5Round12FixesTests.swift */; };
 		4F1F79EA9E7BDBEA56233A18 /* BASSovereignSnapshotManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55E6CC85B669B884DAEDC99B /* BASSovereignSnapshotManagerTests.swift */; };
+		4FBC958958001EF0AFEE15BD /* BASEnduranceAppRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C45F76979B07DBA98E1ECB8 /* BASEnduranceAppRunner.swift */; };
 		506EEAB41DD1933A92FCD46D /* BASChapter796L5StoresTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D5F7065CB0D1E51C319E28 /* BASChapter796L5StoresTests.swift */; };
 		507A9D96CCD1832849030377 /* BASMemoryAtomReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD6E4188D47B893BAD18EA9 /* BASMemoryAtomReducerTests.swift */; };
 		50BB50EA588CB4901F479B95 /* BASLayerActorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCE1CC79CFB6963E93E379D /* BASLayerActorTests.swift */; };
@@ -965,6 +966,7 @@
 		AFFA4B6096A48ED0A41B676C /* BASPermitEscalationStepResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A5B26233D4E740AD854AA3B /* BASPermitEscalationStepResultsTests.swift */; };
 		B00F2201835F9C97781BF73B /* BASRealHotPathAttackTier1AchievementDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECE79FFBFD5A6BC5A8CE972 /* BASRealHotPathAttackTier1AchievementDoctrineTests.swift */; };
 		B010DD60A4EBA3FD6ADC5E8D /* BASAppleConsoleSnapshotBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0A43715ADE874039EF5222 /* BASAppleConsoleSnapshotBuilderTests.swift */; };
+		B039D8B4ACC5B357741E4053 /* BASMLXAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = 89B57FD6EC6775A3B4F00889 /* BASMLXAdapter */; };
 		B1266B5FB52EFF9A0ED767C4 /* BASTierBGenericPrimitivesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80ADE2C75881F7C6F94FFD73 /* BASTierBGenericPrimitivesTests.swift */; };
 		B1421F5FAE6F50FD6759EF4B /* BASChapter876ScaffoldingKernelsAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501493B80427B0A2C47CDFCD /* BASChapter876ScaffoldingKernelsAuditTests.swift */; };
 		B167CBD6E87FA23B33D33367 /* BASOrchestrationCodableExtensionContinuationWaveTwoDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7960ACA50D5DA7AAF116961F /* BASOrchestrationCodableExtensionContinuationWaveTwoDoctrineTests.swift */; };
@@ -1237,6 +1239,7 @@
 		E0221517D826D155625D53E7 /* AppleFoundationE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B1F03A07303811684A966B /* AppleFoundationE2ETests.swift */; };
 		E03617A7C7705F90D36BA95D /* BASAllTierFullCompletionDoctrineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B116991CA0E544957E76FE1F /* BASAllTierFullCompletionDoctrineTests.swift */; };
 		E09ABC5842A57F4265C567B0 /* BASAppleCurrentBrainHostStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34DFA1B157ED5877CB58915 /* BASAppleCurrentBrainHostStateTests.swift */; };
+		E0A17331DFF100BCCCCE7EAC /* BASOrgan in Frameworks */ = {isa = PBXBuildFile; productRef = 99F51A0FC7B996C2FCE341DD /* BASOrgan */; };
 		E0CABBF16F867B3240992D32 /* BASTurnAuditProjectionsKunlunAxisProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0545B55A26EE4AFC3324F284 /* BASTurnAuditProjectionsKunlunAxisProtocolTests.swift */; };
 		E0D358D0B104C0FFAB69AA3D /* BASChapter879BrainLOCTrajectoryAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E261AB76DA3923BFDBE7F483 /* BASChapter879BrainLOCTrajectoryAuditTests.swift */; };
 		E0E4CCD8F1419B81894197F5 /* BASEBrainTurnResultAuditProjectionForwardBundleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510EFADAC45E7B845E77CEC3 /* BASEBrainTurnResultAuditProjectionForwardBundleTests.swift */; };
@@ -1466,6 +1469,7 @@
 		0C063CF7E049485FE0873FF4 /* BASAuditProjectionsAggregatorCodableExtensionArcSealedWireInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAuditProjectionsAggregatorCodableExtensionArcSealedWireInTests.swift; sourceTree = "<group>"; };
 		0C1F655C372459B6C94E1AEB /* BASChapter999ANEGenericHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter999ANEGenericHelperTests.swift; sourceTree = "<group>"; };
 		0C4443BD585AB22264DB3834 /* BASPostOctaModuleExtensionHexaCompletionDoctrineWireInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASPostOctaModuleExtensionHexaCompletionDoctrineWireInTests.swift; sourceTree = "<group>"; };
+		0C45F76979B07DBA98E1ECB8 /* BASEnduranceAppRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASEnduranceAppRunner.swift; sourceTree = "<group>"; };
 		0C8B74AD2E471125E9558B3C /* BASChapter868FlashAttentionAssertedBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter868FlashAttentionAssertedBenchmarkTests.swift; sourceTree = "<group>"; };
 		0C9CF92CF7E76409910D6F08 /* BASChenglu20MinStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChenglu20MinStressTests.swift; sourceTree = "<group>"; };
 		0CBB32618ED88E2B1C536E3A /* BASChapter954SharedStateGraphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter954SharedStateGraphTests.swift; sourceTree = "<group>"; };
@@ -2811,6 +2815,8 @@
 				8A4B79E06BF5FD8CEA862482 /* BASHostKit in Frameworks */,
 				AE9624784934797E29A7D611 /* BASMemory in Frameworks */,
 				AA149FE2CE48B23693AAF958 /* BASRuntimeCore in Frameworks */,
+				B039D8B4ACC5B357741E4053 /* BASMLXAdapter in Frameworks */,
+				E0A17331DFF100BCCCCE7EAC /* BASOrgan in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2821,6 +2827,7 @@
 			isa = PBXGroup;
 			children = (
 				19653C38FA5D38C99D402855 /* BASDeviceTestApp.swift */,
+				0C45F76979B07DBA98E1ECB8 /* BASEnduranceAppRunner.swift */,
 			);
 			name = App;
 			path = Sources/App;
@@ -4248,6 +4255,8 @@
 				444AD3F4361E4EE007254054 /* BASHostKit */,
 				DED654648C160FDB8E44EE58 /* BASMemory */,
 				8728D9135E6AAB3B28A85682 /* BASRuntimeCore */,
+				89B57FD6EC6775A3B4F00889 /* BASMLXAdapter */,
+				99F51A0FC7B996C2FCE341DD /* BASOrgan */,
 			);
 			productName = BASDeviceTestApp;
 			productReference = C84BD597C819857A3FF066DB /* BASDeviceTestApp.app */;
@@ -4335,6 +4344,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				129A5ADD8ADFEDDEB8D3AB0A /* BASDeviceTestApp.swift in Sources */,
+				4FBC958958001EF0AFEE15BD /* BASEnduranceAppRunner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -6014,6 +6024,14 @@
 		8728D9135E6AAB3B28A85682 /* BASRuntimeCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BASRuntimeCore;
+		};
+		89B57FD6EC6775A3B4F00889 /* BASMLXAdapter */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASMLXAdapter;
+		};
+		99F51A0FC7B996C2FCE341DD /* BASOrgan */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BASOrgan;
 		};
 		AEC10CDDFC81241B20C1B6D3 /* BASMetalSubstrate */ = {
 			isa = XCSwiftPackageProductDependency;

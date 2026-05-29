@@ -70,6 +70,15 @@ targets:
         product: BASMemory
       - package: BehavioralAISubstrate
         product: BASRuntimeCore
+      # ch 1025.4 — `BASEnduranceAppRunner` needs MLX + Organ to
+      # execute the endurance loop inside the app process (autostart
+      # mode via BAS_ENDURANCE_AUTOSTART=1)。 Adding these to the
+      # App target also pulls them into the build product so
+      # `devicectl device process launch` can find the symbols。
+      - package: BehavioralAISubstrate
+        product: BASMLXAdapter
+      - package: BehavioralAISubstrate
+        product: BASOrgan
     settings:
       base:
         # Bundle ID matches the existing wildcard provisioning profile

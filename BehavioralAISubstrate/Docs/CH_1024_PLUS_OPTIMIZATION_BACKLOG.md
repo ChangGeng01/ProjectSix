@@ -47,12 +47,106 @@ full stderr。 The「0 hard fail」 claim stays valid for XCTest portion
 but SHOULD be qualified as「XCTest-only — Mac Swift Testing portion
 deferred to ch 1025+ root-cause investigation」。
 
-## What ch 1024.0/1 already shipped
+## What ch 1024.0/1 + ch 1025.4 + ch 1025.5 + ch 1025.5.0 + ch 1025.5.5 + ch 1025.7 already shipped
 
 | Chapter | Finding | Fix |
 |---|---|---|
 | ch 1024.0 | ch 868 testTinyShapeCPUBeats 5× flaky | best-of-3 trials |
 | ch 1024.1 | ch 868 testMediumSequenceOrderingPin 1× flaky | best-of-3 trials |
+| **ch 1025.4 / M3899** | **ch 1025 v4 killed by competing xcodebuild — XCTest architecture can't survive concurrent xcodebuild sessions on one Mac** | **In-app endurance entry: `BASEnduranceAppRunner.swift` (480 lines) + `BAS_ENDURANCE_AUTOSTART=1` env var read by App init + os.Logger emit for idevicesyslog visibility + Documents/ log file dual-write + UIApplication.isIdleTimerDisabled。 Launch via `xcrun devicectl device process launch -e '{"BAS_ENDURANCE_AUTOSTART":"1",...}' com.changgeng.basdevicetest` — Mac side can disconnect entirely without affecting the iPhone-side run。 Verified 02:13 AEST May 29: MLX load 2.9s,iter 1 prompt 1 tokens=1208 tok_per_s=32.28,full ch1025 stream visible via `idevicesyslog -u <UDID> \| grep ch1025`。 Closes Tier 3 entry #16 conceptually (script-level lockout no longer needed for in-app mode — but xcodebuild test mode still vulnerable so #16 remains for that path)。** |
+| **ch 1025.5.0 / M3899** | **Substrate adapter `.mlmodelc` resource-lookup gap discovered while shipping ch 1025.5** — `BASContextClassifierMLAdapter.init()` previously only looked for raw `.mlmodel` via `Bundle.module.url(forResource:"BASContextClassifier", withExtension:"mlmodel")`。 SPM `swift test` ships raw `.mlmodel` per Resources rule,but Xcode iOS app builds pre-compile to `.mlmodelc` AND strip the raw source。 Production-path bug:any iOS app using `BASCognitiveBrain.makeWithDefaults()` would throw `modelResourceMissing` because the raw .mlmodel was stripped。 Audit HIGH-2(architecture)flagged this as warranting a sibling chapter rather than co-shipping in ch 1025.5。 Documented separately here for clean commit-history attribution。 | `Sources/BASRuntimeCore/BASContextClassifierMLAdapter.swift:248-293` — dual-lookup path: prefer pre-compiled `.mlmodelc`(Xcode iOS app bundle path),fall back to raw `.mlmodel` + runtime compile via `MLModel.compileModel`(SPM `swift test` path)。 Both branches exhaustive within init,no shared mutable state,Mac swift test unaffected。 Verified 02:39 AEST May 29:Brain.makeWithDefaults() load_ms=14 in app process,brain.process() emits taskType+riskLevel+candidateCount per prompt。 |
+| **ch 1025.5 / M3899** | **「fabric 真参与」 — endurance loop was MLX-only(`adapter.draft()` directly,bypassing host pipeline + fabric)** | **`BASEnduranceAppRunner.swift` — each prompt now invokes `brain.process(prompt)` BEFORE `adapter.draft(request)`。 brain.process exercises L1-L14 substrate classifier + verdict-ref cascade(context → decompose → memory → loop → triSelf → risk → action render → evolution synthesis)。 Verified: different prompts produce different taskType(highPressure / chat / manipulationRisk),different riskLevel(low / medium / high),different candidate counts(1-3)— substrate is doing intelligent work,not no-op。 Brain overhead: ~20ms cold,2-12ms warm = <0.1% of MLX per-prompt time(MLX ~30-90s)。 **Full `BASAgentFabricHostPipeline.runTurn()` integration deferred to ch 1025.6** — requires substrate-side `BASAgentFabricHostPipeline.makeMinimalForEndurance(brain:adapter:)` factory that doesn't currently exist (app target lacks zero-config fabric assembly entry,needs coordinator + roster + state-graph build ~200 LOC)。** |
+| **ch 1025.5.5 / M3899** | **3-agent N-pass audit catch on ch 1025.5: HIGH-1(UI honesty), HIGH-2(sibling-chapter discipline), MED-2(conf=0.00 misleading)** | (1) **HIGH-1 UI honesty fix** — runner now emits `🪧 ch1025 fabric_activation=bypassed iter=N prompt=M reason=no_pipeline_in_runner defer_to=ch_1025.6` per prompt so the syslog truthfully reflects that fabric.runTurn() does NOT fire(even though UI badge shows "Fabric: enabled (all)" because env var is set)。 (2) **HIGH-2 sibling chapter discipline** — substrate adapter fix promoted to ch 1025.5.0(see row above);BACKLOG now lists them as 3 distinct shipped sub-chapters。 (3) **MED-2 conf=n/a fix** — brain confidence band now renders `conf=n/a` when nil instead of `conf=0.00`(BASMLContextService.swift never sets confidenceBand → always nil in brain.process path → previously implied broken classifier)。 (4) **MED runner header stale** — fixed,header now lists all three chapters(1025.4 + 1025.5 + 1025.5.5)。 Code review verdict: SHIP(no CRITICAL/HIGH from code path itself)。 |
+| **ch 1025.7 / M3899** | **User mandate「最最 严苛 全面 — 所有 组件 数据 都要记录」**。 ch 1025.5 only logged 4 fields from BASEBrainTurnResult(task / conf / risk / candidates count)。 30+ fields available were unsurfaced。 | Added `emitBrainDetail(turnResult:iter:prompt:)` helper that emits 8 sub-category log lines per prompt: `ctx`(L6 full signal panel — emotionalLoad / timePressure / ambiguityScore / consequenceLevel / manipulationHints.count / sceneType / hostRelevance),`decompose`(L7 — facts/goals/emotions/unknowns/contradictions/pressureSignals/manipulationSignals/factShards/claimShards counts),`risk`(L11 scalars — totalRisk/uncertainty/irreversibility/manipulationStrength/gsiScore/factors/recommendedMode/stackedModes),`permit`(L11 — mode/stackedModes/reasonCodes/allowed/blocked domains/toolScope/memoryScope/requireMirror),`mem`(L8 — atoms/tags/conflicts),`render`(L12 — headline_len/body_len/alts/explanationCodes — body is rule-template not MLX tokens),`triself`(L10 — per-candidate id/ego/super/merged/veto preview),`candidates`(L9 — per-path benefit/cost/reversibility/confidence),`host_gate`(L13 — value/sovereignVerdict_present/warrants/commit_tokens/update_tickets)。 Plus per-MLX: `mlx-detail` with sessionCount + currentCapacity from adapter。 Plus one-time boot: `📊 ch1025 inventory exercised=... nyi=...` explicit coverage manifest so future operators reading syslog know exactly what's tested。 Verified 03:06 AEST May 29: PID 950 launch,9 detail lines emitted in first 30s,`sovereign_present=true` confirms L14 actually fires per turn,`scene=highPressureConflict` confirms L6 classifier actually classifies(not just returns default)。 Pure additive logging,no path change,LOW risk。 **✅ COMPLETED 10-HOUR RUN(03:06→13:10 AEST May 29):100/100 iters,247,133 tokens,0 hard fail,0 leak(net RSS −1461 MB),L14 sovereign 300/300=100%,0 competing-xcodebuild kills。 Full analysis → `Docs/CH_1025_7_ENDURANCE_FINAL_REPORT.md`。 Archive → `/Users/changgeng/ch1025-endurance-archives/`(912K extracted from 4.6GB raw)。 Key thermal finding:iPhone Air recovers serious→nominal ONLY at cooldown ≥180s — direct ch 1026 thermal-policy design input。** |
+
+## ch 1025 v4 internal-loop smoke — premature termination diagnosis(2026-05-29 added)
+
+**Run**:`run-iphone-air-internal-loop-10hr.sh` v4 launched 01:16:50 AEST May 29,
+xcodebuild PID 73350 detached via python3 fork+setsid;target iter=100 internal-loop。
+
+**Outcome**:died at 01:38:35(~20m 44s in)during **iter 6/100 cooldown** with
+bash-reported `exit=137`(SIGKILL)。 6 iters of clean trajectory captured before death:
+~14,851 cumul tokens × 18 MLX inferences,RSS stable 2911-2912 MB(no leak),
+thermal cycling nominal↔serious↔fair as designed,adaptive cooldown
+60→60→90→90→90→180s working per schedule。
+
+**Initial hypothesis**:iOS jetsam OOM kill(iter 6 `avail_mb=266` + thermal serious)。
+
+**Diagnosis(user-elected option C — pull crash log + Mac unified log)**:
+
+| Evidence source | Finding |
+|---|---|
+| `idevicecrashreport` from iPhone Air UDID 00008150-00163C6A3E38401C | NO JetsamEvent newer than 2026-05-12;most recent BASDeviceTestApp ips files from 04:xx UTC May 28(before this run);**no crash report generated for 01:38 UTC+10 = 15:38 UTC May 28** |
+| Mac unified log `01:38:00-01:39:00` | 73350 `runningboardd: termination reported by proc_exit` at 01:38:35.251;**no `memorystatus` SIGKILL against 73350**;only SIGKILL log was launchd cleaning up 73350's own child KeychainService 73396 "during teardown of process-scoped services after host exited"(consequence,not cause)|
+| Timeline reconstruction | 01:38:31 — competing xcodebuild **PID 79959** launched(target = simulator DA99B4D8,scheme ProjectEleven UITests);01:38:35.197 — 79959 disconnects SimLaunchHost(amfid rejected `ProjectElevenUITests-Runner: adhoc signed`);01:38:35.233 — 73350 disconnects(**36ms after 79959**);01:38:35.251 — 73350 proc_exit |
+
+**Root cause**:**Xcode CoreDevice/testmanagerd does not allow two concurrent
+xcodebuild test sessions on one Mac**,even when targeting different devices
+(73350 → iPhone Air real device 9E9E3DEB,79959 → simulator DA99B4D8)。 The
+competing xcodebuild start triggered test orchestration cleanup of the running
+session → ch 1025 v4 was collateral damage of an unrelated ProjectEleven UITest
+launch(likely user cmd-U in Xcode IDE or other script trigger)。
+
+**What this is NOT**:not jetsam,not iPhone OOM,not Mac OOM,not thermal kill,
+not memory leak。 The physical resource trajectory was healthy;the wrapper was killed
+at the OS test-orchestration layer。
+
+**Counter-evidence for jetsam hypothesis**(burnt down so future sessions don't
+chase the wrong root cause):
+- iPhone Air RSS held 2911-2912 MB constant across 6 iters(Δ < 1MB)
+- iPhone available_mb 266 IS low but iOS jetsam normally generates a
+  `JetsamEvent-*.ips` report;none was created
+- Mac `runningboardd:jetsam` log entries during the death window were
+  unrelated lmstudio process complaints,not BAS
+
+**Captured data still useful for ch 1026 thermal-policy wire-in**:
+- iter 1 cold-start 72s(2336 tokens)vs iter 2+ steady-state 90-140s
+  (~2100-3200 tokens)— MLX model cache validated
+- iter 4 prompt 3 lowest tok/s 13.36 vs iter 1 prompt 1 best 48.34
+  = **3.6× thermal throttle observed at iPhone Air dim**
+- adaptive cooldown schedule 60→60→90→90→90→180 confirmed working
+
+## ch 1025.5 endurance coverage audit — what's actually tested vs what isn't(2026-05-29 added)
+
+**Why this section**:user asked「所有 数值 例如 ane 多线程 mamba 神经网络 正常工作吗」 during ch 1025.5 run。 The naive answer "endurance is healthy" is misleading because endurance covers a NARROW slice of substrate components。 Future operators reading a successful 7-hour run should NOT infer that "all substrate works" — they should know exactly which components were exercised vs untested。
+
+### ✓ ACTUALLY exercised in ch 1025.5 endurance(per-prompt path)
+
+| Component | Mode | Frequency | Per-prompt evidence in syslog |
+|---|---|---|---|
+| **CoreML `BASContextClassifier`** | tiny 2-layer MLP ~18K params, 7-class softmax | every prompt | `task=<7-class>` in ch1025 brain log line |
+| **MLX Gemma 4 E2B 4-bit transformer** | full LLM inference,GPU(Metal) | every prompt | `tokens=N latency_ms=M tok_per_s=X` in ch1025 mlx log line |
+| **L1-L14 substrate cascade** | rule-based signal derivation through 9 BASML* services | every prompt | brain `latency_ms` + `risk=<low/medium/high>` + `candidates=<1-3>` |
+| **L8 bounded LRU caches** | classifier cache(256)+ brain summary history(bounded) | passive | RSS stable 2871-2872 MB across iters → no leak |
+
+### ✗ NOT exercised in ch 1025.5 endurance(architectural gaps)
+
+| Component | Status | Where it lives | Why endurance doesn't touch it |
+|---|---|---|---|
+| **🔴 Mamba SSM(`runMambaScan`)** | bundled but never invoked | `Sources/BASMetalSubstrate/BASMambaSSMState.swift` + `BASMetalLinearAlgebraDispatchers.runMambaScan` + `BASBiomimeticTurnObserver.mambaInputs` | Mamba is biomimetic state-space probe path,parallel to standard transformer。 Neither `brain.process()` nor `adapter.draft()` invokes it。 0 mamba calls during the entire 7-hour run。 |
+| **🔴 Apple Neural Engine direct invocation** | telemetry only | `BASMetalSubstrate/BASANEKernelEligibilityClassifier.swift` + `BASANELiveReader.swift` exist for ANE usage analysis but don't drive ANE | ANE only used indirectly via CoreML auto-select(iOS decides per-model)。 MLX framework is GPU-only(Metal),never ANE。 The 18K-param classifier may or may not actually use ANE depending on iOS scheduler — endurance doesn't probe which compute unit was selected。 |
+| **🔴 Rust crates(rayon multi-threaded)** | not on iOS | `Cargo/bas-retrieval-ranker`,`bas-audit-aggregator`,`bas-red-team-bench` etc. | iOS dylib infra not yet built — verified no `.dylib` in app bundle。 Entire iOS app can't reach Rust crates。 **This is ch 1027 arc deferred work**(Tier 3 #8)。 Mac swift test exercises Rust;iOS endurance does not。 |
+| **🟡 MPSGraph kernels(MatMul,Attention,RMSNorm,RotaryEmbedding,Conv,LayerNorm,Softmax)** | substrate has them,endurance bypasses | `Sources/BASMetalSubstrate/BASMPSGraph*Kernel.swift`(ch 870/871 wires) + `BASMetalLinearAlgebraDispatchers` | MLX framework calls Metal directly,not through substrate's MPSGraph layer。 The substrate-level kernel dispatcher infrastructure is untouched by ch 1025.5 endurance。 |
+| **🟡 Substrate cascade parallelism** | single-threaded | `BASCognitiveBrain.process()` runs L1-L14 sequentially,no `TaskGroup` / `async let` | Cascade is BY DESIGN sequential per turn(later layers depend on earlier outputs)。 MLX internally multi-threaded for GPU dispatch,but substrate this layer is not parallel。 If user wants parallel-substrate test,that's a different chapter。 |
+| **🟡 Multi-organ rotation** | 1 model only | substrate supports many organ adapters(`BASOrganAdapter` protocol with Foundation Models / MLX / Chat Completions / others) | ch 1025 endurance only invokes Gemma 4 E2B + 1 classifier。 No Foundation Models,no Chat Completions,no second MLX model,no organ-switching mid-run。 |
+
+### Honest interpretation framework
+
+When you see「ch 1025.5 7hr endurance complete,0 hard fail」 you should read:
+- **Verified stable under sustained load**: MLX Gemma 4 E2B on iPhone Air GPU,L1-L14 rule cascade,L8 LRU caches,thermal-aware adaptive cooldown schedule,fabric env-var gate read (not run),idleTimer-disabled app-process model
+- **NOT verified**: Mamba SSM kernel,direct ANE usage,Rust ranker concurrency,MPSGraph kernel pool,multi-organ switching,substrate parallelism,fabric runTurn() actual execution
+
+Both are valid。 Don't conflate。
+
+### Future arcs to widen coverage(speculative chapter numbering)
+
+- **ch 1027 arc** — iOS Rust dylib wire(unlocks Rust + rayon on device) — see Tier 3 #8
+- **ch 1028.x** — Mamba SSM endurance path(invoke `runMambaScan` per N iters in endurance loop)
+- **ch 1029.x** — ANE saturation test(rotate 3-5 CoreML models per iter to force ANE scheduling)
+- **ch 1030.x** — MPSGraph kernel diversity(rotate MatMul/Attention/RMSNorm/RoPE per iter)
+- **ch 1031.x** — Multi-organ rotation(Gemma 4 E2B / Foundation Models / Chat Completions in same run)
+
+These are NOT priority over the existing Tier 1-3 work — they're added here for transparency about substrate scope vs current endurance scope。
 
 ## Open findings — ranked by tractability × impact
 
@@ -86,6 +180,8 @@ ONE PER CHAPTER with audit not bundled to avoid class-h trap。
 | 10 | ch 1029.0 | Kernel crash BASKernelDispatchEndToEndRealKernelTests | HIGH(real device bug)| lldb attach device + print scaffolding |
 | 11 | ch 1029.1 | NSXPCConnection iter-isolation leak(Mac SwiftData)| LOW | SwiftData iter cleanup hooks |
 | 12 | ch 1029.2 | Mac MLX REAL E2E Swift Testing bundle hang | MED | Apple bundle isolation work — same as Foundation Models Mac issue |
+| 16 | ch 1032.0 | Smoke script lacks competing-xcodebuild lockout(ch 1025 v4 lost to ProjectEleven UITest launch — see「ch 1025 v4 premature termination」section above)| HIGH for endurance discipline — without this,any concurrent xcodebuild on the Mac silently kills the running smoke | `/tmp/ch1025.lock` PID file + pre-launch `pgrep -f "xcodebuild test"` abort + post-launch ping watchdog |
+| 17 | ch 1025.6 | **Substrate API gap discovered via ch 1025.5 architecture audit:no public helper to assemble a `BASAgentFabricHostPipeline` from an app target without `@testable` imports**。 ch 1025.5 wanted to invoke `pipeline.runTurn()` per prompt(true fabric participation),but app target cannot construct the dependency chain(coordinator + fabric runtime + roster + state graph + 11 ML services)without `@testable import BASHostKit / BASMemory` — which the app target can't use。 Result:ch 1025.5 shipped brain.process()-only(substrate cascade)with `fabric_activation=bypassed` honesty marker。 | HIGH — unblocks app-target fabric integration generally,not just endurance。 Also relevant to any external SDK consumer wanting fabric semantics | Ship `BASAgentFabricHostPipeline.makeMinimalForEndurance(brain:adapter:sessionID:envOverride:)` public factory in `Sources/BASHostKit/BASAgentFabricHostPipeline.swift` that builds + returns a pipeline ready for `runTurn(prompt:)` callers,with minimal default coordinator + fabric runtime + roster + state graph。 Then update `BASEnduranceAppRunner` per-prompt path to call it。 Est ~150 LOC substrate + ~30 LOC runner integration |
 
 ### Tier 4: ADR-014 OPT-IN next phase(major substrate arc)
 
@@ -99,6 +195,10 @@ ONE PER CHAPTER with audit not bundled to avoid class-h trap。
 |---|---|---|---|---|
 | 14 | ch 1031 arc | Trend analysis tooling(automated soft-fail pattern detection across iter logs)| MED — drives future ch 1024-style proactive fixes | scripting + parser |
 | 15 | ch 1031.1 | Per-iter scorecard aggregation(cross-iter MLX throughput trend graph)| LOW | scripting |
+| 18 | ch 1028 arc | **Mamba SSM endurance invocation** — `BASMetalLinearAlgebraDispatchers.runMambaScan` exists in `Sources/BASMetalSubstrate/` but ch 1025 path never calls it。 endurance does not exercise the biomimetic state-space layer。 | MED — substrate has Mamba code,untested under sustained load | Add `runMambaScan(syntheticInputs)` call per N iters in endurance loop;log `BASMambaSSMScanOutputs` summary。 Est ~50 LOC runner + 0 substrate change(API already public)。 Run requires synthetic input shape build,~1 hr 实现 + smoke verify。 |
+| 19 | ch 1029 arc | **ANE direct invocation / multi-CoreML rotation** — ch 1025 uses 1 CoreML model(BASContextClassifier 18K params)which MAY auto-select ANE(iOS decides per-call,not visible in log)。 No way to verify ANE actually engages,no saturation test。 | MED — ANE telemetry exists(`BASANELiveReader`,`BASANEKernelEligibilityClassifier`)but unused | (1) Wire `BASANELiveReader` snapshot into per-iter log(ANE utilization %)。 (2) Add second CoreML model(small task-type variant)to rotate across iters,forcing ANE scheduling pressure。 Est ~100 LOC + 1 new .mlmodel resource + ~2 hr。 |
+| 20 | ch 1030 arc | **MPSGraph kernel rotation** — substrate has 5+ MPSGraph kernel wires(ch 870/871: MatMul / Attention / RMSNorm / RotaryEmbedding / LayerNorm)but MLX framework bypasses substrate's dispatcher,calling Metal directly。 Endurance never exercises substrate-side `BASMetalLinearAlgebraDispatchers` kernel pool。 | MED — substrate has the wires,untested in app context | Per N iters,invoke `BASMetalLinearAlgebraDispatchers` with synthetic tensors hitting each kernel(matmul / attention / rmsnorm / rope)。 Log MPSGraph dispatch latency + cache stats。 Est ~200 LOC runner + 0 substrate change,~3-4 hr。 |
+| 21 | ch 1031.x arc | **Multi-organ rotation** — endurance uses MLXOrganAdapter(Gemma 4 E2B)only。 Substrate supports Foundation Models / Chat Completions / external adapters via `BASOrganAdapter` protocol。 Endurance never switches organs mid-run。 | LOW — single-organ stability already validated;multi-organ adds breadth not depth | Per N iters,call an alternate `BASOrganAdapter` if available(Foundation Models on iOS 26+ or Chat Completions if API key set)。 Log organ provider + draft outputs。 Est ~150 LOC + 4-6 hr(needs FM model availability check + Chat Completions API key handling)。 |
 
 ## Sequence recommendation
 
