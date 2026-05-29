@@ -637,12 +637,25 @@ final class BASEnduranceAppController: ObservableObject {
                             riskCard: turnResult.riskCard,
                             triScores: turnResult.triScores)
                         let skip = outcome.skipReason ?? "-"
+                        // ch 1038 不满2 fix:`activated=true` alone is
+                        // only OBSERVABILITY(it fired)— NOT proof
+                        // fabric influenced anything。 Log the real
+                        // BEHAVIOR evidence from diagnostics:how many
+                        // deltas the seats EMITTED + how many the
+                        // merge engine ACCEPTED。 deltas.accepted>0 is
+                        // the honest proof fabric actually merged seat
+                        // proposals,not just ran without crashing。
+                        let emitted = outcome
+                            .diagnostics["deltas.emitted"] ?? "-"
+                        let accepted = outcome
+                            .diagnostics["deltas.accepted"] ?? "-"
                         await emitBoth(String(format:
                             "🪧 ch1025 fabric iter=%d prompt=%d " +
-                            "activated=%@ skip=%@",
+                            "activated=%@ skip=%@ " +
+                            "deltas_emitted=%@ deltas_accepted=%@",
                             iter, p + 1,
                             outcome.activated ? "true" : "false",
-                            skip))
+                            skip, emitted, accepted))
                     } catch {
                         await emitBoth(
                             "⚠️ ch1025 fabric iter=\(iter) " +

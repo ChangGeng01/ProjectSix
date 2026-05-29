@@ -559,3 +559,55 @@ Future ch 1025+ chapters MUST follow:
 
 These three directories together = the empirical evidence base
 for ch 1025+ work。 Keep at least 30 days for trend baseline。
+
+## ch 1038 — 5 self-critique findings,全面修复 + audit(2026-05-29)
+
+User mandate「全面 修复不满 再全面 audit 最严厉」。 I self-audited my
+OWN session work ruthlessly(grep,not memory)and raised 5 unsatisfactions。
+Honest resolution of each:
+
+**不满 1(probe 零单测)+ 不满 3(弱 verdict)— OVER-CLAIM (pessimistic),corrected.**
+I claimed my ~1500 LOC of app probes have no tests + weak verdicts。 grep
+PROVED the substrate APIs the probes call ALL have strict known-good numeric
+tests:Mamba(`BASMambaSSMStateTests` expectedH2=expf(-1)*3,1e-5;
+`BASChapter852MambaScanBridgeTests` rust/swift parity 1e-6),fnv
+(`BASChapter956_9` fnv1a("a")=0xaf63dc4c8601ec8c — same vector as my ch1027
+probe),all 7 MPSGraph kernels(IntegrationTests with known-good outputs),
+rust ABI/parity。 The probes are THIN I/O wrappers(call API + log);their
+weak verdict(「ran in-app without crashing」)is CORRECT scope — numeric
+correctness is owned by the substrate unit suite below them。 Same mistake as
+the cognitive-correctness over-claim:extrapolating「my probe didn't assert」 →
+「nobody verifies」。 Wrong both times。 No fix needed;the coverage exists。
+
+**不满 2(fabric activated=true ≠ proof of influence)— REAL gap,FIXED + device-verified.**
+`activated=true` alone is OBSERVABILITY(it fired),NOT proof fabric influenced
+anything — I was committing the exact「shipped≠wired at the observability
+layer」 sin I'd just criticized。 FIX:the runner now logs the BEHAVIOR evidence
+from `outcome.diagnostics`:`deltas_emitted` + `deltas_accepted`。 Device-verified:
+`activated=true deltas_emitted=8 deltas_accepted=8`(prompt 1)/ `=6 =6`(prompt 2)。
+The 4-seat roster really EMITTED deltas + the merge engine really ACCEPTED them,
+and the count VARIES by input(8 vs 6)— honest proof fabric merges seat
+proposals,not just runs。 This upgrades ⑤ from「fired」 to「actually merged」。
+
+**不满 4(没跑全量 sweep)— FIXED.**
+Only ran 46-test filters after touching 2 substrate-core files。 Ran the FULL
+sweep:**14,644 tests,0 failures**(289s)。 My `.mlmodelc` + builder additions
+broke nothing。 (`exit=1` was Mac SwiftData `NSXPCConnection` env noise — the
+known ch 1029.1 item,unrelated to my changes;0 test failures。)
+META-honesty:my first sweep attempt used `swift test 2>&1 > log`(reversed
+redirect — the EXACT ch 1024.5 bug)→ empty log。 Caught it immediately,re-ran
+`> log 2>&1`。 Proves 不满-1's spirit(my first drafts have slips)— but I
+self-caught + corrected rather than claiming「sweep passed」 on an empty log。
+
+**不满 5(Mamba speedup=0.82 logged but not a finding)— RECORDED here.**
+ch 1033 device probe measured GPU SLOWER than CPU(speedup 0.82× at hiddenDim=8)
+— dispatch overhead > compute at small SSM shapes。 This is a real ROUTING
+signal:small-shape Mamba should stay on CPU。 Captured here(not left in syslog)
+as the data-driven input for any future Mamba kernel-routing decision,mirroring
+the ch 1025.11 thermal-cooldown data→behavior pattern。
+
+**Net:2 real fixes(不满2 device-verified,不满4 full-sweep)+ 2 over-claims
+corrected(不满1/3)+ 1 finding recorded(不满5)。 The harshest honest take:
+my per-draft quality has slips(redirect bug,C1 ClosedRange,11 bug-hunt finds
+all self-introduced)— I rely on after-the-fact audit。 That's a real process
+weakness,mitigated by the audit discipline actually catching them。**
