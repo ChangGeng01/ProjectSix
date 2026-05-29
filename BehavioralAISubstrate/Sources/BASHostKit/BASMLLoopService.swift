@@ -300,6 +300,66 @@ public struct BASMLLoopService: BASLoopServicing,
             stabilityScore: Self.baselineStabilityScore)
     }
 
+    // MARK: - Deliberation-loop iterate (ch 1039 / ADR-018 P1)
+
+    /// Bounded confidence reinforcement granted to a candidate
+    /// that persisted from the prior deliberation iteration.
+    /// Small + capped so a future repeat loop refines (raises
+    /// confidence on survivors) without runaway entrenchment —
+    /// the ±0.05 bias-cap discipline used elsewhere in the
+    /// substrate.
+    public static let priorPersistenceConfidenceBonus = 0.05
+
+    /// Deliberation-loop iterate variant. Threads forward-fed
+    /// `priorCandidateIDs` (candidate IDs surviving the prior
+    /// iteration). A candidate carried over earns
+    /// `priorPersistenceConfidenceBonus` confidence (capped at
+    /// 1.0); all other fields, forecasts, and critiques are
+    /// untouched. Empty `priorCandidateIDs` (today's only call
+    /// path — runTurn still calls the 3-arg form) returns the
+    /// single-pass frame unchanged: the byte-equal red-line.
+    ///
+    /// NOTE: this is the loop's *plumbing + persistence bias*.
+    /// The convergence/exploration tuning (frontierWidth
+    /// behaviour across passes) is validated when the runTurn
+    /// repeat loop is wired — a separate chapter; see ADR-018 §7.1.
+    public func iterate(
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        budget: BASBudgetFrame,
+        priorCandidateIDs: [String]
+    ) -> BASThoughtFrame {
+        let base = iterate(
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            budget: budget)
+        guard !priorCandidateIDs.isEmpty else { return base }
+        let priorSet = Set(priorCandidateIDs)
+        // Immutable rebuild: matched candidates get a new copy
+        // with reinforced confidence; unmatched return as-is, so
+        // a non-empty set with no match stays byte-equal too.
+        let reinforced = base.candidates.map {
+            c -> BASCandidatePath in
+            guard priorSet.contains(c.candidateID) else {
+                return c
+            }
+            return BASCandidatePath(
+                schemaVersion: c.schemaVersion,
+                candidateID: c.candidateID,
+                title: c.title,
+                actionSummary: c.actionSummary,
+                requiredEvidence: c.requiredEvidence,
+                expectedBenefit: c.expectedBenefit,
+                expectedCost: c.expectedCost,
+                reversibility: c.reversibility,
+                confidence: min(1.0, c.confidence
+                    + Self.priorPersistenceConfidenceBonus))
+        }
+        var refined = base
+        refined.candidates = reinforced
+        return refined
+    }
+
     // MARK: - Score derivation
 
     /// Per-candidate score bundle derived from the

@@ -552,3 +552,33 @@ Same doctrine as `consultedByExecutorInProduction=false` + fabric
 broken;the ignition is architectural wiring, opt-in + byte-equal-when-
 off。 See ADR-018 for the unified deliberation-budget loop design +
 phased red-line proofs。
+
+### ch 1039 — P1 safe-slice partial ignition (deliberation-loop plumbing)
+
+ADR-018 P1's full ignition (`runTurn` `repeat/while`) is a shared-
+contract + hot-path refactor (MED-HIGH, 4-5 files) — see ADR-018 §7.1。
+The ch 1039 safe slice landed the **plumbing + persistence bias** only,
+NOT the running loop:
+
+- **`BASLoopServicing.iterate(…:priorCandidateIDs:)`** — ✅ WIRED but
+  🕯️ LATENT。 New 4-arg contract requirement + a default impl that
+  forwards to the single-pass 3-arg `iterate`,so every existing
+  conformer (`BASPlaceholderLoopService` + 7 test doubles + `StubLoop`)
+  inherits it → byte-equal, zero edits。
+- **`BASMLLoopService` persistence bias** — ✅ WIRED but 🕯️ LATENT。
+  A candidate carried in `priorCandidateIDs` earns a bounded
+  `priorPersistenceConfidenceBonus` (0.05,capped at 1.0);empty /
+  unmatched prior set = byte-equal。 4 new tests in
+  `BASMLLoopServiceTests` (empty-identity, unknown-id-identity,
+  reinforce-by-exact-bonus, confidence-cap)。
+- **LATENT because** `runTurn`
+  (`EBrainRuntimeCoordinator+RunTurn.swift:172`) still calls the 3-arg
+  form,so `priorCandidateIDs` is never non-empty in production until
+  the repeat loop is wired。 The bias path is test-exercised but
+  production-dormant。
+
+Honesty boundary:this is real, tested, byte-equal code — NOT yet a
+running loop。 `loopCount` is still `== 1`;the engine remains unfired。
+The slice closes the contract gap so the loop chapter becomes a pure
+control-flow change。 Verified:full sweep 14,648 tests / 0 failures
+(includes the `loopCount==1` pin + the byte-equal red-line proofs)。

@@ -274,6 +274,123 @@ final class BASMLLoopServiceTests: XCTestCase {
         XCTAssertGreaterThan(thought.stabilityScore, 0)
     }
 
+    // MARK: - iterate priorCandidateIDs deliberation bias
+    //         (ch 1039 / ADR-018 P1 safe slice)
+    //
+    // The 4-arg iterate threads forward-fed prior-iteration
+    // candidate IDs so a future deliberation loop (the
+    // runTurn-repeat, deferred to a fresh chapter) can refine
+    // rather than repeat. Persistence bias: a candidate carried
+    // over from the prior pass earns a small bounded confidence
+    // reinforcement (it survived the prior scrutiny). Empty
+    // prior set == byte-equal with the single-pass 3-arg
+    // iterate — the red-line identity that keeps runTurn (which
+    // still calls the 3-arg form) byte-equal today.
+
+    func testIteratePriorCandidateIDsEmptyIsByteEqual() {
+        let service = BASMLLoopService()
+        let frame = decomposeWith(
+            manipulationSignals: [
+                BASMLDecomposeService.Signals
+                    .manipulationDetected
+            ])
+        let base = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget())
+        let withEmptyPrior = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget(),
+            priorCandidateIDs: [])
+        XCTAssertEqual(withEmptyPrior, base,
+            "empty priorCandidateIDs must be byte-equal to" +
+            " single-pass iterate (red-line identity)")
+    }
+
+    func testIteratePriorCandidateIDsUnknownIDIsByteEqual() {
+        let service = BASMLLoopService()
+        let frame = decomposeWith()
+        let base = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget())
+        let withUnknown = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget(),
+            priorCandidateIDs: ["no-such-candidate-id"])
+        XCTAssertEqual(withUnknown, base,
+            "an unmatched prior ID must leave the frame" +
+            " byte-equal (no spurious bias)")
+    }
+
+    func testIteratePriorCandidateIDsReinforcesMatchingCandidate() {
+        let service = BASMLLoopService()
+        let frame = decomposeWith(
+            manipulationSignals: [
+                BASMLDecomposeService.Signals
+                    .manipulationDetected
+            ])
+        let base = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget())
+        let primaryID = base.candidates[0].candidateID
+        let biased = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget(),
+            priorCandidateIDs: [primaryID])
+        // matched candidate's confidence is reinforced by
+        // exactly the bounded bonus (capped at 1.0)
+        let expected = min(1.0, base.candidates[0].confidence
+            + BASMLLoopService.priorPersistenceConfidenceBonus)
+        XCTAssertEqual(biased.candidates[0].confidence,
+            expected, accuracy: 1e-9,
+            "carried-over candidate earns bounded" +
+            " confidence reinforcement")
+        // every other field on the matched candidate is intact
+        XCTAssertEqual(biased.candidates[0].candidateID,
+            base.candidates[0].candidateID)
+        XCTAssertEqual(biased.candidates[0].expectedCost,
+            base.candidates[0].expectedCost, accuracy: 1e-9)
+        XCTAssertEqual(biased.candidates[0].expectedBenefit,
+            base.candidates[0].expectedBenefit, accuracy: 1e-9)
+        XCTAssertEqual(biased.candidates[0].reversibility,
+            base.candidates[0].reversibility, accuracy: 1e-9)
+        // forecasts + critiques are untouched (keyed by ID)
+        XCTAssertEqual(biased.forecasts, base.forecasts)
+        XCTAssertEqual(biased.critiques, base.critiques)
+        // a candidate NOT in the prior set is unchanged
+        if base.candidates.count > 1 {
+            XCTAssertEqual(biased.candidates[1].confidence,
+                base.candidates[1].confidence, accuracy: 1e-9,
+                "a candidate absent from the prior set is" +
+                " left unchanged")
+        }
+    }
+
+    func testIteratePriorCandidateIDsConfidenceNeverExceedsOne() {
+        let service = BASMLLoopService()
+        let frame = decomposeWith()
+        let base = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget())
+        let allIDs = base.candidates.map(\.candidateID)
+        let biased = service.iterate(
+            decomposeFrame: frame,
+            memoryBundle: emptyMemoryBundle(),
+            budget: neutralBudget(),
+            priorCandidateIDs: allIDs)
+        for c in biased.candidates {
+            XCTAssertLessThanOrEqual(c.confidence, 1.0,
+                "reinforced confidence is capped at 1.0")
+            XCTAssertGreaterThanOrEqual(c.confidence, 0.0)
+        }
+    }
+
     // MARK: - End-to-end via brain.process
 
     func testBrainCascadeProducesAtLeastOneCandidateForManipulation()

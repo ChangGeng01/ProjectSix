@@ -290,6 +290,40 @@ public protocol BASLoopServicing: Sendable {
         memoryBundle: BASMemoryBundle,
         budget: BASBudgetFrame
     ) -> BASThoughtFrame
+
+    /// ch 1039 / ADR-018 P1 — deliberation-loop iterate variant
+    /// that threads forward-fed prior-iteration candidate IDs so
+    /// a future runTurn repeat loop can refine rather than repeat.
+    /// A default implementation (below) ignores `priorCandidateIDs`
+    /// and forwards to the single-pass `iterate`, so every existing
+    /// conformer (placeholder service + test doubles) keeps
+    /// byte-equal behaviour with no edits. Only services with a
+    /// real refinement bias override it.
+    func iterate(
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        budget: BASBudgetFrame,
+        priorCandidateIDs: [String]
+    ) -> BASThoughtFrame
+}
+
+public extension BASLoopServicing {
+    /// Default deliberation-loop iterate: ignore
+    /// `priorCandidateIDs` and forward to the single-pass
+    /// `iterate`. Byte-equal with pre-ch1039 behaviour — the
+    /// red-line that keeps runTurn (still on the 3-arg form) and
+    /// every test double unchanged.
+    func iterate(
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        budget: BASBudgetFrame,
+        priorCandidateIDs: [String]
+    ) -> BASThoughtFrame {
+        iterate(
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            budget: budget)
+    }
 }
 
 public protocol BASTriSelfServicing: Sendable {

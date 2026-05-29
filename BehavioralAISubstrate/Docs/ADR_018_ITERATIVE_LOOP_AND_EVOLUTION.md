@@ -108,6 +108,54 @@ The evolution points (2 / 4 / 5) are the **slower outer learning loop** that fee
 - `Sources/BASRuntimeCore/BASAutoRouteRanker.swift` (`dreamLoopBatchScore` — P1 点1 cost modulation) + `Cargo/bas-dream-loop/src/lib.rs` (pure kernel, untouched)
 - `Sources/BASMemory/HostConstitutionCore.swift` (`:465` version tree, `parentVersionID` M110 — P5)
 
+### 7.1 Implementation ground-truth (ch 1039 fresh verification, 2026-05-29)
+
+Re-reading the live hot path during the ch 1039 P1 attempt refined four
+estimates above. Recorded append-only — the original §6/§7 verdicts stand as
+the design record; this is the executable detail.
+
+1. **Loop body is `:172-221`, not `:172-197`.** The convergence predicate
+   (`loopConverged`) needs the *materialized* telemetry —
+   `candidateFrontier` / `uncertaintyLedger` / `evidenceDebts` /
+   `convergenceCertificate` are filled by `materializeThoughtArtifacts`
+   (`:204-221`), AFTER `normalizeThoughtFrame` (`:198`). So the `repeat` must
+   wrap `iterate → 3 backfills → normalize → organMap → materialize`
+   (`:172-221`). `materializePublicProjection` (`:222-238`), world-prior
+   (`:250`), and tri-self (`:254-280`) stay OUTSIDE the loop — they run once on
+   the converged frame.
+
+2. **`iterate()` takes no prior frame → the contract change is a prerequisite,
+   not an optional refinement.** `loopService.iterate(decomposeFrame:
+   memoryBundle:budget:)` (call site `:172-176`;
+   `EBrainHostRuntime+LoopService.swift:110-145`) is a pure function of its
+   inputs and returns `stepIndex: appliedLoopCount` analytically in ONE pass —
+   `appliedLoopCount = min(budget.maxLoops, desiredLoopCount())`. Calling it
+   twice with identical inputs yields an identical frame, so a `repeat` without
+   forward-fed state is a no-op repetition. A *meaningful* P1 loop REQUIRES the
+   `BASLoopServicing` contract gain a `priorCandidateIDs: [String] = []` (or
+   prior-frame) parameter, wired through BOTH `BASMLLoopService` and
+   `EBrainHostRuntime+LoopService`. This makes P1 a **shared-contract +
+   hot-path** change across 4-5 files, blast radius **MED-HIGH** — best executed
+   at the start of a fresh focused session, NOT the tail of a long cascade.
+
+3. **Default byte-equality mechanism is the `while` guard.** With
+   `routedBudget.maxLoops == 1` (today's default) the guard
+   `deliberationPass < maxLoops` is `1 < 1 == false` → body runs exactly once →
+   byte-equal with pre-P1. The red-line test
+   `BASEBrainSchemaCoreTests.swift` `loopCount == 1` uses `riskHint: .high`
+   (→ `desiredLoopCount == 3`) and stays green ONLY because
+   `appliedLoopCount = min(maxLoops=1, 3) == 1`. Therefore **P1 must NOT raise
+   the production-default budget** — `点3 drift/thermal → maxLoops` must itself
+   sit behind the opt-in flag (pulling part of P3's flag ahead of P1), else this
+   pinned test breaks.
+
+4. **1-hour test motivates a thermal-gated budget floor.** The ch 1039 1-hour
+   all-parts run measured thermal == `serious` for all 20 iterations (consistent
+   with the 10-hour data, ch 1025.11). So the deliberation-budget function must
+   floor depth under thermal pressure: `serious → maxLoops == 1` (no extra
+   deliberation when the device is already hot). This is the safest first slice
+   of 点3 and is directly evidence-backed.
+
 ---
 
 ## 8. Consequences
@@ -118,7 +166,7 @@ The evolution points (2 / 4 / 5) are the **slower outer learning loop** that fee
 - Unifies thermal (ch1025.11) + drift + uncertainty into one deliberation budget rather than scattered ad-hoc gates.
 
 **Negative / risks:**
-- runTurn is the hot path; P1's main lift is moving artifact materialization inside the loop (`:214-219`) — must preserve byte-equality at budget=1.
+- runTurn is the hot path; P1's main lift is wrapping `:172-221` (iterate → backfill → normalize → materialize) in the deliberation loop PLUS a shared `BASLoopServicing` contract change to forward prior-candidate state (see §7.1) — 4-5 files, MED-HIGH; must preserve byte-equality at budget=1.
 - P4 (policy mutation) is genuinely dangerous (user can degrade safety) — gated behind L14 sovereign + caps; must not ship without it.
 - P5 (version branching) is a 2-3 session cross-module arc — not to be attempted piecemeal.
 
