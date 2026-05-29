@@ -514,3 +514,41 @@ process launch`(in-app endurance)has no test-bundle enumeration +
 no shared test session,so these cannot recur on the now-default
 path。 Retained only for the legacy `scripts/run-iphone-air-10hr.sh`
 xcodebuild-test path。
+
+---
+
+## ch 1039+ — 循环/进化 引擎未点火(verified scaffold,→ ADR-018)
+
+A ch 1037-1038 deep architecture study (3 layered Explore agents over
+all 14 layers + 5 ignition-point feasibility spikes) verified a NEW
+class of reserved-but-unfired interface: the substrate's **iterative-
+loop + evolution engine**。 Recorded here as scaffold;designed in
+`Docs/ADR_018_ITERATIVE_LOOP_AND_EVOLUTION.md`。
+
+- **`loopCount` / `maxLoops` / `stepIndex`** — 🪜 SCAFFOLD (engine
+  unfired)。 `runTurn()` is a single linear pass;`loopCount =
+  max(1, stepIndex)` is pinned `== 1` by `BASEBrainSchemaCoreTests
+  .swift:1743`。 The convergence telemetry (`BASConvergenceStoppingMode`,
+  `uncertaintyLedger.confidenceFloor`, `evidenceDebts.debtWeight`,
+  `candidateFrontier.frontierWidth`) + the `desiredLoopCount()`
+  budget hook (`EBrainHostRuntime+LoopService.swift:115`) ALL exist
+  — but nothing `repeat/while`s on them。 Ignition = ADR-018 Phase 1。
+- **`ShadowTrialStateMachineCore` + `bas-shadow-trial` (Rust) +
+  `bas-dream-loop` (Rust)** — 🪜 SCAFFOLD (real algorithms, feedback
+  unwired)。 Pure trial-transition + batch-scoring kernels exist + are
+  `@_silgen_name`-bound, but no cross-turn feedback consumes their
+  output。 Ignition = ADR-018 Phase 2 (trial) + Phase 1 (dream-loop bias)。
+- **`BASFeedbackEvent` → policy** — 🪜 SCAFFOLD (dead-ends at audit)。
+  Field exists on the turn request, generates an UpdateTicket, but the
+  ticket is never applied to future behavior。 Ignition = ADR-018
+  Phase 4 — DANGEROUS, requires an L14 sovereign gate (a user could
+  train the system badly)。
+- **L13 version-tree branch/merge** — 🪜 SCAFFOLD (append-only)。
+  `parentVersionID` (M110) exists but no branch/shadow-trial/merge。
+  Ignition = ADR-018 Phase 5 — major multi-session arc。
+
+Same doctrine as `consultedByExecutorInProduction=false` + fabric
+`.observationOnly`:**reserved interface, behavior pending**。 None is
+broken;the ignition is architectural wiring, opt-in + byte-equal-when-
+off。 See ADR-018 for the unified deliberation-budget loop design +
+phased red-line proofs。
