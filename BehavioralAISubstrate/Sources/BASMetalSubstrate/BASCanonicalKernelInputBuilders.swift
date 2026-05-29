@@ -212,6 +212,71 @@ public enum BASCanonicalKernelInputBuilders {
             ])
     }
 
+    /// ch 1034.1 — RANK-2 RoPE input matching the SHIPPED
+    /// `BASMPSGraphRotaryEmbeddingKernel` contract `[seq, headDim]`。
+    ///
+    /// The rank-3 `rotaryEmbedding(…)` above emits
+    /// `[seq, heads, headDim]` for a hypothetical multi-head kernel
+    /// that does NOT exist — the shipped kernel(M1190,8/8 native
+    /// coverage,624-commit byte-equal)validates `rank == 2` and
+    /// throws `shapeMismatch` on rank-3。 ch 1034's endurance probe
+    /// was the first call site to feed builder→kernel and exposed the
+    /// mismatch。 **Use THIS builder to feed the real kernel;the
+    /// rank-3 form is retained only for a future multi-head kernel。**
+    ///
+    /// Pre-conditions:
+    ///   - `headDim` is even
+    ///   - `input.count == seq * headDim`
+    ///   - `cos.count == sin.count == seq * (headDim/2)`
+    public static func rotaryEmbeddingRank2(
+        input: [Float],
+        cosTable: [Float],
+        sinTable: [Float],
+        sequenceLength: Int,
+        headDim: Int
+    ) -> BASKernelInputs {
+        precondition(
+            sequenceLength > 0 && headDim > 0,
+            "rotaryEmbeddingRank2 dims must be > 0")
+        precondition(
+            headDim % 2 == 0,
+            "rotaryEmbeddingRank2 headDim must be even" +
+            " (got \(headDim))")
+        let half = headDim / 2
+        precondition(
+            input.count == sequenceLength * headDim,
+            "input length must equal seq*headDim")
+        precondition(cosTable.count == sequenceLength * half,
+            "cosTable length must equal seq*headDim/2")
+        precondition(sinTable.count == sequenceLength * half,
+            "sinTable length must equal seq*headDim/2")
+        let descInput = BASTensorDescriptor(
+            shape: [sequenceLength, headDim],
+            strides: [headDim * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        let descCos = BASTensorDescriptor(
+            shape: [sequenceLength, half],
+            strides: [half * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        let descSin = BASTensorDescriptor(
+            shape: [sequenceLength, half],
+            strides: [half * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        return BASKernelInputs(
+            descriptors: [descInput, descCos, descSin],
+            payloads: [
+                floatArrayToData(input),
+                floatArrayToData(cosTable),
+                floatArrayToData(sinTable)
+            ])
+    }
+
     // MARK: - Helpers
 
     /// Pack `[Float]` into `Data` via raw bytes for

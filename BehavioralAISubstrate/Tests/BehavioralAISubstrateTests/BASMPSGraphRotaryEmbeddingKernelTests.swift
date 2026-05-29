@@ -25,6 +25,51 @@ final class BASMPSGraphRotaryEmbeddingKernelTests: XCTestCase {
         }
     }
 
+    /// ch 1034.1 — INTEGRATION:the canonical rank-2 builder must
+    /// produce inputs the kernel ACCEPTS。 The rank-3 `rotaryEmbedding`
+    /// builder does NOT(emits [seq,heads,headDim];kernel requires
+    /// [seq,headDim])— ch 1034's endurance probe was the first call
+    /// site to feed builder→kernel and hit `shapeMismatch`。 This pins
+    /// that `rotaryEmbeddingRank2` → kernel works end-to-end,so the
+    /// builder/kernel pair can never silently drift apart again。
+    func testRotaryEmbeddingRank2BuilderFeedsKernel() async throws {
+        let kernel: BASMPSGraphRotaryEmbeddingKernel
+        do {
+            kernel = try BASMPSGraphRotaryEmbeddingKernel()
+        } catch BASKernelError
+            .frameworkUnavailable(let framework)
+        {
+            try XCTSkipIf(true,
+                "Metal unavailable (\(framework))")
+            return
+        }
+        let seqLen = 4, headDim = 4, half = 2
+        // cos=1 / sin=0 → identity rotation → output == input。
+        let inputs = BASCanonicalKernelInputBuilders
+            .rotaryEmbeddingRank2(
+                input: [Float](repeating: 0.5,
+                               count: seqLen * headDim),
+                cosTable: [Float](repeating: 1.0,
+                                  count: seqLen * half),
+                sinTable: [Float](repeating: 0.0,
+                                  count: seqLen * half),
+                sequenceLength: seqLen, headDim: headDim)
+        // Must NOT throw shapeMismatch(the ch 1034 builder/kernel bug)。
+        let outputs = try await kernel.evaluate(inputs: inputs)
+        XCTAssertEqual(outputs.descriptors.count, 1,
+            "rotaryEmbedding kernel emits 1 output tensor")
+        let outFloats = BASCanonicalKernelInputBuilders
+            .dataToFloatArray(
+                outputs.payloads[0],
+                elementCount: seqLen * headDim)
+        XCTAssertEqual(outFloats.count, seqLen * headDim)
+        // Identity rotation:every output element equals input(0.5)。
+        for v in outFloats {
+            XCTAssertEqual(v, 0.5, accuracy: 1e-4,
+                "cos=1/sin=0 is identity → output must equal input")
+        }
+    }
+
     /// Identity test:cos=1,sin=0 → output equals
     /// input (rotation by 0 angle is identity)。
     func testZeroAngleIsIdentity() async throws {
