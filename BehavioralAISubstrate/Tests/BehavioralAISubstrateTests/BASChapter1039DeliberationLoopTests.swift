@@ -241,5 +241,77 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
             off.thoughtFrame.candidates,
             "the deliberation loop's persistence bias refines" +
             " candidates vs the single-pass frame")
+        // Pin the bias semantics: it is a SINGLE non-accumulating
+        // +bonus for surviving candidates, NOT graduated by pass
+        // count. Each pass regenerates base candidates then applies
+        // `reinforce` once, so the refinement saturates after the
+        // first biased pass — a matched candidate is exactly
+        // off.confidence + bonus (capped at 1.0) regardless of how
+        // many passes ran. Graduated/accumulating refinement would
+        // need a contract change to forward prior confidences
+        // (ADR-018 §7.3 follow-up); this assertion guards against a
+        // silent change to that contract.
+        let bonus = BASDeliberationBias.priorPersistenceConfidenceBonus
+        for offCandidate in off.thoughtFrame.candidates {
+            guard let onCandidate = on.thoughtFrame.candidates.first(
+                where: { $0.candidateID == offCandidate.candidateID })
+            else { continue }
+            XCTAssertEqual(onCandidate.confidence,
+                min(1.0, offCandidate.confidence + bonus),
+                accuracy: 1e-9,
+                "refinement is a single non-accumulating +bonus," +
+                " not graduated by pass count")
+        }
+    }
+
+    // MARK: - Coverage gaps closed by the ch1039 deep audit
+
+    /// The cap branch `min(1.0, confidence + bonus)` was never
+    /// exercised — no existing test drove confidence high enough to
+    /// clamp. Pin it directly on the shared bias helper.
+    func testReinforceCapsConfidenceAtOne() {
+        let candidate = BASCandidatePath(
+            candidateID: "near-one",
+            title: "t",
+            actionSummary: "a",
+            expectedBenefit: 0.5,
+            expectedCost: 0.5,
+            reversibility: 0.5,
+            confidence: 0.98)
+        let frame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "cap.decomp",
+            memoryRefs: [],
+            candidates: [candidate],
+            forecasts: [],
+            critiques: [],
+            stabilityScore: 0.5,
+            stopReason: .candidateStable)
+        let reinforced = BASDeliberationBias.reinforce(
+            frame, priorCandidateIDs: ["near-one"])
+        XCTAssertEqual(reinforced.candidates[0].confidence, 1.0,
+            accuracy: 1e-9,
+            "0.98 + 0.05 clamps to 1.0, never exceeds it")
+    }
+
+    /// Flag ON but maxLoops==1 → the budget forbids looping → exactly
+    /// one pass. (The service requests 3, but normalize clamps to 1.)
+    func testFlagOnButMaxLoopsOneRunsSinglePass() {
+        let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 1, enabled: true)
+        _ = coord.runTurn(BASCoordinatorTestStubs.makeStubRequest())
+        XCTAssertEqual(loop.iterateCalls, 1,
+            "flag on but maxLoops=1 → budget forbids looping → 1 pass")
+    }
+
+    /// Flag ON with ample budget, but the service requests a
+    /// single-pass budget (stepIndex==1) → exactly one pass (the loop
+    /// honors the service's own requested depth, not just maxLoops).
+    func testFlagOnButServiceRequestsSinglePassRunsOnce() {
+        let loop = CountingLoop(requestedStep: 1, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: true)
+        _ = coord.runTurn(BASCoordinatorTestStubs.makeStubRequest())
+        XCTAssertEqual(loop.iterateCalls, 1,
+            "flag on + budget=4 but service requests stepIndex=1 → 1 pass")
     }
 }

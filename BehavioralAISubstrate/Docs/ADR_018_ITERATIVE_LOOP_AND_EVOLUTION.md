@@ -242,6 +242,56 @@ per the doctrine's recovery paths). The sync host path
 tested, so this is a completeness gap on a non-default path, not a hole
 in the core deliverable.
 
+### 7.4 Deep-audit finding — the loop is currently DECISION-INERT (ch 1039)
+
+A deep adversarial audit (4 round-1 + 3 round-2 agents, each reading the
+live code; one ran a mutation test) found that P1's loop is SAFE
+(byte-equal off, full sweep 14,653 / 0) and mechanically correct, BUT
+its refinement is **decision-inert** — when enabled it changes **no**
+selected candidate, risk level, action permit, or rendered output. Two
+structural reasons, both traced to exact code:
+
+1. **Uniform bias.** The loop reinforces ALL surviving candidates by the
+   same +0.05 (`priorCandidateIDs` = every prior candidate ID, so
+   `BASDeliberationBias.reinforce` bumps every match). A uniform additive
+   shift cannot move an argmax, a ranking (`candidateDominanceScore`), or
+   the `scoreGap` agency-reservation threshold — selection is invariant.
+2. **Clamped out of the deciding score.** Candidate confidence feeds
+   selection only through `egoScore`
+   (`EBrainHostRuntime+TriSelfService.swift`), which clamps confidence at
+   `confidenceCeiling` (0.64). The default `proposePaths` confidences are
+   already at/above 0.64, so the +0.05 is clipped → net `mergedScore`
+   delta = 0. `calibrateRisk` reads neither candidate confidence nor
+   `mergedScore` magnitude (only the `veto` boolean + `reversibility`).
+   `stabilityScore` / `supportLevel` / `confidenceBand` / `hostGateValue`
+   are write-only reported fields that no `if`/`guard`/`switch` consumes.
+
+Combined with the non-accumulating saturation (pass N≥2 is byte-identical
+to pass 2 — the loop is idempotent once candidate IDs stabilize), a
+budget of 3/4/5 delivers nothing beyond pass 2 except wasted recompute.
+
+**Honest status correction:** P1 landed the loop INFRASTRUCTURE — safe,
+opt-in, mechanically correct, real-pipeline-verified — but the refinement
+is **NOT yet consequential**. Earlier ch1039 framing ("produces an
+observable, useful effect") overclaimed: the effect is observable (a
+confidence number + derived reported metrics) but useless (no decision
+reads it). This is scaffold at the decision level, disclosed here per
+honest-mode. The loop is dormant in production (default OFF), so this is
+not a production defect — but activating it today accomplishes nothing
+consequential.
+
+To make it consequential (focused-session follow-ups, NOT fatigued-tail
+changes):
+- **Differential bias** — reinforce selectively (e.g., only the surviving
+  leader, or weight by persistence/evidence) so it can widen/narrow
+  `scoreGap` or flip the argmax, rather than a uniform shift.
+- **Clamp-aware / consumer wiring** — relax or bypass the egoScore
+  `confidenceCeiling` clamp for the bias, OR wire a decision
+  (selection/risk) to consume the loop's confidence delta.
+- **Early-exit on convergence** — `if newFrame == priorFrame { break }`
+  (BASThoughtFrame is Equatable) to stop the saturated wasted passes;
+  changes the pass-count pin `testRunsBudgetedPassesWhenEnabled`.
+
 ---
 
 ## 8. Consequences

@@ -630,3 +630,23 @@ Verified:full sweep 14,653 / 0 failures with the flag OFF
 (`BASMLLoopService` refactor behaviour-identical)。 Remaining follow-
 ups (ADR-018 §7.3):async-engine `buildCoordinator` threading;flag-on-
 by-default in a host (a deliberate behaviour change)。
+
+### ch 1039 (deep audit) — loop is DECISION-INERT (honest correction)
+
+A deep adversarial audit corrected an overclaim:the loop is SAFE +
+mechanically correct,but its refinement is **decision-inert**。 The
++0.05 confidence bias is (1) UNIFORM across all survivors (can't move an
+argmax / ranking / `scoreGap` threshold) and (2) clamped out of
+`egoScore` (the only selection-feeding score,ceiling 0.64,which the
+candidates already meet)→ net `mergedScore` delta 0。 No selected
+candidate / risk / permit / render changes。 So:
+
+- **loop refinement** — 🪜 SCAFFOLD AT THE DECISION LEVEL。 Infra is
+  ✅ WIRED (runs N passes,refines a confidence number through the real
+  pipeline),but the number is decision-inert — nothing consumes it。
+  Earlier "observable, useful effect" was an overclaim:observable,not
+  useful。 Dormant in production (flag OFF),so not a production defect。
+
+Making it consequential needs a DIFFERENTIAL + clamp-aware bias (or a
+decision that consumes confidence),plus an early-exit on convergence to
+end the saturated wasted passes — design follow-ups (ADR-018 §7.4)。

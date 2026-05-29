@@ -310,9 +310,10 @@ public protocol BASLoopServicing: Sendable {
 public extension BASLoopServicing {
     /// Default deliberation-loop iterate: ignore
     /// `priorCandidateIDs` and forward to the single-pass
-    /// `iterate`. Byte-equal with pre-ch1039 behaviour — the
-    /// red-line that keeps runTurn (still on the 3-arg form) and
-    /// every test double unchanged.
+    /// `iterate`. Byte-equal with pre-ch1039 behaviour — every
+    /// conformer that does NOT override (the placeholder service +
+    /// test doubles) keeps its prior behaviour, and runTurn's 4-arg
+    /// `[]` call is equivalent to the prior single 3-arg pass.
     func iterate(
         decomposeFrame: BASDecomposeFrame,
         memoryBundle: BASMemoryBundle,
