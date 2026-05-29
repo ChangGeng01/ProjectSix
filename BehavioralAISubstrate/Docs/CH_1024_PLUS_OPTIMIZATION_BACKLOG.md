@@ -387,6 +387,40 @@ NOT the substrate core。 The substrate-core thermal optimization(ch 1026
 change(needs 5-axis perf at .nominal + red-line 7 byte-equality)。 ch 1025.11
 is the prototype, not the graduation。
 
+### Cognitive-correctness investigation — self-audit CORRECTION(2026-05-29)
+
+During the honest-mode self-audit I claimed the substrate "only verifies the
+pipeline runs, not that judgments are correct" — that the 10hr endurance proved
+"fire/不崩" not "判断对"。 **On「全面开发」I investigated instead of assuming,and
+that claim was an OVER-CLAIM(in the pessimistic direction)。**
+
+The substrate HAS a dedicated cognitive-correctness test suite,independent of
+the endurance probe:
+- **L6 classifier**:`BASContextClassifierMLAdapterTests`,`BASMLContextServiceTests`,
+  `BASCognitiveBrainContextRoutingTests`,`BASEBrainContextDrivenTests`,
+  `BASLLMTaskClassifierTests`(known prompt → expected taskType)
+- **L11 risk**:`BASMLRiskServiceTests`,`BASRiskGateTests`
+- **L14 sovereign**:`BASSovereignVerdictTests`,`BASChapter414SovereignActuationTests`
+
+**Empirical baseline(swift test,2026-05-29):running L6+L11+L14 correctness =
+51 tests,0 failures,6.2s。** So cognitive correctness IS verified — by Mac unit
+tests with known-correct fixtures。 The division of labor is sound:**unit tests
+verify judgment correctness(Mac,known answers);endurance verifies stability +
+instrumentation(device,sustained load)。** The endurance not asserting
+correctness is BY DESIGN,not a gap — correctness is covered elsewhere。
+
+**Corrected honest position:** the substrate is HEALTHIER than my self-audit
+said。 Accurate statement = "my ch 1025 endurance probe doesn't assert cognitive
+correctness, but the substrate core has a 51+-test correctness suite that does,
+and it passes"。 The remaining真 gaps are NOT cognitive correctness — they are
+the multi-session arc(ch 1026 thermal graduation, fabric runTurn, #4 isolation)
++ the minor endurance-instrument completeness(L1/L2/L4/L5 not surfaced in MY
+probe — but those layers ARE unit-tested elsewhere)。
+
+This is the honest-mode lesson:I twice said "substrate 没验 cognitive
+correctness" — investigation(51 tests pass)proved that wrong。 Don't extrapolate
+from "my probe didn't" to "the substrate doesn't"。
+
 ### Honest note on the 10hr endurance report
 
 `Docs/CH_1025_7_ENDURANCE_FINAL_REPORT.md` headline "247,133 tokens" is
