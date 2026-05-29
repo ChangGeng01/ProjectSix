@@ -272,6 +272,49 @@ grants only to its own processes。 No public iOS API surfaces ANE busy-time。
 5. **ch 1035**(ANE rescoped)— rotation + request-log only;utilization% DECLINE-WITH-TRIGGER(revisit if Apple exposes public ANE counters)。
 6. **ch 1036**(multi-organ)— LOW priority,breadth not depth。
 
+## ch 1025.8 bug hunt findings — 4-agent adversarial(2026-05-29)
+
+User mandate「全面 寻找 bug 最最严苛」。 4 parallel read-only review agents
+(concurrency/Sendable · substrate-impact · error/edge · correctness-silent-data)
+swept this session's diff(99f56f66f..HEAD)。 **11 verified findings;substrate
+PRODUCTION code(the `.mlmodelc` adapter change)audited CLEAN(byte-equal raw
+path,no macOS regression)— every finding is in the DeviceTestApp probes/runner。**
+HIGH-1 + HIGH-2 adversarially re-verified(token source confirmed chars/4;this
+run's RSS trajectory confirmed step-down,not a hidden leak)。
+
+### ✅ Fixed this batch(ch 1025.8,device-verified)
+
+| # | Sev | Finding | Fix |
+|---|---|---|---|
+| C1 | **CRITICAL** | `for iter in 1...totalIters` ClosedRange traps(hard crash)when `BAS_INTERNAL_ITER_COUNT=0`/negative — no clamp | `max(1, …)` on totalIters + mlxPrompts。 Device-verified:launched with iters=0 → clamped to 1 → FINAL emitted,NO crash,app alive |
+| C2 | HIGH | C1's trap skipped `closeLogFile()` + `isIdleTimerDisabled=false`(log leak + screen pinned) | Resolved by C1 clamp(loop no longer traps) |
+| HIGH-1 | HIGH | `tokens`/`tok_per_s` were `(body.count+3)/4` char-estimates(`BASOrganDeterministicAdapter.estimateTokens`),mislabeled as real decode tokens — "247K tokens" headline was chars/4 | Renamed `est_tokens`/`est_tok_per_s`/`est_cumul_tokens`/`est_total_tokens`/`est_tokens_per_iter` across mlx line + scorecard + FINAL。 Device-verified `est_tokens=75 est_tok_per_s=49.69` |
+| HIGH-3 | HIGH | per-prompt `rss_delta_mb` bracketed only `adapter.draft()`(mlxPreSnap taken AFTER brain.process + emitBrainDetail)→ excluded substrate-cascade alloc,mislabeled as total per-prompt | Renamed `mlx_rss_delta_mb`(scopes it MLX-draft-only)。 Device-verified |
+
+### 🔧 Deferred to next batch(ch 1025.9 — verified real,fix designed,not yet applied)
+
+Deferred to avoid a fix-of-fix bundle(cascade discipline)— all in DeviceTestApp,
+none touch shipped substrate。
+
+| # | Sev | Finding | Fix design |
+|---|---|---|---|
+| HIGH-2 | HIGH | `total_rss_growth_mb = last − first`(2-point endpoint)hides intra-run leaks — a peak@iter40 + low@iter100 reports negative "growth" while a real leak was reclaimed late。 This run was step-down(verified no real leak),but method is fragile for future runs | FINAL also compute `rss_max`,`rss_peak_vs_first`,linear regression slope over `iterRssAfter`;keep last−first but label it `endpoint_delta` |
+| #4 | HIGH | `Task.detached { await self?.runEndurance() }` but `runEndurance` is `@MainActor`(method inheritance)→ the multi-hour loop is MainActor-pinned with 300s sleeps;intent ≠ behavior。 10hr run completed(await yields main frequently)so impact LOW,but the detached design is illusory | Make `runEndurance` nonisolated;keep @State writes inside the existing `MainActor.run` blocks(they already wrap status/log). Requires full re-review of every self.state access — moderate risk,LOW impact,hence batched separately |
+| MED-1 | MED | percentile bias:`p50 = sorted[count/2]`(n=100 → index 50 = 51st = ~p51);`p99 = sorted[min(count-1, Int(count*0.99))]`(n=100 → index 99 = MAX,not p99)。 Tail consistently overstated | nearest-rank:`index = clamp(ceil(p*N)-1, 0, N-1)`。 p50→idx49,p99→idx98 for N=100 |
+| MED-mono | MED | all latency/duration use wall-clock `Date().timeIntervalSince`;`monotonicNs` is captured in every snapshot but ONLY logged,never used for deltas → NTP step/DST on a 10hr run injects silent error into every latency + p50/p99/avg | Derive elapsed from `DispatchTime.now().uptimeNanoseconds` deltas(brainMs/mlxMs/iterMs/elapsedSec/totalSec/cognitiveBrainMs/brainLoadMs);keep `Date()` only for wall-clock timestamps。 Mechanical but multi-site |
+| #5 | MED | SwiftUI `onAppear` can fire repeatedly(re-appear/backgrounding)→ `rustVerify` re-runs + MPSGraph Task re-spawns → two `BASMPSGraphProbe.run()` can overlap GPU dispatch。 `autostartIfEnabled` is guarded by `started`;the probes are not | Add a `probesRan` guard flag(like `started`)so ch 1027/1034 probes run once per process |
+| L1 | LOW | `snapshot()` labels `info.virtual_size` as `footprint_mb` — virtual size ≠ phys_footprint。 10hr report's footprint column is mislabeled(virtual,which is huge ~404 GB-range, obviously not footprint) | Either relabel `vsize_mb`,or switch to `task_vm_info`'s `phys_footprint`(the real footprint metric) |
+| LOW-2 | LOW | ch 1027 fnv `non_constant = probeHash != offsetBasis` is a WEAK proof of "real compute"(a stub returning any fixed non-basis constant passes)。 Verdict is still SOUND because `emptyOK`(known offset basis)+ 8/8 ABI gate it,but the per-line comment overstates what that one check proves | Assert `probeHash == <precomputed FNV-1a of "ch1027-rust-verify">`(known-good value),matching the rigor of the empty-input check |
+
+### Honest note on the 10hr endurance report
+
+`Docs/CH_1025_7_ENDURANCE_FINAL_REPORT.md` headline "247,133 tokens" is
+chars/4 estimates(HIGH-1),and its p99 latencies are biased high by one rank
+(MED-1)。 The "0 leak(net RSS −1461)" conclusion is CORRECT for that run
+(trajectory verified step-down)but rests on the fragile endpoint method
+(HIGH-2)。 The report should be annotated with these caveats when ch 1025.9
+lands the fixes。
+
 ## Sequence recommendation
 
 **Honest pacing — ship one chapter per session,never bundle:**

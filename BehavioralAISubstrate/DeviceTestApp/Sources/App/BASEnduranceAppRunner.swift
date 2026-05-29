@@ -305,10 +305,15 @@ final class BASEnduranceAppController: ObservableObject {
 
     private func runEndurance() async {
         let env = ProcessInfo.processInfo.environment
-        let totalIters = Int(
-            env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100
-        let mlxPrompts = Int(
-            env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3
+        // ch 1025.8 C1 fix(CRITICAL):clamp to ≥1。 env "0"/negative
+        // would make `for iter in 1...totalIters` a ClosedRange with
+        // lowerBound > upperBound,which TRAPS at runtime(hard crash
+        // + skips closeLogFile/idleTimer cleanup = C2)。 mlxPrompts=0
+        // makes the inner `0..<0` a silent 0-token no-op — clamp too。
+        let totalIters = max(1, Int(
+            env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100)
+        let mlxPrompts = max(1, Int(
+            env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3)
         let baseCooldown = Int(
             env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
         let adaptive = (
@@ -534,21 +539,34 @@ final class BASEnduranceAppController: ObservableObject {
                         .timeIntervalSince(mlxStart) * 1000
                     let mlxPostSnap = snapshot()
                     let bodyLen = draft.body.count
-                    let tokens = draft.outputTokensEstimated
-                    let tps = mlxMs > 0
-                        ? Double(tokens) / (mlxMs / 1000.0)
+                    // ch 1025.8 HIGH-1 fix:`outputTokensEstimated` is
+                    // a chars/4 heuristic(BASOrganDeterministicAdapter
+                    // .estimateTokens = (body.count+3)/4),NOT a real
+                    // MLX decode-token count(the adapter never exposes
+                    // one)。 Renamed tokens→est_tokens + tok_per_s→
+                    // est_tok_per_s so the log + report don't claim
+                    // measured throughput they can't deliver(diverges
+                    // sharply for multibyte / whitespace-heavy output)。
+                    let estTokens = draft.outputTokensEstimated
+                    let estTps = mlxMs > 0
+                        ? Double(estTokens) / (mlxMs / 1000.0)
                         : 0
-                    iterTokens += tokens
+                    iterTokens += estTokens
                     allMlxLatenciesMs.append(mlxMs)
-                    let rssDeltaMB = mlxPostSnap.memoryRssMB
+                    // ch 1025.8 HIGH-3 fix:mlxPreSnap is taken AFTER
+                    // brain.process + emitBrainDetail already ran,so
+                    // this delta brackets ONLY adapter.draft() memory,
+                    // not total per-prompt。 Renamed rss_delta_mb→
+                    // mlx_rss_delta_mb to scope it honestly。
+                    let mlxRssDeltaMB = mlxPostSnap.memoryRssMB
                         - mlxPreSnap.memoryRssMB
                     await emitBoth(String(format:
                         "🧠 ch1025 mlx iter=%d prompt=%d " +
-                        "prompt_len=%d resp_len=%d tokens=%d " +
-                        "latency_ms=%.0f tok_per_s=%.2f " +
-                        "rss_delta_mb=%.2f",
+                        "prompt_len=%d resp_len=%d est_tokens=%d " +
+                        "latency_ms=%.0f est_tok_per_s=%.2f " +
+                        "mlx_rss_delta_mb=%.2f",
                         iter, p + 1, promptLen, bodyLen,
-                        tokens, mlxMs, tps, rssDeltaMB))
+                        estTokens, mlxMs, estTps, mlxRssDeltaMB))
                     // ch 1025.7 — MLX adapter telemetry per prompt
                     let sessions = await adapter.sessionCount()
                     let capacity = await adapter.currentCapacity()
@@ -578,9 +596,11 @@ final class BASEnduranceAppController: ObservableObject {
                 .timeIntervalSince(iterStart) * 1000
             iterDurationMs.append(iterMs)
 
+            // ch 1025.8 HIGH-1:est_ prefix — these are chars/4
+            // estimates(see mlx line),not real decode tokens。
             await emitBoth(String(format:
                 "📊 ch1025 scorecard iter=%d iter_ms=%.0f " +
-                "tokens=%d cumul_tokens=%d " +
+                "est_tokens=%d est_cumul_tokens=%d " +
                 "thermal=%@→%@ rss_mb=%.1f→%.1f " +
                 "avail_mb=%d→%d",
                 iter, iterMs, iterTokens, totalTokens,
@@ -661,10 +681,14 @@ final class BASEnduranceAppController: ObservableObject {
                 "p99_iter_ms=%.0f",
                 totalSec, totalIters,
                 avgDurMs, p50DurMs, p99DurMs))
+            // ch 1025.8 HIGH-1:est_total_tokens(chars/4,not real)。
+            // ch 1025.8 MED-1 NOTE:p50/p99 below still use the
+            // biased index(sorted[count/2] / last-element)— a known
+            // overstatement deferred to the next batch(BACKLOG)。
             await emitBoth(String(format:
                 "📊 ch1025 FINAL mlx_total_inferences=%d " +
                 "avg_lat_ms=%.0f p50_lat_ms=%.0f " +
-                "p99_lat_ms=%.0f total_tokens=%d",
+                "p99_lat_ms=%.0f est_total_tokens=%d",
                 allMlxLatenciesMs.count, avgMlxMs,
                 p50MlxMs, p99MlxMs, totalTokens))
             await emitBoth(String(format:
@@ -681,7 +705,7 @@ final class BASEnduranceAppController: ObservableObject {
                 iterCooldownThermalRecovery
                     .joined(separator: ","))
             await emitBoth(
-                "📊 ch1025 FINAL tokens_per_iter=" +
+                "📊 ch1025 FINAL est_tokens_per_iter=" +
                 iterMlxTokens.map { String($0) }
                     .joined(separator: ","))
         }
