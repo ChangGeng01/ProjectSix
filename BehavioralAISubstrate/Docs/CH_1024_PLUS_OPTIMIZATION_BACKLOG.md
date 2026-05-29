@@ -150,18 +150,25 @@ These are NOT priority over the existing Tier 1-3 work — they're added here fo
 
 ## Open findings — ranked by tractability × impact
 
-### Tier 1: ship-ready data-driven flaky fixes(estimated 1-2 hr work each)
+### Tier 1: ship-ready data-driven flaky fixes(best-of-3 mirror)
 
-| # | Chapter | Finding | Impact | Tractability |
+**ch 1037 SCOPE CORRECTION(2026-05-29):the original "4 flaky tests"
+estimate was WRONG。 Inspecting the files found ~12 perf tests across
+4 files,not 4。** Renumbered to ch 1037.x(the old ch 1025.0-.3 numbers
+were consumed by ch 1025.4-.9)。
+
+| # | Chapter | Test(s) | Count | Status |
 |---|---|---|---|---|
-| 1 | ch 1025.0 | ch 956.6 fabric merge perf bench 4 flaky tests | MED — fabric perf gate | best-of-3 mirror pattern |
-| 2 | ch 1025.1 | ch 869 testMPSGraphTimingMediumShape 1 flaky | LOW | same pattern |
-| 3 | ch 1025.2 | ch 806 testL6BatchFasterThanPerCall 1 flaky | LOW | same pattern |
-| 4 | ch 1025.3 | ch 905 testBenchmarkEventLogAppend100 1 flaky | LOW | same pattern |
+| 1 | **ch 1037.0** | ch 806 `testL6BatchFasterThanPerCall`(ratio ≥3×) | 1 | ✅ **DONE,swift-test-verified** — best-of-3 max-ratio,result 34.8× |
+| 2 | ch 1037.1 | ch 869 `testMPSGraphTimingMediumShape` + 1 sibling(`mps < std×10` upper bound) | 2 | TODO — best-of-3 min(mps)/max(std);measure block at line 309 + 380 |
+| 3 | ch 1037.2 | ch 905 `testBenchmarkEventLogAppend100` + `…Append1000`(via `runEventLogBenchmark` helper) | 2 | TODO — fix inside the shared helper,covers both |
+| 4 | ch 1037.3 | ch 956.6 `testMergeEnginePerf_{singleton,typical8,high32,critic128,pathological512}` + `testMergeApplyPerf_{typical8,high32}`(all `p99 < threshold`) | **7** | TODO — best-of-3 min(p99)across trials;already measures p99 internally |
 
-These are mechanical mirrors of ch 1023.0/ch 1024.0 best-of-3 pattern。
-Each ~30 min work,~150 lines edit。 Total <2 hr,but should ship
-ONE PER CHAPTER with audit not bundled to avoid class-h trap。
+best-of-3 "best" differs per assertion:max-ratio(806)/ min-mps+max-std
+(869)/ min-latency(905)/ min-p99(956.6)— NOT a pure mechanical mirror。
+ch 1037.0 demonstrated the ratio variant(verified)。 Remaining ~11 tests
+ship ch 1037.1-.3,one file per chapter(Mac `swift test`,SPM-independent
+so NOT exposed to the competing-xcodebuild risk that hit device runs)。
 
 ### Tier 2: real device gap investigations(estimated 2-4 hr each)
 
