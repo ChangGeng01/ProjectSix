@@ -651,10 +651,10 @@ final class BASEnduranceAppController: ObservableObject {
             let sortedDurMs = iterDurationMs.sorted()
             let avgDurMs = iterDurationMs.reduce(0, +)
                 / Double(iterDurationMs.count)
-            let p50DurMs = sortedDurMs[sortedDurMs.count / 2]
-            let p99DurMs = sortedDurMs[min(
-                sortedDurMs.count - 1,
-                Int(Double(sortedDurMs.count) * 0.99))]
+            let p50DurMs = sortedDurMs[Self.nearestRankIndex(
+                0.5, count: sortedDurMs.count)]
+            let p99DurMs = sortedDurMs[Self.nearestRankIndex(
+                0.99, count: sortedDurMs.count)]
             let sortedMlxLat = allMlxLatenciesMs.sorted()
             let avgMlxMs = sortedMlxLat.isEmpty
                 ? 0
@@ -662,17 +662,24 @@ final class BASEnduranceAppController: ObservableObject {
                     / Double(allMlxLatenciesMs.count)
             let p50MlxMs = sortedMlxLat.isEmpty
                 ? 0
-                : sortedMlxLat[sortedMlxLat.count / 2]
+                : sortedMlxLat[Self.nearestRankIndex(
+                    0.5, count: sortedMlxLat.count)]
             let p99MlxMs = sortedMlxLat.isEmpty
                 ? 0
-                : sortedMlxLat[min(
-                    sortedMlxLat.count - 1,
-                    Int(Double(sortedMlxLat.count) * 0.99))]
+                : sortedMlxLat[Self.nearestRankIndex(
+                    0.99, count: sortedMlxLat.count)]
             let avgRssBefore = iterRssBefore.reduce(0, +)
                 / Double(iterRssBefore.count)
             let avgRssAfter = iterRssAfter.reduce(0, +)
                 / Double(iterRssAfter.count)
-            let rssGrowthMB = (iterRssAfter.last ?? 0)
+            // ch 1025.9 HIGH-2 fix:`last − first` endpoint delta hides
+            // intra-run leaks(peak mid-run then reclaimed by cooldown
+            // GC reads as negative "growth")。 Also report max + peak-
+            // vs-first so a reclaimed-late leak stays visible。
+            let rssEndpointDeltaMB = (iterRssAfter.last ?? 0)
+                - (iterRssBefore.first ?? 0)
+            let rssMaxMB = iterRssAfter.max() ?? 0
+            let rssPeakVsFirstMB = rssMaxMB
                 - (iterRssBefore.first ?? 0)
 
             await emitBoth(String(format:
@@ -695,8 +702,10 @@ final class BASEnduranceAppController: ObservableObject {
                 "📊 ch1025 FINAL memory " +
                 "avg_rss_before_mb=%.1f " +
                 "avg_rss_after_mb=%.1f " +
-                "total_rss_growth_mb=%.1f",
-                avgRssBefore, avgRssAfter, rssGrowthMB))
+                "endpoint_delta_mb=%.1f " +
+                "rss_max_mb=%.1f peak_vs_first_mb=%.1f",
+                avgRssBefore, avgRssAfter, rssEndpointDeltaMB,
+                rssMaxMB, rssPeakVsFirstMB))
             await emitBoth(
                 "📊 ch1025 FINAL thermal_trajectory=" +
                 iterThermalAfter.joined(separator: ","))
@@ -731,13 +740,26 @@ final class BASEnduranceAppController: ObservableObject {
         }
     }
 
+    /// ch 1025.9 MED-1 fix:nearest-rank percentile index。 1-based
+    /// rank = ceil(p×N),0-based index = rank−1,clamped [0, N−1]。
+    /// For N=100:p50→idx49(50th elem),p99→idx98(99th)。 Pre-fix used
+    /// `count/2`(→idx50=51st≈p51)and `Int(count×0.99)`(→idx99=MAX),
+    /// both biased the tail high。
+    private nonisolated static func nearestRankIndex(
+        _ p: Double, count: Int
+    ) -> Int {
+        guard count > 0 else { return 0 }
+        let rank = Int((Double(count) * p).rounded(.up))
+        return max(0, min(count - 1, rank - 1))
+    }
+
     private nonisolated func formatSnap(
         _ s: SystemSnapshot, iter: Int, phase: String
     ) -> String {
         return String(format:
             "📊 ch1025 sys iter=%d phase=%@ thermal=%@ " +
             "low_power=%d active_cpu=%d/%d " +
-            "rss_mb=%.1f footprint_mb=%.1f " +
+            "rss_mb=%.1f vsize_mb=%.1f " +
             "avail_mb=%d mono_ns=%llu",
             iter, phase, s.thermalState,
             s.isLowPowerMode ? 1 : 0,

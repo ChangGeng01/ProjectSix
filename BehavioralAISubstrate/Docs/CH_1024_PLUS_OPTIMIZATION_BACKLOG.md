@@ -306,6 +306,30 @@ none touch shipped substrate。
 | L1 | LOW | `snapshot()` labels `info.virtual_size` as `footprint_mb` — virtual size ≠ phys_footprint。 10hr report's footprint column is mislabeled(virtual,which is huge ~404 GB-range, obviously not footprint) | Either relabel `vsize_mb`,or switch to `task_vm_info`'s `phys_footprint`(the real footprint metric) |
 | LOW-2 | LOW | ch 1027 fnv `non_constant = probeHash != offsetBasis` is a WEAK proof of "real compute"(a stub returning any fixed non-basis constant passes)。 Verdict is still SOUND because `emptyOK`(known offset basis)+ 8/8 ABI gate it,but the per-line comment overstates what that one check proves | Assert `probeHash == <precomputed FNV-1a of "ch1027-rust-verify">`(known-good value),matching the rigor of the empty-input check |
 
+### ch 1025.9 update(2026-05-29,device-verified)
+
+5 of the 7 deferred findings fixed + device-verified on iPhone Air A19:
+- **HIGH-2**:FINAL now emits `endpoint_delta_mb` + `rss_max_mb` +
+  `peak_vs_first_mb`(verified:peak_vs_first 20.2 > endpoint 8.9 — max
+  catches what the endpoint diff alone misses)。
+- **MED-1**:`nearestRankIndex` helper — p50/p99 now nearest-rank
+  `ceil(p×N)−1`,no longer biased high(p99 no longer just MAX)。
+- **#5**:`probesStarted` @State guard — ch 1027/1034 probes run once
+  per process even if onAppear re-fires。
+- **L1**:`footprint_mb`→`vsize_mb`(honest — it was always virtual_size,
+  ~400 GB-range,obviously not footprint)。
+- **LOW-2**:fnv check now asserts the canonical FNV-1a 64 vector
+  `fnv("a")==0xaf63dc4c8601ec8c`(device-verified EXACT match → proves
+  BAS Rust fnv == standard FNV-1a,not just "≠ basis")。
+
+Remaining 2 → **ch 1025.10**(risk-managed sequencing,NOT skipped):
+- **#4**(Task.detached MainActor-pin):needs full re-review of every
+  `self.@MainActor` access if `runEndurance` goes nonisolated —
+  moderate risk,LOW impact(10hr run completed),warrants a fresh session。
+- **MED-mono**(wall-clock→monotonic):mechanical but ~14 call sites
+  (runStart/iterStart/brainStart/mlxStart/…)— deferred to do carefully
+  in one pass,not at the tail of an already-long session。
+
 ### Honest note on the 10hr endurance report
 
 `Docs/CH_1025_7_ENDURANCE_FINAL_REPORT.md` headline "247,133 tokens" is

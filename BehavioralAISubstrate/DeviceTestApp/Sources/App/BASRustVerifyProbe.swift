@@ -129,13 +129,21 @@ enum BASRustVerifyProbe {
             "expected=0x%016llx ok=%@",
             emptyHash, fnvOffsetBasis, emptyOK ? "true" : "false"))
 
-        let probeData = Data("ch1027-rust-verify".utf8)
-        let probeHash = BASAgentFabricBridge.fnv1a64(probeData)
-        let computeOK = probeHash != fnvOffsetBasis
+        // ch 1025.9 LOW-2 fix:replaced the weak `!= offsetBasis` check
+        // (a stub returning any fixed non-basis constant would pass)
+        // with a KNOWN-GOOD standard FNV-1a 64 test vector。 FNV-1a 64
+        // of "a" = 0xaf63dc4c8601ec8c(canonical vector)。 Asserting the
+        // exact value proves real + CORRECT FNV compute,not just
+        // "differs from basis"。 If this fails,BAS fnv1a64 diverges
+        // from standard FNV-1a(itself a finding)。
+        let knownInput = Data("a".utf8)
+        let knownExpected: UInt64 = 0xaf63_dc4c_8601_ec8c
+        let knownHash = BASAgentFabricBridge.fnv1a64(knownInput)
+        let computeOK = knownHash == knownExpected
         emit(String(format:
-            "📊 ch1027 rust_verify fnv1a64_probe=0x%016llx " +
-            "non_constant=%@",
-            probeHash, computeOK ? "true" : "false"))
+            "📊 ch1027 rust_verify fnv1a64_a=0x%016llx " +
+            "expected=0x%016llx ok=%@",
+            knownHash, knownExpected, computeOK ? "true" : "false"))
 
         // ── VERDICT
         let allOK = auditOK && matched == 8 && emptyOK && computeOK

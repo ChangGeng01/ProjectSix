@@ -49,6 +49,8 @@ struct ContentView: View {
     @State private var fabricStatus: String = "probing…"
     @State private var rustVerify: String = "probing…"
     @State private var mpsgraphVerify: String = "probing…"
+    // ch 1025.9 #5 fix:guard probes against onAppear re-fire。
+    @State private var probesStarted = false
     @StateObject private var endurance =
         BASEnduranceAppController.shared
 
@@ -96,16 +98,21 @@ struct ContentView: View {
             } else {
                 fabricStatus = "disabled"
             }
-            // ch 1027:on-device Rust verify — runs every launch,
-            // proves Rust symbols resolve + execute on iPhone(not
-            // just present in the binary)。 Microsecond-level extern
-            // "C" calls,safe to run synchronously。
-            rustVerify = BASRustVerifyProbe.run()
-            // ch 1034:on-device MPSGraph kernel exercise — async
-            // (kernel evaluate is async)。 Serial,runs once at boot,
-            // never concurrent with MLX(no GPU contention)。
-            Task {
-                mpsgraphVerify = await BASMPSGraphProbe.run()
+            // ch 1027 + 1034:on-device Rust + MPSGraph probes。
+            // ch 1025.9 #5 fix:`onAppear` can fire repeatedly(view
+            // re-appear / app backgrounding)。 Guard so probes run
+            // ONCE per process — without it,a re-fire re-runs the Rust
+            // probe AND re-spawns the MPSGraph Task,overlapping GPU
+            // dispatch with a still-running prior invocation。
+            if !probesStarted {
+                probesStarted = true
+                // Rust verify:microsecond extern "C" calls,sync-safe。
+                rustVerify = BASRustVerifyProbe.run()
+                // MPSGraph:async(kernel evaluate)。 Serial,never
+                // concurrent with MLX(no GPU contention)。
+                Task {
+                    mpsgraphVerify = await BASMPSGraphProbe.run()
+                }
             }
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
             // the endurance loop。 No-op otherwise(legacy
