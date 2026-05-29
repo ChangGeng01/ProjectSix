@@ -475,13 +475,12 @@ final class BASEnduranceAppController: ObservableObject {
             "📊 ch1025 inventory " +
             "exercised=mlx_gemma4_E2B_4bit+" +
             "coreml_BASContextClassifier_18Kparams+" +
-            "L1_to_L14_cascade+L8_LRU_bounded " +
+            "L0_to_L14_cascade_all14_surfaced(ch1025.13)+" +
+            "L8_LRU_bounded " +
             "nyi=fabric_runTurn(ch1025.6)+" +
-            "iOS_Rust_dylib(ch1027)+" +
-            "mamba_SSM_runMambaScan(ch1028)+" +
-            "ANE_direct_invocation(ch1029)+" +
-            "MPSGraph_kernel_rotation(ch1030)+" +
-            "multi_organ_rotation(ch1031)")
+            "mamba_SSM_runMambaScan(ch1033)+" +
+            "ANE_utilization_pct(WONTDO_iOS_sandbox)+" +
+            "multi_organ_rotation(ch1036)")
 
         var iterDurationMs: [Double] = []
         var iterMlxTokens: [Int] = []
@@ -948,7 +947,7 @@ final class BASEnduranceAppController: ObservableObject {
                 iter, prompt, preview))
         }
 
-        // ── L13 host gate + emergency brake ────────────────────
+        // ── L14 host gate + sovereign verdict ──────────────────
         let svPresent = tr.sovereignVerdict != nil
             ? "true" : "false"
         await emitBoth(String(format:
@@ -961,5 +960,69 @@ final class BASEnduranceAppController: ObservableObject {
             tr.sovereignWarrants.count,
             tr.sovereignCommitTokens.count,
             tr.updateTickets.count))
+
+        // ── ch 1025.13 — the 4 layers the original probe MISSED ──
+        // (honest-mode self-audit found instrumentation was ~9/14
+        // layers — these close the gap so "14-layer" is real)。
+
+        // L0 device/lifecycle frame(budget + wake + vital)
+        let bf = tr.budgetFrame
+        let vs = tr.vitalState
+        await emitBoth(String(format:
+            "🧠 ch1025 L0frame iter=%d prompt=%d " +
+            "run_mode=%@ max_loops=%d max_cands=%d " +
+            "max_decode=%d wake=%@ " +
+            "survival=%.2f thermal_margin=%.2f " +
+            "power_margin=%.2f continuity=%.2f stability=%.2f",
+            iter, prompt,
+            bf.runMode.rawValue, bf.maxLoops, bf.maxCandidates,
+            bf.maxDecodeTokens,
+            String(describing: tr.wakeIntent),
+            vs.survivalMargin, vs.thermalMargin,
+            vs.powerMargin, vs.continuityScore, vs.stabilityScore))
+
+        // L1 run lease(budget envelope for the turn)
+        if let lease = tr.runLease {
+            await emitBoth(String(format:
+                "🧠 ch1025 L1lease iter=%d prompt=%d " +
+                "allowed_mode=%@ max_loops=%d max_ms=%d " +
+                "energy_quota=%.2f valid_heads=%d",
+                iter, prompt,
+                lease.allowedMode.rawValue, lease.maxLoops,
+                lease.maxMs, lease.maxEnergyQuota,
+                lease.validHeads.count))
+        } else {
+            await emitBoth(
+                "🧠 ch1025 L1lease iter=\(iter) " +
+                "prompt=\(prompt) lease=nil")
+        }
+
+        // L5 host constitution(identity/value spine)
+        if let hc = tr.hostConstitution {
+            await emitBoth(String(format:
+                "🧠 ch1025 L5host iter=%d prompt=%d " +
+                "constitution_id=%@ active_version=%@",
+                iter, prompt,
+                hc.constitutionID, hc.activeVersion))
+        } else {
+            await emitBoth(
+                "🧠 ch1025 L5host iter=\(iter) " +
+                "prompt=\(prompt) constitution=nil")
+        }
+
+        // L13 host version tree(evolution lineage)
+        if let vt = tr.hostVersionTree {
+            await emitBoth(String(format:
+                "🧠 ch1025 L13vtree iter=%d prompt=%d " +
+                "active=%@ versions=%d pending=%d frozen=%d",
+                iter, prompt,
+                vt.activeVersionID, vt.versions.count,
+                vt.pendingCandidateIDs.count,
+                vt.frozenVersionIDs.count))
+        } else {
+            await emitBoth(
+                "🧠 ch1025 L13vtree iter=\(iter) " +
+                "prompt=\(prompt) version_tree=nil")
+        }
     }
 }
