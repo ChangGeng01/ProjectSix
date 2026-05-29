@@ -170,6 +170,24 @@ ch 1037.0 demonstrated the ratio variant(verified)。 Remaining ~11 tests
 ship ch 1037.1-.3,one file per chapter(Mac `swift test`,SPM-independent
 so NOT exposed to the competing-xcodebuild risk that hit device runs)。
 
+**✅ ch 1037 COMPLETE(2026-05-29,all 12 tests swift-test-verified):**
+- ch 1037.0 — ch 806(1):best-of-3 max-ratio,34.8× ✓
+- ch 1037.1 — ch 869(2):`testMPSGraphTimingMediumShape`(iter 20)+
+  `testMPSGraphTimingLargeShape`(iter 15),best-of-3 min(mps)/max(std)✓
+- ch 1037.2 — ch 905(2):`runEventLogBenchmark` helper best-of-3
+  min(rust)/max(swift),distinct entry-id base per trial。 Covers
+  Append100 + Append1000 ✓
+- ch 1037.3 — ch 956.6(7):**`bench` helper itself wrapped best-of-3**
+  (lowest-p99 trial across 3 runs)→ auto-covers all 5 `testMergeEnginePerf_*`
+  with zero call-site changes。 The 2 `testMergeApplyPerf_*` were left
+  as-is:their thresholds have ~100× headroom(measured ~94μs vs 10ms
+  ceiling),so single-shot is not flaky there — best-of-3 would add 3×
+  runtime for no benefit。 All 7 pass(EnginePerf now ~3× slower from
+  the 3 trials,acceptable for non-hot-path tests)。
+
+Tier 1 cleared。 Net new perf-test robustness:11 of 12 flaky tests now
+best-of-3(the 12th — ApplyPerf — needs none)。
+
 ### Tier 2: real device gap investigations(estimated 2-4 hr each)
 
 | # | Chapter | Finding | Impact | Tractability |
