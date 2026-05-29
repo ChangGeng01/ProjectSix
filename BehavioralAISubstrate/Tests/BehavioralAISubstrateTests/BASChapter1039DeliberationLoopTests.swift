@@ -262,6 +262,23 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
                 "refinement is a single non-accumulating +bonus," +
                 " not graduated by pass count")
         }
+        // Deep-audit refinement: the +bonus is NOT fully inert — it
+        // propagates to `confidenceFloor` (= min over candidates of
+        // confidence − penalties), which the risk path DOES consume
+        // (RiskService `if confidenceFloor < 0.55`, supportLevel). It
+        // is "telemetry-consequential": the signal changes…
+        if let onFloor = on.thoughtFrame.uncertaintyLedger?.confidenceFloor,
+           let offFloor = off.thoughtFrame.uncertaintyLedger?.confidenceFloor {
+            XCTAssertEqual(onFloor, min(1.0, offFloor + bonus),
+                accuracy: 1e-9,
+                "the +bonus propagates to confidenceFloor (a" +
+                " risk-consumed signal), so the loop is NOT fully inert")
+        }
+        // …but for these candidate values it stays sub-threshold, so
+        // the risk OUTCOME is unchanged — decision-inert IN PRACTICE.
+        XCTAssertEqual(on.riskCard.riskLevel, off.riskCard.riskLevel,
+            "the propagated +bonus is sub-threshold here → the risk" +
+            " OUTCOME (riskLevel) is unchanged: decision-inert in practice")
     }
 
     // MARK: - Coverage gaps closed by the ch1039 deep audit

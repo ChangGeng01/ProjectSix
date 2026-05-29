@@ -261,10 +261,24 @@ structural reasons, both traced to exact code:
    (`EBrainHostRuntime+TriSelfService.swift`), which clamps confidence at
    `confidenceCeiling` (0.64). The default `proposePaths` confidences are
    already at/above 0.64, so the +0.05 is clipped → net `mergedScore`
-   delta = 0. `calibrateRisk` reads neither candidate confidence nor
-   `mergedScore` magnitude (only the `veto` boolean + `reversibility`).
-   `stabilityScore` / `supportLevel` / `confidenceBand` / `hostGateValue`
-   are write-only reported fields that no `if`/`guard`/`switch` consumes.
+   delta = 0. So **selection** is unchanged.
+
+**Correction (deeper grounding, empirically confirmed ch1039).** The
+round-2 "decision-inert" claim was over-stated for the RISK path. The
++0.05 is NOT fully write-only: `buildUncertaintyLedger` computes
+`confidenceFloor = min over candidates of (confidence − penalties)`, so
+the uniform +0.05 raises `confidenceFloor` by +0.05 — and `calibrateRisk`
+DOES consume it (`if ledger.confidenceFloor < 0.55 { riskIncrement +=
+0.03 }`, RiskService `:671`; and `supportLevel`, `:302`). The
+integration test now pins both halves: `on.confidenceFloor ==
+off.confidenceFloor + 0.05` (the signal changes), AND `on.riskLevel ==
+off.riskLevel` (it stays sub-threshold — default floor ≈0.27 vs the 0.55
+gate — so the risk OUTCOME is unchanged). Accurate status: the loop is
+**telemetry-consequential but sub-threshold → decision-inert *in
+practice* for default candidate values.** Near a threshold (a base floor
+in [0.50, 0.55)) the same +0.05 WOULD flip the `:671` risk increment —
+so the wiring already exists; it is the loop's *effect size + signal
+choice* that is inert, not the consumer.
 
 Combined with the non-accumulating saturation (pass N≥2 is byte-identical
 to pass 2 — the loop is idempotent once candidate IDs stabilize), a
