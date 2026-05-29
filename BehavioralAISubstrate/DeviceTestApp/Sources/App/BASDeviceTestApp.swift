@@ -49,6 +49,7 @@ struct ContentView: View {
     @State private var fabricStatus: String = "probing…"
     @State private var rustVerify: String = "probing…"
     @State private var mpsgraphVerify: String = "probing…"
+    @State private var mambaVerify: String = "probing…"  // ch 1033
     // ch 1025.9 #5 fix:guard probes against onAppear re-fire。
     @State private var probesStarted = false
     @StateObject private var endurance =
@@ -76,6 +77,12 @@ struct ContentView: View {
                 .padding(.horizontal)
             // ch 1034:on-device MPSGraph kernel verdict surface
             Text("MPSGraph: \(mpsgraphVerify)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            // ch 1033:on-device Mamba SSM verdict surface
+            Text("Mamba: \(mambaVerify)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -112,6 +119,9 @@ struct ContentView: View {
                 // concurrent with MLX(no GPU contention)。
                 Task {
                     mpsgraphVerify = await BASMPSGraphProbe.run()
+                    // ch 1033:Mamba SSM after MPSGraph(serial,
+                    // same Task → never overlap GPU dispatch)。
+                    mambaVerify = await BASMambaProbe.run()
                 }
             }
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
