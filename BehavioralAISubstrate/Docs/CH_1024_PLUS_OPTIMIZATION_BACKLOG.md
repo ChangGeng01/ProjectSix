@@ -175,7 +175,7 @@ ONE PER CHAPTER with audit not bundled to avoid class-h trap。
 
 | # | Chapter arc | Finding | Impact | Tractability |
 |---|---|---|---|---|
-| 8 | ch 1027 arc | iOS Rust dylib wire | HIGH — recovers 32 Cognitive Brain tests on device | major infra(cargo iOS lipo + codesigning + xcodegen)|
+| 8 | ch 1027 arc | iOS Rust dylib wire | HIGH — recovers 32 Cognitive Brain tests on device | ✅ **DONE ch1027(2026-05-29)** — audit found already-built(ios-arm64 slice committed since ch707/M2191);`nm` confirms debug.dylib has all `bas_*` symbols(`T` defined,not `U`,no SPM dead-strip);on-device `BASRustVerifyProbe` VERDICT **all_ok=true**(0 audit mismatches incl bundle 24-crate count + 8/8 namespace ABI match + fnv1a64 real-compute `0x2f41f83720730719` ≠ offset basis)。 Was verify-only ~150 LOC single-session,NOT the multi-session infra this row assumed。 NOTE:proves Rust RUNTIME resolves + executes;the "32 Cognitive Brain tests" recovery ADDITIONALLY needs ch 1028 Swift-Testing iOS bundle enumeration to actually run them via xcodebuild test。|
 | 9 | ch 1028 arc | Swift Testing iOS bundle enumeration | MED — recovers 48 @Suite tests on device | Apple-side SwiftPM iOS test config |
 | 10 | ch 1029.0 | Kernel crash BASKernelDispatchEndToEndRealKernelTests | HIGH(real device bug)| lldb attach device + print scaffolding |
 | 11 | ch 1029.1 | NSXPCConnection iter-isolation leak(Mac SwiftData)| LOW | SwiftData iter cleanup hooks |

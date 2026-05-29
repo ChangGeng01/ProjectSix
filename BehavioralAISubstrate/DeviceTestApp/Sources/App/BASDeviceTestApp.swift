@@ -47,6 +47,7 @@ struct BASDeviceTestApp: App {
 
 struct ContentView: View {
     @State private var fabricStatus: String = "probing…"
+    @State private var rustVerify: String = "probing…"
     @StateObject private var endurance =
         BASEnduranceAppController.shared
 
@@ -64,6 +65,12 @@ struct ContentView: View {
             Text("Fabric: \(fabricStatus)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+            // ch 1027:on-device Rust verify verdict surface
+            Text("Rust: \(rustVerify)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
             // ch 1025.4:endurance autostart status surface
             Text("Endurance: \(endurance.status.label)")
                 .font(.caption2)
@@ -82,6 +89,11 @@ struct ContentView: View {
             } else {
                 fabricStatus = "disabled"
             }
+            // ch 1027:on-device Rust verify — runs every launch,
+            // proves Rust symbols resolve + execute on iPhone(not
+            // just present in the binary)。 Microsecond-level extern
+            // "C" calls,safe to run synchronously。
+            rustVerify = BASRustVerifyProbe.run()
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
             // the endurance loop。 No-op otherwise(legacy
             // xcodebuild test mode still works because the
