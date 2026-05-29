@@ -678,3 +678,28 @@ Still scaffold/deferred:the DANGEROUS direction (caution-DOWN / changed
 selection) is sovereign-gated (ADR-019 §4 P1.5b);and the per-pass
 *refinement quality* (making N passes genuinely resolve more,not just
 the opt-in MODE) is the separate substantive-refinement step。
+
+### ch 1041 — loop now changes the ACTION (reversibility-tilt, opt-in, SAFE)
+
+The opt-in loop now changes the SELECTED candidate (not just the risk
+assessment)。 `applyReversibilityTilt`
+(`EBrainHostRuntime+TriSelfService.swift`,in `mergeChoice` after the
+score-winner)：on a genuinely-uncertain turn it breaks near-ties
+(`reversibilityTiltCap` 0.05) toward the MORE-reversible non-vetoed
+candidate。
+
+- **deliberation → safer action** — ✅ WIRED + CONSEQUENTIAL (opt-in)。
+  Flips `mergedChoice.candidateID` (high-risk:bounded 0.86 → reflective
+  0.91 reversibility);the binding re-derives for the new winner →
+  survives。 The FIRST lever that changes the action,not just the
+  assessment。 Survives the clamps that defeated prior attempts
+  (reversibility not ceiling-clamped;selection-time not binding-halved;
+  not a candidate-list change)。
+- Monotonic-toward-conservative (only ever a STRICTLY more-reversible
+  choice → not-less-safe);`path.direct` stays vetoed;permit only
+  ratchets stricter。 Flag-off → byte-equal。
+- Substantive per-pass resolution remains INFEASIBLE (deterministic loop
+  + signal-count memory,ADR-019 §12) — out of scope。
+
+Verified:`testActivatesAndRefines…` (tilt+caution compose),ch1039 8/8,
+full sweep 14,656 / 0 flag-off。

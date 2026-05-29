@@ -17,6 +17,56 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
     let currentBrain: BASHostCurrentBrain
     let tuning: BASEBrainRuntimeSynthesisPolicy
     let hostConstitution: BASHostConstitution?
+    // chapter 一千零四十一 / ADR-019 — OPT-IN reversibility-tilt gate.
+    // Default false so every other construction stays byte-equal; only
+    // the `makeEBrainTurn` seam (which has the coordinator's
+    // `deliberationLoopEnabled` in scope) sets it true. When true, a
+    // genuinely-uncertain turn breaks near-ties toward the MORE-
+    // reversible (safer) candidate. See `applyReversibilityTilt`.
+    var deliberationLoopEnabled: Bool = false
+
+    /// chapter 一千零四十一 / ADR-019 — reversibility-tilt. When the
+    /// opt-in deliberation loop runs on a genuinely-uncertain turn,
+    /// prefer the MORE-reversible non-vetoed candidate over the
+    /// score-winner IF it is within a near-tie (`reversibilityTiltCap`).
+    /// Monotonic-toward-conservative: only ever switches to a STRICTLY
+    /// more-reversible option (reversibility is the substrate's own
+    /// conservatism axis → "more reversible" = not-less-safe), and the
+    /// new winner's lower irreversibility flows through the binding
+    /// re-derivation. Operates on reversibility (NOT confidence → not
+    /// ceiling-clamped) at selection time (NOT pre-binding → not halved),
+    /// so it survives the clamps that defeated prior consequential
+    /// attempts (ADR-019 §9/§10). Returns the score-winner unchanged when
+    /// the flag is off OR the turn is not genuinely uncertain → byte-equal.
+    private func applyReversibilityTilt(
+        _ scoreWinner: BASTriSelfScore?,
+        nonVetoScores: [BASTriSelfScore],
+        thoughtFrame: BASThoughtFrame
+    ) -> BASTriSelfScore? {
+        guard deliberationLoopEnabled, let winner = scoreWinner else {
+            return scoreWinner
+        }
+        guard BASDeliberationCaution.isGenuinelyUncertain(
+            confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
+            maxEvidenceDebt: thoughtFrame.evidenceDebts?.map(\.debtWeight).max(),
+            leaseEnded: thoughtFrame.convergenceCertificate?
+                .stoppingMode == .leaseEnd
+        ) else { return scoreWinner }
+        guard let winnerCandidate = thoughtFrame.candidates.first(
+            where: { $0.candidateID == winner.candidateID }
+        ) else { return scoreWinner }
+        let nonVetoIDs = Set(nonVetoScores.map(\.candidateID))
+        guard let mostReversible = thoughtFrame.candidates
+            .filter({ nonVetoIDs.contains($0.candidateID) })
+            .max(by: { $0.reversibility < $1.reversibility }),
+            mostReversible.reversibility > winnerCandidate.reversibility,
+            let mostReversibleScore = nonVetoScores.first(
+                where: { $0.candidateID == mostReversible.candidateID }),
+            winner.mergedScore - mostReversibleScore.mergedScore
+                <= BASDeliberationCaution.reversibilityTiltCap
+        else { return scoreWinner }
+        return mostReversibleScore
+    }
 
     func mergeChoice(
         thoughtFrame: BASThoughtFrame,
@@ -87,12 +137,21 @@ struct BASHostRuntimeEBrainTriSelfService: BASTriSelfServicing {
                 .flatMap { $0.vetoReasonCodes }
         )
         let nonVetoScores = scores.filter { !$0.veto }
-        let selectedScore: BASTriSelfScore?
+        let scoreWinner: BASTriSelfScore?
         if let preferredScore = nonVetoScores.max(by: isLowerMergedScore(_:_:)) {
-            selectedScore = preferredScore
+            scoreWinner = preferredScore
         } else {
-            selectedScore = scores.max(by: isLowerMergedScore(_:_:))
+            scoreWinner = scores.max(by: isLowerMergedScore(_:_:))
         }
+        // ch1041 / ADR-019 — reversibility-tilt (OPT-IN, safe): on a
+        // genuinely-uncertain turn the opt-in deliberation loop breaks
+        // near-ties toward the MORE-reversible (safer) candidate.
+        // Identity when the flag is off → byte-equal.
+        let selectedScore = applyReversibilityTilt(
+            scoreWinner,
+            nonVetoScores: nonVetoScores,
+            thoughtFrame: thoughtFrame
+        )
 
         let selectedCandidate = thoughtFrame.candidates.first {
             $0.candidateID == selectedScore?.candidateID

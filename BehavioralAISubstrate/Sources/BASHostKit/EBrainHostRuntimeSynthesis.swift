@@ -322,7 +322,11 @@ extension BASHostRuntime {
                 request: request,
                 currentBrain: enforcedCurrentBrain,
                 tuning: configuration.runtimeTuning,
-                hostConstitution: resolvedConstitution
+                hostConstitution: resolvedConstitution,
+                // chapter 一千零四十一 / ADR-019 — opt-in reversibility-
+                // tilt. Sync host path only; default-false elsewhere →
+                // byte-equal.
+                deliberationLoopEnabled: deliberationLoopEnabled
             ),
             riskService: BASHostRuntimeEBrainRiskService(
                 request: request,

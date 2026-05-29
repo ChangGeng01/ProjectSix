@@ -264,3 +264,58 @@ per-pass *refinement quality* (making N passes genuinely resolve more, not just
 the flag) is the separate substantive-refinement step (§4). This slice makes
 "opt-in deliberation on an uncertain matter ⇒ a higher, sovereign-/audit-visible
 risk assessment + tighter assertion guardrail" real + verified.
+
+## 12. Substantive per-pass refinement — INFEASIBLE (ch1041)
+
+The natural next step ("make the N passes genuinely RESOLVE uncertainty, not just
+re-confirm") was investigated (two Explore agents, cross-checked) and found
+**infeasible without a major new capability**:
+- The loop service is **deterministic + information-poor**: `proposePaths`/
+  `forecast`/`critique` are pure functions of fixed inputs, so every pass
+  regenerates IDENTICAL candidates. There is no source of new information across
+  passes (no external query, no stochastic exploration).
+- **Memory has nothing to resolve against**: `BASMemoryAtom.summary` is signal
+  *counts* ("emotions=2, pressure=3", `BASMLMemoryService.swift:333`), retrieval
+  is Jaccard over signal-sets — not text matching. `requiredEvidence` are
+  hardcoded prompts ("Confirm the missing facts first.", `EBrainHostRuntime+
+  LoopService.swift:34`), never matched to memory.
+
+So genuine per-pass resolution would be **theater** (recording "resolved N" when
+nothing was). Making it real needs a knowledge-retrieval capability (matchable
+memory + retrieval + `requiredEvidence` reduction) the substrate lacks — a major
+separate project, NOT a loop refinement. **Reframe:** the loop is structurally a
+budget-counter + designed-bias applicator, not a "think-harder" engine, until an
+information source is added.
+
+## 13. Reversibility-tilt LANDED — the loop changes the ACTION (ch1041, SAFE)
+
+Frontier "surface more candidates" is clamp-defeated (high-risk already has all
+3; the egoScore confidence-ceiling absorbs any bias). But the **reversibility
+axis is consumed by selection UN-clamped**, so the consequential lever is a tilt
+at SELECTION time:
+
+In `mergeChoice` (`EBrainHostRuntime+TriSelfService.swift`, after the score-winner
+`:89-95`), when `deliberationLoopEnabled` AND the turn is genuinely uncertain,
+prefer the MORE-reversible non-vetoed candidate over the score-winner IF within a
+near-tie (`BASDeliberationCaution.reversibilityTiltCap = 0.05`). It only ever
+switches to a STRICTLY more-reversible option (`applyReversibilityTilt`) →
+monotonic-toward-conservative.
+
+**Why this survives where prior attempts died:** it operates on `reversibility`
+(NOT confidence → not ceiling-clamped, §9), at selection time (NOT pre-binding →
+not ×0.5-halved, §10), and is not a candidate-list change (not prefix/normalize-
+clamped). It flips `mergedChoice.candidateID` (canonical high-risk: bounded →
+reflective, 0.86 → 0.91 reversibility), and the binding re-derives FOR the new
+winner — so it survives. **This is the first lever that changes the host's
+ACTION (the selected candidate), not just the risk assessment.**
+
+Composes with P1.5a: on an uncertain turn the opt-in loop BOTH picks a more-
+reversible action (tilt) AND raises the assessment band (caution) — two safe
+effects. (They interact: the tilt's safer candidate has a slightly-lower binding,
+so on.totalRisk isn't off+0.06 exactly, but the band crossing still holds.)
+
+Safety: only ever selects a MORE-reversible non-vetoed candidate (reversibility =
+the substrate's own conservatism axis → not-less-safe); `path.direct` stays
+vetoed; downstream permit only ratchets stricter. Byte-equal when the flag is off.
+Verified: `testActivatesAndRefinesViaRealHostRuntimePath` (combined tilt+caution),
+ch1039 8/8, full sweep **14,656 / 0** flag-off.

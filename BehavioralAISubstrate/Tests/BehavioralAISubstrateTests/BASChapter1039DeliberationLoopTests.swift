@@ -288,15 +288,31 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
         XCTAssertEqual(on.riskCard.riskLevel, .high,
             "the opt-in deliberation caution crosses the band → high" +
             " (the loop is no longer decision-inert)")
-        XCTAssertEqual(on.riskCard.totalRisk,
-            min(1, off.riskCard.totalRisk
-                + BASDeliberationCaution.uncertainDeliberationRiskIncrement),
-            accuracy: 1e-9,
-            "caution adds exactly the bounded increment on the final" +
-            " bound card (NOT halved by the binding — see ADR-019 §10)")
+        XCTAssertGreaterThan(on.riskCard.totalRisk, off.riskCard.totalRisk,
+            "the deliberation caution raises totalRisk across the band" +
+            " (not asserted as off+0.06 exactly: the ch1041 tilt also" +
+            " fires, so the +0.06 lands on the more-reversible" +
+            " candidate's slightly-lower binding — see below)")
         XCTAssertTrue(
             on.riskCard.factors.contains("deliberation_uncertain_caution"),
             "the deliberation-caution factor is surfaced on the card")
+        // ch1041 — the reversibility-tilt ALSO fires here (same opt-in
+        // flag + uncertain turn): selection breaks the near-tie toward
+        // the MORE-reversible candidate, so `on` selects a different,
+        // SAFER candidate than `off`. The two safe effects compose:
+        // tilt (safer choice) + caution (higher assessment).
+        XCTAssertNotEqual(on.mergedChoice.candidateID,
+            off.mergedChoice.candidateID,
+            "the reversibility-tilt selects a different (safer) candidate")
+        let offSel = off.thoughtFrame.candidates.first {
+            $0.candidateID == off.mergedChoice.candidateID
+        }
+        let onSel = on.thoughtFrame.candidates.first {
+            $0.candidateID == on.mergedChoice.candidateID
+        }
+        XCTAssertGreaterThan(onSel?.reversibility ?? 0, offSel?.reversibility ?? 1,
+            "the tilt's choice is STRICTLY more reversible" +
+            " (monotonic-toward-conservative)")
         // Honest scope (verified by diagnostic): the escalation is at
         // the risk-ASSESSMENT level — riskLevel (above) + the assertion
         // guardrail tightens to "guarded". The action permit MODE is

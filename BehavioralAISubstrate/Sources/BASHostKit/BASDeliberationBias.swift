@@ -76,6 +76,17 @@ enum BASDeliberationCaution {
     /// (bands at 0.35 / 0.65 / 0.85). One-shot, bounded, caution-only.
     static let uncertainDeliberationRiskIncrement = 0.06
 
+    /// chapter 一千零四十一 / ADR-019 — reversibility-tilt near-tie
+    /// window. When the opt-in loop runs on a genuinely-uncertain turn,
+    /// the selection prefers a STRICTLY-more-reversible non-vetoed
+    /// candidate if it is within this `mergedScore` distance of the
+    /// score-winner (a near-tie → break toward the safer/more-reversible
+    /// option). Small enough to fire only on genuine near-ties; the
+    /// canonical high-risk bounded↔reflective gap is ~0.003, well within.
+    /// Monotonic-toward-conservative (only ever picks a MORE-reversible
+    /// option), so widening it can only make the host safer, never less.
+    static let reversibilityTiltCap = 0.05
+
     /// Genuine-uncertainty predicate reusing the signals the dream-loop
     /// already trusts (confidenceFloor < 0.55 OR maxEvidenceDebt >= 0.5
     /// OR stoppingMode == .leaseEnd; cf. RiskService court signals).
