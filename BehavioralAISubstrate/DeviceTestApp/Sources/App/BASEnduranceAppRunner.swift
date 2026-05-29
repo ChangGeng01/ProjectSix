@@ -96,6 +96,7 @@ import os
 import BASHostKit
 import BASMLXAdapter
 import BASOrgan
+import BASMemory  // ch 1025.6 — fabric roster/graph/runtime types
 
 // ch 1025.4 — Unified logging via `os.Logger`。 Swift `print()` does
 // NOT appear in iOS system log,which means `idevicesyslog` from
@@ -426,6 +427,71 @@ final class BASEnduranceAppController: ObservableObject {
             "📍 ch1025 BASCognitiveBrain loaded load_ms=%.0f",
             cognitiveBrainMs))
 
+        // ch 1025.6 — REAL fabric pipeline(closes the last
+        // self-audit gap:fabric was ALWAYS bypassed before)。
+        // Investigation(this chapter)found ch 1025.5's "needs 200
+        // LOC / 11 services / @testable" deferral was stale,exactly
+        // like the ch 1027 Rust misdiagnosis:all 10 `BASML*Service`
+        // are PUBLIC(Sources/BASHostKit),9 have no-arg `init()`,
+        // and `BASContextClassifierMLAdapter()` already works in-app
+        // (ch 1025.5.0)。 So the app CAN build a real coordinator +
+        // fabric runtime + 4-seat roster from public API in ~25 LOC。
+        // `pipeline.runTurn(...)` then fires per prompt fed by the
+        // turnResult fields brain.process() already produces。 Only
+        // active when BAS_AGENT_FABRIC=enabled(env gate inside
+        // runTurn);otherwise it returns activated=false(no behavior
+        // change — ADR-014 OPT-IN preserved)。
+        let fabricPipeline: BASAgentFabricHostPipeline?
+        do {
+            let fabricRuntime = BASAgentFabricRuntime(
+                roster: BASAgentTurnRoster(
+                    scout: BASAgentSpec(
+                        agentID: "scout.1", role: .scout,
+                        writeDomains: [.situationField],
+                        defaultLeaseProfile: .hotSeat,
+                        visibility: .high),
+                    planner: BASAgentSpec(
+                        agentID: "planner.1", role: .planner,
+                        writeDomains: [.candidateFrontier],
+                        defaultLeaseProfile: .hotSeat,
+                        visibility: .high),
+                    risk: BASAgentSpec(
+                        agentID: "risk.1", role: .risk,
+                        writeDomains: [.riskField],
+                        defaultLeaseProfile: .hotSeat,
+                        visibility: .high),
+                    surface: BASAgentSpec(
+                        agentID: "surface.1", role: .surface,
+                        writeDomains: [.renderFrame],
+                        defaultLeaseProfile: .hotSeat,
+                        visibility: .high)),
+                graph: BASSharedStateGraph())
+            let fabricCoordinator = try BASEBrainRuntimeCoordinator(
+                powerClockService: BASMLPowerClockService(),
+                hostProfileService: BASMLHostProfileService(),
+                contextService: BASMLContextService(
+                    adapter: BASContextClassifierMLAdapter()),
+                decomposeService: BASMLDecomposeService(),
+                memoryService: BASMLMemoryService(),
+                loopService: BASMLLoopService(),
+                triSelfService: BASMLTriSelfService(),
+                riskService: BASMLRiskService(),
+                actionService: BASMLActionService(),
+                evolutionService: BASMLEvolutionService(),
+                agentFabric: fabricRuntime)
+            fabricPipeline = BASAgentFabricHostPipeline(
+                coordinator: fabricCoordinator,
+                sessionID: "ch1025-endurance")
+            await emitBoth(
+                "📍 ch1025 fabric pipeline constructed " +
+                "(4-seat roster:scout/planner/risk/surface)")
+        } catch {
+            fabricPipeline = nil
+            await emitBoth(
+                "⚠️ ch1025 fabric pipeline construct failed=" +
+                "\(error) — falling back to bypass")
+        }
+
         // MLX model load
         await emitBoth(
             "📍 ch1025 MLXOrganAdapter loading Gemma 4 E2B")
@@ -548,26 +614,45 @@ final class BASEnduranceAppController: ObservableObject {
                     confStr,
                     String(describing: riskLevel),
                     candidateCount))
-                // ch 1025.5.5 audit HIGH-1:emit explicit fabric
-                // bypass marker per prompt so the syslog doesn't
-                // lie。 ContentView UI shows "Fabric: enabled (all)"
-                // because BAS_AGENT_FABRIC=enabled is in launch env,
-                // but `BASAgentFabricHostPipeline.runTurn` is NOT
-                // called from this runner — fabric coordination
-                // doesn't actually fire。 Pipeline integration is
-                // deferred to ch 1025.6(needs substrate
-                // `makeMinimalForEndurance(brain:adapter:)` factory
-                // — currently no public helper for app-target
-                // fabric assembly)。 Without this marker an operator
-                // reading the log would see "enabled" badge + brain
-                // lines and conclude fabric ran。 With this marker
-                // the truth is grep-able。
-                await emitBoth(String(format:
-                    "🪧 ch1025 fabric_activation=bypassed " +
-                    "iter=%d prompt=%d " +
-                    "reason=no_pipeline_in_runner " +
-                    "defer_to=ch_1025.6",
-                    iter, p + 1))
+                // ch 1025.6 — REAL fabric turn(replaces the ch
+                // 1025.5.5 bypass marker)。 fabric.runTurn() is now
+                // ACTUALLY called per prompt,fed by the turnResult
+                // fields brain.process() already produced(decompose
+                // frame + candidate paths + risk + triScores)。 The
+                // env gate(BAS_AGENT_FABRIC)lives INSIDE runTurn:
+                // enabled → fabric coordinates(activated=true);
+                // unset → returns activated=false with a skipReason
+                // (no behavior change,ADR-014 OPT-IN preserved)。 So
+                // the syslog now reports the TRUTH of whether fabric
+                // fired,not a hardcoded "bypassed"。
+                if let pipeline = fabricPipeline {
+                    do {
+                        let outcome = try await pipeline.runTurn(
+                            turnID: "ch1025-i\(iter)-p\(p)",
+                            decomposeFrame:
+                                turnResult.decomposeFrame,
+                            candidatePaths:
+                                turnResult.thoughtFrame.candidates,
+                            riskCard: turnResult.riskCard,
+                            triScores: turnResult.triScores)
+                        let skip = outcome.skipReason ?? "-"
+                        await emitBoth(String(format:
+                            "🪧 ch1025 fabric iter=%d prompt=%d " +
+                            "activated=%@ skip=%@",
+                            iter, p + 1,
+                            outcome.activated ? "true" : "false",
+                            skip))
+                    } catch {
+                        await emitBoth(
+                            "⚠️ ch1025 fabric iter=\(iter) " +
+                            "prompt=\(p+1) runTurn_error=\(error)")
+                    }
+                } else {
+                    await emitBoth(
+                        "🪧 ch1025 fabric iter=\(iter) " +
+                        "prompt=\(p+1) activated=false " +
+                        "skip=pipeline_construct_failed")
+                }
 
                 // ch 1025.7 — comprehensive turnResult instrumentation:
                 // emit 8+ detailed log lines covering all public
