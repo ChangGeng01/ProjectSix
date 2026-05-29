@@ -139,3 +139,40 @@ machinery (it shares the ADR-018 P4 gate).
   gate, `:677` evidenceDebt gate, `:302` supportLevel — the existing consumers)
 - `Sources/BASHostKit/EBrainHostRuntime+TriSelfService.swift` (`egoScore` ceiling
   `:42`, `scoreGap` agency threshold `:351` — P1.5b only, sovereign-gated)
+
+## 9. Architectural root cause — the substrate is clamp-dominated (ch1040)
+
+Scoping a *clean* P1.5a implementation surfaced WHY the loop resists becoming
+consequential, and it is not a loop defect — it is a pervasive substrate
+property. **The substrate clamps small perturbations at every decision seam**
+(a deliberate stability/safety feature — it resists small manipulations):
+
+- **Selection:** `egoScore` clamps candidate confidence at `confidenceCeiling`
+  (0.64); default candidates are already ≥0.64 → confidence above it is ignored.
+- **Risk:** `calibrateRisk` gates on thresholds (`confidenceFloor < 0.55`,
+  `maxDebt >= 0.5`) → a sub-threshold nudge changes nothing.
+- **Candidate set:** `proposePaths` returns `…prefix(maxCandidates)` AND
+  `normalizeThoughtFrame` re-clamps to `maxCandidates` → a surfaced extra
+  candidate is dropped at TWO points.
+
+So a deliberation signal that moves a value by a *small* amount (the ±0.05-class
+bias, a single re-query, one widened candidate) is **structurally damped** — it
+cannot cross any clamp/threshold, so no decision changes. Every P1.5a mechanism
+tried (confidence bias, risk-caution, frontier-widening) dies on a clamp.
+
+**This is the real constraint:** a consequential deliberation effect must be
+EITHER (a) a **threshold-crossing** perturbation — large enough to flip a gate
+(e.g. move `confidenceFloor` across 0.55, a ~0.28 swing — semantically extreme
+and itself risky), OR (b) a **clamp/threshold change** (raise the egoScore
+ceiling, relax the candidate prefix, lower a risk gate — all guardrails →
+sovereign-gated, P1.5b). **There is no small, clean, safe consequential slice:
+the architecture forbids it on purpose.**
+
+**Honest implication for execution:** the right consequential-wiring is NOT a
+bias tweak — it is either (i) a *substantive* refinement that genuinely resolves
+enough evidence to legitimately move a signal a real (threshold-crossing)
+amount, or (ii) a deliberate, bounded, sovereign-gated change to a specific
+clamp/threshold (P1.5b). Both are careful focused-session work. Rushing a
+clamp-fighting hack would produce an **inert** (sub-threshold) feature — the
+ch1039 cosmetic failure repeated — or an **unsafe** (clamp-breaking) one. The
+ch1040 work therefore stops at this finding rather than ship either.
