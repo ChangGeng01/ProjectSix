@@ -235,14 +235,34 @@ final class BASEnduranceAppController: ObservableObject {
     // MARK: - Adaptive cooldown(matches ch 1025 schedule)
 
     private nonisolated func cooldownSecFor(
-        iter: Int, base: Int, adaptive: Bool
+        iter: Int, base: Int, adaptive: Bool,
+        thermalState: String
     ) -> Int {
         guard adaptive else { return base }
-        switch iter {
-        case 1...2:   return base
-        case 3...5:   return base + 30
-        case 6...10:  return base * 2 + 60
-        default:      return base * 3 + 120
+        // ch 1025.11 — DATA-DRIVEN(10hr endurance 2026-05-29,first
+        // time the 10hr data actually reshaped behavior)。 Measured
+        // cooldown→recovery proved <180s at `serious` is ZERO-recovery:
+        // 8/8 serious→serious at 60-90s,AND 180s was still wasted
+        // while heat peaked at iter 6-8;ALL 5 serious→nominal
+        // recoveries occurred at ≥180s。 So gate cooldown on MEASURED
+        // thermal,not blind iter count — `serious` gets a ≥180s floor
+        // (skipping the empirically-wasted 60-90s steps the old
+        // iter-schedule burned),`critical` 300s,fair/nominal keep the
+        // light iter schedule。 This is the test-infra PROTOTYPE of
+        // ch 1026's thermal-aware kernel policy(same data,same ≥180s
+        // threshold)— validating the thermal-feedback idea cheaply
+        // before it graduates to the substrate executor。
+        switch thermalState {
+        case "critical":
+            return max(base * 3 + 120, 300)
+        case "serious":
+            return max(base * 2 + 60, 180)  // ≥180s floor(measured)
+        default:  // fair / nominal — light schedule suffices
+            switch iter {
+            case 1...2:   return base
+            case 3...5:   return base + 30
+            default:      return base * 2 + 60
+            }
         }
     }
 
@@ -620,9 +640,12 @@ final class BASEnduranceAppController: ObservableObject {
             }
 
             if iter < totalIters {
+                // ch 1025.11 — feed MEASURED thermal(iter-end
+                // snapshot)so cooldown is thermal-aware,not blind。
                 let cooldown = cooldownSecFor(
                     iter: iter, base: baseCooldown,
-                    adaptive: adaptive)
+                    adaptive: adaptive,
+                    thermalState: snapAfter.thermalState)
                 await emitBoth(
                     "⏸ ch1025 cooldown iter=\(iter) " +
                     "duration_s=\(cooldown) starting")

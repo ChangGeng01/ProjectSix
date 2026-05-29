@@ -355,6 +355,38 @@ Remaining 2 → **ch 1025.10**(risk-managed sequencing,NOT skipped):
   (runStart/iterStart/brainStart/mlxStart/…)— deferred to do carefully
   in one pass,not at the tail of an already-long session。
 
+### ch 1025.11 — 10hr data ACTUALLY reshapes behavior(2026-05-29,device-verified)
+
+**Answering「有根据 10 小时数据优化吗」honestly:before this, NO** — the 10hr
+data was collected + archived + documented(report says "≥180s recovery
+threshold")but NEVER fed back into any behavior。 The "data-driven" loop was
+collect+document,never optimize-ship。 ch 1025.11 closes the FIRST real
+data→optimization loop(albeit test-infra scope,not substrate core yet)。
+
+**The data:** measured cooldown→recovery(archive)proved every `<180s` cooldown
+at `serious` is ZERO-recovery — 8/8 `serious→serious` at 60-90s,plus 180s still
+wasted while heat peaked iter 6-8;ALL 5 `serious→nominal` recoveries were ≥180s。
+
+**The change:** `cooldownSecFor` went from BLIND iter-schedule(`case 1...2: base`)
+to THERMAL-FEEDBACK — gated on the measured iter-end thermal state:`serious` →
+≥180s floor(skip the empirically-wasted 60-90s),`critical` → 300s,fair/nominal
+→ light iter schedule。 **Device-verified:** iter 1 `nominal→serious` → cooldown
+**180s**(old blind logic would have burned 20s = wasted)。
+
+**Why this matters beyond test infra:** this is the **data-driven PROTOTYPE of
+ch 1026's thermal-aware kernel policy** — same 10hr data, same ≥180s threshold,
+same thermal-feedback shape。 ch 1026 graduates this idea(cooldown→kernel
+selection)to the substrate executor。 ch 1025.11 validates the thermal-feedback
+logic cheaply in test infra BEFORE touching the production hot path(ADR-014
+OPT-IN + red-line 7)。 So the 10hr data is no longer just documented — it now
+(a)reshapes endurance cooldown behavior AND (b)de-risks ch 1026's design。
+
+**Still honest about scope:** this optimizes the ENDURANCE RUNNER(test infra),
+NOT the substrate core。 The substrate-core thermal optimization(ch 1026
+`BASThermalAwareKernelSelectionPolicy` wire)remains a multi-session production
+change(needs 5-axis perf at .nominal + red-line 7 byte-equality)。 ch 1025.11
+is the prototype, not the graduation。
+
 ### Honest note on the 10hr endurance report
 
 `Docs/CH_1025_7_ENDURANCE_FINAL_REPORT.md` headline "247,133 tokens" is
