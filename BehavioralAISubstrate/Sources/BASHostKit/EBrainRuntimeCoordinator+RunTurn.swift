@@ -169,56 +169,112 @@ extension BASEBrainRuntimeCoordinator {
             activeKillSwitches: request.activeKillSwitches
         )
 
-        var thoughtFrame = loopService.iterate(
-            decomposeFrame: decomposeFrame,
-            memoryBundle: memoryBundle,
-            budget: routedBudget
-        )
-        if thoughtFrame.candidates.isEmpty {
-            thoughtFrame.candidates = loopService.proposePaths(
+        // ch 1039 / ADR-018 P1 — one deliberation pass:
+        // iterate → backfill → normalize → materialize. Extracted as
+        // a local function so the loop below can run it repeatedly.
+        // `priorCandidateIDs` is empty on the first pass (byte-equal
+        // with the pre-P1 single pass) and carries the prior pass's
+        // candidate IDs on subsequent passes.
+        func runDeliberationPass(
+            _ priorCandidateIDs: [String]
+        ) -> (BASThoughtFrame, [BASRuntimeAuditFinding], BASNeuralThoughtMaterialization) {
+            var thoughtFrame = loopService.iterate(
                 decomposeFrame: decomposeFrame,
                 memoryBundle: memoryBundle,
+                budget: routedBudget,
+                priorCandidateIDs: priorCandidateIDs
+            )
+            if thoughtFrame.candidates.isEmpty {
+                thoughtFrame.candidates = loopService.proposePaths(
+                    decomposeFrame: decomposeFrame,
+                    memoryBundle: memoryBundle,
+                    budget: routedBudget
+                )
+            }
+            if thoughtFrame.forecasts.isEmpty {
+                thoughtFrame.forecasts = loopService.forecast(
+                    candidates: thoughtFrame.candidates,
+                    decomposeFrame: decomposeFrame,
+                    memoryBundle: memoryBundle
+                )
+            }
+            if thoughtFrame.critiques.isEmpty {
+                thoughtFrame.critiques = loopService.critique(
+                    candidates: thoughtFrame.candidates,
+                    forecasts: thoughtFrame.forecasts,
+                    hostContext: hostContext
+                )
+            }
+            let (normalizedThoughtFrame, passFindings) = normalizeThoughtFrame(
+                thoughtFrame,
                 budget: routedBudget
             )
-        }
-        if thoughtFrame.forecasts.isEmpty {
-            thoughtFrame.forecasts = loopService.forecast(
-                candidates: thoughtFrame.candidates,
+            thoughtFrame = normalizedThoughtFrame
+            thoughtFrame.organMap = baseNeuralCore.organMap
+            let thoughtArtifacts = neuralCoreService?.materializeThoughtArtifacts(
+                budgetFrame: routedBudget,
+                contextFrame: contextFrame,
                 decomposeFrame: decomposeFrame,
-                memoryBundle: memoryBundle
+                memoryBundle: memoryBundle,
+                hostProfile: hostContext,
+                thoughtFrame: thoughtFrame
+            ) ?? BASNeuralMaterializationCompiler.materializeThoughtArtifacts(
+                thoughtFrame: thoughtFrame
             )
+            thoughtFrame.candidateFrontier = thoughtArtifacts.candidateFrontier
+            thoughtFrame.counterfactualBundles = thoughtArtifacts.counterfactualBundles
+            thoughtFrame.critiqueBundles = thoughtArtifacts.critiqueBundles
+            thoughtFrame.uncertaintyLedger = thoughtArtifacts.uncertaintyLedger
+            thoughtFrame.evidenceDebts = thoughtArtifacts.evidenceDebts
+            thoughtFrame.convergenceCertificate = thoughtArtifacts.convergenceCertificate
+            thoughtFrame.loopLeaseReceipt = thoughtArtifacts.loopLeaseReceipt
+            thoughtFrame.sovereignBreakpointHints = thoughtArtifacts.sovereignBreakpointHints
+            return (thoughtFrame, passFindings, thoughtArtifacts)
         }
-        if thoughtFrame.critiques.isEmpty {
-            thoughtFrame.critiques = loopService.critique(
-                candidates: thoughtFrame.candidates,
-                forecasts: thoughtFrame.forecasts,
-                hostContext: hostContext
-            )
+
+        // A terminal stop ends the deliberation loop immediately; a
+        // non-terminal stop (the common converged case) lets it keep
+        // refining up to the requested budget. Exhaustive switch so a
+        // new stop reason forces an explicit terminal/non-terminal
+        // decision here.
+        func isTerminalDeliberationStop(
+            _ stopReason: BASThoughtStopReason?
+        ) -> Bool {
+            switch stopReason {
+            case .blocked, .replaced, .maxLoopsReached, .guardTakeover:
+                return true
+            case .none, .candidateStable, .riskConverged,
+                 .uncertaintyBelowThreshold:
+                return false
+            }
         }
-        let (normalizedThoughtFrame, loopFindings) = normalizeThoughtFrame(
-            thoughtFrame,
-            budget: routedBudget
-        )
-        thoughtFrame = normalizedThoughtFrame
-        thoughtFrame.organMap = baseNeuralCore.organMap
-        let thoughtArtifacts = neuralCoreService?.materializeThoughtArtifacts(
-            budgetFrame: routedBudget,
-            contextFrame: contextFrame,
-            decomposeFrame: decomposeFrame,
-            memoryBundle: memoryBundle,
-            hostProfile: hostContext,
-            thoughtFrame: thoughtFrame
-        ) ?? BASNeuralMaterializationCompiler.materializeThoughtArtifacts(
-            thoughtFrame: thoughtFrame
-        )
-        thoughtFrame.candidateFrontier = thoughtArtifacts.candidateFrontier
-        thoughtFrame.counterfactualBundles = thoughtArtifacts.counterfactualBundles
-        thoughtFrame.critiqueBundles = thoughtArtifacts.critiqueBundles
-        thoughtFrame.uncertaintyLedger = thoughtArtifacts.uncertaintyLedger
-        thoughtFrame.evidenceDebts = thoughtArtifacts.evidenceDebts
-        thoughtFrame.convergenceCertificate = thoughtArtifacts.convergenceCertificate
-        thoughtFrame.loopLeaseReceipt = thoughtArtifacts.loopLeaseReceipt
-        thoughtFrame.sovereignBreakpointHints = thoughtArtifacts.sovereignBreakpointHints
+
+        // First deliberation pass — empty prior set → byte-equal with
+        // the pre-P1 single pass (红线 7 identity).
+        var (thoughtFrame, loopFindings, thoughtArtifacts) = runDeliberationPass([])
+
+        // ch 1039 / ADR-018 P1 — unified deliberation loop. OPT-IN,
+        // default OFF: when `deliberationLoopEnabled` is false the
+        // body never runs → byte-equal everywhere. When enabled, run
+        // up to the service-requested budget (min(maxLoops,
+        // stepIndex)) of refinement passes, each biased by the prior
+        // pass's surviving candidate IDs, halting early on a terminal
+        // stop. `targetPasses` reads the service's own stepIndex
+        // (already = min(maxLoops, desiredLoopCount)), so the loop
+        // never exceeds what the service requested or the budget.
+        if deliberationLoopEnabled {
+            var deliberationPassIndex = 1
+            let targetPasses = max(1, min(
+                routedBudget.maxLoops, thoughtFrame.stepIndex))
+            while deliberationPassIndex < targetPasses,
+                  !isTerminalDeliberationStop(thoughtFrame.stopReason) {
+                deliberationPassIndex += 1
+                let priorCandidateIDs = thoughtFrame.candidates
+                    .map(\.candidateID)
+                (thoughtFrame, loopFindings, thoughtArtifacts) = runDeliberationPass(
+                    priorCandidateIDs)
+            }
+        }
         let publicProjection = neuralCoreService?.materializePublicProjection(
             budgetFrame: routedBudget,
             contextFrame: contextFrame,

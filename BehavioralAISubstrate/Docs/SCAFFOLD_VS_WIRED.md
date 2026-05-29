@@ -582,3 +582,28 @@ running loop。 `loopCount` is still `== 1`;the engine remains unfired。
 The slice closes the contract gap so the loop chapter becomes a pure
 control-flow change。 Verified:full sweep 14,648 tests / 0 failures
 (includes the `loopCount==1` pin + the byte-equal red-line proofs)。
+
+### ch 1039 (follow-up) — deliberation loop LANDED (opt-in, default OFF)
+
+The plumbing above is now connected to a real running loop。
+`BASEBrainRuntimeCoordinator.deliberationLoopEnabled` (default false)
+gates a `runTurn` repeat that runs budget-driven refinement passes
+(`min(maxLoops, stepIndex)`,prior-candidate-biased,terminal early-
+exit) when ON。 Status flip:
+
+- **loop engine** — was 🪜 SCAFFOLD ("`runTurn` is a single linear
+  pass;nothing `repeat/while`s on the telemetry"),now ✅ WIRED but
+  OPT-IN + 🕯️ dormant in production。 `makeWithDefaults` keeps the
+  flag OFF and uses `BASMLLoopService` (stepIndex → 1),so
+  `loopCount` is still 1 in production until explicitly opted in with
+  a multi-loop service + budget。 Enabling it fires real refinement
+  passes — the engine that **structurally could not run before**
+  ch 1039 now can。
+- byte-equal proof:full sweep 14,652 tests / 0 failures with the
+  flag OFF (incl. `loopCount==1` pin,×2 `stepIndex==maxLoops`,
+  canonical identity + byte-equality-proof sweeps)。
+
+Honesty boundary:the loop is REAL + tested,but OFF by default。
+Same doctrine as `agentFabric` / `.observationOnly`:reserved +
+now-runnable,activation gated。 点3 (thermal → fewer loops) +
+production activation remain follow-ups (see ADR-018 §7.2)。

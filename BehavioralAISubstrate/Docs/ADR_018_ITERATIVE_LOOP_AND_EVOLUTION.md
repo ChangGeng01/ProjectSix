@@ -156,6 +156,42 @@ the design record; this is the executable detail.
    deliberation when the device is already hot). This is the safest first slice
    of 点3 and is directly evidence-backed.
 
+### 7.2 P1 core LANDED — opt-in deliberation loop (ch 1039)
+
+The ch 1039 follow-up landed the running loop itself (not just the §7.1
+plumbing). Status: **IMPLEMENTED, opt-in, default OFF.**
+
+Done:
+- `BASEBrainRuntimeCoordinator.deliberationLoopEnabled: Bool = false` — the
+  OPT-IN gate (ADR-014 + 红线 7), same doctrine as the `agentFabric` slot.
+- `runTurn` extracts `runDeliberationPass(priorCandidateIDs:)` (the `:172-221`
+  iterate → backfill → normalize → materialize cycle, returning frame +
+  findings + artifacts) and, when enabled, runs `min(maxLoops, stepIndex)`
+  refinement passes — each carrying the prior pass's candidate IDs forward —
+  halting early on a terminal stop (maxLoopsReached / blocked / replaced /
+  guardTakeover). The non-terminal converged states (candidateStable /
+  riskConverged / uncertaintyBelowThreshold) do NOT stop it; it refines up to
+  the requested budget.
+- Tests: `BASChapter1039DeliberationLoopTests` — off = 1 pass, on = N passes,
+  terminal early-exit, maxLoops-bound (over-budget stepIndex clamps to a
+  terminal stop).
+
+Verified byte-equal: full sweep **14,652 tests / 0 failures** with the flag
+OFF — incl. the `loopCount==1` pin, ×2 `stepIndex==maxLoops`, and the
+canonical identity + byte-equality-proof sweeps. (A flaky `swiftpm-testing-
+helper` SIGBUS on an unrelated swift-testing test, `exposesDefaultDescriptors
+ForBuiltInProviders`, exits the runner non-zero but passes in isolation — not
+a regression.)
+
+Deferred (still ADR-018 scope):
+- 点3 THERMAL → maxLoops floor: drift → MORE loops is already partly wired via
+  `desiredLoopCount()` (returns 3 when calibration is unstable); thermal →
+  FEWER is not yet wired.
+- Production activation: `makeWithDefaults` keeps the flag OFF and uses
+  `BASMLLoopService` (stepIndex → 1), so the loop is dormant in production until
+  explicitly opted in with a multi-loop service + budget. **The engine can now
+  FIRE (opt-in) — before ch 1039 it structurally could not.**
+
 ---
 
 ## 8. Consequences

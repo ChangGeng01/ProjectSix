@@ -134,6 +134,18 @@ public struct BASEBrainRuntimeCoordinator {
     /// drive coordinator output。
     public var agentFabric: BASAgentFabricRuntime?
 
+    /// chapter 一千零三十九 / ADR-018 P1 — OPT-IN deliberation-loop
+    /// gate。 Default false preserves byte-equality per 红线 7 +
+    /// ADR-014:when false,`runTurn` executes exactly one L9
+    /// deliberation pass (the pre-P1 single-pass behaviour)。 When
+    /// true,runTurn runs up to the service-requested budget
+    /// (min(maxLoops, stepIndex)) of refinement passes — each
+    /// carrying the prior pass's candidate IDs forward via the
+    /// `iterate(…:priorCandidateIDs:)` contract — exiting early on a
+    /// terminal stop (maxLoopsReached / blocked / replaced /
+    /// guardTakeover)。 Does NOT change any other coordinator output。
+    public var deliberationLoopEnabled: Bool
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -164,7 +176,10 @@ public struct BASEBrainRuntimeCoordinator {
         // ADR-014。 Setting this param activates the Agent Fabric
         // observation surface (call `runAgentFabricObservation`)
         // — does NOT change existing runTurn behavior。
-        agentFabric: BASAgentFabricRuntime? = nil
+        agentFabric: BASAgentFabricRuntime? = nil,
+        // chapter 一千零三十九 / ADR-018 P1 — OPT-IN deliberation
+        // loop。 Default false → single pass (byte-equal, 红线 7).
+        deliberationLoopEnabled: Bool = false
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -189,6 +204,7 @@ public struct BASEBrainRuntimeCoordinator {
         self.projectionBlockEmissionHandler =
             projectionBlockEmissionHandler
         self.agentFabric = agentFabric
+        self.deliberationLoopEnabled = deliberationLoopEnabled
     }
 
     // MARK: - Agent Fabric observation (ch 960)

@@ -92,7 +92,13 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // preserves all prior caller compat per 红线 7
                 // + ADR-014;this pin is updated to track the
                 // canonical signature。
-                agentFabric:)
+                agentFabric:
+                // chapter 一千零三十九 / ADR-018 P1 — deliberation
+                // loop OPT-IN slot added。 Default-false preserves
+                // all prior caller compat per 红线 7 + ADR-014;
+                // this pin is updated to track the canonical
+                // signature。
+                deliberationLoopEnabled:)
         XCTAssertNotNil(initRef)
     }
 
