@@ -176,3 +176,42 @@ clamp/threshold (P1.5b). Both are careful focused-session work. Rushing a
 clamp-fighting hack would produce an **inert** (sub-threshold) feature — the
 ch1039 cosmetic failure repeated — or an **unsafe** (clamp-breaking) one. The
 ch1040 work therefore stops at this finding rather than ship either.
+
+## 10. Implementation finding (ch1040) — the risk card is RE-DERIVED by the binding; inject there, not `calibrateRisk`
+
+A careful P1.5a attempt (plan-approved: a bounded caution increment added in
+`calibrateRisk`, flag-gated, byte-equal-off) was implemented and then
+**reverted** after a diagnostic caught it would be cosmetic. The precise reason
+— a pipeline stage the plan missed:
+
+The final per-turn risk card (`boundRiskCard`,
+`EBrainRuntimeCoordinator+RunTurn.swift:393`) is NOT `calibrateRisk`'s card — it
+is RE-DERIVED by `materializeRiskBindings` (BASOrchestration,
+`EBrainNeuralMaterializationCore.swift`) as:
+
+```
+totalRisk = min(1, riskCard.totalRisk * 0.5
+                   + irreversibility*0.25 + uncertainty*0.10
+                   + manipulationStrength*0.10 + boundaryConflict*0.05)
+riskLevel = riskLevelResolver(max(totalRisk, gsiScore))
+```
+
+So a `calibrateRisk`-level **+0.06** factor reaches the final card as only
+**+0.03** (the `* 0.5` weight) — AND when the deliberation loop runs (flag on,
+the high-risk case that matters most), the loop's confidence bias shifts the
+binding's per-candidate terms (`uncertainty` via `forecast`/`evidenceGap`)
+enough to OFFSET it (net 0). Empirically pinned by a temporary diagnostic:
+`+0.06` in `calibrateRisk` → `+0.03` final (loop off) / `0` (loop on). It never
+crossed a band → cosmetic.
+
+**Correct injection** for a consequential caution factor: the **binding stage**
+(`materializeRiskBindings`), where the final `totalRisk`/`riskLevel` are
+actually set — not `calibrateRisk`. It must also handle the loop↔binding
+interaction (the loop's bias moving the per-candidate terms). This is a
+**cross-module** change (BASHostKit flag → BASOrchestration binding) and revises
+the P1.5a injection point. The caution-increasing + byte-equal-off discipline is
+unchanged; only the LOCATION moves to the binding.
+
+**最小心 payoff:** the diagnostic caught the wrong injection point *before*
+shipping a cosmetic factor (the ch1039 failure mode), and produced the precise
+correct injection point. The binding-stage injection is the focused next step.
