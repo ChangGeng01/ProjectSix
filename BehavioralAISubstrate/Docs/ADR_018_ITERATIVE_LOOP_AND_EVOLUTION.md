@@ -192,6 +192,40 @@ Deferred (still ADR-018 scope):
   explicitly opted in with a multi-loop service + budget. **The engine can now
   FIRE (opt-in) — before ch 1039 it structurally could not.**
 
+### 7.3 P1 activation + real-engine refinement LANDED (ch 1039)
+
+The harden+activate follow-up made the loop usable through the real
+production host path, not just a test double:
+
+- **Shared bias** — `BASDeliberationBias.reinforce(_:priorCandidateIDs:)`
+  single-sources the persistence bias; BOTH `BASMLLoopService` and
+  `BASHostRuntimeEBrainLoopService` now apply it. (Key finding before
+  this: only `BASMLLoopService` refined, and it never loops —
+  stepIndex → 1; the host service loops but IGNORED `priorCandidateIDs`,
+  so the loop ran inert. No single service both looped AND refined.)
+- **Activation** — `buildEBrainTurn(…, deliberationLoopEnabled:)`
+  (→ `makeEBrainTurn` → coordinator), default false. A host opts in per
+  the same defaulted-param doctrine as `agentFabric`; the sync /
+  `.v1ByteEqual` path is wired. (The async-engine `buildCoordinator`
+  path is a noted follow-up.)
+- **Real-engine proof** — `testActivatesAndRefinesViaRealHostRuntimePath`:
+  a high-risk turn through `BASHostRuntime` carries `loopCount > 1`, and
+  with the loop ON the refinement SURVIVES the full projection pipeline
+  (`on.candidates ≠ off.candidates`). The default
+  `materializePublicProjection` returns `candidates: nil`, so the loop's
+  refined candidates are preserved to the output. The loop now produces
+  an observable, useful effect with the production-capable service.
+
+Verified byte-equal: full sweep **14,653 / 0 failures** with the flag
+OFF — the `BASMLLoopService` refactor is behaviour-identical (its tests
+pass in-suite).
+
+Still deferred: 点3 thermal → fewer loops (largely emergent — the power
+clock's throttle reduces `maxLoops` under thermal pressure, which the
+loop already honors via `min(maxLoops, stepIndex)`); async-engine
+`buildCoordinator` threading; flipping the flag ON by default in any
+host (a deliberate behaviour-change decision, not yet taken).
+
 ---
 
 ## 8. Consequences

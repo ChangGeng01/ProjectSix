@@ -189,4 +189,57 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
             "over-budget stepIndex is clamped to a terminal stop →" +
             " loop halts (never exceeds maxLoops)")
     }
+
+    // MARK: - Real-engine integration (production host path)
+
+    /// Exercises the loop through the FULL real host-runtime pipeline
+    /// (BASHostRuntime → buildEBrainTurn → BASHostRuntimeEBrainLoop
+    /// Service), not a counting double. A high-risk turn carries a
+    /// multi-pass budget; with the loop ON, the real service's
+    /// persistence bias refines surviving candidates across passes,
+    /// so the on-frame differs from the byte-equal off-frame.
+    func testActivatesAndRefinesViaRealHostRuntimePath() throws {
+        let configuration = BASHostConfiguration.fixtureGeneric
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .reflective,
+            surface: .application,
+            prompt: "Push into an irreversible high-stakes move now.",
+            riskLevel: .high)
+        let seed = try runtime.startSession(request)
+        let currentBrain = seed.currentBrain
+        let projection = BASBrainProjection(
+            records: [], candidates: [], recentEvents: [])
+        let device = BASCoordinatorTestStubs.nominalDeviceState
+
+        let off = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: projection,
+            deviceStateOverride: device,
+            deliberationLoopEnabled: false)
+        let on = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: projection,
+            deviceStateOverride: device,
+            deliberationLoopEnabled: true)
+
+        // High-risk → the real loop service requests a multi-pass
+        // budget (desiredLoopCount = 3), so loopCount > 1.
+        XCTAssertGreaterThan(off.runtimeTrace.loopCount, 1,
+            "high-risk turn should carry a multi-loop budget")
+        XCTAssertEqual(on.runtimeTrace.loopCount,
+            off.runtimeTrace.loopCount,
+            "loopCount is the analytical budget — identical on/off")
+        // Flag ON ran real refinement passes through the full
+        // pipeline: the persistence bias raises surviving
+        // candidates' confidence, so the on-frame differs from the
+        // byte-equal off-frame.
+        XCTAssertNotEqual(on.thoughtFrame.candidates,
+            off.thoughtFrame.candidates,
+            "the deliberation loop's persistence bias refines" +
+            " candidates vs the single-pass frame")
+    }
 }

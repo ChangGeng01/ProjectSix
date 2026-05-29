@@ -24,14 +24,20 @@ extension BASHostRuntime {
         currentBrain: BASHostCurrentBrain,
         projection: BASBrainProjection,
         deviceStateOverride: BASDeviceState? = nil,
-        now: Date = .now
+        now: Date = .now,
+        // ch 1039 / ADR-018 P1 — OPT-IN deliberation loop. Default
+        // false → single pass (byte-equal, 红线 7 + ADR-014). A host
+        // sets this true to let high-risk / calibration-drift turns
+        // run budget-bounded refinement passes.
+        deliberationLoopEnabled: Bool = false
     ) -> BASEBrainTurnResult {
         makeEBrainTurn(
             for: request,
             currentBrain: currentBrain,
             projection: projection,
             deviceStateOverride: deviceStateOverride,
-            now: now
+            now: now,
+            deliberationLoopEnabled: deliberationLoopEnabled
         )
     }
 
@@ -236,7 +242,10 @@ extension BASHostRuntime {
         currentBrain: BASHostCurrentBrain,
         projection: BASBrainProjection,
         deviceStateOverride: BASDeviceState?,
-        now: Date
+        now: Date,
+        // ch 1039 / ADR-018 P1 — OPT-IN deliberation loop. Default
+        // false → single pass (byte-equal, 红线 7).
+        deliberationLoopEnabled: Bool = false
     ) -> BASEBrainTurnResult {
         let enforcedCurrentBrain = currentBrain.applyingControlPlaneDisposition(
             configuration.controlPlaneExecutionDisposition,
@@ -334,7 +343,8 @@ extension BASHostRuntime {
             hostConstitution: resolvedConstitution,
             hostConstitutionVault: resolvedVault,
             hostVersionTree: configuration.hostVersionTree,
-            hostForgetRequest: configuration.hostForgetRequest
+            hostForgetRequest: configuration.hostForgetRequest,
+            deliberationLoopEnabled: deliberationLoopEnabled
         )
 
         return coordinator.runTurn(

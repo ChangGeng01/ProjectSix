@@ -145,6 +145,28 @@ struct BASHostRuntimeEBrainLoopService: BASLoopServicing {
         )
     }
 
+    /// ch 1039 / ADR-018 P1 — deliberation-loop iterate variant.
+    /// The single-pass `iterate` reports the budget-bounded
+    /// `stepIndex` (so the loop knows how many passes to run); this
+    /// override then applies the shared persistence bias so each
+    /// pass actually REFINES (surviving candidates gain confidence)
+    /// rather than repeating identically. Empty `priorCandidateIDs`
+    /// — the only call path when the loop is OFF — returns the
+    /// single-pass frame unchanged: the byte-equal red-line.
+    func iterate(
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        budget: BASBudgetFrame,
+        priorCandidateIDs: [String]
+    ) -> BASThoughtFrame {
+        let base = iterate(
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            budget: budget)
+        return BASDeliberationBias.reinforce(
+            base, priorCandidateIDs: priorCandidateIDs)
+    }
+
     private func projectedLoopHostContext(
         memoryBundle: BASMemoryBundle
     ) -> BASHostProfile {

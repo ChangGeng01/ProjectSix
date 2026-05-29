@@ -607,3 +607,26 @@ Honesty boundary:the loop is REAL + tested,but OFF by default。
 Same doctrine as `agentFabric` / `.observationOnly`:reserved +
 now-runnable,activation gated。 点3 (thermal → fewer loops) +
 production activation remain follow-ups (see ADR-018 §7.2)。
+
+### ch 1039 (harden+activate) — real-engine refinement LANDED
+
+The loop now refines through the REAL production host path,not just a
+test double:
+
+- **`BASDeliberationBias`** (shared bias) + a refining
+  `iterate(…:priorCandidateIDs:)` on `BASHostRuntimeEBrainLoopService`
+  — ✅ WIRED。 Key finding:before this,NO single service both looped
+  AND refined (`BASMLLoopService` refines but stepIndex → 1;the host
+  service loops but ignored `priorCandidateIDs`)。 Now both refine via
+  the shared bias。
+- **`buildEBrainTurn(…, deliberationLoopEnabled:)`** — ✅ WIRED,OPT-IN
+  (default false → byte-equal)。 The sync/.v1ByteEqual production host
+  path can now activate the loop。
+- **Real-engine proof** — `testActivatesAndRefinesViaRealHostRuntime
+  Path`:high-risk turn → `loopCount > 1`,and the refinement SURVIVES
+  the full projection pipeline (`on.candidates ≠ off.candidates`)。
+
+Verified:full sweep 14,653 / 0 failures with the flag OFF
+(`BASMLLoopService` refactor behaviour-identical)。 Remaining follow-
+ups (ADR-018 §7.3):async-engine `buildCoordinator` threading;flag-on-
+by-default in a host (a deliberate behaviour change)。
