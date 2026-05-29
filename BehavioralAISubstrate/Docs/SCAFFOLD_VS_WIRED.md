@@ -660,12 +660,18 @@ caution increment is injected POST-binding on the FINAL bound risk card
 that made the calibrateRisk-level attempt cosmetic,ADR-019 §10),gated
 on (flag ON AND genuinely-uncertain)。
 
-- **deliberation → caution** — ✅ WIRED + CONSEQUENTIAL (opt-in)。 A
-  high-stakes/uncertain turn lands at totalRisk 0.6427 (.medium) with
-  the loop off;with the opt-in loop on,the caution crosses the 0.65
-  band → .high (guarded assertionCeiling,sovereign hint,Cthulhu permit
-  gating)。 No longer cosmetic。 Verified:`testActivatesAndRefines…`;
-  full sweep 14,656 / 0 with the flag OFF (byte-equal red-line)。
+- **deliberation → caution (risk ASSESSMENT)** — ✅ WIRED +
+  CONSEQUENTIAL (opt-in)。 A high-stakes/uncertain turn lands at
+  totalRisk 0.6427 (.medium) with the loop off;with the opt-in loop
+  on,the caution crosses the 0.65 band → .high + tightens the assertion
+  guardrail to "guarded"。 No longer cosmetic。 Honest scope (diagnostic-
+  verified):the escalation is at the risk-ASSESSMENT level — the action
+  permit MODE was ALREADY .block (uncertain high-stakes turns are
+  already maximally cautious),so the caution escalates the assessment
+  (riskLevel,a real sovereign-/audit-/downstream-consumed output),NOT
+  the action mode here;it WOULD flip the action mode on a borderline-
+  permit turn。 Verified:`testActivatesAndRefines…`;full sweep
+  14,656 / 0 with the flag OFF (byte-equal red-line)。
 - Caution-INCREASING only → no sovereign gate。 Flag-off → byte-equal。
 
 Still scaffold/deferred:the DANGEROUS direction (caution-DOWN / changed

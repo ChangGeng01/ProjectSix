@@ -297,6 +297,21 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
         XCTAssertTrue(
             on.riskCard.factors.contains("deliberation_uncertain_caution"),
             "the deliberation-caution factor is surfaced on the card")
+        // Honest scope (verified by diagnostic): the escalation is at
+        // the risk-ASSESSMENT level — riskLevel (above) + the assertion
+        // guardrail tightens to "guarded". The action permit MODE is
+        // ALREADY `.block` (off and on): an uncertain + irreversible
+        // high-stakes turn is already maximally cautious, so the caution
+        // cannot escalate the MODE further (no room). riskLevel remains a
+        // real consumed output (sovereign escalation / audit / downstream)
+        // and WOULD flip the action mode on a borderline-permit turn —
+        // but uncertain turns here are already block.
+        XCTAssertEqual(off.actionPermit.mode, .block)
+        XCTAssertEqual(on.actionPermit.mode, .block,
+            "the action mode is already block (max caution); the caution" +
+            " escalates the risk ASSESSMENT, not the action mode here")
+        XCTAssertEqual(on.riskCard.assertionCeiling, "guarded",
+            "the assertion guardrail tightens to the high-risk ceiling")
     }
 
     // MARK: - Coverage gaps closed by the ch1039 deep audit

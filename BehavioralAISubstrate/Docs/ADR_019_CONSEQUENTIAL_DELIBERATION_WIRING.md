@@ -239,13 +239,28 @@ scope and the card is already final:
 it is no longer cosmetic.** Verified by `testActivatesAndRefinesViaRealHost
 RuntimePath`: a high-stakes/uncertain turn lands at `totalRisk = 0.6427` (just
 below the 0.65 band → `.medium`) with the loop OFF; with the opt-in loop ON the
-bounded caution crosses the band → `.high` (→ guarded assertionCeiling,
-sovereign hint, Cthulhu permit gating, downstream caution). Full sweep
-**14,656 / 0** with the flag OFF (byte-equal red-line intact).
+bounded caution crosses the band → `.high`, and the assertion guardrail tightens
+to `"guarded"`. Full sweep **14,656 / 0** with the flag OFF (byte-equal red-line
+intact).
 
-**Honest scope:** this is the SAFE direction (caution-up on uncertainty) and it
-makes the deliberation MODE consequential. The DANGEROUS direction (caution-
-down / changed selection) remains sovereign-gated (§4, P1.5b). And the per-pass
-*refinement quality* (making N passes genuinely resolve more, not just the
-flag) is still the separate substantive-refinement step (§4) — this slice makes
-"opt-in deliberation on an uncertain matter ⇒ more caution" real + verified.
+**Honest scope of the consequence (diagnostic-verified, corrects an earlier
+overclaim).** The escalation is at the risk-ASSESSMENT level — `riskLevel`
+(medium→high) + the assertion guardrail + the sovereign hint. The action permit
+MODE is NOT changed for the tested fixtures: an uncertain + irreversible
+high-stakes turn is **already `.block`** (maximally cautious) at medium, so the
+caution has no room to escalate the *action mode* further — it escalates the
+risk *assessment*. `riskLevel`/`assertionCeiling` are still real consumed
+outputs (sovereign escalation, audit, downstream caution) and the band crossing
+WOULD flip the action mode on a *borderline-permit* turn (medium ⇒ non-block,
+high ⇒ block) — but uncertain turns in this substrate tend to already be block,
+so a clean action-mode-flip demonstration needs a constructed borderline fixture
+(noted follow-up). This is more than cosmetic (a real, consumed assessment
+escalation) but it is honest that it does not flip an already-maximal action.
+
+**Honest scope (direction + depth):** SAFE direction only (caution-up on
+uncertainty), makes the deliberation MODE consequential. The DANGEROUS direction
+(caution-down / changed selection) remains sovereign-gated (§4, P1.5b). The
+per-pass *refinement quality* (making N passes genuinely resolve more, not just
+the flag) is the separate substantive-refinement step (§4). This slice makes
+"opt-in deliberation on an uncertain matter ⇒ a higher, sovereign-/audit-visible
+risk assessment + tighter assertion guardrail" real + verified.
