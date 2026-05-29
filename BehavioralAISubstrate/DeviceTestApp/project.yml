@@ -79,6 +79,13 @@ targets:
         product: BASMLXAdapter
       - package: BehavioralAISubstrate
         product: BASOrgan
+      # ch 1034 — `BASMPSGraphProbe` needs the MPSGraph kernel actors
+      # (BASMPSGraph*Kernel) + BASCanonicalKernelInputBuilders。
+      # Transitively pulled via BASHostKit,but the app target needs
+      # an explicit dep so the devicectl-launched product links the
+      # MPSGraph symbols directly(same reason as MLX/Organ above)。
+      - package: BehavioralAISubstrate
+        product: BASMetalSubstrate
     settings:
       base:
         # Bundle ID matches the existing wildcard provisioning profile

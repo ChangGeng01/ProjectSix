@@ -48,6 +48,7 @@ struct BASDeviceTestApp: App {
 struct ContentView: View {
     @State private var fabricStatus: String = "probing…"
     @State private var rustVerify: String = "probing…"
+    @State private var mpsgraphVerify: String = "probing…"
     @StateObject private var endurance =
         BASEnduranceAppController.shared
 
@@ -67,6 +68,12 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             // ch 1027:on-device Rust verify verdict surface
             Text("Rust: \(rustVerify)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            // ch 1034:on-device MPSGraph kernel verdict surface
+            Text("MPSGraph: \(mpsgraphVerify)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -94,6 +101,12 @@ struct ContentView: View {
             // just present in the binary)。 Microsecond-level extern
             // "C" calls,safe to run synchronously。
             rustVerify = BASRustVerifyProbe.run()
+            // ch 1034:on-device MPSGraph kernel exercise — async
+            // (kernel evaluate is async)。 Serial,runs once at boot,
+            // never concurrent with MLX(no GPU contention)。
+            Task {
+                mpsgraphVerify = await BASMPSGraphProbe.run()
+            }
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
             // the endurance loop。 No-op otherwise(legacy
             // xcodebuild test mode still works because the
