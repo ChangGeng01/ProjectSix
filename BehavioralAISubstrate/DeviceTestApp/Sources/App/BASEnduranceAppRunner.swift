@@ -347,7 +347,15 @@ final class BASEnduranceAppController: ObservableObject {
 
     // MARK: - Run loop
 
-    private func runEndurance() async {
+    // ch 1025.12 #4 fix:`nonisolated` so the multi-hour loop actually
+    // runs OFF the MainActor(the `Task.detached` intent)。 Pre-fix the
+    // method inherited the class's @MainActor → the whole loop +300s
+    // sleeps were main-actor-pinned。 Every self-state touch inside is
+    // already wrapped in `await MainActor.run { … }`(status / log
+    // handle),so making the method nonisolated is safe:isolated work
+    // hops explicitly,everything else(snapshot / brain / mlx / emit)
+    // is genuinely off-main where it belongs。
+    private nonisolated func runEndurance() async {
         let env = ProcessInfo.processInfo.environment
         // ch 1025.8 C1 fix(CRITICAL):clamp to ≥1。 env "0"/negative
         // would make `for iter in 1...totalIters` a ClosedRange with
@@ -778,7 +786,11 @@ final class BASEnduranceAppController: ObservableObject {
 
     /// Emit to both stdout (for idevicesyslog) and the Documents log
     /// file (for post-run pull via Xcode Devices)。
-    private func emitBoth(_ line: String) async {
+    // ch 1025.12 #4 fix:nonisolated so the off-main detached
+    // endurance task runs emit off the MainActor;the actual
+    // file write hops back via MainActor.run(writeToLogFile is
+    // @MainActor-isolated)。
+    private nonisolated func emitBoth(_ line: String) async {
         emit(line)
         await MainActor.run {
             self.writeToLogFile(line)
@@ -821,7 +833,8 @@ final class BASEnduranceAppController: ObservableObject {
     /// decompose / risk / permit / mem / render / triself /
     /// candidates / host_gate)to investigate specific substrate
     /// layers under load。
-    private func emitBrainDetail(
+    // ch 1025.12 #4 fix:nonisolated(only calls nonisolated emitBoth)。
+    private nonisolated func emitBrainDetail(
         _ tr: BASEBrainTurnResult, iter: Int, prompt: Int
     ) async {
         // ── L6 context frame full signal panel ─────────────────

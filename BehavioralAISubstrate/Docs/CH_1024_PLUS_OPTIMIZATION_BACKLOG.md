@@ -357,12 +357,26 @@ Remaining 2 → **ch 1025.10**(risk-managed sequencing,NOT skipped):
   log-file name stamp(correct timestamp uses,not deltas)。 Device-verified:
   load_ms=6/2703,brain latency_ms=22/3,mlx latency_ms=15866/42704,
   iter_ms=58598 — all sane positive,zero negative/absurd。
-- **#4**(Task.detached MainActor-pin):STILL DEFERRED — needs full
-  re-review of every `self.@MainActor` access if `runEndurance` goes
-  nonisolated。 Moderate risk,LOW impact(10hr run completed fine despite
-  the pin — `await` yields the main actor),warrants a fresh session,NOT
-  the tail of an already-long one(exactly the fatigue-risk the bug hunt
-  warned about)。 This is the LAST open bug-hunt finding。
+- **#4**(Task.detached MainActor-pin):✅ **DONE ch1025.12(2026-05-29,
+  device-verified)**。 Investigation found the fix is CONTAINED,not the
+  big risk feared:every self-state touch inside `runEndurance` was
+  ALREADY wrapped in `await MainActor.run { … }`(status / log handle,
+  7 sites),and snapshot/emit/cooldown were already `nonisolated`。 So
+  marking `runEndurance` + `emitBoth` + `emitBrainDetail` `nonisolated`
+  is safe — isolated work hops explicitly,everything else(snapshot /
+  brain / mlx / emit / 300s sleeps)now genuinely runs OFF the MainActor
+  (the original `Task.detached` intent,finally delivered)。 **The Swift
+  compiler validated isolation correctness:BUILD SUCCEEDED with zero
+  isolation errors** — the strongest possible proof the hop-points are
+  all correct。 Device-verified:full lifecycle(host config → brain →
+  mlx → scorecard → FINAL run_sec=67)completes off-main,no crash,
+  PID alive。
+
+**✅✅ BUG HUNT 11/11 COMPLETE。** All findings from the 4-agent
+adversarial sweep(C1/C2/HIGH-1/HIGH-2/HIGH-3/#4/#5/MED-1/MED-mono/L1/
+LOW-2)are fixed + verified。 Substrate production code was CLEAN
+throughout(only the `.mlmodelc` + rope additive touches,both
+byte-equal red-line-preserved)。
 
 ### ch 1025.11 — 10hr data ACTUALLY reshapes behavior(2026-05-29,device-verified)
 
