@@ -173,4 +173,41 @@ final class BASMPSGraphAttentionIntegrationTests:
         XCTAssertGreaterThan(
             outputs.executionNanos, 0)
     }
+
+    // MARK: - ch 1034.2 canonical builder → kernel integration
+
+    /// ch 1034.2 — the NEW `BASCanonicalKernelInputBuilders.attention`
+    /// must(a)produce inputs EQUAL to this file's proven hand-rolled
+    /// `makeAttentionInputs`,and(b)feed the kernel end-to-end with the
+    /// same known-correct result。 Closes the builder/kernel mismatch
+    /// CLASS that ch 1034.1 fixed for rope — proving attention's
+    /// canonical builder matches its kernel too。
+    func testCanonicalAttentionBuilderMatchesKernel() async throws {
+        let kernel: BASMPSGraphAttentionKernel
+        do {
+            kernel = try BASMPSGraphAttentionKernel()
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal unavailable")
+        }
+        // Same fixture as testZeroQKProducesUniformAttention:
+        // zero Q·K → uniform softmax → output = mean of V rows = [2,3]。
+        let q: [Float] = [0, 0]
+        let k: [Float] = [0, 0, 0, 0]
+        let v: [Float] = [1, 2, 3, 4]
+        let canonical = BASCanonicalKernelInputBuilders
+            .attention(q: q, k: k, v: v,
+                       seqQ: 1, seqK: 2, dim: 2)
+        let handRolled = makeAttentionInputs(
+            Q: q, K: k, V: v, seqQ: 1, seqK: 2, dim: 2)
+        // (a)canonical builder == proven hand-rolled inputs。
+        XCTAssertEqual(canonical, handRolled,
+            "ch 1034.2: canonical attention builder must match the " +
+            "proven hand-rolled inputs")
+        // (b)builder feeds the kernel + yields the known result [2,3]。
+        let outputs = try await kernel.evaluate(inputs: canonical)
+        let result = BASCanonicalKernelInputBuilders
+            .dataToFloatArray(outputs.payloads[0], elementCount: 2)
+        XCTAssertEqual(result[0], 2.0, accuracy: 1e-4)
+        XCTAssertEqual(result[1], 3.0, accuracy: 1e-4)
+    }
 }

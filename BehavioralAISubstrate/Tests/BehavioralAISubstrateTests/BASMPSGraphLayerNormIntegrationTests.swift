@@ -187,4 +187,47 @@ final class BASMPSGraphLayerNormIntegrationTests:
             inputs: inputs)
         XCTAssertGreaterThan(outputs.executionNanos, 0)
     }
+
+    // MARK: - ch 1034.2 canonical builder → kernel integration
+
+    /// ch 1034.2 — the NEW `BASCanonicalKernelInputBuilders.layerNorm`
+    /// must(a)produce inputs EQUAL to this file's proven hand-rolled
+    /// `makeLayerNormInputs`,and(b)feed the kernel end-to-end with the
+    /// known-correct result。 Closes the builder/kernel mismatch CLASS
+    /// (ch 1034.1 fixed it for rope)— proving layerNorm's canonical
+    /// builder matches its kernel(incl. the rank-1 gamma/beta shape
+    /// that's the easiest place for a builder to drift)。
+    func testCanonicalLayerNormBuilderMatchesKernel() async throws {
+        let kernel: BASMPSGraphLayerNormKernel
+        do {
+            kernel = try BASMPSGraphLayerNormKernel()
+        } catch BASKernelError.frameworkUnavailable {
+            throw XCTSkip("Metal unavailable")
+        }
+        // Same fixture as testLayerNormIdentityGammaBeta:
+        // x=[[2,0],[0,2]] gamma=[1,1] beta=[0,0] → [1,-1,-1,1]。
+        let x: [Float] = [2, 0, 0, 2]
+        let gamma: [Float] = [1, 1]
+        let beta: [Float] = [0, 0]
+        let canonical = BASCanonicalKernelInputBuilders
+            .layerNorm(x: x, gamma: gamma, beta: beta,
+                       batch: 2, hidden: 2)
+        let handRolled = makeLayerNormInputs(
+            x: x, gamma: gamma, beta: beta,
+            batch: 2, hidden: 2)
+        // (a)canonical builder == proven hand-rolled inputs。
+        XCTAssertEqual(canonical, handRolled,
+            "ch 1034.2: canonical layerNorm builder must match the " +
+            "proven hand-rolled inputs(incl. rank-1 gamma/beta)")
+        // (b)builder feeds the kernel + yields [1,-1,-1,1]。
+        let outputs = try await kernel.evaluate(inputs: canonical)
+        let result = BASCanonicalKernelInputBuilders
+            .dataToFloatArray(outputs.payloads[0], elementCount: 4)
+        let expected: [Float] = [1, -1, -1, 1]
+        for (idx, val) in result.enumerated() {
+            XCTAssertEqual(val, expected[idx], accuracy: 1e-3,
+                "ch 1034.2 layerNorm[\(idx)] = \(val);" +
+                " expected \(expected[idx])")
+        }
+    }
 }

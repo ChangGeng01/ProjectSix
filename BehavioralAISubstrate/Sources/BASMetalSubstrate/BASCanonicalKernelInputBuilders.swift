@@ -277,6 +277,122 @@ public enum BASCanonicalKernelInputBuilders {
             ])
     }
 
+    // MARK: - attention input builder
+
+    /// ch 1034.2 — Build a 3-input bundle for `BASMPSGraphAttentionKernel`:
+    ///   - q: rank-2 Float32 `[seqQ, dim]`
+    ///   - k: rank-2 Float32 `[seqK, dim]`
+    ///   - v: rank-2 Float32 `[seqK, dim]`
+    /// Completes the 5-kernel builder coverage(ch 1034.1 added rope;
+    /// matMul/rmsNorm already had builders)。 Matches the kernel's
+    /// rank-2 3-input contract(validation:descriptors.count==3,all
+    /// shape.count==2,K/V share seqK + dim with Q)。
+    /// Pre-conditions:
+    ///   - all dims > 0
+    ///   - `q.count == seqQ*dim`,`k.count == v.count == seqK*dim`
+    public static func attention(
+        q: [Float],
+        k: [Float],
+        v: [Float],
+        seqQ: Int,
+        seqK: Int,
+        dim: Int
+    ) -> BASKernelInputs {
+        precondition(seqQ > 0 && seqK > 0 && dim > 0,
+            "attention dims must be > 0")
+        precondition(q.count == seqQ * dim,
+            "attention Q length must equal seqQ*dim" +
+            " (got \(q.count), expected \(seqQ * dim))")
+        precondition(k.count == seqK * dim,
+            "attention K length must equal seqK*dim" +
+            " (got \(k.count), expected \(seqK * dim))")
+        precondition(v.count == seqK * dim,
+            "attention V length must equal seqK*dim" +
+            " (got \(v.count), expected \(seqK * dim))")
+        let descQ = BASTensorDescriptor(
+            shape: [seqQ, dim],
+            strides: [dim * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        let descK = BASTensorDescriptor(
+            shape: [seqK, dim],
+            strides: [dim * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        let descV = BASTensorDescriptor(
+            shape: [seqK, dim],
+            strides: [dim * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        return BASKernelInputs(
+            descriptors: [descQ, descK, descV],
+            payloads: [
+                floatArrayToData(q),
+                floatArrayToData(k),
+                floatArrayToData(v)
+            ])
+    }
+
+    // MARK: - layerNorm input builder
+
+    /// ch 1034.2 — Build a 3-input bundle for `BASMPSGraphLayerNormKernel`:
+    ///   - x: rank-2 Float32 `[batch, hidden]`
+    ///   - gamma: rank-1 Float32 `[hidden]`
+    ///   - beta: rank-1 Float32 `[hidden]`
+    /// Matches the kernel's contract(validation:descriptors.count==3,
+    /// x rank-2,gamma+beta rank-1 of length hidden)。
+    /// Pre-conditions:
+    ///   - `batch > 0 && hidden > 0`
+    ///   - `x.count == batch*hidden`
+    ///   - `gamma.count == beta.count == hidden`
+    public static func layerNorm(
+        x: [Float],
+        gamma: [Float],
+        beta: [Float],
+        batch: Int,
+        hidden: Int
+    ) -> BASKernelInputs {
+        precondition(batch > 0 && hidden > 0,
+            "layerNorm dims must be > 0")
+        precondition(x.count == batch * hidden,
+            "layerNorm x length must equal batch*hidden" +
+            " (got \(x.count), expected \(batch * hidden))")
+        precondition(gamma.count == hidden,
+            "layerNorm gamma length must equal hidden" +
+            " (got \(gamma.count), expected \(hidden))")
+        precondition(beta.count == hidden,
+            "layerNorm beta length must equal hidden" +
+            " (got \(beta.count), expected \(hidden))")
+        let descX = BASTensorDescriptor(
+            shape: [batch, hidden],
+            strides: [hidden * 4, 4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-2-matrix")
+        let descGamma = BASTensorDescriptor(
+            shape: [hidden],
+            strides: [4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-1-vector")
+        let descBeta = BASTensorDescriptor(
+            shape: [hidden],
+            strides: [4],
+            dataType: .float32,
+            backingKind: .metalBuffer,
+            rankTag: "rank-1-vector")
+        return BASKernelInputs(
+            descriptors: [descX, descGamma, descBeta],
+            payloads: [
+                floatArrayToData(x),
+                floatArrayToData(gamma),
+                floatArrayToData(beta)
+            ])
+    }
+
     // MARK: - Helpers
 
     /// Pack `[Float]` into `Data` via raw bytes for
