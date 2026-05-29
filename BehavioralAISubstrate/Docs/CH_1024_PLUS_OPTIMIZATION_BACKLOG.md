@@ -444,6 +444,53 @@ This is the honest-mode lesson:I twice said "substrate 没验 cognitive
 correctness" — investigation(51 tests pass)proved that wrong。 Don't extrapolate
 from "my probe didn't" to "the substrate doesn't"。
 
+### ch 1025.6 + ch 1025.13 — last self-audit gaps closed,DEVICE-VERIFIED(2026-05-29)
+
+The two remaining honest-mode dissatisfaction points,both now device-verified
+on iPhone Air A19(after killing the試水 1hr trial early — it had already proven
+ch 1025.11 thermal-aware cooldown:6/6 iters serious→180s,no leak):
+
+**ch 1025.6 — fabric runTurn REALLY fires(⑤,the last gap):**
+```
+📍 ch1025 fabric pipeline constructed (4-seat roster:scout/planner/risk/surface)
+🪧 ch1025 fabric iter=1 prompt=1 activated=true skip=-
+🪧 ch1025 fabric iter=1 prompt=2 activated=true skip=-
+```
+`activated=true skip=-` is the device proof the bypass is gone。 ch 1025.5's
+"needs 200 LOC / 11 services / @testable" deferral was STALE(same class as the
+ch 1027 Rust misdiagnosis):all 10 `BASML*Service` are public,9 are no-arg
+`init()`,`BASContextClassifierMLAdapter()` works in-app — so the app builds a
+real coordinator + fabric runtime + 4-seat roster in ~25 LOC of public API。
+fabric.runTurn() is fed per prompt by the turnResult fields brain.process()
+already produces。
+
+**ch 1025.13 — L0/L1/L5/L13 instrument(①):**
+```
+🧠 ch1025 L0frame run_mode=engage max_loops=3 max_decode=240
+   wake=…intentLevel:engage estimatedValue:0.696 estimatedRisk:0.18
+   survival=0.80 thermal_margin=0.92 power_margin=0.55 continuity=0.64 stability=0.73
+🧠 ch1025 L1lease  lease=nil
+🧠 ch1025 L5host   constitution=nil
+🧠 ch1025 L13vtree version_tree=nil
+```
+L0frame is rich + real。 **HONEST FINDING:L1 runLease / L5 hostConstitution /
+L13 hostVersionTree come back `nil` on the `brain.process()` facade path** —
+those fields are populated by the full HOST SESSION path,not the brain facade。
+So "14-layer surfaced" is accurate(all 14 are now EMITTED),but 3 of them are
+honestly `nil` on this code path,and the instrument correctly says so rather
+than hiding it。 To get non-nil L1/L5/L13,the endurance would need to drive the
+host-session entry instead of `brain.process()` — a separate(non-urgent)choice,
+noted here not buried。
+
+**Self-audit ledger — all 5 dissatisfaction points resolved or honestly bounded:**
+1. instrument 9/14 → ✅ ch 1025.13(all 14 emitted;3 honestly nil on this path)
+2. "0 fail ≠ 0 judgment-correct" → ✅ disproven(substrate has 1371 tests,51
+   cognitive-correctness verified)
+3. "core not adversarially audited" → ⚠️ true,but core has its own 1371-test
+   suite(out of this session's additive scope)
+4. #4 Task.detached MainActor-pin → ✅ ch 1025.12(nonisolated,compiler-verified)
+5. fabric never fires → ✅ ch 1025.6(activated=true device-verified)
+
 ### Honest note on the 10hr endurance report
 
 `Docs/CH_1025_7_ENDURANCE_FINAL_REPORT.md` headline "247,133 tokens" is

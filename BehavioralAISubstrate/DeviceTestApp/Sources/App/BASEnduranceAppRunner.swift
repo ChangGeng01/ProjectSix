@@ -542,9 +542,9 @@ final class BASEnduranceAppController: ObservableObject {
             "exercised=mlx_gemma4_E2B_4bit+" +
             "coreml_BASContextClassifier_18Kparams+" +
             "L0_to_L14_cascade_all14_surfaced(ch1025.13)+" +
+            "fabric_runTurn(ch1025.6_activated)+" +
             "L8_LRU_bounded " +
-            "nyi=fabric_runTurn(ch1025.6)+" +
-            "mamba_SSM_runMambaScan(ch1033)+" +
+            "nyi=mamba_SSM_runMambaScan(ch1033)+" +
             "ANE_utilization_pct(WONTDO_iOS_sandbox)+" +
             "multi_organ_rotation(ch1036)")
 
