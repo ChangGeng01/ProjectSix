@@ -449,3 +449,68 @@ are correctly multi-chapter scope。 Future arcs will close them
 as their preconditions are met (watcher integration → tier wire;
 authoritative-mode wire → coordinator branch refactor;tier-
 based ANE dispatch → multi-chapter kernel arc)。
+
+---
+
+## ch 1025-1037 update — 最严苛 triage(2026-05-29)
+
+This doc was last substantively updated at ch 1015。 A 2-agent
+adversarial triage at ch 1037 (user mandate「全面 解决 scaffold/
+backlog 最严苛 最诚实」) found THREE honesty debts in the sections
+above,recorded here without rewriting history:
+
+### Debt 1 — summary count self-contradicts its own tables
+Line ~167 says「🪜 SCAFFOLD: ~4 (5%)」 but EVERY named row in the
+inventory tables already reads ✅ WIRED — zero 🪜 rows remain in
+the tables。 The genuinely-residual scaffolds live in PROSE only
+(the「explicitly DID NOT do」 list),not the tables。 Honest
+residual count is ~2 behavioral(`consultedByExecutorInProduction`,
+`BASAgentFabricMode.authoritative`)+ ~3 DEAD reserved prefixes
+(`agentFabric.activated:`,`agentPersona.applied:`,`.clamped:`),
+NOT「4 SCAFFOLD」。
+
+### Debt 2 — 「shipped ≠ wired」 reintroduced at the audit-emitter layer
+ch 1006-1009 flipped `BASAgentObservation` / `BASAgentFabricMode` /
+`Gate.Tier` / `Gate.TranscriptMode` to ✅ WIRED — but via
+audit/observer/projection EMITTERS,which do NOT change dispatch
+behavior。 `BASAgentFabricMode` runtime docstring itself says
+`.observationOnly` and `.authoritative` 「produce byte-identical」
+output。 The ✅ glyph reads stronger than the reality(observability-
+wired,not behavior-wired)。 This is the exact pattern this doc was
+created to stop — honest re-label: these are ✅ OBSERVABILITY-WIRED,
+behavior-wired remains Phase 9+。
+
+### Debt 3 — `agentFabric.merged:` mislabeled 💀 DEAD,actually Bucket-A
+The triage proved the merge engine RUNS in the production dispatcher
+(`BASAgentTurnDispatcher.swift:382`),`BASAgentMergeResult.
+mergeReasonCodes` is a real per-turn field,and the watcher-aggregator
+pattern(`BASAxisSanctumWatchersAggregator`)proves the emit shape。
+So `agentFabric.merged:` is honestly-closable(add a merge-audit
+emitter),NOT dead。 Triaged Bucket-A;ship when the audit-ledger
+consumer is added。
+
+### ch 1033 Mamba — now boot-probe exercised(device-verified)
+`BASMetalBenchmarkHarness.runMambaScan` is exercised on-device by
+`DeviceTestApp/.../BASMambaProbe.swift`(ch 1033,VERDICT all_ok=true,
+cpu 370µs / gpu 452µs / speedup 0.82 at hiddenDim=8)。 The biomimetic
+SSM layer was the top「NYI」 inventory line — now run on the A19。
+
+### Honestly NOT closable(close-would-lie or external)
+- `consultedByExecutorInProduction=false` → flipping = lie(ANE/
+  thermal tier dispatch not routed;`tierReadByExecutorInProduction`
+  companion already captures the true sub-state)。 ch 1026 needs
+  5-axis perf at .nominal + red-line-7。
+- `BASAgentFabricMode.authoritative` behavior wire → Phase 9+
+  coordinator-branch refactor。
+- ANE utilization% → iOS sandbox(private `H11ANE` entitlement)=
+  WONTDO。
+- 3 DEAD persona/activated prefixes → need the persona-resolver +
+  watcher arcs wired into the turn pipeline first。
+
+### OBSOLETE(mooted by ch 1025.4 in-app architecture)
+`ch 1032 competing-xcodebuild lockout` + endurance `exit=65` items
+were `xcodebuild test`-controller artifacts。 `devicectl device
+process launch`(in-app endurance)has no test-bundle enumeration +
+no shared test session,so these cannot recur on the now-default
+path。 Retained only for the legacy `scripts/run-iphone-air-10hr.sh`
+xcodebuild-test path。
