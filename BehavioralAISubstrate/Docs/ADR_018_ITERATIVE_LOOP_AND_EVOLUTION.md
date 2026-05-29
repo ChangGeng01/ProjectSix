@@ -226,6 +226,22 @@ loop already honors via `min(maxLoops, stepIndex)`); async-engine
 `buildCoordinator` threading; flipping the flag ON by default in any
 host (a deliberate behaviour-change decision, not yet taken).
 
+**Async-engine threading — attempted ch 1039, reverted (toolchain
+blocker).** Threading the flag through `buildEBrainTurnWithRuntimeMode`
+→ `buildCoordinator` is trivial and byte-equal-off, BUT its only
+faithful activation test is an `async XCTest` that calls
+`runtime.startSession(...)` — which deterministically crashes the
+XCTest process with `signal code 10` (SIGBUS) on the current toolchain
+(macOS 26 SDK + async-XCTest bridging), a PRE-EXISTING documented issue
+(`BASSignalTenIntegrationTestTriageDoctrine`, 12 known such tests). Per
+the discipline "do not ship behaviour-capable code that cannot be
+verified", the threading was reverted rather than shipped untested.
+Re-attempt once the toolchain SIGBUS is resolved (Xcode rollback/upgrade
+per the doctrine's recovery paths). The sync host path
+(`buildEBrainTurn`, the `.v1ByteEqual` default) is fully activated +
+tested, so this is a completeness gap on a non-default path, not a hole
+in the core deliverable.
+
 ---
 
 ## 8. Consequences
