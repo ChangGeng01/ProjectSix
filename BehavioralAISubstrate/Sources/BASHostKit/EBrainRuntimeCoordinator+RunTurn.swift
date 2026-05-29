@@ -390,7 +390,35 @@ extension BASEBrainRuntimeCoordinator {
             mergedChoice: mergedChoice,
             thoughtFrame: thoughtFrame
         )
-        let boundRiskCard = primaryBinding?.riskCard ?? riskCard
+        var boundRiskCard = primaryBinding?.riskCard ?? riskCard
+        // ADR-019 P1.5a — opt-in deliberation caution, injected on the
+        // FINAL bound card (post-binding) so it is NOT halved by the
+        // binding's ×0.5 re-derivation nor offset by the loop's own
+        // bias (ADR-019 §10). When the opt-in deliberation loop ran on a
+        // genuinely-uncertain matter, raise caution enough to cross a
+        // risk band. Caution-INCREASING only (cannot lower the band) →
+        // no sovereign gate. Flag-off → no injection → byte-equal
+        // (红线 7); this is the ONLY seam that consumes the flag here.
+        if deliberationLoopEnabled,
+           BASDeliberationCaution.isGenuinelyUncertain(
+               confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
+               maxEvidenceDebt: thoughtFrame.evidenceDebts?
+                   .map(\.debtWeight).max(),
+               leaseEnded: thoughtFrame.convergenceCertificate?
+                   .stoppingMode == .leaseEnd) {
+            let raised = min(1, boundRiskCard.totalRisk
+                + BASDeliberationCaution.uncertainDeliberationRiskIncrement)
+            let raisedLevel = resolvedRiskService.riskLevel(for: raised)
+            boundRiskCard.totalRisk = raised
+            boundRiskCard.riskLevel = raisedLevel
+            boundRiskCard.assertionCeiling =
+                raisedLevel >= .high ? "guarded" : "standard"
+            if boundRiskCard.sovereignHintLevel == nil, raisedLevel >= .high {
+                boundRiskCard.sovereignHintLevel = "medium"
+            }
+            boundRiskCard.factors =
+                boundRiskCard.factors + ["deliberation_uncertain_caution"]
+        }
         // M392 — `boundActionPermit` is rebound by the Cthulhu
         // doctrine gate block below (M303/M304/M384/M320/M385).
         // The block runs BEFORE `applySovereignNeuralContract`,

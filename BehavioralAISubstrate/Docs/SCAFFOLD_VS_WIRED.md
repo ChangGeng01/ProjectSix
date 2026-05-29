@@ -650,3 +650,25 @@ candidate / risk / permit / render changes。 So:
 Making it consequential needs a DIFFERENTIAL + clamp-aware bias (or a
 decision that consumes confidence),plus an early-exit on convergence to
 end the saturated wasted passes — design follow-ups (ADR-018 §7.4)。
+
+### ch 1040 — loop is now DECISION-CONSEQUENTIAL (opt-in, safe direction)
+
+P1.5a (ADR-019 §11) closed the inertness in the SAFE direction:the
+opt-in deliberation loop now **changes a real decision**。 A bounded
+caution increment is injected POST-binding on the FINAL bound risk card
+(in `runTurn`,past the binding's ×0.5 re-derivation + the loop-offset
+that made the calibrateRisk-level attempt cosmetic,ADR-019 §10),gated
+on (flag ON AND genuinely-uncertain)。
+
+- **deliberation → caution** — ✅ WIRED + CONSEQUENTIAL (opt-in)。 A
+  high-stakes/uncertain turn lands at totalRisk 0.6427 (.medium) with
+  the loop off;with the opt-in loop on,the caution crosses the 0.65
+  band → .high (guarded assertionCeiling,sovereign hint,Cthulhu permit
+  gating)。 No longer cosmetic。 Verified:`testActivatesAndRefines…`;
+  full sweep 14,656 / 0 with the flag OFF (byte-equal red-line)。
+- Caution-INCREASING only → no sovereign gate。 Flag-off → byte-equal。
+
+Still scaffold/deferred:the DANGEROUS direction (caution-DOWN / changed
+selection) is sovereign-gated (ADR-019 §4 P1.5b);and the per-pass
+*refinement quality* (making N passes genuinely resolve more,not just
+the opt-in MODE) is the separate substantive-refinement step。

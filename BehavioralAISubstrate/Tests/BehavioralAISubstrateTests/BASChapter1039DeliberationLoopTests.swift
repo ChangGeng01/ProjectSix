@@ -274,11 +274,29 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
                 "the +bonus propagates to confidenceFloor (a" +
                 " risk-consumed signal), so the loop is NOT fully inert")
         }
-        // …but for these candidate values it stays sub-threshold, so
-        // the risk OUTCOME is unchanged — decision-inert IN PRACTICE.
-        XCTAssertEqual(on.riskCard.riskLevel, off.riskCard.riskLevel,
-            "the propagated +bonus is sub-threshold here → the risk" +
-            " OUTCOME (riskLevel) is unchanged: decision-inert in practice")
+        // ADR-019 P1.5a — the loop is now DECISION-CONSEQUENTIAL on a
+        // genuinely-uncertain turn. The post-binding deliberation
+        // caution (injected on the FINAL bound card, §10) raises this
+        // high-stakes/uncertain turn across the high band: off lands at
+        // 0.6427 (just below 0.65 → medium); the opt-in loop adds the
+        // bounded caution → over 0.65 → high. This is a real decision
+        // change (assertionCeiling, sovereign hint, Cthulhu permit
+        // gating, downstream caution), safe-direction (caution can only
+        // rise), and byte-equal when the flag is off.
+        XCTAssertEqual(off.riskCard.riskLevel, .medium,
+            "without the loop, this fixture lands just below the high band")
+        XCTAssertEqual(on.riskCard.riskLevel, .high,
+            "the opt-in deliberation caution crosses the band → high" +
+            " (the loop is no longer decision-inert)")
+        XCTAssertEqual(on.riskCard.totalRisk,
+            min(1, off.riskCard.totalRisk
+                + BASDeliberationCaution.uncertainDeliberationRiskIncrement),
+            accuracy: 1e-9,
+            "caution adds exactly the bounded increment on the final" +
+            " bound card (NOT halved by the binding — see ADR-019 §10)")
+        XCTAssertTrue(
+            on.riskCard.factors.contains("deliberation_uncertain_caution"),
+            "the deliberation-caution factor is surfaced on the card")
     }
 
     // MARK: - Coverage gaps closed by the ch1039 deep audit

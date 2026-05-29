@@ -214,4 +214,38 @@ unchanged; only the LOCATION moves to the binding.
 
 **最小心 payoff:** the diagnostic caught the wrong injection point *before*
 shipping a cosmetic factor (the ch1039 failure mode), and produced the precise
-correct injection point. The binding-stage injection is the focused next step.
+correct injection point. → **LANDED in §11.**
+
+## 11. P1.5a LANDED — post-binding caution injection (ch1040)
+
+The §10 finding pointed at the right place — but the clean landing is NOT
+inside `materializeRiskBindings` (cross-module). It is **POST-binding, in
+`runTurn`** (`EBrainRuntimeCoordinator+RunTurn.swift`, right after
+`boundRiskCard` is selected), where `deliberationLoopEnabled` is directly in
+scope and the card is already final:
+
+- When the opt-in loop ran AND the turn is genuinely uncertain
+  (`BASDeliberationCaution.isGenuinelyUncertain`: `confidenceFloor < 0.55` OR
+  `maxEvidenceDebt >= 0.5` OR `stoppingMode == .leaseEnd`), raise the FINAL
+  bound card's `totalRisk` by a bounded **+0.06** and recompute `riskLevel`
+  (+ `assertionCeiling` / `sovereignHintLevel`). This is PAST the binding's
+  ×0.5 re-derivation and the loop-offset, so the increment lands at full
+  strength.
+- Caution-INCREASING only (monotonic; cannot lower the band) → no sovereign
+  gate. Flag-off → no injection → byte-equal (红线 7); this is the only seam
+  consuming the flag in the risk path.
+
+**This is the first DECISION-CONSEQUENTIAL effect of the deliberation loop —
+it is no longer cosmetic.** Verified by `testActivatesAndRefinesViaRealHost
+RuntimePath`: a high-stakes/uncertain turn lands at `totalRisk = 0.6427` (just
+below the 0.65 band → `.medium`) with the loop OFF; with the opt-in loop ON the
+bounded caution crosses the band → `.high` (→ guarded assertionCeiling,
+sovereign hint, Cthulhu permit gating, downstream caution). Full sweep
+**14,656 / 0** with the flag OFF (byte-equal red-line intact).
+
+**Honest scope:** this is the SAFE direction (caution-up on uncertainty) and it
+makes the deliberation MODE consequential. The DANGEROUS direction (caution-
+down / changed selection) remains sovereign-gated (§4, P1.5b). And the per-pass
+*refinement quality* (making N passes genuinely resolve more, not just the
+flag) is still the separate substantive-refinement step (§4) — this slice makes
+"opt-in deliberation on an uncertain matter ⇒ more caution" real + verified.

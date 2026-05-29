@@ -56,3 +56,36 @@ enum BASDeliberationBias {
         return refined
     }
 }
+
+// MARK: - BASDeliberationCaution
+// chapter 一千零四十 / ADR-019 P1.5a — consequential deliberation caution
+//
+// The ch1039 loop is decision-inert (ADR-019 §9 clamp-domination); a
+// calibrateRisk-level factor is halved + loop-offset by the binding
+// re-derivation (§10). This injects on the FINAL bound risk card
+// (post-binding, in runTurn) so the increment is NOT halved and NOT
+// offset — when the opt-in loop runs on a genuinely-uncertain matter,
+// raise caution enough to cross a risk band. Caution-INCREASING only →
+// no sovereign gate. Flag-off → no injection → byte-equal.
+
+enum BASDeliberationCaution {
+
+    /// Bounded caution added to the FINAL bound `totalRisk` when the
+    /// opt-in deliberation loop runs AND the matter is genuinely
+    /// uncertain. Sized to cross one risk band from a borderline value
+    /// (bands at 0.35 / 0.65 / 0.85). One-shot, bounded, caution-only.
+    static let uncertainDeliberationRiskIncrement = 0.06
+
+    /// Genuine-uncertainty predicate reusing the signals the dream-loop
+    /// already trusts (confidenceFloor < 0.55 OR maxEvidenceDebt >= 0.5
+    /// OR stoppingMode == .leaseEnd; cf. RiskService court signals).
+    static func isGenuinelyUncertain(
+        confidenceFloor: Double?,
+        maxEvidenceDebt: Double?,
+        leaseEnded: Bool
+    ) -> Bool {
+        (confidenceFloor.map { $0 < 0.55 } ?? false)
+            || (maxEvidenceDebt.map { $0 >= 0.5 } ?? false)
+            || leaseEnded
+    }
+}
