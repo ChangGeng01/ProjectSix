@@ -348,12 +348,21 @@ none touch shipped substrate。
   BAS Rust fnv == standard FNV-1a,not just "≠ basis")。
 
 Remaining 2 → **ch 1025.10**(risk-managed sequencing,NOT skipped):
-- **#4**(Task.detached MainActor-pin):needs full re-review of every
-  `self.@MainActor` access if `runEndurance` goes nonisolated —
-  moderate risk,LOW impact(10hr run completed),warrants a fresh session。
-- **MED-mono**(wall-clock→monotonic):mechanical but ~14 call sites
-  (runStart/iterStart/brainStart/mlxStart/…)— deferred to do carefully
-  in one pass,not at the tail of an already-long session。
+- **MED-mono**(wall-clock→monotonic):✅ **DONE ch1025.10(2026-05-29,
+  device-verified)**。 Added `monoNowNs()` + `monoElapsedMs(since:)`
+  helpers(`DispatchTime.now().uptimeNanoseconds`,NTP/DST-safe)。 All 9
+  duration deltas converted off `Date().timeIntervalSince`:runStart,
+  cognitiveBrain,brainLoad,iterStart/elapsedSec,brain,mlx,iterMs,
+  totalSec。 `Date()` retained ONLY for the snapshot wallClock timestamp +
+  log-file name stamp(correct timestamp uses,not deltas)。 Device-verified:
+  load_ms=6/2703,brain latency_ms=22/3,mlx latency_ms=15866/42704,
+  iter_ms=58598 — all sane positive,zero negative/absurd。
+- **#4**(Task.detached MainActor-pin):STILL DEFERRED — needs full
+  re-review of every `self.@MainActor` access if `runEndurance` goes
+  nonisolated。 Moderate risk,LOW impact(10hr run completed fine despite
+  the pin — `await` yields the main actor),warrants a fresh session,NOT
+  the tail of an already-long one(exactly the fatigue-risk the bug hunt
+  warned about)。 This is the LAST open bug-hunt finding。
 
 ### ch 1025.11 — 10hr data ACTUALLY reshapes behavior(2026-05-29,device-verified)
 

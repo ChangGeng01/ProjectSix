@@ -232,6 +232,30 @@ final class BASEnduranceAppController: ObservableObject {
         }
     }
 
+    // MARK: - Monotonic clock(ch 1025.10 MED-mono fix)
+
+    /// ch 1025.10 — monotonic now,in nanoseconds。 ALL latency/
+    /// duration deltas use this(not `Date()`)。 Wall-clock
+    /// `Date().timeIntervalSince` is subject to NTP steps / DST /
+    /// manual clock changes — on a 10-hour run that silently
+    /// corrupts every latency + the p50/p99/avg derived from them。
+    /// `DispatchTime.now().uptimeNanoseconds` is monotonic(does not
+    /// move when the wall clock is adjusted)。 `snapshot()` already
+    /// captured this but only LOGGED it — now it drives the deltas。
+    private nonisolated func monoNowNs() -> UInt64 {
+        return DispatchTime.now().uptimeNanoseconds
+    }
+
+    /// Elapsed milliseconds between two `monoNowNs()` readings。
+    private nonisolated func monoElapsedMs(
+        since startNs: UInt64
+    ) -> Double {
+        let now = monoNowNs()
+        // Monotonic ⇒ now ≥ startNs;guard defensively anyway。
+        let deltaNs = now >= startNs ? now - startNs : 0
+        return Double(deltaNs) / 1_000_000.0
+    }
+
     // MARK: - Adaptive cooldown(matches ch 1025 schedule)
 
     private nonisolated func cooldownSecFor(
@@ -338,7 +362,8 @@ final class BASEnduranceAppController: ObservableObject {
             env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
         let adaptive = (
             env["BAS_INTERNAL_ADAPTIVE"] ?? "1") == "1"
-        let runStart = Date()
+        // ch 1025.10 — monotonic run start(NTP/DST-safe)。
+        let runStartNs = monoNowNs()
 
         await MainActor.run {
             self.openLogFile()
@@ -374,7 +399,7 @@ final class BASEnduranceAppController: ObservableObject {
         await emitBoth(
             "📍 ch1025 BASCognitiveBrain.makeWithDefaults loading")
         let brain: BASCognitiveBrain
-        let cognitiveBrainStart = Date()
+        let cognitiveBrainStartNs = monoNowNs()
         do {
             brain = try await BASCognitiveBrain.makeWithDefaults()
         } catch {
@@ -387,8 +412,8 @@ final class BASEnduranceAppController: ObservableObject {
             }
             return
         }
-        let cognitiveBrainMs = Date()
-            .timeIntervalSince(cognitiveBrainStart) * 1000
+        let cognitiveBrainMs = monoElapsedMs(
+            since: cognitiveBrainStartNs)
         await emitBoth(String(format:
             "📍 ch1025 BASCognitiveBrain loaded load_ms=%.0f",
             cognitiveBrainMs))
@@ -398,7 +423,7 @@ final class BASEnduranceAppController: ObservableObject {
             "📍 ch1025 MLXOrganAdapter loading Gemma 4 E2B")
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E2B_4bit)
-        let brainLoadStart = Date()
+        let brainLoadStartNs = monoNowNs()
         do {
             try await adapter.loadModel()
         } catch {
@@ -411,8 +436,8 @@ final class BASEnduranceAppController: ObservableObject {
             }
             return
         }
-        let brainLoadMs = Date()
-            .timeIntervalSince(brainLoadStart) * 1000
+        let brainLoadMs = monoElapsedMs(
+            since: brainLoadStartNs)
         let isLoaded = await adapter.isModelLoaded()
         await emitBoth(String(format:
             "📍 ch1025 MLXOrganAdapter loaded load_ms=%.0f " +
@@ -463,9 +488,9 @@ final class BASEnduranceAppController: ObservableObject {
         var totalTokens = 0
 
         for iter in 1...totalIters {
-            let iterStart = Date()
+            let iterStartNs = monoNowNs()
             let elapsedSec = Int(
-                iterStart.timeIntervalSince(runStart))
+                monoElapsedMs(since: runStartNs) / 1000.0)
             await emitBoth(
                 "📍 ch1025 internal-iter=\(iter) start " +
                 "elapsed=\(elapsedSec)s")
@@ -491,10 +516,9 @@ final class BASEnduranceAppController: ObservableObject {
                 // is REAL substrate work,not just MLX。 No fabric
                 // activation yet (pipeline.runTurn deferred to ch 1025.6
                 // — needs fabric+roster+graph build in app target)。
-                let brainStart = Date()
+                let brainStartNs = monoNowNs()
                 let turnResult = await brain.process(prompt)
-                let brainMs = Date()
-                    .timeIntervalSince(brainStart) * 1000
+                let brainMs = monoElapsedMs(since: brainStartNs)
                 let taskType = turnResult.contextFrame.taskType
                 // ch 1025.5.5 audit MED-2:`confidenceBand` is
                 // `Optional<Double>` and the `brain.process` path
@@ -545,7 +569,7 @@ final class BASEnduranceAppController: ObservableObject {
                     turnResult, iter: iter, prompt: p + 1)
 
                 let mlxPreSnap = snapshot()
-                let mlxStart = Date()
+                let mlxStartNs = monoNowNs()
                 let request = BASOrganRequest(
                     requestID:
                         "ch1025-iter\(iter)-prompt\(p)",
@@ -555,8 +579,7 @@ final class BASEnduranceAppController: ObservableObject {
                     context: [])
                 do {
                     let draft = try await adapter.draft(request)
-                    let mlxMs = Date()
-                        .timeIntervalSince(mlxStart) * 1000
+                    let mlxMs = monoElapsedMs(since: mlxStartNs)
                     let mlxPostSnap = snapshot()
                     let bodyLen = draft.body.count
                     // ch 1025.8 HIGH-1 fix:`outputTokensEstimated` is
@@ -612,8 +635,7 @@ final class BASEnduranceAppController: ObservableObject {
             iterAvailMemAfter.append(
                 snapAfter.availableMemoryMB)
 
-            let iterMs = Date()
-                .timeIntervalSince(iterStart) * 1000
+            let iterMs = monoElapsedMs(since: iterStartNs)
             iterDurationMs.append(iterMs)
 
             // ch 1025.8 HIGH-1:est_ prefix — these are chars/4
@@ -669,7 +691,7 @@ final class BASEnduranceAppController: ObservableObject {
             }
         }
 
-        let totalSec = Date().timeIntervalSince(runStart)
+        let totalSec = monoElapsedMs(since: runStartNs) / 1000.0
         if !iterDurationMs.isEmpty {
             let sortedDurMs = iterDurationMs.sorted()
             let avgDurMs = iterDurationMs.reduce(0, +)
