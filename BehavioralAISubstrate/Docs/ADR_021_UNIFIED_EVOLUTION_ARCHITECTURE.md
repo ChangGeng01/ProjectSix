@@ -243,6 +243,87 @@ prerequisites are themselves designed + sovereign-reviewed." **No code was writt
 this chapter; the honest finding is the deliverable** (the same posture as the P4
 NO-GO + P5 deferral).
 
+### 5.3 The two prerequisites, designed (ch1044) — and why (b) is the binding wall
+
+"先设计" → both architecture-wide prerequisites from §5.2 were studied as design
+artifacts (Opus, code-grounded, design-only). The results are ASYMMETRIC, and the
+asymmetry is the deepest finding of this whole arc.
+
+**Prereq-(a) — generalized clamp-free selection injection point → DESIGNABLE (a
+safe one-way ratchet).** The reversibility-tilt (ADR-019 §13) generalizes to a
+charter:
+- **The contract:** at selection, among non-vetoed candidates within a near-tie
+  window of the score-winner, prefer the one maximizing a CERTIFIED clamp-free
+  safety axis — monotonic-toward-conservative.
+- **The 4-clause safety theorem** (so any future lever inherits safety without
+  re-proving): admissible iff (1) non-vetoed, (2) within the near-tie window, (3)
+  strictly safer on a *certified* axis (an axis is certified iff a one-time
+  `materializeRiskBindings`-monotonicity proof shows `boundRiskCard` is
+  non-increasing in risk along it — the `EBrainNeuralMaterializationCore.swift:149`
+  `irreversibility = max(floor, 1−reversibility)` style), (4) the binding
+  re-derives for the new winner. ⇒ can never select a less-safe action; flag-off →
+  identity → byte-equal.
+- **The learning attachment is structurally a one-way safety ratchet** (the key
+  result, and the genuine answer to the O1 clamp-domination wall): a learned signal
+  may ONLY tune the near-tie *window* or *choose among certified axes* — never the
+  direction, never confidence/cost (clamped anyway). A maximally-bad learned signal
+  maps onto `[byte-equal … more-conservative]` and is *structurally incapable* of
+  reducing safety. This realizes §4's "ratchet-up made structural."
+- **Honest limit (the punchline):** **reversibility is the ONLY axis today that is
+  both clamp-free AND monotone-toward-safer through the binding.** Every other
+  candidate axis (manipulation, boundary-conflict, evidence-gap, forecast
+  uncertainty) enters the binding via `max(frame_floor, per_candidate)`
+  (`…MaterializationCore.swift:152,156`) → a per-candidate improvement is absorbed
+  by the floor (safe-but-INERT, the O1 "decoration" failure one level up), OR is
+  already a *veto* (a hard rule, not a tilt). So the charter ships with an
+  allow-list of **exactly one axis**, a certification gate (operator/L14,
+  ADR-006/012-style) for any future axis, and lexicographic-veto-union +
+  single-tilt-per-turn rules so a multi-axis future can't trade safety-on-X for
+  danger-on-Y. **Verdict: worth designing as the prereq-(a) charter (contract +
+  theorem + learning ratchet); NOT an invitation to add axes. Today it behaves
+  identically to the single existing tilt.**
+
+**Prereq-(b) — realized-outcome feedback channel → effectively INFEASIBLE (the
+binding wall).** The deeper prerequisite, and it dies for a principled reason:
+- **No trustworthy outcome source exists.** Grep-confirmed: no `actualOutcome /
+  wasCorrect / realizedOutcome / groundTruth` anywhere. The substrate is a
+  behavioral-advice core — it decides → renders → audits, but NEVER observes the
+  world's reaction. `BASFeedbackEvent` is opaque free-text, prod-nil, no turnRef/
+  verdict (`EBrainObservationPlaneCore.swift:365`); ShadowTrial `completionState`
+  is self-assigned same-turn (not a realized future outcome); memory retirement is
+  age-based only, no outcome field (`MemoryGovernanceCore.swift:383-414`). The
+  cross-turn *transport* is solved (the carrier idiom + the existing `turnID`
+  addressing) — the **signal** is what's absent.
+- **The killing asymmetry (maps onto the §4 axis):** the ONLY outcome direction
+  that means "learn to do *better*" — "you were too CAUTIOUS, loosen up" — is a
+  request to REDUCE caution below baseline = exactly the CLOSED P4 / below-baseline
+  / §14 danger (a host could train-to-reckless with false "too-cautious"
+  attestations, with *weaker* provenance than the evidence-key ch1042 already
+  rejected for reduction). The only *safe* direction (caution-UP) is **redundant**
+  with the existing `requiresReview` review-ticket path (`BASMLEvolutionService.swift
+  :120-135`) and can never discover OVER-caution — so it is a noisier driver of a
+  ratchet the substrate already has, NOT learning.
+- **Verdict:** same infeasibility shape as substantive per-pass refinement
+  (ADR-019 §12), transposed to the outer loop: outcome-driven learning is
+  infeasible because the substrate is *outcome-blind + attestation-dependent*, and
+  the only safe fold direction carries no learning. DESIGNABLE only as (i) a
+  redundant safe caution-up form or (ii) a sovereign-gated form identical to the
+  already-closed P4 escape hatch. **Build NONE.**
+
+**The combined architecture truth (最极致最优雅 honest form):** genuine outer-loop
+learning needs BOTH prerequisites; (a) is designable as a safe ratchet, **but (b)
+is the binding constraint** — you can build a safe *selection ratchet*, but you
+cannot feed it real outcomes, so it can only ever ratchet toward caution, never
+learn calibration. **The deepest reason this substrate cannot self-evolve is not
+the clamps (designable-around via the tilt) — it is OUTCOME-BLINDNESS.** A
+behavioral-advice core with no trustworthy ground-truth feed has no safe direction
+in which "learning" is distinguishable from "becoming more cautious." That is the
+final, honest 整体逻辑: the architecture is *complete and elegant as a
+single-shot conservative decision core with an opt-in safe-selection ratchet*; it
+is *structurally not a self-improving learner*, and making it one needs an external
+trustworthy outcome capability the substrate is — by its nature as advice, not
+action-with-observed-consequence — unable to obtain on its own.
+
 ---
 
 ## 6. Red-line proofs (outer-loop discipline, per slice)
