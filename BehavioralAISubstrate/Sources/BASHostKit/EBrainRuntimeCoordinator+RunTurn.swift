@@ -442,12 +442,18 @@ extension BASEBrainRuntimeCoordinator {
         // credit is the fraction of the turn's TYPED unknowns
         // (`decomposeFrame.unknownRecords`) that the opt-in
         // `evidenceLedger` resolves by EXACT key. So the loop can WITHHOLD
-        // its OWN added caution (down to 0 = the loop-off baseline) when
-        // stored evidence resolves the uncertainty — NEVER below baseline,
-        // so the §14 verdict-after-render invariant holds by construction
-        // (the loop's contribution stays in [0, increment]). `evidenceLedger`
-        // nil (default everywhere) → credit 0 → withheld = full increment →
-        // byte-equal with the pre-Step-4 P1.5a behavior (红线 7).
+        // its OWN added caution (down to 0) when stored evidence resolves
+        // the uncertainty. The loop's contribution stays in [0, increment]
+        // — it never subtracts MORE than it added (the §14-safe shape). NOTE
+        // (ADR-020 §9 correction): the floor is "withholds ≤ its own added
+        // increment, vs the SAME-SELECTION on_stuck baseline" — NOT "≥ the
+        // loop-off baseline". On a turn where the ch1041 reversibility-tilt
+        // also fires, the safer (more-reversible) selected candidate has a
+        // slightly-lower binding, so the resolved total can land marginally
+        // BELOW the loop-off scalar even though caution-withholding alone
+        // never goes negative. `evidenceLedger` nil (default everywhere) →
+        // credit 0 → withheld = full increment → byte-equal with the
+        // pre-Step-4 P1.5a behavior (红线 7).
         if deliberationLoopEnabled,
            BASDeliberationCaution.isGenuinelyUncertain(
                confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
