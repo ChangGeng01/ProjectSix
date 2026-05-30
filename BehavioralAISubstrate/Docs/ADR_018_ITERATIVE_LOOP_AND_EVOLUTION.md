@@ -396,7 +396,24 @@ mirroring ch1042, threaded through `buildEBrainTurn`/`makeEBrainTurn`. 0 refs in
 runTurn → dormant. Tests `BASChapter1043ShadowTrialFeedbackTests` 7/0; byte-equal
 witness `BASChapter1039` 9/0; init-pin `BASChapter602` 4/0.
 
-### P2 Commit 2 — RESUME SPEC (the opt-in N→N+1 trigger — a runTurn SPINE edit; do with a FRESH context)
+### P2 Commit 2 — LANDED (ch 1043, `48e195e68`), opt-in N→N+1 trigger in runTurn (observation-only, byte-equal-off)
+
+The opt-in trigger SHIPPED. One guarded block at runTurn turn-start
+(`EBrainRuntimeCoordinator+RunTurn.swift:121`, after the turn IDs derive)
+evaluates the PRIOR turn's pending trials via the pure Commit-1 evaluator
+and feeds the result to `resolvedTrialSink` ONLY (observation-only —
+`evaluated` appears only at its declaration + the sink call). NEVER-
+EFFECTIVE-SAME-TURN holds by construction: `buildEvolutionGovernance
+Artifacts` (this turn's trial construction) is at :983, 862 lines later, so
+the carrier can only hold turn N−1's trials. Three off-switches
+(`shadowTrialFeedbackEnabled` false / `pendingTrialLedgerIn` nil /
+`resolvedTrialSink` nil), all default → block skipped → byte-equal. No init
+params added. Tests `BASChapter1043` 14/0 (incl. the 2-turn N→N+1
+transition, NEVER-SAME-TURN guards, byte-equal-off, replay-determinism);
+ch1039 9/0; ch602 4/0.
+
+The original RESUME SPEC (the seam, the guarded block) is preserved below as
+the implementation record:
 
 In `EBrainRuntimeCoordinator+RunTurn.swift`, insert a guarded block at
 **turn-start** (after `derivedTurnID` is available, ~:116-120, and BEFORE
@@ -421,7 +438,21 @@ turn N+1, two distinct turns); NEVER-SAME-TURN guard (nil carrier → empty sink
 byte-equal-off (each off-switch); replay-determinism. Gate on fast filters
 (ADR-020 §8), not the noisy full sweep.
 
-### P2 Commit 3 — tests/docs/telemetry (optional trace telemetry behind the flag; flip SCAFFOLD ShadowTrial scaffold→opt-in-wired; flip this §10 status).
+### P2 Commit 3 — LANDED (ch 1043), docs close-out
+
+SCAFFOLD_VS_WIRED.md L13 ShadowTrial flipped scaffold→opt-in-wired (N→N+1);
+this §10 status flipped (C1+C2+C3 all LANDED). **Optional trace telemetry
+(surfacing evaluated-trial outcomes into the runtime trace behind the flag)
+was NOT built** — it is a non-essential observability add, and the
+observation-only sink already gives a host the evaluated trials; deferring
+it avoids touching the trace/seal path for marginal value. P2's core
+(the N→N+1 feedback capability) is complete.
+
+**P2 STATUS: COMPLETE (safe scope).** The ShadowTrial N→N+1 feedback loop is
+opt-in wired + tested. Honest boundary (unchanged from below): observation-
+only; production-inert until a host populates + re-injects the carrier;
+World B + BASFeedbackEvent untouched; carrier is in-memory host-persistable
+(no sovereign-audit-chain durability).
 
 ### P2 honest boundary (what it does NOT do)
 Observation-only (closing a trial changes nothing the host sees unless it acts on
