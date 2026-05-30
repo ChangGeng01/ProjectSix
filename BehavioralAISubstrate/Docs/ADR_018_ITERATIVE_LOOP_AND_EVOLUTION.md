@@ -90,7 +90,7 @@ The evolution points (2 / 4 / 5) are the **slower outer learning loop** that fee
 | **P2** | ch 1040 | 点2 ShadowTrial evaluator + ledger replay (N→N+1 trial closure) | ⚠️ needs-infra | ~150 | MED (NEVER-SAME-TURN intact) | feedbackEvent path unchanged → identity sweep; trial transitions across 2 turns |
 | **P3** | ch 1041 → **landed ch 1044** | opt-in flag + loop/trial telemetry into trace + thermal-gated depth on-device proof | ✅ **LANDED** (mostly already done; the real gap was the thermal floor — see §11) | ~60 (actual: ~40, rest already shipped) | Low | flag OFF → identity; `.hot`/`.critical` thermal → maxLoops==1 (NOT `.serious` — that case does not exist; see §11) |
 | **P4** | ch 1044 | 点4 feedback→policy (single scalar threshold) + L14 sovereign gate | 🔴 **NO-GO / DESIGN-ONLY — do NOT implement without a human sovereign review (see §12)** | ~250 | HIGH (can train-bad) | nil-feedback = identity; sovereign veto blocks; ±0.05 cap; replay-deterministic |
-| **P5** | ch 1043+ | 点5 version-tree branch / shadow-trial / merge | 🔴 major-arc | 600-900 | HIGH (highest-stakes cross-module) | multi-session; each step sovereign-gated + reversible + device-sync |
+| **P5** | ch 1043+ | 点5 version-tree branch / shadow-trial / merge | 🔴 major-arc — **scout NO-GO this session (see §13); scope corrected: smaller than 600-900, danger concentrated in merge-promotion** | ~300-500 (CRDT device-sync ALREADY built) | HIGH (highest-stakes cross-module) | multi-session; each step sovereign-gated + reversible + device-sync |
 | **P6** | aspiration | population / fitness / selection / crossover GA (zero GA machinery exists today) | far-future | — | — | multi-session; ADR records the route only |
 
 **Ship order: P1 (most elegant start) → P2 → P3 → P4 → P5.** P1 is the true 「最极致最优雅」 starting point: minimal code, reuses all existing telemetry, zero red-line risk, device-verifiable.
@@ -577,3 +577,73 @@ P3 (thermal floor) are LANDED. **P4 is CLOSED as NO-GO/design-only.** P5
 (version-tree branch/merge, ADR §6) remains a 🔴 major multi-session cross-module
 arc — also not to be attempted at the tail of a long session. The opt-in
 deliberation/evolution substrate is at a coherent, honest stopping point.
+
+---
+
+## 13. P5 (version-tree branch / shadow-trial / merge) — scout NO-GO this session (ch 1044)
+
+A read-only adversarial scout (Opus, safety-first) mapped P5 against the real
+code. **Verdict: NO-GO for this session — a genuine multi-session cross-module
+arc, not to be started at a long-session tail.** It also CORRECTED the §6 scope
+estimate with evidence.
+
+### Scope correction (the ADR was over-pessimistic)
+- The "version tree" is **linear today** — `BASHostVersionTree`
+  (`HostConstitutionCore.swift:465`) is a flat version list + single
+  `activeVersionID`, NOT a DAG. `parentVersionID` (`EBrainKnowledgePlaneCore.swift
+  :121`) is **carried-but-unpopulated** by the live commit `approving()`
+  (`:795-825`) — lineage recording only, zero branch/merge logic (grep empty).
+- **Sub-capability (4) device-sync CRDT ALREADY EXISTS** (the §4 "net-new" claim
+  is WRONG): `BASHostVersionTreeMerge.merging()` (`BASHostVersionTreeMerge.swift:
+  54-173`) is a complete, property-tested CRDT device-merge; plus a full
+  BASSovereign CRDT strategy family (LWW / vector-clock / gossip / MV-register).
+  Dormant (0 production callers) but built.
+- **The sovereign-gate primitives EXIST:** `BASSovereignTokenAuthority`
+  (`BASSovereignTokenAuthority.swift:30`) is a complete double-key Ed25519
+  commit/warrant system with `policyHash` lineage-pinning + single-use + TTL +
+  revocation, and a `.hostMutate` commit scope.
+- So the real residual is **smaller than 600-900 LOC** and concentrated in the
+  two greenfield + dangerous pieces: **(2) merge-promotion** (promote a divergent
+  branch into the live `activeVersionID`) and **(3) multi-trial isolation**.
+
+### Danger model — vs P4
+Merge-promotion is **equal-or-greater blast radius than P4** (it can swap the
+ENTIRE active constitution to a divergent lineage in one op, polluting every
+downstream `project()` consumer) — BUT, unlike P4, it is **unsafe-by-DEFAULT,
+not unsafe-by-CONSTRUCTION**: it is gate-safeable. That is why P4 is permanently
+CLOSED (§12, no safe middle) while P5 is "deferred major arc." **Sharp pitfall
+the scout flagged:** `merging()` resolves content collisions by LWW-on-createdAt
+with an `approvedByPolicy` tiebreak and does NOT verify `signature` (the field is
+documented forge-able) — so the device-reconciliation merge is attacker-favorable
+and MUST NEVER be the promotion arbiter for a divergent branch. Safe promotion
+requires: model-unreachable `.hostMutate` `policyHash`-pinned single-use token +
+signature verification (not LWW) + a written rollback point + branch-trial
+isolation (trials run against the BRANCH constitution, never live) + default-OFF
+byte-equal.
+
+### Recommendation
+**NO-GO this session — even for the safe dormant first slice.** A dormant slice
+DOES exist and is genuinely isolatable (the live `approve()` path is linear and
+never reads a branch concept, so a new branch-record value type + a merge-approval
+intent type, both 0 call sites, are byte-equal-by-construction — the ch1043 P2
+Commit-1 discipline). But its only value is "advance the arc," and the dangerous
+core (2) — the whole point — must be done fresh + sovereign-reviewed + red-line-
+proofed. Landing scaffolding at a session tail buys little. Deferred in full.
+
+### Future phase map (fresh + sovereign-reviewed effort)
+- **P5.0** dormant types (`BASHostVersionBranchRecord` + a `.hostMutate`
+  merge-approval intent, 0 call sites, byte-equal) — low-risk, any session.
+- **P5.1** branch registration (carrier-pattern `branches` on the tree, INERT —
+  never affects `activeVersionID`/`project()`; byte-equal-off).
+- **P5.2** multi-trial isolation (finally instantiate the World-A
+  `BASShadowTrialCoordinator`, run branch trials against the branch constitution;
+  preserve NEVER-EFFECTIVE-SAME-TURN). Multi-session on its own.
+- **P5.3** sovereign-gated merge-promotion (THE dangerous core — token + signature
+  verify + rollback point; human sovereign review required, per the P4 precedent).
+- **P5.4** device-sync wiring (give `merging()` a production caller, keeping
+  device-reconciliation strictly separate from branch promotion).
+Module dependency: BASMemory ← BASOrchestration ← BASSovereign (matches §6).
+
+**Status after the scout: P5 deferred (NOT started). The ch1039→1044 arc — P1
++ P1-consequential + P2 + P3 LANDED, P4 CLOSED, P5 mapped-and-deferred — is at a
+coherent, audited, honest stopping point.**
