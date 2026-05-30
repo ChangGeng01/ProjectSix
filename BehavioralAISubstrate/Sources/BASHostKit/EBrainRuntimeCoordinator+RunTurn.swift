@@ -118,6 +118,29 @@ extension BASEBrainRuntimeCoordinator {
             .withDerivedPresenceObservationBundle(
                 frameContext: frameContext)
 
+        // chapter 一千零四十三 / ADR-018 P2 — evaluate the PRIOR turn's
+        // pending trials (N→N+1 closure). Placed at TURN-START (right
+        // after the turn IDs derive, BEFORE this turn's own trials are
+        // built in buildEvolutionGovernanceArtifacts below) so the
+        // carrier can only ever hold turn N−1's trials — this is what
+        // guarantees NEVER-EFFECTIVE-SAME-TURN
+        // (BASEvolutionShadowSeat doctrine).
+        //
+        // OPT-IN: flag-off OR nil carrier OR nil sink → skipped →
+        // byte-equal (红线 7). OBSERVATION-ONLY (mirrors
+        // provisionalVerdictSink): feeds resolvedTrialSink ONLY — gates
+        // nothing; NOT in any render / seal / verdict / governance /
+        // canonical-bytes / hash path.
+        if shadowTrialFeedbackEnabled,
+           let pendingLedger = pendingTrialLedgerIn,
+           let resolvedTrialSink,
+           !pendingLedger.pendingTrials.isEmpty {
+            let evaluated = pendingLedger.pendingTrials.map {
+                BASShadowTrialFeedbackLedger.evaluate($0)
+            }
+            resolvedTrialSink(evaluated)
+        }
+
         var decomposeFrame = decomposeService.decompose(
             contextFrame: contextFrame,
             memoryHints: []

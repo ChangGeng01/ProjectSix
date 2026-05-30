@@ -1,6 +1,6 @@
 # ADR-018 — 循环算法 + 进化学习回路 底层架构(统一 Deliberation-Budget Loop)
 
-- **Status**: ACCEPTED (design only — no substrate-core code changed by this ADR)
+- **Status**: IN PROGRESS — NO LONGER "design only". P1 LANDED (ch 1039, substrate code CHANGED — see §7.2-§7.4; async-engine `buildCoordinator` threading still blocked by toolchain SIGBUS, §7.3) + P1 made decision-consequential (ch 1040-1042 via ADR-019/020) + P2 Commit 1 LANDED dormant (ch 1043, §10). Original design accepted 2026-05-29; implementation status tracked in §7.2-§7.4 + §10.
 - **Date**: 2026-05-29
 - **Chapters**: design for ch 1039+ (P1) through ch 1043+ (P5); P6 aspiration
 - **Supersedes / relates**: ADR-014 (OPT-IN doctrine), red-line 7 (additive byte-equal), ch 1025.11 (thermal-aware cooldown data), SCAFFOLD_VS_WIRED.md
