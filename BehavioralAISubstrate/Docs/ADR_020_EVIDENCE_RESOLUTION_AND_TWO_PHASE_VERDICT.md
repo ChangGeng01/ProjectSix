@@ -1,6 +1,14 @@
 # ADR-020 — Evidence-Resolving Deliberation + Two-Phase Verdict
 
-> **Status: IN PROGRESS.** Successor arc to ADR-018/019. After the consequential-
+> **Status: COMPLETE (safe scope).** Both directions landed opt-in + byte-equal-off:
+> Arc-3 two-phase verdict (observation-only, Phase A+B+C) and Arc-2 evidence-
+> resolving caution-withholding (Step 4 C1+C2+C3). Step 2b closed as not-needed
+> (§4); both dangerous endpoints closed as architecturally unsafe (§1). The
+> floored-invariant phrasing was corrected (§9 — floor is "≤ the loop's own added
+> increment", NOT "≥ the loop-off baseline"). Substantive per-pass refinement
+> remains out of scope (infeasible, ADR-019 §12).
+>
+> Successor arc to ADR-018/019. After the consequential-
 > wiring arc landed the SAFE levers (reversibility-tilt §13, caution-up §11) and
 > closed the dangerous one (P1.5b caution-reduction, §14 — architecturally
 > incompatible), the user selected BOTH remaining build directions:
@@ -90,22 +98,26 @@ observation-only** artifact (NOT a gate on any reduction — see §1):
 | **2a** | Arc-2 latent primitives — `BASEvidenceAtom`/`ContentType`/`Ledger`/`Matcher` (dormant) | very low (dormant) | ✅ `e6458fbc4` — sweep 14,662/0 |
 | **3 Phase B** | Arc-3 `buildProvisionalVerdict` + `BASProvisionalVerdict` (dead code; `computeVerdictDecision`→`static`) | low (dead code) | ✅ `91123cd66` — sweep 14,667/0 |
 | **3 Phase C** | wire the provisional verdict as INERT, observation-only at `RunTurn:~823` | low (off-gated, mutation-free seam) | ✅ `628384370` — sweep 14,668/0 |
-| **2b** | defaulted-optional `BASMemoryBundle.resolvedEvidence` (custom Codable — `encodeIfPresent`) + `BASUncertaintyLedger.resolvedEvidenceRefs` + coordinator `evidenceStore` slot | low (dormant) | pending (interface coupled to Step 4) |
+| **2b** | ~~defaulted-optional `BASMemoryBundle.resolvedEvidence` Codable field + `evidenceStore` slot~~ | — | ❌ **CLOSED — not needed.** Step 4 (C1) chose the coordinator-`slot + sink` carriers precisely to AVOID a Codable/seal-path field (the dominant byte-equality risk). `evidenceLedger` (in) + `resolvedEvidenceSink` (out) deliver the same capability off the canonical-bytes path. So 2b is correctly-scoped non-work, not deferred. |
 | **4** | Arc-2 single-layer floored caution-withholding (at the P1.5a seam) | medium (opt-in, byte-equal-off) | **C1 ✅** `1cc6dfcb6` (pure helper `BASDeliberationResolutionCredit` + dormant coordinator slots `evidenceLedger`/`resolvedEvidenceSink`) · **C2 ✅** `219d9b865` (seam: add `withheldIncrement = max(0, 0.06 − credit)` instead of the constant — byte-equal + **production-inert**: `buildEBrainTurn` does not thread the ledger yet) · **C3 ✅** `83e05e222` (thread `evidenceLedger` through `buildEBrainTurn` → activate in production; e2e proof on `.fixtureGeneric`, 2 live `missingFact` keys: full resolution drops high→medium with `on_resolved.totalRisk == on_stuck − increment` exactly, ch1042 5/0 + ch1039 9/0 + ch602 4/0, + replay-determinism + anti-theater + byte-equal-off) — **see §9 for the floor-claim CORRECTION** |
-| **5** | Borderline fixture + ADR/SCAFFOLD status flips | docs | pending |
+| **5** | ADR/SCAFFOLD status flips + honest-scope close-out | docs | ✅ `SCAFFOLD_VS_WIRED.md` ch1042 entry + §9 correction + this table |
 
 **Excluded (confirmed unsafe, §1):** below-baseline reduction (Arc-2 caution-DOWN)
 and verdict-gated reduction (Arc-3 "Phase D"). Both need the render-and-verdict
 replay → a separate sovereign-gated ADR.
 
-**ARC-3 (two-phase verdict) is COMPLETE** in its safe, observation-only form
-(Phase A + B + C landed, byte-equal, verified end-to-end: the provisional
-forecast fires pre-render and equals the post-render verdict level for the
-production path, while changing no decision). What remains is all **Arc-2**
-(knowledge-retrieval): Step 2b (the evidence store + defaulted fields, dormant)
-and Step 4 (the consequential floored caution-withholding) — the latter being the
-one decision-changing slice, sized large and design-gated. Resume Step 4 with a
-fresh context per the §7-style discipline.
+**BOTH arcs are COMPLETE in their safe scope** (all opt-in, byte-equal-off):
+- **Arc-3 (two-phase verdict)** — Phase A+B+C landed; the provisional forecast
+  fires pre-render and equals the post-render verdict level for the production
+  path, observation-only (changes no decision).
+- **Arc-2 (evidence-resolving caution-withholding)** — Step 4 C1+C2+C3 landed;
+  the loop withholds its own added caution (floored — see §9) when a host-supplied
+  `evidenceLedger` resolves the turn's typed unknowns by exact key.
+
+Step 2b closed as not-needed (the slot+sink carriers avoid a Codable field). The
+only remaining "work" is genuinely out of scope: substantive per-pass refinement
+(infeasible, ADR-019 §12) and the below-baseline/verdict-gated reductions
+(architecturally unsafe, §1) — both correctly NOT built.
 
 ## 5. Phase A — verdict-decision extraction (LANDING)
 

@@ -709,3 +709,48 @@ candidate。
 
 Verified:`testActivatesAndRefines…` (tilt+caution compose),ch1039 8/8,
 full sweep 14,656 / 0 flag-off。
+
+### ch 1042 — ADR-020:two-phase verdict(观测)+ evidence-resolving 谨慎-withholding
+
+ch1042 arc 在 ch1039–1041 的基础上,落地了用户选的两个方向(opt-in,
+byte-equal-off,全程红线 7)。
+
+- **two-phase verdict(Arc-3)→ ✅ WIRED,observation-only**。
+  `computeVerdictDecision` 抽成 render-independent 纯函数(`ce13c2e9e`);
+  `buildProvisionalVerdict` 在 render 前预测 post-render 裁决 LEVEL
+  (`91123cd66`);经 `provisionalVerdictSink` 在 `RunTurn` 接线
+  (`628384370`)—— 只观测、**不 gate 任何东西**。危险的 caution-降级
+  端点(P1.5b / below-baseline reduction)经两轮独立架构评审确认**架构上
+  不安全**,关闭(ADR-020 §1)。
+
+- **evidence-resolving 谨慎-withholding(Arc-2 / Step 4)→ ✅ WIRED +
+  CONSEQUENTIAL(opt-in)**。 不确定 turn 上,host 供给的
+  `evidenceLedger` 若按 EXACT key 解析了该 turn 的 typed unknowns
+  (`decomposeFrame.unknownRecords`),循环就**收回它自己加的那点谨慎**:
+  seam 加 `withheldIncrement = max(0, increment − credit)`,credit =
+  已解析比例 × increment。 实测(`.fixtureGeneric`,2 个 live
+  `missingFact` key):`on_stuck` high 0.69850 → `on_resolved` medium
+  0.63850(完全解析 → 退一个 band)。提交 `1cc6dfcb6`(helper+槽位)、
+  `219d9b865`(seam)、`83e05e222`(穿线+证明)。
+  - **安全性质(诚实,见 ADR-020 §9 的纠正)**:floor 是"收回 ≤ 自身
+    增量"(相对同选择 on_stuck 基线),**不是**"≥ loop-off 基线"——
+    ch1041 tilt 同时选了更可逆候选,其 binding 本就略低,所以
+    `on_resolved` 可能比 loop-off 标量低约 0.004。仍是保守方向
+    (动作更可逆 + band 退回),但 "≥off" 是早先的 overclaim,已纠正。
+  - anti-theater:near-miss atom(内容差一个 token)→ key 不等 → 不解析
+    → 不 withhold(EXACT key only)。replay-deterministic。
+    Flag-off 或 ledger nil(生产默认)→ byte-equal。
+
+- **生产现状(诚实)**:`buildEBrainTurn` 已穿 `evidenceLedger`,但默认
+  nil → 生产路径暂时 inert,直到 host 真去 populate evidence。Step 4
+  让循环**有能力**按真实证据收回谨慎,不伪造证据。
+- **未做(正确范围)**:substantive per-pass refinement 仍 INFEASIBLE
+  (确定性循环 + 信号计数记忆,ADR-019 §12);below-baseline /
+  verdict-gated reduction 架构上不安全已关闭(ADR-020 §1)。
+  ADR-020 计划里的 "Step 2b"(`BASMemoryBundle.resolvedEvidence`
+  Codable 字段)经评审**不需要** —— Step 4 走协调器 slot + sink,刻意
+  避开 Codable/seal 路径,所以 2b 关闭(非遗留工作)。
+
+Verified(ADR-020 §8 flaky-triage:门禁用快而干净的 ch1039,不信任嘈杂
+全量):ch1039 9/0(byte-equal 见证)、ch1042 5/0(consequence)、
+ch602 4/0(init-pin)。
