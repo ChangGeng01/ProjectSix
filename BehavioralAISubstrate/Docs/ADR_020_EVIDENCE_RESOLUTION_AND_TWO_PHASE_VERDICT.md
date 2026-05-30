@@ -120,3 +120,54 @@ the full sweep is the proof.
   (a near-miss prose pair must NOT match).
 - The `loopCount==1` pin + canonical identity + byte-equality-proof sweeps stay
   green at every step.
+
+## 7. Phase C resume spec (the NEXT spine edit — do with a fresh context)
+
+Goal: wire `buildProvisionalVerdict` (Phase B) into `runTurn` as an **inert,
+observation-only** artifact — byte-equal when off AND provably inert when on.
+This is the one spine touch; everything it needs already exists.
+
+**Seam:** `EBrainRuntimeCoordinator+RunTurn.swift`, immediately AFTER
+`boundActionPermit` is fully settled by the Cthulhu gate (~:807–820) and BEFORE
+`render` (:856). At that point `boundRiskCard`, `boundActionPermit`, `budgetFrame`,
+`request.activeKillSwitches`, and `thoughtFrame.uncertaintyLedger` are all settled.
+
+**Three pieces:**
+1. **Sink** — add a default-nil `@Sendable` closure slot on the coordinator,
+   mirroring `agentFabric` exactly (`EBrainRuntimeCoordinator.swift` property :135
+   / init param :179 / assignment :206):
+   `public var provisionalVerdictSink: (@Sendable (BASProvisionalVerdict) -> Void)? = nil`.
+   It is NOT Codable and must appear in **zero** canonical-bytes/hash/seal paths
+   (proof obligation: grep the name → only the init + the :807 emit).
+2. **Pre-render emergencyBrake** — compute a provisional brake via the existing
+   pure `buildEmergencyBrake(...)` (`EBrainRuntimeCoordinator+SovereignRuntime.swift:16`)
+   from the pre-render inputs. This is a SEPARATE local; it must NOT replace or
+   perturb the authoritative `emergencyBrake` computed later (~:1046).
+3. **Emit (off-gated, side-effect-only):**
+   ```
+   if deliberationLoopEnabled {
+       let pv = Self.buildProvisionalVerdict(
+           policyLineagePresent: policyLineage != nil,
+           budgetFrame: budgetFrame, riskCard: boundRiskCard,
+           actionPermit: boundActionPermit, emergencyBrake: <pre-render brake>,
+           activeKillSwitches: request.activeKillSwitches,
+           confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
+           maxEvidenceDebt: thoughtFrame.evidenceDebts.map(\.debtWeight).max(),
+           leaseEnded: <stoppingMode == .leaseEnd>)
+       provisionalVerdictSink?(pv)
+   }
+   ```
+
+**Byte-equality:** flag off → block never runs → byte-equal. Flag ON + sink nil
+(the default everywhere, incl. every fixture) → `buildProvisionalVerdict` is a
+pure computation whose ONLY effect is `sink?(pv)`, a no-op when nil → byte-equal.
+The sink must never feed render/seal/verdict/hash — that is the whole safety.
+
+**Tests (now that a real verdict exists to compare):** `provisionalLevel ==
+finalLevel` for the production evolution service across the fixture grid;
+inert-when-on identity (on-vs-off full `BASEBrainTurnResult` byte-equal, since the
+emit is observation-only); flag-off full sweep stays at the current count / 0.
+
+**Then STOP and checkpoint** before Step 4 (the consequential floored
+caution-withholding) — it is the one slice that changes a decision, and it is
+sovereign-review-gated by design.
