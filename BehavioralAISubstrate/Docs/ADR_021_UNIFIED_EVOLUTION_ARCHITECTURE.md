@@ -180,6 +180,69 @@ no code for these. INFEASIBLE → needs a capability the substrate lacks.
 **STOP at the SAFE/GATED boundary.** O5/O6 await sovereign machinery + review; the
 CLOSED rows are never built.
 
+### 5.1 Implementation-feasibility re-study (ch1044) — the SAFE ladder is NOT cleanly buildable as drafted
+
+Two adversarial implementation studies (Opus, code-grounded) examined O0 + O1 to
+START "全面开发." Both reached HONEST NO-GO — sharpening this design:
+
+- **O0 (name the carrier pattern) → DON'T-BUILD as code.** The two landed carriers
+  share only the *plumbing* triple; their FOLDS and CONSUMPTION SEAMS genuinely
+  differ — evidence's fold (`BASDeliberationResolutionCredit`) is a free-function
+  pipeline over the frame that MUTATES `boundRiskCard` (`+RunTurn.swift:473-483`),
+  while ShadowTrial's fold is a `map` of a carrier method feeding a sink that
+  GATES NOTHING (`:138-141`). A unifying protocol is either **vacuous** (a marker
+  enforcing nothing both types don't already satisfy) or **behavior-changing**
+  (can't byte-equally relocate the evidence fold onto the carrier). Two instances
+  is not a pattern (rule-of-three unmet); `BASExperience*` is already a taken name
+  (`BASExperienceCandidate(Type)`). **§2.2's table already IS the O0 artifact.**
+  Codifying "same shape" would amplify the §8 risk it warns against (same shape ≠
+  same safety). Verdict: the doc IS the deliverable; revisit a shared type only at
+  a genuine third instance.
+
+- **O1 (dream-loop success-tally) → NO-GO; the ADR-018 "~40 LOC clean" estimate is
+  WRONG three independent ways** (like the P4 "feasible" + P5 "600-900 LOC"
+  estimates were wrong): (1) **dead target** — `dreamLoopBatchScore`
+  (`BASAutoRouteRanker.swift:3058`) has 0 production callers; biasing its `costs[]`
+  changes nothing (the live decision is `mergeChoice`'s `mergedScore`, not the
+  batch-scorer). (2) **clamp-dominated** — even if wired, a cost/confidence nudge
+  dies on the 0.64 `egoScore` ceiling (ADR-019 §9: "there is no small, clean, safe
+  consequential slice; the architecture forbids it on purpose"). Only the
+  reversibility-tilt survived, precisely because it is NOT confidence/cost and acts
+  on a near-tie at selection. (3) **no learning signal** — there is NO realized
+  per-candidate-type outcome ("path.direct succeeded/failed") anywhere in the turn
+  result; the only feedback channel is the opaque, prod-nil, L14-gated
+  `BASFeedbackEvent` (ADR-018 §4 point 4). A tally with nothing to learn from is
+  decoration — the same INFEASIBILITY wall as substantive per-pass refinement
+  (ADR-019 §12).
+
+### 5.2 The deeper finding (the honest answer to "全面开发")
+
+The SAFE-surface ladder O1-O4 is **not** a set of clean ~40-LOC opt-in slices. The
+two walls that defeat O1 — **clamp-domination** (no small perturbation reaches a
+decision; ADR-019 §9) and **no realized-outcome feedback channel** (the substrate
+is a deterministic single-shot pipeline; ADR-019 §12) — are **architecture-wide**,
+not O1-specific. They equally constrain O3/O4 (a memory-decay/demotion pump needs
+a "this memory proved wrong" signal that doesn't exist) and O5 (gated anyway). So
+the honest conclusion of "认真研究 仔细想想 全面开发":
+
+> **"全面开发" of the evolution OUTER loop is NOT available as safe code today —**
+> not for lack of effort or session-depth, but because the substrate is
+> structurally clamp-dominated and has no realized-outcome feedback channel into
+> selection/memory. The ONLY consequential evolution lever that has ever survived
+> the clamps is the reversibility-tilt (ADR-019 §13) — and it survived by being a
+> selection-time near-tie break on a clamp-free axis, NOT a learned bias. Any
+> genuine outer-loop learning requires FIRST building (a) a clamp-free selection
+> injection point AND (b) a realized-outcome signal the substrate does not produce
+> — each a MED-HIGH arc, not a "clean slice."
+
+This is itself the most valuable output of the study: it converts the ADR-021
+ignition ladder from "4 clean SAFE slices ready to build" into the truthful
+"4 slices each blocked on one of two architecture-wide prerequisites (a clamp-free
+injection point; a realized-outcome channel) — design only, build NONE until those
+prerequisites are themselves designed + sovereign-reviewed." **No code was written
+this chapter; the honest finding is the deliverable** (the same posture as the P4
+NO-GO + P5 deferral).
+
 ---
 
 ## 6. Red-line proofs (outer-loop discipline, per slice)
