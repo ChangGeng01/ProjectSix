@@ -241,3 +241,40 @@ session tail), not a hidden gap.
 prod risk, and it guards everything else) → DEFER-1 + DEFER-2 (one
 sovereign-reviewed spine arc) → DEFER-4 (mechanical, any time). LOW-8 + the
 HIGH-1 guard are already done.
+
+---
+
+## ADR-ROADMAP NOT-YET-DEVELOPED REGISTER (ch1044 严查)
+
+DEFER-1..4 above are the *audit-finding* deferrals. A separate 严查 (read-only,
+code-verified) of the full ADR series (014/016/018/019/020) found the
+**ADR-roadmap** not-yet-developed items below. The 严查's headline: **the ADRs are
+honest — every "deferred/closed/infeasible" claim checks out against code, every
+"LANDED" claim is backed by wired code; NO doc-says-done-but-isn't and NO
+doc-says-deferred-but-built.** These items are all disclosed in ADR prose; this
+consolidates them so none is lost. **All are deferred/closed — nothing is being
+built in this pass.**
+
+| ID | ADR/§ | Item | Status | Code-verified |
+|---|---|---|---|---|
+| **N1** | 018 §6 P6 | Genetic-algorithm evolution (population/fitness/selection/crossover) | **UNBUILT — far-future aspiration** | no GA machinery (`fitness/crossover/tournamentSelect` grep = only HW-perf hits) |
+| **N2** | 018 §4 点1 / P1 | Dream-loop success-tally cost modulation (`candidateTypeSuccessTally` + bias `costs[]` before the FFI) — the ADR's *specific* 点1 | **UNBUILT** — P1 shipped a uniform `BASDeliberationBias` bump instead | `candidateTypeSuccessTally` grep EMPTY; `dreamLoopBatchScore` 0 prod callers |
+| **N3** | 018 §6 P5 / §13 | Version-tree branch/merge (P5: branch reg / merge-promotion / multi-trial isolation / device-sync) | **DEFERRED — major multi-session sovereign arc** | `BASHostVersionBranchRecord` grep EMPTY; `parentVersionID` carried-but-unpopulated. (`merging()` + `BASSovereignTokenAuthority` exist dormant.) |
+| **N4** | 018 §12 / 019 §4 / 014 §5 | Feedback→policy/threshold mutation (P4) | **CLOSED / NO-GO** (unsafe-by-construction; inverts ADR-012 不变量 #2) | `BASFeedbackEvent` dead-ends at advisory ticket; no threshold-mutation consumer |
+| **N5** | 019 §14 / 020 §1 | P1.5b sovereign-gated caution REDUCTION (+ post-verdict re-raise) | **CLOSED — architecturally incompatible** (verdict-after-render circularity) | `cautionReduction/reRaiseVeto` grep EMPTY; only caution-UP + tilt exist |
+| **N6** | 020 §1/§4 | Below-baseline / verdict-gated reduction ("Phase D") — needs render-and-verdict replay | **DEFERRED to a future sovereign ADR** | only floored `max(0, increment−credit)` exists; no replay machinery |
+| **N7** | 019 §12 | Substantive per-pass refinement (passes that genuinely RESOLVE uncertainty) | **INFEASIBLE on this substrate** (deterministic loop + signal-count memory) | loop is budget-counter + bias/credit applicator; no cross-pass info source |
+| **N8** | 018 §3 / MED-7 | World-A `BASShadowTrialCoordinator` actor — never instantiated in production | **UNBUILT (pure scaffold)** — P5.2 would activate it | constructed only in its own factory (`BASShadowTrialRustStateMachine.swift:134`), 0 prod callers |
+| **N9** | 018 §7.3 | Direct async-surface XCTest of `buildCoordinator` loop activation | **DEFERRED — external TOOLCHAIN SIGBUS** (capability SHIPPED; only the direct test blocked) | threading wired (`EBrainHostRuntimeSynthesis.swift:121-165`); macOS-26 async-XCTest SIGBUS |
+| **N10** | 018 §10 C3 | P2 trial-into-trace telemetry | **DEFERRED (deliberate — non-essential, avoids seal path)** | `evaluatedTrial.*trace` grep EMPTY; only `resolvedTrialSink` ships |
+| **N11** | 019 §11 | Borderline-permit action-mode-flip fixture (prove caution-up flips a *non-block* action) | **DOC-GAP / test-not-built** (ADR notes it as follow-up) | P1.5a consequential at assessment level; mode-flip fixture not built |
+| **N12** | 016 §5 / ADR_INDEX | ADR-006 + ADR-012 standalone charter docs | **DOC-GAP** | doctrine lives inline in `BASPolicy/BASRiskCalibration{Bundle,Gate,StratumSubModel}.swift`; ADR_INDEX makes it findable |
+
+### Triage of the 12 (for a future effort — NOT this session)
+- **Trivial doc tasks (any session):** N12 (ADR-006/012 charters), N11 (one fixture test).
+- **External-blocked (wait for toolchain):** N9 (async SIGBUS).
+- **Correctly CLOSED — keep closed (do NOT build):** N4 (feedback→policy), N5 (P1.5b reduction). N7 INFEASIBLE without a new knowledge-retrieval capability.
+- **Major sovereign/multi-session arcs (fresh + sovereign-reviewed):** N3 (P5 version-tree, also = the DEFER-1/2 spine prerequisites), N8 (activate the ShadowTrial actor, part of P5.2), N6 (below-baseline reduction — a future sovereign ADR).
+- **Deliberate non-builds:** N10 (trace telemetry — skipped for seal-path safety), N1/N2 (GA + the specific dream-loop lever — far-future / superseded by the shipped uniform bias).
+
+**Net:** beyond DEFER-1..4, the only *low-cost* unregistered work is N11 + N12 (docs/test). Everything else is either correctly closed (keep closed), infeasible, external-blocked, or a major sovereign arc — none to be started at a session tail.
