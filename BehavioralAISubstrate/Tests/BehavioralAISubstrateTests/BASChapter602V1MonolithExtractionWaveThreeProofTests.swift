@@ -111,7 +111,16 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // compat per 红线 7 + ADR-014;this pin tracks the
                 // canonical signature (an unsynced pin breaks compile)。
                 evidenceLedger:
-                resolvedEvidenceSink:)
+                resolvedEvidenceSink:
+                // chapter 一千零四十三 / ADR-018 P2 — ShadowTrial N→N+1
+                // feedback OPT-IN slots added (gate + pending-trial
+                // ledger-in + evaluated-trial sink-out)。 Default
+                // false/nil preserves all prior caller compat per
+                // 红线 7 + ADR-014;this pin tracks the canonical
+                // signature (an unsynced pin breaks compile)。
+                shadowTrialFeedbackEnabled:
+                pendingTrialLedgerIn:
+                resolvedTrialSink:)
         XCTAssertNotNil(initRef)
     }
 

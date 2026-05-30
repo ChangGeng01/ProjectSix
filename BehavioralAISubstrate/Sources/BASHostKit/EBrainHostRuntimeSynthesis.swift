@@ -41,7 +41,16 @@ extension BASHostRuntime {
         // `deliberationLoopEnabled` is threaded.
         evidenceLedger: BASEvidenceLedger? = nil,
         resolvedEvidenceSink:
-            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
+            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil,
+        // chapter 一千零四十三 / ADR-018 P2 — OPT-IN ShadowTrial N→N+1
+        // feedback carriers threaded through to the coordinator. All
+        // default false/nil → the coordinator slots stay default →
+        // byte-equal with the pre-P2 host path (红线 7). Mirrors exactly
+        // how `evidenceLedger` is threaded. Dormant in Commit 1.
+        shadowTrialFeedbackEnabled: Bool = false,
+        pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
+        resolvedTrialSink:
+            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
     ) -> BASEBrainTurnResult {
         makeEBrainTurn(
             for: request,
@@ -51,7 +60,10 @@ extension BASHostRuntime {
             now: now,
             deliberationLoopEnabled: deliberationLoopEnabled,
             evidenceLedger: evidenceLedger,
-            resolvedEvidenceSink: resolvedEvidenceSink
+            resolvedEvidenceSink: resolvedEvidenceSink,
+            shadowTrialFeedbackEnabled: shadowTrialFeedbackEnabled,
+            pendingTrialLedgerIn: pendingTrialLedgerIn,
+            resolvedTrialSink: resolvedTrialSink
         )
     }
 
@@ -266,7 +278,16 @@ extension BASHostRuntime {
         // coordinator slot stays nil → byte-equal (红线 7).
         evidenceLedger: BASEvidenceLedger? = nil,
         resolvedEvidenceSink:
-            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
+            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil,
+        // chapter 一千零四十三 / ADR-018 P2 — OPT-IN ShadowTrial N→N+1
+        // feedback carriers, threaded onto the coordinator alongside the
+        // ch1042 evidence carriers. All default false/nil → the
+        // coordinator slots stay default → byte-equal (红线 7). Dormant
+        // in Commit 1.
+        shadowTrialFeedbackEnabled: Bool = false,
+        pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
+        resolvedTrialSink:
+            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
     ) -> BASEBrainTurnResult {
         let enforcedCurrentBrain = currentBrain.applyingControlPlaneDisposition(
             configuration.controlPlaneExecutionDisposition,
@@ -376,7 +397,15 @@ extension BASHostRuntime {
             // the P1.5a seam reads. nil (default) → empty ledger at the
             // seam → full increment → byte-equal (红线 7).
             evidenceLedger: evidenceLedger,
-            resolvedEvidenceSink: resolvedEvidenceSink
+            resolvedEvidenceSink: resolvedEvidenceSink,
+            // chapter 一千零四十三 / ADR-018 P2 — thread the ShadowTrial
+            // N→N+1 feedback carriers onto the coordinator. All
+            // default false/nil → the coordinator slots stay default →
+            // nothing in runTurn reads them yet → byte-equal (红线 7).
+            // Dormant in Commit 1.
+            shadowTrialFeedbackEnabled: shadowTrialFeedbackEnabled,
+            pendingTrialLedgerIn: pendingTrialLedgerIn,
+            resolvedTrialSink: resolvedTrialSink
         )
 
         return coordinator.runTurn(

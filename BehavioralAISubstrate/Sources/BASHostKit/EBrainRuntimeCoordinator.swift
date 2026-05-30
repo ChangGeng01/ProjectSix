@@ -180,6 +180,36 @@ public struct BASEBrainRuntimeCoordinator {
     public var resolvedEvidenceSink:
         (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
 
+    /// chapter 一千零四十三 / ADR-018 P2 — OPT-IN, default-false gate for
+    /// the ShadowTrial N→N+1 feedback loop。 Mirrors
+    /// `deliberationLoopEnabled`:when false, `runTurn` produces a turn
+    /// byte-identically to the pre-feedback-loop behaviour。 Default
+    /// false preserves byte-equality per 红线 7 + ADR-014。 Dormant in
+    /// Commit 1 (no `runTurn` path reads it yet);the consequential
+    /// N→N+1 wiring lands in Commit 2。 NOT in any canonical-bytes /
+    /// seal / hash path.
+    public var shadowTrialFeedbackEnabled: Bool
+
+    /// chapter 一千零四十三 / ADR-018 P2 — OPT-IN, default-nil pending-trial
+    /// ledger carried in from the host (slot-in)。 This is last turn's
+    /// pending shadow trials, seeded so this turn can advance them via
+    /// `BASShadowTrialFeedbackLedger.evaluate(...)`。 Mirrors
+    /// `evidenceLedger`。 Default nil → no carried trials → byte-equality
+    /// per 红线 7 + ADR-014。 Dormant in Commit 1 (no `runTurn` path reads
+    /// it yet)。 NOT in any canonical-bytes / seal / hash path.
+    public var pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil
+
+    /// chapter 一千零四十三 / ADR-018 P2 — OPT-IN, default-nil write-back
+    /// sink for this turn's evaluated trials (sink-out)。 Mirrors
+    /// `resolvedEvidenceSink`:when set, `runTurn` (Commit 2) emits the
+    /// turn's evaluated `BASShadowTrialRecord`s to this closure for the
+    /// host to carry into the NEXT turn — OBSERVATION-ONLY (it feeds no
+    /// render/seal/verdict/hash)。 Default nil → no emission →
+    /// byte-equality per 红线 7 + ADR-014:nil → no effect。 NOT in any
+    /// canonical-bytes / seal / hash path.
+    public var resolvedTrialSink:
+        (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -227,7 +257,21 @@ public struct BASEBrainRuntimeCoordinator {
         // for newly-resolved evidence atoms。 Default nil → no emission
         // → byte-equal (红线 7)。 Observation-only; gates nothing.
         resolvedEvidenceSink:
-            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
+            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil,
+        // chapter 一千零四十三 / ADR-018 P2 — OPT-IN ShadowTrial N→N+1
+        // feedback loop。 Default false → no feedback → byte-equal
+        // (红线 7)。 Dormant in Commit 1; the N→N+1 wiring lands in
+        // Commit 2.
+        shadowTrialFeedbackEnabled: Bool = false,
+        // chapter 一千零四十三 / ADR-018 P2 — OPT-IN pending-trial ledger
+        // (slot-in)。 Default nil → no carried trials → byte-equal
+        // (红线 7)。 Dormant in Commit 1.
+        pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
+        // chapter 一千零四十三 / ADR-018 P2 — OPT-IN write-back sink for
+        // this turn's evaluated trials (sink-out)。 Default nil → no
+        // emission → byte-equal (红线 7)。 Observation-only; gates nothing.
+        resolvedTrialSink:
+            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -256,6 +300,11 @@ public struct BASEBrainRuntimeCoordinator {
         self.provisionalVerdictSink = provisionalVerdictSink
         self.evidenceLedger = evidenceLedger
         self.resolvedEvidenceSink = resolvedEvidenceSink
+        self.shadowTrialFeedbackEnabled = shadowTrialFeedbackEnabled
+        self.pendingTrialLedgerIn = pendingTrialLedgerIn
+        self.resolvedTrialSink = resolvedTrialSink
+        // (ADR-018 P2) shadow-trial feedback slots wired above; DORMANT
+        // until Commit 2 reads them.
     }
 
     // MARK: - Agent Fabric observation (ch 960)
