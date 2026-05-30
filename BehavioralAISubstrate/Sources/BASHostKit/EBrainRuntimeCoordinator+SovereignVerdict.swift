@@ -48,7 +48,7 @@ extension BASEBrainRuntimeCoordinator {
         ]
         let rollbackSource = thoughtFold.rollbackAnchorRef ?? thoughtFold.snapshotRef
 
-        let decision = computeVerdictDecision(
+        let decision = Self.computeVerdictDecision(
             policyLineagePresent: policyLineage != nil,
             budgetFrame: budgetFrame,
             riskCard: riskCard,
@@ -95,9 +95,12 @@ extension BASEBrainRuntimeCoordinator {
     // Pure function of pre-render-settled inputs (everything except
     // `needsProtectedWriteLane`, which the caller derives from `updateTickets`).
     // `quarantineSources`/`rollbackSource` are opaque ref strings supplied by the
-    // caller. No instance state is read — kept on the type for call-site locality
-    // and reuse by the pre-render provisional verdict (Phase B).
-    func computeVerdictDecision(
+    // caller. No instance state is read — `policyLineage` presence is passed in as
+    // a `Bool`. ADR-020 Phase B makes this `static` (it reads no `self`) so the
+    // pre-render provisional verdict can reuse it without a coordinator; static vs
+    // instance dispatch does not change the computed value, so Phase A stays
+    // byte-equal (verified by the full sweep).
+    static func computeVerdictDecision(
         policyLineagePresent: Bool,
         budgetFrame: BASBudgetFrame,
         riskCard: BASRiskCard,
