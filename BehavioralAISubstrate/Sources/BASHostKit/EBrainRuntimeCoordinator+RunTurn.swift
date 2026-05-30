@@ -287,8 +287,20 @@ extension BASEBrainRuntimeCoordinator {
         // never exceeds what the service requested or the budget.
         if deliberationLoopEnabled {
             var deliberationPassIndex = 1
+            // ADR-018 P3 Commit 2 — thermal floor. On .hot/.critical the
+            // device must not spend extra deliberation passes, so the routed
+            // maxLoops is floored to at most 1 BEFORE the stepIndex min/max.
+            // On .nominal/.warm this is a passthrough (byte-equal with prior
+            // behaviour). It reads the SAME request.deviceState.thermalLevel
+            // the power clock already used to compute routedBudget, so the
+            // floor is consistent (no double-counting). Whole block is gated
+            // by deliberationLoopEnabled → flag-off is byte-equal.
+            let thermallyFlooredMaxLoops =
+                BASDeliberationThermalFloor.flooredMaxLoops(
+                    routedBudget.maxLoops,
+                    thermalLevel: request.deviceState.thermalLevel)
             let targetPasses = max(1, min(
-                routedBudget.maxLoops, thoughtFrame.stepIndex))
+                thermallyFlooredMaxLoops, thoughtFrame.stepIndex))
             while deliberationPassIndex < targetPasses,
                   !isTerminalDeliberationStop(thoughtFrame.stopReason) {
                 deliberationPassIndex += 1

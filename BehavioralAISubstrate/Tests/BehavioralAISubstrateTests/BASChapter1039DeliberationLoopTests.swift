@@ -151,6 +151,31 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
             provisionalVerdictSink: provisionalVerdictSink)
     }
 
+    /// Stub turn request carrying a chosen thermal level. Identical to
+    /// `BASCoordinatorTestStubs.makeStubRequest()` except the device's
+    /// `thermalLevel` is overridden — the minimal knob the existing sync
+    /// harness lacks, needed to drive the ADR-018 P3 thermal floor.
+    private func makeRequest(
+        thermalLevel: BASThermalLevel
+    ) -> BASEBrainTurnRequest {
+        let nominal = BASCoordinatorTestStubs.nominalDeviceState
+        let device = BASDeviceState(
+            batteryLevel: nominal.batteryLevel,
+            thermalLevel: thermalLevel,
+            memoryFreeMB: nominal.memoryFreeMB,
+            networkState: nominal.networkState,
+            foregroundState: nominal.foregroundState,
+            cpuLoad: nominal.cpuLoad,
+            gpuLoad: nominal.gpuLoad,
+            npuAvailable: nominal.npuAvailable,
+            latencyBudgetMs: nominal.latencyBudgetMs)
+        return BASEBrainTurnRequest(
+            userInput: "stub test input",
+            deviceState: device,
+            hostID: "stub.test.host",
+            recordedAt: Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
     func testSinglePassWhenDisabled() {
         let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
         let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: false)
@@ -158,6 +183,66 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
         XCTAssertEqual(loop.iterateCalls, 1,
             "disabled (default) → exactly one deliberation pass" +
             " (byte-equal with pre-P1)")
+    }
+
+    // MARK: - ADR-018 P3 Commit 2 — deliberation thermal floor
+
+    /// Flag ON, multi-pass budget (maxLoops 4, service requests stepIndex 3
+    /// → 3 passes when cool, exactly like `testRunsBudgetedPassesWhenEnabled`),
+    /// but the device is `.hot` → the thermal floor collapses the loop to a
+    /// single pass.
+    func testThermalFloorCollapsesLoopWhenHot() {
+        let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: true)
+        _ = coord.runTurn(makeRequest(thermalLevel: .hot))
+        XCTAssertEqual(loop.iterateCalls, 1,
+            "flag on + .hot → thermal floor caps maxLoops at 1 → 1 pass" +
+            " (vs 3 when cool — see testThermalFloorPassthroughWhenNominal)")
+    }
+
+    /// `.critical` floors the loop to a single pass exactly like `.hot`.
+    func testThermalFloorCollapsesLoopWhenCritical() {
+        let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: true)
+        _ = coord.runTurn(makeRequest(thermalLevel: .critical))
+        XCTAssertEqual(loop.iterateCalls, 1,
+            "flag on + .critical → thermal floor caps maxLoops at 1 → 1 pass")
+    }
+
+    /// Flag ON, same multi-pass budget, but `.nominal` → the floor is a no-op
+    /// and the full service-requested passes run (proving the floor is inert
+    /// when cool — byte-equal with pre-floor behaviour, matching
+    /// `testRunsBudgetedPassesWhenEnabled`'s iterateCalls == 3).
+    func testThermalFloorPassthroughWhenNominal() {
+        let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: true)
+        _ = coord.runTurn(makeRequest(thermalLevel: .nominal))
+        XCTAssertEqual(loop.iterateCalls, 3,
+            "flag on + .nominal → floor is passthrough → full budgeted" +
+            " passes (min(maxLoops, stepIndex) = 3)")
+    }
+
+    /// `.warm` is also a passthrough — only `.hot`/`.critical` floor the loop.
+    func testThermalFloorPassthroughWhenWarm() {
+        let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: true)
+        _ = coord.runTurn(makeRequest(thermalLevel: .warm))
+        XCTAssertEqual(loop.iterateCalls, 3,
+            "flag on + .warm → floor is passthrough → full budgeted passes")
+    }
+
+    /// Flag OFF + `.hot`: the whole deliberation-loop block is gated by
+    /// `deliberationLoopEnabled`, so the floor never runs — the turn takes the
+    /// pre-P1 single pass (byte-equal, exactly like `testSinglePassWhenDisabled`
+    /// but with a hot device, confirming the floor is reached ONLY inside the
+    /// gated block).
+    func testThermalFloorByteEqualOffWhenFlagDisabled() {
+        let loop = CountingLoop(requestedStep: 3, stop: .candidateStable)
+        let coord = makeCoordinator(loop: loop, maxLoops: 4, enabled: false)
+        _ = coord.runTurn(makeRequest(thermalLevel: .hot))
+        XCTAssertEqual(loop.iterateCalls, 1,
+            "flag off + .hot → gated block skipped → single pass" +
+            " (byte-equal; the floor is unreachable when the flag is off)")
     }
 
     func testRunsBudgetedPassesWhenEnabled() {
