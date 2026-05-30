@@ -355,7 +355,7 @@ A fresh adversarial architect pass (Opus, code-grounded) CORRECTED §6/§7's sta
   preserved by construction: the slot-IN only ever holds turn N−1's records, so
   evaluating it at turn-start cannot touch turn N's own (not-yet-built) trial.
 
-### P2 Commit 1 — LANDED (ch 1043, `2dd28f3ce`), DORMANT + byte-equal
+### P2 Commit 1 — LANDED (ch 1043, `74f31dedf`), DORMANT + byte-equal
 
 `BASShadowTrialFeedbackLedger` (new, BASMemory): immutable Codable carrier +
 pure `evaluate(_:using:)` that advances a prior-turn pending trial ONE step by
