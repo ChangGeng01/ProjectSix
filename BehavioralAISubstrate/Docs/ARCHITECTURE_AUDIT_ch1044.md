@@ -163,3 +163,81 @@ The highest-value follow-ups for a fresh, focused effort, in order:
    (the same discipline that closed P4 / deferred P5).
 5. **MED-6 god-file decomposition** (`BASCognitiveBrain.swift` 4134) + **LOW-8 deps
    hygiene** — mechanical, low-risk, any session.
+
+---
+
+## DEFERRED WORK REGISTER — the 4 findings NOT fixed in ch1044
+
+The ch1044 fix pass closed the safe subset (HIGH-1 nonce determinism + the HIGH-2
+regression guard + LOW-8 deps + MED-5 ADR charters + MED-7 SCAFFOLD honesty). The
+following **4 findings are explicitly DEFERRED** — each is recorded here as a
+self-contained work item so a future session need not re-derive scope from the
+finding sections above. **None is an active safety bypass** (the inline safety
+spine holds independently — see "GENUINELY SOUND" above); deferral is a
+discipline choice (sovereign-path / large-refactor work must not start at a long
+session tail), not a hidden gap.
+
+### DEFER-1 — HIGH-3: wire the Ed25519 sovereign token authority into the commit path
+- **Why deferred:** sovereign-path change that alters safety *semantics* (today
+  production "signs" with an unkeyed, forgeable SHA256 digest and nothing
+  redeems/verifies a token before a persistent write). Replacing that with the
+  real `BASSovereignTokenAuthority` mint+verify is exactly the class of change
+  the session-long discipline reserves for a fresh, **sovereign-reviewed** effort
+  (same bar that closed P4 / deferred P5).
+- **Blast radius:** the post-turn write/commit gate (BASObservability lifecycle) +
+  every commit-token/warrant producer in `+SovereignCommit.swift`. HIGH.
+- **Resume entry:** `Sources/BASSovereign/BASSovereignTokenAuthority.swift`
+  (dormant, 0 prod callers — the mint/verify/policyHash-pin/single-use machinery
+  already exists); the production digest seam `+SovereignCommit.swift:~1669`
+  (`sovereignDigestHex`); the write gate `BASObservability/.../approveForDistillation`.
+- **Precondition:** human sovereign review. Must stay byte-equal-off (opt-in) per
+  ADR-014; must be reversible.
+
+### DEFER-2 — MED-HIGH-4: wire the BR-001..BR-012 parity engine + fail-closed halt
+- **Why deferred:** same sovereign-path class as DEFER-1. Production runs the
+  hand-rolled `computeVerdictDecision`; the real `BASSovereignVerdictEngine` +
+  its `coordinatorLaxer → halt` cross-check are test-only. Wiring the halt into
+  the live turn changes the safety-decision authority → sovereign review required.
+  (Mitigated today: the hand-rolled lattice only escalates, monotonic `raise()`.)
+- **Blast radius:** the L14 verdict seam in `runTurn` + every verdict consumer. HIGH.
+- **Resume entry:** `Sources/BASSovereign/BASSovereignVerdictEngine.swift` +
+  `BASSovereignTurnVerifier.swift` (the dormant parity check);
+  `+SovereignVerdict.swift` (`computeVerdictDecision`, the production path).
+- **Precondition:** human sovereign review. Pairs naturally with DEFER-1 (one
+  sovereign-spine arc).
+
+### DEFER-3 — HIGH-2 (full harness): replace the stub Canonical60 runner + wire it into CI
+- **Why deferred (partial — the GUARD shipped):** the ch1044 fix added a scoped
+  replay-determinism regression test (`testSovereignCommitTokensAreReplay
+  Deterministic`) that covers the most important regression (it would have caught
+  HIGH-1). The *full* substrate-wide byte-equality harness — a real V1-vs-coordinator
+  comparison whose summary includes the varying fields (nonce/token/signature),
+  plus a `pre-commit-gates.sh` hook — is the larger remaining piece; the code
+  itself says the real runner is "deferred to a follow-up chapter."
+- **Blast radius:** test-infra + CI only (no production code). MED, low-risk —
+  but sizable.
+- **Resume entry:** `Sources/BASHostKit/BASStressSweepCanonical60Driver.swift:39-62`
+  (the stub `identityStubRunner` to replace) + `:200-219`;
+  `BASRuntimeAuditEmissionSummary.swift:63-140` (the comparison unit that needs
+  nonce/token fields added); `scripts/pre-commit-gates.sh` (the CI hook).
+- **Precondition:** none (test-only). Any focused session.
+
+### DEFER-4 — MED-6: decompose the >800-LOC god-files
+- **Why deferred:** `BASCognitiveBrain.swift` (4134 LOC) + `BASAutoRouteRanker.swift`
+  (3802) + 46 other files over the repo's own 800-LOC max. Decomposing a
+  byte-equality-sensitive 4134-LOC file is a real refactor needing its own focused
+  effort with full byte-equal proof at each extraction (the coordinator's 17
+  `+Extension` split is the proven pattern to follow).
+- **Blast radius:** large file-count, but mechanical (pure code MOVE, no logic
+  change), and byte-equal-verifiable per extraction. MED.
+- **Resume entry:** `Sources/BASHostKit/BASCognitiveBrain.swift` (worst, 4134);
+  `Sources/BASRuntimeCore/BASAutoRouteRanker.swift` (3802); follow the
+  `EBrainRuntimeCoordinator+*.swift` extension-split precedent. Also fold in the
+  ~30 commemorative `*Doctrine` literal-only files cluttering BASRuntimeCore.
+- **Precondition:** none. Any session with byte-equal discipline; do per-file,
+  not piecemeal-across-files.
+
+**Suggested order (per the §recommendation above):** DEFER-3 (test harness, no
+prod risk, and it guards everything else) → DEFER-1 + DEFER-2 (one
+sovereign-reviewed spine arc) → DEFER-4 (mechanical, any time). LOW-8 + the
+HIGH-1 guard are already done.
