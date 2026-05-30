@@ -399,20 +399,6 @@ extension BASEBrainRuntimeCoordinator {
         // risk band. Caution-INCREASING only (cannot lower the band) →
         // no sovereign gate. Flag-off → no injection → byte-equal
         // (红线 7); this is the ONLY seam that consumes the flag here.
-        //
-        // ch1042 ADR-020 Step 4 — the added caution is now FLOORED by
-        // genuine evidence resolution. Instead of always adding the full
-        // `uncertainDeliberationRiskIncrement`, add
-        // `withheldIncrement = max(0, increment − credit)`, where the
-        // credit is the fraction of the turn's TYPED unknowns
-        // (`decomposeFrame.unknownRecords`) that the opt-in
-        // `evidenceLedger` resolves by EXACT key. So the loop can WITHHOLD
-        // its OWN added caution (down to 0 = the loop-off baseline) when
-        // stored evidence resolves the uncertainty — NEVER below baseline,
-        // so the §14 verdict-after-render invariant holds by construction
-        // (the loop's contribution stays in [0, increment]). `evidenceLedger`
-        // nil (default everywhere) → credit 0 → withheld = full increment →
-        // byte-equal with the pre-Step-4 P1.5a behavior (红线 7).
         if deliberationLoopEnabled,
            BASDeliberationCaution.isGenuinelyUncertain(
                confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
@@ -420,16 +406,8 @@ extension BASEBrainRuntimeCoordinator {
                    .map(\.debtWeight).max(),
                leaseEnded: thoughtFrame.convergenceCertificate?
                    .stoppingMode == .leaseEnd) {
-            let requiredKeys =
-                BASDeliberationResolutionCredit.requiredEvidenceKeys(
-                    unknownRecords: decomposeFrame.unknownRecords)
-            let withheld =
-                BASDeliberationResolutionCredit.withheldIncrement(
-                    requiredKeys: requiredKeys,
-                    ledger: evidenceLedger,
-                    increment: BASDeliberationCaution
-                        .uncertainDeliberationRiskIncrement)
-            let raised = min(1, boundRiskCard.totalRisk + withheld)
+            let raised = min(1, boundRiskCard.totalRisk
+                + BASDeliberationCaution.uncertainDeliberationRiskIncrement)
             let raisedLevel = resolvedRiskService.riskLevel(for: raised)
             boundRiskCard.totalRisk = raised
             boundRiskCard.riskLevel = raisedLevel
@@ -440,22 +418,6 @@ extension BASEBrainRuntimeCoordinator {
             }
             boundRiskCard.factors =
                 boundRiskCard.factors + ["deliberation_uncertain_caution"]
-            // ch1042 ADR-020 Step 4 write-back / audit — emit the evidence
-            // atoms that resolved this turn's unknowns (drove the
-            // withholding) for host persistence + auditability。
-            // OBSERVATION-ONLY side-channel (feeds no render/seal/verdict/
-            // hash)。 Nil sink OR nil ledger (defaults) → no emission →
-            // byte-equal (红线 7)。
-            if let resolvedEvidenceSink, let evidenceLedger {
-                let resolvedKeys = BASEvidenceMatcher.resolvedKeys(
-                    requiredKeys: requiredKeys, in: evidenceLedger)
-                if !resolvedKeys.isEmpty {
-                    resolvedEvidenceSink(
-                        evidenceLedger.atoms.filter {
-                            resolvedKeys.contains($0.evidenceKey)
-                        })
-                }
-            }
         }
         // M392 — `boundActionPermit` is rebound by the Cthulhu
         // doctrine gate block below (M303/M304/M384/M320/M385).
