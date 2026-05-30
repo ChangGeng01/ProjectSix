@@ -29,7 +29,19 @@ extension BASHostRuntime {
         // false → single pass (byte-equal, 红线 7 + ADR-014). A host
         // sets this true to let high-risk / calibration-drift turns
         // run budget-bounded refinement passes.
-        deliberationLoopEnabled: Bool = false
+        deliberationLoopEnabled: Bool = false,
+        // chapter 一千零四十二 / ADR-020 Step 4 Commit 3 — OPT-IN evidence
+        // ledger (and write-back sink) threaded through to the
+        // coordinator so a host can supply RESOLVED evidence that
+        // reaches the P1.5a seam and WITHHOLDS the loop's own added
+        // caution (floored at the loop-off baseline, never below). Both
+        // default nil → the coordinator slot stays nil → the seam sees
+        // an empty ledger → the full increment is added → byte-equal
+        // with the pre-Step-4 host path (红线 7). Mirrors exactly how
+        // `deliberationLoopEnabled` is threaded.
+        evidenceLedger: BASEvidenceLedger? = nil,
+        resolvedEvidenceSink:
+            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
     ) -> BASEBrainTurnResult {
         makeEBrainTurn(
             for: request,
@@ -37,7 +49,9 @@ extension BASHostRuntime {
             projection: projection,
             deviceStateOverride: deviceStateOverride,
             now: now,
-            deliberationLoopEnabled: deliberationLoopEnabled
+            deliberationLoopEnabled: deliberationLoopEnabled,
+            evidenceLedger: evidenceLedger,
+            resolvedEvidenceSink: resolvedEvidenceSink
         )
     }
 
@@ -245,7 +259,14 @@ extension BASHostRuntime {
         now: Date,
         // ch 1039 / ADR-018 P1 — OPT-IN deliberation loop. Default
         // false → single pass (byte-equal, 红线 7).
-        deliberationLoopEnabled: Bool = false
+        deliberationLoopEnabled: Bool = false,
+        // chapter 一千零四十二 / ADR-020 Step 4 Commit 3 — OPT-IN evidence
+        // ledger + write-back sink, threaded onto the coordinator
+        // alongside `deliberationLoopEnabled`. Both default nil → the
+        // coordinator slot stays nil → byte-equal (红线 7).
+        evidenceLedger: BASEvidenceLedger? = nil,
+        resolvedEvidenceSink:
+            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
     ) -> BASEBrainTurnResult {
         let enforcedCurrentBrain = currentBrain.applyingControlPlaneDisposition(
             configuration.controlPlaneExecutionDisposition,
@@ -348,7 +369,14 @@ extension BASHostRuntime {
             hostConstitutionVault: resolvedVault,
             hostVersionTree: configuration.hostVersionTree,
             hostForgetRequest: configuration.hostForgetRequest,
-            deliberationLoopEnabled: deliberationLoopEnabled
+            deliberationLoopEnabled: deliberationLoopEnabled,
+            // chapter 一千零四十二 / ADR-020 Step 4 Commit 3 — activate the
+            // floored caution-withholding seam in production: a host-
+            // supplied `evidenceLedger` now reaches the coordinator slot
+            // the P1.5a seam reads. nil (default) → empty ledger at the
+            // seam → full increment → byte-equal (红线 7).
+            evidenceLedger: evidenceLedger,
+            resolvedEvidenceSink: resolvedEvidenceSink
         )
 
         return coordinator.runTurn(
