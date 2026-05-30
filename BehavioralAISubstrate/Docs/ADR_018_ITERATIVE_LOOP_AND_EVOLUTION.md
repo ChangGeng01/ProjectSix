@@ -226,8 +226,8 @@ loop already honors via `min(maxLoops, stepIndex)`); async-engine
 `buildCoordinator` threading; flipping the flag ON by default in any
 host (a deliberate behaviour-change decision, not yet taken).
 
-**Async-engine threading — attempted ch 1039, reverted (toolchain
-blocker).** Threading the flag through `buildEBrainTurnWithRuntimeMode`
+**Async-engine threading — attempted ch 1039, reverted then SHIPPED
+ch 1043 (see UPDATE below).** Threading the flag through `buildEBrainTurnWithRuntimeMode`
 → `buildCoordinator` is trivial and byte-equal-off, BUT its only
 faithful activation test is an `async XCTest` that calls
 `runtime.startSession(...)` — which deterministically crashes the
@@ -241,6 +241,35 @@ per the doctrine's recovery paths). The sync host path
 (`buildEBrainTurn`, the `.v1ByteEqual` default) is fully activated +
 tested, so this is a completeness gap on a non-default path, not a hole
 in the core deliverable.
+
+**UPDATE (ch 1043, `05c993df1`) — threading SHIPPED; blocker shrunk from a
+capability gap to a test gap.** The earlier "reverted, not shipped" stance
+was re-examined and superseded. The flag is now threaded through
+`buildEBrainTurnWithRuntimeMode` → `buildCoordinator` → BOTH the
+`triSelfService` (ch1041 reversibility-tilt) AND the coordinator init,
+mirroring the sync `makeEBrainTurn` wiring exactly. Default false everywhere
+→ byte-equal-off (every existing caller omits it; ch1039 byte-equal witness
+stays 9/0; ch602 init-pin 4/0). Before this the async runtime-mode surface
+STRUCTURALLY COULD NOT run the loop (`buildCoordinator` had no such param →
+coordinator defaulted false); that real activation gap is now closed.
+
+- **The SIGBUS blocker is a TOOLCHAIN bug, not our code** — Xcode 26.5 /
+  Swift 6.3 / macOS 26 SDK; `async XCTest method + startSession + actor hop`
+  crashes (signal 10) before the test body runs (empirically re-confirmed
+  this session: Diagnostic C). It cannot be fixed in this repo; only a
+  toolchain change resolves it.
+- **Why shipping (not reverting) is now the honest call:** the threading is
+  byte-equal-off (zero risk to every existing caller) and its on-effect is
+  proven TRANSITIVELY — the async path builds the SAME real
+  `BASHostRuntimeEBrainLoopService` + `coordinator.runTurn` the sync path
+  uses, where `testActivatesAndRefinesViaRealHostRuntimePath` (ch1039/ch1041)
+  proves on≠off. So the capability is wired + safe; only a DIRECT
+  async-surface test is blocked. Reverting would re-open a real gap to avoid
+  a test that the toolchain (not our code) forbids.
+- **Remaining (external, documented):** a direct XCTest of the async surface,
+  once the toolchain SIGBUS is resolved. Until then the param's own doc
+  comment (`EBrainHostRuntimeSynthesis.swift`) records the transitive-proof
+  rationale. The 12 quarantined async tests stay quarantined (not un-skipped).
 
 ### 7.4 Deep-audit finding — the loop is currently DECISION-INERT (ch 1039)
 
