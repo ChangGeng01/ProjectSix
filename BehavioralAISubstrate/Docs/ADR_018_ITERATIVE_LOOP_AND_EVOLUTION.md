@@ -89,7 +89,7 @@ The evolution points (2 / 4 / 5) are the **slower outer learning loop** that fee
 | **P1** | ch 1039 | Unified deliberation loop: `repeat/while` in runTurn + 点3 drift/thermal→maxLoops + 点1 dream-loop tally | ✅ clean | ~110 | MED (runTurn hot path) | budget=1 → identity sweep + `loopCount==1` green unchanged; maxLoops=3 → loopCount ≤ 3, frontierWidth non-decreasing |
 | **P2** | ch 1040 | 点2 ShadowTrial evaluator + ledger replay (N→N+1 trial closure) | ⚠️ needs-infra | ~150 | MED (NEVER-SAME-TURN intact) | feedbackEvent path unchanged → identity sweep; trial transitions across 2 turns |
 | **P3** | ch 1041 → **landed ch 1044** | opt-in flag + loop/trial telemetry into trace + thermal-gated depth on-device proof | ✅ **LANDED** (mostly already done; the real gap was the thermal floor — see §11) | ~60 (actual: ~40, rest already shipped) | Low | flag OFF → identity; `.hot`/`.critical` thermal → maxLoops==1 (NOT `.serious` — that case does not exist; see §11) |
-| **P4** | ch 1042 | 点4 feedback→policy (single scalar threshold) + L14 sovereign gate | 🔴 sovereign-gate | ~250 | HIGH (can train-bad) | nil-feedback = identity; sovereign veto blocks; ±0.05 cap; replay-deterministic |
+| **P4** | ch 1044 | 点4 feedback→policy (single scalar threshold) + L14 sovereign gate | 🔴 **NO-GO / DESIGN-ONLY — do NOT implement without a human sovereign review (see §12)** | ~250 | HIGH (can train-bad) | nil-feedback = identity; sovereign veto blocks; ±0.05 cap; replay-deterministic |
 | **P5** | ch 1043+ | 点5 version-tree branch / shadow-trial / merge | 🔴 major-arc | 600-900 | HIGH (highest-stakes cross-module) | multi-session; each step sovereign-gated + reversible + device-sync |
 | **P6** | aspiration | population / fitness / selection / crossover GA (zero GA machinery exists today) | far-future | — | — | multi-session; ADR records the route only |
 
@@ -512,3 +512,68 @@ actually TRUE (was documented, now enforced). Honest boundary: opt-in +
 default-OFF like all of ADR-018, so the floor is **inert in production today**
 (it only matters once a host enables the loop) — safety hardening of an opt-in
 path + making the red-line real, not a user-observable change now.
+
+---
+
+## 12. P4 (feedback → policy/threshold mutation) — NO-GO / DESIGN-ONLY (ch 1044)
+
+A fresh adversarial, code-grounded plan (Opus, safety-first) reached a **NO-GO on
+literal P4** — do NOT implement without a real human sovereign review. Same class
+of closure as ADR-019 P1.5b (§14) and the ADR-020 §1 below-baseline reduction,
+plus a stronger reason this investigation surfaced.
+
+### The decisive finding — the substrate already forbids exactly this
+`Sources/BASPolicy/BASRiskCalibrationGate.swift` + `BASRiskCalibrationBundle.swift`
+(ADR-012) ALREADY implement risk-threshold mutation **safely**: per-stratum
+threshold deltas, clamped ±0.25, requiring a non-empty L14 `sovereignWarrantRef`,
+monotonic-versioned anti-replay — and their doctrine explicitly states the
+mutation is **"NOT mutated per-turn", "NOT auto-derived", operator-authored +
+L14-signed** ("不变量 #2 神经不掌权: substrate doesn't auto-derive"). **P4
+(per-event user-feedback → threshold) is the precise INVERSE of the sanctioned
+mechanism and breaches invariant #2.** The sanctioned path for tuning a band
+threshold is operator-authored + L14-warranted + between-deploy — never live
+feedback.
+
+### Why neither target works (the honest no-middle)
+- **Consequential target = risk band thresholds** (`HostSynthesisPolicyCore.swift:
+  1899-1901` medium/high/extreme 0.35/0.65/0.85, consumed decisively by the band
+  resolver `EBrainHostRuntime+RiskService.swift:97-106`). These are **NOT
+  clamp-dominated (ADR-019 §9) — they ARE the gate.** Feedback-driven mutation is
+  a ratchet toward danger: enough attacker-controlled "good" `eventType` strings
+  raise `highThreshold`/`extremeThreshold` until formerly-blocked actions pass,
+  and (ADR-020 §2) `riskLevel` is one of the 6/7 pre-render inputs the L14 verdict
+  reads → it contaminates the verdict's own response to the very turn it
+  mis-rates (the P1.5b §14 circularity). **Too dangerous.**
+- **Safe target = the caution-up increment** (`BASDeliberationCaution.
+  uncertainDeliberationRiskIncrement`, the only caution-only clamp-floored scalar)
+  — but caution-UP from feedback is just "a human says be more careful," already
+  expressed by the existing `requiresReview:true` ticket path
+  (`BASMLEvolutionService.swift:134` → verdict escalation); and the caution-DOWN
+  side re-opens the §14/§1 closed reduction surface with WEAKER provenance
+  (free-string `eventType` vs. ch1042's exact typed `evidenceKey`). **Near-zero
+  marginal value or re-opens a closed danger.**
+
+### What is verified separable (and must stay so)
+Kill switches (`request.activeKillSwitches`), hard-no-go
+(`BASConstitutionEnforcer.evaluateInputAgainstHardNoGo`, short-circuits before the
+band mapping), and the L14 verdict hard-rules are NOT gated by any tunable scalar
+today. A safe P4 could never be allowed to touch them.
+
+### Recorded escape hatch (if a human sovereign ever mandates it)
+The ONLY architecturally-honest shape is a **caution-UP-only, clamp-floored-at-
+baseline, sovereign-gated, byte-equal-off** slice that modulates the deliberation
+caution increment (NEVER a band threshold, NEVER a verdict input), via the proven
+ch1042/ch1043 carrier pattern (host-held slot-IN + `@Sendable` sink-OUT, default
+nil → byte-equal) + a model-unreachable construction-time approval token
+lineage-pinned by `policyHash` (the `BASSovereignTokenAuthority` pattern). It
+must land dormant-first. The full incremental plan + TDD matrix + the explicit
+"MUST NOT" list (never mutate `RiskTuning`; never lower caution below baseline;
+never relax a hard rule/verdict/kill switch; never auto-derive or default-ON) are
+on record from the ch1044 P4 plan. **Default decision: NOT built.**
+
+### Roadmap status after P4
+P1 (loop) + P1-consequential (ch1040-42 ADR-019/020) + P2 (ShadowTrial N→N+1) +
+P3 (thermal floor) are LANDED. **P4 is CLOSED as NO-GO/design-only.** P5
+(version-tree branch/merge, ADR §6) remains a 🔴 major multi-session cross-module
+arc — also not to be attempted at the tail of a long session. The opt-in
+deliberation/evolution substrate is at a coherent, honest stopping point.
