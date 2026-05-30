@@ -18,6 +18,7 @@
 | **ADR-018** | Iterative loop + evolution底层架构 (the deliberation-budget loop; P1-P5 roadmap) | **`Docs/ADR_018_ITERATIVE_LOOP_AND_EVOLUTION.md`** | behavioral |
 | **ADR-019** | Consequential deliberation wiring (reversibility-tilt, P1.5a caution, clamp-domination §9, P1.5b closure §14) | **`Docs/ADR_019_CONSEQUENTIAL_DELIBERATION_WIRING.md`** | behavioral |
 | **ADR-020** | Evidence-resolution + two-phase verdict (Step-4 floored withholding, provisional verdict, §9 floor correction) | **`Docs/ADR_020_EVIDENCE_RESOLUTION_AND_TWO_PHASE_VERDICT.md`** | behavioral |
+| **ADR-021** | Unified Evolution Architecture (统一进化算法底层架构): the two-loop model (inner per-turn + outer cross-turn) as ONE pattern (carrier/fold/sink) + the single safe/gated/closed axis. DESIGN-only — unifies verified machinery, builds nothing | **`Docs/ADR_021_UNIFIED_EVOLUTION_ARCHITECTURE.md`** | behavioral (design synthesis) |
 
 ## Related contracts that are NOT numbered ADRs
 - **红线 7** (additive byte-equal safety invariant) — stated in `ADR_014_OPT_IN_DOCTRINE.md` §4 + `L8_ARC_SEAL.md`.
