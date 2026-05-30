@@ -463,3 +463,52 @@ sovereign-audit-chain durability (carrier is in-memory host-persistable); the
 coordinator stays immutable (cross-turn state is host-held). ~125 production LOC
 total (the ADR's ~150 estimate was accurate; only the *mechanism* + file names
 were wrong).
+
+---
+
+## 11. P3 (thermal-gated deliberation depth) — LANDED (ch 1044)
+
+A fresh code-grounded scout found P3 was **mostly already done** and the ADR §6
+row **overstated the remaining work** + used wrong thermal vocabulary. Honest
+breakdown:
+
+- **Already shipped (P1/ch1039 + the throttle):** the opt-in flag
+  (`deliberationLoopEnabled`); `loopCount` + loop telemetry in the trace
+  (`BASRuntimeTrace.loopCount`, `dreamLoopTraceDetail`); the loop honoring
+  `min(maxLoops, stepIndex)`; the throttle that drops `maxLoops` by 1 on `.hot`.
+  Trial-into-trace telemetry was DELIBERATELY deferred by P2 (§10 Commit 3) —
+  NOT re-litigated here.
+- **The one genuine gap (now closed):** the ADR red-line "`serious` thermal →
+  maxLoops==1" was **FALSE**. Real pre-P3: `.hot` → 4→3 (throttle −1),
+  `.critical` → stays 4. So a hot/critical device with the loop on ran **3-4
+  extra deliberation passes** — contradicting §7.1 point 4.
+- **Vocabulary correction:** `BASThermalLevel` is `nominal/warm/hot/critical`
+  (`EBrainControlPlaneCore.swift:8-13`). There is **NO `.serious`** (that was
+  `ProcessInfo.ThermalState` vocabulary); the genuinely-hot levels are `.hot` +
+  `.critical`. §6 row + §7.2 deferred item corrected accordingly.
+
+### P3 LANDED — the thermal floor (opt-in, byte-equal-off)
+
+- **Commit 1 (`ae2ef8b82`)** — `BASDeliberationThermalFloor.flooredMaxLoops(
+  maxLoops, thermalLevel)` (new pure helper, BASHostKit): `.hot`/`.critical` →
+  `min(maxLoops, 1)`; `.nominal`/`.warm` → passthrough. Exhaustive switch (no
+  `default:`); `min()` so it only ever LOWERS maxLoops (monotonic-toward-less).
+  Dormant (0 call sites) → byte-equal-by-construction. Tests `BASChapter1044`
+  5/0.
+- **Commit 2 (`f306840d2`)** — one edit INSIDE the `if deliberationLoopEnabled`
+  block (`EBrainRuntimeCoordinator+RunTurn.swift:288`): floor
+  `routedBudget.maxLoops` by `request.deviceState.thermalLevel` BEFORE the
+  `min(…, stepIndex)`. Same thermal level the power clock used (no double-count);
+  NO new coordinator/init param → `BASChapter602` 4/0 untouched. Byte-equal-off
+  three ways: flag off → block skipped; flag on + `.nominal`/`.warm` →
+  passthrough; only new behavior is flag on + `.hot`/`.critical` →
+  `targetPasses` collapses to 1. Does NOT touch the P1.5a caution seam or the
+  P2 trigger. Tests `BASChapter1039` 14/0.
+- **On-device proof:** a sync XCTest (not the SIGBUS-blocked async path);
+  `.hot` injected via a test-local device-state helper.
+
+**P3 STATUS: COMPLETE (safe scope).** The thermal floor makes the ADR red-line
+actually TRUE (was documented, now enforced). Honest boundary: opt-in +
+default-OFF like all of ADR-018, so the floor is **inert in production today**
+(it only matters once a host enables the loop) — safety hardening of an opt-in
+path + making the red-line real, not a user-observable change now.
