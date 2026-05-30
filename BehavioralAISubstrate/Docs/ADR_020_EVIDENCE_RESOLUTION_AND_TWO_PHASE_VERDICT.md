@@ -89,7 +89,7 @@ observation-only** artifact (NOT a gate on any reduction — see §1):
 | **1 Phase A** | extract render-independent `computeVerdictDecision` (pure) | zero (byte-equal *unconditionally*) | ✅ `ce13c2e9e` — sweep 14,656/0 |
 | **2a** | Arc-2 latent primitives — `BASEvidenceAtom`/`ContentType`/`Ledger`/`Matcher` (dormant) | very low (dormant) | ✅ `e6458fbc4` — sweep 14,662/0 |
 | **3 Phase B** | Arc-3 `buildProvisionalVerdict` + `BASProvisionalVerdict` (dead code; `computeVerdictDecision`→`static`) | low (dead code) | ✅ `91123cd66` — sweep 14,667/0 |
-| **3 Phase C** | wire the provisional verdict as INERT, observation-only at `RunTurn:807` | low (one off-gated, mutation-free seam — but the spine) | **next** |
+| **3 Phase C** | wire the provisional verdict as INERT, observation-only at `RunTurn:~823` | low (off-gated, mutation-free seam) | ✅ `628384370` — sweep 14,668/0 |
 | **2b** | defaulted-optional `BASMemoryBundle.resolvedEvidence` (custom Codable — `encodeIfPresent`) + `BASUncertaintyLedger.resolvedEvidenceRefs` + coordinator `evidenceStore` slot | low (dormant) | pending (interface coupled to Step 4) |
 | **4** | Arc-2 retrieval → write-back → floored caution-withholding | medium (opt-in, byte-equal-off) | 🛑 **checkpoint before starting** |
 | **5** | Borderline fixture + ADR/SCAFFOLD status flips | docs | pending |
@@ -97,6 +97,15 @@ observation-only** artifact (NOT a gate on any reduction — see §1):
 **Excluded (confirmed unsafe, §1):** below-baseline reduction (Arc-2 caution-DOWN)
 and verdict-gated reduction (Arc-3 "Phase D"). Both need the render-and-verdict
 replay → a separate sovereign-gated ADR.
+
+**ARC-3 (two-phase verdict) is COMPLETE** in its safe, observation-only form
+(Phase A + B + C landed, byte-equal, verified end-to-end: the provisional
+forecast fires pre-render and equals the post-render verdict level for the
+production path, while changing no decision). What remains is all **Arc-2**
+(knowledge-retrieval): Step 2b (the evidence store + defaulted fields, dormant)
+and Step 4 (the consequential floored caution-withholding) — the latter being the
+one decision-changing slice, sized large and design-gated. Resume Step 4 with a
+fresh context per the §7-style discipline.
 
 ## 5. Phase A — verdict-decision extraction (LANDING)
 
