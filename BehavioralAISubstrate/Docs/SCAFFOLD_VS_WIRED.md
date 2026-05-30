@@ -700,6 +700,12 @@ candidate。
   ratchets stricter。 Flag-off → byte-equal。
 - Substantive per-pass resolution remains INFEASIBLE (deterministic loop
   + signal-count memory,ADR-019 §12) — out of scope。
+- **P1.5b(caution-DOWN)CLOSED — out-of-scope-by-architecture**(ADR-019
+  §14):pipeline 是 card→render→seals→verdict,verdict 审计 render 的产物,
+  所以无法用 verdict 去 gate 一个 render 之前的 caution 降低(循环依赖);
+  post-verdict re-raise 要重跑整个后半段。需要两阶段 verdict 架构(独立研究
+  项目),不是 deliberation-loop 的增量。**caution 在此 pipeline 只能向上
+  ratchet。** 之前标注的「sovereign-gated / 待开发」据此关闭。
 
 Verified:`testActivatesAndRefines…` (tilt+caution compose),ch1039 8/8,
 full sweep 14,656 / 0 flag-off。

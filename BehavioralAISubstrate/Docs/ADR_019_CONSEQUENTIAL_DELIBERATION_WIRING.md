@@ -83,6 +83,12 @@ relaxing any guardrail.
   deliberation reduce safety friction and can be "trained bad," so it is gated
   exactly like ADR-018 P4: L14 sovereign veto, a bounded per-turn cap
   (±0.05-class), replay-determinism, high-confidence-auto / low-confidence-human.
+  > **SUPERSEDED by §14 — DO NOT BUILD.** Attempted in ch1041; found
+  > architecturally incompatible with the verdict-after-render pipeline (the
+  > post-verdict re-raise veto is circular: the verdict audits the render, so it
+  > can't gate a pre-render reduction). Closed as out-of-scope-by-architecture.
+  > The safe directions (§11 caution-up + §13 reversibility-tilt) are the
+  > architecturally-compatible way deliberation is consequential.
 
 ## 5. Red-line proofs (for the future implementation)
 
@@ -319,3 +325,42 @@ the substrate's own conservatism axis → not-less-safe); `path.direct` stays
 vetoed; downstream permit only ratchets stricter. Byte-equal when the flag is off.
 Verified: `testActivatesAndRefinesViaRealHostRuntimePath` (combined tilt+caution),
 ch1039 8/8, full sweep **14,656 / 0** flag-off.
+
+## 14. P1.5b (sovereign-gated caution REDUCTION) — ARCHITECTURALLY INCOMPATIBLE, NOT BUILT (ch1041)
+
+P1.5b (deliberation that genuinely resolves uncertainty ⇒ LESS caution, gated by
+a model-unreachable approval token + a **post-verdict re-raise veto** = "Lock B")
+was attempted and found **architecturally incompatible** with `runTurn`'s
+pipeline — a code-grounded blocker, not a fatigue/judgment deferral.
+
+**The pipeline is card → render → seals → verdict** (`RunTurn.swift`). `boundRisk
+Card` (the seam where a reduction would apply, ~:421) flows into **everything
+downstream**: `render` (:858), the sealed output (:887/:896), `buildThoughtFold`
+(:959), `buildRuntimeTrace` (:1028), AND `buildSovereignVerdict` (:1057). And the
+verdict (:1052) is computed FROM the trace+fold (:1054/:1056), which are built
+FROM the rendered output (:1030). So **the verdict structurally AUDITS the
+rendered/sealed output — it necessarily comes after the render.**
+
+Consequences for P1.5b:
+- A caution **reduction** at the card seam contaminates the render, every seal,
+  AND the verdict's own inputs → a reduced card can suppress the verdict's own
+  `.throttle`/`.escalate` response to itself. **Unsafe without Lock B.**
+- **Lock B is the problem:** "re-raise if the verdict is non-pass" would require
+  re-running the ENTIRE back half (:856–1052: render → seal output → fold → trace
+  → verdict) after restoring the un-reduced card — and the first-pass verdict was
+  already computed on the contaminated card.
+- **Gating the reduction on the verdict is circular:** the verdict needs the
+  render, the render needs the card. You cannot compute the verdict "before" the
+  render to gate a pre-render reduction; the verdict's whole role is to audit
+  what render produced.
+
+So P1.5b as designed (assessment caution-reduction + post-verdict veto) **cannot
+be a safe slice on this architecture.** A correct version needs a fundamentally
+different **two-phase verdict** (a pre-render provisional gate distinct from the
+post-render audit verdict) — a separate research project, NOT a deliberation-loop
+increment. **Decision: do NOT build P1.5b.** The architecturally-compatible way
+deliberation is consequential is the SAFE direction already landed — the
+reversibility-tilt (§13, changes the action) + P1.5a caution-up (§11, raises the
+assessment). Caution only ever RATCHETS UP in this pipeline; reduction fights the
+verdict-after-render invariant. This supersedes §4's "future focused session"
+framing for P1.5b: it is closed as out-of-scope-by-architecture, not deferred.
