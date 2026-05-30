@@ -91,7 +91,7 @@ observation-only** artifact (NOT a gate on any reduction — see §1):
 | **3 Phase B** | Arc-3 `buildProvisionalVerdict` + `BASProvisionalVerdict` (dead code; `computeVerdictDecision`→`static`) | low (dead code) | ✅ `91123cd66` — sweep 14,667/0 |
 | **3 Phase C** | wire the provisional verdict as INERT, observation-only at `RunTurn:~823` | low (off-gated, mutation-free seam) | ✅ `628384370` — sweep 14,668/0 |
 | **2b** | defaulted-optional `BASMemoryBundle.resolvedEvidence` (custom Codable — `encodeIfPresent`) + `BASUncertaintyLedger.resolvedEvidenceRefs` + coordinator `evidenceStore` slot | low (dormant) | pending (interface coupled to Step 4) |
-| **4** | Arc-2 single-layer floored caution-withholding (at the P1.5a seam) | medium (opt-in, byte-equal-off) | **C1 ✅** `1cc6dfcb6` (pure helper `BASDeliberationResolutionCredit` + dormant coordinator slots `evidenceLedger`/`resolvedEvidenceSink`) · **C2 ✅** `219d9b865` (seam: add `withheldIncrement = max(0, 0.06 − credit)` instead of the constant — byte-equal + **production-inert**: `buildEBrainTurn` does not thread the ledger yet) · **C3 pending** — see §8 |
+| **4** | Arc-2 single-layer floored caution-withholding (at the P1.5a seam) | medium (opt-in, byte-equal-off) | **C1 ✅** `1cc6dfcb6` (pure helper `BASDeliberationResolutionCredit` + dormant coordinator slots `evidenceLedger`/`resolvedEvidenceSink`) · **C2 ✅** `219d9b865` (seam: add `withheldIncrement = max(0, 0.06 − credit)` instead of the constant — byte-equal + **production-inert**: `buildEBrainTurn` does not thread the ledger yet) · **C3 ✅** `83e05e222` (thread `evidenceLedger` through `buildEBrainTurn` → activate in production; e2e proof on `.fixtureGeneric`, 2 live `missingFact` keys: full resolution drops high→medium with `on_resolved.totalRisk == on_stuck − increment` exactly, ch1042 5/0 + ch1039 9/0 + ch602 4/0, + replay-determinism + anti-theater + byte-equal-off) — **see §9 for the floor-claim CORRECTION** |
 | **5** | Borderline fixture + ADR/SCAFFOLD status flips | docs | pending |
 
 **Excluded (confirmed unsafe, §1):** below-baseline reduction (Arc-2 caution-DOWN)
@@ -180,6 +180,41 @@ emit is observation-only); flag-off full sweep stays at the current count / 0.
 **Then STOP and checkpoint** before Step 4 (the consequential floored
 caution-withholding) — it is the one slice that changes a decision, and it is
 sovereign-review-gated by design.
+
+## 9. CORRECTION (ch1042 C3) — the floor is vs the loop's OWN contribution, NOT the loop-off baseline
+
+§3 and §8 stated the floored invariant as `on_resolved.totalRisk >= off.totalRisk`
+("genuine resolution withholds the loop's own added caution, never subtracts
+baseline caution… never below the loop-off baseline"). **The C3 end-to-end test
+found that literal phrasing is FALSE on `.fixtureGeneric`, and this is the honest
+correction.**
+
+What is TRUE (verified, `BASChapter1042EvidenceResolutionTests`):
+- The seam adds `withheldIncrement = max(0, increment − credit) ∈ [0, increment]`,
+  so the loop withholds **at most its own added caution** off the SAME-selection
+  baseline. Full resolution → `on_resolved.totalRisk == on_stuck − increment`
+  EXACTLY (0.63850 == 0.69850 − 0.06, 1e-12). The loop never subtracts more than
+  it added. This is the real §14-safe property and it holds at the seam.
+
+What is FALSE (the imprecise claim, now corrected):
+- `on_resolved >= off` does NOT hold here. Live numbers: `off` 0.64275 (selects
+  `path.bounded`), `on_resolved` 0.63850 — **~0.00425 BELOW off.** Cause: the
+  ch1041 **reversibility-tilt co-fires** when the loop is on and moves selection
+  to the more-reversible `path.reflective`, whose base binding is ~0.00425 lower.
+  The post-binding withholding seam floors the loop's OWN increment relative to
+  the (tilt-selected) bound card; it cannot — and does not — compare the composed
+  (tilt binding + withholding) card against the loop-OFF value.
+
+Why this is still SAFE (not a guardrail breach): the sub-baseline result is not
+the withholding "over-subtracting" — it is the ch1041 tilt independently selecting
+a **more-reversible (safer) action**, whose lower binding legitimately carries
+slightly lower risk. Both opt-in effects are conservative; they simply compose to
+a number marginally under the loop-off scalar while the band returns to off's
+(medium) and the selected action is strictly safer. The test asserts the TRUE
+floor (vs `on_stuck`) and PINS the deviation (`XCTAssertLessThan(on_resolved, off)`)
+so any future change is forced to re-examine it. **Takeaway:** state the Step-4
+floor as "withholds ≤ its own added increment (vs the same-selection on_stuck
+baseline)", NOT "≥ the loop-off baseline."
 
 ## 8. Step 4 Commit 3 resume spec + the ch1042 flaky-triage lesson
 
