@@ -329,3 +329,76 @@ changes):
 - Internal consistency + every `file:line` accurate against verified ground truth (Section 2-7 cross-checked via grep 2026-05-29).
 - `SCAFFOLD_VS_WIRED.md` append keeps `BASChapter1005ScaffoldInventoryPin` structural test green (append-only, required substrings preserved).
 - Zero code change → zero build/test/device regression risk.
+
+---
+
+## 10. P2 (ShadowTrial N→N+1 feedback) — implementation status + resume spec (ch 1043)
+
+A fresh adversarial architect pass (Opus, code-grounded) CORRECTED §6/§7's stale
+"machinery READY, just wire it" framing:
+
+- **§6/§7 mechanism was wrong.** "ledger replay on coordinator init" has NO home:
+  `BASEBrainRuntimeCoordinator` is an immutable value-type `struct` with no
+  per-turn init. The correct mechanism is the **ch1042 carrier pattern** — a
+  coordinator slot-IN (last turn's pending trials) + a `@Sendable` sink-OUT
+  (this turn's evaluated trials), both default-nil → off the Codable/seal path →
+  byte-equal. The OUT half already exists (`result.shadowTrialRecords`).
+- **Two disjoint ShadowTrial worlds exist** (the ADR conflated them): World A =
+  the real lifecycle state machine (`ShadowTrialStateMachineCore.swift`,
+  `BASShadowTrialCoordinator` actor) — fully DEFINED, NEVER instantiated in
+  production. World B = the inline ad-hoc `BASShadowTrialRecord` construction in
+  `EBrainRuntimeCoordinator+EvolutionGovernance.swift:~144-167` — this is what
+  runTurn actually does, and it can birth a trial `"passed"`/`"failed"`
+  same-turn. P2 adds a PARALLEL prior-turn evaluator; it does NOT touch World B
+  (that unification is a separate, higher-byte-risk refactor).
+- **NEVER-EFFECTIVE-SAME-TURN** (`BASEvolutionShadowSeat.swift:9` doctrine) is
+  preserved by construction: the slot-IN only ever holds turn N−1's records, so
+  evaluating it at turn-start cannot touch turn N's own (not-yet-built) trial.
+
+### P2 Commit 1 — LANDED (ch 1043, `2dd28f3ce`), DORMANT + byte-equal
+
+`BASShadowTrialFeedbackLedger` (new, BASMemory): immutable Codable carrier +
+pure `evaluate(_:using:)` that advances a prior-turn pending trial ONE step by
+faithfully delegating to `BASShadowTrialStateMachineCore.transition` (verified
+total against the real machine; terminal records unchanged; anti-theater — no
+silent advance on unknown states). 3 default-OFF coordinator slots
+(`shadowTrialFeedbackEnabled`/`pendingTrialLedgerIn`/`resolvedTrialSink`)
+mirroring ch1042, threaded through `buildEBrainTurn`/`makeEBrainTurn`. 0 refs in
+runTurn → dormant. Tests `BASChapter1043ShadowTrialFeedbackTests` 7/0; byte-equal
+witness `BASChapter1039` 9/0; init-pin `BASChapter602` 4/0.
+
+### P2 Commit 2 — RESUME SPEC (the opt-in N→N+1 trigger — a runTurn SPINE edit; do with a FRESH context)
+
+In `EBrainRuntimeCoordinator+RunTurn.swift`, insert a guarded block at
+**turn-start** (after `derivedTurnID` is available, ~:116-120, and BEFORE
+`buildEvolutionGovernanceArtifacts` ~:960) — this placement is what guarantees
+NEVER-SAME-TURN:
+```
+if shadowTrialFeedbackEnabled, let pending = pendingTrialLedgerIn,
+   let sink = resolvedTrialSink, !pending.pendingTrials.isEmpty {
+    let evaluated = pending.pendingTrials.map { BASShadowTrialFeedbackLedger.evaluate($0) }
+    sink(evaluated)                  // OUT only — gates nothing
+}
+```
+**OBSERVATION-ONLY** (mirrors `provisionalVerdictSink`): the evaluated outcome
+feeds the sink ONLY — NOT render, seals, `buildSovereignVerdict`, governance, or
+any canonical-bytes/hash path. Three independent off-switches (flag false / nil
+carrier / nil sink, all default) → block never runs → byte-equal. The host closes
+the cycle: persist `result.shadowTrialRecords.filter(\.isPending)` after turn N,
+feed as `pendingTrialLedgerIn` on turn N+1 (the coordinator stays immutable; the
+host or a thin host-loop helper owns persist-and-reinject — the genuine
+"needs-infra" delta). Tests: the 2-turn transition (trial born turn N, closed
+turn N+1, two distinct turns); NEVER-SAME-TURN guard (nil carrier → empty sink);
+byte-equal-off (each off-switch); replay-determinism. Gate on fast filters
+(ADR-020 §8), not the noisy full sweep.
+
+### P2 Commit 3 — tests/docs/telemetry (optional trace telemetry behind the flag; flip SCAFFOLD ShadowTrial scaffold→opt-in-wired; flip this §10 status).
+
+### P2 honest boundary (what it does NOT do)
+Observation-only (closing a trial changes nothing the host sees unless it acts on
+the sink); does NOT touch World B's same-turn construction; does NOT touch
+`BASFeedbackEvent` (stays an advisory dead-end ticket — that's P4); no
+sovereign-audit-chain durability (carrier is in-memory host-persistable); the
+coordinator stays immutable (cross-turn state is host-held). ~125 production LOC
+total (the ADR's ~150 estimate was accurate; only the *mechanism* + file names
+were wrong).
