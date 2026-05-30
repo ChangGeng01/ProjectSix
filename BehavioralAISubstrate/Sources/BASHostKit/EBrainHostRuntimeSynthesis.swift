@@ -96,13 +96,34 @@ extension BASHostRuntime {
         projection: BASBrainProjection,
         deviceStateOverride: BASDeviceState? = nil,
         runtimeMode: BASTurnRuntimeMode = .v1ByteEqual,
-        now: Date = .now
+        now: Date = .now,
+        // ch 1039 / ADR-018 P1 — OPT-IN deliberation loop, threaded onto
+        // the coordinator this async surface builds (via buildCoordinator).
+        // Default false → single pass (byte-equal, 红线 7 + ADR-014).
+        // Mirrors exactly how the sync `buildEBrainTurn(...)` →
+        // `makeEBrainTurn(...)` path threads it. Before this, the
+        // runtime-mode surface had NO such parameter and buildCoordinator
+        // defaulted the coordinator's flag to false, so this async path
+        // could NEVER run the deliberation loop — a real activation gap.
+        // By construction the loop IS consequential when set (the
+        // runtime-mode path uses the SAME real
+        // BASHostRuntimeEBrainLoopService + coordinator.runTurn as the sync
+        // path, where ch1039/ch1041 prove the on/off divergence). NOTE: the
+        // on-effect could not be exercised by a direct XCTest of THIS async
+        // surface — a faithful test needs an `async` test method (the func
+        // is async) seeded via `startSession`, and on this toolchain
+        // `async test + startSession` crashes with SIGBUS (the same bucket
+        // pinned in BASSignalTenIntegrationTestTriageDoctrine; empirically
+        // re-confirmed). The activation is proven transitively through the
+        // sync-path tests that exercise the identical coordinator wiring.
+        deliberationLoopEnabled: Bool = false
     ) async -> BASEBrainTurnResult {
         let coordinator = buildCoordinator(
             for: request,
             currentBrain: currentBrain,
             projection: projection,
-            now: now
+            now: now,
+            deliberationLoopEnabled: deliberationLoopEnabled
         )
         let deviceState = deviceStateOverride
             ?? vitalMonitor?.currentDeviceState(now: now)
@@ -145,7 +166,13 @@ extension BASHostRuntime {
         for request: BASHostSessionRequest,
         currentBrain: BASHostCurrentBrain,
         projection: BASBrainProjection,
-        now: Date
+        now: Date,
+        // ch 1039 / ADR-018 P1 — OPT-IN deliberation loop. Default false →
+        // single pass (byte-equal, 红线 7). Threaded onto BOTH the
+        // triSelfService (ch1040 ADR-019 reversibility-tilt) and the
+        // coordinator init below, exactly as the sync `makeEBrainTurn(...)`
+        // path does, so this async surface activates the same loop.
+        deliberationLoopEnabled: Bool = false
     ) -> BASEBrainRuntimeCoordinator {
         let enforcedCurrentBrain = currentBrain
             .applyingControlPlaneDisposition(
@@ -232,7 +259,11 @@ extension BASHostRuntime {
                     request: request,
                     currentBrain: enforcedCurrentBrain,
                     tuning: configuration.runtimeTuning,
-                    hostConstitution: resolvedConstitution
+                    hostConstitution: resolvedConstitution,
+                    // chapter 一千零四十一 / ADR-019 — opt-in reversibility-
+                    // tilt. Default-false elsewhere → byte-equal. Mirrors
+                    // the sync `makeEBrainTurn(...)` wiring.
+                    deliberationLoopEnabled: deliberationLoopEnabled
                 ),
             riskService:
                 BASHostRuntimeEBrainRiskService(
@@ -259,7 +290,13 @@ extension BASHostRuntime {
             hostConstitution: resolvedConstitution,
             hostConstitutionVault: resolvedVault,
             hostVersionTree: configuration.hostVersionTree,
-            hostForgetRequest: configuration.hostForgetRequest
+            hostForgetRequest: configuration.hostForgetRequest,
+            // ch 1039 / ADR-018 P1 — thread the opt-in deliberation flag
+            // onto the coordinator the async runtime-mode surface uses.
+            // Default false (every existing caller omits it) → the
+            // coordinator's own default false → the runTurn loop body +
+            // P1.5a caution seam stay dormant → byte-equal (红线 7).
+            deliberationLoopEnabled: deliberationLoopEnabled
         )
     }
 
