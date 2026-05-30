@@ -268,10 +268,11 @@ built in this pass.**
 | **N9** | 018 §7.3 | Direct async-surface XCTest of `buildCoordinator` loop activation | **DEFERRED — external TOOLCHAIN SIGBUS** (capability SHIPPED; only the direct test blocked) | threading wired (`EBrainHostRuntimeSynthesis.swift:121-165`); macOS-26 async-XCTest SIGBUS |
 | **N10** | 018 §10 C3 | P2 trial-into-trace telemetry | **DEFERRED (deliberate — non-essential, avoids seal path)** | `evaluatedTrial.*trace` grep EMPTY; only `resolvedTrialSink` ships |
 | **N11** | 019 §11 | Borderline-permit action-mode-flip fixture (prove caution-up flips a *non-block* action) | **DOC-GAP / test-not-built** (ADR notes it as follow-up) | P1.5a consequential at assessment level; mode-flip fixture not built |
-| **N12** | 016 §5 / ADR_INDEX | ADR-006 + ADR-012 standalone charter docs | **DOC-GAP** | doctrine lives inline in `BASPolicy/BASRiskCalibration{Bundle,Gate,StratumSubModel}.swift`; ADR_INDEX makes it findable |
+| **N12** | 016 §5 / ADR_INDEX | ADR-006 + ADR-012 standalone charter docs | **✅ DONE (ch1044)** | charters written: `Docs/ADR_006_RISK_CALIBRATION_TIMING.md` + `Docs/ADR_012_HYBRID_RISK_CALIBRATION_PIPELINE.md`; ADR_INDEX updated |
 
 ### Triage of the 12 (for a future effort — NOT this session)
-- **Trivial doc tasks (any session):** N12 (ADR-006/012 charters), N11 (one fixture test).
+- **Trivial doc tasks (any session):** N12 (ADR-006/012 charters) — **✅ DONE ch1044**. N11 (one fixture test) — see note below.
+- **N11 honest reassessment (ch1044):** architecturally REACHABLE (the permit-escalation gate chain at `RunTurn.swift:514-886` reads the P1.5a-bumped `boundRiskCard.riskLevel`, so a caution-up CAN flip a non-block permit), but a faithful borderline fixture must be hunted through the real host runtime (a prompt+config where off-permit is non-block AND genuinely-uncertain AND the +0.06 crosses a gate threshold). That fixture-hunt is delicate + fragile to build at a session tail → deferred as "reachable but not cheaply/robustly now," NOT closed. Left for a focused session.
 - **External-blocked (wait for toolchain):** N9 (async SIGBUS).
 - **Correctly CLOSED — keep closed (do NOT build):** N4 (feedback→policy), N5 (P1.5b reduction). N7 INFEASIBLE without a new knowledge-retrieval capability.
 - **Major sovereign/multi-session arcs (fresh + sovereign-reviewed):** N3 (P5 version-tree, also = the DEFER-1/2 spine prerequisites), N8 (activate the ShadowTrial actor, part of P5.2), N6 (below-baseline reduction — a future sovereign ADR).
