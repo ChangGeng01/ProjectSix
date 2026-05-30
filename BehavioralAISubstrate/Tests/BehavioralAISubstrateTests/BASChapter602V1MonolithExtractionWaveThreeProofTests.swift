@@ -104,7 +104,14 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // Default-nil preserves all prior caller compat per
                 // 红线 7 + ADR-014;this pin tracks the canonical
                 // signature。
-                provisionalVerdictSink:)
+                provisionalVerdictSink:
+                // chapter 一千零四十二 / ADR-020 Step 4 — evidence
+                // ledger + resolved-evidence write-back sink OPT-IN
+                // slots added。 Default-nil preserves all prior caller
+                // compat per 红线 7 + ADR-014;this pin tracks the
+                // canonical signature (an unsynced pin breaks compile)。
+                evidenceLedger:
+                resolvedEvidenceSink:)
         XCTAssertNotNil(initRef)
     }
 

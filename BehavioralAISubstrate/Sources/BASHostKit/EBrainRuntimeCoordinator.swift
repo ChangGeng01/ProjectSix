@@ -159,6 +159,27 @@ public struct BASEBrainRuntimeCoordinator {
     public var provisionalVerdictSink:
         (@Sendable (BASProvisionalVerdict) -> Void)?
 
+    /// chapter 一千零四十二 / ADR-020 Step 4 — OPT-IN, default-nil
+    /// evidence the deliberation loop matches a turn's typed unknowns
+    /// against to WITHHOLD a floored fraction of its own added caution
+    /// (`BASDeliberationCaution.uncertainDeliberationRiskIncrement`)
+    /// when stored evidence resolves those unknowns。 Default nil → no
+    /// resolution → no withholding → byte-equality per 红线 7 + ADR-014。
+    /// Dormant in Commit 1 (no `runTurn` path reads it yet); the
+    /// consequential floored caution-withholding lands in Commit 2。
+    /// NOT in any canonical-bytes / seal / hash path.
+    public var evidenceLedger: BASEvidenceLedger? = nil
+
+    /// chapter 一千零四十二 / ADR-020 Step 4 — OPT-IN, default-nil
+    /// write-back sink for newly-resolved evidence atoms。 Mirrors
+    /// `provisionalVerdictSink`: when set,`runTurn` (Commit 2) emits the
+    /// turn's newly-resolved `BASEvidenceAtom`s to this closure —
+    /// OBSERVATION-ONLY (it feeds no render/seal/verdict/hash)。 Default
+    /// nil → no emission → byte-equality per 红线 7 + ADR-014:nil →
+    /// no effect。 NOT in any canonical-bytes / seal / hash path.
+    public var resolvedEvidenceSink:
+        (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -197,7 +218,16 @@ public struct BASEBrainRuntimeCoordinator {
         // the pre-render provisional verdict。 Default nil → no emission
         // → byte-equal (红线 7)。 Observation-only; gates nothing.
         provisionalVerdictSink:
-            (@Sendable (BASProvisionalVerdict) -> Void)? = nil
+            (@Sendable (BASProvisionalVerdict) -> Void)? = nil,
+        // chapter 一千零四十二 / ADR-020 Step 4 — OPT-IN evidence ledger。
+        // Default nil → no resolution → byte-equal (红线 7)。 Dormant in
+        // Commit 1; the floored caution-withholding lands in Commit 2.
+        evidenceLedger: BASEvidenceLedger? = nil,
+        // chapter 一千零四十二 / ADR-020 Step 4 — OPT-IN write-back sink
+        // for newly-resolved evidence atoms。 Default nil → no emission
+        // → byte-equal (红线 7)。 Observation-only; gates nothing.
+        resolvedEvidenceSink:
+            (@Sendable ([BASEvidenceAtom]) -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -224,6 +254,8 @@ public struct BASEBrainRuntimeCoordinator {
         self.agentFabric = agentFabric
         self.deliberationLoopEnabled = deliberationLoopEnabled
         self.provisionalVerdictSink = provisionalVerdictSink
+        self.evidenceLedger = evidenceLedger
+        self.resolvedEvidenceSink = resolvedEvidenceSink
     }
 
     // MARK: - Agent Fabric observation (ch 960)
