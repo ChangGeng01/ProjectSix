@@ -482,6 +482,86 @@ extension BASHostKitTests {
         XCTAssertEqual(turn.evolutionLineageSummary.sovereignWarrants, turn.sovereignWarrants)
     }
 
+    /// ch1044 audit HIGH-1 regression guard (and the HIGH-2-scoped
+    /// determinism test that was missing): the SAME healthy turn run
+    /// twice with the SAME injected `now` must produce BIT-IDENTICAL
+    /// sovereign commit tokens — including the `nonce` and `signature`
+    /// fields. Before the fix, `makeCommitToken` minted the nonce from
+    /// `UUID()` (process-random), so the token bytes differed every run
+    /// even on identical inputs, silently breaking replay-determinism of
+    /// `BASEBrainTurnResult`. This turn is the `testHealthyTurn…` recipe,
+    /// which is known to mint [.checkpointCommit, .renderHighRisk] tokens,
+    /// so the guard exercises the real commit-token path.
+    func testSovereignCommitTokensAreReplayDeterministic() throws {
+        func makeHealthyRuntime() -> BASHostRuntime {
+            BASHostRuntime(
+                configuration: makeConfiguration(
+                    hostConstitution: BASHostConstitution(
+                        hostID: "host.healthy",
+                        activeVersion: "constitution.healthy.v1",
+                        valueAxes: BASValueAxisSet(
+                            axes: ["clarity", "speed"],
+                            relativeWeights: [0.52, 0.48],
+                            conflictRules: [],
+                            updateThreshold: 0.95
+                        ),
+                        goalSpine: BASGoalSpine(
+                            goals: ["reply_clearly"],
+                            priorityOrder: ["reply_clearly"],
+                            stageState: "steady"
+                        ),
+                        narrativeLoom: BASNarrativeLoom(
+                            longFormSummary:
+                                "Keep the turn steady and release only boundedly.",
+                            currentPhase: "steady"
+                        )
+                    )
+                )
+            )
+        }
+        // A FIXED injected `now` — so the deterministic nonce (which folds
+        // in `issuedAt` = runtimeTrace.recordedAt) is genuinely comparable
+        // across the two runs. With the old UUID() nonce, the tokens would
+        // differ here regardless of the fixed clock.
+        let fixedNow = Date(timeIntervalSinceReferenceDate: 760_000_000)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Draft a bounded local reply and keep the session stable.",
+            title: "Replay determinism guard",
+            riskLevel: .low
+        )
+
+        let turnA = try XCTUnwrap(
+            makeHealthyRuntime().startSession(request, now: fixedNow).eBrainTurn)
+        let turnB = try XCTUnwrap(
+            makeHealthyRuntime().startSession(request, now: fixedNow).eBrainTurn)
+
+        // Precondition: this turn really does mint commit tokens (else the
+        // guard would be vacuous — the HIGH-2 failure mode).
+        XCTAssertFalse(turnA.sovereignCommitTokens.isEmpty,
+            "precondition: the healthy turn must mint commit tokens")
+
+        // The whole point: tokens are bit-identical across runs, INCLUDING
+        // the nonce + signature (the fields the UUID() bug made vary).
+        XCTAssertEqual(turnA.sovereignCommitTokens, turnB.sovereignCommitTokens,
+            "commit tokens must be replay-deterministic (HIGH-1)")
+        XCTAssertEqual(
+            turnA.sovereignCommitTokens.map(\.nonce),
+            turnB.sovereignCommitTokens.map(\.nonce),
+            "the nonce must be deterministic (was UUID() — HIGH-1)")
+        XCTAssertEqual(
+            turnA.sovereignCommitTokens.map(\.signature),
+            turnB.sovereignCommitTokens.map(\.signature),
+            "the signature folds in the nonce → must be deterministic too")
+        // Distinct-scope tokens within ONE turn still have DISTINCT nonces
+        // (the fix preserves uniqueness; it only removed randomness).
+        let nonces = turnA.sovereignCommitTokens.map(\.nonce)
+        XCTAssertEqual(Set(nonces).count, nonces.count,
+            "distinct tokens keep distinct nonces (uniqueness preserved)")
+    }
+
     func testMissingLineageRecoveryEscalatesIntoMemoryFreezeWhenWritesNeedReview() throws {
         let explicitTuning = makePolicyOwnedRuntimeTuning(
             schemaVersion: "host.runtime-synthesis.explicit-no-lineage.v2"

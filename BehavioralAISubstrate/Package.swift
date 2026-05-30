@@ -407,7 +407,16 @@ let package = Package(
                 // Store for hosts that want fast
                 // in-process telemetry without SQLite
                 // durability。
-                "BASRustCoreBridge"
+                "BASRustCoreBridge",
+                // ch1044 audit LOW-8 — declare BASOrgan explicitly.
+                // BASLLMNeuralCoreService.swift + BASTrainingExample
+                // Sublimator.swift `import BASOrgan`; it previously
+                // resolved only via the transitive closure
+                // (AppleAdapters→Organ / Orchestration→Organ), a latent
+                // fragility if an intermediary ever dropped it. Direct
+                // declaration matches the same discipline as the M320
+                // BASWorldPrior entry above。
+                "BASOrgan"
             ],
             // chapter 七百五十 第一刀 follow-up — silence
             // the pre-existing SPM `unhandled` warning

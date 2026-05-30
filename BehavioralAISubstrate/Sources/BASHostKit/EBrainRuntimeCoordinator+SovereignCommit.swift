@@ -122,10 +122,34 @@ extension BASEBrainRuntimeCoordinator {
         issuedAt: Date,
         ttlMs: Int
     ) -> BASSovereignCommitToken {
-        let nonce = "nonce.\(UUID().uuidString.lowercased())"
         let actionDigest = sovereignDigestHex(
             actionDigestParts + [sessionID, turnID, scope.rawValue, snapshotRef, policyHash]
         )
+        // ch1044 audit HIGH-1 fix: previously `UUID().uuidString` — a
+        // process-random nonce on the NON-opt-in path, so the same turn
+        // inputs produced different commit-token bytes across runs,
+        // breaking replay-determinism (the token's `nonce` + `signature`
+        // are stored Codable fields that reach `BASEBrainTurnResult`). This
+        // is the SAME bug class M336 fixed just below for `tokenID` (was
+        // randomly-seeded `String.hashValue`). Derive the nonce
+        // deterministically from the turn-stable inputs — still unique per
+        // (session, turn, scope, action, snapshot, policy, issuedAt) so no
+        // two distinct tokens collide, but bit-identical on replay.
+        // `issuedAt` is `runtimeTrace.recordedAt` (injected from the
+        // request, deterministic), and `sovereignDigestHex` is a pure
+        // SHA256 over its inputs (no clock/random). nonce stays the same
+        // `nonce.<hex>` shape.
+        let nonceDigest = sovereignDigestHex([
+            "nonce.v2",
+            sessionID,
+            turnID,
+            scope.rawValue,
+            actionDigest,
+            snapshotRef,
+            policyHash,
+            String(issuedAt.timeIntervalSinceReferenceDate)
+        ])
+        let nonce = "nonce." + String(nonceDigest.prefix(24))
         // M336 deep review fix: previously
         // `abs(actionDigest.hashValue)` — Swift's `String.hashValue`
         // is randomly seeded per process, so token IDs varied
