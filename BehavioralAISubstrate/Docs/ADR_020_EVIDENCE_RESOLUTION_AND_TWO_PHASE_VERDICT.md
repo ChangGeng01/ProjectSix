@@ -91,7 +91,7 @@ observation-only** artifact (NOT a gate on any reduction — see §1):
 | **3 Phase B** | Arc-3 `buildProvisionalVerdict` + `BASProvisionalVerdict` (dead code; `computeVerdictDecision`→`static`) | low (dead code) | ✅ `91123cd66` — sweep 14,667/0 |
 | **3 Phase C** | wire the provisional verdict as INERT, observation-only at `RunTurn:~823` | low (off-gated, mutation-free seam) | ✅ `628384370` — sweep 14,668/0 |
 | **2b** | defaulted-optional `BASMemoryBundle.resolvedEvidence` (custom Codable — `encodeIfPresent`) + `BASUncertaintyLedger.resolvedEvidenceRefs` + coordinator `evidenceStore` slot | low (dormant) | pending (interface coupled to Step 4) |
-| **4** | Arc-2 retrieval → write-back → floored caution-withholding | medium (opt-in, byte-equal-off) | 🛑 **checkpoint before starting** |
+| **4** | Arc-2 single-layer floored caution-withholding (at the P1.5a seam) | medium (opt-in, byte-equal-off) | **C1 ✅** `1cc6dfcb6` (pure helper `BASDeliberationResolutionCredit` + dormant coordinator slots `evidenceLedger`/`resolvedEvidenceSink`) · **C2 ✅** `219d9b865` (seam: add `withheldIncrement = max(0, 0.06 − credit)` instead of the constant — byte-equal + **production-inert**: `buildEBrainTurn` does not thread the ledger yet) · **C3 pending** — see §8 |
 | **5** | Borderline fixture + ADR/SCAFFOLD status flips | docs | pending |
 
 **Excluded (confirmed unsafe, §1):** below-baseline reduction (Arc-2 caution-DOWN)
@@ -180,3 +180,55 @@ emit is observation-only); flag-off full sweep stays at the current count / 0.
 **Then STOP and checkpoint** before Step 4 (the consequential floored
 caution-withholding) — it is the one slice that changes a decision, and it is
 sovereign-review-gated by design.
+
+## 8. Step 4 Commit 3 resume spec + the ch1042 flaky-triage lesson
+
+**State at handoff:** C1 (`1cc6dfcb6`) + C2 (`219d9b865`, the reapply — see the
+lesson below) are landed, byte-equal, on origin. The floored withholding logic
+EXISTS at the seam and is UNIT-tested (`BASDeliberationResolutionCreditTests`),
+but it is **production-inert**: `buildEBrainTurn` does not thread `evidenceLedger`,
+so the coordinator slot is always nil on the host path → `withheld` is always the
+full 0.06 → byte-equal with the pre-Step-4 P1.5a. C3 activates + proves it.
+
+**Commit 3 (do with a fresh context):**
+1. **Thread `evidenceLedger:` through `buildEBrainTurn`** (`EBrainHostRuntime
+   Synthesis.swift`, mirror how `deliberationLoopEnabled` is threaded; default nil
+   → byte-equal-off) so a host can supply evidence that reaches the coordinator
+   slot, activating the withholding in production. Optionally thread
+   `resolvedEvidenceSink:` too for write-back.
+2. **End-to-end consequence test** (new `BASChapter1042EvidenceResolutionTests`,
+   reuse the `testActivatesAndRefinesViaRealHostRuntimePath` harness: `.fixture
+   Generic`, prompt "Push into an irreversible high-stakes move now.", `.high`):
+   - `off` (loop off) → medium (~0.6427); `on_stuck` (loop on, nil ledger) → high
+     (~0.7027, today's P1.5a).
+   - `on_resolved` (loop on, ledger SEEDED): build `BASEvidenceAtom`s whose
+     `evidenceKey` equals the LIVE keys from `BASDeliberationResolutionCredit
+     .requiredEvidenceKeys(on.decomposeFrame.unknownRecords)` (do NOT hardcode —
+     derive from the live frame), confidence ≥ 0.3 → assert
+     `on_resolved.riskCard.riskLevel == .medium` (dropped back from high),
+     `on_resolved.totalRisk < on_stuck.totalRisk`, AND
+     `on_resolved.totalRisk >= off.totalRisk` (THE FLOORED INVARIANT — never below
+     baseline).
+   - Replay-determinism (same ledger → same result) + anti-theater (a near-miss
+     atom → no withholding → stays at on_stuck).
+   - **HONEST CAVEAT to record:** if `decomposeFrame.unknownRecords` is empty for
+     this fixture, the consequence cannot manifest on it — then either pick/seed a
+     fixture whose decompose surfaces typed unknowns, or document that production
+     benefit requires hosts to populate both the unknowns AND the ledger. Do not
+     fake the seed.
+3. Flip §4's C3 row + add a §15 "Step 4 LANDED" + update SCAFFOLD_VS_WIRED.
+
+**⚠️ ch1042 FLAKY-TRIAGE LESSON (the reason C2 was needlessly reverted once):**
+this package's full `swift test` sweep has **THREE independent infra flakes**, none
+of which is a real regression. Before EVER reverting on a "1 failure", grep the log
+and exclude all three:
+- **swift-testing SIGBUS** — `exited with unexpected signal code 10` (hops between
+  unrelated tests across runs; `BASSignalTenIntegrationTestTriageDoctrineTests`).
+- **CoreData / NSXPC** — `Unable to send to server; failed after N attempts`,
+  `NSXPCConnection`, `addPersistentStoreWithType … NSCocoaErrorDomain (134060)`
+  (e.g. surfaced once in `BASProductionAdoptionSmokeTests.testCanonicalAudit
+  ComplianceHostAdoption` as a cross-store atomID mismatch).
+- Read the ACTUAL failing assertion + file:line; only count a real
+  `XCTAssertEqual failed` **in the changed area** as a regression. The reliable
+  byte-equal witness for Step 4 is `BASChapter1039DeliberationLoopTests` (9/0,
+  fast, no CoreData/swift-testing) — gate on THAT, not the noisy full sweep.
