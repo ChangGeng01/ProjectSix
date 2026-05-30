@@ -9,6 +9,14 @@ import BASRuntimeCore
 // MARK: - M71 split — BASEBrainRuntimeCoordinator — sovereign verdict evaluator.
 // buildSovereignVerdict — L14 BR-001..BR-012 hard-rule evaluation + lexicographic escalation.
 // Extracted from the 6099-line monolith during the M71 cohesion split.
+//
+// ch1042 ADR-020 Phase A: the escalation-level decision (the `raise(...)` lattice)
+// is extracted into `computeVerdictDecision`, a PURE function of pre-render-settled
+// inputs. The only render-derived input (`updateTickets`) is reduced by the caller
+// to a `needsProtectedWriteLane` bool, so the decision core itself is
+// render-independent and can be reused by the pre-render provisional verdict
+// (ADR-020 Phase B). This is a behavior-preserving extract — byte-equal
+// unconditionally (verified by the full sweep), no flag involved.
 
 extension BASEBrainRuntimeCoordinator {
     func buildSovereignVerdict(
@@ -22,6 +30,84 @@ extension BASEBrainRuntimeCoordinator {
         updateTickets: [BASUpdateTicket]
     ) -> BASSovereignVerdict {
         let policyHash = sovereignPolicyHash(for: budgetFrame)
+
+        // The single render-derived input, reduced to a bool so the decision
+        // core below is render-independent.
+        let needsProtectedWriteLane =
+            request.activeKillSwitches.contains(.requireReviewedWrites)
+            || actionPermit.mode == .delay
+            || actionPermit.mode == .replace
+            || updateTickets.contains(where: { $0.requiresReview || $0.conflictFlag })
+
+        // Quarantine/rollback ref strings (post-render IDs in this caller; the
+        // decision core treats them as opaque, so Phase B can pass placeholders).
+        let quarantineSources = [
+            runtimeTrace.sessionID,
+            thoughtFold.foldID,
+            thoughtFold.resumeFrameRef ?? ""
+        ]
+        let rollbackSource = thoughtFold.rollbackAnchorRef ?? thoughtFold.snapshotRef
+
+        let decision = computeVerdictDecision(
+            policyLineagePresent: policyLineage != nil,
+            budgetFrame: budgetFrame,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            emergencyBrake: emergencyBrake,
+            activeKillSwitches: request.activeKillSwitches,
+            needsProtectedWriteLane: needsProtectedWriteLane,
+            quarantineSources: quarantineSources,
+            rollbackSource: rollbackSource
+        )
+
+        let userStubMode: BASSovereignUserStubMode
+        switch decision.level {
+        case .deadStop:
+            userStubMode = .refusalOnly
+        case .toolCut, .memoryFreeze, .quarantine, .rollback:
+            userStubMode = .minimalReceipt
+        case .pass, .throttle, .shadowLock:
+            userStubMode = .none
+        }
+
+        let verdictID = "verdict.\(runtimeTrace.sessionID)"
+        let orderedQuarantineRefs = unique(decision.quarantineRefs.filter { !$0.isEmpty })
+        let expiresAt = runtimeTrace.recordedAt.addingTimeInterval(
+            decision.level.isLatchedByDefault ? 300 : 90
+        )
+
+        return BASSovereignVerdict(
+            verdictID: verdictID,
+            verdictLevel: decision.level,
+            latched: decision.level.isLatchedByDefault,
+            forcedMode: emergencyBrake.forcedMode ?? decision.level.defaultForcedMode,
+            reasonCodes: orderedReasonCodes(decision.reasonCodes),
+            revokedPermissions: Array(decision.revokedPermissions).sorted { $0.rawValue < $1.rawValue },
+            quarantineRefs: orderedQuarantineRefs,
+            rollbackRef: decision.rollbackRef?.trimmingCharacters(in: .whitespacesAndNewlines),
+            userStubMode: userStubMode,
+            policyHash: policyHash,
+            expiresAt: expiresAt
+        )
+    }
+
+    // ch1042 ADR-020 Phase A — render-independent escalation-level decision core.
+    // Pure function of pre-render-settled inputs (everything except
+    // `needsProtectedWriteLane`, which the caller derives from `updateTickets`).
+    // `quarantineSources`/`rollbackSource` are opaque ref strings supplied by the
+    // caller. No instance state is read — kept on the type for call-site locality
+    // and reuse by the pre-render provisional verdict (Phase B).
+    func computeVerdictDecision(
+        policyLineagePresent: Bool,
+        budgetFrame: BASBudgetFrame,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        emergencyBrake: BASEmergencyBrake,
+        activeKillSwitches: [BASKillSwitchID],
+        needsProtectedWriteLane: Bool,
+        quarantineSources: [String],
+        rollbackSource: String?
+    ) -> BASSovereignVerdictDecision {
         var verdictLevel: BASSovereignVerdictLevel = .pass
         var reasonCodes: [String] = []
         var revokedPermissions = Set<BASSovereignPermission>()
@@ -46,7 +132,7 @@ extension BASEBrainRuntimeCoordinator {
             }
         }
 
-        if policyLineage == nil {
+        if !policyLineagePresent {
             raise(
                 .shadowLock,
                 reasons: ["runtime.policy_lineage_missing"],
@@ -77,11 +163,7 @@ extension BASEBrainRuntimeCoordinator {
                     .hostMutation,
                     .rulePromotion
                 ],
-                quarantineSources: [
-                    runtimeTrace.sessionID,
-                    thoughtFold.foldID,
-                    thoughtFold.resumeFrameRef ?? ""
-                ]
+                quarantineSources: quarantineSources
             )
         }
 
@@ -90,7 +172,7 @@ extension BASEBrainRuntimeCoordinator {
                 .deadStop,
                 reasons: ["risk.extreme", "permit.answer", "risk_permit_conflict"],
                 revoked: BASSovereignPermission.allCases,
-                rollbackSource: thoughtFold.rollbackAnchorRef ?? thoughtFold.snapshotRef
+                rollbackSource: rollbackSource
             )
         } else if actionPermit.mode == .block {
             raise(
@@ -103,21 +185,15 @@ extension BASEBrainRuntimeCoordinator {
                     .renderHighRisk
                 ],
                 rollbackSource: emergencyBrake.brakeLevel == .lockdown
-                    ? (thoughtFold.rollbackAnchorRef ?? thoughtFold.snapshotRef)
+                    ? rollbackSource
                     : nil
             )
         }
 
-        let needsProtectedWriteLane =
-            request.activeKillSwitches.contains(.requireReviewedWrites)
-            || actionPermit.mode == .delay
-            || actionPermit.mode == .replace
-            || updateTickets.contains(where: { $0.requiresReview || $0.conflictFlag })
-
         if needsProtectedWriteLane {
             raise(
                 .memoryFreeze,
-                reasons: request.activeKillSwitches.map(\.rawValue) + actionPermit.reasonCodes + ["writes.review_required"],
+                reasons: activeKillSwitches.map(\.rawValue) + actionPermit.reasonCodes + ["writes.review_required"],
                 revoked: [
                     .memoryWriteHot,
                     .memoryWriteWarm,
@@ -141,39 +217,29 @@ extension BASEBrainRuntimeCoordinator {
                 .deadStop,
                 reasons: emergencyBrake.reasonCodes + ["runtime.lockdown"],
                 revoked: BASSovereignPermission.allCases,
-                rollbackSource: thoughtFold.rollbackAnchorRef ?? thoughtFold.snapshotRef
+                rollbackSource: rollbackSource
             )
         }
 
-        let userStubMode: BASSovereignUserStubMode
-        switch verdictLevel {
-        case .deadStop:
-            userStubMode = .refusalOnly
-        case .toolCut, .memoryFreeze, .quarantine, .rollback:
-            userStubMode = .minimalReceipt
-        case .pass, .throttle, .shadowLock:
-            userStubMode = .none
-        }
-
-        let verdictID = "verdict.\(runtimeTrace.sessionID)"
-        let orderedQuarantineRefs = unique(quarantineRefs.filter { !$0.isEmpty })
-        let expiresAt = runtimeTrace.recordedAt.addingTimeInterval(
-            verdictLevel.isLatchedByDefault ? 300 : 90
-        )
-
-        return BASSovereignVerdict(
-            verdictID: verdictID,
-            verdictLevel: verdictLevel,
-            latched: verdictLevel.isLatchedByDefault,
-            forcedMode: emergencyBrake.forcedMode ?? verdictLevel.defaultForcedMode,
-            reasonCodes: orderedReasonCodes(reasonCodes),
-            revokedPermissions: Array(revokedPermissions).sorted { $0.rawValue < $1.rawValue },
-            quarantineRefs: orderedQuarantineRefs,
-            rollbackRef: rollbackRef?.trimmingCharacters(in: .whitespacesAndNewlines),
-            userStubMode: userStubMode,
-            policyHash: policyHash,
-            expiresAt: expiresAt
+        return BASSovereignVerdictDecision(
+            level: verdictLevel,
+            reasonCodes: reasonCodes,
+            revokedPermissions: revokedPermissions,
+            quarantineRefs: quarantineRefs,
+            rollbackRef: rollbackRef
         )
     }
 
+}
+
+// ch1042 ADR-020 Phase A — the render-independent output of the verdict-level
+// decision lattice. Intermediate value (the final BASSovereignVerdict adds IDs,
+// expiry, ordering, and userStubMode); kept internal so the provisional verdict
+// (Phase B) can consume the same decision core.
+struct BASSovereignVerdictDecision {
+    let level: BASSovereignVerdictLevel
+    let reasonCodes: [String]
+    let revokedPermissions: Set<BASSovereignPermission>
+    let quarantineRefs: [String]
+    let rollbackRef: String?
 }
