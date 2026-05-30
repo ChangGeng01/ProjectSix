@@ -146,6 +146,19 @@ public struct BASEBrainRuntimeCoordinator {
     /// guardTakeover)。 Does NOT change any other coordinator output。
     public var deliberationLoopEnabled: Bool
 
+    /// chapter 一千零四十二 / ADR-020 Arc-3 Phase C — OPT-IN, default-nil
+    /// sink for the pre-render provisional sovereign verdict
+    /// (`BASProvisionalVerdict`)。 When set AND `deliberationLoopEnabled`
+    /// is true,`runTurn` emits a render-independent FORECAST of the
+    /// post-render verdict level to this closure just before render —
+    /// OBSERVATION-ONLY (it gates nothing; the caution-reduction such a
+    /// forecast could gate is excluded as architecturally unsafe,
+    /// ADR-020 §1)。 Default nil preserves byte-equality per 红线 7 +
+    /// ADR-014:nil → no emission → no effect。 NOT in any
+    /// canonical-bytes / seal / hash path.
+    public var provisionalVerdictSink:
+        (@Sendable (BASProvisionalVerdict) -> Void)?
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -179,7 +192,12 @@ public struct BASEBrainRuntimeCoordinator {
         agentFabric: BASAgentFabricRuntime? = nil,
         // chapter 一千零三十九 / ADR-018 P1 — OPT-IN deliberation
         // loop。 Default false → single pass (byte-equal, 红线 7).
-        deliberationLoopEnabled: Bool = false
+        deliberationLoopEnabled: Bool = false,
+        // chapter 一千零四十二 / ADR-020 Arc-3 Phase C — OPT-IN sink for
+        // the pre-render provisional verdict。 Default nil → no emission
+        // → byte-equal (红线 7)。 Observation-only; gates nothing.
+        provisionalVerdictSink:
+            (@Sendable (BASProvisionalVerdict) -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -205,6 +223,7 @@ public struct BASEBrainRuntimeCoordinator {
             projectionBlockEmissionHandler
         self.agentFabric = agentFabric
         self.deliberationLoopEnabled = deliberationLoopEnabled
+        self.provisionalVerdictSink = provisionalVerdictSink
     }
 
     // MARK: - Agent Fabric observation (ch 960)

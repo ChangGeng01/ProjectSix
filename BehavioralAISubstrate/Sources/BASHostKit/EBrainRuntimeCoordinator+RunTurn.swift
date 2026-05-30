@@ -821,6 +821,38 @@ extension BASEBrainRuntimeCoordinator {
             .withDerivedRiskObservationBundle(
                 frameContext: frameContext)
 
+        // ch1042 / ADR-020 Arc-3 Phase C — pre-render provisional sovereign
+        // verdict。 OBSERVATION-ONLY:forecast the post-render verdict LEVEL
+        // from the now-settled pre-render inputs — boundRiskCard /
+        // boundActionPermit / routedBudget / activeKillSwitches, the SAME
+        // inputs `buildSovereignVerdict` consumes at ~:1052 (so the provisional
+        // brake equals the authoritative one and the forecast is high-fidelity).
+        // The ONLY effect is the sink call; it mutates nothing the render /
+        // seals / verdict / hash read。 The caution-REDUCTION such a forecast
+        // could gate is excluded as architecturally unsafe (ADR-020 §1 / §14)。
+        // Flag-off OR nil sink (both default everywhere) → skipped → byte-equal
+        // (红线 7); the sink is in no canonical-bytes / seal / hash path.
+        if deliberationLoopEnabled, let provisionalVerdictSink {
+            let provisionalBrake = buildEmergencyBrake(
+                budgetFrame: routedBudget,
+                riskCard: boundRiskCard,
+                actionPermit: boundActionPermit,
+                activeKillSwitches: request.activeKillSwitches)
+            let provisionalVerdict = Self.buildProvisionalVerdict(
+                policyLineagePresent: policyLineage != nil,
+                budgetFrame: routedBudget,
+                riskCard: boundRiskCard,
+                actionPermit: boundActionPermit,
+                emergencyBrake: provisionalBrake,
+                activeKillSwitches: request.activeKillSwitches,
+                confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
+                maxEvidenceDebt: thoughtFrame.evidenceDebts?
+                    .map(\.debtWeight).max(),
+                leaseEnded: thoughtFrame.convergenceCertificate?
+                    .stoppingMode == .leaseEnd)
+            provisionalVerdictSink(provisionalVerdict)
+        }
+
         let hostGateValue = hostProfileService.applyHostGate(
             profile: hostContext,
             taskType: contextFrame.taskType,

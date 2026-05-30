@@ -98,7 +98,13 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // all prior caller compat per 红线 7 + ADR-014;
                 // this pin is updated to track the canonical
                 // signature。
-                deliberationLoopEnabled:)
+                deliberationLoopEnabled:
+                // chapter 一千零四十二 / ADR-020 Arc-3 Phase C —
+                // provisional-verdict sink OPT-IN slot added。
+                // Default-nil preserves all prior caller compat per
+                // 红线 7 + ADR-014;this pin tracks the canonical
+                // signature。
+                provisionalVerdictSink:)
         XCTAssertNotNil(initRef)
     }
 

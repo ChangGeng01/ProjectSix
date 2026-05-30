@@ -132,7 +132,9 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
     private func makeCoordinator(
         loop: CountingLoop,
         maxLoops: Int,
-        enabled: Bool
+        enabled: Bool,
+        provisionalVerdictSink:
+            (@Sendable (BASProvisionalVerdict) -> Void)? = nil
     ) -> BASEBrainRuntimeCoordinator {
         BASEBrainRuntimeCoordinator(
             powerClockService: BudgetClock(loops: maxLoops),
@@ -145,7 +147,8 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
             riskService: StubRisk(),
             actionService: StubAction(),
             evolutionService: StubEvolution(),
-            deliberationLoopEnabled: enabled)
+            deliberationLoopEnabled: enabled,
+            provisionalVerdictSink: provisionalVerdictSink)
     }
 
     func testSinglePassWhenDisabled() {
@@ -188,6 +191,51 @@ final class BASChapter1039DeliberationLoopTests: XCTestCase {
         XCTAssertEqual(loop.iterateCalls, 1,
             "over-budget stepIndex is clamped to a terminal stop →" +
             " loop halts (never exceeds maxLoops)")
+    }
+
+    // MARK: - ADR-020 Arc-3 Phase C — pre-render provisional verdict
+
+    /// The opt-in provisional sink fires once per turn with a faithful
+    /// PRE-render forecast of the post-render verdict LEVEL, and the
+    /// emission is OBSERVATION-ONLY: the decision is identical to running
+    /// the same turn with no sink (the emit mutates nothing the
+    /// verdict / risk / permit read).
+    func testProvisionalVerdictEmittedFaithfullyAndInert() throws {
+        final class Capture: @unchecked Sendable {
+            var verdicts: [BASProvisionalVerdict] = []
+        }
+        let capture = Capture()
+        let coord = makeCoordinator(
+            loop: CountingLoop(requestedStep: 1, stop: .candidateStable),
+            maxLoops: 4,
+            enabled: true,
+            provisionalVerdictSink: { capture.verdicts.append($0) })
+        let result = coord.runTurn(BASCoordinatorTestStubs.makeStubRequest())
+
+        XCTAssertEqual(capture.verdicts.count, 1,
+            "the sink fires exactly once per turn when flag + sink are set")
+        let provisional = try XCTUnwrap(capture.verdicts.first)
+        let finalVerdict = try XCTUnwrap(result.sovereignVerdict)
+        XCTAssertEqual(provisional.provisionalLevel, finalVerdict.verdictLevel,
+            "the pre-render provisional LEVEL forecasts the post-render" +
+            " verdict level — identical pre-render inputs, same lattice")
+        XCTAssertTrue(provisional.renderIndependent)
+
+        // Observation-only: the SAME turn with NO sink yields the same
+        // decision (the provisional emit is a side-channel — it assigns to
+        // nothing the verdict / risk / permit consume).
+        let bare = makeCoordinator(
+            loop: CountingLoop(requestedStep: 1, stop: .candidateStable),
+            maxLoops: 4, enabled: true)
+        let bareResult = bare.runTurn(
+            BASCoordinatorTestStubs.makeStubRequest())
+        let bareVerdict = try XCTUnwrap(bareResult.sovereignVerdict)
+        XCTAssertEqual(finalVerdict.verdictLevel, bareVerdict.verdictLevel,
+            "the provisional emit is observation-only → verdict unchanged")
+        XCTAssertEqual(finalVerdict.verdictID, bareVerdict.verdictID)
+        XCTAssertEqual(finalVerdict.reasonCodes, bareVerdict.reasonCodes)
+        XCTAssertEqual(result.riskCard.riskLevel, bareResult.riskCard.riskLevel)
+        XCTAssertEqual(result.actionPermit.mode, bareResult.actionPermit.mode)
     }
 
     // MARK: - Real-engine integration (production host path)
