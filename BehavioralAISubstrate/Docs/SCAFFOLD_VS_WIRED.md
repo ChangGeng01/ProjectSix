@@ -533,11 +533,25 @@ loop + evolution engine**。 Recorded here as scaffold;designed in
   `candidateFrontier.frontierWidth`) + the `desiredLoopCount()`
   budget hook (`EBrainHostRuntime+LoopService.swift:115`) ALL exist
   — but nothing `repeat/while`s on them。 Ignition = ADR-018 Phase 1。
-- **`ShadowTrialStateMachineCore` + `bas-shadow-trial` (Rust) +
-  `bas-dream-loop` (Rust)** — 🪜 SCAFFOLD (real algorithms, feedback
-  unwired)。 Pure trial-transition + batch-scoring kernels exist + are
-  `@_silgen_name`-bound, but no cross-turn feedback consumes their
-  output。 Ignition = ADR-018 Phase 2 (trial) + Phase 1 (dream-loop bias)。
+- **`ShadowTrialStateMachineCore` + `bas-shadow-trial` (Rust)** — ✅
+  **N→N+1 trial feedback now opt-in WIRED** (ADR-018 P2, ch 1043)。 Was:
+  pure trial-transition kernel existed but no cross-turn feedback consumed
+  it。 Now: opt-in coordinator slots (`shadowTrialFeedbackEnabled` +
+  `pendingTrialLedgerIn` + `resolvedTrialSink`, all default OFF →
+  byte-equal); at runTurn turn-start (`:121`) the PRIOR turn's pending
+  trials run through the pure `BASShadowTrialFeedbackLedger.evaluate`
+  (faithfully delegating to `BASShadowTrialStateMachineCore.transition`)
+  and emit to `resolvedTrialSink`。 NEVER-EFFECTIVE-SAME-TURN by position
+  (trigger :121 vs this-turn trial construction :983)。 **observation-only**
+  (feeds the sink, gates no decision); **production-inert** until a host
+  populates + re-injects the carrier。 World B (inline same-turn trial
+  construction) + the World-A `BASShadowTrialCoordinator` actor +
+  `BASFeedbackEvent` (P4) all untouched。 Commits `74f31dedf` (C1) +
+  `48e195e68` (C2)。 Tests ch1043 14/0, ch1039 9/0, ch602 4/0。
+- **`bas-dream-loop` (Rust)** — 🪜 SCAFFOLD (real algorithm, feedback
+  unwired)。 Pure batch-scoring kernel exists + is `@_silgen_name`-bound,
+  but no cross-turn feedback consumes its output。 Ignition = ADR-018
+  Phase 1 (dream-loop candidate bias) — NOT yet built。
 - **`BASFeedbackEvent` → policy** — 🪜 SCAFFOLD (dead-ends at audit)。
   Field exists on the turn request, generates an UpdateTicket, but the
   ticket is never applied to future behavior。 Ignition = ADR-018
