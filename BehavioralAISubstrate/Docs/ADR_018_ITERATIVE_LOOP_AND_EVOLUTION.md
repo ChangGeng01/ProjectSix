@@ -88,7 +88,7 @@ The evolution points (2 / 4 / 5) are the **slower outer learning loop** that fee
 |---|---|---|---|---|---|---|
 | **P1** | ch 1039 | Unified deliberation loop: `repeat/while` in runTurn + 点3 drift/thermal→maxLoops + 点1 dream-loop tally | ✅ clean | ~110 | MED (runTurn hot path) | budget=1 → identity sweep + `loopCount==1` green unchanged; maxLoops=3 → loopCount ≤ 3, frontierWidth non-decreasing |
 | **P2** | ch 1040 | 点2 ShadowTrial evaluator + ledger replay (N→N+1 trial closure) | ⚠️ needs-infra | ~150 | MED (NEVER-SAME-TURN intact) | feedbackEvent path unchanged → identity sweep; trial transitions across 2 turns |
-| **P3** | ch 1041 | opt-in flag + loop/trial telemetry into trace + thermal-gated depth on-device proof | ✅ clean | ~60 | Low | flag OFF → identity; `serious` thermal → maxLoops==1 |
+| **P3** | ch 1041 → **landed ch 1044** | opt-in flag + loop/trial telemetry into trace + thermal-gated depth on-device proof | ✅ **LANDED** (mostly already done; the real gap was the thermal floor — see §11) | ~60 (actual: ~40, rest already shipped) | Low | flag OFF → identity; `.hot`/`.critical` thermal → maxLoops==1 (NOT `.serious` — that case does not exist; see §11) |
 | **P4** | ch 1042 | 点4 feedback→policy (single scalar threshold) + L14 sovereign gate | 🔴 sovereign-gate | ~250 | HIGH (can train-bad) | nil-feedback = identity; sovereign veto blocks; ±0.05 cap; replay-deterministic |
 | **P5** | ch 1043+ | 点5 version-tree branch / shadow-trial / merge | 🔴 major-arc | 600-900 | HIGH (highest-stakes cross-module) | multi-session; each step sovereign-gated + reversible + device-sync |
 | **P6** | aspiration | population / fitness / selection / crossover GA (zero GA machinery exists today) | far-future | — | — | multi-session; ADR records the route only |
