@@ -186,7 +186,8 @@ a regression.)
 Deferred (still ADR-018 scope):
 - 点3 THERMAL → maxLoops floor: drift → MORE loops is already partly wired via
   `desiredLoopCount()` (returns 3 when calibration is unstable); thermal →
-  FEWER is not yet wired.
+  FEWER **is now WIRED (P3, ch 1044 — see §11)**: a hot/critical device floors
+  the deliberation budget to a single pass, opt-in + byte-equal-off.
 - Production activation: `makeWithDefaults` keeps the flag OFF and uses
   `BASMLLoopService` (stepIndex → 1), so the loop is dormant in production until
   explicitly opted in with a multi-loop service + budget. **The engine can now
