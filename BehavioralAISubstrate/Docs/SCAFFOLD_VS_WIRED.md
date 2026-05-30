@@ -167,6 +167,34 @@ adapters / bridges / DTOs / enums)。
 - 🪜 SCAFFOLD: ~4 (5%) — all genuinely multi-chapter Phase 9++
 - 💀 DEAD / future-allocation: ~3 (4%)
 
+> **⚠️ ch1044 audit MED-7 — scope clarification on the "91% WIRED" figure.**
+> This count is scoped to the **Agent-Fabric arc's ~75 public APIs**, and
+> "✅ WIRED" here means **the API exists + is reachable + emits its
+> audit/observation surface** — it does NOT mean "changes a default
+> production turn's decision." Per this doc's own Debt-2 (below), ch1006-1009
+> flipped `BASAgentObservation`/`BASAgentFabricMode`/`Gate.Tier`/
+> `Gate.TranscriptMode` to ✅ via audit/observer emitters that do **not**
+> change dispatch (`BASAgentFabricRuntime`: `.observationOnly` and
+> `.authoritative` produce byte-identical output). So a large share of the
+> "WIRED" APIs are **observability-wired, not behavior-wired**.
+>
+> For the broader "does the 14-layer substrate DO anything consequential on a
+> DEFAULT turn?" question (which this arc-scoped doc does not tally), the
+> honest picture is in ADR-018 §1/§3 + `Docs/ARCHITECTURE_AUDIT_ch1044.md`
+> (MED-7): the **core L0-L14 forward-pass spine genuinely decides** (risk
+> escalation, the Cthulhu/Kunlun permit-narrowing gate, tribunal veto,
+> sovereign verdict — real, not theater), but the **advanced-cognition**
+> subsystems are roughly **0 live-by-default / 2 opt-in / 3 observation-only /
+> ~5 defined-but-never-instantiated** (deliberation loop + evidence-
+> withholding opt-in; agent-fabric + shadow-trial-feedback + evolution-
+> lifecycle observation-only; dream-loop kernel + ShadowTrial actor +
+> feedback→policy + version-branch + ANE-consult never-instantiated). The 12
+> `withDerived…ObservationBundle` seams are write-once audit telemetry no
+> decision reads (ADR-018 §3 "reservoir, no pump"). The prose ADRs are honest
+> about this; the "91%" headline + the string-presence-only
+> `BASChapter1005ScaffoldInventoryPin` test are where the residual honesty
+> debt sits.
+
 ## Cascade asymptote (Round-24 honest meta-assessment)
 
 After 5 fix-rounds (ch 1000.5 / 1010.5 / 1010.6 / 1014.5 /
