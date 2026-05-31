@@ -221,6 +221,80 @@ public actor BASSovereignTokenAuthority {
         )
     }
 
+    /// Deterministic-IDENTITY variant of `issueCommitToken` (ch1044 #2 / DEFER-1).
+    /// The caller supplies `tokenID` / `nonce` / `issuedAt` instead of the
+    /// authority generating a random UUID + fresh nonce + `now()`, so the token's
+    /// IDENTITY is reproducible. It produces a real Ed25519-signed, single-use
+    /// token that `verifyCommitToken` validates exactly like a randomly-minted one.
+    ///
+    /// ⚠️ FINDING (ch1044): CryptoKit's `Curve25519.Signing` is a RANDOMIZED
+    /// (hedged) Ed25519 — the SIGNATURE is NOT bit-reproducible even for the same
+    /// key + message. So full-token byte-determinism INCLUDING the signature (the
+    /// HIGH-1 replay contract) is NOT achievable with CryptoKit Ed25519.
+    /// Reconciling that is the #2 wiring's key design decision (ADR-025): relax
+    /// replay-determinism to exclude the signature, carry a DUAL signature
+    /// (deterministic SHA256 tag + Ed25519), or use a deterministic Ed25519 impl.
+    /// Additive — production `makeCommitToken` is untouched, so this is byte-equal
+    /// until a host opts in.
+    public func issueDeterministicCommitToken(
+        for intent: CommitIntent,
+        tokenID: String,
+        nonce: String,
+        issuedAt: Date
+    ) throws -> BASSovereignCommitToken {
+        guard !intent.sessionID.isEmpty, !intent.turnID.isEmpty else {
+            throw AuthorityError.invalidIntent("session/turn must be non-empty")
+        }
+        guard !intent.actionDigest.isEmpty else {
+            throw AuthorityError.invalidIntent("actionDigest must be non-empty")
+        }
+        guard intent.ttlMs > 0 else {
+            throw AuthorityError.invalidIntent("ttlMs must be positive")
+        }
+        guard !tokenID.isEmpty, !nonce.isEmpty else {
+            throw AuthorityError.invalidIntent("tokenID/nonce must be non-empty")
+        }
+
+        let canonical = canonicalCommitBytes(
+            tokenID: tokenID,
+            sessionID: intent.sessionID,
+            turnID: intent.turnID,
+            scope: intent.scope,
+            allowedTargets: intent.allowedTargets,
+            actionDigest: intent.actionDigest,
+            snapshotRef: intent.snapshotRef,
+            policyHash: intent.policyHash,
+            ttlMs: intent.ttlMs,
+            nonce: nonce,
+            issuedAtEpochMs: Int(issuedAt.timeIntervalSince1970 * 1000)
+        )
+        let signature = try signingKey.signature(for: canonical).base64EncodedString()
+
+        mintedTokens[tokenID] = MintedTokenRecord(
+            issuedAt: issuedAt,
+            ttlMs: intent.ttlMs,
+            actionDigest: intent.actionDigest,
+            scope: intent.scope,
+            policyHash: intent.policyHash,
+            redeemed: false
+        )
+
+        return BASSovereignCommitToken(
+            tokenID: tokenID,
+            sessionID: intent.sessionID,
+            turnID: intent.turnID,
+            scope: intent.scope,
+            allowedTargets: intent.allowedTargets,
+            actionDigest: intent.actionDigest,
+            snapshotRef: intent.snapshotRef,
+            policyHash: intent.policyHash,
+            ttlMs: intent.ttlMs,
+            nonce: nonce,
+            singleUse: true,
+            signature: signature
+        )
+    }
+
     /// Verify a commit token against the authority.
     ///
     /// `redeem: true` — mark the token as spent; subsequent verifications

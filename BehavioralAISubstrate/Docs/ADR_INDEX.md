@@ -6,7 +6,7 @@
 > an `ADR-NNN` comment never has to hunt for a missing file. Built by grepping all
 > `ADR-NNN` tokens across `Sources/` + `Docs/` (complete set, not a sample).
 
-## The complete reference set (12 ADRs — 11 active + ADR-013 ghost)
+## The complete reference set (13 ADRs — 12 active + ADR-013 ghost)
 
 | ADR | Topic | Defining location | Kind |
 |---|---|---|---|
@@ -22,6 +22,7 @@
 | **ADR-022** | Sovereign verdict **parity shadow gate** (#3 / audit DEFER-2): wire `BASSovereignTurnVerifier` alongside `buildSovereignVerdict` **dormant-first** (project settled turn state → engine → compare levels; observe+log drift, NEVER halt, byte-equal-off). Invariant `coordinatorLevel >= engineLevel`; `coordinatorLaxer` = halt signal. Phase 2 (`coordinatorLaxer`→actual halt) deferred until Phase-1 parity evidence. DESIGN-only | **`Docs/ADR_022_SOVEREIGN_VERDICT_PARITY_SHADOW_GATE.md`** | behavioral (design) |
 | **ADR-023** | **Verdict-authority reconciliation** (Phase-2 prerequisite): the ADR-022 §8 full-grid sweep measured ~46% coordinator-vs-engine divergence; ADR-023 maps the taxonomy (**83% = missing-lineage over-escalated to `deadStop`** via the verifier's `policyBundleTampered` conflation) + a phased **R1–R4** reconciliation (R1 = give the engine a real BR-006 *missing-lineage ≠ tampering* → `shadowLock`, sovereign), each gated by the full-grid sweep; `coordinatorLaxer == 0` unlocks Phase-2. DESIGN-only | **`Docs/ADR_023_VERDICT_AUTHORITY_RECONCILIATION.md`** | behavioral (design) |
 | **ADR-024** | **One verdict kernel** (eliminate the two-authorities anti-pattern at its root): factor the engine's verdict logic into ONE pure sync `evaluateLevel(context)→LevelDecision` kernel (no IDs/clock/ledger) that every authority shares → rule-drift impossible by construction. **Step 1 LANDED byte-equal** (`BASSovereignVerdictEngine.evaluateLevel`, gated by 41 engine tests); Steps 2–4 (kernel adopts ADR-023's reconciled rules → coordinator adapter → shadow uses kernel) gated/future. Supplies the *mechanism* that makes ADR-023's reconciliation permanent | **`Docs/ADR_024_ONE_VERDICT_KERNEL.md`** | behavioral |
+| **ADR-025** | **Ed25519 commit-gate wiring** (#2 / DEFER-1): wire the dormant Ed25519 `BASSovereignTokenAuthority` into the SHA256-tag commit gate, dormant-first / opt-in / byte-equal-off. **Decisive finding:** CryptoKit `Curve25519.Signing` is RANDOMIZED → full-token byte-determinism (HIGH-1 replay contract) is UNACHIEVABLE with an Ed25519 signature → an operator policy choice (A relax determinism / **B dual-signature** rec / C deterministic-impl). **First brick LANDED:** `issueDeterministicCommitToken` (deterministic-IDENTITY Ed25519 mint, additive/byte-equal, 4 tests). Production `makeCommitToken` untouched | **`Docs/ADR_025_ED25519_COMMIT_GATE_WIRING.md`** | behavioral |
 
 ## Related contracts that are NOT numbered ADRs
 - **红线 7** (additive byte-equal safety invariant) — stated in `ADR_014_OPT_IN_DOCTRINE.md` §4 + `L8_ARC_SEAL.md`.
