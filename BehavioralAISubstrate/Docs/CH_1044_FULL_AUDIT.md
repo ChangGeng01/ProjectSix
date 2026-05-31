@@ -26,6 +26,23 @@ crates build.
 
 ## DEFERRED (RISKY — change persisted values or behavior; 亏的不要上)
 
+> **UPDATE (ch1044 continued — D1, D2, D6 now RESOLVED on explicit operator request):**
+> - **D6 RESOLVED** (`877548fc5`): internal `NSLock` (scoped `withLock` around sync
+>   `perform*` helpers) serializes the off-actor SQLite transactions; concurrency test
+>   added. Behavior-preserving.
+> - **D2 RESOLVED** (`dcbac9f74` + `06cdf849d`): append() rejects forbidden canonical
+>   separators — but FIELD-TYPE-AWARE (U+001E in scalars; U+001F+U+001E in array
+>   elements). The first cut over-rejected U+001F in scalars and broke the shadow-trial
+>   path: `verdictRef = "shadow_trial\u{1F}<id>"` legitimately uses U+001F as a SCALAR
+>   composite delimiter (the D3 lesson again). Byte-equal for real content; step-2
+>   (injective re-encode + chain migration) still deferred.
+> - **D1 RESOLVED** (`f95ee7394`): evolution-service IDs/cooldowns now derive from the
+>   injected turn clock + turn-stable content (was UUID/Date). Surprise: NO golden
+>   re-pin was needed — the stress/canonical suites assert structure, not pinned ID
+>   values. The determinism guard was extended with a non-empty evolution fixture so
+>   the updateTickets→commit-token path is actually exercised.
+
+
 ### D1 — 3 CRITICAL determinism leaks: `UUID()`/`Date()` ticketIDs reach commit-token signature bytes
 The two PRODUCTION evolution services mint `ticketID`/`candidateID`/`cooldownUntil`
 from `UUID()`/`Date()`/`.now` instead of the injected `request.recordedAt`:
