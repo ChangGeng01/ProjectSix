@@ -91,7 +91,13 @@ public struct BASMLEvolutionService:
         feedbackEvent: BASFeedbackEvent?
     ) -> [BASUpdateTicket] {
         var tickets: [BASUpdateTicket] = []
-        let now = Self.ticketIDTimestamp()
+        // ch1044 D1 — replay-deterministic ticket seed (was `Int(Date()…)`, which
+        // leaked a wall-clock into commit-token/warrant/audit SIGNATURE bytes on the
+        // BASCognitiveBrain runTurn path). Derived from turn-stable content so the
+        // same turn replays bit-identically; the category prefix keeps the per-turn
+        // tickets distinct.
+        let now = Self.deterministicTicketSeed(
+            thoughtFrame: thoughtFrame, output: output, feedbackEvent: feedbackEvent)
 
         // Inspect riskCard if present
         if let card = thoughtFrame.riskCard {
@@ -174,11 +180,26 @@ public struct BASMLEvolutionService:
 
     // MARK: - Static helpers
 
-    /// Stable timestamp for ticket identifiers。 Uses
-    /// monotonic-ish wall clock。 The fact that hosts
-    /// can dedupe on summary + sessionRef means the
-    /// exact timestamp is not load-bearing for
-    /// correctness。
+    /// ch1044 D1 — replay-deterministic turn seed for ticket IDs, from turn-stable
+    /// content (output + risk card + any feedback). Replaces the wall-clock
+    /// `ticketIDTimestamp()` in `buildTickets`, whose value reached commit-token /
+    /// warrant / audit signature bytes and broke replay-determinism.
+    static func deterministicTicketSeed(
+        thoughtFrame: BASThoughtFrame,
+        output: BASRenderedOutput,
+        feedbackEvent: BASFeedbackEvent?
+    ) -> String {
+        let risk = thoughtFrame.riskCard
+            .map { "\($0.riskLevel):\($0.manipulationStrength)" } ?? "norisk"
+        let fb = feedbackEvent.map { "\($0.eventType):\($0.detail)" } ?? "nofb"
+        let seed = [output.mode.rawValue, output.headline, output.body, risk, fb]
+            .joined(separator: "\u{1F}")
+        return String(BASCognitiveBrain.sha256HexAuto(seed).value.prefix(20))
+    }
+
+    /// Wall-clock timestamp (ms). ch1044 D1: NO LONGER used by `buildTickets` (which
+    /// now uses `deterministicTicketSeed` for replay-determinism). Kept as public API
+    /// for external callers; do NOT use it for any value that reaches signature bytes.
     public static func ticketIDTimestamp() -> Int {
         return Int(Date().timeIntervalSince1970 * 1000)
     }

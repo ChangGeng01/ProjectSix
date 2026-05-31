@@ -72,6 +72,27 @@ final class BASMLEvolutionServiceTests: XCTestCase {
             " tickets。 Got \(tickets.count)")
     }
 
+    // MARK: - ch1044 D1: ticket IDs are replay-DETERMINISTIC (was Int(Date()…))
+
+    /// The leak the BASCoordinatorTurnDeterminismTests guard could NOT see (its
+    /// StubEvolution returns []): the evolution service minted ticket IDs from a
+    /// wall-clock, which flowed into commit-token/warrant/audit SIGNATURE bytes. Now
+    /// the IDs derive from turn-stable content, so building twice from identical
+    /// inputs yields byte-identical tickets.
+    func testElevatedRiskTicketsAreReplayDeterministic() {
+        let service = BASMLEvolutionService()
+        let frame = thoughtFrame(
+            riskCard: riskCard(level: .extreme, manipulationStrength: 0.9))
+        let out = emptyOutput()
+        let t1 = service.buildTickets(thoughtFrame: frame, output: out, feedbackEvent: nil)
+        let t2 = service.buildTickets(thoughtFrame: frame, output: out, feedbackEvent: nil)
+        XCTAssertFalse(t1.isEmpty, "extreme risk + manipulation must produce tickets")
+        XCTAssertEqual(t1, t2, "ticket IDs must be replay-stable (D1: was a wall-clock)")
+        XCTAssertTrue(
+            t1.first?.ticketID.hasPrefix("ticket.elevated_risk.") ?? false,
+            "ID keeps its category prefix; the suffix is now content-hash, not a clock")
+    }
+
     // MARK: - Elevated risk produces ticket
 
     func testHighRiskProducesTicket() {

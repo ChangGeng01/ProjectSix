@@ -15,6 +15,26 @@ struct BASHostRuntimeEBrainEvolutionService: BASEvolutionServicing {
     let request: BASHostSessionRequest
     let currentBrain: BASHostCurrentBrain
     let hostConstitution: BASHostConstitution?
+    /// ch1044 D1 — the injected turn clock (the turn's `now`/recordedAt). Evolution
+    /// IDs + cooldowns derive from it instead of `UUID()` / `.now`, which were
+    /// non-deterministic and leaked into commit-token/warrant/audit SIGNATURE bytes
+    /// on essentially every production turn (breaking the HIGH-1 / red-line-7 replay
+    /// contract). Same injected timestamp that becomes `runtimeTrace.recordedAt`.
+    let turnRecordedAt: Date
+
+    /// ch1044 D1 — replay-deterministic evolution ID (was `UUID()`). Keyed off the
+    /// injected turn clock + turn-stable request content + a per-kind salt, so the
+    /// same turn replays bit-identically while distinct turns/kinds stay distinct.
+    private func deterministicEvolutionID(_ prefix: String, salt: String) -> String {
+        let seed = [
+            String(turnRecordedAt.timeIntervalSinceReferenceDate),
+            request.kind.rawValue,
+            request.workflowProfile.rawValue,
+            request.prompt,
+            salt
+        ].joined(separator: "\u{1F}")
+        return "\(prefix).\(BASCognitiveBrain.sha256HexAuto(seed).value.prefix(24))"
+    }
 
     func buildTickets(
         thoughtFrame: BASThoughtFrame,
@@ -34,7 +54,7 @@ struct BASHostRuntimeEBrainEvolutionService: BASEvolutionServicing {
         let courtDecisionDraft = thoughtFrame.courtDecisionDraft
         return [
             BASUpdateTicket(
-                ticketID: "ticket.\(UUID().uuidString.lowercased())",
+                ticketID: deterministicEvolutionID("ticket", salt: output.mode.rawValue),
                 sessionRef: "\(request.kind.rawValue).\(request.workflowProfile.rawValue)",
                 summary: output.body,
                 memoryWriteSuggestion: protectiveWriteSuggestion,
@@ -114,11 +134,12 @@ struct BASHostRuntimeEBrainEvolutionService: BASEvolutionServicing {
     ) -> BASHostChangeCandidate {
         guard let hostConstitution else {
             return BASHostChangeCandidate(
-                candidateID: "candidate.\(UUID().uuidString.lowercased())",
+                candidateID: deterministicEvolutionID(
+                    "candidate", salt: "review_host_gate_strength.\(output.mode.rawValue)"),
                 changeType: "review_host_gate_strength",
                 proposedDelta: ["host_gate_strength"],
                 evidenceRefs: ["calibration:drifting", "mode:\(output.mode.rawValue)"],
-                cooldownUntil: .now.addingTimeInterval(1_800),
+                cooldownUntil: turnRecordedAt.addingTimeInterval(1_800),
                 confidence: output.mode == .answer ? 0.68 : 0.82,
                 conflictRefs: output.explanationCodes,
                 previewState: "review_only",
@@ -173,11 +194,12 @@ struct BASHostRuntimeEBrainEvolutionService: BASEvolutionServicing {
         }
 
         return BASHostChangeCandidate(
-            candidateID: "candidate.\(UUID().uuidString.lowercased())",
+            candidateID: deterministicEvolutionID(
+                "candidate", salt: "review_constitution_alignment.\(output.mode.rawValue)"),
             changeType: "review_constitution_alignment",
             proposedDelta: orderedUnique(proposedDelta),
             evidenceRefs: orderedUnique(evidenceRefs),
-            cooldownUntil: .now.addingTimeInterval(1_800),
+            cooldownUntil: turnRecordedAt.addingTimeInterval(1_800),
             confidence: output.mode == .answer ? 0.72 : 0.84,
             conflictRefs: output.explanationCodes,
             previewState: "review_only",

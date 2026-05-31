@@ -29,9 +29,15 @@ public enum BASCoordinatorTestStubs {
     /// suitable for testing BASTurnRuntimeEngine.runWith
     /// Plan(...) end-to-end without needing a real
     /// production host runtime。 chapter 462 / M1225。
-    public static func makeStub()
-        -> BASEBrainRuntimeCoordinator
-    {
+    public static func makeStub() -> BASEBrainRuntimeCoordinator {
+        // Default no-arg path. (StubEvolution is internal, so it can't be a public
+        // default-arg value — reference it in the body via this overload instead.)
+        makeStub(evolutionService: StubEvolution())
+    }
+
+    public static func makeStub(
+        evolutionService: BASEvolutionServicing
+    ) -> BASEBrainRuntimeCoordinator {
         return BASEBrainRuntimeCoordinator(
             powerClockService: StubPowerClock(),
             hostProfileService: StubHost(),
@@ -42,7 +48,7 @@ public enum BASCoordinatorTestStubs {
             triSelfService: StubTriSelf(),
             riskService: StubRisk(),
             actionService: StubAction(),
-            evolutionService: StubEvolution())
+            evolutionService: evolutionService)
     }
 
     /// Minimal device-state fixture for stub-coordinator
@@ -381,5 +387,23 @@ struct StubEvolution: BASEvolutionServicing {
         feedbackEvent: BASFeedbackEvent?
     ) -> [BASUpdateTicket] {
         return []
+    }
+}
+
+/// ch1044 D1 — a NON-EMPTY evolution stub with a DETERMINISTIC ticket id, so the
+/// determinism guard actually exercises the `updateTickets → commit-token` path that
+/// `StubEvolution` (returning []) hid — the very gap that let the production
+/// evolution services' `UUID()`/clock ticket ids leak into signature bytes undetected.
+struct DeterministicTicketStubEvolution: BASEvolutionServicing {
+    func buildTickets(
+        thoughtFrame: BASThoughtFrame,
+        output: BASRenderedOutput,
+        feedbackEvent: BASFeedbackEvent?
+    ) -> [BASUpdateTicket] {
+        [BASUpdateTicket(
+            ticketID: "ticket.det.\(output.mode.rawValue)",
+            sessionRef: "stub.det",
+            summary: output.body,
+            confidence: 0.7)]
     }
 }

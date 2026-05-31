@@ -280,7 +280,8 @@ extension BASHostRuntime {
                 BASHostRuntimeEBrainEvolutionService(
                     request: request,
                     currentBrain: enforcedCurrentBrain,
-                    hostConstitution: resolvedConstitution
+                    hostConstitution: resolvedConstitution,
+                    turnRecordedAt: now
                 ),
             policyLineage:
                 configuration.runtimePolicyLineage,
@@ -419,7 +420,8 @@ extension BASHostRuntime {
             evolutionService: BASHostRuntimeEBrainEvolutionService(
                 request: request,
                 currentBrain: enforcedCurrentBrain,
-                hostConstitution: resolvedConstitution
+                hostConstitution: resolvedConstitution,
+                turnRecordedAt: now
             ),
             policyLineage: configuration.runtimePolicyLineage,
             hostRhythmProfile: constitutionService.projectRhythm(from: resolvedConstitution),

@@ -76,4 +76,23 @@ final class BASCoordinatorTurnDeterminismTests: XCTestCase {
         XCTAssertEqual(r1.memoryBundle.atoms, r2.memoryBundle.atoms)
         XCTAssertEqual(r1.memoryBundle.retrievalTags, r2.memoryBundle.retrievalTags)
     }
+
+    // MARK: - 4) The updateTickets → commit-token path is replay-stable (D1)
+
+    /// The original guard wired `StubEvolution` (returns []), so the consequential
+    /// path that derives a commit token from `updateTickets[].ticketID` was NEVER
+    /// exercised — exactly how the production evolution services' `UUID()`/clock ticket
+    /// ids leaked into commit-token/warrant/audit signature bytes undetected. Wire a
+    /// NON-EMPTY evolution service so the path actually runs, and assert it is
+    /// replay-stable (a future non-deterministic id reaching the token would break it).
+    func testUpdateTicketCommitTokenPathIsReplayStable() {
+        let coordinator = BASCoordinatorTestStubs.makeStub(
+            evolutionService: DeterministicTicketStubEvolution())
+        let request = BASCoordinatorTestStubs.makeStubRequest()
+        let r1 = coordinator.runTurn(request)
+        let r2 = coordinator.runTurn(request)
+        XCTAssertFalse(
+            r1.updateTickets.isEmpty, "the non-empty updateTickets path must be exercised")
+        assertConsequentialEqual(r1, r2, "non-empty-evolution")
+    }
 }
