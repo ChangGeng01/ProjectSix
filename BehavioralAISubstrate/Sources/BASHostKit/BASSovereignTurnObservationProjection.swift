@@ -225,8 +225,49 @@ public enum BASSovereignTurnObservationProjection {
         guard let report = await shadowVerifyResult(result, verifier: verifier)
         else { return nil }
         return "parity=\(report.parity.rawValue) "
+            + "class=\(classifyDivergence(report).rawValue) "
             + "engine=\(report.engineVerdict.verdictLevel.rawValue) "
             + "coordinator=\(report.coordinatorLevel?.rawValue ?? "nil") "
             + "acceptable=\(report.isAcceptable)"
     }
+
+    /// Classify a parity report for the host's halt policy (ch1044 — operator
+    /// decision "keep both / defense-in-depth"). A `.coordinatorLaxer` is NOT
+    /// automatically an alarm: some divergences are INTENTIONAL — the engine is a
+    /// deliberately-stricter independent backstop while the coordinator runs the
+    /// recoverable production path. Those are allowlisted as
+    /// `.intentionalDefenseInDepth`; any OTHER `.coordinatorLaxer` is
+    /// `.unexpectedDrift` — the genuine fail-closed signal a future Phase-2 halt
+    /// would act on. Phase-2 must NEVER halt on the intentional classes.
+    public static func classifyDivergence(
+        _ report: BASSovereignTurnVerifierReport
+    ) -> BASShadowDivergenceClass {
+        switch report.parity {
+        case .match: return .match
+        case .coordinatorStricter: return .coordinatorStricter
+        case .engineOnly: return .engineOnly
+        case .coordinatorLaxer:
+            // Allowlist of operator-ruled INTENTIONAL disagreements.
+            // #1 (ch1044): missing policy-lineage — the engine deadStops as a
+            //     stricter backstop while the coordinator shadowLocks (recoverable).
+            //     Operator decision: keep both → this laxer is EXPECTED.
+            if report.observations.policyLineageMissing {
+                return .intentionalDefenseInDepth
+            }
+            return .unexpectedDrift
+        }
+    }
+}
+
+/// How the host should read a parity report under the "keep both" defense-in-depth
+/// policy (ch1044). Only `.unexpectedDrift` is a genuine fail-closed signal; the
+/// intentional-disagreement classes are EXPECTED and must NOT trigger a Phase-2
+/// halt. As the operator rules on each disagreement class (ADR-023 §8), it is
+/// added to the `classifyDivergence` allowlist.
+public enum BASShadowDivergenceClass: String, Sendable, Equatable {
+    case match
+    case coordinatorStricter
+    case engineOnly
+    case intentionalDefenseInDepth
+    case unexpectedDrift
 }

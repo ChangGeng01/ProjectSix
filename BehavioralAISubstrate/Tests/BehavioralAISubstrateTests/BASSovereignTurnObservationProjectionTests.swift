@@ -298,6 +298,8 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         var benignLaxer: [String] = []
         var pairHist: [String: Int] = [:]
         var condHist: [String: Int] = [:]
+        var clsHist: [String: Int] = [:]
+        var misclassified: [String] = []
         var total = 0
         for r in risks { for b in brakes { for p in permits { for m in modes {
             for lineage in [true, false] { for pw in [true, false] {
@@ -323,6 +325,14 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
                         : (b != .none) ? "brakeElevated"
                         : (r == .high || r == .extreme) ? "highRisk" : "other"
                     condHist[cond, default: 0] += 1
+                    let cls = BASSovereignTurnObservationProjection
+                        .classifyDivergence(report)
+                    clsHist[cls.rawValue, default: 0] += 1
+                    // Under "keep both", EVERY missing-lineage laxer must be
+                    // allowlisted as intentional defense-in-depth.
+                    if !lineage && cls != .intentionalDefenseInDepth {
+                        misclassified.append("r=\(r.rawValue) m=\(m.rawValue) b=\(b.rawValue)")
+                    }
                     // A fully-BENIGN turn must never be flagged laxer (false
                     // alarm). Benign = lineage present, .engage mode, no brake,
                     // low/medium risk. (Adversarial divergence is expected — it is
@@ -348,13 +358,44 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         // / elevated-mode turns (\(laxer)/\(total) coordinatorLaxer; dist=\(dist)).
         // This is the hard evidence Phase-2 (auto-halt on coordinatorLaxer) stays
         // OFF until the two verdict authorities are reconciled (ADR-022 §6).
+        // SAFETY: every missing-lineage laxer must classify as intentional
+        // defense-in-depth (ch1044 "keep both" ruling) — NEVER a Phase-2 halt.
+        XCTAssertTrue(
+            misclassified.isEmpty,
+            "missing-lineage laxer NOT classified intentional:\n"
+            + misclassified.prefix(10).joined(separator: "\n"))
         XCTAssertEqual(total, 1920)
         XCTAssertGreaterThan(laxer, 0,
             "expected the shadow to surface real adversarial divergence")
-        // pairHist/condHist taxonomy captured for ADR-023 reconciliation —
-        // dominated by lineageMissing (engine deadStop vs coordinator
-        // shadowLock/memoryFreeze). See ADR-022 §8 + ADR-023.
-        _ = (pairHist, condHist)
+        // clsHist splits laxer into intentionalDefenseInDepth (allowlisted) vs
+        // unexpectedDrift (classes still awaiting an operator ruling, ADR-023 §8).
+        _ = (pairHist, condHist, clsHist)
+    }
+
+    // MARK: - 12) Phase-1e — divergence classification ("keep both" policy)
+
+    func testClassifyDivergenceAllowlistsMissingLineage() async throws {
+        let ledger = BASSovereignAuditLedger.withSeed("classify")
+        let verifier = BASSovereignTurnVerifier(
+            engine: BASSovereignVerdictEngine(ledger: ledger))
+        // Healthy match → .match.
+        let healthy = project(risk: makeRisk(.low), permit: makePermit(), brake: makeBrake())
+        let rMatch = try await BASSovereignTurnObservationProjection.shadowVerify(
+            healthy, coordinatorLevel: .pass, using: verifier)
+        XCTAssertEqual(
+            BASSovereignTurnObservationProjection.classifyDivergence(rMatch), .match)
+        // Missing-lineage + coordinator forced lax → coordinatorLaxer, but the
+        // operator ruled this INTENTIONAL (engine is a stricter backstop).
+        let lineageMissing = project(
+            risk: makeRisk(.low), permit: makePermit(), brake: makeBrake(),
+            lineagePresent: false)
+        let rLineage = try await BASSovereignTurnObservationProjection.shadowVerify(
+            lineageMissing, coordinatorLevel: .pass, using: verifier)
+        XCTAssertEqual(rLineage.parity, .coordinatorLaxer)
+        XCTAssertEqual(
+            BASSovereignTurnObservationProjection.classifyDivergence(rLineage),
+            .intentionalDefenseInDepth,
+            "missing-lineage laxer must be allowlisted, not a Phase-2 halt signal")
     }
 
     // MARK: - 11) Phase-1d — host-friendly default-engine one-call (env-gated)

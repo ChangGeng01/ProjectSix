@@ -168,3 +168,20 @@ on the severity of missing provenance. Consequences:
 **Revised gate for Phase-2:** not merely `coordinatorLaxer == 0`, but
 `coordinatorLaxer == 0` **after** the operator has ruled on each
 intentional-disagreement class (missing-lineage first). Phase-2 stays CLOSED.
+
+### Resolution (ch1044 operator ruling): KEEP BOTH (defense-in-depth)
+
+The operator ruled **keep both** for missing-lineage: the engine's `deadStop` is a
+deliberately-stricter INDEPENDENT BACKSTOP; the coordinator's `shadowLock` is the
+recoverable production path. A missing-lineage `coordinatorLaxer` is therefore
+EXPECTED, not an alarm. **Shipped (BASHostKit only — no sovereign change):**
+`BASSovereignTurnObservationProjection.classifyDivergence(report)` →
+`BASShadowDivergenceClass` { `match` / `coordinatorStricter` / `engineOnly` /
+**`intentionalDefenseInDepth`** / **`unexpectedDrift`** }. The allowlist's first
+entry is `policyLineageMissing`; the full-grid sweep asserts EVERY missing-lineage
+laxer classifies as `intentionalDefenseInDepth`, and `shadowParitySummary` now
+emits `class=…`. **Phase-2 must halt ONLY on `unexpectedDrift`, never on an
+intentional class.** The remaining laxer classes (elevatedMode / brake / highRisk)
+stay `unexpectedDrift` until the operator rules on each (same keep-both-or-reconcile
+decision), at which point they join the allowlist. This turns the shadow from a
+noisy 46%-divergence detector into a precise one: it now flags only GENUINE drift.
