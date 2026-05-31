@@ -48,7 +48,6 @@ public enum BASSovereignTurnObservationProjection {
         riskCard: BASRiskCard,
         actionPermit: BASActionPermit,
         emergencyBrake: BASEmergencyBrake,
-        needsProtectedWriteLane: Bool,
         quarantineCount: Int,
         operation: BASSovereignVerdictEngine.OperationDomain,
         evidenceSufficient: Bool,
@@ -73,9 +72,15 @@ public enum BASSovereignTurnObservationProjection {
             externalSideEffectWithoutSCT: false,
             // BR-005 — not sourced at this seam → conservative false (laxer).
             hostRemovalBypassed: false,
-            // BR-007 — the coordinator's own protected-write-lane signal
-            // (kill-switch / permit .delay|.replace / update-ticket review|conflict).
-            unauthorizedSelfMutation: needsProtectedWriteLane,
+            // BR-007 — NO faithful source at this seam (ch1044 rigorous-sweep
+            // finding). The coordinator's `needsProtectedWriteLane` means "this
+            // write needs REVIEW", NOT "self-mod WITHOUT a warrant" — and it also
+            // fires on permit `.delay`/`.replace`, which aren't self-mutation at
+            // all. Mapping it here over-fired the engine into a FALSE
+            // `coordinatorLaxer`, so it now defaults engine-laxer like the other
+            // unsourced hard flags. A faithful BR-007 needs the warrant-presence
+            // signal, which isn't on the turn result.
+            unauthorizedSelfMutation: false,
             // BR-004 — not sourced at this seam → conservative false (laxer).
             memoryOrHostWriteBypass: false,
             // Soft signals — straight from the risk card.
@@ -148,13 +153,6 @@ public enum BASSovereignTurnObservationProjection {
         operation: BASSovereignVerdictEngine.OperationDomain = .pureInference,
         evidenceSufficient: Bool = true
     ) -> BASSovereignTurnObservations {
-        // Mirror the coordinator's own protected-write derivation (minus the
-        // request-only kill-switch term, whose omission only ever UNDER-sets the
-        // flag → engine-laxer → no false `.coordinatorLaxer`).
-        let needsProtectedWriteLane =
-            result.actionPermit.mode == .delay
-            || result.actionPermit.mode == .replace
-            || result.updateTickets.contains { $0.requiresReview || $0.conflictFlag }
         return project(
             sessionID: result.runtimeTrace.sessionID,
             turnID: result.thoughtFold.foldID,
@@ -165,7 +163,6 @@ public enum BASSovereignTurnObservationProjection {
             riskCard: result.riskCard,
             actionPermit: result.actionPermit,
             emergencyBrake: result.emergencyBrake,
-            needsProtectedWriteLane: needsProtectedWriteLane,
             quarantineCount: 0,
             operation: operation,
             evidenceSufficient: evidenceSufficient,

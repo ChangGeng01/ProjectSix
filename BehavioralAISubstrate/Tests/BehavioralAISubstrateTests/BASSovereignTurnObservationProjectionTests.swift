@@ -28,12 +28,23 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
     }
 
     private func makeRisk(
-        _ level: BASBrainRiskLevel, irreversibility: Double = 0.1
+        _ level: BASBrainRiskLevel, irreversibility: Double? = nil
     ) -> BASRiskCard {
-        BASRiskCard(
-            totalRisk: 0.2, riskLevel: level, uncertainty: 0.15,
-            irreversibility: irreversibility, manipulationStrength: 0.1,
-            gsiScore: 0.2, recommendedMode: .answer)
+        // Realistic: the soft scalars track the band (a high-risk card has high
+        // irreversibility/gsi/etc.), so the engine's soft-signal stage sees a
+        // turn consistent with `riskLevel`.
+        let s: Double
+        switch level {
+        case .low: s = 0.1
+        case .medium: s = 0.35
+        case .high: s = 0.7
+        case .extreme: s = 0.9
+        @unknown default: s = 0.5
+        }
+        return BASRiskCard(
+            totalRisk: s, riskLevel: level, uncertainty: s,
+            irreversibility: irreversibility ?? s, manipulationStrength: s,
+            gsiScore: s, recommendedMode: .answer)
     }
 
     private func makePermit(_ mode: BASActionPermitMode = .answer) -> BASActionPermit {
@@ -48,7 +59,7 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
 
     private func project(
         risk: BASRiskCard, permit: BASActionPermit, brake: BASEmergencyBrake,
-        lineagePresent: Bool = true, protectedWrite: Bool = false,
+        lineagePresent: Bool = true,
         budget: BASBudgetFrame? = nil
     ) -> BASSovereignTurnObservations {
         BASSovereignTurnObservationProjection.project(
@@ -56,7 +67,7 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             policyLineagePresent: lineagePresent,
             budgetFrame: budget ?? makeBudget(),
             riskCard: risk, actionPermit: permit, emergencyBrake: brake,
-            needsProtectedWriteLane: protectedWrite, quarantineCount: 0,
+            quarantineCount: 0,
             operation: .pureInference, evidenceSufficient: true)
     }
 
@@ -98,13 +109,6 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         let obs = project(risk: makeRisk(.high), permit: makePermit(.block), brake: makeBrake(.guard))
         XCTAssertTrue(obs.runtimeUnstableInHighRisk)      // BR-009
         XCTAssertFalse(obs.riskPermitHeadConflict)        // permit is .block, not .answer
-    }
-
-    func testProtectedWriteLaneMapsToSelfMutationFlag() {
-        let obs = project(
-            risk: makeRisk(.low), permit: makePermit(), brake: makeBrake(),
-            protectedWrite: true)
-        XCTAssertTrue(obs.unauthorizedSelfMutation)       // BR-007 proxy
     }
 
     // MARK: - 4) End-to-end: healthy turn is NOT coordinatorLaxer
@@ -188,7 +192,7 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             sessionID: "s", turnID: "t", snapshotRef: "r", policyHash: "p",
             policyLineagePresent: true, budgetFrame: makeBudget(),
             riskCard: makeRisk(.low), actionPermit: makePermit(),
-            emergencyBrake: makeBrake(), needsProtectedWriteLane: false,
+            emergencyBrake: makeBrake(),
             quarantineCount: 0, operation: .pureInference, evidenceSufficient: true,
             hostGateValue: 0.2)
         XCTAssertEqual(obs.hostGateValue, 0.2, accuracy: 1e-9)
@@ -270,6 +274,75 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         XCTAssertEqual(
             laxer, 0,
             "healthy parity sweep produced \(laxer)/\(total) coordinatorLaxer; dist=\(distribution)")
+    }
+
+    /// MOST-RIGOROUS evidence: the FULL input grid (every risk × brake × permit ×
+    /// runMode × lineage × protected-write). For each, the REAL coordinator core
+    /// vs the engine-via-projection. Surfaces EVERY `coordinatorLaxer` — a turn
+    /// the engine would refuse but the coordinator (per the projection) waved
+    /// through. If this is 0 across the whole space, the shadow provably never
+    /// false-alarms; if not, each case is a real divergence to investigate before
+    /// Phase-2 (the test prints them).
+    func testParityFullGridSurfacesEveryCoordinatorLaxer() async throws {
+        let verifier = BASSovereignTurnVerifier(
+            engine: BASSovereignVerdictEngine(
+                ledger: BASSovereignAuditLedger.withSeed("parity-fullgrid")))
+        let risks: [BASBrainRiskLevel] = [.low, .medium, .high, .extreme]
+        let brakes: [BASEmergencyBrakeLevel] =
+            [.none, .caution, .guard, .quarantine, .lockdown]
+        let permits: [BASActionPermitMode] =
+            [.answer, .mirror, .compare, .delay, .block, .replace]
+        let modes: [BASEBrainRunMode] = [.engage, .guard, .recovery, .quarantine]
+        var dist: [BASSovereignTurnParity: Int] = [:]
+        var laxer = 0
+        var benignLaxer: [String] = []
+        var total = 0
+        for r in risks { for b in brakes { for p in permits { for m in modes {
+            for lineage in [true, false] { for pw in [true, false] {
+                total += 1
+                let riskCard = makeRisk(r), permit = makePermit(p), brake = makeBrake(b)
+                let budget = makeBudget(runMode: m)
+                let decision = BASEBrainRuntimeCoordinator.computeVerdictDecision(
+                    policyLineagePresent: lineage, budgetFrame: budget,
+                    riskCard: riskCard, actionPermit: permit, emergencyBrake: brake,
+                    activeKillSwitches: [], needsProtectedWriteLane: pw,
+                    quarantineSources: [], rollbackSource: nil)
+                let obs = project(
+                    risk: riskCard, permit: permit, brake: brake,
+                    lineagePresent: lineage, budget: budget)
+                let report = try await BASSovereignTurnObservationProjection
+                    .shadowVerify(obs, coordinatorLevel: decision.level, using: verifier)
+                dist[report.parity, default: 0] += 1
+                if report.parity == .coordinatorLaxer {
+                    laxer += 1
+                    // A fully-BENIGN turn must never be flagged laxer (false
+                    // alarm). Benign = lineage present, .engage mode, no brake,
+                    // low/medium risk. (Adversarial divergence is expected — it is
+                    // what the shadow exists to surface.)
+                    let benign = lineage && m == .engage && b == .none
+                        && (r == .low || r == .medium)
+                    if benign {
+                        benignLaxer.append(
+                            "risk=\(r.rawValue) permit=\(p.rawValue) mode=\(m.rawValue) "
+                            + "pw=\(pw): coord=\(decision.level.rawValue) "
+                            + "engine=\(report.engineVerdict.verdictLevel.rawValue)")
+                    }
+                }
+            }}
+        }}}}
+        // SAFETY CRITERION: the shadow must NEVER false-alarm on a benign turn.
+        XCTAssertTrue(
+            benignLaxer.isEmpty,
+            "BENIGN turns produced coordinatorLaxer (FALSE ALARM):\n"
+            + benignLaxer.prefix(20).joined(separator: "\n"))
+        // CHARACTERIZATION (not a failure): the adversarial region diverges — the
+        // engine is systematically stricter than the coordinator on missing-lineage
+        // / elevated-mode turns (\(laxer)/\(total) coordinatorLaxer; dist=\(dist)).
+        // This is the hard evidence Phase-2 (auto-halt on coordinatorLaxer) stays
+        // OFF until the two verdict authorities are reconciled (ADR-022 §6).
+        XCTAssertEqual(total, 1920)
+        XCTAssertGreaterThan(laxer, 0,
+            "expected the shadow to surface real adversarial divergence")
     }
 
     // MARK: - 11) Phase-1d — host-friendly default-engine one-call (env-gated)

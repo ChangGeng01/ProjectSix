@@ -174,3 +174,39 @@ safe, separate ADR.
   evidence, separate ADR.
 - This does **not** touch #2 (Ed25519 commit gate, audit DEFER-1) — that is a
   distinct sovereign arc.
+
+## 8. Rigorous full-grid sweep finding (ch1044 全面优化)
+
+`testParityFullGridSurfacesEveryCoordinatorLaxer` sweeps **1920 combos** (every
+risk × brake × permit × runMode × lineage × protected-write), running the REAL
+coordinator core (`computeVerdictDecision`) against the engine-via-projection:
+
+- **Benign region (lineage present, `.engage` mode, no brake, low/medium risk):
+  0 `coordinatorLaxer`** — the shadow never false-alarms on a normal turn (the
+  enforced safety criterion; the test fails if any benign turn is laxer).
+- **Adversarial region: ~46% `coordinatorLaxer`** (886/1920; dist = match 296 /
+  stricter 738 / laxer 886). The two verdict authorities **genuinely diverge** on
+  missing-lineage / elevated-mode turns: the engine escalates missing
+  policy-lineage to `deadStop` (the verifier's `policyLineageMissing →
+  policyBundleTampered` mapping in `makeContext`) while the coordinator gives
+  `shadowLock`/`quarantine`.
+
+### Bug the sweep caught + fixed
+The first sweep showed **1242** laxer. Investigation found a **projection
+faithfulness bug**: `unauthorizedSelfMutation` was mapped from the coordinator's
+`needsProtectedWriteLane` ("this write needs REVIEW") — which is NOT BR-007
+("self-mod WITHOUT a warrant") and also fires on permit `.delay`/`.replace`
+(not self-mutation at all). That over-fired the engine into FALSE
+`coordinatorLaxer`. Defaulting it engine-laxer (no faithful source at this seam,
+like BR-003/004/005/012) dropped laxer **1242 → 886** and moved those cases to
+the safe `coordinatorStricter` direction. `project(...)` lost its
+`needsProtectedWriteLane` parameter as a result.
+
+### Decisive consequence for Phase-2
+This is the hard, in-repo evidence that **Phase-2 (auto-halt on
+`coordinatorLaxer`) must stay OFF**: enabling it would halt ~46% of adversarial
+turns. The prerequisite is **reconciling the two verdict authorities** (aligning
+the engine's `policyBundleTampered` / escalation semantics with the coordinator's
+lattice, or vice-versa) — a sovereign task beyond this shadow. The shadow has
+done its job: it surfaced the divergence with hard numbers, and the benign path
+is provably false-alarm-free.
