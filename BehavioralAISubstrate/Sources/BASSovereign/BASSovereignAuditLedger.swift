@@ -393,9 +393,15 @@ public actor BASSovereignAuditLedger {
             sealed.signature = sign(canonical)
         } else {
             switch signingMode {
-            case .hmac:
-                let computedSignature = sign(canonical)
-                guard sealed.signature == computedSignature else {
+            case .hmac(let key):
+                // ch1044 audit fix: CONSTANT-TIME MAC verification. Was a recompute +
+                // `String ==`, which short-circuits on the first differing byte — a
+                // timing side-channel that could recover a valid MAC byte-by-byte.
+                // isValidAuthenticationCode is constant-time; same accept/reject set.
+                guard let providedMac = Data(base64Encoded: sealed.signature),
+                      HMAC<SHA256>.isValidAuthenticationCode(
+                        providedMac, authenticating: canonical, using: key)
+                else {
                     throw LedgerError.signatureMismatch(auditID: sealed.auditID)
                 }
             case .ed25519(let keyPair):
@@ -1151,22 +1157,30 @@ public actor BASSovereignAuditLedger {
     }
 
     private func sign(_ data: Data) -> String {
-        // M87 — dispatch on the active signing mode. Ed25519 is
-        // deterministic (RFC 8032: the nonce is derived from the
-        // message + private key, not random), so recompute-and-
-        // compare in `verifyChainIntegrity()` stays byte-exact. HMAC
-        // path is the pre-M87 behaviour retained for backward compat.
+        // M87 — dispatch on the active signing mode. HMAC is deterministic and
+        // verified by a constant-time MAC check. Ed25519 (CryptoKit) is RANDOMIZED
+        // (hedged — ADR-025), so it is verified CRYPTOGRAPHICALLY via isValidSignature,
+        // NEVER by recompute-and-compare. (ch1044 audit H2: an earlier comment here
+        // wrongly claimed Ed25519 was deterministic — corrected.)
         switch signingMode {
         case .hmac(let key):
             let mac = HMAC<SHA256>.authenticationCode(for: data, using: key)
             return Data(mac).base64EncodedString()
         case .ed25519(let keyPair):
-            // `signature(for:)` is non-throwing on
-            // `Curve25519.Signing.PrivateKey`; returns the raw
-            // 64-byte signature which we base64 to share the same
-            // storage shape as HMAC.
-            let sig = (try? keyPair.privateKey.signature(for: data)) ?? Data()
-            return sig.base64EncodedString()
+            // ch1044 audit H1: do NOT silently swallow a signing failure into an empty
+            // signature (which would persist a knowingly-invalid entry into the
+            // tamper-evident chain). `signature(for:)` realistically never throws for a
+            // valid key, but it IS a throwing API — so surface any failure to stderr.
+            // The empty sentinel still fails verification downstream, so a bad entry
+            // cannot pass even if this ever fires.
+            do {
+                return try keyPair.privateKey.signature(for: data)
+                    .base64EncodedString()
+            } catch {
+                FileHandle.standardError.write(Data(
+                    "[BASSovereignAuditLedger] Ed25519 signing FAILED: \(error)\n".utf8))
+                return ""
+            }
         }
     }
 

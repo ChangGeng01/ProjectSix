@@ -406,6 +406,15 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
         // Cache write (LRU eviction if at capacity)
         if cacheCapacity > 0 {
             cacheLock.lock()
+            // ch1044 audit fix (concurrency): dedup before append. Two concurrent
+            // misses for the SAME `text` could each append it to cacheOrder while
+            // `cache` holds one entry → cacheOrder.count > cache.count → premature
+            // eviction of a live entry + unbounded cacheOrder growth. Removing any
+            // existing index first keeps the invariant cacheOrder.count == cache.count
+            // (and doubles as a correct LRU "touch"). Byte-equal single-threaded.
+            if let existing = cacheOrder.firstIndex(of: text) {
+                cacheOrder.remove(at: existing)
+            }
             cache[text] = CachedResult(
                 label: label,
                 confidence: confidence,

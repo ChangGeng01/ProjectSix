@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import BASRuntimeCore
 
 /// M93b — Trust-anchor fingerprint store for the sovereign subsystem.
 ///
@@ -305,25 +306,41 @@ public struct BASSovereignFingerprintStore: Sendable {
     public static func canonicalManifestBytes(
         for manifest: BASSovereignFingerprintManifest
     ) -> Data {
-        var parts: [String] = [
-            manifest.schemaVersion,
-            String(Int(
-                manifest.issuedAt.timeIntervalSince1970 * 1000)),
-            String(Int(
-                manifest.notAfter.timeIntervalSince1970 * 1000))
-        ]
+        // ch1044 全面 audit fix — INJECTIVE length-prefixed encoding. Was a `|`-join
+        // with NO arity guard on the fingerprint list: an in-band `|` (label/role) OR
+        // a crafted label absorbing an adjacent fingerprint's 5 fields could forge a
+        // manifest that injects an unauthorized trusted KEY while keeping the root
+        // signature valid (a trust-anchor privilege escalation). Each fingerprint is
+        // now a count-prefixed group of length-delimited fields, and dates use the
+        // clamped safeEpochMs (no Int(Double) trap on a hostile decoded Date).
         let sortedFingerprints = manifest.fingerprints
             .sorted { $0.label < $1.label }
+        var fields: [String] = [
+            manifest.schemaVersion,
+            String(Self.safeEpochMs(manifest.issuedAt)),
+            String(Self.safeEpochMs(manifest.notAfter)),
+            String(sortedFingerprints.count)
+        ]
         for fp in sortedFingerprints {
-            parts.append(fp.label)
-            parts.append(fp.publicKeyRaw)
-            parts.append(fp.role)
-            parts.append(String(Int(
-                fp.issuedAt.timeIntervalSince1970 * 1000)))
-            parts.append(String(Int(
-                fp.notAfter.timeIntervalSince1970 * 1000)))
+            fields.append(fp.label)
+            fields.append(fp.publicKeyRaw)
+            fields.append(fp.role)
+            fields.append(String(Self.safeEpochMs(fp.issuedAt)))
+            fields.append(String(Self.safeEpochMs(fp.notAfter)))
         }
-        return Data(parts.joined(separator: "|").utf8)
+        return BASSovereignCanonicalBytes.lengthPrefixed(fields)
+    }
+
+    /// Clamp an epoch-ms conversion so a hostile decoded `Date` (NaN / out-of-range)
+    /// cannot trap `Int(Double)` (ch1044 audit — an unauthenticated crash reachable
+    /// before signature verification). Any realistic timestamp is far inside ±9e15 ms
+    /// (~year 287396), so `Int(ms)` is unchanged → byte-equal for valid manifests.
+    private static func safeEpochMs(_ date: Date) -> Int {
+        let ms = date.timeIntervalSince1970 * 1000
+        guard ms.isFinite else { return 0 }
+        if ms >= 9.0e15 { return 9_000_000_000_000_000 }
+        if ms <= -9.0e15 { return -9_000_000_000_000_000 }
+        return Int(ms)
     }
 
     /// Convenience builder: given a set of fingerprints + a root

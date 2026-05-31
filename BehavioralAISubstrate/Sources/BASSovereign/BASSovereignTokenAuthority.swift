@@ -577,21 +577,18 @@ public actor BASSovereignTokenAuthority {
         expiresAtEpochMs: Int,
         witnessRefs: [String]
     ) -> Data {
-        let fields: [String] = [
-            "WARRANT",
-            warrantID,
-            scope.rawValue,
-            actionDigest,
-            jurisdictionRef,
-            snapshotRef,
-            timeLockRef,
-            policyHash,
-            String(issuedAtEpochMs),
-            String(expiresAtEpochMs),
-            witnessRefs.joined(separator: ","),
-            BASSovereignTrustConstants.signingNamespace
-        ]
-        return Data(fields.joined(separator: "|").utf8)
+        // ch1044 全面 audit fix — INJECTIVE length-prefixed encoding (was a `,`-join
+        // on witnessRefs inside a `|`-join; same forgery class as canonicalCommitBytes,
+        // missed in the first pass). witnessRefs become count-prefixed length-delimited
+        // elements so no in-band separator can shift a boundary. (issueWarrant is
+        // dormant — no persisted warrants — so the layout change is byte-safe.)
+        return BASSovereignCanonicalBytes.lengthPrefixed(
+            ["WARRANT", warrantID, scope.rawValue, actionDigest, jurisdictionRef,
+             snapshotRef, timeLockRef, policyHash,
+             String(issuedAtEpochMs), String(expiresAtEpochMs)]
+            + BASSovereignCanonicalBytes.list(witnessRefs)
+            + [BASSovereignTrustConstants.signingNamespace]
+        )
     }
 
     private func makeFreshNonce() -> String {
