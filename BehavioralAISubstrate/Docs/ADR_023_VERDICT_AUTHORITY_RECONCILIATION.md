@@ -130,3 +130,41 @@ laxness (not an unreconciled-semantics artifact).
   gated.
 - **Phase-2 (the halt) stays CLOSED** until R1–R4 land and the sweep is clean.
 - This does not touch #2 (Ed25519 commit gate) — a separate sovereign arc.
+
+## 8. R1 ATTEMPTED + REVERTED — it is a POLICY decision, not a fix (ch1044)
+
+R1 was implemented (engine `BR-006b: policyLineageMissing → shadowLock` + the
+`makeContext` rewire) and then **REVERTED**. The 928-test sovereign suite caught
+**4 failures, ALL asserting the engine's missing-lineage → `deadStop` ON PURPOSE**:
+
+- `testPolicyLineageMissingFiresBR006` — explicitly checks `BR-006` fires at
+  `deadStop` for `policyLineageMissing: true`.
+- `testCoordinatorLaxerIsFailClosed` — comment `// → engine deadStop`, "engine
+  demands deadStop"; it is the *designed* fail-closed demonstration.
+
+So the engine's `deadStop`-on-missing-lineage is a **deliberate, tested safety
+choice** — NOT the accidental conflation §2/§3 assumed. The coordinator's
+`shadowLock` is *also* deliberate. **The two authorities intentionally disagree**
+on the severity of missing provenance. Consequences:
+
+- **R1 is a safety-RELAXING policy change** (`deadStop → shadowLock`), not a bug
+  fix. "Fixing" the two tests to match would be lowering a sovereign verdict on an
+  implementer's judgment and rewriting the tests that guard it — a **红线
+  violation**. Hence the revert. (The honest discipline worked: the safety tests
+  stopped a safety relaxation that looked like a tidy fix on paper.)
+- **Reconciliation here is an OPERATOR / ARCHITECT POLICY DECISION:** is missing
+  policy-lineage `deadStop` (no provenance → maximal suspicion → kill) or
+  `shadowLock` (lock writes, recoverable)? Both are defensible; neither is a bug.
+  The implementer must NOT pick the laxer one unilaterally.
+- **This sharpens the whole arc.** The ~46% divergence is NOT all "bugs to patch".
+  Its largest part (the 83% missing-lineage class) is an **intentional policy
+  disagreement** between two deliberately-different authorities. R2–R4 must each be
+  re-examined the same way before being assumed mechanical.
+- **It strengthens ADR-024.** With ONE kernel there is ONE explicit place to make
+  this policy call, instead of two implementations silently encoding different
+  answers. Step 2 of ADR-024 is therefore "land the OPERATOR's ruling per
+  disagreement class into the kernel" — not "make the implementations agree".
+
+**Revised gate for Phase-2:** not merely `coordinatorLaxer == 0`, but
+`coordinatorLaxer == 0` **after** the operator has ruled on each
+intentional-disagreement class (missing-lineage first). Phase-2 stays CLOSED.
