@@ -6,6 +6,7 @@
 import XCTest
 import BASSovereign
 import BASRuntimeCore
+import CryptoKit
 
 private let detFixedNow = Date(timeIntervalSince1970: 1_700_000_000)
 
@@ -22,23 +23,32 @@ final class BASSovereignDeterministicCommitTokenTests: XCTestCase {
 
     func testDeterministicMintHasReproducibleIdentity() async throws {
         let authority = BASSovereignTokenAuthority(now: { detFixedNow })
-        let intent = makeIntent()
-        let a = try await authority.issueDeterministicCommitToken(
-            for: intent, tokenID: "sct-det-1", nonce: "nonce-1", issuedAt: detFixedNow)
-        let b = try await authority.issueDeterministicCommitToken(
-            for: intent, tokenID: "sct-det-1", nonce: "nonce-1", issuedAt: detFixedNow)
+        let token = try await authority.issueDeterministicCommitToken(
+            for: makeIntent(), tokenID: "sct-det-1", nonce: "nonce-1", issuedAt: detFixedNow)
         // The IDENTITY fields are caller-supplied → reproducible (the replay-stable
-        // part). The SIGNATURE is a RANDOMIZED CryptoKit Ed25519 sig, so it is NOT
-        // bit-reproducible — full-token byte-determinism is not achievable with
-        // CryptoKit Ed25519 (ADR-025 finding). Both signatures still verify.
-        XCTAssertEqual(a.tokenID, b.tokenID)
-        XCTAssertEqual(a.nonce, b.nonce)
-        XCTAssertEqual(a.actionDigest, b.actionDigest)
-        XCTAssertNotEqual(a.signature, b.signature, "CryptoKit Ed25519 is randomized")
-        XCTAssertFalse(a.signature.isEmpty)
-        XCTAssertTrue(a.singleUse)
+        // part). A tokenID is single-use, so re-minting it is rejected (FINDING 4) —
+        // identity-determinism is therefore asserted by the fields equalling the
+        // supplied inputs, not by a second mint of the same tokenID.
+        XCTAssertEqual(token.tokenID, "sct-det-1")
+        XCTAssertEqual(token.nonce, "nonce-1")
+        XCTAssertEqual(token.actionDigest, "digest-1")
+        XCTAssertFalse(token.signature.isEmpty)
+        XCTAssertTrue(token.singleUse)
         try await authority.verifyCommitToken(
-            a, expectedScope: .toolWrite, expectedActionDigest: "digest-1", redeem: false)
+            token, expectedScope: .toolWrite, expectedActionDigest: "digest-1", redeem: false)
+    }
+
+    // MARK: - 1b) The ADR-025 finding: CryptoKit Ed25519 is RANDOMIZED (same key)
+
+    func testCryptoKitEd25519IsRandomized() throws {
+        // Same key, same message, twice → DIFFERENT signatures (hedged Ed25519). This
+        // is WHY full-token byte-determinism including the signature is unachievable
+        // with CryptoKit, so the replay identity is the SHA256 tag + identity fields.
+        let key = Curve25519.Signing.PrivateKey()
+        let msg = Data("same-message".utf8)
+        let s1 = try key.signature(for: msg)
+        let s2 = try key.signature(for: msg)
+        XCTAssertNotEqual(s1, s2, "CryptoKit Curve25519 signing is randomized (hedged)")
     }
 
     // MARK: - 2) Verifies through the real Ed25519 path
@@ -85,6 +95,32 @@ final class BASSovereignDeterministicCommitTokenTests: XCTestCase {
             try await authority.verifyCommitToken(
                 t, expectedScope: .toolWrite, expectedActionDigest: "digest-1", redeem: true)
             XCTFail("expected alreadyUsed after redemption")
+        } catch { /* expected */ }
+    }
+
+    // MARK: - 5) Re-minting a tokenID is rejected (single-use ledger, FINDING 4)
+
+    func testReMintingSameTokenIDRejected() async throws {
+        let authority = BASSovereignTokenAuthority(now: { detFixedNow })
+        _ = try await authority.issueDeterministicCommitToken(
+            for: makeIntent(), tokenID: "sct-remint", nonce: "n-a", issuedAt: detFixedNow)
+        do {
+            _ = try await authority.issueDeterministicCommitToken(
+                for: makeIntent(), tokenID: "sct-remint", nonce: "n-b", issuedAt: detFixedNow)
+            XCTFail("re-minting an existing tokenID must be rejected (double-spend)")
+        } catch { /* expected alreadyUsed */ }
+    }
+
+    // MARK: - 6) Reusing a nonce is rejected (FINDING 4)
+
+    func testReusingNonceRejected() async throws {
+        let authority = BASSovereignTokenAuthority(now: { detFixedNow })
+        _ = try await authority.issueDeterministicCommitToken(
+            for: makeIntent(), tokenID: "sct-n-1", nonce: "shared", issuedAt: detFixedNow)
+        do {
+            _ = try await authority.issueDeterministicCommitToken(
+                for: makeIntent(), tokenID: "sct-n-2", nonce: "shared", issuedAt: detFixedNow)
+            XCTFail("reusing a nonce must be rejected")
         } catch { /* expected */ }
     }
 }

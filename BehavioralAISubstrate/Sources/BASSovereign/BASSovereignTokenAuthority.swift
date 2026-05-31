@@ -254,6 +254,17 @@ public actor BASSovereignTokenAuthority {
         guard !tokenID.isEmpty, !nonce.isEmpty else {
             throw AuthorityError.invalidIntent("tokenID/nonce must be non-empty")
         }
+        // ch1044 audit fix (FINDING 4): a deterministic mint must NOT silently
+        // overwrite an existing ledger record — that would reset a redeemed token's
+        // `redeemed:true -> false` and defeat single-use (a double-spend). A tokenID
+        // and a nonce are each one-shot here, exactly as in the random-mint path.
+        // (Re-deriving a token to VERIFY it uses `verifyCommitToken`, never a re-mint.)
+        guard mintedTokens[tokenID] == nil else {
+            throw AuthorityError.alreadyUsed(tokenID: tokenID)
+        }
+        guard seenNonces.insert(nonce).inserted else {
+            throw AuthorityError.alreadyUsed(tokenID: tokenID)
+        }
 
         let canonical = canonicalCommitBytes(
             tokenID: tokenID,
@@ -540,22 +551,18 @@ public actor BASSovereignTokenAuthority {
         nonce: String,
         issuedAtEpochMs: Int
     ) -> Data {
-        let fields: [String] = [
-            "COMMIT",
-            tokenID,
-            sessionID,
-            turnID,
-            scope.rawValue,
-            allowedTargets.joined(separator: ","),
-            actionDigest,
-            snapshotRef,
-            policyHash,
-            String(ttlMs),
-            nonce,
-            String(issuedAtEpochMs),
-            BASSovereignTrustConstants.signingNamespace
-        ]
-        return Data(fields.joined(separator: "|").utf8)
+        // ch1044 audit fix — INJECTIVE length-prefixed encoding. Was a `,`-join on
+        // allowedTargets inside a `|`-join: an in-band `,` or `|` in any field could
+        // forge a different field set into byte-identical signed bytes. Each target
+        // is now its own length-prefixed element behind a count marker; no in-band
+        // separator can shift a boundary.
+        BASSovereignCanonicalBytes.lengthPrefixed(
+            ["COMMIT", tokenID, sessionID, turnID, scope.rawValue]
+            + BASSovereignCanonicalBytes.list(allowedTargets)
+            + [actionDigest, snapshotRef, policyHash,
+               String(ttlMs), nonce, String(issuedAtEpochMs),
+               BASSovereignTrustConstants.signingNamespace]
+        )
     }
 
     private func canonicalWarrantBytes(

@@ -58,4 +58,56 @@ final class BASSovereignCommitTokenEd25519Tests: XCTestCase {
             BASSovereignCommitTokenEd25519.verify(dual, with: otherKey.publicKey),
             .invalid)
     }
+
+    // MARK: - 5) CRITICAL regression: in-band separator cannot forge a target set
+
+    /// ch1044 audit fix. Under the old `\u{1E}`-join, `["a␞b","c"]` and
+    /// `["a","b␞c"]` produced byte-identical signed bytes → one signature validated
+    /// for two DIFFERENT authorized-target sets (a scope-expansion forgery). The
+    /// injective length-prefixed encoding must make them distinct.
+    func testInBandSeparatorCannotForgeDifferentTargets() throws {
+        let key = Curve25519.Signing.PrivateKey()
+        func tok(_ targets: [String]) -> BASSovereignCommitToken {
+            BASSovereignCommitToken(
+                tokenID: "tok-1", sessionID: "s1", turnID: "t1", scope: .toolWrite,
+                allowedTargets: targets, actionDigest: "digest", snapshotRef: "snap",
+                policyHash: "ph", ttlMs: 60_000, nonce: "nonce-1", signature: "tag")
+        }
+        let a = tok(["a\u{1E}b", "c"])
+        let b = tok(["a", "b\u{1E}c"])
+        XCTAssertNotEqual(
+            a.identityCanonicalBytes(), b.identityCanonicalBytes(),
+            "distinct target sets must not share canonical bytes")
+        // A signature minted for A must NOT validate for B (no forgery).
+        let signedA = try BASSovereignCommitTokenEd25519.signed(a, with: key)
+        var bWithASig = b
+        bWithASig.ed25519Signature = signedA.ed25519Signature
+        XCTAssertEqual(
+            BASSovereignCommitTokenEd25519.verify(bWithASig, with: key.publicKey),
+            .invalid)
+    }
+
+    // MARK: - 6) requireValid rejects BOTH absent (downgrade) and invalid
+
+    func testRequireValidRejectsAbsentAndWrongKey() throws {
+        let key = Curve25519.Signing.PrivateKey()
+        XCTAssertFalse(  // absent → reject (strip-the-sig downgrade)
+            BASSovereignCommitTokenEd25519.requireValid(makeToken(), with: key.publicKey))
+        let dual = try BASSovereignCommitTokenEd25519.signed(makeToken(), with: key)
+        XCTAssertTrue(
+            BASSovereignCommitTokenEd25519.requireValid(dual, with: key.publicKey))
+        XCTAssertFalse(  // wrong key → reject
+            BASSovereignCommitTokenEd25519.requireValid(
+                dual, with: Curve25519.Signing.PrivateKey().publicKey))
+    }
+
+    // MARK: - 7) present-but-malformed base64 signature → invalid (not a crash)
+
+    func testMalformedBase64SignatureIsInvalid() {
+        let key = Curve25519.Signing.PrivateKey()
+        var bad = makeToken()
+        bad.ed25519Signature = "!!!not-base64!!!"
+        XCTAssertEqual(
+            BASSovereignCommitTokenEd25519.verify(bad, with: key.publicKey), .invalid)
+    }
 }

@@ -368,14 +368,20 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             misclassified.isEmpty,
             "missing-lineage laxer NOT classified intentional:\n"
             + misclassified.prefix(10).joined(separator: "\n"))
-        // REFRAME (ch1044): the engine is a deliberately-stricter independent
-        // backstop, so ALL current divergence is intentional (allowlisted). 0
-        // unexpectedDrift now → any FUTURE unexpectedDrift is a genuine NEW
-        // coordinator REGRESSION, the only thing a Phase-2 halt should fire on.
+        // REFRAME (ch1044, audit-corrected): the engine is a deliberately-stricter
+        // independent backstop, so EVERY coordinatorLaxer is intentional. HONEST
+        // NOTE: this `== 0` is true BY ENGINE INVARIANT — the engine always emits a
+        // reason code when level != .pass (the LEX_ORDER fallback), and
+        // classifyDivergence returns .unexpectedDrift ONLY on the (impossible-today)
+        // "engine escalated with NO reason". So this is a DEFENSIVE guard against an
+        // engine-invariant violation, NOT a coordinator-regression detector. The real
+        // coordinator-regression signal is BASCoordinatorConsistencyCheck (re-derive
+        // the verdict from settled state) — see the dedicated unexpectedDrift-branch
+        // test below for direct coverage.
         XCTAssertEqual(
             clsHist["unexpectedDrift"] ?? 0, 0,
-            "all current divergence must be intentional-stricter-engine; "
-            + "unexpectedDrift signals a NEW coordinator regression: \(driftHist)")
+            "engine-invariant: a stricter engine verdict always carries a reason; "
+            + "unexpectedDrift would mean the engine escalated inexplicably: \(driftHist)")
         XCTAssertEqual(total, 1920)
         XCTAssertGreaterThan(laxer, 0,
             "expected the shadow to surface real adversarial divergence")
@@ -408,8 +414,10 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             BASSovereignTurnObservationProjection.classifyDivergence(rLineage),
             .intentionalDefenseInDepth,
             "missing-lineage laxer must be allowlisted, not a Phase-2 halt signal")
-        // The engine's soft-signal model (high irreversibility/manipulation) drives
-        // a stricter verdict via a LEX_ORDER reason → allowlisted intentional (#2).
+        // Audit-corrected (H2): extreme risk + an answering permit actually fires
+        // BR-010 (riskPermitHeadConflict, a HARD rule), not a pure soft-signal
+        // LEX_ORDER reason — either way the engine's stricter verdict carries a
+        // reason code → allowlisted intentional (#2).
         let softHigh = project(
             risk: makeRisk(.extreme), permit: makePermit(), brake: makeBrake())
         let rSoft = try await BASSovereignTurnObservationProjection.shadowVerify(
@@ -418,8 +426,32 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             XCTAssertEqual(
                 BASSovereignTurnObservationProjection.classifyDivergence(rSoft),
                 .intentionalDefenseInDepth,
-                "soft-signal-driven (LEX_ORDER) laxer must be allowlisted")
+                "any reasoned stricter engine verdict (BR-010 here) must be allowlisted")
         }
+    }
+
+    // MARK: - 12b) DIRECT coverage of the .unexpectedDrift defensive branch (H1)
+
+    /// The real engine can never produce a non-pass verdict with NO reason code (the
+    /// LEX_ORDER invariant), so `.unexpectedDrift` is unreachable through the live
+    /// path and the sweep's `== 0` is true-by-invariant. This test hand-builds the
+    /// impossible-today report — a coordinatorLaxer whose engine verdict carries no
+    /// reason — to prove the defensive guard actually fires (and would catch an
+    /// engine that ever escalated inexplicably).
+    func testUnexpectedDriftFiresWhenEngineEscalatesWithoutReason() {
+        let obs = project(risk: makeRisk(.low), permit: makePermit(), brake: makeBrake())
+        let reasonlessEscalation = BASSovereignVerdict(
+            verdictID: "synthetic", verdictLevel: .throttle, latched: false,
+            policyHash: "ph")  // reasonCodes defaults to [] — the impossible case
+        let report = BASSovereignTurnVerifierReport(
+            observations: obs,
+            engineVerdict: reasonlessEscalation,
+            coordinatorLevel: .pass,
+            parity: .coordinatorLaxer)
+        XCTAssertEqual(
+            BASSovereignTurnObservationProjection.classifyDivergence(report),
+            .unexpectedDrift,
+            "a stricter engine verdict with no reason code must be unexpectedDrift")
     }
 
     // MARK: - 11) Phase-1d — host-friendly default-engine one-call (env-gated)

@@ -213,13 +213,24 @@ public struct BASAuditObservationProjectionsBundleObservation:
     /// a replay/audit fingerprint)。 Matches the pinned
     /// `json-sha256-sortedKeys-utf8` idiom used by
     /// `BASRuntimeAuditEmissionSummaryDigest.from(...)`。
-    /// Returns nil only if Codable encoding fails (defensive
-    /// — never expected for these typed Codable blocks)。
+    /// Returns nil only if Codable encoding genuinely fails
+    /// (defensive — non-finite floats are handled below, so
+    /// this is now even rarer)。
     public static func canonicalInputsDigest<T: Encodable>(
         _ value: T
     ) -> String? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
+        // ch1044 audit fix (FINDING 5): JSONEncoder THROWS on a non-finite
+        // Double/Float (NaN/±Infinity) by default, and the `try?` below would
+        // collapse that to nil — INDISTINGUISHABLE from the "uncovered" (no
+        // fingerprint) case, a silent integrity blind spot precisely when a float
+        // has gone anomalous. Stable sentinels keep a non-finite value
+        // deterministically hashable so drift is still detectable.
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(
+            positiveInfinity: "__+inf__",
+            negativeInfinity: "__-inf__",
+            nan: "__nan__")
         guard let data = try? encoder.encode(value) else {
             return nil
         }

@@ -735,17 +735,21 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
     /// the token ALONE: the identity fields (tokenID / nonce / …) already
     /// deterministically encode the mint-time `issuedAt`, so it need not be signed
     /// separately (and isn't stored on the token). Deterministic + stable; mint
-    /// and verify derive identical bytes from the same token. Unit-/record-
-    /// separator framing keeps distinct field sets from colliding.
+    /// and verify derive identical bytes from the same token. INJECTIVE
+    /// length-prefixed framing makes distinct field sets impossible to collide.
     public func identityCanonicalBytes() -> Data {
-        let parts: [String] = [
-            schemaVersion, tokenID, sessionID, turnID, scope.rawValue,
-            "\(allowedTargets.count)",
-            allowedTargets.joined(separator: "\u{1E}"),
-            actionDigest, snapshotRef, policyHash,
-            String(ttlMs), nonce, String(singleUse)
-        ]
-        return Data(parts.joined(separator: "\u{1F}").utf8)
+        // ch1044 audit fix (was a `\u{1E}`-join on allowedTargets — an in-band
+        // separator inside a target could forge a DIFFERENT authorized-target set
+        // into byte-identical signed bytes). Now each target is its own
+        // length-prefixed element behind a count marker. Excludes both signatures
+        // (avoids self-reference; identity fields already encode mint-time issuedAt
+        // via tokenID/nonce → verifiable from the token alone).
+        BASSovereignCanonicalBytes.lengthPrefixed(
+            [schemaVersion, tokenID, sessionID, turnID, scope.rawValue]
+            + BASSovereignCanonicalBytes.list(allowedTargets)
+            + [actionDigest, snapshotRef, policyHash,
+               String(ttlMs), nonce, String(singleUse)]
+        )
     }
 }
 

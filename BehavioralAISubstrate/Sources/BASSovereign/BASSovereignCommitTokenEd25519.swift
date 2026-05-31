@@ -56,4 +56,17 @@ public enum BASSovereignCommitTokenEd25519 {
             sigData, for: token.identityCanonicalBytes())
         return ok ? .valid : .invalid
     }
+
+    /// Policy-safe verification for an Ed25519-REQUIRED gate: `true` ONLY for a
+    /// present, valid signature. Collapses BOTH `.absent` (no signature — i.e. a
+    /// strip-the-sig downgrade attempt) and `.invalid` to `false`, so a caller
+    /// cannot accidentally accept an unsigned token by treating `.absent` as
+    /// acceptable. Use `verify` only when you genuinely must distinguish the three
+    /// states (e.g. logging "not yet dual-signed" vs "tampered").
+    public static func requireValid(
+        _ token: BASSovereignCommitToken,
+        with publicKey: Curve25519.Signing.PublicKey
+    ) -> Bool {
+        verify(token, with: publicKey) == .valid
+    }
 }

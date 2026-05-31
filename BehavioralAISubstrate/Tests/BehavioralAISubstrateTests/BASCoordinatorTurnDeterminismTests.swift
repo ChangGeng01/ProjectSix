@@ -6,12 +6,16 @@
 // default param). That is an intentional observation field, not part of the replay
 // contract; the consequential decision never depends on it.
 //
-// The HIGH-1 / red-line-7 replay contract covers the CONSEQUENTIAL decision —
-// verdict, commit tokens, action permit, risk card, merged choice, host gate, update
-// tickets — which this guard asserts is replay-stable. Any future change that sneaks
-// a UUID / clock / random into a CONSEQUENTIAL field (the thing that actually
-// authorizes an action) breaks this guard. This is the automated tripwire behind the
-// session's "byte-equal when off" carriers (parity shadow, dual Ed25519 sig, …).
+// The HIGH-1 / red-line-7 replay contract covers the CONSEQUENTIAL decision — every
+// field that authorizes or constrains an action: verdict, commit tokens, WARRANTS,
+// ACTUATION COMMANDS, EXECUTION RECEIPTS, sovereign LOCK, QUARANTINE records,
+// RECOVERY disposition, action permit, risk card, merged choice, host gate, update
+// tickets — which this guard asserts is replay-stable. (Observation fields are
+// EXCLUDED by design: `memoryBundle.retrievedAt` and `sovereignAuditEntry` carry
+// real-clock timestamps, which are NOT authorization state.) Any future change that
+// sneaks a UUID / clock / random into one of the guarded authorization fields breaks
+// this guard — the automated tripwire behind the session's "byte-equal when off"
+// carriers (parity shadow, dual Ed25519 sig, …).
 
 import XCTest
 @testable import BASHostKit
@@ -26,6 +30,12 @@ final class BASCoordinatorTurnDeterminismTests: XCTestCase {
     ) {
         XCTAssertEqual(a.sovereignVerdict, b.sovereignVerdict, "verdict [\(ctx)]", file: file, line: line)
         XCTAssertEqual(a.sovereignCommitTokens, b.sovereignCommitTokens, "commitTokens [\(ctx)]", file: file, line: line)
+        XCTAssertEqual(a.sovereignWarrants, b.sovereignWarrants, "warrants [\(ctx)]", file: file, line: line)
+        XCTAssertEqual(a.sovereignActuationCommands, b.sovereignActuationCommands, "actuation [\(ctx)]", file: file, line: line)
+        XCTAssertEqual(a.sovereignExecutionReceipts, b.sovereignExecutionReceipts, "receipts [\(ctx)]", file: file, line: line)
+        XCTAssertEqual(a.sovereignLock, b.sovereignLock, "lock [\(ctx)]", file: file, line: line)
+        XCTAssertEqual(a.quarantineRecords, b.quarantineRecords, "quarantine [\(ctx)]", file: file, line: line)
+        XCTAssertEqual(a.recoveryDisposition, b.recoveryDisposition, "recovery [\(ctx)]", file: file, line: line)
         XCTAssertEqual(a.actionPermit, b.actionPermit, "permit [\(ctx)]", file: file, line: line)
         XCTAssertEqual(a.riskCard, b.riskCard, "risk [\(ctx)]", file: file, line: line)
         XCTAssertEqual(a.mergedChoice, b.mergedChoice, "mergedChoice [\(ctx)]", file: file, line: line)
