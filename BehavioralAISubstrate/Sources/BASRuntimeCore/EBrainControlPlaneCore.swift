@@ -688,6 +688,14 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
     public var nonce: String
     public var singleUse: Bool
     public var signature: String
+    /// ADR-025 option B (dual signature): an OPTIONAL Ed25519 signature over the
+    /// token's canonical bytes (asymmetric authority), ALONGSIDE the deterministic
+    /// `signature` SHA256 tag (which stays the replay-stable identity). Default
+    /// `nil` → byte-equal with pre-dual tokens. Populated only when a host opts
+    /// into the Ed25519 commit authority; verified via the authority's public key.
+    /// CryptoKit Ed25519 is randomized, so this field is NOT part of the
+    /// replay-determinism contract — `signature` (the SHA256 tag) is.
+    public var ed25519Signature: String?
 
     public init(
         schemaVersion: String = BASSovereignCommitToken.currentSchemaVersion,
@@ -702,7 +710,8 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
         ttlMs: Int,
         nonce: String,
         singleUse: Bool = true,
-        signature: String
+        signature: String,
+        ed25519Signature: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.tokenID = tokenID
@@ -717,6 +726,7 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
         self.nonce = nonce
         self.singleUse = singleUse
         self.signature = signature
+        self.ed25519Signature = ed25519Signature
     }
 }
 

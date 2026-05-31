@@ -84,10 +84,18 @@ and B) build on; it does NOT wire anything into production.
 
 - **Brick (LANDED):** the deterministic-identity Ed25519 mint + tests. Byte-equal
   (additive). No production change.
-- **Decision (next, operator):** pick A / B / C for the determinism tension (§3).
-- **Wiring (gated):** the opt-in Ed25519 signer on the commit gate, default-OFF →
-  byte-equal; verification accepts the Ed25519 path when enabled. The commit gate
-  is the most sovereign path — this stays CLOSED until the §3 decision + a
-  byte-equal-off proof + the full sovereign suite (928 tests) green.
+- **Decision (RESOLVED, ch1044):** operator chose **B — dual signature**. The
+  `BASSovereignCommitToken.ed25519Signature: String?` field LANDED (default `nil` →
+  byte-equal; 933 sovereign tests green incl. the HIGH-1 replay-determinism test).
+  The SHA256 `signature` tag stays the replay-stable identity; the Ed25519 sig is
+  the OPTIONAL asymmetric authority carried alongside it.
+- **Dual-mint / dual-verify (next, gated):** production `makeCommitToken` populates
+  `ed25519Signature` via an OPT-IN host-held Ed25519 signer (default nil →
+  byte-equal); a dual-verify checks the SHA256 tag (as now) AND the Ed25519 sig
+  (when present, via the authority's public key). The commit gate is the most
+  sovereign path — this stays CLOSED until a byte-equal-off proof + the full
+  sovereign suite green. (The Ed25519 sig must cover the same canonical bytes the
+  SHA256 tag does, incl. the deterministic issuedAt — the threading is the next
+  careful step.)
 - Honest boundary: design + a safe additive brick; the production gate is NOT
   touched, and the determinism policy is the operator's.
