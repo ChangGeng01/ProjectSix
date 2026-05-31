@@ -483,6 +483,87 @@ final class BASSovereignTokenAuthorityTests: XCTestCase {
         }
     }
 
+    // MARK: - Warrant canonical-bytes injectivity (ch1044 全面 audit forgery class)
+
+    private func forge(
+        _ w: BASSovereignWarrant,
+        jurisdictionRef: String? = nil,
+        snapshotRef: String? = nil,
+        witnessRefs: [String]? = nil
+    ) -> BASSovereignWarrant {
+        // A forged warrant: keep the original warrantID + signature (so the ledger
+        // lookup + scope/digest/policy checks all pass), but shift a delimiter
+        // boundary. Under the OLD `,`/`|`-join these canonicalize identically to the
+        // original, so the original signature would validate — the injective encoder
+        // must make the canonical bytes DISTINCT so verification fails.
+        BASSovereignWarrant(
+            warrantID: w.warrantID, scope: w.scope, actionDigest: w.actionDigest,
+            commitTokenRef: w.commitTokenRef,
+            jurisdictionRef: jurisdictionRef ?? w.jurisdictionRef,
+            snapshotRef: snapshotRef ?? w.snapshotRef, timeLockRef: w.timeLockRef,
+            policyHash: w.policyHash, issuedAt: w.issuedAt, expiresAt: w.expiresAt,
+            witnessRefs: witnessRefs ?? w.witnessRefs, singleUse: w.singleUse,
+            signature: w.signature)
+    }
+
+    private func warrantIntent(
+        actionDigest: String, jurisdiction: String, snapshot: String,
+        witnessRefs: [String]
+    ) -> BASSovereignTokenAuthority.WarrantIntent {
+        BASSovereignTokenAuthority.WarrantIntent(
+            scope: .hostMutate, actionDigest: actionDigest, jurisdictionRef: jurisdiction,
+            snapshotRef: snapshot, timeLockRef: "tl-1", ttlMs: 60_000,
+            witnessRefs: witnessRefs,
+            policyHash: BASSovereignTrustConstants.builtInPolicyHash)
+    }
+
+    /// witnessRefs `["a,b"]` and `["a","b"]` `,`-join to the same string — the list
+    /// boundary forgery. The injective `.list(...)` (count + per-element length
+    /// prefix) must make them cross-validate-proof.
+    func testWarrantWitnessRefListBoundaryCannotForge() async throws {
+        let authority = makeAuthority()
+        let warrantA = try await authority.issueWarrant(
+            for: warrantIntent(actionDigest: "sha256:wf1", jurisdiction: "jur",
+                               snapshot: "snap", witnessRefs: ["a,b"]))
+        let forged = forge(warrantA, witnessRefs: ["a", "b"])
+        do {
+            try await authority.verifyWarrant(
+                forged, expectedScope: .hostMutate, expectedActionDigest: "sha256:wf1",
+                redeem: false)
+            XCTFail("witnessRef list-boundary forgery must be rejected")
+        } catch BASSovereignTokenAuthority.AuthorityError.signatureInvalid { /* expected */ }
+    }
+
+    /// jurisdictionRef `"j"` + snapshotRef `"s|x"` vs `"j|s"` + `"x"` `|`-join to the
+    /// same field stream — the field boundary forgery.
+    func testWarrantFieldBoundaryCannotForge() async throws {
+        let authority = makeAuthority()
+        let warrantA = try await authority.issueWarrant(
+            for: warrantIntent(actionDigest: "sha256:wf2", jurisdiction: "j",
+                               snapshot: "s|x", witnessRefs: ["w"]))
+        let forged = forge(warrantA, jurisdictionRef: "j|s", snapshotRef: "x")
+        do {
+            try await authority.verifyWarrant(
+                forged, expectedScope: .hostMutate, expectedActionDigest: "sha256:wf2",
+                redeem: false)
+            XCTFail("field-boundary forgery must be rejected")
+        } catch BASSovereignTokenAuthority.AuthorityError.signatureInvalid { /* expected */ }
+    }
+
+    /// Positive control: a LEGITIMATE warrant whose fields genuinely CONTAIN `,`/`|`
+    /// must still round-trip issue→verify. The injective encoder HANDLES separators
+    /// (unlike rejecting them) — distinct content stays distinct, valid content stays
+    /// valid.
+    func testWarrantWithSeparatorsInFieldsStillRoundTrips() async throws {
+        let authority = makeAuthority()
+        let warrant = try await authority.issueWarrant(
+            for: warrantIntent(actionDigest: "sha256:rt", jurisdiction: "a|b",
+                               snapshot: "c,d", witnessRefs: ["x,y", "z"]))
+        try await authority.verifyWarrant(
+            warrant, expectedScope: .hostMutate, expectedActionDigest: "sha256:rt",
+            redeem: true)
+    }
+
     // MARK: - Diagnostics
 
     func testDiagnosticsTrackIssuanceAndActiveCounts() async throws {
