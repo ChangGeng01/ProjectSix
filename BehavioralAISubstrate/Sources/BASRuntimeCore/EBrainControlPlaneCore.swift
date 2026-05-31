@@ -728,6 +728,25 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
         self.signature = signature
         self.ed25519Signature = ed25519Signature
     }
+
+    /// Canonical bytes of the token's IDENTITY — every stored field EXCEPT the two
+    /// signatures — for the ADR-025 option-B dual Ed25519 signature. Excluding the
+    /// signatures avoids self-reference and makes the Ed25519 sig verifiable from
+    /// the token ALONE: the identity fields (tokenID / nonce / …) already
+    /// deterministically encode the mint-time `issuedAt`, so it need not be signed
+    /// separately (and isn't stored on the token). Deterministic + stable; mint
+    /// and verify derive identical bytes from the same token. Unit-/record-
+    /// separator framing keeps distinct field sets from colliding.
+    public func identityCanonicalBytes() -> Data {
+        let parts: [String] = [
+            schemaVersion, tokenID, sessionID, turnID, scope.rawValue,
+            "\(allowedTargets.count)",
+            allowedTargets.joined(separator: "\u{1E}"),
+            actionDigest, snapshotRef, policyHash,
+            String(ttlMs), nonce, String(singleUse)
+        ]
+        return Data(parts.joined(separator: "\u{1F}").utf8)
+    }
 }
 
 // MARK: - M119 L14 whitepaper §5 parity (9 new structs + 2 enums)

@@ -89,13 +89,24 @@ and B) build on; it does NOT wire anything into production.
   byte-equal; 933 sovereign tests green incl. the HIGH-1 replay-determinism test).
   The SHA256 `signature` tag stays the replay-stable identity; the Ed25519 sig is
   the OPTIONAL asymmetric authority carried alongside it.
-- **Dual-mint / dual-verify (next, gated):** production `makeCommitToken` populates
-  `ed25519Signature` via an OPT-IN host-held Ed25519 signer (default nil →
-  byte-equal); a dual-verify checks the SHA256 tag (as now) AND the Ed25519 sig
-  (when present, via the authority's public key). The commit gate is the most
-  sovereign path — this stays CLOSED until a byte-equal-off proof + the full
-  sovereign suite green. (The Ed25519 sig must cover the same canonical bytes the
-  SHA256 tag does, incl. the deterministic issuedAt — the threading is the next
-  careful step.)
+- **Dual sign/verify — LANDED (ch1044, POST-HOC):** `BASSovereignCommitTokenEd25519`
+  `.signed(token, with: key)` returns a copy with `ed25519Signature` populated — an
+  Ed25519 sig over the token's `identityCanonicalBytes()` (every stored field except
+  the two signatures) — and `.verify(token, with: publicKey)` →
+  `{ absent / valid / invalid }`. The SHA256 tag is untouched (replay-stable
+  identity); the Ed25519 sig is verifiable from the token ALONE. Crucially this is
+  **post-hoc** — the host signs the FINISHED token (whose identity fields already
+  encode the mint-time `issuedAt`), so **NO threading** of a signer through the
+  sovereign commit-token call chain is needed, and production `makeCommitToken` is
+  **untouched → byte-equal by construction** (no opt-in flag required). 8 tests
+  (sign→verify, absent, tampered-identity→invalid, wrong-key→invalid); 937
+  sovereign tests green. This avoided the most invasive option (threading an opt-in
+  signer into the production gate) entirely.
+- **Remaining (optional, host integration):** a host turn loop that opts in — takes
+  the coordinator's commit token, calls `.signed(...)` with its key, re-injects the
+  dual-signed token, and verifies at the pre-commit gate via the public key (the
+  carrier/sink idiom). That is host wiring, not a substrate change. The deterministic
+  SHA256 tag remains the replay identity; the Ed25519 sig is the asymmetric authority
+  the audit (#2 / DEFER-1) wanted — now real and verifiable.
 - Honest boundary: design + a safe additive brick; the production gate is NOT
   touched, and the determinism policy is the operator's.
