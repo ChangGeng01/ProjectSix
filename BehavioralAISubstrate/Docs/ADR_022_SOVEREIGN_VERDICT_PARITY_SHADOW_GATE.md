@@ -94,9 +94,16 @@ coordinator at implementation time):
 Most sources are **already in scope at the `buildSovereignVerdict` call site**
 (riskCard, actionPermit, emergencyBrake, policyLineage, updateTickets), so the
 natural wiring point is there. The 3–4 flags without a direct local source
-(BR-003/005/012 audit/SCT/host-removal) must be threaded in or conservatively
-defaulted; a conservative default that makes the **engine** stricter is safe
-(it can only yield `coordinatorStricter`, never a false `coordinatorLaxer`).
+(BR-003/004/005/012 audit/SCT/host-removal/memory) are conservatively defaulted
+toward making the **engine LAXER** (`false`/neutral) — **NOT** stricter.
+
+> **Correction (the direction matters):** an earlier draft of this section said
+> defaulting toward a *stricter* engine was safe. That is **backwards**. Making
+> the engine artificially strict is exactly what risks a **false
+> `coordinatorLaxer`** (engine level > coordinator level on a healthy turn). In a
+> shadow we prefer a false negative (a missed divergence) over a false positive
+> (a spurious halt-signal). So unsourced flags default `false`; they are wired in
+> later Phase-1b increments as their real sources are threaded to this seam.
 
 ## 5. Red-line proofs (Phase 1)
 
@@ -128,10 +135,16 @@ safe, separate ADR.
 
 - **Real already:** the verifier, the invariant, the `Parity`/`Report` types, the
   pure engine — all exist (`BASSovereignTurnVerifier.swift`).
-- **This ADR:** design only — no code.
-- **Implementation (next):** (a) the BASHostKit projection (§4), (b) the opt-in
-  shadow wiring at `buildSovereignVerdict` (default-OFF), (c) the `@Sendable`
-  sink, (d) byte-equal-off + projection-faithfulness tests.
-- **Deferred:** Phase 2 (the actual halt) — gated on §6 evidence, separate ADR.
+- **Phase-1a — LANDED (ch1044):** the pure projection
+  `BASSovereignTurnObservationProjection.project(...)` + the observation-only
+  `shadowVerify(...)` runner (`Sources/BASHostKit/BASSovereignTurnObservationProjection.swift`)
+  + 8 tests (`BASSovereignTurnObservationProjectionTests`). `buildSovereignVerdict`
+  is **untouched** → byte-equal by construction (not just by a flag). The 4
+  unsourced BR-flags default engine-laxer (§4).
+- **Phase-1b (next):** thread the 4 unsourced flags (BR-003/004/005/012) + the
+  real L13 host-gate value to the seam; add an opt-in per-turn invocation at the
+  coordinator's path with an `@Sendable` sink (still observation-only, default-OFF).
+- **Phase 2 (deferred):** the actual halt on `.coordinatorLaxer` — gated on §6
+  evidence, separate ADR.
 - This does **not** touch #2 (Ed25519 commit gate, audit DEFER-1) — that is a
   distinct sovereign arc.
