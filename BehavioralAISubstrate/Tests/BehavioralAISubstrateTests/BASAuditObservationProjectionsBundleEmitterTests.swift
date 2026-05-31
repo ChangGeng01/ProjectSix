@@ -154,9 +154,9 @@ final class BASAuditObservationProjectionsBundleEmitterTests:
                     cthulhuInputs: ci)
         XCTAssertTrue(obs.hasBothBlocks)
         XCTAssertEqual(
-            obs.kunlunInputsHash, ki.hashValue)
+            obs.kunlunInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ki))
         XCTAssertEqual(
-            obs.cthulhuInputsHash, ci.hashValue)
+            obs.cthulhuInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ci))
     }
 
     // MARK: - 2) kunlun only → kunlunOnly
@@ -174,7 +174,7 @@ final class BASAuditObservationProjectionsBundleEmitterTests:
         XCTAssertTrue(obs.kunlunCovered)
         XCTAssertFalse(obs.cthulhuCovered)
         XCTAssertEqual(
-            obs.kunlunInputsHash, ki.hashValue)
+            obs.kunlunInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ki))
         XCTAssertNil(obs.cthulhuInputsHash)
     }
 
@@ -194,7 +194,7 @@ final class BASAuditObservationProjectionsBundleEmitterTests:
         XCTAssertTrue(obs.cthulhuCovered)
         XCTAssertNil(obs.kunlunInputsHash)
         XCTAssertEqual(
-            obs.cthulhuInputsHash, ci.hashValue)
+            obs.cthulhuInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ci))
     }
 
     // MARK: - 4) both nil → uncovered

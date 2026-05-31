@@ -41,6 +41,7 @@
 //   - ADR-016 advances M1424 → M1425
 
 import Foundation
+import CryptoKit
 import BASRuntimeCore
 
 /// Per-turn observation of the chapter 511 projection
@@ -82,15 +83,22 @@ public struct BASAuditObservationProjectionsBundleObservation:
 
     // MARK: - Coverage fingerprint
 
-    /// Hashable + Sendable digest of the Kunlun inputs
+    /// Canonical SHA256 digest (hex) of the Kunlun inputs
     /// block when `kunlunCovered`,nil otherwise。 Audit
     /// walkers comparing replays use this digest to
     /// detect drift across two runs of the same fixture。
-    public let kunlunInputsHash: Int?
+    ///
+    /// ch1044 严查 #4:was `Int?` from Swift `.hashValue`,
+    /// whose per-process random SipHash seed is NOT stable
+    /// across processes — wrong for a replay/audit
+    /// fingerprint。 Now `json-sha256-sortedKeys-utf8` (see
+    /// `canonicalInputsDigest`)。
+    public let kunlunInputsHash: String?
 
-    /// Hashable + Sendable digest of the Cthulhu inputs
-    /// block when `cthulhuCovered`,nil otherwise。
-    public let cthulhuInputsHash: Int?
+    /// Canonical SHA256 digest (hex) of the Cthulhu inputs
+    /// block when `cthulhuCovered`,nil otherwise。 Same
+    /// replay-stable derivation as `kunlunInputsHash`。
+    public let cthulhuInputsHash: String?
 
     // MARK: - Construction
 
@@ -100,8 +108,8 @@ public struct BASAuditObservationProjectionsBundleObservation:
         emittedAt: Date,
         kunlunCovered: Bool,
         cthulhuCovered: Bool,
-        kunlunInputsHash: Int?,
-        cthulhuInputsHash: Int?
+        kunlunInputsHash: String?,
+        cthulhuInputsHash: String?
     ) {
         self.turnID = turnID
         self.sessionID = sessionID
@@ -115,10 +123,10 @@ public struct BASAuditObservationProjectionsBundleObservation:
     // MARK: - Convenience factory
 
     /// Build a fully-covered observation from both
-    /// blocks。 Uses each block's `hashValue` as the
-    /// digest field — Hashable conformance guarantees
-    /// stable across same-input invocations within a
-    /// process。
+    /// blocks。 Uses each block's canonical SHA256 digest
+    /// (`canonicalInputsDigest`) — replay-stable ACROSS
+    /// processes,unlike the former `.hashValue` (ch1044
+    /// 严查 #4)。
     public static func fullyCovered(
         turnID: String,
         sessionID: String,
@@ -134,8 +142,8 @@ public struct BASAuditObservationProjectionsBundleObservation:
             emittedAt: emittedAt,
             kunlunCovered: true,
             cthulhuCovered: true,
-            kunlunInputsHash: kunlunInputs.hashValue,
-            cthulhuInputsHash: cthulhuInputs.hashValue)
+            kunlunInputsHash: Self.canonicalInputsDigest(kunlunInputs),
+            cthulhuInputsHash: Self.canonicalInputsDigest(cthulhuInputs))
     }
 
     /// Build a Kunlun-only observation (host did not use
@@ -153,7 +161,7 @@ public struct BASAuditObservationProjectionsBundleObservation:
             emittedAt: emittedAt,
             kunlunCovered: true,
             cthulhuCovered: false,
-            kunlunInputsHash: kunlunInputs.hashValue,
+            kunlunInputsHash: Self.canonicalInputsDigest(kunlunInputs),
             cthulhuInputsHash: nil)
     }
 
@@ -173,7 +181,7 @@ public struct BASAuditObservationProjectionsBundleObservation:
             kunlunCovered: false,
             cthulhuCovered: true,
             kunlunInputsHash: nil,
-            cthulhuInputsHash: cthulhuInputs.hashValue)
+            cthulhuInputsHash: Self.canonicalInputsDigest(cthulhuInputs))
     }
 
     /// Build a no-coverage observation (host used the
@@ -193,6 +201,30 @@ public struct BASAuditObservationProjectionsBundleObservation:
             cthulhuCovered: false,
             kunlunInputsHash: nil,
             cthulhuInputsHash: nil)
+    }
+
+    // MARK: - Canonical digest
+
+    /// Replay-stable digest of a projection input block:
+    /// SHA256 over the block's canonical (`.sortedKeys`)
+    /// JSON,hex-encoded。 chapter 五百十二 / ch1044 严查 #4:
+    /// replaces Swift `.hashValue` (per-process random
+    /// SipHash seed → NOT stable across processes,wrong for
+    /// a replay/audit fingerprint)。 Matches the pinned
+    /// `json-sha256-sortedKeys-utf8` idiom used by
+    /// `BASRuntimeAuditEmissionSummaryDigest.from(...)`。
+    /// Returns nil only if Codable encoding fails (defensive
+    /// — never expected for these typed Codable blocks)。
+    public static func canonicalInputsDigest<T: Encodable>(
+        _ value: T
+    ) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(value) else {
+            return nil
+        }
+        let hash = SHA256.hash(data: data)
+        return BASAutoRouteRanker.bytesToHexLower(Array(hash))
     }
 
     // MARK: - Coverage queries

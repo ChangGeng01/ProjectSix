@@ -159,9 +159,9 @@ final class BASAuditObservationProjectionsBundleObservationTests:
         XCTAssertTrue(obs.kunlunCovered)
         XCTAssertTrue(obs.cthulhuCovered)
         XCTAssertEqual(
-            obs.kunlunInputsHash, ki.hashValue)
+            obs.kunlunInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ki))
         XCTAssertEqual(
-            obs.cthulhuInputsHash, ci.hashValue)
+            obs.cthulhuInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ci))
     }
 
     // MARK: - 2) Partial factories
@@ -178,7 +178,7 @@ final class BASAuditObservationProjectionsBundleObservationTests:
         XCTAssertTrue(obs.kunlunCovered)
         XCTAssertFalse(obs.cthulhuCovered)
         XCTAssertEqual(
-            obs.kunlunInputsHash, ki.hashValue)
+            obs.kunlunInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ki))
         XCTAssertNil(obs.cthulhuInputsHash)
     }
 
@@ -195,7 +195,7 @@ final class BASAuditObservationProjectionsBundleObservationTests:
         XCTAssertTrue(obs.cthulhuCovered)
         XCTAssertNil(obs.kunlunInputsHash)
         XCTAssertEqual(
-            obs.cthulhuInputsHash, ci.hashValue)
+            obs.cthulhuInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ci))
     }
 
     // MARK: - 3) uncovered factory

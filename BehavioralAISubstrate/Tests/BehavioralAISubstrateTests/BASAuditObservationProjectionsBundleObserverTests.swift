@@ -222,9 +222,9 @@ final class BASAuditObservationProjectionsBundleObserverTests:
         XCTAssertTrue(snap[0].hasBothBlocks)
         XCTAssertEqual(snap[0].turnID, "t")
         XCTAssertEqual(
-            snap[0].kunlunInputsHash, ki.hashValue)
+            snap[0].kunlunInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ki))
         XCTAssertEqual(
-            snap[0].cthulhuInputsHash, ci.hashValue)
+            snap[0].cthulhuInputsHash, BASAuditObservationProjectionsBundleObservation.canonicalInputsDigest(ci))
     }
 
     // MARK: - 4) Coverage metrics roll up correctly
