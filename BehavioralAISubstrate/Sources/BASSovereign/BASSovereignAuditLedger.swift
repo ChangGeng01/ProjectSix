@@ -366,29 +366,37 @@ public actor BASSovereignAuditLedger {
     ///   cross-process integrity)
     /// - in-process callers that just want the ledger to sign and store
     @discardableResult
-    /// ch1044 D2 audit fix (step 1, byte-equal): reject U+001F / U+001E in any field
-    /// that contributes to the signed + hash-chained canonical pre-image
-    /// (`basSovereignAuditCanonicalBytes`). The hardened form uses them as array
-    /// (U+001F) / field (U+001E) separators and only ASSERTS — never enforces — that
-    /// legal content lacks them. An in-band control char would shift a boundary so two
-    /// distinct entries collide onto one pre-image (forge / mutate an entry that still
-    /// passes `verifyChainIntegrity`). `signalRefs` provably embeds caller/scope-
-    /// influenced witness refs, so this is reachable. Legitimate content never
-    /// contains these control chars, so rejecting them is byte-equal for valid entries.
+    /// ch1044 D2 audit fix (step 1, byte-equal — FIELD-TYPE-AWARE): the hardened
+    /// canonical pre-image (`basSovereignAuditCanonicalBytes`) joins ARRAY elements
+    /// with U+001F and FIELDS with U+001E. A boundary shift (→ two distinct entries
+    /// colliding onto one signed + hash-chained pre-image, forging an entry that still
+    /// passes `verifyChainIntegrity`) requires:
+    ///   • an ARRAY element (ruleIDs/signalRefs/actionRefs) containing U+001F or
+    ///     U+001E — `signalRefs` provably embeds caller/scope-influenced witness refs,
+    ///     so this is the reachable attack surface; OR
+    ///   • a SCALAR field containing U+001E (the field separator).
+    /// U+001F is LEGITIMATELY used elsewhere as an intra-SCALAR composite delimiter
+    /// (e.g. `verdictRef = "shadow_trial\u{1F}<trialID>"`), and a U+001F INSIDE a
+    /// scalar cannot shift the U+001E field boundary — so scalars forbid only U+001E.
+    /// This stays byte-equal for real content while closing the array surface.
     private static func rejectForbiddenCanonicalSeparators(
         in draft: BASSovereignAuditEntry
     ) throws {
-        func hasSeparator(_ s: String) -> Bool {
-            for b in s.utf8 where b == 0x1F || b == 0x1E { return true }
+        func contains(_ s: String, _ bytes: Set<UInt8>) -> Bool {
+            for b in s.utf8 where bytes.contains(b) { return true }
             return false
         }
         let scalars = [draft.schemaVersion, draft.auditID, draft.sessionID,
                        draft.turnID, draft.verdictRef, draft.snapshotRef,
                        draft.actor.rawValue]
-        for s in scalars + draft.ruleIDs + draft.signalRefs + draft.actionRefs
-        where hasSeparator(s) {
+        for s in scalars where contains(s, [0x1E]) {
             throw LedgerError.invalidEntry(
-                "audit field contains a forbidden canonical separator (U+001F/U+001E)")
+                "audit scalar field contains the U+001E canonical field separator")
+        }
+        for s in draft.ruleIDs + draft.signalRefs + draft.actionRefs
+        where contains(s, [0x1F, 0x1E]) {
+            throw LedgerError.invalidEntry(
+                "audit array element contains a canonical separator (U+001F/U+001E)")
         }
     }
 

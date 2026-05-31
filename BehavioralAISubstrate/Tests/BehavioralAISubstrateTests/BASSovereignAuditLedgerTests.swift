@@ -129,6 +129,16 @@ final class BASSovereignAuditLedgerTests: XCTestCase {
             auditEntry(auditID: "a3", signalRefs: ["a,b", "c|d"], actionRefs: ["e,f"]))
     }
 
+    /// Positive control (D2 field-type-aware fix): U+001F inside a SCALAR field is
+    /// LEGITIMATE — `verdictRef = "shadow_trial\u{1F}<id>"` is used across the
+    /// codebase, and a U+001F inside a scalar can't shift the U+001E field boundary,
+    /// so it must be ACCEPTED. (Only array-element U+001F shifts a boundary.)
+    func testAppendAcceptsU001FInScalarVerdictRef() async throws {
+        let ledger = makeLedger()
+        _ = try await ledger.append(
+            auditEntry(auditID: "a4", verdictRef: "shadow_trial\u{1F}t-1"))
+    }
+
     func testAppendRejectsEmptyVerdictRef() async {
         let ledger = makeLedger()
         var bad = makeEntry(auditID: "a-001")
