@@ -370,7 +370,11 @@ pub unsafe extern "C" fn bas_sovereign_verify_chain(
     // Parse length-prefixed entries buffer
     let count = u32::from_be_bytes(
         [buf[0], buf[1], buf[2], buf[3]]) as usize;
-    let mut entries: Vec<&[u8]> = Vec::with_capacity(count);
+    // ch1044 audit fix: cap the pre-allocation to what the buffer can hold (each
+    // entry is >= 4 bytes: its u32 length prefix). A hostile `count` header (e.g.
+    // 0xFFFFFFFF) otherwise reserves ~68 GB → allocator abort = process death. For
+    // any valid buffer `count <= buf.len()/4`, so this is byte-equal for real input.
+    let mut entries: Vec<&[u8]> = Vec::with_capacity(count.min(buf.len() / 4));
     let mut off = 4_usize;
     for _ in 0..count {
         if off + 4 > buf.len() { return -1; }

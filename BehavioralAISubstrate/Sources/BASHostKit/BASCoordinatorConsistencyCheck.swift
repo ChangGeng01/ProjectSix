@@ -11,6 +11,11 @@
 // STRICTLY LAXER than the re-derived one is a genuine regression: stale inputs, a
 // post-hoc mutation, or a rule change that no longer reproduces. THAT is what a
 // real Phase-2 halt should act on.
+//
+// WIRING (honest — ch1044 audit M2): this is OBSERVATION-ONLY today. The endurance
+// runner emits a `🚨 coordinator_regression` log line on `.regression`; NO
+// production path in Sources/ consumes `.isRegression` to halt anything. It is the
+// signal a FUTURE Phase-2 gate would act on — not an active fail-closed halt yet.
 
 import Foundation
 import BASRuntimeCore
@@ -30,7 +35,9 @@ public enum BASCoordinatorConsistency: Sendable, Equatable {
         stored: BASSovereignVerdictLevel,
         atLeast: BASSovereignVerdictLevel)
 
-    /// True only for `.regression` — the fail-closed halt signal.
+    /// True only for `.regression`. NOTE (ch1044 audit M2): observation-only today —
+    /// no production path halts on this yet (see the header); it is the signal a
+    /// future Phase-2 gate would consume.
     public var isRegression: Bool {
         if case .regression = self { return true }
         return false

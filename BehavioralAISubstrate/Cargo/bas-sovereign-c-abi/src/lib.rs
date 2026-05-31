@@ -295,7 +295,11 @@ fn parse_claims(buf: &[u8]) -> Option<Vec<ParsedClaim<'_>>> {
     }
     let count = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
     let mut offset = 4usize;
-    let mut claims = Vec::with_capacity(count);
+    // ch1044 audit fix: cap the pre-allocation to what the buffer can hold (each
+    // claim is >= 2 bytes: its u16 id-length prefix). A hostile `count` header
+    // otherwise reserves tens of GB → allocator abort. Byte-equal for valid input
+    // (count <= buf.len()/2).
+    let mut claims = Vec::with_capacity(count.min(buf.len() / 2));
     for _ in 0..count {
         if buf.len() < offset + 2 { return None; }
         let id_len = u16::from_le_bytes([buf[offset], buf[offset + 1]]) as usize;
