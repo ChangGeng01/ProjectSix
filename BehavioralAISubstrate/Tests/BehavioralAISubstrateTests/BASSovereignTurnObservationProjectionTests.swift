@@ -4,7 +4,7 @@
 // a genuine engine-stricter divergence MUST be detected.
 
 import XCTest
-import BASHostKit
+@testable import BASHostKit
 import BASSovereign
 import BASPolicy
 import BASRuntimeCore
@@ -228,6 +228,67 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             result, verifier: nil)
         XCTAssertNil(none)
     }
+
+    // MARK: - 10) Phase-1d — parity EVIDENCE sweep (coordinator oracle vs engine)
+
+    /// §6 acceptance evidence: across a grid of HEALTHY inputs, compute the real
+    /// coordinator verdict (`computeVerdictDecision`) AND the engine verdict (via
+    /// the projection), and assert the coordinator is NEVER laxer than the engine
+    /// (0 `coordinatorLaxer`). This is the in-repo, deterministic proof the shadow
+    /// does not false-alarm on healthy turns — the gate Phase-2 is waiting on.
+    func testParityEvidenceSweepHealthyTurnsNeverCoordinatorLaxer() async throws {
+        let ledger = BASSovereignAuditLedger.withSeed("parity-sweep")
+        let verifier = BASSovereignTurnVerifier(
+            engine: BASSovereignVerdictEngine(ledger: ledger))
+        let risks: [BASBrainRiskLevel] = [.low, .medium]
+        let permits: [BASActionPermitMode] = [.answer, .mirror, .compare]
+        let modes: [BASEBrainRunMode] = [.engage, .reflect, .sentinel]
+        var laxer = 0, total = 0
+        var distribution: [BASSovereignTurnParity: Int] = [:]
+        for r in risks {
+            for p in permits {
+                for m in modes {
+                    total += 1
+                    let riskCard = makeRisk(r)
+                    let permit = makePermit(p)
+                    let brake = makeBrake(.none)
+                    let budget = makeBudget(runMode: m)
+                    let decision = BASEBrainRuntimeCoordinator.computeVerdictDecision(
+                        policyLineagePresent: true, budgetFrame: budget,
+                        riskCard: riskCard, actionPermit: permit, emergencyBrake: brake,
+                        activeKillSwitches: [], needsProtectedWriteLane: false,
+                        quarantineSources: [], rollbackSource: nil)
+                    let obs = project(
+                        risk: riskCard, permit: permit, brake: brake, budget: budget)
+                    let report = try await BASSovereignTurnObservationProjection.shadowVerify(
+                        obs, coordinatorLevel: decision.level, using: verifier)
+                    distribution[report.parity, default: 0] += 1
+                    if report.parity == .coordinatorLaxer { laxer += 1 }
+                }
+            }
+        }
+        XCTAssertEqual(
+            laxer, 0,
+            "healthy parity sweep produced \(laxer)/\(total) coordinatorLaxer; dist=\(distribution)")
+    }
+
+    // MARK: - 11) Phase-1d — host-friendly default-engine one-call (env-gated)
+
+    func testDefaultEngineShadowGatesOnEnabledFlag() async {
+        let coordinator = BASCoordinatorTestStubs.makeStub()
+        let result = coordinator.runTurn(BASCoordinatorTestStubs.makeStubRequest())
+        let box = StringSinkBox()
+        // OFF → no-op → byte-equal (sink never called).
+        await BASSovereignTurnObservationProjection.shadowVerifyResultWithDefaultEngine(
+            result, enabled: false, sink: { box.add($0) })
+        XCTAssertEqual(box.count, 0)
+        // ON → exactly one compact parity summary.
+        await BASSovereignTurnObservationProjection.shadowVerifyResultWithDefaultEngine(
+            result, enabled: true, sink: { box.add($0) })
+        XCTAssertEqual(box.count, 1)
+        XCTAssertTrue(box.last?.contains("parity=") ?? false)
+        XCTAssertTrue(box.last?.contains("acceptable=") ?? false)
+    }
 }
 
 /// Thread-safe sink collector for the opt-in shadow tests.
@@ -238,4 +299,13 @@ private final class ShadowSinkBox: @unchecked Sendable {
         lock.lock(); reports.append(r); lock.unlock()
     }
     var count: Int { lock.lock(); defer { lock.unlock() }; return reports.count }
+}
+
+/// Thread-safe string-sink collector for the default-engine one-call test.
+private final class StringSinkBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lines: [String] = []
+    func add(_ s: String) { lock.lock(); lines.append(s); lock.unlock() }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return lines.count }
+    var last: String? { lock.lock(); defer { lock.unlock() }; return lines.last }
 }

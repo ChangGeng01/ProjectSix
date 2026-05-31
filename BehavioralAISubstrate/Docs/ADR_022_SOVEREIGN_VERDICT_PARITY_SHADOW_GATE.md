@@ -152,9 +152,24 @@ safe, separate ADR.
   (risk / permit / brake / budget→runMode / host-gate / update-tickets / policy
   lineage / the coordinator's own verdict level). A 12th test runs a real stub
   coordinator turn → project → shadow (opt-in, observation-only). A host turn loop
-  can now shadow a turn in ONE line. **Remaining:** source the 4 hard flags
-  (BR-003/004/005/012) from the result, and add an actual host turn-loop call to
-  gather §6 parity evidence — then Phase-2 (`coordinatorLaxer`→halt).
+  can now shadow a turn in ONE line.
+- **Phase-1d — LANDED (ch1044):** (a) host-friendly one-call
+  `shadowParitySummary(result, enabled:)` / `shadowVerifyResultWithDefaultEngine`
+  needing ONLY BASHostKit (no `BASSovereign` import) — the per-turn evidence
+  one-liner; (b) **opt-in live wiring** in the device endurance runner
+  (`BAS_SHADOW_PARITY=enabled`, default-OFF → byte-equal) so an on-device run
+  gathers real evidence; (c) an **in-repo parity-evidence sweep** — 18 healthy
+  combos run through the REAL coordinator core (`computeVerdictDecision`) vs the
+  engine, **0 `coordinatorLaxer`** (the §6 healthy criterion, proven
+  deterministically in CI). The 4 hard flags (BR-003/004/005/012) have **no
+  faithful source at this seam** (verified — SCT-with-external-effect / audit-append
+  / host-removal / memory-bypass are not on the turn result), so they stay
+  engine-laxer-defaulted by **design, not omission**.
+- **Phase-2 (deferred, 红线):** the `acceptable=false` / `.coordinatorLaxer`
+  signal is now surfaced per turn; flipping it to an actual halt is the operator's
+  evidence-gated decision (a real multi-turn run showing 0 spurious laxer). It is
+  deliberately **NOT enabled here** — enabling a live safety gate without that
+  evidence is exactly what §6 forbids.
 - **Phase 2 (deferred):** the actual halt on `.coordinatorLaxer` — gated on §6
   evidence, separate ADR.
 - This does **not** touch #2 (Ed25519 commit gate, audit DEFER-1) — that is a

@@ -189,4 +189,47 @@ public enum BASSovereignTurnObservationProjection {
             verifier: verifier,
             sink: sink)
     }
+
+    /// Host-friendly one-call live shadow that needs ONLY BASHostKit — the host
+    /// neither imports nor names any `BASSovereign` type. It constructs a default
+    /// verifier internally, runs the shadow from the result, and hands a compact
+    /// parity SUMMARY STRING to `sink` (`parity=… engine=… coordinator=…
+    /// acceptable=…`). A **no-op** (byte-equal) when `enabled` is false — the
+    /// default-OFF path a host gates behind a flag / env var (e.g.
+    /// `BAS_SHADOW_PARITY=enabled`). This is the per-turn call a host turn loop
+    /// makes to gather ADR-022 §6 parity evidence. OBSERVATION-ONLY: it never
+    /// halts and never mutates the turn; acting on `acceptable=false`
+    /// (`.coordinatorLaxer`) is the operator's evidence-gated Phase-2 decision.
+    public static func shadowVerifyResultWithDefaultEngine(
+        _ result: BASEBrainTurnResult,
+        enabled: Bool,
+        ledgerSeed: String = "shadow-parity",
+        sink: (@Sendable (String) -> Void)? = nil
+    ) async {
+        if let line = await shadowParitySummary(
+            result, enabled: enabled, ledgerSeed: ledgerSeed) {
+            sink?(line)
+        }
+    }
+
+    /// Returns a compact parity summary string for one turn, or nil when
+    /// `enabled` is false (the no-op / byte-equal path). Host-friendly: needs
+    /// ONLY BASHostKit — the per-turn evidence one-liner a host turn loop uses
+    /// (`if let line = await shadowParitySummary(result, enabled: flag) { log(line) }`).
+    /// OBSERVATION-ONLY.
+    public static func shadowParitySummary(
+        _ result: BASEBrainTurnResult,
+        enabled: Bool,
+        ledgerSeed: String = "shadow-parity"
+    ) async -> String? {
+        guard enabled else { return nil }   // OFF → no-op → byte-equal
+        let verifier = BASSovereignTurnVerifier(
+            engine: BASSovereignVerdictEngine(ledger: .withSeed(ledgerSeed)))
+        guard let report = await shadowVerifyResult(result, verifier: verifier)
+        else { return nil }
+        return "parity=\(report.parity.rawValue) "
+            + "engine=\(report.engineVerdict.verdictLevel.rawValue) "
+            + "coordinator=\(report.coordinatorLevel?.rawValue ?? "nil") "
+            + "acceptable=\(report.isAcceptable)"
+    }
 }

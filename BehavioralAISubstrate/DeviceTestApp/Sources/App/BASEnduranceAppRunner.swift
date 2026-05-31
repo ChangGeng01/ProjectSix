@@ -371,6 +371,13 @@ final class BASEnduranceAppController: ObservableObject {
             env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
         let adaptive = (
             env["BAS_INTERNAL_ADAPTIVE"] ?? "1") == "1"
+        // ch1044 ADR-022 #3 — OPT-IN sovereign-verdict parity shadow。
+        // Default OFF (env unset) → byte-equal:no projection,no verify,no log。
+        // With `BAS_SHADOW_PARITY=enabled`,each turn's coordinator verdict is
+        // compared against the engine's (observation-only — NEVER halts) so an
+        // on-device endurance run gathers ADR-022 §6 parity evidence。
+        let shadowParityEnabled =
+            (env["BAS_SHADOW_PARITY"] ?? "") == "enabled"
         // ch 1025.10 — monotonic run start(NTP/DST-safe)。
         let runStartNs = monoNowNs()
 
@@ -690,6 +697,18 @@ final class BASEnduranceAppController: ObservableObject {
                 // fields the standard brain line doesn't surface。
                 await emitBrainDetail(
                     turnResult, iter: iter, prompt: p + 1)
+
+                // ch1044 ADR-022 #3 — opt-in parity shadow (observation-only,
+                // no-op when disabled)。 One-liner via the BASHostKit helper —
+                // the app needs no BASSovereign import。
+                if let parityLine = await
+                    BASSovereignTurnObservationProjection
+                        .shadowParitySummary(
+                            turnResult, enabled: shadowParityEnabled) {
+                    await emitBoth(
+                        "🛡 ch1025 shadow_parity iter=\(iter) "
+                        + "prompt=\(p + 1) \(parityLine)")
+                }
 
                 let mlxPreSnap = snapshot()
                 let mlxStartNs = monoNowNs()
