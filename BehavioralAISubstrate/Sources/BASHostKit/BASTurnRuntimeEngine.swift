@@ -407,6 +407,18 @@ public actor BASTurnRuntimeEngine {
     /// `.complete` audit envelope on the wired event log
     /// (when present)。Byte-equal to V1's result。
     ///
+    /// ⚠️ ch1044 严查 #1 — MODE-AGNOSTIC BY DESIGN:`runTurn`
+    /// ALWAYS delegates to V1 and is byte-equal REGARDLESS of the
+    /// configured `runtimeMode` (incl. `.nativeV2`)— it never reads
+    /// the mode。 The native stage/plan executors run ONLY via
+    /// `runWithPlan` (below) + `EBrainHostRuntimeSynthesis`。
+    /// `BASCognitiveBrain.process()` calls THIS method (its engine
+    /// is built at the `.v1ByteEqual` init-default,NOT via
+    /// `.default()`),so the brain's main path is intentionally
+    /// V1-byte-equal — native-V2 stage execution requires calling
+    /// `runWithPlan` explicitly。 So `.default() == .nativeV2` does
+    /// NOT mean the brain's `process()` runs native。
+    ///
     /// chapter 四百六 / M989:`auditProjections` parameter
     /// added。 Hosts pre-build the M976
     /// `BASRuntimeAuditProjectionsBundle` (5 namespace slots
