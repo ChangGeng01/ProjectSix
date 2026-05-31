@@ -86,6 +86,17 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     /// checkpoint. Reset to 0 on every successful checkpoint.
     private var savesSinceCheckpoint: Int = 0
 
+    /// ch1044 D6 audit fix — serializes save / checkpoint / load. The owning actor's
+    /// `persistQuietly()` dispatches writes inside an unstructured `Task`, and these
+    /// methods are `nonisolated async` on a Sendable class, so an awaited call runs on
+    /// the GLOBAL concurrent executor — NOT the actor's serial executor. Without this
+    /// lock two `BEGIN…COMMIT` transactions can overlap on the one connection
+    /// (spurious "transaction within a transaction", or a DELETE landing inside
+    /// another save's INSERT loop) and `savesSinceCheckpoint += 1` can lose updates.
+    /// Used only via scoped `withLock { performX() }` around the fully-synchronous
+    /// `perform*` helpers, so the lock is never held across a suspension point.
+    private let ioLock = NSLock()
+
     public init(
         url: URL,
         autoCheckpointEvery: Int = 100
@@ -103,6 +114,11 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     // MARK: - Protocol conformance
 
     public func load() async throws
+    -> [String: BASUpdateTicketLifecycleEntry] {
+        try ioLock.withLock { try performLoad() }
+    }
+
+    private func performLoad() throws
     -> [String: BASUpdateTicketLifecycleEntry] {
         var result: [String: BASUpdateTicketLifecycleEntry] = [:]
         let sql =
@@ -146,6 +162,12 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     public func save(
         _ entries: [String: BASUpdateTicketLifecycleEntry]
     ) async throws {
+        try ioLock.withLock { try performSave(entries) }
+    }
+
+    private func performSave(
+        _ entries: [String: BASUpdateTicketLifecycleEntry]
+    ) throws {
         // Atomic batch write: BEGIN, DELETE all, INSERT each,
         // COMMIT. On error rollback so a half-written batch
         // doesn't corrupt prior state.
@@ -225,7 +247,7 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
         if autoCheckpointEvery > 0 {
             savesSinceCheckpoint += 1
             if savesSinceCheckpoint >= autoCheckpointEvery {
-                _ = try? checkpoint()
+                _ = try? performCheckpoint()  // already holding ioLock
                 savesSinceCheckpoint = 0
             }
         }
@@ -241,6 +263,13 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     /// observability).
     @discardableResult
     public func checkpoint() throws -> CheckpointResult {
+        try ioLock.withLock { try performCheckpoint() }
+    }
+
+    /// ch1044 D6 — checkpoint body WITHOUT acquiring `ioLock`, for callers already
+    /// holding it (e.g. `performSave`'s auto-checkpoint). NSLock is non-recursive, so
+    /// re-entering `checkpoint()` from a locked save would deadlock.
+    private func performCheckpoint() throws -> CheckpointResult {
         // PRAGMA wal_checkpoint(TRUNCATE) returns one row with
         // 3 columns: busy (0/1), log (frames in WAL),
         // checkpointed (frames merged).
