@@ -50,8 +50,13 @@ asserting (NOT enforcing) those control chars are absent. `signalRefs` embeds
 change breaks the chain. **SAFE interim (do first):** reject U+001F/U+001E in those
 arrays at `append()` — byte-equal for legitimate content, closes the boundary shift.
 
-### D3 — production commit-tag `sovereignDigestHex` `|`-join (already spawned)
-See CH_1044_SEVERE_AUDIT.md finding P + the spawned task.
+### D3 — production commit-tag `sovereignDigestHex` `|`-join (resolved: option-(b) infeasible → injective + re-pin)
+The byte-equal boundary-validation (reject separators at mint) was attempted and
+REVERTED — a regression test proved identity fields legitimately contain `|`
+(production `sessionID` = `host.primary|task|sentinel`), so it drove the healthy
+turn to 0 tokens. The only correct fix is the injective encoder, which changes tag
+values → stress-baseline re-pin (fold into D1's re-pin effort). The tag is not an
+auth gate, so live impact is low. See CH_1044_SEVERE_AUDIT.md finding P RESOLUTION.
 
 ### D4 — constitution vault `versionSignature` (latent): multi-list flatten forgery + 64-bit truncation
 `HostConstitutionCore.swift:1066-1094` (+ `basStableSignature` `prefix(16)`). Never

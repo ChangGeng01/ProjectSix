@@ -51,9 +51,31 @@ The production `signature` tag has the same `|`-join collision, but:
   ruling 亏的不要上: do not ship a risky production change in an audit pass).
 
 Resume options for P: (a) length-prefix the production tag (changes tag values —
-needs a migration/■byte-diff proof), or (b) reject control/separator chars in signed
+needs a migration/byte-diff proof), or (b) reject control/separator chars in signed
 string fields at the mint boundary (byte-equal for legitimate tokens, closes the
-collision). Either is a focused follow-up.
+collision).
+
+### RESOLUTION (ch1044 — option (b) attempted, rigorously tested, REVERTED)
+
+Option (b) — the "byte-equal" boundary-validation — was implemented and is
+**INFEASIBLE for this codebase**. The regression test immediately revealed the bad
+assumption behind it: **identity fields legitimately contain `|`**. The production
+`sessionID` is the composite `host.primary|task|sentinel`, so rejecting `|` in
+signed fields drove the healthy-turn suite to **0 minted tokens** (the `["a","b"]`
+vs `["a|b"]` premise — "internal IDs never contain separators" — is simply false
+here). The change was reverted.
+
+So the ONLY correct fix is option (a): the injective `BASSovereignCanonicalBytes`
+encoder for the production tag — which **changes every tag value** and therefore
+needs the stress-sweep baseline re-pin (the same focused effort as the determinism
+leaks, D1). Deferred under 亏的不要上.
+
+This also means the existing `|`-join is genuinely ambiguous for real `sessionID`
+data *today* — but the tag is an identity/replay/audit marker, **NOT an auth gate**
+(nothing verifies its signature value), and real sessionIDs don't collide, so the
+live impact is low. The fix is correctness / defense-in-depth, appropriately
+deferred. The honest lesson: the audit's "preferred byte-equal path" did not survive
+contact with the real data — the test caught it before it shipped.
 
 ## What held (clean)
 
