@@ -193,6 +193,41 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             hostGateValue: 0.2)
         XCTAssertEqual(obs.hostGateValue, 0.2, accuracy: 1e-9)
     }
+
+    // MARK: - 9) Phase-1c — project + shadow from a real turn result
+
+    func testProjectFromResultThreadsFieldsAndShadowsCleanly() async {
+        let coordinator = BASCoordinatorTestStubs.makeStub()
+        let result = coordinator.runTurn(BASCoordinatorTestStubs.makeStubRequest())
+
+        // Identity + soft signals + lineage thread straight from the result.
+        let obs = BASSovereignTurnObservationProjection.projectFromResult(result)
+        XCTAssertEqual(obs.sessionID, result.runtimeTrace.sessionID)
+        XCTAssertEqual(obs.turnID, result.thoughtFold.foldID)
+        XCTAssertEqual(obs.hostGateValue, result.hostGateValue, accuracy: 1e-9)
+        XCTAssertEqual(
+            obs.irreversibilityScore, result.riskCard.irreversibility, accuracy: 1e-9)
+        XCTAssertEqual(
+            obs.manipulationStrength, result.riskCard.manipulationStrength, accuracy: 1e-9)
+        XCTAssertEqual(obs.policyLineageMissing, result.policyLineage == nil)
+
+        // One-call shadow from the result: opt-in + observation-only.
+        let ledger = BASSovereignAuditLedger.withSeed("parity-1c")
+        let verifier = BASSovereignTurnVerifier(
+            engine: BASSovereignVerdictEngine(ledger: ledger))
+        let box = ShadowSinkBox()
+        let report = await BASSovereignTurnObservationProjection.shadowVerifyResult(
+            result, verifier: verifier, sink: { box.add($0) })
+        XCTAssertNotNil(report)
+        XCTAssertEqual(box.count, 1)
+        // Coordinator level taken from the result's own sovereign verdict.
+        XCTAssertEqual(report?.coordinatorLevel, result.sovereignVerdict?.verdictLevel)
+
+        // No-op (byte-equal) when the verifier is nil.
+        let none = await BASSovereignTurnObservationProjection.shadowVerifyResult(
+            result, verifier: nil)
+        XCTAssertNil(none)
+    }
 }
 
 /// Thread-safe sink collector for the opt-in shadow tests.

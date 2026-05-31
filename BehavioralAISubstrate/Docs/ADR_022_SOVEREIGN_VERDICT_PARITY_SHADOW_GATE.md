@@ -147,9 +147,14 @@ safe, separate ADR.
   `@Sendable` sink when enabled, swallows verify errors, never halts — plus a
   `hostGateValue` param on `project(...)` so the host can thread the real L13
   value. 3 new tests (no-op-when-off, emits-when-on, host-gate-threaded).
-  **Remaining (Phase-1c):** source the 4 flags (BR-003/004/005/012) from the turn
-  result, a `projectFromResult` convenience, and an actual invocation from a host
-  turn loop (still observation-only) to start gathering §6 parity evidence.
+- **Phase-1c — LANDED (ch1044):** `projectFromResult(_:)` + the one-call
+  `shadowVerifyResult(_:verifier:sink:)` source every field the result exposes
+  (risk / permit / brake / budget→runMode / host-gate / update-tickets / policy
+  lineage / the coordinator's own verdict level). A 12th test runs a real stub
+  coordinator turn → project → shadow (opt-in, observation-only). A host turn loop
+  can now shadow a turn in ONE line. **Remaining:** source the 4 hard flags
+  (BR-003/004/005/012) from the result, and add an actual host turn-loop call to
+  gather §6 parity evidence — then Phase-2 (`coordinatorLaxer`→halt).
 - **Phase 2 (deferred):** the actual halt on `.coordinatorLaxer` — gated on §6
   evidence, separate ADR.
 - This does **not** touch #2 (Ed25519 commit gate, audit DEFER-1) — that is a

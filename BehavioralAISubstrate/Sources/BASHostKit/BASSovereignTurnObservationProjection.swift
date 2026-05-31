@@ -133,4 +133,60 @@ public enum BASSovereignTurnObservationProjection {
         sink?(report)
         return report
     }
+
+    // MARK: - Phase-1c — project directly from a completed turn result
+
+    /// Project from a completed `BASEBrainTurnResult`. Sources every input the
+    /// result exposes — risk card, permit, brake, budget (runMode), host-gate,
+    /// update tickets (→ the BR-007 protected-write proxy), policy lineage
+    /// (BR-006), and the identity fields. The 4 hard flags (BR-003/004/005/012)
+    /// still default engine-laxer pending their plumbing; `operation` and
+    /// `evidenceSufficient` default to the conservative (laxer) values until a
+    /// richer signal is threaded (Phase-1c+). Pure + deterministic.
+    public static func projectFromResult(
+        _ result: BASEBrainTurnResult,
+        operation: BASSovereignVerdictEngine.OperationDomain = .pureInference,
+        evidenceSufficient: Bool = true
+    ) -> BASSovereignTurnObservations {
+        // Mirror the coordinator's own protected-write derivation (minus the
+        // request-only kill-switch term, whose omission only ever UNDER-sets the
+        // flag → engine-laxer → no false `.coordinatorLaxer`).
+        let needsProtectedWriteLane =
+            result.actionPermit.mode == .delay
+            || result.actionPermit.mode == .replace
+            || result.updateTickets.contains { $0.requiresReview || $0.conflictFlag }
+        return project(
+            sessionID: result.runtimeTrace.sessionID,
+            turnID: result.thoughtFold.foldID,
+            snapshotRef: result.thoughtFold.snapshotRef ?? "",
+            policyHash: result.sovereignVerdict?.policyHash ?? "",
+            policyLineagePresent: result.policyLineage != nil,
+            budgetFrame: result.budgetFrame,
+            riskCard: result.riskCard,
+            actionPermit: result.actionPermit,
+            emergencyBrake: result.emergencyBrake,
+            needsProtectedWriteLane: needsProtectedWriteLane,
+            quarantineCount: 0,
+            operation: operation,
+            evidenceSufficient: evidenceSufficient,
+            hostGateValue: result.hostGateValue)
+    }
+
+    /// Phase-1c opt-in one-call per-turn shadow: project from the result + run
+    /// the verifier, taking the coordinator level from the result's own sovereign
+    /// verdict. No-op / byte-equal when `verifier` is nil. OBSERVATION-ONLY — a
+    /// host turn loop calls this once after the turn; it never halts or mutates.
+    @discardableResult
+    public static func shadowVerifyResult(
+        _ result: BASEBrainTurnResult,
+        verifier: BASSovereignTurnVerifier?,
+        sink: (@Sendable (BASSovereignTurnVerifierReport) -> Void)? = nil
+    ) async -> BASSovereignTurnVerifierReport? {
+        guard verifier != nil else { return nil }
+        return await runShadowIfEnabled(
+            observations: projectFromResult(result),
+            coordinatorLevel: result.sovereignVerdict?.verdictLevel,
+            verifier: verifier,
+            sink: sink)
+    }
 }
