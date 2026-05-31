@@ -299,6 +299,7 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         var pairHist: [String: Int] = [:]
         var condHist: [String: Int] = [:]
         var clsHist: [String: Int] = [:]
+        var driftHist: [String: Int] = [:]
         var misclassified: [String] = []
         var total = 0
         for r in risks { for b in brakes { for p in permits { for m in modes {
@@ -328,6 +329,9 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
                     let cls = BASSovereignTurnObservationProjection
                         .classifyDivergence(report)
                     clsHist[cls.rawValue, default: 0] += 1
+                    if cls == .unexpectedDrift {
+                        driftHist["\(cond)|permit=\(p.rawValue)|\(decision.level.rawValue)->\(report.engineVerdict.verdictLevel.rawValue)", default: 0] += 1
+                    }
                     // Under "keep both", EVERY missing-lineage laxer must be
                     // allowlisted as intentional defense-in-depth.
                     if !lineage && cls != .intentionalDefenseInDepth {
@@ -369,7 +373,7 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             "expected the shadow to surface real adversarial divergence")
         // clsHist splits laxer into intentionalDefenseInDepth (allowlisted) vs
         // unexpectedDrift (classes still awaiting an operator ruling, ADR-023 §8).
-        _ = (pairHist, condHist, clsHist)
+        _ = (pairHist, condHist, clsHist, driftHist)
     }
 
     // MARK: - 12) Phase-1e — divergence classification ("keep both" policy)
