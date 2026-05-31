@@ -78,9 +78,14 @@ final class BASSovereignAuditLedgerTests: XCTestCase {
         }
     }
 
-    // ch1044 D2 — a forbidden canonical separator (U+001F array / U+001E field) in a
-    // ref would shift a boundary in the signed+hash-chained pre-image → forge/mutate
-    // an entry that still passes chain verify. The append boundary must reject it.
+    // ch1044 D2 — the "reject forbidden canonical separators at append" validation
+    // was REVERTED as INFEASIBLE: U+001F and U+001E are LEGITIMATELY used as composite
+    // delimiters in real audit content — verdictRef "shadow_trial\u{1F}<id>" (scalar,
+    // shadow trial), warrant witnessRefs → signalRefs (array elements), and
+    // BASAgentObservationAuditEmitter records (U+001E). No byte-equal validation can
+    // reject them. The genuine fix for the canonical ambiguity is the injective
+    // re-encode (step-2, deferred — see CH_1044_FULL_AUDIT.md D2). These tests guard
+    // that the append boundary ACCEPTS such legitimate composite refs.
 
     private func auditEntry(
         auditID: String, verdictRef: String = "v",
@@ -93,50 +98,22 @@ final class BASSovereignAuditLedgerTests: XCTestCase {
             appendedAt: Date(timeIntervalSince1970: 1))
     }
 
-    private func assertRejected(
-        _ ledger: BASSovereignAuditLedger, _ entry: BASSovereignAuditEntry, _ ctx: String,
-        file: StaticString = #filePath, line: UInt = #line
-    ) async {
-        do {
-            _ = try await ledger.append(entry)
-            XCTFail("\(ctx) must be rejected", file: file, line: line)
-        } catch BASSovereignAuditLedger.LedgerError.invalidEntry {
-            // expected
-        } catch {
-            XCTFail("\(ctx): unexpected error \(error)", file: file, line: line)
-        }
-    }
-
-    func testAppendRejectsForbiddenSeparatorInSignalRef() async {
+    /// Composite refs with U+001F/U+001E (scalar verdictRef AND array signalRefs/
+    /// actionRefs) are LEGITIMATE here and MUST be accepted — a regression guard
+    /// against re-adding the infeasible reject-separators validation.
+    func testAppendAcceptsCompositeSeparatorRefs() async throws {
         let ledger = makeLedger()
-        await assertRejected(
-            ledger, auditEntry(auditID: "a1", signalRefs: ["ok", "ev\u{1F}il"]),
-            "U+001F in a signalRef")
+        _ = try await ledger.append(
+            auditEntry(auditID: "a1", verdictRef: "shadow_trial\u{1F}t-1",
+                       signalRefs: ["render_target\u{1F}x", "ok"],
+                       actionRefs: ["cand\u{1E}1"]))
     }
 
-    func testAppendRejectsForbiddenSeparatorInScalarField() async {
-        let ledger = makeLedger()
-        await assertRejected(
-            ledger, auditEntry(auditID: "a2", verdictRef: "v\u{1E}x"),
-            "U+001E in verdictRef")
-    }
-
-    /// Positive control (byte-equal): legacy `,`/`|` content in refs is STILL
-    /// accepted — only the hardened control separators are forbidden.
+    /// Legacy `,`/`|` content in refs is also accepted (never validated).
     func testAppendAcceptsCommaAndPipeInRefs() async throws {
         let ledger = makeLedger()
         _ = try await ledger.append(
-            auditEntry(auditID: "a3", signalRefs: ["a,b", "c|d"], actionRefs: ["e,f"]))
-    }
-
-    /// Positive control (D2 field-type-aware fix): U+001F inside a SCALAR field is
-    /// LEGITIMATE — `verdictRef = "shadow_trial\u{1F}<id>"` is used across the
-    /// codebase, and a U+001F inside a scalar can't shift the U+001E field boundary,
-    /// so it must be ACCEPTED. (Only array-element U+001F shifts a boundary.)
-    func testAppendAcceptsU001FInScalarVerdictRef() async throws {
-        let ledger = makeLedger()
-        _ = try await ledger.append(
-            auditEntry(auditID: "a4", verdictRef: "shadow_trial\u{1F}t-1"))
+            auditEntry(auditID: "a2", signalRefs: ["a,b", "c|d"], actionRefs: ["e,f"]))
     }
 
     func testAppendRejectsEmptyVerdictRef() async {

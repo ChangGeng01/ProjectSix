@@ -365,41 +365,19 @@ public actor BASSovereignAuditLedger {
     /// - callers that pre-sign outside the actor (preferred for
     ///   cross-process integrity)
     /// - in-process callers that just want the ledger to sign and store
+    // ch1044 D2 — the step-1 "reject forbidden canonical separators at append"
+    // validation was REVERTED: it is INFEASIBLE for this codebase. The hardened
+    // canonical joins arrays with U+001F and fields with U+001E, but BOTH control
+    // chars are LEGITIMATELY used as composite delimiters in real audit content —
+    // `verdictRef = "shadow_trial\u{1F}<id>"` (scalar, shadow trial), warrant
+    // witnessRefs → `signalRefs` carry U+001F (array elements), and
+    // `BASAgentObservationAuditEmitter` joins records with U+001E. So no
+    // byte-equal validation can reject them without breaking legitimate paths
+    // (it broke the warrant-bridge + shadow-trial suites). The genuine fix is the
+    // INJECTIVE re-encode (step-2): length-prefix the canonical under a new
+    // schemaVersion gate so an in-band separator can't shift a boundary — a
+    // version-gated chain migration, deferred (see CH_1044_FULL_AUDIT.md D2).
     @discardableResult
-    /// ch1044 D2 audit fix (step 1, byte-equal — FIELD-TYPE-AWARE): the hardened
-    /// canonical pre-image (`basSovereignAuditCanonicalBytes`) joins ARRAY elements
-    /// with U+001F and FIELDS with U+001E. A boundary shift (→ two distinct entries
-    /// colliding onto one signed + hash-chained pre-image, forging an entry that still
-    /// passes `verifyChainIntegrity`) requires:
-    ///   • an ARRAY element (ruleIDs/signalRefs/actionRefs) containing U+001F or
-    ///     U+001E — `signalRefs` provably embeds caller/scope-influenced witness refs,
-    ///     so this is the reachable attack surface; OR
-    ///   • a SCALAR field containing U+001E (the field separator).
-    /// U+001F is LEGITIMATELY used elsewhere as an intra-SCALAR composite delimiter
-    /// (e.g. `verdictRef = "shadow_trial\u{1F}<trialID>"`), and a U+001F INSIDE a
-    /// scalar cannot shift the U+001E field boundary — so scalars forbid only U+001E.
-    /// This stays byte-equal for real content while closing the array surface.
-    private static func rejectForbiddenCanonicalSeparators(
-        in draft: BASSovereignAuditEntry
-    ) throws {
-        func contains(_ s: String, _ bytes: Set<UInt8>) -> Bool {
-            for b in s.utf8 where bytes.contains(b) { return true }
-            return false
-        }
-        let scalars = [draft.schemaVersion, draft.auditID, draft.sessionID,
-                       draft.turnID, draft.verdictRef, draft.snapshotRef,
-                       draft.actor.rawValue]
-        for s in scalars where contains(s, [0x1E]) {
-            throw LedgerError.invalidEntry(
-                "audit scalar field contains the U+001E canonical field separator")
-        }
-        for s in draft.ruleIDs + draft.signalRefs + draft.actionRefs
-        where contains(s, [0x1F, 0x1E]) {
-            throw LedgerError.invalidEntry(
-                "audit array element contains a canonical separator (U+001F/U+001E)")
-        }
-    }
-
     public func append(_ draft: BASSovereignAuditEntry) throws -> AppendedEntry {
         guard !draft.auditID.isEmpty else {
             throw LedgerError.invalidEntry("auditID must be non-empty")
@@ -410,7 +388,6 @@ public actor BASSovereignAuditLedger {
         guard !draft.verdictRef.isEmpty else {
             throw LedgerError.invalidEntry("verdictRef must be non-empty")
         }
-        try Self.rejectForbiddenCanonicalSeparators(in: draft)
 
         let priorHash = entries.last?.selfHash ?? Self.genesisHash
         let canonical = canonicalBytes(for: draft, priorHash: priorHash)
