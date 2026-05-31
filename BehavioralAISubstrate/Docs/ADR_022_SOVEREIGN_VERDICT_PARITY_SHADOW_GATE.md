@@ -141,9 +141,15 @@ safe, separate ADR.
   + 8 tests (`BASSovereignTurnObservationProjectionTests`). `buildSovereignVerdict`
   is **untouched** → byte-equal by construction (not just by a flag). The 4
   unsourced BR-flags default engine-laxer (§4).
-- **Phase-1b (next):** thread the 4 unsourced flags (BR-003/004/005/012) + the
-  real L13 host-gate value to the seam; add an opt-in per-turn invocation at the
-  coordinator's path with an `@Sendable` sink (still observation-only, default-OFF).
+- **Phase-1b — PARTIALLY LANDED (ch1044):** the opt-in carrier
+  `runShadowIfEnabled(observations:coordinatorLevel:verifier:sink:)` — a no-op /
+  byte-equal when `verifier` is nil (default-OFF), emits the parity report to an
+  `@Sendable` sink when enabled, swallows verify errors, never halts — plus a
+  `hostGateValue` param on `project(...)` so the host can thread the real L13
+  value. 3 new tests (no-op-when-off, emits-when-on, host-gate-threaded).
+  **Remaining (Phase-1c):** source the 4 flags (BR-003/004/005/012) from the turn
+  result, a `projectFromResult` convenience, and an actual invocation from a host
+  turn loop (still observation-only) to start gathering §6 parity evidence.
 - **Phase 2 (deferred):** the actual halt on `.coordinatorLaxer` — gated on §6
   evidence, separate ADR.
 - This does **not** touch #2 (Ed25519 commit gate, audit DEFER-1) — that is a

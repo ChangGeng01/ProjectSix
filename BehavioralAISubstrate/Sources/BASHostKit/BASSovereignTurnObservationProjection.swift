@@ -51,7 +51,8 @@ public enum BASSovereignTurnObservationProjection {
         needsProtectedWriteLane: Bool,
         quarantineCount: Int,
         operation: BASSovereignVerdictEngine.OperationDomain,
-        evidenceSufficient: Bool
+        evidenceSufficient: Bool,
+        hostGateValue: Double = 1.0
     ) -> BASSovereignTurnObservations {
         let riskHighPlus = riskCard.riskLevel >= .high
         let brakeElevated = emergencyBrake.brakeLevel != .none
@@ -82,10 +83,11 @@ public enum BASSovereignTurnObservationProjection {
             manipulationStrength: riskCard.manipulationStrength,
             uncertaintyScore: riskCard.uncertainty,
             gsiScore: riskCard.gsiScore,
-            // hostGateValue (L13) not visible at this seam → 1.0 (full integrity,
-            // which the engine maps to a 0.0 integrity-loss signal = laxer).
-            // Phase-1b threads the real host-gate value.
-            hostGateValue: 1.0,
+            // hostGateValue (L13): defaults to 1.0 (full integrity → a 0.0
+            // integrity-loss signal = engine-laxer) when the caller can't supply
+            // it. Phase-1b lets the host thread the real
+            // `BASEBrainTurnResult.hostGateValue` through this param.
+            hostGateValue: hostGateValue,
             quarantineCount: max(0, quarantineCount),
             runMode: budgetFrame.runMode,
             emergencyBrakeLevel: emergencyBrake.brakeLevel,
@@ -107,5 +109,28 @@ public enum BASSovereignTurnObservationProjection {
         using verifier: BASSovereignTurnVerifier
     ) async throws -> BASSovereignTurnVerifierReport {
         try await verifier.verify(observations, coordinatorLevel: coordinatorLevel)
+    }
+
+    /// Phase-1b OPT-IN per-turn shadow — the carrier. A **no-op** when
+    /// `verifier` is nil: that is the default-OFF / byte-equal path. The host
+    /// holds the (verifier, sink) pair; both nil means the shadow never runs, so
+    /// the turn is bit-identical (红线 7). When enabled, it verifies and hands the
+    /// parity report to `sink`, then returns it. OBSERVATION-ONLY — it never
+    /// halts and never mutates the coordinator's verdict. A verify error is
+    /// swallowed (the shadow must NEVER break a real turn); Phase-2 — which acts
+    /// on `.coordinatorLaxer` — is a separate, later, gated arc.
+    @discardableResult
+    public static func runShadowIfEnabled(
+        observations: BASSovereignTurnObservations,
+        coordinatorLevel: BASSovereignVerdictLevel?,
+        verifier: BASSovereignTurnVerifier?,
+        sink: (@Sendable (BASSovereignTurnVerifierReport) -> Void)? = nil
+    ) async -> BASSovereignTurnVerifierReport? {
+        guard let verifier else { return nil }
+        guard let report = try? await verifier.verify(
+            observations, coordinatorLevel: coordinatorLevel
+        ) else { return nil }
+        sink?(report)
+        return report
     }
 }

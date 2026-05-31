@@ -154,4 +154,53 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             obs, coordinatorLevel: nil, using: verifier)
         XCTAssertEqual(report.parity, .engineOnly)
     }
+
+    // MARK: - 7) Phase-1b opt-in carrier (default-OFF = no-op = byte-equal)
+
+    func testRunShadowIsNoOpWhenVerifierNil() async {
+        let obs = project(risk: makeRisk(.low), permit: makePermit(), brake: makeBrake())
+        let box = ShadowSinkBox()
+        let report = await BASSovereignTurnObservationProjection.runShadowIfEnabled(
+            observations: obs, coordinatorLevel: .pass,
+            verifier: nil, sink: { box.add($0) })
+        XCTAssertNil(report)                       // OFF → no-op
+        XCTAssertEqual(box.count, 0)               // sink never called
+    }
+
+    func testRunShadowEmitsToSinkWhenEnabled() async {
+        let ledger = BASSovereignAuditLedger.withSeed("parity-1b-sink")
+        let verifier = BASSovereignTurnVerifier(
+            engine: BASSovereignVerdictEngine(ledger: ledger))
+        let obs = project(risk: makeRisk(.low), permit: makePermit(), brake: makeBrake())
+        let box = ShadowSinkBox()
+        let report = await BASSovereignTurnObservationProjection.runShadowIfEnabled(
+            observations: obs, coordinatorLevel: .pass,
+            verifier: verifier, sink: { box.add($0) })
+        XCTAssertNotNil(report)
+        XCTAssertEqual(box.count, 1)               // sink received the report
+        XCTAssertTrue(report?.isAcceptable ?? false)
+    }
+
+    // MARK: - 8) Phase-1b host-gate threading
+
+    func testHostGateValueIsThreaded() {
+        let obs = BASSovereignTurnObservationProjection.project(
+            sessionID: "s", turnID: "t", snapshotRef: "r", policyHash: "p",
+            policyLineagePresent: true, budgetFrame: makeBudget(),
+            riskCard: makeRisk(.low), actionPermit: makePermit(),
+            emergencyBrake: makeBrake(), needsProtectedWriteLane: false,
+            quarantineCount: 0, operation: .pureInference, evidenceSufficient: true,
+            hostGateValue: 0.2)
+        XCTAssertEqual(obs.hostGateValue, 0.2, accuracy: 1e-9)
+    }
+}
+
+/// Thread-safe sink collector for the opt-in shadow tests.
+private final class ShadowSinkBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reports: [BASSovereignTurnVerifierReport] = []
+    func add(_ r: BASSovereignTurnVerifierReport) {
+        lock.lock(); reports.append(r); lock.unlock()
+    }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return reports.count }
 }
