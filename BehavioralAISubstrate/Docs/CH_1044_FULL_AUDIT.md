@@ -26,21 +26,43 @@ crates build.
 
 ## DEFERRED (RISKY — change persisted values or behavior; 亏的不要上)
 
-> **UPDATE (ch1044 continued — D1, D2, D6 now RESOLVED on explicit operator request):**
+> **UPDATE (ch1044 continued — on explicit operator request):**
 > - **D6 RESOLVED** (`877548fc5`): internal `NSLock` (scoped `withLock` around sync
 >   `perform*` helpers) serializes the off-actor SQLite transactions; concurrency test
 >   added. Behavior-preserving.
-> - **D2 RESOLVED** (`dcbac9f74` + `06cdf849d`): append() rejects forbidden canonical
->   separators — but FIELD-TYPE-AWARE (U+001E in scalars; U+001F+U+001E in array
->   elements). The first cut over-rejected U+001F in scalars and broke the shadow-trial
->   path: `verdictRef = "shadow_trial\u{1F}<id>"` legitimately uses U+001F as a SCALAR
->   composite delimiter (the D3 lesson again). Byte-equal for real content; step-2
->   (injective re-encode + chain migration) still deferred.
+> - **D3 RESOLVED** (`cbb27f846`): production commit-token/warrant digests now use
+>   `sovereignDigestHexInjective` (SHA256 over length-prefixed canonical bytes) instead
+>   of the `"|"`-join. Option (a) boundary-validation was proven INFEASIBLE (sessionID
+>   legitimately contains `"|"`), so this is option (b) — byte-changing but
+>   deterministic, no golden re-pin (no test pins the coordinator's computed tag). 3
+>   tests; closes the allowedTargets + rendered-content boundary collisions.
+> - **D2 — step-1 REVERTED, infeasible** (`dcbac9f74`+`06cdf849d` → reverted
+>   `faccc38e4`): the "reject canonical separators at append" validation cannot be
+>   byte-equal — the substrate LEGITIMATELY uses BOTH U+001F and U+001E as composite
+>   delimiters in audit content (verdictRef `shadow_trial\u{1F}<id>`, warrant
+>   witnessRefs→signalRefs U+001F array elements, `BASAgentObservationAuditEmitter`
+>   U+001E records). 4 confirmations of the same lesson. The genuine fix is the
+>   INJECTIVE re-encode (step-2): length-prefix the audit canonical under a NEW
+>   schemaVersion gate (old entries verify under their form, new under injective) —
+>   a version-gated, chain-affecting migration with byte-equality re-pinning. Genuinely
+>   deferred as a focused migration; the canonical ambiguity is pre-existing and
+>   low-exploitability (the composite refs are system-generated, not attacker-controlled,
+>   and the ledger is Ed25519-signed + hash-chained).
+> - **D4 — latent, not gated:** the constitution `versionSignature` is NEVER recompared
+>   as a tamper gate (verified), so its delimiter-join forgery is UNREACHABLE. Pure
+>   hygiene; left as-is to avoid churning a persisted never-gated field.
+> - **D5 — operator-policy (flag-not-patch):** allowedTargets-not-enforced,
+>   `revokeAllTokens(forSession:)` global-nuke, fail-soft store reads — each is a
+>   behavior change needing an operator ruling (R1 discipline: don't change sovereign
+>   behavior on a hunch). Documented, not auto-patched.
 > - **D1 RESOLVED** (`f95ee7394`): evolution-service IDs/cooldowns now derive from the
 >   injected turn clock + turn-stable content (was UUID/Date). Surprise: NO golden
 >   re-pin was needed — the stress/canonical suites assert structure, not pinned ID
 >   values. The determinism guard was extended with a non-empty evolution fixture so
 >   the updateTickets→commit-token path is actually exercised.
+>
+> **Net remaining:** only **D2 step-2** (the injective audit-canonical migration) is a
+> real deferred work item; D4 is unreachable/hygiene, D5 is operator-gated by design.
 
 
 ### D1 — 3 CRITICAL determinism leaks: `UUID()`/`Date()` ticketIDs reach commit-token signature bytes
