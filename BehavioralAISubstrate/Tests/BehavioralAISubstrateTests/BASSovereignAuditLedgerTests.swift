@@ -78,6 +78,57 @@ final class BASSovereignAuditLedgerTests: XCTestCase {
         }
     }
 
+    // ch1044 D2 — a forbidden canonical separator (U+001F array / U+001E field) in a
+    // ref would shift a boundary in the signed+hash-chained pre-image → forge/mutate
+    // an entry that still passes chain verify. The append boundary must reject it.
+
+    private func auditEntry(
+        auditID: String, verdictRef: String = "v",
+        signalRefs: [String] = [], actionRefs: [String] = []
+    ) -> BASSovereignAuditEntry {
+        BASSovereignAuditEntry(
+            auditID: auditID, sessionID: "s", turnID: "t", verdictRef: verdictRef,
+            ruleIDs: ["BR-001"], signalRefs: signalRefs, actionRefs: actionRefs,
+            snapshotRef: "snap", actor: .system, signature: "",
+            appendedAt: Date(timeIntervalSince1970: 1))
+    }
+
+    private func assertRejected(
+        _ ledger: BASSovereignAuditLedger, _ entry: BASSovereignAuditEntry, _ ctx: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) async {
+        do {
+            _ = try await ledger.append(entry)
+            XCTFail("\(ctx) must be rejected", file: file, line: line)
+        } catch BASSovereignAuditLedger.LedgerError.invalidEntry {
+            // expected
+        } catch {
+            XCTFail("\(ctx): unexpected error \(error)", file: file, line: line)
+        }
+    }
+
+    func testAppendRejectsForbiddenSeparatorInSignalRef() async {
+        let ledger = makeLedger()
+        await assertRejected(
+            ledger, auditEntry(auditID: "a1", signalRefs: ["ok", "ev\u{1F}il"]),
+            "U+001F in a signalRef")
+    }
+
+    func testAppendRejectsForbiddenSeparatorInScalarField() async {
+        let ledger = makeLedger()
+        await assertRejected(
+            ledger, auditEntry(auditID: "a2", verdictRef: "v\u{1E}x"),
+            "U+001E in verdictRef")
+    }
+
+    /// Positive control (byte-equal): legacy `,`/`|` content in refs is STILL
+    /// accepted — only the hardened control separators are forbidden.
+    func testAppendAcceptsCommaAndPipeInRefs() async throws {
+        let ledger = makeLedger()
+        _ = try await ledger.append(
+            auditEntry(auditID: "a3", signalRefs: ["a,b", "c|d"], actionRefs: ["e,f"]))
+    }
+
     func testAppendRejectsEmptyVerdictRef() async {
         let ledger = makeLedger()
         var bad = makeEntry(auditID: "a-001")

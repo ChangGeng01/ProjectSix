@@ -366,6 +366,32 @@ public actor BASSovereignAuditLedger {
     ///   cross-process integrity)
     /// - in-process callers that just want the ledger to sign and store
     @discardableResult
+    /// ch1044 D2 audit fix (step 1, byte-equal): reject U+001F / U+001E in any field
+    /// that contributes to the signed + hash-chained canonical pre-image
+    /// (`basSovereignAuditCanonicalBytes`). The hardened form uses them as array
+    /// (U+001F) / field (U+001E) separators and only ASSERTS — never enforces — that
+    /// legal content lacks them. An in-band control char would shift a boundary so two
+    /// distinct entries collide onto one pre-image (forge / mutate an entry that still
+    /// passes `verifyChainIntegrity`). `signalRefs` provably embeds caller/scope-
+    /// influenced witness refs, so this is reachable. Legitimate content never
+    /// contains these control chars, so rejecting them is byte-equal for valid entries.
+    private static func rejectForbiddenCanonicalSeparators(
+        in draft: BASSovereignAuditEntry
+    ) throws {
+        func hasSeparator(_ s: String) -> Bool {
+            for b in s.utf8 where b == 0x1F || b == 0x1E { return true }
+            return false
+        }
+        let scalars = [draft.schemaVersion, draft.auditID, draft.sessionID,
+                       draft.turnID, draft.verdictRef, draft.snapshotRef,
+                       draft.actor.rawValue]
+        for s in scalars + draft.ruleIDs + draft.signalRefs + draft.actionRefs
+        where hasSeparator(s) {
+            throw LedgerError.invalidEntry(
+                "audit field contains a forbidden canonical separator (U+001F/U+001E)")
+        }
+    }
+
     public func append(_ draft: BASSovereignAuditEntry) throws -> AppendedEntry {
         guard !draft.auditID.isEmpty else {
             throw LedgerError.invalidEntry("auditID must be non-empty")
@@ -376,6 +402,7 @@ public actor BASSovereignAuditLedger {
         guard !draft.verdictRef.isEmpty else {
             throw LedgerError.invalidEntry("verdictRef must be non-empty")
         }
+        try Self.rejectForbiddenCanonicalSeparators(in: draft)
 
         let priorHash = entries.last?.selfHash ?? Self.genesisHash
         let canonical = canonicalBytes(for: draft, priorHash: priorHash)
