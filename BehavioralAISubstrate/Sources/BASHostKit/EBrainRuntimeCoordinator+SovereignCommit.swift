@@ -122,7 +122,7 @@ extension BASEBrainRuntimeCoordinator {
         issuedAt: Date,
         ttlMs: Int
     ) -> BASSovereignCommitToken {
-        let actionDigest = sovereignDigestHex(
+        let actionDigest = sovereignDigestHexInjective(
             actionDigestParts + [sessionID, turnID, scope.rawValue, snapshotRef, policyHash]
         )
         // ch1044 audit HIGH-1 fix: previously `UUID().uuidString` — a
@@ -139,7 +139,7 @@ extension BASEBrainRuntimeCoordinator {
         // request, deterministic), and `sovereignDigestHex` is a pure
         // SHA256 over its inputs (no clock/random). nonce stays the same
         // `nonce.<hex>` shape.
-        let nonceDigest = sovereignDigestHex([
+        let nonceDigest = sovereignDigestHexInjective([
             "nonce.v2",
             sessionID,
             turnID,
@@ -158,7 +158,7 @@ extension BASEBrainRuntimeCoordinator {
         // prefix of the SHA256 digest instead. `actionDigest` is
         // already a hex string from `sovereignDigestHex(...)`.
         let tokenID = "token.\(scope.rawValue).\(sessionID).\(actionDigest.prefix(16))"
-        let signature = sovereignDigestHex(
+        let signature = sovereignDigestHexInjective(
             [
                 tokenID,
                 sessionID,
@@ -206,7 +206,7 @@ extension BASEBrainRuntimeCoordinator {
             token: token,
             sovereignVerdict: sovereignVerdict
         )
-        let signature = sovereignDigestHex(
+        let signature = sovereignDigestHexInjective(
             [
                 warrantID,
                 token.scope.rawValue,
@@ -1700,6 +1700,20 @@ extension BASEBrainRuntimeCoordinator {
         //         String(format: "%02x", $0) }.joined()
         return BASAutoRouteRanker.bytesToHexLower(
             Array(digest))
+    }
+
+    /// ch1044 D3 — INJECTIVE digest: SHA256 over the length-prefixed canonical bytes
+    /// (`BASSovereignCanonicalBytes`) instead of a `"|"`-join. The `"|"`-join is
+    /// forgeable — an in-band `"|"` in a component (a composite `sessionID`, or a
+    /// rendered headline/body in `actionDigestParts`) can shift a component boundary so
+    /// two DISTINCT inputs collide onto one digest (`["a","b"]` vs `["a|b"]`). Used for
+    /// the commit-token / warrant digests, whose inputs include variable-length lists
+    /// AND caller-influenced text. (Byte-CHANGING vs the old tag, but deterministic; no
+    /// test pins the coordinator's computed tag value — verified — so no re-pin.)
+    func sovereignDigestHexInjective(_ components: [String]) -> String {
+        let digest = SHA256.hash(
+            data: BASSovereignCanonicalBytes.lengthPrefixed(components))
+        return BASAutoRouteRanker.bytesToHexLower(Array(digest))
     }
 
     func buildSovereignExecutionReceipts(
