@@ -214,6 +214,17 @@ session tail), not a hidden gap.
   comparison whose summary includes the varying fields (nonce/token/signature),
   plus a `pre-commit-gates.sh` hook — is the larger remaining piece; the code
   itself says the real runner is "deferred to a follow-up chapter."
+- **ch1044 (continued) — broader guard + a de-risking finding:**
+  `BASCoordinatorTurnDeterminismTests` now asserts the FULL consequential decision
+  (verdict, commit tokens, permit, risk, merged choice, host gate, update tickets)
+  is replay-stable across two runs of the same turn — broader than the
+  commit-tokens-only guard. Building it surfaced a FINDING: the full
+  `BASEBrainTurnResult` is NOT byte-identical, because `memoryBundle.retrievedAt` is
+  a real-clock OBSERVATION timestamp (`Date()` default param in the history
+  stores) — intentional, and never a consequential field. **The full
+  V1-vs-coordinator byte-equal harness (the larger remaining piece) must therefore
+  EXCLUDE/normalize observation timestamps like `retrievedAt`** — this finding
+  de-risks that work before it starts.
 - **Blast radius:** test-infra + CI only (no production code). MED, low-risk —
   but sizable.
 - **Resume entry:** `Sources/BASHostKit/BASStressSweepCanonical60Driver.swift:39-62`
