@@ -710,6 +710,19 @@ final class BASEnduranceAppController: ObservableObject {
                         + "prompt=\(p + 1) \(parityLine)")
                 }
 
+                // ch1044 (a) — coordinator self-consistency: the GENUINE
+                // fail-closed signal (vs the observability shadow above). Cheap,
+                // sync, observation-only; emits ONLY on a regression (stored
+                // verdict laxer than the coordinator's own rules re-derived from
+                // this turn's settled state). Always-on — this is the real signal.
+                if case .regression(let stored, let atLeast) =
+                    BASCoordinatorConsistencyCheck.check(turnResult) {
+                    await emitBoth(
+                        "🚨 ch1025 coordinator_regression iter=\(iter) "
+                        + "prompt=\(p + 1) stored=\(stored.rawValue) "
+                        + "should_be_at_least=\(atLeast.rawValue)")
+                }
+
                 let mlxPreSnap = snapshot()
                 let mlxStartNs = monoNowNs()
                 let request = BASOrganRequest(

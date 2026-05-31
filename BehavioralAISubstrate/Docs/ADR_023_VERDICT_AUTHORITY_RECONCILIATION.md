@@ -216,3 +216,21 @@ the "two authorities" are not peers to reconcile but a **production path + a
 stricter independent backstop**, and the shadow's honest role is **observability of
 that intentional gap** — with `unexpectedDrift` reserved as a tripwire for a future
 engine that escalates without a reason.
+
+### The REAL halt signal (ch1044 (a)): coordinator self-consistency
+
+Since engine-parity is observability, the genuine fail-closed signal is the
+coordinator vs ITS OWN baseline. `BASCoordinatorConsistencyCheck.check(result)`
+re-derives the coordinator verdict LEVEL from a completed turn's settled state
+(`computeVerdictDecision` over the result's risk card / permit / brake / budget /
+policy-lineage / update-tickets) and flags a stored verdict **strictly laxer** than
+that re-derived level — a genuine regression: stale inputs, a post-hoc mutation, or
+a rule change that no longer reproduces. It is **conservative** (the request-only
+kill-switch term of `needsProtectedWriteLane` is omitted → the re-derived level is a
+LOWER BOUND → it can NEVER false-alarm). Shipped (`Sources/BASHostKit/BASCoordinator
+ConsistencyCheck.swift`) + 4 tests (real stub turn → `consistent`; a state mutated
+to warrant `deadStop` with a lax stored verdict → `regression(atLeast: deadStop)`;
+stricter-stored → `consistent`; absent verdict → `noVerdict`) and wired into the
+endurance runner (`🚨 coordinator_regression` emitted only when detected). **THIS —
+not engine-parity — is what a real Phase-2 halt would act on:** a coordinator that
+is laxer than its *own* rules, on the same turn.
