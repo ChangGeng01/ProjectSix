@@ -205,23 +205,94 @@ public actor BASSovereignVerdictEngine {
         // Stage 1: hard rules (Swift — produces hits metadata
         // for reasonCodes/revokedPermissions that the Rust port
         // does not return)。
-        let hits = evaluateHardRules(context.hardObservations)
+        // ADR-024 — derive the level via the PURE SYNC rule kernel (one source
+        // of truth). `evaluate(...)` only adds IDs/clock/ledger around it.
+        let decision = evaluateLevel(context)
 
-        // ============================================================
-        // Stage 2 + Stage 3 — chapter 七百五十三 第一刀 / M2433
-        //
-        // ROUTED PATH (default-on per 13.84× measurement,user
-        // directive 「也一起 解决了」)。 The Rust port computes
-        // the FULL level (hard cap + soft lex + evidence
-        // upgrade) in one C ABI call。 If the routed path
-        // returns nil (FFI fault),fall through to the Swift
-        // 3-stage logic preserved as commented-out reference。
-        //
-        // Cross-check:we still take max(hits' min levels,
-        // routed_level) as belt-and-suspenders — if Rust ever
-        // disagreed,Swift's hits floor would surface (no
-        // security regression risk)。
-        // ============================================================
+        // Build verdict + append to ledger. Ledger-append failure is
+        // the BR-012 fail-closed signal.
+        let verdictID = "sv-\(UUID().uuidString)"
+        let auditID = "av-\(UUID().uuidString)"
+        let issuedAt = now()
+
+        let verdict = BASSovereignVerdict(
+            verdictID: verdictID,
+            verdictLevel: decision.level,
+            latched: decision.level.isLatchedByDefault,
+            forcedMode: decision.level.defaultForcedMode,
+            reasonCodes: decision.reasonCodes,
+            revokedPermissions: decision.revokedPermissions,
+            quarantineRefs: [],
+            rollbackRef: nil,
+            userStubMode: defaultStubMode(for: decision.level),
+            auditRef: auditID,
+            policyHash: context.policyHash,
+            expiresAt: nil
+        )
+
+        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
+        // canonical-bytes for verdict engine emission (main
+        // L14 audit emission point)
+        let entry = BASSovereignAuditEntry(
+            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
+            schemaVersion: BASSovereignAuditEntry
+                .hardenedSchemaVersion,
+            auditID: auditID,
+            sessionID: context.sessionID,
+            turnID: context.turnID,
+            verdictRef: verdictID,
+            ruleIDs: decision.reasonCodes,
+            signalRefs: [],
+            actionRefs: [context.operation.rawValue],
+            snapshotRef: context.snapshotRef,
+            actor: .system,
+            signature: "",
+            appendedAt: issuedAt
+        )
+
+        do {
+            _ = try await ledger.append(entry)
+        } catch {
+            throw EngineError.auditAppendFailed("\(error)")
+        }
+
+        return verdict
+    }
+
+    // MARK: - Pure rule kernel (ADR-024 — one verdict authority)
+
+    /// The pure output of `evaluateLevel`: the verdict LEVEL plus its reason
+    /// codes and revoked permissions — with NO verdict/audit IDs, NO clock, and
+    /// NO ledger side-effect. (ADR-024.)
+    public struct LevelDecision: Sendable, Equatable {
+        public let level: BASSovereignVerdictLevel
+        public let reasonCodes: [String]
+        public let revokedPermissions: [BASSovereignPermission]
+        public init(
+            level: BASSovereignVerdictLevel,
+            reasonCodes: [String],
+            revokedPermissions: [BASSovereignPermission]
+        ) {
+            self.level = level
+            self.reasonCodes = reasonCodes
+            self.revokedPermissions = revokedPermissions
+        }
+    }
+
+    /// The PURE, SYNCHRONOUS rule kernel: Stage-1 hard rules + (routed/Swift)
+    /// level + the evidence-insufficient upgrade + reason codes + revoked
+    /// permissions. It has no IDs, no clock, and NO ledger append, so it is
+    /// deterministic (same context → same decision) and side-effect-free.
+    /// `evaluate(...)` builds the full signed `BASSovereignVerdict` + audit entry
+    /// AROUND this. Exposing it lets any other verdict authority (the
+    /// coordinator's `computeVerdictDecision`, the parity shadow) derive the SAME
+    /// level from the SAME context without an async ledger append — the single
+    /// source of truth that makes accidental rule-drift impossible (ADR-024).
+    public func evaluateLevel(_ context: VerdictContext) -> LevelDecision {
+        // Stage 1: hard rules (Swift — produces hits metadata
+        // for reasonCodes/revokedPermissions that the Rust port
+        // does not return)。
+        let hits = evaluateHardRules(context.hardObservations)
 
         var level: BASSovereignVerdictLevel
         let softPinnedDomain: String?
@@ -235,24 +306,16 @@ public actor BASSovereignVerdictEngine {
         {
             // Rust path:single C ABI call covers Stages 2+3
             // + hard bit cap promotion。 Cross-check max with
-            // hits' min levels (belt-and-suspenders;normally
-            // routedLevel already includes the hard cap)。
+            // hits' min levels (belt-and-suspenders)。
             level = routedLevel
             for hit in hits where hit.minLevel > level {
                 level = hit.minLevel
             }
-            // pinnedDomain still derived from Swift soft-signal
-            // lex order — Rust returns the LEVEL but the Swift
-            // pinnedDomain string is needed for reasonCodes
-            // metadata。 evaluateSoftSignals is fast vs the
-            // overall evaluate() cost so this preserves the
-            // 13.84× win on the actual level math。
             let (_, pinned) =
                 evaluateSoftSignals(context.softSignals)
             softPinnedDomain = pinned
         } else {
-            // V1 Swift path — preserved per 「依旧 不删除 只 comment」。
-            // Stage 2: soft-signal lex order.
+            // V1 Swift path — Stage 2: soft-signal lex order.
             let (softLevel, pinned) =
                 evaluateSoftSignals(context.softSignals)
             softPinnedDomain = pinned
@@ -291,54 +354,10 @@ public actor BASSovereignVerdictEngine {
             reasonCodes.append("EVIDENCE_INSUFFICIENT:\(context.operation.rawValue)")
         }
 
-        // Build verdict + append to ledger. Ledger-append failure is
-        // the BR-012 fail-closed signal.
-        let verdictID = "sv-\(UUID().uuidString)"
-        let auditID = "av-\(UUID().uuidString)"
-        let issuedAt = now()
-
-        let verdict = BASSovereignVerdict(
-            verdictID: verdictID,
-            verdictLevel: level,
-            latched: level.isLatchedByDefault,
-            forcedMode: level.defaultForcedMode,
+        return LevelDecision(
+            level: level,
             reasonCodes: reasonCodes,
-            revokedPermissions: revoked.sorted { $0.rawValue < $1.rawValue },
-            quarantineRefs: [],
-            rollbackRef: nil,
-            userStubMode: defaultStubMode(for: level),
-            auditRef: auditID,
-            policyHash: context.policyHash,
-            expiresAt: nil
-        )
-
-        // chapter 九百九十六.5 Round-15 CRITICAL-2:hardened
-        // canonical-bytes for verdict engine emission (main
-        // L14 audit emission point)
-        let entry = BASSovereignAuditEntry(
-            // ch 1011 / M3770 — Round-21 HIGH-1: shared constant
-            schemaVersion: BASSovereignAuditEntry
-                .hardenedSchemaVersion,
-            auditID: auditID,
-            sessionID: context.sessionID,
-            turnID: context.turnID,
-            verdictRef: verdictID,
-            ruleIDs: reasonCodes,
-            signalRefs: [],
-            actionRefs: [context.operation.rawValue],
-            snapshotRef: context.snapshotRef,
-            actor: .system,
-            signature: "",
-            appendedAt: issuedAt
-        )
-
-        do {
-            _ = try await ledger.append(entry)
-        } catch {
-            throw EngineError.auditAppendFailed("\(error)")
-        }
-
-        return verdict
+            revokedPermissions: revoked.sorted { $0.rawValue < $1.rawValue })
     }
 
     // MARK: - Stage 1: hard rules
