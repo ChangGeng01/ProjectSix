@@ -537,12 +537,29 @@ final class BASEnduranceAppController: ObservableObject {
         // operators reading the syslog know EXACTLY what's exercised
         // vs what's NYI(grep-able)。 See BACKLOG "ch 1025.5
         // endurance coverage audit" section for the deferred arc。
+        // ch 1025.8 — HONEST fabric token. Was hardcoded
+        // "fabric_runTurn(ch1025.6_activated)" — an overclaim: it said
+        // "activated" even when the BAS_AGENT_FABRIC gate is OFF (the
+        // default), so the boot line disagreed with the per-prompt
+        // `activated=false` truth. Now derived from the SAME predicate
+        // the adapter uses (BASAgentFabricFullTurnAdapter.swift:385:
+        // environment["BAS_AGENT_FABRIC"] == "enabled") + construction
+        // success, so the boot line cannot lie about activation again.
+        let fabricGateOn = (env["BAS_AGENT_FABRIC"] == "enabled")
+        let fabricInventory: String
+        if fabricPipeline == nil {
+            fabricInventory = "construct_failed"
+        } else if fabricGateOn {
+            fabricInventory = "active"
+        } else {
+            fabricInventory = "constructed_gate_off"
+        }
         await emitBoth(
             "📊 ch1025 inventory " +
             "exercised=mlx_gemma4_E2B_4bit+" +
             "coreml_BASContextClassifier_18Kparams+" +
             "L0_to_L14_cascade_all14_surfaced(ch1025.13)+" +
-            "fabric_runTurn(ch1025.6_activated)+" +
+            "fabric_runTurn(\(fabricInventory))+" +
             "mamba_SSM(ch1033_boot_probe)+" +
             "L8_LRU_bounded " +
             "nyi=ANE_utilization_pct(WONTDO_iOS_sandbox)+" +
