@@ -296,6 +296,8 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         var dist: [BASSovereignTurnParity: Int] = [:]
         var laxer = 0
         var benignLaxer: [String] = []
+        var pairHist: [String: Int] = [:]
+        var condHist: [String: Int] = [:]
         var total = 0
         for r in risks { for b in brakes { for p in permits { for m in modes {
             for lineage in [true, false] { for pw in [true, false] {
@@ -315,6 +317,12 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
                 dist[report.parity, default: 0] += 1
                 if report.parity == .coordinatorLaxer {
                     laxer += 1
+                    pairHist["\(decision.level.rawValue)->\(report.engineVerdict.verdictLevel.rawValue)", default: 0] += 1
+                    let cond = !lineage ? "lineageMissing"
+                        : (m == .quarantine || m == .recovery || m == .guard) ? "elevatedMode"
+                        : (b != .none) ? "brakeElevated"
+                        : (r == .high || r == .extreme) ? "highRisk" : "other"
+                    condHist[cond, default: 0] += 1
                     // A fully-BENIGN turn must never be flagged laxer (false
                     // alarm). Benign = lineage present, .engage mode, no brake,
                     // low/medium risk. (Adversarial divergence is expected — it is
@@ -343,6 +351,10 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         XCTAssertEqual(total, 1920)
         XCTAssertGreaterThan(laxer, 0,
             "expected the shadow to surface real adversarial divergence")
+        // pairHist/condHist taxonomy captured for ADR-023 reconciliation —
+        // dominated by lineageMissing (engine deadStop vs coordinator
+        // shadowLock/memoryFreeze). See ADR-022 §8 + ADR-023.
+        _ = (pairHist, condHist)
     }
 
     // MARK: - 11) Phase-1d — host-friendly default-engine one-call (env-gated)

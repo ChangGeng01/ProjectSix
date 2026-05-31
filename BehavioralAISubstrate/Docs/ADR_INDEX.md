@@ -6,7 +6,7 @@
 > an `ADR-NNN` comment never has to hunt for a missing file. Built by grepping all
 > `ADR-NNN` tokens across `Sources/` + `Docs/` (complete set, not a sample).
 
-## The complete reference set (10 ADRs — 9 active + ADR-013 ghost)
+## The complete reference set (11 ADRs — 10 active + ADR-013 ghost)
 
 | ADR | Topic | Defining location | Kind |
 |---|---|---|---|
@@ -20,6 +20,7 @@
 | **ADR-020** | Evidence-resolution + two-phase verdict (Step-4 floored withholding, provisional verdict, §9 floor correction) | **`Docs/ADR_020_EVIDENCE_RESOLUTION_AND_TWO_PHASE_VERDICT.md`** | behavioral |
 | **ADR-021** | Unified Evolution Architecture (统一进化算法底层架构): the two-loop model (inner per-turn + outer cross-turn) as ONE pattern (carrier/fold/sink) + the single safe/gated/closed axis. DESIGN-only — unifies verified machinery, builds nothing. §5.1-§5.3 feasibility findings: O0/O1 NO-GO (premature/clamp-dominated); prereq-(a) clamp-free ratchet DESIGNABLE; prereq-(b) outcome channel INFEASIBLE → the deepest wall is OUTCOME-BLINDNESS (substrate is not a self-improving learner) | **`Docs/ADR_021_UNIFIED_EVOLUTION_ARCHITECTURE.md`** | behavioral (design synthesis) |
 | **ADR-022** | Sovereign verdict **parity shadow gate** (#3 / audit DEFER-2): wire `BASSovereignTurnVerifier` alongside `buildSovereignVerdict` **dormant-first** (project settled turn state → engine → compare levels; observe+log drift, NEVER halt, byte-equal-off). Invariant `coordinatorLevel >= engineLevel`; `coordinatorLaxer` = halt signal. Phase 2 (`coordinatorLaxer`→actual halt) deferred until Phase-1 parity evidence. DESIGN-only | **`Docs/ADR_022_SOVEREIGN_VERDICT_PARITY_SHADOW_GATE.md`** | behavioral (design) |
+| **ADR-023** | **Verdict-authority reconciliation** (Phase-2 prerequisite): the ADR-022 §8 full-grid sweep measured ~46% coordinator-vs-engine divergence; ADR-023 maps the taxonomy (**83% = missing-lineage over-escalated to `deadStop`** via the verifier's `policyBundleTampered` conflation) + a phased **R1–R4** reconciliation (R1 = give the engine a real BR-006 *missing-lineage ≠ tampering* → `shadowLock`, sovereign), each gated by the full-grid sweep; `coordinatorLaxer == 0` unlocks Phase-2. DESIGN-only | **`Docs/ADR_023_VERDICT_AUTHORITY_RECONCILIATION.md`** | behavioral (design) |
 
 ## Related contracts that are NOT numbered ADRs
 - **红线 7** (additive byte-equal safety invariant) — stated in `ADR_014_OPT_IN_DOCTRINE.md` §4 + `L8_ARC_SEAL.md`.
