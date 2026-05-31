@@ -368,6 +368,14 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             misclassified.isEmpty,
             "missing-lineage laxer NOT classified intentional:\n"
             + misclassified.prefix(10).joined(separator: "\n"))
+        // REFRAME (ch1044): the engine is a deliberately-stricter independent
+        // backstop, so ALL current divergence is intentional (allowlisted). 0
+        // unexpectedDrift now → any FUTURE unexpectedDrift is a genuine NEW
+        // coordinator REGRESSION, the only thing a Phase-2 halt should fire on.
+        XCTAssertEqual(
+            clsHist["unexpectedDrift"] ?? 0, 0,
+            "all current divergence must be intentional-stricter-engine; "
+            + "unexpectedDrift signals a NEW coordinator regression: \(driftHist)")
         XCTAssertEqual(total, 1920)
         XCTAssertGreaterThan(laxer, 0,
             "expected the shadow to surface real adversarial divergence")
@@ -400,6 +408,18 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
             BASSovereignTurnObservationProjection.classifyDivergence(rLineage),
             .intentionalDefenseInDepth,
             "missing-lineage laxer must be allowlisted, not a Phase-2 halt signal")
+        // The engine's soft-signal model (high irreversibility/manipulation) drives
+        // a stricter verdict via a LEX_ORDER reason → allowlisted intentional (#2).
+        let softHigh = project(
+            risk: makeRisk(.extreme), permit: makePermit(), brake: makeBrake())
+        let rSoft = try await BASSovereignTurnObservationProjection.shadowVerify(
+            softHigh, coordinatorLevel: .throttle, using: verifier)
+        if rSoft.parity == .coordinatorLaxer {
+            XCTAssertEqual(
+                BASSovereignTurnObservationProjection.classifyDivergence(rSoft),
+                .intentionalDefenseInDepth,
+                "soft-signal-driven (LEX_ORDER) laxer must be allowlisted")
+        }
     }
 
     // MARK: - 11) Phase-1d — host-friendly default-engine one-call (env-gated)

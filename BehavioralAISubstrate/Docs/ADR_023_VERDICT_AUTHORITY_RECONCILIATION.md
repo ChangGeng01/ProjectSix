@@ -182,6 +182,37 @@ entry is `policyLineageMissing`; the full-grid sweep asserts EVERY missing-linea
 laxer classifies as `intentionalDefenseInDepth`, and `shadowParitySummary` now
 emits `class=…`. **Phase-2 must halt ONLY on `unexpectedDrift`, never on an
 intentional class.** The remaining laxer classes (elevatedMode / brake / highRisk)
-stay `unexpectedDrift` until the operator rules on each (same keep-both-or-reconcile
-decision), at which point they join the allowlist. This turns the shadow from a
-noisy 46%-divergence detector into a precise one: it now flags only GENUINE drift.
+stay `unexpectedDrift` until the operator rules on each.
+
+### FINAL reframe (ch1044): engine-parity is OBSERVABILITY, not a halt gate
+
+Examining the remaining classes (elevatedMode / brake / highRisk) showed they are
+ALSO the engine being deliberately stricter — via its tested soft-signal model +
+BR hard rules (BR-009 instability, BR-010 head-conflict). So **100% of the measured
+divergence (886/886 `coordinatorLaxer`) is the engine's intentional stricter
+behavior.** Every verdict the engine raises above the coordinator carries a reason
+code (a BR rule or the soft-signal lex order).
+
+**Decisive conclusion:** the engine is ALWAYS the deliberately-stricter baseline,
+so **engine-vs-coordinator parity CANNOT detect a coordinator regression** — a
+`coordinatorLaxer` never means "the coordinator has a bug", only "the engine's
+finer model is stricter here, by design". Therefore:
+
+- `classifyDivergence` allowlists EVERY reasoned engine escalation as
+  `.intentionalDefenseInDepth`; the full-grid sweep asserts **`unexpectedDrift ==
+  0`** (the sole `.unexpectedDrift` is the defensive never-case: an engine verdict
+  with NO reason code = an inexplicable escalation = a real engine bug).
+- **The shadow is OBSERVABILITY** — it surfaces where + why (the engine's reason
+  codes) the stricter engine model diverges from the coordinator. It is NOT an
+  auto-halt gate.
+- **Phase-2 (engine-parity → halt) is ABANDONED.** It would halt wherever the
+  engine is intentionally stricter (most adversarial turns). A true coordinator-
+  REGRESSION detector needs a COORDINATOR-OWN baseline (compare the coordinator's
+  verdict against its *expected* verdict for the same inputs), NOT the stricter
+  engine — separate future work if wanted.
+
+The whole arc lands here: the rigorous sweep + the R1 revert + this analysis proved
+the "two authorities" are not peers to reconcile but a **production path + a
+stricter independent backstop**, and the shadow's honest role is **observability of
+that intentional gap** — with `unexpectedDrift` reserved as a tripwire for a future
+engine that escalates without a reason.

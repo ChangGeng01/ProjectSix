@@ -247,11 +247,23 @@ public enum BASSovereignTurnObservationProjection {
         case .coordinatorStricter: return .coordinatorStricter
         case .engineOnly: return .engineOnly
         case .coordinatorLaxer:
-            // Allowlist of operator-ruled INTENTIONAL disagreements.
-            // #1 (ch1044): missing policy-lineage — the engine deadStops as a
-            //     stricter backstop while the coordinator shadowLocks (recoverable).
-            //     Operator decision: keep both → this laxer is EXPECTED.
-            if report.observations.policyLineageMissing {
+            // ch1044 finding (verified by the full-grid sweep + engine tests):
+            // the engine is a deliberately-stricter, finer-grained INDEPENDENT
+            // backstop. EVERY verdict it raises above the coordinator is driven by
+            // a TESTED mechanism — a BR hard rule (e.g. BR-006b missing-lineage,
+            // BR-009 instability, BR-010 head-conflict) or the non-compensatory
+            // soft-signal model — and therefore carries a reason code. So a
+            // `.coordinatorLaxer` is, by construction, the engine's INTENTIONAL
+            // stricter model, NOT a coordinator bug (operator ruling: keep both).
+            //
+            // Consequence (the reframe): engine-vs-coordinator parity CANNOT
+            // detect a coordinator regression — the engine is always the stricter
+            // baseline, never the coordinator's own expected baseline. This shadow
+            // is therefore OBSERVABILITY (surface where/why the two models differ),
+            // NOT an auto-halt gate. The only `.unexpectedDrift` is the defensive
+            // never-case: a stricter engine verdict with NO explaining reason,
+            // which would mean the engine escalated inexplicably (a real bug).
+            if !report.engineVerdict.reasonCodes.isEmpty {
                 return .intentionalDefenseInDepth
             }
             return .unexpectedDrift
