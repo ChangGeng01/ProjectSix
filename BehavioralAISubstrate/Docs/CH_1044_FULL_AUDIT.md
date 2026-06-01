@@ -125,8 +125,17 @@ lock across `BEGIN…COMMIT`. Spawned as its own task to verify no actor/lock de
 
 ## Verified CLEAN (checked, no finding)
 Verdict lattice total-order + most-severe-wins + fail-closed FFI fallback;
-TokenAuthority single-use (synchronous check-and-redeem, no TOCTOU); coordinator
-value-type carries no shared mutable state; the Rust `bas-substrate-core` C-ABI
-null/len/bounds handling; the injective `BASSovereignCanonicalBytes` (ch1044 fix);
-the `.hashValue→SHA256` digest (#4); Set→Array ordering discipline (sorted or
-order-preserving dedup); `SCAFFOLD_VS_WIRED.md` honesty ledger.
+TokenAuthority single-use against CONCURRENCY (synchronous check-and-redeem, no
+TOCTOU) — **but see the correction below**; coordinator value-type carries no shared
+mutable state; the Rust `bas-substrate-core` C-ABI null/len/bounds handling; the
+injective `BASSovereignCanonicalBytes` (ch1044 fix); the `.hashValue→SHA256` digest
+(#4); Set→Array ordering discipline (sorted or order-preserving dedup);
+`SCAFFOLD_VS_WIRED.md` honesty ledger.
+
+> **CORRECTION (深入 audit, `0bbe14d78`):** "TokenAuthority single-use … Verified
+> CLEAN" was WRONG. That pass verified only the *concurrency* of check-and-redeem, not
+> whether the flag driving it is *authenticated*. The deep pass found a CRITICAL replay
+> bypass: the guard was `record.redeemed && token.singleUse`, and `singleUse` is an
+> attacker-mutable, UNSIGNED field — flipping it to `false` replayed a redeemed token.
+> Fixed by enforcing single-use from the server record. The lesson: "no TOCTOU" ≠ "the
+> control is sound" — the input to the control must also be authenticated.
