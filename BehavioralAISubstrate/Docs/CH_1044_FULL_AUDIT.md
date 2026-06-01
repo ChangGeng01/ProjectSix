@@ -36,18 +36,21 @@ crates build.
 >   legitimately contains `"|"`), so this is option (b) — byte-changing but
 >   deterministic, no golden re-pin (no test pins the coordinator's computed tag). 3
 >   tests; closes the allowedTargets + rendered-content boundary collisions.
-> - **D2 — step-1 REVERTED, infeasible** (`dcbac9f74`+`06cdf849d` → reverted
->   `faccc38e4`): the "reject canonical separators at append" validation cannot be
->   byte-equal — the substrate LEGITIMATELY uses BOTH U+001F and U+001E as composite
->   delimiters in audit content (verdictRef `shadow_trial\u{1F}<id>`, warrant
->   witnessRefs→signalRefs U+001F array elements, `BASAgentObservationAuditEmitter`
->   U+001E records). 4 confirmations of the same lesson. The genuine fix is the
->   INJECTIVE re-encode (step-2): length-prefix the audit canonical under a NEW
->   schemaVersion gate (old entries verify under their form, new under injective) —
->   a version-gated, chain-affecting migration with byte-equality re-pinning. Genuinely
->   deferred as a focused migration; the canonical ambiguity is pre-existing and
->   low-exploitability (the composite refs are system-generated, not attacker-controlled,
->   and the ledger is Ed25519-signed + hash-chained).
+> - **D2 — step-1 reverted, step-2 RESOLVED** (`dcbac9f74`+`06cdf849d` → reverted
+>   `faccc38e4` → fixed `801110706`): the "reject canonical separators at append"
+>   validation could not be byte-equal — the substrate LEGITIMATELY uses BOTH U+001F
+>   and U+001E as composite delimiters in audit content (verdictRef
+>   `shadow_trial\u{1F}<id>`, warrant witnessRefs→signalRefs, `BASAgentObservation
+>   AuditEmitter` U+001E records; 4 confirmations). **Step-2 — the genuine fix — landed:**
+>   a NEW `schemaVersion "1.2.0"` branch in `basSovereignAuditCanonicalBytes` that
+>   length-prefixes every field (+ count marker per array) → INJECTIVE regardless of
+>   in-band bytes. Bumping the single `hardenedSchemaVersion` constant `1.1.0→1.2.0`
+>   migrated all ~10 producers at once; old `1.0.0/1.1.0` entries keep their branch so
+>   `verifyChainIntegrity` (per-entry-version) still validates mixed chains —
+>   forward-only, non-breaking. Swift-only (the byte-eq test is Swift↔Rust HASH parity,
+>   not form parity; the Rust assembler crate is unused in prod). 4 CRITICAL version
+>   pins re-pinned `1.1.0→1.2.0` (a strengthening); new test proves the old
+>   `['a','b']`/`['a␟b']` collision is gone.
 > - **D4 — latent, not gated:** the constitution `versionSignature` is NEVER recompared
 >   as a tamper gate (verified), so its delimiter-join forgery is UNREACHABLE. Pure
 >   hygiene; left as-is to avoid churning a persisted never-gated field.
@@ -61,8 +64,11 @@ crates build.
 >   values. The determinism guard was extended with a non-empty evolution fixture so
 >   the updateTickets→commit-token path is actually exercised.
 >
-> **Net remaining:** only **D2 step-2** (the injective audit-canonical migration) is a
-> real deferred work item; D4 is unreachable/hygiene, D5 is operator-gated by design.
+> **Net remaining: NONE that is a forgery/correctness gap.** Every CRITICAL/HIGH
+> forgery vector is closed (commit/warrant/manifest/authority + the production tag D3 +
+> the audit canonical D2 step-2). D4 is unreachable/hygiene (never-gated signature);
+> D5 is operator-policy by design (behavior changes needing a sovereign ruling, not a
+> code fix). The full 全面 audit is dispositioned.
 
 
 ### D1 — 3 CRITICAL determinism leaks: `UUID()`/`Date()` ticketIDs reach commit-token signature bytes
