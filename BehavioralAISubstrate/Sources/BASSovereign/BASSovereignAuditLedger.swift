@@ -59,6 +59,9 @@ public actor BASSovereignAuditLedger {
         /// M83 — LINEAGE_CUT referenced a root audit ID that doesn't
         /// exist in the current ledger scope.
         case lineageRootNotFound(auditID: String)
+        /// ch1044 A2 append-floor — an append was rejected because its schemaVersion is
+        /// below the ledger's configured `minimumSchemaVersion` (opt-in hardened-only mode).
+        case schemaVersionBelowFloor(found: String, floor: String)
     }
 
     /// A fully-verified append record. Distinct from
@@ -209,6 +212,17 @@ public actor BASSovereignAuditLedger {
     /// `Sendable` — serialization is the actor's job.
     private let storage: any BASSovereignLedgerStorage
 
+    /// ch1044 A2 append-floor — OPT-IN minimum schema version for NEW appends. `nil` (the
+    /// default) = no floor = current behavior, byte-equal-off: any well-formed entry is
+    /// accepted regardless of schemaVersion (old + new coexist, per-entry-version verify).
+    /// When set to `BASSovereignAuditEntry.hardenedSchemaVersion` ("1.2.0"), `append`
+    /// REJECTS entries whose schemaVersion is below the floor — i.e. the ambiguous
+    /// delimiter-join forms ("1.0.0"/"1.1.0") whose canonical bytes are non-injective. A
+    /// security-conscious host opts in once all its producers emit the hardened form; the
+    /// critical producers (warrant bridge, verdict engine, clean-reboot) already do post-D2.
+    /// This is a forward-only floor on appends; it does NOT touch already-persisted entries.
+    private let minimumSchemaVersion: String?
+
     // MARK: - M83 state
     //
     // The ledger started life as one flat append-only chain. M83 adds
@@ -255,11 +269,13 @@ public actor BASSovereignAuditLedger {
         signingSecret: SymmetricKey,
         signingNamespace: String = BASSovereignTrustConstants.signingNamespace,
         storage: any BASSovereignLedgerStorage =
-            BASSovereignLedgerNullStorage()
+            BASSovereignLedgerNullStorage(),
+        minimumSchemaVersion: String? = nil
     ) {
         self.signingMode = .hmac(signingSecret)
         self.signingNamespace = signingNamespace
         self.storage = storage
+        self.minimumSchemaVersion = minimumSchemaVersion
         Self.rehydrate(
             storage: storage,
             entries: &self.entries,
@@ -284,11 +300,13 @@ public actor BASSovereignAuditLedger {
         ed25519KeyPair: BASSovereignEd25519KeyPair,
         signingNamespace: String = BASSovereignTrustConstants.signingNamespace,
         storage: any BASSovereignLedgerStorage =
-            BASSovereignLedgerNullStorage()
+            BASSovereignLedgerNullStorage(),
+        minimumSchemaVersion: String? = nil
     ) {
         self.signingMode = .ed25519(ed25519KeyPair)
         self.signingNamespace = signingNamespace
         self.storage = storage
+        self.minimumSchemaVersion = minimumSchemaVersion
         Self.rehydrate(
             storage: storage,
             entries: &self.entries,
@@ -415,6 +433,18 @@ public actor BASSovereignAuditLedger {
     // INJECTIVE re-encode (step-2): length-prefix the canonical under a new
     // schemaVersion gate so an in-band separator can't shift a boundary — a
     // version-gated chain migration, deferred (see CH_1044_FULL_AUDIT.md D2).
+    /// Parse a "MAJOR.MINOR.PATCH" schema version into a comparable tuple (Swift tuples of
+    /// Comparable elements are themselves Comparable). Missing/unparseable components rank
+    /// as 0, so a malformed version sorts below any well-formed one — fail-closed for a
+    /// floor comparison. ch1044 A2 append-floor.
+    static func schemaRank(_ version: String) -> (Int, Int, Int) {
+        let parts = version.split(separator: ".").map { Int($0) ?? 0 }
+        return (
+            parts.count > 0 ? parts[0] : 0,
+            parts.count > 1 ? parts[1] : 0,
+            parts.count > 2 ? parts[2] : 0)
+    }
+
     @discardableResult
     public func append(_ draft: BASSovereignAuditEntry) throws -> AppendedEntry {
         // ch1044 A2 — verify the reloaded chain on first write; fail closed if corrupt.
@@ -423,6 +453,13 @@ public actor BASSovereignAuditLedger {
             throw LedgerError.invalidEntry(
                 "ledger quarantined: reloaded chain failed integrity verification — "
                 + "refusing new appends")
+        }
+        // ch1044 A2 append-floor (opt-in): reject sub-hardened (non-injective) entries when
+        // the ledger is configured hardened-only. Default (nil floor) accepts any version.
+        if let floor = minimumSchemaVersion,
+           Self.schemaRank(draft.schemaVersion) < Self.schemaRank(floor) {
+            throw LedgerError.schemaVersionBelowFloor(
+                found: draft.schemaVersion, floor: floor)
         }
         guard !draft.auditID.isEmpty else {
             throw LedgerError.invalidEntry("auditID must be non-empty")
