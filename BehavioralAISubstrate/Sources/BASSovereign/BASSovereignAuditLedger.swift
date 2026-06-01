@@ -106,6 +106,25 @@ public actor BASSovereignAuditLedger {
     /// were computed with a different scheme.
     private let signingMode: SigningMode
 
+    /// ch1044 A2 — set true if the persisted chain FAILED integrity verification on
+    /// cold-start reload (a tampered/downgraded entry whose signature or linkage no
+    /// longer checks). A quarantined ledger REFUSES new appends (fail-closed, integrity
+    /// > availability per BR-012/BR-013) and surfaces the state via
+    /// `isIntegrityQuarantined` so a consumer can halt rather than treat forged history
+    /// as authoritative.
+    private var integrityQuarantined: Bool = false
+
+    /// ch1044 A2 — verify-on-reload runs LAZILY on the first isolated operation (the
+    /// actor's nonisolated init can't call isolated verification). Idempotent.
+    private var reloadVerified: Bool = false
+
+    /// ch1044 A2 — true iff the reloaded chain failed verify-on-reload. Triggers the
+    /// (idempotent) lazy verification so a read-only consumer can gate on it.
+    public var isIntegrityQuarantined: Bool {
+        ensureReloadVerified()
+        return integrityQuarantined
+    }
+
     /// Convenience accessor for the Ed25519 public key when the
     /// ledger is in `.ed25519` mode; nil in `.hmac` mode. Cross-
     /// process verifiers that already hold the ledger instance can
@@ -322,6 +341,25 @@ public actor BASSovereignAuditLedger {
         }
     }
 
+    /// ch1044 A2 — verify-on-reload (fail closed). A storage-wired ledger re-verifies the
+    /// persisted chain on cold start. A tampered/downgraded entry — e.g. `schemaVersion`
+    /// forced to a forgeable form with a recomputed UNKEYED selfHash + next priorHash —
+    /// still fails the KEYED signature (and the linkage) check, because the attacker
+    /// lacks the signing key. On any corruption the ledger QUARANTINES (refuses new
+    /// appends) rather than serve forged history as authoritative — the integrity >
+    /// availability doctrine the docstrings already promise but no code enforced.
+    private func ensureReloadVerified() {
+        guard !reloadVerified else { return }
+        reloadVerified = true
+        guard !entries.isEmpty else { return }
+        let report = auditChainFull()
+        guard !report.corruptions.isEmpty else { return }
+        integrityQuarantined = true
+        FileHandle.standardError.write(Data(
+            ("[BASSovereignAuditLedger] QUARANTINED on reload — chain integrity FAILED "
+             + "(\(report.corruptions.count) corruption(s)); refusing new appends.\n").utf8))
+    }
+
     /// Convenience factory that derives a deterministic HMAC secret
     /// from a string seed. Useful for tests and for bootstrap when
     /// a secure keyring is not yet available. **Not appropriate for
@@ -379,6 +417,13 @@ public actor BASSovereignAuditLedger {
     // version-gated chain migration, deferred (see CH_1044_FULL_AUDIT.md D2).
     @discardableResult
     public func append(_ draft: BASSovereignAuditEntry) throws -> AppendedEntry {
+        // ch1044 A2 — verify the reloaded chain on first write; fail closed if corrupt.
+        ensureReloadVerified()
+        guard !integrityQuarantined else {
+            throw LedgerError.invalidEntry(
+                "ledger quarantined: reloaded chain failed integrity verification — "
+                + "refusing new appends")
+        }
         guard !draft.auditID.isEmpty else {
             throw LedgerError.invalidEntry("auditID must be non-empty")
         }
