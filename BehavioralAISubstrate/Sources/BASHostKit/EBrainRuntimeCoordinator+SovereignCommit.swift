@@ -122,9 +122,12 @@ extension BASEBrainRuntimeCoordinator {
         issuedAt: Date,
         ttlMs: Int
     ) -> BASSovereignCommitToken {
-        let actionDigest = sovereignDigestHexInjective(
-            actionDigestParts + [sessionID, turnID, scope.rawValue, snapshotRef, policyHash]
-        )
+        // ch1044 A1: single source of truth (byte-equal to the prior inline digest) so
+        // a verifier can independently recompute it from the approved artifact.
+        let actionDigest = BASSovereignActionDigest.compute(
+            scope: scope, actionDigestParts: actionDigestParts,
+            sessionID: sessionID, turnID: turnID,
+            snapshotRef: snapshotRef, policyHash: policyHash)
         // ch1044 audit HIGH-1 fix: previously `UUID().uuidString` — a
         // process-random nonce on the NON-opt-in path, so the same turn
         // inputs produced different commit-token bytes across runs,
