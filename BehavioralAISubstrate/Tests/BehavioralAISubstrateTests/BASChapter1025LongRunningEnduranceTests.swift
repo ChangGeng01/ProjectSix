@@ -141,15 +141,19 @@ final class BASChapter1025LongRunningEnduranceTests: XCTestCase {
             }
         }
         let rssMB: Double
-        let footprintMB: Double
         if result == KERN_SUCCESS {
             rssMB = Double(info.resident_size) / 1024.0 / 1024.0
-            footprintMB = Double(info.virtual_size)
-                / 1024.0 / 1024.0
         } else {
             rssMB = 0
-            footprintMB = 0
         }
+        // ch1044 fix: report phys_footprint (the OS metric jetsam actually uses), NOT
+        // info.virtual_size — which is the ~400 GB of reserved 64-bit address space
+        // (near-constant, independent of real memory) and made footprint_mb useless for
+        // the endurance monitor. mach_task_basic_info has no phys_footprint field; use the
+        // substrate's TASK_VM_INFO probe (single source of truth).
+        let footprintMB = Double(
+            (try? BASTaskVmInfoProbe.rawSnapshot())?.physFootprintBytes ?? 0)
+            / 1024.0 / 1024.0
         let availMB = Int(os_proc_available_memory())
             / 1024 / 1024
         return SystemSnapshot(
