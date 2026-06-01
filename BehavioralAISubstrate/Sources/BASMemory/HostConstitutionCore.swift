@@ -645,6 +645,17 @@ public struct BASHostConstitutionVault: BASSchemaVersioned {
     public var deviceConsistencyReport: BASHostDeviceConsistencyReport
     public var migrationContract: BASHostDeviceMigrationContract?
 
+    /// ch1044 A3(a) — OPTIONAL detached Ed25519 seal over the vault's safety-critical
+    /// material (computed by `BASHostConstitutionVaultSovereignSeal` in BASHostKit, the
+    /// only layer that sees both this type and Ed25519). `nil` = unsealed, the default and
+    /// the byte-equal-off state: synthesized Codable OMITS a nil Optional, so an unsealed
+    /// vault's persisted `payload_json` is byte-identical to before this field existed
+    /// (红线 7), and `PRAGMA user_version` is unchanged — no schema migration. When set, the
+    /// seal rides in the same JSON payload (no new column) and a host's verifying loader
+    /// rejects the vault on a mismatch. The unkeyed `versionSignature` remains for
+    /// identity/trace; this is the real, keyed authenticator.
+    public var sovereignSeal: String?
+
     public init(
         schemaVersion: String = BASHostConstitutionVault.currentSchemaVersion,
         vaultID: String? = nil,
@@ -655,7 +666,8 @@ public struct BASHostConstitutionVault: BASSchemaVersioned {
         exportInvalidationManifest: [String] = [],
         syncRevocationLedger: BASHostSyncRevocationLedger = BASHostSyncRevocationLedger(),
         deviceConsistencyReport: BASHostDeviceConsistencyReport,
-        migrationContract: BASHostDeviceMigrationContract? = nil
+        migrationContract: BASHostDeviceMigrationContract? = nil,
+        sovereignSeal: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.vaultID = vaultID ?? "\(constitutionSnapshot.hostID).constitution.vault"
@@ -667,6 +679,7 @@ public struct BASHostConstitutionVault: BASSchemaVersioned {
         self.syncRevocationLedger = syncRevocationLedger
         self.deviceConsistencyReport = deviceConsistencyReport
         self.migrationContract = migrationContract
+        self.sovereignSeal = sovereignSeal
         self.versionSignature = versionSignature ?? BASHostConstitutionVault.signature(
             constitutionSnapshot: constitutionSnapshot,
             deletionManifest: deletionManifest,

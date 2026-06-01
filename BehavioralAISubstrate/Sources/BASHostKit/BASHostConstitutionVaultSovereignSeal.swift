@@ -187,4 +187,71 @@ public enum BASHostConstitutionVaultSovereignSeal {
         let after = Set(vaultAfter.constitutionSnapshot.boundaryVeil.hardNoGo)
         return !before.subtracting(after).isEmpty
     }
+
+    // MARK: - Seal lifecycle (set the field) + verify-on-load gate
+
+    /// The result of checking a loaded vault's persisted seal.
+    public enum SealVerification: Equatable, Sendable {
+        /// No seal is present (`vault.sovereignSeal == nil`) — a legacy/unsealed vault.
+        case unsealed
+        /// A seal is present and validates against the recomputed canonical bytes.
+        case valid
+        /// A seal is present but does NOT validate — tampered content, a wrong/forged seal,
+        /// or a wrong key. The host MUST refuse such a vault.
+        case invalid
+    }
+
+    /// Thrown by `requireValidSeal` when a loaded vault must be refused.
+    public enum VaultSealError: Error, Equatable, Sendable {
+        /// A seal was present but failed verification — treat as tampered.
+        case sealVerificationFailed(vaultID: String)
+        /// No seal was present and the caller required one (strict mode).
+        case unsealedVaultRejected(vaultID: String)
+    }
+
+    /// Return a COPY of `vault` carrying a fresh seal in `sovereignSeal` (immutable update —
+    /// the input is not modified). Seal LAST, after all content mutations and immediately
+    /// before persisting: the canonical bytes exclude `sovereignSeal` and `versionSignature`,
+    /// so re-sealing is idempotent w.r.t. those fields, but any change to the safety-critical
+    /// material requires a re-seal or the persisted vault will fail verification (fail-closed).
+    public static func sealed(
+        _ vault: BASHostConstitutionVault,
+        with keyPair: BASSovereignEd25519KeyPair
+    ) throws -> BASHostConstitutionVault {
+        let sealHex = try seal(vault, with: keyPair)
+        var copy = vault
+        copy.sovereignSeal = sealHex
+        return copy
+    }
+
+    /// Classify a loaded vault's persisted seal (reads `vault.sovereignSeal`).
+    public static func verifySealed(
+        _ vault: BASHostConstitutionVault,
+        publicKey: Curve25519.Signing.PublicKey
+    ) -> SealVerification {
+        guard let sealHex = vault.sovereignSeal else { return .unsealed }
+        return verify(vault, sealHex: sealHex, publicKey: publicKey) ? .valid : .invalid
+    }
+
+    /// Fail-closed verify-on-load gate. A host calls this immediately after loading a vault
+    /// from storage, with its sovereign public key (from `BASSovereignKeychainBinding` —
+    /// NOT a per-process random key). Throws `sealVerificationFailed` on a tampered/forged
+    /// seal; with `allowUnsealed: false` (the strict default once a host has opted into
+    /// sealing) it also throws `unsealedVaultRejected` for a vault with no seal, so an
+    /// attacker cannot bypass verification simply by STRIPPING the seal field.
+    public static func requireValidSeal(
+        _ vault: BASHostConstitutionVault,
+        publicKey: Curve25519.Signing.PublicKey,
+        allowUnsealed: Bool = false
+    ) throws {
+        switch verifySealed(vault, publicKey: publicKey) {
+        case .valid:
+            return
+        case .unsealed:
+            if allowUnsealed { return }
+            throw VaultSealError.unsealedVaultRejected(vaultID: vault.vaultID)
+        case .invalid:
+            throw VaultSealError.sealVerificationFailed(vaultID: vault.vaultID)
+        }
+    }
 }

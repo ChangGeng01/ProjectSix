@@ -166,4 +166,111 @@ final class BASHostConstitutionVaultSovereignSealTests: XCTestCase {
             vaultBefore: base, vaultAfter: makeVault(hardNoGo: ["x", "y"])),
             "no change is not a shrink")
     }
+
+    // MARK: - Seal lifecycle (sealed / verifySealed / requireValidSeal)
+
+    func testSealedVaultVerifiesValid() throws {
+        let key = BASSovereignEd25519KeyPair.generate()
+        let sealed = try Seal.sealed(makeVault(), with: key)
+        XCTAssertNotNil(sealed.sovereignSeal, "sealed() must set the seal field")
+        XCTAssertEqual(Seal.verifySealed(sealed, publicKey: key.publicKey), .valid)
+        XCTAssertNoThrow(try Seal.requireValidSeal(sealed, publicKey: key.publicKey))
+    }
+
+    func testTamperedSealedVaultIsInvalid() throws {
+        // The persisted-blob-edit attack: seal a vault, then SHRINK hardNoGo without
+        // re-sealing (as an attacker editing payload_json would). Must be .invalid.
+        let key = BASSovereignEd25519KeyPair.generate()
+        let sealed = try Seal.sealed(makeVault(hardNoGo: ["a", "b"]), with: key)
+        var tampered = sealed
+        var snap = tampered.constitutionSnapshot
+        snap.boundaryVeil = BASBoundaryVeil(
+            hardNoGo: ["a"], softCaution: [], confirmRequired: [],
+            restrictedMemoryDomains: [], restrictedToolDomains: [])
+        tampered.constitutionSnapshot = snap  // seal now mismatches content
+        XCTAssertEqual(Seal.verifySealed(tampered, publicKey: key.publicKey), .invalid)
+        XCTAssertThrowsError(
+            try Seal.requireValidSeal(tampered, publicKey: key.publicKey)
+        ) { error in
+            XCTAssertEqual(
+                error as? Seal.VaultSealError,
+                .sealVerificationFailed(vaultID: tampered.vaultID))
+        }
+    }
+
+    func testStrippedSealRejectedInStrictModeButAllowedWhenPermitted() throws {
+        // Stripping the seal field must NOT be a bypass in strict mode.
+        let key = BASSovereignEd25519KeyPair.generate()
+        let unsealed = makeVault()  // sovereignSeal == nil
+        XCTAssertEqual(Seal.verifySealed(unsealed, publicKey: key.publicKey), .unsealed)
+        XCTAssertThrowsError(
+            try Seal.requireValidSeal(unsealed, publicKey: key.publicKey)
+        ) { error in
+            XCTAssertEqual(
+                error as? Seal.VaultSealError,
+                .unsealedVaultRejected(vaultID: unsealed.vaultID))
+        }
+        // The migration window (host not yet sealing) can permit unsealed vaults.
+        XCTAssertNoThrow(
+            try Seal.requireValidSeal(unsealed, publicKey: key.publicKey, allowUnsealed: true))
+    }
+
+    func testWrongKeyMakesSealedVaultInvalid() throws {
+        let signer = BASSovereignEd25519KeyPair.generate()
+        let attacker = BASSovereignEd25519KeyPair.generate()
+        let sealed = try Seal.sealed(makeVault(), with: signer)
+        XCTAssertEqual(Seal.verifySealed(sealed, publicKey: attacker.publicKey), .invalid)
+    }
+
+    // MARK: - Persistence (byte-equal-off + store round-trip)
+
+    func testUnsealedPayloadOmitsSealKeyButSealedIncludesIt() throws {
+        // 红线 7 at the persistence layer: an unsealed vault's JSON payload is byte-identical
+        // to before this field existed (the key is omitted), so already-persisted vaults
+        // round-trip unchanged. A sealed vault includes the key.
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        let unsealedJSON = String(
+            data: try enc.encode(makeVault()), encoding: .utf8)!
+        XCTAssertFalse(unsealedJSON.contains("sovereignSeal"),
+            "unsealed vault must omit the seal key (byte-equal-off)")
+        let key = BASSovereignEd25519KeyPair.generate()
+        let sealedJSON = String(
+            data: try enc.encode(try Seal.sealed(makeVault(), with: key)), encoding: .utf8)!
+        XCTAssertTrue(sealedJSON.contains("sovereignSeal"),
+            "sealed vault must include the seal key")
+    }
+
+    func testStoreRoundTripPreservesSealAndVerifies() async throws {
+        // The seal rides in payload_json with no schema change: persist a sealed vault,
+        // reload it, and the seal must survive + verify. Also persists an UNSEALED vault to
+        // prove the migration-safe coexistence (old + new in the same table).
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vault-seal-\(UUID().uuidString).sqlite")
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
+        }
+        let key = BASSovereignEd25519KeyPair.generate()
+        let store = try BASRoutedHostConstitutionVaultStorage(databaseURL: url)
+
+        let unsealed = makeVault(hostID: "host.legacy")
+        _ = try await store.save(unsealed)
+        let loadedUnsealed = try await store.loadVault(vaultID: unsealed.vaultID)
+        let reloadedUnsealed = try XCTUnwrap(loadedUnsealed)
+        XCTAssertNil(reloadedUnsealed.sovereignSeal, "legacy vault reloads with no seal")
+
+        let sealed = try Seal.sealed(makeVault(hostID: "host.sealed"), with: key)
+        _ = try await store.save(sealed)
+        let loadedSealed = try await store.loadVault(vaultID: sealed.vaultID)
+        let reloadedSealed = try XCTUnwrap(loadedSealed)
+        XCTAssertEqual(reloadedSealed.sovereignSeal, sealed.sovereignSeal,
+            "the seal must persist through payload_json")
+        XCTAssertEqual(
+            Seal.verifySealed(reloadedSealed, publicKey: key.publicKey), .valid,
+            "a reloaded sealed vault must verify against the signing key")
+        XCTAssertNoThrow(
+            try Seal.requireValidSeal(reloadedSealed, publicKey: key.publicKey))
+    }
 }
