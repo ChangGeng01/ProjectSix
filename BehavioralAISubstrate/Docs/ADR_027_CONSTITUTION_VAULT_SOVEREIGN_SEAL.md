@@ -1,11 +1,13 @@
-# ADR-027 — Constitution Vault Sovereign Seal (A3 a+c)
+# ADR-027 — Constitution Vault Sovereign Seal (A3 a+c+b, A2)
 
-> **Status: CORE BUILT + TESTED (ch1044 A3 a+c, opt-in / byte-equal-off).** Closes the
+> **Status: CORE + INTEGRATION BUILT + TESTED (ch1044, opt-in / byte-equal-off).** Closes the
 > deep-audit finding that the host constitution vault's integrity field is a *decorative
 > checksum*, not an authenticator: a tamperer who edits the persisted vault — most
 > dangerously by SHRINKING `boundaryVeil.hardNoGo` to disable a sovereign block — simply
 > recomputes `versionSignature` and nothing detects it. Per ADR-014 this is OPT-IN and
-> byte-equal when unconfigured.
+> byte-equal when unconfigured. §2-4 are the authenticator core; §5 is the integration layer
+> (persisted seal + verify-on-load gate, the A3b dual-key approval gate, the A2 append-floor);
+> §6 is the honest remaining per-host wiring.
 
 ## 1. The gap (three weaknesses in one field)
 
@@ -66,36 +68,49 @@ legacy field covered), `testWrongKeyFailsVerification`, `testMalformedSealHexFai
 
 ## 4. Opt-in / byte-equal (ADR-014, 红线 7)
 
-This pass adds a **new file + new tests only** — it does not touch the vault struct, the
-SQLite schema, or any turn-path code. `versionSignature` is unchanged; a host that never
-constructs a seal sees a byte-identical vault. The seal is detached (returned as hex), not
-persisted.
+The seal core (§2) added a **new file + new tests only**. The integration layer (§5) adds an
+OPTIONAL `sovereignSeal: String?` to the vault, but it is byte-equal-off: synthesized Codable
+OMITS a nil Optional, so an unsealed vault's persisted `payload_json` is byte-identical to
+before the field existed, `PRAGMA user_version` is unchanged, and a host that never seals
+sees no behavior change. `versionSignature` is untouched.
 
-## 5. What is honestly deferred (A3 a+c — one level deeper)
+## 5. The integration layer — now BUILT (ch1044 A3 integration session)
 
-Parallel to A1/ADR-026: the cryptographic core + verifier exist and are tested; two
-**integration** pieces are deliberately NOT done at session tail, under 亏的不要上 / 小心翼翼 / R1
-(do not rush a persisted-format migration or invent a sovereign key-management scheme on a
-hunch):
+The earlier draft of this section deferred the persist + verify-on-load wiring and the
+dual-key gate as "needs a schema migration / a sovereign-flow change." A key discovery
+removed the migration risk: **both constitution stores persist the vault as a Codable
+`payload_json` blob** (`JSONDecoder().decode(BASHostConstitutionVault.self)`), so the seal
+rides in the blob with **no column migration** and old blobs decode the missing key as nil.
+With that, the following are built + tested:
 
-- **Key provenance.** `seal`/`verify` take the keypair / public key as a parameter. A host
-  must supply a `BASSovereignEd25519KeyPair` from its keyring — NOT a per-process random
-  key, NOT `fromSeed("constant")` (test-only). Where the constitution signing key lives
-  (keychain / enclave / per-host / cross-device-synced) is a sovereign-security design
-  decision, not a code detail to guess.
-- **Persist + verify-on-load.** Making verification actually run in the storage load path
-  needs the seal to round-trip through SQLite — a nullable `sovereign_seal` column (legacy
-  rows decode to NULL → nil → load unaffected, the migration-safe shape) — and the storage
-  constructor to receive the public key, then quarantine on mismatch (the A2 pattern applied
-  to the vault). Wiring verify-on-load *without* also wiring sign-on-write would buy a
-  dormant code path at the cost of a schema migration, so both land together with the key
-  decision above.
-- **A3b (dual-key on shrink)** remains its own session: `shrinksHardNoGo` is the trigger
-  predicate; routing a shrinking approval through `BASSovereignHighConsequenceGate` is a new
-  sovereign gate inserted into the constitution staging flow (`EBrainHostRuntime+HostConstitutionService`,
-  currently a pure value-type with no key/ledger) — exactly the R1 class, not a tail-of-session change.
+- **Persisted seal + verify-on-load.** `sovereignSeal: String?` on the vault (byte-equal-off,
+  §4). Lifecycle in `BASHostConstitutionVaultSovereignSeal`: `sealed()` sets the field;
+  `verifySealed()` → `{unsealed, valid, invalid}`; `requireValidSeal()` is the fail-closed
+  gate a host calls after loading from storage. Verification lives in BASHostKit (a wrapper
+  around the BASMemory store's load), because the store's module cannot import Ed25519.
+  `allowUnsealed: false` also rejects a STRIPPED seal, so deleting the field is not a bypass.
+  Proven by a real routed-store round-trip (sign → persist → reload → verify) + tamper +
+  strip + wrong-key tests.
+- **A3b dual-key on shrink** — `BASConstitutionApprovalGate` (BASHostKit): classifies an
+  approval and requires a valid `BASSovereignDualKeyCommit` (two principals, over a digest
+  binding the exact transition) for a hardNoGo/confirmRequired SHRINK, via the existing
+  `BASSovereignHighConsequenceGate`. Opt-in; routine approvals pass without a commit; a
+  commit for one transition cannot be replayed onto another. 9 tests.
+- **A2 append-floor** — `BASSovereignAuditLedger(minimumSchemaVersion:)`: opt-in rejection of
+  sub-hardened (non-injective) audit appends; nil default = byte-equal-off. 4 tests.
 
-So the deep-audit gap is two-layered, like A1: (1) **no authenticator / verifier** — *closed
-by this ADR* (real, keyed, injective, tested); and (2) **no production writer/loader that
-holds the key** — which awaits the key-provenance decision + the nullable-column migration,
-both bounded and documented above.
+**Key provenance** is codebase-determined: `BASSovereignKeychainBinding` (BASSovereign) is
+the established store/load for an Ed25519 keypair — the seal/verify and the two approver keys
+come from there, NOT a per-process random key, NOT `fromSeed("constant")` (test-only).
+
+## 6. What genuinely remains (the honest layer-2, like A1/ADR-026)
+
+Every reusable sovereign primitive now exists, is opt-in/byte-equal-off, and is tested:
+authenticator, verifier, persisted seal, fail-closed verify-on-load gate, dual-key approval
+gate, approval audit-entry builder, ledger append-floor. What remains is purely the **per-host
+call sites**: a host that, with a `BASSovereignKeychainBinding`-bound key, seals-on-write,
+calls `requireValidSeal` on load, calls `BASConstitutionApprovalGate.requireAuthorized` at
+the approval seam (today a pure value transform with no key/ledger), appends the approval
+audit entry, and enables the ledger floor. That wiring awaits a host that actually persists +
+approves constitution with a sovereign key — the same two-layer honesty as A1: the gates
+exist and are one-call invocations; no current host executes that flow.
