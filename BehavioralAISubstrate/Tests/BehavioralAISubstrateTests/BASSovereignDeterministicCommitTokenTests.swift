@@ -123,4 +123,30 @@ final class BASSovereignDeterministicCommitTokenTests: XCTestCase {
             XCTFail("reusing a nonce must be rejected")
         } catch { /* expected */ }
     }
+
+    // MARK: - 7) 深入 audit: flipping the unsigned `singleUse` flag can't bypass single-use
+
+    func testSingleUseCannotBeBypassedByFlippingFlag() async throws {
+        let authority = BASSovereignTokenAuthority(now: { detFixedNow })
+        let t = try await authority.issueDeterministicCommitToken(
+            for: makeIntent(), tokenID: "sct-bypass", nonce: "nb", issuedAt: detFixedNow)
+        // First redemption succeeds.
+        try await authority.verifyCommitToken(
+            t, expectedScope: .toolWrite, expectedActionDigest: "digest-1", redeem: true)
+        // Forge a copy with singleUse flipped to false — the attacker-mutable, UNSIGNED
+        // field. The Ed25519 signature still verifies (singleUse isn't in the signed
+        // bytes), so the OLD `record.redeemed && token.singleUse` guard would skip and
+        // allow replay. The fix enforces single-use from the server record regardless.
+        let forged = BASSovereignCommitToken(
+            tokenID: t.tokenID, sessionID: t.sessionID, turnID: t.turnID, scope: t.scope,
+            allowedTargets: t.allowedTargets, actionDigest: t.actionDigest,
+            snapshotRef: t.snapshotRef, policyHash: t.policyHash, ttlMs: t.ttlMs,
+            nonce: t.nonce, singleUse: false, signature: t.signature)
+        do {
+            try await authority.verifyCommitToken(
+                forged, expectedScope: .toolWrite, expectedActionDigest: "digest-1",
+                redeem: true)
+            XCTFail("flipping singleUse->false must NOT bypass single-use replay protection")
+        } catch BASSovereignTokenAuthority.AuthorityError.alreadyUsed { /* expected */ }
+    }
 }

@@ -171,6 +171,28 @@ public actor BASVectorIndex {
         /// Caller inserted a duplicate atomID。Index is keyed by
         /// atomID;use `replace(...)` to update。
         case duplicateAtomID(String)
+        /// ch1044 深入 audit: caller inserted an embedding with a
+        /// non-finite (NaN/Inf) component — rejected at the boundary
+        /// because it would corrupt/trap the top-K cosine sort.
+        case nonFiniteEmbedding(String)
+    }
+
+    /// ch1044 深入 audit: NaN-safe descending sort key. A non-finite cosine score
+    /// (from a poisoned embedding or a NaN query/Rust result) violates strict-weak-
+    /// ordering in `sort(by:)` → undefined behavior / potential trap (a one-atom DoS).
+    /// Mapping non-finite → -infinity keeps the order valid and sinks such entries last.
+    @inline(__always)
+    fileprivate static func sortKey(_ s: Float) -> Float {
+        s.isFinite ? s : -.infinity
+    }
+
+    /// ch1044 深入 audit: reject a non-finite embedding at the insert boundary. A
+    /// stored NaN/Inf component yields NaN cosine scores downstream; validating on the
+    /// way in is the primary guard (the NaN-safe sort is defense-in-depth).
+    private func validateFinite(_ entry: BASVectorIndexEntry) throws {
+        guard entry.normalizedEmbedding.vector.allSatisfy(\.isFinite) else {
+            throw BASVectorIndexError.nonFiniteEmbedding(entry.atomID)
+        }
     }
 
     /// chapter 七百二十七 第二刀 — feature flag controlling
@@ -216,6 +238,7 @@ public actor BASVectorIndex {
     public func insert(
         _ entry: BASVectorIndexEntry
     ) throws {
+        try validateFinite(entry)
         if let bound = boundDimension {
             guard entry.normalizedEmbedding.dimension == bound
             else {
@@ -239,6 +262,7 @@ public actor BASVectorIndex {
     public func upsert(
         _ entry: BASVectorIndexEntry
     ) throws {
+        try validateFinite(entry)
         if let bound = boundDimension {
             guard entry.normalizedEmbedding.dimension == bound
             else {
@@ -356,7 +380,7 @@ public actor BASVectorIndex {
                 atomID: id, score: score))
         }
         // Sort descending + truncate
-        scored.sort { $0.score > $1.score }
+        scored.sort { Self.sortKey($0.score) > Self.sortKey($1.score) }
         if scored.count > k {
             return Array(scored.prefix(k))
         }
@@ -434,7 +458,7 @@ public actor BASVectorIndex {
                 BASVectorTopKResult(
                     atomID: $0.0, score: $0.1)
             }
-        paired.sort { $0.score > $1.score }
+        paired.sort { Self.sortKey($0.score) > Self.sortKey($1.score) }
         if paired.count > k {
             return Array(paired.prefix(k))
         }
@@ -543,7 +567,7 @@ public actor BASVectorIndex {
             scored.append(BASVectorTopKResult(
                 atomID: id, score: r.value[i]))
         }
-        scored.sort { $0.score > $1.score }
+        scored.sort { Self.sortKey($0.score) > Self.sortKey($1.score) }
         if scored.count > k {
             return Array(scored.prefix(k))
         }

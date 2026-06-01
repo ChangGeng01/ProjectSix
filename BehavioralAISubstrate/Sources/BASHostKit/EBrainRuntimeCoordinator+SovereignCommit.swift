@@ -1606,7 +1606,12 @@ extension BASEBrainRuntimeCoordinator {
                 + observationStatusCodes
         )
         let ruleIDs = sovereignRuleIDs(for: sovereignVerdict)
-        let signature = sovereignDigestHex(
+        // ch1044 深入 audit fix: was sovereignDigestHex (`|`-join over 3 consecutive
+        // lists — ruleIDs/signalRefs/actionRefs — which composite refs could collide).
+        // Use the injective digest WITH per-list count markers (`.list`); a flat
+        // length-prefix of 3 adjacent lists is STILL arity-ambiguous, so the count
+        // markers are required to make element-redistribution across lists distinct.
+        let signature = sovereignDigestHexInjective(
             [
                 auditID,
                 runtimeTrace.sessionID,
@@ -1614,7 +1619,10 @@ extension BASEBrainRuntimeCoordinator {
                 sovereignVerdict.verdictID,
                 snapshotRef,
                 sovereignVerdict.policyHash
-            ] + ruleIDs + signalRefs + actionRefs
+            ]
+            + BASSovereignCanonicalBytes.list(ruleIDs)
+            + BASSovereignCanonicalBytes.list(signalRefs)
+            + BASSovereignCanonicalBytes.list(actionRefs)
         )
 
         return BASSovereignAuditEntry(
@@ -1678,7 +1686,10 @@ extension BASEBrainRuntimeCoordinator {
             policyLineage?.runtimeTuningPolicyID ?? budgetFrame.policyDecisionIDs.dropFirst().first ?? "tuning.none",
             policyLineage?.resolutionSourceID ?? "resolution.none"
         ]
-        return sovereignDigestHex(components)
+        // ch1044 深入 audit fix: injective digest (was `|`-join, forgeable at any field
+        // boundary). This policyHash feeds the now-injective commit-token actionDigest,
+        // so a lossy sub-hash would partially undermine D3.
+        return sovereignDigestHexInjective(components)
     }
 
     func sovereignSnapshotRef(

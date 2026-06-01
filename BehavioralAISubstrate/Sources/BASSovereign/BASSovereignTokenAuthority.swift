@@ -331,7 +331,14 @@ public actor BASSovereignTokenAuthority {
         guard token.policyHash == expectedPolicyHash else {
             throw AuthorityError.policyHashMismatch(tokenID: token.tokenID)
         }
-        if record.redeemed && token.singleUse {
+        // ch1044 深入 audit fix (CRITICAL replay bypass): enforce single-use from the
+        // SERVER record, NOT the token-carried `singleUse` flag. `singleUse` is an
+        // attacker-mutable Codable field NOT covered by `canonicalCommitBytes`, so an
+        // attacker could flip it to false and replay a redeemed token (the Ed25519 sig
+        // still verifies — the byte isn't signed). The authority only mints single-use
+        // tokens (the `redeemed` flag IS the mechanism), so a redeemed record is spent
+        // regardless of the token's claimed flag.
+        if record.redeemed {
             throw AuthorityError.alreadyUsed(tokenID: token.tokenID)
         }
 
@@ -499,7 +506,9 @@ public actor BASSovereignTokenAuthority {
         guard warrant.policyHash == expectedPolicyHash else {
             throw AuthorityError.policyHashMismatch(tokenID: warrant.warrantID)
         }
-        if record.redeemed && warrant.singleUse {
+        // ch1044 深入 audit fix (CRITICAL replay bypass): enforce single-use from the
+        // SERVER record, not the attacker-mutable, unsigned `warrant.singleUse` flag.
+        if record.redeemed {
             throw AuthorityError.alreadyUsed(tokenID: warrant.warrantID)
         }
         if let expiresAt = warrant.expiresAt, now() > expiresAt {
