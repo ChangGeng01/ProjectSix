@@ -65,9 +65,19 @@ commit/sovereign tests green).
   and calls `authorize(...)` immediately before each irreversible op (renderHighRisk,
   memoryWrite, checkpointCommit, toolWrite, hostMutate) with the digest recomputed from
   the approved artifact for that scope.
-- **What remains (honest):** the per-op-site invocation lives in the HOST's
-  op-execution code (the substrate cannot gate an op it does not execute). This ADR
-  ships the *seam* — the production verification API + the independent-digest discipline
-  — so that wiring is now a one-call gate per op site, not a from-scratch build. The
-  keyring source for the authority is `BASSovereignKeychainBinding` (NOT a per-process
-  random key, NOT `withSeed("constant")`).
+- **What remains (honest — A1 one level deeper):** the per-op-site invocation lives in
+  the HOST's op-execution code (the substrate cannot gate an op it does not execute).
+  Crucially, I checked the current hosts and **none actually executes the token-gated
+  irreversible ops** — `BASAgentFabricHostPipeline` is the agent-fabric host (consumes
+  warrant-validation results, logs to the audit ledger), and the DeviceTestApp is an
+  observe-only endurance harness. They produce/observe the turn result + tokens; nothing
+  executes the substrate's `renderHighRisk`/`memoryWrite`/`checkpointCommit` as a gated
+  side-effect. So the deep-audit gap is two-layered: (1) no verifier — **closed by this
+  ADR** (the verification gate now exists, is tested, and is a one-call invocation); and
+  (2) no production op-executor to invoke it — which awaits a host that actually performs
+  those side-effects. Wiring this enforcer into such a host (with a
+  `BASSovereignKeychainBinding`-backed authority — NOT a per-process random key, NOT
+  `withSeed("constant")`) is then a one-call gate per op site, not a from-scratch build.
+  A drift-free per-scope `expectedActionDigest` recompute helper (mirroring
+  `buildSovereignCommitTokens`' part assembly) is the natural companion when that host
+  exists.
