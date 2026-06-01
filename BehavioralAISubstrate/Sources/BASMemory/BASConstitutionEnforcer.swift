@@ -267,6 +267,22 @@ public enum BASConstitutionEnforcer {
     /// Empty pattern entries are skipped (defensive — no
     /// substring of any string equals empty,but we'd match
     /// every input which is wrong)。
+    /// ch1044 A3 — fold a string to a canonical comparison form so a banned term can't
+    /// be EVADED by inserting an invisible splitter ("ex\u{200B}ploit") or by a
+    /// compatibility / homoglyph variant. NFKC compatibility mapping folds those
+    /// variants; stripping Format (Cf — includes zero-width U+200B/C/D, BOM) + Control
+    /// (Cc) scalars removes invisible splitters. Lowercased for case-insensitivity.
+    /// Byte-equal to plain `lowercased()` for ordinary ASCII content (NFKC is identity,
+    /// nothing to strip), so existing matches are unaffected — it only catches evasions.
+    static func normalizeForMatching(_ s: String) -> String {
+        let folded = s.precomposedStringWithCompatibilityMapping
+        let kept = folded.unicodeScalars.filter {
+            let cat = $0.properties.generalCategory
+            return cat != .format && cat != .control
+        }
+        return String(String.UnicodeScalarView(kept)).lowercased()
+    }
+
     static func firstMatchingPattern(
         input: String,
         patterns: [String]
@@ -274,12 +290,16 @@ public enum BASConstitutionEnforcer {
         guard !patterns.isEmpty, !input.isEmpty else {
             return .none
         }
-        let lowered = input.lowercased()
+        let normalizedInput = normalizeForMatching(input)
         for pattern in patterns {
             let trimmed = pattern.trimmingCharacters(
                 in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
-            if lowered.contains(trimmed.lowercased()) {
+            let normalizedPattern = normalizeForMatching(trimmed)
+            // A pattern that is ALL format/control chars normalizes to empty — skip it
+            // (same defense as the empty-pattern guard: don't match every input).
+            guard !normalizedPattern.isEmpty else { continue }
+            if normalizedInput.contains(normalizedPattern) {
                 return BASConstitutionMatch(
                     pattern: trimmed,
                     matchedInput: input)

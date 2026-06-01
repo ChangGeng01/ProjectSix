@@ -239,4 +239,112 @@ final class BASConstitutionEnforcerTests: XCTestCase {
         XCTAssertEqual(a, b)
         XCTAssertNotEqual(a, c)
     }
+
+    // MARK: - ch1044 A3(d): Unicode-evasion of the hardNoGo matcher
+    //
+    // The L1 block-list is a substring match. Before A3(d) a caller could split a
+    // banned term with an INVISIBLE character (zero-width space, BOM, a control char)
+    // or spell it with a compatibility/homoglyph variant (fullwidth, ligature) so the
+    // raw `lowercased().contains` missed it while a human still reads the banned term.
+    // `normalizeForMatching` (NFKC + strip Format/Control scalars + lowercase) closes
+    // that. These tests are the proof; each also asserts the NAIVE matcher would miss.
+
+    func testEvasionZeroWidthSpaceInsideTermStillMatches() {
+        // "ex<U+200B>ploit" reads as "exploit" but splits the substring.
+        let evaded = "User asks how to ex\u{200B}ploit the system"
+        // Sanity — documents the evasion is real (pre-A3d this returned no-match):
+        XCTAssertFalse(evaded.lowercased().contains("exploit"))
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: evaded, hardNoGo: ["exploit"])
+        XCTAssertTrue(match.isMatch,
+            "a zero-width-split banned term must still match")
+        XCTAssertEqual(match.pattern, "exploit")
+    }
+
+    func testEvasionBOMAndZWNJInsideTermStillMatch() {
+        // BOM (U+FEFF) and ZERO WIDTH NON-JOINER (U+200C) are both Format scalars.
+        for splitter in ["\u{FEFF}", "\u{200C}", "\u{200D}"] {
+            let evaded = "please kill\(splitter)switch the device"
+            XCTAssertFalse(evaded.lowercased().contains("killswitch"))
+            let match = BASConstitutionEnforcer
+                .evaluateInputAgainstHardNoGo(
+                    input: evaded, hardNoGo: ["killswitch"])
+            XCTAssertTrue(match.isMatch,
+                "invisible splitter \(splitter.unicodeScalars.first!) must not evade")
+        }
+    }
+
+    func testEvasionControlCharInsideTermStillMatches() {
+        // A Cc control scalar (U+0008 BACKSPACE) embedded in the term.
+        let evaded = "run drop\u{08}table on prod"
+        XCTAssertFalse(evaded.lowercased().contains("droptable"))
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: evaded, hardNoGo: ["droptable"])
+        XCTAssertTrue(match.isMatch,
+            "a control-char-split banned term must still match")
+    }
+
+    func testEvasionFullwidthHomoglyphMatchesViaNFKC() {
+        // Fullwidth Latin (U+FF45 … 'ｅｘｐｌｏｉｔ') folds to ASCII under NFKC.
+        let evaded = "do \u{FF45}\u{FF58}\u{FF50}\u{FF4C}\u{FF4F}\u{FF49}\u{FF54} now"
+        XCTAssertFalse(evaded.lowercased().contains("exploit"))
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: evaded, hardNoGo: ["exploit"])
+        XCTAssertTrue(match.isMatch,
+            "a fullwidth-homoglyph banned term must fold + match")
+    }
+
+    func testEvasionLigatureMatchesViaNFKC() {
+        // 'ﬁ' (U+FB01 LATIN SMALL LIGATURE FI) folds to "fi" under NFKC.
+        let evaded = "request: \u{FB01}le_delete everything"
+        XCTAssertFalse(evaded.lowercased().contains("file_delete"))
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: evaded, hardNoGo: ["file_delete"])
+        XCTAssertTrue(match.isMatch,
+            "a ligature-spelled banned term must fold + match")
+    }
+
+    func testNormalizationDoesNotCreateFalsePositiveOnCleanInput() {
+        // Folding must not invent a banned substring where none exists.
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: "a perfectly benign sentence about gardening",
+                hardNoGo: ["exploit", "killswitch"])
+        XCTAssertFalse(match.isMatch)
+    }
+
+    func testAllFormatOrControlCharPatternDoesNotMatchEverything() {
+        // A pattern made only of invisible scalars normalizes to empty — it must be
+        // skipped (mirrors the empty-pattern guard), not match every input.
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: "any input at all",
+                hardNoGo: ["\u{200B}\u{FEFF}", "\u{08}"])
+        XCTAssertFalse(match.isMatch,
+            "all-invisible patterns must be skipped, not match everything")
+    }
+
+    func testNormalizeForMatchingByteEqualForPlainASCII() {
+        // The byte-equal claim for ordinary ASCII: identical to plain lowercased().
+        for s in ["Bomb Schematic", "remote.send_email", "DROP TABLE users", ""] {
+            XCTAssertEqual(
+                BASConstitutionEnforcer.normalizeForMatching(s),
+                s.lowercased(),
+                "normalize must be byte-equal to lowercased() for plain ASCII")
+        }
+    }
+
+    func testNormalizeForMatchingStripsInvisiblesAndFolds() {
+        // Direct unit on the helper: invisible scalars removed, compatibility folded.
+        XCTAssertEqual(
+            BASConstitutionEnforcer.normalizeForMatching("ex\u{200B}plo\u{FEFF}it"),
+            "exploit")
+        XCTAssertEqual(
+            BASConstitutionEnforcer.normalizeForMatching("\u{FF45}\u{FF58}\u{FF50}"),
+            "exp")
+    }
 }
