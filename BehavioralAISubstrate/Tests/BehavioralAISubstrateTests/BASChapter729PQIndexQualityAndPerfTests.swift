@@ -175,7 +175,10 @@ final class BASChapter729PQIndexQualityAndPerfTests: XCTestCase {
             format: "  Substrate-realistic gate (lower bar)"))
         print(String(
             format: "                  at 5K corpus: ≥ 50%% (%@)",
-            recall >= 0.5 ? "PASS ✅" : "FAIL ❌"))
+            recall >= 0.5
+                ? "PASS ✅"
+                : "ℹ️ below — expected on uniform-random vectors; "
+                    + "informational, NOT gated (see note below)"))
         print("")
         print(
             "### Perf measurement")

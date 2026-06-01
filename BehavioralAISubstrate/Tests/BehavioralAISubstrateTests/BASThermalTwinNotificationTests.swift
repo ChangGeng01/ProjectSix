@@ -83,9 +83,12 @@ final class BASThermalTwinNotificationTests: XCTestCase {
     ) throws {
         if received == nil {
             throw XCTSkip(
-                "macOS NotificationCenter stack flaky " +
-                "(likely AddressBook XPC); skipping " +
-                "M216 thermal-twin notification test")
+                "OS NotificationCenter did not deliver the sample " +
+                "within the timeout (observed on macOS — likely " +
+                "AddressBook XPC — AND on iOS device runs per the " +
+                "ch1044 device audit); treated as an environmental " +
+                "flake, not a substrate regression. M216 thermal-twin " +
+                "notification test skipped")
         }
     }
 

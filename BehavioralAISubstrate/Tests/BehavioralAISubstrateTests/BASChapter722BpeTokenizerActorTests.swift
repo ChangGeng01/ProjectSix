@@ -9,14 +9,20 @@
 //      whitespace runs as their own chunks)
 //   3. Encode round-trips through decode for typical inputs
 //   4. Empty input handles gracefully
-//   5. PRE-TOKENIZATION SPEEDUP — the actor's encode at 1 KB
-//      runs at least 10× faster than the raw handle's encode
-//      (proves the O(N²) → O(N) algorithmic improvement)
+//   5. ENCODE LINEAR-TIME GATE — both the actor's pre-tokenized
+//      encode AND the raw handle's encode stay sub-5 ms at 1 KB
+//      (an O(N²) regression in either path would blow past it)。
 //
-// Perf gate per plan:Knife 3 measured the raw handle at
-// ~13 ms / 1 KB encode。 The actor SHOULD drop this below
-// ~1 ms,which is the production-ready threshold for
-// per-turn tokenization。
+// Historical note (ch1044 audit honesty fix):chapter 七百二十二
+// added the actor's pre-tokenization to beat a raw handle then
+// measured at ~13 ms / 1 KB (O(N²))。 chapter 七百三十七 第三刀
+// fixed the raw merge loop DIRECTLY,so the raw handle is now
+// ~0.2 ms — the pre-tok actor is NO LONGER a speedup (it can be
+// marginally slower from per-chunk overhead) and is retained for
+// actor-isolation, not speed。 This gate guards LINEAR-TIME on
+// both paths, NOT a 5×/10× ratio。 (The prior method name +
+// header advertised a 5× speedup that ch737 obsoleted — corrected
+// here so the test no longer claims a contract it doesn't check.)
 
 import XCTest
 import Foundation
@@ -254,7 +260,7 @@ final class BASChapter722BpeTokenizerActorTests: XCTestCase {
     ///   2. BOTH paths sub-millisecond at 1 KB
     ///   3. No strict speedup assertion — chapter 七百三十七 第三刀
     ///      makes pre-tok overhead irrelevant
-    func testPreTokenizationDeliversAtLeast5xSpeedup() async throws {
+    func testEncodeBothPathsStaySubFiveMsAt1KB() async throws {
         #if os(iOS) || os(macOS)
         let actor = try await makeActor()
         let (v, m, u) = syntheticData()
@@ -293,7 +299,7 @@ final class BASChapter722BpeTokenizerActorTests: XCTestCase {
 
         print("")
         print(
-            "## chapter 七百二十二 第四刀 — pre-tokenization speedup")
+            "## ch722 — encode linear-time gate (raw vs pre-tok actor, post-ch737)")
         print("")
         print(String(
             format: "  raw handle (no pre-tok):  %8.2f µs/op",
