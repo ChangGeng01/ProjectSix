@@ -39,11 +39,10 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
     func testCRITICAL_HardenedSchemaVersion_ExistsAndCorrect() {
         XCTAssertEqual(
             BASSovereignAuditEntry.hardenedSchemaVersion,
-            "1.1.0",
-            "ch 1011 CRITICAL: hardenedSchemaVersion MUST be " +
-            "\"1.1.0\" — the canonical value for the hardened " +
-            "canonical-bytes format (U+001F inner / U+001E " +
-            "outer separators per ch 993)")
+            "1.2.0",
+            "ch1044 D2 step-2: hardenedSchemaVersion bumped to \"1.2.0\" — the hardened " +
+            "canonical is now the INJECTIVE length-prefixed form (the U+001F/U+001E " +
+            "delimiter-join of 1.1.0 was ambiguous for the substrate's composite refs)")
     }
 
     // MARK: - 2. Distinct from currentSchemaVersion
@@ -127,10 +126,9 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
             snapshotRef: "",
             signature: "",
             appendedAt: Date())
-        XCTAssertEqual(entry.schemaVersion, "1.1.0",
-            "ch 1011: entries built via shared constant MUST " +
-            "have schemaVersion == \"1.1.0\" — behaviorally " +
-            "equivalent to pre-fix literal")
+        XCTAssertEqual(entry.schemaVersion, "1.2.0",
+            "ch1044 D2 step-2: entries built via the shared constant carry the new " +
+            "injective hardened version \"1.2.0\"")
     }
 
     // MARK: - 5. Pin migration completeness

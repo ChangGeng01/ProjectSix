@@ -235,4 +235,30 @@ final class BASChapter716AuditLedgerByteEqualityTests:
             "NIST anchor: base64(SHA256('abc'))" +
             " must match published digest")
     }
+
+    // MARK: - ch1044 D2 step-2: injective 1.2.0 canonical resists boundary collisions
+
+    /// Under the OLD 1.1.0 U+001F-join, signalRefs `["a","b"]` and `["a\u{1F}b"]`
+    /// produced IDENTICAL canonical bytes — the composite-ref ambiguity that made
+    /// reject-separator validation infeasible. The injective 1.2.0 form (length-
+    /// prefixed) must make them DISTINCT (forgery closed), and Swift/Rust must still
+    /// hash the injective bytes identically.
+    func testInjective120CanonicalResistsCompositeRefBoundary() {
+        func entry(_ signalRefs: [String]) -> BASSovereignAuditEntry {
+            BASSovereignAuditEntry(
+                schemaVersion: BASSovereignAuditEntry.hardenedSchemaVersion,
+                auditID: "a", sessionID: "s", turnID: "t", verdictRef: "v",
+                ruleIDs: [], signalRefs: signalRefs, actionRefs: [],
+                snapshotRef: "snap", actor: .system, signature: "",
+                appendedAt: Date(timeIntervalSince1970: 1))
+        }
+        let a = basSovereignAuditCanonicalBytes(
+            for: entry(["a", "b"]), priorHash: "p", signingNamespace: signingNamespace)
+        let b = basSovereignAuditCanonicalBytes(
+            for: entry(["a\u{1F}b"]), priorHash: "p", signingNamespace: signingNamespace)
+        XCTAssertNotEqual(a, b,
+            "injective 1.2.0 canonical must distinguish a composite-ref boundary shift")
+        XCTAssertEqual(swiftCryptoKitHash(a), rustRoutedHash(a),
+            "Swift/Rust must still hash the injective bytes identically")
+    }
 }

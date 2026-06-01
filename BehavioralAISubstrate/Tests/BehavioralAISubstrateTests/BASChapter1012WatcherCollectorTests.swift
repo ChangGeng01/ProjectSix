@@ -154,8 +154,8 @@ final class BASChapter1012WatcherCollectorTests: XCTestCase {
             "ch 1012 CRITICAL: audit entry MUST reference " +
             "BASSovereignAuditEntry.hardenedSchemaVersion " +
             "constant (ch 1011 single-canonical doctrine)")
-        XCTAssertEqual(entry.schemaVersion, "1.1.0",
-            "ch 1012: constant value sanity check")
+        XCTAssertEqual(entry.schemaVersion, "1.2.0",
+            "ch 1012: constant value sanity check (ch1044 D2 step-2: hardened → 1.2.0 injective)")
     }
 
     // MARK: - 7. CRITICAL — zero hints still audit

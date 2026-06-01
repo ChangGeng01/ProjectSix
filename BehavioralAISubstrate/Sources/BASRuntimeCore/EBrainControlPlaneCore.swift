@@ -1324,9 +1324,17 @@ public struct BASSovereignAuditEntry: BASSchemaVersioned {
     /// All audit-entry construction sites that opt into the
     /// hardened format MUST reference this constant instead
     /// of inlining the literal。 The structural pin test in
-    /// ch 1011 verifies no `"1.1.0"` literal remains in
+    /// ch 1011 verifies no hardened-version literal remains in
     /// `schemaVersion:` argument positions across Sources/。
-    public static let hardenedSchemaVersion = "1.1.0"
+    ///
+    /// ch1044 D2 step-2 — bumped `"1.1.0"` → `"1.2.0"`: the hardened
+    /// canonical is now the INJECTIVE length-prefixed form
+    /// (`basSovereignAuditCanonicalBytes`), because the U+001F/U+001E
+    /// delimiter-join was ambiguous for the substrate's composite refs
+    /// (verdictRef/witnessRef/agent-observation). The bump migrates all
+    /// ~10 producers at once; already-persisted `1.1.0` entries keep
+    /// verifying under the retained 1.1.0 branch (per-entry-version).
+    public static let hardenedSchemaVersion = "1.2.0"
 
     public var schemaVersion: String
     public var auditID: String

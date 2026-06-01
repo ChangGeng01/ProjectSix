@@ -290,10 +290,10 @@ final class BASChapter993FullTurnAdapterAndHardeningTests:
             sessionID: "s",
             turnID: "t",
             externalAgentID: "ext.alpha")
-        XCTAssertEqual(entry.schemaVersion, "1.1.0",
-            "ch 993 CRITICAL-C: warrant bridge MUST default to " +
-            "1.1.0 hardened format (closes Round-8 primary " +
-            "attack surface)")
+        XCTAssertEqual(entry.schemaVersion, "1.2.0",
+            "ch 993 CRITICAL-C: warrant bridge MUST default to the hardened format — " +
+            "ch1044 D2 step-2 made that the INJECTIVE 1.2.0 form (closes Round-8 + the " +
+            "composite-ref boundary ambiguity)")
     }
 
     // MARK: - Helpers

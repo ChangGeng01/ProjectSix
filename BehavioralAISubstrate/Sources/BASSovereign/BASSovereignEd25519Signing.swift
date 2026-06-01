@@ -137,6 +137,30 @@ package func basSovereignAuditCanonicalBytes(
     priorHash: String,
     signingNamespace: String
 ) -> Data {
+    // ch1044 D2 step-2: INJECTIVE length-prefixed canonical (the new hardened form,
+    // schemaVersion "1.2.0"). The 1.0.0/1.1.0 delimiter-joins are AMBIGUOUS for real
+    // content — the substrate legitimately uses U+001F/U+001E as composite delimiters
+    // in refs (verdictRef "shadow_trial\u{1F}<id>", warrant witnessRefs → signalRefs,
+    // agent-observation records), so an in-band separator could shift a boundary and
+    // collide two distinct entries onto one signed + hash-chained pre-image. Length-
+    // prefixing each field (`<utf8ByteCount>:<bytes>`) + a count marker per array makes
+    // the encoding injective regardless of in-band bytes. Old 1.0.0/1.1.0 entries keep
+    // their form below, so already-persisted chains still verify per-entry-version.
+    if entry.schemaVersion == "1.2.0" {
+        var parts: [String] = [
+            entry.schemaVersion, entry.auditID, entry.sessionID, entry.turnID,
+            entry.verdictRef]
+        parts.append(String(entry.ruleIDs.count)); parts += entry.ruleIDs
+        parts.append(String(entry.signalRefs.count)); parts += entry.signalRefs
+        parts.append(String(entry.actionRefs.count)); parts += entry.actionRefs
+        parts += [
+            entry.snapshotRef,
+            entry.actor.rawValue,
+            String(Int(entry.appendedAt.timeIntervalSince1970 * 1000)),
+            priorHash,
+            signingNamespace]
+        return BASSovereignCanonicalBytes.lengthPrefixed(parts)
+    }
     // Schema-version-gated separator choice。 Old format preserved
     // for backward compat;new format uses ASCII control-char
     // separators that cannot appear in user-supplied string content。
@@ -147,7 +171,8 @@ package func basSovereignAuditCanonicalBytes(
         fieldSep = "|"
     } else {
         // chapter 九百九十三 / M3670 hardened format:U+001F inner,
-        // U+001E outer。 Forbidden in legal user content。
+        // U+001E outer。 Forbidden in legal user content。(Kept for already-persisted
+        // 1.1.0 entries; ch1044 D2 step-2 supersedes it with the injective 1.2.0 form.)
         arraySep = "\u{001F}"
         fieldSep = "\u{001E}"
     }
