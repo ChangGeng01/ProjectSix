@@ -57,13 +57,17 @@ and **L1 effort downgrade**. (§13 red lines #1,#6,#7,#8,#11,#14,#16 — ENFORCE
 ## 3. What this pass did / did not do
 - **DID** (safe / additive / opt-in): `BASSovereigntyMetrics` (§12.2), Codable round-trip coverage for
   the session's new types, and this honest correction.
-- **DID NOT** (deliberately): wire the contract gate into live call sites, the crypto token verifier,
-  the dual-key gate, the pre-work sovereign gate, fabric-authoritative multi-agent mode, speculative
-  execution, or turn persistence. Each is a **behavioral change to the 2016-line coordinator or the
-  neural-core factory**, needs policy decisions (per-purpose forbidden context, the keyring, etc.), and
-  per 亏的不要上 / R1 must be the host's deliberate, separately-verified step — not a gap-check edit.
+- **DID NOT** *in the correction pass* (deliberately): wire the governance/perf layers. **A follow-up
+  pass (§5) then shipped opt-in install points for the safely-wirable ones.** Still genuinely deferred
+  as host-deliberate behavioral work: the **crypto token verifier**, the **dual-key gate**,
+  **fabric-authoritative** multi-agent mode, **speculative execution**, and **turn persistence** — each
+  gates or rewrites real sovereign behavior / the 2016-line coordinator and needs the host's
+  keyring/policy (R1 / 亏的不要上).
 
 ## 4. Recommended wiring order (host-deliberate, when the host opts in)
+
+> **Status (ch1054–1055):** steps 1, 3, 4 are now shipped as **opt-in install points** (default-OFF /
+> byte-equal) — see §5. Steps 2 and 5 remain genuinely host-deliberate.
 1. **Install the contract gate** at the one chokepoint (`BASLLMNeuralCoreService.makeDefault` → wrap
    the adapter with `BASContractEnforcingOrganAdapter` per purpose). Closes #12 — the highest-leverage
    single wire (one factory, all call sites).
@@ -73,3 +77,39 @@ and **L1 effort downgrade**. (§13 red lines #1,#6,#7,#8,#11,#14,#16 — ENFORCE
 5. **Fabric-authoritative mode** (the outline's ch961+) for real 单脑多席; then speculative exec / zero-copy.
 
 Each is additive-capable but behavior-affecting; ship one at a time with its own verification.
+
+## 5. Follow-up — opt-in install points shipped (ch1054–1055, 剩余一次性解决掉 小心翼翼)
+
+On the request to "resolve the remaining, carefully," the **safely-wirable** gaps were closed as
+**opt-in install points** — default-OFF / byte-equal (R1 preserved); a host flips one flag/call to
+activate. No coordinator architecture was rewritten.
+
+- **#12 contract gate (§4.1) — SHIPPED.** `BASLLMContractInstall` + `BASLLMNeuralCoreService.makeDefault(…,
+  contractInstall:)`. nil → adapter unwrapped (byte-equal); set → every LLM call through the engine is
+  contracted (fail-closed) + traced. **One flag closes #12 across all call sites.** (commit `63111c71c`)
+- **Pre-work sovereign gate (§6 step 3) — SHIPPED.** `BASSovereignPreflightGate.evaluate(request)` — a
+  standalone gate the host calls *before* `runTurn` (no coordinator edit; early-denying inside the body
+  would require synthesizing a 52-field result — unsafe). (commit `633af40cb`)
+- **Distillation ingest (§6 step 19) — SHIPPED.** `BASDistillationBank.ingestingTraces(…)` feeds a
+  turn's collected ProcessTraces into the pool; the pool now has a real caller path. (commit `633af40cb`)
+- **§12.2 sovereignty metrics — SHIPPED** (`BASSovereigntyMetrics`, commit `64e7b8f1e`).
+
+**Honest status:** these are **activatable in one flag/call**, NOT enforced-by-default. So §13 #12 is
+now *one flag from satisfied* (was *scattered wiring from satisfied*); it remains **default-off** per
+R1 — flipping it on is the host's explicit, byte-changing choice.
+
+### Still host-deliberate — NOT shipped (would be unsafe to rush)
+- **#13 crypto token verifier.** `BASSovereignCommitEnforcer.authorize(token, scope:, target:,
+  expectedActionDigest:, expectedPolicyHash:)` is built + usable, but the substrate only *produces*
+  actuation commands — execution lives in the host layer (`HostRuntimeCore` / Apple executors). Gating
+  real OS actuation on token verification is an **R1 sovereign-behavior change** and needs the host's
+  keyring (`BASSovereignTokenAuthority`). Recipe: before each actuation, `try await enforcer.authorize(…)`.
+- **#5 fabric-authoritative + speculative exec.** The codebase itself defers this to **ch961+** (the
+  fabric runs observation-only *by design*). Wiring the fabric surface delta into the render frame +
+  risk gate is a deep coordinator rewrite — out of scope for a careful one-push (亏的不要上).
+
+**Net:** of the 5 dormant clusters, **4 now have opt-in install points** (contract gate, pre-work gate,
+distillation ingest, sovereignty metrics); **2 remain host-deliberate** (crypto verifier — needs the
+keyring + gates real OS actions; fabric-authoritative — a codebase-deferred deep rewrite). Resolving
+those two safely is not possible without the host's keyring and a coordinator-architecture change, so
+forcing them now would violate 小心翼翼 / R1 — they are documented with recipes instead.

@@ -268,6 +268,15 @@ rewriting the snapshot.
   found the contract keystone + crypto verifier + 9-席 fabric + speculative/zero-copy + distillation
   ingest are **built-but-unwired**; the live turn enforces only the core verdict chain. The deep
   wiring is host-deliberate (not done this pass).
+- **2026-06-02 — 剩余一次性解决掉 (opt-in install points, ch1054–1055).** The safely-wirable dormant
+  gaps were closed as opt-in / default-OFF / byte-equal install points (R1 preserved): **#12 contract
+  gate** (`BASLLMContractInstall` + `makeDefault(…,contractInstall:)`, one flag closes it across all
+  call sites — `63111c71c`); **pre-work sovereign gate** (`BASSovereignPreflightGate`, host calls before
+  `runTurn` — `633af40cb`); **distillation ingest** (`BASDistillationBank.ingestingTraces` — `633af40cb`);
+  **§12.2 sovereignty metrics** (`64e7b8f1e`). Now activatable in one flag/call, NOT enforced-by-default.
+  **Still host-deliberate** (ADR-031 §5): #13 crypto token verifier (needs the host keyring + gates real
+  OS actuation = R1 change) and #5 fabric-authoritative (codebase-deferred to ch961+). Forcing those two
+  now would violate 小心翼翼/R1 — documented with recipes instead.
 
 ### Net result after gap-clearing
 
