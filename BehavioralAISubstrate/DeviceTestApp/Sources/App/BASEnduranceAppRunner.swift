@@ -1010,7 +1010,7 @@ final class BASEnduranceAppController: ObservableObject {
         return String(format:
             "📊 ch1025 sys iter=%d phase=%@ thermal=%@ " +
             "low_power=%d active_cpu=%d/%d " +
-            "rss_mb=%.1f vsize_mb=%.1f " +
+            "rss_mb=%.1f footprint_mb=%.1f " +
             "avail_mb=%d mono_ns=%llu",
             iter, phase, s.thermalState,
             s.isLowPowerMode ? 1 : 0,
