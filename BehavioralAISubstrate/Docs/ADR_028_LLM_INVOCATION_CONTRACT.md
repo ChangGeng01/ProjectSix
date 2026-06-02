@@ -89,6 +89,12 @@ let organ = BASContractEnforcingOrganAdapter(
 (`forbiddenContext`, `sovereignConstraints`). That install is the host's deliberate step — not a
 silent default (亏的不要上 / ADR-014).
 
+> **Correction (查缺补漏, ADR-031):** "demo-proven" must not be read as "enforced." In THIS repo the
+> gate is installed on **no live call site** — `BASAgentLLMPurposeMap.enforcingAdapter` has **zero
+> callers**, and `BASLLMExtractionEngine` / `BASLLMVerifierPipeline` call `adapter.draft()` directly.
+> So §13 red line #12 (禁止随便问模型) is **satisfiable, not satisfied**. The one-line install is
+> ADR-031 §4 step 1 (wrap the adapter in `BASLLMNeuralCoreService.makeDefault`).
+
 ## 6. Done in this arc + remaining roadmap
 
 Done (ch1045): the contract + gate + `ProcessTrace` (§2); **`BASEffortPlan`** (squeeze intensity,

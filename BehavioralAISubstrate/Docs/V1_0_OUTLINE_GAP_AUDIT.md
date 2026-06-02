@@ -260,13 +260,39 @@ rewriting the snapshot.
   field preserved). 3 tests. **`Answer` (slice 4 #1): reclassified as by-design, NOT a gap** — the
   `.answer` permit mode is intentionally served by the draft surface; adding a dedicated Answer
   surface would require touching the shared `QinaoUI.ComponentID` enum for a capability that already
-  works (亏的不要上 — not built).
+  works (亏的不要上 — not built). (commit `935fd585c`)
+- **2026-06-02 — 查缺补漏 self-audit + blind-spot pass.** (a) Codable round-trip coverage for all new
+  session types (commit `b84f628df`). (b) `BASSovereigntyMetrics` — the §12.2 sovereignty-metric
+  battery, the one product-relevant metrics gap (commit `64e7b8f1e`). (c) **Built-vs-Wired
+  correction** (ADR-031): three investigators (§6 pipeline 10/5/4, §13 red lines 8/6/2, §12 metrics)
+  found the contract keystone + crypto verifier + 9-席 fabric + speculative/zero-copy + distillation
+  ingest are **built-but-unwired**; the live turn enforces only the core verdict chain. The deep
+  wiring is host-deliberate (not done this pass).
 
 ### Net result after gap-clearing
 
 Of the 12 original non-BUILT verdicts, **11 resolved to BUILT** — DistillationBank, brain.chat,
 RegretProfile, SacrificeMap, ConsentMatrix (alias), GuardBranch, and the 5 Qinao SDK surfaces
 (Effort/Transcript/Axis/OldSeal/Studio) — and **1 reclassified as by-design** (Answer, served by the
-draft surface). The v1.0 outline is now fully accounted for: every named object is BUILT, aliased to
-its built equivalent, or an explicit by-design decision. All additions are additive / ADR-014 opt-in
-/ byte-equal-off. **Final tally: 100 BUILT (incl. aliases) + 1 by-design = 101.**
+draft surface). Every named **object** is BUILT, aliased, or an explicit by-design decision. All
+additions are additive / ADR-014 opt-in / byte-equal-off. **Object-existence tally: 100 BUILT (incl.
+aliases) + 1 by-design = 101.**
+
+> ## ⚠️ Built vs Wired correction (查缺补漏, 2026-06-02) — see ADR-031
+>
+> This audit counted object **existence**. A follow-up 查缺补漏 pass (3 investigators over §6 pipeline,
+> §13 red lines, §12 metrics) found that **existence ≠ live guarantee**. The corrected, honest picture:
+>
+> - **Wired & live (core sovereign safety holds):** the turn verdict chain genuinely enforces 8 of the
+>   16 §13 red lines (LLM can't mint commit tokens, real delete/rollback, single-commit, lineage
+>   fail-closed, shadow-trial FSM, L1 downgrade).
+> - **Built-but-UNWIRED (do not mistake for a guarantee):** the LLM **contract gate (#12 — the
+>   keystone) has zero callers** → 禁止随便问模型 is *not met in-repo*; the crypto commit-token verifier
+>   (#13) and dual-key gate (#3) have zero non-test callers; per-call redaction (#15) is opt-in-path
+>   only. The 9-席 fabric runs **observation-only** (not authoritative in `runTurn`); speculative exec
+>   + zero-copy bus + `DistillationBank` ingest have **zero production callers**.
+> - **Pipeline (§6):** 10/19 steps live; **no pre-work sovereign gate** (step 3); `runTurn` is a **pure
+>   function** (records/seals/anchors returned, not persisted — steps 18/19).
+>
+> So the prior "v1.0 fully accounted for" is true at the **object** level but **overstated at the
+> guarantee level**. Wiring the dormant layers is host-deliberate behavioral work (ADR-031 §4).
