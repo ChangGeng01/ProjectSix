@@ -56,11 +56,45 @@ unchanged; non-gated callers (`adapter.draft(request)` directly) see zero behavi
 opts in by constructing `BASContractedOrganGate(adapter:)` and routing its calls through it.
 Verified: 11 contract tests + 701 organ/LLM blast-radius tests green; full test-target compiles.
 
-## 5. Roadmap (the rest of v1.0 — each its own increment)
+## 5. Consequential wiring — mechanism BUILT + demo-proven (ch1045)
 
-- **Wire the ~6 existing `draft()` call sites** through the gate (the consequential step that makes
-  "禁止随便问模型" enforced everywhere, not just available) — with a per-purpose contract builder.
-- **`EffortPlan`** (requested/applied/override → candidate count, agent count, memory depth) and the
-  L12 **`TranscriptView`** structured surface (consuming `BASProcessTrace`).
-- **Auto-invoke the verifier** named by `verifierRef` (`BASLLMVerifierPipeline`) inside the gate.
-- The 9 named agents; the SDK `brain.chat`; the distillation bank; the 8 typed buses.
+The "禁止随便问模型, enforced" step is delivered the safe way — without rewriting the ~6 dispersed
+`draft()` consumers:
+
+- **`BASContractEnforcingOrganAdapter`** (`Sources/BASOrgan/`) — a drop-in `BASOrganAdapter` that
+  wraps an inner adapter + a fixed purpose; on every `draft()` it derives a contract
+  (`BASLLMContractDeriver`, the per-purpose builder), runs `BASContractedOrganGate` (fail-closed),
+  records a `BASProcessTrace` to an optional sink, and returns the draft. `descriptor`/capacity pass
+  through. A host installs it by wrapping the adapter handed to each call site (extraction →
+  `.decompose`, verifier → `.verify`, planner → `.plan`, surface → `.render`, …) — every call
+  through that site is then contracted + traced, with ZERO consumer rewrites.
+- **End-to-end demo** (`BASContractedWiringIntegrationTests`): the wrapper composed with the real
+  `BASRoutingOrganAdapter` chokepoint proves (a) output is byte-identical to the unwrapped path
+  (zero behavior change), (b) every routed call is contracted + traced, (c) a forbidden-context
+  policy rejects before routing/model, (d) the traces render through `BASTranscriptView` — the full
+  Phase-0 flow contract → gate → routing → ProcessTrace → TranscriptView.
+
+**Install recipe (one line per call site):**
+```swift
+let organ = BASContractEnforcingOrganAdapter(
+    inner: realAdapter, purpose: .decompose,
+    forbiddenContext: ["sealed.memory"], verifierRef: "v:schema",
+    sovereignCheck: { contract, _ in hostSovereign.violation(for: contract) },
+    traceSink: { processTraceLedger.record($0) })
+// hand `organ` wherever a BASOrganAdapter is expected.
+```
+
+**Honest layer-2:** the mechanism is consequential-*ready* and demo-proven, but enabling it on a
+*production* host changes behavior (calls can be rejected) and needs per-purpose policy
+(`forbiddenContext`, `sovereignConstraints`). That install is the host's deliberate step — not a
+silent default (亏的不要上 / ADR-014).
+
+## 6. Done in this arc + remaining roadmap
+
+Done (ch1045): the contract + gate + `ProcessTrace` (§2); **`BASEffortPlan`** (squeeze intensity,
+requested/applied/override); **`BASTranscriptView`** (L12 §8.2); the consequential wiring mechanism
+(above). All opt-in / byte-equal-off.
+
+Remaining v1.0 increments: auto-invoke the `verifierRef` verifier (`BASLLMVerifierPipeline`) inside
+the gate; the 9 named agents (§7); the SDK `brain.chat` (§11); the distillation bank; the 8 typed
+buses; and the production host install of the enforcing adapter with its policy.
