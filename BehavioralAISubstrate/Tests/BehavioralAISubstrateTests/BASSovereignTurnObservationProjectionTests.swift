@@ -470,6 +470,19 @@ final class BASSovereignTurnObservationProjectionTests: XCTestCase {
         XCTAssertEqual(box.count, 1)
         XCTAssertTrue(box.last?.contains("parity=") ?? false)
         XCTAssertTrue(box.last?.contains("acceptable=") ?? false)
+        // ch1058 regression guard: `acceptable` must agree with the refined class.
+        // The pre-fix bug logged the contradiction `class=intentionalDefenseInDepth
+        // acceptable=false` (it used the crude `report.isAcceptable`). Now
+        // acceptable=false ⟺ unexpectedDrift only; an intentional divergence is acceptable.
+        let line = box.last ?? ""
+        if line.contains("acceptable=false") {
+            XCTAssertTrue(line.contains("class=unexpectedDrift"),
+                          "acceptable=false must only accompany unexpectedDrift: \(line)")
+        }
+        if line.contains("class=intentionalDefenseInDepth") {
+            XCTAssertTrue(line.contains("acceptable=true"),
+                          "intentionalDefenseInDepth must be acceptable=true: \(line)")
+        }
     }
 }
 

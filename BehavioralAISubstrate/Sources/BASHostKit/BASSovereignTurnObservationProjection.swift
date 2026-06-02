@@ -224,11 +224,19 @@ public enum BASSovereignTurnObservationProjection {
             engine: BASSovereignVerdictEngine(ledger: .withSeed(ledgerSeed)))
         guard let report = await shadowVerifyResult(result, verifier: verifier)
         else { return nil }
+        // ch1058 — `acceptable` reflects the REFINED ch1044 classification, NOT the
+        // crude `report.isAcceptable` (= `parity != .coordinatorLaxer`), which mislabels
+        // an INTENTIONAL defense-in-depth divergence (engine stricter WITH a reason code)
+        // as unacceptable and produced the contradictory `class=intentionalDefenseInDepth
+        // acceptable=false` log. Only `.unexpectedDrift` (engine stricter with NO reason)
+        // is the genuine fail-closed signal. Observation-only — never halts/mutates the turn;
+        // `report.isAcceptable` (its own tested low-level contract) is intentionally untouched.
+        let divergenceClass = classifyDivergence(report)
         return "parity=\(report.parity.rawValue) "
-            + "class=\(classifyDivergence(report).rawValue) "
+            + "class=\(divergenceClass.rawValue) "
             + "engine=\(report.engineVerdict.verdictLevel.rawValue) "
             + "coordinator=\(report.coordinatorLevel?.rawValue ?? "nil") "
-            + "acceptable=\(report.isAcceptable)"
+            + "acceptable=\(divergenceClass != .unexpectedDrift)"
     }
 
     /// Classify a parity report for the host's halt policy (ch1044 — operator
