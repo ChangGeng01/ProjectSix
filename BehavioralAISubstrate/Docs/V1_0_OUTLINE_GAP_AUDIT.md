@@ -246,4 +246,11 @@ rewriting the snapshot.
   `BASRegretProfile`/`BASRegretEntry` (likelihood×severity weight, irreversible-regret flag) +
   `BASSacrificeMap`/`BASSacrificeEntry` (per-stakeholder, magnitude, `fromFlat` bridge from the
   preserved `BASTradeoffLedger.sacrifices`) in BASOrchestration. Standalone / byte-equal-off — the
-  legacy flat field is untouched. 5 tests.
+  legacy flat field is untouched. 5 tests. (commit `f3ce206ab`)
+- **2026-06-02 — SDK packaging (slice 5 #8/#9/#17/#18/#19): MISSING → BUILT (in SDK).** 5 thin
+  `Qinao*` SDK surface targets re-exporting the substrate types under the §11 names: QinaoEffort
+  (BASEffortPlan/Level/Budget), QinaoTranscript (BASTranscriptView/Mode/ProcessTrace), QinaoAxis
+  (BASKunlunAxisView/BASAxisDeviation), QinaoOldSeal (BASSealEnvelope/BASOldSealSealingProtocol),
+  QinaoStudio (BASAgentPersonaSDK). Typealias re-exports (convention-consistent with QinaoMemory/
+  QinaoRisk surfacing BAS value types) → NO mirror-drift; verified by compilation (no logic to
+  unit-test). These were packaging gaps, not capability gaps.

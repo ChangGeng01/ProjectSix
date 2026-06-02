@@ -46,6 +46,14 @@ let package = Package(
         // seeded vault + standard seats with one call so hosts
         // doing demos don't have to re-derive sensible defaults.
         .library(name: "QinaoDefaults", targets: ["QinaoDefaults"]),
+        // ch1050 / v1.0 §11 — thin SDK surfaces re-exporting the substrate squeeze
+        // objects under the outline's Qinao* module names (value-type re-use,
+        // consistent with QinaoMemory/QinaoRisk surfacing BAS value types).
+        .library(name: "QinaoEffort", targets: ["QinaoEffort"]),
+        .library(name: "QinaoTranscript", targets: ["QinaoTranscript"]),
+        .library(name: "QinaoAxis", targets: ["QinaoAxis"]),
+        .library(name: "QinaoOldSeal", targets: ["QinaoOldSeal"]),
+        .library(name: "QinaoStudio", targets: ["QinaoStudio"]),
         // M180 — opt-in Apple FoundationModels endpoint factory.
         // Hosts wanting Apple LLM `import QinaoAppleFoundation`;
         // hosts that don't keep a substrate-only QinaoLoop graph.
@@ -89,6 +97,18 @@ let package = Package(
         .package(path: "../BehavioralAISubstrate")
     ],
     targets: [
+        // ch1050 / v1.0 §11 — thin SDK surfaces: typealias re-exports of the
+        // substrate squeeze objects under the Qinao* names from the outline.
+        .target(name: "QinaoEffort", dependencies: [
+            .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate")]),
+        .target(name: "QinaoTranscript", dependencies: [
+            .product(name: "BASOrgan", package: "BehavioralAISubstrate")]),
+        .target(name: "QinaoAxis", dependencies: [
+            .product(name: "BASOrchestration", package: "BehavioralAISubstrate")]),
+        .target(name: "QinaoOldSeal", dependencies: [
+            .product(name: "BASMemory", package: "BehavioralAISubstrate")]),
+        .target(name: "QinaoStudio", dependencies: [
+            .product(name: "BASMemory", package: "BehavioralAISubstrate")]),
         // QinaoHost — L5 façade. Host version tree, candidate
         // pipeline, projections, delete/freeze/rollback.
         .target(
