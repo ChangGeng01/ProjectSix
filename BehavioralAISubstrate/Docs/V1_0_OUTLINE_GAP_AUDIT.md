@@ -236,4 +236,9 @@ rewriting the snapshot.
 - **2026-06-02 — DistillationBank (L13 #17): MISSING → BUILT.** `BASDistillationBank` +
   entry/quality/policy/admission + ProcessTrace & LearningExportBundle adapters. Fail-closed on the
   three red-line safety gates; immutable; `exportManifest` bridges to WP15. 10 tests. ADR-029.
-  (commit pending)
+  (commit `c74eebcf0`)
+- **2026-06-02 — brain.chat (slice 5 #20): PARTIAL → BUILT.** `BASBrainChat` + `BASBrainChatRequest`/
+  `Response` (BASHostKit): the §11 governed entry composing a host-injected `runTurn` executor into
+  the 6-field developer response; honors effort (receipt) + transcript (rendered view) at the facade
+  boundary; surface = permit kind; processTraceRef from host traces. Facade, not a coordinator
+  rewrite. 5 tests (incl. a real stub-coordinator turn). ADR-030.
