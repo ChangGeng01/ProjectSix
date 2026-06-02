@@ -193,11 +193,17 @@ public actor BASToolCallingPlanner {
         tools: [BASTool],
         policy: @escaping BASToolCallingPlanPolicy,
         maxIterations: Int =
-            BASToolCallingPlanner.defaultMaxIterations
+            BASToolCallingPlanner.defaultMaxIterations,
+        contractInstall: BASLLMContractInstall? = nil
     ) {
         precondition(maxIterations > 0,
             "maxIterations must be > 0")
-        self.adapter = adapter
+        // §13 #12 opt-in: contract the planner's adapter when an install is supplied (byte-equal-off, R1).
+        if let ci = contractInstall {
+            self.adapter = ci.wrap(adapter)
+        } else {
+            self.adapter = adapter
+        }
         self.dispatcher = dispatcher
         self.tools = tools
         self.policy = policy

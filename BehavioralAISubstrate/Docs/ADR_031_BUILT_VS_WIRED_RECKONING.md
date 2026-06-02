@@ -84,15 +84,18 @@ On the request to "resolve the remaining, carefully," the **safely-wirable** gap
 **opt-in install points** — default-OFF / byte-equal (R1 preserved); a host flips one flag/call to
 activate. No coordinator architecture was rewritten.
 
-- **#12 contract gate (§4.1) — SHIPPED (extraction-engine site).** `BASLLMContractInstall` +
-  `BASLLMNeuralCoreService.makeDefault(…, contractInstall:)`. nil → adapter unwrapped (byte-equal);
-  set → every LLM call through the *extraction engine* is contracted (fail-closed) + traced.
-  **Correction (全面 audit):** an adversarial review caught an overclaim — this flag covers the
-  **extraction-engine chokepoint only**; `BASLLMVerifierPipeline`, `BASToolCallingPlanner`, and routing
-  construct their own adapters and are NOT reached by it. #12 is *closable at any site* via the same
-  public `BASLLMContractInstall.wrap(adapter)` (those sites take their adapter at init — wrap it there);
-  full closure = applying the wrap at each construction site (a convenience flag per site is a clean
-  follow-up). (commit `63111c71c`)
+- **#12 contract gate (§4.1) — SHIPPED at every production engine site (全面 修复, ch1056).**
+  `BASLLMContractInstall` was **moved to BASOrgan** (the lowest module owning the contract types) so
+  every call site can use it, and an opt-in `contractInstall` param was added at each production engine:
+  `BASLLMNeuralCoreService.makeDefault` (extraction, `63111c71c`), `BASLLMVerifierPipeline.init` (wraps
+  each of the ≤4 stage adapters), and `BASToolCallingPlanner.init` (wraps its adapter). nil → adapter
+  unwrapped (byte-equal-off, R1); set → every LLM call through that engine is contracted (fail-closed)
+  + traced — **drive tests prove the wrap fires at all three**. A router / custom site wraps its adapter
+  directly via the same public `install.wrap(adapter)`. **Streaming adapters are deliberately NOT
+  auto-wrapped** — the non-streaming gate would downgrade streaming; a streaming-aware contract wrapper
+  is a follow-up (亏的不要上). The eval harness is non-production. *(This corrects the earlier "one flag,
+  all call sites" overclaim caught by the 全面 audit: it is now genuinely closable by a flag at every
+  production engine, with the streaming caveat explicit.)*
 - **Pre-work sovereign gate (§6 step 3) — SHIPPED.** `BASSovereignPreflightGate.evaluate(request)` — a
   standalone gate the host calls *before* `runTurn` (no coordinator edit; early-denying inside the body
   would require synthesizing a 52-field result — unsafe). (commit `633af40cb`)

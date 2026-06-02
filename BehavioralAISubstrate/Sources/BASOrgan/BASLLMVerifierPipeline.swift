@@ -223,9 +223,16 @@ public actor BASLLMVerifierPipeline {
                 .defaultFactCheckerInstruction,
         compressorInstruction: String =
             BASLLMVerifierPipeline
-                .defaultCompressorInstruction
+                .defaultCompressorInstruction,
+        contractInstall: BASLLMContractInstall? = nil
     ) {
-        self.adapters = adapters
+        // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
+        // (fail-closed) + traced; nil → adapters used unwrapped (byte-equal-off, R1).
+        if let ci = contractInstall {
+            self.adapters = adapters.mapValues { ci.wrap($0) as any BASOrganAdapter }
+        } else {
+            self.adapters = adapters
+        }
         self.reviewerInstruction = reviewerInstruction
         self.redTeamInstruction = redTeamInstruction
         self.factCheckerInstruction =

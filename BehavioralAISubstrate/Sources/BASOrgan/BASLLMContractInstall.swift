@@ -1,19 +1,19 @@
-// ch1054 / v1.0 §13 #12 — one-flag install of the LLM contract gate at the call chokepoint.
+// ch1056 / v1.0 §13 #12 — install of the LLM contract gate at ANY adapter call site.
 //
-// Closes ADR-031 §4 step 1 (the highest-leverage wire). The gap audit found that the contract gate
-// (`BASContractEnforcingOrganAdapter`) was correct but had ZERO callers — every LLM call site builds
-// its engine from `BASLLMNeuralCoreService.makeDefault(adapter:eventLog:)`, which used the adapter
-// raw. A host now passes a `BASLLMContractInstall` to `makeDefault` and every LLM call through that
-// engine is contracted (fail-closed) + traced — one flag, all call sites.
+// Lives in BASOrgan (the lowest module that owns the contract types — `BASContractEnforcingOrganAdapter`,
+// `BASLLMCallPurpose`, `BASLLMInvocationContract`, `BASProcessTrace`) so EVERY call site can use it:
+// the extraction engine (via `BASLLMNeuralCoreService.makeDefault`, BASHostKit), the verifier pipeline,
+// and the tool-calling planner (both BASOrgan) each take an opt-in `contractInstall`. A host can also
+// wrap any adapter directly via `install.wrap(adapter)` before handing it to a router / streaming /
+// custom site. This is the comprehensive closure of §13 #12 (禁止随便问模型) across call sites.
 //
-// Opt-in / byte-equal-off (ADR-014 / R1): `makeDefault` defaults `contractInstall` to nil, in which
-// case the adapter is used UNWRAPPED exactly as before — no behavior change unless a host opts in.
+// Opt-in / byte-equal-off (ADR-014 / R1): every site defaults `contractInstall` to nil, in which case
+// the adapter is used UNWRAPPED exactly as before — no behavior change unless a host opts in.
 
 import Foundation
-import BASOrgan
 
-/// Host policy that, when supplied to `BASLLMNeuralCoreService.makeDefault`, wraps the engine's
-/// adapter in a contract-enforcing gate. Carries the per-purpose policy the gate needs.
+/// Host policy that, when supplied to a call-site constructor, wraps that site's adapter(s) in a
+/// contract-enforcing gate. Carries the per-purpose policy the gate needs.
 public struct BASLLMContractInstall: Sendable {
     public let purpose: BASLLMCallPurpose
     public let agentRef: String?
@@ -39,8 +39,8 @@ public struct BASLLMContractInstall: Sendable {
         self.traceSink = traceSink
     }
 
-    /// Wrap an adapter with the contract-enforcing gate per this install. Used by `makeDefault`;
-    /// also usable directly by any host wiring its own call site.
+    /// Wrap an adapter with the contract-enforcing gate per this install. Used by every call-site
+    /// constructor; also usable directly by a host wiring a router / streaming / custom site.
     public func wrap(_ adapter: any BASOrganAdapter) -> BASContractEnforcingOrganAdapter {
         BASContractEnforcingOrganAdapter(
             inner: adapter,

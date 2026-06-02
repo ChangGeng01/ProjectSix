@@ -287,6 +287,13 @@ rewriting the snapshot.
   `.guarded` request, contradicting `wasOverridden` — corrected + regression test); **(honesty)** one
   overclaim corrected — the `makeDefault` flag closes #12 at the extraction-engine site, not "all call
   sites" (other sites use `install.wrap(adapter)`).
+- **2026-06-02 — 全面 修复 #12 (ch1056).** Closed the audit residual: `BASLLMContractInstall` **moved to
+  BASOrgan** (so every site can use it) + opt-in `contractInstall` params added to
+  `BASLLMVerifierPipeline.init` (wraps each stage adapter) and `BASToolCallingPlanner.init` (wraps its
+  adapter), alongside `makeDefault` (extraction). **Drive tests** prove the wrap fires at all three
+  engines. #12 is now closable by a flag at every production engine; router/custom sites use
+  `install.wrap(adapter)`; **streaming is a deliberate exception** (a non-streaming gate would downgrade
+  it — streaming-aware wrapper is a follow-up). All opt-in / byte-equal-off (R1). ADR-031 §5.
 
 ### Net result after gap-clearing
 
