@@ -88,15 +88,33 @@ limit?
   died at **19 / 24 / 88 min**; a bg probe died at 29 min; a pure-bash probe ran the **full
   60 min** and finished on its own (never killed). So there is no ~19-min ceiling (my
   earlier claim was wrong and is retracted).
-- **Exact trigger: under rigorous investigation (§6).** The variance points to an
-  event-/policy-driven reap inside the harness rather than a wall-clock timer; the harness's
-  internal rule is not visible from settings.json (no timeout keys).
+- **Exact trigger (DEFINITIVE — ch1044 严查): the Claude Code desktop app's `IdleManager`
+  pausing the session when it goes idle.** Found in `~/Library/Logs/Claude/main.log` for
+  THIS session:
+  ```
+  [IdleManager:session] Idle timeout reached, disconnecting local_d80fe4d0-…
+  [CCD] Pausing session local_d80fe4d0-… due to idle
+  ```
+  fired repeatedly today (01:38, 04:26, 07:29 …). The idle timeouts are **900 s (15 min)
+  "session" / 1800 s (30 min) "preview"** (1007 / 979 occurrences in the log). Pausing the
+  session tears down its shell PTY (`LocalSessions.stopShellPty`), which SIGKILLs the
+  `run_in_background` Bash tasks running in that PTY. The signal is SIGKILL (no trap fired)
+  because version **2.1.156 predates the v2.1.160 changelog's SIGTERM-before-SIGKILL
+  graceful-teardown fix** — so cleanup handlers never run.
+- **Why the variance (19/24/29/88 min):** the idle timer **resets on activity**. A background
+  task dies only after a CONTINUOUS idle gap (the agent waiting for the user's next message)
+  exceeds the ~15 min timeout; survival = launch + active periods (each resets the timer) +
+  the final fatal idle gap. **Live proof:** a control probe stayed alive 60 min and a device
+  run 88 min precisely while foreground commands kept firing; the moment a >15 min idle gap
+  occurred, the session paused and the task was SIGKILL'd.
 
-**Consequence for "run a full hour":** a continuous 1-hour run via the harness's background
-mechanism *can* succeed (the endurance ran 88 min) — it is not blocked by a time limit — but
-the reap is non-deterministic from inside a tool session. A guaranteed continuous hour runs
-in the user's own terminal (outside the tool sandbox), where neither the phone nor xcodebuild
-imposes any limit.
+**Consequence + fix for "run a full hour":** a continuous 1-hour run via the harness's
+background mechanism *can* succeed — it is NOT blocked by a time limit, the phone, or
+xcodebuild. The only thing that kills it is the **session going idle >15 min**. So:
+- **Keep the session active** — poll the run every <15 min (also reports progress); each
+  foreground command resets the idle timer → the run survives.
+- **Pin the session** (Ctrl+T in agent view) — exempts it from idle reaping.
+- **Run it in your own terminal** (outside Claude Code) — no IdleManager at all.
 
 ## 6. Environment constraints (host-side, not the substrate)
 
