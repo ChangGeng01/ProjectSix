@@ -118,11 +118,16 @@ extension BASLLMNeuralCoreService {
     ///       engine: engine)
     public static func makeDefault(
         adapter: any BASOrganAdapter,
-        eventLog: any BASEventLogStorage
+        eventLog: any BASEventLogStorage,
+        contractInstall: BASLLMContractInstall? = nil
     ) -> BASLLMNeuralCoreService {
-        BASLLMNeuralCoreService(
+        // ADR-031 §4 step 1 (opt-in / byte-equal-off): when an install is supplied, every LLM call
+        // through this engine is contracted (fail-closed) + traced; nil → adapter used unwrapped,
+        // identical to before (no behavior change).
+        let effectiveAdapter: any BASOrganAdapter = contractInstall?.wrap(adapter) ?? adapter
+        return BASLLMNeuralCoreService(
             engine: BASLLMExtractionEngine(
-                adapter: adapter,
+                adapter: effectiveAdapter,
                 eventLog: eventLog))
     }
 }
