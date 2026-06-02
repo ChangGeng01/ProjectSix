@@ -93,6 +93,22 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
+            // ch1057:tap-to-start. Runs the ~1-hour endurance IN-APP on the phone,
+            // fully decoupled from the Mac/xcodebuild — so it survives the host
+            // idle-kill that capped prior runs at ~19 min. Tap, then walk away.
+            Button {
+                endurance.startManual()
+            } label: {
+                Text(endurance.status.isActive
+                     ? "Endurance running…"
+                     : "▶︎ Start 1-Hour Endurance")
+                    .font(.callout).bold()
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(endurance.status.isActive)
+            .padding(.top, 8)
         }
         .padding()
         .onAppear {

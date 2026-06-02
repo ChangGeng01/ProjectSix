@@ -138,6 +138,14 @@ final class BASEnduranceAppController: ObservableObject {
                 return "FAILED: \(m)"
             }
         }
+
+        /// ch1057 — true while the run is starting or in progress (button-disable guard)。
+        var isActive: Bool {
+            switch self {
+            case .starting, .running: return true
+            default: return false
+            }
+        }
     }
 
     @Published var status: RunStatus = .autostartOff
@@ -156,14 +164,37 @@ final class BASEnduranceAppController: ObservableObject {
             status = .autostartOff
             return
         }
+        // env-driven sizing (devicectl autostart / xcodebuild test path)。
+        let iters = max(1, Int(env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100)
+        let mlxPrompts = max(1, Int(env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3)
+        let cooldownSec = Int(env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
+        launch(iters: iters, cooldownSec: cooldownSec, mlxPrompts: mlxPrompts)
+    }
+
+    /// ch1057 — button-triggered manual start (no env var needed)。 Tapping the in-app
+    /// 「Start 1-Hour Endurance」button runs the endurance inside THIS app process,
+    /// fully decoupled from the Mac / xcodebuild — so it survives the host idle-kill
+    /// that capped xcodebuild-test runs at ~19 min。 Defaults size a ~1-hour run。
+    /// Idempotent:a second tap while a run is active is a no-op。
+    func startManual(iters: Int = 30, cooldownSec: Int = 30, mlxPrompts: Int = 2) {
+        guard !started else { return }
+        launch(iters: max(1, iters),
+               cooldownSec: max(0, cooldownSec),
+               mlxPrompts: max(1, mlxPrompts))
+    }
+
+    /// Shared start path for both the env-autostart and the manual-button entry points。
+    private func launch(iters: Int, cooldownSec: Int, mlxPrompts: Int) {
+        guard !started else { return }
         started = true
         status = .starting
-        // Prevent screen auto-lock during long endurance run。 The
-        // operator should also set Settings → Display & Brightness
-        // → Auto-Lock = Never on the device,and keep it charging。
+        // Prevent screen auto-lock during the long run。 The operator should also set
+        // Settings → Display & Brightness → Auto-Lock = Never + keep the device charging。
         UIApplication.shared.isIdleTimerDisabled = true
         Task.detached(priority: .userInitiated) { [weak self] in
-            await self?.runEndurance()
+            await self?.runEndurance(iters: iters,
+                                     cooldownSec: cooldownSec,
+                                     mlxPrompts: mlxPrompts)
         }
     }
 
@@ -361,19 +392,16 @@ final class BASEnduranceAppController: ObservableObject {
     // handle),so making the method nonisolated is safe:isolated work
     // hops explicitly,everything else(snapshot / brain / mlx / emit)
     // is genuinely off-main where it belongs。
-    private nonisolated func runEndurance() async {
+    private nonisolated func runEndurance(iters: Int, cooldownSec: Int,
+                                          mlxPrompts mlxPromptsArg: Int) async {
         let env = ProcessInfo.processInfo.environment
-        // ch 1025.8 C1 fix(CRITICAL):clamp to ≥1。 env "0"/negative
-        // would make `for iter in 1...totalIters` a ClosedRange with
-        // lowerBound > upperBound,which TRAPS at runtime(hard crash
-        // + skips closeLogFile/idleTimer cleanup = C2)。 mlxPrompts=0
-        // makes the inner `0..<0` a silent 0-token no-op — clamp too。
-        let totalIters = max(1, Int(
-            env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100)
-        let mlxPrompts = max(1, Int(
-            env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3)
-        let baseCooldown = Int(
-            env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
+        // ch1057 — sizing now arrives as params (from the env-autostart path OR the
+        // in-app button)。 The ≥1 clamp is kept here as the last line of defense:a
+        // 0/negative count would make `1...totalIters` a lowerBound>upperBound range
+        // that TRAPS at runtime (skipping closeLogFile/idleTimer cleanup)。
+        let totalIters = max(1, iters)
+        let mlxPrompts = max(1, mlxPromptsArg)
+        let baseCooldown = cooldownSec
         let adaptive = (
             env["BAS_INTERNAL_ADAPTIVE"] ?? "1") == "1"
         // ch1044 ADR-022 #3 — OPT-IN sovereign-verdict parity shadow。
