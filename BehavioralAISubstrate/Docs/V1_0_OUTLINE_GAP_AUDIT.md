@@ -241,4 +241,9 @@ rewriting the snapshot.
   `Response` (BASHostKit): the §11 governed entry composing a host-injected `runTurn` executor into
   the 6-field developer response; honors effort (receipt) + transcript (rendered view) at the facade
   boundary; surface = permit kind; processTraceRef from host traces. Facade, not a coordinator
-  rewrite. 5 tests (incl. a real stub-coordinator turn). ADR-030.
+  rewrite. 5 tests (incl. a real stub-coordinator turn). ADR-030. (commit `e98700d2d`)
+- **2026-06-02 — L10 RegretProfile (#15 MISSING) + SacrificeMap (#14 PARTIAL) → BUILT.**
+  `BASRegretProfile`/`BASRegretEntry` (likelihood×severity weight, irreversible-regret flag) +
+  `BASSacrificeMap`/`BASSacrificeEntry` (per-stakeholder, magnitude, `fromFlat` bridge from the
+  preserved `BASTradeoffLedger.sacrifices`) in BASOrchestration. Standalone / byte-equal-off — the
+  legacy flat field is untouched. 5 tests.
