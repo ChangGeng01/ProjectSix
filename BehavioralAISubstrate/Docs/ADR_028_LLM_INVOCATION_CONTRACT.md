@@ -96,5 +96,43 @@ requested/applied/override); **`BASTranscriptView`** (L12 §8.2); the consequent
 (above). All opt-in / byte-equal-off.
 
 Remaining v1.0 increments: auto-invoke the `verifierRef` verifier (`BASLLMVerifierPipeline`) inside
-the gate; the 9 named agents (§7); the SDK `brain.chat` (§11); the distillation bank; the 8 typed
-buses; and the production host install of the enforcing adapter with its policy.
+the gate; the SDK `brain.chat` (§11); the distillation bank; the 8 typed buses; and the production
+host install of the enforcing adapter with its policy. (The 9 named agents of §7 already existed on
+the fabric — §7 below bridges them to the contract.)
+
+## 7. 席 → contract bridge (§7 单脑多席) — BUILT (ch1046, opt-in / byte-equal-off)
+
+**Honest finding:** the 9 named 席 are NOT new. They already exist as first-class roles on the agent
+fabric — `BASAgentRole` (`Sources/BASMemory/BASAgentFabricEnums.swift`) enumerates
+scout / memory / planner / critic / hostAlignment / risk / surface / sovereignSentinel /
+evolutionShadow + 7 watchers + 4 sovereign seals = **20 named roles**, with personas
+(`BASAgentPersonaRoleTemplates`, 12 templates), proposals (`BASAgentProposal`), a merge engine, and
+the single-commit gate (单提交口). Building them again would be redundant. What was MISSING is the
+connection from a 席 to this keystone: nothing declared WHICH LLM "squeeze" each 席 performs, and a
+`BASProcessTrace` could not record WHICH 席 made a call.
+
+`BASAgentLLMPurposeMap` (`Sources/BASOrchestration/`, deps BASMemory + BASOrgan — the lowest module
+that imports both) is that bridge:
+
+- **`defaultPurpose(for: BASAgentRole) -> BASLLMCallPurpose?`** — the canonical map, grounded in the
+  purpose enum's own L-layer tie-points: scout→`decompose` (L7), planner→`plan` (L9),
+  critic→`critique`, risk→`risk` (L11), surface→`render` (L12), evolutionShadow→`distill` (L13),
+  sovereignSentinel→`verify`, hostAlignment→`verify` (host-constitution fit; the **same** purpose as
+  the sentinel, distinguished by SCOPE via `agentRef`). The governor/retrieval 席 (memory, the 7
+  watchers, the 4 seals/moderator) return `nil` — they observe / gate / serve memory
+  deterministically; they do not 压榨 the model generatively, so they have no LLM purpose. The
+  `switch` is **exhaustive over all 20 roles** (compiler-enforced totality).
+- **`enforcingAdapter(for:inner:…) -> BASContractEnforcingOrganAdapter?`** — builds a 席-scoped
+  contract-enforcing adapter (purpose = the 席's, `agentRef = role.rawValue`); returns `nil` for a
+  non-generative 席 (the caller uses `inner` unwrapped). `BASContractEnforcingOrganAdapter` gained an
+  additive `agentRef` param (default `nil` = byte-equal-off) so the 席 is stamped onto every derived
+  contract + `ProcessTrace`.
+
+**Proven** (`BASAgentLLMPurposeMapTests`, 7 tests): the 8 generative 席 map to their purpose; the 12
+governor 席 map to `nil`; the map is total over all 20 roles; a 席-scoped adapter stamps `agentRef` +
+purpose onto the trace; the two verify-purpose 席 (sentinel + hostAlignment) are disambiguated by
+`agentRef`; a forbidden-context policy rejects before the model.
+
+**Honest layer-2:** this makes each 席's governed LLM-call path AVAILABLE; routing a 席's real calls
+through it (and choosing per-席 `forbiddenContext` / `sovereignConstraints` / `verifierRef`) is the
+host's deliberate install step, like the rest of ADR-028 — not a silent default (亏的不要上).

@@ -15,6 +15,10 @@ public struct BASContractEnforcingOrganAdapter: BASOrganAdapter {
     private let inner: any BASOrganAdapter
     /// The fixed purpose for calls through this wrapper (one wrapper instance per call-site purpose).
     private let purpose: BASLLMCallPurpose
+    /// Optional 席 (agent) identity stamped onto every derived contract + emitted `BASProcessTrace`,
+    /// so a trace records WHICH agent made the call (单脑多席 attribution). nil = unattributed
+    /// (byte-equal-off — the derived contract's `agentRef` stays nil exactly as before).
+    private let agentRef: String?
     /// Context tags this purpose may NEVER include (host policy, e.g. sealed/high-sensitivity memory).
     private let forbiddenContext: [String]
     private let verifierRef: String?
@@ -27,6 +31,7 @@ public struct BASContractEnforcingOrganAdapter: BASOrganAdapter {
     public init(
         inner: any BASOrganAdapter,
         purpose: BASLLMCallPurpose,
+        agentRef: String? = nil,
         forbiddenContext: [String] = [],
         verifierRef: String? = nil,
         sovereignConstraints: [String] = [],
@@ -35,6 +40,7 @@ public struct BASContractEnforcingOrganAdapter: BASOrganAdapter {
     ) {
         self.inner = inner
         self.purpose = purpose
+        self.agentRef = agentRef
         self.forbiddenContext = forbiddenContext
         self.verifierRef = verifierRef
         self.sovereignConstraints = sovereignConstraints
@@ -49,6 +55,7 @@ public struct BASContractEnforcingOrganAdapter: BASOrganAdapter {
             purpose: purpose,
             request: request,
             forbiddenContext: forbiddenContext,
+            agentRef: agentRef,
             verifierRef: verifierRef,
             sovereignConstraints: sovereignConstraints)
         let gate = BASContractedOrganGate(adapter: inner, sovereignCheck: sovereignCheck)
