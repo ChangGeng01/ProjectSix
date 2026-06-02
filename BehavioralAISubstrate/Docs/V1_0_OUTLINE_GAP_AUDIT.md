@@ -270,13 +270,23 @@ rewriting the snapshot.
   wiring is host-deliberate (not done this pass).
 - **2026-06-02 — 剩余一次性解决掉 (opt-in install points, ch1054–1055).** The safely-wirable dormant
   gaps were closed as opt-in / default-OFF / byte-equal install points (R1 preserved): **#12 contract
-  gate** (`BASLLMContractInstall` + `makeDefault(…,contractInstall:)`, one flag closes it across all
-  call sites — `63111c71c`); **pre-work sovereign gate** (`BASSovereignPreflightGate`, host calls before
+  gate** (`BASLLMContractInstall` + `makeDefault(…,contractInstall:)`, one flag at the
+  **extraction-engine** site; other sites (verifier/planner/routing) use `install.wrap(adapter)` —
+  corrected by the 全面 audit, ADR-031 §5 — `63111c71c`); **pre-work sovereign gate** (`BASSovereignPreflightGate`, host calls before
   `runTurn` — `633af40cb`); **distillation ingest** (`BASDistillationBank.ingestingTraces` — `633af40cb`);
   **§12.2 sovereignty metrics** (`64e7b8f1e`). Now activatable in one flag/call, NOT enforced-by-default.
   **Still host-deliberate** (ADR-031 §5): #13 crypto token verifier (needs the host keyring + gates real
   OS actuation = R1 change) and #5 fabric-authoritative (codebase-deferred to ch961+). Forcing those two
   now would violate 小心翼翼/R1 — documented with recipes instead.
+- **2026-06-02 — 全面 audit (full suite + 3 adversarial reviewers).** Full substrate suite GREEN
+  (`swift test` exit 0). Reviewer findings: **(discipline)** byte-equality-when-off + zero-production-
+  caller default-OFF independently VERIFIED TRUE; **(security)** no hole — every new gate proven
+  fail-closed, distillation red-line enforced unconditionally, refs-only end-to-end, no secrets/PII/
+  force-unwraps, canonicalBytes injective; **(correctness)** no CRITICAL/HIGH/MEDIUM — one LOW honesty
+  bug fixed (`BASBrainChat.effortReceipt` set `overrideReason` while `applied == requested` for a
+  `.guarded` request, contradicting `wasOverridden` — corrected + regression test); **(honesty)** one
+  overclaim corrected — the `makeDefault` flag closes #12 at the extraction-engine site, not "all call
+  sites" (other sites use `install.wrap(adapter)`).
 
 ### Net result after gap-clearing
 

@@ -139,11 +139,17 @@ public struct BASBrainChat {
     }
 
     /// The effort receipt rule (pure, testable): the requested effort is applied when the turn was
-    /// granted a run lease; otherwise it is downgraded to `.guarded` with a reason. Richer
+    /// granted a run lease; otherwise it falls back to the `.guarded` safe floor. A reason is recorded
+    /// ONLY when that actually changes the level — requesting `.guarded` with no lease is already the
+    /// floor, so it is not an override (keeps `BASEffortPlan`'s invariant: `overrideReason` non-nil iff
+    /// `applied != requested`, so `wasOverridden` and the reason never contradict). Richer
     /// applied-effort resolution (device/thermal downgrades) is a pipeline concern.
     public static func effortReceipt(requested: BASEffortLevel, leaseGranted: Bool) -> BASEffortPlan {
-        BASEffortPlan(requested: requested,
-                      applied: leaseGranted ? requested : .guarded,
-                      overrideReason: leaseGranted ? nil : "no_run_lease")
+        if leaseGranted {
+            return BASEffortPlan(requested: requested, applied: requested, overrideReason: nil)
+        }
+        let applied: BASEffortLevel = .guarded
+        return BASEffortPlan(requested: requested, applied: applied,
+                             overrideReason: applied == requested ? nil : "no_run_lease")
     }
 }

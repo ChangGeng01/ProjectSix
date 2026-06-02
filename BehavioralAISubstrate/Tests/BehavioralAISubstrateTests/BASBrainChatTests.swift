@@ -71,6 +71,14 @@ final class BASBrainChatTests: XCTestCase {
         XCTAssertEqual(down.applied, .guarded)
         XCTAssertEqual(down.overrideReason, "no_run_lease")
         XCTAssertTrue(down.wasOverridden)
+
+        // requested .guarded + no lease: already at the floor → NOT an override. The (applied,
+        // overrideReason) pair must stay consistent with wasOverridden (invariant: reason non-nil
+        // iff applied != requested). Regression guard for the audit finding.
+        let guardedNoLease = BASBrainChat.effortReceipt(requested: .guarded, leaseGranted: false)
+        XCTAssertEqual(guardedNoLease.applied, .guarded)
+        XCTAssertNil(guardedNoLease.overrideReason, "no actual downgrade → no reason")
+        XCTAssertFalse(guardedNoLease.wasOverridden, "wasOverridden must not contradict overrideReason")
     }
 
     // The request maps onto the existing pipeline request (the fields runTurn consumes today).
