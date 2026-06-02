@@ -253,4 +253,20 @@ rewriting the snapshot.
   (BASKunlunAxisView/BASAxisDeviation), QinaoOldSeal (BASSealEnvelope/BASOldSealSealingProtocol),
   QinaoStudio (BASAgentPersonaSDK). Typealias re-exports (convention-consistent with QinaoMemory/
   QinaoRisk surfacing BAS value types) → NO mirror-drift; verified by compilation (no logic to
-  unit-test). These were packaging gaps, not capability gaps.
+  unit-test). These were packaging gaps, not capability gaps. (commit `47d0ab926`)
+- **2026-06-02 — Tier-3 naming nits.** `ConsentMatrix` (#12): `BASConsentMatrix` typealias →
+  `BASConsentLattice` (outline name, no duplication). `GuardBranch` (#10): `BASGuardBranch` first-class
+  type + `fromGuardPaths(_:)` bridge + `BASCandidateFrontier.guardBranches()` (the flat `guardPaths`
+  field preserved). 3 tests. **`Answer` (slice 4 #1): reclassified as by-design, NOT a gap** — the
+  `.answer` permit mode is intentionally served by the draft surface; adding a dedicated Answer
+  surface would require touching the shared `QinaoUI.ComponentID` enum for a capability that already
+  works (亏的不要上 — not built).
+
+### Net result after gap-clearing
+
+Of the 12 original non-BUILT verdicts, **11 resolved to BUILT** — DistillationBank, brain.chat,
+RegretProfile, SacrificeMap, ConsentMatrix (alias), GuardBranch, and the 5 Qinao SDK surfaces
+(Effort/Transcript/Axis/OldSeal/Studio) — and **1 reclassified as by-design** (Answer, served by the
+draft surface). The v1.0 outline is now fully accounted for: every named object is BUILT, aliased to
+its built equivalent, or an explicit by-design decision. All additions are additive / ADR-014 opt-in
+/ byte-equal-off. **Final tally: 100 BUILT (incl. aliases) + 1 by-design = 101.**
