@@ -404,6 +404,11 @@ final class BASEnduranceAppController: ObservableObject {
         let baseCooldown = cooldownSec
         let adaptive = (
             env["BAS_INTERNAL_ADAPTIVE"] ?? "1") == "1"
+        // ch1057 — optional wall-clock cap (seconds; 0 = run all iters). Lets a
+        // "run for N hours" launch finish CLEANLY at the cap regardless of iter count
+        // (the post-loop summary + closeLogFile + idleTimer reset still run).
+        let maxRuntimeSec = Int(
+            env["BAS_INTERNAL_MAX_RUNTIME_SEC"] ?? "0") ?? 0
         // ch1044 ADR-022 #3 — OPT-IN sovereign-verdict parity shadow。
         // Default OFF (env unset) → byte-equal:no projection,no verify,no log。
         // With `BAS_SHADOW_PARITY=enabled`,each turn's coordinator verdict is
@@ -625,6 +630,15 @@ final class BASEnduranceAppController: ObservableObject {
             await emitBoth(
                 "📍 ch1025 internal-iter=\(iter) start " +
                 "elapsed=\(elapsedSec)s")
+            // ch1057 — wall-clock cap check. Break BEFORE the iter's work so a capped
+            // run ends at a clean iteration boundary; the loop exit runs the normal
+            // post-loop summary / closeLogFile / idleTimer reset.
+            if maxRuntimeSec > 0 && elapsedSec >= maxRuntimeSec {
+                await emitBoth(
+                    "⏹ ch1025 time-cap reached elapsed=\(elapsedSec)s " +
+                    "cap=\(maxRuntimeSec)s — finishing (completed \(iter - 1) iters)")
+                break
+            }
 
             let snapBefore = snapshot()
             await emitBoth(formatSnap(
