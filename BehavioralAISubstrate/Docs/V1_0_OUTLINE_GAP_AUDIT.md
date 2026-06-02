@@ -225,3 +225,15 @@ packaging/naming. Ranked by real value:
 
 > Everything above is additive. Per ADR-014 the new objects default OFF / byte-equal-off, and any
 > behavioral composition (#2) is the host's deliberate install step.
+
+---
+
+## Update log (gap-clearing progress)
+
+The tables above are the as-of-2026-06-02 snapshot. Resolutions are tracked here rather than by
+rewriting the snapshot.
+
+- **2026-06-02 — DistillationBank (L13 #17): MISSING → BUILT.** `BASDistillationBank` +
+  entry/quality/policy/admission + ProcessTrace & LearningExportBundle adapters. Fail-closed on the
+  three red-line safety gates; immutable; `exportManifest` bridges to WP15. 10 tests. ADR-029.
+  (commit pending)
