@@ -1,7 +1,7 @@
 # ADR-033 — Wiring the real capabilities onto the cognitive main chain (5-step arc)
 
-> **Status: Steps 1, 3, 4, 5 SHIPPED + proven. Step 2 SHIPPED (the routed service, opt-in + proven);
-> its default-flip DEFERRED (model-gated).**
+> **Status: ALL of Steps 1–5 SHIPPED + proven — including the Step-2 default-flip onto an on-device
+> MiniLM-L6-v2 semantic embedder (free, Apache-2.0, $0; converted to CoreML in-repo).**
 > Response to the file-grounded critique that the *default* main chain still ran the V1 path + the
 > in-memory toy memory while the heavy machinery sat opt-in / observer / scaffold beside it.
 
@@ -35,7 +35,7 @@ verified), **诚实** (no overclaiming).
 |---|------|--------|--------|
 | 1 | BASEBrainTurnResult byte-equal replay harness | **shipped + proven** | `ec382534b` |
 | 2 | BASL8RoutedMemoryService (build + prove, opt-in) | **shipped + proven** | `8f4f03dbf` |
-| 2-flip | routed memory as the brain default | **deferred — model-gated** | — |
+| 2-flip | routed memory as the brain default (on-device MiniLM) | **shipped + proven** | `9f520f014` + `458a2cd31` |
 | 3 | nativeV2 honest semantics (dispatch runWithPlan) | **shipped + proven** | `1cdd8ab9a` |
 | 4 | Metal/Mamba per-turn observation (host-driven) | **shipped + proven** | `9efe40677` |
 | 5 | Agent Fabric authoritative (host feed-forward) | **shipped + proven** | `06f096852` |
@@ -61,13 +61,17 @@ service's); constitution `restrictedMemoryDomains` filtering. 8 tests prove dete
 recall the Jaccard-over-signals backend structurally cannot do; note the default `lexicalEmbed` is
 bag-of-tokens, NOT semantic embeddings), domain filtering, store writes, and that `retrieve()` stays sync.
 
-**The default-flip is DEFERRED and model-gated** (the user's "flip default, model I supply"). Vector
-≠ Jaccard, so the routed output is intentionally NOT byte-equal; the flip is a separate, gated step
-that requires: (a) the brain opt-in seam (`BASMemoryBackend` option + a branch at
-`BASCognitiveBrain.swift:612`) + atom-store provisioning + a `refresh()` lifecycle, and (b) the
-user-supplied **semantic** embedding model (a CoreML `.mlpackage` wrapped as a sync embedder). A
-stub/lexical-backed flip would be deterministic-but-meaningless = 亏的上, so the flip waits for the
-real model. `BASMLMemoryService` stays live + an env escape hatch remains.
+**The default-flip SHIPPED** (`9f520f014` + `458a2cd31`). Rather than a paid/API model, the free
+Apache-2.0 **sentence-transformers/all-MiniLM-L6-v2** was converted to CoreML on-device (fp32,
+mean-pool + L2-norm baked in; CoreML-vs-PyTorch cosine == 1.0; car/automobile=0.86 vs
+car/banana=0.39) — `BASMiniLMEmbeddingProvider` (sync, loaded from `Bundle.module`) + a pure-Swift
+BERT WordPiece tokenizer (provenance: `Tools/minilm_to_coreml.py`, `Docs/MiniLM_NOTICE.md`). The
+routed service gained opt-in **self-population** (drop-in recall like the legacy LRU, vector-scored).
+The brain takes a host-injected `memoryEmbed` sync closure (BASHostKit can't depend on the Apple
+adapter where MiniLM lives): supplied ⇒ routed+MiniLM default; nil ⇒ legacy `BASMLMemoryService`
+(byte-equal-off / R1). Vector ≠ Jaccard, so the routed output is intentionally NOT byte-equal — proven
+instead by golden semantic recall (related frame recalled, unrelated dropped) + the brain still
+emitting a sovereign verdict on the MiniLM-routed turn. `BASMLMemoryService` stays live as the fallback.
 
 ### Step 3 — nativeV2 honest semantics (shipped)
 Through M1081 the runtime mode was stored but `runTurn` ignored it (always V1 — the ch1044 finding),
@@ -112,10 +116,11 @@ Shipped (`BASAgentFabricAuthoritativeProjection`):
 Deeper integration (structured deltas consumed by the cascade beyond `userInput`; multi-turn
 authoritative loops) remains a future arc.
 
-## Memory default posture: opt-in → prove → flip
-The routed memory backend is **built + proven opt-in**; the default stays `BASMLMemoryService`. The
-flip to default is a separate, reviewed, **model-gated** commit. This is the R1 / 亏的不要上 path —
-never a silent swap, legacy kept live, escape hatch retained.
+## Memory default posture: opt-in → prove → flip (DONE)
+The routed memory backend was **built + proven opt-in**, then **flipped** onto the on-device MiniLM
+embedder via a host-injected sync closure (`memoryEmbed`): supplied ⇒ routed+MiniLM, nil ⇒ legacy
+`BASMLMemoryService` (byte-equal-off). This was the R1 / 亏的不要上 path — never a silent swap (the
+library default with no embedder is the unchanged legacy service), legacy kept live as the fallback.
 
 ## Verification
 - Per-step targeted tests all green: Step 1 (7), Step 2 (8), Step 3 (2 + the existing
