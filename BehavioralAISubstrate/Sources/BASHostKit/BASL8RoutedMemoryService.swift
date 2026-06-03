@@ -23,13 +23,16 @@
 //   • vector  — embedding cosine top-K, routed to Rust SIMD via `BASAutoRouteRanker`.
 //   • SQL/event — the injected `BASMemoryAtomStore` (a `BASSQLiteMemoryAtomStore` for SQL, or a
 //     `BASEventSourcedMemoryAtomStore` for event-sourcing).
-//   • event/log/provenance — when the injected store is a `BASEventSourcedMemoryAtomStore`, a
-//     governance write in `drainIntents()` appends a replayable event (the provenance trail).
-//     PRECONDITION (honest): the store's `updateGovernanceStatus` only records an event for an atom
-//     ALREADY in its projection — i.e. the host must have `admit()`ed the atoms into the SAME
-//     event-sourced store first. This service reads atoms via `loadAllAtoms` and does NOT `admit()`
-//     them itself, so the event trail materializes only under that host wiring (it is the Step-2
-//     flip's job to establish it; the current unit tests use an in-memory store and don't cover it).
+//   • event/log/provenance — TWO async write paths in `drainIntents()`, both opt-in:
+//     (1) ADMIT: when `admitAtom` is wired, each SELF-POPULATED atom is `admit()`ed to the durable
+//         store. A `BASEventSourcedMemoryAtomStore.admit` appends a `memoryAtomEvent` (the provenance
+//         trail) and the atom survives restart — a `loadAllAtoms` reading the SAME store reloads it on
+//         the next `refresh()`. This is the path the Step-2 flip wires (see ADR-033); it is covered by
+//         `BASRoutedMemoryFlipTests.testRoutedMemoryPersistsAndReloadsViaEventSourcedStore`.
+//     (2) GOVERNANCE: a promote/freeze calls `updateGovernanceStatus`, which records an event only for
+//         an atom ALREADY in the store's projection — so promote/freeze of a self-populated atom is
+//         durable only AFTER its admit (path 1) has run, or for atoms the host admitted elsewhere and
+//         surfaced via `loadAllAtoms`. nil `admitAtom`/`atomStore` ⇒ pure in-memory (no persistence).
 //
 // ## Embedding seam
 //
@@ -49,6 +52,25 @@ import Foundation
 import BASRuntimeCore
 import BASMemory
 import BASOrchestration
+
+/// Host-supplied durable persistence for the routed memory backend (the Step-2 SQL/event/provenance
+/// half). Wire e.g. a `BASEventSourcedMemoryAtomStore` (events + provenance) or
+/// `BASSQLiteMemoryAtomStore` so self-populated recall survives restart and emits a provenance event
+/// per atom. nil ⇒ pure in-memory (the default flip).
+public struct BASRoutedMemoryPersistence: Sendable {
+    public let loadAllAtoms: @Sendable () async -> [BASGovernedMemory]
+    public let admitAtom: @Sendable (BASGovernedMemory) async -> Void
+    public let atomStore: any BASMemoryAtomStore
+    public init(
+        loadAllAtoms: @escaping @Sendable () async -> [BASGovernedMemory],
+        admitAtom: @escaping @Sendable (BASGovernedMemory) async -> Void,
+        atomStore: any BASMemoryAtomStore
+    ) {
+        self.loadAllAtoms = loadAllAtoms
+        self.admitAtom = admitAtom
+        self.atomStore = atomStore
+    }
+}
 
 public final class BASL8RoutedMemoryService: BASMemoryServicing,
     @unchecked Sendable
@@ -102,6 +124,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     private var snapshot: [SnapshotEntry] = []
     private var promoteIntents: [String] = []   // atom IDs to mark governed
     private var freezeIntents: [String] = []     // atom IDs to mark archived/frozen
+    private var admitIntents: [BASGovernedMemory] = []  // self-pop atoms to persist via admitAtom
     private var selfPopSeq: Int = 0              // monotonic id source for self-populated atoms
 
     /// When true, retrieve() also writes the current frame as a new (vector-embedded) atom into the
@@ -109,6 +132,11 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// BASMLMemoryService's self-managed LRU, but vector-scored. Bounded by `selfPopulateCap`.
     private let selfPopulate: Bool
     private let selfPopulateCap: Int
+    /// Optional persistence hook: when set, self-populated atoms are admitted to a durable store at
+    /// drainIntents() — a `BASEventSourcedMemoryAtomStore.admit` emits a provenance event per atom,
+    /// so recall survives restart (with a `loadAllAtoms` that reads the same store). The host wires
+    /// this (BASHostKit can't take a concrete-store generic); nil ⇒ pure in-memory (no persistence).
+    private let admitAtom: (@Sendable (BASGovernedMemory) async -> Void)?
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -119,7 +147,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         relevanceFloor: Float = Parameters.relevanceFloor,
         atomStore: (any BASMemoryAtomStore)? = nil,
         selfPopulate: Bool = false,
-        selfPopulateCap: Int = 64
+        selfPopulateCap: Int = 64,
+        admitAtom: (@Sendable (BASGovernedMemory) async -> Void)? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -130,6 +159,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.atomStore = atomStore
         self.selfPopulate = selfPopulate
         self.selfPopulateCap = max(1, selfPopulateCap)
+        self.admitAtom = admitAtom
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -199,6 +229,10 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
                 snapshot.append(SnapshotEntry(
                     atomID: id, domain: "session", embedding: query, atom: atom))
                 while snapshot.count > selfPopulateCap { snapshot.removeFirst() }
+                // Persistence: queue the atom for a durable admit (event/provenance) at drain.
+                if admitAtom != nil {
+                    admitIntents.append(Self.governedMemory(content: queryText))
+                }
             }
         }
         return bundle
@@ -258,17 +292,26 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// from the queue when drained, so a write that returns false (atom absent) or throws is NOT
     /// retried — the returned (promoted, frozen) counts let the caller detect a shortfall.
     @discardableResult
-    public func drainIntents() async -> (promoted: Int, frozen: Int) {
-        let (promotes, freezes) = withLock {
-            () -> ([String], [String]) in
+    public func drainIntents() async -> (promoted: Int, frozen: Int, admitted: Int) {
+        let (promotes, freezes, admits) = withLock {
+            () -> ([String], [String], [BASGovernedMemory]) in
             let pendingPromotes = promoteIntents
             let pendingFreezes = freezeIntents
+            let pendingAdmits = admitIntents
             promoteIntents.removeAll(keepingCapacity: true)
             freezeIntents.removeAll(keepingCapacity: true)
-            return (pendingPromotes, pendingFreezes)
+            admitIntents.removeAll(keepingCapacity: true)
+            return (pendingPromotes, pendingFreezes, pendingAdmits)
         }
 
-        guard let store = atomStore else { return (0, 0) }
+        // Persist self-populated atoms first (an event-sourced store emits a provenance event per
+        // admit) so a later promote/freeze of the same atom finds it in the store.
+        var admitted = 0
+        if let admit = admitAtom {
+            for atom in admits { await admit(atom); admitted += 1 }
+        }
+
+        guard let store = atomStore else { return (0, 0, admitted) }
         var promoted = 0
         var frozen = 0
         for id in promotes {
@@ -281,7 +324,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
                 frozen += 1
             }
         }
-        return (promoted, frozen)
+        return (promoted, frozen, admitted)
     }
 
     // MARK: - Introspection
@@ -326,6 +369,14 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             conflictFingerprint: record.id.uuidString,
             promotionState: promotionState(for: record.governanceStatus),
             frozen: record.governanceStatus == .archived)
+    }
+
+    /// Build a durable governed-memory record from a self-populated frame's content (for `admitAtom`).
+    static func governedMemory(content: String) -> BASGovernedMemory {
+        BASGovernedMemory(
+            kind: .semantic, content: content, scope: .session, sensitivity: .low,
+            tier: .hot, confidence: 0.7, sourceType: Parameters.atomSource,
+            governanceStatus: .governed, provenanceSummary: "routed-self-pop")
     }
 
     private static func contentType(

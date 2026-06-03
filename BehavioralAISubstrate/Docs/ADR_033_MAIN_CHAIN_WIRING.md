@@ -1,10 +1,13 @@
 # ADR-033 — Wiring the real capabilities onto the cognitive main chain (5-step arc)
 
 > **Status: ALL of Steps 1–5 SHIPPED + proven — including the Step-2 flip onto a free on-device
-> MiniLM-L6-v2 embedder (Apache-2.0, $0; converted to CoreML in-repo). HONEST SCOPE (2nd deep audit):
-> the flip is HOST-INJECTED — the library `makeWithDefaults()` default stays legacy / byte-equal-off;
-> it ships IN-MEMORY semantic vector recall, NOT the SQL/event/provenance store (that stays opt-in);
-> and the on-device app is wired but not yet re-run on hardware.**
+> MiniLM-L6-v2 embedder (Apache-2.0, $0; converted to CoreML in-repo). HONEST SCOPE (2nd + 3rd deep
+> audit): the flip is HOST-INJECTED — the library `makeWithDefaults()` default stays legacy /
+> byte-equal-off; it ships IN-MEMORY semantic vector recall by DEFAULT, with the SQL/event/provenance
+> store now a WIRED + PROVEN opt-in (a host passes `BASRoutedMemoryPersistence` → self-populated recall
+> is `admit()`ed to a `BASEventSourcedMemoryAtomStore`, emits a provenance event per atom, and survives
+> restart — see `testRoutedMemoryPersistsAndReloadsViaEventSourcedStore`); the on-device app is wired
+> but not yet re-run on hardware.**
 > Response to the file-grounded critique that the *default* main chain still ran the V1 path + the
 > in-memory toy memory while the heavy machinery sat opt-in / observer / scaffold beside it.
 
@@ -56,10 +59,11 @@ that unblocked Step 3b.
 A `BASMemoryServicing` conformer composing the real backends behind the **sync** `retrieve()`:
 sync query embedding → `BASAutoRouteRanker.cosineSimilarity` (Rust-SIMD-routed) over a
 pre-materialized snapshot; `refresh()`/`drainIntents()` are the only async surfaces (touch the
-actor-based store); promote/freeze route governance writes through an injected `BASMemoryAtomStore`
-(wiring an event-sourced store records each governance write as a replayable event — provenance —
-**once the atoms have been admitted into that store**, which is the host's / flip's job, not this
-service's); constitution `restrictedMemoryDomains` filtering. 8 tests prove determinism, **lexical
+actor-based store); promote/freeze route governance writes through an injected `BASMemoryAtomStore`, and — when a
+`BASRoutedMemoryPersistence` is wired — `drainIntents()` also `admit()`s each **self-populated** atom
+to a durable `BASEventSourcedMemoryAtomStore` (one replayable provenance event per atom) BEFORE any
+governance write, so a self-pop atom is both persisted and subsequently governable; constitution
+`restrictedMemoryDomains` filtering. 8 tests prove determinism, **lexical
 (text-overlap) ranking** (a weather query recalls the weather atom and drops the unrelated one — text
 recall the Jaccard-over-signals backend structurally cannot do; note the default `lexicalEmbed` is
 bag-of-tokens, NOT semantic embeddings), domain filtering, store writes, and that `retrieve()` stays sync.
@@ -75,16 +79,22 @@ LRU, vector-scored). The brain takes a host-injected `memoryEmbed` sync closure 
 depend on the Apple adapter where MiniLM lives): supplied ⇒ routed+MiniLM; nil ⇒ legacy
 `BASMLMemoryService` (the library default; byte-equal-off / R1).
 
-**HONEST SCOPE of the shipped flip** (2nd deep audit): `resolveMemoryService` wires
-`BASL8RoutedMemoryService(loadAllAtoms: { [] }, atomStore: nil, selfPopulate: true)` — i.e. **pure
-in-memory** MiniLM vector self-population. The SQL/event store, event-sourced provenance, and
-persistence are NOT active in the flip (they are the service's opt-in `atomStore` capability;
-`drainIntents()` is a no-op without it; recall is process-memory, lost on restart). The only Rust in
-the path is `BASAutoRouteRanker.cosineSimilarity` (a SIMD kernel). Vector ≠ Jaccard, so the routed
-output is intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated
-dropped) + the brain still emitting a sovereign verdict. Caveats: the routed+self-populate path is NOT
-covered by the byte-equal replay/determinism suites (they use the stub), and the DeviceTestApp wiring
-(`b1d118374`) is not yet re-run on hardware. `BASMLMemoryService` stays live as the fallback.
+**HONEST SCOPE of the shipped flip** (2nd + 3rd deep audit): by DEFAULT `resolveMemoryService` wires
+`BASL8RoutedMemoryService(loadAllAtoms: { [] }, atomStore: nil, selfPopulate: true, admitAtom: nil)` —
+i.e. **pure in-memory** MiniLM vector self-population (recall is process-memory, lost on restart). The
+SQL/event store + event-sourced provenance are now a **WIRED + PROVEN opt-in**: a host passes
+`memoryPersistence: BASRoutedMemoryPersistence(loadAllAtoms:admitAtom:atomStore:)` through
+`makeWithDefaults`/the bundle init, and then each self-populated atom is `admit()`ed to a
+`BASEventSourcedMemoryAtomStore` at `drainIntents()`, emitting one provenance event per atom and
+surviving restart — `testRoutedMemoryPersistsAndReloadsViaEventSourcedStore` proves admit→persist→
+provenance-events→reload→recall-after-restart end-to-end. The only Rust in the recall path is
+`BASAutoRouteRanker.cosineSimilarity` (a SIMD kernel). Vector ≠ Jaccard, so the routed output is
+intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated dropped)
++ the brain still emitting a sovereign verdict. The routed+self-populate path's **own** determinism is
+now pinned directly by `testRoutedSelfPopulatePathIsDeterministic` (closing the 3rd-audit gap that the
+byte-equal replay/determinism suites only exercise the stub coordinator). Remaining caveat: the
+DeviceTestApp wiring (`b1d118374`) is not yet re-run on hardware. `BASMLMemoryService` stays live as
+the byte-equal-off fallback.
 
 ### Step 3 — nativeV2 honest semantics (shipped)
 Through M1081 the runtime mode was stored but `runTurn` ignored it (always V1 — the ch1044 finding),

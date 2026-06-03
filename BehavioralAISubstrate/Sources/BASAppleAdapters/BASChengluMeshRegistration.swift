@@ -279,9 +279,12 @@ public extension BASChengluMeshRegistration {
     /// strict concurrency,a non-Sendable struct silently
     /// auto-promotes to `@unchecked` at the cross,masking the
     /// safety story。Mark explicit + document the contract:
-    /// MLModel reference itself is read-only post-load (Apple
-    /// docs confirm `MLModel.prediction(from:)` is thread-safe),
-    /// so the struct can safely cross actor boundaries。Same
+    /// MLModel reference itself is read-only post-load, so the struct
+    /// can safely CROSS actor boundaries。 NOTE (corrected): Apple's
+    /// `MLModel.prediction(from:)` is NOT thread-safe — concurrent
+    /// predictions must be serialized by the caller; this struct only
+    /// moves the model across the boundary, it does not invoke
+    /// concurrent predictions itself。Same
     /// pattern as the private `ChengluModelBox: @unchecked
     /// Sendable` (line 390)。
     struct RegistrationOptions: @unchecked Sendable {

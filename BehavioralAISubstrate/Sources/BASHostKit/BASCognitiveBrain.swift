@@ -417,7 +417,10 @@ public actor BASCognitiveBrain {
         // adapters), the default L8 memory becomes a self-populating routed VECTOR backend instead
         // of BASMLMemoryService's in-memory Jaccard. nil ⇒ legacy (byte-equal-off / R1).
         memoryEmbed: (@Sendable (String) -> [Float])? = nil,
-        memoryEmbedDim: Int = 384
+        memoryEmbedDim: Int = 384,
+        // Opt-in durable persistence for the routed memory (SQL/event/provenance store). nil ⇒
+        // in-memory self-population only. Host wires a BASEventSourcedMemoryAtomStore.
+        memoryPersistence: BASRoutedMemoryPersistence? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -427,6 +430,7 @@ public actor BASCognitiveBrain {
                 enableKnowledgeGraph: true),
             memoryEmbed: memoryEmbed,
             memoryEmbedDim: memoryEmbedDim,
+            memoryPersistence: memoryPersistence,
             summaryHistoryCapacity:
                 summaryHistoryCapacity,
             sqlHistoryStore: sqlHistoryStore,
@@ -448,14 +452,29 @@ public actor BASCognitiveBrain {
     /// The host-injected embedder keeps BASHostKit free of any Apple / CoreML dependency.
     static func resolveMemoryService(
         memoryEmbed: (@Sendable (String) -> [Float])?,
-        dim: Int
+        dim: Int,
+        persistence: BASRoutedMemoryPersistence? = nil
     ) -> any BASMemoryServicing {
         guard let embed = memoryEmbed else { return BASMLMemoryService() }
+        // Destructure persistence with `if let` (not optional-chaining): reading a `@Sendable`
+        // stored closure through `persistence?.x` strips the `@Sendable` bit on this toolchain.
+        if let store = persistence {
+            return BASL8RoutedMemoryService(
+                loadAllAtoms: store.loadAllAtoms,
+                syncEmbed: embed,
+                embeddingDimension: dim,
+                atomStore: store.atomStore,
+                selfPopulate: true,
+                admitAtom: store.admitAtom)
+        }
+        let emptyLoad: @Sendable () async -> [BASGovernedMemory] = { [] }
         return BASL8RoutedMemoryService(
-            loadAllAtoms: { [] },
+            loadAllAtoms: emptyLoad,
             syncEmbed: embed,
             embeddingDimension: dim,
-            selfPopulate: true)
+            atomStore: nil,
+            selfPopulate: true,
+            admitAtom: nil)
     }
 
     /// 主线 加强 实用性 — fully-wired brain factory。
@@ -551,6 +570,7 @@ public actor BASCognitiveBrain {
         // vector memory; nil ⇒ legacy BASMLMemoryService (byte-equal-off / R1).
         memoryEmbed: (@Sendable (String) -> [Float])? = nil,
         memoryEmbedDim: Int = 384,
+        memoryPersistence: BASRoutedMemoryPersistence? = nil,
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
@@ -637,7 +657,8 @@ public actor BASCognitiveBrain {
             // last major placeholder layer in the core
             // L0 → L7 cascade。
             memoryService: BASCognitiveBrain.resolveMemoryService(
-                memoryEmbed: memoryEmbed, dim: memoryEmbedDim),
+                memoryEmbed: memoryEmbed, dim: memoryEmbedDim,
+                persistence: memoryPersistence),
             // L3 loop: REAL candidate generation
             // service。 Produces 1-3 candidates derived
             // from L2 decompose signals (primary +

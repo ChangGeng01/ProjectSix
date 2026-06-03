@@ -9,6 +9,7 @@ import Foundation
 @testable import BASAppleAdapters
 @testable import BASMemory
 @testable import BASOrchestration
+@testable import BASRuntimeCore
 
 #if canImport(CoreML) && !os(iOS)
 final class BASRoutedMemoryFlipTests: XCTestCase {
@@ -85,6 +86,81 @@ final class BASRoutedMemoryFlipTests: XCTestCase {
         let result = await brain.process("tell me about mountain trails")
         XCTAssertNotNil(result.sovereignVerdict,
             "the MiniLM-routed brain still produces a sovereign verdict")
+    }
+
+    // MARK: - #1 persistence: self-pop → admit → an event-sourced store persists + emits a
+    //         provenance event per atom, and a fresh service reloads it (recall survives "restart").
+
+    func testRoutedMemoryPersistsAndReloadsViaEventSourcedStore() async throws {
+        let mini = try XCTUnwrap(BASMiniLMEmbeddingProvider())
+        let eventLog = BASInMemoryEventLogStorage()
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: eventLog, sessionID: "routed-persist")
+
+        let svc = BASL8RoutedMemoryService(
+            loadAllAtoms: { await store.allAtoms() },
+            syncEmbed: mini.syncEmbedClosure(),
+            embeddingDimension: 384,
+            atomStore: store,
+            selfPopulate: true,
+            admitAtom: { _ = try? await store.admit($0) })
+
+        // two self-populating turns — each queues a durable-admit intent (NOT yet flushed).
+        _ = svc.retrieve(decomposeFrame: frame("alpine skiing in deep winter snow"),
+                         hostContext: profile(), budget: budget())
+        _ = svc.retrieve(decomposeFrame: frame("ocean scuba diving on the coral reef"),
+                         hostContext: profile(), budget: budget())
+
+        // flush → durable admit; each admit appends a replayable provenance event to the store.
+        let drained = await svc.drainIntents()
+        XCTAssertEqual(drained.admitted, 2,
+            "both self-populated atoms are admitted to the durable store at drain")
+
+        let persisted = await store.allAtoms()
+        XCTAssertEqual(persisted.count, 2, "the event-sourced store persisted both atoms")
+        let events = await eventLog.events(forSession: "routed-persist")
+        XCTAssertGreaterThanOrEqual(events.count, 2,
+            "each admit emitted a replayable provenance event (the event/log/provenance trail)")
+
+        // a FRESH service (simulating process restart) reloads the persisted atoms via loadAllAtoms…
+        let reborn = BASL8RoutedMemoryService(
+            loadAllAtoms: { await store.allAtoms() },
+            syncEmbed: mini.syncEmbedClosure(), embeddingDimension: 384)
+        await reborn.refresh()
+        XCTAssertEqual(reborn.snapshotCount, 2, "restart reloaded both persisted atoms")
+
+        // …and still recalls the semantically-related one (recall survived the restart).
+        let recalled = reborn.retrieve(
+            decomposeFrame: frame("winter mountain snow sports"),
+            hostContext: profile(), budget: budget())
+        XCTAssertEqual(recalled.atoms.first?.summary, "alpine skiing in deep winter snow",
+            "the reloaded MiniLM memory recalls the skiing atom (not the diving atom) after restart")
+    }
+
+    // MARK: - #2 the routed + self-populate path is itself deterministic. The byte-equal/replay
+    //         suites only exercise the stub coordinator, never this backend's own state machine,
+    //         so this pins the self-pop counter IDs + cosine ordering directly (hermetic: lexical).
+
+    func testRoutedSelfPopulatePathIsDeterministic() {
+        func recallSequence() -> [[String]] {
+            let svc = BASL8RoutedMemoryService(
+                loadAllAtoms: { [] },
+                syncEmbed: BASL8RoutedMemoryService.lexicalEmbed(),
+                embeddingDimension: BASL8RoutedMemoryService.Parameters.defaultLexicalDimension,
+                selfPopulate: true)
+            let frames = ["weather is sunny today", "the weather forecast looks sunny",
+                          "quarterly stock market earnings", "sunny weather again tomorrow"]
+            return frames.map { text in
+                svc.retrieve(decomposeFrame: frame(text), hostContext: profile(), budget: budget())
+                    .atoms.map(\.memoryID)
+            }
+        }
+        let a = recallSequence()
+        let b = recallSequence()
+        XCTAssertEqual(a, b,
+            "the routed self-populate path (counter IDs + cosine ordering) is deterministic")
+        XCTAssertTrue(a.contains { !$0.isEmpty },
+            "the sequence actually recalls something — the determinism check is non-vacuous")
     }
 }
 #endif
