@@ -1,7 +1,7 @@
 # ADR-033 — Wiring the real capabilities onto the cognitive main chain (5-step arc)
 
-> **Status: Steps 1, 3, 4 SHIPPED + proven. Step 2 SHIPPED (the routed service, opt-in + proven);
-> its default-flip DEFERRED (model-gated). Step 5 SCOPED + DEFERRED (a dedicated replay-gated arc).**
+> **Status: Steps 1, 3, 4, 5 SHIPPED + proven. Step 2 SHIPPED (the routed service, opt-in + proven);
+> its default-flip DEFERRED (model-gated).**
 > Response to the file-grounded critique that the *default* main chain still ran the V1 path + the
 > in-memory toy memory while the heavy machinery sat opt-in / observer / scaffold beside it.
 
@@ -38,7 +38,7 @@ verified), **诚实** (no overclaiming).
 | 2-flip | routed memory as the brain default | **deferred — model-gated** | — |
 | 3 | nativeV2 honest semantics (dispatch runWithPlan) | **shipped + proven** | `1cdd8ab9a` |
 | 4 | Metal/Mamba per-turn observation (host-driven) | **shipped + proven** | `9efe40677` |
-| 5 | Agent Fabric Rust-authoritative | **scoped + deferred** | this ADR |
+| 5 | Agent Fabric authoritative (host feed-forward) | **shipped + proven** | `06f096852` |
 
 ### Step 1 — replay harness (the safety net for 2/3/5)
 `BASEBrainTurnResultReplayCanonicalizer` (pins `memoryBundle.retrievedAt` only — R1 contract +
@@ -86,27 +86,31 @@ so it does NOT touch the sync `runTurn` — zero change to the main chain. HONES
 its byte-equal-off proof are shipped, but **no host wires it yet** (like the sovereign shadow it
 mirrors, which is also host-callable-but-unwired); per-turn host wiring is a follow-up, not done here.
 
-### Step 5 — Agent Fabric Rust-authoritative (scoped + deferred)
-`BASAgentFabricMode.authoritative` is today a scaffold the substrate branches on nowhere. The Rust
-`bas-agent-fabric` crate is pure merge-compute (no mode branching); single-writer-per-domain is
-already enforced by `BASSharedStateGraph` — so authoritative is a **host-side consumption choice, not
-a new Rust component**.
+### Step 5 — Agent Fabric authoritative (shipped — host feed-forward)
+`BASAgentFabricMode.authoritative` was inert scaffold (the substrate branched on it nowhere; both
+modes produced byte-identical output). The Rust `bas-agent-fabric` crate is pure merge-compute and
+single-writer-per-domain is enforced by `BASSharedStateGraph`, so authoritative is a **host-side
+consumption choice, not a new Rust component**. The ch883 sync/async boundary (the sync `runTurn`
+cannot `await` the async fabric) makes the honest path a **host feed-forward**, not inline mutation.
 
-- **The seam**: `EBrainRuntimeCoordinator.runAgentFabricObservation(...)` (`:310-383`) returns a
-  `BASAgentTurnResult` that today is **not consumed as authoritative input to `runTurn`** (it is
-  consumed for audit/observation by the fabric adapter / host pipeline, but never feeds the verdict).
-  Authoritative wiring would project the accepted
-  `AgentDelta`s / surface delta into the render-frame inputs + the risk gate **as INPUT only**,
-  always downstream-gated by `buildSovereignVerdict` (`+RunTurn.swift:1163`) + the single-commit gate
-  (`:589`) + the emergency brake — **never bypassing L11/L14** (不变量 #2 神经不掌权; 单提交口 不变).
-- **The async/sync boundary** forces the realistic authoritative path **host-side**: run the fabric
-  async, derive an authoritative input, and feed it into the **next** `runTurn` request — not an
-  inline mutation of the current sync turn.
-- **Why no flag scaffold this pass**: the critique that opened this arc was precisely about scaffolds
-  that "branch nowhere". Adding a dead `fabricAuthoritativeEnabled` flag now would repeat that. The
-  flag lands **with** the real wiring, in a dedicated replay-gated arc, guarded so that: flag-off is
-  byte-equal; flag-on still passes the sovereign-parity shadow and never produces an
-  `.unexpectedDrift`; and fabric deltas reach the commit mouth only as **gated INPUT**.
+Shipped (`BASAgentFabricAuthoritativeProjection`):
+- `project(fabricResult:mode:sourceTurnID:)` turns turn N's merge-ACCEPTED deltas into a typed
+  `BASAgentFabricAuthoritativeInput` — **only** when `mode == .authoritative` and ≥1 delta was
+  accepted; `.observationOnly` / no-accepted ⇒ `nil`. **This is where the mode finally branches.**
+- `enrichedRequest(_:with:)` folds those conclusions into turn N+1's `userInput` as a labeled context
+  block. The existing gated cascade processes it; `buildSovereignVerdict` (`+RunTurn.swift:1163`) +
+  the single-commit gate (`:589`) + the emergency brake remain the SOLE authority — the deltas are
+  **input-class** (红线 7), never bypassing L11/L14 (不变量 #2 神经不掌权; 单提交口 不变).
+- **Additive-only**: no coordinator / `runTurn` / verdict change → byte-equal-off by construction
+  (replay-harness + determinism suites stay green). The brain's output changes only when the host
+  enriches `userInput` with an `.authoritative` input.
+- Proven (5 tests): mode-gating, projection, deterministic fold + original-unmutated, and the effect
+  — a real brain's `decomposeFrame` DIFFERS for the enriched input while its sovereign verdict still
+  runs (verdict path intact). NO dead `fabricAuthoritativeEnabled` flag was added (it would "branch
+  nowhere" — the very pattern this arc set out to fix); the mode itself is the switch.
+
+Deeper integration (structured deltas consumed by the cascade beyond `userInput`; multi-turn
+authoritative loops) remains a future arc.
 
 ## Memory default posture: opt-in → prove → flip
 The routed memory backend is **built + proven opt-in**; the default stays `BASMLMemoryService`. The
@@ -115,8 +119,9 @@ never a silent swap, legacy kept live, escape hatch retained.
 
 ## Verification
 - Per-step targeted tests all green: Step 1 (7), Step 2 (8), Step 3 (2 + the existing
-  engine/mode/readiness suites, 0 regressions), Step 4 (6). The ch883 sync-contract test and the
-  existing `BASCoordinatorTurnDeterminism` guard still pass.
+  engine/mode/readiness suites, 0 regressions), Step 4 (6), Step 5 (5). The ch883 sync-contract test
+  and the existing `BASCoordinatorTurnDeterminism` guard still pass; byte-equal-off re-confirmed after
+  Step 5 (replay-harness + determinism suites green).
 - Full `swift test` regression run (the byte-equal-off gate for Step 3's `runTurn` edit): the XCTest
   suite is **14,917 tests, 100 skipped, 0 failures**. The process exit was non-zero ONLY because the
   separate swift-testing (`@Test`) portion hit a **SIGBUS** in pre-existing SwiftData / host-bootstrap
