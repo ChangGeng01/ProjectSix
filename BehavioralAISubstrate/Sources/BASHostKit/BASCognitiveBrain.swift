@@ -411,7 +411,13 @@ public actor BASCognitiveBrain {
             (any BASHostProfileServicing)? = nil,
         healthSnapshotHistoryCapacity: Int = 0,
         healthSnapshotAutoCaptureEvery: Int = 0,
-        metalSignalThreshold: Double? = nil
+        metalSignalThreshold: Double? = nil,
+        // Opt-in semantic memory (ADR-033 Step-2 flip): when a sync embedder is supplied (e.g. the
+        // on-device MiniLM provider, wired host-side since BASHostKit can't depend on Apple
+        // adapters), the default L8 memory becomes a self-populating routed VECTOR backend instead
+        // of BASMLMemoryService's in-memory Jaccard. nil ⇒ legacy (byte-equal-off / R1).
+        memoryEmbed: (@Sendable (String) -> [Float])? = nil,
+        memoryEmbedDim: Int = 384
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -419,6 +425,8 @@ public actor BASCognitiveBrain {
                 enableUserState: true,
                 enableVectorIndex: true,
                 enableKnowledgeGraph: true),
+            memoryEmbed: memoryEmbed,
+            memoryEmbedDim: memoryEmbedDim,
             summaryHistoryCapacity:
                 summaryHistoryCapacity,
             sqlHistoryStore: sqlHistoryStore,
@@ -433,6 +441,21 @@ public actor BASCognitiveBrain {
             healthSnapshotAutoCaptureEvery:
                 healthSnapshotAutoCaptureEvery,
             metalSignalThreshold: metalSignalThreshold)
+    }
+
+    /// Resolve the default L8 memory service: a self-populating routed VECTOR backend when a sync
+    /// embedder is supplied (the Step-2 semantic flip), else the legacy in-memory Jaccard service.
+    /// The host-injected embedder keeps BASHostKit free of any Apple / CoreML dependency.
+    static func resolveMemoryService(
+        memoryEmbed: (@Sendable (String) -> [Float])?,
+        dim: Int
+    ) -> any BASMemoryServicing {
+        guard let embed = memoryEmbed else { return BASMLMemoryService() }
+        return BASL8RoutedMemoryService(
+            loadAllAtoms: { [] },
+            syncEmbed: embed,
+            embeddingDimension: dim,
+            selfPopulate: true)
     }
 
     /// 主线 加强 实用性 — fully-wired brain factory。
@@ -524,6 +547,10 @@ public actor BASCognitiveBrain {
     /// operation。
     public init(
         options: BASCognitiveOSBundleOptions,
+        // Step-2 flip injection (see makeWithDefaults): a sync embedder ⇒ self-populating routed
+        // vector memory; nil ⇒ legacy BASMLMemoryService (byte-equal-off / R1).
+        memoryEmbed: (@Sendable (String) -> [Float])? = nil,
+        memoryEmbedDim: Int = 384,
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
@@ -609,7 +636,8 @@ public actor BASCognitiveBrain {
             // confidence = similarity score。 Closes the
             // last major placeholder layer in the core
             // L0 → L7 cascade。
-            memoryService: BASMLMemoryService(),
+            memoryService: BASCognitiveBrain.resolveMemoryService(
+                memoryEmbed: memoryEmbed, dim: memoryEmbedDim),
             // L3 loop: REAL candidate generation
             // service。 Produces 1-3 candidates derived
             // from L2 decompose signals (primary +

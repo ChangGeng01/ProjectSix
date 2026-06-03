@@ -102,6 +102,13 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     private var snapshot: [SnapshotEntry] = []
     private var promoteIntents: [String] = []   // atom IDs to mark governed
     private var freezeIntents: [String] = []     // atom IDs to mark archived/frozen
+    private var selfPopSeq: Int = 0              // monotonic id source for self-populated atoms
+
+    /// When true, retrieve() also writes the current frame as a new (vector-embedded) atom into the
+    /// in-memory snapshot, so the service accumulates recall on its own — a drop-in for
+    /// BASMLMemoryService's self-managed LRU, but vector-scored. Bounded by `selfPopulateCap`.
+    private let selfPopulate: Bool
+    private let selfPopulateCap: Int
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -110,7 +117,9 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         restrictedMemoryDomains: [String] = [],
         topK: Int = Parameters.topK,
         relevanceFloor: Float = Parameters.relevanceFloor,
-        atomStore: (any BASMemoryAtomStore)? = nil
+        atomStore: (any BASMemoryAtomStore)? = nil,
+        selfPopulate: Bool = false,
+        selfPopulateCap: Int = 64
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -119,6 +128,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.topK = topK
         self.relevanceFloor = relevanceFloor
         self.atomStore = atomStore
+        self.selfPopulate = selfPopulate
+        self.selfPopulateCap = max(1, selfPopulateCap)
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -136,7 +147,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         hostContext: BASHostProfile,
         budget: BASBudgetFrame
     ) -> BASMemoryBundle {
-        let query = syncEmbed(Self.queryText(from: decomposeFrame))
+        let queryText = Self.queryText(from: decomposeFrame)
+        let query = syncEmbed(queryText)
 
         let snap = withLock { snapshot }
 
@@ -164,13 +176,32 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             return atom
         }
 
-        return BASMemoryBundle(
+        let bundle = BASMemoryBundle(
             atoms: atoms,
             retrievalTags: Self.retrievalTags(
                 count: atoms.count,
                 dropped: filtered.droppedReasonCodes),
             conflictRefs: atoms.filter(\.frozen).map(\.memoryID),
             activeHostVersion: hostContext.activeVersion)
+
+        // Self-population (drop-in recall): append THIS frame as a new vector-embedded atom for
+        // FUTURE turns. Appended AFTER scoring, so it is NOT in the current bundle — single-turn
+        // determinism is preserved (a fresh service returns an empty bundle on turn 1). Bounded LRU.
+        if selfPopulate && !queryText.isEmpty {
+            withLock {
+                let id = "memory.routed.\(selfPopSeq)"
+                selfPopSeq += 1
+                let atom = BASMemoryAtom(
+                    memoryID: id, summary: queryText, contentType: .hot,
+                    source: Parameters.atomSource,
+                    timestamp: Date(timeIntervalSince1970: 0),
+                    confidence: 0.7, conflictFingerprint: id)
+                snapshot.append(SnapshotEntry(
+                    atomID: id, domain: "session", embedding: query, atom: atom))
+                while snapshot.count > selfPopulateCap { snapshot.removeFirst() }
+            }
+        }
+        return bundle
     }
 
     public func promote(
