@@ -98,6 +98,7 @@ import BASMLXAdapter
 import BASOrgan
 import BASMemory  // ch 1025.6 — fabric roster/graph/runtime types
 import BASRuntimeCore  // ch1044 — BASTaskVmInfoProbe (phys_footprint, jetsam metric)
+import BASAppleAdapters  // Step-2 flip — on-device MiniLM semantic memory embedder
 
 // ch 1025.4 — Unified logging via `os.Logger`。 Swift `print()` does
 // NOT appear in iOS system log,which means `idevicesyslog` from
@@ -455,7 +456,13 @@ final class BASEnduranceAppController: ObservableObject {
         let brain: BASCognitiveBrain
         let cognitiveBrainStartNs = monoNowNs()
         do {
-            brain = try await BASCognitiveBrain.makeWithDefaults()
+            // Step-2 flip: wire the on-device MiniLM embedder so the brain's default L8 memory is
+            // real semantic vector recall (falls back to legacy Jaccard if the model can't load).
+            let memoryEmbed = BASMiniLMEmbeddingProvider()?.syncEmbedClosure()
+            await emitBoth(memoryEmbed != nil
+                ? "📍 ch1061 memory backend = routed+MiniLM (on-device semantic)"
+                : "📍 ch1061 memory backend = legacy Jaccard (MiniLM unavailable)")
+            brain = try await BASCognitiveBrain.makeWithDefaults(memoryEmbed: memoryEmbed)
         } catch {
             let msg = "Brain init failed: \(error)"
             await emitBoth("⚠️ ch1025 \(msg)")

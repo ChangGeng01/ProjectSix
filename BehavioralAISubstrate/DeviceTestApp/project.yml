@@ -86,6 +86,9 @@ targets:
       # MPSGraph symbols directly(same reason as MLX/Organ above)。
       - package: BehavioralAISubstrate
         product: BASMetalSubstrate
+      # Step-2 flip — BASMiniLMEmbeddingProvider (on-device semantic memory embedder).
+      - package: BehavioralAISubstrate
+        product: BASAppleAdapters
     settings:
       base:
         # Bundle ID matches the existing wildcard provisioning profile
