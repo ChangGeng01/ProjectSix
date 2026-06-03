@@ -116,8 +116,15 @@ This closes the prior "wired but not run on hardware" caveat: the Step-2 flip (M
 memory → full cognitive turn, alongside the on-device LLM) is verified LIVE on an iPhone Air. NOTE
 (honest scope): this proves the runtime WIRING + load path on hardware in a single bounded run — it is
 not a multi-hour endurance run, nor a measurement that semantic recall improves output quality over
-many turns (separate questions). The simulator can still verify build + bundle every cycle, but the
-MiniLM/MLX RUNTIME load is a device-only check (sim: CoreML large-model reload hangs; MLX absent).
+many turns (separate questions). The simulator verifies build + bundle + the MiniLM CoreML RUNTIME
+load (`routed+MiniLM`, captured in ~4 s); only MLX Gemma's load + a full turn stay device-only (MLX
+is absent on the sim). CORRECTION (honest): an earlier note here claimed the sim couldn't do the
+runtime load because "CoreML large-model reload hangs" — that was a MISDIAGNOSIS. The real cause was a
+DeviceTestApp bug: the `BASMPSGraphProbe` (a GPU-graph boot probe) threw an uncatchable Obj-C
+`NSException` from `MPSGraphDeviceDescriptor initWithMPSGraphDevice:` on the simulator, hard-aborting
+the app (SIGABRT) and racing the `ch1061` log line. Fixed by skipping that device-only probe under
+`#if targetEnvironment(simulator)`; the sim app now boots cleanly and the runtime load is reliably
+observable there too.
 
 ### Step 3 — nativeV2 honest semantics (shipped)
 Through M1081 the runtime mode was stored but `runTurn` ignored it (always V1 — the ch1044 finding),

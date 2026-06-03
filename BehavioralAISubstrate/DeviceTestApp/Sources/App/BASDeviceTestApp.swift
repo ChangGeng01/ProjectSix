@@ -134,9 +134,19 @@ struct ContentView: View {
                 // MPSGraph:async(kernel evaluate)。 Serial,never
                 // concurrent with MLX(no GPU contention)。
                 Task {
+                    // MPSGraph cannot initialize a device on the iOS Simulator —
+                    // `MPSGraphDeviceDescriptor initWithMPSGraphDevice:` throws an uncaught
+                    // Obj-C NSException (NSArray insert nil) that Swift do/catch cannot
+                    // intercept, hard-aborting the app (SIGABRT). The probe is a DEVICE-only
+                    // check by design, so skip it on the simulator (run it on real hardware).
+                    #if targetEnvironment(simulator)
+                    mpsgraphVerify = "skipped (simulator)"
+                    #else
                     mpsgraphVerify = await BASMPSGraphProbe.run()
+                    #endif
                     // ch 1033:Mamba SSM after MPSGraph(serial,
-                    // same Task → never overlap GPU dispatch)。
+                    // same Task → never overlap GPU dispatch)。 The Mamba harness handles
+                    // gpuAvailable=false on the simulator gracefully (CPU scan still runs)。
                     mambaVerify = await BASMambaProbe.run()
                 }
             }
