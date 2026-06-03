@@ -372,7 +372,13 @@ let package = Package(
         .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASEvaluation", "BASWorldPrior"]),
         .target(
             name: "BASAppleAdapters",
-            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife"]
+            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife"],
+            // MiniLM-L6-v2 sentence embedder (CoreML, fp32) + its BERT WordPiece vocab,
+            // for the on-device semantic memory backend (BASMiniLMEmbeddingProvider).
+            resources: [
+                .copy("Resources/MiniLM.mlmodelc"),
+                .copy("Resources/vocab.txt"),
+            ]
         ),
         .target(
             name: "BASHostKit",
