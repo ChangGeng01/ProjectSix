@@ -905,6 +905,20 @@ final class BASEnduranceAppController: ObservableObject {
                     thermal: updateThermal)
             }
 
+            // ch1062 — PER-ITERATION host-driven persistence flush. The brain queued this iter's
+            // self-populated atoms during process(); drive the durable admit (one event + provenance
+            // per atom) at the iteration boundary so the persist path is EXERCISED CONTINUOUSLY over
+            // a long endurance (not just once at the end) and the admit-intent queue never backs up.
+            // No-op for the legacy backend.
+            if let store = memoryStore {
+                let mem = await brain.drainMemoryIntents()
+                let storedAtoms = await store.allAtoms().count
+                await emitBoth(
+                    "📍 ch1062 iter=\(iter) memory persisted " +
+                    "admitted=\(mem.admitted) store_atoms=\(storedAtoms) " +
+                    "promoted=\(mem.promoted)")
+            }
+
             if iter < totalIters {
                 // ch 1025.11 — feed MEASURED thermal(iter-end
                 // snapshot)so cooldown is thermal-aware,not blind。
@@ -1008,17 +1022,17 @@ final class BASEnduranceAppController: ObservableObject {
                     .joined(separator: ","))
         }
 
-        // ch1062 — HOST-DRIVEN persistence flush. process() only QUEUES self-populated atoms in the
-        // routed memory; the brain never auto-persists (drainIntents is async/off the sync hot path,
-        // ch883). As the host, drive the durable flush at the session boundary and report what landed
-        // in the event-sourced store (one provenance event per atom). No-op for the legacy backend.
+        // ch1062 — FINAL persistence summary. The per-ITERATION flushes (above) already drove the
+        // durable admits throughout the run (host-driven; process() only queues — ch883). This does a
+        // last flush to catch any straggler and reports the run's CUMULATIVE store total (one event +
+        // provenance per atom over the whole run). No-op for the legacy backend.
         if let store = memoryStore {
             let mem = await brain.drainMemoryIntents()
             let storedAtoms = await store.allAtoms().count
             await emitBoth(
-                "📍 ch1062 memory persisted admitted=\(mem.admitted) " +
-                "store_atoms=\(storedAtoms) promoted=\(mem.promoted) " +
-                "(host-driven drainMemoryIntents at session boundary)")
+                "📊 ch1062 FINAL memory total_store_atoms=\(storedAtoms) " +
+                "final_flush_admitted=\(mem.admitted) " +
+                "(host-driven persistence: per-iteration + final)")
         }
 
         await MainActor.run {
