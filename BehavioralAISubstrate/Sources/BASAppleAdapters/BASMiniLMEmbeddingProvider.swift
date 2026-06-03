@@ -34,7 +34,10 @@ public final class BASMiniLMEmbeddingProvider: BASEmbeddingProvider, @unchecked 
     public var dimension: Int { Self.embeddingDim }
 
     private let model: MLModel
-    private let tokenizer: BASBertWordPieceTokenizer
+    let tokenizer: BASBertWordPieceTokenizer  // internal: tokenizer-parity tests reach it via @testable
+    /// MLModel.prediction(from:) is NOT thread-safe (Apple); this serializes embedSync so the
+    /// @Sendable syncEmbedClosure is safe to call from any isolation domain.
+    private let lock = NSLock()
 
     /// Load the bundled CoreML model + vocab. Returns `nil` if either resource is missing or the
     /// model fails to load (host should fall back to NLEmbedding / lexical).
@@ -72,8 +75,12 @@ public final class BASMiniLMEmbeddingProvider: BASEmbeddingProvider, @unchecked 
         guard let inputs = try? MLDictionaryFeatureProvider(dictionary: [
                 Self.inputIDsName: MLFeatureValue(multiArray: inputIDs),
                 Self.attentionMaskName: MLFeatureValue(multiArray: attMask),
-              ]),
-              let out = try? model.prediction(from: inputs),
+              ])
+        else { return zero }
+        // Serialize the (non-thread-safe) CoreML prediction + output read.
+        lock.lock()
+        defer { lock.unlock() }
+        guard let out = try? model.prediction(from: inputs),
               let emb = out.featureValue(for: Self.outputName)?.multiArrayValue,
               emb.count >= Self.embeddingDim
         else { return zero }

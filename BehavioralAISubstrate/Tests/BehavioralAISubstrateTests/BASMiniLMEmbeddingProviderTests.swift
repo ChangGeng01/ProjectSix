@@ -60,5 +60,34 @@ final class BASMiniLMEmbeddingProviderTests: XCTestCase {
         XCTAssertEqual(ids[5], 0, "[PAD]")
         XCTAssertEqual(mask, [1, 1, 1, 1, 1, 0, 0, 0])
     }
+
+    // EXACT parity against HuggingFace's BERT-uncased tokenizer (reference ids computed by
+    // transformers in Tools/minilm_to_coreml.py's venv). Covers ASCII, punctuation, subwords,
+    // CJK (中文 -> per-char tokens, the bug the deep audit found), and control chars (ZWSP /
+    // soft-hyphen deletion). This is what makes the on-device embeddings == the validated path.
+    func testTokenizerMatchesHuggingFaceReference() throws {
+        let tok = try XCTUnwrap(BASMiniLMEmbeddingProvider()).tokenizer
+        let cases: [(String, [Int32])] = [
+            ("Hello, World!", [101, 7592, 1010, 2088, 999, 102]),
+            ("playing footballs", [101, 2652, 2374, 2015, 102]),
+            ("cafe naive resume", [101, 7668, 15743, 13746, 102]),
+            ("the quick brown fox", [101, 1996, 4248, 2829, 4419, 102]),
+            ("GPT-4 is amazing!!!", [101, 14246, 2102, 1011, 1018, 2003, 6429, 999, 999, 999, 102]),
+            ("multytokenizationz", [101, 14163, 24228, 18715, 18595, 9276, 2480, 102]),
+            ("spaced   out", [101, 19835, 2041, 102]),
+            ("中文", [101, 1746, 1861, 102]),
+            ("机器学习", [101, 100, 100, 1817, 100, 102]),
+            ("你好 world", [101, 100, 100, 2088, 102]),
+            ("北京大学", [101, 1781, 1755, 1810, 1817, 102]),
+            ("mix中en文glish", [101, 4666, 1746, 4372, 1861, 1043, 13602, 102]),
+            ("hello\u{200b}world", [101, 7592, 11108, 102]),    // ZWSP deleted -> helloworld
+            ("a\u{00ad}b", [101, 11113, 102]),                  // soft hyphen deleted -> ab
+        ]
+        for (text, ref) in cases {
+            let (ids, mask) = tok.encode(text)
+            XCTAssertEqual(Int(mask.reduce(0, +)), ref.count, "\(text): non-pad length")
+            XCTAssertEqual(Array(ids.prefix(ref.count)), ref, "\(text): ids must match HuggingFace")
+        }
+    }
 }
 #endif

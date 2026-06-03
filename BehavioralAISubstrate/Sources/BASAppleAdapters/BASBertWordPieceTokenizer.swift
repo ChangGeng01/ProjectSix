@@ -94,11 +94,14 @@ public struct BASBertWordPieceTokenizer: Sendable {
     // MARK: - Basic tokenization (clean + lowercase + strip accents + split punctuation)
 
     static func basicTokenize(_ text: String) -> [String] {
-        let normalized = stripAccents(text.lowercased())
+        // HF BasicTokenizer order: clean text (drop control/format/0/FFFD; whitespace→space) →
+        // wrap CJK chars in spaces → lowercase + strip accents → split on whitespace + punctuation.
+        let cjk = tokenizeChineseChars(cleanText(text))
+        let normalized = stripAccents(cjk.lowercased())
         var tokens: [String] = []
         var current = ""
         for scalar in normalized.unicodeScalars {
-            if isWhitespaceOrControl(scalar) {
+            if isWhitespaceChar(scalar) {
                 if !current.isEmpty { tokens.append(current); current = "" }
             } else if isPunctuation(scalar) {
                 if !current.isEmpty { tokens.append(current); current = "" }
@@ -111,6 +114,39 @@ public struct BASBertWordPieceTokenizer: Sendable {
         return tokens
     }
 
+    /// HF `_clean_text`: drop U+0000 / U+FFFD / control+format chars; normalize whitespace to space.
+    static func cleanText(_ text: String) -> String {
+        var out = String.UnicodeScalarView()
+        for s in text.unicodeScalars {
+            if s.value == 0 || s.value == 0xFFFD || isControlChar(s) { continue }
+            out.append(isWhitespaceChar(s) ? " " : s)
+        }
+        return String(out)
+    }
+
+    /// HF `_tokenize_chinese_chars`: wrap each CJK-Unified codepoint in spaces so each becomes its
+    /// own token before WordPiece. WITHOUT this, CJK text glues together and tokenizes wrong.
+    static func tokenizeChineseChars(_ text: String) -> String {
+        var out = String.UnicodeScalarView()
+        for s in text.unicodeScalars {
+            if isCJKChar(s) {
+                out.append(" "); out.append(s); out.append(" ")
+            } else {
+                out.append(s)
+            }
+        }
+        return String(out)
+    }
+
+    /// HF `_is_chinese_char` — the CJK-Unified (Han) codepoint ranges.
+    static func isCJKChar(_ s: Unicode.Scalar) -> Bool {
+        let c = s.value
+        return (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF)
+            || (c >= 0x20000 && c <= 0x2A6DF) || (c >= 0x2A700 && c <= 0x2B73F)
+            || (c >= 0x2B740 && c <= 0x2B81F) || (c >= 0x2B820 && c <= 0x2CEAF)
+            || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0x2F800 && c <= 0x2FA1F)
+    }
+
     /// NFD decompose, drop combining marks (HF `_run_strip_accents`).
     static func stripAccents(_ text: String) -> String {
         var out = String.UnicodeScalarView()
@@ -121,11 +157,20 @@ public struct BASBertWordPieceTokenizer: Sendable {
         return String(out)
     }
 
-    static func isWhitespaceOrControl(_ s: Unicode.Scalar) -> Bool {
+    /// HF `_is_whitespace`: \t \n \r, space, and Unicode space separators (Zs).
+    static func isWhitespaceChar(_ s: Unicode.Scalar) -> Bool {
         if s == " " || s == "\t" || s == "\n" || s == "\r" { return true }
-        let cat = s.properties.generalCategory
-        return cat == .control || cat == .format || cat == .lineSeparator || cat == .paragraphSeparator
-            || cat == .spaceSeparator
+        return s.properties.generalCategory == .spaceSeparator
+    }
+
+    /// HF `_is_control`: any C* category (control/format/surrogate/privateUse/unassigned), but NOT
+    /// \t \n \r (those are whitespace).
+    static func isControlChar(_ s: Unicode.Scalar) -> Bool {
+        if s == "\t" || s == "\n" || s == "\r" { return false }
+        switch s.properties.generalCategory {
+        case .control, .format, .surrogate, .privateUse, .unassigned: return true
+        default: return false
+        }
     }
 
     /// HF BERT punctuation: all non-alphanumeric ASCII, plus any Unicode punctuation category.
