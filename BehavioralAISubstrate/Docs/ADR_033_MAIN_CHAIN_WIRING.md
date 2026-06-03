@@ -90,16 +90,20 @@ i.e. **pure in-memory** MiniLM vector self-population (recall is process-memory,
 SQL/event store + event-sourced provenance exist as an **opt-in API** (`BASRoutedMemoryPersistence`,
 plumbed through `makeWithDefaults`/the bundle init): when wired, each self-populated atom is `admit()`ed
 to a `BASEventSourcedMemoryAtomStore` at `drainIntents()`, emitting one provenance event per atom and
-reloadable via `loadAllAtoms`. **HONEST SCOPE (3rd-audit, verified by grep + protocol read):** (a) it is
-NOT consumed by any host (zero `BASRoutedMemoryPersistence(...)` constructions in the repo) and the brain
-does NOT drive it — `drainIntents()`/`refresh()` are NOT on `BASMemoryServicing` (only `retrieve`/
-`promote`/`freeze`), and the brain holds the service as `any BASMemoryServicing`, so persistence NEVER
-fires through `brain.process()`; a host must keep the concrete service and drive it at session
-boundaries. (b) "Reload" is **in-process, NOT cross-restart-durable**: the event store replays content
-empty (`BASMemoryAtomReducer` hard-codes `content: ""` — privacy doctrine) and rehydrates from an
-in-process cache. `testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess` proves admit→persist→
-provenance-events→**in-process** reload+recall (it shares one store actor) — NOT durability across a real
-process restart. The only Rust in the recall path is
+reloadable via `loadAllAtoms`. **HONEST SCOPE (3rd-audit, verified):** (a) REACHABILITY — now closed. The
+brain exposes a HOST-DRIVEN seam `BASCognitiveBrain.refreshMemory()` / `drainMemoryIntents()` (public,
+async): the brain retains the concrete routed service and these drive its `refresh()`/`drainIntents()`
+(which are deliberately NOT on the sync `BASMemoryServicing` — ch883). `brain.process()` still only
+QUEUES (it does NOT auto-persist — the host must call `drainMemoryIntents()` at session/turn boundaries,
+by design); `testBrainHostDrivenPersistenceDrainsToEventStore` proves the full public path end-to-end (a
+host wires `memoryPersistence` → runs turns → drives the brain hook → atoms admitted to the store +
+provenance events; store is empty until the host drains; a no-embedder brain's hook is a verified no-op).
+Caveat: no SHIPPING host wires it yet (the integration test is the consumer). (b) DURABILITY — still
+**in-process, NOT cross-restart-durable**: the event store replays content empty (`BASMemoryAtomReducer`
+hard-codes `content: ""` — privacy doctrine) and rehydrates from an in-process cache.
+`testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess` proves admit→persist→provenance-events→**in-process**
+reload+recall — NOT durability across a real process restart (a separate item needing out-of-band content
+persistence). The only Rust in the recall path is
 `BASAutoRouteRanker.cosineSimilarity` (a SIMD kernel). Vector ≠ Jaccard, so the routed output is
 intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated dropped)
 + the brain still emitting a sovereign verdict. The routed+self-populate path's **own** determinism is

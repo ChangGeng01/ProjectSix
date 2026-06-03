@@ -122,6 +122,14 @@ public actor BASCognitiveBrain {
     /// calls delegate here。
     private let engine: BASTurnRuntimeEngine
 
+    /// Retained reference to the routed VECTOR memory service when the Step-2 flip is active
+    /// (a sync embedder was injected); nil for the default legacy / placeholder backends. The
+    /// coordinator holds the SAME instance for the sync `retrieve()`, so this lets a HOST drive
+    /// the async session-boundary operations — `refreshMemory()` / `drainMemoryIntents()` — that
+    /// are deliberately NOT on the sync `BASMemoryServicing` protocol (ch883). nil ⇒ both are
+    /// no-ops, so byte-equal-off / R1 is preserved for the default brain.
+    private let routedMemory: BASL8RoutedMemoryService?
+
     /// The cognitive-OS bundle (event log + user state +
     /// vector + knowledge graph)。 Held to keep the
     /// SQLite-backed storage alive for the engine's lifetime
@@ -632,6 +640,12 @@ public actor BASCognitiveBrain {
             any BASHostProfileServicing =
             hostProfileService
             ?? BASMLHostProfileService()
+        // Resolve the L8 memory service ONCE and retain the routed instance (if any), so a host
+        // can drive its async session-boundary ops; the coordinator below gets the SAME instance.
+        let resolvedMemoryService = BASCognitiveBrain.resolveMemoryService(
+            memoryEmbed: memoryEmbed, dim: memoryEmbedDim,
+            persistence: memoryPersistence)
+        self.routedMemory = resolvedMemoryService as? BASL8RoutedMemoryService
         let coordinator = BASEBrainRuntimeCoordinator(
             // L8 power-clock: REAL device-aware budget
             // tier (lockdown/throttle/engage/deepLoop)
@@ -660,9 +674,7 @@ public actor BASCognitiveBrain {
             // confidence = similarity score。 Closes the
             // last major placeholder layer in the core
             // L0 → L7 cascade。
-            memoryService: BASCognitiveBrain.resolveMemoryService(
-                memoryEmbed: memoryEmbed, dim: memoryEmbedDim,
-                persistence: memoryPersistence),
+            memoryService: resolvedMemoryService,
             // L3 loop: REAL candidate generation
             // service。 Produces 1-3 candidates derived
             // from L2 decompose signals (primary +
@@ -758,6 +770,8 @@ public actor BASCognitiveBrain {
         // (may not even be ML-backed)。 Brains constructed
         // via this init return nil from classifyProbabilities。
         self.mlClassifierAdapter = nil
+        // Explicit-services init wires placeholder memory (not the routed vector backend).
+        self.routedMemory = nil
         let coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASPlaceholderPowerClockService(),
@@ -783,6 +797,29 @@ public actor BASCognitiveBrain {
             eventLog: bundle.eventLog)
         self.monotonicClock = BASMonotonicNanos(
             useCBridge: true)
+    }
+
+    // MARK: - Host-driven memory session boundaries (routed vector backend only)
+
+    /// Rebuild the routed memory's retrieval snapshot from its durable store. No-op unless the
+    /// Step-2 routed vector backend is active (default legacy/placeholder ⇒ does nothing). Call at
+    /// SESSION START so a host that wired `memoryPersistence` recalls previously-admitted atoms.
+    /// Async + host-driven by design — `retrieve()` stays sync in the turn hot path (ch883).
+    public func refreshMemory() async {
+        await routedMemory?.refresh()
+    }
+
+    /// Flush the routed memory's queued writes — self-populated atom admits (durable, one provenance
+    /// event each) plus promote/freeze governance — to its store, returning what was persisted.
+    /// No-op returning zeros unless the routed vector backend is active AND a host wired a store.
+    /// Call at TURN / SESSION boundaries (never inside the sync turn — ch883). This is the seam that
+    /// makes the opt-in persistence actually fire: the brain queues during `process()`, the host
+    /// drives the durable flush here.
+    @discardableResult
+    public func drainMemoryIntents() async
+        -> (promoted: Int, frozen: Int, admitted: Int)
+    {
+        await routedMemory?.drainIntents() ?? (0, 0, 0)
     }
 
     /// Read the monotonic clock — C bridge if available,

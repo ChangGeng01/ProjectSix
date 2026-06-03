@@ -169,5 +169,59 @@ final class BASRoutedMemoryFlipTests: XCTestCase {
         XCTAssertTrue(a.contains { !$0.isEmpty },
             "the sequence actually recalls something — the determinism check is non-vacuous")
     }
+
+    // MARK: - HOST-DRIVEN persistence through the brain's public API (closes the audit gap that
+    //         persistence was an unconsumed API unreachable from `brain.process()`).
+    //   A real host wires `memoryPersistence` into `makeWithDefaults`, runs turns, then drives the
+    //   brain's `drainMemoryIntents()` seam at a session boundary → self-populated atoms genuinely
+    //   persist to a `BASEventSourcedMemoryAtomStore` (one provenance event each). This exercises
+    //   the WHOLE public path (brain hook → routed service → store), not the service in isolation.
+    //   (Durability is still in-process — the event log replays content empty; that is a separate
+    //   item. This test proves REACHABILITY + host-driven flush, the thing that was missing.)
+
+    func testBrainHostDrivenPersistenceDrainsToEventStore() async throws {
+        let mini = try XCTUnwrap(BASMiniLMEmbeddingProvider())
+        let eventLog = BASInMemoryEventLogStorage()
+        let store = BASEventSourcedMemoryAtomStore(
+            eventLog: eventLog, sessionID: "brain-host-persist")
+        let persistence = BASRoutedMemoryPersistence(
+            loadAllAtoms: { await store.allAtoms() },
+            admitAtom: { _ = try? await store.admit($0) },
+            atomStore: store)
+
+        // real host wiring: MiniLM embedder + the durable persistence hook, through makeWithDefaults.
+        let brain = try await BASCognitiveBrain.makeWithDefaults(
+            memoryEmbed: mini.syncEmbedClosure(),
+            memoryPersistence: persistence)
+
+        // a few turns — each self-populates the routed memory (queued for a durable admit).
+        _ = await brain.process("I love hiking in the mountains")
+        _ = await brain.process("tell me about alpine ski trails")
+        _ = await brain.process("the ocean is calm today")
+
+        // PERSISTENCE IS HOST-DRIVEN: process() only QUEUES — nothing is in the store yet.
+        let beforeDrain = await store.allAtoms()
+        XCTAssertTrue(beforeDrain.isEmpty,
+            "process() queues but does not persist — the brain never auto-drives drainIntents()")
+
+        // the host drives the session-boundary flush through the brain's PUBLIC API.
+        let drained = await brain.drainMemoryIntents()
+        XCTAssertGreaterThan(drained.admitted, 0,
+            "the brain hook admitted the self-populated atoms to the durable store")
+
+        let persisted = await store.allAtoms()
+        XCTAssertEqual(persisted.count, drained.admitted,
+            "every atom the brain admitted is in the event-sourced store's projection")
+        let events = await eventLog.events(forSession: "brain-host-persist")
+        XCTAssertGreaterThanOrEqual(events.count, drained.admitted,
+            "each admit emitted a replayable provenance event (the event/log/provenance trail)")
+
+        // a default brain (no embedder) has no routed backend → the hook is a safe no-op (R1).
+        let legacyBrain = try await BASCognitiveBrain.makeWithDefaults()
+        _ = await legacyBrain.process("hello")
+        let legacyDrain = await legacyBrain.drainMemoryIntents()
+        XCTAssertEqual(legacyDrain.admitted, 0,
+            "the legacy/byte-equal-off brain has no routed memory — drainMemoryIntents is a no-op")
+    }
 }
 #endif
