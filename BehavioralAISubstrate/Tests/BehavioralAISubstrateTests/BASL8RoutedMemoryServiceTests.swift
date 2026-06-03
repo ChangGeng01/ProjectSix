@@ -75,9 +75,10 @@ final class BASL8RoutedMemoryServiceTests: XCTestCase {
         XCTAssertEqual(r1.atoms.map(\.confidence), r2.atoms.map(\.confidence))
     }
 
-    // MARK: - 2. vector/semantic ranking (Jaccard-over-signals cannot do this)
+    // MARK: - 2. vector/LEXICAL ranking (text-overlap recall the Jaccard-over-signals backend
+    // structurally cannot do — note: lexicalEmbed is bag-of-tokens, NOT semantic embeddings)
 
-    func testVectorRetrievalSurfacesSemanticallyClosestAtom() async {
+    func testVectorRetrievalSurfacesLexicallyClosestAtom() async {
         let svc = makeService(atoms: [
             governed(id: weatherID, content: "weather forecast sunny rain clouds", domain: "general"),
             governed(id: taxID, content: "tax invoice payment deadline office", domain: "general"),
@@ -88,7 +89,7 @@ final class BASL8RoutedMemoryServiceTests: XCTestCase {
             hostContext: profile(), budget: budget())
         XCTAssertFalse(r.atoms.isEmpty, "the weather query must recall the weather atom")
         XCTAssertEqual(r.atoms.first?.memoryID, weatherID.uuidString,
-            "vector retrieval must rank the lexically/semantically closest atom first")
+            "vector retrieval must rank the lexically closest atom first (text overlap)")
         XCTAssertFalse(r.atoms.contains { $0.memoryID == taxID.uuidString },
             "the unrelated tax atom must fall below the relevance floor")
     }

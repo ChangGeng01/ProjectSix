@@ -95,8 +95,11 @@ public enum BASEBrainTurnResultReplayHarness {
     // MARK: - (B) Codable round-trip
 
     /// encode (`.sortedKeys`) → decode → re-encode; `true` ⇔ the two encodings are byte-identical.
-    /// Proves the full result's `Codable` conformance is a stable fixed-point (no field drops a
-    /// value, changes precision, or re-orders on a round-trip).
+    /// Proves the full result's `Codable` conformance is a stable re-encode FIXED-POINT (no field
+    /// changes precision or re-orders on a round-trip). NOTE: a byte-stable fixed-point does not by
+    /// itself prove `decode(encode(x)) == x` for the ORIGINAL value (a field that consistently
+    /// failed to encode would still pass here) — the test pairs this with a `decoded == result`
+    /// value-preservation assertion over a fully-populated stub result.
     public static func codableRoundTripIsByteStable(
         _ result: BASEBrainTurnResult
     ) -> Bool {

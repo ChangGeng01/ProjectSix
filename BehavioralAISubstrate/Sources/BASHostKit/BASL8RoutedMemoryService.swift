@@ -23,8 +23,13 @@
 //   • vector  — embedding cosine top-K, routed to Rust SIMD via `BASAutoRouteRanker`.
 //   • SQL/event — the injected `BASMemoryAtomStore` (a `BASSQLiteMemoryAtomStore` for SQL, or a
 //     `BASEventSourcedMemoryAtomStore` for event-sourcing).
-//   • event/log/provenance — wiring a `BASEventSourcedMemoryAtomStore` gives this for FREE: every
-//     governance write in `drainIntents()` is an appended, replayable event (the provenance trail).
+//   • event/log/provenance — when the injected store is a `BASEventSourcedMemoryAtomStore`, a
+//     governance write in `drainIntents()` appends a replayable event (the provenance trail).
+//     PRECONDITION (honest): the store's `updateGovernanceStatus` only records an event for an atom
+//     ALREADY in its projection — i.e. the host must have `admit()`ed the atoms into the SAME
+//     event-sourced store first. This service reads atoms via `loadAllAtoms` and does NOT `admit()`
+//     them itself, so the event trail materializes only under that host wiring (it is the Step-2
+//     flip's job to establish it; the current unit tests use an in-memory store and don't cover it).
 //
 // ## Embedding seam
 //
@@ -172,8 +177,12 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         atom: BASMemoryAtom,
         hostContext: BASHostProfile
     ) -> BASPromotionState {
-        // Same transition semantics as BASMLMemoryService: candidate -> admitted; admitted stays;
-        // frozen/retired terminal. The durable write is deferred to drainIntents() (sync-safe).
+        // Transition: candidate -> admitted; admitted stays; frozen/retired terminal (matches
+        // BASMLMemoryService). The `atom.frozen ? .frozen` wrapper below mirrors
+        // BASHostRuntimeEBrainMemoryService (NOT BASMLMemoryService, which returns the switch
+        // result directly) — it only diverges for a candidate+frozen atom, which this service's
+        // own mapping never produces (frozen <=> archived <=> promotionState .frozen). The durable
+        // write is deferred to drainIntents() (sync-safe).
         let next: BASPromotionState
         switch atom.promotionState {
         case .candidate: next = .admitted
@@ -213,7 +222,10 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     }
 
     /// Flush queued promote/freeze intents to the atom store. With a
-    /// `BASEventSourcedMemoryAtomStore` each write appends an event (event/log/provenance).
+    /// `BASEventSourcedMemoryAtomStore` (whose atoms were already admitted) each successful write
+    /// appends an event (event/log/provenance). Semantics are AT-MOST-ONCE: an intent is removed
+    /// from the queue when drained, so a write that returns false (atom absent) or throws is NOT
+    /// retried — the returned (promoted, frozen) counts let the caller detect a shortfall.
     @discardableResult
     public func drainIntents() async -> (promoted: Int, frozen: Int) {
         let (promotes, freezes) = withLock {

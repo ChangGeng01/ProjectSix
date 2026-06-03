@@ -71,12 +71,20 @@ final class BASEBrainTurnResultReplayHarnessTests: XCTestCase {
 
     // MARK: - (B) Codable round-trip
 
-    func testCodableRoundTripIsByteStable() {
+    func testCodableRoundTripIsByteStable() throws {
         let result = BASCoordinatorTestStubs.makeStub()
             .runTurn(BASCoordinatorTestStubs.makeStubRequest())
         XCTAssertTrue(
             BASEBrainTurnResultReplayHarness.codableRoundTripIsByteStable(result),
             "full BASEBrainTurnResult must be a byte-stable Codable fixed-point")
+        // Value-preservation (not just byte-stability): decode(encode(x)) == x, so no field is
+        // silently dropped on the round-trip (closes the audit gap that a fixed-point alone leaves).
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let decoded = try JSONDecoder().decode(
+            BASEBrainTurnResult.self, from: try encoder.encode(result))
+        XCTAssertEqual(decoded, result,
+            "Codable round-trip must preserve the full value, not just be a byte-stable fixed-point")
     }
 
     // MARK: - (C) V1-vs-runWithPlan parity

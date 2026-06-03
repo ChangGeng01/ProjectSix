@@ -146,12 +146,12 @@ extension BASHostRuntime {
             // the synchronous `buildEBrainTurn(...)`。
             return coordinator.runTurn(turnRequest)
         case .nativeV2, .stressSweepDual:
-            // V2 engine path — wraps coordinator + emits
-            // M991 lifecycle envelopes。 Currently
-            // delegates to coordinator.runTurn,so the
-            // returned `BASEBrainTurnResult` is byte-
-            // equal to the V1 path。 Phase L+ work makes
-            // the engine paths diverge meaningfully。
+            // V2 engine path — wraps coordinator + emits M991 lifecycle
+            // envelopes。 As of ADR-033 Step 3b `engine.runTurn` reads the
+            // mode: `.nativeV2` dispatches `runWithPlan` (native executors),
+            // `.stressSweepDual` takes the single V1 pass。 In BOTH cases the
+            // returned `BASEBrainTurnResult` is byte-equal to the V1 path
+            // (runWithPlan returns the same coordinator.runTurn value)。
             let engine = BASTurnRuntimeEngine(
                 coordinator: coordinator,
                 runtimeMode: runtimeMode)

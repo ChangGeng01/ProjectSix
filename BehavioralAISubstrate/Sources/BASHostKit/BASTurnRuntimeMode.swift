@@ -65,8 +65,11 @@ public enum BASTurnRuntimeMode:
     /// The native path's observable effect is additional stage-ledger / dispatch telemetry,
     /// NOT a different answer。
     case nativeV2 = "native-v2"
-    /// Dual mode:run BOTH V1 and V2 paths per turn,
-    /// digest-compare via M1074 BASStressSweepHarness。
-    /// Used during V2 default-mode flip validation。
+    /// Dual mode:used by the stress-sweep harness/runner
+    /// (BASStressSweepHarness / BASTurnRuntimeFullSummaryStressSweepRunner)
+    /// to run BOTH V1 + V2 paths per fixture and digest-compare。 NOTE:
+    /// `BASTurnRuntimeEngine.runTurn` itself treats this like
+    /// `.v1ByteEqual` (a single V1 pass) — the dual run is driven by the
+    /// harness, NOT by `runTurn`。 Used during V2 default-mode flip validation。
     case stressSweepDual = "stress-sweep-dual"
 }

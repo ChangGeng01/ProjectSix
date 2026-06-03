@@ -267,13 +267,13 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
     /// `runtimeMode` remains `.v1ByteEqual` per back-compat
     /// contract with explicit init callers。
     ///
-    /// **Scope (ch1044 严查 #1)**:this `.nativeV2` default is
-    /// honored by `runWithPlan` + `EBrainHostRuntimeSynthesis` ONLY。
-    /// `BASTurnRuntimeEngine.runTurn` is mode-agnostic (always
-    /// V1-byte-equal),and `BASCognitiveBrain` builds its engine at
-    /// the `.v1ByteEqual` init-default (it does NOT call `.default()`)
-    /// — so flipping this default did NOT change the brain's main
-    /// `process()` path。
+    /// **Scope (updated ADR-033 Step 3b)**:as of Step 3b
+    /// `BASTurnRuntimeEngine.runTurn` READS the mode — a `.nativeV2`
+    /// engine (incl. one built from this `.default()`) now dispatches
+    /// `runWithPlan(...)` (byte-equal result, extra telemetry); it is no
+    /// longer mode-agnostic。 `BASCognitiveBrain` still builds its engine
+    /// at the `.v1ByteEqual` init-default (it does NOT call `.default()`),
+    /// so this default does NOT change the brain's main `process()` path。
     public static func `default`()
         -> BASTurnRuntimeEngineConfiguration
     {

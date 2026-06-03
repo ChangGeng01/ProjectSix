@@ -403,21 +403,24 @@ public actor BASTurnRuntimeEngine {
 
     // MARK: - runTurn
 
-    /// V2 runTurn:delegates to V1 coordinator,then emits a
-    /// `.complete` audit envelope on the wired event log
-    /// (when present)。Byte-equal to V1's result。
+    /// V2 runTurn:dispatches on `runtimeMode`。`.v1ByteEqual` (and
+    /// `.stressSweepDual`) delegate to the V1 coordinator, then emit a
+    /// `.complete` audit envelope on the wired event log (when present)。
+    /// `.nativeV2` dispatches `runWithPlan(...)` (the real native stage
+    /// executors)。 In ALL modes the returned `BASEBrainTurnResult` is
+    /// byte-equal to V1's result — `runWithPlan` returns the same
+    /// `coordinator.runTurn(request)` value, proven across canonical60 by
+    /// `BASEBrainTurnResultReplayHarness.v1VsRunWithPlanParityVerdict`。
     ///
-    /// ⚠️ ch1044 严查 #1 — MODE-AGNOSTIC BY DESIGN:`runTurn`
-    /// ALWAYS delegates to V1 and is byte-equal REGARDLESS of the
-    /// configured `runtimeMode` (incl. `.nativeV2`)— it never reads
-    /// the mode。 The native stage/plan executors run ONLY via
-    /// `runWithPlan` (below) + `EBrainHostRuntimeSynthesis`。
-    /// `BASCognitiveBrain.process()` calls THIS method (its engine
-    /// is built at the `.v1ByteEqual` init-default,NOT via
-    /// `.default()`),so the brain's main path is intentionally
-    /// V1-byte-equal — native-V2 stage execution requires calling
-    /// `runWithPlan` explicitly。 So `.default() == .nativeV2` does
-    /// NOT mean the brain's `process()` runs native。
+    /// ADR-033 Step 3b — HONEST .nativeV2:BEFORE Step 3b `runTurn`
+    /// ignored `runtimeMode` and was always V1 (the ch1044 严查 #1
+    /// finding); it now READS the mode。 `BASCognitiveBrain.process()`
+    /// calls THIS method but its engine is built at the `.v1ByteEqual`
+    /// init-default (NOT via `.default()`),so the brain's main path
+    /// stays V1-byte-equal。 NOTE: `.default() == .nativeV2`, so a host
+    /// constructing the engine via `init(coordinator:configuration:
+    /// .default())` now takes the native dispatch (byte-equal result;
+    /// the only delta is extra stage-ledger / dispatch telemetry)。
     ///
     /// chapter 四百六 / M989:`auditProjections` parameter
     /// added。 Hosts pre-build the M976
