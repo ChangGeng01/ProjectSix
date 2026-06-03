@@ -1,7 +1,10 @@
 # ADR-033 — Wiring the real capabilities onto the cognitive main chain (5-step arc)
 
-> **Status: ALL of Steps 1–5 SHIPPED + proven — including the Step-2 default-flip onto an on-device
-> MiniLM-L6-v2 semantic embedder (free, Apache-2.0, $0; converted to CoreML in-repo).**
+> **Status: ALL of Steps 1–5 SHIPPED + proven — including the Step-2 flip onto a free on-device
+> MiniLM-L6-v2 embedder (Apache-2.0, $0; converted to CoreML in-repo). HONEST SCOPE (2nd deep audit):
+> the flip is HOST-INJECTED — the library `makeWithDefaults()` default stays legacy / byte-equal-off;
+> it ships IN-MEMORY semantic vector recall, NOT the SQL/event/provenance store (that stays opt-in);
+> and the on-device app is wired but not yet re-run on hardware.**
 > Response to the file-grounded critique that the *default* main chain still ran the V1 path + the
 > in-memory toy memory while the heavy machinery sat opt-in / observer / scaffold beside it.
 
@@ -61,17 +64,27 @@ service's); constitution `restrictedMemoryDomains` filtering. 8 tests prove dete
 recall the Jaccard-over-signals backend structurally cannot do; note the default `lexicalEmbed` is
 bag-of-tokens, NOT semantic embeddings), domain filtering, store writes, and that `retrieve()` stays sync.
 
-**The default-flip SHIPPED** (`9f520f014` + `458a2cd31`). Rather than a paid/API model, the free
-Apache-2.0 **sentence-transformers/all-MiniLM-L6-v2** was converted to CoreML on-device (fp32,
-mean-pool + L2-norm baked in; CoreML-vs-PyTorch cosine == 1.0; car/automobile=0.86 vs
-car/banana=0.39) — `BASMiniLMEmbeddingProvider` (sync, loaded from `Bundle.module`) + a pure-Swift
-BERT WordPiece tokenizer (provenance: `Tools/minilm_to_coreml.py`, `Docs/MiniLM_NOTICE.md`). The
-routed service gained opt-in **self-population** (drop-in recall like the legacy LRU, vector-scored).
-The brain takes a host-injected `memoryEmbed` sync closure (BASHostKit can't depend on the Apple
-adapter where MiniLM lives): supplied ⇒ routed+MiniLM default; nil ⇒ legacy `BASMLMemoryService`
-(byte-equal-off / R1). Vector ≠ Jaccard, so the routed output is intentionally NOT byte-equal — proven
-instead by golden semantic recall (related frame recalled, unrelated dropped) + the brain still
-emitting a sovereign verdict on the MiniLM-routed turn. `BASMLMemoryService` stays live as the fallback.
+**The default-flip SHIPPED** (`9f520f014` + `458a2cd31` + `8a4610b58`). Rather than a paid/API model,
+the free Apache-2.0 **sentence-transformers/all-MiniLM-L6-v2** was converted to CoreML in-repo (fp32,
+mean-pool + L2-norm baked in; CoreML-vs-PyTorch cosine ≈1.0 [>0.99 gate]; car/automobile≈0.86 vs
+car/banana≈0.39, observed locally) — `BASMiniLMEmbeddingProvider` (sync, `Bundle.module`) + a
+pure-Swift BERT WordPiece tokenizer with EXACT HuggingFace parity (incl. CJK + control chars, locked
+by `testTokenizerMatchesHuggingFaceReference`; an earlier version mis-tokenized CJK — fixed in
+`8a4610b58`). The routed service gained opt-in **self-population** (drop-in recall like the legacy
+LRU, vector-scored). The brain takes a host-injected `memoryEmbed` sync closure (BASHostKit can't
+depend on the Apple adapter where MiniLM lives): supplied ⇒ routed+MiniLM; nil ⇒ legacy
+`BASMLMemoryService` (the library default; byte-equal-off / R1).
+
+**HONEST SCOPE of the shipped flip** (2nd deep audit): `resolveMemoryService` wires
+`BASL8RoutedMemoryService(loadAllAtoms: { [] }, atomStore: nil, selfPopulate: true)` — i.e. **pure
+in-memory** MiniLM vector self-population. The SQL/event store, event-sourced provenance, and
+persistence are NOT active in the flip (they are the service's opt-in `atomStore` capability;
+`drainIntents()` is a no-op without it; recall is process-memory, lost on restart). The only Rust in
+the path is `BASAutoRouteRanker.cosineSimilarity` (a SIMD kernel). Vector ≠ Jaccard, so the routed
+output is intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated
+dropped) + the brain still emitting a sovereign verdict. Caveats: the routed+self-populate path is NOT
+covered by the byte-equal replay/determinism suites (they use the stub), and the DeviceTestApp wiring
+(`b1d118374`) is not yet re-run on hardware. `BASMLMemoryService` stays live as the fallback.
 
 ### Step 3 — nativeV2 honest semantics (shipped)
 Through M1081 the runtime mode was stored but `runTurn` ignored it (always V1 — the ch1044 finding),

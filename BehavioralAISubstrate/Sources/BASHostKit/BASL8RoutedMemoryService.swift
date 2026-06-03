@@ -1,4 +1,4 @@
-// MARK: - BASL8RoutedMemoryService — Step 2 (the real Rust+SQL vector/event memory backend)
+// MARK: - BASL8RoutedMemoryService — Step 2 (routed vector memory: Rust-SIMD cosine + OPTIONAL SQL/event store)
 //
 // A `BASMemoryServicing` conformer that composes the production L8 backends behind the SAME
 // synchronous `retrieve()` the protocol requires — replacing the in-memory Jaccard recall of
