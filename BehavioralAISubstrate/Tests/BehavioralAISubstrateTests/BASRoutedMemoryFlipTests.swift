@@ -89,9 +89,15 @@ final class BASRoutedMemoryFlipTests: XCTestCase {
     }
 
     // MARK: - #1 persistence: self-pop → admit → an event-sourced store persists + emits a
-    //         provenance event per atom, and a fresh service reloads it (recall survives "restart").
+    //         provenance event per atom, and a fresh service reloads it IN-PROCESS.
+    //   HONEST SCOPE: this proves admit → persist → provenance-events → reload → recall WITHIN one
+    //   process. It is NOT cross-restart durability: the `reborn` service reads the SAME `store`
+    //   actor, whose in-process `contentCache` still holds the atom content. A genuine new process
+    //   projecting from the event log alone would get empty content (the reducer hard-codes
+    //   `content: ""` — privacy doctrine) and would NOT recall. True restart durability needs the
+    //   host to persist content out-of-band.
 
-    func testRoutedMemoryPersistsAndReloadsViaEventSourcedStore() async throws {
+    func testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess() async throws {
         let mini = try XCTUnwrap(BASMiniLMEmbeddingProvider())
         let eventLog = BASInMemoryEventLogStorage()
         let store = BASEventSourcedMemoryAtomStore(
@@ -122,19 +128,20 @@ final class BASRoutedMemoryFlipTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(events.count, 2,
             "each admit emitted a replayable provenance event (the event/log/provenance trail)")
 
-        // a FRESH service (simulating process restart) reloads the persisted atoms via loadAllAtoms…
+        // a FRESH service reloads the persisted atoms via loadAllAtoms (IN-PROCESS — same store
+        // actor, whose content cache is still warm; this is NOT a cross-process restart)…
         let reborn = BASL8RoutedMemoryService(
             loadAllAtoms: { await store.allAtoms() },
             syncEmbed: mini.syncEmbedClosure(), embeddingDimension: 384)
         await reborn.refresh()
-        XCTAssertEqual(reborn.snapshotCount, 2, "restart reloaded both persisted atoms")
+        XCTAssertEqual(reborn.snapshotCount, 2, "the fresh service reloaded both persisted atoms")
 
-        // …and still recalls the semantically-related one (recall survived the restart).
+        // …and still recalls the semantically-related one (content survived in-process).
         let recalled = reborn.retrieve(
             decomposeFrame: frame("winter mountain snow sports"),
             hostContext: profile(), budget: budget())
         XCTAssertEqual(recalled.atoms.first?.summary, "alpine skiing in deep winter snow",
-            "the reloaded MiniLM memory recalls the skiing atom (not the diving atom) after restart")
+            "the reloaded MiniLM memory recalls the skiing atom (not the diving atom)")
     }
 
     // MARK: - #2 the routed + self-populate path is itself deterministic. The byte-equal/replay

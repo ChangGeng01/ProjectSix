@@ -163,6 +163,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             = { _ in }
     ) async throws {
         #if canImport(MLXLLM)
+        #if targetEnvironment(simulator)
+        // MLX's Metal device constructor (`mlx::core::metal::Device`) calls
+        // `std::__libcpp_verbose_abort` on the iOS Simulator (no real Metal GPU) — a C++ abort that
+        // Swift do/catch CANNOT intercept; it terminates the whole process (SIGABRT). Surface it as
+        // a CATCHABLE Swift error so every caller's `try await loadModel()` handles it gracefully
+        // instead of crashing. MLX runs normally on physical Apple-silicon devices.
+        throw BASOrganError.providerUnavailable(
+            reason:
+                "MLX requires a physical Metal GPU; " +
+                "unavailable on the iOS Simulator")
+        #endif
         if modelContainer != nil { return }
 
         let configuration = ModelConfiguration(

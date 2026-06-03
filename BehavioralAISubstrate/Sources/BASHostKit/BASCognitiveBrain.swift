@@ -418,8 +418,12 @@ public actor BASCognitiveBrain {
         // of BASMLMemoryService's in-memory Jaccard. nil ⇒ legacy (byte-equal-off / R1).
         memoryEmbed: (@Sendable (String) -> [Float])? = nil,
         memoryEmbedDim: Int = 384,
-        // Opt-in durable persistence for the routed memory (SQL/event/provenance store). nil ⇒
-        // in-memory self-population only. Host wires a BASEventSourcedMemoryAtomStore.
+        // Opt-in persistence hook for the routed memory (SQL/event/provenance store). nil ⇒ in-memory
+        // self-population only. NOTE: the brain only PLUMBS this into the service; it does NOT drive
+        // persistence — `drainIntents()`/`refresh()` are not on `BASMemoryServicing`, so a host that
+        // wants durable admit must keep the concrete service and call them at session boundaries
+        // itself. Reload is in-process (the event store replays content empty). See
+        // `BASRoutedMemoryPersistence` + `BASL8RoutedMemoryService` for the full honest scope.
         memoryPersistence: BASRoutedMemoryPersistence? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(

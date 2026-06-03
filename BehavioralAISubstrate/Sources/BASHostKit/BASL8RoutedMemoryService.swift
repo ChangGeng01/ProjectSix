@@ -26,13 +26,25 @@
 //   • event/log/provenance — TWO async write paths in `drainIntents()`, both opt-in:
 //     (1) ADMIT: when `admitAtom` is wired, each SELF-POPULATED atom is `admit()`ed to the durable
 //         store. A `BASEventSourcedMemoryAtomStore.admit` appends a `memoryAtomEvent` (the provenance
-//         trail) and the atom survives restart — a `loadAllAtoms` reading the SAME store reloads it on
-//         the next `refresh()`. This is the path the Step-2 flip wires (see ADR-033); it is covered by
-//         `BASRoutedMemoryFlipTests.testRoutedMemoryPersistsAndReloadsViaEventSourcedStore`.
+//         trail), and a `loadAllAtoms` reading the SAME store reloads it on the next `refresh()`.
 //     (2) GOVERNANCE: a promote/freeze calls `updateGovernanceStatus`, which records an event only for
 //         an atom ALREADY in the store's projection — so promote/freeze of a self-populated atom is
 //         durable only AFTER its admit (path 1) has run, or for atoms the host admitted elsewhere and
 //         surfaced via `loadAllAtoms`. nil `admitAtom`/`atomStore` ⇒ pure in-memory (no persistence).
+//
+// ## HONEST SCOPE — two limits a host MUST know (verified by the 3rd-arc audit):
+//   • NOT auto-wired to the brain. `refresh()`/`drainIntents()` are NOT on `BASMemoryServicing`
+//     (only `retrieve`/`promote`/`freeze`, all sync — ch883). `BASCognitiveBrain` holds the service
+//     as `any BASMemoryServicing`, so it NEVER calls them. Persistence fires ONLY if a host keeps the
+//     concrete `BASL8RoutedMemoryService` and drives `refresh()`/`drainIntents()` at session
+//     boundaries itself. As of this writing NO host in the repo does this (it is an opt-in building
+//     block, not a live path through `brain.process()`).
+//   • "Reload" is IN-PROCESS, not cross-restart durability. `BASEventSourcedMemoryAtomStore` replays
+//     event content as EMPTY (`BASMemoryAtomReducer` hard-codes `content: ""` — privacy doctrine) and
+//     rehydrates `content` only from an in-process `contentCache`. So reload works while the SAME
+//     store actor is alive; a genuine new process projecting from the event log alone recalls atoms
+//     with empty content (→ no semantic recall). True cross-restart durability needs the host to
+//     persist content out-of-band.
 //
 // ## Embedding seam
 //
@@ -53,10 +65,15 @@ import BASRuntimeCore
 import BASMemory
 import BASOrchestration
 
-/// Host-supplied durable persistence for the routed memory backend (the Step-2 SQL/event/provenance
+/// Host-supplied persistence hook for the routed memory backend (the Step-2 SQL/event/provenance
 /// half). Wire e.g. a `BASEventSourcedMemoryAtomStore` (events + provenance) or
-/// `BASSQLiteMemoryAtomStore` so self-populated recall survives restart and emits a provenance event
-/// per atom. nil ⇒ pure in-memory (the default flip).
+/// `BASSQLiteMemoryAtomStore` so each self-populated atom is `admit()`ed (one provenance event per
+/// atom) and reloadable via `loadAllAtoms`. nil ⇒ pure in-memory (the default flip).
+///
+/// HONEST SCOPE (see the type-level comment on `BASL8RoutedMemoryService`): this is an OPT-IN API with
+/// NO consumer in this repo yet — the brain does not construct it or drive `drainIntents()`, so it
+/// does not fire through `brain.process()`. And reload is IN-PROCESS (the event-sourced store replays
+/// content empty; content lives in an in-process cache), so it is NOT cross-restart-durable on its own.
 public struct BASRoutedMemoryPersistence: Sendable {
     public let loadAllAtoms: @Sendable () async -> [BASGovernedMemory]
     public let admitAtom: @Sendable (BASGovernedMemory) async -> Void
@@ -230,8 +247,14 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
                     atomID: id, domain: "session", embedding: query, atom: atom))
                 while snapshot.count > selfPopulateCap { snapshot.removeFirst() }
                 // Persistence: queue the atom for a durable admit (event/provenance) at drain.
+                // Bounded like the snapshot: a host that wires `admitAtom` but never calls
+                // `drainIntents()` would otherwise grow this unboundedly. Oldest un-drained
+                // intents past the cap are dropped (the cap matches the in-memory recall window).
                 if admitAtom != nil {
                     admitIntents.append(Self.governedMemory(content: queryText))
+                    while admitIntents.count > selfPopulateCap {
+                        admitIntents.removeFirst()
+                    }
                 }
             }
         }

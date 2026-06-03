@@ -3,14 +3,16 @@
 > **Status: ALL of Steps 1–5 SHIPPED + proven — including the Step-2 flip onto a free on-device
 > MiniLM-L6-v2 embedder (Apache-2.0, $0; converted to CoreML in-repo). HONEST SCOPE (2nd + 3rd deep
 > audit): the flip is HOST-INJECTED — the library `makeWithDefaults()` default stays legacy /
-> byte-equal-off; it ships IN-MEMORY semantic vector recall by DEFAULT, with the SQL/event/provenance
-> store now a WIRED + PROVEN opt-in (a host passes `BASRoutedMemoryPersistence` → self-populated recall
-> is `admit()`ed to a `BASEventSourcedMemoryAtomStore`, emits a provenance event per atom, and survives
-> restart — see `testRoutedMemoryPersistsAndReloadsViaEventSourcedStore`); and the on-device app is
-> now VERIFIED ON REAL HARDWARE — a bounded run on a physical iPhone Air (iPhone18,4, iOS 26.5) loaded
-> MiniLM's CoreML model (`routed+MiniLM`), constructed the brain in 108 ms, loaded MLX Gemma-4-E2B-4bit
-> (2.8 s), and completed a real `brain.process()` turn (L1–L14 cascade, 34 ms) — see "On-device proof"
-> below.**
+> byte-equal-off; it ships IN-MEMORY semantic vector recall by DEFAULT. The SQL/event/provenance store
+> exists as an OPT-IN API (`BASRoutedMemoryPersistence`) with a unit proof of
+> admit→persist→provenance-event→**in-process** reload — but (3rd-audit honesty, verified) it is NOT
+> consumed by any host or auto-driven by the brain (`drainIntents()`/`refresh()` are not on
+> `BASMemoryServicing`), and its "reload" is in-process, NOT cross-restart-durable (the event log
+> replays content empty per the privacy doctrine). On-device: a bounded run on a physical iPhone Air
+> (iPhone18,4, iOS 26.5) LOADED MiniLM's CoreML model (`routed+MiniLM`), built the brain in 108 ms,
+> loaded MLX Gemma-4-E2B-4bit (2.8 s), and completed one real `brain.process()` turn (34 ms) — this
+> proves the load + one-turn path on hardware; it did NOT exercise recall (needs ≥2 turns) or any
+> persistence. See "On-device proof" below.**
 > Response to the file-grounded critique that the *default* main chain still ran the V1 path + the
 > in-memory toy memory while the heavy machinery sat opt-in / observer / scaffold beside it.
 
@@ -85,12 +87,19 @@ depend on the Apple adapter where MiniLM lives): supplied ⇒ routed+MiniLM; nil
 **HONEST SCOPE of the shipped flip** (2nd + 3rd deep audit): by DEFAULT `resolveMemoryService` wires
 `BASL8RoutedMemoryService(loadAllAtoms: { [] }, atomStore: nil, selfPopulate: true, admitAtom: nil)` —
 i.e. **pure in-memory** MiniLM vector self-population (recall is process-memory, lost on restart). The
-SQL/event store + event-sourced provenance are now a **WIRED + PROVEN opt-in**: a host passes
-`memoryPersistence: BASRoutedMemoryPersistence(loadAllAtoms:admitAtom:atomStore:)` through
-`makeWithDefaults`/the bundle init, and then each self-populated atom is `admit()`ed to a
-`BASEventSourcedMemoryAtomStore` at `drainIntents()`, emitting one provenance event per atom and
-surviving restart — `testRoutedMemoryPersistsAndReloadsViaEventSourcedStore` proves admit→persist→
-provenance-events→reload→recall-after-restart end-to-end. The only Rust in the recall path is
+SQL/event store + event-sourced provenance exist as an **opt-in API** (`BASRoutedMemoryPersistence`,
+plumbed through `makeWithDefaults`/the bundle init): when wired, each self-populated atom is `admit()`ed
+to a `BASEventSourcedMemoryAtomStore` at `drainIntents()`, emitting one provenance event per atom and
+reloadable via `loadAllAtoms`. **HONEST SCOPE (3rd-audit, verified by grep + protocol read):** (a) it is
+NOT consumed by any host (zero `BASRoutedMemoryPersistence(...)` constructions in the repo) and the brain
+does NOT drive it — `drainIntents()`/`refresh()` are NOT on `BASMemoryServicing` (only `retrieve`/
+`promote`/`freeze`), and the brain holds the service as `any BASMemoryServicing`, so persistence NEVER
+fires through `brain.process()`; a host must keep the concrete service and drive it at session
+boundaries. (b) "Reload" is **in-process, NOT cross-restart-durable**: the event store replays content
+empty (`BASMemoryAtomReducer` hard-codes `content: ""` — privacy doctrine) and rehydrates from an
+in-process cache. `testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess` proves admit→persist→
+provenance-events→**in-process** reload+recall (it shares one store actor) — NOT durability across a real
+process restart. The only Rust in the recall path is
 `BASAutoRouteRanker.cosineSimilarity` (a SIMD kernel). Vector ≠ Jaccard, so the routed output is
 intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated dropped)
 + the brain still emitting a sovereign verdict. The routed+self-populate path's **own** determinism is
@@ -112,9 +121,13 @@ wall-clock, NOT in CI):
   • `🧠 ch1025 brain iter=1 prompt=1 latency_ms=34 task=manipulationRisk risk=high candidates=3` — a
     real `brain.process()` turn ran the full cascade end-to-end on-device.
   • `📊 ch1025 FINAL run_sec=4 iters=1` — clean completion.
-This closes the prior "wired but not run on hardware" caveat: the Step-2 flip (MiniLM → CoreML → routed
-memory → full cognitive turn, alongside the on-device LLM) is verified LIVE on an iPhone Air. NOTE
-(honest scope): this proves the runtime WIRING + load path on hardware in a single bounded run — it is
+This closes the prior "wired but not run on hardware" caveat for the LOAD + ONE-TURN path: on an iPhone
+Air, the brain selects + loads the routed+MiniLM backend, the on-device LLM loads, and one real
+`brain.process()` turn completes. NOTE (honest scope, sharpened by the 3rd audit): `ch1061` proves the
+backend was selected/loaded — it does NOT prove a self-populated atom was embedded, stored, or recalled
+on device; a single `ITER_COUNT=1` turn CANNOT exercise recall (turn 1 always returns an empty bundle by
+design — recall needs ≥2 turns) and exercised ZERO persistence (`admitAtom` nil, `drainIntents()` never
+called). So this is a load + one-turn proof, NOT a recall or persistence proof. It is also
 not a multi-hour endurance run, nor a measurement that semantic recall improves output quality over
 many turns (separate questions). The simulator verifies build + bundle + the MiniLM CoreML RUNTIME
 load (`routed+MiniLM`, captured in ~4 s); only MLX Gemma's load + a full turn stay device-only (MLX

@@ -187,6 +187,17 @@ final class BASEnduranceAppController: ObservableObject {
     /// Shared start path for both the env-autostart and the manual-button entry points。
     private func launch(iters: Int, cooldownSec: Int, mlxPrompts: Int) {
         guard !started else { return }
+        #if targetEnvironment(simulator)
+        // The endurance loop loads MLX (Gemma-4-E2B-4bit), whose Metal device constructor
+        // (`mlx::core::metal::Device::Device`) calls `std::__libcpp_verbose_abort` on the iOS
+        // Simulator — a C++ abort (SIGABRT) that the Swift do/catch around loadModel() CANNOT
+        // intercept. The endurance benchmark is device-only by design (on-device LLM on the
+        // ANE/GPU), so refuse to start it on the simulator instead of crashing. Runs normally on
+        // a physical iPhone.
+        status = .failed(message:
+            "endurance is device-only — MLX aborts on the Simulator; run on a physical iPhone")
+        return
+        #endif
         started = true
         status = .starting
         // Prevent screen auto-lock during the long run。 The operator should also set
