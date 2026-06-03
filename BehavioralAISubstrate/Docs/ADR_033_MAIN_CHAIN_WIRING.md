@@ -98,7 +98,11 @@ QUEUES (it does NOT auto-persist — the host must call `drainMemoryIntents()` a
 by design); `testBrainHostDrivenPersistenceDrainsToEventStore` proves the full public path end-to-end (a
 host wires `memoryPersistence` → runs turns → drives the brain hook → atoms admitted to the store +
 provenance events; store is empty until the host drains; a no-embedder brain's hook is a verified no-op).
-Caveat: no SHIPPING host wires it yet (the integration test is the consumer). (b) DURABILITY — still
+A SHIPPING host now consumes it: the DeviceTestApp endurance runner (ch1062) wires a
+`BASEventSourcedMemoryAtomStore` + `BASRoutedMemoryPersistence` and drives `brain.drainMemoryIntents()`
+at the run's session boundary — PROVEN on a physical iPhone Air: `ch1062 memory persisted admitted=2
+store_atoms=2` (a 2-turn bounded run admitted both self-populated atoms to the durable event store with
+provenance events on real hardware). (b) DURABILITY — still
 **in-process, NOT cross-restart-durable**: the event store replays content empty (`BASMemoryAtomReducer`
 hard-codes `content: ""` — privacy doctrine) and rehydrates from an in-process cache.
 `testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess` proves admit→persist→provenance-events→**in-process**

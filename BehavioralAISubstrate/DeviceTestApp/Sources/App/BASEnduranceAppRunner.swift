@@ -465,15 +465,39 @@ final class BASEnduranceAppController: ObservableObject {
         await emitBoth(
             "📍 ch1025 BASCognitiveBrain.makeWithDefaults loading")
         let brain: BASCognitiveBrain
+        // ch1062 — durable memory store for this run; this app is a REAL host that DRIVES
+        // brain.drainMemoryIntents() at the session boundary (see end of the loop).
+        let memoryStore: BASEventSourcedMemoryAtomStore?
         let cognitiveBrainStartNs = monoNowNs()
         do {
             // Step-2 flip: wire the on-device MiniLM embedder so the brain's default L8 memory is
             // real semantic vector recall (falls back to legacy Jaccard if the model can't load).
             let memoryEmbed = BASMiniLMEmbeddingProvider()?.syncEmbedClosure()
+            // ch1062 — when the routed backend is active, wire opt-in DURABLE persistence (an
+            // event-sourced store + one provenance event per admitted atom). The brain queues
+            // self-populated atoms during process(); THIS host flushes them via drainMemoryIntents()
+            // at the run's end. (In-process store for this run — cross-restart durability is a
+            // separate item: the event log replays content empty per the privacy doctrine.)
+            let memoryPersistence: BASRoutedMemoryPersistence?
+            if memoryEmbed != nil {
+                let store = BASEventSourcedMemoryAtomStore(
+                    eventLog: BASInMemoryEventLogStorage(),
+                    sessionID: "ch1062-endurance")
+                memoryStore = store
+                memoryPersistence = BASRoutedMemoryPersistence(
+                    loadAllAtoms: { await store.allAtoms() },
+                    admitAtom: { _ = try? await store.admit($0) },
+                    atomStore: store)
+            } else {
+                memoryStore = nil
+                memoryPersistence = nil
+            }
             await emitBoth(memoryEmbed != nil
-                ? "📍 ch1061 memory backend = routed+MiniLM (on-device semantic)"
+                ? "📍 ch1061 memory backend = routed+MiniLM (on-device semantic) + durable persistence"
                 : "📍 ch1061 memory backend = legacy Jaccard (MiniLM unavailable)")
-            brain = try await BASCognitiveBrain.makeWithDefaults(memoryEmbed: memoryEmbed)
+            brain = try await BASCognitiveBrain.makeWithDefaults(
+                memoryEmbed: memoryEmbed,
+                memoryPersistence: memoryPersistence)
         } catch {
             let msg = "Brain init failed: \(error)"
             await emitBoth("⚠️ ch1025 \(msg)")
@@ -982,6 +1006,19 @@ final class BASEnduranceAppController: ObservableObject {
                 "📊 ch1025 FINAL est_tokens_per_iter=" +
                 iterMlxTokens.map { String($0) }
                     .joined(separator: ","))
+        }
+
+        // ch1062 — HOST-DRIVEN persistence flush. process() only QUEUES self-populated atoms in the
+        // routed memory; the brain never auto-persists (drainIntents is async/off the sync hot path,
+        // ch883). As the host, drive the durable flush at the session boundary and report what landed
+        // in the event-sourced store (one provenance event per atom). No-op for the legacy backend.
+        if let store = memoryStore {
+            let mem = await brain.drainMemoryIntents()
+            let storedAtoms = await store.allAtoms().count
+            await emitBoth(
+                "📍 ch1062 memory persisted admitted=\(mem.admitted) " +
+                "store_atoms=\(storedAtoms) promoted=\(mem.promoted) " +
+                "(host-driven drainMemoryIntents at session boundary)")
         }
 
         await MainActor.run {
