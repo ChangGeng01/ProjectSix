@@ -11,6 +11,9 @@
 // the adapter is used UNWRAPPED exactly as before — no behavior change unless a host opts in.
 
 import Foundation
+#if canImport(os)
+import os
+#endif
 
 /// Host policy that, when supplied to a call-site constructor, wraps that site's adapter(s) in a
 /// contract-enforcing gate. Carries the per-purpose policy the gate needs.
@@ -51,5 +54,47 @@ public struct BASLLMContractInstall: Sendable {
             sovereignConstraints: sovereignConstraints,
             sovereignCheck: sovereignCheck,
             traceSink: traceSink)
+    }
+}
+
+// MARK: - Observe-mode (the SAFE-to-enable form: output byte-equal, never blocks) — ch1059
+
+public extension BASLLMContractInstall {
+    /// Observe-mode install — contracts + traces every call but **never rejects**:
+    /// `forbiddenContext`/`allowedContext`/`sovereignConstraints` are empty and there is no
+    /// `sovereignCheck`, so `BASContractedOrganGate.validate()` cannot throw → the model is ALWAYS
+    /// called and the drafted OUTPUT is byte-identical to the unwrapped path (proven by
+    /// `BASContractObserveModeTests`). The only effect is one governance `BASProcessTrace` per call.
+    ///
+    /// This is the SAFE form of "全面启用 #12" (禁止随便问模型 → every LLM call carries + records a
+    /// contract, output unchanged). ENFORCEMENT (rejecting forbidden context / sovereign constraints,
+    /// requiring a schema, capping tokens, the crypto/dual-key gates) needs a deliberate host policy
+    /// + keyring and is intentionally NOT part of observe-mode (R1 / 亏的不要上).
+    static func observeOnly(
+        purpose: BASLLMCallPurpose,
+        agentRef: String? = nil,
+        traceSink: (@Sendable (BASProcessTrace) -> Void)? = nil
+    ) -> BASLLMContractInstall {
+        BASLLMContractInstall(
+            purpose: purpose,
+            agentRef: agentRef,
+            forbiddenContext: [],
+            verifierRef: nil,
+            sovereignConstraints: [],
+            sovereignCheck: nil,
+            traceSink: traceSink ?? BASLLMContractInstall.defaultObserveSink)
+    }
+
+    /// Default observe sink: records the per-call governance trace to the system log where available
+    /// (retrievable via `log collect`), else a no-op. Refs only — `BASProcessTrace` carries no body.
+    private static var defaultObserveSink: (@Sendable (BASProcessTrace) -> Void)? {
+        #if canImport(os)
+        let log = Logger(subsystem: "bas.llm.contract", category: "observe")
+        return { t in
+            log.notice("contract call=\(t.callID, privacy: .public) purpose=\(t.purpose.rawValue, privacy: .public) agent=\(t.agentRef ?? "-", privacy: .public) verdict=\(t.verdict == .accepted ? "accepted" : "rejected", privacy: .public)")
+        }
+        #else
+        return nil
+        #endif
     }
 }

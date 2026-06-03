@@ -119,7 +119,7 @@ extension BASLLMNeuralCoreService {
     public static func makeDefault(
         adapter: any BASOrganAdapter,
         eventLog: any BASEventLogStorage,
-        contractInstall: BASLLMContractInstall? = nil
+        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .decompose)
     ) -> BASLLMNeuralCoreService {
         // ADR-031 §4 step 1 (opt-in / byte-equal-off): when an install is supplied, every LLM call
         // through this engine is contracted (fail-closed) + traced; nil → adapter used unwrapped,

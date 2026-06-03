@@ -65,7 +65,23 @@ final class BASLLMContractInstallTests: XCTestCase {
         _ = BASLLMNeuralCoreService.makeDefault(
             adapter: BASOrganDeterministicAdapter(), eventLog: log,
             contractInstall: BASLLMContractInstall(purpose: .decompose, forbiddenContext: ["sealed"]))
-        // Construction smoke: the opt-in param compiles; nil path = byte-equal (adapter unwrapped),
-        // install path = wrapped. The wrap's enforcement/trace behavior is proven by the tests above.
+        // Construction smoke: both forms compile + construct. ch1059: the DEFAULT is now
+        // observe-mode (governance ON, output byte-equal — see testObserveOnlyIsOutputByteEqual);
+        // an explicit install overrides it. The wrap's behavior is proven by the tests above.
+    }
+
+    // ch1059 — observe-mode is OUTPUT byte-equal: it contracts + traces but NEVER rejects, even with
+    // context an ENFORCING install would block. This is what makes default-on governance safe.
+    func testObserveOnlyIsOutputByteEqual() async throws {
+        let scary = req("r", context: ["sealed.memory", "forbidden", "anything"])
+        // Fresh adapter on each side: BASOrganDeterministicAdapter has a PER-INSTANCE call counter in
+        // its body, so reusing one instance would make #1 vs #2 differ for reasons unrelated to the
+        // gate. Separate instances isolate the contract wrap as the only variable.
+        let bare = try await BASOrganDeterministicAdapter().draft(scary)
+        let viaObserve = try await BASLLMContractInstall.observeOnly(purpose: .decompose)
+            .wrap(BASOrganDeterministicAdapter()).draft(scary)
+        XCTAssertEqual(viaObserve.body, bare.body,
+                       "observe-mode must never reject → output byte-identical to unwrapped")
+        XCTAssertEqual(viaObserve.providerID, bare.providerID)
     }
 }

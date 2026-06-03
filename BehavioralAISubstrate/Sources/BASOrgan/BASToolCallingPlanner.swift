@@ -194,7 +194,7 @@ public actor BASToolCallingPlanner {
         policy: @escaping BASToolCallingPlanPolicy,
         maxIterations: Int =
             BASToolCallingPlanner.defaultMaxIterations,
-        contractInstall: BASLLMContractInstall? = nil
+        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .plan)
     ) {
         precondition(maxIterations > 0,
             "maxIterations must be > 0")

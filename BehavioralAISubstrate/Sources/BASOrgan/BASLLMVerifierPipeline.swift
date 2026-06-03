@@ -224,7 +224,7 @@ public actor BASLLMVerifierPipeline {
         compressorInstruction: String =
             BASLLMVerifierPipeline
                 .defaultCompressorInstruction,
-        contractInstall: BASLLMContractInstall? = nil
+        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .verify)
     ) {
         // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
         // (fail-closed) + traced; nil → adapters used unwrapped (byte-equal-off, R1).
