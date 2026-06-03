@@ -20,6 +20,14 @@
 //   - `.stressSweepDual`:run BOTH V1 + V2 paths per turn
 //     and digest-compare via M1074 BASStressSweepHarness
 //
+// ## ADR-033 Step 3b update — the mode switch is now LIVE
+//
+// Through M1081 the mode was STORED on the engine but `runTurn` IGNORED it (always V1 —
+// the ch1044 严查 finding). As of ADR-033 Step 3b `runTurn` READS `runtimeMode`:
+// `.nativeV2` dispatches `runWithPlan(...)` (the real native executors). The result stays
+// V1-derived / byte-equal (proven across canonical60 by BASEBrainTurnResultReplayHarness),
+// so this honors ADR-014 / R1 while making the `.nativeV2` label TRUE, not aspirational.
+//
 // ## What this ships (M1081)
 //
 //   - `BASTurnRuntimeMode` typed enum (3 cases) +
@@ -48,10 +56,14 @@ public enum BASTurnRuntimeMode:
     /// Default mode:V2 actor delegates to V1 coordinator
     /// for byte-equal output。 ADR-014 OPT-IN compliance。
     case v1ByteEqual = "v1-byte-equal"
-    /// Native V2 mode:execute via M1075 BASNativeStage
-    /// Executor + M1072 BASParallelStageDispatchExecutor
-    /// + M1070 BASPermitEscalationFoldExecutor。 Hosts
-    /// opt in。
+    /// Native V2 mode:`BASTurnRuntimeEngine.runTurn` dispatches `runWithPlan(...)`,
+    /// executing the M1075 BASNativeStageExecutor + M1072 BASParallelStageDispatchExecutor
+    /// + M1070 BASPermitEscalationFoldExecutor。 Hosts opt in。 The returned
+    /// `BASEBrainTurnResult` remains V1-derived (ADR-014) and is BYTE-EQUAL to
+    /// `.v1ByteEqual` — proven across canonical60 by
+    /// `BASEBrainTurnResultReplayHarness.v1VsRunWithPlanParityVerdict` (ADR-033 Step 3b)。
+    /// The native path's observable effect is additional stage-ledger / dispatch telemetry,
+    /// NOT a different answer。
     case nativeV2 = "native-v2"
     /// Dual mode:run BOTH V1 and V2 paths per turn,
     /// digest-compare via M1074 BASStressSweepHarness。

@@ -439,6 +439,20 @@ public actor BASTurnRuntimeEngine {
             BASTurnRuntimeStagePlan? = nil,
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
+        // ADR-033 Step 3b — honest .nativeV2: when the host opted into native execution,
+        // dispatch the REAL native stage executors via runWithPlan. The returned
+        // BASEBrainTurnResult stays V1-derived and is BYTE-EQUAL to the .v1ByteEqual path —
+        // proven across canonical60 by
+        // BASEBrainTurnResultReplayHarness.v1VsRunWithPlanParityVerdict (the evidence gate).
+        // .v1ByteEqual (default) + .stressSweepDual leave the V1 path below textually
+        // unchanged (ADR-014 byte-equal-off / R1). The native path's only observable effect
+        // is additional stage-ledger / dispatch telemetry, NOT a different answer.
+        if runtimeMode == .nativeV2 {
+            return await runWithPlan(
+                request,
+                plan: stagePlan ?? BASTurnRuntimeStagePlan.canonical(),
+                timestampMsOverride: timestampMsOverride)
+        }
         let result = coordinator.runTurn(request)
         // chapter 四百六 / M991: V2 actor now emits BOTH .start
         // and .complete lifecycle envelopes per turn。 Both fire
