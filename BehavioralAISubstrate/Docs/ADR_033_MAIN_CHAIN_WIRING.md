@@ -6,8 +6,11 @@
 > byte-equal-off; it ships IN-MEMORY semantic vector recall by DEFAULT, with the SQL/event/provenance
 > store now a WIRED + PROVEN opt-in (a host passes `BASRoutedMemoryPersistence` → self-populated recall
 > is `admit()`ed to a `BASEventSourcedMemoryAtomStore`, emits a provenance event per atom, and survives
-> restart — see `testRoutedMemoryPersistsAndReloadsViaEventSourcedStore`); the on-device app is wired
-> but not yet re-run on hardware.**
+> restart — see `testRoutedMemoryPersistsAndReloadsViaEventSourcedStore`); and the on-device app is
+> now VERIFIED ON REAL HARDWARE — a bounded run on a physical iPhone Air (iPhone18,4, iOS 26.5) loaded
+> MiniLM's CoreML model (`routed+MiniLM`), constructed the brain in 108 ms, loaded MLX Gemma-4-E2B-4bit
+> (2.8 s), and completed a real `brain.process()` turn (L1–L14 cascade, 34 ms) — see "On-device proof"
+> below.**
 > Response to the file-grounded critique that the *default* main chain still ran the V1 path + the
 > in-memory toy memory while the heavy machinery sat opt-in / observer / scaffold beside it.
 
@@ -92,9 +95,29 @@ provenance-events→reload→recall-after-restart end-to-end. The only Rust in t
 intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated dropped)
 + the brain still emitting a sovereign verdict. The routed+self-populate path's **own** determinism is
 now pinned directly by `testRoutedSelfPopulatePathIsDeterministic` (closing the 3rd-audit gap that the
-byte-equal replay/determinism suites only exercise the stub coordinator). Remaining caveat: the
-DeviceTestApp wiring (`b1d118374`) is not yet re-run on hardware. `BASMLMemoryService` stays live as
-the byte-equal-off fallback.
+byte-equal replay/determinism suites only exercise the stub coordinator). `BASMLMemoryService` stays
+live as the byte-equal-off fallback.
+
+**On-device proof (real iPhone Air, iPhone18,4, iOS 26.5).** The DeviceTestApp (`b1d118374`) was
+built for the physical device (Apple Development signing, automatic provisioning), installed, and run
+BOUNDED (`BAS_ENDURANCE_AUTOSTART=1 BAS_INTERNAL_ITER_COUNT=1 BAS_INTERNAL_MLX_PROMPTS=1`) via
+`devicectl`, with the device syslog captured over `idevicesyslog`. Result (one clean run, ~6 s
+wall-clock, NOT in CI):
+  • `📍 ch1061 memory backend = routed+MiniLM (on-device semantic)` — MiniLM's CoreML model loaded on
+    real silicon (the routed path, not the `legacy Jaccard` fallback).
+  • `📍 ch1025 BASCognitiveBrain loaded load_ms=108` — the L0–L14 brain constructed with MiniLM-backed
+    routed memory in 108 ms (vs ~342 ms on the simulator).
+  • `📍 ch1025 MLXOrganAdapter loaded load_ms=2843 is_loaded=true` — MLX Gemma-4-E2B-4bit loaded on the
+    Neural Engine / GPU (a path the simulator cannot run at all).
+  • `🧠 ch1025 brain iter=1 prompt=1 latency_ms=34 task=manipulationRisk risk=high candidates=3` — a
+    real `brain.process()` turn ran the full cascade end-to-end on-device.
+  • `📊 ch1025 FINAL run_sec=4 iters=1` — clean completion.
+This closes the prior "wired but not run on hardware" caveat: the Step-2 flip (MiniLM → CoreML → routed
+memory → full cognitive turn, alongside the on-device LLM) is verified LIVE on an iPhone Air. NOTE
+(honest scope): this proves the runtime WIRING + load path on hardware in a single bounded run — it is
+not a multi-hour endurance run, nor a measurement that semantic recall improves output quality over
+many turns (separate questions). The simulator can still verify build + bundle every cycle, but the
+MiniLM/MLX RUNTIME load is a device-only check (sim: CoreML large-model reload hangs; MLX absent).
 
 ### Step 3 — nativeV2 honest semantics (shipped)
 Through M1081 the runtime mode was stored but `runTurn` ignored it (always V1 — the ch1044 finding),
