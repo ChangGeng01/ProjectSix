@@ -32,19 +32,19 @@
 //         durable only AFTER its admit (path 1) has run, or for atoms the host admitted elsewhere and
 //         surfaced via `loadAllAtoms`. nil `admitAtom`/`atomStore` ⇒ pure in-memory (no persistence).
 //
-// ## HONEST SCOPE — two limits a host MUST know (verified by the 3rd-arc audit):
-//   • NOT auto-wired to the brain. `refresh()`/`drainIntents()` are NOT on `BASMemoryServicing`
-//     (only `retrieve`/`promote`/`freeze`, all sync — ch883). `BASCognitiveBrain` holds the service
-//     as `any BASMemoryServicing`, so it NEVER calls them. Persistence fires ONLY if a host keeps the
-//     concrete `BASL8RoutedMemoryService` and drives `refresh()`/`drainIntents()` at session
-//     boundaries itself. As of this writing NO host in the repo does this (it is an opt-in building
-//     block, not a live path through `brain.process()`).
-//   • "Reload" is IN-PROCESS, not cross-restart durability. `BASEventSourcedMemoryAtomStore` replays
-//     event content as EMPTY (`BASMemoryAtomReducer` hard-codes `content: ""` — privacy doctrine) and
-//     rehydrates `content` only from an in-process `contentCache`. So reload works while the SAME
-//     store actor is alive; a genuine new process projecting from the event log alone recalls atoms
-//     with empty content (→ no semantic recall). True cross-restart durability needs the host to
-//     persist content out-of-band.
+// ## HOST-DRIVEN seam + DURABILITY (current state — this was once an in-process-only opt-in; the
+//    durable-memory arc made it cross-restart durable + host-consumed):
+//   • Host-driven, NOT auto-wired. `refresh()`/`drainIntents()` are NOT on `BASMemoryServicing` (only
+//     `retrieve`/`promote`/`freeze`, all sync — ch883), so `BASCognitiveBrain.process()` never calls
+//     them. The brain exposes `refreshMemory()` / `drainMemoryIntents()` and a HOST drives them at
+//     session/turn boundaries. The DeviceTestApp endurance is the shipping host that consumes this.
+//   • CROSS-RESTART durable via the right store. The event-sourced store is IN-PROCESS only (its reducer
+//     replays content EMPTY — privacy doctrine — rehydrating from an in-process cache). For durability
+//     across a REAL restart, wire the FILE-BACKED `BASSQLiteMemoryAtomStore` (persists full content as
+//     payload_json) + `BASSQLiteVectorIndexStorage` (persisted embeddings) via the optional
+//     `loadEmbedding`/`upsertEmbedding` closures below: a brand-new process reloads content + embeddings
+//     and reproduces recall WITHOUT re-embedding. Proven by
+//     `BASL8RoutedMemoryServiceCrossRestartTests` (content) + `…VectorIndexTests` (embeddings).
 //
 // ## Embedding seam
 //
@@ -232,8 +232,16 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             above.map { (domain: $0.entry.domain, payload: $0) },
             restrictedMemoryDomains: restrictedMemoryDomains)
 
+        // Score DESC, then a stable tie-break on the unique atom ID ASC. Swift's `sorted` is not
+        // documented stable, so without the secondary key two atoms with EXACTLY equal cosine scores
+        // could reorder across runs / toolchains / snapshot insertion order. atomID is unique +
+        // content-derived, giving a total order ⇒ byte-deterministic top-K (红线 byte-determinism).
         let top = filtered.allowed
-            .sorted { $0.score > $1.score }
+            .sorted {
+                $0.score != $1.score
+                    ? $0.score > $1.score
+                    : $0.entry.atomID < $1.entry.atomID
+            }
             .prefix(topK)
 
         let atoms: [BASMemoryAtom] = top.map { tuple in

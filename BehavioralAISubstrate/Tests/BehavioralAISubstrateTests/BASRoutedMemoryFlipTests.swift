@@ -223,5 +223,34 @@ final class BASRoutedMemoryFlipTests: XCTestCase {
         XCTAssertEqual(legacyDrain.admitted, 0,
             "the legacy/byte-equal-off brain has no routed memory — drainMemoryIntents is a no-op")
     }
+
+    // MARK: - retrieve() top-K is byte-deterministic even when scores are EXACTLY tied (tie-break)
+
+    func testRetrieveTieBreakIsDeterministicOnEqualScores() async {
+        // Four atoms with IDENTICAL embeddings ⇒ identical cosine to any query ⇒ EXACT score ties.
+        // Without a stable secondary key, Swift's (unspecified-stability) sort could reorder them;
+        // the atomID tie-break must select the 3 smallest atomIDs, deterministically.
+        let ids = [UUID(), UUID(), UUID(), UUID()].map(\.uuidString).sorted()
+        let governed = ids.map { idStr in
+            BASGovernedMemory(
+                id: UUID(uuidString: idStr)!, kind: .semantic, content: "x", scope: .session,
+                sensitivity: .low, tier: .hot, confidence: 0.5, sourceType: "d",
+                governanceStatus: .governed, provenanceSummary: "t")
+        }
+        let svc = BASL8RoutedMemoryService(
+            loadAllAtoms: { governed },
+            syncEmbed: { _ in [1, 0, 0, 0] },   // constant ⇒ every atom + query embed identically
+            embeddingDimension: 4, topK: 3, relevanceFloor: -1.0)
+        await svc.refresh()
+
+        func recalled() -> [String] {
+            svc.retrieve(decomposeFrame: frame("q"), hostContext: profile(), budget: budget())
+                .atoms.map(\.memoryID)
+        }
+        let r1 = recalled(), r2 = recalled()
+        XCTAssertEqual(r1, r2, "exact-tie top-K is deterministic across calls")
+        XCTAssertEqual(r1, Array(ids.prefix(3)),
+            "ties broken by atomID ascending → the 3 smallest atom IDs, deterministically")
+    }
 }
 #endif
