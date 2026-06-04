@@ -124,14 +124,29 @@ extension BASHostRuntime {
         // pinned in BASSignalTenIntegrationTestTriageDoctrine; empirically
         // re-confirmed). The activation is proven transitively through the
         // sync-path tests that exercise the identical coordinator wiring.
-        deliberationLoopEnabled: Bool = false
+        deliberationLoopEnabled: Bool = false,
+        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // threaded onto the coordinator this async surface builds (via
+        // buildCoordinator). Default false → coordinator flag false → the L11
+        // SSM seam is dormant → byte-equal (红线 7 + ADR-014). Mirrors exactly
+        // how `deliberationLoopEnabled` is threaded here. Before this, the
+        // runtime-mode surface had NO such parameter and buildCoordinator
+        // defaulted the coordinator's flag to false, so this async path could
+        // NEVER enable the operator — the same activation gap noted above for
+        // the deliberation flag. Like that flag, the async on-effect can't be
+        // exercised by a direct XCTest (async test + startSession SIGBUSes per
+        // BASSignalTenIntegrationTestTriageDoctrine); it is proven transitively
+        // by the sync-path BASSSMCautionOperatorRunTurnTests, which exercise
+        // the identical coordinator wiring.
+        ssmCautionOperatorEnabled: Bool = false
     ) async -> BASEBrainTurnResult {
         let coordinator = buildCoordinator(
             for: request,
             currentBrain: currentBrain,
             projection: projection,
             now: now,
-            deliberationLoopEnabled: deliberationLoopEnabled
+            deliberationLoopEnabled: deliberationLoopEnabled,
+            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
         )
         let deviceState = deviceStateOverride
             ?? vitalMonitor?.currentDeviceState(now: now)
@@ -180,7 +195,13 @@ extension BASHostRuntime {
         // triSelfService (ch1040 ADR-019 reversibility-tilt) and the
         // coordinator init below, exactly as the sync `makeEBrainTurn(...)`
         // path does, so this async surface activates the same loop.
-        deliberationLoopEnabled: Bool = false
+        deliberationLoopEnabled: Bool = false,
+        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // threaded onto the coordinator init below. The SSM seam is purely an
+        // L11 risk-card raise in runTurn, so — unlike `deliberationLoopEnabled`
+        // — it is NOT threaded onto triSelfService (no reversibility-tilt
+        // analogue). Default false → seam dormant → byte-equal (红线 7 + ADR-014).
+        ssmCautionOperatorEnabled: Bool = false
     ) -> BASEBrainRuntimeCoordinator {
         let enforcedCurrentBrain = currentBrain
             .applyingControlPlaneDisposition(
@@ -305,7 +326,12 @@ extension BASHostRuntime {
             // Default false (every existing caller omits it) → the
             // coordinator's own default false → the runTurn loop body +
             // P1.5a caution seam stay dormant → byte-equal (红线 7).
-            deliberationLoopEnabled: deliberationLoopEnabled
+            deliberationLoopEnabled: deliberationLoopEnabled,
+            // chapter 一百八十六 / ADR-019 P1.5b — thread the SSM caution
+            // operator flag onto the coordinator the async runtime-mode
+            // surface uses. Default false → the coordinator's own default
+            // false → the L11 SSM seam stays dormant → byte-equal (红线 7).
+            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
         )
     }
 
