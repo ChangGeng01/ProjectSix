@@ -147,4 +147,40 @@ final class BASSSMCrossTurnStateTests: XCTestCase {
         XCTAssertNil(decoded.ssmStateOut)
         XCTAssertNil(decoded.gpuShadowMAE)
     }
+
+    // MARK: - request wire-format (turnHistory + priorSSMState custom decoder)
+
+    func testRequestCodableRoundTripWithNewFields() throws {
+        let req = BASEBrainTurnRequest(
+            userInput: "hi",
+            deviceState: BASCoordinatorTestStubs.nominalDeviceState,
+            hostID: "h",
+            turnHistory: ["t1", "t2"],
+            priorSSMState: [0.1, 0.2, 0.3])
+        let decoded = try JSONDecoder().decode(
+            BASEBrainTurnRequest.self, from: JSONEncoder().encode(req))
+        XCTAssertEqual(decoded.turnHistory, ["t1", "t2"])
+        XCTAssertEqual(decoded.priorSSMState, [0.1, 0.2, 0.3])
+        XCTAssertEqual(decoded, req, "full Codable round-trip is identity")
+    }
+
+    func testRequestDecodesOldEncodingWithoutNewFields() throws {
+        // Simulate a pre-turnHistory/priorSSMState encoding: encode, strip the new keys, decode.
+        let req = BASEBrainTurnRequest(
+            userInput: "hi",
+            deviceState: BASCoordinatorTestStubs.nominalDeviceState,
+            hostID: "h",
+            turnHistory: ["x"],
+            priorSSMState: [0.5])
+        var obj = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(req)) as? [String: Any])
+        obj.removeValue(forKey: "turnHistory")
+        obj.removeValue(forKey: "priorSSMState")
+        let stripped = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(BASEBrainTurnRequest.self, from: stripped)
+        XCTAssertEqual(decoded.turnHistory, [], "absent turnHistory ⇒ [] (backward-compatible)")
+        XCTAssertNil(decoded.priorSSMState, "absent priorSSMState ⇒ nil (backward-compatible)")
+        XCTAssertEqual(decoded.userInput, "hi")
+        XCTAssertEqual(decoded.hostID, "h")
+    }
 }
