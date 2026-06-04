@@ -44,11 +44,19 @@ public struct BASMambaSSMTurnObservation:
 
 public enum BASMambaSSMTurnObservationProjection {
 
-    /// Provisional caution calibration: the approximate steady-state |y| for an all-ones input given
-    /// the fixed scan constants (Δ=0.1, A=-1, B=0.2, C=0.3): C·(ΔB)/(1−e^{ΔA}) ≈ 0.3·0.02/0.095 ≈ 0.063.
-    /// Used to normalize the raw magnitude into a useful [0,1] span. CALIBRATION IS PROVISIONAL —
-    /// tuning the caution scale is explicitly a later phase (the safety proofs do not depend on it).
-    static let cautionReferenceMagnitude: Double = 0.063
+    /// Caution-scale reference, CALIBRATED FROM MEASURED scan magnitudes (pinned by
+    /// `BASSSMCautionCalibrationTests`). The original value was the all-ones analytic steady state
+    /// (C·(ΔB)/(1−e^{ΔA}) ≈ 0.063), but the actual per-turn scan never approaches it: measured
+    /// max-abs(y) spans ~0.003 (a minimal turn) to ~0.046 (all three sources saturated at their 8-row
+    /// caps), and a genuinely high-pressure turn (manipulative + irreversible + low-confidence) sits
+    /// near ~0.013. The analytic 0.063 sat ABOVE that entire realistic range, leaving the operator
+    /// near-inert (a high-pressure turn normalized to only ~0.20, and even a saturated turn to ~0.74).
+    /// This reference (0.025) puts a high-pressure turn near ~0.50, a mid turn near ~0.35, benign turns
+    /// near ~0.12, and the saturated extreme at the 1.0 cap — so the caution DISCRIMINATES
+    /// proportionally to temporal pressure. The SAFETY proofs (raise-only, monotonic, byte-equal-off,
+    /// verdict-gated) are independent of this magnitude — it only scales the bounded raise within
+    /// [0, BASSSMCautionInput.ssmCautionRiskIncrement].
+    static let cautionReferenceMagnitude: Double = 0.025
 
     /// Deterministic reducer: the temporal magnitude (max-abs over the scan output) normalized to
     /// [0, 1] by the reference. Pure + bounded.
