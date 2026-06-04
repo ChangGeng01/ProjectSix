@@ -469,29 +469,46 @@ final class BASEnduranceAppController: ObservableObject {
         // This app is a REAL host that DRIVES brain.refreshMemory() at start + drainMemoryIntents() per
         // iteration. Atoms (incl. content) persist as payload_json and survive an app restart.
         let memoryStore: BASSQLiteMemoryAtomStore?
+        // ch1064 — durable VECTOR INDEX (persisted embeddings, BLOB) so refresh() loads vectors on
+        // restart instead of re-embedding every atom via CoreML.
+        let memoryVectorIndex: BASSQLiteVectorIndexStorage?
         let cognitiveBrainStartNs = monoNowNs()
         do {
             // Step-2 flip: wire the on-device MiniLM embedder so the brain's default L8 memory is
             // real semantic vector recall (falls back to legacy Jaccard if the model can't load).
             let memoryEmbed = BASMiniLMEmbeddingProvider()?.syncEmbedClosure()
-            // ch1063 — when the routed backend is active, wire opt-in DURABLE persistence to a
-            // file-backed BASSQLiteMemoryAtomStore (full content as payload_json, survives restart —
+            // ch1063/ch1064 — when the routed backend is active, wire opt-in DURABLE persistence to a
+            // file-backed BASSQLiteMemoryAtomStore (full content as payload_json — survives restart,
             // unlike the in-memory event store whose reducer replays content empty per the privacy
-            // doctrine). The brain queues self-populated atoms during process(); THIS host flushes
-            // them via drainMemoryIntents() each iteration and reloads them via refreshMemory() at start.
+            // doctrine) AND a file-backed BASSQLiteVectorIndexStorage (persisted embeddings). The brain
+            // queues self-populated atoms during process(); THIS host flushes them via
+            // drainMemoryIntents() each iteration and reloads them via refreshMemory() at start.
             let memoryPersistence: BASRoutedMemoryPersistence?
             if memoryEmbed != nil {
                 let docs = FileManager.default.urls(
                     for: .documentDirectory, in: .userDomainMask).first!
-                let atomsURL = docs.appendingPathComponent("bas-memory-atoms.sqlite")
-                let store = try BASSQLiteMemoryAtomStore(databaseURL: atomsURL)
+                let store = try BASSQLiteMemoryAtomStore(
+                    databaseURL: docs.appendingPathComponent("bas-memory-atoms.sqlite"))
+                let vindex = try BASSQLiteVectorIndexStorage(
+                    databaseURL: docs.appendingPathComponent("bas-vector-index.sqlite"))
                 memoryStore = store
+                memoryVectorIndex = vindex
                 memoryPersistence = BASRoutedMemoryPersistence(
                     loadAllAtoms: { (try? await store.allAtoms()) ?? [] },
                     admitAtom: { _ = try? await store.admit($0) },
-                    atomStore: store)
+                    atomStore: store,
+                    loadEmbedding: { await vindex.entry(forID: $0)?.normalizedEmbedding.vector },
+                    upsertEmbedding: { id, vec, domain in
+                        _ = try? await vindex.upsert(BASVectorIndexEntry(
+                            atomID: id,
+                            normalizedEmbedding: BASEmbedding(
+                                vector: vec, dimension: vec.count,
+                                providerVersion: "MiniLM-L6-v2-coreml-fp32-v1").normalized,
+                            domain: domain))
+                    })
             } else {
                 memoryStore = nil
+                memoryVectorIndex = nil
                 memoryPersistence = nil
             }
             await emitBoth(memoryEmbed != nil
@@ -522,9 +539,12 @@ final class BASEnduranceAppController: ObservableObject {
         if let store = memoryStore {
             await brain.refreshMemory()
             let preloaded = (try? await store.allAtoms().count) ?? 0
+            let vidxEntries = (memoryVectorIndex != nil)
+                ? await memoryVectorIndex!.totalCount : 0
             await emitBoth(
                 "📍 ch1063 memory reload-at-start store_atoms=\(preloaded) " +
-                "(>0 on 2nd launch over same container = cross-restart durable)")
+                "vector_index_entries=\(vidxEntries) " +
+                "(>0 on 2nd launch over same container = cross-restart durable content + embeddings)")
         }
 
         // ch 1025.6 — REAL fabric pipeline(closes the last
