@@ -465,27 +465,29 @@ final class BASEnduranceAppController: ObservableObject {
         await emitBoth(
             "📍 ch1025 BASCognitiveBrain.makeWithDefaults loading")
         let brain: BASCognitiveBrain
-        // ch1062 — durable memory store for this run; this app is a REAL host that DRIVES
-        // brain.drainMemoryIntents() at the session boundary (see end of the loop).
-        let memoryStore: BASEventSourcedMemoryAtomStore?
+        // ch1063 — DURABLE cross-restart memory store: a FILE-BACKED SQLite atom store under Documents.
+        // This app is a REAL host that DRIVES brain.refreshMemory() at start + drainMemoryIntents() per
+        // iteration. Atoms (incl. content) persist as payload_json and survive an app restart.
+        let memoryStore: BASSQLiteMemoryAtomStore?
         let cognitiveBrainStartNs = monoNowNs()
         do {
             // Step-2 flip: wire the on-device MiniLM embedder so the brain's default L8 memory is
             // real semantic vector recall (falls back to legacy Jaccard if the model can't load).
             let memoryEmbed = BASMiniLMEmbeddingProvider()?.syncEmbedClosure()
-            // ch1062 — when the routed backend is active, wire opt-in DURABLE persistence (an
-            // event-sourced store + one provenance event per admitted atom). The brain queues
-            // self-populated atoms during process(); THIS host flushes them via drainMemoryIntents()
-            // at the run's end. (In-process store for this run — cross-restart durability is a
-            // separate item: the event log replays content empty per the privacy doctrine.)
+            // ch1063 — when the routed backend is active, wire opt-in DURABLE persistence to a
+            // file-backed BASSQLiteMemoryAtomStore (full content as payload_json, survives restart —
+            // unlike the in-memory event store whose reducer replays content empty per the privacy
+            // doctrine). The brain queues self-populated atoms during process(); THIS host flushes
+            // them via drainMemoryIntents() each iteration and reloads them via refreshMemory() at start.
             let memoryPersistence: BASRoutedMemoryPersistence?
             if memoryEmbed != nil {
-                let store = BASEventSourcedMemoryAtomStore(
-                    eventLog: BASInMemoryEventLogStorage(),
-                    sessionID: "ch1062-endurance")
+                let docs = FileManager.default.urls(
+                    for: .documentDirectory, in: .userDomainMask).first!
+                let atomsURL = docs.appendingPathComponent("bas-memory-atoms.sqlite")
+                let store = try BASSQLiteMemoryAtomStore(databaseURL: atomsURL)
                 memoryStore = store
                 memoryPersistence = BASRoutedMemoryPersistence(
-                    loadAllAtoms: { await store.allAtoms() },
+                    loadAllAtoms: { (try? await store.allAtoms()) ?? [] },
                     admitAtom: { _ = try? await store.admit($0) },
                     atomStore: store)
             } else {
@@ -493,7 +495,7 @@ final class BASEnduranceAppController: ObservableObject {
                 memoryPersistence = nil
             }
             await emitBoth(memoryEmbed != nil
-                ? "📍 ch1061 memory backend = routed+MiniLM (on-device semantic) + durable persistence"
+                ? "📍 ch1061 memory backend = routed+MiniLM (on-device semantic) + durable SQLite (cross-restart)"
                 : "📍 ch1061 memory backend = legacy Jaccard (MiniLM unavailable)")
             brain = try await BASCognitiveBrain.makeWithDefaults(
                 memoryEmbed: memoryEmbed,
@@ -513,6 +515,17 @@ final class BASEnduranceAppController: ObservableObject {
         await emitBoth(String(format:
             "📍 ch1025 BASCognitiveBrain loaded load_ms=%.0f",
             cognitiveBrainMs))
+
+        // ch1063 — CROSS-RESTART proof: reload the durable store into the routed snapshot at start.
+        // store_atoms is 0 on launch #1 over a fresh container, and >0 on launch #2 over the SAME
+        // container — i.e. a prior run's self-populated memory survived an app restart.
+        if let store = memoryStore {
+            await brain.refreshMemory()
+            let preloaded = (try? await store.allAtoms().count) ?? 0
+            await emitBoth(
+                "📍 ch1063 memory reload-at-start store_atoms=\(preloaded) " +
+                "(>0 on 2nd launch over same container = cross-restart durable)")
+        }
 
         // ch 1025.6 — REAL fabric pipeline(closes the last
         // self-audit gap:fabric was ALWAYS bypassed before)。
@@ -912,7 +925,7 @@ final class BASEnduranceAppController: ObservableObject {
             // No-op for the legacy backend.
             if let store = memoryStore {
                 let mem = await brain.drainMemoryIntents()
-                let storedAtoms = await store.allAtoms().count
+                let storedAtoms = (try? await store.allAtoms().count) ?? -1
                 await emitBoth(
                     "📍 ch1062 iter=\(iter) memory persisted " +
                     "admitted=\(mem.admitted) store_atoms=\(storedAtoms) " +
@@ -1028,11 +1041,11 @@ final class BASEnduranceAppController: ObservableObject {
         // provenance per atom over the whole run). No-op for the legacy backend.
         if let store = memoryStore {
             let mem = await brain.drainMemoryIntents()
-            let storedAtoms = await store.allAtoms().count
+            let storedAtoms = (try? await store.allAtoms().count) ?? -1
             await emitBoth(
                 "📊 ch1062 FINAL memory total_store_atoms=\(storedAtoms) " +
                 "final_flush_admitted=\(mem.admitted) " +
-                "(host-driven persistence: per-iteration + final)")
+                "(host-driven durable SQLite persistence: per-iteration + final)")
         }
 
         await MainActor.run {
