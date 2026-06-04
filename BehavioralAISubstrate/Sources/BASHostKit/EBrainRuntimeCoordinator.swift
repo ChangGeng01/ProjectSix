@@ -210,6 +210,23 @@ public struct BASEBrainRuntimeCoordinator {
     public var resolvedTrialSink:
         (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
 
+    /// chapter 一百八十六 / ADR-019 P1.5b — OPT-IN, default-false gate for the SSM caution operator
+    /// (Mamba/SSM as an AUTHORITATIVE raise-caution-only L11 input)。 Mirrors `deliberationLoopEnabled`:
+    /// when false, `runTurn` produces a turn byte-identically to the pre-operator behaviour (红线 7 /
+    /// ADR-014)。 When true AND the turn is genuinely-uncertain, the CPU-deterministic `ssmCaution`
+    /// RAISES the final bound `totalRisk` (monotonic, ≤ 1) as an INPUT the sovereign verdict GATES —
+    /// never a verdict / permit / commit token, and it can never DOWNGRADE (不变量 #2)。 NOT in any
+    /// canonical-bytes / seal / hash path.
+    public var ssmCautionOperatorEnabled: Bool
+
+    /// chapter 一百八十六 / ADR-019 P1.5b — OPT-IN, default-nil sink for the per-turn SSM operator
+    /// observation (`BASMambaSSMTurnObservation`)。 Mirrors `provisionalVerdictSink`: when set AND
+    /// `ssmCautionOperatorEnabled` is true, `runTurn` emits the turn's SSM observation here —
+    /// OBSERVATION-ONLY (it feeds no render / seal / verdict / hash)。 Default nil → no emission →
+    /// byte-equal (红线 7 / ADR-014)。 NOT in any canonical-bytes / seal / hash path.
+    public var ssmCautionObservationSink:
+        (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -271,7 +288,14 @@ public struct BASEBrainRuntimeCoordinator {
         // this turn's evaluated trials (sink-out)。 Default nil → no
         // emission → byte-equal (红线 7)。 Observation-only; gates nothing.
         resolvedTrialSink:
-            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
+            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil,
+        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator。
+        // Default false → never invoked → byte-equal (红线 7)。
+        ssmCautionOperatorEnabled: Bool = false,
+        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM observation sink。
+        // Default nil → no emission → byte-equal (红线 7)。 Observation-only.
+        ssmCautionObservationSink:
+            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -303,8 +327,12 @@ public struct BASEBrainRuntimeCoordinator {
         self.shadowTrialFeedbackEnabled = shadowTrialFeedbackEnabled
         self.pendingTrialLedgerIn = pendingTrialLedgerIn
         self.resolvedTrialSink = resolvedTrialSink
+        self.ssmCautionOperatorEnabled = ssmCautionOperatorEnabled
+        self.ssmCautionObservationSink = ssmCautionObservationSink
         // (ADR-018 P2) shadow-trial feedback slots wired above; DORMANT
-        // until Commit 2 reads them.
+        // until Commit 2 reads them. (ADR-019 P1.5b) the SSM caution
+        // operator flag + sink are wired above; the consequential L11
+        // seam reads `ssmCautionOperatorEnabled` in runTurn.
     }
 
     // MARK: - Agent Fabric observation (ch 960)

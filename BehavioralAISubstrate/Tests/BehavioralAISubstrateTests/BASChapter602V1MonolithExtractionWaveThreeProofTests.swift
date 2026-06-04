@@ -120,7 +120,14 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // signature (an unsynced pin breaks compile)。
                 shadowTrialFeedbackEnabled:
                 pendingTrialLedgerIn:
-                resolvedTrialSink:)
+                resolvedTrialSink:
+                // chapter 一百八十六 / ADR-019 P1.5b — SSM caution
+                // operator OPT-IN slots added (gate + observation
+                // sink-out)。 Default false/nil preserves all prior
+                // caller compat per 红线 7 + ADR-014;this pin tracks
+                // the canonical signature (an unsynced pin breaks compile)。
+                ssmCautionOperatorEnabled:
+                ssmCautionObservationSink:)
         XCTAssertNotNil(initRef)
     }
 
