@@ -50,6 +50,7 @@ struct ContentView: View {
     @State private var rustVerify: String = "probing…"
     @State private var mpsgraphVerify: String = "probing…"
     @State private var mambaVerify: String = "probing…"  // ch 1033
+    @State private var ssmVerify: String = "probing…"  // ch1065 — SSM caution operator
     // ch 1025.9 #5 fix:guard probes against onAppear re-fire。
     @State private var probesStarted = false
     @StateObject private var endurance =
@@ -83,6 +84,12 @@ struct ContentView: View {
                 .padding(.horizontal)
             // ch 1033:on-device Mamba SSM verdict surface
             Text("Mamba: \(mambaVerify)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            // ch1065:on-device SSM caution OPERATOR (fire/raise/verdict-gates) surface
+            Text("SSM caution: \(ssmVerify)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -148,6 +155,9 @@ struct ContentView: View {
                     // same Task → never overlap GPU dispatch)。 The Mamba harness handles
                     // gpuAvailable=false on the simulator gracefully (CPU scan still runs)。
                     mambaVerify = await BASMambaProbe.run()
+                    // ch1065:on-device SSM caution operator validation (sync turn
+                    // work hops to a detached task inside run()). Serial, after Mamba.
+                    ssmVerify = await BASSSMCautionProbe.run()
                 }
             }
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
