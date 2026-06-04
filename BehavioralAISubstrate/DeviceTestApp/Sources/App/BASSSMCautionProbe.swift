@@ -24,8 +24,15 @@ enum BASSSMCautionProbe {
         category: "ch1065-ssm-caution")
 
     /// Run the on-device SSM-operator validation off the main actor; return a short UI verdict.
+    /// Also measures the per-turn GPU SHADOW (arc-1): the CPU-vs-GPU selective-scan MAE on real A19
+    /// silicon — telemetry only (the SSM operator value stays CPU). nil ⇒ Metal unavailable.
     static func run() async -> String {
-        await Task.detached(priority: .userInitiated) { runSync() }.value
+        let ssmVerdict = await Task.detached(priority: .userInitiated) { runSync() }.value
+        let mae = await BASMambaSSMTurnGPUShadow.representativeParityMAE()
+        let maeStr = mae.map { String(format: "%.3e", $0) } ?? "nil(no-metal)"
+        emit("📊 ch1065 gpu-shadow parity_mae=\(maeStr) " +
+             "(cpu vs gpu state-space selective-scan, on-device A19)")
+        return ssmVerdict + " | gpu_mae=\(maeStr)"
     }
 
     private static func runSync() -> String {

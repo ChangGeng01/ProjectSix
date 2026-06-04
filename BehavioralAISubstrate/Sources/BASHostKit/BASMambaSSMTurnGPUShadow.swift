@@ -42,6 +42,19 @@ public enum BASMambaSSMTurnGPUShadow {
         return (inputs, shape)
     }
 
+    /// A representative per-turn GPU-shadow MAE for an on-device probe / benchmark that lacks a live
+    /// turn (a fixed high-pressure-shaped turn), or nil if Metal is unavailable. Lets the device probe
+    /// measure the real-silicon CPU-vs-GPU parity with a single BASHostKit call (no extra imports).
+    public static func representativeParityMAE() async -> Double? {
+        await maeForTurn(
+            affectLayers: [BASAffectLayer(
+                tone: "t", intensity: 0.9, volatility: 0.8, spilloverRisk: 0.7)],
+            turnHistory: ["high tension escalating now"],
+            candidates: [BASCandidatePath(
+                candidateID: "c", title: "t", actionSummary: "a",
+                expectedBenefit: 0.2, expectedCost: 0.9, reversibility: 0.2, confidence: 0.3)])
+    }
+
     /// CPU-vs-GPU selective-scan MAE for this turn's three sources, or nil (all sources empty OR GPU
     /// unavailable). ASYNC + GPU — telemetry only, off the byte-deterministic value path.
     public static func maeForTurn(

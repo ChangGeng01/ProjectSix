@@ -55,6 +55,14 @@ final class BASMambaGPUShadowParityTests: XCTestCase {
         }
     }
 
+    func testRepresentativeParityMAESmallOrNil() async {
+        let mae = await BASMambaSSMTurnGPUShadow.representativeParityMAE()
+        if let mae {
+            print("GPUSHADOW | representative parity MAE = \(mae)")
+            XCTAssertTrue(mae >= 0 && mae < 1e-4, "representative on-device probe MAE is tight")
+        }
+    }
+
     func testMaeForTurnEmptyIsNil() async {
         let mae = await BASMambaSSMTurnGPUShadow.maeForTurn(
             affectLayers: [], turnHistory: [], candidates: [])
