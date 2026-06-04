@@ -3,12 +3,15 @@
 > **Status: ALL of Steps 1–5 SHIPPED + proven — including the Step-2 flip onto a free on-device
 > MiniLM-L6-v2 embedder (Apache-2.0, $0; converted to CoreML in-repo). HONEST SCOPE (2nd + 3rd deep
 > audit): the flip is HOST-INJECTED — the library `makeWithDefaults()` default stays legacy /
-> byte-equal-off; it ships IN-MEMORY semantic vector recall by DEFAULT. The SQL/event/provenance store
-> exists as an OPT-IN API (`BASRoutedMemoryPersistence`) with a unit proof of
-> admit→persist→provenance-event→**in-process** reload — but (3rd-audit honesty, verified) it is NOT
-> consumed by any host or auto-driven by the brain (`drainIntents()`/`refresh()` are not on
-> `BASMemoryServicing`), and its "reload" is in-process, NOT cross-restart-durable (the event log
-> replays content empty per the privacy doctrine). On-device: a bounded run on a physical iPhone Air
+> byte-equal-off; it ships IN-MEMORY semantic vector recall by DEFAULT. The opt-in persistence is now
+> **CROSS-RESTART DURABLE + consumes the real L8 SQL/vector index**: a host wires a file-backed
+> `BASSQLiteMemoryAtomStore` (durable content) + `BASSQLiteVectorIndexStorage` (durable embeddings) via
+> `BASRoutedMemoryPersistence`; a genuine new process reloads content + embeddings and reproduces recall
+> WITHOUT re-embedding (`testSelfPopAtomsSurviveRealProcessRestartViaSQLiteFile`,
+> `testReopenVectorIndexRecallsWithoutReEmbedding`). The brain is driven by the host via
+> `refreshMemory()`/`drainMemoryIntents()` (still not auto-driven — `refresh`/`drain` are off
+> `BASMemoryServicing` per ch883), and the DeviceTestApp endurance is the shipping host. On-device: a
+> bounded run on a physical iPhone Air
 > (iPhone18,4, iOS 26.5) LOADED MiniLM's CoreML model (`routed+MiniLM`), built the brain in 108 ms,
 > loaded MLX Gemma-4-E2B-4bit (2.8 s), and completed one real `brain.process()` turn (34 ms) — this
 > proves the load + one-turn path on hardware; it did NOT exercise recall (needs ≥2 turns) or any
@@ -102,12 +105,21 @@ A SHIPPING host now consumes it: the DeviceTestApp endurance runner (ch1062) wir
 `BASEventSourcedMemoryAtomStore` + `BASRoutedMemoryPersistence` and drives `brain.drainMemoryIntents()`
 at the run's session boundary — PROVEN on a physical iPhone Air: `ch1062 memory persisted admitted=2
 store_atoms=2` (a 2-turn bounded run admitted both self-populated atoms to the durable event store with
-provenance events on real hardware). (b) DURABILITY — still
-**in-process, NOT cross-restart-durable**: the event store replays content empty (`BASMemoryAtomReducer`
-hard-codes `content: ""` — privacy doctrine) and rehydrates from an in-process cache.
-`testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess` proves admit→persist→provenance-events→**in-process**
-reload+recall — NOT durability across a real process restart (a separate item needing out-of-band content
-persistence). The only Rust in the recall path is
+provenance events on real hardware). (b) DURABILITY — **NOW CROSS-RESTART DURABLE** (this arc). The
+event store loses content on a real restart (`BASMemoryAtomReducer` hard-codes `content: ""` — privacy
+doctrine — and rehydrates from an in-process cache; `testRoutedMemoryAdmitsToEventStoreAndReloadsInProcess`
+proves only IN-PROCESS reload). So durable memory now routes through the **file-backed
+`BASSQLiteMemoryAtomStore`** (persists the full atom incl. content as `payload_json` — the sanctioned
+content store, not the event log) plus the **file-backed `BASSQLiteVectorIndexStorage`** (persisted
+embeddings). A genuine new process over the same files reloads content + embeddings and reproduces
+recall WITHOUT re-embedding — proven by `testSelfPopAtomsSurviveRealProcessRestartViaSQLiteFile` (content)
+and `testReopenVectorIndexRecallsWithoutReEmbedding` (embeddings, 0 CoreML re-embeds). The routed service
+gained two optional, default-`nil` `loadEmbedding`/`upsertEmbedding` closures (`refresh()` loads persisted
+vectors or lazily backfills; `drainIntents()` upserts) — additive, byte-equal-off preserved, `retrieve()`
+unchanged (ch883). The DeviceTestApp endurance is the shipping host: it wires both file-backed stores at
+Documents/ paths, calls `refreshMemory()` at start, and logs `ch1063 … store_atoms=N
+vector_index_entries=M` (both `0` on launch #1, `>0` on launch #2 over the same container). The only Rust
+in the recall path is
 `BASAutoRouteRanker.cosineSimilarity` (a SIMD kernel). Vector ≠ Jaccard, so the routed output is
 intentionally NOT byte-equal — proven by golden semantic recall (related recalled, unrelated dropped)
 + the brain still emitting a sovereign verdict. The routed+self-populate path's **own** determinism is
