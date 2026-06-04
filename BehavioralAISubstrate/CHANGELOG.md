@@ -41,12 +41,24 @@ unchanged (canonical60 byte-equal). No caller-side work on upgrade (default off)
 ### Chapter ③ — Agent Fabric multi-round authoritative loop (opt-in)
 
 `BASAgentFabricMultiRoundLoop` iterates the fabric to a digest fixpoint and projects the
-converged merge-accepted deltas into an authoritative feed-forward input (via the existing
-`BASAgentFabricAuthoritativeProjection`), which the host folds into the next turn's
-`userInput` → the verdict-gated cascade. Additive (no runTurn/verdict change); opt-in
-(`mode == .authoritative`, else inert → byte-equal); deterministic; bounded
-(fixpoint / nil-projection / `maxRounds` cap). Injectable-dispatch + live-runtime overloads.
-No caller-side work (the loop has no Sources/ consumers yet — host policy).
+converged merge-accepted deltas into an authoritative feed-forward input (via
+`BASAgentFabricAuthoritativeProjection`), which the host folds into the next turn's `userInput`
+→ the verdict-gated cascade. Additive (no runTurn/verdict change); opt-in (`mode ==
+.authoritative`, else inert → byte-equal); deterministic; bounded (fixpoint / digest-cycle /
+nil-projection / `maxRounds` cap).
+
+- **Host wiring:** `BASAgentFabricAuthoritativeTurn` composes it — `loopResult(decompose +
+  candidates → fabric input → loop)` + `enrichedNextRequest(...)` (folds the converged conclusions
+  into the next request, or returns it unchanged when inert → byte-equal-off). Makes the loop
+  functional end-to-end.
+- **Two bugs the real-fabric wiring caught** (the bare-ID stub fixtures had masked both):
+  (1) `project` matched `acceptedDeltaIDs` against raw emitted `deltaID`s, but the merge reports
+  them as `delta:<deltaID>` — so it ALWAYS returned nil with the real fabric (the feed-forward was
+  dead). Fixed: normalize the `delta:` prefix. (2) The loop converged on the full digest (incl. the
+  turnID-stamped deltaID) → never a fixpoint with the real fabric → ran to the cap. Fixed:
+  `contentDigest` (excludes the deltaID) → converges at round 2 when the conclusions' meaning is
+  stable.
+No caller-side work (opt-in / default-off). DeviceTestApp endurance wiring is a follow-up.
 
 ### Chapter 一千零十五 / M3800 — 诚实模式 cascade consolidation (SUBTRACTIVE)
 
