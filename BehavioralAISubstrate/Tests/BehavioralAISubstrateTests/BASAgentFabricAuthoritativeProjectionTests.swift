@@ -55,6 +55,26 @@ final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
             "no accepted deltas ⇒ nothing to feed forward")
     }
 
+    func testProjectNormalizesMergeRefFormatAcceptedIDs() throws {
+        // The REAL merge reports accepted IDs in the dependency-REF format `delta:<deltaID>`; the
+        // projection must normalize the prefix to match the raw emitted deltaIDs. REGRESSION: before the
+        // fix this returned nil (the authoritative feed-forward was dead end-to-end with the real fabric;
+        // the bare-ID stub fixtures above masked it).
+        let r = BASAgentTurnResult(
+            emittedDeltas: [delta("delta.T.scout.1"), delta("delta.T.planner.2")],
+            mergeResult: BASAgentMergeResult(
+                mergeID: "m1",
+                acceptedDeltaIDs: ["delta:delta.T.scout.1", "delta:delta.T.planner.2"],
+                rejectedDeltaIDs: [], conflictResolution: [],
+                resultingStateRef: "x", mergeReasonCodes: []),
+            applyOutcomes: [], finalSeq: 2, evidenceDebt: .empty)
+        let input = try XCTUnwrap(BASAgentFabricAuthoritativeProjection.project(
+            fabricResult: r, mode: .authoritative, sourceTurnID: "T"),
+            "ref-format accepted IDs must normalize + match the emitted deltas (was nil before the fix)")
+        XCTAssertEqual(input.acceptedDeltaIDs.sorted(), ["delta.T.planner.2", "delta.T.scout.1"])
+        XCTAssertEqual(input.conclusions.count, 2)
+    }
+
     // MARK: - authoritative projection
 
     func testProjectProducesInputForAuthoritative() throws {

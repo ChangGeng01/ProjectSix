@@ -96,7 +96,14 @@ public enum BASAgentFabricAuthoritativeProjection {
     ) -> BASAgentFabricAuthoritativeInput? {
         guard mode == .authoritative else { return nil }
 
-        let acceptedIDs = Set(fabricResult.mergeResult.acceptedDeltaIDs)
+        // The merge reports accepted IDs in the dependency-REF format `delta:<deltaID>` (ch956.5), so
+        // normalize to the raw deltaID to match `emittedDeltas[*].deltaID`. WITHOUT this, the filter
+        // below never matched the real fabric's accepted IDs ⇒ the projection always returned nil ⇒ the
+        // authoritative feed-forward was dead end-to-end (the stub tests masked it by using bare IDs).
+        // A bare `<deltaID>` (no prefix) is matched as-is, so stub/legacy callers are unaffected.
+        let acceptedIDs = Set(fabricResult.mergeResult.acceptedDeltaIDs.map { id in
+            id.hasPrefix("delta:") ? String(id.dropFirst("delta:".count)) : id
+        })
         guard !acceptedIDs.isEmpty else { return nil }
 
         // Preserve emit order; keep only the deltas the merge accepted.
