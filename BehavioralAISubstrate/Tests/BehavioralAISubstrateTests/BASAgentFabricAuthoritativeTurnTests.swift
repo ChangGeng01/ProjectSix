@@ -41,12 +41,15 @@ final class BASAgentFabricAuthoritativeTurnTests: XCTestCase {
         let r = await BASAgentFabricAuthoritativeTurn.loopResult(
             decomposeFrame: decompose(), candidatePaths: candidates(),
             runtime: runtime(), config: config())
-        XCTAssertGreaterThanOrEqual(r.roundsRun, 1)
-        XCTAssertLessThanOrEqual(r.roundsRun, 5)
         XCTAssertNotNil(r.finalProjection,
             "the real fabric's seats emit (scout from pressure, planner per candidate) → a usable " +
             "authoritative projection (regression: the projection's delta:-prefix mismatch returned " +
             "nil before the fix)")
+        // The content digest is turnID-independent, so the loop CONVERGES with the real fabric (round 2)
+        // instead of running to the budget cap on per-round turnID-stamped deltaIDs.
+        XCTAssertTrue(r.converged, "stable conclusion content ⇒ the loop converges with the real fabric")
+        XCTAssertEqual(r.stopReason, "digest-fixpoint")
+        XCTAssertEqual(r.roundsRun, 2, "fixpoint detected on round 2 (content stable from round 0)")
     }
 
     func testLoopResultIsDeterministic() async {

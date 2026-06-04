@@ -51,7 +51,9 @@ public struct BASAgentFabricMultiRoundResult: Sendable, Equatable {
     public let converged: Bool
     /// The converged authoritative feed-forward input — or nil (byte-equal-off / no accepted deltas).
     public let finalProjection: BASAgentFabricAuthoritativeInput?
-    /// Per-round projection digests, in order (for audit / replay identity).
+    /// Per-round CONTENT digests (the convergence key — see `BASAgentFabricAuthoritativeProjection.
+    /// contentDigest`, which excludes the turnID-stamped deltaID), in order. (The per-round provenance
+    /// identity is on each round's projection digest; `finalProjection.digest` is the final one.)
     public let perRoundDigests: [String]
     /// Why the loop stopped: "mode-inert" | "nil-projection" | "digest-fixpoint" | "digest-cycle" |
     /// "budget-cap".
@@ -117,9 +119,14 @@ public enum BASAgentFabricMultiRoundLoop {
             //   • multi-step cycle — the digest reappeared earlier in the run → the loop is oscillating
             //     among a finite conclusion set; stop CLEANLY here instead of burning the budget. Not a
             //     single fixpoint, so `converged: false` (bounded + stable, but no unique answer).
-            let isFixpoint = lastDigest.map { projection.digest == $0 } ?? false
-            let isCycle = !isFixpoint && digests.contains(projection.digest)
-            digests.append(projection.digest)
+            // Converge on the CONTENT digest (excludes the turnID-stamped deltaID): a real fabric stamps
+            // the per-round turnID into every deltaID, so converging on the full provenance digest would
+            // never reach a fixpoint (every round looks unique → budget cap). The content digest reaches
+            // a fixpoint when the conclusions' MEANING is stable round-over-round.
+            let key = BASAgentFabricAuthoritativeProjection.contentDigest(of: projection.conclusions)
+            let isFixpoint = lastDigest.map { key == $0 } ?? false
+            let isCycle = !isFixpoint && digests.contains(key)
+            digests.append(key)
             finalProjection = projection
 
             if isFixpoint {
@@ -132,7 +139,7 @@ public enum BASAgentFabricMultiRoundLoop {
                     roundsRun: rounds, converged: false, finalProjection: projection,
                     perRoundDigests: digests, stopReason: "digest-cycle")
             }
-            lastDigest = projection.digest
+            lastDigest = key
             current = refine(roundInput, projection)
         }
 

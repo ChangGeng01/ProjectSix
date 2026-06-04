@@ -182,4 +182,24 @@ public enum BASAgentFabricAuthoritativeProjection {
         let hash = SHA256.hash(data: data)
         return BASAutoRouteRanker.bytesToHexLower(Array(hash))
     }
+
+    /// chapter 一百九十一 — a CONTENT digest over each conclusion's MEANING (domain, deltaType,
+    /// confidence, summary, reasonCodes) but EXCLUDING the turnID-stamped `deltaID`. The multi-round loop
+    /// converges on THIS (not `digest`) so a real fabric — which stamps the per-round turnID into every
+    /// deltaID — reaches a fixpoint when the conclusions' meaning is stable across rounds, instead of
+    /// running to the budget cap on superficially-unique per-round digests. `digest` (full, incl. deltaID)
+    /// remains the provenance/replay identity. Deterministic (fixed field order + sortedKeys + %.6f).
+    public static func contentDigest(
+        of conclusions: [BASAgentFabricAuthoritativeInput.Conclusion]
+    ) -> String {
+        let content = conclusions.map { c in
+            "\(c.domain)|\(c.deltaType)|\(String(format: "%.6f", c.confidence))|" +
+            "\(c.summary)|\(c.reasonCodes.joined(separator: ","))"
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(content) else { return "" }
+        let hash = SHA256.hash(data: data)
+        return BASAutoRouteRanker.bytesToHexLower(Array(hash))
+    }
 }
