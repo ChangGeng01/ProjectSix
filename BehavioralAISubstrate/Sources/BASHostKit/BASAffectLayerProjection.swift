@@ -1,5 +1,5 @@
 // MARK: - BASAffectLayerProjection
-// chapter 一百八十六 / ADR-019 P1.5b — materialize TYPED affect on the value path
+// chapter 一百八十六 / ADR-019 §15 — materialize TYPED affect on the value path
 //
 // Typed `BASAffectLayer` is NOT produced on the authoritative runtime turn path: it lives only on the
 // whitepaper-literal AUDIT shape `BASCognitiveDissectionFrame` (never constructed per-turn). The

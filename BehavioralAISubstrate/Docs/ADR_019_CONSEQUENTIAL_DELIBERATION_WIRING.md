@@ -364,3 +364,65 @@ reversibility-tilt (§13, changes the action) + P1.5a caution-up (§11, raises t
 assessment). Caution only ever RATCHETS UP in this pipeline; reduction fights the
 verdict-after-render invariant. This supersedes §4's "future focused session"
 framing for P1.5b: it is closed as out-of-scope-by-architecture, not deferred.
+
+## 15. SSM temporal caution operator LANDED — safe-direction, the SSM sibling of §11 (ch186–190)
+
+A second consequential-wiring operator landed alongside the §11 deliberation caution:
+a **Mamba/SSM temporal caution operator**. It is the SSM/temporal analog of §11 — a
+post-binding, opt-in, **caution-INCREASING (raise-only)** L11 input — driven by a
+CPU-deterministic selective-scan over the turn's three live sources (L7 affect +
+cross-turn history + L9 candidates) instead of the deliberation loop's pass count.
+
+**Label reconciliation (honesty — IMPORTANT).** The implementation's commits + early
+code comments tagged this operator "ADR-019 P1.5b". That is a **MISNOMER**: §4/§14's
+P1.5b is the *dangerous* caution-**reduction** direction, which is **closed / not built**
+(§14). This operator only ever RAISES caution → it is **SAFE-DIRECTION (P1.5a-family)**,
+not P1.5b. This §15 is the authoritative classification; the code labels were updated
+from "P1.5b" to "§15". (Code references to "the caution REDUCTION is impossible
+(verdict-after-render)" correctly point at §14 — only the operator's own tag was wrong.)
+
+**What landed (each opt-in, default-off → byte-equal; verified):**
+- **Authoritative seam** (`EBrainRuntimeCoordinator+RunTurn.swift`, immediately after the
+  §11 P1.5a block, on the same post-binding `boundRiskCard`, gated by the SAME
+  `isGenuinelyUncertain` predicate): `raisedTotalRisk = min(1, total + 0.06·ssmCaution)`
+  — monotonic, raise-only; ratchets `riskLevel`, sets `assertionCeiling="guarded"` at high
+  (never resets it down — stricter than §11), appends factor `ssm_temporal_caution`.
+  Gated by `ssmCautionOperatorEnabled` (default false). `BASSSMCautionInput` /
+  `BASMambaTurnSignalBuilder` / `BASMambaSSMTurnObservation`.
+- **Typed affect materialized on the value path** (`BASAffectLayerProjection`): typed
+  `BASAffectLayer` is NOT on the authoritative runtime frame (it lives only on the
+  audit-shape `BASCognitiveDissectionFrame`), so affect is derived from the real runtime
+  `pressureVectors` — one bounded, deterministic affect layer per vector. Runs only inside
+  the flag-gated block.
+- **Calibration** (`cautionReferenceMagnitude` 0.063→0.025): the all-ones analytic 0.063
+  sat ABOVE the entire measured magnitude range (operator near-inert at ~0.20 on a
+  high-pressure turn); recalibrated from measured scan magnitudes so caution discriminates
+  (high-pressure ~0.50, saturated → 1.0). Pinned by `BASSSMCautionCalibrationTests`.
+  Safety proofs are magnitude-independent.
+- **TEMPORAL state** (the operator is now a true state-space operator):
+  `BASSSMScanCPUReference.scanWithState` threads the per-channel hidden state across turns
+  via `request.priorSSMState` (in) → `observation.ssmStateOut` (out, the host carries it
+  forward — the §11-style feed-forward pattern). The state evolves on EVERY flag-on turn
+  (continuous SSM semantics); the RAISE stays uncertainty-gated. The recurrence's `A<0`
+  decay is contractive → bounded state. nil state → zero-seed → byte-equal.
+- **GPU shadow** (`BASMambaGPUShadowParity` / `BASMambaSSMTurnGPUShadow`): per-turn
+  CPU-vs-GPU MAE on the operator's REAL per-channel scan (`BASSSMScanCPUReference` vs the
+  chapter-677 `ssm_scan_float32` MSL kernel via `BASMetalSSMScanDispatcher`), ~1.3e-9 on
+  Apple Silicon — OBSERVATION-ONLY telemetry toward an eventual GPU-authoritative path. The
+  value path is always the sync CPU reference (ch883; GPU never authoritative).
+
+**Safety envelope (held throughout, mirrors §11):** opt-in / byte-equal-off (flag-off OR
+nil state ⇒ identical; canonical60 + replay byte-equal at every step); monotonic raise-only
+(safe direction — a pre-render caution reduction is architecturally impossible per §14);
+verdict-gated INPUT-class (writes only `boundRiskCard`; never a verdict/permit/commit token —
+不变量 #2 神经不掌权); CPU-deterministic value path (ch883 sync); host-driven cross-turn
+state (no in-substrate cross-process persistence — host responsibility, like `turnHistory`).
+
+**Honest scope:** same assessment-level consequence caveat as §11 (escalates `riskLevel` /
+`assertionCeiling` / sovereign hint; an action-mode flip needs a borderline-permit fixture).
+Calibration is measured-but-provisional. State evolves on uncertain+non-uncertain flag-on
+turns but the RAISE only on uncertain turns. Verified end-to-end:
+`BASSSMCautionInputTests`, `BASSSMCautionOperatorRunTurnTests` (incl. the real-host fire
+proof: a genuinely-uncertain high-risk turn fires, raises, preserves the `.medium` flag-off
+baseline, and the sovereign verdict still gates), `BASSSMCautionCalibrationTests`,
+`BASSSMCrossTurnStateTests`, `BASMambaGPUShadowParityTests` — full XCTest suite green.

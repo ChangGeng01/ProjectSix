@@ -498,7 +498,7 @@ extension BASEBrainRuntimeCoordinator {
                 }
             }
         }
-        // chapter 一百八十六 / ADR-019 P1.5b — SSM caution operator
+        // chapter 一百八十六 / ADR-019 §15 — SSM caution operator
         // (Mamba/SSM as an AUTHORITATIVE, raise-caution-only L11 INPUT).
         // Mirrors the P1.5a deliberation-caution seam ABOVE exactly — on
         // the SAME post-binding `boundRiskCard`, with the SAME genuine-
@@ -509,7 +509,7 @@ extension BASEBrainRuntimeCoordinator {
         // SAFE BY CONSTRUCTION:
         //   • RAISE-ONLY — `raisedTotalRisk(c,s) ≥ c` (== c at s=0, ≤ 1);
         //     a pre-render caution REDUCTION is architecturally impossible
-        //     (verdict-after-render, ADR-019 P1.5b), so this can only RAISE.
+        //     (verdict-after-render, ADR-019 §14 — the not-built reduction), so this can only RAISE.
         //     The `assertionCeiling` write only ever sets "guarded" (the
         //     high-risk ceiling) and otherwise LEAVES THE EXISTING VALUE —
         //     so when both this and the P1.5a block fire it never resets a

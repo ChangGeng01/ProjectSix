@@ -210,7 +210,7 @@ public struct BASEBrainRuntimeCoordinator {
     public var resolvedTrialSink:
         (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
 
-    /// chapter 一百八十六 / ADR-019 P1.5b — OPT-IN, default-false gate for the SSM caution operator
+    /// chapter 一百八十六 / ADR-019 §15 — OPT-IN, default-false gate for the SSM caution operator
     /// (Mamba/SSM as an AUTHORITATIVE raise-caution-only L11 input)。 Mirrors `deliberationLoopEnabled`:
     /// when false, `runTurn` produces a turn byte-identically to the pre-operator behaviour (红线 7 /
     /// ADR-014)。 When true AND the turn is genuinely-uncertain, the CPU-deterministic `ssmCaution`
@@ -219,7 +219,7 @@ public struct BASEBrainRuntimeCoordinator {
     /// canonical-bytes / seal / hash path.
     public var ssmCautionOperatorEnabled: Bool
 
-    /// chapter 一百八十六 / ADR-019 P1.5b — OPT-IN, default-nil sink for the per-turn SSM operator
+    /// chapter 一百八十六 / ADR-019 §15 — OPT-IN, default-nil sink for the per-turn SSM operator
     /// observation (`BASMambaSSMTurnObservation`)。 Mirrors `provisionalVerdictSink`: when set AND
     /// `ssmCautionOperatorEnabled` is true, `runTurn` emits the turn's SSM observation here —
     /// OBSERVATION-ONLY (it feeds no render / seal / verdict / hash)。 Default nil → no emission →
@@ -289,10 +289,10 @@ public struct BASEBrainRuntimeCoordinator {
         // emission → byte-equal (红线 7)。 Observation-only; gates nothing.
         resolvedTrialSink:
             (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil,
-        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator。
+        // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM caution operator。
         // Default false → never invoked → byte-equal (红线 7)。
         ssmCautionOperatorEnabled: Bool = false,
-        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM observation sink。
+        // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM observation sink。
         // Default nil → no emission → byte-equal (红线 7)。 Observation-only.
         ssmCautionObservationSink:
             (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
@@ -330,7 +330,7 @@ public struct BASEBrainRuntimeCoordinator {
         self.ssmCautionOperatorEnabled = ssmCautionOperatorEnabled
         self.ssmCautionObservationSink = ssmCautionObservationSink
         // (ADR-018 P2) shadow-trial feedback slots wired above; DORMANT
-        // until Commit 2 reads them. (ADR-019 P1.5b) the SSM caution
+        // until Commit 2 reads them. (ADR-019 §15) the SSM caution
         // operator flag + sink are wired above; the consequential L11
         // seam reads `ssmCautionOperatorEnabled` in runTurn.
     }

@@ -51,7 +51,7 @@ extension BASHostRuntime {
         pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
         resolvedTrialSink:
             (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil,
-        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM caution operator,
         // threaded onto the coordinator alongside `deliberationLoopEnabled`.
         // Default false → the coordinator's flag stays false → the L11 SSM
         // seam is dormant → byte-equal (红线 7 + ADR-014). A host sets this
@@ -125,7 +125,7 @@ extension BASHostRuntime {
         // re-confirmed). The activation is proven transitively through the
         // sync-path tests that exercise the identical coordinator wiring.
         deliberationLoopEnabled: Bool = false,
-        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM caution operator,
         // threaded onto the coordinator this async surface builds (via
         // buildCoordinator). Default false → coordinator flag false → the L11
         // SSM seam is dormant → byte-equal (红线 7 + ADR-014). Mirrors exactly
@@ -196,7 +196,7 @@ extension BASHostRuntime {
         // coordinator init below, exactly as the sync `makeEBrainTurn(...)`
         // path does, so this async surface activates the same loop.
         deliberationLoopEnabled: Bool = false,
-        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM caution operator,
         // threaded onto the coordinator init below. The SSM seam is purely an
         // L11 risk-card raise in runTurn, so — unlike `deliberationLoopEnabled`
         // — it is NOT threaded onto triSelfService (no reversibility-tilt
@@ -327,7 +327,7 @@ extension BASHostRuntime {
             // coordinator's own default false → the runTurn loop body +
             // P1.5a caution seam stay dormant → byte-equal (红线 7).
             deliberationLoopEnabled: deliberationLoopEnabled,
-            // chapter 一百八十六 / ADR-019 P1.5b — thread the SSM caution
+            // chapter 一百八十六 / ADR-019 §15 — thread the SSM caution
             // operator flag onto the coordinator the async runtime-mode
             // surface uses. Default false → the coordinator's own default
             // false → the L11 SSM seam stays dormant → byte-equal (红线 7).
@@ -360,7 +360,7 @@ extension BASHostRuntime {
         pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
         resolvedTrialSink:
             (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil,
-        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM caution operator,
         // threaded onto the coordinator the sync host path builds. Default
         // false → coordinator flag false → L11 SSM seam dormant → byte-equal
         // (红线 7 + ADR-014). Mirrors exactly how `deliberationLoopEnabled`
@@ -485,7 +485,7 @@ extension BASHostRuntime {
             shadowTrialFeedbackEnabled: shadowTrialFeedbackEnabled,
             pendingTrialLedgerIn: pendingTrialLedgerIn,
             resolvedTrialSink: resolvedTrialSink,
-            // chapter 一百八十六 / ADR-019 P1.5b — activate the SSM caution
+            // chapter 一百八十六 / ADR-019 §15 — activate the SSM caution
             // operator in production: the host-supplied flag reaches the
             // coordinator slot the L11 SSM seam reads. false (default) → seam
             // dormant → byte-equal (红线 7).

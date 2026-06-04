@@ -1,5 +1,5 @@
 // MARK: - BASSSMCautionInput
-// chapter 一百八十六 / ADR-019 P1.5b — the SSM operator as an AUTHORITATIVE, raise-caution-only L11 INPUT
+// chapter 一百八十六 / ADR-019 §15 — the SSM operator as an AUTHORITATIVE, raise-caution-only L11 INPUT
 //
 // Phase 2 of "Mamba/SSM as a core per-turn operator". Mirrors `BASDeliberationCaution` (ADR-019 P1.5a):
 // a bounded, one-shot, caution-INCREASING increment added to the FINAL bound `totalRisk` (post-binding,
@@ -10,7 +10,7 @@
 //
 // SAFETY (load-bearing):
 //   • RAISE-ONLY by construction — `raisedTotalRisk(c, s) ≥ c` for all s ≥ 0, == c exactly when s == 0.
-//     A pre-render caution REDUCTION is architecturally impossible (verdict-after-render, ADR-019 P1.5b);
+//     A pre-render caution REDUCTION is architecturally impossible (verdict-after-render, ADR-019 §14 — the not-built reduction);
 //     this only ever RAISES, so it is in the safe direction.
 //   • 不变量 #2 (神经不掌权) — the raised risk flows as an INPUT the sovereign verdict GATES downstream;
 //     this writes only `boundRiskCard`, never a verdict / permit / commit token, and can never DOWNGRADE.

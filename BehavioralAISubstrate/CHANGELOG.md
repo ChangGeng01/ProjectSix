@@ -11,6 +11,43 @@ Following keep-a-changelog conventions where they fit. The substrate is private
 
 ## [Unreleased]
 
+### Chapter 一百八十五–一百九十 — SSM temporal caution operator (opt-in, safe-direction)
+
+Mamba/SSM as a CORE per-turn operator: an opt-in, raise-only L11 caution INPUT
+(`ssmCautionOperatorEnabled`, default off → byte-equal). Authoritative classification +
+the full arc are in **ADR-019 §15** (NOTE: early commits/comments tagged it "P1.5b" — a
+misnomer; P1.5b is the §14 not-built caution-reduction. This operator is safe-direction).
+
+- **Authoritative seam** — CPU-deterministic selective-scan over L7 affect (materialized
+  from runtime `pressureVectors`) + cross-turn history + L9 candidates → a bounded,
+  monotonic `+0.06·ssmCaution` raise on genuinely-uncertain turns; verdict-gated,
+  input-class (不变量 #2). Threaded through the sync `buildEBrainTurn` + the async
+  runtime-mode surface.
+- **Calibration** — `cautionReferenceMagnitude` 0.063→0.025 (data-driven from measured
+  scan magnitudes; the operator was near-inert before).
+- **Temporal** — per-channel hidden state carried across turns via
+  `request.priorSSMState` → `observation.ssmStateOut` (host feed-forward); continuous
+  every-turn state evolution; contractive (bounded) recurrence.
+- **GPU shadow** — per-turn CPU-vs-GPU MAE on the operator's REAL per-channel scan
+  (~1.3e-9 on Apple Silicon), observation-only telemetry toward GPU-authoritative.
+- **On-device** — `BASSSMCautionProbe` (DeviceTestApp) validates fire/raise/verdict-gates
+  + the GPU-shadow MAE on the iPhone Air.
+
+Wire-format: `BASEBrainTurnRequest` gains `turnHistory` + `priorSSMState`;
+`BASMambaSSMTurnObservation` gains `gpuShadowMAE` + `ssmStateOut` — all optional,
+`decodeIfPresent` (backward-compatible), NOT echoed into the turn result → result bytes
+unchanged (canonical60 byte-equal). No caller-side work on upgrade (default off).
+
+### Chapter ③ — Agent Fabric multi-round authoritative loop (opt-in)
+
+`BASAgentFabricMultiRoundLoop` iterates the fabric to a digest fixpoint and projects the
+converged merge-accepted deltas into an authoritative feed-forward input (via the existing
+`BASAgentFabricAuthoritativeProjection`), which the host folds into the next turn's
+`userInput` → the verdict-gated cascade. Additive (no runTurn/verdict change); opt-in
+(`mode == .authoritative`, else inert → byte-equal); deterministic; bounded
+(fixpoint / nil-projection / `maxRounds` cap). Injectable-dispatch + live-runtime overloads.
+No caller-side work (the loop has no Sources/ consumers yet — host policy).
+
 ### Chapter 一千零十五 / M3800 — 诚实模式 cascade consolidation (SUBTRACTIVE)
 
 User invoked「诚实模式 全面 deep review 足够 优雅 极致」 — honest
