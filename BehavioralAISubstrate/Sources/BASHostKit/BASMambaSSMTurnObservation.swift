@@ -22,6 +22,11 @@ public struct BASMambaSSMTurnObservation:
     public let ssmCaution: Double
     /// Raw max-abs of the scan output (pre-normalization), for audit.
     public let finalMagnitude: Double
+    /// OPT-IN GPU-shadow telemetry: the CPU-vs-GPU selective-scan MAE for this turn's inputs (see
+    /// `BASMambaGPUShadowParity`), or nil when the GPU shadow wasn't run / Metal is unavailable.
+    /// OBSERVATION-ONLY — never on a value path; the authoritative ssmCaution above is always
+    /// CPU-derived. Optional ⇒ Codable-backward-compatible (absent key decodes to nil).
+    public let gpuShadowMAE: Double?
 
     public init(
         sessionID: String,
@@ -30,7 +35,8 @@ public struct BASMambaSSMTurnObservation:
         historyCount: Int,
         candidateCount: Int,
         ssmCaution: Double,
-        finalMagnitude: Double
+        finalMagnitude: Double,
+        gpuShadowMAE: Double? = nil
     ) {
         self.sessionID = sessionID
         self.turnID = turnID
@@ -39,6 +45,7 @@ public struct BASMambaSSMTurnObservation:
         self.candidateCount = candidateCount
         self.ssmCaution = ssmCaution
         self.finalMagnitude = finalMagnitude
+        self.gpuShadowMAE = gpuShadowMAE
     }
 }
 
