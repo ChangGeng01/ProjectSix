@@ -138,6 +138,15 @@ public struct BASHostStorageRoot:
     public var eventLogURL: URL {
         rootURL.appendingPathComponent("event-log.sqlite")
     }
+
+    /// L8 routed vector-index SQLite database file URL。Durable
+    /// embeddings (BLOB) for `BASSQLiteVectorIndexStorage`, keyed by
+    /// atom ID — lets the routed memory load persisted vectors on
+    /// restart instead of re-embedding every atom (the cross-restart
+    /// durable-memory path).
+    public var vectorIndexURL: URL {
+        rootURL.appendingPathComponent("vector-index.sqlite")
+    }
 }
 
 // MARK: - Storage options bundle
