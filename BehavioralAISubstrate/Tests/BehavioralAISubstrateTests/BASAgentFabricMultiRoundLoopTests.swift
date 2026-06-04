@@ -114,6 +114,19 @@ final class BASAgentFabricMultiRoundLoopTests: XCTestCase {
         XCTAssertEqual(counter.refineCalls, 4, "refine is threaded once per non-terminal round")
     }
 
+    func testDetectsDigestCycleBeforeBudgetCap() async {
+        // Oscillating accepted-set A,B,A,B… → a 2-cycle the budget cap would otherwise burn through.
+        let stub = StubFabric { round in round % 2 == 0 ? ("a", ["a"]) : ("b", ["b"]) }
+        let r = await BASAgentFabricMultiRoundLoop.run(
+            mode: .authoritative, initialInput: BASAgentTurnInput(turnID: "T"),
+            config: config(20), dispatch: { stub.dispatch($0) })
+        XCTAssertEqual(r.stopReason, "digest-cycle")
+        XCTAssertFalse(r.converged, "a 2-cycle is bounded but not a single fixpoint")
+        XCTAssertEqual(r.roundsRun, 3,
+            "cycle detected when digest A reappears (round 3), not at the cap (20)")
+        XCTAssertLessThan(r.roundsRun, 20, "stopped well before the budget cap")
+    }
+
     func testNilProjectionEarlyStop() async {
         let stub = StubFabric { _ in ("x", []) } // no accepted deltas ⇒ projection nil
         let r = await BASAgentFabricMultiRoundLoop.run(

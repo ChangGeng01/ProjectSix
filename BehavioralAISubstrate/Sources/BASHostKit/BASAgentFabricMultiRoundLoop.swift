@@ -53,7 +53,8 @@ public struct BASAgentFabricMultiRoundResult: Sendable, Equatable {
     public let finalProjection: BASAgentFabricAuthoritativeInput?
     /// Per-round projection digests, in order (for audit / replay identity).
     public let perRoundDigests: [String]
-    /// Why the loop stopped: "mode-inert" | "nil-projection" | "digest-fixpoint" | "budget-cap".
+    /// Why the loop stopped: "mode-inert" | "nil-projection" | "digest-fixpoint" | "digest-cycle" |
+    /// "budget-cap".
     public let stopReason: String
 
     public init(
@@ -111,14 +112,25 @@ public enum BASAgentFabricMultiRoundLoop {
                     perRoundDigests: digests, stopReason: "nil-projection")
             }
 
+            // Convergence checks (against PRIOR rounds, before recording this one):
+            //   • 1-step fixpoint — equals the immediately-previous round → a single stable answer.
+            //   • multi-step cycle — the digest reappeared earlier in the run → the loop is oscillating
+            //     among a finite conclusion set; stop CLEANLY here instead of burning the budget. Not a
+            //     single fixpoint, so `converged: false` (bounded + stable, but no unique answer).
+            let isFixpoint = lastDigest.map { projection.digest == $0 } ?? false
+            let isCycle = !isFixpoint && digests.contains(projection.digest)
             digests.append(projection.digest)
             finalProjection = projection
 
-            if let last = lastDigest, projection.digest == last {
-                // Fixpoint — the authoritative conclusion set is stable.
+            if isFixpoint {
                 return BASAgentFabricMultiRoundResult(
                     roundsRun: rounds, converged: true, finalProjection: projection,
                     perRoundDigests: digests, stopReason: "digest-fixpoint")
+            }
+            if isCycle {
+                return BASAgentFabricMultiRoundResult(
+                    roundsRun: rounds, converged: false, finalProjection: projection,
+                    perRoundDigests: digests, stopReason: "digest-cycle")
             }
             lastDigest = projection.digest
             current = refine(roundInput, projection)
