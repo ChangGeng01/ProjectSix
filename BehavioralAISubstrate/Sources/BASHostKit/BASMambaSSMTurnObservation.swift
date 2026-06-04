@@ -27,6 +27,11 @@ public struct BASMambaSSMTurnObservation:
     /// OBSERVATION-ONLY — never on a value path; the authoritative ssmCaution above is always
     /// CPU-derived. Optional ⇒ Codable-backward-compatible (absent key decodes to nil).
     public let gpuShadowMAE: Double?
+    /// OPT-IN cross-turn TEMPORAL state: the per-(batch,channel) hidden state AFTER this turn's scan
+    /// (count == B*D), or nil when the operator ran stateless. OBSERVATION-ONLY — the host folds this
+    /// into the NEXT request's `priorSSMState` to carry the recurrence across turns. Never on a value
+    /// path; the turn result bytes are unchanged. Optional ⇒ Codable-backward-compatible.
+    public let ssmStateOut: [Float]?
 
     public init(
         sessionID: String,
@@ -36,7 +41,8 @@ public struct BASMambaSSMTurnObservation:
         candidateCount: Int,
         ssmCaution: Double,
         finalMagnitude: Double,
-        gpuShadowMAE: Double? = nil
+        gpuShadowMAE: Double? = nil,
+        ssmStateOut: [Float]? = nil
     ) {
         self.sessionID = sessionID
         self.turnID = turnID
@@ -46,6 +52,7 @@ public struct BASMambaSSMTurnObservation:
         self.ssmCaution = ssmCaution
         self.finalMagnitude = finalMagnitude
         self.gpuShadowMAE = gpuShadowMAE
+        self.ssmStateOut = ssmStateOut
     }
 }
 
@@ -84,7 +91,8 @@ public enum BASMambaSSMTurnObservationProjection {
         sessionID: String,
         turnID: String,
         input: BASMambaTurnScanInput,
-        scanOutput y: [Float]
+        scanOutput y: [Float],
+        stateOut: [Float]? = nil
     ) -> BASMambaSSMTurnObservation {
         BASMambaSSMTurnObservation(
             sessionID: sessionID,
@@ -93,7 +101,8 @@ public enum BASMambaSSMTurnObservationProjection {
             historyCount: input.historyCount,
             candidateCount: input.candidateCount,
             ssmCaution: ssmCaution(fromScanOutput: y),
-            finalMagnitude: rawMagnitude(y))
+            finalMagnitude: rawMagnitude(y),
+            ssmStateOut: stateOut)
     }
 
     /// Host-callable per-turn SSM operator probe. nil `sink` OR all-empty sources ⇒ no run ⇒ returns

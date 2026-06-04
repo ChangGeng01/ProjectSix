@@ -543,7 +543,13 @@ extension BASEBrainRuntimeCoordinator {
                // runs ONLY here, inside the flag-gated block, so flag-off is byte-equal.
                affectLayers: BASAffectLayerProjection.project(from: decomposeFrame),
                turnHistory: request.turnHistory,
-               candidates: thoughtFrame.candidates) {
+               candidates: thoughtFrame.candidates,
+               // chapter 一百八十八 — carry the prior turn's SSM hidden state (the host folds the
+               // prior observation's `ssmStateOut` into `request.priorSSMState`) so the operator is
+               // TEMPORAL: caution reflects sustained-pressure trajectory. nil ⇒ fresh recurrence
+               // ⇒ byte-equal with the stateless operator. The emitted observation carries the new
+               // `ssmStateOut` out via the (opt-in) sink — never on the value path.
+               priorState: request.priorSSMState) {
             let raised = BASSSMCautionInput.raisedTotalRisk(
                 boundRiskCard.totalRisk, ssmCaution: ssmObservation.ssmCaution)
             let raisedLevel = resolvedRiskService.riskLevel(for: raised)

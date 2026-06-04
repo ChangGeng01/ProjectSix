@@ -40,16 +40,26 @@ enum BASSSMCautionInput {
         turnID: String,
         affectLayers: [BASAffectLayer],
         turnHistory: [String],
-        candidates: [BASCandidatePath]
+        candidates: [BASCandidatePath],
+        priorState: [Float]? = nil
     ) -> BASMambaSSMTurnObservation? {
         guard let input = BASMambaTurnSignalBuilder.scanInput(
             affectLayers: affectLayers, turnHistory: turnHistory, candidates: candidates)
         else { return nil }
-        guard let y = try? BASSSMScanCPUReference.scan(
-            x: input.x, delta: input.delta, A: input.a, B: input.b, C: input.c, shape: input.shape)
+        // Cross-turn TEMPORAL state: seed the recurrence from `priorState` when it matches the channel
+        // count (B*D); otherwise start from zero — a nil OR wrong-length carry is treated as a fresh
+        // recurrence (defensive). priorState nil ⇒ zero seed ⇒ y byte-identical to the stateless scan
+        // ⇒ ssmCaution unchanged ⇒ byte-equal-off.
+        let bdCount = Int(input.shape.B) * Int(input.shape.D)
+        let initialState = (priorState?.count == bdCount)
+            ? priorState! : [Float](repeating: 0, count: bdCount)
+        guard let scan = try? BASSSMScanCPUReference.scanWithState(
+            x: input.x, delta: input.delta, A: input.a, B: input.b, C: input.c,
+            shape: input.shape, initialState: initialState)
         else { return nil }
         return BASMambaSSMTurnObservationProjection.project(
-            sessionID: sessionID, turnID: turnID, input: input, scanOutput: y)
+            sessionID: sessionID, turnID: turnID, input: input,
+            scanOutput: scan.y, stateOut: scan.finalState)
     }
 
     /// The CPU-deterministic SSM caution scalar ∈ [0,1] for this turn's three live sources, or nil when

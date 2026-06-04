@@ -76,9 +76,31 @@ public enum BASSSMScanCPUReference {
         C: [Float],
         shape: BASSSMScanShape
     ) throws -> [Float] {
+        // Stateless entry point — byte-identical to before: a zero initial state, final state dropped.
+        let bdCount = Int(shape.B) * Int(shape.D)
+        return try scanWithState(
+            x: x, delta: delta, A: A, B: B, C: C, shape: shape,
+            initialState: [Float](repeating: 0.0, count: bdCount)).y
+    }
+
+    /// chapter 一百八十八 — cross-turn (TEMPORAL) variant. Seeds the per-(batch,channel) hidden state
+    /// `h` from `initialState` (count == B*D, indexed `b*D + d`) and RETURNS the final per-(batch,channel)
+    /// state, so a host can carry the recurrence across turns (the operator's state-space "memory").
+    /// `scan(...)` is exactly this with a zero initial state and the final state dropped — byte-identical.
+    /// Same recurrence / sequential reduction order / Float32 as the MSL twin (chapter 二百一一 / 三百九二).
+    public static func scanWithState(
+        x: [Float],
+        delta: [Float],
+        A: [Float],
+        B: [Float],
+        C: [Float],
+        shape: BASSSMScanShape,
+        initialState: [Float]
+    ) throws -> (y: [Float], finalState: [Float]) {
         // Validate input lengths
         let bldCount = shape.elementCount
         let dCount = Int(shape.D)
+        let bdCount = Int(shape.B) * dCount
 
         if x.count != bldCount {
             throw BASSSMScanCPUReferenceError
@@ -115,8 +137,16 @@ public enum BASSSMScanCPUReference {
                     expected: bldCount,
                     actual: C.count)
         }
+        if initialState.count != bdCount {
+            throw BASSSMScanCPUReferenceError
+                .payloadCountMismatch(
+                    name: "initialState",
+                    expected: bdCount,
+                    actual: initialState.count)
+        }
 
         var y = [Float](repeating: 0.0, count: bldCount)
+        var finalState = [Float](repeating: 0.0, count: bdCount)
 
         let batchInt = Int(shape.B)
         let lengthInt = Int(shape.L)
@@ -128,7 +158,8 @@ public enum BASSSMScanCPUReference {
         for b in 0..<batchInt {
             for d in 0..<channelsInt {
                 let A_d = A[d]
-                var h: Float = 0.0
+                // Seed the recurrence from the carried-in state (zero in the stateless path).
+                var h: Float = initialState[b * channelsInt + d]
 
                 for t in 0..<lengthInt {
                     let idx = shape.linearIndex(
@@ -148,9 +179,12 @@ public enum BASSSMScanCPUReference {
                     // Output projection
                     y[idx] = C_t * h
                 }
+
+                // Carry the final per-channel state out for the next turn.
+                finalState[b * channelsInt + d] = h
             }
         }
-        return y
+        return (y, finalState)
     }
 
     /// Convenience overload accepting Data-encoded payloads

@@ -17,6 +17,12 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
     /// (ADR-014 / 红线 7). The host populates this from its summary ring; it is NOT echoed into the
     /// turn result, so default-[] does not change any result bytes.
     public var turnHistory: [String]
+    /// OPT-IN cross-turn SSM hidden state carried from the prior turn's observation
+    /// (`BASMambaSSMTurnObservation.ssmStateOut`). nil ⇒ the SSM caution operator starts a FRESH
+    /// recurrence (byte-equal-off). The host folds the prior turn's `ssmStateOut` here to make the
+    /// operator TEMPORAL — caution reflects the sustained-pressure trajectory across turns. Not echoed
+    /// into the result ⇒ result bytes unchanged; default nil ⇒ identical to the stateless operator.
+    public var priorSSMState: [Float]?
 
     public init(
         userInput: String,
@@ -26,7 +32,8 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         riskHint: BASBrainRiskLevel? = nil,
         feedbackEvent: BASFeedbackEvent? = nil,
         activeKillSwitches: [BASKillSwitchID] = [],
-        turnHistory: [String] = []
+        turnHistory: [String] = [],
+        priorSSMState: [Float]? = nil
     ) {
         self.userInput = userInput
         self.deviceState = deviceState
@@ -36,11 +43,12 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         self.feedbackEvent = feedbackEvent
         self.activeKillSwitches = activeKillSwitches
         self.turnHistory = turnHistory
+        self.priorSSMState = priorSSMState
     }
 
     private enum CodingKeys: String, CodingKey {
         case userInput, deviceState, hostID, recordedAt
-        case riskHint, feedbackEvent, activeKillSwitches, turnHistory
+        case riskHint, feedbackEvent, activeKillSwitches, turnHistory, priorSSMState
     }
 
     public init(from decoder: Decoder) throws {
@@ -55,5 +63,7 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
             [BASKillSwitchID].self, forKey: .activeKillSwitches) ?? []
         // Backward-compatible: pre-existing encodings have no turnHistory ⇒ [].
         turnHistory = try c.decodeIfPresent([String].self, forKey: .turnHistory) ?? []
+        // Backward-compatible: absent ⇒ nil (stateless operator).
+        priorSSMState = try c.decodeIfPresent([Float].self, forKey: .priorSSMState)
     }
 }
