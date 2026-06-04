@@ -78,14 +78,24 @@ public struct BASRoutedMemoryPersistence: Sendable {
     public let loadAllAtoms: @Sendable () async -> [BASGovernedMemory]
     public let admitAtom: @Sendable (BASGovernedMemory) async -> Void
     public let atomStore: any BASMemoryAtomStore
+    /// Phase 2 — OPTIONAL durable VECTOR-INDEX consumption (e.g. `BASSQLiteVectorIndexStorage`). Both
+    /// nil ⇒ Phase-1 behavior (refresh re-embeds every atom via the CoreML model). When wired:
+    /// `refresh()` LOADS each persisted embedding (no re-embed; lazy-backfills a miss), and the admit
+    /// path UPSERTS each self-populated atom's embedding — so embeddings survive restart too.
+    public let loadEmbedding: (@Sendable (_ atomID: String) async -> [Float]?)?
+    public let upsertEmbedding: (@Sendable (_ atomID: String, _ embedding: [Float], _ domain: String) async -> Void)?
     public init(
         loadAllAtoms: @escaping @Sendable () async -> [BASGovernedMemory],
         admitAtom: @escaping @Sendable (BASGovernedMemory) async -> Void,
-        atomStore: any BASMemoryAtomStore
+        atomStore: any BASMemoryAtomStore,
+        loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
+        upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.admitAtom = admitAtom
         self.atomStore = atomStore
+        self.loadEmbedding = loadEmbedding
+        self.upsertEmbedding = upsertEmbedding
     }
 }
 
@@ -154,6 +164,12 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// so recall survives restart (with a `loadAllAtoms` that reads the same store). The host wires
     /// this (BASHostKit can't take a concrete-store generic); nil ⇒ pure in-memory (no persistence).
     private let admitAtom: (@Sendable (BASGovernedMemory) async -> Void)?
+    /// Phase 2 — OPTIONAL durable vector-index consumption. `loadEmbedding` reads a persisted vector
+    /// (atomID-keyed) so `refresh()` can skip the CoreML re-embed; `upsertEmbedding` writes each
+    /// self-populated atom's vector so it survives restart. Both nil ⇒ Phase-1 re-embed-on-refresh.
+    /// Touched ONLY in async refresh()/drainIntents() — never in the sync retrieve() hot path (ch883).
+    private let loadEmbedding: (@Sendable (String) async -> [Float]?)?
+    private let upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)?
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -165,7 +181,9 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         atomStore: (any BASMemoryAtomStore)? = nil,
         selfPopulate: Bool = false,
         selfPopulateCap: Int = 64,
-        admitAtom: (@Sendable (BASGovernedMemory) async -> Void)? = nil
+        admitAtom: (@Sendable (BASGovernedMemory) async -> Void)? = nil,
+        loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
+        upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -177,6 +195,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.selfPopulate = selfPopulate
         self.selfPopulateCap = max(1, selfPopulateCap)
         self.admitAtom = admitAtom
+        self.loadEmbedding = loadEmbedding
+        self.upsertEmbedding = upsertEmbedding
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -294,17 +314,31 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
 
     // MARK: - Async session-boundary operations
 
-    /// Rebuild the retrieval snapshot from the atom store. Embeds each atom's content via the
-    /// SYNC embedder (cheap; runs off the turn hot path). Call at session start / between turns.
+    /// Rebuild the retrieval snapshot from the atom store. Runs off the turn hot path (call at session
+    /// start / between turns). Each atom's embedding is LOADED from the durable vector index when one
+    /// is wired and present (dimension-consistent) — avoiding a CoreML re-embed; otherwise it is
+    /// computed via the SYNC embedder and lazily BACKFILLED into the index for next time.
     public func refresh() async {
         let governed = await loadAllAtoms()
-        let entries: [SnapshotEntry] = governed.map { record in
+        var entries: [SnapshotEntry] = []
+        entries.reserveCapacity(governed.count)
+        for record in governed {
             let atom = Self.memoryAtom(from: record)
-            return SnapshotEntry(
-                atomID: atom.memoryID,
-                domain: record.sourceType,
-                embedding: syncEmbed(atom.summary),
-                atom: atom)
+            let id = atom.memoryID
+            let domain = record.sourceType
+            let embedding: [Float]
+            if let load = loadEmbedding, let persisted = await load(id),
+               persisted.count == embeddingDimension {
+                embedding = persisted                       // durable vector — no re-embed
+            } else {
+                let computed = syncEmbed(atom.summary)
+                embedding = computed
+                if let upsert = upsertEmbedding {
+                    await upsert(id, computed, domain)       // lazy backfill for next restart
+                }
+            }
+            entries.append(SnapshotEntry(
+                atomID: id, domain: domain, embedding: embedding, atom: atom))
         }
         withLock { snapshot = entries }
     }
@@ -328,10 +362,18 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         }
 
         // Persist self-populated atoms first (an event-sourced store emits a provenance event per
-        // admit) so a later promote/freeze of the same atom finds it in the store.
+        // admit) so a later promote/freeze of the same atom finds it in the store. When a durable
+        // vector index is wired, also UPSERT each atom's embedding (recomputed here, off the hot path
+        // — deterministic, so identical to what refresh() would load back) so embeddings survive
+        // restart and refresh() can skip the re-embed.
         var admitted = 0
         if let admit = admitAtom {
-            for atom in admits { await admit(atom); admitted += 1 }
+            for atom in admits {
+                await admit(atom); admitted += 1
+                if let upsert = upsertEmbedding {
+                    await upsert(atom.id.uuidString, syncEmbed(atom.content), atom.sourceType)
+                }
+            }
         }
 
         guard let store = atomStore else { return (0, 0, admitted) }
@@ -354,6 +396,13 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
 
     public var snapshotCount: Int {
         return withLock { snapshot.count }
+    }
+
+    /// Test introspection (internal — exposed only via `@testable`, NOT public API): the snapshot
+    /// embedding for an atom, so tests can verify `refresh()` LOADED a persisted vector from the
+    /// index rather than re-embedding it.
+    func snapshotEmbedding(forAtomID id: String) -> [Float]? {
+        return withLock { snapshot.first { $0.atomID == id }?.embedding }
     }
 
     // MARK: - Query-text derivation

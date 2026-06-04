@@ -477,7 +477,9 @@ public actor BASCognitiveBrain {
                 embeddingDimension: dim,
                 atomStore: store.atomStore,
                 selfPopulate: true,
-                admitAtom: store.admitAtom)
+                admitAtom: store.admitAtom,
+                loadEmbedding: store.loadEmbedding,
+                upsertEmbedding: store.upsertEmbedding)
         }
         let emptyLoad: @Sendable () async -> [BASGovernedMemory] = { [] }
         return BASL8RoutedMemoryService(
