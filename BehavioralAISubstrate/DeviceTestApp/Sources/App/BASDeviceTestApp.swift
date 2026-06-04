@@ -138,6 +138,10 @@ struct ContentView: View {
                 probesStarted = true
                 // Rust verify:microsecond extern "C" calls,sync-safe。
                 rustVerify = BASRustVerifyProbe.run()
+                // ch1065:SSM caution operator FIRST, in its OWN task — CPU-only (~2s),
+                // so it captures within a brief foreground window, independent of (and
+                // concurrent with) the slower GPU probe chain below (no GPU contention).
+                Task { ssmVerify = await BASSSMCautionProbe.run() }
                 // MPSGraph:async(kernel evaluate)。 Serial,never
                 // concurrent with MLX(no GPU contention)。
                 Task {
@@ -155,9 +159,6 @@ struct ContentView: View {
                     // same Task → never overlap GPU dispatch)。 The Mamba harness handles
                     // gpuAvailable=false on the simulator gracefully (CPU scan still runs)。
                     mambaVerify = await BASMambaProbe.run()
-                    // ch1065:on-device SSM caution operator validation (sync turn
-                    // work hops to a detached task inside run()). Serial, after Mamba.
-                    ssmVerify = await BASSSMCautionProbe.run()
                 }
             }
             // ch 1025.4:if BAS_ENDURANCE_AUTOSTART=1,kick off
