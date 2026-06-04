@@ -527,13 +527,15 @@ extension BASEBrainRuntimeCoordinator {
         //   • ch883 — `BASSSMCautionInput.observation` runs the SYNC pure-
         //     Swift CPU scan (`BASSSMScanCPUReference`); no GPU / async /
         //     CoreML on the value path, so `runTurn` stays sync + byte-det.
+        // chapter 一百八十九 — EVERY-TURN temporal state-tracking. The operator (scan + cross-turn
+        // state) runs on EVERY flag-on turn with non-empty sources, so the recurrence evolves
+        // continuously (no gaps on calm turns — standard SSM/Mamba semantics: the state always tracks
+        // the input). The authoritative RAISE stays gated by genuine uncertainty (the condition is
+        // UNCHANGED), so on a non-uncertain turn `boundRiskCard` is untouched ⇒ the RESULT is byte-equal
+        // to the pre-every-turn seam; only the observation cadence broadens. The observation (carrying
+        // the new ssmStateOut) is emitted every flag-on turn so the host carries the state forward —
+        // observation-only side-channel, never on the value path.
         if ssmCautionOperatorEnabled,
-           BASDeliberationCaution.isGenuinelyUncertain(
-               confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
-               maxEvidenceDebt: thoughtFrame.evidenceDebts?
-                   .map(\.debtWeight).max(),
-               leaseEnded: thoughtFrame.convergenceCertificate?
-                   .stoppingMode == .leaseEnd),
            let ssmObservation = BASSSMCautionInput.observation(
                sessionID: derivedSessionID,
                turnID: derivedTurnID,
@@ -550,24 +552,33 @@ extension BASEBrainRuntimeCoordinator {
                // ⇒ byte-equal with the stateless operator. The emitted observation carries the new
                // `ssmStateOut` out via the (opt-in) sink — never on the value path.
                priorState: request.priorSSMState) {
-            let raised = BASSSMCautionInput.raisedTotalRisk(
-                boundRiskCard.totalRisk, ssmCaution: ssmObservation.ssmCaution)
-            let raisedLevel = resolvedRiskService.riskLevel(for: raised)
-            boundRiskCard.totalRisk = raised
-            boundRiskCard.riskLevel = raisedLevel
-            // RAISE-ONLY on the ceiling: set "guarded" at high, else leave
-            // the existing value untouched (never downgrade to "standard").
-            if raisedLevel >= .high {
-                boundRiskCard.assertionCeiling = "guarded"
+            // RAISE only on a genuinely-uncertain turn — the AUTHORITATIVE condition, UNCHANGED from the
+            // pre-every-turn seam (so the result is byte-equal on non-uncertain turns; the state-tracking
+            // scan above is observation-only).
+            if BASDeliberationCaution.isGenuinelyUncertain(
+                   confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
+                   maxEvidenceDebt: thoughtFrame.evidenceDebts?
+                       .map(\.debtWeight).max(),
+                   leaseEnded: thoughtFrame.convergenceCertificate?
+                       .stoppingMode == .leaseEnd) {
+                let raised = BASSSMCautionInput.raisedTotalRisk(
+                    boundRiskCard.totalRisk, ssmCaution: ssmObservation.ssmCaution)
+                let raisedLevel = resolvedRiskService.riskLevel(for: raised)
+                boundRiskCard.totalRisk = raised
+                boundRiskCard.riskLevel = raisedLevel
+                // RAISE-ONLY on the ceiling: set "guarded" at high, else leave
+                // the existing value untouched (never downgrade to "standard").
+                if raisedLevel >= .high {
+                    boundRiskCard.assertionCeiling = "guarded"
+                }
+                if boundRiskCard.sovereignHintLevel == nil, raisedLevel >= .high {
+                    boundRiskCard.sovereignHintLevel = "medium"
+                }
+                boundRiskCard.factors =
+                    boundRiskCard.factors + ["ssm_temporal_caution"]
             }
-            if boundRiskCard.sovereignHintLevel == nil, raisedLevel >= .high {
-                boundRiskCard.sovereignHintLevel = "medium"
-            }
-            boundRiskCard.factors =
-                boundRiskCard.factors + ["ssm_temporal_caution"]
-            // OBSERVATION-ONLY side-channel — emit the SSM operator's typed
-            // observation for host telemetry / audit. Nil sink (default) →
-            // no emission → byte-equal (红线 7). Feeds no render/seal/verdict/hash.
+            // OBSERVATION-ONLY side-channel — emitted EVERY flag-on turn (continuous state-tracking).
+            // Nil sink (default) → no emission → byte-equal (红线 7). Feeds no render/seal/verdict/hash.
             ssmCautionObservationSink?(ssmObservation)
         }
         // M392 — `boundActionPermit` is rebound by the Cthulhu

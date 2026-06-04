@@ -85,10 +85,12 @@ final class BASSSMCautionOperatorRunTurnTests: XCTestCase {
             "the operator can only RAISE risk, never lower it (safe-direction)")
     }
 
-    /// The exact raise math at the runTurn level, robust to whether the stub turn happens to satisfy the
-    /// genuine-uncertainty predicate: if the seam fired (sink emitted an observation), on.totalRisk is
-    /// EXACTLY off raised by the scaled increment; if it did not, on is byte-equal to off.
-    func testFlagOnMatchesRaiseMathWhetherOrNotItFires() {
+    /// EVERY-TURN state-tracking + factor-gated raise (chapter 一百八十九): the operator runs + EMITS on
+    /// every flag-on turn (continuous state-tracking), but the RAISE is gated by genuine uncertainty.
+    /// So keying off the FACTOR (raise applied), not the sink firing: when the factor is present
+    /// on.totalRisk is EXACTLY off raised by the scaled increment; when absent the operator still ran
+    /// (obs emitted) but did NOT raise ⇒ on is byte-equal to off.
+    func testFlagOnEmitsEveryTurnAndRaiseIsFactorGated() throws {
         final class Box: @unchecked Sendable { var obs: BASMambaSSMTurnObservation? }
         let box = Box()
         let on = makeCoordinator(
@@ -98,21 +100,24 @@ final class BASSSMCautionOperatorRunTurnTests: XCTestCase {
         let off = makeCoordinator(ssmCautionOperatorEnabled: false)
             .runTurn(BASCoordinatorTestStubs.makeStubRequest())
 
-        if let obs = box.obs {
+        // Every-turn state-tracking: the operator runs + emits on EVERY flag-on turn (non-empty sources),
+        // independent of whether it raises.
+        let obs = try XCTUnwrap(box.obs,
+            "flag-on emits the SSM observation every turn (continuous state-tracking)")
+        if on.riskCard.factors.contains("ssm_temporal_caution") {
+            // RAISE applied (a genuinely-uncertain turn): exact scaled-increment math.
             XCTAssertEqual(on.riskCard.totalRisk,
                 BASSSMCautionInput.raisedTotalRisk(
                     off.riskCard.totalRisk, ssmCaution: obs.ssmCaution),
                 accuracy: 1e-12,
-                "seam fired → on.totalRisk == raisedTotalRisk(off.totalRisk, ssmCaution)")
-            XCTAssertTrue(on.riskCard.factors.contains("ssm_temporal_caution"),
-                "seam fired → the caution factor is surfaced on the card")
+                "raise applied → on.totalRisk == raisedTotalRisk(off.totalRisk, ssmCaution)")
             XCTAssertGreaterThanOrEqual(on.riskCard.totalRisk, off.riskCard.totalRisk,
-                "and the raise is in the safe direction")
+                "the raise is in the safe direction")
         } else {
+            // Observation emitted but NO raise (non-uncertain turn) → result byte-equal despite the
+            // operator running (the state-tracking scan is observation-only).
             XCTAssertEqual(on.riskCard.totalRisk, off.riskCard.totalRisk, accuracy: 1e-12,
-                "seam did not fire → on is byte-equal to off")
-            XCTAssertFalse(on.riskCard.factors.contains("ssm_temporal_caution"),
-                "seam did not fire → no caution factor")
+                "operator ran (obs emitted) but did not raise → on is byte-equal to off")
         }
     }
 
