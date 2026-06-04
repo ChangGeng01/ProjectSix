@@ -498,6 +498,72 @@ extension BASEBrainRuntimeCoordinator {
                 }
             }
         }
+        // chapter 一百八十六 / ADR-019 P1.5b — SSM caution operator
+        // (Mamba/SSM as an AUTHORITATIVE, raise-caution-only L11 INPUT).
+        // Mirrors the P1.5a deliberation-caution seam ABOVE exactly — on
+        // the SAME post-binding `boundRiskCard`, with the SAME genuine-
+        // uncertainty predicate — but driven by the CPU-deterministic
+        // `ssmCaution` over this turn's THREE live sources (L7 affect-
+        // layers + cross-turn `request.turnHistory` + L9 candidates).
+        //
+        // SAFE BY CONSTRUCTION:
+        //   • RAISE-ONLY — `raisedTotalRisk(c,s) ≥ c` (== c at s=0, ≤ 1);
+        //     a pre-render caution REDUCTION is architecturally impossible
+        //     (verdict-after-render, ADR-019 P1.5b), so this can only RAISE.
+        //     The `assertionCeiling` write only ever sets "guarded" (the
+        //     high-risk ceiling) and otherwise LEAVES THE EXISTING VALUE —
+        //     so when both this and the P1.5a block fire it never resets a
+        //     "guarded" ceiling back to "standard" (raise-only on the
+        //     ceiling too, stricter than P1.5a's unconditional write).
+        //   • 不变量 #2 神经不掌权 — writes ONLY `boundRiskCard`, an INPUT the
+        //     sovereign verdict GATES downstream; never a verdict / permit /
+        //     commit token, and it can never DOWNGRADE.
+        //   • 红线 7 / ADR-014 — `ssmCautionOperatorEnabled` is the FIRST
+        //     condition, so when OFF (default) the scan is never even run →
+        //     byte-equal + zero cost. `observation(...)` is nil when all
+        //     three sources are empty → clean per-turn no-op. The
+        //     observation side-channel feeds no render / seal / verdict /
+        //     hash (nil sink → no emission → byte-equal).
+        //   • ch883 — `BASSSMCautionInput.observation` runs the SYNC pure-
+        //     Swift CPU scan (`BASSSMScanCPUReference`); no GPU / async /
+        //     CoreML on the value path, so `runTurn` stays sync + byte-det.
+        if ssmCautionOperatorEnabled,
+           BASDeliberationCaution.isGenuinelyUncertain(
+               confidenceFloor: thoughtFrame.uncertaintyLedger?.confidenceFloor,
+               maxEvidenceDebt: thoughtFrame.evidenceDebts?
+                   .map(\.debtWeight).max(),
+               leaseEnded: thoughtFrame.convergenceCertificate?
+                   .stoppingMode == .leaseEnd),
+           let ssmObservation = BASSSMCautionInput.observation(
+               sessionID: derivedSessionID,
+               turnID: derivedTurnID,
+               // Affect is MATERIALIZED from the authoritative runtime frame's typed
+               // pressure vectors (typed affect is not on the value path otherwise —
+               // it lives only on the audit-shape dissection frame). This projection
+               // runs ONLY here, inside the flag-gated block, so flag-off is byte-equal.
+               affectLayers: BASAffectLayerProjection.project(from: decomposeFrame),
+               turnHistory: request.turnHistory,
+               candidates: thoughtFrame.candidates) {
+            let raised = BASSSMCautionInput.raisedTotalRisk(
+                boundRiskCard.totalRisk, ssmCaution: ssmObservation.ssmCaution)
+            let raisedLevel = resolvedRiskService.riskLevel(for: raised)
+            boundRiskCard.totalRisk = raised
+            boundRiskCard.riskLevel = raisedLevel
+            // RAISE-ONLY on the ceiling: set "guarded" at high, else leave
+            // the existing value untouched (never downgrade to "standard").
+            if raisedLevel >= .high {
+                boundRiskCard.assertionCeiling = "guarded"
+            }
+            if boundRiskCard.sovereignHintLevel == nil, raisedLevel >= .high {
+                boundRiskCard.sovereignHintLevel = "medium"
+            }
+            boundRiskCard.factors =
+                boundRiskCard.factors + ["ssm_temporal_caution"]
+            // OBSERVATION-ONLY side-channel — emit the SSM operator's typed
+            // observation for host telemetry / audit. Nil sink (default) →
+            // no emission → byte-equal (红线 7). Feeds no render/seal/verdict/hash.
+            ssmCautionObservationSink?(ssmObservation)
+        }
         // M392 — `boundActionPermit` is rebound by the Cthulhu
         // doctrine gate block below (M303/M304/M384/M320/M385).
         // The block runs BEFORE `applySovereignNeuralContract`,

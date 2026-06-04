@@ -50,7 +50,14 @@ extension BASHostRuntime {
         shadowTrialFeedbackEnabled: Bool = false,
         pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
         resolvedTrialSink:
-            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
+            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil,
+        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // threaded onto the coordinator alongside `deliberationLoopEnabled`.
+        // Default false → the coordinator's flag stays false → the L11 SSM
+        // seam is dormant → byte-equal (红线 7 + ADR-014). A host sets this
+        // true to let the CPU-deterministic temporal-caution operator RAISE
+        // L11 caution (verdict-gated, raise-only) on genuinely-uncertain turns.
+        ssmCautionOperatorEnabled: Bool = false
     ) -> BASEBrainTurnResult {
         makeEBrainTurn(
             for: request,
@@ -63,7 +70,8 @@ extension BASHostRuntime {
             resolvedEvidenceSink: resolvedEvidenceSink,
             shadowTrialFeedbackEnabled: shadowTrialFeedbackEnabled,
             pendingTrialLedgerIn: pendingTrialLedgerIn,
-            resolvedTrialSink: resolvedTrialSink
+            resolvedTrialSink: resolvedTrialSink,
+            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
         )
     }
 
@@ -325,7 +333,13 @@ extension BASHostRuntime {
         shadowTrialFeedbackEnabled: Bool = false,
         pendingTrialLedgerIn: BASShadowTrialFeedbackLedger? = nil,
         resolvedTrialSink:
-            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil
+            (@Sendable ([BASShadowTrialRecord]) -> Void)? = nil,
+        // chapter 一百八十六 / ADR-019 P1.5b — OPT-IN SSM caution operator,
+        // threaded onto the coordinator the sync host path builds. Default
+        // false → coordinator flag false → L11 SSM seam dormant → byte-equal
+        // (红线 7 + ADR-014). Mirrors exactly how `deliberationLoopEnabled`
+        // is threaded onto the coordinator below.
+        ssmCautionOperatorEnabled: Bool = false
     ) -> BASEBrainTurnResult {
         let enforcedCurrentBrain = currentBrain.applyingControlPlaneDisposition(
             configuration.controlPlaneExecutionDisposition,
@@ -444,7 +458,12 @@ extension BASHostRuntime {
             // Dormant in Commit 1.
             shadowTrialFeedbackEnabled: shadowTrialFeedbackEnabled,
             pendingTrialLedgerIn: pendingTrialLedgerIn,
-            resolvedTrialSink: resolvedTrialSink
+            resolvedTrialSink: resolvedTrialSink,
+            // chapter 一百八十六 / ADR-019 P1.5b — activate the SSM caution
+            // operator in production: the host-supplied flag reaches the
+            // coordinator slot the L11 SSM seam reads. false (default) → seam
+            // dormant → byte-equal (红线 7).
+            ssmCautionOperatorEnabled: ssmCautionOperatorEnabled
         )
 
         return coordinator.runTurn(
