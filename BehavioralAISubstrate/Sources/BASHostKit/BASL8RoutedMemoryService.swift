@@ -175,6 +175,13 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// Touched ONLY in async refresh()/drainIntents() — never in the sync retrieve() hot path (ch883).
     private let loadEmbedding: (@Sendable (String) async -> [Float]?)?
     private let upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)?
+    /// chapter 一千〇六十二 / WS3 — OPTIONAL host-injected perf-fast retrieve seam. When wired,
+    /// `retrieve()` ranks via the index's integrated cosine top-K (1 FFI call returning
+    /// (atomID, score)) instead of scoring every snapshot atom in Swift. nil ⇒ the orchestrated
+    /// score-all path (byte-equal-off, ADR-014 default). NON-byte-equal when wired (the index ties
+    /// by rowid + truncates before the Swift floor/constitution filter) — opt-in by the host.
+    private let cosineTopKSync:
+        (@Sendable (_ query: [Float], _ k: Int) -> [(atomID: String, score: Float)])?
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -188,7 +195,9 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         selfPopulateCap: Int = 64,
         admitAtom: (@Sendable (BASGovernedMemory) async -> Void)? = nil,
         loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
-        upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil
+        upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
+        cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
+            -> [(atomID: String, score: Float)])? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -202,6 +211,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.admitAtom = admitAtom
         self.loadEmbedding = loadEmbedding
         self.upsertEmbedding = upsertEmbedding
+        self.cosineTopKSync = cosineTopKSync
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -224,11 +234,26 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
 
         let snap = withLock { snapshot }
 
-        // Rust-SIMD-routed cosine over the pre-materialized snapshot — fully synchronous.
-        let scored: [(score: Float, entry: SnapshotEntry)] = snap.map { entry in
-            let score = BASAutoRouteRanker
-                .cosineSimilarity(query, entry.embedding).value
-            return (score, entry)
+        // chapter 一千〇六十二 / WS3 — perf-fast hot path when the host wires the index's integrated
+        // cosine top-K seam: ONE FFI call ranks the corpus + resolves atom_ids (vs N Swift cosine
+        // calls over the snapshot). NON-byte-equal (the index ties by rowid + truncates before the
+        // floor/constitution filter below); the returned atom_ids are mapped to snapshot atoms (a
+        // result for an atom not in the recall window is skipped). nil seam ⇒ the orchestrated
+        // score-all baseline — fully synchronous (ch883), byte-equal-off (ADR-014).
+        let scored: [(score: Float, entry: SnapshotEntry)]
+        if let cosineTopKSync {
+            let byID = Dictionary(
+                snap.map { ($0.atomID, $0) }, uniquingKeysWith: { a, _ in a })
+            scored = cosineTopKSync(query, topK).compactMap { hit in
+                byID[hit.atomID].map { (hit.score, $0) }
+            }
+        } else {
+            // Rust-SIMD-routed cosine over the pre-materialized snapshot — fully synchronous.
+            scored = snap.map { entry in
+                let score = BASAutoRouteRanker
+                    .cosineSimilarity(query, entry.embedding).value
+                return (score, entry)
+            }
         }
         let above = scored.filter { $0.score >= relevanceFloor }
 

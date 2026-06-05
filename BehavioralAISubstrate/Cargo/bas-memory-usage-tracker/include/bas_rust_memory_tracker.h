@@ -1715,6 +1715,15 @@ int32_t bas_l8_vector_index_read_embedding_for_atom(
     const char* atom_id_utf8, size_t atom_id_len,
     uint8_t* out_buf, size_t out_capacity);
 
+// chapter 一千〇六十二 / WS3 — resolve a vector_index rowid back to its
+// atom_id (UTF-8, probe-mode buffer; null buf + 0 cap = size probe).
+// Reverse of read_embedding_for_atom; lets a cosine_topk caller map
+// the returned rowids to atoms. -2 = not found, -1 = null engine.
+int32_t bas_l8_vector_index_atom_id_for_rowid(
+    const L8Engine* engine,
+    int64_t rowid,
+    uint8_t* out_buf, size_t out_capacity);
+
 // INTEGRATED cosine top-k: reads all embeddings for a domain
 // + dot-product against query + returns top-k via 2 caller-
 // allocated buffers (out_rowids: i64[k], out_scores: f32[k]).

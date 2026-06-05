@@ -547,5 +547,84 @@ public actor BASRoutedVectorIndexStorage {
         }
         return out
     }
+
+    // MARK: - chapter 一千〇六十二 / WS3 — SYNC cosine top-K → atom_ids
+
+    /// SYNCHRONOUS cosine top-K that resolves each result's rowid back to its atom_id (via the
+    /// new `bas_l8_vector_index_atom_id_for_rowid` FFI), returning `(atomID, score)` descending
+    /// by score. `nonisolated` so the ch883 SYNC L8 retrieve hot path can call it WITHOUT an actor
+    /// hop (the underlying FFIs are synchronous — the actor only wrapped them for isolation). One
+    /// topK FFI call + K cheap rowid→atom_id lookups (K≪N corpus). This is the host-injected
+    /// perf-fast retrieve path (audit ch1040 WS3); it is NOT byte-equal to the orchestrated
+    /// score-all path (the index ties by rowid, not atomID, and truncates before the Swift-side
+    /// floor/constitution filter).
+    ///
+    /// CONCURRENCY CONTRACT: bypasses the actor's serialization — reads `enginePtr` directly (as
+    /// `deinit` already does). The caller MUST guarantee no concurrent `upsert`/`remove` during the
+    /// call. The L8 retrieve hot path satisfies this by turn-phase separation: retrieve runs
+    /// synchronously WITHIN a turn; the durable upsert/drain runs asynchronously BETWEEN turns.
+    public nonisolated func cosineTopKAtomIDsSync(
+        forDomain domain: String,
+        query: [Float],
+        k: Int
+    ) throws -> [(atomID: String, score: Float)] {
+        try Self.validateQueryFloats(query)
+        guard k > 0 && k <= Self.limitCap else {
+            throw StoreError.invalidArgument(
+                reason: "k must be in 1...\(Self.limitCap), got \(k)")
+        }
+        // Pack [Float] → [UInt8] little-endian (same wire format as the async path).
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(query.count * 4)
+        for v in query {
+            var x = v
+            withUnsafeBytes(of: &x) { raw in bytes.append(contentsOf: raw) }
+        }
+        let dom = Array(domain.utf8)
+        var rowids = [Int64](repeating: 0, count: k)
+        var scores = [Float](repeating: 0, count: k)
+        let n = dom.withUnsafeBufferPointer { domBuf in
+            bytes.withUnsafeBufferPointer { qBuf in
+                rowids.withUnsafeMutableBufferPointer { rBuf in
+                    scores.withUnsafeMutableBufferPointer { sBuf in
+                        bas_l8_vector_index_cosine_topk_for_domain(
+                            enginePtr,
+                            domBuf.baseAddress.map {
+                                UnsafeRawPointer($0)
+                                    .assumingMemoryBound(to: CChar.self)
+                            },
+                            domBuf.count,
+                            qBuf.baseAddress, qBuf.count,
+                            k, rBuf.baseAddress, sBuf.baseAddress)
+                    }
+                }
+            }
+        }
+        guard n >= 0 else { throw StoreError.readFailed(code: n) }
+        var out: [(atomID: String, score: Float)] = []
+        out.reserveCapacity(Int(n))
+        for i in 0..<Int(n) {
+            if let aid = Self.atomIDForRowidSync(enginePtr, rowids[i]) {
+                out.append((atomID: aid, score: scores[i]))
+            }
+        }
+        return out
+    }
+
+    /// SYNC rowid → atom_id via the probe-mode FFI (null buf returns the size). Returns nil on
+    /// not-found / decode failure (the caller skips that entry).
+    private nonisolated static func atomIDForRowidSync(
+        _ engine: OpaquePointer, _ rowid: Int64
+    ) -> String? {
+        let needed = bas_l8_vector_index_atom_id_for_rowid(engine, rowid, nil, 0)
+        guard needed > 0 else { return nil }  // -2 not found / -1 null / 0 empty
+        var buf = [UInt8](repeating: 0, count: Int(needed))
+        let wrote = buf.withUnsafeMutableBufferPointer { b in
+            bas_l8_vector_index_atom_id_for_rowid(
+                engine, rowid, b.baseAddress, b.count)
+        }
+        guard wrote == needed else { return nil }
+        return String(decoding: buf, as: UTF8.self)
+    }
 }
 #endif

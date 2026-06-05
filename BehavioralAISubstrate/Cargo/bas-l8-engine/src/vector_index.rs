@@ -126,6 +126,23 @@ pub fn read_embedding_for_atom(
     Ok(r)
 }
 
+/// chapter 一千〇六十二 / WS3 — resolve an atom_id from a vector_index
+/// rowid。 The REVERSE of `read_embedding_for_atom` (atom_id →
+/// embedding)。 Needed so a `cosine_topk_for_domain` caller (which
+/// gets back rowids) can map those rowids to atoms — closing the
+/// L8 retrieve cosineTopK hot-path takeover (audit ch1040 WS3)。
+pub fn atom_id_for_rowid(
+    conn: &Connection,
+    rowid: i64,
+) -> rusqlite::Result<Option<String>> {
+    let r: Option<String> = conn.query_row(
+        "SELECT atom_id FROM vector_index
+         WHERE rowid = ? LIMIT 1",
+        params![rowid], |row| row.get(0)
+    ).ok();
+    Ok(r)
+}
+
 /// chapter 九百六 / M3230 — INTEGRATED hot-path consolidation。
 /// Reads all embeddings for a domain + computes cosine
 /// similarity against the query + returns top-k scores in
@@ -417,6 +434,44 @@ bas_l8_vector_index_read_embedding_for_atom(
     };
     let needed = bytes.len();
     // chapter 九百四十二 / M3415 fix HIGH-1 (14P) — i32 overflow guard
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
+    if out_buf.is_null() || out_capacity < needed {
+        return safe_needed;
+    }
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            bytes.as_ptr(), out_buf, needed);
+    }
+    safe_needed
+}
+
+/// chapter 一千〇六十二 / WS3 — resolve a vector_index rowid back to
+/// its atom_id (UTF-8, probe-mode buffer read)。 Probe (null buf +
+/// 0 capacity) returns the required byte size。 The REVERSE of
+/// `read_embedding_for_atom`; lets a `cosine_topk_for_domain` caller
+/// map the returned rowids to atoms (the L8 retrieve cosineTopK
+/// hot-path takeover — audit ch1040 WS3)。
+/// -2 = rowid not found,-1 = null engine。
+#[no_mangle]
+pub unsafe extern "C" fn
+bas_l8_vector_index_atom_id_for_rowid(
+    engine: *const L8Engine,
+    rowid: i64,
+    out_buf: *mut u8, out_capacity: usize,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    let engine_ref = unsafe { &*engine };
+    let aid: Option<String> = engine_ref.with_conn(|conn| {
+        atom_id_for_rowid(conn, rowid).unwrap_or(None)
+    });
+    let s = match aid {
+        Some(v) => v,
+        None => return -2,
+    };
+    let bytes = s.as_bytes();
+    let needed = bytes.len();
     let safe_needed = match crate::safe_i32_size(needed) {
         Ok(n) => n, Err(c) => return c,
     };
