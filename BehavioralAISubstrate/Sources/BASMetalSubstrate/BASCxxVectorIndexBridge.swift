@@ -21,6 +21,10 @@ public enum BASCxxVectorIndexBridgeError: Error,
     case cxxInternalException
     case jsonDecodeFailed(message: String)
     case unknownReturnCode(Int32)
+    /// An empty input vector was passed. An empty `[Float]` yields a nil
+    /// `baseAddress` from `withUnsafeBufferPointer`, which the FFI call would
+    /// force-unwrap and trap on — so the bridge fails closed with this instead.
+    case emptyVector
 
     public var caseIdentifier: String {
         switch self {
@@ -31,6 +35,8 @@ public enum BASCxxVectorIndexBridgeError: Error,
             return "jsonDecodeFailed"
         case .unknownReturnCode:
             return "unknownReturnCode"
+        case .emptyVector:
+            return "emptyVector"
         }
     }
 }
@@ -83,6 +89,11 @@ public actor BASCxxVectorIndexBridge {
             throw BASCxxVectorIndexBridgeError
                 .unknownReturnCode(-99)
         }
+        // Fail closed on an empty vector: `withUnsafeBufferPointer` hands back a
+        // nil `baseAddress`, which the `baseAddress!` below would trap on.
+        guard !vector.isEmpty else {
+            throw BASCxxVectorIndexBridgeError.emptyVector
+        }
         let rc = id.withCString { idPtr -> Int32 in
             vector.withUnsafeBufferPointer { buf in
                 bas_mps_index_add(
@@ -114,6 +125,10 @@ public actor BASCxxVectorIndexBridge {
         k: Int
     ) throws -> [BASCxxVectorIndexResult] {
         guard useCxxIndex else { return [] }
+        // Fail closed on an empty query (same nil-`baseAddress` trap as `add`).
+        guard !query.isEmpty else {
+            throw BASCxxVectorIndexBridgeError.emptyVector
+        }
         var outPtr: UnsafeMutablePointer<CChar>?
         var outLen: Int = 0
         let rc = query.withUnsafeBufferPointer {
