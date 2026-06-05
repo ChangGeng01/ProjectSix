@@ -27,7 +27,21 @@ enum BASSSMCautionProbe {
     /// Also measures the per-turn GPU SHADOW (arc-1): the CPU-vs-GPU selective-scan MAE on real A19
     /// silicon — telemetry only (the SSM operator value stays CPU). nil ⇒ Metal unavailable.
     static func run() async -> String {
-        let ssmVerdict = await Task.detached(priority: .userInitiated) { runSync() }.value
+        // 全面修复 (ch1066) — run the full turn (startSession → buildEBrainTurn → runTurn →
+        // construct the giant 52-field BASEBrainTurnResult through its convenience-init
+        // cascade) on a dedicated LARGE-stack thread. On the Swift cooperative pool's ~544KB
+        // stack this path overruns the stack guard page → SIGBUS (signal 10) — the exact
+        // bucket BASSignalTenIntegrationTestTriageDoctrine documents (Task.detached +
+        // startSession), proven by the on-device crash report (faulting address inside the
+        // stack guard, far−sp = 56,816 B). A 16MB stack gives the giant-struct copy ample
+        // headroom; runSync() stays a pure sync CPU turn, so the operator's value path and
+        // its on-device numbers are unchanged.
+        let ssmVerdict: String = await withCheckedContinuation { cont in
+            let worker = Thread { cont.resume(returning: runSync()) }
+            worker.stackSize = 16 * 1024 * 1024
+            worker.name = "ch1066-ssm-caution-bigstack"
+            worker.start()
+        }
         let mae = await BASMambaSSMTurnGPUShadow.representativeParityMAE()
         let maeStr = mae.map { String(format: "%.3e", $0) } ?? "nil(no-metal)"
         emit("📊 ch1065 gpu-shadow parity_mae=\(maeStr) " +
