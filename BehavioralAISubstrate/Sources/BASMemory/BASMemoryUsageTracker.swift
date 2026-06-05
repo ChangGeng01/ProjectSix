@@ -129,6 +129,15 @@ public actor BASMemoryUsageTracker {
     /// 二百四十八 / M735 commentary on why `nonisolated(unsafe)`
     /// is the right opt-out for deinit cleanup of an
     /// actor-isolated `OpaquePointer`.
+    ///
+    /// `internal` (not `private`) ONLY so the split-out `+SQLCore` /
+    /// `+ReplayAuditFTS` / `+SQLPrimitives` extension files (god-object
+    /// decomposition, ch1040) can reach it. It is STILL actor-isolated:
+    /// every read is from an `async` actor-isolated method, and the
+    /// `nonisolated(unsafe)` opt-out is consumed ONLY by `deinit`. The
+    /// `internal` visibility is NOT license to touch this pointer from a
+    /// `nonisolated` / `static` context — that would break isolation. The
+    /// same applies to the in-memory state below (widened for the same reason).
     nonisolated(unsafe) var db: OpaquePointer?
 
     /// In-memory record store keyed by recordID. Used in

@@ -422,12 +422,31 @@ extension BASMemoryUsageTracker {
         // then insert (FTS5 contentless / virtual tables
         // don't natively support ON CONFLICT)。 Wrap in
         // a transaction for atomicity。
-        try runExec(db: db, sql: """
+        // Parameterized DELETE (audit ch1040 polish): recordID is
+        // caller-supplied via attachNotes(); was previously
+        // string-interpolated with manual ''-escaping — the only
+        // un-parameterized query in the tracker family. Now a bound
+        // statement, mirroring the parameterized INSERT below.
+        let ftsDeleteSQL = """
             DELETE FROM memory_usage_record_notes_fts
-             WHERE record_id = '\(recordID
-                .replacingOccurrences(
-                    of: "'", with: "''"))'
-            """)
+             WHERE record_id = ?
+            """
+        var ftsDeleteStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db, ftsDeleteSQL, -1, &ftsDeleteStmt, nil)
+            == SQLITE_OK, let ftsDeleteStmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: ftsDeleteSQL,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(ftsDeleteStmt) }
+        bindText(ftsDeleteStmt, 1, recordID)
+        guard sqlite3_step(ftsDeleteStmt) == SQLITE_DONE else {
+            throw TrackerError.stepFailed(
+                sql: ftsDeleteSQL,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
         let ftsSQL = """
             INSERT INTO memory_usage_record_notes_fts (
                 record_id, notes
