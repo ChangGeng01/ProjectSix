@@ -213,6 +213,13 @@ final class BASAgentFabricMultiRoundLoopTests: XCTestCase {
         XCTAssertEqual(r1.roundsRun, r2.roundsRun, "the live overload is deterministic across runs")
         XCTAssertEqual(r1.perRoundDigests, r2.perRoundDigests)
         XCTAssertEqual(r1.stopReason, r2.stopReason)
+        // Non-vacuity (B4 / audit ch1040): assert the CONCRETE terminal outcome, not just the
+        // round bounds — otherwise a regression that made the real fabric stop at "nil-projection"
+        // or run to the budget cap would still pass this "live" test green. The surface seat
+        // always emits, so the loop reaches a content-digest fixpoint with a usable projection.
+        XCTAssertTrue(r1.converged, "stable seat output ⇒ the live loop converges")
+        XCTAssertEqual(r1.stopReason, "digest-fixpoint")
+        XCTAssertNotNil(r1.finalProjection, "a converged authoritative loop yields a projection")
     }
 
     func testLiveRuntimeObservationOnlyIsInert() async {
