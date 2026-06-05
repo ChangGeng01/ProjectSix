@@ -423,7 +423,10 @@ public actor BASCognitiveBrain {
                 selfPopulate: true,
                 admitAtom: store.admitAtom,
                 loadEmbedding: store.loadEmbedding,
-                upsertEmbedding: store.upsertEmbedding)
+                upsertEmbedding: store.upsertEmbedding,
+                // WS3/ADR-036 — thread the opt-in cosineTopK seam through the standard factory path
+                // (nil unless the host wires a cosineTopK-capable routed index ⇒ byte-equal-off).
+                cosineTopKSync: store.cosineTopKSync)
         }
         let emptyLoad: @Sendable () async -> [BASGovernedMemory] = { [] }
         return BASL8RoutedMemoryService(

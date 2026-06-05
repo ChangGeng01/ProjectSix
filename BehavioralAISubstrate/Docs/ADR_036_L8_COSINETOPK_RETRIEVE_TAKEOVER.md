@@ -37,6 +37,10 @@ side alone. The Explore agent + the plan both assumed a map existed; it didn't.
   path (byte-equal-off, ADR-014 default)**; when wired, `retrieve` ranks via the seam + maps the returned
   atom_ids to snapshot atoms (an atom_id outside the recall window is skipped), then applies the SAME
   floor + constitution filter + final top-K.
+- **Factory-path threading** (`BASRoutedMemoryPersistence.cosineTopKSync` → `resolveMemoryService` → the
+  service): the opt-in is now reachable via the standard `makeWithDefaults(memoryPersistence:)` host path
+  (previously settable only by constructing `BASL8RoutedMemoryService` directly). nil default ⇒
+  byte-equal-off, so every host that doesn't elect it is unchanged.
 
 ## Why this is NON-byte-equal (honest — the accepted semantic change)
 
@@ -73,3 +77,13 @@ the L8 cross-restart suites green. New XCFramework symbol exported (`nm`).
   batch-string ABI; deferred as not worth the complexity at small K.)
 - **Domain scoping:** the seam closure owns the domain choice (the index's cosineTopK is per-domain; the
   host wires it for the domain(s) it recalls from).
+- **DeviceTestApp adoption (deferred, honest):** the plan's WS3 assumed the app's durable index
+  (`BASSQLiteVectorIndexStorage`) could back the seam — it can't: that store is pure sqlite3 with **no
+  cosineTopK engine** (the engine lives only on `BASRoutedVectorIndexStorage`, a different actor with a
+  different read API + on-disk schema). So DeviceTestApp leaves the seam **nil (byte-equal-off)**. Real
+  adoption requires backing it with a routed index for the recall domain **and** re-proving the
+  ch1063/ch1064 cross-restart durability **on-device** (the sim build links fail environmentally, so it
+  can't be runtime-verified here). Swapping a load-bearing durable backend on a change I can't
+  runtime-verify is declined per 亏的不要上 / R1 — the seam ships **adoptable** (threaded through the
+  standard factory path) with the exact remaining on-device step recorded. This is the SECOND incorrect
+  premise the plan's WS3 carried (the first was the missing rowid→atom_id map, fixed by the new FFI).

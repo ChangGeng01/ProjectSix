@@ -493,6 +493,13 @@ final class BASEnduranceAppController: ObservableObject {
                     databaseURL: docs.appendingPathComponent("bas-vector-index.sqlite"))
                 memoryStore = store
                 memoryVectorIndex = vindex
+                // ADR-036/WS3 — the L8 retrieve cosineTopK takeover seam (`cosineTopKSync`) is left
+                // UNWIRED here (defaults to nil ⇒ byte-equal-off score-all path). It requires a
+                // cosineTopK-capable routed index (`BASRoutedVectorIndexStorage`, Rust L8 engine); this
+                // app's durable index is `BASSQLiteVectorIndexStorage` (pure sqlite3, no cosineTopK).
+                // Adopting the takeover means backing the seam with a routed index for the recall domain
+                // AND re-proving ch1063/ch1064 cross-restart durability on-device — a documented
+                // follow-up, NOT a hunch-shipped load-bearing backend swap (亏的不要上 / R1).
                 memoryPersistence = BASRoutedMemoryPersistence(
                     loadAllAtoms: { (try? await store.allAtoms()) ?? [] },
                     admitAtom: { _ = try? await store.admit($0) },

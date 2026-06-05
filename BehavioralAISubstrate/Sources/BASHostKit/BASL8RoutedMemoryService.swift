@@ -89,18 +89,31 @@ public struct BASRoutedMemoryPersistence: Sendable {
     /// path UPSERTS each self-populated atom's embedding — so embeddings survive restart too.
     public let loadEmbedding: (@Sendable (_ atomID: String) async -> [Float]?)?
     public let upsertEmbedding: (@Sendable (_ atomID: String, _ embedding: [Float], _ domain: String) async -> Void)?
+    /// chapter 一千〇六十二 / WS3 — OPTIONAL host-injected cosineTopK seam (the perf-fast L8 retrieve
+    /// takeover, ADR-036). nil ⇒ the orchestrated score-all path (byte-equal-off, ADR-014). When wired,
+    /// the host backs it with a cosineTopK-capable routed index (`BASRoutedVectorIndexStorage`) for the
+    /// recall domain; NON-byte-equal (rowid tie-break + pre-filter truncation). The host owns the domain
+    /// (the closure captures it). This threads the opt-in through the standard `makeWithDefaults(
+    /// memoryPersistence:)` factory path — without it the seam is only reachable by constructing
+    /// `BASL8RoutedMemoryService` directly. DeviceTestApp leaves it nil while its durable index is
+    /// SQLite-only (no cosineTopK engine); on-device adoption is a documented follow-up (ADR-036).
+    public let cosineTopKSync:
+        (@Sendable (_ query: [Float], _ k: Int) -> [(atomID: String, score: Float)])?
     public init(
         loadAllAtoms: @escaping @Sendable () async -> [BASGovernedMemory],
         admitAtom: @escaping @Sendable (BASGovernedMemory) async -> Void,
         atomStore: any BASMemoryAtomStore,
         loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
-        upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil
+        upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
+        cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
+            -> [(atomID: String, score: Float)])? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.admitAtom = admitAtom
         self.atomStore = atomStore
         self.loadEmbedding = loadEmbedding
         self.upsertEmbedding = upsertEmbedding
+        self.cosineTopKSync = cosineTopKSync
     }
 }
 
