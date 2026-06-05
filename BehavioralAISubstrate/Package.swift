@@ -244,8 +244,13 @@ let package = Package(
         // `import Metal` UNGATED and ~60 consumer references reach
         // their types — so a watchOS compile of this target is NOT
         // currently verified to be the intended "schema-only stub"。
-        // A build-verified watchOS gating pass (the 10 files + their
-        // consumers) is tracked as a follow-up; see ADR-035。
+        // BUILD-VERIFIED FOLLOW-UP FINDING (ch1040): watchOS is broken
+        // PACKAGE-WIDE, not just here — `swift build` for watchOS fails
+        // at resolution on the vendored MLX deps, and (MLX stripped) in
+        // BASRuntimeCore's ungated CoreML `compileModel(at:)` BEFORE this
+        // target compiles. The 10-file gating is necessary-but-insufficient
+        // and can't be watchOS-build-verified, so it is NOT shipped。 See
+        // ADR-035 for the ≥4-layer scope + drop-watchOS / split-package options。
         .target(
             name: "BASMetalSubstrate",
             // M2184 chapter 七百五 第二刀 — BASMetalSubstrate

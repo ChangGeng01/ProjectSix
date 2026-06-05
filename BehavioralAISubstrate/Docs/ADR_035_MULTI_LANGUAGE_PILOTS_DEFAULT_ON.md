@@ -60,20 +60,48 @@ So: **flags default-ON, turn output byte-equal.** 红线 7 holds at the contract
   chronological record**, each accurate AT ITS chapter. They are history, not stale present-tense
   claims, and are intentionally left intact.
 
-## watchOS Metal gating — honest status (deferred, build-verification-dependent)
+## watchOS Metal gating — build-verified investigation (the gap is package-wide)
 
-The same audit found `BASMetalSubstrate`'s Package.swift comment overclaims that the target "compiles
-as a thin schema-only stub on watchOS". Reality: while most Metal source is `#if canImport(Metal)`-
-gated (43 sites), **10 Metal-using files still `import Metal` ungated**
-(`BASMambaSSMState`, `BASPlasticityFold`, and 8 `BASBuiltinKernels/*Kernel` files), and those 10 types
-are referenced by **~60 consumer sites** (3–8 external files each, plus internal non-gated files). So a
-watchOS compile of this target is **not** verified to be the intended stub.
+The audit found `BASMetalSubstrate`'s Package.swift comment overclaims that the target "compiles as a
+thin schema-only stub on watchOS". Reality: while most Metal source is `#if canImport(Metal)`-gated
+(43 sites), **10 Metal-using files still `import Metal` ungated** (`BASMambaSSMState`, `BASPlasticityFold`,
+and 8 `BASBuiltinKernels/*Kernel` files), referenced by **~60 consumer sites**.
 
-Decision: the Package.swift comment is corrected to state this honestly NOW. The **code** fix — granular
-`#if canImport(Metal)` gating of the 10 files **and** their ~60 consumer call-sites, the module's
-established convention — is **deferred to a dedicated, build-verified pass**, because it cannot be
-validated without compiling for a watchOS destination (unavailable in the current environment), and
-shipping a blind, likely-incomplete gating would violate 亏的不要上 / R1. Tracked as a follow-up.
+**Investigation (ch1040 follow-up — build-verified this time).** A dedicated follow-up ran the gating in
+an environment that DOES have the watchOS SDK (WatchOS 26.5 + WatchSimulator). It established two things
+and surfaced a third, larger one:
+
+1. **The gating premise HOLDS.** `canImport(Metal)` evaluates **false** against the watchOS SDK (verified:
+   a `#if canImport(Metal) #error(…) #endif` probe fires on the macOS SDK and is clean on the watchOS
+   SDK). So the granular `#if canImport(Metal)` convention would correctly exclude Metal on watchOS.
+2. **But `swift build`/`swift test` for watchOS cannot even RESOLVE this package.** The vendored
+   MLX/HuggingFace path-packages have internally-inconsistent watchOS deployment targets (`error: the
+   library 'Tokenizers'/'Hub' requires watchos 4.0, but depends on the product 'Jinja'/'HuggingFace'
+   which requires watchos 9.0`). Resolution fails before any source compiles. (MLX is a Metal-based ML
+   runtime; it cannot target watchOS regardless.)
+3. **Even with MLX temporarily stripped** (a throwaway manifest, reverted), the watchOS compile fails
+   FIRST inside `BASRuntimeCore` — `BASContextClassifierMLAdapter.swift:287`: `'compileModel(at:)' is
+   unavailable in watchOS` (an ungated CoreML API in the base dependency of everything) — **before**
+   `BASMetalSubstrate`'s 10 files are ever reached.
+
+**Conclusion: watchOS support is broken at ≥4 independent layers, not the 10 Metal files.** The
+package-wide watchOS-risky surface: MLX/HuggingFace deps (resolution) → BASRuntimeCore CoreML (1 file,
+the first failure) → BASMetalSubstrate (10 ungated Metal files, part of 19 Metal/MPS/CoreML files) →
+BASAppleAdapters (6 files) → BASHostKit (1 file). Gating only the 10 Metal files is **necessary but not
+sufficient** and **cannot be build-verified for watchOS** (resolution dies on MLX; the dep chain dies in
+RuntimeCore first). Per **亏的不要上 / R1**, that change is therefore **NOT shipped** — a large,
+unverifiable patch that does not make watchOS build would be lossy effort.
+
+**The real decision (operator's call), one of:**
+- **(A) Drop `.watchOS(.v11)` from the package platforms** — the honest move if watchOS is not genuinely
+  a target (the Metal/CoreML/MLX device-ML core fundamentally cannot run there). Smallest + truthful.
+- **(B) Extract the device-ML core** (BASMetalSubstrate + the CoreML/MLX adapters) into a separate
+  iOS/macOS-only package, leaving a genuinely watchOS-portable schema/runtime core — large; the only path
+  to *real* watchOS support.
+- **(C) Full package-wide gating pass** (the 10 Metal files + RuntimeCore CoreML + AppleAdapters + an
+  MLX-resolution split), build-verified per module — large, and still leaves MLX unusable on watchOS.
+
+Recommendation: **(A)** unless watchOS is a genuine product target, in which case **(B)**.
 
 ## Verification
 
