@@ -18,7 +18,9 @@ R1, 亏的不要上, conventional commits, no Co-Authored-By.
 | 1 | `BASAutoRouteRanker` → `+Tokenizer.swift`: the 5 BPE FFI passthroughs | `opaqueHandle` temporarily widened `fileprivate`→`internal` | BASChapter722Bpe* (30) |
 | 2 | `BASAutoRouteRanker` → `+Activations.swift`: gelu/silu routing + Swift fallbacks | public + private fallbacks moved together (no widening) | Activation/BASChapter711; cascade-digest (6) |
 | 3 | `BASBpeTokenizerHandle` class → `+Tokenizer.swift` (reunites the tokenizer domain) | `opaqueHandle` restored to `fileprivate` (widening reverted) | BASChapter722Bpe* (30) |
-| — | `BASAutoRouteRanker` net | **3802 → 3341 lines** | |
+| 5 | `BASAutoRouteRanker` → `+DreamLoop.swift`: L9 dream-loop / dominance-order (i32+f64) / telemetry + test seam (+`atomicAdd1`) | self-contained (no widening) | BASChapter748/836/838 (21) + cascade-digest (6) |
+| 6 | `BASAutoRouteRanker` → `+Mamba.swift`: Mamba SSM-scan routing (seq + parallel) | self-contained | mamba suites + cascade-digest (6) |
+| — | `BASAutoRouteRanker` net | **3802 → 2861 lines (−25%)** | |
 | 4 | `BASCognitiveBrain` → `BASCognitiveMetalKernels.swift` (collaborator actor) | **4226 → 3843 lines**; collaborator 502 | cascade-digest (6) + 113 kernel call-site tests + sovereign (29) |
 
 ## Honest correction of the audit (split 4)
@@ -46,6 +48,8 @@ trusting the sketch.)
 
 ## Remaining (mapped, not done)
 
-The remaining `BASAutoRouteRanker` FFI-routing domains (ledger/crypto, tribunal, KG-codec, dream-loop,
-mamba, int8) share `private` wire-format/hex helpers, so each needs a helper-widening step first —
-safe + byte-equal but entangled, diminishing cosmetic return. Left as an optional follow-up.
+The self-contained domains (tokenizer, activations, dream-loop, mamba) are **done**. The remaining
+`BASAutoRouteRanker` FFI-routing domains (ledger/crypto, tribunal, KG-codec, event-extractor,
+int8/aggregations, importance, organ-router) share `private` wire-format/hex helpers, so each needs a
+helper-widening step first — safe + byte-equal but entangled, diminishing cosmetic return. Left as an
+optional follow-up.
