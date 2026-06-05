@@ -44,11 +44,17 @@ side alone. The Explore agent + the plan both assumed a map existed; it didn't.
 
 ## Why this is NON-byte-equal (honest — the accepted semantic change)
 
-vs. the orchestrated score-all path, the cosineTopK path differs in two documented ways:
-1. **Tie-break**: the index orders by SQLite **rowid** at equal scores; the orchestrated path tie-breaks by
-   the content-derived **atomID** (a 红线 byte-determinism guarantee). Equal-score atoms may reorder.
-2. **Pre-filter truncation**: the index returns the top-K **before** the Swift floor/constitution filter,
-   so a result set that the score-all path would have reached deeper for (after filtering) can differ.
+The root cause: the index truncates to top-K **inside the engine, ordered by (score DESC, rowid)**, BEFORE
+the Swift floor/constitution filter — whereas the score-all path scores the full corpus, filters, and only
+then truncates. Both paths apply the SAME final `score DESC, atomID ASC` sort to whatever survives, so the
+difference is purely in *which atoms are members of* the top-K, never an independent reordering of the
+returned bundle. Two consequences:
+1. **Tie membership at the K-th boundary**: at equal cosine scores the engine keeps the lower **rowid**,
+   while the score-all path keeps the lower content-derived **atomID** (the 红线 byte-determinism order). A
+   tie straddling the K-th cut can therefore surface a different atom.
+2. **Pre-filter truncation**: an atom the score-all path would have reached deeper for (once the floor /
+   constitution filter removed higher-scored-but-filtered atoms) may fall outside the engine's pre-filter
+   top-K and never be considered at all.
 
 These are accepted (the operator chose perf-fast). The path is therefore **opt-in only** — the library
 default (`makeWithDefaults`, nil seam) keeps the byte-deterministic score-all path, so ADR-014 / 红线 7 hold

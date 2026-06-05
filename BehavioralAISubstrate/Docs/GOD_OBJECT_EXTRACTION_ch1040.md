@@ -79,3 +79,41 @@ split 4 needed **zero** widening. A `Duration→UInt64` build error in split 3 w
 byte-equality) green after **every** split; a 103-test sweep across 10 suites (determinism · cosine/matmul/
 ANE/flash kernels · facade+factory · history queries · health · pilots · all-pilots) green at HEAD. Pure
 relocation + visibility-only widening ⇒ byte-equal: every call site (`BASCognitiveBrain.x`) is unchanged.
+
+## DONE — `BASMemoryUsageTracker` fully decomposed (backlog decomp 1–3)
+
+The biggest backlog god-object (a SQL-heavy `actor`) was taken **2714 → 274 lines (−90%), under cap**, in
+3 byte-equal commits — base = init + stored props + public surface only:
+
+| Decomp | Extracted | New files | Base |
+|--------|-----------|-----------|------|
+| 1 | top-level value types (usage record / replay+audit log / WAL / summaries) | `+Records` (218) | 2714 → 2504 |
+| 2 | SQL primitives (record insert/upsert + the fetch* query family) | `+SQLPrimitives` (502) | 2504 → 2011 |
+| 3 | SQL core / flag-factory / ReplayLog+AuditLog+FTS / utility | `+SQLCore` (732), `+Factory` (94), `+ReplayAuditFTS` (755), `+Utility` (192) | 2011 → **274** |
+
+**Widening — HONEST full count (audit-corrected):** unlike the brain (6 of 17 members widened, minimal), the
+tracker's SQL methods are tightly interdependent, so the split widened a **much larger** surface. The
+pre-split monolith had **51** `private`/`fileprivate` declarations; the decomposed family has **13** — i.e.
+**~38 members widened to `internal`**: the SQL statement helpers (`readText`, `bindText`, the `fetch*` /
+`insert*` / `upsert*` / `ensure*Schema` / `runExec` family) AND, necessarily, the actor's **shared SQL-mode
+state** (the `db` `OpaquePointer` handle + the 6 in-memory dicts/sets/arrays). This is the inherent cost of
+the extension-relocation pattern on a state-coupled actor: a `private` member can't be reached from a method
+now in a sibling `+*.swift` file. It is **byte-equal** (visibility-only) and **contained in practice** — an
+audit grep confirmed *nothing outside the tracker's own `+*.swift` files* references any widened member, and
+the `db` handle carries an explicit comment that `internal` is not license for nonisolated access. But the
+encapsulation surface of `BASMemoryUsageTracker` *within* the `BASMemory` module did grow materially — this
+is the documented trade-off, recorded here rather than buried. (Where a widened helper turns out to be used
+by only one sibling file, re-narrowing to that file is a fair future cleanup.)
+
+**Verification:** `swift build` green per commit; 105 tests across 9 tracker/SQL/replay/aggregation/perf
+suites green at HEAD. Pure relocation + visibility-only widening ⇒ byte-equal; every call site unchanged.
+
+## Honest takeaway on the pattern (from the ch1040 全面 audit)
+
+The architecture audit's verdict: the `extension X {}` split is a **net win for "type-bag" files** (many
+unrelated top-level types in one file — split by extracting types, near-zero risk) but only **neutral** for a
+genuinely cohesive single-type monolith, where it fixes the 800-line *lint metric* without reducing the
+type's intrinsic complexity and forces `private→internal` widening. **Treat a forced `private→internal` as a
+smell flag:** if a split needs it, the seam may be wrong, and responsibility-extraction into a collaborating
+value type (as was done for `BASCognitiveMetalKernels`) is the better tool. The remaining backlog (45 files
+>800) should be triaged on this basis, not split mechanically.
