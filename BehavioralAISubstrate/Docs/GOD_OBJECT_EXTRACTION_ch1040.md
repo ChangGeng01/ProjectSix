@@ -53,5 +53,29 @@ trusting the sketch.)
 **DONE (ch1040 WS1):** `BASAutoRouteRanker` is now **fully decomposed** — every routing domain lives in
 its own `+Domain.swift` (17 files) and the base is **502 lines, under the 800-line cap**. The shared
 `private` wire-format helpers were lifted to `+WireFormat.swift` (widened `internal`); the remaining
-domains were extracted in one verified single-pass. `BASCognitiveBrain` keeps its collaborator split
-(split 4); its further reduction is governed by the same "stateful, not pure" finding above.
+domains were extracted in one verified single-pass.
+
+## DONE — `BASCognitiveBrain` fully decomposed (brain splits 1–4)
+
+After the collaborator split above (which corrected the audit's "pure kernels" premise), the brain was
+**3846 → 634 lines (−84%), now under the 800-line cap**, across 4 byte-equal `extension BASCognitiveBrain`
+splits (the designated inits + the core `process` loop + memory-session boundaries stay in the actor body
+— Swift requires designated inits in-type):
+
+| Split | Extracted | New files | Base |
+|-------|-----------|-----------|------|
+| 1 | top-level value types (Codable snapshots) | `+ResultTypes` (406), `+PilotTypes` (459) | 3846 → 3011 |
+| 2 | math/Metal kernels (cosine/rmsnorm/matmul/attention + ANE ch999/ch1000 8-op) | `+Kernels` (279), `+KernelsANE` (595) | 3011 → 2172 |
+| 3 | summary DTO · derived signals · history queries · pilots · health | `+Summary` (517), `+Pilots` (360), `+Health` (268) | 2172 → 1079 |
+| 4 | static factories + safety/risk verdict + cascade digest | `+Construction` (214), `+SafetyVerdict` (271) | 1081 → **634** |
+
+**Widening (all byte-equal, visibility-only):** split 2 widened `metalKernels` `private→internal`; split 3
+widened 5 actor members the moved methods read (`summaryHistory`, `currentNanos` `private→internal`;
+`metalSignalThreshold`, `summaryCallCount`, `healthSnapshotAutoCaptureEvery` `fileprivate→internal`);
+split 4 needed **zero** widening. A `Duration→UInt64` build error in split 3 was a *cascade* from
+`currentNanos` being inaccessible — it vanished once that member was widened (not an independent bug).
+
+**Verification:** `swift build` green per split; `BASCognitiveBrainCascadeDigestTests` (6, full-turn
+byte-equality) green after **every** split; a 103-test sweep across 10 suites (determinism · cosine/matmul/
+ANE/flash kernels · facade+factory · history queries · health · pilots · all-pilots) green at HEAD. Pure
+relocation + visibility-only widening ⇒ byte-equal: every call site (`BASCognitiveBrain.x`) is unchanged.
