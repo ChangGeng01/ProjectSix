@@ -103,6 +103,14 @@ unverifiable patch that does not make watchOS build would be lossy effort.
 
 Recommendation: **(A)** unless watchOS is a genuine product target, in which case **(B)**.
 
+**Resolution (ch1040): option (A) taken.** `.watchOS(.v11)` was removed from the package's `platforms`
+array, so the package no longer ADVERTISES watchOS support (the false claim is gone) and iOS/macOS stay
+byte-equal (macOS build green). Caveat, recorded honestly: SwiftPM has no "exclude platform" primitive —
+a caller can still *force* a watchOS cross-build (`--triple arm64-apple-watchos…`), which now falls back
+to SPM's default watchOS minimum and **still fails on the vendored MLX deps**. That residual is inherent
+SwiftPM behavior, not a claim made by this package; genuine watchOS support remains the **(B)**
+split-package effort if it is ever actually wanted.
+
 ## Verification
 
 `swift build` green (macOS); the flags-file and Package.swift changes are comment-only → no behavioral

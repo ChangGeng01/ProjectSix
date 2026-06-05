@@ -5,8 +5,12 @@ import PackageDescription
 let package = Package(
     name: "BehavioralAISubstrate",
     platforms: [
+        // watchOS was DROPPED at ch1040 (ADR-035 option A): it was broken
+        // package-wide (the vendored MLX deps fail to resolve for watchOS,
+        // and BASRuntimeCore's CoreML + BASMetalSubstrate's Metal cannot
+        // compile there) and was never a real target for a Metal/CoreML/MLX
+        // device-ML substrate. Re-adding it requires the ADR-035 §watchOS work.
         .iOS(.v18),
-        .watchOS(.v11),
         .macOS(.v14)
     ],
     products: [
@@ -237,20 +241,14 @@ let package = Package(
         //   - Accelerate      — vDSP / BNNS fallback paths
         //   - CoreML          — MLMultiArray bridge for ANE dispatch
         //
-        // watchOS has no Metal; the framework LINKS below are
-        // platform-gated (.when(platforms: [.iOS, .macOS]))。
-        // HONEST STATUS (audit ch1040): most Metal source is
-        // `#if canImport(Metal)`-gated, but 10 Metal-using files still
-        // `import Metal` UNGATED and ~60 consumer references reach
-        // their types — so a watchOS compile of this target is NOT
-        // currently verified to be the intended "schema-only stub"。
-        // BUILD-VERIFIED FOLLOW-UP FINDING (ch1040): watchOS is broken
-        // PACKAGE-WIDE, not just here — `swift build` for watchOS fails
-        // at resolution on the vendored MLX deps, and (MLX stripped) in
-        // BASRuntimeCore's ungated CoreML `compileModel(at:)` BEFORE this
-        // target compiles. The 10-file gating is necessary-but-insufficient
-        // and can't be watchOS-build-verified, so it is NOT shipped。 See
-        // ADR-035 for the ≥4-layer scope + drop-watchOS / split-package options。
+        // The framework LINKS below are platform-gated to iOS + macOS。
+        // NOTE (ch1040): the package's `.watchOS` platform was DROPPED
+        // (ADR-035 option A) — watchOS was broken package-wide (the
+        // vendored MLX deps fail to resolve for watchOS; BASRuntimeCore's
+        // CoreML + this target's 10 ungated `import Metal` files cannot
+        // compile there) and was never a real target for a Metal/CoreML/MLX
+        // device-ML substrate. The `#if canImport(Metal)` gating elsewhere
+        // in this module stays as defensive practice (harmless on iOS/macOS)。
         .target(
             name: "BASMetalSubstrate",
             // M2184 chapter 七百五 第二刀 — BASMetalSubstrate
