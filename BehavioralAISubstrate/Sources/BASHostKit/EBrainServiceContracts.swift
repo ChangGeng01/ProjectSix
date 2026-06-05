@@ -237,18 +237,7 @@ public extension BASNeuralCoreServicing {
             mergedChoice: mergedChoice,
             riskCard: riskCard,
             actionPermit: actionPermit,
-            riskLevelResolver: { score in
-                switch score {
-                case ..<0.35:
-                    return .low
-                case ..<0.60:
-                    return .medium
-                case ..<0.82:
-                    return .high
-                default:
-                    return .extreme
-                }
-            }
+            riskLevelResolver: { BASRiskBandThresholds.band(for: $0) }
         )
     }
 
@@ -450,16 +439,7 @@ public extension BASRiskServicing {
     }
 
     func riskLevel(for score: Double) -> BASBrainRiskLevel {
-        switch score {
-        case ..<0.35:
-            return .low
-        case ..<0.60:
-            return .medium
-        case ..<0.82:
-            return .high
-        default:
-            return .extreme
-        }
+        BASRiskBandThresholds.band(for: score)
     }
 }
 
