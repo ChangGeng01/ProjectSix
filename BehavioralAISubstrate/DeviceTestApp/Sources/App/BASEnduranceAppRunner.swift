@@ -431,6 +431,17 @@ final class BASEnduranceAppController: ObservableObject {
         // on-device endurance run gathers ADR-022 §6 parity evidence。
         let shadowParityEnabled =
             (env["BAS_SHADOW_PARITY"] ?? "") == "enabled"
+        // ch1066 全面修复 — OPT-IN gate for the WS2 fabric-authoritative N→N+1
+        // feed-forward (default OFF). DEFAULT-ON regressed the on-device endurance
+        // run: the enriched prompt (raw + fabric JSON conclusions) fed to the
+        // UNBOUNDED MLX decoder (`adapter.draft`, ~line 948) wedged the small 4-bit
+        // gemma into a runaway/repetition decode at iter=1 prompt=2 — EVERY run today
+        // froze there, vs June-4's 2408 iters on raw prompts (same device, looser
+        // memory). Default OFF restores the verified June-4 behavior (ADR-014 opt-in /
+        // R1 不上未验证). Set `BAS_FABRIC_AUTH_FEEDFORWARD=1` only after the enriched-
+        // prompt decode is proven non-wedging on-device.
+        let fabricAuthFeedForward =
+            (env["BAS_FABRIC_AUTH_FEEDFORWARD"] ?? "0") == "1"
         // ch 1025.10 — monotonic run start(NTP/DST-safe)。
         let runStartNs = monoNowNs()
 
@@ -891,7 +902,11 @@ final class BASEnduranceAppController: ObservableObject {
                         maxRounds: 5,
                         baseTurnID: "ch1062-i\(iter)-p\(p)",
                         nowNanos: Int64(bitPattern: monoNowNs())))
-                if let proj = authLoop.finalProjection {
+                // ch1066 — feed-forward is OPT-IN (default OFF; see fabricAuthFeedForward).
+                // The loop above still runs + logs (WS2 stays observable); we just do NOT
+                // fold the enriched conclusions into the next prompt's MLX input unless the
+                // operator opted in — that fold wedged the unbounded on-device decoder.
+                if fabricAuthFeedForward, let proj = authLoop.finalProjection {
                     pendingEnrichedPrompt = nextRaw.isEmpty
                         ? proj.contextBlock
                         : nextRaw + "\n\n" + proj.contextBlock

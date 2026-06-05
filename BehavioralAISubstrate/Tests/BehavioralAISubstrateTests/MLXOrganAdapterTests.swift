@@ -233,6 +233,40 @@ final class MLXOrganAdapterTests: XCTestCase {
             "scout and core must produce distinct temperatures " +
             "(otherwise the two-tier organ contract is broken)")
     }
+
+    // ch1066 全面修复 — the decode MUST be bounded. Before this fix
+    // `_generateParameters` never set `params.maxTokens`, so generation relied SOLELY
+    // on the model emitting EOS; a small 4-bit model on a structured/adversarial prompt
+    // could run away unbounded → the caller's turn wedged (on-device: every endurance
+    // run froze INSIDE `draft` at iter=1 prompt=2 for minutes, then SIGKILL). These pin
+    // that EVERY decode is now capped — honoring the per-request cap, else the
+    // descriptor's contracted max — so `maxTokens` is NEVER nil (nil = unbounded).
+    func testGenerateParametersBoundsDecodeToDescriptorMaxByDefault() async {
+        let adapter = MLXOrganAdapter()  // default descriptor maxOutputTokens = 4096
+        let params = await adapter._generateParameters(for: .core)
+        XCTAssertEqual(
+            params.maxTokens, 4096,
+            "an unset per-request cap must fall back to the descriptor's contracted " +
+            "maxOutputTokens — never nil (nil = unbounded decode = the iter=1 wedge)")
+    }
+
+    func testGenerateParametersHonorsExplicitPerRequestCap() async {
+        let adapter = MLXOrganAdapter()
+        let params = await adapter._generateParameters(
+            for: .core, maxOutputTokens: 256)
+        XCTAssertEqual(
+            params.maxTokens, 256,
+            "an explicit per-request maxOutputTokens must cap the decode")
+    }
+
+    func testGenerateParametersCustomDescriptorMaxBoundsDecode() async {
+        let adapter = MLXOrganAdapter(maxOutputTokens: 512)
+        let params = await adapter._generateParameters(for: .core)
+        XCTAssertEqual(
+            params.maxTokens, 512,
+            "the descriptor's maxOutputTokens must bound the decode when no " +
+            "per-request cap is supplied")
+    }
     #endif
 
     // MARK: - 7. Prompt builder coverage (M226)

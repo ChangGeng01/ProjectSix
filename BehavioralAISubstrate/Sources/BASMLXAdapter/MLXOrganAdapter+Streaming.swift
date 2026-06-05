@@ -67,7 +67,8 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
             container,
             instructions: Self.systemInstructions(for: request),
             generateParameters: self._generateParameters(
-                for: request.preset))
+                for: request.preset,
+                maxOutputTokens: request.maxOutputTokens))
 
         let prompt = Self.prompt(for: request)
         var cumulative = ""

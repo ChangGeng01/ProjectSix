@@ -114,11 +114,22 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// extension in `MLXOrganAdapter+Streaming.swift` can reuse the
     /// same translation rule the non-streaming `draft(_:)` uses.
     func _generateParameters(
-        for preset: BASOrganPreset
+        for preset: BASOrganPreset,
+        maxOutputTokens: Int? = nil
     ) -> GenerateParameters {
         var params = GenerateParameters()
         params.temperature = Float(preset.temperature)
         params.topP = Float(preset.topP)
+        // ch1066 全面修复 — ENFORCE the decode bound. Previously unset, so generation
+        // relied ENTIRELY on the model emitting EOS; a small 4-bit model fed a
+        // structured/adversarial prompt can fail to stop → unbounded decode → the
+        // caller's turn wedges (observed on-device: every endurance run froze INSIDE
+        // `draft` at iter=1 prompt=2 for minutes, then SIGKILL). The descriptor already
+        // CONTRACTS `maxOutputTokens` (default 4096) yet the decode never honored it —
+        // a latent contract violation affecting every consumer. Honor the per-request
+        // cap when supplied, else the descriptor's contracted max. Normal responses
+        // (well under the cap) are unaffected; only a runaway is bounded.
+        params.maxTokens = maxOutputTokens ?? descriptor.maxOutputTokens
         return params
     }
     #endif
@@ -321,7 +332,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             container,
             instructions: Self.systemInstructions(for: request),
             generateParameters: _generateParameters(
-                for: request.preset))
+                for: request.preset,
+                maxOutputTokens: request.maxOutputTokens))
 
         let prompt = Self.prompt(for: request)
         let rawBody = try await session.respond(to: prompt)
@@ -407,7 +419,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 instructions:
                     Self.systemInstructions(for: request),
                 generateParameters: _generateParameters(
-                    for: request.preset))
+                    for: request.preset,
+                    maxOutputTokens: request.maxOutputTokens))
             box = ChatSessionBox(session: fresh)
             sessions[key] = box
         }
