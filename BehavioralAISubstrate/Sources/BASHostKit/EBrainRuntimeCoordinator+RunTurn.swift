@@ -255,23 +255,6 @@ extension BASEBrainRuntimeCoordinator {
             return (thoughtFrame, passFindings, thoughtArtifacts)
         }
 
-        // A terminal stop ends the deliberation loop immediately; a
-        // non-terminal stop (the common converged case) lets it keep
-        // refining up to the requested budget. Exhaustive switch so a
-        // new stop reason forces an explicit terminal/non-terminal
-        // decision here.
-        func isTerminalDeliberationStop(
-            _ stopReason: BASThoughtStopReason?
-        ) -> Bool {
-            switch stopReason {
-            case .blocked, .replaced, .maxLoopsReached, .guardTakeover:
-                return true
-            case .none, .candidateStable, .riskConverged,
-                 .uncertaintyBelowThreshold:
-                return false
-            }
-        }
-
         // First deliberation pass — empty prior set → byte-equal with
         // the pre-P1 single pass (红线 7 identity).
         var (thoughtFrame, loopFindings, thoughtArtifacts) = runDeliberationPass([])
@@ -2058,6 +2041,24 @@ extension BASEBrainRuntimeCoordinator {
                     yaochiSanctumEntry:
                         kunlunYaochiSanctumForAudit)
         )
+    }
+
+    /// A terminal stop ends the deliberation loop immediately; a non-terminal
+    /// stop (the common converged case) lets it keep refining up to the
+    /// requested budget. Exhaustive switch so a new stop reason forces an
+    /// explicit terminal/non-terminal decision. (ch1040: lifted out of
+    /// runTurn's deliberation loop — a zero-capture pure predicate, so the
+    /// in-loop call site resolves to this method unchanged; byte-equal.)
+    private func isTerminalDeliberationStop(
+        _ stopReason: BASThoughtStopReason?
+    ) -> Bool {
+        switch stopReason {
+        case .blocked, .replaced, .maxLoopsReached, .guardTakeover:
+            return true
+        case .none, .candidateStable, .riskConverged,
+             .uncertaintyBelowThreshold:
+            return false
+        }
     }
 
     /// M275 — async wrapper that runs a turn AND auto-flows
