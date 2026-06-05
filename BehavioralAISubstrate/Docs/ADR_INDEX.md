@@ -5,10 +5,10 @@
 > `Docs/ADR_NNN*.md` files. This index maps EVERY referenced ADR to where its doctrine
 > actually lives, so a reader who hits an `ADR-NNN` comment never has to hunt for a
 > missing file. Built by grepping all `ADR-NNN` tokens across `Sources/` + `Docs/`
-> (complete set, not a sample). ADR-026–034 were appended to this index as the chapters
+> (complete set, not a sample). ADR-026–035 were appended to this index as the chapters
 > that introduced them landed.
 
-## The complete reference set (22 ADRs — 21 active + ADR-013 ghost)
+## The complete reference set (23 ADRs — 22 active + ADR-013 ghost)
 
 | ADR | Topic | Defining location | Kind |
 |---|---|---|---|
@@ -34,6 +34,7 @@
 | **ADR-032** | **Governance enablement — observe-mode ON by default** (ch1059): response to 「全面启用 能够启用的 最严谨」 — enable the SAFE subset (`BASLLMContractInstall.observeOnly` contracts+traces every LLM call at all three sites, never rejects → output byte-equal) + REFUSE the unsafe subset (rejection / crypto commit-verifier / dual-key / fabric-authoritative / deny-conditions — each needs a deliberate host keyring/policy; R1 / 亏的不要上). §13 #12 now met by default with zero output change | **`Docs/ADR_032_GOVERNANCE_ENABLEMENT.md`** | behavioral |
 | **ADR-033** | **Wiring the real capabilities onto the cognitive main chain** (5-step arc): move the real memory (MiniLM-L6-v2 CoreML embedder + cross-restart-durable SQL/vector index), native stage executors, Metal/Mamba, and the agent fabric ONTO (or honestly BESIDE) the default `process()` cascade — HOST-INJECTED, `makeWithDefaults()` stays legacy/byte-equal-off. **§Step-5** = the single-shot Agent Fabric authoritative feed-forward projection (turn N's accepted deltas → turn N+1 `userInput`), the foundation ADR-034 extends. On-device one-turn proof on iPhone Air (iOS 26.5). SHIPPED, opt-in/byte-equal-off | **`Docs/ADR_033_MAIN_CHAIN_WIRING.md`** | behavioral |
 | **ADR-034** | **Agent Fabric multi-round AUTHORITATIVE loop**: iterate the fabric to a content-digest fixpoint + the host-callable composition (`BASAgentFabricAuthoritativeTurn`) that makes ADR-033 §Step-5's feed-forward FUNCTIONAL end-to-end (`turnResult → loop → enriched next request`). Surfaced + fixed two real-fabric bugs the stub fixtures masked: the `delta:`-prefix dead projection (Step-5 was inert end-to-end) + content-digest convergence (per-round turnID-stamped deltaIDs never reached a fixpoint). Additive / opt-in / byte-equal-off / INPUT-class / verdict-gated (不变量 #2; 红线 7; ch883). SHIPPED | **`Docs/ADR_034_AGENT_FABRIC_MULTI_ROUND_AUTHORITATIVE_LOOP.md`** | behavioral |
+| **ADR-035** | **Multi-language pilots default-ON** (sanctioned opt-OUT inversion) + watchOS gating status: per the 「全面 转向 多个 语言」 directive the 5 SQL/C/Metal/C++/Rust pilots ship `perFlagDefaults` all-TRUE (chapters 七百十一-七百十二). Records WHY this stays byte-equal at TURN OUTPUT (no substrate caller routes a pilot into `BASEBrainTurnResult`; the live brain uses direct-init V1; pinned `substrateInternalFactoryCallSiteCount = 0`), reconciles the flags file's stale "ALL FALSE" doctrine (the audit's headline self-contradiction), and records the HONEST watchOS status (10 ungated `import Metal` files + ~60 consumers → a build-verified gating pass is a deferred follow-up) | **`Docs/ADR_035_MULTI_LANGUAGE_PILOTS_DEFAULT_ON.md`** | behavioral (honest reconciliation) |
 
 ## Related contracts that are NOT numbered ADRs
 - **红线 7** (additive byte-equal safety invariant) — stated in `ADR_014_OPT_IN_DOCTRINE.md` §4 + `L8_ARC_SEAL.md`.

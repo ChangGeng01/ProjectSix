@@ -12,14 +12,17 @@
 // per-language pilots (SQL,C,Metal,C++,Rust) on top
 // of the chapter 701 scaffold。
 //
-// EVERY pilot must be opt-in per ADR-014 OPT-OUT — V1
-// Swift byte path stays default。 This actor centralizes
-// the 5 boolean flags that gate each pilot's consumer
-// site。 Default values:ALL FALSE → V1 Swift path is
-// the only path that fires under default configuration。
+// This actor centralizes the 5 boolean flags that gate each
+// pilot's consumer site。 Default values: as of chapters 七百十一-
+// 七百十二 (the 「全面 转向」 completion) ALL FIVE default to TRUE —
+// the pilots ship opt-OUT, not opt-in。 This stays byte-equal at
+// TURN OUTPUT (not by keeping the flags off): NO substrate caller
+// routes a pilot factory into `BASEBrainTurnResult`, so the live turn
+// is byte-identical regardless of the flags。 See the "Honest scope
+// acknowledgment" on `perFlagDefaults` below + ADR-035 for the proof。
 //
-// Hosts that want to exercise a pilot call
-// `setFlag(.sqlMigratorEnabled, true)` etc。
+// Hosts that need the V1 byte path pin it per-flag with
+// `setFlag(.sqlMigratorEnabled, false)` etc。
 //
 // The actor isolates flag state so concurrent readers
 // + writers don't race。 Hot-path consumers read once
@@ -55,17 +58,15 @@
 //     Actor (Rust XCFramework) instead of Swift。
 //     SQLite-mode unchanged。
 //
-// ## Default-off discipline
+// ## Default discipline (opt-OUT since chapters 七百十一-七百十二)
 //
-// All 5 flags default to false。 The 748-byte-equality-
-// clean-commits invariant is preserved by construction:
-// every test that doesn't explicitly flip a flag stays
-// on the V1 Swift path,producing identical bytes to
-// pre-M2167 substrate。
-//
-// chapter 702-706 pilot chapters add dual-mode tests
-// that flip a single flag and assert byte-equality
-// against the V1 baseline。
+// All 5 flags default to TRUE (`perFlagDefaults`, below)。 The
+// byte-equality invariant is preserved AT TURN OUTPUT, not by
+// keeping the flags off: no substrate caller routes a pilot factory
+// into a turn result, so `BASEBrainTurnResult` is byte-identical
+// regardless of the flags。 A HOST that adopts a pilot factory gets a
+// V2 path that is itself byte-equality-verified against V1 (chapter
+// 七百二 dual-mode schema + I/O tests)。 See ADR-035。
 
 import Foundation
 
@@ -218,12 +219,11 @@ public actor BASLanguageAugmentationFeatureFlags {
 
     private var state: [Flag: Bool]
 
-    /// Default-off initializer:every flag's value derived
-    /// from `effectiveDefault(for:)`。 ADR-014 OPT-OUT
-    /// preserved AS LONG AS `perFlagDefaults` stays empty。
-    /// A future commit that sets a per-flag default to
-    /// true will flip THAT flag's init value (the desired
-    /// production-wire-in semantic)。
+    /// Default initializer:every flag's value derived from
+    /// `effectiveDefault(for:)` — which, since chapters 七百十一-七百十二,
+    /// is TRUE for all 5 pilots (`perFlagDefaults`)。 Byte-equality is
+    /// held at TURN OUTPUT (no substrate caller routes a pilot into a
+    /// result), NOT by an empty `perFlagDefaults`。 See ADR-035。
     public init() {
         var initial: [Flag: Bool] = [:]
         for flag in Flag.allCases {
@@ -270,7 +270,8 @@ public actor BASLanguageAugmentationFeatureFlags {
     /// (per-flag default if defined,else global false)。
     /// Renamed semantic since M2199:was "every flag is
     /// false";now "every flag is at its effective default"。
-    /// Behavior identical while `perFlagDefaults` is empty。
+    /// (`perFlagDefaults` is fully populated now — all 5 true — so this
+    /// reports true iff every flag is at its TRUE default; see ADR-035。)
     public func allDefault() -> Bool {
         for flag in Flag.allCases {
             let current = state[flag]

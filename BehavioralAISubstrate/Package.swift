@@ -237,10 +237,15 @@ let package = Package(
         //   - Accelerate      — vDSP / BNNS fallback paths
         //   - CoreML          — MLMultiArray bridge for ANE dispatch
         //
-        // watchOS has no Metal; framework links are gated by
-        // platform inside source files via `#if canImport(Metal)`。
-        // The target itself compiles as a thin schema-only stub
-        // on watchOS so BASRuntimeCore consumers stay portable。
+        // watchOS has no Metal; the framework LINKS below are
+        // platform-gated (.when(platforms: [.iOS, .macOS]))。
+        // HONEST STATUS (audit ch1040): most Metal source is
+        // `#if canImport(Metal)`-gated, but 10 Metal-using files still
+        // `import Metal` UNGATED and ~60 consumer references reach
+        // their types — so a watchOS compile of this target is NOT
+        // currently verified to be the intended "schema-only stub"。
+        // A build-verified watchOS gating pass (the 10 files + their
+        // consumers) is tracked as a follow-up; see ADR-035。
         .target(
             name: "BASMetalSubstrate",
             // M2184 chapter 七百五 第二刀 — BASMetalSubstrate
