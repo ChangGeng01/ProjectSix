@@ -283,13 +283,22 @@ public actor BASMPSGraphMatMulKernel: BASMetalKernel {
             leftMatrix: matrixA,
             rightMatrix: matrixB,
             resultMatrix: matrixC)
-        commandBuffer.commit()
-        // Swift concurrency-aware wait for the GPU。
-        // `completed()` is the async-context counterpart
-        // of the now-deprecated `waitUntilCompleted()`。
-        // Returns when the command buffer reaches
-        // .completed status (success or failure)。
-        _ = await commandBuffer.completed()
+        // Swift concurrency-aware GPU wait — register the completion
+        // handler BEFORE commit() so a fast GPU (the A19 finishing a tiny
+        // 4×4 matmul in microseconds) can never complete the buffer before
+        // the await observes it. The prior `commit(); await commandBuffer
+        // .completed()` form had a missed-completion race that
+        // deterministically HUNG on iPhone Air (the ch1034 mpsgraph launch
+        // probe) while passing on the slower-timed Mac GPU. Mirrors the
+        // race-free pattern every sibling dispatcher uses (FlashAttention /
+        // CosineSimilarity / SSMScan / Attention / KernelLibraryLoader).
+        await withCheckedContinuation {
+            (cont: CheckedContinuation<Void, Never>) in
+            commandBuffer.addCompletedHandler { _ in
+                cont.resume()
+            }
+            commandBuffer.commit()
+        }
         if let err = commandBuffer.error {
             throw BASKernelError
                 .deviceDispatchFailure(
