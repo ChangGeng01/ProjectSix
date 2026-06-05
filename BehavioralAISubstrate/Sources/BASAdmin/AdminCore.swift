@@ -1251,16 +1251,12 @@ public struct BASConsoleView: View {
 
     @ViewBuilder
     private func platformSelectableBrainSummary(_ summary: String) -> some View {
-        #if os(watchOS)
-        Text(summary)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        #else
+        // watchOS was dropped at ch1040 (Package.swift = iOS + macOS only),
+        // so the former `#if os(watchOS)` branch was dead. iOS/macOS path only.
         Text(summary)
             .font(.caption)
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
-        #endif
     }
 
     private func runtimeKillSwitchSummary(from runtimeSummary: String) -> String? {

@@ -375,7 +375,10 @@ let package = Package(
         .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability"]),
         .target(
             name: "BASEvaluation",
-            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability"]
+            // Memory + Policy dropped (audit ch1040): no BASEvaluation source imports them —
+            // the module documents intentional isolation from both. BASObservability remains
+            // (and transitively provides them if ever needed). Aligns manifest with actual usage.
+            dependencies: ["BASRuntimeCore", "BASObservability"]
         ),
         .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASEvaluation", "BASWorldPrior"]),
         .target(
