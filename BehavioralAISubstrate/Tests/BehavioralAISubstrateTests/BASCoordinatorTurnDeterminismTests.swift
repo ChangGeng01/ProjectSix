@@ -95,4 +95,84 @@ final class BASCoordinatorTurnDeterminismTests: XCTestCase {
             r1.updateTickets.isEmpty, "the non-empty updateTickets path must be exercised")
         assertConsequentialEqual(r1, r2, "non-empty-evolution")
     }
+
+    // MARK: - 5) The HIGH-CONSEQUENCE turn shape is replay-stable (not just benign)
+
+    /// ch1044 DEFER-3 gap-closure (audit follow-up). Guards 1–4 only ever drove the
+    /// BENIGN shape (`StubRisk` → `.low` / `.answer`, no `requireSecondCheck`), so the
+    /// consequential branches that actually matter — the `requireSecondCheck →
+    /// .renderHighRisk` commit token (`+SovereignCommit.swift:76`), a non-`.pass`
+    /// verdict's `sovereignLock`, the permit-driven revocations — were `nil`/empty in
+    /// every covered case, and the replay-equality assertions passed VACUOUSLY
+    /// (`nil == nil`). A non-determinism (UUID / clock / random) introduced INSIDE one
+    /// of those branches would have slipped straight past guards 1–4. This drives a
+    /// high-risk turn (`requireSecondCheck: true`, high risk card, `.delay` mode →
+    /// protected-write lane), ASSERTS the high-consequence path actually fires
+    /// (non-vacuity), then asserts the consequential decision is replay-stable.
+    func testHighConsequenceTurnIsReplayStable() {
+        let coordinator = BASEBrainRuntimeCoordinator(
+            powerClockService: StubPowerClock(),
+            hostProfileService: StubHost(),
+            contextService: StubContext(),
+            decomposeService: StubDecompose(),
+            memoryService: StubMemory(),
+            loopService: StubLoop(),
+            triSelfService: StubTriSelf(),
+            riskService: HighRiskStub(),
+            actionService: StubAction(),
+            evolutionService: DeterministicTicketStubEvolution())
+        let request = BASCoordinatorTestStubs.makeStubRequest(
+            userInput: "execute the irreversible high-risk action now")
+        let r1 = coordinator.runTurn(request)
+        let r2 = coordinator.runTurn(request)
+
+        // Non-vacuity guard: the high-risk turn MUST populate a high-consequence field,
+        // otherwise the replay-equality below is the same vacuous nil==nil the benign
+        // guards (1–4) already had. We accept any of the three consequential branches
+        // the audit named (which one fires depends on the exact escalation level).
+        let exercisedHighConsequence =
+            r1.sovereignCommitTokens.contains { $0.scope == .renderHighRisk }
+            || r1.sovereignLock != nil
+            || !r1.quarantineRecords.isEmpty
+        XCTAssertTrue(
+            exercisedHighConsequence,
+            "the high-risk turn must populate a high-consequence field (renderHighRisk " +
+            "token / sovereignLock / quarantine); empty ⇒ this guard would be vacuous")
+
+        assertConsequentialEqual(r1, r2, "high-consequence")
+    }
+
+    /// A risk service producing a HIGH-CONSEQUENCE turn: a high/irreversible risk card
+    /// plus a permit that requires a second check (`requireSecondCheck: true`) and a
+    /// `.delay` mode (→ `needsProtectedWriteLane`). This reaches the consequential
+    /// commit-token / lock branches the benign `StubRisk` never does.
+    struct HighRiskStub: BASRiskServicing {
+        func calibrateRisk(
+            contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame,
+            triScores: [BASTriSelfScore], budget: BASBudgetFrame
+        ) -> BASRiskCard {
+            BASRiskCard(
+                totalRisk: 0.85, riskLevel: .high, factors: ["stub.high"],
+                uncertainty: 0.3, irreversibility: 0.9, manipulationStrength: 0.6,
+                gsiScore: 0.85, recommendedMode: .delay)
+        }
+        func computeGSI(
+            contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame
+        ) -> Double { 0.85 }
+        func gateAction(
+            contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame,
+            triScores: [BASTriSelfScore], budget: BASBudgetFrame
+        ) -> (BASRiskCard, BASActionPermit) {
+            (calibrateRisk(
+                contextFrame: contextFrame, thoughtFrame: thoughtFrame,
+                triScores: triScores, budget: budget),
+             BASActionPermit(
+                mode: .delay,
+                reasonCodes: ["stub.high"],
+                requireSecondCheck: true,
+                outputLengthCap: 100,
+                tonePolicy: "neutral",
+                templatePolicy: "default"))
+        }
+    }
 }
