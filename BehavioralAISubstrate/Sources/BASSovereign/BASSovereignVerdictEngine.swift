@@ -289,6 +289,22 @@ public actor BASSovereignVerdictEngine {
     /// level from the SAME context without an async ledger append — the single
     /// source of truth that makes accidental rule-drift impossible (ADR-024).
     public func evaluateLevel(_ context: VerdictContext) -> LevelDecision {
+        // The production default reads the (startup-stable) routing flag at
+        // exactly one point and delegates. The explicit-`useRouted` overload
+        // below lets tests exercise BOTH branches without mutating the shared
+        // `useRoutedVerdictLevel` static — which races under parallel test
+        // execution (the verdict engine is the safety arbiter; a concurrent
+        // reader must never observe a mid-flip value). byte-equal by
+        // construction: same global, same single read, same branch logic.
+        evaluateLevel(context, useRouted: Self.useRoutedVerdictLevel)
+    }
+
+    /// The pure level kernel with the routed-vs-Swift choice as an EXPLICIT
+    /// input (ADR-024: a deterministic function of its inputs — same context +
+    /// same `useRouted` → same decision). `evaluateLevel(_:)` passes the
+    /// production `useRoutedVerdictLevel` default; tests pass an explicit value
+    /// so they never mutate the shared static.
+    public func evaluateLevel(_ context: VerdictContext, useRouted: Bool) -> LevelDecision {
         // Stage 1: hard rules (Swift — produces hits metadata
         // for reasonCodes/revokedPermissions that the Rust port
         // does not return)。
@@ -297,7 +313,7 @@ public actor BASSovereignVerdictEngine {
         var level: BASSovereignVerdictLevel
         let softPinnedDomain: String?
 
-        if Self.useRoutedVerdictLevel,
+        if useRouted,
            let routedLevel = Self.routedDeriveLevel(
             hardObservations: context.hardObservations,
             softSignals: context.softSignals,

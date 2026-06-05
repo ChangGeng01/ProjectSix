@@ -111,9 +111,7 @@ final class BASChapter753VerdictEngineFlipTests: XCTestCase {
     /// 七百四十二 第三刀 fixture this is already pinned for the
     /// Rust port in isolation;this test pins it at the LIVE
     /// production seam (evaluate() with the flag flipped)。
-    func testRoutedVerdictMatchesV1SwiftAcross100Cases() async
-        throws
-    {
+    func testRoutedVerdictMatchesV1SwiftAcross100Cases() async {
         var rng = SplitMix64(state: 0xDEAD_BEEF_F00D_CAFE)
         let domains: [BASSovereignVerdictEngine
             .OperationDomain] = [
@@ -138,26 +136,25 @@ final class BASChapter753VerdictEngineFlipTests: XCTestCase {
                 operation: domain,
                 evidenceSufficient: evidence)
 
-            // Route ON
-            BASSovereignVerdictEngine
-                .useRoutedVerdictLevel = true
-            let routed = try await engine.evaluate(context)
+            // Compare the routed vs the V1-Swift level via the PURE kernel
+            // (the single source of truth that `evaluate()` builds around,
+            // ADR-024), passing the routing choice EXPLICITLY. This pins the
+            // exact branch the production global selects, WITHOUT mutating the
+            // shared `useRoutedVerdictLevel` static — so the test no longer
+            // races with any other suite reading that flag under parallel
+            // execution (the verdict engine is the safety arbiter)。
+            let routed = await engine.evaluateLevel(
+                context, useRouted: true).level
+            let v1 = await engine.evaluateLevel(
+                context, useRouted: false).level
 
-            // Route OFF — exact V1 Swift logic
-            BASSovereignVerdictEngine
-                .useRoutedVerdictLevel = false
-            let v1 = try await engine.evaluate(context)
-
-            if routed.verdictLevel != v1.verdictLevel {
+            if routed != v1 {
                 failures.append((
                     idx: i,
-                    routed: routed.verdictLevel.rawValue,
-                    swift: v1.verdictLevel.rawValue))
+                    routed: routed.rawValue,
+                    swift: v1.rawValue))
             }
         }
-
-        // Restore flag to default-on per chapter 七百五十三 第一刀
-        BASSovereignVerdictEngine.useRoutedVerdictLevel = true
 
         XCTAssertTrue(
             failures.isEmpty,
