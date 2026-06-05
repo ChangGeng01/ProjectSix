@@ -179,6 +179,7 @@ extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
         }
 
         var cumulative = ""
+        let responseCap = streamingMaxResponseBytes
         for try await line in bytes.lines {
             if Self.isSSEDoneLine(line) { return }
             guard let delta = Self.parseSSEDataLine(line) else {
@@ -186,6 +187,12 @@ extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
             }
             if delta.isEmpty { continue }
             cumulative += delta
+            // Pre-bounded: refuse an unbounded stream from a hostile / runaway
+            // endpoint instead of growing `cumulative` without limit.
+            if cumulative.utf8.count > responseCap {
+                throw BASOrganError.providerUnavailable(
+                    reason: "response-too-large:stream>\(responseCap)")
+            }
             continuation.yield(
                 BASOrganDraftChunk(
                     requestID: request.requestID,
@@ -212,5 +219,10 @@ extension BASChatCompletionsOrganAdapter {
     /// is Sendable in modern toolchains.
     package nonisolated var streamingURLSession: URLSession {
         nonisolatedURLSession
+    }
+
+    /// Response-body ceiling reachable from the nonisolated SSE pump.
+    package nonisolated var streamingMaxResponseBytes: Int {
+        nonisolatedMaxResponseBytes
     }
 }

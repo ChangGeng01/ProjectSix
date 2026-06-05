@@ -249,6 +249,43 @@ final class BASChatCompletionsOrganAdapterTests: XCTestCase {
         // care about.
     }
 
+    // MARK: - 4. Response-size cap (audit follow-up: bound a memory-DoS)
+
+    func testOversizeResponseBodyIsRejected() async {
+        StubURLProtocol.canned = (
+            200, okBody(String(repeating: "x", count: 8192)))
+        let adapter = BASChatCompletionsOrganAdapter(
+            endpoint: endpoint,
+            providerID: "test.cap",
+            providerName: "cap-test",
+            urlSession: makeStubbedSession(),
+            maxResponseBytes: 64)   // far below the ~8 KB canned body
+        do {
+            _ = try await adapter.draft(makeRequest())
+            XCTFail("an over-cap response must be rejected, not parsed")
+        } catch BASOrganError.providerUnavailable(let reason) {
+            XCTAssertTrue(
+                reason.hasPrefix("response-too-large"),
+                "expected a response-too-large rejection, got: \(reason)")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    func testUnderCapResponseStillByteEqual() async throws {
+        StubURLProtocol.canned = (
+            200, okBody("Gravity pulls things toward Earth."))
+        let adapter = BASChatCompletionsOrganAdapter(
+            endpoint: endpoint,
+            providerID: "test.cap.ok",
+            providerName: "cap-test",
+            urlSession: makeStubbedSession())   // default 32 MiB cap
+        let draft = try await adapter.draft(makeRequest())
+        XCTAssertEqual(
+            draft.body, "Gravity pulls things toward Earth.",
+            "an under-cap response is unaffected by the cap (byte-equal)")
+    }
+
     func testHTTP401MapsToProviderUnavailable() async {
         StubURLProtocol.canned = (
             401, Data(#"{"error":"unauthorized"}"#.utf8))

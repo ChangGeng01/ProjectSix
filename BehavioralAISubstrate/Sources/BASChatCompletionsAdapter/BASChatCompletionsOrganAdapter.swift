@@ -61,9 +61,16 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
         }
     }
 
+    /// Default response-body ceiling (32 MiB). Generous — no legitimate
+    /// chat-completions response approaches it — but bounds memory against a
+    /// hostile / misconfigured endpoint that returns a multi-GB body or an
+    /// unbounded stream. Hosts override per-endpoint via `init(maxResponseBytes:)`.
+    public static let defaultMaxResponseBytes: Int = 32 * 1024 * 1024
+
     public nonisolated let descriptor: BASOrganDescriptor
     private let endpoint: Endpoint
     private let urlSession: URLSession
+    private let maxResponseBytes: Int
 
     /// M210 — nonisolated mirrors of `endpoint` and `urlSession`
     /// so the streaming extension (which builds an
@@ -73,6 +80,8 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
     /// reading them off-actor is data-race-free.
     nonisolated let nonisolatedEndpoint: Endpoint
     nonisolated let nonisolatedURLSession: URLSession
+    /// Same nonisolated-mirror rationale — read by the streaming SSE pump.
+    nonisolated let nonisolatedMaxResponseBytes: Int
 
     public init(
         endpoint: Endpoint,
@@ -81,12 +90,16 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
         urlSession: URLSession = URLSession.shared,
         maxInputTokens: Int = 8_192,
         maxOutputTokens: Int = 4_096,
+        maxResponseBytes: Int =
+            BASChatCompletionsOrganAdapter.defaultMaxResponseBytes,
         supportedRoles: Set<BASOrganRole> = [.scout, .core]
     ) {
         self.endpoint = endpoint
         self.urlSession = urlSession
+        self.maxResponseBytes = max(1, maxResponseBytes)
         self.nonisolatedEndpoint = endpoint
         self.nonisolatedURLSession = urlSession
+        self.nonisolatedMaxResponseBytes = max(1, maxResponseBytes)
         self.descriptor = BASOrganDescriptor(
             providerID: providerID,
             providerName: providerName,
@@ -143,6 +156,17 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
         guard (200..<300).contains(http.statusCode) else {
             throw BASOrganError.providerUnavailable(
                 reason: "http-\(http.statusCode)")
+        }
+
+        // Bound the accepted body. HONEST RESIDUAL: `URLSession.data(for:)` has
+        // already buffered the full body by the time we reach here, so this guard
+        // bounds what we ACCEPT + parse (avoiding a second large allocation) but
+        // cannot stop the transport from buffering an over-cap body first. Hosts
+        // facing untrusted endpoints should prefer the streaming API (which IS
+        // pre-bounded — see `+Streaming.swift`) and/or set a small `maxResponseBytes`.
+        guard data.count <= maxResponseBytes else {
+            throw BASOrganError.providerUnavailable(
+                reason: "response-too-large:\(data.count)>\(maxResponseBytes)")
         }
 
         let bodyText = try Self.parseResponseBody(data)
