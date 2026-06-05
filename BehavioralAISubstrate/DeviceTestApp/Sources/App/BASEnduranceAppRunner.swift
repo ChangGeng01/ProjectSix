@@ -612,6 +612,36 @@ final class BASEnduranceAppController: ObservableObject {
                 "\(error) — falling back to bypass")
         }
 
+        // ch1062 WS2 — the Agent Fabric AUTHORITATIVE multi-round loop is now the
+        // DeviceTestApp endurance DEFAULT main-chain behavior (host opt-in; the library
+        // makeWithDefaults stays byte-equal-off). A second runtime in `.authoritative`
+        // mode drives the N→N+1 feed-forward enrichment in the per-prompt loop below:
+        // turn N's accepted fabric deltas fold into turn N+1's userInput (INPUT-class,
+        // verdict-gated — 红线 7 / 不变量 #2; the sovereign verdict stays sole authority).
+        let fabricAuthRuntime = BASAgentFabricRuntime(
+            roster: BASAgentTurnRoster(
+                scout: BASAgentSpec(
+                    agentID: "scout.1", role: .scout,
+                    writeDomains: [.situationField],
+                    defaultLeaseProfile: .hotSeat, visibility: .high),
+                planner: BASAgentSpec(
+                    agentID: "planner.1", role: .planner,
+                    writeDomains: [.candidateFrontier],
+                    defaultLeaseProfile: .hotSeat, visibility: .high),
+                risk: BASAgentSpec(
+                    agentID: "risk.1", role: .risk,
+                    writeDomains: [.riskField],
+                    defaultLeaseProfile: .hotSeat, visibility: .high),
+                surface: BASAgentSpec(
+                    agentID: "surface.1", role: .surface,
+                    writeDomains: [.renderFrame],
+                    defaultLeaseProfile: .hotSeat, visibility: .high)),
+            graph: BASSharedStateGraph(),
+            mode: .authoritative)
+        await emitBoth(
+            "📍 ch1062 fabric-authoritative runtime constructed " +
+            "(.authoritative mode — N→N+1 feed-forward DEFAULT-ON)")
+
         // MLX model load
         await emitBoth(
             "📍 ch1025 MLXOrganAdapter loading Gemma 4 E2B")
@@ -697,6 +727,9 @@ final class BASEnduranceAppController: ObservableObject {
         var iterCooldownThermalRecovery: [String] = []
         var allMlxLatenciesMs: [Double] = []
         var totalTokens = 0
+        // ch1062 WS2 — carries the fabric-authoritative enrichment from turn N into
+        // turn N+1's prompt (the N→N+1 feed-forward). nil ⇒ use the raw promptPool prompt.
+        var pendingEnrichedPrompt: String?
 
         for iter in 1...totalIters {
             let iterStartNs = monoNowNs()
@@ -725,9 +758,17 @@ final class BASEnduranceAppController: ObservableObject {
 
             var iterTokens = 0
             for p in 0..<mlxPrompts {
-                let prompt = Self.promptPool[
-                    (iter * mlxPrompts + p)
-                    % Self.promptPool.count]
+                // ch1062 WS2 — if the prior turn's authoritative loop produced an
+                // enriched input, use it (the N→N+1 feed-forward); else the raw prompt.
+                let prompt: String
+                if let enriched = pendingEnrichedPrompt {
+                    prompt = enriched
+                    pendingEnrichedPrompt = nil
+                } else {
+                    prompt = Self.promptPool[
+                        (iter * mlxPrompts + p)
+                        % Self.promptPool.count]
+                }
                 let promptLen = prompt.count
 
                 // ch 1025.5 — brain.process() exercises L1-L14 cascade
@@ -813,6 +854,35 @@ final class BASEnduranceAppController: ObservableObject {
                         "prompt=\(p+1) activated=false " +
                         "skip=pipeline_construct_failed")
                 }
+
+                // ch1062 WS2 — DEFAULT-ON Agent Fabric AUTHORITATIVE multi-round loop:
+                // run it on THIS turn's outputs, then fold the converged conclusions into
+                // the NEXT prompt's input (N→N+1). Deterministic: nowNanos pinned per turn;
+                // converges on the content digest. The enriched text enters turn N+1 as
+                // INPUT (userInput), gated by the sovereign verdict exactly as any input.
+                let nextRaw = Self.promptPool[
+                    (iter * mlxPrompts + p + 1) % Self.promptPool.count]
+                let authLoop = await BASAgentFabricAuthoritativeTurn.loopResult(
+                    decomposeFrame: turnResult.decomposeFrame,
+                    candidatePaths: turnResult.thoughtFrame.candidates,
+                    acceptedCandidateID: turnResult.mergedChoice.candidateID,
+                    runtime: fabricAuthRuntime,
+                    config: BASAgentFabricMultiRoundConfig(
+                        maxRounds: 5,
+                        baseTurnID: "ch1062-i\(iter)-p\(p)",
+                        nowNanos: Int64(bitPattern: monoNowNs())))
+                if let proj = authLoop.finalProjection {
+                    pendingEnrichedPrompt = nextRaw.isEmpty
+                        ? proj.contextBlock
+                        : nextRaw + "\n\n" + proj.contextBlock
+                }
+                await emitBoth(String(format:
+                    "🪧 ch1062 fabric-authoritative iter=%d prompt=%d " +
+                    "rounds=%d %@ deltas=%d stop=%@",
+                    iter, p + 1, authLoop.roundsRun,
+                    authLoop.converged ? "converged" : "incomplete",
+                    authLoop.finalProjection?.conclusions.count ?? 0,
+                    authLoop.stopReason))
 
                 // ch 1025.7 — comprehensive turnResult instrumentation:
                 // emit 8+ detailed log lines covering all public
