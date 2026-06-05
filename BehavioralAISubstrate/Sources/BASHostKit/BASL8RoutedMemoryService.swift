@@ -70,10 +70,15 @@ import BASOrchestration
 /// `BASSQLiteMemoryAtomStore` so each self-populated atom is `admit()`ed (one provenance event per
 /// atom) and reloadable via `loadAllAtoms`. nil ⇒ pure in-memory (the default flip).
 ///
-/// HONEST SCOPE (see the type-level comment on `BASL8RoutedMemoryService`): this is an OPT-IN API with
-/// NO consumer in this repo yet — the brain does not construct it or drive `drainIntents()`, so it
-/// does not fire through `brain.process()`. And reload is IN-PROCESS (the event-sourced store replays
-/// content empty; content lives in an in-process cache), so it is NOT cross-restart-durable on its own.
+/// HONEST SCOPE (see the type-level comment on `BASL8RoutedMemoryService`): this is an OPT-IN,
+/// host-injected API. As of ch1062 the SHIPPING consumer is the DeviceTestApp endurance runner — it
+/// wires a `BASRoutedMemoryPersistence` into `BASCognitiveBrain.makeWithDefaults(memoryPersistence:)`
+/// and drives `drainMemoryIntents()` per turn, so it DOES fire through the host's `brain.process()`
+/// loop. Durability depends on the wired store: a bare event-sourced store replays content IN-PROCESS
+/// (NOT cross-restart-durable on its own), whereas a file-backed `BASSQLiteMemoryAtomStore` +
+/// `BASSQLiteVectorIndexStorage` (the DeviceTestApp wiring) IS cross-restart durable — content +
+/// embeddings reload from SQLite without re-embedding (ADR-033 §104-120). The library
+/// `makeWithDefaults()` default stays legacy/in-memory, byte-equal-off (the flip is host-injected).
 public struct BASRoutedMemoryPersistence: Sendable {
     public let loadAllAtoms: @Sendable () async -> [BASGovernedMemory]
     public let admitAtom: @Sendable (BASGovernedMemory) async -> Void
