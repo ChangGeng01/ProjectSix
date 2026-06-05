@@ -153,6 +153,7 @@ final class BASEnduranceAppController: ObservableObject {
     static let shared = BASEnduranceAppController()
 
     private var started = false
+    private var autostartConsumed = false
     private var logFileHandle: FileHandle?
     private var logFileURL: URL?
 
@@ -160,11 +161,13 @@ final class BASEnduranceAppController: ObservableObject {
 
     func autostartIfEnabled() {
         guard !started else { return }
+        guard !autostartConsumed else { return }
         let env = ProcessInfo.processInfo.environment
         guard env["BAS_ENDURANCE_AUTOSTART"] == "1" else {
             status = .autostartOff
             return
         }
+        autostartConsumed = true
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100)
         let mlxPrompts = max(1, Int(env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3)
@@ -432,6 +435,13 @@ final class BASEnduranceAppController: ObservableObject {
         let runStartNs = monoNowNs()
 
         await MainActor.run {
+            // ch1066 — disable auto-lock at the START of the run (before the brain load) so the
+            // hands-off autostart path keeps the screen lit for an unattended long run. The
+            // button path (startManual) already disables it on tap; the autostart path
+            // (autostartIfEnabled → launch) bypasses that, so without this the screen locks, the
+            // foregroundless app backgrounds, and iOS jetsam-kills it (signal 9). Required for a
+            // 10h endurance run.
+            UIApplication.shared.isIdleTimerDisabled = true
             self.openLogFile()
         }
 
@@ -529,6 +539,7 @@ final class BASEnduranceAppController: ObservableObject {
             await emitBoth("⚠️ ch1025 \(msg)")
             await MainActor.run {
                 self.status = .failed(message: msg)
+                self.started = false
                 self.closeLogFile()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
@@ -662,6 +673,7 @@ final class BASEnduranceAppController: ObservableObject {
             await emitBoth("⚠️ ch1025 \(msg)")
             await MainActor.run {
                 self.status = .failed(message: msg)
+                self.started = false
                 self.closeLogFile()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
@@ -680,6 +692,7 @@ final class BASEnduranceAppController: ObservableObject {
             await emitBoth("⚠️ ch1025 \(msg)")
             await MainActor.run {
                 self.status = .failed(message: msg)
+                self.started = false
                 self.closeLogFile()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
@@ -1150,6 +1163,7 @@ final class BASEnduranceAppController: ObservableObject {
                 totalIters: totalIters,
                 totalTokens: totalTokens,
                 runSec: totalSec)
+            self.started = false
             self.closeLogFile()
             UIApplication.shared.isIdleTimerDisabled = false
         }
