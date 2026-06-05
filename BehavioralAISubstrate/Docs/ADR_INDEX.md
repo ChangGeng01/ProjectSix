@@ -5,10 +5,10 @@
 > `Docs/ADR_NNN*.md` files. This index maps EVERY referenced ADR to where its doctrine
 > actually lives, so a reader who hits an `ADR-NNN` comment never has to hunt for a
 > missing file. Built by grepping all `ADR-NNN` tokens across `Sources/` + `Docs/`
-> (complete set, not a sample). ADR-026–035 were appended to this index as the chapters
+> (complete set, not a sample). ADR-026–036 were appended to this index as the chapters
 > that introduced them landed.
 
-## The complete reference set (23 ADRs — 22 active + ADR-013 ghost)
+## The complete reference set (24 ADRs — 23 active + ADR-013 ghost)
 
 | ADR | Topic | Defining location | Kind |
 |---|---|---|---|
@@ -35,6 +35,7 @@
 | **ADR-033** | **Wiring the real capabilities onto the cognitive main chain** (5-step arc): move the real memory (MiniLM-L6-v2 CoreML embedder + cross-restart-durable SQL/vector index), native stage executors, Metal/Mamba, and the agent fabric ONTO (or honestly BESIDE) the default `process()` cascade — HOST-INJECTED, `makeWithDefaults()` stays legacy/byte-equal-off. **§Step-5** = the single-shot Agent Fabric authoritative feed-forward projection (turn N's accepted deltas → turn N+1 `userInput`), the foundation ADR-034 extends. On-device one-turn proof on iPhone Air (iOS 26.5). SHIPPED, opt-in/byte-equal-off | **`Docs/ADR_033_MAIN_CHAIN_WIRING.md`** | behavioral |
 | **ADR-034** | **Agent Fabric multi-round AUTHORITATIVE loop**: iterate the fabric to a content-digest fixpoint + the host-callable composition (`BASAgentFabricAuthoritativeTurn`) that makes ADR-033 §Step-5's feed-forward FUNCTIONAL end-to-end (`turnResult → loop → enriched next request`). Surfaced + fixed two real-fabric bugs the stub fixtures masked: the `delta:`-prefix dead projection (Step-5 was inert end-to-end) + content-digest convergence (per-round turnID-stamped deltaIDs never reached a fixpoint). Additive / opt-in / byte-equal-off / INPUT-class / verdict-gated (不变量 #2; 红线 7; ch883). SHIPPED | **`Docs/ADR_034_AGENT_FABRIC_MULTI_ROUND_AUTHORITATIVE_LOOP.md`** | behavioral |
 | **ADR-035** | **Multi-language pilots default-ON** (sanctioned opt-OUT inversion) + watchOS gating status: per the 「全面 转向 多个 语言」 directive the 5 SQL/C/Metal/C++/Rust pilots ship `perFlagDefaults` all-TRUE (chapters 七百十一-七百十二). Records WHY this stays byte-equal at TURN OUTPUT (no substrate caller routes a pilot into `BASEBrainTurnResult`; the live brain uses direct-init V1; pinned `substrateInternalFactoryCallSiteCount = 0`), reconciles the flags file's stale "ALL FALSE" doctrine (the audit's headline self-contradiction), and records the HONEST watchOS status (10 ungated `import Metal` files + ~60 consumers → a build-verified gating pass is a deferred follow-up) | **`Docs/ADR_035_MULTI_LANGUAGE_PILOTS_DEFAULT_ON.md`** | behavioral (honest reconciliation) |
+| **ADR-036** | **L8 retrieve cosineTopK hot-path takeover** (host-injected, opt-in — the substrate's ONLY sanctioned NON-byte-equal path): the operator chose the perf-fast cosineTopK retrieve over a byte-equal one. Adds the missing `bas_l8_vector_index_atom_id_for_rowid` Rust FFI (rebuilt XCFramework) so cosineTopK's rowids resolve to atoms; a `nonisolated` sync `cosineTopKAtomIDsSync` (ch883-safe) + an OPTIONAL `BASL8RoutedMemoryService.cosineTopKSync` seam (nil ⇒ score-all, byte-equal-off). NON-byte-equal when wired (rowid tie-break + pre-filter truncation, documented) | **`Docs/ADR_036_L8_COSINETOPK_RETRIEVE_TAKEOVER.md`** | behavioral (host opt-in) |
 
 ## Related contracts that are NOT numbered ADRs
 - **红线 7** (additive byte-equal safety invariant) — stated in `ADR_014_OPT_IN_DOCTRINE.md` §4 + `L8_ARC_SEAL.md`.
