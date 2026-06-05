@@ -20,7 +20,9 @@ R1, 亏的不要上, conventional commits, no Co-Authored-By.
 | 3 | `BASBpeTokenizerHandle` class → `+Tokenizer.swift` (reunites the tokenizer domain) | `opaqueHandle` restored to `fileprivate` (widening reverted) | BASChapter722Bpe* (30) |
 | 5 | `BASAutoRouteRanker` → `+DreamLoop.swift`: L9 dream-loop / dominance-order (i32+f64) / telemetry + test seam (+`atomicAdd1`) | self-contained (no widening) | BASChapter748/836/838 (21) + cascade-digest (6) |
 | 6 | `BASAutoRouteRanker` → `+Mamba.swift`: Mamba SSM-scan routing (seq + parallel) | self-contained | mamba suites + cascade-digest (6) |
-| — | `BASAutoRouteRanker` net | **3802 → 2861 lines (−25%)** | |
+| 7 | `BASAutoRouteRanker` → `+WireFormat.swift`: shared big-endian byte/buffer helpers | widened `private`→`internal` (cross-domain) | cascade-digest (6) + importance byte-equality (7) |
+| 8 | `BASAutoRouteRanker` → **13 domain files** (+Linalg/+Cosine/+Crypto/+Importance/+ProvenanceFilter/+RiskPlane/+Tribunal/+Sovereign/+Verdict/+KGCodec/+EventExtractor/+OrganRouter/+Reducers) | single-pass MARK-range extraction; `swiftNaiveCosine` widened `private`→`internal` | cascade-digest (6) + 197-test domain sweep |
+| — | `BASAutoRouteRanker` net | **3802 → 502 lines — UNDER the 800 cap** (17 domain files) | |
 | 4 | `BASCognitiveBrain` → `BASCognitiveMetalKernels.swift` (collaborator actor) | **4226 → 3843 lines**; collaborator 502 | cascade-digest (6) + 113 kernel call-site tests + sovereign (29) |
 
 ## Honest correction of the audit (split 4)
@@ -48,8 +50,8 @@ trusting the sketch.)
 
 ## Remaining (mapped, not done)
 
-The self-contained domains (tokenizer, activations, dream-loop, mamba) are **done**. The remaining
-`BASAutoRouteRanker` FFI-routing domains (ledger/crypto, tribunal, KG-codec, event-extractor,
-int8/aggregations, importance, organ-router) share `private` wire-format/hex helpers, so each needs a
-helper-widening step first — safe + byte-equal but entangled, diminishing cosmetic return. Left as an
-optional follow-up.
+**DONE (ch1040 WS1):** `BASAutoRouteRanker` is now **fully decomposed** — every routing domain lives in
+its own `+Domain.swift` (17 files) and the base is **502 lines, under the 800-line cap**. The shared
+`private` wire-format helpers were lifted to `+WireFormat.swift` (widened `internal`); the remaining
+domains were extracted in one verified single-pass. `BASCognitiveBrain` keeps its collaborator split
+(split 4); its further reduction is governed by the same "stateful, not pure" finding above.
