@@ -357,26 +357,26 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
             .appendingPathComponent("Sources")
             .appendingPathComponent("BASHostKit")
             .appendingPathComponent(
-                "BASCognitiveBrain.swift")
+                "BASCognitiveBrain+KernelsANE.swift")
         let content = try String(
             contentsOf: url, encoding: .utf8)
 
         // The original false claim shouldn't be there anymore
         XCTAssertFalse(content.contains(
             "1.24-1.62x faster"),
-            "BASCognitiveBrain.swift must not re-introduce the " +
+            "BASCognitiveBrain kernel docs must not re-introduce the " +
             "FALSE「1.24-1.62x faster」 FA claim — chapter 八百六十八 " +
             "measured FA as 1.07-1.10× SLOWER at production shapes")
         XCTAssertFalse(content.contains(
             "1.24-1.62× faster"),  // unicode variant
-            "BASCognitiveBrain.swift must not re-introduce the " +
+            "BASCognitiveBrain kernel docs must not re-introduce the " +
             "FALSE「1.24-1.62× faster」 FA claim")
 
         // The corrected text should reference chapter 八百六十八
         XCTAssertTrue(content.contains("chapter 八百六十八")
             || content.contains("chapter 868")
             || content.contains("M2996"),
-            "BASCognitiveBrain.swift attentionAuto doc should " +
+            "BASCognitiveBrain kernel attentionAuto doc should " +
             "reference chapter 八百六十八 / M2996 correction")
     }
 

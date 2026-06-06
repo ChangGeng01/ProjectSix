@@ -119,7 +119,7 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
             "/Users/changgeng/Project/Project06/Project06/" +
             "BehavioralAISubstrate"
         let path = "\(projectRoot)/Sources/BASHostKit/" +
-            "BASCognitiveBrain.swift"
+            "BASCognitiveBrain+KernelsANE.swift"
         guard let content = try? String(
             contentsOfFile: path, encoding: .utf8)
         else {

@@ -1,6 +1,8 @@
 // MARK: - BASChapter879BrainLOCTrajectoryAuditTests
 // chapter 八百七十九 / M3080 — pin the BASCognitiveBrain.swift
 // LOC growth trajectory + trigger for extraction chapter。
+// chapter 一千二十四 — extraction landed; this audit now pins
+// the facade file and the extracted BASCognitiveBrain file family。
 //
 // CONTEXT — agent D 全量 review (chapter 877) HIGH finding:
 // BASCognitiveBrain.swift grew 3,603 → 3,836 LOC over arc
@@ -33,13 +35,14 @@ final class BASChapter879BrainLOCTrajectoryAuditTests:
     func testBASCognitiveBrainLOCStaysUnderTriggerThreshold()
         throws
     {
-        let url = URL(
+        let hostKitURL = URL(
             fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources")
             .appendingPathComponent("BASHostKit")
+        let url = hostKitURL
             .appendingPathComponent(
                 "BASCognitiveBrain.swift")
         let content = try String(
@@ -48,45 +51,57 @@ final class BASChapter879BrainLOCTrajectoryAuditTests:
             separator: "\n", omittingEmptySubsequences: false
         ).count
 
-        let pinnedAtChapter879 = 3836
-        let extractionTrigger = 5000  // ~30% over current
-        let warnAtTrigger = 4500       // intermediate warning
+        let pinnedFacadeAfterExtraction = 635
+        let facadeLowerBound = 450
+        let facadeWarnAt = 900
+        let facadeHardCeiling = 1200
 
-        // Current state must be near the chapter 879 pin。
-        // Chapter 879 13th-pass LOW 1 fix: drift upper bound
-        // raised to warnAtTrigger (4,500) so the WARN print
-        // branch below is actually reachable before the hard
-        // test failure。 Drift floor stays at 90% (3,452) since
-        // shrinks are unusual。
-        let lowerBound = Int(
-            Double(pinnedAtChapter879) * 0.9)
-        let upperBound = warnAtTrigger
-        XCTAssertGreaterThanOrEqual(
-            lineCount, lowerBound,
-            "BASCognitiveBrain.swift LOC dropped below 90% " +
-            "of chapter 879 pin (\(pinnedAtChapter879)) — " +
-            "actual \(lineCount)。 If extraction happened,update " +
-            "this pin。 If file shrank organically,investigate。")
-        XCTAssertLessThanOrEqual(
-            lineCount, upperBound,
-            "BASCognitiveBrain.swift LOC grew above warn " +
-            "threshold (\(upperBound) = warnAtTrigger,from " +
-            "chapter 879 pin \(pinnedAtChapter879)) — actual " +
-            "\(lineCount)。 Update this pin in the growing chapter。")
-
-        // Hard ceiling: extraction MUST happen before this
-        XCTAssertLessThan(
-            lineCount, extractionTrigger,
-            "BASCognitiveBrain.swift exceeded the extraction " +
-            "trigger of \(extractionTrigger) LOC — chapter " +
-            "extraction is now REQUIRED before further additions。")
-
-        // Warning: intermediate signal
-        if lineCount > warnAtTrigger {
-            print("WARNING: BASCognitiveBrain.swift at \(lineCount) " +
-                "LOC > warn threshold \(warnAtTrigger) — " +
-                "extraction chapter should be planned。")
+        let familyURLs = try FileManager.default
+            .contentsOfDirectory(
+                at: hostKitURL,
+                includingPropertiesForKeys: nil)
+            .filter {
+                $0.lastPathComponent.hasPrefix("BASCognitiveBrain")
+                    && $0.pathExtension == "swift"
+            }
+        let familyLineCount = try familyURLs.reduce(0) { total, url in
+            let source = try String(contentsOf: url, encoding: .utf8)
+            return total + source.split(
+                separator: "\n",
+                omittingEmptySubsequences: false
+            ).count
         }
+        let pinnedFamilyAfterExtraction = 4913
+        let familyUpperBound = 5600
+
+        XCTAssertGreaterThanOrEqual(
+            lineCount, facadeLowerBound,
+            "BASCognitiveBrain.swift facade LOC dropped below " +
+            "\(facadeLowerBound) — actual \(lineCount)。 If another " +
+            "extraction happened,update this post-extraction pin。")
+        XCTAssertLessThanOrEqual(
+            lineCount, facadeWarnAt,
+            "BASCognitiveBrain.swift facade LOC grew above warn " +
+            "threshold (\(facadeWarnAt),from post-extraction pin " +
+            "\(pinnedFacadeAfterExtraction)) — actual \(lineCount)。")
+
+        XCTAssertLessThan(
+            lineCount, facadeHardCeiling,
+            "BASCognitiveBrain.swift facade exceeded hard ceiling " +
+            "\(facadeHardCeiling) LOC — another extraction pass is " +
+            "required before further additions。")
+
+        XCTAssertGreaterThanOrEqual(
+            familyLineCount, pinnedFamilyAfterExtraction,
+            "BASCognitiveBrain extracted family unexpectedly shrank " +
+            "below post-extraction pin \(pinnedFamilyAfterExtraction) " +
+            "— actual \(familyLineCount)。 If cleanup happened,repin " +
+            "the family trajectory explicitly。")
+        XCTAssertLessThanOrEqual(
+            familyLineCount, familyUpperBound,
+            "BASCognitiveBrain extracted family grew above " +
+            "\(familyUpperBound) LOC — actual \(familyLineCount)。 " +
+            "Plan a second extraction or repin with justification。")
     }
 
     /// Trigger conditions for the extraction chapter。
