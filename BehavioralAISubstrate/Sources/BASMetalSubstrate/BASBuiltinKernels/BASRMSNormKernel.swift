@@ -57,7 +57,7 @@ public struct BASRMSNormKernel: BASMetalKernel {
     /// transformer blocks。
     public let epsilon: Float
 
-    public init(epsilon: Float = 1e-6) {
+    public init(epsilon: Float = BASNormEpsilon.rmsNorm) {
         self.epsilon = epsilon
     }
 

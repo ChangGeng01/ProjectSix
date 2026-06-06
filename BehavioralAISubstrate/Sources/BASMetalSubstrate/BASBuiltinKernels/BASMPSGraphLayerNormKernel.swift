@@ -53,7 +53,7 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
     private let cache: BASMPSGraphExecutableCache?
 
     public init(
-        epsilon: Float = 1e-5,
+        epsilon: Float = BASNormEpsilon.layerNorm,
         cache: BASMPSGraphExecutableCache? = nil
     ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()

@@ -109,6 +109,16 @@ public actor BASMPSGraphAttentionKernel: BASMetalKernel {
             kP, dimension: 0, withDimension: 1, name: "kT")
         let scoresRaw = graph.matrixMultiplication(
             primary: qP, secondary: kT, name: "scoresRaw")
+        // Softmax scale 1/√d。 GPU path computes the reciprocal
+        // sqrt in double-precision `sqrt(Double(dim))` then
+        // narrows the constant to Float32 — this is INTENTIONAL
+        // and platform-native: the CPU sibling
+        // (BASAttentionKernel) uses single-precision
+        // `sqrtf(Float(dim))`。 The per-platform precision
+        // difference is deliberate and is parity-checked within
+        // tolerance by the attention cross-validation /
+        // integration tests — do NOT "fix" the two sites to
+        // match, that would risk a parity break, not avert one。
         let scale = graph.constant(
             1.0 / sqrt(Double(dim)),
             shape: [1, 1], dataType: .float32)

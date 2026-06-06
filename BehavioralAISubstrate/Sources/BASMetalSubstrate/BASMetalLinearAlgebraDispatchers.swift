@@ -64,7 +64,8 @@ public actor BASMetalRMSNormDispatcher {
     /// Numerical stability epsilon added under the square
     /// root before reciprocal — matches the standard
     /// rmsnorm convention used by Llama/Mamba families。
-    public static let defaultEpsilon: Float = 1e-6
+    public static let defaultEpsilon: Float =
+        BASNormEpsilon.rmsNorm
 
     private let loader: BASMetalKernelLibraryLoader
 

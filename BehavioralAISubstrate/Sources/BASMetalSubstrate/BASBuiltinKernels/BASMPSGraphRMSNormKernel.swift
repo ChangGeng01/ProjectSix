@@ -120,7 +120,7 @@ public actor BASMPSGraphRMSNormKernel: BASMetalKernel {
     /// `nil` preserves M1169 byte-equality semantics for
     /// hosts that haven't opted in。
     public init(
-        epsilon: Float = 1e-6,
+        epsilon: Float = BASNormEpsilon.rmsNorm,
         cache: BASMPSGraphExecutableCache? = nil
     ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()

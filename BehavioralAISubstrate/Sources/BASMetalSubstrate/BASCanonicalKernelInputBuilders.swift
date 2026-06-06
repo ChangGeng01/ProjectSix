@@ -81,20 +81,26 @@ public enum BASCanonicalKernelInputBuilders {
         precondition(b.count == K * N,
             "matMul B array length must equal K*N" +
             " (got \(b.count), expected \(K * N))")
+        // NOTE: input descriptors use the BUILDER-INPUT rankTag
+        // convention (`BASBuilderInputRankTag.matrix` ==
+        // "rank-2-matrix"),which is DELIBERATELY distinct from
+        // the typed kernel-OUTPUT `_2D.rankTag` ("rank-2")。
+        // Receiving kernels validate by `shape.count`,not by
+        // comparing this tag — see BASBuilderInputRankTag。
         let descA = BASTensorDescriptor(
             shape: [M, K],
             strides: [K * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descB = BASTensorDescriptor(
             shape: [K, N],
             strides: [N * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let dataA = floatArrayToData(a)
         let dataB = floatArrayToData(b)
         return BASKernelInputs(
@@ -134,13 +140,13 @@ public enum BASCanonicalKernelInputBuilders {
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descGamma = BASTensorDescriptor(
             shape: [hiddenDim],
             strides: [MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-1-vector")
+            rankTag: BASBuilderInputRankTag.vector)
         return BASKernelInputs(
             descriptors: [descInput, descGamma],
             payloads: [
@@ -193,21 +199,21 @@ public enum BASCanonicalKernelInputBuilders {
             ],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-3-tensor")
+            rankTag: BASBuilderInputRankTag.tensor3D)
         let descCos = BASTensorDescriptor(
             shape: [sequenceLength, half],
             strides: [half * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descSin = BASTensorDescriptor(
             shape: [sequenceLength, half],
             strides: [half * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         return BASKernelInputs(
             descriptors: [descInput, descCos, descSin],
             payloads: [
@@ -261,21 +267,21 @@ public enum BASCanonicalKernelInputBuilders {
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descCos = BASTensorDescriptor(
             shape: [sequenceLength, half],
             strides: [half * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descSin = BASTensorDescriptor(
             shape: [sequenceLength, half],
             strides: [half * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         return BASKernelInputs(
             descriptors: [descInput, descCos, descSin],
             payloads: [
@@ -323,21 +329,21 @@ public enum BASCanonicalKernelInputBuilders {
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descK = BASTensorDescriptor(
             shape: [seqK, dim],
             strides: [dim * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descV = BASTensorDescriptor(
             shape: [seqK, dim],
             strides: [dim * MemoryLayout<Float>.stride,
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         return BASKernelInputs(
             descriptors: [descQ, descK, descV],
             payloads: [
@@ -383,19 +389,19 @@ public enum BASCanonicalKernelInputBuilders {
                       MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-2-matrix")
+            rankTag: BASBuilderInputRankTag.matrix)
         let descGamma = BASTensorDescriptor(
             shape: [hidden],
             strides: [MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-1-vector")
+            rankTag: BASBuilderInputRankTag.vector)
         let descBeta = BASTensorDescriptor(
             shape: [hidden],
             strides: [MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
-            rankTag: "rank-1-vector")
+            rankTag: BASBuilderInputRankTag.vector)
         return BASKernelInputs(
             descriptors: [descX, descGamma, descBeta],
             payloads: [

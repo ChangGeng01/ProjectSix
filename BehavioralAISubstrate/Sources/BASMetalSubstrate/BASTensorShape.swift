@@ -114,6 +114,59 @@ public enum _NDim: BASTensorShape {
     public static let rankTag: String = "rank-dynamic"
 }
 
+// MARK: - Builder-input rankTag convention (DELIBERATELY
+//         distinct from the typed `_ND.rankTag` above)
+//
+// There are TWO independent-but-internally-consistent rankTag
+// conventions in the substrate,and they are NOT meant to be
+// unified:
+//
+//   1. TYPED / kernel-OUTPUT convention — `_2D.rankTag` ==
+//      "rank-2",`_1D.rankTag` == "rank-1",etc。 Kernels
+//      stamp their OUTPUT descriptors with these (see every
+//      `BASBuiltinKernels/*Kernel.swift` output descriptor),
+//      and `BASTensor.init` preconditions
+//      `descriptor.rankTag == Shape.rankTag` against them when
+//      re-typing a descriptor into a phantom-typed tensor。
+//
+//   2. BUILDER-INPUT convention — "rank-2-matrix" /
+//      "rank-1-vector" / "rank-3-tensor" / "rank-4-tensor"。
+//      `BASCanonicalKernelInputBuilders` stamps the kernel
+//      INPUT descriptors it constructs with these richer,
+//      human-readable tags。 Receiving kernels validate inputs
+//      by `descriptor.shape.count` (rank arity),NEVER by
+//      comparing the input `rankTag`,so the two conventions
+//      never meet at a comparison site。 Tests assert these
+//      exact strings (e.g. BASCanonicalKernelInputBuildersTests
+//      + the *IntegrationTests),so the VALUES are load-
+//      bearing and must not drift。
+//
+// These constants give the builder-input convention a single
+// source per string (chapter 二百一一),replacing the inline
+// literals previously hand-written at every descriptor site。
+// They are intentionally NOT the same strings as `_ND.rankTag`。
+public enum BASBuilderInputRankTag {
+
+    /// Rank-1 input descriptor tag (vectors — e.g. rmsNorm /
+    /// layerNorm gamma + beta weights)。 Distinct from
+    /// `_1D.rankTag` ("rank-1") by design。
+    public static let vector: String = "rank-1-vector"
+
+    /// Rank-2 input descriptor tag (matrices — e.g. matMul
+    /// operands,attention Q/K/V,rope tables)。 Distinct
+    /// from `_2D.rankTag` ("rank-2") by design。
+    public static let matrix: String = "rank-2-matrix"
+
+    /// Rank-3 input descriptor tag (the multi-head rope input
+    /// `[seq, heads, headDim]`)。 Distinct from `_3D.rankTag`
+    /// ("rank-3") by design。
+    public static let tensor3D: String = "rank-3-tensor"
+
+    /// Rank-4 input descriptor tag (e.g. conv2d NCHW inputs)。
+    /// Distinct from `_4D.rankTag` ("rank-4") by design。
+    public static let tensor4D: String = "rank-4-tensor"
+}
+
 // MARK: - Scalar evidence (element type marker protocol)
 
 /// Marker protocol carried by `BASTensor.Element`。 Every

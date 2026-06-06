@@ -109,6 +109,16 @@ public struct BASAttentionKernel: BASMetalKernel {
         let vFloats = inputs.payloads[2]
             .toFloat32Array(elementCount: seqK * dim)
 
+        // Softmax scale 1/√d。 CPU path uses single-precision
+        // `sqrtf(Float(dim))` — this is INTENTIONAL and
+        // platform-native: the MPSGraph GPU sibling
+        // (BASMPSGraphAttentionKernel) builds the same scale
+        // from `sqrt(Double(dim))`。 The per-platform precision
+        // difference is deliberate (Float here mirrors the
+        // GPU's Float32 arithmetic) and is parity-checked
+        // within tolerance by the attention cross-validation /
+        // integration tests — do NOT "fix" the two sites to
+        // match, that would risk a parity break, not avert one。
         let scale: Float = 1.0 / sqrtf(Float(dim))
 
         // Compute scores[i, j] = (Q[i, :] · K[j, :]) * scale
