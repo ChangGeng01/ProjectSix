@@ -1161,7 +1161,13 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 if let deepLoopCueDetected, deepLoopCueDetected != context.deepLoopCueDetected {
                     return false
                 }
-                if let minimumBatteryLevel, context.batteryLevel < minimumBatteryLevel {
+                if let minimumBatteryLevel,
+                   context.batteryLevel < min(max(minimumBatteryLevel, 0), 1) {
+                    // ch1066 — clamp at the comparison: the init clamps minimumBatteryLevel
+                    // to [0,1], but RunModeTransitionRule's SYNTHESIZED Codable decoder
+                    // bypasses that init, so a decoded out-of-range floor would otherwise
+                    // silently change which rule matches (→ wrong run mode / budget).
+                    // Byte-equal for any in-range (valid) floor; only clamps malformed input.
                     return false
                 }
                 return true

@@ -922,6 +922,8 @@ public struct BASHostRuntime: Sendable {
         now: Date = .now
     ) -> BASHostInterventionSuggestion? {
         guard request.riskLevel >= .medium else { return nil }
+        // ch1066 — intervention-suggestion validity window (was a bare `30 * 60`).
+        let interventionSuggestionTTL: TimeInterval = 30 * 60  // 30 minutes
         let predictiveBehavior = configuration.lifecycleBehavior.predictiveInterventionBehavior
         let riskBehavior: BASApplePredictiveInterventionRiskBehavior = {
             switch request.riskLevel {
@@ -948,7 +950,7 @@ public struct BASHostRuntime: Sendable {
                 .flatMap { configuration.workflowBehavior.workflowProfile(forModeID: $0) }
                 ?? request.workflowProfile,
             reason: request.triggerReason ?? predictiveBehavior.defaultReason,
-            expiresAt: now.addingTimeInterval(30 * 60)
+            expiresAt: now.addingTimeInterval(interventionSuggestionTTL)
         )
     }
 
