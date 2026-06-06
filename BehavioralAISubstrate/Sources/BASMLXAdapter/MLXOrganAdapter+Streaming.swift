@@ -57,10 +57,8 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         guard let container = self._loadedContainerForStreaming()
         else {
             throw BASOrganError.providerUnavailable(
-                reason:
-                    "mlx-organ-adapter-not-loaded — call " +
-                    "loadModel(progressHandler:) before " +
-                    "streamDraft(_:)")
+                reason: MLXOrganAdapter.notLoadedReason(
+                    "loadModel(progressHandler:) before streamDraft(_:)"))
         }
 
         let session = ChatSession(
@@ -97,9 +95,8 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         }
         #else
         throw BASOrganError.providerUnavailable(
-            reason:
-                "MLXLLM framework unavailable in this build " +
-                "(watchOS / non-Apple-Silicon target)")
+            reason: MLXOrganAdapter.frameworkUnavailableReason
+                + MLXOrganAdapter.frameworkUnavailablePlatformSuffix)
         #endif
     }
 }

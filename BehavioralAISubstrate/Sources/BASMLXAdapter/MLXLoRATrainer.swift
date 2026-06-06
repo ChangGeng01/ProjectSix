@@ -61,6 +61,28 @@ public actor MLXLoRATrainer {
     /// vendored `LoRATrain.Parameters` with sensible defaults
     /// suitable for a 5–15 minute smoke run on Apple Silicon.
     public struct Configuration: Sendable, Codable, Equatable {
+        /// ch1066 — LoRA layer count (last-N transformer blocks adapted). Kept a type-level
+        /// constant (NOT a Codable field, so persisted Configurations stay decodable); the
+        /// trainer AND `MLXOrganAdapter.loadAdapter` must use this SAME value, or a loaded
+        /// adapter's shapes won't match the layers it was trained on.
+        public static let numLoRALayers = 4
+
+        /// ch1040 — default values for every `Configuration` field, hoisted out of the
+        /// `init` signature so the "sensible 5–15 min smoke-run" baseline lives in one
+        /// named place (and tests can assert against it instead of bare literals). Values
+        /// are byte-for-byte the previous inline `init` defaults.
+        public enum Defaults {
+            public static let rank = 8
+            public static let scale: Float = 10.0
+            public static let batchSize = 4
+            public static let iterations = 100
+            public static let learningRate: Float = 1e-5
+            public static let stepsPerReport = 10
+            public static let stepsPerEval = 100
+            public static let saveEvery = 100
+            public static let validationBatches = 10
+        }
+
         /// LoRA rank — higher = more parameters, more capacity,
         /// more memory. 8 is a reasonable default for 4-bit
         /// quantized foundation models.
@@ -102,15 +124,15 @@ public actor MLXLoRATrainer {
         public var adapterURL: URL?
 
         public init(
-            rank: Int = 8,
-            scale: Float = 10.0,
-            batchSize: Int = 4,
-            iterations: Int = 100,
-            learningRate: Float = 1e-5,
-            stepsPerReport: Int = 10,
-            stepsPerEval: Int = 100,
-            saveEvery: Int = 100,
-            validationBatches: Int = 10,
+            rank: Int = Defaults.rank,
+            scale: Float = Defaults.scale,
+            batchSize: Int = Defaults.batchSize,
+            iterations: Int = Defaults.iterations,
+            learningRate: Float = Defaults.learningRate,
+            stepsPerReport: Int = Defaults.stepsPerReport,
+            stepsPerEval: Int = Defaults.stepsPerEval,
+            saveEvery: Int = Defaults.saveEvery,
+            validationBatches: Int = Defaults.validationBatches,
             adapterURL: URL? = nil
         ) {
             self.rank = rank
@@ -173,6 +195,12 @@ public actor MLXLoRATrainer {
     public nonisolated let model: MLXModelCatalog.Entry
     public nonisolated let configuration: Configuration
 
+    /// ch1040 — hoisted reason text for the non-MLX build (this type's
+    /// `loadFoundationModel` / `train` / `saveAdapter` `#else` paths all
+    /// render it). Byte-identical to the previous inline literal.
+    private static let frameworkUnavailableReason =
+        "MLXLLM framework unavailable in this build"
+
     #if canImport(MLXLLM)
     /// The loaded foundation model + tokenizer. `nil` until
     /// `loadModel(...)` has completed at least once.
@@ -222,7 +250,7 @@ public actor MLXLoRATrainer {
         self.modelContext = context
         #else
         throw TrainingError.underlying(
-            reason: "MLXLLM framework unavailable in this build")
+            reason: Self.frameworkUnavailableReason)
         #endif
     }
 
@@ -272,7 +300,7 @@ public actor MLXLoRATrainer {
                 scale: configuration.scale,
                 keys: nil)
             let loraConfig = LoRAConfiguration(
-                numLayers: 4,
+                numLayers: Configuration.numLoRALayers,
                 fineTuneType: .lora,
                 loraParameters: loraParams)
             do {
@@ -319,7 +347,7 @@ public actor MLXLoRATrainer {
         progressHandler(.complete(totalIterations: totalIterations))
         #else
         throw TrainingError.underlying(
-            reason: "MLXLLM framework unavailable in this build")
+            reason: Self.frameworkUnavailableReason)
         #endif
     }
 
@@ -331,6 +359,18 @@ public actor MLXLoRATrainer {
         guard let context = modelContext else {
             throw TrainingError.modelNotLoaded
         }
+        // BUG-1 (ch1040) — `modelContext != nil` alone is satisfied by a
+        // bare `loadFoundationModel(...)`; without a prior `train(...)` no
+        // LoRA layers are attached and the model isn't frozen, so
+        // `saveLoRAWeights` would serialize the FULL base model (multi-GB,
+        // base-model keys) — a later `loadAdapter` then throws on key
+        // mismatch. Require at least one train() so we only ever write a
+        // real adapter.
+        guard modelHasLoRAAdapters else {
+            throw TrainingError.underlying(
+                reason: "saveAdapter(to:) requires at least one " +
+                    "train(...) call — no LoRA layers are attached")
+        }
         let module: Module = context.model as Module
         do {
             try LoRATrain.saveLoRAWeights(model: module, url: url)
@@ -341,7 +381,7 @@ public actor MLXLoRATrainer {
         }
         #else
         throw TrainingError.underlying(
-            reason: "MLXLLM framework unavailable in this build")
+            reason: Self.frameworkUnavailableReason)
         #endif
     }
 

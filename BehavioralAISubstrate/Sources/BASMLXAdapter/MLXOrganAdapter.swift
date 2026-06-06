@@ -78,10 +78,61 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// The model entry this adapter is configured to serve.
     public nonisolated let model: MLXModelCatalog.Entry
 
+    // MARK: - Descriptor defaults (ch1040 — named-constant extraction)
+
+    /// Default input-token ceiling reported through the descriptor
+    /// when the caller doesn't override it. The model itself decides
+    /// the real runtime bound; this is the contracted descriptor cap.
+    ///
+    /// `public` (not `private`) because it's a default-argument value
+    /// of the `public init`, so it must be visible at every external
+    /// call site that omits `maxInputTokens`.
+    public static let defaultMaxInputTokens = 4_096
+
+    /// Default output-token ceiling reported through the descriptor
+    /// when the caller doesn't override it. `public` for the same
+    /// default-argument-of-a-public-init reason as the input ceiling.
+    public static let defaultMaxOutputTokens = 4_096
+
+    // MARK: - Shared error-reason strings (ch1040 — hoisted, byte-identical)
+
+    /// Reason text for the non-Apple-Silicon / watchOS build where
+    /// `MLXLLM` can't be imported. Internal (not `private`) so the
+    /// streaming extension in `MLXOrganAdapter+Streaming.swift` can
+    /// route its `#else` branch through the same string — same reason
+    /// `_generateParameters` / `_loadedContainerForStreaming` aren't
+    /// private (cross-file extensions can't see `private` members).
+    static let frameworkUnavailableReason =
+        "MLXLLM framework unavailable in this build"
+
+    /// Suffix appended to `frameworkUnavailableReason` at the inference
+    /// call sites (`draft` / `draftMultiTurn` / `streamDraft` / load),
+    /// naming the platforms that lack Metal.
+    static let frameworkUnavailablePlatformSuffix =
+        " (watchOS / non-Apple-Silicon target)"
+
+    /// Build the stable "model not loaded yet" reason. `method` is the
+    /// full call-to-make tail (e.g. `"loadModel(...) before prewarm()"`)
+    /// so each call site's rendered text stays byte-identical. Internal
+    /// for the same cross-file-extension reason as above.
+    static func notLoadedReason(_ method: String) -> String {
+        "mlx-organ-adapter-not-loaded — call \(method)"
+    }
+
     #if canImport(MLXLLM)
     /// The loaded model container. `nil` until `loadModel(...)` has
     /// completed at least once on this actor instance.
     private var modelContainer: ModelContainer?
+
+    // MARK: - Prewarm constants (ch1040 — named-constant extraction)
+
+    /// Decode-token cap for `prewarm()`. We only need to JIT the
+    /// Metal kernels and exercise the prefill→decode boundary, not
+    /// generate a full response, so 4 tokens is enough.
+    private static let prewarmDecodeTokens = 4
+
+    /// Synthetic request ID used by `prewarm()`'s dummy turn.
+    private static let prewarmRequestID = "prewarm"
 
     /// M254 — multi-turn session pool. Keys are
     /// `"\(callerSessionID)#\(role.rawValue)"` so the same
@@ -146,8 +197,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         providerID: String? = nil,
         providerName: String? = nil,
         supportsStreaming: Bool = true,
-        maxInputTokens: Int = 4_096,
-        maxOutputTokens: Int = 4_096,
+        maxInputTokens: Int = MLXOrganAdapter.defaultMaxInputTokens,
+        maxOutputTokens: Int = MLXOrganAdapter.defaultMaxOutputTokens,
         supportedRoles: Set<BASOrganRole> = [.scout, .core]
     ) {
         self.model = model
@@ -204,9 +255,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         self.modelContainer = container
         #else
         throw BASOrganError.providerUnavailable(
-            reason:
-                "MLXLLM framework unavailable in this build " +
-                "(watchOS / non-Apple-Silicon target)")
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
         #endif
     }
 
@@ -221,15 +271,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// Calling with a different URL replaces the loaded adapter.
     ///
     /// - Parameter url: file URL pointing to a `.safetensors` file
-    ///   produced by `MLXLoRATrainer.saveAdapter`. Must match the
-    ///   trainer's `Configuration.rank` (default 8).
-    public func loadAdapter(from url: URL) async throws {
+    ///   produced by `MLXLoRATrainer.saveAdapter`.
+    /// - Parameter configuration: the SAME training `Configuration` the adapter was trained
+    ///   with — its `rank`/`scale` must match the adapter's shapes or `update(verify:)`
+    ///   throws. ch1066: was hardcoded rank 8 / scale 10, silently mismatching any adapter
+    ///   trained with a non-default rank. Defaults to `Configuration()` (rank 8 / scale 10).
+    public func loadAdapter(
+        from url: URL,
+        configuration: MLXLoRATrainer.Configuration = MLXLoRATrainer.Configuration()
+    ) async throws {
         #if canImport(MLXLLM)
         guard let container = modelContainer else {
             throw BASOrganError.providerUnavailable(
-                reason:
-                    "mlx-organ-adapter-not-loaded — call " +
-                    "loadModel(...) before loadAdapter(...)")
+                reason: Self.notLoadedReason(
+                    "loadModel(...) before loadAdapter(...)"))
         }
         // M246 — apply LoRA layers + load adapter weights via the
         // container's perform action so all model mutation runs on
@@ -237,9 +292,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // loaded INSIDE the closure (NestedDictionary<MLXArray>
         // isn't Sendable across actor boundaries).
         let loraParams = LoRAConfiguration.LoRAParameters(
-            rank: 8, scale: 10.0, keys: nil)
+            rank: configuration.rank, scale: configuration.scale, keys: nil)
         let loraConfig = LoRAConfiguration(
-            numLayers: 4,
+            numLayers: MLXLoRATrainer.Configuration.numLoRALayers,
             fineTuneType: .lora,
             loraParameters: loraParams)
         let adapterURL = url
@@ -256,8 +311,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
         #else
         throw BASOrganError.providerUnavailable(
-            reason:
-                "MLXLLM framework unavailable in this build")
+            reason: Self.frameworkUnavailableReason)
         #endif
     }
 
@@ -291,23 +345,21 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #if canImport(MLXLLM)
         guard let container = modelContainer else {
             throw BASOrganError.providerUnavailable(
-                reason:
-                    "mlx-organ-adapter-not-loaded — call " +
-                    "loadModel(...) before prewarm()")
+                reason: Self.notLoadedReason(
+                    "loadModel(...) before prewarm()"))
         }
         let role: BASOrganRole = descriptor.supportedRoles
             .contains(.scout) ? .scout : .core
         let dummyRequest = BASOrganRequest(
-            requestID: "prewarm",
+            requestID: Self.prewarmRequestID,
             role: role,
             preset: role == .scout ? .scout : .core,
             instruction: "Hi.")
         var params = _generateParameters(
             for: dummyRequest.preset)
-        // Cap decode at 4 tokens — we only need to JIT the kernels
-        // and exercise the prefill→decode boundary, not generate
-        // a full response.
-        params.maxTokens = 4
+        // Cap decode — we only need to JIT the kernels and exercise
+        // the prefill→decode boundary, not generate a full response.
+        params.maxTokens = Self.prewarmDecodeTokens
         let session = ChatSession(
             container,
             instructions:
@@ -315,6 +367,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             generateParameters: params)
         _ = try await session.respond(
             to: Self.prompt(for: dummyRequest))
+        #else
+        // BUG-2 (ch1040) — every sibling (loadModel/loadAdapter/draft)
+        // throws on the non-MLX path; prewarm previously had an empty
+        // #else and silently "succeeded" off Apple Silicon. Match the
+        // sibling contract.
+        throw BASOrganError.providerUnavailable(
+            reason: Self.frameworkUnavailableReason)
         #endif
     }
 
@@ -330,9 +389,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #if canImport(MLXLLM)
         guard let container = modelContainer else {
             throw BASOrganError.providerUnavailable(
-                reason:
-                    "mlx-organ-adapter-not-loaded — call " +
-                    "loadModel(progressHandler:) before draft(_:)")
+                reason: Self.notLoadedReason(
+                    "loadModel(progressHandler:) before draft(_:)"))
         }
 
         let session = ChatSession(
@@ -361,9 +419,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 for: request, providerID: descriptor.providerID))
         #else
         throw BASOrganError.providerUnavailable(
-            reason:
-                "MLXLLM framework unavailable in this build " +
-                "(watchOS / non-Apple-Silicon target)")
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
         #endif
     }
 
@@ -409,9 +466,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #if canImport(MLXLLM)
         guard let container = modelContainer else {
             throw BASOrganError.providerUnavailable(
-                reason:
-                    "mlx-organ-adapter-not-loaded — call " +
-                    "loadModel(...) before draftMultiTurn(...)")
+                reason: Self.notLoadedReason(
+                    "loadModel(...) before draftMultiTurn(...)"))
         }
 
         // Composite key — same caller session ID with different
@@ -451,9 +507,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 for: request, providerID: descriptor.providerID))
         #else
         throw BASOrganError.providerUnavailable(
-            reason:
-                "MLXLLM framework unavailable in this build " +
-                "(watchOS / non-Apple-Silicon target)")
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
         #endif
     }
 

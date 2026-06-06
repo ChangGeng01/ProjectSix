@@ -13,16 +13,20 @@ final class MLXLoRATrainerTests: XCTestCase {
     // MARK: - 1. Configuration defaults
 
     func testConfigurationDefaultsAreSensible() {
+        // ch1040 — the init defaults were hoisted into
+        // `Configuration.Defaults`; assert the no-arg init wires each
+        // field to its named default (same values as before).
+        typealias Defaults = MLXLoRATrainer.Configuration.Defaults
         let cfg = MLXLoRATrainer.Configuration()
-        XCTAssertEqual(cfg.rank, 8)
-        XCTAssertEqual(cfg.scale, 10.0)
-        XCTAssertEqual(cfg.batchSize, 4)
-        XCTAssertEqual(cfg.iterations, 100)
-        XCTAssertEqual(cfg.learningRate, 1e-5)
-        XCTAssertEqual(cfg.stepsPerReport, 10)
-        XCTAssertEqual(cfg.stepsPerEval, 100)
-        XCTAssertEqual(cfg.saveEvery, 100)
-        XCTAssertEqual(cfg.validationBatches, 10)
+        XCTAssertEqual(cfg.rank, Defaults.rank)
+        XCTAssertEqual(cfg.scale, Defaults.scale)
+        XCTAssertEqual(cfg.batchSize, Defaults.batchSize)
+        XCTAssertEqual(cfg.iterations, Defaults.iterations)
+        XCTAssertEqual(cfg.learningRate, Defaults.learningRate)
+        XCTAssertEqual(cfg.stepsPerReport, Defaults.stepsPerReport)
+        XCTAssertEqual(cfg.stepsPerEval, Defaults.stepsPerEval)
+        XCTAssertEqual(cfg.saveEvery, Defaults.saveEvery)
+        XCTAssertEqual(cfg.validationBatches, Defaults.validationBatches)
         XCTAssertNil(cfg.adapterURL)
     }
 
