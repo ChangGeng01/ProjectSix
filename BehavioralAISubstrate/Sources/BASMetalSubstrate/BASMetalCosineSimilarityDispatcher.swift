@@ -42,6 +42,11 @@ public enum BASMetalCosineSimilarityDispatcherError:
     case payloadCountMismatch(
         name: String, expected: Int, actual: Int)
     case zeroLengthVectors
+    /// GPU command buffer completed with a fault
+    /// (`MTLCommandBuffer.error` was non-nil)。 The zero-
+    /// filled partials are NOT a valid result — throw
+    /// rather than reduce them into a bogus similarity。
+    case commandBufferFailed(message: String)
 
     public var caseIdentifier: String {
         switch self {
@@ -61,6 +66,8 @@ public enum BASMetalCosineSimilarityDispatcherError:
             return "payloadCountMismatch"
         case .zeroLengthVectors:
             return "zeroLengthVectors"
+        case .commandBufferFailed:
+            return "commandBufferFailed"
         }
     }
 }
@@ -240,10 +247,22 @@ public actor BASMetalCosineSimilarityDispatcher {
             gridSize,
             threadsPerThreadgroup: groupSize)
         encoder.endEncoding()
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmdBuf.addCompletedHandler { _ in
-                cont.resume()
+        // Resume by THROWING on a GPU fault — reducing zero-
+        // filled partials would yield a bogus similarity
+        // returned as success。 Success path resumes with the
+        // partials buffers unchanged。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMetalCosineSimilarityDispatcherError
+                            .commandBufferFailed(
+                                message:
+                                    err.localizedDescription))
+                } else {
+                    cont.resume()
+                }
             }
             cmdBuf.commit()
         }

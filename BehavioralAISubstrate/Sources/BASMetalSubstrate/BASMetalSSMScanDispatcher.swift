@@ -77,6 +77,12 @@ public enum BASMetalSSMScanDispatcherError: Error,
     case payloadCountMismatch(
         name: String, expected: Int, actual: Int)
 
+    /// GPU command buffer completed with a fault
+    /// (`MTLCommandBuffer.error` was non-nil)。 The pre-
+    /// zeroed output buffer is NOT a valid result — throw
+    /// rather than return it as success。
+    case commandBufferFailed(message: String)
+
     public var caseIdentifier: String {
         switch self {
         case .metalUnavailableOnPlatform:
@@ -93,6 +99,8 @@ public enum BASMetalSSMScanDispatcherError: Error,
             return "bufferAllocationFailed"
         case .payloadCountMismatch:
             return "payloadCountMismatch"
+        case .commandBufferFailed:
+            return "commandBufferFailed"
         }
     }
 }
@@ -289,11 +297,23 @@ public actor BASMetalSSMScanDispatcher {
         // async without making MTLCommandBuffer cross the
         // suspension point (it isn't Sendable)。 The
         // continuation resumes from the callback fired by
-        // the GPU driver thread。
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmdBuf.addCompletedHandler { _ in
-                cont.resume()
+        // the GPU driver thread。 A non-nil
+        // commandBuffer.error means a GPU fault — resume by
+        // THROWING so the pre-zeroed buffer is never
+        // returned as a valid (silent zero) result。 The
+        // success path resumes with the output unchanged。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMetalSSMScanDispatcherError
+                            .commandBufferFailed(
+                                message:
+                                    err.localizedDescription))
+                } else {
+                    cont.resume()
+                }
             }
             cmdBuf.commit()
         }

@@ -2,11 +2,21 @@
 // chapter 七百七 第一刀 / M2206
 //
 // Swift dispatcher for the chapter-七百五-第一刀 BASFlashAttention
-// .metal tiled-attention kernel family。 Three variants exposed:
+// .metal tiled-attention kernel family。
+//
+// WIRED TODAY:only the unmasked forward path —
 //
 //   - dispatch(q:qRows:qCols:k:kRows:v:vCols:)
-//   - dispatch(q:.., k:.., v:.., mask:)
-//   - dispatchCausal(q:.., k:.., v:..)
+//
+// NOT YET WIRED:the masked + causal MSL kernels
+// (`flash_attention_forward_masked` /
+// `flash_attention_forward_causal`) exist in the .metal
+// source and their symbol names + pipeline slots
+// (`maskedPipeline` / `causalPipeline`) are scaffolded
+// below, but no Swift `dispatch(...mask:)` /
+// `dispatchCausal(...)` entry point builds those pipelines
+// yet。 The scaffolding is intentionally retained for the
+// follow-up commit that wires them。
 //
 // Output is mathematically equivalent to the standard
 // `scaled_dot_product_attention` kernel,but uses O(N) memory
@@ -31,6 +41,11 @@ public enum BASMetalFlashAttentionDispatcherError:
     case zeroDimension
     case maxHeadDimExceeded(Int)
     case maxTileRowsExceeded(Int)
+    /// GPU command buffer completed with a fault
+    /// (`MTLCommandBuffer.error` was non-nil)。 The zero-
+    /// filled output buffer is NOT a valid result — throw
+    /// rather than return it as success。
+    case commandBufferFailed(message: String)
 
     public var caseIdentifier: String {
         switch self {
@@ -54,6 +69,8 @@ public enum BASMetalFlashAttentionDispatcherError:
             return "maxHeadDimExceeded"
         case .maxTileRowsExceeded:
             return "maxTileRowsExceeded"
+        case .commandBufferFailed:
+            return "commandBufferFailed"
         }
     }
 }
@@ -156,10 +173,22 @@ public actor BASMetalFlashAttentionDispatcher {
             threadsPerThreadgroup: MTLSize(
                 width: bR, height: 1, depth: 1))
         encoder.endEncoding()
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmdBuf.addCompletedHandler { _ in
-                cont.resume()
+        // Resume by THROWING when the GPU faults — a non-nil
+        // commandBuffer.error means the zero-filled output is
+        // garbage, not a valid result。 Success path resumes
+        // with the unchanged output buffer。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMetalFlashAttentionDispatcherError
+                            .commandBufferFailed(
+                                message:
+                                    err.localizedDescription))
+                } else {
+                    cont.resume()
+                }
             }
             cmdBuf.commit()
         }

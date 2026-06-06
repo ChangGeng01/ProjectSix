@@ -255,7 +255,7 @@ public actor BASMetalSSMScanKernel: BASMetalKernel {
                 reason: "failed to allocate output y")
         }
 
-        // Allocate shape constant buffer (12 bytes)
+        // Allocate shape constant buffer (MemoryLayout size)
         var shapeStruct = shape
         guard let bufShape = withUnsafeBytes(
             of: &shapeStruct,

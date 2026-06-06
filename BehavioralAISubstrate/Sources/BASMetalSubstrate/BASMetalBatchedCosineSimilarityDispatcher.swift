@@ -35,6 +35,11 @@ public enum BASMetalBatchedCosineDispatcherError:
     case zeroCorpus
     case shapeMismatch(
         queryLen: Int, corpusLen: Int, dim: Int)
+    /// GPU command buffer completed with a fault
+    /// (`MTLCommandBuffer.error` was non-nil)。 The zero-
+    /// filled scores buffer is NOT a valid result — throw
+    /// rather than return it as success。
+    case commandBufferFailed(message: String)
 
     public var caseIdentifier: String {
         switch self {
@@ -56,6 +61,8 @@ public enum BASMetalBatchedCosineDispatcherError:
             return "zeroCorpus"
         case .shapeMismatch:
             return "shapeMismatch"
+        case .commandBufferFailed:
+            return "commandBufferFailed"
         }
     }
 }
@@ -198,10 +205,22 @@ public actor BASMetalBatchedCosineSimilarityDispatcher {
             gridSize,
             threadsPerThreadgroup: groupSize)
         encoder.endEncoding()
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmdBuf.addCompletedHandler { _ in
-                cont.resume()
+        // Resume by THROWING when the GPU faults — a non-nil
+        // commandBuffer.error means the zero-filled scores
+        // buffer is garbage, not a valid result。 Success
+        // path resumes with the unchanged scores buffer。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMetalBatchedCosineDispatcherError
+                            .commandBufferFailed(
+                                message:
+                                    err.localizedDescription))
+                } else {
+                    cont.resume()
+                }
             }
             cmdBuf.commit()
         }

@@ -272,9 +272,9 @@ public actor BASMetalKernelLibraryLoader {
     ///
     /// Hosts use this for observability / verification:
     /// "did the SSMScan.metal compile expose the expected
-    /// kernel symbol?" Currently the expected name is
-    /// `bas_ssm_scan_forward` (per chapter 七百四
-    /// SSMScan.metal contents) — tests can pin that
+    /// kernel symbol?" The expected name is
+    /// `ssm_scan_float32` (the actual `kernel void`
+    /// declaration in SSMScan.metal) — tests can pin that
     /// expectation。
     public func compiledFunctionNames() -> [String] {
         #if canImport(Metal)
@@ -429,13 +429,37 @@ public actor BASMetalKernelLibraryLoader {
         enc.endEncoding()
         // Bridge addCompletedHandler to async without
         // crossing actor boundaries with MTLCommandBuffer
-        // (not Sendable)。
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmd.addCompletedHandler { _ in
-                cont.resume()
+        // (not Sendable)。 Resume by THROWING on a GPU fault
+        // (non-nil commandBuffer.error) so a faulted self-
+        // test reports `.failed` instead of reading the pre-
+        // zeroed buffer and (since expected is 1.0) failing
+        // with a misleading "math mismatch" reason。 Success
+        // path resumes normally with the output unchanged。
+        do {
+            try await withCheckedThrowingContinuation {
+                (cont: CheckedContinuation<Void, Error>) in
+                cmd.addCompletedHandler { buffer in
+                    if let err = buffer.error {
+                        cont.resume(throwing:
+                            BASMetalKernelLibraryLoaderError
+                                .metalCompilationFailed(
+                                    message:
+                                        "self-test command" +
+                                        " buffer error: " +
+                                        err.localizedDescription))
+                    } else {
+                        cont.resume()
+                    }
+                }
+                cmd.commit()
             }
-            cmd.commit()
+        } catch {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason:
+                    "command buffer faulted: \(error)",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
         }
         let outPtr = yBuf.contents().bindMemory(
             to: Float.self, capacity: 1)

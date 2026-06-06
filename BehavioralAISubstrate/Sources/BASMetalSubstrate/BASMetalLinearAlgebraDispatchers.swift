@@ -26,6 +26,11 @@ public enum BASMetalRMSNormDispatcherError: Error,
     case pipelineCreationFailed(message: String)
     case bufferAllocationFailed(name: String)
     case zeroLengthVector
+    /// GPU command buffer completed with a fault
+    /// (`MTLCommandBuffer.error` was non-nil)。 The zero-
+    /// filled output buffer is NOT a valid result — throw
+    /// rather than return it as success。
+    case commandBufferFailed(message: String)
 
     public var caseIdentifier: String {
         switch self {
@@ -43,6 +48,8 @@ public enum BASMetalRMSNormDispatcherError: Error,
             return "bufferAllocationFailed"
         case .zeroLengthVector:
             return "zeroLengthVector"
+        case .commandBufferFailed:
+            return "commandBufferFailed"
         }
     }
 }
@@ -171,10 +178,22 @@ public actor BASMetalRMSNormDispatcher {
         encoder.dispatchThreads(
             gridSize, threadsPerThreadgroup: groupSize)
         encoder.endEncoding()
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmdBuf.addCompletedHandler { _ in
-                cont.resume()
+        // Resume by THROWING when the GPU faults — a non-nil
+        // commandBuffer.error means the zero-filled output is
+        // garbage, not a valid result。 Success path resumes
+        // with the unchanged output buffer。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMetalRMSNormDispatcherError
+                            .commandBufferFailed(
+                                message:
+                                    err.localizedDescription))
+                } else {
+                    cont.resume()
+                }
             }
             cmdBuf.commit()
         }
@@ -230,6 +249,11 @@ public enum BASMetalMatMulDispatcherError: Error,
     case shapeMismatch(
         message: String)
     case zeroDimension
+    /// GPU command buffer completed with a fault
+    /// (`MTLCommandBuffer.error` was non-nil)。 The zero-
+    /// filled output buffer is NOT a valid result — throw
+    /// rather than return it as success。
+    case commandBufferFailed(message: String)
 
     public var caseIdentifier: String {
         switch self {
@@ -249,6 +273,8 @@ public enum BASMetalMatMulDispatcherError: Error,
             return "shapeMismatch"
         case .zeroDimension:
             return "zeroDimension"
+        case .commandBufferFailed:
+            return "commandBufferFailed"
         }
     }
 }
@@ -395,10 +421,22 @@ public actor BASMetalMatMulDispatcher {
         encoder.dispatchThreads(
             gridSize, threadsPerThreadgroup: groupSize)
         encoder.endEncoding()
-        await withCheckedContinuation {
-            (cont: CheckedContinuation<Void, Never>) in
-            cmdBuf.addCompletedHandler { _ in
-                cont.resume()
+        // Resume by THROWING when the GPU faults — a non-nil
+        // commandBuffer.error means the zero-filled output is
+        // garbage, not a valid result。 Success path resumes
+        // with the unchanged output buffer。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMetalMatMulDispatcherError
+                            .commandBufferFailed(
+                                message:
+                                    err.localizedDescription))
+                } else {
+                    cont.resume()
+                }
             }
             cmdBuf.commit()
         }

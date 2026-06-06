@@ -517,9 +517,12 @@ public actor BASPlasticityFold {
                 " must equal postDim (\(shape.postDim))")
         }
         // Compute scale + stdpAmplitude CPU-side per
-        // the configured rule — identical to CPU path
-        // so GPU/CPU output is byte-equal within Float
-        // precision。
+        // the configured rule — identical to the CPU path's
+        // scale。 The GPU result is numerically close, not
+        // bit-identical, to the CPU path:the CPU computes a
+        // delta then applies weights += delta as a separate
+        // step, whereas the kernel fuses the multiply-add,
+        // so float rounding can differ in the last ULP。
         let scale: Float
         var stdpAmplitude: Float = 0
         switch shape.rule {

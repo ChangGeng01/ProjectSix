@@ -167,9 +167,28 @@ extension BASBundle
 /// sequenceIndex preserves invocation ordering。
 public actor BASMPSGraphExecutableCache {
 
+    /// Maximum number of compiled `MPSGraphExecutable`
+    /// entries retained before FIFO eviction kicks in。
+    /// Bounds the cache so a batch-size sweep (each unique
+    /// inputShapes combination is a distinct key) cannot
+    /// grow it without limit — every retained entry pins a
+    /// compiled executable + its backing GPU pipeline
+    /// state。 64 covers the realistic spread of shapes a
+    /// single kernel sees across a run while capping the
+    /// resident footprint。
+    public static let maxEntries: Int = 64
+
     private var observations:
         [BASMPSGraphCacheHitObservationItem] = []
     private var nextSequenceIndex: Int = 0
+
+    /// Running hit counter — incremented in `recordHit`。
+    /// Replaces the O(n) `observations.filter` recompute on
+    /// every `hitCount` / `hitRatio` read。
+    private var runningHitCount: Int = 0
+
+    /// Running miss counter — incremented in `recordMiss`。
+    private var runningMissCount: Int = 0
 
     /// M2033 chapter 六百六十四 第一刀:per-key compiled
     /// `MPSGraphExecutable` storage slot。 Kernel actors
@@ -181,6 +200,12 @@ public actor BASMPSGraphExecutableCache {
     /// callers always go through `async` accessors。
     private var executables:
         [BASMPSGraphCacheKey: MPSGraphExecutable] = [:]
+
+    /// FIFO insertion order of keys currently in
+    /// `executables`。 The head is the oldest entry,
+    /// evicted first when `executables.count` would exceed
+    /// `maxEntries`。
+    private var insertionOrder: [BASMPSGraphCacheKey] = []
 
     public init() {}
 
@@ -206,7 +231,22 @@ public actor BASMPSGraphExecutableCache {
         _ executable: MPSGraphExecutable,
         forKey key: BASMPSGraphCacheKey
     ) {
+        // Overwrite of an existing key:value updates in
+        // place,FIFO position unchanged (no count growth)。
+        if executables[key] != nil {
+            executables[key] = executable
+            return
+        }
+        // FIFO eviction:if at capacity, drop the oldest
+        // entry before inserting the new one so the resident
+        // executable count never exceeds maxEntries。
+        if executables.count >= Self.maxEntries,
+           let oldest = insertionOrder.first {
+            insertionOrder.removeFirst()
+            executables.removeValue(forKey: oldest)
+        }
         executables[key] = executable
+        insertionOrder.append(key)
     }
 
     /// Number of compiled executables stored。 Useful
@@ -226,6 +266,7 @@ public actor BASMPSGraphExecutableCache {
                 wasHit: true,
                 sequenceIndex: nextSequenceIndex))
         nextSequenceIndex += 1
+        runningHitCount += 1
     }
 
     /// Record a cache miss for the given key。
@@ -238,29 +279,27 @@ public actor BASMPSGraphExecutableCache {
                 wasHit: false,
                 sequenceIndex: nextSequenceIndex))
         nextSequenceIndex += 1
+        runningMissCount += 1
     }
 
     /// Total hits observed since construction or last
-    /// reset。
-    public var hitCount: Int {
-        observations.filter { $0.wasHit }.count
-    }
+    /// reset。 O(1) via the running counter (no per-read
+    /// `observations.filter` scan)。
+    public var hitCount: Int { runningHitCount }
 
     /// Total misses observed since construction or last
-    /// reset。
-    public var missCount: Int {
-        observations.filter { !$0.wasHit }.count
-    }
+    /// reset。 O(1) via the running counter。
+    public var missCount: Int { runningMissCount }
 
     /// Total cache lookups observed。
     public var totalLookups: Int { observations.count }
 
     /// Hit ratio。 Returns 0 when no lookups recorded
-    /// (avoids divide-by-zero)。
+    /// (avoids divide-by-zero)。 O(1) via running counters。
     public var hitRatio: Double {
-        guard !observations.isEmpty else { return 0 }
-        return Double(hitCount)
-            / Double(observations.count)
+        let total = runningHitCount + runningMissCount
+        guard total > 0 else { return 0 }
+        return Double(runningHitCount) / Double(total)
     }
 
     /// Snapshot the current observation set as a typed
@@ -287,6 +326,9 @@ public actor BASMPSGraphExecutableCache {
     public func reset() {
         observations.removeAll()
         nextSequenceIndex = 0
+        runningHitCount = 0
+        runningMissCount = 0
         executables.removeAll()
+        insertionOrder.removeAll()
     }
 }

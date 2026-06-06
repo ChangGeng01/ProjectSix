@@ -388,10 +388,14 @@ public actor BASMetalBenchmarkHarness {
             gpuAvailable: gpuAvailable)
     }
 
-    // High-resolution monotonic clock in µs。 mach
-    // absolute time on Apple platforms;falls back to
-    // CFAbsoluteTime elsewhere。
+    // High-resolution MONOTONIC clock in µs。 Uses
+    // `DispatchTime.now().uptimeNanoseconds` (backed by
+    // mach_absolute_time) so a wall-clock adjustment (NTP
+    // step, manual clock change) during a benchmark run
+    // cannot produce a negative or skewed elapsed time。
+    // Benchmark-only timing — not a parity path。
     fileprivate static func nowMicroseconds() -> Double {
-        return CFAbsoluteTimeGetCurrent() * 1_000_000.0
+        return Double(DispatchTime.now().uptimeNanoseconds)
+            / 1_000.0
     }
 }
