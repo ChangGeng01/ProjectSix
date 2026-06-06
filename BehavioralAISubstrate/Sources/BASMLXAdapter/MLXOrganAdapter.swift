@@ -120,23 +120,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         var params = GenerateParameters()
         params.temperature = Float(preset.temperature)
         params.topP = Float(preset.topP)
-        // ch1066 — ENFORCE a decode bound, closing a latent contract violation: the
-        // descriptor CONTRACTS `maxOutputTokens` (default 4096) yet the decode never set
-        // params.maxTokens, so generation relied solely on the model emitting EOS (an
-        // unbounded TOKEN runaway was possible). Honor the per-request cap when supplied
-        // and POSITIVE (a 0/negative cap would emit nothing → fall back to the contract),
-        // else the descriptor's contracted max.
+        // ch1066 — ENFORCE a decode bound (the cap was never applied; generation relied
+        // solely on the model emitting EOS → an unbounded TOKEN runaway). Precedence: an
+        // explicit POSITIVE per-request cap wins; else the PRESET's output budget
+        // (scout=terse 192, core=fuller 1024) — the SAME fallback the cloud
+        // BASChatCompletionsOrganAdapter uses, so provider choice no longer silently changes
+        // output length (on-device used to ignore the preset and decode up to the 4096
+        // descriptor max). In every case, clamp to the descriptor's contracted ceiling.
         //
         // HONEST SCOPE (ch1066 再查 / on-device A/B): this bounds a TOKEN runaway. It does
-        // NOT fix the on-device iter=1 endurance freeze — that was an UNCANCELLABLE
-        // Metal/GPU eval hang with ZERO token progress, so this per-token cap never fires.
-        // That freeze is addressed by preventing the trigger: feed-forward gate default
-        // OFF plus sanitized/bounded authoritative projection. A per-turn wall-clock
-        // timeout was rejected on-device because the synchronous Metal eval is not
-        // cancellable. This cap is correct, additive, invariant-safe hardening — just
-        // not the cure for that specific hang.
+        // NOT fix the on-device iter=1 endurance freeze — that was an uncancellable Metal/GPU
+        // eval hang with ZERO token progress (handled by the feed-forward gate default OFF +
+        // sanitized/bounded authoritative projection; a per-turn wall-clock timeout was
+        // rejected on-device because the synchronous Metal eval is not cancellable).
         let perRequestCap = maxOutputTokens.flatMap { $0 > 0 ? $0 : nil }
-        params.maxTokens = perRequestCap ?? descriptor.maxOutputTokens
+        params.maxTokens = min(
+            perRequestCap ?? preset.maxOutputTokens,
+            descriptor.maxOutputTokens)
         return params
     }
     #endif
@@ -416,7 +416,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
 
         // Composite key — same caller session ID with different
         // role gets its own ChatSession (different system prompt).
-        let key = "\(sessionID)#\(request.role.rawValue)"
+        let key = Self.sessionKey(sessionID, request.role)
         let box: ChatSessionBox
         if let existing = sessions[key] {
             box = existing
@@ -457,15 +457,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #endif
     }
 
+    #if canImport(MLXLLM)
+    /// ch1066 — single source of truth for the multi-turn session-pool key
+    /// (`<sessionID>#<role>`); used by `draftMultiTurn` + `clearSession` so they can't drift.
+    private static func sessionKey(
+        _ sessionID: String, _ role: BASOrganRole
+    ) -> String {
+        "\(sessionID)#\(role.rawValue)"
+    }
+    #endif
+
     /// Drop the `ChatSession` keyed by `sessionID` for both roles.
     /// Frees its KV cache; future calls with that ID start fresh.
     /// No-op if no session under that ID exists.
     public func clearSession(sessionID: String) {
         #if canImport(MLXLLM)
-        sessions.removeValue(
-            forKey: "\(sessionID)#\(BASOrganRole.scout.rawValue)")
-        sessions.removeValue(
-            forKey: "\(sessionID)#\(BASOrganRole.core.rawValue)")
+        sessions.removeValue(forKey: Self.sessionKey(sessionID, .scout))
+        sessions.removeValue(forKey: Self.sessionKey(sessionID, .core))
         #endif
     }
 

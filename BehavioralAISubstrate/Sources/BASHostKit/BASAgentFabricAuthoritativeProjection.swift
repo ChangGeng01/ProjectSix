@@ -91,6 +91,12 @@ public enum BASAgentFabricAuthoritativeProjection {
     /// never dominate the decoder's prefill. Provenance (digest) is from the typed
     /// conclusions, not this text, so this does not affect convergence/replay.
     public static let maxContextBlockChars: Int = 512
+    /// ch1066 再查 — structural / angle-bracket punctuation stripped from a summary before it
+    /// enters a prompt. The raw `{...}` / `<...>` blob is the out-of-distribution prefill that
+    /// wedged the on-device decoder. Single source of truth so `plainSummary` and its test
+    /// can't drift.
+    public static let structuralPunctuation: Set<Character> = [
+        "{", "}", "[", "]", "\"", "<", ">", "|", "\\", "`"]
 
     /// Project a fabric turn's merge-accepted deltas into an authoritative feed-forward input —
     /// ONLY when `mode == .authoritative` and at least one delta was accepted. Returns `nil`
@@ -172,8 +178,7 @@ public enum BASAgentFabricAuthoritativeProjection {
     /// prompt text — the stored Conclusion.summary (and the provenance digest, computed from
     /// the typed conclusions) are untouched.
     static func plainSummary(_ s: String) -> String {
-        let structural: Set<Character> = [
-            "{", "}", "[", "]", "\"", "<", ">", "|", "\\", "`"]
+        let structural = Self.structuralPunctuation
         var out = ""
         out.reserveCapacity(s.count)
         var lastWasSpace = false

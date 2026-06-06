@@ -179,5 +179,20 @@ final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
         XCTAssertTrue(input.contextBlock.hasSuffix(" …"),
             "truncated context blocks should make the truncation visible")
     }
+
+    func testPlainSummaryStripsEveryStructuralPunctuationChar() {
+        // ch1066 再查 — pin plainSummary against the SAME constant it uses, so the stripper
+        // and this test can't drift (the contextBlock tests above only check a header-safe
+        // subset, since the provenance header legitimately contains [ ]).
+        let punct = BASAgentFabricAuthoritativeProjection.structuralPunctuation
+        let dirty = punct.map(String.init).joined() + "keepThis123"
+        let clean = BASAgentFabricAuthoritativeProjection.plainSummary(dirty)
+        for ch in punct {
+            XCTAssertFalse(clean.contains(ch),
+                "plainSummary must strip the structural char \(ch)")
+        }
+        XCTAssertTrue(clean.contains("keepThis123"),
+            "plainSummary must keep ordinary content")
+    }
 }
 #endif

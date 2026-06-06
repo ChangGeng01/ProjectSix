@@ -236,19 +236,18 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     // ch1066 — every token decode must be bounded. Before this fix
     // `_generateParameters` never set `params.maxTokens`, so generation relied solely
-    // on the model emitting EOS; structured/adversarial prompts could run away
-    // unbounded. These pin that every decode is now capped — honoring the per-request
-    // cap, else the descriptor's contracted max — so `maxTokens` is never nil.
-    // Note: the on-device iter=1 endurance freeze was a zero-token Metal/GPU eval hang,
-    // so it is handled by the feed-forward gate + projection sanitization, not by this
-    // token cap alone.
-    func testGenerateParametersBoundsDecodeToDescriptorMaxByDefault() async {
+    // on the model emitting EOS; structured/adversarial prompts could run away unbounded.
+    // These pin that every decode is now capped — an explicit per-request cap wins, else
+    // the PRESET's output budget, clamped to the descriptor ceiling — so `maxTokens` is
+    // never nil. (再查: the on-device iter=1 freeze was a zero-token Metal/GPU eval hang,
+    // handled by the feed-forward gate + projection sanitization, not this token cap.)
+    func testGenerateParametersFallsBackToPresetBudgetByDefault() async {
         let adapter = MLXOrganAdapter()  // default descriptor maxOutputTokens = 4096
         let params = await adapter._generateParameters(for: .core)
         XCTAssertEqual(
-            params.maxTokens, 4096,
-            "an unset per-request cap must fall back to the descriptor's contracted " +
-            "maxOutputTokens — never nil (nil = unbounded token decode)")
+            params.maxTokens, BASOrganPreset.core.maxOutputTokens,
+            "an unset per-request cap must fall back to the preset's output budget " +
+            "(core), clamped to the descriptor — matching the cloud adapter; never nil")
     }
 
     func testGenerateParametersHonorsExplicitPerRequestCap() async {
