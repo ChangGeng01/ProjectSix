@@ -150,6 +150,26 @@ public actor BASRoutedVectorIndexStorage {
         }
     }
 
+    /// ADR-037 — IN-MEMORY engine (`:memory:`), NOT file-backed. Backs the OPT-IN global-recall
+    /// corpus: a SEPARATE Rust L8 engine that must NOT share the durable WAL file with the
+    /// system-SQLite `BASSQLiteVectorIndexStorage` (rusqlite-bundled SQLite vs system SQLite3 on one
+    /// `-shm` = corruption). Passes `(nil, 0)` to `bas_l8_engine_init` ⇒ `open_in_memory()`
+    /// (Cargo/bas-l8-engine/src/lib.rs:366). The host rebuilds it from the durable store at startup
+    /// (no re-embed), so the durable index stays the untouched source of truth and this is a derived,
+    /// rebuildable replica. Mirrors `init(databaseURL:)`'s two-step init + schema, sans the file path.
+    public init(inMemory: Void) throws {
+        self.databaseURL = URL(fileURLWithPath: ":memory:")  // sentinel — introspection only
+        guard let engine = bas_l8_engine_init(nil, 0) else {
+            throw StoreError.engineInitFailed
+        }
+        self.enginePtr = engine
+        let rc = bas_l8_vector_index_init_schema(engine)
+        guard rc == 0 else {
+            _ = bas_l8_engine_close(engine)
+            throw StoreError.schemaInitFailed(code: rc)
+        }
+    }
+
     deinit { _ = bas_l8_engine_close(enginePtr) }
 
     /// UPSERT。 Returns true on insert,false on replace

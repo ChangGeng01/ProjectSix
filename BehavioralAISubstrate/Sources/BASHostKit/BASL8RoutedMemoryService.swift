@@ -99,6 +99,10 @@ public struct BASRoutedMemoryPersistence: Sendable {
     /// SQLite-only (no cosineTopK engine); on-device adoption is a documented follow-up (ADR-036).
     public let cosineTopKSync:
         (@Sendable (_ query: [Float], _ k: Int) -> [(atomID: String, score: Float)])?
+    /// ADR-037 — OPTIONAL host-injected GLOBAL recall seam (full-corpus cosineTopK + atom resolver).
+    /// nil ⇒ no global recall. Preferred over `cosineTopKSync` in `retrieve()` when both are wired.
+    /// Byte-equal-off by default; the host owns the in-memory engine + resolver map.
+    public let globalRecall: BASGlobalRecallSeam?
     public init(
         loadAllAtoms: @escaping @Sendable () async -> [BASGovernedMemory],
         admitAtom: @escaping @Sendable (BASGovernedMemory) async -> Void,
@@ -106,7 +110,8 @@ public struct BASRoutedMemoryPersistence: Sendable {
         loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
         upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
-            -> [(atomID: String, score: Float)])? = nil
+            -> [(atomID: String, score: Float)])? = nil,
+        globalRecall: BASGlobalRecallSeam? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.admitAtom = admitAtom
@@ -114,6 +119,33 @@ public struct BASRoutedMemoryPersistence: Sendable {
         self.loadEmbedding = loadEmbedding
         self.upsertEmbedding = upsertEmbedding
         self.cosineTopKSync = cosineTopKSync
+        self.globalRecall = globalRecall
+    }
+}
+
+/// ADR-037 — GLOBAL durable cosineTopK recall seam. Pairs the full-corpus ranker with an atom
+/// resolver so `retrieve()` can return top-K atoms even when they fall OUTSIDE the in-memory
+/// ≤selfPopulateCap recall window. nil default ⇒ byte-equal-off (ADR-014 / 红线 7). NON-byte-equal
+/// when wired (ADR-036-class semantics — tie membership at the K-th boundary by rowid, pre-filter
+/// truncation — now over the full corpus). The host owns the in-memory engine + resolver map
+/// lifetime + memory bound; both closures are synchronous (ch883 retrieve stays sync).
+public struct BASGlobalRecallSeam: Sendable {
+    /// 1 FFI call: full-corpus cosine top-K → (atomID, score), score DESC. Backed by the host's
+    /// in-memory `BASRoutedVectorIndexStorage.cosineTopKAtomIDsSync(forDomain:query:k:)`.
+    public let cosineTopK:
+        @Sendable (_ query: [Float], _ k: Int) -> [(atomID: String, score: Float)]
+    /// atomID → (atom, domain) over the FULL corpus. nil for an unknown id (that hit is skipped, like
+    /// the windowed path skips an out-of-window hit). Host-backed by a bounded [String:(atom,domain)].
+    public let atomForID:
+        @Sendable (_ atomID: String) -> (atom: BASMemoryAtom, domain: String)?
+    public init(
+        cosineTopK: @escaping @Sendable (_ query: [Float], _ k: Int)
+            -> [(atomID: String, score: Float)],
+        atomForID: @escaping @Sendable (_ atomID: String)
+            -> (atom: BASMemoryAtom, domain: String)?
+    ) {
+        self.cosineTopK = cosineTopK
+        self.atomForID = atomForID
     }
 }
 
@@ -195,6 +227,9 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// by rowid + truncates before the Swift floor/constitution filter) — opt-in by the host.
     private let cosineTopKSync:
         (@Sendable (_ query: [Float], _ k: Int) -> [(atomID: String, score: Float)])?
+    /// ADR-037 — OPTIONAL global-recall seam (full-corpus cosineTopK + atom resolver). Preferred over
+    /// `cosineTopKSync` in retrieve() when both are set; nil ⇒ unchanged paths, byte-equal-off.
+    private let globalRecall: BASGlobalRecallSeam?
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -210,7 +245,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         loadEmbedding: (@Sendable (String) async -> [Float]?)? = nil,
         upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
-            -> [(atomID: String, score: Float)])? = nil
+            -> [(atomID: String, score: Float)])? = nil,
+        globalRecall: BASGlobalRecallSeam? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -225,6 +261,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.loadEmbedding = loadEmbedding
         self.upsertEmbedding = upsertEmbedding
         self.cosineTopKSync = cosineTopKSync
+        self.globalRecall = globalRecall
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -254,7 +291,21 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         // result for an atom not in the recall window is skipped). nil seam ⇒ the orchestrated
         // score-all baseline — fully synchronous (ch883), byte-equal-off (ADR-014).
         let scored: [(score: Float, entry: SnapshotEntry)]
-        if let cosineTopKSync {
+        if let globalRecall {
+            // ADR-037 — GLOBAL recall: rank over the FULL durable corpus (the host's in-memory routed
+            // index) and resolve winning atom_ids BEYOND the ≤selfPopulateCap snapshot window. A hit
+            // whose id the resolver can't map is skipped (compactMap) — exactly as the windowed path
+            // skips an out-of-window hit. NON-byte-equal vs the legacy default (ADR-036-class
+            // semantics over the full corpus); the shared floor/constitution/sort tail below is
+            // unchanged, so the returned bundle stays byte-deterministic within its membership.
+            scored = globalRecall.cosineTopK(query, topK).compactMap { hit in
+                globalRecall.atomForID(hit.atomID).map { resolved in
+                    (hit.score, SnapshotEntry(
+                        atomID: hit.atomID, domain: resolved.domain,
+                        embedding: [], atom: resolved.atom))
+                }
+            }
+        } else if let cosineTopKSync {
             let byID = Dictionary(
                 snap.map { ($0.atomID, $0) }, uniquingKeysWith: { a, _ in a })
             scored = cosineTopKSync(query, topK).compactMap { hit in
@@ -478,7 +529,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     // this additive backend touches no existing code — a future refactor may dedup into a shared
     // BASGovernedMemoryAtomProjection, chapter 二百一一)
 
-    static func memoryAtom(from record: BASGovernedMemory) -> BASMemoryAtom {
+    public static func memoryAtom(from record: BASGovernedMemory) -> BASMemoryAtom {
         BASMemoryAtom(
             memoryID: record.id.uuidString,
             summary: record.content,

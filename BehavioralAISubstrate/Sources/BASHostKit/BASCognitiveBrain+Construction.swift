@@ -118,7 +118,9 @@ extension BASCognitiveBrain {
                 upsertEmbedding: store.upsertEmbedding,
                 // WS3/ADR-036 — thread the opt-in cosineTopK seam through the standard factory path
                 // (nil unless the host wires a cosineTopK-capable routed index ⇒ byte-equal-off).
-                cosineTopKSync: store.cosineTopKSync)
+                cosineTopKSync: store.cosineTopKSync,
+                // ADR-037 — and the opt-in GLOBAL recall seam (full-corpus cosineTopK + resolver).
+                globalRecall: store.globalRecall)
         }
         let emptyLoad: @Sendable () async -> [BASGovernedMemory] = { [] }
         return BASL8RoutedMemoryService(
