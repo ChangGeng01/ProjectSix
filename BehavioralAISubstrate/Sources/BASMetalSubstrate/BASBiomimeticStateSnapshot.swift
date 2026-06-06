@@ -195,6 +195,22 @@ public struct BASBiomimeticStateSnapshot:
     /// when not used。
     public let plasticity: BASPlasticitySnapshot?
 
+    /// Hierarchical predictive-coding state snapshot。
+    /// nil when not used。 OPTIONAL-WITH-NIL-DEFAULT so
+    /// existing 3-slot encodings still decode (synthesized
+    /// Codable treats a missing optional key as nil)。
+    /// Closes the chapter 467/468 checkpoint→replay gap
+    /// where HPC learned state was silently dropped。
+    public let hierarchical:
+        BASHierarchicalPredictiveCodingSnapshot?
+
+    /// BCM meta-plasticity state snapshot。 nil when not
+    /// used。 OPTIONAL-WITH-NIL-DEFAULT (backward-compat:
+    /// pre-existing 3-slot encodings decode with this as
+    /// nil)。 Closes the same checkpoint→replay drop for
+    /// BCM learned state (weights + sliding θ)。
+    public let bcm: BASBCMMetaPlasticitySnapshot?
+
     /// Snapshot version tag for forward-compat
     /// migration。 chapter 八十七 raw-value stability:
     /// bumping requires explicit audit。
@@ -209,6 +225,9 @@ public struct BASBiomimeticStateSnapshot:
         mamba: BASMambaSSMSnapshot? = nil,
         predictive: BASPredictiveCodingSnapshot? = nil,
         plasticity: BASPlasticitySnapshot? = nil,
+        hierarchical:
+            BASHierarchicalPredictiveCodingSnapshot? = nil,
+        bcm: BASBCMMetaPlasticitySnapshot? = nil,
         snapshotVersion: String =
             "biomimetic-snapshot-v1",
         timestampMs: Int64 = Int64(
@@ -217,6 +236,8 @@ public struct BASBiomimeticStateSnapshot:
         self.mamba = mamba
         self.predictive = predictive
         self.plasticity = plasticity
+        self.hierarchical = hierarchical
+        self.bcm = bcm
         self.snapshotVersion = snapshotVersion
         self.timestampMs = timestampMs
     }
@@ -228,6 +249,8 @@ public struct BASBiomimeticStateSnapshot:
         if mamba != nil { count += 1 }
         if predictive != nil { count += 1 }
         if plasticity != nil { count += 1 }
+        if hierarchical != nil { count += 1 }
+        if bcm != nil { count += 1 }
         return count
     }
 }

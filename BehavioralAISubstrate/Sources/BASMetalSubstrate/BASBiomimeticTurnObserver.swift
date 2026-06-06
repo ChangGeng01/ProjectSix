@@ -419,10 +419,17 @@ public actor BASBiomimeticTurnObserver {
             await predictive?.exportSnapshot()
         let plasticitySnap: BASPlasticitySnapshot? =
             await plasticity?.exportSnapshot()
+        let hierarchicalSnap:
+            BASHierarchicalPredictiveCodingSnapshot? =
+            await hierarchical?.exportSnapshot()
+        let bcmSnap: BASBCMMetaPlasticitySnapshot? =
+            await bcm?.exportSnapshot()
         return BASBiomimeticStateSnapshot(
             mamba: mambaSnap,
             predictive: predictiveSnap,
-            plasticity: plasticitySnap)
+            plasticity: plasticitySnap,
+            hierarchical: hierarchicalSnap,
+            bcm: bcmSnap)
     }
 
     /// Restore all populated primitives from an
@@ -452,6 +459,16 @@ public actor BASBiomimeticTurnObserver {
            let foldSnap = snapshot.plasticity
         {
             try await fold.importSnapshot(foldSnap)
+        }
+        if let hier = hierarchical,
+           let hierSnap = snapshot.hierarchical
+        {
+            try await hier.importSnapshot(hierSnap)
+        }
+        if let b = bcm,
+           let bcmSnap = snapshot.bcm
+        {
+            try await b.importSnapshot(bcmSnap)
         }
     }
 

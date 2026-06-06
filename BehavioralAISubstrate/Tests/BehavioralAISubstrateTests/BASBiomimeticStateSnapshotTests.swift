@@ -142,6 +142,141 @@ final class BASBiomimeticStateSnapshotTests: XCTestCase {
             decoded.timestampMs, 1_700_000_000_000)
     }
 
+    // MARK: - 5-slot aggregate (chapter 467/468 gap fix)
+
+    /// Aggregate carrying ALL 5 primitive snapshots
+    /// (including the previously-dropped hierarchical +
+    /// bcm slots) round-trips through Codable and reports
+    /// populatedPrimitiveCount == 5。
+    func testBiomimeticAggregateAll5SlotsRoundTrip()
+        throws
+    {
+        let mambaShape = BASMambaSSMShape(
+            batch: 1, hiddenDim: 1, stateDim: 2)
+        let mamba = BASMambaSSMSnapshot(
+            shape: mambaShape,
+            hiddenState: [0.1, 0.2],
+            processedScanCalls: 1)
+        let probeShape = BASPredictiveCodingProbeShape(
+            dim: 2,
+            learningRate: 0.1,
+            initialPrediction: [0.0, 0.0])
+        let probe = BASPredictiveCodingSnapshot(
+            shape: probeShape,
+            prediction: [0.3, 0.4],
+            observationsProcessed: 2,
+            sumSquaredError: 0.05)
+        let foldShape = BASPlasticityFoldShape(
+            preDim: 2, postDim: 2,
+            learningRate: 0.01, rule: .hebbian)
+        let fold = BASPlasticitySnapshot(
+            shape: foldShape,
+            weights: [0.0, 0.1, 0.2, 0.3],
+            updatesProcessed: 3)
+        let hierShape = try BASHierarchicalPredictiveCodingShape(
+            layers: [
+                BASPredictiveCodingProbeShape(
+                    dim: 2,
+                    learningRate: 0.1,
+                    initialPrediction: [0.0, 0.0]),
+                BASPredictiveCodingProbeShape(
+                    dim: 2,
+                    learningRate: 0.1,
+                    initialPrediction: [0.0, 0.0]),
+            ])
+        let hier = BASHierarchicalPredictiveCodingSnapshot(
+            shape: hierShape,
+            layers: [
+                BASPredictiveCodingSnapshot(
+                    shape: hierShape.layers[0],
+                    prediction: [0.1, 0.2],
+                    observationsProcessed: 1,
+                    sumSquaredError: 0.02),
+                BASPredictiveCodingSnapshot(
+                    shape: hierShape.layers[1],
+                    prediction: [0.3, 0.4],
+                    observationsProcessed: 1,
+                    sumSquaredError: 0.03),
+            ],
+            observationsProcessed: 1)
+        let bcmShape = BASBCMMetaPlasticityShape(
+            preDim: 2, postDim: 2,
+            learningRate: 0.05,
+            thresholdTimeConstant: 0.1,
+            initialThreshold: 0.4)
+        let bcm = BASBCMMetaPlasticitySnapshot(
+            shape: bcmShape,
+            weights: [0.5, 0.6, 0.7, 0.8],
+            threshold: 0.61,
+            updatesProcessed: 4)
+        let aggregate = BASBiomimeticStateSnapshot(
+            mamba: mamba,
+            predictive: probe,
+            plasticity: fold,
+            hierarchical: hier,
+            bcm: bcm,
+            snapshotVersion: "biomimetic-snapshot-v1",
+            timestampMs: 1_700_000_000_000)
+        XCTAssertEqual(aggregate.populatedPrimitiveCount, 5)
+        let data = try JSONEncoder().encode(aggregate)
+        let decoded = try JSONDecoder()
+            .decode(
+                BASBiomimeticStateSnapshot.self,
+                from: data)
+        XCTAssertEqual(decoded, aggregate)
+        XCTAssertEqual(decoded.populatedPrimitiveCount, 5)
+        XCTAssertNotNil(decoded.hierarchical)
+        XCTAssertNotNil(decoded.bcm)
+        XCTAssertEqual(decoded.bcm?.threshold, 0.61)
+    }
+
+    /// BACKWARD-COMPAT:an aggregate JSON that was encoded
+    /// with ONLY the original 3 slots (no hierarchical /
+    /// bcm keys) must still decode — the new optional
+    /// slots come back nil。 Uses a hand-written 3-slot
+    /// payload to prove a literal pre-existing encoding
+    /// (missing the new keys entirely) is accepted。
+    func testLegacy3SlotEncodingDecodesWithNewSlotsNil()
+        throws
+    {
+        let legacyJSON = """
+        {
+          "predictive": {
+            "shape": {
+              "dim": 2,
+              "learningRate": 0.1,
+              "initialPrediction": [0.0, 0.0]
+            },
+            "prediction": [0.5, 0.6],
+            "observationsProcessed": 2,
+            "sumSquaredError": 0.05
+          },
+          "snapshotVersion": "biomimetic-snapshot-v1",
+          "timestampMs": 1700000000000
+        }
+        """
+        let data = Data(legacyJSON.utf8)
+        let decoded = try JSONDecoder()
+            .decode(
+                BASBiomimeticStateSnapshot.self,
+                from: data)
+        // Old slot survives
+        XCTAssertNotNil(decoded.predictive)
+        XCTAssertEqual(decoded.predictive?.prediction,
+            [0.5, 0.6])
+        // Unspecified old slots are nil
+        XCTAssertNil(decoded.mamba)
+        XCTAssertNil(decoded.plasticity)
+        // NEW slots (keys absent from payload) decode as nil
+        XCTAssertNil(decoded.hierarchical)
+        XCTAssertNil(decoded.bcm)
+        XCTAssertEqual(decoded.populatedPrimitiveCount, 1)
+        XCTAssertEqual(decoded.snapshotVersion,
+            "biomimetic-snapshot-v1")
+        XCTAssertEqual(decoded.timestampMs,
+            1_700_000_000_000)
+    }
+
     func testAggregateSnapshotWithSomePrimitivesNil()
         throws
     {

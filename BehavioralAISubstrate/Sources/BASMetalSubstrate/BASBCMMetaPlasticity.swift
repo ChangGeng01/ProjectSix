@@ -148,6 +148,47 @@ public struct BASBCMMetaPlasticityUpdate:
     }
 }
 
+// MARK: - Typed snapshot bundle
+
+/// Codable snapshot of a `BASBCMMetaPlasticity` actor's
+/// internal state at a point in time。 chapter 455-style
+/// cross-turn persistence parity:weight matrix +
+/// sliding threshold θ + update counter,with the shape
+/// stored alongside so import can validate dimensional
+/// compatibility before mutating。 Closes the chapter
+/// 467/468 checkpoint→replay gap where BCM learned state
+/// was silently dropped (BCM had no snapshot surface)。
+public struct BASBCMMetaPlasticitySnapshot:
+    Codable, Equatable, Hashable, Sendable
+{
+
+    /// Shape the snapshot was taken at。 Import requires
+    /// matching shape on the target actor。
+    public let shape: BASBCMMetaPlasticityShape
+
+    /// Weight matrix flattened (preDim × postDim)。
+    public let weights: [Float]
+
+    /// Sliding modification threshold θ at snapshot time。
+    public let threshold: Float
+
+    /// Number of apply() calls since reset()。
+    public let updatesProcessed: Int
+
+    public init(
+        shape: BASBCMMetaPlasticityShape,
+        weights: [Float],
+        threshold: Float,
+        updatesProcessed: Int
+    ) {
+        self.shape = shape
+        self.weights = weights
+        self.threshold = threshold
+        self.updatesProcessed =
+            max(0, updatesProcessed)
+    }
+}
+
 // MARK: - Typed error
 
 public enum BASBCMMetaPlasticityError:
@@ -266,5 +307,53 @@ public actor BASBCMMetaPlasticity {
             weightDelta: delta,
             updatedWeightSnapshot: weights,
             updateIndex: currentIndex)
+    }
+
+    // MARK: - chapter 455-parity snapshot persistence
+
+    /// Capture an immutable snapshot of the actor's
+    /// current weight matrix + sliding threshold θ +
+    /// update counter。 Safe to encode/persist (Codable
+    /// via BASBCMMetaPlasticitySnapshot)。
+    public func exportSnapshot()
+        -> BASBCMMetaPlasticitySnapshot
+    {
+        return BASBCMMetaPlasticitySnapshot(
+            shape: shape,
+            weights: weights,
+            threshold: threshold,
+            updatesProcessed: updatesProcessed)
+    }
+
+    /// Restore actor state from a previously-exported
+    /// snapshot。 Throws `.shapeMismatch` if the
+    /// snapshot's shape doesn't match the actor's shape,
+    /// or if `weights.count` doesn't match
+    /// `preDim × postDim`。 Validation happens BEFORE any
+    /// mutation — failure leaves actor state untouched。
+    public func importSnapshot(
+        _ snapshot: BASBCMMetaPlasticitySnapshot
+    ) throws {
+        guard snapshot.shape == shape else {
+            throw BASBCMMetaPlasticityError
+                .shapeMismatch(
+                    reason: "snapshot.shape" +
+                    " (\(snapshot.shape)) !=" +
+                    " actor.shape (\(shape))")
+        }
+        let expectedSize =
+            shape.preDim * shape.postDim
+        guard snapshot.weights.count == expectedSize
+        else {
+            throw BASBCMMetaPlasticityError
+                .shapeMismatch(
+                    reason:
+                    "snapshot.weights.count" +
+                    " (\(snapshot.weights.count))" +
+                    " != expected (\(expectedSize))")
+        }
+        weights = snapshot.weights
+        threshold = snapshot.threshold
+        updatesProcessed = snapshot.updatesProcessed
     }
 }
