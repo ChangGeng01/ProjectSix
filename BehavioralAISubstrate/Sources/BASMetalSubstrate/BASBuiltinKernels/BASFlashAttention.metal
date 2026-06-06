@@ -102,6 +102,16 @@ kernel void flash_attention_forward(
     const uint D  = shape.D;
     const uint Dv = shape.Dv;
 
+    // In-shader head-dim guard。 The register arrays O_i / Q_i /
+    // S_i are sized [D_MAX] but the loops below run to runtime
+    // D / Dv。 The host dispatcher enforces D, Dv ≤ D_MAX, but a
+    // direct dispatch (test / future caller) could bypass that —
+    // early-out here so an oversized shape can never index the
+    // register arrays out of bounds。
+    if (D > D_MAX || Dv > D_MAX) {
+        return;
+    }
+
     // Each lane handles one query row inside this tile。
     const uint q_row = tg_id * B_R + lane;
     if (q_row >= M || lane >= B_R) {
@@ -207,6 +217,8 @@ kernel void flash_attention_forward_masked(
     const uint N  = shape.N;
     const uint D  = shape.D;
     const uint Dv = shape.Dv;
+    // In-shader head-dim guard (see flash_attention_forward)。
+    if (D > D_MAX || Dv > D_MAX) { return; }
     const uint q_row = tg_id * B_R + lane;
     if (q_row >= M || lane >= B_R) { return; }
     const float inv_sqrt_d = rsqrt(float(D));
@@ -287,6 +299,8 @@ kernel void flash_attention_forward_causal(
     const uint N  = shape.N;
     const uint D  = shape.D;
     const uint Dv = shape.Dv;
+    // In-shader head-dim guard (see flash_attention_forward)。
+    if (D > D_MAX || Dv > D_MAX) { return; }
     const uint q_row = tg_id * B_R + lane;
     if (q_row >= M || lane >= B_R) { return; }
     const float inv_sqrt_d = rsqrt(float(D));
