@@ -97,7 +97,7 @@ public actor BASMPSGraphSoftmaxKernel: BASMetalKernel {
 
         let startTick = DispatchTime.now()
             .uptimeNanoseconds
-        let bytesCount = rows * cols * 4
+        let bytesCount = rows * cols * MemoryLayout<Float>.stride
 
         // Upload CPU bytes → MTLBuffer
         guard let bufferX = inputs.payloads[0]

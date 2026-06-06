@@ -150,9 +150,10 @@ public actor BASMPSGraphConv2DKernel: BASMetalKernel {
 
         let startTick = DispatchTime.now()
             .uptimeNanoseconds
-        let inBytes = n * h * w * cin * 4
-        let wBytes = hk * wk * cin * cout * 4
-        let outBytes = n * outH * outW * cout * 4
+        let inBytes = n * h * w * cin * MemoryLayout<Float>.stride
+        let wBytes = hk * wk * cin * cout * MemoryLayout<Float>.stride
+        let outBytes =
+            n * outH * outW * cout * MemoryLayout<Float>.stride
 
         guard let bufferIn = inputs.payloads[0]
             .withUnsafeBytes({ raw in

@@ -390,19 +390,26 @@ public actor BASMetalKernelLibraryLoader {
         var shapeValues: [UInt32] = [1, 1, 1]
         let dev = lib.device
         guard let xBuf = dev.makeBuffer(
-            bytes: x, length: 4, options: []),
+            bytes: x, length: MemoryLayout<Float>.stride,
+            options: []),
             let dBuf = dev.makeBuffer(
-                bytes: delta, length: 4, options: []),
+                bytes: delta, length: MemoryLayout<Float>.stride,
+                options: []),
             let aBuf = dev.makeBuffer(
-                bytes: A, length: 4, options: []),
+                bytes: A, length: MemoryLayout<Float>.stride,
+                options: []),
             let bBuf = dev.makeBuffer(
-                bytes: B, length: 4, options: []),
+                bytes: B, length: MemoryLayout<Float>.stride,
+                options: []),
             let cBuf = dev.makeBuffer(
-                bytes: C, length: 4, options: []),
+                bytes: C, length: MemoryLayout<Float>.stride,
+                options: []),
             let yBuf = dev.makeBuffer(
-                bytes: &y, length: 4, options: []),
+                bytes: &y, length: MemoryLayout<Float>.stride,
+                options: []),
             let sBuf = dev.makeBuffer(
-                bytes: &shapeValues, length: 12,
+                bytes: &shapeValues,
+                length: MemoryLayout<BASSSMScanShape>.size,
                 options: []),
             let cmd = queue.makeCommandBuffer(),
             let enc = cmd.makeComputeCommandEncoder()

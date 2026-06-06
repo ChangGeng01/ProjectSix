@@ -159,10 +159,10 @@ public actor BASMPSGraphAttentionKernel: BASMetalKernel {
         let startTick = DispatchTime.now()
             .uptimeNanoseconds
 
-        let qBytes = seqQ * dim * 4
-        let kBytes = seqK * dim * 4
-        let vBytes = seqK * dim * 4
-        let outBytes = seqQ * dim * 4
+        let qBytes = seqQ * dim * MemoryLayout<Float>.stride
+        let kBytes = seqK * dim * MemoryLayout<Float>.stride
+        let vBytes = seqK * dim * MemoryLayout<Float>.stride
+        let outBytes = seqQ * dim * MemoryLayout<Float>.stride
 
         guard let qBuf = inputs.payloads[0]
             .withUnsafeBytes({ raw in

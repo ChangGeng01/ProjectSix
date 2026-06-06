@@ -83,13 +83,15 @@ public enum BASCanonicalKernelInputBuilders {
             " (got \(b.count), expected \(K * N))")
         let descA = BASTensorDescriptor(
             shape: [M, K],
-            strides: [K * 4, 4],
+            strides: [K * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descB = BASTensorDescriptor(
             shape: [K, N],
-            strides: [N * 4, 4],
+            strides: [N * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
@@ -128,13 +130,14 @@ public enum BASCanonicalKernelInputBuilders {
             " \(hiddenDim))")
         let descInput = BASTensorDescriptor(
             shape: [batchSeq, hiddenDim],
-            strides: [hiddenDim * 4, 4],
+            strides: [hiddenDim * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descGamma = BASTensorDescriptor(
             shape: [hiddenDim],
-            strides: [4],
+            strides: [MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-1-vector")
@@ -184,22 +187,24 @@ public enum BASCanonicalKernelInputBuilders {
         let descInput = BASTensorDescriptor(
             shape: [sequenceLength, heads, headDim],
             strides: [
-                heads * headDim * 4,
-                headDim * 4,
-                4
+                heads * headDim * MemoryLayout<Float>.stride,
+                headDim * MemoryLayout<Float>.stride,
+                MemoryLayout<Float>.stride
             ],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-3-tensor")
         let descCos = BASTensorDescriptor(
             shape: [sequenceLength, half],
-            strides: [half * 4, 4],
+            strides: [half * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descSin = BASTensorDescriptor(
             shape: [sequenceLength, half],
-            strides: [half * 4, 4],
+            strides: [half * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
@@ -252,19 +257,22 @@ public enum BASCanonicalKernelInputBuilders {
             "sinTable length must equal seq*headDim/2")
         let descInput = BASTensorDescriptor(
             shape: [sequenceLength, headDim],
-            strides: [headDim * 4, 4],
+            strides: [headDim * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descCos = BASTensorDescriptor(
             shape: [sequenceLength, half],
-            strides: [half * 4, 4],
+            strides: [half * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descSin = BASTensorDescriptor(
             shape: [sequenceLength, half],
-            strides: [half * 4, 4],
+            strides: [half * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
@@ -311,19 +319,22 @@ public enum BASCanonicalKernelInputBuilders {
             " (got \(v.count), expected \(seqK * dim))")
         let descQ = BASTensorDescriptor(
             shape: [seqQ, dim],
-            strides: [dim * 4, 4],
+            strides: [dim * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descK = BASTensorDescriptor(
             shape: [seqK, dim],
-            strides: [dim * 4, 4],
+            strides: [dim * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descV = BASTensorDescriptor(
             shape: [seqK, dim],
-            strides: [dim * 4, 4],
+            strides: [dim * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
@@ -368,19 +379,20 @@ public enum BASCanonicalKernelInputBuilders {
             " (got \(beta.count), expected \(hidden))")
         let descX = BASTensorDescriptor(
             shape: [batch, hidden],
-            strides: [hidden * 4, 4],
+            strides: [hidden * MemoryLayout<Float>.stride,
+                      MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-2-matrix")
         let descGamma = BASTensorDescriptor(
             shape: [hidden],
-            strides: [4],
+            strides: [MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-1-vector")
         let descBeta = BASTensorDescriptor(
             shape: [hidden],
-            strides: [4],
+            strides: [MemoryLayout<Float>.stride],
             dataType: .float32,
             backingKind: .metalBuffer,
             rankTag: "rank-1-vector")
@@ -414,9 +426,10 @@ public enum BASCanonicalKernelInputBuilders {
         _ data: Data,
         elementCount: Int
     ) -> [Float] {
-        precondition(data.count == elementCount * 4,
+        precondition(
+            data.count == elementCount * MemoryLayout<Float>.stride,
             "data byte count must equal" +
-            " elementCount * 4")
+            " elementCount * MemoryLayout<Float>.stride")
         return data.withUnsafeBytes { rawBuffer in
             let typedBuffer = rawBuffer
                 .bindMemory(to: Float.self)

@@ -554,9 +554,9 @@ public actor BASPlasticityFold {
                 reason: "metal pipeline not ready")
         }
         // Allocate MTLBuffers (Float = 4 bytes each)
-        let preBytes = shape.preDim * 4
-        let postBytes = shape.postDim * 4
-        let wBytes = weights.count * 4
+        let preBytes = shape.preDim * MemoryLayout<Float>.stride
+        let postBytes = shape.postDim * MemoryLayout<Float>.stride
+        let wBytes = weights.count * MemoryLayout<Float>.stride
         guard let preBuf = pre
             .withUnsafeBufferPointer({ ptr in
                 device.makeBuffer(
@@ -603,7 +603,7 @@ public actor BASPlasticityFold {
         var scaleVal: Float = scale
         guard let scaleBuf = device.makeBuffer(
             bytes: &scaleVal,
-            length: 4,
+            length: MemoryLayout<Float>.stride,
             options: .storageModeShared)
         else {
             throw BASPlasticityError.gpuDispatchFailure(
@@ -619,7 +619,7 @@ public actor BASPlasticityFold {
             .withUnsafeBufferPointer({ ptr in
                 device.makeBuffer(
                     bytes: ptr.baseAddress!,
-                    length: 8,
+                    length: dims.count * MemoryLayout<UInt32>.stride,
                     options: .storageModeShared)
             })
         else {

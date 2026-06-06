@@ -478,13 +478,13 @@ public actor BASMambaSSMState {
                 reason: "metal pipeline not ready")
         }
         // Allocate MTLBuffers for inputs + state + output
-        let xBytes = B * L * D * 4
-        let deltaBytes = B * L * D * 4
-        let aBytes = D * N * 4
-        let bBytes = B * L * N * 4
-        let cBytes = B * L * N * 4
-        let hBytes = B * D * N * 4
-        let yBytes = B * L * D * 4
+        let xBytes = B * L * D * MemoryLayout<Float>.stride
+        let deltaBytes = B * L * D * MemoryLayout<Float>.stride
+        let aBytes = D * N * MemoryLayout<Float>.stride
+        let bBytes = B * L * N * MemoryLayout<Float>.stride
+        let cBytes = B * L * N * MemoryLayout<Float>.stride
+        let hBytes = B * D * N * MemoryLayout<Float>.stride
+        let yBytes = B * L * D * MemoryLayout<Float>.stride
         guard let xBuf = inputs.x
             .withUnsafeBufferPointer({ ptr in
                 device.makeBuffer(
@@ -570,7 +570,7 @@ public actor BASMambaSSMState {
             .withUnsafeBufferPointer({ ptr in
                 device.makeBuffer(
                     bytes: ptr.baseAddress!,
-                    length: 16,
+                    length: dims.count * MemoryLayout<UInt32>.stride,
                     options: .storageModeShared)
             })
         else {

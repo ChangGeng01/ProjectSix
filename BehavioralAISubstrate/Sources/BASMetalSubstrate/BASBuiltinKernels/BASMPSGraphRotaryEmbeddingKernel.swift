@@ -226,10 +226,10 @@ public actor BASMPSGraphRotaryEmbeddingKernel:
         let startTick = DispatchTime.now()
             .uptimeNanoseconds
 
-        let xBytesCount = seqLen * headDim * 4
-        let cosBytesCount = seqLen * halfDim * 4
-        let sinBytesCount = seqLen * halfDim * 4
-        let outBytesCount = seqLen * headDim * 4
+        let xBytesCount = seqLen * headDim * MemoryLayout<Float>.stride
+        let cosBytesCount = seqLen * halfDim * MemoryLayout<Float>.stride
+        let sinBytesCount = seqLen * halfDim * MemoryLayout<Float>.stride
+        let outBytesCount = seqLen * headDim * MemoryLayout<Float>.stride
 
         guard let bufferX = inputs.payloads[0]
             .withUnsafeBytes({ raw in

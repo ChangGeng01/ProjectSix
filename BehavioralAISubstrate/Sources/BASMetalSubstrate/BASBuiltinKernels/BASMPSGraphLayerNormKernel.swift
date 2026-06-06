@@ -155,9 +155,9 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
 
         let startTick = DispatchTime.now()
             .uptimeNanoseconds
-        let xBytesCount = batch * hidden * 4
-        let gBytesCount = hidden * 4
-        let outBytesCount = batch * hidden * 4
+        let xBytesCount = batch * hidden * MemoryLayout<Float>.stride
+        let gBytesCount = hidden * MemoryLayout<Float>.stride
+        let outBytesCount = batch * hidden * MemoryLayout<Float>.stride
 
         // Upload CPU bytes → MTLBuffers
         guard let bufferX = inputs.payloads[0]

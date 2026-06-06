@@ -197,9 +197,9 @@ public actor BASMPSGraphMatMulKernel: BASMetalKernel {
             .uptimeNanoseconds
 
         // Upload CPU bytes → MTLBuffers
-        let aBytesCount = M * K * 4
-        let bBytesCount = K * N * 4
-        let cBytesCount = M * N * 4
+        let aBytesCount = M * K * MemoryLayout<Float>.stride
+        let bBytesCount = K * N * MemoryLayout<Float>.stride
+        let cBytesCount = M * N * MemoryLayout<Float>.stride
         guard let bufferA = inputs.payloads[0]
             .withUnsafeBytes({ rawBuffer in
                 device.makeBuffer(
@@ -240,17 +240,17 @@ public actor BASMPSGraphMatMulKernel: BASMetalKernel {
         let descMatrixA = MPSMatrixDescriptor(
             rows: M,
             columns: K,
-            rowBytes: K * 4,
+            rowBytes: K * MemoryLayout<Float>.stride,
             dataType: .float32)
         let descMatrixB = MPSMatrixDescriptor(
             rows: K,
             columns: N,
-            rowBytes: N * 4,
+            rowBytes: N * MemoryLayout<Float>.stride,
             dataType: .float32)
         let descMatrixC = MPSMatrixDescriptor(
             rows: M,
             columns: N,
-            rowBytes: N * 4,
+            rowBytes: N * MemoryLayout<Float>.stride,
             dataType: .float32)
         let matrixA = MPSMatrix(
             buffer: bufferA, descriptor: descMatrixA)
