@@ -234,20 +234,21 @@ final class MLXOrganAdapterTests: XCTestCase {
             "(otherwise the two-tier organ contract is broken)")
     }
 
-    // ch1066 全面修复 — the decode MUST be bounded. Before this fix
-    // `_generateParameters` never set `params.maxTokens`, so generation relied SOLELY
-    // on the model emitting EOS; a small 4-bit model on a structured/adversarial prompt
-    // could run away unbounded → the caller's turn wedged (on-device: every endurance
-    // run froze INSIDE `draft` at iter=1 prompt=2 for minutes, then SIGKILL). These pin
-    // that EVERY decode is now capped — honoring the per-request cap, else the
-    // descriptor's contracted max — so `maxTokens` is NEVER nil (nil = unbounded).
+    // ch1066 — every token decode must be bounded. Before this fix
+    // `_generateParameters` never set `params.maxTokens`, so generation relied solely
+    // on the model emitting EOS; structured/adversarial prompts could run away
+    // unbounded. These pin that every decode is now capped — honoring the per-request
+    // cap, else the descriptor's contracted max — so `maxTokens` is never nil.
+    // Note: the on-device iter=1 endurance freeze was a zero-token Metal/GPU eval hang,
+    // so it is handled by the feed-forward gate + projection sanitization, not by this
+    // token cap alone.
     func testGenerateParametersBoundsDecodeToDescriptorMaxByDefault() async {
         let adapter = MLXOrganAdapter()  // default descriptor maxOutputTokens = 4096
         let params = await adapter._generateParameters(for: .core)
         XCTAssertEqual(
             params.maxTokens, 4096,
             "an unset per-request cap must fall back to the descriptor's contracted " +
-            "maxOutputTokens — never nil (nil = unbounded decode = the iter=1 wedge)")
+            "maxOutputTokens — never nil (nil = unbounded token decode)")
     }
 
     func testGenerateParametersHonorsExplicitPerRequestCap() async {
