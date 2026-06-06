@@ -57,67 +57,70 @@ struct ContentView: View {
         BASEnduranceAppController.shared
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.shield.fill")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("BAS Device Test Host")
-                .font(.title2)
-            Text("Running test bundle…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            // ch 995:fabric env-var gate status surface
-            Text("Fabric: \(fabricStatus)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            // ch 1027:on-device Rust verify verdict surface
-            Text("Rust: \(rustVerify)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            // ch 1034:on-device MPSGraph kernel verdict surface
-            Text("MPSGraph: \(mpsgraphVerify)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            // ch 1033:on-device Mamba SSM verdict surface
-            Text("Mamba: \(mambaVerify)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            // ch1065:on-device SSM caution OPERATOR (fire/raise/verdict-gates) surface
-            Text("SSM caution: \(ssmVerify)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            // ch 1025.4:endurance autostart status surface
-            Text("Endurance: \(endurance.status.label)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            // ch1057:tap-to-start. Runs the ~1-hour endurance IN-APP on the phone,
-            // fully decoupled from the Mac/xcodebuild — so it survives the host
-            // idle-kill that capped prior runs at ~19 min. Tap, then walk away.
-            Button {
-                endurance.startManual()
-            } label: {
-                Text(endurance.status.isActive
-                     ? "Endurance running…"
-                     : "▶︎ Start 1-Hour Endurance")
-                    .font(.callout).bold()
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 16)
+        ScrollView {
+            VStack(spacing: 16) {
+                Image(systemName: "checkmark.shield.fill")
+                    .imageScale(.large)
+                    .foregroundStyle(.tint)
+                Text("BAS Device Test Host")
+                    .font(.title2)
+                Text("Running test bundle…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                // ch 995:fabric env-var gate status surface
+                Text("Fabric: \(fabricStatus)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                // ch 1027:on-device Rust verify verdict surface
+                Text("Rust: \(rustVerify)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                // ch 1034:on-device MPSGraph kernel verdict surface
+                Text("MPSGraph: \(mpsgraphVerify)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                // ch 1033:on-device Mamba SSM verdict surface
+                Text("Mamba: \(mambaVerify)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                // ch1065:on-device SSM caution OPERATOR (fire/raise/verdict-gates) surface
+                Text("SSM caution: \(ssmVerify)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                // ch 1025.4:endurance autostart status surface
+                Text("Endurance: \(endurance.status.label)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                // ch1057:tap-to-start. Runs the ~1-hour endurance IN-APP on the phone,
+                // fully decoupled from the Mac/xcodebuild — so it survives the host
+                // idle-kill that capped prior runs at ~19 min. Tap, then walk away.
+                Button {
+                    endurance.startManual()
+                } label: {
+                    Text(endurance.status.isActive
+                         ? "Endurance running…"
+                         : "▶︎ Start 1-Hour Endurance")
+                        .font(.callout).bold()
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(endurance.status.isActive)
+                .padding(.top, 8)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(endurance.status.isActive)
-            .padding(.top, 8)
+            .frame(maxWidth: .infinity)
+            .padding()
         }
-        .padding()
         .onAppear {
             let activation = BASAgentFabricGate
                 .activationFromEnvironment()
