@@ -504,11 +504,14 @@ let package = Package(
         //
         // Platform-gated to iOS + macOS (no watchOS slice
         // — rustc cannot cross-compile to
-        // arm64-apple-watchos)。 At present the XCFramework
-        // ships ONLY the macos-arm64 slice;iOS device +
-        // simulator slices documented as planned-future-
-        // cuts in scripts/build-rust-xcframework.sh
-        // TARGETS array。
+        // arm64-apple-watchos)。 The XCFramework ships ALL
+        // THREE slices — ios-arm64 (device), ios-arm64-
+        // simulator, macos-arm64 — built by
+        // scripts/build-rust-xcframework.sh (verified in the
+        // xcframework Info.plist; ADR-037). The device slice
+        // exports the L8 engine FFI symbols (ch1027 on-device
+        // BASRustVerifyProbe all_ok),so the Rust engine links
+        // + runs on a physical device。
         .binaryTarget(
             name: "BASRustMemoryTrackerBinary",
             path: "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"),

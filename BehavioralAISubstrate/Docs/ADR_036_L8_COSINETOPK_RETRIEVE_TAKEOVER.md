@@ -93,3 +93,24 @@ the L8 cross-restart suites green. New XCFramework symbol exported (`nm`).
   runtime-verify is declined per 亏的不要上 / R1 — the seam ships **adoptable** (threaded through the
   standard factory path) with the exact remaining on-device step recorded. This is the SECOND incorrect
   premise the plan's WS3 carried (the first was the missing rowid→atom_id map, fixed by the new FFI).
+
+## Correction (superseded by ADR-037)
+
+The "DeviceTestApp adoption (deferred)" rationale above was partly WRONG and is superseded by ADR-037:
+
+- **"the sim build links fail environmentally, so it can't be runtime-verified" was a MISDIAGNOSIS.**
+  The Rust L8 engine links + runs on a real device today — ch1027 `BASRustVerifyProbe` reports
+  `all_ok=true` in the shipping app; the `ios-arm64` device slice exports the cosineTopK FFI symbols
+  (`nm`: defined text); the App target statically links the engine via
+  `BASMemory → BASRustMemoryTrackerBinary`; the xcframework ships all three slices (ios-arm64,
+  ios-arm64-simulator, macos-arm64). The phrase conflated the headless swift-testing SIGBUS (a host
+  test-runner issue) and the MPSGraph simulator device-init NSException (unrelated to Rust). There was
+  no device link failure.
+- **The "load-bearing durable backend swap" risk was avoided, not accepted.** ADR-037 does NOT swap the
+  durable backend: `BASSQLiteVectorIndexStorage` stays the untouched durable source of truth, and a
+  SEPARATE in-memory Rust engine (rebuilt from it, no re-embed) serves cosineTopK — so ch1063/ch1064
+  durability is preserved by construction. (The two must not share the WAL file: rusqlite-bundled
+  SQLite vs system SQLite3 on one `-shm` = corruption.)
+
+On-device adoption is therefore real and gated behind `BAS_GLOBAL_RECALL` (opt-in, default off),
+verified by a real-device 2-launch run. See ADR-037.
