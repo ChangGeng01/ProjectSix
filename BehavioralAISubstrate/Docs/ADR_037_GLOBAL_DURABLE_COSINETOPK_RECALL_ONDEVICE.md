@@ -2,10 +2,14 @@
 
 ## Status
 
-Library shipped + macOS-verified (`BASGlobalRecallSeam` + the in-memory engine init + the retrieve
-global branch, all byte-equal-off by default). Device-host adoption is **opt-in** (`BAS_GLOBAL_RECALL=1`,
-default off) and gated on real-device 2-launch verification (see Verification). Supersedes ADR-036's
-"DeviceTestApp adoption (deferred)" — including its misdiagnosed blocker.
+Shipped + **verified on a real device**. Library (`BASGlobalRecallSeam` + the in-memory engine init +
+the retrieve global branch) is byte-equal-off by default + macOS-verified. Device-host adoption is
+**opt-in** (`BAS_GLOBAL_RECALL=1`, default off) and was confirmed by a real-device 2-launch run
+(iPhone Air): launch #1 fresh → `ACTIVE corpus=0`, 2 iters → `synced` corpus 0→1→2; launch #2 same
+container → `ACTIVE corpus=2` (engine REBUILT from the durable store = cross-restart global recall, no
+re-embed) + `ch1063 reload-at-start store_atoms=2 vector_index_entries=2` (durability survived); launch
+#3 gate-unset → `global recall OFF` (default-off confirmed). Supersedes ADR-036's "DeviceTestApp
+adoption (deferred)" — including its misdiagnosed blocker.
 
 ## Context
 

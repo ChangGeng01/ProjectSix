@@ -111,6 +111,36 @@ private let ch1025Log = Logger(
     subsystem: BASDeviceLog.subsystem,
     category: "ch1025-endurance")
 
+/// ADR-037 — host-local resolver backing the global-recall seam's `atomForID`. NSLock-guarded
+/// atomID → (atom, domain) map with insertion-order LRU (memory bound). `lookupSync` is the sync
+/// hot-path read (called inside the ch883 sync retrieve); `put` runs between turns. Mirrors the
+/// service's withLock idiom (never holds the lock across a suspension). `@unchecked Sendable`: the
+/// lock provides the synchronization the compiler can't prove.
+final class BASGlobalRecallResolver: @unchecked Sendable {
+    private let lock = NSLock()
+    private var map: [String: (atom: BASMemoryAtom, domain: String)] = [:]
+    private var order: [String] = []          // insertion order for LRU eviction
+    private let cap: Int
+    init(cap: Int) { self.cap = max(64, cap) }
+    func put(id: String, atom: BASMemoryAtom, domain: String) {
+        lock.lock(); defer { lock.unlock() }
+        if map[id] == nil { order.append(id) }
+        map[id] = (atom, domain)
+        while order.count > cap {
+            let evict = order.removeFirst()
+            map[evict] = nil
+        }
+    }
+    func lookupSync(id: String) -> (atom: BASMemoryAtom, domain: String)? {
+        lock.lock(); defer { lock.unlock() }
+        return map[id]
+    }
+    var count: Int {
+        lock.lock(); defer { lock.unlock() }
+        return map.count
+    }
+}
+
 @MainActor
 final class BASEnduranceAppController: ObservableObject {
 
@@ -189,6 +219,12 @@ final class BASEnduranceAppController: ObservableObject {
         /// Opt-in WS2 fabric-authoritative N→N+1 feed-forward。 Default `"0"`;on when `== "1"`。
         static let fabricAuthFeedForwardKey = "BAS_FABRIC_AUTH_FEEDFORWARD"
         static let fabricAuthFeedForwardDefault = "0"
+        /// Opt-in ADR-037 GLOBAL durable cosineTopK recall. Default `"0"`; on when `== "1"`.
+        static let globalRecallKey = "BAS_GLOBAL_RECALL"
+        static let globalRecallDefault = "0"
+        /// LRU cap for the in-memory global-recall corpus (memory bound). Default `"4096"`.
+        static let globalRecallCapKey = "BAS_GLOBAL_RECALL_CAP"
+        static let globalRecallCapDefault = "4096"
         /// Agent-fabric activation gate。 Activated when `== "enabled"` (ADR-014 opt-in)。
         static let agentFabricKey = "BAS_AGENT_FABRIC"
     }
@@ -523,6 +559,11 @@ final class BASEnduranceAppController: ObservableObject {
         // decode is proven non-wedging on-device.
         let fabricAuthFeedForward =
             (env[EnduranceEnv.fabricAuthFeedForwardKey] ?? EnduranceEnv.fabricAuthFeedForwardDefault) == "1"
+        // ADR-037 — opt-in GLOBAL durable recall (default OFF → verify-on, mirrors fabricAuthFeedForward).
+        let globalRecallEnabled =
+            (env[EnduranceEnv.globalRecallKey] ?? EnduranceEnv.globalRecallDefault) == "1"
+        let globalRecallCap =
+            max(64, Int(env[EnduranceEnv.globalRecallCapKey] ?? EnduranceEnv.globalRecallCapDefault) ?? 4096)
         // ch1066 再查 — a per-turn wall-clock TIMEOUT around adapter.draft was tried here
         // and REMOVED after on-device proof it cannot work: the MLX decode is a SYNCHRONOUS,
         // UNCANCELLABLE Metal eval, so (a) a structured task-group timeout hangs in teardown
@@ -581,6 +622,12 @@ final class BASEnduranceAppController: ObservableObject {
         // ch1064 — durable VECTOR INDEX (persisted embeddings, BLOB) so refresh() loads vectors on
         // restart instead of re-embedding every atom via CoreML.
         let memoryVectorIndex: BASSQLiteVectorIndexStorage?
+        // ADR-037 — function-local (NOT a @MainActor stored prop, which runEndurance's nonisolated
+        // context can't touch): the in-memory global-recall engine + resolver, built in the brain-init
+        // block below and read by the per-turn incremental sync. Retained for the whole runEndurance
+        // call; the seam closures capture them strongly too.
+        var globalRecallEngine: BASRoutedVectorIndexStorage? = nil
+        var globalRecallResolver: BASGlobalRecallResolver? = nil
         let cognitiveBrainStartNs = monoNowNs()
         do {
             // Step-2 flip: wire the on-device MiniLM embedder so the brain's default L8 memory is
@@ -602,13 +649,48 @@ final class BASEnduranceAppController: ObservableObject {
                     databaseURL: docs.appendingPathComponent(Self.vectorIndexDBFilename))
                 memoryStore = store
                 memoryVectorIndex = vindex
-                // ADR-036/WS3 — the L8 retrieve cosineTopK takeover seam (`cosineTopKSync`) is left
-                // UNWIRED here (defaults to nil ⇒ byte-equal-off score-all path). It requires a
-                // cosineTopK-capable routed index (`BASRoutedVectorIndexStorage`, Rust L8 engine); this
-                // app's durable index is `BASSQLiteVectorIndexStorage` (pure sqlite3, no cosineTopK).
-                // Adopting the takeover means backing the seam with a routed index for the recall domain
-                // AND re-proving ch1063/ch1064 cross-restart durability on-device — a documented
-                // follow-up, NOT a hunch-shipped load-bearing backend swap (亏的不要上 / R1).
+                // ADR-037 — OPT-IN GLOBAL durable recall (BAS_GLOBAL_RECALL=1). Build a SEPARATE
+                // in-memory Rust L8 engine + a bounded resolver from the durable store WITHOUT
+                // re-embedding (reuse persisted vectors — preserves ch1064), and wire the cosineTopK
+                // seam over the FULL durable corpus (recall reaches BEYOND the ≤64 in-memory window).
+                // The durable BASSQLiteVectorIndexStorage (system SQLite3) stays the UNTOUCHED source
+                // of truth; the engine is a private :memory: replica (rusqlite-bundled) — never the
+                // same WAL file (two sqlite libs on one -shm = corruption). nil seam ⇒ byte-equal-off
+                // (ADR-014). Cross-restart durability is preserved by construction (the durable write
+                // path is unchanged); the engine is rebuilt from it at startup + synced per turn.
+                var globalSeam: BASGlobalRecallSeam? = nil
+                if globalRecallEnabled {
+                    let engine = try BASRoutedVectorIndexStorage(inMemory: ())
+                    let resolver = BASGlobalRecallResolver(cap: globalRecallCap)
+                    let pin = BASL8RoutedMemoryService.Parameters.atomSource
+                    let durableAtoms = (try? await store.allAtoms()) ?? []
+                    let durableEntries = await vindex.allEntries()
+                    let entryByID = Dictionary(
+                        durableEntries.map { ($0.atomID, $0) }, uniquingKeysWith: { a, _ in a })
+                    for record in durableAtoms {
+                        let id = record.id.uuidString
+                        resolver.put(id: id,
+                            atom: BASL8RoutedMemoryService.memoryAtom(from: record),
+                            domain: record.sourceType)
+                        if let e = entryByID[id] {
+                            _ = try? await engine.upsert(BASVectorIndexEntry(
+                                atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
+                        }
+                    }
+                    globalRecallEngine = engine
+                    globalRecallResolver = resolver
+                    let corpus = await engine.totalCount
+                    await emitBoth(
+                        "📍 ADR-037 global recall ACTIVE corpus=\(corpus) resolver=\(resolver.count) " +
+                        "cap=\(globalRecallCap) domain=\(pin)")
+                    globalSeam = BASGlobalRecallSeam(
+                        cosineTopK: { [engine, pin] q, k in
+                            (try? engine.cosineTopKAtomIDsSync(forDomain: pin, query: q, k: k)) ?? []
+                        },
+                        atomForID: { [resolver] id in resolver.lookupSync(id: id) })
+                } else {
+                    await emitBoth("📍 ADR-037 global recall OFF (BAS_GLOBAL_RECALL!=1)")
+                }
                 memoryPersistence = BASRoutedMemoryPersistence(
                     loadAllAtoms: { (try? await store.allAtoms()) ?? [] },
                     admitAtom: { _ = try? await store.admit($0) },
@@ -621,7 +703,8 @@ final class BASEnduranceAppController: ObservableObject {
                                 vector: vec, dimension: vec.count,
                                 providerVersion: Self.embeddingProviderVersion).normalized,
                             domain: domain))
-                    })
+                    },
+                    globalRecall: globalSeam)
             } else {
                 memoryStore = nil
                 memoryVectorIndex = nil
@@ -1142,11 +1225,38 @@ final class BASEnduranceAppController: ObservableObject {
             // No-op for the legacy backend.
             if let store = memoryStore {
                 let mem = await brain.drainMemoryIntents()
-                let storedAtoms = (try? await store.allAtoms().count) ?? -1
+                let allAtoms = try? await store.allAtoms()
+                let storedAtoms = allAtoms?.count ?? -1
                 await emitBoth(
                     "📍 ch1062 iter=\(iter) memory persisted " +
                     "admitted=\(mem.admitted) store_atoms=\(storedAtoms) " +
                     "promoted=\(mem.promoted)")
+                // ADR-037 — incremental sync: fold NEW durable atoms into the in-memory global-recall
+                // engine + resolver (delta vs the resolver) so this turn's persisted atoms are
+                // globally recall-eligible next turn. Between-turns ONLY (turn-phase separation: the
+                // sync engine.upsert never overlaps the sync cosineTopK read inside retrieve()).
+                if let engine = globalRecallEngine, let resolver = globalRecallResolver,
+                   let vindex = memoryVectorIndex {
+                    let pin = BASL8RoutedMemoryService.Parameters.atomSource
+                    var added = 0
+                    for record in (allAtoms ?? [])
+                    where resolver.lookupSync(id: record.id.uuidString) == nil {
+                        let id = record.id.uuidString
+                        resolver.put(id: id,
+                            atom: BASL8RoutedMemoryService.memoryAtom(from: record),
+                            domain: record.sourceType)
+                        if let e = await vindex.entry(forID: id) {
+                            _ = try? await engine.upsert(BASVectorIndexEntry(
+                                atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
+                            added += 1
+                        }
+                    }
+                    if added > 0 {
+                        let corpus = await engine.totalCount
+                        await emitBoth(
+                            "📍 ADR-037 iter=\(iter) global recall synced +\(added) corpus=\(corpus)")
+                    }
+                }
             }
 
             if iter < totalIters {
