@@ -85,6 +85,12 @@ public enum BASAgentFabricAuthoritativeProjection {
 
     /// chapter 一百八十五 — bound each conclusion summary so the folded block stays compact.
     public static let maxSummaryChars: Int = 240
+    /// ch1066 再查 — hard cap on the TOTAL enriched context block fed into the next turn's
+    /// prompt. On-device, a small 4-bit MLX decoder WEDGED (uncancellable Metal eval, zero
+    /// token progress) on a long out-of-distribution structured blob; bound it so it can
+    /// never dominate the decoder's prefill. Provenance (digest) is from the typed
+    /// conclusions, not this text, so this does not affect convergence/replay.
+    public static let maxContextBlockChars: Int = 512
 
     /// Project a fabric turn's merge-accepted deltas into an authoritative feed-forward input —
     /// ONLY when `mode == .authoritative` and at least one delta was accepted. Returns `nil`
@@ -159,6 +165,32 @@ public enum BASAgentFabricAuthoritativeProjection {
         return String(patchJson.prefix(maxSummaryChars)) + "…"
     }
 
+    /// ch1066 再查 — flatten a (JSON patch) summary to plain prose before it enters a prompt:
+    /// drop JSON/structural + angle-bracket punctuation and collapse whitespace. The raw
+    /// `{...}` / `<...>` blob is a severe out-of-distribution prefill that wedged the on-device
+    /// 4-bit decoder (uncancellable Metal eval, zero token progress). Applied ONLY to the
+    /// prompt text — the stored Conclusion.summary (and the provenance digest, computed from
+    /// the typed conclusions) are untouched.
+    static func plainSummary(_ s: String) -> String {
+        let structural: Set<Character> = [
+            "{", "}", "[", "]", "\"", "<", ">", "|", "\\", "`"]
+        var out = ""
+        out.reserveCapacity(s.count)
+        var lastWasSpace = false
+        for ch in s {
+            let isSpace = structural.contains(ch)
+                || ch == "\n" || ch == "\t" || ch == "\r" || ch == " "
+            if isSpace {
+                if !lastWasSpace { out.append(" ") }
+                lastWasSpace = true
+            } else {
+                out.append(ch)
+                lastWasSpace = false
+            }
+        }
+        return out.trimmingCharacters(in: .whitespaces)
+    }
+
     static func contextBlock(
         sourceTurnID: String,
         conclusions: [BASAgentFabricAuthoritativeInput.Conclusion]
@@ -168,9 +200,20 @@ public enum BASAgentFabricAuthoritativeProjection {
         ]
         for c in conclusions {
             let conf = String(format: "%.2f", c.confidence)
-            lines.append("- \(c.domain) (\(c.deltaType), conf \(conf)): \(c.summary)")
+            lines.append(
+                "- \(c.domain) (\(c.deltaType), conf \(conf)): "
+                + Self.plainSummary(c.summary))
         }
-        return lines.joined(separator: "\n")
+        // ch1066 — hard-bound the total, including the truncation marker, so it never
+        // dominates the decoder's prefill.
+        let block = lines.joined(separator: "\n")
+        guard block.count > maxContextBlockChars else { return block }
+        let suffix = " …"
+        let prefixLimit = max(0, maxContextBlockChars - suffix.count)
+        guard prefixLimit > 0 else {
+            return String(suffix.prefix(maxContextBlockChars))
+        }
+        return String(block.prefix(prefixLimit)) + suffix
     }
 
     static func digest(

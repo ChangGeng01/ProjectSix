@@ -133,5 +133,51 @@ final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
         XCTAssertNotNil(enr.sovereignVerdict,
             "the sovereign verdict still runs on the enriched turn — input-class, verdict path intact")
     }
+
+    // MARK: - ch1066 prompt-safety: the enriched block must be sanitized + bounded
+
+    func testContextBlockSanitizesStructuralJSONAndBoundsLength() throws {
+        // The authoritative summary is raw patch JSON; feeding `{...}`/`"`/`<...>` verbatim to a
+        // small 4-bit on-device decoder WEDGED it (uncancellable Metal eval, zero token
+        // progress). The folded block must carry NO raw structural punctuation from the summary
+        // and stay bounded — while keeping the label + domain the cascade needs.
+        let r = fabricResult(
+            emitted: [delta("d1", domain: "render")], accepted: ["d1"])
+        let input = try XCTUnwrap(BASAgentFabricAuthoritativeProjection.project(
+            fabricResult: r, mode: .authoritative, sourceTurnID: "t1"))
+        for ch in ["{", "}", "\"", "<", ">"] {
+            XCTAssertFalse(input.contextBlock.contains(ch),
+                "the enriched block must not carry raw structural char \(ch)")
+        }
+        XCTAssertTrue(input.contextBlock.contains("render"),
+            "the domain must survive sanitization (the cascade keys on it)")
+        XCTAssertTrue(input.contextBlock.contains("fabric-authoritative"),
+            "the provenance label must survive sanitization")
+        XCTAssertLessThanOrEqual(
+            input.contextBlock.count,
+            BASAgentFabricAuthoritativeProjection.maxContextBlockChars,
+            "the enriched block must stay bounded so it can't dominate the prefill")
+    }
+
+    func testContextBlockHardCapsLongAcceptedDeltaSet() throws {
+        let deltas = (0..<20).map { i in
+            BASAgentDelta(
+                deltaID: "d\(i)", agentID: "planner",
+                targetObjectRef: "render#obj-\(i)",
+                deltaType: .replace,
+                patchJson: String(repeating: "{\"risk\":\"repeat\"}", count: 40),
+                confidence: 0.9, createdAtNanos: 0,
+                reasonCodes: ["planner.primary"], dependencies: [], conflictRefs: [])
+        }
+        let r = fabricResult(emitted: deltas, accepted: deltas.map(\.deltaID))
+        let input = try XCTUnwrap(BASAgentFabricAuthoritativeProjection.project(
+            fabricResult: r, mode: .authoritative, sourceTurnID: "t-long"))
+        XCTAssertLessThanOrEqual(
+            input.contextBlock.count,
+            BASAgentFabricAuthoritativeProjection.maxContextBlockChars,
+            "many accepted deltas must still produce a bounded context block")
+        XCTAssertTrue(input.contextBlock.hasSuffix(" …"),
+            "truncated context blocks should make the truncation visible")
+    }
 }
 #endif

@@ -433,15 +433,22 @@ final class BASEnduranceAppController: ObservableObject {
             (env["BAS_SHADOW_PARITY"] ?? "") == "enabled"
         // ch1066 全面修复 — OPT-IN gate for the WS2 fabric-authoritative N→N+1
         // feed-forward (default OFF). DEFAULT-ON regressed the on-device endurance
-        // run: the enriched prompt (raw + fabric JSON conclusions) fed to the
-        // UNBOUNDED MLX decoder (`adapter.draft`, ~line 948) wedged the small 4-bit
-        // gemma into a runaway/repetition decode at iter=1 prompt=2 — EVERY run today
-        // froze there, vs June-4's 2408 iters on raw prompts (same device, looser
-        // memory). Default OFF restores the verified June-4 behavior (ADR-014 opt-in /
-        // R1 不上未验证). Set `BAS_FABRIC_AUTH_FEEDFORWARD=1` only after the enriched-
-        // prompt decode is proven non-wedging on-device.
+        // run: the enriched prompt (raw + fabric JSON conclusions) fed a long
+        // out-of-distribution structured blob into MLX eval and wedged the small 4-bit
+        // gemma at iter=1 prompt=2 — EVERY run today froze there, vs June-4's 2408
+        // iters on raw prompts (same device, looser memory). Default OFF restores the
+        // verified June-4 behavior (ADR-014 opt-in / R1 不上未验证). Set
+        // `BAS_FABRIC_AUTH_FEEDFORWARD=1` only after the sanitized enriched-prompt
+        // decode is proven non-wedging on-device.
         let fabricAuthFeedForward =
             (env["BAS_FABRIC_AUTH_FEEDFORWARD"] ?? "0") == "1"
+        // ch1066 再查 — a per-turn wall-clock TIMEOUT around adapter.draft was tried here
+        // and REMOVED after on-device proof it cannot work: the MLX decode is a SYNCHRONOUS,
+        // UNCANCELLABLE Metal eval, so (a) a structured task-group timeout hangs in teardown
+        // awaiting the wedged child, and (b) the GPU wedge gets the app killed within tens of
+        // seconds regardless — a decode-timeout races a kill it can't win and the GPU stays
+        // wedged. The robust fix is to PREVENT the wedge: keep the feed-forward gate OFF
+        // (above) + sanitize/bound the enriched prompt (BASAgentFabricAuthoritativeProjection).
         // ch 1025.10 — monotonic run start(NTP/DST-safe)。
         let runStartNs = monoNowNs()
 
@@ -641,11 +648,11 @@ final class BASEnduranceAppController: ObservableObject {
                 "\(error) — falling back to bypass")
         }
 
-        // ch1062 WS2 — the Agent Fabric AUTHORITATIVE multi-round loop is now the
-        // DeviceTestApp endurance DEFAULT main-chain behavior (host opt-in; the library
-        // makeWithDefaults stays byte-equal-off). A second runtime in `.authoritative`
-        // mode drives the N→N+1 feed-forward enrichment in the per-prompt loop below:
-        // turn N's accepted fabric deltas fold into turn N+1's userInput (INPUT-class,
+        // ch1062 WS2 — the Agent Fabric AUTHORITATIVE multi-round loop is now built
+        // into the DeviceTestApp endurance path for observation. The actual N→N+1
+        // feed-forward fold is gated by BAS_FABRIC_AUTH_FEEDFORWARD (default OFF);
+        // library makeWithDefaults stays byte-equal-off. When enabled, turn N's
+        // accepted fabric deltas fold into turn N+1's userInput (INPUT-class,
         // verdict-gated — 红线 7 / 不变量 #2; the sovereign verdict stays sole authority).
         let fabricAuthRuntime = BASAgentFabricRuntime(
             roster: BASAgentTurnRoster(
@@ -669,7 +676,7 @@ final class BASEnduranceAppController: ObservableObject {
             mode: .authoritative)
         await emitBoth(
             "📍 ch1062 fabric-authoritative runtime constructed " +
-            "(.authoritative mode — N→N+1 feed-forward DEFAULT-ON)")
+            "(.authoritative loop observable; N→N+1 feed-forward opt-in/default-off)")
 
         // MLX model load
         await emitBoth(
@@ -886,11 +893,12 @@ final class BASEnduranceAppController: ObservableObject {
                         "skip=pipeline_construct_failed")
                 }
 
-                // ch1062 WS2 — DEFAULT-ON Agent Fabric AUTHORITATIVE multi-round loop:
-                // run it on THIS turn's outputs, then fold the converged conclusions into
-                // the NEXT prompt's input (N→N+1). Deterministic: nowNanos pinned per turn;
-                // converges on the content digest. The enriched text enters turn N+1 as
-                // INPUT (userInput), gated by the sovereign verdict exactly as any input.
+                // ch1062 WS2 — Agent Fabric AUTHORITATIVE multi-round loop:
+                // run it on THIS turn's outputs; only when fabricAuthFeedForward is true
+                // do the converged conclusions fold into the NEXT prompt's input (N→N+1).
+                // Deterministic: nowNanos pinned per turn; converges on the content
+                // digest. The enriched text enters turn N+1 as INPUT (userInput), gated
+                // by the sovereign verdict exactly as any input.
                 let nextRaw = Self.promptPool[
                     (iter * mlxPrompts + p + 1) % Self.promptPool.count]
                 let authLoop = await BASAgentFabricAuthoritativeTurn.loopResult(
@@ -905,7 +913,7 @@ final class BASEnduranceAppController: ObservableObject {
                 // ch1066 — feed-forward is OPT-IN (default OFF; see fabricAuthFeedForward).
                 // The loop above still runs + logs (WS2 stays observable); we just do NOT
                 // fold the enriched conclusions into the next prompt's MLX input unless the
-                // operator opted in — that fold wedged the unbounded on-device decoder.
+                // operator opted in — the raw structured fold wedged on-device MLX eval.
                 if fabricAuthFeedForward, let proj = authLoop.finalProjection {
                     pendingEnrichedPrompt = nextRaw.isEmpty
                         ? proj.contextBlock

@@ -120,16 +120,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         var params = GenerateParameters()
         params.temperature = Float(preset.temperature)
         params.topP = Float(preset.topP)
-        // ch1066 全面修复 — ENFORCE the decode bound. Previously unset, so generation
-        // relied ENTIRELY on the model emitting EOS; a small 4-bit model fed a
-        // structured/adversarial prompt can fail to stop → unbounded decode → the
-        // caller's turn wedges (observed on-device: every endurance run froze INSIDE
-        // `draft` at iter=1 prompt=2 for minutes, then SIGKILL). The descriptor already
-        // CONTRACTS `maxOutputTokens` (default 4096) yet the decode never honored it —
-        // a latent contract violation affecting every consumer. Honor the per-request
-        // cap when supplied, else the descriptor's contracted max. Normal responses
-        // (well under the cap) are unaffected; only a runaway is bounded.
-        params.maxTokens = maxOutputTokens ?? descriptor.maxOutputTokens
+        // ch1066 — ENFORCE a decode bound, closing a latent contract violation: the
+        // descriptor CONTRACTS `maxOutputTokens` (default 4096) yet the decode never set
+        // params.maxTokens, so generation relied solely on the model emitting EOS (an
+        // unbounded TOKEN runaway was possible). Honor the per-request cap when supplied
+        // and POSITIVE (a 0/negative cap would emit nothing → fall back to the contract),
+        // else the descriptor's contracted max.
+        //
+        // HONEST SCOPE (ch1066 再查 / on-device A/B): this bounds a TOKEN runaway. It does
+        // NOT fix the on-device iter=1 endurance freeze — that was an UNCANCELLABLE
+        // Metal/GPU eval hang with ZERO token progress, so this per-token cap never fires.
+        // That freeze is addressed by preventing the trigger: feed-forward gate default
+        // OFF plus sanitized/bounded authoritative projection. A per-turn wall-clock
+        // timeout was rejected on-device because the synchronous Metal eval is not
+        // cancellable. This cap is correct, additive, invariant-safe hardening — just
+        // not the cure for that specific hang.
+        let perRequestCap = maxOutputTokens.flatMap { $0 > 0 ? $0 : nil }
+        params.maxTokens = perRequestCap ?? descriptor.maxOutputTokens
         return params
     }
     #endif
