@@ -33,7 +33,7 @@ import BASMetalSubstrate
 enum BASMambaProbe {
 
     private static let log = Logger(
-        subsystem: "com.changgeng.basdevicetest",
+        subsystem: BASDeviceLog.subsystem,
         category: "ch1033-mamba")
 
     /// Run the Mamba selective-scan(CPU + GPU)on-device,emit a

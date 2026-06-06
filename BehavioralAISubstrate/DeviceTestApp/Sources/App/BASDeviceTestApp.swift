@@ -36,6 +36,15 @@
 import SwiftUI
 import BASHostKit
 
+/// Shared os.Logger subsystem for every DeviceTestApp probe/runner。 Extracted
+/// (ch — same value) so the `com.changgeng.basdevicetest` literal lives in ONE
+/// place instead of being hand-duplicated across the 5 `Logger(subsystem:…)`
+/// call sites (endurance runner + SSM/MPSGraph/Mamba/Rust probes)。 Each probe
+/// keeps its own `category` string。 Value is byte-identical to the prior literal。
+enum BASDeviceLog {
+    static let subsystem = "com.changgeng.basdevicetest"
+}
+
 @main
 struct BASDeviceTestApp: App {
     var body: some Scene {

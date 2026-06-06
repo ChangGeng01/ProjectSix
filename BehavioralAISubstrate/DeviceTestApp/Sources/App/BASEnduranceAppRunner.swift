@@ -108,7 +108,7 @@ import BASAppleAdapters  // Step-2 flip — on-device MiniLM semantic memory emb
 //   - log show / log stream / Xcode Devices Console
 // while still also writing to Documents/ for post-run analysis。
 private let ch1025Log = Logger(
-    subsystem: "com.changgeng.basdevicetest",
+    subsystem: BASDeviceLog.subsystem,
     category: "ch1025-endurance")
 
 @MainActor
@@ -157,21 +157,57 @@ final class BASEnduranceAppController: ObservableObject {
     private var logFileHandle: FileHandle?
     private var logFileURL: URL?
 
+    // MARK: - Launch environment(keys + defaults, one documented place)
+    //
+    // The endurance launch env vars were scattered across `autostartIfEnabled`
+    // and `runEndurance`。 Extracted here so each KEY string lives with its
+    // DOCUMENTED default — values byte-identical to the prior inline literals。
+    // `key` is the `ProcessInfo` env key;`default` is the `??` fallback the read
+    // site used (the integer-parse fallback `?? N` at the numeric sites is kept
+    // inline — it's the malformed-value fallback, same N as the string default)。
+    private enum EnduranceEnv {
+        /// `1` = run endurance;unset / other = idle。 Gate is `== "1"`。
+        static let autostartKey = "BAS_ENDURANCE_AUTOSTART"
+        /// Iteration count。 Default `"100"` (parse fallback 100)。
+        static let iterCountKey = "BAS_INTERNAL_ITER_COUNT"
+        static let iterCountDefault = "100"
+        /// MLX prompts per iteration。 Default `"3"` (parse fallback 3)。
+        static let mlxPromptsKey = "BAS_INTERNAL_MLX_PROMPTS"
+        static let mlxPromptsDefault = "3"
+        /// Base cooldown seconds。 Default `"60"` (parse fallback 60)。
+        static let cooldownSecKey = "BAS_INTERNAL_COOLDOWN_SEC"
+        static let cooldownSecDefault = "60"
+        /// Adaptive cooldown schedule。 Default `"1"`;enabled when `== "1"`。
+        static let adaptiveKey = "BAS_INTERNAL_ADAPTIVE"
+        static let adaptiveDefault = "1"
+        /// Wall-clock cap seconds (0 = run all iters)。 Default `"0"` (parse fallback 0)。
+        static let maxRuntimeSecKey = "BAS_INTERNAL_MAX_RUNTIME_SEC"
+        static let maxRuntimeSecDefault = "0"
+        /// Opt-in sovereign-verdict parity shadow。 Default `""`;enabled when `== "enabled"`。
+        static let shadowParityKey = "BAS_SHADOW_PARITY"
+        static let shadowParityDefault = ""
+        /// Opt-in WS2 fabric-authoritative N→N+1 feed-forward。 Default `"0"`;on when `== "1"`。
+        static let fabricAuthFeedForwardKey = "BAS_FABRIC_AUTH_FEEDFORWARD"
+        static let fabricAuthFeedForwardDefault = "0"
+        /// Agent-fabric activation gate。 Activated when `== "enabled"` (ADR-014 opt-in)。
+        static let agentFabricKey = "BAS_AGENT_FABRIC"
+    }
+
     // MARK: - Autostart hook
 
     func autostartIfEnabled() {
         guard !started else { return }
         guard !autostartConsumed else { return }
         let env = ProcessInfo.processInfo.environment
-        guard env["BAS_ENDURANCE_AUTOSTART"] == "1" else {
+        guard env[EnduranceEnv.autostartKey] == "1" else {
             status = .autostartOff
             return
         }
         autostartConsumed = true
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
-        let iters = max(1, Int(env["BAS_INTERNAL_ITER_COUNT"] ?? "100") ?? 100)
-        let mlxPrompts = max(1, Int(env["BAS_INTERNAL_MLX_PROMPTS"] ?? "3") ?? 3)
-        let cooldownSec = Int(env["BAS_INTERNAL_COOLDOWN_SEC"] ?? "60") ?? 60
+        let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
+        let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
+        let cooldownSec = Int(env[EnduranceEnv.cooldownSecKey] ?? EnduranceEnv.cooldownSecDefault) ?? 60
         launch(iters: iters, cooldownSec: cooldownSec, mlxPrompts: mlxPrompts)
     }
 
@@ -310,6 +346,26 @@ final class BASEnduranceAppController: ObservableObject {
 
     // MARK: - Adaptive cooldown(matches ch 1025 schedule)
 
+    /// ch 1025.11 cooldown thresholds/formulas, extracted (same exact values) so
+    /// the `cooldownSecFor` policy numbers live in one named place。 The formulas
+    /// combine these with the runtime `base` cooldown:`base * multiplier + addend`,
+    /// floored at the per-state floor。 The `sustainedLoad*` pair is the shared
+    /// `base*2+60` form used by BOTH the serious floor formula AND the light
+    /// schedule's heavy-iter (default) step。
+    private enum CooldownPolicy {
+        // `critical` thermal:base*3+120, ≥300s floor。
+        static let criticalMultiplier = 3
+        static let criticalAddendSec = 120
+        static let criticalFloorSec = 300
+        // `serious` thermal:base*2+60, ≥180s floor(measured zero-recovery <180s)。
+        static let seriousFloorSec = 180
+        // Shared `base*2+60` form (serious floor body + light schedule default)。
+        static let sustainedLoadMultiplier = 2
+        static let sustainedLoadAddendSec = 60
+        // Light schedule mid-step (iter 3...5):base+30。
+        static let lightStepAddendSec = 30
+    }
+
     private nonisolated func cooldownSecFor(
         iter: Int, base: Int, adaptive: Bool,
         thermalState: String
@@ -320,27 +376,52 @@ final class BASEnduranceAppController: ObservableObject {
         // cooldown→recovery proved <180s at `serious` is ZERO-recovery:
         // 8/8 serious→serious at 60-90s,AND 180s was still wasted
         // while heat peaked at iter 6-8;ALL 5 serious→nominal
-        // recoveries occurred at ≥180s。 So gate cooldown on MEASURED
-        // thermal,not blind iter count — `serious` gets a ≥180s floor
-        // (skipping the empirically-wasted 60-90s steps the old
-        // iter-schedule burned),`critical` 300s,fair/nominal keep the
-        // light iter schedule。 This is the test-infra PROTOTYPE of
-        // ch 1026's thermal-aware kernel policy(same data,same ≥180s
-        // threshold)— validating the thermal-feedback idea cheaply
-        // before it graduates to the substrate executor。
+        // recoveries occurred at ≥180s。 So the HIGH-heat states gate on
+        // MEASURED thermal,not blind iter count — `serious` gets a ≥180s
+        // floor(skipping the empirically-wasted 60-90s steps the old
+        // iter-schedule burned),`critical` 300s。 The fair/nominal
+        // states are NOT thermal-gated:they keep the original light iter
+        // schedule(base / base+30 / base*2+60 by iter band)。 This is the
+        // test-infra PROTOTYPE of ch 1026's thermal-aware kernel policy
+        // (same data,same ≥180s threshold)— validating the thermal-
+        // feedback idea cheaply before it graduates to the substrate
+        // executor。
         switch thermalState {
         case "critical":
-            return max(base * 3 + 120, 300)
+            return max(
+                base * CooldownPolicy.criticalMultiplier
+                    + CooldownPolicy.criticalAddendSec,
+                CooldownPolicy.criticalFloorSec)
         case "serious":
-            return max(base * 2 + 60, 180)  // ≥180s floor(measured)
-        default:  // fair / nominal — light schedule suffices
+            return max(
+                base * CooldownPolicy.sustainedLoadMultiplier
+                    + CooldownPolicy.sustainedLoadAddendSec,
+                CooldownPolicy.seriousFloorSec)  // ≥180s floor(measured)
+        default:  // fair / nominal — light iter schedule(NOT thermal-gated)
             switch iter {
             case 1...2:   return base
-            case 3...5:   return base + 30
-            default:      return base * 2 + 60
+            case 3...5:   return base + CooldownPolicy.lightStepAddendSec
+            default:      return base * CooldownPolicy.sustainedLoadMultiplier
+                                 + CooldownPolicy.sustainedLoadAddendSec
             }
         }
     }
+
+    // MARK: - Durable-store identity constants(ch1063/ch1064)
+    //
+    // LOAD-BEARING for cross-restart durability:the SQLite filenames key the
+    // Documents-backed atom + vector stores that must survive an app restart,and
+    // the provider-version tags the persisted embeddings。 Extracted (same exact
+    // strings) so they live in one place;changing any of these silently orphans a
+    // prior run's durable memory。
+    private static let memoryAtomsDBFilename = "bas-memory-atoms.sqlite"
+    private static let vectorIndexDBFilename = "bas-vector-index.sqlite"
+    private static let embeddingProviderVersion = "MiniLM-L6-v2-coreml-fp32-v1"
+
+    /// ch1062 WS2 — max rounds for the fabric-authoritative multi-round loop。
+    /// Extracted (same value) from the inline `maxRounds:` arg at the loopResult
+    /// call site。
+    private static let fabricAuthMaxRounds = 5
 
     private nonisolated static let promptPool: [String] = [
         "On-device inference matters for privacy. Why is this true?",
@@ -418,19 +499,19 @@ final class BASEnduranceAppController: ObservableObject {
         let mlxPrompts = max(1, mlxPromptsArg)
         let baseCooldown = cooldownSec
         let adaptive = (
-            env["BAS_INTERNAL_ADAPTIVE"] ?? "1") == "1"
+            env[EnduranceEnv.adaptiveKey] ?? EnduranceEnv.adaptiveDefault) == "1"
         // ch1057 — optional wall-clock cap (seconds; 0 = run all iters). Lets a
         // "run for N hours" launch finish CLEANLY at the cap regardless of iter count
         // (the post-loop summary + closeLogFile + idleTimer reset still run).
         let maxRuntimeSec = Int(
-            env["BAS_INTERNAL_MAX_RUNTIME_SEC"] ?? "0") ?? 0
+            env[EnduranceEnv.maxRuntimeSecKey] ?? EnduranceEnv.maxRuntimeSecDefault) ?? 0
         // ch1044 ADR-022 #3 — OPT-IN sovereign-verdict parity shadow。
         // Default OFF (env unset) → byte-equal:no projection,no verify,no log。
         // With `BAS_SHADOW_PARITY=enabled`,each turn's coordinator verdict is
         // compared against the engine's (observation-only — NEVER halts) so an
         // on-device endurance run gathers ADR-022 §6 parity evidence。
         let shadowParityEnabled =
-            (env["BAS_SHADOW_PARITY"] ?? "") == "enabled"
+            (env[EnduranceEnv.shadowParityKey] ?? EnduranceEnv.shadowParityDefault) == "enabled"
         // ch1066 全面修复 — OPT-IN gate for the WS2 fabric-authoritative N→N+1
         // feed-forward (default OFF). DEFAULT-ON regressed the on-device endurance
         // run: the enriched prompt (raw + fabric JSON conclusions) fed a long
@@ -441,7 +522,7 @@ final class BASEnduranceAppController: ObservableObject {
         // `BAS_FABRIC_AUTH_FEEDFORWARD=1` only after the sanitized enriched-prompt
         // decode is proven non-wedging on-device.
         let fabricAuthFeedForward =
-            (env["BAS_FABRIC_AUTH_FEEDFORWARD"] ?? "0") == "1"
+            (env[EnduranceEnv.fabricAuthFeedForwardKey] ?? EnduranceEnv.fabricAuthFeedForwardDefault) == "1"
         // ch1066 再查 — a per-turn wall-clock TIMEOUT around adapter.draft was tried here
         // and REMOVED after on-device proof it cannot work: the MLX decode is a SYNCHRONOUS,
         // UNCANCELLABLE Metal eval, so (a) a structured task-group timeout hangs in teardown
@@ -516,9 +597,9 @@ final class BASEnduranceAppController: ObservableObject {
                 let docs = FileManager.default.urls(
                     for: .documentDirectory, in: .userDomainMask).first!
                 let store = try BASSQLiteMemoryAtomStore(
-                    databaseURL: docs.appendingPathComponent("bas-memory-atoms.sqlite"))
+                    databaseURL: docs.appendingPathComponent(Self.memoryAtomsDBFilename))
                 let vindex = try BASSQLiteVectorIndexStorage(
-                    databaseURL: docs.appendingPathComponent("bas-vector-index.sqlite"))
+                    databaseURL: docs.appendingPathComponent(Self.vectorIndexDBFilename))
                 memoryStore = store
                 memoryVectorIndex = vindex
                 // ADR-036/WS3 — the L8 retrieve cosineTopK takeover seam (`cosineTopKSync`) is left
@@ -538,7 +619,7 @@ final class BASEnduranceAppController: ObservableObject {
                             atomID: id,
                             normalizedEmbedding: BASEmbedding(
                                 vector: vec, dimension: vec.count,
-                                providerVersion: "MiniLM-L6-v2-coreml-fp32-v1").normalized,
+                                providerVersion: Self.embeddingProviderVersion).normalized,
                             domain: domain))
                     })
             } else {
@@ -733,7 +814,7 @@ final class BASEnduranceAppController: ObservableObject {
         // the adapter uses (BASAgentFabricFullTurnAdapter.swift:385:
         // environment["BAS_AGENT_FABRIC"] == "enabled") + construction
         // success, so the boot line cannot lie about activation again.
-        let fabricGateOn = (env["BAS_AGENT_FABRIC"] == "enabled")
+        let fabricGateOn = (env[EnduranceEnv.agentFabricKey] == "enabled")
         let fabricInventory: String
         if fabricPipeline == nil {
             fabricInventory = "construct_failed"
@@ -899,15 +980,13 @@ final class BASEnduranceAppController: ObservableObject {
                 // Deterministic: nowNanos pinned per turn; converges on the content
                 // digest. The enriched text enters turn N+1 as INPUT (userInput), gated
                 // by the sovereign verdict exactly as any input.
-                let nextRaw = Self.promptPool[
-                    (iter * mlxPrompts + p + 1) % Self.promptPool.count]
                 let authLoop = await BASAgentFabricAuthoritativeTurn.loopResult(
                     decomposeFrame: turnResult.decomposeFrame,
                     candidatePaths: turnResult.thoughtFrame.candidates,
                     acceptedCandidateID: turnResult.mergedChoice.candidateID,
                     runtime: fabricAuthRuntime,
                     config: BASAgentFabricMultiRoundConfig(
-                        maxRounds: 5,
+                        maxRounds: Self.fabricAuthMaxRounds,
                         baseTurnID: "ch1062-i\(iter)-p\(p)",
                         nowNanos: Int64(bitPattern: monoNowNs())))
                 // ch1066 — feed-forward is OPT-IN (default OFF; see fabricAuthFeedForward).
@@ -915,6 +994,11 @@ final class BASEnduranceAppController: ObservableObject {
                 // fold the enriched conclusions into the next prompt's MLX input unless the
                 // operator opted in — the raw structured fold wedged on-device MLX eval.
                 if fabricAuthFeedForward, let proj = authLoop.finalProjection {
+                    // ch — nextRaw is only consumed here (default-OFF path skips it),
+                    // so compute it inside the gate to avoid the wasted promptPool index
+                    // every prompt。 Index expression is unchanged from the prior site。
+                    let nextRaw = Self.promptPool[
+                        (iter * mlxPrompts + p + 1) % Self.promptPool.count]
                     pendingEnrichedPrompt = nextRaw.isEmpty
                         ? proj.contextBlock
                         : nextRaw + "\n\n" + proj.contextBlock
@@ -1138,9 +1222,11 @@ final class BASEnduranceAppController: ObservableObject {
                 totalSec, totalIters,
                 avgDurMs, p50DurMs, p99DurMs))
             // ch 1025.8 HIGH-1:est_total_tokens(chars/4,not real)。
-            // ch 1025.8 MED-1 NOTE:p50/p99 below still use the
-            // biased index(sorted[count/2] / last-element)— a known
-            // overstatement deferred to the next batch(BACKLOG)。
+            // p50/p99 below use nearest-rank percentiles via
+            // `Self.nearestRankIndex(...)`(rank=ceil(p×N), 0-based
+            // index=rank−1, clamped)— the correct, unbiased index
+            // (ch 1025.9 MED-1 fix already replaced the old
+            // sorted[count/2] / last-element estimates)。
             await emitBoth(String(format:
                 "📊 ch1025 FINAL mlx_total_inferences=%d " +
                 "avg_lat_ms=%.0f p50_lat_ms=%.0f " +

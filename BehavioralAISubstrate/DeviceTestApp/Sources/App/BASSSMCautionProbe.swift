@@ -20,8 +20,14 @@ import BASHostKit
 enum BASSSMCautionProbe {
 
     private static let log = Logger(
-        subsystem: "com.changgeng.basdevicetest",
+        subsystem: BASDeviceLog.subsystem,
         category: "ch1065-ssm-caution")
+
+    /// Dedicated worker-thread stack size for the full rule-based turn。 The
+    /// giant 52-field BASEBrainTurnResult convenience-init cascade overruns the
+    /// Swift cooperative pool's ~544KB stack (SIGBUS / signal 10); 16MB gives the
+    /// giant-struct copy ample headroom。 Same value as the prior inline literal。
+    private static let bigStackBytes = 16 * 1024 * 1024
 
     /// Run the on-device SSM-operator validation off the main actor; return a short UI verdict.
     /// Also measures the per-turn GPU SHADOW (arc-1): the CPU-vs-GPU selective-scan MAE on real A19
@@ -38,7 +44,7 @@ enum BASSSMCautionProbe {
         // its on-device numbers are unchanged.
         let ssmVerdict: String = await withCheckedContinuation { cont in
             let worker = Thread { cont.resume(returning: runSync()) }
-            worker.stackSize = 16 * 1024 * 1024
+            worker.stackSize = bigStackBytes
             worker.name = "ch1066-ssm-caution-bigstack"
             worker.start()
         }

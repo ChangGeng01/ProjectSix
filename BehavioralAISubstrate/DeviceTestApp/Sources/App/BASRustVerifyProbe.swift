@@ -54,7 +54,7 @@ import BASRuntimeCore
 enum BASRustVerifyProbe {
 
     private static let log = Logger(
-        subsystem: "com.changgeng.basdevicetest",
+        subsystem: BASDeviceLog.subsystem,
         category: "ch1027-rust-verify")
 
     /// FNV-1a 64-bit offset basis — the documented empty-input return
@@ -119,7 +119,8 @@ enum BASRustVerifyProbe {
         }
         let matched = checks.filter { $0.ok }.count
         emit("📊 ch1027 rust_verify abi_summary " +
-             "resolved=\(checks.count)/8 matched=\(matched)/8")
+             "resolved=\(checks.count)/\(checks.count) " +
+             "matched=\(matched)/\(checks.count)")
 
         // ── 3. Real-compute proof via fnv1a64
         let emptyHash = BASAgentFabricBridge.fnv1a64(Data())
@@ -146,14 +147,14 @@ enum BASRustVerifyProbe {
             knownHash, knownExpected, computeOK ? "true" : "false"))
 
         // ── VERDICT
-        let allOK = auditOK && matched == 8 && emptyOK && computeOK
+        let allOK = auditOK && matched == checks.count && emptyOK && computeOK
         emit("📊 ch1027 rust_verify VERDICT all_ok=\(allOK) " +
-             "(audit=\(auditOK) abi=\(matched)/8 " +
+             "(audit=\(auditOK) abi=\(matched)/\(checks.count) " +
              "fnv_empty=\(emptyOK) fnv_compute=\(computeOK))")
 
         return allOK
-            ? "✓ all_ok (8/8 abi, fnv real)"
-            : "✗ FAIL (audit=\(auditOK) abi=\(matched)/8 " +
+            ? "✓ all_ok (\(checks.count)/\(checks.count) abi, fnv real)"
+            : "✗ FAIL (audit=\(auditOK) abi=\(matched)/\(checks.count) " +
               "fnv_empty=\(emptyOK) fnv_compute=\(computeOK))"
     }
 

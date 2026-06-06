@@ -48,7 +48,7 @@ import BASMetalSubstrate
 enum BASMPSGraphProbe {
 
     private static let log = Logger(
-        subsystem: "com.changgeng.basdevicetest",
+        subsystem: BASDeviceLog.subsystem,
         category: "ch1034-mpsgraph")
 
     /// Identical-shape repeats per kernel。 Repeats 2+ exercise the
