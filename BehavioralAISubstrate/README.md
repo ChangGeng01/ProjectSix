@@ -164,7 +164,9 @@ through `BASHostConfiguration.presentation`, `BASHostConfiguration.workflowBehav
 Primary validation lives in:
 
 - `cd BehavioralAISubstrate && swift build` (SPM,no Xcode required)
-- `cd BehavioralAISubstrate && swift test` (~13k tests,~85s sweep)
+- `cd BehavioralAISubstrate && swift test --disable-swift-testing`
+  (headless XCTest gate; monolithic `swift test` still hits a
+  swift-testing helper SIGBUS in headless macOS)
 - `xcodebuild test -scheme SampleHost` (optional Apple-platform integration smoke)
 
 ## Import Boundary

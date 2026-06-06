@@ -35,8 +35,9 @@ Archive/
 ## What this repo holds now
 
 - `BehavioralAISubstrate/` — the core library。 Swift Package Manager-based,
-  no Xcode project required。 Builds + tests via `swift build` and
-  `swift test`。
+  no Xcode project required。 Builds via `swift build`; headless validation
+  uses `swift test --disable-swift-testing` because monolithic `swift test`
+  still hits a SwiftPM swift-testing helper SIGBUS in headless macOS.
 - `SampleHost/` — minimal app demonstrating the substrate's public surface。
 - `QinaoRuntimeSDK/` — substrate's runtime SDK packaging。
 
@@ -44,8 +45,8 @@ Archive/
 
 ```bash
 cd BehavioralAISubstrate
-swift build      # clean SPM build,no Xcode required
-swift test       # ~13k tests,~85s sweep
+swift build                         # clean SPM build,no Xcode required
+swift test --disable-swift-testing  # headless XCTest gate
 ```
 
 ## 14-layer substrate (L1-L14)

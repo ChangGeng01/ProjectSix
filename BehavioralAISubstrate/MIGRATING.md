@@ -189,9 +189,12 @@ version + target version。
 1. **Always read CHANGELOG.md before bumping minor or major versions。**
 2. **Always run the full test sweep after upgrading:**
    ```bash
-   cd BehavioralAISubstrate && swift test
+   cd BehavioralAISubstrate && swift test --disable-swift-testing
    ```
-   Expected:12,965 tests / 31 skipped / 0 failures (substrate 0.56.0)。
+   Expected headless gate:15,015 XCTest tests / 101 skipped / 0 failures
+   on the current tree。 Run swift-testing `@Test` suites in batches or a
+   logged-in GUI session; monolithic `swift test` still hits a headless
+   swift-testing helper SIGBUS。
 3. **If a schema bump rejects your existing cache file,don't manually
    edit it。** Let the substrate's lazy-upgrade path handle it。
 4. **If you find yourself writing migration glue code outside this doc,
