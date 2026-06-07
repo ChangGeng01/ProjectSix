@@ -111,59 +111,8 @@ private let ch1025Log = Logger(
     subsystem: BASDeviceLog.subsystem,
     category: "ch1025-endurance")
 
-/// ADR-037 — host-local resolver backing the global-recall seam's `atomForID`. NSLock-guarded
-/// atomID → (atom, domain) map with insertion-order FIFO eviction (the memory bound). `put` returns
-/// any evicted ids so the caller mirrors the eviction into the engine — keeping engine-rows ==
-/// resolver-keys (the ADR-037 lockstep invariant; without it the engine grows unbounded and cosineTopK
-/// returns ids the resolver can't resolve → silent recall loss). `lookupSync` is the sync hot-path read
-/// (inside the ch883 sync retrieve); `put`/eviction run between turns. Mirrors the service's withLock
-/// idiom (never holds the lock across a suspension). `@unchecked Sendable`: the lock synchronizes.
-final class BASGlobalRecallResolver: @unchecked Sendable {
-    /// Smallest sane corpus cap (also the runner's parse floor).
-    static let minCap = 64
-    private let lock = NSLock()
-    private var map: [String: (atom: BASMemoryAtom, domain: String)] = [:]
-    private var order: [String] = []          // insertion order for FIFO eviction
-    private let cap: Int
-    #if DEBUG
-    private var writing = false
-    #endif
-    init(cap: Int) { self.cap = max(Self.minCap, cap) }
-    /// Insert/replace; returns the ids the FIFO cap evicted so the caller can `engine.remove` them in
-    /// lockstep (engine-rows == resolver-keys).
-    @discardableResult
-    func put(id: String, atom: BASMemoryAtom, domain: String) -> [String] {
-        lock.lock(); defer { lock.unlock() }
-        if map[id] == nil { order.append(id) }
-        map[id] = (atom, domain)
-        var evicted: [String] = []
-        while order.count > cap {
-            let e = order.removeFirst()
-            map[e] = nil
-            evicted.append(e)
-        }
-        return evicted
-    }
-    func lookupSync(id: String) -> (atom: BASMemoryAtom, domain: String)? {
-        lock.lock(); defer { lock.unlock() }
-        return map[id]
-    }
-    var count: Int {
-        lock.lock(); defer { lock.unlock() }
-        return map.count
-    }
-    #if DEBUG
-    // ADR-037 concurrency contract (M2): the sync hot-path read (atomForID, WITHIN a turn) must never
-    // overlap the between-turns engine/resolver writes. The seam's atomForID closure asserts this; the
-    // runner brackets its between-turns sync with begin/endWrite. Debug-only (zero release cost).
-    func beginWrite() { lock.lock(); writing = true; lock.unlock() }
-    func endWrite() { lock.lock(); writing = false; lock.unlock() }
-    func assertNotWriting() {
-        lock.lock(); let w = writing; lock.unlock()
-        assert(!w, "ADR-037: global-recall sync read overlapped a between-turns write — turn-phase separation violated")
-    }
-    #endif
-}
+// ADR-037 — BASGlobalRecallResolver moved to Sources/BASHostKit/BASGlobalRecallResolver.swift
+// (public, SPM-unit-testable). The runner wires it as the global-recall seam's atomForID backing.
 
 @MainActor
 final class BASEnduranceAppController: ObservableObject {
@@ -732,13 +681,12 @@ final class BASEnduranceAppController: ObservableObject {
                         "📍 ADR-037 global recall ACTIVE corpus=\(corpus) resolver=\(resolver.count) " +
                         "cap=\(globalRecallCap) domain=\(pin)")
                     globalSeam = BASGlobalRecallSeam(
-                        cosineTopK: { [engine, pin] q, k in
-                            (try? engine.cosineTopKAtomIDsSync(forDomain: pin, query: q, k: k)) ?? []
+                        cosineTopK: { [engine, pin, resolver] q, k in
+                            resolver.assertNotWriting()   // no-op in release; guards the ENGINE read too
+                            return (try? engine.cosineTopKAtomIDsSync(forDomain: pin, query: q, k: k)) ?? []
                         },
                         atomForID: { [resolver] id in
-                            #if DEBUG
-                            resolver.assertNotWriting()
-                            #endif
+                            resolver.assertNotWriting()   // no-op in release; guards the resolver read
                             return resolver.lookupSync(id: id)
                         })
                 } else {
@@ -1292,9 +1240,7 @@ final class BASEnduranceAppController: ObservableObject {
                 if let engine = globalRecallEngine, let resolver = globalRecallResolver,
                    let vindex = memoryVectorIndex {
                     let pin = BASL8RoutedMemoryService.Parameters.atomSource
-                    #if DEBUG
-                    resolver.beginWrite()
-                    #endif
+                    resolver.beginWrite()   // no-op in release; brackets the between-turns write window
                     var added = 0
                     // Monotonic gate: only atoms NEVER synced (NOT resolver-presence — that re-finds
                     // evicted atoms + oscillates the capped membership). Upsert FIRST, then put + mirror
@@ -1325,9 +1271,7 @@ final class BASEnduranceAppController: ObservableObject {
                             await emitBoth("⚠️ ADR-037 engine upsert failed id=\(id): \(error)")
                         }
                     }
-                    #if DEBUG
-                    resolver.endWrite()
-                    #endif
+                    resolver.endWrite()     // no-op in release
                     if added > 0 {
                         let corpus = await engine.totalCount
                         await emitBoth(

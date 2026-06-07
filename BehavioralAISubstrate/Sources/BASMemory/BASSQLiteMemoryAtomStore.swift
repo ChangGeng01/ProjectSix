@@ -548,7 +548,7 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
     ) throws -> [BASGovernedMemory] {
         let sql = """
             SELECT atom_id, payload_json FROM memory_atoms
-             ORDER BY created_at_ms ASC
+             ORDER BY created_at_ms ASC, atom_id ASC
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
