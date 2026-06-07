@@ -13,7 +13,10 @@ payload), **ADR-014** (opt-in / 红线 7 byte-equal-off), **ADR-018/019/020** (d
 consequential wiring, evidence-resolution two-phase verdict).
 
 Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` stays legacy):
-- **ADR-024** one-verdict-kernel (Step 1 landed byte-equal; Steps 2-4 gated).
+- **ADR-024** one-verdict-kernel — Step 1 (`evaluateLevel`) landed byte-equal + load-bearing. **Steps 2-3
+  SUPERSEDED** (coordinator can't adopt the kernel byte-equally: rich-frames vs projected-primitives
+  mismatch; keep-both forbids collapsing the two authorities — see ADR-024 REFRAME). Step 4 = optional
+  deferred tidy. Drift handled by the kernel + `BASCoordinatorConsistencyCheck`, not a shared kernel.
 - **ADR-025/026** Ed25519 commit-token authority + enforcer + gated-execution seam (`BASSovereignGatedCommit`:
   register → authorize → op-only-on-success; policy B dual-signature; 6 tests) · **ADR-027** constitution-vault
   seal · **ADR-028** LLM invocation contract · **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.

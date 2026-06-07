@@ -104,3 +104,47 @@ the single source of truth without yet rewiring any consumer.
   actually removes the duplication; Step 4 is the shadow simplification.
 - Relationship: ADR-024 supplies the *mechanism* (one kernel) that makes ADR-023's
   *content* (the agreed rules) permanent. Neither touches #2 (Ed25519, DEFER-1).
+
+## REFRAME (post-ch1044) — Steps 2–3 are SUPERSEDED; Step 4 is an optional, deferred tidy
+
+Re-examined against ADR-023 §8's FINAL reframe **and the actual code**, Steps 2–3 do not survive — for
+two independent reasons:
+
+1. **Overtaken by the keep-both ruling.** Step 2 was "land ADR-023 R1–R4 into the kernel." But R1 was
+   implemented, **REVERTED**, and operator-ruled **KEEP BOTH**: the engine's strict verdict (e.g.
+   missing-lineage → `deadStop`) is a deliberate INDEPENDENT BACKSTOP; the coordinator's recoverable
+   verdict (→ `shadowLock`) is the production path. ADR-023's FINAL reframe established that **100% of the
+   886 divergences are intentional engine strictness** and ABANDONED engine-parity-as-a-halt-gate. There
+   are no "agreed reconciled rules" left to land — the two authorities are MEANT to differ.
+
+2. **Infeasible by construction (input-granularity mismatch).** Step 3 was "the coordinator adopts the
+   kernel" (rich frames → `VerdictContext` → `evaluateLevel`). But `computeVerdictDecision` reasons over
+   RICH domain frames (`riskCard.riskLevel`, `actionPermit.mode`, `emergencyBrake.brakeLevel`,
+   `budgetFrame.runMode`, kill-switches) while `evaluateLevel` reasons over PROJECTED primitives
+   (BR-001..012 booleans + soft-signal scalars). The rich→primitive projection is **lossy by nature** —
+   that lossiness IS the ~46% divergence (§2). So `evaluateLevel(project(richframes)) ≠
+   computeVerdictDecision(richframes)`: the coordinator cannot adopt the kernel byte-equally (it would
+   CHANGE the production verdict to the engine's stricter one — exactly what keep-both forbids), and a
+   "coordinator profile" taking rich frames would not share the engine's kernel at all — it would merely
+   relocate `computeVerdictDecision` into `BASSovereign` for zero benefit and real risk.
+
+**The achievable end-state is already in place** — drift is handled on BOTH sides WITHOUT a single shared
+kernel:
+- **Engine side:** ONE kernel (`evaluateLevel`, Step 1) is the single source for every engine-side
+  consumer (the parity shadow, warrant signing). No engine-side drift.
+- **Coordinator side:** `BASCoordinatorConsistencyCheck` (shipped, ADR-023 §8) re-derives the
+  coordinator's verdict from its OWN settled state and flags a stored verdict laxer than its own rules —
+  the real coordinator-regression detector (NOT engine-parity).
+
+**Step 4 (shadow uses `evaluateLevel` sync) is the only residual**, and the original draft undersold it as
+"small/safe." The shadow report holds a FULL `BASSovereignVerdict`, so a clean sync path needs the verdict
+CONSTRUCTION factored out of the async `evaluate` (the IDs/clock part separated from the ledger append).
+The shadow consumes only level + reasonCodes (both already from `evaluateLevel`), so the gain
+(side-effect-free, no throwaway ledger) is real but MODEST. **Deferred** — touching the safety-critical
+verdict engine for a modest non-safety observability gain is not worth the churn (亏的不要上); revisit
+only if the shadow's ledger side-effects become a measured problem.
+
+**Net:** Step 1 stands and is load-bearing. Steps 2–3 are CLOSED (superseded by the keep-both architecture
++ the input-granularity reality). Step 4 is an optional, deferred tidy. The "two-authorities anti-pattern"
+this ADR set out to remove turned out, on rigorous analysis, to be the INTENDED production-path +
+independent-backstop design — not an accident to unify away.
