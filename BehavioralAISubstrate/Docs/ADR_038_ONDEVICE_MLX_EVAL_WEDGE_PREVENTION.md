@@ -90,6 +90,22 @@ prompt.** Honest reading:
   non-prompt levers remain: a smaller/different decoder, or an EXTERNAL watchdog that detects the
   zero-token freeze and relaunches (in-process cancellation being impossible).
 
+### Lever-1 result (Run C, on-device 2026-06-08): shrink maxContextBlockChars 512→256 — DELAYED, did NOT clear
+
+The first falsification lever was built (configurable `contextBlock` maxChars / topConclusionsOnly,
+committed) + run on-device: `BAS_FABRIC_AUTH_FEEDFORWARD=1 BAS_FABRIC_CONTEXT_BLOCK_CHARS=256`, 10 iters ×
+2 prompts. **RESULT: WEDGE at iter=4/prompt=1** — 6 clean mlx responses (vs Run B's 3 at 512) then a
+zero-token hang. So halving the enriched prefill (prompt_len ~323 vs Run B's 543) roughly DOUBLED the
+responses-before-wedge (3 → 6) but did **not** eliminate it; the wedge moved iter2 → iter4.
+
+**Conclusion:** the wedge is **cumulative**, not pure prefill-shape — it recurs after ~N enriched decodes,
+and smaller prefills push N higher (more progress) without clearing it. Consistent with GPU-state /
+resource accumulation across the feed-forward decode path, NOT a per-prompt OOD-shape trigger.
+**Prompt-shaping (size) is therefore INSUFFICIENT** — shrinking delays the wedge but cannot prevent it.
+The honest read: the real levers are non-prompt (smaller/different decoder, or an external watchdog-
+relaunch). **Feed-forward STAYS default-OFF** (the iron rule held — the lever was tried on-device and
+honestly failed, not force-enabled).
+
 ## 7. Posture + deferred follow-ups
 
 - **Feed-forward stays OPT-IN (default 0)** regardless of Run B. A default-flip needs BOTH sustained
