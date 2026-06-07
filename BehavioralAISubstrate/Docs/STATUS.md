@@ -17,11 +17,14 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   SUPERSEDED** (coordinator can't adopt the kernel byte-equally: rich-frames vs projected-primitives
   mismatch; keep-both forbids collapsing the two authorities — see ADR-024 REFRAME). Step 4 = optional
   deferred tidy. Drift handled by the kernel + `BASCoordinatorConsistencyCheck`, not a shared kernel.
-- **ADR-025/026** Ed25519 commit-token authority + enforcer + gated-execution seam (`BASSovereignGatedCommit`:
-  register → authorize → op-only-on-success; policy B dual-signature; 6 tests) · **ADR-027** constitution-vault
-  seal · **ADR-028** LLM invocation contract · **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.
-- **ADR-032** governance enablement — observe-mode contracts/traces ON by default (zero output change;
-  rejection/crypto/dual-key/deny REFUSED pending a host keyring, per R1).
+- **ADR-025/026/032** Ed25519 commit authority + enforcer + per-op seam (`BASSovereignGatedCommit`) +
+  turn-level host-side gate (`BASSovereignGatedTurn`, single-source digest formula, fail-closed; 12 tests) —
+  the crypto commit-gate MECHANISM (runTurn is pure-emit → the gate is host-side by design; live needs a host
+  keyring + adoption) · **ADR-027** constitution-vault seal · **ADR-028** LLM invocation contract ·
+  **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.
+- **ADR-032** governance enablement — observe-mode contracts/traces ON by default (zero output change).
+  The **crypto commit-verify** subset now has a host-side MECHANISM (`BASSovereignGatedTurn`, above);
+  rejection / dual-key / deny still REFUSED pending a host keyring/policy (R1). See ADR-032 UPDATE.
 - **ADR-033** main-chain wiring (MiniLM memory + durable SQL/vector index + native executors + fabric,
   host-injected) · **ADR-034** agent-fabric multi-round authoritative loop.
 - **ADR-036** L8 cosineTopK retrieve takeover (the ONLY sanctioned NON-byte-equal path; host opt-in).

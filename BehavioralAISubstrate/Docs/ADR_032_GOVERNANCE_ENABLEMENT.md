@@ -45,3 +45,29 @@ brain's own model call is a separate, careful integration — **not** a reflexiv
   proven (`testObserveOnlyIsOutputByteEqual`, with deliberately forbidden-looking context).
 - **R1 preserved**: observe-mode never blocks/mutates; the verifier's own `report.isAcceptable` and the
   sovereign verdict path are untouched.
+
+## UPDATE (2026-06-08) — the crypto commit-verifier subset now has a LIVE host-side mechanism
+
+ADR-032 above REFUSED the "unsafe subset" (crypto commit-verify / dual-key / deny) pending a host keyring
+(R1). The crypto commit-verify part now has its mechanism, shipped this session:
+- **ADR-025/026** built the primitives: deterministic Ed25519 mint, `BASSovereignCommitEnforcer`
+  (register → authorize, fail-closed), and `BASSovereignGatedCommit` (the per-op gated-execution seam).
+- **`BASSovereignGatedTurn`** (this session) is the turn-level host-side gate: given the turn's emitted
+  commit tokens + the settled artifact + a keyring-backed enforcer, it authorizes each irreversible op
+  (checkpointCommit / memoryWrite / renderHighRisk) against the ACTUAL artifact and runs the host's op
+  ONLY on success — fail-closed on no-token / unsupported-scope / aliased-target / tampered-artifact /
+  replay / TTL / invalid-sig. `BASSovereignTurnArtifactParts` is the SINGLE SOURCE OF TRUTH for the
+  per-scope digest formula (the emitter `buildSovereignCommitTokens` + the gate share it → the recompute
+  can't drift from the emit). 6 tests; the emitter refactor is byte-equal (determinism suite green).
+
+**Architecture finding (why it's HOST-SIDE, not in `runTurn`):** `runTurn` is a PURE emit-only function —
+it computes + emits the commit tokens; the HOST executes the irreversible ops (persist fold / apply
+tickets / render). So a gate INSIDE `runTurn` is structurally impossible (nothing executes there). The
+gate is host-side BY DESIGN — exactly where ADR-026's enforcer was always meant to sit.
+
+**Still REFUSED / honest scope:** this is the MECHANISM, not a live-in-production gate. Going live needs a
+host to (a) hold a keyring-backed `BASSovereignTokenAuthority` (the operator's key/policy decision — R1)
+and (b) route its real fold-persist / ticket-apply / render through `BASSovereignGatedTurn.gate`. No
+current host does (the endurance runner + fabric pipeline consume tokens but don't execute gated ops). The
+dual-key + deny-condition subsets remain REFUSED pending their own host policy. OPT-IN / byte-equal-off:
+the coordinator / `runTurn` is untouched; a host that never gates is byte-identical.
