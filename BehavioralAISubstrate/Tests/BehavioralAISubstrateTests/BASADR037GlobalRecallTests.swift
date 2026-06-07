@@ -206,23 +206,36 @@ final class BASADR037GlobalRecallTests: XCTestCase {
         let pin = BASL8RoutedMemoryService.Parameters.atomSource
         let healthID = UUID(uuidString: "00000000-0000-0000-0000-0000000000C3")!
         let health = governed(
-            id: healthID, content: "blood pressure medication dosage prescription",
-            domain: "health")
+            id: healthID, content: "blood pressure medication dosage prescription", domain: "health")
         let seam = try await makeGlobalSeam(corpus: [health], embed: embed, pin: pin)
-        let svc = BASL8RoutedMemoryService(
+        let q = frame("blood pressure medication")
+
+        // POSITIVE CONTROL: unrestricted ⇒ the health atom IS globally recalled — so the negative case
+        // below is a genuine constitution DROP, not a no-recall (M3 strengthening).
+        let open = BASL8RoutedMemoryService(
+            loadAllAtoms: { [] }, syncEmbed: embed, embeddingDimension: dim,
+            relevanceFloor: 0.0, globalRecall: seam)
+        await open.refresh()
+        let rOpen = open.retrieve(decomposeFrame: q, hostContext: profile(), budget: budget())
+        XCTAssertTrue(rOpen.atoms.contains { $0.memoryID == healthID.uuidString },
+            "positive control: the health atom IS globally recalled when unrestricted")
+
+        // NEGATIVE: restrict "health" ⇒ the SAME atom is dropped by the constitution filter using its
+        // REAL resolver domain (not the engine's pin domain).
+        let restricted = BASL8RoutedMemoryService(
             loadAllAtoms: { [] }, syncEmbed: embed, embeddingDimension: dim,
             restrictedMemoryDomains: ["health"], relevanceFloor: 0.0, globalRecall: seam)
-        await svc.refresh()
-        let r = svc.retrieve(
-            decomposeFrame: frame("blood pressure medication"),
-            hostContext: profile(), budget: budget())
-        XCTAssertFalse(r.atoms.contains { $0.memoryID == healthID.uuidString },
+        await restricted.refresh()
+        let rRestricted = restricted.retrieve(decomposeFrame: q, hostContext: profile(), budget: budget())
+        XCTAssertFalse(rRestricted.atoms.contains { $0.memoryID == healthID.uuidString },
             "constitution filter must drop the restricted-domain atom via its REAL resolver domain")
     }
 
-    /// Nil seam ⇒ the score-all baseline is UNCHANGED (byte-equal-off, ADR-014): a windowed service
-    /// recalls the lexically-closest in-window atom exactly as before the ADR-037 seam existed.
-    func testNilSeamIsScoreAllUnchanged() async {
+    /// Nil seam ⇒ the score-all baseline still recalls the lexically-closest in-window atom. This is a
+    /// FUNCTIONAL check, NOT the byte-equal proof: byte-equal-off rests on (1) ADR-037 only PREPENDING
+    /// the global branch (the score-all `else` is byte-identical to pre-ADR-037) and (2) the real net,
+    /// BASCognitiveBrainCascadeDigestTests.
+    func testNilSeamScoreAllStillRecallsClosest() async {
         let embed = BASL8RoutedMemoryService.lexicalEmbed()
         let dim = BASL8RoutedMemoryService.Parameters.defaultLexicalDimension
         let wID = UUID(uuidString: "00000000-0000-0000-0000-0000000000A1")!
@@ -237,7 +250,44 @@ final class BASADR037GlobalRecallTests: XCTestCase {
             decomposeFrame: frame("will it rain today sunny weather"),
             hostContext: profile(), budget: budget())
         XCTAssertEqual(r.atoms.first?.memoryID, wID.uuidString,
-            "nil seam ⇒ unchanged score-all windowed recall (byte-equal-off)")
+            "nil seam ⇒ score-all windowed recall still surfaces the closest atom")
+    }
+
+    /// HIGH-1 lockstep proof: mirroring the runner's eviction (engine.remove when the FIFO cap evicts)
+    /// keeps the engine BOUNDED to the cap AND ensures cosineTopK never returns an evicted (now
+    /// unresolvable) id. Without the engine.remove, the engine would grow unbounded and return ids the
+    /// resolver dropped → silent recall loss. Uses the real in-memory engine.
+    func testEngineEvictionKeepsCorpusBoundedAndResolvable() async throws {
+        let embed = BASL8RoutedMemoryService.lexicalEmbed()
+        let pin = BASL8RoutedMemoryService.Parameters.atomSource
+        let engine = try BASRoutedVectorIndexStorage(inMemory: ())
+        let cap = 8
+        var fifo: [String] = []                 // mirrors BASGlobalRecallResolver's FIFO keys
+        for i in 0..<24 {                        // 24 ≫ cap = 8
+            let id = "atom-\(i)"
+            let vec = embed("alpha token\(i) beta gamma")
+            _ = try await engine.upsert(BASVectorIndexEntry(
+                atomID: id,
+                normalizedEmbedding: BASEmbedding(
+                    vector: vec, dimension: vec.count, providerVersion: "p").normalized,
+                domain: pin))
+            fifo.append(id)
+            while fifo.count > cap {             // lockstep eviction (here: engine side)
+                let evict = fifo.removeFirst()
+                _ = try await engine.remove(atomID: evict)
+            }
+        }
+        // Engine bounded to the cap (NOT 24) — the REAL memory bound (HIGH-1).
+        let n = await engine.totalCount
+        XCTAssertEqual(n, cap, "lockstep engine.remove must bound the engine corpus to the cap")
+        // cosineTopK returns ONLY ids still in the FIFO set — no evicted/unresolvable ids (no slot loss).
+        let top = try engine.cosineTopKAtomIDsSync(
+            forDomain: pin, query: embed("alpha token23 beta gamma"), k: 5)
+        XCTAssertFalse(top.isEmpty)
+        for hit in top {
+            XCTAssertTrue(fifo.contains(hit.atomID),
+                "engine must not return evicted atom \(hit.atomID) (HIGH-1: no slot loss)")
+        }
     }
     #endif
 }

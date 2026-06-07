@@ -28,10 +28,15 @@ the headless swift-testing SIGBUS (a host test-runner issue) and the MPSGraph si
 NSException (unrelated to Rust). There was never a device link failure.
 
 The operator chose the **compelling** scope: use cosineTopK for GLOBAL semantic recall over the FULL
-durable corpus — not just the ≤`selfPopulateCap` (64) in-memory recall window — so the brain can recall
-a relevant memory from far outside the recent window. This is a real recall-quality + perf win (1 Rust
-FFI scoring call over the whole corpus vs. N Swift cosine calls over a tiny window that cannot even see
-older atoms).
+durable corpus. Precise framing (a later audit corrected an over-claim): `refresh()` already loads the
+full durable corpus into the snapshot UNCAPPED, so the score-all baseline DOES see every atom right
+after a refresh; `selfPopulateCap` (64) only trims the snapshot **mid-run** as self-populated frames are
+appended (`removeFirst`). So the genuine wins are (a) **ranking semantics + perf** — one Rust cosineTopK
+FFI call over the whole corpus vs. N Swift cosine calls — and (b) **steady-state reach**: on turns after
+the snapshot has trimmed toward ~64, global recall still ranks the entire corpus while the baseline sees
+only the recent window. (The macOS needle test proves the beyond-window reach; the on-device run had a
+tiny corpus (2–4 ≪ 64), so the at-scale beyond-window + cap behavior is proven by tests, not exercised
+on device.)
 
 ## What landed
 
@@ -50,7 +55,7 @@ older atoms).
   within its membership. `memoryAtom(from:)` was promoted to `public` so the host builds its resolver
   with the exact atom shape (no drift).
 - **Host adoption** (DeviceTestApp `BASEnduranceAppRunner`, `BAS_GLOBAL_RECALL=1`): builds the
-  in-memory engine + a bounded `BASGlobalRecallResolver` (NSLock-guarded, insertion-order LRU,
+  in-memory engine + a bounded `BASGlobalRecallResolver` (NSLock-guarded, insertion-order FIFO,
   `BAS_GLOBAL_RECALL_CAP` default 4096) from the durable store at startup WITHOUT re-embedding (reuses
   persisted vectors — preserves ch1064), wires the seam, and folds NEW durable atoms in after each
   `drainMemoryIntents()` (incremental sync). The engine stores every atom under one recall domain
@@ -114,11 +119,50 @@ AND global recall is live across a restart."
 
 ## Honest scope / follow-ups
 
-- **LRU coverage**: atoms past the cap (default 4096) fall out of global recall until re-touched. The
-  durable store keeps them (no data loss) — a recall-coverage trade-off, not a durability loss.
-  Cap sizing: 4096 atoms × (small atom + a ~384-float vector) ≈ tens of MB on iPhone; env-overridable.
-- **Between-turns `store.allAtoms()` delta scan** is O(corpus)/turn — negligible at endurance cadence
-  (one MLX inference + cooldown per turn). A `loadAtomsSince(count:)` is a deferred optimization.
+- **Cap coverage (FIFO, lockstep)**: the `cap` (default 4096) bounds BOTH the resolver map AND the
+  engine — the host evicts from both in lockstep (resolver `put` returns evicted ids; the runner
+  `engine.remove`s them), so engine-rows == resolver-keys and the engine's vectors (the memory weight)
+  are actually bounded. Eviction is insertion-order **FIFO** (recency: the newest `cap` atoms stay).
+  Atoms past the cap fall out of global recall (the durable store keeps them — a recall-coverage
+  trade-off, not data loss). Cap sizing: 4096 × (atom + ~384-float vector) ≈ tens of MB; env-overridable.
+- **Per-turn sync is monotonic**: gated on a "seen" set (`globalRecallSynced`), each atom synced once —
+  NOT on resolver presence (which re-finds evicted atoms and would oscillate the capped membership +
+  thrash O(corpus)/turn past the cap). The seen-set is O(durable-corpus) of atomID strings (cheap vs.
+  the vectors). A `loadAtomsSince(count:)` high-water gate is a deferred O(1)-memory optimization.
 - **Multi-domain recall** deferred (single recall-domain pin).
 - **`cosineTopKSync` vs `globalRecall` coexistence**: `retrieve()` prefers `globalRecall`; a host that
   wires both leaves `cosineTopKSync` dead. Documented precedence; minor.
+
+## Audit & hardening (全面 audit)
+
+A multi-perspective audit confirmed byte-equal-off holds + the on-device claims are accurate, and found
+two HIGH defects on the opt-in path (since fixed — all on the opt-in path; the default is unaffected):
+- **HIGH-1** — the engine was unbounded (only the resolver was capped) → memory growth past the cap +
+  cosineTopK returning resolver-evicted ids → silent recall loss. Fixed by lockstep engine/resolver
+  eviction (above) + a macOS test (`testEngineEvictionKeepsCorpusBoundedAndResolvable`).
+- **HIGH-2** — the per-turn sentinel used resolver presence, which both stranded a no-embedding atom
+  (never retried) AND oscillated the capped membership past the cap. Fixed by the monotonic seen-set
+  gate (above) + upsert-first-then-put ordering (no engine/resolver divergence on a write failure).
+- Hardening: a DEBUG turn-phase-separation assertion (the sync read must not overlap a between-turns
+  write), a single-sourced cap floor/default, the FIFO comment correction, and logged (no longer
+  swallowed) engine-upsert AND evict-remove errors. The runner eviction/sync logic is host code (not
+  SPM-testable); it is review-verified, with the engine-side lockstep covered by the macOS test + the
+  on-device run.
+
+### Deferred follow-ups (re-audit — accepted, not blocking)
+- **`created_at_ms` tie ordering**: `fetchAllAtoms` is `ORDER BY created_at_ms ASC` (millisecond wall
+  clock) with no secondary key, so atoms admitted within the same ms have an unspecified order. At the
+  `suffix(cap)` boundary this can wobble which atom occupies the last cap slot by ±1ms — self-healing
+  (an excluded new atom is left unseen ⇒ retried), never silent recall loss. A `…, atom_id ASC`
+  secondary key would make it deterministic, but it touches the load-bearing durable query, so deferred
+  per R1 (no recall-correctness need).
+- **Per-turn `store.allAtoms()` full re-read** is O(corpus)/turn (the seen-set avoids re-*syncing*, not
+  re-*reading*). A `loadAtomsSince(count:)` high-water API would make both the re-read and the seen-set
+  O(1); deferred (negligible at endurance cadence).
+- **Resolver↔engine glue test**: the engine-side lockstep is macOS-tested; a DeviceTestApp-target unit
+  test asserting `BASGlobalRecallResolver.put`'s returned-evicted contract + `resolver.count ==
+  engine.totalCount` after a >cap run would lock the host glue against regression (needs the app test
+  target).
+- **DEBUG tripwire symmetry**: the assertion guards the resolver read (`atomForID`); the engine read
+  (`cosineTopK`) is unguarded when it returns `[]`. DEBUG-only; the single-task driver holds the real
+  invariant.

@@ -128,7 +128,8 @@ public struct BASRoutedMemoryPersistence: Sendable {
 /// ≤selfPopulateCap recall window. nil default ⇒ byte-equal-off (ADR-014 / 红线 7). NON-byte-equal
 /// when wired (ADR-036-class semantics — tie membership at the K-th boundary by rowid, pre-filter
 /// truncation — now over the full corpus). The host owns the in-memory engine + resolver map
-/// lifetime + memory bound; both closures are synchronous (ch883 retrieve stays sync).
+/// lifetime + memory bound (host-side lockstep FIFO eviction of engine + resolver); both closures
+/// are synchronous (ch883 retrieve stays sync).
 public struct BASGlobalRecallSeam: Sendable {
     /// 1 FFI call: full-corpus cosine top-K → (atomID, score), score DESC. Backed by the host's
     /// in-memory `BASRoutedVectorIndexStorage.cosineTopKAtomIDsSync(forDomain:query:k:)`.

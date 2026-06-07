@@ -112,24 +112,37 @@ private let ch1025Log = Logger(
     category: "ch1025-endurance")
 
 /// ADR-037 — host-local resolver backing the global-recall seam's `atomForID`. NSLock-guarded
-/// atomID → (atom, domain) map with insertion-order LRU (memory bound). `lookupSync` is the sync
-/// hot-path read (called inside the ch883 sync retrieve); `put` runs between turns. Mirrors the
-/// service's withLock idiom (never holds the lock across a suspension). `@unchecked Sendable`: the
-/// lock provides the synchronization the compiler can't prove.
+/// atomID → (atom, domain) map with insertion-order FIFO eviction (the memory bound). `put` returns
+/// any evicted ids so the caller mirrors the eviction into the engine — keeping engine-rows ==
+/// resolver-keys (the ADR-037 lockstep invariant; without it the engine grows unbounded and cosineTopK
+/// returns ids the resolver can't resolve → silent recall loss). `lookupSync` is the sync hot-path read
+/// (inside the ch883 sync retrieve); `put`/eviction run between turns. Mirrors the service's withLock
+/// idiom (never holds the lock across a suspension). `@unchecked Sendable`: the lock synchronizes.
 final class BASGlobalRecallResolver: @unchecked Sendable {
+    /// Smallest sane corpus cap (also the runner's parse floor).
+    static let minCap = 64
     private let lock = NSLock()
     private var map: [String: (atom: BASMemoryAtom, domain: String)] = [:]
-    private var order: [String] = []          // insertion order for LRU eviction
+    private var order: [String] = []          // insertion order for FIFO eviction
     private let cap: Int
-    init(cap: Int) { self.cap = max(64, cap) }
-    func put(id: String, atom: BASMemoryAtom, domain: String) {
+    #if DEBUG
+    private var writing = false
+    #endif
+    init(cap: Int) { self.cap = max(Self.minCap, cap) }
+    /// Insert/replace; returns the ids the FIFO cap evicted so the caller can `engine.remove` them in
+    /// lockstep (engine-rows == resolver-keys).
+    @discardableResult
+    func put(id: String, atom: BASMemoryAtom, domain: String) -> [String] {
         lock.lock(); defer { lock.unlock() }
         if map[id] == nil { order.append(id) }
         map[id] = (atom, domain)
+        var evicted: [String] = []
         while order.count > cap {
-            let evict = order.removeFirst()
-            map[evict] = nil
+            let e = order.removeFirst()
+            map[e] = nil
+            evicted.append(e)
         }
+        return evicted
     }
     func lookupSync(id: String) -> (atom: BASMemoryAtom, domain: String)? {
         lock.lock(); defer { lock.unlock() }
@@ -139,6 +152,17 @@ final class BASGlobalRecallResolver: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return map.count
     }
+    #if DEBUG
+    // ADR-037 concurrency contract (M2): the sync hot-path read (atomForID, WITHIN a turn) must never
+    // overlap the between-turns engine/resolver writes. The seam's atomForID closure asserts this; the
+    // runner brackets its between-turns sync with begin/endWrite. Debug-only (zero release cost).
+    func beginWrite() { lock.lock(); writing = true; lock.unlock() }
+    func endWrite() { lock.lock(); writing = false; lock.unlock() }
+    func assertNotWriting() {
+        lock.lock(); let w = writing; lock.unlock()
+        assert(!w, "ADR-037: global-recall sync read overlapped a between-turns write — turn-phase separation violated")
+    }
+    #endif
 }
 
 @MainActor
@@ -222,7 +246,8 @@ final class BASEnduranceAppController: ObservableObject {
         /// Opt-in ADR-037 GLOBAL durable cosineTopK recall. Default `"0"`; on when `== "1"`.
         static let globalRecallKey = "BAS_GLOBAL_RECALL"
         static let globalRecallDefault = "0"
-        /// LRU cap for the in-memory global-recall corpus (memory bound). Default `"4096"`.
+        /// FIFO cap for the global-recall corpus — bounds BOTH the resolver map AND the engine
+        /// (lockstep eviction = the real memory bound). Default `"4096"`.
         static let globalRecallCapKey = "BAS_GLOBAL_RECALL_CAP"
         static let globalRecallCapDefault = "4096"
         /// Agent-fabric activation gate。 Activated when `== "enabled"` (ADR-014 opt-in)。
@@ -562,8 +587,12 @@ final class BASEnduranceAppController: ObservableObject {
         // ADR-037 — opt-in GLOBAL durable recall (default OFF → verify-on, mirrors fabricAuthFeedForward).
         let globalRecallEnabled =
             (env[EnduranceEnv.globalRecallKey] ?? EnduranceEnv.globalRecallDefault) == "1"
-        let globalRecallCap =
-            max(64, Int(env[EnduranceEnv.globalRecallCapKey] ?? EnduranceEnv.globalRecallCapDefault) ?? 4096)
+        // Floor + default single-sourced (no bare 64/4096): env value if parseable, else the documented
+        // default constant, else the floor. Floor = BASGlobalRecallResolver.minCap.
+        let globalRecallCap = max(
+            BASGlobalRecallResolver.minCap,
+            Int(env[EnduranceEnv.globalRecallCapKey] ?? "")
+                ?? Int(EnduranceEnv.globalRecallCapDefault) ?? BASGlobalRecallResolver.minCap)
         // ch1066 再查 — a per-turn wall-clock TIMEOUT around adapter.draft was tried here
         // and REMOVED after on-device proof it cannot work: the MLX decode is a SYNCHRONOUS,
         // UNCANCELLABLE Metal eval, so (a) a structured task-group timeout hangs in teardown
@@ -628,6 +657,11 @@ final class BASEnduranceAppController: ObservableObject {
         // call; the seam closures capture them strongly too.
         var globalRecallEngine: BASRoutedVectorIndexStorage? = nil
         var globalRecallResolver: BASGlobalRecallResolver? = nil
+        // ADR-037 — monotonic "seen" set: the per-turn delta-sync gate. Each atom is synced to the
+        // engine+resolver exactly once (when first seen WITH an embedding); the FIFO cap then keeps the
+        // newest `cap`. Gating on this (NOT resolver presence) avoids re-syncing evicted atoms — which
+        // would oscillate the capped membership + thrash O(corpus)/turn past the cap.
+        var globalRecallSynced = Set<String>()
         let cognitiveBrainStartNs = monoNowNs()
         do {
             // Step-2 flip: wire the on-device MiniLM embedder so the brain's default L8 memory is
@@ -667,14 +701,28 @@ final class BASEnduranceAppController: ObservableObject {
                     let durableEntries = await vindex.allEntries()
                     let entryByID = Dictionary(
                         durableEntries.map { ($0.atomID, $0) }, uniquingKeysWith: { a, _ in a })
-                    for record in durableAtoms {
+                    // Load only the NEWEST `cap` durable atoms into the engine+resolver (recency — the
+                    // FIFO keeps the newest); mark EVERY durable atom "seen" so the per-turn delta-sync
+                    // handles only NEW atoms (monotonic, no churn). `allAtoms()` is created-ASC, so the
+                    // suffix is the newest. A newest-window atom missing its vector is left UNSEEN so the
+                    // per-turn sync retries it once the embedding lands (no resolver-only strand).
+                    let newest = durableAtoms.suffix(globalRecallCap)
+                    let newestIDs = Set(newest.map { $0.id.uuidString })
+                    for record in durableAtoms where !newestIDs.contains(record.id.uuidString) {
+                        globalRecallSynced.insert(record.id.uuidString)   // older than window — excluded
+                    }
+                    for record in newest {
                         let id = record.id.uuidString
-                        resolver.put(id: id,
-                            atom: BASL8RoutedMemoryService.memoryAtom(from: record),
-                            domain: record.sourceType)
-                        if let e = entryByID[id] {
-                            _ = try? await engine.upsert(BASVectorIndexEntry(
+                        guard let e = entryByID[id] else { continue }     // no vector → retried next turn
+                        do {
+                            try await engine.upsert(BASVectorIndexEntry(
                                 atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
+                            resolver.put(id: id,                          // newest.count ≤ cap ⇒ no evict
+                                atom: BASL8RoutedMemoryService.memoryAtom(from: record),
+                                domain: record.sourceType)
+                            globalRecallSynced.insert(id)
+                        } catch {
+                            await emitBoth("⚠️ ADR-037 engine upsert failed id=\(id): \(error)")
                         }
                     }
                     globalRecallEngine = engine
@@ -687,7 +735,12 @@ final class BASEnduranceAppController: ObservableObject {
                         cosineTopK: { [engine, pin] q, k in
                             (try? engine.cosineTopKAtomIDsSync(forDomain: pin, query: q, k: k)) ?? []
                         },
-                        atomForID: { [resolver] id in resolver.lookupSync(id: id) })
+                        atomForID: { [resolver] id in
+                            #if DEBUG
+                            resolver.assertNotWriting()
+                            #endif
+                            return resolver.lookupSync(id: id)
+                        })
                 } else {
                     await emitBoth("📍 ADR-037 global recall OFF (BAS_GLOBAL_RECALL!=1)")
                 }
@@ -1232,25 +1285,49 @@ final class BASEnduranceAppController: ObservableObject {
                     "admitted=\(mem.admitted) store_atoms=\(storedAtoms) " +
                     "promoted=\(mem.promoted)")
                 // ADR-037 — incremental sync: fold NEW durable atoms into the in-memory global-recall
-                // engine + resolver (delta vs the resolver) so this turn's persisted atoms are
-                // globally recall-eligible next turn. Between-turns ONLY (turn-phase separation: the
-                // sync engine.upsert never overlaps the sync cosineTopK read inside retrieve()).
+                // engine + resolver so this turn's persisted atoms are globally recall-eligible next
+                // turn, keeping engine-rows == resolver-keys (lockstep eviction). Between-turns ONLY
+                // (turn-phase separation: these writes never overlap the sync atomForID read inside
+                // retrieve(); the DEBUG begin/endWrite asserts it).
                 if let engine = globalRecallEngine, let resolver = globalRecallResolver,
                    let vindex = memoryVectorIndex {
                     let pin = BASL8RoutedMemoryService.Parameters.atomSource
+                    #if DEBUG
+                    resolver.beginWrite()
+                    #endif
                     var added = 0
+                    // Monotonic gate: only atoms NEVER synced (NOT resolver-presence — that re-finds
+                    // evicted atoms + oscillates the capped membership). Upsert FIRST, then put + mirror
+                    // the FIFO eviction into the engine; mark synced only on success (a no-vector or
+                    // failed atom stays unseen ⇒ retried next turn — no resolver-only strand, no divergence).
                     for record in (allAtoms ?? [])
-                    where resolver.lookupSync(id: record.id.uuidString) == nil {
+                    where !globalRecallSynced.contains(record.id.uuidString) {
                         let id = record.id.uuidString
-                        resolver.put(id: id,
-                            atom: BASL8RoutedMemoryService.memoryAtom(from: record),
-                            domain: record.sourceType)
-                        if let e = await vindex.entry(forID: id) {
-                            _ = try? await engine.upsert(BASVectorIndexEntry(
+                        guard let e = await vindex.entry(forID: id) else { continue }
+                        do {
+                            try await engine.upsert(BASVectorIndexEntry(
                                 atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
+                            let evicted = resolver.put(id: id,
+                                atom: BASL8RoutedMemoryService.memoryAtom(from: record),
+                                domain: record.sourceType)
+                            for ev in evicted {
+                                // Log (don't swallow) an evict-remove failure: it would leave the engine
+                                // with a row the resolver dropped (a mini-HIGH-1 slot loss) — rare for an
+                                // in-memory engine, but it must be visible, symmetric with upsert.
+                                do { _ = try await engine.remove(atomID: ev) }
+                                catch {
+                                    await emitBoth("⚠️ ADR-037 engine evict-remove failed id=\(ev): \(error)")
+                                }
+                            }
+                            globalRecallSynced.insert(id)
                             added += 1
+                        } catch {
+                            await emitBoth("⚠️ ADR-037 engine upsert failed id=\(id): \(error)")
                         }
                     }
+                    #if DEBUG
+                    resolver.endWrite()
+                    #endif
                     if added > 0 {
                         let corpus = await engine.totalCount
                         await emitBoth(
