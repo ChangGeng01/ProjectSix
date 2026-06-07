@@ -44,8 +44,11 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
   Engine-parity→halt (Phase-2) is **ABANDONED**; reconciled via `classifyDivergence` →
   `intentionalDefenseInDepth` (shipped, BASHostKit). The REAL halt signal = `BASCoordinatorConsistencyCheck`
   (coordinator vs its own re-derived baseline; shipped + wired). See **ADR-023 §8** before touching this arc.
-- **ADR-038** (forthcoming) on-device MLX-eval-wedge prevention — **PENDING the real-device A/B**; not
-  certified until hardware proves it (亏的不要上).
+- **ADR-038** on-device MLX-eval-wedge re-cert — **DONE (honest negative).** Run A PASS (baseline stable,
+  256-cap verified on the REAL build — the prior runs unknowingly ran a STALE binary). Run B WEDGE: the WS1
+  typed prompt cleared the historical iter1/prompt2 point but the wedge **MOVED to iter2/prompt2** →
+  **prevention UNPROVEN; feed-forward stays default-OFF.** WS1+WS2 are partial improvements, not a green
+  light. See ADR-038.
 - **GHOST:** ADR-013 (a historical chapter note, not a live contract).
 
 ## 3. Multi-language pilots — probe vs main-path (honest, #7)
@@ -62,10 +65,12 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
 
 ## 4. Known issues + workarounds
 
-- **MLX/Metal GPU-eval wedge** (highest-priority): a synchronous, uncancellable Metal eval that hangs
-  with zero token progress; **no in-process recovery** (Swift can't cancel it). Strategy = PREVENTION
-  (typed-summary feed-forward prompt + low decode cap + feed-forward default-off + 512 prompt cap),
-  proven only by on-device A/B. See ADR-038 (forthcoming) + `BASEnduranceAppRunner.swift` / `MLXOrganAdapter.swift`.
+- **MLX/Metal GPU-eval wedge** (highest-priority, **UNRESOLVED**): a synchronous, uncancellable Metal eval
+  that hangs with zero token progress; **no in-process recovery** (Swift can't cancel it). On-device A/B
+  (ADR-038, 2026-06-07): WS1's typed prompt cleared the historical iter1/prompt2 point but the wedge
+  **MOVED to iter2/prompt2** — so prompt-shaping prevention is INSUFFICIENT and **feed-forward stays
+  default-OFF** (it still wedges). WS2's 256-cap (verified) + the 512 backstop bound exposure but don't
+  eliminate it. Next levers + falsification in ADR-038 §6. See `BASEnduranceAppRunner.swift` / `MLXOrganAdapter.swift`.
 - **Swift-testing headless SIGBUS** (#6): the `@Test` parallel runner SIGBUSes under full load in a
   headless macOS session (environmental, not project code). Authoritative gate =
   `swift test --disable-swift-testing` (XCTest, 15k+). Entry: `scripts/swift-test-headless.sh`. See
