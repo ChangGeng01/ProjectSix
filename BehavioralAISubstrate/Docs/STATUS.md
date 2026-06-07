@@ -1,0 +1,73 @@
+# STATUS — current-state "you-are-here" index
+
+> **Purpose (WS6):** `ADR_INDEX.md` maps every `ADR-NNN` to its defining doc (a reference map). This
+> file is the **currency-ranked** complement: at a glance, what is SHIPPED + load-bearing vs DESIGN-only
+> vs DEFERRED, plus the live known-issues + the honest pilot status. When an ADR body and the code
+> disagree, **the code wins** — flag the doc, don't trust "historical description" as "current state."
+> Keep this file current as ADRs land.
+
+## 1. Shipped + live (or opt-in, byte-equal-off by default)
+
+Foundational behavioral doctrine (always-on contracts): **ADR-006/012** (risk-calibration timing +
+payload), **ADR-014** (opt-in / 红线 7 byte-equal-off), **ADR-018/019/020** (deliberation loop,
+consequential wiring, evidence-resolution two-phase verdict).
+
+Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` stays legacy):
+- **ADR-024** one-verdict-kernel (Step 1 landed byte-equal; Steps 2-4 gated).
+- **ADR-026** sovereign commit-token enforcement · **ADR-027** constitution-vault seal · **ADR-028** LLM
+  invocation contract · **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.
+- **ADR-032** governance enablement — observe-mode contracts/traces ON by default (zero output change;
+  rejection/crypto/dual-key/deny REFUSED pending a host keyring, per R1).
+- **ADR-033** main-chain wiring (MiniLM memory + durable SQL/vector index + native executors + fabric,
+  host-injected) · **ADR-034** agent-fabric multi-round authoritative loop.
+- **ADR-036** L8 cosineTopK retrieve takeover (the ONLY sanctioned NON-byte-equal path; host opt-in).
+- **ADR-037** global durable cosineTopK recall on-device (opt-in; on-device verified; hardened — engine
+  bounded in lockstep, monotonic sync).
+
+Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
+(built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).
+
+## 2. Design-only / deferred (built nothing, or partial + gated)
+
+- **ADR-021** unified evolution architecture — DESIGN synthesis; O0/O1 NO-GO; the wall is
+  outcome-blindness (the substrate is not a self-improving learner).
+- **ADR-022** sovereign-verdict parity shadow gate — DESIGN; Phase-2 (laxer→halt) deferred until Phase-1
+  parity evidence (`coordinatorLaxer == 0`).
+- **ADR-023** verdict-authority reconciliation — DESIGN; R1-R4 phased, each gated by the full-grid sweep.
+- **ADR-025** Ed25519 commit-gate — first brick landed (deterministic-identity mint); full wiring blocked
+  on an operator policy choice (CryptoKit Ed25519 is randomized → full-token byte-determinism needs A/B/C).
+- **ADR-038** (forthcoming) on-device MLX-eval-wedge prevention — **PENDING the real-device A/B**; not
+  certified until hardware proves it (亏的不要上).
+- **GHOST:** ADR-013 (a historical chapter note, not a live contract).
+
+## 3. Multi-language pilots — probe vs main-path (honest, #7)
+
+- **SQL + Rust: genuinely main-path** (when the host wires routed memory) — the MiniLM/SQL/vector index
+  + the Rust L8 engine cosineTopK are real hot paths (ADR-033/036/037).
+- **Metal / C / C++: probe + local bridge only** — observability/telemetry, NOT main-chain hot paths.
+  **Metal contributes 0 to live LLM decode — MLX owns the GPU.** Mamba/MPSGraph kernels exist but are
+  not on the decode path. `substrateInternalFactoryCallSiteCount = 0` (ADR-035): no pilot routes into
+  `BASEBrainTurnResult`; the live brain uses direct-init V1.
+- Deferred hygiene: ~10 ungated `import Metal` files + ~60 consumers want `#if canImport(Metal)` guards
+  (source clarity; does NOT enable watchOS — MLX deps fail there first). NOT a path to replacing MLX
+  decode.
+
+## 4. Known issues + workarounds
+
+- **MLX/Metal GPU-eval wedge** (highest-priority): a synchronous, uncancellable Metal eval that hangs
+  with zero token progress; **no in-process recovery** (Swift can't cancel it). Strategy = PREVENTION
+  (typed-summary feed-forward prompt + low decode cap + feed-forward default-off + 512 prompt cap),
+  proven only by on-device A/B. See ADR-038 (forthcoming) + `BASEnduranceAppRunner.swift` / `MLXOrganAdapter.swift`.
+- **Swift-testing headless SIGBUS** (#6): the `@Test` parallel runner SIGBUSes under full load in a
+  headless macOS session (environmental, not project code). Authoritative gate =
+  `swift test --disable-swift-testing` (XCTest, 15k+). Entry: `scripts/swift-test-headless.sh`. See
+  `Docs/KNOWN_ISSUE_swift_testing_headless_sigbus.md`.
+- **Device thermal envelope**: sustained on-device gemma decode drives the device to `serious` thermal
+  within ~45 min; the adaptive cooldown manages it (never `critical`). See `Docs/DEVICE_TEST_THERMAL_ENVELOPE.md`.
+
+## 5. Source-of-truth pointers
+
+- `Docs/ADR_INDEX.md` — the full ADR→doc reference map (every `ADR-NNN` resolves).
+- `Docs/L8_ARC_SEAL.md` — memory/rusqlite/vector-index wiring + 不变量 #1/#2/#3 + 红线 7.
+- `Docs/CH_1024_PLUS_OPTIMIZATION_BACKLOG.md` — endurance/probe status.
+- Per-subsystem ADRs as listed above.
