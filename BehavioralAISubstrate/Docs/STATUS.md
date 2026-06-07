@@ -14,8 +14,9 @@ consequential wiring, evidence-resolution two-phase verdict).
 
 Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` stays legacy):
 - **ADR-024** one-verdict-kernel (Step 1 landed byte-equal; Steps 2-4 gated).
-- **ADR-026** sovereign commit-token enforcement · **ADR-027** constitution-vault seal · **ADR-028** LLM
-  invocation contract · **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.
+- **ADR-025/026** Ed25519 commit-token authority + enforcer + gated-execution seam (`BASSovereignGatedCommit`:
+  register → authorize → op-only-on-success; policy B dual-signature; 6 tests) · **ADR-027** constitution-vault
+  seal · **ADR-028** LLM invocation contract · **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.
 - **ADR-032** governance enablement — observe-mode contracts/traces ON by default (zero output change;
   rejection/crypto/dual-key/deny REFUSED pending a host keyring, per R1).
 - **ADR-033** main-chain wiring (MiniLM memory + durable SQL/vector index + native executors + fabric,
@@ -40,8 +41,6 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
   Engine-parity→halt (Phase-2) is **ABANDONED**; reconciled via `classifyDivergence` →
   `intentionalDefenseInDepth` (shipped, BASHostKit). The REAL halt signal = `BASCoordinatorConsistencyCheck`
   (coordinator vs its own re-derived baseline; shipped + wired). See **ADR-023 §8** before touching this arc.
-- **ADR-025** Ed25519 commit-gate — first brick landed (deterministic-identity mint); full wiring blocked
-  on an operator policy choice (CryptoKit Ed25519 is randomized → full-token byte-determinism needs A/B/C).
 - **ADR-038** (forthcoming) on-device MLX-eval-wedge prevention — **PENDING the real-device A/B**; not
   certified until hardware proves it (亏的不要上).
 - **GHOST:** ADR-013 (a historical chapter note, not a live contract).

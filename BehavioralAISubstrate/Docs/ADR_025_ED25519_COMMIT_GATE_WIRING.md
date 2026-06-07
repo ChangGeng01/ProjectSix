@@ -110,3 +110,25 @@ and B) build on; it does NOT wire anything into production.
   the audit (#2 / DEFER-1) wanted — now real and verifiable.
 - Honest boundary: design + a safe additive brick; the production gate is NOT
   touched, and the determinism policy is the operator's.
+
+## Gated-execution seam LANDED — option B is now FUNCTIONAL end-to-end (`BASSovereignGatedCommit`)
+
+The operator chose **B (dual signature)**. Beyond the primitives above, the piece that was missing is
+the one-call composition that ties the enforcer path (register → authorize) into a foot-gun-free
+gated-execution call. **Shipped `Sources/BASSovereign/BASSovereignGatedCommit.swift`** (the ADR-034
+pattern — a host-callable composition that turns primitives into a usable seam):
+- `register(brainToken, issuedAt:)` → mints the authoritative Ed25519 token + single-use ledger entry
+  (identity preserved).
+- `executeGated(token, scope, target, approvedArtifactParts, …, op:)` → recomputes the
+  `expectedActionDigest` HERE from the approved artifact (NEVER off the token) via
+  `BASSovereignActionDigest.compute`, calls `enforcer.authorize`, and runs `op` **only if** authorize did
+  not throw. Any gate failure (aliased target / tampered digest / replay / TTL / scope / policy / invalid
+  signature) propagates and `op` is NEVER invoked.
+- OPT-IN / byte-equal-off (红线 7): nothing constructs it by default → the turn path is byte-equal;
+  production `makeCommitToken` untouched. 6 XCTest cases (op runs once on valid + returns value; tampered
+  → `actionDigestMismatch` + op not run; aliased → `targetNotAllowed` + op not run; replay → op runs
+  EXACTLY once; expired → op not run; register preserves identity). 50 commit/authority tests green.
+- **Still deferred (host integration):** a live host that holds a keyring-backed authority and routes its
+  REAL renderHighRisk / memoryWrite / checkpointCommit ops through `executeGated`. The seam is ready; no
+  host currently executes gated irreversible ops, so default-on wiring is a separate, deliberate step
+  (亏的不要上 — don't claim a live gate that nothing routes through).
