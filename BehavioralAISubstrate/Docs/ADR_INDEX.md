@@ -8,7 +8,7 @@
 > (complete set, not a sample). ADR-026–036 were appended to this index as the chapters
 > that introduced them landed.
 
-## The complete reference set (26 ADRs — 25 active + ADR-013 ghost)
+## The complete reference set (27 ADRs — 26 active + ADR-013 ghost)
 
 | ADR | Topic | Defining location | Kind |
 |---|---|---|---|
@@ -38,6 +38,7 @@
 | **ADR-036** | **L8 retrieve cosineTopK hot-path takeover** (host-injected, opt-in — the substrate's ONLY sanctioned NON-byte-equal path): the operator chose the perf-fast cosineTopK retrieve over a byte-equal one. Adds the missing `bas_l8_vector_index_atom_id_for_rowid` Rust FFI (rebuilt XCFramework) so cosineTopK's rowids resolve to atoms; a `nonisolated` sync `cosineTopKAtomIDsSync` (ch883-safe) + an OPTIONAL `BASL8RoutedMemoryService.cosineTopKSync` seam (nil ⇒ score-all, byte-equal-off). NON-byte-equal when wired (rowid tie-break + pre-filter truncation, documented) | **`Docs/ADR_036_L8_COSINETOPK_RETRIEVE_TAKEOVER.md`** | behavioral (host opt-in) |
 | **ADR-037** | **Global durable cosineTopK recall on-device** (opt-in extension of ADR-036): a `BASGlobalRecallSeam` ranking cosineTopK + atomForID over the FULL durable corpus via a SEPARATE in-memory Rust L8 engine (rusqlite bundled SQLite ≠ system SQLite3 → must NOT share the durable WAL); lockstep eviction (engine-rows == resolver-keys), monotonic seen-set gate, FIFO cap (minCap=64). On-device verified (2-launch cross-restart + 1-hour soak + cap=64 eviction proof). Opt-in / byte-equal-off | **`Docs/ADR_037_GLOBAL_DURABLE_COSINETOPK_RECALL_ONDEVICE.md`** | behavioral (host opt-in) |
 | **ADR-038** | **On-device MLX/Metal GPU-eval wedge — prevention + re-cert** (honest NEGATIVE): the uncancellable zero-token Metal hang. WS1 typed-summary feed-forward prompt (drop `patchJson` OOD prefill) + WS2 256-decode-cap. Real-device A/B on iPhone Air: Run A PASS (baseline stable, cap verified — the prior runs ran a STALE binary), **Run B WEDGE** (typed prompt cleared iter1/prompt2 but the wedge MOVED to iter2/prompt2). **Prevention UNPROVEN; feed-forward stays default-OFF.** No in-process recovery (Swift can't cancel a sync Metal eval) | **`Docs/ADR_038_ONDEVICE_MLX_EVAL_WEDGE_PREVENTION.md`** | behavioral (honest negative) |
+| **ADR-039** | **Hybrid Metal/CPU determinism boundary** (the doctrine for real GPU compute): byte-determinism REQUIRED → CPU/Rust (Storage / Memory / Event-Log / Replay / Governance), approximate ALLOWED → Metal (Embedding / LLM / Planning / Reasoning / Animation / Perception); a Metal (non-bit-reproducible) result NEVER crosses into the spine raw — only via an audited `snapToDeterministic`. Enforced in the TYPE SYSTEM: `BASApproxValue<T>` quarantine (no raw getter; exits = audited snap / grep-banned `approximateOnly`) + a spine-allowlist source-honesty TRIPWIRE test + audited crossings. **Phase 0 LANDED**; Phases 1-4 (instrumentation / L8 Metal topK / kernel router / SSM-reasoning) opt-in + on-device-gated | **`Docs/ADR_039_HYBRID_METAL_DETERMINISM_BOUNDARY.md`** | behavioral (doctrine + enforcement) |
 
 ## Related contracts that are NOT numbered ADRs
 - **红线 7** (additive byte-equal safety invariant) — stated in `ADR_014_OPT_IN_DOCTRINE.md` §4 + `L8_ARC_SEAL.md`.
