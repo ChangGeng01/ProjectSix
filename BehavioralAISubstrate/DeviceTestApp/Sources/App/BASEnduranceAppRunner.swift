@@ -186,6 +186,11 @@ final class BASEnduranceAppController: ObservableObject {
         /// Wall-clock cap seconds (0 = run all iters)。 Default `"0"` (parse fallback 0)。
         static let maxRuntimeSecKey = "BAS_INTERNAL_MAX_RUNTIME_SEC"
         static let maxRuntimeSecDefault = "0"
+        /// WS2 — explicit per-request MLX DECODE cap (tokens) for the endurance draft. Default "256".
+        /// Bounds decode length only (defense-in-depth + shorter iters) — NOT the zero-token prefill
+        /// wedge. Env-tunable for a sweep. (Was implicit: the `.core` preset's 1024.)
+        static let maxDecodeTokensKey = "BAS_INTERNAL_MAX_DECODE_TOKENS"
+        static let maxDecodeTokensDefault = "256"
         /// Opt-in sovereign-verdict parity shadow。 Default `""`;enabled when `== "enabled"`。
         static let shadowParityKey = "BAS_SHADOW_PARITY"
         static let shadowParityDefault = ""
@@ -515,6 +520,9 @@ final class BASEnduranceAppController: ObservableObject {
         // (the post-loop summary + closeLogFile + idleTimer reset still run).
         let maxRuntimeSec = Int(
             env[EnduranceEnv.maxRuntimeSecKey] ?? EnduranceEnv.maxRuntimeSecDefault) ?? 0
+        // WS2 — explicit low decode cap on each endurance MLX request (bounds decode, not prefill).
+        let maxDecodeTokens = max(1, Int(
+            env[EnduranceEnv.maxDecodeTokensKey] ?? EnduranceEnv.maxDecodeTokensDefault) ?? 256)
         // ch1044 ADR-022 #3 — OPT-IN sovereign-verdict parity shadow。
         // Default OFF (env unset) → byte-equal:no projection,no verify,no log。
         // With `BAS_SHADOW_PARITY=enabled`,each turn's coordinator verdict is
@@ -1134,7 +1142,8 @@ final class BASEnduranceAppController: ObservableObject {
                     role: .core,
                     preset: .core,
                     instruction: prompt,
-                    context: [])
+                    context: [],
+                    maxOutputTokens: maxDecodeTokens)   // WS2: explicit low decode cap (was preset 1024)
                 do {
                     let draft = try await adapter.draft(request)
                     let mlxMs = monoElapsedMs(since: mlxStartNs)
