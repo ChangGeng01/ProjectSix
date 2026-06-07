@@ -97,6 +97,11 @@ public enum BASAgentFabricAuthoritativeProjection {
     /// can't drift.
     public static let structuralPunctuation: Set<Character> = [
         "{", "}", "[", "]", "\"", "<", ">", "|", "\\", "`"]
+    /// WS1 (typed-summary) — the enriched line now carries ONLY typed fields + the single top reason
+    /// code (a controlled vocabulary), never the patchJson free-text that wedged the on-device decoder.
+    /// Bound a single code token + a fixed fallback for an empty list. Single source of truth.
+    public static let maxReasonCodeChars: Int = 48
+    public static let reasonCodeFallback: String = "unspecified"
 
     /// Project a fabric turn's merge-accepted deltas into an authoritative feed-forward input —
     /// ONLY when `mode == .authoritative` and at least one delta was accepted. Returns `nil`
@@ -196,6 +201,13 @@ public enum BASAgentFabricAuthoritativeProjection {
         return out.trimmingCharacters(in: .whitespaces)
     }
 
+    /// WS1 — the single top reason code (controlled vocab) for the typed enriched line, length-bounded;
+    /// an empty list → the fixed fallback. No free-text ever reaches the prompt through this path.
+    static func topReasonCode(_ codes: [String]) -> String {
+        guard let first = codes.first, !first.isEmpty else { return reasonCodeFallback }
+        return String(first.prefix(maxReasonCodeChars))
+    }
+
     static func contextBlock(
         sourceTurnID: String,
         conclusions: [BASAgentFabricAuthoritativeInput.Conclusion]
@@ -204,10 +216,14 @@ public enum BASAgentFabricAuthoritativeProjection {
             "[fabric-authoritative · turn \(sourceTurnID) · \(conclusions.count) accepted delta(s)]"
         ]
         for c in conclusions {
+            // WS1 typed-summary: typed fields + the single top reason code ONLY — the patchJson
+            // free-text (the OOD prefill that wedged the decoder) is dropped entirely. domain + reason
+            // are still run through plainSummary (domain is NOT a closed vocab — it's the targetObjectRef
+            // prefix), so no structural punctuation can reach the prompt. deltaType is a closed enum raw.
             let conf = String(format: "%.2f", c.confidence)
-            lines.append(
-                "- \(c.domain) (\(c.deltaType), conf \(conf)): "
-                + Self.plainSummary(c.summary))
+            let dom = Self.plainSummary(c.domain)
+            let reason = Self.plainSummary(Self.topReasonCode(c.reasonCodes))
+            lines.append("- \(dom) (\(c.deltaType), conf \(conf)) [\(reason)]")
         }
         // ch1066 — hard-bound the total, including the truncation marker, so it never
         // dominates the decoder's prefill.

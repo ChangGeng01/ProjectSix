@@ -151,6 +151,8 @@ final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
         }
         XCTAssertTrue(input.contextBlock.contains("render"),
             "the domain must survive sanitization (the cascade keys on it)")
+        XCTAssertTrue(input.contextBlock.contains("[planner.primary]"),
+            "WS1: the line carries the typed top reason code, not the patchJson free-text")
         XCTAssertTrue(input.contextBlock.contains("fabric-authoritative"),
             "the provenance label must survive sanitization")
         XCTAssertLessThanOrEqual(
@@ -178,6 +180,39 @@ final class BASAgentFabricAuthoritativeProjectionTests: XCTestCase {
             "many accepted deltas must still produce a bounded context block")
         XCTAssertTrue(input.contextBlock.hasSuffix(" …"),
             "truncated context blocks should make the truncation visible")
+    }
+
+    // MARK: - WS1 typed-summary: typed reason code only, no patchJson free-text
+
+    func testContextBlockEmitsTypedReasonCodeNotPatchJson() throws {
+        let d = BASAgentDelta(
+            deltaID: "dx", agentID: "planner", targetObjectRef: "risk#obj-x",
+            deltaType: .merge, patchJson: "{\"secretPayloadToken\":\"zzz\"}",
+            confidence: 0.8, createdAtNanos: 0,
+            reasonCodes: ["evidence.recent"], dependencies: [], conflictRefs: [])
+        let r = fabricResult(emitted: [d], accepted: ["dx"])
+        let input = try XCTUnwrap(BASAgentFabricAuthoritativeProjection.project(
+            fabricResult: r, mode: .authoritative, sourceTurnID: "t1"))
+        XCTAssertTrue(input.contextBlock.contains("[evidence.recent]"),
+            "the typed top reason code must appear in brackets")
+        XCTAssertFalse(input.contextBlock.contains("secretPayloadToken"),
+            "the patchJson free-text must NOT enter the prompt (WS1 OOD-prefill prevention)")
+        XCTAssertTrue(input.contextBlock.contains("risk (merge, conf 0.80)"),
+            "the typed fields (domain/type/conf) carry through")
+    }
+
+    func testContextBlockEmptyReasonCodesFallsBack() throws {
+        let d = BASAgentDelta(
+            deltaID: "de", agentID: "planner", targetObjectRef: "render#obj-e",
+            deltaType: .replace, patchJson: "{\"k\":\"e\"}",
+            confidence: 0.7, createdAtNanos: 0,
+            reasonCodes: [], dependencies: [], conflictRefs: [])
+        let r = fabricResult(emitted: [d], accepted: ["de"])
+        let input = try XCTUnwrap(BASAgentFabricAuthoritativeProjection.project(
+            fabricResult: r, mode: .authoritative, sourceTurnID: "t1"))
+        XCTAssertTrue(input.contextBlock.contains(
+            "[\(BASAgentFabricAuthoritativeProjection.reasonCodeFallback)]"),
+            "empty reasonCodes must fall back to the fixed literal token")
     }
 
     func testPlainSummaryStripsEveryStructuralPunctuationChar() {
