@@ -31,9 +31,15 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
 
 - **ADR-021** unified evolution architecture — DESIGN synthesis; O0/O1 NO-GO; the wall is
   outcome-blindness (the substrate is not a self-improving learner).
-- **ADR-022** sovereign-verdict parity shadow gate — DESIGN; Phase-2 (laxer→halt) deferred until Phase-1
-  parity evidence (`coordinatorLaxer == 0`).
-- **ADR-023** verdict-authority reconciliation — DESIGN; R1-R4 phased, each gated by the full-grid sweep.
+- **ADR-022 / ADR-023** sovereign-verdict parity + reconciliation — **RESOLVED (observability, NOT a halt
+  gate). Do not re-attempt R1.** The full-grid sweep proved 100% of the 886 coordinator↔engine divergences
+  are the engine being *deliberately stricter* (every escalation carries a reason code). R1 (engine
+  missing-lineage → shadowLock) was implemented, **REVERTED** (4 sovereign tests assert deadStop on purpose),
+  and operator-ruled **KEEP BOTH** (engine deadStop = independent backstop; coordinator shadowLock =
+  recoverable production path) — re-doing it lowers a sovereign verdict + rewrites its guard tests = 红线.
+  Engine-parity→halt (Phase-2) is **ABANDONED**; reconciled via `classifyDivergence` →
+  `intentionalDefenseInDepth` (shipped, BASHostKit). The REAL halt signal = `BASCoordinatorConsistencyCheck`
+  (coordinator vs its own re-derived baseline; shipped + wired). See **ADR-023 §8** before touching this arc.
 - **ADR-025** Ed25519 commit-gate — first brick landed (deterministic-identity mint); full wiring blocked
   on an operator policy choice (CryptoKit Ed25519 is randomized → full-token byte-determinism needs A/B/C).
 - **ADR-038** (forthcoming) on-device MLX-eval-wedge prevention — **PENDING the real-device A/B**; not
