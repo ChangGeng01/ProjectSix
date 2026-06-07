@@ -23,8 +23,45 @@ actor BASCognitiveMetalKernels {
     /// Shared reference to the brain's injected Metal library loader (same instance).
     let metalLibraryLoader: BASMetalKernelLibraryLoader?
 
-    init(metalLibraryLoader: BASMetalKernelLibraryLoader?) {
+    /// ADR-039 Phase 1 — OPT-IN per-kernel execution telemetry sink (default nil ⇒ byte-equal, no
+    /// overhead). When the host wires it, each dispatch emits a `BASMetalKernelExecutionRecord`
+    /// (did-run-on-GPU / duration / error). Feeds NO value/verdict/hash — pure observability
+    /// (ADR-014 shape #3).
+    let recordSink: (@Sendable (BASMetalKernelExecutionRecord) -> Void)?
+
+    init(
+        metalLibraryLoader: BASMetalKernelLibraryLoader?,
+        recordSink: (@Sendable (BASMetalKernelExecutionRecord) -> Void)? = nil
+    ) {
         self.metalLibraryLoader = metalLibraryLoader
+        self.recordSink = recordSink
+    }
+
+    /// ADR-039 Phase 1 — wrap a Metal dispatch: stamp start/end, emit a record (success ⇒ didRunOnGPU;
+    /// throw ⇒ error, and the CALLER falls back to CPU). Zero overhead + byte-equal when `recordSink` is
+    /// nil. Pure telemetry — never alters the dispatched value.
+    private func instrument<T>(
+        _ kernelSymbol: String,
+        _ body: () async throws -> T
+    ) async throws -> T {
+        guard let sink = recordSink else { return try await body() }
+        let start = DispatchTime.now().uptimeNanoseconds
+        do {
+            let result = try await body()
+            let end = DispatchTime.now().uptimeNanoseconds
+            sink(BASMetalKernelExecutionRecord(
+                kernelSymbol: kernelSymbol, didRunOnGPU: true,
+                durationMs: Double(end &- start) / 1_000_000.0, error: nil,
+                dispatchStartMonoNs: start, dispatchEndMonoNs: end))
+            return result
+        } catch {
+            let end = DispatchTime.now().uptimeNanoseconds
+            sink(BASMetalKernelExecutionRecord(
+                kernelSymbol: kernelSymbol, didRunOnGPU: false,
+                durationMs: Double(end &- start) / 1_000_000.0, error: String(describing: error),
+                dispatchStartMonoNs: start, dispatchEndMonoNs: end))
+            throw error
+        }
     }
 
     /// 主线 继续 开发 — memoized SSMScan dispatcher built
@@ -107,7 +144,7 @@ actor BASCognitiveMetalKernels {
                 .libraryUnavailable(
                     message: "dispatcher init failed")
         }
-        return try await d.dispatch(a: a, b: b)
+        return try await instrument("cosine") { try await d.dispatch(a: a, b: b) }
     }
 
     public func rmsnorm(
