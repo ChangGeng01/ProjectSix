@@ -42,12 +42,11 @@ extension BASEBrainRuntimeCoordinator {
                     turnID: turnID,
                     scope: .checkpointCommit,
                     allowedTargets: [thoughtFold.foldID],
-                    actionDigestParts: [
-                        "checkpoint",
-                        thoughtFold.foldID,
-                        renderedOutput.mode.rawValue,
-                        String(updateTickets.count)
-                    ],
+                    actionDigestParts: BASSovereignTurnArtifactParts.parts(
+                        scope: .checkpointCommit,
+                        thoughtFold: thoughtFold,
+                        renderedOutput: renderedOutput,
+                        updateTickets: updateTickets) ?? [],
                     snapshotRef: snapshotRef,
                     policyHash: sovereignVerdict.policyHash,
                     issuedAt: runtimeTrace.recordedAt,
@@ -64,7 +63,11 @@ extension BASEBrainRuntimeCoordinator {
                     turnID: turnID,
                     scope: .memoryWrite,
                     allowedTargets: updateTickets.map(\.ticketID),
-                    actionDigestParts: updateTickets.flatMap(\.actionDigestParts),
+                    actionDigestParts: BASSovereignTurnArtifactParts.parts(
+                        scope: .memoryWrite,
+                        thoughtFold: thoughtFold,
+                        renderedOutput: renderedOutput,
+                        updateTickets: updateTickets) ?? [],
                     snapshotRef: snapshotRef,
                     policyHash: sovereignVerdict.policyHash,
                     issuedAt: runtimeTrace.recordedAt,
@@ -81,11 +84,11 @@ extension BASEBrainRuntimeCoordinator {
                     turnID: turnID,
                     scope: .renderHighRisk,
                     allowedTargets: [renderedOutput.mode.rawValue],
-                    actionDigestParts: [
-                        renderedOutput.mode.rawValue,
-                        renderedOutput.headline,
-                        renderedOutput.body
-                    ],
+                    actionDigestParts: BASSovereignTurnArtifactParts.parts(
+                        scope: .renderHighRisk,
+                        thoughtFold: thoughtFold,
+                        renderedOutput: renderedOutput,
+                        updateTickets: updateTickets) ?? [],
                     snapshotRef: snapshotRef,
                     policyHash: sovereignVerdict.policyHash,
                     issuedAt: runtimeTrace.recordedAt,
