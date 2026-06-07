@@ -197,6 +197,14 @@ final class BASEnduranceAppController: ObservableObject {
         /// Opt-in WS2 fabric-authoritative N→N+1 feed-forward。 Default `"0"`;on when `== "1"`。
         static let fabricAuthFeedForwardKey = "BAS_FABRIC_AUTH_FEEDFORWARD"
         static let fabricAuthFeedForwardDefault = "0"
+        /// ADR-038 §6 wedge lever: enriched contextBlock char cap (default "512" = the
+        /// maxContextBlockChars backstop) + fold-top-1-only (default "0"). Shrink to test
+        /// whether a smaller OOD prefill clears the on-device MLX wedge (Run B: typed prompt
+        /// cleared iter1/prompt2 but the wedge MOVED to iter2/prompt2).
+        static let contextBlockCharsKey = "BAS_FABRIC_CONTEXT_BLOCK_CHARS"
+        static let contextBlockCharsDefault = "512"
+        static let topConclusionsOnlyKey = "BAS_FABRIC_TOP_CONCLUSIONS_ONLY"
+        static let topConclusionsOnlyDefault = "0"
         /// Opt-in ADR-037 GLOBAL durable cosineTopK recall. Default `"0"`; on when `== "1"`.
         static let globalRecallKey = "BAS_GLOBAL_RECALL"
         static let globalRecallDefault = "0"
@@ -523,6 +531,12 @@ final class BASEnduranceAppController: ObservableObject {
         // WS2 — explicit low decode cap on each endurance MLX request (bounds decode, not prefill).
         let maxDecodeTokens = max(1, Int(
             env[EnduranceEnv.maxDecodeTokensKey] ?? EnduranceEnv.maxDecodeTokensDefault) ?? 256)
+        // ADR-038 §6 wedge lever — configurable enriched-prefill size for the on-device A/B
+        // (shrink the feed-forward contextBlock / fold top-1 only). Defaults = byte-equal.
+        let fabricContextBlockChars = max(0, Int(
+            env[EnduranceEnv.contextBlockCharsKey] ?? EnduranceEnv.contextBlockCharsDefault) ?? 512)
+        let fabricTopConclusionsOnly =
+            (env[EnduranceEnv.topConclusionsOnlyKey] ?? EnduranceEnv.topConclusionsOnlyDefault) == "1"
         // ch1044 ADR-022 #3 — OPT-IN sovereign-verdict parity shadow。
         // Default OFF (env unset) → byte-equal:no projection,no verify,no log。
         // With `BAS_SHADOW_PARITY=enabled`,each turn's coordinator verdict is
@@ -1091,9 +1105,16 @@ final class BASEnduranceAppController: ObservableObject {
                     // every prompt。 Index expression is unchanged from the prior site。
                     let nextRaw = Self.promptPool[
                         (iter * mlxPrompts + p + 1) % Self.promptPool.count]
+                    // ADR-038 §6 lever: rebuild the enriched block at the configured size
+                    // (default 512 / all-conclusions == byte-equal to proj.contextBlock).
+                    let block = BASAgentFabricAuthoritativeProjection.contextBlock(
+                        sourceTurnID: proj.sourceTurnID,
+                        conclusions: proj.conclusions,
+                        maxChars: fabricContextBlockChars,
+                        topConclusionsOnly: fabricTopConclusionsOnly)
                     pendingEnrichedPrompt = nextRaw.isEmpty
-                        ? proj.contextBlock
-                        : nextRaw + "\n\n" + proj.contextBlock
+                        ? block
+                        : nextRaw + "\n\n" + block
                 }
                 await emitBoth(String(format:
                     "🪧 ch1062 fabric-authoritative iter=%d prompt=%d " +

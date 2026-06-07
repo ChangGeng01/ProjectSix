@@ -208,14 +208,25 @@ public enum BASAgentFabricAuthoritativeProjection {
         return String(first.prefix(maxReasonCodeChars))
     }
 
-    static func contextBlock(
+    /// ADR-038 §6 falsification lever: `maxChars` + `topConclusionsOnly` let a host shrink
+    /// the enriched prefill — a smaller char cap and/or only the top-1 conclusion — to test
+    /// whether a smaller out-of-distribution prefill clears the on-device MLX wedge (Run B
+    /// showed the typed prompt cleared iter1/prompt2 but the wedge MOVED to iter2/prompt2).
+    /// Defaults reproduce the prior behavior EXACTLY (byte-equal-off): `project` calls this
+    /// with no extra args. Public so a host (the endurance runner) can rebuild the block at
+    /// a configured size for the A/B.
+    public static func contextBlock(
         sourceTurnID: String,
-        conclusions: [BASAgentFabricAuthoritativeInput.Conclusion]
+        conclusions: [BASAgentFabricAuthoritativeInput.Conclusion],
+        maxChars: Int = maxContextBlockChars,
+        topConclusionsOnly: Bool = false
     ) -> String {
+        let used = topConclusionsOnly ? Array(conclusions.prefix(1)) : conclusions
+        let cap = max(0, maxChars)
         var lines: [String] = [
-            "[fabric-authoritative · turn \(sourceTurnID) · \(conclusions.count) accepted delta(s)]"
+            "[fabric-authoritative · turn \(sourceTurnID) · \(used.count) accepted delta(s)]"
         ]
-        for c in conclusions {
+        for c in used {
             // WS1 typed-summary: typed fields + the single top reason code ONLY — the patchJson
             // free-text (the OOD prefill that wedged the decoder) is dropped entirely. domain + reason
             // are still run through plainSummary (domain is NOT a closed vocab — it's the targetObjectRef
@@ -228,11 +239,11 @@ public enum BASAgentFabricAuthoritativeProjection {
         // ch1066 — hard-bound the total, including the truncation marker, so it never
         // dominates the decoder's prefill.
         let block = lines.joined(separator: "\n")
-        guard block.count > maxContextBlockChars else { return block }
+        guard block.count > cap else { return block }
         let suffix = " …"
-        let prefixLimit = max(0, maxContextBlockChars - suffix.count)
+        let prefixLimit = max(0, cap - suffix.count)
         guard prefixLimit > 0 else {
-            return String(suffix.prefix(maxContextBlockChars))
+            return String(suffix.prefix(cap))
         }
         return String(block.prefix(prefixLimit)) + suffix
     }
