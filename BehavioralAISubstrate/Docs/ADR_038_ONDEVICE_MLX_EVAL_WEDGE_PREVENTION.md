@@ -151,6 +151,13 @@ Lever (additive, opt-in, default OFF, byte-equal-off): `MLXOrganAdapter.drainGPU
   **load-wedges** (app alive, zero log) until a **full device reboot**. This independently confirms there is no
   in-process recovery and reinforces that an **EXTERNAL watchdog-relaunch** (kill + relaunch the app, and on
   repeat-load-wedge, reboot the device) is the only viable mitigation.
+  > **⛔ REFUTED 2026-06-09 — see §10.2.** This "GPU poisoned until reboot" claim was a CONFOUND. The
+  > "subsequent launch load-wedges (zero log)" observation coincided with the period before the
+  > `BAS_ENDURANCE_AUTOSTART=1` fix — a relaunched app sat idle at the autostart=off screen producing zero
+  > log, which read as "load-wedged." With autostart fixed, a measured on-device control (§10.2) shows a
+  > full-MLX relaunch on a just-wedged device **loads and runs normally with NO reboot**, and a sibling Metal
+  > queue keeps completing command buffers **throughout** the wedge. The GPU is NOT poisoned. Keep this line
+  > for the audit trail; the operative finding is §10.2.
 
 **Disposition:** the lever code stays as an opt-in MEMORY tool (default OFF) — it genuinely bounds footprint,
 which may help unrelated memory-pressure cases — but it is **documented as NOT a wedge fix**. The honest next
@@ -195,6 +202,13 @@ eval, no reset API), not a substrate bug we can fix in our code.
 
 **Recommendation:** build the external watchdog for our cert/endurance workflow (the only measured-viable path);
 treat true prevention as an upstream dependency, not an open substrate task.
+
+> **↻ REVISED 2026-06-09 — see §10.2.** The on-device measurement retired the "device-poison / needs-reboot"
+> premise. The recovery is simpler than §9 assumed: **detect stall → kill → relaunch → resume-from-checkpoint**,
+> with **NO reboot-on-poison step** (the GPU is never poisoned). And because the fault is MLX **in-process**
+> (not Apple firmware), true prevention is NOT merely an upstream dependency — it is a reachable bug in the
+> vendored MLX (a completion-handler lost-signal / lock-inversion). §9's "no in-app fix / impossible" was
+> predicated on the now-refuted poison claim.
 
 ## 10. Layer-pin (2026-06-09): "is it Metal or MLX?" — verified split, with an honesty correction to §9
 
@@ -285,3 +299,54 @@ The trivial-Metal control is now implemented (was: "never run"):
 Reading: `verdict=ALL_COMPLETED` on a *confirmed-contaminated* device ⇒ MLX-CAUSED (prevention fix possible in
 vendored MLX); `verdict=WEDGED` ⇒ Apple-firmware-leaning (external watchdog ceiling stands). **The on-device
 result will be recorded here honestly (pass OR fail) once the run completes.**
+
+### 10.2 ON-DEVICE RESULT (2026-06-09, iPhone Air, iOS 26.5) — the GPU is NOT the fault; the wedge is MLX-process-local
+
+Ran the experiment on a physical iPhone Air. **Triple-dissociation, all three angles agree: the GPU device is
+healthy during and after the wedge; the hang is specific to the MLX eval path within a process; killing the
+process FULLY recovers with NO reboot.**
+
+1. **DURING the wedge — sibling Metal queue stays alive.** A normal endurance run (concurrent heartbeat on)
+   wedged at MLX response #17 (last decode normal: `latency_ms=2387`, then frozen inside the next eval; `avail_mb≈300`,
+   not OOM). The MLX-FREE sibling-queue heartbeat completed **56/56 samples (0 timedOut, 0 errored)** at ~4 ms
+   each — **including 8+ samples (t_sec 750→859) AFTER MLX froze.** A GPU-device/firmware-wide wedge cannot keep
+   executing another queue's command buffers; the GPU was demonstrably processing work while MLX's eval thread
+   was parked. ⇒ the fault is NOT a GPU/Metal-firmware-wide hang.
+2. **AFTER killing the wedged app — bare Metal is fine.** Relaunched PROBE-ONLY (no MLX) on the same device:
+   `verdict=ALL_COMPLETED`, 6/6 completed, **0.69 ms median**. The "contaminated" GPU runs bare Metal perfectly.
+3. **AFTER killing the wedged app — full MLX recovers with NO reboot.** Relaunched the FULL Gemma-4-E2B MLX
+   endurance on the same just-wedged device: model loaded (`load_ms=2741`), produced 8 healthy decodes
+   (~2400 ms, ~50 tok/s), and **COMPLETED**. No load-wedge. No reboot.
+
+**Verdict (measured, code-corroborated):**
+- **It is NOT a Metal/GPU-driver/firmware fault.** The GPU stayed healthy throughout (heartbeat + bare-Metal +
+  full-MLX-relaunch all succeed). This RETIRES the §8 "GPU poisoned until reboot" claim as a confound (the
+  pre-autostart-fix idle-app artifact — see the §8 ⛔ note).
+- **It IS MLX-process-local.** The wedge lives in MLX's own in-process eval/command-buffer/lock path: as a
+  session accumulates (cumulative threshold, §6), MLX's eval eventually parks forever waiting on ITS command
+  buffer's completion **even though the GPU has moved on** — the signature of a CPU-side **completion-handler
+  lost-signal / lock-inversion** under the process-global `evalLock` (suspects: `device.cpp:466/489` fence_mtx +
+  scheduler mtx; or premature buffer recycling `device.cpp:405/411/418`), NOT a GPU kernel hang. Cleared
+  completely by process death.
+- **So "is it Metal or MLX?" is now answered: MLX.** Both the *unrecoverability* (§10, proven) AND the *fault
+  itself* (§10.2, measured: GPU exonerated) are MLX. The earlier "fault owner undetermined, leaning firmware"
+  (§10) is resolved toward **MLX-caused** by the on-device GPU exoneration.
+
+**What this CHANGES (the good news):**
+- **Recovery no longer needs a reboot.** Because the GPU is never poisoned and the process is healthy (one thread
+  parked; not jetsammed), **kill + relaunch fully recovers**. For the **test/endurance/cert** workflow this makes
+  an unattended Mac watchdog trivially reliable: *detect stall (the heartbeat is exactly such a detector, and it
+  stays alive) → kill → relaunch → resume-from-checkpoint*. **Drop the reboot-on-poison step** (§9) — it was
+  predicated on the refuted poison claim.
+- **"完全解决" (true prevention) is genuinely back on the table.** The fault is MLX **in-process** code/state we
+  can reach (the vendored MLX, or our usage of it), not Apple firmware. The most likely mechanism — a
+  completion-handler lost-signal/lock-inversion where the GPU finishes but MLX never gets signaled — is a
+  fixable concurrency bug. Next step to localize the exact line: instrument the wedge point (sample
+  `cb.status` / `event` value at the hang, or a GPU capture) to confirm "GPU completed, CPU never signaled" vs
+  "buffer never submitted," then fix in vendored MLX or upstream.
+
+**Honesty bounds:** n=1 device, iOS 26.5; the wedge reproduced (here @17 responses vs the earlier OFF @56 — high
+variance, but it wedged), and the "relaunch recovers without reboot" result is being reconfirmed (n=2) — recorded
+on completion. The GPU-exoneration itself is decisive from a single instance (the heartbeat directly observed the
+GPU executing during the wedge — not an inference). The exact MLX line is not yet pinned (closed below the
+metal-cpp bridge for the Apple side, but the suspects above are in the vendored MLX C++ we can instrument).
