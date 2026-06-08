@@ -195,3 +195,72 @@ eval, no reset API), not a substrate bug we can fix in our code.
 
 **Recommendation:** build the external watchdog for our cert/endurance workflow (the only measured-viable path);
 treat true prevention as an upstream dependency, not an open substrate task.
+
+## 10. Layer-pin (2026-06-09): "is it Metal or MLX?" — verified split, with an honesty correction to §9
+
+A 9-agent layer-pin workflow traced the vendored MLX C++ core + Metal backend + Apple `metal-cpp`, then
+adversarially refuted its own verdict (metal-skeptic / mlx-skeptic / epistemics-skeptic). The result **splits the
+question in two and assigns DIFFERENT confidence to each half** — and corrects an over-claim that had crept into
+§9's "upstream MLX/**Metal**" framing.
+
+**(A) The UNRECOVERABILITY (why it can't be aborted in-process) = an MLX problem. HIGH confidence — proven by
+reading the vendored source, verbatim:**
+- `event.cpp:24-25` — `Event::wait()` calls `waitUntilSignaledValue(value(), -1)`; the `-1` fills the
+  `uint64_t milliseconds` timeout slot (`MTLEvent.hpp:73`) = `UINT64_MAX` (~584M yr), so the timeout-throw at
+  `event.cpp:26` is **unreachable** — an effectively-infinite wait.
+- `eval.cpp:92` — `gpu::synchronize()` calls bare `cb->waitUntilCompleted()`, which has **no timeout variant**
+  in the Metal API (`MTLCommandBuffer.hpp:456`); `check_error` runs only *after* completion, so a never-completing
+  buffer is an **unobservable infinite hang, never a thrown error**. (Two independent infinite host-block paths.)
+- No in-wait cancellation — `Task.isCancelled` is checked only **between tokens** (`MLXLMCommon/Evaluate.swift:1691/1723`);
+  `next()` at `:689` does `step()` + `asyncEval(token)` at `:700` with **no cancel check**, so a zero-token wedge in
+  the *first* eval is never reached. (Corrects §9's mis-cite "Evaluate.swift:689-705" — those lines are `next()`'s
+  body, which contains no cancel check; the real checks are at 1691/1723 in `MLXLMCommon`, not `MLXLLM`.)
+- Process-global `NSRecursiveLock evalLock` (`Transforms+Eval.swift:9,17`) wraps `mlx_eval`, so one wedged decode
+  freezes **every** eval in the process.
+> MLX *could* make this a CLEAN catchable failure (the `milliseconds` slot already exists — pass e.g. 30000) — but
+> it requires fixing **both** wait sites (the `event.cpp` SharedEvent wait *and* the `eval.cpp:92`
+> `waitUntilCompleted`, which has no timeout API), and even then the `Scheduler` destructor re-enters `synchronize`
+> at teardown. No shipping MLX has this → it is a **hypothetical upstream fix** (file an mlx-swift issue). It buys
+> *recoverable-as-clean-failure*, NOT *recoverable-as-keep-running* (the GPU stays wedged regardless).
+
+**(B) The FAULT (where the hang physically lives) = sub-process / GPU-resident. HIGH confidence it is BELOW the
+process; but the OWNER is UNDETERMINED — MEDIUM confidence — between Apple firmware and an MLX-caused GPU bug:**
+- The decisive measured symptom (§8: survives app kill, cleared only by full reboot; OOM measured-out at 730+MB
+  free) proves the stuck state lives **below the process boundary** — a pure in-process Swift/C++ deadlock would
+  die with the process. This much is solid.
+- **It does NOT prove "Apple Metal/AGX firmware" specifically.** The adversarial pass showed the *same* symptom
+  fits an **MLX-caused** GPU fault at least as well:
+  - MLX commits per-decode buffers via `commandBufferWithUnretainedReferences()` (`device.cpp:405`) then eagerly
+    `release()`/`null()`s them (`device.cpp:411/418-420`) — if MLX recycles a buffer the in-flight GPU command
+    still references, **MLX faults the GPU context itself** (a use-after-free / premature-donation, owned by MLX's
+    allocator/memory-pool — the same pool the §8 `clearCache` lever pokes).
+  - A CPU-side completion-handler **lock-inversion** on `stream.fence_mtx` (`device.cpp:466/489`) + scheduler mtx,
+    under the global `evalLock` — the GPU could FINISH yet the SharedEvent never get signaled: an MLX-internal
+    deadlock indistinguishable from a firmware wedge at the symptom level.
+  - (An MLX-authored GPU `while(1)` spin exists at `fence.metal:40-52` / CPU spin `fence.cpp:65-66`, but on the
+    `MLX_METAL_FAST_SYNCH` path which **defaults OFF**, `utils.h:159` — ships but off the default path.)
+- The cumulative-threshold signature (§6: 512→256 prefill *doubled* responses-before-wedge 3→6; §8: OFF @56) fits
+  an **MLX software resource leak** as well as a firmware one — accumulation-toward-a-limit is the hallmark of a
+  software leak, so it does not break the tie.
+- **Unknowable from code/symptoms alone:** the exact Apple AGX driver line / IOAccelerator queue field / firmware
+  condition (closed source, below the `metal-cpp` objc bridge); and whether the owner is Apple-firmware vs an
+  MLX-resource/lock bug. n=1 device, n=1 OS (iOS 26.5), zero GPU-side capture.
+
+**Honesty correction to §9:** §9 said the wedge "is an upstream MLX/**Metal** limitation … not a substrate bug."
+The UNRECOVERABILITY half is correct (MLX, upstream). But §9 *implicitly assumed* the FAULT is Apple-Metal/firmware
+and concluded "true prevention is IMPOSSIBLE." **That assumption is not proven.** If the fault owner is an MLX
+buffer-lifecycle or lock-ordering bug (in `device.cpp`, which is in the **vendored MLX we control**), then a real
+**prevention** fix could exist — which would reopen "完全解决" beyond the watchdog. §9's "impossible" should be read
+as "impossible *given the unproven assumption that the fault is Apple firmware*," not as an established fact.
+
+**The one discriminating experiment that would settle it (NEVER RUN — this is the honest open gate):** after a
+wedge, on the *contaminated* device, submit a **trivial non-MLX Metal command buffer** (a bare `MTLCommandQueue` +
+no-op compute) and sample `cbuf.status` / take a Metal System Trace or GPU frame capture.
+- If the bare command buffer **also** hangs/errors → the GPU client is genuinely wedged below MLX → leaning Apple
+  driver/firmware → our ceiling is the external watchdog + reboot-on-poison (§8/§9 stand).
+- If the bare command buffer **succeeds** → the contamination is MLX-state-specific (buffer lifecycle / lock) →
+  a real **prevention** fix could live in the vendored MLX, and "完全解决" is back on the table.
+
+**Net answer to "Metal or MLX?":** the *inability to abort it* is **MLX, for sure**; the *hang itself* is **below
+the process, for sure**, but **Metal-firmware-vs-MLX-bug is undetermined** and is decidable by the trivial-Metal
+probe above — which we have not yet run.
