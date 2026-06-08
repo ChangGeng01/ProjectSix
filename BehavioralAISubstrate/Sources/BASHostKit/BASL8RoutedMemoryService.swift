@@ -79,6 +79,17 @@ import BASOrchestration
 /// `BASSQLiteVectorIndexStorage` (the DeviceTestApp wiring) IS cross-restart durable — content +
 /// embeddings reload from SQLite without re-embedding (ADR-033 §104-120). The library
 /// `makeWithDefaults()` default stays legacy/in-memory, byte-equal-off (the flip is host-injected).
+///
+/// ADR-039 Phase 2 — host-injected Metal cosine-topK seam over the in-Swift SNAPSHOT corpus. Signature:
+/// `(query, flatCorpus [row0_d0..row0_dN-1, row1_d0..], dim, k) -> [(rowIndex, score)]?`. A nil RESULT
+/// means Metal faulted / timed out ⇒ `retrieve()` retreats to the CPU score-all path (wedge-safe, ADR-038).
+/// nil SEAM ⇒ byte-equal-off (ADR-014). The host backs it with `BASMetalTopKDispatcher` + the sync bridge;
+/// per the determinism boundary (ADR-039 §2, verified) only `atomID` crosses — the Metal score orders the
+/// bundle + becomes `atom.confidence` (reasoning side; proven NOT to feed replay/event-log/store/verdict).
+public typealias BASMetalCosineTopKSeam =
+    @Sendable (_ query: [Float], _ corpus: [Float], _ dim: Int, _ k: Int)
+        -> [(rowIndex: Int, score: Float)]?
+
 public struct BASRoutedMemoryPersistence: Sendable {
     public let loadAllAtoms: @Sendable () async -> [BASGovernedMemory]
     public let admitAtom: @Sendable (BASGovernedMemory) async -> Void
@@ -103,6 +114,9 @@ public struct BASRoutedMemoryPersistence: Sendable {
     /// nil ⇒ no global recall. Preferred over `cosineTopKSync` in `retrieve()` when both are wired.
     /// Byte-equal-off by default; the host owns the in-memory engine + resolver map.
     public let globalRecall: BASGlobalRecallSeam?
+    /// ADR-039 Phase 2 — OPTIONAL Metal cosine-topK seam over the in-Swift snapshot corpus (nil ⇒
+    /// byte-equal-off; a nil result ⇒ CPU fallback). Host-wired to BASMetalTopKDispatcher + sync bridge.
+    public let metalCosineTopK: BASMetalCosineTopKSeam?
     public init(
         loadAllAtoms: @escaping @Sendable () async -> [BASGovernedMemory],
         admitAtom: @escaping @Sendable (BASGovernedMemory) async -> Void,
@@ -111,7 +125,8 @@ public struct BASRoutedMemoryPersistence: Sendable {
         upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
             -> [(atomID: String, score: Float)])? = nil,
-        globalRecall: BASGlobalRecallSeam? = nil
+        globalRecall: BASGlobalRecallSeam? = nil,
+        metalCosineTopK: BASMetalCosineTopKSeam? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.admitAtom = admitAtom
@@ -120,6 +135,7 @@ public struct BASRoutedMemoryPersistence: Sendable {
         self.upsertEmbedding = upsertEmbedding
         self.cosineTopKSync = cosineTopKSync
         self.globalRecall = globalRecall
+        self.metalCosineTopK = metalCosineTopK
     }
 }
 
@@ -231,6 +247,12 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// ADR-037 — OPTIONAL global-recall seam (full-corpus cosineTopK + atom resolver). Preferred over
     /// `cosineTopKSync` in retrieve() when both are set; nil ⇒ unchanged paths, byte-equal-off.
     private let globalRecall: BASGlobalRecallSeam?
+    /// ADR-039 Phase 2 — OPTIONAL Metal cosine-topK over the in-Swift snapshot corpus (taken ONLY when
+    /// neither Rust seam is wired; the Rust corpus has no dump FFI, the snapshot IS already in Swift).
+    /// nil seam ⇒ byte-equal-off (the CPU score-all path). A nil RESULT from the seam ⇒ CPU fallback
+    /// (wedge-safe, ADR-038). Only atomID crosses the determinism boundary; the Metal score orders the
+    /// bundle (reasoning side — verified non-spine).
+    private let metalCosineTopK: BASMetalCosineTopKSeam?
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -247,7 +269,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         upsertEmbedding: (@Sendable (String, [Float], String) async -> Void)? = nil,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
             -> [(atomID: String, score: Float)])? = nil,
-        globalRecall: BASGlobalRecallSeam? = nil
+        globalRecall: BASGlobalRecallSeam? = nil,
+        metalCosineTopK: BASMetalCosineTopKSeam? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -263,6 +286,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.upsertEmbedding = upsertEmbedding
         self.cosineTopKSync = cosineTopKSync
         self.globalRecall = globalRecall
+        self.metalCosineTopK = metalCosineTopK
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -312,13 +336,27 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             scored = cosineTopKSync(query, topK).compactMap { hit in
                 byID[hit.atomID].map { (hit.score, $0) }
             }
+        } else if let metalCosineTopK, !snap.isEmpty,
+                  snap.allSatisfy({ $0.embedding.count == embeddingDimension }) {
+            // ADR-039 Phase 2 — Metal cosine-topK over the in-Swift snapshot corpus (opt-in; the host
+            // backs it with BASMetalTopKDispatcher + the sync bridge). WEDGE-SAFE: a nil result (Metal
+            // fault / timeout) retreats to the CPU score-all path. BOUNDARY (ADR-039 §2, verified): only
+            // the resolved atomID crosses; the Metal score orders the bundle (reasoning side). Uniform-dim
+            // guarded above — a ragged snapshot skips Metal (the CPU path handles per-entry dims).
+            var corpus: [Float] = []
+            corpus.reserveCapacity(snap.count * embeddingDimension)
+            for entry in snap { corpus.append(contentsOf: entry.embedding) }
+            if let hits = metalCosineTopK(query, corpus, embeddingDimension, topK) {
+                scored = hits.compactMap { hit in
+                    (hit.rowIndex >= 0 && hit.rowIndex < snap.count)
+                        ? (hit.score, snap[hit.rowIndex]) : nil
+                }
+            } else {
+                scored = Self.scoreAllSnapshot(query: query, snap: snap)   // wedge-safe CPU retreat
+            }
         } else {
             // Rust-SIMD-routed cosine over the pre-materialized snapshot — fully synchronous.
-            scored = snap.map { entry in
-                let score = BASAutoRouteRanker
-                    .cosineSimilarity(query, entry.embedding).value
-                return (score, entry)
-            }
+            scored = Self.scoreAllSnapshot(query: query, snap: snap)
         }
         let above = scored.filter { $0.score >= relevanceFloor }
 
@@ -382,6 +420,16 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             }
         }
         return bundle
+    }
+
+    /// Rust-SIMD cosine over the pre-materialized snapshot — the byte-equal-off baseline AND the Metal
+    /// wedge-safe fallback (ADR-039 Phase 2). Pure; the caller passes a snapshot copy (no lock here).
+    private static func scoreAllSnapshot(
+        query: [Float], snap: [SnapshotEntry]
+    ) -> [(score: Float, entry: SnapshotEntry)] {
+        snap.map { entry in
+            (BASAutoRouteRanker.cosineSimilarity(query, entry.embedding).value, entry)
+        }
     }
 
     public func promote(

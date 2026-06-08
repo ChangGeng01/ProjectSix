@@ -120,7 +120,9 @@ extension BASCognitiveBrain {
                 // (nil unless the host wires a cosineTopK-capable routed index ⇒ byte-equal-off).
                 cosineTopKSync: store.cosineTopKSync,
                 // ADR-037 — and the opt-in GLOBAL recall seam (full-corpus cosineTopK + resolver).
-                globalRecall: store.globalRecall)
+                globalRecall: store.globalRecall,
+                // ADR-039 Phase 2 — the opt-in Metal cosine-topK seam over the in-Swift snapshot corpus.
+                metalCosineTopK: store.metalCosineTopK)
         }
         let emptyLoad: @Sendable () async -> [BASGovernedMemory] = { [] }
         return BASL8RoutedMemoryService(
