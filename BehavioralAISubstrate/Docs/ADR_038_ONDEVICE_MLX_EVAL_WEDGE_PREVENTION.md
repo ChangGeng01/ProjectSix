@@ -158,3 +158,40 @@ lever is the external watchdog-relaunch, not another in-process memory knob.
 
 **Tooling fix found en route:** the devicectl cert harness never set `BAS_ENDURANCE_AUTOSTART=1`, so headless
 launches sat idle until a manual Start tap; fixed in `scripts/run-device-app-cert.sh`.
+
+## 9. Can it be COMPLETELY solved? Investigation verdict (2026-06-09): NO in-process fix on iOS
+
+An 8-agent complete-fix workflow evaluated every remaining avenue for TRUE PREVENTION (the wedge never
+affects the product), each adversarially verified against the vendored MLX source. **All four dead-end:**
+
+- **Deep in-process state reset — feasibility NONE.** `clearCache()` was shallow (freed buffers only). MLX
+  0.31.1 exposes **no API** to reset/recreate the process-global singletons that hold the wedge state, and the
+  one operation that would "drain" the command queue (`Stream().synchronize()` / `eval`) **is itself the
+  operation that wedges**. A new `Stream`/`MTLCommandQueue` per turn is a partial reset that does not escape.
+- **Model / quant swap — shifts N, never prevents.** A different arch runs the *same* `mlx_eval` under the
+  *same* process-global `evalLock` (Transforms+Eval.swift:9; cancellation only between tokens at
+  Evaluate.swift:689-705); the KV-cache type is irrelevant. At best it moves the threshold.
+- **Upstream MLX — no fix exists.** No newer mlx-swift / mlx core adds a cancellable or timeout-bounded eval
+  or otherwise fixes the decode hang.
+- **iOS recovery / out-of-process — not viable on iOS.** The eval is synchronous, global-locked, no-timeout,
+  **uncancellable** — a watchdog can only DETECT (a token heartbeat off the eval thread), never kill it or free
+  the GPU. iOS cannot spawn a helper process (extensions jetsam at this model's ~3 GB; no long-running compute
+  extension; XPC reaches only system services, not an app-hosted service), and **cannot self-relaunch after a
+  jetsam kill** (BGTaskScheduler is a maintenance wake, not crash recovery).
+
+**Verdict (honest, code-grounded — not inferred):** a COMPLETE in-process fix is **IMPOSSIBLE on iOS** for this
+uncancellable synchronous Metal eval hang. It is an **upstream MLX/Metal limitation** (no cancellable/timeout
+eval, no reset API), not a substrate bug we can fix in our code.
+
+**The achievable ceiling:**
+- **Test / endurance / cert context (Mac-driven):** an EXTERNAL Mac watchdog-relaunch harness (heartbeat
+  stall-detect → terminate → relaunch → resume-from-checkpoint → reboot-on-device-poison) makes UNATTENDED runs
+  survive wedges. The common wedge auto-recovers; the device-poison case needs a reboot, and a passcode device
+  needs a manual unlock after reboot unless it is in an MDM-kiosk (no-passcode) mode. This is "complete" for the
+  unattended test workflow, NOT true prevention.
+- **End-user product:** the wedge remains a force-quit-and-reboot event until **upstream MLX gains a cancellable
+  / timeout-bounded eval** (file/track an mlx-swift issue) OR the model is run on a runtime that has one. There
+  is no in-app fix.
+
+**Recommendation:** build the external watchdog for our cert/endurance workflow (the only measured-viable path);
+treat true prevention as an upstream dependency, not an open substrate task.
