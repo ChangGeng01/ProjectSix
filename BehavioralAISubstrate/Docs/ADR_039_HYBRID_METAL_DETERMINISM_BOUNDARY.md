@@ -163,3 +163,35 @@ byte-equal-off; taken only on the snapshot path (a Rust seam wins precedence). A
 **Status:** macOS-certified (`BASMetalL8SeamTests` + `BASMetalTopKParityTests` + spine tripwire + cascade
 byte-equal net; DeviceTestApp builds for the iPhone Air). **On-device cert PENDING an awake device** (the
 device slept between the §7 smoke cert and the L8 run, so the launched app was iOS-suspended).
+
+## 9. Phase 4 — Metal SSMScan → non-governance reasoning sink (the sharpest boundary)
+
+The CPU `ssmCaution` operator (`BASSSMCautionInput` → `boundRiskCard.totalRisk` → the sovereign verdict)
+stays the AUTHORITATIVE, byte-deterministic value path — UNCHANGED. Phase 4 adds a SECOND, opt-in path that
+runs the Metal `SSMScan` kernel on the SAME per-turn data without ever touching governance:
+
+- **The seam:** `EBrainRuntimeCoordinator` gains a default-nil `ssmReasoningInputSink` + an
+  `ssmMetalReasoningEnabled` flag (mirroring `ssmCautionObservationSink`). When both are set, `runTurn` emits
+  the per-turn DETERMINISTIC scan input (`BASMambaTurnSignalBuilder.scanInput` — the same pure builder the
+  CPU path is built from) to the sink. `runTurn` runs NO Metal (stays sync + Metal-free → the spine tripwire
+  still passes; it references only the pure builder + a value type).
+- **Host runs Metal OFF the turn thread:** `BASSSMMetalReasoning.run` dispatches `BASMetalSSMScanDispatcher`
+  asynchronously and reduces the output to a reasoning magnitude (mean |y|). Because the Metal runs OFF the
+  sync turn thread, a Metal wedge (ADR-038, uncancellable) can NEVER block the deterministic path — STRICTER
+  than Phase 2's bounded sync-bridge, chosen deliberately for the governance-ADJACENT SSM.
+- **The boundary (why flag-on == flag-off byte-for-byte):** the Metal reasoning signal is emitted ONLY via
+  the sink; it never enters the returned `BASEBrainTurnResult` (the replay-digest preimage), never feeds the
+  verdict / permit / commit / render / seal, and its state NEVER folds into `request.priorSSMState` (the CPU
+  `ssmStateOut` owns the deterministic recurrence). Proven by `BASSSMMetalReasoningRunTurnTests`: flag-on
+  emits the REAL per-turn input yet the DECISION (risk / level / factors / choice / permit / verdict /
+  render) is byte-identical to flag-off — STRONGER than the CPU ssmCaution, which can RAISE risk.
+- **Why a SEPARATE sink (not the ssmCaution one):** the CPU caution path is governance (it can raise the
+  verdict input); the Metal reasoning path is non-governance (it raises nothing). Distinct sinks make the
+  boundary explicit + the byte-identical proof unconditional.
+
+**Cert status:** macOS-certified (the boundary proof + Metal-vs-CPU magnitude parity ≤1e-4 on the Mac GPU;
+spine tripwire green; DeviceTestApp builds). **On-device SSM GPU+parity** is certified by an extension to the
+`BAS_METAL_SMOKE` boot block (it now ALSO dispatches the SSMScan kernel + logs
+`📊 ssm-metal-smoke gpu=.. parity_mae=..`) — **PENDING an awake device** (batched with the Phase-2 L8 cert).
+The live per-turn reasoning emission over a long endurance run (the host wiring the sink end-to-end) is the
+operational follow-up; the MECHANISM + the BOUNDARY are proven.

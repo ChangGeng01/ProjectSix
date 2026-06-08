@@ -45,8 +45,14 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   (query-dim/dim>0 guards + `cpuReference` no-trap; `k=snap.count` ⇒ CPU-identical membership; single-in-flight
   wedge gate bounds a hang to ONE leaked task; telemetry captures fault-vs-timeout; real-dim pre-warm). Honest
   limits (ADR-039 §8): at ≤64-row snapshot scale it's a perf LOSS (default-off mandatory) + the score reaches
-  `atom.confidence` in the replay preimage ⇒ approximate, NOT replay-stable (spine verified clean). **Pending:** Phase 4 (Metal SSM
-  reasoning — `ssmCaution` stays CPU). See ADR-039 §7.
+  `atom.confidence` in the replay preimage ⇒ approximate, NOT replay-stable (spine verified clean).
+  **Phase 4 BUILT + macOS-certified** — Metal SSMScan → a NON-governance reasoning side-channel (opt-in
+  `ssmReasoningInputSink` + `ssmMetalReasoningEnabled`; CPU `ssmCaution`→verdict UNCHANGED). `runTurn` emits
+  only the deterministic scan input; the host runs Metal OFF the turn thread (never blocks the deterministic
+  path). Boundary PROVEN byte-identical flag-on vs flag-off (`BASSSMMetalReasoningRunTurnTests`) + Metal≈CPU
+  ≤1e-4; the `BAS_METAL_SMOKE` boot block now also dispatches the SSM kernel (`📊 ssm-metal-smoke`).
+  **On-device cert (L8 topK + SSM) pending an awake device.** See ADR-039 §7/§8/§9. Roadmap Phases 0-4 COMPLETE
+  (host-side; on-device certs batched).
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).
@@ -79,9 +85,13 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
   **Metal contributes 0 to live LLM decode — MLX owns the GPU.** Mamba/MPSGraph kernels exist but are
   not on the decode path. `substrateInternalFactoryCallSiteCount = 0` (ADR-035): no pilot routes into
   `BASEBrainTurnResult`; the live brain uses direct-init V1.
-- Deferred hygiene: ~10 ungated `import Metal` files + ~60 consumers want `#if canImport(Metal)` guards
-  (source clarity; does NOT enable watchOS — MLX deps fail there first). NOT a path to replacing MLX
-  decode.
+- **WS5 source-honesty — RECONCILED (substantive part done; cosmetic part declined, 亏的不要上).** The
+  load-bearing half (the byte-deterministic SPINE must reference no Metal) is ENFORCED by the ADR-039 Phase-0
+  build tripwire (`BASMetalDeterminismBoundaryTests.testSpineFilesAreFreeOfMetalSymbols`, green). The other
+  half — wrapping ~10 ungated `import Metal` files + ~60 consumers in `#if canImport(Metal)` — is **declined**:
+  it is pure source-clarity that unlocks NO platform (watchOS fails on the MLX deps first), so a ~70-file
+  mechanical churn with regression risk and zero functional benefit is not worth it. Reopen only if a
+  Metal-free build target ever becomes real.
 
 ## 4. Known issues + workarounds
 

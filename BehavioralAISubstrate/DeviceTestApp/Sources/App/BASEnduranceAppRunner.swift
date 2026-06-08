@@ -1065,6 +1065,41 @@ final class BASEnduranceAppController: ObservableObject {
                     "📊 ch1025 metal-smoke gpu=false FALLBACK topk_ms=%.2f routing=%@ error=%@",
                     ms, smokeRouting.rawValue, String(describing: error)))
             }
+
+            // ADR-039 Phase 4 — on-device SSM-kernel cert: dispatch the Metal SSMScan + parity vs the CPU
+            // reference. Proves the substrate's OTHER live Metal kernel (the Mamba scan) runs on the GPU +
+            // agrees with CPU on real silicon (the Phase-4 reasoning side-channel runs this exact kernel).
+            let ssmShape = BASSSMScanShape(B: 1, L: 8, D: 3)
+            let ssmBLD = 1 * 8 * 3
+            let ssmX = (0..<ssmBLD).map { Float($0 % 7) / 7.0 }
+            let ssmDelta = [Float](repeating: 0.1, count: ssmBLD)
+            let ssmA = [Float](repeating: -1.0, count: 3)
+            let ssmB = [Float](repeating: 0.2, count: ssmBLD)
+            let ssmC = [Float](repeating: 0.3, count: ssmBLD)
+            let ssmCPUy = (try? BASSSMScanCPUReference.scan(
+                x: ssmX, delta: ssmDelta, A: ssmA, B: ssmB, C: ssmC, shape: ssmShape)) ?? []
+            let ssmDispatcher = BASMetalSSMScanDispatcher(
+                loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
+            let ssmT0 = monoNowNs()
+            do {
+                let ssmGPUy = try await ssmDispatcher.dispatch(
+                    x: ssmX, delta: ssmDelta, A: ssmA, B: ssmB, C: ssmC, shape: ssmShape)
+                let ssmMs = Double(monoNowNs() - ssmT0) / 1_000_000.0
+                let n = min(ssmCPUy.count, ssmGPUy.count)
+                var mae = 0.0
+                if n > 0 {
+                    for i in 0..<n { mae += Double(abs(ssmCPUy[i] - ssmGPUy[i])) }
+                    mae /= Double(n)
+                }
+                await emitBoth(String(format:
+                    "📊 ch1025 ssm-metal-smoke gpu=true ssm_ms=%.2f parity_mae=%.6f y_len=%d cpu_len=%d",
+                    ssmMs, mae, ssmGPUy.count, ssmCPUy.count))
+            } catch {
+                let ssmMs = Double(monoNowNs() - ssmT0) / 1_000_000.0
+                await emitBoth(String(format:
+                    "📊 ch1025 ssm-metal-smoke gpu=false FALLBACK ssm_ms=%.2f error=%@",
+                    ssmMs, String(describing: error)))
+            }
         }
 
         var iterDurationMs: [Double] = []
