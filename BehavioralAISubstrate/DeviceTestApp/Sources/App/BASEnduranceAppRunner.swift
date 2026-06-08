@@ -1100,6 +1100,41 @@ final class BASEnduranceAppController: ObservableObject {
                     "📊 ch1025 ssm-metal-smoke gpu=false FALLBACK ssm_ms=%.2f error=%@",
                     ssmMs, String(describing: error)))
             }
+
+            // ADR-039 Phase 5 — on-device attention-kernel cert: dispatch single-head attention (the
+            // Phase-5 reasoning side-channel runs this exact kernel, Phase-3 routed) + parity vs the CPU
+            // reference. Proves the THIRD substrate-owned Metal kernel runs on the GPU + agrees with CPU.
+            let attnInput = BASAttentionTurnInput(
+                q: [0.6, 0.3, 0.8],
+                k: [0.9, 0.2, 0.1, 0.1, 0.8, 0.3, 0.5, 0.5, 0.5, 0.2, 0.1, 0.9],
+                v: [0.9, 0.2, 0.1, 0.1, 0.8, 0.3, 0.5, 0.5, 0.5, 0.2, 0.1, 0.9],
+                qRows: 1, cols: 3, kRows: 4, candidateCount: 4)
+            let attnRouting = BASMetalKernelDispatchRouter.decide(
+                op: .attention, thermalState: .nominal, anePriority: .aneFirst).routing
+            let attnCPU = BASAttentionMetalReasoning.cpuReference(attnInput)
+            let attnDispatcher = BASMetalAttentionDispatcher(
+                loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
+            let attnT0 = monoNowNs()
+            do {
+                let attnGPU = try await attnDispatcher.dispatch(
+                    q: attnInput.q, qRows: attnInput.qRows, qCols: attnInput.cols,
+                    k: attnInput.k, kRows: attnInput.kRows, v: attnInput.v, vCols: attnInput.cols)
+                let attnMs = Double(monoNowNs() - attnT0) / 1_000_000.0
+                let n = min(attnCPU.count, attnGPU.count)
+                var mae = 0.0
+                if n > 0 {
+                    for i in 0..<n { mae += Double(abs(attnCPU[i] - attnGPU[i])) }
+                    mae /= Double(n)
+                }
+                await emitBoth(String(format:
+                    "📊 ch1025 attn-metal-smoke gpu=true attn_ms=%.2f parity_mae=%.6f routing=%@ y_len=%d",
+                    attnMs, mae, attnRouting.rawValue, attnGPU.count))
+            } catch {
+                let attnMs = Double(monoNowNs() - attnT0) / 1_000_000.0
+                await emitBoth(String(format:
+                    "📊 ch1025 attn-metal-smoke gpu=false FALLBACK attn_ms=%.2f routing=%@ error=%@",
+                    attnMs, attnRouting.rawValue, String(describing: error)))
+            }
         }
 
         var iterDurationMs: [Double] = []

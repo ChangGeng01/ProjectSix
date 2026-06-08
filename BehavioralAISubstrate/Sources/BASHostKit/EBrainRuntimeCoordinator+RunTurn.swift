@@ -580,6 +580,19 @@ extension BASEBrainRuntimeCoordinator {
             reasoningSink(BASSSMReasoningTurnInput(
                 sessionID: derivedSessionID, turnID: derivedTurnID, scanInput: reasoningScan))
         }
+        // ADR-039 Phase 5 — OPT-IN Metal attention reasoning emission (the FIRST live consumer of the
+        // Phase-3 dispatch router). Emits the per-turn DETERMINISTIC attention input (affect → Q,
+        // candidates → K=V) to the default-nil sink; the HOST runs Metal attention OFF this sync turn
+        // thread (Phase-3 routed: thermal-critical ⇒ CPU), so a Metal wedge can NEVER block the
+        // deterministic path. NON-governance: the salience signal feeds NO verdict/permit/commit/render/
+        // seal/replay (never enters BASEBrainTurnResult). Flag-off / nil sink ⇒ no emission ⇒ byte-equal.
+        if attentionMetalReasoningEnabled, let attentionSink = attentionReasoningInputSink,
+           let attentionInput = BASAttentionTurnSignalBuilder.signal(
+               affectLayers: BASAffectLayerProjection.project(from: decomposeFrame),
+               candidates: thoughtFrame.candidates) {
+            attentionSink(BASAttentionReasoningTurnInput(
+                sessionID: derivedSessionID, turnID: derivedTurnID, input: attentionInput))
+        }
         // M392 — `boundActionPermit` is rebound by the Cthulhu
         // doctrine gate block below (M303/M304/M384/M320/M385).
         // The block runs BEFORE `applySovereignNeuralContract`,

@@ -132,7 +132,12 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // reasoning input sink-out)。 Default false/nil preserves all prior caller compat per
                 // 红线 7 + ADR-014;this pin tracks the canonical signature (an unsynced pin breaks compile)。
                 ssmMetalReasoningEnabled:
-                ssmReasoningInputSink:)
+                ssmReasoningInputSink:
+                // ADR-039 Phase 5 — Metal attention reasoning side-channel OPT-IN slots added (gate +
+                // attention input sink-out)。 Default false/nil preserves all prior caller compat per
+                // 红线 7 + ADR-014;this pin tracks the canonical signature (an unsynced pin breaks compile)。
+                attentionMetalReasoningEnabled:
+                attentionReasoningInputSink:)
         XCTAssertNotNil(initRef)
     }
 

@@ -237,6 +237,14 @@ public struct BASEBrainRuntimeCoordinator {
     public var ssmReasoningInputSink:
         (@Sendable (BASSSMReasoningTurnInput) -> Void)? = nil
 
+    /// ADR-039 Phase 5 — OPT-IN: when true AND `attentionReasoningInputSink` is set, runTurn emits the
+    /// per-turn DETERMINISTIC attention input here so the HOST runs Metal attention (Phase-3 routed) OFF
+    /// the turn thread. NON-governance side-channel: feeds no verdict/permit/commit/render/seal/replay and
+    /// never folds into governance. Default false/nil → no emission → byte-equal (红线 7).
+    public var attentionMetalReasoningEnabled: Bool
+    public var attentionReasoningInputSink:
+        (@Sendable (BASAttentionReasoningTurnInput) -> Void)? = nil
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -310,7 +318,12 @@ public struct BASEBrainRuntimeCoordinator {
         // no emission → byte-equal (红线 7)。 Non-governance; host runs Metal off-turn.
         ssmMetalReasoningEnabled: Bool = false,
         ssmReasoningInputSink:
-            (@Sendable (BASSSMReasoningTurnInput) -> Void)? = nil
+            (@Sendable (BASSSMReasoningTurnInput) -> Void)? = nil,
+        // ADR-039 Phase 5 — OPT-IN Metal attention reasoning side-channel。 Default false/nil →
+        // no emission → byte-equal (红线 7)。 Non-governance; host runs Metal off-turn (Phase-3 routed).
+        attentionMetalReasoningEnabled: Bool = false,
+        attentionReasoningInputSink:
+            (@Sendable (BASAttentionReasoningTurnInput) -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -346,6 +359,8 @@ public struct BASEBrainRuntimeCoordinator {
         self.ssmCautionObservationSink = ssmCautionObservationSink
         self.ssmMetalReasoningEnabled = ssmMetalReasoningEnabled
         self.ssmReasoningInputSink = ssmReasoningInputSink
+        self.attentionMetalReasoningEnabled = attentionMetalReasoningEnabled
+        self.attentionReasoningInputSink = attentionReasoningInputSink
         // (ADR-018 P2) shadow-trial feedback slots wired above; DORMANT
         // until Commit 2 reads them. (ADR-019 §15) the SSM caution
         // operator flag + sink are wired above; the consequential L11
