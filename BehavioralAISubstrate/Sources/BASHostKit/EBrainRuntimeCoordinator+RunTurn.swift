@@ -564,6 +564,22 @@ extension BASEBrainRuntimeCoordinator {
             // Nil sink (default) → no emission → byte-equal (红线 7). Feeds no render/seal/verdict/hash.
             ssmCautionObservationSink?(ssmObservation)
         }
+        // ADR-039 Phase 4 — OPT-IN Metal SSM reasoning emission (independent of the CPU caution operator
+        // above). Emits the per-turn DETERMINISTIC scan input (the SAME pure builder the CPU path is built
+        // from) to the default-nil reasoning sink; the HOST runs the Metal SSMScan on it OFF this sync turn
+        // thread, so a Metal wedge can NEVER block the deterministic path (ADR-038/§2 boundary rule). The
+        // Metal result is a NON-governance side-channel — it feeds NO verdict/permit/commit/render/seal/
+        // replay (never enters the returned BASEBrainTurnResult, the replay-digest preimage) and NEVER folds
+        // into `request.priorSSMState` (the CPU `ssmStateOut` owns the deterministic recurrence). Flag-off /
+        // nil sink ⇒ no emission ⇒ byte-equal (红线 7). Mutates nothing on the value path.
+        if ssmMetalReasoningEnabled, let reasoningSink = ssmReasoningInputSink,
+           let reasoningScan = BASMambaTurnSignalBuilder.scanInput(
+               affectLayers: BASAffectLayerProjection.project(from: decomposeFrame),
+               turnHistory: request.turnHistory,
+               candidates: thoughtFrame.candidates) {
+            reasoningSink(BASSSMReasoningTurnInput(
+                sessionID: derivedSessionID, turnID: derivedTurnID, scanInput: reasoningScan))
+        }
         // M392 — `boundActionPermit` is rebound by the Cthulhu
         // doctrine gate block below (M303/M304/M384/M320/M385).
         // The block runs BEFORE `applySovereignNeuralContract`,

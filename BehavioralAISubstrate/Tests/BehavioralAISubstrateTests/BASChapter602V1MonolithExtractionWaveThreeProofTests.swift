@@ -127,7 +127,12 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // caller compat per 红线 7 + ADR-014;this pin tracks
                 // the canonical signature (an unsynced pin breaks compile)。
                 ssmCautionOperatorEnabled:
-                ssmCautionObservationSink:)
+                ssmCautionObservationSink:
+                // ADR-039 Phase 4 — Metal SSM reasoning side-channel OPT-IN slots added (gate +
+                // reasoning input sink-out)。 Default false/nil preserves all prior caller compat per
+                // 红线 7 + ADR-014;this pin tracks the canonical signature (an unsynced pin breaks compile)。
+                ssmMetalReasoningEnabled:
+                ssmReasoningInputSink:)
         XCTAssertNotNil(initRef)
     }
 

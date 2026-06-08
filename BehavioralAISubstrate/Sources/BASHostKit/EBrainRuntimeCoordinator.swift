@@ -227,6 +227,16 @@ public struct BASEBrainRuntimeCoordinator {
     public var ssmCautionObservationSink:
         (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
 
+    /// ADR-039 Phase 4 — OPT-IN: when true AND `ssmReasoningInputSink` is set, `runTurn` emits the per-turn
+    /// DETERMINISTIC SSM scan input here so the HOST runs the Metal SSMScan OFF the sync turn thread. The
+    /// CPU `ssmCaution` above stays the authoritative verdict input — UNCHANGED. The Metal reasoning result
+    /// is a NON-governance side-channel: feeds no verdict/permit/commit/render/seal/replay, and never folds
+    /// into `request.priorSSMState`. Default false/nil → no emission → byte-equal (红线 7). NOT in any
+    /// canonical-bytes / seal / hash path.
+    public var ssmMetalReasoningEnabled: Bool
+    public var ssmReasoningInputSink:
+        (@Sendable (BASSSMReasoningTurnInput) -> Void)? = nil
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -295,7 +305,12 @@ public struct BASEBrainRuntimeCoordinator {
         // chapter 一百八十六 / ADR-019 §15 — OPT-IN SSM observation sink。
         // Default nil → no emission → byte-equal (红线 7)。 Observation-only.
         ssmCautionObservationSink:
-            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
+            (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
+        // ADR-039 Phase 4 — OPT-IN Metal SSM reasoning side-channel。 Default false/nil →
+        // no emission → byte-equal (红线 7)。 Non-governance; host runs Metal off-turn.
+        ssmMetalReasoningEnabled: Bool = false,
+        ssmReasoningInputSink:
+            (@Sendable (BASSSMReasoningTurnInput) -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -329,6 +344,8 @@ public struct BASEBrainRuntimeCoordinator {
         self.resolvedTrialSink = resolvedTrialSink
         self.ssmCautionOperatorEnabled = ssmCautionOperatorEnabled
         self.ssmCautionObservationSink = ssmCautionObservationSink
+        self.ssmMetalReasoningEnabled = ssmMetalReasoningEnabled
+        self.ssmReasoningInputSink = ssmReasoningInputSink
         // (ADR-018 P2) shadow-trial feedback slots wired above; DORMANT
         // until Commit 2 reads them. (ADR-019 §15) the SSM caution
         // operator flag + sink are wired above; the consequential L11
