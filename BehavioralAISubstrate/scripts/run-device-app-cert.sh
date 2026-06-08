@@ -38,8 +38,17 @@ PULL_DIR="$(mktemp -d /tmp/bas-devcert.XXXXXX)"
 # bash gotcha — the JSON's own `}` closes the parameter expansion early, leaving a stray literal `}` that is
 # appended to ANY overridden value (→ malformed JSON → devicectl rejects --environment-variables). Using a
 # variable reference (`$DEFAULT_ENV_JSON`) has no brace collision, so overrides pass through cleanly.
-DEFAULT_ENV_JSON='{"BAS_METAL_SMOKE":"1","BAS_L8_METAL_TOPK":"1","BAS_GLOBAL_RECALL":"0","BAS_INTERNAL_ITER_COUNT":"2","BAS_INTERNAL_MLX_PROMPTS":"1","BAS_INTERNAL_COOLDOWN_SEC":"0","BAS_INTERNAL_MAX_DECODE_TOKENS":"48"}'
+# BAS_ENDURANCE_AUTOSTART=1 is REQUIRED for the run to auto-start headlessly — without it the app launches to
+# an idle "autostart=off" screen and waits for a manual Start-button tap (BASEnduranceAppRunner.autostartIfEnabled).
+# This was the real reason earlier devicectl-launch runs only produced logs after a manual button press.
+# If you pass a custom ENV_JSON, it MUST include "BAS_ENDURANCE_AUTOSTART":"1" or the run won't start.
+DEFAULT_ENV_JSON='{"BAS_ENDURANCE_AUTOSTART":"1","BAS_METAL_SMOKE":"1","BAS_L8_METAL_TOPK":"1","BAS_GLOBAL_RECALL":"0","BAS_INTERNAL_ITER_COUNT":"2","BAS_INTERNAL_MLX_PROMPTS":"1","BAS_INTERNAL_COOLDOWN_SEC":"0","BAS_INTERNAL_MAX_DECODE_TOKENS":"48"}'
 ENV_JSON="${ENV_JSON:-$DEFAULT_ENV_JSON}"
+# Safety net: if a custom ENV_JSON omitted the autostart flag, inject it (so the harness is always headless).
+case "$ENV_JSON" in
+  *BAS_ENDURANCE_AUTOSTART*) : ;;
+  *) ENV_JSON="${ENV_JSON/\{/\{\"BAS_ENDURANCE_AUTOSTART\":\"1\",}" ;;
+esac
 
 LOG_GLOB="ch1025-endurance-2026*.log"
 
