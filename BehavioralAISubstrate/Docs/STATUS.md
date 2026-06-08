@@ -30,6 +30,13 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
 - **ADR-036** L8 cosineTopK retrieve takeover (the ONLY sanctioned NON-byte-equal path; host opt-in).
 - **ADR-037** global durable cosineTopK recall on-device (opt-in; on-device verified; hardened — engine
   bounded in lockstep, monotonic sync).
+- **ADR-039** hybrid Metal/CPU determinism boundary — the doctrine for real GPU compute (byte-determinism
+  REQUIRED→CPU/Rust spine: Storage/Memory/EventLog/Replay/Governance; approximate ALLOWED→Metal:
+  Embedding/LLM/Planning/Reasoning/Animation/Perception). **macOS mechanisms built (Phases 0-3 + sync-bridge),
+  each opt-in / byte-equal-off / macOS-verified:** `BASApproxValue` type-quarantine + spine build-tripwire
+  (P0) · per-kernel exec records + `recordSink` (P1) · L8 Metal topK dispatcher + async→sync bridge (P2) ·
+  deterministic dispatch router (P3). **Pending (batched on-device + host integration):** the live runner
+  wiring + the iPhone-Air R1 certs + Phase 4 (Metal SSM reasoning — `ssmCaution` stays CPU). See ADR-039.
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).
