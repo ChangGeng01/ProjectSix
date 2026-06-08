@@ -975,6 +975,22 @@ final class BASEnduranceAppController: ObservableObject {
             "is_loaded=%@",
             brainLoadMs, isLoaded ? "true" : "false"))
 
+        // ADR-038 wedge lever (opt-in, default OFF ⇒ byte-equal-off): bound MLX's GPU buffer/allocator cache,
+        // which is NEVER drained or capped anywhere in our code and defaults to the full memory limit (may
+        // cache GBs) — a CUMULATIVE GPU-memory-pressure source consistent with the wedge signature (worsens
+        // with responses-before-wedge, not per-prompt). BAS_MLX_CACHE_LIMIT_MB caps the cache once here;
+        // BAS_MLX_DRAIN_CACHE=1 drains it between iterations (wired in the loop below).
+        let mlxMemEnv = ProcessInfo.processInfo.environment
+        let mlxDrainCache = (mlxMemEnv["BAS_MLX_DRAIN_CACHE"] ?? "0") == "1"
+        if let capMBStr = mlxMemEnv["BAS_MLX_CACHE_LIMIT_MB"],
+           let capMB = Int(capMBStr), capMB > 0 {
+            await adapter.setGPUCacheLimit(bytes: capMB * 1024 * 1024)
+            await emitBoth("📍 ch1025 mlx-cache-limit set cap_mb=\(capMB)")
+        }
+        if mlxDrainCache {
+            await emitBoth("📍 ch1025 mlx-drain-cache ENABLED (clearCache between iterations)")
+        }
+
         if !isLoaded {
             let msg = "MLX not loaded post-loadModel"
             await emitBoth("⚠️ ch1025 \(msg)")
@@ -1424,6 +1440,19 @@ final class BASEnduranceAppController: ObservableObject {
             iterThermalAfter.append(snapAfter.thermalState)
             iterAvailMemAfter.append(
                 snapAfter.availableMemoryMB)
+
+            // ADR-038 wedge lever: drain the MLX GPU buffer cache between iterations (opt-in). Snapshot rss
+            // around the drain so the A/B can measure reclaimed memory + responses-before-wedge. Byte-equal to
+            // OFF (frees buffers MLX would otherwise reallocate; no effect on decode outputs).
+            if mlxDrainCache {
+                let preDrainRss = snapAfter.memoryRssMB
+                await adapter.drainGPUCache()
+                let postDrain = snapshot()
+                await emitBoth(String(format:
+                    "📊 ch1025 mlx-drain iter=%d rss_mb=%.1f→%.1f reclaimed_mb=%.1f",
+                    iter, preDrainRss, postDrain.memoryRssMB,
+                    preDrainRss - postDrain.memoryRssMB))
+            }
 
             let iterMs = monoElapsedMs(since: iterStartNs)
             iterDurationMs.append(iterMs)

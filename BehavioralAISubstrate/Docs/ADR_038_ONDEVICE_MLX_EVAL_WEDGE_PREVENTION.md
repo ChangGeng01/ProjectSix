@@ -115,3 +115,46 @@ honestly failed, not force-enabled).
   eval). Prevention only.
 - **Deferred:** the library `budget.maxDecodeTokens → request` wiring (WS2 is endurance-host-scoped only);
   a sustained (multi-hour) Run B before any default-flip.
+
+## 8. GPU-memory lever — the in-process root-cause probe (2026-06-09): REFUTED, honest FAIL
+
+A fresh investigation (operator + a 15-agent root-cause workflow) refuted the §1 "OOD-prefill" framing and
+converged on a never-tried lever: the MLX **Metal buffer/allocator cache is never bounded or drained anywhere
+in our code** (zero `Memory.clearCache()` / `Memory.cacheLimit` calls). The endurance runner uses the STATELESS
+`MLXOrganAdapter.draft` (fresh `ChatSession` per call ⇒ no cross-decode KV reuse), so whatever accumulates is
+process-global GPU state, and the cumulative wedge signature (§6: 512→256 prefill doubled responses-before-wedge
+3→6) pointed at the unbounded cache → working-set pressure as the hypothesis.
+
+Lever (additive, opt-in, default OFF, byte-equal-off): `MLXOrganAdapter.drainGPUCache()` (`Memory.clearCache()`)
++ `setGPUCacheLimit(bytes:)` (`Memory.cacheLimit`), wired into the endurance loop behind `BAS_MLX_DRAIN_CACHE`
++ `BAS_MLX_CACHE_LIMIT_MB`.
+
+**On-device A/B (iPhone Air, feed-forward OFF, raw in-distribution prompts, ITER=40, decode=96):**
+
+| config | wedge at | avail at wedge | footprint |
+|---|---|---|---|
+| OFF (no lever) | **56 responses** | **311 MB** | ~3064 MB |
+| cap=64 MB + drain | 6 responses | 741 MB | ~2635 MB |
+| drain-only (no cap) | ~15 responses (then crawled to a stall) | 734 MB | ~2642 MB |
+
+**VERDICT — the lever does NOT clear the wedge; the OOM hypothesis is REFUTED by measurement:**
+- The wedge fires with **730+ MB FREE** under both lever configs — so it is **NOT memory exhaustion**. The
+  unbounded-cache → OOM root-cause is wrong.
+- The drain DID bound the footprint (~2642 vs 3064 MB; avail 734 vs 311 MB) — but that was **irrelevant**:
+  memory was never the trigger. Worse, the lever configs wedge **EARLIER** (6, 15) than the no-lever baseline
+  (56), and `clearCache()` every iteration progressively **slows** the run (an extra synchronous GPU
+  sync/dealloc each iter appears to poke the same uncancellable Metal hang sooner). The lever is counterproductive.
+- **Refined root cause:** the wedge is the uncancellable synchronous Metal command-buffer hang (the eval that
+  never returns), triggered by accumulated GPU/Metal **state not captured by RSS/footprint** — not memory
+  pressure. Prevention-by-memory fails.
+- **Device-contamination finding:** once a run wedges, the device GPU stays poisoned — every subsequent launch
+  **load-wedges** (app alive, zero log) until a **full device reboot**. This independently confirms there is no
+  in-process recovery and reinforces that an **EXTERNAL watchdog-relaunch** (kill + relaunch the app, and on
+  repeat-load-wedge, reboot the device) is the only viable mitigation.
+
+**Disposition:** the lever code stays as an opt-in MEMORY tool (default OFF) — it genuinely bounds footprint,
+which may help unrelated memory-pressure cases — but it is **documented as NOT a wedge fix**. The honest next
+lever is the external watchdog-relaunch, not another in-process memory knob.
+
+**Tooling fix found en route:** the devicectl cert harness never set `BAS_ENDURANCE_AUTOSTART=1`, so headless
+launches sat idle until a manual Start tap; fixed in `scripts/run-device-app-cert.sh`.

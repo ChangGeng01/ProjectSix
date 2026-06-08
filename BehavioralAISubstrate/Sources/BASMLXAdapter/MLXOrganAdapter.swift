@@ -540,6 +540,32 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #endif
     }
 
+    // MARK: - GPU memory cache control (opt-in memory tool)
+
+    /// Drain ALL cached Metal buffers from MLX's allocator cache (`MLX.Memory.clearCache()`). That cache
+    /// defaults to the full memory limit and can grow across a long inference run; this bounds steady-state GPU
+    /// memory. It only frees buffers MLX would otherwise reallocate, so it is OUTPUT-byte-equal to not calling
+    /// it (a memory lever, never a correctness one).
+    ///
+    /// **NOT an ADR-038 wedge fix (measured).** The on-device A/B (ADR-038 §8) probed this as the candidate
+    /// wedge cure and REFUTED it: the wedge fires with 730+ MB FREE, so it is NOT memory exhaustion; calling
+    /// `clearCache()` every iteration wedged the run EARLIER (15 vs 56 responses) and slowed it. Keep this as a
+    /// general memory tool; do NOT rely on it to prevent the wedge (use an external watchdog-relaunch).
+    public func drainGPUCache() {
+        #if canImport(MLX)
+        MLX.Memory.clearCache()
+        #endif
+    }
+
+    /// Cap MLX's free-buffer cache to `bytes` (`MLX.Memory.cacheLimit`). The cache defaults to the memory limit
+    /// (so it may cache GBs); a low cap reclaims aggressively on the next allocation. Set ONCE at startup.
+    /// Output-byte-equal — buffers are reclaimed + reallocated, the math is unchanged.
+    public func setGPUCacheLimit(bytes: Int) {
+        #if canImport(MLX)
+        MLX.Memory.cacheLimit = bytes
+        #endif
+    }
+
     /// Number of active sessions. Hosts use this for UI / metrics
     /// (e.g. "5 ongoing conversations cached").
     public func sessionCount() -> Int {
