@@ -240,6 +240,14 @@ A hot path becomes a live Metal eat ONLY when it is (i) **substrate-owned**, (ii
 - **Decode attention does NOT qualify** — MLX-owned (wall 1); the only substrate-owned softmax is governance
   (wall 2). ✗
 
+**Current-binary re-cert (2026-06-09, iPhone Air, `scripts/run-device-app-cert.sh`):** all three Metal smokes
+re-confirmed on the latest build — `metal-smoke gpu=true topk_ms=1.51 parity_set_ok=true max_score_err=0.000000`,
+`ssm-metal-smoke gpu=true ssm_ms=0.84 parity_mae=0.000000`, `attn-metal-smoke gpu=true attn_ms=0.72
+parity_mae=0.000000`; L8 topK `gpu=2 cpu_fallback=0`; and the M1.1 turn-breakdown `brain_ms=21 mlx_ms=2551
+substrate_pct=0.8 mlx_pct=99.0` — substrate **0.8%** / MLX **99.0%** of a turn, on-device. (The full-MLX-turn
+run is intermittently subject to the ADR-038 wedge: a 4-turn attempt wedged; the 2-turn retry completed. The
+wedge is uncancellable / prevention-only and does not affect the measurement's validity.)
+
 ### 10.3 The sequencing rule (先稳 before 再吃掉)
 
 A hot path is Metal-eligible only AFTER its deterministic spine is proven Metal-free (the §3 tripwire) AND

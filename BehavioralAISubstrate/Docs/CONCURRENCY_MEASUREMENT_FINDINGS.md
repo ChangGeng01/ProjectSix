@@ -18,8 +18,14 @@ From real on-device runs (MLX `latency_ms` summed per iter vs total `iter_ms`):
 
 **MLX decode is 97–98.5% of every turn.** The whole substrate (brain.process L1-L14 cascade) is a fraction
 of the ~2-3% remainder (which also includes fabric + per-prompt snapshots + logging). A new
-`📊 ch1025 turn-breakdown` scorecard line (committed) splits `brain_ms` vs `mlx_ms` vs `other_ms` exactly;
-its capture is batched for the next awake-device run, but the iter-vs-MLX ratio above already settles the gate.
+`📊 ch1025 turn-breakdown` scorecard line splits `brain_ms` vs `mlx_ms` vs `other_ms` exactly.
+**On-device CAPTURED (2026-06-09, iPhone Air, current binary, via `scripts/run-device-app-cert.sh`):**
+`📊 ch1025 turn-breakdown iter=1 iter_ms=2577 brain_ms=21 mlx_ms=2551 other_ms=5 substrate_pct=0.8 mlx_pct=99.0`
+— the substrate (L1–L14 cascade) is **0.8%** of the turn; MLX decode is **99.0%**. The macOS iter-vs-MLX ratio
+(~98%) estimate is now confirmed on-device with the exact per-component breakdown (`brain_ms=21 / mlx_ms=2551`).
+(Note: the full-MLX-turn run is intermittently subject to the ADR-038 MLX eval wedge — a 4-turn attempt wedged;
+the 2-turn retry completed. The wedge is uncancellable/prevention-only; it does not affect this measurement's
+validity, only the ease of capturing it.)
 
 ## M1.2 — L8 retrieval concurrent-read scaling (macOS, 18-core)
 
