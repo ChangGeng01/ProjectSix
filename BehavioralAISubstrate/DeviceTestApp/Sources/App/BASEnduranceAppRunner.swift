@@ -99,6 +99,7 @@ import BASOrgan
 import BASMemory  // ch 1025.6 — fabric roster/graph/runtime types
 import BASRuntimeCore  // ch1044 — BASTaskVmInfoProbe (phys_footprint, jetsam metric)
 import BASAppleAdapters  // Step-2 flip — on-device MiniLM semantic memory embedder
+import BASMetalSubstrate  // ADR-039 — Metal kernel dispatchers + the determinism-boundary quarantine
 
 // ch 1025.4 — Unified logging via `os.Logger`。 Swift `print()` does
 // NOT appear in iOS system log,which means `idevicesyslog` from
@@ -205,6 +206,10 @@ final class BASEnduranceAppController: ObservableObject {
         static let contextBlockCharsDefault = "512"
         static let topConclusionsOnlyKey = "BAS_FABRIC_TOP_CONCLUSIONS_ONLY"
         static let topConclusionsOnlyDefault = "0"
+        /// ADR-039 on-device cert — opt-in Metal smoke (default off → byte-equal). When "1", a boot-time
+        /// topK dispatch + parity check + router decision are logged, certifying the Metal mechanisms
+        /// (Phases 1-3) really run on the GPU + hold parity on real hardware.
+        static let metalSmokeKey = "BAS_METAL_SMOKE"
         /// Opt-in ADR-037 GLOBAL durable cosineTopK recall. Default `"0"`; on when `== "1"`.
         static let globalRecallKey = "BAS_GLOBAL_RECALL"
         static let globalRecallDefault = "0"
@@ -940,6 +945,45 @@ final class BASEnduranceAppController: ObservableObject {
             "nyi=ANE_utilization_pct(WONTDO_iOS_sandbox)+" +
             "thermal_executor_wire(ch1026_5axis_perf)+" +
             "multi_organ_real_LLM(ch1036)")
+
+        // ADR-039 on-device cert — Metal smoke (opt-in BAS_METAL_SMOKE; default off → byte-equal). A
+        // self-contained boot-time topK dispatch + on-device parity + router decision: proves the Metal
+        // mechanisms (Phases 1-3) really run on the GPU + agree with the CPU reference on real hardware,
+        // ahead of the deep L8/RunTurn integration.
+        if (env[EnduranceEnv.metalSmokeKey] ?? "0") == "1" {
+            let smokeQuery: [Float] = [0.2, 0.5, 0.1, 0.9]
+            var smokeCorpus: [Float] = []
+            for r in 0..<64 {
+                for d in 0..<4 {
+                    smokeCorpus.append(Float((r * 7 + d * 3) % 11) / 11.0 + 0.013 * Float(r % 3))
+                }
+            }
+            let smokeDim = 4, smokeK = 5
+            let cpuTop = BASMetalTopKDispatcher.cpuReference(
+                query: smokeQuery, corpus: smokeCorpus, dim: smokeDim, k: smokeK)
+            let smokeRouting = BASMetalKernelDispatchRouter.decide(
+                op: .matMul, thermalState: .nominal, anePriority: .aneFirst).routing
+            let smokeDispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader())
+            let smokeT0 = monoNowNs()
+            do {
+                let approx = try await smokeDispatcher.dispatch(
+                    query: smokeQuery, corpus: smokeCorpus, dim: smokeDim, k: smokeK)
+                let ms = Double(monoNowNs() - smokeT0) / 1_000_000.0
+                let metalTop = approx.approximateOnly()
+                let sameSet = Set(metalTop.map(\.rowIndex)) == Set(cpuTop.map(\.rowIndex))
+                let cpuByRow = Dictionary(uniqueKeysWithValues: cpuTop.map { ($0.rowIndex, $0.score) })
+                let maxErr = metalTop.map { abs($0.score - (cpuByRow[$0.rowIndex] ?? .nan)) }.max() ?? 0
+                await emitBoth(String(format:
+                    "📊 ch1025 metal-smoke gpu=%@ topk_ms=%.2f parity_set_ok=%@ max_score_err=%.6f routing=%@ hits=%d",
+                    approx.provenance.didRunOnGPU ? "true" : "false", ms,
+                    sameSet ? "true" : "false", maxErr, smokeRouting.rawValue, metalTop.count))
+            } catch {
+                let ms = Double(monoNowNs() - smokeT0) / 1_000_000.0
+                await emitBoth(String(format:
+                    "📊 ch1025 metal-smoke gpu=false FALLBACK topk_ms=%.2f routing=%@ error=%@",
+                    ms, smokeRouting.rawValue, String(describing: error)))
+            }
+        }
 
         var iterDurationMs: [Double] = []
         var iterMlxTokens: [Int] = []
