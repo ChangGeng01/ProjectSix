@@ -175,6 +175,20 @@ public actor BASMetalKernelLibraryLoader {
             throw BASMetalKernelLibraryLoaderError
                 .mtlDeviceUnavailable
         }
+        // ADR-039 fix — prefer the SPM-precompiled `default.metallib`. SPM's
+        // `.process(...metal)` COMPILES all the kernel `.metal` files into ONE
+        // `default.metallib`; the iOS-app bundle ships ONLY that (the `.metal`
+        // SOURCE is NOT copied there), so the runtime-source path below throws
+        // `resourceURLMissing` on-device (the real Metal-on-device blocker found
+        // by the on-device smoke). `makeDefaultLibrary(bundle:)` loads that
+        // precompiled lib — every kernel function is present. Fall THROUGH to
+        // runtime source compilation only when the metallib is absent (e.g. a
+        // build that ships `.metal` source but no compiled lib).
+        if let precompiled = try? device.makeDefaultLibrary(
+            bundle: Self.expectedBundle) {
+            memoized = precompiled
+            return precompiled
+        }
         // chapter 七百七 第一刀 — load ALL .metal resources
         // from the bundle and concatenate into one source。
         // Previously only SSMScan.metal was loaded;the
