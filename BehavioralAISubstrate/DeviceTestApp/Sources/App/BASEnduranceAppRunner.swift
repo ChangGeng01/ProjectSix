@@ -1178,6 +1178,10 @@ final class BASEnduranceAppController: ObservableObject {
                 snapBefore.availableMemoryMB)
 
             var iterTokens = 0
+            // ADR-039 concurrency arc M1.1 — per-iter substrate (brain.process) vs MLX-decode (adapter.draft)
+            // time, to measure what fraction of a turn is the parallelizable substrate vs the GPU decode.
+            var iterBrainMs = 0.0
+            var iterMlxMs = 0.0
             for p in 0..<mlxPrompts {
                 // ch1062 WS2 — if the prior turn's authoritative loop produced an
                 // enriched input, use it (the N→N+1 feed-forward); else the raw prompt.
@@ -1201,6 +1205,7 @@ final class BASEnduranceAppController: ObservableObject {
                 let brainStartNs = monoNowNs()
                 let turnResult = await brain.process(prompt)
                 let brainMs = monoElapsedMs(since: brainStartNs)
+                iterBrainMs += brainMs   // M1.1 — substrate (L1-L14 cascade) time
                 let taskType = turnResult.contextFrame.taskType
                 // ch 1025.5.5 audit MED-2:`confidenceBand` is
                 // `Optional<Double>` and the `brain.process` path
@@ -1364,6 +1369,7 @@ final class BASEnduranceAppController: ObservableObject {
                 do {
                     let draft = try await adapter.draft(request)
                     let mlxMs = monoElapsedMs(since: mlxStartNs)
+                    iterMlxMs += mlxMs   // M1.1 — MLX GPU decode time (the dominant, non-parallelizable part)
                     let mlxPostSnap = snapshot()
                     let bodyLen = draft.body.count
                     // ch 1025.8 HIGH-1 fix:`outputTokensEstimated` is
@@ -1436,6 +1442,18 @@ final class BASEnduranceAppController: ObservableObject {
                 snapAfter.memoryRssMB,
                 snapBefore.availableMemoryMB,
                 snapAfter.availableMemoryMB))
+
+            // M1.1 — THE Phase-2 gate: substrate (brain.process, parallelizable) vs MLX decode (GPU, not)
+            // as a fraction of the whole turn. Small substrate_pct ⇒ stage fan-out is NOT the throughput
+            // lever (the turn is GPU-decode-bound); large ⇒ fan-out could help (then digest-gate it).
+            let breakdownAccountedMs = iterBrainMs + iterMlxMs
+            let substratePct = iterMs > 0 ? iterBrainMs / iterMs * 100 : 0
+            let mlxPct = iterMs > 0 ? iterMlxMs / iterMs * 100 : 0
+            await emitBoth(String(format:
+                "📊 ch1025 turn-breakdown iter=%d iter_ms=%.0f brain_ms=%.0f mlx_ms=%.0f other_ms=%.0f " +
+                "substrate_pct=%.1f mlx_pct=%.1f",
+                iter, iterMs, iterBrainMs, iterMlxMs,
+                max(0, iterMs - breakdownAccountedMs), substratePct, mlxPct))
 
             // ADR-039 Phase 2 — drain + log the L8 Metal topK execution records for this iter (real GPU
             // runs vs CPU fallbacks + timing). Empty unless BAS_L8_METAL_TOPK=1 AND the snapshot retrieve
