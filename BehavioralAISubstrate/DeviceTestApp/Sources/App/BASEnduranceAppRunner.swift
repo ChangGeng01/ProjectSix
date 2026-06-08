@@ -239,6 +239,15 @@ final class BASEnduranceAppController: ObservableObject {
             return
         }
         autostartConsumed = true
+        // ADR-038 §10 — the discriminating experiment. BAS_METAL_PROBE_ONLY=1 runs ONLY the MLX-FREE
+        // bare-Metal probe (no model load, no MLX eval). Launch it on a *contaminated* device (after a
+        // wedge, kill the wedged app, relaunch with this flag) to decide Metal-firmware-vs-MLX-bug:
+        // bare Metal completes → MLX-state-specific contamination (MLX-CAUSED); bare Metal hangs → the
+        // GPU client is wedged below MLX (Apple-firmware-leaning). This is the missing §8 trivial control.
+        if (env["BAS_METAL_PROBE_ONLY"] ?? "0") == "1" {
+            launchProbeOnly()
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
@@ -281,6 +290,56 @@ final class BASEnduranceAppController: ObservableObject {
             await self?.runEndurance(iters: iters,
                                      cooldownSec: cooldownSec,
                                      mlxPrompts: mlxPrompts)
+        }
+    }
+
+    // MARK: - ADR-038 §10 — Metal-vs-MLX discriminating probe
+
+    /// Start path for BAS_METAL_PROBE_ONLY=1 — runs the MLX-free bare-Metal probe and exits. No model
+    /// load, no MLX eval. Mirrors `launch()` (detached, idle-timer off) so it is headless-safe.
+    private func launchProbeOnly() {
+        guard !started else { return }
+        started = true
+        status = .starting
+        UIApplication.shared.isIdleTimerDisabled = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.runMetalProbeOnly()
+        }
+    }
+
+    /// Submit a handful of trivial, MLX-FREE Metal command buffers and report whether the GPU completes
+    /// them. On a *contaminated* device this is the discriminating reading (ADR-038 §10):
+    ///   ALL_COMPLETED → bare Metal works → contamination is MLX-state-specific → MLX-CAUSED.
+    ///   WEDGED        → bare Metal also hangs → GPU client wedged below MLX → Apple-firmware-leaning.
+    private nonisolated func runMetalProbeOnly() async {
+        await MainActor.run { self.openLogFile() }
+        let env = ProcessInfo.processInfo.environment
+        let iters = max(1, Int(env["BAS_METAL_PROBE_ITERS"] ?? "5") ?? 5)
+        let timeoutSec = max(1.0, Double(env["BAS_METAL_PROBE_TIMEOUT_SEC"] ?? "8") ?? 8.0)
+        await emitBoth(
+            "📍 ch1025 metal-probe-only START iters=\(iters) timeout_sec=\(timeoutSec) — " +
+            "MLX-FREE bare-Metal compute probe on the (possibly contaminated) GPU")
+        await emitBoth(
+            "📍 ch1025 metal-probe-only creating MTLDevice+queue+pipeline … " +
+            "(if the log STOPS here, device/queue creation itself wedged → strong GPU-client-wedge signal)")
+
+        let summary = BASMetalGPUProbe.runSuite(iterations: iters, timeoutSec: timeoutSec)
+        for (i, o) in summary.outcomes.enumerated() {
+            await emitBoth(String(
+                format: "📊 ch1025 metal-probe iter=%d status=%@ ms=%.2f detail=%@",
+                i, o.status.rawValue, o.elapsedMs, o.detail))
+        }
+        await emitBoth(summary.verdictLine(context: "probe-only"))
+        // FINAL marker so the cert harness stops polling and records completion.
+        await emitBoth("📊 ch1025 FINAL run_sec=0.0 metal-probe-only done verdict_setup_failed=\(summary.setupFailed)")
+
+        await MainActor.run {
+            self.closeLogFile()
+            UIApplication.shared.isIdleTimerDisabled = false
+            self.status = summary.setupFailed
+                ? .failed(message: "metal-probe setup failed (no Metal device or setup wedged)")
+                : .completed(totalIters: summary.iterations, totalTokens: 0, runSec: 0)
+            self.started = false
         }
     }
 
@@ -1168,6 +1227,38 @@ final class BASEnduranceAppController: ObservableObject {
         // turn N+1's prompt (the N→N+1 feed-forward). nil ⇒ use the raw promptPool prompt.
         var pendingEnrichedPrompt: String?
 
+        // ADR-038 §10 — concurrent sibling-queue GPU heartbeat. BAS_METAL_PROBE_CONCURRENT=1 runs a
+        // long-lived, MLX-FREE Metal probe every BAS_METAL_PROBE_HB_SEC seconds ALONGSIDE the MLX decode
+        // loop (its own device/queue, never the global evalLock, each tick timeout-bounded so a wedged
+        // GPU can't lose the heartbeat thread). When the MLX loop wedges, do the `metal-probe-hb` lines
+        // keep showing status=completed (→ GPU device fine, MLX-state-local wedge → MLX-CAUSED) or flip
+        // to status=timedOut at the same moment (→ whole GPU client wedged → Apple-firmware-leaning)?
+        // Default OFF — normal endurance/cert runs are unaffected.
+        let probeConcurrent = (env["BAS_METAL_PROBE_CONCURRENT"] ?? "0") == "1"
+        let probeHbIntervalSec = max(1.0, Double(env["BAS_METAL_PROBE_HB_SEC"] ?? "20") ?? 20.0)
+        let probeHbTimeoutSec = max(1.0, Double(env["BAS_METAL_PROBE_TIMEOUT_SEC"] ?? "6") ?? 6.0)
+        var metalProbeHeartbeat: Task<Void, Never>? = nil
+        if probeConcurrent {
+            await emitBoth(
+                "📍 ch1025 metal-probe-hb ENABLED interval_sec=\(probeHbIntervalSec) " +
+                "timeout_sec=\(probeHbTimeoutSec) — sibling-queue GPU health sampled during the MLX run")
+            let hbStartNs = monoNowNs()
+            metalProbeHeartbeat = Task.detached(priority: .background) { [weak self] in
+                guard let session = BASMetalGPUProbeSession.make() else {
+                    await self?.emitBoth("📊 ch1025 metal-probe-hb SETUP_FAILED (no Metal device / setup wedged)")
+                    return
+                }
+                while !Task.isCancelled {
+                    let o = session.probeOnce(timeoutSec: probeHbTimeoutSec)
+                    let tSec = (self?.monoElapsedMs(since: hbStartNs) ?? 0) / 1000.0
+                    await self?.emitBoth(String(
+                        format: "📊 ch1025 metal-probe-hb t_sec=%.1f status=%@ ms=%.2f detail=%@",
+                        tSec, o.status.rawValue, o.elapsedMs, o.detail))
+                    try? await Task.sleep(nanoseconds: UInt64(probeHbIntervalSec * 1_000_000_000))
+                }
+            }
+        }
+
         for iter in 1...totalIters {
             let iterStartNs = monoNowNs()
             let elapsedSec = Int(
@@ -1682,6 +1773,10 @@ final class BASEnduranceAppController: ObservableObject {
                 "final_flush_admitted=\(mem.admitted) " +
                 "(host-driven durable SQLite persistence: per-iteration + final)")
         }
+
+        // ADR-038 §10 — stop the sibling-queue heartbeat before closing the log (write-after-close is a
+        // safe no-op, but cancel cleanly anyway). cancel() interrupts the inter-tick sleep.
+        metalProbeHeartbeat?.cancel()
 
         await MainActor.run {
             self.status = .completed(

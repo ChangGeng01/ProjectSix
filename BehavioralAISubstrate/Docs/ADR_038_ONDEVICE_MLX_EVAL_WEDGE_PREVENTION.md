@@ -264,3 +264,24 @@ no-op compute) and sample `cbuf.status` / take a Metal System Trace or GPU frame
 **Net answer to "Metal or MLX?":** the *inability to abort it* is **MLX, for sure**; the *hang itself* is **below
 the process, for sure**, but **Metal-firmware-vs-MLX-bug is undetermined** and is decidable by the trivial-Metal
 probe above — which we have not yet run.
+
+### 10.1 The discriminating probe — BUILT (2026-06-09), ready to run on-device
+
+The trivial-Metal control is now implemented (was: "never run"):
+- **`Sources/BASMetalSubstrate/BASMetalGPUProbe.swift`** — an MLX-FREE raw-Metal probe: its own `MTLDevice` +
+  `MTLCommandQueue` + a trivial inline compute kernel, with completion awaited via `addCompletedHandler` + a
+  **timed `DispatchSemaphore`** (NOT `waitUntilCompleted` — deliberately avoiding the exact MLX trap, so a wedged
+  GPU yields `.timedOut` instead of hanging the probe thread). `runSuite()` for the one-shot control;
+  `BASMetalGPUProbeSession` for the long-lived concurrent heartbeat. Validated on macOS GPU (`ALL_COMPLETED`).
+- **Runner wiring** (`DeviceTestApp/Sources/App/BASEnduranceAppRunner.swift`), default-OFF:
+  - `BAS_METAL_PROBE_ONLY=1` → fresh-process control: run ONLY the bare-Metal probe (no model load, no MLX),
+    emit `📊 ch1025 metal-probe context=probe-only verdict=…`. Launch it on a *contaminated* device.
+  - `BAS_METAL_PROBE_CONCURRENT=1` → a sibling-queue heartbeat (`📊 ch1025 metal-probe-hb …`) sampled every
+    `BAS_METAL_PROBE_HB_SEC` during the MLX run — gives a same-run signal (do hb lines keep `status=completed`
+    after the `🧠 mlx` lines stop, or flip to `status=timedOut` at the wedge?).
+- **`scripts/run-metal-probe-experiment.sh`** — the two-phase harness: (A) endurance + heartbeat until wedge,
+  (B) kill → relaunch PROBE-ONLY on the contaminated device → print the discriminating verdict.
+
+Reading: `verdict=ALL_COMPLETED` on a *confirmed-contaminated* device ⇒ MLX-CAUSED (prevention fix possible in
+vendored MLX); `verdict=WEDGED` ⇒ Apple-firmware-leaning (external watchdog ceiling stands). **The on-device
+result will be recorded here honestly (pass OR fail) once the run completes.**
