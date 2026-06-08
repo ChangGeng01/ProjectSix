@@ -34,7 +34,12 @@ POLL_SEC="${POLL_SEC:-14}"
 MAX_POLL="${MAX_POLL:-12}"          # ~MAX_POLL × POLL_SEC budget to see a fresh log before "asleep"
 BUILD="${BUILD:-0}"                 # 1 ⇒ xcodebuild build + install before launch
 PULL_DIR="$(mktemp -d /tmp/bas-devcert.XXXXXX)"
-ENV_JSON="${ENV_JSON:-{\"BAS_METAL_SMOKE\":\"1\",\"BAS_L8_METAL_TOPK\":\"1\",\"BAS_GLOBAL_RECALL\":\"0\",\"BAS_INTERNAL_ITER_COUNT\":\"2\",\"BAS_INTERNAL_MLX_PROMPTS\":\"1\",\"BAS_INTERNAL_COOLDOWN_SEC\":\"0\",\"BAS_INTERNAL_MAX_DECODE_TOKENS\":\"48\"}}"
+# NOTE: keep the default in a SEPARATE single-quoted var. Inlining the JSON into `${ENV_JSON:-{...}}` hits a
+# bash gotcha — the JSON's own `}` closes the parameter expansion early, leaving a stray literal `}` that is
+# appended to ANY overridden value (→ malformed JSON → devicectl rejects --environment-variables). Using a
+# variable reference (`$DEFAULT_ENV_JSON`) has no brace collision, so overrides pass through cleanly.
+DEFAULT_ENV_JSON='{"BAS_METAL_SMOKE":"1","BAS_L8_METAL_TOPK":"1","BAS_GLOBAL_RECALL":"0","BAS_INTERNAL_ITER_COUNT":"2","BAS_INTERNAL_MLX_PROMPTS":"1","BAS_INTERNAL_COOLDOWN_SEC":"0","BAS_INTERNAL_MAX_DECODE_TOKENS":"48"}'
+ENV_JSON="${ENV_JSON:-$DEFAULT_ENV_JSON}"
 
 LOG_GLOB="ch1025-endurance-2026*.log"
 
