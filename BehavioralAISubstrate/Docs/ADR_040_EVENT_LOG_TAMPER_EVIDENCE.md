@@ -64,9 +64,18 @@ per-row hash chain. Built the way everything else in this codebase ships: opt-in
   (atomic with the event row), `row_hash = SHA256( canonical(entry as sorted-keys JSON) || prev_hash )` where
   `prev_hash` is the session's current chain tail (`""` genesis for the first). Deterministic ⇒ compatible with
   the byte-determinism doctrine.
+- **Chained rows force the JSON write path.** When the chain is on, an event row is stored as JSON (format=1)
+  even if `useBinaryPayload` is also on, so the hash (over the in-memory entry at append) matches the
+  re-decoded entry at verify. Enabling the chain therefore forfeits binary storage savings for event rows —
+  an accepted tradeoff (the binary v2 envelope is also faithful now, but JSON keeps the hash domain exact).
 - **Verify:** `verifyIntegrityChain(forSession:)` walks the event rows, recomputes each hash + chain link, and
-  throws `corruptedRow` (fail-closed) on a hash mismatch (semantic edit), a `prev_hash` mismatch
-  (deletion/reorder), or a missing sidecar row. Read-only + Metal-free ⇒ spine-safe.
+  throws `corruptedRow` (fail-closed). It seeds from the SURVIVING head's recorded `prev_hash`, so it is
+  prune-safe (a legitimate `pruneEventsBefore` front-removal does not false-trip) while still catching every
+  interior tamper.
+  - **Detects:** a semantic payload edit (hash mismatch); an INTERIOR/middle row deletion or a reorder (broken
+    `prev_hash` link); and a TOTAL-session erasure (event rows gone while the chain remains).
+  - **Does NOT detect:** a pure TAIL deletion (the surviving prefix is still a valid chain) or a legitimate
+    front-prune — both tolerated by design — and the keyless-recompute attacker below.
 - **Honest limit (KEYLESS chain).** The hash is keyless, so an attacker with full DB write who ALSO recomputes
   the whole chain is undetected. The chain still defeats naïve tampering (the attacker must recompute every
   SHA256 link). FULL tamper-evidence against a fully-capable attacker needs a **keyed HMAC** (key stored

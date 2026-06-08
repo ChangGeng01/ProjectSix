@@ -37,7 +37,21 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         // Replay determinism
         "BASHostKit/BASEBrainTurnResultReplayDigest.swift",
         "BASHostKit/BASEBrainTurnResultReplayCanonicalizer.swift",
+        "BASHostKit/BASEBrainTurnResultReplayHarness.swift",
+        // Commit-token AUTHORITY + gate (the consequential irreversible-op path — audit GAP: these were
+        // omitted, yet they are byte-deterministic governance/commit spine writers).
+        "BASSovereign/BASSovereignTokenAuthority.swift",
+        "BASSovereign/BASSovereignCommitEnforcer.swift",
+        "BASSovereign/BASSovereignGatedCommit.swift",
+        "BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift",
     ]
+
+    // NOTE on the CoreML asymmetry (audit LOW): the tripwire bans Metal *dispatchers* + BASApproxValue, but NOT
+    // CoreML inference. That is INTENTIONAL + audited: `BASMLContextService`'s CoreML classification produces
+    // approximate context-frame INPUTS (emotionalLoad / ambiguity / …) that the DETERMINISTIC CPU governance
+    // then scores (softmax → riskCard.totalRisk → verdict). The approximate value feeds the INPUT side and is
+    // gated by the verdict; it never crosses into a byte-deterministic spine field raw. The governance MATH
+    // (softmax + totalRisk) is pure CPU + lives in files that ARE in the allowlist above.
 
     /// Symbols that must NOT appear in any spine file (a Metal value crossing the boundary raw).
     private static let bannedInSpine: [String] = [

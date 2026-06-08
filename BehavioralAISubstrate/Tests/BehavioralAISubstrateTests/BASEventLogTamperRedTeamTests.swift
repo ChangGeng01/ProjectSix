@@ -308,4 +308,89 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
         let events = try await store.eventsOrThrow(forSession: "s")
         XCTAssertEqual(events.map(\.sequenceNumber), [0, 1, 2])
     }
+
+    // MARK: - ADR-040 hash chain (audit fixes): reorder, total-erasure, prune-safety, binary compat
+
+    func testHashChainDetectsReorder() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-reorder.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        try await appendN(store, session: "s", n: 3)   // seq 0,1,2
+        // Swap the seq columns of rows 1 and 2 (a reorder) via a temp value.
+        _ = try rawExec(p, "UPDATE event_log SET sequence_number=99 WHERE session_id='s' AND sequence_number=1;")
+        _ = try rawExec(p, "UPDATE event_log SET sequence_number=1  WHERE session_id='s' AND sequence_number=2;")
+        _ = try rawExec(p, "UPDATE event_log SET sequence_number=2  WHERE session_id='s' AND sequence_number=99;")
+        do {
+            try await store.verifyIntegrityChain(forSession: "s")
+            XCTFail("the chain must detect a reorder (broken prev_hash link)")
+        } catch let e as BASSQLiteEventLogStorage.StorageError {
+            guard case .corruptedRow = e else { return XCTFail("expected .corruptedRow, got \(e)") }
+        }
+    }
+
+    func testHashChainDetectsTotalSessionErasure() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-total.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        try await appendN(store, session: "s", n: 3)
+        _ = try rawExec(p, "DELETE FROM event_log WHERE session_id='s';")   // erase all events; sidecar remains
+        do {
+            try await store.verifyIntegrityChain(forSession: "s")
+            XCTFail("the chain must detect total-session erasure (events gone but chain present)")
+        } catch let e as BASSQLiteEventLogStorage.StorageError {
+            guard case .corruptedRow = e else { return XCTFail("expected .corruptedRow, got \(e)") }
+        }
+    }
+
+    func testHashChainPruneIsNotFalseFlagged() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-prune.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        try await appendN(store, session: "s", n: 5)   // ts base+0..4 (seq 0..4)
+        _ = try await store.pruneEventsBefore(timestampMs: 1_700_000_000_002)   // legitimate front-prune of 0,1
+        try await store.verifyIntegrityChain(forSession: "s")   // must NOT throw (seeds from surviving head)
+    }
+
+    func testHashChainWithBinaryPayloadEnabledVerifiesClean() async throws {
+        // The audit HIGH config: BOTH flags on. The chain must force the JSON path so verify passes on a clean
+        // log (previously a guaranteed FALSE mismatch on the lossy binary round-trip) and still catches a tamper.
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        BASSQLiteEventLogStorage.useBinaryPayload = true
+        let p = path("evt-chain-binary.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        _ = try await store.append(BASEventLogEntry(
+            eventID: "s-e0", timestampMs: 1_700_000_000_000, kind: .substrateAudit, sessionID: "s",
+            sequenceNumber: 0, intent: "UNIQUEINTENT", actions: ["a", "b"], confidence: 0.75,
+            payloadJson: "{\"k\":1}"))
+        try await store.verifyIntegrityChain(forSession: "s")   // clean log verifies (no false mismatch)
+
+        _ = try rawExec(p,
+            "UPDATE event_log SET payload_json = REPLACE(payload_json, 'UNIQUEINTENT', 'FORGED') WHERE sequence_number=0;")
+        do {
+            try await store.verifyIntegrityChain(forSession: "s")
+            XCTFail("the chain must still detect a tamper with both flags on")
+        } catch let e as BASSQLiteEventLogStorage.StorageError {
+            guard case .corruptedRow = e else { return XCTFail("expected .corruptedRow, got \(e)") }
+        }
+    }
+
+    func testBinaryPayloadRoundTripsAllFields() async throws {
+        // Audit HIGH (data-loss): the v2 binary envelope must now carry the formerly-dropped fields.
+        BASSQLiteEventLogStorage.useBinaryPayload = true   // chain OFF (default) — pure binary path
+        let p = path("evt-binary-fidelity.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        _ = try await store.append(BASEventLogEntry(
+            eventID: "s-e0", timestampMs: 1_700_000_000_000, kind: .substrateAudit, sessionID: "s",
+            sequenceNumber: 0, intent: "i", emotion: "e",
+            stateBeforeID: "S0", stateAfterID: "S1", actions: ["act,with,comma", "act2"],
+            confidence: 0.875, payloadJson: "{\"host\":\"ext\"}"))
+        let got = try await store.eventsOrThrow(forSession: "s")
+        XCTAssertEqual(got.count, 1)
+        let e = got[0]
+        XCTAssertEqual(e.stateBeforeID, "S0", "binary v2 must round-trip stateBeforeID (was silently dropped)")
+        XCTAssertEqual(e.stateAfterID, "S1", "binary v2 must round-trip stateAfterID")
+        XCTAssertEqual(e.actions, ["act,with,comma", "act2"], "actions round-trip incl. embedded commas")
+        XCTAssertEqual(e.confidence, 0.875, accuracy: 1e-9, "confidence round-trips")
+        XCTAssertEqual(e.payloadJson, "{\"host\":\"ext\"}", "host payloadJson extension round-trips")
+    }
 }

@@ -592,16 +592,18 @@ public actor BASSQLiteVectorIndexStorage {
         let domain = readText(stmt, offset + 3)
         let metadataJson = readText(stmt, offset + 4)
         let metadata: [String: String]
-        do {
-            if let mdData = metadataJson.data(using: .utf8),
-               !mdData.isEmpty
-            {
-                metadata = (try? JSONDecoder().decode(
-                    [String: String].self, from: mdData))
-                    ?? [:]
-            } else {
-                metadata = [:]
+        if let mdData = metadataJson.data(using: .utf8), !mdData.isEmpty {
+            do {
+                metadata = try JSONDecoder().decode([String: String].self, from: mdData)
+            } catch {
+                // Audit fix: a NON-EMPTY but unparseable metadata blob is corruption — surface it (the
+                // non-throwing accessors route it to onSilentFailure; the throwing siblings rethrow) instead of
+                // silently returning [:] and masking the damage. Mirrors embedding/dimension corruption.
+                throw StorageError.decodeFailed(
+                    atomID: atomID, message: "metadata_json decode failed: \(error)")
             }
+        } else {
+            metadata = [:]
         }
         let embedding = BASEmbedding(
             vector: vector,

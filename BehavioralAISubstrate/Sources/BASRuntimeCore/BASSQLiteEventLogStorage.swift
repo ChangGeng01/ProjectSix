@@ -307,6 +307,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             return (wasNew: true, assignedSequenceNumber: assigned)
         } catch {
             try? Self.runExec(db: db, sql: "ROLLBACK;")
+            // ADR-040: a rolled-back txn may have UN-done the sidecar `CREATE TABLE` (SQLite DDL is
+            // transactional); clear the cached flag so the next append re-ensures it instead of inserting into a
+            // table that no longer exists. Harmless if the table did persist (CREATE IF NOT EXISTS is idempotent).
+            integrityTableEnsured = false
             throw error
         }
     }
@@ -403,19 +407,37 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
 
     /// Verify the per-row SHA256 hash CHAIN for a session, throwing `corruptedRow` on the first row whose
     /// recomputed hash (or chain link) does not match the recorded sidecar value. Detects a seq-preserving
-    /// SEMANTIC payload edit (which `eventsVerifyingContiguity` cannot), row deletion, and reordering. Requires
-    /// the chain to have been recorded (`rowIntegrityChainEnabled` was ON during the appends): a missing sidecar
-    /// row for an existing event is itself a failure (fail-closed). Read-only + Metal-free ⇒ spine-safe.
+    /// SEMANTIC payload edit (which `eventsVerifyingContiguity` cannot), an INTERIOR/middle row deletion, a
+    /// reorder, and a TOTAL-session erasure (events gone but chain present). A pure TAIL deletion and a
+    /// legitimate front-prune (`pruneEventsBefore`) are tolerated by design (it seeds from the surviving head's
+    /// recorded prev_hash). Requires the chain to have been recorded (`rowIntegrityChainEnabled` was ON during
+    /// the appends): a missing sidecar row for an existing event is itself a failure (fail-closed). Read-only +
+    /// Metal-free ⇒ spine-safe.
     public func verifyIntegrityChain(forSession sessionID: String) async throws {
         guard let db else {
             throw StorageError.openFailed(code: -1, message: "db handle unavailable")
         }
         let events = try Self.fetchEventsForSession(db: db, sessionID: sessionID)
-        if events.isEmpty { return }   // nothing recorded ⇒ nothing to verify
         let recorded = try Self.integrityRows(db: db, sessionID: sessionID)
-        var prev = ""
+        if events.isEmpty {
+            // No event rows, but a chain WAS recorded ⇒ the event rows were erased (total/tail deletion) while
+            // the sidecar remains. Fail-closed instead of silently passing.
+            guard recorded.isEmpty else {
+                throw StorageError.corruptedRow(
+                    eventID: "<session \(sessionID)>",
+                    reason: "event rows deleted but integrity chain present (\(recorded.count) chained rows) — "
+                        + "session '\(sessionID)'")
+            }
+            return
+        }
+        // Seed `prev` from the SURVIVING head's recorded prev_hash (not a hard "" genesis) so a LEGITIMATE
+        // front-prune (`pruneEventsBefore`) does not false-trip: the head's recorded prev is the pruned
+        // predecessor's hash, trusted here as the chain anchor. This still validates every row's content hash
+        // and every interior link, so a MIDDLE/interior deletion, a semantic edit, or a reorder all break a
+        // downstream link/hash and throw; only legitimate front-prune (and a pure tail deletion) are tolerated.
+        var prev = recorded[events[0].eventID]?.prevHash ?? ""
         for e in events {
-            let expected = Self.integrityHash(entry: e, prevHash: prev)
+            let expected = try Self.integrityHash(entry: e, prevHash: prev)
             guard let row = recorded[e.eventID] else {
                 throw StorageError.corruptedRow(
                     eventID: e.eventID,
@@ -443,7 +465,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             integrityTableEnsured = true
         }
         let prev = try Self.prevHashForSession(db: db, sessionID: entry.sessionID)
-        let rowHash = Self.integrityHash(entry: entry, prevHash: prev)
+        let rowHash = try Self.integrityHash(entry: entry, prevHash: prev)
         try Self.insertIntegrityRow(
             db: db, eventID: entry.eventID, sessionID: entry.sessionID,
             seq: entry.sequenceNumber, rowHash: rowHash, prevHash: prev)
@@ -484,10 +506,17 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// `SHA256( canonical(entry as sorted-keys JSON) || prevHash )`, lowercase hex. Computed identically at
     /// append + verify, so a tamper that changes the DECODED entry changes the hash; `prevHash` chains rows so
     /// a deletion/reorder breaks the link.
-    fileprivate static func integrityHash(entry: BASEventLogEntry, prevHash: String) -> String {
+    fileprivate static func integrityHash(entry: BASEventLogEntry, prevHash: String) throws -> String {
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
-        let body = (try? enc.encode(entry)) ?? Data()
+        let body: Data
+        do {
+            body = try enc.encode(entry)
+        } catch {
+            // Fail CLOSED rather than hash an empty body (which would produce a content-unbound tag that
+            // matches any other un-encodable entry). Both callers are throwing contexts.
+            throw StorageError.encodeFailed(eventID: entry.eventID, message: "integrity hash encode failed: \(error)")
+        }
         var hasher = SHA256()
         hasher.update(data: body)
         hasher.update(data: Data(prevHash.utf8))
@@ -776,7 +805,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         defer { sqlite3_finalize(stmt) }
 
-        let useBinary = useBinaryPayload
+        // ADR-040: when the integrity chain is ON, force the FAITHFUL JSON path for this row so the chain hash
+        // (computed over the in-memory entry at append) matches the re-decoded entry at verify. JSON stores the
+        // full entry verbatim, so its decode→encode round-trip is exact. (Belt-and-suspenders even though the
+        // v2 envelope below is now faithful too — this keeps the canonical hash domain unambiguous.)
+        let useBinary = useBinaryPayload && !rowIntegrityChainEnabled
         var payloadJson: String = ""
         var payloadBlob: Data? = nil
         var format: Int32 = 1
@@ -864,8 +897,13 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             // image,file,web,calendar,health,…
             kind = .hostInput
         }
-        // Build payloadJson with all the "extra" fields the
-        // binary wire doesn't natively carry。 Decoded on read。
+        // Build payloadJson with ALL non-core fields the binary wire doesn't natively carry。 Decoded on read。
+        // ADR-040 durability fix: this envelope PREVIOUSLY dropped stateBeforeID / stateAfterID / actions /
+        // confidence / payloadJson — a silent, irreversible data loss on every v2 read (incl. the S_{t-1}/S_t
+        // replay LINKS). They are now carried for a FAITHFUL round-trip. (actions JSON-encoded so a comma in an
+        // action code can't corrupt the list, unlike the legacy comma-joined memoryRefs.)
+        let actionsJson = (try? JSONEncoder().encode(entry.actions))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let payloadEnvelope: [String: String] = [
             "riskBand":       entry.riskBand.rawValue,
             "source":         entry.source ?? "",
@@ -873,8 +911,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             "intent":         entry.intent ?? "",
             "emotion":        entry.emotion ?? "",
             "project":        entry.project ?? "",
-            "memoryRefs":
-                entry.memoryRefs.joined(separator: ","),
+            "memoryRefs":     entry.memoryRefs.joined(separator: ","),
+            "stateBeforeID":  entry.stateBeforeID ?? "",
+            "stateAfterID":   entry.stateAfterID ?? "",
+            "confidence":     String(entry.confidence),
+            "payloadJson":    entry.payloadJson ?? "",
+            "actions":        actionsJson,
         ]
         let payloadJson: String
         do {
@@ -920,6 +962,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         var emotion: String? = nil
         var project: String? = nil
         var memoryRefs: [String] = []
+        var stateBeforeID: String? = nil
+        var stateAfterID: String? = nil
+        var payloadJson: String? = nil
+        var confidence: Double = 0
+        var actions: [String] = []
         if let payloadStr = binary.payloadJson,
            let payloadData = payloadStr.data(using: .utf8),
            let env = try? JSONDecoder().decode(
@@ -944,6 +991,15 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 memoryRefs = refs.split(separator: ",")
                     .map { String($0) }
             }
+            // ADR-040 durability fix — recover the formerly-dropped fields (faithful round-trip).
+            stateBeforeID = env["stateBeforeID"].flatMap { $0.isEmpty ? nil : $0 }
+            stateAfterID  = env["stateAfterID"].flatMap { $0.isEmpty ? nil : $0 }
+            payloadJson   = env["payloadJson"].flatMap { $0.isEmpty ? nil : $0 }
+            if let c = env["confidence"].flatMap({ Double($0) }) { confidence = c }
+            if let a = env["actions"], let aData = a.data(using: .utf8),
+               let parsed = try? JSONDecoder().decode([String].self, from: aData) {
+                actions = parsed
+            }
         }
         let kindParsed: BASEventLogKind =
             BASEventLogKind(rawValue: kindRaw)
@@ -962,7 +1018,12 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             emotion:        emotion,
             riskBand:       riskBand,
             project:        project,
-            memoryRefs:     memoryRefs)
+            memoryRefs:     memoryRefs,
+            stateBeforeID:  stateBeforeID,
+            stateAfterID:   stateAfterID,
+            actions:        actions,
+            confidence:     confidence,
+            payloadJson:    payloadJson)
     }
 
     fileprivate static func fetchEntry(
