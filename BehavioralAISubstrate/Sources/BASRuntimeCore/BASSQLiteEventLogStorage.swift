@@ -65,6 +65,7 @@
 
 import Foundation
 import SQLite3
+import CryptoKit
 
 /// SQLite-backed `BASEventLogStorage`. Events persist across
 /// process restarts。
@@ -121,6 +122,15 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     public nonisolated(unsafe) static var useBinaryPayload:
         Bool = false
 
+    /// ADR-040 — OPT-IN (default off): when ON, each NEW append also records a per-row SHA256 hash CHAIN in a
+    /// sidecar table (`event_log_integrity`), enabling `verifyIntegrityChain(forSession:)` to detect a
+    /// seq-preserving SEMANTIC payload edit — the tamper class `eventsVerifyingContiguity` cannot catch — plus
+    /// row deletion / reorder. OFF (default) ⇒ the sidecar table is NEVER created and the write path is
+    /// byte-identical to today (true byte-equal-off). Honest limit: the chain is KEYLESS, so an attacker with
+    /// full DB write who ALSO recomputes the chain is undetected; a keyed-HMAC variant (key outside the DB) is
+    /// the further follow-up. The keyless chain still defeats naïve tampering (must recompute SHA256 links).
+    public nonisolated(unsafe) static var rowIntegrityChainEnabled: Bool = false
+
     // MARK: - Stored state
 
     /// Database file URL。Surfaced for tests / observability。
@@ -130,6 +140,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// `BASSQLiteMemoryAtomStore` — deinit closes it,all other
     /// access through actor-isolated methods。
     private nonisolated(unsafe) var db: OpaquePointer?
+
+    /// ADR-040 — set once the integrity sidecar table has been ensured for this handle (lazy create on the first
+    /// chained append, so a flag-off store never touches the DB). Actor-isolated instance state.
+    private var integrityTableEnsured = false
 
     /// 先稳 P0 — OPT-IN diagnostic hook (default nil). The non-throwing read accessors route a swallowed
     /// SQLite error here BEFORE defaulting, so a host can tell "no events" from "DB broken". Fires only on
@@ -285,6 +299,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 confidence: entry.confidence,
                 payloadJson: entry.payloadJson)
             try Self.insertEntry(db: db, entry: stamped)
+            // ADR-040 — when enabled, record this row's chained hash in the SAME txn (atomic with the event row).
+            if Self.rowIntegrityChainEnabled {
+                try self.appendIntegrityRow(db: db, entry: stamped)
+            }
             try Self.runExec(db: db, sql: "COMMIT;")
             return (wasNew: true, assignedSequenceNumber: assigned)
         } catch {
@@ -328,8 +346,8 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     ///     reordering manifests only as a gap or a duplicate; it is not a separate detection class.
     ///   - Does NOT detect: a semantic payload edit that preserves the `sequence_number` column; a tail-row
     ///     deletion (the surviving prefix stays contiguous); nor a value-set-preserving SWAP of two rows'
-    ///     `sequence_number` (the multiset stays contiguous after the ASC sort). Full tamper-evidence needs
-    ///     per-row integrity tags / a hash chain — see Docs/ADR_040 (the operator-gated follow-up).
+    ///     `sequence_number` (the multiset stays contiguous after the ASC sort). For the semantic-edit class,
+    ///     enable the opt-in per-row hash chain (`rowIntegrityChainEnabled` + `verifyIntegrityChain`) — ADR-040.
     ///   - Does NOT false-trip on legitimate front-pruning (`pruneEventsBefore`): the surviving rows remain
     ///     contiguous, just starting at a sequence number > 0.
     ///
@@ -377,6 +395,142 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         var out: [(eventID: String, seq: Int64)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             out.append((eventID: readText(stmt, 0), seq: sqlite3_column_int64(stmt, 1)))
+        }
+        return out
+    }
+
+    // MARK: - ADR-040 per-row hash chain (opt-in tamper-evidence; sidecar table)
+
+    /// Verify the per-row SHA256 hash CHAIN for a session, throwing `corruptedRow` on the first row whose
+    /// recomputed hash (or chain link) does not match the recorded sidecar value. Detects a seq-preserving
+    /// SEMANTIC payload edit (which `eventsVerifyingContiguity` cannot), row deletion, and reordering. Requires
+    /// the chain to have been recorded (`rowIntegrityChainEnabled` was ON during the appends): a missing sidecar
+    /// row for an existing event is itself a failure (fail-closed). Read-only + Metal-free ⇒ spine-safe.
+    public func verifyIntegrityChain(forSession sessionID: String) async throws {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        let events = try Self.fetchEventsForSession(db: db, sessionID: sessionID)
+        if events.isEmpty { return }   // nothing recorded ⇒ nothing to verify
+        let recorded = try Self.integrityRows(db: db, sessionID: sessionID)
+        var prev = ""
+        for e in events {
+            let expected = Self.integrityHash(entry: e, prevHash: prev)
+            guard let row = recorded[e.eventID] else {
+                throw StorageError.corruptedRow(
+                    eventID: e.eventID,
+                    reason: "no integrity-chain row recorded (chain absent or tampered) — session '\(sessionID)'")
+            }
+            guard row.prevHash == prev else {
+                throw StorageError.corruptedRow(
+                    eventID: e.eventID,
+                    reason: "integrity chain broken: prev_hash mismatch (deletion/reorder) — session '\(sessionID)'")
+            }
+            guard row.rowHash == expected else {
+                throw StorageError.corruptedRow(
+                    eventID: e.eventID,
+                    reason: "integrity hash mismatch: row tampered (semantic payload edit) — session '\(sessionID)'")
+            }
+            prev = expected
+        }
+    }
+
+    /// Append-time chain step (called INSIDE the append BEGIN IMMEDIATE txn, only when the flag is ON): ensure
+    /// the sidecar table once, then insert this row's hash chained off the session's current chain tail.
+    fileprivate func appendIntegrityRow(db: OpaquePointer, entry: BASEventLogEntry) throws {
+        if !integrityTableEnsured {
+            try Self.ensureIntegrityTable(db: db)
+            integrityTableEnsured = true
+        }
+        let prev = try Self.prevHashForSession(db: db, sessionID: entry.sessionID)
+        let rowHash = Self.integrityHash(entry: entry, prevHash: prev)
+        try Self.insertIntegrityRow(
+            db: db, eventID: entry.eventID, sessionID: entry.sessionID,
+            seq: entry.sequenceNumber, rowHash: rowHash, prevHash: prev)
+    }
+
+    fileprivate static func ensureIntegrityTable(db: OpaquePointer) throws {
+        try runExec(db: db, sql: """
+            CREATE TABLE IF NOT EXISTS event_log_integrity (
+                event_id TEXT PRIMARY KEY NOT NULL,
+                session_id TEXT NOT NULL,
+                sequence_number INTEGER NOT NULL,
+                row_hash TEXT NOT NULL,
+                prev_hash TEXT NOT NULL
+            );
+            """)
+        try runExec(db: db, sql: """
+            CREATE INDEX IF NOT EXISTS event_log_integrity_session_seq_idx
+                ON event_log_integrity(session_id, sequence_number);
+            """)
+    }
+
+    /// The chain tail (highest sequence_number) `row_hash` for a session, or "" (genesis) if none yet.
+    fileprivate static func prevHashForSession(db: OpaquePointer, sessionID: String) throws -> String {
+        let sql = """
+            SELECT row_hash FROM event_log_integrity
+            WHERE session_id = ? ORDER BY sequence_number DESC LIMIT 1
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, sessionID)
+        if sqlite3_step(stmt) == SQLITE_ROW { return readText(stmt, 0) }
+        return ""
+    }
+
+    /// `SHA256( canonical(entry as sorted-keys JSON) || prevHash )`, lowercase hex. Computed identically at
+    /// append + verify, so a tamper that changes the DECODED entry changes the hash; `prevHash` chains rows so
+    /// a deletion/reorder breaks the link.
+    fileprivate static func integrityHash(entry: BASEventLogEntry, prevHash: String) -> String {
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        let body = (try? enc.encode(entry)) ?? Data()
+        var hasher = SHA256()
+        hasher.update(data: body)
+        hasher.update(data: Data(prevHash.utf8))
+        return BASAutoRouteRanker.bytesToHexLower(Array(hasher.finalize()))
+    }
+
+    fileprivate static func insertIntegrityRow(
+        db: OpaquePointer, eventID: String, sessionID: String,
+        seq: Int64, rowHash: String, prevHash: String
+    ) throws {
+        let sql = """
+            INSERT INTO event_log_integrity
+              (event_id, session_id, sequence_number, row_hash, prev_hash)
+            VALUES (?, ?, ?, ?, ?)
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, eventID)
+        bindText(stmt, 2, sessionID)
+        sqlite3_bind_int64(stmt, 3, seq)
+        bindText(stmt, 4, rowHash)
+        bindText(stmt, 5, prevHash)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    fileprivate static func integrityRows(
+        db: OpaquePointer, sessionID: String
+    ) throws -> [String: (rowHash: String, prevHash: String)] {
+        let sql = "SELECT event_id, row_hash, prev_hash FROM event_log_integrity WHERE session_id = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, sessionID)
+        var out: [String: (rowHash: String, prevHash: String)] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            out[readText(stmt, 0)] = (rowHash: readText(stmt, 1), prevHash: readText(stmt, 2))
         }
         return out
     }

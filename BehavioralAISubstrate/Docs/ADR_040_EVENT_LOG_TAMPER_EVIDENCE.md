@@ -1,7 +1,9 @@
-# ADR-040 — Event-log tamper-evidence (red-team finding + contiguity verifier; hash-chain follow-up)
+# ADR-040 — Event-log tamper-evidence (red-team finding + contiguity verifier + opt-in hash chain)
 
-- **Status:** Accepted (Phase 7, red-team arc). Contiguity verifier SHIPPED; hash-chain is a documented,
-  operator-gated follow-up (NOT yet built — per 亏的不要上, the spine write path is not rewritten on spec).
+- **Status:** Accepted (Phase 7, red-team arc). Contiguity verifier SHIPPED; per-row hash CHAIN SHIPPED as an
+  OPT-IN, default-off, byte-equal-off feature (sidecar table — no change to the byte-deterministic `event_log`
+  write path when off). A KEYED-HMAC upgrade (full tamper-evidence against a fully-capable attacker) remains
+  the documented follow-up.
 - **Context:** the adversarial "red-team the walls" arc (Wall 3 — tamper / replay-digest / commit-gate).
 - **Related:** ADR-023 (missing-lineage ≠ tampering → shadowLock), ADR-025 (Ed25519 commit-token authority),
   ADR-032 (live crypto commit-gate), ADR-039 §10 (the determinism + governance walls).
@@ -47,29 +49,48 @@ order and throws `StorageError.corruptedRow` on the first discontinuity (each se
 A replay/audit caller that needs tamper-evidence calls `eventsVerifyingContiguity` instead of the plain
 `eventsOrThrow`. The default reads are unchanged (byte-equal-off).
 
-### 2b. FOLLOW-UP (operator-gated, NOT built) — per-row hash chain
+### 2b. SHIPPED — per-row hash chain (OPT-IN, byte-equal-off, sidecar table)
 
-Full tamper-evidence (catching the seq-preserving semantic edit + tail deletion) requires a per-row integrity
-tag. The proper design is a **hash chain**: a new schema column `row_hash = SHA256(canonical(entry) ||
-prev_row_hash_for_session)`, computed under the existing `BEGIN IMMEDIATE` writer lock (so it is race-safe and
-deterministic), with a verify pass that recomputes + chains on replay.
+Catches the seq-preserving SEMANTIC payload edit (GAP-3a) + deletion + reorder that contiguity cannot, via a
+per-row hash chain. Built the way everything else in this codebase ships: opt-in, default-off, byte-equal-off.
 
-This is **deliberately not implemented in this arc** because it is a write-path + schema change (v2 → v3
-migration) to a *spine* file, with determinism + concurrency implications that warrant their own focused arc
-and operator sign-off (R1 / 亏的不要上 — do not rewrite the deterministic spine on spec). The hash is a
-deterministic function of entry bytes, so it is compatible with the byte-determinism doctrine; the cost is the
-migration + the added per-append hash compute. Recommended when the threat model elevates audit-log integrity
-above "contiguity + Ed25519 commit-token authority" (which already protect the consequential commit path).
+- **Flag:** `BASSQLiteEventLogStorage.rowIntegrityChainEnabled` (default `false`).
+- **Sidecar, not a schema bump.** The chain lives in a SEPARATE `event_log_integrity` table
+  (`event_id, session_id, sequence_number, row_hash, prev_hash`) created LAZILY only when the flag is ON. With
+  the flag OFF the sidecar is never created → the `event_log` table + its write path are byte-identical to
+  today (no v2→v3 migration forced on flag-off stores). This is why the sidecar design was chosen over an
+  `ALTER TABLE event_log ADD COLUMN`.
+- **Chain:** on each NEW append (idempotent re-appends skip it), INSIDE the existing `BEGIN IMMEDIATE` txn
+  (atomic with the event row), `row_hash = SHA256( canonical(entry as sorted-keys JSON) || prev_hash )` where
+  `prev_hash` is the session's current chain tail (`""` genesis for the first). Deterministic ⇒ compatible with
+  the byte-determinism doctrine.
+- **Verify:** `verifyIntegrityChain(forSession:)` walks the event rows, recomputes each hash + chain link, and
+  throws `corruptedRow` (fail-closed) on a hash mismatch (semantic edit), a `prev_hash` mismatch
+  (deletion/reorder), or a missing sidecar row. Read-only + Metal-free ⇒ spine-safe.
+- **Honest limit (KEYLESS chain).** The hash is keyless, so an attacker with full DB write who ALSO recomputes
+  the whole chain is undetected. The chain still defeats naïve tampering (the attacker must recompute every
+  SHA256 link). FULL tamper-evidence against a fully-capable attacker needs a **keyed HMAC** (key stored
+  OUTSIDE the DB, e.g. Keychain) — the remaining follow-up. The keyed variant slots into the same sidecar +
+  verify shape (swap `SHA256` for `HMAC<SHA256>`), so it is an incremental upgrade, not a redesign.
+
+Tests: `BASEventLogTamperRedTeamTests` — chain detects the semantic edit (which contiguity does NOT) +
+deletion; verifies an untampered log; and proves flag-OFF creates NO sidecar (byte-equal-off).
 
 ## 3. Why this is enough for now
 
 The **consequential** path — irreversible commits — is already fail-closed via the Ed25519 commit-token
 authority (ADR-025/032): a forged or tampered artifact cannot authorize an op regardless of what the event log
 says (`BASCommitGateRedTeamTests` proves a keyless/cross-authority token is rejected). The event log is an
-*audit/replay* surface, not the commit authenticator. Contiguity closes the cheapest, highest-signal tamper
-(deletion); the residual (seq-preserving payload edit) is documented + has a clear remediation path.
+*audit/replay* surface, not the commit authenticator. Contiguity (always-on, read-side) closes deletion / gap
+/ column tamper; the opt-in hash chain closes the seq-preserving SEMANTIC edit + reorder. The only remaining
+residual is a fully-capable attacker who recomputes the entire keyless chain — closed by the keyed-HMAC
+follow-up (§2b).
 
 ## 4. Tests
 
-- `BASEventLogTamperRedTeamTests` — middle-row deletion detected; duplicate seq detected; untampered +
-  front-pruned logs pass (no false positive); semantic payload edit documented as undetected (GAP-3a).
+- `BASEventLogTamperRedTeamTests` (contiguity) — middle-row deletion detected; duplicate seq detected;
+  column-only seq tamper detected; untampered + front-pruned logs pass (no false positive); empty + single
+  sessions pass; semantic payload edit documented as undetected by contiguity (GAP-3a).
+- `BASEventLogTamperRedTeamTests` (hash chain, opt-in) — semantic payload edit detected (the GAP-3a case
+  contiguity cannot catch); row deletion detected (broken prev_hash link); untampered log verifies; flag-OFF
+  creates no sidecar (byte-equal-off proof).

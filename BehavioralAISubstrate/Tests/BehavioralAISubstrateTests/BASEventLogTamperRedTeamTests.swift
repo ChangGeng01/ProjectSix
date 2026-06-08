@@ -26,12 +26,14 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
         // path. Pin the process-global `useBinaryPayload` flag OFF defensively so a sibling suite that flips
         // it true cannot leak across the shared test process and route our appends to payload_blob.
         BASSQLiteEventLogStorage.useBinaryPayload = false
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = false
         base = FileManager.default.temporaryDirectory
             .appendingPathComponent("bas-evt-tamper-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
     }
     override func tearDownWithError() throws {
         BASSQLiteEventLogStorage.useBinaryPayload = false
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = false
         if let base { try? FileManager.default.removeItem(at: base) }
     }
     private func path(_ n: String) -> String { base.appendingPathComponent(n).path }
@@ -53,6 +55,28 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
             throw NSError(domain: "rawExec", code: Int(rc), userInfo: [NSLocalizedDescriptionKey: m])
         }
         return Int(sqlite3_changes(db))
+    }
+
+    /// Read-only scalar query against the DB file (e.g. to assert table existence). Returns 0 on no row.
+    private func rawScalarInt(_ dbPath: String, _ sql: String) throws -> Int {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
+            throw NSError(domain: "rawScalarInt", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "open failed: \(dbPath)"])
+        }
+        defer { sqlite3_close_v2(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw NSError(domain: "rawScalarInt", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(db))])
+        }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
+    }
+
+    private func sidecarTableCount(_ dbPath: String) throws -> Int {
+        try rawScalarInt(dbPath,
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='event_log_integrity';")
     }
 
     private func appendN(_ store: BASSQLiteEventLogStorage, session: String, n: Int) async throws {
@@ -216,5 +240,72 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
         let out = try await store.eventsVerifyingContiguity(forSession: "s")
         XCTAssertEqual(out.map(\.sequenceNumber), [0],
             "a single-event session is trivially contiguous (no discontinuity guard fires)")
+    }
+
+    // MARK: - ADR-040 hash chain (opt-in): catches the SEMANTIC payload edit contiguity cannot
+
+    func testHashChainDetectsSemanticPayloadEdit() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-semantic.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        let session = "s"
+        _ = try await store.append(BASEventLogEntry(
+            eventID: "\(session)-e0", timestampMs: 1_700_000_000_000, kind: .substrateAudit,
+            sessionID: session, sequenceNumber: 0, intent: "ORIGINAL-INTENT", actions: ["original"]))
+
+        // Seq-preserving semantic edit (the GAP-3a class).
+        let changed = try rawExec(p, """
+            UPDATE event_log SET payload_json = REPLACE(payload_json, 'ORIGINAL-INTENT', 'FORGED-INTENT')
+            WHERE session_id='\(session)' AND sequence_number=0;
+            """)
+        XCTAssertEqual(changed, 1)
+
+        // Contiguity CANNOT catch it (seq column intact) — but the hash chain CAN.
+        _ = try await store.eventsVerifyingContiguity(forSession: session)   // does not throw
+        do {
+            try await store.verifyIntegrityChain(forSession: session)
+            XCTFail("the hash chain must detect a semantic payload edit")
+        } catch let err as BASSQLiteEventLogStorage.StorageError {
+            guard case .corruptedRow = err else { return XCTFail("expected .corruptedRow, got \(err)") }
+        }
+    }
+
+    func testHashChainVerifiesUntamperedLog() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-ok.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        try await appendN(store, session: "s", n: 5)
+        try await store.verifyIntegrityChain(forSession: "s")   // must not throw
+        XCTAssertEqual(try sidecarTableCount(p), 1, "the sidecar table exists once the chain is enabled")
+    }
+
+    func testHashChainDetectsRowDeletion() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-del.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        let session = "s"
+        try await appendN(store, session: session, n: 3)
+        // Delete the middle EVENT row (leave the sidecar chain) → the next row's prev_hash no longer links.
+        XCTAssertEqual(try rawExec(p,
+            "DELETE FROM event_log WHERE session_id='\(session)' AND sequence_number=1;"), 1)
+        do {
+            try await store.verifyIntegrityChain(forSession: session)
+            XCTFail("the hash chain must detect a deleted middle row (broken prev_hash link)")
+        } catch let err as BASSQLiteEventLogStorage.StorageError {
+            guard case .corruptedRow = err else { return XCTFail("expected .corruptedRow, got \(err)") }
+        }
+    }
+
+    func testHashChainFlagOffCreatesNoSidecar_byteEqualOff() async throws {
+        // Default OFF: appends must NOT create the sidecar table — the main event_log is byte-identical to today.
+        XCTAssertFalse(BASSQLiteEventLogStorage.rowIntegrityChainEnabled, "default is OFF")
+        let p = path("evt-chain-off.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        try await appendN(store, session: "s", n: 3)
+        XCTAssertEqual(try sidecarTableCount(p), 0,
+            "flag OFF ⇒ the integrity sidecar table is never created (true byte-equal-off)")
+        // And the normal reads still work unchanged.
+        let events = try await store.eventsOrThrow(forSession: "s")
+        XCTAssertEqual(events.map(\.sequenceNumber), [0, 1, 2])
     }
 }
