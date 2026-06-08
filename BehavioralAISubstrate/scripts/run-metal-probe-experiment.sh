@@ -47,6 +47,16 @@ newest_log() {
     find "${PULL_DIR}" -type f -name "${LOG_GLOB}" 2>/dev/null | sort | tail -1
 }
 
+# Robust freshness: extract the YYYYMMDD-HHMMSS stamp → digits → numeric compare (no `\>` test-op
+# dependency, which is unreliable across shells). Returns 0 (true) iff $1 is strictly newer than $2.
+log_stamp() { echo "${1:-}" | grep -oE '[0-9]{8}-[0-9]{6}' | tr -d '-' | tail -1; }
+newer_than() {  # newer_than NEW_BASE PRIOR_BASE
+    local a b; a="$(log_stamp "$1")"; b="$(log_stamp "$2")"
+    [ -n "$a" ] || return 1
+    [ -n "$b" ] || return 0
+    [ "$a" -gt "$b" ]
+}
+
 terminate_app() {
     local pid
     pid=$(xcrun devicectl device info processes --device "${DEVICE_ID}" 2>/dev/null \
@@ -88,7 +98,7 @@ for i in $(seq 1 "${WEDGE_MAX_POLL}"); do
     sleep "${POLL_SEC}"
     NEW="$(newest_log)"; BASE="$(basename "${NEW:-none}")"
     [ -z "${NEW}" ] && { echo "  poll ${i}: no log yet"; continue; }
-    [ "${BASE}" \> "${PRIOR_A}" ] || { echo "  poll ${i}: no fresh log (newest=${BASE})"; continue; }
+    newer_than "${BASE}" "${PRIOR_A}" || { echo "  poll ${i}: no fresh log (newest=${BASE})"; continue; }
     PHASE_A_LOG="${NEW}"
     mlx=$(grep -ac '🧠 ch1025 mlx ' "${NEW}" 2>/dev/null || echo 0)
     hb=$(grep -ac 'metal-probe-hb ' "${NEW}" 2>/dev/null || echo 0)
@@ -128,7 +138,7 @@ PROBE_LOG=""
 for i in $(seq 1 "${PROBE_MAX_POLL}"); do
     sleep "${POLL_SEC}"
     NEW="$(newest_log)"; BASE="$(basename "${NEW:-none}")"
-    [ -n "${NEW}" ] && [ "${BASE}" \> "${PRIOR_B}" ] || { echo "  poll ${i}: no fresh probe log (newest=${BASE})"; continue; }
+    { [ -n "${NEW}" ] && newer_than "${BASE}" "${PRIOR_B}"; } || { echo "  poll ${i}: no fresh probe log (newest=${BASE})"; continue; }
     PROBE_LOG="${NEW}"
     echo "  poll ${i}: probe log ${BASE}"
     if grep -aq 'metal-probe context=probe-only' "${NEW}" 2>/dev/null \
