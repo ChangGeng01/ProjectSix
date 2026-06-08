@@ -217,6 +217,13 @@ final class BASEnduranceAppController: ObservableObject {
         /// (lockstep eviction = the real memory bound). Default `"4096"`.
         static let globalRecallCapKey = "BAS_GLOBAL_RECALL_CAP"
         static let globalRecallCapDefault = "4096"
+        /// ADR-039 Phase 2 — opt-in Metal cosine-topK over the in-Swift snapshot corpus. Default "0"
+        /// (byte-equal-off). Fires ONLY on the snapshot retrieve path (BAS_GLOBAL_RECALL must be off too).
+        static let l8MetalTopKKey = "BAS_L8_METAL_TOPK"
+        static let l8MetalTopKDefault = "0"
+        /// Hard timeout (ms) for the sync-bridged Metal topK; on timeout retrieve retreats to CPU. Default 100.
+        static let l8MetalTopKTimeoutKey = "BAS_L8_METAL_TOPK_TIMEOUT_MS"
+        static let l8MetalTopKTimeoutDefault = 100
         /// Agent-fabric activation gate。 Activated when `== "enabled"` (ADR-014 opt-in)。
         static let agentFabricKey = "BAS_AGENT_FABRIC"
     }
@@ -569,6 +576,11 @@ final class BASEnduranceAppController: ObservableObject {
             BASGlobalRecallResolver.minCap,
             Int(env[EnduranceEnv.globalRecallCapKey] ?? "")
                 ?? Int(EnduranceEnv.globalRecallCapDefault) ?? BASGlobalRecallResolver.minCap)
+        // ADR-039 Phase 2 — opt-in Metal cosine-topK over the in-Swift snapshot corpus (default OFF).
+        let l8MetalTopKEnabled =
+            (env[EnduranceEnv.l8MetalTopKKey] ?? EnduranceEnv.l8MetalTopKDefault) == "1"
+        let l8MetalTopKTimeoutMs =
+            Int(env[EnduranceEnv.l8MetalTopKTimeoutKey] ?? "") ?? EnduranceEnv.l8MetalTopKTimeoutDefault
         // ch1066 再查 — a per-turn wall-clock TIMEOUT around adapter.draft was tried here
         // and REMOVED after on-device proof it cannot work: the MLX decode is a SYNCHRONOUS,
         // UNCANCELLABLE Metal eval, so (a) a structured task-group timeout hangs in teardown
@@ -633,6 +645,8 @@ final class BASEnduranceAppController: ObservableObject {
         // call; the seam closures capture them strongly too.
         var globalRecallEngine: BASRoutedVectorIndexStorage? = nil
         var globalRecallResolver: BASGlobalRecallResolver? = nil
+        // ADR-039 Phase 2 — per-kernel exec records for the L8 Metal topK seam (drained + logged per iter).
+        let l8MetalAcc = BASMetalKernelExecutionAccumulator()
         // ADR-037 — monotonic "seen" set: the per-turn delta-sync gate. Each atom is synced to the
         // engine+resolver exactly once (when first seen WITH an embedding); the FIFO cap then keeps the
         // newest `cap`. Gating on this (NOT resolver presence) avoids re-syncing evicted atoms — which
@@ -719,6 +733,42 @@ final class BASEnduranceAppController: ObservableObject {
                 } else {
                     await emitBoth("📍 ADR-037 global recall OFF (BAS_GLOBAL_RECALL!=1)")
                 }
+                // ADR-039 Phase 2 — opt-in Metal cosine-topK seam over the in-Swift snapshot corpus.
+                // WEDGE-SAFE: the async dispatch runs under a HARD timeout (sync bridge); a nil result
+                // (fault / timeout) retreats to the CPU score-all path — the caller is never blocked past
+                // the timeout. Pre-warmed at boot so the first real retrieve isn't charged the
+                // pipeline-compile. Fires only on the snapshot path (retrieve() prefers a Rust seam first).
+                var metalTopKSeam: BASMetalCosineTopKSeam? = nil
+                if l8MetalTopKEnabled {
+                    let dispatcher = BASMetalTopKDispatcher(
+                        loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
+                    _ = try? await dispatcher.dispatch(
+                        query: [1, 0, 0, 0], corpus: [1, 0, 0, 0], dim: 4, k: 1)   // pre-warm the pipeline
+                    let warm = await dispatcher.hasMemoizedPipeline
+                    await emitBoth(
+                        "📍 ADR-039 L8 metal-topK ACTIVE warm=\(warm) timeout_ms=\(l8MetalTopKTimeoutMs)")
+                    let timeoutMs = l8MetalTopKTimeoutMs
+                    metalTopKSeam = { [l8MetalAcc, dispatcher] query, corpus, dim, k in
+                        let t0 = DispatchTime.now().uptimeNanoseconds
+                        let (value, usedFallback) = BASMetalSyncBridge.runWithTimeout(
+                            timeoutMs: timeoutMs,
+                            {
+                                guard let approx = try? await dispatcher.dispatch(
+                                    query: query, corpus: corpus, dim: dim, k: k) else { return nil }
+                                return approx.approximateOnly().map {
+                                    (rowIndex: $0.rowIndex, score: $0.score) }
+                            },
+                            fallback: { [] as [(rowIndex: Int, score: Float)] })
+                        let ms = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
+                        l8MetalAcc.record(BASMetalKernelExecutionRecord(
+                            kernelSymbol: "l8_topk", didRunOnGPU: !usedFallback, durationMs: ms,
+                            error: nil, dispatchStartMonoNs: 0,
+                            dispatchEndMonoNs: UInt64(max(0, ms) * 1_000_000)))
+                        return usedFallback ? nil : value
+                    }
+                } else {
+                    await emitBoth("📍 ADR-039 L8 metal-topK OFF (BAS_L8_METAL_TOPK!=1)")
+                }
                 memoryPersistence = BASRoutedMemoryPersistence(
                     loadAllAtoms: { (try? await store.allAtoms()) ?? [] },
                     admitAtom: { _ = try? await store.admit($0) },
@@ -732,7 +782,8 @@ final class BASEnduranceAppController: ObservableObject {
                                 providerVersion: Self.embeddingProviderVersion).normalized,
                             domain: domain))
                     },
-                    globalRecall: globalSeam)
+                    globalRecall: globalSeam,
+                    metalCosineTopK: metalTopKSeam)
             } else {
                 memoryStore = nil
                 memoryVectorIndex = nil
@@ -1288,6 +1339,18 @@ final class BASEnduranceAppController: ObservableObject {
                 snapAfter.memoryRssMB,
                 snapBefore.availableMemoryMB,
                 snapAfter.availableMemoryMB))
+
+            // ADR-039 Phase 2 — drain + log the L8 Metal topK execution records for this iter (real GPU
+            // runs vs CPU fallbacks + timing). Empty unless BAS_L8_METAL_TOPK=1 AND the snapshot retrieve
+            // fired (snapshot non-empty + no Rust seam). This is the on-device cert signal.
+            let l8Batch = l8MetalAcc.drain()
+            if !l8Batch.isEmpty {
+                let agg = BASMetalKernelExecutionAccumulator.aggregate(l8Batch)
+                await emitBoth(String(format:
+                    "📊 ch1025 l8-metal-topk iter=%d calls=%d gpu=%d cpu_fallback=%d p50_ms=%.2f p99_ms=%.2f",
+                    iter, l8Batch.count, agg.gpuRuns, agg.cpuFallbacks,
+                    agg.p50DurationMs, agg.p99DurationMs))
+            }
 
             let updateThermal = snapAfter.thermalState
             await MainActor.run {
