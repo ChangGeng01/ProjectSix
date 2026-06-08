@@ -51,8 +51,19 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   only the deterministic scan input; the host runs Metal OFF the turn thread (never blocks the deterministic
   path). Boundary PROVEN byte-identical flag-on vs flag-off (`BASSSMMetalReasoningRunTurnTests`) + Metal≈CPU
   ≤1e-4; the `BAS_METAL_SMOKE` boot block now also dispatches the SSM kernel (`📊 ssm-metal-smoke`).
-  **On-device cert (L8 topK + SSM) pending an awake device.** See ADR-039 §7/§8/§9. Roadmap Phases 0-4 COMPLETE
-  (host-side; on-device certs batched).
+  **Phase 5 BUILT + macOS-certified** — Metal attention → a NON-governance candidate-salience reasoning op
+  (the FIRST live consumer of the Phase-3 router; opt-in `attentionReasoningInputSink`; Q=affect, K=V=candidates).
+  `runTurn` emits only the deterministic input; the host runs Metal OFF the turn thread (Phase-3 routed,
+  thermal-critical⇒CPU). Boundary PROVEN byte-identical (`BASAttentionMetalReasoningRunTurnTests`) + Metal≈CPU
+  ≤1e-4; the smoke now also dispatches the attention kernel (`📊 attn-metal-smoke`).
+  **On-device cert (L8 topK + SSM + attention) pending an awake device.** See ADR-039 §7/§8/§9/§10.
+  **Division-of-labor doctrine codified (§10):** the two walls (MLX-owns-decode-attention; the context
+  softmax is governance⇒CPU) + the eligibility rule (substrate-owned + non-governance + opt-in/byte-equal-off/
+  parity/wedge-safe/cert) + the 先稳→再吃掉 sequencing. **先稳: the Rust+SQL L8 spine was hardened FIRST**
+  (error-surfacing + `onSilentFailure` + `…OrThrow`; DEBUG concurrency tripwire; event-log append txn;
+  durability/corruption/concurrency/dual-write tests; deterministic cosine-topK order; bounded WAL; opt-in
+  integrity_check) — 3-lens adversarial verification PASS (byte-equality + correctness; one flaky-test fixed).
+  Roadmap Phases 0-5 + 先稳 COMPLETE (host-side; both guardrails enforced; on-device certs batched).
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).

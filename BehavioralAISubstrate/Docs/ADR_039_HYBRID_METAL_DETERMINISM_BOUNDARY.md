@@ -195,3 +195,52 @@ spine tripwire green; DeviceTestApp builds). **On-device SSM GPU+parity** is cer
 `📊 ssm-metal-smoke gpu=.. parity_mae=..`) — **PENDING an awake device** (batched with the Phase-2 L8 cert).
 The live per-turn reasoning emission over a long endurance run (the host wiring the sink end-to-end) is the
 operational follow-up; the MECHANISM + the BOUNDARY are proven.
+
+## 10. The division of labor — Rust+SQL 先稳 → Metal 再吃掉 (operator doctrine)
+
+The operator's governing rule for the whole substrate, of which §2 is the boundary and §1 the rationale:
+
+> **Rust + SQL 先稳** the byte-deterministic spine (Storage / Memory / Event-log / Replay / Governance) —
+> stabilize it FIRST, and it stays CPU/Rust forever. **Metal 再吃掉** the approximate, substrate-owned,
+> non-governance hot paths (retrieval vector-similarity, Mamba/SSM, attention-class) — and ONLY those.
+> **不要用 Metal 写业务状态. 不要用 Rust 硬扛 GPU tensor math.**
+
+Both guardrails are enforced + verified: the spine build-tripwire (§3) keeps Metal symbols out of the spine
+files (Metal ≠ business state); Rust does only CPU-SIMD (cosine / matmul / softmax / mamba are CPU reference
+impls, never GPU, never on governance — Rust ≠ GPU tensor math).
+
+### 10.1 The two walls — Metal eats only what the substrate OWNS
+
+- **The MLX wall.** LLM decode — logits / sampling / masking **and attention** — lives inside the closed
+  MLX-Swift forward graph (`Vendor/mlx-swift-lm`); the substrate has no hook. MLX already runs decode
+  attention on Metal (faster than the substrate's single-head kernel), so forking MLX to "re-eat" it is
+  rejected. Decode attention joins decode-logits in the §6 "honestly OUT for the substrate's own
+  re-implementation" set.
+- **The governance wall.** The only *substrate-owned* attention-shaped op on the live turn —
+  `BASMLContextService.softmax` → `emotionalLoad / timePressure / consequenceLevel / ambiguityScore` →
+  `riskCard.totalRisk` → the sovereign verdict (`EBrainHostRuntime+RiskService.swift`) — is verdict-feeding,
+  hence **CPU-forbidden** (the same boundary that keeps `ssmCaution` on CPU, §2). Metal must not touch it.
+
+### 10.2 Eligibility rule — what qualifies as a *live* Metal eat
+
+A hot path becomes a live Metal eat ONLY when it is (i) **substrate-owned**, (ii) **non-governance**,
+(iii) opt-in / byte-equal-off / parity-verified / wedge-safe / on-device-certified. Why each path landed:
+- **Retrieval cosine-topK** (Phase 2) — substrate-owned ranking, only `atomID` crosses (§8). ✓
+- **Mamba/SSM** (Phase 4) — a non-governance reasoning sink; `ssmCaution` stays CPU (§9). ✓
+- **Candidate-salience attention** (Phase 5) — a NEW non-governance reasoning op
+  (`BASAttentionTurnSignalBuilder` → `BASAttentionMetalReasoning`, the FIRST live consumer of the Phase-3
+  router): Q = affect, K=V = candidates → `softmax(QKᵀ/√D)·V`; emitted via a default-nil
+  `attentionReasoningInputSink`; the host runs Metal OFF the turn thread; flag-on is byte-identical to off
+  (`BASAttentionMetalReasoningRunTurnTests`). Feeds NO verdict. ✓
+- **Decode attention does NOT qualify** — MLX-owned (wall 1); the only substrate-owned softmax is governance
+  (wall 2). ✗
+
+### 10.3 The sequencing rule (先稳 before 再吃掉)
+
+A hot path is Metal-eligible only AFTER its deterministic spine is proven Metal-free (the §3 tripwire) AND
+its boundary proven byte-identical (the per-phase boundary test). Concretely, the Rust+SQL L8 spine was
+**hardened first** ("先稳", a dedicated pass): silent-failure surfacing + `…OrThrow` siblings + an
+`onSilentFailure` hook on the 3 stores; a DEBUG concurrency tripwire on the lone nonisolated reader
+(`cosineTopKAtomIDsSync`); event-log `append` transactionality (`BEGIN IMMEDIATE`); durability / corruption
+/ concurrency / dual-write tests; deterministic cosine-topK ordering; bounded `wal_autocheckpoint`; opt-in
+`integrity_check`. Only then does Metal eat the approximate paths on top of a spine proven solid.
