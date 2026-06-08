@@ -345,6 +345,37 @@ process FULLY recovers with NO reboot.**
   `cb.status` / `event` value at the hang, or a GPU capture) to confirm "GPU completed, CPU never signaled" vs
   "buffer never submitted," then fix in vendored MLX or upstream.
 
+### 10.3 A-attempt #1 (2026-06-09): `Event::wait` timeout — shipped, but on-device it does NOT catch the wedge
+
+Made `Event::wait` (event.cpp) timeout opt-in (`MLX_EVENT_WAIT_TIMEOUT_MS`, default `-1`/infinite =
+byte-identical). On-device test with the **reliable** feed-forward wedge trigger (ADR §6 big-prefill;
+fired exactly — iter=2 `prompt_len=537` → stalled at 3 decodes):
+- The run wedged inside iter-4's `adapter.draft` (substrate `brain.process` for iter 4 logged; no `🧠 mlx
+  iter=4`), sat frozen for the full 17-min window, and **`MLX_EVENT_WAIT_TIMEOUT_MS=30000` did NOT fire**
+  (0 timeout errors). ⇒ **the decode block is NOT `Event::wait`.**
+
+Code trace narrowed the real block (the decode `eval()` → `eval_impl().wait()` chain):
+- **Prime suspect: `scheduler::wait_for_one()`** (scheduler.h:130-136) — `completion_cv.wait(lk, …)` that is
+  woken only by `notify_task_completion` fired from a command buffer's `addCompletedHandler` (eval.cpp:61).
+  If the GPU buffer never completes / its handler never fires, this CPU condition-variable parks forever —
+  exactly the "completion-handler lost-signal" hypothesis (§10.2), and NOT `Event::wait`. (Other candidates:
+  `gpu::synchronize`'s `cb->waitUntilCompleted()` eval.cpp:92; `Fence::wait` fence.cpp.)
+- **Binding blocker for in-process recovery:** `mlx_eval` (mlx-c) *catches* C++ exceptions → `mlx_error()` →
+  returns 1, **and mlx-swift discards the code** (`_ = evalLock.withLock { mlx_eval(...) }`,
+  Transforms+Eval.swift:18). So even a correctly-bounded, catchable timeout will NOT surface to the Swift
+  endurance loop as an error unless we ALSO re-plumb the binding (check the code / install a throwing
+  `mlx_error` handler / change mlx-swift to propagate).
+
+**Honest verdict on the true in-process fix:** it is a legitimate but **multi-layer MLX-internals arc**, not a
+quick patch: (1) localize the exact blocking wait (Event::wait ruled out on-device; `scheduler::wait_for_one`
+is the prime suspect), (2) bound it with a timeout, (3) plumb the error through mlx-c → mlx-swift (currently
+swallowed), (4) test whether the in-process stream actually recovers after the throw (uncertain — the stuck
+command buffer may block subsequent in-process evals, even though a FRESH PROCESS provably recovers, §10.2).
+The `Event::wait` timeout stays in (opt-in, default byte-identical, harmless — it may bound other waits) but is
+NOT the fix. **Disposition:** the practical "完全解决" remains the watchdog (test/cert auto-recovery, no reboot,
+§10.2) + a precise upstream MLX issue (GPU-exonerated completion-handler lost-signal in `scheduler::wait_for_one`);
+the deeper in-process fix is a fundable follow-up, not claimed done.
+
 **Honesty bounds:** n=1 device, iOS 26.5; the wedge reproduced across runs (@17, then @12 responses — high
 variance in the threshold, but it wedges reliably). The **"kill + relaunch fully recovers, no reboot" result is
 now n=2 confirmed**: two independent wedge→kill→full-MLX-relaunch cycles both loaded + ran + COMPLETED normally
