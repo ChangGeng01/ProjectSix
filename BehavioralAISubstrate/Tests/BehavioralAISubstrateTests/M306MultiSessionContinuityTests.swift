@@ -186,6 +186,11 @@ final class M306MultiSessionContinuityTests: XCTestCase {
             workflowProfile: .primary,
             prompt: "M306 sig prompt")
         let entry = try XCTUnwrap(turn.sovereignAuditEntry)
+        // Comprehensive-audit fix (LOW): the coordinator now emits a CLEARED signature — it no longer
+        // over-claims authentication with a keyless SHA256 tag (the keyed ledger is the sole signer). Confirm
+        // that new invariant directly.
+        XCTAssertTrue(entry.signature.isEmpty,
+            "coordinator audit entry must carry NO keyless signature (keyed ledger is the sole signer)")
 
         let storage = try BASSovereignLedgerSQLiteStorage(
             path: locations.auditLedgerURL.path)
@@ -196,12 +201,17 @@ final class M306MultiSessionContinuityTests: XCTestCase {
         let exp = expectation(
             description: "M306-append-reject-then-accept")
         Task {
-            // Step a: append with runtime signature intact → throws.
+            // Step a: a RUNTIME (keyless, non-HMAC) signature must be REJECTED by the keyed ledger. Inject a
+            // runtime-style keyless hex tag (the 64-char shape the coordinator used to emit) onto the entry —
+            // since the coordinator now emits "", we recreate the "runtime signature intact" case explicitly.
+            var runtimeSigned = entry
+            runtimeSigned.signature =
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
             do {
-                _ = try await ledger.append(entry)
+                _ = try await ledger.append(runtimeSigned)
                 XCTFail(
-                    "expected signatureMismatch when runtime " +
-                    "signature is intact")
+                    "expected signatureMismatch when a runtime (keyless) " +
+                    "signature is present")
             } catch let err as BASSovereignAuditLedger.LedgerError {
                 switch err {
                 case .signatureMismatch(let auditID):

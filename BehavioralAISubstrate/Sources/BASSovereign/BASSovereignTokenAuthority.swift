@@ -511,7 +511,11 @@ public actor BASSovereignTokenAuthority {
         if record.redeemed {
             throw AuthorityError.alreadyUsed(tokenID: warrant.warrantID)
         }
-        if let expiresAt = warrant.expiresAt, now() > expiresAt {
+        // Audit fix: SERVER-AUTHORITATIVE expiry (mirrors verifyCommitToken:345-350 + the ch1044 singleUse
+        // doctrine). The client-carried `warrant.expiresAt` is advisory only — a nil no longer means "never";
+        // the authority computes age from the server record's issuedAt + ttlMs. Fail-closed.
+        let ageMs = Int(now().timeIntervalSince(record.issuedAt) * 1000)
+        if ageMs > record.ttlMs {
             throw AuthorityError.expired(tokenID: warrant.warrantID)
         }
 
@@ -524,7 +528,10 @@ public actor BASSovereignTokenAuthority {
             timeLockRef: warrant.timeLockRef,
             policyHash: warrant.policyHash,
             issuedAtEpochMs: Int(record.issuedAt.timeIntervalSince1970 * 1000),
-            expiresAtEpochMs: Int((warrant.expiresAt ?? record.issuedAt).timeIntervalSince1970 * 1000),
+            // Server-authoritative: reproduce the mint-time expiry (issuedAt + ttlMs) from the RECORD so the
+            // canonical never trusts the client-carried `expiresAt`; byte-matches the value signed at mint.
+            expiresAtEpochMs: Int(record.issuedAt.addingTimeInterval(
+                TimeInterval(record.ttlMs) / 1000.0).timeIntervalSince1970 * 1000),
             witnessRefs: warrant.witnessRefs
         )
         guard let sigData = Data(base64Encoded: warrant.signature),

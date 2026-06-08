@@ -37,9 +37,11 @@ public enum BASSovereignGatedTurn {
     ///
     /// The expected action digest is recomputed HERE from the artifact primitives (via the
     /// shared `BASSovereignTurnArtifactParts`) — NEVER read off the token — so a tampered
-    /// artifact fails. The token's signature-protected identity fields
-    /// (sessionID/turnID/snapshotRef/policyHash) are taken from the token: a forged change
-    /// to any of them breaks the Ed25519 signature the enforcer verifies.
+    /// artifact fails. sessionID/turnID/snapshotRef are taken from the token (a forged change breaks the
+    /// Ed25519 signature the enforcer verifies). policyHash is NOT trusted from the token — the gate recomputes
+    /// the TRUSTED policy hash INDEPENDENTLY via `trustedPolicyHashProvider` (host-owned, derived from the
+    /// canonical active policy bundle) and compares; a token minted under a stale/swapped policy lineage, or
+    /// when the host has no policy lineage, is rejected FAIL-CLOSED.
     ///
     /// `target` MUST be in the token's signed `allowedTargets` (the enforcer rejects an
     /// aliased target). `register` stamps the TTL origin at call time, so the token's TTL
@@ -59,6 +61,7 @@ public enum BASSovereignGatedTurn {
         ticketActionDigestParts: [[String]],
         ticketCount: Int,
         enforcer: BASSovereignCommitEnforcer,
+        trustedPolicyHashProvider: BASTrustedPolicyHashProvider,
         op: @Sendable () async throws -> T
     ) async throws -> T {
         guard let token = commitTokens.first(where: { $0.scope == scope }) else {
@@ -84,7 +87,10 @@ public enum BASSovereignGatedTurn {
             sessionID: token.sessionID,
             turnID: token.turnID,
             snapshotRef: token.snapshotRef,
-            policyHash: token.policyHash,
+            // INDEPENDENT trusted policyHash (not token.policyHash) — closes the tautological policy-rotation
+            // check. Throws fail-closed if the host lineage is missing/malformed; mismatch ⇒ the enforcer
+            // rejects (policyHashMismatch + actionDigest mismatch, since policyHash folds into the digest).
+            policyHash: try trustedPolicyHashProvider.trustedPolicyHash(),
             op: op)
     }
 
@@ -98,6 +104,7 @@ public enum BASSovereignGatedTurn {
         scope: BASSovereignCommitScope,
         target: String,
         enforcer: BASSovereignCommitEnforcer,
+        trustedPolicyHashProvider: BASTrustedPolicyHashProvider,
         op: @Sendable () async throws -> T
     ) async throws -> T {
         try await gate(
@@ -111,6 +118,7 @@ public enum BASSovereignGatedTurn {
             ticketActionDigestParts: result.updateTickets.map(\.actionDigestParts),
             ticketCount: result.updateTickets.count,
             enforcer: enforcer,
+            trustedPolicyHashProvider: trustedPolicyHashProvider,
             op: op)
     }
 }

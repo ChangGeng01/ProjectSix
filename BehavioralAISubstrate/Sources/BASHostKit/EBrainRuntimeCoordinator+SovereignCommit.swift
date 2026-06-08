@@ -1612,25 +1612,12 @@ extension BASEBrainRuntimeCoordinator {
                 + observationStatusCodes
         )
         let ruleIDs = sovereignRuleIDs(for: sovereignVerdict)
-        // ch1044 深入 audit fix: was sovereignDigestHex (`|`-join over 3 consecutive
-        // lists — ruleIDs/signalRefs/actionRefs — which composite refs could collide).
-        // Use the injective digest WITH per-list count markers (`.list`); a flat
-        // length-prefix of 3 adjacent lists is STILL arity-ambiguous, so the count
-        // markers are required to make element-redistribution across lists distinct.
-        let signature = sovereignDigestHexInjective(
-            [
-                auditID,
-                runtimeTrace.sessionID,
-                turnID,
-                sovereignVerdict.verdictID,
-                snapshotRef,
-                sovereignVerdict.policyHash
-            ]
-            + BASSovereignCanonicalBytes.list(ruleIDs)
-            + BASSovereignCanonicalBytes.list(signalRefs)
-            + BASSovereignCanonicalBytes.list(actionRefs)
-        )
-
+        // Comprehensive-audit fix (LOW): this coordinator-built entry terminates in the turn RESULT
+        // (EBrainTurnResult.sovereignAuditEntry) and is NEVER passed to the keyed BASSovereignAuditLedger.append.
+        // Emitting a KEYLESS SHA256 tag here NAMED `signature` over-claimed authentication — and would fail
+        // CLOSED if ever piped to the keyed ledger (which treats a non-empty `signature` as a base64 MAC/Ed25519,
+        // so a hex SHA256 string is invalid). Leave it EMPTY — matching the 9 audit-bridge producers — so the
+        // keyed ledger is the SOLE producer of a real signature whenever this entry is actually appended.
         return BASSovereignAuditEntry(
             // chapter 九百九十六.5 META-REVIEW Round-15 CRITICAL-2
             // fix:explicit "1.1.0" for hardened canonical-bytes
@@ -1653,7 +1640,7 @@ extension BASEBrainRuntimeCoordinator {
             actionRefs: actionRefs,
             snapshotRef: snapshotRef,
             actor: .system,
-            signature: signature,
+            signature: "",   // keyed ledger.append is the sole signer (see note above) — no keyless over-claim
             appendedAt: runtimeTrace.recordedAt
         )
     }
@@ -1686,15 +1673,23 @@ extension BASEBrainRuntimeCoordinator {
     func sovereignPolicyHash(
         for budgetFrame: BASBudgetFrame
     ) -> String {
+        // Comprehensive-audit fix (MEDIUM): present lineage → the SINGLE canonical recipe
+        // (`BASTrustedPolicyHash.compute`) shared with the commit gate's INDEPENDENT recompute, so a
+        // legitimately-minted token's policyHash byte-matches the gate's trusted hash and the policy-rotation
+        // check is no longer tautological. Byte-IDENTICAL to the prior inline computation for a present lineage
+        // (same 4 fields, same injective `lengthPrefixed`+SHA256+hex primitives).
+        if let lineage = policyLineage {
+            return BASTrustedPolicyHash.compute(lineage: lineage)
+        }
+        // Nil lineage (legacy fallback): still deterministic, but a token minted here will be REJECTED by the
+        // gate's TrustedPolicyHashProvider (fail-closed on nil lineage) — so it can never authorize a commit.
+        // ch1044 深入 audit fix: injective digest (was `|`-join, forgeable at any field boundary).
         let components = [
-            policyLineage?.bundleVersion ?? budgetFrame.policyBundleVersion ?? "policy.none",
-            policyLineage?.providerRoutingPolicyID ?? budgetFrame.policyDecisionIDs.first ?? "routing.none",
-            policyLineage?.runtimeTuningPolicyID ?? budgetFrame.policyDecisionIDs.dropFirst().first ?? "tuning.none",
-            policyLineage?.resolutionSourceID ?? "resolution.none"
+            budgetFrame.policyBundleVersion ?? "policy.none",
+            budgetFrame.policyDecisionIDs.first ?? "routing.none",
+            budgetFrame.policyDecisionIDs.dropFirst().first ?? "tuning.none",
+            "resolution.none"
         ]
-        // ch1044 深入 audit fix: injective digest (was `|`-join, forgeable at any field
-        // boundary). This policyHash feeds the now-injective commit-token actionDigest,
-        // so a lossy sub-hash would partially undermine D3.
         return sovereignDigestHexInjective(components)
     }
 

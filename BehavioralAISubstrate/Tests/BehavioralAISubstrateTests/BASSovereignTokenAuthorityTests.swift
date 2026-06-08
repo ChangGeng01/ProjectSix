@@ -432,6 +432,38 @@ final class BASSovereignTokenAuthorityTests: XCTestCase {
         }
     }
 
+    // Audit fix: warrant expiry is SERVER-AUTHORITATIVE. A forged far-future `expiresAt` (client claiming "never
+    // expires") must NOT extend the warrant — the authority computes age from its own record's issuedAt+ttlMs.
+    func testVerifyWarrantExpiryIsServerAuthoritativeIgnoringClientExpiresAt() async throws {
+        let clock = BASAuthorityClock()
+        let authority = makeAuthority(clock: clock)
+        let intent = makeWarrantIntent(ttlMs: 2_000)
+        let warrant = try await authority.issueWarrant(for: intent)
+
+        // Forge a copy claiming a far-future expiresAt; signature is unchanged (over the real mint bytes). The
+        // server recomputes the canonical expiry from its RECORD, so the sig stays valid and the expiry decision
+        // uses the server ttl — not this forged field.
+        let forged = BASSovereignWarrant(
+            warrantID: warrant.warrantID, scope: warrant.scope, actionDigest: warrant.actionDigest,
+            commitTokenRef: warrant.commitTokenRef, jurisdictionRef: warrant.jurisdictionRef,
+            snapshotRef: warrant.snapshotRef, timeLockRef: warrant.timeLockRef, policyHash: warrant.policyHash,
+            issuedAt: warrant.issuedAt,
+            expiresAt: (warrant.issuedAt ?? Date(timeIntervalSince1970: 1_700_000_000))
+                .addingTimeInterval(10_000_000),
+            witnessRefs: warrant.witnessRefs, singleUse: warrant.singleUse, signature: warrant.signature)
+
+        clock.advance(byMs: 5_000)   // past the SERVER ttl (2000ms), before the forged client "expiry"
+
+        do {
+            try await authority.verifyWarrant(
+                forged, expectedScope: intent.scope,
+                expectedActionDigest: intent.actionDigest, redeem: false)
+            XCTFail("a forged far-future expiresAt must NOT extend the warrant — expiry is server-authoritative")
+        } catch BASSovereignTokenAuthority.AuthorityError.expired(let id) {
+            XCTAssertEqual(id, warrant.warrantID, "rejected as EXPIRED via the server ttl, not the client field")
+        }
+    }
+
     func testVerifyWarrantRejectsScopeAndDigestMismatch() async throws {
         let authority = makeAuthority()
         let intent = makeWarrantIntent(scope: .hostMutate, actionDigest: "sha256:mut")

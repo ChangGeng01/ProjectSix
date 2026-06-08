@@ -20,6 +20,17 @@ final class BASSovereignGatedTurnTests: XCTestCase {
         func get() -> Int { count }
     }
 
+    /// Test provider for the gate's INDEPENDENT trusted-policy-hash recompute. Defaults to "ph-1" (the
+    /// renderToken's policyHash) for the happy path; can return a stale hash or throw to exercise rejection.
+    private struct StubPolicyHashProvider: BASTrustedPolicyHashProvider {
+        var hash: String? = "ph-1"
+        var error: Error? = nil
+        func trustedPolicyHash() throws -> String {
+            if let error { throw error }
+            return hash ?? ""
+        }
+    }
+
     private func makeEnforcer(_ clock: BASAuthorityClock) -> BASSovereignCommitEnforcer {
         clock.set(t0)
         return BASSovereignCommitEnforcer(
@@ -48,12 +59,14 @@ final class BASSovereignGatedTurnTests: XCTestCase {
     @discardableResult
     private func gateRender(
         tokens: [BASSovereignCommitToken], target: String, body: String, mode: String = "answer",
-        enforcer: BASSovereignCommitEnforcer, counter: OpCounter
+        enforcer: BASSovereignCommitEnforcer, counter: OpCounter,
+        provider: BASTrustedPolicyHashProvider = StubPolicyHashProvider()
     ) async throws -> String {
         try await BASSovereignGatedTurn.gate(
             commitTokens: tokens, scope: .renderHighRisk, target: target,
             foldID: "f1", renderMode: mode, renderHeadline: "head", renderBody: body,
-            ticketActionDigestParts: [], ticketCount: 0, enforcer: enforcer
+            ticketActionDigestParts: [], ticketCount: 0, enforcer: enforcer,
+            trustedPolicyHashProvider: provider
         ) { await counter.bump(); return "rendered" }
     }
 
@@ -130,6 +143,45 @@ final class BASSovereignGatedTurnTests: XCTestCase {
         } catch BASSovereignTokenAuthority.AuthorityError.alreadyUsed { /* expected */ }
         let n = await counter.get()
         XCTAssertEqual(n, 1, "the irreversible op must run EXACTLY once across a replay")
+    }
+
+    // MARK: - 5b) stale/swapped policy hash → DENY (the independent recompute closes the tautology)
+
+    func testGateDeniesStalePolicyHash() async throws {
+        let enforcer = makeEnforcer(BASAuthorityClock())
+        let counter = OpCounter()
+        do {
+            _ = try await gateRender(
+                tokens: [renderToken(body: "approved")], target: "answer", body: "approved",
+                enforcer: enforcer, counter: counter,
+                provider: StubPolicyHashProvider(hash: "ph-STALE-rotated"))   // trusted ≠ token's "ph-1"
+            XCTFail("a token minted under a different policy lineage must be denied")
+        } catch BASSovereignTokenAuthority.AuthorityError.actionDigestMismatch {
+            // expected — policyHash folds into the actionDigest, so the independent recompute's digest mismatches
+            // FIRST (verifyCommitToken checks actionDigest before policyHash). The isolated policyHashMismatch
+            // path is covered by BASSovereignTokenAuthorityTests.testVerifyCommitTokenRejectsPolicyHashMismatch.
+        }
+        let n = await counter.get()
+        XCTAssertEqual(n, 0, "op must NOT run when the trusted policy hash differs from the token's")
+    }
+
+    // MARK: - 5c) trusted policy hash unavailable (nil/malformed host lineage) → FAIL CLOSED
+
+    func testGateFailsClosedWhenTrustedPolicyHashUnavailable() async throws {
+        let enforcer = makeEnforcer(BASAuthorityClock())
+        let counter = OpCounter()
+        do {
+            _ = try await gateRender(
+                tokens: [renderToken(body: "approved")], target: "answer", body: "approved",
+                enforcer: enforcer, counter: counter,
+                provider: StubPolicyHashProvider(
+                    hash: nil, error: BASTrustedPolicyHashError.missingRuntimePolicyLineage))
+            XCTFail("a missing host policy lineage must fail CLOSED (op never runs)")
+        } catch BASTrustedPolicyHashError.missingRuntimePolicyLineage {
+            // expected — the gate cannot source a trusted hash, so it must not proceed
+        }
+        let n = await counter.get()
+        XCTAssertEqual(n, 0, "op must NOT run when the trusted policy hash is unavailable")
     }
 
     // MARK: - 6) the shared parts formula — all scopes + tamper-sensitivity
