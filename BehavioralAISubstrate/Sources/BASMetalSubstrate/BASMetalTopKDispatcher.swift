@@ -66,7 +66,9 @@ public actor BASMetalTopKDispatcher {
         dim: Int,
         k: Int
     ) -> [BASCosineTopKHit] {
-        guard dim > 0, !query.isEmpty, corpus.count % dim == 0 else { return [] }
+        // `query.count == dim` is REQUIRED (not just `!query.isEmpty`): the inner loop indexes `query[d]`
+        // for d in 0..<dim, so a short query would trap. A ragged query ⇒ empty (the seam falls back to CPU).
+        guard dim > 0, query.count == dim, corpus.count % dim == 0 else { return [] }
         let nRows = corpus.count / dim
         var qNorm: Float = 0
         for v in query { qNorm += v * v }

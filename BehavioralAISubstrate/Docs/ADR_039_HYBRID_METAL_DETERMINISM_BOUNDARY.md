@@ -118,3 +118,48 @@ live decode" status:
 on-device — the core claim "the substrate's Metal kernels really execute on the GPU + agree with CPU" is
 now PROVEN, not inferred. It does NOT yet put Metal on the LIVE cascade: the L8 retrieval seam (corpus
 extraction + the sync-bridge wiring) + Phase 4 (SSM reasoning) remain the live-integration work.
+
+## 8. Phase 2 L8 live seam — built, hardened (3-perspective audit), on-device cert PENDING
+
+The L8 live seam (`BASMetalCosineTopKSeam`, opt-in `BAS_L8_METAL_TOPK`) wires the certified Metal topK into
+`BASL8RoutedMemoryService.retrieve()` over the **in-Swift snapshot corpus** — the Rust corpus has NO dump
+FFI, but the snapshot is already a flat `[Float]` in Swift with `rowIndex→atomID` direct. Default
+byte-equal-off; taken only on the snapshot path (a Rust seam wins precedence). A 3-perspective review
+(correctness / boundary+wedge+honesty / concurrency+quality) surfaced and FIXED:
+
+- **Safety (C-1):** the branch now guards `dim>0 && query.count==dim && uniform-dim snapshot` (the flat GPU
+  corpus can't tolerate ragged dims; the CPU path can) and `cpuReference` guards `query.count==dim` (it
+  indexed `query[d]` for d in 0..<dim → a short query trapped). A mismatched query skips Metal → CPU.
+- **CPU-identical membership (M-1):** the seam requests `k = snap.count` (ALL rows) so the SHARED
+  deterministic tail (floor → sort by score-desc, atomID-asc → prefix topK) decides membership — the
+  dispatcher's own rowIndex tie-break never leaks into the selection (the prior `selectTopK(topK)` tie-broke
+  by rowIndex while the CPU path tie-breaks by atomID → divergent sets at a K-th-score tie).
+- **Wedge containment (HIGH-2):** a single-in-flight GATE bounds a genuine GPU hang to ONE leaked task —
+  the dispatch task clears the gate only on actual completion, so a hung dispatch keeps the gate closed and
+  every subsequent retrieve falls back to CPU (the bridge already unblocks the caller at the timeout).
+- **Telemetry honesty:** the seam now captures the Metal fault string (was `try?`→`error: nil`, so the
+  records' `errors` column was structurally 0), distinguishes timeout from fault, and stamps real
+  start/end mono-ns. Pre-warm now uses the REAL embedding dim (was dim=4).
+
+**HONEST LIMITS (亏的不要上 / 诚实):**
+1. **Perf at snapshot scale is a LOSS.** The snapshot is bounded by `selfPopulateCap` (≈64). The on-device
+   smoke measured `topk_ms≈8.3` for a tiny corpus; Rust-SIMD cosine over ≤64 rows is microseconds. So at
+   the ONLY scale this seam currently fires, Metal is ~1000× slower (GPU dispatch/encode/round-trip ≫ the
+   µs CPU cosine). It is a **mechanism demonstration, not a perf win** — default-off is MANDATORY; enabling
+   it by default would be 亏的不要上. The real win needs a LARGE corpus (the future global-recall path via a
+   Rust corpus-dump FFI), where GPU dispatch amortizes.
+2. **Approximate + NOT replay-stable.** The Metal score becomes `atom.confidence` on the reasoning-side
+   bundle, which IS in the `BASEBrainTurnResultReplayDigest` preimage (synthesized Codable, not
+   canonicalized). The Metal score is non-bit-reproducible, so a host that computes a replay digest over the
+   routed backend would get a non-reproducible digest. The byte-determinism SPINE (durable store /
+   event-log / governance verdict) is VERIFIED Metal-free (only `atomID` crosses); but the Metal L8 seam
+   **must NOT be combined with replay-over-routed-backend** until the snap-pattern lands. The default-off
+   posture + the single (non-replaying) endurance-runner wirer keep every shipping config doctrine-clean.
+3. **Future replay-safe design:** Metal SCREENS the corpus to top-M candidates, then a CPU
+   `snapToDeterministic` re-scores those M (deterministic + the GPU still does the O(N·D) screen). This pays
+   ONLY at large corpus (where M ≪ N), which is exactly where Metal is also a perf win — so the two unlocks
+   land together, not at snapshot scale.
+
+**Status:** macOS-certified (`BASMetalL8SeamTests` + `BASMetalTopKParityTests` + spine tripwire + cascade
+byte-equal net; DeviceTestApp builds for the iPhone Air). **On-device cert PENDING an awake device** (the
+device slept between the §7 smoke cert and the L8 run, so the launched app was iOS-suspended).

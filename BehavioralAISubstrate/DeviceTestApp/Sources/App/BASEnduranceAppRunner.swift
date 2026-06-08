@@ -734,36 +734,63 @@ final class BASEnduranceAppController: ObservableObject {
                     await emitBoth("📍 ADR-037 global recall OFF (BAS_GLOBAL_RECALL!=1)")
                 }
                 // ADR-039 Phase 2 — opt-in Metal cosine-topK seam over the in-Swift snapshot corpus.
-                // WEDGE-SAFE: the async dispatch runs under a HARD timeout (sync bridge); a nil result
-                // (fault / timeout) retreats to the CPU score-all path — the caller is never blocked past
-                // the timeout. Pre-warmed at boot so the first real retrieve isn't charged the
-                // pipeline-compile. Fires only on the snapshot path (retrieve() prefers a Rust seam first).
+                // WEDGE-SAFE by construction: (1) the async dispatch runs under a HARD timeout (sync bridge)
+                // so the SYNC retrieve caller never blocks past timeoutMs; (2) a single-in-flight GATE bounds
+                // a genuine GPU hang to ONE leaked task — every subsequent retrieve skips Metal → CPU
+                // (ADR-038: a sync Metal eval is uncancellable; a leaked task can't be reclaimed, only
+                // prevented from multiplying). A nil result (fault / timeout / gate-busy) retreats to the CPU
+                // score-all path. Fires only on the snapshot path (retrieve() prefers a Rust seam first).
                 var metalTopKSeam: BASMetalCosineTopKSeam? = nil
                 if l8MetalTopKEnabled {
                     let dispatcher = BASMetalTopKDispatcher(
                         loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
-                    _ = try? await dispatcher.dispatch(
-                        query: [1, 0, 0, 0], corpus: [1, 0, 0, 0], dim: 4, k: 1)   // pre-warm the pipeline
+                    // Pre-warm at the REAL embedding dim (probe the live embedder) so the first retrieve is
+                    // charged neither the pipeline-compile NOR the first full-width execution.
+                    if let probe = memoryEmbed?("metal-topk-warmup"), !probe.isEmpty {
+                        _ = try? await dispatcher.dispatch(
+                            query: probe, corpus: probe, dim: probe.count, k: 1)
+                    }
                     let warm = await dispatcher.hasMemoizedPipeline
                     await emitBoth(
                         "📍 ADR-039 L8 metal-topK ACTIVE warm=\(warm) timeout_ms=\(l8MetalTopKTimeoutMs)")
                     let timeoutMs = l8MetalTopKTimeoutMs
-                    metalTopKSeam = { [l8MetalAcc, dispatcher] query, corpus, dim, k in
+                    let gate = L8MetalInFlightGate()
+                    metalTopKSeam = { [l8MetalAcc, dispatcher, gate] query, corpus, dim, k in
                         let t0 = DispatchTime.now().uptimeNanoseconds
+                        // Single-in-flight: if a prior dispatch is still running (slow OR wedged), skip Metal
+                        // this turn → CPU. Bounds a permanent hang to exactly one leaked task.
+                        guard gate.tryEnter() else {
+                            l8MetalAcc.record(BASMetalKernelExecutionRecord(
+                                kernelSymbol: "l8_topk", didRunOnGPU: false, durationMs: 0,
+                                error: "in-flight-skip", dispatchStartMonoNs: t0, dispatchEndMonoNs: t0))
+                            return nil
+                        }
+                        let errBox = BASSyncResultBox<String>()
                         let (value, usedFallback) = BASMetalSyncBridge.runWithTimeout(
                             timeoutMs: timeoutMs,
                             {
-                                guard let approx = try? await dispatcher.dispatch(
-                                    query: query, corpus: corpus, dim: dim, k: k) else { return nil }
-                                return approx.approximateOnly().map {
-                                    (rowIndex: $0.rowIndex, score: $0.score) }
+                                let out: [(rowIndex: Int, score: Float)]?
+                                do {
+                                    let approx = try await dispatcher.dispatch(
+                                        query: query, corpus: corpus, dim: dim, k: k)
+                                    out = approx.approximateOnly().map {
+                                        (rowIndex: $0.rowIndex, score: $0.score) }
+                                } catch {
+                                    errBox.set("\(error)")
+                                    out = nil
+                                }
+                                gate.leave()   // cleared ONLY on actual completion — never on a hang
+                                return out
                             },
                             fallback: { [] as [(rowIndex: Int, score: Float)] })
-                        let ms = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
+                        let t1 = DispatchTime.now().uptimeNanoseconds
+                        let ms = Double(t1 &- t0) / 1_000_000
+                        // Distinguish a real Metal fault (errBox set by the catch) from a timeout (op still
+                        // running) — so the records' `errors` column is truthful, not structurally zero.
+                        let err = usedFallback ? (errBox.take() ?? "timeout(\(timeoutMs)ms)") : nil
                         l8MetalAcc.record(BASMetalKernelExecutionRecord(
                             kernelSymbol: "l8_topk", didRunOnGPU: !usedFallback, durationMs: ms,
-                            error: nil, dispatchStartMonoNs: 0,
-                            dispatchEndMonoNs: UInt64(max(0, ms) * 1_000_000)))
+                            error: err, dispatchStartMonoNs: t0, dispatchEndMonoNs: t1))
                         return usedFallback ? nil : value
                     }
                 } else {
@@ -1794,4 +1821,20 @@ final class BASEnduranceAppController: ObservableObject {
                 "prompt=\(prompt) version_tree=nil")
         }
     }
+}
+
+/// ADR-039 Phase 2 — single-in-flight gate for the L8 Metal seam. Bounds a genuine (uncancellable, ADR-038)
+/// GPU hang to ONE leaked task: `tryEnter()` succeeds only when no dispatch is in flight; `leave()` is called
+/// by the dispatch task ONLY on actual completion (never on a hang), so a hung dispatch keeps the gate closed
+/// and every subsequent retrieve falls back to CPU. Lock-guarded; `@unchecked Sendable` (NSLock-protected).
+private final class L8MetalInFlightGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var inFlight = false
+    func tryEnter() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if inFlight { return false }
+        inFlight = true
+        return true
+    }
+    func leave() { lock.lock(); inFlight = false; lock.unlock() }
 }

@@ -84,8 +84,10 @@ import BASOrchestration
 /// `(query, flatCorpus [row0_d0..row0_dN-1, row1_d0..], dim, k) -> [(rowIndex, score)]?`. A nil RESULT
 /// means Metal faulted / timed out ⇒ `retrieve()` retreats to the CPU score-all path (wedge-safe, ADR-038).
 /// nil SEAM ⇒ byte-equal-off (ADR-014). The host backs it with `BASMetalTopKDispatcher` + the sync bridge;
-/// per the determinism boundary (ADR-039 §2, verified) only `atomID` crosses — the Metal score orders the
-/// bundle + becomes `atom.confidence` (reasoning side; proven NOT to feed replay/event-log/store/verdict).
+/// per the determinism boundary (ADR-039 §2) only `atomID` crosses into the spine — the durable store /
+/// event-log / governance verdict are VERIFIED Metal-free. The Metal score becomes `atom.confidence` on the
+/// reasoning-side bundle, which IS in the replay-digest preimage; since the Metal score is non-reproducible,
+/// this path is APPROXIMATE + NOT replay-stable (default-off; do not enable with replay-over-routed-backend).
 public typealias BASMetalCosineTopKSeam =
     @Sendable (_ query: [Float], _ corpus: [Float], _ dim: Int, _ k: Int)
         -> [(rowIndex: Int, score: Float)]?
@@ -336,17 +338,29 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             scored = cosineTopKSync(query, topK).compactMap { hit in
                 byID[hit.atomID].map { (hit.score, $0) }
             }
-        } else if let metalCosineTopK, !snap.isEmpty,
+        } else if let metalCosineTopK, embeddingDimension > 0,
+                  query.count == embeddingDimension, !snap.isEmpty,
                   snap.allSatisfy({ $0.embedding.count == embeddingDimension }) {
-            // ADR-039 Phase 2 — Metal cosine-topK over the in-Swift snapshot corpus (opt-in; the host
-            // backs it with BASMetalTopKDispatcher + the sync bridge). WEDGE-SAFE: a nil result (Metal
-            // fault / timeout) retreats to the CPU score-all path. BOUNDARY (ADR-039 §2, verified): only
-            // the resolved atomID crosses; the Metal score orders the bundle (reasoning side). Uniform-dim
-            // guarded above — a ragged snapshot skips Metal (the CPU path handles per-entry dims).
+            // ADR-039 Phase 2 — Metal cosine-topK over the in-Swift snapshot corpus (opt-in; the host backs
+            // it with BASMetalTopKDispatcher + the sync bridge). WEDGE-SAFE: a nil result (Metal fault /
+            // timeout) retreats to the CPU score-all path. GUARDS: dim>0 + query.count==dim + uniform-dim
+            // snapshot — any mismatch skips Metal (the flat GPU corpus can't tolerate ragged dims; the CPU
+            // path can). We request k = snap.count (ALL rows), so the SHARED deterministic tail below
+            // (floor → sort by score-desc,atomID-asc → prefix topK) decides membership IDENTICALLY to the
+            // CPU path — the dispatcher's own rowIndex tie-break never leaks into the selection. (The GPU
+            // does the full O(N·D) cosine regardless of k; truncation is free.)
+            //
+            // BOUNDARY HONESTY (ADR-039 §2): only the resolved atomID crosses into the spine (governance /
+            // durable store / event-log are verified Metal-free). The Metal score becomes atom.confidence
+            // on the reasoning-side bundle — which IS in the replay-digest preimage (synthesized Codable,
+            // not canonicalized). The Metal score is NON-bit-reproducible, so this path is APPROXIMATE +
+            // NOT replay-stable: a host that computes a replay digest over the routed backend must NOT
+            // enable it (default-off; the spine stays CPU/Rust). The future large-corpus design snaps the
+            // ranking to determinism (Metal screens top-M, CPU re-scores). See ADR-039 §7/§8.
             var corpus: [Float] = []
             corpus.reserveCapacity(snap.count * embeddingDimension)
             for entry in snap { corpus.append(contentsOf: entry.embedding) }
-            if let hits = metalCosineTopK(query, corpus, embeddingDimension, topK) {
+            if let hits = metalCosineTopK(query, corpus, embeddingDimension, snap.count) {
                 scored = hits.compactMap { hit in
                     (hit.rowIndex >= 0 && hit.rowIndex < snap.count)
                         ? (hit.score, snap[hit.rowIndex]) : nil

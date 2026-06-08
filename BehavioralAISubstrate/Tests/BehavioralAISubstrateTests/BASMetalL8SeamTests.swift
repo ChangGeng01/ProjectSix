@@ -7,9 +7,12 @@
 //      matches the CPU set on the GPU, or falls back to the identical CPU set). GPU-execution parity per
 //      se is proven by BASMetalTopKParityTests (Mac GPU) + the on-device BAS_METAL_SMOKE cert.
 //
-// Determinism boundary (ADR-039 §2, separately verified by trace): only `atomID` crosses; the Metal score
-// orders the bundle + becomes atom.confidence (reasoning side — never the replay/event-log/store/verdict
-// spine). These tests assert the atomID membership, the boundary-relevant property.
+// Determinism boundary (ADR-039 §2): only `atomID` crosses into the spine — the durable store / event-log /
+// governance verdict are verified Metal-free. The Metal score becomes atom.confidence on the reasoning-side
+// bundle, which IS in the replay-digest preimage; since the Metal score is non-reproducible, the path is
+// APPROXIMATE + NOT replay-stable (default-off; not for replay-over-routed-backend). These tests assert the
+// atomID membership (CPU-identical via the shared sort, since the seam requests all rows) + the wedge-safe
+// CPU retreat — NOT replay-stability, which this path deliberately does not provide.
 
 import XCTest
 import Foundation
@@ -119,6 +122,45 @@ final class BASMetalL8SeamTests: XCTestCase {
         XCTAssertEqual(metalIDs.count, cpuIDs.count)
         XCTAssertEqual(Set(metalIDs), Set(cpuIDs),
             "the Metal-branch rowIndex→atomID mapping must surface exactly the CPU path's atoms")
+    }
+
+    // MARK: - 2b. SAFETY: a dim-mismatched query SKIPS Metal (no crash) and falls back to CPU (C-1 guard)
+
+    func testRaggedQuerySkipsMetalAndFallsBackToCpu() async {
+        // Simulate an embedding failure for ONE query (returns []), while the corpus embeds normally at the
+        // declared dim. The service's `query.count == embeddingDimension` guard must skip Metal (the flat
+        // GPU corpus + cpuReference would otherwise index query[d] out of bounds) and take the CPU path.
+        let dim = 8
+        let embed: @Sendable (String) -> [Float] = { text in
+            text == "POISON-QUERY"
+                ? []                                                   // embedding failure for this query
+                : (0..<dim).map { Float(($0 + text.count) % 5) }       // normal vector otherwise
+        }
+        // The seam ASSERTS it is never called with a dim-mismatched query — if the guard regresses, this
+        // fires. With the guard intact, the seam is simply not invoked for the poison query.
+        let guardProbe: BASMetalCosineTopKSeam = { query, _, dim, _ in
+            XCTAssertEqual(query.count, dim,
+                "the service must never invoke the Metal seam with a dim-mismatched query")
+            return nil
+        }
+        let atoms = [
+            governed(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!, content: "alpha"),
+            governed(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000D2")!, content: "beta gamma"),
+        ]
+        let svc = BASL8RoutedMemoryService(
+            loadAllAtoms: { atoms }, syncEmbed: embed, embeddingDimension: dim,
+            relevanceFloor: 0.0, selfPopulate: false, metalCosineTopK: guardProbe)
+        let cpuSvc = BASL8RoutedMemoryService(
+            loadAllAtoms: { atoms }, syncEmbed: embed, embeddingDimension: dim,
+            relevanceFloor: 0.0, selfPopulate: false)   // no seam ⇒ pure CPU
+        await svc.refresh(); await cpuSvc.refresh()
+        // Must NOT crash; the poison (empty) query takes the CPU path, byte-identical to the no-seam service.
+        let guarded = svc.retrieve(
+            decomposeFrame: frame("POISON-QUERY"), hostContext: profile(), budget: budget())
+        let cpu = cpuSvc.retrieve(
+            decomposeFrame: frame("POISON-QUERY"), hostContext: profile(), budget: budget())
+        XCTAssertEqual(guarded.atoms.map(\.memoryID), cpu.atoms.map(\.memoryID),
+            "a dim-mismatched query must skip Metal (no trap) and match the CPU path exactly")
     }
 
     // MARK: - 3. INTEGRATION: the REAL dispatcher through the REAL sync bridge never corrupts the result

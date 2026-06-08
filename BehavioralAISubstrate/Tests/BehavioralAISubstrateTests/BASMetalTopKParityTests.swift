@@ -33,6 +33,21 @@ final class BASMetalTopKParityTests: XCTestCase {
         XCTAssertEqual(top[2].score, 0.0, accuracy: 1e-5)
     }
 
+    // MARK: - cpuReference safety: a dim-mismatched query returns empty, never traps (C-1)
+
+    func testCpuReferenceRaggedQueryReturnsEmptyNoTrap() {
+        // query.count (3) != dim (4): the inner loop indexes query[d] for d in 0..<4 → would TRAP on a
+        // short query. The guard must convert this to an empty result so the seam falls back to CPU.
+        let ragged = BASMetalTopKDispatcher.cpuReference(
+            query: [1, 0, 0], corpus: [1, 0, 0, 0, 0, 1, 0, 0], dim: 4, k: 2)
+        XCTAssertTrue(ragged.isEmpty, "a dim-mismatched query must return [] (no out-of-bounds trap)")
+        // empty query, dim 0 — both already covered by the same guard.
+        XCTAssertTrue(BASMetalTopKDispatcher.cpuReference(
+            query: [], corpus: [1, 0], dim: 2, k: 1).isEmpty)
+        XCTAssertTrue(BASMetalTopKDispatcher.cpuReference(
+            query: [1], corpus: [1], dim: 0, k: 1).isEmpty)
+    }
+
     // MARK: - Metal ≈ CPU parity (integration; Mac Metal, graceful skip if absent)
 
     func testMetalTopKMatchesCpuWithinTolerance() async throws {

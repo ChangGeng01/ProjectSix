@@ -41,7 +41,11 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   Metal cosine-topK over the in-Swift snapshot corpus (`BASMetalCosineTopKSeam`, opt-in `BAS_L8_METAL_TOPK`,
   default byte-equal-off; wedge-safe nil→CPU retreat; boundary-verified by a full spine trace = only atomID
   crosses), DeviceTestApp builds + the per-iter `📊 l8-metal-topk` line is wired; **on-device cert pending an
-  awake device** (the device slept between the smoke cert and the run). **Pending:** Phase 4 (Metal SSM
+  awake device** (the device slept between the smoke cert and the run). **Hardened via a 3-perspective audit**
+  (query-dim/dim>0 guards + `cpuReference` no-trap; `k=snap.count` ⇒ CPU-identical membership; single-in-flight
+  wedge gate bounds a hang to ONE leaked task; telemetry captures fault-vs-timeout; real-dim pre-warm). Honest
+  limits (ADR-039 §8): at ≤64-row snapshot scale it's a perf LOSS (default-off mandatory) + the score reaches
+  `atom.confidence` in the replay preimage ⇒ approximate, NOT replay-stable (spine verified clean). **Pending:** Phase 4 (Metal SSM
   reasoning — `ssmCaution` stays CPU). See ADR-039 §7.
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
