@@ -309,6 +309,78 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         return try Self.fetchEventsForSession(db: db, sessionID: sessionID)
     }
 
+    /// Red-team GAP-3b (tamper-evidence on REPLAY) — assert a session's events are CONTIGUOUS by
+    /// `sequence_number` (each = previous + 1, no gaps, no duplicates), throwing `corruptedRow` on the first
+    /// discontinuity, then return the decoded entries. The default reads (`events` / `eventsOrThrow`) return
+    /// whatever rows survive, so an out-of-band middle-row `DELETE` (or a duplicate-`sequence_number` row)
+    /// silently yields a non-contiguous replay with no signal. A replay/audit caller that needs tamper-evidence
+    /// calls THIS.
+    ///
+    /// Contiguity is checked on the `sequence_number` COLUMN — the AUTHORITATIVE ordering key (the same column
+    /// the fetch sorts by and that `nextSequenceNumber` assigns from), read directly from SQL. It deliberately
+    /// does NOT use the decoded entry's `sequenceNumber`, which for v1 JSON rows is recovered from
+    /// `payload_json` and could diverge from the column under a column-only tamper (red-team finding: the check
+    /// must validate the same physical location it sorts by).
+    ///
+    /// Scope (honest limits):
+    ///   - DETECTS: middle-row deletion (a sequence gap) and duplicated sequence numbers — i.e. any tamper that
+    ///     breaks contiguity of the sequence-number column *values*. Because the fetch re-sorts ASC, a genuine
+    ///     reordering manifests only as a gap or a duplicate; it is not a separate detection class.
+    ///   - Does NOT detect: a semantic payload edit that preserves the `sequence_number` column; a tail-row
+    ///     deletion (the surviving prefix stays contiguous); nor a value-set-preserving SWAP of two rows'
+    ///     `sequence_number` (the multiset stays contiguous after the ASC sort). Full tamper-evidence needs
+    ///     per-row integrity tags / a hash chain — see Docs/ADR_040 (the operator-gated follow-up).
+    ///   - Does NOT false-trip on legitimate front-pruning (`pruneEventsBefore`): the surviving rows remain
+    ///     contiguous, just starting at a sequence number > 0.
+    ///
+    /// Read-only + Metal-free ⇒ byte-deterministic-spine-safe (no write-path or stored-byte change).
+    @discardableResult
+    public func eventsVerifyingContiguity(
+        forSession sessionID: String
+    ) async throws -> [BASEventLogEntry] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        let rows = try Self.sessionColumnSequenceRows(db: db, sessionID: sessionID)
+        var expected: Int64? = nil
+        for row in rows {
+            if let exp = expected, row.seq != exp {
+                throw StorageError.corruptedRow(
+                    eventID: row.eventID,
+                    reason: "sequence discontinuity in session '\(sessionID)': expected \(exp), "
+                        + "found \(row.seq) — gap, duplicate, or out-of-band deletion/tamper")
+            }
+            expected = row.seq + 1
+        }
+        return try Self.fetchEventsForSession(db: db, sessionID: sessionID)
+    }
+
+    /// Column-only read of (event_id, sequence_number) for a session, ordered by the `sequence_number` COLUMN.
+    /// Used by `eventsVerifyingContiguity` so the contiguity check validates the authoritative column value
+    /// (not a payload_json-decoded value that could diverge under a column-only tamper).
+    fileprivate static func sessionColumnSequenceRows(
+        db: OpaquePointer,
+        sessionID: String
+    ) throws -> [(eventID: String, seq: Int64)] {
+        let sql = """
+            SELECT event_id, sequence_number FROM event_log
+            WHERE session_id = ?
+            ORDER BY sequence_number ASC
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, sessionID)
+        var out: [(eventID: String, seq: Int64)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            out.append((eventID: readText(stmt, 0), seq: sqlite3_column_int64(stmt, 1)))
+        }
+        return out
+    }
+
     public func events(
         sinceTimestampMs since: Int64,
         limit: Int

@@ -21,6 +21,14 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         "BASHostKit/EBrainRuntimeCoordinator+Permit.swift",
         "BASHostKit/EBrainRuntimeCoordinator+RunTurn.swift",
         "BASSovereign/BASSovereignVerdictEngine.swift",
+        // Governance RISK MATH — the actual writers of riskCard.totalRisk + the softmax that feeds the
+        // context frame + the ssmCaution that may RAISE risk. ADR-039 §10.2 "governance wall": these must be
+        // CPU-only; a Metal/approximate shortcut into governance scoring is forbidden. (Red-team GAP-2a: the
+        // list above named +RunTurn.swift but NOT these — where totalRisk is actually computed — a real hole.)
+        "BASHostKit/EBrainHostRuntime+RiskService.swift",
+        "BASHostKit/BASMLRiskService.swift",
+        "BASHostKit/BASMLContextService.swift",
+        "BASHostKit/BASSSMCautionInput.swift",
         // Durable stores + event log
         "BASHostKit/BASSQLBrainHistoryStore.swift",
         "BASHostKit/BASRustBrainHistoryStore.swift",
@@ -46,6 +54,13 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         "BASMetalKernelDispatchRouter",
     ]
 
+    /// The SHARED matcher used by BOTH the production tripwire (`testSpineFilesAreFreeOfMetalSymbols`) AND its
+    /// negative control (`testSpineGrepActuallyCatchesABannedSymbol`). Extracting it means the control
+    /// genuinely guards the production predicate: a refactor that broke this matcher fails the control too.
+    static func firstBannedSymbol(in content: String) -> String? {
+        bannedInSpine.first { content.contains($0) }
+    }
+
     func testSpineFilesAreFreeOfMetalSymbols() throws {
         let sources = Self.sourcesDir()
         var checked = 0
@@ -56,15 +71,45 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
                 continue
             }
             checked += 1
-            for banned in Self.bannedInSpine {
-                XCTAssertFalse(
-                    content.contains(banned),
+            if let banned = Self.firstBannedSymbol(in: content) {
+                XCTFail(
                     "DETERMINISM-BOUNDARY VIOLATION (ADR-039): spine file '\(rel)' references '\(banned)'. "
                     + "A non-bit-reproducible Metal value must NOT reach the byte-deterministic spine — "
                     + "cross only via snapToDeterministic in a boundary adapter, never in a spine file.")
             }
         }
         XCTAssertEqual(checked, Self.spineFiles.count, "every spine file must be present + checked")
+    }
+
+    // MARK: - Negative control (red-team GAP-1b): the grep actually catches a violation
+
+    /// The spine tripwire passes today because the spine files are clean — but a passing tripwire is only
+    /// meaningful if the underlying predicate WOULD fail on a real violation. This runs the EXACT shared
+    /// predicate the production test uses (`Self.firstBannedSymbol(in:)`) over a fixture that embeds a banned
+    /// symbol and asserts it is detected — and, symmetrically, that a clean fixture is not falsely flagged. Now
+    /// that both call the same matcher, a refactor that broke it fails THIS control too (not just silently
+    /// leaving the production tripwire passing).
+    func testSpineGrepActuallyCatchesABannedSymbol() {
+        // A line that a determinism-boundary violation would look like in a spine file. It embeds
+        // `approximateOnly` (bannedInSpine[0]) and `BASMetalTopKDispatcher`; the matcher returns the first hit
+        // by bannedInSpine order, i.e. "approximateOnly".
+        let violatingFixture = """
+            import BASMetalSubstrate
+            let score = BASMetalTopKDispatcher.shared.run(...)
+            atom.confidence = score.approximateOnly()   // <-- raw Metal value into the spine
+            """
+        XCTAssertEqual(Self.firstBannedSymbol(in: violatingFixture), "approximateOnly",
+            "the SHARED matcher MUST flag a fixture embedding a banned symbol — otherwise "
+            + "testSpineFilesAreFreeOfMetalSymbols could pass vacuously")
+
+        // Symmetric: a clean fixture (only the deterministic atomID crosses; value already snapped) must NOT
+        // be flagged by the same matcher.
+        let cleanFixture = """
+            let key = retrieved.atomID            // only the deterministic key crosses
+            atom.confidence = snapped             // already snapped via snapToDeterministic upstream
+            """
+        XCTAssertNil(Self.firstBannedSymbol(in: cleanFixture),
+            "a clean fixture must not trip the shared banned-symbol matcher (no false positive)")
     }
 
     // MARK: - BASApproxValue quarantine unit tests
