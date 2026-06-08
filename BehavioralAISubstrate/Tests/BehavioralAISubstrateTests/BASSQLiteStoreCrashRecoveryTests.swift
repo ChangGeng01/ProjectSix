@@ -47,7 +47,12 @@ final class BASSQLiteStoreCrashRecoveryTests: XCTestCase {
             domain: "d")
     }
 
-    // MARK: - Reopen-durability (WAL survives a clean-but-uncheckpointed close = crash-like)
+    // MARK: - Reopen-durability (data persists across close + reopen)
+    //
+    // NOTE: dropping the store runs `deinit` → `sqlite3_close_v2`, which on the LAST connection checkpoints
+    // the WAL into the main DB. So this proves REOPEN durability (committed data survives close+reopen,
+    // whether via checkpoint-on-close or WAL replay), NOT "WAL replay of an uncheckpointed -wal after a
+    // hard crash" — that needs a SIGKILL/process harness and is out of scope (see the file header).
 
     func testVectorIndexSurvivesReopen() async throws {
         let u = url("vec.sqlite")
@@ -55,7 +60,7 @@ final class BASSQLiteStoreCrashRecoveryTests: XCTestCase {
             let s = try BASSQLiteVectorIndexStorage(databaseURL: u)
             _ = try await s.upsert(entry("a1"))
             _ = try await s.upsert(entry("a2"))
-        }  // store dropped → deinit closes the handle without an explicit checkpoint (crash-like)
+        }  // store dropped → deinit closes the handle (close_v2 checkpoints the WAL into the main DB)
         let s2 = try BASSQLiteVectorIndexStorage(databaseURL: u)
         let all = try await s2.allEntriesOrThrow()
         XCTAssertEqual(Set(all.map(\.atomID)), ["a1", "a2"],

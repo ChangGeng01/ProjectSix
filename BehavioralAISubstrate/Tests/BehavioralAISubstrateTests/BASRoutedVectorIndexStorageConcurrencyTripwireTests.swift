@@ -30,21 +30,30 @@ final class BASRoutedVectorIndexStorageConcurrencyTripwireTests: XCTestCase {
         let original = BASRoutedVectorIndexStorage._concurrencyViolationHandler
         defer { BASRoutedVectorIndexStorage._concurrencyViolationHandler = original }
 
-        final class Box: @unchecked Sendable { let lock = NSLock(); var count = 0 }
-        let box = Box()
-        BASRoutedVectorIndexStorage._concurrencyViolationHandler = { _ in
-            box.lock.lock(); box.count += 1; box.lock.unlock()
+        // Box with INTERNALLY-LOCKED sync accessors — NSLock.lock() is unavailable DIRECTLY in an async body,
+        // but a sync getter that locks internally is fine to call from one.
+        final class Box: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _count = 0
+            private var _stop = false
+            func bump() { lock.lock(); _count += 1; lock.unlock() }
+            var count: Int { lock.lock(); defer { lock.unlock() }; return _count }
+            var stopped: Bool { lock.lock(); defer { lock.unlock() }; return _stop }
+            func stop() { lock.lock(); _stop = true; lock.unlock() }
         }
+        let box = Box()
+        BASRoutedVectorIndexStorage._concurrencyViolationHandler = { _ in box.bump() }
 
         let engine = try BASRoutedVectorIndexStorage(inMemory: ())
         for i in 0..<8 {
             _ = try await engine.upsert(entry("seed-\(i)", Float(i) / 8.0))
         }
 
-        // Writer: hammer upsert (actor-isolated → holds the writeInFlight flag across its FFI). Inline the
-        // entry construction so the detached task captures ONLY the Sendable `engine` (not `self`).
+        // Writer runs CONTINUOUSLY (always a mutation in-flight to race) until told to stop — captures only
+        // the Sendable engine + box (inline entry, no self).
         let writer = Task.detached {
-            for i in 0..<3000 {
+            var i = 0
+            while !box.stopped {
                 let e = BASVectorIndexEntry(
                     atomID: "seed-\(i % 8)",
                     normalizedEmbedding: BASEmbedding(
@@ -52,20 +61,28 @@ final class BASRoutedVectorIndexStorageConcurrencyTripwireTests: XCTestCase {
                         providerVersion: "p").normalized,
                     domain: "g")
                 _ = try? await engine.upsert(e)
+                i += 1
             }
         }
-        // Reader: hammer the nonisolated sync read on THIS thread, concurrent with the writer.
-        for _ in 0..<3000 {
-            _ = try? engine.cosineTopKAtomIDsSync(forDomain: "g", query: [1, 0, 0, 0], k: 3)
+        // Reader hammers the nonisolated sync read until a race is DETECTED or a generous deadline — making
+        // the catch scheduler-INDEPENDENT (was flaky: a one-shot reader loop could finish before the
+        // detached writer ever got a time-slice → 0 detected races → false fail). Yield between batches so
+        // the writer makes progress even on few-core / loaded machines. Deadline-with-0 ⇒ the detector is
+        // genuinely broken (a real signal, not a scheduling fluke).
+        let deadline = Date().addingTimeInterval(10)
+        while box.count == 0 && Date() < deadline {
+            for _ in 0..<200 {
+                _ = try? engine.cosineTopKAtomIDsSync(forDomain: "g", query: [1, 0, 0, 0], k: 3)
+                if box.count > 0 { break }
+            }
+            await Task.yield()
         }
+        box.stop()
         await writer.value
 
-        // Writer + reader loops have both finished — no concurrent mutation remains, so read directly
-        // (NSLock.lock() is unavailable from an async context, and unnecessary here).
-        let fired = box.count
-        XCTAssertGreaterThan(fired, 0,
+        XCTAssertGreaterThan(box.count, 0,
             "the DEBUG concurrency tripwire must fire when an upsert races the nonisolated sync read " +
-            "(if this is 0, the detector is broken — the safety net the contract relies on is absent)")
+            "(deadline-bounded catch; 0 here ⇒ the detector is broken, not a scheduling fluke)")
     }
 }
 #endif
