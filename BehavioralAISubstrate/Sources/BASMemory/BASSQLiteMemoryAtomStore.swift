@@ -125,6 +125,17 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
     /// stored property.
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    /// 先稳 P0 — OPT-IN diagnostic hook (default nil). The non-throwing protocol methods + convenience
+    /// accessors route a swallowed SQLite error here BEFORE returning their default, so a host can tell
+    /// "not found" from "DB broken" (integrity > availability, M91). Fires ONLY on the error path (which
+    /// already produced the default) ⇒ byte-equal on the success path. Default nil ⇒ today's exact behavior.
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+
+    /// Wire the diagnostic hook (actor-isolated; hosts set it once at setup). Zero init-signature change.
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Lifecycle
 
     /// Open or create the SQLite-backed store at `databaseURL`.
@@ -205,7 +216,8 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
 
     public func atom(forID id: String) async -> BASGovernedMemory? {
         guard let db else { return nil }
-        return try? Self.fetchAtom(db: db, atomID: id)
+        do { return try Self.fetchAtom(db: db, atomID: id) }
+        catch { onSilentFailure?(error); return nil }
     }
 
     @discardableResult
@@ -214,13 +226,16 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         to newTier: BASMemoryTier
     ) async -> Bool {
         guard let db else { return false }
-        guard var atom = try? Self.fetchAtom(db: db, atomID: id)
-        else { return false }
+        let fetched: BASGovernedMemory?
+        do { fetched = try Self.fetchAtom(db: db, atomID: id) }
+        catch { onSilentFailure?(error); return false }
+        guard var atom = fetched else { return false }
         atom.tier = newTier
         do {
             try Self.upsertAtom(db: db, atom: atom)
             return true
         } catch {
+            onSilentFailure?(error)
             return false
         }
     }
@@ -231,13 +246,16 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         to newStatus: BASMemoryGovernanceStatus
     ) async -> Bool {
         guard let db else { return false }
-        guard var atom = try? Self.fetchAtom(db: db, atomID: id)
-        else { return false }
+        let fetched: BASGovernedMemory?
+        do { fetched = try Self.fetchAtom(db: db, atomID: id) }
+        catch { onSilentFailure?(error); return false }
+        guard var atom = fetched else { return false }
         atom.governanceStatus = newStatus
         do {
             try Self.upsertAtom(db: db, atom: atom)
             return true
         } catch {
+            onSilentFailure?(error)
             return false
         }
     }
@@ -247,12 +265,15 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         forID id: String
     ) async -> BASGovernedMemory? {
         guard let db else { return nil }
-        guard let existing = try? Self.fetchAtom(db: db, atomID: id)
-        else { return nil }
+        let existing: BASGovernedMemory?
+        do { existing = try Self.fetchAtom(db: db, atomID: id) }
+        catch { onSilentFailure?(error); return nil }
+        guard let existing else { return nil }
         do {
             try Self.deleteAtom(db: db, atomID: id)
             return existing
         } catch {
+            onSilentFailure?(error)
             return nil
         }
     }
@@ -264,8 +285,18 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
     public var count: Int {
         get async {
             guard let db else { return 0 }
-            return (try? Self.countAtoms(db: db)) ?? 0
+            do { return try Self.countAtoms(db: db) }
+            catch { onSilentFailure?(error); return 0 }
         }
+    }
+
+    /// 先稳 P0 — throwing sibling of `count`: surfaces a SQLite error instead of returning 0, so a caller
+    /// can distinguish "empty" from "DB broken". The non-throwing `count` stays the byte-equal path.
+    public func countOrThrow() async throws -> Int {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.countAtoms(db: db)
     }
 
     /// All atom IDs currently stored. Mirrors
@@ -273,8 +304,17 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
     public var allIDs: Set<String> {
         get async {
             guard let db else { return [] }
-            return (try? Self.fetchAllIDs(db: db)) ?? []
+            do { return try Self.fetchAllIDs(db: db) }
+            catch { onSilentFailure?(error); return [] }
         }
+    }
+
+    /// 先稳 P0 — throwing sibling of `allIDs` (surfaces SQLite errors instead of returning []).
+    public func allIDsOrThrow() async throws -> Set<String> {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchAllIDs(db: db)
     }
 
     /// Insert or replace an atom. Used by hosts that admit atoms

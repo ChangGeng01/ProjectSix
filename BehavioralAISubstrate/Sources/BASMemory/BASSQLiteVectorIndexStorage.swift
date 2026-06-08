@@ -94,6 +94,16 @@ public actor BASSQLiteVectorIndexStorage {
     public let databaseURL: URL
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    /// 先稳 P0 — OPT-IN diagnostic hook (default nil). Non-throwing accessors route a swallowed SQLite error
+    /// here BEFORE defaulting, so a host can tell "absent" from "DB broken". Fires only on the error path
+    /// ⇒ byte-equal on success. Default nil ⇒ today's exact behavior.
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+
+    /// Wire the diagnostic hook (actor-isolated; set once at setup; zero init-signature change).
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     public init(databaseURL: URL) throws {
         self.databaseURL = databaseURL
         var handle: OpaquePointer?
@@ -162,8 +172,16 @@ public actor BASSQLiteVectorIndexStorage {
         forID atomID: String
     ) async -> BASVectorIndexEntry? {
         guard let db else { return nil }
-        return try? Self.fetch(
-            db: db, atomID: atomID)
+        do { return try Self.fetch(db: db, atomID: atomID) }
+        catch { onSilentFailure?(error); return nil }
+    }
+
+    /// 先稳 P0 — throwing sibling of `entry(forID:)`: surfaces a SQLite error instead of returning nil.
+    public func entryOrThrow(forID atomID: String) async throws -> BASVectorIndexEntry? {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetch(db: db, atomID: atomID)
     }
 
     /// Remove entry by atom ID。Returns true if removed,false
@@ -182,8 +200,17 @@ public actor BASSQLiteVectorIndexStorage {
     public var totalCount: Int {
         get async {
             guard let db else { return 0 }
-            return (try? Self.countAll(db: db)) ?? 0
+            do { return try Self.countAll(db: db) }
+            catch { onSilentFailure?(error); return 0 }
         }
+    }
+
+    /// 先稳 P0 — throwing sibling of `totalCount` (surfaces SQLite errors instead of returning 0).
+    public func totalCountOrThrow() async throws -> Int {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.countAll(db: db)
     }
 
     /// Bulk-fetch all entries (for preload at session start)。
@@ -191,7 +218,16 @@ public actor BASSQLiteVectorIndexStorage {
     /// `atom_id` ASC for stable deterministic replay。
     public func allEntries() async -> [BASVectorIndexEntry] {
         guard let db else { return [] }
-        return (try? Self.fetchAll(db: db)) ?? []
+        do { return try Self.fetchAll(db: db) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 P0 — throwing sibling of `allEntries()` (surfaces SQLite errors instead of returning []).
+    public func allEntriesOrThrow() async throws -> [BASVectorIndexEntry] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchAll(db: db)
     }
 
     // MARK: - Preload helper

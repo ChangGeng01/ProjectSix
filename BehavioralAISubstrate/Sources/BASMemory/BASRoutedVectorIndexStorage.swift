@@ -127,6 +127,33 @@ public actor BASRoutedVectorIndexStorage {
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
 
+    #if DEBUG
+    // 先稳 P0 — DEBUG-only concurrency tripwire for `cosineTopKAtomIDsSync`'s contract ("no concurrent
+    // upsert/remove during the nonisolated sync read"). The actor-isolated mutators raise a flag across
+    // their FFI; the nonisolated reader checks it. NSLock-guarded (no new dep); compiles out ENTIRELY in
+    // release (the hot path stays byte-identical). The violation handler is swappable so a test can RECORD
+    // instead of abort. ADR-037 acknowledged this footgun in prose; this makes it catchable.
+    private nonisolated(unsafe) let _writeLock = NSLock()
+    private nonisolated(unsafe) var _writeInFlightCount = 0
+    public nonisolated(unsafe) static var _concurrencyViolationHandler: @Sendable (String) -> Void = {
+        assertionFailure($0)
+    }
+    private nonisolated func _enterWrite() {
+        _writeLock.lock(); _writeInFlightCount += 1; _writeLock.unlock()
+    }
+    private nonisolated func _exitWrite() {
+        _writeLock.lock(); _writeInFlightCount -= 1; _writeLock.unlock()
+    }
+    private nonisolated func _assertNoConcurrentWrite() {
+        _writeLock.lock(); let n = _writeInFlightCount; _writeLock.unlock()
+        if n != 0 {
+            Self._concurrencyViolationHandler(
+                "BASRoutedVectorIndexStorage.cosineTopKAtomIDsSync raced \(n) concurrent upsert/remove " +
+                "— turn-phase separation violated (the nonisolated sync read is unsafe during a mutation)")
+        }
+    }
+    #endif
+
     public init(databaseURL: URL) throws {
         self.databaseURL = databaseURL
         let pathStr = databaseURL.path
@@ -198,6 +225,9 @@ public actor BASRoutedVectorIndexStorage {
     public func upsert(
         _ entry: BASVectorIndexEntry
     ) async throws -> Bool {
+        #if DEBUG
+        _enterWrite(); defer { _exitWrite() }
+        #endif
         // Encode metadata as JSON via Apple boundary
         // chapter 九百二十二 / M3315 CRITICAL fix NC3:
         // .sortedKeys for deterministic encoding (was the
@@ -281,6 +311,9 @@ public actor BASRoutedVectorIndexStorage {
 
     @discardableResult
     public func remove(atomID: String) async throws -> Bool {
+        #if DEBUG
+        _enterWrite(); defer { _exitWrite() }
+        #endif
         let bytes = Array(atomID.utf8)
         let rc = bytes.withUnsafeBufferPointer { buf in
             bas_l8_vector_index_remove(
@@ -588,6 +621,9 @@ public actor BASRoutedVectorIndexStorage {
         query: [Float],
         k: Int
     ) throws -> [(atomID: String, score: Float)] {
+        #if DEBUG
+        _assertNoConcurrentWrite()
+        #endif
         try Self.validateQueryFloats(query)
         guard k > 0 && k <= Self.limitCap else {
             throw StoreError.invalidArgument(

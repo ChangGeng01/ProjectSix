@@ -127,6 +127,16 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// access through actor-isolated methods。
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    /// 先稳 P0 — OPT-IN diagnostic hook (default nil). The non-throwing read accessors route a swallowed
+    /// SQLite error here BEFORE defaulting, so a host can tell "no events" from "DB broken". Fires only on
+    /// the error path ⇒ byte-equal on success. Default nil ⇒ today's exact behavior.
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+
+    /// Wire the diagnostic hook (actor-isolated; set once at setup; zero init-signature change).
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Lifecycle
 
     public init(databaseURL: URL) throws {
@@ -248,8 +258,16 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         forSession sessionID: String
     ) async -> [BASEventLogEntry] {
         guard let db else { return [] }
-        return (try? Self.fetchEventsForSession(
-            db: db, sessionID: sessionID)) ?? []
+        do { return try Self.fetchEventsForSession(db: db, sessionID: sessionID) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 P0 — throwing sibling of `events(forSession:)` (surfaces SQLite errors instead of returning []).
+    public func eventsOrThrow(forSession sessionID: String) async throws -> [BASEventLogEntry] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchEventsForSession(db: db, sessionID: sessionID)
     }
 
     public func events(
@@ -257,15 +275,33 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         limit: Int
     ) async -> [BASEventLogEntry] {
         guard let db, limit > 0 else { return [] }
-        return (try? Self.fetchEventsSinceTimestamp(
-            db: db, since: since, limit: limit)) ?? []
+        do { return try Self.fetchEventsSinceTimestamp(db: db, since: since, limit: limit) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 P0 — throwing sibling of `events(sinceTimestampMs:limit:)` (surfaces SQLite errors).
+    public func eventsOrThrow(sinceTimestampMs since: Int64, limit: Int) async throws -> [BASEventLogEntry] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        guard limit > 0 else { return [] }
+        return try Self.fetchEventsSinceTimestamp(db: db, since: since, limit: limit)
     }
 
     public var totalCount: Int {
         get async {
             guard let db else { return 0 }
-            return (try? Self.countAll(db: db)) ?? 0
+            do { return try Self.countAll(db: db) }
+            catch { onSilentFailure?(error); return 0 }
         }
+    }
+
+    /// 先稳 P0 — throwing sibling of `totalCount` (surfaces SQLite errors instead of returning 0).
+    public func totalCountOrThrow() async throws -> Int {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.countAll(db: db)
     }
 
     @discardableResult
