@@ -35,8 +35,10 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   Embedding/LLM/Planning/Reasoning/Animation/Perception). **macOS mechanisms built (Phases 0-3 + sync-bridge),
   each opt-in / byte-equal-off / macOS-verified:** `BASApproxValue` type-quarantine + spine build-tripwire
   (P0) · per-kernel exec records + `recordSink` (P1) · L8 Metal topK dispatcher + async→sync bridge (P2) ·
-  deterministic dispatch router (P3). **Pending (batched on-device + host integration):** the live runner
-  wiring + the iPhone-Air R1 certs + Phase 4 (Metal SSM reasoning — `ssmCaution` stays CPU). See ADR-039.
+  deterministic dispatch router (P3). **On-device cert PASSED** (iPhone Air: `gpu=true`, parity_set_ok,
+  `max_score_err=0` — the FIRST on-device execution of the substrate's own Metal kernels, after fixing the
+  V2-guard + the loader's source-vs-metallib bug). **Pending:** the LIVE-cascade integration (L8 seam corpus
+  extraction + per-iter endurance line) + Phase 4 (Metal SSM reasoning — `ssmCaution` stays CPU). See ADR-039 §7.
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).

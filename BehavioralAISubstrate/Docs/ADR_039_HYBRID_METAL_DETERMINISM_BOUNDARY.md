@@ -92,3 +92,29 @@ Nothing ships/claims-"Metal is live here" on macOS-green alone. Each phase is:
 - No in-process Metal-wedge recovery exists or is added (ADR-038) — prevention + external watchdog only.
 - This ADR supersedes the scattered "Metal is observation-only" notes (`BASMetalKernelLibraryLoader`,
   the classifier/policy `consultedByExecutorInProduction=false` comments) with one governing rule.
+
+## 7. On-device cert — PASSED (Metal runs on the iPhone Air GPU), 2026-06-08
+
+The Metal mechanisms (Phases 1-3) were certified on real hardware via a boot-time `BAS_METAL_SMOKE` in the
+endurance runner (topK dispatch + on-device parity vs the CPU reference + the router decision). The cert
+surfaced — and fixed — TWO real blockers behind the long-standing "probe-only / Metal contributes 0 to
+live decode" status:
+
+1. **The V2-guard.** `BASMetalKernelLibraryLoader.library()` short-circuits to `.metalUnavailableOnPlatform`
+   unless `useMetalKernelV2: true` is requested (default false) — any caller using the default loader never
+   reached the GPU. (`canImport(Metal)` is true on-device; it was NOT a real Metal-unavailable.)
+2. **Source-vs-metallib.** SPM's `.process(...metal)` COMPILES all kernel `.metal` files into ONE
+   `default.metallib`; the iOS-app bundle ships ONLY that (no `.metal` SOURCE), so the loader's runtime
+   source-compile path threw `resourceURLMissing` on-device. Fixed: `library()` now prefers
+   `device.makeDefaultLibrary(bundle:)` (the precompiled lib), falling through to source-compile.
+
+**Result (iPhone Air, iOS 26.5):**
+`📊 ch1025 metal-smoke gpu=true topk_ms=8.33 parity_set_ok=true max_score_err=0.000000 routing=ane-native hits=5`
+— the Metal topK ran on the GPU, selected the SAME rows as the CPU reference, scores matching to 6 decimals.
+**First on-device execution of the substrate's own Metal kernels, with parity.** The macOS parity test
+(`useMetalKernelV2: true`) independently runs on the Mac GPU + passes.
+
+**Honest scope:** this certifies the Metal MECHANISMS (dispatch + parity + records + the router decision)
+on-device — the core claim "the substrate's Metal kernels really execute on the GPU + agree with CPU" is
+now PROVEN, not inferred. It does NOT yet put Metal on the LIVE cascade: the L8 retrieval seam (corpus
+extraction + the sync-bridge wiring) + Phase 4 (SSM reasoning) remain the live-integration work.
