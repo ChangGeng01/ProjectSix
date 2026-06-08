@@ -161,8 +161,9 @@ byte-equal-off; taken only on the snapshot path (a Rust seam wins precedence). A
    land together, not at snapshot scale.
 
 **Status:** macOS-certified (`BASMetalL8SeamTests` + `BASMetalTopKParityTests` + spine tripwire + cascade
-byte-equal net; DeviceTestApp builds for the iPhone Air). **On-device cert PENDING an awake device** (the
-device slept between the §7 smoke cert and the L8 run, so the launched app was iOS-suspended).
+byte-equal net; DeviceTestApp builds for the iPhone Air). **On-device cert PASSED (2026-06-08, iPhone Air):**
+`📊 ch1025 metal-smoke gpu=true topk_ms=1.56 parity_set_ok=true max_score_err=0.000000 routing=ane-native
+hits=5` — the L8 Metal topK runs on the GPU + selects the same rows as the CPU reference, exact.
 
 ## 9. Phase 4 — Metal SSMScan → non-governance reasoning sink (the sharpest boundary)
 
@@ -192,9 +193,11 @@ runs the Metal `SSMScan` kernel on the SAME per-turn data without ever touching 
 **Cert status:** macOS-certified (the boundary proof + Metal-vs-CPU magnitude parity ≤1e-4 on the Mac GPU;
 spine tripwire green; DeviceTestApp builds). **On-device SSM GPU+parity** is certified by an extension to the
 `BAS_METAL_SMOKE` boot block (it now ALSO dispatches the SSMScan kernel + logs
-`📊 ssm-metal-smoke gpu=.. parity_mae=..`) — **PENDING an awake device** (batched with the Phase-2 L8 cert).
-The live per-turn reasoning emission over a long endurance run (the host wiring the sink end-to-end) is the
-operational follow-up; the MECHANISM + the BOUNDARY are proven.
+`📊 ssm-metal-smoke gpu=.. parity_mae=..`). **On-device cert PASSED (2026-06-08, iPhone Air):**
+`📊 ch1025 ssm-metal-smoke gpu=true ssm_ms=0.82 parity_mae=0.000000 y_len=24 cpu_len=24` — the Metal SSMScan
+runs on the GPU + agrees with the CPU reference to 6 decimals (mae=0). The live per-turn reasoning emission
+over a long endurance run (the host wiring the sink end-to-end) is the operational follow-up; the MECHANISM +
+the BOUNDARY are proven.
 
 ## 10. The division of labor — Rust+SQL 先稳 → Metal 再吃掉 (operator doctrine)
 
@@ -231,7 +234,9 @@ A hot path becomes a live Metal eat ONLY when it is (i) **substrate-owned**, (ii
   (`BASAttentionTurnSignalBuilder` → `BASAttentionMetalReasoning`, the FIRST live consumer of the Phase-3
   router): Q = affect, K=V = candidates → `softmax(QKᵀ/√D)·V`; emitted via a default-nil
   `attentionReasoningInputSink`; the host runs Metal OFF the turn thread; flag-on is byte-identical to off
-  (`BASAttentionMetalReasoningRunTurnTests`). Feeds NO verdict. ✓
+  (`BASAttentionMetalReasoningRunTurnTests`). Feeds NO verdict. **On-device cert PASSED (2026-06-08, iPhone
+  Air):** `📊 ch1025 attn-metal-smoke gpu=true attn_ms=27.85 parity_mae=0.000000 routing=ane-native y_len=3`
+  — Metal attention runs on the GPU + matches the CPU reference (mae=0). ✓
 - **Decode attention does NOT qualify** — MLX-owned (wall 1); the only substrate-owned softmax is governance
   (wall 2). ✗
 

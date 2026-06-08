@@ -40,8 +40,8 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   V2-guard + the loader's source-vs-metallib bug). **Phase 2 L8 LIVE seam BUILT + macOS-certified** —
   Metal cosine-topK over the in-Swift snapshot corpus (`BASMetalCosineTopKSeam`, opt-in `BAS_L8_METAL_TOPK`,
   default byte-equal-off; wedge-safe nil→CPU retreat; boundary-verified by a full spine trace = only atomID
-  crosses), DeviceTestApp builds + the per-iter `📊 l8-metal-topk` line is wired; **on-device cert pending an
-  awake device** (the device slept between the smoke cert and the run). **Hardened via a 3-perspective audit**
+  crosses), DeviceTestApp builds + the per-iter `📊 l8-metal-topk` line is wired; **on-device cert PASSED**
+  (iPhone Air 2026-06-08: `topk gpu=true parity_set_ok=true max_score_err=0`). **Hardened via a 3-perspective audit**
   (query-dim/dim>0 guards + `cpuReference` no-trap; `k=snap.count` ⇒ CPU-identical membership; single-in-flight
   wedge gate bounds a hang to ONE leaked task; telemetry captures fault-vs-timeout; real-dim pre-warm). Honest
   limits (ADR-039 §8): at ≤64-row snapshot scale it's a perf LOSS (default-off mandatory) + the score reaches
@@ -56,7 +56,9 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   `runTurn` emits only the deterministic input; the host runs Metal OFF the turn thread (Phase-3 routed,
   thermal-critical⇒CPU). Boundary PROVEN byte-identical (`BASAttentionMetalReasoningRunTurnTests`) + Metal≈CPU
   ≤1e-4; the smoke now also dispatches the attention kernel (`📊 attn-metal-smoke`).
-  **On-device cert (L8 topK + SSM + attention) pending an awake device.** See ADR-039 §7/§8/§9/§10.
+  **On-device cert PASSED (iPhone Air, 2026-06-08) — all 3 substrate Metal kernels run on the GPU with EXACT
+  parity:** `metal-smoke gpu=true parity_set_ok=true max_score_err=0` (topK) · `ssm-metal-smoke gpu=true
+  parity_mae=0` (SSM) · `attn-metal-smoke gpu=true parity_mae=0 routing=ane-native` (attention). See ADR-039 §7/§8/§9/§10.
   **Division-of-labor doctrine codified (§10):** the two walls (MLX-owns-decode-attention; the context
   softmax is governance⇒CPU) + the eligibility rule (substrate-owned + non-governance + opt-in/byte-equal-off/
   parity/wedge-safe/cert) + the 先稳→再吃掉 sequencing. **先稳: the Rust+SQL L8 spine was hardened FIRST**
