@@ -219,39 +219,52 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 code: -1,
                 message: "db handle nil after init")
         }
-        // Idempotent retry: if event_id exists,return its
-        // sequenceNumber + wasNew=false
-        if let existing = try Self.fetchEntry(
-            db: db, eventID: entry.eventID)
-        {
-            return (
-                wasNew: false,
-                assignedSequenceNumber:
-                    existing.sequenceNumber)
+        // 先稳 P1 — wrap the read-modify-write (idempotent check + SELECT MAX(seq) + INSERT) in
+        // BEGIN IMMEDIATE so the per-session sequence-number assignment is ATOMIC: the writer lock is
+        // taken up-front, closing the SELECT-MAX/INSERT race window. Assigned values are unchanged (still
+        // max+1 per session) ⇒ byte-equal with the in-memory store + the parity suites. On any error the
+        // txn is rolled back so a failed append never leaves a half-open transaction (which would make the
+        // NEXT append's BEGIN IMMEDIATE fail). Mirrors BASSQLiteAtomLifecycleStore's txn idiom.
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        do {
+            // Idempotent retry: if event_id exists, return its sequenceNumber + wasNew=false.
+            if let existing = try Self.fetchEntry(
+                db: db, eventID: entry.eventID)
+            {
+                try Self.runExec(db: db, sql: "COMMIT;")
+                return (
+                    wasNew: false,
+                    assignedSequenceNumber:
+                        existing.sequenceNumber)
+            }
+            let assigned = try Self.nextSequenceNumber(
+                db: db, sessionID: entry.sessionID)
+            let stamped = BASEventLogEntry(
+                eventID: entry.eventID,
+                timestampMs: entry.timestampMs,
+                kind: entry.kind,
+                sessionID: entry.sessionID,
+                sequenceNumber: assigned,
+                source: entry.source,
+                turnRef: entry.turnRef,
+                rawInputDigest: entry.rawInputDigest,
+                intent: entry.intent,
+                emotion: entry.emotion,
+                riskBand: entry.riskBand,
+                project: entry.project,
+                memoryRefs: entry.memoryRefs,
+                stateBeforeID: entry.stateBeforeID,
+                stateAfterID: entry.stateAfterID,
+                actions: entry.actions,
+                confidence: entry.confidence,
+                payloadJson: entry.payloadJson)
+            try Self.insertEntry(db: db, entry: stamped)
+            try Self.runExec(db: db, sql: "COMMIT;")
+            return (wasNew: true, assignedSequenceNumber: assigned)
+        } catch {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw error
         }
-        let assigned = try Self.nextSequenceNumber(
-            db: db, sessionID: entry.sessionID)
-        let stamped = BASEventLogEntry(
-            eventID: entry.eventID,
-            timestampMs: entry.timestampMs,
-            kind: entry.kind,
-            sessionID: entry.sessionID,
-            sequenceNumber: assigned,
-            source: entry.source,
-            turnRef: entry.turnRef,
-            rawInputDigest: entry.rawInputDigest,
-            intent: entry.intent,
-            emotion: entry.emotion,
-            riskBand: entry.riskBand,
-            project: entry.project,
-            memoryRefs: entry.memoryRefs,
-            stateBeforeID: entry.stateBeforeID,
-            stateAfterID: entry.stateAfterID,
-            actions: entry.actions,
-            confidence: entry.confidence,
-            payloadJson: entry.payloadJson)
-        try Self.insertEntry(db: db, entry: stamped)
-        return (wasNew: true, assignedSequenceNumber: assigned)
     }
 
     public func events(
