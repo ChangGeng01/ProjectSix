@@ -963,7 +963,11 @@ final class BASEnduranceAppController: ObservableObject {
                 query: smokeQuery, corpus: smokeCorpus, dim: smokeDim, k: smokeK)
             let smokeRouting = BASMetalKernelDispatchRouter.decide(
                 op: .matMul, thermalState: .nominal, anePriority: .aneFirst).routing
-            let smokeDispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader())
+            // useMetalKernelV2: true is REQUIRED — the loader's library() short-circuits to
+            // .metalUnavailableOnPlatform when V2 is not requested (it is NOT a real Metal-unavailable;
+            // canImport(Metal) is true on-device). This is the actual gate for the Metal-kernel path.
+            let smokeDispatcher = BASMetalTopKDispatcher(
+                loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
             let smokeT0 = monoNowNs()
             do {
                 let approx = try await smokeDispatcher.dispatch(
