@@ -345,8 +345,10 @@ process FULLY recovers with NO reboot.**
   `cb.status` / `event` value at the hang, or a GPU capture) to confirm "GPU completed, CPU never signaled" vs
   "buffer never submitted," then fix in vendored MLX or upstream.
 
-**Honesty bounds:** n=1 device, iOS 26.5; the wedge reproduced (here @17 responses vs the earlier OFF @56 — high
-variance, but it wedged), and the "relaunch recovers without reboot" result is being reconfirmed (n=2) — recorded
-on completion. The GPU-exoneration itself is decisive from a single instance (the heartbeat directly observed the
-GPU executing during the wedge — not an inference). The exact MLX line is not yet pinned (closed below the
-metal-cpp bridge for the Apple side, but the suspects above are in the vendored MLX C++ we can instrument).
+**Honesty bounds:** n=1 device, iOS 26.5; the wedge reproduced across runs (@17, then @12 responses — high
+variance in the threshold, but it wedges reliably). The **"kill + relaunch fully recovers, no reboot" result is
+now n=2 confirmed**: two independent wedge→kill→full-MLX-relaunch cycles both loaded + ran + COMPLETED normally
+on the just-wedged device. The GPU-exoneration is decisive even from a single instance (the heartbeat directly
+observed the GPU executing during the wedge — not an inference). The exact MLX line is not yet pinned (closed
+below the metal-cpp bridge for the Apple side, but the suspects above are in the vendored MLX C++ we can
+instrument — task A/#60).
