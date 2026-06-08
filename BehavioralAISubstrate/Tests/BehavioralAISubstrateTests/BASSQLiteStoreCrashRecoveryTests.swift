@@ -136,4 +136,21 @@ final class BASSQLiteStoreCrashRecoveryTests: XCTestCase {
                 "OrThrow surfaces the typed StorageError, got \(error)")
         }
     }
+
+    // MARK: - integrity_check opt-in (P2) — passes on a healthy DB
+
+    func testIntegrityCheckOpenPassesOnHealthyDB() async throws {
+        let prior = BASSQLiteVectorIndexStorage.runIntegrityCheckOnOpen
+        defer { BASSQLiteVectorIndexStorage.runIntegrityCheckOnOpen = prior }
+        BASSQLiteVectorIndexStorage.runIntegrityCheckOnOpen = true
+        let u = url("integ.sqlite")
+        let s = try BASSQLiteVectorIndexStorage(databaseURL: u)   // opens cleanly with the scan ON
+        _ = try await s.upsert(entry("ok1"))
+        let n1 = try await s.totalCountOrThrow()
+        XCTAssertEqual(n1, 1)
+        let s2 = try BASSQLiteVectorIndexStorage(databaseURL: u)  // reopen, scan still ON, still healthy
+        let n2 = try await s2.totalCountOrThrow()
+        XCTAssertEqual(n2, 1,
+            "integrity_check passes on a healthy DB (opt-in proactive scan adds no false positives)")
+    }
 }

@@ -85,6 +85,10 @@ public actor BASSQLiteVectorIndexStorage {
 
     public static let schemaVersion: Int = 1
 
+    /// 先稳 P2 — OPT-IN (default off): run `PRAGMA integrity_check` at open + throw if corrupt. Off by
+    /// default (full-DB scan ⇒ boot latency). Static so a host can enable it before init.
+    public nonisolated(unsafe) static var runIntegrityCheckOnOpen: Bool = false
+
     /// Float32 byte size — pinned per chapter 一百八十五 anti-
     /// magic-number。Used by encode/decode of embedding_blob。
     public static let floatByteSize: Int = 4
@@ -124,6 +128,8 @@ public actor BASSQLiteVectorIndexStorage {
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
+        // 先稳 P2 — bound WAL growth over long sessions (mirrors the event log's M891 setting).
+        try Self.runExec(db: handle, sql: "PRAGMA wal_autocheckpoint=200;")
 
         // M886 backport (M882 audit fix):read user_version FIRST,
         // branch on:0 → write current,equal → accept,mismatch
@@ -143,10 +149,32 @@ public actor BASSQLiteVectorIndexStorage {
         }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
+        if Self.runIntegrityCheckOnOpen {
+            try Self.assertIntegrity(db: handle)   // 先稳 P2 — opt-in proactive corruption scan
+        }
     }
 
     deinit {
         if let db { sqlite3_close_v2(db) }
+    }
+
+    /// 先稳 P2 — run `PRAGMA integrity_check`; throw if not "ok" (called at init when the flag is set).
+    private static func assertIntegrity(db: OpaquePointer) throws {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA integrity_check;", -1, &stmt, nil) == SQLITE_OK,
+              let stmt else {
+            throw StorageError.openFailed(
+                code: -2, message: "integrity_check prepare failed: " +
+                    String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var result = ""
+        if sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) {
+            result = String(cString: c)
+        }
+        guard result == "ok" else {
+            throw StorageError.openFailed(code: -2, message: "integrity_check failed: \(result)")
+        }
     }
 
     // MARK: - Public API

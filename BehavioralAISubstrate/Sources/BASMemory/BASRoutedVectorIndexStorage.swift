@@ -664,6 +664,14 @@ public actor BASRoutedVectorIndexStorage {
                 out.append((atomID: aid, score: scores[i]))
             }
         }
+        // 先稳 P2 — deterministic ORDER: re-sort the engine's (score, rowid)-ordered top-K by
+        // (score DESC, atomID ASC). atomID is content-derived (stable across engine rebuilds), so the
+        // RETURNED ORDER no longer depends on rowid assignment (which the in-memory ADR-037 engine
+        // reassigns on every rebuild). NOTE: this pins the ORDER; the K-th-boundary MEMBERSHIP at an EXACT
+        // score tie is still rowid-decided inside the engine — a rare, ACCEPTED non-byte-equal (ADR-036:
+        // this is the opt-in fast retrieve path, never the byte-deterministic spine). A full membership
+        // fix is the Rust-side `, atom_id` tiebreaker (requires an XCFramework rebuild — deferred).
+        out.sort { a, b in a.score != b.score ? a.score > b.score : a.atomID < b.atomID }
         return out
     }
 

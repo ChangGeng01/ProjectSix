@@ -109,6 +109,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     /// the payload_format column。
     public static let schemaVersion: Int = 2
 
+    /// 先稳 P2 — OPT-IN (default off): run `PRAGMA integrity_check` at open + throw if corrupt. Off by
+    /// default (full-DB scan ⇒ boot latency). Static so a host can enable it before init.
+    public nonisolated(unsafe) static var runIntegrityCheckOnOpen: Bool = false
+
     /// chapter 七百三十二 第三刀 — opt-in feature flag controlling
     /// whether NEW writes go through the binary path。 Default
     /// OFF until chapter 七百三十二 第四刀 measurement decides。
@@ -199,10 +203,32 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
+        if Self.runIntegrityCheckOnOpen {
+            try Self.assertIntegrity(db: handle)   // 先稳 P2 — opt-in proactive corruption scan
+        }
     }
 
     deinit {
         if let db { sqlite3_close_v2(db) }
+    }
+
+    /// 先稳 P2 — run `PRAGMA integrity_check`; throw if not "ok" (called at init when the flag is set).
+    private static func assertIntegrity(db: OpaquePointer) throws {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA integrity_check;", -1, &stmt, nil) == SQLITE_OK,
+              let stmt else {
+            throw StorageError.openFailed(
+                code: -2, message: "integrity_check prepare failed: " +
+                    String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var result = ""
+        if sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) {
+            result = String(cString: c)
+        }
+        guard result == "ok" else {
+            throw StorageError.openFailed(code: -2, message: "integrity_check failed: \(result)")
+        }
     }
 
     // MARK: - Protocol — BASEventLogStorage

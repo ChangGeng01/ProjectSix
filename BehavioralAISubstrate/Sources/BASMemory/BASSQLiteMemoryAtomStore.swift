@@ -105,6 +105,11 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
 
     public static let schemaVersion: Int = 1
 
+    /// 先稳 P2 — OPT-IN (default off): run `PRAGMA integrity_check` at open and THROW if the DB is corrupt,
+    /// surfacing subtle page corruption a lazy header check misses. Off by default (it is a full-DB scan ⇒
+    /// boot latency); a host enables it for high-assurance startup. Static so it can be set before init.
+    public nonisolated(unsafe) static var runIntegrityCheckOnOpen: Bool = false
+
     // MARK: - Stored state
 
     /// Database file URL. Surfaced for tests / observability —
@@ -178,6 +183,9 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         try Self.runExec(db: handle, sql: "PRAGMA foreign_keys=ON;")
+        // 先稳 P2 — bound WAL growth over long sessions (mirrors the event log's M891 setting) so an
+        // unexpected termination leaves a SMALL -wal to replay and a clean reopen stays fast.
+        try Self.runExec(db: handle, sql: "PRAGMA wal_autocheckpoint=200;")
 
         // M886 backport (M882 audit fix):read user_version FIRST,
         // branch on 0/equal/mismatch。Pre-M886 unconditional pragma
@@ -195,6 +203,9 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
+        if Self.runIntegrityCheckOnOpen {
+            try Self.assertIntegrity(db: handle)   // 先稳 P2 — opt-in proactive corruption scan
+        }
 
         // Idempotent boot: only seed `initial` when the table is
         // empty. Existing data wins.
@@ -210,6 +221,26 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
 
     deinit {
         if let db { sqlite3_close_v2(db) }
+    }
+
+    /// 先稳 P2 — run `PRAGMA integrity_check` and throw if the result is not "ok" (proactive corruption
+    /// detection). Called at init only when `runIntegrityCheckOnOpen` is set.
+    private static func assertIntegrity(db: OpaquePointer) throws {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA integrity_check;", -1, &stmt, nil) == SQLITE_OK,
+              let stmt else {
+            throw StorageError.openFailed(
+                code: -2, message: "integrity_check prepare failed: " +
+                    String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var result = ""
+        if sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) {
+            result = String(cString: c)
+        }
+        guard result == "ok" else {
+            throw StorageError.openFailed(code: -2, message: "integrity_check failed: \(result)")
+        }
     }
 
     // MARK: - Protocol — BASMemoryAtomStore
