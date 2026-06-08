@@ -43,9 +43,9 @@ public enum BASSovereignGatedTurn {
     /// canonical active policy bundle) and compares; a token minted under a stale/swapped policy lineage, or
     /// when the host has no policy lineage, is rejected FAIL-CLOSED.
     ///
-    /// `target` MUST be in the token's signed `allowedTargets` (the enforcer rejects an
-    /// aliased target). `register` stamps the TTL origin at call time, so the token's TTL
-    /// bounds the gate→execute window — gate promptly after the turn.
+    /// `target` MUST be in the token's signed `allowedTargets` (the enforcer rejects an aliased target). The
+    /// TTL is anchored to the TURN (`turnRecordedAt` → register issuedAt), so a stale token from an old turn is
+    /// rejected as expired — the scope TTL bounds turn-age, not just the gate→execute micro-window.
     ///
     /// - Throws: `GateError` (no token / unsupported scope) or the enforcer/authority
     ///   error on any gate failure — in EVERY failure case `op` is NOT invoked.
@@ -62,6 +62,7 @@ public enum BASSovereignGatedTurn {
         ticketCount: Int,
         enforcer: BASSovereignCommitEnforcer,
         trustedPolicyHashProvider: BASTrustedPolicyHashProvider,
+        turnRecordedAt: Date,
         op: @Sendable () async throws -> T
     ) async throws -> T {
         guard let token = commitTokens.first(where: { $0.scope == scope }) else {
@@ -77,7 +78,8 @@ public enum BASSovereignGatedTurn {
             ticketCount: ticketCount) else {
             throw GateError.unsupportedScope(scope)
         }
-        let registered = try await enforcer.register(token)
+        // TTL anchored to TURN time (not gate-call time) so a stale token is rejected as expired.
+        let registered = try await enforcer.register(token, issuedAt: turnRecordedAt)
         let gated = BASSovereignGatedCommit(enforcer: enforcer)
         return try await gated.executeGated(
             token: registered,
@@ -119,6 +121,7 @@ public enum BASSovereignGatedTurn {
             ticketCount: result.updateTickets.count,
             enforcer: enforcer,
             trustedPolicyHashProvider: trustedPolicyHashProvider,
+            turnRecordedAt: result.runtimeTrace.recordedAt,
             op: op)
     }
 }

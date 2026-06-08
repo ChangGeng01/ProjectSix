@@ -393,4 +393,51 @@ final class BASEventLogTamperRedTeamTests: XCTestCase {
         XCTAssertEqual(e.confidence, 0.875, accuracy: 1e-9, "confidence round-trips")
         XCTAssertEqual(e.payloadJson, "{\"host\":\"ext\"}", "host payloadJson extension round-trips")
     }
+
+    // MARK: - Audit-2 fix: a FULL retention prune must not false-flag as total erasure; out-of-band still does
+
+    func testHashChainFullPruneDoesNotFalseFlagAsErasure() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-fullprune.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        try await appendN(store, session: "s", n: 3)   // ts base+0..2
+        // FULL retention prune (cutoff past the last event) removes ALL events; the sidecar is pruned in
+        // lockstep, so verify sees no events + no chain = CLEAN (not a false total-erasure alarm).
+        _ = try await store.pruneEventsBefore(timestampMs: 1_700_000_000_999)
+        try await store.verifyIntegrityChain(forSession: "s")   // must NOT throw
+
+        // An OUT-OF-BAND total erasure (sidecar NOT pruned) is STILL detected.
+        try await appendN(store, session: "s2", n: 2)
+        _ = try rawExec(p, "DELETE FROM event_log WHERE session_id='s2';")
+        do {
+            try await store.verifyIntegrityChain(forSession: "s2")
+            XCTFail("out-of-band total erasure (sidecar intact) must still be detected")
+        } catch let e as BASSQLiteEventLogStorage.StorageError {
+            guard case .corruptedRow = e else { return XCTFail("expected .corruptedRow, got \(e)") }
+        }
+    }
+
+    // MARK: - Audit-2 coverage: the chain holds under concurrent (actor-serialized) appends
+
+    func testHashChainHoldsUnderConcurrentAppends() async throws {
+        BASSQLiteEventLogStorage.rowIntegrityChainEnabled = true
+        let p = path("evt-chain-concurrent.sqlite")
+        let store = try BASSQLiteEventLogStorage(databaseURL: URL(fileURLWithPath: p))
+        let session = "s"
+        let n = 50
+        await withTaskGroup(of: Void.self) { group in
+            for j in 0..<n {
+                group.addTask {
+                    _ = try? await store.append(BASEventLogEntry(
+                        eventID: "\(session)-e\(j)", timestampMs: 1_700_000_000_000 + Int64(j),
+                        kind: .substrateAudit, sessionID: session, sequenceNumber: 0, actions: ["a\(j)"]))
+                }
+            }
+        }
+        let events = try await store.eventsOrThrow(forSession: session)
+        XCTAssertEqual(events.count, n, "all concurrent appends landed")
+        // The chain must verify cleanly — each append's sidecar insert is atomic inside its BEGIN IMMEDIATE txn,
+        // and the actor serializes appends so the prevHash read→insert never races.
+        try await store.verifyIntegrityChain(forSession: session)
+    }
 }

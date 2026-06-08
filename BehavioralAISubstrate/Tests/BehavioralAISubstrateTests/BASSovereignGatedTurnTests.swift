@@ -60,13 +60,14 @@ final class BASSovereignGatedTurnTests: XCTestCase {
     private func gateRender(
         tokens: [BASSovereignCommitToken], target: String, body: String, mode: String = "answer",
         enforcer: BASSovereignCommitEnforcer, counter: OpCounter,
-        provider: BASTrustedPolicyHashProvider = StubPolicyHashProvider()
+        provider: BASTrustedPolicyHashProvider = StubPolicyHashProvider(),
+        turnRecordedAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
     ) async throws -> String {
         try await BASSovereignGatedTurn.gate(
             commitTokens: tokens, scope: .renderHighRisk, target: target,
             foldID: "f1", renderMode: mode, renderHeadline: "head", renderBody: body,
             ticketActionDigestParts: [], ticketCount: 0, enforcer: enforcer,
-            trustedPolicyHashProvider: provider
+            trustedPolicyHashProvider: provider, turnRecordedAt: turnRecordedAt
         ) { await counter.bump(); return "rendered" }
     }
 
@@ -182,6 +183,22 @@ final class BASSovereignGatedTurnTests: XCTestCase {
         }
         let n = await counter.get()
         XCTAssertEqual(n, 0, "op must NOT run when the trusted policy hash is unavailable")
+    }
+
+    // MARK: - 5d) a STALE turn (recordedAt older than the token TTL) → DENY as expired (turn-anchored TTL)
+
+    func testGateDeniesStaleTurnViaTurnAnchoredTTL() async throws {
+        let enforcer = makeEnforcer(BASAuthorityClock())   // clock pinned at t0
+        let counter = OpCounter()
+        do {
+            _ = try await gateRender(
+                tokens: [renderToken(body: "approved")], target: "answer", body: "approved",
+                enforcer: enforcer, counter: counter,
+                turnRecordedAt: t0.addingTimeInterval(-3600))   // turn recorded 1h ago → past the 60s token TTL
+            XCTFail("a token from a stale turn must be denied as expired (TTL anchored to turn time)")
+        } catch BASSovereignTokenAuthority.AuthorityError.expired { /* expected */ }
+        let n = await counter.get()
+        XCTAssertEqual(n, 0, "op must NOT run for a token whose turn is older than its TTL")
     }
 
     // MARK: - 6) the shared parts formula — all scopes + tamper-sensitivity

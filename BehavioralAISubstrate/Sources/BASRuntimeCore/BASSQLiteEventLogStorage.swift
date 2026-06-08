@@ -176,6 +176,10 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
         self.db = handle
 
+        // Audit fix (LOW): set busy_timeout BEFORE the WAL/checkpoint pragmas so a checkpoint/reader collision
+        // makes a write block-and-retry internally (up to 5s) rather than throwing SQLITE_BUSY + losing the
+        // append. Mirrors BASSovereignLedgerStorage.
+        try Self.runExec(db: handle, sql: "PRAGMA busy_timeout=5000;")
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
@@ -621,27 +625,62 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         db: OpaquePointer,
         cutoff: Int64
     ) throws -> Int {
+        // Audit fix (ADR-040): prune the integrity sidecar in LOCKSTEP with event_log, atomically, so a
+        // retention prune leaves no orphan chain rows AND a FULL prune does not later read as total-session
+        // erasure tamper (the sidecar is emptied too ⇒ verifyIntegrityChain sees no events + no chain = clean).
+        // An OUT-OF-BAND event_log delete (the malicious case) leaves the sidecar intact ⇒ still detected.
+        // The sidecar rows are deleted FIRST (their subquery reads event_log before its rows are removed).
+        try runExec(db: db, sql: "BEGIN IMMEDIATE;")
+        do {
+            if try sidecarTableExists(db: db) {
+                try pruneSidecarBefore(db: db, cutoff: cutoff)
+            }
+            let sql = "DELETE FROM event_log WHERE timestamp_ms < ?"
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+                throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_int64(stmt, 1, cutoff)
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            }
+            let changed = Int(sqlite3_changes(db))
+            try runExec(db: db, sql: "COMMIT;")
+            return changed
+        } catch {
+            try? runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Does the opt-in integrity sidecar table exist? (Avoids a DELETE error when the chain was never enabled.)
+    fileprivate static func sidecarTableExists(db: OpaquePointer) throws -> Bool {
+        let sql = "SELECT 1 FROM sqlite_master WHERE type='table' AND name='event_log_integrity' LIMIT 1"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW
+    }
+
+    /// Delete sidecar rows for events being pruned (event_id matches an event_log row below the cutoff). MUST
+    /// run BEFORE the event_log delete so the subquery still sees those rows.
+    fileprivate static func pruneSidecarBefore(db: OpaquePointer, cutoff: Int64) throws {
         let sql = """
-            DELETE FROM event_log
-            WHERE timestamp_ms < ?
+            DELETE FROM event_log_integrity WHERE event_id IN
+              (SELECT event_id FROM event_log WHERE timestamp_ms < ?)
             """
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
-            == SQLITE_OK,
-            let stmt
-        else {
-            throw StorageError.prepareFailed(
-                sql: sql,
-                message: String(cString: sqlite3_errmsg(db)))
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw StorageError.prepareFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, cutoff)
         guard sqlite3_step(stmt) == SQLITE_DONE else {
-            throw StorageError.stepFailed(
-                sql: sql,
-                message: String(cString: sqlite3_errmsg(db)))
+            throw StorageError.stepFailed(sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
-        return Int(sqlite3_changes(db))
     }
 
     // MARK: - Schema setup

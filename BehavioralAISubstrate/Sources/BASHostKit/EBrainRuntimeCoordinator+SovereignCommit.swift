@@ -1616,8 +1616,8 @@ extension BASEBrainRuntimeCoordinator {
         // (EBrainTurnResult.sovereignAuditEntry) and is NEVER passed to the keyed BASSovereignAuditLedger.append.
         // Emitting a KEYLESS SHA256 tag here NAMED `signature` over-claimed authentication — and would fail
         // CLOSED if ever piped to the keyed ledger (which treats a non-empty `signature` as a base64 MAC/Ed25519,
-        // so a hex SHA256 string is invalid). Leave it EMPTY — matching the 9 audit-bridge producers — so the
-        // keyed ledger is the SOLE producer of a real signature whenever this entry is actually appended.
+        // so a hex SHA256 string is invalid). Leave it EMPTY — matching the established empty-signature
+        // convention — so the keyed ledger is the SOLE producer of a real signature when this entry is appended.
         return BASSovereignAuditEntry(
             // chapter 九百九十六.5 META-REVIEW Round-15 CRITICAL-2
             // fix:explicit "1.1.0" for hardened canonical-bytes
