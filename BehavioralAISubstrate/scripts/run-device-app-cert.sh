@@ -47,7 +47,7 @@ ENV_JSON="${ENV_JSON:-$DEFAULT_ENV_JSON}"
 # Safety net: if a custom ENV_JSON omitted the autostart flag, inject it (so the harness is always headless).
 case "$ENV_JSON" in
   *BAS_ENDURANCE_AUTOSTART*) : ;;
-  *) ENV_JSON="${ENV_JSON/\{/\{\"BAS_ENDURANCE_AUTOSTART\":\"1\",}" ;;
+  *) ENV_JSON='{"BAS_ENDURANCE_AUTOSTART":"1",'"${ENV_JSON#\{}" ;;
 esac
 
 LOG_GLOB="ch1025-endurance-2026*.log"
