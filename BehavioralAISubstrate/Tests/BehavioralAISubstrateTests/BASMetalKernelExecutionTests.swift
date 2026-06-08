@@ -35,7 +35,7 @@ final class BASMetalKernelExecutionTests: XCTestCase {
     func testRecordSinkEmitsOnInstrumentedDispatch() async {
         let acc = BASMetalKernelExecutionAccumulator()
         let mk = BASCognitiveMetalKernels(
-            metalLibraryLoader: BASMetalKernelLibraryLoader(),
+            metalLibraryLoader: BASMetalKernelLibraryLoader(useMetalKernelV2: true),
             recordSink: { acc.record($0) })
         // Runs on Mac Metal if available; if the GPU path throws (env), the instrument helper still emits a
         // record (didRunOnGPU=false + error). Either way the MECHANISM fired exactly once.
@@ -48,7 +48,7 @@ final class BASMetalKernelExecutionTests: XCTestCase {
 
     func testNilRecordSinkEmitsNothing() async {
         // recordSink nil ⇒ the instrument helper calls the body directly (byte-equal-off, zero overhead).
-        let mk = BASCognitiveMetalKernels(metalLibraryLoader: BASMetalKernelLibraryLoader())
+        let mk = BASCognitiveMetalKernels(metalLibraryLoader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
         _ = try? await mk.cosineSimilarity([1, 0, 1], [1, 0, 1])
         // No sink, no accumulator → nothing to assert beyond "did not crash"; the nil path is exercised.
     }

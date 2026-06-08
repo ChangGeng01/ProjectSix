@@ -44,7 +44,7 @@ final class BASMetalTopKParityTests: XCTestCase {
         let dim = 4, k = 5
         let cpu = BASMetalTopKDispatcher.cpuReference(query: q, corpus: corpus, dim: dim, k: k)
 
-        let dispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader())
+        let dispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
         guard let approx = try? await dispatcher.dispatch(query: q, corpus: corpus, dim: dim, k: k) else {
             throw XCTSkip("Metal unavailable in this environment — parity is certified on-device")
         }
