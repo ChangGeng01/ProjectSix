@@ -21,7 +21,7 @@ private let _basWedgeBeaconFH: FileHandle? = {
     try? fh?.seekToEnd()
     return fh
 }()
-@inline(__always) func basWedgeBeacon(_ tag: @autoclosure () -> String) {
+@inline(__always) public func basWedgeBeacon(_ tag: @autoclosure () -> String) {
     guard let fh = _basWedgeBeaconFH else { return }
     let line = tag() + " mono=\(DispatchTime.now().uptimeNanoseconds)\n"
     if let d = line.data(using: .utf8) { try? fh.write(contentsOf: d) }

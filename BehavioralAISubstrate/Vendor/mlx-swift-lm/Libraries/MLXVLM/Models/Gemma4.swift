@@ -4,6 +4,11 @@ import MLX
 import MLXLMCommon
 import MLXNN
 
+// BAS/ADR-038 §11.6 — opt-in per-layer eval+beacon for localizing the Gemma-3n forward wedge. Default off
+// → byte/behavior-identical to upstream.
+private let _basGemmaLayerEval: Bool =
+    ProcessInfo.processInfo.environment["BAS_GEMMA_LAYER_EVAL"] == "1"
+
 // Based on https://github.com/Blaizzy/mlx-vlm/tree/main/mlx_vlm/models/gemma4
 
 private enum Gemma4Error: LocalizedError {
@@ -1049,6 +1054,14 @@ private final class Gemma4TextBackbone: Module {
             )
             h = output
             intermediates[idx] = (kvState, attentionOffset)
+            // BAS/ADR-038 §11.6 — per-layer eval+beacon (BAS_GEMMA_LAYER_EVAL=1, default off). Forces each
+            // Gemma-3n layer's graph to drain + logs the layer idx to wedge.log. Localizes WHICH layer's op
+            // explodes (last beacon = stuck layer) AND tests a candidate fix: if bounding the graph per layer
+            // breaks the wedge, the cause was an un-evaled accumulating forward graph (fixable by eval-ing).
+            if _basGemmaLayerEval {
+                eval(h)
+                basWedgeBeacon("GL-layer idx=\(idx)")
+            }
         }
         return norm(h)
     }
