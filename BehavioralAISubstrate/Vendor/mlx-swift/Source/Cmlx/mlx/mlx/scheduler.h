@@ -119,17 +119,32 @@ class Scheduler {
   }
 
   void notify_new_task(const Stream& stream) {
+    unsigned long long c = 0, d = 0;
+    int n = 0;
     {
       std::lock_guard<std::mutex> lk(mtx);
       n_active_tasks_++;
+      bas_created_++;
+      c = bas_created_;
+      d = bas_completed_;
+      n = n_active_tasks_;
     }
     completion_cv.notify_all();
+    // BAS/ADR-038 §11.4 — task create/complete BALANCE. Prints created vs completed periodically so we
+    // can settle the n==11 pin: created≫completed (growing gap) ⇒ a genuine notify_task_completion LEAK;
+    // created≈completed (both climb, gap stable) ⇒ a self-refilling LIVELOCK. Gated on MLX_WEDGE_TRACE.
+    if (bas_wedge_trace_sched() && (c % 500ULL == 0ULL)) {
+      std::fprintf(stderr, "[BAS]task-balance created=%llu completed=%llu n=%d gap=%lld\n",
+                   c, d, n, (long long)(c - d));
+      std::fflush(stderr);
+    }
   }
 
   void notify_task_completion(const Stream& stream) {
     {
       std::lock_guard<std::mutex> lk(mtx);
       n_active_tasks_--;
+      bas_completed_++;
     }
     completion_cv.notify_all();
   }
@@ -169,6 +184,8 @@ class Scheduler {
 
  private:
   int n_active_tasks_;
+  unsigned long long bas_created_ = 0;    // BAS/ADR-038 §11.4 — task create/complete balance
+  unsigned long long bas_completed_ = 0;
   std::vector<StreamThread*> threads_;
   std::vector<Stream> streams_;
   std::unordered_map<Device::DeviceType, Stream> default_streams_;

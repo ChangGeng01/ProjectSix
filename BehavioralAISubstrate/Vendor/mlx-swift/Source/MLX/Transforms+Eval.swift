@@ -8,16 +8,30 @@ import Foundation
 /// call back into eval.
 let evalLock = NSRecursiveLock()
 
+/// BAS/ADR-038 §11.4 — the binding previously DISCARDED `mlx_eval`/`mlx_async_eval`'s `int` return code
+/// (`_ = ... mlx_eval(...)`), so an eval error (the C++ wrapper catches the exception, routes the message
+/// to the mlx error handler, and returns 1) was INVISIBLE to Swift callers. Surface a non-zero code to
+/// stderr so a swallowed eval error can never go unnoticed. No-op on the success path (ret == 0), so the
+/// normal path is byte/behavior-identical. (A fuller fix — making `eval` throwing — is an API change left
+/// as a follow-up; this stops the silent drop.)
+@inline(__always)
+private func basSurfaceEvalError(_ ret: Int32, _ op: String) {
+    if ret != 0 {
+        FileHandle.standardError.write(Data("[BAS][\(op)] non-zero return=\(ret)\n".utf8))
+    }
+}
+
 /// Evaluate one or more `MLXArray`
 ///
 /// ### See Also
 /// - <doc:lazy-evaluation>
 public func eval(_ arrays: MLXArray...) {
     let vector_array = new_mlx_vector_array(arrays)
-    _ = evalLock.withLock {
+    let ret = evalLock.withLock {
         mlx_eval(vector_array)
     }
     mlx_vector_array_free(vector_array)
+    basSurfaceEvalError(ret, "mlx_eval")
 }
 
 /// Evaluate one or more `MLXArray`
@@ -26,10 +40,11 @@ public func eval(_ arrays: MLXArray...) {
 /// - <doc:lazy-evaluation>
 public func eval(_ arrays: some Collection<MLXArray>) {
     let vector_array = new_mlx_vector_array(arrays)
-    _ = evalLock.withLock {
+    let ret = evalLock.withLock {
         mlx_eval(vector_array)
     }
     mlx_vector_array_free(vector_array)
+    basSurfaceEvalError(ret, "mlx_eval")
 }
 
 /// Evaluate one or more `MLXArray` asynchronously.
@@ -39,10 +54,11 @@ public func eval(_ arrays: some Collection<MLXArray>) {
 /// - ``asyncEval(_:)-(Collection<MLXArray>)``
 public func asyncEval(_ arrays: some Collection<MLXArray>) {
     let vector_array = new_mlx_vector_array(arrays)
-    _ = evalLock.withLock {
+    let ret = evalLock.withLock {
         mlx_async_eval(vector_array)
     }
     mlx_vector_array_free(vector_array)
+    basSurfaceEvalError(ret, "mlx_async_eval")
 }
 
 /// Evaluate one or more `MLXArray`.

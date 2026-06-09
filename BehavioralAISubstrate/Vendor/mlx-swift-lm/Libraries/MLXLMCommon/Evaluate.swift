@@ -4,6 +4,29 @@ import Foundation
 import MLX
 import MLXNN
 
+// BAS/ADR-038 §11.4 — token-loop phase beacons (env BAS_WEDGE_BEACON=1). Writes ordered checkpoints to
+// Documents/wedge.log so that, when a turn wedges and never returns, the LAST surviving line names the exact
+// boundary it stuck at (prefill-submit vs first step() vs item() drain vs which token). Uses an unbuffered
+// `FileHandle.write` (a write() syscall — the bytes reach the kernel page cache immediately and survive the
+// watchdog SIGKILL, so no per-token fsync stall is needed). O(1) no-op when the env flag is unset → the normal
+// path is byte/behavior-identical.
+private let _basWedgeBeaconFH: FileHandle? = {
+    guard ProcessInfo.processInfo.environment["BAS_WEDGE_BEACON"] == "1" else { return nil }
+    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    guard let url = docs?.appendingPathComponent("wedge.log") else { return nil }
+    if !FileManager.default.fileExists(atPath: url.path) {
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+    }
+    let fh = try? FileHandle(forWritingTo: url)
+    try? fh?.seekToEnd()
+    return fh
+}()
+@inline(__always) func basWedgeBeacon(_ tag: @autoclosure () -> String) {
+    guard let fh = _basWedgeBeaconFH else { return }
+    let line = tag() + " mono=\(DispatchTime.now().uptimeNanoseconds)\n"
+    if let d = line.data(using: .utf8) { try? fh.write(contentsOf: d) }
+}
+
 /// A `LogitSampler` is responsible for sampling `logits` produced by
 /// a ``LanguageModel`` to produce a token.
 ///
@@ -650,10 +673,13 @@ public struct TokenIterator: TokenIteratorProtocol {
 
         case .logits(let result):
             y = .init(tokens: convertToToken(logits: result.logits))
+            basWedgeBeacon("P1-prefill-logits-before-asyncEval")
             asyncEval(y.tokens)
+            basWedgeBeacon("P2-prefill-asyncEval-returned")
 
             break
         }
+        basWedgeBeacon("P2.5-prepare-returned")
     }
 
     mutating func convertToToken(logits: MLXArray) -> MLXArray {
@@ -671,6 +697,7 @@ public struct TokenIterator: TokenIteratorProtocol {
 
     /// Evaluate the next token and return the new token (y), updating cache state
     mutating func step(previous: LMInput.Text) -> MLXArray {
+        basWedgeBeacon("P4-enter-step")
         let result = model(
             previous[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: state)
         self.state = result.state
@@ -691,6 +718,7 @@ public struct TokenIterator: TokenIteratorProtocol {
             return nil
         }
 
+        basWedgeBeacon("P3-enter-next tc=\(tokenCount)")
         // save current value -- this will be returned
         let previousY = y
 
@@ -701,7 +729,10 @@ public struct TokenIterator: TokenIteratorProtocol {
 
         tokenCount += 1
 
-        return previousY.tokens.item(Int.self)
+        basWedgeBeacon("P5-before-item tc=\(tokenCount)")
+        let out = previousY.tokens.item(Int.self)
+        basWedgeBeacon("P6-after-item tc=\(tokenCount)")
+        return out
     }
 }
 
