@@ -180,6 +180,36 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
     }
 }
 
+/// REAL decode anatomy from the underlying LLM runtime (e.g. MLX `GenerateCompletionInfo`), split into the
+/// two phases that matter for efficiency: PREFILL (processing the input prompt, O(prompt length)) vs DECODE
+/// (generating the output tokens, O(output length)). Token counts here are the runtime's ACTUAL counts — NOT
+/// the `outputTokensEstimated` chars/4 heuristic on `BASOrganDraft`. Optional: adapters that can't surface it
+/// (the deterministic adapter; cloud adapters without timing) leave it `nil`.
+public struct BASOrganCompletionMetrics: Sendable, Equatable, Codable {
+    public let promptTokens: Int           // real prefill token count
+    public let generationTokens: Int       // real decoded token count
+    public let prefillMs: Double            // wall time to process the prompt (prefill)
+    public let decodeMs: Double             // wall time to generate the output tokens (decode)
+    public let prefillTokensPerSec: Double
+    public let decodeTokensPerSec: Double
+
+    public init(
+        promptTokens: Int,
+        generationTokens: Int,
+        prefillMs: Double,
+        decodeMs: Double,
+        prefillTokensPerSec: Double,
+        decodeTokensPerSec: Double
+    ) {
+        self.promptTokens = max(0, promptTokens)
+        self.generationTokens = max(0, generationTokens)
+        self.prefillMs = max(0, prefillMs)
+        self.decodeMs = max(0, decodeMs)
+        self.prefillTokensPerSec = max(0, prefillTokensPerSec)
+        self.decodeTokensPerSec = max(0, decodeTokensPerSec)
+    }
+}
+
 public struct BASOrganDraft: Sendable, Equatable, Codable {
     public let requestID: String
     public let providerID: String
@@ -189,6 +219,9 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
     public let outputTokensEstimated: Int
     public let producedAt: Date
     public let traceID: String
+    /// REAL prefill/decode anatomy when the adapter can surface it (e.g. MLX); `nil` otherwise. Additive +
+    /// optional → existing callers + serialized drafts are unaffected (decodeIfPresent ⇒ nil for old JSON).
+    public let completionMetrics: BASOrganCompletionMetrics?
 
     public init(
         requestID: String,
@@ -198,7 +231,8 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
         inputTokensEstimated: Int,
         outputTokensEstimated: Int,
         producedAt: Date,
-        traceID: String
+        traceID: String,
+        completionMetrics: BASOrganCompletionMetrics? = nil
     ) {
         self.requestID = requestID
         self.providerID = providerID
@@ -208,6 +242,7 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
         self.outputTokensEstimated = max(0, outputTokensEstimated)
         self.producedAt = producedAt
         self.traceID = traceID
+        self.completionMetrics = completionMetrics
     }
 }
 

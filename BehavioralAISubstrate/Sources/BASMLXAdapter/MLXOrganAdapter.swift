@@ -437,7 +437,10 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 maxOutputTokens: request.maxOutputTokens))
 
         let prompt = Self.prompt(for: request)
-        let rawBody = try await session.respond(to: prompt)
+        // Consume `streamDetails` (the SAME underlying stream `respond(to:)` accumulates — respond does exactly
+        // `output += chunk`) so we ALSO capture the terminal `GenerateCompletionInfo` (real prefill/decode time
+        // + token counts). The joined body is BYTE-IDENTICAL to `respond(to:)`; this is observability-only.
+        let (rawBody, completionInfo) = try await Self.streamBody(session, prompt: prompt)
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
         return BASOrganDraft(
@@ -452,7 +455,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 .estimateTokens(from: [body]),
             producedAt: Date(),
             traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID))
+                for: request, providerID: descriptor.providerID),
+            completionMetrics: Self.completionMetrics(from: completionInfo))
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
@@ -525,7 +529,10 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
 
         let prompt = Self.prompt(for: request)
-        let rawBody = try await box.session.respond(to: prompt)
+        // Same byte-equal stream-consume as draft(_:) — also surfaces the real prefill/decode metrics. On a
+        // REUSED session (KV warm) the captured `promptTokenCount` reflects only the new turn → this is also
+        // how the Phase-2 KV-reuse lever would be measured.
+        let (rawBody, completionInfo) = try await Self.streamBody(box.session, prompt: prompt)
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
         return BASOrganDraft(
@@ -540,13 +547,46 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 .estimateTokens(from: [body]),
             producedAt: Date(),
             traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID))
+                for: request, providerID: descriptor.providerID),
+            completionMetrics: Self.completionMetrics(from: completionInfo))
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
                 + Self.frameworkUnavailablePlatformSuffix)
         #endif
     }
+
+    #if canImport(MLXLLM)
+    /// Consume `ChatSession.streamDetails` (the same stream `respond(to:)` accumulates) → the joined body
+    /// (BYTE-IDENTICAL to `respond`) PLUS the terminal `GenerateCompletionInfo`. Observability-only; the
+    /// generated text is unchanged.
+    private static func streamBody(
+        _ session: ChatSession, prompt: String
+    ) async throws -> (body: String, info: GenerateCompletionInfo?) {
+        var body = ""
+        var info: GenerateCompletionInfo?
+        for try await gen in session.streamDetails(to: prompt, images: [], videos: []) {
+            if let chunk = gen.chunk { body += chunk }
+            if let i = gen.info { info = i }
+        }
+        return (body, info)
+    }
+
+    /// Map MLX's `GenerateCompletionInfo` (seconds-based) into the substrate's `BASOrganCompletionMetrics`
+    /// (ms-based, real prefill/decode split + real tokens/s). `nil` info → `nil` metrics.
+    private static func completionMetrics(
+        from info: GenerateCompletionInfo?
+    ) -> BASOrganCompletionMetrics? {
+        guard let info else { return nil }
+        return BASOrganCompletionMetrics(
+            promptTokens: info.promptTokenCount,
+            generationTokens: info.generationTokenCount,
+            prefillMs: info.promptTime * 1000.0,
+            decodeMs: info.generateTime * 1000.0,
+            prefillTokensPerSec: info.promptTokensPerSecond,
+            decodeTokensPerSec: info.tokensPerSecond)
+    }
+    #endif
 
     #if canImport(MLXLLM)
     /// ch1066 — single source of truth for the multi-turn session-pool key

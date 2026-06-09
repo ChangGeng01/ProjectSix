@@ -1568,6 +1568,18 @@ final class BASEnduranceAppController: ObservableObject {
                         "mlx_rss_delta_mb=%.2f",
                         iter, p + 1, promptLen, bodyLen,
                         estTokens, mlxMs, estTps, mlxRssDeltaMB))
+                    // MLX decode anatomy — the REAL prefill-vs-decode split + REAL token counts/tok-s from
+                    // GenerateCompletionInfo (vs the chars/4 est_tokens above). Nil for non-MLX adapters → skip.
+                    // This is the measure-first gate for the decode-efficiency lever (prefill-bound vs decode-bound).
+                    if let m = draft.completionMetrics {
+                        await emitBoth(String(format:
+                            "📊 ch1025 mlx-decode iter=%d prompt=%d " +
+                            "prefill_ms=%.0f decode_ms=%.0f prompt_tokens=%d gen_tokens=%d " +
+                            "prefill_tps=%.1f decode_tps=%.1f",
+                            iter, p + 1,
+                            m.prefillMs, m.decodeMs, m.promptTokens, m.generationTokens,
+                            m.prefillTokensPerSec, m.decodeTokensPerSec))
+                    }
                     // ch 1025.7 — MLX adapter telemetry per prompt
                     let sessions = await adapter.sessionCount()
                     let capacity = await adapter.currentCapacity()
