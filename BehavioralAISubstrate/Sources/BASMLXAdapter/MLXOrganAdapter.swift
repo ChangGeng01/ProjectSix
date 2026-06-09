@@ -566,6 +566,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #endif
     }
 
+    /// ADR-038 §11.7 — MLX GPU memory stats (MB). `active` = memory held by LIVE MLXArrays (a growing
+    /// `active` across fresh sessions = a RETAINED-reference leak); `cache` = the free-buffer pool (a growing
+    /// `cache` = pool not drained, which `clearCache()` would release). Splits WHERE the ~175 MB/turn goes.
+    public func mlxMemoryStatsMB() -> (active: Double, cache: Double, peak: Double) {
+        #if canImport(MLX)
+        let mb = 1024.0 * 1024.0
+        return (Double(MLX.Memory.activeMemory) / mb,
+                Double(MLX.Memory.cacheMemory) / mb,
+                Double(MLX.Memory.peakMemory) / mb)
+        #else
+        return (0, 0, 0)
+        #endif
+    }
+
     /// Number of active sessions. Hosts use this for UI / metrics
     /// (e.g. "5 ongoing conversations cached").
     public func sessionCount() -> Int {

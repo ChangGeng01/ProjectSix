@@ -1536,6 +1536,13 @@ final class BASEnduranceAppController: ObservableObject {
             let snapAfter = snapshot()
             await emitBoth(formatSnap(
                 snapAfter, iter: iter, phase: "after"))
+            // ADR-038 §11.7 — MLX GPU memory split per iter, to localize the ~175 MB/turn Gemma-3n leak:
+            // active = live MLXArrays (growing ⇒ retained-reference leak), cache = free pool (growing ⇒
+            // clearCache-able pool). Whichever climbs ~175/iter is the leak's home.
+            let mlxMem = await adapter.mlxMemoryStatsMB()
+            await emitBoth(String(format:
+                "📊 ch1025 mlx-mem iter=%d active_mb=%.1f cache_mb=%.1f peak_mb=%.1f",
+                iter, mlxMem.active, mlxMem.cache, mlxMem.peak))
             iterRssAfter.append(snapAfter.memoryRssMB)
             iterThermalAfter.append(snapAfter.thermalState)
             iterAvailMemAfter.append(
