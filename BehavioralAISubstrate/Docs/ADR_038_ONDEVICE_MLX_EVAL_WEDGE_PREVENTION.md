@@ -534,3 +534,28 @@ ceiling, NOT a task-completion leak, NOT a stale MLX version. The remaining ques
 one forward submit unbounded work (a runaway op inside the Gemma-3n forward / per-layer-inputs path). The
 upstream issue carries this exact mechanism. The `mlx_eval` binding fix (surface the dropped return code) lands
 as a standalone correctness improvement regardless.
+
+### 11.5 DECISIVE: the wedge is GEMMA-3n-SPECIFIC (Llama A/B, iOS 27)
+
+Ran the SAME feed-forward wedge scenario with **Llama 3.2 3B 4-bit** (standard transformer arch; via
+`BAS_MLX_MODEL=llama`) instead of Gemma-3n E2B:
+- **Llama: status=COMPLETED, 20/20 responses, NO wedge**, sane output (resp_len ~420-537, ~36 tok/s, 99% MLX).
+- **Gemma-3n: wedges at response 3** under the identical scenario.
+
+→ **The wedge is GEMMA-3n-SPECIFIC, not a general MLX/Metal/iOS defect.** Confirmed by direct on-device A/B.
+A standard-architecture model (Llama/Qwen) running the same decode path does not wedge. This means **switching
+the model is a real, in-reach PRODUCT FIX** — no MLX surgery, no upstream dependency.
+
+**Why Gemma-3n and not Llama:** Gemma-3n (the "nano" E2B/E4B mobile model) has a NOVEL architecture no other
+model uses — **per-layer inputs** (large per-layer embedding tables + `per_layer_input_gate`/`perLayerProjection`),
+**altUp** (alternating updates), **laurel** blocks, MatFormer/elastic structure (41 such refs in Gemma4.swift).
+Its MLX port (`MLXVLM/Gemma4.swift`, loaded as a VLM even for text → the un-chunked `prepare`) is newer and far
+less battle-tested than the standard-transformer path Llama uses. Under the cumulative feed-forward stress on a
+memory-tight iPhone, one of those novel ops submits an unbounded stream of GPU command buffers and the forward
+never returns (GPU healthy, CPU livelocked in MLX's drain throttle — §11.4). Llama's plain transformer never
+exercises those ops, so it never wedges. Gemma being "supported" in MLX means it RUNS + produces correct output
+(it did, for 3 turns), NOT that every novel op is bulletproof under sustained edge-case load.
+
+**Disposition / the practical fix:** for the product, prefer a standard-arch on-device model (Llama 3.2 / Qwen)
+to AVOID the wedge entirely; keep `BAS_MLX_MODEL` as the selector. The Gemma-3n-specific MLX-port bug is the
+upstream issue (now scoped to the Gemma-3n forward, not generic MLX). The watchdog remains the safety net.
