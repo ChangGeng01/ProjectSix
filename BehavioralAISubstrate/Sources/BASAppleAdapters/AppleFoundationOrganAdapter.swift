@@ -130,30 +130,42 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         let options = GenerationOptions(
             temperature: request.preset.temperature)
 
-        // Chapter 三百八三 / M870 — A1 G6 AFM tool wire transparency:
-        // pre-M870 this method silently dropped `request.tools[]` +
-        // `request.outputSchema`。Post-M870 we still drop them at
-        // the SDK call (the iOS 26 `respond(to:tools:)` real wire
-        // ships when the FoundationModels Tool bridge stabilizes),
-        // but we now emit a typed audit signal via the trace ID so
-        // downstream observers can detect the gap。Hosts that need
-        // tool calling today should route through a cloud adapter
-        // (which honors `tools[]`) until this bridge activates。
-        let toolGap =
-            !request.tools.isEmpty
-                || request.outputSchema != nil
         let prompt = Self.prompt(for: request)
-        let response = try await session.respond(
-            to: prompt,
-            options: options)
 
-        let body = response.content
+        // `request.outputSchema` → NATIVE FoundationModels guided generation (runtime DynamicGenerationSchema →
+        // GenerationSchema → respond(to:schema:)). Structured output is SIDE-EFFECT-FREE, so it does NOT cross
+        // the ADR-039 byte-deterministic governance wall — it is wired natively here, independently of tools.
+        // Falls back to plain generation when the schema can't be mapped (BASGuidedSchemaTranslator returns nil)
+        // — never drops a field silently, never crashes on a malformed schema.
+        let body: String
+        var schemaWired = false
+        if let outputSchema = request.outputSchema,
+           let parsed = BASGuidedSchemaTranslator.parse(
+               propertiesJSON: outputSchema.propertiesJSON,
+               schemaName: outputSchema.schemaName),
+           let genSchema = try? BASGuidedSchemaTranslator.makeGenerationSchema(from: parsed) {
+            let response = try await session.respond(
+                to: prompt, schema: genSchema, options: options)
+            body = response.content.jsonString
+            schemaWired = true
+        } else {
+            let response = try await session.respond(to: prompt, options: options)
+            body = response.content
+        }
 
-        // Post-fix: build the trace ID with the tools-dropped
-        // audit suffix when applicable (typed,grep-able)
+        // `request.tools[]` are still NOT natively executed — DELIBERATELY (governance): FoundationModels'
+        // native `Tool` protocol AUTO-executes `tool.call(...)` mid-generation, which would run ungated tool
+        // side-effects inside the organ, bypassing BAS's gate-before-execute model (BASToolInvocationGate / 红线
+        // 7 hint-only / the L11-L14 single commit gate). The governance-safe path is `.runtimeSchema` (declare in
+        // prompt, host gates + dispatches) — see BASFoundationModelsToolBridge. Until that's wired, tools degrade.
+        //
+        // Audit suffix (typed, grep-able) fires ONLY for the parts still degraded: tools present, OR an
+        // outputSchema we couldn't map. A mapped schema with no tools is fully honored → no suffix.
+        let schemaGap = (request.outputSchema != nil) && !schemaWired
+        let degraded = !request.tools.isEmpty || schemaGap
         let baseTrace = BASOrganDeterministicAdapter.digest(
             for: request, providerID: descriptor.providerID)
-        let traceID = toolGap
+        let traceID = degraded
             ? "\(baseTrace)#afm-tools-dropped-no-sdk-bridge"
             : baseTrace
 
