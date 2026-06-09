@@ -49,28 +49,39 @@ mlx-decode iter=3 p=2 prefill_ms=155 decode_ms=2250 prompt_tokens=65 gen_tokens=
 
 ## Cross-model decode tok/s (2026-06-10, iPhone Air, iOS 27 beta, same harness, decode cap 96)
 
-The Phase-2 "faster model" lever measured BEFORE building anything — does a model swap even help?
+The Phase-2 "faster model" lever measured BEFORE building anything — two passes: dense-3B "lateral" candidates,
+then sub-2B "smaller" picks. The full tok/s ladder (4-bit, decode cap 96, short prompts):
 
-| model | real decode tok/s | vs Gemma-3n-E2B | notes |
-|---|---|---|---|
-| **Gemma-3n-E2B** (~2B-effective; MatFormer/per-layer-inputs) | **~42.6** | baseline (FASTEST) | the current default |
-| Qwen2.5-3B (dense, 4-bit) | ~34.6 (34.2-34.7) | **−19%** | loaded clean (id + `<|im_end|>` correct on HW — incidental n=1 confirm of #2) |
-| Llama-3.2-3B (dense, 4-bit) | ~32.5 (32.3-32.7) | **−24%** | — |
+| model | params | real decode tok/s | vs Gemma-3n-E2B | notes |
+|---|---|---|---|---|
+| **Llama-3.2-1B** | 1B | **~84.5** (84.1-84.8) | **1.98×** | the smaller-model win |
+| **Qwen2.5-1.5B** | 1.5B | **~66.5** (66.2-66.8) | **1.56×** | — |
+| **Gemma-3n-E2B** | ~2B-eff | **~42.6** | 1.0× (baseline) | current default; throughput-best ≥2B pick |
+| Qwen2.5-3B | 3B | ~34.6 (34.2-34.7) | −19% | id + `<|im_end|>` confirmed on HW (incidental #2 cert) |
+| Llama-3.2-3B | 3B | ~32.5 (32.3-32.7) | −24% | — |
 
-**Finding — the "faster model" lever via Llama/Qwen is REFUTED:** both dense-3B alternatives decode SLOWER
-than Gemma-3n-E2B (more parameters → more compute per token). Gemma-3n-E2B is already the throughput-best of
-the catalog; Llama/Qwen are stable-architecture fallbacks for the WEDGE class (ADR-038 §11.5), **not** for
-speed. All three are decode-bound (prefill ≤ ~7-13%).
+**Finding 1 — the "faster model via Llama/Qwen-3B" lever is REFUTED:** both dense-3B alternatives decode
+SLOWER than Gemma-3n-E2B (more parameters → more compute/token). Among ≥2B models, Gemma-3n-E2B is already the
+throughput-best; Llama/Qwen-3B are stable-architecture fallbacks for the WEDGE class (ADR-038 §11.5), **not**
+for speed.
 
-**Implication for the lever:** to actually beat ~42.6 tok/s you need either (a) a genuinely SMALLER model
-(sub-2B / ~1B) or HEAVIER quant (3-bit/2-bit) — a lateral or larger swap hurts; or (b) **speculative decoding**
-(~2-3×, but a 2nd-model memory cost on 8 GB + heavy vendor integration); or (c) accept ~42.6 as the
-Gemma-3n-E2B/A-series floor and tune the decode-token cap. KV-quant is orthogonal (memory, modest speed).
+**Finding 2 — the SMALLER-model lever is REAL + quantified:** decode tok/s scales ~inversely with parameter
+count. **Llama-3.2-1B ≈ 2× the Gemma-3n-E2B baseline (84.5 vs 42.6); Qwen2.5-1.5B ≈ 1.56× (66.5).** The
+tradeoff is QUALITY (a 1B/1.5B is weaker at reasoning) — so a smaller model fits **latency-sensitive
+fast-path roles** (scout / classify / routing), keeping a ≥2B model for core reasoning. All decode-bound
+(prefill ≤ ~13%; the smaller models prefill even faster, ~1000-1200 tok/s).
+
+**Remaining levers (need building, not just measuring):** (a) **speculative decoding** (~2-3× WITHOUT a
+quality drop — but a 2nd draft-model's memory on 8 GB + heavy vendored-MLX integration); (b) **KV
+quantization** (`kvBits`, orthogonal — memory + modest speed). The decode-token cap (WS2) is a linear latency
+lever already wired.
 
 ## Honesty bound (R1 / 亏的不要上)
 
-n=1 device (iPhone Air, 8 GB), iOS 27.0 beta, Gemma-3n-E2B, **short prompts (~65 tok)**, decode cap 96, one
-3-iter run. The decode-bound verdict is for THIS regime; a long-prompt/long-context workload could shift toward
-prefill-bound (measure again before assuming). Cross-model tok/s (Qwen/Llama) not yet captured (those models
-are opt-in/uncertified + need a first-launch download). No decode lever is built yet — that's the next
+n=1 device (iPhone Air, 8 GB), iOS 27.0 beta, **short prompts (~65 tok)**, decode cap 96, one 3-iter run per
+model (5 models). The decode-bound verdict + tok/s ladder are for THIS regime; a long-prompt/long-context
+workload could shift toward prefill-bound (measure again before assuming), and tok/s are throughput only —
+QUALITY was not measured (a 1B is faster AND weaker; the smaller-model lever is a latency-vs-quality trade, not
+a free win). The cross-model loads incidentally exercised the opt-in catalog ids on hardware (all 5 loaded
+clean) but that is not an endurance/quality cert. No decode lever is wired yet — that's the next
 operator-steered fork, and any throughput claim will be on-device-certified, never inferred.
