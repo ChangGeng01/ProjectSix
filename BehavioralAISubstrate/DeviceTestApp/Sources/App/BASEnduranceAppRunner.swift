@@ -100,6 +100,9 @@ import BASMemory  // ch 1025.6 — fabric roster/graph/runtime types
 import BASRuntimeCore  // ch1044 — BASTaskVmInfoProbe (phys_footprint, jetsam metric)
 import BASAppleAdapters  // Step-2 flip — on-device MiniLM semantic memory embedder
 import BASMetalSubstrate  // ADR-039 — Metal kernel dispatchers + the determinism-boundary quarantine
+#if canImport(FoundationModels)
+import FoundationModels   // #1 on-device FM E2E probe (BAS_FM_E2E) — availability + native schema/tools wires
+#endif
 
 // ch 1025.4 — Unified logging via `os.Logger`。 Swift `print()` does
 // NOT appear in iOS system log,which means `idevicesyslog` from
@@ -709,6 +712,19 @@ final class BASEnduranceAppController: ObservableObject {
         let initialSnap = snapshot()
         await emitBoth(formatSnap(initialSnap, iter: 0,
                                   phase: "initial"))
+
+        // #1 — opt-in FoundationModels E2E probe (exercises the Apple FM native wires ON THIS DEVICE before
+        // loading MLX). Default OFF → single-stream path unchanged. The probe IS the run when set.
+        if (env["BAS_FM_E2E"] ?? "0") == "1" {
+            await runFoundationModelsE2EProbe()
+            await MainActor.run {
+                self.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
+                self.started = false
+                self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+            return
+        }
 
         // ch 1025.5 — L1-L14 brain cascade (real substrate, not just MLX)
         await emitBoth(
@@ -1891,6 +1907,76 @@ final class BASEnduranceAppController: ObservableObject {
     /// For N=100:p50→idx49(50th elem),p99→idx98(99th)。 Pre-fix used
     /// `count/2`(→idx50=51st≈p51)and `Int(count×0.99)`(→idx99=MAX),
     /// both biased the tail high。
+    // MARK: - #1 FoundationModels E2E probe (on-device runtime cert of the native wires)
+
+    /// Exercise `AppleFoundationOrganAdapter` on THIS device: availability → outputSchema (native guided
+    /// generation should return schema-constrained JSON) → tools (bridged via .runtimeSchema; parse round-trip).
+    /// Logs `📊 ch1025 fm-e2e …` lines the driver reads. Observability-only; runs nothing governance-side.
+    private nonisolated func runFoundationModelsE2EProbe() async {
+        await emitBoth("📍 ch1025 fm-e2e START")
+        #if canImport(FoundationModels)
+        if #available(iOS 26, macOS 26, visionOS 26, *) {
+            let availability = SystemLanguageModel.default.availability
+            guard case .available = availability else {
+                await emitBoth("📊 ch1025 fm-e2e available=false reason=\(availability)")
+                return
+            }
+            await emitBoth("📊 ch1025 fm-e2e available=true")
+            let adapter = AppleFoundationOrganAdapter()
+
+            // 1) outputSchema → native guided generation should return JSON with the schema-constrained keys.
+            do {
+                let schema = BASGuidedGenerationSchema(
+                    schemaName: "city_fact",
+                    propertiesJSON:
+                        "{\"type\":\"object\",\"properties\":{"
+                        + "\"city\":{\"type\":\"string\"},"
+                        + "\"population\":{\"type\":\"integer\"}}}")
+                let draft = try await adapter.draft(BASOrganRequest(
+                    requestID: "fm-e2e-schema", role: .core, preset: .core,
+                    instruction: "Give a city and its approximate population.",
+                    outputSchema: schema))
+                let obj = draft.body.data(using: .utf8)
+                    .flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+                let schemaOk = (obj?["city"] != nil) && (obj?["population"] != nil)
+                let dropped = BASFoundationModelsToolBridge.isAuditedTraceID(draft.traceID)
+                await emitBoth(
+                    "📊 ch1025 fm-e2e schema schema_ok=\(schemaOk) dropped_suffix=\(dropped) "
+                    + "body=\(draft.body.replacingOccurrences(of: "\n", with: " ").prefix(160))")
+            } catch {
+                await emitBoth("⚠️ ch1025 fm-e2e schema error=\(error)")
+            }
+
+            // 2) tools → bridged via .runtimeSchema (marker present, not dropped); parse the body back.
+            do {
+                let tool = BASTool(
+                    name: "get_weather",
+                    description: "Get the current weather for a city.",
+                    parameters: [BASToolParameter(
+                        name: "city", description: "the city name",
+                        type: .string, required: true, allowedValues: [])])
+                let draft = try await adapter.draft(BASOrganRequest(
+                    requestID: "fm-e2e-tools", role: .core, preset: .core,
+                    instruction: "What is the weather in Paris? Use the get_weather tool.",
+                    tools: [tool]))
+                let bridged = draft.traceID.contains(
+                    BASFoundationModelsToolBridge.runtimeSchemaTraceSuffix)
+                let parsedTool = BASToolPromptRenderer.parseToolCall(draft.body)?.toolName ?? "none"
+                await emitBoth(
+                    "📊 ch1025 fm-e2e tools bridged=\(bridged) parsed_tool=\(parsedTool) "
+                    + "body=\(draft.body.replacingOccurrences(of: "\n", with: " ").prefix(160))")
+            } catch {
+                await emitBoth("⚠️ ch1025 fm-e2e tools error=\(error)")
+            }
+            await emitBoth("📊 ch1025 fm-e2e verdict done")
+        } else {
+            await emitBoth("📊 ch1025 fm-e2e available=false reason=os<26")
+        }
+        #else
+        await emitBoth("📊 ch1025 fm-e2e available=false reason=no-FoundationModels-build")
+        #endif
+    }
+
     // MARK: - ADR-039 concurrency arc #5 — CONCURRENT-TURNS certification probe
 
     private struct ConcurrentTurnOutcome: Sendable {
