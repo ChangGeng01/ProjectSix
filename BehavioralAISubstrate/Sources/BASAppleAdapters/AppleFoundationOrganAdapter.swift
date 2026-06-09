@@ -10,10 +10,16 @@ import FoundationModels
 /// ## Why this exists
 ///
 /// The plan (§9.6 and §9.9 Q1 = Y) locks the default neural provider
-/// to Apple's on-device `FoundationModels` framework (iOS 18.1+ /
-/// macOS 15.1+ / visionOS 2.1+). This file is the adapter that
-/// fulfills that commitment: it implements `BASOrganAdapter` by
-/// delegating to `LanguageModelSession`.
+/// to Apple's on-device `FoundationModels` framework. This file is the
+/// adapter that fulfills that commitment: it implements `BASOrganAdapter`
+/// by delegating to `LanguageModelSession`.
+///
+/// NOTE (version honesty): the live delegation path is gated
+/// `@available(iOS 26, macOS 26, visionOS 26, *)` — that is the OS floor
+/// where Apple actually shipped the on-device `FoundationModels`
+/// inference API this adapter calls. Earlier-OS builds (and non-Apple
+/// platforms) fall through to the unavailability stub via
+/// `currentCapacity()` (see below).
 ///
 /// ## Availability
 ///

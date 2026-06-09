@@ -580,10 +580,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// memory. It only frees buffers MLX would otherwise reallocate, so it is OUTPUT-byte-equal to not calling
     /// it (a memory lever, never a correctness one).
     ///
-    /// **NOT an ADR-038 wedge fix (measured).** The on-device A/B (ADR-038 §8) probed this as the candidate
-    /// wedge cure and REFUTED it: the wedge fires with 730+ MB FREE, so it is NOT memory exhaustion; calling
-    /// `clearCache()` every iteration wedged the run EARLIER (15 vs 56 responses) and slowed it. Keep this as a
-    /// general memory tool; do NOT rely on it to prevent the wedge (use an external watchdog-relaunch).
+    /// **This drain-ALL is NOT the wedge fix; the bounded CAP (`setGPUCacheLimit` / `cacheLimitBytes`,
+    /// default 512 MB) is — ADR-038 §11.8.** Root cause (§11.7): MLX's free-buffer cache POOL grows unbounded
+    /// under Gemma-3n's variable buffer shapes (cache_mb 99→446→645… while `active` stays constant), and as the
+    /// pool grows against low device headroom the allocator drain LIVELOCKS (the "wedge") or the OS OOM-kills.
+    /// A moderate CAP bounds the pool while keeping within-turn reuse; draining EVERYTHING every iteration
+    /// instead causes re-alloc churn and wedged EARLIER (§8 A/B: 15 vs 56 responses, slower) — so this is an
+    /// occasional memory tool, NOT a per-iteration wedge cure. (§8 read the symptom as "not memory exhaustion —
+    /// 730 MB free"; that's superseded by §11.7's pinning of the *cache-pool* growth as the cause.)
     public func drainGPUCache() {
         #if canImport(MLX)
         MLX.Memory.clearCache()

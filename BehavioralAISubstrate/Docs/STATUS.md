@@ -26,7 +26,11 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   The **crypto commit-verify** subset now has a host-side MECHANISM (`BASSovereignGatedTurn`, above);
   rejection / dual-key / deny still REFUSED pending a host keyring/policy (R1). See ADR-032 UPDATE.
 - **ADR-033** main-chain wiring (MiniLM memory + durable SQL/vector index + native executors + fabric,
-  host-injected) · **ADR-034** agent-fabric multi-round authoritative loop.
+  host-injected) · **ADR-034** agent-fabric multi-round authoritative loop. **Honest scope:** the Agent Fabric
+  is OPT-IN / host-controlled, NOT an automatic main-loop takeover — `EBrainRuntimeCoordinator.agentFabric`
+  defaults `nil` and `runTurn` never calls it implicitly (byte-equal-off; ADR-014); tier / transcriptMode in
+  `BASAgentFabricFullTurnAdapter` are still scaffold. The wiring POSITION is shipped; production authoritative
+  takeover of the main loop is NOT.
 - **ADR-036** L8 cosineTopK retrieve takeover (the ONLY sanctioned NON-byte-equal path; host opt-in).
 - **ADR-037** global durable cosineTopK recall on-device (opt-in; on-device verified; hardened — engine
   bounded in lockstep, monotonic sync).

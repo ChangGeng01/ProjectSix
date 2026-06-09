@@ -7,11 +7,13 @@
 //   2. N concurrent `process()` turns on ONE shared brain are LIVE — they all complete within a deadline
 //      (the regression tripwire for a future cross-actor await cycle / deadlock).
 //
-// What this does NOT claim (and why): it does NOT assert the adapter ACTOR serializes decode. Swift actors
-// are REENTRANT across `await`, so the adapter actor is not the serializer. The real serializer for the GPU
-// decode is MLX's process-global `evalLock` (Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift:9) held across
-// the synchronous `mlx_eval` — which is exactly why N concurrent turns yield no GPU-decode throughput gain.
-// That is a hardware property measured on-device by the cert, not something to fake with a synthetic lock here.
+// What this does NOT claim (and why this file is named "Liveness", NOT "Serialization"): it does NOT assert
+// the adapter ACTOR serializes decode. Swift actors are REENTRANT across `await`, so the adapter actor is not
+// the serializer. The real serializer for the GPU decode is MLX's process-global `evalLock`
+// (Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift:9) held across the synchronous `mlx_eval` — which is why
+// N concurrent turns yield no GPU-decode throughput gain. That SERIALIZATION is a hardware property, proven
+// ON-DEVICE by the cert (scripts/run-concurrent-turns-cert.sh: wall_speedup ≈ 1.0; FINDINGS #5), NOT by a
+// synthetic-lock unit test here. So this host file deliberately scopes to liveness + concurrency-safety only.
 
 import XCTest
 import Foundation
@@ -22,7 +24,7 @@ import BASRuntimeCore
 @testable import BASMemory
 #endif
 
-final class BASConcurrentTurnSerializationTests: XCTestCase {
+final class BASConcurrentTurnLivenessTests: XCTestCase {
 
     // MARK: - Helpers
 
@@ -112,6 +114,15 @@ final class BASConcurrentTurnSerializationTests: XCTestCase {
         XCTAssertEqual(completed, n,
             "all \(n) concurrent process() turns must complete with a populated result — " +
             "no deadlock, no cross-actor await cycle")
+
+        #if (os(iOS) || os(macOS)) && DEBUG
+        // Surface (do NOT assert ==0) the recorded retrieve-read tripwire hits. Concurrent turns on ONE brain
+        // can legitimately trip the single-stream `cosineTopKAtomIDsSync` contract (a read racing a write) —
+        // that's expected here and is exactly WHY production serves one turn per brain. A non-zero count
+        // documents that contract; the liveness assertion above is the real check.
+        print("[BASConcurrentTurnLivenessTests] recorded \(violations.count) retrieve-read tripwire hit(s) " +
+            "across \(n) concurrent turns (single-stream contract — observational, not a failure)")
+        #endif
     }
 }
 
