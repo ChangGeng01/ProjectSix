@@ -39,10 +39,17 @@ PER_RUN_ITERS="${PER_RUN_ITERS:-200}"        # per-relaunch iter cap (big; a wed
 STALL_SEC="${STALL_SEC:-90}"                 # no new mlx line for this long (app alive) ⇒ wedge
 POLL_SEC="${POLL_SEC:-15}"
 MAX_DECODE_TOKENS="${MAX_DECODE_TOKENS:-96}"
+WEDGE_FAST="${WEDGE_FAST:-0}"   # 1 ⇒ inject the fabric feed-forward (ADR §6 big-prefill) so each segment
+                                # wedges FAST — used to VALIDATE the watchdog's detect→kill→relaunch path
+                                # in-harness (the plain wedge is variable and may not fire in a short window).
 LOG_GLOB="ch1025-endurance-2026*.log"
 PULL_DIR="$(mktemp -d /tmp/bas-wd.XXXXXX)"
 
-ENV_RUN='{"BAS_ENDURANCE_AUTOSTART":"1","BAS_INTERNAL_ITER_COUNT":"'"${PER_RUN_ITERS}"'","BAS_INTERNAL_MLX_PROMPTS":"1","BAS_INTERNAL_COOLDOWN_SEC":"0","BAS_INTERNAL_MAX_DECODE_TOKENS":"'"${MAX_DECODE_TOKENS}"'"}'
+WEDGE_FRAG=""
+if [ "${WEDGE_FAST}" = "1" ]; then
+    WEDGE_FRAG='"BAS_FABRIC_AUTH_FEEDFORWARD":"1","BAS_AGENT_FABRIC":"enabled",'
+fi
+ENV_RUN='{"BAS_ENDURANCE_AUTOSTART":"1",'"${WEDGE_FRAG}"'"BAS_INTERNAL_ITER_COUNT":"'"${PER_RUN_ITERS}"'","BAS_INTERNAL_MLX_PROMPTS":"1","BAS_INTERNAL_COOLDOWN_SEC":"0","BAS_INTERNAL_MAX_DECODE_TOKENS":"'"${MAX_DECODE_TOKENS}"'"}'
 
 log_stamp() { echo "${1:-}" | grep -oE '[0-9]{8}-[0-9]{6}' | tr -d '-' | tail -1; }
 newest_log() {
