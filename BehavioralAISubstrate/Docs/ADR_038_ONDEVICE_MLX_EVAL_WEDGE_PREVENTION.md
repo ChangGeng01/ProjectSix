@@ -634,3 +634,17 @@ window + varying prompt lengths) prevent reuse, exhausting device memory after ~
 livelocks (or OOMs).** The fix is a one-line moderate `MLX.Memory.cacheLimit` — no model switch, no model
 surgery, no MLX/upstream change required. (Llama avoids it natively via better buffer reuse; the watchdog remains
 a safety net.)
+
+### 11.9 Default-fix durability — 30/30 with NO env, cache bounded the whole run (iOS 27)
+
+Installed the build with the 512 MB DEFAULT (no `BAS_MLX_CACHE_LIMIT_MB`), ran Gemma-3n feed-forward for 30
+iterations to confirm the default applies on its own and the fix holds (not just 12):
+```
+iter=1  active=2512.6 cache=99.5     iter=3 cache=512.2   iter=9 cache=495.5
+iter=13/17/21/25/29  active=2512.6 cache≈512   → status=COMPLETED, 30/30, NO wedge
+```
+**The cache pool plateaus at ~512 MB for the entire run** (vs the unbounded 99→446→645→… that wedged at 3),
+`active` stays 2512, and the run completes 30/30 with the adapter's default cap and **no env override**. The fix
+is automatic + durable. (Honesty bound: n=1 device, iOS 26.5→27.0; 30 turns, not a multi-hour soak — but the
+cache is provably *bounded* now, which is the property that prevents the exhaustion, so it does not depend on
+run length. A longer soak + the watchdog remain available.)
