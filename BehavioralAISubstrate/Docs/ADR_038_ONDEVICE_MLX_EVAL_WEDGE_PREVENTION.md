@@ -399,3 +399,37 @@ reboot, validated). For the **end-user product**, true in-process prevention rem
 `wait_for_one` only blocks when `n_tasks_old > 1` (may not be the single-decode block), and the `Event::wait`
 timeout's effect was not positively confirmed — Phase 2 starts with **observability** (device-console capture +
 enter/exit tripwires) to pin the wait before bounding it.
+
+## 11. iOS 27 + ROOT-CAUSE LOCALIZED (2026-06-09): scheduler-throttle livelock, n_active_tasks pinned at 11
+
+Device upgraded to **iOS 27.0 (Build 24A5355q)**. The Xcode-26.5 build deploys to it fine. **The wedge
+REPRODUCES on iOS 27** (feed-forward, stalled at 3 decodes) → **reconfirms it's MLX, not the OS** (as §10.2
+predicted; iOS 27 changes Apple's driver, not MLX's scheduler).
+
+**Localized via `MLX_WEDGE_TRACE` (enter/exit tripwires + `--console` capture), decisive:**
+- `Event::wait`: `>1 <1` balanced, 30 s timeout fired **0** times → **NOT** the block (corrects the §10/§10.3
+  prime-suspect assumption).
+- `gpu::synchronize`: `>3 <3` balanced → not the block.
+- **`scheduler::wait_for_one`: called 5754× (matched pairs — it RETURNS each time, not a deadlock), always
+  with `n_active_tasks() == 11`.** The flood starts right after `brain iter=4` (the big feed-forward prefill
+  decode) and never ends; no `🧠 mlx iter=4` is ever produced.
+
+**Mechanism:** `eval_impl`'s drain throttle (transforms.cpp:242) is
+`if (n_active_tasks() > MAX_ACTIVE_TASKS || (active_memory > memory_limit && n>0)) { … wait_for_one(); … }`
+with `MAX_ACTIVE_TASKS = 10`. The memory clause is false here (allocator `block_limit_ ≈ 5 GB`, app RSS ~2.9 GB).
+The driver is `n_active_tasks() == 11 > 10`: **`n_active_tasks_` has LEAKED** — a `notify_task_completion`
+(fired from a command buffer's `addCompletedHandler`, eval.cpp:61) that never fired pins the counter at 11. So
+**every** subsequent decode-eval trips the throttle and the generate loop livelocks (thousands of throttled
+evals, no token), while the GPU stays healthy (each `wait_for_one` returns as other tasks complete). This is
+**exactly the §10.2 picture** — GPU-exonerated, CPU-side MLX scheduler bug — now pinned to the line.
+
+**This is a different bug than the original ADR framing.** The wedge is NOT an "uncancellable synchronous Metal
+eval hang" (§1) — it is a **scheduler task-accounting leak → throttle livelock**. The earlier framing was the
+best read from the symptoms; the trace corrects it.
+
+**Fix test in flight (decisive):** made `MAX_ACTIVE_TASKS` env-configurable (`BAS_MLX_MAX_ACTIVE_TASKS`, default
+10 = upstream). If raising it above the leaked floor (e.g. 64) **un-wedges** the decode → confirms the
+n-leak-throttle mechanism AND yields a mitigation (prevention, if the leak is bounded; a delay, if it grows).
+If it does NOT un-wedge → the throttle is a symptom and the block is in the generate loop itself. Result (pass
+OR fail) recorded here next. The true fix is to stop the `notify_task_completion` leak (upstream MLX);
+`BAS_MLX_MAX_ACTIVE_TASKS` + the watchdog are the in-reach levers.

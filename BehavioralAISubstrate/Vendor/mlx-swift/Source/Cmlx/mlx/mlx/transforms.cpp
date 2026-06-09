@@ -22,7 +22,25 @@
 
 namespace mlx::core {
 
-static constexpr int MAX_ACTIVE_TASKS = 10;
+// BAS/ADR-038 §11 — the on-device decode wedge is a scheduler-throttle livelock: n_active_tasks leaks
+// (a notify_task_completion that never fires) and pins at MAX_ACTIVE_TASKS+1, so every subsequent eval
+// trips the `n_active_tasks() > MAX_ACTIVE_TASKS` drain throttle and the generate loop livelocks while
+// the GPU stays healthy (each wait_for_one returns). Make the throttle ceiling env-configurable
+// (BAS_MLX_MAX_ACTIVE_TASKS) so we can raise it above the leaked floor and confirm/mitigate the wedge.
+// Default 10 == upstream (byte/behavior-identical when unset).
+static int bas_max_active_tasks() {
+  static const int v = []() {
+    const char* e = std::getenv("BAS_MLX_MAX_ACTIVE_TASKS");
+    if (e != nullptr && *e != '\0') {
+      int n = std::atoi(e);
+      if (n > 0) {
+        return n;
+      }
+    }
+    return 10; // upstream default
+  }();
+  return v;
+}
 
 /* This class is only meant to be used in eval
  * for synchronizing with the main thread. */
@@ -239,7 +257,7 @@ array eval_impl(std::vector<array> outputs, bool async) {
       cpu::eval(arr);
     }
 
-    if (scheduler::n_active_tasks() > MAX_ACTIVE_TASKS ||
+    if (scheduler::n_active_tasks() > bas_max_active_tasks() ||
         (get_active_memory() > get_memory_limit() &&
          scheduler::n_active_tasks() > 0)) {
       // Commit any open streams
