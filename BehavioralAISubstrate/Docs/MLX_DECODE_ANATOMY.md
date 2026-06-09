@@ -47,6 +47,26 @@ mlx-decode iter=3 p=2 prefill_ms=155 decode_ms=2250 prompt_tokens=65 gen_tokens=
   context): at ~400-600 prefill tok/s, a ~2000-token context ≈ 3-5 s of prefill, which would then rival decode.
   So KV-reuse / prompt-shrink is a CONDITIONAL lever, gated on real prompt lengths — currently short.
 
+## Cross-model decode tok/s (2026-06-10, iPhone Air, iOS 27 beta, same harness, decode cap 96)
+
+The Phase-2 "faster model" lever measured BEFORE building anything — does a model swap even help?
+
+| model | real decode tok/s | vs Gemma-3n-E2B | notes |
+|---|---|---|---|
+| **Gemma-3n-E2B** (~2B-effective; MatFormer/per-layer-inputs) | **~42.6** | baseline (FASTEST) | the current default |
+| Qwen2.5-3B (dense, 4-bit) | ~34.6 (34.2-34.7) | **−19%** | loaded clean (id + `<|im_end|>` correct on HW — incidental n=1 confirm of #2) |
+| Llama-3.2-3B (dense, 4-bit) | ~32.5 (32.3-32.7) | **−24%** | — |
+
+**Finding — the "faster model" lever via Llama/Qwen is REFUTED:** both dense-3B alternatives decode SLOWER
+than Gemma-3n-E2B (more parameters → more compute per token). Gemma-3n-E2B is already the throughput-best of
+the catalog; Llama/Qwen are stable-architecture fallbacks for the WEDGE class (ADR-038 §11.5), **not** for
+speed. All three are decode-bound (prefill ≤ ~7-13%).
+
+**Implication for the lever:** to actually beat ~42.6 tok/s you need either (a) a genuinely SMALLER model
+(sub-2B / ~1B) or HEAVIER quant (3-bit/2-bit) — a lateral or larger swap hurts; or (b) **speculative decoding**
+(~2-3×, but a 2nd-model memory cost on 8 GB + heavy vendor integration); or (c) accept ~42.6 as the
+Gemma-3n-E2B/A-series floor and tune the decode-token cap. KV-quant is orthogonal (memory, modest speed).
+
 ## Honesty bound (R1 / 亏的不要上)
 
 n=1 device (iPhone Air, 8 GB), iOS 27.0 beta, Gemma-3n-E2B, **short prompts (~65 tok)**, decode cap 96, one
