@@ -26,12 +26,19 @@ from a command buffer's `addCompletedHandler` — if that handler never fires, t
 - Reproduces reliably with **large prefills** (a big enriched feed-forward prompt wedges within ~3 decodes);
   small prompts wedge variably (~12 to 56+ decodes, or not in a short window). Cumulative/probabilistic.
 
-## Critical observation: the process is SPINNING, not frozen
+## Critical observation: SPINNING (not frozen) + UNBOUNDED allocation
 
 With per-wait tripwires (`--console`), at the wedge the process is **actively running thousands of evals**
-(`scheduler::wait_for_one` called 5754×, all returning) while producing **zero** new tokens — `respond()` for the
-wedged turn never returns. `n_active_tasks()` is **pinned at 11** (> `MAX_ACTIVE_TASKS=10`). The GPU keeps
-completing work the whole time (each `wait_for_one` returns). So it is a **CPU-side livelock**, not a GPU hang.
+(`scheduler::wait_for_one` called ~5600–5750×, all returning) while producing **zero** new tokens — `respond()`
+for the wedged turn never returns. The GPU keeps completing work (each `wait_for_one` returns) → **CPU-side
+livelock, not a GPU hang**. A drain-trip diagnostic at `transforms.cpp` (the throttle in `eval_impl`) shows:
+- **The throttle trips on the TASK clause**: `n_active_tasks()` is **pinned at exactly 11** (> `MAX_ACTIVE_TASKS=10`),
+  with `mem_trip=0` on **every** trip — `get_active_memory()` (134→2585 MB) stays far below `get_memory_limit()`
+  (~11 GB). So it is **not** the memory-pressure clause.
+- **`get_active_memory()` grows UNBOUNDEDLY** (134 → 2585 MB and still climbing when killed at 240 s) for a single
+  turn whose prompt is only ~35–134 tokens. A finite prefill/step graph would peak then emit a token; this looks
+  like an **unbounded allocation / re-evaluation** — something keeps submitting work / never marks an output
+  available. This is the core unresolved question.
 
 ## Levers we tried that did NOT fix it (so you can skip them)
 
@@ -43,6 +50,19 @@ completing work the whole time (each `wait_for_one` returns). So it is a **CPU-s
 - **Newer mlx-swift / -lm**: we are already on the latest LM line; no relevant fix in 0.31.2-0.31.4.
 - **`TokenIterator.next()` stop condition is correct** in the vendored copy (`if tokenCount >= maxTokens { return
   nil }`) → not a runaway-past-maxTokens loop.
+- **Chunking the Gemma4 (VLM) prefill** (mirroring `LLMModel.prepare`'s chunked loop, at chunk size 32):
+  **still wedged** → the un-chunked prefill *graph size* is not the cause.
+- **Raising the memory limit is irrelevant**: the drain-trip is the task clause, never the memory clause
+  (`active_memory` ≪ `memory_limit`).
+
+## Where it points (for a maintainer)
+
+The remaining, unresolved question is **why `n_active_tasks` pins at 11 and `active_memory` grows unbounded for a
+single short turn that emits no token** — i.e. what keeps submitting GPU work / never marks the turn's output
+array available, specifically for **Gemma4 (Gemma-3n E2B, per-layer-inputs architecture)** on iOS. It is NOT the
+generic decode loop (small prompts/other models don't wedge), NOT `Event::wait`/`synchronize`, NOT the throttle
+ceiling, NOT memory pressure, NOT prefill graph size. It is cumulative across turns (fresh `ChatSession` each
+turn, so it is MLX *process-global* state, not session/KV state). A repro harness can be shared.
 
 ## What we measured (the controls that exonerate the GPU)
 
