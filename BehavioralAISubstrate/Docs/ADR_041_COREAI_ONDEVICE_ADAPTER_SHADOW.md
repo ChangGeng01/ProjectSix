@@ -84,8 +84,18 @@ the **Metal Toolchain** component. Exhaustively diagnosed:
   (`xcodebuild -downloadComponent MetalToolchain -buildVersion 27A5194q`) → **`Failed fetching catalog … RequestedBuild = 27A5194q`** (it does not exist).
 - **Xcode 27 does NOT bundle a usable Metal Toolchain** — the in-app `metal` is a **107 KB stub** that delegates to
   the downloadable cryptex. So there is no bundled fallback.
-- Ruled out: NOT `xcode-select` (both Xcodes report the component installed); NOT env poisoning (clean env fails
-  identically); NOT our code (the compile-cert proves the adapter binds the real API).
+- Ruled out: NOT env poisoning (clean `env -i` fails identically); NOT our code (the compile-cert proves the
+  adapter binds the real API).
+- **DECISIVE switch test (the operator ran it, eliminating xcode-select):** initially `xcode-select` pointed at
+  Xcode 26.5, so `aimodelc` saw the 26.5 Metal Toolchain (`17F42`, cryptex `v17.6.42.0`) — there are TWO Metal
+  cryptexes mounted (26.5 `17F42` + 27 `27A5194o` = `v27.1.5194.15`). The operator ran
+  `sudo xcode-select -s <Xcode-beta>/Contents/Developer`; `xcodebuild -showComponent MetalToolchain` then
+  reported **`27A5194o` selected** (the 27 toolchain) — **yet `aimodelc` rejected it identically.** This PROVES
+  the blocker is the build sub-version skew, not toolchain selection: letter-decode `o` = 15th letter ↔
+  `v27.1.5194.**15**`, `q` = 17th letter ↔ Xcode `27A5194**q**`, so `aimodelc` (Xcode build **.17/q**) requires a
+  **.17** Metal Toolchain while Apple has published only **.15/o**. (`metal -c` tolerates `o` and compiles; only
+  `aimodelc`'s stricter gate rejects it.) NOTE: restore `xcode-select` to 26.5 after this test
+  (`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`) so the default-toolchain build stays 26.5.
 
 **Unblock paths (any one):** Apple ships a Metal Toolchain matching the Xcode-beta build (or a self-consistent
 seed); OR install the Xcode beta whose build matches the available `27A5194o` toolchain; OR (mechanical-only
