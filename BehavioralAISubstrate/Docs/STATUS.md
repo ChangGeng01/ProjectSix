@@ -83,11 +83,15 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
   Engine-parity→halt (Phase-2) is **ABANDONED**; reconciled via `classifyDivergence` →
   `intentionalDefenseInDepth` (shipped, BASHostKit). The REAL halt signal = `BASCoordinatorConsistencyCheck`
   (coordinator vs its own re-derived baseline; shipped + wired). See **ADR-023 §8** before touching this arc.
-- **ADR-038** on-device MLX-eval-wedge re-cert — **DONE (honest negative).** Run A PASS (baseline stable,
-  256-cap verified on the REAL build — the prior runs unknowingly ran a STALE binary). Run B WEDGE: the WS1
-  typed prompt cleared the historical iter1/prompt2 point but the wedge **MOVED to iter2/prompt2** →
-  **prevention UNPROVEN; feed-forward stays default-OFF.** WS1+WS2 are partial improvements, not a green
-  light. See ADR-038.
+- **ADR-038** on-device MLX-eval-wedge — **ROOT CAUSE PINNED + leading fix VALIDATED (n=1).** The wedge is
+  MLX's **free-buffer cache pool growing unbounded** under Gemma-3n's variable buffer shapes → device-memory
+  exhaustion → allocator-drain livelock ("wedge") or OS OOM-kill (§11.7). Fix: a moderate `MLX.Memory.cacheLimit`
+  (default 512 MB, §11.8) — on iPhone Air / iOS 27.0 beta the unbounded default wedges at ~3 turns; with the cap
+  Gemma-3n-E2B ran **30/30**, cache plateaued ≈512 MB (§11.9). Honesty bound (R1): **n=1 device, iOS 27 beta,
+  E2B-class, short prompts** — a leading fix, not a multi-device cert; the cap is a ceiling so never WORSE than
+  unbounded, but E4B/3-4B/long-prompts are unmeasured. (The 06-07 "honest negative / prevention UNPROVEN" framing
+  — WS1 typed prompt + WS2 256-cap — is **superseded**: the wedge is now explained + bounded, not merely avoided.)
+  See ADR-038 §10-§11.9.
 - **GHOST:** ADR-013 (a historical chapter note, not a live contract).
 
 ## 3. Multi-language pilots — probe vs main-path (honest, #7)
@@ -108,12 +112,16 @@ Process: **ADR-016** milestone-advance convention. Honest corrections (not new b
 
 ## 4. Known issues + workarounds
 
-- **MLX/Metal GPU-eval wedge** (highest-priority, **UNRESOLVED**): a synchronous, uncancellable Metal eval
-  that hangs with zero token progress; **no in-process recovery** (Swift can't cancel it). On-device A/B
-  (ADR-038, 2026-06-07): WS1's typed prompt cleared the historical iter1/prompt2 point but the wedge
-  **MOVED to iter2/prompt2** — so prompt-shaping prevention is INSUFFICIENT and **feed-forward stays
-  default-OFF** (it still wedges). WS2's 256-cap (verified) + the 512 backstop bound exposure but don't
-  eliminate it. Next levers + falsification in ADR-038 §6. See `BASEnduranceAppRunner.swift` / `MLXOrganAdapter.swift`.
+- **MLX/Metal GPU-eval wedge** (**ROOT-CAUSED + leading fix shipped, n=1**): the symptom is a synchronous,
+  uncancellable Metal hang with zero token progress + **no in-process recovery** (Swift can't cancel a sync
+  Metal eval — so the cure is *prevention*, not a thread-based rescue). Root cause (ADR-038 §11.7): MLX's
+  free-buffer **cache pool grows unbounded** under Gemma-3n's variable buffer shapes → device-memory exhaustion
+  → the allocator drain livelocks (or the OS OOM-kills). Fix: the adapter now defaults `MLX.Memory.cacheLimit`
+  to 512 MB (§11.8) — Gemma-3n-E2B ran 30/30 with the cache plateaued ≈512 MB (§11.9). Honesty bound: validated
+  on **one device / iOS 27 beta / E2B / 30 turns** (a ceiling, never worse than unbounded; E4B/3-4B/long prompts
+  unmeasured). The watchdog-relaunch (no reboot) remains a safety net. The earlier prompt-shaping framing (WS1
+  typed prompt; the 06-07 "MOVED to iter2/prompt2" negative) is superseded — that was a symptom, not the cause.
+  See ADR-038 §10-§11.9 / `BASEnduranceAppRunner.swift` / `MLXOrganAdapter.swift`.
 - **Swift-testing headless SIGBUS** (#6): the `@Test` parallel runner SIGBUSes under full load in a
   headless macOS session (environmental, not project code). Authoritative gate =
   `swift test --disable-swift-testing` (XCTest, 15k+). Entry: `scripts/swift-test-headless.sh`. See
