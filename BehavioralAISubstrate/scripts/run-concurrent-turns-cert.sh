@@ -151,13 +151,14 @@ case "${V}" in
         echo "RESULT: FAIL — the concurrent run did not complete (deadlock / wedge / partial). See status= above."
         echo "Pulled log: ${FRESH}"; exit 1 ;;
     *speedup=some*)
-        echo "RESULT: INVESTIGATE — concurrent aggregate tokens/s BEAT sequential (speedup=some). The GPU-serial"
-        echo "        deduction is REFUTED on this device — dig into why (genuine overlap? measurement bug?)."
+        echo "RESULT: INVESTIGATE — concurrent WALL-CLOCK beat sequential (wall_speedup well above 1.0,"
+        echo "        speedup=some). The GPU-serial deduction is REFUTED on this device — dig into why"
+        echo "        (genuine parallel overlap? measurement bug?). See seq_wall_ms/conc_wall_ms above."
         echo "Pulled log: ${FRESH}"; exit 1 ;;
     *speedup=none*evallock_serial=confirmed*)
-        echo "RESULT: PASS — concurrent aggregate tokens/s did NOT beat sequential (speedup=none) AND the run"
-        echo "        completed without deadlock/wedge. The GPU decode is serial (evalLock-bound); concurrent"
-        echo "        turns buy NO throughput. The Phase-2 #5 deduction is now hardware-proven (n=1)."
+        echo "RESULT: PASS — concurrent WALL-CLOCK did NOT beat sequential (wall_speedup ≈ 1.0, speedup=none)"
+        echo "        AND the run completed without deadlock/wedge. The GPU decode is serial (evalLock-bound);"
+        echo "        concurrent turns buy NO throughput. The Phase-2 #5 deduction is now hardware-proven (n=1)."
         echo "Pulled log: ${FRESH}"; exit 0 ;;
     *)
         echo "RESULT: INCONCLUSIVE — verdict line present but unrecognized; inspect it:"
