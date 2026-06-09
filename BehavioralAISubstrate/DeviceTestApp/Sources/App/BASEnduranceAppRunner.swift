@@ -226,6 +226,21 @@ final class BASEnduranceAppController: ObservableObject {
         static let l8MetalTopKTimeoutDefault = 100
         /// Agent-fabric activation gate。 Activated when `== "enabled"` (ADR-014 opt-in)。
         static let agentFabricKey = "BAS_AGENT_FABRIC"
+        /// ADR-039 concurrency arc #5 — on-device CONCURRENT-TURNS certification. N>=2 runs the
+        /// SEQ-vs-CONC probe + emits `📊 concurrent-turns`, then returns; `0`/unset = OFF = the
+        /// single-stream `for iter` path below is unchanged (byte-equal). Converts the Phase-2
+        /// "concurrent turns SKIP by deduction" into an on-device measurement (R1).
+        static let concurrentTurnsKey = "BAS_CONCURRENT_TURNS"
+        static let concurrentTurnsDefault = "0"
+        /// Probe topology: "fullturn" (brain.process + adapter.draft, Topology A, default) |
+        /// "decode" (adapter.draft only — isolates the GPU/evalLock seam, the deadlock canary).
+        static let concurrentModeKey = "BAS_CONCURRENT_MODE"
+        static let concurrentModeDefault = "fullturn"
+        /// Advisory per-phase wall budget (sec) logged in the START line. The MLX decode is a
+        /// SYNCHRONOUS, UNCANCELLABLE Metal eval (see :643-649), so a real wedge is killed by the
+        /// driver script / watchdog — NOT cancelled in-app. Default 180.
+        static let concurrentTimeoutSecKey = "BAS_CONCURRENT_TIMEOUT_SEC"
+        static let concurrentTimeoutSecDefault = "180"
     }
 
     // MARK: - Autostart hook
@@ -640,6 +655,14 @@ final class BASEnduranceAppController: ObservableObject {
             (env[EnduranceEnv.l8MetalTopKKey] ?? EnduranceEnv.l8MetalTopKDefault) == "1"
         let l8MetalTopKTimeoutMs =
             Int(env[EnduranceEnv.l8MetalTopKTimeoutKey] ?? "") ?? EnduranceEnv.l8MetalTopKTimeoutDefault
+        // ADR-039 concurrency arc #5 — opt-in on-device CONCURRENT-TURNS cert (default 0 = OFF → single-stream).
+        let concurrentTurns = max(0, Int(
+            env[EnduranceEnv.concurrentTurnsKey] ?? EnduranceEnv.concurrentTurnsDefault) ?? 0)
+        let concurrentMode =
+            (env[EnduranceEnv.concurrentModeKey] ?? EnduranceEnv.concurrentModeDefault) == "decode"
+            ? "decode" : "fullturn"
+        let concurrentTimeoutSec = max(1.0, Double(
+            env[EnduranceEnv.concurrentTimeoutSecKey] ?? EnduranceEnv.concurrentTimeoutSecDefault) ?? 180.0)
         // ch1066 再查 — a per-turn wall-clock TIMEOUT around adapter.draft was tried here
         // and REMOVED after on-device proof it cannot work: the MLX decode is a SYNCHRONOUS,
         // UNCANCELLABLE Metal eval, so (a) a structured task-group timeout hangs in teardown
@@ -1277,6 +1300,25 @@ final class BASEnduranceAppController: ObservableObject {
             }
         }
 
+        // ADR-039 concurrency arc #5 — opt-in CONCURRENT-TURNS certification. Default OFF (concurrentTurns==0)
+        // ⇒ fall through to the byte-equal single-stream loop below. When N>=2: run the SEQ-vs-CONC probe
+        // (the probe IS the run for this launch), then clean up + return. Brain + adapter are loaded above.
+        if concurrentTurns > 0 {
+            await runConcurrentProbe(
+                brain: brain, adapter: adapter, n: concurrentTurns,
+                mode: concurrentMode, maxDecodeTokens: maxDecodeTokens,
+                timeoutSec: concurrentTimeoutSec)
+            metalProbeHeartbeat?.cancel()
+            await MainActor.run {
+                self.status = .completed(
+                    totalIters: concurrentTurns, totalTokens: 0, runSec: 0)
+                self.started = false
+                self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+            return
+        }
+
         for iter in 1...totalIters {
             let iterStartNs = monoNowNs()
             let elapsedSec = Int(
@@ -1834,6 +1876,122 @@ final class BASEnduranceAppController: ObservableObject {
     /// For N=100:p50→idx49(50th elem),p99→idx98(99th)。 Pre-fix used
     /// `count/2`(→idx50=51st≈p51)and `Int(count×0.99)`(→idx99=MAX),
     /// both biased the tail high。
+    // MARK: - ADR-039 concurrency arc #5 — CONCURRENT-TURNS certification probe
+
+    private struct ConcurrentTurnOutcome: Sendable {
+        let latencyMs: Double
+        let estTokens: Int
+        let ok: Bool
+    }
+
+    /// On-device CONCURRENT-TURNS cert (Docs/CONCURRENCY_MEASUREMENT_FINDINGS.md #5). Runs N turns
+    /// SEQUENTIALLY (baseline) then CONCURRENTLY (probe) on the ONE shared brain + adapter, emitting three
+    /// `📊 ch1025 concurrent-turns` lines (phase=seq, phase=conc, verdict). Decisive comparison: concurrent
+    /// aggregate est-tokens/s should NOT beat sequential (the GPU decode is serial behind MLX's process-global
+    /// evalLock), and the concurrent run must complete without deadlock/wedge. A throughput GAIN would REFUTE
+    /// the GPU-serial deduction (the falsifiable hook). Observability-only — never touches the byte-deterministic
+    /// governance path; opt-in / default-OFF so the single-stream run is byte-equal.
+    private nonisolated func runConcurrentProbe(
+        brain: BASCognitiveBrain,
+        adapter: MLXOrganAdapter,
+        n: Int,
+        mode: String,
+        maxDecodeTokens: Int,
+        timeoutSec: Double
+    ) async {
+        await emitBoth(
+            "📍 ch1025 concurrent-turns START mode=\(mode) n=\(n) timeout_sec=\(Int(timeoutSec)) " +
+            "(advisory; the MLX decode is uncancellable — a wedge is killed by the driver/watchdog, not in-app)")
+
+        // One full turn: fullturn = brain.process (L1-L14) + adapter.draft (decode); decode = draft only.
+        // Captures only Sendable values (brain/adapter actors, Ints, String) → no `self` capture (@Sendable-safe).
+        let promptCount = Self.promptPool.count
+        let oneTurn: @Sendable (Int) async -> ConcurrentTurnOutcome = { k in
+            let prompt = Self.promptPool[k % promptCount]
+            let startNs = DispatchTime.now().uptimeNanoseconds
+            if mode == "fullturn" {
+                _ = await brain.process(prompt)
+            }
+            let request = BASOrganRequest(
+                requestID: "conc-\(mode)-\(k)",
+                role: .core, preset: .core,
+                instruction: prompt, context: [],
+                maxOutputTokens: maxDecodeTokens)
+            let endNsClosure: (Bool, Int) -> ConcurrentTurnOutcome = { ok, est in
+                let endNs = DispatchTime.now().uptimeNanoseconds
+                let ms = Double(endNs >= startNs ? endNs - startNs : 0) / 1_000_000.0
+                return ConcurrentTurnOutcome(latencyMs: ms, estTokens: est, ok: ok)
+            }
+            do {
+                let draft = try await adapter.draft(request)
+                return endNsClosure(true, draft.outputTokensEstimated)
+            } catch {
+                return endNsClosure(false, 0)
+            }
+        }
+
+        // SEQ baseline — N turns one after another; wall-clock around the whole loop. A per-turn progress
+        // line gives the driver script a liveness heartbeat (the probe does NOT emit the single-stream
+        // `🧠 ch1025 mlx` line, so the script's stall-detection keys on these `concurrent-turns` lines).
+        let seqStartNs = monoNowNs()
+        var seqOut: [ConcurrentTurnOutcome] = []
+        for k in 0..<n {
+            let o = await oneTurn(k)
+            seqOut.append(o)
+            await emitBoth(
+                "📊 ch1025 concurrent-turns progress phase=seq done=\(k + 1)/\(n) " +
+                "ok=\(o.ok) ms=\(Int(o.latencyMs)) est_tokens=\(o.estTokens)")
+        }
+        let seqWallMs = monoElapsedMs(since: seqStartNs)
+
+        // CONC probe — N turns concurrently; wall-clock around the whole task group.
+        let concStartNs = monoNowNs()
+        let concOut: [ConcurrentTurnOutcome] = await withTaskGroup(
+            of: ConcurrentTurnOutcome.self
+        ) { group in
+            for k in 0..<n { group.addTask { await oneTurn(k) } }
+            var out: [ConcurrentTurnOutcome] = []
+            for await o in group { out.append(o) }
+            return out
+        }
+        let concWallMs = monoElapsedMs(since: concStartNs)
+
+        let seq = await emitConcurrentPhase("seq", mode: mode, n: n, outs: seqOut, wallMs: seqWallMs)
+        let conc = await emitConcurrentPhase("conc", mode: mode, n: n, outs: concOut, wallMs: concWallMs)
+
+        let ratio = seq.tps > 0 ? conc.tps / seq.tps : 0
+        let speedup = ratio > 1.05 ? "some" : "none"
+        let completed = seq.ok && conc.ok
+        let evalLockSerial = !completed ? "inconclusive" : (speedup == "none" ? "confirmed" : "refuted")
+        await emitBoth(String(format:
+            "📊 ch1025 concurrent-turns verdict mode=%@ n=%d conc_tok_per_s=%.2f seq_tok_per_s=%.2f " +
+            "ratio=%.2f speedup=%@ completed=%@ evallock_serial=%@",
+            mode, n, conc.tps, seq.tps, ratio, speedup,
+            completed ? "true" : "false", evalLockSerial))
+    }
+
+    /// Emit one `📊 ch1025 concurrent-turns phase=…` line and return (aggregate est-tokens/s, all-ok).
+    private nonisolated func emitConcurrentPhase(
+        _ phase: String, mode: String, n: Int,
+        outs: [ConcurrentTurnOutcome], wallMs: Double
+    ) async -> (tps: Double, ok: Bool) {
+        let aggTokens = outs.reduce(0) { $0 + $1.estTokens }
+        let tps = wallMs > 0 ? Double(aggTokens) / (wallMs / 1000.0) : 0
+        let errors = outs.filter { !$0.ok }.count
+        let allOk = (errors == 0 && outs.count == n)
+        let status = allOk ? "completed" : "partial(\(outs.count - errors)/\(n))"
+        let lat = outs.map { $0.latencyMs }.sorted()
+        let lmin = lat.first ?? 0
+        let lmax = lat.last ?? 0
+        let p50 = lat.isEmpty ? 0 : lat[Self.nearestRankIndex(0.50, count: lat.count)]
+        let p99 = lat.isEmpty ? 0 : lat[Self.nearestRankIndex(0.99, count: lat.count)]
+        await emitBoth(String(format:
+            "📊 ch1025 concurrent-turns phase=%@ mode=%@ n=%d wall_ms=%.0f agg_est_tokens=%d " +
+            "agg_est_tok_per_s=%.2f min_ms=%.0f p50_ms=%.0f p99_ms=%.0f max_ms=%.0f status=%@ errors=%d",
+            phase, mode, n, wallMs, aggTokens, tps, lmin, p50, p99, lmax, status, errors))
+        return (tps, allOk)
+    }
+
     private nonisolated static func nearestRankIndex(
         _ p: Double, count: Int
     ) -> Int {
