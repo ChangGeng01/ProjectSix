@@ -111,6 +111,24 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Qwen2.5 3B (MLX, 4-bit)",
         extraEOSTokens: ["<|im_end|>"])
 
+    /// Llama 3.2 **1B** instruction-tuned, 4-bit — a SMALLER (sub-2B) throughput pick. Decode tok/s scales
+    /// inversely with parameter count, so a 1B should decode meaningfully faster than the ~42.6 tok/s
+    /// Gemma-3n-E2B baseline (MLX_DECODE_ANATOMY.md) — at a QUALITY cost (fits fast/scout/classify paths, not
+    /// core reasoning). Same `<|eot_id|>` Llama-3 terminator. (Available, host opt-in; uncertified.)
+    public static let llama3_2_1B_4bit = Entry(
+        id: "mlx-community/Llama-3.2-1B-Instruct-4bit",
+        providerID: "mlx.llama3_2.1b.it.4bit",
+        providerName: "Llama 3.2 1B (MLX, 4-bit)",
+        extraEOSTokens: ["<|eot_id|>"])
+
+    /// Qwen2.5 **1.5B** instruction-tuned, 4-bit — the other smaller throughput pick (ChatML `<|im_end|>`).
+    /// Same throughput-vs-quality tradeoff as Llama-3.2-1B. (Available, host opt-in; uncertified.)
+    public static let qwen2_5_1_5B_4bit = Entry(
+        id: "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+        providerID: "mlx.qwen2_5.1_5b.it.4bit",
+        providerName: "Qwen2.5 1.5B (MLX, 4-bit)",
+        extraEOSTokens: ["<|im_end|>"])
+
     /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
     /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
     public static let defaultEntries: [Entry] = [
@@ -127,7 +145,9 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// cache-cap fix. Kept OUT of `defaultEntries` precisely so "default" stays = "certified".
     public static let availableAlternatives: [Entry] = [
         llama3_2_3B_4bit,
-        qwen2_5_3B_4bit
+        qwen2_5_3B_4bit,
+        llama3_2_1B_4bit,
+        qwen2_5_1_5B_4bit
     ]
 
     /// Every selectable entry (certified defaults + opt-in alternatives) for SDK pickers that want to surface

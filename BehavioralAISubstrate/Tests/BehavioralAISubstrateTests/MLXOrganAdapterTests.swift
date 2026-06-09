@@ -620,7 +620,9 @@ final class MLXOrganAdapterTests: XCTestCase {
         let altIDs = MLXModelCatalog.availableAlternatives.map(\.id)
         XCTAssertEqual(altIDs, [
             "mlx-community/Llama-3.2-3B-Instruct-4bit",
-            "mlx-community/Qwen2.5-3B-Instruct-4bit"
+            "mlx-community/Qwen2.5-3B-Instruct-4bit",
+            "mlx-community/Llama-3.2-1B-Instruct-4bit",
+            "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
         ])
         let defaultIDs = Set(MLXModelCatalog.defaultEntries.map(\.id))
         for alt in MLXModelCatalog.availableAlternatives {
@@ -628,6 +630,18 @@ final class MLXOrganAdapterTests: XCTestCase {
                 defaultIDs.contains(alt.id),
                 "\(alt.id) is an opt-in alternative — must NOT be a certified default")
         }
+    }
+
+    func testSmallerModelsDeclareCorrectTerminators() {
+        // The sub-2B throughput picks must carry their family terminator (wrong one → runaway generation).
+        XCTAssertTrue(
+            MLXModelCatalog.llama3_2_1B_4bit.extraEOSTokens.contains("<|eot_id|>"))
+        XCTAssertEqual(
+            MLXModelCatalog.llama3_2_1B_4bit.id, "mlx-community/Llama-3.2-1B-Instruct-4bit")
+        XCTAssertTrue(
+            MLXModelCatalog.qwen2_5_1_5B_4bit.extraEOSTokens.contains("<|im_end|>"))
+        XCTAssertEqual(
+            MLXModelCatalog.qwen2_5_1_5B_4bit.id, "mlx-community/Qwen2.5-1.5B-Instruct-4bit")
     }
 
     func testAllEntriesProviderIDsAreUniqueAcrossDefaultsAndAlternatives() {
