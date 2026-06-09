@@ -35,12 +35,22 @@ if [ ! -d "$MAC27_SDK/System/Library/Frameworks/CoreAI.framework" ]; then
 fi
 
 echo "🔧 Xcode 27 toolchain : $BETA_DEVELOPER_DIR"
-DEVELOPER_DIR="$BETA_DEVELOPER_DIR" "$BETA_DEVELOPER_DIR/usr/bin/swift" --version
+DEVELOPER_DIR="$BETA_DEVELOPER_DIR" xcrun swift --version
 echo "🧩 CoreAI.framework    : present in MacOSX27.0.sdk ✓"
+# Non-vacuous-gate guard (R1): confirm canImport(CoreAI) actually resolves under this toolchain, so a green
+# build genuinely exercises the gated branch (not a vacuous skip). Compiles a 1-line probe.
+PROBE_SRC="$(mktemp /tmp/coreai_gate_probe.XXXXXX.swift)"
+printf '#if canImport(CoreAI)\nimport CoreAI\nprint("YES")\n#else\nprint("NO")\n#endif\n' > "$PROBE_SRC"
+GATE="$(DEVELOPER_DIR="$BETA_DEVELOPER_DIR" xcrun swiftc "$PROBE_SRC" -o "${PROBE_SRC%.swift}" 2>/dev/null && "${PROBE_SRC%.swift}")"
+if [ "$GATE" != "YES" ]; then
+  echo "❌ canImport(CoreAI) did NOT resolve under this toolchain (got '$GATE') — a green build would be vacuous."
+  exit 2
+fi
+echo "🧪 canImport(CoreAI)   : YES (gate is live — the build will exercise the real branch)"
 echo "🏗  Compile-certifying BASAppleAdapters (real CoreAI branch) under Xcode 27 …"
 
 cd "$PKG_DIR"
-DEVELOPER_DIR="$BETA_DEVELOPER_DIR" "$BETA_DEVELOPER_DIR/usr/bin/swift" build \
+DEVELOPER_DIR="$BETA_DEVELOPER_DIR" xcrun swift build \
   --target BASAppleAdapters \
   --scratch-path "$SCRATCH" \
   "$@"
