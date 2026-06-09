@@ -81,6 +81,15 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   process-global `evalLock`), no deadlock/wedge. The real throughput lever is MLX-side (decode-token cap /
   prompt-batching / speculative decode / smaller-faster model), not substrate fan-out. See
   `Docs/CONCURRENCY_MEASUREMENT_FINDINGS.md` + `BASConcurrentTurnLivenessTests` (host no-deadlock gate).
+- **MLX decode efficiency — MEASURE-FIRST arc COMPLETE + CONCLUDED (bounded, not "高效完成").** Surfaced MLX's
+  REAL prefill/decode split + token counts (`BASOrganDraft.completionMetrics` ← `GenerateCompletionInfo`, via a
+  byte-equal `streamDetails` consume; runner `📊 ch1025 mlx-decode` line). On-device (iPhone Air, iOS 27 beta):
+  the turn is **decode-bound** (prefill ≤13%) at a **real ~42.6 tok/s** (the chars/4 estimate overstated it).
+  Cross-model ladder (4-bit): **Llama-3.2-1B ~84.5 (1.98×) · Qwen2.5-1.5B ~66.5 (1.56×) · Gemma-3n-E2B ~42.6
+  (baseline) · Qwen2.5-3B ~34.6 · Llama-3.2-3B ~32.5**. Findings: lateral/larger swap REFUTED (dense-3B
+  slower); the SMALLER-model lever is real (~2× at a QUALITY cost). **Decision (operator): accept the bounded
+  floor — build no new decode machinery** (gains need a quality tradeoff or heavy speculative-decode work; not
+  taken now). Efficiency is now MEASURED + bounded, honestly. See `Docs/MLX_DECODE_ANATOMY.md`.
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).
