@@ -38,6 +38,16 @@ inline uint64_t bas_event_wait_timeout_ms() {
   }();
   return cached;
 }
+
+// BAS/ADR-038 §10.3 — opt-in wedge-localization trace (MLX_WEDGE_TRACE=1). Prints enter/exit at each
+// candidate blocking wait so the LAST unmatched "[BAS]>tag" in the console stream is the stuck wait.
+inline bool bas_wedge_trace() {
+  static const bool on = []() {
+    const char* e = std::getenv("MLX_WEDGE_TRACE");
+    return e != nullptr && *e == '1';
+  }();
+  return on;
+}
 } // namespace
 
 Event::Event(Stream stream) : stream_(stream) {
@@ -57,7 +67,15 @@ Event::Event(Stream stream) : stream_(stream) {
 void Event::wait() {
   auto* ev = static_cast<MTL::SharedEvent*>(event_.get());
   const uint64_t timeout = bas_event_wait_timeout_ms();
-  if (!ev->waitUntilSignaledValue(value(), timeout)) {
+  if (bas_wedge_trace()) {
+    std::fprintf(stderr, "[BAS]>ev v=%llu sig=%llu\n",
+                 static_cast<unsigned long long>(value()),
+                 static_cast<unsigned long long>(ev->signaledValue()));
+    std::fflush(stderr);
+  }
+  const bool ok = ev->waitUntilSignaledValue(value(), timeout);
+  if (bas_wedge_trace()) { std::fprintf(stderr, "[BAS]<ev ok=%d\n", (int)ok); std::fflush(stderr); }
+  if (!ok) {
     // Reachable only when MLX_EVENT_WAIT_TIMEOUT_MS is set to a finite value. Log the event state at
     // the hang (BAS/ADR-038 §10.2 A): signaled < target ⇒ the GPU never reached the encoded signal
     // (MLX submission/scheduling/dependency issue); signaled >= target ⇒ a wait/API race.

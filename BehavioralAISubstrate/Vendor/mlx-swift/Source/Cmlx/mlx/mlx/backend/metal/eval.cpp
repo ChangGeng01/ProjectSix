@@ -89,7 +89,9 @@ void synchronize(Stream s) {
   cb->retain();
   d.end_encoding(s.index);
   d.commit_command_buffer(s.index);
+  if (bas_wedge_trace_sched()) { std::fprintf(stderr, "[BAS]>sync\n"); std::fflush(stderr); }
   cb->waitUntilCompleted();
+  if (bas_wedge_trace_sched()) { std::fprintf(stderr, "[BAS]<sync st=%d\n", (int)cb->status()); std::fflush(stderr); }
   check_error(cb);
   cb->release();
 }

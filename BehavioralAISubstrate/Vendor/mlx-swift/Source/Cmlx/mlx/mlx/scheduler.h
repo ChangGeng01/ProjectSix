@@ -3,6 +3,8 @@
 #pragma once
 
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <future>
 #include <queue>
 #include <thread>
@@ -12,6 +14,15 @@
 #include "mlx/backend/gpu/eval.h"
 #include "mlx/device.h"
 #include "mlx/stream.h"
+
+// BAS/ADR-038 §10.3 — opt-in wedge-localization trace (MLX_WEDGE_TRACE=1).
+static inline bool bas_wedge_trace_sched() {
+  static const bool on = []() {
+    const char* e = std::getenv("MLX_WEDGE_TRACE");
+    return e != nullptr && *e == '1';
+  }();
+  return on;
+}
 
 namespace mlx::core::scheduler {
 
@@ -131,9 +142,13 @@ class Scheduler {
     std::unique_lock<std::mutex> lk(mtx);
     int n_tasks_old = n_active_tasks();
     if (n_tasks_old > 1) {
+      if (bas_wedge_trace_sched()) {
+        std::fprintf(stderr, "[BAS]>wfo n=%d\n", n_tasks_old); std::fflush(stderr);
+      }
       completion_cv.wait(lk, [this, n_tasks_old] {
         return this->n_active_tasks() < n_tasks_old;
       });
+      if (bas_wedge_trace_sched()) { std::fprintf(stderr, "[BAS]<wfo\n"); std::fflush(stderr); }
     }
   }
 
