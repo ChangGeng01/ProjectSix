@@ -504,3 +504,33 @@ operator's "b 实在不行 a", the deep in-process root-cause drill is **exhaust
 on-device cycles, the primary hypothesis refuted) → consolidate to the watchdog + a rich upstream issue. All
 diagnostic env flags (`MLX_WEDGE_TRACE`, `MLX_EVENT_WAIT_TIMEOUT_MS`, `BAS_MLX_MAX_ACTIVE_TASKS`,
 `BAS_MLX_CHUNK_PREFILL`, `BAS_MLX_PREFILL_CHUNK`) stay opt-in / default-off (byte-identical) as future tools.
+
+### 11.4 Upstream instruments CRACK the mechanism + "upgrade MLX" proven moot (iOS 27)
+
+**"Upgrade all MLX to latest" — checked at the source level, it cannot fix this wedge:**
+- mlx-swift latest (0.31.4) wraps the **same mlx core 0.31.1** (`MLX_VERSION` + `version.h` identical).
+- mlx **core 0.32.0** (latest C++): the `eval_impl` drain throttle (transforms.cpp) + `wait_for_one` +
+  `notify_task_completion` (scheduler.h) are **byte-identical** to 0.31.1 (only line numbers shifted).
+- mlx-swift-lm latest: the `next()`/`step()`/`asyncEval` generate loop is **unchanged**.
+→ Every component's wedging code is identical in the latest → a re-vendor would wedge the same way; **not done**.
+
+**The 3 operator-directed instruments (token-loop beacons + task balance + eval-error) settled the mechanism:**
+- **NOT a prefill hang.** The beacon ladder shows the decode generating a full turn: `P3-enter-next tc=0…96`,
+  `P4/P5/P6` ~204×, `tc` reaching **96** (= maxTokens). The workflow's PRIMARY hypothesis (un-chunked prefill
+  graph) is **DEFINITIVELY REFUTED** — tokens flow fine.
+- **The wedge is a `step()` (model forward) that HANGS.** The last beacon is `P4-enter-step` with **no
+  matching `P6`** (32 s+ gap, still stuck at kill). A single forward never returns.
+- **LIVELOCK, not a leak** (settles the §11 question): task balance `created=12000 completed=11989 gap=11
+  STABLE` — created/completed climb together, the gap pinned at 11. The stuck forward **submits unbounded GPU
+  work** (command buffers climbing past 12,000) that all completes, yet the forward never finishes. So
+  `notify_task_completion` does NOT leak (the §11/transforms.cpp:25-30 "never fires" comment is WRONG) — it is
+  a self-refilling producer livelock.
+- **No swallowed eval error** (the new `mlx_eval` return-code surface fired 0×) → genuine hang, not a hidden error.
+
+**Pinned conclusion:** a single MLX model `step()` forward, for a specific (cumulative, post-N-turns) Gemma-3n-E2B
+input on iOS, **submits an unbounded stream of GPU command buffers and never completes** (GPU healthy, CPU
+livelocked in the drain throttle). NOT prefill-size, NOT Event::wait, NOT memory clause, NOT the throttle
+ceiling, NOT a task-completion leak, NOT a stale MLX version. The remaining question for upstream: WHY does that
+one forward submit unbounded work (a runaway op inside the Gemma-3n forward / per-layer-inputs path). The
+upstream issue carries this exact mechanism. The `mlx_eval` binding fix (surface the dropped return code) lands
+as a standalone correctness improvement regardless.
