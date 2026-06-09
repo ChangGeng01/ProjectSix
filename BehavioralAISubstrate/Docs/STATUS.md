@@ -80,7 +80,7 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   (`speedup=none, evallock_serial=confirmed`) — two concurrent turns each took ~both decodes (serialized at MLX's
   process-global `evalLock`), no deadlock/wedge. The real throughput lever is MLX-side (decode-token cap /
   prompt-batching / speculative decode / smaller-faster model), not substrate fan-out. See
-  `Docs/CONCURRENCY_MEASUREMENT_FINDINGS.md` + `BASConcurrentTurnSerializationTests` (host no-deadlock gate).
+  `Docs/CONCURRENCY_MEASUREMENT_FINDINGS.md` + `BASConcurrentTurnLivenessTests` (host no-deadlock gate).
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).

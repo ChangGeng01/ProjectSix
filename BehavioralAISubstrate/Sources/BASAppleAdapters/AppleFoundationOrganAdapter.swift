@@ -131,20 +131,24 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
             temperature: request.preset.temperature)
 
         // `.runtimeSchema` tool bridging: DECLARE tools in the prompt so the model can emit a parseable
-        // tool-call. The HOST (BASToolCallingPlanner policy) parses it, gates it (BASToolInvocationGate), and
-        // executes it — the adapter runs NOTHING (gate-before-execute / 红线 7 preserved). This is the
+        // tool-call. The matched parser ships alongside (`BASToolPromptRenderer.parseToolCall`); a HOST opts it
+        // into a `BASToolCallingPlanner` policy → the parsed call is gated (BASToolInvocationGate) + dispatched
+        // (BASToolDispatcher). The adapter runs NOTHING (gate-before-execute / 红线 7 preserved) — the
         // governance-safe alternative to FoundationModels' native Tool auto-execution (which would run ungated
-        // side-effects mid-generation). Empty tools → empty block → byte-equal to before.
+        // side-effects mid-generation). HONEST BOUND: emit+parse pair only; the host wires the policy and the
+        // real-model round-trip is NOT yet exercised on-device. Empty tools → empty block → byte-equal to before.
         let toolBlock = BASToolPromptRenderer.runtimeSchemaBlock(for: request.tools)
         let prompt = toolBlock.isEmpty
             ? Self.prompt(for: request)
             : Self.prompt(for: request) + "\n\n" + toolBlock
 
-        // `request.outputSchema` → NATIVE FoundationModels guided generation (runtime DynamicGenerationSchema →
+        // `request.outputSchema` → FoundationModels guided generation (runtime DynamicGenerationSchema →
         // GenerationSchema → respond(to:schema:)). Structured output is SIDE-EFFECT-FREE, so it does NOT cross
-        // the ADR-039 byte-deterministic governance wall — it is wired natively here, independently of tools.
-        // Falls back to plain generation when the schema can't be mapped (BASGuidedSchemaTranslator returns nil)
-        // — never drops a field silently, never crashes on a malformed schema.
+        // the ADR-039 byte-deterministic governance wall — wired independently of tools. Falls back to plain
+        // generation when the schema can't be mapped (BASGuidedSchemaTranslator returns nil) — never drops a
+        // field silently, never crashes on a malformed schema.
+        // HONEST BOUND (R1): compile-checked via `swift build`; the iOS-26 GenerationSchema/respond(to:schema:)
+        // RUNTIME path is on-device-only and NOT yet exercised on hardware (the macOS host can't run the model).
         let body: String
         var schemaWired = false
         if let outputSchema = request.outputSchema,
@@ -171,13 +175,10 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         let toolBridge = BASFoundationModelsToolBridge.resolve(
             strategy: .runtimeSchema, tools: request.tools, baseTraceID: baseTrace)
         let schemaGap = (request.outputSchema != nil) && !schemaWired
-        var traceID = baseTrace
-        if toolBridge.didBridgeTools {
-            traceID += BASFoundationModelsToolBridge.runtimeSchemaTraceSuffix
-        }
-        if schemaGap {
-            traceID += BASFoundationModelsToolBridge.auditTraceSuffix
-        }
+        let traceID = Self.composeTraceID(
+            base: baseTrace,
+            toolsBridged: toolBridge.didBridgeTools,
+            schemaGap: schemaGap)
 
         return BASOrganDraft(
             requestID: request.requestID,
@@ -195,6 +196,24 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
     #endif
 
     // MARK: - Prompt helpers (pure)
+
+    /// Compose the draft's traceID from the base digest + the two independent degradation/bridge facts. Pure +
+    /// non-gated so it is host-testable (the live `draftViaFoundation` is iOS-26-only). Order matters: the
+    /// runtime-schema marker (tools bridged) goes first, the M870 audit suffix (unmapped schema) LAST — so
+    /// `BASFoundationModelsToolBridge.isAuditedTraceID`'s `hasSuffix(auditTraceSuffix)` still resolves.
+    ///   - tools bridged via .runtimeSchema → append `#afm-tools-runtime-schema`
+    ///   - outputSchema present but unmappable → append `#afm-tools-dropped-no-sdk-bridge`
+    ///   - mapped schema + no tools → no suffix (fully honored)
+    static func composeTraceID(base: String, toolsBridged: Bool, schemaGap: Bool) -> String {
+        var traceID = base
+        if toolsBridged {
+            traceID += BASFoundationModelsToolBridge.runtimeSchemaTraceSuffix
+        }
+        if schemaGap {
+            traceID += BASFoundationModelsToolBridge.auditTraceSuffix
+        }
+        return traceID
+    }
 
     /// System-level instruction derived from role + preset. This is
     /// what we send to FoundationModels as the "instructions"

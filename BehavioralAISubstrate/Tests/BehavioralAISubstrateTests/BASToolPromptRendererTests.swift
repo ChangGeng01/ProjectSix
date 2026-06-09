@@ -68,4 +68,53 @@ final class BASToolPromptRendererTests: XCTestCase {
         XCTAssertFalse(status.didBridgeTools,
             "no tools ⇒ nothing to bridge")
     }
+
+    // MARK: - The matched parser (the contract is no longer orphaned)
+
+    func testParseToolCallExtractsNameAndJSONFragmentArgs() {
+        let body = """
+        {"tool_call": {"name": "search_memory", "arguments": {"query": "hello", "limit": 5, "deep": true}}}
+        """
+        let inv = BASToolPromptRenderer.parseToolCall(body)
+        XCTAssertEqual(inv?.toolName, "search_memory")
+        // arguments are JSON fragments (the BASToolInvocation contract — caller decodes per param type).
+        XCTAssertEqual(inv?.arguments["query"], "\"hello\"")
+        XCTAssertEqual(inv?.arguments["limit"], "5")
+        XCTAssertEqual(inv?.arguments["deep"], "true")
+    }
+
+    func testParseToolCallIsLenientAboutSurroundingProse() {
+        let body = """
+        Sure, let me look that up.
+        {"tool_call": {"name": "lookup", "arguments": {"q": "x"}}}
+        """
+        XCTAssertEqual(BASToolPromptRenderer.parseToolCall(body)?.toolName, "lookup")
+    }
+
+    func testParseNonToolBodyReturnsNil() {
+        XCTAssertNil(BASToolPromptRenderer.parseToolCall("Just a plain answer, no tool."))
+        XCTAssertNil(BASToolPromptRenderer.parseToolCall("{\"not_a_tool_call\": 1}"))
+        XCTAssertNil(BASToolPromptRenderer.parseToolCall(""))
+    }
+
+    func testParseToolCallInvocationIDIsDeterministic() {
+        let body = "{\"tool_call\": {\"name\": \"t\", \"arguments\": {\"a\": 1}}}"
+        XCTAssertEqual(
+            BASToolPromptRenderer.parseToolCall(body)?.invocationID,
+            BASToolPromptRenderer.parseToolCall(body)?.invocationID,
+            "same body ⇒ same invocationID (pure, no UUID/Date)")
+    }
+
+    func testEmitParseAreOneContract() {
+        // The renderer's instruction documents the EXACT shape parseToolCall consumes — emit↔parse is one
+        // contract (single-source-of-truth). A reply in that shape must parse to a usable invocation.
+        let declared = BASToolPromptRenderer.toolCallInstruction
+        XCTAssertTrue(declared.contains("\"tool_call\""))
+        XCTAssertTrue(declared.contains("\"name\""))
+        XCTAssertTrue(declared.contains("\"arguments\""))
+        let inv = BASToolPromptRenderer.parseToolCall(
+            "{\"tool_call\": {\"name\": \"do_it\", \"arguments\": {}}}")
+        XCTAssertEqual(inv?.toolName, "do_it")
+        XCTAssertEqual(inv?.arguments, [:])
+    }
 }

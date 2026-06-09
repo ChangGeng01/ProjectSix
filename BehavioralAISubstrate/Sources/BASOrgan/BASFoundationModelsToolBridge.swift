@@ -60,14 +60,21 @@
 //   - `auditTraceSuffix` + `runtimeSchemaTraceSuffix` constants
 //     pinning the exact trace-id markers for downstream parsers
 //
-// ## What this ships NOW (live, not just typed surface)
+// ## What this ships NOW (the emit↔parse PAIR, not the full loop)
 //
 //   - `.runtimeSchema` is WIRED in `AppleFoundationOrganAdapter`:
-//     `BASToolPromptRenderer` declares tools in the prompt; the
-//     HOST parses the tool-call + gates (`BASToolInvocationGate`)
-//     + executes (`BASToolDispatcher`). The adapter EXERCISES
-//     `resolve(.runtimeSchema, …)` per call. Gate-before-execute
-//     preserved — the adapter runs NO tool.
+//     `BASToolPromptRenderer.runtimeSchemaBlock` declares tools in
+//     the prompt + the adapter EXERCISES `resolve(.runtimeSchema, …)`
+//     per call (emits the `#afm-tools-runtime-schema` marker).
+//   - The MATCHED parser `BASToolPromptRenderer.parseToolCall`
+//     ships alongside the renderer (one contract, no drift).
+//   HONEST BOUND: this is the emit + parse PAIR, not an end-to-end
+//   loop. The HOST must opt `parseToolCall` into a
+//   `BASToolCallingPlanner` policy (the planner stays vendor-neutral
+//   by design) → only then is the parsed call gated
+//   (`BASToolInvocationGate`) + dispatched (`BASToolDispatcher`).
+//   The adapter runs NO tool (gate-before-execute preserved). The
+//   real-model round-trip is NOT yet exercised on-device.
 //
 // ## What this does NOT ship (DELIBERATELY)
 //

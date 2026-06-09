@@ -1885,6 +1885,14 @@ final class BASEnduranceAppController: ObservableObject {
         let ok: Bool
     }
 
+    /// Thread-safe counter for recorded (non-fatal) retrieve-read tripwire hits during a fullturn probe.
+    private final class ConcurrencyViolationRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var n = 0
+        func bump() { lock.lock(); n += 1; lock.unlock() }
+        var count: Int { lock.lock(); defer { lock.unlock() }; return n }
+    }
+
     /// On-device CONCURRENT-TURNS cert (Docs/CONCURRENCY_MEASUREMENT_FINDINGS.md #5). Runs N turns
     /// SEQUENTIALLY (baseline) then CONCURRENTLY (probe) on the ONE shared brain + adapter, emitting three
     /// `📊 ch1025 concurrent-turns` lines (phase=seq, phase=conc, verdict). Decisive comparison: concurrent
@@ -1903,6 +1911,19 @@ final class BASEnduranceAppController: ObservableObject {
         await emitBoth(
             "📍 ch1025 concurrent-turns START mode=\(mode) n=\(n) timeout_sec=\(Int(timeoutSec)) " +
             "(advisory; the MLX decode is uncancellable — a wedge is killed by the driver/watchdog, not in-app)")
+
+        #if DEBUG
+        // A `fullturn` probe runs N concurrent brain.process() turns on ONE brain, which can race the
+        // nonisolated retrieve-read (cosineTopKAtomIDsSync) against a memory write → BASRoutedVectorIndexStorage's
+        // DEBUG tripwire would `assertionFailure`-CRASH the probe, faking a WEDGE/FAIL (the single-stream
+        // retrieve contract is by design; concurrent turns legitimately trip it). Swap the handler to RECORD so
+        // the probe measures throughput instead of crashing on a Debug device build; the count is reported
+        // (observational, NOT a failure — a host serves one turn per brain in production).
+        let savedViolationHandler = BASRoutedVectorIndexStorage._concurrencyViolationHandler
+        defer { BASRoutedVectorIndexStorage._concurrencyViolationHandler = savedViolationHandler }
+        let violations = ConcurrencyViolationRecorder()
+        BASRoutedVectorIndexStorage._concurrencyViolationHandler = { _ in violations.bump() }
+        #endif
 
         // One full turn: fullturn = brain.process (L1-L14) + adapter.draft (decode); decode = draft only.
         // Captures only Sendable values (brain/adapter actors, Ints, String) → no `self` capture (@Sendable-safe).
@@ -1978,6 +1999,15 @@ final class BASEnduranceAppController: ObservableObject {
             "speedup=%@ completed=%@ evallock_serial=%@",
             mode, n, seqWallMs, concWallMs, wallSpeedup, conc.tps, seq.tps, tokRatio, speedup,
             completed ? "true" : "false", evalLockSerial))
+
+        #if DEBUG
+        // Observational: how many times the concurrent turns tripped the single-stream retrieve-read contract
+        // (recorded, not crashed — see the handler swap above). Nonzero is EXPECTED for fullturn and is NOT a
+        // failure; it documents why production serves one turn per brain.
+        await emitBoth(
+            "📊 ch1025 concurrent-turns retrieve-read-tripwire-hits=\(violations.count) " +
+            "(single-stream contract; observational, not a failure)")
+        #endif
     }
 
     /// Emit one `📊 ch1025 concurrent-turns phase=…` line and return (aggregate est-tokens/s, all-ok).

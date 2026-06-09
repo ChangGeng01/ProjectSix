@@ -15,6 +15,10 @@ import FoundationModels
 ///     unit-testable on any host (the macOS test host can't construct real FoundationModels schema objects).
 ///   - `makeGenerationSchema(from:)` (iOS 26 gated) builds the real `GenerationSchema`.
 ///
+/// HONEST BOUND (R1): only `parse(...)` is unit-tested. `makeGenerationSchema` + the adapter's
+/// `respond(to:schema:)` runtime path are compile-checked (swift build) but on-device-only — NOT yet exercised
+/// on hardware.
+///
 /// CONSERVATIVE by design: only the common JSON-Schema shapes are mapped — an `object` with `string` /
 /// `integer` / `number` / `boolean` properties, plus one-level `array`s of those, honoring `required`.
 /// Anything else (nested objects, `anyOf`, `$ref`, an empty `{}`) returns `nil`, and the caller FALLS BACK to

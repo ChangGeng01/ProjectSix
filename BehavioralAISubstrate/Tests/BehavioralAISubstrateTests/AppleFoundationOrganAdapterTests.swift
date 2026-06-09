@@ -201,4 +201,44 @@ final class AppleFoundationOrganAdapterTests: XCTestCase {
             "Stable audit code prefix that downstream " +
             "observability hooks pin against")
     }
+
+    // MARK: - composeTraceID (audit-2 #C: the trace-suffix assembly is now pure + tested)
+
+    func testComposeTraceIDNoToolsNoSchemaGapIsBare() {
+        XCTAssertEqual(
+            AppleFoundationOrganAdapter.composeTraceID(
+                base: "abc", toolsBridged: false, schemaGap: false),
+            "abc",
+            "a fully-honored request (no tools, schema mapped or absent) gets NO suffix")
+    }
+
+    func testComposeTraceIDToolsOnlyGetsRuntimeSchemaMarker() {
+        let t = AppleFoundationOrganAdapter.composeTraceID(
+            base: "abc", toolsBridged: true, schemaGap: false)
+        XCTAssertEqual(t, "abc" + BASFoundationModelsToolBridge.runtimeSchemaTraceSuffix)
+        XCTAssertFalse(
+            BASFoundationModelsToolBridge.isAuditedTraceID(t),
+            "bridged tools are NOT 'dropped' — must not carry the audit suffix")
+    }
+
+    func testComposeTraceIDUnmappedSchemaOnlyGetsAuditSuffix() {
+        let t = AppleFoundationOrganAdapter.composeTraceID(
+            base: "abc", toolsBridged: false, schemaGap: true)
+        XCTAssertEqual(t, "abc" + BASFoundationModelsToolBridge.auditTraceSuffix)
+        XCTAssertTrue(BASFoundationModelsToolBridge.isAuditedTraceID(t))
+    }
+
+    func testComposeTraceIDBothSuffixesOrderedSoIsAuditedStillResolves() {
+        // tools bridged AND schema unmappable → BOTH markers, audit LAST so hasSuffix(auditTraceSuffix) holds.
+        let t = AppleFoundationOrganAdapter.composeTraceID(
+            base: "abc", toolsBridged: true, schemaGap: true)
+        XCTAssertEqual(
+            t,
+            "abc"
+                + BASFoundationModelsToolBridge.runtimeSchemaTraceSuffix
+                + BASFoundationModelsToolBridge.auditTraceSuffix)
+        XCTAssertTrue(
+            BASFoundationModelsToolBridge.isAuditedTraceID(t),
+            "audit suffix must be LAST so the dropped-detector still resolves when both markers present")
+    }
 }

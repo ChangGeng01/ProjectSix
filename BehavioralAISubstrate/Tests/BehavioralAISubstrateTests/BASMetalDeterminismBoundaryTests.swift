@@ -66,6 +66,13 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         "BASMetalMatMulDispatcher",
         "BASMetalRMSNormDispatcher",
         "BASMetalKernelDispatchRouter",
+        // audit-2 defense-in-depth: reasoning-side symbols (MLX runtime config + the FoundationModels
+        // structured-output / tool bridges) must never reach the spine. Already structurally impossible
+        // (Package.swift: spine modules can't import BASMLXAdapter/BASAppleAdapters), so this is belt-and-
+        // suspenders for a future accidental dependency — specific type names, no false-trip on comments.
+        "MLXRuntimeConfig",
+        "BASGuidedSchemaTranslator",
+        "BASToolPromptRenderer",
     ]
 
     /// The SHARED matcher used by BOTH the production tripwire (`testSpineFilesAreFreeOfMetalSymbols`) AND its
