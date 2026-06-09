@@ -97,10 +97,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// or long prompts; the cap is a CEILING so it can never be WORSE than the unbounded default, but whether 512
     /// is OPTIMAL there (no within-turn-working-set churn) is unverified.
     ///
-    /// CAVEAT: `MLX.Memory.cacheLimit` is a **process-global** static — across coexisting adapters, the last
-    /// `loadModel` wins. Benign today (no production call site passes a non-default `cacheLimitBytes`, so all use
-    /// the identical 512 MB). `nil` disables the cap (upstream/unbounded behavior); env `BAS_MLX_CACHE_LIMIT_MB`
-    /// (host-side) overrides it at runtime.
+    /// CAVEAT: `MLX.Memory.cacheLimit` is a **process-global** static. All writes now route through the single
+    /// `MLXRuntimeConfig.shared` seam (`MLXRuntimeConfig.swift`): the FIRST adapter default wins the global cap;
+    /// a coexisting adapter with a *different* default is REJECTED + logged (no silent last-write-wins). `nil`
+    /// disables the cap (upstream/unbounded); an explicit `setGPUCacheLimit` / env `BAS_MLX_CACHE_LIMIT_MB`
+    /// overrides at runtime (last write wins, also logged).
     public nonisolated let cacheLimitBytes: Int?
 
     // MARK: - Descriptor defaults (ch1040 — named-constant extraction)
@@ -281,10 +282,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             progressHandler: progressHandler)
         self.modelContainer = container
         // ADR-038 §11.7-§11.9 — bound MLX's free-buffer cache pool so it can't grow unbounded across turns
-        // (variable-shape models like Gemma-3n otherwise exhaust device memory → wedge/OOM). Routed through the
-        // single `setGPUCacheLimit` path (one contract). Output-byte-equal (a free-buffer recycling ceiling).
+        // (variable-shape models like Gemma-3n otherwise exhaust device memory → wedge/OOM). Output-byte-equal
+        // (a free-buffer recycling ceiling). Applied with `.adapterDefault` precedence via MLXRuntimeConfig:
+        // the FIRST adapter's default wins the process-global cap; a SECOND adapter with a different default is
+        // rejected + logged (not a silent last-write-wins). An explicit `setGPUCacheLimit` still overrides.
         if let cacheLimitBytes {
-            setGPUCacheLimit(bytes: cacheLimitBytes)
+            MLXRuntimeConfig.shared.applyCacheLimit(bytes: cacheLimitBytes, precedence: .adapterDefault)
         }
         #else
         throw BASOrganError.providerUnavailable(
@@ -595,12 +598,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     }
 
     /// Cap MLX's free-buffer cache to `bytes` (`MLX.Memory.cacheLimit`). The cache defaults to the memory limit
-    /// (so it may cache GBs); a low cap reclaims aggressively on the next allocation. Set ONCE at startup.
-    /// Output-byte-equal — buffers are reclaimed + reallocated, the math is unchanged.
+    /// (so it may cache GBs); a low cap reclaims aggressively on the next allocation. Output-byte-equal —
+    /// buffers are reclaimed + reallocated, the math is unchanged. This is an EXPLICIT caller (host env override
+    /// / deliberate API), so it routes through `MLXRuntimeConfig` with `.explicitOverride` precedence — it WINS
+    /// over any adapter default already in force (and the change is logged; the global write is single-seamed).
     public func setGPUCacheLimit(bytes: Int) {
-        #if canImport(MLX)
-        MLX.Memory.cacheLimit = bytes
-        #endif
+        MLXRuntimeConfig.shared.applyCacheLimit(bytes: bytes, precedence: .explicitOverride)
     }
 
     /// ADR-038 §11.7 — MLX GPU memory stats (MB). `active` = memory held by LIVE MLXArrays (a growing
