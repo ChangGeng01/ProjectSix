@@ -18,11 +18,31 @@ from a command buffer's `addCompletedHandler` — if that handler never fires, t
 
 ## Environment
 
-- Device: iPhone Air (A-series), iOS 26.5, physical device (not Simulator).
-- Model: Gemma-4-E2B 4-bit (quantized), via MLXLLM/MLXLMCommon generate.
-- mlx-swift with mlx core **0.31.1** (path-vendored).
-- Reproduces more readily with **large prefills** (a big enriched prompt wedges within ~3 decodes; small prompts
-  wedge variably — anywhere from ~12 to 56+ decodes, or not at all in a short window). Cumulative/probabilistic.
+- Device: iPhone Air (A-series), physical device (not Simulator). Reproduces on **iOS 26.5 AND iOS 27.0
+  (Build 24A5355q)** — i.e. a newer OS does not fix it (the GPU is exonerated; see below).
+- Model: Gemma-4-E2B 4-bit (quantized), via MLXLLM/MLXLMCommon generate (`ChatSession.respond`).
+- **Latest MLX stack:** mlx-swift-lm **3.x main line** (has SpeculativeGenerator + batched RoPE); mlx-swift core
+  0.31.1 (latest 0.31.4 has no scheduler/eval/generate change). So this is **not** a stale-version artifact.
+- Reproduces reliably with **large prefills** (a big enriched feed-forward prompt wedges within ~3 decodes);
+  small prompts wedge variably (~12 to 56+ decodes, or not in a short window). Cumulative/probabilistic.
+
+## Critical observation: the process is SPINNING, not frozen
+
+With per-wait tripwires (`--console`), at the wedge the process is **actively running thousands of evals**
+(`scheduler::wait_for_one` called 5754×, all returning) while producing **zero** new tokens — `respond()` for the
+wedged turn never returns. `n_active_tasks()` is **pinned at 11** (> `MAX_ACTIVE_TASKS=10`). The GPU keeps
+completing work the whole time (each `wait_for_one` returns). So it is a **CPU-side livelock**, not a GPU hang.
+
+## Levers we tried that did NOT fix it (so you can skip them)
+
+- **Bounding `Event::wait`** (a finite timeout via `waitUntilSignaledValue(value(), ms)`): the timeout **never
+  fired** at the wedge → the decode does not block in `Event::wait`.
+- **Raising `MAX_ACTIVE_TASKS`** (10 → 64): **still wedged** (if anything earlier) → the `wait_for_one` throttle
+  is a *symptom*, not the cause.
+- **`Memory.clearCache()` / a small `Memory.cacheLimit`**: made it **worse** (earlier wedge).
+- **Newer mlx-swift / -lm**: we are already on the latest LM line; no relevant fix in 0.31.2-0.31.4.
+- **`TokenIterator.next()` stop condition is correct** in the vendored copy (`if tokenCount >= maxTokens { return
+  nil }`) → not a runaway-past-maxTokens loop.
 
 ## What we measured (the controls that exonerate the GPU)
 
