@@ -598,4 +598,49 @@ final class MLXOrganAdapterTests: XCTestCase {
             defaultIDs.contains(MLXModelCatalog.llama3_2_3B_4bit.id),
             "Llama 3.2 is an opt-in alternative, not a default")
     }
+
+    // MARK: - 11. Stable-architecture fallback SDK surface (#2)
+
+    func testQwenEntryDeclaresChatMLTerminator() {
+        XCTAssertTrue(
+            MLXModelCatalog.qwen2_5_3B_4bit.extraEOSTokens
+                .contains("<|im_end|>"),
+            "Qwen2.5 uses the ChatML terminator <|im_end|>")
+        XCTAssertEqual(
+            MLXModelCatalog.qwen2_5_3B_4bit.id,
+            "mlx-community/Qwen2.5-3B-Instruct-4bit")
+        XCTAssertEqual(
+            MLXModelCatalog.qwen2_5_3B_4bit.providerID,
+            "mlx.qwen2_5.3b.it.4bit")
+    }
+
+    func testAvailableAlternativesAreLlamaAndQwenOptIn() {
+        // The stable-arch fallbacks exposed to the SDK face: Llama + Qwen,
+        // and they MUST stay OUT of the certified defaults (R1 honesty).
+        let altIDs = MLXModelCatalog.availableAlternatives.map(\.id)
+        XCTAssertEqual(altIDs, [
+            "mlx-community/Llama-3.2-3B-Instruct-4bit",
+            "mlx-community/Qwen2.5-3B-Instruct-4bit"
+        ])
+        let defaultIDs = Set(MLXModelCatalog.defaultEntries.map(\.id))
+        for alt in MLXModelCatalog.availableAlternatives {
+            XCTAssertFalse(
+                defaultIDs.contains(alt.id),
+                "\(alt.id) is an opt-in alternative — must NOT be a certified default")
+        }
+    }
+
+    func testAllEntriesProviderIDsAreUniqueAcrossDefaultsAndAlternatives() {
+        // providerID is the audit primary key — it must be collision-free across
+        // the ENTIRE selectable set, not just within defaults.
+        let providers = MLXModelCatalog.allEntries.map(\.providerID)
+        XCTAssertEqual(
+            Set(providers).count, providers.count,
+            "providerIDs must be unique across defaults + alternatives")
+        XCTAssertEqual(
+            MLXModelCatalog.allEntries.count,
+            MLXModelCatalog.defaultEntries.count
+                + MLXModelCatalog.availableAlternatives.count,
+            "allEntries = defaults + alternatives (no overlap, no drop)")
+    }
 }

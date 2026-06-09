@@ -1,8 +1,11 @@
 import Foundation
 
 /// M220 — known-good MLX model identifiers for the Qinao runtime.
-/// M236 retired Gemma 3n entries; the catalog is now Gemma 4 +
-/// Gemma 3 4B only.
+/// M236 retired Gemma 3n entries. The CERTIFIED defaults are Gemma 4
+/// + Gemma 3 4B (`defaultEntries`); standard-architecture stable
+/// fallbacks (Llama 3.2, Qwen2.5) are exposed as host-opt-in
+/// `availableAlternatives` (ADR-038) — see those members for the
+/// honest cert scope. `allEntries` = both, for SDK pickers.
 ///
 /// Entries point at the `mlx-community` Hugging Face org's
 /// quantized variants. `id` is a HuggingFace repo path; the actual
@@ -86,22 +89,48 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Gemma 3 4B (MLX, 4-bit)",
         extraEOSTokens: ["<end_of_turn>"])
 
-    /// Llama 3.2 3B instruction-tuned, 4-bit. ADR-038 §11.5 — a STANDARD-architecture LLM (no Gemma-3n
-    /// per-layer-inputs / altUp / laurel), used to test whether the on-device decode wedge is Gemma-3n-
-    /// specific (Llama doesn't wedge → confirmed Gemma-3n) or a general MLX issue (Llama also wedges).
-    /// Llama 3 turn terminator is `<|eot_id|>`.
+    /// Llama 3.2 3B instruction-tuned, 4-bit. A STANDARD-architecture LLM (no Gemma-3n per-layer-inputs /
+    /// altUp / laurel). ADR-038 §11.5 found it does NOT accumulate the variable-shape cache-pool growth that
+    /// wedges Gemma-3n (Llama ran 20/20 where Gemma wedged at ~3) — so it is the **stable-architecture
+    /// fallback** exposed for hosts that want to avoid the Gemma-3n wedge class entirely. Llama 3 turn
+    /// terminator is `<|eot_id|>`. (Available, host opt-in — see `availableAlternatives`; not in the certified
+    /// `defaultEntries`.)
     public static let llama3_2_3B_4bit = Entry(
         id: "mlx-community/Llama-3.2-3B-Instruct-4bit",
         providerID: "mlx.llama3_2.3b.it.4bit",
         providerName: "Llama 3.2 3B (MLX, 4-bit)",
         extraEOSTokens: ["<|eot_id|>"])
 
-    /// Default Gemma entries, in the order they should appear in
-    /// UI pickers. Gemma 4 leads (newest + recommended); Gemma 3
-    /// 4B trails as the long-context outlier.
+    /// Qwen2.5 3B instruction-tuned, 4-bit. Another STANDARD-architecture (ChatML) stable fallback alongside
+    /// Llama — different vendor/tokenizer, same "no Gemma-3n variable-shape accumulation" property. Qwen uses
+    /// the ChatML turn terminator `<|im_end|>`. (Available, host opt-in — see `availableAlternatives`; not yet
+    /// on-device certified, so not in `defaultEntries`.)
+    public static let qwen2_5_3B_4bit = Entry(
+        id: "mlx-community/Qwen2.5-3B-Instruct-4bit",
+        providerID: "mlx.qwen2_5.3b.it.4bit",
+        providerName: "Qwen2.5 3B (MLX, 4-bit)",
+        extraEOSTokens: ["<|im_end|>"])
+
+    /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
+    /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
     public static let defaultEntries: [Entry] = [
         gemma4_E4B_4bit,
         gemma4_E2B_4bit,
         gemma3_4B_it_4bit
     ]
+
+    /// **Stable-architecture fallbacks** exposed to the product/SDK face (ADR-038): standard-arch LLMs that
+    /// avoid the Gemma-3n variable-shape cache-pool wedge class. **Honest scope (R1 / 亏的不要上):** these are
+    /// *available, host opt-in* options — NOT yet on-device certified to the same bar as `defaultEntries`
+    /// (Llama: 20/20 in the §11.5 A/B but not a full endurance cert; Qwen: not yet exercised on-device). A host
+    /// that hits the Gemma-3n wedge can switch to one of these via the catalog without waiting on the
+    /// cache-cap fix. Kept OUT of `defaultEntries` precisely so "default" stays = "certified".
+    public static let availableAlternatives: [Entry] = [
+        llama3_2_3B_4bit,
+        qwen2_5_3B_4bit
+    ]
+
+    /// Every selectable entry (certified defaults + opt-in alternatives) for SDK pickers that want to surface
+    /// the full set. Order: certified defaults first, then alternatives.
+    public static let allEntries: [Entry] = defaultEntries + availableAlternatives
 }

@@ -1036,6 +1036,7 @@ final class BASEnduranceAppController: ObservableObject {
         let mlxModel: MLXModelCatalog.Entry
         switch mlxModelSel {
         case "llama", "llama3.2", "llama3", "llama_3b": mlxModel = MLXModelCatalog.llama3_2_3B_4bit
+        case "qwen", "qwen2.5", "qwen_3b": mlxModel = MLXModelCatalog.qwen2_5_3B_4bit
         case "gemma_e4b", "e4b": mlxModel = MLXModelCatalog.gemma4_E4B_4bit
         case "gemma3_4b": mlxModel = MLXModelCatalog.gemma3_4B_it_4bit
         default: mlxModel = MLXModelCatalog.gemma4_E2B_4bit
