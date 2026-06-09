@@ -3,7 +3,8 @@
 > **Verdict: the substrate is NOT the throughput bottleneck. The MLX GPU decode is (~98% of turn time),
 > and it is inherently serial + uncancellable.** Substrate-side parallelism (stage fan-out, concurrent
 > turns) would not move the needle; the storage concurrency is already fine. This arc deliberately
-> MEASURED before refactoring — and the data says don't do the high-risk, low-ROI work.
+> MEASURED before refactoring — and the data says don't do the high-risk, low-ROI work. (Concurrent turns
+> are now ON-DEVICE CERTIFIED n=1 — `wall_speedup ≈ 1.0`, serialized at the GPU `evalLock`; see #5.)
 
 ## M1.1 — per-turn substrate vs MLX (on-device, iPhone Air)
 
@@ -56,10 +57,35 @@ validity, only the ease of capturing it.)
   `matMulMetalMinProduct`, `batchedCosineRayonMinRows=3000`) and **rayon is live** for large batches; no
   benchmark surfaced a suboptimal regime (retrieval reads scale; writes are fast). Revisit only at much
   larger corpus scale.
-- **Concurrent turns (point 5) — SKIP.** The single GPU decode is the bottleneck, is serial, and is
-  uncancellable (ADR-038). Concurrent turns would contend for the one GPU + amplify the MLX wedge risk for
-  ZERO throughput gain (~98% of the turn is already GPU-serial). Multiple-brains is device-hostile (~100 MB
-  each) — only if a real multi-user use-case demands it.
+- **Concurrent turns (point 5) — ON-DEVICE CERTIFIED (n=1).** The deduction: the single GPU decode is the
+  bottleneck, is serial + uncancellable (ADR-038), so concurrent turns would contend for the one GPU for ZERO
+  throughput gain (~98%+ of the turn is GPU-serial); multiple-brains is device-hostile (2 models ≈ 5 GB on an
+  8 GB device → OOM). Per IRON RULE R1 (on-device proof certifies; deduction ≠ proof), this was **measured**,
+  not just argued, via `BAS_CONCURRENT_TURNS` + `scripts/run-concurrent-turns-cert.sh`: N concurrent full
+  turns (one shared brain + adapter) vs the same N sequential, comparing **wall-clock** (the variance-robust
+  signal — serialized ⇒ conc_wall ≈ seq_wall; genuine parallel ⇒ approaches N×).
+  **On-device CAPTURED (2026-06-10, iPhone Air, iOS 27.0 beta, Gemma-3n-E2B):**
+  ```
+  verdict mode=fullturn n=2 seq_wall_ms=4803 conc_wall_ms=4770 wall_speedup=1.01 speedup=none completed=true evallock_serial=confirmed
+  verdict mode=decode   n=2 seq_wall_ms=4750 conc_wall_ms=4761 wall_speedup=1.00 speedup=none completed=true evallock_serial=confirmed
+  ```
+  Two concurrent turns each took ~4750 ms (CONC per-task min/max ≈ 4741/4770) — i.e. **as long as both decodes
+  combined**: while one decoded, the other waited at MLX's process-global `evalLock`
+  (`Vendor/mlx-swift/Source/MLX/Transforms+Eval.swift:9`). `wall_speedup ≈ 1.0` (not the 2.0 a real 2-way
+  parallel decode would show) ⇒ **serialized; concurrent turns buy NO throughput**, and the run completed
+  with no deadlock/wedge (the `decode`-only Topology B is the explicit deadlock canary). The deduction is now
+  hardware-proven.
+  - **Honesty bound (R1 / 亏的不要上):** n=1 device, iOS 27.0 beta, E2B-class, short prompts, N=2, one run per
+    mode. A `wall_speedup` approaching N would REFUTE the GPU-serial model — none observed.
+  - **Metric note (a real correction):** the probe's FIRST verdict mis-fired `speedup=some` because it judged
+    on aggregate **est-tokens/s**, which divides by a per-turn MLX output length that varies run-to-run
+    (sampling) — the "win" was just the concurrent run emitting a few more tokens at the same wall time. Fixed
+    to judge on **wall-clock** (chars/4 est-tokens is reported as context only). Caught + corrected before
+    claiming a result (亏的不要上).
+  - **Topology C (2 brains / 2 models) — considered + rejected:** ~5 GB on an 8 GB device → OOM/device-hostile;
+    and since the substrate is 0.8% of a turn, the extra substrate-overlap it would buy is immeasurable.
+    Multiple brains remain the only path to true concurrent turns — pursue ONLY if a real multi-user use-case
+    + the hardware justify it.
 - **Concurrent reads/writes (points 2/3) — already fine** (above); no work needed.
 
 ## Where the throughput lever actually is

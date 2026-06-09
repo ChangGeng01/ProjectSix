@@ -66,6 +66,17 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   durability/corruption/concurrency/dual-write tests; deterministic cosine-topK order; bounded WAL; opt-in
   integrity_check) — 3-lens adversarial verification PASS (byte-equality + correctness; one flaky-test fixed).
   Roadmap Phases 0-5 + 先稳 COMPLETE (host-side; both guardrails enforced; on-device certs batched).
+- **Concurrency / throughput — MEASURE-FIRST arc COMPLETE (data says don't fan out).** On-device (iPhone Air):
+  a turn is **substrate 0.8% / MLX decode 99%** (`brain_ms=21 / mlx_ms=2551`), so the 14-layer stage fan-out is
+  NOT the throughput lever (Phase-2 gate: SKIP — the dormant `BASParallelStageDispatchExecutor` stays ready +
+  determinism-safe but unwired; 亏的不要上). L8 nonisolated reads scale **7×** (1→16 readers); event/atom writes
+  are **~20K ops/s** gapless+integrity-correct; size-routing (`BASAutoRouteRanker`, rayon-live) already covers
+  the scheduler. **Concurrent turns now ON-DEVICE CERTIFIED (n=1, R1)** — not just deduced: `BAS_CONCURRENT_TURNS`
+  + `scripts/run-concurrent-turns-cert.sh`, N=2 fullturn AND decode-canary both `wall_speedup ≈ 1.0`
+  (`speedup=none, evallock_serial=confirmed`) — two concurrent turns each took ~both decodes (serialized at MLX's
+  process-global `evalLock`), no deadlock/wedge. The real throughput lever is MLX-side (decode-token cap /
+  prompt-batching / speculative decode / smaller-faster model), not substrate fan-out. See
+  `Docs/CONCURRENCY_MEASUREMENT_FINDINGS.md` + `BASConcurrentTurnSerializationTests` (host no-deadlock gate).
 
 Process: **ADR-016** milestone-advance convention. Honest corrections (not new behavior): **ADR-031**
 (built-vs-wired reckoning), **ADR-035** (multi-lang pilots default-on reconciliation).

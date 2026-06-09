@@ -1959,14 +1959,23 @@ final class BASEnduranceAppController: ObservableObject {
         let seq = await emitConcurrentPhase("seq", mode: mode, n: n, outs: seqOut, wallMs: seqWallMs)
         let conc = await emitConcurrentPhase("conc", mode: mode, n: n, outs: concOut, wallMs: concWallMs)
 
-        let ratio = seq.tps > 0 ? conc.tps / seq.tps : 0
-        let speedup = ratio > 1.05 ? "some" : "none"
+        // VERDICT METRIC = WALL-CLOCK speedup (seq_wall / conc_wall), NOT tokens/s. tokens/s divides by a
+        // per-turn MLX output length that varies run-to-run (sampling), so an aggregate-tokens/s comparison is
+        // confounded — concurrent can "win" merely by emitting a few more tokens at the same wall time. Wall
+        // clock is the variance-robust signal: with the GPU decode serialized behind MLX's process-global
+        // evalLock, N concurrent turns ≈ N sequential turns ⇒ wall_speedup ≈ 1.0; genuine parallel decode
+        // would approach N×. (Threshold 1.30: well above substrate-overlap/noise — substrate is ~0.8% of a
+        // turn — yet far below the 2.0 a real 2-way parallel decode would show.)
+        let wallSpeedup = concWallMs > 0 ? seqWallMs / concWallMs : 0
+        let tokRatio = seq.tps > 0 ? conc.tps / seq.tps : 0
+        let speedup = wallSpeedup >= 1.30 ? "some" : "none"
         let completed = seq.ok && conc.ok
         let evalLockSerial = !completed ? "inconclusive" : (speedup == "none" ? "confirmed" : "refuted")
         await emitBoth(String(format:
-            "📊 ch1025 concurrent-turns verdict mode=%@ n=%d conc_tok_per_s=%.2f seq_tok_per_s=%.2f " +
-            "ratio=%.2f speedup=%@ completed=%@ evallock_serial=%@",
-            mode, n, conc.tps, seq.tps, ratio, speedup,
+            "📊 ch1025 concurrent-turns verdict mode=%@ n=%d seq_wall_ms=%.0f conc_wall_ms=%.0f " +
+            "wall_speedup=%.2f conc_tok_per_s=%.2f seq_tok_per_s=%.2f tok_ratio=%.2f " +
+            "speedup=%@ completed=%@ evallock_serial=%@",
+            mode, n, seqWallMs, concWallMs, wallSpeedup, conc.tps, seq.tps, tokRatio, speedup,
             completed ? "true" : "false", evalLockSerial))
     }
 
