@@ -1007,11 +1007,20 @@ final class BASEnduranceAppController: ObservableObject {
             "📍 ch1062 fabric-authoritative runtime constructed " +
             "(.authoritative loop observable; N→N+1 feed-forward opt-in/default-off)")
 
-        // MLX model load
+        // MLX model load. ADR-038 §11.5 — BAS_MLX_MODEL selects the model so we can A/B the wedge across
+        // architectures (default = Gemma-3n E2B; "llama" = standard-arch Llama 3.2 3B). Default unchanged.
+        let mlxModelSel = (ProcessInfo.processInfo.environment["BAS_MLX_MODEL"] ?? "").lowercased()
+        let mlxModel: MLXModelCatalog.Entry
+        switch mlxModelSel {
+        case "llama", "llama3.2", "llama3", "llama_3b": mlxModel = MLXModelCatalog.llama3_2_3B_4bit
+        case "gemma_e4b", "e4b": mlxModel = MLXModelCatalog.gemma4_E4B_4bit
+        case "gemma3_4b": mlxModel = MLXModelCatalog.gemma3_4B_it_4bit
+        default: mlxModel = MLXModelCatalog.gemma4_E2B_4bit
+        }
         await emitBoth(
-            "📍 ch1025 MLXOrganAdapter loading Gemma 4 E2B")
+            "📍 ch1025 MLXOrganAdapter loading model=\(mlxModel.providerID) (\(mlxModel.providerName))")
         let adapter = MLXOrganAdapter(
-            model: MLXModelCatalog.gemma4_E2B_4bit)
+            model: mlxModel)
         let brainLoadStartNs = monoNowNs()
         do {
             try await adapter.loadModel()

@@ -86,6 +86,16 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Gemma 3 4B (MLX, 4-bit)",
         extraEOSTokens: ["<end_of_turn>"])
 
+    /// Llama 3.2 3B instruction-tuned, 4-bit. ADR-038 §11.5 — a STANDARD-architecture LLM (no Gemma-3n
+    /// per-layer-inputs / altUp / laurel), used to test whether the on-device decode wedge is Gemma-3n-
+    /// specific (Llama doesn't wedge → confirmed Gemma-3n) or a general MLX issue (Llama also wedges).
+    /// Llama 3 turn terminator is `<|eot_id|>`.
+    public static let llama3_2_3B_4bit = Entry(
+        id: "mlx-community/Llama-3.2-3B-Instruct-4bit",
+        providerID: "mlx.llama3_2.3b.it.4bit",
+        providerName: "Llama 3.2 3B (MLX, 4-bit)",
+        extraEOSTokens: ["<|eot_id|>"])
+
     /// Default Gemma entries, in the order they should appear in
     /// UI pickers. Gemma 4 leads (newest + recommended); Gemma 3
     /// 4B trails as the long-context outlier.
