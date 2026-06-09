@@ -383,3 +383,19 @@ on the just-wedged device. The GPU-exoneration is decisive even from a single in
 observed the GPU executing during the wedge — not an inference). The exact MLX line is not yet pinned (closed
 below the metal-cpp bridge for the Apple side, but the suspects above are in the vendored MLX C++ we can
 instrument — task A/#60).
+
+### 10.4 Phase-1 consolidation (2026-06-09): watchdog VALIDATED on real wedges + upstream issue drafted
+
+- **Watchdog validated in-harness.** `scripts/run-endurance-watchdog.sh WEDGE_FAST=1` (feed-forward big-prefill
+  so each segment wedges fast) ran **20 min unattended**: **12 segments, 11 wedges, 11/11 recovered** by
+  detect→kill→relaunch, **0 reboots, 0 launch failures** → `RESULT: PASS`. This proves the §10.2 recovery path
+  end-to-end in automation (beyond the manual n=2): the wedge is harmless to an unattended Mac-driven run.
+- **Upstream issue drafted:** `Docs/UPSTREAM_MLX_EVAL_WEDGE_ISSUE_DRAFT.md` — GPU-exonerated, lost-signal
+  localization, binding blocker, repro — ready to file at ml-explore/mlx-swift.
+
+**Practical "完全解决" status:** for the **test/cert/endurance workflow it is DONE** (unattended auto-recovery, no
+reboot, validated). For the **end-user product**, true in-process prevention remains the deeper Phase-2 arc
+(§10.3) + the upstream ask. Honest caveat carried forward: the exact blocking wait is still unpinned —
+`wait_for_one` only blocks when `n_tasks_old > 1` (may not be the single-decode block), and the `Event::wait`
+timeout's effect was not positively confirmed — Phase 2 starts with **observability** (device-console capture +
+enter/exit tripwires) to pin the wait before bounding it.
