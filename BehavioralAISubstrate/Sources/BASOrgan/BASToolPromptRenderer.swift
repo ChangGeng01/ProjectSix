@@ -73,10 +73,21 @@ public enum BASToolPromptRenderer {
             arguments: arguments)
     }
 
-    /// Find the first `{...}` that parses to an object containing a `tool_call` key — try the whole body
-    /// (the ideal "on its own line" contract case), then each line (lenient if the model wrapped it in prose).
+    /// Find the `{…}` that parses to an object containing a `tool_call` key. Real models (verified on-device:
+    /// Apple FoundationModels) often wrap the JSON in a markdown ```json fence AND pretty-print it across
+    /// multiple lines — so try, in order: (1) the whole body; (2) the body with code fences stripped; (3) the
+    /// first-`{`…last-`}` slice of the de-fenced text (handles surrounding prose + multi-line pretty-print);
+    /// (4) each individual line (the single-line contract). First parse that yields a `tool_call` object wins.
     private static func extractToolCallObject(from body: String) -> [String: Any]? {
-        let candidates = [body] + body.split(separator: "\n").map(String.init)
+        var defenced = body
+        for fence in ["```json", "```JSON", "```Json", "```"] {
+            defenced = defenced.replacingOccurrences(of: fence, with: " ")
+        }
+        var candidates: [String] = [body, defenced]
+        if let lo = defenced.firstIndex(of: "{"), let hi = defenced.lastIndex(of: "}"), lo < hi {
+            candidates.append(String(defenced[lo...hi]))   // first-{ … last-} (multi-line pretty-print)
+        }
+        candidates += defenced.split(separator: "\n").map(String.init)
         for candidate in candidates {
             let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let data = trimmed.data(using: .utf8),

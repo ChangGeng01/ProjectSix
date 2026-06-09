@@ -83,6 +83,24 @@ final class BASToolPromptRendererTests: XCTestCase {
         XCTAssertEqual(inv?.arguments["deep"], "true")
     }
 
+    func testParseToolCallHandlesMarkdownFencedMultilineJSON() {
+        // The EXACT shape Apple FoundationModels emitted ON-DEVICE (iPhone Air): a markdown ```json fence
+        // wrapping pretty-printed multi-line JSON. The pre-fix parser (whole-body OR single-line) missed this.
+        let body = """
+        ```json
+        {
+          "tool_call": {
+            "name": "get_weather",
+            "arguments": { "city": "Paris" }
+          }
+        }
+        ```
+        """
+        let inv = BASToolPromptRenderer.parseToolCall(body)
+        XCTAssertEqual(inv?.toolName, "get_weather", "must parse a fenced + pretty-printed tool-call")
+        XCTAssertEqual(inv?.arguments["city"], "\"Paris\"")
+    }
+
     func testParseToolCallIsLenientAboutSurroundingProse() {
         let body = """
         Sure, let me look that up.
