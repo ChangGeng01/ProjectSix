@@ -10,6 +10,12 @@ import MLXNN
 // `FileHandle.write` (a write() syscall — the bytes reach the kernel page cache immediately and survive the
 // watchdog SIGKILL, so no per-token fsync stall is needed). O(1) no-op when the env flag is unset → the normal
 // path is byte/behavior-identical.
+//
+// LIFECYCLE (honest, audit LOW #10): this log is APPEND-ONLY and UNROTATED — it is opened with seekToEnd and
+// grows for the life of the file, accumulating across relaunches (append, not truncate, is deliberate: the
+// watchdog kill→relaunch loop wants the prior run's last-surviving line to persist). It is a short-session
+// diagnostic gated behind BAS_WEDGE_BEACON; it is NOT meant to be left on in a long-lived/production process.
+// If a multi-hour diagnostic is needed, delete Documents/wedge.log between sessions (no in-process rotation).
 private let _basWedgeBeaconFH: FileHandle? = {
     guard ProcessInfo.processInfo.environment["BAS_WEDGE_BEACON"] == "1" else { return nil }
     let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first

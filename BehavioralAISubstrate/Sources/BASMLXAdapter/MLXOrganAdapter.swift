@@ -78,13 +78,29 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// The model entry this adapter is configured to serve.
     public nonisolated let model: MLXModelCatalog.Entry
 
-    /// ADR-038 §11.8 — cap for MLX's free-buffer cache pool (bytes), applied on `loadModel`. Default 512 MB.
-    /// ROOT-CAUSE FIX: on-device, models with variable buffer shapes (notably Gemma-3n: per-layer-inputs +
-    /// sliding window + varying prompt lengths) leave freed buffers in MLX's cache pool that the next turn
-    /// cannot reuse, so the pool grows unbounded and exhausts device memory after a few turns → the allocator
-    /// drain LIVELOCKS (the "wedge") or the OS OOM-kills. A moderate cap bounds the pool (proven on-device:
-    /// cache held at ≈512 MB, Gemma-3n ran 12/12 feed-forward turns where the unbounded default wedged at 3)
-    /// without §8's cap=64 re-alloc churn. `nil` disables the cap (upstream/unbounded behavior).
+    /// Default MLX cache-pool cap (512 MB) — the band is ~384-768 MB (low enough to bound the pool, high
+    /// enough to avoid §8's cap=64 re-alloc churn). This is the value with measured on-device evidence (E2B).
+    public static let defaultCacheLimitBytes: Int = 512 * 1024 * 1024
+
+    /// ADR-038 §11.7-§11.9 — cap for MLX's **free-buffer cache pool** (bytes), applied on `loadModel` (default
+    /// `defaultCacheLimitBytes`). This is a pure MEMORY ceiling (a free-buffer recycling bound), NOT a math
+    /// lever — it changes only WHEN buffers are reclaimed, so it is **output-byte-equal** for any input.
+    ///
+    /// WHY: on-device, models with variable buffer shapes (notably Gemma-3n: per-layer-inputs + sliding window
+    /// + varying prompt lengths) leave freed buffers in MLX's cache pool that the next turn cannot reuse, so the
+    /// pool grows unbounded and exhausts device memory after a few turns → the allocator drain LIVELOCKS (the
+    /// "wedge") or the OS OOM-kills.
+    ///
+    /// EVIDENCE (honest scope): on iPhone Air (8 GB), iOS 27.0 beta, **Gemma-3n-E2B** with short (~35-134-token)
+    /// prompts — the unbounded default wedges at ~3 turns; with this 512 MB cap the pool plateaus at ≈512 MB and
+    /// the run completes 30/30 (ADR §11.8-§11.9). NOT yet measured for the larger E4B/Gemma-3-4B catalog entries
+    /// or long prompts; the cap is a CEILING so it can never be WORSE than the unbounded default, but whether 512
+    /// is OPTIMAL there (no within-turn-working-set churn) is unverified.
+    ///
+    /// CAVEAT: `MLX.Memory.cacheLimit` is a **process-global** static — across coexisting adapters, the last
+    /// `loadModel` wins. Benign today (no production call site passes a non-default `cacheLimitBytes`, so all use
+    /// the identical 512 MB). `nil` disables the cap (upstream/unbounded behavior); env `BAS_MLX_CACHE_LIMIT_MB`
+    /// (host-side) overrides it at runtime.
     public nonisolated let cacheLimitBytes: Int?
 
     // MARK: - Descriptor defaults (ch1040 — named-constant extraction)
@@ -209,7 +225,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         maxInputTokens: Int = MLXOrganAdapter.defaultMaxInputTokens,
         maxOutputTokens: Int = MLXOrganAdapter.defaultMaxOutputTokens,
         supportedRoles: Set<BASOrganRole> = [.scout, .core],
-        cacheLimitBytes: Int? = 512 * 1024 * 1024
+        cacheLimitBytes: Int? = MLXOrganAdapter.defaultCacheLimitBytes
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
@@ -264,13 +280,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             configuration: configuration,
             progressHandler: progressHandler)
         self.modelContainer = container
-        // ADR-038 §11.8 ROOT-CAUSE FIX — bound MLX's free-buffer cache pool so it can't grow unbounded
-        // across turns (variable-shape models like Gemma-3n otherwise exhaust device memory → wedge/OOM).
-        #if canImport(MLX)
+        // ADR-038 §11.7-§11.9 — bound MLX's free-buffer cache pool so it can't grow unbounded across turns
+        // (variable-shape models like Gemma-3n otherwise exhaust device memory → wedge/OOM). Routed through the
+        // single `setGPUCacheLimit` path (one contract). Output-byte-equal (a free-buffer recycling ceiling).
         if let cacheLimitBytes {
-            MLX.Memory.cacheLimit = cacheLimitBytes
+            setGPUCacheLimit(bytes: cacheLimitBytes)
         }
-        #endif
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

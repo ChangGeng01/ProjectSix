@@ -515,4 +515,87 @@ final class MLXOrganAdapterTests: XCTestCase {
             XCTFail("unexpected error: \(error)")
         }
     }
+
+    // MARK: - 9. ADR-038 §11.8 cache-pool cap (the wedge fix)
+
+    func testCacheLimitDefaultsTo512MB() async {
+        // The wedge fix ships as a DEFAULT-ON 512 MB cap (ADR-038
+        // §11.8). Pin the default value AND that it flows from the
+        // single named constant, so a future edit to either surfaces
+        // here rather than silently changing the certified ceiling.
+        let adapter = MLXOrganAdapter()
+        XCTAssertEqual(
+            adapter.cacheLimitBytes,
+            MLXOrganAdapter.defaultCacheLimitBytes)
+        XCTAssertEqual(
+            MLXOrganAdapter.defaultCacheLimitBytes,
+            512 * 1024 * 1024,
+            "the on-device-validated cap is 512 MB; changing it " +
+            "moves off the measured evidence (ADR-038 §11.8)")
+    }
+
+    func testCacheLimitNilOptOutIsReachable() async {
+        // `nil` must restore upstream/unbounded behavior — the cap is
+        // a ceiling, and callers (e.g. larger-RAM hosts, A/B vs the
+        // unbounded default) must be able to turn it OFF explicitly.
+        let adapter = MLXOrganAdapter(cacheLimitBytes: nil)
+        XCTAssertNil(adapter.cacheLimitBytes)
+    }
+
+    func testCacheLimitHonorsExplicitOverride() async {
+        let custom = 384 * 1024 * 1024
+        let adapter = MLXOrganAdapter(cacheLimitBytes: custom)
+        XCTAssertEqual(adapter.cacheLimitBytes, custom)
+    }
+
+    // NOTE on mlxMemoryStatsMB / setGPUCacheLimit / drainGPUCache:
+    // these are deliberately NOT unit-tested here. On the macOS SPM
+    // host `canImport(MLX)` is TRUE, so the #else (0,0,0) stub is not
+    // compiled — yet the real path touches `MLX.Memory.*`, which forces
+    // MLX to load its Metal default.metallib. That library is absent in
+    // the test bundle, so the very first call aborts the process via
+    // MLX's fatalError error-handler trampoline (the same trampoline
+    // documented in Transforms+Eval.swift). They are therefore
+    // on-device-only surfaces; exercising them is the endurance-run's
+    // job (the §11.x `📊 mlx-mem` line), not a macOS unit test. Faking
+    // coverage by invoking them here would crash the whole suite.
+
+    // MARK: - 10. Llama 3.2 fallback catalog entry (ADR-038)
+
+    func testLlamaEntryDeclaresEotIdTerminator() {
+        // The Llama 3.2 fallback (a wedge-resistant alternative to
+        // Gemma-3n) MUST list `<|eot_id|>` or generation runs past
+        // the reply boundary.
+        XCTAssertTrue(
+            MLXModelCatalog.llama3_2_3B_4bit.extraEOSTokens
+                .contains("<|eot_id|>"),
+            "Llama 3.2 turn terminator is <|eot_id|>")
+        XCTAssertEqual(
+            MLXModelCatalog.llama3_2_3B_4bit.id,
+            "mlx-community/Llama-3.2-3B-Instruct-4bit")
+        XCTAssertEqual(
+            MLXModelCatalog.llama3_2_3B_4bit.providerID,
+            "mlx.llama3_2.3b.it.4bit")
+    }
+
+    func testLlamaEntryProviderIDDoesNotCollideWithCatalog() {
+        // Audit logs key on providerID; the Llama entry must not
+        // collide with any default Gemma entry.
+        let defaultIDs = Set(
+            MLXModelCatalog.defaultEntries.map(\.providerID))
+        XCTAssertFalse(
+            defaultIDs.contains(
+                MLXModelCatalog.llama3_2_3B_4bit.providerID),
+            "Llama providerID collides with a default entry")
+    }
+
+    func testLlamaEntryIsNotInDefaultCatalog() {
+        // Honesty pin (ADR-038 audit MEDIUM): the Llama entry is an
+        // available alternative, NOT a shipped default — it is not
+        // on-device certified, so it must stay out of defaultEntries.
+        let defaultIDs = Set(MLXModelCatalog.defaultEntries.map(\.id))
+        XCTAssertFalse(
+            defaultIDs.contains(MLXModelCatalog.llama3_2_3B_4bit.id),
+            "Llama 3.2 is an opt-in alternative, not a default")
+    }
 }

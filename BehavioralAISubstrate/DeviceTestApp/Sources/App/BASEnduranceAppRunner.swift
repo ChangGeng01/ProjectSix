@@ -1043,17 +1043,26 @@ final class BASEnduranceAppController: ObservableObject {
             "is_loaded=%@",
             brainLoadMs, isLoaded ? "true" : "false"))
 
-        // ADR-038 wedge lever (opt-in, default OFF ⇒ byte-equal-off): bound MLX's GPU buffer/allocator cache,
-        // which is NEVER drained or capped anywhere in our code and defaults to the full memory limit (may
-        // cache GBs) — a CUMULATIVE GPU-memory-pressure source consistent with the wedge signature (worsens
-        // with responses-before-wedge, not per-prompt). BAS_MLX_CACHE_LIMIT_MB caps the cache once here;
-        // BAS_MLX_DRAIN_CACHE=1 drains it between iterations (wired in the loop below).
+        // ADR-038 §11.8 cache-pool fix (default-ON ⇒ byte-equal-off): MLX's free-buffer cache pool is otherwise
+        // NEVER drained or capped and defaults to the full memory limit (may cache GBs) — a CUMULATIVE
+        // GPU-memory-pressure source that, under Gemma-3n's variable buffer shapes, grows unbounded across turns
+        // and exhausts device memory → the allocator-drain livelock (the "wedge") or OS OOM-kill. The adapter
+        // now applies its `cacheLimitBytes` (default 512 MB) DURING loadModel, so the cap is already in effect
+        // here. `BAS_MLX_CACHE_LIMIT_MB` OVERRIDES that default at runtime; `BAS_MLX_DRAIN_CACHE=1` additionally
+        // drains the pool between iterations (wired in the loop below).
         let mlxMemEnv = ProcessInfo.processInfo.environment
         let mlxDrainCache = (mlxMemEnv["BAS_MLX_DRAIN_CACHE"] ?? "0") == "1"
+        // Log the EFFECTIVE cap so it is visible in the boot log even when no env override is set (the default
+        // 512 MB cap is otherwise invisible — audit MEDIUM #2).
+        let adapterCapBytes = adapter.cacheLimitBytes
         if let capMBStr = mlxMemEnv["BAS_MLX_CACHE_LIMIT_MB"],
            let capMB = Int(capMBStr), capMB > 0 {
             await adapter.setGPUCacheLimit(bytes: capMB * 1024 * 1024)
-            await emitBoth("📍 ch1025 mlx-cache-limit set cap_mb=\(capMB)")
+            await emitBoth("📍 ch1025 mlx-cache-limit cap_mb=\(capMB) source=env-override "
+                + "(adapter-default=\(adapterCapBytes.map { "\($0 / (1024*1024))MB" } ?? "nil"))")
+        } else {
+            await emitBoth("📍 ch1025 mlx-cache-limit cap_mb="
+                + "\(adapterCapBytes.map { "\($0 / (1024*1024))" } ?? "none") source=adapter-default")
         }
         if mlxDrainCache {
             await emitBoth("📍 ch1025 mlx-drain-cache ENABLED (clearCache between iterations)")

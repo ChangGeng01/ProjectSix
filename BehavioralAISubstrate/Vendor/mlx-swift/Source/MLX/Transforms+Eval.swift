@@ -9,11 +9,14 @@ import Foundation
 let evalLock = NSRecursiveLock()
 
 /// BAS/ADR-038 §11.4 — the binding previously DISCARDED `mlx_eval`/`mlx_async_eval`'s `int` return code
-/// (`_ = ... mlx_eval(...)`), so an eval error (the C++ wrapper catches the exception, routes the message
-/// to the mlx error handler, and returns 1) was INVISIBLE to Swift callers. Surface a non-zero code to
-/// stderr so a swallowed eval error can never go unnoticed. No-op on the success path (ret == 0), so the
-/// normal path is byte/behavior-identical. (A fuller fix — making `eval` throwing — is an API change left
-/// as a follow-up; this stops the silent drop.)
+/// (`_ = ... mlx_eval(...)`). This surfaces a non-zero code to stderr instead of dropping it. SCOPE (honest):
+/// MLX's C++ wrapper catches the exception and routes the message to the *installed* mlx error handler before
+/// returning non-zero — and mlx-swift's default handler trampoline calls `fatalError`, which aborts the process
+/// FIRST, so on the default path this stderr line is effectively unreachable (the abort wins). It becomes the
+/// actual surfacing point only when a NON-aborting error handler is installed (e.g. for diagnostics). So this is
+/// a belt-and-suspenders guard against a *future* silent-drop regression, not protection on the default config.
+/// No-op on the success path (ret == 0) → the normal path is byte/behavior-identical. (A fuller fix — making
+/// `eval` throwing — is an API change left as a follow-up.)
 @inline(__always)
 private func basSurfaceEvalError(_ ret: Int32, _ op: String) {
     if ret != 0 {

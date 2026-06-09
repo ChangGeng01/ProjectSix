@@ -1761,7 +1761,9 @@ public final class Gemma4: Module, VLMModel, KVCacheDimensionProvider {
                 // BAS_MLX_PREFILL_CHUNK overrides the chunk size — the feed-forward prompts are only ~35-134
                 // tokens, so the default 512 never chunks; a small value (e.g. 32) actually splits the prefill.
                 let envChunk = Int(ProcessInfo.processInfo.environment["BAS_MLX_PREFILL_CHUNK"] ?? "")
-                let prefillStepSize = envChunk ?? (windowSize ?? 512)
+                // ADR-038 audit fix — floor at 1: a 0 chunk size makes `while tokens.size > 0` loop forever on
+                // a zero-width slice (self-inflicted wedge from a one-char env typo). Mirror the runner's max(1,…).
+                let prefillStepSize = max(1, envChunk ?? (windowSize ?? 512))
                 var y = input.text
                 while y.tokens.size > prefillStepSize {
                     let chunk = y[.newAxis, ..<prefillStepSize]

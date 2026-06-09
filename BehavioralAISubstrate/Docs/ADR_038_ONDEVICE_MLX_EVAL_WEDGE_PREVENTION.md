@@ -1,10 +1,19 @@
 # ADR-038 — On-device MLX/Metal GPU-eval wedge: prevention + real-device re-certification
 
-> **Status: re-certified on iPhone Air (iOS 26.5), 2026-06-07. Run A PASS; Run B WEDGE.** The WS1 typed
-> prompt did NOT eliminate the wedge (it moved iter1/prompt2 → iter2/prompt2) → **feed-forward stays
-> default-OFF; prevention UNPROVEN.** Records what the HARDWARE actually showed — not inference. Per
-> 亏的不要上 (R1): macOS-green ≠ certified; this ADR is written to the device's ACTUAL result, pass OR fail —
-> and it failed, honestly.
+> **Status (current): root cause PINNED + a leading fix VALIDATED on one device, pending wider durability.**
+> The wedge is MLX's **free-buffer cache pool growing unbounded** under Gemma-3n's variable buffer shapes →
+> device-memory exhaustion → allocator-drain livelock ("wedge") or OS OOM-kill (§11.7). The fix is a moderate
+> `MLX.Memory.cacheLimit` (default 512 MB, §11.8): on iPhone Air / iOS 27.0 beta the unbounded default wedges
+> at ~3 feed-forward turns; with the cap Gemma-3n-E2B ran **30/30** with the cache plateaued at ≈512 MB (§11.9).
+> Honesty bounds (R1 / 亏的不要上): this is **n=1 device, single OS (iOS 27 beta), E2B-class model, short
+> prompts** — a *leading* fix, not a multi-device certification; larger catalog entries + long prompts are not
+> yet measured (the cap is a ceiling, so never WORSE than unbounded, but not proven OPTIMAL there). This ADR is
+> written to what the HARDWARE actually showed — not inference; macOS-green ≠ certified.
+>
+> - _2026-06-07 (superseded audit-trail): re-certified on iPhone Air (iOS 26.5) — Run A PASS; Run B WEDGE.
+>   The WS1 typed prompt did NOT eliminate the wedge (moved iter1/prompt2 → iter2/prompt2); at that point
+>   prevention was UNPROVEN and feed-forward stayed default-OFF. The §11.7-§11.9 cache-pool root-cause work
+>   (on iOS 27) supersedes this: the wedge is now explained and bounded, not merely avoided._
 
 ## 1. The wedge (what we are preventing)
 
@@ -611,17 +620,27 @@ as used; with only ~690 MB free after the 2.5 GB model, the pool exhausts it in 
 ~512 MB) should bound the pool WITHOUT churn — a one-line product config (`BAS_MLX_CACHE_LIMIT_MB`), no Gemma or
 MLX surgery. Testing next.
 
-### 11.8 ✅ FIX CONFIRMED — moderate `cacheLimit` bounds the pool, Gemma-3n runs clean (iOS 27)
+### 11.8 ✅ FIX VALIDATED (one 12-turn run) — moderate `cacheLimit` bounds the pool, Gemma-3n runs clean (iOS 27)
 
 `BAS_MLX_CACHE_LIMIT_MB=512`, Gemma-3n feed-forward:
 ```
 iter=1 active=2512.6 cache=99.5    iter=3 active=2512.6 cache=512.0   ← CAPPED, stops growing
 iter=4..12 active=2512.6 cache≈473-512  → status=COMPLETED, 12/12, NO wedge
 ```
-**This is the fix.** Capping MLX's free-buffer cache pool at 512 MB bounds the cross-turn accumulation (cache
-holds at ~512 instead of growing 99→446→645→…), so device memory is never exhausted and Gemma-3n runs clean for
-the full 12-turn feed-forward run where the unbounded default wedges at 3. Root cause (§11.7) confirmed: it was
-the cache-pool growth, not a retained leak / not a single op / not Metal / not the OS / not a stale version.
+**This is the leading fix** (validated on this one 12-turn run, then 30/30 in §11.9 — see honesty bounds below).
+Capping MLX's free-buffer cache pool at 512 MB bounds the cross-turn accumulation (cache holds at ~512 instead of
+growing 99→446→645→…), so device memory is never exhausted and Gemma-3n runs clean for the full 12-turn
+feed-forward run where the unbounded default wedges at 3. This is consistent with the root cause pinned in §11.7
+(cache-pool growth — not a retained leak / not a single op / not Metal / not the OS / not a stale version): the
+cap acts directly on the measured failure variable (`cache_mb`) and the run stops failing.
+
+**Honesty bounds (R1 / 亏的不要上 — stated to match the hedging on the §11.1-§11.7 refutations, not asymmetric
+with them):** this is **n=1 device** (iPhone Air, 8 GB), **single OS** (iOS 27.0 beta 24A5355q), **one model
+class** (Gemma-3n-E2B), **short prompts** (~35-134 tokens), and the wedge threshold itself is variable
+(prompt-length / shape dependent), so "wedges at 3" is the observed mode on this scenario, not a constant. The
+cap is a *ceiling*, so it can never be WORSE than the unbounded default on any model — but it is not yet *proven
+optimal* (no within-turn working-set churn) for the larger E4B / Gemma-3-4B catalog entries or long prompts.
+Treat this as a validated leading fix, not a multi-device certification.
 
 **Why 512 (and not §8's 64):** §8's cap=64 was too low → every allocation overflowed the cap → re-alloc churn →
 wedged earlier. 512 MB is large enough for within-turn reuse (no churn — decode latency stayed normal) yet small
