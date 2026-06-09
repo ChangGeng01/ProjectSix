@@ -559,3 +559,31 @@ exercises those ops, so it never wedges. Gemma being "supported" in MLX means it
 **Disposition / the practical fix:** for the product, prefer a standard-arch on-device model (Llama 3.2 / Qwen)
 to AVOID the wedge entirely; keep `BAS_MLX_MODEL` as the selector. The Gemma-3n-specific MLX-port bug is the
 upstream issue (now scoped to the Gemma-3n forward, not generic MLX). The watchdog remains the safety net.
+
+### 11.6 NOT pure footprint — Gemma-3n ACCUMULATES memory per turn (post-reboot confirm, iOS 27)
+
+Rebooted the iPhone to free memory (was 34 MB free → other apps), then re-ran Gemma-3n feed-forward with a
+fresh 3.3 GB of headroom. **Gemma STILL wedged at response 3** — so it is NOT pure static footprint. The memory
+curve is the finding:
+```
+iter=0  avail=3362 MB   (fresh, post-reboot)
+iter=1  avail=581 MB    (model ~3 GB loaded + turn 1)
+iter=3  avail=231 MB    (dropping ~175 MB/turn)
+→ wedge at avail ~52 MB
+```
+**Mechanism (refined, decisive):** Gemma-3n's run CONSUMES device memory turn-over-turn and does not return it —
+the ~3 GB model PLUS ~175 MB accumulated per turn that is never freed (each turn is a FRESH `ChatSession`, so the
+KV cache / activations should free, but the device-available memory keeps dropping). After ~3 turns the 3.3 GB
+headroom is exhausted, Gemma's kernel-heavy forward can no longer get the memory it needs, and the Metal
+allocator/drain livelocks (wedge) — or, when even tighter, the OS OOM-kills it (§11.3 crash). It is a
+**memory-ACCUMULATION bug specific to Gemma-3n**, not a single op and not pure footprint.
+
+- **`Memory.clearCache()` between turns does NOT fix it** (§8 measured it WORSE) → the accumulated ~175 MB/turn is
+  NOT in MLX's free-buffer pool; it is RETAINED (a live reference held across the fresh sessions, or the per-layer
+  embedding tables re-materialized and pinned). That retained-reference leak is the true root.
+- **Llama 3.2 3B does not accumulate like this** (lighter model + standard forward that frees) → survives 20 turns.
+
+**Answer to "can Gemma be fixed":** the bug is REAL and Gemma-3n-specific — a per-turn memory accumulation in its
+MLX path. Fixing it = find the retained reference (the leaked ~175 MB/turn) in the Gemma-3n forward / KV-cache
+handling — a further dig in the MLXVLM Gemma-3n port. Practical product fix remains: a lighter standard model
+(Llama/Qwen, proven 20/20), and/or a smaller Gemma variant. The watchdog covers the test/cert path either way.
