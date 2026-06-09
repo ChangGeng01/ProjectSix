@@ -433,3 +433,29 @@ n-leak-throttle mechanism AND yields a mitigation (prevention, if the leak is bo
 If it does NOT un-wedge → the throttle is a symptom and the block is in the generate loop itself. Result (pass
 OR fail) recorded here next. The true fix is to stop the `notify_task_completion` leak (upstream MLX);
 `BAS_MLX_MAX_ACTIVE_TASKS` + the watchdog are the in-reach levers.
+
+### 11.1 MAX_ACTIVE_TASKS A/B (iOS 27) — REFUTED: the throttle is a symptom, not the cause
+
+On-device A/B, feed-forward wedge:
+- CONTROL (default throttle n>10): **WEDGED @ mlx=3**.
+- TREATMENT (`BAS_MLX_MAX_ACTIVE_TASKS=64`): **still WEDGED @ mlx=1** (if anything earlier — like `clearCache`
+  made it worse in §8).
+
+**Verdict: raising the throttle ceiling does NOT prevent the wedge** → the `wait_for_one` flood is a *symptom*
+of the wedge, not its driver. My §11 "n-leak-throttle is the cause" hypothesis is **refuted** by measurement.
+
+**Refined (honest) understanding:** the MLX_WEDGE_TRACE flood (5754 `wait_for_one`, all returning) proves the
+process is **SPINNING, not frozen** — it is actively running thousands of evals while producing **no** `🧠 mlx`
+line. So the decode `draft()` for the wedged iter never returns even though evals keep completing and the GPU
+stays healthy. That is consistent with EITHER:
+  (a) a **lost completion signal** that leaks task state (the throttle is then a side-effect we already see), OR
+  (b) a **runaway / non-terminating generate loop** — the per-token loop keeps evaluating past `maxTokens`
+      without hitting its stop condition (5754 evals ≫ the ~96-token cap would need).
+Neither `Event::wait`, `gpu::synchronize`, nor the `wait_for_one` throttle is THE block. The next diagnostic to
+distinguish (a) vs (b) is to instrument the **token counter + notify_new_task/notify_task_completion balance**
+(does n leak monotonically, or does the token count run away past maxTokens?).
+
+**Disposition:** `BAS_MLX_MAX_ACTIVE_TASKS` stays as an opt-in knob (default 10 = upstream) but is **NOT a fix**
+(documented). The practical 完全解决 remains the watchdog (validated 11/11, OS-independent). The precise root is
+still open — a deeper MLX/MLXLMCommon generate-loop instrumentation pass, or hand it to upstream with this
+(rich) localization.
