@@ -610,3 +610,27 @@ as used; with only ~690 MB free after the 2.5 GB model, the pool exhausts it in 
 → wedged EARLIER); the unbounded default lets the pool exhaust memory. A cap between (≈ device-free-after-model,
 ~512 MB) should bound the pool WITHOUT churn — a one-line product config (`BAS_MLX_CACHE_LIMIT_MB`), no Gemma or
 MLX surgery. Testing next.
+
+### 11.8 ✅ FIX CONFIRMED — moderate `cacheLimit` bounds the pool, Gemma-3n runs clean (iOS 27)
+
+`BAS_MLX_CACHE_LIMIT_MB=512`, Gemma-3n feed-forward:
+```
+iter=1 active=2512.6 cache=99.5    iter=3 active=2512.6 cache=512.0   ← CAPPED, stops growing
+iter=4..12 active=2512.6 cache≈473-512  → status=COMPLETED, 12/12, NO wedge
+```
+**This is the fix.** Capping MLX's free-buffer cache pool at 512 MB bounds the cross-turn accumulation (cache
+holds at ~512 instead of growing 99→446→645→…), so device memory is never exhausted and Gemma-3n runs clean for
+the full 12-turn feed-forward run where the unbounded default wedges at 3. Root cause (§11.7) confirmed: it was
+the cache-pool growth, not a retained leak / not a single op / not Metal / not the OS / not a stale version.
+
+**Why 512 (and not §8's 64):** §8's cap=64 was too low → every allocation overflowed the cap → re-alloc churn →
+wedged earlier. 512 MB is large enough for within-turn reuse (no churn — decode latency stayed normal) yet small
+enough that `active(2512) + cache(512) ≈ 3 GB` fits the device with headroom. A cap in ~384-768 MB is the band.
+
+**The complete fix story (ADR-038 §10-§11.8):** the on-device "wedge" is NOT a Metal/GPU/iOS/uncancellable-eval
+defect (those framings, §1-§9, were the best read from symptoms and are corrected here). It is: **MLX's
+free-buffer cache pool growing unbounded because Gemma-3n's variable buffer shapes (per-layer-inputs + sliding
+window + varying prompt lengths) prevent reuse, exhausting device memory after ~3 turns → the allocator drain
+livelocks (or OOMs).** The fix is a one-line moderate `MLX.Memory.cacheLimit` — no model switch, no model
+surgery, no MLX/upstream change required. (Llama avoids it natively via better buffer reuse; the watchdog remains
+a safety net.)

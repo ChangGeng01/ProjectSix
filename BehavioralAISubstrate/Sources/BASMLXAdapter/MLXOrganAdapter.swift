@@ -78,6 +78,15 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// The model entry this adapter is configured to serve.
     public nonisolated let model: MLXModelCatalog.Entry
 
+    /// ADR-038 §11.8 — cap for MLX's free-buffer cache pool (bytes), applied on `loadModel`. Default 512 MB.
+    /// ROOT-CAUSE FIX: on-device, models with variable buffer shapes (notably Gemma-3n: per-layer-inputs +
+    /// sliding window + varying prompt lengths) leave freed buffers in MLX's cache pool that the next turn
+    /// cannot reuse, so the pool grows unbounded and exhausts device memory after a few turns → the allocator
+    /// drain LIVELOCKS (the "wedge") or the OS OOM-kills. A moderate cap bounds the pool (proven on-device:
+    /// cache held at ≈512 MB, Gemma-3n ran 12/12 feed-forward turns where the unbounded default wedged at 3)
+    /// without §8's cap=64 re-alloc churn. `nil` disables the cap (upstream/unbounded behavior).
+    public nonisolated let cacheLimitBytes: Int?
+
     // MARK: - Descriptor defaults (ch1040 — named-constant extraction)
 
     /// Default input-token ceiling reported through the descriptor
@@ -199,9 +208,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         supportsStreaming: Bool = true,
         maxInputTokens: Int = MLXOrganAdapter.defaultMaxInputTokens,
         maxOutputTokens: Int = MLXOrganAdapter.defaultMaxOutputTokens,
-        supportedRoles: Set<BASOrganRole> = [.scout, .core]
+        supportedRoles: Set<BASOrganRole> = [.scout, .core],
+        cacheLimitBytes: Int? = 512 * 1024 * 1024
     ) {
         self.model = model
+        self.cacheLimitBytes = cacheLimitBytes
         self.descriptor = BASOrganDescriptor(
             providerID: providerID ?? model.providerID,
             providerName: providerName ?? model.providerName,
@@ -253,6 +264,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             configuration: configuration,
             progressHandler: progressHandler)
         self.modelContainer = container
+        // ADR-038 §11.8 ROOT-CAUSE FIX — bound MLX's free-buffer cache pool so it can't grow unbounded
+        // across turns (variable-shape models like Gemma-3n otherwise exhaust device memory → wedge/OOM).
+        #if canImport(MLX)
+        if let cacheLimitBytes {
+            MLX.Memory.cacheLimit = cacheLimitBytes
+        }
+        #endif
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
