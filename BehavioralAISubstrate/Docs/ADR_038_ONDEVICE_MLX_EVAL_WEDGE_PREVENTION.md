@@ -587,3 +587,26 @@ allocator/drain livelocks (wedge) — or, when even tighter, the OS OOM-kills it
 MLX path. Fixing it = find the retained reference (the leaked ~175 MB/turn) in the Gemma-3n forward / KV-cache
 handling — a further dig in the MLXVLM Gemma-3n port. Practical product fix remains: a lighter standard model
 (Llama/Qwen, proven 20/20), and/or a smaller Gemma variant. The watchdog covers the test/cert path either way.
+
+### 11.7 LEAK PINNED: it's the MLX CACHE POOL (not a retained reference) — Gemma-3n's variable shapes
+
+Per-iter `mlx-mem` split (active vs cache GPU memory), Gemma-3n feed-forward, post-reboot:
+```
+iter=1  active=2512.6  cache=99.3   peak=2578
+iter=2  active=2512.6  cache=446.0  peak=2789
+iter=3  active=2512.6  cache=644.7  peak=2789   → wedge (device avail 3360→690→564→263→84)
+```
+- **`active_mb` is CONSTANT at 2512 MB** → NO retained-reference leak (the live MLXArray working set is stable;
+  each fresh `ChatSession` DOES free its arrays). This RETIRES the §11.6 "retained reference" hypothesis.
+- **The growth is entirely `cache_mb`** (MLX's free-buffer pool): 99 → 446 → 645 MB, ~175-350 MB/turn.
+
+**Mechanism (pinned):** each turn frees its buffers into MLX's cache pool, but the NEXT turn cannot reuse them —
+Gemma-3n produces **variable buffer shapes** (per-layer-inputs + sliding-window + varying enriched-prompt
+lengths), so the pool fills with non-reusable buffers and grows unbounded. The pool holds GPU memory iOS counts
+as used; with only ~690 MB free after the 2.5 GB model, the pool exhausts it in ~3 turns → the drain livelocks
+(wedge) / OOM. Llama (fewer distinct shapes, better reuse) doesn't accumulate → survives.
+
+**The fix is in-reach:** a MODERATE `MLX.Memory.cacheLimit`. §8 only tried cap=64 MB (too low → re-alloc churn
+→ wedged EARLIER); the unbounded default lets the pool exhaust memory. A cap between (≈ device-free-after-model,
+~512 MB) should bound the pool WITHOUT churn — a one-line product config (`BAS_MLX_CACHE_LIMIT_MB`), no Gemma or
+MLX surgery. Testing next.
