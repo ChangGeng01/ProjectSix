@@ -477,3 +477,30 @@ re-vendor:
 available core bump (0.31.4) has no relevant change. (Resolved by research; the risky multi-package re-vendor was
 **not** needed — effort saved.) The bug is in the current/latest MLX, on iOS 27, GPU-exonerated → it is a genuine
 upstream defect to report, not a stale-version artifact.
+
+### 11.3 Chunked-prefill fix + drain-trip diagnostic (iOS 27) — workflow PRIMARY hypothesis REFUTED
+
+An 8-agent Ultracode workflow (adversarially verified) converged on a PRIMARY root cause: the model is
+**Gemma4 (a VLM)**, whose `prepare` override bypasses the `LLMModel` chunked prefill → ONE un-chunked
+whole-prompt forward graph drained inline. Implemented the fix (mirror `LLMModel.prepare`'s chunked loop in
+`Gemma4.prepare` text branch, env-gated `BAS_MLX_CHUNK_PREFILL` + `BAS_MLX_PREFILL_CHUNK`). On-device A/B + a
+drain-trip diagnostic (`[BAS]drain-trip` printing the throttle clause + live memory) settled it:
+
+- **First chunk A/B was a dud** (my error): chunk size 512 > the ~35-134-token feed-forward prompts, so the
+  `while tokens.size > 512` loop never ran. Re-tested at chunk=32 (chunking actually runs).
+- **chunk=32 → still WEDGED @3** → chunking the prefill does NOT prevent the wedge. **PRIMARY refuted on-device.**
+- **Drain-trip clause (5620 trips): ALL `mem_trip=0`** → the **TASK clause** (`n_active_tasks()==11 > MAX=10`),
+  NEVER the memory clause (`active_mb` 134→2585 ≪ `limit_mb=11143`). → skeptic-A's memory-pressure-drain
+  hypothesis is also **refuted**.
+- **`active_mb` grows UNBOUNDEDLY** (134 → 2585 MB and still climbing when killed at 240 s) with `n` pinned at 11
+  → an **unbounded allocation / re-evaluation** in iter-4's eval, NOT a finite graph being drained slowly
+  (which would peak then emit a token). This matches skeptic-B's untested point C (something keeps
+  re-submitting / never marks the output available).
+
+**Net (honest):** the wedge is narrowed to "iter-4's eval allocates unboundedly with `n` pinned at 11" but is
+**NOT** any of: Event::wait (§10.3), the throttle ceiling (§11.1), the memory clause (here), or the prefill graph
+size (chunking refuted here). The exact cause (what re-submits / leaks) is not pinned to a one-line fix. Per the
+operator's "b 实在不行 a", the deep in-process root-cause drill is **exhausted for now** (8-agent workflow + 5
+on-device cycles, the primary hypothesis refuted) → consolidate to the watchdog + a rich upstream issue. All
+diagnostic env flags (`MLX_WEDGE_TRACE`, `MLX_EVENT_WAIT_TIMEOUT_MS`, `BAS_MLX_MAX_ACTIVE_TASKS`,
+`BAS_MLX_CHUNK_PREFILL`, `BAS_MLX_PREFILL_CHUNK`) stay opt-in / default-off (byte-identical) as future tools.

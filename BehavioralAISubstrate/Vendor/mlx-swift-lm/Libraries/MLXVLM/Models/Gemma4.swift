@@ -1736,6 +1736,28 @@ public final class Gemma4: Module, VLMModel, KVCacheDimensionProvider {
             )
             return .logits(result)
         } else {
+            // BAS/ADR-038 §11.3 — ROOT-CAUSE FIX for the on-device decode wedge. This VLM `prepare`
+            // override bypassed the chunked prefill that `LLMModel.prepare` does (LLMModel.swift:24-35):
+            // it built the ENTIRE text prompt as ONE un-chunked forward graph, which `asyncEval` then
+            // drains inline kernel-by-kernel (thousands of ~20-op command buffers) → the 5754-`wait_for_one`
+            // spin, zero tokens, stuck in `TokenIterator.init`'s prepare(). Mirror the LLMModel chunked
+            // pattern: process the prompt in `windowSize` chunks, `eval(cache)` to drain+free between
+            // chunks, hand the small remainder to the TokenIterator. Env-gated (BAS_MLX_CHUNK_PREFILL=1)
+            // for an A/B; default OFF = byte-identical to upstream until proven on-device.
+            if ProcessInfo.processInfo.environment["BAS_MLX_CHUNK_PREFILL"] == "1" {
+                // BAS_MLX_PREFILL_CHUNK overrides the chunk size — the feed-forward prompts are only ~35-134
+                // tokens, so the default 512 never chunks; a small value (e.g. 32) actually splits the prefill.
+                let envChunk = Int(ProcessInfo.processInfo.environment["BAS_MLX_PREFILL_CHUNK"] ?? "")
+                let prefillStepSize = envChunk ?? (windowSize ?? 512)
+                var y = input.text
+                while y.tokens.size > prefillStepSize {
+                    let chunk = y[.newAxis, ..<prefillStepSize]
+                    _ = self(chunk, cache: convertedCache.isEmpty ? nil : convertedCache, state: nil)
+                    eval(convertedCache)
+                    y = y[prefillStepSize...]
+                }
+                return .tokens(y)
+            }
             let result = languageModel(input.text.tokens, cache: convertedCache)
             return .logits(result)
         }

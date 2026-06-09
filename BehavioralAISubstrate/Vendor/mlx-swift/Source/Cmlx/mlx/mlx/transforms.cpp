@@ -260,6 +260,16 @@ array eval_impl(std::vector<array> outputs, bool async) {
     if (scheduler::n_active_tasks() > bas_max_active_tasks() ||
         (get_active_memory() > get_memory_limit() &&
          scheduler::n_active_tasks() > 0)) {
+      // BAS/ADR-038 §11.3 — drain-trip diagnostic (MLX_WEDGE_TRACE=1). Settles WHICH clause trips the
+      // throttle: TASK (n > MAX) vs MEMORY (active_memory > memory_limit). Prints the live values so we
+      // can see if the wedge is a task-count livelock or a memory-pressure drain that never clears.
+      if (bas_wedge_trace_sched()) {
+        bool mem_trip = get_active_memory() > get_memory_limit();
+        std::fprintf(stderr, "[BAS]drain-trip n=%d mem_trip=%d active_mb=%zu limit_mb=%zu\n",
+                     scheduler::n_active_tasks(), mem_trip ? 1 : 0,
+                     get_active_memory() >> 20, get_memory_limit() >> 20);
+        std::fflush(stderr);
+      }
       // Commit any open streams
       for (auto i : open_streams) {
         auto s = get_stream(i);
