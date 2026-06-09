@@ -459,3 +459,21 @@ distinguish (a) vs (b) is to instrument the **token counter + notify_new_task/no
 (documented). The practical 完全解决 remains the watchdog (validated 11/11, OS-independent). The precise root is
 still open — a deeper MLX/MLXLMCommon generate-loop instrumentation pass, or hand it to upstream with this
 (rich) localization.
+
+### 11.2 "Try a newer mlx-swift" — REFUTED by research (we are already current)
+
+Operator-chosen lever: upgrade the vendored MLX stack. Researched before committing to the (large, risky)
+re-vendor:
+- **mlx-swift-lm** (where the generate loop / `ChatSession.respond` / `TokenIterator` live): our vendored copy
+  is already the **3.x main line** (README confirms "new major version 3.x"; we already have
+  `SpeculativeGenerator` + batched `RoPEApplication` = 3.31.3 features, and the 2.31.3 "fix concurrency issues" +
+  Swift-6 migration are carried into 3.x). **No newer LM line exists to upgrade to.**
+- **mlx-swift core**: vendored 0.31.1; latest 0.31.4. The 0.31.2/3/4 release notes are fmt 12.1.0 /
+  `mlx_save_safetensors` evalLock / nuclear-norm linalg — **nothing in the scheduler / eval / generate path**.
+- **Generate stop-condition is correct** in our copy (`TokenIterator.next`: `if tokenCount >= maxTokens { return
+  nil }`, Evaluate.swift:690) → not a runaway-past-maxTokens loop.
+
+**Verdict:** a newer mlx-swift/-lm will **not** fix this wedge — we are already on the latest LM line and the only
+available core bump (0.31.4) has no relevant change. (Resolved by research; the risky multi-package re-vendor was
+**not** needed — effort saved.) The bug is in the current/latest MLX, on iOS 27, GPU-exonerated → it is a genuine
+upstream defect to report, not a stale-version artifact.
