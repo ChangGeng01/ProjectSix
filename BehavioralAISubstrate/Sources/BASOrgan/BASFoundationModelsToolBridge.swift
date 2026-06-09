@@ -57,18 +57,28 @@
 //     `resolve(forStrategy:tools:)` typed factory that returns
 //     a status describing what the bridge will do for a
 //     given tools[] array
-//   - `auditTraceSuffix` constant pinning M870's exact
-//     trace-id suffix for downstream parsers
+//   - `auditTraceSuffix` + `runtimeSchemaTraceSuffix` constants
+//     pinning the exact trace-id markers for downstream parsers
 //
-// ## What this does NOT ship
+// ## What this ships NOW (live, not just typed surface)
 //
-//   - The actual SDK Tool conformer (deferred until iOS 26
-//     `Tool` protocol stabilizes + we make the macro
-//     decision)
+//   - `.runtimeSchema` is WIRED in `AppleFoundationOrganAdapter`:
+//     `BASToolPromptRenderer` declares tools in the prompt; the
+//     HOST parses the tool-call + gates (`BASToolInvocationGate`)
+//     + executes (`BASToolDispatcher`). The adapter EXERCISES
+//     `resolve(.runtimeSchema, …)` per call. Gate-before-execute
+//     preserved — the adapter runs NO tool.
+//
+// ## What this does NOT ship (DELIBERATELY)
+//
+//   - `.compiledGenerable` — native FoundationModels `Tool`
+//     auto-execution. NOT a maturity gap: FM auto-runs
+//     `tool.call(...)` mid-generation, which would execute
+//     ungated side-effects inside the organ, bypassing the
+//     gate-before-execute model. Use `.runtimeSchema` (above)
+//     so the host stays the executor + gatekeeper.
 //   - Tool-call response parsing for cloud adapters (already
 //     lives in `BASChatCompletionsOrganAdapter`)
-//   - Device exercise — the substrate primitives are pure
-//     value-types,no I/O
 //
 // ## Doctrine pins held
 //
@@ -81,8 +91,11 @@
 //   strategy taxonomy for AFM tool bridging
 // - chapter 一百八十五 anti-magic-number — audit suffix
 //   string is a typed constant,grep-able + stable
-// - ADR-014 OPT-IN → PROD — bridge stays in `.audit` mode
-//   until host explicitly opts into a different strategy
+// - ADR-014 OPT-IN → PROD — the FM adapter now defaults to
+//   `.runtimeSchema` (host-executes, gated); `.audit` remains
+//   the fallback when a strategy can't bridge (e.g. unmapped
+//   schema). Native auto-exec (`.compiledGenerable`) stays OFF
+//   by governance choice, not by maturity.
 // - ADR-016 (M872) substrate completion doctrine — G6's
 //   `substrateClosedSDKBridgePending` status now points to
 //   THIS file as the typed surface where the bridge lands
@@ -169,6 +182,13 @@ public enum BASFoundationModelsToolBridge {
     ///     extends this taxonomy explicitly,not inline
     public static let auditTraceSuffix: String =
         "#afm-tools-dropped-no-sdk-bridge"
+
+    /// Grep-able marker appended when tools are bridged via the `.runtimeSchema` strategy (declared in the
+    /// prompt; the HOST parses + gates + executes — the adapter runs nothing). Distinct from
+    /// `auditTraceSuffix`: tools are NOT dropped here, they are prompt-declared. Observers use this to tell
+    /// "prompt-bridged (host-executed)" apart from "natively executed" and from "dropped".
+    public static let runtimeSchemaTraceSuffix: String =
+        "#afm-tools-runtime-schema"
 
     /// Resolve the bridge status for a given strategy + tool
     /// list + base trace ID。Pure function — caller composes

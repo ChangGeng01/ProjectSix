@@ -130,7 +130,15 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         let options = GenerationOptions(
             temperature: request.preset.temperature)
 
-        let prompt = Self.prompt(for: request)
+        // `.runtimeSchema` tool bridging: DECLARE tools in the prompt so the model can emit a parseable
+        // tool-call. The HOST (BASToolCallingPlanner policy) parses it, gates it (BASToolInvocationGate), and
+        // executes it — the adapter runs NOTHING (gate-before-execute / 红线 7 preserved). This is the
+        // governance-safe alternative to FoundationModels' native Tool auto-execution (which would run ungated
+        // side-effects mid-generation). Empty tools → empty block → byte-equal to before.
+        let toolBlock = BASToolPromptRenderer.runtimeSchemaBlock(for: request.tools)
+        let prompt = toolBlock.isEmpty
+            ? Self.prompt(for: request)
+            : Self.prompt(for: request) + "\n\n" + toolBlock
 
         // `request.outputSchema` → NATIVE FoundationModels guided generation (runtime DynamicGenerationSchema →
         // GenerationSchema → respond(to:schema:)). Structured output is SIDE-EFFECT-FREE, so it does NOT cross
@@ -153,21 +161,23 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
             body = response.content
         }
 
-        // `request.tools[]` are still NOT natively executed — DELIBERATELY (governance): FoundationModels'
-        // native `Tool` protocol AUTO-executes `tool.call(...)` mid-generation, which would run ungated tool
-        // side-effects inside the organ, bypassing BAS's gate-before-execute model (BASToolInvocationGate / 红线
-        // 7 hint-only / the L11-L14 single commit gate). The governance-safe path is `.runtimeSchema` (declare in
-        // prompt, host gates + dispatches) — see BASFoundationModelsToolBridge. Until that's wired, tools degrade.
-        //
-        // Audit suffix (typed, grep-able) fires ONLY for the parts still degraded: tools present, OR an
-        // outputSchema we couldn't map. A mapped schema with no tools is fully honored → no suffix.
-        let schemaGap = (request.outputSchema != nil) && !schemaWired
-        let degraded = !request.tools.isEmpty || schemaGap
+        // Trace markers (typed, grep-able) composed from the bridge taxonomy — the bridge is now EXERCISED in
+        // the live path, not just typed surface:
+        //   - tools present → bridged via `.runtimeSchema` (declared in prompt, host-executed; NOT dropped, NOT
+        //     natively run) → `#afm-tools-runtime-schema`.
+        //   - outputSchema present but unmappable → still degraded (plain generation) → the M870 dropped suffix.
         let baseTrace = BASOrganDeterministicAdapter.digest(
             for: request, providerID: descriptor.providerID)
-        let traceID = degraded
-            ? "\(baseTrace)#afm-tools-dropped-no-sdk-bridge"
-            : baseTrace
+        let toolBridge = BASFoundationModelsToolBridge.resolve(
+            strategy: .runtimeSchema, tools: request.tools, baseTraceID: baseTrace)
+        let schemaGap = (request.outputSchema != nil) && !schemaWired
+        var traceID = baseTrace
+        if toolBridge.didBridgeTools {
+            traceID += BASFoundationModelsToolBridge.runtimeSchemaTraceSuffix
+        }
+        if schemaGap {
+            traceID += BASFoundationModelsToolBridge.auditTraceSuffix
+        }
 
         return BASOrganDraft(
             requestID: request.requestID,
