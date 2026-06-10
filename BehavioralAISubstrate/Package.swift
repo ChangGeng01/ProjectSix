@@ -389,6 +389,12 @@ let package = Package(
             resources: [
                 .copy("Resources/MiniLM.mlmodelc"),
                 .copy("Resources/vocab.txt"),
+                // SCAFFOLD (ADR-041 / docs/COREAI_RUNCERT_BACKLOG.md) — the Core AI shadow-classifier asset.
+                // UNCOMMENT once Sources/BASAppleAdapters/Resources/BASContextClassifier.aimodel exists
+                // (produced by scripts/coreai-build-aimodel.sh). Kept COMMENTED today because SPM errors on a
+                // missing resource: the asset can't be built yet — Apple's Xcode-27 beta-1 ships the Metal
+                // Toolchain at build .15/o while the app is .17/q, and aimodelc requires an exact match.
+                // .copy("Resources/BASContextClassifier.aimodel"),
             ]
         ),
         .target(
