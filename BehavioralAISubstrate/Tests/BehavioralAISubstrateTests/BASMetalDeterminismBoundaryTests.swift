@@ -74,17 +74,20 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         "BASGuidedSchemaTranslator",
         "BASToolPromptRenderer",
         // Core AI (ADR-039 extension): the Core AI small-head adapter + runner + NDArray bridge + shadow
-        // comparison are reasoning-side — Core AI tensor inference produces approximate context-frame INPUTS
-        // (gated by the verdict, observation-only), exactly the CoreML asymmetry noted above. They must never
-        // reach a byte-deterministic spine file. NOTE: unlike the MLX entries, this ban is LOAD-BEARING, not
-        // belt-and-suspenders — BASHostKit (which contains most spine files) DOES depend on BASAppleAdapters
-        // (Package.swift), so a spine file could legally `import BASAppleAdapters` and call these types; only
-        // this tripwire stops that. Specific type names (a comment naming them in a spine file also trips —
-        // accepted: spine files shouldn't discuss reasoning-side types either).
+        // comparison + migration verdict are reasoning-side — Core AI tensor inference produces approximate
+        // context-frame INPUTS (gated by the verdict, observation-only), exactly the CoreML asymmetry noted
+        // above. They must never reach a byte-deterministic spine file. NOTE: unlike the MLX entries, this ban
+        // is LOAD-BEARING, not belt-and-suspenders — BASHostKit (which contains most spine files) DOES depend
+        // on BASAppleAdapters (Package.swift), so a spine file could legally `import BASAppleAdapters` and call
+        // these types; only this tripwire stops that. Specific type names (a comment naming them in a spine
+        // file also trips — accepted: spine files shouldn't discuss reasoning-side types either).
         "BASCoreAIModelRunner",
         "BASCoreAIContextClassifierAdapter",
         "BASCoreAINDArrayBridge",
         "BASCoreAIShadowComparison",
+        // The migration verdict RANKS migrate/don't-migrate from shadow evidence — a recommendation a human
+        // reads, never an auto-promotion. Its provider-preference output must never reach the deterministic spine.
+        "BASCoreAIMigrationVerdict",
         // ADR-041 §D — the task→provider matrix is reasoning-side (it RANKS providers by preference; governance
         // still RESOLVES + gates the choice). Provider preference must never reach a byte-deterministic spine file.
         "BASNeuralProviderMatrix",

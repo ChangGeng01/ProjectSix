@@ -63,6 +63,62 @@ public enum BASCoreAIShadowComparison {
             candidateLatencyMillis: candidateLatencyMillis)
     }
 
+    // MARK: - Corpus aggregation (n > 1 — evidence for the migration verdict)
+
+    /// Aggregate parity statistics across a CORPUS of single-comparison `Result`s. The migration verdict
+    /// (`BASCoreAIMigrationVerdict`) judges parity off this — n=1 is never enough to retire an incumbent.
+    ///
+    /// Honest on empty input: zero samples ⇒ `labelAgreementRate == 0` (NOT 1 — "no evidence of agreement"),
+    /// and the MAE fields are `nil` (no comparable logits seen). `maeSampleCount` counts only the comparisons
+    /// whose logits shared a space (`logitsMAE != nil`) — a future model revision with a different logits width
+    /// contributes a label datapoint but not an MAE datapoint, so the two counts can legitimately differ.
+    public struct ParitySummary: Equatable, Sendable {
+        public let sampleCount: Int
+        public let labelsAgreeCount: Int
+        public let labelAgreementRate: Double
+        public let maeSampleCount: Int
+        public let meanLogitsMAE: Float?
+        public let maxLogitsMAE: Float?
+
+        public init(
+            sampleCount: Int,
+            labelsAgreeCount: Int,
+            labelAgreementRate: Double,
+            maeSampleCount: Int,
+            meanLogitsMAE: Float?,
+            maxLogitsMAE: Float?
+        ) {
+            self.sampleCount = sampleCount
+            self.labelsAgreeCount = labelsAgreeCount
+            self.labelAgreementRate = labelAgreementRate
+            self.maeSampleCount = maeSampleCount
+            self.meanLogitsMAE = meanLogitsMAE
+            self.maxLogitsMAE = maxLogitsMAE
+        }
+    }
+
+    /// Fold a corpus of comparisons into a `ParitySummary`. Pure + deterministic.
+    public static func aggregate(_ results: [Result]) -> ParitySummary {
+        let sampleCount = results.count
+        let labelsAgreeCount = results.reduce(0) { $0 + ($1.labelsAgree ? 1 : 0) }
+        let rate = sampleCount == 0 ? 0 : Double(labelsAgreeCount) / Double(sampleCount)
+        let maes = results.compactMap(\.logitsMAE)
+        // CORRUPTION GUARD: a non-finite MAE (NaN/Inf — from NaN logits, numeric overflow, GPU corruption) must
+        // surface as a non-finite MAX so the verdict's parity check FAILS it. `Array.max()` uses `<` and SILENTLY
+        // DROPS a non-first NaN (returning a finite value), so a single corrupted sample could otherwise slip
+        // through as PARITY_MET. We force `.nan` whenever ANY sample is non-finite — the gate then rejects it.
+        let hasNonFinite = maes.contains { !$0.isFinite }
+        let mean: Float? = maes.isEmpty ? nil : maes.reduce(0, +) / Float(maes.count)
+        let maxMAE: Float? = maes.isEmpty ? nil : (hasNonFinite ? Float.nan : maes.max())
+        return ParitySummary(
+            sampleCount: sampleCount,
+            labelsAgreeCount: labelsAgreeCount,
+            labelAgreementRate: rate,
+            maeSampleCount: maes.count,
+            meanLogitsMAE: mean,
+            maxLogitsMAE: maxMAE)
+    }
+
     /// Append a PENDING ("observing") shadow-trial record for `comparison` to `ledger`, returning a NEW ledger
     /// (the receiver is untouched — immutability). The record is observation-only; it never auto-promotes.
     /// Timestamps are caller-supplied (no internal clock) so the result is deterministic + replay-stable.

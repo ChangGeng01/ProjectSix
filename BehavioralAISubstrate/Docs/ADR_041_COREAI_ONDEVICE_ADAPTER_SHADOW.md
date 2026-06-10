@@ -147,23 +147,47 @@ AIProgram.save_asset()`. That path drives the **`metal` compiler directly** (whi
 - **Bundled + green:** the asset is now a `Package.swift` `.copy` resource on BASAppleAdapters; `swift build`
   copies it; the full default-toolchain suite stays **15249/0**.
 
-So the run-cert is **NO LONGER externally blocked** — the asset exists + is parity-validated. The only remaining
-step is the SWIFT on-device run (§4.4): `BASCoreAIContextClassifierAdapter` loading + running it on an iOS 27
-runtime, which is gated on the DeviceTestApp building under Xcode 27 (Swift-6.4 Vendor/MLX adaptation, #61),
-not on Core AI. (The `aimodelc`-CLI fix from Apple — §6 — is now moot for our purposes; we don't need it.)
-
-**Unblock paths (any one):** Apple ships a Metal Toolchain matching the Xcode-beta build (or a self-consistent
-seed); OR install the Xcode beta whose build matches the available `27A5194o` toolchain; OR (mechanical-only
-interim) load a pre-converted sample `.aimodel` (e.g. from Apple's `coreai-models`) to run-cert the
-`BASCoreAIModelRunner` load→run→readback path on the iOS 27 simulator (proves the runner, not the classifier
-parity). When unblocked: `bash scripts/coreai-build-aimodel.sh` → wire the `.aimodel` as a `.copy` resource on the
-`BASAppleAdapters` target in `Package.swift` → `bash scripts/run-coreai-e2e-cert.sh` (MODE=sim then MODE=device).
+So the run-cert is **NO LONGER externally blocked** — the asset exists + is parity-validated, AND the Swift
+on-device run-cert subsequently **PASSED** on the iPhone Air (§4.4: 4/4 argmax parity, logits-MAE ~1e-6, warm
+latency ~0.7 ms). The §6 `aimodelc`-CLI blocker is fully moot (we never needed it). What remains is **NOT a
+Swift-run gap** — it is the **migration decision gate** (§8): the candidate has only *matched* the incumbent at
+n=1 on a single device, with latency + memory not yet measured head-to-head against CoreML. The gate
+(`BASCoreAIMigrationVerdict`) is therefore *forced* to return `insufficientEvidence`; CoreML stands. §8 records
+the exact device-capture checklist that — and only that — could ever flip it to `migrate`.
 
 ## 7. Consequences
 
-- Core AI is now a REAL, compile-certified first-class adapter bound to the genuine iOS 27 SDK — a substantial,
-  honest increase in Core AI usage, with the only gap (live inference) being an external Apple-beta defect, fully
-  documented + scripted for a one-command finish once Apple's seed is consistent.
-- The CoreML incumbent is NOT replaced. Core AI is labeled `experimental` until on-device parity + latency + memory
-  are measured on real iOS 27 hardware.
-- The byte-deterministic spine is untouched; the candidate stays observation-only.
+- Core AI is now a REAL, compile-certified AND on-device-run-certified first-class adapter bound to the genuine
+  iOS 27 SDK (§4.4) — a substantial, honest increase in Core AI usage. Live inference is no longer a gap; the
+  former Apple-beta `aimodelc` defect (§6) was bypassed (§6.1) and is moot.
+- The CoreML incumbent is NOT replaced. Core AI is labeled `experimental`. Whether it is *ever* promoted is no
+  longer a matter of narrative judgment — it is decided by the strict, default-deny **migration verdict gate**
+  (§8, `BASCoreAIMigrationVerdict`), which on today's evidence returns `insufficientEvidence`.
+- The byte-deterministic spine is untouched; the candidate stays observation-only (the verdict gate is itself
+  banned from the spine — §5).
+
+## 8. The migration verdict gate — 亏的不要 in executable form (2026-06-10)
+
+§4.4 proved Core AI *matches* CoreML at n=1. **Matching is not winning**, and retiring a working incumbent is
+irreversible churn — so "migrate CoreML → Core AI only if it wins" must be a verifiable code path, not a vibe.
+`BASCoreAIMigrationVerdict` (pure, framework-free, deterministic; `Sources/BASAppleAdapters/`) is that gate.
+
+- **Evidence** = the multi-sample parity corpus (`BASCoreAIShadowComparison.aggregate` folds N shadow `Result`s
+  into a `ParitySummary`: label-agreement rate + mean/max logits-MAE) PLUS *paired* candidate-vs-incumbent
+  latency + peak-memory (present only once device instrumentation captures BOTH sides) PLUS a distinct-device count.
+- **Decision (`decide`)**, strict priority: (1) any proven **LOSS/regression** on any dimension → `doNotMigrate`
+  (decisive); (2) any **NO_EVIDENCE** dimension or sub-threshold sample / device coverage → `insufficientEvidence`;
+  (3) **WIN on every dimension** (parity + latency + memory) with ≥`minSamples` across ≥`minDistinctDevices`
+  → `migrate`; (4) full evidence, no loss, but a **TIE** (no net benefit) → `doNotMigrate` (don't pay churn for
+  a wash). Defaults: 100% label-agreement floor, MAE ε = 1e-3, a 5% latency/memory win margin, ≥50 samples, ≥2 devices.
+- **Today's verdict (the canary, unit-pinned):** feeding §4.4's real evidence — n=4 / 1 device / parity-only,
+  no head-to-head latency, no memory — yields `insufficientEvidence` with reasons
+  `[DEVICES_BELOW_MIN, LATENCY_NO_EVIDENCE, MEMORY_NO_EVIDENCE, PARITY_MET, SAMPLES_BELOW_MIN]`. CoreML stands.
+- **The exact device-capture checklist that would flip it to `migrate`** (and nothing short of it):
+  1. ≥50 shadow comparisons (real input distribution), aggregated via `aggregate`, label-agreement 100% + max MAE ≤ 1e-3.
+  2. Across ≥2 distinct iOS 27 devices (kills the single-device bound).
+  3. **Paired** latency: candidate mean ≤ incumbent mean × 0.95 (measure the CoreML incumbent head-to-head, same inputs).
+  4. **Paired** peak memory: candidate ≤ incumbent × 0.95 (device-side peak RSS for both paths).
+  Until every one holds, the gate returns `doNotMigrate` / `insufficientEvidence` — by construction, never `migrate`.
+- **Guardrail:** the gate emits a *recommendation a human reads* — it cannot itself promote any provider, never
+  touches the turn/governance (红线 7), and is on the banned-in-spine tripwire (§5).

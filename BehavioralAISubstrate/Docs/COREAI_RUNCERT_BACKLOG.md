@@ -7,16 +7,39 @@
 
 ---
 
+## What's next is a GATE, not a blocker — `BASCoreAIMigrationVerdict` (ADR-041 §8)
 
-**Status (UPDATED 2026-06-10):** the Apple `aimodelc`-CLI block was **BYPASSED** via the Python `coreai_torch`
-converter. `BASContextClassifier.aimodel` is built + bundled + **run-validated in the coreai Python runtime
-(5/5 argmax vs PyTorch, logits-MAE ~1e-6)**. The DeviceTestApp **builds clean under Xcode 27** (sim + device).
-The ONLY remaining item is the Swift `BASCoreAIContextClassifierAdapter` run on **real iPhone Air hardware**:
-- **Simulator is impossible** — `CoreAI.framework` is not in `iPhoneSimulator27.0.sdk` (device-only framework).
-- **Device run is gated only on the iPhone Air being unlocked + connected + trusted** (it last reported
-  `unavailable` → devicectl error 4016). One command finishes it: `MODE=device bash scripts/run-coreai-e2e-cert.sh`.
+Run-cert proved Core AI **matches** CoreML at n=1. It has **not won** — so the CoreML incumbent stands, by
+doctrine (亏的不要: never retire a working incumbent for a tie or on partial evidence). Whether Core AI is *ever*
+promoted is now decided by the strict, default-deny **migration verdict gate** (`BASCoreAIMigrationVerdict`,
+pure + unit-pinned). Fed today's evidence it returns `insufficientEvidence`. To ever flip it to `migrate`,
+capture ALL of (this is the real backlog — none of it is externally blocked, just not yet measured):
+
+1. **≥50 shadow comparisons** over a real input distribution → `BASCoreAIShadowComparison.aggregate`, with
+   label-agreement 100% AND max logits-MAE ≤ 1e-3.
+2. **≥2 distinct iOS 27 devices** (retires the single-device bound).
+3. **Paired latency**: measure the CoreML incumbent head-to-head on the SAME inputs; candidate mean must be
+   ≤ incumbent mean × 0.95 (today only the candidate latency is captured — no incumbent baseline).
+4. **Paired peak memory**: device-side peak RSS for BOTH paths; candidate ≤ incumbent × 0.95 (not captured today).
+
+Anything short of all four → the gate returns `doNotMigrate` / `insufficientEvidence` by construction. The gate
+emits a recommendation a HUMAN reads; it never auto-promotes and is banned from the deterministic spine.
+
+---
+
+
+**Status — ✅ FULLY RESOLVED (2026-06-10):** the Apple `aimodelc`-CLI block was **BYPASSED** via the Python
+`coreai_torch` converter; `BASContextClassifier.aimodel` is built + bundled + run-validated in the coreai Python
+runtime (5/5 argmax vs PyTorch, logits-MAE ~1e-6); AND the Swift `BASCoreAIContextClassifierAdapter` **ran
+on-device on the iPhone Air (iOS 27)** — 4/4 argmax agree vs CoreML, logits-MAE ~1e-6, warm latency ~0.7 ms
+(ADR-041 §4.4). Nothing here is pending.
+- **Simulator is impossible** — `CoreAI.framework` is not in `iPhoneSimulator27.0.sdk` (device-only framework);
+  the cert ran on real iPhone Air hardware (§4.4). Re-run any time: `MODE=device bash scripts/run-coreai-e2e-cert.sh`.
+- **What's NOT done is the migration *promotion*** — see the gate section above: matched ≠ won, so the verdict is
+  `insufficientEvidence` and CoreML stands. That is a measurement backlog (more samples / devices / paired
+  latency+memory), not a run-cert gap.
 The original Apple-blocker write-up below is kept for the record (now moot — we don't need `aimodelc`).
-**Full diagnosis + resolution:** [`ADR_041_COREAI_ONDEVICE_ADAPTER_SHADOW.md`](ADR_041_COREAI_ONDEVICE_ADAPTER_SHADOW.md) §6 + §6.1.
+**Full diagnosis + resolution:** [`ADR_041_COREAI_ONDEVICE_ADAPTER_SHADOW.md`](ADR_041_COREAI_ONDEVICE_ADAPTER_SHADOW.md) §4.4 + §6.1 + §8.
 
 ---
 
