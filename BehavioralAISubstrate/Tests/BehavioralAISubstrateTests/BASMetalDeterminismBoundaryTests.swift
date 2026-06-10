@@ -93,6 +93,15 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         // ADR-041 §D — the task→provider matrix is reasoning-side (it RANKS providers by preference; governance
         // still RESOLVES + gates the choice). Provider preference must never reach a byte-deterministic spine file.
         "BASNeuralProviderMatrix",
+        // 结构大重构 — speculative decoding is entirely MLX-reasoning-lane. The ENABLE gate + its ledger composer
+        // (in BASAppleAdapters, LOAD-BEARING like the CoreAI verdict — BASHostKit depends on BASAppleAdapters) and
+        // the rejection-sampling rule must never reach a byte-deterministic spine file.
+        "BASSpeculativeMigrationVerdict",
+        "BASSpeculativeShadowComposer",
+        "BASSpeculativeRejectionSampler",
+        // Defense-in-depth (BASMLXAdapter reasoning types — the spine doesn't import MLX, but ban by name too).
+        "BASSpeculativeMode",
+        "BASMLXMemoryBudget",
     ]
 
     /// The SHARED matcher used by BOTH the production tripwire (`testSpineFilesAreFreeOfMetalSymbols`) AND its

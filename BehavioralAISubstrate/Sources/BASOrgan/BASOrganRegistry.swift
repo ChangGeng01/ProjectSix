@@ -86,6 +86,38 @@ public actor BASOrganRegistry {
         throw RegistryError.noAdapterForRole(role)
     }
 
+    /// 结构大重构 — Phase D: resolve an adapter for `role` under an explicit ROUTING policy.
+    ///
+    /// `.registryDefault` (the default) delegates to `adapter(for:)` → byte-identical to today. `.neuralMatrix`
+    /// opts into the observation-class `BASNeuralProviderMatrix` ranking: it ranks the registry's role-eligible
+    /// providers and resolves the chosen one. If the matrix selects nothing resolvable, it falls back to
+    /// `.registryDefault` (never worse than today). Every existing caller uses the no-routing `adapter(for:)`
+    /// overload and is unaffected (ADR-014 OPT-IN). The matrix is reasoning-side / hint-only — this resolution is
+    /// not a spine operation.
+    public func adapter(
+        for role: BASOrganRole,
+        routing: BASProviderRouting
+    ) throws -> any BASOrganAdapter {
+        switch routing {
+        case .registryDefault:
+            return try adapter(for: role)
+
+        case let .neuralMatrix(preferCertified, preferSmallest):
+            let selection = BASNeuralProviderMatrix.select(
+                context: .init(
+                    role: role,
+                    preferCertified: preferCertified,
+                    preferSmallest: preferSmallest),
+                candidates: descriptors())
+            guard let chosenID = selection.chosen?.providerID,
+                  let entry = entries[chosenID] else {
+                // Matrix chose nothing resolvable → registry default (fail-safe).
+                return try adapter(for: role)
+            }
+            return entry.adapter
+        }
+    }
+
     public func descriptors() -> [BASOrganDescriptor] {
         registrationOrder.compactMap { entries[$0]?.descriptor }
     }

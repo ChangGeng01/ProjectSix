@@ -202,4 +202,21 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
         MLXModelCatalog.defaultEntries.contains { $0.providerID == catalogEntry.providerID }
             ? "certified" : "experimental"
     }
+
+    /// 结构大重构 — Phase 3: the recommended same-family DRAFT model for SPECULATIVE DECODING with this model as
+    /// the target, or nil if this model has no curated pairing (e.g. Gemma 3 4B, which has no same-tokenizer
+    /// sibling). Speculative decoding co-residents a smaller same-family draft that proposes tokens the target
+    /// verifies — a latency lever. Surfaced through the Qinao facade so a host can elect a pair WITHOUT touching
+    /// `MLXModelCatalog` (the BAS identifiers stay behind `catalogEntry`).
+    public var speculativeDraft: QinaoMLXModel? {
+        guard let draft = MLXModelCatalog.recommendedDraft(
+            forTargetProviderID: catalogEntry.providerID) else { return nil }
+        return QinaoMLXModel.allCases.first {
+            $0.catalogEntry.providerID == draft.providerID
+        }
+    }
+
+    /// Whether this model can be a speculative-decoding TARGET (has a curated same-family draft). Honest scope:
+    /// availability ≠ certification — the latency/memory win is on-device-cert-pending (see the spec-decode plan).
+    public var supportsSpeculativeDecoding: Bool { speculativeDraft != nil }
 }

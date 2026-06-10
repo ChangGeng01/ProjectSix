@@ -112,6 +112,33 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// process-global, identical policy to `cacheLimitBytes`.
     public nonisolated let memoryLimitBytes: Int?
 
+    // MARK: - Speculative decoding (结构大重构 — default OFF ⇒ byte-identical)
+
+    /// The same-family smaller DRAFT model to co-resident for speculative decoding, or `nil` (the default) for
+    /// single-model decoding. Must share the target's tokenizer (validated against `speculativePairings` by
+    /// `loadDraftModel`). ADR-014 OPT-IN: `nil` ⇒ the draft container is never loaded ⇒ byte-identical to today.
+    public nonisolated let draftModel: MLXModelCatalog.Entry?
+
+    /// Speculative-decoding mode. `.off` (default) ⇒ single-model path, byte-identical. `.greedy` ⇒ token-identical
+    /// speculative decoding at temperature 0. `.sampling` ⇒ rejection-sampling lane (Phase 2). See `BASSpeculativeMode`.
+    public nonisolated let speculativeDecoding: BASSpeculativeMode
+
+    /// Tokens the draft model proposes per speculation round (vendor default 2). Higher ⇒ bigger win when the
+    /// draft agrees, bigger wasted verify when it diverges. Tuned per pairing during the on-device cert.
+    public nonisolated let numDraftTokens: Int
+
+    /// Pure validity check for a speculative target↔draft pairing: a shared tokenizer is REQUIRED (a cross-family
+    /// draft would mis-tokenize the target's stream) and the draft must be a DISTINCT model. The shared tokenizer
+    /// is proxied here by a shared turn terminator (`extraEOSTokens`); Phase 3 replaces the proxy with the explicit
+    /// `speculativePairings` table. `nonisolated static` + framework-free so it is host-testable without a load.
+    public nonisolated static func isValidDraftPairing(
+        target: MLXModelCatalog.Entry,
+        draft: MLXModelCatalog.Entry
+    ) -> Bool {
+        draft.providerID != target.providerID
+            && draft.extraEOSTokens == target.extraEOSTokens
+    }
+
     // MARK: - Descriptor defaults (ch1040 — named-constant extraction)
 
     /// Default input-token ceiling reported through the descriptor
@@ -157,6 +184,16 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// The loaded model container. `nil` until `loadModel(...)` has
     /// completed at least once on this actor instance.
     private var modelContainer: ModelContainer?
+
+    /// The loaded DRAFT model container for speculative decoding. `nil` until `loadDraftModel(...)` completes
+    /// (and only ever loaded when `draftModel != nil && speculativeDecoding != .off`). Lives on this actor next
+    /// to `modelContainer`; both are reached on the same executor, so the speculative path can co-drive them.
+    private var draftContainer: ModelContainer?
+
+    /// Read accessor for the speculative streaming extension (different file, same module).
+    func _loadedDraftContainerForStreaming() -> ModelContainer? {
+        draftContainer
+    }
 
     // MARK: - Prewarm constants (ch1040 — named-constant extraction)
 
@@ -224,6 +261,37 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             descriptor.maxOutputTokens)
         return params
     }
+
+    /// Greedy generation parameters (temperature 0 → `ArgMaxSampler`, see `GenerateParameters.sampler()`). Used
+    /// ONLY by the speculative greedy lane: at temperature 0 the vendored exact-equality acceptance is
+    /// token-identical to greedy target-only decoding. Derived from `_generateParameters` so the decode-cap /
+    /// clamp rule is shared; the sole delta is forcing the greedy sampler. `_generateParameters` itself is
+    /// byte-unchanged, so single-model scout/core outputs are untouched.
+    func _greedyParameters(
+        for preset: BASOrganPreset,
+        maxOutputTokens: Int? = nil
+    ) -> GenerateParameters {
+        var params = _generateParameters(
+            for: preset, maxOutputTokens: maxOutputTokens)
+        params.temperature = 0
+        return params
+    }
+
+    /// Whether the speculative path should run for `request`. True only when a draft container is loaded AND the
+    /// configured mode is LIVE. `.greedy` is token-identical to greedy target-only decoding; `.sampling`
+    /// (Phase 2) is distribution-equivalent via Leviathan rejection sampling — both are wired. (The sampling
+    /// lane's MLX port is device-cert-pending: the algorithm is host-proven, the on-device distribution check is
+    /// Phase 6; the evidence gate keeps the verdict `doNotEnable` until then.) Role admission is enforced by the
+    /// caller.
+    func shouldSpeculate(for request: BASOrganRequest) -> Bool {
+        guard draftContainer != nil else { return false }
+        switch speculativeDecoding {
+        case .off:
+            return false
+        case .greedy, .sampling:
+            return true
+        }
+    }
     #endif
 
     public init(
@@ -235,11 +303,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         maxOutputTokens: Int = MLXOrganAdapter.defaultMaxOutputTokens,
         supportedRoles: Set<BASOrganRole> = [.scout, .core],
         cacheLimitBytes: Int? = MLXOrganAdapter.defaultCacheLimitBytes,
-        memoryLimitBytes: Int? = nil
+        memoryLimitBytes: Int? = nil,
+        draftModel: MLXModelCatalog.Entry? = nil,
+        speculativeDecoding: BASSpeculativeMode = .off,
+        numDraftTokens: Int = 2
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
         self.memoryLimitBytes = memoryLimitBytes
+        self.draftModel = draftModel
+        self.speculativeDecoding = speculativeDecoding
+        self.numDraftTokens = max(1, numDraftTokens)
         self.descriptor = BASOrganDescriptor(
             providerID: providerID ?? model.providerID,
             providerName: providerName ?? model.providerName,
@@ -292,12 +366,24 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             id: model.id,
             extraEOSTokens: Set(model.extraEOSTokens))
 
+        // Resolve the load-time memory budget (Phase C). With spec-decode OFF this returns today's exact
+        // single-model values + `.adapterDefault` precedence → byte-identical to the pre-speculative path. With
+        // a draft configured it returns the dual-residency UNION applied with `.explicitOverride` (the union
+        // must beat any single-model `.adapterDefault` already in force on the process-global). See
+        // `BASMLXMemoryBudget`.
+        let budget = BASMLXMemoryBudget.resolve(
+            targetProviderID: model.providerID,
+            draftProviderID: (speculativeDecoding != .off) ? draftModel?.providerID : nil,
+            singleCacheLimitBytes: cacheLimitBytes,
+            singleMemoryLimitBytes: memoryLimitBytes)
+        let precedence: MLXRuntimeConfig.Precedence =
+            budget.isSpeculativeUnion ? .explicitOverride : .adapterDefault
+
         // ADR-041 §C — bound the LOAD-TIME memory peak (the download/materialize spike) BEFORE the container
         // load: `MLX.Memory.memoryLimit` makes malloc WAIT once exceeded, so it must be set first (the
-        // post-load `cacheLimit` below cannot bound the load spike). OPT-IN (default nil=off → byte-equal);
-        // first-default-wins on the process-global via MLXRuntimeConfig.
-        if let memoryLimitBytes {
-            MLXRuntimeConfig.shared.applyMemoryLimit(bytes: memoryLimitBytes, precedence: .adapterDefault)
+        // post-load `cacheLimit` below cannot bound the load spike). OPT-IN (default nil=off → byte-equal).
+        if let mem = budget.memoryLimitBytes {
+            MLXRuntimeConfig.shared.applyMemoryLimit(bytes: mem, precedence: precedence)
         }
         let container = try await #huggingFaceLoadModelContainer(
             configuration: configuration,
@@ -305,12 +391,64 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         self.modelContainer = container
         // ADR-038 §11.7-§11.9 — bound MLX's free-buffer cache pool so it can't grow unbounded across turns
         // (variable-shape models like Gemma-3n otherwise exhaust device memory → wedge/OOM). Output-byte-equal
-        // (a free-buffer recycling ceiling). Applied with `.adapterDefault` precedence via MLXRuntimeConfig:
-        // the FIRST adapter's default wins the process-global cap; a SECOND adapter with a different default is
-        // rejected + logged (not a silent last-write-wins). An explicit `setGPUCacheLimit` still overrides.
-        if let cacheLimitBytes {
-            MLXRuntimeConfig.shared.applyCacheLimit(bytes: cacheLimitBytes, precedence: .adapterDefault)
+        // (a free-buffer recycling ceiling). Single-model: first-`.adapterDefault`-wins; speculative union:
+        // `.explicitOverride` (the union must win). An explicit `setGPUCacheLimit` still overrides either.
+        if let cache = budget.cacheLimitBytes {
+            MLXRuntimeConfig.shared.applyCacheLimit(bytes: cache, precedence: precedence)
         }
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
+
+    /// Load the configured DRAFT model into its own container for speculative decoding. Must be called AFTER
+    /// `loadModel(...)` (the target's load sets the dual-residency union memory budget). Idempotent: a no-op if
+    /// the draft container is already loaded.
+    ///
+    /// Throws — and the caller keeps the byte-identical single-model path (`shouldSpeculate` stays false), the
+    /// fail-honest fallback — when: speculative decoding is off, no draft is configured, the target isn't loaded,
+    /// or the draft is not a valid same-family pairing. A shared tokenizer is required (a cross-family draft would
+    /// mis-tokenize the target's stream); it is proxied here by a shared turn terminator + a distinct provider.
+    /// Phase 3 replaces this proxy with the explicit `speculativePairings` table.
+    public func loadDraftModel(
+        progressHandler: @Sendable @escaping (Progress) -> Void = { _ in }
+    ) async throws {
+        #if canImport(MLXLLM)
+        #if targetEnvironment(simulator)
+        throw BASOrganError.providerUnavailable(
+            reason:
+                "MLX requires a physical Metal GPU; " +
+                "unavailable on the iOS Simulator")
+        #endif
+        guard speculativeDecoding != .off else {
+            throw BASOrganError.providerUnavailable(
+                reason: "speculative decoding is off — no draft model to load")
+        }
+        guard let draft = draftModel else {
+            throw BASOrganError.providerUnavailable(
+                reason: "no draft model configured for speculative decoding")
+        }
+        guard modelContainer != nil else {
+            throw BASOrganError.providerUnavailable(
+                reason: Self.notLoadedReason(
+                    "loadModel(...) before loadDraftModel(...)"))
+        }
+        guard Self.isValidDraftPairing(target: model, draft: draft) else {
+            throw BASOrganError.providerUnavailable(
+                reason: "draft model \(draft.providerID) is not a valid same-family pairing for "
+                    + "target \(model.providerID) (tokenizer mismatch)")
+        }
+        if draftContainer != nil { return }
+        let configuration = ModelConfiguration(
+            id: draft.id,
+            extraEOSTokens: Set(draft.extraEOSTokens))
+        // The union memory budget was already applied on the target's loadModel(); the draft loads under it.
+        let container = try await #huggingFaceLoadModelContainer(
+            configuration: configuration,
+            progressHandler: progressHandler)
+        self.draftContainer = container
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

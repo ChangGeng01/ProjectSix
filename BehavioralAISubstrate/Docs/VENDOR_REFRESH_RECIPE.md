@@ -13,7 +13,10 @@
   swift-jinja, EventSource, yyjson).
 - **2 of OURS — never touched by a re-vendor:** `bas-rust-binaries` (Rust XCFramework), `mamba-ssm-fixtures`.
 
-## The THREE patch classes that MUST be ported (they die silently if forgotten)
+## The FOUR patch classes that MUST be ported (they die silently if forgotten)
+
+> **Apply order for the two that touch `Evaluate.swift`:** class 2 (ADR-038 wedge instruments) FIRST, then class 3
+> (rejection sampling) — class 3's diff is cut against the post-ADR-038 file.
 
 0. **Vendor warning suppression** — `Docs/patches/vendor-suppress-warnings.diff` (apply with plain `git apply`).
    Kills ALL vendored-package compiler warnings (8338 → 0 under Xcode 27) so first-party diagnostics stay
@@ -37,6 +40,17 @@
    **`Docs/patches/adr038-mlx-wedge-instruments.diff`** — apply with plain `git apply` (NOT `--3way`: the index
    still holds the old vendor, so 3way fails with "does not match index"). It applied cleanly across the
    2.x→3.31.3 major; if a hunk ever fails, port by hand and REGENERATE the archived diff.
+3. **Spec-decode rejection sampling** — `Docs/patches/spec-decode-rejection-sampling.diff` (apply with plain
+   `git apply`, AFTER patch class 2 — both touch `MLXLMCommon/Evaluate.swift`, and class 3's diff is cut against
+   the post-ADR-038 file). Adds the distribution-correct sampling lane to the vendored `SpeculativeTokenIterator`:
+   a public `SpeculativeAcceptanceStrategy` enum (`.argmaxEquality` = upstream default / unchanged behaviour;
+   `.rejectionSampling` = Leviathan accept-with-prob `min(1,p/q)` + residual `(p−q)₊` resample), threaded through
+   the speculative `generate(...)` / `generateTokens(...)` free functions. The greedy/argmax path stays
+   byte-identical (the new branch is reached ONLY when a caller passes `.rejectionSampling`). Mirrors BAS's
+   host-proven `BASSpeculativeRejectionSampler` (algorithm verified on host; MLX port's distribution-equivalence
+   certified on-device). If a hunk fails after a refresh, port by hand (re-add the enum, the `acceptanceStrategy`
+   init param + stored field, the `switch acceptanceStrategy` in `speculateRound`, and the two free-function
+   params) and REGENERATE the archived diff.
 
 ## Procedure (the 2026-06-11 run, verbatim-reusable)
 

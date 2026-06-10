@@ -54,6 +54,13 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         }
 
         #if canImport(MLXLLM)
+        // 结构大重构 — route to the speculative decoder when a draft model is loaded AND the mode is live.
+        // Default off (no draft / `.off`) ⇒ this guard is skipped ⇒ the exact pre-speculative single-model path
+        // below runs, byte-identical. Deleting these three lines fully reverts the feature.
+        if shouldSpeculate(for: request) {
+            try await _streamDraftSpeculative(request, continuation: continuation)
+            return
+        }
         guard let container = self._loadedContainerForStreaming()
         else {
             throw BASOrganError.providerUnavailable(

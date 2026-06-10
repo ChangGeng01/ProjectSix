@@ -153,4 +153,25 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// Every selectable entry (certified defaults + opt-in alternatives) for SDK pickers that want to surface
     /// the full set. Order: certified defaults first, then alternatives.
     public static let allEntries: [Entry] = defaultEntries + availableAlternatives
+
+    /// 结构大重构 — Phase 3: curated same-family TARGET → DRAFT speculative-decoding pairings. A target's value is
+    /// the recommended SMALLER same-tokenizer-family draft to co-resident for speculative decoding. Keyed by the
+    /// target's `providerID`. Every pair shares a turn terminator (same tokenizer family), the hard requirement
+    /// for speculative decoding.
+    ///
+    /// - `gemma4.e4b → e2b` — the PRIMARY on-device cert target (operator-elected). Heaviest dual residency +
+    ///   the ADR-038 Gemma-3n cache-wedge risk under two pools — see the spec-decode plan's risk ranking.
+    /// - `llama3_2.3b → 1b`, `qwen2_5.3b → 1.5b` — standard-architecture pairs with NO Gemma-3n variable-shape
+    ///   wedge (ADR-038 §11.5); the documented FALLBACK lane if the Gemma pair OOMs/wedges on 8 GB.
+    /// - `gemma3.4b` is intentionally ABSENT (no same-family sibling) ⇒ speculative decoding honestly unavailable.
+    public static let speculativePairings: [String: Entry] = [
+        gemma4_E4B_4bit.providerID: gemma4_E2B_4bit,
+        llama3_2_3B_4bit.providerID: llama3_2_1B_4bit,
+        qwen2_5_3B_4bit.providerID: qwen2_5_1_5B_4bit,
+    ]
+
+    /// The recommended same-family draft for a target's `providerID`, or nil if the target has no curated pairing.
+    public static func recommendedDraft(forTargetProviderID providerID: String) -> Entry? {
+        speculativePairings[providerID]
+    }
 }

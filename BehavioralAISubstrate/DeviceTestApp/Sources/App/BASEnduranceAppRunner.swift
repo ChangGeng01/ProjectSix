@@ -273,6 +273,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchCoreAIProbeOnly()
             return
         }
+        // 结构大重构 Phase 6 — speculative-decoding cert probe (BAS_SPEC_DECODE=1). DEVICE-ONLY (it loads two
+        // MLX models, which SIGABRT on the iOS Simulator). Dispatched here; refuses on the simulator.
+        if (env["BAS_SPEC_DECODE"] ?? "0") == "1" {
+            launchSpeculativeProbeOnly()
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
@@ -349,6 +355,30 @@ final class BASEnduranceAppController: ObservableObject {
                 self.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
                 self.started = false
                 self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+        }
+    }
+
+    /// Start path for BAS_SPEC_DECODE=1 — runs the speculative-decoding cert probe and exits. DEVICE-ONLY (the
+    /// probe loads two MLX models). Mirrors `launchCoreAIProbeOnly` (detached, idle-timer off, headless-safe).
+    /// Refuses on the simulator (MLX SIGABRTs there). The probe emits its `📊 spec-decode …` readings via its own
+    /// `os.Logger` (idevicesyslog-visible), so no log-file plumbing is needed here.
+    private func launchSpeculativeProbeOnly() {
+        guard !started else { return }
+        #if targetEnvironment(simulator)
+        status = .failed(message:
+            "spec-decode probe is device-only — MLX aborts on the Simulator; run on a physical iPhone")
+        return
+        #endif
+        started = true
+        status = .starting
+        UIApplication.shared.isIdleTimerDisabled = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await BASSpeculativeDecodeProbe.run()
+            await MainActor.run {
+                self?.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
+                self?.started = false
                 UIApplication.shared.isIdleTimerDisabled = false
             }
         }

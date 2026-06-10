@@ -317,6 +317,18 @@ public struct BASOrganPreset: Sendable, Equatable, Codable {
         topP: 0.95,
         maxOutputTokens: 1_024,
         deterministic: false)
+
+    /// Greedy-deterministic preset (temperature 0 → argmax decoding). ADDITIVE — no existing static is
+    /// touched, so scout/core outputs are byte-unchanged. A host elects this to request greedy single-model
+    /// decoding, and it is the lane the greedy speculative-decode path runs on: at temperature 0 the MLX
+    /// speculative decoder's exact-equality acceptance is token-IDENTICAL to greedy target-only decoding
+    /// (provable byte-identity + a latency win). See the spec-decode plan / `BASSpeculativeMode.greedy`.
+    public static let greedyDeterministic = BASOrganPreset(
+        name: "bas.greedy.v1",
+        temperature: 0,
+        topP: 1,
+        maxOutputTokens: 1_024,
+        deterministic: true)
 }
 
 public enum BASOrganError: Error, Equatable, Sendable {
