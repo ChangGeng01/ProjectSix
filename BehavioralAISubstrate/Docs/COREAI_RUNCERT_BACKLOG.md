@@ -20,7 +20,12 @@ capture ALL of (this is the real backlog — none of it is externally blocked, j
 2. **≥2 distinct iOS 27 devices** (retires the single-device bound).
 3. **Paired latency**: measure the CoreML incumbent head-to-head on the SAME inputs; candidate mean must be
    ≤ incumbent mean × 0.95 (today only the candidate latency is captured — no incumbent baseline).
-4. **Paired peak memory**: device-side peak RSS for BOTH paths; candidate ≤ incumbent × 0.95 (not captured today).
+4. **Paired peak memory**: device-side peak footprint for BOTH paths; candidate ≤ incumbent × 0.95. Mechanism
+   (wired 2026-06-11): in-process load-delta diagnostics are printed per probe run (confounded — never gate
+   evidence); the REAL campaign numbers come from separate single-model runs, then feed the gate via
+   `BAS_COREAI_MEM_CANDIDATE_BYTES` + `BAS_COREAI_MEM_INCUMBENT_BYTES` on the next probe run (paired-or-nothing —
+   the composer refuses a half-supplied pair). The probe now prints the gate verdict
+   (`coreai-migration-gate recommendation=…`) on every run via `BASCoreAIVerdictEvidenceComposer`.
 
 Anything short of all four → the gate returns `doNotMigrate` / `insufficientEvidence` by construction. The gate
 emits a recommendation a HUMAN reads; it never auto-promotes and is banned from the deterministic spine.

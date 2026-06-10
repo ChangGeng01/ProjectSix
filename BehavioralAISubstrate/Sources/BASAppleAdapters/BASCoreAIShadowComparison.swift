@@ -26,26 +26,31 @@ public enum BASCoreAIShadowComparison {
         return sum / Float(lhs.count)
     }
 
-    /// A parity summary of one candidate-vs-incumbent comparison.
+    /// A parity summary of one candidate-vs-incumbent comparison. `incumbentLatencyMillis` is the PAIRED
+    /// incumbent-side measurement on the SAME input (nil when the probe didn't capture it — the migration
+    /// gate then reports LATENCY_NO_EVIDENCE rather than comparing unpaired numbers).
     public struct Result: Equatable, Sendable {
         public let incumbentLabel: String
         public let candidateLabel: String
         public let labelsAgree: Bool
         public let logitsMAE: Float?
         public let candidateLatencyMillis: Double
+        public let incumbentLatencyMillis: Double?
 
         public init(
             incumbentLabel: String,
             candidateLabel: String,
             labelsAgree: Bool,
             logitsMAE: Float?,
-            candidateLatencyMillis: Double
+            candidateLatencyMillis: Double,
+            incumbentLatencyMillis: Double? = nil
         ) {
             self.incumbentLabel = incumbentLabel
             self.candidateLabel = candidateLabel
             self.labelsAgree = labelsAgree
             self.logitsMAE = logitsMAE
             self.candidateLatencyMillis = candidateLatencyMillis
+            self.incumbentLatencyMillis = incumbentLatencyMillis
         }
     }
 
@@ -53,14 +58,16 @@ public enum BASCoreAIShadowComparison {
     public static func compare(
         incumbentLabel: String, incumbentLogits: [Float],
         candidateLabel: String, candidateLogits: [Float],
-        candidateLatencyMillis: Double
+        candidateLatencyMillis: Double,
+        incumbentLatencyMillis: Double? = nil
     ) -> Result {
         Result(
             incumbentLabel: incumbentLabel,
             candidateLabel: candidateLabel,
             labelsAgree: incumbentLabel == candidateLabel,
             logitsMAE: logitsMAE(incumbentLogits, candidateLogits),
-            candidateLatencyMillis: candidateLatencyMillis)
+            candidateLatencyMillis: candidateLatencyMillis,
+            incumbentLatencyMillis: incumbentLatencyMillis)
     }
 
     // MARK: - Corpus aggregation (n > 1 — evidence for the migration verdict)
@@ -132,20 +139,26 @@ public enum BASCoreAIShadowComparison {
         candidateRef: String = BASCoreAIClassifierMetadata.candidateRef
     ) -> BASShadowTrialFeedbackLedger {
         let maeString = comparison.logitsMAE.map { "\($0)" } ?? "n/a"
+        var effects = [
+            "input_len: \(inputLength)",
+            "incumbent_label: \(comparison.incumbentLabel)",
+            "candidate_label: \(comparison.candidateLabel)",
+            "labels_agree: \(comparison.labelsAgree)",
+            "logits_mae: \(maeString)",
+            "candidate_latency_ms: \(comparison.candidateLatencyMillis)",
+        ]
+        // PAIRED incumbent latency (additive — absent on pre-pairing records; the evidence composer treats a
+        // missing line as nil so old ledgers stay parseable and the gate honestly reports LATENCY_NO_EVIDENCE).
+        if let incumbentMs = comparison.incumbentLatencyMillis {
+            effects.append("incumbent_latency_ms: \(incumbentMs)")
+        }
         let record = BASShadowTrialRecord(
             trialID: trialID,
             candidateRef: candidateRef,
             trialScope: "coreai-classifier",
             startAt: startAt,
             endAt: endAt,
-            observedEffects: [
-                "input_len: \(inputLength)",
-                "incumbent_label: \(comparison.incumbentLabel)",
-                "candidate_label: \(comparison.candidateLabel)",
-                "labels_agree: \(comparison.labelsAgree)",
-                "logits_mae: \(maeString)",
-                "candidate_latency_ms: \(comparison.candidateLatencyMillis)",
-            ],
+            observedEffects: effects,
             failConditions: [],
             completionState: "observing")
         return ledger.appending(record)

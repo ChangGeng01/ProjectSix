@@ -88,6 +88,8 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         // The migration verdict RANKS migrate/don't-migrate from shadow evidence — a recommendation a human
         // reads, never an auto-promotion. Its provider-preference output must never reach the deterministic spine.
         "BASCoreAIMigrationVerdict",
+        // K2 — the composer that folds ledger records into gate Evidence is equally reasoning-side.
+        "BASCoreAIVerdictEvidenceComposer",
         // ADR-041 §D — the task→provider matrix is reasoning-side (it RANKS providers by preference; governance
         // still RESOLVES + gates the choice). Provider preference must never reach a byte-deterministic spine file.
         "BASNeuralProviderMatrix",
