@@ -503,6 +503,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// or the draft is not a valid same-family pairing. A shared tokenizer is required (a cross-family draft would
     /// mis-tokenize the target's stream); it is proxied here by a shared turn terminator + a distinct provider.
     /// Phase 3 replaces this proxy with the explicit `speculativePairings` table.
+    ///
+    /// AUDIT-4 (the fit-budget asymmetry, made EXPLICIT): unlike the auto-load in `loadModel`, this explicit
+    /// call does NOT enforce `speculativeFitBudgetBytes` — deliberately, so a cert probe / entitled host can
+    /// probe pairs beyond the conservative default budget (it is how the Gemma memory finding was measured).
+    /// Calling it when `willEngageSpeculation == false` means the HOST ACCEPTS THE MEMORY RISK: the union budget
+    /// was never applied, and on a constrained device the load can be jetsam-killed (uncatchable). The breach is
+    /// logged loudly below — never silent.
     public func loadDraftModel(
         progressHandler: @Sendable @escaping (Progress) -> Void = { _ in }
     ) async throws {
@@ -532,6 +539,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                     + "target \(model.providerID) (tokenizer mismatch)")
         }
         if draftContainer != nil { return }
+        // AUDIT-4: explicit loads beyond the fit budget are PERMITTED (the probe escape hatch) but never silent.
+        if let budget = speculativeFitBudgetBytes,
+           !BASMLXMemoryBudget.dualResidencyFits(
+                targetProviderID: model.providerID,
+                draftProviderID: draft.providerID,
+                budgetBytes: budget) {
+            #if canImport(os)
+            Logger(subsystem: "com.bas.mlx", category: "speculative").warning(
+                "explicit loadDraftModel BEYOND the fit budget (\(budget / (1024 * 1024), privacy: .public)MB) — host accepts the memory risk; a constrained device may jetsam-kill this load (uncatchable)")
+            #endif
+        }
         let configuration = ModelConfiguration(
             id: draft.id,
             extraEOSTokens: Set(draft.extraEOSTokens))
@@ -540,6 +558,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             configuration: configuration,
             progressHandler: progressHandler)
         self.draftContainer = container
+        // AUDIT-4: an EXPLICIT load that succeeds clears any stale auto-load failure (a host that retried after
+        // an auto failure must not see contradictory signals: active=true + a leftover failure reason).
+        draftLoadFailureReason = nil
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

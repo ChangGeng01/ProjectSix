@@ -9,6 +9,11 @@
 //    path: a bare speculativeOptimalTarget adapter (must auto-engage; greedy streamDraft AND the non-streaming
 //    draft() both speculative) byte-compared + timed against an explicit `.off` adapter, plus the dormancy check
 //    (a bare default-Gemma adapter must report willEngageSpeculation=false WITHOUT loading anything).
+//    AUDIT-4 disclosure: the probe's two adapters share the PROCESS-GLOBAL MLXRuntimeConfig — the auto adapter's
+//    UNION cache cap (768MB, .explicitOverride) is set first, and the later .off adapter's 512MB .adapterDefault
+//    is rejected (first-write policy) — so the baseline also ran under 768MB. Byte-equal by doctrine (the cap is
+//    a recycling ceiling), but the probe's spec-vs-base LATENCY comparison is config-skewed and is therefore NOT
+//    a latency claim — the latency cert remains the n=50 BAS_SPEC_DECODE run. This probe certifies PATH + BYTES.
 //
 // 2. BAS_SPEC_SWEEP=1 — numDraftTokens sweep for the SAMPLING lane. The n=50 cert measured sampling at the
 //    default numDraftTokens=2 → ~30% slower (doNotEnable). Whether a different draft length flips it was

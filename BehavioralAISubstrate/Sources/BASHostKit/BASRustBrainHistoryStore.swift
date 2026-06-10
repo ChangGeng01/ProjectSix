@@ -152,7 +152,9 @@ public actor BASRustBrainHistoryStore {
         let sorted = all.sorted {
             $0.retrievedAt != $1.retrievedAt
                 ? $0.retrievedAt > $1.retrievedAt
-                : (Int($0.turnRef) ?? 0) > (Int($1.turnRef) ?? 0)
+                // AUDIT-4: BASTurnRefOrdering mirrors SQLite CAST semantics so the Swift fold and the
+                // SQL-native ORDER BY agree even on malformed turn_refs (cross-path parity).
+                : BASTurnRefOrdering.numericValue($0.turnRef) > BASTurnRefOrdering.numericValue($1.turnRef)
         }
         let take = min(max(0, limit), sorted.count)
         return Array(sorted.prefix(take))

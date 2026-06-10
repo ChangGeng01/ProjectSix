@@ -127,6 +127,38 @@ final class BASSQLNativeQueryTests: XCTestCase {
         XCTAssertEqual(both.map(\.atomID), ["turn10", "turn2"])
     }
 
+    /// AUDIT-4 — CROSS-PATH parity on MALFORMED turn_refs. SQLite `CAST('12abc' AS INTEGER)` = 12 (leading
+    /// digits) while Swift `Int("12abc")` = nil → the old fold mapped it to 0 — so the Swift fold and the SQL
+    /// native query could order the SAME tied records DIFFERENTLY (the exact divergence the tiebreaker exists to
+    /// kill). `BASTurnRefOrdering.numericValue` now mirrors CAST; this test pins BOTH paths returning the SAME
+    /// order on the same tied, malformed dataset.
+    func testFoldAndNativePathsAgreeOnMalformedTurnRefTies() async throws {
+        let url = makeTempDBURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let tracker = try BASMemoryUsageTracker(
+            databaseURL: url)
+        let store = BASSQLBrainHistoryStore(tracker: tracker)
+        let ts = Date(timeIntervalSince1970: 1_700_000_000)   // one timestamp — every record ties
+        // turn_refs: '12abc' (CAST→12, old-Swift→0), '9' (both→9), 'abc' (both→0).
+        _ = try await tracker.record(
+            atomID: "malformed12", sessionRef: "S",
+            turnRef: "12abc", permitMode: "safe", retrievedAt: ts)
+        _ = try await tracker.record(
+            atomID: "clean9", sessionRef: "S",
+            turnRef: "9", permitMode: "safe", retrievedAt: ts)
+        _ = try await tracker.record(
+            atomID: "junk", sessionRef: "S",
+            turnRef: "abc", permitMode: "safe", retrievedAt: ts)
+
+        let fold = await store.recentRecords(limit: 3).map(\.atomID)
+        let native = try await store.recentRecordsViaSQL(limit: 3).map(\.atomID)
+        XCTAssertEqual(fold, native,
+            "the Swift fold and the SQL-native path must order the SAME tied records IDENTICALLY, "
+            + "including malformed turn_refs (CAST-compatible leading-digit parsing)")
+        XCTAssertEqual(fold.first, "malformed12",
+            "leading-digit semantics: '12abc' (12) outranks '9' on the tie — in BOTH paths")
+    }
+
     func testRecentRecordsViaSQLHonorsLimit() async throws {
         let url = makeTempDBURL()
         defer { try? FileManager.default.removeItem(at: url) }
