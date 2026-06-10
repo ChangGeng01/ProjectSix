@@ -72,6 +72,13 @@ export SOURCE_DATE_EPOCH="${SDE}"
 export RUSTFLAGS="-C codegen-units=1 -C strip=symbols"
 export CARGO_TERM_COLOR=always
 
+# Pin the iOS/macOS slices to the package minimums (Package.swift: .iOS(.v18), .macOS(.v14)). Rust's
+# *-apple-ios / *-apple-darwin targets honor these deployment-target env vars for the per-object min-OS load
+# command. WITHOUT them, a build under a newer Xcode SDK bakes in that SDK's default (e.g. iOS 26.5), which then
+# mismatches the iOS-18 app deployment target at link time ("built for newer 'iOS' version than being linked").
+export IPHONEOS_DEPLOYMENT_TARGET="18.0"
+export MACOSX_DEPLOYMENT_TARGET="14.0"
+
 # Targets shipped。 Three slices since M2191 chapter
 # 七百七 第一刀 (expanded from host-only at M2187)。
 TARGETS=(

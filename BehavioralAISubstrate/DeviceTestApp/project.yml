@@ -59,6 +59,9 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         CFBundleDisplayName: BAS Test
+        # Headless test host — it requires full screen, which waives the
+        # "all interface orientations must be supported" iPad validation.
+        UIRequiresFullScreen: true
         UIRequiredDeviceCapabilities:
           - armv7
         UISupportedInterfaceOrientations:

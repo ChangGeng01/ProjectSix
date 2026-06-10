@@ -342,12 +342,13 @@ final class BASEnduranceAppController: ObservableObject {
         status = .starting
         UIApplication.shared.isIdleTimerDisabled = true
         Task.detached(priority: .userInitiated) { [weak self] in
-            await MainActor.run { self?.openLogFile() }
-            await self?.runCoreAIShadowProbe()
+            guard let self else { return }   // strong `let` for the task's duration — avoids capturing the weak `var self` across the nested @Sendable closures (Swift-6)
+            await MainActor.run { self.openLogFile() }
+            await self.runCoreAIShadowProbe()
             await MainActor.run {
-                self?.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
-                self?.started = false
-                self?.closeLogFile()
+                self.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
+                self.started = false
+                self.closeLogFile()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
         }
@@ -554,8 +555,10 @@ final class BASEnduranceAppController: ObservableObject {
     // the provider-version tags the persisted embeddings。 Extracted (same exact
     // strings) so they live in one place;changing any of these silently orphans a
     // prior run's durable memory。
-    private static let memoryAtomsDBFilename = "bas-memory-atoms.sqlite"
-    private static let vectorIndexDBFilename = "bas-vector-index.sqlite"
+    // `nonisolated`: immutable Sendable String constants — read from the nonisolated runEndurance loop, so they
+    // must not be MainActor-isolated (Swift-6 forbids reaching a MainActor static from outside the actor).
+    private nonisolated static let memoryAtomsDBFilename = "bas-memory-atoms.sqlite"
+    private nonisolated static let vectorIndexDBFilename = "bas-vector-index.sqlite"
     private static let embeddingProviderVersion = "MiniLM-L6-v2-coreml-fp32-v1"
 
     /// ch1062 WS2 — max rounds for the fabric-authoritative multi-round loop。
@@ -834,7 +837,7 @@ final class BASEnduranceAppController: ObservableObject {
                         let id = record.id.uuidString
                         guard let e = entryByID[id] else { continue }     // no vector → retried next turn
                         do {
-                            try await engine.upsert(BASVectorIndexEntry(
+                            _ = try await engine.upsert(BASVectorIndexEntry(
                                 atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
                             resolver.put(id: id,                          // newest.count ≤ cap ⇒ no evict
                                 atom: BASL8RoutedMemoryService.memoryAtom(from: record),
@@ -1717,10 +1720,11 @@ final class BASEnduranceAppController: ObservableObject {
             }
 
             let updateThermal = snapAfter.thermalState
+            let cumulTokensSnapshot = totalTokens   // snapshot the mutable accumulator into a `let` before the @Sendable MainActor.run capture (Swift-6)
             await MainActor.run {
                 self.status = .running(
                     iter: iter, totalIters: totalIters,
-                    cumulTokens: totalTokens,
+                    cumulTokens: cumulTokensSnapshot,
                     thermal: updateThermal)
             }
 
@@ -1756,7 +1760,7 @@ final class BASEnduranceAppController: ObservableObject {
                         let id = record.id.uuidString
                         guard let e = await vindex.entry(forID: id) else { continue }
                         do {
-                            try await engine.upsert(BASVectorIndexEntry(
+                            _ = try await engine.upsert(BASVectorIndexEntry(
                                 atomID: id, normalizedEmbedding: e.normalizedEmbedding, domain: pin))
                             let evicted = resolver.put(id: id,
                                 atom: BASL8RoutedMemoryService.memoryAtom(from: record),
@@ -1907,10 +1911,11 @@ final class BASEnduranceAppController: ObservableObject {
         // safe no-op, but cancel cleanly anyway). cancel() interrupts the inter-tick sleep.
         metalProbeHeartbeat?.cancel()
 
+        let finalTokensSnapshot = totalTokens   // snapshot before the @Sendable MainActor.run capture (Swift-6)
         await MainActor.run {
             self.status = .completed(
                 totalIters: totalIters,
-                totalTokens: totalTokens,
+                totalTokens: finalTokensSnapshot,
                 runSec: totalSec)
             self.started = false
             self.closeLogFile()
