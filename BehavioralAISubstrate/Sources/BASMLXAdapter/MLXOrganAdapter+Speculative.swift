@@ -33,31 +33,28 @@ extension MLXOrganAdapter {
     }
     #endif
 
-    /// Actor-isolated speculative streaming body. Precondition (asserted by `shouldSpeculate`): a draft container
-    /// is loaded and the mode is live. Greedy lane only in Phase 0/1.
-    func _streamDraftSpeculative(
-        _ request: BASOrganRequest,
-        continuation: AsyncThrowingStream<
-            BASOrganDraftChunk, Error>.Continuation
-    ) async throws {
-        guard descriptor.supportedRoles.contains(request.role) else {
-            throw BASOrganError.unsupportedRole(request.role)
-        }
-
-        #if canImport(MLXLLM)
+    #if canImport(MLXLLM)
+    /// Shared setup + decode for BOTH speculative entry points (streaming `_streamDraftSpeculative` and the
+    /// non-streaming `_draftSpeculative`): container guards, ChatSession-identical prompt construction, lane
+    /// parameter selection, the DraftModelBox transfer, and the vendored speculative `generate(...)` call.
+    /// Returns the raw `AsyncStream<Generation>` for the caller to consume (yield chunks vs accumulate).
+    private func _speculativeGenerationStream(
+        for request: BASOrganRequest
+    ) async throws -> AsyncStream<Generation> {
         guard let mainContainer = self._loadedContainerForStreaming() else {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason(
-                    "loadModel(progressHandler:) before speculative streamDraft(_:)"))
+                    "loadModel(progressHandler:) before speculative draft"))
         }
         guard let draftContainer = self._loadedDraftContainerForStreaming() else {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason(
-                    "loadDraftModel(progressHandler:) before speculative streamDraft(_:)"))
+                    "loadDraftModel(progressHandler:) before speculative draft"))
         }
 
         // Build the LMInput exactly as the single-model ChatSession path does (same system instructions + user
-        // prompt) so the prompt tokenization is identical — only the decoder differs.
+        // prompt) so the prompt tokenization is identical — only the decoder differs. (Hardware-verified: the
+        // n=50 greedy cert's bytewise identity would have failed on any prompt-construction drift.)
         var messages: [Chat.Message] = []
         let instructions = Self.systemInstructions(for: request)
         if !instructions.isEmpty {
@@ -69,11 +66,11 @@ extension MLXOrganAdapter {
 
         // Choose the lane by mode:
         //  • .greedy   — temperature 0 → ArgMaxSampler → exact-equality acceptance → token-identical to greedy
-        //                target-only decoding (bytewise-provable).
+        //                target-only decoding (bytewise-provable; n=50 dual-device hardware-verified).
         //  • .sampling — preset temperature with the PURE-TEMPERATURE envelope forced (`_samplingParameters`
-        //                sets topP=1 — the rejection branch's exactness envelope; audit fix) → Leviathan
-        //                rejection sampling → distribution-equivalent to pure-temperature target-only sampling
-        //                (statistical, device-cert-pending).
+        //                sets topP=1 — the rejection branch's exactness envelope) → Leviathan rejection
+        //                sampling → distribution-equivalent (on-device dist-check verified; latency-certified
+        //                doNotEnable, so this lane only runs on explicit host election).
         let params: GenerateParameters
         let acceptance: SpeculativeAcceptanceStrategy
         switch speculativeDecoding {
@@ -91,14 +88,14 @@ extension MLXOrganAdapter {
         let nDraft = self.numDraftTokens
 
         // Move the draft model handle across the main container's perform boundary (see DraftModelBox).
-        let draftBox = try await draftContainer.perform { ctx in
+        let draftBox = await draftContainer.perform { ctx in
             DraftModelBox(ctx.model)
         }
 
         // Drive the vendored speculative generate inside the main container's serial-access closure. `input`
         // (non-Sendable LMInput) is transferred via the `perform(nonSendable:)` overload; the returned
         // AsyncStream<Generation> is Sendable and drives the SpeculativeTokenIterator lazily.
-        let stream = try await mainContainer.perform(
+        return try await mainContainer.perform(
             nonSendable: input
         ) { mainContext, input in
             try MLXLMCommon.generate(
@@ -111,7 +108,22 @@ extension MLXOrganAdapter {
                 numDraftTokens: nDraft,
                 acceptanceStrategy: acceptance)
         }
+    }
+    #endif
 
+    /// Actor-isolated speculative streaming body. Precondition (asserted by `shouldSpeculate`): a draft container
+    /// is loaded and the request is mode-eligible.
+    func _streamDraftSpeculative(
+        _ request: BASOrganRequest,
+        continuation: AsyncThrowingStream<
+            BASOrganDraftChunk, Error>.Continuation
+    ) async throws {
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+
+        #if canImport(MLXLLM)
+        let stream = try await _speculativeGenerationStream(for: request)
         var cumulative = ""
         for await item in stream {
             guard case let .chunk(delta) = item else { continue }
@@ -129,6 +141,51 @@ extension MLXOrganAdapter {
                 producedAt: Date())
             continuation.yield(chunk)
         }
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason: MLXOrganAdapter.frameworkUnavailableReason
+                + MLXOrganAdapter.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
+
+    /// Non-streaming speculative draft — the `draft(_:)` counterpart of `_streamDraftSpeculative`. Accumulates
+    /// the speculative stream and captures the terminal `.info` (`GenerateCompletionInfo`) so the returned
+    /// `BASOrganDraft` carries REAL prefill/decode metrics, exactly like the single-model `draft(_:)` path.
+    /// The body construction mirrors `draft(_:)` field-for-field (marker postprocessing, token estimates,
+    /// deterministic traceID) so callers can't tell which decoder produced the draft — except by latency.
+    ///
+    /// NOTE — `draftMultiTurn` is DELIBERATELY not speculative: its value is ChatSession KV-cache reuse across
+    /// turns (only the new turn's tokens prefill). The speculative path builds fresh caches per call, so routing
+    /// multi-turn through it would RE-PREFILL the whole conversation every turn — a net loss (亏的不要).
+    func _draftSpeculative(
+        _ request: BASOrganRequest
+    ) async throws -> BASOrganDraft {
+        #if canImport(MLXLLM)
+        let stream = try await _speculativeGenerationStream(for: request)
+        var rawBody = ""
+        var completionInfo: GenerateCompletionInfo?
+        for await item in stream {
+            switch item {
+            case .chunk(let delta): rawBody += delta
+            case .info(let info): completionInfo = info
+            default: break
+            }
+        }
+        let body = Self.applyMarkerPostprocessing(rawBody)  // M256 — same contract as draft(_:)
+        return BASOrganDraft(
+            requestID: request.requestID,
+            providerID: descriptor.providerID,
+            role: request.role,
+            body: body,
+            inputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(
+                    from: [request.instruction] + request.context),
+            outputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(from: [body]),
+            producedAt: Date(),
+            traceID: BASOrganDeterministicAdapter.digest(
+                for: request, providerID: descriptor.providerID),
+            completionMetrics: Self.completionMetrics(from: completionInfo))
         #else
         throw BASOrganError.providerUnavailable(
             reason: MLXOrganAdapter.frameworkUnavailableReason

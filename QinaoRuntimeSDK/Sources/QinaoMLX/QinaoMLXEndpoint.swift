@@ -217,6 +217,12 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     }
 
     /// Whether this model can be a speculative-decoding TARGET (has a curated same-family draft). Honest scope:
-    /// availability ≠ certification — the latency/memory win is on-device-cert-pending (see the spec-decode plan).
+    /// availability ≠ certification — see `speculativeOptimal` for the one pairing that IS certified.
     public var supportsSpeculativeDecoding: Bool { speculativeDraft != nil }
+
+    /// The SPECULATION-OPTIMAL pick: greedy speculative decoding on this model is ON-DEVICE CERTIFIED `enable`
+    /// (Llama-3.2 3B↔1B — bytewise-correct, ~31% faster, fits the default memory cap; 2 devices, n=100). The
+    /// quality default (`gemma4E4B`) is unchanged — its pair does not fit 8 GB, so speculation stays dormant
+    /// there. A latency-prioritizing host picks THIS model and the certified fast lane engages automatically.
+    public static var speculativeOptimal: QinaoMLXModel { .llama3_2_3B }
 }

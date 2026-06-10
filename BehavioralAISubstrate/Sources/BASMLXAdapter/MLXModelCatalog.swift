@@ -174,4 +174,15 @@ public struct MLXModelCatalog: Sendable, Equatable {
     public static func recommendedDraft(forTargetProviderID providerID: String) -> Entry? {
         speculativePairings[providerID]
     }
+
+    /// The SPECULATION-OPTIMAL target — the entry whose greedy speculative decoding is ON-DEVICE CERTIFIED
+    /// `enable` (Llama-3.2 3B↔1B: token-identity bytewise-verified, ~31% latency win, dual peak 2533 MB — fits
+    /// the default per-process cap; 100 paired records / 2 devices; Docs/SPEC_DECODE_CERT_RESULTS.md).
+    ///
+    /// HONEST TRADE (the default target is deliberately NOT changed): `gemma4_E4B_4bit` stays the quality
+    /// default, but its dual residency does NOT fit 8 GB, so greedy speculation stays dormant there. A host that
+    /// prioritizes LATENCY over the Gemma quality tier constructs its adapter with THIS entry — the auto-resolved
+    /// 1B draft engages and greedy turns get the certified speedup. Quality-vs-speed is the host's election;
+    /// this constant just makes the certified fast lane discoverable.
+    public static let speculativeOptimalTarget: Entry = llama3_2_3B_4bit
 }

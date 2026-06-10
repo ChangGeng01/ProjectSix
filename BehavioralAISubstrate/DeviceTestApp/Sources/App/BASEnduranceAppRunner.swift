@@ -279,6 +279,16 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpeculativeProbeOnly()
             return
         }
+        // 满意收尾 — default-on auto-path verification (BAS_SPEC_DEFAULTON=1) and the sampling
+        // numDraftTokens sweep (BAS_SPEC_SWEEP=1). Both device-only (MLX loads).
+        if (env["BAS_SPEC_DEFAULTON"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecDefaultOnProbe.runDefaultOnVerification() }
+            return
+        }
+        if (env["BAS_SPEC_SWEEP"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecDefaultOnProbe.runDraftTokenSweep() }
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
@@ -355,6 +365,28 @@ final class BASEnduranceAppController: ObservableObject {
                 self.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
                 self.started = false
                 self.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+        }
+    }
+
+    /// 满意收尾 — shared start path for the small speculative auxiliary probes (default-on verification +
+    /// numDraftTokens sweep). Same shape as `launchSpeculativeProbeOnly`: device-only, detached, idle-timer off.
+    private func launchSpecAux(_ body: @Sendable @escaping () async -> Void) {
+        guard !started else { return }
+        #if targetEnvironment(simulator)
+        status = .failed(message:
+            "spec probes are device-only — MLX aborts on the Simulator; run on a physical iPhone")
+        return
+        #endif
+        started = true
+        status = .starting
+        UIApplication.shared.isIdleTimerDisabled = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await body()
+            await MainActor.run {
+                self?.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
+                self?.started = false
                 UIApplication.shared.isIdleTimerDisabled = false
             }
         }

@@ -1,6 +1,9 @@
 import Foundation
 import BASRuntimeCore
 import BASOrgan
+#if canImport(os)
+import os
+#endif
 #if canImport(MLXLLM)
 import MLXLLM
 import MLXLMCommon
@@ -209,6 +212,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// to `modelContainer`; both are reached on the same executor, so the speculative path can co-drive them.
     private var draftContainer: ModelContainer?
 
+    /// Why the AUTO draft load (greedy default-on, `loadModel`'s best-effort step) failed — `nil` when it
+    /// succeeded or was never attempted. The auto-load is deliberately fail-closed (a draft failure must never
+    /// break the target; the adapter just stays single-model, byte-identical) — but a SILENT fail-closed would
+    /// leave a host believing speculation is active when it isn't. This property + the os.Logger fault line make
+    /// the downgrade observable: hosts check `isSpeculationActive` / this reason after `loadModel()`.
+    public private(set) var draftLoadFailureReason: String?
+
+    /// True when the speculative path is LIVE right now (draft container loaded + mode on) — i.e. eligible
+    /// requests can actually speculate. The honest post-`loadModel()` signal for hosts/dashboards
+    /// (`willEngageSpeculation` is the pre-load PLAN; this is the post-load REALITY).
+    public var isSpeculationActive: Bool {
+        speculativeDecoding != .off && draftContainer != nil
+    }
+
     /// Read accessor for the speculative streaming extension (different file, same module).
     func _loadedDraftContainerForStreaming() -> ModelContainer? {
         draftContainer
@@ -331,12 +348,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// Whether the speculative path should run for `request`. True only when a draft container is LOADED AND the
     /// request is eligible under the configured mode. `.greedy` (the default) is token-identical to greedy
     /// target-only decoding AND runs only for greedy requests (byte-safe). `.sampling` is on-device-certified
-    /// `doNotEnable` (slower) → kept OFF by default (a host elects it explicitly). Role admission is the caller's.
+    /// `doNotEnable` for the default n=2 lane, so it is never the default; an explicit host/test probe can elect
+    /// `.sampling` to measure the rejection-sampling lane. Role admission is the caller's.
     func shouldSpeculate(for request: BASOrganRequest) -> Bool {
         guard draftContainer != nil else { return false }
-        // The sampling lane is wired (rejection sampling) but on-device-certified doNotEnable (latency loss) —
-        // never auto-engage it; only the greedy lane runs without an explicit per-call opt-in.
-        guard speculativeDecoding == .greedy else { return false }
+        guard speculativeDecoding != .off else { return false }
         return Self.requestEligibleForSpeculation(mode: speculativeDecoding, request: request)
     }
     #endif
@@ -453,12 +469,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         if let cache = budget.cacheLimitBytes {
             MLXRuntimeConfig.shared.applyCacheLimit(bytes: cache, precedence: precedence)
         }
-        // GREEDY SPECULATION DEFAULT-ON: auto-load the draft when speculation will engage (mode on + draft
-        // resolved + fits the budget). Best-effort — a draft-load failure must NOT break the target; on any
+        // SPECULATION AUTO-LOAD: auto-load the draft when speculation will engage (mode on + draft resolved +
+        // fits the budget). Greedy is the default-on lane; sampling only happens when explicitly configured.
+        // Best-effort — a draft-load failure must NOT break the target; on any
         // throw the adapter stays single-model (byte-identical), `shouldSpeculate` returns false (no draft
-        // container). A host can still call `loadDraftModel()` explicitly.
+        // container). But NEVER silently: the downgrade is recorded in `draftLoadFailureReason` + logged, so a
+        // host can tell "speculating" from "quietly fell back". A host can still call `loadDraftModel()` itself.
         if willSpeculate {
-            try? await loadDraftModel()
+            do {
+                try await loadDraftModel()
+                draftLoadFailureReason = nil
+            } catch {
+                draftLoadFailureReason = String(describing: error)
+                #if canImport(os)
+                Logger(subsystem: "com.bas.mlx", category: "speculative").fault(
+                    "auto draft load FAILED — staying single-model (byte-identical): \(String(describing: error), privacy: .public)")
+                #endif
+            }
         }
         #else
         throw BASOrganError.providerUnavailable(
@@ -647,6 +674,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
 
         #if canImport(MLXLLM)
+        // Route to the speculative decoder under the same fail-closed gates as `streamDraft`: loaded draft,
+        // live mode, and request eligibility for that mode. Default off path / ineligible requests run the exact
+        // single-model code below, byte-identical. (`draftMultiTurn` is deliberately NOT routed — its ChatSession
+        // KV-cache reuse beats speculation, which would re-prefill the whole conversation per turn.)
+        if shouldSpeculate(for: request) {
+            return try await _draftSpeculative(request)
+        }
         guard let container = modelContainer else {
             throw BASOrganError.providerUnavailable(
                 reason: Self.notLoadedReason(
@@ -798,7 +832,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
 
     /// Map MLX's `GenerateCompletionInfo` (seconds-based) into the substrate's `BASOrganCompletionMetrics`
     /// (ms-based, real prefill/decode split + real tokens/s). `nil` info → `nil` metrics.
-    private static func completionMetrics(
+    static func completionMetrics(
         from info: GenerateCompletionInfo?
     ) -> BASOrganCompletionMetrics? {
         guard let info else { return nil }

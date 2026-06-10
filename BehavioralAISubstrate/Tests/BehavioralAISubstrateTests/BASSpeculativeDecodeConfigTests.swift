@@ -157,6 +157,30 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
         XCTAssertFalse(MLXOrganAdapter.requestEligibleForSpeculation(mode: .off, request: req(.greedyDeterministic)))
     }
 
+    // MARK: - 2e. Satisfaction pass: optimal-target pointer + post-load reality signals
+
+    func testSpeculativeOptimalTargetIsTheCertifiedLlamaPair() {
+        XCTAssertEqual(MLXModelCatalog.speculativeOptimalTarget, MLXModelCatalog.llama3_2_3B_4bit,
+            "the speculation-optimal pointer names the on-device-certified enable pair's target")
+        // And it actually engages under the default fit budget (the whole point of the pointer).
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.speculativeOptimalTarget)
+        XCTAssertTrue(adapter.willEngageSpeculation)
+        // The DEFAULT target stays Gemma (quality default unchanged — the honest trade is documented).
+        XCTAssertEqual(MLXOrganAdapter().model, MLXModelCatalog.gemma4_E4B_4bit)
+    }
+
+    #if canImport(MLXLLM)
+    func testSpeculationRealitySignalsBeforeLoad() async {
+        // Pre-load: the PLAN says engage, the REALITY says not yet (no container), and no failure is recorded.
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.speculativeOptimalTarget)
+        XCTAssertTrue(adapter.willEngageSpeculation, "plan: the pair fits ⇒ will engage")
+        let active = await adapter.isSpeculationActive
+        let reason = await adapter.draftLoadFailureReason
+        XCTAssertFalse(active, "reality: nothing loaded yet ⇒ not active (plan ≠ reality)")
+        XCTAssertNil(reason, "no auto-load attempted ⇒ no failure reason")
+    }
+    #endif
+
     func testMemoryBudgetFitDiscriminatesPairs() {
         let budget = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes
         XCTAssertTrue(BASMLXMemoryBudget.dualResidencyFits(
@@ -195,10 +219,10 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
         XCTAssertFalse(speculate, "no loaded draft container ⇒ shouldSpeculate false (fail-honest fallback)")
     }
 
-    func testShouldSpeculateNeverAutoEngagesSampling() async {
+    func testSamplingModeStillRequiresLoadedDraft() async {
         // .sampling is wired (Leviathan rejection sampling) but on-device-certified doNotEnable (latency loss),
-        // so it is NEVER auto-engaged — only the greedy lane runs without an explicit per-call opt-in. (A loaded
-        // draft container can't be created on host anyway; the point is that even with one, sampling stays off.)
+        // so it is never the default. If a host explicitly elects it, it still cannot engage until the draft
+        // container is actually loaded.
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E4B_4bit,
             draftModel: MLXModelCatalog.gemma4_E2B_4bit,
@@ -206,7 +230,7 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
         let request = BASOrganRequest(
             requestID: "r", role: .core, preset: .core, instruction: "hi", context: [])
         let speculate = await adapter.shouldSpeculate(for: request)
-        XCTAssertFalse(speculate, ".sampling never auto-engages (certified doNotEnable — slower)")
+        XCTAssertFalse(speculate, "no loaded draft container ⇒ sampling stays single-model")
     }
 
     // MARK: - 4. Greedy-lane precondition: temp 0 → ArgMaxSampler (the token-identity guarantee)

@@ -107,6 +107,48 @@ other turn is unchanged. ADR-014 spirit preserved (turn outputs do not change). 
 (`speculativeDecoding: .off`) or raise the fit budget on an entitled / higher-memory device
 (`speculativeFitBudgetBytes:`).
 
+## Satisfaction pass — closing the residual gaps (hardware-verified)
+
+### The shipping default-on AUTO path is hardware-verified (both devices, `verified=true`)
+
+The n=50 cert drove explicitly-constructed adapters; the actual default path had only host tests. The
+`BAS_SPEC_DEFAULTON` probe ran THAT path — bare `MLXOrganAdapter(model: .speculativeOptimalTarget)`, everything
+auto — on both iPhone Airs:
+
+```
+gemma-default will_engage=false            (the shipping Gemma default correctly DORMANT — no load attempted)
+auto-plan     will_engage=true draft=mlx.llama3_2.1b.it.4bit
+auto-loaded   speculation_active=true draft_load_failure=none
+RESULT        stream_byte_identical=10/10  draft_byte_identical=10/10
+FINAL         verified=true                (identical on device 2)
+```
+
+This also hardware-verifies the NON-STREAMING `draft(_:)` speculative route (10/10 bytewise) and the new
+observability surface (`isSpeculationActive` / `draftLoadFailureReason`). Note: on this short-answer 10-prompt
+set spec ≈ base (~879 vs ~891 ms) — the latency CLAIM remains the n=50 cert's ~31 %; this probe certifies the
+PATH and BYTES, not throughput.
+
+### Coverage note — which entry points speculate
+
+`streamDraft(_:)` AND `draft(_:)` both route through the gates. `draftMultiTurn` is DELIBERATELY excluded: its
+value is ChatSession KV-cache reuse (only the new turn prefills); the speculative path builds fresh caches per
+call, so routing multi-turn through it would re-prefill the whole conversation every turn — a net loss (亏的不要).
+
+### numDraftTokens sweep (sampling lane) — DIRECTIONAL, not a cert
+
+`BAS_SPEC_SWEEP` measured the sampling lane at numDraftTokens ∈ {1,2,3} (10 short prompts/config, Llama pair):
+
+| | n=1 | n=2 | n=3 | baseline |
+|---|---|---|---|---|
+| device 1 | **855 ms** | 1013 | 1029 | 1479 |
+| device 2 | **821 ms** | 1031 | 1244 | 1413 |
+
+Cross-device-consistent direction: **n=1 is markedly better than the default n=2**, and on THIS prompt set every
+n beat the baseline. TWO honest confounds: (a) fixed run order (n=1 coolest → baseline hottest; thermal drift
+inflates later configs), (b) prompt-set sensitivity — the n=50 cert (50 varied prompts) measured sampling n=2 as
+~30 % SLOWER, so the cert's `doNotEnable` REMAINS the authoritative sampling verdict. What the sweep adds: a
+properly randomized n=1 / 50-prompt re-cert is the right next experiment if the sampling lane is ever wanted.
+
 ## What the campaign proved
 
 1. The full pipeline runs end-to-end on hardware, never auto-enabling.

@@ -18,9 +18,9 @@ import Foundation
 ///   stream is **token-identical to greedy target-only decoding**: provable byte-identity plus a latency win.
 /// - `.sampling` — temperature>0. Exact-equality acceptance is NOT distribution-preserving for stochastic
 ///   sampling; the honest lane needs Leviathan rejection sampling (accept with prob `min(1, p/q)`, else resample
-///   the normalized residual `(p−q)₊`) — **distribution-equivalent, not bytewise**. Wired in Phase 2; until
-///   then `MLXOrganAdapter.shouldSpeculate` keeps `.sampling` OFF (falls back to single-model rather than
-///   silently running the distribution-altering argmax path).
+///   the normalized residual `(p−q)₊`) — **distribution-equivalent, not bytewise**. This lane is never the
+///   default because the current device cert says `doNotEnable` at the default draft length; a host/probe must
+///   explicitly construct the adapter with `.sampling`.
 public enum BASSpeculativeMode: String, Sendable, Equatable, Codable, CaseIterable {
     /// Single-model decoding — byte-identical to the pre-speculative path (the ADR-014 default).
     case off

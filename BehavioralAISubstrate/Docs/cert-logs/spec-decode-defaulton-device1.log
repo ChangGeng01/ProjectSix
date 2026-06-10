@@ -1,0 +1,6 @@
+📊 spec-defaulton START decode_cap=48
+📊 spec-defaulton gemma-default will_engage=false (expected false — pair exceeds the fit budget; stays single-model)
+📊 spec-defaulton auto-plan will_engage=true draft=mlx.llama3_2.1b.it.4bit
+📊 spec-defaulton auto-loaded speculation_active=true draft_load_failure=none
+📊 spec-defaulton RESULT stream_byte_identical=10/10 draft_byte_identical=10/10 spec_stream_ms=879 spec_draft_ms=883 base_ms=891
+📊 spec-defaulton FINAL verified=true (default auto path: plan→load→engage→byte-identical, Gemma dormant; n=1 device per run)
