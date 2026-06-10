@@ -52,10 +52,31 @@ surface + golden-vector & randomized parity tests vs `basSovereignAuditCanonical
 XCFramework rebuild together with the `bas-tokenizer` FFI exposure (T2.2), so the SHA-pin/byte-equality
 rebuild discipline is paid once.
 
+## T2.2 pre-adjudication — tokenizer FFI: ALREADY WIRED; the "replace heuristic" idea DECLINES on value ✅
+
+A further scan-correction (the third): `bas-tokenizer` already has a FULL extern-C surface (6 symbols in the
+built XCFramework: new/free/encode/decode/vocab_size/abi_version) AND Swift consumers (`BASBpeTokenizer`
+bridge actor, `BASAutoRouteRanker+Tokenizer`). The remaining plan idea — replace the heuristic
+`estimateTokens` with "exact" counts — fails the value test: the estimates feed `BASProcessTrace` (audit
+METADATA, not decisions; the only `inputTooLong` decision lives in the deterministic test adapter), exactness
+is model-specific (each MLX/FM model has its own tokenizer — a generic BPE count is no more "exact" for
+Gemma/Llama than the heuristic), and changing the values would alter audit metadata bytes for zero decision
+gain (ADR-014 hazard). DECLINED. Re-open trigger: a consumer that makes real budget decisions on these
+estimates for a model whose tokenizer the crate actually matches.
+
 ## Tranche-2 queue (re-specified by these findings)
 
-1. **One batched XCFramework rebuild**: canonical-bytes 1.2.0 assembler + extern-C, tokenizer extern-C —
-   then Swift bridges + parity/accuracy gates for both.
+1. **canonical-bytes 1.2.0 rewrite** (the one concrete native-dev item left from this batch): Rust assembler
+   to the injective length-prefixed form + extern-C + golden-vector & randomized parity gates vs
+   `basSovereignAuditCanonicalBytes` — one XCFramework rebuild (SHA-pin discipline), banking flip evidence
+   for a future Rust audit-ledger lane.
 2. retrieval-ranker decay/fuser into the ADR-036 opt-in ranking seam (dual-mode A/B + recall@K gate).
 3. 低熵 additions (typed observedEffects parallel field; C probes into the observation surface; C++ MPS cache
    first caller).
+
+## The meta-lesson of this tranche (recorded deliberately)
+
+Four of six investigated items resolved to "the repo already did it / the premise was stale" — found ONLY by
+reading the actual code against the plan. That is the measurement-first doctrine working on the PLAN itself:
+the strictest scan is of one's own assumptions. The two device campaigns that survived scrutiny produced the
+tranche's two decisive, novel results (CoreAI doNotMigrate; ANE zero-placement).
