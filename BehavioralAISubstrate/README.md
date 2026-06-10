@@ -148,7 +148,7 @@ through `BASHostConfiguration.presentation`, `BASHostConfiguration.workflowBehav
 
 ## Reference Hosts
 
-- [`SampleHost`](/Users/changgeng/Project/Project06/Project06/SampleHost): minimal façade-only iOS host (the substrate's only living reference)
+- [`SampleHost`](../SampleHost): minimal façade-only iOS host (the substrate's only living reference)
 - Legacy `Before` host preserved at `/Archive/Legacy/Before/` for historical reference; not built, not tested, not on the substrate's dependency graph.
 
 ## Current Delivery Model

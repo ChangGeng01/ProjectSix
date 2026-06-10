@@ -491,6 +491,13 @@ public struct BASHostRuntime: Sendable {
         try startSession(request, now: now)
     }
 
+    /// STACK REQUIREMENT (M399 SIGBUS root-cause, 2026-06-11): the synchronous turn pipeline beneath this
+    /// call needs ~550 KB of stack in DEBUG builds (runTurn ≈ 127 KB single frame + makeEBrainTurn ≈ 68 KB +
+    /// the 6-deep BASEBrainTurnResult.init delegation chain's large value-type temporaries). Swift Concurrency
+    /// cooperative-pool threads get only ~512 KB — calling this from a `Task {}` / async context in a debug
+    /// build overflows the guard page (SIGBUS "Thread stack size exceeded"). Call it from the main thread
+    /// (8 MB), a dedicated `Thread` with adequate `stackSize`, or hop via `MainActor.run`. Release builds
+    /// fit comfortably; the constraint is debug-only but binding for tests.
     public func startSession(
         _ request: BASHostSessionRequest,
         now: Date = .now

@@ -29,7 +29,7 @@ import BASRuntimeCore
 ///      ticket.
 final class QinaoSampleHostCthulhuEndToEndDemoTests: XCTestCase {
 
-    private func makeRuntime() -> BASHostRuntime {
+    private static func makeRuntime() -> BASHostRuntime {
         BASHostRuntime(
             configuration: BASHostConfiguration(
                 runtimeProfileID: "host.m399.tests",
@@ -62,7 +62,7 @@ final class QinaoSampleHostCthulhuEndToEndDemoTests: XCTestCase {
                 hostRhythmProfile: .generic))
     }
 
-    private func driveOneTurn() throws -> BASEBrainTurnResult {
+    private static func driveOneTurn() throws -> BASEBrainTurnResult {
         let runtime = makeRuntime()
         let result = try runtime.startSession(
             BASHostSessionRequest(
@@ -80,7 +80,7 @@ final class QinaoSampleHostCthulhuEndToEndDemoTests: XCTestCase {
     // MARK: - 1. Runtime turn shape — actionPermit + auditEntry
 
     func testRuntimeTurnHasPermitAndAuditEntry() throws {
-        let turn = try driveOneTurn()
+        let turn = try Self.driveOneTurn()
         XCTAssertNotNil(turn.sovereignAuditEntry)
         // permit.mode is one of the canonical BASActionPermitMode
         // raw values regardless of escalation outcome.
@@ -96,7 +96,7 @@ final class QinaoSampleHostCthulhuEndToEndDemoTests: XCTestCase {
     // MARK: - 2. Always-on Cthulhu wires emit codes
 
     func testAlwaysOnWiresEmitAuditCodes() throws {
-        let turn = try driveOneTurn()
+        let turn = try Self.driveOneTurn()
         let auditEntry = try XCTUnwrap(turn.sovereignAuditEntry)
         let signalRefs = auditEntry.signalRefs
         // M303 abyssal magnitude — always emits.
@@ -118,7 +118,7 @@ final class QinaoSampleHostCthulhuEndToEndDemoTests: XCTestCase {
     // MARK: - 3. Permit assertionCeiling is canonical
 
     func testPermitAssertionCeilingIsCanonical() throws {
-        let turn = try driveOneTurn()
+        let turn = try Self.driveOneTurn()
         // Post-M392 the M385 cap fires before render; the
         // resulting permit's assertionCeiling must be one of
         // the canonical strictness vocab values (substrate
@@ -137,7 +137,16 @@ final class QinaoSampleHostCthulhuEndToEndDemoTests: XCTestCase {
     // MARK: - 4. M391 production caller refuses paired ticket
 
     func testM391ProductionCallerRefusesRejectedTicket() async throws {
-        let turn = try driveOneTurn()
+        // The synchronous turn pipeline needs ~550 KB of stack in
+        // debug builds (startSession ≈ 15 KB, makeEBrainTurn ≈ 67 KB,
+        // runTurn ≈ 124 KB + large dynamic temporaries for the
+        // BASEBrainTurnResult init chain). Swift Concurrency
+        // cooperative-pool threads only get 512 KB, so driving the
+        // turn directly from this async test overflows the stack
+        // guard page (SIGBUS, "Thread stack size exceeded"). Hop to
+        // the main actor — the main thread has an 8 MB stack, the
+        // same environment every synchronous turn-driving test uses.
+        let turn = try await MainActor.run { try Self.driveOneTurn() }
         let firstTicket = try XCTUnwrap(turn.updateTickets.first)
 
         let coordinator = BASUpdateTicketLifecycleCoordinator(

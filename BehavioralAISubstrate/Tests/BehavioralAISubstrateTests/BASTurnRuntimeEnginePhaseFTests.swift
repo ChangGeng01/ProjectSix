@@ -58,7 +58,7 @@ final class BASTurnRuntimeEnginePhaseFTests: XCTestCase {
         ) -> Void = { _, _ in
             // signature compile-check
         }
-        XCTAssertTrue(true)
+        // Compile-time proof only — the typed binding above IS the contract (a conformance/type change fails compilation, not a runtime assertion). M824 doctrine: no XCTAssertTrue(true) tautology.
     }
 
     // MARK: - Probe accessor signature pin
@@ -70,7 +70,7 @@ final class BASTurnRuntimeEnginePhaseFTests: XCTestCase {
         // full coordinator stub harness) — type pin only。
         let _: BASTurnRuntimePlanDispatchProbe.Type =
             BASTurnRuntimePlanDispatchProbe.self
-        XCTAssertTrue(true)
+        // Compile-time proof only — the typed binding above IS the contract (a conformance/type change fails compilation, not a runtime assertion). M824 doctrine: no XCTAssertTrue(true) tautology.
     }
 
     // MARK: - Probe is the .unwired() default

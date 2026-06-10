@@ -274,7 +274,7 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
         let _: any Sendable =
             BASLanguageAugmentationFeatureFlags.Flag
                 .sqlMigratorEnabled
-        XCTAssertTrue(true)
+        // Compile-time proof only — the typed binding above IS the contract (a conformance/type change fails compilation, not a runtime assertion). M824 doctrine: no XCTAssertTrue(true) tautology.
     }
 
     // MARK: - Cross-doctrine invariant

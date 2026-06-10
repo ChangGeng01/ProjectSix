@@ -47,7 +47,7 @@ final class BASEventReducerTests: XCTestCase {
         // typealias State = [String: BASGovernedMemory]
         let _: BASMemoryAtomReducer.State =
             [String: BASGovernedMemory]()
-        XCTAssertTrue(true)
+        // Compile-time proof only — the typed binding above IS the contract (a conformance/type change fails compilation, not a runtime assertion). M824 doctrine: no XCTAssertTrue(true) tautology.
     }
 
     func testReduceStepWrapsExistingReducerStep() {

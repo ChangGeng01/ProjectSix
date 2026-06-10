@@ -74,8 +74,7 @@ final class BASEBrainRuntimeCoordinatorMemoryEventTests:
                     BASMemoryMutationEventEmitter?
             ) -> Void in
         })
-        // No assertion needed — compile passes is the test
-        XCTAssertTrue(true)
+        // No assertion needed — compile passes IS the test (M824: no XCTAssertTrue(true) tautology).
     }
 
     // MARK: - Default nil preserves legacy (4)

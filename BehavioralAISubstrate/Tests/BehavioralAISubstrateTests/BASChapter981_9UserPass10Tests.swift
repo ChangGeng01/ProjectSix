@@ -255,10 +255,18 @@ final class BASChapter981_9UserPass10Tests: XCTestCase {
         // accidentally REMOVES tests,the cumulative count
         // drops below 700 and this fails — defense against
         // silent test deletion。
-        XCTAssertTrue(true,
-            "ch 981.9 arc-test-count: this is a meta-test " +
-            "marker。 Run `swift test --filter \"BASChapter9[5-8]\" " +
-            "2>&1 | grep \"Executed [0-9]+ tests\"` and verify " +
-            "the count is ≥ 700 (monotonic growth invariant)。")
+        // REAL assertion (was a tautology telling the reader to run a command): count `func test`
+        // declarations across the ch 953–981.9 arc files via #filePath (the live-state pattern the Rust
+        // SHA pins use) and enforce the monotonic-growth floor in code. 764 at pin time.
+        let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let arcFiles = (try? FileManager.default.contentsOfDirectory(atPath: testsDir.path))?
+            .filter { $0.hasPrefix("BASChapter9") && $0 >= "BASChapter95" && $0 < "BASChapter99" } ?? []
+        let cumulative = arcFiles.reduce(0) { sum, name in
+            let content = (try? String(contentsOf: testsDir.appendingPathComponent(name), encoding: .utf8)) ?? ""
+            return sum + content.components(separatedBy: "func test").count - 1
+        }
+        XCTAssertGreaterThanOrEqual(cumulative, 700,
+            "ch 953–981.9 cumulative test count dropped below the monotonic-growth floor " +
+            "(\(cumulative) < 700) — tests were silently deleted")
     }
 }

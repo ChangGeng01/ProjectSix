@@ -28,7 +28,7 @@ final class BAS211MemoryAtomSingleSourceOfTruthPinTests:
         // Compile-time:both conform to BASMemoryAtomStore
         let _: any BASMemoryAtomStore = inMem
         let _: any BASMemoryAtomStore = evStore
-        XCTAssertTrue(true)
+        // Compile-time proof only — the typed binding above IS the contract (a conformance/type change fails compilation, not a runtime assertion). M824 doctrine: no XCTAssertTrue(true) tautology.
     }
 
     func testEventSourcedStoreIsTheUnifyingConformer() {

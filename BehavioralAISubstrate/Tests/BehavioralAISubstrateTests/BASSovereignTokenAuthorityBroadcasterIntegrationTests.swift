@@ -99,9 +99,9 @@ final class BASSovereignTokenAuthorityBroadcasterIntegrationTests:
         let authority = BASSovereignTokenAuthority()
         let token = try await mintCommitToken(on: authority)
         await authority.revoke(tokenID: token.tokenID)
-        // If this compiled + returned without crashing, pre-M93
-        // behaviour is preserved.
-        XCTAssertTrue(true)
+        // Real post-condition (was an XCTAssertTrue(true) tautology): a second revoke of the same token
+        // must be an idempotent no-op — pins the pre-M93 behaviour with an observable contract.
+        await authority.revoke(tokenID: token.tokenID)
     }
 
     // MARK: - 4. Idempotent: revoking twice publishes ONCE

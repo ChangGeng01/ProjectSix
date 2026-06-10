@@ -334,8 +334,16 @@ final class BASChapter978Phase7CloseE2ETests: XCTestCase {
         //   ch 977 A2A external:       26 tests
         //   ch 978 Phase 7 close E2E:  10+ tests (this suite)
         //
-        // No assertion — meta-comment for the audit trail。
-        // Actual counts checked by ch 974 SDK stability tests。
-        XCTAssertTrue(true)
+        // REAL assertions (was an XCTAssertTrue(true) tautology whose 'checked by ch 974' claim was
+        // false): pin the runtime-discovered test counts so silent test deletion FAILS here.
+        XCTAssertEqual(
+            BASChapter976MCPCapabilityGatewayTests.defaultTestSuite.testCaseCount, 20,
+            "ch 976 MCP gateway suite lost/gained tests — update the Phase 7 pin deliberately")
+        XCTAssertEqual(
+            BASChapter977ExternalAgentA2ATests.defaultTestSuite.testCaseCount, 26,
+            "ch 977 A2A external suite lost/gained tests — update the Phase 7 pin deliberately")
+        XCTAssertGreaterThanOrEqual(
+            Self.defaultTestSuite.testCaseCount, 10,
+            "ch 978 Phase 7 close suite shrank below its pinned floor")
     }
 }
