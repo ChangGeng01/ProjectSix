@@ -117,18 +117,22 @@ public enum BASRustCoreBridge {
     ///   - chapter 七百七十三 第二刀: 12 → 20 crate bundle
     ///   - chapter 七百七十四 第一刀: 20 → 21 crate bundle
     ///     (+ bas-shadow-trial L13 Phase 2 first cut)
+    ///   - "latest-languages" cut: Rust 1.95→1.96 + IPHONEOS=18.0/MACOSX=14.0
+    ///     deployment-target pin (fixes the iOS sqlite3.o 26.5-vs-18.0 link
+    ///     warning). Byte-equality re-verified across two clean rebuilds.
     public static let macosArm64SliceSHA256: String =
-        "5e5bb95fa794acb8529c41903d1174f44e666c7ec17fede2564896c28811c281"
+        "38074aac19dea3714c3d772e75fff564077c10f57bf81b7c0255778350519244"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
-    /// Bumped at chapter 七百八十三 / M2566 (+atom-lifecycle)。
+    /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
+    /// cut (Rust 1.96 + iOS-18 deployment-target pin)。
     public static let iosArm64SliceSHA256: String =
-        "e7f22d412c0ffabd0f17c408fb218b537106ae72b802c03fb1f6c5a89067cf7d"
+        "d0a0940c915f701cffc9a3813a5ba6fc2c2445bebd05bc0d8d8d9e9feaad1c42"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
-    /// SHA256。 Bumped at chapter 七百八十三 / M2566。
+    /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "c0d0f70538353f9a28f96d7188af6d388da3c2a62006c6f757c8f6ea13eafec5"
+        "49d7d7bac4bbec838b0eeddd80205af3bac0f54184b375fa2ca868214fb15904"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

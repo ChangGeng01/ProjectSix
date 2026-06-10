@@ -64,6 +64,8 @@
 //  28. make(flags:) honors default-off (V1) + explicit-on (V2)
 
 import XCTest
+import Foundation
+import CryptoKit   // SHA256 for the live-slice reproducibility check (liveSliceSHA256)
 @testable import BASRustCoreBridge
 @testable import BASRuntimeCore
 @testable import BASMemory
@@ -118,14 +120,39 @@ final class BASRustMemoryUsageTrackerActorTests:
         //   - M2191 chapter 七百七 第一刀: rustup toolchain switch
         //   - chapter 七百七十三 第二刀: 12 → 20 crate bundle
         //     (DEEPER LAYER-MIGRATION ARC XCFramework rebuild)
+        //   - "latest-languages" cut: Rust 1.96 + iOS-18/macOS-14 pin
         XCTAssertEqual(
             BASRustCoreBridge.macosArm64SliceSHA256,
-            "5e5bb95fa794acb8529c41903d1174f44e666c7ec17fede2564896c28811c281",
+            "38074aac19dea3714c3d772e75fff564077c10f57bf81b7c0255778350519244",
             "Chapter 七百一 RED FLAG #1 reproducibility-" +
             "verification pin。 If this hash changes," +
             "a future commit rebuilt the XCFramework " +
             "with different toolchain / flags — that's " +
             "a doctrine review trigger。")
+        // NON-VACUOUS check: hash the LIVE committed slice + assert it matches the pin. The literal-only
+        // assertion above guards against an accidental constant edit, but it CANNOT detect a binary rebuild
+        // that changed the slice without updating the pin (exactly the drift that slipped through the
+        // latest-languages cut). This catches that. Located via this test file's path → repo Vendor dir.
+        if let liveHash = Self.liveSliceSHA256("macos-arm64") {
+            XCTAssertEqual(
+                liveHash, BASRustCoreBridge.macosArm64SliceSHA256,
+                "the COMMITTED macos-arm64 slice hash must match the pin — a mismatch means the XCFramework " +
+                "was rebuilt without updating BASRustCoreBridge.macosArm64SliceSHA256 (reproducibility drift)")
+        }
+    }
+
+    /// SHA256 of the committed XCFramework slice, located relative to THIS test file's source path
+    /// (`#filePath`), or nil if the Vendor tree isn't reachable (e.g. a source-stripped CI). Pure read.
+    private static func liveSliceSHA256(_ slice: String) -> String? {
+        // …/BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/<thisFile> → up 2 → BehavioralAISubstrate/
+        let pkgRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let lib = pkgRoot
+            .appendingPathComponent("Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework")
+            .appendingPathComponent(slice)
+            .appendingPathComponent("libbas_memory_usage_tracker.a")
+        guard let data = try? Data(contentsOf: lib) else { return nil }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - M2191 NEW iOS-slice pins (chapter 七百七);
@@ -134,15 +161,23 @@ final class BASRustMemoryUsageTrackerActorTests:
     func testIosArm64SliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SliceSHA256,
-            "e7f22d412c0ffabd0f17c408fb218b537106ae72b802c03fb1f6c5a89067cf7d",
+            "d0a0940c915f701cffc9a3813a5ba6fc2c2445bebd05bc0d8d8d9e9feaad1c42",
             "iOS device slice byte-equality pin。")
+        if let liveHash = Self.liveSliceSHA256("ios-arm64") {
+            XCTAssertEqual(liveHash, BASRustCoreBridge.iosArm64SliceSHA256,
+                "committed ios-arm64 slice must match the pin (reproducibility drift guard)")
+        }
     }
 
     func testIosArm64SimulatorSliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
-            "c0d0f70538353f9a28f96d7188af6d388da3c2a62006c6f757c8f6ea13eafec5",
+            "49d7d7bac4bbec838b0eeddd80205af3bac0f54184b375fa2ca868214fb15904",
             "iOS simulator slice byte-equality pin。")
+        if let liveHash = Self.liveSliceSHA256("ios-arm64-simulator") {
+            XCTAssertEqual(liveHash, BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
+                "committed ios-arm64-simulator slice must match the pin (reproducibility drift guard)")
+        }
     }
 
     func testSliceSHA256CountIsThree() {
