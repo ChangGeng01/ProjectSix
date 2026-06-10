@@ -1,4 +1,12 @@
-# Core AI run-cert — asset DONE + parity-validated; only the Swift-on-iOS-27 app run remains
+# Core AI run-cert — ✅ DONE (on-device certified on iPhone Air iOS 27, 4/4 parity vs CoreML)
+
+> **RESOLVED 2026-06-10.** Full chain certified: real `.aimodel` (coreai_torch, bypassing aimodelc) →
+> Python-runtime parity (5/5, MAE ~1e-6) → Swift adapter ON-DEVICE run on the iPhone Air (iOS 27): 4/4 argmax
+> agree vs CoreML, logits-MAE ~1e-6, warm latency ~0.7 ms, tier=experimental. See ADR-041 §4.4 + §6.1.
+> The notes below are the historical journey (kept for the record).
+
+---
+
 
 **Status (UPDATED 2026-06-10):** the Apple `aimodelc`-CLI block was **BYPASSED** via the Python `coreai_torch`
 converter. `BASContextClassifier.aimodel` is built + bundled + **run-validated in the coreai Python runtime

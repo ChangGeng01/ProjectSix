@@ -1,6 +1,8 @@
 # ADR-041 — Apple Core AI as a first-class on-device neural adapter (CoreML small-head shadow)
 
-**Status:** Accepted — code shipped + compile-certified; live-inference run-cert DEFERRED (external Apple-beta blocker, see §6).
+**Status:** Accepted — code shipped, compile-certified, AND **on-device run-certified** (iPhone Air iOS 27,
+4/4 parity vs CoreML, logits-MAE ~1e-6 — §4.4). The Apple `aimodelc`-CLI block (§6) was bypassed via the Python
+`coreai_torch` converter (§6.1).
 **Date:** 2026-06-10
 **Relates to:** ADR-039 (determinism boundary — Core AI is reasoning-side, banned from the spine), the CoreML
 incumbent `BASContextClassifierMLAdapter` (BASRuntimeCore), FoundationModels (#1, the LLM-draft lane Core AI does NOT occupy).
@@ -58,7 +60,38 @@ Hardened against a 17-agent adversarial review (11 confirmed findings fixed befo
    branch binds the genuine SDK API. **Proven NON-VACUOUS** by a negative control: a deliberate type error injected
    inside the `#if canImport(CoreAI)` block fails the compile-cert at that exact line (so a green build genuinely
    exercises the gated branch). `canImport(CoreAI)` confirmed YES under the beta toolchain.
-3. **Run-cert (live `.aimodel` inference on iOS 27):** **DEFERRED — blocked externally.** See §6.
+3. **Asset produced + RUN-VALIDATED in the Core AI runtime (2026-06-10 — UPDATE, see §6.1):** the `aimodelc`
+   CLI block was BYPASSED via the Python `coreai_torch` converter. `BASContextClassifier.aimodel` is built
+   (`scripts/PhaseB_ContextClassifier/convert_coreai.py`) + bundled, and **validated against the PyTorch
+   reference through the coreai Python runtime: 5/5 argmax agree, logits-MAE ~1e-6** (float-identical). The asset
+   declares input `bag_of_buckets` (1,256) + output `logits` (1,7) — the shared encoder contract.
+4. **Swift on-device run-cert — DEVICE-ONLY, gated on the iPhone Air being available:**
+   - **Simulator is IMPOSSIBLE:** `CoreAI.framework` is NOT in `iPhoneSimulator27.0.sdk` (only `iPhoneOS27.0.sdk`
+     + `MacOSX27.0.sdk` ship it). The DeviceTestApp builds + the probe dispatches on the iOS 27 sim
+     (`📍 coreai-e2e START`), but `canImport(CoreAI)` is false there → `available=false reason=no-CoreAI-build`.
+     Confirmed: `DEVELOPER_DIR=<beta> xcrun --sdk iphonesimulator --show-sdk-path` → no CoreAI.framework.
+   - **Probe dispatch FIXED for run:** `BAS_COREAI_E2E` now dispatches at the MLX-free `autostartIfEnabled` level
+     (`launchCoreAIProbeOnly`), not inside `runEndurance` (which `launch()` refuses on the sim because the
+     endurance loop loads MLX, which SIGABRTs there). So the probe runs on sim AND device.
+   - **Device build works:** `DEVELOPER_DIR=<beta>` resolves Xcode 27 + the iPhoneOS 27 SDK (which HAS CoreAI),
+     so the device build compiles the REAL `#if canImport(CoreAI)` branch.
+   - **✅ ON-DEVICE RUN-CERT PASSED (2026-06-10, iPhone Air iOS 27, n=1):** `MODE=device bash
+     scripts/run-coreai-e2e-cert.sh` built the real branch, installed on the iPhone Air, and the Swift
+     `BASCoreAIContextClassifierAdapter` LOADED `BASContextClassifier.aimodel` (`candidate_load_ms=71.2`) and
+     RAN real Core AI inference on-device. Shadow vs the CoreML incumbent on 4 texts:
+
+     | text | incumbent (CoreML) | candidate (Core AI) | agree | logits-MAE | latency |
+     |---|---|---|---|---|---|
+     | 0 | chat | chat | ✅ | 1e-6 | 355.84 ms (cold) |
+     | 1 | conflict | conflict | ✅ | 0 | 0.83 ms |
+     | 2 | manipulationRisk | manipulationRisk | ✅ | 1e-6 | 0.68 ms |
+     | 3 | choice | choice | ✅ | 0 | 0.99 ms |
+
+     **verdict: 4/4 argmax agree, logits-MAE ~1e-6 (float-identical to CoreML), warm latency sub-millisecond
+     (~0.7 ms), 4 shadow trials recorded (observation-only), tier=experimental.** This closes the
+     compile-cert ≠ run-cert gap: the Swift NDArray bridge + runner + adapter run the genuine Core AI runtime on
+     real iOS 27 hardware. R1 bounds: n=1, single device, beta toolchain, experimental tier — the CoreML
+     incumbent is NOT replaced (Core AI matches it; no win on accuracy yet, and latency parity needs more runs).
 
 ## 5. Guardrails preserved
 
@@ -96,6 +129,28 @@ the **Metal Toolchain** component. Exhaustively diagnosed:
   **.17** Metal Toolchain while Apple has published only **.15/o**. (`metal -c` tolerates `o` and compiles; only
   `aimodelc`'s stricter gate rejects it.) NOTE: restore `xcode-select` to 26.5 after this test
   (`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`) so the default-toolchain build stays 26.5.
+
+## 6.1 RESOLVED — the `aimodelc` CLI gate is BYPASSED via the Python `coreai_torch` converter (2026-06-10)
+
+The §6 block is the `aimodelc` **CLI**. But Core AI's canonical authoring path is the **Python `coreai_torch`**
+converter (`apple/coreai-models`), which goes `torch.export → run_decompositions → TorchConverter.to_coreai() →
+AIProgram.save_asset()`. That path drives the **`metal` compiler directly** (which TOLERATES the `.15/o` toolchain)
+— it has **no `aimodelc` exact-build gate** — so it produces a real `.aimodel` despite the beta seed mismatch.
+
+- **Built it:** `scripts/PhaseB_ContextClassifier/convert_coreai.py` converts the existing `context_classifier.pt`
+  (the same PyTorch source behind the CoreML incumbent) → `BASContextClassifier.aimodel` (80 KB bundle:
+  `main.mlirb` + `metadata.json` + `main.hash`). `coreai-core` has no Python-3.14 wheel → built in a Python-3.12
+  `uv` venv (`uv pip install coreai-torch`).
+- **RUN-VALIDATED (not just produced):** loaded the asset via the **coreai Python runtime** (`AIModel.load` →
+  `load_function("main")` → call with `NDArray` inputs) and compared to the PyTorch reference on 5 texts spanning
+  distinct labels → **5/5 argmax agree, max logits-MAE 1.19e-6** (float-identical). So the asset is faithful.
+- **Bundled + green:** the asset is now a `Package.swift` `.copy` resource on BASAppleAdapters; `swift build`
+  copies it; the full default-toolchain suite stays **15249/0**.
+
+So the run-cert is **NO LONGER externally blocked** — the asset exists + is parity-validated. The only remaining
+step is the SWIFT on-device run (§4.4): `BASCoreAIContextClassifierAdapter` loading + running it on an iOS 27
+runtime, which is gated on the DeviceTestApp building under Xcode 27 (Swift-6.4 Vendor/MLX adaptation, #61),
+not on Core AI. (The `aimodelc`-CLI fix from Apple — §6 — is now moot for our purposes; we don't need it.)
 
 **Unblock paths (any one):** Apple ships a Metal Toolchain matching the Xcode-beta build (or a self-consistent
 seed); OR install the Xcode beta whose build matches the available `27A5194o` toolchain; OR (mechanical-only
