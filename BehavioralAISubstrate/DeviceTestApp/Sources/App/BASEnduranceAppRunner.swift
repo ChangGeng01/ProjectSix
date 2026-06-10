@@ -266,6 +266,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchProbeOnly()
             return
         }
+        // Core AI shadow parity probe (BAS_COREAI_E2E=1). MLX-FREE — loads only the .aimodel + the CoreML
+        // incumbent, NOT MLX — so it runs on the iOS Simulator too (the endurance loop below loads MLX, which
+        // SIGABRTs on the sim, so launch() refuses there). Dispatched HERE, before launch()'s simulator bail.
+        if (env["BAS_COREAI_E2E"] ?? "0") == "1" {
+            launchCoreAIProbeOnly()
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
@@ -322,6 +329,27 @@ final class BASEnduranceAppController: ObservableObject {
         UIApplication.shared.isIdleTimerDisabled = true
         Task.detached(priority: .userInitiated) { [weak self] in
             await self?.runMetalProbeOnly()
+        }
+    }
+
+    /// Sim-safe start path for BAS_COREAI_E2E=1 — runs the MLX-FREE Core AI shadow parity probe and exits.
+    /// It loads only `BASContextClassifier.aimodel` (Core AI) + the CoreML incumbent — no MLX — so it runs on
+    /// the iOS Simulator as well as a physical device. Mirrors `launchProbeOnly` (detached, idle-timer off,
+    /// headless-safe; opens its own log).
+    private func launchCoreAIProbeOnly() {
+        guard !started else { return }
+        started = true
+        status = .starting
+        UIApplication.shared.isIdleTimerDisabled = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await MainActor.run { self?.openLogFile() }
+            await self?.runCoreAIShadowProbe()
+            await MainActor.run {
+                self?.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
+                self?.started = false
+                self?.closeLogFile()
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
         }
     }
 
@@ -726,19 +754,8 @@ final class BASEnduranceAppController: ObservableObject {
             return
         }
 
-        // Core AI run-cert — opt-in shadow parity probe (Core AI candidate vs CoreML incumbent classifier ON
-        // THIS device/sim). Requires an Xcode 27 build (canImport(CoreAI)) + iOS 27 runtime + the bundled
-        // .aimodel; logs honest unavailability otherwise. Default OFF → single-stream path unchanged.
-        if (env["BAS_COREAI_E2E"] ?? "0") == "1" {
-            await runCoreAIShadowProbe()
-            await MainActor.run {
-                self.status = .completed(totalIters: 0, totalTokens: 0, runSec: 0)
-                self.started = false
-                self.closeLogFile()
-                UIApplication.shared.isIdleTimerDisabled = false
-            }
-            return
-        }
+        // (BAS_COREAI_E2E is dispatched earlier in autostartIfEnabled via launchCoreAIProbeOnly — MLX-free +
+        // sim-safe — so it never needs to reach this MLX-loading endurance path.)
 
         // ch 1025.5 — L1-L14 brain cascade (real substrate, not just MLX)
         await emitBoth(
