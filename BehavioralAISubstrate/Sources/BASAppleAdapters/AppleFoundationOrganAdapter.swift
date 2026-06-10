@@ -70,7 +70,10 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
             maxInputTokens: maxInputTokens,
             maxOutputTokens: maxOutputTokens,
             runsOnDevice: true,
-            supportedRoles: supportedRoles)
+            supportedRoles: supportedRoles,
+            // ADR-041 §D — matrix metadata: Apple's built-in on-device LLM, on-device run-certified (#1 cert).
+            providerKind: .appleNative,
+            certificationTier: .certified)
         self.includeRiskCurriculum = includeRiskCurriculum
         self.includePermitCurriculum = includePermitCurriculum
     }

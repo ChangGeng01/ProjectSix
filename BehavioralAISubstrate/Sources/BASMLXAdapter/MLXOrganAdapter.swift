@@ -104,6 +104,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// overrides at runtime (last write wins, also logged).
     public nonisolated let cacheLimitBytes: Int?
 
+    /// ADR-041 §C — OPT-IN cap (bytes) for MLX's **load-time** memory peak, applied via `MLXRuntimeConfig`
+    /// BEFORE the container load. Unlike `cacheLimitBytes` (a post-load recycling ceiling), `MLX.Memory.memoryLimit`
+    /// makes `malloc` WAIT once exceeded — so it bounds the download/materialize SPIKE the cache cap cannot.
+    /// Default `nil` (off → byte-equal, ADR-014 opt-in): a device-aware bound is follow-on work, and a too-low
+    /// value could throttle the load, so this stays opt-in until measured. First-default-wins on the
+    /// process-global, identical policy to `cacheLimitBytes`.
+    public nonisolated let memoryLimitBytes: Int?
+
     // MARK: - Descriptor defaults (ch1040 — named-constant extraction)
 
     /// Default input-token ceiling reported through the descriptor
@@ -226,10 +234,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         maxInputTokens: Int = MLXOrganAdapter.defaultMaxInputTokens,
         maxOutputTokens: Int = MLXOrganAdapter.defaultMaxOutputTokens,
         supportedRoles: Set<BASOrganRole> = [.scout, .core],
-        cacheLimitBytes: Int? = MLXOrganAdapter.defaultCacheLimitBytes
+        cacheLimitBytes: Int? = MLXOrganAdapter.defaultCacheLimitBytes,
+        memoryLimitBytes: Int? = nil
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
+        self.memoryLimitBytes = memoryLimitBytes
         self.descriptor = BASOrganDescriptor(
             providerID: providerID ?? model.providerID,
             providerName: providerName ?? model.providerName,
@@ -237,7 +247,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             maxInputTokens: maxInputTokens,
             maxOutputTokens: maxOutputTokens,
             runsOnDevice: true,
-            supportedRoles: supportedRoles)
+            supportedRoles: supportedRoles,
+            // ADR-041 §D — matrix metadata: MLX is the open-weight on-device lane. The default Gemma entries are
+            // on-device certified; the Llama/Qwen `availableAlternatives` are experimental.
+            providerKind: .mlx,
+            certificationTier: MLXModelCatalog.defaultEntries.contains { $0.providerID == model.providerID }
+                ? .certified : .experimental)
     }
 
     // MARK: - Load
@@ -277,6 +292,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             id: model.id,
             extraEOSTokens: Set(model.extraEOSTokens))
 
+        // ADR-041 §C — bound the LOAD-TIME memory peak (the download/materialize spike) BEFORE the container
+        // load: `MLX.Memory.memoryLimit` makes malloc WAIT once exceeded, so it must be set first (the
+        // post-load `cacheLimit` below cannot bound the load spike). OPT-IN (default nil=off → byte-equal);
+        // first-default-wins on the process-global via MLXRuntimeConfig.
+        if let memoryLimitBytes {
+            MLXRuntimeConfig.shared.applyMemoryLimit(bytes: memoryLimitBytes, precedence: .adapterDefault)
+        }
         let container = try await #huggingFaceLoadModelContainer(
             configuration: configuration,
             progressHandler: progressHandler)

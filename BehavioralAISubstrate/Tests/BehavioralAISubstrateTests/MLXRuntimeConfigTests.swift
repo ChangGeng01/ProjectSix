@@ -22,6 +22,14 @@ final class MLXRuntimeConfigTests: XCTestCase {
         return (cfg, rec)
     }
 
+    /// Like `makeConfig` but records the MEMORY sink + the logger (the cache sink is a no-op here).
+    private func makeMemConfig() -> (MLXRuntimeConfig, Recorder) {
+        let rec = Recorder()
+        let cfg = MLXRuntimeConfig(
+            sink: { _ in }, memorySink: { rec.sink($0) }, logger: { rec.log($0) })
+        return (cfg, rec)
+    }
+
     func testFirstApplySetsTheValueAndHitsTheSink() {
         let (cfg, rec) = makeConfig()
         let r = cfg.applyCacheLimit(bytes: 512 * 1024 * 1024, precedence: .adapterDefault)
@@ -70,6 +78,52 @@ final class MLXRuntimeConfigTests: XCTestCase {
         XCTAssertEqual(r, .rejectedConflict(kept: 384, ignored: 512))
         XCTAssertEqual(cfg.currentCacheLimitBytes, 384)
         XCTAssertEqual(rec.sinks, [512, 384], "no further runtime writes after the override")
+    }
+
+    // MARK: - memoryLimit (ADR-041 §C — independent process-global, bounds the LOAD peak)
+
+    func testMemoryFirstApplySetsTheValueAndHitsTheSink() {
+        let (cfg, rec) = makeMemConfig()
+        let r = cfg.applyMemoryLimit(bytes: 2 * 1024 * 1024 * 1024, precedence: .adapterDefault)
+        XCTAssertEqual(r, .applied(bytes: 2 * 1024 * 1024 * 1024))
+        XCTAssertEqual(rec.sinks, [2 * 1024 * 1024 * 1024])
+        XCTAssertEqual(cfg.currentMemoryLimitBytes, 2 * 1024 * 1024 * 1024)
+        XCTAssertNil(cfg.currentCacheLimitBytes, "memory + cache are independent globals")
+    }
+
+    func testMemoryConflictingAdapterDefaultIsRejectedFirstWins() {
+        let (cfg, rec) = makeMemConfig()
+        cfg.applyMemoryLimit(bytes: 2048, precedence: .adapterDefault)
+        let r = cfg.applyMemoryLimit(bytes: 4096, precedence: .adapterDefault)
+        XCTAssertEqual(r, .rejectedConflict(kept: 2048, ignored: 4096))
+        XCTAssertEqual(cfg.currentMemoryLimitBytes, 2048, "first memory default must win")
+        XCTAssertEqual(rec.sinks, [2048])
+        XCTAssertEqual(rec.logs.count, 1)
+        XCTAssertTrue(rec.logs[0].contains("memoryLimit"), "diagnostic must name memoryLimit, not cacheLimit")
+        XCTAssertTrue(rec.logs[0].contains("CONFLICT"))
+    }
+
+    func testMemoryExplicitOverrideWinsAndIsLogged() {
+        let (cfg, rec) = makeMemConfig()
+        cfg.applyMemoryLimit(bytes: 2048, precedence: .adapterDefault)
+        let r = cfg.applyMemoryLimit(bytes: 1024, precedence: .explicitOverride)
+        XCTAssertEqual(r, .overrodeConflict(from: 2048, to: 1024))
+        XCTAssertEqual(cfg.currentMemoryLimitBytes, 1024)
+        XCTAssertEqual(rec.sinks, [2048, 1024])
+        XCTAssertTrue(rec.logs[0].contains("memoryLimit"))
+        XCTAssertTrue(rec.logs[0].contains("OVERRIDE"))
+    }
+
+    func testMemoryAndCacheLimitsAreIndependent() {
+        let cacheRec = Recorder(); let memRec = Recorder()
+        let cfg = MLXRuntimeConfig(
+            sink: { cacheRec.sink($0) }, memorySink: { memRec.sink($0) }, logger: { _ in })
+        cfg.applyCacheLimit(bytes: 512, precedence: .adapterDefault)
+        cfg.applyMemoryLimit(bytes: 2048, precedence: .adapterDefault)
+        XCTAssertEqual(cfg.currentCacheLimitBytes, 512)
+        XCTAssertEqual(cfg.currentMemoryLimitBytes, 2048)
+        XCTAssertEqual(cacheRec.sinks, [512], "cache sink saw only the cache value")
+        XCTAssertEqual(memRec.sinks, [2048], "memory sink saw only the memory value (no cross-talk)")
     }
 
     func testProductionSingletonExists() {

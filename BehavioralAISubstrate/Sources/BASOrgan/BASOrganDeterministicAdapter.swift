@@ -36,7 +36,10 @@ public actor BASOrganDeterministicAdapter: BASOrganAdapter {
             maxInputTokens: maxInputTokens,
             maxOutputTokens: maxOutputTokens,
             runsOnDevice: true,
-            supportedRoles: supportedRoles)
+            supportedRoles: supportedRoles,
+            // ADR-041 §D — matrix metadata: the in-memory deterministic fake (tests / last-resort fallback);
+            // not a real model, so no certification tier.
+            providerKind: .deterministic)
         self.clock = clock
     }
 

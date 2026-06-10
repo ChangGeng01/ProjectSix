@@ -57,6 +57,21 @@ public protocol BASOrganAdapter: Sendable {
 
 /// Describes what an organ provider is. Included in every draft so
 /// the audit trail can prove which model produced which output.
+/// The kind of neural backend a provider is — used by `BASNeuralProviderMatrix` to bias selection
+/// (on-device-native vs open-weight vs deterministic vs remote). Observation-class metadata, never governance.
+public enum BASProviderKind: String, Sendable, Equatable, Hashable, Codable, CaseIterable {
+    case appleNative    // Apple FoundationModels / Core AI (built-in, ANE-accelerated)
+    case mlx            // on-device MLX (open-weight LLM, downloaded weights)
+    case deterministic  // in-memory deterministic fake (tests / fallback)
+    case remote         // OpenAI-compatible HTTP provider (off-device)
+}
+
+/// How certified a provider is. `experimental` until measured on-device; the matrix may prefer `certified`.
+public enum BASCertificationTier: String, Sendable, Equatable, Hashable, Codable, CaseIterable {
+    case certified
+    case experimental
+}
+
 public struct BASOrganDescriptor: Sendable, Equatable, Codable {
     public let providerID: String
     public let providerName: String
@@ -66,6 +81,15 @@ public struct BASOrganDescriptor: Sendable, Equatable, Codable {
     public let runsOnDevice: Bool
     public let supportedRoles: Set<BASOrganRole>
 
+    // ADR-041 §D — OPTIONAL provider metadata for BASNeuralProviderMatrix ranking (observation-class, never
+    // governance). Default nil → Codable stays byte-equal (Swift synthesizes encodeIfPresent/decodeIfPresent
+    // for optionals, so a nil-field descriptor serializes exactly as before) + existing Equatable holds for
+    // nil-field descriptors. The matrix degrades gracefully (role-only ranking) when these are nil.
+    public let providerKind: BASProviderKind?
+    public let certificationTier: BASCertificationTier?
+    /// Approximate parameter count (e.g. `2_000_000_000` = 2B), nil if unknown. NOT bytes, NOT a model name.
+    public let modelSizeHint: Int?
+
     public init(
         providerID: String,
         providerName: String,
@@ -73,7 +97,10 @@ public struct BASOrganDescriptor: Sendable, Equatable, Codable {
         maxInputTokens: Int,
         maxOutputTokens: Int,
         runsOnDevice: Bool,
-        supportedRoles: Set<BASOrganRole>
+        supportedRoles: Set<BASOrganRole>,
+        providerKind: BASProviderKind? = nil,
+        certificationTier: BASCertificationTier? = nil,
+        modelSizeHint: Int? = nil
     ) {
         self.providerID = providerID
         self.providerName = providerName
@@ -82,6 +109,9 @@ public struct BASOrganDescriptor: Sendable, Equatable, Codable {
         self.maxOutputTokens = max(0, maxOutputTokens)
         self.runsOnDevice = runsOnDevice
         self.supportedRoles = supportedRoles
+        self.providerKind = providerKind
+        self.certificationTier = certificationTier
+        self.modelSizeHint = modelSizeHint
     }
 }
 

@@ -111,7 +111,10 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
             // adapter. Hosts can still register multiple remotes
             // and pick by descriptor.
             runsOnDevice: false,
-            supportedRoles: supportedRoles)
+            supportedRoles: supportedRoles,
+            // ADR-041 §D — matrix metadata: off-device remote provider (whatever model the endpoint serves;
+            // not certified by this substrate).
+            providerKind: .remote)
     }
 
     public func draft(

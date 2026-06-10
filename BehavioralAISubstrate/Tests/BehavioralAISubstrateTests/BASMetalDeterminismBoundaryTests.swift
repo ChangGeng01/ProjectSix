@@ -85,6 +85,9 @@ final class BASMetalDeterminismBoundaryTests: XCTestCase {
         "BASCoreAIContextClassifierAdapter",
         "BASCoreAINDArrayBridge",
         "BASCoreAIShadowComparison",
+        // ADR-041 §D — the task→provider matrix is reasoning-side (it RANKS providers by preference; governance
+        // still RESOLVES + gates the choice). Provider preference must never reach a byte-deterministic spine file.
+        "BASNeuralProviderMatrix",
     ]
 
     /// The SHARED matcher used by BOTH the production tripwire (`testSpineFilesAreFreeOfMetalSymbols`) AND its
