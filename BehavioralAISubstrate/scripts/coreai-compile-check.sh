@@ -17,7 +17,12 @@
 # + a real .aimodel asset — see scripts producing BASContextClassifier.aimodel and the on-device probe.
 set -euo pipefail
 
-BETA_DEVELOPER_DIR="${BETA_DEVELOPER_DIR:-/Users/changgeng/Downloads/Xcode-beta.app/Contents/Developer}"
+if [ -z "${BETA_DEVELOPER_DIR:-}" ]; then
+  for _x in /Applications/Xcode-beta.app /Users/changgeng/Downloads/Xcode-beta.app; do
+    [ -d "$_x/Contents/Developer" ] && BETA_DEVELOPER_DIR="$_x/Contents/Developer" && break
+  done
+fi
+BETA_DEVELOPER_DIR="${BETA_DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
 PKG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRATCH="$PKG_DIR/.build/coreai-x27"
 
