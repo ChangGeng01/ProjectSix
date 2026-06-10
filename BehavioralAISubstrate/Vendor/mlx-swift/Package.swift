@@ -203,6 +203,11 @@ let cmlx = Target.target(
     cSettings: [
         .headerSearchPath("mlx"),
         .headerSearchPath("mlx-c"),
+        // BAS vendor patch: silence the ~8k -Wshorten-64-to-32 integer-precision warnings inherent to the
+        // MLX numerics C++ (upstream compiles with them; Xcode's default surfaces them). unsafeFlags is
+        // PERMITTED here because this package is consumed as a LOCAL PATH dependency (M224 vendor freeze) —
+        // SwiftPM only forbids unsafeFlags for versioned dependencies. See Docs/VENDOR_REFRESH_RECIPE.md.
+        .unsafeFlags(["-Wno-shorten-64-to-32"]),
     ],
     cxxSettings: cxxSettings + [
         .headerSearchPath("mlx"),
@@ -210,6 +215,8 @@ let cmlx = Target.target(
         .headerSearchPath("json/single_include/nlohmann"),
         .headerSearchPath("fmt/include"),
         .define("MLX_VERSION", to: "\"0.31.1\""),
+        // BAS vendor patch: see cSettings note above.
+        .unsafeFlags(["-Wno-shorten-64-to-32"]),
     ],
     linkerSettings: linkerSettings
 )
@@ -344,4 +351,21 @@ if Context.environment["MLX_SWIFT_BUILD_DOC"] == "1"
     package.dependencies.append(
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0")
     )
+}
+
+
+// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
+// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
+// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
+// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
+for target in package.targets where target.type == .regular || target.type == .macro {
+    var sw = target.swiftSettings ?? []
+    sw.append(.unsafeFlags(["-suppress-warnings"]))
+    target.swiftSettings = sw
+    var cs = target.cSettings ?? []
+    cs.append(.unsafeFlags(["-w"]))
+    target.cSettings = cs
+    var cx = target.cxxSettings ?? []
+    cx.append(.unsafeFlags(["-w"]))
+    target.cxxSettings = cx
 }

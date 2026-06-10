@@ -13,7 +13,17 @@
   swift-jinja, EventSource, yyjson).
 - **2 of OURS — never touched by a re-vendor:** `bas-rust-binaries` (Rust XCFramework), `mamba-ssm-fixtures`.
 
-## The two patch classes that MUST be ported (they die silently if forgotten)
+## The THREE patch classes that MUST be ported (they die silently if forgotten)
+
+0. **Vendor warning suppression** — `Docs/patches/vendor-suppress-warnings.diff` (apply with plain `git apply`).
+   Kills ALL vendored-package compiler warnings (8338 → 0 under Xcode 27) so first-party diagnostics stay
+   visible: (a) a tail loop appended to 7 manifests (swift-nio, swift-syntax, swift-collections, mlx-swift,
+   mlx-swift-lm, swift-transformers, EventSource) adding `-suppress-warnings` (Swift) / `-w` (C/C++) via
+   `unsafeFlags` — PERMITTED because path dependencies are exempt from SwiftPM's unsafeFlags ban; (b)
+   `-Wno-shorten-64-to-32` on the Cmlx target's c/cxxSettings; (c) `#pragma clang diagnostic ignored
+   "-Wc++17-extensions"` atop 2 Metal headers (steel_attention.h, integral_constant.h) — the Metal frontend
+   ignores manifest settings, only the pragma reaches it. If new packages gain warnings after a refresh,
+   append the same tail loop to their manifests and regenerate this diff.
 
 1. **M224 url→path rewrites** — each vendored manifest's `.package(url: …)` deps pointing at vendored siblings
    become `.package(path: "../<sibling>")`. In swift-nio + swift-crypto, the upstream manifests have a

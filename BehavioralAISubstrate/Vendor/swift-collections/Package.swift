@@ -378,3 +378,20 @@ let package = Package(
   products: _products,
   traits: _traits,
   targets: _targets)
+
+
+// BAS vendor patch (see Docs/VENDOR_REFRESH_RECIPE.md): vendored third-party code — suppress its compiler
+// warnings so FIRST-PARTY diagnostics stay visible in Xcode/CI (this package's warnings are upstream's to fix;
+// we never act on them). `unsafeFlags` is PERMITTED because the M224 vendor freeze consumes every package as a
+// LOCAL PATH dependency (SwiftPM forbids unsafeFlags only for versioned dependencies).
+for target in package.targets where target.type == .regular || target.type == .macro {
+    var sw = target.swiftSettings ?? []
+    sw.append(.unsafeFlags(["-suppress-warnings"]))
+    target.swiftSettings = sw
+    var cs = target.cSettings ?? []
+    cs.append(.unsafeFlags(["-w"]))
+    target.cSettings = cs
+    var cx = target.cxxSettings ?? []
+    cx.append(.unsafeFlags(["-w"]))
+    target.cxxSettings = cx
+}

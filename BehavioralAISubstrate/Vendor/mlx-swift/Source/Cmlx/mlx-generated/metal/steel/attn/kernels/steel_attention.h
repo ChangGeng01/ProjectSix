@@ -1,3 +1,8 @@
+// BAS vendor patch: the Metal frontend compiles this header in a pre-C++17 mode and flags `if constexpr`
+// as a C++17 extension (4 warnings). The construct is valid for the Metal compiler in use; suppress the
+// extension warning so vendored noise stays out of first-party diagnostics. See Docs/VENDOR_REFRESH_RECIPE.md.
+#pragma clang diagnostic ignored "-Wc++17-extensions"
+
 // Copyright © 2024-25 Apple Inc.
 
 #include "../../../steel/attn/attn.h"
