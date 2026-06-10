@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftSyntax
 #else
 import SwiftSyntax
@@ -61,7 +61,7 @@ extension String {
 
 // MARK: SyntaxProtocol.stripp
 
-private class IndentationStripper: SyntaxRewriter {
+fileprivate class IndentationStripper: SyntaxRewriter {
   override func visit(_ token: TokenSyntax) -> TokenSyntax {
     if token.leadingTrivia.contains(where: \.isNewline) || token.trailingTrivia.contains(where: \.isNewline) {
       return

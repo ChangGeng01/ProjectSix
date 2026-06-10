@@ -16,7 +16,7 @@ import InternalCollectionsUtilities
 import ContainersPreview
 #endif
 
-#if compiler(>=6.2) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.2) && UnstableContainersPreview
 
 #if false // FIXME
 @available(SwiftStdlib 5.0, *)
@@ -24,19 +24,19 @@ extension RigidDeque where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   @_lifetime(borrow self)
-  public func borrowElement(at index: Int) -> Borrow<Element> {
+  public func borrowElement(at index: Int) -> Ref<Element> {
     _checkItemIndex(index)
     let slot = _handle.slot(forOffset: index)
-    return Borrow(unsafeAddress: _handle.ptr(at: slot), borrowing: self)
+    return Ref(unsafeAddress: _handle.ptr(at: slot), borrowing: self)
   }
   
   @_alwaysEmitIntoClient
   @_transparent
   @_lifetime(&self)
-  public mutating func mutateElement(at index: Int) -> Inout<Element> {
+  public mutating func mutateElement(at index: Int) -> MutableRef<Element> {
     _checkItemIndex(index)
     let slot = _handle.slot(forOffset: index)
-    return Inout(unsafeAddress: _handle.mutablePtr(at: slot), mutating: &self)
+    return MutableRef(unsafeAddress: _handle.mutablePtr(at: slot), mutating: &self)
   }
 }
 #endif

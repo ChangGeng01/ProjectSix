@@ -10,15 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftDiagnostics
-public import SwiftIfConfig
 internal import SwiftOperators
 public import SwiftSyntax
 public import SwiftSyntaxMacros
 #else
 import SwiftDiagnostics
-import SwiftIfConfig
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -64,9 +62,6 @@ public class BasicMacroExpansionContext {
     ///
     /// Used in conjunction with `expansionDiscriminator`.
     var uniqueNames: [String: Int] = [:]
-
-    /// The build configuration that will be applied to the expanded code.
-    var buildConfiguration: (any BuildConfiguration)? = nil
   }
 
   /// State shared by different instances of the macro expansion context,
@@ -87,14 +82,12 @@ public class BasicMacroExpansionContext {
   public init(
     lexicalContext: [Syntax] = [],
     expansionDiscriminator: String = "__macro_local_",
-    sourceFiles: [SourceFileSyntax: KnownSourceFile] = [:],
-    buildConfiguration: (any BuildConfiguration)? = nil
+    sourceFiles: [SourceFileSyntax: KnownSourceFile] = [:]
   ) {
     self.sharedState = SharedState()
     self.lexicalContext = lexicalContext
     self.expansionDiscriminator = expansionDiscriminator
     self.sharedState.sourceFiles = sourceFiles
-    self.sharedState.buildConfiguration = buildConfiguration
   }
 
   /// Create a new macro evaluation context that shares most of its global
@@ -217,7 +210,7 @@ extension BasicMacroExpansionContext: MacroExpansionContext {
       // The syntax node came from the source file itself.
       rootSourceFile = directRootSourceFile
       offsetAdjustment = .zero
-    } else if let nodeInOriginalTree = sharedState.detachedNodes[node.root] {
+    } else if let nodeInOriginalTree = sharedState.detachedNodes[Syntax(node)] {
       // The syntax node came from a disconnected root, so adjust for that.
       rootSourceFile = nodeInOriginalTree.root.as(SourceFileSyntax.self)
       offsetAdjustment = SourceLength(utf8Length: nodeInOriginalTree.position.utf8Offset)
@@ -268,9 +261,5 @@ extension BasicMacroExpansionContext: MacroExpansionContext {
     // Do the location lookup.
     let converter = SourceLocationConverter(fileName: fileName, tree: rootSourceFile)
     return AbstractSourceLocation(converter.location(for: rawPosition + offsetAdjustment))
-  }
-
-  public var buildConfiguration: (any BuildConfiguration)? {
-    sharedState.buildConfiguration
   }
 }

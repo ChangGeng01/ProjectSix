@@ -15,10 +15,10 @@
 import InternalCollectionsUtilities
 #endif
 
-#if compiler(>=6.3) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 
 @available(SwiftStdlib 5.0, *)
-extension Container where Self: ~Copyable /*& ~Escapable*/ {
+extension Container where Self: ~Copyable /*& ~Escapable*/, Element: ~Copyable {
   @_lifetime(borrow self)
   public func _filter(
     _ isIncluded: @escaping (borrowing Element) -> Bool
@@ -28,7 +28,7 @@ extension Container where Self: ~Copyable /*& ~Escapable*/ {
 }
 
 @available(SwiftStdlib 5.0, *)
-extension ContainerIterator {
+extension ContainerIterator where Base.Element: ~Copyable {
   @_lifetime(copy self)
   public func filter(
     _ isIncluded: @escaping (borrowing Element) -> Bool
@@ -40,14 +40,16 @@ extension ContainerIterator {
 @available(SwiftStdlib 5.0, *)
 public struct ContainerFilter<
   Base: Container & ~Copyable/* FIXME & ~Escapable */
->: ~Copyable, ~Escapable {
+>: ~Copyable, ~Escapable
+where Base.Element: ~Copyable
+{
   public typealias Element = Base.Element
 
   @_alwaysEmitIntoClient
   public let _isIncluded: (borrowing Element) -> Bool
 
   @_alwaysEmitIntoClient
-  public let _base: Borrow<Base> // FIXME: This does not allow escapable Bases
+  public let _base: Ref<Base> // FIXME: This does not allow escapable Bases
 
   @_alwaysEmitIntoClient
   public var _position: Base.Index
@@ -58,7 +60,7 @@ public struct ContainerFilter<
   @inlinable
   @_lifetime(copy _base)
   internal init(
-    _base: Borrow<Base>,
+    _base: Ref<Base>,
     index: Base.Index,
     isIncluded: @escaping (borrowing Element) -> Bool
   ) {
@@ -75,7 +77,7 @@ public struct ContainerFilter<
     isIncluded: @escaping (borrowing Element) -> Bool
   ) {
     self._isIncluded = isIncluded
-    self._base = Borrow(_base)
+    self._base = Ref(_base)
     self._position = _base.startIndex
     self._remainder = .init()
   }
@@ -84,9 +86,11 @@ public struct ContainerFilter<
 // FIXME: Sendable
 
 @available(SwiftStdlib 5.0, *)
-extension ContainerFilter: BorrowingIteratorProtocol {
-  @_lifetime(copy self)
-  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+extension ContainerFilter: BorrowingIteratorProtocol_ where Element: ~Copyable {
+  public typealias Element_ = Base.Element
+
+  @_lifetime(&self) // FIXME: This should be `@_lifetime(copy self)`
+  public mutating func nextSpan_(maximumCount: Int) -> Span<Element> {
     precondition(maximumCount > 0)
     while true {
       // Drop filtered out items from prefix of _remainder
@@ -95,7 +99,6 @@ extension ContainerFilter: BorrowingIteratorProtocol {
         i &+= 1
       }
       _remainder = _remainder.extracting(droppingFirst: i)
-      // Return maximal
       if !_remainder.isEmpty {
         let c = Swift.min(_remainder.count, maximumCount)
         i = 1

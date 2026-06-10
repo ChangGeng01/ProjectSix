@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) import SwiftSyntax
 #endif
 
 /// A separate lexer specifically for regex literals.
-private struct RegexLiteralLexer {
+fileprivate struct RegexLiteralLexer {
   enum LexResult {
     /// Continue the lex, this is returned from `lexPatternCharacter` when
     /// it successfully lexed a character.
@@ -207,6 +207,9 @@ private struct RegexLiteralLexer {
         lastUnespacedSpaceOrTab.position.advanced(by: 1).pointer == slashBegin.position.pointer
       {
         if mustBeRegex {
+          // TODO: We ought to have a fix-it that suggests #/.../#. We could
+          // suggest escaping, but that would be wrong if the user has written (?x).
+          // TODO: Should we suggest #/.../# for space-as-first character too?
           builder.recordPatternError(.spaceAtEndOfRegexLiteral, at: lastUnespacedSpaceOrTab)
         } else {
           return .notARegex
@@ -253,6 +256,7 @@ private struct RegexLiteralLexer {
           // }
           //
           if mustBeRegex {
+            // TODO: We ought to have a fix-it that inserts a backslash to escape.
             builder.recordPatternError(.spaceAtStartOfRegexLiteral, at: cursor)
           } else {
             return .notARegex
@@ -643,10 +647,6 @@ extension Lexer.Cursor {
     case .identifier, .dollarIdentifier, .wildcard:
       return false
 
-    // Module selectors are allowed before an operator, but not a regex.
-    case .colonColon:
-      return false
-
     // Literals are themselves expressions and therefore don't sequence expressions.
     case .floatLiteral, .integerLiteral:
       return false
@@ -741,7 +741,7 @@ extension Lexer.Cursor {
       // an unapplied operator is legal, and we should prefer to lex as that
       // instead.
       switch previousTokenKind {
-      case .leftParen, .leftSquare, .comma, .colon, .colonColon:
+      case .leftParen, .leftSquare, .comma, .colon:
         break
       default:
         mustBeRegex = true

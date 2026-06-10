@@ -1,16 +1,16 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6.0)
 public import SwiftSyntaxMacros
 @_spi(PluginMessage) private import SwiftCompilerPluginMessageHandling
 #else
@@ -112,6 +112,6 @@ extension CompilerPlugin {
     let connection = try StandardIOMessageConnection()
     let provider = MacroProviderAdapter(plugin: Self())
     let impl = CompilerPluginMessageListener(connection: connection, provider: provider)
-    try impl.main()
+    impl.main()
   }
 }

@@ -18,7 +18,7 @@ import ContainersPreview
 
 #if compiler(>=6.2)
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension RigidArray where Element: ~Copyable {
   @_lifetime(&self)
@@ -137,7 +137,7 @@ extension RigidArray where Element: ~Copyable {
 }
 #endif
 
-#if compiler(>=6.3) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.3) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
@@ -153,7 +153,7 @@ extension RigidArray where Element: ~Copyable {
   @frozen
   public struct SubrangeConsumer: ~Copyable, ~Escapable {
     @usableFromInline
-    internal var _base: Inout<RigidArray>
+    internal var _base: MutableRef<RigidArray>
       
     @usableFromInline
     internal var _offsetRange: Range<Int>
@@ -167,7 +167,7 @@ extension RigidArray where Element: ~Copyable {
     internal init(_base: inout RigidArray, offsetRange: Range<Int>) {
       
       self._remainder = _base._storage._extracting(unchecked: offsetRange)
-      self._base = Inout(&_base)
+      self._base = MutableRef(&_base)
       self._offsetRange = offsetRange
     }
 
@@ -182,13 +182,21 @@ extension RigidArray where Element: ~Copyable {
       // to avoid exclusivity violations.
       self._base._pointer.pointee
         ._closeGap(at: _offsetRange.lowerBound, count: _offsetRange.count)
+      self._base._pointer.pointee._count -= _offsetRange.count
     }
   }
 }
 
 
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension RigidArray.SubrangeConsumer: Drain where Element: ~Copyable {
+}
+#endif
+
+
+@available(SwiftStdlib 5.0, *)
+extension RigidArray.SubrangeConsumer where Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
   @_lifetime(self: copy self)

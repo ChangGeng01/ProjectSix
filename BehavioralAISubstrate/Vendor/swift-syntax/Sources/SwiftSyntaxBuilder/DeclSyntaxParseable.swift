@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -50,7 +50,6 @@ extension EnumDeclSyntax: DeclSyntaxParseable {}
 extension ExtensionDeclSyntax: DeclSyntaxParseable {}
 extension FunctionDeclSyntax: DeclSyntaxParseable {}
 extension ImportDeclSyntax: DeclSyntaxParseable {}
-extension InitializerDeclSyntax: DeclSyntaxParseable {}
 extension VariableDeclSyntax: DeclSyntaxParseable {}
 extension MacroDeclSyntax: DeclSyntaxParseable {}
 extension OperatorDeclSyntax: DeclSyntaxParseable {}

@@ -7,5 +7,6 @@ xcuserdata/
 .*.sw?
 /Benchmarks/.swiftpm
 /Benchmarks/.build
+/Utils/Debugger/FormatterFixtures/.build
 .docc-build
 __pycache__

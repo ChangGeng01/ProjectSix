@@ -33,8 +33,10 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
         public struct \(node.kind.syntaxType): \(node.baseType.syntaxBaseName)Protocol, SyntaxHashable, \(node.base.leafProtocolType)
         """
       ) {
-        for childNodeChoices in node.node.childrenNodeChoices() {
-          childNodeChoices.enumDecl
+        for child in node.children {
+          if let childChoiceDecl = try! generateSyntaxChildChoices(for: child) {
+            childChoiceDecl
+          }
         }
 
         // ==============
@@ -46,32 +48,21 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
         DeclSyntax(
           """
           public init?(_ node: __shared some SyntaxProtocol) {
-            guard node.raw.kind == .\(node.enumCaseCallName) else { return nil }
+            guard node.raw.kind == .\(node.varOrCaseName) else { return nil }
             self._syntaxNode = node._syntaxNode
           }
           """
         )
 
-        DeclSyntax(
-          """
-          @_transparent
-          init(unsafeCasting node: Syntax) {
-            self._syntaxNode = node
-          }
-          """
-        )
-
-        let initSignature = InitSignature(node)
-
         try! InitializerDeclSyntax(
           """
-          \(initSignature.generateInitializerDocComment())\
-          \(initSignature.generateInitializerDeclHeader())
+          \(node.generateInitializerDocComment())\
+          \(node.generateInitializerDeclHeader())
           """
         ) {
           let parameters = ClosureParameterListSyntax {
             for child in node.children {
-              ClosureParameterSyntax(firstName: child.varDeclName)
+              ClosureParameterSyntax(firstName: child.varOrCaseName.backtickedIfNeeded)
             }
           }
 
@@ -90,7 +81,7 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
               ArrayElementSyntax(
                 expression: MemberAccessExprSyntax(
                   base: child.buildableType.optionalChained(
-                    expr: ExprSyntax("\(child.baseCallName)")
+                    expr: ExprSyntax("\(child.varOrCaseName.backtickedIfNeeded)")
                   ),
                   period: .periodToken(),
                   name: "raw"
@@ -103,18 +94,18 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
             calledExpression: ExprSyntax("withExtendedLifetime"),
             leftParen: .leftParenToken(),
             arguments: LabeledExprListSyntax {
-              LabeledExprSyntax(expression: ExprSyntax("(RawSyntaxArena(), (\(parameters)))"))
+              LabeledExprSyntax(expression: ExprSyntax("(SyntaxArena(), (\(parameters)))"))
             },
             rightParen: .rightParenToken(),
             trailingClosure: ClosureExprSyntax(signature: closureSignature) {
               if node.children.isEmpty {
-                DeclSyntax("let raw = RawSyntax.makeEmptyLayout(kind: SyntaxKind.\(node.memberCallName), arena: arena)")
+                DeclSyntax("let raw = RawSyntax.makeEmptyLayout(kind: SyntaxKind.\(node.varOrCaseName), arena: arena)")
               } else {
                 DeclSyntax("let layout: [RawSyntax?] = \(layoutList)")
                 DeclSyntax(
                   """
                   let raw = RawSyntax.makeLayout(
-                    kind: SyntaxKind.\(node.memberCallName),
+                    kind: SyntaxKind.\(node.varOrCaseName),
                     from: layout,
                     arena: arena,
                     leadingTrivia: leadingTrivia,
@@ -151,7 +142,7 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
           try! VariableDeclSyntax(
             """
             \(child.documentation)\
-            \(child.apiAttributes)public var \(child.varDeclName): \(type)
+            \(child.apiAttributes)public var \(child.varOrCaseName.backtickedIfNeeded): \(type)
             """
           ) {
             AccessorDeclSyntax(accessorSpecifier: .keyword(.get)) {
@@ -163,7 +154,7 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
             AccessorDeclSyntax(
               """
               set(value) {
-                self = Syntax(self).replacingChild(at: \(raw: index), with: Syntax(value), rawAllocationArena: RawSyntaxArena()).cast(\(node.kind.syntaxType).self)
+                self = Syntax(self).replacingChild(at: \(raw: index), with: Syntax(value), arena: SyntaxArena()).cast(\(node.kind.syntaxType).self)
               }
               """
             )
@@ -176,32 +167,31 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
           // If needed, this could be added in the future, but for now withUnexpected should be sufficient.
           if let childNode = SYNTAX_NODE_MAP[child.syntaxNodeKind]?.collectionNode,
             !child.isUnexpectedNodes,
-            case .collection(_, collectionElementName: let childElt?, _, _, generateDeprecatedAddFunction: true) =
-              child.kind
+            case .collection(_, collectionElementName: let childElt, _, _) = child.kind
           {
             let childEltType = childNode.collectionElementType.syntaxBaseName
 
             DeclSyntax(
               """
-              /// Adds the provided `element` to the node's `\(child.identifier)`
+              /// Adds the provided `element` to the node's `\(child.varOrCaseName)`
               /// collection.
               ///
               /// - param element: The new `\(raw: childElt)` to add to the node's
-              ///                  `\(child.identifier)` collection.
+              ///                  `\(child.varOrCaseName)` collection.
               /// - returns: A copy of the receiver with the provided `\(raw: childElt)`
-              ///            appended to its `\(child.identifier)` collection.
-              @available(*, deprecated, message: "Use node.\(child.identifier).append(newElement) instead")
+              ///            appended to its `\(child.varOrCaseName)` collection.
+              @available(*, deprecated, message: "Use node.\(child.varOrCaseName).append(newElement) instead")
               public func add\(raw: childElt)(_ element: \(childEltType)) -> \(node.kind.syntaxType) {
                 var collection: RawSyntax
-                let arena = RawSyntaxArena()
+                let arena = SyntaxArena()
                 if let col = raw.layoutView!.children[\(raw: index)] {
                   collection = col.layoutView!.appending(element.raw, arena: arena)
                 } else {
-                  collection = RawSyntax.makeLayout(kind: SyntaxKind.\(childNode.memberCallName),
+                  collection = RawSyntax.makeLayout(kind: SyntaxKind.\(childNode.varOrCaseName),
                                                     from: [element.raw], arena: arena)
                 }
                 return Syntax(self)
-                  .replacingChild(at: \(raw: index), with: collection, rawNodeArena: arena, rawAllocationArena: arena)
+                  .replacingChild(at: \(raw: index), with: collection, rawNodeArena: arena, allocationArena: arena)
                   .cast(\(node.kind.syntaxType).self)
               }
               """
@@ -212,7 +202,7 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
         let layout = ArrayExprSyntax {
           for child in node.children {
             ArrayElementSyntax(
-              expression: ExprSyntax(#"\Self.\#(child.memberCallName)"#)
+              expression: ExprSyntax(#"\Self.\#(child.varOrCaseName)"#)
             )
           }
         }
@@ -222,36 +212,76 @@ func syntaxNode(nodesStartingWith: [Character]) -> SourceFileSyntax {
   }
 }
 
-extension ChildNodeChoices {
-  var enumDecl: EnumDeclSyntax {
-    try! EnumDeclSyntax("public enum \(self.name): SyntaxChildChoices, SyntaxHashable") {
-      for choice in self.choices {
-        choice.enumCaseDecl
-      }
+private func generateSyntaxChildChoices(for child: Child) throws -> EnumDeclSyntax? {
+  guard case .nodeChoices(let choices) = child.kind else {
+    return nil
+  }
 
-      self.syntaxGetter(propertyName: "_syntaxNode", propertyType: "Syntax")
+  return try! EnumDeclSyntax("public enum \(child.syntaxChoicesType): SyntaxChildChoices, SyntaxHashable") {
+    for choice in choices {
+      DeclSyntax("case `\(choice.varOrCaseName)`(\(choice.syntaxNodeKind.syntaxType))")
+    }
 
-      for choice in self.choices {
-        choice.baseTypeInitDecl(hasArgumentName: false) ?? choice.concreteTypeInitDecl
-      }
-
-      self.syntaxInitDecl(inputType: "__shared some SyntaxProtocol")
-
-      try! VariableDeclSyntax("public static var structure: SyntaxNodeStructure") {
-        let choices = ArrayExprSyntax {
-          for choice in self.choices {
-            ArrayElementSyntax(
-              expression: ExprSyntax(".node(\(choice.syntaxType).self)")
-            )
+    try! VariableDeclSyntax("public var _syntaxNode: Syntax") {
+      try! SwitchExprSyntax("switch self") {
+        for choice in choices {
+          SwitchCaseSyntax("case .\(choice.varOrCaseName)(let node):") {
+            StmtSyntax("return node._syntaxNode")
           }
         }
+      }
+    }
 
-        StmtSyntax("return .choices(\(choices))")
+    for choice in choices {
+      if let choiceNode = SYNTAX_NODE_MAP[choice.syntaxNodeKind], choiceNode.kind.isBase {
+        DeclSyntax(
+          """
+          public init(_ node: some \(choiceNode.kind.protocolType)) {
+            self = .\(choice.varOrCaseName)(\(choiceNode.kind.syntaxType)(node))
+          }
+          """
+        )
+
+      } else {
+        DeclSyntax(
+          """
+          public init(_ node: \(choice.syntaxNodeKind.syntaxType)) {
+            self = .\(choice.varOrCaseName)(node)
+          }
+          """
+        )
+      }
+    }
+
+    try! InitializerDeclSyntax("public init?(_ node: __shared some SyntaxProtocol)") {
+      for choice in choices {
+        StmtSyntax(
+          """
+          if let node = node.as(\(choice.syntaxNodeKind.syntaxType).self) {
+            self = .\(choice.varOrCaseName)(node)
+            return
+          }
+          """
+        )
       }
 
-      for choice in self.choices {
-        choice.castingMethods
+      StmtSyntax("return nil")
+    }
+
+    try! VariableDeclSyntax("public static var structure: SyntaxNodeStructure") {
+      let choices = ArrayExprSyntax {
+        for choice in choices {
+          ArrayElementSyntax(
+            expression: ExprSyntax(".node(\(choice.syntaxNodeKind.syntaxType).self)")
+          )
+        }
       }
+
+      StmtSyntax("return .choices(\(choices))")
+    }
+
+    for choiceNode in choices {
+      choiceNodeCastingMethods(for: choiceNode.syntaxNodeKind)
     }
   }
 }

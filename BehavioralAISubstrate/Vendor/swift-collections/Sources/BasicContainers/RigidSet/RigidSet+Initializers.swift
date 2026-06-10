@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension RigidSet where Element: ~Copyable {
@@ -49,7 +49,7 @@ extension RigidSet where Element: ~Copyable {
     try self.insert(maximumCount: capacity, initializingWith: initializer)
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public init<
     E: Error,
@@ -57,13 +57,15 @@ extension RigidSet where Element: ~Copyable {
   >(
     capacity: Int,
     from producer: inout P
-  ) throws(E) {
+  ) throws(E)
+  where P.Element: ~Copyable
+  {
     self.init(capacity: capacity)
     try self.insert(maximumCount: capacity, from: &producer)
   }
 #endif
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public init<
     D: Drain<Element> & ~Copyable & ~Escapable
@@ -79,11 +81,11 @@ extension RigidSet where Element: ~Copyable {
 
 @available(SwiftStdlib 5.0, *)
 extension RigidSet /* where Element: Copyable */ {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   @inline(__always)
   public init<
-    S: BorrowingSequence<Element> & ~Copyable & ~Escapable
+    S: BorrowingSequence_<Element> & ~Copyable & ~Escapable
   >(
     capacity: Int,
     copying contents: borrowing S
@@ -113,11 +115,11 @@ extension RigidSet /* where Element: Copyable */ {
     self.insert(copying: contents)
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   @inline(__always)
   public init<
-    S: BorrowingSequence<Element> & Sequence<Element>
+    S: BorrowingSequence_<Element> & Sequence<Element>
   >(
     capacity: Int,
     copying contents: borrowing S
@@ -129,7 +131,7 @@ extension RigidSet /* where Element: Copyable */ {
   @_alwaysEmitIntoClient
   @inline(__always)
   public init<
-    S: BorrowingSequence<Element> & Collection<Element>
+    S: BorrowingSequence_<Element> & Collection<Element>
   >(
     capacity: Int? = nil,
     copying contents: S

@@ -55,26 +55,27 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       /// Prints the provided trivia as they would be written in a source file.
       ///
       /// - Parameter stream: The stream to which to print the trivia.
-      public func write(to stream: inout some TextOutputStream)
+      public func write(to target: inout some TextOutputStream)
       """
     ) {
       DeclSyntax(
         """
         func printRepeated(_ character: String, count: Int) {
-          for _ in 0..<count { stream.write(character) }
+          for _ in 0..<count { target.write(character) }
         }
         """
       )
 
       try SwitchExprSyntax("switch self") {
         for trivia in TRIVIAS {
-          if let characters = trivia.characters {
+          if trivia.isCollection {
+            let joined = trivia.characters.map { "\($0)" }.joined()
             SwitchCaseSyntax("case let .\(trivia.enumCaseName)(count):") {
-              ExprSyntax("printRepeated(\(literal: characters), count: count)")
+              ExprSyntax("printRepeated(\(literal: joined), count: count)")
             }
           } else {
             SwitchCaseSyntax("case let .\(trivia.enumCaseName)(text):") {
-              ExprSyntax("stream.write(text)")
+              ExprSyntax("target.write(text)")
             }
           }
         }
@@ -111,10 +112,11 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
     """
   ) {
     for trivia in TRIVIAS {
-      if let characters = trivia.characters {
+      if trivia.isCollection {
+        let joined = trivia.characters.map { "\($0)" }.joined()
         DeclSyntax(
           """
-          /// Returns a piece of trivia for some number of \(literal: characters) characters.
+          /// Returns a piece of trivia for some number of \(literal: joined) characters.
           public static func \(trivia.enumCaseName)(_ count: Int) -> Trivia {
             return [.\(trivia.enumCaseName)(count)]
           }
@@ -123,7 +125,7 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
         DeclSyntax(
           """
-          /// Gets a piece of trivia for \(literal: characters) characters.
+          /// Gets a piece of trivia for \(literal: joined) characters.
           public static var \(trivia.lowerName): Trivia {
             return .\(trivia.enumCaseName)(1)
           }
@@ -149,10 +151,10 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
     try VariableDeclSyntax("public var sourceLength: SourceLength") {
       try SwitchExprSyntax("switch self") {
         for trivia in TRIVIAS {
-          if let characters = trivia.characters {
+          if trivia.isCollection {
             SwitchCaseSyntax("case let .\(trivia.enumCaseName)(count):") {
-              if characters.utf8.count != 1 {
-                StmtSyntax("return SourceLength(utf8Length: count * \(raw: characters.utf8.count))")
+              if trivia.charactersLen != 1 {
+                StmtSyntax("return SourceLength(utf8Length: count * \(raw: trivia.charactersLen))")
               } else {
                 StmtSyntax("return SourceLength(utf8Length: count)")
               }
@@ -188,7 +190,7 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
     try FunctionDeclSyntax(
       """
-      static func make(_ piece: TriviaPiece, arena: RawSyntaxArena) -> RawTriviaPiece
+      static func make(_ piece: TriviaPiece, arena: SyntaxArena) -> RawTriviaPiece
       """
     ) {
       try SwitchExprSyntax("switch piece") {
@@ -229,10 +231,10 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
     try VariableDeclSyntax("public var byteLength: Int") {
       try SwitchExprSyntax("switch self") {
         for trivia in TRIVIAS {
-          if let characters = trivia.characters {
+          if trivia.isCollection {
             SwitchCaseSyntax("case let .\(trivia.enumCaseName)(count):") {
-              if characters.utf8.count != 1 {
-                StmtSyntax("return count * \(raw: characters.utf8.count)")
+              if trivia.charactersLen != 1 {
+                StmtSyntax("return count * \(raw: trivia.charactersLen)")
               } else {
                 StmtSyntax("return count")
               }
@@ -268,13 +270,24 @@ let triviaPiecesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
   try! generateIsHelpers(for: "RawTriviaPiece")
 }
 
-private func generateIsHelpers(for pieceName: TokenSyntax) throws -> ExtensionDeclSyntax {
-  func generateHelper(_ header: SyntaxNodeString, trait: TriviaTraits) throws -> VariableDeclSyntax {
-    try VariableDeclSyntax(header) {
+fileprivate func generateIsHelpers(for pieceName: TokenSyntax) throws -> ExtensionDeclSyntax {
+  return try ExtensionDeclSyntax("extension \(pieceName)") {
+    DeclSyntax(
+      """
+      /// Returns `true` if this piece is a newline, space or tab.
+      public var isWhitespace: Bool {
+        return isSpaceOrTab || isNewline
+      }
+      """
+    )
+
+    try VariableDeclSyntax("public var isNewline: Bool") {
       try SwitchExprSyntax("switch self") {
-        for trivia in TRIVIAS where trivia.traits.contains(trait) {
-          SwitchCaseSyntax("case .\(trivia.enumCaseName):") {
-            StmtSyntax("return true")
+        for trivia in TRIVIAS {
+          if trivia.isNewLine {
+            SwitchCaseSyntax("case .\(trivia.enumCaseName):") {
+              StmtSyntax("return true")
+            }
           }
         }
         SwitchCaseSyntax("default:") {
@@ -282,39 +295,34 @@ private func generateIsHelpers(for pieceName: TokenSyntax) throws -> ExtensionDe
         }
       }
     }
-  }
 
-  return try ExtensionDeclSyntax("extension \(pieceName)") {
-    try generateHelper(
+    DeclSyntax(
       """
-      /// Returns `true` if this piece is a whitespace.
-      public var isWhitespace: Bool
-      """,
-      trait: .whitespace
+      public var isSpaceOrTab: Bool {
+        switch self {
+        case .spaces:
+          return true
+        case .tabs:
+          return true
+        default:
+          return false
+        }
+      }
+      """
     )
 
-    try generateHelper(
-      """
-      /// Returns `true` if this piece is a newline.
-      public var isNewline: Bool
-      """,
-      trait: .newline
-    )
-
-    try generateHelper(
-      """
-      /// Returns `true` if this piece is a space or tab.
-      public var isSpaceOrTab: Bool
-      """,
-      trait: .spaceOrTab
-    )
-
-    try generateHelper(
+    DeclSyntax(
       """
       /// Returns `true` if this piece is a comment.
-      public var isComment: Bool
-      """,
-      trait: .comment
+      public var isComment: Bool {
+        switch self {
+        case .lineComment, .blockComment, .docLineComment, .docBlockComment:
+          return true
+        default:
+          return false
+        }
+      }
+      """
     )
   }
 }

@@ -44,17 +44,22 @@ option(SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26
 include(AddSwiftHostLibrary)
 include(SwiftCompilerCapability)
 
-# Don't link with 'string-processing'
+# Don't link with 'string-processing' and 'backtracing'.
 swift_supports_implicit_module("string-processing" SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+swift_supports_implicit_module("backtracing" SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
 if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
   add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
 endif()
-
-if(NOT DEFINED Swift_COMPILER_PACKAGE_CMO_SUPPORT AND SWIFTSYNTAX_EMIT_MODULE)
-  swift_get_package_cmo_support(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>")
 endif()
-if(NOT DEFINED SWIFTSYNTAX_PACKAGE_NAME)
-  set(SWIFTSYNTAX_PACKAGE_NAME "${SWIFT_MODULE_ABI_NAME_PREFIX}${PROJECT_NAME}")
+
+# SWIFTSYNTAX_EMIT_MODULE is TRUE by default
+if(NOT DEFINED SWIFTSYNTAX_EMIT_MODULE)
+  set(SWIFTSYNTAX_EMIT_MODULE TRUE)
+endif()
+if(SWIFTSYNTAX_EMIT_MODULE)
+  swift_get_package_cmo_support(SWIFT_PACKAGE_CMO_SUPPORT)
 endif()
 
 # Determine the module triple.

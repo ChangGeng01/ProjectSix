@@ -32,7 +32,6 @@ class SwiftParserCli: ParsableCommand {
     subcommands: [
       BasicFormat.self,
       PerformanceTest.self,
-      Print.self,
       PrintDiags.self,
       PrintTree.self,
       Reduce.self,

@@ -1,16 +1,16 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftDiagnostics
 internal import SwiftSyntax
 #else
@@ -110,27 +110,13 @@ extension PluginMessage.Diagnostic {
           let text: String
           switch $0 {
           case .replace(let oldNode, let newNode):
-            // Replace the whole node including leading/trailing trivia, but if
-            // the trivia are the same, don't include them in the replacing range.
-            let leadingMatch = oldNode.leadingTrivia == newNode.leadingTrivia
-            let trailingMatch = oldNode.trailingTrivia == newNode.trailingTrivia
             range = sourceManager.range(
               of: oldNode,
-              from: leadingMatch ? .afterLeadingTrivia : .beforeLeadingTrivia,
-              to: trailingMatch ? .beforeTrailingTrivia : .afterTrailingTrivia
+              from: .afterLeadingTrivia,
+              to: .beforeTrailingTrivia
             )
-            var newNode = newNode.detached
-            if leadingMatch {
-              newNode.leadingTrivia = []
-            }
-            if trailingMatch {
-              newNode.trailingTrivia = []
-            }
-            text = newNode.description
+            text = newNode.trimmedDescription
           case .replaceLeadingTrivia(let token, let newTrivia):
-            guard token.leadingTrivia != newTrivia else {
-              return nil
-            }
             range = sourceManager.range(
               of: Syntax(token),
               from: .beforeLeadingTrivia,
@@ -138,31 +124,18 @@ extension PluginMessage.Diagnostic {
             )
             text = newTrivia.description
           case .replaceTrailingTrivia(let token, let newTrivia):
-            guard token.trailingTrivia != newTrivia else {
-              return nil
-            }
             range = sourceManager.range(
               of: Syntax(token),
               from: .beforeTrailingTrivia,
               to: .afterTrailingTrivia
             )
             text = newTrivia.description
-          case .replaceChild(let replaceChildData):
-            range = sourceManager.range(replaceChildData.replacementRange, in: replaceChildData.parent)
-            text = replaceChildData.newChild.description
-          case .replaceText(
-            range: let replacementRange,
-            with: let newText,
-            in: let syntax
-          ):
-            range = sourceManager.range(replacementRange, in: syntax)
-            text = newText
           #if RESILIENT_LIBRARIES
           @unknown default:
             fatalError()
           #endif
           }
-          guard let range else {
+          guard let range = range else {
             return nil
           }
           return .init(

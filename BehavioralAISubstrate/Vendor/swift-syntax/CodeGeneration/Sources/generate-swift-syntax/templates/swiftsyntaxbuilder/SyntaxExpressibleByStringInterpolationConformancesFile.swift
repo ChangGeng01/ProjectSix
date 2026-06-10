@@ -16,7 +16,15 @@ import SyntaxSupport
 import Utils
 
 let syntaxExpressibleByStringInterpolationConformancesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  importSwiftSyntax()
+  DeclSyntax(
+    """
+    #if swift(>=6)
+    internal import SwiftSyntax
+    #else
+    import SwiftSyntax
+    #endif
+    """
+  )
 
   let typesExpressibleByStringInterpolation =
     SYNTAX_NODES
@@ -35,9 +43,7 @@ let syntaxExpressibleByStringInterpolationConformancesFile = SourceFileSyntax(le
     DeclSyntax(
       """
       #if compiler(>=6)
-      extension \(type): Swift.ExpressibleByStringInterpolation {}
-      // Work around https://github.com/swiftlang/swift/issues/85153 by restating the implicit conformances.
-      extension \(type): Swift.ExpressibleByStringLiteral, Swift.ExpressibleByExtendedGraphemeClusterLiteral, Swift.ExpressibleByUnicodeScalarLiteral {}
+      extension \(type): @retroactive ExpressibleByStringInterpolation {}
       #endif
       """
     )

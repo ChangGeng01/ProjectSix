@@ -18,23 +18,19 @@ public let TYPE_NODES: [Node] = [
     children: [
       Child(
         name: "leftSquare",
+        deprecatedName: "leftSquareBracket",
         kind: .token(choices: [.token(.leftSquare)])
       ),
       Child(
         name: "element",
+        deprecatedName: "elementType",
         kind: .node(kind: .type)
       ),
       Child(
         name: "rightSquare",
+        deprecatedName: "rightSquareBracket",
         kind: .token(choices: [.token(.rightSquare)])
       ),
-    ],
-    childHistory: [
-      [
-        "leftSquare": .renamed(from: "leftSquareBracket"),
-        "element": .renamed(from: "elementType"),
-        "rightSquare": .renamed(from: "rightSquareBracket"),
-      ]
     ]
   ),
 
@@ -56,17 +52,6 @@ public let TYPE_NODES: [Node] = [
         name: "attributes",
         kind: .collection(kind: .attributeList, collectionElementName: "Attribute", defaultsToEmpty: true),
         documentation: "A list of attributes that can be attached to the type, such as `@escaping`."
-      ),
-      Child(
-        name: "lateSpecifiers",
-        kind: .collection(
-          kind: .typeSpecifierList,
-          collectionElementName: "Specifier",
-          defaultsToEmpty: true,
-          generateDeprecatedAddFunction: false
-        ),
-        documentation:
-          "A list of specifiers that can be attached to the type after the attributes, such as 'nonisolated'."
       ),
       Child(
         name: "baseType",
@@ -135,13 +120,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "constraint",
+        deprecatedName: "baseType",
         kind: .node(kind: .type)
       ),
-    ],
-    childHistory: [
-      [
-        "constraint": .renamed(from: "baseType")
-      ]
     ]
   ),
 
@@ -152,10 +133,12 @@ public let TYPE_NODES: [Node] = [
     children: [
       Child(
         name: "leftSquare",
+        deprecatedName: "leftSquareBracket",
         kind: .token(choices: [.token(.leftSquare)])
       ),
       Child(
         name: "key",
+        deprecatedName: "keyType",
         kind: .node(kind: .type),
         nameForDiagnostics: "key type"
       ),
@@ -165,21 +148,15 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "value",
+        deprecatedName: "valueType",
         kind: .node(kind: .type),
         nameForDiagnostics: "value type"
       ),
       Child(
         name: "rightSquare",
+        deprecatedName: "rightSquareBracket",
         kind: .token(choices: [.token(.rightSquare)])
       ),
-    ],
-    childHistory: [
-      [
-        "leftSquare": .renamed(from: "leftSquareBracket"),
-        "key": .renamed(from: "keyType"),
-        "value": .renamed(from: "valueType"),
-        "rightSquare": .renamed(from: "rightSquareBracket"),
-      ]
     ]
   ),
 
@@ -197,6 +174,7 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "parameters",
+        deprecatedName: "arguments",
         kind: .collection(
           kind: .tupleTypeElementList,
           collectionElementName: "Parameter",
@@ -214,14 +192,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "returnClause",
+        deprecatedName: "output",
         kind: .node(kind: .returnClause)
       ),
-    ],
-    childHistory: [
-      [
-        "parameters": .renamed(from: "arguments"),
-        "returnClause": .renamed(from: "output"),
-      ]
     ]
   ),
 
@@ -232,6 +205,7 @@ public let TYPE_NODES: [Node] = [
     children: [
       Child(
         name: "leftAngle",
+        deprecatedName: "leftAngleBracket",
         kind: .token(choices: [.token(.leftAngle)])
       ),
       Child(
@@ -240,14 +214,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "rightAngle",
+        deprecatedName: "rightAngleBracket",
         kind: .token(choices: [.token(.rightAngle)])
       ),
-    ],
-    childHistory: [
-      [
-        "leftAngle": .renamed(from: "leftAngleBracket"),
-        "rightAngle": .renamed(from: "rightAngleBracket"),
-      ]
     ]
   ),
 
@@ -268,29 +237,14 @@ public let TYPE_NODES: [Node] = [
     children: [
       Child(
         name: "argument",
-        kind: .nodeChoices(choices: [
-          Child(
-            name: "type",
-            kind: .node(kind: .type)
-          ),
-          Child(
-            name: "expr",
-            kind: .node(kind: .expr)
-          ),
-        ]),
-        documentation:
-          "The argument type for a generic argument. This can either be a regular type argument or an expression for value generics."
+        deprecatedName: "argumentType",
+        kind: .node(kind: .type)
       ),
       Child(
         name: "trailingComma",
         kind: .token(choices: [.token(.comma)]),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "argument": .renamed(from: "argumentType")
-      ]
     ]
   ),
 
@@ -311,47 +265,6 @@ public let TYPE_NODES: [Node] = [
   ),
 
   Node(
-    kind: .inlineArrayType,
-    base: .type,
-    nameForDiagnostics: "inline array type",
-    documentation: "An inline array type `[3 of Int]`, sugar for `InlineArray<3, Int>`.",
-    children: [
-      Child(
-        name: "leftSquare",
-        kind: .token(choices: [.token(.leftSquare)])
-      ),
-      Child(
-        name: "count",
-        kind: .node(kind: .genericArgument),
-        nameForDiagnostics: "count",
-        documentation: """
-          The `count` argument for the inline array type.
-
-          - Note: In semantically valid Swift code, this is always an integer or a wildcard type, e.g `_` in `[_ of Int]`.
-          """
-      ),
-      Child(
-        name: "separator",
-        kind: .token(choices: [.keyword(.of)])
-      ),
-      Child(
-        name: "element",
-        kind: .node(kind: .genericArgument),
-        nameForDiagnostics: "element type",
-        documentation: """
-          The `element` argument for the inline array type.
-
-          - Note: In semantically valid Swift code, this is always a type.
-          """
-      ),
-      Child(
-        name: "rightSquare",
-        kind: .token(choices: [.token(.rightSquare)])
-      ),
-    ]
-  ),
-
-  Node(
     kind: .memberType,
     base: .type,
     nameForDiagnostics: "member type",
@@ -366,12 +279,6 @@ public let TYPE_NODES: [Node] = [
         kind: .token(choices: [.token(.period)])
       ),
       Child(
-        name: "moduleSelector",
-        kind: .node(kind: .moduleSelector),
-        nameForDiagnostics: "module selector",
-        isOptional: true
-      ),
-      Child(
         name: "name",
         kind: .token(choices: [.token(.identifier), .keyword(.self)]),
         nameForDiagnostics: "name"
@@ -381,11 +288,6 @@ public let TYPE_NODES: [Node] = [
         kind: .node(kind: .genericArgumentClause),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "moduleSelector": .introduced
-      ]
     ]
   ),
 
@@ -405,13 +307,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "metatypeSpecifier",
+        deprecatedName: "typeOrProtocol",
         kind: .token(choices: [.keyword(.Type), .keyword(.Protocol)])
       ),
-    ],
-    childHistory: [
-      [
-        "metatypeSpecifier": .renamed(from: "typeOrProtocol")
-      ]
     ]
   ),
 
@@ -422,19 +320,15 @@ public let TYPE_NODES: [Node] = [
     children: [
       Child(
         name: "genericParameterClause",
+        deprecatedName: "genericParameters",
         kind: .node(kind: .genericParameterClause),
         documentation: "The parameter clause that defines the generic parameters."
       ),
       Child(
         name: "type",
+        deprecatedName: "baseType",
         kind: .node(kind: .type)
       ),
-    ],
-    childHistory: [
-      [
-        "genericParameterClause": .renamed(from: "genericParameters"),
-        "type": .renamed(from: "baseType"),
-      ]
     ]
   ),
 
@@ -465,13 +359,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "type",
+        deprecatedName: "patternType",
         kind: .node(kind: .type)
       ),
-    ],
-    childHistory: [
-      [
-        "type": .renamed(from: "patternType")
-      ]
     ]
   ),
 
@@ -486,13 +376,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "repetitionPattern",
+        deprecatedName: "patternType",
         kind: .node(kind: .type)
       ),
-    ],
-    childHistory: [
-      [
-        "repetitionPattern": .renamed(from: "patternType")
-      ]
     ]
   ),
 
@@ -507,13 +393,9 @@ public let TYPE_NODES: [Node] = [
       ),
       Child(
         name: "pack",
+        deprecatedName: "packType",
         kind: .node(kind: .type)
       ),
-    ],
-    childHistory: [
-      [
-        "pack": .renamed(from: "packType")
-      ]
     ]
   ),
 
@@ -522,12 +404,6 @@ public let TYPE_NODES: [Node] = [
     base: .type,
     nameForDiagnostics: "type",
     children: [
-      Child(
-        name: "moduleSelector",
-        kind: .node(kind: .moduleSelector),
-        nameForDiagnostics: "module selector",
-        isOptional: true
-      ),
       Child(
         name: "name",
         kind: .token(choices: [
@@ -542,11 +418,6 @@ public let TYPE_NODES: [Node] = [
         kind: .node(kind: .genericArgumentClause),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "moduleSelector": .introduced
-      ]
     ]
   ),
 
@@ -567,11 +438,13 @@ public let TYPE_NODES: [Node] = [
     children: [
       Child(
         name: "inoutKeyword",
+        deprecatedName: "inOut",
         kind: .token(choices: [.keyword(.inout)]),
         isOptional: true
       ),
       Child(
         name: "firstName",
+        deprecatedName: "name",
         kind: .token(choices: [.token(.identifier), .token(.wildcard)]),
         nameForDiagnostics: "name",
         isOptional: true
@@ -601,12 +474,6 @@ public let TYPE_NODES: [Node] = [
         kind: .token(choices: [.token(.comma)]),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "inoutKeyword": .renamed(from: "inOut"),
-        "firstName": .renamed(from: "name"),
-      ]
     ]
   ),
 
@@ -709,52 +576,6 @@ public let TYPE_NODES: [Node] = [
   ),
 
   Node(
-    kind: .nonisolatedSpecifierArgument,
-    base: .syntax,
-    nameForDiagnostics: nil,
-    documentation: """
-      A single argument that can be added to a nonisolated specifier: 'nonsending'.
-
-      ### Example
-      `data` in `func foo(data: nonisolated(nonsending) () async -> Void) -> X`
-      """,
-    traits: [
-      "Parenthesized"
-    ],
-    children: [
-      Child(
-        name: "leftParen",
-        kind: .token(choices: [.token(.leftParen)])
-      ),
-      Child(
-        name: "nonsendingKeyword",
-        kind: .token(choices: [.keyword(.nonsending)])
-      ),
-      Child(
-        name: "rightParen",
-        kind: .token(choices: [.token(.rightParen)])
-      ),
-    ]
-  ),
-
-  Node(
-    kind: .nonisolatedTypeSpecifier,
-    base: .syntax,
-    nameForDiagnostics: "'nonisolated' specifier",
-    children: [
-      Child(
-        name: "nonisolatedKeyword",
-        kind: .token(choices: [.keyword(.nonisolated)])
-      ),
-      Child(
-        name: "argument",
-        kind: .node(kind: .nonisolatedSpecifierArgument),
-        isOptional: true
-      ),
-    ]
-  ),
-
-  Node(
     kind: .simpleTypeSpecifier,
     base: .syntax,
     nameForDiagnostics: "type specifier",
@@ -770,6 +591,7 @@ public let TYPE_NODES: [Node] = [
           .keyword(._const),
           .keyword(.borrowing),
           .keyword(.consuming),
+          .keyword(._resultDependsOn),
           .keyword(.sending),
         ]),
         documentation: "The specifier token that's attached to the type."
@@ -781,6 +603,6 @@ public let TYPE_NODES: [Node] = [
     kind: .typeSpecifierList,
     base: .syntaxCollection,
     nameForDiagnostics: nil,
-    elementChoices: [.simpleTypeSpecifier, .lifetimeTypeSpecifier, .nonisolatedTypeSpecifier]
+    elementChoices: [.simpleTypeSpecifier, .lifetimeTypeSpecifier]
   ),
 ]

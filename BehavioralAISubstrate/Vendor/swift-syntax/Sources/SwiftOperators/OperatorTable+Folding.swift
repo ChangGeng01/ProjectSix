@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
-@_spi(ExperimentalLanguageFeatures) public import SwiftSyntax
+#if swift(>=6)
+public import SwiftSyntax
 #else
-@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+import SwiftSyntax
 #endif
 
 extension ExprSyntax {
@@ -104,8 +104,8 @@ extension OperatorTable {
     op: ExprSyntax,
     rhs: ExprSyntax
   ) -> ExprSyntax {
-    // If the left-hand side is a "try", "await", or "unsafe", hoist it up to
-    // encompass the right-hand side as well.
+    // If the left-hand side is a "try" or "await", hoist it up to encompass
+    // the right-hand side as well.
     if let tryExpr = lhs.as(TryExprSyntax.self) {
       return ExprSyntax(
         TryExprSyntax(
@@ -137,24 +137,6 @@ extension OperatorTable {
         )
       )
     }
-
-    if let unsafeExpr = lhs.as(UnsafeExprSyntax.self) {
-      return ExprSyntax(
-        UnsafeExprSyntax(
-          unsafeExpr.unexpectedBeforeUnsafeKeyword,
-          unsafeKeyword: unsafeExpr.unsafeKeyword,
-          unsafeExpr.unexpectedBetweenUnsafeKeywordAndExpression,
-          expression: makeBinaryOperationExpr(
-            lhs: unsafeExpr.expression,
-            op: op,
-            rhs: rhs
-          ),
-          unsafeExpr.unexpectedAfterExpression
-        )
-      )
-    }
-    // NOTE: If you add a new try/await/unsafe-like hoisting case here, make
-    // sure to also update `allMacroLexicalContexts` to handle it.
 
     // The form of the binary operation depends on the operator itself,
     // which will be one of the unresolved infix operators.

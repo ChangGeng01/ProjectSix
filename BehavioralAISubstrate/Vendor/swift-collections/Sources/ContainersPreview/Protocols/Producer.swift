@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6.2) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 
 @_alwaysEmitIntoClient
 @_transparent
@@ -23,13 +23,13 @@ public var _producerBufferSize: Int { 8 }
 /// merely providing borrowing access to them. A `Producer` instance represents
 /// an ongoing iteration over such a generative sequence.
 @available(SwiftStdlib 5.0, *)
-public protocol Producer<Element, ProducerError>: ~Copyable, ~Escapable {
+public protocol Producer<Element, Failure>: ~Copyable, ~Escapable {
   /// The type of the items that this producer generates.
   associatedtype Element: ~Copyable
   
   /// The error that this producer may throw, or `Never` if this producer
   /// always succeeds.
-  associatedtype ProducerError: Error = Never
+  associatedtype Failure: Error = Never
   
   /// A value less than or equal to the number of remaining items that this
   /// producer is able to generate until it reaches its end.
@@ -94,7 +94,7 @@ public protocol Producer<Element, ProducerError>: ~Copyable, ~Escapable {
   @_lifetime(self: copy self)
   mutating func generate(
     into target: inout OutputSpan<Element>
-  ) throws(ProducerError) -> Bool
+  ) throws(Failure) -> Bool
   
   /// Skip at most the given number items in the underlying generative sequence,
   /// decreasing it by the number of items successfully skipped.
@@ -126,8 +126,8 @@ public protocol Producer<Element, ProducerError>: ~Copyable, ~Escapable {
   ///    skip at least one item without hitting the end of the underlying
   ///    sequence.
   @_lifetime(self: copy self)
-  mutating func skip(upTo n: inout Int) throws(ProducerError) -> Bool
-  
+  mutating func skip(by n: inout Int) throws(Failure) -> Bool
+
   /// Generate and return the next element in the underlying generative
   /// sequence.
   ///
@@ -160,11 +160,11 @@ public protocol Producer<Element, ProducerError>: ~Copyable, ~Escapable {
   /// implementation, but they may exhibit observably different performance
   /// metrics.
   @_lifetime(self: copy self)
-  mutating func next() throws(ProducerError) -> Element?
+  mutating func next() throws(Failure) -> Element?
 }
 
 @available(SwiftStdlib 5.0, *)
-extension Producer where Self: ~Copyable & ~Escapable {
+extension Producer where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   /// A value less than or equal to the number of remaining items that this
   /// producer is able to generate until it reaches its end.
   ///
@@ -205,12 +205,12 @@ extension Producer where Self: ~Copyable & ~Escapable {
   ///    sequence.
   @inlinable
   @_lifetime(self: copy self)
-  public mutating func skip(upTo n: inout Int) throws(ProducerError) -> Bool {
+  public mutating func skip(by n: inout Int) throws(Failure) -> Bool {
     precondition(n > 0, "Cannot skip fewer than one item")
     let maxBufferSize = 8
     return try withTemporaryOutputSpan(
       of: Element.self, capacity: Swift.min(maxBufferSize, n)
-    ) { span throws(ProducerError) in
+    ) { span throws(Failure) in
       defer { n &-= span.count }
       return try self.generate(into: &span)
     }
@@ -249,10 +249,10 @@ extension Producer where Self: ~Copyable & ~Escapable {
   /// metrics.
   @inlinable
   @_lifetime(self: copy self)
-  public mutating func next() throws(ProducerError) -> Element? {
+  public mutating func next() throws(Failure) -> Element? {
     try _withUnsafeTemporaryAllocation(
       of: Element.self, capacity: 1
-    ) { buffer throws(ProducerError) in
+    ) { buffer throws(Failure) in
       var span = OutputSpan(buffer: buffer, initializedCount: 0)
       guard try self.generate(into: &span) else { return nil }
       return span.removeLast()
@@ -261,16 +261,16 @@ extension Producer where Self: ~Copyable & ~Escapable {
 }
 
 @available(SwiftStdlib 5.0, *)
-extension Producer where Self: ~Copyable & ~Escapable {
+extension Producer where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   /// Returns true if the producer has no more elements, consuming it in
   /// the process. This is implemented by checking if it is possible to
   /// skip one item.
   ///
   /// This is useful in preconditions.
   @inlinable
-  public consuming func _isAtEnd() throws(ProducerError) -> Bool {
+  public consuming func _isAtEnd() throws(Failure) -> Bool {
     var c = 1
-    return try !skip(upTo: &c)
+    return try !skip(by: &c)
   }
 }
 

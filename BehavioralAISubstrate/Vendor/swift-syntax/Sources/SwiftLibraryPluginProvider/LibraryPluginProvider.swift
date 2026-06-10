@@ -1,22 +1,19 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if !os(WASI)
-
-#if compiler(>=6)
+#if swift(>=6.0)
 public import SwiftSyntaxMacros
 @_spi(PluginMessage) public import SwiftCompilerPluginMessageHandling
 private import _SwiftLibraryPluginProviderCShims
-
 // NOTE: Do not use '_SwiftSyntaxCShims' for 'dlopen' and 'LoadLibraryW' (Windows)
 // because we don't want other modules depend on 'WinSDK'.
 #if canImport(Darwin)
@@ -25,17 +22,10 @@ private import Darwin
 private import Glibc
 #elseif canImport(Musl)
 private import Musl
-#elseif canImport(Android)
-private import Android
-#endif  // canImport
-
-#else  // compiler(>=6)
-
+#endif
+#else
 import SwiftSyntaxMacros
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
-
-#if RESILIENT_LIBRARIES
-
 @_implementationOnly import _SwiftLibraryPluginProviderCShims
 #if canImport(Darwin)
 @_implementationOnly import Darwin
@@ -43,22 +33,8 @@ import SwiftSyntaxMacros
 @_implementationOnly import Glibc
 #elseif canImport(Musl)
 @_implementationOnly import Musl
-#endif  // canImport
-
-#else  // RESILIENT_LIBRARIES
-
-import _SwiftLibraryPluginProviderCShims
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#endif  // canImport
-
-#endif  // RESILIENT_LIBRARIES
-
-#endif  // compiler(>=6)
+#endif
+#endif
 
 /// Singleton 'PluginProvider' that can serve shared library plugins.
 @_spi(PluginMessage)
@@ -161,7 +137,7 @@ private func _loadLibrary(_ path: String) throws -> UnsafeMutableRawPointer {
 #else
 private func _loadLibrary(_ path: String) throws -> UnsafeMutableRawPointer {
   guard let dlHandle = dlopen(path, RTLD_LAZY | RTLD_LOCAL) else {
-    throw LibraryPluginError(message: "loader error: \(String(cString: dlerror()!))")
+    throw LibraryPluginError(message: "loader error: \(String(cString: dlerror()))")
   }
   return dlHandle
 }
@@ -223,5 +199,3 @@ extension UnsafeMutableBufferPointer {
   }
 }
 #endif
-
-#endif  // !os(WASI)

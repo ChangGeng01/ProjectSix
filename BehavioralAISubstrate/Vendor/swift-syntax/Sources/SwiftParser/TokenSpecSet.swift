@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
@@ -121,7 +121,7 @@ enum CanBeStatementStart: TokenSpecSet {
     case TokenSpec(.repeat): self = .repeat
     case TokenSpec(.return): self = .return
     case TokenSpec(.switch): self = .switch
-    case TokenSpec(.then) where experimentalFeatures.contains(.thenStatements): self = .then
+    case TokenSpec(.then): self = .then
     case TokenSpec(.throw): self = .throw
     case TokenSpec(.while): self = .while
     case TokenSpec(.yield): self = .yield
@@ -267,9 +267,9 @@ enum ContextualDeclKeyword: TokenSpecSet {
   }
 }
 
-/// A `DeclarationKeyword` that is not a `VariableDeclSyntax.BindingSpecifierOptions`.
+/// A `DeclarationKeyword` that is not a `ValueBindingPatternSyntax.BindingSpecifierOptions`.
 ///
-/// `VariableDeclSyntax.BindingSpecifierOptions` are injected into
+/// `ValueBindingPatternSyntax.BindingSpecifierOptions` are injected into
 /// `DeclarationKeyword` via an `EitherTokenSpecSet`.
 enum PureDeclarationKeyword: TokenSpecSet {
   case actor
@@ -290,7 +290,6 @@ enum PureDeclarationKeyword: TokenSpecSet {
   case `subscript`
   case `typealias`
   case pound
-  case using
 
   init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
     switch PrepareForKeywordMatch(lexeme) {
@@ -312,7 +311,6 @@ enum PureDeclarationKeyword: TokenSpecSet {
     case TokenSpec(.subscript): self = .subscript
     case TokenSpec(.typealias): self = .typealias
     case TokenSpec(.pound): self = .pound
-    case TokenSpec(.using) where experimentalFeatures.contains(.defaultIsolationPerFile): self = .using
     default: return nil
     }
   }
@@ -337,14 +335,13 @@ enum PureDeclarationKeyword: TokenSpecSet {
     case .subscript: return .keyword(.subscript)
     case .typealias: return .keyword(.typealias)
     case .pound: return TokenSpec(.pound, recoveryPrecedence: .openingPoundIf)
-    case .using: return TokenSpec(.using)
     }
   }
 }
 
 typealias DeclarationKeyword = EitherTokenSpecSet<
   PureDeclarationKeyword,
-  VariableDeclSyntax.BindingSpecifierOptions
+  ValueBindingPatternSyntax.BindingSpecifierOptions
 >
 
 enum DeclarationModifier: TokenSpecSet {
@@ -384,6 +381,8 @@ enum DeclarationModifier: TokenSpecSet {
   case `static`
   case unowned
   case weak
+  case _resultDependsOn
+  case _resultDependsOnSelf
 
   init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
     switch PrepareForKeywordMatch(lexeme) {
@@ -423,6 +422,9 @@ enum DeclarationModifier: TokenSpecSet {
     case TokenSpec(.sending): self = .sending
     case TokenSpec(.unowned): self = .unowned
     case TokenSpec(.weak): self = .weak
+    case TokenSpec(._resultDependsOn) where experimentalFeatures.contains(.nonescapableTypes): self = ._resultDependsOn
+    case TokenSpec(._resultDependsOnSelf) where experimentalFeatures.contains(.nonescapableTypes):
+      self = ._resultDependsOnSelf
     default: return nil
     }
   }
@@ -465,6 +467,8 @@ enum DeclarationModifier: TokenSpecSet {
     case .sending: return .keyword(.sending)
     case .unowned: return TokenSpec(.unowned, recoveryPrecedence: .declKeyword)
     case .weak: return TokenSpec(.weak, recoveryPrecedence: .declKeyword)
+    case ._resultDependsOn: return TokenSpec(._resultDependsOn, recoveryPrecedence: .declKeyword)
+    case ._resultDependsOnSelf: return TokenSpec(._resultDependsOnSelf, recoveryPrecedence: .declKeyword)
     }
   }
 }
@@ -697,27 +701,23 @@ enum ExpressionModifierKeyword: TokenSpecSet {
   case _move
   case _borrow
   case `try`
-  case borrow
   case consume
   case copy
   case `repeat`
   case each
   case any
-  case unsafe
 
   init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
     switch PrepareForKeywordMatch(lexeme) {
     case TokenSpec(.await): self = .await
-    case TokenSpec(._move) where experimentalFeatures.contains(.oldOwnershipOperatorSpellings): self = ._move
-    case TokenSpec(._borrow) where experimentalFeatures.contains(.oldOwnershipOperatorSpellings): self = ._borrow
+    case TokenSpec(._move): self = ._move
+    case TokenSpec(._borrow): self = ._borrow
     case TokenSpec(.try): self = .try
-    case TokenSpec(.borrow): self = .borrow
     case TokenSpec(.consume): self = .consume
     case TokenSpec(.copy): self = .copy
     case TokenSpec(.repeat): self = .repeat
     case TokenSpec(.each): self = .each
     case TokenSpec(.any): self = .any
-    case TokenSpec(.unsafe): self = .unsafe
     default: return nil
     }
   }
@@ -727,14 +727,12 @@ enum ExpressionModifierKeyword: TokenSpecSet {
     case .await: return .keyword(.await)
     case ._move: return .keyword(._move)
     case ._borrow: return .keyword(._borrow)
-    case .borrow: return .keyword(.borrow)
     case .consume: return .keyword(.consume)
     case .copy: return .keyword(.copy)
     case .try: return .keyword(.try)
     case .repeat: return .keyword(.repeat)
     case .each: return .keyword(.each)
     case .any: return .keyword(.any)
-    case .unsafe: return .keyword(.unsafe)
     }
   }
 }
@@ -835,7 +833,6 @@ enum PrimaryExpressionStart: TokenSpecSet {
   case `Any`
   case atSign  // For recovery
   case `Self`
-  case colonColon
   case `deinit`
   case dollarIdentifier
   case `false`
@@ -868,7 +865,6 @@ enum PrimaryExpressionStart: TokenSpecSet {
     case TokenSpec(.Any): self = .Any
     case TokenSpec(.atSign): self = .atSign
     case TokenSpec(.Self): self = .Self
-    case TokenSpec(.colonColon): self = .colonColon
     case TokenSpec(.deinit): self = .`deinit`
     case TokenSpec(.dollarIdentifier): self = .dollarIdentifier
     case TokenSpec(.false): self = .false
@@ -904,7 +900,6 @@ enum PrimaryExpressionStart: TokenSpecSet {
     case .Any: return .keyword(.Any)
     case .atSign: return .atSign
     case .Self: return .keyword(.Self)
-    case .colonColon: return .colonColon
     case .`deinit`: return .keyword(.`deinit`)
     case .dollarIdentifier: return .dollarIdentifier
     case .false: return .keyword(.false)

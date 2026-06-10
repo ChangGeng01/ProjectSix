@@ -1,30 +1,20 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6) && RESILIENT_LIBRARIES
-@_implementationOnly private import _SwiftSyntaxCShims
-#elseif compiler(>=6) && !RESILIENT_LIBRARIES
+#if swift(>=6)
 private import _SwiftSyntaxCShims
-#elseif !compiler(>=6) && RESILIENT_LIBRARIES
-@_implementationOnly import _SwiftSyntaxCShims
-#elseif !compiler(>=6) && !RESILIENT_LIBRARIES
-import _SwiftSyntaxCShims
-#endif
-
-#if compiler(>=6)
-internal import SwiftIfConfig
 public import SwiftSyntaxMacros
 #else
-import SwiftIfConfig
+@_implementationOnly import _SwiftSyntaxCShims
 import SwiftSyntaxMacros
 #endif
 
@@ -84,21 +74,15 @@ struct HostCapability {
 ///
 /// The low level connection and the provider is injected by the client.
 @_spi(PluginMessage)
-public class CompilerPluginMessageListener<Connection: MessageConnection, Handler: PluginMessageHandler> {
+public class CompilerPluginMessageListener<Connection: MessageConnection, Provider: PluginProvider> {
   /// Message channel for bidirectional communication with the plugin host.
   let connection: Connection
 
-  let handler: Handler
+  let handler: CompilerPluginMessageHandler<Provider>
 
-  public init(connection: Connection, messageHandler: Handler) {
+  public init(connection: Connection, provider: Provider) {
     self.connection = connection
-    self.handler = messageHandler
-  }
-
-  public init<Provider: PluginProvider>(connection: Connection, provider: Provider)
-  where Handler == PluginProviderMessageHandler<Provider> {
-    self.connection = connection
-    self.handler = PluginProviderMessageHandler(provider: provider)
+    self.handler = CompilerPluginMessageHandler(provider: provider)
   }
 
   /// Run the main message listener loop.
@@ -106,55 +90,25 @@ public class CompilerPluginMessageListener<Connection: MessageConnection, Handle
   ///
   /// On internal errors, such as I/O errors or JSON serialization errors, print
   /// an error message and `exit(1)`
-  public func main() throws {
-    #if os(WASI)
-    // Rather than blocking on read(), let the host tell us when there's data.
-    readabilityHandler = { _ = self.handleNextMessage() }
-    #else
-    while handleNextMessage() {}
-    try self.handler.shutDown()
-    #endif
-  }
-
-  /// Receives and handles a single message from the plugin host.
-  ///
-  /// - Returns: `true` if there was a message to read, `false`
-  /// if the end-of-file was reached.
-  private func handleNextMessage() -> Bool {
+  public func main() {
     do {
-      guard let message = try connection.waitForNextMessage(HostToPluginMessage.self) else {
-        return false
+      while let message = try connection.waitForNextMessage(HostToPluginMessage.self) {
+        let result = handler.handleMessage(message)
+        try connection.sendMessage(result)
       }
-      let result = handler.handleMessage(message)
-      try connection.sendMessage(result)
-      return true
     } catch {
       // Emit a diagnostic and indicate failure to the plugin host,
       // and exit with an error code.
-      fputs("Internal Error: \(error)\n", swift_syntax_stderr)
+      fputs("Internal Error: \(error)\n", _stderr)
       exit(1)
     }
   }
 }
 
-/// A type that handles a plugin message and returns a response.
-///
-/// - SeeAlso: ``PluginProviderMessageHandler``
+/// 'CompilerPluginMessageHandler' is a type that handle a message and do the
+/// corresponding operation.
 @_spi(PluginMessage)
-public protocol PluginMessageHandler {
-  /// Handles a single message received from the plugin host.
-  func handleMessage(_ message: HostToPluginMessage) -> PluginToHostMessage
-
-  /// Deterministically and synchronously cleans up resources that cannot be dealt with in
-  /// a deinitializer due to possible errors thrown during the clean up. Usually this
-  /// includes closure of file handles, sockets, shutting down external processes and IPC
-  /// resources set up for these processes, etc.
-  func shutDown() throws
-}
-
-/// A `PluginMessageHandler` that uses a `PluginProvider`.
-@_spi(PluginMessage)
-public class PluginProviderMessageHandler<Provider: PluginProvider>: PluginMessageHandler {
+public class CompilerPluginMessageHandler<Provider: PluginProvider> {
   /// Object to provide actual plugin functions.
   let provider: Provider
 
@@ -191,25 +145,12 @@ public class PluginProviderMessageHandler<Provider: PluginProvider>: PluginMessa
       let macroRole,
       let discriminator,
       let expandingSyntax,
-      let lexicalContext,
-      let staticBuildConfigurationString
+      let lexicalContext
     ):
-      // Decode the static build configuration.
-      let staticBuildConfiguration: StaticBuildConfiguration?
-      if let staticBuildConfigurationString {
-        var mutableConfigurationString = staticBuildConfigurationString
-        staticBuildConfiguration = mutableConfigurationString.withUTF8 {
-          try? JSON.decode(StaticBuildConfiguration.self, from: $0)
-        }
-      } else {
-        staticBuildConfiguration = nil
-      }
-
       return expandFreestandingMacro(
         macro: macro,
         macroRole: macroRole,
         discriminator: discriminator,
-        staticBuildConfiguration: staticBuildConfiguration,
         expandingSyntax: expandingSyntax,
         lexicalContext: lexicalContext
       )
@@ -223,25 +164,12 @@ public class PluginProviderMessageHandler<Provider: PluginProvider>: PluginMessa
       let parentDeclSyntax,
       let extendedTypeSyntax,
       let conformanceListSyntax,
-      let lexicalContext,
-      let staticBuildConfigurationString
+      let lexicalContext
     ):
-      // Decode the static build configuration.
-      let staticBuildConfiguration: StaticBuildConfiguration?
-      if let staticBuildConfigurationString {
-        var mutableConfigurationString = staticBuildConfigurationString
-        staticBuildConfiguration = mutableConfigurationString.withUTF8 {
-          try? JSON.decode(StaticBuildConfiguration.self, from: $0)
-        }
-      } else {
-        staticBuildConfiguration = nil
-      }
-
       return expandAttachedMacro(
         macro: macro,
         macroRole: macroRole,
         discriminator: discriminator,
-        staticBuildConfiguration: staticBuildConfiguration,
         attributeSyntax: attributeSyntax,
         declSyntax: declSyntax,
         parentDeclSyntax: parentDeclSyntax,
@@ -269,15 +197,7 @@ public class PluginProviderMessageHandler<Provider: PluginProvider>: PluginMessa
       return .loadPluginLibraryResult(loaded: diags.isEmpty, diagnostics: diags)
     }
   }
-
-  /// Empty implementation for the default message handler, since all resources are automatically
-  /// cleaned up in the synthesized initializer.
-  public func shutDown() throws {}
 }
-
-@_spi(PluginMessage)
-@available(*, deprecated, renamed: "PluginProviderMessageHandler")
-public typealias CompilerPluginMessageHandler<Provider: PluginProvider> = PluginProviderMessageHandler<Provider>
 
 struct UnimplementedError: Error, CustomStringConvertible {
   var description: String { "unimplemented" }
@@ -296,31 +216,3 @@ extension PluginProvider {
     throw UnimplementedError()
   }
 }
-
-#if compiler(>=6) && os(WASI)
-
-/// A callback invoked by the Wasm Host when new data is available on `stdin`.
-///
-/// This is safe to access without serialization as Wasm plugins are single-threaded.
-nonisolated(unsafe) private var readabilityHandler: () -> Void = {
-  fatalError(
-    """
-    CompilerPlugin.main wasn't called. Did you annotate your plugin with '@main'?
-    """
-  )
-}
-
-@_expose(wasm, "swift_wasm_macro_v1_pump")
-@_cdecl("swift_wasm_macro_v1_pump")
-func wasmPump() {
-  readabilityHandler()
-}
-
-// we can't nest the whole #if-#else in '#if os(WASI)' due to a bug where
-// '#if compiler' directives have to be the top-level #if, otherwise
-// the compiler doesn't skip unknown syntax.
-#elseif os(WASI)
-
-#error("Building swift-syntax for WebAssembly requires compiler version 6.0 or higher.")
-
-#endif

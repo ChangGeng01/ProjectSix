@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension RigidDictionary where Key: ~Copyable, Value: ~Copyable {
@@ -96,14 +96,14 @@ extension RigidDictionary where Key: ~Copyable, Value: ~Copyable {
     return nil
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @inlinable
   @discardableResult
   @_lifetime(&self)
   public mutating func memoizedValue<E: Error>(
     forKey key: consuming Key,
     _ body: (borrowing Key) throws(E) -> Value
-  ) throws(E) -> Borrow<Value> {
+  ) throws(E) -> Ref<Value> {
     let r = _find(key)
     let bucket: _Bucket
     if let b = r.bucket {
@@ -136,7 +136,8 @@ extension RigidDictionary where Key: ~Copyable, Value: ~Copyable {
         if let value = value.take() { // Simple update
           _valuePtr(at: bucket).initialize(to: value)
         } else { // Removal
-          _ = _removeValue(at: bucket)
+          self._keyPtr(at: bucket).deinitialize(count: 1)
+          _resolveHole(at: bucket)
         }
       } else if let value = value.take() { // Insertion
         self._insertNew(key.take()!, hashValue: r.hashValue, value)

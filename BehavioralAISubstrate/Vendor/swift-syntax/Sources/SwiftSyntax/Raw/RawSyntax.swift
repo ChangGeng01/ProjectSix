@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_spi(RawSyntax) public typealias RawSyntaxBuffer = ArenaAllocatedBufferPointer<RawSyntax?>
+@_spi(RawSyntax) public typealias RawSyntaxBuffer = SyntaxArenaAllocatedBufferPointer<RawSyntax?>
 
-typealias RawTriviaPieceBuffer = ArenaAllocatedBufferPointer<RawTriviaPiece>
+typealias RawTriviaPieceBuffer = SyntaxArenaAllocatedBufferPointer<RawTriviaPiece>
 
 fileprivate extension SyntaxKind {
   /// Whether this node kind should be considered as `hasError` for purposes of `RecursiveRawSyntaxFlags`.
@@ -39,7 +39,7 @@ struct RecursiveRawSyntaxFlags: OptionSet, Sendable {
 /// Node data for RawSyntax tree. Tagged union plus common data.
 internal struct RawSyntaxData: Sendable {
   internal enum Payload: Sendable {
-    /// - Important: A raw syntax node for a parsed token must always be allocated in a `ParsingRawSyntaxArena` so we can
+    /// - Important: A raw syntax node for a parsed token must always be allocated in a `ParsingSyntaxArena` so we can
     ///   parse the trivia in the token.
     case parsedToken(ParsedToken)
     case materializedToken(MaterializedToken)
@@ -169,7 +169,7 @@ internal struct RawSyntaxData: Sendable {
   }
 
   var payload: Payload
-  var arenaReference: RawSyntaxArenaRef
+  var arenaReference: SyntaxArenaRef
 }
 
 extension RawSyntaxData.ParsedToken {
@@ -186,10 +186,10 @@ extension RawSyntaxData.ParsedToken {
 
 extension RawSyntaxData.MaterializedToken {
   var leadingTrivia: RawTriviaPieceBuffer {
-    RawTriviaPieceBuffer(rebasing: triviaPieces[..<Int(numLeadingTrivia)])
+    triviaPieces[..<Int(numLeadingTrivia)]
   }
   var trailingTrivia: RawTriviaPieceBuffer {
-    RawTriviaPieceBuffer(rebasing: triviaPieces[Int(numLeadingTrivia)...])
+    triviaPieces[Int(numLeadingTrivia)...]
   }
 }
 
@@ -199,35 +199,31 @@ extension RawSyntaxData.MaterializedToken {
 @_spi(RawSyntax)
 public struct RawSyntax: Sendable {
 
-  /// Pointer to the actual data which resides in a RawSyntaxArena.
-  var pointer: ArenaAllocatedPointer<RawSyntaxData>
-  init(pointer: ArenaAllocatedPointer<RawSyntaxData>) {
+  /// Pointer to the actual data which resides in a SyntaxArena.
+  var pointer: SyntaxArenaAllocatedPointer<RawSyntaxData>
+  init(pointer: SyntaxArenaAllocatedPointer<RawSyntaxData>) {
     self.pointer = pointer
   }
 
-  init(arena: __shared RawSyntaxArena, payload: RawSyntaxData.Payload) {
-    let arenaRef = RawSyntaxArenaRef(arena)
+  init(arena: __shared SyntaxArena, payload: RawSyntaxData.Payload) {
+    let arenaRef = SyntaxArenaRef(arena)
     let data = RawSyntaxData(
       payload: payload,
       arenaReference: arenaRef
     )
-    self.init(pointer: ArenaAllocatedPointer(arena.intern(data)))
+    self.init(pointer: SyntaxArenaAllocatedPointer(arena.intern(data)))
   }
 
   var rawData: RawSyntaxData {
-    @_transparent unsafeAddress { pointer.pointer }
+    pointer.pointee
   }
 
-  public var arena: RetainedRawSyntaxArena {
-    arenaReference.retained
-  }
-
-  internal var arenaReference: RawSyntaxArenaRef {
+  internal var arenaReference: SyntaxArenaRef {
     rawData.arenaReference
   }
 
   internal var payload: RawSyntaxData.Payload {
-    rawData.payload
+    get { rawData.payload }
   }
 }
 
@@ -313,9 +309,9 @@ extension RawSyntax {
   /// If the syntax tree did not contain a token and thus no trivia could be attached to it, `nil` is returned.
   /// - Parameters:
   ///   - leadingTrivia: The trivia to attach.
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   @_spi(RawSyntax)
-  public func withLeadingTrivia(_ leadingTrivia: Trivia, arena: RawSyntaxArena) -> RawSyntax? {
+  public func withLeadingTrivia(_ leadingTrivia: Trivia, arena: SyntaxArena) -> RawSyntax? {
     switch view {
     case .token(let tokenView):
       return .makeMaterializedToken(
@@ -340,9 +336,9 @@ extension RawSyntax {
   /// If the syntax tree did not contain a token and thus no trivia could be attached to it, `nil` is returned.
   /// - Parameters:
   ///   - trailingTrivia: The trivia to attach.
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   @_spi(RawSyntax)
-  public func withTrailingTrivia(_ trailingTrivia: Trivia, arena: RawSyntaxArena) -> RawSyntax? {
+  public func withTrailingTrivia(_ trailingTrivia: Trivia, arena: SyntaxArena) -> RawSyntax? {
     switch view {
     case .token(let tokenView):
       return .makeMaterializedToken(
@@ -365,23 +361,16 @@ extension RawSyntax {
 }
 
 extension RawTriviaPiece {
-  /// Call `body` with the syntax text of this trivia piece.
-  ///
-  /// If `isEphemeral` is `true`, the ``SyntaxText`` argument is only guaranteed
-  /// to be valid within the call.
-  func withSyntaxText(body: (SyntaxText, _ isEphemeral: Bool) throws -> Void) rethrows {
+  func withSyntaxText(body: (SyntaxText) throws -> Void) rethrows {
     if let syntaxText = storedText {
-      try body(syntaxText, /*isEphemeral*/ false)
+      try body(syntaxText)
       return
     }
 
     var description = ""
     write(to: &description)
     try description.withUTF8 { buffer in
-      try body(
-        SyntaxText(baseAddress: buffer.baseAddress, count: buffer.count),
-        /*isEphemeral*/ true
-      )
+      try body(SyntaxText(baseAddress: buffer.baseAddress, count: buffer.count))
     }
   }
 }
@@ -393,21 +382,21 @@ extension RawSyntax {
   /// Unlike `description`, this provides a source-accurate representation
   /// even in the presence of malformed UTF-8 in the input source.
   ///
-  /// If `isEphemeral` is `true`, the ``SyntaxText`` arguments passed to the
-  /// visitor are only guaranteed to be valid within that call. Otherwise, they
-  /// are valid as long as the raw syntax is alive.
-  public func withEachSyntaxText(body: (SyntaxText, _ isEphemeral: Bool) throws -> Void) rethrows {
+  /// The ``SyntaxText`` arguments passed to the visitor are only guaranteed
+  /// to be valid within that call. It is unsafe to escape the `SyntaxValue`
+  /// values outside of the closure.
+  public func withEachSyntaxText(body: (SyntaxText) throws -> Void) rethrows {
     switch rawData.payload {
     case .parsedToken(let dat):
       if dat.presence == .present {
-        try body(dat.wholeText, /*isEphemeral*/ false)
+        try body(dat.wholeText)
       }
     case .materializedToken(let dat):
       if dat.presence == .present {
         for p in dat.leadingTrivia {
           try p.withSyntaxText(body: body)
         }
-        try body(dat.tokenText, /*isEphemeral*/ false)
+        try body(dat.tokenText)
         for p in dat.trailingTrivia {
           try p.withSyntaxText(body: body)
         }
@@ -423,20 +412,9 @@ extension RawSyntax {
   /// source even in the presence of invalid UTF-8.
   public var syntaxTextBytes: [UInt8] {
     var result: [UInt8] = []
-    var buf: SyntaxText = ""
-    withEachSyntaxText { syntaxText, isEphemeral in
-      if isEphemeral {
-        result.append(contentsOf: buf)
-        result.append(contentsOf: syntaxText)
-        buf = ""
-      } else if let base = buf.baseAddress, base + buf.count == syntaxText.baseAddress {
-        buf = SyntaxText(baseAddress: base, count: buf.count + syntaxText.count)
-      } else {
-        result.append(contentsOf: buf)
-        buf = syntaxText
-      }
+    withEachSyntaxText { syntaxText in
+      result.append(contentsOf: syntaxText)
     }
-    result.append(contentsOf: buf)
     return result
   }
 }
@@ -568,14 +546,14 @@ extension RawSyntax {
   ///   - wholeText: Whole text of this token including trailing/leading trivia.
   ///   - textRange: Range of the token text in `wholeText`.
   ///   - presence: Whether the token appeared in the source code or if it was synthesized.
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   internal static func parsedToken(
     kind: RawTokenKind,
     wholeText: SyntaxText,
     textRange: Range<SyntaxText.Index>,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared ParsingRawSyntaxArena
+    arena: __shared ParsingSyntaxArena
   ) -> RawSyntax {
     assert(
       arena.contains(text: wholeText),
@@ -608,7 +586,7 @@ extension RawSyntax {
   ///   - numLeadingTrivia: Number of leading trivia pieces in `triviaPieces`.
   ///   - byteLength: Byte length of this token including trivia.
   ///   - presence: Whether the token appeared in the source code or if it was synthesized.
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   internal static func materializedToken(
     kind: RawTokenKind,
     text: SyntaxText,
@@ -617,7 +595,7 @@ extension RawSyntax {
     byteLength: UInt32,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) -> RawSyntax {
     let payload = RawSyntaxData.MaterializedToken(
       tokenKind: kind,
@@ -640,7 +618,7 @@ extension RawSyntax {
   ///   - leadingTriviaPieceCount: Number of leading trivia pieces.
   ///   - trailingTriviaPieceCount: Number of trailing trivia pieces.
   ///   - presence: Whether the token appeared in the source code or if it was synthesized.
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   ///   - initializingLeadingTriviaWith: A closure that initializes leading trivia pieces.
   ///   - initializingTrailingTriviaWith: A closure that initializes trailing trivia pieces.
   public static func makeMaterializedToken(
@@ -650,7 +628,7 @@ extension RawSyntax {
     trailingTriviaPieceCount: Int,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared RawSyntaxArena,
+    arena: __shared SyntaxArena,
     initializingLeadingTriviaWith: (UnsafeMutableBufferPointer<RawTriviaPiece>) -> Void,
     initializingTrailingTriviaWith: (UnsafeMutableBufferPointer<RawTriviaPiece>) -> Void
   ) -> RawSyntax {
@@ -680,7 +658,7 @@ extension RawSyntax {
   /// Factory method to create a materialized token node.
   ///
   /// - Parameters:
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   ///   - kind: Token kind.
   ///   - text: Token text.
   ///   - leadingTrivia: Leading trivia.
@@ -691,7 +669,7 @@ extension RawSyntax {
     trailingTrivia: Trivia,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) -> RawSyntax {
     let decomposed = kind.decomposeToRaw()
     let rawKind = decomposed.rawKind
@@ -724,7 +702,7 @@ extension RawSyntax {
 
   static func makeMissingToken(
     kind: TokenKind,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) -> RawSyntax {
     let (rawKind, _) = kind.decomposeToRaw()
     return .materializedToken(
@@ -748,7 +726,7 @@ extension RawSyntax {
   /// `makeEmptyLayout(arena:kind:)` instead.
   ///
   /// - Parameters:
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   ///   - kind: Syntax kind. This should not be `.token`.
   ///   - layout: Layout buffer of the children.
   ///   - byteLength: Computed total byte length of this node.
@@ -759,7 +737,7 @@ extension RawSyntax {
     byteLength: Int,
     descendantCount: Int,
     recursiveFlags: RecursiveRawSyntaxFlags,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) -> RawSyntax {
     validateLayout(layout: layout, as: kind)
     let payload = RawSyntaxData.Layout(
@@ -775,7 +753,7 @@ extension RawSyntax {
   /// Factory method to create a layout node.
   ///
   /// - Parameters:
-  ///   - arena: RawSyntaxArena to the result node data resides.
+  ///   - arena: SyntaxArena to the result node data resides.
   ///   - kind: Syntax kind.
   ///   - count: Number of children.
   ///   - initializer: A closure that initializes elements.
@@ -783,7 +761,7 @@ extension RawSyntax {
     kind: SyntaxKind,
     uninitializedCount count: Int,
     isMaximumNestingLevelOverflow: Bool = false,
-    arena: __shared RawSyntaxArena,
+    arena: __shared SyntaxArena,
     initializingWith initializer: (UnsafeMutableBufferPointer<RawSyntax?>) -> Void
   ) -> RawSyntax {
     // Allocate and initialize the list.
@@ -821,7 +799,7 @@ extension RawSyntax {
 
   static func makeEmptyLayout(
     kind: SyntaxKind,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) -> RawSyntax {
     var recursiveFlags = RecursiveRawSyntaxFlags()
     if kind.hasError {
@@ -840,7 +818,7 @@ extension RawSyntax {
   static func makeLayout(
     kind: SyntaxKind,
     from collection: some Collection<RawSyntax?>,
-    arena: __shared RawSyntaxArena,
+    arena: __shared SyntaxArena,
     leadingTrivia: Trivia? = nil,
     trailingTrivia: Trivia? = nil
   ) -> RawSyntax {
@@ -958,7 +936,7 @@ extension RawSyntax {
 extension RawSyntax: Identifiable {
   public struct ID: Hashable, @unchecked Sendable {
     /// The pointer to the start of the `RawSyntax` node.
-    fileprivate var pointer: UnsafeRawPointer
+    private var pointer: UnsafeRawPointer
     fileprivate init(_ raw: RawSyntax) {
       self.pointer = raw.pointer.unsafeRawPointer
     }

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -18,7 +18,7 @@ import SwiftSyntax
 
 /// Describes a "some" parameter that has been rewritten into a generic
 /// parameter.
-private struct RewrittenSome {
+fileprivate struct RewrittenSome {
   let original: SomeOrAnyTypeSyntax
   let genericParam: GenericParameterSyntax
   let genericParamRef: IdentifierTypeSyntax
@@ -37,7 +37,7 @@ private struct RewrittenSome {
 /// ```swift
 /// func someFunction<T1: Value>(_ input: T1) {}
 /// ```
-private class SomeParameterRewriter: SyntaxRewriter {
+fileprivate class SomeParameterRewriter: SyntaxRewriter {
   var rewrittenSomeParameters: [RewrittenSome] = []
 
   override func visit(_ node: SomeOrAnyTypeSyntax) -> TypeSyntax {
@@ -60,7 +60,7 @@ private class SomeParameterRewriter: SyntaxRewriter {
 
     let genericParam = GenericParameterSyntax(
       attributes: [],
-      specifier: nil,
+      eachKeyword: nil,
       name: paramNameSyntax,
       colon: colon,
       inheritedType: inheritedType,
@@ -179,7 +179,7 @@ public struct OpaqueParameterToGeneric: SyntaxRefactoringProvider {
   public static func refactor(
     syntax decl: DeclSyntax,
     in context: Void
-  ) throws -> DeclSyntax {
+  ) -> DeclSyntax? {
     // Function declaration.
     if let funcSyntax = decl.as(FunctionDeclSyntax.self) {
       guard
@@ -188,7 +188,7 @@ public struct OpaqueParameterToGeneric: SyntaxRefactoringProvider {
           augmenting: funcSyntax.genericParameterClause
         )
       else {
-        throw RefactoringNotApplicableError("found no parameters to rewrite")
+        return nil
       }
 
       return DeclSyntax(
@@ -206,7 +206,7 @@ public struct OpaqueParameterToGeneric: SyntaxRefactoringProvider {
           augmenting: initSyntax.genericParameterClause
         )
       else {
-        throw RefactoringNotApplicableError("found no parameters to rewrite")
+        return nil
       }
 
       return DeclSyntax(
@@ -224,7 +224,7 @@ public struct OpaqueParameterToGeneric: SyntaxRefactoringProvider {
           augmenting: subscriptSyntax.genericParameterClause
         )
       else {
-        throw RefactoringNotApplicableError("found no parameters to rewrite")
+        return nil
       }
 
       return DeclSyntax(
@@ -234,6 +234,6 @@ public struct OpaqueParameterToGeneric: SyntaxRefactoringProvider {
       )
     }
 
-    throw RefactoringNotApplicableError("unsupported declaration")
+    return nil
   }
 }

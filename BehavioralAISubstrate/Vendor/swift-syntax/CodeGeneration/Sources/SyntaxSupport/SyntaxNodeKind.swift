@@ -17,14 +17,12 @@ import SwiftSyntaxBuilder
 ///
 /// Using the cases of this enum, children of syntax nodes can refer the syntax
 /// node that defines their layout.
-public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeConvertible {
+public enum SyntaxNodeKind: String, CaseIterable {
   // Please keep this list sorted alphabetically
 
   case _canImportExpr
   case _canImportVersionInfo
-  case abiAttributeArguments
   case accessorBlock
-  case accessorBlockFile
   case accessorDecl
   case accessorDeclList
   case accessorEffectSpecifiers
@@ -40,13 +38,11 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case associatedTypeDecl
   case attribute
   case attributedType
-  case attributeClauseFile
   case attributeList
   case availabilityArgument
   case availabilityArgumentList
   case availabilityCondition
   case availabilityLabeledArgument
-  case availabilityMacroDefinitionFile
   case awaitExpr
   case backDeployedAttributeArguments
   case binaryOperatorExpr
@@ -71,7 +67,6 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case closureShorthandParameterList
   case closureSignature
   case codeBlock
-  case codeBlockFile
   case codeBlockItem
   case codeBlockItemList
   case compositionType
@@ -82,6 +77,8 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case conformanceRequirement
   case consumeExpr
   case continueStmt
+  case conventionAttributeArguments
+  case conventionWitnessMethodAttributeArguments
   case copyExpr
   case decl
   case declModifier
@@ -123,6 +120,7 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case enumCaseParameterClause
   case enumCaseParameterList
   case enumDecl
+  case exposeAttributeArguments
   case expr
   case expressionPattern
   case expressionSegment
@@ -169,7 +167,6 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case inheritedTypeList
   case initializerClause
   case initializerDecl
-  case inlineArrayType
   case inOutExpr
   case integerLiteralExpr
   case isExpr
@@ -180,7 +177,6 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case keyPathOptionalComponent
   case keyPathPropertyComponent
   case keyPathSubscriptComponent
-  case keyPathMethodComponent
   case labeledExpr
   case labeledExprList
   case labeledSpecializeArgument
@@ -197,7 +193,6 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case memberBlock
   case memberBlockItem
   case memberBlockItemList
-  case memberBlockItemListFile
   case memberType
   case metatypeType
   case missing
@@ -206,16 +201,13 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case missingPattern
   case missingStmt
   case missingType
-  case moduleSelector
   case multipleTrailingClosureElement
   case multipleTrailingClosureElementList
   case namedOpaqueReturnType
   case nilLiteralExpr
-  case nonisolatedSpecifierArgument
-  case nonisolatedSpecifierArgumentList
-  case nonisolatedTypeSpecifier
   case objCSelectorPiece
   case objCSelectorPieceList
+  case opaqueReturnTypeOfAttributeArguments
   case operatorDecl
   case operatorPrecedenceAndTypes
   case optionalBindingCondition
@@ -260,7 +252,6 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case simpleStringLiteralSegmentList
   case someOrAnyType
   case sourceFile
-  case specializedAttributeArgument
   case specializeAttributeArgumentList
   case specializeAvailabilityArgument
   case specializeTargetFunctionArgument
@@ -301,13 +292,12 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
   case typeSpecifier
   case lifetimeSpecifierArguments
   case typeSpecifierList
-  case unexpectedCodeDecl
+  case unavailableFromAsyncAttributeArguments
+  case underscorePrivateAttributeArguments
   case unexpectedNodes
   case unresolvedAsExpr
   case unresolvedIsExpr
   case unresolvedTernaryExpr
-  case unsafeExpr
-  case usingDecl
   case valueBindingPattern
   case variableDecl
   case versionComponent
@@ -337,6 +327,7 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     }
   }
 
+  /// Whether this is one of the syntax base nodes.
   public var isBase: Bool {
     switch self {
     case .decl, .expr, .pattern, .stmt, .syntax, .syntaxCollection, .type:
@@ -346,19 +337,13 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     }
   }
 
-  public var identifier: TokenSyntax {
+  /// A name for this node that is suitable to be used as a variables or enum
+  /// case's name.
+  public var varOrCaseName: TokenSyntax {
     return .identifier(rawValue)
   }
 
-  public var uppercasedFirstWordRawValue: String {
-    switch self {
-    case .abiAttributeArguments:
-      "ABIAttributeArguments"
-    default:
-      rawValue.withFirstCharacterUppercased
-    }
-  }
-
+  /// The type name of this node in the SwiftSyntax module.
   public var syntaxType: TypeSyntax {
     switch self {
     case .syntax:
@@ -366,10 +351,11 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     case .syntaxCollection:
       return "SyntaxCollection"
     default:
-      return "\(raw: uppercasedFirstWordRawValue)Syntax"
+      return "\(raw: rawValue.withFirstCharacterUppercased)Syntax"
     }
   }
 
+  /// Whether the node is public API and not underscored/deprecated and can thus be referenced in docc links.
   public var isAvailableInDocc: Bool {
     if let node = SYNTAX_NODE_MAP[self], node.isExperimental {
       return false
@@ -380,8 +366,37 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     }
   }
 
+  /// If this node is non-experimental a docc link wrapped in two backticks.
+  ///
+  /// For experimental nodes, the node's type name in code font.
+  public var doccLink: String {
+    if isAvailableInDocc {
+      return "``\(syntaxType)``"
+    } else {
+      return "`\(syntaxType)`"
+    }
+  }
+
+  /// For base nodes, the name of the corresponding protocol to which all the
+  /// concrete nodes that have this base kind, conform.
   public var protocolType: TypeSyntax {
     return "\(syntaxType)Protocol"
+  }
+
+  /// The name of this node at the `RawSyntax` level.
+  public var rawType: TypeSyntax {
+    return "Raw\(syntaxType)"
+  }
+
+  /// For base nodes, the name of the corresponding raw protocol to which all the
+  /// concrete raw nodes that have this base kind, conform.
+  public var rawProtocolType: TypeSyntax {
+    switch self {
+    case .syntax, .syntaxCollection:
+      return "RawSyntaxNodeProtocol"
+    default:
+      return "Raw\(raw: rawValue.withFirstCharacterUppercased)SyntaxNodeProtocol"
+    }
   }
 
   /// For base node types, generates the name of the protocol to which all
@@ -458,7 +473,6 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     case .someOrAnyType: return "constrainedSugarType"
     case .simpleTypeSpecifier: return "typeSpecifier"
     case .specializeAttributeArgumentList: return "specializeAttributeSpecList"
-    case .specializedAttributeArgument: return "specializedAttribute"
     case .specializeAvailabilityArgument: return "availabilityEntry"
     case .specializeTargetFunctionArgument: return "targetFunctionEntry"
     case .stringLiteralSegmentList: return "stringLiteralSegments"
@@ -467,6 +481,7 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     case .switchCaseItem: return "caseItem"
     case .switchCaseItemList: return "caseItemList"
     case .typeAliasDecl: return "typealiasDecl"
+    case .unavailableFromAsyncAttributeArguments: return "unavailableFromAsyncArguments"
     case .yieldedExpression: return "yieldExprListElement"
     case .yieldedExpressionList: return "yieldExprList"
     case .yieldedExpressionsClause: return "yieldList"
@@ -492,9 +507,5 @@ public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeCon
     } else {
       AttributeSyntax(#"@available(*, deprecated, renamed: "\#(syntaxType)")"#)
     }
-  }
-
-  public var raw: RawSyntaxNodeKind {
-    RawSyntaxNodeKind(syntaxNodeKind: self)
   }
 }

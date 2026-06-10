@@ -13,7 +13,7 @@
 import SwiftSyntax
 
 /// Represents the specification for a Token in the TokenSyntax file.
-public struct TokenSpec: IdentifierConvertible {
+public struct TokenSpec {
   public enum Kind {
     case punctuation
     /// The `keyword` TokenKind that contains the actual keyword as an associated value
@@ -21,8 +21,8 @@ public struct TokenSpec: IdentifierConvertible {
     case other
   }
 
-  /// The name of the token as an identifier.
-  public let identifier: TokenSyntax
+  /// The name of the token, suitable for use in variable or enum case names.
+  public let varOrCaseName: TokenSyntax
 
   /// The experimental feature the token is part of, or `nil` if this isn't
   /// for an experimental feature.
@@ -66,7 +66,7 @@ public struct TokenSpec: IdentifierConvertible {
     text: String? = nil,
     kind: Kind
   ) {
-    self.identifier = .identifier(name)
+    self.varOrCaseName = .identifier(name)
     self.experimentalFeature = experimentalFeature
     self.nameForDiagnostics = nameForDiagnostics
     self.text = text
@@ -126,7 +126,6 @@ public enum Token: CaseIterable {
   case backtick
   case binaryOperator
   case colon
-  case colonColon
   case comma
   case dollarIdentifier
   case ellipsis
@@ -186,8 +185,6 @@ public enum Token: CaseIterable {
       return .other(name: "binaryOperator", nameForDiagnostics: "binary operator")
     case .colon:
       return .punctuator(name: "colon", text: ":")
-    case .colonColon:
-      return .punctuator(name: "colonColon", text: "::")
     case .comma:
       return .punctuator(name: "comma", text: ",")
     case .dollarIdentifier:

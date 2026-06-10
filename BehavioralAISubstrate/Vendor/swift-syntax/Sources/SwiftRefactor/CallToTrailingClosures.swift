@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 import SwiftBasicFormat
 public import SwiftSyntax
 #else
@@ -50,48 +50,22 @@ public struct CallToTrailingClosures: SyntaxRefactoringProvider {
     }
   }
 
-  public typealias Input = Syntax
-  public typealias Output = Syntax
-
-  /// Apply the refactoring to a given syntax node. If either a
-  /// non-function-like syntax node is passed, or the refactoring fails,
-  /// an error is thrown.
-  public static func refactor(
-    syntax: Syntax,
-    in context: Context = Context()
-  ) throws -> Syntax {
-    guard let call = syntax.asProtocol(CallLikeSyntax.self) else {
-      throw RefactoringNotApplicableError("not a call")
-    }
-    return try Syntax(fromProtocol: _refactor(syntax: call, in: context))
-  }
-
-  @available(*, deprecated, message: "Pass a Syntax argument instead of FunctionCallExprSyntax")
+  // TODO: Rather than returning nil, we should consider throwing errors with
+  // appropriate messages instead.
   public static func refactor(
     syntax call: FunctionCallExprSyntax,
     in context: Context = Context()
-  ) throws -> FunctionCallExprSyntax {
-    try _refactor(syntax: call, in: context)
-  }
-
-  internal static func _refactor<C: CallLikeSyntax>(
-    syntax call: C,
-    in context: Context = Context()
-  ) throws -> C {
-    let converted = try call.convertToTrailingClosures(from: context.startAtArgument)
-
-    guard let formatted = converted.formatted().as(C.self) else {
-      throw RefactoringNotApplicableError("format error")
-    }
-
-    return formatted
+  ) -> FunctionCallExprSyntax? {
+    let converted = call.convertToTrailingClosures(from: context.startAtArgument)
+    return converted?.formatted().as(FunctionCallExprSyntax.self)
   }
 }
 
-extension CallLikeSyntax {
-  fileprivate func convertToTrailingClosures(from startAtArgument: Int) throws -> Self {
+extension FunctionCallExprSyntax {
+  fileprivate func convertToTrailingClosures(from startAtArgument: Int) -> FunctionCallExprSyntax? {
     guard trailingClosure == nil, additionalTrailingClosures.isEmpty, leftParen != nil, rightParen != nil else {
-      throw RefactoringNotApplicableError("call already uses trailing closures")
+      // Already have trailing closures
+      return nil
     }
 
     var closures = [(original: LabeledExprSyntax, closure: ClosureExprSyntax)]()
@@ -110,7 +84,7 @@ extension CallLikeSyntax {
     }
 
     guard !closures.isEmpty else {
-      throw RefactoringNotApplicableError("no arguments to convert to closures")
+      return nil
     }
 
     // First trailing closure won't have label/colon. Transfer their trivia.
@@ -175,6 +149,12 @@ extension CallLikeSyntax {
     }
 
     return converted
+  }
+}
+
+fileprivate extension Trivia {
+  var droppingLeadingWhitespace: Trivia {
+    return Trivia(pieces: self.drop(while: \.isWhitespace))
   }
 }
 

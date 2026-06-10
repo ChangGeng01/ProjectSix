@@ -158,7 +158,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
     guard cut > 0 else { return .init(start: nil, count: 0) }
     let oldStart = baseAddress.unsafelyUnwrapped
     self = Self(start: oldStart + cut, count: count - cut)
-    return Self(start: baseAddress, count: cut)
+    return Self(start: oldStart, count: cut)
   }
 
   @_alwaysEmitIntoClient
@@ -167,8 +167,10 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
     precondition(maxLength >= 0, "Cannot have a suffix of negative length")
     let cut = Swift.min(maxLength, count)
     guard cut > 0 else { return .init(start: nil, count: 0) }
-    self = .init(start: baseAddress, count: count &- cut)
-    return Self(start: baseAddress.unsafelyUnwrapped + (count &- cut), count: cut)
+    let oldStart = baseAddress.unsafelyUnwrapped
+    let newCount = count &- cut
+    self = .init(start: oldStart, count: newCount)
+    return Self(start: oldStart + newCount, count: cut)
   }
 }
 

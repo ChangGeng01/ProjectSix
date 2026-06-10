@@ -156,9 +156,6 @@ extension SyntaxProtocol {
   /// Return this subtree with this node as the root, ie. detach this node
   /// from its parent.
   public var detached: Self {
-    if !self.hasParent {
-      return self
-    }
     // Make sure `self` (and thus the arena of `self.raw`) can’t get deallocated
     // before the detached node can be created.
     return withExtendedLifetime(self) {
@@ -189,7 +186,7 @@ extension SyntaxProtocol {
   }
 }
 
-// MARK: Children / parent / ancestor
+// MARK: Children / parent
 
 extension SyntaxProtocol {
   /// A sequence over the children of this node.
@@ -205,7 +202,7 @@ extension SyntaxProtocol {
 
   /// The index of this node in a ``SyntaxChildren`` collection.
   internal var indexInParent: SyntaxChildrenIndex {
-    return SyntaxChildrenIndex(value: Syntax(self).layoutIndexInParent)
+    return SyntaxChildrenIndex(Syntax(self).absoluteInfo)
   }
 
   /// The parent of this syntax node, or `nil` if this node is the root.
@@ -215,12 +212,16 @@ extension SyntaxProtocol {
 
   /// The root of the tree in which this node resides.
   public var root: Syntax {
-    return Syntax(self).root
+    var this = _syntaxNode
+    while let parent = this.parent {
+      this = parent
+    }
+    return this
   }
 
   /// Whether or not this node has a parent.
   public var hasParent: Bool {
-    return Syntax(self).hasParent
+    return parent != nil
   }
 
   public var keyPathInParent: AnyKeyPath? {
@@ -230,20 +231,12 @@ extension SyntaxProtocol {
     guard case .layout(let childrenKeyPaths) = parent.kind.syntaxNodeType.structure else {
       return nil
     }
-    return childrenKeyPaths[Syntax(self).layoutIndexInParent]
+    return childrenKeyPaths[Syntax(self).indexInParent]
   }
 
   @available(*, deprecated, message: "Use previousToken(viewMode:) instead")
   public var previousToken: TokenSyntax? {
     return self.previousToken(viewMode: .sourceAccurate)
-  }
-
-  /// Applies `map` to this node and each of its ancestors until a non-`nil`
-  /// value is produced, then returns that value.
-  ///
-  /// If no node has a non-`nil` mapping, returns `nil`.
-  public func ancestorOrSelf<T>(mapping map: (Syntax) -> T?) -> T? {
-    Syntax(self).ancestorOrSelf(mapping: map)
   }
 }
 
@@ -253,7 +246,21 @@ extension SyntaxProtocol {
   /// Recursively walks through the tree to find the token semantically before
   /// this node.
   public func previousToken(viewMode: SyntaxTreeViewMode) -> TokenSyntax? {
-    return self._syntaxNode.previousToken(viewMode: viewMode)
+    guard let parent = self.parent else {
+      return nil
+    }
+    let siblings = NonNilRawSyntaxChildren(parent, viewMode: viewMode)
+    // `self` could be a missing node at index 0 and `viewMode` be `.sourceAccurate`.
+    // In that case `siblings` skips over the missing `self` node and has a `startIndex > 0`.
+    if self.indexInParent >= siblings.startIndex {
+      for absoluteRaw in siblings[..<self.indexInParent].reversed() {
+        let child = Syntax(absoluteRaw, parent: parent)
+        if let token = child.lastToken(viewMode: viewMode) {
+          return token
+        }
+      }
+    }
+    return parent.previousToken(viewMode: viewMode)
   }
 
   @available(*, deprecated, message: "Use nextToken(viewMode:) instead")
@@ -264,7 +271,18 @@ extension SyntaxProtocol {
   /// Recursively walks through the tree to find the next token semantically
   /// after this node.
   public func nextToken(viewMode: SyntaxTreeViewMode) -> TokenSyntax? {
-    return self._syntaxNode.nextToken(viewMode: viewMode)
+    guard let parent = self.parent else {
+      return nil
+    }
+    let siblings = NonNilRawSyntaxChildren(parent, viewMode: viewMode)
+    let nextSiblingIndex = siblings.index(after: self.indexInParent)
+    for absoluteRaw in siblings[nextSiblingIndex...] {
+      let child = Syntax(absoluteRaw, parent: parent)
+      if let token = child.firstToken(viewMode: viewMode) {
+        return token
+      }
+    }
+    return parent.nextToken(viewMode: viewMode)
   }
 
   @available(*, deprecated, message: "Use firstToken(viewMode: .sourceAccurate) instead")
@@ -274,7 +292,17 @@ extension SyntaxProtocol {
 
   /// Returns the first token node that is part of this syntax node.
   public func firstToken(viewMode: SyntaxTreeViewMode) -> TokenSyntax? {
-    return self._syntaxNode.firstToken(viewMode: viewMode)
+    guard viewMode.shouldTraverse(node: raw) else { return nil }
+    if let token = _syntaxNode.as(TokenSyntax.self) {
+      return token
+    }
+
+    for child in children(viewMode: viewMode) {
+      if let token = child.firstToken(viewMode: viewMode) {
+        return token
+      }
+    }
+    return nil
   }
 
   @available(*, deprecated, message: "Use lastToken(viewMode: .sourceAccurate) instead")
@@ -284,7 +312,17 @@ extension SyntaxProtocol {
 
   /// Returns the last token node that is part of this syntax node.
   public func lastToken(viewMode: SyntaxTreeViewMode) -> TokenSyntax? {
-    return self._syntaxNode.lastToken(viewMode: viewMode)
+    guard viewMode.shouldTraverse(node: raw) else { return nil }
+    if let token = _syntaxNode.as(TokenSyntax.self) {
+      return token
+    }
+
+    for child in children(viewMode: viewMode).reversed() {
+      if let tok = child.lastToken(viewMode: viewMode) {
+        return tok
+      }
+    }
+    return nil
   }
 
   /// Sequence of tokens that are part of this Syntax node.
@@ -321,27 +359,20 @@ extension SyntaxProtocol {
   /// If the identifier references a node from a different tree (ie. one that has a different root ID in the
   /// ``SyntaxIdentifier``) or if no node with the given identifier is a child of this syntax node, returns `nil`.
   public func node(at syntaxIdentifier: SyntaxIdentifier) -> Syntax? {
-    let syntax = Syntax(self)
-    guard syntax.raw.id == syntaxIdentifier.rootId else {
+    guard self.id <= syntaxIdentifier && syntaxIdentifier < self.id.advancedBySibling(self.raw) else {
+      // The syntax identifier is not part of this tree.
       return nil
     }
-
-    func _node(at indexInTree: UInt32, in node: Syntax) -> Syntax? {
-      let i = node.absoluteInfo.indexInTree
-      if i == indexInTree {
+    if self.id == syntaxIdentifier {
+      return Syntax(self)
+    }
+    for child in children(viewMode: .all) {
+      if let node = child.node(at: syntaxIdentifier) {
         return node
       }
-      guard i < indexInTree, indexInTree < i &+ UInt32(truncatingIfNeeded: node.raw.totalNodes) else {
-        return nil
-      }
-      for child in node.children(viewMode: .all) {
-        if let node = _node(at: indexInTree, in: child) {
-          return node
-        }
-      }
-      preconditionFailure("syntaxIdentifier is covered by this node but not any of its children?")
     }
-    return _node(at: syntaxIdentifier.indexInTree.indexInTree, in: syntax)
+
+    preconditionFailure("syntaxIdentifier is covered by this node but not any of its children?")
   }
 }
 
@@ -413,34 +444,19 @@ extension SyntaxProtocol {
   }
 
   /// The byte source range of this node including leading and trailing trivia.
-  @available(*, deprecated, renamed: "range")
   public var totalByteRange: ByteSourceRange {
     return ByteSourceRange(offset: position.utf8Offset, length: totalLength.utf8Length)
-  }
-
-  /// The range of this node including leading and trailing trivia.
-  public var range: Range<AbsolutePosition> {
-    return position..<endPosition
   }
 
   /// The byte source range of this node excluding leading and trailing trivia.
   ///
   /// - Note: If this node consists of multiple tokens, only the first token’s
   ///   leading and the last token’s trailing trivia will be trimmed.
-  @available(*, deprecated, renamed: "trimmedRange")
   public var trimmedByteRange: ByteSourceRange {
     return ByteSourceRange(
       offset: positionAfterSkippingLeadingTrivia.utf8Offset,
       length: trimmedLength.utf8Length
     )
-  }
-
-  /// The range of this node excluding leading and trailing trivia.
-  ///
-  /// - Note: If this node consists of multiple tokens, only the first token’s
-  ///   leading and the last token’s trailing trivia will be trimmed.
-  public var trimmedRange: Range<AbsolutePosition> {
-    return positionAfterSkippingLeadingTrivia..<endPositionBeforeTrailingTrivia
   }
 
   @available(*, deprecated, renamed: "trimmedLength")
@@ -484,7 +500,7 @@ extension SyntaxProtocol {
       return raw.formLeadingTrivia()
     }
     set {
-      self = Syntax(self).withLeadingTrivia(newValue, rawAllocationArena: RawSyntaxArena()).cast(Self.self)
+      self = Syntax(self).withLeadingTrivia(newValue, arena: SyntaxArena()).cast(Self.self)
     }
   }
 
@@ -503,7 +519,7 @@ extension SyntaxProtocol {
       return raw.formTrailingTrivia()
     }
     set {
-      self = Syntax(self).withTrailingTrivia(newValue, rawAllocationArena: RawSyntaxArena()).cast(Self.self)
+      self = Syntax(self).withTrailingTrivia(newValue, arena: SyntaxArena()).cast(Self.self)
     }
   }
 
@@ -540,18 +556,16 @@ extension SyntaxProtocol {
 
   /// Prints the raw value of this node to the provided stream.
   /// - Parameter stream: The stream to which to print the raw tree.
-  public func write<Target>(to stream: inout Target)
+  public func write<Target>(to target: inout Target)
   where Target: TextOutputStream {
-    Syntax(self).raw.write(to: &stream)
+    Syntax(self).raw.write(to: &target)
   }
 
   /// A copy of this node without the leading trivia of the first token in the
   /// node and the trailing trivia of the last token in the node.
-  ///
-  /// The trimmed node is detached from its parent.
   public var trimmed: Self {
     // TODO: Should only need one new node here
-    return self.detached.with(\.leadingTrivia, []).with(\.trailingTrivia, [])
+    return self.with(\.leadingTrivia, []).with(\.trailingTrivia, [])
   }
 
   /// A copy of this node with pieces that match `matching` trimmed from the
@@ -624,8 +638,8 @@ extension SyntaxProtocol {
   ///   `[startLine:startCol...endLine:endCol]` to each node.
   ///   - mark: Adds `***` around the given node, intended to highlight it in
   ///   the dump.
-  ///   - indentString: The starting indentation, empty by default. Each
-  ///   additional indentation will add 2 spaces.
+  ///   - indentLevel: The starting indent level, 0 by default. Each level is 2
+  ///   spaces.
   public func debugDescription(
     includeTrivia: Bool = false,
     converter: SourceLocationConverter? = nil,

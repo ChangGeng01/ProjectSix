@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -25,11 +25,12 @@ extension SyntaxProtocol {
   /// consecutive tokens would have the same classification then a single classified
   /// range is provided for all of them.
   public var classifications: SyntaxClassifications {
-    return SyntaxClassifications(_syntaxNode, in: self.range)
+    let fullRange = ByteSourceRange(offset: 0, length: totalLength.utf8Length)
+    return SyntaxClassifications(_syntaxNode, in: fullRange)
   }
 
   /// Sequence of ``SyntaxClassifiedRange``s contained in this syntax node within
-  /// a source range.
+  /// a relative range.
   ///
   /// The provided classified ranges may extend beyond the provided `range`.
   /// Active classifications (non-`none`) will extend the range to include the
@@ -40,9 +41,9 @@ extension SyntaxProtocol {
   /// intersect the provided `range`.
   ///
   /// - Parameters:
-  ///   - in: The range to pull ``SyntaxClassifiedRange``s from.
+  ///   - in: The relative byte range to pull ``SyntaxClassifiedRange``s from.
   /// - Returns: Sequence of ``SyntaxClassifiedRange``s.
-  public func classifications(in range: Range<AbsolutePosition>) -> SyntaxClassifications {
+  public func classifications(in range: ByteSourceRange) -> SyntaxClassifications {
     return SyntaxClassifications(_syntaxNode, in: range)
   }
 
@@ -51,20 +52,19 @@ extension SyntaxProtocol {
   ///   - at: The relative to the node byte offset.
   /// - Returns: The ``SyntaxClassifiedRange`` for the offset or nil if the source text
   ///   at the given offset is unclassified.
-  @available(*, deprecated, message: "Use classification(at: AbsolutePosition) instead.")
   public func classification(at offset: Int) -> SyntaxClassifiedRange? {
-    return classification(at: AbsolutePosition(utf8Offset: offset + self.position.utf8Offset))
+    let classifications = SyntaxClassifications(_syntaxNode, in: ByteSourceRange(offset: offset, length: 1))
+    var iterator = classifications.makeIterator()
+    return iterator.next()
   }
 
   /// The ``SyntaxClassifiedRange`` for an absolute position.
   /// - Parameters:
   ///   - at: The absolute position.
-  /// - Returns: The ``SyntaxClassifiedRange`` for the position or `nil`` if the source text
+  /// - Returns: The ``SyntaxClassifiedRange`` for the position or nil if the source text
   ///   at the given position is unclassified.
   public func classification(at position: AbsolutePosition) -> SyntaxClassifiedRange? {
-    let range = Range(position: position, length: SourceLength(utf8Length: 1))
-    let classifications = SyntaxClassifications(_syntaxNode, in: range)
-    var iterator = classifications.makeIterator()
-    return iterator.next()
+    let relativeOffset = position.utf8Offset - self.position.utf8Offset
+    return self.classification(at: relativeOffset)
   }
 }

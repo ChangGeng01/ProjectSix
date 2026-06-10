@@ -74,7 +74,7 @@ extension Unicode.Scalar {
   }
 
   var isValidIdentifierStartCodePoint: Bool {
-    if self.isASCII {
+    if (self.isASCII) {
       return self.isAsciiIdentifierStart
     }
     guard self.isValidIdentifierContinuationCodePoint else {
@@ -84,38 +84,13 @@ extension Unicode.Scalar {
     // N1518: Recommendations for extended identifier characters for C and C++
     // Proposed Annex X.2: Ranges of characters disallowed initially
     let c = self.value
-    if (c >= 0x0300 && c <= 0x036F) || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20FF)
-      || (c >= 0xFE20 && c <= 0xFE2F)
+    if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20FF)
+      || (c >= 0xFE20 && c <= 0xFE2F))
     {
       return false
     }
 
     return true
-  }
-
-  var isForbiddenRawIdentifierWhitespace: Bool {
-    let c = self.value
-    // This is the set of code points satisfying the `White_Space` property,
-    // excluding the set satisfying the `Pattern_White_Space` property, and
-    // excluding any other ASCII non-printables and Unicode separators. In
-    // other words, the only whitespace code points allowed in a raw
-    // identifier are U+0020, and U+200E/200F (LTR/RTL marks).
-    return (c >= 0x0009 && c <= 0x000D) as Bool
-      || (c == 0x0085) as Bool
-      || (c == 0x00A0) as Bool
-      || (c == 0x1680) as Bool
-      || (c >= 0x2000 && c <= 0x200A) as Bool
-      || (c >= 0x2028 && c <= 0x2029) as Bool
-      || (c == 0x202F) as Bool
-      || (c == 0x205F) as Bool
-      || (c == 0x3000) as Bool
-  }
-
-  var isPermittedRawIdentifierWhitespace: Bool {
-    let c = self.value
-    return (c == 0x0020) as Bool
-      || (c == 0x200E) as Bool
-      || (c == 0x200F) as Bool
   }
 
   /// isOperatorStartCodePoint - Return true if the specified code point is a
@@ -183,7 +158,7 @@ extension Unicode.Scalar {
       return nil
     }
 
-    if curByte < 0x80 {
+    if (curByte < 0x80) {
       return Unicode.Scalar(curByte)
     }
 
@@ -216,7 +191,7 @@ extension Unicode.Scalar {
       }
       // If the high bit isn't set or the second bit isn't clear, then this is not
       // a continuation byte!
-      if curByte < 0x80 || curByte >= 0xC0 {
+      if (curByte < 0x80 || curByte >= 0xC0) {
         return nil
       }
 
@@ -270,6 +245,24 @@ extension UInt8 {
 }
 
 /// Allows direct comparisons between UInt8 and double quoted literals.
+extension UInt8 {
+  /// Equality operator
+  @_transparent
+  static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+  /// Inequality operator
+  @_transparent
+  static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    return i != UInt8(ascii: s)
+  }
+  /// Used in switch statements
+  @_transparent
+  static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+}
+
 extension UInt8? {
   /// Equality operator
   @_transparent

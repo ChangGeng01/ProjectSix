@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Finds all marked ranges in the given text, see `Marker`.
-private func findMarkedRanges(text: String) -> [Marker] {
+fileprivate func findMarkedRanges(text: String) -> [Marker] {
   var markers = [Marker]()
   while let marker = nextMarkedRange(text: text, from: markers.last?.range.upperBound ?? text.startIndex) {
     markers.append(marker)
@@ -29,7 +29,7 @@ extension Character {
   }
 }
 
-private func nextMarkedRange(text: String, from: String.Index) -> Marker? {
+fileprivate func nextMarkedRange(text: String, from: String.Index) -> Marker? {
   guard let start = text[from...].firstIndex(where: { $0.isMarkerEmoji }) else {
     return nil
   }
@@ -41,7 +41,7 @@ private func nextMarkedRange(text: String, from: String.Index) -> Marker? {
   return Marker(name: name, range: markerRange)
 }
 
-private struct Marker {
+fileprivate struct Marker {
   /// The name of the marker.
   let name: Substring
   /// The range of the marker.

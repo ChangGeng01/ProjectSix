@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -35,7 +35,7 @@ import SwiftSyntax
 /// "Hello World"
 /// ```
 public struct FormatRawStringLiteral: SyntaxRefactoringProvider {
-  public static func refactor(syntax lit: StringLiteralExprSyntax, in context: Void) -> StringLiteralExprSyntax {
+  public static func refactor(syntax lit: StringLiteralExprSyntax, in context: Void) -> StringLiteralExprSyntax? {
     var maximumHashes = 0
     for segment in lit.segments {
       switch segment {

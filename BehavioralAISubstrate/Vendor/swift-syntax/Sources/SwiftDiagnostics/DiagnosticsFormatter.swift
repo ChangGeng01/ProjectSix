@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -293,13 +293,10 @@ public struct DiagnosticsFormatter {
         )
       )
 
-      // Remove any trailing newline and replace it; this may seem
-      // counterintuitive, but if we're running within CMake and we let a
-      // '\r\n' through, CMake will turn that into *two* newlines.
-      if let last = annotatedSource.last, last.isNewline {
-        annotatedSource.removeLast()
+      // If the line did not end with \n (e.g. the last line), append it manually
+      if annotatedSource.last != "\n" {
+        annotatedSource.append("\n")
       }
-      annotatedSource.append("\n")
 
       let columnsWithDiagnostics = Set(
         annotatedLine.diagnostics.map {
@@ -334,13 +331,8 @@ public struct DiagnosticsFormatter {
       }
 
       // Add suffix text.
-      if !annotatedLine.suffixText.isEmpty {
-        annotatedSource.append(annotatedLine.suffixText)
-
-        // See above for an explanation of why we do this
-        if let last = annotatedSource.last, last.isNewline {
-          annotatedSource.removeLast()
-        }
+      annotatedSource.append(annotatedLine.suffixText)
+      if annotatedSource.last != "\n" {
         annotatedSource.append("\n")
       }
     }
@@ -358,47 +350,5 @@ public struct DiagnosticsFormatter {
       indentString: "",
       suffixTexts: [:]
     )
-  }
-
-  /// Produce a string that formats the given diagnostic message with any
-  /// source-location information.
-  public func formattedMessage(_ message: some DiagnosticMessage) -> String {
-    diagnosticDecorator.decorateDiagnosticMessage(message)
-  }
-
-  /// Produce a string containing "footnotes" for each of the diagnostic
-  /// category provided that has associated documentation. Each category
-  /// is printed in Markdown link format, e.g.,
-  ///
-  /// ```
-  /// [#categoryName]: <categoryDocumentationURL>
-  /// ```
-  ///
-  /// This function also deduplicates entries and alphabetizes the results.
-  ///
-  /// - Parameters:
-  ///   - categories: the categories to print
-  ///   - leadingText: text that is prefixed to the list of categories when
-  ///     there is at least one category to print.
-  public func categoryFootnotes(
-    _ categories: some Sequence<DiagnosticCategory>,
-    leadingText: String = "\n"
-  ) -> String {
-    let categoriesInOrder = categories.compactMap { category in
-      if let documentationURL = category.documentationURL {
-        return (category.name, documentationURL)
-      } else {
-        return nil
-      }
-    }.sorted { $0.0.lowercased() < $1.0.lowercased() }
-
-    if categoriesInOrder.isEmpty {
-      return ""
-    }
-
-    return leadingText
-      + categoriesInOrder.map { name, url in
-        "[#\(name)]: <\(url)>"
-      }.joined(separator: "\n")
   }
 }

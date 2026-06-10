@@ -15,6 +15,30 @@ import SwiftSyntaxBuilder
 import SyntaxSupport
 import Utils
 
+fileprivate extension Node {
+  var childrenChoicesEnums: [(name: TypeSyntax, choices: [(caseName: TokenSyntax, kind: SyntaxNodeKind)])] {
+    let node = self
+    if let node = node.layoutNode {
+      return node.children.compactMap {
+        child -> (name: TypeSyntax, choices: [(caseName: TokenSyntax, kind: SyntaxNodeKind)])? in
+        switch child.kind {
+        case .nodeChoices(let choices):
+          return (child.syntaxChoicesType, choices.map { ($0.varOrCaseName, $0.syntaxNodeKind) })
+        default:
+          return nil
+        }
+      }
+    } else if let node = node.collectionNode, node.elementChoices.count > 1 {
+      let choices = node.elementChoices.map { choice -> (TokenSyntax, SyntaxNodeKind) in
+        (SYNTAX_NODE_MAP[choice]!.varOrCaseName, SYNTAX_NODE_MAP[choice]!.kind)
+      }
+      return [("Element", choices)]
+    } else {
+      return []
+    }
+  }
+}
+
 func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
   return SourceFileSyntax(leadingTrivia: copyrightHeader) {
     for node in SYNTAX_NODES
@@ -25,7 +49,7 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
       DeclSyntax(
         """
         \(node.apiAttributes(forRaw: true))\
-        public protocol \(node.kind.raw.protocolType): \(node.base.raw.protocolType) {}
+        public protocol \(node.kind.rawType)NodeProtocol: \(node.base.rawProtocolType) {}
         """
       )
     }
@@ -35,11 +59,50 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
       try! StructDeclSyntax(
         """
         \(node.apiAttributes(forRaw: true))\
-        public struct \(node.kind.raw.syntaxType): \(node.kind.isBase ? node.kind.raw.protocolType : node.base.raw.protocolType)
+        public struct \(node.kind.rawType): \(node.kind.isBase ? node.kind.rawProtocolType : node.base.rawProtocolType)
         """
       ) {
-        for childNodeChoices in node.childrenNodeChoices(forRaw: true) {
-          childNodeChoices.rawEnumDecl
+        for (name, choices) in node.childrenChoicesEnums {
+          try EnumDeclSyntax(
+            """
+            public enum \(name): RawSyntaxNodeProtocol
+            """
+          ) {
+            for (caseName, kind) in choices {
+              DeclSyntax("case `\(caseName)`(\(kind.rawType))")
+            }
+
+            DeclSyntax(
+              """
+              public static func isKindOf(_ raw: RawSyntax) -> Bool {
+                return \(raw: choices.map { "\($0.kind.rawType).isKindOf(raw)" }.joined(separator: " || "))
+              }
+              """
+            )
+
+            try VariableDeclSyntax("public var raw: RawSyntax") {
+              try SwitchExprSyntax("switch self") {
+                for (swiftName, _) in choices {
+                  SwitchCaseSyntax("case .\(swiftName)(let node): return node.raw")
+                }
+              }
+            }
+
+            try InitializerDeclSyntax("public init?(_ other: some RawSyntaxNodeProtocol)") {
+              for (swiftName, kind) in choices {
+                StmtSyntax(
+                  """
+                  if let node = \(kind.rawType)(other) {
+                    self = .\(swiftName)(node)
+                    return
+                  }
+                  """
+                )
+              }
+
+              StmtSyntax("return nil")
+            }
+          }
         }
 
         DeclSyntax(
@@ -58,7 +121,7 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
               for n in SYNTAX_NODES where n.base == node.kind {
                 SwitchCaseItemSyntax(
                   pattern: ExpressionPatternSyntax(
-                    expression: ExprSyntax(".\(n.memberCallName)")
+                    expression: ExprSyntax(".\(n.varOrCaseName)")
                   )
                 )
               }
@@ -73,7 +136,7 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
               """
             )
           } else {
-            StmtSyntax("return raw.kind == .\(node.memberCallName)")
+            StmtSyntax("return raw.kind == .\(node.varOrCaseName)")
           }
         }
 
@@ -108,7 +171,7 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
         if node.kind.isBase {
           DeclSyntax(
             """
-            public init(_ other: some \(node.kind.raw.protocolType)) {
+            public init(_ other: some \(node.kind.rawType)NodeProtocol) {
               self.init(unchecked: other.raw)
             }
             """
@@ -116,12 +179,12 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
         }
 
         if let node = node.collectionNode {
-          let element = node.elementChoices.only != nil ? node.elementChoices.only!.raw.syntaxType : "Element"
+          let element = node.elementChoices.only != nil ? node.elementChoices.only!.rawType : "Element"
           DeclSyntax(
             """
-            public init(elements: [\(element)], arena: __shared RawSyntaxArena) {
+            public init(elements: [\(element)], arena: __shared SyntaxArena) {
               let raw = RawSyntax.makeLayout(
-                kind: .\(node.memberCallName), uninitializedCount: elements.count, arena: arena) { layout in
+                kind: .\(node.varOrCaseName), uninitializedCount: elements.count, arena: arena) { layout in
                   guard var ptr = layout.baseAddress else { return }
                   for elem in elements {
                     ptr.initialize(to: elem.raw)
@@ -146,15 +209,15 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
           let params = FunctionParameterListSyntax {
             for child in node.children {
               FunctionParameterSyntax(
-                firstName: child.isUnexpectedNodes ? .wildcardToken(trailingTrivia: .space) : child.labelDeclName,
-                secondName: child.isUnexpectedNodes ? child.labelDeclName : nil,
+                firstName: child.isUnexpectedNodes ? .wildcardToken(trailingTrivia: .space) : child.varOrCaseName,
+                secondName: child.isUnexpectedNodes ? child.varOrCaseName : nil,
                 colon: .colonToken(),
                 type: child.rawParameterType,
                 defaultValue: child.isUnexpectedNodes ? child.defaultInitialization : nil
               )
             }
 
-            FunctionParameterSyntax("arena: __shared RawSyntaxArena")
+            FunctionParameterSyntax("arena: __shared SyntaxArena")
           }
           try InitializerDeclSyntax("public init(\(params))") {
             if !node.children.isEmpty {
@@ -164,7 +227,7 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
                   let optionalMark = child.isOptional ? "?" : ""
 
                   ExprSyntax(
-                    "layout[\(raw: index)] = \(child.baseCallName)\(raw: optionalMark).raw"
+                    "layout[\(raw: index)] = \(child.varOrCaseName.backtickedIfNeeded)\(raw: optionalMark).raw"
                   )
                   .with(\.leadingTrivia, .newline)
                 }
@@ -173,20 +236,20 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
               DeclSyntax(
                 """
                 let raw = RawSyntax.makeLayout(
-                  kind: .\(node.memberCallName), uninitializedCount: \(raw: node.children.count), arena: arena) { layout in
+                  kind: .\(node.varOrCaseName), uninitializedCount: \(raw: node.children.count), arena: arena) { layout in
                   \(list)
                 }
                 """
               )
             } else {
-              DeclSyntax("let raw = RawSyntax.makeEmptyLayout(kind: .\(node.memberCallName), arena: arena)")
+              DeclSyntax("let raw = RawSyntax.makeEmptyLayout(kind: .\(node.varOrCaseName), arena: arena)")
             }
             ExprSyntax("self.init(unchecked: raw)")
           }
 
           for (index, child) in node.children.enumerated() {
             try VariableDeclSyntax(
-              "public var \(child.varDeclName): Raw\(child.buildableType.buildable)"
+              "public var \(child.varOrCaseName.backtickedIfNeeded): Raw\(child.buildableType.buildable)"
             ) {
               let exclamationMark = child.isOptional ? "" : "!"
 
@@ -194,7 +257,7 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
                 ExprSyntax("layoutView.children[\(raw: index)]\(raw: exclamationMark)")
               } else {
                 ExprSyntax(
-                  "layoutView.children[\(raw: index)].map(\(child.syntaxNodeKind.raw.syntaxType).init(raw:))\(raw: exclamationMark)"
+                  "layoutView.children[\(raw: index)].map(\(child.syntaxNodeKind.rawType).init(raw:))\(raw: exclamationMark)"
                 )
               }
             }
@@ -205,42 +268,13 @@ func rawSyntaxNodesFile(nodesStartingWith: [Character]) -> SourceFileSyntax {
   }
 }
 
-private extension ChildNodeChoices {
-  var rawEnumDecl: EnumDeclSyntax {
-    try! EnumDeclSyntax("public enum \(self.name): RawSyntaxNodeProtocol") {
-      for choice in self.choices {
-        choice.enumCaseDecl
-      }
-
-      self.isKindOfFuncDecl(parameterName: "raw", parameterType: "RawSyntax")
-
-      self.syntaxGetter(propertyName: "raw", propertyType: "RawSyntax")
-
-      self.syntaxInitDecl(inputType: "__shared some RawSyntaxNodeProtocol")
-
-      for choice in self.choices {
-        if let baseTypeInitDecl = choice.baseTypeInitDecl(hasArgumentName: true) {
-          baseTypeInitDecl
-        }
-      }
-    }
-  }
-}
-
 fileprivate extension Child {
   var rawParameterType: TypeSyntax {
-    var paramType: TypeSyntax
-    if !kind.isNodeChoicesEmpty {
-      paramType = "\(syntaxChoicesType)"
-    } else if hasBaseType && !isOptional {
-      // we restrict the use of generic type to non-optional parameter types, otherwise call sites would no longer be
-      // able to just pass `nil` to this parameter without specializing `(some Raw<Kind>SyntaxNodeProtocol)?`
-      //
-      // we've opted out of providing a default value to the parameter (e.g. `RawExprSyntax?.none`) as a workaround,
-      // as passing an explicit `nil` would prompt developers to think clearly whether this parameter should be parsed
-      paramType = "some \(syntaxNodeKind.raw.protocolType)"
+    let paramType: TypeSyntax
+    if case ChildKind.nodeChoices = kind {
+      paramType = syntaxChoicesType
     } else {
-      paramType = syntaxNodeKind.raw.syntaxType
+      paramType = syntaxNodeKind.rawType
     }
 
     return buildableType.optionalWrapped(type: paramType)

@@ -16,13 +16,21 @@ import SyntaxSupport
 import Utils
 
 let tokenNameForDiagnosticFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  importSwiftSyntax()
+  DeclSyntax(
+    """
+    #if swift(>=6)
+    @_spi(RawSyntax) internal import SwiftSyntax
+    #else
+    @_spi(RawSyntax) import SwiftSyntax
+    #endif
+    """
+  )
 
   try! ExtensionDeclSyntax("extension TokenKind") {
     try! VariableDeclSyntax("var nameForDiagnostics: String") {
       try! SwitchExprSyntax("switch self") {
         for tokenSpec in Token.allCases.map(\.spec) where tokenSpec.kind != .keyword {
-          SwitchCaseSyntax("case .\(tokenSpec.enumCaseCallName):") {
+          SwitchCaseSyntax("case .\(tokenSpec.varOrCaseName):") {
             StmtSyntax("return \(literal: tokenSpec.nameForDiagnostics)")
           }
         }

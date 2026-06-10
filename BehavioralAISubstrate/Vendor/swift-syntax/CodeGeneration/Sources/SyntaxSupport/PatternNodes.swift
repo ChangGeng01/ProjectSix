@@ -109,6 +109,7 @@ public let PATTERN_NODES: [Node] = [
     children: [
       Child(
         name: "label",
+        deprecatedName: "labelName",
         kind: .token(choices: [.token(.identifier)]),
         nameForDiagnostics: "label",
         documentation: "The label of the pattern.",
@@ -116,6 +117,7 @@ public let PATTERN_NODES: [Node] = [
       ),
       Child(
         name: "colon",
+        deprecatedName: "labelColon",
         kind: .token(choices: [.token(.colon)]),
         documentation: "The colon separating label and pattern.",
         isOptional: true
@@ -131,12 +133,6 @@ public let PATTERN_NODES: [Node] = [
         documentation: "The comma separating elements.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "label": .renamed(from: "labelName"),
-        "colon": .renamed(from: "labelColon"),
-      ]
     ]
   ),
 
@@ -201,6 +197,7 @@ public let PATTERN_NODES: [Node] = [
     children: [
       Child(
         name: "bindingSpecifier",
+        deprecatedName: "bindingKeyword",
         kind: .token(choices: [
           .keyword(.let), .keyword(.var), .keyword(.inout),
           .keyword(._mutating), .keyword(._borrowing), .keyword(._consuming),
@@ -209,14 +206,9 @@ public let PATTERN_NODES: [Node] = [
       ),
       Child(
         name: "pattern",
+        deprecatedName: "valuePattern",
         kind: .node(kind: .pattern)
       ),
-    ],
-    childHistory: [
-      [
-        "bindingSpecifier": .renamed(from: "bindingKeyword"),
-        "pattern": .renamed(from: "valuePattern"),
-      ]
     ]
   ),
 

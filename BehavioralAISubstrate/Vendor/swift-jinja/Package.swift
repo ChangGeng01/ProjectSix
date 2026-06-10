@@ -18,9 +18,8 @@ let package = Package(
             targets: ["Jinja"]
         )
     ],
-    // M224 vendor freeze — url: rewritten to path: ../swift-collections.
     dependencies: [
-        .package(path: "../swift-collections")
+        .package(path: "../swift-collections")  // M224 vendor freeze: url -> path
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

@@ -17,7 +17,7 @@ import ContainersPreview
 #endif
 
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableHashedContainers && UnstableContainersPreview
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueSet {
@@ -28,8 +28,11 @@ extension UniqueSet {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
+extension UniqueSet: Equatable {}
+
 @available(SwiftStdlib 5.0, *)
-extension UniqueSet: Equatable {
+extension UniqueSet {
   @inlinable
   @inline(__always)
   public static func ==(left: borrowing Self, right: borrowing Self) -> Bool {

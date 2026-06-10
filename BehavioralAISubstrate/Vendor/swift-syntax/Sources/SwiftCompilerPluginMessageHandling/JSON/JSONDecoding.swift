@@ -1,23 +1,19 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6) && RESILIENT_LIBRARIES
-@_implementationOnly private import _SwiftSyntaxCShims
-#elseif compiler(>=6) && !RESILIENT_LIBRARIES
+#if swift(>=6.0)
 private import _SwiftSyntaxCShims
-#elseif !compiler(>=6) && RESILIENT_LIBRARIES
+#else
 @_implementationOnly import _SwiftSyntaxCShims
-#elseif !compiler(>=6) && !RESILIENT_LIBRARIES
-import _SwiftSyntaxCShims
 #endif
 
 func decodeFromJSON<T: Decodable>(json: UnsafeBufferPointer<UInt8>) throws -> T {

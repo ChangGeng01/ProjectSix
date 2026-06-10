@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftBasicFormat
 @_spi(Diagnostics) internal import SwiftParser
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
@@ -119,20 +119,24 @@ extension SyntaxProtocol {
     }
   }
 
+  /// Returns this node or the first ancestor that satisfies `condition`.
+  func ancestorOrSelf<T>(mapping map: (Syntax) -> T?) -> T? {
+    var walk: Syntax? = Syntax(self)
+    while let unwrappedParent = walk {
+      if let mapped = map(unwrappedParent) {
+        return mapped
+      }
+      walk = unwrappedParent.parent
+    }
+    return nil
+  }
+
   /// Returns `true` if the next token's leading trivia should be made leading trivia
   /// of this mode, when it is switched from being missing to present.
   var shouldBeInsertedAfterNextTokenTrivia: Bool {
     if !self.raw.kind.isMissing,
       let memberDeclItem = self.ancestorOrSelf(mapping: { $0.as(MemberBlockItemSyntax.self) }),
       memberDeclItem.firstToken(viewMode: .all) == self.firstToken(viewMode: .all)
-    {
-      return true
-    } else if let selfToken = self.as(TokenSyntax.self),
-      selfToken.isMissing,
-      selfToken.tokenKind.isIdentifier,
-      let nextToken = self.nextToken(viewMode: .sourceAccurate),
-      nextToken.isPresent,
-      nextToken.tokenKind == .colonColon
     {
       return true
     } else {
@@ -220,7 +224,6 @@ extension TypeSpecifierListSyntax {
       switch specifier {
       case .simpleTypeSpecifier(let specifier): return specifier.specifier
       case .lifetimeTypeSpecifier: return nil
-      case .nonisolatedTypeSpecifier: return nil
       #if RESILIENT_LIBRARIES
       @unknown default:
         fatalError()

@@ -20,7 +20,6 @@ private let unsortedSyntaxNodes: [Node] =
   + TYPE_NODES
   + PATTERN_NODES
   + AVAILABILITY_NODES
-  + COMPILER_NODES
 
 public let SYNTAX_NODES: [Node] =
   unsortedSyntaxNodes
@@ -36,5 +35,3 @@ public let SYNTAX_NODE_MAP: [SyntaxNodeKind: Node] = Dictionary(
 )
 
 public let NON_BASE_SYNTAX_NODES = SYNTAX_NODES.filter { !$0.kind.isBase }
-
-public let SYNTAX_COMPATIBILITY_LAYER = CompatibilityLayer(nodes: SYNTAX_NODES, traits: TRAITS)

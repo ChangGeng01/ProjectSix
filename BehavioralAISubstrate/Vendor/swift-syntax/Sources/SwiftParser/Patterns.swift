@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
@@ -94,7 +94,7 @@ extension Parser {
       )
     case (.lhs(.dollarIdentifier), let handle)?:
       let dollarIdent = self.eat(handle)
-      let unexpectedBeforeIdentifier = RawUnexpectedNodesSyntax([dollarIdent], arena: self.arena)
+      let unexpectedBeforeIdentifier = RawUnexpectedNodesSyntax(elements: [RawSyntax(dollarIdent)], arena: self.arena)
       return RawPatternSyntax(
         RawIdentifierPatternSyntax(
           unexpectedBeforeIdentifier,
@@ -164,7 +164,7 @@ extension Parser {
             remainingTokens,
             label: nil,
             colon: nil,
-            pattern: RawMissingPatternSyntax(arena: self.arena),
+            pattern: RawPatternSyntax(RawMissingPatternSyntax(arena: self.arena)),
             trailingComma: nil,
             arena: self.arena
           )
@@ -257,7 +257,8 @@ extension Parser {
       // binding patterns much earlier.
       return RawPatternSyntax(pat.pattern)
     }
-    return RawPatternSyntax(RawExpressionPatternSyntax(expression: patternSyntax, arena: self.arena))
+    let expr = RawExprSyntax(patternSyntax)
+    return RawPatternSyntax(RawExpressionPatternSyntax(expression: expr, arena: self.arena))
   }
 }
 
@@ -272,10 +273,7 @@ extension Parser.Lookahead {
     // than likely need to be made contextual as well before finalizing their
     // grammar.
     case ._borrowing, .borrowing:
-      return peek(
-        isAt: TokenSpec(.identifier, allowAtStartOfLine: false),
-        TokenSpec(.wildcard, allowAtStartOfLine: false)
-      )
+      return peek(isAt: TokenSpec(.identifier, allowAtStartOfLine: false))
     default:
       // Other keywords can be parsed unconditionally.
       return true
@@ -377,10 +375,10 @@ extension Parser.Lookahead {
         && !self.at(.keyword(.repeat))
         && !self.at(.keyword(.__shared))
         && !self.at(.keyword(.__owned))
-        && !self.at(.keyword(._const))
         && !self.at(.keyword(.borrowing))
         && !self.at(.keyword(.consuming))
         && !self.at(.keyword(.sending))
+        && !(experimentalFeatures.contains(.nonescapableTypes) && self.at(.keyword(._resultDependsOn)))
       {
         return true
       }

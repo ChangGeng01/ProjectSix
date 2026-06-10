@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) import SwiftSyntax
@@ -79,7 +79,7 @@ extension Lexer.Cursor {
 
     /// The lexer has finished lexing the contents of a string literal and is now
     /// looking for the closing quote.
-    case afterStringLiteral(kind: StringLiteralKind, isRawString: Bool)
+    case afterStringLiteral(isRawString: Bool)
 
     /// The lexer has lexed the closing quote of a string literal that had raw
     /// string delimiters and is now looking for the closing raw string delimiters.
@@ -176,7 +176,7 @@ extension Lexer.Cursor {
 
     mutating func perform(stateTransition: Lexer.StateTransition, stateAllocator: BumpPtrAllocator) {
       switch stateTransition {
-      case .push(let newState):
+      case .push(newState: let newState):
         if let topState {
           if let stateStack = stateStack {
             let newStateStack = stateAllocator.allocate(State.self, count: stateStack.count + 1)
@@ -197,7 +197,7 @@ extension Lexer.Cursor {
           ),
           stateAllocator: stateAllocator
         )
-      case .replace(let newState):
+      case .replace(newState: let newState):
         topState = newState
       case .pop:
         if let stateStack {
@@ -255,8 +255,6 @@ extension Lexer {
     }
     var position: Position
 
-    var experimentalFeatures: Parser.ExperimentalFeatures
-
     /// If we have already lexed a token, the kind of the previously lexed token
     var previousTokenKind: RawTokenKind?
 
@@ -269,9 +267,8 @@ extension Lexer {
 
     private var stateStack: StateStack = StateStack()
 
-    init(input: UnsafeBufferPointer<UInt8>, previous: UInt8, experimentalFeatures: Parser.ExperimentalFeatures) {
+    init(input: UnsafeBufferPointer<UInt8>, previous: UInt8) {
       self.position = Position(input: input, previous: previous)
-      self.experimentalFeatures = experimentalFeatures
     }
 
     /// Returns `true` if this cursor is sufficiently different to `other` in a way that indicates that the lexer has
@@ -295,7 +292,7 @@ extension Lexer {
       self.stateStack.perform(stateTransition: stateTransition, stateAllocator: stateAllocator)
     }
 
-    func starts(with possiblePrefix: SyntaxText) -> Bool {
+    func starts(with possiblePrefix: some Sequence<UInt8>) -> Bool {
       return self.input.starts(with: possiblePrefix)
     }
 
@@ -452,17 +449,17 @@ extension Lexer.Cursor {
       // In this state we lex a single token with the flag set, and then pop the state.
       result = lexNormal(sourceBufferStart: sourceBufferStart, preferRegexOverBinaryOperator: true)
       self.stateStack.perform(stateTransition: .pop, stateAllocator: stateAllocator)
-    case .afterRawStringDelimiter(let delimiterLength):
+    case .afterRawStringDelimiter(delimiterLength: let delimiterLength):
       result = lexAfterRawStringDelimiter(delimiterLength: delimiterLength)
-    case .inStringLiteral(kind: let stringLiteralKind, let delimiterLength):
+    case .inStringLiteral(kind: let stringLiteralKind, delimiterLength: let delimiterLength):
       result = lexInStringLiteral(stringLiteralKind: stringLiteralKind, delimiterLength: delimiterLength)
-    case .afterStringLiteral(kind: let stringLiteralKind, isRawString: _):
-      result = lexAfterStringLiteral(stringLiteralKind: stringLiteralKind)
+    case .afterStringLiteral(isRawString: _):
+      result = lexAfterStringLiteral()
     case .afterClosingStringQuote:
       result = lexAfterClosingStringQuote()
-    case .inStringInterpolationStart(let stringLiteralKind):
+    case .inStringInterpolationStart(stringLiteralKind: let stringLiteralKind):
       result = lexInStringInterpolationStart(stringLiteralKind: stringLiteralKind)
-    case .inStringInterpolation(let stringLiteralKind, let parenCount):
+    case .inStringInterpolation(stringLiteralKind: let stringLiteralKind, parenCount: let parenCount):
       result = lexInStringInterpolation(
         stringLiteralKind: stringLiteralKind,
         parenCount: parenCount,
@@ -906,7 +903,7 @@ extension Lexer.Cursor {
 
     case "/":
       // A following comment counts as whitespace, so this token is not right bound.
-      if self.is(offset: 1, at: "/", "*") {
+      if (self.is(offset: 1, at: "/", "*")) {
         return false
       } else {
         return true
@@ -943,19 +940,46 @@ extension Lexer.Cursor {
 
     case ",": _ = self.advance(); return Lexer.Result(.comma)
     case ";": _ = self.advance(); return Lexer.Result(.semicolon)
+    case ":": _ = self.advance(); return Lexer.Result(.colon)
     case "\\": _ = self.advance(); return Lexer.Result(.backslash)
 
-    case ":": return self.lexNormalColon()
-    case "#": return self.lexNormalPound()
+    case "#":
+      // Try lex shebang.
+      if self.isAtStartOfFile, self.peek(at: 1) == "!" {
+        self.advanceToEndOfLine()
+        return Lexer.Result(.shebang)
+      }
+      // Try lex a raw string literal.
+      if let delimiterLength = self.advanceIfOpeningRawStringDelimiter() {
+        return Lexer.Result(
+          .rawStringPoundDelimiter,
+          stateTransition: .push(newState: .afterRawStringDelimiter(delimiterLength: delimiterLength))
+        )
+      }
+
+      // Try lex a regex literal.
+      if let result = self.lexRegexLiteral() {
+        return result
+      }
+      // Otherwise try lex a magic pound literal.
+      return self.lexMagicPoundLiteral()
 
     case "!", "?":
-      return self.lexNormalQuestionOrExclamation(
+      if let result = lexPostfixOptionalChain(sourceBufferStart: sourceBufferStart) {
+        return result
+      }
+      return self.lexOperatorIdentifier(
         sourceBufferStart: sourceBufferStart,
         preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
       )
 
     case "<":
-      return self.lexNormalLeftAngle(
+      if self.is(offset: 1, at: "#"),
+        let result = self.tryLexEditorPlaceholder(sourceBufferStart: sourceBufferStart)
+      {
+        return result
+      }
+      return self.lexOperatorIdentifier(
         sourceBufferStart: sourceBufferStart,
         preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
       )
@@ -974,108 +998,38 @@ extension Lexer.Cursor {
     case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
       return self.lexNumber()
     case #"'"#, #"""#:
-      return self.lexStringQuote(matchingOpening: nil, leadingDelimiterLength: 0)
+      return self.lexStringQuote(isOpening: true, leadingDelimiterLength: 0)
 
     case "`":
       return self.lexEscapedIdentifier()
     case nil:
       return Lexer.Result(.endOfFile)
     default:
-      return lexNormalMiscellaneous(
-        sourceBufferStart: sourceBufferStart,
-        preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
-      )
-    }
-  }
+      var tmp = self
+      if tmp.advance(if: { $0.isValidIdentifierStartCodePoint }) {
+        return self.lexIdentifier()
+      }
 
-  private mutating func lexNormalColon() -> Lexer.Result {
-    _ = self.advance()
-    guard self.peek() == ":" else {
-      return Lexer.Result(.colon)
-    }
+      if tmp.advance(if: { $0.isOperatorStartCodePoint }) {
+        return self.lexOperatorIdentifier(
+          sourceBufferStart: sourceBufferStart,
+          preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
+        )
+      }
 
-    _ = self.advance()
-    return Lexer.Result(.colonColon)
-  }
-
-  private mutating func lexNormalPound() -> Lexer.Result {
-    // Try lex shebang.
-    if self.isAtStartOfFile, self.peek(at: 1) == "!" {
-      self.advanceToEndOfLine()
-      return Lexer.Result(.shebang)
-    }
-    // Try lex a raw string literal.
-    if let delimiterLength = self.advanceIfOpeningRawStringDelimiter() {
-      return Lexer.Result(
-        .rawStringPoundDelimiter,
-        stateTransition: .push(newState: .afterRawStringDelimiter(delimiterLength: delimiterLength))
-      )
-    }
-
-    // Try lex a regex literal.
-    if let result = self.lexRegexLiteral() {
-      return result
-    }
-    // Otherwise try lex a magic pound literal.
-    return self.lexMagicPoundLiteral()
-  }
-
-  private mutating func lexNormalQuestionOrExclamation(
-    sourceBufferStart: Lexer.Cursor,
-    preferRegexOverBinaryOperator: Bool
-  ) -> Lexer.Result {
-    if let result = lexPostfixOptionalChain(sourceBufferStart: sourceBufferStart) {
-      return result
-    }
-    return self.lexOperatorIdentifier(
-      sourceBufferStart: sourceBufferStart,
-      preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
-    )
-  }
-
-  private mutating func lexNormalLeftAngle(
-    sourceBufferStart: Lexer.Cursor,
-    preferRegexOverBinaryOperator: Bool
-  ) -> Lexer.Result {
-    if self.is(offset: 1, at: "#"),
-      let result = self.tryLexEditorPlaceholder(sourceBufferStart: sourceBufferStart)
-    {
-      return result
-    }
-    return self.lexOperatorIdentifier(
-      sourceBufferStart: sourceBufferStart,
-      preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
-    )
-  }
-
-  private mutating func lexNormalMiscellaneous(
-    sourceBufferStart: Lexer.Cursor,
-    preferRegexOverBinaryOperator: Bool
-  ) -> Lexer.Result {
-    var tmp = self
-    if tmp.advance(if: { $0.isValidIdentifierStartCodePoint }) {
-      return self.lexIdentifier()
-    }
-
-    if tmp.advance(if: { $0.isOperatorStartCodePoint }) {
-      return self.lexOperatorIdentifier(
-        sourceBufferStart: sourceBufferStart,
-        preferRegexOverBinaryOperator: preferRegexOverBinaryOperator
-      )
-    }
-
-    switch self.lexUnknown() {
-    case .lexemeContents(let result):
-      return result
-    case .trivia:
-      preconditionFailure("Invalid UTF-8 sequence should be eaten by lexTrivia as LeadingTrivia")
+      switch self.lexUnknown() {
+      case .lexemeContents(let result):
+        return result
+      case .trivia:
+        preconditionFailure("Invalid UTF-8 sequence should be eaten by lexTrivia as LeadingTrivia")
+      }
     }
   }
 
   private mutating func lexAfterRawStringDelimiter(delimiterLength: Int) -> Lexer.Result {
     switch self.peek() {
     case #"'"#, #"""#:
-      return self.lexStringQuote(matchingOpening: nil, leadingDelimiterLength: delimiterLength)
+      return self.lexStringQuote(isOpening: true, leadingDelimiterLength: delimiterLength)
     case nil:
       return Lexer.Result(.endOfFile)
     default:
@@ -1083,10 +1037,10 @@ extension Lexer.Cursor {
     }
   }
 
-  private mutating func lexAfterStringLiteral(stringLiteralKind: StringLiteralKind) -> Lexer.Result {
+  private mutating func lexAfterStringLiteral() -> Lexer.Result {
     switch self.peek() {
     case #"'"#, #"""#:
-      return self.lexStringQuote(matchingOpening: stringLiteralKind, leadingDelimiterLength: 0)
+      return self.lexStringQuote(isOpening: false, leadingDelimiterLength: 0)
     case nil:
       return Lexer.Result(.endOfFile)
     default:
@@ -1640,7 +1594,7 @@ extension Lexer.Cursor {
 // MARK: Lexing a character in a string literal
 
 extension Lexer.Cursor {
-  enum CharacterLex: Equatable {
+  enum CharacterLex {
     /// A normal character as it occurs in the source file
     case success(Unicode.Scalar)
 
@@ -1842,11 +1796,11 @@ extension Lexer.Cursor {
 extension Lexer.Cursor {
   private func stateTransitionAfterLexingStringQuote(kind: StringLiteralKind) -> Lexer.StateTransition {
     switch currentState {
-    case .afterStringLiteral(kind: _, isRawString: true):
+    case .afterStringLiteral(isRawString: true):
       return .replace(newState: .afterClosingStringQuote)
-    case .afterStringLiteral(kind: _, isRawString: false):
+    case .afterStringLiteral(isRawString: false):
       return .pop
-    case .afterRawStringDelimiter(let delimiterLength):
+    case .afterRawStringDelimiter(delimiterLength: let delimiterLength):
       return .replace(newState: .inStringLiteral(kind: kind, delimiterLength: delimiterLength))
     case .normal, .preferRegexOverBinaryOperator, .inStringInterpolation:
       return .push(newState: .inStringLiteral(kind: kind, delimiterLength: 0))
@@ -1855,12 +1809,9 @@ extension Lexer.Cursor {
     }
   }
 
-  /// `matchingOpening` is the opening literal kind if this string quote is the
-  /// closing quote of a string literal, `nil` if it's the opening quote.
-  mutating func lexStringQuote(
-    matchingOpening: StringLiteralKind?,
-    leadingDelimiterLength: Int
-  ) -> Lexer.Result {
+  /// `isOpening` is `true` if this string quote is the opening quote of a string
+  /// literal and `false` if we are lexing the closing quote of a string literal.
+  mutating func lexStringQuote(isOpening: Bool, leadingDelimiterLength: Int) -> Lexer.Result {
     if self.advance(matching: "'") {
       return Lexer.Result(.singleQuote, stateTransition: stateTransitionAfterLexingStringQuote(kind: .singleQuote))
     }
@@ -1868,57 +1819,52 @@ extension Lexer.Cursor {
     let firstQuoteConsumed = self.advance(matching: #"""#)
     precondition(firstQuoteConsumed)
 
-    // Check to see if we have a multi-line delimiter. If we're matching an
-    // opening '"' then we want to bail since e.g `"a"""` shouldn't try to eat
-    // the '"""' as its closing delimiter.
     var lookingForMultilineString = self
-    if matchingOpening == .singleLine
-      || !(lookingForMultilineString.advance(matching: #"""#) && lookingForMultilineString.advance(matching: #"""#))
-    {
+    if lookingForMultilineString.advance(matching: #"""#), lookingForMultilineString.advance(matching: #"""#) {
+      if leadingDelimiterLength > 0 {
+        // If this is a string literal, check if we have the closing delimiter on the same line to correctly parse things like `#"""#` as a single line string containing a quote.
+        var isSingleLineString = lookingForMultilineString
+
+        if isSingleLineString.advanceIfStringDelimiter(delimiterLength: leadingDelimiterLength) {
+          // If we have the correct number of delimiters now, we have something like `#"""#`.
+          // This is a single-line string.
+          return Lexer.Result(.stringQuote, stateTransition: stateTransitionAfterLexingStringQuote(kind: .singleLine))
+        }
+
+        // Scan ahead until the end of the line. Every time we see a closing
+        // quote, check if it is followed by the correct number of closing delimiters.
+        while isSingleLineString.is(notAt: "\r", "\n") {
+          if isSingleLineString.advance(if: { $0 == #"""# }) {
+            if isSingleLineString.advanceIfStringDelimiter(delimiterLength: leadingDelimiterLength) {
+              return Lexer.Result(
+                .stringQuote,
+                stateTransition: stateTransitionAfterLexingStringQuote(kind: .singleLine)
+              )
+            }
+            continue
+          }
+          _ = isSingleLineString.advance()
+        }
+      }
+
+      self = lookingForMultilineString
+      let trailingTriviaLexingMode: TriviaLexingMode?
+      if isOpening && self.is(at: "\n", "\r") {
+        // The opening quote of a multi-line string literal must be followed by
+        // a newline that's not part of the represented string.
+        trailingTriviaLexingMode = .escapedNewlineInMultiLineStringLiteral
+      } else {
+        trailingTriviaLexingMode = nil
+      }
+
+      return Lexer.Result(
+        .multilineStringQuote,
+        stateTransition: stateTransitionAfterLexingStringQuote(kind: .multiLine),
+        trailingTriviaLexingMode: trailingTriviaLexingMode
+      )
+    } else {
       return Lexer.Result(.stringQuote, stateTransition: stateTransitionAfterLexingStringQuote(kind: .singleLine))
     }
-
-    if leadingDelimiterLength > 0 {
-      // If this is a string literal, check if we have the closing delimiter on the same line to correctly parse things like `#"""#` as a single line string containing a quote.
-      var isSingleLineString = lookingForMultilineString
-
-      if isSingleLineString.advanceIfStringDelimiter(delimiterLength: leadingDelimiterLength) {
-        // If we have the correct number of delimiters now, we have something like `#"""#`.
-        // This is a single-line string.
-        return Lexer.Result(.stringQuote, stateTransition: stateTransitionAfterLexingStringQuote(kind: .singleLine))
-      }
-
-      // Scan ahead until the end of the line. Every time we see a closing
-      // quote, check if it is followed by the correct number of closing delimiters.
-      while isSingleLineString.is(notAt: "\r", "\n") {
-        if isSingleLineString.advance(if: { $0 == #"""# }) {
-          if isSingleLineString.advanceIfStringDelimiter(delimiterLength: leadingDelimiterLength) {
-            return Lexer.Result(
-              .stringQuote,
-              stateTransition: stateTransitionAfterLexingStringQuote(kind: .singleLine)
-            )
-          }
-          continue
-        }
-        _ = isSingleLineString.advance()
-      }
-    }
-
-    self = lookingForMultilineString
-    let trailingTriviaLexingMode: TriviaLexingMode?
-    if matchingOpening == nil && self.is(at: "\n", "\r") {
-      // The opening quote of a multi-line string literal must be followed by
-      // a newline that's not part of the represented string.
-      trailingTriviaLexingMode = .escapedNewlineInMultiLineStringLiteral
-    } else {
-      trailingTriviaLexingMode = nil
-    }
-
-    return Lexer.Result(
-      .multilineStringQuote,
-      stateTransition: stateTransitionAfterLexingStringQuote(kind: .multiLine),
-      trailingTriviaLexingMode: trailingTriviaLexingMode
-    )
   }
 
   /// Returns `true` if the cursor is positioned at `\##(` with `delimiterLength`
@@ -1989,9 +1935,7 @@ extension Lexer.Cursor {
         return Lexer.Result(
           .stringSegment,
           error: error,
-          stateTransition: .replace(
-            newState: .afterStringLiteral(kind: stringLiteralKind, isRawString: delimiterLength > 0)
-          )
+          stateTransition: .replace(newState: .afterStringLiteral(isRawString: delimiterLength > 0))
         )
       default:
         break
@@ -2023,9 +1967,7 @@ extension Lexer.Cursor {
         return Lexer.Result(
           .stringSegment,
           error: error,
-          stateTransition: .replace(
-            newState: .afterStringLiteral(kind: stringLiteralKind, isRawString: delimiterLength > 0)
-          )
+          stateTransition: .replace(newState: .afterStringLiteral(isRawString: delimiterLength > 0))
         )
       }
     }
@@ -2083,61 +2025,18 @@ extension Lexer.Cursor {
     // Check whether we have an identifier followed by another backtick, in which
     // case this is an escaped identifier.
     let identifierStart = self
+    if self.advance(if: { $0.isValidIdentifierStartCodePoint }) {
+      // Keep continuing the identifier.
+      self.advance(while: { $0.isValidIdentifierContinuationCodePoint })
 
-    // Scan until we see either a closing backtick or the end of the line. Do
-    // additional validation for raw identifiers along the way; if we see
-    // characters that aren't allowed (prohibited whitespace or unprintable
-    // ASCII characters) or if the identifier is an operator, provide a more
-    // precise diagnostic and location, but otherwise keep trying to tokenize
-    // it as a raw identifier as long as we see the closing backtick because
-    // it more likely represents what the user was trying to do.
-    var hasNonOperatorCharacter = false
-    var hasNonWhitespaceCharacter = false
-    var isEmpty = true
-    var error: LexingDiagnostic? = nil
-    while true {
-      let ch = self.peek()
-      if ch == nil || ch == "`" || ch == "\n" || ch == "\r" {
-        break
+      // If we have the terminating "`", it's an escaped identifier.
+      if self.advance(matching: "`") {
+        return Lexer.Result(.identifier)
       }
-      let position = self
-      guard let scalar = self.advanceValidatingUTF8Character() else {
-        error = LexingDiagnostic(.invalidUtf8, position: position)
-        continue
-      }
-      if error == nil {
-        if scalar.isForbiddenRawIdentifierWhitespace {
-          error = LexingDiagnostic(.invalidWhitespaceInRawIdentifier, position: position)
-        } else if scalar == "\\" {
-          error = LexingDiagnostic(.invalidBackslashInRawIdentifier, position: position)
-        } else if scalar.isASCII && !scalar.isPrintableASCII {
-          error = LexingDiagnostic(.unprintableAsciiCharacter, position: position)
-        }
-      }
-      if !scalar.isPermittedRawIdentifierWhitespace {
-        hasNonWhitespaceCharacter = true
-      }
-      if (isEmpty && !scalar.isOperatorStartCodePoint) || !scalar.isOperatorContinuationCodePoint {
-        hasNonOperatorCharacter = true
-      }
-      isEmpty = false
-    }
-
-    // If we have the terminating "`", it's an escaped/raw identifier, unless
-    // it contained only operator characters or had other invalid elements.
-    if self.advance(matching: "`") {
-      if isEmpty {
-        error = LexingDiagnostic(.rawIdentifierCannotBeEmpty, position: quote)
-      } else if error == nil && !hasNonWhitespaceCharacter {
-        error = LexingDiagnostic(.rawIdentifierCannotBeAllWhitespace, position: quote)
-      } else if error == nil && !hasNonOperatorCharacter {
-        error = LexingDiagnostic(.rawIdentifierCannotBeOperator, position: quote)
-      }
-      return Lexer.Result(.identifier, error: error)
     }
 
     // Special case; allow '`$`'.
-    if quote.starts(with: "`$`") {
+    if quote.starts(with: "`$`".utf8) {
       self = quote
       let firstBacktickConsumed = self.advance(matching: "`")
       let dollarConsumed = self.advance(matching: "$")
@@ -2219,14 +2118,14 @@ extension Lexer.Cursor {
       case ".":
         return (.period, error: nil)
       case "?":
-        if leftBound {
+        if (leftBound) {
           return (.postfixQuestionMark, error: nil)
         }
         return (.infixQuestionMark, error: nil)
       default:
         break
       }
-    } else if operEnd.input.baseAddress! - operStart.input.baseAddress! == 2 {
+    } else if (operEnd.input.baseAddress! - operStart.input.baseAddress! == 2) {
       switch (operStart.peek(), operStart.peek(at: 1)) {
       case ("-", ">"):  // ->
         return (.arrow, error: nil)
@@ -2484,7 +2383,7 @@ extension Lexer.Cursor {
     case normal
     case perforce
 
-    var introducer: SyntaxText {
+    var introducer: String {
       switch self {
       case .perforce:
         return ">>>> "
@@ -2493,7 +2392,7 @@ extension Lexer.Cursor {
       }
     }
 
-    var terminator: SyntaxText {
+    var terminator: String {
       switch self {
       case .perforce:
         return "<<<<\n"
@@ -2509,16 +2408,12 @@ extension Lexer.Cursor {
     }
 
     // Check to see if we have <<<<<<< or >>>>.
-    let kind: ConflictMarker
-    if start.starts(with: ConflictMarker.normal.introducer) {
-      kind = .normal
-    } else if start.starts(with: ConflictMarker.perforce.introducer) {
-      kind = .perforce
-    } else {
+    guard start.starts(with: "<<<<<<< ".utf8) || start.starts(with: ">>>> ".utf8) else {
       return false
     }
 
-    guard let end = Self.findConflictEnd(start, markerKind: kind, experimentalFeatures: experimentalFeatures) else {
+    let kind = start.is(at: "<") ? ConflictMarker.normal : .perforce
+    guard let end = Self.findConflictEnd(start, markerKind: kind) else {
       // No end of conflict marker found.
       return false
     }
@@ -2534,40 +2429,32 @@ extension Lexer.Cursor {
   }
 
   /// Find the end of a version control conflict marker.
-  static func findConflictEnd(
-    _ curPtr: Lexer.Cursor,
-    markerKind: ConflictMarker,
-    experimentalFeatures: Parser.ExperimentalFeatures
-  ) -> Lexer.Cursor? {
+  static func findConflictEnd(_ curPtr: Lexer.Cursor, markerKind: ConflictMarker) -> Lexer.Cursor? {
     // Get a reference to the rest of the buffer minus the length of the start
     // of the conflict marker.
-    let advanced = curPtr.input.baseAddress?.advanced(by: markerKind.introducer.count)
+    let advanced = curPtr.input.baseAddress?.advanced(by: markerKind.introducer.utf8.count)
     var restOfBuffer = Lexer.Cursor(
-      input: .init(start: advanced, count: curPtr.input.count - markerKind.introducer.count),
-      previous: curPtr.input[markerKind.introducer.count - 1],
-      experimentalFeatures: experimentalFeatures
+      input: .init(start: advanced, count: curPtr.input.count - markerKind.introducer.utf8.count),
+      previous: curPtr.input[markerKind.introducer.utf8.count - 1]
     )
-    let terminator = markerKind.terminator
-    let terminatorStart = terminator.first!
     while !restOfBuffer.isAtEndOfFile {
-      restOfBuffer.advance(while: { $0.value != terminatorStart })
+      let terminatorStart = markerKind.terminator.unicodeScalars.first!
+      restOfBuffer.advance(while: { byte in byte != terminatorStart })
 
-      guard restOfBuffer.starts(with: terminator) else {
+      guard restOfBuffer.starts(with: markerKind.terminator.utf8) else {
         _ = restOfBuffer.advance()
         continue
       }
 
       // Must occur at start of line.
       guard restOfBuffer.previous == "\n" || restOfBuffer.previous == "\r" else {
-        _ = restOfBuffer.advance()
         continue
       }
 
-      let advanced = restOfBuffer.input.baseAddress?.advanced(by: terminator.count)
+      let advanced = restOfBuffer.input.baseAddress?.advanced(by: markerKind.terminator.utf8.count)
       return Lexer.Cursor(
-        input: .init(start: advanced, count: restOfBuffer.input.count - terminator.count),
-        previous: restOfBuffer.input[terminator.count - 1],
-        experimentalFeatures: experimentalFeatures
+        input: .init(start: advanced, count: restOfBuffer.input.count - markerKind.terminator.utf8.count),
+        previous: restOfBuffer.input[markerKind.terminator.utf8.count - 1]
       )
     }
     return nil

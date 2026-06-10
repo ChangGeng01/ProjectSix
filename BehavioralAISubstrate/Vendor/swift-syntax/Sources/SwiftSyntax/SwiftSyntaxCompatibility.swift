@@ -112,48 +112,6 @@ extension AttributeSyntax {
   public typealias Argument = Arguments
 }
 
-extension AttributeSyntax.Arguments {
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func token(_: TokenSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func string(_: StringLiteralExprSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func conventionArguments(_: ConventionAttributeArgumentsSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func conventionWitnessMethodArguments(_: ConventionWitnessMethodAttributeArgumentsSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func opaqueReturnTypeOfAttributeArguments(_: OpaqueReturnTypeOfAttributeArgumentsSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func exposeAttributeArguments(_: ExposeAttributeArgumentsSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use '.rgumentList(_: LabeledExprListSyntax)' instead")
-  public static func underscorePrivateAttributeArguments(_: UnderscorePrivateAttributeArgumentsSyntax) -> Self {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "use 'argumentList(LabeledExprListSyntax)' instead")
-  public static func unavailableFromAsyncArguments(_: UnavailableFromAsyncAttributeArgumentsSyntax) -> Self {
-    fatalError("unavailable")
-  }
-}
-
 @available(*, deprecated, renamed: "WithAttributesSyntax")
 public typealias AttributedSyntax = WithAttributesSyntax
 
@@ -161,10 +119,6 @@ extension AvailabilityArgumentSyntax {
   @available(*, deprecated, renamed: "Argument")
   public typealias Entry = Argument
 }
-
-@_spi(Compiler)
-@available(*, deprecated, renamed: "AvailabilityMacroDefinitionFileSyntax")
-public typealias AvailabilityMacroDefinitionSyntax = AvailabilityMacroDefinitionFileSyntax
 
 extension ClosureSignatureSyntax {
   @available(*, deprecated, renamed: "ParameterClause")
@@ -189,162 +143,6 @@ extension DeclGroupSyntax {
     }
   }
 }
-
-extension ClosureCaptureSyntax {
-  @available(*, deprecated, renamed: "unexpectedBetweenNameAndInitializer")
-  public var unexpectedBetweenNameAndAssignToken: UnexpectedNodesSyntax? {
-    get {
-      return unexpectedBetweenNameAndInitializer
-    }
-    set {
-      unexpectedBetweenNameAndInitializer = newValue
-    }
-  }
-
-  @available(*, deprecated, renamed: "initializer.equal")
-  public var assignToken: TokenSyntax? {
-    get {
-      return initializer?.equal
-    }
-    set {
-      initializer?.equal = newValue ?? .equalToken(presence: .missing)
-    }
-  }
-
-  @available(*, deprecated, renamed: "initializer.unexpectedBetweenEqualAndValue")
-  public var unexpectedBetweenAssignTokenAndExpression: UnexpectedNodesSyntax? {
-    get {
-      return initializer?.unexpectedBetweenEqualAndValue
-    }
-    set {
-      initializer?.unexpectedBetweenEqualAndValue = newValue
-    }
-  }
-
-  /// Creates a ``ClosureCaptureSyntax`` with a `name`, and automatically adds an `equal` token to it since the name is non-optional.
-  ///
-  /// - SeeAlso: ``ClosureCaptureSyntax/init(leadingTrivia:_:specifier:_:name:_:initializer:_:trailingComma:_:trailingTrivia:)``.
-  ///
-  @available(
-    *,
-    deprecated,
-    message: "Use 'init(leadingTrivia:_:specifier:_:name:_:initializer:_:trailingComma:_:trailingTrivia:)' instead"
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    specifier: ClosureCaptureSpecifierSyntax? = nil,
-    name: TokenSyntax,
-    equal: TokenSyntax = TokenSyntax.equalToken(),
-    expression: some ExprSyntaxProtocol,
-    trailingComma: TokenSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      specifier: specifier,
-      name: name,
-      initializer: InitializerClauseSyntax(equal: equal, value: expression),
-      trailingComma: trailingComma,
-      trailingTrivia: trailingTrivia
-    )
-  }
-
-  @available(*, deprecated, renamed: "unexpectedBetweenNameAndInitializer")
-  public var unexpectedBetweenNameAndEqual: UnexpectedNodesSyntax? {
-    get {
-      return unexpectedBetweenNameAndInitializer
-    }
-    set {
-      unexpectedBetweenNameAndInitializer = newValue
-    }
-  }
-
-  @available(*, deprecated, renamed: "initializer.equal")
-  public var equal: TokenSyntax? {
-    get {
-      return initializer?.equal
-    }
-    set {
-      initializer?.equal = newValue ?? .equalToken(presence: .missing)
-    }
-  }
-
-  @available(*, deprecated, renamed: "initializer.unexpectedBetweenEqualAndValue")
-  public var unexpectedBetweenEqualAndExpression: UnexpectedNodesSyntax? {
-    get {
-      return initializer?.unexpectedBetweenEqualAndValue
-    }
-    set {
-      initializer?.unexpectedBetweenEqualAndValue = newValue
-    }
-  }
-
-  @available(*, deprecated, renamed: "initializer.value")
-  public var expression: ExprSyntax {
-    get {
-      return initializer?.value ?? ExprSyntax(MissingExprSyntax())
-    }
-    set(value) {
-      initializer?.value = value
-    }
-  }
-
-  @available(*, deprecated, renamed: "unexpectedBetweenInitializerAndTrailingComma")
-  public var unexpectedBetweenExpressionAndTrailingComma: UnexpectedNodesSyntax? {
-    get {
-      return unexpectedBetweenInitializerAndTrailingComma
-    }
-    set(value) {
-      unexpectedBetweenInitializerAndTrailingComma = value
-    }
-  }
-
-  @available(
-    *,
-    deprecated,
-    renamed: "ClosureCaptureSyntax(leadingTrivia:_:specifier:_:name:_:initializer:_:trailingComma:_:trailingTrivia:)"
-  )
-  @_disfavoredOverload
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeSpecifier: UnexpectedNodesSyntax? = nil,
-    specifier: ClosureCaptureSpecifierSyntax? = nil,
-    _ unexpectedBetweenSpecifierAndName: UnexpectedNodesSyntax? = nil,
-    name: TokenSyntax? = nil,
-    _ unexpectedBetweenNameAndEqual: UnexpectedNodesSyntax? = nil,
-    equal: TokenSyntax? = nil,
-    _ unexpectedBetweenEqualAndExpression: UnexpectedNodesSyntax? = nil,
-    expression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenExpressionAndTrailingComma: UnexpectedNodesSyntax? = nil,
-    trailingComma: TokenSyntax? = nil,
-    _ unexpectedAfterTrailingComma: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeSpecifier,
-      specifier: specifier,
-      unexpectedBetweenSpecifierAndName,
-      name: name ?? .identifier("", presence: .missing),
-      unexpectedBetweenNameAndEqual,
-      initializer: InitializerClauseSyntax(
-        equal: equal ?? .equalToken(presence: .missing),
-        unexpectedBetweenEqualAndExpression,
-        value: expression
-      ),
-      unexpectedBetweenExpressionAndTrailingComma,
-      trailingComma: trailingComma,
-      unexpectedAfterTrailingComma,
-      trailingTrivia: trailingTrivia
-    )
-  }
-}
-
-@available(*, unavailable, message: "Use 'LabeledExprListSyntax' instead")
-public struct ConventionAttributeArgumentsSyntax {}
-
-@available(*, unavailable, message: "Use 'LabeledExprListSyntax' instead")
-public struct ConventionWitnessMethodAttributeArgumentsSyntax {}
 
 extension EffectSpecifiersSyntax {
   @available(*, deprecated, renamed: "unexpectedBetweenAsyncSpecifierAndThrowsClause")
@@ -378,294 +176,6 @@ extension EffectSpecifiersSyntax {
   }
 }
 
-@available(*, unavailable, message: "Use 'LabeledExprListSyntax' instead")
-public struct ExposeAttributeArgumentsSyntax {}
-
-extension GenericArgumentSyntax {
-  @_disfavoredOverload
-  @available(*, deprecated, message: "use GenericArgumentSyntax.Argument for 'argument'")
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeArgument: UnexpectedNodesSyntax? = nil,
-    argument: some TypeSyntaxProtocol,
-    _ unexpectedBetweenArgumentAndTrailingComma: UnexpectedNodesSyntax? = nil,
-    trailingComma: TokenSyntax? = nil,
-    _ unexpectedAfterTrailingComma: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeArgument,
-      argument: .type(TypeSyntax(argument)),
-      unexpectedBetweenArgumentAndTrailingComma,
-      trailingComma: trailingComma,
-      unexpectedAfterTrailingComma,
-      trailingTrivia: trailingTrivia
-    )
-  }
-}
-
-extension FreestandingMacroExpansionSyntax {
-  // SPI protocol requirements require a default implementation, but this should never be used because there should be
-  // no conforming types outside of SwiftSyntax.
-  @_spi(ExperimentalLanguageFeatures)
-  @available(*, deprecated, message: "concrete type should implement its own moduleSelector property")
-  public var moduleSelector: ModuleSelectorSyntax? {
-    get {
-      return nil
-    }
-    set {
-      fatalError("\(Self.self) should implement its own moduleSelector property")
-    }
-  }
-}
-
-extension FunctionCallExprSyntax {
-  @_disfavoredOverload
-  @available(
-    *,
-    deprecated,
-    message: "Use the initializer that does not provide default values for leftParen and rightParen."
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeCalledExasdfpression: UnexpectedNodesSyntax? = nil,
-    calledExpression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenCalledExpressionAndLeftParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenLeftParenAndArguments: UnexpectedNodesSyntax? = nil,
-    arguments: LabeledExprListSyntax,
-    _ unexpectedBetweenArgumentsAndRightParen: UnexpectedNodesSyntax? = nil,
-    rightParen: TokenSyntax?,
-    _ unexpectedBetweenRightParenAndTrailingClosure: UnexpectedNodesSyntax? = nil,
-    trailingClosure: ClosureExprSyntax? = nil,
-    _ unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax = [],
-    _ unexpectedAfterAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeCalledExasdfpression,
-      calledExpression: calledExpression,
-      leftParen: nil,
-      unexpectedBetweenLeftParenAndArguments,
-      arguments: arguments,
-      unexpectedBetweenArgumentsAndRightParen,
-      rightParen: rightParen,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures,
-      trailingTrivia: trailingTrivia
-    )
-  }
-
-  @_disfavoredOverload
-  @available(
-    *,
-    deprecated,
-    message: "Use the initializer that does not provide default values for leftParen and rightParen."
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeCalledExasdfpression: UnexpectedNodesSyntax? = nil,
-    calledExpression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenCalledExpressionAndLeftParen: UnexpectedNodesSyntax? = nil,
-    leftParen: TokenSyntax?,
-    _ unexpectedBetweenLeftParenAndArguments: UnexpectedNodesSyntax? = nil,
-    arguments: LabeledExprListSyntax,
-    _ unexpectedBetweenArgumentsAndRightParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenRightParenAndTrailingClosure: UnexpectedNodesSyntax? = nil,
-    trailingClosure: ClosureExprSyntax? = nil,
-    _ unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax = [],
-    _ unexpectedAfterAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeCalledExasdfpression,
-      calledExpression: calledExpression,
-      leftParen: leftParen,
-      unexpectedBetweenLeftParenAndArguments,
-      arguments: arguments,
-      unexpectedBetweenArgumentsAndRightParen,
-      rightParen: nil,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures,
-      trailingTrivia: trailingTrivia
-    )
-  }
-
-  @_disfavoredOverload
-  @available(
-    *,
-    deprecated,
-    message: "Use the initializer that does not provide default values for leftParen and rightParen."
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeCalledExasdfpression: UnexpectedNodesSyntax? = nil,
-    calledExpression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenCalledExpressionAndLeftParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenLeftParenAndArguments: UnexpectedNodesSyntax? = nil,
-    arguments: LabeledExprListSyntax,
-    _ unexpectedBetweenArgumentsAndRightParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenRightParenAndTrailingClosure: UnexpectedNodesSyntax? = nil,
-    trailingClosure: ClosureExprSyntax? = nil,
-    _ unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax = [],
-    _ unexpectedAfterAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeCalledExasdfpression,
-      calledExpression: calledExpression,
-      leftParen: nil,
-      unexpectedBetweenLeftParenAndArguments,
-      arguments: arguments,
-      unexpectedBetweenArgumentsAndRightParen,
-      rightParen: nil,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures,
-      trailingTrivia: trailingTrivia
-    )
-  }
-
-  @_disfavoredOverload
-  @available(
-    *,
-    deprecated,
-    renamed:
-      "init(leadingTrivia:_:calledExpression:_:leftParen:_:arguments:_:rightParen:_:trailingClosure:_:additionalTrailingClosures:_:trailingTrivia:)"
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeCalledExpression: UnexpectedNodesSyntax? = nil,
-    calledExpression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenCalledExpressionAndLeftParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenLeftParenAndArgumentList: UnexpectedNodesSyntax? = nil,
-    argumentList: LabeledExprListSyntax,
-    _ unexpectedBetweenArgumentListAndRightParen: UnexpectedNodesSyntax? = nil,
-    rightParen: TokenSyntax?,
-    _ unexpectedBetweenRightParenAndTrailingClosure: UnexpectedNodesSyntax? = nil,
-    trailingClosure: ClosureExprSyntax? = nil,
-    _ unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax = [],
-    _ unexpectedAfterAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeCalledExpression,
-      calledExpression: calledExpression,
-      unexpectedBetweenCalledExpressionAndLeftParen,
-      leftParen: nil,
-      unexpectedBetweenLeftParenAndArgumentList,
-      arguments: argumentList,
-      unexpectedBetweenArgumentListAndRightParen,
-      rightParen: rightParen,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures,
-      trailingTrivia: trailingTrivia
-    )
-  }
-
-  @_disfavoredOverload
-  @available(
-    *,
-    deprecated,
-    renamed:
-      "init(leadingTrivia:_:calledExpression:_:leftParen:_:arguments:_:rightParen:_:trailingClosure:_:additionalTrailingClosures:_:trailingTrivia:)"
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeCalledExpression: UnexpectedNodesSyntax? = nil,
-    calledExpression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenCalledExpressionAndLeftParen: UnexpectedNodesSyntax? = nil,
-    leftParen: TokenSyntax?,
-    _ unexpectedBetweenLeftParenAndArgumentList: UnexpectedNodesSyntax? = nil,
-    argumentList: LabeledExprListSyntax,
-    _ unexpectedBetweenArgumentListAndRightParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenRightParenAndTrailingClosure: UnexpectedNodesSyntax? = nil,
-    trailingClosure: ClosureExprSyntax? = nil,
-    _ unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax = [],
-    _ unexpectedAfterAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeCalledExpression,
-      calledExpression: calledExpression,
-      unexpectedBetweenCalledExpressionAndLeftParen,
-      leftParen: leftParen,
-      unexpectedBetweenLeftParenAndArgumentList,
-      arguments: argumentList,
-      unexpectedBetweenArgumentListAndRightParen,
-      rightParen: nil,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures,
-      trailingTrivia: trailingTrivia
-    )
-  }
-
-  @_disfavoredOverload
-  @available(
-    *,
-    deprecated,
-    renamed:
-      "init(leadingTrivia:_:calledExpression:_:leftParen:_:arguments:_:rightParen:_:trailingClosure:_:additionalTrailingClosures:_:trailingTrivia:)"
-  )
-  public init(
-    leadingTrivia: Trivia? = nil,
-    _ unexpectedBeforeCalledExpression: UnexpectedNodesSyntax? = nil,
-    calledExpression: some ExprSyntaxProtocol,
-    _ unexpectedBetweenCalledExpressionAndLeftParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenLeftParenAndArgumentList: UnexpectedNodesSyntax? = nil,
-    argumentList: LabeledExprListSyntax,
-    _ unexpectedBetweenArgumentListAndRightParen: UnexpectedNodesSyntax? = nil,
-    _ unexpectedBetweenRightParenAndTrailingClosure: UnexpectedNodesSyntax? = nil,
-    trailingClosure: ClosureExprSyntax? = nil,
-    _ unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    additionalTrailingClosures: MultipleTrailingClosureElementListSyntax = [],
-    _ unexpectedAfterAdditionalTrailingClosures: UnexpectedNodesSyntax? = nil,
-    trailingTrivia: Trivia? = nil
-  ) {
-    self.init(
-      leadingTrivia: leadingTrivia,
-      unexpectedBeforeCalledExpression,
-      calledExpression: calledExpression,
-      unexpectedBetweenCalledExpressionAndLeftParen,
-      leftParen: nil,
-      unexpectedBetweenLeftParenAndArgumentList,
-      arguments: argumentList,
-      unexpectedBetweenArgumentListAndRightParen,
-      rightParen: nil,
-      unexpectedBetweenRightParenAndTrailingClosure,
-      trailingClosure: trailingClosure,
-      unexpectedBetweenTrailingClosureAndAdditionalTrailingClosures,
-      additionalTrailingClosures: additionalTrailingClosures,
-      unexpectedAfterAdditionalTrailingClosures,
-      trailingTrivia: trailingTrivia
-    )
-  }
-}
-
 extension FunctionEffectSpecifiersSyntax {
   @_disfavoredOverload
   @available(*, deprecated, message: "use throwsClause instead of throwsSpecifier")
@@ -687,6 +197,48 @@ extension FunctionEffectSpecifiersSyntax {
       unexpectedAfterThrowsSpecifier,
       trailingTrivia: trailingTrivia
     )
+  }
+}
+
+extension FreestandingMacroExpansionSyntax {
+  @available(*, deprecated, renamed: "pound")
+  public var poundToken: TokenSyntax {
+    get {
+      return pound
+    }
+    set {
+      pound = newValue
+    }
+  }
+
+  @available(*, deprecated, renamed: "macroName")
+  public var macro: TokenSyntax {
+    get {
+      return macroName
+    }
+    set {
+      macroName = newValue
+    }
+  }
+
+  @available(*, deprecated, renamed: "genericArgumentClause")
+  public var genericArguments: GenericArgumentClauseSyntax? {
+    get {
+      return genericArgumentClause
+    }
+    set {
+      genericArgumentClause = newValue
+    }
+  }
+
+  @available(*, deprecated, renamed: "arguments")
+  public var argumentList: LabeledExprListSyntax {
+    get {
+      return arguments
+    }
+    set {
+      arguments = newValue
+    }
   }
 }
 
@@ -716,18 +268,6 @@ extension KeyPathPropertyComponentSyntax {
     }
     set {
       declName.argumentNames = newValue
-    }
-  }
-}
-
-extension MemberTypeSyntax {
-  @available(*, deprecated, renamed: "unexpectedBetweenModuleSelectorAndName")
-  public var unexpectedBeforeName: UnexpectedNodesSyntax? {
-    get {
-      return unexpectedBetweenModuleSelectorAndName
-    }
-    set(value) {
-      unexpectedBetweenModuleSelectorAndName = value
     }
   }
 }
@@ -798,9 +338,6 @@ extension MemberAccessExprSyntax {
     )
   }
 }
-
-@available(*, unavailable, message: "Use 'LabeledExprListSyntax' instead")
-public struct OpaqueReturnTypeOfAttributeArgumentsSyntax {}
 
 extension SyntaxProtocol {
   @available(*, deprecated, message: "Use detached computed property instead.")
@@ -1074,12 +611,6 @@ extension TypeEffectSpecifiersSyntax {
   }
 }
 
-@available(*, unavailable, message: "Use 'LabeledExprListSyntax' instead")
-public struct UnderscorePrivateAttributeArgumentsSyntax {}
-
-@available(*, unavailable, message: "Use 'LabeledExprListSyntax' instead")
-public struct UnavailableFromAsyncAttributeArgumentsSyntax {}
-
 extension WildcardPatternSyntax {
   @available(*, deprecated, message: "remove 'typeAnnotation'")
   public init(
@@ -1097,7 +628,7 @@ extension WildcardPatternSyntax {
       wildcard: wildcard,
       unexpectedAfterTypeAnnotation,
       trailingTrivia: trailingTrivia
-    )
+    );
   }
 
   @available(*, deprecated, message: "'unexpectedBetweenWildcardAndTypeAnnotation' was removed")

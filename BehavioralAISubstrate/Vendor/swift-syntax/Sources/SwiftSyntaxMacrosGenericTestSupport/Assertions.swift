@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6.0)
 import SwiftBasicFormat
 public import SwiftDiagnostics
-public import SwiftIfConfig
 @_spi(FixItApplier) import SwiftIDEUtils
 import SwiftParser
 import SwiftParserDiagnostics
@@ -25,7 +24,6 @@ private import _SwiftSyntaxGenericTestSupport
 import SwiftBasicFormat
 import SwiftDiagnostics
 @_spi(FixItApplier) import SwiftIDEUtils
-import SwiftIfConfig
 import SwiftParser
 import SwiftParserDiagnostics
 import SwiftSyntax
@@ -148,7 +146,7 @@ public struct NoteSpec {
 
 func assertNote(
   _ note: Note,
-  in expansionContext: DiagnosticAssertionContext,
+  in expansionContext: BasicMacroExpansionContext,
   expected spec: NoteSpec,
   failureHandler: (TestFailureSpec) -> Void
 ) {
@@ -340,37 +338,9 @@ extension DiagnosticSpec {
   }
 }
 
-/// Describes the context in which we are asserting diagnostic correctness.
-///
-/// This is used to map source locations.
-public enum DiagnosticAssertionContext {
-  case macroExpansion(BasicMacroExpansionContext)
-  case tree(any SyntaxProtocol)
-
-  func location(
-    for position: AbsolutePosition,
-    anchoredAt node: Syntax,
-    fileName: String
-  ) -> SourceLocation {
-    switch self {
-    case .macroExpansion(let expansionContext):
-      return expansionContext.location(
-        for: position,
-        anchoredAt: node,
-        fileName: fileName
-      )
-
-    case .tree(let syntax):
-      return SourceLocationConverter(fileName: fileName, tree: syntax)
-        .location(for: position)
-    }
-  }
-}
-
-@_spi(Testing)
-public func assertDiagnostic(
+func assertDiagnostic(
   _ diag: Diagnostic,
-  in expansionContext: DiagnosticAssertionContext,
+  in expansionContext: BasicMacroExpansionContext,
   expected spec: DiagnosticSpec,
   failureHandler: (TestFailureSpec) -> Void
 ) {
@@ -499,7 +469,6 @@ public func assertMacroExpansion(
   testModuleName: String = "TestModule",
   testFileName: String = "test.swift",
   indentationWidth: Trivia = .spaces(4),
-  buildConfiguration: (any BuildConfiguration)? = nil,
   failureHandler: (TestFailureSpec) -> Void,
   fileID: StaticString = #fileID,
   filePath: StaticString = #filePath,
@@ -512,8 +481,7 @@ public func assertMacroExpansion(
 
   // Expand all macros in the source.
   let context = BasicMacroExpansionContext(
-    sourceFiles: [origSourceFile: .init(moduleName: testModuleName, fullFilePath: testFileName)],
-    buildConfiguration: buildConfiguration
+    sourceFiles: [origSourceFile: .init(moduleName: testModuleName, fullFilePath: testFileName)]
   )
 
   func contextGenerator(_ syntax: Syntax) -> BasicMacroExpansionContext {
@@ -565,12 +533,7 @@ public func assertMacroExpansion(
     )
   } else {
     for (actualDiag, expectedDiag) in zip(context.diagnostics, diagnostics) {
-      assertDiagnostic(
-        actualDiag,
-        in: .macroExpansion(context),
-        expected: expectedDiag,
-        failureHandler: failureHandler
-      )
+      assertDiagnostic(actualDiag, in: context, expected: expectedDiag, failureHandler: failureHandler)
     }
   }
 
@@ -627,20 +590,6 @@ fileprivate extension FixIt.Change {
         range: start..<end,
         replacement: newTrivia.description
       )
-
-    case .replaceChild(let replacingChildData):
-      let range = replacingChildData.replacementRange
-      let start = expansionContext.position(of: range.lowerBound, anchoredAt: replacingChildData.parent)
-      let end = expansionContext.position(of: range.upperBound, anchoredAt: replacingChildData.parent)
-      return SourceEdit(
-        range: start..<end,
-        replacement: replacingChildData.newChild.description
-      )
-
-    case .replaceText(let range, with: let newText, in: let syntax):
-      let start = expansionContext.position(of: range.lowerBound, anchoredAt: syntax)
-      let end = expansionContext.position(of: range.upperBound, anchoredAt: syntax)
-      return SourceEdit(range: start..<end, replacement: newText)
     }
   }
 }

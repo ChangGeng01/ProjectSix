@@ -34,8 +34,7 @@ extension DiagnosticDecorator where Self == BasicDiagnosticDecorator {
   /// - Returns: A string that combines the severity-specific prefix and the original diagnostic message.
   @_spi(Testing) public func decorateMessage(
     _ message: String,
-    basedOnSeverity severity: DiagnosticSeverity,
-    category: DiagnosticCategory? = nil
+    basedOnSeverity severity: DiagnosticSeverity
   ) -> String {
     let severityText: String
 
@@ -50,10 +49,7 @@ extension DiagnosticDecorator where Self == BasicDiagnosticDecorator {
       severityText = "remark"
     }
 
-    // Append the [#CategoryName] suffix when there is a category.
-    let categorySuffix: String = category.map { category in " [#\(category.name)]" } ?? ""
-
-    return severityText + ": " + message + categorySuffix
+    return severityText + ": " + message
   }
 
   /// Passes through the source code buffer outline without modification.
@@ -72,9 +68,9 @@ extension DiagnosticDecorator where Self == BasicDiagnosticDecorator {
   /// - Returns: A tuple containing:
   ///   - `highlightedSourceCode`: The original text segment.
   ///   - `additionalHighlightedLine`: Always nil.
-  @_spi(Testing) public func decorateHighlight(
-    _ highlight: String
-  ) -> (highlightedSourceCode: String, additionalHighlightedLine: String?) {
+  @_spi(Testing) public func decorateHighlight(_ highlight: String) -> (
+    highlightedSourceCode: String, additionalHighlightedLine: String?
+  ) {
     return (highlightedSourceCode: highlight, additionalHighlightedLine: nil)
   }
 }

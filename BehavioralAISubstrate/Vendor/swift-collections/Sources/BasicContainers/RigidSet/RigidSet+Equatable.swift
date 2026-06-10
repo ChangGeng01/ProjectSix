@@ -17,7 +17,7 @@ import ContainersPreview
 #endif
 
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension RigidSet {
@@ -28,18 +28,21 @@ extension RigidSet {
   }
 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
+@available(SwiftStdlib 6.4, *)
+extension RigidSet: Equatable {}
+
 @available(SwiftStdlib 5.0, *)
-extension RigidSet: Equatable {
+extension RigidSet {
   @inlinable
   public static func ==(left: borrowing Self, right: borrowing Self) -> Bool {
     if left.isTriviallyIdentical(to: right) { return true }
     
     guard left.count == right.count else { return false }
     
-    var lit = left.makeBorrowingIterator()
+    var lit = left.makeBorrowingIterator_()
     while true {
-      let l = lit.nextSpan()
+      let l = lit.nextSpan_()
       if l.isEmpty { break }
       var i = 0
       while i < l.count {

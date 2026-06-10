@@ -11,13 +11,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6.2) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 
 @available(SwiftStdlib 5.0, *)
-extension Producer where Self: ~Copyable & ~Escapable {
+extension Producer where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   @_lifetime(copy self)
   public consuming func map<T: ~Copyable>(
-    _ transform: @escaping (consuming Element) throws(ProducerError) -> T
+    _ transform: @escaping (consuming Element) throws(Failure) -> T
   ) -> ConsumingMapProducer<Self, T> {
     ConsumingMapProducer(_base: self, transform: transform)
   }
@@ -27,32 +27,41 @@ extension Producer where Self: ~Copyable & ~Escapable {
 public struct ConsumingMapProducer<
   Base: Producer & ~Copyable & ~Escapable,
   Element: ~Copyable,
->: ~Copyable, ~Escapable {
-  public typealias ProducerError = Base.ProducerError
+>: ~Copyable, ~Escapable
+where Base.Element: ~Copyable
+{
+  public typealias Failure = Base.Failure
 
   @_alwaysEmitIntoClient
   public var _base: Base
   @_alwaysEmitIntoClient
-  public let _transform: (consuming Base.Element) throws(ProducerError) -> Element
+  public let _transform: (consuming Base.Element) throws(Failure) -> Element
 
   @inlinable
   @_lifetime(copy _base)
   public init(
     _base: consuming Base,
-    transform: @escaping (consuming Base.Element) throws(ProducerError) -> Element
+    transform: @escaping (consuming Base.Element) throws(Failure) -> Element
   ) {
     self._base = _base
     self._transform = transform
   }
 }
 
+
+#if false // FIXME: This does not work with SuppressedAssociatedTypesWithDefaults
+// error: Conditional conformance to 'Escapable' must explicitly state whether
+// 'Base.Element' is required to conform to 'Escapable' or not
+// (Even though it states exactly that.)
 @available(SwiftStdlib 5.0, *)
 extension ConsumingMapProducer: Escapable
 where
   Element: ~Copyable,
   Base: ~Copyable,
-  Base: Escapable
+  Base: Escapable,
+  Base.Element: ~Copyable
 {}
+#endif
 
 @available(SwiftStdlib 5.0, *)
 extension ConsumingMapProducer: Producer where Base: ~Copyable & ~Escapable {
@@ -63,7 +72,7 @@ extension ConsumingMapProducer: Producer where Base: ~Copyable & ~Escapable {
   }
 
   @inlinable
-  public mutating func next() throws(ProducerError) -> Element? {
+  public mutating func next() throws(Failure) -> Element? {
     guard let next = try _base.next() else { return nil }
     return try _transform(next)
   }
@@ -74,11 +83,11 @@ extension ConsumingMapProducer: Producer where Base: ~Copyable & ~Escapable {
   @_lifetime(self: copy self)
   public mutating func generate(
     into target: inout OutputSpan<Element>
-  ) throws(ProducerError) -> Bool {
+  ) throws(Failure) -> Bool {
     let c = Swift.min(target.freeCapacity, _producerBufferSize)
     return try _withUnsafeTemporaryAllocation(
       of: Base.Element.self, capacity: c
-    ) { buffer throws(ProducerError) in
+    ) { buffer throws(Failure) in
       var outputSpan = OutputSpan(buffer: buffer, initializedCount: 0)
       let result = try _base.generate(into: &outputSpan)
       let c = outputSpan.finalize(for: buffer)

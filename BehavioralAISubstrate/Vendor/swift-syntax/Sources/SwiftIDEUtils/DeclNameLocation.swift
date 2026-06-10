@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -68,9 +68,9 @@ public struct DeclNameLocation: Equatable {
       case .labeled(let firstName, let secondName):
         let endPosition = secondName?.upperBound ?? firstName.upperBound
         return firstName.lowerBound..<endPosition
-      case .labeledCall(let label, let colon):
+      case .labeledCall(label: let label, colon: let colon):
         return label.lowerBound..<colon.upperBound
-      case .unlabeled(let argumentPosition):
+      case .unlabeled(argumentPosition: let argumentPosition):
         return argumentPosition..<argumentPosition
       }
     }
@@ -78,11 +78,11 @@ public struct DeclNameLocation: Equatable {
     /// Shift the ranges `utf8Offset` bytes to the right, ie. add `utf8Offset` to the upper and lower bound.
     func advanced(by utf8Offset: Int) -> DeclNameLocation.Argument {
       switch self {
-      case .labeled(let firstName, let secondName):
+      case .labeled(firstName: let firstName, secondName: let secondName):
         return .labeled(firstName: firstName.advanced(by: utf8Offset), secondName: secondName?.advanced(by: utf8Offset))
-      case .labeledCall(let label, let colon):
+      case .labeledCall(label: let label, colon: let colon):
         return .labeledCall(label: label.advanced(by: utf8Offset), colon: colon.advanced(by: utf8Offset))
-      case .unlabeled(let argumentPosition):
+      case .unlabeled(argumentPosition: let argumentPosition):
         return .unlabeled(argumentPosition: argumentPosition.advanced(by: utf8Offset))
       }
     }
@@ -122,7 +122,7 @@ public struct DeclNameLocation: Equatable {
       switch self {
       case .noArguments:
         return .noArguments
-      case .call(let arguments, let firstTrailingClosureIndex):
+      case .call(let arguments, firstTrailingClosureIndex: let firstTrailingClosureIndex):
         return .call(
           arguments.map { $0.advanced(by: utf8Offset) },
           firstTrailingClosureIndex: firstTrailingClosureIndex

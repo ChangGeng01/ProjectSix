@@ -28,14 +28,10 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "trailingPeriod",
-        kind: .token(choices: [.token(.period), .token(.colonColon)]),
+        deprecatedName: "trailingDot",
+        kind: .token(choices: [.token(.period)]),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "trailingPeriod": .renamed(from: "trailingDot")
-      ]
     ]
   ),
 
@@ -104,6 +100,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "accessorSpecifier",
+        deprecatedName: "accessorKind",
         kind: .token(choices: [
           .keyword(.get),
           .keyword(.set),
@@ -116,16 +113,13 @@ public let DECL_NODES: [Node] = [
           .keyword(.mutableAddressWithOwner),
           .keyword(.mutableAddressWithNativeOwner),
           .keyword(._read),
-          .keyword(.read),
           .keyword(._modify),
-          .keyword(.modify),
           .keyword(.`init`),
-          .keyword(.borrow),
-          .keyword(.mutate),
         ])
       ),
       Child(
         name: "parameters",
+        deprecatedName: "parameter",
         kind: .node(kind: .accessorParameters),
         nameForDiagnostics: "parameter",
         isOptional: true
@@ -140,12 +134,6 @@ public let DECL_NODES: [Node] = [
         kind: .node(kind: .codeBlock),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "accessorSpecifier": .renamed(from: "accessorKind"),
-        "parameters": .renamed(from: "parameter"),
-      ]
     ]
   ),
 
@@ -210,6 +198,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: "The name of the actor. If the name matches a reserved keyword use backticks to escape it."
       ),
@@ -238,11 +227,6 @@ public let DECL_NODES: [Node] = [
         name: "memberBlock",
         kind: .node(kind: .memberBlock)
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -302,6 +286,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: "The name of this associated type."
       ),
@@ -326,11 +311,6 @@ public let DECL_NODES: [Node] = [
         documentation: "The `where` clause that applies to the generic parameters of this associated type declaration.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -390,6 +370,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: "The name of the class."
       ),
@@ -420,11 +401,6 @@ public let DECL_NODES: [Node] = [
         documentation:
           "The members of the class declaration. As class extension declarations may declare additional members, the contents of this member block isn't guaranteed to be a complete list of members for this type."
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -490,6 +466,7 @@ public let DECL_NODES: [Node] = [
           .keyword(.private),
           .keyword(.public),
           .keyword(.reasync),
+          .keyword(._resultDependsOnSelf),
           .keyword(.required),
           .keyword(.static),
           .keyword(.unowned),
@@ -510,7 +487,7 @@ public let DECL_NODES: [Node] = [
     base: .decl,
     nameForDiagnostics: "deinitializer",
     documentation: """
-      A `deinit` declaration
+      A `deint` declaration
 
       An example of a deinitializer is
 
@@ -607,16 +584,12 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "placeholder",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: """
           The actual editor placeholder that starts with `<#` and ends with `#>`.
           """
       ),
-    ],
-    childHistory: [
-      [
-        "placeholder": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -635,6 +608,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "parameters",
+        deprecatedName: "parameterList",
         kind: .collection(kind: .enumCaseParameterList, collectionElementName: "Parameter"),
         nameForDiagnostics: "parameters",
         documentation: "The actual parameters."
@@ -644,11 +618,6 @@ public let DECL_NODES: [Node] = [
         kind: .token(choices: [.token(.rightParen)]),
         documentation: "The ')' to close the parameter clause."
       ),
-    ],
-    childHistory: [
-      [
-        "parameters": .renamed(from: "parameterList")
-      ]
     ]
   ),
 
@@ -695,6 +664,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "defaultValue",
+        deprecatedName: "defaultArgument",
         kind: .node(kind: .initializerClause),
         nameForDiagnostics: "default value",
         documentation: "If the parameter has a default value, the initializer clause describing the default value.",
@@ -706,11 +676,6 @@ public let DECL_NODES: [Node] = [
         documentation: "If the parameter is followed by another parameter, the comma separating them.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "defaultValue": .renamed(from: "defaultArgument")
-      ]
     ]
   ),
 
@@ -771,11 +736,13 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: "The name of this case."
       ),
       Child(
         name: "parameterClause",
+        deprecatedName: "associatedValue",
         kind: .node(kind: .enumCaseParameterClause),
         nameForDiagnostics: "associated values",
         documentation: "The set of associated values of the case.",
@@ -793,12 +760,6 @@ public let DECL_NODES: [Node] = [
         documentation: "The trailing comma of this element, if the case has multiple elements.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier"),
-        "parameterClause": .renamed(from: "associatedValue"),
-      ]
     ]
   ),
 
@@ -834,12 +795,14 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation:
           "Declares the name of this enum. If the name matches a reserved keyword use backticks to escape it."
       ),
       Child(
         name: "genericParameterClause",
+        deprecatedName: "genericParameters",
         kind: .node(kind: .genericParameterClause),
         nameForDiagnostics: "generic parameter clause",
         documentation: "The generic parameters, if any, for this enum declaration.",
@@ -865,12 +828,6 @@ public let DECL_NODES: [Node] = [
         documentation:
           "The cases and other members associated with this enum declaration. Because enum extension declarations may declare additional members the contents of this member block isn't guaranteed to be a complete list of members for this type."
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier"),
-        "genericParameterClause": .renamed(from: "genericParameters"),
-      ]
     ]
   ),
 
@@ -878,19 +835,6 @@ public let DECL_NODES: [Node] = [
     kind: .extensionDecl,
     base: .decl,
     nameForDiagnostics: "extension",
-    documentation: """
-        An `extension` declaration.
-
-       ### Example
-
-        ```swift
-        extension String {
-          var url: URL? {
-            URL(string: self)
-          }
-        }
-        ```
-      """,
     traits: [
       "DeclGroup",
       "WithAttributes",
@@ -900,18 +844,7 @@ public let DECL_NODES: [Node] = [
       Child(
         name: "attributes",
         kind: .collection(kind: .attributeList, collectionElementName: "Attribute", defaultsToEmpty: true),
-        nameForDiagnostics: "attributes",
-        documentation: """
-          Attributes that are attached to the extension declaration.
-
-          ### Example
-
-          `@MainActor` in
-
-          ```swift
-          @MainActor extension SomeType {}
-          ```
-          """
+        nameForDiagnostics: "attributes"
       ),
       Child(
         name: "modifiers",
@@ -921,19 +854,16 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "extensionKeyword",
-        kind: .token(choices: [.keyword(.extension)]),
-        documentation: "The `extension` keyword."
+        kind: .token(choices: [.keyword(.extension)])
       ),
       Child(
         name: "extendedType",
-        kind: .node(kind: .type),
-        documentation: "The extended `type` for which the extension is added."
+        kind: .node(kind: .type)
       ),
       Child(
         name: "inheritanceClause",
         kind: .node(kind: .inheritanceClause),
         nameForDiagnostics: "inheritance clause",
-        documentation: "The inheritance clause describing one or more conformances for this extension declaration.",
         isOptional: true
       ),
       Child(
@@ -957,27 +887,6 @@ public let DECL_NODES: [Node] = [
     kind: .functionDecl,
     base: .decl,
     nameForDiagnostics: "function",
-    documentation: """
-        A Swift `func` declaration.
-        
-        ### Example
-        
-        A func declaration may be declared without any parameter.
-        
-        ```swift
-        func foo() {
-        
-        }
-        ```
-        
-        A func declaration with multiple parameters.
-        
-        ```swift
-        func bar(_ arg1: Int, _ arg2: Int) {
-        
-        }
-        ```
-      """,
     traits: [
       "NamedDecl",
       "WithAttributes",
@@ -989,8 +898,7 @@ public let DECL_NODES: [Node] = [
       Child(
         name: "attributes",
         kind: .collection(kind: .attributeList, collectionElementName: "Attribute", defaultsToEmpty: true),
-        nameForDiagnostics: "attributes",
-        documentation: "Attributes that are attached to the function declaration."
+        nameForDiagnostics: "attributes"
       ),
       Child(
         name: "modifiers",
@@ -1000,11 +908,11 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "funcKeyword",
-        kind: .token(choices: [.keyword(.func)]),
-        documentation: "The `func` keyword."
+        kind: .token(choices: [.keyword(.func)])
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [
           .token(.identifier),
           .token(.binaryOperator),
@@ -1023,10 +931,7 @@ public let DECL_NODES: [Node] = [
       Child(
         name: "signature",
         kind: .node(kind: .functionSignature),
-        nameForDiagnostics: "function signature",
-        documentation: """
-          A function signature that defines the interface of the function.
-          """
+        nameForDiagnostics: "function signature"
       ),
       Child(
         name: "genericWhereClause",
@@ -1039,14 +944,8 @@ public let DECL_NODES: [Node] = [
       Child(
         name: "body",
         kind: .node(kind: .codeBlock),
-        documentation: "The function's body.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -1054,18 +953,6 @@ public let DECL_NODES: [Node] = [
     kind: .functionParameterList,
     base: .syntaxCollection,
     nameForDiagnostics: "parameter list",
-    documentation: """
-      A list of function parameters that are type annotated and a label.
-      The function parameters are represented by `FunctionParameterListSyntax`.
-
-      ### Example
-
-      ```swift
-      func foo(bar: Int, baz: Int) {
-
-      }
-      ```
-      """,
     elementChoices: [.functionParameter]
   ),
 
@@ -1073,70 +960,55 @@ public let DECL_NODES: [Node] = [
     kind: .functionParameter,
     base: .syntax,
     nameForDiagnostics: "parameter",
-    documentation: "A function parameter",
     parserFunction: "parseFunctionParameter",
     traits: ["WithTrailingComma", "WithAttributes", "WithModifiers"],
     children: [
       Child(
         name: "attributes",
         kind: .collection(kind: .attributeList, collectionElementName: "Attribute", defaultsToEmpty: true),
-        nameForDiagnostics: "attributes",
-        documentation: "Attributes that are attached to the parameter."
+        nameForDiagnostics: "attributes"
       ),
       Child(
         name: "modifiers",
         kind: .collection(kind: .declModifierList, collectionElementName: "Modifier", defaultsToEmpty: true),
-        nameForDiagnostics: "modifiers",
-        documentation: "Modifiers that are attached to the parameter."
+        nameForDiagnostics: "modifiers"
       ),
       Child(
         name: "firstName",
-        kind: .token(choices: [.token(.identifier), .token(.wildcard)]),
-        documentation: "The label of this parameter that will be used when the function is called."
+        kind: .token(choices: [.token(.identifier), .token(.wildcard)])
       ),
       Child(
         name: "secondName",
         kind: .token(choices: [.token(.identifier), .token(.wildcard)], requiresLeadingSpace: true),
         nameForDiagnostics: "internal name",
-        documentation:
-          "If this is specified, it is the name by which the parameter can be referenced inside the function body.",
         isOptional: true
       ),
       Child(
         name: "colon",
-        kind: .token(choices: [.token(.colon)]),
-        documentation: "The colon separating the label from the type."
+        kind: .token(choices: [.token(.colon)])
       ),
       Child(
         name: "type",
         kind: .node(kind: .type),
-        nameForDiagnostics: "type",
-        documentation: "The parameter's type."
+        nameForDiagnostics: "type"
       ),
       Child(
         name: "ellipsis",
         kind: .token(choices: [.token(.ellipsis)]),
-        documentation: "If the parameter is variadic, `...` to indicate that.",
         isOptional: true
       ),
       Child(
         name: "defaultValue",
+        deprecatedName: "defaultArgument",
         kind: .node(kind: .initializerClause),
         nameForDiagnostics: "default value",
-        documentation: "If the parameter has a default value, the expression describing the default value.",
         isOptional: true
       ),
       Child(
         name: "trailingComma",
         kind: .token(choices: [.token(.comma)]),
-        documentation: "If the parameter is followed by another parameter, the comma separating them.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "defaultValue": .renamed(from: "defaultArgument")
-      ]
     ]
   ),
 
@@ -1144,31 +1016,23 @@ public let DECL_NODES: [Node] = [
     kind: .functionSignature,
     base: .syntax,
     nameForDiagnostics: "function signature",
-    documentation: "A function signature that defines the interface of the function.",
     children: [
       Child(
         name: "parameterClause",
-        kind: .node(kind: .functionParameterClause),
-        documentation: "The parameters of the function."
+        deprecatedName: "input",
+        kind: .node(kind: .functionParameterClause)
       ),
       Child(
         name: "effectSpecifiers",
         kind: .node(kind: .functionEffectSpecifiers),
-        documentation: "The effect indicators of the function, like `async` or `throws`",
         isOptional: true
       ),
       Child(
         name: "returnClause",
+        deprecatedName: "output",
         kind: .node(kind: .returnClause),
-        documentation: "The return type of the function.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "parameterClause": .renamed(from: "input"),
-        "returnClause": .renamed(from: "output"),
-      ]
     ]
   ),
 
@@ -1272,11 +1136,13 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "importKeyword",
+        deprecatedName: "importTok",
         kind: .token(choices: [.keyword(.import)]),
         documentation: "The `import` keyword for this declaration."
       ),
       Child(
         name: "importKindSpecifier",
+        deprecatedName: "importKind",
         kind: .token(choices: [
           .keyword(.typealias),
           .keyword(.struct),
@@ -1300,43 +1166,6 @@ public let DECL_NODES: [Node] = [
         kind: .collection(kind: .importPathComponentList, collectionElementName: "PathComponent"),
         documentation: "The path to the module, submodule or symbol being imported."
       ),
-    ],
-    childHistory: [
-      [
-        "importKeyword": .renamed(from: "importTok"),
-        "importKindSpecifier": .renamed(from: "importKind"),
-      ]
-    ]
-  ),
-
-  Node(
-    kind: .usingDecl,
-    base: .decl,
-    experimentalFeature: .defaultIsolationPerFile,
-    nameForDiagnostics: "using",
-    documentation: """
-      A `using` declaration, currently used to control actor isolation within the current file.
-
-      An example of a `using` declaration is
-
-      ```swift
-      using @MainActor
-      ```
-      """,
-    children: [
-      Child(
-        name: "usingKeyword",
-        kind: .token(choices: [.keyword(.using)]),
-        documentation: "The `using` keyword for this declaration."
-      ),
-      Child(
-        name: "specifier",
-        kind: .nodeChoices(choices: [
-          Child(name: "attribute", kind: .node(kind: .attribute)),
-          Child(name: "modifier", kind: .token(choices: [.token(.identifier)])),
-        ]),
-        documentation: "The specifier that could be either an attribute or a modifier."
-      ),
     ]
   ),
 
@@ -1357,6 +1186,7 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "type",
+        deprecatedName: "typeName",
         kind: .node(kind: .type)
       ),
       Child(
@@ -1364,11 +1194,6 @@ public let DECL_NODES: [Node] = [
         kind: .token(choices: [.token(.comma)]),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "type": .renamed(from: "typeName")
-      ]
     ]
   ),
 
@@ -1494,6 +1319,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)])
       ),
       Child(
@@ -1522,11 +1348,6 @@ public let DECL_NODES: [Node] = [
           "A `where` clause that places additional constraints on generic parameters like `where Element: Hashable`.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -1553,20 +1374,18 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "pound",
+        deprecatedName: "poundToken",
         kind: .token(choices: [.token(.pound)]),
         documentation: "The `#` sign."
       ),
       Child(
-        name: "moduleSelector",
-        kind: .node(kind: .moduleSelector),
-        isOptional: true
-      ),
-      Child(
         name: "macroName",
+        deprecatedName: "macro",
         kind: .token(choices: [.token(.identifier)])
       ),
       Child(
         name: "genericArgumentClause",
+        deprecatedName: "genericArguments",
         kind: .node(kind: .genericArgumentClause),
         isOptional: true
       ),
@@ -1577,6 +1396,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "arguments",
+        deprecatedName: "argumentList",
         kind: .collection(kind: .labeledExprList, collectionElementName: "Argument")
       ),
       Child(
@@ -1597,17 +1417,6 @@ public let DECL_NODES: [Node] = [
           defaultsToEmpty: true
         )
       ),
-    ],
-    childHistory: [
-      [
-        "moduleSelector": .introduced
-      ],
-      [
-        "pound": .renamed(from: "poundToken"),
-        "macroName": .renamed(from: "macro"),
-        "genericArgumentClause": .renamed(from: "genericArguments"),
-        "arguments": .renamed(from: "argumentList"),
-      ],
     ]
   ),
 
@@ -1678,6 +1487,7 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "fixitySpecifier",
+        deprecatedName: "fixity",
         kind: .token(choices: [.keyword(.prefix), .keyword(.postfix), .keyword(.infix)]),
         nameForDiagnostics: "fixity",
         documentation: "The fixity applied to the 'operator' declaration."
@@ -1688,6 +1498,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.binaryOperator), .token(.prefixOperator), .token(.postfixOperator)])
       ),
       Child(
@@ -1696,12 +1507,6 @@ public let DECL_NODES: [Node] = [
         documentation: "Optionally specify a precedence group and designated types.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "fixitySpecifier": .renamed(from: "fixity"),
-        "name": .renamed(from: "identifier"),
-      ]
     ]
   ),
 
@@ -1744,6 +1549,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "parameters",
+        deprecatedName: "parameterList",
         kind: .collection(kind: .functionParameterList, collectionElementName: "Parameter"),
         nameForDiagnostics: "parameters"
       ),
@@ -1751,11 +1557,6 @@ public let DECL_NODES: [Node] = [
         name: "rightParen",
         kind: .token(choices: [.token(.rightParen)])
       ),
-    ],
-    childHistory: [
-      [
-        "parameters": .renamed(from: "parameterList")
-      ]
     ]
   ),
 
@@ -1815,6 +1616,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "accessorBlock",
+        deprecatedName: "accessor",
         kind: .node(kind: .accessorBlock),
         documentation: """
           If the variable is computed, the accessors that get (and optionally set) the value.
@@ -1826,11 +1628,6 @@ public let DECL_NODES: [Node] = [
         kind: .token(choices: [.token(.comma)]),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "accessorBlock": .renamed(from: "accessor")
-      ]
     ]
   ),
 
@@ -1841,10 +1638,12 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "fileLabel",
+        deprecatedName: "fileArgLabel",
         kind: .token(choices: [.keyword(.file)])
       ),
       Child(
         name: "fileColon",
+        deprecatedName: "fileArgColon",
         kind: .token(choices: [.token(.colon)])
       ),
       Child(
@@ -1858,10 +1657,12 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "lineLabel",
+        deprecatedName: "lineArgLabel",
         kind: .token(choices: [.keyword(.line)])
       ),
       Child(
         name: "lineColon",
+        deprecatedName: "lineArgColon",
         kind: .token(choices: [.token(.colon)])
       ),
       Child(
@@ -1869,14 +1670,6 @@ public let DECL_NODES: [Node] = [
         kind: .token(choices: [.token(.integerLiteral)]),
         nameForDiagnostics: "line number"
       ),
-    ],
-    childHistory: [
-      [
-        "fileLabel": .renamed(from: "fileArgLabel"),
-        "fileColon": .renamed(from: "fileArgColon"),
-        "lineLabel": .renamed(from: "lineArgLabel"),
-        "lineColon": .renamed(from: "lineArgColon"),
-      ]
     ]
   ),
 
@@ -1898,6 +1691,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "arguments",
+        deprecatedName: "args",
         kind: .node(kind: .poundSourceLocationArguments),
         nameForDiagnostics: "arguments",
         isOptional: true
@@ -1906,11 +1700,6 @@ public let DECL_NODES: [Node] = [
         name: "rightParen",
         kind: .token(choices: [.token(.rightParen)])
       ),
-    ],
-    childHistory: [
-      [
-        "arguments": .renamed(from: "args")
-      ]
     ]
   ),
 
@@ -1922,6 +1711,7 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "assignmentLabel",
+        deprecatedName: "assignmentKeyword",
         kind: .token(choices: [.keyword(.assignment)])
       ),
       Child(
@@ -1930,16 +1720,11 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "value",
+        deprecatedName: "flag",
         kind: .token(choices: [.keyword(.true), .keyword(.false)]),
         documentation:
           "When true, an operator in the corresponding precedence group uses the same grouping rules during optional chaining as the assignment operators from the standard library. Otherwise, operators in the precedence group follows the same optional chaining rules as operators that don't perform assignment."
       ),
-    ],
-    childHistory: [
-      [
-        "assignmentLabel": .renamed(from: "assignmentKeyword"),
-        "value": .renamed(from: "flag"),
-      ]
     ]
   ),
 
@@ -1952,6 +1737,7 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "associativityLabel",
+        deprecatedName: "associativityKeyword",
         kind: .token(choices: [.keyword(.associativity)])
       ),
       Child(
@@ -1964,11 +1750,6 @@ public let DECL_NODES: [Node] = [
         documentation:
           "Operators that are `left`-associative group left-to-right. Operators that are `right`-associative group right-to-left. Operators that are specified with an associativity of `none` don't associate at all"
       ),
-    ],
-    childHistory: [
-      [
-        "associativityLabel": .renamed(from: "associativityKeyword")
-      ]
     ]
   ),
   Node(
@@ -2008,6 +1789,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: "The name of this precedence group."
       ),
@@ -2024,11 +1806,6 @@ public let DECL_NODES: [Node] = [
         name: "rightBrace",
         kind: .token(choices: [.token(.rightBrace)])
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -2066,6 +1843,7 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "higherThanOrLowerThanLabel",
+        deprecatedName: "higherThanOrLowerThan",
         kind: .token(choices: [.keyword(.higherThan), .keyword(.lowerThan)]),
         documentation: "The relation to specified other precedence groups."
       ),
@@ -2075,15 +1853,10 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "precedenceGroups",
+        deprecatedName: "otherNames",
         kind: .collection(kind: .precedenceGroupNameList, collectionElementName: "OtherName"),
         documentation: "The name of other precedence group to which this precedence group relates."
       ),
-    ],
-    childHistory: [
-      [
-        "higherThanOrLowerThanLabel": .renamed(from: "higherThanOrLowerThan"),
-        "precedenceGroups": .renamed(from: "otherNames"),
-      ]
     ]
   ),
 
@@ -2128,6 +1901,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation: "The name of the protocol."
       ),
@@ -2157,11 +1931,6 @@ public let DECL_NODES: [Node] = [
         kind: .node(kind: .memberBlock),
         documentation: "The members of the protocol declaration."
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -2172,20 +1941,14 @@ public let DECL_NODES: [Node] = [
     children: [
       Child(
         name: "arrow",
-        kind: .token(choices: [.token(.arrow)]),
-        documentation: "If return type is presented, the arrow introducing the return type."
+        kind: .token(choices: [.token(.arrow)])
       ),
       Child(
         name: "type",
+        deprecatedName: "returnType",
         kind: .node(kind: .type),
-        nameForDiagnostics: "return type",
-        documentation: "The `return` type."
+        nameForDiagnostics: "return type"
       ),
-    ],
-    childHistory: [
-      [
-        "type": .renamed(from: "returnType")
-      ]
     ]
   ),
 
@@ -2208,13 +1971,9 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "endOfFileToken",
+        deprecatedName: "eofToken",
         kind: .token(choices: [.token(.endOfFile)])
       ),
-    ],
-    childHistory: [
-      [
-        "endOfFileToken": .renamed(from: "eofToken")
-      ]
     ]
   ),
 
@@ -2308,6 +2067,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)]),
         documentation:
           "Declares the name of this struct. If the name matches a reserved keyword use backticks to escape it."
@@ -2340,11 +2100,6 @@ public let DECL_NODES: [Node] = [
         documentation:
           "The members of the struct declaration. Because struct extension declarations may declare additional members the contents of this member block isn't guaranteed to be a complete list of members for this type."
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -2381,10 +2136,12 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "parameterClause",
+        deprecatedName: "indices",
         kind: .node(kind: .functionParameterClause)
       ),
       Child(
         name: "returnClause",
+        deprecatedName: "result",
         kind: .node(kind: .returnClause)
       ),
       Child(
@@ -2397,16 +2154,10 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "accessorBlock",
+        deprecatedName: "accessor",
         kind: .node(kind: .accessorBlock),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "parameterClause": .renamed(from: "indices"),
-        "returnClause": .renamed(from: "result"),
-        "accessorBlock": .renamed(from: "accessor"),
-      ]
     ]
   ),
 
@@ -2421,13 +2172,9 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "inheritedTypes",
+        deprecatedName: "inheritedTypeCollection",
         kind: .collection(kind: .inheritedTypeList, collectionElementName: "InheritedType")
       ),
-    ],
-    childHistory: [
-      [
-        "inheritedTypes": .renamed(from: "inheritedTypeCollection")
-      ]
     ]
   ),
 
@@ -2475,6 +2222,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "name",
+        deprecatedName: "identifier",
         kind: .token(choices: [.token(.identifier)])
       ),
       Child(
@@ -2496,11 +2244,6 @@ public let DECL_NODES: [Node] = [
           "A `where` clause that places additional constraints on generic parameters like `where Element: Hashable`.",
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "name": .renamed(from: "identifier")
-      ]
     ]
   ),
 
@@ -2532,6 +2275,7 @@ public let DECL_NODES: [Node] = [
       ),
       Child(
         name: "bindingSpecifier",
+        deprecatedName: "bindingKeyword",
         kind: .token(choices: [
           .keyword(.let), .keyword(.var), .keyword(.inout),
           .keyword(._mutating), .keyword(._borrowing), .keyword(._consuming),
@@ -2557,11 +2301,6 @@ public let DECL_NODES: [Node] = [
           ```
           """
       ),
-    ],
-    childHistory: [
-      [
-        "bindingSpecifier": .renamed(from: "bindingKeyword")
-      ]
     ]
   ),
 ]

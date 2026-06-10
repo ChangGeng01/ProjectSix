@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueSet where Element: ~Copyable {
@@ -50,14 +50,16 @@ extension UniqueSet where Element: ~Copyable {
       initializingWith: initializer)
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public init<
     E: Error,
     P: Producer<Element, E> & ~Copyable & ~Escapable
   >(
     minimumCapacity: Int? = nil, from producer: inout P
-  ) throws(E) {
+  ) throws(E)
+  where P.Element: ~Copyable
+  {
     let c = producer.underestimatedCount
     if let minimumCapacity {
       self.init(minimumCapacity: Swift.min(minimumCapacity, c))
@@ -72,10 +74,10 @@ extension UniqueSet where Element: ~Copyable {
 @available(SwiftStdlib 5.0, *)
 extension UniqueSet where Element: Copyable {
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public init<
-    S: BorrowingSequence<Element> & ~Copyable & ~Escapable
+    S: BorrowingSequence_<Element> & ~Copyable & ~Escapable
   >(
     copying items: borrowing S
   ) {
@@ -90,10 +92,10 @@ extension UniqueSet where Element: Copyable {
     self.insert(copying: items)
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public init<
-    S: BorrowingSequence<Element> & Sequence<Element>
+    S: BorrowingSequence_<Element> & Sequence<Element>
   >(
     copying items: borrowing S
   ) {

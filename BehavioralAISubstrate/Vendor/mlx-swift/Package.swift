@@ -234,10 +234,9 @@ let package = Package(
         .library(name: "MLXLinalg", targets: ["MLXLinalg"]),
         .library(name: "MLXFast", targets: ["MLXFast"]),
     ],
-    // M224 vendor freeze — url: rewritten to path: ../swift-numerics.
     dependencies: [
         // for Complex type
-        .package(path: "../swift-numerics")
+        .package(path: "../swift-numerics")  // M224 vendor freeze: url -> path
     ],
     targets: [
         cmlx,

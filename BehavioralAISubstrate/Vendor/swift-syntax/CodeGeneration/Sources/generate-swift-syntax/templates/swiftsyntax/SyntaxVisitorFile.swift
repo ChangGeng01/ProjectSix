@@ -34,6 +34,13 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
     DeclSyntax(
       """
+      /// 'Syntax' object factory recycling 'Syntax.Info' instances.
+      private let nodeFactory: SyntaxNodeFactory = SyntaxNodeFactory()
+      """
+    )
+
+    DeclSyntax(
+      """
       public init(viewMode: SyntaxTreeViewMode) {
         self.viewMode = viewMode
       }
@@ -45,7 +52,8 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       /// Walk all nodes of the given syntax tree, calling the corresponding `visit`
       /// function for every node that is being visited.
       public func walk(_ node: some SyntaxProtocol) {
-        dispatchVisit(Syntax(node))
+        var syntaxNode = Syntax(node)
+        visit(&syntaxNode)
       }
       """
     )
@@ -76,7 +84,7 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
     DeclSyntax(
       """
       /// Visiting ``TokenSyntax`` specifically.
-      ///   - Parameter token: the token we are visiting.
+      ///   - Parameter node: the node we are visiting.
       ///   - Returns: how should we continue visiting.
       open func visit(_ token: TokenSyntax) -> SyntaxVisitorContinueKind {
         return .visitChildren
@@ -92,33 +100,35 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       """
     )
 
-    // NOTE: '@inline(never)' because perf tests showed the best results.
-    // It keeps 'dispatchVisit(_:)' function small, and make all 'case' bodies exactly the same pattern.
-    // Which enables some optimizations.
     DeclSyntax(
       """
-      @inline(never)
-      private func visitTokenSyntaxImpl(_ node: Syntax) {
-        _ = visit(TokenSyntax(unsafeCasting: node))
-        // No children to visit.
-        visitPost(TokenSyntax(unsafeCasting: node))
+      /// Cast `node` to a node of type `nodeType`, visit it, calling
+      /// the `visit` and `visitPost` functions during visitation.
+      ///
+      /// - Note: node is an `inout` parameter so that callers don't have to retain it before passing it to `visitImpl`.
+      ///   With it being an `inout` parameter, the caller and `visitImpl` can work on the same reference of `node` without
+      ///   any reference counting.
+      /// - Note: Inline so that the optimizer can look through the calles to `visit` and `visitPost`, which means it
+      ///   doesn't need to retain `self` when forming closures to the unapplied function references on `self`.
+      @inline(__always)
+      private func visitImpl<NodeType: SyntaxProtocol>(
+        _ node: inout Syntax,
+        _ nodeType: NodeType.Type,
+        _ visit: (NodeType) -> SyntaxVisitorContinueKind,
+        _ visitPost: (NodeType) -> Void
+      ) {
+        let castedNode = node.cast(NodeType.self)
+        // We retain castedNode.info here before passing it to visit.
+        // I don't think that's necessary because castedNode is already retained but don't know how to prevent it.
+        let needsChildren = (visit(castedNode) == .visitChildren)
+        // Avoid calling into visitChildren if possible.
+        if needsChildren && !node.raw.layoutView!.children.isEmpty {
+          visitChildren(&node)
+        }
+        visitPost(castedNode)
       }
       """
     )
-
-    for node in NON_BASE_SYNTAX_NODES {
-      DeclSyntax(
-        """
-        @inline(never)
-        private func visit\(node.kind.syntaxType)Impl(_ node: Syntax) {
-          if visit(\(node.kind.syntaxType)(unsafeCasting: node)) == .visitChildren {
-            visitChildren(node)
-          }
-          visitPost(\(node.kind.syntaxType)(unsafeCasting: node))
-        }
-        """
-      )
-    }
 
     try IfConfigDeclSyntax(
       leadingTrivia:
@@ -156,18 +166,27 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
                 /// that determines the correct visitation function will be popped of the
                 /// stack before the function is being called, making the switch's stack
                 /// space transient instead of having it linger in the call stack.
-                private func visitationFunc(for node: Syntax) -> (Syntax) -> Void
+                private func visitationFunc(for node: Syntax) -> ((inout Syntax) -> Void)
                 """
               ) {
                 try SwitchExprSyntax("switch node.raw.kind") {
                   SwitchCaseSyntax("case .token:") {
-                    StmtSyntax("return self.visitTokenSyntaxImpl(_:)")
+                    StmtSyntax(
+                      """
+                      return {
+                        let node = $0.cast(TokenSyntax.self)
+                        _ = self.visit(node)
+                        // No children to visit.
+                        self.visitPost(node)
+                      }
+                      """
+                    )
                   }
 
                   for node in NON_BASE_SYNTAX_NODES {
-                    SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
+                    SwitchCaseSyntax("case .\(node.varOrCaseName):") {
                       StmtSyntax(
-                        "return self.visit\(node.kind.syntaxType)Impl(_:)"
+                        "return { self.visitImpl(&$0, \(node.kind.syntaxType).self, self.visit, self.visitPost) }"
                       )
                     }
                   }
@@ -176,8 +195,8 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
               DeclSyntax(
                 """
-                private func dispatchVisit(_ node: Syntax) {
-                  return visitationFunc(for: node)(node)
+                private func visit(_ node: inout Syntax) {
+                  return visitationFunc(for: node)(&node)
                 }
                 """
               )
@@ -190,21 +209,30 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
             CodeBlockItemListSyntax {
               try! FunctionDeclSyntax(
                 """
-                private func dispatchVisit(_ node: Syntax)
+                /// - Note: `node` is `inout` to avoid ref-counting. See comment in `visitImpl`
+                private func visit(_ node: inout Syntax)
                 """
               ) {
                 try SwitchExprSyntax("switch node.raw.kind") {
                   SwitchCaseSyntax("case .token:") {
-                    ExprSyntax("self.visitTokenSyntaxImpl(node)")
+                    DeclSyntax("let node = node.cast(TokenSyntax.self)")
+                    ExprSyntax("_ = visit(node)")
+                    ExprSyntax(
+                      """
+                      // No children to visit.
+                      visitPost(node)
+                      """
+                    )
                   }
 
                   for node in NON_BASE_SYNTAX_NODES {
-                    SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
-                      ExprSyntax("self.visit\(node.kind.syntaxType)Impl(node)")
+                    SwitchCaseSyntax("case .\(node.varOrCaseName):") {
+                      ExprSyntax("visitImpl(&node, \(node.kind.syntaxType).self, visit, visitPost)")
                     }
                   }
                 }
               }
+
             }
           )
         )
@@ -213,9 +241,12 @@ let syntaxVisitorFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
     DeclSyntax(
       """
-      private func visitChildren(_ node: Syntax) {
-        for case let childDataRef? in node.layoutBuffer where viewMode.shouldTraverse(node: childDataRef.pointee.raw) {
-          dispatchVisit(Syntax(arena: node.arena, dataRef: childDataRef))
+      /// - Note: `node` is `inout` to avoid reference counting. See comment in `visitImpl`.
+      private func visitChildren(_ node: inout Syntax) {
+        for case let (child?, info) in RawSyntaxChildren(node) where viewMode.shouldTraverse(node: child) {
+          var childNode = nodeFactory.create(parent: node, raw: child, absoluteInfo: info)
+          visit(&childNode)
+          nodeFactory.dispose(&childNode)
         }
       }
       """

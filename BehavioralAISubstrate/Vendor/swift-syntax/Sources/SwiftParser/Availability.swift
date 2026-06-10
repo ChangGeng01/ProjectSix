@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -47,8 +47,7 @@ extension Parser {
             arena: self.arena
           )
         )
-      } while keepGoing != nil
-        && self.hasProgressed(&availabilityArgumentProgress)
+      } while keepGoing != nil && self.hasProgressed(&availabilityArgumentProgress)
     }
 
     return RawAvailabilityArgumentListSyntax(elements: elements, arena: self.arena)

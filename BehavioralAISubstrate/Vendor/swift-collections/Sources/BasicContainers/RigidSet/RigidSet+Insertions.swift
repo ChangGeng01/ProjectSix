@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension RigidSet where Element: ~Copyable {
@@ -140,7 +140,7 @@ extension RigidSet where Element: ~Copyable {
         capacity: c
       ) { output throws(E) in
         defer {
-          #if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+          #if UnstableContainersPreview
           output._consumeAll { span in
             if span.count < c {
               remainder = 0
@@ -165,7 +165,7 @@ extension RigidSet where Element: ~Copyable {
     }
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public mutating func insert<
     E: Error,
@@ -173,7 +173,9 @@ extension RigidSet where Element: ~Copyable {
   >(
     maximumCount: Int? = nil,
     from producer: inout P
-  ) throws(E) {
+  ) throws(E)
+  where P.Element: ~Copyable
+  {
     try self.insert(
       maximumCount: maximumCount ?? freeCapacity
     ) { target throws(E) in
@@ -184,7 +186,7 @@ extension RigidSet where Element: ~Copyable {
   }
 #endif
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   public mutating func insert<
     D: Drain<Element> & ~Copyable & ~Escapable
@@ -196,10 +198,10 @@ extension RigidSet where Element: ~Copyable {
     while remainder > 0 {
       var span = drain.drainNext(maximumCount: remainder)
       guard !span.isEmpty else { break }
+      remainder &-= span.count
       while let next = span.popFirst() {
         self.insert(next)
       }
-      remainder &-= span.count
     }
   }
 #endif
@@ -218,27 +220,27 @@ extension RigidSet /* where Element: Copyable */ {
     }
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   package mutating func _insert<
-    S: BorrowingSequence<Element> & ~Copyable & ~Escapable
+    S: BorrowingSequence_<Element> & ~Copyable & ~Escapable
   >(
     copying items: borrowing S
   ) {
-    var it = items.makeBorrowingIterator()
+    var it = items.makeBorrowingIterator_()
     while true {
-      let span = it.nextSpan()
+      let span = it.nextSpan_()
       guard !span.isEmpty else { break }
       self.insert(copying: span)
     }
   }
 #endif
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   @inline(__always)
   public mutating func insert<
-    S: BorrowingSequence<Element> & ~Copyable & ~Escapable
+    S: BorrowingSequence_<Element> & ~Copyable & ~Escapable
   >(
     copying items: borrowing S
   ) {
@@ -255,11 +257,11 @@ extension RigidSet /* where Element: Copyable */ {
     }
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   @inline(__always)
   public mutating func insert<
-    S: BorrowingSequence<Element> & Sequence<Element>
+    S: BorrowingSequence_<Element> & Sequence<Element>
   >(
     copying items: borrowing S
   ) {

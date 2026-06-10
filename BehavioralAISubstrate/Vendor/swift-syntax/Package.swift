@@ -1,36 +1,22 @@
-// swift-tools-version: 5.9
+// swift-tools-version:5.8
 
 import Foundation
 import PackageDescription
 
-let products: [Product]
-
-if buildDynamicLibrary {
-  products = [
-    .library(
-      name: "_SwiftSyntaxDynamic",
-      type: .dynamic,
-      targets: [
-        "SwiftBasicFormat",
-        "SwiftDiagnostics",
-        "SwiftIDEUtils",
-        "SwiftParser",
-        "SwiftParserDiagnostics",
-        "SwiftRefactor",
-        "SwiftSyntax",
-        "SwiftSyntaxBuilder",
-      ]
-    )
-  ]
-} else {
-  products = [
+let package = Package(
+  name: "swift-syntax",
+  platforms: [
+    .macOS(.v10_15),
+    .iOS(.v13),
+    .tvOS(.v13),
+    .watchOS(.v6),
+    .macCatalyst(.v13),
+  ],
+  products: [
     .library(name: "SwiftBasicFormat", targets: ["SwiftBasicFormat"]),
     .library(name: "SwiftCompilerPlugin", targets: ["SwiftCompilerPlugin"]),
     .library(name: "SwiftDiagnostics", targets: ["SwiftDiagnostics"]),
     .library(name: "SwiftIDEUtils", targets: ["SwiftIDEUtils"]),
-    .library(name: "SwiftIfConfig", targets: ["SwiftIfConfig"]),
-    .library(name: "SwiftWarningControl", targets: ["SwiftWarningControl"]),
-    .library(name: "SwiftLexicalLookup", targets: ["SwiftLexicalLookup"]),
     .library(name: "SwiftOperators", targets: ["SwiftOperators"]),
     .library(name: "SwiftParser", targets: ["SwiftParser"]),
     .library(name: "SwiftParserDiagnostics", targets: ["SwiftParserDiagnostics"]),
@@ -43,19 +29,7 @@ if buildDynamicLibrary {
     .library(name: "SwiftSyntaxMacrosGenericTestSupport", targets: ["SwiftSyntaxMacrosGenericTestSupport"]),
     .library(name: "_SwiftCompilerPluginMessageHandling", targets: ["SwiftCompilerPluginMessageHandling"]),
     .library(name: "_SwiftLibraryPluginProvider", targets: ["SwiftLibraryPluginProvider"]),
-  ]
-}
-
-let package = Package(
-  name: "swift-syntax",
-  platforms: [
-    .macOS(.v10_15),
-    .iOS(.v13),
-    .tvOS(.v13),
-    .watchOS(.v6),
-    .macCatalyst(.v13),
   ],
-  products: products,
   targets: [
     // MARK: - Internal helper targets
     .target(
@@ -163,55 +137,6 @@ let package = Package(
       dependencies: ["_SwiftSyntaxTestSupport", "SwiftIDEUtils", "SwiftParser", "SwiftSyntax"]
     ),
 
-    // MARK: SwiftIfConfig
-
-    .target(
-      name: "SwiftIfConfig",
-      dependencies: ["SwiftSyntax", "SwiftSyntaxBuilder", "SwiftDiagnostics", "SwiftOperators", "SwiftParser"],
-      exclude: ["CMakeLists.txt"]
-    ),
-
-    .testTarget(
-      name: "SwiftIfConfigTest",
-      dependencies: [
-        "_SwiftSyntaxTestSupport",
-        "SwiftIfConfig",
-        "SwiftParser",
-        "SwiftSyntaxMacrosGenericTestSupport",
-      ]
-    ),
-
-    // MARK: SwiftWarningControl
-
-    .target(
-      name: "SwiftWarningControl",
-      dependencies: ["SwiftSyntax", "SwiftParser", "SwiftDiagnostics"],
-      exclude: ["CMakeLists.txt", "SwiftWarningControl.md"]
-    ),
-
-    .testTarget(
-      name: "SwiftWarningControlTest",
-      dependencies: [
-        "_SwiftSyntaxTestSupport",
-        "SwiftWarningControl",
-        "SwiftParser",
-        "SwiftSyntaxMacrosGenericTestSupport",
-      ]
-    ),
-
-    // MARK: SwiftLexicalLookup
-
-    .target(
-      name: "SwiftLexicalLookup",
-      dependencies: ["SwiftSyntax", "SwiftIfConfig"],
-      exclude: ["CMakeLists.txt"]
-    ),
-
-    .testTarget(
-      name: "SwiftLexicalLookupTest",
-      dependencies: ["_SwiftSyntaxTestSupport", "SwiftLexicalLookup"]
-    ),
-
     // MARK: SwiftLibraryPluginProvider
 
     .target(
@@ -229,10 +154,7 @@ let package = Package(
 
     .target(
       name: "SwiftSyntax",
-      dependencies: [
-        "_SwiftSyntaxCShims", "SwiftSyntax509", "SwiftSyntax510", "SwiftSyntax600", "SwiftSyntax601", "SwiftSyntax602",
-        "SwiftSyntax603",
-      ],
+      dependencies: ["_SwiftSyntaxCShims", "SwiftSyntax509", "SwiftSyntax510", "SwiftSyntax600"],
       exclude: ["CMakeLists.txt"],
       swiftSettings: swiftSyntaxSwiftSettings
     ),
@@ -260,21 +182,6 @@ let package = Package(
       path: "Sources/VersionMarkerModules/SwiftSyntax600"
     ),
 
-    .target(
-      name: "SwiftSyntax601",
-      path: "Sources/VersionMarkerModules/SwiftSyntax601"
-    ),
-
-    .target(
-      name: "SwiftSyntax602",
-      path: "Sources/VersionMarkerModules/SwiftSyntax602"
-    ),
-
-    .target(
-      name: "SwiftSyntax603",
-      path: "Sources/VersionMarkerModules/SwiftSyntax603"
-    ),
-
     // MARK: SwiftSyntaxBuilder
 
     .target(
@@ -294,13 +201,7 @@ let package = Package(
 
     .target(
       name: "SwiftSyntaxMacros",
-      dependencies: [
-        "SwiftDiagnostics",
-        "SwiftIfConfig",
-        "SwiftParser",
-        "SwiftSyntax",
-        "SwiftSyntaxBuilder",
-      ],
+      dependencies: ["SwiftDiagnostics", "SwiftParser", "SwiftSyntax", "SwiftSyntaxBuilder"],
       exclude: ["CMakeLists.txt"]
     ),
 
@@ -347,7 +248,6 @@ let package = Package(
         "_SwiftSyntaxGenericTestSupport",
         "SwiftDiagnostics",
         "SwiftIDEUtils",
-        "SwiftIfConfig",
         "SwiftParser",
         "SwiftSyntaxMacros",
         "SwiftSyntaxMacroExpansion",
@@ -419,7 +319,7 @@ let package = Package(
 
     .testTarget(
       name: "SwiftRefactorTest",
-      dependencies: ["_SwiftSyntaxTestSupport", "SwiftIDEUtils", "SwiftRefactor"]
+      dependencies: ["_SwiftSyntaxTestSupport", "SwiftRefactor"]
     ),
 
     // MARK: - Deprecated targets
@@ -475,12 +375,8 @@ var rawSyntaxValidation: Bool { hasEnvironmentVariable("SWIFTSYNTAX_ENABLE_RAWSY
 /// See CONTRIBUTING.md for more information
 var alternateTokenIntrospection: Bool { hasEnvironmentVariable("SWIFTPARSER_ENABLE_ALTERNATE_TOKEN_INTROSPECTION") }
 
-/// Instead of building object files for all modules to be statically linked, build a single dynamic library.
-///
-/// This allows us to build swift-syntax as dynamic libraries, which in turn allows us to build SourceKit-LSP using
-/// SwiftPM on Windows. Linking swift-syntax statically into sourcekit-lsp exceeds the maximum number of exported
-/// symbols on Windows.
-var buildDynamicLibrary: Bool { hasEnvironmentVariable("SWIFTSYNTAX_BUILD_DYNAMIC_LIBRARY") }
+/// Assume that swift-argument-parser is checked out next to swift-syntax and use that instead of fetching a remote dependency.
+var useLocalDependencies: Bool { hasEnvironmentVariable("SWIFTCI_USE_LOCAL_DEPS") }
 
 // MARK: - Compute custom build settings
 

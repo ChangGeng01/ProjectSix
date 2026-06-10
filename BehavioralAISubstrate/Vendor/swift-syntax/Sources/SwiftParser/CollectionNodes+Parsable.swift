@@ -10,17 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) public import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
 #endif
 
-extension SyntaxCollection where Self: SyntaxParseable {
-  fileprivate static func parse(
+fileprivate extension SyntaxCollection {
+  static func parse(
     from parser: inout Parser,
     parse: (_ parser: inout Parser) -> some RawSyntaxNodeProtocol,
-    makeMissing: (_ remainingTokens: [RawSyntax], _ arena: RawSyntaxArena) -> some RawSyntaxNodeProtocol
+    makeMissing: (_ remainingTokens: [RawSyntax], _ arena: SyntaxArena) -> some RawSyntaxNodeProtocol
   ) -> Self {
     // Keep the parser alive so that the arena in which `raw` is allocated
     // doesn’t get deallocated before we have a chance to create a syntax node
@@ -35,7 +35,7 @@ extension SyntaxCollection where Self: SyntaxParseable {
     let node = parse(&parser)
 
     if parser.at(.endOfFile) {
-      return Syntax(raw: node.raw, rawNodeArena: node.raw.arena).cast(Self.self)
+      return Syntax(raw: node.raw, rawNodeArena: parser.arena).cast(Self.self)
     }
 
     let layoutView = node.raw.layoutView!
@@ -45,7 +45,7 @@ extension SyntaxCollection where Self: SyntaxParseable {
       assert(!remainingTokens.isEmpty)
       let missing = makeMissing(remainingTokens, parser.arena)
       let raw = layoutView.insertingChild(missing.raw, at: node.raw.layoutView!.children.count, arena: parser.arena)
-      return Syntax(raw: raw, rawNodeArena: raw.arena).cast(Self.self)
+      return Syntax(raw: raw, rawNodeArena: parser.arena).cast(Self.self)
     } else {
       // First unwrap: We know that children.last exists because children is not empty
       // Second unwrap: This is a collection and collections never have optional children. Thus the last child can’t be nil.
@@ -55,7 +55,7 @@ extension SyntaxCollection where Self: SyntaxParseable {
         with: lastWithRemainder,
         arena: parser.arena
       )
-      return Syntax(raw: raw, rawNodeArena: raw.arena).cast(Self.self)
+      return Syntax(raw: raw, rawNodeArena: parser.arena).cast(Self.self)
     }
   }
 }
@@ -72,7 +72,6 @@ extension AccessorDeclListSyntax: SyntaxParseable {
         parameters: nil,
         effectSpecifiers: nil,
         body: nil,
-        RawUnexpectedNodesSyntax(remainingTokens, arena: arena),
         arena: arena
       )
     }
@@ -82,15 +81,14 @@ extension AccessorDeclListSyntax: SyntaxParseable {
 extension AttributeListSyntax: SyntaxParseable {
   public static func parse(from parser: inout Parser) -> Self {
     return parse(from: &parser) { parser in
-      return parser.parseAttributeList()
+      return RawSyntax(parser.parseAttributeList())
     } makeMissing: { remainingTokens, arena in
       return RawAttributeSyntax(
         atSign: RawTokenSyntax(missing: .atSign, arena: arena),
-        attributeName: RawMissingTypeSyntax(arena: arena),
+        attributeName: RawTypeSyntax(RawMissingTypeSyntax(arena: arena)),
         leftParen: nil,
         arguments: nil,
         rightParen: nil,
-        RawUnexpectedNodesSyntax(remainingTokens, arena: arena),
         arena: arena
       )
     }
@@ -101,14 +99,10 @@ extension CodeBlockItemListSyntax: SyntaxParseable {
   public static func parse(from parser: inout Parser) -> Self {
     return parse(from: &parser) { parser in
       let node = parser.parseCodeBlockItemList(until: { _ in false })
-      return node
+      return RawSyntax(node)
     } makeMissing: { remainingTokens, arena in
-      RawCodeBlockItemSyntax(
-        item: .init(expr: RawMissingExprSyntax(arena: arena)),
-        semicolon: nil,
-        RawUnexpectedNodesSyntax(remainingTokens, arena: arena),
-        arena: arena
-      )
+      let missingExpr = RawMissingExprSyntax(arena: arena)
+      return RawCodeBlockItemSyntax(item: .expr(RawExprSyntax(missingExpr)), semicolon: nil, arena: arena)
     }
   }
 }
@@ -116,7 +110,7 @@ extension CodeBlockItemListSyntax: SyntaxParseable {
 extension MemberBlockItemListSyntax: SyntaxParseable {
   public static func parse(from parser: inout Parser) -> Self {
     return parse(from: &parser) { parser in
-      return parser.parseMemberDeclList(until: { _ in false })
+      return RawSyntax(parser.parseMemberDeclList())
     } makeMissing: { remainingTokens, arena in
       let missingDecl = RawMissingDeclSyntax(
         attributes: RawAttributeListSyntax(elements: [], arena: arena),
@@ -125,7 +119,7 @@ extension MemberBlockItemListSyntax: SyntaxParseable {
         RawUnexpectedNodesSyntax(remainingTokens, arena: arena),
         arena: arena
       )
-      return RawMemberBlockItemSyntax(decl: missingDecl, semicolon: nil, arena: arena)
+      return RawMemberBlockItemSyntax(decl: RawDeclSyntax(missingDecl), semicolon: nil, arena: arena)
     }
   }
 }

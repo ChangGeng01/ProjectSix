@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueDictionary where Key: ~Copyable, Value: ~Copyable {
@@ -24,18 +24,18 @@ extension UniqueDictionary where Key: ~Copyable, Value: ~Copyable {
     _storage.containsKey(key)
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @inlinable
   @_lifetime(borrow self)
   public func value(
     forKey key: borrowing Key
-  ) -> Borrow<Value>? {
+  ) -> Ref<Value>? {
     // FIXME: Why is this override necessary? Is it sound? It was triggered by RigidDictionary becoming `@_addressableForDependencies`.
     _overrideLifetime(_storage.value(forKey: key), borrowing: self)
   }
 #endif
 
-  /// A stand-in for a `struct Borrow`-returning lookup operation.
+  /// A stand-in for a `struct Ref`-returning lookup operation.
   /// This is quite clumsy to use, but this is the best we can do without a way
   /// to express optional borrows.
   @_alwaysEmitIntoClient

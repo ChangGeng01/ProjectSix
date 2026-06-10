@@ -14,11 +14,12 @@
 
 import PackageDescription
 
-// FIXME: This can sometimes induce a runtime crash (rdar://150240032)
 let _traits: Set<Trait> = [
   .default(
     enabledTraits: [
-      //"UnstableContainersPreview"
+//      "UnstableContainersPreview",
+//      "UnstableHashedContainers",
+//      "UnstableSortedCollections",
     ]),
   .trait(
     name: "UnstableContainersPreview",
@@ -32,9 +33,9 @@ let _traits: Set<Trait> = [
     description: """
       Enables source-unstable prototypes of `SortedSet` and `SortedDictionary`,
       two potential new collection types implementing in-memory B-trees.
-      These are early developer drafts, and they not ready for use in 
+      These are early developer drafts, and they not ready for use in
       production. We will make significant, source breaking API changes to these
-      types before they ship. 
+      types before they ship.
       """),
   .trait(
     name: "UnstableHashedContainers",
@@ -52,16 +53,6 @@ let _traits: Set<Trait> = [
 //
 //     swift build -Xswiftc -DCOLLECTIONS_INTERNAL_CHECKS
 var defines: [SwiftSetting] = [
-  .define(
-    "COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW",
-    .when(traits: ["UnstableContainersPreview"])),
-  .define(
-    "COLLECTIONS_UNSTABLE_SORTED_COLLECTIONS",
-    .when(traits: ["UnstableSortedCollections"])),
-  .define(
-    "COLLECTIONS_UNSTABLE_HASHED_CONTAINERS",
-    .when(traits: ["UnstableHashedContainers"])),
-
   // Enables internal consistency checks at the end of initializers and
   // mutating operations. This can have very significant overhead, so enabling
   // this setting invalidates all documented performance guarantees.
@@ -96,6 +87,9 @@ var defines: [SwiftSetting] = [
   
   // Enables longer, more exhaustive tests.
 //  .define("COLLECTIONS_LONG_TESTS"),
+
+  // Enable the use of `Builtin.Borrow` in `struct Ref`.
+//  .define("COLLECTIONS_BORROW_BUILTIN")
 ]
 
 let availabilityMacros: KeyValuePairs<String, String> = [
@@ -110,6 +104,8 @@ let availabilityMacros: KeyValuePairs<String, String> = [
   "SwiftStdlib 6.1":  "macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4",
   "SwiftStdlib 6.2":  "macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0",
   "SwiftStdlib 6.3":  "macOS 26.4, iOS 26.4, watchOS 26.4, tvOS 26.4, visionOS 26.4",
+  "SwiftStdlib 6.4":  "macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999",
+  "SwiftStdlib 6.5":  "macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999",
   // Note: if you touch these, please make sure to also update the similar lists in
   // CMakeLists.txt and Xcode/Shared.xcconfig.
 ]
@@ -120,24 +116,23 @@ let extraSettings: [SwiftSetting] = [
   .enableExperimentalFeature("BuiltinModule"),
   .enableExperimentalFeature("Lifetimes"),
   .enableExperimentalFeature("InoutLifetimeDependence"),
-  .enableExperimentalFeature("SuppressedAssociatedTypes"),
   .enableExperimentalFeature("AddressableParameters"),
   .enableExperimentalFeature("AddressableTypes"),
+  .enableExperimentalFeature("SuppressedAssociatedTypesWithDefaults"), // Requires Swift 6.4
 
   // Note: if you touch these, please make sure to also update the similar lists in
   // CMakeLists.txt and Xcode/Shared.xcconfig.
 ]
 
-let _sharedSettings: [SwiftSetting] = (
+let _baseSettings: [SwiftSetting] = (
   defines
   + availabilityMacros.map { name, value in
       .enableExperimentalFeature("AvailabilityMacro=\(name): \(value)")
   }
-  + extraSettings
 )
 
-let _settings: [SwiftSetting] = _sharedSettings + []
-let _testSettings: [SwiftSetting] = _sharedSettings + []
+let _settings: [SwiftSetting] = _baseSettings + extraSettings
+let _testSettings: [SwiftSetting] = _settings
 
 struct CustomTarget {
   enum Kind {
@@ -327,7 +322,7 @@ let targets: [CustomTarget] = [
     directory: "RopeModule",
     exclude: ["CMakeLists.txt"],
     // FIXME: _modify accessors in RopeModule seem to be broken in Swift 6 mode
-    settings: _sharedSettings + [.swiftLanguageMode(.v5)]),
+    settings: _settings + [.swiftLanguageMode(.v5)]),
   .target(
     kind: .test,
     name: "RopeModuleTests",
@@ -364,7 +359,12 @@ let targets: [CustomTarget] = [
       "OrderedCollections",
       "_RopeModule",
     ],
-    exclude: ["CMakeLists.txt"])
+    exclude: ["CMakeLists.txt"]),
+  .target(
+    kind: .test,
+    name: "CollectionsModuleTests",
+    dependencies: ["Collections", "_CollectionsTestSupport"],
+    settings: _baseSettings),
 ]
 
 let _products: [Product] = targets.compactMap { t in
@@ -377,5 +377,4 @@ let package = Package(
   name: "swift-collections",
   products: _products,
   traits: _traits,
-  targets: _targets
-)
+  targets: _targets)

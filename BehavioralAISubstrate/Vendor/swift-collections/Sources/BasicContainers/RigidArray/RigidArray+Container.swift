@@ -18,23 +18,19 @@ import ContainersPreview
 
 #if compiler(>=6.2)
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
-extension RigidArray: BorrowingSequence where Element: ~Copyable {
-  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
-
-  @inlinable
-  public var underestimatedCount: Int { count }
-
+extension RigidArray: BorrowingSequence_ where Element: ~Copyable {
+  public typealias BorrowingIterator_ = SpanIterator<Element>
   @_alwaysEmitIntoClient
   @inline(__always)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    self.span.makeBorrowingIterator()
+  public func makeBorrowingIterator_() -> BorrowingIterator_ {
+    SpanIterator(self.span)
   }
 }
 #endif
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension RigidArray: Container where Element: ~Copyable {}
 
@@ -55,6 +51,9 @@ extension RigidArray: RangeReplaceableContainer where Element: ~Copyable {}
 
 @available(SwiftStdlib 5.0, *)
 extension RigidArray where Element: ~Copyable {
+  @inlinable
+  public var underestimatedCount_: Int { count }
+
   /// A Boolean value indicating whether this array contains no elements.
   ///
   /// - Complexity: O(1)
@@ -304,7 +303,7 @@ extension RigidArray where Element: ~Copyable {
   ///    This optimization may be removed in future versions; do not rely on it.
   ///
   /// - Parameter index: A valid index of the array. On return, `index` is
-  ///    set to `limit` if
+  ///    set to the resulting position.
   /// - Parameter n: The distance to offset `index`.
   ///    On return, `n` is set to zero if the operation succeeded without
   ///    hitting the limit; otherwise, `n` reflects the number of steps that
@@ -401,7 +400,6 @@ extension RigidArray where Element: ~Copyable {
     return _span(in: Range(uncheckedBounds: (start, index)))
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @inlinable
   @_lifetime(&self)
   public mutating func nextMutableSpan(after index: inout Int, maximumCount: Int) -> MutableSpan<Element> {
@@ -423,7 +421,6 @@ extension RigidArray where Element: ~Copyable {
     index = start &- Swift.min(maximumCount, start)
     return _span(in: Range(uncheckedBounds: (index, start)))
   }
-#endif
 }
 
 #endif

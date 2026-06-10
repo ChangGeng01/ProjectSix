@@ -64,7 +64,7 @@ public struct SyntaxBuildableType: Hashable {
       return ExprSyntax(NilLiteralExprSyntax())
     } else if let token = token {
       if token.text != nil {
-        return ExprSyntax(".\(token.identifier)Token()")
+        return ExprSyntax(".\(token.varOrCaseName)Token()")
       }
     }
     return nil
@@ -122,7 +122,7 @@ public struct SyntaxBuildableType: Hashable {
   /// without any question marks attached.
   public var syntaxBaseName: TypeSyntax {
     switch kind {
-    case .node(let kind):
+    case .node(kind: let kind):
       return kind.syntaxType
     case .token:
       return "TokenSyntax"
@@ -150,8 +150,8 @@ public struct SyntaxBuildableType: Hashable {
   /// that can be used to build the collection.
   public var resultBuilderType: TypeSyntax {
     switch kind {
-    case .node(let kind):
-      return TypeSyntax("\(raw: kind.uppercasedFirstWordRawValue)Builder")
+    case .node(kind: let kind):
+      return TypeSyntax("\(raw: kind.rawValue.withFirstCharacterUppercased)Builder")
     case .token:
       preconditionFailure("Tokens cannot be constructed using result builders")
     }

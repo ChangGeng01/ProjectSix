@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -48,22 +48,6 @@ extension FixIt {
       message: message,
       changes: [
         .replace(oldNode: Syntax(oldNode), newNode: Syntax(newNode))
-      ]
-    )
-  }
-
-  public static func replaceChild<Parent: SyntaxProtocol, Child: SyntaxProtocol>(
-    message: FixItMessage,
-    parent: Parent,
-    replacingChildAt keyPath: WritableKeyPath<Parent, Child?> & Sendable,
-    with newChild: Child
-  ) -> Self {
-    FixIt(
-      message: message,
-      changes: [
-        .replaceChild(
-          data: FixIt.Change.ReplacingOptionalChildData(parent: parent, newChild: newChild, keyPath: keyPath)
-        )
       ]
     )
   }

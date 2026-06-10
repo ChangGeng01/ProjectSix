@@ -40,11 +40,6 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
     self._syntaxNode = Syntax(node)
   }
 
-  @_transparent
-  init(unsafeCasting node: Syntax) {
-    self._syntaxNode = node
-  }
-
   /// Construct a new token with the given `kind`, `leadingTrivia`,
   /// `trailingTrivia` and `presence`.
   public init(
@@ -53,7 +48,7 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
     trailingTrivia: Trivia = [],
     presence: SourcePresence
   ) {
-    let arena = RawSyntaxArena()
+    let arena = SyntaxArena()
     let raw = RawSyntax.makeMaterializedToken(
       kind: kind,
       leadingTrivia: leadingTrivia,
@@ -62,7 +57,7 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       tokenDiagnostic: nil,
       arena: arena
     )
-    self = Syntax.forRoot(raw, rawNodeArena: RetainedRawSyntaxArena(arena)).cast(TokenSyntax.self)
+    self = Syntax.forRoot(raw, rawNodeArena: RetainedSyntaxArena(arena)).cast(TokenSyntax.self)
   }
 
   /// Whether the token is present or missing.
@@ -71,7 +66,7 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       return tokenView.presence
     }
     set {
-      self = Syntax(self).withPresence(newValue, rawAllocationArena: RawSyntaxArena()).cast(TokenSyntax.self)
+      self = Syntax(self).withPresence(newValue, arena: SyntaxArena()).cast(TokenSyntax.self)
     }
   }
 
@@ -91,7 +86,7 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       return tokenView.formLeadingTrivia()
     }
     set {
-      self = Syntax(self).withLeadingTrivia(newValue, rawAllocationArena: RawSyntaxArena()).cast(TokenSyntax.self)
+      self = Syntax(self).withLeadingTrivia(newValue, arena: SyntaxArena()).cast(TokenSyntax.self)
     }
   }
 
@@ -101,7 +96,7 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       return tokenView.formTrailingTrivia()
     }
     set {
-      self = Syntax(self).withTrailingTrivia(newValue, rawAllocationArena: RawSyntaxArena()).cast(TokenSyntax.self)
+      self = Syntax(self).withTrailingTrivia(newValue, arena: SyntaxArena()).cast(TokenSyntax.self)
     }
   }
 
@@ -114,10 +109,10 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       guard raw.kind == .token else {
         fatalError("TokenSyntax must have token as its raw")
       }
-      let arena = RawSyntaxArena()
+      let arena = SyntaxArena()
       let newRaw = tokenView.withKind(newValue, arena: arena)
       self = Syntax(self)
-        .replacingSelf(newRaw, rawNodeArena: RetainedRawSyntaxArena(arena), rawAllocationArena: arena)
+        .replacingSelf(newRaw, rawNodeArena: RetainedSyntaxArena(arena), allocationArena: arena)
         .cast(TokenSyntax.self)
     }
   }
@@ -146,6 +141,16 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
   /// The length of this node including all of its trivia.
   public var totalLength: SourceLength {
     return raw.totalLength
+  }
+
+  /// Whether the token text is an editor placeholder or not.
+  public var isEditorPlaceholder: Bool {
+    switch self.tokenKind {
+    case .identifier(let text):
+      return text.hasPrefix("<#") && text.hasSuffix("#>")
+    default:
+      return false
+    }
   }
 
   /// An identifier created from `self`.

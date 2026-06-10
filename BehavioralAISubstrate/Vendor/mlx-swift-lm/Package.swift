@@ -35,11 +35,9 @@ let package = Package(
             name: "IntegrationTestHelpers",
             targets: ["IntegrationTestHelpers"]),
     ],
-    // M224 vendor freeze — url: rewritten to path: ../<vendored>.
-    // Original repo: https://github.com/ml-explore/mlx-swift-lm
     dependencies: [
-        .package(path: "../mlx-swift"),
-        .package(path: "../swift-syntax"),
+        .package(path: "../mlx-swift"),  // M224 vendor freeze: url -> path
+        .package(path: "../swift-syntax"),  // M224 vendor freeze: url -> path
     ],
     targets: [
         .target(

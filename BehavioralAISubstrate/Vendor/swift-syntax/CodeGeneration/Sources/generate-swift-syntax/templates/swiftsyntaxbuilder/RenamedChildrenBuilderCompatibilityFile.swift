@@ -16,38 +16,32 @@ import SyntaxSupport
 import Utils
 
 let renamedChildrenBuilderCompatibilityFile = try! SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  importSwiftSyntax(accessLevel: .public)
+  DeclSyntax(
+    """
+    #if swift(>=6)
+    public import SwiftSyntax
+    #else
+    import SwiftSyntax
+    #endif
+    """
+  )
 
-  for layoutNode in SYNTAX_NODES.compactMap(\.layoutNode) {
-    let deprecatedMembers = SYNTAX_COMPATIBILITY_LAYER.deprecatedMembers(for: layoutNode)
-    if !deprecatedMembers.isEmpty {
-      for signature in deprecatedMembers.inits {
-        if let convenienceInit = try signature.createConvenienceBuilderInitializer() {
-          if signature.isHistorical {
-            let deprecatedNames = layoutNode.children
-              .filter { !$0.isUnexpectedNodes && !signature.children.contains($0) }
-              .compactMap { $0.identifier.description }
-              .joined(separator: ", ")
-            DeclSyntax(
-              """
-              extension \(layoutNode.type.syntaxBaseName) {
-              @available(*, deprecated, message: "Use an initializer with \(raw: deprecatedNames) argument(s).")
-              @_disfavoredOverload
-              \(convenienceInit)
-              }
-              """
-            )
-          } else {
-            DeclSyntax(
-              """
-              extension \(layoutNode.type.syntaxBaseName) {
-              \(convenienceInit)
-              }
-              """
-            )
-          }
+  for layoutNode in SYNTAX_NODES.compactMap(\.layoutNode).filter({ $0.children.hasDeprecatedChild }) {
+    if let convenienceInit = try layoutNode.createConvenienceBuilderInitializer(useDeprecatedChildName: true) {
+      let deprecatedNames = layoutNode.children
+        .filter { !$0.isUnexpectedNodes && $0.hasDeprecatedName }
+        .compactMap { $0.varOrCaseName.description }
+        .joined(separator: ", ")
+
+      DeclSyntax(
+        """
+        extension \(layoutNode.type.syntaxBaseName) {
+        @available(*, deprecated, message: "Use an initializer with \(raw: deprecatedNames) argument(s).")
+        @_disfavoredOverload
+        \(convenienceInit)
         }
-      }
+        """
+      )
     }
   }
 }

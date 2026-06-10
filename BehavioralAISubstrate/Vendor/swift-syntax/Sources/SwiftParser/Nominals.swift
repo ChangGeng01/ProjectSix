@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -30,7 +30,7 @@ protocol NominalTypeDeclarationTrait {
     inheritanceClause: RawInheritanceClauseSyntax?,
     genericWhereClause: RawGenericWhereClauseSyntax?,
     memberBlock: RawMemberBlockSyntax,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   )
 
   static func parsePrimaryOrGenerics(_ parser: inout Parser) -> PrimaryOrGenerics?
@@ -48,7 +48,7 @@ extension RawProtocolDeclSyntax: NominalTypeDeclarationTrait {
     inheritanceClause: RawInheritanceClauseSyntax?,
     genericWhereClause: RawGenericWhereClauseSyntax?,
     memberBlock: RawMemberBlockSyntax,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     self.init(
       attributes: attributes,
@@ -82,7 +82,7 @@ extension RawClassDeclSyntax: NominalTypeDeclarationTrait {
     inheritanceClause: RawInheritanceClauseSyntax?,
     genericWhereClause: RawGenericWhereClauseSyntax?,
     memberBlock: RawMemberBlockSyntax,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     self.init(
       attributes: attributes,
@@ -116,7 +116,7 @@ extension RawActorDeclSyntax: NominalTypeDeclarationTrait {
     inheritanceClause: RawInheritanceClauseSyntax?,
     genericWhereClause: RawGenericWhereClauseSyntax?,
     memberBlock: RawMemberBlockSyntax,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     self.init(
       attributes: attributes,
@@ -150,7 +150,7 @@ extension RawStructDeclSyntax: NominalTypeDeclarationTrait {
     inheritanceClause: RawInheritanceClauseSyntax?,
     genericWhereClause: RawGenericWhereClauseSyntax?,
     memberBlock: RawMemberBlockSyntax,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     self.init(
       attributes: attributes,
@@ -184,7 +184,7 @@ extension RawEnumDeclSyntax: NominalTypeDeclarationTrait {
     inheritanceClause: RawInheritanceClauseSyntax?,
     genericWhereClause: RawGenericWhereClauseSyntax?,
     memberBlock: RawMemberBlockSyntax,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     self.init(
       attributes: attributes,
@@ -315,7 +315,7 @@ extension Parser {
             arena: self.arena
           )
         )
-      } while keepGoing != nil && !self.atInheritanceListTerminator() && self.hasProgressed(&loopProgress)
+      } while keepGoing != nil && self.hasProgressed(&loopProgress)
     }
 
     let unexpectedAfterInheritedTypeCollection: RawUnexpectedNodesSyntax?
@@ -323,7 +323,7 @@ extension Parser {
     // If it is a Python style inheritance clause, then consume a right paren if there is one.
     if isPythonStyleInheritanceClause, let rightParen = self.consume(if: .rightParen) {
       unexpectedAfterInheritedTypeCollection = RawUnexpectedNodesSyntax(
-        [rightParen],
+        elements: [RawSyntax(rightParen)],
         arena: self.arena
       )
     } else {
@@ -337,10 +337,6 @@ extension Parser {
       unexpectedAfterInheritedTypeCollection,
       arena: self.arena
     )
-  }
-
-  mutating func atInheritanceListTerminator() -> Bool {
-    return self.experimentalFeatures.contains(.trailingComma) && (self.at(.leftBrace) || self.at(.keyword(.where)))
   }
 
   mutating func parsePrimaryAssociatedTypes() -> RawPrimaryAssociatedTypeClauseSyntax {
@@ -361,11 +357,6 @@ extension Parser {
             arena: self.arena
           )
         )
-
-        // If this was a trailing comma, there are no more elements
-        if at(prefix: ">") {
-          break
-        }
       } while keepGoing != nil && self.hasProgressed(&loopProgress)
     }
     let rangle = self.expectWithoutRecovery(prefix: ">", as: .rightAngle)

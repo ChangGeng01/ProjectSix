@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -39,24 +39,6 @@ extension CodeBlockItemListBuilder {
 
   public static func buildExpression(_ expression: some Sequence<DeclSyntaxProtocol>) -> Component {
     buildExpression(expression.map { CodeBlockItemSyntax(item: .decl(DeclSyntax($0))) })
-  }
-
-  public static func buildFinalResult(_ component: Component) -> CodeBlockItemListSyntax {
-    // Treat the first element as being on a new line. It doesn't need a leading newline
-    var previousEndedInNewline = true
-
-    return CodeBlockItemListSyntax(
-      component.map { expression in
-        defer {
-          previousEndedInNewline = expression.trailingTrivia.pieces.last?.isNewline ?? false
-        }
-        if !previousEndedInNewline, !expression.leadingTrivia.contains(where: \.isNewline) {
-          return expression.with(\.leadingTrivia, .newline.merging(expression.leadingTrivia))
-        } else {
-          return expression
-        }
-      }
-    )
   }
 }
 

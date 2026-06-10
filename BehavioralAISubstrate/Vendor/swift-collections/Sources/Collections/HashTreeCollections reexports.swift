@@ -14,6 +14,6 @@
 #if !COLLECTIONS_SINGLE_MODULE
 import HashTreeCollections
 
-public typealias TreeSet = HashTreeCollections.TreeSet
-public typealias TreeDictionary = HashTreeCollections.TreeDictionary
+public typealias TreeSet<Element: Hashable> = HashTreeCollections.TreeSet<Element>
+public typealias TreeDictionary<Key: Hashable, Value> = HashTreeCollections.TreeDictionary<Key, Value>
 #endif

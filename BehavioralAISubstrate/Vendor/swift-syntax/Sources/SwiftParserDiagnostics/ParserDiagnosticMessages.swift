@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftDiagnostics
 @_spi(Diagnostics) internal import SwiftParser
 @_spi(RawSyntax) public import SwiftSyntax
@@ -20,7 +20,7 @@ import SwiftDiagnostics
 @_spi(RawSyntax) import SwiftSyntax
 #endif
 
-private let diagnosticDomain: String = "SwiftParser"
+fileprivate let diagnosticDomain: String = "SwiftParser"
 
 /// An error diagnostic whose ID is determined by the diagnostic's type.
 public protocol ParserError: DiagnosticMessage {
@@ -191,9 +191,6 @@ extension DiagnosticMessage where Self == StaticParserError {
   public static var maximumNestingLevelOverflow: Self {
     .init("parsing has exceeded the maximum nesting level")
   }
-  public static var misplacedAttributeInVarDecl: Self {
-    .init("misplaced attribute in variable declaration")
-  }
   public static var missingColonAndExprInTernaryExpr: Self {
     .init("expected ':' and expression after '? ...' in ternary expression")
   }
@@ -232,9 +229,6 @@ extension DiagnosticMessage where Self == StaticParserError {
   }
   public static var subscriptsCannotHaveNames: Self {
     .init("subscripts cannot have a name")
-  }
-  public static var submoduleCannotBeImportedUsingModuleSelector: Self {
-    .init("submodule cannot be imported using module selector")
   }
   public static var tooManyClosingPoundDelimiters: Self {
     .init("too many '#' characters in closing delimiter")
@@ -306,30 +300,6 @@ public struct CannotParseVersionTuple: ParserError {
 
   public var message: String {
     return "cannot parse version component \(versionTuple.shortSingleLineContentDescription)"
-  }
-}
-
-public struct DeclarationNotPermittedInContext: ParserError {
-  public var missingDecl: MissingDeclSyntax
-  public var invalidDecl: DeclSyntax
-
-  public var message: String {
-    return "\(self.invalidDeclDescription) is not permitted \(self.missingDeclContextDescription)"
-  }
-
-  var invalidDeclDescription: String {
-    return invalidDecl.kind.nameForDiagnostics ?? "declaration"
-  }
-
-  var missingDeclContextDescription: String {
-    guard
-      let description = missingDecl.parent?.ancestorOrSelf(mapping: { ancestor in
-        ancestor.nodeTypeNameForDiagnostics(allowBlockNames: false)
-      })
-    else {
-      return "here"
-    }
-    return "as \(description)"
   }
 }
 
@@ -407,21 +377,6 @@ public struct IdentifierNotAllowedInOperatorName: ParserError {
   public var message: String {
     return
       "\(nodesDescription([identifier], format: false)) is considered an identifier and must not appear within an operator name"
-  }
-}
-
-public struct IfConfigDeclNotAllowedInContext: ParserError {
-  public let context: Syntax
-
-  private var contextDescription: String {
-    if let description = context.ancestorOrSelf(mapping: { $0.nodeTypeNameForDiagnostics(allowBlockNames: true) }) {
-      return "in \(description)"
-    }
-    return "here"
-  }
-
-  public var message: String {
-    return "conditional compilation not permitted \(contextDescription)"
   }
 }
 
@@ -697,9 +652,6 @@ extension FixItMessage where Self == StaticParserFixIt {
   public static var insertAttributeArguments: Self {
     .init("insert attribute argument")
   }
-  public static var insertBackslash: Self {
-    .init(#"insert '\'"#)
-  }
   public static var insertNewline: Self {
     .init("insert newline")
   }
@@ -713,7 +665,7 @@ extension FixItMessage where Self == StaticParserFixIt {
     .init("join the identifiers together with camel-case")
   }
   public static var removeBackslash: Self {
-    .init(#"remove '\'"#)
+    .init("remove '\'")
   }
   public static var removeExtraneousDelimiters: Self {
     .init("remove extraneous delimiters")
@@ -735,9 +687,6 @@ extension FixItMessage where Self == StaticParserFixIt {
   }
   public static var wrapInBackticks: Self {
     .init("if this name is unavoidable, use backticks to escape it")
-  }
-  public static var convertToExtendedRegexLiteral: Self {
-    .init("convert to extended regex literal with '#'")
   }
 }
 
@@ -761,15 +710,15 @@ public struct MoveTokensAfterFixIt: ParserFixIt {
   }
 }
 
-public struct MoveNodesInFrontOfFixIt<Node: SyntaxProtocol>: ParserFixIt {
-  /// The nodes that should be moved
-  public let movedNodes: [Node]
+public struct MoveTokensInFrontOfFixIt: ParserFixIt {
+  /// The token that should be moved
+  public let movedTokens: [TokenSyntax]
 
-  /// The token before which `movedNodes` should be moved
+  /// The token before which 'movedTokens' should be moved
   public let inFrontOf: TokenKind
 
   public var message: String {
-    "move \(nodesDescription(movedNodes, format: false)) in front of '\(inFrontOf.nameForDiagnostics)'"
+    "move \(nodesDescription(movedTokens, format: false)) in front of '\(inFrontOf.nameForDiagnostics)'"
   }
 }
 

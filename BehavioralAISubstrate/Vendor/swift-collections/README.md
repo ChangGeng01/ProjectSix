@@ -23,7 +23,7 @@
   * [Project Status](#project-status)
     * [Definition of Public API](#public-api)
     * [Minimum Required Swift Toolchain Version](#minimum-required-swift-toolchain-version)
-  * [Using <strong>Swift Collections</strong> in your project](#using-swift-collections-in-your-project)
+  * [Using Swift Collections in your project](#using-swift-collections-in-your-project)
   * [Contributing to Swift Collections](#contributing-to-swift-collections)
     * [Branching Strategy](#branching-strategy)
     * [Working on the package](#working-on-the-package)
@@ -93,10 +93,10 @@ Provides efficient implementations of bit maps.
 
 #### [`HashTreeCollections`][HashTreeCollections] module
 
-Persistent hashed collections implementing Compressed Hash-Array Mapped Prefix Trees (CHAMP). These are like `Set` and `Dictionary`, but they can efficiently mutate shared copies.
+Persistent hashed collections implementing Compressed Hash-Array Mapped Prefix Trees (CHAMP). These are like `Set` and `Dictionary`, but they support efficient mutations of shared copies of values, without duplicating the unchanged parts.
 
-   - [`struct TreeSet<Element>`][TreeSet] is a persistent hashed set.
-   - [`struct TreeDictionary<Key, Value>`][TreeDictionary] is a persistent hashed dictionary.
+- [`struct TreeSet<Element>`][TreeSet] is a persistent hashed set.
+- [`struct TreeDictionary<Key, Value>`][TreeDictionary] is a persistent hashed dictionary.
 
 [HashTreeCollections]: https://swiftpackageindex.com/apple/swift-collections/documentation/hashtreecollections
 [TreeSet]: https://swiftpackageindex.com/apple/swift-collections/documentation/hashtreecollections/treeset
@@ -104,7 +104,7 @@ Persistent hashed collections implementing Compressed Hash-Array Mapped Prefix T
 
 #### [`TrailingElementsModule`][TrailingElementsModule] module
 
-- [`struct TrailingArray`][TrailingArray], a low-level, ownership-aware variant of `ManagedBuffer`, for interoperability with C constructs that consist of a fixed-size header directly followed by variable-size storage buffer.
+- [`struct TrailingArray`][TrailingArray], a low-level, ownership-aware variant of `ManagedBuffer`, for interoperability with C constructs that consist of a fixed-size header directly followed by a variable-size storage buffer.
 - [`protocol TrailingElements`][TrailingElements]
 - [`struct TrailingPadding<Header>`][TrailingPadding]
 
@@ -115,12 +115,12 @@ Persistent hashed collections implementing Compressed Hash-Array Mapped Prefix T
 
 #### [`ContainersPreview`][ContainersPreview] module
 
-An experimental preview of an ownership-aware container model in Swift.
+An experimental preview of an ownership-aware container model in Swift. Most of this module's contents are gated behind the [`UnstableContainersPreview`](#unstablecontainerspreview-package-trait) package trait and are not considered stable API. The type below is the only stable entry point:
 
-- [`struct Box<T>`][Box] a wrapper type that forms a heap-allocated noncopyable box around an arbitrary item.
+- [`struct UniqueBox<Value>`][UniqueBox] is a heap-allocated noncopyable wrapper for an arbitrary value.
 
 [ContainersPreview]: https://swiftpackageindex.com/apple/swift-collections/documentation/containerspreview
-[Box]: https://swiftpackageindex.com/apple/swift-collections/documentation/containerspreview/box
+[UniqueBox]: https://swiftpackageindex.com/apple/swift-collections/documentation/containerspreview/uniquebox
 
 #### [`Collections`][CollectionsModule] module
 
@@ -133,13 +133,13 @@ Exposes the most commonly used collection types with a single import statement:
 - [`struct OrderedSet<Element>`][OrderedSet] from `OrderedCollections`
 - [`struct OrderedDictionary<Key, Value>`][OrderedDictionary] from `OrderedCollections`
 - [`struct TreeSet<Element>`][TreeSet] from `HashTreeCollections`
-- [`struct TreeDictionary<Element>`][TreeDictionary] from `HashTreeCollections`
+- [`struct TreeDictionary<Key, Value>`][TreeDictionary] from `HashTreeCollections`
 
 [CollectionsModule]: https://swiftpackageindex.com/apple/swift-collections/documentation/collections
 
 ## Experimental Features
 
-The package also includes previews of features that aren't ready to be declared source stable yet. This includes prototypes of basic abstractions that belong in the Swift Standard Library, as well as concrete data structures that aren't ready for production use yet -- either because they depend on unreleased language/stdlib improvements, or because they still have known API or implementation issues.
+The package also includes previews of features that aren't ready to be declared source-stable yet. This includes prototypes of basic abstractions that belong in the Swift Standard Library, as well as concrete data structures that aren't ready for production use -- either because they depend on unreleased language/stdlib improvements, or because they still have known API or implementation issues.
 
 These features are disabled by default. The package provides several package traits to allow intrepid early adopters to selectively opt into using them, to validate potential use cases. All APIs and behavior that these traits enable are highly experimental, and completely unstable -- they can (and often will!) change in incompatible ways or they may even get removed with no advance notice, in any new release of the package (including patch releases).
 
@@ -148,8 +148,8 @@ These features are disabled by default. The package provides several package tra
 This trait enables the following types in the [`ContainersPreview`][ContainersPreview] module:
 
 - [`struct InputSpan<Element>`][InputSpan] is a reference to a contiguous region of consumable items.
-- [`struct Borrow<Target>`][Borrow] represents a borrowing reference to an item.
-- [`struct Inout<Target>`][Inout] represents a mutating reference to an item.
+- [`struct Ref<Target>`][Ref] represents a borrowing reference to an item.
+- [`struct MutableRef<Target>`][MutableRef] represents a mutating reference to an item.
 
 - [`protocol BorrowingSequence<Element>`][BorrowingSequence] models borrowing sequences with ephemeral lifetimes.
 - [`protocol BorrowingIteratorProtocol<Element>`][BorrowingIteratorProtocol] models borrowing iterators with ephemeral elements.
@@ -160,12 +160,12 @@ This trait enables the following types in the [`ContainersPreview`][ContainersPr
 - [`protocol MutableContainer<Element>`][MutableContainer] refines `PermutableContainer` to also support arbitrary element replacements/mutations, like `MutableCollection`.
 - [`protocol RangeReplaceableContainer<Element>`][RangeReplaceableContainer] models a (potentially fixed capacity) container with insert/append/replace operations.
 - [`protocol DynamicContainer<Element>`][DynamicContainer] refines `RangeReplaceableContainer` to add operations that require dynamic storage sizing.
-- [`protocol Producer<Element, ProducerError>`][Producer] models a generative iterator -- an abstraction for producing items on demand.
-- [`protocol Drain<Element>`][Drain] refines `Producer` to model an in-place consumable elements -- primarily for use around container types.
+- [`protocol Producer<Element, Failure>`][Producer] models a generative iterator -- an abstraction for producing items on demand.
+- [`protocol Drain<Element>`][Drain] refines `Producer` to model a source of in-place consumable elements -- primarily for use around container types.
 
 [InputSpan]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Types/InputSpan.swift
-[Borrow]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Types/Borrow.swift
-[Inout]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Types/Inout.swift
+[Ref]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Types/Ref.swift
+[MutableRef]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Types/MutableRef.swift
 [BorrowingSequence]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Protocols/BorrowingSequence.swift
 [BorrowingIteratorProtocol]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Protocols/BorrowingIteratorProtocol.swift
 [Container]: https://github.com/apple/swift-collections/blob/main/Sources/ContainersPreview/Protocols/Container/Container.swift
@@ -180,7 +180,7 @@ This trait enables the following types in the [`ContainersPreview`][ContainersPr
 
 The trait also enables a large list of new APIs throughout the package that make use of these constructs -- such as generic methods for transferring items between container types, and implementations of the classic `map`/`reduce`/`filter`/etc algorithms.
 
-These constructs are previews of potential stdlib additions. As of March 2026, some of these are already making their way through the Swift Evolution process; others are still unfinished and highly experimental. These need to remain unstable, as we expect that (as usual) these construct will see some API breaking changes on their way to the stdlib; additionally, they will likely need to be removed from the package entirely once they are fully adopted into the Standard Library. (It would not be feasible to maintain two distinct versions of universal library primitives, or basic protocols / generic algorithms.)
+These constructs are previews of potential stdlib additions. Some of these are already making their way through the Swift Evolution process; others are still unfinished and highly experimental. These need to remain unstable, as we expect that (as usual) these constructs will see some API breaking changes on their way to the stdlib; additionally, they will likely need to be removed from the package entirely once they are fully adopted into the Standard Library. (It would not be feasible to maintain two distinct versions of universal library primitives, or basic protocols / generic algorithms.)
 
 ### `UnstableHashedContainers` package trait
 
@@ -196,7 +196,7 @@ This trait enables the following hashed containers in the [`BasicContainers`][Ba
 [RigidDictionary]: https://github.com/apple/swift-collections/tree/main/Sources/BasicContainers/RigidDictionary
 [UniqueDictionary]: https://github.com/apple/swift-collections/tree/main/Sources/BasicContainers/UniqueDictionary
 
-The set types support noncopyable members, while the dictionary types support noncopyable keys and values. (Of course, they can also be used with copyable types.)
+These types support noncopyable elements -- noncopyable members in the set types, and noncopyable keys and/or values in the dictionary types. (Of course, they can also be used with copyable types.)
 
 Under the hood, these containers implement Robin Hood hashing, achieving better memory utilization and more consistent lookup performance when compared to the standard `Set` and `Dictionary` types.
 
@@ -204,11 +204,12 @@ These types need to remain unstable for now, as they depend on compiler/stdlib f
 
 ### `UnstableSortedCollections` package trait
 
-This trait enables the following types in the `SortedCollections` module:
+This trait enables the following types in the [`SortedCollections`][SortedCollections] module:
 
 - [`struct SortedSet<Element>`][SortedSet] is a set type that requires its element to be `Comparable`, and keeps its members sorted in strictly increasing order.
-- [`struct SortedDictionary<Element>`][SortedDictionary] is a dictionary type that always keeps its keys sorted in strictly increasing order.
+- [`struct SortedDictionary<Key, Value>`][SortedDictionary] is a dictionary type that always keeps its keys sorted in strictly increasing order.
 
+[SortedCollections]: https://github.com/apple/swift-collections/tree/main/Sources/SortedCollections
 [SortedSet]: https://github.com/apple/swift-collections/tree/main/Sources/SortedCollections/SortedSet
 [SortedDictionary]: https://github.com/apple/swift-collections/tree/main/Sources/SortedCollections/SortedDictionary
 
@@ -218,13 +219,13 @@ They remain unstable for now because they have known API deficiencies -- we expe
 
 ## Project Status
 
-The Swift Collections package is source stable. The version numbers follow [Semantic Versioning][semver] -- source breaking changes to public API can only land in a new major version.
+The Swift Collections package is source-stable. The version numbers follow [Semantic Versioning][semver] -- source breaking changes to public API can only land in a new major version.
 
 [semver]: https://semver.org
 
 ### Definition of Public API
 
-The public API of version 1.4 of the `swift-collections` package consists of non-underscored declarations that are marked `public` in the `Collections`, `BasicContainers`, `BitCollections`, `DequeModule`, `HeapModule`, `OrderedCollections`, and `HashTreeCollections` modules.
+The public API of version 1.5 of the `swift-collections` package consists of non-underscored declarations that are marked `public` in the `Collections`, `BasicContainers`, `BitCollections`, `ContainersPreview`, `DequeModule`, `HashTreeCollections`, `HeapModule`, `OrderedCollections`, and `TrailingElementsModule` modules.
 
 Interfaces that aren't part of the public API may continue to change in any release, including patch releases.
 
@@ -237,13 +238,13 @@ By "underscored declarations" we mean declarations that have a leading underscor
 
 Interfaces that get enabled by opting into the `UnstableContainersPreview`, `UnstableSortedCollections`, or `UnstableHashedContainers` package traits are not part of the public API; those interfaces may get removed or changed in any release.
 
-(Note: the list of stable modules above intentionally does not include `ContainersPreview`, `SortedCollections`, nor `_RopeModule` -- these experimental modules are unstable and need more time in the oven before they can become public API.)
+(Note: the list of stable modules above intentionally does not include `SortedCollections` nor `_RopeModule` -- these experimental modules are unstable and need more time in the oven before they can become public API.)
 
 If you have a use case that requires using underscored (or otherwise non-public) APIs, please [submit a Feature Request][enhancement] describing it! We'd like the public interface to be as useful as possible -- although preferably without compromising safety or limiting future evolution.
 
 This source compatibility promise only applies to swift-collections when built as a Swift package. The repository also contains unstable configurations for building swift-collections using CMake and Xcode. These configurations are provided for internal Swift project use only -- such as for building the (private) swift-collections binaries that ship within Swift toolchains. As such, they are unstable and may arbitrarily change (including wholesale removal) in any swift-collections release.
 
-The files in the `Tests`, `Utils`, `Documentation`, `Xcode`, `cmake`, and `Benchmarks` subdirectories may change at whim; they may get added, modified, or removed in any new release. Do not rely on anything about them.
+The files in the `Tests`, `Utils`, `Documentation`, `Xcode`, `cmake`, and `Benchmarks` subdirectories may change at will; they may get added, modified, or removed in any new release. Do not rely on anything about them.
 
 Future minor versions of the package may update these rules as needed.
 
@@ -260,6 +261,8 @@ The following table maps package releases to their minimum required Swift toolch
 | swift-collections 1.2.x | >= Swift 5.10.0 | >= Xcode 15.3 |
 | swift-collections 1.3.x | >= Swift 6.0.3  | >= Xcode 16.2 |
 | swift-collections 1.4.x | >= Swift 6.0.3  | >= Xcode 16.2 |
+| swift-collections 1.5.x | >= Swift 6.0.3  | >= Xcode 16.2 |
+| swift-collections 1.6.x | >= Swift 6.0.3 | >= Xcode 16.2 |
 
 We make an effort to ensure that each new minor package version supports the most recent three major Swift versions at the time of its release.
 
@@ -280,7 +283,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/apple/swift-collections.git",
-      .upToNextMinor(from: "1.4.0") // or `.upToNextMajor`
+      .upToNextMinor(from: "1.6.0") // or `.upToNextMajor`
     )
   ],
   targets: [
@@ -308,18 +311,20 @@ We maintain separate branches for each minor version of the package:
 
 | Package version         | Branch      | Status   |
 | ----------------------- | ----------- | -------- |
-| swift-collections 1.0.x | release/1.0 | Obsolete |
-| swift-collections 1.1.x | release/1.1 | Obsolete |
-| swift-collections 1.2.x | release/1.2 | Obsolete |
-| swift-collections 1.3.x | release/1.3 | Bugfixes only |
-| swift-collections 1.4.x | release/1.4 | Bugfixes only |
+| swift-collections 1.0.x | release/1.0 | Obsolete, closed|
+| swift-collections 1.1.x | release/1.1 | Obsolete, closed|
+| swift-collections 1.2.x | release/1.2 | Obsolete, closed|
+| swift-collections 1.3.x | release/1.3 | Bugfixes only|
+| swift-collections 1.4.x | <created on demand> | Bugfixes only |
+| swift-collections 1.5.x | <created on demand> | Bugfixes only |
+| swift-collections 1.6.x | <created on demand>| Bugfixes only |
 | n.a.                    | main        | Feature work towards next minor release |
 
 Changes must land on the branch corresponding to the earliest release that they will need to ship on. They are periodically propagated to subsequent branches, in the following direction:
 
-`release/1.3` → `release/1.4` → `main`
+`release/1.3` → `release/1.4` → `release/1.5` → `main`
 
-For example, anything landing on `release/1.3` will eventually appear on `release/1.4` and then `main` too; there is no need to file standalone PRs for each release line. Change propagation is not instantaneous, as it currently requires manual work -- it is performed by project maintainers.
+For example, anything landing on `release/1.3` will eventually appear on `release/1.4`, `release/1.5`, and then `main` too; there is no need to file standalone PRs for each release line. Change propagation is not instantaneous, as it currently requires manual work -- it is performed by project maintainers.
 
 ### Working on the package
 
@@ -349,7 +354,7 @@ By submitting a pull request, you represent that you have the right to license y
 
 #### Proposing the addition of a new data structure
 
-**Note:** We are currently fully preoccupied with refactoring our existing data structures to support noncopyable and/or nonescapable element types; this includes designing new container protocols around them. I don't expect we'll have capacity to work on any major new data structure implementations until this effort is complete.
+**Note:** We are currently fully preoccupied with refactoring our existing data structures to support noncopyable and/or nonescapable element types; this includes designing new container protocols around them. We don't expect to have capacity to work on any major new data structure implementations until this effort is complete.
 
 ## Code of Conduct
 

@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6.2) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 
 @available(SwiftStdlib 5.0, *)
-extension Producer where Self: ~Copyable & ~Escapable {
+extension Producer where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   @_lifetime(copy self)
   public consuming func filter(
     // Note: The predicate is not throwing to avoid difficult exception safety problems
@@ -27,9 +27,10 @@ extension Producer where Self: ~Copyable & ~Escapable {
 @available(SwiftStdlib 5.0, *)
 public struct ConsumingFilterProducer<
   Base: Producer & ~Copyable & ~Escapable
->: ~Copyable, ~Escapable {
+>: ~Copyable, ~Escapable
+where Base.Element: ~Copyable {
   public typealias Element = Base.Element
-  public typealias ProducerError = Base.ProducerError
+  public typealias Failure = Base.Failure
 
   @_alwaysEmitIntoClient
   public var _base: Base
@@ -47,23 +48,32 @@ public struct ConsumingFilterProducer<
   }
 }
 
+#if false // FIXME: This does not work with SuppressedAssociatedTypesWithDefaults
+// error: Conditional conformance to 'Escapable' must explicitly state whether
+// 'Base.Element' is required to conform to 'Escapable' or not
+// (Even though it states exactly that.)
 @available(SwiftStdlib 5.0, *)
 extension ConsumingFilterProducer: Escapable
 where
-  Base: ~Copyable,
-  Base: Escapable
+  Base: ~Copyable & Escapable,
+  Base.Element: ~Copyable & Escapable, // FIXME: Why declare Escapable?
+  Base.Failure: Copyable & Escapable // FIXME: Why declare this?
 {}
+#endif
 
 @available(SwiftStdlib 5.0, *)
-extension ConsumingFilterProducer: Producer where Base: ~Copyable & ~Escapable {
-
+extension ConsumingFilterProducer: Producer
+where
+  Base: ~Copyable & ~Escapable,
+  Base.Element: ~Copyable
+{
   @inlinable
   public var underestimatedCount: Int {
     _base.underestimatedCount
   }
 
   @inlinable
-  public mutating func next() throws(ProducerError) -> Element? {
+  public mutating func next() throws(Failure) -> Element? {
     while let next = try _base.next() {
       if _isIncluded(next) { return next }
     }
@@ -76,7 +86,7 @@ extension ConsumingFilterProducer: Producer where Base: ~Copyable & ~Escapable {
   @_lifetime(self: copy self)
   public mutating func generate(
     into target: inout OutputSpan<Element>
-  ) throws(ProducerError) -> Bool {
+  ) throws(Failure) -> Bool {
     let startCount = target.count
     repeat {
       let prevCount = target.count

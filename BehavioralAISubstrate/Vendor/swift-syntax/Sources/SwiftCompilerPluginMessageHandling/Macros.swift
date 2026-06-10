@@ -1,36 +1,32 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftBasicFormat
 internal import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) internal import SwiftIfConfig
 internal import SwiftOperators
-@_spi(ExperimentalLanguageFeatures) internal import SwiftParser
 internal import SwiftSyntax
 @_spi(MacroExpansion) @_spi(ExperimentalLanguageFeature) internal import SwiftSyntaxMacroExpansion
 @_spi(ExperimentalLanguageFeature) internal import SwiftSyntaxMacros
 #else
 import SwiftBasicFormat
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftIfConfig
 import SwiftOperators
-@_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftSyntax
 @_spi(MacroExpansion) @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
 @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 #endif
 
-extension PluginProviderMessageHandler {
+extension CompilerPluginMessageHandler {
   /// Get concrete macro type from a pair of module name and type name.
   private func resolveMacro(_ ref: PluginMessage.MacroReference) throws -> Macro.Type {
     try provider.resolveMacro(moduleName: ref.moduleName, typeName: ref.typeName)
@@ -40,8 +36,6 @@ extension PluginProviderMessageHandler {
   private static func resolveLexicalContext(
     _ lexicalContext: [PluginMessage.Syntax]?,
     sourceManager: SourceManager,
-    swiftVersion: Parser.SwiftVersion?,
-    experimentalFeatures: Parser.ExperimentalFeatures?,
     operatorTable: OperatorTable,
     fallbackSyntax: some SyntaxProtocol
   ) -> [Syntax] {
@@ -51,14 +45,7 @@ extension PluginProviderMessageHandler {
       return fallbackSyntax.allMacroLexicalContexts()
     }
 
-    return lexicalContext.map {
-      sourceManager.add(
-        $0,
-        swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
-        foldingWith: operatorTable
-      )
-    }
+    return lexicalContext.map { sourceManager.add($0, foldingWith: operatorTable) }
   }
 
   /// Expand `@freestainding(XXX)` macros.
@@ -66,32 +53,21 @@ extension PluginProviderMessageHandler {
     macro: PluginMessage.MacroReference,
     macroRole pluginMacroRole: PluginMessage.MacroRole?,
     discriminator: String,
-    staticBuildConfiguration: StaticBuildConfiguration?,
     expandingSyntax: PluginMessage.Syntax,
     lexicalContext: [PluginMessage.Syntax]?
   ) -> PluginToHostMessage {
     let sourceManager = SourceManager(syntaxRegistry: syntaxRegistry)
-    let swiftVersion = staticBuildConfiguration?.parserSwiftVersion
-    let experimentalFeatures = staticBuildConfiguration?.experimentalFeatures
-    let syntax = sourceManager.add(
-      expandingSyntax,
-      swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures,
-      foldingWith: .standardOperators
-    )
+    let syntax = sourceManager.add(expandingSyntax, foldingWith: .standardOperators)
 
     let context = PluginMacroExpansionContext(
       sourceManager: sourceManager,
       lexicalContext: Self.resolveLexicalContext(
         lexicalContext,
         sourceManager: sourceManager,
-        swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
         operatorTable: .standardOperators,
         fallbackSyntax: syntax
       ),
-      expansionDiscriminator: discriminator,
-      staticBuildConfiguration: staticBuildConfiguration
+      expansionDiscriminator: discriminator
     )
 
     let expandedSource: String?
@@ -137,7 +113,6 @@ extension PluginProviderMessageHandler {
     macro: PluginMessage.MacroReference,
     macroRole: PluginMessage.MacroRole,
     discriminator: String,
-    staticBuildConfiguration: StaticBuildConfiguration?,
     attributeSyntax: PluginMessage.Syntax,
     declSyntax: PluginMessage.Syntax,
     parentDeclSyntax: PluginMessage.Syntax?,
@@ -146,29 +121,17 @@ extension PluginProviderMessageHandler {
     lexicalContext: [PluginMessage.Syntax]?
   ) -> PluginToHostMessage {
     let sourceManager = SourceManager(syntaxRegistry: syntaxRegistry)
-    let swiftVersion = staticBuildConfiguration?.parserSwiftVersion
-    let experimentalFeatures = staticBuildConfiguration?.experimentalFeatures
-
-    func addToSourceManager(_ syntax: PluginMessage.Syntax, foldOperators: Bool) -> Syntax {
-      sourceManager.add(
-        syntax,
-        swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
-        foldingWith: foldOperators ? .standardOperators : nil
-      )
-    }
-
-    let attributeNode = addToSourceManager(attributeSyntax, foldOperators: true)
-      .cast(AttributeSyntax.self)
-    let declarationNode = addToSourceManager(declSyntax, foldOperators: false)
-    let parentDeclNode = parentDeclSyntax.map {
-      addToSourceManager($0, foldOperators: false).cast(DeclSyntax.self)
-    }
+    let attributeNode = sourceManager.add(
+      attributeSyntax,
+      foldingWith: .standardOperators
+    ).cast(AttributeSyntax.self)
+    let declarationNode = sourceManager.add(declSyntax).cast(DeclSyntax.self)
+    let parentDeclNode = parentDeclSyntax.map { sourceManager.add($0).cast(DeclSyntax.self) }
     let extendedType = extendedTypeSyntax.map {
-      addToSourceManager($0, foldOperators: false).cast(TypeSyntax.self)
+      sourceManager.add($0).cast(TypeSyntax.self)
     }
     let conformanceList = conformanceListSyntax.map {
-      let placeholderStruct = addToSourceManager($0, foldOperators: false).cast(StructDeclSyntax.self)
+      let placeholderStruct = sourceManager.add($0).cast(StructDeclSyntax.self)
       return placeholderStruct.inheritanceClause!.inheritedTypes
     }
 
@@ -177,13 +140,10 @@ extension PluginProviderMessageHandler {
       lexicalContext: Self.resolveLexicalContext(
         lexicalContext,
         sourceManager: sourceManager,
-        swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
         operatorTable: .standardOperators,
         fallbackSyntax: declarationNode
       ),
-      expansionDiscriminator: discriminator,
-      staticBuildConfiguration: staticBuildConfiguration
+      expansionDiscriminator: discriminator
     )
 
     // TODO: Make this a 'String?' and remove non-'hasExpandMacroResult' branches.
@@ -196,28 +156,19 @@ extension PluginProviderMessageHandler {
         definition: macroDefinition,
         macroRole: role,
         attributeNode: attributeNode,
-        node: declarationNode,
+        declarationNode: declarationNode,
         parentDeclNode: parentDeclNode,
         extendedType: extendedType,
         conformanceList: conformanceList,
         in: context
       )
       if let expansions, hostCapability.hasExpandMacroResult {
-        let collapseIndentationWidth: Trivia?
-        switch macroDefinition.formatMode {
-        case .auto: collapseIndentationWidth = nil
-        case .disabled: collapseIndentationWidth = []
-        #if RESILIENT_LIBRARIES
-        @unknown default: fatalError()
-        #endif
-        }
         // Make a single element array by collapsing the results into a string.
         expandedSources = [
           SwiftSyntaxMacroExpansion.collapse(
             expansions: expansions,
             for: role,
-            attachedTo: declarationNode,
-            indentationWidth: collapseIndentationWidth
+            attachedTo: declarationNode
           )
         ]
       } else {

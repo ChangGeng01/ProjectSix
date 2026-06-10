@@ -1,10 +1,5 @@
 // swift-tools-version: 6.1
-// M224 vendor freeze. Original Package.swift edits:
-//   - EventSource / swift-crypto url: rewritten to path: ../<vendored>
-//   - swift-xet url: + Xet trait dep removed (we do not vendor
-//     swift-xet and the Xet trait is never enabled in BAS builds)
-//   - testTargets removed (Tests/ stripped during vendor)
-// Original repo: https://github.com/huggingface/swift-huggingface
+// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
@@ -24,9 +19,16 @@ let package = Package(
             targets: ["HuggingFace"]
         )
     ],
+    traits: [
+        .trait(
+            name: "Xet",
+            description: "Enable Xet transport support.",
+        )
+    ],
     dependencies: [
-        .package(path: "../EventSource"),
+        .package(path: "../EventSource"),  // M224 vendor freeze: url -> path
         .package(path: "../swift-crypto"),
+        .package(url: "https://github.com/huggingface/swift-xet.git", from: "0.2.0"),
     ],
     targets: [
         .target(
@@ -34,8 +36,26 @@ let package = Package(
             dependencies: [
                 .product(name: "EventSource", package: "EventSource"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Xet", package: "swift-xet", condition: .when(traits: ["Xet"])),
             ],
-            path: "Sources/HuggingFace"
+            path: "Sources/HuggingFace",
+            swiftSettings: [
+                .define("HUGGINGFACE_ENABLE_XET", .when(traits: ["Xet"]))
+            ]
+        ),
+        .testTarget(
+            name: "HuggingFaceTests",
+            dependencies: ["HuggingFace"],
+            swiftSettings: [
+                .define("HUGGINGFACE_ENABLE_XET", .when(traits: ["Xet"]))
+            ]
+        ),
+        .testTarget(
+            name: "HubBenchmarks",
+            dependencies: ["HuggingFace"],
+            swiftSettings: [
+                .define("HUGGINGFACE_ENABLE_XET", .when(traits: ["Xet"]))
+            ]
         ),
     ]
 )

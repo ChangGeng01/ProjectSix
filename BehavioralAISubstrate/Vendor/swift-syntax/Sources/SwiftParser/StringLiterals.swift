@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -18,10 +18,10 @@
 
 // MARK: - Check multiline string literal indentation
 
-private class StringLiteralExpressionIndentationChecker {
+fileprivate class StringLiteralExpressionIndentationChecker {
   // MARK: Entry
 
-  init(expectedIndentation: SyntaxText, arena: RawSyntaxArena) {
+  init(expectedIndentation: SyntaxText, arena: SyntaxArena) {
     self.expectedIndentation = expectedIndentation
     self.arena = arena
   }
@@ -37,7 +37,7 @@ private class StringLiteralExpressionIndentationChecker {
   // MARK: Implementation
 
   private let expectedIndentation: SyntaxText
-  private let arena: RawSyntaxArena
+  private let arena: SyntaxArena
 
   private func visit(node: RawSyntax) -> RawSyntax? {
     if node.isToken {
@@ -341,6 +341,22 @@ extension Parser {
     closingQuote: RawTokenSyntax
   ) {
     // -------------------------------------------------------------------------
+    // Precondition
+
+    precondition(
+      allSegments.allSatisfy {
+        if case .stringSegment(let segment) = $0 {
+          return segment.unexpectedBeforeContent == nil
+            && segment.unexpectedAfterContent == nil
+            && segment.content.leadingTriviaByteLength == 0
+        } else {
+          return true
+        }
+      },
+      "String segment produced by the lexer should not have unexpected text or trivia because we would drop it during post-processing"
+    )
+
+    // -------------------------------------------------------------------------
     // Variables
 
     var middleSegments = allSegments
@@ -379,9 +395,6 @@ extension Parser {
     // Parse indentation of the closing quote
 
     if let lastSegment,
-      lastSegment.unexpectedBeforeContent == nil,
-      lastSegment.unexpectedAfterContent == nil,
-      lastSegment.content.leadingTriviaByteLength == 0,
       let parsedTrivia = parseIndentationTrivia(text: lastSegment.content.tokenText)
     {
       indentationTrivia = parsedTrivia
@@ -396,9 +409,10 @@ extension Parser {
         arena: self.arena
       )
     } else {
-      if let lastSegment {
-        indentationTrivia = TriviaParser.parseTrivia(lastSegment.content.tokenText, position: .leading)
-          .prefix(while: \.isIndentationWhitespace)
+      if let lastSegment = lastSegment {
+        indentationTrivia = TriviaParser.parseTrivia(lastSegment.content.tokenText, position: .leading).prefix(while: {
+          $0.isIndentationWhitespace
+        })
         let indentationByteLength = indentationTrivia.reduce(0, { $0 + $1.byteLength })
         indentation = SyntaxText(rebasing: lastSegment.content.tokenText[0..<indentationByteLength])
         middleSegments.append(.stringSegment(lastSegment))
@@ -537,10 +551,7 @@ extension Parser {
         )
         let leftParen = self.expectWithoutRecoveryOrLeadingTrivia(.leftParen)
         let expressions = RawLabeledExprListSyntax(
-          elements: self.parseArgumentListElements(
-            pattern: .none,
-            allowTrailingComma: true
-          ),
+          elements: self.parseArgumentListElements(pattern: .none),
           arena: self.arena
         )
 
@@ -689,7 +700,10 @@ extension Parser {
       }
     }
 
-    let (unexpectedBetweenSegmentAndCloseQuote, closeQuote) = self.expect(openQuote.closeTokenKind.spec)
+    let (unexpectedBetweenSegmentAndCloseQuote, closeQuote) = self.expect(
+      anyIn: SimpleStringLiteralExprSyntax.ClosingQuoteOptions.self,
+      default: openQuote.closeTokenKind
+    )
     let closeDelimiter = self.consume(if: .rawStringPoundDelimiter)
 
     if openQuote.tokenKind == .multilineStringQuote, !openQuote.isMissing, !closeQuote.isMissing {

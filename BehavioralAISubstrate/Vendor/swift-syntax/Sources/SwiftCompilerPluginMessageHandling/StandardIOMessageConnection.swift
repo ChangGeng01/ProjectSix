@@ -1,23 +1,19 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6) && RESILIENT_LIBRARIES
-@_implementationOnly private import _SwiftSyntaxCShims
-#elseif compiler(>=6) && !RESILIENT_LIBRARIES
+#if swift(>=6.0)
 private import _SwiftSyntaxCShims
-#elseif !compiler(>=6) && RESILIENT_LIBRARIES
+#else
 @_implementationOnly import _SwiftSyntaxCShims
-#elseif !compiler(>=6) && !RESILIENT_LIBRARIES
-import _SwiftSyntaxCShims
 #endif
 
 #if canImport(ucrt)
@@ -44,16 +40,6 @@ public struct StandardIOMessageConnection: MessageConnection {
     self.outputFileDescriptor = outputFileDescriptor
   }
 
-  #if os(WASI)
-  /// Convenience initializer for Wasm executable plugins. Connects
-  /// directly to `stdin` and `stdout` as WASI doesn't support
-  /// `dup{,2}`.
-  public init() throws {
-    let inputFD = fileno(swift_syntax_stdin)
-    let outputFD = fileno(swift_syntax_stdout)
-    self.init(inputFileDescriptor: inputFD, outputFileDescriptor: outputFD)
-  }
-  #else
   /// Convenience initializer for normal executable plugins. Upon creation:
   ///   - Redirect `stdout` to `stderr` so that print statements from the plugin
   ///     are treated as plain-text output
@@ -64,29 +50,29 @@ public struct StandardIOMessageConnection: MessageConnection {
   public init() throws {
     // Duplicate the `stdin` file descriptor, which we will then use for
     // receiving messages from the plugin host.
-    let inputFD = dup(fileno(swift_syntax_stdin))
+    let inputFD = dup(fileno(_stdin))
     guard inputFD >= 0 else {
-      throw IOError.systemError(function: "dup(fileno(stdin))", errno: swift_syntax_errno)
+      throw IOError.systemError(function: "dup(fileno(stdin))", errno: _errno)
     }
 
     // Having duplicated the original standard-input descriptor, we close
     // `stdin` so that attempts by the plugin to read console input (which
     // are usually a mistake) return errors instead of blocking.
-    guard close(fileno(swift_syntax_stdin)) >= 0 else {
-      throw IOError.systemError(function: "close(fileno(stdin))", errno: swift_syntax_errno)
+    guard close(fileno(_stdin)) >= 0 else {
+      throw IOError.systemError(function: "close(fileno(stdin))", errno: _errno)
     }
 
     // Duplicate the `stdout` file descriptor, which we will then use for
     // sending messages to the plugin host.
-    let outputFD = dup(fileno(swift_syntax_stdout))
+    let outputFD = dup(fileno(_stdout))
     guard outputFD >= 0 else {
-      throw IOError.systemError(function: "dup(fileno(stdout))", errno: swift_syntax_errno)
+      throw IOError.systemError(function: "dup(fileno(stdout))", errno: _errno)
     }
 
     // Having duplicated the original standard-output descriptor, redirect
     // `stdout` to `stderr` so that all free-form text output goes there.
-    guard dup2(fileno(swift_syntax_stderr), fileno(swift_syntax_stdout)) >= 0 else {
-      throw IOError.systemError(function: "dup2(fileno(stderr), fileno(stdout))", errno: swift_syntax_errno)
+    guard dup2(fileno(_stderr), fileno(_stdout)) >= 0 else {
+      throw IOError.systemError(function: "dup2(fileno(stderr), fileno(stdout))", errno: _errno)
     }
 
     #if canImport(ucrt)
@@ -97,7 +83,6 @@ public struct StandardIOMessageConnection: MessageConnection {
 
     self.init(inputFileDescriptor: inputFD, outputFileDescriptor: outputFD)
   }
-  #endif
 
   /// Write the buffer to the file descriptor. Throws an error on failure.
   private func _write(contentsOf buffer: UnsafeRawBufferPointer) throws {
@@ -105,7 +90,7 @@ public struct StandardIOMessageConnection: MessageConnection {
     let endPtr = ptr.advanced(by: buffer.count)
     while ptr != endPtr {
       switch write(outputFileDescriptor, ptr, numericCast(endPtr - ptr)) {
-      case -1: throw IOError.systemError(function: "write(_:_:_:)", errno: swift_syntax_errno)
+      case -1: throw IOError.systemError(function: "write(_:_:_:)", errno: _errno)
       case 0: throw IOError.systemError(function: "write", errno: 0) /* unreachable */
       case let n: ptr += Int(n)
       }
@@ -120,7 +105,7 @@ public struct StandardIOMessageConnection: MessageConnection {
     let endPtr = ptr.advanced(by: buffer.count)
     while ptr != endPtr {
       switch read(inputFileDescriptor, ptr, numericCast(endPtr - ptr)) {
-      case -1: throw IOError.systemError(function: "read(_:_:_:)", errno: swift_syntax_errno)
+      case -1: throw IOError.systemError(function: "read(_:_:_:)", errno: _errno)
       case 0: throw IOError.readReachedEndOfInput
       case let n: ptr += Int(n)
       }
@@ -152,10 +137,6 @@ public struct StandardIOMessageConnection: MessageConnection {
 
     // Read the JSON payload.
     let count = Int(UInt64(littleEndian: header))
-    // Empty message is a termination signal.
-    if count == 0 {
-      return nil
-    }
     let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
     defer { data.deallocate() }
     try _read(into: data)
@@ -181,17 +162,6 @@ private enum IOError: Error, CustomStringConvertible {
 
 // Private function to construct an error message from an `errno` code.
 private func describe(errno: CInt) -> String {
-  // We can't tell how long the error message will be but 1024 characters should be enough to hold most, if not all,
-  // error messages.
-  return withUnsafeTemporaryAllocation(of: CChar.self, capacity: 1024) { buffer in
-    guard let baseAddress = buffer.baseAddress else {
-      return ""
-    }
-    #if os(Windows)
-    strerror_s(baseAddress, buffer.count, errno)
-    #else
-    strerror_r(errno, baseAddress, buffer.count)
-    #endif
-    return String(cString: baseAddress)
-  }
+  if let cStr = strerror(errno) { return String(cString: cStr) }
+  return String(describing: errno)
 }

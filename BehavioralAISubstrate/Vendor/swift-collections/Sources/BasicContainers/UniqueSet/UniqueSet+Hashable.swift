@@ -16,10 +16,13 @@ import InternalCollectionsUtilities
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableHashedContainers && UnstableContainersPreview
+
+@available(SwiftStdlib 6.4, *)
+extension UniqueSet: Hashable {}
 
 @available(SwiftStdlib 5.0, *)
-extension UniqueSet: Hashable {
+extension UniqueSet {
   @inlinable
   public func hash(into hasher: inout Hasher) {
     _storage.hash(into: &hasher)

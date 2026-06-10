@@ -10,13 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6.0)
 #if canImport(Darwin)
 private import Darwin
 #elseif canImport(Glibc)
 private import Glibc
-#elseif canImport(Bionic)
-private import Bionic
 #elseif canImport(Musl)
 private import Musl
 #endif
@@ -47,11 +45,10 @@ import Musl
 /// replacement character (`\u{FFFD}`).
 @_spi(RawSyntax)
 public struct SyntaxText: Sendable {
-  public typealias Buffer = ArenaAllocatedBufferPointer<UInt8>
-  var buffer: Buffer
+  var buffer: SyntaxArenaAllocatedBufferPointer<UInt8>
 
   /// Construct a ``SyntaxText`` whose text is represented by the given `buffer`.
-  public init(buffer: Buffer) {
+  public init(buffer: SyntaxArenaAllocatedBufferPointer<UInt8>) {
     self.buffer = buffer
   }
 
@@ -181,18 +178,6 @@ extension SyntaxText: RandomAccessCollection {
   public subscript(index: Index) -> Element {
     get { return buffer[index] }
   }
-
-  public func makeIterator() -> Buffer.Iterator {
-    buffer.makeIterator()
-  }
-
-  public func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {
-    try buffer.withContiguousStorageIfAvailable(body)
-  }
-
-  public func _copyContents(initializing ptr: UnsafeMutableBufferPointer<Element>) -> (Iterator, Int) {
-    buffer._copyContents(initializing: ptr)
-  }
 }
 
 extension SyntaxText: Hashable {
@@ -296,8 +281,6 @@ private func compareMemory(
   return Darwin.memcmp(s1, s2, count) == 0
   #elseif canImport(Glibc)
   return Glibc.memcmp(s1, s2, count) == 0
-  #elseif canImport(Bionic)
-  return Bionic.memcmp(s1, s2, count) == 0
   #else
   return UnsafeBufferPointer(start: s1, count: count)
     .elementsEqual(UnsafeBufferPointer(start: s2, count: count))

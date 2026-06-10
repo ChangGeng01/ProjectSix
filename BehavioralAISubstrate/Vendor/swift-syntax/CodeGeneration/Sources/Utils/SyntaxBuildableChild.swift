@@ -29,11 +29,11 @@ extension Child {
   public var buildableType: SyntaxBuildableType {
     let buildableKind: SyntaxOrTokenNodeKind
     switch kind {
-    case .node(let kind):
+    case .node(kind: let kind):
       buildableKind = .node(kind: kind)
     case .nodeChoices:
       buildableKind = .node(kind: .syntax)
-    case .collection(let kind, _, _, _, _):
+    case .collection(kind: let kind, _, _, _):
       buildableKind = .node(kind: kind)
     case .token:
       buildableKind = .token(self.tokenKind!)
@@ -65,19 +65,19 @@ extension Child {
         return ExprSyntax("nil")
       }
     }
-    if case .collection(_, _, defaultsToEmpty: true, _, _) = kind {
+    if case .collection(_, _, defaultsToEmpty: true, _) = kind {
       return ExprSyntax("[]")
     }
     guard let token = token, isToken else {
       return buildableType.defaultValue
     }
     if token.text != nil {
-      return ExprSyntax(".\(token.identifier)Token()")
+      return ExprSyntax(".\(token.varOrCaseName)Token()")
     }
     if case .token(let choices, _, _) = kind,
       case .keyword(let keyword) = choices.only
     {
-      return ExprSyntax(".\(token.memberCallName)(.\(keyword.spec.memberCallName))")
+      return ExprSyntax(".\(token.varOrCaseName)(.\(keyword.spec.varOrCaseName))")
     }
     return nil
   }
@@ -86,7 +86,7 @@ extension Child {
   /// ` = default_value` that can be used as the default value to for a
   /// function parameter. Otherwise, return `nil`.
   public var defaultInitialization: InitializerClauseSyntax? {
-    if providesDefaultInitialization, let defaultValue {
+    if let defaultValue {
       return InitializerClauseSyntax(
         equal: .equalToken(leadingTrivia: .space, trailingTrivia: .space),
         value: defaultValue

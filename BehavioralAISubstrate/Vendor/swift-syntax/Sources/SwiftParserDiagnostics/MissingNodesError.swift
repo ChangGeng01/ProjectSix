@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftBasicFormat
 internal import SwiftDiagnostics
 @_spi(RawSyntax) public import SwiftSyntax
@@ -23,7 +23,7 @@ import SwiftDiagnostics
 // MARK: - Shared code
 
 /// Returns the bottommost node that is an ancestor of all nodes in `nodes`.
-private func findCommonAncestor(_ nodes: [Syntax]) -> Syntax? {
+fileprivate func findCommonAncestor(_ nodes: [Syntax]) -> Syntax? {
   return findCommonAncestorOrSelf(nodes.compactMap({ $0.parent }))
 }
 
@@ -35,7 +35,7 @@ class NoNewlinesFormat: BasicFormat {
   }
 }
 
-private enum NodesDescriptionPart {
+fileprivate enum NodesDescriptionPart {
   case tokensWithDefaultText([TokenSyntax])
   case tokenWithoutDefaultText(TokenSyntax)
   case node(Syntax)
@@ -232,7 +232,7 @@ fileprivate extension TokenKind {
 }
 
 /// Checks whether a node contains any tokens (missing or present)
-private class HasTokenChecker: SyntaxAnyVisitor {
+fileprivate class HasTokenChecker: SyntaxAnyVisitor {
   var hasToken: Bool = false
 
   override func visitAny(_ node: Syntax) -> SyntaxVisitorContinueKind {

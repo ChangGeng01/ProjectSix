@@ -11,16 +11,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6.2) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 
 @available(SwiftStdlib 5.0, *)
 extension Container
 where
   Self: ~Copyable /*FIXME: & ~Escapable*/,
-  BorrowingIterator == ContainerIterator<Self>
+  Element: ~Copyable,
+  BorrowingIterator_ == ContainerIterator<Self>
 {
   @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> BorrowingIterator {
+  public func makeBorrowingIterator_() -> BorrowingIterator_ {
     ContainerIterator(_borrowing: self, from: self.startIndex)
   }
 }
@@ -28,43 +29,37 @@ where
 @available(SwiftStdlib 5.0, *)
 public struct ContainerIterator<
   Base: Container & ~Copyable /*FIXME: & ~Escapable*/
->: ~Copyable, ~Escapable {
-  let _base: Borrow<Base> // FIXME: This doesn't support nonescapable Bases
+>: ~Copyable, ~Escapable
+where Base.Element: ~Copyable
+{
+  public typealias Element = Base.Element
+  
+  let _base: Ref<Base> // FIXME: This doesn't support nonescapable Bases
   var _position: Base.Index
 
   @_lifetime(borrow base)
   init(_borrowing base: borrowing @_addressable Base, from position: Base.Index) {
-    self._base = Borrow(_borrowing: base)
+    self._base = Ref(base)
     self._position = position
   }
 }
 
 @available(SwiftStdlib 5.0, *)
-extension ContainerIterator: BorrowingIteratorProtocol
-where Base: ~Copyable /*FIXME: & ~Escapable*/
+extension ContainerIterator: BorrowingIteratorProtocol_
+where
+  Base: ~Copyable /*FIXME: & ~Escapable*/,
+  Base.Element: ~Copyable
 {
-  public typealias Element = Base.Element
+  public typealias Element_ = Base.Element
 
   @_unsafeNonescapableResult // FIXME: we cannot convert from a borrow to an inout dependence?!
   @_lifetime(&self)
-  public mutating func nextSpan(maximumCount: Int) -> Span<Base.Element> {
+  public mutating func nextSpan_(maximumCount: Int) -> Span<Base.Element> {
     _base.value.nextSpan(after: &self._position, maximumCount: maximumCount)
   }
 
-//  @_lifetime(copy self)
-//  public mutating func nextSpan2(maximumCount: Int) -> Span<Base.Element> {
-//    var i = self._position
-//    let span = _base.value.nextSpan(
-//      after: &i,
-//      maximumCount: maximumCount)
-//    _ = consume span
-//    let result = _overrideLifetime(span, copying: self)
-//    self._position = i
-//    return .init()
-//  }
-
   @_lifetime(self: copy self)
-  public mutating func skip(by maximumOffset: Int) -> Int {
+  public mutating func skip_(by maximumOffset: Int) -> Int {
     // FIXME: If we aren't modeling bidirectional iterators, then this should
     // trap on negative maximumOffsets
     var n = maximumOffset

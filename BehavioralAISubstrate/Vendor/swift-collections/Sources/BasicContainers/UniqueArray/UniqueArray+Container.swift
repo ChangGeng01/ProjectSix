@@ -18,23 +18,23 @@ import ContainersPreview
 
 #if compiler(>=6.2)
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
-extension UniqueArray: BorrowingSequence where Element: ~Copyable {
-  public typealias BorrowingIterator = RigidArray<Element>.BorrowingIterator
+extension UniqueArray: BorrowingSequence_ where Element: ~Copyable {
+  public typealias BorrowingIterator_ = RigidArray<Element>.BorrowingIterator_
 
   @inlinable
-  public var underestimatedCount: Int { count }
+  public var underestimatedCount_: Int { count }
 
   @_alwaysEmitIntoClient
   @inline(__always)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    self._storage.makeBorrowingIterator()
+  public func makeBorrowingIterator_() -> BorrowingIterator_ {
+    self._storage.makeBorrowingIterator_()
   }
 }
 #endif
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension UniqueArray: Container where Element: ~Copyable {}
 
@@ -264,7 +264,7 @@ extension UniqueArray where Element: ~Copyable {
   ///    This optimization may be removed in future versions; do not rely on it.
   ///
   /// - Parameter index: A valid index of the array. On return, `index` is
-  ///    set to `limit` if
+  ///    set to the resulting position.
   /// - Parameter n: The distance to offset `index`.
   ///    On return, `n` is set to zero if the operation succeeded without
   ///    hitting the limit; otherwise, `n` reflects the number of steps that
@@ -357,7 +357,6 @@ extension UniqueArray where Element: ~Copyable {
     _storage.nextSpan(after: &index, maximumCount: maximumCount)
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @inlinable
   @_lifetime(&self)
   public mutating func nextMutableSpan(
@@ -373,7 +372,6 @@ extension UniqueArray where Element: ~Copyable {
   ) -> Span<Element> {
     _storage.previousSpan(before: &index, maximumCount: maximumCount)
   }
-#endif
 }
 
 #endif

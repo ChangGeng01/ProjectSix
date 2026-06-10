@@ -67,6 +67,7 @@ let package = Package(
                 "NIOConcurrencyHelpers",
                 "_NIOBase64",
                 "CNIOOpenBSD",
+                "CNIOFreeBSD",
                 "CNIODarwin",
                 "CNIOLinux",
                 "CNIOWindows",
@@ -165,6 +166,10 @@ let package = Package(
         ),
         .target(
             name: "CNIOOpenBSD",
+            dependencies: []
+        ),
+        .target(
+            name: "CNIOFreeBSD",
             dependencies: []
         ),
         .target(
@@ -627,7 +632,7 @@ let package = Package(
     ]
 )
 
-// M224 vendor freeze — always use vendored paths.
+// M224 vendor freeze: path deps forced unconditionally (was SWIFTCI_USE_LOCAL_DEPS-conditional)
 package.dependencies += [
     .package(path: "../swift-atomics"),
     .package(path: "../swift-collections"),

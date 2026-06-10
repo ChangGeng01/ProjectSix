@@ -27,7 +27,17 @@ struct PrintTree: ParsableCommand, ParseCommand {
   var includeTrivia: Bool = false
 
   func run() throws {
-    let (tree, _) = try parsedSourceFile(wantDiagnostics: false)
-    print(tree.debugDescription(includeTrivia: includeTrivia))
+    try sourceFileContents.withUnsafeBufferPointer { sourceBuffer in
+      let tree = Parser.parse(source: sourceBuffer)
+
+      let resultTree: Syntax
+      if foldSequences {
+        resultTree = foldAllSequences(tree).0
+      } else {
+        resultTree = Syntax(tree)
+      }
+
+      print(resultTree.debugDescription(includeTrivia: includeTrivia))
+    }
   }
 }

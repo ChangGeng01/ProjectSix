@@ -14,7 +14,7 @@ import ArgumentParser
 import Foundation
 import RegexBuilder
 
-private let modules: [String] = [
+fileprivate let modules: [String] = [
   "SwiftParser",
   "SwiftParserDiagnostics",
   "SwiftSyntax",
@@ -138,7 +138,7 @@ struct VerifySpiYmlExecutor {
   /// a dependency from this script on a YAML parser and that just doesn’t seem worth it.
   private func targetsInSwiftPackageIndexManifest() throws -> [String] {
     let extractTargetRegex = Regex {
-      #/^        - /#
+      #/^      - /#
       Capture(ZeroOrMore(.word))
       #/$/#
     }

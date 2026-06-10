@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
@@ -21,15 +21,31 @@ extension TokenConsumer {
   /// item.
   ///
   /// - Parameters:
+  ///   - allowRecovery: Whether to attempt to perform recovery.
   ///   - preferExpr: If either an expression or statement could be
   ///     parsed and this parameter is `true`, the function returns `false`
   ///     such that an expression can be parsed.
   ///
   /// - Note: This function must be kept in sync with `parseStatement()`.
   /// - Seealso: ``Parser/parseStatement()``
-  func atStartOfStatement(preferExpr: Bool) -> Bool {
+  func atStartOfStatement(allowRecovery: Bool = false, preferExpr: Bool) -> Bool {
     var lookahead = self.lookahead()
-    return lookahead.atStartOfStatement(preferExpr: preferExpr)
+    if allowRecovery {
+      // Attributes are not allowed on statements. But for recovery, skip over
+      // misplaced attributes.
+      _ = lookahead.consumeAttributeList()
+    }
+    return lookahead.atStartOfStatement(allowRecovery: allowRecovery, preferExpr: preferExpr)
+  }
+}
+
+extension Parser.Lookahead {
+  mutating func atStartOfSwitchCaseItem() -> Bool {
+    while self.consume(if: .atSign) != nil {
+      self.consume(if: .identifier)
+    }
+
+    return self.at(anyIn: SwitchCaseStart.self) != nil
   }
 }
 
@@ -42,7 +58,7 @@ extension Parser {
   mutating func parseStatement() -> RawStmtSyntax {
     // If this is a label on a loop/switch statement, consume it and pass it into
     // parsing logic below.
-    func label(_ stmt: some RawStmtSyntaxNodeProtocol, with label: Parser.StatementLabel?) -> RawStmtSyntax {
+    func label<S: RawStmtSyntaxNodeProtocol>(_ stmt: S, with label: Parser.StatementLabel?) -> RawStmtSyntax {
       guard let label = label else {
         return RawStmtSyntax(stmt)
       }
@@ -50,7 +66,7 @@ extension Parser {
         RawLabeledStmtSyntax(
           label: label.label,
           colon: label.colon,
-          statement: stmt,
+          statement: RawStmtSyntax(stmt),
           arena: self.arena
         )
       )
@@ -71,7 +87,7 @@ extension Parser {
       if self.experimentalFeatures.contains(.doExpressions) {
         let doExpr = self.parseDoExpression(doHandle: handle)
         let doStmt = RawExpressionStmtSyntax(
-          expression: doExpr,
+          expression: RawExprSyntax(doExpr),
           arena: self.arena
         )
         return label(doStmt, with: optLabel)
@@ -81,7 +97,7 @@ extension Parser {
     case (.if, let handle)?:
       let ifExpr = self.parseIfExpression(ifHandle: handle)
       let ifStmt = RawExpressionStmtSyntax(
-        expression: ifExpr,
+        expression: RawExprSyntax(ifExpr),
         arena: self.arena
       )
       return label(ifStmt, with: optLabel)
@@ -90,7 +106,7 @@ extension Parser {
     case (.switch, let handle)?:
       let switchExpr = self.parseSwitchExpression(switchHandle: handle)
       let switchStmt = RawExpressionStmtSyntax(
-        expression: switchExpr,
+        expression: RawExprSyntax(switchExpr),
         arena: self.arena
       )
       return label(switchStmt, with: optLabel)
@@ -110,10 +126,11 @@ extension Parser {
       return label(self.parseDeferStatement(deferHandle: handle), with: optLabel)
     case (.yield, let handle)?:
       return label(self.parseYieldStatement(yieldHandle: handle), with: optLabel)
-    case (.then, let handle)?:
+    case (.then, let handle)? where experimentalFeatures.contains(.thenStatements):
       return label(self.parseThenStatement(handle: handle), with: optLabel)
-    case nil:
-      return label(RawMissingStmtSyntax(arena: self.arena), with: optLabel)
+    case nil, (.then, _)?:
+      let missingStmt = RawStmtSyntax(RawMissingStmtSyntax(arena: self.arena))
+      return label(missingStmt, with: optLabel)
     }
   }
 }
@@ -124,10 +141,8 @@ extension Parser {
   /// Parse a guard statement.
   mutating func parseGuardStatement(guardHandle: RecoveryConsumptionHandle) -> RawGuardStmtSyntax {
     let (unexpectedBeforeGuardKeyword, guardKeyword) = self.eat(guardHandle)
-    let conditions = self.parseConditionList(isGuardStatement: true)
-    let (unexpectedBeforeElseKeyword, elseKeyword) = self.expect(
-      TokenSpec(.else, recoveryPrecedence: .openingBrace(closingDelimiter: .rightBrace))
-    )
+    let conditions = self.parseConditionList()
+    let (unexpectedBeforeElseKeyword, elseKeyword) = self.expect(.keyword(.else))
     let body = self.parseCodeBlock(introducer: guardKeyword)
     return RawGuardStmtSyntax(
       unexpectedBeforeGuardKeyword,
@@ -143,7 +158,7 @@ extension Parser {
 
 extension Parser {
   /// Parse a list of condition elements.
-  mutating func parseConditionList(isGuardStatement: Bool) -> RawConditionElementListSyntax {
+  mutating func parseConditionList() -> RawConditionElementListSyntax {
     // We have a simple comma separated list of clauses, but also need to handle
     // a variety of common errors situations (including migrating from Swift 2
     // syntax).
@@ -172,23 +187,9 @@ extension Parser {
           arena: self.arena
         )
       )
-    } while keepGoing != nil && !atConditionListTerminator(isGuardStatement: isGuardStatement)
-      && self.hasProgressed(&loopProgress)
+    } while keepGoing != nil && self.hasProgressed(&loopProgress)
 
     return RawConditionElementListSyntax(elements: elements, arena: self.arena)
-  }
-
-  mutating func atConditionListTerminator(isGuardStatement: Bool) -> Bool {
-    guard experimentalFeatures.contains(.trailingComma) else {
-      return false
-    }
-    // Condition terminator is `else` for `guard` statements.
-    if isGuardStatement, self.at(.keyword(.else)) {
-      return true
-    }
-    // Condition terminator is start of statement body for `if` or `while` statements.
-    // Missing `else` is a common mistake for `guard` statements so we fall back to lookahead for a body.
-    return self.at(.leftBrace) && withLookahead({ $0.atStartOfConditionalStatementBody() })
   }
 
   /// Parse a condition element.
@@ -299,7 +300,7 @@ extension Parser {
           initializer: initializer
             ?? RawInitializerClauseSyntax(
               equal: RawTokenSyntax(missing: .equal, arena: self.arena),
-              value: RawMissingExprSyntax(arena: self.arena),
+              value: RawExprSyntax(RawMissingExprSyntax(arena: self.arena)),
               arena: self.arena
             ),
           arena: self.arena
@@ -501,11 +502,12 @@ extension Parser {
   mutating func parseWhileStatement(whileHandle: RecoveryConsumptionHandle) -> RawWhileStmtSyntax {
     let (unexpectedBeforeWhileKeyword, whileKeyword) = self.eat(whileHandle)
     let conditions: RawConditionElementListSyntax
+
     if self.at(.leftBrace) {
       conditions = RawConditionElementListSyntax(
         elements: [
           RawConditionElementSyntax(
-            condition: .init(expression: RawMissingExprSyntax(arena: self.arena)),
+            condition: .expression(RawExprSyntax(RawMissingExprSyntax(arena: self.arena))),
             trailingComma: nil,
             arena: self.arena
           )
@@ -513,11 +515,9 @@ extension Parser {
         arena: self.arena
       )
     } else {
-      conditions = self.parseConditionList(isGuardStatement: false)
+      conditions = self.parseConditionList()
     }
-
     let body = self.parseCodeBlock(introducer: whileKeyword)
-
     return RawWhileStmtSyntax(
       unexpectedBeforeWhileKeyword,
       whileKeyword: whileKeyword,
@@ -555,16 +555,6 @@ extension Parser {
     let (unexpectedBeforeForKeyword, forKeyword) = self.eat(forHandle)
     let tryKeyword = self.consume(if: .keyword(.try))
     let awaitKeyword = self.consume(if: .keyword(.await))
-
-    let unsafeKeyword: RawTokenSyntax?
-    if let modifierKeyword = ExpressionModifierKeyword(
-      lexeme: self.currentToken,
-      experimentalFeatures: self.experimentalFeatures
-    ), modifierKeyword == .unsafe, !self.peek(isAt: .keyword(.in), .colon) {
-      unsafeKeyword = self.expectWithoutRecovery(.keyword(.unsafe))
-    } else {
-      unsafeKeyword = nil
-    }
 
     // Parse the pattern.  This is either 'case <refutable pattern>' or just a
     // normal pattern.
@@ -620,7 +610,6 @@ extension Parser {
       forKeyword: forKeyword,
       tryKeyword: tryKeyword,
       awaitKeyword: awaitKeyword,
-      unsafeKeyword: unsafeKeyword,
       caseKeyword: caseKeyword,
       pattern: pattern,
       typeAnnotation: type,
@@ -687,9 +676,6 @@ extension Parser {
       return true
     }
     if self.atStartOfStatement(preferExpr: true) || self.atStartOfDeclaration() {
-      return false
-    }
-    if self.atStartOfLine && self.withLookahead({ $0.atStartOfSwitchCase() }) {
       return false
     }
     return true
@@ -770,7 +756,7 @@ extension Parser {
         )
       )
     } else {
-      yieldedExpressions = .init(single: self.parseExpression(flavor: .basic, pattern: .none))
+      yieldedExpressions = .single(self.parseExpression(flavor: .basic, pattern: .none))
     }
 
     return RawYieldStmtSyntax(
@@ -889,131 +875,6 @@ extension Parser {
   }
 }
 
-extension TokenConsumer {
-  /// Disambiguate the word at the cursor looks like a keyword-prefixed syntax.
-  ///
-  /// - Parameters:
-  ///   - exprFlavor: The expression context. When using this function for a statement, e.g. 'yield',
-  ///     use `.basic`.
-  ///   - acceptClosure: When the next token is '{' and it looks like a closure, use this value as the result.
-  ///   - preferPostfixExpr: When the next token is '.', '(', or '[' and there is a space between the word,
-  ///     use `!preferPostfixExpr` as the result.
-  ///   - allowNextLineOperand: Whether the keyword-prefixed syntax accepts the operand on the next line.
-  mutating func atContextualKeywordPrefixedSyntax(
-    exprFlavor: Parser.ExprFlavor,
-    acceptClosure: Bool = false,
-    preferPostfixExpr: Bool = true,
-    allowNextLineOperand: Bool = false
-  ) -> Bool {
-    let next = peek()
-
-    // The next token must be at the same line.
-    if next.isAtStartOfLine && !allowNextLineOperand {
-      return false
-    }
-
-    switch next.rawTokenKind {
-
-    case .identifier, .dollarIdentifier, .wildcard:
-      // E.g. <word> foo
-      return true
-
-    case .integerLiteral, .floatLiteral,
-      .stringQuote, .multilineStringQuote, .singleQuote, .rawStringPoundDelimiter,
-      .regexSlash, .regexPoundDelimiter:
-      // E.g. <word> 1
-      return true
-
-    case .prefixAmpersand, .prefixOperator, .atSign, .backslash, .pound:
-      // E.g. <word> !<expr>
-      return true
-
-    case .keyword:
-      // Some lexer-classified keywords can start expressions.
-      switch Keyword(next.tokenText) {
-      case .Any, .Self, .self, .super, .`init`, .true, .false, .nil:
-        return true
-      case .repeat, .try:
-        return true
-      case .if, .switch:
-        return true
-      case .do where self.experimentalFeatures.contains(.doExpressions):
-        return true
-
-      default:
-        return false
-      }
-
-    case .binaryOperator, .equal, .arrow, .infixQuestionMark:
-      // E.g. <word> != <expr>
-      return false
-    case .postfixOperator, .postfixQuestionMark, .exclamationMark, .ellipsis:
-      // E.g. <word>++
-      return false
-    case .rightBrace, .rightParen, .rightSquare:
-      // E.g. <word>]
-      return false
-    case .colon, .comma:
-      // E.g. <word>,
-      return false
-    case .semicolon, .endOfFile, .poundElse, .poundElseif, .poundEndif:
-      return false
-    case .colonColon:
-      // E.g. <word> :: <word>
-      return false
-
-    case .leftAngle, .rightAngle:
-      // Lexer never produce these token kinds.
-      return false
-
-    case .stringSegment, .regexLiteralPattern:
-      // Calling this function inside a string/regex literal?
-      return false
-
-    case .backtick, .poundAvailable, .poundUnavailable,
-      .poundSourceLocation, .poundIf, .shebang, .unknown:
-      // These are invalid for both cases
-      // E.g. <word> #available
-      return false
-
-    case .period, .leftParen, .leftSquare:
-      // These are truly ambiguous. They can be both start of postfix expression
-      // suffix or start of primary expression:
-      //
-      //   - Member access vs. implicit member expression
-      //   - Call vs. tuple expression
-      //   - Subscript vs. collection literal
-      //
-      if preferPostfixExpr {
-        return false
-      }
-
-      // If there's no space between the tokens, consider it's an expression.
-      // Otherwise, it looks like a keyword followed by an expression.
-      return (next.leadingTriviaByteLength + currentToken.trailingTriviaByteLength) != 0
-
-    case .leftBrace:
-      // E.g. <word> { ... }
-      // Trailing closure is also ambiguous:
-      //
-      //   - Trailing closure vs. immediately-invoked closure
-      //
-      if !acceptClosure {
-        return false
-      }
-
-      // Checking whitespace between the word cannot help this because people
-      // usually put a space before trailing closures. Even though that is source
-      // breaking, we prefer parsing it as a keyword if the syntax accepts
-      // expressions starting with a closure. E.g. 'unsafe { ... }()'
-      return self.withLookahead {
-        $0.consumeAnyToken()
-        return $0.atValidTrailingClosure(flavor: exprFlavor)
-      }
-    }
-  }
-}
-
 // MARK: Lookahead
 
 extension Parser.Lookahead {
@@ -1021,15 +882,29 @@ extension Parser.Lookahead {
   /// item.
   ///
   /// - Parameters:
+  ///   - allowRecovery: Whether to attempt to perform recovery.
   ///   - preferExpr: If either an expression or statement could be
   ///     parsed and this parameter is `true`, the function returns `false`
   ///     such that an expression can be parsed.
   ///
   /// - Note: This function must be kept in sync with `parseStatement()`.
   /// - Seealso: ``Parser/parseStatement()``
-  mutating func atStartOfStatement(preferExpr: Bool) -> Bool {
+  mutating func atStartOfStatement(allowRecovery: Bool = false, preferExpr: Bool) -> Bool {
+    if (self.at(anyIn: SwitchCaseStart.self) != nil || self.at(.atSign))
+      && withLookahead({ $0.atStartOfSwitchCaseItem() })
+    {
+      // We consider SwitchCaseItems statements so we don't parse the start of a new case item as trailing parts of an expression.
+      return true
+    }
+
     _ = self.consume(if: .identifier, followedBy: .colon)
-    switch self.at(anyIn: CanBeStatementStart.self)?.0 {
+    let switchSubject: CanBeStatementStart?
+    if allowRecovery {
+      switchSubject = self.canRecoverTo(anyIn: CanBeStatementStart.self)?.0
+    } else {
+      switchSubject = self.at(anyIn: CanBeStatementStart.self)?.0
+    }
+    switch switchSubject {
     case .return?,
       .throw?,
       .defer?,
@@ -1049,38 +924,109 @@ extension Parser.Lookahead {
       // FIXME: 'repeat' followed by '{' could be a pack expansion
       // with a closure pattern.
       return self.peek().rawTokenKind == .leftBrace
-    case .yield?, .discard?:
-      return atContextualKeywordPrefixedSyntax(
-        exprFlavor: .basic,
-        preferPostfixExpr: true
-      )
-    case .then?:
-      return atContextualKeywordPrefixedSyntax(
-        exprFlavor: .basic,
-        preferPostfixExpr: false,
-        allowNextLineOperand: !preferExpr
-      )
-
-    case nil:
-      // Special recovery 'try return' etc..
-      if !preferExpr,
-        consume(if: .keyword(.try)) != nil,
-        self.at(anyIn: SingleValueStatementExpression.self) == nil
-      {
-        return atStartOfStatement(preferExpr: preferExpr)
+    case .yield?:
+      switch self.peek().rawTokenKind {
+      case .prefixAmpersand:
+        // "yield &" always denotes a yield statement.
+        return true
+      case .leftParen:
+        // "yield (", by contrast, must be disambiguated with additional
+        // context. We always consider it an apply expression of a function
+        // called `yield` for the purposes of the parse.
+        return false
+      case .binaryOperator:
+        // 'yield &= x' treats yield as an identifier.
+        return false
+      default:
+        // "yield" followed immediately by any other token is likely a
+        // yield statement of some singular expression.
+        return !self.peek().isAtStartOfLine
       }
+    case .discard?:
+      let next = peek()
+      // The thing to be discarded must be on the same line as `discard`.
+      if next.isAtStartOfLine {
+        return false
+      }
+      switch next.rawTokenKind {
+      case .identifier, .keyword:
+        // Since some identifiers like "self" are classified as keywords,
+        // we want to recognize those too, to handle "discard self". We also
+        // accept any identifier since we want to emit a nice error message
+        // later on during type checking.
+        return true
+      default:
+        // any other token following "discard" means it's not the statement.
+        // For example, could be the function call "discard()".
+        return false
+      }
+
+    case .then where experimentalFeatures.contains(.thenStatements):
+      return atStartOfThenStatement(preferExpr: preferExpr)
+
+    case nil, .then:
       return false
     }
   }
 
+  /// Whether we're currently at a `then` token that should be parsed as a
+  /// `then` statement.
+  mutating func atStartOfThenStatement(preferExpr: Bool) -> Bool {
+    guard self.at(.keyword(.then)) else {
+      return false
+    }
+
+    // If we prefer an expr and aren't at the start of a newline, then don't
+    // parse a ThenStmt.
+    if preferExpr && !self.atStartOfLine {
+      return false
+    }
+
+    // If 'then' is followed by a binary or postfix operator, prefer to parse as
+    // an expr.
+    if peek(isAtAnyIn: BinaryOperatorLike.self) != nil || peek(isAtAnyIn: PostfixOperatorLike.self) != nil {
+      return false
+    }
+
+    switch PrepareForKeywordMatch(peek()) {
+    case TokenSpec(.is), TokenSpec(.as):
+      // Treat 'is' and 'as' like the binary operator case, and parse as an
+      // expr.
+      return false
+
+    case .leftBrace:
+      // This is a trailing closure.
+      return false
+
+    case .leftParen, .leftSquare, .period:
+      // These are handled based on whether there is trivia between the 'then'
+      // and the token. If so, it's a 'then' statement. Otherwise it should
+      // be treated as an expression, e.g `then(...)`, `then[...]`, `then.foo`.
+      return !self.currentToken.trailingTriviaText.isEmpty || !peek().leadingTriviaText.isEmpty
+    default:
+      break
+    }
+    return true
+  }
+
   /// Returns whether the parser's current position is the start of a switch case,
   /// given that we're in the middle of a switch already.
-  mutating func atStartOfSwitchCase() -> Bool {
+  mutating func atStartOfSwitchCase(allowRecovery: Bool = false) -> Bool {
     // Check for and consume attributes. The only valid attribute is `@unknown`
     // but that's a semantic restriction.
     var lookahead = self.lookahead()
+    var loopProgress = LoopProgressCondition()
+    var hasAttribute = false
+    while lookahead.at(.atSign) && lookahead.hasProgressed(&loopProgress) {
+      guard lookahead.peek().rawTokenKind == .identifier else {
+        return false
+      }
 
-    let hasAttribute = lookahead.consumeAttributeList()
+      lookahead.eat(.atSign)
+      lookahead.eat(.identifier)
+      hasAttribute = true
+    }
+
     if hasAttribute && lookahead.at(.rightBrace) {
       // If we are at an attribute that's the last token in the SwitchCase, parse
       // that as an attribute to a missing 'case'. That way, if the developer writes
@@ -1090,7 +1036,11 @@ extension Parser.Lookahead {
       return true
     }
 
-    return lookahead.at(anyIn: SwitchCaseStart.self) != nil
+    if allowRecovery {
+      return lookahead.canRecoverTo(anyIn: SwitchCaseStart.self) != nil
+    } else {
+      return lookahead.at(anyIn: SwitchCaseStart.self) != nil
+    }
   }
 
   mutating func atStartOfConditionalSwitchCases() -> Bool {
@@ -1107,54 +1057,4 @@ extension Parser.Lookahead {
     } while lookahead.at(.poundIf, .poundElseif, .poundElse) && lookahead.hasProgressed(&loopProgress)
     return lookahead.atStartOfSwitchCase()
   }
-
-  /// Returns `true` if the current token represents the start of an `if` or `while` statement body.
-  mutating func atStartOfConditionalStatementBody() -> Bool {
-    guard at(.leftBrace) else {
-      // Statement bodies always start with a '{'. If there is no '{', we can't be at the statement body.
-      return false
-    }
-    skipSingle()
-    if self.at(.endOfFile) {
-      // There's nothing else in the source file that could be the statement body, so this must be it.
-      return true
-    }
-    if self.at(.semicolon) {
-      // We can't have a semicolon between the condition and the statement body, so this must be the statement body.
-      return true
-    }
-    if self.at(.keyword(.else)) {
-      // If the current token is an `else` keyword, this must be the statement body of an `if` statement since conditions can't be followed by `else`.
-      return true
-    }
-    if self.at(.rightBrace, .rightParen) {
-      // A right brace or parenthesis cannot start a statement body, nor can the condition list continue afterwards. So, this must be the statement body.
-      // This covers cases like `if true, { if true, { } }` or `( if true, { print(0) } )`. While the latter is not valid code, it improves diagnostics.
-      return true
-    }
-    if self.atStartOfLine {
-      // If the current token is at the start of a line, it is most likely a statement body. The only exceptions are:
-      if self.at(.comma) {
-        // If newline begins with ',' it must be a condition trailing comma, so this can't be the statement body, e.g.
-        // if true, { true }
-        // , true { print("body") }
-        return false
-      }
-      if self.at(.binaryOperator) {
-        // If current token is a binary operator this can't be the statement body since an `if` expression can't be the left-hand side of an operator, e.g.
-        // if true, { true }
-        // != nil
-        // {
-        //   print("body")
-        // }
-        return false
-      }
-      // Excluded the above exceptions, this must be the statement body.
-      return true
-    } else {
-      // If the current token isn't at the start of a line and isn't `EOF`, `;`, `else`, `)` or `}` this can't be the statement body.
-      return false
-    }
-  }
-
 }

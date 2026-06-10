@@ -16,36 +16,20 @@ import SyntaxSupport
 import Utils
 
 let layoutNodesParsableFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  importSwiftSyntax(accessLevel: .public)
+  DeclSyntax(
+    """
+    #if swift(>=6)
+    @_spi(RawSyntax) public import SwiftSyntax
+    #else
+    @_spi(RawSyntax) import SwiftSyntax
+    #endif
+    """
+  )
 
   DeclSyntax(
     """
     public protocol SyntaxParseable: SyntaxProtocol {
       static func parse(from parser: inout Parser) -> Self
-    }
-    """
-  )
-  DeclSyntax(
-    """
-    extension SyntaxParseable {
-      fileprivate static func parse(
-        from parser: inout Parser,
-        parse: (_ parser: inout Parser) -> some RawSyntaxNodeProtocol
-      ) -> Self {
-        // Keep the parser alive so that the arena in which `raw` is allocated
-        // doesn’t get deallocated before we have a chance to create a syntax node
-        // from it. We can’t use `parser.arena` as the parameter to
-        // `Syntax(raw:arena:)` because the node might have been re-used during an
-        // incremental parse and would then live in a different arena than
-        // `parser.arena`.
-        defer {
-          withExtendedLifetime(parser) {
-          }
-        }
-        let node = parse(&parser)
-        let raw = RawSyntax(parser.parseRemainder(into: node))
-        return Syntax(raw: raw, rawNodeArena: raw.arena).cast(Self.self)
-      }
     }
     """
   )
@@ -56,7 +40,16 @@ let layoutNodesParsableFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
         """
         extension \(node.kind.syntaxType): SyntaxParseable {
           public static func parse(from parser: inout Parser) -> Self {
-            parse(from: &parser) { $0.\(parserFunction)() }
+            // Keep the parser alive so that the arena in which `raw` is allocated
+            // doesn’t get deallocated before we have a chance to create a syntax node
+            // from it. We can’t use `parser.arena` as the parameter to
+            // `Syntax(raw:arena:)` because the node might have been re-used during an
+            // incremental parse and would then live in a different arena than
+            // `parser.arena`.
+            defer { withExtendedLifetime(parser) {} }
+            let node = parser.\(parserFunction)()
+            let raw = RawSyntax(parser.parseRemainder(into: node))
+            return Syntax(raw: raw, rawNodeArena: parser.arena).cast(Self.self)
           }
         }
         """
@@ -68,15 +61,17 @@ let layoutNodesParsableFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
     DeclSyntax(
       """
       mutating func parseNonOptionalCodeBlockItem() -> RawCodeBlockItemSyntax {
-        guard let node = self.parseCodeBlockItem(allowInitDecl: true, until: { _ in false }) else {
+        guard let node = self.parseCodeBlockItem(isAtTopLevel: false, allowInitDecl: true) else {
           // The missing item is not necessary to be a declaration,
           // which is just a placeholder here
           return RawCodeBlockItemSyntax(
-            item: .init(
-              decl: RawMissingDeclSyntax(
-                attributes: self.emptyCollection(RawAttributeListSyntax.self),
-                modifiers: self.emptyCollection(RawDeclModifierListSyntax.self),
-                arena: self.arena
+            item: .decl(
+              RawDeclSyntax(
+                RawMissingDeclSyntax(
+                  attributes: self.emptyCollection(RawAttributeListSyntax.self),
+                  modifiers: self.emptyCollection(RawDeclModifierListSyntax.self),
+                  arena: self.arena
+                )
               )
             ),
             semicolon: nil,

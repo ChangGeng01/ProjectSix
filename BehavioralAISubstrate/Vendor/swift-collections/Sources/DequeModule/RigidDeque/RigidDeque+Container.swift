@@ -21,9 +21,11 @@ import ContainersPreview
 
 @available(SwiftStdlib 5.0, *)
 extension RigidDeque where Element: ~Copyable {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
   @frozen
-  public struct BorrowingIterator: ~Escapable, BorrowingIteratorProtocol {
+  public struct BorrowingIterator: ~Escapable, BorrowingIteratorProtocol_ {
+    public typealias Element_ = Element
+
     @usableFromInline
     internal var _currentSegment: Span<Element>
     
@@ -44,9 +46,9 @@ extension RigidDeque where Element: ~Copyable {
     }
     
     @_alwaysEmitIntoClient
-    @_lifetime(copy self)
+    @_lifetime(&self) // FIXME: This should be `@_lifetime(copy self)`
     @_lifetime(self: copy self)
-    public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+    public mutating func nextSpan_(maximumCount: Int) -> Span<Element> {
       let result = _currentSegment._trim(first: maximumCount)
       if _currentSegment.isEmpty {
         _currentSegment = _nextSegment
@@ -58,13 +60,13 @@ extension RigidDeque where Element: ~Copyable {
   
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  public borrowing func makeBorrowingIterator() -> BorrowingIterator {
+  public borrowing func makeBorrowingIterator_() -> BorrowingIterator {
     BorrowingIterator(_deque: self)
   }
 #endif
 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension RigidDeque: Container where Element: ~Copyable {}
 
@@ -89,21 +91,17 @@ extension RigidDeque where Element: ~Copyable {
   @inline(__always)
   public func index(after index: Int) -> Int { index + 1 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @_alwaysEmitIntoClient
   @inline(__always)
   public func index(before index: Int) -> Int { index - 1 }
-#endif
 
   @_alwaysEmitIntoClient
   @inline(__always)
   public func formIndex(after index: inout Int) { index += 1 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @_alwaysEmitIntoClient
   @inline(__always)
   public func formIndex(before index: inout Int) { index -= 1 }
-#endif
 
   @_alwaysEmitIntoClient
   @inline(__always)
@@ -130,11 +128,12 @@ extension RigidDeque where Element: ~Copyable {
     return _overrideLifetime(Span(_unsafeElements: segment), borrowing: self)
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @_lifetime(&self)
   public mutating func nextMutableSpan(
     after index: inout Int, maximumCount: Int
   ) -> MutableSpan<Element> {
+    _checkValidIndex(index)
+    precondition(maximumCount > 0, "maximumCount must be positive")
     let segment = self._handle
       .nextSegment(after: index)
       ._extracting(first: maximumCount)
@@ -155,7 +154,6 @@ extension RigidDeque where Element: ~Copyable {
     index &-= segment.count
     return _overrideLifetime(Span(_unsafeElements: segment), borrowing: self)
   }
-#endif
 }
 
 #endif

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) public import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -25,9 +25,7 @@ public struct TriviaParser {
     var pieces: [RawTriviaPiece] = []
     var cursor = Lexer.Cursor(
       input: UnsafeBufferPointer(start: source.baseAddress, count: source.count),
-      previous: 0,
-      // There are currently no experimental features that affect trivia parsing.
-      experimentalFeatures: []
+      previous: 0
     )
 
     while true {

@@ -1,27 +1,25 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
+// This source file is part of the Swift open source project
 //
 // Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftDiagnostics
-internal import SwiftIfConfig
 internal import SwiftOperators
-@_spi(ExperimentalLanguageFeatures) internal import SwiftParser
+internal import SwiftParser
 internal import SwiftSyntax
 internal import SwiftSyntaxMacros
 #else
 import SwiftDiagnostics
-import SwiftIfConfig
 import SwiftOperators
-@_spi(ExperimentalLanguageFeatures) import SwiftParser
+import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
 #endif
@@ -31,8 +29,6 @@ class ParsedSyntaxRegistry {
   struct Key: Hashable {
     let source: String
     let kind: PluginMessage.Syntax.Kind
-    let swiftVersion: Parser.SwiftVersion
-    let experimentalFeatures: Parser.ExperimentalFeatures
   }
 
   private var storage: LRUCache<Key, Syntax>
@@ -41,17 +37,8 @@ class ParsedSyntaxRegistry {
     self.storage = LRUCache(capacity: cacheCapacity)
   }
 
-  private func parse(
-    source: String,
-    kind: PluginMessage.Syntax.Kind,
-    swiftVersion: Parser.SwiftVersion,
-    experimentalFeatures: Parser.ExperimentalFeatures
-  ) -> Syntax {
-    var parser = Parser(
-      source,
-      swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
-    )
+  private func parse(source: String, kind: PluginMessage.Syntax.Kind) -> Syntax {
+    var parser = Parser(source)
     switch kind {
     case .declaration:
       return Syntax(DeclSyntax.parse(from: &parser))
@@ -68,30 +55,13 @@ class ParsedSyntaxRegistry {
     }
   }
 
-  func get(
-    source: String,
-    kind: PluginMessage.Syntax.Kind,
-    swiftVersion: Parser.SwiftVersion?,
-    experimentalFeatures: Parser.ExperimentalFeatures?
-  ) -> Syntax {
-    let swiftVersion = swiftVersion ?? Parser.defaultSwiftVersion
-    let experimentalFeatures = experimentalFeatures ?? Parser.ExperimentalFeatures()
-    let key = Key(
-      source: source,
-      kind: kind,
-      swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
-    )
+  func get(source: String, kind: PluginMessage.Syntax.Kind) -> Syntax {
+    let key = Key(source: source, kind: kind)
     if let cached = storage[key] {
       return cached
     }
 
-    let node = parse(
-      source: source,
-      kind: kind,
-      swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
-    )
+    let node = parse(source: source, kind: kind)
     storage[key] = node
     return node
   }
@@ -154,16 +124,10 @@ class SourceManager {
   /// are cached in the source manager to provide `location(of:)` et al.
   func add(
     _ syntaxInfo: PluginMessage.Syntax,
-    swiftVersion: Parser.SwiftVersion?,
-    experimentalFeatures: Parser.ExperimentalFeatures?,
-    foldingWith operatorTable: OperatorTable?
+    foldingWith operatorTable: OperatorTable? = nil
   ) -> Syntax {
-    var node = syntaxRegistry.get(
-      source: syntaxInfo.source,
-      kind: syntaxInfo.kind,
-      swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
-    )
+
+    var node = syntaxRegistry.get(source: syntaxInfo.source, kind: syntaxInfo.kind)
     if let operatorTable {
       node = operatorTable.foldAll(node, errorHandler: { _ in /*ignore*/ })
     }
@@ -206,24 +170,19 @@ class SourceManager {
     from startKind: PositionInSyntaxNode = .afterLeadingTrivia,
     to endKind: PositionInSyntaxNode = .beforeTrailingTrivia
   ) -> SourceRange? {
-    range(node.position(at: startKind)..<node.position(at: endKind), in: node)
-  }
-
-  /// Get ``SourceRange`` (file name + UTF-8 offset range) of `localRange` in `node`'s root node, which must be one
-  /// of the returned values from `add(_:)`.
-  func range(
-    _ localRange: @autoclosure () -> Range<AbsolutePosition>,
-    in node: some SyntaxProtocol
-  ) -> SourceRange? {
     guard let base = self.knownSourceSyntax[node.root.id] else {
       return nil
     }
+    let localStartPosition = node.position(at: startKind)
+    let localEndPosition = node.position(at: endKind)
+    precondition(localStartPosition <= localEndPosition)
+
     let positionOffset = base.location.offset
-    let localRange = localRange()
+
     return SourceRange(
       fileName: base.location.fileName,
-      startUTF8Offset: localRange.lowerBound.advanced(by: positionOffset).utf8Offset,
-      endUTF8Offset: localRange.upperBound.advanced(by: positionOffset).utf8Offset
+      startUTF8Offset: localStartPosition.advanced(by: positionOffset).utf8Offset,
+      endUTF8Offset: localEndPosition.advanced(by: positionOffset).utf8Offset
     )
   }
 
@@ -286,7 +245,7 @@ fileprivate extension Syntax {
 }
 
 class PluginMacroExpansionContext {
-  private var sourceManager: SourceManager
+  private var sourceManger: SourceManager
 
   /// The lexical context of the macro expansion described by this context.
   let lexicalContext: [Syntax]
@@ -298,10 +257,6 @@ class PluginMacroExpansionContext {
   /// to produce unique names.
   private var expansionDiscriminator: String
 
-  /// The static build configuration, if any, that will be used for the
-  /// macro-expanded code.
-  private var staticBuildConfiguration: StaticBuildConfiguration?
-
   /// Counter for each of the uniqued names.
   ///
   /// Used in conjunction with `expansionDiscriminator`.
@@ -311,16 +266,10 @@ class PluginMacroExpansionContext {
   /// macro.
   internal private(set) var diagnostics: [Diagnostic] = []
 
-  init(
-    sourceManager: SourceManager,
-    lexicalContext: [Syntax],
-    expansionDiscriminator: String = "",
-    staticBuildConfiguration: StaticBuildConfiguration?
-  ) {
-    self.sourceManager = sourceManager
+  init(sourceManager: SourceManager, lexicalContext: [Syntax], expansionDiscriminator: String = "") {
+    self.sourceManger = sourceManager
     self.lexicalContext = lexicalContext
     self.expansionDiscriminator = expansionDiscriminator
-    self.staticBuildConfiguration = staticBuildConfiguration
   }
 }
 
@@ -362,13 +311,9 @@ extension PluginMacroExpansionContext: MacroExpansionContext {
     at positionMode: PositionInSyntaxNode,
     filePathMode: SourceLocationFilePathMode
   ) -> AbstractSourceLocation? {
-    guard let location = sourceManager.location(of: Syntax(node), at: positionMode, filePathMode: filePathMode) else {
+    guard let location = sourceManger.location(of: Syntax(node), at: positionMode, filePathMode: filePathMode) else {
       return nil
     }
     return AbstractSourceLocation(location)
-  }
-
-  public var buildConfiguration: (any BuildConfiguration)? {
-    staticBuildConfiguration
   }
 }

@@ -17,7 +17,7 @@ import InternalCollectionsUtilities
 import ContainersPreview
 #endif
 
-#if compiler(>=6.2) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.2) && UnstableContainersPreview
 
 #if false // TODO
 extension UniqueArray /*where Element: Copyable*/ {
@@ -46,7 +46,7 @@ extension UniqueArray where Element: ~Copyable {
   @inlinable
   @inline(__always)
   @_lifetime(borrow self)
-  public func borrowElement(at index: Int) -> Borrow<Element> {
+  public func borrowElement(at index: Int) -> Ref<Element> {
     _storage.borrowElement(at: index)
   }
 }

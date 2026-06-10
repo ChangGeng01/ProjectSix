@@ -1141,7 +1141,7 @@ public enum QuantizationMode: String, Codable, Sendable {
 ///   - stream: Stream or device to evaluate on
 ///
 /// ### See Also
-/// - ``quantized(_:groupSize:bits:mode:stream:)``
+/// - ``quantized(_:groupSize:bits:mode:globalScale:stream:)``
 /// - ``quantizedMM(_:_:scales:biases:transpose:groupSize:bits:mode:stream:)``
 public func dequantized(
     _ w: MLXArray,
@@ -1485,6 +1485,27 @@ public func gatherQuantizedMM(
         gs, bits, mode.rawValue, sortedIndices,
         stream.ctx)
 
+    return MLXArray(result)
+}
+
+/// Perform a matrix multiplication but segment the inner dimension and
+/// save the result for each segment separately.
+///
+/// - Parameters:
+///   - a: array of shape `MxK`
+///   - b: array of shape `KxN`
+///   - segments: offsets into the inner dimension for each segment
+///   - stream: stream or device to evaluate on
+/// - Returns: result per segment of shape `MxN`
+/// ### See Also
+/// - <doc:arithmetic>
+public func segmentedMM(
+    _ a: MLXArray, _ b: MLXArray,
+    segments: MLXArray,
+    stream: StreamOrDevice = .default
+) -> MLXArray {
+    var result = mlx_array_new()
+    mlx_segmented_mm(&result, a.ctx, b.ctx, segments.ctx, stream.ctx)
     return MLXArray(result)
 }
 
@@ -2348,7 +2369,7 @@ public func putAlong(
 /// [this documentation](https://ml-explore.github.io/mlx/build/html/python/_autosummary/mlx.core.quantize.html)
 ///
 /// ### See Also
-/// - ``dequantized(_:scales:biases:groupSize:bits:mode:dtype:stream:)``
+/// - ``dequantized(_:scales:biases:groupSize:bits:mode:globalScale:dtype:stream:)``
 /// - ``quantizedMM(_:_:scales:biases:transpose:groupSize:bits:mode:stream:)``
 public func quantized(
     _ w: MLXArray,
@@ -2407,8 +2428,8 @@ public func quantizedMatmul(
 ///   - stream: Stream or device to evaluate on
 ///
 /// ### See Also
-/// - ``dequantized(_:scales:biases:groupSize:bits:mode:dtype:stream:)``
-/// - ``quantized(_:groupSize:bits:mode:stream:)``
+/// - ``dequantized(_:scales:biases:groupSize:bits:mode:globalScale:dtype:stream:)``
+/// - ``quantized(_:groupSize:bits:mode:globalScale:stream:)``
 public func quantizedMM(
     _ x: MLXArray, _ w: MLXArray, scales: MLXArray, biases: MLXArray?,
     transpose: Bool = true,
@@ -2644,6 +2665,7 @@ public func softMax(
 /// - Parameters:
 ///     - array: input array
 ///     - axes: axes to compute the softmax over
+///     - precise: if true, compute a more precise softmax by scaling the input
 ///     - stream: stream or device to evaluate on
 ///
 /// ### See Also
@@ -2678,6 +2700,7 @@ public func softMax(
 /// - Parameters:
 ///     - array: input array
 ///     - axis: axis to compute the softmax over
+///     - precise: if true, compute a more precise softmax by scaling the input
 ///     - stream: stream or device to evaluate on
 ///
 /// ### See Also
@@ -2710,6 +2733,7 @@ public func softMax(_ array: MLXArray, precise: Bool = false, stream: StreamOrDe
 ///
 /// - Parameters:
 ///     - array: input array
+///     - precise: if true, compute a more precise softmax by scaling the input
 ///     - stream: stream or device to evaluate on
 ///
 /// ### See Also

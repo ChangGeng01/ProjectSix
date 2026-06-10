@@ -240,7 +240,19 @@ final class BasicTokenizer: Sendable {
 
     func maybeStripAccents(_ text: String) -> String {
         guard doLowerCase else { return text }
-        return text.folding(options: .diacriticInsensitive, locale: nil)
+        // Equivalent of HF Python's `_run_strip_accents`: NFD-decompose then drop every
+        // nonspacing-mark scalar (Unicode general category Mn). The standard Foundation
+        // API `.folding(options: .diacriticInsensitive, locale: nil)` strips Latin
+        // diacritics but does NOT strip Japanese voiced-kana combining marks.
+        // Conceptual reference:
+        // https://github.com/huggingface/transformers/blob/542e65fae2fe9cc7ddeb816e540162bc5a8bff77/src/transformers/models/bert/tokenization_bert.py#L382
+        return String(
+            String.UnicodeScalarView(
+                text.decomposedStringWithCanonicalMapping.unicodeScalars.filter {
+                    $0.properties.generalCategory != .nonspacingMark
+                }
+            )
+        )
     }
 
     func maybeLowercase(_ text: String) -> String {
@@ -303,23 +315,23 @@ final class WordpieceTokenizer: Sendable {
     }
 
     /// `word`: A single token.
-    /// Warning: this differs from the `pytorch-transformers` implementation.
-    /// This should have already been passed through `BasicTokenizer`.
     func tokenize(word: String) -> [String] {
-        if word.count > maxInputCharsPerWord {
+        // Iterate Unicode scalars so we NFD-decompose syllables rather than follow Characters.
+        // Conceptual reference:
+        // https://github.com/huggingface/transformers/blob/542e65fae2fe9cc7ddeb816e540162bc5a8bff77/src/transformers/models/bert/tokenization_bert.py#L341
+        let scalars = Array(word.unicodeScalars)
+        if scalars.count > maxInputCharsPerWord {
             return [unkToken]
         }
         var outputTokens: [String] = []
         var isBad = false
         var start = 0
         var subTokens: [String] = []
-        while start < word.count {
-            var end = word.count
+        while start < scalars.count {
+            var end = scalars.count
             var cur_substr: String?
             while start < end {
-                let startIndex = word.index(word.startIndex, offsetBy: start)
-                let endIndex = word.index(word.startIndex, offsetBy: end)
-                var substr = String(word[startIndex..<endIndex])
+                var substr = String(String.UnicodeScalarView(scalars[start..<end]))
                 if start > 0 {
                     substr = "##\(substr)"
                 }

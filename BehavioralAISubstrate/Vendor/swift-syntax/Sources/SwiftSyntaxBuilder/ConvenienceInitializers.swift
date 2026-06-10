@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftParser
 @_spi(RawSyntax) public import SwiftSyntax
 #else
@@ -83,7 +83,7 @@ extension BooleanLiteralExprSyntax {
   }
 }
 #if compiler(>=6)
-extension BooleanLiteralExprSyntax: Swift.ExpressibleByBooleanLiteral {}
+extension BooleanLiteralExprSyntax: @retroactive ExpressibleByBooleanLiteral {}
 #else
 extension BooleanLiteralExprSyntax: ExpressibleByBooleanLiteral {}
 #endif
@@ -184,7 +184,7 @@ extension FloatLiteralExprSyntax {
 }
 
 #if compiler(>=6)
-extension FloatLiteralExprSyntax: Swift.ExpressibleByFloatLiteral {}
+extension FloatLiteralExprSyntax: @retroactive ExpressibleByFloatLiteral {}
 #else
 extension FloatLiteralExprSyntax: ExpressibleByFloatLiteral {}
 #endif
@@ -227,7 +227,7 @@ extension IntegerLiteralExprSyntax {
 }
 
 #if compiler(>=6)
-extension IntegerLiteralExprSyntax: Swift.ExpressibleByIntegerLiteral {}
+extension IntegerLiteralExprSyntax: @retroactive ExpressibleByIntegerLiteral {}
 #else
 extension IntegerLiteralExprSyntax: ExpressibleByIntegerLiteral {}
 #endif
@@ -403,8 +403,7 @@ extension VariableDeclSyntax {
     _ bindingSpecifier: Keyword,
     name: PatternSyntax,
     type: TypeAnnotationSyntax? = nil,
-    initializer: InitializerClauseSyntax? = nil,
-    accessorBlock: AccessorBlockSyntax? = nil
+    initializer: InitializerClauseSyntax? = nil
   ) {
     self.init(
       leadingTrivia: leadingTrivia,
@@ -415,8 +414,7 @@ extension VariableDeclSyntax {
       PatternBindingSyntax(
         pattern: name,
         typeAnnotation: type,
-        initializer: initializer,
-        accessorBlock: accessorBlock
+        initializer: initializer
       )
     }
   }

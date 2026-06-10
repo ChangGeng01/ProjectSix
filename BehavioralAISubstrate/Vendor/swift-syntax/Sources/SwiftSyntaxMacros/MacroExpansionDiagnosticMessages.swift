@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftDiagnostics
 #else
 import SwiftDiagnostics
 #endif
 
-private let diagnosticDomain: String = "SwiftSyntaxMacros"
+fileprivate let diagnosticDomain: String = "SwiftSyntaxMacros"
 
 /// An error during macro expansion that is described by its message.
 ///

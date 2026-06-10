@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) public import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) import SwiftSyntax
@@ -83,14 +83,14 @@ extension StringSegmentSyntax {
     precondition(!hasError, "appendUnescapedLiteralValue relies on properly parsed literals")
 
     let rawText = content.rawText
-    if !rawText.contains(where: { $0 == "\\" || $0 == "\r" }) {
-      // Fast path. No escape sequence that need to be interpreted or line endings that need to be normalized to \n.
+    if !rawText.contains("\\") {
+      // Fast path. No escape sequence.
       output.append(String(syntaxText: rawText))
       return
     }
 
     rawText.withBuffer { buffer in
-      var cursor = Lexer.Cursor(input: buffer, previous: 0, experimentalFeatures: [])
+      var cursor = Lexer.Cursor(input: buffer, previous: 0)
 
       // Put the cursor in the string literal lexing state. This is just
       // defensive as it's currently not used by `lexCharacterInStringLiteral`.
@@ -105,18 +105,6 @@ extension StringSegmentSyntax {
         )
 
         switch lex {
-        case .success(Unicode.Scalar("\r")):
-          // Line endings in multi-line string literals are normalized to line feeds even if the source file has a
-          // different encoding for new lines.
-          output.append("\n")
-          if cursor.peek() == "\n" {
-            // If we have \r\n, eat the \n as well and leave
-            let consumed = cursor.lexCharacterInStringLiteral(
-              stringLiteralKind: stringLiteralKind,
-              delimiterLength: delimiterLength
-            )
-            assert(consumed == .success(Unicode.Scalar("\n")))
-          }
         case .success(let scalar),
           .validatedEscapeSequence(let scalar):
           output.append(Character(scalar))

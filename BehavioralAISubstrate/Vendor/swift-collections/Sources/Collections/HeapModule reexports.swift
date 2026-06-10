@@ -14,5 +14,5 @@
 #if !COLLECTIONS_SINGLE_MODULE
 import HeapModule
 
-public typealias Heap = HeapModule.Heap
+public typealias Heap<Element: Comparable> = HeapModule.Heap<Element>
 #endif

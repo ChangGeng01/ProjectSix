@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftBasicFormat
 internal import SwiftDiagnostics
 @_spi(RawSyntax) @_spi(Testing) internal import SwiftParser
@@ -82,7 +82,7 @@ extension SyntaxStringInterpolation: StringInterpolationProtocol {
     let startIndex = sourceText.count
     let indentedNode: Node
     if let lastIndentation {
-      indentedNode = node.indented(by: lastIndentation)
+      indentedNode = Indenter.indent(node, indentation: lastIndentation)
     } else {
       indentedNode = node
     }
@@ -453,10 +453,10 @@ extension Optional: ExpressibleByLiteralSyntax where Wrapped: ExpressibleByLiter
 extension TokenSyntax: SyntaxExpressibleByStringInterpolation {
   public init(stringInterpolation: SyntaxStringInterpolation) {
     let string = stringInterpolation.sourceText.withUnsafeBufferPointer { buf in
-      // Technically, `buf` is not allocated in a `RawSyntaxArena` but it satisfies
+      // Technically, `buf` is not allocated in a `SyntaxArena` but it satisfies
       // all the required properties: `buf` will always outlive any references
       // to it.
-      let syntaxArenaBuf = ArenaAllocatedBufferPointer(buf)
+      let syntaxArenaBuf = SyntaxArenaAllocatedBufferPointer(buf)
       return String(syntaxText: SyntaxText(buffer: syntaxArenaBuf))
     }
     self = .identifier(string)
@@ -466,11 +466,7 @@ extension TokenSyntax: SyntaxExpressibleByStringInterpolation {
 #if compiler(>=6)
 // Silence warning that TokenSyntax has a retroactive conformance to `ExpressibleByStringInterpolation` through
 // `SyntaxExpressibleByStringInterpolation`.
-extension TokenSyntax: Swift.ExpressibleByStringInterpolation {}
-// Work around https://github.com/swiftlang/swift/issues/85153 by restating the implicit conformances.
-extension TokenSyntax: Swift.ExpressibleByStringLiteral {}
-extension TokenSyntax: Swift.ExpressibleByExtendedGraphemeClusterLiteral {}
-extension TokenSyntax: Swift.ExpressibleByUnicodeScalarLiteral {}
+extension TokenSyntax: @retroactive ExpressibleByStringInterpolation {}
 #endif
 
 // MARK: - Trivia expressible as string
@@ -499,10 +495,10 @@ extension Trivia {
   public init(stringInterpolation: String.StringInterpolation) {
     var text = String(stringInterpolation: stringInterpolation)
     let pieces = text.withUTF8 { (buf) -> [TriviaPiece] in
-      // Technically, `buf` is not allocated in a `RawSyntaxArena` but it satisfies
+      // Technically, `buf` is not allocated in a `SyntaxArena` but it satisfies
       // all the required properties: `buf` will always outlive any references
       // to it.
-      let syntaxArenaBuf = ArenaAllocatedBufferPointer(buf)
+      let syntaxArenaBuf = SyntaxArenaAllocatedBufferPointer(buf)
       // The leading trivia position is a little bit less restrictive (it allows a shebang), so let's use it.
       let rawPieces = TriviaParser.parseTrivia(SyntaxText(buffer: syntaxArenaBuf), position: .leading)
       return rawPieces.map { TriviaPiece.init(raw: $0) }
@@ -519,13 +515,7 @@ extension Trivia {
 }
 
 #if compiler(>=6)
-// Silence warning that Trivia has a retroactive conformance to `ExpressibleByStringInterpolation` through
-// `SyntaxExpressibleByStringInterpolation`.
-extension Trivia: Swift.ExpressibleByStringInterpolation {}
-// Work around https://github.com/swiftlang/swift/issues/85153 by restating the implicit conformances.
-extension Trivia: Swift.ExpressibleByStringLiteral {}
-extension Trivia: Swift.ExpressibleByExtendedGraphemeClusterLiteral {}
-extension Trivia: Swift.ExpressibleByUnicodeScalarLiteral {}
+extension Trivia: @retroactive ExpressibleByStringInterpolation {}
 #else
 extension Trivia: ExpressibleByStringInterpolation {}
 #endif

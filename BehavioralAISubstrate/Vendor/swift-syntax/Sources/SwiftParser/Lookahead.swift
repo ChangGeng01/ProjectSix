@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -163,21 +163,19 @@ extension Parser.Lookahead {
 // MARK: Skipping Tokens
 
 extension Parser.Lookahead {
-  /// Skip *any* single attribute. I.e. a type attribute, a decl attribute, or
-  /// a custom attribute.
-  mutating func consumeAnyAttribute() {
-    self.eat(.atSign)
-
-    let nameHadSpace = self.currentToken.trailingTriviaByteLength > 0
+  mutating func skipTypeAttribute() {
+    // These are keywords that we accept as attribute names.
+    guard self.at(.identifier) || self.at(.keyword(.in), .keyword(.inout)) else {
+      return
+    }
 
     // Determine which attribute it is.
     if let (attr, handle) = self.at(anyIn: TypeAttribute.self) {
+      // Ok, it is a valid attribute, eat it, and then process it.
       self.eat(handle)
       switch attr {
-      case .convention, .isolated, .differentiable:
-        if self.atAttributeOrSpecifierArgument(lastTokenHadSpace: nameHadSpace) {
-          self.skipSingle()
-        }
+      case .convention, .isolated:
+        self.skipSingle()
       default:
         break
       }
@@ -185,9 +183,20 @@ extension Parser.Lookahead {
     }
 
     if let (_, handle) = self.at(anyIn: Parser.DeclarationAttributeWithSpecialSyntax.self) {
+      // This is a valid decl attribute so they should have put it on the decl
+      // instead of the type.
+      //
+      // Recover by eating @foo(...)
       self.eat(handle)
-      if self.atAttributeOrSpecifierArgument(lastTokenHadSpace: nameHadSpace) {
-        self.skipSingle()
+      if self.at(.leftParen) {
+        var lookahead = self.lookahead()
+        lookahead.skipSingle()
+        // If we found '->', or 'throws' after paren, it's likely a parameter
+        // of function type.
+        guard lookahead.at(.arrow) || lookahead.at(.keyword(.throws), .keyword(.rethrows), .keyword(.throw)) else {
+          self.skipSingle()
+          return
+        }
       }
       return
     }
@@ -203,9 +212,21 @@ extension Parser.Lookahead {
       return false
     }
 
-    var attributeProgress = LoopProgressCondition()
-    while self.at(.atSign), self.hasProgressed(&attributeProgress) {
-      self.consumeAnyAttribute()
+    while let _ = self.consume(if: .atSign) {
+      // Consume qualified names that may or may not involve generic arguments.
+      repeat {
+        self.consume(if: .identifier, .keyword(.rethrows))
+        // We don't care whether this succeeds or fails to eat generic
+        // parameters.
+        _ = self.consumeGenericArguments()
+      } while self.consume(if: .period) != nil
+
+      if self.consume(if: .leftParen) != nil {
+        while !self.at(.endOfFile, .rightParen, .poundEndif) {
+          self.skipSingle()
+        }
+        self.consume(if: .rightParen)
+      }
     }
     return true
   }
@@ -233,9 +254,7 @@ extension Parser.Lookahead {
           didSeeAnyAttributes = true
           _ = self.consumeAttributeList()
         case .poundIf:
-          if self.consumeIfConfigOfAttributes() {
-            didSeeAnyAttributes = true
-          }
+          _ = self.consumeIfConfigOfAttributes()
         default:
           break ATTRIBUTE_LOOP
         }
@@ -266,20 +285,13 @@ extension Parser.Lookahead {
     }
 
     // If we don't have attributes, then it cannot be an accessor block.
-    guard self.peek(isAt: .atSign) else {
+    if nextToken.rawTokenKind != .atSign {
       return false
     }
 
     // Eat the "{".
     var lookahead = self.lookahead()
     lookahead.eat(.leftBrace)
-
-    // '@_accessorBlock' is a builtin disambiguation marker.
-    if lookahead.peek(isAt: .identifier),
-      lookahead.peek().tokenText == "_accessorBlock"
-    {
-      return true
-    }
 
     // Eat attributes, if present.
     while lookahead.consume(if: .atSign) != nil {
@@ -390,7 +402,7 @@ extension Parser.Lookahead {
         case nil:
           self.consumeAnyToken()
         }
-      case .skipSinglePost(let start):
+      case .skipSinglePost(start: let start):
         switch start {
         case .leftParen:
           self.consume(if: .rightParen)

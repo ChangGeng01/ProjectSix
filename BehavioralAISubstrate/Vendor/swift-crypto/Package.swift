@@ -245,7 +245,8 @@ let package = Package(
     cxxLanguageStandard: .cxx17
 )
 
-// M224 vendor freeze — always use the vendored swift-asn1 path.
+// Switch between local and remote dependencies depending on an environment variable
+// M224 vendor freeze: path dep forced unconditionally (was SWIFTCI_USE_LOCAL_DEPS-conditional)
 package.dependencies += [
     .package(path: "../swift-asn1")
 ]

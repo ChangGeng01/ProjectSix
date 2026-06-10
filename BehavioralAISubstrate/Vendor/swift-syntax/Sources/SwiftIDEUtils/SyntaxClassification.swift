@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -114,8 +114,6 @@ extension RawTokenKind {
       return .operator
     case .colon:
       return .none
-    case .colonColon:
-      return .operator
     case .comma:
       return .none
     case .dollarIdentifier:

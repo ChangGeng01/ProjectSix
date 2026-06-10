@@ -13,21 +13,11 @@
 #ifndef SWIFTSYNTAX_ERRNO_H
 #define SWIFTSYNTAX_ERRNO_H
 
-#include "_bridging.h"
-
 #include <errno.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-SWIFT_NAME_S("getter:swift_syntax_errno()")
+__attribute__((swift_name("getter:_errno()")))
 static inline int swiftsyntax_errno(void) {
   return errno;
 }
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // SWIFTSYNTAX_ERRNO_H

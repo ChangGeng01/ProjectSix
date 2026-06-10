@@ -17,7 +17,7 @@ import Foundation
 import WinSDK
 #endif
 
-private func withTemporaryFile<T>(contents: [UInt8], body: (URL) throws -> T) throws -> T {
+fileprivate func withTemporaryFile<T>(contents: [UInt8], body: (URL) throws -> T) throws -> T {
   var tempFileURL = FileManager.default.temporaryDirectory
   tempFileURL.appendPathComponent("swift-parser-cli-\(UUID().uuidString).swift")
   try Data(contents).write(to: tempFileURL)
@@ -97,7 +97,7 @@ struct Reduce: ParsableCommand {
         #if os(Windows)
         _ = TerminateProcess(process.processHandle, 0)
         #else
-        kill(pid_t(process.processIdentifier), SIGKILL)  // ignore-unacceptable-language
+        kill(pid_t(process.processIdentifier), SIGKILL)
         #endif
         return .timeout
       }

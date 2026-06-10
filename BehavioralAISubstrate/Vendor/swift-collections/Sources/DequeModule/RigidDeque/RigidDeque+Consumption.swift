@@ -20,7 +20,7 @@ import ContainersPreview
 
 @available(SwiftStdlib 5.0, *)
 extension RigidDeque where Element: ~Copyable {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   /// Remove the specified subrange of items from this deque,
   /// passing a series of input spans to a given callback function to consume
   /// them in place.
@@ -33,9 +33,8 @@ extension RigidDeque where Element: ~Copyable {
   /// may not be called at all.
   ///
   /// - Parameter subrange: The subrange of items to consume from this deque.
-  /// - Parameter consumer: A function taking an input span of the removed items,
+  /// - Parameter consumer: A function taking an input span of removed items,
   ///    allowing them to be consumed straight out of the deque's storage.
-  ///    The function is called at most once.
   ///
   /// - Complexity: O(`self.count`)
   @_alwaysEmitIntoClient
@@ -54,7 +53,9 @@ extension RigidDeque where Element: ~Copyable {
     if let second = segments.second {
       var span = InputSpan(buffer: second, initializedCount: second.count)
       consumer(&span)
+      _ = consume span
     }
+    _handle.closeGap(offsets: subrange)
   }
 
   /// Remove the specified subrange of items from this deque,
@@ -71,7 +72,6 @@ extension RigidDeque where Element: ~Copyable {
   /// - Parameter subrange: The subrange of items to consume from this deque.
   /// - Parameter consumer: A function taking an input span of the removed items,
   ///    allowing them to be consumed straight out of the deque's storage.
-  ///    The function is called at most once.
   ///
   /// - Complexity: O(`self.count`)
   @_alwaysEmitIntoClient
@@ -95,7 +95,6 @@ extension RigidDeque where Element: ~Copyable {
   ///
   /// - Parameter consumer: A function taking an input span of the removed items,
   ///    allowing them to be consumed straight out of the deque's storage.
-  ///    The function is called at most once.
   /// - Complexity: O(`self.count`)
   @_alwaysEmitIntoClient
   @inline(__always)
@@ -165,7 +164,7 @@ extension RigidDeque where Element: ~Copyable {
 #endif
 }
 
-#if compiler(>=6.3) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.3) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension RigidDeque where Element: ~Copyable {
   @_alwaysEmitIntoClient
@@ -181,7 +180,7 @@ extension RigidDeque where Element: ~Copyable {
   @frozen
   public struct SubrangeConsumer: ~Copyable, ~Escapable {
     @usableFromInline
-    internal var _base: Inout<RigidDeque>
+    internal var _base: MutableRef<RigidDeque>
       
     @usableFromInline
     internal var _offsetRange: Range<Int>
@@ -200,7 +199,7 @@ extension RigidDeque where Element: ~Copyable {
       let segments = _base._handle.mutableSegments(forOffsets: offsetRange)
       self._buffer1 = segments.first
       self._buffer2 = segments.second ?? .init(start: nil, count: 0)
-      self._base = Inout(&_base)
+      self._base = MutableRef(&_base)
       self._offsetRange = offsetRange
     }
 
@@ -218,8 +217,14 @@ extension RigidDeque where Element: ~Copyable {
   }
 }
 
+#if compiler(>=6.4)
 @available(SwiftStdlib 5.0, *)
 extension RigidDeque.SubrangeConsumer: Drain where Element: ~Copyable {
+}
+#endif
+
+@available(SwiftStdlib 5.0, *)
+extension RigidDeque.SubrangeConsumer where Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
   @_lifetime(self: copy self)

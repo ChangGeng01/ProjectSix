@@ -26,17 +26,13 @@ public let STMT_NODES: [Node] = [
       ),
       Child(
         name: "availabilityArguments",
+        deprecatedName: "availabilitySpec",
         kind: .collection(kind: .availabilityArgumentList, collectionElementName: "AvailabilityArgument")
       ),
       Child(
         name: "rightParen",
         kind: .token(choices: [.token(.rightParen)])
       ),
-    ],
-    childHistory: [
-      [
-        "availabilityArguments": .renamed(from: "availabilitySpec")
-      ]
     ]
   ),
 
@@ -285,11 +281,6 @@ public let STMT_NODES: [Node] = [
         isOptional: true
       ),
       Child(
-        name: "unsafeKeyword",
-        kind: .token(choices: [.keyword(.unsafe)]),
-        isOptional: true
-      ),
-      Child(
         name: "caseKeyword",
         kind: .token(choices: [.keyword(.case)]),
         isOptional: true
@@ -309,6 +300,7 @@ public let STMT_NODES: [Node] = [
       ),
       Child(
         name: "sequence",
+        deprecatedName: "sequenceExpr",
         kind: .node(kind: .expr)
       ),
       Child(
@@ -321,11 +313,6 @@ public let STMT_NODES: [Node] = [
         kind: .node(kind: .codeBlock),
         nameForDiagnostics: "body"
       ),
-    ],
-    childHistory: [
-      [
-        "sequence": .renamed(from: "sequenceExpr")
-      ]
     ]
   ),
 
@@ -381,23 +368,19 @@ public let STMT_NODES: [Node] = [
     children: [
       Child(
         name: "label",
+        deprecatedName: "labelName",
         kind: .token(choices: [.token(.identifier)]),
         nameForDiagnostics: "label name"
       ),
       Child(
         name: "colon",
+        deprecatedName: "labelColon",
         kind: .token(choices: [.token(.colon)])
       ),
       Child(
         name: "statement",
         kind: .node(kind: .stmt)
       ),
-    ],
-    childHistory: [
-      [
-        "label": .renamed(from: "labelName"),
-        "colon": .renamed(from: "labelColon"),
-      ]
     ]
   ),
 
@@ -433,6 +416,7 @@ public let STMT_NODES: [Node] = [
     children: [
       Child(
         name: "bindingSpecifier",
+        deprecatedName: "bindingKeyword",
         kind: .token(choices: [
           .keyword(.let), .keyword(.var), .keyword(.inout), .keyword(._mutating), .keyword(._borrowing),
           .keyword(._consuming),
@@ -452,11 +436,6 @@ public let STMT_NODES: [Node] = [
         kind: .node(kind: .initializerClause),
         isOptional: true
       ),
-    ],
-    childHistory: [
-      [
-        "bindingSpecifier": .renamed(from: "bindingKeyword")
-      ]
     ]
   ),
 
@@ -533,13 +512,9 @@ public let STMT_NODES: [Node] = [
       ),
       Child(
         name: "condition",
+        deprecatedName: "guardResult",
         kind: .node(kind: .expr)
       ),
-    ],
-    childHistory: [
-      [
-        "condition": .renamed(from: "guardResult")
-      ]
     ]
   ),
 
@@ -577,17 +552,13 @@ public let STMT_NODES: [Node] = [
       ),
       Child(
         name: "elements",
+        deprecatedName: "elementList",
         kind: .collection(kind: .yieldedExpressionList, collectionElementName: "Element")
       ),
       Child(
         name: "rightParen",
         kind: .token(choices: [.token(.rightParen)])
       ),
-    ],
-    childHistory: [
-      [
-        "elements": .renamed(from: "elementList")
-      ]
     ]
   ),
 
@@ -602,30 +573,20 @@ public let STMT_NODES: [Node] = [
       ),
       Child(
         name: "yieldedExpressions",
-        kind: .nodeChoices(
-          choices: [
-            Child(
-              name: "multiple",
-              kind: .node(kind: .yieldedExpressionsClause)
-            ),
-            Child(
-              name: "single",
-              kind: .node(kind: .expr)
-            ),
-          ],
-          childHistory: [
-            [
-              "multiple": .renamed(from: "yieldList"),
-              "single": .renamed(from: "simpleYield"),
-            ]
-          ]
-        )
+        deprecatedName: "yields",
+        kind: .nodeChoices(choices: [
+          Child(
+            name: "multiple",
+            deprecatedName: "yieldList",
+            kind: .node(kind: .yieldedExpressionsClause)
+          ),
+          Child(
+            name: "single",
+            deprecatedName: "simpleYield",
+            kind: .node(kind: .expr)
+          ),
+        ])
       ),
-    ],
-    childHistory: [
-      [
-        "yieldedExpressions": .renamed(from: "yields")
-      ]
     ]
   ),
 

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
@@ -38,6 +38,8 @@ enum TokenPrecedence: Comparable {
   case mediumPunctuator
   /// The closing delimiter of `weakBracketed`
   case weakBracketClose
+  /// Keywords that start a new statement.
+  case stmtKeyword
   /// The '{' token because it typically marks the body of a declaration.
   /// `closingDelimiter` must have type `strongPunctuator`
   case openingBrace(closingDelimiter: RawTokenKind)
@@ -45,9 +47,7 @@ enum TokenPrecedence: Comparable {
   case strongPunctuator
   /// The closing delimiter of `strongBracketed`
   case closingBrace
-  /// Keywords that start a new statement.
-  case stmtKeyword
-  /// Keywords that start a new declaration
+  /// Tokens that start a new declaration
   case declKeyword
   case openingPoundIf
   case closingPoundIf
@@ -55,9 +55,9 @@ enum TokenPrecedence: Comparable {
   /// If the precedence is `weakBracketed` or `strongBracketed`, the closing delimiter of the bracketed group.
   var closingTokenKind: RawTokenKind? {
     switch self {
-    case .weakBracketed(let closingDelimiter):
+    case .weakBracketed(closingDelimiter: let closingDelimiter):
       return closingDelimiter
-    case .openingBrace(let closingDelimiter):
+    case .openingBrace(closingDelimiter: let closingDelimiter):
       return closingDelimiter
     case .openingPoundIf:
       return .poundEndif
@@ -84,18 +84,20 @@ enum TokenPrecedence: Comparable {
         return 5
       case .weakBracketClose:
         return 6
-      case .strongPunctuator:
+      case .stmtKeyword:
         return 7
-      case .openingBrace:
+      case .strongPunctuator:
         return 8
-      case .declKeyword, .stmtKeyword:
+      case .openingBrace:
         return 9
       case .closingBrace:
         return 10
-      case .openingPoundIf:
+      case .declKeyword:
         return 11
-      case .closingPoundIf:
+      case .openingPoundIf:
         return 12
+      case .closingPoundIf:
+        return 13
       }
     }
 
@@ -126,7 +128,7 @@ enum TokenPrecedence: Comparable {
       // Pound literals
       .poundAvailable, .poundSourceLocation, .poundUnavailable,
       // Identifiers
-      .dollarIdentifier, .identifier, .colonColon,
+      .dollarIdentifier, .identifier,
       // '_' can occur in types to replace a type identifier
       .wildcard,
       // String segment, string interpolation anchor, pound, shebang and regex pattern don't really fit anywhere else
@@ -233,13 +235,14 @@ enum TokenPrecedence: Comparable {
       .__consuming, .final, .required, .optional, .lazy, .dynamic, .infix, .postfix, .prefix, .mutating, .nonmutating,
       .convenience, .override, .package, .open,
       .__setter_access, .indirect, .isolated, .nonisolated, .distributed, ._local,
-      .inout, ._mutating, ._borrow, ._borrowing, .borrow, .borrowing, ._consuming, .consuming, .consume,
+      .inout, ._mutating, ._borrow, ._borrowing, .borrowing, ._consuming, .consuming, .consume, ._resultDependsOnSelf,
+      ._resultDependsOn,
       .dependsOn, .scoped, .sending,
       // Accessors
       .get, .set, .didSet, .willSet, .unsafeAddress, .addressWithOwner, .addressWithNativeOwner, .unsafeMutableAddress,
-      .mutableAddressWithOwner, .mutableAddressWithNativeOwner, ._read, .read, ._modify, .modify, .mutate,
+      .mutableAddressWithOwner, .mutableAddressWithNativeOwner, ._read, ._modify,
       // Misc
-      .import, .using:
+      .import:
       self = .declKeyword
 
     case  // `TypeAttribute`
@@ -259,21 +262,35 @@ enum TokenPrecedence: Comparable {
       self = .exprKeyword
 
     case  // `DeclarationAttributeWithSpecialSyntax`
-    ._backDeploy,
+    ._alignment,
+      ._backDeploy,
+      ._cdecl,
       ._documentation,
       ._dynamicReplacement,
       ._effects,
+      ._expose,
       ._implements,
+      ._nonSendable,
+      ._objcImplementation,
+      ._objcRuntimeName,
+      ._optimize,
       ._originallyDefinedIn,
-      .specialized,
+      ._private,
+      ._projectedValueProperty,
+      ._semantics,
       ._specialize,
+      ._spi,
       ._spi_available,
-      .abi,
+      ._swift_native_objc_runtime_base,
+      ._typeEraser,
+      ._unavailableFromAsync,
       .attached,
       .available,
       .backDeployed,
       .derivative,
+      .exclusivity,
       .freestanding,
+      .inline,
       .objc,
       .transpose:
       self = .exprKeyword
@@ -307,6 +324,7 @@ enum TokenPrecedence: Comparable {
       .block,
       .canImport,
       .compiler,
+      .cType,
       .deprecated,
       .exported,
       .file,
@@ -325,7 +343,6 @@ enum TokenPrecedence: Comparable {
       .module,
       .noasync,
       .none,
-      .nonsending,
       .obsoleted,
       .of,
       .Protocol,
@@ -333,6 +350,7 @@ enum TokenPrecedence: Comparable {
       .reverse,
       .right,
       .safe,
+      .sourceFile,
       .spi,
       .spiModule,
       .swift,
@@ -342,6 +360,7 @@ enum TokenPrecedence: Comparable {
       .unowned,
       .visibility,
       .weak,
+      .witness_method,
       .wrt,
       .unsafe:
       self = .exprKeyword

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) public import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -308,12 +308,10 @@ open class BasicFormat: SyntaxRewriter {
     case (.atSign, _),
       (.backslash, _),
       (.backtick, _),
-      (.colonColon, .identifier),
       (.dollarIdentifier, .period),  // a.b
       (.endOfFile, _),
       (.exclamationMark, .period),  // myOptionalBar!.foo()
       (.regexPoundDelimiter, .regexSlash),  // opening extended regex delimiter should never be separate by a space
-      (.identifier, .colonColon),
       (.identifier, .leftAngle),  // MyType<Int>
       (.identifier, .leftSquare),  // myArray[1]
       (.identifier, .period),  // a.b
@@ -676,5 +674,19 @@ fileprivate extension TokenSyntax {
     default:
       return false
     }
+  }
+}
+
+fileprivate extension SyntaxProtocol {
+  /// Returns this node or the first ancestor that satisfies `condition`.
+  func ancestorOrSelf<T>(mapping map: (Syntax) -> T?) -> T? {
+    var walk: Syntax? = Syntax(self)
+    while let unwrappedParent = walk {
+      if let mapped = map(unwrappedParent) {
+        return mapped
+      }
+      walk = unwrappedParent.parent
+    }
+    return nil
   }
 }

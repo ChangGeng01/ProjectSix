@@ -1,15 +1,3 @@
-##===----------------------------------------------------------------------===##
-##
-## This source file is part of the Swift.org open source project
-##
-## Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
-## Licensed under Apache License v2.0 with Runtime Library Exception
-##
-## See https://swift.org/LICENSE.txt for license information
-## See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-##
-##===----------------------------------------------------------------------===##
-
 load("@build_bazel_rules_apple//apple/testing/default_runner:ios_xctestrun_runner.bzl", "ios_xctestrun_runner")
 load("//utils/bazel:swift_syntax_library.bzl", "swift_syntax_library", "swift_syntax_test")
 
@@ -96,51 +84,6 @@ swift_syntax_test(
 )
 
 swift_syntax_library(
-    name = "SwiftIfConfig",
-    deps = [
-        ":SwiftDiagnostics",
-        ":SwiftOperators",
-        ":SwiftSyntax",
-        ":SwiftSyntaxBuilder",
-    ],
-)
-
-swift_syntax_test(
-    name = "SwiftIfConfigTest",
-    deps = [
-        ":SwiftIfConfig",
-        ":SwiftParser",
-        ":SwiftSyntaxMacrosGenericTestSupport",
-        ":_SwiftSyntaxTestSupport",
-    ],
-)
-
-swift_syntax_library(
-    name = "SwiftLexicalLookup",
-    deps = [
-        ":SwiftIfConfig",
-        ":SwiftSyntax",
-    ],
-)
-
-swift_syntax_test(
-    name = "SwiftLexicalLookupTest",
-    deps = [
-        ":SwiftLexicalLookup",
-        ":_SwiftSyntaxTestSupport",
-    ],
-)
-
-swift_syntax_library(
-    name = "SwiftLibraryPluginProvider",
-    deps = [
-        ":SwiftCompilerPluginMessageHandling",
-        ":SwiftSyntaxMacros",
-        ":_SwiftLibraryPluginProviderCShims",
-    ],
-)
-
-swift_syntax_library(
     name = "SwiftOperators",
     deps = [
         ":SwiftDiagnostics",
@@ -219,9 +162,6 @@ swift_syntax_library(
         ":SwiftSyntax509",
         ":SwiftSyntax510",
         ":SwiftSyntax600",
-        ":SwiftSyntax601",
-        ":SwiftSyntax602",
-        ":SwiftSyntax603",
         ":_SwiftSyntaxCShims",
     ],
 )
@@ -243,27 +183,6 @@ swift_syntax_library(
 swift_syntax_library(
     name = "SwiftSyntax600",
     srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax600/**/*.swift"]),
-    deps = [
-    ],
-)
-
-swift_syntax_library(
-    name = "SwiftSyntax601",
-    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax601/**/*.swift"]),
-    deps = [
-    ],
-)
-
-swift_syntax_library(
-    name = "SwiftSyntax602",
-    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax602/**/*.swift"]),
-    deps = [
-    ],
-)
-
-swift_syntax_library(
-    name = "SwiftSyntax603",
-    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax603/**/*.swift"]),
     deps = [
     ],
 )
@@ -340,10 +259,13 @@ swift_syntax_library(
     name = "SwiftSyntaxMacrosTestSupport",
     testonly = True,
     deps = [
-        ":SwiftSyntax",
+        ":SwiftDiagnostics",
+        ":SwiftIDEUtils",
+        ":SwiftParser",
         ":SwiftSyntaxMacroExpansion",
         ":SwiftSyntaxMacros",
         ":SwiftSyntaxMacrosGenericTestSupport",
+        ":_SwiftSyntaxTestSupport",
     ],
 )
 
@@ -378,25 +300,16 @@ cc_library(
     name = "_InstructionCounter",
     srcs = glob(["Sources/_InstructionCounter/src/*.c"]),
     hdrs = glob(["Sources/_InstructionCounter/include/*.h"]),
-    aspect_hints = ["@build_bazel_rules_swift//swift:auto_module"],
     includes = ["Sources/_InstructionCounter/include"],
-    visibility = ["//visibility:private"],
-)
-
-cc_library(
-    name = "_SwiftLibraryPluginProviderCShims",
-    hdrs = glob(["Sources/_SwiftLibraryPluginProviderCShims/include/*.h"]),
-    aspect_hints = ["@build_bazel_rules_swift//swift:auto_module"],
-    includes = ["Sources/_SwiftLibraryPluginProviderCShims/include"],
+    tags = ["swift_module=_InstructionCounter"],
     visibility = ["//visibility:private"],
 )
 
 cc_library(
     name = "_SwiftSyntaxCShims",
-    srcs = glob(["Sources/_SwiftSyntaxCShims/*.c"]),
     hdrs = glob(["Sources/_SwiftSyntaxCShims/include/*.h"]),
-    aspect_hints = ["@build_bazel_rules_swift//swift:auto_module"],
     includes = ["Sources/_SwiftSyntaxCShims/include"],
+    tags = ["swift_module=_SwiftSyntaxCShims"],
     visibility = ["//visibility:private"],
 )
 

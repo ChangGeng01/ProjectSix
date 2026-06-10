@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 internal import SwiftDiagnostics
 public import SwiftSyntax
 internal import SwiftSyntaxBuilder
@@ -103,7 +103,7 @@ extension MacroDefinition {
   }
 }
 
-private class ParameterReplacementVisitor: OnlyLiteralExprChecker {
+fileprivate class ParameterReplacementVisitor: OnlyLiteralExprChecker {
   let macro: MacroDeclSyntax
   var replacements: [MacroDefinition.Replacement] = []
   var genericReplacements: [MacroDefinition.GenericArgumentReplacement] = []
@@ -262,13 +262,13 @@ private final class MacroExpansionRewriter: SyntaxRewriter {
   let parameterReplacements: [DeclReferenceExprSyntax: Int]
   let arguments: [ExprSyntax]
   let genericParameterReplacements: [GenericArgumentSyntax: Int]
-  let genericArguments: [GenericArgumentSyntax.Argument]
+  let genericArguments: [TypeSyntax]
 
   init(
     parameterReplacements: [DeclReferenceExprSyntax: Int],
     arguments: [ExprSyntax],
     genericReplacements: [GenericArgumentSyntax: Int],
-    genericArguments: [GenericArgumentSyntax.Argument]
+    genericArguments: [TypeSyntax]
   ) {
     self.parameterReplacements = parameterReplacements
     self.arguments = arguments
@@ -331,7 +331,7 @@ extension MacroDeclSyntax {
       },
       uniquingKeysWith: { l, r in l }
     )
-    let genericArguments: [GenericArgumentSyntax.Argument] =
+    let genericArguments: [TypeSyntax] =
       genericArgumentList?.arguments.map { $0.argument } ?? []
 
     let rewriter = MacroExpansionRewriter(

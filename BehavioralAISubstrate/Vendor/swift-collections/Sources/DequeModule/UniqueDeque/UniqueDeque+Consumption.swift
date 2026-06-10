@@ -20,7 +20,7 @@ import ContainersPreview
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueDeque where Element: ~Copyable {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   /// Remove the specified subrange of items from this deque,
   /// passing a series of input spans to a given callback function to consume
   /// them in place.
@@ -35,7 +35,6 @@ extension UniqueDeque where Element: ~Copyable {
   /// - Parameter subrange: The subrange of items to consume from this deque.
   /// - Parameter consumer: A function taking an input span of the removed items,
   ///    allowing them to be consumed straight out of the deque's storage.
-  ///    The function is called at most once.
   ///
   /// - Complexity: O(`self.count`)
   @_alwaysEmitIntoClient
@@ -61,7 +60,6 @@ extension UniqueDeque where Element: ~Copyable {
   /// - Parameter subrange: The subrange of items to consume from this deque.
   /// - Parameter consumer: A function taking an input span of the removed items,
   ///    allowing them to be consumed straight out of the deque's storage.
-  ///    The function is called at most once.
   ///
   /// - Complexity: O(`self.count`)
   @_alwaysEmitIntoClient
@@ -85,7 +83,6 @@ extension UniqueDeque where Element: ~Copyable {
   ///
   /// - Parameter consumer: A function taking an input span of the removed items,
   ///    allowing them to be consumed straight out of the deque's storage.
-  ///    The function is called at most once.
   /// - Complexity: O(`self.count`)
   @_alwaysEmitIntoClient
   @inline(__always)
@@ -150,7 +147,7 @@ extension UniqueDeque where Element: ~Copyable {
 #endif
 }
 
-#if compiler(>=6.3) && COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.3) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension UniqueDeque where Element: ~Copyable {
   public typealias SubrangeConsumer = RigidDeque<Element>.SubrangeConsumer

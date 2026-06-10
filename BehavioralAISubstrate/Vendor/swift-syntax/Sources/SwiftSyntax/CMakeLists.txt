@@ -8,14 +8,13 @@
 
 add_swift_syntax_library(SwiftSyntax
   AbsolutePosition.swift
+  AbsoluteRawSyntax.swift
   AbsoluteSyntaxInfo.swift
-  ArenaAllocatedBuffer.swift
   Assert.swift
   BumpPtrAllocator.swift
   CommonAncestor.swift
   Convenience.swift
   CustomTraits.swift
-  EditorPlaceholder.swift
   Identifier.swift
   MemoryLayout.swift
   MissingNodeInitializers.swift
@@ -25,10 +24,13 @@ add_swift_syntax_library(SwiftSyntax
   SourcePresence.swift
   SwiftSyntaxCompatibility.swift
   Syntax.swift
+  SyntaxArena.swift
+  SyntaxArenaAllocatedBuffer.swift
   SyntaxChildren.swift
   SyntaxCollection.swift
   SyntaxHashable.swift
   SyntaxIdentifier.swift
+  SyntaxNodeFactory.swift
   SyntaxNodeStructure.swift
   SyntaxProtocol.swift
   SyntaxText.swift
@@ -40,7 +42,6 @@ add_swift_syntax_library(SwiftSyntax
   Utils.swift
 
   Raw/RawSyntax.swift
-  Raw/RawSyntaxArena.swift
   Raw/RawSyntaxLayoutView.swift
   Raw/RawSyntaxNodeProtocol.swift
   Raw/RawSyntaxTokenView.swift
@@ -83,12 +84,5 @@ add_swift_syntax_library(SwiftSyntax
   generated/syntaxNodes/SyntaxNodesTUVWXYZ.swift
 )
 
-if (SWIFTSYNTAX_EMIT_MODULE)
-  target_link_swift_syntax_libraries(SwiftSyntax PRIVATE
-    _SwiftSyntaxCShims)
-else()
-  # We can't use @_implementationOnly if we don't enable library evolution, so we need
-  # to link _SwiftSyntaxCShims publicly.
-  target_link_swift_syntax_libraries(SwiftSyntax PUBLIC
-    _SwiftSyntaxCShims)
-endif()
+target_link_swift_syntax_libraries(SwiftSyntax PRIVATE
+  _SwiftSyntaxCShims)

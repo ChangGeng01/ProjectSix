@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -29,7 +29,7 @@ extension RawEnumCaseParameterSyntax: RawParameterTrait {}
 protocol RawParameterListTrait: RawSyntaxNodeProtocol {
   associatedtype ParameterSyntax: RawParameterTrait
 
-  init(elements: [ParameterSyntax], arena: __shared RawSyntaxArena)
+  init(elements: [ParameterSyntax], arena: __shared SyntaxArena)
 }
 
 extension RawFunctionParameterListSyntax: RawParameterListTrait {}
@@ -47,7 +47,7 @@ protocol RawParameterClauseTrait: RawSyntaxNodeProtocol {
     _ unexpectedBetweenParameterListAndRightParen: RawUnexpectedNodesSyntax?,
     rightParen: RawTokenSyntax,
     _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax?,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   )
 }
 
@@ -96,32 +96,10 @@ extension Parser {
     let modifiers = parseParameterModifiers(isClosure: false)
     let misplacedSpecifiers = parseMisplacedSpecifiers()
 
-    var names: ParameterNames
+    var names = self.parseParameterNames()
+    let (unexpectedBeforeColon, colon) = self.expect(.colon)
 
-    let unexpectedBeforeColon: RawUnexpectedNodesSyntax?
-    let colon: RawTokenSyntax
     let type: RawTypeSyntax
-
-    // try to parse the type regardless of the presence of the preceding colon
-    // to tackle any unnamed parameter or missing colon
-    // e.g. [X], (:[X]) or (x [X])
-    let canParseType = withLookahead {
-      $0.currentToken.tokenText.isStartingWithUppercase && $0.canParseType() && $0.at(.comma, .rightParen)
-    }
-
-    if canParseType {
-      names = ParameterNames(
-        unexpectedBeforeFirstName: nil,
-        firstName: nil,
-        unexpectedBeforeSecondName: nil,
-        secondName: nil
-      )
-      unexpectedBeforeColon = nil
-      colon = missingToken(.colon)
-    } else {
-      names = self.parseParameterNames()
-      (unexpectedBeforeColon, colon) = self.expect(.colon)
-    }
 
     if colon.presence == .missing,
       let secondName = names.secondName,
@@ -131,7 +109,6 @@ extension Parser {
       // Synthesize the secondName parameter as a type node.
       type = RawTypeSyntax(
         RawIdentifierTypeSyntax(
-          moduleSelector: nil,
           name: secondName,
           genericArgumentClause: nil,
           arena: self.arena
@@ -152,27 +129,12 @@ extension Parser {
 
     let defaultValue: RawInitializerClauseSyntax?
     if self.at(.equal) || self.atContextualPunctuator("==") {
-      defaultValue = self.parseInitializerClause()
+      defaultValue = self.parseDefaultArgument()
     } else {
       defaultValue = nil
     }
 
-    var trailingComma: Token?
-    if self.at(.comma) {
-      trailingComma = self.consume(if: .comma)
-    } else if !self.at(.rightParen) {
-      let canParseIdentifier: Bool = withLookahead {
-        $0.canParseTypeIdentifier(allowKeyword: false)
-      }
-
-      let canParseAttribute: Bool = withLookahead {
-        $0.consume(if: .atSign) != nil && $0.canParseCustomAttribute()
-      }
-
-      if canParseIdentifier || canParseAttribute {
-        trailingComma = Token(missing: .comma, arena: self.arena)
-      }
-    }
+    let trailingComma = self.consume(if: .comma)
 
     return RawFunctionParameterSyntax(
       attributes: attrs,
@@ -198,23 +160,10 @@ extension Parser {
     let misplacedSpecifiers = parseMisplacedSpecifiers()
 
     let names = self.parseParameterNames()
-    var colon = self.consume(if: .colon)
-    // try to parse the type regardless of the presence of the preceding colon
-    // to tackle any unnamed parameter or missing colon
-    // e.g. [X], (:[X]) or (x [X])
-    let canParseType = withLookahead { $0.canParseType() }
+    let colon = self.consume(if: .colon)
     let type: RawTypeSyntax?
-    if canParseType {
+    if colon != nil {
       type = self.parseType(misplacedSpecifiers: misplacedSpecifiers)
-      if colon == nil {
-        // mark the preceding colon as missing if the type is present
-        // e.g. [X] or (x [X])
-        colon = missingToken(.colon)
-      }
-    } else if colon != nil {
-      // mark the type as missing if the preceding colon is present
-      // e.g. (:) or (_:)
-      type = RawTypeSyntax(RawMissingTypeSyntax(arena: self.arena))
     } else {
       type = nil
     }
@@ -272,7 +221,7 @@ extension Parser {
 
     let defaultValue: RawInitializerClauseSyntax?
     if self.at(.equal) || self.atContextualPunctuator("==") {
-      defaultValue = self.parseInitializerClause()
+      defaultValue = self.parseDefaultArgument()
     } else {
       defaultValue = nil
     }
@@ -301,13 +250,17 @@ extension Parser {
   mutating func parseParameterModifiers(isClosure: Bool) -> RawDeclModifierListSyntax {
     var elements = [RawDeclModifierSyntax]()
     var loopProgress = LoopProgressCondition()
-    while self.hasProgressed(&loopProgress) {
-      guard let match = self.at(anyIn: ParameterModifier.self),
-        !withLookahead({ $0.startsParameterName(isClosure: isClosure, allowMisplacedSpecifierRecovery: false) })
-      else {
-        break
+    MODIFIER_LOOP: while self.hasProgressed(&loopProgress) {
+      switch self.at(anyIn: ParameterModifier.self) {
+      case (._const, let handle)?:
+        elements.append(RawDeclModifierSyntax(name: self.eat(handle), detail: nil, arena: self.arena))
+      case (.isolated, let handle)?
+      where self.withLookahead({ !$0.startsParameterName(isClosure: isClosure, allowMisplacedSpecifierRecovery: false) }
+      ):
+        elements.append(RawDeclModifierSyntax(name: self.eat(handle), detail: nil, arena: self.arena))
+      default:
+        break MODIFIER_LOOP
       }
-      elements.append(RawDeclModifierSyntax(name: self.eat(match.handle), detail: nil, arena: self.arena))
     }
     if elements.isEmpty {
       return self.emptyCollection(RawDeclModifierListSyntax.self)

@@ -28,17 +28,9 @@ extension UniqueArray where Element: ~Copyable {
   
   /// Initializes a new unique array with the specified capacity and no elements.
   @inlinable
-  public init(capacity: Int) {
-    _storage = .init(capacity: capacity)
-  }
-
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
-  /// Initializes a new unique array with the specified capacity and no elements.
-  @inlinable
   public init(minimumCapacity: Int) {
     _storage = .init(capacity: minimumCapacity)
   }
-#endif
 }
 
 @available(SwiftStdlib 5.0, *)
@@ -58,7 +50,7 @@ extension UniqueArray where Element: ~Copyable {
     capacity: Int,
     initializingWith body: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
-    self.init(capacity: capacity)
+    self.init(minimumCapacity: capacity)
     try edit(body)
   }
 }
@@ -93,7 +85,7 @@ extension UniqueArray where Element: ~Copyable {
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueArray /*where Element: Copyable*/ {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
   /// Creates a new array with the specified initial capacity, holding a copy
   /// of the contents of a given borrowing sequence.
   ///
@@ -104,11 +96,11 @@ extension UniqueArray /*where Element: Copyable*/ {
   ///      The sequence must not contain more than `capacity` elements.
   @_alwaysEmitIntoClient
   @inline(__always)
-  public init<Source: BorrowingSequence<Element> & ~Copyable & ~Escapable>(
+  public init<Source: BorrowingSequence_<Element> & ~Copyable & ~Escapable>(
     capacity: Int? = nil,
     copying contents: borrowing Source
   ) {
-    self.init(capacity: capacity ?? 0)
+    self.init(minimumCapacity: capacity ?? 0)
     self.append(copying: contents)
   }
 #endif
@@ -126,11 +118,11 @@ extension UniqueArray /*where Element: Copyable*/ {
     capacity: Int? = nil,
     copying contents: some Sequence<Element>
   ) {
-    self.init(capacity: capacity ?? 0)
+    self.init(minimumCapacity: capacity ?? 0)
     self.append(copying: contents)
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
   /// Creates a new array with the specified initial capacity, holding a copy
   /// of the contents of a given container.
   ///
@@ -140,11 +132,11 @@ extension UniqueArray /*where Element: Copyable*/ {
   ///   - contents: The container whose contents to copy into the new array.
   @_alwaysEmitIntoClient
   @inline(__always)
-  public init<Source: BorrowingSequence<Element> & Sequence<Element>>(
+  public init<Source: BorrowingSequence_<Element> & Sequence<Element>>(
     capacity: Int? = nil,
     copying contents: Source
   ) {
-    self.init(capacity: capacity ?? 0)
+    self.init(minimumCapacity: capacity ?? 0)
     self.append(copying: contents)
   }
 #endif
@@ -163,7 +155,7 @@ extension UniqueArray /*where Element: Copyable*/ {
     capacity: Int? = nil,
     copying span: Span<Element>
   ) {
-    self.init(capacity: capacity ?? span.count)
+    self.init(minimumCapacity: capacity ?? span.count)
     self.append(copying: span)
   }
 }

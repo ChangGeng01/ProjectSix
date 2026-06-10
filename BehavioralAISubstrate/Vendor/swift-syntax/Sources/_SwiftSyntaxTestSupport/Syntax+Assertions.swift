@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 private import XCTest
 #else
@@ -170,7 +170,7 @@ public enum SubtreeError: Error, CustomStringConvertible {
   }
 }
 
-private class SyntaxTypeFinder: SyntaxAnyVisitor {
+fileprivate class SyntaxTypeFinder: SyntaxAnyVisitor {
   private let offset: Int
   private let type: SyntaxProtocol.Type
   private var found: Syntax?

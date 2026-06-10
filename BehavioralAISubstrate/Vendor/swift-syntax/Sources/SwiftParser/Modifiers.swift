@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) internal import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -89,7 +89,8 @@ extension Parser {
         (.declarationModifier(._const), let handle)?,
         (.declarationModifier(._local), let handle)?,
         (.declarationModifier(.__setter_access), let handle)?,
-        (.declarationModifier(.reasync), let handle)?
+        (.declarationModifier(.reasync), let handle)?,
+        (.declarationModifier(._resultDependsOnSelf), let handle)?
       where experimentalFeatures.contains(.nonescapableTypes):
         let (unexpectedBeforeKeyword, keyword) = self.eat(handle)
         elements.append(RawDeclModifierSyntax(unexpectedBeforeKeyword, name: keyword, detail: nil, arena: self.arena))
@@ -236,11 +237,7 @@ extension Parser {
     let detail: RawDeclModifierDetailSyntax?
     if self.at(.leftParen) {
       let (unexpectedBeforeLeftParen, leftParen) = self.expect(.leftParen)
-      let (unexpectedBeforeDetailToken, detailToken) = self.expect(
-        TokenSpec(.unsafe, remapping: .identifier),
-        TokenSpec(.nonsending, remapping: .identifier),
-        default: TokenSpec(.identifier)
-      )
+      let (unexpectedBeforeDetailToken, detailToken) = self.expect(TokenSpec(.unsafe, remapping: .identifier))
       let (unexpectedBeforeRightParen, rightParen) = self.expect(.rightParen)
       detail = RawDeclModifierDetailSyntax(
         unexpectedBeforeLeftParen,

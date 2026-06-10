@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -28,7 +28,7 @@ public struct GroupedDiagnostics {
     let id: SourceFileID
 
     /// The syntax tree for the source file.
-    let tree: Syntax
+    let tree: SourceFileSyntax
 
     /// The source location converter for this source file.
     let sourceLocationConverter: SourceLocationConverter
@@ -55,7 +55,7 @@ public struct GroupedDiagnostics {
 
   /// Mapping from the root source file syntax nodes to the corresponding
   /// source file IDs.
-  var rootIndexes: [Syntax: SourceFileID] = [:]
+  var rootIndexes: [SourceFileSyntax: SourceFileID] = [:]
 
   public init() {}
 
@@ -71,13 +71,12 @@ public struct GroupedDiagnostics {
   /// - Returns: The unique ID for this source file.
   @discardableResult
   public mutating func addSourceFile(
-    tree: some SyntaxProtocol,
+    tree: SourceFileSyntax,
     sourceLocationConverter: SourceLocationConverter? = nil,
     displayName: String,
     parent: (SourceFileID, AbsolutePosition)? = nil,
     diagnostics: [Diagnostic] = []
   ) -> SourceFileID {
-    let tree = Syntax(tree)
     // Determine the ID this source file will have.
     let id = SourceFileID(id: sourceFiles.count)
     let slc =
@@ -109,7 +108,11 @@ public struct GroupedDiagnostics {
 
   /// Find the ID of the source file containing this syntax node.
   func findSourceFileContaining(_ node: Syntax) -> SourceFileID? {
-    return rootIndexes[node.root]
+    guard let rootSourceFile = node.root.as(SourceFileSyntax.self) else {
+      return nil
+    }
+
+    return rootIndexes[rootSourceFile]
   }
 
   /// Add a diagnostic to the set of grouped diagnostics.
@@ -182,7 +185,7 @@ extension GroupedDiagnostics {
     let slc = sourceFile.sourceLocationConverter
     let diagnosticDecorator = formatter.diagnosticDecorator
 
-    let childPadding = String(slc.sourceLines.count + 1).count + 1
+    let childPadding = String(slc.sourceLines.count + 1).count + 1;
 
     // Collect the child sources.
     var childSources: [AbsolutePosition: String] = [:]
@@ -227,8 +230,7 @@ extension GroupedDiagnostics {
             let bufferLoc = slc.location(for: rootPosition)
             let decoratedMessage = diagnosticDecorator.decorateMessage(
               "expanded code originates here",
-              basedOnSeverity: .note,
-              category: nil
+              basedOnSeverity: .note
             )
             prefixString += "`- \(bufferLoc.file):\(bufferLoc.line):\(bufferLoc.column): \(decoratedMessage)\n"
           }

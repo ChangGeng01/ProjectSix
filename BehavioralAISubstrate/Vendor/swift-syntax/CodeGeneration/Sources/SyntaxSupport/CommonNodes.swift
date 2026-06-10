@@ -177,7 +177,7 @@ public let COMMON_NODES: [Node] = [
     kind: .decl,
     base: .syntax,
     nameForDiagnostics: "declaration",
-    parserFunction: "parseDeclarationOrIfConfig"
+    parserFunction: "parseDeclaration"
   ),
 
   Node(
@@ -331,24 +331,6 @@ public let COMMON_NODES: [Node] = [
   ),
 
   Node(
-    kind: .moduleSelector,
-    base: .syntax,
-    nameForDiagnostics: "module selector",
-    children: [
-      Child(
-        name: "moduleName",
-        kind: .token(choices: [.token(.identifier)]),
-        nameForDiagnostics: "module name"
-      ),
-      Child(
-        name: "colonColon",
-        kind: .token(choices: [.token(.colonColon)]),
-        nameForDiagnostics: "'::' operator"
-      ),
-    ]
-  ),
-
-  Node(
     kind: .pattern,
     base: .syntax,
     nameForDiagnostics: "pattern",
@@ -400,18 +382,4 @@ public let COMMON_NODES: [Node] = [
     elementChoices: [.syntax]
   ),
 
-  Node(
-    kind: .unexpectedCodeDecl,
-    base: .decl,
-    nameForDiagnostics: nil,
-    documentation: "Unexpected code at declaration position",
-    children: [
-      Child(
-        name: "unexpectedCode",
-        // NOTE: This is not .collection() on purpose. We don't need collection related functions for this.
-        kind: .node(kind: .unexpectedNodes)
-      )
-    ],
-    noInterleaveUnexpected: true
-  ),
 ]

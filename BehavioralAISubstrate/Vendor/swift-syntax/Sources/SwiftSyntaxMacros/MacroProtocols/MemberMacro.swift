@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftSyntax
 #else
 import SwiftSyntax
@@ -41,7 +41,7 @@ public protocol MemberMacro: AttachedMacro {
   /// - Parameters:
   ///   - node: The custom attribute describing the attached macro.
   ///   - declaration: The declaration the macro attribute is attached to.
-  ///   - protocols: The set of protocols that were declared
+  ///   - conformingTo: The set of protocols that were declared
   ///     in the set of conformances for the macro and to which the declaration
   ///     does not explicitly conform. The member macro itself cannot declare
   ///     conformances to these protocols (only an extension macro can do that),
@@ -81,11 +81,6 @@ extension MemberMacro {
   }
 
   /// Default implementation that ignores the unhandled conformances.
-  @available(
-    *,
-    deprecated,
-    message: "`MemberMacro` conformance should implement the `expansion` function that takes a `conformingTo` parameter"
-  )
   public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,

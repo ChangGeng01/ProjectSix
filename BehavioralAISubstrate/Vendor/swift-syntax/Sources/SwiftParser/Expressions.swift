@@ -10,20 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
-@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#if swift(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
 #else
-@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(RawSyntax) import SwiftSyntax
 #endif
 
 extension TokenConsumer {
   mutating func atStartOfExpression() -> Bool {
-    if self.isAtModuleSelector() {
-      var lookahead = self.lookahead()
-      _ = lookahead.consumeModuleSelectorTokensIfPresent()
-      return lookahead.atStartOfExpression()
-    }
-
     switch self.at(anyIn: ExpressionStart.self) {
     case (.awaitTryMove, let handle)?:
       var lookahead = self.lookahead()
@@ -51,13 +45,15 @@ extension TokenConsumer {
     case nil:
       break
     }
-    if self.at(.atSign) && self.peek(isAt: .stringQuote) {
-      // Invalid Objective-C-style string literal
-      return true
+    if self.at(.atSign) || self.at(.keyword(.inout)) {
+      var lookahead = self.lookahead()
+      if lookahead.canParseType() {
+        return true
+      }
     }
 
     // 'repeat' is the start of a pack expansion expression.
-    if self.at(.keyword(.repeat)) {
+    if (self.at(.keyword(.repeat))) {
       // FIXME: 'repeat' followed by '{' could still be a pack
       // expansion, but we need to do more lookahead to figure out
       // whether the '{' is the start of a closure expression or a
@@ -147,7 +143,7 @@ extension Parser {
         break
       }
     }
-    return self.parseSequenceExpression(flavor: flavor, pattern: pattern)
+    return RawExprSyntax(self.parseSequenceExpression(flavor: flavor, pattern: pattern))
   }
 }
 
@@ -385,31 +381,18 @@ extension Parser {
     }
   }
 
-  /// Make sure that we only accept `nonisolated(nonsending)` as a valid type specifier
-  /// in expression context to minimize source compatibility impact.
-  mutating func canParseNonisolatedAsSpecifierInExpressionContext() -> Bool {
-    // If the token isn't even here, bail out before creating a lookahead.
-    guard self.at(.keyword(.nonisolated)) else {
-      return false
-    }
-
-    return withLookahead {
-      $0.consumeAnyToken()
-
-      if $0.currentToken.isAtStartOfLine {
-        return false
-      }
-
-      guard $0.consume(if: .leftParen) != nil else {
-        return false
-      }
-
-      guard $0.consume(if: TokenSpec(.nonsending, allowAtStartOfLine: false)) != nil else {
-        return false
-      }
-
-      return $0.at(TokenSpec(.rightParen, allowAtStartOfLine: false))
-    }
+  /// Whether the current token is a valid contextual exprssion modifier like
+  /// `copy`, `consume`.
+  ///
+  /// `copy` etc. are only contextually a keyword if they are followed by an
+  /// identifier or keyword on the same line. We do this to ensure that we do
+  /// not break any copy functions defined by users.
+  private mutating func atContextualExpressionModifier() -> Bool {
+    return self.peek(
+      isAt: TokenSpec(.identifier, allowAtStartOfLine: false),
+      TokenSpec(.dollarIdentifier, allowAtStartOfLine: false),
+      TokenSpec(.self, allowAtStartOfLine: false)
+    )
   }
 
   /// Parse an expression sequence element.
@@ -417,39 +400,21 @@ extension Parser {
     flavor: ExprFlavor,
     pattern: PatternContext = .none
   ) -> RawExprSyntax {
-    // Try to parse '@' sign, 'inout', or 'nonisolated' as an attributed typerepr.
-    if let type = parseAttributedTypeExprIfPresent() {
-      return RawExprSyntax(type)
-    }
-
-    if let prefixExpr = parseSequenceExpressionElementPrefixIfPresent(flavor: flavor, pattern: pattern) {
-      return prefixExpr
-    }
-
-    return self.parseUnaryExpression(flavor: flavor, pattern: pattern)
-  }
-
-  private mutating func parseAttributedTypeExprIfPresent() -> RawTypeExprSyntax? {
-    if self.at(.atSign, .keyword(.inout))
-      || self.canParseNonisolatedAsSpecifierInExpressionContext()
-    {
+    // Try to parse '@' sign or 'inout' as an attributed typerepr.
+    if self.at(.atSign, .keyword(.inout)) {
       var lookahead = self.lookahead()
       if lookahead.canParseType() {
         let type = self.parseType()
-        return RawTypeExprSyntax(
-          type: type,
-          arena: self.arena
+        return RawExprSyntax(
+          RawTypeExprSyntax(
+            type: type,
+            arena: self.arena
+          )
         )
       }
     }
-    return nil
-  }
 
-  private mutating func parseSequenceExpressionElementPrefixIfPresent(
-    flavor: ExprFlavor,
-    pattern: PatternContext
-  ) -> RawExprSyntax? {
-    switch self.at(anyIn: ExpressionModifierKeyword.self) {
+    EXPR_PREFIX: switch self.at(anyIn: ExpressionModifierKeyword.self) {
     case (.await, let handle)?:
       let awaitTok = self.eat(handle)
       let sub = self.parseSequenceExpressionElement(
@@ -463,7 +428,6 @@ extension Parser {
           arena: self.arena
         )
       )
-
     case (.try, let handle)?:
       let tryKeyword = self.eat(handle)
       let mark = self.consume(if: .exclamationMark, .postfixQuestionMark)
@@ -480,31 +444,20 @@ extension Parser {
           arena: self.arena
         )
       )
-    case (.unsafe, let handle)?:
-      if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor, acceptClosure: true, preferPostfixExpr: false) {
-        break
-      }
-
-      let unsafeTok = self.eat(handle)
+    case (._move, let handle)?:
+      let moveKeyword = self.eat(handle)
       let sub = self.parseSequenceExpressionElement(
         flavor: flavor,
         pattern: pattern
       )
       return RawExprSyntax(
-        RawUnsafeExprSyntax(
-          unsafeKeyword: unsafeTok,
+        RawConsumeExprSyntax(
+          consumeKeyword: moveKeyword,
           expression: sub,
           arena: self.arena
         )
       )
-
     case (._borrow, let handle)?:
-      assert(self.experimentalFeatures.contains(.oldOwnershipOperatorSpellings))
-      fallthrough
-    case (.borrow, let handle)?:
-      if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) {
-        break
-      }
       let borrowTok = self.eat(handle)
       let sub = self.parseSequenceExpressionElement(
         flavor: flavor,
@@ -519,8 +472,8 @@ extension Parser {
       )
 
     case (.copy, let handle)?:
-      if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) {
-        break
+      if !atContextualExpressionModifier() {
+        break EXPR_PREFIX
       }
 
       let copyTok = self.eat(handle)
@@ -536,12 +489,9 @@ extension Parser {
         )
       )
 
-    case (._move, let handle)?:
-      assert(self.experimentalFeatures.contains(.oldOwnershipOperatorSpellings))
-      fallthrough
     case (.consume, let handle)?:
-      if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) {
-        break
+      if !atContextualExpressionModifier() {
+        break EXPR_PREFIX
       }
 
       let consumeKeyword = self.eat(handle)
@@ -562,8 +512,8 @@ extension Parser {
       return RawExprSyntax(parsePackExpansionExpr(repeatHandle: handle, flavor: flavor, pattern: pattern))
 
     case (.each, let handle)?:
-      if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) {
-        break
+      if !atContextualExpressionModifier() {
+        break EXPR_PREFIX
       }
 
       let each = self.eat(handle)
@@ -577,8 +527,8 @@ extension Parser {
       )
 
     case (.any, _)?:
-      if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) && !self.peek().isContextualPunctuator("~") {
-        break
+      if !atContextualExpressionModifier() && !self.peek().isContextualPunctuator("~") {
+        break EXPR_PREFIX
       }
 
       // 'any' is parsed as a part of 'type'.
@@ -588,7 +538,7 @@ extension Parser {
     case nil:
       break
     }
-    return nil
+    return self.parseUnaryExpression(flavor: flavor, pattern: pattern)
   }
 
   /// Parse an optional prefix operator followed by an expression.
@@ -598,7 +548,7 @@ extension Parser {
   ) -> RawExprSyntax {
     // Try parse a single value statement as an expression (e.g do/if/switch).
     // Note we do this here in parseUnaryExpression as we don't allow postfix
-    // syntax to be attached to such expressions to avoid ambiguities such as postfix
+    // syntax to hang off such expressions to avoid ambiguities such as postfix
     // '.member', which can currently be parsed as a static dot member for a
     // result builder.
     switch self.at(anyIn: SingleValueStatementExpression.self) {
@@ -619,7 +569,7 @@ extension Parser {
       return RawExprSyntax(
         RawInOutExprSyntax(
           ampersand: amp,
-          expression: expr,
+          expression: RawExprSyntax(expr),
           arena: self.arena
         )
       )
@@ -663,9 +613,7 @@ extension Parser {
     )
   }
 
-  mutating func parseDottedExpressionSuffix(
-    previousNode: (some RawSyntaxNodeProtocol)?
-  ) -> (
+  mutating func parseDottedExpressionSuffix(previousNode: (some RawSyntaxNodeProtocol)?) -> (
     unexpectedPeriod: RawUnexpectedNodesSyntax?,
     period: RawTokenSyntax,
     declName: RawDeclReferenceExprSyntax,
@@ -676,7 +624,6 @@ extension Parser {
     if skipMemberName {
       let missingIdentifier = missingToken(.identifier)
       let declName = RawDeclReferenceExprSyntax(
-        moduleSelector: nil,
         baseName: missingIdentifier,
         argumentNames: nil,
         arena: self.arena
@@ -686,10 +633,9 @@ extension Parser {
 
     // Parse the name portion.
     let declName: RawDeclReferenceExprSyntax
-    if !self.isAtModuleSelector(), let indexOrSelf = self.consume(if: .integerLiteral, .keyword(.self)) {
+    if let indexOrSelf = self.consume(if: .integerLiteral, .keyword(.self)) {
       // Handle "x.42" - a tuple index.
       declName = RawDeclReferenceExprSyntax(
-        moduleSelector: nil,
         baseName: indexOrSelf,
         argumentNames: nil,
         arena: self.arena
@@ -727,7 +673,7 @@ extension Parser {
 
     return RawExprSyntax(
       RawGenericSpecializationExprSyntax(
-        expression: memberAccess,
+        expression: RawExprSyntax(memberAccess),
         genericArgumentClause: generics,
         arena: self.arena
       )
@@ -740,7 +686,10 @@ extension Parser {
   ) -> RawExprSyntax {
     precondition(self.at(.poundIf))
 
-    let config = self.parsePoundIfDirective { parser in
+    let config = self.parsePoundIfDirective { (parser, isFirstElement) -> RawExprSyntax? in
+      if !isFirstElement {
+        return nil
+      }
       let head: RawExprSyntax
       if parser.at(.period) {
         head = parser.parseDottedExpressionSuffix(nil)
@@ -755,7 +704,15 @@ extension Parser {
         flavor: flavor,
         pattern: .none
       )
-      return .postfixExpression(result)
+
+      // TODO: diagnose and skip the remaining token in the current clause.
+      return result
+    } syntax: { (parser, elements) -> RawIfConfigClauseSyntax.Elements? in
+      switch elements.count {
+      case 0: return nil
+      case 1: return .postfixExpression(elements.first!)
+      default: fatalError("Postfix #if should only have one element")
+      }
     }
 
     return RawExprSyntax(
@@ -788,32 +745,92 @@ extension Parser {
       }
 
       // If there is an expr-call-suffix, parse it and form a call.
-      if let call = self.parsePostfixExpressionCallSuffixIfPresent(
-        leadingExpr: leadingExpr,
-        flavor: flavor,
-        pattern: pattern
-      ) {
-        leadingExpr = call
+      if let lparen = self.consume(if: TokenSpec(.leftParen, allowAtStartOfLine: false)) {
+        let args = self.parseArgumentListElements(pattern: pattern, flavor: flavor.callArgumentFlavor)
+        let (unexpectedBeforeRParen, rparen) = self.expect(.rightParen)
+
+        // If we can parse trailing closures, do so.
+        let trailingClosure: RawClosureExprSyntax?
+        let additionalTrailingClosures: RawMultipleTrailingClosureElementListSyntax
+        if case .basic = flavor, self.at(.leftBrace), self.withLookahead({ $0.atValidTrailingClosure(flavor: flavor) })
+        {
+          (trailingClosure, additionalTrailingClosures) = self.parseTrailingClosures(flavor: flavor)
+        } else {
+          trailingClosure = nil
+          additionalTrailingClosures = self.emptyCollection(RawMultipleTrailingClosureElementListSyntax.self)
+        }
+
+        leadingExpr = RawExprSyntax(
+          RawFunctionCallExprSyntax(
+            calledExpression: leadingExpr,
+            leftParen: lparen,
+            arguments: RawLabeledExprListSyntax(elements: args, arena: self.arena),
+            unexpectedBeforeRParen,
+            rightParen: rparen,
+            trailingClosure: trailingClosure,
+            additionalTrailingClosures: additionalTrailingClosures,
+            arena: self.arena
+          )
+        )
         continue
       }
 
       // Check for a [expr] suffix.
       // Note that this cannot be the start of a new line.
-      if let sub = self.parsePostfixExpressionSubscriptSuffixIfPresent(
-        leadingExpr: leadingExpr,
-        flavor: flavor,
-        pattern: pattern
-      ) {
-        leadingExpr = sub
+      if let lsquare = self.consume(if: TokenSpec(.leftSquare, allowAtStartOfLine: false)) {
+        let args: [RawLabeledExprSyntax]
+        if self.at(.rightSquare) {
+          args = []
+        } else {
+          args = self.parseArgumentListElements(pattern: pattern)
+        }
+        let (unexpectedBeforeRSquare, rsquare) = self.expect(.rightSquare)
+
+        // If we can parse trailing closures, do so.
+        let trailingClosure: RawClosureExprSyntax?
+        let additionalTrailingClosures: RawMultipleTrailingClosureElementListSyntax
+        if case .basic = flavor, self.at(.leftBrace), self.withLookahead({ $0.atValidTrailingClosure(flavor: flavor) })
+        {
+          (trailingClosure, additionalTrailingClosures) = self.parseTrailingClosures(flavor: flavor)
+        } else {
+          trailingClosure = nil
+          additionalTrailingClosures = self.emptyCollection(RawMultipleTrailingClosureElementListSyntax.self)
+        }
+
+        leadingExpr = RawExprSyntax(
+          RawSubscriptCallExprSyntax(
+            calledExpression: leadingExpr,
+            leftSquare: lsquare,
+            arguments: RawLabeledExprListSyntax(elements: args, arena: self.arena),
+            unexpectedBeforeRSquare,
+            rightSquare: rsquare,
+            trailingClosure: trailingClosure,
+            additionalTrailingClosures: additionalTrailingClosures,
+            arena: self.arena
+          )
+        )
         continue
       }
 
       // Check for a trailing closure, if allowed.
-      if let implicitCall = self.parsePostfixExpressionTrailingClosureSuffixIfPresent(
-        leadingExpr: leadingExpr,
-        flavor: flavor
-      ) {
-        leadingExpr = implicitCall
+      if self.at(.leftBrace) && !leadingExpr.raw.kind.isLiteral
+        && self.withLookahead({ $0.atValidTrailingClosure(flavor: flavor) })
+      {
+        // Add dummy blank argument list to the call expression syntax.
+        let list = RawLabeledExprListSyntax(elements: [], arena: self.arena)
+        let (first, rest) = self.parseTrailingClosures(flavor: flavor)
+
+        leadingExpr = RawExprSyntax(
+          RawFunctionCallExprSyntax(
+            calledExpression: leadingExpr,
+            leftParen: nil,
+            arguments: list,
+            rightParen: nil,
+            trailingClosure: first,
+            additionalTrailingClosures: rest,
+            arena: self.arena
+          )
+        )
 
         // We only allow a single trailing closure on a call.  This could be
         // generalized in the future, but needs further design.
@@ -823,18 +840,70 @@ extension Parser {
         continue
       }
 
-      // Check for a ?, !, or operator suffix.
-      if let postfixOp = self.parsePostfixExpressionOperatorSuffixIfPresent(leadingExpr: leadingExpr) {
-        leadingExpr = postfixOp
+      // Check for a ? suffix.
+      if let question = self.consume(if: .postfixQuestionMark) {
+        leadingExpr = RawExprSyntax(
+          RawOptionalChainingExprSyntax(
+            expression: leadingExpr,
+            questionMark: question,
+            arena: self.arena
+          )
+        )
+        continue
+      }
+
+      // Check for a ! suffix.
+      if let exlaim = self.consume(if: .exclamationMark) {
+        leadingExpr = RawExprSyntax(
+          RawForceUnwrapExprSyntax(
+            expression: leadingExpr,
+            exclamationMark: exlaim,
+            arena: self.arena
+          )
+        )
+        continue
+      }
+
+      // Check for a postfix-operator suffix.
+      if let op = self.consume(if: .postfixOperator) {
+        leadingExpr = RawExprSyntax(
+          RawPostfixOperatorExprSyntax(
+            expression: leadingExpr,
+            operator: op,
+            arena: self.arena
+          )
+        )
         continue
       }
 
       if self.at(.poundIf) {
-        guard let ifConfigExpr = self.parsePostfixExpressionIfConfigSuffix(leadingExpr: leadingExpr, flavor: flavor)
-        else {
-          break
+        // Check if the first '#if' body starts with '.' <identifier>, and parse
+        // it as a "postfix ifconfig expression".
+        do {
+          var lookahead = self.lookahead()
+          // Skip to the first body. We may need to skip multiple '#if' directives
+          // since we support nested '#if's. e.g.
+          //   baseExpr
+          //   #if CONDITION_1
+          //     #if CONDITION_2
+          //       .someMember
+          var loopProgress = LoopProgressCondition()
+          repeat {
+            lookahead.eat(.poundIf)
+            while !lookahead.at(.endOfFile) && !lookahead.currentToken.isAtStartOfLine {
+              lookahead.skipSingle()
+            }
+          } while lookahead.at(.poundIf) && lookahead.hasProgressed(&loopProgress)
+
+          guard lookahead.atStartOfPostfixExprSuffix() else {
+            break
+          }
         }
-        leadingExpr = ifConfigExpr
+
+        leadingExpr = self.parseIfConfigExpressionSuffix(
+          leadingExpr,
+          flavor: flavor
+        )
         continue
       }
 
@@ -843,204 +912,18 @@ extension Parser {
     }
     return leadingExpr
   }
-
-  private mutating func parsePostfixExpressionCallSuffixIfPresent(
-    leadingExpr: RawExprSyntax,
-    flavor: ExprFlavor,
-    pattern: PatternContext
-  ) -> RawExprSyntax? {
-    guard let lparen = self.consume(if: TokenSpec(.leftParen, allowAtStartOfLine: false)) else {
-      return nil
-    }
-
-    let args = self.parseArgumentListElements(
-      pattern: pattern,
-      flavor: flavor.callArgumentFlavor,
-      allowTrailingComma: true
-    )
-    let (unexpectedBeforeRParen, rparen) = self.expect(.rightParen)
-
-    // If we can parse trailing closures, do so.
-    let trailingClosure: RawClosureExprSyntax?
-    let additionalTrailingClosures: RawMultipleTrailingClosureElementListSyntax
-    if case .basic = flavor, self.at(.leftBrace), self.withLookahead({ $0.atValidTrailingClosure(flavor: flavor) }) {
-      (trailingClosure, additionalTrailingClosures) = self.parseTrailingClosures(flavor: flavor)
-    } else {
-      trailingClosure = nil
-      additionalTrailingClosures = self.emptyCollection(RawMultipleTrailingClosureElementListSyntax.self)
-    }
-
-    return RawExprSyntax(
-      RawFunctionCallExprSyntax(
-        calledExpression: leadingExpr,
-        leftParen: lparen,
-        arguments: RawLabeledExprListSyntax(elements: args, arena: self.arena),
-        unexpectedBeforeRParen,
-        rightParen: rparen,
-        trailingClosure: trailingClosure,
-        additionalTrailingClosures: additionalTrailingClosures,
-        arena: self.arena
-      )
-    )
-  }
-
-  private mutating func parsePostfixExpressionSubscriptSuffixIfPresent(
-    leadingExpr: RawExprSyntax,
-    flavor: ExprFlavor,
-    pattern: PatternContext
-  ) -> RawExprSyntax? {
-    guard let lsquare = self.consume(if: TokenSpec(.leftSquare, allowAtStartOfLine: false)) else {
-      return nil
-    }
-
-    let args: [RawLabeledExprSyntax]
-    if self.at(.rightSquare) {
-      args = []
-    } else {
-      args = self.parseArgumentListElements(
-        pattern: pattern,
-        allowTrailingComma: true
-      )
-    }
-    let (unexpectedBeforeRSquare, rsquare) = self.expect(.rightSquare)
-
-    // If we can parse trailing closures, do so.
-    let trailingClosure: RawClosureExprSyntax?
-    let additionalTrailingClosures: RawMultipleTrailingClosureElementListSyntax
-    if case .basic = flavor, self.at(.leftBrace), self.withLookahead({ $0.atValidTrailingClosure(flavor: flavor) }) {
-      (trailingClosure, additionalTrailingClosures) = self.parseTrailingClosures(flavor: flavor)
-    } else {
-      trailingClosure = nil
-      additionalTrailingClosures = self.emptyCollection(RawMultipleTrailingClosureElementListSyntax.self)
-    }
-
-    return RawExprSyntax(
-      RawSubscriptCallExprSyntax(
-        calledExpression: leadingExpr,
-        leftSquare: lsquare,
-        arguments: RawLabeledExprListSyntax(elements: args, arena: self.arena),
-        unexpectedBeforeRSquare,
-        rightSquare: rsquare,
-        trailingClosure: trailingClosure,
-        additionalTrailingClosures: additionalTrailingClosures,
-        arena: self.arena
-      )
-    )
-  }
-
-  private mutating func parsePostfixExpressionTrailingClosureSuffixIfPresent(
-    leadingExpr: RawExprSyntax,
-    flavor: ExprFlavor
-  ) -> RawExprSyntax? {
-    guard
-      self.at(.leftBrace) && !leadingExpr.raw.kind.isLiteral
-        && self.withLookahead({ $0.atValidTrailingClosure(flavor: flavor) })
-    else {
-      return nil
-    }
-
-    // Add dummy blank argument list to the call expression syntax.
-    let list = RawLabeledExprListSyntax(elements: [], arena: self.arena)
-    let (first, rest) = self.parseTrailingClosures(flavor: flavor)
-
-    return RawExprSyntax(
-      RawFunctionCallExprSyntax(
-        calledExpression: leadingExpr,
-        leftParen: nil,
-        arguments: list,
-        rightParen: nil,
-        trailingClosure: first,
-        additionalTrailingClosures: rest,
-        arena: self.arena
-      )
-    )
-  }
-
-  private mutating func parsePostfixExpressionOperatorSuffixIfPresent(
-    leadingExpr: RawExprSyntax
-  ) -> RawExprSyntax? {
-    // Check for a ? suffix.
-    if let question = self.consume(if: .postfixQuestionMark) {
-      return RawExprSyntax(
-        RawOptionalChainingExprSyntax(
-          expression: leadingExpr,
-          questionMark: question,
-          arena: self.arena
-        )
-      )
-    }
-
-    // Check for a ! suffix.
-    if let exlaim = self.consume(if: .exclamationMark) {
-      return RawExprSyntax(
-        RawForceUnwrapExprSyntax(
-          expression: leadingExpr,
-          exclamationMark: exlaim,
-          arena: self.arena
-        )
-      )
-    }
-
-    // Check for a postfix-operator suffix.
-    if let op = self.consume(if: .postfixOperator) {
-      return RawExprSyntax(
-        RawPostfixOperatorExprSyntax(
-          expression: leadingExpr,
-          operator: op,
-          arena: self.arena
-        )
-      )
-    }
-
-    return nil
-  }
-
-  private mutating func parsePostfixExpressionIfConfigSuffix(
-    leadingExpr: RawExprSyntax,
-    flavor: ExprFlavor
-  ) -> RawExprSyntax? {
-    // Check if the first '#if' body starts with '.' <identifier>, and parse
-    // it as a "postfix ifconfig expression".
-    do {
-      var lookahead = self.lookahead()
-      // Skip to the first body. We may need to skip multiple '#if' directives
-      // since we support nested '#if's. e.g.
-      //   baseExpr
-      //   #if CONDITION_1
-      //     #if CONDITION_2
-      //       .someMember
-      var loopProgress = LoopProgressCondition()
-      repeat {
-        lookahead.eat(.poundIf)
-        while !lookahead.at(.endOfFile) && !lookahead.currentToken.isAtStartOfLine {
-          lookahead.skipSingle()
-        }
-      } while lookahead.at(.poundIf) && lookahead.hasProgressed(&loopProgress)
-
-      guard lookahead.atStartOfPostfixExprSuffix() else {
-        return nil
-      }
-    }
-
-    return self.parseIfConfigExpressionSuffix(
-      leadingExpr,
-      flavor: flavor
-    )
-  }
 }
 
 extension Parser {
   /// Determine if this is a key path postfix operator like ".?!?".
-  private func getNumOptionalKeyPathPostfixComponents(_ tokenText: SyntaxText, mayBeAfterTypeName: Bool) -> Int? {
-    var mayBeAfterTypeName = mayBeAfterTypeName
+  private func getNumOptionalKeyPathPostfixComponents(
+    _ tokenText: SyntaxText
+  ) -> Int? {
     // Make sure every character is ".", "!", or "?", without two "."s in a row.
     var numComponents = 0
     var lastWasDot = false
     for byte in tokenText {
       if byte == UInt8(ascii: ".") {
-        if !mayBeAfterTypeName {
-          break
-        }
         if lastWasDot {
           return nil
         }
@@ -1050,7 +933,6 @@ extension Parser {
       }
 
       if byte == UInt8(ascii: "!") || byte == UInt8(ascii: "?") {
-        mayBeAfterTypeName = false
         lastWasDot = false
         numComponents += 1
         continue
@@ -1064,31 +946,22 @@ extension Parser {
 
   /// Consume the optional key path postfix ino a set of key path components.
   private mutating func consumeOptionalKeyPathPostfix(
-    numComponents: Int,
-    mayBeAfterTypeName: inout Bool
+    numComponents: Int
   ) -> [RawKeyPathComponentSyntax] {
     var components: [RawKeyPathComponentSyntax] = []
 
     for _ in 0..<numComponents {
       // Consume a period, if there is one.
-      var unexpectedBeforeComponent: RawUnexpectedNodesSyntax?
-      var period = self.consume(ifPrefix: ".", as: .period)
-      if !mayBeAfterTypeName {
-        // A period is only permitted after the type name. See comment on `mayBeAfterTypeName` in `parseKeyPathExpression`.
-        unexpectedBeforeComponent = RawUnexpectedNodesSyntax([period], arena: arena)
-        period = nil
-      }
+      let period = self.consume(ifPrefix: ".", as: .period)
 
       // Consume the '!' or '?'.
       let questionOrExclaim =
         self.consume(ifPrefix: "!", as: .exclamationMark)
         ?? self.expectWithoutRecovery(prefix: "?", as: .postfixQuestionMark)
 
-      mayBeAfterTypeName = false
       components.append(
         RawKeyPathComponentSyntax(
           period: period,
-          unexpectedBeforeComponent,
           component: .optional(
             RawKeyPathOptionalComponentSyntax(
               questionOrExclamationMark: questionOrExclaim,
@@ -1115,22 +988,18 @@ extension Parser {
     // the token is an operator starts with '.', or the following token is '['.
     let rootType: RawTypeSyntax?
     if !self.at(prefix: ".") {
-      rootType = self.parseSimpleType(allowMemberTypes: false)
+      rootType = self.parseSimpleType(stopAtFirstPeriod: true)
     } else {
       rootType = nil
     }
 
     var components: [RawKeyPathComponentSyntax] = []
     var loopProgress = LoopProgressCondition()
-    // Whether all components parsed so far are property components and we could thus be after the base type name of the
-    // subscript. Syntax like `.[2]` or `.?` is only permitted after the type name. Since we don't know what constitutes
-    // a nested type reference and what constitutes a type's member, we can only disallow it in the parser after seeing
-    // the first non-property component.
-    var mayBeAfterTypeName = true
     while self.hasProgressed(&loopProgress) {
-      // Check for a [] or .[] suffix.
+      // Check for a [] or .[] suffix. The latter is only permitted when there
+      // are no components.
       if self.at(TokenSpec(.leftSquare, allowAtStartOfLine: false))
-        || (mayBeAfterTypeName && self.at(.period) && self.peek(isAt: .leftSquare))
+        || (components.isEmpty && self.at(.period) && self.peek(isAt: .leftSquare))
       {
         // Consume the '.', if it's allowed here.
         let period: RawTokenSyntax?
@@ -1146,14 +1015,10 @@ extension Parser {
         if self.at(.rightSquare) {
           args = []
         } else {
-          args = self.parseArgumentListElements(
-            pattern: pattern,
-            allowTrailingComma: true
-          )
+          args = self.parseArgumentListElements(pattern: pattern)
         }
         let (unexpectedBeforeRSquare, rsquare) = self.expect(.rightSquare)
 
-        mayBeAfterTypeName = false
         components.append(
           RawKeyPathComponentSyntax(
             period: period,
@@ -1179,66 +1044,22 @@ extension Parser {
       // periods, '?'s, and '!'s. Expand that into key path components.
       if self.at(.prefixOperator, .binaryOperator, .postfixOperator) || self.at(.postfixQuestionMark, .exclamationMark),
         let numComponents = getNumOptionalKeyPathPostfixComponents(
-          currentToken.tokenText,
-          mayBeAfterTypeName: mayBeAfterTypeName
-        ),
-        numComponents > 0
+          self.currentToken.tokenText
+        )
       {
-        components += self.consumeOptionalKeyPathPostfix(
-          numComponents: numComponents,
-          mayBeAfterTypeName: &mayBeAfterTypeName
+        components.append(
+          contentsOf: self.consumeOptionalKeyPathPostfix(
+            numComponents: numComponents
+          )
         )
         continue
       }
 
-      // Check for a .name, .1, .name(), .name("Kiwi"), .name(fruit:),
-      // .name(_:), .name(fruit: "Kiwi) suffix.
+      // Check for a .name or .1 suffix.
       if self.at(.period) {
         let (unexpectedPeriod, period, declName, generics) = parseDottedExpressionSuffix(
           previousNode: components.last?.raw ?? rootType?.raw ?? backslash.raw
         )
-
-        // If fully applied method component, parse as a keypath method.
-        if self.experimentalFeatures.contains(.keypathWithMethodMembers)
-          && self.at(.leftParen)
-        {
-          var (unexpectedBeforeLParen, leftParen) = self.expect(.leftParen)
-          if let generics = generics {
-            unexpectedBeforeLParen = RawUnexpectedNodesSyntax(
-              (unexpectedBeforeLParen?.elements ?? []) + [RawSyntax(generics)],
-              arena: self.arena
-            )
-          }
-          let args = self.parseArgumentListElements(
-            pattern: pattern,
-            allowTrailingComma: true
-          )
-          let (unexpectedBeforeRParen, rightParen) = self.expect(.rightParen)
-
-          components.append(
-            RawKeyPathComponentSyntax(
-              unexpectedPeriod,
-              period: period,
-              component: .method(
-                RawKeyPathMethodComponentSyntax(
-                  declName: declName,
-                  unexpectedBeforeLParen,
-                  leftParen: leftParen,
-                  arguments: RawLabeledExprListSyntax(
-                    elements: args,
-                    arena: self.arena
-                  ),
-                  unexpectedBeforeRParen,
-                  rightParen: rightParen,
-                  arena: self.arena
-                )
-              ),
-              arena: self.arena
-            )
-          )
-          continue
-        }
-        // Else, parse as a property.
         components.append(
           RawKeyPathComponentSyntax(
             unexpectedPeriod,
@@ -1259,6 +1080,7 @@ extension Parser {
       // No more postfix expressions.
       break
     }
+
     return RawKeyPathExprSyntax(
       unexpectedBeforeBackslash,
       backslash: backslash,
@@ -1319,13 +1141,6 @@ extension Parser {
           arena: self.arena
         )
       )
-    case (.colonColon, _)?,  // Module selector with no module name
-      (.wildcard, _)? where self.isAtModuleSelector(),  // Module selectors with invalid module names
-      (.Any, _)? where self.isAtModuleSelector(),
-      (.`self`, _)? where self.isAtModuleSelector(),
-      (.`Self`, _)? where self.isAtModuleSelector(),
-      (.super, _)? where self.isAtModuleSelector():
-      return self.parseIdentifierExpression(flavor: flavor)
     case (.identifier, let handle)?, (.self, let handle)?, (.`init`, let handle)?, (.`deinit`, let handle)?,
       (.`subscript`, let handle)?:
       // If we have "case let x" followed by ".", "(", "[", or a generic
@@ -1333,18 +1148,21 @@ extension Parser {
       // is the start of an enum or expr pattern.
       if pattern.admitsBinding && self.lookahead().isInBindingPatternPosition() {
         let identifier = self.eat(handle)
-        let patternNode = RawIdentifierPatternSyntax(
-          identifier: identifier,
-          arena: self.arena
+        let pattern = RawPatternSyntax(
+          RawIdentifierPatternSyntax(
+            identifier: identifier,
+            arena: self.arena
+          )
         )
-        return RawExprSyntax(RawPatternExprSyntax(pattern: patternNode, arena: self.arena))
+        return RawExprSyntax(RawPatternExprSyntax(pattern: pattern, arena: self.arena))
       }
 
-      return self.parseIdentifierExpression(flavor: flavor)
+      return RawExprSyntax(self.parseIdentifierExpression(flavor: flavor))
     case (.Self, _)?:  // Self
-      return self.parseIdentifierExpression(flavor: flavor)
+      return RawExprSyntax(self.parseIdentifierExpression(flavor: flavor))
     case (.Any, _)?:  // Any
-      return RawExprSyntax(RawTypeExprSyntax(type: self.parseAnyType(), arena: self.arena))
+      let anyType = RawTypeSyntax(self.parseAnyType())
+      return RawExprSyntax(RawTypeExprSyntax(type: anyType, arena: self.arena))
     case (.dollarIdentifier, _)?:
       return RawExprSyntax(self.parseAnonymousClosureArgument())
     case (.wildcard, let handle)?:  // _
@@ -1363,7 +1181,6 @@ extension Parser {
       let poundAvailable = self.parsePoundAvailableConditionElement()
       return RawExprSyntax(
         RawDeclReferenceExprSyntax(
-          moduleSelector: nil,
           RawUnexpectedNodesSyntax([poundAvailable], arena: self.arena),
           baseName: missingToken(.identifier),
           argumentNames: nil,
@@ -1390,9 +1207,9 @@ extension Parser {
               arena: self.arena
             ),
             RawUnexpectedNodesSyntax(
-              [
-                period,
-                integerLiteral,
+              elements: [
+                RawSyntax(period),
+                RawSyntax(integerLiteral),
               ],
               arena: self.arena
             ),
@@ -1447,7 +1264,7 @@ extension Parser {
     let generics = self.parseGenericArguments()
     return RawExprSyntax(
       RawGenericSpecializationExprSyntax(
-        expression: declName,
+        expression: RawExprSyntax(declName),
         genericArgumentClause: generics,
         arena: self.arena
       )
@@ -1470,14 +1287,6 @@ extension Parser {
       )
       pound = pound.tokenView.withTokenDiagnostic(tokenDiagnostic: diagnostic, arena: self.arena)
     }
-
-    let moduleSelector: RawModuleSelectorSyntax?
-    if !self.atStartOfLine {
-      (moduleSelector, _) = self.parseModuleSelectorIfPresent()
-    } else {
-      moduleSelector = nil
-    }
-
     let unexpectedBeforeMacroName: RawUnexpectedNodesSyntax?
     let macroName: RawTokenSyntax
     if !self.atStartOfLine {
@@ -1501,10 +1310,7 @@ extension Parser {
     let unexpectedBeforeRightParen: RawUnexpectedNodesSyntax?
     let rightParen: RawTokenSyntax?
     if leftParen != nil {
-      args = parseArgumentListElements(
-        pattern: pattern,
-        allowTrailingComma: true
-      )
+      args = parseArgumentListElements(pattern: pattern)
       (unexpectedBeforeRightParen, rightParen) = self.expect(.rightParen)
     } else {
       args = []
@@ -1525,7 +1331,6 @@ extension Parser {
     return RawMacroExpansionExprSyntax(
       unexpectedBeforePound,
       pound: pound,
-      moduleSelector: moduleSelector,
       unexpectedBeforeMacroName,
       macroName: macroName,
       genericArgumentClause: generics,
@@ -1619,10 +1424,7 @@ extension Parser {
   /// Parse a tuple expression.
   mutating func parseTupleExpression(pattern: PatternContext) -> RawTupleExprSyntax {
     let (unexpectedBeforeLParen, lparen) = self.expect(.leftParen)
-    let elements = self.parseArgumentListElements(
-      pattern: pattern,
-      allowTrailingComma: true
-    )
+    let elements = self.parseArgumentListElements(pattern: pattern)
     let (unexpectedBeforeRParen, rparen) = self.expect(.rightParen)
     return RawTupleExprSyntax(
       unexpectedBeforeLParen,
@@ -1644,76 +1446,6 @@ extension Parser {
       value: RawExprSyntax
     )
     case array(RawExprSyntax)
-
-    fileprivate func makeElement(trailingComma: RawTokenSyntax?, arena: RawSyntaxArena) -> RawSyntax {
-      switch self {
-      case .array(let el):
-        return RawSyntax(
-          RawArrayElementSyntax(
-            expression: el,
-            trailingComma: trailingComma,
-            arena: arena
-          )
-        )
-      case .dictionary(let key, let unexpectedBeforeColon, let colon, let value):
-        return RawSyntax(
-          RawDictionaryElementSyntax(
-            key: key,
-            unexpectedBeforeColon,
-            colon: colon,
-            value: value,
-            trailingComma: trailingComma,
-            arena: arena
-          )
-        )
-      }
-    }
-
-    fileprivate func makeCollection(
-      _ unexpectedBeforeLSquare: RawUnexpectedNodesSyntax?,
-      lsquare: RawTokenSyntax,
-      elements: [RawSyntax],
-      _ unexpectedBeforeRSquare: RawUnexpectedNodesSyntax?,
-      rsquare: RawTokenSyntax,
-      arena: RawSyntaxArena
-    ) -> RawExprSyntax {
-      switch self {
-      case .dictionary:
-        return RawExprSyntax(
-          RawDictionaryExprSyntax(
-            unexpectedBeforeLSquare,
-            leftSquare: lsquare,
-            content: .elements(
-              RawDictionaryElementListSyntax(
-                elements: elements.map {
-                  $0.as(RawDictionaryElementSyntax.self)!
-                },
-                arena: arena
-              )
-            ),
-            unexpectedBeforeRSquare,
-            rightSquare: rsquare,
-            arena: arena
-          )
-        )
-      case .array:
-        return RawExprSyntax(
-          RawArrayExprSyntax(
-            unexpectedBeforeLSquare,
-            leftSquare: lsquare,
-            elements: RawArrayElementListSyntax(
-              elements: elements.map {
-                $0.as(RawArrayElementSyntax.self)!
-              },
-              arena: arena
-            ),
-            unexpectedBeforeRSquare,
-            rightSquare: rsquare,
-            arena: arena
-          )
-        )
-      }
-    }
   }
 
   /// Parse an element of an array or dictionary literal.
@@ -1750,11 +1482,28 @@ extension Parser {
 
     let (unexpectedBeforeLSquare, lsquare) = self.expect(.leftSquare)
 
-    if let specialLiteral = parseSpecialCollectionLiteral(
-      unexpectedBeforeLSquare: unexpectedBeforeLSquare,
-      lsquare: lsquare
-    ) {
-      return specialLiteral
+    if let rsquare = self.consume(if: .rightSquare) {
+      return RawExprSyntax(
+        RawArrayExprSyntax(
+          unexpectedBeforeLSquare,
+          leftSquare: lsquare,
+          elements: RawArrayElementListSyntax(elements: [], arena: self.arena),
+          rightSquare: rsquare,
+          arena: self.arena
+        )
+      )
+    }
+
+    if let (colon, rsquare) = self.consume(if: .colon, followedBy: .rightSquare) {
+      return RawExprSyntax(
+        RawDictionaryExprSyntax(
+          unexpectedBeforeLSquare,
+          leftSquare: lsquare,
+          content: .colon(colon),
+          rightSquare: rsquare,
+          arena: self.arena
+        )
+      )
     }
 
     var elementKind: CollectionKind? = nil
@@ -1762,7 +1511,7 @@ extension Parser {
     do {
       var collectionProgress = LoopProgressCondition()
       var keepGoing: RawTokenSyntax?
-      repeat {
+      COLLECTION_LOOP: repeat {
         elementKind = self.parseCollectionElement(elementKind)
 
         /// Whether expression of an array element or the value of a dictionary
@@ -1788,74 +1537,81 @@ extension Parser {
           keepGoing = nil
         }
 
-        let element = elementKind!.makeElement(trailingComma: keepGoing, arena: self.arena)
-        if element.isEmpty {
-          break
-        } else {
-          elements.append(RawSyntax(element))
+        switch elementKind! {
+        case .array(let el):
+          let element = RawArrayElementSyntax(
+            expression: el,
+            trailingComma: keepGoing,
+            arena: self.arena
+          )
+          if element.isEmpty {
+            break COLLECTION_LOOP
+          } else {
+            elements.append(RawSyntax(element))
+          }
+        case .dictionary(let key, let unexpectedBeforeColon, let colon, let value):
+          let element = RawDictionaryElementSyntax(
+            key: key,
+            unexpectedBeforeColon,
+            colon: colon,
+            value: value,
+            trailingComma: keepGoing,
+            arena: self.arena
+          )
+          if element.isEmpty {
+            break COLLECTION_LOOP
+          } else {
+            elements.append(RawSyntax(element))
+          }
         }
       } while keepGoing != nil && self.hasProgressed(&collectionProgress)
     }
 
     let (unexpectedBeforeRSquare, rsquare) = self.expect(.rightSquare)
-    return elementKind!.makeCollection(
-      unexpectedBeforeLSquare,
-      lsquare: lsquare,
-      elements: elements,
-      unexpectedBeforeRSquare,
-      rsquare: rsquare,
-      arena: self.arena
-    )
-  }
-
-  private mutating func parseSpecialCollectionLiteral(
-    unexpectedBeforeLSquare: RawUnexpectedNodesSyntax?,
-    lsquare: RawTokenSyntax
-  ) -> RawExprSyntax? {
-    // Check to see if we have an InlineArray type in expression position.
-    if self.isAtStartOfInlineArrayTypeBody() {
-      let type = self.parseInlineArrayType(
-        unexpectedBeforeLSquare: unexpectedBeforeLSquare,
-        leftSquare: lsquare
-      )
-      return RawExprSyntax(RawTypeExprSyntax(type: type, arena: self.arena))
-    }
-
-    if let rsquare = self.consume(if: .rightSquare) {
-      return RawExprSyntax(
-        RawArrayExprSyntax(
-          unexpectedBeforeLSquare,
-          leftSquare: lsquare,
-          elements: RawArrayElementListSyntax(elements: [], arena: self.arena),
-          rightSquare: rsquare,
-          arena: self.arena
-        )
-      )
-    }
-
-    if let (colon, rsquare) = self.consume(if: .colon, followedBy: .rightSquare) {
+    switch elementKind! {
+    case .dictionary:
       return RawExprSyntax(
         RawDictionaryExprSyntax(
-          unexpectedBeforeLSquare,
           leftSquare: lsquare,
-          content: .colon(colon),
+          content: .elements(
+            RawDictionaryElementListSyntax(
+              elements: elements.map {
+                $0.as(RawDictionaryElementSyntax.self)!
+              },
+              arena: self.arena
+            )
+          ),
+          unexpectedBeforeRSquare,
+          rightSquare: rsquare,
+          arena: self.arena
+        )
+      )
+    case .array:
+      return RawExprSyntax(
+        RawArrayExprSyntax(
+          leftSquare: lsquare,
+          elements: RawArrayElementListSyntax(
+            elements: elements.map {
+              $0.as(RawArrayElementSyntax.self)!
+            },
+            arena: self.arena
+          ),
+          unexpectedBeforeRSquare,
           rightSquare: rsquare,
           arena: self.arena
         )
       )
     }
-
-    return nil
   }
 }
 
 extension Parser {
-  mutating func parseInitializerClause() -> RawInitializerClauseSyntax {
+  mutating func parseDefaultArgument() -> RawInitializerClauseSyntax {
     let unexpectedBeforeEq: RawUnexpectedNodesSyntax?
     let eq: RawTokenSyntax
     if let comparison = self.consumeIfContextualPunctuator("==") {
       unexpectedBeforeEq = RawUnexpectedNodesSyntax(
-        [comparison],
+        elements: [RawSyntax(comparison)],
         arena: self.arena
       )
       eq = missingToken(.equal)
@@ -1877,7 +1633,6 @@ extension Parser {
   mutating func parseAnonymousClosureArgument() -> RawDeclReferenceExprSyntax {
     let (unexpectedBeforeBaseName, baseName) = self.expect(.dollarIdentifier)
     return RawDeclReferenceExprSyntax(
-      moduleSelector: nil,
       unexpectedBeforeBaseName,
       baseName: baseName,
       argumentNames: nil,
@@ -1889,24 +1644,13 @@ extension Parser {
 extension Parser {
   /// Parse a closure expression.
   mutating func parseClosureExpression() -> RawClosureExprSyntax {
-    if let remainingTokens = self.remainingTokensIfMaximumNestingLevelReached() {
-      return RawClosureExprSyntax(
-        remainingTokens,
-        leftBrace: missingToken(.leftBrace),
-        signature: nil,
-        statements: RawCodeBlockItemListSyntax(elements: [], arena: self.arena),
-        rightBrace: missingToken(.rightBrace),
-        arena: self.arena
-      )
-    }
-
     // Parse the opening left brace.
     let (unexpectedBeforeLBrace, lbrace) = self.expect(.leftBrace)
     // Parse the closure-signature, if present.
     let signature = self.parseClosureSignatureIfPresent()
 
     // Parse the body.
-    let elements = parseCodeBlockItemList()
+    let elements = parseCodeBlockItemList(until: { $0.at(.rightBrace) })
 
     // Parse the closing '}'.
     let (unexpectedBeforeRBrace, rbrace) = self.expect(.rightBrace)
@@ -1951,22 +1695,29 @@ extension Parser {
           let specifier = self.parseClosureCaptureSpecifiers()
 
           // The thing being capture specified is an identifier, or as an identifier
-          // followed by an initializer clause.
-          let (unexpectedBeforeName, name) = self.expect(
-            .identifier,
-            TokenSpec(.self),
-            default: .identifier
-          )
-
-          let initializer: RawInitializerClauseSyntax?
-          if self.at(.equal) {
-            // The name is a new declaration with
-            // initializer clause.
-            initializer = self.parseInitializerClause()
+          // followed by an expression.
+          let unexpectedBeforeName: RawUnexpectedNodesSyntax?
+          let name: RawTokenSyntax?
+          let unexpectedBeforeEqual: RawUnexpectedNodesSyntax?
+          let equal: RawTokenSyntax?
+          let expression: RawExprSyntax
+          if self.peek(isAt: .equal) {
+            // The name is a new declaration.
+            (unexpectedBeforeName, name) = self.expect(
+              .identifier,
+              TokenSpec(.self, remapping: .identifier),
+              default: .identifier
+            )
+            (unexpectedBeforeEqual, equal) = self.expect(.equal)
+            expression = self.parseExpression(flavor: .basic, pattern: .none)
           } else {
-            // This is the simple case - the identifier is the name and
-            // the initializer clause is empty.
-            initializer = nil
+            // This is the simple case - the identifier is both the name and
+            // the expression to capture.
+            unexpectedBeforeName = nil
+            name = nil
+            unexpectedBeforeEqual = nil
+            equal = nil
+            expression = RawExprSyntax(self.parseIdentifierExpression(flavor: .basic))
           }
 
           keepGoing = self.consume(if: .comma)
@@ -1975,12 +1726,14 @@ extension Parser {
               specifier: specifier,
               unexpectedBeforeName,
               name: name,
-              initializer: initializer,
+              unexpectedBeforeEqual,
+              equal: equal,
+              expression: expression,
               trailingComma: keepGoing,
-              arena: arena
+              arena: self.arena
             )
           )
-        } while keepGoing != nil && !self.atCaptureListTerminator() && self.hasProgressed(&loopProgress)
+        } while keepGoing != nil && self.hasProgressed(&loopProgress)
       }
       // We were promised a right square bracket, so we're going to get it.
       var unexpectedNodes = [RawSyntax]()
@@ -2067,10 +1820,6 @@ extension Parser {
     )
   }
 
-  mutating func atCaptureListTerminator() -> Bool {
-    return self.at(.rightSquare)
-  }
-
   mutating func parseClosureCaptureSpecifiers() -> RawClosureCaptureSpecifierSyntax? {
     // Check for the strength specifier: "weak", "unowned", or
     // "unowned(safe/unsafe)".
@@ -2110,14 +1859,6 @@ extension Parser {
   }
 }
 
-extension TokenConsumer {
-  mutating func atBinaryOperatorArgument() -> Bool {
-    var lookahead = self.lookahead()
-    _ = lookahead.consumeModuleSelectorTokensIfPresent()
-    return lookahead.at(.binaryOperator) && lookahead.peek(isAt: .comma, .rightParen, .rightSquare)
-  }
-}
-
 extension Parser {
   /// Parse the elements of an argument list.
   ///
@@ -2125,8 +1866,7 @@ extension Parser {
   /// this will be a dedicated argument list type.
   mutating func parseArgumentListElements(
     pattern: PatternContext,
-    flavor: ExprFlavor = .basic,
-    allowTrailingComma: Bool
+    flavor: ExprFlavor = .basic
   ) -> [RawLabeledExprSyntax] {
     if let remainingTokens = remainingTokensIfMaximumNestingLevelReached() {
       return [
@@ -2134,7 +1874,7 @@ extension Parser {
           remainingTokens,
           label: nil,
           colon: nil,
-          expression: RawMissingExprSyntax(arena: self.arena),
+          expression: RawExprSyntax(RawMissingExprSyntax(arena: self.arena)),
           trailingComma: nil,
           arena: self.arena
         )
@@ -2169,7 +1909,7 @@ extension Parser {
       // this case lexes as a binary operator because it neither leads nor
       // follows a proper subexpression.
       let expr: RawExprSyntax
-      if self.atBinaryOperatorArgument() {
+      if self.at(.binaryOperator) && self.peek(isAt: .comma, .rightParen, .rightSquare) {
         expr = RawExprSyntax(self.parseDeclReferenceExpr(.operators))
       } else {
         expr = self.parseExpression(flavor: flavor, pattern: pattern)
@@ -2185,12 +1925,8 @@ extension Parser {
           arena: self.arena
         )
       )
-    } while keepGoing != nil && !atArgumentListTerminator(allowTrailingComma) && self.hasProgressed(&loopProgress)
+    } while keepGoing != nil && self.hasProgressed(&loopProgress)
     return result
-  }
-
-  mutating func atArgumentListTerminator(_ allowTrailingComma: Bool) -> Bool {
-    return allowTrailingComma && (self.at(.rightParen) || self.at(.rightSquare))
   }
 }
 
@@ -2369,7 +2105,9 @@ extension Parser {
 
 extension Parser {
   /// Parse an if statement/expression.
-  mutating func parseIfExpression(ifHandle: RecoveryConsumptionHandle) -> RawIfExprSyntax {
+  mutating func parseIfExpression(
+    ifHandle: RecoveryConsumptionHandle
+  ) -> RawIfExprSyntax {
     let (unexpectedBeforeIfKeyword, ifKeyword) = self.eat(ifHandle)
 
     let conditions: RawConditionElementListSyntax
@@ -2378,7 +2116,7 @@ extension Parser {
       conditions = RawConditionElementListSyntax(
         elements: [
           RawConditionElementSyntax(
-            condition: .init(expression: RawMissingExprSyntax(arena: self.arena)),
+            condition: .expression(RawExprSyntax(RawMissingExprSyntax(arena: self.arena))),
             trailingComma: nil,
             arena: self.arena
           )
@@ -2386,7 +2124,7 @@ extension Parser {
         arena: self.arena
       )
     } else {
-      conditions = self.parseConditionList(isGuardStatement: false)
+      conditions = self.parseConditionList()
     }
 
     let body = self.parseCodeBlock(introducer: ifKeyword)
@@ -2464,20 +2202,32 @@ extension Parser {
   mutating func parseSwitchCases(allowStandaloneStmtRecovery: Bool) -> RawSwitchCaseListSyntax {
     var elements = [RawSwitchCaseListSyntax.Element]()
     var elementsProgress = LoopProgressCondition()
-    while !self.at(.endOfFile, .rightBrace), !self.atEndOfIfConfigClauseBody(), self.hasProgressed(&elementsProgress) {
-      if self.withLookahead({ $0.atStartOfSwitchCase() }) {
+    while !self.at(.endOfFile, .rightBrace) && !self.at(.poundEndif, .poundElseif, .poundElse)
+      && self.hasProgressed(&elementsProgress)
+    {
+      if self.withLookahead({ $0.atStartOfSwitchCase(allowRecovery: false) }) {
         elements.append(.switchCase(self.parseSwitchCase()))
       } else if self.canRecoverTo(.poundIf) != nil {
         // '#if' in 'case' position can enclose zero or more 'case' or 'default'
         // clauses.
         elements.append(
           .ifConfigDecl(
-            self.parsePoundIfDirective({ parser in
-              .switchCases(parser.parseSwitchCases(allowStandaloneStmtRecovery: allowStandaloneStmtRecovery))
-            })
+            self.parsePoundIfDirective(
+              { (parser, _) in parser.parseSwitchCases(allowStandaloneStmtRecovery: allowStandaloneStmtRecovery) },
+              syntax: { parser, cases in
+                guard cases.count == 1, let firstCase = cases.first else {
+                  precondition(cases.isEmpty)
+                  return .switchCases(RawSwitchCaseListSyntax(elements: [], arena: parser.arena))
+                }
+                return .switchCases(firstCase)
+              }
+            )
           )
         )
-      } else if allowStandaloneStmtRecovery {
+      } else if allowStandaloneStmtRecovery
+        && (self.atStartOfExpression() || self.atStartOfStatement(preferExpr: false)
+          || self.atStartOfDeclaration())
+      {
         // Synthesize a label for the statement or declaration that isn't covered by a case right now.
         let statements = parseSwitchCaseBody()
         if statements.isEmpty {
@@ -2493,9 +2243,11 @@ extension Parser {
                   caseItems: RawSwitchCaseItemListSyntax(
                     elements: [
                       RawSwitchCaseItemSyntax(
-                        pattern: RawIdentifierPatternSyntax(
-                          identifier: missingToken(.identifier),
-                          arena: self.arena
+                        pattern: RawPatternSyntax(
+                          RawIdentifierPatternSyntax(
+                            identifier: missingToken(.identifier),
+                            arena: self.arena
+                          )
                         ),
                         whereClause: nil,
                         trailingComma: nil,
@@ -2513,6 +2265,8 @@ extension Parser {
             )
           )
         )
+      } else if self.withLookahead({ $0.atStartOfSwitchCase(allowRecovery: true) }) {
+        elements.append(.switchCase(self.parseSwitchCase()))
       } else {
         break
       }
@@ -2522,13 +2276,8 @@ extension Parser {
 
   mutating func parseSwitchCaseBody() -> RawCodeBlockItemListSyntax {
     parseCodeBlockItemList(until: {
-      if $0.at(.rightBrace, .keyword(.case), .keyword(.default)) || $0.atEndOfIfConfigClauseBody() {
-        return true
-      }
-      if $0.withLookahead({ $0.atStartOfConditionalSwitchCases() }) {
-        return true
-      }
-      return false
+      $0.at(.rightBrace) || $0.at(.poundEndif, .poundElseif, .poundElse)
+        || $0.withLookahead({ $0.atStartOfConditionalSwitchCases() })
     })
   }
 
@@ -2540,12 +2289,9 @@ extension Parser {
 
       unknownAttr = RawAttributeSyntax(
         atSign: at,
-        attributeName: RawIdentifierTypeSyntax(
-          moduleSelector: nil,
-          unexpectedBeforeIdent,
-          name: ident,
-          genericArgumentClause: nil,
-          arena: self.arena
+        unexpectedBeforeIdent,
+        attributeName: RawTypeSyntax(
+          RawIdentifierTypeSyntax(name: ident, genericArgumentClause: nil, arena: self.arena)
         ),
         leftParen: nil,
         arguments: nil,
@@ -2569,7 +2315,9 @@ extension Parser {
           caseItems: RawSwitchCaseItemListSyntax(
             elements: [
               RawSwitchCaseItemSyntax(
-                pattern: RawIdentifierPatternSyntax(identifier: missingToken(.identifier), arena: self.arena),
+                pattern: RawPatternSyntax(
+                  RawIdentifierPatternSyntax(identifier: missingToken(.identifier), arena: self.arena)
+                ),
                 whereClause: nil,
                 trailingComma: nil,
                 arena: self.arena
@@ -2603,29 +2351,18 @@ extension Parser {
     do {
       var keepGoing: RawTokenSyntax? = nil
       var loopProgress = LoopProgressCondition()
-      var unexpectedPrePatternCase: RawUnexpectedNodesSyntax? = nil
       repeat {
         let (pattern, whereClause) = self.parseGuardedCasePattern()
         keepGoing = self.consume(if: .comma)
         caseItems.append(
           RawSwitchCaseItemSyntax(
-            unexpectedPrePatternCase,
             pattern: pattern,
             whereClause: whereClause,
             trailingComma: keepGoing,
             arena: self.arena
           )
         )
-
-        if keepGoing != nil, let caseToken = self.consume(if: .keyword(.case)) {
-          unexpectedPrePatternCase = RawUnexpectedNodesSyntax(
-            [caseToken],
-            arena: self.arena
-          )
-        } else {
-          unexpectedPrePatternCase = nil
-        }
-      } while keepGoing != nil && !self.atSwitchCaseListTerminator() && self.hasProgressed(&loopProgress)
+      } while keepGoing != nil && self.hasProgressed(&loopProgress)
     }
     let (unexpectedBeforeColon, colon) = self.expect(.colon)
     return RawSwitchCaseLabelSyntax(
@@ -2636,10 +2373,6 @@ extension Parser {
       colon: colon,
       arena: self.arena
     )
-  }
-
-  mutating func atSwitchCaseListTerminator() -> Bool {
-    return self.experimentalFeatures.contains(.trailingComma) && self.at(.colon)
   }
 
   /// Parse a switch case with a 'default' label.
@@ -2700,9 +2433,8 @@ extension Parser.Lookahead {
   mutating func canParseClosureSignature() -> Bool {
     // Consume attributes.
     var lookahead = self.lookahead()
-    var sawTopLevelArrowInLookahead = false
     var attributesProgress = LoopProgressCondition()
-    while lookahead.consume(if: .atSign) != nil, lookahead.hasProgressed(&attributesProgress) {
+    while let _ = lookahead.consume(if: .atSign), lookahead.hasProgressed(&attributesProgress) {
       guard lookahead.at(.identifier) else {
         break
       }
@@ -2764,21 +2496,15 @@ extension Parser.Lookahead {
         return false
       }
 
-      sawTopLevelArrowInLookahead = true
-
       lookahead.consumeEffectsSpecifiers()
     }
 
     // Parse the 'in' at the end.
-    if lookahead.at(.keyword(.in)) {
-      // Okay, we have a closure signature.
-      return true
+    guard lookahead.at(.keyword(.in)) else {
+      return false
     }
-
-    // Even if 'in' is missing, the presence of a top-level '->' makes this look like a
-    // closure signature. There's no other valid syntax that could legally
-    // contain '->' at this position.
-    return sawTopLevelArrowInLookahead
+    // Okay, we have a closure signature.
+    return true
   }
 }
 

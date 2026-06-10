@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 @_spi(RawSyntax) public import SwiftSyntax
 #else
 @_spi(RawSyntax) import SwiftSyntax
@@ -91,7 +91,7 @@
 /// tokens as needed to disambiguate a parse. However, because lookahead
 /// operates on a copy of the lexical stream, no input tokens are lost..
 public struct Parser {
-  var arena: ParsingRawSyntaxArena
+  var arena: ParsingSyntaxArena
 
   /// A view of the sequence of lexemes in the input.
   var lexemes: Lexer.LexemeSequence
@@ -137,7 +137,7 @@ public struct Parser {
   #endif
 
   /// The Swift version as which source files should be parsed if no Swift version is explicitly specified in the parser.
-  public static let defaultSwiftVersion: SwiftVersion = .v6
+  static let defaultSwiftVersion: SwiftVersion = .v6
 
   var _emptyRawMultipleTrailingClosureElementListSyntax: RawMultipleTrailingClosureElementListSyntax?
 
@@ -222,7 +222,7 @@ public struct Parser {
     buffer input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int?,
     parseTransition: IncrementalParseTransition?,
-    arena: ParsingRawSyntaxArena?,
+    arena: ParsingSyntaxArena?,
     swiftVersion: SwiftVersion?,
     experimentalFeatures: ExperimentalFeatures
   ) {
@@ -231,7 +231,7 @@ public struct Parser {
       self.arena = arena
       precondition(arena.contains(text: SyntaxText(baseAddress: input.baseAddress, count: input.count)))
     } else {
-      self.arena = ParsingRawSyntaxArena(parseTriviaFunction: TriviaParser.parseTrivia)
+      self.arena = ParsingSyntaxArena(parseTriviaFunction: TriviaParser.parseTrivia)
       input = self.arena.internSourceBuffer(input)
     }
 
@@ -240,11 +240,7 @@ public struct Parser {
     self.experimentalFeatures = experimentalFeatures
     self.lookaheadTrackerOwner = LookaheadTrackerOwner()
 
-    self.lexemes = Lexer.tokenize(
-      input,
-      lookaheadTracker: lookaheadTrackerOwner.lookaheadTracker,
-      experimentalFeatures: experimentalFeatures
-    )
+    self.lexemes = Lexer.tokenize(input, lookaheadTracker: lookaheadTrackerOwner.lookaheadTracker)
     self.currentToken = self.lexemes.advance()
     if let parseTransition {
       self.parseLookup = IncrementalParseLookup(transition: parseTransition)
@@ -307,10 +303,15 @@ public struct Parser {
   ///                          if this is `nil`.
   ///   - parseTransition: The previously recorded state for an incremental
   ///                      parse, or `nil`.
+  ///   - arena: Arena the parsing syntax are made into. If it's `nil`, a new
+  ///            arena is created automatically, and `input` copied into the
+  ///            arena. If non-`nil`, `input` must be within its registered
+  ///            source buffer or allocator.
   public init(
     _ input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
+    arena: ParsingSyntaxArena? = nil,
     swiftVersion: SwiftVersion? = nil
   ) {
     // Chain to the private buffer initializer.
@@ -318,7 +319,7 @@ public struct Parser {
       buffer: input,
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: parseTransition,
-      arena: nil,
+      arena: arena,
       swiftVersion: swiftVersion,
       experimentalFeatures: []
     )
@@ -351,7 +352,7 @@ public struct Parser {
     _ input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
-    arena: ParsingRawSyntaxArena? = nil,
+    arena: ParsingSyntaxArena? = nil,
     swiftVersion: SwiftVersion? = nil,
     experimentalFeatures: ExperimentalFeatures
   ) {
@@ -512,11 +513,11 @@ extension Parser {
   mutating func eat(_ handle: RecoveryConsumptionHandle) -> (RawUnexpectedNodesSyntax?, Token) {
     let unexpectedNodes: RawUnexpectedNodesSyntax?
     if handle.unexpectedTokens > 0 {
-      var unexpectedTokens = [RawTokenSyntax]()
+      var unexpectedTokens = [RawSyntax]()
       for _ in 0..<handle.unexpectedTokens {
-        unexpectedTokens.append(self.consumeAnyTokenWithoutAdjustingNestingLevel())
+        unexpectedTokens.append(RawSyntax(self.consumeAnyTokenWithoutAdjustingNestingLevel()))
       }
-      unexpectedNodes = RawUnexpectedNodesSyntax(unexpectedTokens, arena: self.arena)
+      unexpectedNodes = RawUnexpectedNodesSyntax(elements: unexpectedTokens, arena: self.arena)
     } else {
       unexpectedNodes = nil
     }
@@ -645,25 +646,6 @@ extension Parser {
     )
   }
 
-  /// Attempts to consume a token starting with the given `prefix` and forming it into `tokenKind`.
-  /// If it cannot be found, the parser tries
-  ///  1. To eat unexpected tokens that have lower ``TokenPrecedence`` than
-  ///     specified by `TokenSpec(tokenKind)` and see if the token occurs after that unexpected.
-  ///  2. If the token couldn't be found after skipping unexpected, it synthesizes
-  ///     a missing token of the requested kind.
-  @inline(__always)
-  mutating func expect(
-    prefix: SyntaxText,
-    as tokenKind: RawTokenKind
-  ) -> (unexpected: RawUnexpectedNodesSyntax?, token: RawTokenSyntax) {
-    let spec = TokenSpec(tokenKind)
-    return expectImpl(
-      consume: { $0.consume(ifPrefix: prefix, as: tokenKind) },
-      canRecoverTo: { $0.canRecoverTo(spec) },
-      makeMissing: { $0.missingToken(spec) }
-    )
-  }
-
   /// If the current token starts with the given prefix, consume the prefis as the given token kind.
   ///
   /// Otherwise, synthesize a missing token of the given kind.
@@ -712,22 +694,22 @@ extension Parser {
     }
     if let unknown = self.consume(if: .unknown) {
       return (
-        RawUnexpectedNodesSyntax([unknown], arena: self.arena),
+        RawUnexpectedNodesSyntax(elements: [RawSyntax(unknown)], arena: self.arena),
         self.missingToken(.identifier)
       )
     }
     if let number = self.consume(if: .integerLiteral, .floatLiteral, .dollarIdentifier) {
       return (
-        RawUnexpectedNodesSyntax([number], arena: self.arena),
+        RawUnexpectedNodesSyntax(elements: [RawSyntax(number)], arena: self.arena),
         self.missingToken(.identifier)
       )
     } else if keywordRecovery,
-      self.currentToken.isLexerClassifiedKeyword || self.at(.wildcard),
+      (self.currentToken.isLexerClassifiedKeyword || self.at(.wildcard)),
       !self.atStartOfLine
     {
       let keyword = self.consumeAnyToken()
       return (
-        RawUnexpectedNodesSyntax([keyword], arena: self.arena),
+        RawUnexpectedNodesSyntax(elements: [RawSyntax(keyword)], arena: self.arena),
         self.missingToken(.identifier)
       )
     }
@@ -844,24 +826,6 @@ extension Parser {
   }
 }
 
-// MARK: Marking Tokens As Missing
-extension Parser {
-  private class TokenMissingMaker: SyntaxRewriter {
-    override func visit(_ token: TokenSyntax) -> TokenSyntax {
-      TokenSyntax(token.tokenKind, presence: .missing)
-    }
-  }
-
-  /// Creates a replicate of `syntax` with all tokens marked as missing.
-  func withAllTokensMarkedMissing<T: RawSyntaxNodeProtocol>(syntax: T) -> T {
-    let tokenMissingMaker = TokenMissingMaker(rawAllocationArena: self.arena)
-    let allMissing = tokenMissingMaker.rewrite(
-      Syntax(raw: RawSyntax(syntax), rawNodeArena: self.arena)
-    ).raw
-    return allMissing.cast(T.self)
-  }
-}
-
 extension SyntaxText {
   func withBuffer<Result>(_ body: (UnsafeBufferPointer<UInt8>) throws -> Result) rethrows -> Result {
     try body(UnsafeBufferPointer<UInt8>(start: self.baseAddress, count: self.count))
@@ -898,7 +862,7 @@ extension Parser {
     // Invalid, extraneous whitespace. Have callers synthesize a missing
     // member if there's a newline after the period.
     return (
-      RawUnexpectedNodesSyntax([period], arena: arena),
+      RawUnexpectedNodesSyntax(elements: [period.raw], arena: arena),
       RawTokenSyntax(missing: .period, arena: arena),
       afterContainsAnyNewline
     )

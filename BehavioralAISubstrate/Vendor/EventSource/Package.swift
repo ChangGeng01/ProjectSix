@@ -1,10 +1,5 @@
 // swift-tools-version: 6.1
-// M224 vendor freeze. Original Package.swift edits:
-//   - async-http-client url: dep removed (trait gated to off; we
-//     do not vendor it and the AsyncHTTPClient trait is never
-//     enabled in the BAS build)
-//   - swift-nio url: rewritten to path: ../swift-nio
-// Original repo: https://github.com/mattt/EventSource
+// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
@@ -19,19 +14,42 @@ let package = Package(
         .visionOS("1.0"),
     ],
     products: [
+        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "EventSource",
             targets: ["EventSource"]
         )
     ],
+    traits: [
+        .trait(name: "AsyncHTTPClient")
+    ],
     dependencies: [
-        .package(path: "../swift-nio"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.24.0"),
+        .package(path: "../swift-nio"),  // M224 vendor freeze: url -> path
     ],
     targets: [
+        // Targets are the basic building blocks of a package, defining a module or a test suite.
+        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "EventSource",
             dependencies: [
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["AsyncHTTPClient"])
+                ),
                 .product(name: "NIOCore", package: "swift-nio"),
+            ]
+        ),
+        .testTarget(
+            name: "EventSourceTests",
+            dependencies: [
+                "EventSource",
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["AsyncHTTPClient"])
+                ),
             ]
         ),
     ]

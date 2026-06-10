@@ -14,5 +14,5 @@
 #if !COLLECTIONS_SINGLE_MODULE
 import DequeModule
 
-public typealias Deque = DequeModule.Deque
+public typealias Deque<Element> = DequeModule.Deque<Element>
 #endif

@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueDictionary where Key: ~Copyable, Value: ~Copyable {
@@ -53,14 +53,14 @@ extension UniqueDictionary where Key: ~Copyable, Value: ~Copyable {
     return nil
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @inlinable
   @discardableResult
   @_lifetime(&self)
   public mutating func memoizedValue<E: Error>(
     forKey key: consuming Key,
     _ body: (borrowing Key) throws(E) -> Value
-  ) throws(E) -> Borrow<Value> {
+  ) throws(E) -> Ref<Value> {
     let r = _storage._find(key)
     let bucket: _Bucket
     if let b = r.bucket {

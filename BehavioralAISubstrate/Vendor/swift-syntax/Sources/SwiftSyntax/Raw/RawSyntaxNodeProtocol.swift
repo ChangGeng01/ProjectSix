@@ -183,7 +183,7 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     textRange: Range<SyntaxText.Index>,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared ParsingRawSyntaxArena
+    arena: __shared ParsingSyntaxArena
   ) {
     let raw = RawSyntax.parsedToken(
       kind: kind,
@@ -205,7 +205,7 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     trailingTriviaPieces: [RawTriviaPiece] = [],
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic? = nil,
-    arena: __shared ParsingRawSyntaxArena
+    arena: __shared ParsingSyntaxArena
   ) {
     if leadingTriviaPieces.isEmpty && trailingTriviaPieces.isEmpty {
       // Create it via `RawSyntax.parsedToken()`.
@@ -239,7 +239,7 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     trailingTriviaPieces: [RawTriviaPiece],
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     let raw = RawSyntax.makeMaterializedToken(
       kind: kind,
@@ -268,7 +268,7 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     text: SyntaxText? = nil,
     leadingTriviaPieces: [RawTriviaPiece] = [],
     trailingTriviaPieces: [RawTriviaPiece] = [],
-    arena: __shared RawSyntaxArena
+    arena: __shared SyntaxArena
   ) {
     self.init(
       materialized: kind,

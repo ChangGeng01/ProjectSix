@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=6)
+#if swift(>=6)
 public import SwiftDiagnostics
 @_spi(Diagnostics) internal import SwiftParser
 @_spi(RawSyntax) public import SwiftSyntax
@@ -20,7 +20,7 @@ import SwiftDiagnostics
 @_spi(RawSyntax) import SwiftSyntax
 #endif
 
-private let diagnosticDomain: String = "SwiftLexer"
+fileprivate let diagnosticDomain: String = "SwiftLexer"
 
 /// An error diagnostic whose ID is determined by the diagnostic's type.
 public protocol TokenError: DiagnosticMessage {
@@ -71,16 +71,11 @@ public enum StaticTokenError: String, DiagnosticMessage {
   case expectedDigitInFloatLiteral = "expected a digit in floating point exponent"
   case expectedHexCodeInUnicodeEscape = #"expected hexadecimal code in \u{...} escape sequence"#
   case expectedHexDigitInHexLiteral = "expected hexadecimal digit (0-9, A-F) in integer literal"
-  case invalidBackslashInRawIdentifier = "a raw identifier cannot contain a backslash"
   case invalidCharacter = "invalid character in source file"
   case invalidEscapeSequenceInStringLiteral = "invalid escape sequence in literal"
   case invalidIdentifierStartCharacter = "an identifier cannot begin with this character"
   case invalidNumberOfHexDigitsInUnicodeEscape = #"\u{...} escape sequence expects between 1 and 8 hex digits"#
   case invalidUtf8 = "invalid UTF-8 found in source file"
-  case invalidWhitespaceInRawIdentifier = "invalid whitespace found in raw identifier"
-  case rawIdentifierCannotBeAllWhitespace = "a raw identifier cannot contain only whitespace characters"
-  case rawIdentifierCannotBeEmpty = "a raw identifier cannot be empty"
-  case rawIdentifierCannotBeOperator = "a raw identifier cannot contain only operator characters"
   case tokenDiagnosticOffsetOverflow =
     "the lexer discovered an error in this token but was not able to represent its offset due to overflow; please split the token"
   case sourceConflictMarker = "source control conflict marker in source file"
@@ -216,7 +211,6 @@ extension SwiftSyntax.TokenDiagnostic {
       // inside `ParseDiagnosticsGenerator` but fall back to an error message
       // here in case the error is not diagnosed.
       return InvalidIndentationInMultiLineStringLiteralError(kind: .insufficientIndentation, lines: 1)
-    case .invalidBackslashInRawIdentifier: return StaticTokenError.invalidBackslashInRawIdentifier
     case .invalidBinaryDigitInIntegerLiteral: return InvalidDigitInIntegerLiteral(kind: .binary(scalarAtErrorOffset))
     case .invalidCharacter: return StaticTokenError.invalidCharacter
     case .invalidDecimalDigitInIntegerLiteral: return InvalidDigitInIntegerLiteral(kind: .decimal(scalarAtErrorOffset))
@@ -229,14 +223,9 @@ extension SwiftSyntax.TokenDiagnostic {
     case .invalidNumberOfHexDigitsInUnicodeEscape: return StaticTokenError.invalidNumberOfHexDigitsInUnicodeEscape
     case .invalidOctalDigitInIntegerLiteral: return InvalidDigitInIntegerLiteral(kind: .octal(scalarAtErrorOffset))
     case .invalidUtf8: return StaticTokenError.invalidUtf8
-    case .invalidWhitespaceInRawIdentifier: return StaticTokenError.invalidWhitespaceInRawIdentifier
     case .multilineRegexClosingNotOnNewline: return StaticTokenError.multilineRegexClosingNotOnNewline
     case .nonBreakingSpace: return StaticTokenWarning.nonBreakingSpace
     case .nulCharacter: return StaticTokenWarning.nulCharacter
-    case .rawIdentifierCannotBeAllWhitespace: return StaticTokenError.rawIdentifierCannotBeAllWhitespace
-    case .rawIdentifierCannotBeEmpty: return StaticTokenError.rawIdentifierCannotBeEmpty
-    case .rawIdentifierCannotBeOperator:
-      return StaticTokenError.rawIdentifierCannotBeOperator
     case .sourceConflictMarker: return StaticTokenError.sourceConflictMarker
     case .spaceAtEndOfRegexLiteral: return StaticTokenError.spaceAtEndOfRegexLiteral
     case .spaceAtStartOfRegexLiteral: return StaticTokenError.spaceAtStartOfRegexLiteral
@@ -336,93 +325,8 @@ extension SwiftSyntax.TokenDiagnostic {
         changes.append(.replaceLeadingTrivia(token: nextToken, newTrivia: []))
       }
       return [FixIt(message: .removeExtraneousWhitespace, changes: changes)]
-    case .spaceAtEndOfRegexLiteral:
-      if let regexLiteral = token.regexParent {
-        // wouldn't suggest `insertBackslash` because the potential presence of (?x) somewhere preceding the trailing
-        // space could mean the trailing space has no semantic meaning. Escaping the space could change the semantics.
-        return [regexLiteral.convertToExtendedRegexLiteralFixIt]
-      } else {
-        return []
-      }
-    case .spaceAtStartOfRegexLiteral:
-      guard let regexLiteral = token.regexParent else {
-        return []
-      }
-
-      let regexText = regexLiteral.regex.text
-      let lastIndex = regexText.index(before: regexText.endIndex)
-      if regexText.startIndex != lastIndex && regexText[lastIndex].isWhitespace {
-        // if the regex has a distinct trailing space, same as the handling at `case .spaceAtEndOfRegexLiteral`
-        return [regexLiteral.convertToExtendedRegexLiteralFixIt]
-      } else {
-        let escapedRegexText = #"\\#(regexText)"#
-        return [
-          regexLiteral.convertToExtendedRegexLiteralFixIt,
-          FixIt(
-            message: .insertBackslash,
-            changes: [
-              .replace(
-                oldNode: Syntax(regexLiteral),
-                newNode: Syntax(
-                  regexLiteral
-                    .with(\.regex, .regexLiteralPattern(escapedRegexText))
-                )
-              )
-            ]
-          ),
-        ]
-      }
     default:
       return []
     }
-  }
-}
-
-private extension TokenSyntax {
-  var regexParent: RegexLiteralExprSyntax? {
-    var parent = Syntax(self)
-    while parent.kind != .regexLiteralExpr, let upper = parent.parent {
-      parent = upper
-    }
-    return parent.as(RegexLiteralExprSyntax.self)
-  }
-}
-
-private extension RegexLiteralExprSyntax {
-  /// Creates a Fix-it that suggests converting to extended regex literal
-  ///
-  /// Covers the following cases:
-  /// ```swift
-  /// let leadingSpaceRegex = / ,/
-  /// // converts to
-  /// let leadingSpaceExtendedRegex = #/ ,/#
-  ///
-  /// let leadingAndTrailingSpaceRegex = / , /
-  /// // converts to
-  /// let leadingAndTrailingSpaceExtendedRegex = #/ , /#
-  ///
-  /// let trailingSpaceRegex = /, /
-  /// // converts to
-  /// let trailingSpaceExtendedRegex = #/ ,/#
-  ///
-  /// let trailingSpaceMissingClosingSlashRegex = /,
-  /// // converts to
-  /// let trailingSpaceExtendedRegex = #/, /#
-  /// ```
-  var convertToExtendedRegexLiteralFixIt: FixIt {
-    FixIt(
-      message: .convertToExtendedRegexLiteral,
-      changes: [
-        .replace(
-          oldNode: Syntax(self),
-          newNode: Syntax(
-            with(\.openingSlash, .regexSlashToken())
-              .with(\.openingPounds, .regexPoundDelimiter("#", leadingTrivia: leadingTrivia))
-              .with(\.closingPounds, .regexPoundDelimiter("#", trailingTrivia: trailingTrivia))
-              .with(\.closingSlash, .regexSlashToken())
-          )
-        )
-      ]
-    )
   }
 }

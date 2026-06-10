@@ -14,6 +14,6 @@
 #if !COLLECTIONS_SINGLE_MODULE
 import OrderedCollections
 
-public typealias OrderedSet = OrderedCollections.OrderedSet
-public typealias OrderedDictionary = OrderedCollections.OrderedDictionary
+public typealias OrderedSet<Element: Hashable> = OrderedCollections.OrderedSet<Element>
+public typealias OrderedDictionary<Key: Hashable, Value> = OrderedCollections.OrderedDictionary<Key, Value>
 #endif

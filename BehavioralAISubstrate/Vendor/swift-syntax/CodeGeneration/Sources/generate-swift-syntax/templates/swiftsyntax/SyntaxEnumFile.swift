@@ -27,7 +27,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       DeclSyntax(
         """
         \(node.apiAttributes())\
-        case \(node.enumCaseDeclName)(\(node.kind.syntaxType))
+        case \(node.varOrCaseName)(\(node.kind.syntaxType))
         """
       )
     }
@@ -50,8 +50,8 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
         }
 
         for node in NON_BASE_SYNTAX_NODES {
-          SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
-            StmtSyntax("return .\(node.memberCallName)(\(node.kind.syntaxType)(self)!)")
+          SwitchCaseSyntax("case .\(node.varOrCaseName):") {
+            StmtSyntax("return .\(node.varOrCaseName)(\(node.kind.syntaxType)(self)!)")
           }
         }
       }
@@ -60,7 +60,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
   for base in SYNTAX_NODES where base.kind.isBase {
     let baseKind = base.kind
-    let baseName = baseKind.uppercasedFirstWordRawValue
+    let baseName = baseKind.rawValue.withFirstCharacterUppercased;
     let enumType: TypeSyntax = "\(raw: baseName)SyntaxEnum"
 
     try! EnumDeclSyntax(
@@ -73,7 +73,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
         DeclSyntax(
           """
           \(node.apiAttributes())\
-          case \(node.enumCaseDeclName)(\(node.kind.syntaxType))
+          case \(node.varOrCaseName)(\(node.kind.syntaxType))
           """
         )
       }
@@ -92,8 +92,8 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       ) {
         try SwitchExprSyntax("switch raw.kind") {
           for node in NON_BASE_SYNTAX_NODES where node.base == baseKind {
-            SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
-              StmtSyntax("return .\(node.memberCallName)(\(node.kind.syntaxType)(self)!)")
+            SwitchCaseSyntax("case .\(node.varOrCaseName):") {
+              StmtSyntax("return .\(node.varOrCaseName)(\(node.kind.syntaxType)(self)!)")
             }
           }
           SwitchCaseSyntax("default:") {

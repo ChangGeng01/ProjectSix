@@ -21,18 +21,18 @@ import ContainersPreview
 
 @available(SwiftStdlib 5.0, *)
 extension UniqueDeque where Element: ~Copyable {
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
   public typealias BorrowingIterator = RigidDeque<Element>.BorrowingIterator
   
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  public borrowing func makeBorrowingIterator() -> BorrowingIterator {
+  public borrowing func makeBorrowingIterator_() -> BorrowingIterator {
     BorrowingIterator(_deque: self._storage)
   }
 #endif
 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if compiler(>=6.4) && UnstableContainersPreview
 @available(SwiftStdlib 5.0, *)
 extension UniqueDeque: Container where Element: ~Copyable {}
 
@@ -60,21 +60,17 @@ extension UniqueDeque where Element: ~Copyable {
   @inline(__always)
   public func index(after index: Int) -> Int { index + 1 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @_alwaysEmitIntoClient
   @inline(__always)
   public func index(before index: Int) -> Int { index - 1 }
-#endif
 
   @_alwaysEmitIntoClient
   @inline(__always)
   public func formIndex(after index: inout Int) { index += 1 }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @_alwaysEmitIntoClient
   @inline(__always)
   public func formIndex(before index: inout Int) { index -= 1 }
-#endif
 
   @_alwaysEmitIntoClient
   @inline(__always)
@@ -95,7 +91,6 @@ extension UniqueDeque where Element: ~Copyable {
     _storage.nextSpan(after: &index, maximumCount: maximumCount)
   }
 
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW // FIXME: Enable unconditionally in 1.5.0
   @_lifetime(&self)
   public mutating func nextMutableSpan(
     after index: inout Int, maximumCount: Int
@@ -108,7 +103,6 @@ extension UniqueDeque where Element: ~Copyable {
   public func previousSpan(before index: inout Int, maximumCount: Int) -> Span<Element> {
     _storage.previousSpan(before: &index, maximumCount: maximumCount)
   }
-#endif
 }
 
 #endif

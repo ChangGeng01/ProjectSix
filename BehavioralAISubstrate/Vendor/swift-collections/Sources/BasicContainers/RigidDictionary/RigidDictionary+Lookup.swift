@@ -15,7 +15,7 @@
 import ContainersPreview
 #endif
 
-#if compiler(>=6.4) && COLLECTIONS_UNSTABLE_HASHED_CONTAINERS
+#if compiler(>=6.4) && UnstableHashedContainers
 
 @available(SwiftStdlib 5.0, *)
 extension RigidDictionary where Key: ~Copyable, Value: ~Copyable {
@@ -32,18 +32,18 @@ extension RigidDictionary where Key: ~Copyable, Value: ~Copyable {
     _find(key).bucket != nil
   }
     
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @inlinable
   @_lifetime(borrow self)
   public func value(
     forKey key: borrowing Key
-  ) -> Borrow<Value>? {
+  ) -> Ref<Value>? {
     guard let bucket = self._find(key).bucket else { return nil }
-    return Borrow(unsafeAddress: _valuePtr(at: bucket), borrowing: self)
+    return Ref(unsafeAddress: _valuePtr(at: bucket), borrowing: self)
   }
 #endif
 
-  /// A stand-in for a `struct Borrow`-returning lookup operation.
+  /// A stand-in for a `struct Ref`-returning lookup operation.
   /// This is quite clumsy to use, but this is the best we can do without a way
   /// to express optional borrows.
   @_alwaysEmitIntoClient
@@ -56,19 +56,19 @@ extension RigidDictionary where Key: ~Copyable, Value: ~Copyable {
     return try body(_valueBuf[bucket])
   }
   
-#if COLLECTIONS_UNSTABLE_CONTAINERS_PREVIEW
+#if UnstableContainersPreview
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  package func _borrowKey(at bucket: _Bucket) -> Borrow<Key> {
+  package func _borrowKey(at bucket: _Bucket) -> Ref<Key> {
     assert(_keys._table.isOccupied(bucket))
-    return Borrow(unsafeAddress: _keyPtr(at: bucket), borrowing: self)
+    return Ref(unsafeAddress: _keyPtr(at: bucket), borrowing: self)
   }
 
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  package func _borrowValue(at bucket: _Bucket) -> Borrow<Value> {
+  package func _borrowValue(at bucket: _Bucket) -> Ref<Value> {
     assert(_keys._table.isOccupied(bucket))
-    return Borrow(unsafeAddress: _valuePtr(at: bucket), borrowing: self)
+    return Ref(unsafeAddress: _valuePtr(at: bucket), borrowing: self)
   }
 #endif
 }
