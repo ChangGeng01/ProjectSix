@@ -256,5 +256,44 @@ final class BASProductionAdoptionSmokeTests: XCTestCase {
             "Audit scenario requires SQL + Rust atomIDs" +
             " to match for cross-store join verification")
     }
+
+    /// Regression pin for the cross-store atomID-parity FLAKE (M2440 第五刀): reproduce the exact condition —
+    /// two distinct inputs recorded with the SAME `retrievedAt` (what the Rust tracker's millisecond truncation
+    /// produces for two rapid summaries) — and assert BOTH stores deterministically return the SAME most-recent
+    /// record. Before the fix, `recentRecords` sorted by `retrievedAt` only; that sort is UNSTABLE on the tie and
+    /// could return a different record in each store → the intermittent failure. The `turnRef` tiebreaker (the
+    /// per-brain monotonic counter, threaded identically into both stores) makes the ordering deterministic AND
+    /// store-identical, so the higher-turnRef ("second") record is the most-recent in BOTH.
+    func testRecentRecordsTiebreaksDeterministicallyUnderTimestampTie()
+        async throws
+    {
+        let ts = Date()   // SAME timestamp for BOTH summaries — forces the tie
+        let sqlStore = BASSQLBrainHistoryStore(
+            tracker: BASMemoryUsageTracker())
+        let rustStore = BASRustBrainHistoryStore(
+            tracker: try BASRustMemoryUsageTrackerActor(
+                useRustCore: true))
+        func summary(_ input: String) -> BASCognitiveBrainSummary {
+            BASCognitiveBrainSummary(
+                input: input, taskType: .chat, confidence: 1.0,
+                ambiguityScore: 0.0, safetyVerdict: .safe,
+                manipulationHints: [], latencyNanos: 1)
+        }
+        // turnRef 1 then 2 in each store (recordSummary increments per call).
+        _ = try await sqlStore.recordSummary(summary("first input"), retrievedAt: ts)
+        _ = try await sqlStore.recordSummary(summary("second input"), retrievedAt: ts)
+        _ = try await rustStore.recordSummary(summary("first input"), retrievedAt: ts)
+        _ = try await rustStore.recordSummary(summary("second input"), retrievedAt: ts)
+
+        let sqlRecent = await sqlStore.recentRecords(limit: 1)
+        let rustRecent = try await rustStore.recentRecords(limit: 1)
+        XCTAssertEqual(sqlRecent.count, 1)
+        XCTAssertEqual(rustRecent.count, 1)
+        XCTAssertEqual(sqlRecent[0].atomID, rustRecent[0].atomID,
+            "under a retrievedAt tie both stores must agree on the most-recent record (turnRef tiebreaker)")
+        XCTAssertEqual(sqlRecent[0].atomID,
+            BASSQLBrainHistoryStore.atomID(forInput: "second input"),
+            "the higher-turnRef (2nd-recorded) input is the deterministic most-recent")
+    }
 }
 #endif

@@ -124,14 +124,28 @@ public actor BASSQLBrainHistoryStore {
     }
 
     /// Read the N most-recent records from the tracker
-    /// (across all sessions)。 Newest first by
-    /// retrievedAt timestamp。
+    /// (across all sessions)。 Newest first by retrievedAt
+    /// timestamp,with `turnRef` as a DETERMINISTIC tiebreaker。
+    ///
+    /// The tiebreaker (M2440 第五刀 / cross-store flake fix)
+    /// MUST match `BASRustBrainHistoryStore.recentRecords` so
+    /// the two backends agree on "most recent" for the same
+    /// summary set。 Both store `retrieved_at_ms` at
+    /// MILLISECOND resolution,so two summaries in the same
+    /// millisecond tie; the bare `retrievedAt`-only sort is
+    /// unstable on the tie and can disagree across stores —
+    /// the intermittent `atomID`-parity smoke-test flake。
+    /// `turnRef` is the per-brain monotonic counter threaded
+    /// identically into both stores,so `(retrievedAt, turnRef)`
+    /// is deterministic and store-identical。
     public func recentRecords(
         limit: Int
     ) async -> [BASMemoryUsageRecord] {
         let all = await tracker.allRecords()
         let sorted = all.sorted {
-            $0.retrievedAt > $1.retrievedAt
+            $0.retrievedAt != $1.retrievedAt
+                ? $0.retrievedAt > $1.retrievedAt
+                : (Int($0.turnRef) ?? 0) > (Int($1.turnRef) ?? 0)
         }
         let take = min(max(0, limit), sorted.count)
         return Array(sorted.prefix(take))

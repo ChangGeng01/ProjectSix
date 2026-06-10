@@ -127,13 +127,32 @@ public actor BASRustBrainHistoryStore {
     }
 
     /// Read the N most-recent records via the Rust
-    /// tracker。 Newest first by retrievedAt timestamp。
+    /// tracker。 Newest first by retrievedAt timestamp,with
+    /// `turnRef` as a DETERMINISTIC tiebreaker。
+    ///
+    /// Why the tiebreaker (M2440 第五刀 / cross-store flake fix):
+    /// the Rust tracker stores `retrievedAtMs` at MILLISECOND
+    /// resolution,so two summaries that complete within the
+    /// same millisecond (common under full-suite CPU load)
+    /// round to the SAME `retrievedAt`。 A bare
+    /// `sorted { $0.retrievedAt > $1.retrievedAt }` is then
+    /// UNSTABLE on the tie and can return a different record
+    /// than the SQL store does for the SAME summary set —
+    /// exactly the intermittent `atomID`-parity smoke-test
+    /// flake (`BASProductionAdoptionSmokeTests`)。 `turnRef`
+    /// is the per-brain monotonic turn counter,threaded
+    /// IDENTICALLY into both the SQL and Rust stores,so
+    /// ordering by `(retrievedAt, turnRef)` is deterministic
+    /// AND agrees across stores → the most-recent record (and
+    /// its atomID) matches by construction。
     public func recentRecords(
         limit: Int
     ) async throws -> [BASMemoryUsageRecord] {
         let all = try await tracker.allRecords()
         let sorted = all.sorted {
-            $0.retrievedAt > $1.retrievedAt
+            $0.retrievedAt != $1.retrievedAt
+                ? $0.retrievedAt > $1.retrievedAt
+                : (Int($0.turnRef) ?? 0) > (Int($1.turnRef) ?? 0)
         }
         let take = min(max(0, limit), sorted.count)
         return Array(sorted.prefix(take))
