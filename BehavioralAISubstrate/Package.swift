@@ -389,12 +389,12 @@ let package = Package(
             resources: [
                 .copy("Resources/MiniLM.mlmodelc"),
                 .copy("Resources/vocab.txt"),
-                // SCAFFOLD (ADR-041 / docs/COREAI_RUNCERT_BACKLOG.md) — the Core AI shadow-classifier asset.
-                // UNCOMMENT once Sources/BASAppleAdapters/Resources/BASContextClassifier.aimodel exists
-                // (produced by scripts/coreai-build-aimodel.sh). Kept COMMENTED today because SPM errors on a
-                // missing resource: the asset can't be built yet — Apple's Xcode-27 beta-1 ships the Metal
-                // Toolchain at build .15/o while the app is .17/q, and aimodelc requires an exact match.
-                // .copy("Resources/BASContextClassifier.aimodel"),
+                // The Core AI shadow-classifier asset (ADR-041). Produced by
+                // scripts/PhaseB_ContextClassifier/convert_coreai.py (coreai_torch: PyTorch → .aimodel) — which
+                // BYPASSES the Apple Xcode-27-beta `aimodelc` Metal-Toolchain version gate by going through the
+                // `metal`-based Python converter. Python-runtime parity vs the PyTorch reference: 5/5 argmax,
+                // logits-MAE ~1e-6. BASCoreAIContextClassifierAdapter loads it via Bundle.module on iOS 27.
+                .copy("Resources/BASContextClassifier.aimodel"),
             ]
         ),
         .target(
