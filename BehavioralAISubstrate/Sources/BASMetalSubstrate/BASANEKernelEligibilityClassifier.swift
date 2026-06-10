@@ -13,7 +13,7 @@
 // Each operation's tier is documented WITH evidence
 // pointing to the underlying capability boundary:
 //
-//   - ANE-native ops: matMul (via CoreML conversion or
+//   - ANE-capable ops: matMul (via CoreML conversion or
 //     direct ANE descriptors when available);attention
 //     for shapes ANE supports
 //   - MPSGraph-native ops: layerNorm,rmsNorm,softmax,
@@ -30,6 +30,22 @@
 // because today's executor doesn't yet consult the
 // classifier — that wire-in is deferred to follow-up
 // arc。
+//
+// T1.2 MEASURED CORRECTION (2026-06-11, 全面进化) —
+// =============================================================
+// `MLComputePlan` on two iPhone Airs planned ZERO ops onto the
+// Neural Engine for BOTH production CoreML heads (context-
+// classifier cpu=2/2;MiniLM gpu=164/164,with `.all` 14× SLOWER
+// than the deliberate `.cpuOnly`)。 The tiers below therefore
+// describe OP-TYPE CAPABILITY,NOT PLACEMENT:the CoreML planner
+// weighs model size/precision/shape and,at production-head
+// scale,picks CPU/GPU — never ANE。 The Swift identifier was
+// renamed `aneNative` → `aneCapable` to pin this semantics
+// (raw value "ane-native" KEPT — it rides audit evidence
+// strings + Codable wire bytes;ADR-014)。 Any future claim of
+// actual ANE placement must re-run the BAS_ANE_PROBE and show
+// `ane=` in the per-op histogram + win a paired latency gate。
+// Details: Docs/ANE_UTILIZATION_FINDINGS.md。
 
 import Foundation
 import BASRuntimeCore
@@ -38,10 +54,16 @@ import BASRuntimeCore
 public enum BASANEEligibilityTier:
     String, Codable, Sendable, Equatable, Hashable, CaseIterable
 {
-    /// Op runs natively on the Apple Neural Engine via
-    /// CoreML ML Program conversion or direct ANE
-    /// descriptors。 Highest priority。
-    case aneNative = "ane-native"
+    /// Op TYPE is ANE-capable (CoreML ML Program conversion or
+    /// direct ANE descriptors expose it)。 Capability,NOT
+    /// placement:T1.2 measured the planner placing ZERO ops on
+    /// the ANE for the production heads — whether a given model
+    /// actually lands there depends on size/precision/shape and
+    /// must be proven per-model via `MLComputePlan`
+    /// (Docs/ANE_UTILIZATION_FINDINGS.md)。 Raw value "ane-native"
+    /// KEPT for audit/Codable byte stability (ADR-014;pinned by
+    /// test)。
+    case aneCapable = "ane-native"
 
     /// Op runs on GPU via MPSGraph fused operators。 ANE
     /// doesn't expose this op natively at the current
@@ -72,7 +94,7 @@ public enum BASANEKernelEligibilityClassifier {
         switch op {
         case .matMul,
              .attention:
-            return .aneNative
+            return .aneCapable
         case .rmsNorm,
              .layerNorm,
              .softmax,
@@ -91,13 +113,21 @@ public enum BASANEKernelEligibilityClassifier {
         for op: BASNeuralOp
     ) -> String {
         switch op {
+        // T1.2 correction: capability-not-placement language。 The
+        // "ane-native:" raw-value prefix is KEPT (doctrine-walker
+        // grep + audit-byte stability);the claim after the colon
+        // no longer asserts placement — MLComputePlan measured zero
+        // ANE ops for the production heads (ANE_UTILIZATION_FINDINGS)。
         case .matMul:
-            return "ane-native:CoreML ML Program with" +
-                " matmul layer maps to ANE on M-series"
+            return "ane-native:matmul is an ANE-CAPABLE op type" +
+                " (CoreML ML Program exposes it);actual placement" +
+                " is planner-decided per model — T1.2 measured CPU" +
+                " for the production heads"
         case .attention:
-            return "ane-native:Apple's transformer" +
-                " attention path runs on ANE via CoreML" +
-                " conversion for supported shapes"
+            return "ane-native:transformer attention is an" +
+                " ANE-CAPABLE op type for supported shapes;actual" +
+                " placement is planner-decided per model — T1.2" +
+                " measured zero ANE ops for the production heads"
         case .rmsNorm:
             return "mpsgraph-native:MPSGraph rsqrt +" +
                 " elementwise composition (no native ANE)"

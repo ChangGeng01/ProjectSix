@@ -48,7 +48,7 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
             "ch 1000.5: recordANEConsultation MUST increment " +
             "counter by exactly 1 per call")
         let validTiers: Set<BASANEEligibilityTier> = [
-            .aneNative, .mpsGraphNative, .fallbackRequired,
+            .aneCapable, .mpsGraphNative, .fallbackRequired,
         ]
         XCTAssertTrue(validTiers.contains(tier),
             "ch 1000.5: returned tier MUST be valid enum value")

@@ -14,7 +14,7 @@ final class BASThermalAwareKernelSelectionPolicyTests:
     func testRoutingPreferenceHasThreeCases() {
         let cases = BASKernelRoutingPreference.allCases
         XCTAssertEqual(cases.count, 3)
-        XCTAssertTrue(cases.contains(.aneNative))
+        XCTAssertTrue(cases.contains(.aneCapable))
         XCTAssertTrue(cases.contains(.gpuMPSGraph))
         XCTAssertTrue(cases.contains(.cpuStub))
     }
@@ -114,7 +114,7 @@ final class BASThermalAwareKernelSelectionPolicyTests:
                 for: .matMul, // ANE-native
                 thermalState: .nominal,
                 anePriority: .aneFirst)
-        XCTAssertEqual(routing, .aneNative)
+        XCTAssertEqual(routing, .aneCapable)
 
         let attentionRouting =
             BASThermalAwareKernelSelectionPolicy
@@ -122,7 +122,7 @@ final class BASThermalAwareKernelSelectionPolicyTests:
                 for: .attention, // ANE-native
                 thermalState: .nominal,
                 anePriority: .aneFirst)
-        XCTAssertEqual(attentionRouting, .aneNative)
+        XCTAssertEqual(attentionRouting, .aneCapable)
     }
 
     // MARK: - 8) Rule 7: default → GPU MPSGraph
@@ -148,7 +148,7 @@ final class BASThermalAwareKernelSelectionPolicyTests:
                 for: .matMul,
                 thermalState: .fair,
                 anePriority: .aneFirst)
-        XCTAssertEqual(routing, .aneNative,
+        XCTAssertEqual(routing, .aneCapable,
             "fair thermal is NOT serious;ANE routing" +
             " preserved for ANE-native ops")
     }

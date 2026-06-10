@@ -78,7 +78,7 @@ public actor BASKernelRoutingDecisionObserver {
     ///   2. Computes preferred routing via M1378 policy
     ///   3. Determines if routing matched the tier's
     ///      "best case" — for ANE-native ops that means
-    ///      routing went to .aneNative;for MPSGraph-
+    ///      routing went to .aneCapable;for MPSGraph-
     ///      native ops that means .gpuMPSGraph;for
     ///      fallback-required ops the best case is
     ///      .cpuStub
@@ -98,8 +98,8 @@ public actor BASKernelRoutingDecisionObserver {
                 anePriority: anePriority)
         let bestCase: Bool
         switch tier {
-        case .aneNative:
-            bestCase = (routing == .aneNative)
+        case .aneCapable:
+            bestCase = (routing == .aneCapable)
         case .mpsGraphNative:
             bestCase = (routing == .gpuMPSGraph)
         case .fallbackRequired:

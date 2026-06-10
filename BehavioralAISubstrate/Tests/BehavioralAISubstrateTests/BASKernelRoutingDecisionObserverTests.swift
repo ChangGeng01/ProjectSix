@@ -41,8 +41,8 @@ final class BASKernelRoutingDecisionObserverTests:
         XCTAssertEqual(snapshot.count, 1)
         let record = snapshot[0]
         XCTAssertEqual(record.operation, .matMul)
-        XCTAssertEqual(record.eligibilityTier, .aneNative)
-        XCTAssertEqual(record.chosenRouting, .aneNative)
+        XCTAssertEqual(record.eligibilityTier, .aneCapable)
+        XCTAssertEqual(record.chosenRouting, .aneCapable)
         XCTAssertTrue(record.matchedBestCase,
             "matMul (ANE-native) at nominal+aneFirst" +
             " SHOULD route to ANE — best case match")
@@ -63,7 +63,7 @@ final class BASKernelRoutingDecisionObserverTests:
             recordedAtMs: 200)
         let snapshot = await observer.snapshot()
         let record = snapshot[0]
-        XCTAssertEqual(record.eligibilityTier, .aneNative)
+        XCTAssertEqual(record.eligibilityTier, .aneCapable)
         XCTAssertEqual(record.chosenRouting, .cpuStub)
         XCTAssertFalse(record.matchedBestCase,
             "critical thermal forces .cpuStub which is" +

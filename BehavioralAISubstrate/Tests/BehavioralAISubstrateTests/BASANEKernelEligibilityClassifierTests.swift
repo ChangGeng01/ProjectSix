@@ -14,7 +14,7 @@ final class BASANEKernelEligibilityClassifierTests:
     func testTierEnumHasThreeCases() {
         let cases = BASANEEligibilityTier.allCases
         XCTAssertEqual(cases.count, 3)
-        XCTAssertTrue(cases.contains(.aneNative))
+        XCTAssertTrue(cases.contains(.aneCapable))
         XCTAssertTrue(cases.contains(.mpsGraphNative))
         XCTAssertTrue(cases.contains(.fallbackRequired))
     }
@@ -34,18 +34,18 @@ final class BASANEKernelEligibilityClassifierTests:
 
     // MARK: - 3) Specific tier pins (honest classification)
 
-    func testMatMulIsAneNative() {
+    func testMatMulIsAneCapable() {
         XCTAssertEqual(
             BASANEKernelEligibilityClassifier
                 .tier(for: .matMul),
-            .aneNative)
+            .aneCapable)
     }
 
-    func testAttentionIsAneNative() {
+    func testAttentionIsAneCapable() {
         XCTAssertEqual(
             BASANEKernelEligibilityClassifier
                 .tier(for: .attention),
-            .aneNative)
+            .aneCapable)
     }
 
     func testRMSNormIsMPSGraphNative() {
@@ -101,7 +101,7 @@ final class BASANEKernelEligibilityClassifierTests:
         let allOps = Set(BASNeuralOp.allCases)
         let aneOps = Set(
             BASANEKernelEligibilityClassifier
-                .operations(inTier: .aneNative))
+                .operations(inTier: .aneCapable))
         let mpsOps = Set(
             BASANEKernelEligibilityClassifier
                 .operations(inTier: .mpsGraphNative))
@@ -144,5 +144,34 @@ final class BASANEKernelEligibilityClassifierTests:
                 .tier(for: op)
             XCTAssertEqual(t1, t2)
         }
+    }
+
+    // MARK: - 9) T1.2 relabel — raw-value byte stability pinned
+
+    /// The 全面进化 T1.2 relabel renamed ONLY the Swift identifier
+    /// (`aneNative` → `aneCapable`,capability-not-placement
+    /// semantics per ANE_UTILIZATION_FINDINGS)。 The raw value
+    /// rides audit evidence strings + Codable wire bytes,so it
+    /// MUST stay "ane-native" forever (ADR-014:renaming the
+    /// string would mutate audit bytes for zero decision gain)。
+    func testAneCapableRawValueIsByteStable() throws {
+        XCTAssertEqual(
+            BASANEEligibilityTier.aneCapable.rawValue, "ane-native")
+        XCTAssertEqual(
+            BASANEEligibilityTier(rawValue: "ane-native"), .aneCapable)
+        // Codable wire bytes unchanged by the rename。
+        let encoded = try JSONEncoder().encode(
+            [BASANEEligibilityTier.aneCapable])
+        XCTAssertEqual(
+            String(decoding: encoded, as: UTF8.self),
+            "[\"ane-native\"]")
+        // Evidence strings keep the raw-value prefix the doctrine
+        // walker greps,while the claim text is capability-only。
+        let matMulEvidence = BASANEKernelEligibilityClassifier
+            .evidence(for: .matMul)
+        XCTAssertTrue(matMulEvidence.hasPrefix("ane-native:"))
+        XCTAssertTrue(matMulEvidence.contains("ANE-CAPABLE"))
+        XCTAssertFalse(matMulEvidence.contains("maps to ANE"),
+            "placement claim was disproven by T1.2 measurement")
     }
 }

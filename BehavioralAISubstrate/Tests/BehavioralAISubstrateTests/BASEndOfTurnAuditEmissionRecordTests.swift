@@ -38,8 +38,8 @@ final class BASEndOfTurnAuditEmissionRecordTests:
                     operation: .matMul,
                     thermalState: .nominal,
                     anePriority: .aneFirst,
-                    eligibilityTier: .aneNative,
-                    chosenRouting: .aneNative,
+                    eligibilityTier: .aneCapable,
+                    chosenRouting: .aneCapable,
                     matchedBestCase: i < bestCases,
                     recordedAtMs: 0)
             }

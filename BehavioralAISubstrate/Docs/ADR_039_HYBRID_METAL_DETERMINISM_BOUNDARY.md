@@ -119,7 +119,7 @@ on-device — the core claim "the substrate's Metal kernels really execute on th
 now PROVEN, not inferred. It does NOT yet put Metal on the LIVE cascade: the L8 retrieval seam (corpus
 extraction + the sync-bridge wiring) + Phase 4 (SSM reasoning) remain the live-integration work.
 
-## 8. Phase 2 L8 live seam — built, hardened (3-perspective audit), on-device cert PENDING
+## 8. Phase 2 L8 live seam — built, hardened (3-perspective audit), on-device cert CAPTURED (2026-06-09 — see §10.2 current-binary re-cert: L8 topK gpu=2 cpu_fallback=0)
 
 The L8 live seam (`BASMetalCosineTopKSeam`, opt-in `BAS_L8_METAL_TOPK`) wires the certified Metal topK into
 `BASL8RoutedMemoryService.retrieve()` over the **in-Swift snapshot corpus** — the Rust corpus has NO dump

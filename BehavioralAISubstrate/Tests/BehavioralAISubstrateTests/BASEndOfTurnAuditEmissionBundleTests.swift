@@ -75,8 +75,8 @@ final class BASEndOfTurnAuditEmissionBundleTests:
                                 operation: .matMul,
                                 thermalState: .nominal,
                                 anePriority: .aneFirst,
-                                eligibilityTier: .aneNative,
-                                chosenRouting: .aneNative,
+                                eligibilityTier: .aneCapable,
+                                chosenRouting: .aneCapable,
                                 matchedBestCase: true,
                                 recordedAtMs: 0)
                         ],

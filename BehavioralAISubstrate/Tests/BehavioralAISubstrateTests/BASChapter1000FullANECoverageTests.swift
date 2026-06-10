@@ -113,7 +113,7 @@ final class BASChapter1000FullANECoverageTests: XCTestCase {
             }
         XCTAssertEqual(result.value, [1.0, 2.0, 3.0])
         let validTiers: Set<BASANEEligibilityTier> = [
-            .aneNative, .mpsGraphNative, .fallbackRequired,
+            .aneCapable, .mpsGraphNative, .fallbackRequired,
         ]
         XCTAssertTrue(validTiers.contains(result.aneTier))
     }
@@ -178,7 +178,7 @@ final class BASChapter1000FullANECoverageTests: XCTestCase {
             "the dispatch-branching invariant stays false。 " +
             "Future arc post-ch-1000 may flip when actual " +
             "tier-based routing wires in (e.g. when " +
-            ".aneNative tier causes matMul to dispatch " +
+            ".aneCapable tier causes matMul to dispatch " +
             "through CoreML-on-ANE path instead of MSL).")
     }
 }

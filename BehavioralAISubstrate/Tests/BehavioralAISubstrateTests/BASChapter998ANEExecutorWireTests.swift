@@ -83,7 +83,7 @@ final class BASChapter998ANEExecutorWireTests: XCTestCase {
         let tier = BASANEKernelEligibilityClassifier
             .tier(for: .softmax)
         let validCases: Set<BASANEEligibilityTier> = [
-            .aneNative, .mpsGraphNative, .fallbackRequired,
+            .aneCapable, .mpsGraphNative, .fallbackRequired,
         ]
         XCTAssertTrue(validCases.contains(tier),
             "ch 998: classifier's tier(for: .softmax) MUST " +

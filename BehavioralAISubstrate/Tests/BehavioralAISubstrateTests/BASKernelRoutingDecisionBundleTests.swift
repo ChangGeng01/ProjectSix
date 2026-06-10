@@ -13,8 +13,8 @@ final class BASKernelRoutingDecisionBundleTests:
 
     private func sampleRecord(
         op: BASNeuralOp = .matMul,
-        tier: BASANEEligibilityTier = .aneNative,
-        routing: BASKernelRoutingPreference = .aneNative,
+        tier: BASANEEligibilityTier = .aneCapable,
+        routing: BASKernelRoutingPreference = .aneCapable,
         matchedBestCase: Bool = true
     ) -> BASKernelRoutingDecisionRecord {
         return BASKernelRoutingDecisionRecord(
@@ -66,15 +66,15 @@ final class BASKernelRoutingDecisionBundleTests:
 
     func testPerTierCountsPartition() {
         let bundle = bundleWith(items: [
-            sampleRecord(tier: .aneNative),
-            sampleRecord(tier: .aneNative),
+            sampleRecord(tier: .aneCapable),
+            sampleRecord(tier: .aneCapable),
             sampleRecord(tier: .mpsGraphNative),
             sampleRecord(tier: .fallbackRequired),
             sampleRecord(tier: .fallbackRequired),
             sampleRecord(tier: .fallbackRequired),
         ])
         let counts = bundle.perTierCounts
-        XCTAssertEqual(counts[.aneNative], 2)
+        XCTAssertEqual(counts[.aneCapable], 2)
         XCTAssertEqual(counts[.mpsGraphNative], 1)
         XCTAssertEqual(counts[.fallbackRequired], 3)
         XCTAssertEqual(counts.values.reduce(0, +),
@@ -85,13 +85,13 @@ final class BASKernelRoutingDecisionBundleTests:
 
     func testPerRoutingCountsPartition() {
         let bundle = bundleWith(items: [
-            sampleRecord(routing: .aneNative),
+            sampleRecord(routing: .aneCapable),
             sampleRecord(routing: .gpuMPSGraph),
             sampleRecord(routing: .gpuMPSGraph),
             sampleRecord(routing: .cpuStub),
         ])
         let counts = bundle.perRoutingCounts
-        XCTAssertEqual(counts[.aneNative], 1)
+        XCTAssertEqual(counts[.aneCapable], 1)
         XCTAssertEqual(counts[.gpuMPSGraph], 2)
         XCTAssertEqual(counts[.cpuStub], 1)
     }
@@ -161,7 +161,7 @@ final class BASKernelRoutingDecisionBundleTests:
     func testObserverPerTierDistribution() async {
         let observer =
             BASKernelRoutingDecisionObserver()
-        // matMul + attention → aneNative tier (2)
+        // matMul + attention → aneCapable tier (2)
         // rmsNorm + softmax + layerNorm → mpsGraphNative (3)
         // ssmScan → fallbackRequired (1)
         for op in [
@@ -182,7 +182,7 @@ final class BASKernelRoutingDecisionBundleTests:
             bundleID: "tier-dist",
             recordedAtMs: 0)
         let counts = bundle.perTierCounts
-        XCTAssertEqual(counts[.aneNative], 2)
+        XCTAssertEqual(counts[.aneCapable], 2)
         XCTAssertEqual(counts[.mpsGraphNative], 3)
         XCTAssertEqual(counts[.fallbackRequired], 1)
     }

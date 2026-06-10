@@ -39,8 +39,10 @@ import BASRuntimeCore
 public enum BASKernelRoutingPreference:
     String, Codable, Sendable, Equatable, Hashable, CaseIterable
 {
-    /// Route to ANE-native impl when available。
-    case aneNative = "ane-native"
+    /// Prefer an ANE-CAPABLE impl when available。 Capability,
+    /// not placement (T1.2:the planner decides per model;raw
+    /// value "ane-native" kept for wire-byte stability)。
+    case aneCapable = "ane-native"
     /// Route to GPU-native MPSGraph impl。
     case gpuMPSGraph = "gpu-mps-graph"
     /// Route to CPU stub (least preferred,emergency
@@ -66,7 +68,7 @@ public enum BASThermalAwareKernelSelectionPolicy {
     ///      → .gpuMPSGraph (ANE dispatch overhead
     ///      exceeds savings at .serious)
     ///   6. If op is ANE-native AND priority is .aneFirst
-    ///      → .aneNative
+    ///      → .aneCapable
     ///   7. Default → .gpuMPSGraph (broadest support)
     public static func preferredRouting(
         for op: BASNeuralOp,
@@ -93,15 +95,15 @@ public enum BASThermalAwareKernelSelectionPolicy {
         }
         // Rule 5: serious thermal + ANE-native op → GPU
         if thermalState == .serious
-            && tier == .aneNative
+            && tier == .aneCapable
         {
             return .gpuMPSGraph
         }
         // Rule 6: ANE-native op + ANE-first priority
-        if tier == .aneNative
+        if tier == .aneCapable
             && anePriority == .aneFirst
         {
-            return .aneNative
+            return .aneCapable
         }
         // Rule 7: default to GPU MPSGraph
         return .gpuMPSGraph
@@ -123,7 +125,7 @@ public enum BASThermalAwareKernelSelectionPolicy {
         "3: anePriority=.cpuOnly → .cpuStub",
         "4: anePriority=.gpuOnly → .gpuMPSGraph",
         "5: thermalState=.serious AND ANE-native op → .gpuMPSGraph",
-        "6: ANE-native op AND .aneFirst priority → .aneNative",
+        "6: ANE-native op AND .aneFirst priority → .aneCapable",
         "7: default → .gpuMPSGraph"
     ]
 }

@@ -35,8 +35,8 @@ final class BASMetalKernelDispatchRouterTests: XCTestCase {
     }
 
     func testRule6_ANENativeWithANEFirstGoesANE() {
-        XCTAssertEqual(route(.matMul, .nominal, .aneFirst), .aneNative)
-        XCTAssertEqual(route(.attention, .nominal, .aneFirst), .aneNative)
+        XCTAssertEqual(route(.matMul, .nominal, .aneFirst), .aneCapable)
+        XCTAssertEqual(route(.attention, .nominal, .aneFirst), .aneCapable)
     }
 
     func testRule7_MPSGraphNativeDefaultsToGPU() {
@@ -51,7 +51,7 @@ final class BASMetalKernelDispatchRouterTests: XCTestCase {
         let back = try JSONDecoder().decode(BASMetalKernelDispatchDecision.self, from: data)
         XCTAssertEqual(d, back)
         XCTAssertEqual(d.op, "mat-mul")
-        XCTAssertEqual(d.routing, .aneNative)
+        XCTAssertEqual(d.routing, .aneCapable)
         XCTAssertFalse(d.declinedAccelerator)
     }
 }

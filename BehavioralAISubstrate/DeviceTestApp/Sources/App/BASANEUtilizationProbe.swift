@@ -1,7 +1,7 @@
 // MARK: - BASANEUtilizationProbe
 //
 // 全面进化 T1.2 — the ANE MEASUREMENT probe (BAS_ANE_PROBE=1). The substrate's ANE story so far is a STATIC
-// claim: `BASANEKernelEligibilityClassifier` is a lookup table ("matMul/attention are aneNative"), consultation
+// claim: `BASANEKernelEligibilityClassifier` is a lookup table ("matMul/attention are aneCapable"), consultation
 // is observe-only, and NO code anywhere reads `MLComputePlan` — zero hardware evidence that anything actually
 // runs on the Neural Engine. This probe converts the claim into measured truth for the two production CoreML
 // heads:

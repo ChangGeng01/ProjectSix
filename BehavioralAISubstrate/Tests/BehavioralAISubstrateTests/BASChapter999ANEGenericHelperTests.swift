@@ -45,7 +45,7 @@ final class BASChapter999ANEGenericHelperTests: XCTestCase {
             "ch 999: dispatch closure result returned in .value")
         // Tier is valid enum value (proves consultation happened)
         let validTiers: Set<BASANEEligibilityTier> = [
-            .aneNative, .mpsGraphNative, .fallbackRequired,
+            .aneCapable, .mpsGraphNative, .fallbackRequired,
         ]
         XCTAssertTrue(validTiers.contains(result.aneTier),
             "ch 999: result.aneTier MUST be a valid enum value")
@@ -111,7 +111,7 @@ final class BASChapter999ANEGenericHelperTests: XCTestCase {
         XCTAssertEqual(sum, 1.0, accuracy: 0.001)
         // aneTier exposed at top level for host inspection
         let validTiers: Set<BASANEEligibilityTier> = [
-            .aneNative, .mpsGraphNative, .fallbackRequired,
+            .aneCapable, .mpsGraphNative, .fallbackRequired,
         ]
         XCTAssertTrue(validTiers.contains(result.aneTier),
             "ch 999: softmaxAutoWithANETier MUST expose the " +
