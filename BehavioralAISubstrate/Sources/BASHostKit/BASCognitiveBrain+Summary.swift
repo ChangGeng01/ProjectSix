@@ -396,7 +396,7 @@ extension BASCognitiveBrain {
                 .recordsForInputViaRust(forInput: input)
             {
                 let priorCount = records.count
-                let currentSession = await store.sessionRef
+                let currentSession = store.sessionRef
                 // Cross-session echo:any prior record
                 // carries a sessionRef OTHER than this
                 // store's current one → input was seen
@@ -415,7 +415,7 @@ extension BASCognitiveBrain {
                     forInput: input, limit: Int.max)
             {
                 let priorCount = records.count
-                let currentSession = await store.sessionRef
+                let currentSession = store.sessionRef
                 let echo = records.contains { record in
                     record.sessionRef != currentSession
                 }

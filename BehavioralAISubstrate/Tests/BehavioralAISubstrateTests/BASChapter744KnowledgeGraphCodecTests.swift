@@ -246,7 +246,7 @@ final class BASChapter744KnowledgeGraphCodecTests: XCTestCase {
             SQLITE_OK)
         let SQLITE_TRANSIENT = unsafeBitCast(
             -1, to: sqlite3_destructor_type.self)
-        v2Payload.withUnsafeBufferPointer { bp in
+        _ = v2Payload.withUnsafeBufferPointer { bp in
             sqlite3_bind_blob(
                 insStmt, 1, bp.baseAddress,
                 Int32(bp.count), SQLITE_TRANSIENT)

@@ -559,7 +559,7 @@ final class BASChapter979_980_981Phase8CloseTests:
 
     private func roundTrip<T: Codable & Equatable>(
         _ v: T,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
         let enc = JSONEncoder()

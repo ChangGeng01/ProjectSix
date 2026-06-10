@@ -166,7 +166,7 @@ final class BASChapter731AutoregressiveKVDriftTests:
         var driftAtStep: [Float] = []
         driftAtStep.reserveCapacity(nSteps)
 
-        for step in 0..<nSteps {
+        for _ in 0..<nSteps {
             let nextF32 = attentionStep(
                 query: qF32,
                 keys: keysF32,

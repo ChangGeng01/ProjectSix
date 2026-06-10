@@ -46,7 +46,7 @@ final class BASKVCacheRegistryTTLTests: XCTestCase {
             func advance(by ms: Int64) { nowMs += ms }
             func current() -> Int64 { nowMs }
         }
-        let clock = ControllableClock()
+        _ = ControllableClock()
         let registry = BASKVCacheRegistry(
             invalidationPolicy: .ttl,
             capacity: nil,

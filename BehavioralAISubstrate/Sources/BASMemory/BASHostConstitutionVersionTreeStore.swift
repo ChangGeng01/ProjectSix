@@ -204,7 +204,7 @@ public actor BASSQLiteHostConstitutionVersionTreeStore:
         }
         sqlite3_bind_int64(stmt, 4, version.createdAtMs)
         // BLOB binding for signature_hash
-        version.signatureHash.withUnsafeBytes { bytes in
+        _ = version.signatureHash.withUnsafeBytes { bytes in
             sqlite3_bind_blob(stmt, 5,
                 bytes.baseAddress,
                 Int32(version.signatureHash.count),
@@ -304,7 +304,7 @@ public actor BASSQLiteHostConstitutionVersionTreeStore:
                 sqlite3_bind_null(stmt, 3)
             }
             sqlite3_bind_int64(stmt, 4, version.createdAtMs)
-            version.signatureHash.withUnsafeBytes { bytes in
+            _ = version.signatureHash.withUnsafeBytes { bytes in
                 sqlite3_bind_blob(stmt, 5,
                     bytes.baseAddress,
                     Int32(version.signatureHash.count),

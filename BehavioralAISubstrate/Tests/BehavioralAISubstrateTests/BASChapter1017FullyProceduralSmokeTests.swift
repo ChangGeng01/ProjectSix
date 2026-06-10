@@ -238,7 +238,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
                 writeDomains: [.situationField],
                 defaultLeaseProfile: .hotSeat,
                 visibility: .high)
-            try timedIter({
+            timedIter({
                 var seq = 0
                 let deltas = BASScoutSeat.emit(
                     from: input, turnID: "t.\(i)",
@@ -287,7 +287,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             let diversity = Double(
                 procInt(function, iter: i + 5000,
                         range: 0...100)) / 100.0
-            try timedIter({
+            timedIter({
                 let frontier = BASCandidateFrontier(
                     candidateIDs: candidates,
                     dominanceOrder: candidates,
@@ -349,7 +349,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
                 writeDomains: [.candidateFrontier],
                 defaultLeaseProfile: .hotSeat,
                 visibility: .high)
-            try timedIter({
+            timedIter({
                 var seq = 0
                 let deltas = BASPlannerSeat.emit(
                     from: candidates,
@@ -390,7 +390,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             let maxTokens = procIntBoundary(
                 function, iter: i + 100,
                 choices: [10, 100, 1000, 10_000])
-            try timedIter({
+            timedIter({
                 let lease = BASAgentLease(
                     leaseID: "l.\(i)",
                     agentID: "a.\(i)",
@@ -500,7 +500,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             let manipDetected = procInt(
                 function, iter: i + 500,
                 range: 0...1) == 1
-            try timedIter({
+            timedIter({
                 let input = BASRiskInput(
                     candidates: candidates,
                     manipulationDetected: manipDetected)
@@ -537,7 +537,7 @@ final class BASChapter1017FullyProceduralSmokeTests: XCTestCase {
             let signals = (0..<signalCount).map {
                 "sig.\(i).\($0)"
             }
-            try timedIter({
+            timedIter({
                 let entry = BASSovereignAuditEntry(
                     schemaVersion: schema,
                     auditID: "a.\(i)",

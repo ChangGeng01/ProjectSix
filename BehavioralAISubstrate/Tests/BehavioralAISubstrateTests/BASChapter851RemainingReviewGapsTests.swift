@@ -126,8 +126,15 @@ final class BASChapter851RemainingReviewGapsTests: XCTestCase {
             label: "chapter-851-concurrent",
             attributes: .concurrent)
         let group = DispatchGroup()
-        let lock = NSLock()
-        var failedIterations = 0
+        // Reference-typed, lock-guarded counter so the concurrent dispatch closures capture an immutable
+        // `let` (Swift-6 Sendable-capture safe) rather than a mutable local var. Behavior is identical.
+        final class FailureCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var value = 0
+            func increment() { lock.lock(); value += 1; lock.unlock() }
+            var snapshot: Int { lock.lock(); defer { lock.unlock() }; return value }
+        }
+        let failed = FailureCounter()
 
         for trial in 0..<iterations {
             group.enter()
@@ -153,16 +160,14 @@ final class BASChapter851RemainingReviewGapsTests: XCTestCase {
                         return sa > sb
                     }
                 if routed != reference {
-                    lock.lock()
-                    failedIterations += 1
-                    lock.unlock()
+                    failed.increment()
                 }
                 group.leave()
             }
         }
         group.wait()
 
-        XCTAssertEqual(failedIterations, 0,
+        XCTAssertEqual(failed.snapshot, 0,
             "All \(iterations) concurrent dispatches must " +
             "produce correct results。 Any failure indicates " +
             "shared state corruption or race condition in the " +

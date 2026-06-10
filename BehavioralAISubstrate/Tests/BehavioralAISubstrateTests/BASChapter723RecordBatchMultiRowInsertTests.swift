@@ -50,7 +50,7 @@ final class BASChapter723RecordBatchMultiRowInsertTests:
                 "bas_chapter723_\(label)_"
                 + UUID().uuidString
                 + ".sqlite")
-        return try await BASMemoryUsageTracker(
+        return try BASMemoryUsageTracker(
             databaseURL: tmp)
     }
 

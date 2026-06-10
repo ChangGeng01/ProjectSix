@@ -68,9 +68,9 @@ final class BASChapter732EventLogBinaryWiringTests:
         BASSQLiteEventLogStorage.useBinaryPayload = false
 
         // Compare via the SAME public read API
-        let jsonReplay = try await storageA.events(
+        let jsonReplay = await storageA.events(
             sinceTimestampMs: 0, limit: 1000)
-        let binaryReplay = try await storageB.events(
+        let binaryReplay = await storageB.events(
             sinceTimestampMs: 0, limit: 1000)
         XCTAssertEqual(
             jsonReplay.count, binaryReplay.count)
@@ -139,7 +139,7 @@ final class BASChapter732EventLogBinaryWiringTests:
         // Read all 20 back via standard API — should NOT
         // throw + should return all 20 entries with correct
         // fields。
-        let replay = try await storage.events(
+        let replay = await storage.events(
             sinceTimestampMs: 0, limit: 1000)
         XCTAssertEqual(replay.count, 20)
         for (i, entry) in replay.enumerated() {

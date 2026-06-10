@@ -106,7 +106,7 @@ final class BASChapter875RMSNormFlipOrDeclineTests: XCTestCase {
             _ = try await kernel.evaluate(inputs: inputs)
         }
 
-        let swiftNs = try await timeMedianNs(
+        let swiftNs = await timeMedianNs(
             warmup: 0, iterations: iterations
         ) {
             _ = self.swiftRMSNorm(

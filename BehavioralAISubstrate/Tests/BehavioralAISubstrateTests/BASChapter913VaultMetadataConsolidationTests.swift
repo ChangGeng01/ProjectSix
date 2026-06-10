@@ -167,7 +167,7 @@ final class BASChapter913VaultMetadataConsolidationTests:
         // metadata reads」 — that alternative requires the
         // chapter 906/909/911/913 integrated pattern。
         // Measures FFI-hop reduction,not end-to-end speedup。
-        let orchSec = try await timeit {
+        let orchSec = await timeit {
             for _ in 0..<n {
                 let _ = await store.vaultCount
             }

@@ -37,7 +37,7 @@ final class BASRustIntegrityChainTests: XCTestCase {
         let trackerA =
             try BASRustMemoryUsageTrackerActor(
                 useRustCore: true)
-        let trackerB =
+        _ =
             try BASRustMemoryUsageTrackerActor(
                 useRustCore: true)
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)

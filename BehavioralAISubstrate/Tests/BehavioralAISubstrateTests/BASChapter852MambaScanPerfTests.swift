@@ -47,7 +47,7 @@ final class BASChapter852MambaScanPerfTests: XCTestCase {
 
     private func mkInputs(scale: Scale) -> (x: [Float], delta: [Float], a: [Float], bProj: [Float], cProj: [Float]) {
         var state: UInt64 = 0xCAFE_BABE_FACE_FEED
-        var next: () -> Float = {
+        let next: () -> Float = {
             state ^= state &<< 13
             state ^= state &>> 7
             state ^= state &<< 17

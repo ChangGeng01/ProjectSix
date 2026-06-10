@@ -187,10 +187,9 @@ final class BASChapter871MatMul5WayBenchmarkTests: XCTestCase {
         M: Int, N: Int, K: Int,
         iterations: Int
     ) async throws {
-        let kernel: BASMPSGraphMatMulKernel
         let kernelWarmCache: BASMPSGraphMatMulKernel
         do {
-            kernel = try BASMPSGraphMatMulKernel()
+            _ = try BASMPSGraphMatMulKernel()
             // BASMPSGraphMatMulKernel.init() does NOT take a cache
             // parameter (unlike attention/RMS/RoPE)。 Verify via
             // the public init signature。 The "warm" measurement
@@ -228,7 +227,7 @@ final class BASChapter871MatMul5WayBenchmarkTests: XCTestCase {
         }
 
         // Time each path
-        let naiveNs = try await timeMedianNs(
+        let naiveNs = await timeMedianNs(
             warmup: 0, iterations: iterations
         ) {
             _ = a.withUnsafeBufferPointer { ap in
@@ -243,7 +242,7 @@ final class BASChapter871MatMul5WayBenchmarkTests: XCTestCase {
                 }
             }
         }
-        let blockedNs = try await timeMedianNs(
+        let blockedNs = await timeMedianNs(
             warmup: 0, iterations: iterations
         ) {
             _ = a.withUnsafeBufferPointer { ap in

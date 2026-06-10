@@ -206,7 +206,9 @@ public actor BASSystemProbe {
             bas_cpu_brand(bp.baseAddress, 256)
         }
         if rc < 0 { return "" }
-        return String(cString: buf)
+        // Truncate at the NUL terminator + decode as UTF-8 (String(cString: [CChar]) is deprecated).
+        let length = buf.firstIndex(of: 0) ?? buf.count
+        return String(decoding: buf[..<length].map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     private static func probeVMPageSize() -> Int64 {

@@ -291,7 +291,7 @@ final class BASChapter868FlashAttentionAssertedBenchmarkTests:
         var bestStdNs: Double = 0
         var bestRatio: Double = 0
         for trial in 0..<numTrials {
-            let cpuNs = try await timeMedianNs(
+            let cpuNs = await timeMedianNs(
                 warmup: 5, iterations: 100
             ) {
                 _ = BASAutoRouteRanker.cpuAttention(

@@ -301,7 +301,7 @@ final class BASChapter960CoordinatorWireTests: XCTestCase {
     func testRedline7_FabricNilPathDoesNotMutateCoordinator() {
         // Calling observation with nil fabric must NOT change any
         // observable state on the coordinator
-        var c = makeCoordinator(fabric: nil)
+        let c = makeCoordinator(fabric: nil)
         let beforeServices = (
             c.powerClockService is
                 BASPlaceholderPowerClockService,

@@ -106,7 +106,7 @@ final class BASChapter1000FullANECoverageTests: XCTestCase {
     func testAsyncHelper_GenericOverSendableValue()
         async throws
     {
-        let result = try await BASCognitiveBrain
+        let result = BASCognitiveBrain
             .aneConsulted(op: .matMul) {
                 // dispatch closure can return any Sendable Value
                 return [Float]([1.0, 2.0, 3.0])

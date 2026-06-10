@@ -65,7 +65,7 @@ extension BASSovereignIntegritySentinel {
         #endif
         #else
         // V1 live path:existing Swift actor — no behavior change。
-        return await scan(request)
+        return scan(request)
         #endif
     }
 
@@ -88,7 +88,7 @@ extension BASSovereignIntegritySentinel {
         // Placeholder — activated at next XCFramework rebuild。
         // Until then,delegate to the Swift actor so the routed
         // surface stays callable + covered by tests。
-        return await scan(request)
+        return scan(request)
     }
 }
 

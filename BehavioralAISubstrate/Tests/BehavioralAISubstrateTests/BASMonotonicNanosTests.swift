@@ -271,10 +271,9 @@ final class BASMonotonicNanosTests: XCTestCase {
     func testUnknownReturnCodePreservesAssociatedValue() {
         let err = BASMonotonicNanosError
             .unknownReturnCode(99)
-        switch err {
-        case .unknownReturnCode(let code):
+        if case .unknownReturnCode(let code) = err {
             XCTAssertEqual(code, 99)
-        default:
+        } else {
             XCTFail("Wrong case captured")
         }
     }

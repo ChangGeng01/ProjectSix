@@ -391,7 +391,7 @@ final class BASChapter976MCPCapabilityGatewayTests:
 
     private func roundTrip<T: Codable & Equatable>(
         _ v: T,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
         let enc = JSONEncoder()

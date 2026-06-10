@@ -206,7 +206,7 @@ final class BASChapter909EventLogConsolidationTests:
         // The previously-reported "17-102×" speedup framing
         // was misleading; the honest framing is「N+1 FFI hops
         // → 1 hop saves the FFI overhead × N」。
-        let orchSec = try await timeit {
+        let orchSec = await timeit {
             let _ = await store.countForSession(session)
             for _ in 0..<n {
                 let _ = await store.countForSession(session)

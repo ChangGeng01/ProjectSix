@@ -294,7 +294,7 @@ final class BASChapter974_975SDKStabilityTests: XCTestCase {
 
     private func roundTrip<T: Codable & Equatable>(
         _ v: T,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
         let enc = JSONEncoder()

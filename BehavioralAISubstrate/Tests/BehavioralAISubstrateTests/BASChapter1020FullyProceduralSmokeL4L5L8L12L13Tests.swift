@@ -264,7 +264,7 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
             let scopeInput = (i % 3 == 0)
                 ? "  \(scopeCore)\n\t"
                 : scopeCore
-            try timedIter({
+            timedIter({
                 let horizon = BASHorizonPrior(
                     priorID: "h.\(i)",
                     priorType: priorType,
@@ -346,7 +346,7 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
             let hostID = "host.\(hostSuffix)"
             let activeVersion =
                 "host.v\(versionMajor).\(versionMinor)"
-            try timedIter({
+            timedIter({
                 let constitution = BASHostConstitution(
                     hostID: hostID,
                     activeVersion: activeVersion)
@@ -472,7 +472,7 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                     frozen: false)
             }
             let tags = (0..<tagCount).map { "tag.\($0)" }
-            try timedIter({
+            timedIter({
                 let bundle = BASMemoryBundle(
                     atoms: atoms,
                     retrievalTags: tags)
@@ -563,7 +563,7 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                     "d.\(i).\($0)"
                 }
             }
-            try timedIter({
+            timedIter({
                 let permit = BASActionPermit(
                     mode: mode,
                     allowedDomains: allowedDomains,
@@ -664,7 +664,7 @@ final class BASChapter1020FullyProceduralSmokeL4L5L8L12L13Tests:
                         : "v.\(i).\(j - 1)")
             }
             let activeID = "v.\(i).\(chainLen - 1)"
-            try timedIter({
+            timedIter({
                 let tree = BASHostVersionTree(
                     activeVersionID: activeID,
                     versions: versions)

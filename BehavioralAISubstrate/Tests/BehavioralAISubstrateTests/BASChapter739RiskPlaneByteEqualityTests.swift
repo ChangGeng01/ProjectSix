@@ -99,8 +99,8 @@ final class BASChapter739RiskPlaneByteEqualityTests:
                         rust, swift,
                         "band=\(band) climate=\(climate) "
                         + "current=\(current): "
-                        + "Rust=\(rust as Int32?? ?? -1) "
-                        + "Swift=\(swift as Int32?? ?? -1)")
+                        + "Rust=\(String(describing: rust as Int32?? ?? -1)) "
+                        + "Swift=\(String(describing: swift as Int32?? ?? -1))")
                     cellsChecked += 1
                 }
             }

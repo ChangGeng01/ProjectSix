@@ -133,7 +133,7 @@ public actor BASRoutedVectorIndexStorage {
     // their FFI; the nonisolated reader checks it. NSLock-guarded (no new dep); compiles out ENTIRELY in
     // release (the hot path stays byte-identical). The violation handler is swappable so a test can RECORD
     // instead of abort. ADR-037 acknowledged this footgun in prose; this makes it catchable.
-    private nonisolated(unsafe) let _writeLock = NSLock()
+    private nonisolated let _writeLock = NSLock()
     private nonisolated(unsafe) var _writeInFlightCount = 0
     public nonisolated(unsafe) static var _concurrencyViolationHandler: @Sendable (String) -> Void = {
         assertionFailure($0)

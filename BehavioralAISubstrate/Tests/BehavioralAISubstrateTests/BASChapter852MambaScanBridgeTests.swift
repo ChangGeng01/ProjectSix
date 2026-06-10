@@ -77,7 +77,7 @@ final class BASChapter852MambaScanBridgeTests: XCTestCase {
         let dCount = Int(shape.D)
         // Deterministic xorshift seed
         var state: UInt64 = 0xCAFEBABE_DEADBEEF
-        var nextF: () -> Float = {
+        let nextF: () -> Float = {
             state ^= state &<< 13
             state ^= state &>> 7
             state ^= state &<< 17
@@ -143,7 +143,7 @@ final class BASChapter852MambaScanBridgeTests: XCTestCase {
             let shape = BASSSMScanShape(
                 B: UInt32(b), L: UInt32(l), D: UInt32(d))
             let bld = Int(shape.elementCount)
-            var nextF: () -> Float = {
+            let nextF: () -> Float = {
                 state ^= state &<< 13
                 state ^= state &>> 7
                 state ^= state &<< 17

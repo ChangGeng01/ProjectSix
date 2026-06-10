@@ -86,7 +86,7 @@ final class BASChapter1000_5SingleCanonicalConsultTests:
         // Path 3: async generic helper
         before = BASANEKernelEligibilityClassifier
             .executorConsultationCount
-        _ = try await BASCognitiveBrain.aneConsulted(
+        _ = BASCognitiveBrain.aneConsulted(
             op: .matMul
         ) { return [Float]([1.0]) }
         after = BASANEKernelEligibilityClassifier

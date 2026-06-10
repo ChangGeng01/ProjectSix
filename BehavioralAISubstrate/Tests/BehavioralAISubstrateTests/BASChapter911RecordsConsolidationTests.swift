@@ -161,7 +161,7 @@ final class BASChapter911RecordsConsolidationTests: XCTestCase
         // reads + compute」 — that alternative requires per-
         // record read FFI which doesn't exist in the bridge。
         // Measures FFI-hop reduction,not end-to-end speedup。
-        let orchSec = try await timeit {
+        let orchSec = await timeit {
             for _ in 0..<n {
                 let _ = await store.usageCount(
                     forAtomID: atom)
