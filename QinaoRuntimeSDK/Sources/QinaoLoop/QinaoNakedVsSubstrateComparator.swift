@@ -12,7 +12,7 @@
 // Chapter 一百四十一 / Appendix R closes that deferral with a
 // real-machine smoke test:
 //   1. naked AFM path: prompt → AppleFoundationOrganAdapter → text
-//   2. naked Gemma 4 E2B path: prompt → MLXOrganAdapter → text
+//   2. naked Gemma 4 E2B path: prompt → substrate MLX endpoint → text
 //   3. substrate path: prompt → BASHostRuntime decision + audit
 //
 // For each path, count red-line violations in the output text using

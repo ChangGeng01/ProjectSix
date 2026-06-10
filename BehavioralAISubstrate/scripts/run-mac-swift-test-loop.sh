@@ -24,6 +24,14 @@
 
 set -uo pipefail
 
+# Xcode-27-beta guard: under the beta toolchain `swift test` SEGVs (signal 11) at xctest LOAD before any
+# test runs (pre-existing toolchain issue — proven via old-vendor control on vendor-latest-refresh). If the
+# machine's xcode-select points at the beta and the caller did not pin a toolchain, pin the STABLE Xcode.
+if [ -z "${DEVELOPER_DIR:-}" ] && xcode-select -p 2>/dev/null | grep -q "Xcode-beta"; then
+    export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+    echo "[toolchain] xcode-select → Xcode-beta (xctest SEGV hazard); pinned DEVELOPER_DIR=${DEVELOPER_DIR}"
+fi
+
 SUBSTRATE_DIR="/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate"
 LOG_DIR="${BAS_MAC_LOG_DIR:-/tmp/ch1022-mac-loop}"
 MAX_SEC=${MAX_SEC:-$((2 * 3600))}   # default 2 hours

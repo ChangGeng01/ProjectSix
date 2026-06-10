@@ -486,6 +486,10 @@ re-vendor:
 available core bump (0.31.4) has no relevant change. (Resolved by research; the risky multi-package re-vendor was
 **not** needed — effort saved.) The bug is in the current/latest MLX, on iOS 27, GPU-exonerated → it is a genuine
 upstream defect to report, not a stale-version artifact.
+**[UPDATE 2026-06-11, vendor-latest-refresh fd7233805]** the multi-package re-vendor WAS subsequently done
+(everything → latest, mlx-swift-lm 3.31.3) for the operator's latest-vendor directive — NOT as a wedge fix (the
+verdict above stands: the wedging code is unchanged upstream). The §11 instruments were ported intact; see the
+maintenance note at the end of §11.
 
 ### 11.3 Chunked-prefill fix + drain-trip diagnostic (iOS 27) — workflow PRIMARY hypothesis REFUTED
 
@@ -522,6 +526,9 @@ diagnostic env flags (`MLX_WEDGE_TRACE`, `MLX_EVENT_WAIT_TIMEOUT_MS`, `BAS_MLX_M
   `notify_task_completion` (scheduler.h) are **byte-identical** to 0.31.1 (only line numbers shifted).
 - mlx-swift-lm latest: the `next()`/`step()`/`asyncEval` generate loop is **unchanged**.
 → Every component's wedging code is identical in the latest → a re-vendor would wedge the same way; **not done**.
+  **[UPDATE 2026-06-11]** a re-vendor to latest was later performed for an unrelated directive (see §11.2 update);
+  the conclusion here is unchanged — the wedge-relevant code is byte-identical in 3.31.3, so the instruments and
+  the cache-bound fix remain the operative mitigations.
 
 **The 3 operator-directed instruments (token-loop beacons + task balance + eval-error) settled the mechanism:**
 - **NOT a prefill hang.** The beacon ladder shows the decode generating a full turn: `P3-enter-next tc=0…96`,
@@ -667,3 +674,12 @@ iter=13/17/21/25/29  active=2512.6 cache≈512   → status=COMPLETED, 30/30, NO
 is automatic + durable. (Honesty bound: n=1 device, iOS 26.5→27.0; 30 turns, not a multi-hour soak — but the
 cache is provably *bounded* now, which is the property that prevents the exhaustion, so it does not depend on
 run length. A longer soak + the watchdog remain available.)
+
+---
+
+**MAINTENANCE NOTE (2026-06-11):** the §11.4 wedge instruments (opt-in `Event::wait` timeout, `MLX_WEDGE_TRACE`
+enter/exit tripwires, scheduler-throttle diagnostics, Gemma per-layer eval beacons, `basSurfaceEvalError` binding
+fix — 7 files across Vendor/mlx-swift + Vendor/mlx-swift-lm) are maintained as a portable diff at
+`Docs/patches/adr038-mlx-wedge-instruments.diff` and MUST be re-applied on every vendor refresh
+(`git apply`, plain — not `--3way`). Most recent port: vendor-latest-refresh `fd7233805` (mlx-swift-lm 3.31.3,
+applied cleanly, 0 conflicts). Full re-vendor procedure: `Docs/VENDOR_REFRESH_RECIPE.md`.

@@ -64,9 +64,13 @@ let package = Package(
         // live in BehavioralAISubstrate/Vendor/ as path packages.
         // Build is now self-contained: no GitHub fetch is required
         // to resolve the substrate. The 15 vendored packages were
-        // copied at the M220 + M221 + M222 pinned revisions and
+        // REFRESHED TO LATEST on the vendor-latest-refresh branch
+        // (2026-06-11, commit fd7233805 — mlx-swift-lm 3.31.3 era;
+        // see that commit for the exact per-package versions) and
         // stripped of `Tests/` / `Documentation/` / `cmake/` for
-        // size discipline (~75 MB total).
+        // size discipline. The M224 url→path rewrites + the ADR-038
+        // wedge instruments were re-applied — full procedure in
+        // Docs/VENDOR_REFRESH_RECIPE.md.
         //
         // Why the full transitive set is vendored: pinning only
         // direct deps still leaves SPM resolving transitives from

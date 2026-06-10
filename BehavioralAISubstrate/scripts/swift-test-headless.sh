@@ -12,6 +12,14 @@
 # failure (run the monolithic `swift test` in a logged-in GUI session for the full @Test pass).
 #
 # Usage:  scripts/swift-test-headless.sh [extra swift-test args...]
+
+# Xcode-27-beta guard: under the beta toolchain `swift test` SEGVs (signal 11) at xctest LOAD before any
+# test runs (pre-existing toolchain issue — proven via old-vendor control on vendor-latest-refresh). If the
+# machine's xcode-select points at the beta and the caller did not pin a toolchain, pin the STABLE Xcode.
+if [ -z "${DEVELOPER_DIR:-}" ] && xcode-select -p 2>/dev/null | grep -q "Xcode-beta"; then
+    export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+    echo "[toolchain] xcode-select → Xcode-beta (xctest SEGV hazard); pinned DEVELOPER_DIR=${DEVELOPER_DIR}"
+fi
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 
