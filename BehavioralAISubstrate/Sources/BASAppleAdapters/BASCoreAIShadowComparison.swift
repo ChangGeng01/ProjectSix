@@ -147,10 +147,23 @@ public enum BASCoreAIShadowComparison {
             "logits_mae: \(maeString)",
             "candidate_latency_ms: \(comparison.candidateLatencyMillis)",
         ]
+        // 全面进化 T2.3 低熵 — DUAL-WRITE: typed effects beside the legacy colon-strings。 The strings stay
+        // the source of record (older composers parse them);typed pairs are the parallel low-entropy lane。
+        // Any field added to `effects` below MUST gain its typed twin here — the composers count a
+        // typed/string disagreement as a skipped record, so drift is loud, not silent.
+        var typed: [BASShadowTrialTypedEffect] = [
+            .init(key: "input_len", value: "\(inputLength)", kind: .metric),
+            .init(key: "incumbent_label", value: comparison.incumbentLabel, kind: .label),
+            .init(key: "candidate_label", value: comparison.candidateLabel, kind: .label),
+            .init(key: "labels_agree", value: "\(comparison.labelsAgree)", kind: .flag),
+            .init(key: "logits_mae", value: maeString, kind: .metric),
+            .init(key: "candidate_latency_ms", value: "\(comparison.candidateLatencyMillis)", kind: .metric),
+        ]
         // PAIRED incumbent latency (additive — absent on pre-pairing records; the evidence composer treats a
         // missing line as nil so old ledgers stay parseable and the gate honestly reports LATENCY_NO_EVIDENCE).
         if let incumbentMs = comparison.incumbentLatencyMillis {
             effects.append("incumbent_latency_ms: \(incumbentMs)")
+            typed.append(.init(key: "incumbent_latency_ms", value: "\(incumbentMs)", kind: .metric))
         }
         let record = BASShadowTrialRecord(
             trialID: trialID,
@@ -160,7 +173,8 @@ public enum BASCoreAIShadowComparison {
             endAt: endAt,
             observedEffects: effects,
             failConditions: [],
-            completionState: "observing")
+            completionState: "observing",
+            typedObservedEffects: typed)
         return ledger.appending(record)
     }
 }

@@ -66,6 +66,17 @@ public struct BASSystemSnapshot:
     public let memoryPressurePercent: Int
     /// VM page size in bytes (typically 4096 or 16384)。
     public let vmPageSize: Int64
+    /// 全面进化 T2.3 低熵 — task_vm_info.phys_footprint:the jetsam-
+    /// relevant per-process memory number (what the kernel actually
+    /// kills on)。 Optional + nil default:synthesized Codable omits
+    /// the absent key,so persisted snapshots and all existing call
+    /// sites stay byte-stable。 nil = probe unavailable/failed (never
+    /// 0-as-unknown)。
+    public let physFootprintBytes: UInt64?
+    /// task_vm_info.compressed bytes (companion to phys footprint)。
+    public let compressedBytes: UInt64?
+    /// task_vm_info.internal bytes (companion to phys footprint)。
+    public let internalBytes: UInt64?
 
     public init(
         thermalBucket: BASThermalBucket,
@@ -76,7 +87,10 @@ public struct BASSystemSnapshot:
         cpuBrand: String,
         memoryTotalBytes: Int64,
         memoryPressurePercent: Int,
-        vmPageSize: Int64
+        vmPageSize: Int64,
+        physFootprintBytes: UInt64? = nil,
+        compressedBytes: UInt64? = nil,
+        internalBytes: UInt64? = nil
     ) {
         self.thermalBucket = thermalBucket
         self.cpuLogicalCount = cpuLogicalCount
@@ -87,6 +101,9 @@ public struct BASSystemSnapshot:
         self.memoryTotalBytes = memoryTotalBytes
         self.memoryPressurePercent = memoryPressurePercent
         self.vmPageSize = vmPageSize
+        self.physFootprintBytes = physFootprintBytes
+        self.compressedBytes = compressedBytes
+        self.internalBytes = internalBytes
     }
 }
 
@@ -160,6 +177,14 @@ public actor BASSystemProbe {
         var pressure: Int32 = 0
         _ = bas_memory_pressure_percent(&pressure)
 
+        // T2.3 低熵 — task_vm_info footprint trio via C bridge。
+        // rc != 0 ⇒ nil (probe honesty:never 0-as-unknown)。
+        var physFootprint: UInt64 = 0
+        var compressed: UInt64 = 0
+        var internalBytes: UInt64 = 0
+        let footprintRC = bas_task_phys_footprint(
+            &physFootprint, &compressed, &internalBytes)
+
         return BASSystemSnapshot(
             thermalBucket: thermal,
             cpuLogicalCount: logical,
@@ -169,7 +194,10 @@ public actor BASSystemProbe {
             cpuBrand: probeCPUBrand(),
             memoryTotalBytes: max(0, totalMem),
             memoryPressurePercent: Int(max(0, pressure)),
-            vmPageSize: probeVMPageSize())
+            vmPageSize: probeVMPageSize(),
+            physFootprintBytes: footprintRC == 0 ? physFootprint : nil,
+            compressedBytes: footprintRC == 0 ? compressed : nil,
+            internalBytes: footprintRC == 0 ? internalBytes : nil)
         #else
         // Non-Apple build host fallback — values zeroed but the
         // struct shape stays。

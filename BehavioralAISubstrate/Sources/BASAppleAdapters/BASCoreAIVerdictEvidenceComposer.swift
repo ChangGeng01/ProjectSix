@@ -32,17 +32,15 @@ public enum BASCoreAIVerdictEvidenceComposer {
     /// Parse one ledger record back into a `Result`, or nil if the record is not a coreai-classifier trial or
     /// its effects are malformed. Pure; tolerant only of ABSENT optional fields (MAE "n/a", missing incumbent
     /// latency), never of malformed required ones.
+    ///
+    /// T2.3 低熵 — fields come from `record.effectFields()`: typed-first when `typedObservedEffects` is
+    /// present (typed/string disagreement ⇒ nil here ⇒ counted as a skipped record), legacy colon-string
+    /// parse otherwise. Old ledgers parse exactly as before.
     public static func parse(
         record: BASShadowTrialRecord
     ) -> BASCoreAIShadowComparison.Result? {
         guard record.trialScope == trialScope else { return nil }
-        var fields: [String: String] = [:]
-        for effect in record.observedEffects {
-            guard let colon = effect.firstIndex(of: ":") else { continue }
-            let key = String(effect[..<colon]).trimmingCharacters(in: .whitespaces)
-            let value = String(effect[effect.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
-            fields[key] = value
-        }
+        guard let fields = record.effectFields() else { return nil }
         guard
             let incumbentLabel = fields["incumbent_label"], !incumbentLabel.isEmpty,
             let candidateLabel = fields["candidate_label"], !candidateLabel.isEmpty,

@@ -38,15 +38,12 @@ public enum BASSpeculativeShadowComposer {
 
     /// Parse one ledger record, or nil if it is not a spec-decode trial or its effects are malformed. Tolerant
     /// only of ABSENT optional fields, never of malformed required ones.
+    ///
+    /// T2.3 低熵 — fields come from `record.effectFields()`: typed-first when `typedObservedEffects` is
+    /// present (typed/string disagreement ⇒ nil ⇒ skipped record), legacy colon-string parse otherwise.
     public static func parse(record: BASShadowTrialRecord) -> ParsedTrial? {
         guard record.trialScope == trialScope else { return nil }
-        var fields: [String: String] = [:]
-        for effect in record.observedEffects {
-            guard let colon = effect.firstIndex(of: ":") else { continue }
-            let key = String(effect[..<colon]).trimmingCharacters(in: .whitespaces)
-            let value = String(effect[effect.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
-            fields[key] = value
-        }
+        guard let fields = record.effectFields() else { return nil }
         guard
             let mode = fields["mode"], !mode.isEmpty,
             let specRaw = fields["speculative_latency_ms"], let specMs = Double(specRaw),

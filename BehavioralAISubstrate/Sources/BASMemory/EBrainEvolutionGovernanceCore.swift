@@ -47,6 +47,48 @@ public struct BASExperienceCandidate: BASSchemaVersioned {
     }
 }
 
+/// 全面进化 T2.3 低熵 — one TYPED observed effect。 The legacy
+/// `observedEffects: [String]` carries colon-string conventions
+/// ("key:value") that every consumer re-parses;this struct is the
+/// typed parallel form。 ADDITIVE ONLY:the string field stays the
+/// source of record for the spine (it sits on the replay-digest
+/// preimage);typed effects ride beside it as an Optional that
+/// synthesized Codable OMITS when nil — so every pre-existing record
+/// and every producer that never sets it stays byte-identical。
+public struct BASShadowTrialTypedEffect: BASSchemaVersioned,
+    Equatable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    /// What kind of fact this effect states。 `metric` = numeric
+    /// measurement,`flag` = boolean condition,`label` = enumerated
+    /// classification,`prose` = free text (the legacy default)。
+    public enum Kind: String, Codable, Equatable, Sendable {
+        case metric
+        case flag
+        case label
+        case prose
+    }
+
+    public var schemaVersion: String
+    public var key: String
+    public var value: String
+    public var kind: Kind
+
+    public init(
+        schemaVersion: String =
+            BASShadowTrialTypedEffect.currentSchemaVersion,
+        key: String,
+        value: String,
+        kind: Kind
+    ) {
+        self.schemaVersion = schemaVersion
+        self.key = key
+        self.value = value
+        self.kind = kind
+    }
+}
+
 public struct BASShadowTrialRecord: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
 
@@ -60,6 +102,15 @@ public struct BASShadowTrialRecord: BASSchemaVersioned {
     public var failConditions: [String]
     public var promotionRecommendation: String?
     public var completionState: String
+    /// 全面进化 T2.3 低熵 — typed parallel form of `observedEffects`。
+    /// MUST stay `Optional` with default `nil` and synthesized Codable:
+    /// `encodeIfPresent` omits the absent key,which is what keeps every
+    /// record that never sets it (including the SPINE producer) byte-
+    /// identical on the replay-digest preimage (ADR-014;same mechanism
+    /// as `endAt`/`promotionRecommendation` above)。 Producers that set
+    /// it MUST dual-write the legacy strings too — typed is a parallel
+    /// lane,not a replacement。
+    public var typedObservedEffects: [BASShadowTrialTypedEffect]?
 
     public init(
         schemaVersion: String = BASShadowTrialRecord.currentSchemaVersion,
@@ -71,7 +122,8 @@ public struct BASShadowTrialRecord: BASSchemaVersioned {
         observedEffects: [String] = [],
         failConditions: [String] = [],
         promotionRecommendation: String? = nil,
-        completionState: String
+        completionState: String,
+        typedObservedEffects: [BASShadowTrialTypedEffect]? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.trialID = trialID
@@ -83,6 +135,41 @@ public struct BASShadowTrialRecord: BASSchemaVersioned {
         self.failConditions = failConditions
         self.promotionRecommendation = promotionRecommendation
         self.completionState = completionState
+        self.typedObservedEffects = typedObservedEffects
+    }
+}
+
+extension BASShadowTrialRecord {
+    /// 全面进化 T2.3 低熵 — the ONE canonical effect-field view both
+    /// evidence composers consume。 Typed-first with string fallback:
+    ///   - `typedObservedEffects == nil` (every legacy record + the
+    ///     spine producer) → the legacy colon-string parse, verbatim。
+    ///   - typed present → typed values WIN,but any key present in
+    ///     BOTH lanes with DIFFERENT values is a producer bug ⇒
+    ///     returns nil and the caller counts the record as skipped
+    ///     (drift must be loud — silently preferring either lane
+    ///     would let the two diverge forever)。
+    /// Pure;keys/values trimmed exactly as the legacy parse did。
+    public func effectFields() -> [String: String]? {
+        var stringFields: [String: String] = [:]
+        for effect in observedEffects {
+            guard let colon = effect.firstIndex(of: ":") else { continue }
+            let key = String(effect[..<colon])
+                .trimmingCharacters(in: .whitespaces)
+            let value = String(effect[effect.index(after: colon)...])
+                .trimmingCharacters(in: .whitespaces)
+            stringFields[key] = value
+        }
+        guard let typed = typedObservedEffects else { return stringFields }
+        var merged = stringFields
+        for e in typed {
+            if let stringValue = stringFields[e.key],
+               stringValue != e.value {
+                return nil  // typed/string disagreement ⇒ skip record
+            }
+            merged[e.key] = e.value
+        }
+        return merged
     }
 }
 
