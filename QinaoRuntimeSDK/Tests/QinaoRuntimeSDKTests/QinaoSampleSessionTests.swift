@@ -2,6 +2,7 @@ import XCTest
 import SwiftUI
 @testable import QinaoSample
 @testable import QinaoLoop
+import QinaoMLX   // B — name QinaoMLXModel explicitly in the picker↔model exhaustiveness assertion
 
 /// M228 — behavior coverage for `SampleSession`.
 ///
@@ -218,6 +219,10 @@ final class QinaoSampleSessionTests: XCTestCase {
             "Gemma 4 E4B (MLX, 4-bit)",
             "Gemma 4 E2B (MLX, 4-bit)",
             "Gemma 3 4B (MLX, 4-bit)",
+            "Llama 3.2 3B (MLX, 4-bit)",
+            "Qwen2.5 3B (MLX, 4-bit)",
+            "Llama 3.2 1B (MLX, 4-bit)",
+            "Qwen2.5 1.5B (MLX, 4-bit)",
             "OpenAI-compatible API (M223)"
         ])
     }
@@ -227,6 +232,10 @@ final class QinaoSampleSessionTests: XCTestCase {
         XCTAssertTrue(SampleProvider.mlxGemma4E4B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma4E2B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma3_4B.isAvailable)
+        XCTAssertTrue(SampleProvider.mlxLlama3_2_3B.isAvailable)
+        XCTAssertTrue(SampleProvider.mlxQwen2_5_3B.isAvailable)
+        XCTAssertTrue(SampleProvider.mlxLlama3_2_1B.isAvailable)
+        XCTAssertTrue(SampleProvider.mlxQwen2_5_1_5B.isAvailable)
         XCTAssertFalse(
             SampleProvider.chatCompletions.isAvailable,
             "ChatCompletions remains a placeholder until M223")
@@ -239,7 +248,19 @@ final class QinaoSampleSessionTests: XCTestCase {
             SampleProvider.mlxGemma4E2B.mlxModel, .gemma4E2B)
         XCTAssertEqual(
             SampleProvider.mlxGemma3_4B.mlxModel, .gemma3_4B)
+        XCTAssertEqual(
+            SampleProvider.mlxLlama3_2_3B.mlxModel, .llama3_2_3B)
+        XCTAssertEqual(
+            SampleProvider.mlxQwen2_5_3B.mlxModel, .qwen2_5_3B)
+        XCTAssertEqual(
+            SampleProvider.mlxLlama3_2_1B.mlxModel, .llama3_2_1B)
+        XCTAssertEqual(
+            SampleProvider.mlxQwen2_5_1_5B.mlxModel, .qwen2_5_1_5B)
         XCTAssertNil(SampleProvider.appleFoundation.mlxModel)
         XCTAssertNil(SampleProvider.chatCompletions.mlxModel)
+        // The picker→model mapping is injective AND total over QinaoMLXModel (every model is reachable).
+        let mapped = SampleProvider.allCases.compactMap(\.mlxModel)
+        XCTAssertEqual(Set(mapped).count, mapped.count, "MLX picker→model mapping must be injective")
+        XCTAssertEqual(Set(mapped), Set(QinaoMLXModel.allCases), "every QinaoMLXModel must have a picker case")
     }
 }

@@ -130,6 +130,20 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     /// quality / longer context (128K) variant. ~3 GB on disk.
     case gemma3_4B = "gemma-3-4b-it-4bit"
 
+    // MARK: - availableAlternatives (stable-arch fallbacks — EXPERIMENTAL tier, host opt-in)
+    // Mirror `MLXModelCatalog.availableAlternatives` (Llama 3.2 / Qwen2.5). NOT in `defaultEntries`;
+    // `certificationTier` reports them "experimental". Distinct EOS tokens (Llama `<|eot_id|>`, Qwen
+    // `<|im_end|>`) live in the catalog entries — `catalogEntry` returns those verbatim.
+
+    /// Llama 3.2 3B instruction-tuned, 4-bit (stable transformer-arch fallback).
+    case llama3_2_3B = "llama-3.2-3b-it-4bit"
+    /// Qwen2.5 3B instruction-tuned, 4-bit.
+    case qwen2_5_3B = "qwen2.5-3b-it-4bit"
+    /// Llama 3.2 1B instruction-tuned, 4-bit (smallest fallback).
+    case llama3_2_1B = "llama-3.2-1b-it-4bit"
+    /// Qwen2.5 1.5B instruction-tuned, 4-bit.
+    case qwen2_5_1_5B = "qwen2.5-1.5b-it-4bit"
+
     public var id: String { rawValue }
 
     /// Human-readable display name suitable for picker UIs.
@@ -141,6 +155,14 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
             return "Gemma 4 E2B (MLX, 4-bit)"
         case .gemma3_4B:
             return "Gemma 3 4B (MLX, 4-bit)"
+        case .llama3_2_3B:
+            return "Llama 3.2 3B (MLX, 4-bit)"
+        case .qwen2_5_3B:
+            return "Qwen2.5 3B (MLX, 4-bit)"
+        case .llama3_2_1B:
+            return "Llama 3.2 1B (MLX, 4-bit)"
+        case .qwen2_5_1_5B:
+            return "Qwen2.5 1.5B (MLX, 4-bit)"
         }
     }
 
@@ -162,6 +184,22 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
             return MLXModelCatalog.gemma4_E2B_4bit
         case .gemma3_4B:
             return MLXModelCatalog.gemma3_4B_it_4bit
+        case .llama3_2_3B:
+            return MLXModelCatalog.llama3_2_3B_4bit
+        case .qwen2_5_3B:
+            return MLXModelCatalog.qwen2_5_3B_4bit
+        case .llama3_2_1B:
+            return MLXModelCatalog.llama3_2_1B_4bit
+        case .qwen2_5_1_5B:
+            return MLXModelCatalog.qwen2_5_1_5B_4bit
         }
+    }
+
+    /// Advisory certification tier for UI / audit labeling — `"certified"` for the on-device-certified default
+    /// Gemma entries, `"experimental"` for the `availableAlternatives` (Llama/Qwen). Computed from the live
+    /// catalog so it can never drift. A `String` (not a BAS enum) to keep the substrate-redaction seam clean.
+    public var certificationTier: String {
+        MLXModelCatalog.defaultEntries.contains { $0.providerID == catalogEntry.providerID }
+            ? "certified" : "experimental"
     }
 }

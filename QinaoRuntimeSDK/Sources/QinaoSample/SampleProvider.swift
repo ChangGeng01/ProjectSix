@@ -14,6 +14,11 @@ public enum SampleProvider: String, CaseIterable, Identifiable,
     case mlxGemma4E4B = "Gemma 4 E4B (MLX, 4-bit)"
     case mlxGemma4E2B = "Gemma 4 E2B (MLX, 4-bit)"
     case mlxGemma3_4B = "Gemma 3 4B (MLX, 4-bit)"
+    // availableAlternatives (Llama/Qwen) — wired + selectable, EXPERIMENTAL tier (QinaoMLXModel.certificationTier).
+    case mlxLlama3_2_3B = "Llama 3.2 3B (MLX, 4-bit)"
+    case mlxQwen2_5_3B = "Qwen2.5 3B (MLX, 4-bit)"
+    case mlxLlama3_2_1B = "Llama 3.2 1B (MLX, 4-bit)"
+    case mlxQwen2_5_1_5B = "Qwen2.5 1.5B (MLX, 4-bit)"
     case chatCompletions = "OpenAI-compatible API (M223)"
 
     public var id: String { rawValue }
@@ -33,6 +38,10 @@ public enum SampleProvider: String, CaseIterable, Identifiable,
         case .mlxGemma4E4B: return .gemma4E4B
         case .mlxGemma4E2B: return .gemma4E2B
         case .mlxGemma3_4B: return .gemma3_4B
+        case .mlxLlama3_2_3B: return .llama3_2_3B
+        case .mlxQwen2_5_3B: return .qwen2_5_3B
+        case .mlxLlama3_2_1B: return .llama3_2_1B
+        case .mlxQwen2_5_1_5B: return .qwen2_5_1_5B
         default: return nil
         }
     }

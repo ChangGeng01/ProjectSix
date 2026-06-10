@@ -17,14 +17,14 @@ final class QinaoMLXEndpointTests: XCTestCase {
 
     // MARK: - 1. Catalog completeness
 
-    func testAllCasesShipsCanonicalGemmaVariants() {
+    func testAllCasesShipsDefaultsPlusAlternatives() {
         let cases = QinaoMLXModel.allCases
-        // M236 retired Gemma 3n cases; canonical pickers ship
-        // Gemma 4 e4b + e2b plus Gemma 3 4B (long-context outlier).
-        XCTAssertEqual(cases.count, 3)
+        // 3 certified default Gemma entries + 4 experimental availableAlternatives (Llama/Qwen) = 7.
+        XCTAssertEqual(cases.count, 7)
         XCTAssertEqual(
             Set(cases),
-            [.gemma4E4B, .gemma4E2B, .gemma3_4B])
+            [.gemma4E4B, .gemma4E2B, .gemma3_4B,
+             .llama3_2_3B, .qwen2_5_3B, .llama3_2_1B, .qwen2_5_1_5B])
     }
 
     // MARK: - 2. Display + provider identity
@@ -33,7 +33,11 @@ final class QinaoMLXEndpointTests: XCTestCase {
         let pairs: [(QinaoMLXModel, String)] = [
             (.gemma4E4B, "Gemma 4 E4B (MLX, 4-bit)"),
             (.gemma4E2B, "Gemma 4 E2B (MLX, 4-bit)"),
-            (.gemma3_4B, "Gemma 3 4B (MLX, 4-bit)")
+            (.gemma3_4B, "Gemma 3 4B (MLX, 4-bit)"),
+            (.llama3_2_3B, "Llama 3.2 3B (MLX, 4-bit)"),
+            (.qwen2_5_3B, "Qwen2.5 3B (MLX, 4-bit)"),
+            (.llama3_2_1B, "Llama 3.2 1B (MLX, 4-bit)"),
+            (.qwen2_5_1_5B, "Qwen2.5 1.5B (MLX, 4-bit)")
         ]
         for (model, expected) in pairs {
             XCTAssertEqual(
@@ -94,5 +98,23 @@ final class QinaoMLXEndpointTests: XCTestCase {
             signatureDefault, .gemma4E4B,
             "recommended default must remain Gemma 4 E4B until a " +
             "subsequent milestone explicitly retires it")
+    }
+
+    // MARK: - 6. Certification tier (B — defaults certified, alternatives experimental)
+
+    func testCertificationTierMatchesCatalogTiering() {
+        let certified: Set<QinaoMLXModel> = [.gemma4E4B, .gemma4E2B, .gemma3_4B]
+        for model in QinaoMLXModel.allCases {
+            let expected = certified.contains(model) ? "certified" : "experimental"
+            XCTAssertEqual(
+                model.certificationTier, expected,
+                "\(model) tier must be \(expected) (defaults=certified, alternatives=experimental)")
+        }
+        XCTAssertTrue(
+            QinaoMLXModel.allCases.contains { $0.certificationTier == "certified" },
+            "at least one certified default must exist")
+        XCTAssertTrue(
+            QinaoMLXModel.allCases.contains { $0.certificationTier == "experimental" },
+            "at least one experimental alternative must exist")
     }
 }
