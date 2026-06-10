@@ -7,7 +7,17 @@ import Testing
 @testable import BASOrchestration
 
 #if !os(iOS)  // ch 1022 source-gate: SwiftTesting iOS bundle discovery quirk
+/// @MainActor — SIGBUS guard (same root cause as 27e0fcb2e): swift-testing runs
+/// EVERY test (sync included) on a 512KB cooperative-pool thread, while the
+/// debug-build turn pipeline needs ~550KB (runTurn 127KB single frame + the
+/// 6-deep BASEBrainTurnResult.init delegation chain — llvm-objdump-measured)。
+/// ~10 tests in this suite drive full turns via startSession/runTurn; the
+/// dream-loop sovereign-cut test crossed the guard page first ("Thread stack
+/// size exceeded", faultingThread on com.apple.root.default-qos.cooperative)。
+/// MainActor isolation hops the whole suite onto the main thread's 8MB stack —
+/// the same thread class every sync XCTest turn test and production host uses。
 @Suite("BASEBrain schemas")
+@MainActor
 struct BASEBrainSchemaCoreTests {
     @Test("update ticket prioritizes structured constitution host change candidates and decodes legacy payloads")
     func updateTicketPrefersStructuredHostChangeCandidateAndDecodesLegacyPayload() throws {
