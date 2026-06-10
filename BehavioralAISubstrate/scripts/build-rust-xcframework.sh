@@ -18,10 +18,14 @@
 #   - strip = symbols
 #   - lto = false (avoids LLVM cross-compile non-determinism)
 #
-# Verify reproducibility:run script twice on a clean
-# tree,then `shasum -a 256` both .xcframework outputs。
-# Hashes MUST match for the chapter 七百六 byte-equality
-# invariant to hold。
+# Verify reproducibility:run the script twice with
+# BAS_CLEAN_REBUILD=1 (cold target dirs — REQUIRED;a warm
+# re-run reuses cargo's fingerprint cache,including the
+# clang-compiled sqlite3.o,and proves nothing),then
+# `shasum -a 256` both .xcframework outputs。 Hashes MUST
+# match for the chapter 七百六 byte-equality invariant to
+# hold。 DEVELOPER_DIR is pinned below because sqlite3.o's
+# bytes follow the active clang。
 #
 # ## Cross-compilation scope
 #
@@ -79,6 +83,17 @@ export CARGO_TERM_COLOR=always
 export IPHONEOS_DEPLOYMENT_TARGET="18.0"
 export MACOSX_DEPLOYMENT_TARGET="14.0"
 
+# 全面进化 T2.1a audit fix — pin the C COMPILER, not just the Rust
+# toolchain。 The bundle contains ONE clang-compiled member
+# (libsqlite3-sys's sqlite3.o via the cc crate);its bytes vary
+# with the active clang (stable vs beta Xcode produce different
+# codegen),and cargo's fingerprint cache reuses the cached .o
+# across script runs — so "run the script twice" was structurally
+# unable to detect the drift (audited 2026-06-11: 456/458 archive
+# members reproducible,sqlite3.o the sole exception)。 DEVELOPER_DIR
+# resolves /usr/bin/cc → this Xcode's clang for the cc crate。
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+
 # Targets shipped。 Three slices since M2191 chapter
 # 七百七 第一刀 (expanded from host-only at M2187)。
 TARGETS=(
@@ -89,8 +104,21 @@ TARGETS=(
 
 echo "==> SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
 echo "==> RUSTFLAGS=${RUSTFLAGS}"
+echo "==> DEVELOPER_DIR=${DEVELOPER_DIR}"
 echo "==> targets:${TARGETS[*]}"
 echo ""
+
+# BAS_CLEAN_REBUILD=1 — cold-rebuild mode for reproducibility
+# verification:wipes each target's release dir so EVERY member
+# (including the clang-compiled sqlite3.o) recompiles from source。
+# The doctrine check is two CLEAN rebuilds hashing identically;
+# warm re-runs only prove the cache works。
+if [ "${BAS_CLEAN_REBUILD:-0}" = "1" ]; then
+  for t in "${TARGETS[@]}"; do
+    echo "==> BAS_CLEAN_REBUILD: rm -rf target/${t}/release"
+    rm -rf "${CARGO_ROOT}/target/${t}/release"
+  done
+fi
 
 # Step 1: cargo build --release per target。
 for t in "${TARGETS[@]}"; do

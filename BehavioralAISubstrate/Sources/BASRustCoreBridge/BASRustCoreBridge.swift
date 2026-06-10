@@ -120,19 +120,28 @@ public enum BASRustCoreBridge {
     ///   - "latest-languages" cut: Rust 1.95→1.96 + IPHONEOS=18.0/MACOSX=14.0
     ///     deployment-target pin (fixes the iOS sqlite3.o 26.5-vs-18.0 link
     ///     warning). Byte-equality re-verified across two clean rebuilds.
+    ///   - 全面进化 T2.1a: bas-canonical-bytes ABI v2 (+1.2.0 injective
+    ///     assembler `bas_canonical_bytes_assemble_v1_2` + force-link anchor)。
+    ///     ALSO the first COLD-rebuild pin: the audit proved the prior pins
+    ///     captured a cache-warmed clang-compiled sqlite3.o (toolchain-
+    ///     sensitive);the build script now pins DEVELOPER_DIR and these
+    ///     hashes are verified by TWO clean rebuilds (BAS_CLEAN_REBUILD=1)
+    ///     hashing byte-identically。
     public static let macosArm64SliceSHA256: String =
-        "38074aac19dea3714c3d772e75fff564077c10f57bf81b7c0255778350519244"
+        "742877c5f54669c72cc22bdea72b5fcf68a1d12ec38b4883ba9358438ac8c2c2"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
     /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
-    /// cut (Rust 1.96 + iOS-18 deployment-target pin)。
+    /// cut (Rust 1.96 + iOS-18 deployment-target pin); 全面进化 T2.1a
+    /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin)。
     public static let iosArm64SliceSHA256: String =
-        "d0a0940c915f701cffc9a3813a5ba6fc2c2445bebd05bc0d8d8d9e9feaad1c42"
+        "a7533f892ee56c0c710f4258797555b0f90a06d1af3c69cb49114513d1defdc5"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
-    /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut。
+    /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut;
+    /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin)。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "49d7d7bac4bbec838b0eeddd80205af3bac0f54184b375fa2ca868214fb15904"
+        "59d5db3367f3dd6beb24e59bb39ee029699aafef99936c98b4576d0f3f43cf93"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

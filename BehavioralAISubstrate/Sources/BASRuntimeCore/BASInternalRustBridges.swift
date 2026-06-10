@@ -801,6 +801,15 @@ public enum BASRustABIRegistry {
             liveProbe: {
                 BASAgentFabricBridge.liveAbiVersion()
             }),
+        // 全面进化 T2.1a — canonical-bytes ABI v2 (1.2.0 injective
+        // assembler)。 Probe wired the same cut that bumped the
+        // crate,so drift is impossible to miss。
+        ABIProbe(
+            crateName: "bas-canonical-bytes",
+            expected: BASCanonicalBytesBridge.abiVersion,
+            liveProbe: {
+                BASCanonicalBytesBridge.liveAbiVersion()
+            }),
     ]
 
     /// Run ALL registered ABI probes,return mismatches。 Empty

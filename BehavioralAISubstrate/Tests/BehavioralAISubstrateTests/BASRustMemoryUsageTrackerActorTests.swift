@@ -121,9 +121,12 @@ final class BASRustMemoryUsageTrackerActorTests:
         //   - chapter 七百七十三 第二刀: 12 → 20 crate bundle
         //     (DEEPER LAYER-MIGRATION ARC XCFramework rebuild)
         //   - "latest-languages" cut: Rust 1.96 + iOS-18/macOS-14 pin
+        //   - 全面进化 T2.1a: canonical-bytes ABI v2 (1.2.0 injective assembler)
+        //     + first cold-rebuild pin (DEVELOPER_DIR-pinned clang; two clean
+        //     rebuilds verified byte-identical via BAS_CLEAN_REBUILD=1)
         XCTAssertEqual(
             BASRustCoreBridge.macosArm64SliceSHA256,
-            "38074aac19dea3714c3d772e75fff564077c10f57bf81b7c0255778350519244",
+            "742877c5f54669c72cc22bdea72b5fcf68a1d12ec38b4883ba9358438ac8c2c2",
             "Chapter 七百一 RED FLAG #1 reproducibility-" +
             "verification pin。 If this hash changes," +
             "a future commit rebuilt the XCFramework " +
@@ -161,7 +164,7 @@ final class BASRustMemoryUsageTrackerActorTests:
     func testIosArm64SliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SliceSHA256,
-            "d0a0940c915f701cffc9a3813a5ba6fc2c2445bebd05bc0d8d8d9e9feaad1c42",
+            "a7533f892ee56c0c710f4258797555b0f90a06d1af3c69cb49114513d1defdc5",
             "iOS device slice byte-equality pin。")
         if let liveHash = Self.liveSliceSHA256("ios-arm64") {
             XCTAssertEqual(liveHash, BASRustCoreBridge.iosArm64SliceSHA256,
@@ -172,7 +175,7 @@ final class BASRustMemoryUsageTrackerActorTests:
     func testIosArm64SimulatorSliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
-            "49d7d7bac4bbec838b0eeddd80205af3bac0f54184b375fa2ca868214fb15904",
+            "59d5db3367f3dd6beb24e59bb39ee029699aafef99936c98b4576d0f3f43cf93",
             "iOS simulator slice byte-equality pin。")
         if let liveHash = Self.liveSliceSHA256("ios-arm64-simulator") {
             XCTAssertEqual(liveHash, BASRustCoreBridge.iosArm64SimulatorSliceSHA256,

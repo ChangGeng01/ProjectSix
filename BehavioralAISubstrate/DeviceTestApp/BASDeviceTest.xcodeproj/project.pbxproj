@@ -1090,6 +1090,7 @@
 		B6A8DAD66F9B27014F0B61AA /* BASChapter625HostKitErrorTrioProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC8AFA98550925377B0E1FC /* BASChapter625HostKitErrorTrioProofTests.swift */; };
 		B6F7B910DD6504D8B7F5F932 /* BASCognitiveBrainHealthSnapshotHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0480293165F17E91C3FFD254 /* BASCognitiveBrainHealthSnapshotHistoryTests.swift */; };
 		B716368EE2AA64685D92BEB0 /* BASCanonicalKernelCoverageChapter681Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E595E0176DFED20E34BEE4 /* BASCanonicalKernelCoverageChapter681Tests.swift */; };
+		CA12B71E5D4A9F30C2E6B802 /* BASCanonicalBytesRustParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA12B71E5D4A9F30C2E6B801 /* BASCanonicalBytesRustParityTests.swift */; };
 		B73896548922693B6F77AA8E /* BASBlueprintHexagonalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 924AA825081DBD82798B2D81 /* BASBlueprintHexagonalTests.swift */; };
 		B74E0E1AA4CB6923EB5DF3B5 /* BASChapter765L7LedgerSchemasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0EE9DC0EA70E5B74CB403A5 /* BASChapter765L7LedgerSchemasTests.swift */; };
 		B74FA6F08C93C8DBD050C82F /* BASAppleMemoryMutationWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A63B0DC76BCF2F4FE5AD388 /* BASAppleMemoryMutationWriterTests.swift */; };
@@ -2337,6 +2338,7 @@
 		926B5F2DD4EBAB73C3CF61CF /* BASAuditObservationProjectionsKunlunProtocolBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAuditObservationProjectionsKunlunProtocolBlockTests.swift; sourceTree = "<group>"; };
 		92C2373E50FBB622BF9367B6 /* BASChapter724BinaryEventLogCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter724BinaryEventLogCodecTests.swift; sourceTree = "<group>"; };
 		92E595E0176DFED20E34BEE4 /* BASCanonicalKernelCoverageChapter681Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASCanonicalKernelCoverageChapter681Tests.swift; sourceTree = "<group>"; };
+		CA12B71E5D4A9F30C2E6B801 /* BASCanonicalBytesRustParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASCanonicalBytesRustParityTests.swift; sourceTree = "<group>"; };
 		92ECD3B04DC73DAA3AD81B7B /* BASChapter895DeletionManifestRustTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter895DeletionManifestRustTests.swift; sourceTree = "<group>"; };
 		92F5CFAA6BEB981D65F38ADE /* BASTurnRuntimeEngineHostInjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASTurnRuntimeEngineHostInjectionTests.swift; sourceTree = "<group>"; };
 		931C2ADB2CFF75CF8D4C0B40 /* BASMLContextServiceUnknownLabelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMLContextServiceUnknownLabelTests.swift; sourceTree = "<group>"; };
@@ -3207,6 +3209,7 @@
 				2E1583EF041252BD010EF3E6 /* BASCandidateObservationMaterializationTests.swift */,
 				79A1DA603D79EBC5C73E983C /* BASCandidateObservationTests.swift */,
 				8F3A1E17B4001EAAEB04D8A9 /* BASCanonicalKernelCoverageChapter496Tests.swift */,
+				CA12B71E5D4A9F30C2E6B801 /* BASCanonicalBytesRustParityTests.swift */,
 				92E595E0176DFED20E34BEE4 /* BASCanonicalKernelCoverageChapter681Tests.swift */,
 				DC65F0F83E7B58478244653B /* BASCanonicalKernelInputBuildersTests.swift */,
 				977F19D30CC023FDF1E6FE1E /* BASCategorizationEnumTrioCodableExtensionDoctrineTests.swift */,
@@ -4828,6 +4831,7 @@
 				E6B8F44FD244FADDAB3E9218 /* BASCandidateObservationMaterializationTests.swift in Sources */,
 				7D3B583994A70395C480C262 /* BASCandidateObservationTests.swift in Sources */,
 				FF7772C5A4A3C8DE81A80C44 /* BASCanonicalKernelCoverageChapter496Tests.swift in Sources */,
+				CA12B71E5D4A9F30C2E6B802 /* BASCanonicalBytesRustParityTests.swift in Sources */,
 				B716368EE2AA64685D92BEB0 /* BASCanonicalKernelCoverageChapter681Tests.swift in Sources */,
 				BA55E2AFC9C1084A09DF8A66 /* BASCanonicalKernelInputBuildersTests.swift in Sources */,
 				332AB37C0FBC8AA122BB1DEB /* BASCategorizationEnumTrioCodableExtensionDoctrineTests.swift in Sources */,

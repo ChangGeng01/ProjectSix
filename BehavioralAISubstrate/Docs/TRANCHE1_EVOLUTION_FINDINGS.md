@@ -66,10 +66,24 @@ estimates for a model whose tokenizer the crate actually matches.
 
 ## Tranche-2 queue (re-specified by these findings)
 
-1. **canonical-bytes 1.2.0 rewrite** (the one concrete native-dev item left from this batch): Rust assembler
-   to the injective length-prefixed form + extern-C + golden-vector & randomized parity gates vs
-   `basSovereignAuditCanonicalBytes` — one XCFramework rebuild (SHA-pin discipline), banking flip evidence
-   for a future Rust audit-ledger lane.
+1. **canonical-bytes 1.2.0 rewrite — DONE (T2.1a, 2026-06-11).** `bas-canonical-bytes` ABI v1 → v2:
+   new `v1_2.rs` injective assembler (length-prefixed `<utf8ByteCount>:<bytes>` parts + per-array count
+   markers, mirroring the Swift incumbent's 1.2.0 branch field-for-field) + extern-C
+   `bas_canonical_bytes_assemble_v1_2` (two-pass size-query/fill) + force-link anchor + XCFramework rebuild +
+   `BASCanonicalBytesBridge` Swift wrapper + ABI-registry probe row + `BASCanonicalBytesRustParityTests`
+   (12 tests: hand-computed golden vectors pinning BOTH languages to the spec, in-band U+001F/U+001E/":"
+   hazards, unicode/empty/pre-epoch, 200 seeded-random entries, legacy-collision distinctness). Swift
+   incumbent == Rust byte-for-byte on every vector. ADR-014 OPT-IN preserved: zero production callers route
+   through Rust — this banks the cross-language evidence a future Rust audit-ledger lane would require.
+
+   **Reproducibility correction (audit-confirmed HIGH, fixed same cut):** the first version of this entry
+   claimed "two clean rebuilds byte-identical" — that check was VACUOUS: cargo's fingerprint cache reused the
+   one clang-compiled archive member (libsqlite3-sys `sqlite3.o`, whose bytes follow the active clang), so a
+   warm re-run could never detect drift, and an independent cold rebuild produced a different hash (456/458
+   members reproducible; sqlite3.o the sole exception). Fixed by pinning `DEVELOPER_DIR` in
+   `scripts/build-rust-xcframework.sh` + adding `BAS_CLEAN_REBUILD=1` cold-rebuild mode; the shipped pins are
+   now verified by TWO genuinely clean rebuilds (cold target dirs, pinned clang) hashing byte-identically on
+   all 3 slices.
 2. retrieval-ranker decay/fuser into the ADR-036 opt-in ranking seam (dual-mode A/B + recall@K gate).
 3. 低熵 additions (typed observedEffects parallel field; C probes into the observation surface; C++ MPS cache
    first caller).

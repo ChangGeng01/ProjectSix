@@ -40,6 +40,28 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_retrieval_ranker::bas_ranker_abi_version());
     total = total.wrapping_add(
         bas_canonical_bytes::bas_canonical_bytes_abi_version());
+    // 全面进化 T2.1a — force-link the 1.2.0 injective canonical-
+    // bytes assembler。 Sentinel:all-empty fields + null out
+    // buffer → pure size query (returns total bytes needed = 30
+    // for the all-empty entry;value folded,call is the anchor)。
+    let cb12_needed = unsafe {
+        bas_canonical_bytes::bas_canonical_bytes_assemble_v1_2(
+            core::ptr::null(), 0,            // schema_version
+            core::ptr::null(), 0,            // audit_id
+            core::ptr::null(), 0,            // session_id
+            core::ptr::null(), 0,            // turn_id
+            core::ptr::null(), 0,            // verdict_ref
+            core::ptr::null(), core::ptr::null(), 0,  // rule_ids
+            core::ptr::null(), core::ptr::null(), 0,  // signal_refs
+            core::ptr::null(), core::ptr::null(), 0,  // action_refs
+            core::ptr::null(), 0,            // snapshot_ref
+            core::ptr::null(), 0,            // actor
+            0,                               // appended_at_ms
+            core::ptr::null(), 0,            // prior_hash
+            core::ptr::null(), 0,            // signing_namespace
+            core::ptr::null_mut(), 0)        // out_buf (size query)
+    };
+    total = total.wrapping_add(cb12_needed as i32);
     total = total.wrapping_add(
         bas_permit_policy::bas_permit_policy_abi_version());
     total = total.wrapping_add(
