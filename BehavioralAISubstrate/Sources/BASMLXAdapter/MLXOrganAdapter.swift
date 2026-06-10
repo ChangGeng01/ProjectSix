@@ -277,6 +277,22 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         return params
     }
 
+    /// Sampling-lane generation parameters: the preset's temperature with the PURE-TEMPERATURE envelope forced
+    /// (topP=1 ⇒ `CategoricalSampler`, no topP/topK/minP filtering). The vendored rejection-sampling branch is
+    /// exact ONLY for pure-temperature sampling — its p/q shaping mirrors `CategoricalSampler`'s
+    /// `softmax(logits/temp)` draw; a filtered sampler would make q ≠ the draft's true draw distribution (audit
+    /// fix). HONEST BOUND: the `.sampling` speculative lane therefore samples the pure-temperature distribution,
+    /// NOT the preset's topP-shaped one — a host that needs nucleus sampling keeps the single-model path.
+    func _samplingParameters(
+        for preset: BASOrganPreset,
+        maxOutputTokens: Int? = nil
+    ) -> GenerateParameters {
+        var params = _generateParameters(
+            for: preset, maxOutputTokens: maxOutputTokens)
+        params.topP = 1
+        return params
+    }
+
     /// Whether the speculative path should run for `request`. True only when a draft container is loaded AND the
     /// configured mode is LIVE. `.greedy` is token-identical to greedy target-only decoding; `.sampling`
     /// (Phase 2) is distribution-equivalent via Leviathan rejection sampling — both are wired. (The sampling

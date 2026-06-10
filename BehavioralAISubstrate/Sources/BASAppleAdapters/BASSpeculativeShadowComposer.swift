@@ -49,7 +49,9 @@ public enum BASSpeculativeShadowComposer {
         }
         guard
             let mode = fields["mode"], !mode.isEmpty,
-            let specRaw = fields["speculative_latency_ms"], let specMs = Double(specRaw)
+            let specRaw = fields["speculative_latency_ms"], let specMs = Double(specRaw),
+            specMs.isFinite, specMs >= 0   // AUDIT hardening: "nan"/"inf"/negative parse as Double — reject (NaN
+                                           // would poison the means; mirrors the CoreAI non-finite MAE guard)
         else { return nil }
 
         // Optional correctness — absent ⇒ nil; present-but-malformed ⇒ reject the record.
@@ -60,15 +62,22 @@ public enum BASSpeculativeShadowComposer {
             guard let parsed = Bool(raw) else { return nil }
             correctness = parsed
         }
-        // Optional acceptance — absent ⇒ nil; present-but-malformed ⇒ reject.
+        // Optional acceptance — absent ⇒ nil; present-but-malformed/non-finite/out-of-range ⇒ reject.
         let acceptance: Double?
         switch fields["acceptance_rate"] {
         case .none: acceptance = nil
         case .some(let raw):
-            guard let parsed = Double(raw) else { return nil }
+            guard let parsed = Double(raw), parsed.isFinite, (0...1).contains(parsed) else { return nil }
             acceptance = parsed
         }
-        let baselineMs = fields["baseline_latency_ms"].flatMap(Double.init)
+        // Optional baseline latency — absent ⇒ nil (unpaired); present-but-malformed/non-finite ⇒ reject.
+        let baselineMs: Double?
+        switch fields["baseline_latency_ms"] {
+        case .none: baselineMs = nil
+        case .some(let raw):
+            guard let parsed = Double(raw), parsed.isFinite, parsed >= 0 else { return nil }
+            baselineMs = parsed
+        }
         return ParsedTrial(
             mode: mode,
             correctnessVerified: correctness,
@@ -86,16 +95,24 @@ public enum BASSpeculativeShadowComposer {
         public let pairedLatencySampleCount: Int
     }
 
-    /// Fold ledger records into gate `Evidence`. Pure + deterministic. `distinctDeviceCount`, the dual peak, and
-    /// the memory budget are caller-supplied (capture-campaign / device properties, not per-record).
+    /// Fold ledger records into gate `Evidence` for ONE lane. Pure + deterministic. `distinctDeviceCount`, the
+    /// dual peak, and the memory budget are caller-supplied (capture-campaign / device properties, not per-record).
+    ///
+    /// AUDIT FIX — PER-MODE composition: `mode` is now a required filter. The previous shape pooled greedy AND
+    /// sampling records into one Evidence (mode picked by arbitrary parse order, correctness AND'd across lanes,
+    /// latency means mixing both lanes) — a dishonest conflation. Each lane is judged on its own records; valid
+    /// records of OTHER modes are simply out of scope (neither counted nor skipped — `skippedRecordCount` keeps
+    /// meaning "in-scope but malformed").
     public static func compose(
         records: [BASShadowTrialRecord],
+        mode: String,
         distinctDeviceCount: Int,
         dualPeakMemoryBytes: Int? = nil,
         memoryBudgetBytes: Int? = nil
     ) -> Composition {
         let scoped = records.filter { $0.trialScope == trialScope }
-        let trials = scoped.compactMap(parse(record:))
+        let parsed = scoped.compactMap(parse(record:))
+        let trials = parsed.filter { $0.mode == mode }
 
         // Correctness is a hard AND: any false ⇒ false; ≥1 true and no false ⇒ true; none measured ⇒ nil.
         let correctnessValues = trials.compactMap(\.correctnessVerified)
@@ -120,7 +137,7 @@ public enum BASSpeculativeShadowComposer {
         let baseMean = paired.isEmpty ? nil : paired.map(\.base).reduce(0, +) / Double(paired.count)
 
         let evidence = BASSpeculativeMigrationVerdict.Evidence(
-            mode: trials.first?.mode ?? "unknown",
+            mode: mode,
             correctnessVerified: correctness,
             acceptanceRate: meanAcceptance,
             speculativeMeanLatencyMillis: specMean,
@@ -128,12 +145,13 @@ public enum BASSpeculativeShadowComposer {
             dualPeakMemoryBytes: dualPeakMemoryBytes,
             memoryBudgetBytes: memoryBudgetBytes,
             sampleCount: trials.count,
+            pairedLatencySampleCount: paired.count,
             distinctDeviceCount: distinctDeviceCount)
 
         return Composition(
             evidence: evidence,
             parsedRecordCount: trials.count,
-            skippedRecordCount: scoped.count - trials.count,
+            skippedRecordCount: scoped.count - parsed.count,
             pairedLatencySampleCount: paired.count)
     }
 
@@ -141,6 +159,7 @@ public enum BASSpeculativeShadowComposer {
 
     public static func decide(
         records: [BASShadowTrialRecord],
+        mode: String,
         distinctDeviceCount: Int,
         dualPeakMemoryBytes: Int? = nil,
         memoryBudgetBytes: Int? = nil,
@@ -148,6 +167,7 @@ public enum BASSpeculativeShadowComposer {
     ) -> (verdict: BASSpeculativeMigrationVerdict.Verdict, composition: Composition) {
         let composition = compose(
             records: records,
+            mode: mode,
             distinctDeviceCount: distinctDeviceCount,
             dualPeakMemoryBytes: dualPeakMemoryBytes,
             memoryBudgetBytes: memoryBudgetBytes)

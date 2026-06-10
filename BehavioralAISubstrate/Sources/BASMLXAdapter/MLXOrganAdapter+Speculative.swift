@@ -70,13 +70,15 @@ extension MLXOrganAdapter {
         // Choose the lane by mode:
         //  • .greedy   — temperature 0 → ArgMaxSampler → exact-equality acceptance → token-identical to greedy
         //                target-only decoding (bytewise-provable).
-        //  • .sampling — preset temperature → Leviathan rejection sampling → distribution-equivalent to
-        //                target-only sampling (statistical, device-cert-pending).
+        //  • .sampling — preset temperature with the PURE-TEMPERATURE envelope forced (`_samplingParameters`
+        //                sets topP=1 — the rejection branch's exactness envelope; audit fix) → Leviathan
+        //                rejection sampling → distribution-equivalent to pure-temperature target-only sampling
+        //                (statistical, device-cert-pending).
         let params: GenerateParameters
         let acceptance: SpeculativeAcceptanceStrategy
         switch speculativeDecoding {
         case .sampling:
-            params = self._generateParameters(
+            params = self._samplingParameters(
                 for: request.preset,
                 maxOutputTokens: request.maxOutputTokens)
             acceptance = .rejectionSampling

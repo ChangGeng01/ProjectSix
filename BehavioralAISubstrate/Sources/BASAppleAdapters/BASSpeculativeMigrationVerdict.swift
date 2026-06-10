@@ -46,6 +46,10 @@ public enum BASSpeculativeMigrationVerdict {
         /// The device memory budget the dual residency must fit under (e.g. an 8 GB device's safe ceiling).
         public let memoryBudgetBytes: Int?
         public let sampleCount: Int
+        /// AUDIT FIX: how many of the samples carry a PAIRED speculative+baseline latency. Unpaired records
+        /// contribute correctness but no latency evidence — without this floor, unpaired records could inflate
+        /// `sampleCount` past `minSamples` while the latency means rest on a tiny paired subset.
+        public let pairedLatencySampleCount: Int
         public let distinctDeviceCount: Int
 
         public init(
@@ -57,6 +61,7 @@ public enum BASSpeculativeMigrationVerdict {
             dualPeakMemoryBytes: Int? = nil,
             memoryBudgetBytes: Int? = nil,
             sampleCount: Int = 0,
+            pairedLatencySampleCount: Int = 0,
             distinctDeviceCount: Int = 0
         ) {
             self.mode = mode
@@ -67,6 +72,7 @@ public enum BASSpeculativeMigrationVerdict {
             self.dualPeakMemoryBytes = dualPeakMemoryBytes
             self.memoryBudgetBytes = memoryBudgetBytes
             self.sampleCount = sampleCount
+            self.pairedLatencySampleCount = pairedLatencySampleCount
             self.distinctDeviceCount = distinctDeviceCount
         }
     }
@@ -160,8 +166,10 @@ public enum BASSpeculativeMigrationVerdict {
 
     /// Memory FIT: the dual-residency peak must be within the device budget. (Unlike a migration's
     /// lower-is-better memory, speculative decoding is EXPECTED to use more — the gate only refuses an OVERFLOW.)
+    /// AUDIT FIX: `peak > 0` (was `>= 0`) — a ZERO peak is a missing measurement (MLX stats unavailable /
+    /// simulator), not a fit; letting 0 through made MEMORY_FITS vacuously true with no data.
     private static func evaluateMemoryFit(dualPeak: Int?, budget: Int?) -> (FitStatus, [String]) {
-        guard let peak = dualPeak, let budget, budget > 0, peak >= 0 else {
+        guard let peak = dualPeak, let budget, budget > 0, peak > 0 else {
             return (.noEvidence, [Reason.memoryNoEvidence])
         }
         return peak <= budget ? (.fits, [Reason.memoryFits]) : (.exceeds, [Reason.memoryExceeds])
@@ -184,7 +192,10 @@ public enum BASSpeculativeMigrationVerdict {
             dualPeak: evidence.dualPeakMemoryBytes, budget: evidence.memoryBudgetBytes)
 
         var reasons = correctnessReasons + latencyReasons + memoryReasons
+        // AUDIT FIX: the sample floor also binds the PAIRED latency count whenever latency evidence exists —
+        // unpaired records must not inflate the count past minSamples while the latency means rest on fewer pairs.
         let samplesShort = evidence.sampleCount < thresholds.minSamples
+            || (latency != .noEvidence && evidence.pairedLatencySampleCount < thresholds.minSamples)
         let devicesShort = evidence.distinctDeviceCount < thresholds.minDistinctDevices
         if samplesShort { reasons.append(Reason.samplesBelowMin) }
         if devicesShort { reasons.append(Reason.devicesBelowMin) }
