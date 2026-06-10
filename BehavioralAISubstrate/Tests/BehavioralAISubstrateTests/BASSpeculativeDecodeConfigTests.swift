@@ -90,6 +90,83 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
             "Gemma 3 4B has no same-family sibling ⇒ speculative decoding honestly unavailable")
     }
 
+    // MARK: - 2c. Greedy default-on (gated + capability auto-select + byte-identical fallback)
+
+    func testDefaultModeIsGreedyAndAutoResolvesDraft() {
+        // Default-on (operator-elected): a bare adapter is greedy with the curated same-family draft resolved.
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
+        XCTAssertEqual(adapter.speculativeDecoding, .greedy, "speculation defaults ON (greedy)")
+        XCTAssertEqual(adapter.draftModel, MLXModelCatalog.gemma4_E2B_4bit,
+            "the draft is auto-resolved from speculativePairings when none is passed")
+    }
+
+    func testGemmaDefaultDoesNotEngageSpeculation() {
+        // Gemma4 E4B+E2B (~4.2GB) exceeds the 3000MB fit budget ⇒ draft NOT loaded ⇒ single-model (byte-identical).
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
+        XCTAssertFalse(adapter.willEngageSpeculation,
+            "the certified-family Gemma pair does NOT fit 8GB ⇒ stays single-model even with default-on greedy")
+    }
+
+    func testLlamaTargetEngagesSpeculation() {
+        // Llama-3.2 3B+1B (~2.5GB) fits the budget ⇒ speculation engages.
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.llama3_2_3B_4bit)
+        XCTAssertEqual(adapter.draftModel, MLXModelCatalog.llama3_2_1B_4bit)
+        XCTAssertTrue(adapter.willEngageSpeculation,
+            "the certified Llama 3B↔1B pair fits ⇒ greedy speculation auto-engages")
+    }
+
+    func testTargetWithoutPairingStaysSingleModel() {
+        // Gemma 3 4B has no same-family sibling ⇒ no draft resolved ⇒ never speculates.
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma3_4B_it_4bit)
+        XCTAssertNil(adapter.draftModel)
+        XCTAssertFalse(adapter.willEngageSpeculation)
+    }
+
+    func testExplicitOffDisablesEverything() {
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.llama3_2_3B_4bit, speculativeDecoding: .off)
+        XCTAssertNil(adapter.draftModel, "off ⇒ no draft auto-resolved")
+        XCTAssertFalse(adapter.willEngageSpeculation)
+    }
+
+    func testNilFitBudgetDisablesTheFitGate() {
+        // A host on an entitled / higher-memory device can pass nil to load any configured pair.
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E4B_4bit, speculativeFitBudgetBytes: nil)
+        XCTAssertTrue(adapter.willEngageSpeculation,
+            "nil fit budget ⇒ fit-gate off ⇒ the resolved Gemma draft would load (host opted into the heavier pair)")
+    }
+
+    // MARK: - 2d. Byte-safety: only GREEDY requests are eligible (scout/core never converted)
+
+    func testOnlyGreedyRequestsAreEligibleUnderGreedyMode() {
+        func req(_ preset: BASOrganPreset) -> BASOrganRequest {
+            BASOrganRequest(requestID: "r", role: .core, preset: preset, instruction: "hi", context: [])
+        }
+        // Greedy mode: ONLY a temperature-0 request is eligible — scout (0.1) / core (0.7) are NOT (converting
+        // them to greedy would change their output → byte-equality break).
+        XCTAssertTrue(MLXOrganAdapter.requestEligibleForSpeculation(
+            mode: .greedy, request: req(.greedyDeterministic)))
+        XCTAssertFalse(MLXOrganAdapter.requestEligibleForSpeculation(
+            mode: .greedy, request: req(.scout)), "scout (temp 0.1) must NOT be converted to greedy")
+        XCTAssertFalse(MLXOrganAdapter.requestEligibleForSpeculation(
+            mode: .greedy, request: req(.core)), "core (temp 0.7) must NOT be converted to greedy")
+        // Sampling mode eligibility is the mirror (temp > 0); off is never eligible.
+        XCTAssertTrue(MLXOrganAdapter.requestEligibleForSpeculation(mode: .sampling, request: req(.core)))
+        XCTAssertFalse(MLXOrganAdapter.requestEligibleForSpeculation(mode: .sampling, request: req(.greedyDeterministic)))
+        XCTAssertFalse(MLXOrganAdapter.requestEligibleForSpeculation(mode: .off, request: req(.greedyDeterministic)))
+    }
+
+    func testMemoryBudgetFitDiscriminatesPairs() {
+        let budget = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes
+        XCTAssertTrue(BASMLXMemoryBudget.dualResidencyFits(
+            targetProviderID: "mlx.llama3_2.3b.it.4bit", draftProviderID: "mlx.llama3_2.1b.it.4bit",
+            budgetBytes: budget), "Llama 3B+1B (~2.5GB) fits the 3000MB budget")
+        XCTAssertFalse(BASMLXMemoryBudget.dualResidencyFits(
+            targetProviderID: "mlx.gemma4.e4b.it.4bit", draftProviderID: "mlx.gemma4.e2b.it.4bit",
+            budgetBytes: budget), "Gemma4 E4B+E2B (~4.2GB) exceeds the 3000MB budget")
+    }
+
     // MARK: - 3. ADR-014 byte-identity witness: OFF ⇒ no speculative path
 
     #if canImport(MLXLLM)
@@ -118,9 +195,10 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
         XCTAssertFalse(speculate, "no loaded draft container ⇒ shouldSpeculate false (fail-honest fallback)")
     }
 
-    func testShouldSpeculateFalseForSamplingWithoutLoadedDraft() async {
-        // Phase 2: .sampling IS wired (Leviathan rejection sampling), but like .greedy it still requires a loaded
-        // draft container — without one it falls back to single-model (the fail-honest path).
+    func testShouldSpeculateNeverAutoEngagesSampling() async {
+        // .sampling is wired (Leviathan rejection sampling) but on-device-certified doNotEnable (latency loss),
+        // so it is NEVER auto-engaged — only the greedy lane runs without an explicit per-call opt-in. (A loaded
+        // draft container can't be created on host anyway; the point is that even with one, sampling stays off.)
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E4B_4bit,
             draftModel: MLXModelCatalog.gemma4_E2B_4bit,
@@ -128,7 +206,7 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
         let request = BASOrganRequest(
             requestID: "r", role: .core, preset: .core, instruction: "hi", context: [])
         let speculate = await adapter.shouldSpeculate(for: request)
-        XCTAssertFalse(speculate, ".sampling with no loaded draft container ⇒ single-model fallback")
+        XCTAssertFalse(speculate, ".sampling never auto-engages (certified doNotEnable — slower)")
     }
 
     // MARK: - 4. Greedy-lane precondition: temp 0 → ArgMaxSampler (the token-identity guarantee)

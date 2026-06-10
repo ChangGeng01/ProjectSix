@@ -58,6 +58,23 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
     /// to avoid cap-too-low re-alloc churn across two working sets. (Unmeasured; revisit with on-device evidence.)
     public static let dualResidencyCacheFloorBytes = 768 * mib
 
+    /// Conservative per-process FIT budget for AUTO-engaging dual residency (greedy speculative default-on). The
+    /// measured default iOS per-process cap is ~3376 MB on the iPhone Air; 3000 MB leaves headroom and needs no
+    /// entitlement. A pair whose estimated dual residency EXCEEDS this stays single-model (byte-identical) — so
+    /// Gemma4 E4B+E2B (~4.2 GB) is excluded and the certified Llama/Qwen 3B+1B (~2.5 GB, measured 2542 MB peak)
+    /// engages. A host on an entitled / higher-memory device can pass a larger budget to opt heavier pairs in.
+    public static let defaultSpeculativeFitBudgetBytes = 3000 * mib
+
+    /// Whether a target+draft pair's estimated dual residency fits within `budgetBytes`. Planning estimates → a
+    /// CEILING test, never a guarantee; the on-device peak is the real check. Used to AUTO-gate greedy speculative
+    /// default-on: fits ⇒ load the draft + speculate; doesn't fit ⇒ single-model (byte-identical).
+    public static func dualResidencyFits(
+        targetProviderID: String, draftProviderID: String, budgetBytes: Int
+    ) -> Bool {
+        approxResidentBytes(forProviderID: targetProviderID)
+            + approxResidentBytes(forProviderID: draftProviderID) <= budgetBytes
+    }
+
     /// Planning resident-byte estimate for a 4-bit entry, keyed by a substring of its providerID. NOT measured —
     /// see the type doc's honest-scope note. Used only to populate `estimatedResidentBytes`.
     static func approxResidentBytes(forProviderID providerID: String) -> Int {

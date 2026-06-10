@@ -127,6 +127,25 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// draft agrees, bigger wasted verify when it diverges. Tuned per pairing during the on-device cert.
     public nonisolated let numDraftTokens: Int
 
+    /// Conservative per-process memory budget (bytes) for AUTO-engaging the draft when greedy speculation is the
+    /// default. `loadModel` loads the draft only if the estimated dual residency fits this budget — so a pair too
+    /// heavy for the device (e.g. Gemma4 E4B+E2B on 8 GB) stays single-model (byte-identical), while the certified
+    /// Llama/Qwen 3B+1B fits and engages. `nil` disables the fit-gate (load the draft whenever one is configured).
+    /// Default `BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes` (3000 MB — fits without the increased-memory
+    /// entitlement); a host on an entitled / higher-memory device can raise it.
+    public nonisolated let speculativeFitBudgetBytes: Int?
+
+    /// Whether `loadModel` will AUTO-engage speculation: the mode is on, a draft is resolved, and the estimated
+    /// dual residency fits `speculativeFitBudgetBytes` (nil budget ⇒ fit-gate off). Pure over the configured
+    /// fields (no container) so it is host-testable. This is what makes greedy default-on safe: a pair too heavy
+    /// for the device (Gemma4 E4B+E2B on 8 GB) returns false ⇒ no draft loaded ⇒ single-model (byte-identical).
+    public nonisolated var willEngageSpeculation: Bool {
+        guard speculativeDecoding != .off, let draft = draftModel else { return false }
+        guard let budget = speculativeFitBudgetBytes else { return true }
+        return BASMLXMemoryBudget.dualResidencyFits(
+            targetProviderID: model.providerID, draftProviderID: draft.providerID, budgetBytes: budget)
+    }
+
     /// Pure validity check for a speculative target↔draft pairing: a shared tokenizer is REQUIRED (a cross-family
     /// draft would mis-tokenize the target's stream) and the draft must be a DISTINCT model. The shared tokenizer
     /// is proxied here by a shared turn terminator (`extraEOSTokens`); Phase 3 replaces the proxy with the explicit
@@ -293,20 +312,32 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         return params
     }
 
-    /// Whether the speculative path should run for `request`. True only when a draft container is loaded AND the
-    /// configured mode is LIVE. `.greedy` is token-identical to greedy target-only decoding; `.sampling`
-    /// (Phase 2) is distribution-equivalent via Leviathan rejection sampling — both are wired. (The sampling
-    /// lane's MLX port is device-cert-pending: the algorithm is host-proven, the on-device distribution check is
-    /// Phase 6; the evidence gate keeps the verdict `doNotEnable` until then.) Role admission is enforced by the
-    /// caller.
+    /// Whether THIS request is eligible for speculation under `mode`, by the REQUEST's sampling temperature. Pure
+    /// + framework-free + host-testable (no container needed). This is the byte-safety gate for greedy default-on:
+    /// the greedy lane forces temperature 0, so it must run ONLY for requests that are ALREADY greedy
+    /// (`temperature == 0`) — a scout (0.1) / core (0.7) request must NEVER be converted to greedy (that would
+    /// change its output). The sampling lane is the mirror (temperature > 0); it stays gated OFF by
+    /// `shouldSpeculate` (on-device cert: doNotEnable — slower) but the eligibility rule is defined for symmetry.
+    public nonisolated static func requestEligibleForSpeculation(
+        mode: BASSpeculativeMode, request: BASOrganRequest
+    ) -> Bool {
+        switch mode {
+        case .off: return false
+        case .greedy: return request.preset.temperature == 0
+        case .sampling: return request.preset.temperature > 0
+        }
+    }
+
+    /// Whether the speculative path should run for `request`. True only when a draft container is LOADED AND the
+    /// request is eligible under the configured mode. `.greedy` (the default) is token-identical to greedy
+    /// target-only decoding AND runs only for greedy requests (byte-safe). `.sampling` is on-device-certified
+    /// `doNotEnable` (slower) → kept OFF by default (a host elects it explicitly). Role admission is the caller's.
     func shouldSpeculate(for request: BASOrganRequest) -> Bool {
         guard draftContainer != nil else { return false }
-        switch speculativeDecoding {
-        case .off:
-            return false
-        case .greedy, .sampling:
-            return true
-        }
+        // The sampling lane is wired (rejection sampling) but on-device-certified doNotEnable (latency loss) —
+        // never auto-engage it; only the greedy lane runs without an explicit per-call opt-in.
+        guard speculativeDecoding == .greedy else { return false }
+        return Self.requestEligibleForSpeculation(mode: speculativeDecoding, request: request)
     }
     #endif
 
@@ -321,15 +352,25 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         cacheLimitBytes: Int? = MLXOrganAdapter.defaultCacheLimitBytes,
         memoryLimitBytes: Int? = nil,
         draftModel: MLXModelCatalog.Entry? = nil,
-        speculativeDecoding: BASSpeculativeMode = .off,
-        numDraftTokens: Int = 2
+        speculativeDecoding: BASSpeculativeMode = .greedy,
+        numDraftTokens: Int = 2,
+        speculativeFitBudgetBytes: Int? = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
         self.memoryLimitBytes = memoryLimitBytes
+        // GREEDY SPECULATION DEFAULT-ON (operator-elected, 2026-06-11): when speculation is enabled and the caller
+        // didn't pass an explicit draft, auto-resolve the curated same-family draft from `speculativePairings`.
+        // A target with no pairing (e.g. a small model used directly, or Gemma 3 4B) resolves to nil → no draft →
+        // single-model (byte-identical). Whether the resolved draft is actually LOADED is gated by the fit budget
+        // in `loadModel`.
         self.draftModel = draftModel
+            ?? (speculativeDecoding != .off
+                ? MLXModelCatalog.recommendedDraft(forTargetProviderID: model.providerID)
+                : nil)
         self.speculativeDecoding = speculativeDecoding
         self.numDraftTokens = max(1, numDraftTokens)
+        self.speculativeFitBudgetBytes = speculativeFitBudgetBytes
         self.descriptor = BASOrganDescriptor(
             providerID: providerID ?? model.providerID,
             providerName: providerName ?? model.providerName,
@@ -382,14 +423,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             id: model.id,
             extraEOSTokens: Set(model.extraEOSTokens))
 
-        // Resolve the load-time memory budget (Phase C). With spec-decode OFF this returns today's exact
-        // single-model values + `.adapterDefault` precedence → byte-identical to the pre-speculative path. With
-        // a draft configured it returns the dual-residency UNION applied with `.explicitOverride` (the union
-        // must beat any single-model `.adapterDefault` already in force on the process-global). See
-        // `BASMLXMemoryBudget`.
+        // Resolve the load-time memory budget (Phase C). Only when speculation will ACTUALLY engage (mode on +
+        // draft resolved + fits the budget) is the dual-residency UNION applied (`.explicitOverride`); otherwise
+        // this returns today's exact single-model values + `.adapterDefault` precedence → byte-identical to the
+        // pre-speculative path. So a non-fitting pair (Gemma4 E4B+E2B on 8 GB) keeps the single-model budget.
+        let willSpeculate = willEngageSpeculation
         let budget = BASMLXMemoryBudget.resolve(
             targetProviderID: model.providerID,
-            draftProviderID: (speculativeDecoding != .off) ? draftModel?.providerID : nil,
+            draftProviderID: willSpeculate ? draftModel?.providerID : nil,
             singleCacheLimitBytes: cacheLimitBytes,
             singleMemoryLimitBytes: memoryLimitBytes)
         let precedence: MLXRuntimeConfig.Precedence =
@@ -411,6 +452,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // `.explicitOverride` (the union must win). An explicit `setGPUCacheLimit` still overrides either.
         if let cache = budget.cacheLimitBytes {
             MLXRuntimeConfig.shared.applyCacheLimit(bytes: cache, precedence: precedence)
+        }
+        // GREEDY SPECULATION DEFAULT-ON: auto-load the draft when speculation will engage (mode on + draft
+        // resolved + fits the budget). Best-effort — a draft-load failure must NOT break the target; on any
+        // throw the adapter stays single-model (byte-identical), `shouldSpeculate` returns false (no draft
+        // container). A host can still call `loadDraftModel()` explicitly.
+        if willSpeculate {
+            try? await loadDraftModel()
         }
         #else
         throw BASOrganError.providerUnavailable(

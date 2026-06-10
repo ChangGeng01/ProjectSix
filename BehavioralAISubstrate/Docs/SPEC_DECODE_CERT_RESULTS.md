@@ -84,8 +84,28 @@ shaping + sequential processor) on hardware. Combined with the greedy lane's ful
 - 50 prompts/lane, 48-token decode cap. The dist check buckets by first-token TEXT (a detokenized proxy) at the
   lane's sampling temperature (0.7); it tests position 0 (where the rejection math runs) — multi-step joint
   structure is covered by the greedy full-sequence identity + the host theorem.
-- The capability remains **default-OFF / observation-only**. The gate RECOMMENDS enabling greedy; a human elects
-  it. To strengthen: add a different-model device, more prompts, and a longer-decode regime.
+- **Action taken (operator-elected):** on this `enable` recommendation, GREEDY speculative decoding is now
+  **default-ON, but GATED** (see below). Sampling stays OFF (certified doNotEnable). To strengthen the bound
+  further: add a different-model device, more prompts, and a longer-decode regime.
+
+## Action: greedy speculative decoding is now default-on (gated, byte-identical fallback)
+
+Acting on the greedy `enable`, `MLXOrganAdapter.speculativeDecoding` now defaults to `.greedy` — but it engages
+ONLY where it is provably net-positive and safe. Three gates, each failing closed to single-model (byte-identical):
+
+1. **Request gate (byte-safety):** only a GREEDY request (`temperature == 0`) speculates. A scout (0.1) / core
+   (0.7) request is a SAMPLING request — converting it to greedy would change its output, so it stays single-model.
+   Enforced by `MLXOrganAdapter.requestEligibleForSpeculation`.
+2. **Capability gate (memory):** the draft is auto-resolved from `speculativePairings` and auto-loaded ONLY if the
+   estimated dual residency fits a conservative per-process budget (`BASMLXMemoryBudget.dualResidencyFits`,
+   default 3000 MB). So Llama/Qwen 3B↔1B (~2.5 GB) engages; Gemma4 E4B+E2B (~4.2 GB) does NOT (stays single-model,
+   matching the §1 finding). No `increased-memory-limit` entitlement required for the Llama pair.
+3. **Sampling stays OFF:** never auto-engaged (certified doNotEnable — slower); a host must elect it explicitly.
+
+Net effect: a greedy turn on a fitting same-family pair gets the ~31 % latency win at byte-identical output; every
+other turn is unchanged. ADR-014 spirit preserved (turn outputs do not change). A host can opt out
+(`speculativeDecoding: .off`) or raise the fit budget on an entitled / higher-memory device
+(`speculativeFitBudgetBytes:`).
 
 ## What the campaign proved
 
