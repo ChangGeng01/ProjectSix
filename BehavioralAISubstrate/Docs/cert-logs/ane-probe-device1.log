@@ -1,0 +1,6 @@
+📊 ane-probe START
+📊 ane-probe plan head=context-classifier ops=2 cpu=2
+📊 ane-probe plan head=minilm-embedder ops=164 gpu=164
+📊 ane-probe ab head=context-classifier cpuOnly_ms=0.085 all_ms=0.087 speedup=0.99x (n=100 each)
+📊 ane-probe ab head=minilm-embedder cpuOnly_ms=3.398 all_ms=47.161 speedup=0.07x nan_outputs=0/30 (cpuOnly doctrine: ANE/GPU fp16 produced NaN at conversion — NOT reproduced in this run)
+📊 ane-probe FINAL (observation-only — per-op plan + A/B latency; no config changed)

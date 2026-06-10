@@ -260,19 +260,43 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
     /// brain.process() per prompt。 Substrate fix prefers
     /// pre-compiled `.mlmodelc` (Xcode path) and falls back to raw
     /// `.mlmodel` + runtime compile (SPM path)。
-    public init(cacheCapacity: Int = 256) throws {
+    public convenience init(cacheCapacity: Int = 256) throws {
+        try self.init(cacheCapacity: cacheCapacity, computeUnits: nil)
+    }
+
+    /// T1.2 (ANE measurement) — ADDITIVE designated init with an optional compute-units override. `nil` (every
+    /// existing caller) loads exactly as before (CoreML default units) — byte-identical. A non-nil value lets
+    /// the ANE utilization probe A/B `.cpuOnly` vs `.all` on the SAME model artifact. Observation-only surface;
+    /// no production path passes a value.
+    public init(
+        cacheCapacity: Int = 256,
+        computeUnits: MLComputeUnits?
+    ) throws {
         self.cacheCapacity = max(0, cacheCapacity)
+        let compiledURL = try Self.compiledModelURL()
+        do {
+            if let computeUnits {
+                let config = MLModelConfiguration()
+                config.computeUnits = computeUnits
+                self.model = try MLModel(contentsOf: compiledURL, configuration: config)
+            } else {
+                self.model = try MLModel(contentsOf: compiledURL)
+            }
+        } catch {
+            throw BASContextClassifierMLAdapterError
+                .modelLoadFailed(message: "\(error)")
+        }
+    }
+
+    /// T1.2 — the COMPILED model artifact URL (the same dual-lookup the init uses: prefer the pre-compiled
+    /// `.mlmodelc` from the Xcode app bundle; fall back to raw `.mlmodel` + runtime compile on the SPM path).
+    /// Public so the ANE utilization probe can hand the artifact to `MLComputePlan` — observation-only.
+    public static func compiledModelURL() throws -> URL {
         // Prefer pre-compiled .mlmodelc(Xcode iOS app bundle path)
         if let compiledURL = Bundle.module.url(
             forResource: "BASContextClassifier",
             withExtension: "mlmodelc") {
-            do {
-                self.model = try MLModel(contentsOf: compiledURL)
-                return
-            } catch {
-                throw BASContextClassifierMLAdapterError
-                    .modelLoadFailed(message: "\(error)")
-            }
+            return compiledURL
         }
         // Fall back to raw .mlmodel + runtime compile
         // (SPM `swift test` path,Resources ship raw)
@@ -284,8 +308,7 @@ public final class BASContextClassifierMLAdapter: @unchecked Sendable {
                 .modelResourceMissing
         }
         do {
-            let compiledURL = try MLModel.compileModel(at: rawURL)
-            self.model = try MLModel(contentsOf: compiledURL)
+            return try MLModel.compileModel(at: rawURL)
         } catch {
             throw BASContextClassifierMLAdapterError
                 .modelLoadFailed(message: "\(error)")

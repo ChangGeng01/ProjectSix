@@ -41,21 +41,34 @@ public final class BASMiniLMEmbeddingProvider: BASEmbeddingProvider, @unchecked 
 
     /// Load the bundled CoreML model + vocab. Returns `nil` if either resource is missing or the
     /// model fails to load (host should fall back to NLEmbedding / lexical).
-    public init?() {
-        guard let modelURL = Bundle.module.url(
-                forResource: "MiniLM", withExtension: "mlmodelc"),
+    public convenience init?() {
+        self.init(computeUnits: .cpuOnly)
+    }
+
+    /// T1.2 (ANE measurement) — ADDITIVE designated init with a compute-units override. The PRODUCTION default
+    /// stays `.cpuOnly` (deliberate: the fp32-CPU conversion is deterministic; the ANE/GPU fp16 path produced
+    /// NaN at conversion time — any probe of `.all` MUST NaN-check its outputs against this history).
+    /// Observation-only surface for the ANE utilization probe; no production path passes a non-cpuOnly value.
+    public init?(computeUnits: MLComputeUnits) {
+        guard let modelURL = Self.modelURL(),
               let vocabURL = Bundle.module.url(
                 forResource: "vocab", withExtension: "txt"),
               let tok = BASBertWordPieceTokenizer(
                 vocabURL: vocabURL, maxLength: Self.sequenceLength)
         else { return nil }
         let config = MLModelConfiguration()
-        // CPU-only: matches the fp32-CPU conversion (deterministic; the ANE/GPU fp16 path is what
+        // Default .cpuOnly: matches the fp32-CPU conversion (deterministic; the ANE/GPU fp16 path is what
         // produced NaN at conversion time).
-        config.computeUnits = .cpuOnly
+        config.computeUnits = computeUnits
         guard let m = try? MLModel(contentsOf: modelURL, configuration: config) else { return nil }
         self.model = m
         self.tokenizer = tok
+    }
+
+    /// T1.2 — the compiled model artifact URL, public so the ANE utilization probe can hand it to
+    /// `MLComputePlan`. Observation-only.
+    public static func modelURL() -> URL? {
+        Bundle.module.url(forResource: "MiniLM", withExtension: "mlmodelc")
     }
 
     /// SYNC embedding: text → 384-dim L2-normalized sentence vector. Returns a zero vector on any

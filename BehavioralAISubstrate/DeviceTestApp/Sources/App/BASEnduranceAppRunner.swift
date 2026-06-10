@@ -289,6 +289,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASSpecDefaultOnProbe.runDraftTokenSweep() }
             return
         }
+        // 全面进化 T1.2 — ANE utilization measurement (BAS_ANE_PROBE=1). MLX-free (CoreML heads only) but
+        // launched via the same aux path; runs fine on device (MLComputePlan is iOS 17.4+).
+        if (env["BAS_ANE_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASANEUtilizationProbe.run() }
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
