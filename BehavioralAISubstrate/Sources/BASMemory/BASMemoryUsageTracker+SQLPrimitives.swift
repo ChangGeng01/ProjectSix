@@ -63,7 +63,8 @@ extension BASMemoryUsageTracker {
                    session_ref, turn_ref, permit_mode,
                    helped_state
               FROM memory_usage_records
-             ORDER BY retrieved_at_ms ASC
+             ORDER BY retrieved_at_ms ASC,
+                      CAST(turn_ref AS INTEGER) ASC
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
@@ -106,6 +107,18 @@ extension BASMemoryUsageTracker {
     /// first records — without dragging the entire table into
     /// Swift memory first。 SQLite handles the ordering + limit
     /// inside the storage engine。
+    ///
+    /// M2440 第六刀 — the ORDER BY carries a `CAST(turn_ref AS
+    /// INTEGER)` tiebreaker (matching the Swift-fold `recentRecords`
+    /// path + `BASRustBrainHistoryStore`)。 `retrieved_at_ms` is
+    /// MILLISECOND resolution,so two records in the same ms tie;
+    /// without a deterministic secondary key the "most recent" row
+    /// is ambiguous and can disagree across backends — the
+    /// cross-store atomID-parity flake class。 `turn_ref` is the
+    /// per-brain monotonic counter (stored as a stringified int;
+    /// CAST → 0 for any non-numeric value,matching the Swift
+    /// `Int(turnRef) ?? 0`),so the order is deterministic and
+    /// store-identical。
     static func fetchRecentRecordsDesc(
         db: OpaquePointer,
         limit: Int
@@ -115,7 +128,8 @@ extension BASMemoryUsageTracker {
                    session_ref, turn_ref, permit_mode,
                    helped_state
               FROM memory_usage_records
-             ORDER BY retrieved_at_ms DESC
+             ORDER BY retrieved_at_ms DESC,
+                      CAST(turn_ref AS INTEGER) DESC
              LIMIT ?
             """
         var stmt: OpaquePointer?
@@ -271,7 +285,8 @@ extension BASMemoryUsageTracker {
                    helped_state
               FROM memory_usage_records
              WHERE atom_id = ?
-             ORDER BY retrieved_at_ms DESC
+             ORDER BY retrieved_at_ms DESC,
+                      CAST(turn_ref AS INTEGER) DESC
              LIMIT ?
             """
         var stmt: OpaquePointer?
@@ -418,7 +433,8 @@ extension BASMemoryUsageTracker {
                    helped_state
               FROM memory_usage_records
              WHERE retrieved_at_ms BETWEEN ? AND ?
-             ORDER BY retrieved_at_ms ASC
+             ORDER BY retrieved_at_ms ASC,
+                      CAST(turn_ref AS INTEGER) ASC
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)

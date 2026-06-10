@@ -93,6 +93,40 @@ final class BASSQLNativeQueryTests: XCTestCase {
             "oldest last")
     }
 
+    /// M2440 第六刀 — the native ORDER BY breaks a `retrieved_at_ms`
+    /// TIE deterministically by `CAST(turn_ref AS INTEGER)` (NOT a
+    /// lexical text sort)。 `retrieved_at_ms` is millisecond-
+    /// resolution,so two records in the same ms tie; without the
+    /// numeric tiebreaker the "most recent" row is ambiguous and the
+    /// SQL-native path could disagree with the Swift-fold / Rust
+    /// paths — the cross-store atomID-parity flake class。
+    func testRecentRecordsViaSQLTiebreaksNumericallyByTurnRefOnTimestampTie()
+        async throws
+    {
+        let url = makeTempDBURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let tracker = try BASMemoryUsageTracker(
+            databaseURL: url)
+        let store = BASSQLBrainHistoryStore(tracker: tracker)
+        // SAME timestamp for both → forces the ms-tie。 turn_ref "2"
+        // vs "10": LEXICALLY "10" < "2",NUMERICALLY 10 > 2 — so the
+        // result proves CAST(turn_ref AS INTEGER),not a text sort。
+        let ts = Date(timeIntervalSince1970: 1_700_000_000)
+        _ = try await tracker.record(
+            atomID: "turn2", sessionRef: "S",
+            turnRef: "2", permitMode: "safe", retrievedAt: ts)
+        _ = try await tracker.record(
+            atomID: "turn10", sessionRef: "S",
+            turnRef: "10", permitMode: "safe", retrievedAt: ts)
+        let top = try await store.recentRecordsViaSQL(limit: 1)
+        XCTAssertEqual(top.first?.atomID, "turn10",
+            "on a retrieved_at_ms tie, turn_ref 10 > 2 NUMERICALLY" +
+            " (CAST AS INTEGER) — the deterministic most-recent")
+        // Full order: 10 then 2 (numeric DESC on the tie)。
+        let both = try await store.recentRecordsViaSQL(limit: 10)
+        XCTAssertEqual(both.map(\.atomID), ["turn10", "turn2"])
+    }
+
     func testRecentRecordsViaSQLHonorsLimit() async throws {
         let url = makeTempDBURL()
         defer { try? FileManager.default.removeItem(at: url) }
