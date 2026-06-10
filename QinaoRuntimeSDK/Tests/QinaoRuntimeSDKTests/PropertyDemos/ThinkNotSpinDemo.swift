@@ -28,7 +28,7 @@ final class ThinkNotSpinDemo: XCTestCase {
     }
 
     func testLoopProducesFrontierCompareAndGuardianBranch() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
 
         // Three candidates:
         //   A — high-benefit, reversible, low-critique    → winner
@@ -97,7 +97,7 @@ final class ThinkNotSpinDemo: XCTestCase {
     /// doesn't invent dissent when there is none — that is the
     /// "not spin" half of the property.
     func testCleanBatchHasNoGuardianBranch() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         try await submit(fx, [
             .init(candidateID: "x",
                   title: "Drink water",

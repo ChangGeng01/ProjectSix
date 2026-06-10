@@ -147,7 +147,7 @@ final class QinaoRuntimeDeepReviewTests: XCTestCase {
                 residueWithRender.observationBundle,
             sovereignFrame: residueWithRender.sovereignFrame,
             renderFrame: nil)
-        let v = await fx.sovereign.verifyTurnResidue(synth)
+        let v = fx.sovereign.verifyTurnResidue(synth)
         XCTAssertTrue(
             v.findings.contains(.missingRenderFrame),
             ".missingRenderFrame must fire when frame absent" +
@@ -175,7 +175,7 @@ final class QinaoRuntimeDeepReviewTests: XCTestCase {
             observationBundle: base.observationBundle,
             sovereignFrame: base.sovereignFrame,
             renderFrame: badRender)
-        let v = await fx.sovereign.verifyTurnResidue(drifted)
+        let v = fx.sovereign.verifyTurnResidue(drifted)
         let hit = v.findings.contains {
             if case .renderFrameIDConventionMismatch(
                 let expected, let got
@@ -212,7 +212,7 @@ final class QinaoRuntimeDeepReviewTests: XCTestCase {
             observationBundle: base.observationBundle,
             sovereignFrame: base.sovereignFrame,
             renderFrame: badRender)
-        let v = await fx.sovereign.verifyTurnResidue(broken)
+        let v = fx.sovereign.verifyTurnResidue(broken)
         let hit = v.findings.contains {
             if case .renderSovereignBackRefBroken = $0 {
                 return true
@@ -245,7 +245,7 @@ final class QinaoRuntimeDeepReviewTests: XCTestCase {
             observationBundle: base.observationBundle,
             sovereignFrame: base.sovereignFrame,
             renderFrame: badRender)
-        let v = await fx.sovereign.verifyTurnResidue(broken)
+        let v = fx.sovereign.verifyTurnResidue(broken)
         let hit = v.findings.contains {
             if case
                 .renderMergedChoiceRefConventionMismatch(
@@ -463,7 +463,7 @@ final class QinaoRuntimeDeepReviewTests: XCTestCase {
         let residue = try XCTUnwrap(outcome.residue)
         XCTAssertTrue(residue.isComplete)
 
-        let v = await fx.sovereign.verifyTurnResidue(residue)
+        let v = fx.sovereign.verifyTurnResidue(residue)
         XCTAssertTrue(
             v.isValid,
             "four-surface residue must verify clean e2e")

@@ -207,9 +207,6 @@ extension QinaoSampleHost {
                     continue
                 }
 
-                let permit = turn.actionPermit.mode
-                let auditID = turn.sovereignAuditEntry?
-                    .auditID ?? "audit-\(iter)"
                 let signalRefs = turn.sovereignAuditEntry?
                     .signalRefs ?? []
 
@@ -641,7 +638,6 @@ extension QinaoSampleHost {
         let counts = DoctrineBenchConstants.multiRunCounts
         var axisStabilities: [Double] = []
         var harmoniesPerTurn: [Double] = []
-        var harmoniesPerEmission: [Double] = []
         var anchorRetentions: [Double] = []
         for c in counts {
             let outputDir = URL(

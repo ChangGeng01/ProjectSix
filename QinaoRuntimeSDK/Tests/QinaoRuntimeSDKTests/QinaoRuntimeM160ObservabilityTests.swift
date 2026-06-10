@@ -91,7 +91,7 @@ final class QinaoRuntimeM160ObservabilityTests: XCTestCase {
 
     func testRecorderFiresOnParityFailureThrow() async throws {
         let collector = MetricsCollector()
-        let fx = await QinaoTestFixture.make(
+        _ = await QinaoTestFixture.make(
             metricsRecorder: makeRecorder(
                 collector: collector))
         // Coordinator says .pass but engine could disagree.

@@ -24,7 +24,7 @@ final class ProtectNotTakeOverDemo: XCTestCase {
     // MARK: - Four-way assessment, stable reason codes
 
     func testAllowReturnsLivePermitWithBaselineReason() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         let permit = try await fx.risk.requestActionPermit(
             for: intent, signals: .safe)
         XCTAssertEqual(permit.mode, .allow)
@@ -32,7 +32,7 @@ final class ProtectNotTakeOverDemo: XCTestCase {
     }
 
     func testBlockCarriesStableHarmSeverityReason() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         do {
             _ = try await fx.risk.requestActionPermit(
                 for: intent,
@@ -47,7 +47,7 @@ final class ProtectNotTakeOverDemo: XCTestCase {
     }
 
     func testReplaceSuggestsMirrorAndCompareInstead() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         do {
             _ = try await fx.risk.requestActionPermit(
                 for: intent,
@@ -61,7 +61,7 @@ final class ProtectNotTakeOverDemo: XCTestCase {
     }
 
     func testDelayReturnsRetryWindowAndStableReason() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         do {
             _ = try await fx.risk.requestActionPermit(
                 for: intent,
@@ -85,7 +85,7 @@ final class ProtectNotTakeOverDemo: XCTestCase {
     /// This is the "not take over" half: the SDK doesn't let
     /// any caller substitute for the risk gate's judgement.
     func testForgedBlockModePermitIsRefusedAtGate() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         let realPermit = try await fx.risk.requestActionPermit(
             for: intent, signals: .safe)
 

@@ -21,7 +21,7 @@ final class GrowNotWildlyDemo: XCTestCase {
     // MARK: - Full lifecycle
 
     func testSubmitPreviewApproveRollbackRoundTrips() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         let genesis = await fx.host.currentHost()
         XCTAssertEqual(
             genesis.constitutionSnapshot.activeVersion, "host.v1")
@@ -53,7 +53,7 @@ final class GrowNotWildlyDemo: XCTestCase {
     // MARK: - Reject path
 
     func testRejectedCandidateLeavesAuditRecordAndNoVersion() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         let cand = BASHostChangeCandidate(
             candidateID: "cand.grow-reject",
             changeType: "boundary.relax",
@@ -77,7 +77,7 @@ final class GrowNotWildlyDemo: XCTestCase {
     // MARK: - Freeze stops unwanted growth paths
 
     func testFreezeVersionBlocksRollbackToIt() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         let cand = BASHostChangeCandidate(
             candidateID: "cand.grow-freeze",
             changeType: "style.tune",
@@ -111,7 +111,7 @@ final class GrowNotWildlyDemo: XCTestCase {
     // MARK: - Memory wipe is orthogonal to host versions
 
     func testForgetAllWipesMemoryButNotHostVersions() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
 
         // Grow the host and seed some memory.
         let cand = BASHostChangeCandidate(

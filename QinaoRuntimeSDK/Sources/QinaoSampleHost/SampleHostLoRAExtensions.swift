@@ -452,7 +452,6 @@ extension QinaoSampleHost {
         let startedAt = Date()
         var iter = 0
         var rotationIdx = 0
-        var currentURL: URL? = nil
         var currentSize: Int = 0
         var currentHandle: FileHandle? = nil
         var okCount = 0
@@ -587,7 +586,6 @@ extension QinaoSampleHost {
                     "iterations.\(rotationIdx).jsonl")
                 FileManager.default.createFile(
                     atPath: url.path, contents: nil)
-                currentURL = url
                 currentSize = 0
                 currentHandle = try? FileHandle(forWritingTo: url)
             }

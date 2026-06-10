@@ -70,7 +70,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
         XCTAssertNotNil(residue.observationBundle)
         XCTAssertNotNil(residue.sovereignFrame)
 
-        let verification = await fx.sovereign
+        let verification = fx.sovereign
             .verifyTurnResidue(residue)
         XCTAssertTrue(
             verification.isValid,
@@ -91,7 +91,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
         XCTAssertNil(residue.observationBundle)
         XCTAssertNil(residue.sovereignFrame)
 
-        let verification = await fx.sovereign
+        let verification = fx.sovereign
             .verifyTurnResidue(residue)
         XCTAssertFalse(verification.isValid)
         XCTAssertTrue(
@@ -132,7 +132,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
 
         let residue = await fx.sovereign.turnResidue(
             sessionID: obs.sessionID, turnID: obs.turnID)
-        let verification = await fx.sovereign
+        let verification = fx.sovereign
             .verifyTurnResidue(residue)
         XCTAssertFalse(verification.isValid)
         let hasConventionFinding = verification.findings.contains {
@@ -177,7 +177,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
 
         let residue = await fx.sovereign.turnResidue(
             sessionID: obs.sessionID, turnID: obs.turnID)
-        let verification = await fx.sovereign
+        let verification = fx.sovereign
             .verifyTurnResidue(residue)
         let hasRefFinding = verification.findings.contains {
             if case .thoughtFoldRefConventionMismatch(
@@ -237,7 +237,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
                     turnID: obs.turnID),
             sovereignFrame: mismatchedFrame)
 
-        let verification = await fx.sovereign
+        let verification = fx.sovereign
             .verifyTurnResidue(residue)
         XCTAssertFalse(verification.isValid)
         let hasSessionMismatch = verification.findings.contains {

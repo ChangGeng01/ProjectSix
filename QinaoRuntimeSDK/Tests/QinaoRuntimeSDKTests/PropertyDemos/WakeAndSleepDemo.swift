@@ -29,7 +29,7 @@ import XCTest
 final class WakeAndSleepDemo: XCTestCase {
 
     func testSessionWakesSleepsAndWakesAgain() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         try await PropertyDemoFixture.prepareHaltPlumbing(runtime: fx)
 
         let intent = PropertyDemoFixture.intent(
@@ -91,7 +91,7 @@ final class WakeAndSleepDemo: XCTestCase {
     /// intent while the session is halted — "sleep" reaches back
     /// to the signature issuance layer, not just the gate.
     func testHaltedSessionRefusesToIssueFreshWarrants() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
         try await PropertyDemoFixture.prepareHaltPlumbing(runtime: fx)
 
         let intent = PropertyDemoFixture.intent(

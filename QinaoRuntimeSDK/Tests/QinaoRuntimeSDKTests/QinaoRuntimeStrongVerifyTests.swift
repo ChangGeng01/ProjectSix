@@ -81,7 +81,7 @@ final class QinaoRuntimeStrongVerifyTests: XCTestCase {
             obs, coordinatorSeverity: .pass)
         let residue = try XCTUnwrap(outcome.residue)
 
-        let pure = await fx.sovereign.verifyTurnResidue(residue)
+        let pure = fx.sovereign.verifyTurnResidue(residue)
         let strong = await fx.sovereign
             .verifyTurnResidueStrong(residue)
         XCTAssertEqual(

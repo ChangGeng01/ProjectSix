@@ -102,7 +102,7 @@ final class QinaoRuntimeOutcomeResidueTests: XCTestCase {
             obs, coordinatorSeverity: .pass)
 
         let residue = try XCTUnwrap(outcome.residue)
-        let verification = await fx.sovereign
+        let verification = fx.sovereign
             .verifyTurnResidue(residue)
         XCTAssertTrue(verification.isValid)
         XCTAssertTrue(verification.findings.isEmpty)

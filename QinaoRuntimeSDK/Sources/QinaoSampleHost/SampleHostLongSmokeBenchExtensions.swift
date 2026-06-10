@@ -133,8 +133,8 @@ extension QinaoSampleHost {
         var iteration = 0
         var afmCompleted = 0
         var gemmaCompleted = 0
-        var afmTimeouts = 0
-        var gemmaTimeouts = 0
+        let afmTimeouts = 0
+        let gemmaTimeouts = 0
         var afmErrors = 0
         var gemmaErrors = 0
         var afmRedLineTotal = 0
@@ -457,7 +457,7 @@ extension QinaoSampleHost {
                 atPath: jsonlURL.path, contents: nil)
         }
         let fh = try? FileHandle(forWritingTo: jsonlURL)
-        try? fh?.seekToEnd()
+        _ = try? fh?.seekToEnd()
 
         // Endpoints
         let afmEndpoint = await QinaoLoop

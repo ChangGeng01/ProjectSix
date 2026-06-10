@@ -68,7 +68,7 @@ final class QinaoOrganErrorTranslationTests: XCTestCase {
     private func callAndExpectLoopError(
         endpoint: BASOrganRegistryEndpoint,
         expectedReason: String,
-        file: StaticString = #file, line: UInt = #line
+        file: StaticString = #filePath, line: UInt = #line
     ) async {
         do {
             _ = try await endpoint.produceBody(

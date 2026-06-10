@@ -25,7 +25,7 @@ final class WorldAndHostDemo: XCTestCase {
     // MARK: - Host track
 
     func testHostCandidateFlowsSubmitPreviewApproveRollback() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
 
         // Genesis state.
         let genesis = await fx.host.currentHost()
@@ -63,7 +63,7 @@ final class WorldAndHostDemo: XCTestCase {
     // MARK: - Memory track
 
     func testMemoryAdmitRecallForgetIsEndToEndCascade() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
 
         let request = QinaoMemory.AdmitRequest(
             kind: .episodic,
@@ -94,7 +94,7 @@ final class WorldAndHostDemo: XCTestCase {
     /// deletion is *typed* — a host can refuse the whole brain's
     /// memory of a category without touching the rest.
     func testSensitivityCascadeForgetIsTyped() async throws {
-        let fx = await PropertyDemoFixture.makeRuntime()
+        let fx = PropertyDemoFixture.makeRuntime()
 
         _ = try await fx.memory.admit(.init(
             kind: .episodic, content: "low",

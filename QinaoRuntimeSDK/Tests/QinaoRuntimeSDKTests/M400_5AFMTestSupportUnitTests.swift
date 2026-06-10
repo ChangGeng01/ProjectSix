@@ -1,5 +1,4 @@
 import XCTest
-@testable import QinaoRuntimeSDKTests
 
 /// M400.5 — unit tests pinning the `XCTestCase.skipIfAFMDegraded(_:)`
 /// helper itself. Chapter 九十一.9 honesty correction: chapter 九十一.7
