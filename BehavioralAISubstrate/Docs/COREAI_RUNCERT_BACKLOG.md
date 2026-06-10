@@ -1,4 +1,31 @@
-# Core AI run-cert — ✅ DONE (on-device certified on iPhone Air iOS 27, 4/4 parity vs CoreML)
+# Core AI — ✅ GATE CLOSED: decisive doNotMigrate (2026-06-11 campaign, n=112 × 2 devices, fully paired)
+
+> **THE MIGRATION QUESTION IS ANSWERED (T1.1 campaign).** 56 class-balanced prompts × 2 iPhone Airs, paired
+> latency on every sample, paired memory from standalone single-model runs — every gate floor cleared, and the
+> verdict is decisive:
+>
+> ```
+> coreai-migration-gate recommendation=doNotMigrate
+>   reasons=LATENCY_LOSS,MEMORY_LOSS,PARITY_MET
+>   parity: samples=112 agree=112 rate=1.000 max_mae=0.000001
+>   latency(paired n=112): candidate_ms=0.71 incumbent_ms=0.14
+>   devices=2 parsed=112 skipped=0
+> ```
+>
+> Core AI MATCHES the CoreML incumbent perfectly (112/112 argmax, MAE ~1e-6) and LOSES both cost dimensions:
+> paired latency ~5× slower (0.71 vs 0.14 ms — the earlier "~0.7 ms warm" had NO incumbent baseline; measured
+> head-to-head, CoreML wins), memory ~2.6× heavier (sampled-max 51.5/44.9 MB vs 18.9/18.2 MB). **CoreML stands;
+> Core AI investment for this head STOPS** (亏的不要: matched ≠ won — now proven, not presumed). Raw logs:
+> `Docs/cert-logs/coreai-campaign-device{1,2}.log`. Honest bounds: 2 devices but ONE hardware model (both
+> iPhone Air); memory = sampled-max phys_footprint from standalone runs.
+>
+> **Implication for future small heads (T3.3):** the `.aimodel` runtime carries ~0.5 ms overhead vs CoreML's
+> 0.14 ms at this head size — CoreML is the evidence-favored runtime for tiny heads. Re-open only on NEW
+> evidence (substantially larger heads / a future OS changing the runtime cost).
+
+---
+
+## Historical — run-cert ✅ (2026-06-10): 4/4 parity, superseded by the campaign verdict above
 
 > **RESOLVED 2026-06-10.** Full chain certified: real `.aimodel` (coreai_torch, bypassing aimodelc) →
 > Python-runtime parity (5/5, MAE ~1e-6) → Swift adapter ON-DEVICE run on the iPhone Air (iOS 27): 4/4 argmax
