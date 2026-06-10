@@ -125,6 +125,14 @@ targets:
           - "BASBrainCLIIntegrationTests.swift"
           - "BASDoctrineStateAndGrowthTests.swift"
           - "BASEventSourcedMemoryAtomStoreTests.swift"
+          # @testable-imports BASSQLSchemaGenCore — an INTERNAL
+          # build-plugin target with no package product, so this
+          # xcodegen target cannot resolve it ("Unable to resolve
+          # module dependency" under Xcode 27's build system; 26.5
+          # tolerated it). The schema-gen core is a macOS build-time
+          # tool — on-device testing adds nothing; SwiftPM host runs
+          # keep covering it (13 tests).
+          - "BASSQLSchemaGenCoreTests.swift"
     dependencies:
       - target: BASDeviceTestApp
       - package: BehavioralAISubstrate

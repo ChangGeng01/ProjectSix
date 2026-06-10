@@ -200,7 +200,9 @@ final class M306MultiSessionContinuityTests: XCTestCase {
 
         let exp = expectation(
             description: "M306-append-reject-then-accept")
-        Task {
+        // `_ =` — the throwing-Task handle is intentionally unowned: every throw path inside is caught and
+        // converted to XCTFail, and completion is signaled via the expectation (Swift 6.4 #NoUseUnstructuredThrowingTask).
+        _ = Task {
             // Step a: a RUNTIME (keyless, non-HMAC) signature must be REJECTED by the keyed ledger. Inject a
             // runtime-style keyless hex tag (the 64-char shape the coordinator used to emit) onto the entry —
             // since the coordinator now emits "", we recreate the "runtime signature intact" case explicitly.
@@ -219,6 +221,10 @@ final class M306MultiSessionContinuityTests: XCTestCase {
                 default:
                     XCTFail("expected signatureMismatch, got \(err)")
                 }
+            } catch {
+                // Exhaustive catch — without it a non-LedgerError would escape the unowned throwing Task
+                // (silently dropped ⇒ the test could only fail by TIMEOUT with no error detail).
+                XCTFail("expected LedgerError.signatureMismatch, got \(error)")
             }
 
             // Step b: clear signature → ledger signs canonically.
