@@ -32,6 +32,12 @@ import XCTest
 
 #if os(iOS) || os(macOS)
 
+/// `@inline(never)` identity — keeps the optimizer from constant-folding the hardcoded benchmark scenario
+/// inputs below into statically-dead branches ("will never be executed" under Swift 6). Values + the measured
+/// control-flow cost are unchanged; it also makes the cross-language comparison fairer (the Rust/FFI side is
+/// likewise not foldable).
+@inline(never) private func basBenchOpaque<T>(_ value: T) -> T { value }
+
 final class BASChapter779PerfCascadeTests: XCTestCase {
 
     // MARK: - bas-lease-life
@@ -81,8 +87,8 @@ final class BASChapter779PerfCascadeTests: XCTestCase {
                 let emotional = 0.6
                 let timePressure = 0.3
                 let consequence = 0.7
-                let ambiguity = 0.5
-                let manipulation = 0.2
+                let ambiguity = basBenchOpaque(0.5)
+                let manipulation = basBenchOpaque(0.2)
                 let elevated = 0.5
                 var bits: UInt8 = 0
                 if ambiguity >= 0.6 { bits |= 1 << 1 }
@@ -152,10 +158,10 @@ final class BASChapter779PerfCascadeTests: XCTestCase {
             iterations: 10_000,
             v1Swift: {
                 // V1 baseline:inline match cascade
-                let fieldKind: UInt8 = 5 // MemoryPermissions
-                let valuesEqual = false
-                let leftRolled = false
-                let rightRolled = false
+                let fieldKind: UInt8 = basBenchOpaque(5) // MemoryPermissions
+                let valuesEqual = basBenchOpaque(false)
+                let leftRolled = basBenchOpaque(false)
+                let rightRolled = basBenchOpaque(false)
                 if leftRolled || rightRolled {
                     let _ = 2 // RollbackBlocked
                 } else if valuesEqual {

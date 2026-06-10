@@ -157,6 +157,22 @@ run_xcodebuild() {
         | tee "${LOG}"
 }
 
+# chapter 一千零十五.6 / M3810 pattern — pre-warm `xcodebuild build` to MATERIALIZE the SwiftPM build-tool
+# plugin outputs (BASSQLSchemaGen `*.generated.swift`) BEFORE `xcodebuild test`. On cold DerivedData a single
+# `xcodebuild test` races the plugin command against the Swift input-dependency check and fail-fasts with
+# "Build input files cannot be found: …/BASSQLSchemaGen/NNN_*.generated.swift". One build runs the plugin +
+# caches the generated files; the test then finds them as inputs. Opt out via BAS_SKIP_PREWARM=1.
+if [ -z "${BAS_SKIP_PREWARM:-}" ]; then
+    echo "$(date) pre-warming xcodebuild build (materialize BASSQLSchemaGen plugin outputs before test)"
+    xcodebuild build \
+        -scheme BehavioralAISubstrate-Package \
+        -destination "${DESTINATION}" \
+        -allowProvisioningUpdates \
+        -skipPackagePluginValidation \
+        > "${LOG}.prewarm" 2>&1 \
+        || echo "$(date) pre-warm build returned non-zero — continuing to test (see ${LOG}.prewarm)"
+fi
+
 if [ -n "${TIMEOUT_BIN}" ]; then
     "${TIMEOUT_BIN}" --foreground "${BUDGET_SEC}s" bash -c "$(declare -f run_xcodebuild); run_xcodebuild"
     RC=$?
