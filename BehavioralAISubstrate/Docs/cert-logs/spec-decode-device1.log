@@ -1,0 +1,32 @@
+📊 spec-decode START budget_mb=6000 decode_cap=64 pairing=fallback
+📊 spec-decode loading-target tier=fallback mode=greedy target=mlx.llama3_2.3b.it.4bit
+📊 spec-decode loaded-target tier=fallback drafting=mlx.llama3_2.1b.it.4bit
+📊 spec-decode dual-resident tier=fallback mode=greedy
+📊 spec-decode lane=greedy p=0 spec_ms=1611
+📊 spec-decode lane=greedy p=1 spec_ms=900
+📊 spec-decode lane=greedy p=2 spec_ms=711
+📊 spec-decode loading-target tier=fallback mode=sampling target=mlx.llama3_2.3b.it.4bit
+📊 spec-decode loaded-target tier=fallback drafting=mlx.llama3_2.1b.it.4bit
+📊 spec-decode dual-resident tier=fallback mode=sampling
+📊 spec-decode lane=sampling p=0 spec_ms=1755
+📊 spec-decode lane=sampling p=1 spec_ms=472
+📊 spec-decode lane=sampling p=2 spec_ms=546
+📊 spec-decode tier=fallback dual_peak_mb=2533
+📊 spec-decode lane=baseline p=0 greedy_ms=1556 sampling_ms=1615
+📊 spec-decode lane=baseline p=1 greedy_ms=904 sampling_ms=2072
+📊 spec-decode lane=baseline p=2 greedy_ms=601 sampling_ms=1153
+📊 speculative-decode-gate mode=greedy recommendation=doNotEnable
+📊   reasons=CORRECTNESS_VERIFIED,DEVICES_BELOW_MIN,LATENCY_LOSS,MEMORY_FITS,SAMPLES_BELOW_MIN
+📊   correctness=verified acceptance=n/a
+📊   latency(paired n=3): speculative_ms=1073.89 baseline_ms=1020.33
+📊   memory: dual_peak=2533MB budget=6000MB
+📊   devices=1 parsed=3 skipped=0
+📊   (observation-only — a human decides; the gate never auto-enables)
+📊 speculative-decode-gate mode=sampling recommendation=insufficientEvidence
+📊   reasons=CORRECTNESS_NO_EVIDENCE,DEVICES_BELOW_MIN,LATENCY_WIN,MEMORY_FITS,SAMPLES_BELOW_MIN
+📊   correctness=n/a acceptance=n/a
+📊   latency(paired n=3): speculative_ms=924.64 baseline_ms=1613.29
+📊   memory: dual_peak=2533MB budget=6000MB
+📊   devices=1 parsed=3 skipped=0
+📊   (observation-only — a human decides; the gate never auto-enables)
+📊 spec-decode FINAL tier=fallback records=6 (n=1 device / beta — a human reads the verdicts; the gate never auto-enables)

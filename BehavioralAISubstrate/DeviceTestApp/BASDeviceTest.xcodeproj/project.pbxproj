@@ -640,6 +640,7 @@
 		6CAC9511821E8194D5A50053 /* BASCognitiveBrainSafetyThresholdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B8985CF710ED30C728BF6B /* BASCognitiveBrainSafetyThresholdTests.swift */; };
 		6CBAA682CA81CEB23512257F /* BASCognitiveBrainSafetyVerdictDeviceStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89CD2680738A330D2B0616BC /* BASCognitiveBrainSafetyVerdictDeviceStateTests.swift */; };
 		6CF8BB48823F35A1684FAF23 /* BASChapter558AuditProjectionsJsonRejectionProofTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE1A0F047C91D0431553EFE /* BASChapter558AuditProjectionsJsonRejectionProofTests.swift */; };
+		6D0C0A9D691A62AAB1573352 /* BASSpecDecodeCrossDeviceMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBECB4DD1738BDB828A784A5 /* BASSpecDecodeCrossDeviceMergeTests.swift */; };
 		6D119CCB7E64F8A5D193BF0A /* BASRiskCalibrationProjectionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94F70EDDF05FD6EC47164278 /* BASRiskCalibrationProjectionsTests.swift */; };
 		6D2AB5A2FABD0FC3DA4E33AF /* BASChapter777ProductionFlipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFCFCC3AE87ABA5CBC9456F0 /* BASChapter777ProductionFlipTests.swift */; };
 		6D926E817ECE20738742DA77 /* BASAppleLifecycleOutcomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AC0D676AD481A388584442 /* BASAppleLifecycleOutcomeTests.swift */; };
@@ -2879,6 +2880,7 @@
 		EB65AE9F4D3F12C7D8BE45BD /* BASChapter960CoordinatorWireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter960CoordinatorWireTests.swift; sourceTree = "<group>"; };
 		EB7DD27DB73EF24FE6B863FD /* BASSSMCautionOperatorRunTurnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSSMCautionOperatorRunTurnTests.swift; sourceTree = "<group>"; };
 		EBE72333B55BAA565CD5F3A5 /* BASPermitEscalationEventPayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASPermitEscalationEventPayloadTests.swift; sourceTree = "<group>"; };
+		EBECB4DD1738BDB828A784A5 /* BASSpecDecodeCrossDeviceMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSpecDecodeCrossDeviceMergeTests.swift; sourceTree = "<group>"; };
 		EC314703B985BABA689633B2 /* BASL13EvolutionFurnaceWhitepaperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASL13EvolutionFurnaceWhitepaperTests.swift; sourceTree = "<group>"; };
 		EC3DA621D963BC6DA88A0C3E /* BASCognitiveBrainCascadeDigestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASCognitiveBrainCascadeDigestTests.swift; sourceTree = "<group>"; };
 		EC644F6AE535B5D1A324A7F1 /* BASMetalPilotBrainAccessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASMetalPilotBrainAccessorTests.swift; sourceTree = "<group>"; };
@@ -4304,6 +4306,7 @@
 				3CF14B3E6A539D55FF5DE146 /* BASSovereignTurnVerifierTests.swift */,
 				2E3AA35EED1A557A526B30C0 /* BASSovereigntyMetricsTests.swift */,
 				05120D16E771943563CA62A5 /* BASSovereignVerdictEngineTests.swift */,
+				EBECB4DD1738BDB828A784A5 /* BASSpecDecodeCrossDeviceMergeTests.swift */,
 				D7E68B0C64CA2D52475614DE /* BASSpeculativeDecodeConfigTests.swift */,
 				5C39C0F15E6CEB960AC634C8 /* BASSpeculativeSamplingDistributionTests.swift */,
 				1E1130A2DE99A94AF363708C /* BASSpeculativeVerdictTests.swift */,
@@ -5942,6 +5945,7 @@
 				725255507243D96CA2E91D93 /* BASSovereignTurnVerifierTests.swift in Sources */,
 				8E89A782381B421EDC2A584A /* BASSovereignVerdictEngineTests.swift in Sources */,
 				51AF5213F996558FD7F87950 /* BASSovereigntyMetricsTests.swift in Sources */,
+				6D0C0A9D691A62AAB1573352 /* BASSpecDecodeCrossDeviceMergeTests.swift in Sources */,
 				3682C8AB5A42ADEFD36E3021 /* BASSpeculativeDecodeConfigTests.swift in Sources */,
 				EAC180AFD16C920E017E91CC /* BASSpeculativeSamplingDistributionTests.swift in Sources */,
 				AE71DC04E9B07BFDA7E8008F /* BASSpeculativeVerdictTests.swift in Sources */,
@@ -6254,6 +6258,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/BASDeviceTestApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -6273,6 +6278,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/BASDeviceTestApp.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;

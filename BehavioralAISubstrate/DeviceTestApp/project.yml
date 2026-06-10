@@ -51,6 +51,10 @@ targets:
     platform: iOS
     sources:
       - path: Sources/App
+    # 结构大重构 Phase 6 — increased-memory-limit entitlement so the dual-residency speculative cert
+    # (Gemma4 E4B+E2B ≈ 4.2GB) can exceed the default ~3.4GB iOS per-process cap on the 8GB iPhone Air.
+    entitlements:
+      path: Resources/BASDeviceTestApp.entitlements
     info:
       path: Resources/Info.plist
       properties:

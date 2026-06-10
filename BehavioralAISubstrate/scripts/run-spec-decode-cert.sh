@@ -43,7 +43,14 @@ PULL_DIR="$(mktemp -d /tmp/bas-specdecode.XXXXXX)"
 LOG_GLOB="spec-decode-2026*.log"
 DD="${DD:-/tmp/bas-specdecode-build-dd}"          # own DerivedData — NEVER the user's (build.db lock)
 
-ENV_JSON='{"BAS_SPEC_DECODE":"1","BAS_SPEC_MEM_BUDGET_MB":"'"${MEM_BUDGET_MB}"'","BAS_SPEC_MAX_DECODE_TOKENS":"'"${MAX_DECODE_TOKENS}"'"}'
+# BAS_ENDURANCE_AUTOSTART=1 is the runner's MASTER autostart gate (autostartIfEnabled guards on it before any
+# probe dispatch) — without it the app launches into idle UI and the spec-decode probe never starts.
+# PAIRING (certified|fallback|all) selects which target↔draft pair to cert. A jetsam per-process-limit kill
+# during a dual load is UNCATCHABLE — so to cover the fail-honest fallback across a kill, run twice:
+#   PAIRING=certified bash scripts/run-spec-decode-cert.sh   # then, if it was killed with no FINAL:
+#   PAIRING=fallback  bash scripts/run-spec-decode-cert.sh
+PAIRING="${PAIRING:-all}"
+ENV_JSON='{"BAS_ENDURANCE_AUTOSTART":"1","BAS_SPEC_DECODE":"1","BAS_SPEC_PAIRING":"'"${PAIRING}"'","BAS_SPEC_MEM_BUDGET_MB":"'"${MEM_BUDGET_MB}"'","BAS_SPEC_MAX_DECODE_TOKENS":"'"${MAX_DECODE_TOKENS}"'"}'
 
 echo "=============================================="
 echo "BAS on-device SPECULATIVE-DECODE cert (Phase 6)"

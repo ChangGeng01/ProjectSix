@@ -103,11 +103,19 @@ enum BASSpeculativeDecodeProbe {
         let decodeCap = Int(env["BAS_SPEC_MAX_DECODE_TOKENS"] ?? "64") ?? 64
         let memoryBudgetBytes = budgetMB * 1024 * 1024
 
+        // Pairing selection (BAS_SPEC_PAIRING = certified | fallback | all). A jetsam per-process-limit kill
+        // during a dual load is UNCATCHABLE (SIGKILL, not a Swift throw) — the in-process fail-honest fallback
+        // below only covers a thrown load error. So the cert SCRIPT sequences across separate launches: run
+        // `certified`; if the app dies with no FINAL (a kill), relaunch with `fallback`. Default `all` tries
+        // both in one process (only reaches the fallback if `certified` THREW rather than was killed).
+        let pairingSel = (env["BAS_SPEC_PAIRING"] ?? "all").lowercased()
+        let selected = pairings.filter { pairingSel == "all" || $0.tier == pairingSel }
+
         let fileLog = FileLog()
         defer { fileLog.close() }
-        fileLog.emit("📊 spec-decode START budget_mb=\(budgetMB) decode_cap=\(decodeCap)")
+        fileLog.emit("📊 spec-decode START budget_mb=\(budgetMB) decode_cap=\(decodeCap) pairing=\(pairingSel)")
 
-        for pairing in pairings {
+        for pairing in selected {
             do {
                 try await certify(
                     pairing: pairing,
@@ -121,7 +129,7 @@ enum BASSpeculativeDecodeProbe {
             }
         }
         fileLog.emit("📊 spec-decode FINAL recommendation=doNotEnable reason=NO_PAIRING_LOADED "
-            + "(every pairing failed to load on this device)")
+            + "(every selected pairing failed to load on this device)")
     }
 
     /// Full cert for one pairing: dual lanes first (honest peak), baseline after, per-mode verdicts.
@@ -191,8 +199,15 @@ enum BASSpeculativeDecodeProbe {
     ) async throws -> (results: [PromptResult], peakMB: Double) {
         var adapter: MLXOrganAdapter? = MLXOrganAdapter(
             model: pairing.target, draftModel: pairing.draft, speculativeDecoding: mode)
+        // Breadcrumbs: a jetsam per-process-limit kill is uncatchable, so these lines pinpoint WHERE the kill
+        // landed — "loading-target" with no "loaded-target" ⇒ the target weights alone exceeded the cap;
+        // "loaded-target" with no "dual-resident" ⇒ the draft pushed it over.
+        fileLog.emit("📊 spec-decode loading-target tier=\(pairing.tier) mode=\(mode.rawValue) "
+            + "target=\(pairing.target.providerID)")
         try await adapter!.loadModel()
+        fileLog.emit("📊 spec-decode loaded-target tier=\(pairing.tier) drafting=\(pairing.draft.providerID)")
         try await adapter!.loadDraftModel()
+        fileLog.emit("📊 spec-decode dual-resident tier=\(pairing.tier) mode=\(mode.rawValue)")
         var results: [PromptResult] = []
         for (i, prompt) in prompts.enumerated() {
             let (body, ms) = try await timedStream(
