@@ -51,7 +51,7 @@ python3 convert.py
 
 | File | Purpose |
 |---|---|
-| `corpus.jsonl` | 105 hand-labeled examples (15 per class × 7 classes) |
+| `corpus.jsonl` | 299 hand-labeled examples (IMBALANCED: chat 71, manipulationRisk 68, task 55, choice 32, conflict 25, highPressure 24, highConsequence 24 — corrected 2026-06-11; the stale "105/15-per-class" claim predated corpus growth) |
 | `train.py` | PyTorch training script |
 | `convert.py` | PyTorch → CoreML conversion |
 | `label_index.json` | Generated: class label order (Swift must match) |
@@ -75,8 +75,8 @@ Matches `BASContextTaskType` cases at
 
 **This is Phase B-1 — a SEED.** Tiny model on tiny data:
 
-- 105 training examples (15 per class) — production needs
-  1000+ per class
+- 299 training examples (imbalanced, 24-71 per class) — production
+  needs 1000+ per class
 - Bag-of-256-hash-buckets — production needs real word
   embeddings or a transformer encoder
 - 2-layer MLP, ~18K parameters — production might need a

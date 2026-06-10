@@ -88,6 +88,30 @@ estimates for a model whose tokenizer the crate actually matches.
 3. 低熵 additions (typed observedEffects parallel field; C probes into the observation surface; C++ MPS cache
    first caller).
 
+## T3.3 — empty-layer neural heads: DECLINE-AND-RESPECIFY → Stage-1 recorder shipped (2026-06-11)
+
+The premise scout adjudicated building the L3 candidate-ranker / L4-L10 tri-self heads NOW as the canonical
+亏的不要 trap: the incumbents are exact arithmetic (`BASMLTriSelfService.score` ≈ 15 lines of clamps;
+`BASMLLoopService.deriveScoreDeltas` = 4 booleans + a count), so a head trained on their outputs is
+SELF-DISTILLATION — best-case parity tie, guaranteed latency loss (sub-µs Swift vs 0.085–0.14ms certified
+CoreML floor) and memory loss (~19MB residency vs zero) ⇒ **doNotMigrate by construction** under the repo's
+own gate doctrine, before a single sample is collected. No ground-truth labels for these targets exist
+on-repo (the 2.7M-event device corpus is off-repo and unlabeled for them).
+
+**Stage 1 (shipped):** `BASNeuralHeadShadowRecorder` — a PURE READER projecting completed
+`BASEBrainTurnResult`s into deterministic JSONL rows pairing the rules' inputs (decompose signal features
+with the EXACT `deriveScoreDeltas` predicates; per-candidate economics) with the rules' outputs (tri-self
+scores, merged choice, stop reason). Zero runtime wiring, zero digest exposure. This creates the real input
+distribution any future head must be evaluated against. Also corrected the stale PhaseB README corpus claim
+("105, 15 per class" → actual 299, imbalanced 24–71 per class).
+
+**Stage 2 (gated, NOT scheduled):** triggers ONLY if externally-acquired labels (human or big-LLM judge via
+the dormant M930/M939 byproduct pipeline) DISAGREE with the rules at a rate creating measurable quality
+headroom. Then: PhaseB venv → fp32 CoreML cpuOnly (runtime LOCKED by T1.1+T1.2), shadow-vs-rules on the
+proven verdict-clone template (agreement-rate is a REDUNDANCY metric, not a win; the benefit dimension is
+label-quality-win, ≥50 samples × ≥2 devices), banned-in-spine, human-read verdict. If the disagreement
+precondition is never met, T3.3 closes the way Core AI did: the incumbent (rules) stands.
+
 ## The meta-lesson of this tranche (recorded deliberately)
 
 Four of six investigated items resolved to "the repo already did it / the premise was stale" — found ONLY by
