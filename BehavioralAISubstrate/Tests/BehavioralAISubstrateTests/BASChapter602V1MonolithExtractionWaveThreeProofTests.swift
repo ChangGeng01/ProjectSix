@@ -128,6 +128,11 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 // the canonical signature (an unsynced pin breaks compile)。
                 ssmCautionOperatorEnabled:
                 ssmCautionObservationSink:
+                // 全面进化 T3.2 — SSM neuromodulation suggestion RECORD nested OPT-IN slot added
+                // (default false ⇒ field stays nil ⇒ byte-equal + zero cost per 红线 7 + ADR-014;
+                // observation-only,raise-only/conserve-only by construction)。 Pin tracks the
+                // canonical signature (an unsynced pin breaks compile)。
+                ssmNeuromodulationSuggestionsEnabled:
                 // ADR-039 Phase 4 — Metal SSM reasoning side-channel OPT-IN slots added (gate +
                 // reasoning input sink-out)。 Default false/nil preserves all prior caller compat per
                 // 红线 7 + ADR-014;this pin tracks the canonical signature (an unsynced pin breaks compile)。

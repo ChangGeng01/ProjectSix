@@ -259,6 +259,15 @@ extension BASEBrainRuntimeCoordinator {
         // the pre-P1 single pass (红线 7 identity).
         var (thoughtFrame, loopFindings, thoughtArtifacts) = runDeliberationPass([])
 
+        // T3.2 — capture the ACTUAL deliberation pass budget for the (flag-gated, observation-only)
+        // SSM neuromodulation suggestion record below. 1 when the loop is disabled (the single pass
+        // above); the loop's own `targetPasses` when enabled. The first pass's `thoughtFrame.stepIndex`
+        // feeds `targetPasses` but later passes REASSIGN `thoughtFrame`, so the value must be threaded
+        // from here as a local — it cannot be recomputed at the SSM seam. Local capture ONLY: it feeds
+        // no value path, and the suggestion composer that reads it is nested behind the default-off
+        // `ssmNeuromodulationSuggestionsEnabled` flag (red line 7 / ADR-014 byte-equal + zero cost).
+        var ssmActualTargetPasses = 1
+
         // ch 1039 / ADR-018 P1 — unified deliberation loop. OPT-IN,
         // default OFF: when `deliberationLoopEnabled` is false the
         // body never runs → byte-equal everywhere. When enabled, run
@@ -284,6 +293,8 @@ extension BASEBrainRuntimeCoordinator {
                     thermalLevel: request.deviceState.thermalLevel)
             let targetPasses = max(1, min(
                 thermallyFlooredMaxLoops, thoughtFrame.stepIndex))
+            // T3.2 — thread the actual pass budget to the SSM suggestion seam (local-only, see above).
+            ssmActualTargetPasses = targetPasses
             while deliberationPassIndex < targetPasses,
                   !isTerminalDeliberationStop(thoughtFrame.stopReason) {
                 deliberationPassIndex += 1
@@ -562,7 +573,35 @@ extension BASEBrainRuntimeCoordinator {
             }
             // OBSERVATION-ONLY side-channel — emitted EVERY flag-on turn (continuous state-tracking).
             // Nil sink (default) → no emission → byte-equal (红线 7). Feeds no render/seal/verdict/hash.
-            ssmCautionObservationSink?(ssmObservation)
+            //
+            // T3.2 — SSM neuromodulation suggestion RECORD (NESTED OPT-IN, default OFF). When
+            // `ssmNeuromodulationSuggestionsEnabled` AND the sink is set, attach the pure
+            // raise-only/conserve-only suggestion (`BASSSMNeuromodulationField`) to the EMITTED COPY of
+            // the observation only — NEVER to `boundRiskCard` / `thoughtFrame` / the returned result, so
+            // the replay-digest preimage is untouched by construction (zero SSM fields in
+            // `BASEBrainTurnResult`). The suggestion is a RECORD forever (gates never auto-promote);
+            // nothing here or downstream applies it. `flooredMaxLoops` is the SAME pure thermal-floor
+            // bound the deliberation loop computes from the SAME inputs, so the suggested band matches
+            // the live loop's own normalization band. Flag-off (default) takes the `else` branch — the
+            // emission is byte-identical to the pre-T3.2 seam and the suggestion is never computed
+            // (红线 7 / ADR-014: byte-equal + zero cost).
+            if ssmNeuromodulationSuggestionsEnabled,
+               let suggestionSink = ssmCautionObservationSink {
+                let suggestionBandCeiling =
+                    BASDeliberationThermalFloor.flooredMaxLoops(
+                        routedBudget.maxLoops,
+                        thermalLevel: request.deviceState.thermalLevel)
+                suggestionSink(ssmObservation.attaching(
+                    neuromodulationSuggestion:
+                        BASSSMNeuromodulationField.suggestion(
+                            ssmCaution: ssmObservation.ssmCaution,
+                            actualTargetPasses: ssmActualTargetPasses,
+                            thermallyFlooredMaxLoops: suggestionBandCeiling,
+                            thermalLevel: request.deviceState.thermalLevel,
+                            npuAvailable: request.deviceState.npuAvailable)))
+            } else {
+                ssmCautionObservationSink?(ssmObservation)
+            }
         }
         // ADR-039 Phase 4 — OPT-IN Metal SSM reasoning emission (independent of the CPU caution operator
         // above). Emits the per-turn DETERMINISTIC scan input (the SAME pure builder the CPU path is built

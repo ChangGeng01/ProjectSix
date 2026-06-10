@@ -32,6 +32,12 @@ public struct BASMambaSSMTurnObservation:
     /// into the NEXT request's `priorSSMState` to carry the recurrence across turns. Never on a value
     /// path; the turn result bytes are unchanged. Optional ⇒ Codable-backward-compatible.
     public let ssmStateOut: [Float]?
+    /// OPT-IN T3.2 neuromodulation suggestion RECORD (`BASSSMNeuromodulationField`), or nil when the
+    /// nested `ssmNeuromodulationSuggestionsEnabled` flag is off (default). OBSERVATION-ONLY +
+    /// raise-only/conserve-only by construction — a RECORD forever (gates never auto-promote): nothing
+    /// applies it to a live path. Never on a value path; the turn result bytes are unchanged.
+    /// Optional ⇒ Codable-backward-compatible (absent key decodes to nil — the `gpuShadowMAE` precedent).
+    public let neuromodulationSuggestion: BASSSMNeuromodulationSuggestion?
 
     public init(
         sessionID: String,
@@ -42,7 +48,8 @@ public struct BASMambaSSMTurnObservation:
         ssmCaution: Double,
         finalMagnitude: Double,
         gpuShadowMAE: Double? = nil,
-        ssmStateOut: [Float]? = nil
+        ssmStateOut: [Float]? = nil,
+        neuromodulationSuggestion: BASSSMNeuromodulationSuggestion? = nil
     ) {
         self.sessionID = sessionID
         self.turnID = turnID
@@ -53,6 +60,7 @@ public struct BASMambaSSMTurnObservation:
         self.finalMagnitude = finalMagnitude
         self.gpuShadowMAE = gpuShadowMAE
         self.ssmStateOut = ssmStateOut
+        self.neuromodulationSuggestion = neuromodulationSuggestion
     }
 }
 

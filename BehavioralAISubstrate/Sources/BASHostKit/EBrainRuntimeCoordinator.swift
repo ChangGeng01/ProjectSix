@@ -227,6 +227,15 @@ public struct BASEBrainRuntimeCoordinator {
     public var ssmCautionObservationSink:
         (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil
 
+    /// T3.2 — OPT-IN, default-false NESTED gate for the SSM neuromodulation suggestion RECORD
+    /// (`BASSSMNeuromodulationField`)。 Effective only inside the `ssmCautionOperatorEnabled` block:
+    /// when true (and the observation sink is set), the emitted `BASMambaSSMTurnObservation` carries a
+    /// raise-only/conserve-only `neuromodulationSuggestion` — OBSERVATION-ONLY (a RECORD forever; gates
+    /// never auto-promote — nothing applies it to a live path)。 When false (default) the field stays
+    /// nil and the suggestion is never computed → byte-equal + zero cost (红线 7 / ADR-014)。 NOT in any
+    /// canonical-bytes / seal / hash path.
+    public var ssmNeuromodulationSuggestionsEnabled: Bool
+
     /// ADR-039 Phase 4 — OPT-IN: when true AND `ssmReasoningInputSink` is set, `runTurn` emits the per-turn
     /// DETERMINISTIC SSM scan input here so the HOST runs the Metal SSMScan OFF the sync turn thread. The
     /// CPU `ssmCaution` above stays the authoritative verdict input — UNCHANGED. The Metal reasoning result
@@ -314,6 +323,9 @@ public struct BASEBrainRuntimeCoordinator {
         // Default nil → no emission → byte-equal (红线 7)。 Observation-only.
         ssmCautionObservationSink:
             (@Sendable (BASMambaSSMTurnObservation) -> Void)? = nil,
+        // T3.2 — OPT-IN nested SSM neuromodulation suggestion record。 Default false → field
+        // stays nil → byte-equal + zero cost (红线 7)。 Observation-only; a record forever.
+        ssmNeuromodulationSuggestionsEnabled: Bool = false,
         // ADR-039 Phase 4 — OPT-IN Metal SSM reasoning side-channel。 Default false/nil →
         // no emission → byte-equal (红线 7)。 Non-governance; host runs Metal off-turn.
         ssmMetalReasoningEnabled: Bool = false,
@@ -357,6 +369,8 @@ public struct BASEBrainRuntimeCoordinator {
         self.resolvedTrialSink = resolvedTrialSink
         self.ssmCautionOperatorEnabled = ssmCautionOperatorEnabled
         self.ssmCautionObservationSink = ssmCautionObservationSink
+        self.ssmNeuromodulationSuggestionsEnabled =
+            ssmNeuromodulationSuggestionsEnabled
         self.ssmMetalReasoningEnabled = ssmMetalReasoningEnabled
         self.ssmReasoningInputSink = ssmReasoningInputSink
         self.attentionMetalReasoningEnabled = attentionMetalReasoningEnabled
