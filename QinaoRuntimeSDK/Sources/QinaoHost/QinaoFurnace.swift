@@ -66,7 +66,7 @@ import BASMemory
 /// The mirror types exist exactly so a public declaration
 /// fragment never contains `Verdict`, `Sentinel`, `AuditLedger`,
 /// etc. Runtime *values* may still contain substrate-vocabulary
-/// strings (`"shadow_trial:…"`, `"evolution_seal_issued"`) —
+/// strings (`"shadow_trial\u{001F}…"`, `"evolution_seal_issued"`) —
 /// those are free-form data and pass through untouched.
 public actor QinaoFurnace {
 
@@ -205,7 +205,7 @@ public actor QinaoFurnace {
         /// Turn that produced the event.
         public let turnID: String
         /// Subject the entry is about. Values like
-        /// `"shadow_trial:trial-xyz"` or `"evolution_seal:seal-abc"`
+        /// `"shadow_trial\u{001F}trial-xyz"` (U+001F composite separator, ch993/ch1044 hardening) or `"evolution_seal:seal-abc"`
         /// pass through verbatim — only the field *name* is
         /// renamed for Qinao symbol hygiene.
         public let subjectRef: String

@@ -422,7 +422,7 @@ final class QinaoFurnaceTests: XCTestCase {
         let qinaoEvents = await furnace.allTrialEvents()
         let substrateEntries = await ledger.all()
         XCTAssertEqual(qinaoEvents.count, substrateEntries.count)
-        XCTAssertEqual(qinaoEvents[0].subjectRef, "shadow_trial:t-xyz")
+        XCTAssertEqual(qinaoEvents[0].subjectRef, "shadow_trial\u{001F}t-xyz")
         XCTAssertEqual(
             qinaoEvents[0].subjectRef,
             substrateEntries[0].verdictRef,

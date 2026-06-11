@@ -140,7 +140,7 @@ final class QinaoFurnaceSovereignAuditTests: XCTestCase {
         XCTAssertEqual(fetched.entry.sessionID, "session-joined-1")
         XCTAssertEqual(fetched.entry.turnID, "turn-1")
         XCTAssertEqual(
-            fetched.entry.verdictRef, "shadow_trial:t-1")
+            fetched.entry.verdictRef, "shadow_trial\u{001F}t-1")
         XCTAssertEqual(
             fetched.entry.ruleIDs, ["L13.shadow_trial_opened"])
         XCTAssertEqual(fetched.entry.actionRefs, [makeCandidate().candidateID])
@@ -312,7 +312,7 @@ final class QinaoFurnaceSovereignAuditTests: XCTestCase {
         XCTAssertEqual(session.count, 1)
         XCTAssertEqual(session[0].entry.turnID, "turn-factory")
         XCTAssertEqual(
-            session[0].entry.verdictRef.hasPrefix("shadow_trial:"),
+            session[0].entry.verdictRef.hasPrefix("shadow_trial\u{001F}"),
             true)
     }
 
