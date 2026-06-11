@@ -342,6 +342,32 @@ final class BASEnduranceAppController: ObservableObject {
         // iOS 27 A3 — arm the OS-attested field-metrics collectors
         // (MetricKit MetricManager AsyncSequences;no-op below 27)。
         BASFieldMetricsCollector.start()
+        // iOS 27 P3/P4 — register the continued-processing wildcard
+        // handler (must happen before launch completes)。 The probe
+        // workload is SYNTHETIC + progress-reporting:it answers the
+        // P3/P4 question (does the OS grant the window / GPU?)
+        // without entangling real consolidation wiring — that
+        // hookup is the follow-up once windows are proven。
+        if let ids = AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
+            bundleID: Bundle.main.bundleIdentifier,
+            context: "consolidation",
+            unique: "probe") {
+            let registered = AppleBGTaskSchedulerBridge
+                .registerContinuedLaunchHandler(
+                    wildcardIdentifier: ids.wildcard) { report in
+                // 20 × 250ms synthetic units (≈5s window) with
+                // honest progress — stalled tasks get force-expired。
+                for unit in 1...20 {
+                    if Task.isCancelled { return false }
+                    try? await Task.sleep(for: .milliseconds(250))
+                    report(Int64(unit), 20)
+                }
+                BASFieldMetricsCollector.phase("continued-probe-done")
+                return true
+            }
+            print("ios27-P3 continued-handler registered=\(registered) "
+                + "wildcard=\(ids.wildcard)")
+        }
         Task.detached(priority: .userInitiated) { [weak self] in
             await self?.runEndurance(iters: iters,
                                      cooldownSec: cooldownSec,
@@ -1915,6 +1941,29 @@ final class BASEnduranceAppController: ObservableObject {
         }
 
         let totalSec = monoElapsedMs(since: runStartNs) / 1000.0
+        // iOS 27 P3/P4 probe (BAS_CONTINUED_PROBE=1) — submit a
+        // continued-processing request at run end ("user just
+        // finished a heavy session" semantics)。 Evidence: does the
+        // OS grant the window?  does it grant GPU (P4;needs the
+        // continued-processing.gpu entitlement)?  Logged for the
+        // human;background the app after the run ends to observe。
+        if (env["BAS_CONTINUED_PROBE"] ?? "0") == "1",
+           let ids = AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
+               bundleID: Bundle.main.bundleIdentifier,
+               context: "consolidation",
+               unique: "run\(Int(totalSec))") {
+            let wantGPU = (env["BAS_CONTINUED_GPU"] ?? "0") == "1"
+            let accepted = await AppleBGTaskSchedulerBridge
+                .submitContinuedProcessing(
+                    concreteIdentifier: ids.concrete,
+                    title: "BAS 巩固维护",
+                    subtitle: "睡眠巩固探针窗口",
+                    preferGPU: wantGPU)
+            await emitBoth("📊 ios27-P3/P4 CONTINUED-PROBE "
+                + "submitted=\(accepted) gpu_requested=\(wantGPU) "
+                + "id=\(ids.concrete) — verdict on grant/expiry "
+                + "reads from the live-activity UI + handler log")
+        }
         // iOS 27 P0 verdict line (human-read;decides the declined
         // Metal-4 quantization family's re-open per
         // IOS27_PERF_ADOPTION_PLAN.md 否决记录 #1)。 Reference

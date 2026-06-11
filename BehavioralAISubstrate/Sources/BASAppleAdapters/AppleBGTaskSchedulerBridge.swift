@@ -168,6 +168,126 @@ public final class AppleBGTaskSchedulerBridge:
     }
     #endif
 
+    // MARK: - Continued processing — iOS 27 P3/P4 (IOS27_PERF_ADOPTION_PLAN)
+    //
+    // `BGContinuedProcessingTask` (ios 26.0;iOS-only — the header
+    // marks macos/tvos/visionos/macCatalyst UNAVAILABLE) converts
+    // "user just finished a heavy session" into a GUARANTEED-start
+    // background window with user-visible progress UI — the third
+    // driver path for T3.1 consolidation,after the foreground
+    // after-turn hook (dependable) and opportunistic BGProcessingTask
+    // windows (OS may never grant)。 P4: `.gpu` resources additionally
+    // permit background Metal — REQUIRES the
+    // com.apple.developer.background-tasks.continued-processing.gpu
+    // entitlement and stays ADR-039-quarantined (background GPU
+    // products are reasoning-side only,never spine)。
+    //
+    // Identifier contract (header doc): registration uses WILDCARD
+    // form `<bundleID>.<context>.*`;each submission a concrete
+    // `<bundleID>.<context>.<unique>`。 Info.plist must list the
+    // wildcard under BGTaskSchedulerPermittedIdentifiers。
+
+    /// Pure identifier derivation (testable cross-platform)。 nil
+    /// when no bundle ID is available (the OS would reject anyway)。
+    public static func continuedTaskIdentifiers(
+        bundleID: String?,
+        context: String,
+        unique: String
+    ) -> (wildcard: String, concrete: String)? {
+        guard let bundleID, !bundleID.isEmpty,
+              !context.isEmpty, !unique.isEmpty,
+              !context.contains("*"), !unique.contains("*")
+        else { return nil }
+        return ("\(bundleID).\(context).*",
+                "\(bundleID).\(context).\(unique)")
+    }
+
+    /// Register the launch handler for a continued-processing
+    /// WILDCARD identifier。 `work` receives a progress-reporter
+    /// closure (the task is force-expired by the OS if it appears
+    /// stalled — report honestly per unit of real work) and runs
+    /// cancellably;completion is guarded exactly like
+    /// `registerLaunchHandler`。 Returns false off-iOS / below 26。
+    public static func registerContinuedLaunchHandler(
+        wildcardIdentifier: String,
+        work: @escaping @Sendable (
+            _ report: @escaping @Sendable (
+                _ completed: Int64, _ total: Int64) -> Void
+        ) async -> Bool
+    ) -> Bool {
+        #if os(iOS)
+        guard #available(iOS 26.0, *) else { return false }
+        return BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: wildcardIdentifier,
+            using: nil
+        ) { task in
+            guard let continued = task as? BGContinuedProcessingTask
+            else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            let box = CompletionBox(continued)
+            let progress = continued.progress
+            let report: @Sendable (Int64, Int64) -> Void = {
+                completed, total in
+                progress.totalUnitCount = max(1, total)
+                progress.completedUnitCount =
+                    min(max(0, completed), max(1, total))
+            }
+            let job = Task {
+                let success = await work(report)
+                box.completeOnce(success: success)
+            }
+            continued.expirationHandler = {
+                job.cancel()
+                box.completeOnce(success: false)
+            }
+        }
+        #else
+        return false
+        #endif
+    }
+
+    /// Submit one continued-processing request (guaranteed start or
+    /// honest failure per `strategy`)。 GPU windows additionally
+    /// require the continued-processing.gpu entitlement AND device
+    /// support — `supportedResources` is consulted first so an
+    /// unsupported request degrades to a CPU window instead of a
+    /// rejected submission。 Returns false on any rejection。
+    public static func submitContinuedProcessing(
+        concreteIdentifier: String,
+        title: String,
+        subtitle: String,
+        preferGPU: Bool = false,
+        queueWhenBusy: Bool = true
+    ) async -> Bool {
+        #if os(iOS)
+        guard #available(iOS 26.0, *) else { return false }
+        let request = BGContinuedProcessingTaskRequest(
+            identifier: concreteIdentifier,
+            title: title,
+            subtitle: subtitle)
+        request.strategy = queueWhenBusy ? .queue : .fail
+        if preferGPU,
+           BGTaskScheduler.supportedResources.contains(.gpu) {
+            request.requiredResources = .gpu
+        }
+        do {
+            if #available(iOS 27.0, *) {
+                try await BGTaskScheduler.shared
+                    .submitTaskRequest(request)
+            } else {
+                try BGTaskScheduler.shared.submit(request)
+            }
+            return true
+        } catch {
+            return false
+        }
+        #else
+        return false
+        #endif
+    }
+
     // MARK: - Platform calls
 
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)

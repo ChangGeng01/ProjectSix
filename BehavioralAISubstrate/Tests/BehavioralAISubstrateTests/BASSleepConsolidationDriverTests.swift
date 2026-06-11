@@ -227,3 +227,21 @@ final class BASSleepConsolidationDriverTests: XCTestCase {
             "Info.plist must list the consolidation identifier")
     }
 }
+
+// MARK: - iOS 27 P3 — continued-task identifier contract (appended gate)
+
+extension BASSleepConsolidationDriverTests {
+    func testContinuedTaskIdentifierDerivation() {
+        let ids = AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
+            bundleID: "com.foo.App", context: "consolidation",
+            unique: "run42")
+        XCTAssertEqual(ids?.wildcard, "com.foo.App.consolidation.*")
+        XCTAssertEqual(ids?.concrete, "com.foo.App.consolidation.run42")
+        // Header contract: wildcard prefix must contain the bundle ID。
+        XCTAssertNil(AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
+            bundleID: nil, context: "c", unique: "u"))
+        XCTAssertNil(AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
+            bundleID: "b", context: "c*", unique: "u"),
+            "wildcard chars in components would corrupt the form")
+    }
+}

@@ -40,7 +40,7 @@
 | P5 | **FoundationModels 系统模型**(swiftinterface `:1178 LanguageModel` 协议 + Executor + `prewarm(model:transcript:)` iOS 27):ANE 驻留系统模型跑 T3.1 巩固摘要/打标 | 功耗/热维度:批量文本工作从 GPU/MLX 移到 ANE 是否净赢(输出非确定 → 默认关可选车道,仅 reasoning-side;Apple Intelligence 设备门) | M |
 | P6 | **vm_statistics64 rev4-6**(`mach/vm_statistics.h:218 swap_count` `:254 donated_count`):bas_memory_pressure.c 增挖 App Swap 信号 | 压力阈值(>80% 天真比率)能否升级为换页真相。**坑**:27 SDK 重编译使 HOST_VM_INFO64_COUNT 长到 REV6 — 必须显式传 count 保旧内核兼容 | S |
 | P7 | **StateReporting 相位标注**(`StateReporting swiftinterface:62 StateReporter` iOS 27):decode/rerank/consolidation 相位 transition 上报,MetricKit `byStateReportingDomain` 归因 | A3 的字段证据能否按相位归因(热/内存成本归到哪个相位)— 锐化 L1 租约决策 | S |
-| P8 | **OutputSpan 数组构造**(stdlib `:1223 Array.init(capacity:initializingWith:)` — **iOS 12.2 可用,无底座问题**):L8 corpus flatten(N×D Float 逐 turn 重建)微基准门 | 检索车道分配开销;明确**不碰** canonical-bytes 脊柱 | S |
+| P8 | **OutputSpan 数组构造** — **已裁决 DECLINE(2026-06-11)**:best-of-3 实测候选慢 ~100×(0.01×,64×384 与 1024×384 双形态)— OutputSpan 仅有逐元素界检 append,现任 `append(contentsOf:)` 本就是 `@_semantics` 批量 memcpy,已是最优形态。候选+门留树作证据(BASCorpusFlattenMicroGateTests);重开 = stdlib 出批量 OutputSpan append | S |
 
 ## Tranche C — 观察哨(零开发,挂触发器)
 

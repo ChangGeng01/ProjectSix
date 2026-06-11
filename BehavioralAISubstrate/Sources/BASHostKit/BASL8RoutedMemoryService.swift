@@ -221,7 +221,11 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
 
     // MARK: - State (NSLock-guarded; the service is a value-free reference type)
 
-    private struct SnapshotEntry {
+    /// internal (was private) — iOS 27 P8: the corpus-flatten
+    /// micro-gate benchmarks the EXACT production helpers,which
+    /// take this type。 No semantic change;tests reach it via
+    /// @testable。
+    struct SnapshotEntry {
         let atomID: String
         let domain: String
         let embedding: [Float]
@@ -387,9 +391,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             // NOT replay-stable: a host that computes a replay digest over the routed backend must NOT
             // enable it (default-off; the spine stays CPU/Rust). The future large-corpus design snaps the
             // ranking to determinism (Metal screens top-M, CPU re-scores). See ADR-039 §7/§8.
-            var corpus: [Float] = []
-            corpus.reserveCapacity(snap.count * embeddingDimension)
-            for entry in snap { corpus.append(contentsOf: entry.embedding) }
+            let corpus = Self.flattenCorpus(
+                snap: snap, embeddingDimension: embeddingDimension)
             if let hits = metalCosineTopK(query, corpus, embeddingDimension, snap.count) {
                 scored = hits.compactMap { hit in
                     (hit.rowIndex >= 0 && hit.rowIndex < snap.count)
@@ -484,6 +487,41 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             }
         }
         return bundle
+    }
+
+    /// iOS 27 P8 (IOS27_PERF_ADOPTION_PLAN) — the Metal-path corpus
+    /// flatten,extracted so the OutputSpan candidate can be gated
+    /// against it。 INCUMBENT: reserveCapacity + append(contentsOf:)。
+    /// Package-visible (not private) so the micro-gate test
+    /// benchmarks the EXACT production implementation。
+    static func flattenCorpus(
+        snap: [SnapshotEntry], embeddingDimension: Int
+    ) -> [Float] {
+        var corpus: [Float] = []
+        corpus.reserveCapacity(snap.count * embeddingDimension)
+        for entry in snap { corpus.append(contentsOf: entry.embedding) }
+        return corpus
+    }
+
+    /// iOS 27 P8 CANDIDATE — OutputSpan construction
+    /// (`Array.init(capacity:initializingWith:)`,stdlib
+    /// swiftinterface :1223,availability iOS 12.2 via
+    /// @_alwaysEmitIntoClient — no deployment-floor issue)。
+    /// Removes per-append bookkeeping;output is element-identical
+    /// by construction (same floats, same order — the gate asserts
+    /// it)。 NOT wired into the hot path:the micro-gate decides,
+    /// a human flips (5-axis discipline:clear win or DECLINE)。
+    static func flattenCorpusOutputSpan(
+        snap: [SnapshotEntry], embeddingDimension: Int
+    ) -> [Float] {
+        let total = snap.reduce(0) { $0 + $1.embedding.count }
+        return [Float](capacity: total) { span in
+            for entry in snap {
+                for value in entry.embedding {
+                    span.append(value)
+                }
+            }
+        }
     }
 
     /// Rust-SIMD cosine over the pre-materialized snapshot — the byte-equal-off baseline AND the Metal
