@@ -119,6 +119,9 @@ public struct BASRoutedMemoryPersistence: Sendable {
     /// ADR-039 Phase 2 — OPTIONAL Metal cosine-topK seam over the in-Swift snapshot corpus (nil ⇒
     /// byte-equal-off; a nil result ⇒ CPU fallback). Host-wired to BASMetalTopKDispatcher + sync bridge.
     public let metalCosineTopK: BASMetalCosineTopKSeam?
+    /// 全面进化 T2.1 — OPTIONAL post-ranking re-rank seam (the ADR-036 decay/fusion lane). nil ⇒
+    /// byte-equal-off (ADR-014). See `BASL8RoutedMemoryService.rerank` for the full honesty contract.
+    public let rerank: BASRetrievalRerankSeam?
     public init(
         loadAllAtoms: @escaping @Sendable () async -> [BASGovernedMemory],
         admitAtom: @escaping @Sendable (BASGovernedMemory) async -> Void,
@@ -128,7 +131,8 @@ public struct BASRoutedMemoryPersistence: Sendable {
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
             -> [(atomID: String, score: Float)])? = nil,
         globalRecall: BASGlobalRecallSeam? = nil,
-        metalCosineTopK: BASMetalCosineTopKSeam? = nil
+        metalCosineTopK: BASMetalCosineTopKSeam? = nil,
+        rerank: BASRetrievalRerankSeam? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.admitAtom = admitAtom
@@ -138,8 +142,16 @@ public struct BASRoutedMemoryPersistence: Sendable {
         self.cosineTopKSync = cosineTopKSync
         self.globalRecall = globalRecall
         self.metalCosineTopK = metalCosineTopK
+        self.rerank = rerank
     }
 }
+
+/// 全面进化 T2.1 — the re-rank seam's input/output contract. One hit as the ranking branch produced
+/// it, plus the atom's timestamp so a decay/fusion re-ranker can derive ages WITHOUT a clock of its
+/// own (the host closure closes over its own `now` — retrieve() stays clock-free).
+public typealias BASRetrievalRerankSeam = @Sendable (
+    _ hits: [(atomID: String, score: Float, timestampMs: Int64)]
+) -> [(atomID: String, score: Float)]
 
 /// ADR-037 — GLOBAL durable cosineTopK recall seam. Pairs the full-corpus ranker with an atom
 /// resolver so `retrieve()` can return top-K atoms even when they fall OUTSIDE the in-memory
@@ -255,6 +267,22 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
     /// (wedge-safe, ADR-038). Only atomID crosses the determinism boundary; the Metal score orders the
     /// bundle (reasoning side — verified non-spine).
     private let metalCosineTopK: BASMetalCosineTopKSeam?
+    /// 全面进化 T2.1 — OPTIONAL post-ranking re-rank seam (the ADR-036 decay/fusion lane,backed by
+    /// `bas_ranker_decayed_fuse_batch`). Applied AFTER the ranking branch and BEFORE the shared
+    /// floor/sort tail,so the pinned (score DESC, atomID ASC) tie-break + topK truncation stay the
+    /// seam's unchanged deterministic spine — membership/order divergence comes only from the scores
+    /// the closure returns。 HONESTY CONTRACT (load-bearing):
+    ///   - nil (default) ⇒ byte-equal-off (ADR-014;flip tests pin this)。
+    ///   - The re-ranked score becomes `atom.confidence`,which IS on the replay-digest preimage —
+    ///     exactly the ADR-039 metalCosineTopK caveat: a host that replays digests over the routed
+    ///     backend must NOT enable this seam (reasoning-side only;the spine stays CPU/Rust)。
+    ///   - Hits dropped by the closure are dropped from the bundle;hits it never saw cannot be
+    ///     invented (membership ⊆ branch output — enforced by the atomID join below)。
+    ///   - Self-populated atoms carry epoch-0 timestamps (line ~419),so age-based decay is a
+    ///     CONSTANT factor over the self-pop window — decay is informative only for durable atoms
+    ///     with real timestamps。 Stated here because a naive A/B over self-pop-only corpora would
+    ///     adjudicate noise (the T1.3 measurement-theater failure mode)。
+    private let rerank: BASRetrievalRerankSeam?
 
     public init(
         loadAllAtoms: @escaping LoadAllAtoms,
@@ -272,7 +300,8 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         cosineTopKSync: (@Sendable (_ query: [Float], _ k: Int)
             -> [(atomID: String, score: Float)])? = nil,
         globalRecall: BASGlobalRecallSeam? = nil,
-        metalCosineTopK: BASMetalCosineTopKSeam? = nil
+        metalCosineTopK: BASMetalCosineTopKSeam? = nil,
+        rerank: BASRetrievalRerankSeam? = nil
     ) {
         self.loadAllAtoms = loadAllAtoms
         self.syncEmbed = syncEmbed
@@ -289,6 +318,7 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
         self.cosineTopKSync = cosineTopKSync
         self.globalRecall = globalRecall
         self.metalCosineTopK = metalCosineTopK
+        self.rerank = rerank
     }
 
     /// Synchronous critical section. Safe to call from async contexts because it never holds the
@@ -372,7 +402,27 @@ public final class BASL8RoutedMemoryService: BASMemoryServicing,
             // Rust-SIMD-routed cosine over the pre-materialized snapshot — fully synchronous.
             scored = Self.scoreAllSnapshot(query: query, snap: snap)
         }
-        let above = scored.filter { $0.score >= relevanceFloor }
+        // 全面进化 T2.1 — OPTIONAL re-rank seam (decay/fusion lane)。 Applied between the ranking
+        // branch and the shared tail (see the property doc for the full honesty contract)。 The
+        // atomID join enforces membership ⊆ branch output;the shared floor/sort/topK below stays
+        // the unchanged deterministic spine。 nil ⇒ this block is a no-op (byte-equal,ADR-014)。
+        let reranked: [(score: Float, entry: SnapshotEntry)]
+        if let rerank {
+            let byID = Dictionary(
+                scored.map { ($0.entry.atomID, $0.entry) },
+                uniquingKeysWith: { a, _ in a })
+            reranked = rerank(scored.map {
+                (atomID: $0.entry.atomID,
+                 score: $0.score,
+                 timestampMs: Int64(
+                    $0.entry.atom.timestamp.timeIntervalSince1970 * 1000))
+            }).compactMap { hit in
+                byID[hit.atomID].map { (hit.score, $0) }
+            }
+        } else {
+            reranked = scored
+        }
+        let above = reranked.filter { $0.score >= relevanceFloor }
 
         // Constitution domain filter (no-op when restrictedMemoryDomains is empty — ADR-014).
         let filtered = BASConstitutionEnforcer.filterMemoryDomains(

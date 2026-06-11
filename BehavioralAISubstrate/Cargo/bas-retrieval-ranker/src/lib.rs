@@ -33,11 +33,161 @@ pub mod simd;             // chapter 七百五 第二刀 — SIMD-accelerated ma
 pub mod softmax;          // chapter 七百九 第一刀 — numerically-stable softmax
 pub mod topk;
 
-pub const ABI_VERSION: i32 = 1;
+/// ABI v2 (全面进化 T2.1): adds `bas_ranker_decayed_fuse_batch` — the
+/// first C-ABI exposure of the decay + fuser modules (previously
+/// declared at lib.rs top but unreachable from Swift)。
+pub const ABI_VERSION: i32 = 2;
 
 #[no_mangle]
 pub extern "C" fn bas_ranker_abi_version() -> i32 {
     ABI_VERSION
+}
+
+// MARK: - Decayed fusion — 全面进化 T2.1 (ADR-036 ranking-seam lane)
+//
+// fused[i] = w_primary × apply_decay(primary[i], ages_ms[i], policy)
+//          + w_secondary × secondary[i]   (null secondary ⇒ 0 term)
+//
+// SEQUENTIAL scalar loop — order-preserving + deterministic (no
+// SIMD/rayon:scores feed a seam whose tie-break sort is pinned
+// downstream;reordered reductions are the known determinism
+// breaker)。 Scores ONLY:membership/sorting stays the Swift seam's
+// job,preserving the ADR-036 "membership-only divergence" contract。
+//
+// policy_tag: 0=None  1=Exponential{rate=policy_a}
+//             2=Linear{horizon_ms=policy_a as i64}
+//             3=Step{threshold_ms=policy_a as i64, floor=policy_b}
+
+/// Batched decayed weighted-linear fusion (see block comment)。
+///
+/// # Safety
+/// `primary_scores`, `ages_ms`, and `out_fused` must each point to
+/// `count` readable (writable for out) elements。 `secondary_scores`
+/// is either null (no secondary term) or `count` readable elements。
+/// Returns 0 on success;-1 on null required pointers (count > 0);
+/// -2 on an unknown policy tag。 count == 0 is a valid no-op。
+#[no_mangle]
+pub unsafe extern "C" fn bas_ranker_decayed_fuse_batch(
+    primary_scores: *const f64,
+    ages_ms: *const i64,
+    count: usize,
+    policy_tag: i32,
+    policy_a: f64,
+    policy_b: f64,
+    secondary_scores: *const f64,
+    w_primary: f64,
+    w_secondary: f64,
+    out_fused: *mut f64,
+) -> i32 {
+    if count == 0 {
+        return 0;
+    }
+    if primary_scores.is_null() || ages_ms.is_null()
+        || out_fused.is_null() {
+        return -1;
+    }
+    let policy = match policy_tag {
+        0 => decay::DecayPolicy::None,
+        1 => decay::DecayPolicy::Exponential { rate: policy_a },
+        2 => decay::DecayPolicy::Linear {
+            horizon_ms: policy_a as i64 },
+        3 => decay::DecayPolicy::Step {
+            threshold_ms: policy_a as i64,
+            floor_factor: policy_b },
+        _ => return -2,
+    };
+    // SAFETY: caller guarantees `count` elements per the contract.
+    let primary = unsafe {
+        core::slice::from_raw_parts(primary_scores, count) };
+    let ages = unsafe {
+        core::slice::from_raw_parts(ages_ms, count) };
+    let secondary: Option<&[f64]> = if secondary_scores.is_null() {
+        None
+    } else {
+        Some(unsafe {
+            core::slice::from_raw_parts(secondary_scores, count) })
+    };
+    let out = unsafe {
+        core::slice::from_raw_parts_mut(out_fused, count) };
+    for i in 0..count {
+        let decayed = decay::apply_decay(primary[i], ages[i], policy);
+        let second = secondary.map_or(0.0, |s| s[i]);
+        out[i] = w_primary * decayed + w_secondary * second;
+    }
+    0
+}
+
+#[cfg(test)]
+mod decayed_fuse_batch_tests {
+    use super::*;
+
+    #[test]
+    fn none_policy_pure_weighted_sum() {
+        let primary = [0.8_f64, 0.4];
+        let ages = [0_i64, 1_000_000];
+        let secondary = [0.2_f64, 0.9];
+        let mut out = [0.0_f64; 2];
+        let rc = unsafe { bas_ranker_decayed_fuse_batch(
+            primary.as_ptr(), ages.as_ptr(), 2,
+            0, 0.0, 0.0,
+            secondary.as_ptr(), 0.5, 0.5,
+            out.as_mut_ptr()) };
+        assert_eq!(rc, 0);
+        assert!((out[0] - 0.5).abs() < 1e-12);
+        assert!((out[1] - 0.65).abs() < 1e-12);
+    }
+
+    #[test]
+    fn exponential_half_life_decays_primary_only() {
+        // rate = ln2 ⇒ half-life 1s;age 1000ms halves the primary。
+        let primary = [1.0_f64];
+        let ages = [1000_i64];
+        let mut out = [0.0_f64; 1];
+        let rc = unsafe { bas_ranker_decayed_fuse_batch(
+            primary.as_ptr(), ages.as_ptr(), 1,
+            1, std::f64::consts::LN_2, 0.0,
+            core::ptr::null(), 1.0, 0.0,
+            out.as_mut_ptr()) };
+        assert_eq!(rc, 0);
+        assert!((out[0] - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn null_secondary_contributes_zero() {
+        let primary = [0.6_f64];
+        let ages = [0_i64];
+        let mut out = [0.0_f64; 1];
+        let rc = unsafe { bas_ranker_decayed_fuse_batch(
+            primary.as_ptr(), ages.as_ptr(), 1,
+            0, 0.0, 0.0,
+            core::ptr::null(), 0.7, 0.3,
+            out.as_mut_ptr()) };
+        assert_eq!(rc, 0);
+        assert!((out[0] - 0.42).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unknown_policy_rejected() {
+        let primary = [1.0_f64];
+        let ages = [0_i64];
+        let mut out = [0.0_f64; 1];
+        let rc = unsafe { bas_ranker_decayed_fuse_batch(
+            primary.as_ptr(), ages.as_ptr(), 1,
+            9, 0.0, 0.0,
+            core::ptr::null(), 1.0, 0.0,
+            out.as_mut_ptr()) };
+        assert_eq!(rc, -2);
+    }
+
+    #[test]
+    fn zero_count_is_a_valid_noop() {
+        let rc = unsafe { bas_ranker_decayed_fuse_batch(
+            core::ptr::null(), core::ptr::null(), 0,
+            0, 0.0, 0.0,
+            core::ptr::null(), 1.0, 0.0,
+            core::ptr::null_mut()) };
+        assert_eq!(rc, 0);
+    }
 }
 
 // MARK: - C ABI surface — chapter 七百四 第三刀

@@ -127,21 +127,24 @@ public enum BASRustCoreBridge {
     ///     sensitive);the build script now pins DEVELOPER_DIR and these
     ///     hashes are verified by TWO clean rebuilds (BAS_CLEAN_REBUILD=1)
     ///     hashing byte-identically。
+    ///   - 全面进化 T2.1: bas-retrieval-ranker ABI v2
+    ///     (+`bas_ranker_decayed_fuse_batch` + force-link anchor;cold ×2
+    ///     byte-identical again)。
     public static let macosArm64SliceSHA256: String =
-        "742877c5f54669c72cc22bdea72b5fcf68a1d12ec38b4883ba9358438ac8c2c2"
+        "c798eaa2683cd52d96ff3cefca3db0de15201b01c5caa0c3cac51e749de3e896"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
     /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
     /// cut (Rust 1.96 + iOS-18 deployment-target pin); 全面进化 T2.1a
     /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin)。
     public static let iosArm64SliceSHA256: String =
-        "a7533f892ee56c0c710f4258797555b0f90a06d1af3c69cb49114513d1defdc5"
+        "f2312c63a277c7a882d3a30e66b583af6ff9e4f928ad72bd0a066ea5d11b8df5"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
     /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut;
     /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin)。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "59d5db3367f3dd6beb24e59bb39ee029699aafef99936c98b4576d0f3f43cf93"
+        "d400251824c468129eaa9e9f2e23c82530b17419f1cba6e8b3e2515b4a191f08"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

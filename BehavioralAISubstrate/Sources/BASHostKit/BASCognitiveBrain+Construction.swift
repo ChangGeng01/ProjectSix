@@ -122,7 +122,9 @@ extension BASCognitiveBrain {
                 // ADR-037 — and the opt-in GLOBAL recall seam (full-corpus cosineTopK + resolver).
                 globalRecall: store.globalRecall,
                 // ADR-039 Phase 2 — the opt-in Metal cosine-topK seam over the in-Swift snapshot corpus.
-                metalCosineTopK: store.metalCosineTopK)
+                metalCosineTopK: store.metalCosineTopK,
+                // 全面进化 T2.1 — the opt-in decay/fusion re-rank seam (nil ⇒ byte-equal-off).
+                rerank: store.rerank)
         }
         let emptyLoad: @Sendable () async -> [BASGovernedMemory] = { [] }
         return BASL8RoutedMemoryService(

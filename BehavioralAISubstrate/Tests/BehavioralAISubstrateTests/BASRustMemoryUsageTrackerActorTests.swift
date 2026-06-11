@@ -126,7 +126,7 @@ final class BASRustMemoryUsageTrackerActorTests:
         //     rebuilds verified byte-identical via BAS_CLEAN_REBUILD=1)
         XCTAssertEqual(
             BASRustCoreBridge.macosArm64SliceSHA256,
-            "742877c5f54669c72cc22bdea72b5fcf68a1d12ec38b4883ba9358438ac8c2c2",
+            "c798eaa2683cd52d96ff3cefca3db0de15201b01c5caa0c3cac51e749de3e896",
             "Chapter 七百一 RED FLAG #1 reproducibility-" +
             "verification pin。 If this hash changes," +
             "a future commit rebuilt the XCFramework " +
@@ -164,7 +164,7 @@ final class BASRustMemoryUsageTrackerActorTests:
     func testIosArm64SliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SliceSHA256,
-            "a7533f892ee56c0c710f4258797555b0f90a06d1af3c69cb49114513d1defdc5",
+            "f2312c63a277c7a882d3a30e66b583af6ff9e4f928ad72bd0a066ea5d11b8df5",
             "iOS device slice byte-equality pin。")
         if let liveHash = Self.liveSliceSHA256("ios-arm64") {
             XCTAssertEqual(liveHash, BASRustCoreBridge.iosArm64SliceSHA256,
@@ -175,7 +175,7 @@ final class BASRustMemoryUsageTrackerActorTests:
     func testIosArm64SimulatorSliceSHA256Pin() {
         XCTAssertEqual(
             BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
-            "59d5db3367f3dd6beb24e59bb39ee029699aafef99936c98b4576d0f3f43cf93",
+            "d400251824c468129eaa9e9f2e23c82530b17419f1cba6e8b3e2515b4a191f08",
             "iOS simulator slice byte-equality pin。")
         if let liveHash = Self.liveSliceSHA256("ios-arm64-simulator") {
             XCTAssertEqual(liveHash, BASRustCoreBridge.iosArm64SimulatorSliceSHA256,

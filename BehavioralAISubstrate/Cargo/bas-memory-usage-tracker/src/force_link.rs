@@ -38,6 +38,16 @@ pub extern "C" fn bas_substrate_bundle_abi_total() -> i32 {
         bas_memory_atom_store::bas_mas_abi_version());
     total = total.wrapping_add(
         bas_retrieval_ranker::bas_ranker_abi_version());
+    // 全面进化 T2.1 — force-link the batched decayed-fusion entry
+    // (ranker ABI v2)。 Sentinel:count=0 ⇒ pure no-op returning 0。
+    let fuse_rc = unsafe {
+        bas_retrieval_ranker::bas_ranker_decayed_fuse_batch(
+            core::ptr::null(), core::ptr::null(), 0,
+            0, 0.0, 0.0,
+            core::ptr::null(), 1.0, 0.0,
+            core::ptr::null_mut())
+    };
+    total = total.wrapping_add(fuse_rc);
     total = total.wrapping_add(
         bas_canonical_bytes::bas_canonical_bytes_abi_version());
     // 全面进化 T2.1a — force-link the 1.2.0 injective canonical-
