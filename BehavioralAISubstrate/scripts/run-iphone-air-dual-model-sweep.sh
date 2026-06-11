@@ -59,11 +59,16 @@ MANIFEST="${ARCHIVE_ROOT}/MANIFEST.txt"
 # the watchdog's ENV_EXTRA slot. The sovereign ledger / field-metrics / P0 phase-split are always-on.
 OBS_KNOBS='"BAS_LIVENESS_MONITOR":"1","BAS_LIVENESS_THRESHOLD_SEC":"30","BAS_SHADOW_TRIAL_LOOP":"1","BAS_SHADOW_PARITY":"enabled",'
 
-# STALL_SEC must exceed the adaptive-cooldown ceiling (base*3+120 = 60*3+120 = 300s) + a slow decode,
-# or a legitimate cooldown reads as a false wedge. 420s is safe; a real wedge during active decode is
-# still caught within ~7 min (negligible over 10h).
+# SWEEP_MODELS selects which phases run: "both" (one device, sequential — the default), "llama" (only the
+# A phases), "e4b" (only the B phases). The dual-device parallel orchestrator pins one model per device.
+SWEEP_MODELS="${SWEEP_MODELS:-both}"
+
+# COOLDOWN_BASE: with two phones the operator can RELAX cooling (lower cooldown ⇒ more inferences ⇒ denser
+# data; the resulting thermal throttling is itself the sustained-load envelope). STALL_SEC must exceed the
+# adaptive-cooldown ceiling (base*3+120) + a slow decode, or a legitimate cooldown reads as a FALSE wedge —
+# so it DERIVES from COOLDOWN_BASE unless set explicitly (base 60 ⇒ 420; base 20 ⇒ 300; base 0 ⇒ 240).
 COOLDOWN_BASE="${COOLDOWN_BASE:-60}"
-STALL_SEC="${STALL_SEC:-420}"
+STALL_SEC="${STALL_SEC:-$(( COOLDOWN_BASE * 3 + 240 ))}"
 MLX_PROMPTS="${MLX_PROMPTS:-3}"
 MAX_DECODE_TOKENS="${MAX_DECODE_TOKENS:-256}"
 
@@ -87,7 +92,7 @@ echo "=================================================================="
 echo "BAS DUAL-MODEL 10h SWEEP — iPhone Air, max data for future dev"
 echo "Device: ${DEVICE_ID}"
 echo "Archive root: ${ARCHIVE_ROOT}"
-echo "Scale: ${SCALE}  (phase minutes multiplied)  STALL_SEC=${STALL_SEC}s  cooldown_base=${COOLDOWN_BASE}s"
+echo "Models: ${SWEEP_MODELS}  Scale: ${SCALE}  STALL_SEC=${STALL_SEC}s  cooldown_base=${COOLDOWN_BASE}s"
 echo "=================================================================="
 
 mkdir -p "${ARCHIVE_ROOT}"
@@ -118,6 +123,10 @@ fi
 TOTAL_MIN=0
 for row in "${PHASES[@]}"; do
     IFS='|' read -r PID MODEL MINS EXTRA DESC <<< "${row}"
+    # SWEEP_MODELS filter: a single-model device runs only its own phases.
+    if [ "${SWEEP_MODELS}" != "both" ] && [ "${SWEEP_MODELS}" != "${MODEL}" ]; then
+        continue
+    fi
     MINS="$(scaled_minutes "${MINS}")"
     TOTAL_MIN=$(( TOTAL_MIN + MINS ))
     PHASE_DIR="${ARCHIVE_ROOT}/phase-${PID}"

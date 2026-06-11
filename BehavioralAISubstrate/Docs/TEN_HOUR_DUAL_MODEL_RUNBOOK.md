@@ -5,12 +5,33 @@ models × a knob sweep that gives clean A/B device evidence for the levers built
 (`kvBits`, `maxKVSize`, the U1 speculation memory governor, the U3 liveness monitor, the ADR-018
 shadow-trial carrier), on top of long-run stability / thermal / memory / sovereign-chain data.
 
-**One command:**
+## TWO PHONES (recommended) — parallel, cooling relaxed
+
+With two iPhone Air devices the thermal constraint loosens (a hot device has a sibling; throttling is
+itself the sustained-load envelope), so run **both phones at once with a low cooldown**. One command:
+
+```bash
+DEVICE_B=<second-udid> BUILD=1 bash scripts/run-dual-device-parallel.sh
+```
+
+- **`MODE=split` (default):** device A runs the FULL Llama sweep, device B runs the FULL Gemma sweep —
+  each model gets the whole ~10h window (vs 5h each on one phone), so 2× the time per model → denser
+  KV/maxKV/governor A/B + longer baselines. Best for **breadth** (future-dev exploration).
+- **`MODE=parity`:** both phones run the SAME dual-model sweep → 2-device parity for every config
+  (cross-device variance, cert-grade). Best for **confidence**.
+- Cooling relaxed via `COOLDOWN_BASE=20` (was 60); `STALL_SEC` auto-derives to 300s (still safely above
+  the adaptive cooldown ceiling, so a cooldown is never a false wedge).
+- Get the two UDIDs: `xcrun devicectl list devices`. Dry-run both first:
+  `DEVICE_B=<udid> SCALE=0.1 bash scripts/run-dual-device-parallel.sh` (~1h).
+
+## ONE PHONE (fallback) — sequential
+
 ```bash
 BUILD=1 bash scripts/run-iphone-air-dual-model-sweep.sh
 ```
-(omit `BUILD=1` if the app is already installed). A `SCALE=0.1` env runs a ~1h dry-run of the full
-sweep shape first — **do this once before the real 10h run** to confirm the device path end-to-end.
+(omit `BUILD=1` if installed). `SCALE=0.1` runs a ~1h dry-run of the full sweep shape first — **do this
+once before the real run** to confirm the device path end-to-end. One phone does both models sequentially
+(5h each); `COOLDOWN_BASE=60` (conservative, single device can't shed heat to a sibling).
 
 ---
 
@@ -114,15 +135,21 @@ stability `BAS_MLX_CACHE_LIMIT_MB` (default 512, the decisive wedge cap). Full i
 
 ## Scripts
 
-- `scripts/run-iphone-air-dual-model-sweep.sh` — the phase driver (this run-book's one command).
+- `scripts/run-dual-device-parallel.sh` — **two-phone orchestrator** (the recommended command). Runs the
+  per-device sweep on both phones concurrently; `MODE=split` (model-per-device, breadth) or `MODE=parity`
+  (same sweep both, cross-device confidence); relaxed `COOLDOWN_BASE=20`.
+- `scripts/run-iphone-air-dual-model-sweep.sh` — the single-device phase driver. `SWEEP_MODELS` selects
+  `both` / `llama` / `e4b` (the parallel orchestrator pins one model per device); `STALL_SEC` auto-derives
+  from `COOLDOWN_BASE` (`base*3+240`).
 - `scripts/run-endurance-watchdog.sh` — the per-phase wedge-surviving watchdog (parameterized 2026-06-12
   with `MODEL` / `MLX_PROMPTS` / `COOLDOWN_SEC` / `ENV_EXTRA` / `ARCHIVE_DIR`; defaults unchanged, so prior
   callers are byte-identical).
 
 ## Honest bounds (R1)
 
-- Two devices are in hand but this run-book drives ONE; cross-device merge (2-device parity) is a
-  separate step — same-model-on-2-devices, not part of this single-device sweep.
+- The two-phone path defaults to `MODE=split` (one model per device — maximizes breadth, NOT parity);
+  for cross-device parity (same model on both, cert-grade) use `MODE=parity`. The single-phone fallback
+  drives one device sequentially.
 - The KV levers (`kvBits`/`maxKVSize`) CHANGE decode numerics — this run gathers the throughput/memory
   data; the **quality** judgment is by-hand on the logged outputs, and any DEFAULT flip remains a
   separate reviewed commit with its own evidence (ADR-014). This run does not promote anything.
