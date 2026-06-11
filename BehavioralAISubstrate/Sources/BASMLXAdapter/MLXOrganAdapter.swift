@@ -107,6 +107,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// overrides at runtime (last write wins, also logged).
     public nonisolated let cacheLimitBytes: Int?
 
+    /// 默认闭环清点 (2026-06-12) — OPT-IN KV-cache quantization bits
+    /// (vendor `GenerateParameters.kvBits`;group size stays the
+    /// vendor default 64)。 nil (default) = no quantization =
+    /// byte-equal;4/8 trades KV memory/bandwidth for low-bit cache
+    /// precision and CHANGES decode numerics — flip only after an
+    /// on-device A/B (throughput + memory + quality)。
+    public nonisolated let kvCacheBits: Int?
+
     /// ADR-041 §C — OPT-IN cap (bytes) for MLX's **load-time** memory peak, applied via `MLXRuntimeConfig`
     /// BEFORE the container load. Unlike `cacheLimitBytes` (a post-load recycling ceiling), `MLX.Memory.memoryLimit`
     /// makes `malloc` WAIT once exceeded — so it bounds the download/materialize SPIKE the cache cap cannot.
@@ -278,6 +286,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         var params = GenerateParameters()
         params.temperature = Float(preset.temperature)
         params.topP = Float(preset.topP)
+        // 默认闭环清点 (2026-06-12) — KV-cache quantization, the cheapest
+        // still-unbuilt decode-side lever the repo names
+        // (MLX_DECODE_ANATOMY.md:42-43,74-77)。 DEFAULT nil = vendor
+        // default = no quantization = byte-equal (ADR-014)。 Non-nil
+        // (4/8) CHANGES decode numerics — opt-in only, on-device A/B
+        // (throughput + memory + quality) before any default thought。
+        params.kvBits = kvCacheBits
         // ch1066 — ENFORCE a decode bound (the cap was never applied; generation relied
         // solely on the model emitting EOS → an unbounded TOKEN runaway). Precedence: an
         // explicit POSITIVE per-request cap wins; else the PRESET's output budget
@@ -370,11 +385,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         draftModel: MLXModelCatalog.Entry? = nil,
         speculativeDecoding: BASSpeculativeMode = .greedy,
         numDraftTokens: Int = 2,
-        speculativeFitBudgetBytes: Int? = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes
+        speculativeFitBudgetBytes: Int? = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes,
+        kvCacheBits: Int? = nil
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
         self.memoryLimitBytes = memoryLimitBytes
+        self.kvCacheBits = kvCacheBits
         // GREEDY SPECULATION DEFAULT-ON (operator-elected, 2026-06-11): when speculation is enabled and the caller
         // didn't pass an explicit draft, auto-resolve the curated same-family draft from `speculativePairings`.
         // A target with no pairing (e.g. a small model used directly, or Gemma 3 4B) resolves to nil → no draft →

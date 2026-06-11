@@ -1218,10 +1218,20 @@ final class BASEnduranceAppController: ObservableObject {
         case "gemma3_4b": mlxModel = MLXModelCatalog.gemma3_4B_it_4bit
         default: mlxModel = MLXModelCatalog.gemma4_E2B_4bit
         }
+        // 默认闭环清点 — KV-cache quantization probe knob
+        // (BAS_KV_BITS=4|8;unset/0 = vendor default, no
+        // quantization, byte-equal)。 A/B: run once without, once
+        // with BAS_KV_BITS=4, compare per-prompt mlx_ms +
+        // peak-footprint + output quality by hand。
+        let kvBits = Int(env["BAS_KV_BITS"] ?? "").flatMap {
+            $0 == 4 || $0 == 8 ? $0 : nil
+        }
         await emitBoth(
-            "📍 ch1025 MLXOrganAdapter loading model=\(mlxModel.providerID) (\(mlxModel.providerName))")
+            "📍 ch1025 MLXOrganAdapter loading model=\(mlxModel.providerID) (\(mlxModel.providerName))"
+            + (kvBits.map { " kv_bits=\($0)" } ?? ""))
         let adapter = MLXOrganAdapter(
-            model: mlxModel)
+            model: mlxModel,
+            kvCacheBits: kvBits)
         let brainLoadStartNs = monoNowNs()
         do {
             try await adapter.loadModel()
