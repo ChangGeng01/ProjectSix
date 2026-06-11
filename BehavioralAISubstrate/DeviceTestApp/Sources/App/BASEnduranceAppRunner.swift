@@ -869,6 +869,33 @@ final class BASEnduranceAppController: ObservableObject {
         await emitBoth(formatSnap(initialSnap, iter: 0,
                                   phase: "initial"))
 
+        // 主权闭环宿主接入 (2026-06-12) — DeviceTestApp is the FIRST
+        // production host to close the sovereign-audit loop: each
+        // turn's `sovereignAuditEntry` (emitted UNSIGNED by the
+        // cascade, per SovereignCommit:1615-1620) is signed + chained
+        // into a keyed Ed25519 ledger persisted in Documents
+        // (generate-once-reload key + SQLite chain — REFERENCE-host
+        // key custody; production needs keychain per ADR-032)。 Pure
+        // side-channel: reads the entry off the result, never touches
+        // the turn bytes (ADR-014 / 红线 7)。
+        let sovereignSink: BASSovereignLedgerHostSink?
+        do {
+            let docs = FileManager.default.urls(
+                for: .documentDirectory, in: .userDomainMask).first!
+            sovereignSink = try BASSovereignLedgerHostSink
+                .makeReferenceHost(
+                    keyURL: docs.appendingPathComponent(
+                        "bas-sovereign-host.key"),
+                    storagePath: docs.appendingPathComponent(
+                        "bas-sovereign-ledger.sqlite").path)
+            await emitBoth("🔐 sovereign-loop ARMED — per-turn entries "
+                + "signed + chained (keyed Ed25519 ledger, Documents)")
+        } catch {
+            sovereignSink = nil
+            await emitBoth("⚠️ sovereign-loop init failed: \(error) "
+                + "— continuing without ledger closure")
+        }
+
         // #1 — opt-in FoundationModels E2E probe (exercises the Apple FM native wires ON THIS DEVICE before
         // loading MLX). Default OFF → single-stream path unchanged. The probe IS the run when set.
         if (env["BAS_FM_E2E"] ?? "0") == "1" {
@@ -1569,6 +1596,17 @@ final class BASEnduranceAppController: ObservableObject {
                 let turnResult = await brain.process(prompt)
                 let brainMs = monoElapsedMs(since: brainStartNs)
                 iterBrainMs += brainMs   // M1.1 — substrate (L1-L14 cascade) time
+                // 主权闭环 — sign + chain this turn's sovereign entry
+                // (side-channel; no effect on the turn bytes above)。
+                if let sovereignSink {
+                    let outcome = await sovereignSink.recordTurn(turnResult)
+                    if iter == 1 || iter % 25 == 0 || !outcome.appended {
+                        await emitBoth("🔐 sovereign iter=\(iter) "
+                            + "appended=\(outcome.appended) "
+                            + "head=\(outcome.selfHash?.prefix(12) ?? "—") "
+                            + (outcome.reason.map { "reason=\($0)" } ?? ""))
+                    }
+                }
                 let taskType = turnResult.contextFrame.taskType
                 // ch 1025.5.5 audit MED-2:`confidenceBand` is
                 // `Optional<Double>` and the `brain.process` path
@@ -1973,6 +2011,17 @@ final class BASEnduranceAppController: ObservableObject {
         }
 
         let totalSec = monoElapsedMs(since: runStartNs) / 1000.0
+        // 主权闭环 — final chain state: how many turns got signed +
+        // chained, the chain head, and a full-chain re-verify under
+        // the host key (the closed-loop proof for the run)。
+        if let sovereignSink {
+            let count = await sovereignSink.appendedCount()
+            let head = await sovereignSink.headHash()
+            let verified = await sovereignSink.verifyChain()
+            await emitBoth("🔐 sovereign-loop FINAL signed_entries=\(count) "
+                + "head=\(head?.prefix(16) ?? "—") "
+                + "chain_verified=\(verified)")
+        }
         // iOS 27 P3/P4 probe (BAS_CONTINUED_PROBE=1) — submit a
         // continued-processing request at run end ("user just
         // finished a heavy session" semantics)。 Evidence: does the

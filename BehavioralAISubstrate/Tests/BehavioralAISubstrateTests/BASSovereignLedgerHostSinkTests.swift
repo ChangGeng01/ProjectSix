@@ -1,0 +1,177 @@
+// MARK: - BASSovereignLedgerHostSinkTests — 主权闭环宿主接入 gate
+//
+// The sink closes the gap the promotion inventory found + the
+// coordinator comment at EBrainRuntimeCoordinator+SovereignCommit
+// .swift:1615-1620 literally describes ("this entry … is NEVER
+// passed to the keyed BASSovereignAuditLedger.append … so the keyed
+// ledger is the SOLE producer of a real signature when this entry is
+// appended")。 Load-bearing claims:
+//   1. A real turn's sovereignAuditEntry, recorded, becomes SIGNED +
+//      CHAINED (the ledger verifies its own key over the chain)。
+//   2. Multiple turns CHAIN (head advances; full-chain audit clean)。
+//   3. BYTE-SAFETY: recording is a side effect — the turn result's
+//      entry stays signature-empty;the result is untouched。
+//   4. The host ledger is the SIGNING AUTHORITY — an inbound
+//      signature is cleared and re-signed under the host key。
+//   5. CROSS-RESTART: a file-keyed/SQLite reference host rehydrates
+//      the chain and appends onto the persisted head。
+
+import XCTest
+import Foundation
+@testable import BASHostKit
+@testable import BASSovereign
+@testable import BASRuntimeCore
+
+final class BASSovereignLedgerHostSinkTests: XCTestCase {
+
+    /// @MainActor — the debug turn pipeline needs ~550KB of stack;
+    /// async XCTest bodies run on 512KB cooperative-pool threads
+    /// (the 27e0fcb2e SIGBUS class)。
+    @MainActor
+    private static func drivenTurn(
+        prompt: String = "Should I send this important message now?"
+    ) throws -> BASEBrainTurnResult {
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .reflective,
+                surface: .application,
+                prompt: prompt,
+                title: "sovereign-sink",
+                riskLevel: .medium))
+        guard let turn = result.eBrainTurn else {
+            throw XCTSkip("fixture turn unavailable")
+        }
+        return turn
+    }
+
+    private func makeInMemorySink() -> BASSovereignLedgerHostSink {
+        // Designated init with a fresh generated key + null storage
+        // (in-memory chain) — the host-injected production shape。
+        let ledger = BASSovereignAuditLedger(
+            ed25519KeyPair: BASSovereignEd25519KeyPair.generate())
+        return BASSovereignLedgerHostSink(ledger: ledger)
+    }
+
+    // MARK: - 1. Real turn → signed + chained
+
+    func testRecordsSignedChainedEntryFromRealTurn() async throws {
+        let turn = try await MainActor.run { try Self.drivenTurn() }
+        // The cascade MUST produce a per-turn sovereign entry — its
+        // absence would itself be a regression (SovereignCommit:1621)。
+        let entry = try XCTUnwrap(
+            turn.sovereignAuditEntry,
+            "the cascade must emit a per-turn sovereignAuditEntry")
+        XCTAssertEqual(entry.signature, "",
+            "the coordinator emits it UNSIGNED — the ledger signs it")
+        XCTAssertEqual(entry.schemaVersion,
+                       BASSovereignAuditEntry.hardenedSchemaVersion,
+                       "per-turn entry uses the 1.2.0 injective form")
+
+        let sink = makeInMemorySink()
+        let outcome = await sink.recordTurn(turn)
+        XCTAssertTrue(outcome.appended,
+            "a well-formed entry must sign + chain: \(outcome.reason ?? "")")
+        XCTAssertEqual(outcome.schemaVersion, "1.2.0")
+        let head = try XCTUnwrap(outcome.selfHash)
+        XCTAssertFalse(head.isEmpty)
+        let count = await sink.appendedCount()
+        XCTAssertEqual(count, 1)
+        let verified = await sink.verifyChain()
+        XCTAssertTrue(verified,
+            "the keyed ledger must verify its own signature over the chain")
+    }
+
+    // MARK: - 2. Chaining across turns
+
+    func testChainLinksAcrossTurns() async throws {
+        let sink = makeInMemorySink()
+        let t1 = try await MainActor.run {
+            try Self.drivenTurn(prompt: "First turn prompt.") }
+        let t2 = try await MainActor.run {
+            try Self.drivenTurn(prompt: "Second, distinct prompt.") }
+        let o1 = await sink.recordTurn(t1)
+        let o2 = await sink.recordTurn(t2)
+        XCTAssertTrue(o1.appended && o2.appended)
+        XCTAssertNotEqual(o1.selfHash, o2.selfHash,
+            "each append advances the chain head")
+        let count = await sink.appendedCount()
+        XCTAssertEqual(count, 2)
+        let head = await sink.headHash()
+        XCTAssertEqual(head, o2.selfHash)
+        let verified = await sink.verifyChain()
+        XCTAssertTrue(verified)
+    }
+
+    // MARK: - 3. Byte-safety (result untouched)
+
+    func testRecordingDoesNotMutateTheTurnResult() async throws {
+        let turn = try await MainActor.run { try Self.drivenTurn() }
+        let sink = makeInMemorySink()
+        _ = await sink.recordTurn(turn)
+        // Value semantics: the caller's entry is unchanged — still
+        // signature-empty (we signed a COPY inside the ledger)。
+        XCTAssertEqual(turn.sovereignAuditEntry?.signature, "",
+            "recording must not sign the host's in-hand entry — " +
+            "the ledger persists a signed copy, the turn result is " +
+            "a pure value side-channel (red line 7 / ADR-014)")
+    }
+
+    // MARK: - 4. Host ledger is the signing authority
+
+    func testInboundSignatureIsClearedAndReSigned() async throws {
+        var turn = try await MainActor.run { try Self.drivenTurn() }
+        // Simulate an entry that arrived pre-signed by some OTHER
+        // authority — the host ledger must still accept it by
+        // clearing + re-signing under the host key (not reject it)。
+        turn.sovereignAuditEntry?.signature = "Zm9yZ2VkLXNpZ25hdHVyZQ=="
+        let sink = makeInMemorySink()
+        let outcome = await sink.recordTurn(turn)
+        XCTAssertTrue(outcome.appended,
+            "an inbound (foreign) signature must be cleared + re-signed, " +
+            "not rejected: \(outcome.reason ?? "")")
+        let verified = await sink.verifyChain()
+        XCTAssertTrue(verified)
+    }
+
+    // MARK: - 5. Cross-restart continuity (file key + SQLite)
+
+    func testReferenceHostRehydratesAndAppendsOntoPersistedHead() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sovereign-sink-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let keyURL = dir.appendingPathComponent("host.key")
+        let dbPath = dir.appendingPathComponent("ledger.sqlite").path
+
+        let turn1 = try await MainActor.run { try Self.drivenTurn() }
+        let headAfterFirst: String?
+        do {
+            let sink = try BASSovereignLedgerHostSink.makeReferenceHost(
+                keyURL: keyURL, storagePath: dbPath)
+            let outcome = await sink.recordTurn(turn1)
+            XCTAssertTrue(outcome.appended)
+            headAfterFirst = outcome.selfHash
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: keyURL.path),
+            "the generated key must persist for reload")
+
+        // Rebuild from the SAME key + db — rehydrate the chain。
+        let turn2 = try await MainActor.run {
+            try Self.drivenTurn(prompt: "Post-restart turn.") }
+        let sink2 = try BASSovereignLedgerHostSink.makeReferenceHost(
+            keyURL: keyURL, storagePath: dbPath)
+        let rehydratedVerified = await sink2.verifyChain()
+        XCTAssertTrue(rehydratedVerified,
+            "the persisted chain must verify under the reloaded key")
+        let outcome2 = await sink2.recordTurn(turn2)
+        XCTAssertTrue(outcome2.appended,
+            "a reloaded host must append onto the persisted head")
+        XCTAssertNotEqual(outcome2.selfHash, headAfterFirst,
+            "the new append chains onto — not over — the persisted head")
+        let stillVerified = await sink2.verifyChain()
+        XCTAssertTrue(stillVerified)
+    }
+}

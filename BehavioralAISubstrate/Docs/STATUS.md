@@ -22,6 +22,18 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   the crypto commit-gate MECHANISM (runTurn is pure-emit → the gate is host-side by design; live needs a host
   keyring + adoption) · **ADR-027** constitution-vault seal · **ADR-028** LLM invocation contract ·
   **ADR-029** distillation bank · **ADR-030** `brain.chat` facade.
+- **主权审计闭环 — per-turn entry signing now has a FIRST HOST (2026-06-12).** The promotion inventory
+  confirmed the SovereignCommit:1615-1620 design note: the per-turn `sovereignAuditEntry` is emitted UNSIGNED
+  and "is NEVER passed to the keyed `BASSovereignAuditLedger.append`". `BASSovereignLedgerHostSink` (BASHostKit,
+  actor) closes it: a host hands it the turn result; the sink clears any inbound signature, appends to a keyed
+  Ed25519 ledger (which SIGNS + CHAINS via priorHash/selfHash), persists, and re-verifies the chain. DeviceTestApp
+  is the first caller (`makeReferenceHost` — file key + SQLite in Documents; PRODUCTION key custody stays the
+  ADR-032 R1 operator decision). Pure side-channel: byte-safe by construction (reads the entry off the result,
+  never the turn bytes); 5/5 gate (real-turn sign+chain, multi-turn linkage, byte-safety, signing-authority,
+  cross-restart rehydrate). **Still open (next unit, honestly deferred):** ADR-028 observe-mode enforcing
+  adapters belong at the brain's ROLED agent call sites (construction layer), NOT bolted onto the runner's raw
+  decode (that would mislabel a throughput call as a scout/planner agent call); the commit-gate + vault-seal
+  live-paths still await the host keyring.
 - **ADR-032** governance enablement — observe-mode contracts/traces ON by default (zero output change).
   The **crypto commit-verify** subset now has a host-side MECHANISM (`BASSovereignGatedTurn`, above);
   rejection / dual-key / deny still REFUSED pending a host keyring/policy (R1). See ADR-032 UPDATE.
