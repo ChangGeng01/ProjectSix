@@ -54,7 +54,7 @@ fi
 # --- per-mode model assignment + scale ---
 case "${MODE}" in
     split)
-        A_MODELS="llama"; B_MODELS="e4b"
+        A_MODELS="llama"; B_MODELS="e2b"   # E2B (not E4B): E4B single-model + full substrate jetsams (2026-06-12)
         SCALE="${SCALE:-2.0}"   # one model fills ~10h (its phases sum to ~300m × 2.0)
         ;;
     parity)

@@ -81,9 +81,9 @@ PHASES=(
   "A2|llama|75|${GOV}\"BAS_KV_BITS\":\"4\",|Llama +kvBits=4 (KV-quant A/B vs A1)"
   "A3|llama|60|${GOV}\"BAS_KV_BITS\":\"8\",|Llama +kvBits=8 (3-point KV sweep off/4/8)"
   "A4|llama|75|${GOV}\"BAS_MAX_KV_SIZE\":\"512\",|Llama +maxKVSize=512 (rotating-KV A/B vs A1)"
-  "B1|e4b|120||Gemma-4-E4B baseline (single-model quality default)"
-  "B2|e4b|90|\"BAS_KV_BITS\":\"4\",|Gemma-E4B +kvBits=4 (KV-quant A/B on Gemma-3n)"
-  "B3|e4b|90|\"BAS_MAX_KV_SIZE\":\"512\",|Gemma-E4B +maxKVSize=512 (rotating-KV A/B)"
+  "B1|e2b|120||Gemma-4-E2B baseline (single-model; E4B+full substrate exceeds the 3376MB jetsam cap — see 2026-06-12 recovery)"
+  "B2|e2b|90|\"BAS_KV_BITS\":\"4\",|Gemma-E2B +kvBits=4 (KV-quant A/B on Gemma-3n)"
+  "B3|e2b|90|\"BAS_MAX_KV_SIZE\":\"512\",|Gemma-E2B +maxKVSize=512 (rotating-KV A/B)"
 )
 
 scaled_minutes() { awk -v m="$1" -v s="${SCALE}" 'BEGIN{v=m*s; if(v<1)v=1; printf "%d", v}'; }

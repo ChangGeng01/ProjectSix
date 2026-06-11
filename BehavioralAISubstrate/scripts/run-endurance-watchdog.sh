@@ -73,8 +73,20 @@ newest_log() {
         --source Documents --destination "${PULL_DIR}" >/dev/null 2>&1
     find "${PULL_DIR}" -type f -name "${LOG_GLOB}" 2>/dev/null | sort | tail -1
 }
-mlx_count() { grep -ac '🧠 ch1025 mlx ' "$1" 2>/dev/null || echo 0; }
+# FIX (2026-06-12): grep -c prints "0" AND exits 1 on no-match, so `... || echo 0` appended a SECOND
+# "0" → c="0\n0" → "integer expression expected" in the arithmetic below. Capture the count, swallow the
+# exit, emit one clean integer.
+mlx_count() { local n; n=$(grep -ac '🧠 ch1025 mlx ' "$1" 2>/dev/null) || true; echo "${n:-0}"; }
 has_final() { grep -aq 'ch1025 FINAL run_sec' "$1" 2>/dev/null; }
+# FIX (2026-06-12): a crashed / jetsam-killed app (procs=0, 0 decodes) was invisible to the wedge
+# detector (which required c>0) — the watchdog polled a DEAD app forever. app_alive lets the loop treat
+# "process gone, no FINAL" as a crash and relaunch.
+app_alive() {
+    local n
+    n=$(xcrun devicectl device info processes --device "${DEVICE_ID}" 2>/dev/null \
+        | grep -ic basdevicetest)
+    [ "${n:-0}" -gt 0 ]
+}
 terminate_app() {
     local pid
     pid=$(xcrun devicectl device info processes --device "${DEVICE_ID}" 2>/dev/null \
@@ -129,8 +141,13 @@ while [ "$(date +%s)" -lt "${DEADLINE}" ]; do
         SEG_LOG="${NEW}"
         c=$(mlx_count "${NEW}"); seg_responses=${c}
         if has_final "${NEW}"; then outcome="completed"; echo "   ✅ segment COMPLETED cleanly (responses=${c})"; break; fi
+        # CRASH / jetsam: the app process is gone and no FINAL — relaunch (covers wedge-on-load + OOM,
+        # which the c>0 wedge check below can never see).
+        if ! app_alive; then outcome="crash"; echo "   ⛔ APP GONE (procs=0, responses=${c}) — crashed/jetsam-killed, relaunch"; break; fi
         if [ "${c}" -eq "${seg_prev}" ]; then seg_stall=$(( seg_stall + POLL_SEC )); else seg_stall=0; fi
-        if [ "${seg_stall}" -ge "${STALL_SEC}" ] && [ "${c}" -gt 0 ]; then
+        # WEDGE: alive but no progress for STALL_SEC. Drop the old c>0 guard so a wedge-on-load (alive,
+        # 0 decodes, never advancing) is caught too — model load is far under STALL_SEC, so no false-trip.
+        if [ "${seg_stall}" -ge "${STALL_SEC}" ]; then
             outcome="wedge"; echo "   ⛔ WEDGE (mlx stalled at ${c} for ${seg_stall}s) — kill + relaunch (NO reboot)"; break
         fi
         echo "   poll: responses=${c} stall=${seg_stall}s"
@@ -140,6 +157,7 @@ while [ "$(date +%s)" -lt "${DEADLINE}" ]; do
     TOTAL_RESPONSES=$(( TOTAL_RESPONSES + seg_responses ))
     case "${outcome}" in
         wedge)      WEDGES=$(( WEDGES + 1 )); RECOVERIES=$(( RECOVERIES + 1 )); terminate_app; sleep 3 ;;
+        crash)      WEDGES=$(( WEDGES + 1 )); RECOVERIES=$(( RECOVERIES + 1 )); terminate_app; sleep 3 ;;
         completed)  CLEAN_COMPLETIONS=$(( CLEAN_COMPLETIONS + 1 )); terminate_app; sleep 2 ;;
         timeout)    echo "   (budget reached mid-segment, responses=${seg_responses})"; terminate_app ;;
     esac
