@@ -365,3 +365,8 @@ int32_t bas_vm_swap_stats(
 
 /// ABI / behavior version pin for `bas_vm_swap_stats`。
 int32_t bas_vm_swap_stats_version(void);
+
+/// 1 = this binary compiled the live 27-SDK swap-stats branch;
+/// 0 = the -3 fallback。 Lets tests assert the honesty contract
+/// per branch instead of vacuously。
+int32_t bas_vm_swap_stats_compiled_live(void);

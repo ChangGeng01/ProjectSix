@@ -61,12 +61,29 @@ enum BASFoundationModelsProbe {
             return
         }
         let thermalBefore = ProcessInfo.processInfo.thermalState
-        let session = LanguageModelSession(
-            model: model,
-            instructions: "你是记忆巩固助手。一句话完成任务,不解释。")
+        let instructions = "你是记忆巩固助手。一句话完成任务,不解释。"
+        // Audit fix (gap-close MEDIUM): LanguageModelSession is
+        // STATEFUL MULTITURN (transcript accumulates and re-feeds as
+        // context),so one shared session inflated prompt i's
+        // latency with i-1 prior turns — a structural skew against
+        // the FM lane vs the INDEPENDENT per-prompt mlx_ms
+        // comparison。 Fix: ONE warm-up call (absorbs model load),
+        // then a FRESH session per prompt — every sample is an
+        // independent batch item,matching the workload being probed。
+        do {
+            let warmup = LanguageModelSession(
+                model: model, instructions: instructions)
+            _ = try await warmup.respond(to: "预热:返回'好'。")
+            emit("📊 fm-probe warm-up done (model-load cost excluded "
+                + "from per-prompt samples)")
+        } catch {
+            emit("⚠️ fm-probe warm-up failed: \(error)")
+        }
         var latencies: [Double] = []
         var failures = 0
         for (i, prompt) in prompts.enumerated() {
+            let session = LanguageModelSession(
+                model: model, instructions: instructions)
             let t0 = DispatchTime.now().uptimeNanoseconds
             do {
                 let response = try await session.respond(to: prompt)
@@ -74,7 +91,7 @@ enum BASFoundationModelsProbe {
                     DispatchTime.now().uptimeNanoseconds - t0) / 1e6
                 latencies.append(ms)
                 emit(String(format:
-                    "📊 fm-probe[%d] ms=%.0f chars=%d",
+                    "📊 fm-probe[%d] ms=%.0f chars=%d (fresh session)",
                     i, ms, response.content.count))
             } catch {
                 failures += 1

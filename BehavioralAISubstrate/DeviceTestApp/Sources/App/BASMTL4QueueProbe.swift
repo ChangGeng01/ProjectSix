@@ -39,6 +39,16 @@ enum BASMTL4QueueProbe {
 
     static func run() async {
         emit("📊 mtl4-probe START softmax[1,512] evaluates=200 best-of-3")
+        // COMPILE-time simulator gate (gap-close audit HIGH,
+        // compile-verified):makeMTL4CommandQueue + run(on:) are
+        // ABSENT from the iPhoneSimulator SDK (MPSGraphExecutable.h
+        // wraps them in #if !TARGET_IPHONE_SIMULATOR) — a runtime
+        // #available cannot cure missing symbols,and the bare body
+        // broke the ENTIRE simulator destination build。
+        #if targetEnvironment(simulator)
+        emit("❌ mtl4-probe ABORT simulator — MTL4 queue API absent "
+            + "from the iPhoneSimulator SDK; device-only probe")
+        #else
         guard #available(iOS 27.0, *) else {
             emit("❌ mtl4-probe ABORT below iOS 27")
             return
@@ -154,5 +164,6 @@ enum BASMTL4QueueProbe {
             + "laneB(MTL4CommandQueue)=%.1fµs ratio=%.2fx verdict=%@ "
             + "— human reads; any wiring is ADR-014 default-off",
             laneAUs, laneBUs, ratio, verdict))
+        #endif  // !simulator
     }
 }

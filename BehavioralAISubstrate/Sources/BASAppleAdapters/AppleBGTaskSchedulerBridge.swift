@@ -215,7 +215,10 @@ public final class AppleBGTaskSchedulerBridge:
                 _ completed: Int64, _ total: Int64) -> Void
         ) async -> Bool
     ) -> Bool {
-        #if os(iOS)
+        // !macCatalyst — see submitContinuedProcessing's note
+        // (BGContinuedProcessingTask is API_UNAVAILABLE(macCatalyst);
+        // bare os(iOS) is TRUE under Catalyst = hard compile break)。
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         guard #available(iOS 26.0, *) else { return false }
         return BGTaskScheduler.shared.register(
             forTaskWithIdentifier: wildcardIdentifier,
@@ -261,7 +264,12 @@ public final class AppleBGTaskSchedulerBridge:
         preferGPU: Bool = false,
         queueWhenBusy: Bool = true
     ) async -> Bool {
-        #if os(iOS)
+        // !macCatalyst (gap-close audit MEDIUM, compile-verified):
+        // the entire continued-processing surface is
+        // API_UNAVAILABLE(macCatalyst) and #if os(iOS) is TRUE under
+        // Catalyst — bare os(iOS) was a latent hard compile break on
+        // a platform this file documents as supported。
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         guard #available(iOS 26.0, *) else { return false }
         let request = BGContinuedProcessingTaskRequest(
             identifier: concreteIdentifier,
@@ -273,12 +281,10 @@ public final class AppleBGTaskSchedulerBridge:
             request.requiredResources = .gpu
         }
         do {
-            if #available(iOS 27.0, *) {
-                try await BGTaskScheduler.shared
-                    .submitTaskRequest(request)
-            } else {
-                try BGTaskScheduler.shared.submit(request)
-            }
+            // Sync submit only — the 27-only async name is a
+            // package-breaking symbol on stable toolchains (see
+            // submitProcessingRequest's A4 revert note)。
+            try BGTaskScheduler.shared.submit(request)
             return true
         } catch {
             return false
@@ -312,17 +318,18 @@ public final class AppleBGTaskSchedulerBridge:
         bg.requiresExternalPower =
             request.maintenanceClass == .deferred
         do {
-            // iOS 27 A4 (IOS27_PERF_ADOPTION_PLAN) — the async
-            // submit removes a synchronous cross-process roundtrip
-            // from the (already-async) register flow and surfaces
-            // submission errors the deprecated sync API dropped。
-            // Older OSes keep the sync call;behavior (Bool) is
-            // identical on both forks。
-            if #available(iOS 27.0, tvOS 27.0, *) {
-                try await BGTaskScheduler.shared.submitTaskRequest(bg)
-            } else {
-                try BGTaskScheduler.shared.submit(bg)
-            }
+            // iOS 27 A4 — REVERTED to the universal sync submit
+            // (gap-close audit HIGH, verified by compile test):
+            // `submitTaskRequest(_:)` is a 27-SDK-ONLY symbol, and
+            // #available is runtime-only — the async fork broke
+            // stable-toolchain iOS builds of this PACKAGE, violating
+            // the same invariant A1 honored via raw-value
+            // construction。 The sync call compiles everywhere;the
+            // 27-SDK deprecation warning in DeviceTestApp builds is
+            // the accepted cost (behavior, Bool, is identical)。 The
+            // async fork can return as a HOST-side injected closure
+            // if the roundtrip ever measures as material。
+            try BGTaskScheduler.shared.submit(bg)
             return true
         } catch {
             // Common throws:

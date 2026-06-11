@@ -20,6 +20,7 @@ import Foundation
 @testable import BASMemory
 @testable import BASRuntimeCore
 @testable import BASAppleAdapters
+import BASCSystemBridge
 
 final class BASTypedObservedEffectsTests: XCTestCase {
 
@@ -242,19 +243,37 @@ final class BASTypedObservedEffectsTests: XCTestCase {
 // MARK: - iOS 27 P6 — swap-stats probe honesty (appended gate)
 
 extension BASTypedObservedEffectsTests {
+    /// Gap-close audit rewrite (LOW): the previous arms were
+    /// tautologies (UInt64 ≥ 0;re-asserting an observed nil) — a
+    /// 0-as-unknown regression would have PASSED。 Now each compile
+    /// branch is asserted falsifiably via the C-side branch truth。
     func testVmSwapStatsProbeIsHonestAcrossSDKs() {
         XCTAssertEqual(
             BASVmSwapStatsProbe.liveCBridgeABIVersion(), 1)
-        // Stable-toolchain builds compile the -3 fallback (nil);
-        // 27-SDK builds on modern kernels return real numbers。
-        // Either is honest;what is FORBIDDEN is 0-as-unknown with
-        // a success rc — covered by the C contract (memset +
-        // returned-count preflight)。
-        if let snapshot = BASVmSwapStatsProbe.rawSnapshot() {
-            // Real numbers: donated/swap are plausible page counts
-            // (no upper assert — device-dependent)。
-            XCTAssertGreaterThanOrEqual(snapshot.swapPages, 0)
+        // Null out-pointers must be rejected on BOTH branches
+        // (-1 live, -3 fallback — never 0)。
+        XCTAssertNotEqual(bas_vm_swap_stats(nil, nil), 0,
+            "null out-pointers can never report success")
+        if bas_vm_swap_stats_compiled_live() == 1 {
+            // Live branch: rc==0 ⇔ snapshot non-nil — and rc must
+            // round-trip consistently with the typed surface。
+            var swap: UInt64 = 0, donated: UInt64 = 0
+            let rc = bas_vm_swap_stats(&swap, &donated)
+            if rc == 0 {
+                XCTAssertNotNil(BASVmSwapStatsProbe.rawSnapshot(),
+                    "rc==0 must surface a snapshot")
+            } else {
+                XCTAssertNil(BASVmSwapStatsProbe.rawSnapshot(),
+                    "non-zero rc must surface nil (rc=\(rc))")
+            }
         } else {
+            // Fallback branch (stable toolchain): the stub MUST
+            // return -3 and the surface MUST be nil — a stub that
+            // started returning 0 (0-as-unknown) fails here。
+            var swap: UInt64 = 0, donated: UInt64 = 0
+            XCTAssertEqual(bas_vm_swap_stats(&swap, &donated), -3,
+                "pre-27-SDK builds must report unsupported, never " +
+                "success with zeroed fields")
             XCTAssertNil(BASVmSwapStatsProbe.rawSnapshot())
         }
     }

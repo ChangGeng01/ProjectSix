@@ -276,3 +276,12 @@ int32_t bas_vm_swap_stats(
 int32_t bas_vm_swap_stats_version(void) {
     return 1;
 }
+
+/// Gap-close audit (LOW) — expose WHICH compile branch this binary
+/// carries so the Swift honesty gate is falsifiable on both
+/// toolchains (1 = live 27-SDK fields, 0 = -3 fallback)。
+#if defined(__APPLE__) && (defined(__IPHONE_27_0) || defined(__MAC_27_0))
+int32_t bas_vm_swap_stats_compiled_live(void) { return 1; }
+#else
+int32_t bas_vm_swap_stats_compiled_live(void) { return 0; }
+#endif
