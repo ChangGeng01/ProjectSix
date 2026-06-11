@@ -1253,12 +1253,71 @@ final class BASEnduranceAppController: ObservableObject {
         let kvBits = Int(env["BAS_KV_BITS"] ?? "").flatMap {
             $0 == 4 || $0 == 8 ? $0 : nil
         }
+        // U2 — rotating-KV token cap probe knob (BAS_MAX_KV_SIZE=N;
+        // unset/non-positive = vendor default unbounded = byte-equal)。
+        // A/B: long-session paired runs with/without, compare KV
+        // memory ceiling + output quality by hand。
+        let maxKV = Int(env["BAS_MAX_KV_SIZE"] ?? "").flatMap {
+            $0 > 0 ? $0 : nil
+        }
         await emitBoth(
             "📍 ch1025 MLXOrganAdapter loading model=\(mlxModel.providerID) (\(mlxModel.providerName))"
-            + (kvBits.map { " kv_bits=\($0)" } ?? ""))
+            + (kvBits.map { " kv_bits=\($0)" } ?? "")
+            + (maxKV.map { " max_kv_size=\($0)" } ?? ""))
         let adapter = MLXOrganAdapter(
             model: mlxModel,
-            kvCacheBits: kvBits)
+            kvCacheBits: kvBits,
+            maxKVSize: maxKV)
+        // U1 — opt-in between-turns speculation memory governor
+        // (BAS_SPEC_GOVERNOR=1)。 Samples phys_footprint (jetsam
+        // metric) + system pressure each iter and advises draft
+        // drop/restore with hysteresis。 Byte-safe: greedy spec is
+        // token-identical, draft presence changes latency only。
+        var specGovernor: BASSpeculationMemoryGovernor? =
+            (env["BAS_SPEC_GOVERNOR"] ?? "0") == "1"
+                ? BASSpeculationMemoryGovernor(
+                    configuration: .fromFitBudget())
+                : nil
+        if let g = specGovernor {
+            let highMB = g.configuration.highWaterBytes / (1024 * 1024)
+            let lowMB = g.configuration.lowWaterBytes / (1024 * 1024)
+            await emitBoth("🧮 spec-governor ARMED — high_water=\(highMB)MB "
+                + "low_water=\(lowMB)MB strikes_to_drop="
+                + "\(g.configuration.strikesToDrop) clean_to_restore="
+                + "\(g.configuration.cleanSamplesToRestore)")
+        }
+        // U3 — opt-in decode liveness monitor (BAS_LIVENESS_MONITOR=1)。
+        // DETECTION ONLY — never cancels (ch1066/ADR-038:the wedge is
+        // uncancellable;a timeout races a jetsam kill it can't win)。
+        // On stall: GPU sibling probe runs once;healthy GPU + stalled
+        // decode = the measured MLX-process-local wedge signature。 The
+        // verdict line goes to syslog for the external Mac watchdog。
+        let livenessMonitor: BASDecodeLivenessMonitor?
+        if (env["BAS_LIVENESS_MONITOR"] ?? "0") == "1" {
+            let thresholdSec = Double(
+                env["BAS_LIVENESS_THRESHOLD_SEC"] ?? "") ?? 30
+            let probeSession = BASMetalGPUProbeSession.make()
+            var gpuProbe: (@Sendable () -> Bool)?
+            if let session = probeSession {
+                gpuProbe = { @Sendable in
+                    session.probeOnce().status == .completed
+                }
+            }
+            livenessMonitor = BASDecodeLivenessMonitor(
+                stallThresholdSec: thresholdSec,
+                gpuProbe: gpuProbe,
+                onStall: { verdict in
+                    // Syslog direct (NSLog) — the decode task that
+                    // normally drives emitBoth may be the wedged one。
+                    NSLog("%@", verdict.verdictLine)
+                })
+            await livenessMonitor?.startChecking(intervalSec: 5)
+            await emitBoth("🛡 liveness-monitor ARMED — threshold="
+                + "\(Int(thresholdSec))s check_interval=5s "
+                + "gpu_probe=\(probeSession != nil)")
+        } else {
+            livenessMonitor = nil
+        }
         let brainLoadStartNs = monoNowNs()
         do {
             try await adapter.loadModel()
@@ -1770,8 +1829,14 @@ final class BASEnduranceAppController: ObservableObject {
                     instruction: prompt,
                     context: [],
                     maxOutputTokens: maxDecodeTokens)   // WS2: explicit low decode cap (was preset 1024)
+                // U3 — liveness marks bracket the decode (non-streaming:
+                // the threshold bounds the WHOLE call;a wedged draft()
+                // never returns, the checker task fires the verdict)。
+                await livenessMonitor?.beginTurn(
+                    id: "ch1025-iter\(iter)-prompt\(p)")
                 do {
                     let draft = try await adapter.draft(request)
+                    await livenessMonitor?.endTurn()
                     let mlxMs = monoElapsedMs(since: mlxStartNs)
                     iterMlxMs += mlxMs   // M1.1 — MLX GPU decode time (the dominant, non-parallelizable part)
                     let mlxPostSnap = snapshot()
@@ -1829,6 +1894,9 @@ final class BASEnduranceAppController: ObservableObject {
                         iter, p + 1, sessions,
                         String(describing: capacity)))
                 } catch {
+                    // U3 — a thrown decode ENDED;silence the monitor
+                    // (a failed turn must not keep reporting stalls)。
+                    await livenessMonitor?.endTurn()
                     await emitBoth(
                         "⚠️ ch1025 mlx iter=\(iter) " +
                         "prompt=\(p+1) error=\(error)")
@@ -1984,6 +2052,42 @@ final class BASEnduranceAppController: ObservableObject {
                     iter: iter, base: baseCooldown,
                     adaptive: adaptive,
                     thermalState: snapAfter.thermalState)
+                // U1 — between-turns governor evaluation (decode is
+                // finished here;the next iter has not started)。
+                if let g = specGovernor {
+                    let footprint =
+                        (try? BASTaskVmInfoProbe.rawSnapshot())?
+                            .physFootprintBytes
+                    let pressure = await BASSystemProbe()
+                        .isUnderPressure()
+                    let (next, advice) = g.evaluating(
+                        BASSpeculationMemoryGovernor.Sample(
+                            footprintBytes: footprint,
+                            underPressure: pressure))
+                    specGovernor = next
+                    switch advice {
+                    case .hold:
+                        break
+                    case .dropDraft(let reason):
+                        let did = await adapter.unloadDraftModel(
+                            reason: reason)
+                        await emitBoth("🧮 spec-governor iter=\(iter) "
+                            + "DROP draft (did=\(did)) footprint_mb="
+                            + "\((footprint ?? 0) / (1024*1024)) "
+                            + "pressure=\(pressure) — \(reason)")
+                    case .restoreDraft(let reason):
+                        do {
+                            try await adapter.loadDraftModel()
+                            await emitBoth("🧮 spec-governor iter=\(iter) "
+                                + "RESTORE draft footprint_mb="
+                                + "\((footprint ?? 0) / (1024*1024)) "
+                                + "— \(reason)")
+                        } catch {
+                            await emitBoth("🧮 spec-governor iter=\(iter) "
+                                + "RESTORE FAILED: \(error)")
+                        }
+                    }
+                }
                 await emitBoth(
                     "⏸ ch1025 cooldown iter=\(iter) " +
                     "duration_s=\(cooldown) starting")

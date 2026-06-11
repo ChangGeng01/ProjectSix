@@ -115,6 +115,16 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// on-device A/B (throughput + memory + quality)。
     public nonisolated let kvCacheBits: Int?
 
+    /// U2 (2026-06-12) — OPT-IN rotating-KV-cache token cap (vendor
+    /// `GenerateParameters.maxKVSize`):when set,the cache becomes a
+    /// `RotatingKVCache` that overwrites old entries (keeping the
+    /// first 4 tokens),BOUNDING per-stream KV memory for long
+    /// sessions。 nil (default) = unbounded `KVCacheSimple` =
+    /// byte-equal (ADR-014)。 Non-nil CHANGES long-context attention
+    /// content (evicted tokens) — opt-in only,flip needs the
+    /// on-device A/B (long-session memory ceiling + quality)。
+    public nonisolated let maxKVSize: Int?
+
     /// ADR-041 §C — OPT-IN cap (bytes) for MLX's **load-time** memory peak, applied via `MLXRuntimeConfig`
     /// BEFORE the container load. Unlike `cacheLimitBytes` (a post-load recycling ceiling), `MLX.Memory.memoryLimit`
     /// makes `malloc` WAIT once exceeded — so it bounds the download/materialize SPIKE the cache cap cannot.
@@ -293,6 +303,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // (4/8) CHANGES decode numerics — opt-in only, on-device A/B
         // (throughput + memory + quality) before any default thought。
         params.kvBits = kvCacheBits
+        // U2 — rotating-KV cap。 DEFAULT nil = unbounded KVCacheSimple
+        // = byte-equal;non-nil bounds per-stream KV memory via
+        // RotatingKVCache (evicts old tokens, keeps first 4) and
+        // CHANGES long-context content — opt-in, A/B first。
+        params.maxKVSize = maxKVSize
         // ch1066 — ENFORCE a decode bound (the cap was never applied; generation relied
         // solely on the model emitting EOS → an unbounded TOKEN runaway). Precedence: an
         // explicit POSITIVE per-request cap wins; else the PRESET's output budget
@@ -386,12 +401,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         speculativeDecoding: BASSpeculativeMode = .greedy,
         numDraftTokens: Int = 2,
         speculativeFitBudgetBytes: Int? = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes,
-        kvCacheBits: Int? = nil
+        kvCacheBits: Int? = nil,
+        maxKVSize: Int? = nil
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
         self.memoryLimitBytes = memoryLimitBytes
         self.kvCacheBits = kvCacheBits
+        self.maxKVSize = maxKVSize
         // GREEDY SPECULATION DEFAULT-ON (operator-elected, 2026-06-11): when speculation is enabled and the caller
         // didn't pass an explicit draft, auto-resolve the curated same-family draft from `speculativePairings`.
         // A target with no pairing (e.g. a small model used directly, or Gemma 3 4B) resolves to nil → no draft →
@@ -582,6 +599,34 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
                 + Self.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
+
+    /// U1 (2026-06-12) — release the DRAFT container so the memory
+    /// governor (`BASSpeculationMemoryGovernor`) can shed dual-
+    /// residency under runtime pressure。 BYTE-SAFE by construction:
+    /// greedy speculation is token-identical to target-only decode,
+    /// so the draft's absence changes latency only, never output
+    /// bits — the one actuator that can flip freely across turns
+    /// (ADR-014)。 Call ONLY between turns (the host owns that
+    /// scheduling;this actor serializes against in-flight draft()
+    /// calls anyway)。 Idempotent:a no-draft state returns false。
+    /// NEVER silent:the reason lands in `draftLoadFailureReason` so
+    /// `isSpeculationActive == false` is always explainable;a later
+    /// `loadDraftModel()` (restore) clears it on success。
+    @discardableResult
+    public func unloadDraftModel(reason: String) -> Bool {
+        #if canImport(MLXLLM)
+        guard draftContainer != nil else { return false }
+        draftContainer = nil
+        draftLoadFailureReason = "unloaded: \(reason)"
+        #if canImport(os)
+        Logger(subsystem: "com.bas.mlx", category: "speculative")
+            .notice("draft model UNLOADED — \(reason, privacy: .public)")
+        #endif
+        return true
+        #else
+        return false
         #endif
     }
 

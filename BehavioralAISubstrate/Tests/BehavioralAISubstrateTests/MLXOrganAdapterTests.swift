@@ -259,6 +259,33 @@ final class MLXOrganAdapterTests: XCTestCase {
             "an explicit per-request maxOutputTokens must cap the decode")
     }
 
+    // KV-memory levers (kvCacheBits landed b37e94606; maxKVSize = U2).
+    // Both are ADR-014 opt-in: DEFAULT nil must flow through as the
+    // vendor defaults (no quantization / unbounded KVCacheSimple =
+    // byte-equal), and a non-nil opt-in must reach GenerateParameters
+    // verbatim — a silent drop here would make the device A/B knobs
+    // (BAS_KV_BITS / BAS_MAX_KV_SIZE) measure nothing.
+    func testGenerateParametersKVLeversDefaultNil() async {
+        let adapter = MLXOrganAdapter()
+        let params = await adapter._generateParameters(for: .core)
+        XCTAssertNil(params.kvBits,
+            "default kvCacheBits=nil must leave vendor kvBits nil (no " +
+            "KV quantization, byte-equal)")
+        XCTAssertNil(params.maxKVSize,
+            "default maxKVSize=nil must leave vendor maxKVSize nil " +
+            "(unbounded KVCacheSimple, byte-equal)")
+    }
+
+    func testGenerateParametersKVLeversOptInFlowThrough() async {
+        let adapter = MLXOrganAdapter(kvCacheBits: 4, maxKVSize: 1024)
+        let params = await adapter._generateParameters(for: .core)
+        XCTAssertEqual(params.kvBits, 4,
+            "opt-in kvCacheBits must reach GenerateParameters.kvBits")
+        XCTAssertEqual(params.maxKVSize, 1024,
+            "opt-in maxKVSize must reach GenerateParameters.maxKVSize " +
+            "(RotatingKVCache bound)")
+    }
+
     func testGenerateParametersCustomDescriptorMaxBoundsDecode() async {
         let adapter = MLXOrganAdapter(maxOutputTokens: 512)
         let params = await adapter._generateParameters(for: .core)
