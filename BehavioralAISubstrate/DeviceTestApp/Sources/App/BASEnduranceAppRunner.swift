@@ -301,6 +301,16 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASRankFuseProbe.run() }
             return
         }
+        // iOS 27 P1 — MTL4-queue A/B dispatch-overhead probe (BAS_MTL4_PROBE=1)。 MLX-free。
+        if (env["BAS_MTL4_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASMTL4QueueProbe.run() }
+            return
+        }
+        // iOS 27 P5 — FoundationModels ANE-resident batch-text probe (BAS_FM_PROBE=1)。 MLX-free。
+        if (env["BAS_FM_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASFoundationModelsProbe.run() }
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
