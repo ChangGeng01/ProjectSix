@@ -42,6 +42,16 @@ MAX_DECODE_TOKENS="${MAX_DECODE_TOKENS:-96}"
 WEDGE_FAST="${WEDGE_FAST:-0}"   # 1 ⇒ inject the fabric feed-forward (ADR §6 big-prefill) so each segment
                                 # wedges FAST — used to VALIDATE the watchdog's detect→kill→relaunch path
                                 # in-harness (the plain wedge is variable and may not fire in a short window).
+# --- data-run parameterization (2026-06-12) — all default to the prior fixed values, so existing
+#     callers are byte-identical. The dual-model sweep driver overrides these per phase. ---
+MODEL="${MODEL:-}"                # BAS_MLX_MODEL value (e.g. "llama"/"e4b"); empty ⇒ runner default (Gemma4 E2B)
+MLX_PROMPTS="${MLX_PROMPTS:-1}"   # prompts per iter (was hardcoded 1)
+COOLDOWN_SEC="${COOLDOWN_SEC:-0}" # base cooldown between iters (was hardcoded 0). NOTE: with cooldown ON,
+                                  # the mlx count legitimately freezes during cooldown — STALL_SEC MUST exceed
+                                  # the adaptive cooldown ceiling (base*3+120) + a decode, or a cooldown reads
+                                  # as a false wedge. The sweep driver sets STALL_SEC accordingly.
+ENV_EXTRA="${ENV_EXTRA:-}"       # extra knobs as a JSON fragment "K":"V",... WITH a trailing comma (or empty)
+ARCHIVE_DIR="${ARCHIVE_DIR:-}"   # if set, the full Documents container is pulled here at the end (per-phase archive)
 LOG_GLOB="ch1025-endurance-2026*.log"
 PULL_DIR="$(mktemp -d /tmp/bas-wd.XXXXXX)"
 
@@ -49,7 +59,11 @@ WEDGE_FRAG=""
 if [ "${WEDGE_FAST}" = "1" ]; then
     WEDGE_FRAG='"BAS_FABRIC_AUTH_FEEDFORWARD":"1","BAS_AGENT_FABRIC":"enabled",'
 fi
-ENV_RUN='{"BAS_ENDURANCE_AUTOSTART":"1",'"${WEDGE_FRAG}"'"BAS_INTERNAL_ITER_COUNT":"'"${PER_RUN_ITERS}"'","BAS_INTERNAL_MLX_PROMPTS":"1","BAS_INTERNAL_COOLDOWN_SEC":"0","BAS_INTERNAL_MAX_DECODE_TOKENS":"'"${MAX_DECODE_TOKENS}"'"}'
+MODEL_FRAG=""
+if [ -n "${MODEL}" ]; then
+    MODEL_FRAG='"BAS_MLX_MODEL":"'"${MODEL}"'",'
+fi
+ENV_RUN='{"BAS_ENDURANCE_AUTOSTART":"1",'"${WEDGE_FRAG}${MODEL_FRAG}${ENV_EXTRA}"'"BAS_INTERNAL_ITER_COUNT":"'"${PER_RUN_ITERS}"'","BAS_INTERNAL_MLX_PROMPTS":"'"${MLX_PROMPTS}"'","BAS_INTERNAL_COOLDOWN_SEC":"'"${COOLDOWN_SEC}"'","BAS_INTERNAL_MAX_DECODE_TOKENS":"'"${MAX_DECODE_TOKENS}"'"}'
 
 log_stamp() { echo "${1:-}" | grep -oE '[0-9]{8}-[0-9]{6}' | tr -d '-' | tail -1; }
 newest_log() {
@@ -142,6 +156,20 @@ echo "  clean completions:    ${CLEAN_COMPLETIONS}"
 echo "  launch failures:      ${LAUNCH_FAILURES}"
 echo "  total decode responses (summed across segments): ${TOTAL_RESPONSES}"
 echo "=============================================="
+
+# Per-phase archive (2026-06-12) — pull the WHOLE Documents container so the sweep driver keeps every
+# phase's data: the endurance .log, field-metrics.jsonl, the sovereign ledger + key, memory/vector SQLite.
+if [ -n "${ARCHIVE_DIR}" ]; then
+    mkdir -p "${ARCHIVE_DIR}"
+    if xcrun devicectl device copy from --device "${DEVICE_ID}" \
+        --domain-type appDataContainer --domain-identifier "${BUNDLE_ID}" \
+        --source Documents --destination "${ARCHIVE_DIR}" >/dev/null 2>&1; then
+        echo "  archived Documents → ${ARCHIVE_DIR} ($(find "${ARCHIVE_DIR}" -type f 2>/dev/null | wc -l | tr -d ' ') files)"
+    else
+        echo "  ⚠️ archive pull FAILED (device unavailable?) — data still on device for manual pull"
+    fi
+fi
+
 if [ "${WEDGES}" -eq "${RECOVERIES}" ] && [ "${LAUNCH_FAILURES}" -eq 0 ]; then
     echo "RESULT: PASS — every wedge auto-recovered by kill+relaunch; NO reboot needed; run was unattended."
     exit 0
