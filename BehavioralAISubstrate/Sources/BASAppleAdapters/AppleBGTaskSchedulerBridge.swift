@@ -91,6 +91,83 @@ public final class AppleBGTaskSchedulerBridge:
         #endif
     }
 
+    // MARK: - Launch-handler registration — 全面进化 T3.1 Phase B
+    //
+    // The SUBMIT side above asks the OS for a wake;this is the
+    // missing RECEIVE side:what runs when the OS grants it。 Apple
+    // requires registration BEFORE the app finishes launching and
+    // the identifier to be listed under
+    // `BGTaskSchedulerPermittedIdentifiers` in Info.plist —
+    // otherwise submit throws `.notPermitted`。
+    //
+    // OPPORTUNISTIC, NOT LOAD-BEARING (T3.1 adjudication): the
+    // foreground after-turn driver (`BASSleepConsolidationDriver`)
+    // is the dependable consolidation path;OS-fired windows are a
+    // bonus。 The handler MUST call `setTaskCompleted(success:)`
+    // and honor expiration — the wrapper enforces both by running
+    // the work in a cancellable Task wired to `expirationHandler`。
+
+    /// Register a launch handler for `identifier`。 Returns false
+    /// when the platform has no BGTaskScheduler,when called after
+    /// launch, or when the identifier was already registered。
+    /// `work` runs on an OS-granted background window;it is
+    /// CANCELLED (Task cancellation) when the OS expires the
+    /// window,and the task is always marked completed。
+    public static func registerLaunchHandler(
+        identifier: String,
+        work: @escaping @Sendable () async -> Bool
+    ) -> Bool {
+        #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
+        guard #available(
+            iOS 13.0, tvOS 13.0, visionOS 1.0,
+            macCatalyst 13.0, *)
+        else { return false }
+        return BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: identifier,
+            using: nil
+        ) { task in
+            // BGTask is not Sendable but `setTaskCompleted` is
+            // documented thread-safe;the box carries it across the
+            // Task/expiration domains and guards against double
+            // completion (expiration + late finish racing)。
+            let box = CompletionBox(task)
+            let job = Task {
+                let success = await work()
+                box.completeOnce(success: success)
+            }
+            task.expirationHandler = {
+                job.cancel()
+                box.completeOnce(success: false)
+            }
+        }
+        #else
+        // Native macOS / watchOS / non-Apple — no BGTaskScheduler;
+        // the foreground driver is the only path (by design)。
+        return false
+        #endif
+    }
+
+    #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
+    /// Carries the (non-Sendable) BGTask across concurrency domains
+    /// + serializes completion。 `@unchecked` is honest:the only
+    /// cross-domain call is `setTaskCompleted` (documented
+    /// thread-safe) and the once-flag is lock-guarded。
+    @available(iOS 13.0, tvOS 13.0, visionOS 1.0, macCatalyst 13.0, *)
+    private final class CompletionBox: @unchecked Sendable {
+        private let task: BGTask
+        private let lock = NSLock()
+        private var completed = false
+        init(_ task: BGTask) { self.task = task }
+        func completeOnce(success: Bool) {
+            lock.lock()
+            let first = !completed
+            completed = true
+            lock.unlock()
+            if first { task.setTaskCompleted(success: success) }
+        }
+    }
+    #endif
+
     // MARK: - Platform calls
 
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
