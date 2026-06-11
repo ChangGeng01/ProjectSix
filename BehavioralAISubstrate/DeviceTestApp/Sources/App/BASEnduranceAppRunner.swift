@@ -896,6 +896,22 @@ final class BASEnduranceAppController: ObservableObject {
                 + "— continuing without ledger closure")
         }
 
+        // ADR-018 P2 (2026-06-12) — opt-in shadow-trial N→N+1 carrier
+        // loop (BAS_SHADOW_TRIAL_LOOP=1)。 First production host of
+        // the carrier seams (was "production-inert until a host
+        // populates + re-injects")。 Turn N−1's shadowTrialRecords are
+        // re-injected before turn N (NEVER-EFFECTIVE-SAME-TURN by
+        // construction);evaluated records come back via the sink —
+        // OBSERVATION-ONLY, gates nothing, turn bytes unchanged。
+        let shadowTrialLoop =
+            (env["BAS_SHADOW_TRIAL_LOOP"] ?? "0") == "1"
+        let shadowResolvedBox = ShadowResolvedBox()
+        var shadowCarriedTrials: [BASShadowTrialRecord] = []
+        if shadowTrialLoop {
+            await emitBoth("🔁 shadow-trial loop ARMED — N→N+1 carrier "
+                + "(observation-only)")
+        }
+
         // #1 — opt-in FoundationModels E2E probe (exercises the Apple FM native wires ON THIS DEVICE before
         // loading MLX). Default OFF → single-stream path unchanged. The probe IS the run when set.
         if (env["BAS_FM_E2E"] ?? "0") == "1" {
@@ -1645,6 +1661,35 @@ final class BASEnduranceAppController: ObservableObject {
                 }
                 let promptLen = prompt.count
 
+                // ADR-018 P2 — re-inject turn N−1's trial records
+                // BEFORE this turn (the carrier can only ever hold the
+                // previous turn's trials = NEVER-EFFECTIVE-SAME-TURN)。
+                if shadowTrialLoop, !shadowCarriedTrials.isEmpty {
+                    let injected = shadowCarriedTrials
+                    await brain.setShadowTrialFeedback(
+                        enabled: true,
+                        pendingLedger: BASShadowTrialFeedbackLedger(
+                            pendingTrials: injected),
+                        resolvedSink: { evaluated in
+                            // advanced = completionState changed vs
+                            // the injected copy。 HONEST EXPECTATION:
+                            // always 0 — evaluate() never auto-
+                            // advances (the pending set and verdict
+                            // vocabulary are disjoint;auto-advance
+                            // would be the ADR-021 learner, NO-GO)。
+                            // A non-zero here would itself be a
+                            // doctrine-violation signal worth
+                            // investigating。
+                            let advanced = zip(injected, evaluated)
+                                .filter {
+                                    $0.completionState
+                                        != $1.completionState
+                                }.count
+                            shadowResolvedBox.record(
+                                evaluated: evaluated.count,
+                                advanced: advanced)
+                        })
+                }
                 // ch 1025.5 — brain.process() exercises L1-L14 cascade
                 // (context classify → decompose → memory → loop → triSelf
                 // → risk → action render → evolution synthesis)。 This
@@ -1655,6 +1700,12 @@ final class BASEnduranceAppController: ObservableObject {
                 let turnResult = await brain.process(prompt)
                 let brainMs = monoElapsedMs(since: brainStartNs)
                 iterBrainMs += brainMs   // M1.1 — substrate (L1-L14 cascade) time
+                // ADR-018 P2 — carry THIS turn's records for the next
+                // turn's injection (evaluate() itself skips
+                // non-pending ones)。
+                if shadowTrialLoop {
+                    shadowCarriedTrials = turnResult.shadowTrialRecords
+                }
                 // 主权闭环 — sign + chain this turn's sovereign entry
                 // (side-channel; no effect on the turn bytes above)。
                 if let sovereignSink {
@@ -2125,6 +2176,14 @@ final class BASEnduranceAppController: ObservableObject {
             await emitBoth("🔐 sovereign-loop FINAL signed_entries=\(count) "
                 + "head=\(head?.prefix(16) ?? "—") "
                 + "chain_verified=\(verified)")
+        }
+        // ADR-018 P2 — carrier-loop totals (observation-only truth)。
+        if shadowTrialLoop {
+            let totals = shadowResolvedBox.totals
+            await emitBoth("🔁 shadow-trial loop FINAL "
+                + "evaluated=\(totals.evaluated) "
+                + "advanced=\(totals.advanced) "
+                + "carried_at_end=\(shadowCarriedTrials.count)")
         }
         // iOS 27 P3/P4 probe (BAS_CONTINUED_PROBE=1) — submit a
         // continued-processing request at run end ("user just
@@ -2973,4 +3032,28 @@ private final class L8MetalInFlightGate: @unchecked Sendable {
         return true
     }
     func leave() { lock.lock(); inFlight = false; lock.unlock() }
+}
+
+/// ADR-018 P2 — lock-guarded collector for the shadow-trial loop's
+/// resolved records (the sink closure is @Sendable;the loop reads
+/// counts between turns + at run end)。
+private final class ShadowResolvedBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var evaluatedTotal = 0
+    private var advancedTotal = 0
+
+    /// Record one sink delivery。 `advanced` = records whose
+    /// completionState changed vs what was injected (the state
+    /// machine moved them);callers compute it since only they hold
+    /// the injected snapshot。
+    func record(evaluated: Int, advanced: Int) {
+        lock.lock(); defer { lock.unlock() }
+        evaluatedTotal += evaluated
+        advancedTotal += advanced
+    }
+
+    var totals: (evaluated: Int, advanced: Int) {
+        lock.lock(); defer { lock.unlock() }
+        return (evaluatedTotal, advancedTotal)
+    }
 }

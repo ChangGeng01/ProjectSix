@@ -62,7 +62,14 @@ public actor BASTurnRuntimeEngine {
 
     // MARK: - Dependencies
 
-    private let coordinator: BASEBrainRuntimeCoordinator
+    /// `var` (not `let`) since ADR-018 P2 host adoption (2026-06-12):
+    /// the coordinator is a value type whose OPT-IN observation seams
+    /// (the shadow-trial N→N+1 carrier) are public vars — a production
+    /// host reaches them only through this engine,so the engine must
+    /// be able to update its copy between turns
+    /// (`setShadowTrialFeedback`)。 Nothing else mutates it;each turn
+    /// still executes against one immutable value copy。
+    private var coordinator: BASEBrainRuntimeCoordinator
     private let eventLog: (any BASEventLogStorage)?
     private let eventIDFactory: @Sendable () -> String
     private let clockMs: @Sendable () -> Int64
@@ -430,6 +437,30 @@ public actor BASTurnRuntimeEngine {
     /// surfaces the bundle's `populatedSlotCount` in the
     /// `.complete` envelope payload for downstream audit
     /// consumers。
+    /// ADR-018 P2 host adoption (2026-06-12) — reach the coordinator's
+    /// shadow-trial N→N+1 carrier seams through the engine。 The
+    /// carrier loop was "production-inert until a host populates +
+    /// re-injects" (ADR-018:452-455) because the coordinator value is
+    /// buried behind `private let` chains:no production host could
+    /// reach its public vars。 This setter is the reachability pipe:
+    /// the host re-injects turn N−1's trial records before turn N
+    /// (NEVER-EFFECTIVE-SAME-TURN holds by construction — the carrier
+    /// can only ever hold the PREVIOUS turn's trials),and harvests
+    /// evaluated records via `resolvedSink`。 OBSERVATION-ONLY:the
+    /// in-turn block feeds the sink and gates nothing(RunTurn block
+    /// doc)。 ADR-014 byte-equal-off:a host that never calls this
+    /// leaves the coordinator exactly as constructed。
+    public func setShadowTrialFeedback(
+        enabled: Bool,
+        pendingLedger: BASShadowTrialFeedbackLedger?,
+        resolvedSink:
+            (@Sendable ([BASShadowTrialRecord]) -> Void)?
+    ) {
+        coordinator.shadowTrialFeedbackEnabled = enabled
+        coordinator.pendingTrialLedgerIn = pendingLedger
+        coordinator.resolvedTrialSink = resolvedSink
+    }
+
     public func runTurn(
         _ request: BASEBrainTurnRequest,
         auditProjections:

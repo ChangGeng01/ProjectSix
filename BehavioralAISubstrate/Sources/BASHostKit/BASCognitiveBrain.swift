@@ -631,4 +631,23 @@ public actor BASCognitiveBrain {
         return await engine.runTurn(request)
     }
 
+    /// ADR-018 P2 host adoption (2026-06-12) — forward the shadow-
+    /// trial N→N+1 carrier seams to the engine's coordinator(see
+    /// `BASTurnRuntimeEngine.setShadowTrialFeedback`)。 Host loop:
+    /// before each `process()`,re-inject a ledger built from the
+    /// PREVIOUS turn's `result.shadowTrialRecords`;harvest evaluated
+    /// records via `resolvedSink`。 OBSERVATION-ONLY + byte-equal-off
+    /// (never calling this leaves every turn byte-identical)。
+    public func setShadowTrialFeedback(
+        enabled: Bool,
+        pendingLedger: BASShadowTrialFeedbackLedger?,
+        resolvedSink:
+            (@Sendable ([BASShadowTrialRecord]) -> Void)?
+    ) async {
+        await engine.setShadowTrialFeedback(
+            enabled: enabled,
+            pendingLedger: pendingLedger,
+            resolvedSink: resolvedSink)
+    }
+
 }
