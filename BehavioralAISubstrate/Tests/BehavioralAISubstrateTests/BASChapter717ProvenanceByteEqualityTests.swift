@@ -15,7 +15,11 @@ final class BASChapter717ProvenanceByteEqualityTests:
     XCTestCase
 {
     override func tearDown() {
-        BASOrganTrainedWeightFilter.useRoutedFilter = false
+        // Restore the CURRENT production default (true, flipped ON
+        // at M2260 / da2d5a168) — not the pre-flip `false`,which
+        // would leave the global in a non-production state for any
+        // later test that reads it。
+        BASOrganTrainedWeightFilter.useRoutedFilter = true
         super.tearDown()
     }
 

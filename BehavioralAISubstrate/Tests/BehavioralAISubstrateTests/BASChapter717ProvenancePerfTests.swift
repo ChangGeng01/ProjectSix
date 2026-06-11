@@ -21,7 +21,9 @@ import Foundation
 final class BASChapter717ProvenancePerfTests: XCTestCase {
 
     override func tearDown() {
-        BASOrganTrainedWeightFilter.useRoutedFilter = false
+        // Restore the CURRENT production default (true, flipped ON
+        // at M2260 / da2d5a168) — not the pre-flip `false`。
+        BASOrganTrainedWeightFilter.useRoutedFilter = true
         super.tearDown()
     }
 

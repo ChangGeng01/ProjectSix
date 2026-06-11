@@ -76,7 +76,19 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
         else {
             return  // skip silently if path missing
         }
-        var offenders: [(file: String, line: Int)] = []
+        // Forbidden inlined hardened-version literals。 The "1.1.0"
+        // check is explicit (the historical hardened form);the
+        // CURRENT hardened version is derived from the constant so a
+        // FUTURE bump (1.3.0, …) is covered automatically the moment
+        // `hardenedSchemaVersion` advances — closing the gap the
+        // ch1044 D2 bump to "1.2.0" opened (a new producer inlining
+        // `schemaVersion: "1.2.0"` would have evaded the 1.1.0-only
+        // grep)。 Deduped so an identical pair never double-reports。
+        let forbiddenVersions: [String] = Array(Set([
+            "1.1.0",
+            BASSovereignAuditEntry.hardenedSchemaVersion,
+        ])).sorted()
+        var offenders: [(file: String, line: Int, version: String)] = []
         for case let p as String in enumerator {
             guard p.hasSuffix(".swift") else { continue }
             let full = "\(sourcesDir)/\(p)"
@@ -87,10 +99,9 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
                 separator: "\n", omittingEmptySubsequences: false)
             for (idx, line) in lines.enumerated() {
                 let s = String(line)
-                // Catch `schemaVersion: "1.1.0"` in code
-                // (not in comments or doc strings)
-                // Skip lines that begin with `//` or `*` for
-                // doc-comment heuristic
+                // Catch `schemaVersion: "X.Y.Z"` in code (not in
+                // comments or doc strings)。 Skip lines that begin
+                // with `//` or `*` for doc-comment heuristic。
                 let trimmed = s.trimmingCharacters(
                     in: .whitespaces)
                 if trimmed.hasPrefix("//") ||
@@ -99,16 +110,18 @@ final class BASChapter1011SchemaVersionCanonicalTests: XCTestCase {
                 {
                     continue
                 }
-                if s.contains("schemaVersion: \"1.1.0\"") ||
-                    s.contains("schemaVersion:\"1.1.0\"")
-                {
-                    offenders.append((file: p, line: idx + 1))
+                for v in forbiddenVersions
+                where s.contains("schemaVersion: \"\(v)\"") ||
+                      s.contains("schemaVersion:\"\(v)\"") {
+                    offenders.append(
+                        (file: p, line: idx + 1, version: v))
                 }
             }
         }
         XCTAssertTrue(offenders.isEmpty,
             "ch 1011 CRITICAL: production Sources/ MUST NOT " +
-            "contain raw `schemaVersion: \"1.1.0\"` literals。 " +
+            "contain raw `schemaVersion: \"<hardened>\"` literals " +
+            "(forbidden: \(forbiddenVersions))。 " +
             "Use `BASSovereignAuditEntry.hardenedSchemaVersion` " +
             "instead。 Offenders: \(offenders)")
     }

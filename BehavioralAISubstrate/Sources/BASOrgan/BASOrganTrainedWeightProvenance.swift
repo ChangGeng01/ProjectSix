@@ -299,7 +299,11 @@ public enum BASOrganTrainedWeightFilter {
         // When the feature flag is on,delegate the decision
         // tree to BASAutoRouteRanker.provenanceFilter (Rust)
         // and map its typed decision back to this enum。
-        // Default off per measurement-grounded policy。
+        // DEFAULT ON since chapter 七百十七 第五刀 / M2260
+        // (commit da2d5a168) — the routed path is byte-equal to
+        // the Swift tree (10/10 variants,BASChapter717Provenance
+        // ByteEqualityTests) at a ~4.9× perf win,so the flip was a
+        // reviewed default per ADR-014。 See the `:228` doc above。
         if useRoutedFilter {
             return rejectionReasonViaAutoRouter(
                 for: provenance)
