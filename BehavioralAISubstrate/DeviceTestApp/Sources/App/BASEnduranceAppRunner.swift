@@ -339,6 +339,9 @@ final class BASEnduranceAppController: ObservableObject {
         // Prevent screen auto-lock during the long run。 The operator should also set
         // Settings → Display & Brightness → Auto-Lock = Never + keep the device charging。
         UIApplication.shared.isIdleTimerDisabled = true
+        // iOS 27 A3 — arm the OS-attested field-metrics collectors
+        // (MetricKit MetricManager AsyncSequences;no-op below 27)。
+        BASFieldMetricsCollector.start()
         Task.detached(priority: .userInitiated) { [weak self] in
             await self?.runEndurance(iters: iters,
                                      cooldownSec: cooldownSec,
@@ -1659,6 +1662,9 @@ final class BASEnduranceAppController: ObservableObject {
                 }
 
                 let mlxPreSnap = snapshot()
+                // iOS 27 P7 — phase attribution for MetricKit
+                // byStateReportingDomain (no-op below iOS 27)。
+                BASFieldMetricsCollector.phase("mlx-decode")
                 let mlxStartNs = monoNowNs()
                 let request = BASOrganRequest(
                     requestID:
@@ -1885,6 +1891,9 @@ final class BASEnduranceAppController: ObservableObject {
                 await emitBoth(
                     "⏸ ch1025 cooldown iter=\(iter) " +
                     "duration_s=\(cooldown) starting")
+                // iOS 27 P7 — cooldown phase (thermal recovery
+                // attribution in MetricKit reports)。
+                BASFieldMetricsCollector.phase("cooldown")
                 let preCoolSnap = snapshot()
                 try? await Task.sleep(
                     for: .seconds(cooldown))

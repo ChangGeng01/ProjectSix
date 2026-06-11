@@ -10,6 +10,7 @@
 #include "include/bas_csystem_bridge.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #if defined(__APPLE__) && (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) \
     || defined(__MAC_OS_X_VERSION_MIN_REQUIRED))
@@ -204,5 +205,74 @@ int32_t bas_task_phys_footprint(
 #endif
 
 int32_t bas_task_phys_footprint_version(void) {
+    return 1;
+}
+
+// MARK: - iOS 27 P6 (IOS27_PERF_ADOPTION_PLAN) — App Swap statistics
+//
+// vm_statistics64 rev4-rev6 fields (iPhoneOS27.0.sdk
+// mach/vm_statistics.h:218 swap_count "pages currently populated in
+// the swapfile"; :254 donated_count "anonymous pages queued for
+// self-donation (App Swap)"). Direct evidence of the OS's
+// memory-pressure RESPONSE that the naive free-page ratio cannot
+// see — feeds the jetsam-endurance signal lane.
+//
+// COMPILE GUARD: the fields exist only in the 27-era SDK headers;
+// the SPM package builds under the stable toolchain → fallback
+// returns -3 (unsupported) there. RUNTIME GUARD: HOST_VM_INFO64_COUNT
+// compiled against the 27 SDK covers rev6, but an older KERNEL
+// returns a shorter count — out fields are preflighted and the
+// returned count is checked against the offsets actually read, so
+// stale stack bytes can never masquerade as data (probe honesty:
+// -2, never 0-as-unknown).
+
+#if defined(__APPLE__) && (defined(__IPHONE_27_0) || defined(__MAC_27_0))
+
+int32_t bas_vm_swap_stats(
+    uint64_t *out_swap_pages,
+    uint64_t *out_donated_pages
+) {
+    if (out_swap_pages == NULL || out_donated_pages == NULL) {
+        return -1;
+    }
+    vm_statistics64_data_t vm_stats;
+    memset(&vm_stats, 0, sizeof(vm_stats));
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    if (host_statistics64(
+            mach_host_self(),
+            HOST_VM_INFO64,
+            (host_info64_t)&vm_stats,
+            &count) != KERN_SUCCESS) {
+        return -1;
+    }
+    // Integers actually returned must cover the LAST field we read
+    // (donated_count). offsetof+size in mach integer_t units.
+    const mach_msg_type_number_t needed =
+        (mach_msg_type_number_t)((offsetof(vm_statistics64_data_t,
+                                           donated_count)
+                                  + sizeof(uint64_t))
+                                 / sizeof(integer_t));
+    if (count < needed) {
+        return -2;  // pre-rev4/5 kernel — fields not provided
+    }
+    *out_swap_pages    = (uint64_t)vm_stats.swap_count;
+    *out_donated_pages = (uint64_t)vm_stats.donated_count;
+    return 0;
+}
+
+#else
+
+int32_t bas_vm_swap_stats(
+    uint64_t *out_swap_pages,
+    uint64_t *out_donated_pages
+) {
+    if (out_swap_pages)    { *out_swap_pages = 0; }
+    if (out_donated_pages) { *out_donated_pages = 0; }
+    return -3;  // SDK too old at compile time
+}
+
+#endif
+
+int32_t bas_vm_swap_stats_version(void) {
     return 1;
 }

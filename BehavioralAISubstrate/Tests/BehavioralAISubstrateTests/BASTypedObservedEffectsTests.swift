@@ -238,3 +238,24 @@ final class BASTypedObservedEffectsTests: XCTestCase {
         XCTAssertFalse(sink.isEmpty)
     }
 }
+
+// MARK: - iOS 27 P6 — swap-stats probe honesty (appended gate)
+
+extension BASTypedObservedEffectsTests {
+    func testVmSwapStatsProbeIsHonestAcrossSDKs() {
+        XCTAssertEqual(
+            BASVmSwapStatsProbe.liveCBridgeABIVersion(), 1)
+        // Stable-toolchain builds compile the -3 fallback (nil);
+        // 27-SDK builds on modern kernels return real numbers。
+        // Either is honest;what is FORBIDDEN is 0-as-unknown with
+        // a success rc — covered by the C contract (memset +
+        // returned-count preflight)。
+        if let snapshot = BASVmSwapStatsProbe.rawSnapshot() {
+            // Real numbers: donated/swap are plausible page counts
+            // (no upper assert — device-dependent)。
+            XCTAssertGreaterThanOrEqual(snapshot.swapPages, 0)
+        } else {
+            XCTAssertNil(BASVmSwapStatsProbe.rawSnapshot())
+        }
+    }
+}

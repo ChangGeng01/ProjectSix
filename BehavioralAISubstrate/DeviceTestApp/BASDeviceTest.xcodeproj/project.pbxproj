@@ -564,6 +564,7 @@
 		5EB702F58F7226ABFA96DD06 /* M299FrontierSummaryConsumptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C13B9F95715D514C8AFA79 /* M299FrontierSummaryConsumptionTests.swift */; };
 		5EEB7406E9BC8A92ADC40F01 /* BASANEUtilizationProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B870065AAE4F479D5DF5997 /* BASANEUtilizationProbe.swift */; };
 		CB34D81E5D4A9F30C2E6B902 /* BASRankFuseProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB34D81E5D4A9F30C2E6B901 /* BASRankFuseProbe.swift */; };
+		CC45E81E5D4A9F30C2E6BA02 /* BASFieldMetricsCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC45E81E5D4A9F30C2E6BA01 /* BASFieldMetricsCollector.swift */; };
 		5F02E37A1EDE1C80F0881C8A /* BASChapter875RMSNormFlipOrDeclineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A6D6F94B4E8A6602CCD96 /* BASChapter875RMSNormFlipOrDeclineTests.swift */; };
 		5F22453DEE5F2BDBFE82233B /* M603FourteenLayerSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F2AAB290676C7A5D723720 /* M603FourteenLayerSmokeTests.swift */; };
 		5FC81107ACB14065DF687737 /* BASChapter741SovereignTokensSchemaGeneratedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61187C54CE29B7663FF1682C /* BASChapter741SovereignTokensSchemaGeneratedTests.swift */; };
@@ -1833,6 +1834,7 @@
 		3B839A8F39EEAA44DA9B2518 /* BASEndOfTurnAuditEmissionRecordProjectionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASEndOfTurnAuditEmissionRecordProjectionPipelineTests.swift; sourceTree = "<group>"; };
 		3B870065AAE4F479D5DF5997 /* BASANEUtilizationProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASANEUtilizationProbe.swift; sourceTree = "<group>"; };
 		CB34D81E5D4A9F30C2E6B901 /* BASRankFuseProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASRankFuseProbe.swift; sourceTree = "<group>"; };
+		CC45E81E5D4A9F30C2E6BA01 /* BASFieldMetricsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASFieldMetricsCollector.swift; sourceTree = "<group>"; };
 		3B8D829682E3F871102A2F15 /* BASChapter741MatrixScorecardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter741MatrixScorecardTests.swift; sourceTree = "<group>"; };
 		3BECF905DE811E340AC4CE16 /* BASChapter938EventLogFullRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter938EventLogFullRowTests.swift; sourceTree = "<group>"; };
 		3C4E12E9EC68109DFD0E0724 /* BASAbyssalProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASAbyssalProtocolTests.swift; sourceTree = "<group>"; };
@@ -3056,6 +3058,7 @@
 			children = (
 				3B870065AAE4F479D5DF5997 /* BASANEUtilizationProbe.swift */,
 				CB34D81E5D4A9F30C2E6B901 /* BASRankFuseProbe.swift */,
+				CC45E81E5D4A9F30C2E6BA01 /* BASFieldMetricsCollector.swift */,
 				19653C38FA5D38C99D402855 /* BASDeviceTestApp.swift */,
 				0C45F76979B07DBA98E1ECB8 /* BASEnduranceAppRunner.swift */,
 				32454CA755DAD7C1FD9CFBDD /* BASMambaProbe.swift */,
@@ -4687,6 +4690,7 @@
 			files = (
 				5EEB7406E9BC8A92ADC40F01 /* BASANEUtilizationProbe.swift in Sources */,
 				CB34D81E5D4A9F30C2E6B902 /* BASRankFuseProbe.swift in Sources */,
+				CC45E81E5D4A9F30C2E6BA02 /* BASFieldMetricsCollector.swift in Sources */,
 				129A5ADD8ADFEDDEB8D3AB0A /* BASDeviceTestApp.swift in Sources */,
 				4FBC958958001EF0AFEE15BD /* BASEnduranceAppRunner.swift in Sources */,
 				576C1485232BE2D0A8B6887F /* BASMPSGraphProbe.swift in Sources */,

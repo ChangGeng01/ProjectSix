@@ -253,3 +253,34 @@ extension BASTaskVmInfoProbe {
         return await make(flags: flags)
     }
 }
+
+// MARK: - iOS 27 P6 — App Swap statistics probe
+
+/// Typed surface over `bas_vm_swap_stats` (vm_statistics64
+/// rev4/rev5: swapfile pages + App Swap donated pages)。 Probe
+/// honesty: nil on ANY non-zero rc — the OS response signal is
+/// either real or absent, never guessed (mirrors BASTaskVmInfoProbe)。
+public enum BASVmSwapStatsProbe {
+
+    public struct Snapshot: Sendable, Equatable {
+        public let swapPages: UInt64
+        public let donatedPages: UInt64
+    }
+
+    public static let cBridgeABIVersion: Int32 = 1
+
+    public static func liveCBridgeABIVersion() -> Int32 {
+        return bas_vm_swap_stats_version()
+    }
+
+    /// nil ⇒ unavailable (pre-27 SDK at compile time, pre-rev4
+    /// kernel at runtime, or mach failure)。
+    public static func rawSnapshot() -> Snapshot? {
+        var swap: UInt64 = 0
+        var donated: UInt64 = 0
+        guard bas_vm_swap_stats(&swap, &donated) == 0 else {
+            return nil
+        }
+        return Snapshot(swapPages: swap, donatedPages: donated)
+    }
+}

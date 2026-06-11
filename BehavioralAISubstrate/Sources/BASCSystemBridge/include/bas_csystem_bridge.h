@@ -350,3 +350,18 @@ int32_t bas_task_phys_footprint_version(void);
 #endif
 
 #endif /* BAS_CSYSTEM_BRIDGE_H */
+
+/// iOS 27 P6 — App Swap statistics from vm_statistics64 rev4/rev5
+/// fields (swap_count: pages populated in the swapfile;
+/// donated_count: anonymous pages queued for App Swap
+/// self-donation)。 Returns 0 on success;-1 null args / mach
+/// failure;-2 kernel too old (fields not in returned count);
+/// -3 compiled against a pre-27 SDK (fields absent at compile
+/// time)。 Probe honesty: never 0-as-unknown — non-zero rc means
+/// the out values are meaningless。
+int32_t bas_vm_swap_stats(
+    uint64_t *out_swap_pages,
+    uint64_t *out_donated_pages);
+
+/// ABI / behavior version pin for `bas_vm_swap_stats`。
+int32_t bas_vm_swap_stats_version(void);
