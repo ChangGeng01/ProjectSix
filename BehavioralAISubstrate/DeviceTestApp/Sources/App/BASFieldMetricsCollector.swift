@@ -64,33 +64,81 @@ enum BASFieldMetricsCollector {
         #endif
     }
 
-    /// Start the AsyncSequence consumers。 Returns immediately;the
-    /// spawned tasks live for the process。 JSONL lands beside the
-    /// endurance logs in Documents。
+    /// Serialized JSONL writer — audit fix (batch-audit HIGH,
+    /// verified): two detached consumers previously raced fresh
+    /// per-row FileHandles + an atomic-replace fallback that could
+    /// DESTROY the evidence file。 One lock,ONE handle opened once,
+    /// append-only。
+    private final class JSONLWriter: @unchecked Sendable {
+        private let lock = NSLock()
+        private let handle: FileHandle?
+        init(url: URL) {
+            if !FileManager.default.fileExists(atPath: url.path) {
+                FileManager.default.createFile(
+                    atPath: url.path, contents: nil)
+            }
+            handle = try? FileHandle(forWritingTo: url)
+            _ = try? handle?.seekToEnd()
+        }
+        func append(_ row: [String: String]) {
+            guard let data = try? JSONSerialization.data(
+                withJSONObject: row, options: [.sortedKeys]),
+                let line = String(data: data, encoding: .utf8)
+            else { return }
+            lock.lock(); defer { lock.unlock() }
+            try? handle?.write(contentsOf: Data((line + "\n").utf8))
+        }
+    }
+
+    /// Process-lifetime once guard — audit fix (batch-audit MEDIUM):
+    /// start() is called from every run-start tap;without the guard
+    /// each tap spawned two MORE never-cancelled consumers ⇒
+    /// duplicate JSONL evidence rows。 Lock-guarded box (strict
+    /// concurrency forbids bare static var)。
+    private final class OnceFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+        /// true exactly once (the first caller)。
+        func tryFire() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if fired { return false }
+            fired = true
+            return true
+        }
+    }
+    private static let startOnce = OnceFlag()
+
+    /// Start the AsyncSequence consumers exactly ONCE per process。
+    /// Returns immediately;the spawned tasks live for the process。
+    /// JSONL lands beside the endurance logs in Documents。
     static func start() {
         #if canImport(MetricKit)
         guard #available(iOS 27.0, *) else {
             log.info("field-metrics: below iOS 27 — collector idle")
             return
         }
+        guard startOnce.tryFire() else {
+            log.info("field-metrics: already armed — start() is once-per-process")
+            return
+        }
         let docs = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask).first!
-        let url = docs.appendingPathComponent("field-metrics.jsonl")
+        let writer = JSONLWriter(
+            url: docs.appendingPathComponent("field-metrics.jsonl"))
         let manager = MetricManager(
             enabledStateReportingDomains: [
                 .init(rawValue: phaseDomain)])
         Task.detached(priority: .utility) {
             for await report in manager.metricReports {
-                appendJSONL(describeMetricReport(report), to: url)
+                writer.append(describeMetricReport(report))
             }
         }
         Task.detached(priority: .utility) {
             for await diagnostic in manager.diagnosticReports {
-                appendJSONL(
+                writer.append(
                     ["kind": "diagnostic",
                      "at": ISO8601DateFormatter().string(from: Date()),
-                     "payload": String(describing: diagnostic)],
-                    to: url)
+                     "payload": String(describing: diagnostic)])
             }
         }
         log.info("field-metrics: collectors armed → field-metrics.jsonl")
@@ -134,21 +182,4 @@ enum BASFieldMetricsCollector {
     }
     #endif
 
-    private static func appendJSONL(
-        _ row: [String: String], to url: URL
-    ) {
-        guard let data = try? JSONSerialization.data(
-            withJSONObject: row, options: [.sortedKeys]),
-            let line = String(data: data, encoding: .utf8)
-        else { return }
-        let payload = Data((line + "\n").utf8)
-        if FileManager.default.fileExists(atPath: url.path),
-           let handle = try? FileHandle(forWritingTo: url) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: payload)
-        } else {
-            try? payload.write(to: url, options: .atomic)
-        }
-    }
 }

@@ -104,10 +104,22 @@ enum BASMTL4QueueProbe {
         }
         let va = floats(firstA), vb = floats(firstB)
         let maxDelta = zip(va, vb).map { abs($0 - $1) }.max() ?? -1
+        // Audit fix (batch-audit MEDIUM): the delta is CHECKED, not
+        // just logged — fp32 softmax across queues of the same
+        // executable should agree to ~1e-5;a bigger delta means the
+        // MTL4 lane changes numerics and the A/B verdict is void。
+        let numericsTolerance: Float = 1e-5
+        let numericsOK = maxDelta >= 0 && maxDelta <= numericsTolerance
         emit(String(format:
-            "📊 mtl4-probe NUMERICS max_abs_delta=%.3e (same "
-            + "executable; quarantine semantics unchanged either way)",
-            maxDelta))
+            "📊 mtl4-probe NUMERICS max_abs_delta=%.3e tol=%.0e %@",
+            maxDelta, numericsTolerance,
+            numericsOK ? "PASS" : "FAIL"))
+        guard numericsOK else {
+            emit("❌ mtl4-probe ABORT numerics mismatch — latency "
+                + "A/B is meaningless across diverging lanes; "
+                + "verdict=LANE-INVALID")
+            return
+        }
 
         // Best-of-3 × 200 per lane。
         func bestOf3(_ body: () -> Void) -> Double {

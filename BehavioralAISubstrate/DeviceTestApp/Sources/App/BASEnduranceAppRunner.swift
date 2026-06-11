@@ -121,6 +121,12 @@ private let ch1025Log = Logger(
 @MainActor
 final class BASEnduranceAppController: ObservableObject {
 
+    /// iOS 27 P3 once-guard (batch-audit HIGH fix) — the continued-
+    /// processing wildcard handler may register at most ONCE per
+    /// process (SDK contract: second registration of the same
+    /// identifier kills the app)。 @MainActor class ⇒ safe static var。
+    static var continuedHandlerRegistered = false
+
     // MARK: - Status surface
 
     enum RunStatus {
@@ -358,10 +364,16 @@ final class BASEnduranceAppController: ObservableObject {
         // P3/P4 question (does the OS grant the window / GPU?)
         // without entangling real consolidation wiring — that
         // hookup is the follow-up once windows are proven。
-        if let ids = AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
+        // ONCE-PER-PROCESS (batch-audit HIGH fix): `started` resets
+        // at run teardown,so a second start tap re-entered this
+        // block — and the SDK contract kills the app on a second
+        // registration of the same identifier。
+        if !Self.continuedHandlerRegistered,
+           let ids = AppleBGTaskSchedulerBridge.continuedTaskIdentifiers(
             bundleID: Bundle.main.bundleIdentifier,
             context: "consolidation",
             unique: "probe") {
+            Self.continuedHandlerRegistered = true
             let registered = AppleBGTaskSchedulerBridge
                 .registerContinuedLaunchHandler(
                     wildcardIdentifier: ids.wildcard) { report in

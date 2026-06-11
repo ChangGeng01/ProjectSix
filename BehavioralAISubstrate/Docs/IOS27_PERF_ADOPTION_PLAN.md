@@ -25,15 +25,15 @@
 |---|---|---|---|---|
 | A1 | **MSL 4.1 编译梯级** | `MTLLibrary.h:224 MTLLanguageVersion4_1 ios(27.0)` | MLX `get_metal_version()`(vendor patch,现有补丁类)+ `BASMetalKernelLibraryLoader` 加 "iOS 27→4.1" 一行可用性梯级。纯使能件:解锁 `__HAVE_TENSOR_MULTIPLANE__`/tensor-ops 编译面,为任何未来张量车道铺地。门:现有 kernel 平价夹具全绿(数值应逐位不变)。 | S |
 | A2 | **MPSGraph 未弃用 — 记录免改造** | 27.0 全头文件 grep:**零**新增 API_DEPRECATED | 写入 ADR-039:6 个内建 MPSGraph kernel + Swift/C++ 双执行缓存**本周期无需迁移** Metal-4 ML encoder;Metal-4 互操作可增量叠加。附 watch:`convertLayoutToNHWC` 自 26.4 默认 no-op(conv 路径换形为编译期行为)。 | S |
-| A3 | **MetricKit 字段证据栈** | swiftinterface `:1184 MetricManager`(AsyncSequence)`:584 PeakMemoryMetric` `:608 SuspendedMemoryMetric` `:806 BackgroundTerminationMetric` 均 iOS 27 | 新 `BASFieldMetricsCollector`(BASAppleAdapters + DeviceTestApp 消费):OS 认证的内存高水位/挂起内存/前后台终止计数/MemoryExceptionDiagnostic → JSONL 证据面。**用 OS 真相验证或证伪 3000MB 预算 vs 3376MB 实测上限**。纯观察,永不入摘要前像。 | M |
-| A4 | **BGTask 异步提交** | `BGTaskScheduler.h:143 submitTaskRequest:completionHandler: ios(27.0)`;旧同步 submit 已弃用(:108) | `AppleBGTaskSchedulerBridge.submitProcessingRequest` 加 `#available(iOS 27)` 分叉:去掉跨进程同步往返 + 拿到此前被吞的提交错误(喂 BASBreathScheduler 记账)。 | S |
+| A3 | **MetricKit 字段证据栈** | swiftinterface `:1184 MetricManager`(AsyncSequence)`:584 PeakMemoryMetric` `:608 SuspendedMemoryMetric` `:806 BackgroundTerminationMetric` 均 iOS 27 | 新 `BASFieldMetricsCollector`(**落地修正:DeviceTestApp 专属** — 27-only 符号不进稳定工具链构建的 SPM 包):OS 认证的内存高水位/挂起内存/前后台终止计数/MemoryExceptionDiagnostic → JSONL 证据面。**用 OS 真相验证或证伪 3000MB 预算 vs 3376MB 实测上限**。纯观察,永不入摘要前像。 | M |
+| A4 | **BGTask 异步提交** | `BGTaskScheduler.h:143 submitTaskRequest:completionHandler: ios(27.0)`;旧同步 submit 已弃用(:108) | `AppleBGTaskSchedulerBridge.submitProcessingRequest` 加 `#available(iOS 27)` 分叉:去掉跨进程同步往返。**落地修正:错误仍折叠为 Bool**(桥接口未变);错误明细喂 BASBreathScheduler 记账 = 诚实残留,挂在桥接口扩展上。 | S |
 
 ## Tranche B — 探针(证据先于一切车道;P0 是钥匙)
 
 | # | 探针 | 决定什么 | 量级 |
 |---|---|---|---|
 | **P0** | **turn 相位切分计量**:endurance runner 给 MLX 调用加 prefill-ms / decode-ms 计数,逐 turn 记录占比 | **整个被否决的 Metal-4 量化家族的重开钥匙**:prefill 占比若实质(参考阈 ≥15–20%),NAX/MPP/MTLTensor 车道全部重审;占比小则否决以证据封存 | S |
-| P1 | **MPSGraph→MTL4 队列 A/B**:`MPSGraphExecutable.h:195/211 run(on: MTL4CommandQueue) ios(27.0)`,对 6 个内建 kernel 测 per-evaluate 提交开销(微秒级 kernel,CPU encode/commit 占大头) | 是否给执行缓存加 MTL4 派发车道(旗标默认关;派发路线在决策脊柱里 — 必须 ADR-014 门控) | M |
+| P1 | **MPSGraph→MTL4 队列 A/B** — **落地形态:单代表性 kernel 探针**(softmax[1,512],BAS_MTL4_PROBE=1;6-kernel 全扫描是 MODEST+ 后的跟进):per-evaluate 提交开销 + 数值阈值判定(≤1e-5 PASS 否则 LANE-INVALID) | 是否给执行缓存加 MTL4 派发车道(旗标默认关;派发路线在决策脊柱里 — 必须 ADR-014 门控) | M |
 | P2 | **ANE 再基线**:重跑 BAS_ANE_PROBE(零代码)— CoreML planner 在 OS 侧,iOS 27 运行时可能静默改放置 | T1.2 裁决(零 ANE 放置 / .all 14× 慢)在 27 运行时下是否仍立 | S |
 | P3 | **BGContinuedProcessingTask**(`BGTask.h:127 ios(26.0)`,SubmissionStrategy Fail/Queue):T3.1 巩固的"保证开窗"车道 — 重会话结束→受保证的后台窗,替代 OS 可能永不授予的机会窗 | 是否给 BASSleepConsolidationDriver 加第三驱动路径(注意:要求可见进度 UI;Info.plist 通配标识符) | M |
 | P4 | **+ GPU 资源**(`BGTaskRequest.h:129-130 Resources.gpu ios(26.0)` + `supportedResources`):受权后台 GPU 窗 | MLX 依赖型维护(嵌入刷新、prompt-cache 预热)能否离前台跑(ADR-039 隔离照旧:后台 GPU 产物仅 reasoning-side) | M |

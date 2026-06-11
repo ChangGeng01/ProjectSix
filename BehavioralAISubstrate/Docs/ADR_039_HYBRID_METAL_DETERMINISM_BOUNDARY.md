@@ -271,3 +271,12 @@ interop arrives incrementally via the new `MPSGraphExecutable.run(on: MTL4Comman
 Watch item recorded with the finding: `convertLayoutToNHWC` became a no-op default at 26.4
 (MPSGraph.h:121-123) — conv-path layout conversion is now compile-time behavior; the Conv2D kernel's
 shapes should be re-checked if its compilation profile ever changes.
+
+### 11.1 A1 evidence-bound correction (batch-audit, 2026-06-11)
+
+The batch-1 commit claimed the MSL 4.1 rung's numerics are "pinned by kernel parity fixtures (44/0)".
+CORRECTION (R1): those 44 tests ran on the macOS STABLE toolchain, whose `#available(iOS 27/macOS 27)`
+check is false — they exercise the PRE-27 fork (options:nil) only. The 4.1 fork's numerics evidence is
+therefore an ON-DEVICE parity run (the same fixtures executed via BASDeviceTests on iOS 27, where the
+4.1 branch is live) — queued in the operator run-book. Until that run lands, the honest claim is:
+"the 4.1 fork compiles and the pre-27 fork is parity-pinned; on-device 4.1 parity pending."
