@@ -30,10 +30,21 @@ Built + tested, **opt-in / byte-equal-off** (host elects; `makeWithDefaults()` s
   is the first caller (`makeReferenceHost` — file key + SQLite in Documents; PRODUCTION key custody stays the
   ADR-032 R1 operator decision). Pure side-channel: byte-safe by construction (reads the entry off the result,
   never the turn bytes); 5/5 gate (real-turn sign+chain, multi-turn linkage, byte-safety, signing-authority,
-  cross-restart rehydrate). **Still open (next unit, honestly deferred):** ADR-028 observe-mode enforcing
-  adapters belong at the brain's ROLED agent call sites (construction layer), NOT bolted onto the runner's raw
-  decode (that would mislabel a throughput call as a scout/planner agent call); the commit-gate + vault-seal
-  live-paths still await the host keyring.
+  cross-restart rehydrate).
+- **ADR-028 observe-mode — built + wired + tested (premise corrected 2026-06-12).** A follow-up scan corrected
+  the inventory's "enforcingAdapter has 0 callers" (that was the ADR-031:27 HISTORICAL state at ch1045): the
+  ch1056 §13 #12 fix wired the contract-gate install to EVERY production LLM call site — extraction engine
+  (`BASLLMNeuralCoreService.makeDefault` defaults to `.observeOnly(purpose:.decompose)`), verifier pipeline,
+  tool-calling planner — and it is extensively tested (6 suites, 32/0): `BASContractInstallSitesTests` proves
+  the wrap reaches every site + byte-equal when no install; `BASContractedWiringIntegrationTests` proves the
+  wrapper is OUTPUT-transparent (drafted body byte-identical to the unwrapped path) + contracts + traces every
+  call + forbidden-context rejection. The MECHANISM and per-site INSTALL are done. What remains is purely host
+  ADOPTION: a host passes a non-nil observe install when constructing the brain's engines (opt-in / byte-equal
+  default-off, ADR-014) — the SAME R1/host-deliberate class as the keyring (and the default rules-fallthrough
+  cascade makes no real LLM call, so it would not even fire there). NOT a dev gap. Wrapping the endurance
+  runner's RAW decode is the wrong move — the gate's derive+validate adds per-call latency that would
+  contaminate the very throughput/tok-s metric the run exists to measure. **Still host-deliberate (R1):**
+  commit-gate + vault-seal live-paths await the host keyring; ADR-028 install adoption is the host's opt-in.
 - **ADR-032** governance enablement — observe-mode contracts/traces ON by default (zero output change).
   The **crypto commit-verify** subset now has a host-side MECHANISM (`BASSovereignGatedTurn`, above);
   rejection / dual-key / deny still REFUSED pending a host keyring/policy (R1). See ADR-032 UPDATE.
