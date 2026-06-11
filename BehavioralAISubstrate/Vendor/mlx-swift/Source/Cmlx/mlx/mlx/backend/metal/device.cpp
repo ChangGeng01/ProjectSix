@@ -21,7 +21,13 @@ constexpr const char* default_mtllib_path = METAL_PATH;
 
 auto get_metal_version() {
   auto get_metal_version_ = []() {
-    if (__builtin_available(macOS 26, iOS 26, tvOS 26, visionOS 26, *)) {
+    // BAS vendor patch (iOS 27 A1, IOS27_PERF_ADOPTION_PLAN.md):
+    // MSL 4.1 rung on OS 27 — unlocks __HAVE_TENSOR_MULTIPLANE__ /
+    // tensor-ops surfaces for existing NAX kernels; identical
+    // sources, numerics pinned by the kernel parity fixtures.
+    if (__builtin_available(macOS 27, iOS 27, tvOS 27, visionOS 27, *)) {
+      return MTL::LanguageVersion4_1;
+    } else if (__builtin_available(macOS 26, iOS 26, tvOS 26, visionOS 26, *)) {
       return MTL::LanguageVersion4_0;
     } else if (__builtin_available(macOS 15, iOS 18, tvOS 18, visionOS 2, *)) {
       return MTL::LanguageVersion3_2;

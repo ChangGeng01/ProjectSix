@@ -241,8 +241,30 @@ public actor BASMetalKernelLibraryLoader {
         let source = combinedSource
         let library: MTLLibrary
         do {
+            // iOS 27 A1 (IOS27_PERF_ADOPTION_PLAN) — MSL 4.1 compile
+            // rung。 Pure enabler:identical sources compile to
+            // identical numerics (kernel parity fixtures pin this);
+            // 4.1 unlocks the tensor-ops/__HAVE_TENSOR_MULTIPLANE__
+            // surface for any FUTURE gated lane。 `options: nil`
+            // (= toolchain default) is preserved below iOS/macOS 27。
+            let options: MTLCompileOptions?
+            if #available(iOS 27.0, macOS 27.0, *),
+               let v41 = MTLLanguageVersion(
+                rawValue: (4 << 16) + 1) {
+                // Raw value is API-pinned (MTLLibrary.h:224
+                // MTLLanguageVersion4_1 = (4<<16)+1);the SYMBOL
+                // only exists in the 27 SDK,so raw construction
+                // keeps this compiling on the stable toolchain
+                // while the runtime gate keeps older OSes on the
+                // toolchain default。
+                let opts = MTLCompileOptions()
+                opts.languageVersion = v41
+                options = opts
+            } else {
+                options = nil
+            }
             library = try device.makeLibrary(
-                source: source, options: nil)
+                source: source, options: options)
         } catch {
             throw BASMetalKernelLibraryLoaderError
                 .metalCompilationFailed(

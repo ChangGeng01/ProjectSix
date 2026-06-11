@@ -71,6 +71,10 @@ _MTL_ENUM(NS::UInteger, LanguageVersion) {
     LanguageVersion3_1 = 196609,
     LanguageVersion3_2 = 196610,
     LanguageVersion4_0 = 262144,
+    // BAS vendor patch (iOS 27 A1, IOS27_PERF_ADOPTION_PLAN.md):
+    // mirrors MTLLibrary.h:224 MTLLanguageVersion4_1 = (4<<16)+1,
+    // API_AVAILABLE(macos(27.0), ios(27.0)).
+    LanguageVersion4_1 = 262145,
 };
 
 _MTL_ENUM(NS::Integer, LibraryType) {

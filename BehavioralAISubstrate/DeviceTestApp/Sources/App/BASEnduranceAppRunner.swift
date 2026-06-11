@@ -1390,6 +1390,14 @@ final class BASEnduranceAppController: ObservableObject {
         var iterAvailMemAfter: [Int] = []
         var iterCooldownThermalRecovery: [String] = []
         var allMlxLatenciesMs: [Double] = []
+        // iOS 27 P0 (IOS27_PERF_ADOPTION_PLAN) — campaign-level
+        // prefill/decode split。 THE re-open key for the declined
+        // Metal-4 quantization family:its hardware tensor path
+        // only feeds prefill,so the family re-opens only if the
+        // prefill SHARE is material across a real run。
+        var p0PrefillMsTotal = 0.0
+        var p0DecodeMsTotal = 0.0
+        var p0SampleCount = 0
         var totalTokens = 0
         // ch1062 WS2 — carries the fabric-authoritative enrichment from turn N into
         // turn N+1's prompt (the N→N+1 feed-forward). nil ⇒ use the raw promptPool prompt.
@@ -1705,6 +1713,10 @@ final class BASEnduranceAppController: ObservableObject {
                             iter, p + 1,
                             m.prefillMs, m.decodeMs, m.promptTokens, m.generationTokens,
                             m.prefillTokensPerSec, m.decodeTokensPerSec))
+                        // iOS 27 P0 — campaign accumulation。
+                        p0PrefillMsTotal += m.prefillMs
+                        p0DecodeMsTotal += m.decodeMs
+                        p0SampleCount += 1
                     }
                     // ch 1025.7 — MLX adapter telemetry per prompt
                     let sessions = await adapter.sessionCount()
@@ -1894,6 +1906,25 @@ final class BASEnduranceAppController: ObservableObject {
         }
 
         let totalSec = monoElapsedMs(since: runStartNs) / 1000.0
+        // iOS 27 P0 verdict line (human-read;decides the declined
+        // Metal-4 quantization family's re-open per
+        // IOS27_PERF_ADOPTION_PLAN.md 否决记录 #1)。 Reference
+        // threshold from the plan: prefill share ≥15–20% ⇒ re-review。
+        if p0SampleCount > 0 {
+            let phaseTotal = p0PrefillMsTotal + p0DecodeMsTotal
+            let share = phaseTotal > 0
+                ? p0PrefillMsTotal / phaseTotal * 100 : 0
+            await emitBoth(String(format:
+                "📊 ios27-P0 PHASE-SPLIT samples=%d prefill_ms=%.0f "
+                + "decode_ms=%.0f prefill_share=%.1f%% "
+                + "verdict=%@ (threshold 15-20%%; human reads — "
+                + "gates never auto-promote)",
+                p0SampleCount, p0PrefillMsTotal, p0DecodeMsTotal,
+                share,
+                share >= 15.0
+                    ? "PREFILL-MATERIAL — Metal-4 quant family re-review warranted"
+                    : "DECODE-DOMINATED — declines stand by evidence"))
+        }
         if !iterDurationMs.isEmpty {
             let sortedDurMs = iterDurationMs.sorted()
             let avgDurMs = iterDurationMs.reduce(0, +)

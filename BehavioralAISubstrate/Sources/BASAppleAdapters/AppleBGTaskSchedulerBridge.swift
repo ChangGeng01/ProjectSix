@@ -76,7 +76,7 @@ public final class AppleBGTaskSchedulerBridge:
             return true
         }
         #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
-        return Self.submitProcessingRequest(request)
+        return await Self.submitProcessingRequest(request)
         #else
         // Native macOS / watchOS / non-Apple — no
         // BGTaskScheduler. `BASBreathScheduler` still records
@@ -173,7 +173,7 @@ public final class AppleBGTaskSchedulerBridge:
     #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
     private static func submitProcessingRequest(
         _ request: BASBreathScheduler.Request
-    ) -> Bool {
+    ) async -> Bool {
         // iOS 13+, iPadOS 13+, tvOS 13+, visionOS 1+, Mac
         // Catalyst 13+. Gate with `#available` for the rare
         // case a host backports below the framework minimum.
@@ -192,7 +192,17 @@ public final class AppleBGTaskSchedulerBridge:
         bg.requiresExternalPower =
             request.maintenanceClass == .deferred
         do {
-            try BGTaskScheduler.shared.submit(bg)
+            // iOS 27 A4 (IOS27_PERF_ADOPTION_PLAN) — the async
+            // submit removes a synchronous cross-process roundtrip
+            // from the (already-async) register flow and surfaces
+            // submission errors the deprecated sync API dropped。
+            // Older OSes keep the sync call;behavior (Bool) is
+            // identical on both forks。
+            if #available(iOS 27.0, tvOS 27.0, *) {
+                try await BGTaskScheduler.shared.submitTaskRequest(bg)
+            } else {
+                try BGTaskScheduler.shared.submit(bg)
+            }
             return true
         } catch {
             // Common throws:

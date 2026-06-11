@@ -257,3 +257,17 @@ its boundary proven byte-identical (the per-phase boundary test). Concretely, th
 (`cosineTopKAtomIDsSync`); event-log `append` transactionality (`BEGIN IMMEDIATE`); durability / corruption
 / concurrency / dual-write tests; deterministic cosine-topK ordering; bounded `wal_autocheckpoint`; opt-in
 `integrity_check`. Only then does Metal eat the approximate paths on top of a spine proven solid.
+
+## 11. iOS 27 adjudication — MPSGraph stack is NOT deprecated (A2, 2026-06-11)
+
+Exhaustive grep of the iPhoneOS27.0.sdk MetalPerformanceShadersGraph headers for
+API_DEPRECATED/NS_DEPRECATED/MPS_DEPRECATED finds ZERO new deprecations at 27.0 (only pre-existing:
+optimizationProfile ios(15.4,17.0), reverseSquareRootWithTensor ios(14.0,18.0)). The hypothesized forced
+migration of the 6 builtin MPSGraph kernels + the Swift/C++ executable caches onto
+MTL4MachineLearningCommandEncoder is NOT required this cycle — the cache investment stands, and Metal-4
+interop arrives incrementally via the new `MPSGraphExecutable.run(on: MTL4CommandQueue, …)` overloads
+(MPSGraphExecutable.h:195/211, ios(27.0)) under the P1 probe of IOS27_PERF_ADOPTION_PLAN.md.
+
+Watch item recorded with the finding: `convertLayoutToNHWC` became a no-op default at 26.4
+(MPSGraph.h:121-123) — conv-path layout conversion is now compile-time behavior; the Conv2D kernel's
+shapes should be re-checked if its compilation profile ever changes.
