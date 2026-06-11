@@ -295,6 +295,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASANEUtilizationProbe.run() }
             return
         }
+        // 全面进化 T2.1 — rank-fuse live-corpus evidence (BAS_RANK_FUSE=1). MLX-free; reads the
+        // durable stores accumulated by prior endurance runs (age truth + paired lane delta)。
+        if (env["BAS_RANK_FUSE"] ?? "0") == "1" {
+            launchSpecAux { await BASRankFuseProbe.run() }
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
@@ -625,8 +631,8 @@ final class BASEnduranceAppController: ObservableObject {
     // prior run's durable memory。
     // `nonisolated`: immutable Sendable String constants — read from the nonisolated runEndurance loop, so they
     // must not be MainActor-isolated (Swift-6 forbids reaching a MainActor static from outside the actor).
-    private nonisolated static let memoryAtomsDBFilename = "bas-memory-atoms.sqlite"
-    private nonisolated static let vectorIndexDBFilename = "bas-vector-index.sqlite"
+    nonisolated static let memoryAtomsDBFilename = "bas-memory-atoms.sqlite"
+    nonisolated static let vectorIndexDBFilename = "bas-vector-index.sqlite"
     private static let embeddingProviderVersion = "MiniLM-L6-v2-coreml-fp32-v1"
 
     /// ch1062 WS2 — max rounds for the fabric-authoritative multi-round loop。
