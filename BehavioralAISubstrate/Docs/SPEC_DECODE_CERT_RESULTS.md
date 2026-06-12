@@ -157,3 +157,21 @@ properly randomized n=1 / 50-prompt re-cert is the right next experiment if the 
 3. The memory gate correctly refused the Gemma pair and passed the Llama pair.
 4. The evidence discipline held: a noisy n=3 signal was refused; at n=50 the gate produced a well-founded
    `enable` (greedy) and a decisive `doNotEnable` (sampling) — exactly 亏的不要.
+
+## Tranche A1 lane confirmation (2026-06-12, decode-elevation program)
+
+The certified-but-dormant greedy lane is now WIRED into the endurance decode path
+(`BAS_GREEDY_SPEC_LANE=1`, commit 533d5a184) and was re-confirmed PAIRED on the actual device A
+(iPhone Air, post-10h-run thermal state, Llama-3.2-3B↔1B, n=3 prompts, maxDecodeTokens=256):
+
+```
+🏎 greedy-spec-lane is_speculation_active=true
+📊 greedy-spec-ab n=3 spec_ms=7937 baseline_ms=10659 speedup=1.34x
+```
+
+**+34% paired** (same prompts, same thermal window, draft toggled via unloadDraftModel/loadDraftModel)
+— consistent with (slightly above) the n=100 cert's +31%. Absolute tok/s is NOT comparable across
+sessions (the device had just finished a 10h run — hot); the paired delta is the valid number. The
+production chooser for this lane is `BASDecodeLanePolicy` (deterministic/factual → greedy; A2,
+20abf2d2a). The KV levers were A/B'd in the same 10h run and DECLINED at this regime
+(`KV_LEVERS_DEVICE_VERDICT_2026-06-12.md`) — greedy spec-decode is the real decode lever.
