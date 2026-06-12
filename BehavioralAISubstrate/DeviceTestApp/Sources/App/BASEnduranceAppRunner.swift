@@ -295,6 +295,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASSpecDefaultOnProbe.runDraftTokenSweep() }
             return
         }
+        // Tranche A3 — GREEDY numDraftTokens sweep, thermal-confound-killed (shuffled middle order +
+        // baseline bracket first/last)。 Device-only (MLX loads)。
+        if (env["BAS_SPEC_GREEDY_SWEEP"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecDefaultOnProbe.runGreedyDraftTokenSweep() }
+            return
+        }
         // 全面进化 T1.2 — ANE utilization measurement (BAS_ANE_PROBE=1). MLX-free (CoreML heads only) but
         // launched via the same aux path; runs fine on device (MLComputePlan is iOS 17.4+).
         if (env["BAS_ANE_PROBE"] ?? "0") == "1" {

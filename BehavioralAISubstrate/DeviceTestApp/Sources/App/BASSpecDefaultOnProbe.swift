@@ -179,6 +179,81 @@ enum BASSpecDefaultOnProbe {
         }
     }
 
+    // MARK: - 3. Tranche A3 — GREEDY numDraftTokens sweep, thermal-confound-killed (2026-06-12)
+    //
+    // The prior sweep (above) had two limits: SAMPLING lane only, and SEQUENTIAL config order with the
+    // baseline LAST — later configs run hotter, so "n=1 best" carried a thermal confound. This sweep:
+    //   • GREEDY lane (the production lane after Tranche A: temp==0, +34% device-confirmed)
+    //   • n ∈ {1,2,3,4} with the MIDDLE ORDER SHUFFLED per run (seeded by clock — order logged)
+    //   • BASELINE BRACKET: single-model greedy runs FIRST and LAST. drift = post−pre quantifies the
+    //     thermal slide across the whole sweep; config means are reported raw + the bracket, so the
+    //     verdict can discount drift honestly instead of pretending it isn't there。
+    // Verdict updates the numDraftTokens default ONLY via a reviewed commit citing this output。
+    static func runGreedyDraftTokenSweep() async {
+        let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_SPEC_MAX_DECODE_TOKENS"] ?? "48") ?? 48
+        let fileLog = FileLog(prefix: "spec-greedy-sweep")
+        defer { fileLog.close() }
+        let target = MLXModelCatalog.speculativeOptimalTarget
+        guard let draft = MLXModelCatalog.recommendedDraft(forTargetProviderID: target.providerID) else {
+            fileLog.emit("📊 greedy-sweep ABORT — no draft pairing for \(target.providerID)")
+            return
+        }
+        var order = [1, 2, 3, 4]
+        order.shuffle()
+        fileLog.emit("📊 greedy-sweep START lane=greedy decode_cap=\(decodeCap) "
+            + "n_prompts=\(prompts.count) shuffled_order=\(order) bracket=baseline-first+last")
+
+        func baselineMean(_ label: String) async throws -> Double {
+            var base: MLXOrganAdapter? = MLXOrganAdapter(model: target, speculativeDecoding: .off)
+            try await base!.loadModel()
+            var total = 0.0
+            for (i, p) in prompts.enumerated() {
+                total += try await timedStream(base!, request(i, p, decodeCap)).1
+            }
+            base = nil
+            let mean = total / Double(prompts.count)
+            fileLog.emit(String(format: "📊 greedy-sweep baseline-%@ mean_ms=%.0f", label, mean))
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            return mean
+        }
+
+        do {
+            let basePre = try await baselineMean("pre")
+            var means: [Int: Double] = [:]
+            for n in order {
+                var adapter: MLXOrganAdapter? = MLXOrganAdapter(
+                    model: target, draftModel: draft,
+                    speculativeDecoding: .greedy, numDraftTokens: n)
+                try await adapter!.loadModel()
+                try await adapter!.loadDraftModel()
+                var total = 0.0
+                for (i, p) in prompts.enumerated() {
+                    total += try await timedStream(adapter!, request(i, p, decodeCap)).1
+                }
+                means[n] = total / Double(prompts.count)
+                fileLog.emit(String(format: "📊 greedy-sweep n=%d mean_ms=%.0f", n, means[n]!))
+                adapter = nil
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+            let basePost = try await baselineMean("post")
+            let driftPct = basePre > 0 ? (basePost - basePre) / basePre * 100 : 0
+            let baseMean = (basePre + basePost) / 2
+            let best = means.min { $0.value < $1.value }!
+            let speedup = best.value > 0 ? baseMean / best.value : 0
+            // Honest verdict: a config wins only if it beats the bracket-mean baseline by more than
+            // the measured drift band (no thermal-slide credit)。
+            let driftBandMs = abs(basePost - basePre)
+            let verdict = best.value < (baseMean - driftBandMs) ? "WIN" : "INCONCLUSIVE-WITHIN-DRIFT"
+            fileLog.emit(String(format: "📊 greedy-sweep FINAL best_n=%d best_ms=%.0f "
+                + "baseline_bracket_ms=%.0f drift_pct=%+.1f%% speedup=%.2fx verdict=%@ "
+                + "(order=%@; n=1 device — directional re-cert input, default change needs reviewed commit)",
+                best.key, best.value, baseMean, driftPct, speedup, verdict,
+                "\(order)"))
+        } catch {
+            fileLog.emit("📊 greedy-sweep FINAL error=\(error)")
+        }
+    }
+
     // MARK: - Helpers
 
     private static func request(
