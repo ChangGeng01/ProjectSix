@@ -51,8 +51,17 @@ once before the real run** to confirm the device path end-to-end. One phone does
 
 | | Model | `BAS_MLX_MODEL` | Arch | Spec-decode | Why |
 |---|---|---|---|---|
-| **A** | Llama-3.2-3B | `llama` | standard (no Gemma-3n wedge) | CERTIFIED 3B↔1B, 2542MB FITS | stable workhorse for the KV sweep + governor + spec-decode |
-| **B** | Gemma-4-E4B | `e4b` | Gemma-3n (wedge-prone, cache-cap-stabilized) | single-model | quality default + architecture contrast + real wedge/liveness exercise |
+| **A** | Llama-3.2-3B | `llama` | standard / dense (no wedge, 1723MB active) | CERTIFIED 3B↔1B, 2542MB FITS | stable workhorse for the KV sweep + governor + spec-decode |
+| **B** | Gemma-4-E2B | `e2b` | Gemma-3n nested (memory-hostile, 2512MB active) | single-model | architecture contrast — BUT see the memory caveat below |
+
+> **MEMORY CAVEAT (2026-06-12, `DEVICE_B_JETSAM_ROOT_CAUSE_2026-06-12.md`):** Gemma-3n's "E2B/E4B" names
+> are the EFFECTIVE param count, NOT the loaded weight size. **E2B loads 2512 MB active — MORE than
+> dense Llama-3B (1723 MB)**; E4B (~4 GB) exceeds the 3376 MB per-process jetsam cap outright. On the
+> live run, device B (E4B) died on first load; switched to E2B which still jetsams on the load spike
+> (271 MB headroom) ~355× — the fixed watchdog recovered every one, but the data is fragmented. **For
+> CLEAN endurance data prefer a DENSE model (Llama / Qwen) on device B too** (e.g. `qwen` or `llama1b`
+> for an arch contrast that actually fits). Gemma-3n endurance needs a lower `BAS_MLX_CACHE_LIMIT_MB`
+> (256) + bounded self-populate growth — a follow-up, not yet wired by default.
 
 ## Phase table (600 min = 10h)
 
