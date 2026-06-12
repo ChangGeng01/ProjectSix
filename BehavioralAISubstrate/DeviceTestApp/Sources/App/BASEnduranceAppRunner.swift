@@ -1283,10 +1283,18 @@ final class BASEnduranceAppController: ObservableObject {
         let maxKV = Int(env["BAS_MAX_KV_SIZE"] ?? "").flatMap {
             $0 > 0 ? $0 : nil
         }
+        // Tranche A1 — greedy speculative-decode LANE (BAS_GREEDY_SPEC_LANE=1)。 The decode request
+        // uses the .greedyDeterministic preset (temp 0) instead of .core (0.7), which ENGAGES the
+        // certified-but-dormant speculative decoder (gate requires temp==0) when the model has a
+        // curated draft pairing (Llama/Qwen/Gemma4). Cert: +31% greedy, token-identical to greedy
+        // single-model (SPEC_DECODE_CERT_RESULTS.md). NOTE: greedy ≠ the .core sampled output — this
+        // is a DECODE-SPEED lane (faster + reproducible), not the default sampling turn。
+        let greedyLane = (env["BAS_GREEDY_SPEC_LANE"] ?? "0") == "1"
         await emitBoth(
             "📍 ch1025 MLXOrganAdapter loading model=\(mlxModel.providerID) (\(mlxModel.providerName))"
             + (kvBits.map { " kv_bits=\($0)" } ?? "")
-            + (maxKV.map { " max_kv_size=\($0)" } ?? ""))
+            + (maxKV.map { " max_kv_size=\($0)" } ?? "")
+            + (greedyLane ? " greedy_spec_lane=on" : ""))
         let adapter = MLXOrganAdapter(
             model: mlxModel,
             kvCacheBits: kvBits,
@@ -1362,6 +1370,42 @@ final class BASEnduranceAppController: ObservableObject {
             "📍 ch1025 MLXOrganAdapter loaded load_ms=%.0f " +
             "is_loaded=%@",
             brainLoadMs, isLoaded ? "true" : "false"))
+
+        // A1 — greedy-spec lane: one-time PAIRED A/B (greedy-spec vs single-model greedy) on the
+        // actual loaded model, confirming the certified +31% on THIS config before the main run.
+        // Reuses U1 unloadDraftModel/loadDraftModel to toggle the draft. Skips honestly when the
+        // model has no draft pairing (Gemma E2B/3-4B) — then greedy-spec == greedy single-model.
+        if greedyLane {
+            let specActive = await adapter.isSpeculationActive
+            await emitBoth("🏎 greedy-spec-lane is_speculation_active=\(specActive)"
+                + (specActive ? "" : " — no draft pairing for \(mlxModel.providerID); "
+                    + "greedy-spec == greedy single-model (use BAS_MLX_MODEL=llama for the speedup)"))
+            if specActive {
+                let abPrompts = Array(Self.promptPool.prefix(3))
+                func avgDecodeMs() async -> Double {
+                    var total = 0.0
+                    for (i, pr) in abPrompts.enumerated() {
+                        let req = BASOrganRequest(
+                            requestID: "greedy-ab-\(i)", role: .core,
+                            preset: .greedyDeterministic, instruction: pr,
+                            context: [], maxOutputTokens: maxDecodeTokens)
+                        let t = monoNowNs()
+                        _ = try? await adapter.draft(req)
+                        total += monoElapsedMs(since: t)
+                    }
+                    return total / Double(max(1, abPrompts.count))
+                }
+                let specMs = await avgDecodeMs()                       // draft loaded ⇒ speculative
+                _ = await adapter.unloadDraftModel(reason: "A1 baseline A/B")  // U1 — drop draft ⇒ single-model
+                let baselineMs = await avgDecodeMs()                   // greedy single-model
+                try? await adapter.loadDraftModel()                    // restore for the main run
+                let speedup = baselineMs > 0 ? baselineMs / max(1, specMs) : 0
+                await emitBoth(String(format:
+                    "📊 greedy-spec-ab n=%d spec_ms=%.0f baseline_ms=%.0f speedup=%.2fx "
+                    + "(cert: ~1.31x Llama 3B↔1B) — token-identical greedy, pure decode speed",
+                    abPrompts.count, specMs, baselineMs, speedup))
+            }
+        }
 
         // ADR-038 §11.8 cache-pool fix (default-ON ⇒ byte-equal-off): MLX's free-buffer cache pool is otherwise
         // NEVER drained or capped and defaults to the full memory limit (may cache GBs) — a CUMULATIVE
@@ -1883,7 +1927,9 @@ final class BASEnduranceAppController: ObservableObject {
                     requestID:
                         "ch1025-iter\(iter)-prompt\(p)",
                     role: .core,
-                    preset: .core,
+                    // A1 — greedy-spec lane engages the speculative decoder (preset temp 0); else the
+                    // default .core sampling preset (single-model, the historical path)。
+                    preset: greedyLane ? .greedyDeterministic : .core,
                     instruction: prompt,
                     context: [],
                     maxOutputTokens: maxDecodeTokens)   // WS2: explicit low decode cap (was preset 1024)
