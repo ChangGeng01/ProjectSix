@@ -51,16 +51,28 @@ public struct MLXModelCatalog: Sendable, Equatable {
         /// past the reply boundary.
         public let extraEOSTokens: [String]
 
+        /// Tranche C (2026-06-12) — OPTIONAL local-directory model:
+        /// a Documents-relative directory name holding an MLX model
+        /// (config.json + *.safetensors + tokenizer), staged via
+        /// `devicectl device copy to`。 When non-nil, `loadModel`
+        /// uses `ModelConfiguration(directory:)` (no HF download) —
+        /// the lane for locally-quantized variants (e.g. the 3-bit
+        /// decode-bandwidth A/B) that mlx-community doesn't publish。
+        /// nil (default) = the HF `id` download path, byte-equal。
+        public let localDirectoryName: String?
+
         public init(
             id: String,
             providerID: String,
             providerName: String,
-            extraEOSTokens: [String]
+            extraEOSTokens: [String],
+            localDirectoryName: String? = nil
         ) {
             self.id = id
             self.providerID = providerID
             self.providerName = providerName
             self.extraEOSTokens = extraEOSTokens
+            self.localDirectoryName = localDirectoryName
         }
     }
 
@@ -128,6 +140,22 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerID: "mlx.qwen2_5.1_5b.it.4bit",
         providerName: "Qwen2.5 1.5B (MLX, 4-bit)",
         extraEOSTokens: ["<|im_end|>"])
+
+    /// Tranche C (2026-06-12) — Llama 3.2 3B **3-bit** LOCAL variant for the decode-bandwidth A/B.
+    /// Decode is bandwidth-bound qmv GEMV (every token reads all weights), so 3-bit reads ~25% fewer
+    /// bytes than 4-bit through the same kernel — the device A/B (tok/s + memory + HUMAN-READ quality)
+    /// decides whether the quality holds (3-bit degradation is the known risk; the quality gate is
+    /// independent). mlx-community publishes no 3B-class 3-bit, so this is locally quantized
+    /// (`mlx_lm convert --hf-path mlx-community/Llama-3.2-3B-Instruct-bf16 -q --q-bits 3
+    /// --q-group-size 64`) and STAGED to the app's Documents/<localDirectoryName>/ via
+    /// `devicectl device copy to`. Loads from the local directory — no HF download. Uncertified;
+    /// A/B-only until the quality gate passes (亏的不要).
+    public static let llama3_2_3B_3bit_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-3bit",
+        providerID: "mlx.llama3_2.3b.it.3bit.local",
+        providerName: "Llama 3.2 3B (MLX, 3-bit local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-3bit")
 
     /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
     /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.

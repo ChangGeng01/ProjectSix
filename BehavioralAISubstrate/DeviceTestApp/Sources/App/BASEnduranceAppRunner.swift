@@ -1267,6 +1267,8 @@ final class BASEnduranceAppController: ObservableObject {
         let mlxModel: MLXModelCatalog.Entry
         switch mlxModelSel {
         case "llama", "llama3.2", "llama3", "llama_3b": mlxModel = MLXModelCatalog.llama3_2_3B_4bit
+        // Tranche C — locally-quantized 3-bit Llama (decode-bandwidth A/B; staged to Documents/models/)。
+        case "llama3b_3bit", "llama_3bit": mlxModel = MLXModelCatalog.llama3_2_3B_3bit_local
         case "qwen", "qwen2.5", "qwen_3b": mlxModel = MLXModelCatalog.qwen2_5_3B_4bit
         case "llama1b", "llama_1b": mlxModel = MLXModelCatalog.llama3_2_1B_4bit
         case "qwen1.5b", "qwen_1_5b": mlxModel = MLXModelCatalog.qwen2_5_1_5B_4bit

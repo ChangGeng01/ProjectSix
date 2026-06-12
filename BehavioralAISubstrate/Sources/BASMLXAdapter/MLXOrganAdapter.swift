@@ -469,9 +469,27 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #endif
         if modelContainer != nil { return }
 
-        let configuration = ModelConfiguration(
-            id: model.id,
-            extraEOSTokens: Set(model.extraEOSTokens))
+        // Tranche C — local-directory model lane: an Entry with `localDirectoryName` loads from the
+        // app's Documents/<dir>/ (operator-staged, e.g. the locally-quantized 3-bit variant) instead
+        // of the HF download. nil (every published entry) keeps the exact id-based path, byte-equal。
+        let configuration: ModelConfiguration
+        if let localDir = model.localDirectoryName {
+            let docs = FileManager.default.urls(
+                for: .documentDirectory, in: .userDomainMask).first!
+            let dirURL = docs.appendingPathComponent(localDir, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: dirURL.path) else {
+                throw BASOrganError.providerUnavailable(
+                    reason: "local model directory missing: Documents/\(localDir) "
+                        + "(stage it via devicectl device copy to)")
+            }
+            configuration = ModelConfiguration(
+                directory: dirURL,
+                extraEOSTokens: Set(model.extraEOSTokens))
+        } else {
+            configuration = ModelConfiguration(
+                id: model.id,
+                extraEOSTokens: Set(model.extraEOSTokens))
+        }
 
         // Resolve the load-time memory budget (Phase C). Only when speculation will ACTUALLY engage (mode on +
         // draft resolved + fits the budget) is the dual-residency UNION applied (`.explicitOverride`); otherwise
