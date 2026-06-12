@@ -1,7 +1,7 @@
 // MARK: - BASVerifierLaneABProbe — A2 verifier default-flip evidence (2026-06-12)
 //
 // The verifier-pipeline decode-lane seam (b071b72d5) is reachable but defaults to `.scout` (temp 0.1).
-// Flipping the DEFAULT to `.greedy` would make the certified +34% spec-decode the production default for
+// Flipping the DEFAULT to `.greedy` would make the certified 1.34× spec-decode the production default for
 // verification AND make verdicts byte-reproducible — but a default flip that changes output bytes needs
 // EVIDENCE (ADR-014, 亏的不要). This probe (`BAS_VERIFIER_LANE_AB=1`) supplies it: it runs the SAME
 // verification task through the verifier pipeline in BOTH lanes on the real device and emits, for human

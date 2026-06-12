@@ -474,8 +474,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // of the HF download. nil (every published entry) keeps the exact id-based path, byte-equal。
         let configuration: ModelConfiguration
         if let localDir = model.localDirectoryName {
-            let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first!
+            guard let docs = FileManager.default.urls(
+                for: .documentDirectory, in: .userDomainMask).first else {
+                throw BASOrganError.providerUnavailable(
+                    reason: "document directory unavailable — cannot resolve "
+                        + "local model dir Documents/\(localDir)")
+            }
             let dirURL = docs.appendingPathComponent(localDir, isDirectory: true)
             guard FileManager.default.fileExists(atPath: dirURL.path) else {
                 throw BASOrganError.providerUnavailable(

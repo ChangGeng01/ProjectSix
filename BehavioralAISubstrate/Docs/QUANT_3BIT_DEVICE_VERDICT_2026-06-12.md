@@ -40,4 +40,4 @@ that gets reasoning wrong is a net negative for core.
 fast path (short factual, no deep reasoning) — but that needs its OWN eval (classification accuracy,
 not these 6 prompts). Until then the `llama3_2_3B_3bit_local` catalog entry stays A/B-only / uncertified
 / not a default. The decode-elevation win that DID survive every gate is greedy speculative decoding
-(A1, +34% device-confirmed, byte-identical) — that stands; 3-bit does not (for core).
+(A1, 1.34× device-confirmed, byte-identical) — that stands; 3-bit does not (for core).

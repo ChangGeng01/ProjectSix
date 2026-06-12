@@ -183,7 +183,7 @@ enum BASSpecDefaultOnProbe {
     //
     // The prior sweep (above) had two limits: SAMPLING lane only, and SEQUENTIAL config order with the
     // baseline LAST — later configs run hotter, so "n=1 best" carried a thermal confound. This sweep:
-    //   • GREEDY lane (the production lane after Tranche A: temp==0, +34% device-confirmed)
+    //   • GREEDY lane (the production lane after Tranche A: temp==0, 1.34× device-confirmed)
     //   • n ∈ {1,2,3,4} with the MIDDLE ORDER SHUFFLED per run (seeded by clock — order logged)
     //   • BASELINE BRACKET: single-model greedy runs FIRST and LAST. drift = post−pre quantifies the
     //     thermal slide across the whole sweep; config means are reported raw + the bracket, so the

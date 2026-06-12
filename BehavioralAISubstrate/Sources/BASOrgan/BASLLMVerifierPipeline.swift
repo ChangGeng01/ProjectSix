@@ -228,9 +228,10 @@ public actor BASLLMVerifierPipeline {
         // Tranche A2 first production caller (2026-06-12) — the decode lane for verifier stages.
         // nil (DEFAULT) keeps the historical `.scout` preset (temp 0.1) ⇒ byte-equal-off (ADR-014).
         // `.greedy` routes stages through `BASDecodeLanePolicy.lane(for: .factual)` (`.greedyDeterministic`,
-        // temp 0) ⇒ ENGAGES the certified spec-decoder (+34% device-confirmed, A1) AND makes verification
+        // temp 0) ⇒ ENGAGES the certified spec-decoder (1.34× device-confirmed, A1) AND makes verification
         // byte-REPRODUCIBLE — doctrinally right for a verifier (a run-to-run-stable verdict). Flipping the
-        // DEFAULT to `.greedy` is the next reviewed step (needs a verification-quality A/B); this lands the
+        // DEFAULT to `.greedy` is the next reviewed step (needs a verification-quality A/B — the first device
+        // run was DEFERRED, device thermally cooked; see SPEC_DECODE_CERT_RESULTS.md §A2). This lands the
         // reachable opt-in seam so the policy has a real production caller instead of zero.
         decodeLane: BASDecodeLane? = nil
     ) {

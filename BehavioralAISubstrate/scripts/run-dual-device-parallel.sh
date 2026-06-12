@@ -14,9 +14,9 @@
 #   MODE=parity:           BOTH devices run the SAME full dual-model sweep (SWEEP_MODELS=both, SCALE=1.0)
 #       → 2-device parity for EVERY config (cross-device variance / cert-grade confidence). Best for CONFIDENCE.
 #
-# Relaxed cooling: COOLDOWN_BASE=20 (was 60). The sweep auto-derives STALL_SEC = base*3+240 = 300s, so a
-# legitimate cooldown is still never mistaken for a wedge while wedge detection stays tighter than the 60s
-# baseline allowed.
+# Relaxed cooling: COOLDOWN_BASE defaults to 0 (full-send, no thermal floors). The sweep auto-derives
+# STALL_SEC = max(base*3+120, 300) + 180 ⇒ 480s at base 0, so a legitimate cooldown is never mistaken for
+# a wedge while wedge detection stays tight. (Override COOLDOWN_BASE=N to reintroduce a floor.)
 #
 # Usage:
 #   DEVICE_B=<udid> BUILD=1 bash scripts/run-dual-device-parallel.sh           # split (default), build both

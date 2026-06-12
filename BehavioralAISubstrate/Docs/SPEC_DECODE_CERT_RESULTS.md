@@ -169,9 +169,13 @@ The certified-but-dormant greedy lane is now WIRED into the endurance decode pat
 📊 greedy-spec-ab n=3 spec_ms=7937 baseline_ms=10659 speedup=1.34x
 ```
 
-**+34% paired** (same prompts, same thermal window, draft toggled via unloadDraftModel/loadDraftModel)
-— consistent with (slightly above) the n=100 cert's +31%. Absolute tok/s is NOT comparable across
-sessions (the device had just finished a 10h run — hot); the paired delta is the valid number. The
+**1.34× speedup = +25.5% time-saved** (= 10659/7937; same prompts, same thermal window, draft toggled
+via unloadDraftModel/loadDraftModel) — directionally consistent with but **BELOW** the n=100 cert's
++31.47% (1.46×), as expected on a hot device just off a 10h run (slower absolute times compress the
+relative win). Both numbers use the same time-saved framing (baseline−spec)/baseline. _(Audit 2026-06-12
+correction: an earlier draft read this as "+34%", which is the (baseline−spec)/spec throughput ratio — a
+different denominator, NOT comparable to the cert. The on-device emit is `speedup=1.34x`; that multiplier
+is the ground-truth number.)_ Absolute tok/s is NOT comparable across sessions; the paired delta is valid. The
 production chooser for this lane is `BASDecodeLanePolicy` (deterministic/factual → greedy; A2,
 20abf2d2a). The KV levers were A/B'd in the same 10h run and DECLINED at this regime
 (`KV_LEVERS_DEVICE_VERDICT_2026-06-12.md`) — greedy spec-decode is the real decode lever.
@@ -192,7 +196,7 @@ last/hottest at 1716ms — hotter than the post-baseline), so the probe REFUSED 
 sequential sweep would have claimed. This run is evidence the old "n=1 best" hint was thermal, not n.
 
 **Standing state**: `numDraftTokens` default stays 2 — independently validated by the A1 PAIRED A/B
-(+34% at n=2, same-thermal-window pairing). **Re-run this sweep on a COLD device** for a clean draft-
+(1.34× at n=2, same-thermal-window pairing). **Re-run this sweep on a COLD device** for a clean draft-
 length verdict; until then no default change.
 
 ## Tranche A2 verifier default-flip — evidence probe built, device-run DEFERRED (2026-06-12)
@@ -209,5 +213,5 @@ cooked; the verifier's first single-model decode never returned. The probe carri
 just hung. This is itself another ADR-038 data point — and precisely the failure LiteRT's cancellable
 decode (Tranche D) would let a host escape. **Re-run on a COOL device** (or under the external
 watchdog). Until the evidence lands, the verifier default stays `.scout` (the reachable greedy seam is
-host-electable). The argument for the flip stands (temp 0.1 ≈ greedy; greedy is reproducible + +34%) but
+host-electable). The argument for the flip stands (temp 0.1 ≈ greedy; greedy is reproducible + 1.34×) but
 is unproven for verification quality.

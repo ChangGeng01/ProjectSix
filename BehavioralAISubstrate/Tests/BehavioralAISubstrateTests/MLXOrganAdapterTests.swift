@@ -684,4 +684,68 @@ final class MLXOrganAdapterTests: XCTestCase {
                 + MLXModelCatalog.availableAlternatives.count,
             "allEntries = defaults + alternatives (no overlap, no drop)")
     }
+
+    // MARK: - 12. Draft-container lifecycle guards (U1 governor seam — audit 2026-06-12)
+
+    /// `unloadDraftModel(reason:)` on an adapter with no draft loaded is an
+    /// idempotent no-op that returns false — the documented contract the
+    /// governor relies on (a `dropDraft` advice for an already-absent draft
+    /// must not throw or falsely claim it dropped one). Works on every
+    /// platform: both the MLXLLM and the stub branch return false here.
+    func testUnloadDraftModelReturnsFalseWhenNoDraftLoaded() async {
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.llama3_2_3B_4bit)
+        let first = await adapter.unloadDraftModel(reason: "audit-test")
+        let second = await adapter.unloadDraftModel(reason: "audit-test")
+        XCTAssertFalse(
+            first,
+            "unloadDraftModel on a no-draft adapter must return false " +
+            "(nothing to drop) — not throw, not claim a drop")
+        XCTAssertFalse(
+            second,
+            "unloadDraftModel must be idempotent on the no-draft path")
+    }
+
+    #if canImport(MLXLLM)
+    /// A fresh adapter has no draft container, so speculation is INACTIVE
+    /// regardless of the configured mode — `isSpeculationActive` reflects the
+    /// loaded-container reality, not just the requested mode. This pins the
+    /// signal the governor + host read after `loadModel()`.
+    func testFreshAdapterReportsSpeculationInactive() async {
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.llama3_2_3B_4bit)
+        let active = await adapter.isSpeculationActive
+        XCTAssertFalse(
+            active,
+            "no draft container loaded ⇒ isSpeculationActive must be false " +
+            "even when speculativeDecoding != .off")
+    }
+
+    /// `loadDraftModel()` on a fresh adapter throws a stable
+    /// `providerUnavailable` — its guard chain (no draft configured / model
+    /// not loaded) fires before any container fetch. Pins the error-path so a
+    /// host gets an honest reason instead of a silent no-op or a crash.
+    func testLoadDraftModelThrowsProviderUnavailableOnFreshAdapter() async {
+        // Default init has speculativeDecoding == .greedy but no draftModel
+        // configured and no modelContainer loaded → the guard chain rejects.
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.llama3_2_3B_4bit)
+        do {
+            try await adapter.loadDraftModel()
+            XCTFail(
+                "loadDraftModel on a fresh adapter must throw — no draft " +
+                "configured and no model loaded")
+        } catch BASOrganError.providerUnavailable(let reason) {
+            let ok = reason.contains("speculative decoding is off")
+                || reason.contains("no draft model configured")
+                || reason.contains("loadModel")
+                || reason.contains("MLXLLM framework")
+            XCTAssertTrue(
+                ok,
+                "expected a documented draft-guard reason; got: \(reason)")
+        } catch {
+            XCTFail("expected providerUnavailable but got \(error)")
+        }
+    }
+    #endif
 }
