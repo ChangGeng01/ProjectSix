@@ -57,6 +57,33 @@ download above.)
 `ls -lh ~/litert-models/gemma-3n-E4B-it-int4.litertlm`. If it's tiny, the LFS object didn't fetch —
 re-run with the token set.
 
+## ⚠️ Step 1 BLOCKER (2026-06-12): the LiteRTLM SPM package does not currently resolve
+
+Diagnosed on the dev box (git-lfs INSTALLED, so this is NOT a local tooling gap):
+```
+swift build → error: 'litert-lm': Couldn't check out revision … :
+  Downloading prebuilt/android_arm64/libLiteRtGpuAccelerator.so … Smudge error …
+  remote missing object 776b194…  → smudge filter lfs failed
+```
+**The LiteRT-LM repo references a Git-LFS object (`prebuilt/android_arm64/libLiteRtGpuAccelerator.so`)
+that is MISSING from the remote LFS store.** SwiftPM clones the whole repo (to read `Package.swift`)
+and the checkout fails on that object — so the package cannot be added by `url:` at all right now. This
+is an UPSTREAM packaging bug on Google's side, not something this repo can fix.
+
+What IS available (so a workaround exists): the iOS binary
+`CLiteRTLM.xcframework.zip` (v0.13.1, ~80 MB) downloads fine from the GitHub release (separate from the
+broken LFS object). What's NOT obtainable without a working clone: the `LiteRTLM` Swift wrapper source
+(the guessed `swift/Sources/LiteRTLM/` path 404s — the real layout is only visible from the clone).
+
+**Paths forward (operator decision):**
+1. WAIT for Google to repair the LFS object / cut a fixed tag — then `url:` resolution works (preferred).
+2. VENDOR it: locate the real `swift/` wrapper layout via the GitHub tree API, vendor those sources +
+   declare a LOCAL `binaryTarget(path:)` against the downloaded `CLiteRTLM.xcframework` — bypasses the
+   repo clone entirely. Substantial; only worth it if the probe is urgent and (1) is slow.
+
+Until then the probe stays a build-green guarded SKIP stub (`BASLiteRTE4BProbe.swift` /
+`BASVerifierLaneABProbe`-style harness ready); steps 1-6 below resume once a resolvable package exists.
+
 ## Step 1 — add the LiteRTLM SPM package (then compile-verify the probe)
 
 Add the official binary package to `DeviceTestApp/BASDeviceTest.xcodeproj` (Xcode → File → Add Package
