@@ -224,7 +224,15 @@ public actor BASLLMVerifierPipeline {
         compressorInstruction: String =
             BASLLMVerifierPipeline
                 .defaultCompressorInstruction,
-        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .verify)
+        contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .verify),
+        // Tranche A2 first production caller (2026-06-12) — the decode lane for verifier stages.
+        // nil (DEFAULT) keeps the historical `.scout` preset (temp 0.1) ⇒ byte-equal-off (ADR-014).
+        // `.greedy` routes stages through `BASDecodeLanePolicy.lane(for: .factual)` (`.greedyDeterministic`,
+        // temp 0) ⇒ ENGAGES the certified spec-decoder (+34% device-confirmed, A1) AND makes verification
+        // byte-REPRODUCIBLE — doctrinally right for a verifier (a run-to-run-stable verdict). Flipping the
+        // DEFAULT to `.greedy` is the next reviewed step (needs a verification-quality A/B); this lands the
+        // reachable opt-in seam so the policy has a real production caller instead of zero.
+        decodeLane: BASDecodeLane? = nil
     ) {
         // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
         // (fail-closed) + traced; nil → adapters used unwrapped (byte-equal-off, R1).
@@ -238,7 +246,13 @@ public actor BASLLMVerifierPipeline {
         self.factCheckerInstruction =
             factCheckerInstruction
         self.compressorInstruction = compressorInstruction
+        // nil → the historical `.scout` preset (byte-equal); a lane → its preset.
+        self.stagePreset = decodeLane?.preset ?? .scout
     }
+
+    /// The preset every verifier stage decodes with (Tranche A2). Default `.scout` (byte-equal); a
+    /// host electing `decodeLane: .greedy` gets `.greedyDeterministic` → spec-decode + reproducibility.
+    private let stagePreset: BASOrganPreset
 
     // MARK: - Verify
 
@@ -348,7 +362,7 @@ public actor BASLLMVerifierPipeline {
             requestID:
                 "\(taskPackage.taskID)-\(stage.rawValue)",
             role: .scout,
-            preset: .scout,
+            preset: stagePreset,   // Tranche A2: `.scout` default (byte-equal) or the elected greedy lane.
             instruction: instruction + "\n\n" + userPrompt)
         do {
             let draft = try await adapter.draft(request)

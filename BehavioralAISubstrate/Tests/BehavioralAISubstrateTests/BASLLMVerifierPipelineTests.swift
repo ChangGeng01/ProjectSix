@@ -270,4 +270,49 @@ final class BASLLMVerifierPipelineTests: XCTestCase {
             BASLLMVerifierPipeline
                 .defaultOverallConfidence)
     }
+
+    // MARK: - Tranche A2 — decode-lane seam (the policy's first production caller)
+
+    /// Records the preset each stage decodes with, so the lane seam is testable。
+    private actor PresetSpyAdapter: BASOrganAdapter {
+        nonisolated let descriptor = BASOrganDescriptor(
+            providerID: "preset-spy", providerName: "PresetSpy",
+            supportsStreaming: false, maxInputTokens: 8192, maxOutputTokens: 2048,
+            runsOnDevice: true, supportedRoles: [.scout, .core])
+        private(set) var lastPreset: BASOrganPreset?
+        func draft(_ r: BASOrganRequest) async throws -> BASOrganDraft {
+            lastPreset = r.preset
+            return BASOrganDraft(
+                requestID: r.requestID, providerID: descriptor.providerID,
+                role: r.role, body: "ok", inputTokensEstimated: 0,
+                outputTokensEstimated: 1, producedAt: Date(), traceID: "t")
+        }
+        func currentCapacity() async -> BASOrganCapacity { .unlimited }
+    }
+
+    /// DEFAULT (no decodeLane) keeps the historical `.scout` preset — byte-equal-off (ADR-014)。
+    func testVerifierDefaultLaneIsScoutByteEqual() async {
+        let spy = PresetSpyAdapter()
+        let pipeline = BASLLMVerifierPipeline(adapters: [.reviewer: spy])
+        _ = await pipeline.verify(
+            draft: makeDraft(), taskPackage: makeTaskPackage())
+        let preset = await spy.lastPreset
+        XCTAssertEqual(preset?.temperature, BASOrganPreset.scout.temperature,
+            "default verifier lane must keep the .scout preset (byte-equal)")
+    }
+
+    /// OPT-IN `.greedy` routes stages through `.greedyDeterministic` (temp 0) — engages spec-decode
+    /// (the gate requires temp==0) + makes verification byte-reproducible。
+    func testVerifierGreedyLaneUsesGreedyDeterministic() async {
+        let spy = PresetSpyAdapter()
+        let pipeline = BASLLMVerifierPipeline(
+            adapters: [.reviewer: spy], decodeLane: .greedy)
+        _ = await pipeline.verify(
+            draft: makeDraft(), taskPackage: makeTaskPackage())
+        let preset = await spy.lastPreset
+        XCTAssertEqual(preset?.temperature, 0,
+            "greedy lane must decode at temperature 0 → the spec-decode gate engages")
+        XCTAssertEqual(preset?.name, BASOrganPreset.greedyDeterministic.name,
+            "greedy lane maps to .greedyDeterministic (BASDecodeLane.greedy.preset)")
+    }
 }
