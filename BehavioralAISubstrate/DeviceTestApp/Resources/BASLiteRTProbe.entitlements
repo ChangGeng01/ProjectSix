@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Entitlements for the LiteRT-LM E4B probe (NOT wired into the default build — see
+  Docs/LITERT_PROBE_RUNBOOK.md). These raise the per-process jetsam ceiling so a large
+  (~3.66GB on-disk) Gemma-3n E4B .litertlm can load; LiteRT-LM's mmap'd weights keep the
+  RESIDENT footprint far below disk (study: ~961MB on the CPU path). The default app
+  entitlements stay empty (Resources/BASDeviceTestApp.entitlements) so the normal MLX build
+  is unaffected. To use: enable BOTH entitlements for the App ID in the developer portal,
+  then point CODE_SIGN_ENTITLEMENTS at this file for the probe build.
+
+  Per the LiteRT-LM maintainer (study §3.5): "these are requests, not guarantees — iOS may
+  still terminate the process under heavy memory pressure."
+-->
+<dict>
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
+	<key>com.apple.developer.kernel.extended-virtual-addressing</key>
+	<true/>
+</dict>
+</plist>

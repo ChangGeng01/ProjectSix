@@ -317,6 +317,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASFoundationModelsProbe.run() }
             return
         }
+        // LiteRT-LM E4B memory + cancellability probe (BAS_LITERT_E4B_PROBE=1)。 The model MLX
+        // jetsam-kills — does LiteRT's mmap'd weights fit it? (LITERT_LM_STUDY.md §6.5). MLX-free;
+        // SKIPS cleanly with a log line if the LiteRTLM package isn't linked (default).
+        if (env["BAS_LITERT_E4B_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASLiteRTE4BProbe.run() }
+            return
+        }
         // env-driven sizing (devicectl autostart / xcodebuild test path)。
         let iters = max(1, Int(env[EnduranceEnv.iterCountKey] ?? EnduranceEnv.iterCountDefault) ?? 100)
         let mlxPrompts = max(1, Int(env[EnduranceEnv.mlxPromptsKey] ?? EnduranceEnv.mlxPromptsDefault) ?? 3)
