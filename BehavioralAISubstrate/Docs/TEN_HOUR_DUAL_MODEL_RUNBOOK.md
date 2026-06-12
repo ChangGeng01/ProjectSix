@@ -19,8 +19,14 @@ DEVICE_B=<second-udid> BUILD=1 bash scripts/run-dual-device-parallel.sh
   KV/maxKV/governor A/B + longer baselines. Best for **breadth** (future-dev exploration).
 - **`MODE=parity`:** both phones run the SAME dual-model sweep → 2-device parity for every config
   (cross-device variance, cert-grade). Best for **confidence**.
-- Cooling relaxed via `COOLDOWN_BASE=20` (was 60); `STALL_SEC` auto-derives to 300s (still safely above
-  the adaptive cooldown ceiling, so a cooldown is never a false wedge).
+- **Cooling relaxed hard** (operator "烫一点没关系"): `COOLDOWN_BASE=0` — NO cooldown in the cool/fair
+  band (max inferences when not hot). `ADAPTIVE=1` (default) keeps the MEASURED thermal recovery floors
+  (serious ≥180s / critical ≥300s, ch1025.11) — below them the device gets ZERO recovery and just
+  throttles, so dropping the floors yields THROTTLED data, not MORE. `STALL_SEC` auto-derives to **480s**
+  = max(base×3+120, 300) + 180 margin, so even a legitimate 300s critical-thermal cooldown is never a
+  false wedge. For true **full-send** (flat base, no floors — to characterize the throttle envelope on
+  purpose), pass `ADAPTIVE=0` (then `STALL_SEC` drops to base+180). The single-phone fallback keeps the
+  conservative `COOLDOWN_BASE=60` (one device can't shed heat to a sibling).
 - Get the two UDIDs: `xcrun devicectl list devices`. Dry-run both first:
   `DEVICE_B=<udid> SCALE=0.1 bash scripts/run-dual-device-parallel.sh` (~1h).
 

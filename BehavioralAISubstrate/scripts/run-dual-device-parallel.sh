@@ -37,7 +37,13 @@ SCHEME="${SCHEME:-BASDeviceTestApp}"
 PROJECT="${PROJECT:-DeviceTestApp/BASDeviceTest.xcodeproj}"
 BUILD="${BUILD:-0}"
 MODE="${MODE:-split}"
-COOLDOWN_BASE="${COOLDOWN_BASE:-20}"     # relaxed (two phones; throttling is data)
+# Thermal RELAXED HARD (2026-06-12, operator "烫一点没关系"): base=0 ⇒ NO cooldown in the cool/fair band
+# (max inferences when not hot). ADAPTIVE=1 keeps the MEASURED serious≥180s/critical≥300s recovery floors
+# (ch1025.11: below them the device gets zero recovery and just throttles — dropping them yields throttled
+# data, not more). Set ADAPTIVE=0 for true full-send (flat base, no floors) to characterize the throttle
+# envelope on purpose.
+COOLDOWN_BASE="${COOLDOWN_BASE:-0}"
+ADAPTIVE="${ADAPTIVE:-1}"
 SWEEP="${SWEEP:-${REPO_ROOT}/scripts/run-iphone-air-dual-model-sweep.sh}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
@@ -74,7 +80,7 @@ LOG_B="${REPO_ROOT}/Docs/cert-logs/dual-device-${STAMP}/deviceB.stdout.log"
 mkdir -p "${ARCHIVE_A%/*}"
 
 echo "=================================================================="
-echo "BAS DUAL-DEVICE PARALLEL — mode=${MODE}  scale=${SCALE}  cooldown_base=${COOLDOWN_BASE}s"
+echo "BAS DUAL-DEVICE PARALLEL — mode=${MODE}  scale=${SCALE}  cooldown_base=${COOLDOWN_BASE}s  adaptive=${ADAPTIVE} (0=full-send, no thermal floors)"
 echo "  device A ${DEVICE_A}  models=${A_MODELS}  → ${ARCHIVE_A}"
 echo "  device B ${DEVICE_B}  models=${B_MODELS}  → ${ARCHIVE_B}"
 echo "=================================================================="
@@ -100,14 +106,14 @@ fi
 
 # Launch both per-device sweeps in the background (each is its own caffeinate-free child — BUILD=0).
 echo "Launching device A sweep (background) → ${LOG_A}"
-SWEEP_MODELS="${A_MODELS}" SCALE="${SCALE}" COOLDOWN_BASE="${COOLDOWN_BASE}" \
+SWEEP_MODELS="${A_MODELS}" SCALE="${SCALE}" COOLDOWN_BASE="${COOLDOWN_BASE}" ADAPTIVE="${ADAPTIVE}" \
   DEVICE_ID="${DEVICE_A}" BUNDLE_ID="${BUNDLE_ID}" BUILD=0 \
   ARCHIVE_ROOT="${ARCHIVE_A}" \
   bash "${SWEEP}" > "${LOG_A}" 2>&1 &
 PID_A=$!
 
 echo "Launching device B sweep (background) → ${LOG_B}"
-SWEEP_MODELS="${B_MODELS}" SCALE="${SCALE}" COOLDOWN_BASE="${COOLDOWN_BASE}" \
+SWEEP_MODELS="${B_MODELS}" SCALE="${SCALE}" COOLDOWN_BASE="${COOLDOWN_BASE}" ADAPTIVE="${ADAPTIVE}" \
   DEVICE_ID="${DEVICE_B}" BUNDLE_ID="${BUNDLE_ID}" BUILD=0 \
   ARCHIVE_ROOT="${ARCHIVE_B}" \
   bash "${SWEEP}" > "${LOG_B}" 2>&1 &

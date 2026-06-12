@@ -58,17 +58,31 @@ MANIFEST="${ARCHIVE_ROOT}/MANIFEST.txt"
 # Observation knobs common to every phase (byte-safe, pure data). Trailing comma — concatenated into
 # the watchdog's ENV_EXTRA slot. The sovereign ledger / field-metrics / P0 phase-split are always-on.
 OBS_KNOBS='"BAS_LIVENESS_MONITOR":"1","BAS_LIVENESS_THRESHOLD_SEC":"30","BAS_SHADOW_TRIAL_LOOP":"1","BAS_SHADOW_PARITY":"enabled",'
+# Adaptive-cooldown passthrough (BAS_INTERNAL_ADAPTIVE): 1 = keep the measured serious/critical thermal
+# floors; 0 = full-send (flat base, no floors). Appended to the per-phase knobs below.
+ADAPTIVE="${ADAPTIVE:-1}"
+ADAPTIVE_KNOB='"BAS_INTERNAL_ADAPTIVE":"'"${ADAPTIVE}"'",'
 
 # SWEEP_MODELS selects which phases run: "both" (one device, sequential — the default), "llama" (only the
 # A phases), "e4b" (only the B phases). The dual-device parallel orchestrator pins one model per device.
 SWEEP_MODELS="${SWEEP_MODELS:-both}"
 
-# COOLDOWN_BASE: with two phones the operator can RELAX cooling (lower cooldown ⇒ more inferences ⇒ denser
-# data; the resulting thermal throttling is itself the sustained-load envelope). STALL_SEC must exceed the
-# adaptive-cooldown ceiling (base*3+120) + a slow decode, or a legitimate cooldown reads as a FALSE wedge —
-# so it DERIVES from COOLDOWN_BASE unless set explicitly (base 60 ⇒ 420; base 20 ⇒ 300; base 0 ⇒ 240).
+# THERMAL RELAXATION (2026-06-12): COOLDOWN_BASE is the real "run hotter" lever — it sets the cooldown in
+# the cool/fair band (base=0 ⇒ NO cooldown when cool ⇒ max inferences). ADAPTIVE (BAS_INTERNAL_ADAPTIVE)
+# keeps the MEASURED thermal floors (serious ≥180s / critical ≥300s, ch1025.11): below them the device
+# gets ZERO recovery and just throttles, so dropping the floors yields THROTTLED data, not MORE data —
+# keep ADAPTIVE=1 unless you explicitly want to characterize the throttle envelope (ADAPTIVE=0 = flat
+# base, no floors, "full send"). STALL_SEC must exceed the LARGEST legitimate cooldown or it false-wedges:
+# with ADAPTIVE on, that ceiling is max(base*3+120, 300) (the critical floor dominates at low base); with
+# ADAPTIVE off it is just `base`. Plus a 180s decode/poll margin.
 COOLDOWN_BASE="${COOLDOWN_BASE:-60}"
-STALL_SEC="${STALL_SEC:-$(( COOLDOWN_BASE * 3 + 240 ))}"
+if [ "${ADAPTIVE}" = "1" ]; then
+    _cool_ceiling=$(( COOLDOWN_BASE * 3 + 120 ))
+    [ "${_cool_ceiling}" -lt 300 ] && _cool_ceiling=300
+else
+    _cool_ceiling="${COOLDOWN_BASE}"
+fi
+STALL_SEC="${STALL_SEC:-$(( _cool_ceiling + 180 ))}"
 MLX_PROMPTS="${MLX_PROMPTS:-3}"
 MAX_DECODE_TOKENS="${MAX_DECODE_TOKENS:-256}"
 
@@ -92,7 +106,7 @@ echo "=================================================================="
 echo "BAS DUAL-MODEL 10h SWEEP — iPhone Air, max data for future dev"
 echo "Device: ${DEVICE_ID}"
 echo "Archive root: ${ARCHIVE_ROOT}"
-echo "Models: ${SWEEP_MODELS}  Scale: ${SCALE}  STALL_SEC=${STALL_SEC}s  cooldown_base=${COOLDOWN_BASE}s"
+echo "Models: ${SWEEP_MODELS}  Scale: ${SCALE}  STALL_SEC=${STALL_SEC}s  cooldown_base=${COOLDOWN_BASE}s  adaptive=${ADAPTIVE}"
 echo "=================================================================="
 
 mkdir -p "${ARCHIVE_ROOT}"
@@ -140,7 +154,7 @@ for row in "${PHASES[@]}"; do
     MLX_PROMPTS="${MLX_PROMPTS}" \
     COOLDOWN_SEC="${COOLDOWN_BASE}" \
     MAX_DECODE_TOKENS="${MAX_DECODE_TOKENS}" \
-    ENV_EXTRA="${OBS_KNOBS}${EXTRA}" \
+    ENV_EXTRA="${OBS_KNOBS}${ADAPTIVE_KNOB}${EXTRA}" \
     ARCHIVE_DIR="${PHASE_DIR}" \
     WATCHDOG_MINUTES="${MINS}" \
     STALL_SEC="${STALL_SEC}" \
