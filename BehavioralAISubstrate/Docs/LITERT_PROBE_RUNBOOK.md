@@ -15,9 +15,7 @@ package is added. This run-book is the deploy sequence.
 
 ## Step 0 — prerequisites (the four real blockers)
 
-1. **The model.** Download the gated `gemma-3n-E4B-it-int4.litertlm` from HuggingFace
-   (`google/gemma-3n-E4B-it-litert-lm`, accept Gemma terms) — ~3.66 GB. Also grab the E2B file for
-   a lighter sanity pass if wanted.
+1. **The model** — see the full acquisition recipe in "Step 0.1" below.
 2. **The entitlement on the App ID.** In the Apple Developer portal, enable
    `com.apple.developer.kernel.increased-memory-limit` (+ `extended-virtual-addressing`) for the
    `com.changgeng.basdevicetest` App ID, then regenerate the provisioning profile. Without this the
@@ -25,6 +23,39 @@ package is added. This run-book is the deploy sequence.
    that lacks it FAILS signing).
 3. **The SPM package** (coordinates below).
 4. **A free device** (the 10h A/B must be done).
+
+## Step 0.1 — acquire the gated model (do this first; it's the long-pole)
+
+The model is a **GATED** HuggingFace repo (license `gemma`; "This repository is publicly accessible,
+but you have to accept the conditions to access its files" — requests are processed immediately).
+
+- **Repo:** `google/gemma-3n-E4B-it-litert-lm`  · **File:** `gemma-3n-E4B-it-int4.litertlm` (~3.66 GB)
+- **Lighter sanity pass (optional):** `google/gemma-3n-E2B-it-litert-lm` → `gemma-3n-E2B-it-int4.litertlm`
+  (~2.96 GB) — useful to confirm the plumbing before committing the big download.
+
+**One-time access:**
+1. Sign in to huggingface.co, open the repo page, click through to **accept the Gemma terms**
+   (instant approval).
+2. Create a **read** access token: huggingface.co → Settings → Access Tokens → New token (role: read).
+
+**Download (huggingface-cli, the recommended path):**
+```bash
+# install if needed:  pip install -U "huggingface_hub[cli]"
+huggingface-cli login                 # paste the read token (or: export HF_TOKEN=hf_xxx)
+huggingface-cli download google/gemma-3n-E4B-it-litert-lm \
+  gemma-3n-E4B-it-int4.litertlm \
+  --local-dir ~/litert-models
+# → ~/litert-models/gemma-3n-E4B-it-int4.litertlm
+```
+(Equivalent: `python -c "from huggingface_hub import hf_hub_download;
+hf_hub_download('google/gemma-3n-E4B-it-litert-lm','gemma-3n-E4B-it-int4.litertlm',
+local_dir='~/litert-models')"`. The LiteRT-LM CLI's `--from-huggingface-repo` flag also auto-downloads
+to its own cache, but for the probe you want the raw file to stage onto the device — use the CLI
+download above.)
+
+**Verify before staging:** confirm the file is a real ~3.6 GB binary (not a 1 KB LFS pointer):
+`ls -lh ~/litert-models/gemma-3n-E4B-it-int4.litertlm`. If it's tiny, the LFS object didn't fetch —
+re-run with the token set.
 
 ## Step 1 — add the LiteRTLM SPM package (then compile-verify the probe)
 
