@@ -175,3 +175,22 @@ sessions (the device had just finished a 10h run — hot); the paired delta is t
 production chooser for this lane is `BASDecodeLanePolicy` (deterministic/factual → greedy; A2,
 20abf2d2a). The KV levers were A/B'd in the same 10h run and DECLINED at this regime
 (`KV_LEVERS_DEVICE_VERDICT_2026-06-12.md`) — greedy spec-decode is the real decode lever.
+
+## Tranche A3 — greedy numDraftTokens sweep, first run (2026-06-12): INCONCLUSIVE-WITHIN-DRIFT
+
+The thermal-confound-killed sweep (`BAS_SPEC_GREEDY_SWEEP=1`, shuffled order + baseline bracket) ran on
+device A immediately after the 10h endurance run + A1 A/B — i.e. on a HOT device:
+
+```
+shuffled_order=[3, 1, 4, 2]  baseline-pre 879ms → baseline-post 1522ms  drift=+73.1%
+n=3 958 · n=1 876 · n=4 1155 · n=2 1716
+FINAL best_n=1 best_ms=876 baseline_bracket_ms=1200 verdict=INCONCLUSIVE-WITHIN-DRIFT
+```
+
+**The bracket did its job**: with +73% thermal slide the config means are position-dominated (n=2 ran
+last/hottest at 1716ms — hotter than the post-baseline), so the probe REFUSED the WIN the old
+sequential sweep would have claimed. This run is evidence the old "n=1 best" hint was thermal, not n.
+
+**Standing state**: `numDraftTokens` default stays 2 — independently validated by the A1 PAIRED A/B
+(+34% at n=2, same-thermal-window pairing). **Re-run this sweep on a COLD device** for a clean draft-
+length verdict; until then no default change.
