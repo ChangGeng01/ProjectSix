@@ -149,6 +149,7 @@ public enum BASLiteRTE4BProbe {
             try await engine.initialize()
             let afterLoadMB = footprintMB()
 
+            // (a) WARM DECODE — bounded, for tps + footprint (no cancel here).
             let convo = try engine.createConversation(with: nil)
             let startNs = DispatchTime.now().uptimeNanoseconds
             var tokens = 0
@@ -156,16 +157,22 @@ public enum BASLiteRTE4BProbe {
                 Message(role: .user, text: "Reply in one short sentence: name a primary color."))
             for try await chunk in stream {
                 tokens += max(1, chunk.text.count / 4)
-                if tokens >= 64 { try? convo.cancel(); break }
+                if tokens >= 64 { break }
             }
             let decodeMs = Double(DispatchTime.now().uptimeNanoseconds &- startNs) / 1_000_000
+
+            // (b) MID-DECODE CANCEL TEST — the ADR-038 question: does cancel() interrupt an
+            // IN-FLIGHT decode? Fresh conversation, a long prompt, fire cancel() ~2s in from a
+            // concurrent task, and judge by whether the stream stops promptly AFTER cancel.
+            let cancel = await testCancel(engine: engine)
 
             return BackendResult(
                 backend: backendName, loaded: true,
                 physFootprintMB: afterLoadMB,
                 decodeTokens: tokens, decodeMs: decodeMs,
-                cancelInterruptedDecode: nil,  // dedicated mid-decode cancel test = runbook step 4
-                note: "ok")
+                cancelInterruptedDecode: cancel.interrupted,
+                note: "warm_ok cancel[\(cancel.note) tokens=\(cancel.tokens) "
+                    + "ms_after_cancel=\(String(format: "%.0f", cancel.msAfterCancel))]")
         } catch {
             return BackendResult(
                 backend: backendName, loaded: false,
@@ -173,6 +180,61 @@ public enum BASLiteRTE4BProbe {
                 decodeTokens: 0, decodeMs: 0,
                 cancelInterruptedDecode: nil,
                 note: "error=\(error)")
+        }
+    }
+
+    /// THE ADR-038 ESCAPE TEST. Start a long decode, fire `convo.cancel()` ~2s in from a concurrent
+    /// task, and judge: did the stream STOP soon after cancel (interrupted ✅), or run to the safety
+    /// cap / past a deadline (NOT interrupted — same wall MLX hits)? HONEST hang caveat: if cancel
+    /// does nothing AND the decode hard-hangs with zero tokens, the `for try await` itself blocks —
+    /// the in-loop deadline only bounds a *trickling* decode; a true uncancellable hang is the very
+    /// failure we're testing for and is backstopped by the external process kill (ADR-038).
+    private static func testCancel(
+        engine: Engine
+    ) async -> (interrupted: Bool, tokens: Int, msAfterCancel: Double, note: String) {
+        let safetyTokenCap = 2048
+        let cancelDelayNs: UInt64 = 2_000_000_000          // let decode run 2s before cancelling
+        let inLoopDeadlineNs = DispatchTime.now().uptimeNanoseconds + 60_000_000_000  // 60s loop bound
+        let longPrompt =
+            "Write a long, detailed, multi-paragraph essay about the entire history of computing, "
+            + "from the abacus and mechanical calculators through to modern AI accelerators."
+        do {
+            let convo = try engine.createConversation(with: nil)
+            let cancelAtNs = DispatchTime.now().uptimeNanoseconds + cancelDelayNs
+            let canceller = Task {
+                try? await Task.sleep(nanoseconds: cancelDelayNs)
+                try? convo.cancel()
+            }
+            var tokens = 0
+            var threw = false
+            var hitDeadline = false
+            do {
+                let stream = convo.sendMessageStream(
+                    Message(role: .user, text: longPrompt))
+                for try await chunk in stream {
+                    tokens += max(1, chunk.text.count / 4)
+                    if tokens >= safetyTokenCap { break }
+                    if DispatchTime.now().uptimeNanoseconds >= inLoopDeadlineNs {
+                        hitDeadline = true; break
+                    }
+                }
+            } catch { threw = true }   // cancel may surface as a thrown error
+            canceller.cancel()
+            let msAfterCancel = max(0,
+                Double(DispatchTime.now().uptimeNanoseconds &- cancelAtNs) / 1_000_000)
+            // Interrupted iff the stream ended SOON after cancel, below the safety cap, no deadline.
+            let interrupted = !hitDeadline
+                && tokens < safetyTokenCap
+                && msAfterCancel < 5_000
+            let note: String
+            if hitDeadline { note = "NOT-interrupted-60s-deadline" }
+            else if tokens >= safetyTokenCap { note = "NOT-interrupted-ran-to-cap" }
+            else if msAfterCancel >= 5_000 { note = "NOT-interrupted-slow-stop" }
+            else if threw { note = "interrupted-threw" }
+            else { note = "interrupted-ended" }
+            return (interrupted, tokens, msAfterCancel, note)
+        } catch {
+            return (false, 0, 0, "cancel-test-setup-error=\(error)")
         }
     }
 

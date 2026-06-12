@@ -117,8 +117,12 @@ Pull `litert-probe-*.log` from Documents (`devicectl device copy from … Docume
 - **GPU reality:** `backend=gpu` `phys_mb` is expected near ~3380 MB (resident Metal weights) — likely
   the jetsam-risk path; the mmap win is CPU-only.
 - **Throughput:** decode `tok_per_s` (study: E4B CPU ≈ 9.7, GPU ≈ 25.1) — is the CPU path fast enough?
-- **Cancellation (extend the probe):** add a mid-decode `cancel()` test and confirm it interrupts the
-  Metal decode (the `cancel_interrupted` field) — a yes would also escape the ADR-038 wedge.
+- **Cancellation (built in):** the `cancel_interrupted=` field + the `note=…cancel[…]…` detail report
+  the dedicated mid-decode test — a long decode with `convo.cancel()` fired ~2s in from a concurrent
+  task. `cancel_interrupted=true` means the stream stopped promptly after cancel → **LiteRT decode is
+  interruptible → escapes the ADR-038 uncancellable wedge** (the biggest possible win).
+  `NOT-interrupted-*` (ran to cap / 60s deadline / slow-stop) means it's the same wall MLX hits. (Honest
+  caveat: a true zero-token hard-hang would block the probe itself — backstopped by the external kill.)
 
 ## Step 6 — promote (only if the probe pays)
 
