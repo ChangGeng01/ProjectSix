@@ -307,6 +307,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASQuantABProbe.run() }
             return
         }
+        // Tranche A2 — verifier default-flip evidence: same verify task in .scout vs .greedy lane,
+        // per-stage outputs captured for human quality read (BAS_VERIFIER_LANE_AB=1)。 Device-only。
+        if (env["BAS_VERIFIER_LANE_AB"] ?? "0") == "1" {
+            launchSpecAux { await BASVerifierLaneABProbe.run() }
+            return
+        }
         // 全面进化 T1.2 — ANE utilization measurement (BAS_ANE_PROBE=1). MLX-free (CoreML heads only) but
         // launched via the same aux path; runs fine on device (MLComputePlan is iOS 17.4+).
         if (env["BAS_ANE_PROBE"] ?? "0") == "1" {
