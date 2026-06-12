@@ -194,3 +194,20 @@ sequential sweep would have claimed. This run is evidence the old "n=1 best" hin
 **Standing state**: `numDraftTokens` default stays 2 — independently validated by the A1 PAIRED A/B
 (+34% at n=2, same-thermal-window pairing). **Re-run this sweep on a COLD device** for a clean draft-
 length verdict; until then no default change.
+
+## Tranche A2 verifier default-flip — evidence probe built, device-run DEFERRED (2026-06-12)
+
+The verifier decode-lane seam (`BASLLMVerifierPipeline.decodeLane`, b071b72d5) is landed + tested
+(default `.scout` byte-equal; `.greedy` → spec-decode + reproducible). To justify FLIPPING the default to
+`.greedy`, `BASVerifierLaneABProbe` (`BAS_VERIFIER_LANE_AB=1`, aa688c904) runs the same verification task
+in both lanes and captures per-stage outputs for a human quality read.
+
+**Device-run deferred — thermal wedge.** Two launches on device A both stalled after the START line with
+the app ALIVE (procs=1) but zero stage progress for 5+ min — the ADR-038 wedge signature. Device A had
+been running models continuously for hours (10h endurance + A1 A/B + A3 sweep + builds) and is thermally
+cooked; the verifier's first single-model decode never returned. The probe carries no watchdog, so it
+just hung. This is itself another ADR-038 data point — and precisely the failure LiteRT's cancellable
+decode (Tranche D) would let a host escape. **Re-run on a COOL device** (or under the external
+watchdog). Until the evidence lands, the verifier default stays `.scout` (the reachable greedy seam is
+host-electable). The argument for the flip stands (temp 0.1 ≈ greedy; greedy is reproducible + +34%) but
+is unproven for verification quality.
