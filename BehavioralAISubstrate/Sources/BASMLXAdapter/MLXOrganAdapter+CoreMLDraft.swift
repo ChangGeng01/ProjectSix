@@ -26,6 +26,8 @@ extension MLXOrganAdapter {
         public let rounds: Int
         public let proposed: Int
         public let accepted: Int
+        public let aneMs: Double   // spec: time in draft propose+commit (ANE/Core ML half)
+        public let gpuMs: Double   // spec: time in target verify+eval (MLX/GPU half)
     }
 
     /// Generate the same prompt under the hybrid (Core ML ANE draft + MLX verify) and the K=0 baseline (pure
@@ -71,7 +73,8 @@ extension MLXOrganAdapter {
             return CoreMLDraftAB(
                 specTokens: spec.tokens, specMs: specMs,
                 baseTokens: base.tokens, baseMs: baseMs,
-                rounds: spec.rounds, proposed: spec.proposed, accepted: spec.accepted)
+                rounds: spec.rounds, proposed: spec.proposed, accepted: spec.accepted,
+                aneMs: spec.aneMs, gpuMs: spec.gpuMs)
         }
     }
 }

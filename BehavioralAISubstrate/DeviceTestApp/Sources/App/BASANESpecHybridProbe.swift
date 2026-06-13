@@ -124,11 +124,15 @@ enum BASANESpecHybridProbe {
                     let hitRate = ab.proposed > 0 ? Double(ab.accepted) / Double(ab.proposed) : 0
                     let meanAcc = ab.rounds > 0 ? Double(ab.accepted) / Double(ab.rounds) : 0
                     speedups.append(speedup)
+                    // The design's gate: overlap pays only when (K+1)·t_ane ≤ t_verify (draft fits the verify
+                    // shadow). ane_ms/gpu_ms is the per-run propose+commit vs verify split → the ratio that decides.
+                    let aneShare = ab.gpuMs > 0 ? ab.aneMs / ab.gpuMs : 0
                     fileLog.emit(String(
                         format: "📊 ane-spec workload=%@ tokens=%d rounds=%d hit_rate=%.2f mean_acc=%.2f "
-                            + "spec_ms=%.0f base_ms=%.0f speedup=%.2fx token_identical=%@",
+                            + "spec_ms=%.0f base_ms=%.0f speedup=%.2fx ane_ms=%.0f gpu_ms=%.0f ane/gpu=%.2f "
+                            + "token_identical=%@",
                         w.name, ab.specTokens.count, ab.rounds, hitRate, meanAcc,
-                        ab.specMs, ab.baseMs, speedup, identical ? "YES" : "NO"))
+                        ab.specMs, ab.baseMs, speedup, ab.aneMs, ab.gpuMs, aneShare, identical ? "YES" : "NO"))
                 } catch {
                     fileLog.emit("📊 ane-spec workload=\(w.name) ERROR=\(error)")
                 }

@@ -34,6 +34,17 @@ public final class BASCoreMLDraftSession: @unchecked Sendable {
     private let cosTable: [Float]
     private let sinTable: [Float]
 
+    // Pre-allocated input buffers, reused + updated in O(K) per step (NOT reallocated + NSNumber-boxed each
+    // forward — that per-step host overhead was ~1024 boxings/step and dominated the draft cost). Direct memory.
+    private let inputID: MLMultiArray
+    private let cosArr: MLMultiArray
+    private let sinArr: MLMultiArray
+    private let ohArr: MLMultiArray
+    private let biasArr: MLMultiArray
+    private let provider: MLDictionaryFeatureProvider
+    private var prevOneHotPos: Int = -1   // the slot currently holding the 1 in write_onehot
+    private var biasBoundary: Int = -1    // highest position currently set to 0 in attn_bias (0..boundary attended)
+
     /// Number of COMMITTED tokens; the next committed slot. The KV at physical slots `0..<draftPos` holds the
     /// committed sequence's K/V; the last committed token's K/V is at slot `draftPos - 1`.
     public private(set) var draftPos: Int = 0
@@ -60,6 +71,19 @@ public final class BASCoreMLDraftSession: @unchecked Sendable {
         self.state = model.makeState()
         self.cosTable = try Self.loadTable(ropeCosURL, count: maxSeq * headDim)
         self.sinTable = try Self.loadTable(ropeSinURL, count: maxSeq * headDim)
+        // Allocate the reusable input buffers once. attn_bias starts fully masked (−inf); write_onehot all zero.
+        self.inputID = try MLMultiArray(shape: [1, 1], dataType: .int32)
+        self.cosArr = try MLMultiArray(shape: [NSNumber(value: headDim)], dataType: .float32)
+        self.sinArr = try MLMultiArray(shape: [NSNumber(value: headDim)], dataType: .float32)
+        self.ohArr = try MLMultiArray(shape: [NSNumber(value: maxSeq)], dataType: .float32)
+        self.biasArr = try MLMultiArray(shape: [NSNumber(value: maxSeq)], dataType: .float32)
+        self.provider = try MLDictionaryFeatureProvider(dictionary: [
+            "input_id": inputID, "rope_cos": cosArr, "rope_sin": sinArr,
+            "write_onehot": ohArr, "attn_bias": biasArr,
+        ])
+        let oh = ohArr.dataPointer.assumingMemoryBound(to: Float.self)
+        let bias = biasArr.dataPointer.assumingMemoryBound(to: Float.self)
+        for j in 0..<maxSeq { oh[j] = 0; bias[j] = negInfinity }
     }
 
     private static func loadTable(_ url: URL, count: Int) throws -> [Float] {
@@ -76,25 +100,26 @@ public final class BASCoreMLDraftSession: @unchecked Sendable {
     @discardableResult
     public func step(token: Int, pos: Int) throws -> Int {
         guard pos < maxSeq else { throw DraftError.windowOverflow(pos: pos, maxSeq: maxSeq) }
-        let inputID = try MLMultiArray(shape: [1, 1], dataType: .int32)
-        inputID[0] = NSNumber(value: Int32(token))
-        let cos = try MLMultiArray(shape: [NSNumber(value: headDim)], dataType: .float32)
-        let sin = try MLMultiArray(shape: [NSNumber(value: headDim)], dataType: .float32)
+        // Update the reused buffers IN PLACE, O(headDim + |Δpos|) — never reallocate / NSNumber-box per step.
+        inputID.dataPointer.assumingMemoryBound(to: Int32.self)[0] = Int32(token)
+        let cosP = cosArr.dataPointer.assumingMemoryBound(to: Float.self)
+        let sinP = sinArr.dataPointer.assumingMemoryBound(to: Float.self)
         let base = pos * headDim
-        for d in 0..<headDim {
-            cos[d] = NSNumber(value: cosTable[base + d])
-            sin[d] = NSNumber(value: sinTable[base + d])
+        cosTable.withUnsafeBufferPointer { cosP.update(from: $0.baseAddress! + base, count: headDim) }
+        sinTable.withUnsafeBufferPointer { sinP.update(from: $0.baseAddress! + base, count: headDim) }
+        // write_onehot: move the single 1 from its old slot to `pos`.
+        let ohP = ohArr.dataPointer.assumingMemoryBound(to: Float.self)
+        if prevOneHotPos >= 0 { ohP[prevOneHotPos] = 0 }
+        ohP[pos] = 1
+        prevOneHotPos = pos
+        // attn_bias step function: 0 for 0..pos, −inf above. Only patch the delta from the previous boundary.
+        let biasP = biasArr.dataPointer.assumingMemoryBound(to: Float.self)
+        if pos > biasBoundary {
+            for j in (biasBoundary + 1)...pos { biasP[j] = 0 }
+        } else if pos < biasBoundary {
+            for j in (pos + 1)...biasBoundary { biasP[j] = neg }
         }
-        let oh = try MLMultiArray(shape: [NSNumber(value: maxSeq)], dataType: .float32)
-        let bias = try MLMultiArray(shape: [NSNumber(value: maxSeq)], dataType: .float32)
-        for j in 0..<maxSeq {
-            oh[j] = NSNumber(value: j == pos ? Float(1) : Float(0))
-            bias[j] = NSNumber(value: j <= pos ? Float(0) : neg)   // causal: attend 0..pos
-        }
-        let provider = try MLDictionaryFeatureProvider(dictionary: [
-            "input_id": inputID, "rope_cos": cos, "rope_sin": sin,
-            "write_onehot": oh, "attn_bias": bias,
-        ])
+        biasBoundary = pos
         let out: MLFeatureProvider
         do { out = try model.prediction(from: provider, using: state) }
         catch { throw DraftError.predict("\(error)") }
@@ -133,9 +158,16 @@ public final class BASCoreMLDraftSession: @unchecked Sendable {
     // MARK: - Primitives the decoder composes
 
     /// Fresh KV + frontier for a new generation (reuse the loaded model across workloads without reloading).
+    /// Also resets the incremental input buffers: clear write_onehot, re-mask attn_bias fully.
     public func reset() {
         state = model.makeState()
         draftPos = 0
+        let ohP = ohArr.dataPointer.assumingMemoryBound(to: Float.self)
+        let biasP = biasArr.dataPointer.assumingMemoryBound(to: Float.self)
+        if prevOneHotPos >= 0 { ohP[prevOneHotPos] = 0 }
+        if biasBoundary >= 0 { for j in 0...biasBoundary { biasP[j] = neg } }
+        prevOneHotPos = -1
+        biasBoundary = -1
     }
 
     /// Sync the draft KV to a committed prefix: feed each token at its position. Sets `draftPos = tokens.count`.

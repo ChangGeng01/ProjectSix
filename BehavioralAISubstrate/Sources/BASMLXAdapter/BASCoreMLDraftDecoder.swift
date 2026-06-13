@@ -24,6 +24,8 @@ public struct BASCoreMLDraftDecoder {
         public let rounds: Int
         public let proposed: Int
         public let accepted: Int
+        public let aneMs: Double      // total wall time in draft propose+commit (the ANE/Core ML half)
+        public let gpuMs: Double      // total wall time in target verify+eval (the MLX/GPU half)
     }
 
     enum DecodeError: Error { case nonTrimmableCache }
@@ -44,6 +46,7 @@ public struct BASCoreMLDraftDecoder {
         let promptTokens = input.text.tokens.asArray(Int.self)
         var out = [Int]()
         var rounds = 0, proposed = 0, accepted = 0
+        var aneNanos: UInt64 = 0, gpuNanos: UInt64 = 0
 
         // ---- Prefill the TARGET and take the FIRST generated token in BOTH prepare cases. `.logits` already
         // computed it; `.tokens` deferred the prompt tail — feed it in one forward to get the first token (the
@@ -57,7 +60,7 @@ public struct BASCoreMLDraftDecoder {
             let token = sampler.sample(logits: r.logits[0..., -1, 0...])
             eval(token)
             let t = token.item(Int.self)
-            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
+            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0, aneMs: 0, gpuMs: 0) }
             out.append(t)
             y = .init(tokens: token)
         case .logits(let result):
@@ -65,11 +68,11 @@ public struct BASCoreMLDraftDecoder {
             let token = sampler.sample(logits: result.logits[0..., -1, 0...])
             eval(token)
             let t = token.item(Int.self)
-            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
+            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0, aneMs: 0, gpuMs: 0) }
             out.append(t)
             y = .init(tokens: token)
         }
-        guard let first = out.first else { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
+        guard let first = out.first else { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0, aneMs: 0, gpuMs: 0) }
 
         // ---- Prefill the DRAFT KV to the same committed prefix: prompt tokens + the first emitted token. ----
         // If the prompt + the first token already fills the draft window, run pure target-greedy (no draft).
@@ -85,11 +88,14 @@ public struct BASCoreMLDraftDecoder {
             let windowRoom = canDraft ? (draft.remainingWindow() - 2) : 0
             let numDraft = Swift.max(0, Swift.min(K, Swift.min(remaining - 1, windowRoom)))
             let seed = out.last ?? first
+            let tProp = DispatchTime.now().uptimeNanoseconds
             let draftTokens = numDraft > 0 ? try draft.propose(seed: seed, k: numDraft) : []
+            aneNanos &+= DispatchTime.now().uptimeNanoseconds &- tProp
             rounds += 1
             proposed += draftTokens.count
 
             // Verify [y] + draft in ONE TARGET forward (VERBATIM from BASPromptLookupDecoder).
+            let tVer = DispatchTime.now().uptimeNanoseconds
             let verifyTokens: MLXArray = draftTokens.isEmpty
                 ? y.tokens
                 : concatenated([y.tokens, MLXArray(draftTokens.map { Int32($0) })])
@@ -101,6 +107,7 @@ public struct BASCoreMLDraftDecoder {
             let mainTokens = sampler.sample(logits: verifyLogits)
             eval(mainTokens)
             let mainList = mainTokens.asArray(Int.self)
+            gpuNanos &+= DispatchTime.now().uptimeNanoseconds &- tVer
 
             // Accept the longest matching prefix; always emit the target's argmax (byte-identity by construction).
             var acc = 0
@@ -118,11 +125,16 @@ public struct BASCoreMLDraftDecoder {
             _ = trimPromptCache(cache, numTokens: draftTokens.count - acc)
             // RESYNC the DRAFT KV: commit acc accepted + the correction (one ANE forward) — unless we stopped.
             if stop { break }
-            if canDraft && numDraft > 0 { try draft.commit(acc: acc, correction: mainList[acc]) }
+            if canDraft && numDraft > 0 {
+                let tCom = DispatchTime.now().uptimeNanoseconds
+                try draft.commit(acc: acc, correction: mainList[acc])
+                aneNanos &+= DispatchTime.now().uptimeNanoseconds &- tCom
+            }
             // Next round seeds from the last emitted token.
             y = .init(tokens: MLXArray([Int32(out.last ?? 0)]))
         }
-        return Result(tokens: out, rounds: rounds, proposed: proposed, accepted: accepted)
+        return Result(tokens: out, rounds: rounds, proposed: proposed, accepted: accepted,
+                      aneMs: Double(aneNanos) / 1_000_000, gpuMs: Double(gpuNanos) / 1_000_000)
     }
 }
 #endif
