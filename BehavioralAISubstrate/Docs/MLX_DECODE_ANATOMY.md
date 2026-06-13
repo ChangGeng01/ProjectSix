@@ -3,7 +3,7 @@
 > **Verdict: at the measured regime the turn is DECODE-BOUND.** Prefill is ~7-13% of MLX time; decode is
 > ~88-93%, at a steady **~42.6 real tok/s**. So the efficiency lever is decode-side (faster/quantized model,
 > KV-quant, speculative decode, or the decode-token cap) — NOT prefill (KV-reuse) at short-prompt scale. The
-> chars/4 `est_tok_per_s` (47-59) **overstated** the real ~42.6 tok/s by 10-30% — measure-first caught it.
+> chars/4 `est_tok_per_s` (47-59) **overstated** the real ~42.6 tok/s by ~10-38% — measure-first caught it.
 
 ## Why this measurement
 
@@ -30,7 +30,7 @@ mlx-decode iter=3 p=2 prefill_ms=155 decode_ms=2250 prompt_tokens=65 gen_tokens=
 | decode | ~2250 ms for 96 tokens; ~709 ms for 30 |
 | **prefill share of MLX time** | **7-13%** (e.g. 184/(184+2255)=7.5%) |
 | **decode share of MLX time** | **~88-93%** ⇒ DECODE-BOUND |
-| chars/4 est_tok_per_s (the old log) | 43-59 — **overstated** the real ~42.6 by 10-30% |
+| chars/4 est_tok_per_s (the old log) | 43-59 — **overstated** the real ~42.6 by ~1-38% |
 
 ## What this means for the lever (Phase-2 gate)
 

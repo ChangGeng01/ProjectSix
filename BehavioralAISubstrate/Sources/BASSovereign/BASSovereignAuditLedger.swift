@@ -605,9 +605,16 @@ public actor BASSovereignAuditLedger {
             // for:)` against the stored signature, which is the
             // canonical verification primitive for the scheme.
             switch signingMode {
-            case .hmac:
-                let expectedSignature = sign(canonical)
-                guard appended.entry.signature == expectedSignature else {
+            case .hmac(let key):
+                // audit-2026-06-12: CONSTANT-TIME read-side MAC verification. Was
+                // recompute + `String ==`, which short-circuits on the first differing
+                // byte — the SAME timing side-channel append() already closed (~line 493).
+                // isValidAuthenticationCode is constant-time; identical accept/reject set
+                // (malformed base64 ⇒ reject, as the Ed25519 branch already does below).
+                guard let providedMac = Data(base64Encoded: appended.entry.signature),
+                      HMAC<SHA256>.isValidAuthenticationCode(
+                        providedMac, authenticating: canonical, using: key)
+                else {
                     throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
                 }
             case .ed25519(let keyPair):
@@ -783,8 +790,17 @@ public actor BASSovereignAuditLedger {
 
             // 2b. Signature.
             switch signingMode {
-            case .hmac:
-                if appended.entry.signature != sign(canonical) {
+            case .hmac(let key):
+                // audit-2026-06-12: CONSTANT-TIME read-side MAC verification (mirrors
+                // append() + the Ed25519 malformed-base64 handling below).
+                let macOK: Bool
+                if let providedMac = Data(base64Encoded: appended.entry.signature) {
+                    macOK = HMAC<SHA256>.isValidAuthenticationCode(
+                        providedMac, authenticating: canonical, using: key)
+                } else {
+                    macOK = false
+                }
+                if !macOK {
                     reasons.append(.signatureInvalid)
                 }
             case .ed25519(let keyPair):

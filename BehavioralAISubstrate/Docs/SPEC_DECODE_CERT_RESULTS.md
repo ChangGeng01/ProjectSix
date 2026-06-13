@@ -175,7 +175,12 @@ via unloadDraftModel/loadDraftModel) — directionally consistent with but **BEL
 relative win). Both numbers use the same time-saved framing (baseline−spec)/baseline. _(Audit 2026-06-12
 correction: an earlier draft read this as "+34%", which is the (baseline−spec)/spec throughput ratio — a
 different denominator, NOT comparable to the cert. The on-device emit is `speedup=1.34x`; that multiplier
-is the ground-truth number.)_ Absolute tok/s is NOT comparable across sessions; the paired delta is valid. The
+is the ground-truth number. **Git fossil:** commits `141093b10` / `8393d5e09` carry the superseded "+34%"
+framing in their subjects (immutable history); the markdown was corrected in `03a6cf7d6`. **Provenance:**
+the raw `greedy-spec-ab` log for this n=3 run is NOT archived in-repo — the 94MB device pull
+(`dual-device-20260612-034321/`) contains the device's `bas-sovereign-host.key` signing keys + sqlite and
+is deliberately gitignored, so unlike the n=100 cert (committed logs) the A1 number is captured-but-
+unarchived. Treat it as corroborating, not independently re-verifiable from the repo.)_ Absolute tok/s is NOT comparable across sessions; the paired delta is valid. The
 production chooser for this lane is `BASDecodeLanePolicy` (deterministic/factual → greedy; A2,
 20abf2d2a). The KV levers were A/B'd in the same 10h run and DECLINED at this regime
 (`KV_LEVERS_DEVICE_VERDICT_2026-06-12.md`) — greedy spec-decode is the real decode lever.
@@ -195,8 +200,8 @@ FINAL best_n=1 best_ms=876 baseline_bracket_ms=1200 verdict=INCONCLUSIVE-WITHIN-
 last/hottest at 1716ms — hotter than the post-baseline), so the probe REFUSED the WIN the old
 sequential sweep would have claimed. This run is evidence the old "n=1 best" hint was thermal, not n.
 
-**Standing state**: `numDraftTokens` default stays 2 — independently validated by the A1 PAIRED A/B
-(1.34× at n=2, same-thermal-window pairing). **Re-run this sweep on a COLD device** for a clean draft-
+**Standing state**: `numDraftTokens` default stays 2 — corroborated by the A1 PAIRED A/B
+(1.34× at n=2, same-thermal-window pairing; **provenance caveat below**). **Re-run this sweep on a COLD device** for a clean draft-
 length verdict; until then no default change.
 
 ## Tranche A2 verifier default-flip — evidence probe built, device-run DEFERRED (2026-06-12)

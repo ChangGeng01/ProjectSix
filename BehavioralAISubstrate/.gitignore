@@ -38,3 +38,20 @@ xcuserdata/
 # ============================================================
 *.swp
 *~
+
+# ============================================================
+# Sovereign secrets + device cert-log pulls (audit 2026-06-12)
+# ------------------------------------------------------------
+# Device "Documents" pulls (Docs/cert-logs/dual-device-*) carry the
+# device's bas-sovereign-host.key (32-byte Ed25519/HMAC signing keys)
+# + the sqlite ledger DBs. NEVER commit those — a committed signing key
+# is a CRITICAL secret exposure. Guard the key + DB classes globally and
+# the bulky raw-pull archives wholesale; commit only hand-extracted log
+# EXCERPTS under Docs/cert-logs/ when evidence must be in-repo.
+# ============================================================
+*.key
+bas-sovereign-host.key
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+Docs/cert-logs/dual-device-*/

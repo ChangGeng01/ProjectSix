@@ -152,6 +152,17 @@ public struct BASSovereignDualKeyVerifier: Sendable {
     public func verify(
         _ commit: BASSovereignDualKeyCommit
     ) -> Bool {
+        // Defense-in-depth (audit 2026-06-12): makeCommit rejects
+        // primaryKeyID == secondaryKeyID, but the verifier is the actual
+        // enforcement point and the public commit init bypasses makeCommit's
+        // guard. A verifier whose own two slots collapse to ONE identity (same
+        // keyID OR same public key) is NOT dual-principal — fail closed so a
+        // degenerate same-key verifier can never silently downgrade "dual-key"
+        // to single-principal protection.
+        guard primaryKeyID != secondaryKeyID,
+              primaryPublicKey.rawRepresentation
+                  != secondaryPublicKey.rawRepresentation
+        else { return false }
         guard commit.primaryKeyID == primaryKeyID else {
             return false
         }

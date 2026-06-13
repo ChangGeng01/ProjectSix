@@ -203,6 +203,59 @@ final class BASSovereignDualKeyCommitTests: XCTestCase {
         }
     }
 
+    // MARK: - Degenerate verifier fails closed (audit 2026-06-12)
+
+    /// makeCommit rejects a same-keyID pair, but the public commit init
+    /// bypasses that guard — so the VERIFIER (the enforcement point) must
+    /// also fail closed when its own two slots collapse to one identity.
+    /// Otherwise a host could mint a single-key commit + a same-key verifier
+    /// and silently downgrade "dual-key" to single-principal protection.
+    func test_degenerateSameKeyIDVerifier_failsClosed() throws {
+        let primary = makePrimary()
+        let digest = makeIntentDigest()
+        // A single-key commit (same keyID + same key in both slots),
+        // minted via the public init that bypasses makeCommit's guard.
+        let sig = try primary.privateKey.signature(for: digest)
+        let commit = BASSovereignDualKeyCommit(
+            intentDigest: digest,
+            primaryKeyID: "same-id",
+            primarySignature: sig,
+            secondaryKeyID: "same-id",
+            secondarySignature: sig)
+        let verifier = BASSovereignDualKeyVerifier(
+            primaryKeyID: "same-id",
+            primaryPublicKey: primary.publicKey,
+            secondaryKeyID: "same-id",
+            secondaryPublicKey: primary.publicKey)
+        XCTAssertFalse(
+            verifier.verify(commit),
+            "a same-identity verifier must fail closed — " +
+            "dual-key must mean two distinct principals")
+    }
+
+    /// Two distinct keyIDs but the SAME public key in both slots is still
+    /// single-principal — the public-key-collision guard must reject it.
+    func test_distinctKeyIDsButSamePublicKey_failsClosed() throws {
+        let primary = makePrimary()
+        let digest = makeIntentDigest()
+        let sig = try primary.privateKey.signature(for: digest)
+        let commit = BASSovereignDualKeyCommit(
+            intentDigest: digest,
+            primaryKeyID: "p",
+            primarySignature: sig,
+            secondaryKeyID: "s",
+            secondarySignature: sig)
+        let verifier = BASSovereignDualKeyVerifier(
+            primaryKeyID: "p",
+            primaryPublicKey: primary.publicKey,
+            secondaryKeyID: "s",
+            secondaryPublicKey: primary.publicKey)  // collision
+        XCTAssertFalse(
+            verifier.verify(commit),
+            "same public key in both slots is single-principal — " +
+            "must fail closed even with distinct keyIDs")
+    }
+
     // MARK: - Codable round-trip
 
     func test_commitRoundTripsViaCodable() throws {
