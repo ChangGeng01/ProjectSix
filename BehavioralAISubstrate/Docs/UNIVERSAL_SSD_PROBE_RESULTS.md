@@ -13,6 +13,29 @@ auto-promotion.
 
 ---
 
+## Track D — EAGLE feature-head (2026-06-14, Mac MLX self-distillation) — pipeline works; first cut drafts ~1 token
+
+EAGLE drafts at the FEATURE level: a small head predicts the next penultimate feature `f_{t+1}` from `(f_t,
+e_{t+1})`; the target's own lm-head maps `f_hat` → token. Vendor patch exposes features/embed/lm-head (byte-identical).
+`Tools/eagle_train_head.py` self-distills (run the 4bit-3B greedy, capture `(f_t, token)` sequences), trains a
+residual head `f_{t+1} ≈ f_t + MLP(concat(f_t, e_{t+1}))` (smooth-L1 feature + 0.1·CE), measures held-out acceptance.
+
+| metric (held-out, 12 seqs) | value |
+|---|---|
+| teacher-forced 1-step accept (head sees the TRUE `f_t`) | **1.000** |
+| **AUTOREGRESSIVE accept** (head feeds back its OWN `f_hat` — the real decode signal) | **0.503** |
+| **mean accepted draft length** | **1.01 / 4** |
+
+**Verdict — pipeline works end-to-end, but the first cut drafts only ~1 token (not EAGLE's SOTA 3–4×).** The
+teacher-forced (1.0) vs autoregressive (0.5) gap is the diagnosis: the head's PREDICTED features **drift** after one
+step, and a pointwise residual MLP cannot model "given the draft so far, predict the next feature" (no attention over
+the sequence). EAGLE's real head is a **transformer decoder layer** (attends to the draft) trained on **~68K samples**;
+this cut is a simple MLP on **52 self-gen sequences / 8 epochs** → undertrained + under-architected. Byte-identity holds
+regardless (the target verify); only the speedup is limited. The honest levers: (i) a proper transformer-layer head,
+(ii) ~100× more training data, (iii) train against the head's OWN autoregressive features (reduce drift). Each is a
+real ML investment — not a marathon-tail task. The pipeline (patch + self-distill + honest held-out/autoregressive
+eval) is the reusable foundation.
+
 ## Track C — tree-structured prompt-lookup (2026-06-14, iPhone A19) — CORRECT byte-identical, but marginal over linear
 
 The aggressive, training-free successor to linear prompt-lookup: propose a TREE of n-gram continuations (branch

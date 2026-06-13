@@ -95,9 +95,15 @@ def main():
     n_pairs = sum(len(s) - 1 for s in seqs_tok)
     print(f">> data: {len(seqs_tok)} sequences, {n_pairs} (f_t, token) pairs, {time.time()-t0:.0f}s")
 
+    # HELD-OUT split (no train-on-test): last 12 sequences are eval-only.
+    n_eval = min(12, len(seqs_tok) // 4)
+    train_f, train_t = seqs_f[:-n_eval], seqs_tok[:-n_eval]
+    eval_f, eval_t = seqs_f[-n_eval:], seqs_tok[-n_eval:]
+    print(f">> split: {len(train_t)} train / {len(eval_t)} held-out sequences")
+
     # Build training tensors: input f_t, e_{t+1}; target f_{t+1}, token_{t+2}.
     F_in, E_in, F_tgt, T_tgt = [], [], [], []
-    for f_seq, t_seq in zip(seqs_f, seqs_tok):
+    for f_seq, t_seq in zip(train_f, train_t):
         T = len(t_seq)
         for t in range(T - 2):
             F_in.append(f_seq[t]); E_in.append(embed(mx.array([t_seq[t + 1]]))[0])
@@ -131,17 +137,41 @@ def main():
             tot += float(l.item()); nb += 1
         print(f">> epoch {ep+1}/{EPOCHS} loss={tot/max(1,nb):.4f}")
 
-    # ---- OFFLINE acceptance: head proposes next token from the last feature; agree with the 3B argmax? ----
-    correct = 0; total = 0
-    for f_seq, t_seq in zip(seqs_f[: min(16, len(seqs_f))], seqs_tok):
+    # ---- HONEST acceptance on HELD-OUT data, two ways. ----
+    # (1) Teacher-forced 1-step (upper bound): head sees the target's TRUE feature f_t, predict token_{t+2}.
+    tf_correct = tf_total = 0
+    for f_seq, t_seq in zip(eval_f, eval_t):
         for t in range(len(t_seq) - 2):
-            fh = head(f_seq[t][None], embed(mx.array([t_seq[t + 1]])))   # predict f_{t+1}
+            fh = head(f_seq[t][None], embed(mx.array([t_seq[t + 1]])))
             pred = int(mx.argmax(lm_logits(model, fh), axis=-1).item())
-            correct += int(pred == t_seq[t + 2]); total += 1
-    acc = correct / max(1, total)
-    print(f">> OFFLINE next-token acceptance = {correct}/{total} = {acc:.3f}")
-    print(f">> (drafting K tokens autoregressively compounds this; one-step accept {acc:.2f} → ~{acc**1:.2f}/"
-          f"{acc**2:.2f}/{acc**3:.2f} for 1/2/3 tokens ahead)")
+            tf_correct += int(pred == t_seq[t + 2]); tf_total += 1
+    tf_acc = tf_correct / max(1, tf_total)
+
+    # (2) AUTOREGRESSIVE draft (what decode actually does): from the target's true f_t, draft K tokens feeding the
+    # head's OWN predicted features back. Accept = consecutive matches with the target continuation (errors compound).
+    K = 4
+    drafted = matched = starts = 0
+    accept_lens = []
+    for f_seq, t_seq in zip(eval_f, eval_t):
+        for t in range(len(t_seq) - K - 2):
+            f_cur = f_seq[t][None]
+            tok_prev = t_seq[t + 1]          # the token f_t produced (known at decode)
+            acc_len = 0
+            for k in range(K):
+                fh = head(f_cur, embed(mx.array([tok_prev])))
+                pred = int(mx.argmax(lm_logits(model, fh), axis=-1).item())
+                drafted += 1
+                if pred == t_seq[t + 2 + k]:
+                    matched += 1; acc_len += 1
+                    f_cur = fh; tok_prev = pred   # autoregress on the predicted feature
+                else:
+                    break
+            accept_lens.append(acc_len); starts += 1
+    ar_acc = matched / max(1, drafted)
+    mean_len = sum(accept_lens) / max(1, len(accept_lens))
+    print(f">> HELD-OUT teacher-forced 1-step accept = {tf_acc:.3f}  ({tf_correct}/{tf_total})")
+    print(f">> HELD-OUT AUTOREGRESSIVE accept = {ar_acc:.3f}, mean accepted draft length = {mean_len:.2f}/{K} "
+          f"(this is the real spec-decode signal)")
 
     from mlx.utils import tree_flatten
     mx.save_safetensors(OUT, dict(tree_flatten(head.parameters())))
