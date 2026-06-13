@@ -322,10 +322,45 @@ fp32 gate alone doesn't certify the quantized artifact). The full measured matri
   early argmax flips and cascades), which would tank acceptance. int8 is **token-identical (24/24)** AND the same
   size-class-fits-ANE, so **int8 is the draft to carry forward**.
 
-**Net — B2 is GREEN and the draft is identified (int8), but the WIN is not yet measured.** Established this arc:
-the ANE *can* run a real LLM decode draft on the A19 (65% placement, fidelity-preserving int8) — the rigorous,
-device-grounded answer to "压榨 CoreAI". **Remaining (the large next build, 亏的不要 binds the ship):** the
-end-to-end hybrid — int8 ANE draft ∥ MLX/GPU 3B-target verify, measuring (1) draft ACCEPTANCE vs the 3B target
-(the real speedup determinant — the int8 1B draft must agree with the 3B argmax often enough), (2) co-residency
-memory (3B ≈ 6 GB + int8 draft 1.2 GB on the A19 — jetsam risk), (3) the actual end-to-end speedup + token
-byte-identity, and (4) the cost of the 65/35 ANE/GPU partition (cross-device transfers per draft step).
+**Net — B2 is GREEN and the draft is identified (int8).** Established this arc: the ANE *can* run a real LLM decode
+draft on the A19 (65% placement, fidelity-preserving int8). The end-to-end hybrid was then BUILT + MEASURED ↓.
+
+### B2 END-TO-END hybrid — built + measured (2026-06-14): CERTIFIED CORRECT, but a net loss as built
+
+`BASCoreMLDraftSession` (Core ML int8 1B draft, stateful KV, host-fed RoPE/one-hot/bias) + `BASCoreMLDraftDecoder`
+(TARGET verify/accept/trim VERBATIM from `BASPromptLookupDecoder` → byte-identity inherited; + the draft KV
+RESYNC: K+1 propose forwards so every proposal's K/V is written, then 1 commit forward for the correction) +
+`BASANESpecHybridProbe` (`BAS_ANE_SPEC_PROBE`). Design de-risked by a 3-agent panel.
+
+On-device A/B (iPhone A19, K=4, spec vs the SAME decoder at K=0 = pure greedy):
+
+| target | draft units | workload | mean_acc /4 | hit_rate | speedup | token_identical | peak |
+|---|---|---|---|---|---|---|---|
+| 1B-4bit | GPU | rag-quote | **3.88** | 0.97 | 0.70× | YES | 1097 MB |
+| 1B-4bit | ANE | rag-quote | 3.88 | 0.97 | 0.73× | YES | 1285 MB |
+| **3B-4bit** | GPU | rag-quote | **4.00** (perfect) | 1.00 | 0.89× | YES | **2253 MB** |
+| 3B-4bit | GPU | code-repeat | 3.00 | 0.75 | 0.82× | YES | — |
+| 3B-4bit | GPU | control | 1.88 | 0.49 | 0.70× | YES | — |
+
+**CERTIFIED CORRECT:** token_identical=3/3 every config (the draft only proposes; the target argmax is
+authoritative — ADR-039 holds with a real Core ML draft). Acceptance up to **4.00/4** (3B target, rag-quote:
+the int8 1B draft predicts the 3B argmax perfectly on verbatim quote) — this certifies the draft KV RESYNC (a
+broken cache stays byte-identical but collapses acceptance to ~0; it didn't). **Memory fits**: 3B + int8 draft =
+2253 MB < 3376 cap — the int8 draft adds only ~14–30 MB resident (clean-page mmap), so the "won't co-reside"
+fear was wrong.
+
+**But speedup < 1 everywhere (0.70×–0.89×) — net loss as built (亏的不要 → DON'T ship). Precise diagnosis:**
+1. **Draft not cheap enough** — the int8 1B forward is ~0.68× the 3B-4bit target forward (int8 dequant overhead
+   eats the size win); break-even for the K+2-forwards/round scheme needs draft < ~0.58× target.
+2. **No ANE offload at execution** — `.all` fails the executable plan (Core ML **error -14**, mixed ANE/GPU
+   partition); `.cpuAndNeuralEngine` runs but the int8 stateful ANE per-forward is comparable-to-SLOWER than GPU
+   (consistent with B0/B1) — the ANE is not the free/fast hardware the thesis assumed.
+3. **Serial loop** — propose-then-verify puts the draft cost on the critical path. The win needs the draft to run
+   ∥ the GPU verify (overlap round r+1 propose with round r verify) — the deferred "v2" — so the draft is hidden.
+
+**Verdict — the "压榨 CoreAI" hybrid is BUILT, byte-identical, and CERTIFIED, but does NOT win on the A19 as built.**
+The negative is MEASURED, not assumed. Two evidence-gated paths to a win (next arc): (a) a genuinely CHEAPER draft
+(4-bit, not int8, or sub-1B same-tokenizer) to get draft < 0.58× target; (b) TRUE ANE∥GPU overlap so the draft
+leaves the critical path. Until one lands, the shipped universal decode win remains **Track A (prompt-lookup,
+token-identical, 1.58× repetitive, production-wired)** — and the B2 mechanism is a certified, correct foundation
+the next arc builds on, not a dead end.
