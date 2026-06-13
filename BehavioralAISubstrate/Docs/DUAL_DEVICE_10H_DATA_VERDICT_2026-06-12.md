@@ -33,14 +33,17 @@ genuinely differ. The authoritative speculative numbers are the gate's own merge
   under the iPhone Air cap (where E4B jetsams), E4B under a larger cap. **Additive** — does NOT change
   `defaultEntries` or the hardcoded `MLXOrganAdapter` default (byte-equal-off, ADR-014); a host opts in.
 
+## Landed in the follow-up (08d2fec4e — operator-elected)
+
+- **In-`loadModel` admission enforcement** — opt-in `enforceMemoryAdmission` + `activeHardCapBytes` on
+  `MLXOrganAdapter` (default off ⇒ byte-equal). When on, `loadModel` refuses an over-cap single-model
+  load BEFORE the materialize step → catchable error instead of the uncatchable mid-load jetsam.
+- **`prewarmGreedySpeculative()` wired into host warm-up** — `BASEnduranceAppRunner` JITs the greedy spec
+  lane (`try?`, best-effort) right after `loadModel`, before the first scored turn; the concurrent method
+  itself was committed per operator direction (verified sound). Byte-safe (falls back to `prewarm()`).
+
 ## Deferred (data-backed but gated)
 
-- **In-`loadModel` admission enforcement** (refuse over-cap single-model loads instead of only warning):
-  the admission primitives are landed; the `MLXOrganAdapter.loadModel` wiring is deferred because that
-  file currently carries an uncommitted `prewarmGreedySpeculative()` from concurrent work (cannot stage
-  cleanly). The selector already prevents the bad load at the SELECTION layer.
-- **Wire `prewarmGreedySpeculative()` into host warm-up** (byte-safe; falls back to `prewarm()` when
-  speculation won't engage) — pending the concurrent method's disposition.
 - **Lower the steady-state cooldown plateau** (<100s) to reclaim wall-clock — data shows ample thermal
   headroom (never left nominal/fair), but this changes iter cadence → needs its own cold-device A/B;
   default stays 100s until measured. (Operator has signalled willingness to run hotter.)
