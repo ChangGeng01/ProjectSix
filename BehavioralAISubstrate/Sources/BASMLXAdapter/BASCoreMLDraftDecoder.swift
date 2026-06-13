@@ -75,8 +75,10 @@ public struct BASCoreMLDraftDecoder {
         guard let first = out.first else { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0, aneMs: 0, gpuMs: 0) }
 
         // ---- Prefill the DRAFT KV to the same committed prefix: prompt tokens + the first emitted token. ----
-        // If the prompt + the first token already fills the draft window, run pure target-greedy (no draft).
-        let canDraft = (promptTokens.count + 1) < draft.maxSeqCount
+        // ONLY when actually speculating (K>0) — the K=0 baseline must be pure target greedy with NO draft work,
+        // else it pays the draft-prefill cost too and the A/B masks the true comparison. (Also stop if the prompt
+        // already fills the draft window.)
+        let canDraft = K > 0 && (promptTokens.count + 1) < draft.maxSeqCount
         if canDraft { try draft.prefill(promptTokens + [first]) }
 
         // ---- Speculative rounds. ----

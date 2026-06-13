@@ -61,6 +61,10 @@ enum BASANESpecHybridProbe {
          + "the cell's supply of adenosine triphosphate.\n\"\"\"\nQuote the passage above back verbatim."),
         ("code-repeat",
          "Repeat this Swift function exactly, then again unchanged:\nfunc add(_ a: Int, _ b: Int) -> Int { a + b }"),
+        ("long-quote",
+         "Here is a passage:\n\"\"\"\nThe quick brown fox jumps over the lazy dog. Pack my box with five dozen "
+         + "liquor jugs. How vexingly quick daft zebras jump. The five boxing wizards jump quickly. Sphinx of "
+         + "black quartz, judge my vow.\n\"\"\"\nNow repeat that entire passage back to me three times, verbatim."),
         ("control-freeform",
          "Write a short original opening paragraph for a science-fiction story set on a distant moon."),
     ]
@@ -107,6 +111,14 @@ enum BASANESpecHybridProbe {
             let draft = try BASCoreMLDraftSession(
                 modelURL: modelURL, ropeCosURL: cosURL, ropeSinURL: sinURL, computeUnits: units)
             fileLog.emit(String(format: "📊 ane-spec draft loaded footprint=%.0fMB (peak resident with both)", footprintMB()))
+
+            // Warmup: absorb the draft's Core ML first-call compile + the target's first decode so the timed
+            // workloads measure steady-state, not one-time lazy compilation.
+            let warm = BASOrganRequest(
+                requestID: "spec-warmup", role: .core, preset: .greedyDeterministic,
+                instruction: "Say hello.", context: [])
+            _ = try? await adapter.coreMLDraftAB(for: warm, draft: draft, numDraftTokens: k)
+            fileLog.emit(String(format: "📊 ane-spec warmup done footprint=%.0fMB", footprintMB()))
 
             var speedups: [Double] = []
             var allIdentical = true
