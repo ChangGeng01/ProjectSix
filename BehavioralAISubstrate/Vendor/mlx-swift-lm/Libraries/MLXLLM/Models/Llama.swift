@@ -228,6 +228,23 @@ public class LlamaModel: Module, LLMModel, KVCacheDimensionProvider {
         }
     }
 
+    // --- BAS EAGLE patch (Docs/patches/spec-decode-tree-mask.diff) -------------------------------------------
+    // EAGLE drafts at the FEATURE level: a small head predicts the next penultimate feature from (feature, next
+    // embedding); the target's own lm-head maps it to a token. These accessors expose the three pieces (the
+    // penultimate features `norm(h)`, the token embeddings, and the lm-head projection) without changing any
+    // existing path. Pure additions → byte-identical.
+    /// The penultimate features (`model.norm(h)`, the lm-head INPUT) for the inputs — EAGLE's draft target.
+    public func featuresForward(_ inputs: MLXArray, cache: [KVCache]?) -> MLXArray {
+        model(inputs, cache: cache)
+    }
+    /// Project features → vocab logits via the SAME lm-head the causal path uses (tied → embed.asLinear).
+    public func logitsFromFeatures(_ features: MLXArray) -> MLXArray {
+        if let lmHead { return lmHead(features) } else { return model.embedTokens.asLinear(features) }
+    }
+    /// The token embeddings (EAGLE feeds e_{t+1} alongside the feature f_t).
+    public func embed(_ inputs: MLXArray) -> MLXArray { model.embedTokens(inputs) }
+    // --- end BAS EAGLE patch ---------------------------------------------------------------------------------
+
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
         // Remove unused precomputed rotary frequencies
         weights.filter {
