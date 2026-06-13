@@ -319,6 +319,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASANEDraftProbe.run() }
             return
         }
+        // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
+        // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
+        if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASPromptLookupProbe.run() }
+            return
+        }
         // 全面进化 T1.2 — ANE utilization measurement (BAS_ANE_PROBE=1). MLX-free (CoreML heads only) but
         // launched via the same aux path; runs fine on device (MLComputePlan is iOS 17.4+).
         if (env["BAS_ANE_PROBE"] ?? "0") == "1" {
