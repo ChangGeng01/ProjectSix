@@ -748,4 +748,50 @@ final class MLXOrganAdapterTests: XCTestCase {
         }
     }
     #endif
+
+    // MARK: - 13. Pre-load jetsam admission (data-driven, 2026-06-12 dual-device run)
+
+    /// Admission enforcement is OPT-IN — default false ⇒ today's warn-only load path, byte-equal (ADR-014).
+    func testMemoryAdmissionDefaultsOff() async {
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.gemma4_E4B_4bit)
+        XCTAssertFalse(
+            adapter.enforceMemoryAdmission,
+            "pre-load admission must be opt-in (default off = byte-equal)")
+        XCTAssertNil(
+            adapter.activeHardCapBytes,
+            "the cap override defaults nil ⇒ the measured iPhone Air cap is used when enforced")
+    }
+
+    #if canImport(MLXLLM)
+    /// With admission ENFORCED, loadModel REFUSES an over-cap model (E4B at the iPhone Air cap) BEFORE the
+    /// network/materialize load — the data-grounded fix for the 2 mid-load jetsam deaths (no runtime watchdog
+    /// can catch a load-time SIGKILL). The refusal is a catchable providerUnavailable, not an uncatchable kill.
+    func testLoadModelRefusesOverCapModelWhenAdmissionEnforced() async {
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E4B_4bit,
+            enforceMemoryAdmission: true,
+            activeHardCapBytes: 3376 * 1024 * 1024)
+        do {
+            try await adapter.loadModel()
+            XCTFail("E4B over the iPhone Air cap with admission enforced must be refused pre-load")
+        } catch BASOrganError.providerUnavailable(let reason) {
+            XCTAssertTrue(
+                reason.contains("jetsam"),
+                "expected the pre-load admission refusal; got: \(reason)")
+        } catch {
+            XCTFail("expected providerUnavailable but got \(error)")
+        }
+    }
+
+    /// A model the data proved survivable (Llama-3B, peak 2969 MB) is ADMITTED even with enforcement on — the
+    /// guard must not block a load the run certified fits. (It proceeds past admission to the real load path.)
+    func testAdmissionDoesNotRefuseMeasuredSurvivorPreLoadGate() {
+        // Pure-guard assertion (no network): the admission predicate the adapter consults admits the survivor.
+        XCTAssertFalse(
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(
+                targetProviderID: MLXModelCatalog.llama3_2_3B_4bit.providerID,
+                capBytes: 3376 * 1024 * 1024),
+            "Llama-3B (measured 2969 MB peak, survived 10h) must pass admission under the iPhone Air cap")
+    }
+    #endif
 }

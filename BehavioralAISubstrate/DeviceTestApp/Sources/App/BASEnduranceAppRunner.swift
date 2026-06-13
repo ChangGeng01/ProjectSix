@@ -1372,6 +1372,12 @@ final class BASEnduranceAppController: ObservableObject {
         let brainLoadStartNs = monoNowNs()
         do {
             try await adapter.loadModel()
+            // Data-driven warm-up (2026-06-12 dual-device run): JIT the greedy speculative decode lane (the
+            // certified +1.459x path; stream/draft byte-identical 10/10) BEFORE the first scored turn so the
+            // cold-start cost doesn't tax iter 1 (MINER-2: the only tok/s dips were cold-start iters 1-8).
+            // Best-effort (try?) + byte-safe: prewarmGreedySpeculative falls back to prewarm() when
+            // speculation won't engage (e.g. Gemma fit-budget miss), and warming changes no scored-turn bytes.
+            try? await adapter.prewarmGreedySpeculative()
         } catch {
             let msg = "MLX load failed: \(error)"
             await emitBoth("⚠️ ch1025 \(msg)")

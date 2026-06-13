@@ -125,6 +125,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// on-device A/B (long-session memory ceiling + quality)。
     public nonisolated let maxKVSize: Int?
 
+    /// OPT-IN pre-load jetsam admission (data-driven, 2026-06-12 dual-device run). When true, `loadModel`
+    /// REFUSES a single-model load whose estimated PEAK footprint would cross the device's ActiveHard cap
+    /// (`BASMLXMemoryBudget.wouldExceedActiveHardCap`) — the only thing that prevents the instant mid-load
+    /// jetsam SIGKILL E4B suffered twice on the iPhone Air (no runtime watchdog can catch a load-time kill).
+    /// Default `false` ⇒ today's warn-only behavior, byte-equal (ADR-014); a host opts in.
+    public nonisolated let enforceMemoryAdmission: Bool
+
+    /// The device's per-process jetsam (ActiveHard) cap for the admission check; nil ⇒ the measured iPhone Air
+    /// default. A larger-RAM / entitled host passes its own. Only consulted when `enforceMemoryAdmission`.
+    public nonisolated let activeHardCapBytes: Int?
+
     /// ADR-041 §C — OPT-IN cap (bytes) for MLX's **load-time** memory peak, applied via `MLXRuntimeConfig`
     /// BEFORE the container load. Unlike `cacheLimitBytes` (a post-load recycling ceiling), `MLX.Memory.memoryLimit`
     /// makes `malloc` WAIT once exceeded — so it bounds the download/materialize SPIKE the cache cap cannot.
@@ -402,13 +413,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         numDraftTokens: Int = 2,
         speculativeFitBudgetBytes: Int? = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes,
         kvCacheBits: Int? = nil,
-        maxKVSize: Int? = nil
+        maxKVSize: Int? = nil,
+        enforceMemoryAdmission: Bool = false,
+        activeHardCapBytes: Int? = nil
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
         self.memoryLimitBytes = memoryLimitBytes
         self.kvCacheBits = kvCacheBits
         self.maxKVSize = maxKVSize
+        self.enforceMemoryAdmission = enforceMemoryAdmission
+        self.activeHardCapBytes = activeHardCapBytes
         // GREEDY SPECULATION DEFAULT-ON (operator-elected, 2026-06-11): when speculation is enabled and the caller
         // didn't pass an explicit draft, auto-resolve the curated same-family draft from `speculativePairings`.
         // A target with no pairing (e.g. a small model used directly, or Gemma 3 4B) resolves to nil → no draft →
@@ -468,6 +483,22 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 "unavailable on the iOS Simulator")
         #endif
         if modelContainer != nil { return }
+
+        // OPT-IN pre-load jetsam admission (default off ⇒ byte-equal, ADR-014). A single-model load whose
+        // estimated peak footprint crosses the device's ActiveHard cap is SIGKILL'd before the first token
+        // (E4B died this way twice on the iPhone Air, deviceB) — refuse it cleanly here so the host gets a
+        // CATCHABLE error instead of an uncatchable jetsam. The data-grounded fix the 2026-06-12 run mandated.
+        if enforceMemoryAdmission {
+            let cap = activeHardCapBytes
+                ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
+            if BASMLXMemoryBudget.wouldExceedActiveHardCap(
+                targetProviderID: model.providerID, capBytes: cap) {
+                throw BASOrganError.providerUnavailable(
+                    reason: "model \(model.providerID) projected peak footprint exceeds the device jetsam "
+                        + "cap (\(cap / (1024 * 1024)) MB) — would SIGKILL at load; pick a smaller model "
+                        + "(see MLXModelCatalog.recommendedDefault(forActiveHardCapBytes:))")
+            }
+        }
 
         // Tranche C — local-directory model lane: an Entry with `localDirectoryName` loads from the
         // app's Documents/<dir>/ (operator-staged, e.g. the locally-quantized 3-bit variant) instead
@@ -764,6 +795,40 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // throws on the non-MLX path; prewarm previously had an empty
         // #else and silently "succeeded" off Apple Silicon. Match the
         // sibling contract.
+        throw BASOrganError.providerUnavailable(
+            reason: Self.frameworkUnavailableReason)
+        #endif
+    }
+
+    /// Throughput-first prewarm for the greedy speculative lane.
+    ///
+    /// `prewarm()` intentionally mirrors the role's normal preset.
+    /// For the max-throughput path, however, the useful hot path is
+    /// `temperature == 0` speculative decode. This method exercises
+    /// that lane when the draft is actually resident; if any gate has
+    /// fallen back to single-model mode, it delegates to `prewarm()`
+    /// so hosts still get the ordinary target-kernel warmup.
+    public func prewarmGreedySpeculative() async throws {
+        #if canImport(MLXLLM)
+        guard modelContainer != nil else {
+            throw BASOrganError.providerUnavailable(
+                reason: Self.notLoadedReason(
+                    "loadModel(...) before prewarmGreedySpeculative()"))
+        }
+        let role: BASOrganRole = descriptor.supportedRoles
+            .contains(.core) ? .core : .scout
+        let dummyRequest = BASOrganRequest(
+            requestID: "prewarm-greedy-speculative",
+            role: role,
+            preset: .greedyDeterministic,
+            instruction: "Hi.",
+            maxOutputTokens: Self.prewarmDecodeTokens)
+        guard shouldSpeculate(for: dummyRequest) else {
+            try await prewarm()
+            return
+        }
+        _ = try await _draftSpeculative(dummyRequest)
+        #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason)
         #endif
