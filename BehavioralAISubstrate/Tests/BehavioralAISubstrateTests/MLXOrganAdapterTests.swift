@@ -77,6 +77,44 @@ final class MLXOrganAdapterTests: XCTestCase {
         }
     }
 
+    // MARK: - Prompt-lookup production routing gate (Track A, host-elected, byte-safe)
+
+    private func makeRequest(preset: BASOrganPreset) -> BASOrganRequest {
+        BASOrganRequest(
+            requestID: "pl-route", role: .core, preset: preset,
+            instruction: "quote the passage", context: [])
+    }
+
+    func testPromptLookupGateRequiresElection() {
+        // Default-off (ADR-014): an un-elected turn never routes to prompt-lookup even when greedy.
+        XCTAssertFalse(MLXOrganAdapter.shouldUsePromptLookup(
+            elect: false, request: makeRequest(preset: .greedyDeterministic)),
+            "no election → fall back to the normal path, byte-equal")
+    }
+
+    func testPromptLookupGateRequiresGreedyPreset() {
+        // Byte-safety: prompt-lookup byte-identity is a GREEDY property; a non-greedy elected turn must NOT route.
+        XCTAssertTrue(MLXOrganAdapter.shouldUsePromptLookup(
+            elect: true, request: makeRequest(preset: .greedyDeterministic)),
+            "elected + greedy (temp 0) is the only routed case")
+        XCTAssertFalse(MLXOrganAdapter.shouldUsePromptLookup(
+            elect: true, request: makeRequest(preset: .core)),
+            "elected but temp 0.7 → must NOT route (argmax-accept would change bytes)")
+        XCTAssertFalse(MLXOrganAdapter.shouldUsePromptLookup(
+            elect: true, request: makeRequest(preset: .scout)),
+            "elected but temp 0.1 → must NOT route (not byte-valid)")
+    }
+
+    func testPromptLookupGateMatchesGreedyTemperatureInvariant() {
+        // The gate keys ONLY on (elect, temperature==0) — same framework-free invariant as the spec-decode gate.
+        for preset in [BASOrganPreset.greedyDeterministic, .scout, .core] {
+            let routed = MLXOrganAdapter.shouldUsePromptLookup(
+                elect: true, request: makeRequest(preset: preset))
+            XCTAssertEqual(routed, preset.temperature == 0,
+                "\(preset.name): routing must equal (elected && temperature==0)")
+        }
+    }
+
     func testDraftRejectsUnsupportedRole() async {
         let adapter = MLXOrganAdapter(
             model: MLXModelCatalog.gemma3_4B_it_4bit,
