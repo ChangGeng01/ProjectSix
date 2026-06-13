@@ -65,5 +65,31 @@ layer count, the stateful KV path, and the end-to-end hybrid speedup + byte-iden
 
 ---
 
-## Track A — prompt-lookup (n-gram) — IN PROGRESS
-Drafter landed (`BASPromptLookupDrafter`, host-tested); decoder + probe next.
+## Track A — universal prompt-lookup SSD (2026-06-14, iPhone Air, Llama-3.2-3B, ngram 1..3, K=4)
+
+Model-free (`speculativeDecoding=.off`, no draft model) BAS-owned greedy verify loop (`BASPromptLookupDecoder`)
+vs a null-drafter baseline (= pure single-model greedy), compared by direct TOKEN sequence (`BASPromptLookupProbe`).
+
+| workload | tokens | hit_rate | mean_acc | spec_ms | base_ms | speedup | byte_identical |
+|---|---|---|---|---|---|---|---|
+| **rag-quote** (verbatim quote) | 47 | 0.82 | 3.27 | 993 | 1842 | **1.86×** | YES |
+| **code-repeat** | 54 | 0.54 | 1.25 | 1580 | 2159 | **1.37×** | YES |
+| **json-structured** | 200 | 0.41 | 0.98 | 5417 | 7251 | **1.34×** | YES |
+| verify-claim | 200 | 0.26 | 0.52 | 9095 | 8978 | 0.99× | YES |
+| control-freeform | 153 | 0.02 | 0.03 | 9425 | 8556 | **0.91×** | YES |
+
+**FINAL: repetitive_mean_speedup = 1.39× · byte_identical = 5/5 · all_identical = YES.**
+
+**Verdict — universal prompt-lookup SSD WORKS, byte-identical, helps the repetitive lanes:**
+- **Byte-identity proven 5/5 on real device** — the BAS-owned loop is token-identical to single-model greedy
+  (the ADR-039-safe property). The loop is correct.
+- **Strong wins where output reuses input**: RAG-quote **1.86×** (the grounded/retrieval lane — accepts 3.27
+  tokens/round), code/JSON 1.34–1.37×. These are exactly BAS's structured/extraction/RAG workloads.
+- **Honest cost on non-repetitive output**: control free-form is **0.91× (−9%)** and verify-claim ~neutral
+  (0.99×) — when nothing is accepted, the K+1-position verify forward costs slightly more than a single-token
+  step. So prompt-lookup must be **GATED to repetitive lanes** (RAG/quote/structured/code), or use adaptive K
+  (shrink K when hit-rate drops) to remove the free-form penalty. Promotion = gate-to-repetitive + the adaptive-K
+  refinement; never an unconditional default (亏的不要 on free-form).
+
+Next (refinement, not blocking): adaptive K (drop K when recent hit-rate is low → eliminates the −9% control
+cost while keeping the repetitive wins); purpose-gated adoption (only the deterministic/factual/RAG lanes).
