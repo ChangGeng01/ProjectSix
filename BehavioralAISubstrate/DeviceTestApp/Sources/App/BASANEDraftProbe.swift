@@ -110,6 +110,21 @@ enum BASANEDraftProbe {
             fileLog.emit("📊 ane-draft llamaDraft1B SKIPPED — LlamaDraft1B_fp16.mlpackage not staged")
         }
 
+        // B2 — quantized real drafts. fp16 was ANE size-rejected (ane_capable=0). int4 (0.66 GB) + int8 (1.2 GB)
+        // both restore ANE capability; int8 ALSO preserves fidelity (24/24 vs HF greedy, int4 is 2/24). DECISIVE:
+        // how much of each A19-ANE-PLACES (prefers ANE)? int8 is the working draft (faithful + small enough).
+        for name in ["LlamaDraft1B_int4", "LlamaDraft1B_int8"] {
+            let url = docs.appendingPathComponent("\(name).mlpackage")
+            if FileManager.default.fileExists(atPath: url.path) {
+                if #available(iOS 17.4, *) {
+                    await plan(url, units: .all, label: "\(name)/all", fileLog: fileLog)
+                    await plan(url, units: .cpuAndNeuralEngine, label: "\(name)/cpuAndANE", fileLog: fileLog)
+                }
+            } else {
+                fileLog.emit("📊 ane-draft \(name) SKIPPED — \(name).mlpackage not staged")
+            }
+        }
+
         // B1' — fixed-window STATEFUL (elementwise one-hot write + additive mask). Mac: 100% GPU. A19 placement.
         let stateful = docs.appendingPathComponent("FixedWindowStateful_fp16.mlpackage")
         if FileManager.default.fileExists(atPath: stateful.path) {

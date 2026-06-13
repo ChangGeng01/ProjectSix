@@ -292,32 +292,40 @@ decode") is vindicated a SECOND time, on the decisive device.
 logged 10.51 / 10.98 ms from a different run. Both agree within run-to-run variance; neither is authoritative over
 the other — treat ±0.5 ms as noise.
 
-### B2 real-draft (Llama-3.2-1B) — conversion PASS, but the fp16 model hits a SIZE wall on the ANE (2026-06-14)
+### B2 real-draft (Llama-3.2-1B) — int8 is the working ANE draft: 65% A19-ANE, fidelity 24/24 (2026-06-14)
 
 The B2-GO synthetic results said stateful KV decode A19-ANE-places. The next gate was a REAL same-family draft.
 `Tools/llama_draft_to_coreml.py` loads real Llama-3.2-1B-Instruct weights (un-gated mirror, pinned revision; same
 Llama-3.2 tokenizer as the 3B target → draft token ids are valid target ids) into a stateful Core ML module
 (host-fed exact llama3 RoPE, GQA 8→32, tied embeddings, the fixed-window static-slice KV write).
 
-- **Conversion + fidelity PASS:** the torch module is **token-identical to HF greedy 24/24** (fp32 gate). The
-  converter now ALSO re-validates the shipped **fp16** Core ML model through the same greedy loop (audit fix — the
-  fp32 gate alone doesn't certify the fp16 artifact). fp16 re-check result: _to be recorded on the next run._
-- **fp16 (2.3 GB) is SIZE-REJECTED by the ANE — on BOTH devices:**
+**Conversion + fidelity:** the torch module is **token-identical to HF greedy 24/24** (fp32 gate); the converter
+re-validates the shipped Core ML model through the same loop via `Tools/check_draft_fidelity.py` (audit fix — the
+fp32 gate alone doesn't certify the quantized artifact). The full measured matrix (size × A19 placement × fidelity):
 
-  | model | size | Mac placement | A19 placement |
-  |---|---|---|---|
-  | LlamaDraft1B **fp16** | 2.3 GB | ops=1205 gpu=1205 **ane_capable=0** | ops=1205 gpu=1203 cpu=2 **ane_capable=0** |
-  | LlamaDraft1B **int4** | 0.66 GB | ops=1208 gpu=1208 **ane_capable=1087** | _pending_ |
+| draft | size | Mac `ane_capable` | **A19 placement** | fidelity vs HF greedy |
+|---|---|---|---|---|
+| LlamaDraft1B **fp16** | 2.3 GB | 0 / 1205 | ops=1205 **ane=0** gpu=1203 (size-rejected) | **24/24** |
+| LlamaDraft1B **int4** | 0.66 GB | 1087 / 1208 | ops=1208 **ane=784** gpu=422 (**65% ANE**) | 2/24 (lossy) |
+| LlamaDraft1B **int8** | 1.2 GB | 1087 / 1208 | ops=1208 **ane=784** gpu=422 (**65% ANE**) | **24/24** ✓ |
 
-  Unlike the synthetic stateful model (`ane_capable=197`, only GPU-*preferred* on Mac), the **fp16 real draft is
-  ane-*incapable* for EVERY op on both Mac and A19** — a per-op diagnostic (`Tools/placement_diag_probe.swift`)
-  showed even trivially-ANE ops (mul/add/matmul) at `ane_capable=0`, i.e. a **model-level** rejection. int4
-  weight-quantization (`Tools/quantize_draft_coreml.py`, 3.5× smaller) **restores Mac `ane_capable` from 0 → 1087
-  of 1208** — decisively confirming the lever is **weight SIZE**: the 2.3 GB fp16 weights exceed the ANE limit;
-  ~0.66 GB int4 is back under it.
+**The size↔fidelity tension, resolved: int8 is the working B2 draft.**
+- **Size is the ANE gate.** The fp16 2.3 GB model is `ane_capable=0` for EVERY op on BOTH Mac and A19 (a
+  per-op diagnostic `Tools/placement_diag_probe.swift` showed even mul/add/matmul incapable) — a **model-level
+  size rejection**, NOT the cost heuristic. Quantizing under the limit restores capability (int4 AND int8 both →
+  `ane_capable=1087`).
+- **On the A19 the quantized draft places 65% on the ANE** (784/1208 ops), vs 0% for fp16. It is a **partition**,
+  not a full takeover — ~422 ops (embedding gather over 128k, dequant, GQA repeat, the big lm_head) stay on GPU.
+  So a hybrid runs the *majority* of the draft on the otherwise-idle ANE in parallel with the GPU verify — a real
+  but **partial** "压榨 CoreAI".
+- **int4 is too lossy; int8 keeps fidelity.** int4 greedy-diverges from its own fp32 (2/24 — coherent text, but an
+  early argmax flips and cascades), which would tank acceptance. int8 is **token-identical (24/24)** AND the same
+  size-class-fits-ANE, so **int8 is the draft to carry forward**.
 
-- **So the working B2 draft must be QUANTIZED.** The int4 draft A19 placement (does it now ANE-*place*, given the
-  Mac shows it ANE-*capable* and the A19 prefers ANE for these ops?) is the next decisive measurement, then the
-  end-to-end hybrid (int4 ANE draft ∥ MLX/GPU 3B verify, byte-identity + speedup). Open: int4 draft fidelity/
-  acceptance (quantization lowers acceptance, not correctness — the target verify still guarantees output), and
-  whether the 3B target + 0.66 GB draft co-resident fit the A19 memory budget without jetsam.
+**Net — B2 is GREEN and the draft is identified (int8), but the WIN is not yet measured.** Established this arc:
+the ANE *can* run a real LLM decode draft on the A19 (65% placement, fidelity-preserving int8) — the rigorous,
+device-grounded answer to "压榨 CoreAI". **Remaining (the large next build, 亏的不要 binds the ship):** the
+end-to-end hybrid — int8 ANE draft ∥ MLX/GPU 3B-target verify, measuring (1) draft ACCEPTANCE vs the 3B target
+(the real speedup determinant — the int8 1B draft must agree with the 3B argmax often enough), (2) co-residency
+memory (3B ≈ 6 GB + int8 draft 1.2 GB on the A19 — jetsam risk), (3) the actual end-to-end speedup + token
+byte-identity, and (4) the cost of the 65/35 ANE/GPU partition (cross-device transfers per draft step).
