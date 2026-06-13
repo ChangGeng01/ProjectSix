@@ -54,6 +54,65 @@ public struct BASPromptLookupDrafter: Sendable, Equatable {
         return []
     }
 
+    /// TREE variant (B2-aggressive): propose a TREE of continuations — branch where the matched suffix recurred
+    /// with DIFFERENT next tokens. v1 forks only at depth 1 (the highest-value divergence point), each branch
+    /// then extends linearly. Branch 0 is the most-recent occurrence's continuation, so `maxBranch == 1` flattens
+    /// to EXACTLY `propose()` (the linear Track-A path — a pinned regression invariant). Nodes are emitted in
+    /// DEPTH-MAJOR (BFS) order (required by the tree-RoPE geometry). Returns an empty tree when nothing recurs.
+    public func proposeTree(over tokens: [Int], maxBranch: Int = 2, maxNodes: Int = 8) -> BASDraftTree {
+        let count = tokens.count
+        guard count >= 2 else { return BASDraftTree(nodes: []) }
+        let mb = Swift.max(1, maxBranch)
+        var n = Swift.min(ngramMax, count - 1)
+        while n >= ngramMin {
+            let needleStart = count - n
+            // Prior occurrence start-positions, MOST-RECENT first (so branch 0 == propose()).
+            var occ: [Int] = []
+            var i = count - n - 1
+            while i >= 0 {
+                if matches(tokens, at: i, needleStart: needleStart, length: n) { occ.append(i) }
+                i -= 1
+            }
+            if !occ.isEmpty {
+                // Distinct next-tokens, most-recent first, up to `mb` branches → each branch is that occurrence's
+                // continuation (capped at numDraftTokens).
+                var branches: [[Int]] = []
+                var seenNext = Set<Int>()
+                for pos in occ {
+                    let start = pos + n
+                    guard start < count else { continue }
+                    let nextTok = tokens[start]
+                    if seenNext.contains(nextTok) { continue }
+                    seenNext.insert(nextTok)
+                    let end = Swift.min(start + numDraftTokens, count)
+                    branches.append(Array(tokens[start..<end]))
+                    if branches.count >= mb { break }
+                }
+                if !branches.isEmpty { return Self.buildTree(branches: branches, maxNodes: maxNodes) }
+            }
+            n -= 1
+        }
+        return BASDraftTree(nodes: [])
+    }
+
+    /// Interleave branch continuations into a DEPTH-MAJOR (BFS) node list bounded by `maxNodes`: depth 0 = each
+    /// branch's first token (parent = root 0), depth d = each branch's d-th token (parent = that branch's prior
+    /// node). BFS truncation keeps the tree balanced when the node budget runs out.
+    static func buildTree(branches: [[Int]], maxNodes: Int) -> BASDraftTree {
+        var nodes: [BASDraftTree.Node] = []
+        var lastFlat = [Int](repeating: 0, count: branches.count)   // parent for the branch's next depth (0=root)
+        let maxDepth = branches.map(\.count).max() ?? 0
+        outer: for d in 0..<maxDepth {
+            for b in 0..<branches.count where d < branches[b].count {
+                if nodes.count >= maxNodes { break outer }
+                let flat = nodes.count + 1                            // this node's flat index in [seed]+nodes
+                nodes.append(.init(token: branches[b][d], parent: d == 0 ? 0 : lastFlat[b]))
+                lastFlat[b] = flat
+            }
+        }
+        return BASDraftTree(nodes: nodes)
+    }
+
     /// Element-wise compare `tokens[i ..< i+length]` to the needle `tokens[needleStart ..< needleStart+length]`
     /// with early exit (avoids allocating sub-arrays in the hot scan).
     private func matches(_ tokens: [Int], at i: Int, needleStart: Int, length: Int) -> Bool {
