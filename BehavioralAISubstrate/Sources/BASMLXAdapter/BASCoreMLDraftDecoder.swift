@@ -45,21 +45,29 @@ public struct BASCoreMLDraftDecoder {
         var out = [Int]()
         var rounds = 0, proposed = 0, accepted = 0
 
-        // ---- Prefill the TARGET: prime the cache + take the first token (argmax of the final-position logits). ----
+        // ---- Prefill the TARGET and take the FIRST generated token in BOTH prepare cases. `.logits` already
+        // computed it; `.tokens` deferred the prompt tail — feed it in one forward to get the first token (the
+        // draft needs `out=[t0]` to sync its KV, so we cannot defer the first token into the loop). ----
         var y: LMInput.Text
         var state: LMOutput.State?
         switch try model.prepare(input, cache: cache, windowSize: parameters.prefillStepSize) {
         case .tokens(let toks):
-            y = toks
-        case .logits(let result):
-            let logits = result.logits[0..., -1, 0...]
-            let token = sampler.sample(logits: logits)
+            let r = model(LMInput.Text(tokens: toks.tokens)[text: .newAxis], cache: cache, state: state)
+            state = r.state
+            let token = sampler.sample(logits: r.logits[0..., -1, 0...])
             eval(token)
-            y = .init(tokens: token)
-            state = result.state
             let t = token.item(Int.self)
             if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
             out.append(t)
+            y = .init(tokens: token)
+        case .logits(let result):
+            state = result.state
+            let token = sampler.sample(logits: result.logits[0..., -1, 0...])
+            eval(token)
+            let t = token.item(Int.self)
+            if eosTokenIds.contains(t) { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
+            out.append(t)
+            y = .init(tokens: token)
         }
         guard let first = out.first else { return Result(tokens: out, rounds: 0, proposed: 0, accepted: 0) }
 

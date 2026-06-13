@@ -72,12 +72,16 @@ enum BASANESpecHybridProbe {
         let k = Int(env["BAS_SPEC_K"] ?? "") ?? 4
         let cap = Int(env["BAS_SPEC_MAX_DECODE"] ?? "") ?? 128
         let unitsStr = env["BAS_SPEC_DRAFT_UNITS"] ?? "all"
+        // Target: 1b (certifies the mechanism; draft not cheaper → no speedup) vs 3b (the WIN case — the 1B int8
+        // draft replaces expensive 3B forwards). int8 draft mmaps to ~30MB resident, so 3B+draft fits the cap.
+        let targetStr = env["BAS_SPEC_TARGET"] ?? "1b"
+        let target = targetStr == "3b" ? MLXModelCatalog.llama3_2_3B_4bit : MLXModelCatalog.llama3_2_1B_4bit
 
         guard #available(iOS 18.0, *) else {
             fileLog.emit("📊 ane-spec SKIPPED — needs iOS 18 (MLState)"); return
         }
         let units: MLComputeUnits = unitsStr == "ane" ? .cpuAndNeuralEngine : (unitsStr == "gpu" ? .cpuAndGPU : .all)
-        fileLog.emit("📊 ane-spec START target=llama3_2_1B_4bit draft=int8 K=\(k) cap=\(cap) units=\(unitsStr) "
+        fileLog.emit("📊 ane-spec START target=\(target.providerID) draft=int8 K=\(k) cap=\(cap) units=\(unitsStr) "
             + String(format: "footprint0=%.0fMB", footprintMB()))
 
         guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -92,7 +96,7 @@ enum BASANESpecHybridProbe {
 
         do {
             let adapter = MLXOrganAdapter(
-                model: MLXModelCatalog.llama3_2_1B_4bit, maxOutputTokens: cap, speculativeDecoding: .off)
+                model: target, maxOutputTokens: cap, speculativeDecoding: .off)
             try await adapter.loadModel()
             fileLog.emit(String(format: "📊 ane-spec target loaded footprint=%.0fMB", footprintMB()))
 
