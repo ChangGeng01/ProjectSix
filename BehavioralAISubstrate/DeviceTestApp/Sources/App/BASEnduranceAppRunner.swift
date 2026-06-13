@@ -319,6 +319,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASANEDraftProbe.run() }
             return
         }
+        // SSD Track B2 — the end-to-end ANE-draft ∥ MLX-verify hybrid: Core ML int8 1B draft proposes, MLX target
+        // verifies; acceptance + speedup + token-identity (BAS_ANE_SPEC_PROBE=1). The last big piece.
+        if (env["BAS_ANE_SPEC_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASANESpecHybridProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
