@@ -152,3 +152,72 @@ models use) MIGHT keep the matmuls on ANE; that is a deeper research problem, no
 ML lowering), not device-specific. **Net: B0 says the ANE runs stateless transformer MATMULS great; B1 says
 real stateful DECODE goes to the GPU. The universal win that actually shipped this arc is Track A
 (prompt-lookup, model-free, byte-identical, 1.39× on repetitive lanes).**
+
+## Track B1' — ANE-FRIENDLY fixed-window stateful (2026-06-14, Mac) — the B1 open question, answered: STILL GPU
+
+`Tools/draft_llm_fixedwindow_stateful_to_coreml.py` is exactly the salvage B1 pointed to: remove BOTH dynamic
+ops B1 blamed — the position-indexed scatter write becomes an **elementwise one-hot select**
+(`kc_new = kc·(1−oh) + k·oh`), the runtime causal mask becomes a **host-supplied additive bias** (no
+`arange<=pos` compare) — the fixed-window pattern Apple's own on-device Core ML LLMs use. Per-layer state in
+separate buffers (zero layer-dim indexing); state write-back via a STATIC full-slice assign (`buf[:] = …`).
+Conversion SUCCEEDS. `Tools/fixedwindow_ane_probe.swift` (autoregressive, host-fed onehot+bias):
+
+| | placement | per-step latency (autoregressive, live KV state) |
+|---|---|---|
+| fixed-window fp16, `.all` | **ops=197, gpu=197** (100% GPU, **0 ANE**) | — |
+| fixed-window fp16, ANE (`.cpuAndNeuralEngine`) | — | 5.26 ms |
+| fixed-window fp16, GPU (`.cpuAndGPU`) | — | **2.66 ms** (GPU faster) |
+
+**Verdict — B1's "dynamic indexing was the cause" hypothesis is FALSIFIED; the GPU fallback is deeper.**
+Removing the dynamic-index scatter + the runtime mask (the two ops B1 blamed) was **necessary but NOT
+sufficient** — the fixed-window stateful graph STILL plans 100% onto the GPU, and forcing the ANE is still ~2×
+slower. The structural barrier is the iOS18 **stateful (`MLState`) read-modify-write mechanism itself** being
+GPU-bound under Core ML's current lowering, not any particular dynamic op. **So the ANE-friendly *stateful*
+formulation is also DECLINED (亏的不要 — second negative, stronger than B1: even the Apple-style approach fails).**
+The ONE door this leaves open is **stateless** decode (no `MLState`) — B1'' below.
+
+## Track B1'' — STATELESS windowed-recompute (2026-06-14, Mac) — the last door, also GPU. Pattern resolved.
+
+`Tools/draft_llm_stateless_window_to_coreml.py` removes state ENTIRELY: each step feeds the last W=64 token
+hidden states as a fixed-shape `[1, W, H]` input + a STATIC baked causal mask, recomputing attention over the
+window (O(W) per token, no `MLState`). B0 proved a stateless fp16 block lands 100% ANE, so this had a strong
+prior. `Tools/stateless_window_ane_probe.swift`:
+
+| | placement | per-draft-token latency (recompute over W=64) |
+|---|---|---|
+| stateless-window fp16, `.all` | **ops=145, gpu=145** (100% GPU, **0 ANE**) | — |
+| stateless-window fp16, ANE (`.cpuAndNeuralEngine`) | — | 25.32 ms (= GPU → ANE units fell back to GPU) |
+| stateless-window fp16, GPU (`.cpuAndGPU`) | — | 25.27 ms |
+
+**Verdict — also GPU. The pattern is now RESOLVED, and it was never about state.** B0 (stateless) → ANE; this
+(also stateless) → GPU. The ONLY structural difference is **seq=1 vs seq=W**: B0 is a single-token forward with
+NO attention-over-history (1×1 attention); this attends over W positions (W×W scores + softmax over the W axis).
+
+### B-track FINAL verdict (B0 + B1 + B1' + B1'' — four experiments, "严查"-grade)
+
+| formulation | state? | attention-over-history? | placement |
+|---|---|---|---|
+| **B0** stateless single-token | no | **no** (seq=1) | **100% ANE** ✓ |
+| B1 stateful KV (dynamic index) | yes | yes | 100% GPU |
+| B1' stateful KV (fixed-window elementwise) | yes | yes | 100% GPU |
+| B1'' stateless windowed recompute | no | yes (seq=W) | 100% GPU |
+
+**The lever is ATTENTION-OVER-HISTORY, not state.** Core ML's planner keeps single-token feed-forward matmuls
+on the ANE (B0) but routes attention-over-multiple-positions to the GPU — whether the history lives in `MLState`
+(B1/B1') or is recomputed statelessly (B1''). Autoregressive decode FUNDAMENTALLY needs attention-over-history
+(a query token attending over the KV prefix). **Therefore a Core ML draft decoder runs on the GPU, contending
+with the MLX/GPU verify — no idle-ANE parallelism, no "压榨 idle ANE" win. The ANE-draft ∥ GPU-verify hybrid (B2)
+is DECLINED on thorough evidence (4 experiments).** This is the rigorous, measured answer to the operator's
+"CoreAI 怎么可能不能参与 decode 严查": CoreAI/ANE *can* run transformer decode matmuls (B0, byte-real) — but NOT the
+attention-over-history that real autoregressive decode requires, so it cannot be the speculative-draft engine.
+
+**What "压榨 CoreAI" honestly means here:** the ANE's real strength is **stateless, batchable, attention-light
+matmuls at fp16** (B0) — embedding / classification / rerank heads, not autoregressive decode. The universal
+decode SPEEDUP that actually shipped is **Track A (prompt-lookup)**: model-free, byte-identical, 1.58×
+repetitive, now production-wired (`respondPromptLookup`) + lane-gated. Track A doesn't touch the ANE, but it is
+the real, on-device-proven win.
+
+**Honest open (low probability of flipping):** Mac planner. B0 already showed A19 placement MATCHED the Mac
+(both 100% ANE, stateless seq=1), so the attention-over-history→GPU routing — a Core ML lowering property — is
+very likely identical on A19; an A19 re-run of B1/B1''  would confirm (not overturn) the wall. Untested:
+int4-weight ANE attention, and whether a future Core ML release lowers attention-over-history to the ANE.
