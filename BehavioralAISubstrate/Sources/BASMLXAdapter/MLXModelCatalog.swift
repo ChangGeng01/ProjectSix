@@ -165,6 +165,30 @@ public struct MLXModelCatalog: Sendable, Equatable {
         gemma3_4B_it_4bit
     ]
 
+    /// Data-grounded constrained-device default selector (2026-06-12 dual-device run). The catalog's nominal
+    /// default is `gemma4_E4B_4bit`, but on a ≤~12 GB iPhone-class device E4B JETSAMS at weight-load (2 deaths
+    /// on deviceB — responses=0, never reached the first token) while E2B survives (peak 3114 MB / 261 MB
+    /// headroom under the ~3376 MB cap). A host that knows its device's per-process jetsam cap can ask for the
+    /// richest default that ADMITS under it instead of blindly loading E4B and dying mid-load.
+    ///
+    /// Purely additive: does NOT change `defaultEntries` or the hardcoded `MLXOrganAdapter` default
+    /// (byte-equal-off, ADR-014) — a host OPTS IN to device-aware selection.
+    ///
+    /// - Parameter capBytes: the device's per-process jetsam (ActiveHard) cap. Defaults to the measured iPhone
+    ///   Air value; a larger-RAM host passes its own (where E4B admits and is returned).
+    /// - Returns: `gemma4_E4B_4bit` where it fits under the cap, else `gemma4_E2B_4bit` (the measured survivor).
+    public static func recommendedDefault(
+        forActiveHardCapBytes capBytes: Int =
+            BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
+    ) -> Entry {
+        if !BASMLXMemoryBudget.wouldExceedActiveHardCap(
+            targetProviderID: gemma4_E4B_4bit.providerID,
+            capBytes: capBytes) {
+            return gemma4_E4B_4bit
+        }
+        return gemma4_E2B_4bit
+    }
+
     /// **Stable-architecture fallbacks** exposed to the product/SDK face (ADR-038): standard-arch LLMs that
     /// avoid the Gemma-3n variable-shape cache-pool wedge class. **Honest scope (R1 / 亏的不要上):** these are
     /// *available, host opt-in* options — NOT yet on-device certified to the same bar as `defaultEntries`

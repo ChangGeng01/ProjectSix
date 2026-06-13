@@ -87,4 +87,63 @@ final class BASMLXMemoryBudgetTests: XCTestCase {
         XCTAssertEqual(unknown, 2 * 1024 * 1024 * 1024,
             "an unmapped entry falls back to a conservative 2 GB so the union never under-counts")
     }
+
+    // MARK: - Pre-load admission (jetsam-cap guard, 2026-06-12 dual-device data)
+
+    private var mib: Int { 1024 * 1024 }
+
+    func testEstimatedPeakFootprintMeasuredAndDerived() {
+        // The MEASURED survivors + the DERIVED E4B estimate from the 10h run.
+        XCTAssertEqual(
+            BASMLXMemoryBudget.estimatedPeakFootprintBytes(forProviderID: "mlx.gemma4.e2b.it.4bit"),
+            3_114 * mib, "E2B measured deviceB peak (survived)")
+        XCTAssertEqual(
+            BASMLXMemoryBudget.estimatedPeakFootprintBytes(forProviderID: "mlx.llama3_2.3b.it.4bit"),
+            2_969 * mib, "Llama-3B measured deviceA peak (survived)")
+        XCTAssertEqual(
+            BASMLXMemoryBudget.estimatedPeakFootprintBytes(forProviderID: "mlx.gemma4.e4b.it.4bit"),
+            4_314 * mib, "E4B derived peak (weights + measured Gemma-3n overhead)")
+        XCTAssertNil(
+            BASMLXMemoryBudget.estimatedPeakFootprintBytes(forProviderID: "mlx.unknown.model"),
+            "no basis => nil => admission ADMITS (never refuse what the data can't justify)")
+    }
+
+    func testWouldExceedActiveHardCapRefusesE4BAdmitsSurvivors() {
+        // Under the measured iPhone Air cap (~3376 MB): E4B refused, the measured survivors admitted.
+        XCTAssertTrue(
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e4b.it.4bit"),
+            "E4B (4314+128 MB) crosses the ~3376 MB cap -> refuse (it jetsam'd twice at load)")
+        XCTAssertFalse(
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.gemma4.e2b.it.4bit"),
+            "E2B (3114+128 MB) fits under the cap -> admit (survived with 261 MB headroom)")
+        XCTAssertFalse(
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.llama3_2.3b.it.4bit"),
+            "Llama-3B (2969+128 MB) fits -> admit (sustained 38.3 tok/s over 10h)")
+        XCTAssertFalse(
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(targetProviderID: "mlx.unknown.model"),
+            "unmeasured => admit (byte-equal-off)")
+    }
+
+    func testWouldExceedActiveHardCapAdmitsE4BUnderLargeCap() {
+        XCTAssertFalse(
+            BASMLXMemoryBudget.wouldExceedActiveHardCap(
+                targetProviderID: "mlx.gemma4.e4b.it.4bit", capBytes: 8_000 * mib),
+            "under an 8 GB cap E4B (4314 MB) admits")
+    }
+
+    func testRecommendedDefaultIsE2BOnConstrainedIPhoneAirElseE4B() {
+        XCTAssertEqual(
+            MLXModelCatalog.recommendedDefault(),
+            MLXModelCatalog.gemma4_E2B_4bit,
+            "at the measured iPhone Air cap, the recommended default is E2B (E4B jetsams)")
+        XCTAssertEqual(
+            MLXModelCatalog.recommendedDefault(forActiveHardCapBytes: 8_000 * mib),
+            MLXModelCatalog.gemma4_E4B_4bit,
+            "under an 8 GB cap the richer E4B is recommended")
+        // Additive only: the hardcoded default catalog entry is unchanged (byte-equal-off).
+        XCTAssertEqual(
+            MLXModelCatalog.defaultEntries.first,
+            MLXModelCatalog.gemma4_E4B_4bit,
+            "recommendedDefault() must NOT mutate the pinned defaultEntries ordering")
+    }
 }

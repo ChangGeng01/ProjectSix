@@ -95,6 +95,56 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
         return 2 * gib
     }
 
+    // MARK: - Pre-load admission (jetsam-cap guard, data-calibrated 2026-06-12 dual-device run)
+
+    /// Measured iOS per-process memory cap (jetsam ActiveHard) on the iPhone Air (11.5 GB phys, iOS 27): a load
+    /// whose PEAK process footprint crosses this is SIGKILL'd BEFORE the first token — observed twice for Gemma4
+    /// E4B at weight-load (deviceB, responses=0, never reached `post_brain_load`), while E2B (peak 3114 MB)
+    /// survived with ~262 MB headroom. Because the kill is instant + mid-load, no runtime watermark or liveness
+    /// stall detector can catch it — only a PRE-LOAD admission check prevents it. Default ceiling for the opt-in
+    /// `wouldExceedActiveHardCap` guard; a host on a larger-RAM device passes its own measured cap.
+    public static let measurediPhoneAirActiveHardCapBytes = 3376 * mib
+
+    /// Best PEAK-process-footprint estimate for an entry (NOT just resident weights — peak includes KV growth +
+    /// the substrate working set + MLX runtime). Returns nil when there is neither a measurement nor a
+    /// family-derived basis, so the admission check ADMITS by default (never refuse what the data can't justify —
+    /// 亏的不要). Sources (2026-06-12 dual-device run), keyed by a providerID substring:
+    ///   • `gemma4.e2b`  → 3114 MB — MEASURED deviceB peak (survived, 261 MB headroom under the cap).
+    ///   • `llama3_2.3b` → 2969 MB — MEASURED deviceA peak (survived; sustained 38.3 tok/s over ~10h).
+    ///   • `gemma4.e4b`  → 4314 MB — DERIVED: 2700 MB weights + the 1614 MB Gemma-3n (MatFormer) runtime overhead
+    ///     measured on E2B (3114 − 1500); consistent with the 2 observed jetsam deaths at load above the cap.
+    /// Dense Llama carries far less overhead than nested Gemma-3n, which is why a 3B Llama (2969 MB) fits where a
+    /// nominally-smaller Gemma "E4B" does not — the substrate measured this directly.
+    public static func estimatedPeakFootprintBytes(
+        forProviderID providerID: String
+    ) -> Int? {
+        let table: [(needle: String, bytes: Int)] = [
+            ("gemma4.e4b", 4_314 * mib),   // derived (weights + measured Gemma-3n overhead)
+            ("gemma4.e2b", 3_114 * mib),   // measured (survived)
+            ("llama3_2.3b", 2_969 * mib),  // measured (survived)
+        ]
+        for (needle, bytes) in table where providerID.contains(needle) {
+            return bytes
+        }
+        return nil  // unmeasured / no basis → admit (conservative, byte-equal-off)
+    }
+
+    /// Pre-load admission: would loading `targetProviderID` (single-model) drive the PEAK process footprint across
+    /// the jetsam cap and SIGKILL the process before the first token? Pure + data-calibrated. A nil estimate ⇒
+    /// admit (returns false — never refuse a load the data can't justify refusing). `safetyMarginBytes` keeps a
+    /// cushion under the hard cap (default 128 MB — deliberately below E2B's observed 261 MB survival headroom so
+    /// a model the data proved survivable is never falsely refused).
+    public static func wouldExceedActiveHardCap(
+        targetProviderID: String,
+        capBytes: Int = measurediPhoneAirActiveHardCapBytes,
+        safetyMarginBytes: Int = 128 * 1024 * 1024
+    ) -> Bool {
+        guard let peak = estimatedPeakFootprintBytes(forProviderID: targetProviderID) else {
+            return false
+        }
+        return peak + safetyMarginBytes > capBytes
+    }
+
     // MARK: - Resolve
 
     /// Resolve the budget to apply on `loadModel`.
