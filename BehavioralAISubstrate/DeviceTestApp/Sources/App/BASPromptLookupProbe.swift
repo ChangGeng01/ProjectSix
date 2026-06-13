@@ -69,8 +69,12 @@ enum BASPromptLookupProbe {
         let k = Int(env["BAS_PL_K"] ?? "") ?? 4
         let cap = Int(env["BAS_PL_MAX_DECODE_TOKENS"] ?? "") ?? 200
         let adaptive = (env["BAS_PL_ADAPTIVE"] ?? "1") == "1"
+        let tree = (env["BAS_PL_TREE"] ?? "0") == "1"      // B2-aggressive: tree-structured vs linear prompt-lookup
+        let maxBranch = Int(env["BAS_PL_TREE_BRANCH"] ?? "") ?? 2
+        let maxNodes = Int(env["BAS_PL_TREE_NODES"] ?? "") ?? 8
         let drafter = BASPromptLookupDrafter(ngramMin: ngramMin, ngramMax: ngramMax, numDraftTokens: k)
-        fileLog.emit("📊 prompt-lookup START ngram=\(ngramMin)..\(ngramMax) K=\(k) cap=\(cap) adaptiveK=\(adaptive)")
+        fileLog.emit("📊 prompt-lookup START ngram=\(ngramMin)..\(ngramMax) K=\(k) cap=\(cap) adaptiveK=\(adaptive) "
+            + "tree=\(tree) branch=\(maxBranch) nodes=\(maxNodes)")
 
         do {
             // Single-model, no draft (prompt-lookup is model-free) → universality + light memory.
@@ -89,19 +93,37 @@ enum BASPromptLookupProbe {
                     requestID: "pl-\(w.name)", role: .core,
                     preset: .greedyDeterministic, instruction: w.prompt, context: [])
                 do {
-                    let ab = try await adapter.promptLookupAB(
-                        for: request, drafter: drafter, adaptiveK: adaptive)
-                    let identical = ab.specTokens == ab.baseTokens
-                    if identical { byteCount += 1 } else { allByteIdentical = false }
-                    let speedup = ab.specMs > 0 ? ab.baseMs / ab.specMs : 0
-                    let hitRate = ab.proposed > 0 ? Double(ab.accepted) / Double(ab.proposed) : 0
-                    let meanAcc = ab.rounds > 0 ? Double(ab.accepted) / Double(ab.rounds) : 0
-                    if w.name.hasPrefix("control") == false { repSpeedups.append(speedup) }
-                    fileLog.emit(String(
-                        format: "📊 prompt-lookup workload=%@ tokens=%d rounds=%d hit_rate=%.2f mean_acc=%.2f "
-                            + "spec_ms=%.0f base_ms=%.0f speedup=%.2fx byte_identical=%@",
-                        w.name, ab.specTokens.count, ab.rounds, hitRate, meanAcc,
-                        ab.specMs, ab.baseMs, speedup, identical ? "YES" : "NO"))
+                    if tree {
+                        // Tree-spec vs the SHIPPED linear lane: parity (tree==linear → token-identical to greedy)
+                        // + marginal speedup (linear_ms/tree_ms) + tree telemetry.
+                        let ab = try await adapter.treeSpecAB(
+                            for: request, drafter: drafter, maxBranch: maxBranch, maxNodes: maxNodes)
+                        let identical = ab.treeTokens == ab.linearTokens
+                        if identical { byteCount += 1 } else { allByteIdentical = false }
+                        let speedup = ab.treeMs > 0 ? ab.linearMs / ab.treeMs : 0
+                        let meanPath = ab.rounds > 0 ? Double(ab.acceptedTokens) / Double(ab.rounds) : 0
+                        if w.name.hasPrefix("control") == false { repSpeedups.append(speedup) }
+                        fileLog.emit(String(
+                            format: "📊 tree-spec workload=%@ tokens=%d rounds=%d nodes=%d accepted=%d "
+                                + "mean_path=%.2f max_path=%d tree_ms=%.0f linear_ms=%.0f vs_linear=%.2fx "
+                                + "token_identical=%@",
+                            w.name, ab.treeTokens.count, ab.rounds, ab.proposedNodes, ab.acceptedTokens,
+                            meanPath, ab.maxPathLen, ab.treeMs, ab.linearMs, speedup, identical ? "YES" : "NO"))
+                    } else {
+                        let ab = try await adapter.promptLookupAB(
+                            for: request, drafter: drafter, adaptiveK: adaptive)
+                        let identical = ab.specTokens == ab.baseTokens
+                        if identical { byteCount += 1 } else { allByteIdentical = false }
+                        let speedup = ab.specMs > 0 ? ab.baseMs / ab.specMs : 0
+                        let hitRate = ab.proposed > 0 ? Double(ab.accepted) / Double(ab.proposed) : 0
+                        let meanAcc = ab.rounds > 0 ? Double(ab.accepted) / Double(ab.rounds) : 0
+                        if w.name.hasPrefix("control") == false { repSpeedups.append(speedup) }
+                        fileLog.emit(String(
+                            format: "📊 prompt-lookup workload=%@ tokens=%d rounds=%d hit_rate=%.2f mean_acc=%.2f "
+                                + "spec_ms=%.0f base_ms=%.0f speedup=%.2fx byte_identical=%@",
+                            w.name, ab.specTokens.count, ab.rounds, hitRate, meanAcc,
+                            ab.specMs, ab.baseMs, speedup, identical ? "YES" : "NO"))
+                    }
                 } catch {
                     fileLog.emit("📊 prompt-lookup workload=\(w.name) ERROR=\(error)")
                 }
