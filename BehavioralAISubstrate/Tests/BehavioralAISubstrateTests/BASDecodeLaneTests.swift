@@ -52,4 +52,33 @@ final class BASDecodeLaneTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - Single-authority unification (the .scoutDefault → .scout byte-equal default)
+
+    func testScoutDefaultPurposeRoutesToScoutPreset() {
+        // The policy can now NAME today's default, so default call sites resolve THROUGH it byte-equal.
+        XCTAssertEqual(BASDecodeLanePolicy.lane(for: .scoutDefault), .scout)
+        XCTAssertEqual(BASDecodeLanePolicy.preset(for: .scoutDefault).name, BASOrganPreset.scout.name)
+        XCTAssertEqual(
+            BASDecodeLanePolicy.preset(for: .scoutDefault).temperature, BASOrganPreset.scout.temperature)
+    }
+
+    func testScoutLaneDoesNotEngageSpeculation() {
+        // The new lane sits on the NON-speculative side of the doctrine→mechanism contract.
+        XCTAssertFalse(BASDecodeLane.scout.engagesSpeculativeDecode)
+        XCTAssertGreaterThan(BASDecodeLane.scout.preset.temperature, 0, "scout is temp 0.1, not greedy")
+        XCTAssertFalse(BASDecodeLane.scout.isReproducible)
+        XCTAssertEqual(BASDecodeLane.scout.preset.name, BASOrganPreset.scout.name)
+    }
+
+    func testEveryLanePresetMatchesGateExpectation() {
+        // The contract, exhaustive: a lane engages spec-decode IFF its preset is temp 0 (the adapter gate).
+        for lane in BASDecodeLane.allCases {
+            XCTAssertEqual(lane.engagesSpeculativeDecode, lane.preset.temperature == 0,
+                "\(lane).engagesSpeculativeDecode must equal (preset.temperature == 0)")
+        }
+        XCTAssertTrue(BASDecodeLane.greedy.engagesSpeculativeDecode)
+        XCTAssertFalse(BASDecodeLane.sampling.engagesSpeculativeDecode)
+        XCTAssertFalse(BASDecodeLane.scout.engagesSpeculativeDecode)
+    }
 }

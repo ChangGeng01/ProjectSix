@@ -225,14 +225,14 @@ public actor BASLLMVerifierPipeline {
             BASLLMVerifierPipeline
                 .defaultCompressorInstruction,
         contractInstall: BASLLMContractInstall? = .observeOnly(purpose: .verify),
-        // Tranche A2 first production caller (2026-06-12) — the decode lane for verifier stages.
-        // nil (DEFAULT) keeps the historical `.scout` preset (temp 0.1) ⇒ byte-equal-off (ADR-014).
-        // `.greedy` routes stages through `BASDecodeLanePolicy.lane(for: .factual)` (`.greedyDeterministic`,
-        // temp 0) ⇒ ENGAGES the certified spec-decoder (1.34× device-confirmed, A1) AND makes verification
-        // byte-REPRODUCIBLE — doctrinally right for a verifier (a run-to-run-stable verdict). Flipping the
-        // DEFAULT to `.greedy` is the next reviewed step (needs a verification-quality A/B — the first device
-        // run was DEFERRED, device thermally cooked; see SPEC_DECODE_CERT_RESULTS.md §A2). This lands the
-        // reachable opt-in seam so the policy has a real production caller instead of zero.
+        // Tranche A2 first production caller (2026-06-12) — the decode lane for verifier stages, resolved
+        // through the single authority `BASDecodeLanePolicy`. nil (DEFAULT) → `lane(for: .scoutDefault)` →
+        // `.scout` (temp 0.1) ⇒ byte-equal-off (ADR-014). `.greedy` (= `lane(for: .factual)`) →
+        // `.greedyDeterministic` (temp 0) ⇒ ENGAGES the certified spec-decoder (1.34× device-confirmed, A1)
+        // AND makes verification byte-REPRODUCIBLE. Flipping the DEFAULT to `.greedy` is the separate,
+        // evidence-gated step (needs a verification-quality A/B — the first device run was DEFERRED, device
+        // thermally cooked; see SPEC_DECODE_CERT_RESULTS.md §A2). The default now routes THROUGH the policy,
+        // so the doctrine encoder has a real production caller instead of zero.
         decodeLane: BASDecodeLane? = nil
     ) {
         // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
@@ -247,8 +247,9 @@ public actor BASLLMVerifierPipeline {
         self.factCheckerInstruction =
             factCheckerInstruction
         self.compressorInstruction = compressorInstruction
-        // nil → the historical `.scout` preset (byte-equal); a lane → its preset.
-        self.stagePreset = decodeLane?.preset ?? .scout
+        // DEFAULT (nil) resolves THROUGH the single doctrine authority: lane(for: .scoutDefault) → .scout
+        // (byte-equal); a host-elected lane uses its own preset.
+        self.stagePreset = (decodeLane ?? BASDecodeLanePolicy.lane(for: .scoutDefault)).preset
     }
 
     /// The preset every verifier stage decodes with (Tranche A2). Default `.scout` (byte-equal); a

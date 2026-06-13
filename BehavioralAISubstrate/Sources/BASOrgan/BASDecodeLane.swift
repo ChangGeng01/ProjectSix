@@ -28,17 +28,26 @@ public enum BASDecodeLane: String, Sendable, Equatable, Codable, CaseIterable {
     case greedy
     /// temp 0.7 → single-model, diverse.
     case sampling
+    /// temp 0.1 → single-model, the historical low-commitment SCOUT default. Lets the policy NAME the preset
+    /// every current default call site already uses, so a default can route THROUGH the policy byte-equal.
+    case scout
 
     /// The `BASOrganPreset` a call site passes to realize this lane.
     public var preset: BASOrganPreset {
         switch self {
         case .greedy: return .greedyDeterministic
         case .sampling: return .core
+        case .scout: return .scout
         }
     }
 
-    /// True when this lane's output is byte-reproducible (greedy is; sampling is not).
+    /// True when this lane's output is byte-reproducible (greedy is; sampling/scout are not).
     public var isReproducible: Bool { self == .greedy }
+
+    /// True when this lane's preset (temp 0) satisfies the adapter's downstream speculative-decode eligibility
+    /// gate (`MLXOrganAdapter.requestEligibleForSpeculation`, which requires `preset.temperature == 0`). This is
+    /// the BASOrgan-side end of the doctrine→mechanism contract: only `.greedy` engages spec-decode.
+    public var engagesSpeculativeDecode: Bool { self == .greedy }
 }
 
 /// The principled greedy-vs-sampling chooser. Host elects per turn by its purpose.
@@ -52,14 +61,21 @@ public enum BASDecodeLanePolicy {
         case factual
         /// User-facing creative generation — output diversity matters more than speed.
         case creative
+        /// The historical default for a call site that has NOT (yet) elected a lane — maps to `.scout`, so the
+        /// policy can express "today's default" as a first-class purpose. Routing a default THROUGH this is
+        /// byte-equal (ADR-014); flipping a call site from `.scoutDefault` to `.factual` is the separate,
+        /// evidence-gated behavioral change (the certified greedy lane in production).
+        case scoutDefault
     }
 
     /// Map a turn's purpose to its decode lane. `deterministic` + `factual` → greedy (eat the +31%
-    /// + reproducibility); `creative` → sampling (diversity). The single doctrine point.
+    /// + reproducibility); `creative` → sampling (diversity); `scoutDefault` → scout (today's byte-equal
+    /// default). The single doctrine point — every preset-choosing call site resolves here.
     public static func lane(for purpose: Purpose) -> BASDecodeLane {
         switch purpose {
         case .deterministic, .factual: return .greedy
         case .creative: return .sampling
+        case .scoutDefault: return .scout
         }
     }
 

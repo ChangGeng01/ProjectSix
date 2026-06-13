@@ -376,6 +376,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// (`temperature == 0`) — a scout (0.1) / core (0.7) request must NEVER be converted to greedy (that would
     /// change its output). The sampling lane is the mirror (temperature > 0); it stays gated OFF by
     /// `shouldSpeculate` (on-device cert: doNotEnable — slower) but the eligibility rule is defined for symmetry.
+    ///
+    /// This is the MECHANISM end of the doctrine→mechanism contract; the DOCTRINE end is
+    /// `BASDecodeLane.engagesSpeculativeDecode` (BASOrgan) — `.greedy` is the only lane whose preset (temp 0)
+    /// satisfies this gate. The two ends stay in their own modules (the gate keys on `temperature`, the honest
+    /// framework-free invariant — no BASMLXAdapter→BASOrgan-policy coupling).
     public nonisolated static func requestEligibleForSpeculation(
         mode: BASSpeculativeMode, request: BASOrganRequest
     ) -> Bool {

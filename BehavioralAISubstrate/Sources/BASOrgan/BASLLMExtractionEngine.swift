@@ -243,7 +243,8 @@ public actor BASLLMExtractionEngine {
         toolHints: [BASTool] = [],
         outputSchema: BASGuidedGenerationSchema? = nil,
         role: BASOrganRole = .scout,
-        preset: BASOrganPreset = .scout,
+        // Default resolves THROUGH the single decode authority: .scoutDefault → .scout (byte-equal, ADR-014).
+        preset: BASOrganPreset = BASDecodeLanePolicy.preset(for: .scoutDefault),
         timestampMs: Int64? = nil
     ) async throws -> BASLLMExtractionResult {
         let runStart = timestampMs
