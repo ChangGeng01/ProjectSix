@@ -69,7 +69,7 @@ public struct BASSpeculationMemoryGovernor: Sendable, Equatable {
             // floors rather than trusting garbage。
             self.highWaterBytes = max(1, highWaterBytes)
             let defaultLow = UInt64(
-                (Double(self.highWaterBytes) * 0.8).rounded(.down))
+                (Double(self.highWaterBytes) * BASMLXMemoryModel.lowWaterRatio).rounded(.down))
             let low = lowWaterBytes ?? defaultLow
             self.lowWaterBytes = min(max(1, low), self.highWaterBytes)
             self.strikesToDrop = max(1, strikesToDrop)
@@ -80,12 +80,12 @@ public struct BASSpeculationMemoryGovernor: Sendable, Equatable {
         /// (`BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes`,
         /// 3000 MB): high = 90% (2700 MB), low = 80% of high。
         public static func fromFitBudget(
-            _ budgetBytes: Int = BASMLXMemoryBudget
+            _ budgetBytes: Int = BASMLXMemoryModel
                 .defaultSpeculativeFitBudgetBytes
         ) -> Configuration {
             Configuration(
                 highWaterBytes: UInt64(
-                    (Double(max(1, budgetBytes)) * 0.9).rounded(.down)))
+                    (Double(max(1, budgetBytes)) * BASMLXMemoryModel.highWaterRatio).rounded(.down)))
         }
     }
 

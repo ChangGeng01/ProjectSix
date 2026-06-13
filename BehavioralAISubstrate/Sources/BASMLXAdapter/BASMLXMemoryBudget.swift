@@ -48,22 +48,13 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
         self.estimatedResidentBytes = estimatedResidentBytes
     }
 
-    // MARK: - Constants (named, no magic numbers)
+    // MARK: - Constants (re-exported from BASMLXMemoryModel — the single source of truth)
 
-    private static let mib = 1024 * 1024
-    private static let gib = 1024 * 1024 * 1024
+    /// Re-export of `BASMLXMemoryModel.dualResidencyCacheFloorBytes` (kept here for the existing public name).
+    public static let dualResidencyCacheFloorBytes = BASMLXMemoryModel.dualResidencyCacheFloorBytes
 
-    /// Floor for the dual-residency cache pool. Two co-resident models churn more free buffers than one, so the
-    /// union pool is lifted from the single-model 512 MB default to 768 MB — still a CEILING, just enough headroom
-    /// to avoid cap-too-low re-alloc churn across two working sets. (Unmeasured; revisit with on-device evidence.)
-    public static let dualResidencyCacheFloorBytes = 768 * mib
-
-    /// Conservative per-process FIT budget for AUTO-engaging dual residency (greedy speculative default-on). The
-    /// measured default iOS per-process cap is ~3376 MB on the iPhone Air; 3000 MB leaves headroom and needs no
-    /// entitlement. A pair whose estimated dual residency EXCEEDS this stays single-model (byte-identical) — so
-    /// Gemma4 E4B+E2B (~4.2 GB) is excluded and the certified Llama/Qwen 3B+1B (~2.5 GB, measured 2542 MB peak)
-    /// engages. A host on an entitled / higher-memory device can pass a larger budget to opt heavier pairs in.
-    public static let defaultSpeculativeFitBudgetBytes = 3000 * mib
+    /// Re-export of `BASMLXMemoryModel.defaultSpeculativeFitBudgetBytes` (kept here for the existing public name).
+    public static let defaultSpeculativeFitBudgetBytes = BASMLXMemoryModel.defaultSpeculativeFitBudgetBytes
 
     /// Whether a target+draft pair's estimated dual residency fits within `budgetBytes`. Planning estimates → a
     /// CEILING test, never a guarantee; the on-device peak is the real check. Used to AUTO-gate greedy speculative
@@ -75,24 +66,9 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
             + approxResidentBytes(forProviderID: draftProviderID) <= budgetBytes
     }
 
-    /// Planning resident-byte estimate for a 4-bit entry, keyed by a substring of its providerID. NOT measured —
-    /// see the type doc's honest-scope note. Used only to populate `estimatedResidentBytes`.
+    /// Planning resident-byte estimate — delegates to `BASMLXMemoryModel` (the single merged table).
     static func approxResidentBytes(forProviderID providerID: String) -> Int {
-        // Ordered most-specific first.
-        let table: [(needle: String, bytes: Int)] = [
-            ("gemma4.e4b", 2_700 * mib),
-            ("gemma4.e2b", 1_500 * mib),
-            ("gemma3.4b", 3_000 * mib),
-            ("llama3_2.3b", 1_800 * mib),
-            ("llama3_2.1b", 700 * mib),
-            ("qwen2_5.3b", 1_800 * mib),
-            ("qwen2_5.1_5b", 1_000 * mib),
-        ]
-        for (needle, bytes) in table where providerID.contains(needle) {
-            return bytes
-        }
-        // Unknown entry — a conservative mid estimate so the union doesn't under-count.
-        return 2 * gib
+        BASMLXMemoryModel.approxResidentBytes(forProviderID: providerID)
     }
 
     // MARK: - Pre-load admission (jetsam-cap guard, data-calibrated 2026-06-12 dual-device run)
@@ -103,7 +79,7 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
     /// survived with ~262 MB headroom. Because the kill is instant + mid-load, no runtime watermark or liveness
     /// stall detector can catch it — only a PRE-LOAD admission check prevents it. Default ceiling for the opt-in
     /// `wouldExceedActiveHardCap` guard; a host on a larger-RAM device passes its own measured cap.
-    public static let measurediPhoneAirActiveHardCapBytes = 3376 * mib
+    public static let measurediPhoneAirActiveHardCapBytes = BASMLXMemoryModel.measuredIPhoneAirActiveHardCapBytes
 
     /// Best PEAK-process-footprint estimate for an entry (NOT just resident weights — peak includes KV growth +
     /// the substrate working set + MLX runtime). Returns nil when there is neither a measurement nor a
@@ -118,15 +94,7 @@ public struct BASMLXMemoryBudget: Sendable, Equatable {
     public static func estimatedPeakFootprintBytes(
         forProviderID providerID: String
     ) -> Int? {
-        let table: [(needle: String, bytes: Int)] = [
-            ("gemma4.e4b", 4_314 * mib),   // derived (weights + measured Gemma-3n overhead)
-            ("gemma4.e2b", 3_114 * mib),   // measured (survived)
-            ("llama3_2.3b", 2_969 * mib),  // measured (survived)
-        ]
-        for (needle, bytes) in table where providerID.contains(needle) {
-            return bytes
-        }
-        return nil  // unmeasured / no basis → admit (conservative, byte-equal-off)
+        BASMLXMemoryModel.estimatedPeakFootprintBytes(forProviderID: providerID)
     }
 
     /// Pre-load admission: would loading `targetProviderID` (single-model) drive the PEAK process footprint across
