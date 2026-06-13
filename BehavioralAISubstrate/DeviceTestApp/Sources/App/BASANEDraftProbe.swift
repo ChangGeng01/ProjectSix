@@ -98,6 +98,18 @@ enum BASANEDraftProbe {
             fileLog.emit("📊 ane-draft statelessWindow SKIPPED — StatelessWindow_fp16.mlpackage not staged")
         }
 
+        // B2 — the REAL Llama-3.2-1B stateful draft (16 layers, 128k-vocab embed gather + GQA repeat). Decisive:
+        // does the real draft (much bigger than the synthetic) still A19-ANE-place? Placement is input-agnostic.
+        let realDraft = docs.appendingPathComponent("LlamaDraft1B_fp16.mlpackage")
+        if FileManager.default.fileExists(atPath: realDraft.path) {
+            if #available(iOS 17.4, *) {
+                await plan(realDraft, units: .all, label: "llamaDraft1B/all", fileLog: fileLog)
+                await plan(realDraft, units: .cpuAndNeuralEngine, label: "llamaDraft1B/cpuAndANE", fileLog: fileLog)
+            }
+        } else {
+            fileLog.emit("📊 ane-draft llamaDraft1B SKIPPED — LlamaDraft1B_fp16.mlpackage not staged")
+        }
+
         // B1' — fixed-window STATEFUL (elementwise one-hot write + additive mask). Mac: 100% GPU. A19 placement.
         let stateful = docs.appendingPathComponent("FixedWindowStateful_fp16.mlpackage")
         if FileManager.default.fileExists(atPath: stateful.path) {
