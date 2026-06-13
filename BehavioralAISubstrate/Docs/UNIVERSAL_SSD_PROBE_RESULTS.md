@@ -94,6 +94,35 @@ vs a null-drafter baseline (= pure single-model greedy), compared by direct TOKE
 Next (refinement, not blocking): adaptive K (drop K when recent hit-rate is low → eliminates the −9% control
 cost while keeping the repetitive wins); purpose-gated adoption (only the deterministic/factual/RAG lanes).
 
+### Track A refinement — adaptive K (2026-06-14, iPhone Air, same model/prompts, `BAS_PL_ADAPTIVE=1`)
+
+`effK = clamp(1, K, round(emaAccept)+1)`, `emaAccept = 0.6·emaAccept + 0.4·accepted_this_round` (floor 1 keeps
+cheaply probing so re-entry into repetition is still caught). Re-measured A/B vs the SAME null-drafter baseline:
+
+| workload | fixed-K speedup | **adaptive-K speedup** | hit_rate | mean_acc | byte_identical |
+|---|---|---|---|---|---|
+| **rag-quote** | 1.86× | **2.05×** | 0.78 | 2.92 | YES |
+| **json-structured** | 1.34× | **1.58×** | 0.57 | 0.69 | YES |
+| **code-repeat** | 1.37× | **1.46×** | 0.57 | 0.86 | YES |
+| **verify-claim** | 0.99× (neutral) | **1.23×** | 0.49 | 0.43 | YES |
+| control-freeform | 0.91× | 0.92× | 0.05 | 0.02 | YES |
+
+**FINAL: repetitive_mean_speedup = 1.58× (was 1.39×) · byte_identical = 5/5 · all_identical = YES.**
+
+**Verdict — adaptive-K is a clear net win, but NOT for the reason I hypothesized (honest correction):**
+- **Hypothesis FALSIFIED:** I expected adaptive-K to remove the −9% free-form penalty by shrinking K. It did
+  not (0.91×→0.92×, unchanged). On free-form the drafter almost never matches (hit_rate 0.05) → numDraft is
+  *already* ~0 → the verify forward is *already* single-token, so K-width was never the free-form cost. The
+  residual −8% is the per-round n-gram `propose()` scan, which adaptive-K doesn't touch. **The free-form penalty
+  still requires lane-gating to eliminate (亏的不要 — never default-on for free-form); adaptive-K alone won't.**
+- **What it actually bought (better than the hypothesis):** it lifts the **partial-repetition** lanes — it ramps
+  K up during quote/reuse spans and down during novel spans, so semi-repetitive output stops paying for wasted
+  verify width. **verify-claim went neutral→1.23× (a real BAS lane: factual verification with claim-quoting), and
+  the repetitive mean rose 1.39×→1.58×.** Every repetitive lane improved; byte-identity held 5/5.
+- **Net:** keep adaptive-K (it strictly dominates fixed-K on every measured lane and never regresses byte-identity),
+  AND lane-gate prompt-lookup to repetitive/structured/RAG/verify lanes (the free-form −8% is gated off, not fixed).
+  Promotion = adaptive-K on + lane-gated, never an unconditional default.
+
 ---
 
 ## Track B1 — stateful Core ML KV-cache decode (2026-06-14, Mac) — TEMPERS B0
