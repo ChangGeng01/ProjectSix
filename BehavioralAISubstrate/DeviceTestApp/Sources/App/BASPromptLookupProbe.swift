@@ -68,8 +68,9 @@ enum BASPromptLookupProbe {
         let ngramMax = Int(env["BAS_PL_NGRAM_MAX"] ?? "") ?? 3
         let k = Int(env["BAS_PL_K"] ?? "") ?? 4
         let cap = Int(env["BAS_PL_MAX_DECODE_TOKENS"] ?? "") ?? 200
+        let adaptive = (env["BAS_PL_ADAPTIVE"] ?? "1") == "1"
         let drafter = BASPromptLookupDrafter(ngramMin: ngramMin, ngramMax: ngramMax, numDraftTokens: k)
-        fileLog.emit("📊 prompt-lookup START ngram=\(ngramMin)..\(ngramMax) K=\(k) cap=\(cap)")
+        fileLog.emit("📊 prompt-lookup START ngram=\(ngramMin)..\(ngramMax) K=\(k) cap=\(cap) adaptiveK=\(adaptive)")
 
         do {
             // Single-model, no draft (prompt-lookup is model-free) → universality + light memory.
@@ -88,7 +89,8 @@ enum BASPromptLookupProbe {
                     requestID: "pl-\(w.name)", role: .core,
                     preset: .greedyDeterministic, instruction: w.prompt, context: [])
                 do {
-                    let ab = try await adapter.promptLookupAB(for: request, drafter: drafter)
+                    let ab = try await adapter.promptLookupAB(
+                        for: request, drafter: drafter, adaptiveK: adaptive)
                     let identical = ab.specTokens == ab.baseTokens
                     if identical { byteCount += 1 } else { allByteIdentical = false }
                     let speedup = ab.specMs > 0 ? ab.baseMs / ab.specMs : 0

@@ -33,7 +33,8 @@ extension MLXOrganAdapter {
     /// Generate the same prompt under prompt-lookup (spec) and the null-drafter baseline, in ONE container pass.
     public func promptLookupAB(
         for request: BASOrganRequest,
-        drafter: BASPromptLookupDrafter
+        drafter: BASPromptLookupDrafter,
+        adaptiveK: Bool = true
     ) async throws -> PromptLookupAB {
         #if canImport(MLXLLM)
         guard let mainContainer = self._loadedContainerForStreaming() else {
@@ -55,7 +56,8 @@ extension MLXOrganAdapter {
 
             let sSpec = DispatchTime.now().uptimeNanoseconds
             let spec = try BASPromptLookupDecoder.generate(
-                input: input, model: ctx.model, parameters: params, drafter: drafter, eosTokenIds: eos)
+                input: input, model: ctx.model, parameters: params, drafter: drafter, eosTokenIds: eos,
+                adaptiveK: adaptiveK)
             let specMs = Double(DispatchTime.now().uptimeNanoseconds &- sSpec) / 1_000_000
 
             let sBase = DispatchTime.now().uptimeNanoseconds

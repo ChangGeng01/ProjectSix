@@ -23,12 +23,18 @@ public struct BASPromptLookupDecoder {
     enum DecodeError: Error { case nonTrimmableCache }
 
     /// Run greedy generation to `maxTokens`/EOS with prompt-lookup speculation. `eosTokenIds` stops generation.
+    ///
+    /// `adaptiveK` (default false → fixed K): shrink the proposed draft length toward 1 when recent acceptance
+    /// is low, ramp back to the full K as it rises. This removes the non-repetitive penalty (an uncapped K+1
+    /// verify forward isn't amortized when nothing is accepted) while keeping the repetitive wins — a floor of 1
+    /// keeps cheaply probing so re-entering repetition is still detected.
     public static func generate(
         input: LMInput,
         model: any LanguageModel,
         parameters: GenerateParameters,
         drafter: BASPromptLookupDrafter,
-        eosTokenIds: Set<Int>
+        eosTokenIds: Set<Int>,
+        adaptiveK: Bool = false
     ) throws -> Result {
         var cache = model.newCache(parameters: parameters)
         guard canTrimPromptCache(cache) else { throw DecodeError.nonTrimmableCache }
@@ -39,6 +45,8 @@ public struct BASPromptLookupDecoder {
         var rolling = input.text.tokens.asArray(Int.self)
         var out = [Int]()
         var rounds = 0, proposed = 0, accepted = 0
+        // Adaptive-K state: EMA of accepted-per-round (start optimistic = full K so it speculates initially).
+        var emaAccept = Double(K)
 
         // ---- Prefill: prime the cache + take the first token (argmax of the final-position logits). ----
         var y: LMInput.Text
@@ -62,9 +70,11 @@ public struct BASPromptLookupDecoder {
         while maxTokens.map({ out.count < $0 }) ?? true {
             let remaining = maxTokens.map { $0 - out.count } ?? K
             guard remaining > 0 else { break }
+            // Adaptive K: floor 1, ramp toward K with the running acceptance EMA (fixed K when disabled).
+            let effK = adaptiveK ? Swift.max(1, Swift.min(K, Int(emaAccept.rounded()) + 1)) : K
             // Free n-gram draft over the running sequence; keep room for the bonus token (remaining - 1).
             let rawDraft = drafter.propose(over: rolling)
-            let numDraft = Swift.min(rawDraft.count, Swift.max(0, remaining - 1))
+            let numDraft = Swift.min(rawDraft.count, Swift.min(effK, Swift.max(0, remaining - 1)))
             let draft = Array(rawDraft.prefix(numDraft))
             rounds += 1
             proposed += numDraft
@@ -90,6 +100,7 @@ public struct BASPromptLookupDecoder {
             var acc = 0
             while acc < numDraft && mainList[acc] == draft[acc] { acc += 1 }
             accepted += acc
+            emaAccept = 0.6 * emaAccept + 0.4 * Double(acc)   // adaptive-K signal (used only when adaptiveK)
 
             var stop = false
             for i in 0...acc {          // acc accepted draft tokens + the correction/bonus token
