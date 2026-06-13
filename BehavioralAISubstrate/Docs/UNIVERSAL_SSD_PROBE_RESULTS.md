@@ -13,6 +13,33 @@ auto-promotion.
 
 ---
 
+## Track C — tree-structured prompt-lookup (2026-06-14, iPhone A19) — CORRECT byte-identical, but marginal over linear
+
+The aggressive, training-free successor to linear prompt-lookup: propose a TREE of n-gram continuations (branch
+where the matched suffix recurred with different next tokens), verify the whole tree in ONE target forward via a
+custom tree attention mask + per-depth RoPE (vendor patch `Docs/patches/spec-decode-tree-mask.diff`, byte-identical
+default), accept the longest root-to-leaf path that is the target's greedy argmax, trim-all + replay the path.
+
+| workload | mean_path | max_path | **vs_linear** | token_identical |
+|---|---|---|---|---|
+| rag-quote | 3.50 | 4 | 0.63× | YES |
+| json-structured | 1.05 | 4 | 0.79× | YES |
+| code-repeat | 1.26 | 4 | 0.78× | YES |
+| verify-claim | 0.54 | 4 | 0.86× | YES |
+| control-freeform | 0.03 | 2 | 0.89× | YES |
+
+**Verdict — the scheme is CORRECT (token_identical 5/5: vendor mask patch + per-depth RoPE + tree walk + trim/replay
+all byte-exact) but a NET LOSS over the shipped linear lane (mean 0.76×).** The tree finds deep paths (rag
+mean_path 3.5) yet loses because it does ~2× the forward work/round (the S≈9 tree forward vs linear's 5, PLUS a
+second "replay" forward for the cache), and the marginal acceptance gain over the ALREADY-strong linear
+prompt-lookup doesn't pay for it. **Insight:** tree-spec wins in the literature (SpecInfer/Medusa) because there the
+draft is often wrong; prompt-lookup's linear n-gram draft is already high-precision on repetitive content, so
+branching adds little. The tree machinery is a correct, reusable foundation — its real payoff is a MODEL draft with
+uncertain branches (EAGLE). Two further levers if revisited: a cache-GATHER vendor patch to drop the replay forward,
+and deeper/wider trees on more-divergent content. Not pursued for prompt-lookup (marginal); carried to EAGLE.
+
+---
+
 ## Track B0 — ANE-placement feasibility gate (2026-06-14, **Mac M-series ANE**)
 
 **Question (the operator's R1 challenge to my too-hasty "CoreAI can't decode"):** does a fp16 transformer at
