@@ -358,6 +358,34 @@ fear was wrong.
 3. **Serial loop** — propose-then-verify puts the draft cost on the critical path. The win needs the draft to run
    ∥ the GPU verify (overlap round r+1 propose with round r verify) — the deferred "v2" — so the draft is hidden.
 
+### Honest re-measurement (fair baseline, no draft prefill) — the conventional 1B-draft hybrid is a 3× SLOWDOWN
+
+The 0.70–0.89× above was a MEASUREMENT ARTIFACT: the K=0 baseline wrongly paid the draft prefill too (canDraft
+ran regardless of K). With the baseline fixed to pure target greedy (no draft work) + a warmup + a long workload:
+
+| workload | mean_acc | **speedup (fair)** | ane/gpu |
+|---|---|---|---|
+| rag-quote | 4.00 | **0.20×** | 3.06 |
+| code-repeat | 3.00 | 0.35× | 3.38 |
+| long-quote | 3.79 | 0.40× | 4.33 |
+| control | 2.26 | 0.39× | 2.29 |
+| **mean** | — | **0.34×** | — |
+
+**The honest end-to-end is a ~3× SLOWDOWN.** Two structural causes: (1) the draft prefill is O(promptLen)
+**sequential** forwards (a seq=1 Core ML stateful model CANNOT batch-prefill the prompt the way the MLX target
+does in ONE forward) — ~4000 ms draft prefill for a 50-token prompt vs the target's ~64 ms batched prefill; (2)
+even the LOOP loses on most lanes — K+2=6 draft forwards × ~0.72× verify ≈ 4.3× verify cost/round, MORE than the
+~4 tokens it saves. The 1B draft is too expensive and there are too many forwards/round.
+
+**Verdict — the conventional separate-1B-draft hybrid is DECLINED DEFINITIVELY (亏的不要): a measured 0.34× net
+loss that loses badly to Track A (prompt-lookup, 1.58×).** It is certified-correct (token-identical 4/4) but
+structurally the wrong design. The fix requires the AGGRESSIVE frontier, not tuning: (i) FEWER draft forwards/round
+(tree/Medusa heads propose K in ONE forward), (ii) a much CHEAPER draft (EAGLE: a 1-layer head on the target's
+hidden state, ~0.1× the target, trained → high acceptance, no separate-model prefill), (iii) batched draft prefill.
+The conventional hybrid is a certified-correct FOUNDATION (the verify/accept/RESYNC machinery is reusable) but a
+mediocre design; the next arc is tree-structured speculation (training-free, builds on the Track A win) and/or an
+ANE-resident EAGLE head (SOTA, training-based).
+
 **Verdict — the "压榨 CoreAI" hybrid is BUILT, byte-identical, and CERTIFIED, but does NOT win on the A19 as built.**
 The negative is MEASURED, not assumed. Two evidence-gated paths to a win (next arc): (a) a genuinely CHEAPER draft
 (4-bit, not int8, or sub-1B same-tokenizer) to get draft < 0.58× target; (b) TRUE ANE∥GPU overlap so the draft
