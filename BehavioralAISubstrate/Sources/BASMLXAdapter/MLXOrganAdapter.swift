@@ -83,7 +83,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
 
     /// Default MLX cache-pool cap (512 MB) — the band is ~384-768 MB (low enough to bound the pool, high
     /// enough to avoid §8's cap=64 re-alloc churn). This is the value with measured on-device evidence (E2B).
-    public static let defaultCacheLimitBytes: Int = 512 * 1024 * 1024
+    public static let defaultCacheLimitBytes: Int = BASMLXMemoryModel.defaultCacheLimitBytes
 
     /// ADR-038 §11.7-§11.9 — cap for MLX's **free-buffer cache pool** (bytes), applied on `loadModel` (default
     /// `defaultCacheLimitBytes`). This is a pure MEMORY ceiling (a free-buffer recycling bound), NOT a math
@@ -449,6 +449,55 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             providerKind: .mlx,
             certificationTier: MLXModelCatalog.defaultEntries.contains { $0.providerID == model.providerID }
                 ? .certified : .experimental)
+    }
+
+    /// Convenience init grouping the six memory/cache/KV/admission knobs into one `MLXMemoryPolicy` instead of
+    /// six flat parameters. Delegates to the designated init — `MLXOrganAdapter(memoryPolicy: MLXMemoryPolicy())`
+    /// is byte-identical to the bare `MLXOrganAdapter()`. `memoryPolicy` is required (no default) so it never
+    /// collides with the zero-arg designated init.
+    public init(
+        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma4_E4B_4bit,
+        providerID: String? = nil,
+        providerName: String? = nil,
+        supportsStreaming: Bool = true,
+        maxInputTokens: Int = MLXOrganAdapter.defaultMaxInputTokens,
+        maxOutputTokens: Int = MLXOrganAdapter.defaultMaxOutputTokens,
+        supportedRoles: Set<BASOrganRole> = [.scout, .core],
+        memoryPolicy: MLXMemoryPolicy,
+        draftModel: MLXModelCatalog.Entry? = nil,
+        speculativeDecoding: BASSpeculativeMode = .greedy,
+        numDraftTokens: Int = 2,
+        speculativeFitBudgetBytes: Int? = BASMLXMemoryBudget.defaultSpeculativeFitBudgetBytes
+    ) {
+        self.init(
+            model: model,
+            providerID: providerID,
+            providerName: providerName,
+            supportsStreaming: supportsStreaming,
+            maxInputTokens: maxInputTokens,
+            maxOutputTokens: maxOutputTokens,
+            supportedRoles: supportedRoles,
+            cacheLimitBytes: memoryPolicy.cacheLimitBytes,
+            memoryLimitBytes: memoryPolicy.memoryLimitBytes,
+            draftModel: draftModel,
+            speculativeDecoding: speculativeDecoding,
+            numDraftTokens: numDraftTokens,
+            speculativeFitBudgetBytes: speculativeFitBudgetBytes,
+            kvCacheBits: memoryPolicy.kvCacheBits,
+            maxKVSize: memoryPolicy.maxKVSize,
+            enforceMemoryAdmission: memoryPolicy.enforceMemoryAdmission,
+            activeHardCapBytes: memoryPolicy.activeHardCapBytes)
+    }
+
+    /// The current memory knobs as a grouped policy (mirror of the convenience init).
+    public nonisolated var memoryPolicy: MLXMemoryPolicy {
+        MLXMemoryPolicy(
+            cacheLimitBytes: cacheLimitBytes,
+            memoryLimitBytes: memoryLimitBytes,
+            kvCacheBits: kvCacheBits,
+            maxKVSize: maxKVSize,
+            enforceMemoryAdmission: enforceMemoryAdmission,
+            activeHardCapBytes: activeHardCapBytes)
     }
 
     // MARK: - Load
