@@ -93,3 +93,33 @@ vs a null-drafter baseline (= pure single-model greedy), compared by direct TOKE
 
 Next (refinement, not blocking): adaptive K (drop K when recent hit-rate is low → eliminates the −9% control
 cost while keeping the repetitive wins); purpose-gated adoption (only the deterministic/factual/RAG lanes).
+
+---
+
+## Track B1 — stateful Core ML KV-cache decode (2026-06-14, Mac) — TEMPERS B0
+
+`Tools/draft_llm_stateful_to_coreml.py` converts a stateful decoder (iOS18 `ct.StateType` per-layer K/V caches,
+`forward(hidden, position)` writing the new token's K/V at `position` + masked attention over the prefix). The
+conversion SUCCEEDS. But `MLComputePlan` + an autoregressive `MLState` latency loop (`/tmp/statefulane.swift`):
+
+| | placement | per-step latency (autoregressive, live KV state) |
+|---|---|---|
+| stateful fp16, `.all` | **ops=133, gpu=133** (100% GPU, **0 ANE**) | — |
+| stateful fp16, ANE (`.cpuAndNeuralEngine`) | — | 4.67 ms |
+| stateful fp16, GPU (`.cpuAndGPU`) | — | **2.40 ms** (GPU faster) |
+
+**Verdict — the ANE-draft hybrid is NOT straightforwardly viable; B0's optimism doesn't carry to real decode.**
+The STATELESS fp16 block lands 100% on the ANE (B0), but the STATEFUL KV-cache decode — what real autoregressive
+decode requires — plans **entirely onto the GPU** (the dynamic position-indexed state write + the masked
+attention over MAX_SEQ are ANE-incompatible ops that push the whole graph to GPU), and FORCING the ANE is
+*slower* (4.67 vs 2.40 ms). So an "ANE draft" of a real (stateful) model would run on the GPU — contending with
+the MLX verify, no parallelism win. **The naive ANE-draft ∥ GPU-verify hybrid (B2) is DECLINED on this evidence
+(亏的不要 — measured, saved building it on a false premise).**
+
+Honest scope / open: (1) the GPU fallback is driven by the dynamic-index state update + mask — an ANE-friendly
+stateful formulation (fixed-window cache, no dynamic indexing, the patterns Apple's own on-device LLM Core ML
+models use) MIGHT keep the matmuls on ANE; that is a deeper research problem, not solved by the naive approach.
+(2) Mac planner; an A19 confirmation could differ but the dynamic-index ANE-incompatibility is structural (Core
+ML lowering), not device-specific. **Net: B0 says the ANE runs stateless transformer MATMULS great; B1 says
+real stateful DECODE goes to the GPU. The universal win that actually shipped this arc is Track A
+(prompt-lookup, model-free, byte-identical, 1.39× on repetitive lanes).**
