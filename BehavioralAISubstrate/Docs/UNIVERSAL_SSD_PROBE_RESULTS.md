@@ -41,12 +41,27 @@ fp16-attention overflow that NaN'd the MiniLM embedder (long-seq softmax).
   hardware** while the GPU runs the verify (a slower-but-GPU-free draft), or a stateful KV path keeping the
   ANE warm.
 
-**Honest scope / not yet answered:** (1) this is the Mac ANE, not the **iPhone A19** (different ANE/GPU ratio,
-the operator's target — authoritative measurement pending); (2) synthetic random-weight block, not a real
-4-bit model (Core ML int4-on-ANE is its own question); (3) 4 layers, not the full 16 (full model ≈ 4× latency);
-(4) no KV-cache yet (B1) — single-token without attention-over-history; the per-step ANE overhead may amortize
-better with a stateful warm model. **B1/B2 proceed because B0 cleared the placement gate; the parallel-draft
-win is the thing to measure, not assume.**
+**Honest scope / not yet answered:** (1) synthetic random-weight block, not a real 4-bit model (Core ML
+int4-on-ANE is its own question); (2) 4 layers, not the full 16 (full model ≈ 4× latency); (3) no KV-cache yet
+(B1) — single-token without attention-over-history.
+
+### B0 on the REAL iPhone A19 (`BASANEDraftProbe`, BAS_ANE_DRAFT_PROBE=1) — STRONGER than the Mac
+
+| model | A19 placement | A19 per-token latency |
+|---|---|---|
+| **fp16 `.all` / `.cpuAndNeuralEngine`** | **ops=140, ane=140** (100% ANE) | — |
+| fp32 `.all` | ops=138, gpu=138, 0 ANE | — |
+| fp16 `.cpuOnly` | — | 19.38 ms |
+| fp16 `.cpuAndGPU` | — | 10.98 ms (GPU) |
+| **fp16 `.cpuAndNeuralEngine` (ANE)** | — | **10.51 ms** |
+| fp16 `.all` (chose ANE) | — | 10.41 ms |
+
+**A19 verdict:** the iPhone A19 confirms **100% ANE placement** AND the ANE latency (10.51 ms) is **competitive
+with — marginally faster than — the GPU (10.98 ms)**. The Mac's 2.5× ANE penalty was a Mac-GPU artifact, NOT a
+fundamental ANE limit. On the operator's target device the **ANE is a genuine decode lane**, so an ANE-draft
+running in PARALLEL on idle hardware while the GPU verifies is a real "压榨 CoreAI" hybrid. **Green light for B1
+(stateful ANE decode loop) → B2 (ANE-draft ∥ GPU-verify).** Remaining to measure: a real 4-bit model, the full
+layer count, the stateful KV path, and the end-to-end hybrid speedup + byte-identity.
 
 ---
 

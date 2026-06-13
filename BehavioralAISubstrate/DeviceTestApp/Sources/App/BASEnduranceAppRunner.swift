@@ -313,6 +313,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASVerifierLaneABProbe.run() }
             return
         }
+        // SSD Track B B0 — A19 ANE placement + latency for the converted fp16 decoder block staged in
+        // Documents (BAS_ANE_DRAFT_PROBE=1)。 The authoritative on-device "can CoreAI participate in decode".
+        if (env["BAS_ANE_DRAFT_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASANEDraftProbe.run() }
+            return
+        }
         // 全面进化 T1.2 — ANE utilization measurement (BAS_ANE_PROBE=1). MLX-free (CoreML heads only) but
         // launched via the same aux path; runs fine on device (MLComputePlan is iOS 17.4+).
         if (env["BAS_ANE_PROBE"] ?? "0") == "1" {
