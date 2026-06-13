@@ -61,7 +61,7 @@ final class BASMetalTopKParityTests: XCTestCase {
 
         let dispatcher = BASMetalTopKDispatcher(loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
         guard let approx = try? await dispatcher.dispatch(query: q, corpus: corpus, dim: dim, k: k) else {
-            throw XCTSkip("Metal unavailable in this environment — parity is certified on-device")
+            throw XCTSkip("Metal unavailable here — topK parity certified on-device via the BAS_METAL_SMOKE probe (ADR-039 / STATUS: iPhone Air, L8 dispatch gpu=true parity_set_ok max_score_err=0)")
         }
         let metal = approx.approximateOnly()   // test is on the approximate side (not a spine file)
         XCTAssertTrue(approx.provenance.didRunOnGPU)

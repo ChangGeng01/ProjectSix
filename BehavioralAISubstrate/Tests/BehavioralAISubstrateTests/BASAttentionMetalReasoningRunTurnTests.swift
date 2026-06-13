@@ -110,7 +110,7 @@ final class BASAttentionMetalReasoningRunTurnTests: XCTestCase {
         guard let signal = await BASAttentionMetalReasoning.run(
             payload, loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true),
             thermalState: .nominal, anePriority: .aneFirst)
-        else { throw XCTSkip("Metal unavailable in this environment — parity certified on-device") }
+        else { throw XCTSkip("Metal unavailable here — attention parity certified on-device via the BAS_METAL_SMOKE probe (ADR-039: iPhone Air 2026-06-08, attn-metal-smoke parity_mae=0 routing=ane-native)") }
 
         // nominal thermal ⇒ the router does NOT decline the GPU ⇒ Metal ran.
         XCTAssertTrue(signal.didRunOnGPU, "nominal thermal ⇒ router routes attention to the GPU")

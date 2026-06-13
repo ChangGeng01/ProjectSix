@@ -125,7 +125,7 @@ final class BASSSMMetalReasoningRunTurnTests: XCTestCase {
         // on-device GPU+parity is certified by the BAS_METAL_SMOKE SSM dispatch).
         guard let signal = await BASSSMMetalReasoning.run(
             input, loader: BASMetalKernelLibraryLoader(useMetalKernelV2: true))
-        else { throw XCTSkip("Metal unavailable in this environment — parity certified on-device") }
+        else { throw XCTSkip("Metal unavailable here — SSM parity certified on-device via the BAS_METAL_SMOKE probe (ADR-039: iPhone Air 2026-06-08, ssm-metal-smoke parity_mae=0)") }
         XCTAssertTrue(signal.didRunOnGPU)
         XCTAssertEqual(signal.magnitude, cpuMag, accuracy: 1e-4,
             "Metal SSM reasoning magnitude ≈ the CPU scan within tolerance (non-governance signal)")

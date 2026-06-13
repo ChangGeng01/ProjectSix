@@ -107,9 +107,34 @@ pub fn encode_edge(
     write_lenprefixed_str(&mut buf, from_node_id);
     write_lenprefixed_str(&mut buf, to_node_id);
     write_lenprefixed_str(&mut buf, kind_raw);
-    buf.extend_from_slice(&weight.to_be_bytes());
+    // Canonicalize before serialization so this byte-stable replay format is
+    // INJECTIVE on value: every NaN payload (2^52 of them, either sign) maps to
+    // one canonical NaN, and -0.0 collapses to +0.0. Without this, two
+    // semantically-equal edges would serialize to DIFFERENT bytes and break
+    // byte-equal replay/dedup — the codec's stated goal (replay determinism,
+    // header §). Numerically a no-op; decode is unchanged (reads any f64).
+    // Reachability: the Swift BASKnowledgeEdge clamp maps NaN->1.0 but lets
+    // -0.0 survive (-0.0 >= 0.0), so -0.0 IS reachable in production; NaN only
+    // reaches here via the direct Rust/C API.
+    buf.extend_from_slice(
+        &canonicalize_weight(weight).to_be_bytes());
     buf.extend_from_slice(&created_at_ms.to_be_bytes());
     buf
+}
+
+/// Canonicalize an f64 weight for byte-stable serialization: collapse every
+/// NaN (any sign/payload) to the single canonical quiet NaN, and -0.0 to +0.0.
+/// Numerically a no-op (NaN stays NaN, zero stays zero) — it only removes the
+/// bit-level ambiguity that would otherwise let equal values encode to
+/// different bytes. `f64::NAN` is Rust's canonical quiet NaN (0x7ff8…0000).
+fn canonicalize_weight(w: f64) -> f64 {
+    if w.is_nan() {
+        f64::NAN
+    } else if w == 0.0 {
+        0.0 // collapse -0.0 -> +0.0 (both compare == 0.0)
+    } else {
+        w
+    }
 }
 
 fn write_lenprefixed_str(buf: &mut Vec<u8>, s: &str) {
@@ -444,15 +469,45 @@ mod tests {
     }
 
     #[test]
-    fn edge_weight_clamp_irrelevant_to_codec() {
-        // Codec preserves whatever weight it receives;
-        // clamp is the caller's responsibility (Swift
-        // BASKnowledgeEdge does it in init)。
+    fn edge_weight_nan_is_canonicalized_but_stays_nan() {
+        // The codec canonicalizes NaN on ENCODE (all payloads -> one
+        // canonical NaN) so the wire is byte-stable, but the VALUE is
+        // still NaN on decode. Clamping to [0,1] is the Swift caller's
+        // job (BASKnowledgeEdge init); the Rust API accepts any f64.
         let bytes = encode_edge(
             "e", "a", "b", "mentions",
             f64::NAN, 0);
         let d = decode_edge(&bytes).unwrap();
         assert!(d.weight.is_nan());
+    }
+
+    #[test]
+    fn edge_weight_distinct_nan_payloads_encode_identically() {
+        // Two NaNs with different bit payloads MUST produce identical
+        // bytes — the replay format is injective on value.
+        let nan_a = f64::from_bits(0x7ff8_0000_0000_0001);
+        let nan_b = f64::from_bits(0xffff_dead_beef_cafe);
+        assert!(nan_a.is_nan() && nan_b.is_nan());
+        let ba = encode_edge("e", "a", "b", "k", nan_a, 0);
+        let bb = encode_edge("e", "a", "b", "k", nan_b, 0);
+        assert_eq!(
+            ba, bb,
+            "distinct NaN payloads must canonicalize to the same bytes");
+    }
+
+    #[test]
+    fn edge_weight_negative_zero_encodes_as_positive_zero() {
+        // -0.0 and +0.0 are numerically equal but differ in bits; the
+        // codec must collapse them so replay-equality holds. -0.0 is
+        // reachable in production because it survives the Swift [0,1]
+        // clamp (-0.0 >= 0.0 is true).
+        let b_neg = encode_edge("e", "a", "b", "k", -0.0, 0);
+        let b_pos = encode_edge("e", "a", "b", "k", 0.0, 0);
+        assert_eq!(
+            b_neg, b_pos,
+            "-0.0 must encode identically to +0.0");
+        let d = decode_edge(&b_neg).unwrap();
+        assert_eq!(d.weight, 0.0);
     }
 
     // MARK: - C ABI
