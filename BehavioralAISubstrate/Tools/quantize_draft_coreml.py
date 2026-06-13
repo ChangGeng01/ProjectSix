@@ -17,8 +17,9 @@ import coremltools as ct
 import coremltools.optimize.coreml as cto
 
 NBITS = int(sys.argv[1]) if len(sys.argv) > 1 else 4
-SRC = "/tmp/draft/LlamaDraft1B_fp16.mlpackage"
-OUT = f"/tmp/draft/LlamaDraft1B_int{NBITS}.mlpackage"
+# argv[2]=SRC mlpackage, argv[3]=OUT mlpackage (default: the 1B draft, back-compatible).
+SRC = sys.argv[2] if len(sys.argv) > 2 else "/tmp/draft/LlamaDraft1B_fp16.mlpackage"
+OUT = sys.argv[3] if len(sys.argv) > 3 else f"/tmp/draft/LlamaDraft1B_int{NBITS}.mlpackage"
 
 
 def main() -> None:

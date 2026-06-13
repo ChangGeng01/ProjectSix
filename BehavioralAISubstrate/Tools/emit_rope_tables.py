@@ -9,13 +9,15 @@ Run:  /tmp/cml312/bin/python3 Tools/emit_rope_tables.py
 Out:  /tmp/draft/rope_cos_f32.bin, rope_sin_f32.bin  ([MAX_SEQ, head_dim] row-major float32)
 """
 import os
+import sys
 
 import numpy as np
 import torch
 from transformers import AutoModelForCausalLM
 
-MODEL = "unsloth/Llama-3.2-1B-Instruct"
-REVISION = "5a8abab4a5d6f164389b1079fb721cfab8d7126c"
+# argv[1]=MODEL (default 1B). Output names are head_dim-suffixed so 1B (h64) and 3B (h128) tables don't collide.
+MODEL = sys.argv[1] if len(sys.argv) > 1 else "unsloth/Llama-3.2-1B-Instruct"
+REVISION = "5a8abab4a5d6f164389b1079fb721cfab8d7126c" if MODEL == "unsloth/Llama-3.2-1B-Instruct" else None
 MAX_SEQ = 512
 OUT_DIR = "/tmp/draft"
 
@@ -34,9 +36,10 @@ def main() -> None:
     cos_t = np.stack(cos_rows)   # [MAX_SEQ, head_dim]
     sin_t = np.stack(sin_rows)
     assert cos_t.shape == (MAX_SEQ, head_dim), cos_t.shape
-    cos_t.tofile(f"{OUT_DIR}/rope_cos_f32.bin")
-    sin_t.tofile(f"{OUT_DIR}/rope_sin_f32.bin")
-    print(f">> emitted rope tables [{MAX_SEQ}, {head_dim}] float32 → {OUT_DIR}/rope_{{cos,sin}}_f32.bin")
+    # head_dim-suffixed so 1B (h64) and 3B (h128) tables don't collide.
+    cos_t.tofile(f"{OUT_DIR}/rope_cos_f32_h{head_dim}.bin")
+    sin_t.tofile(f"{OUT_DIR}/rope_sin_f32_h{head_dim}.bin")
+    print(f">> emitted rope tables [{MAX_SEQ}, {head_dim}] float32 → {OUT_DIR}/rope_{{cos,sin}}_f32_h{head_dim}.bin")
 
 
 if __name__ == "__main__":

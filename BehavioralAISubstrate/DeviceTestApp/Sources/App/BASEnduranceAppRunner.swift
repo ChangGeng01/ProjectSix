@@ -325,6 +325,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASANESpecHybridProbe.run() }
             return
         }
+        // Core ML BACKEND Phase 0 GATE — does a Core ML Llama-3.2-3B TARGET decode ≥ 38.3 tok/s on the A19?
+        // (BAS_ANE_TARGET_PROBE=1). The decisive bet behind the backend rewrite; NO-GO is the likely, legitimate outcome.
+        if (env["BAS_ANE_TARGET_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASANETargetProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
