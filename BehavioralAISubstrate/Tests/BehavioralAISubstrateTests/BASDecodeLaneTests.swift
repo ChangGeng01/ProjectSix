@@ -81,4 +81,36 @@ final class BASDecodeLaneTests: XCTestCase {
         XCTAssertFalse(BASDecodeLane.sampling.engagesSpeculativeDecode)
         XCTAssertFalse(BASDecodeLane.scout.engagesSpeculativeDecode)
     }
+
+    // MARK: - Prompt-lookup eligibility (Track A SSD — gate the free-form −8% off, keep the repetitive wins)
+
+    func testPromptLookupEligibleForFactualAndDeterministic() {
+        // The lanes the iPhone-Air A/B measured net-positive (1.23×–2.05×, byte-identical 5/5).
+        XCTAssertTrue(BASDecodeLanePolicy.promptLookupEligible(for: .factual),
+            "RAG / extraction / verification reuse the prompt — the n-gram draft hits")
+        XCTAssertTrue(BASDecodeLanePolicy.promptLookupEligible(for: .deterministic),
+            "replay-spine turns are repetition by construction + byte-identical-safe under greedy verify")
+    }
+
+    func testPromptLookupNotEligibleForCreativeOrScoutDefault() {
+        // creative measured 0.92× (−8%): the per-round n-gram scan isn't amortized when nothing is accepted.
+        XCTAssertFalse(BASDecodeLanePolicy.promptLookupEligible(for: .creative),
+            "free-form pays the scan with no acceptance — 亏的不要, gate it off")
+        // scoutDefault: preserve the ADR-014 byte-equal default; also temp 0.1 ≠ 0 (not byte-valid for argmax accept).
+        XCTAssertFalse(BASDecodeLanePolicy.promptLookupEligible(for: .scoutDefault),
+            "default-on is a separate evidence-gated step; scout is temp 0.1 so argmax-accept isn't byte-valid")
+    }
+
+    func testPromptLookupEligibilityImpliesGreedyLane() {
+        // The load-bearing INVARIANT: prompt-lookup byte-identity is a GREEDY property. Any purpose the policy
+        // deems eligible MUST route to the greedy lane (temp 0) — else the argmax-equality accept changes bytes.
+        for purpose in BASDecodeLanePolicy.Purpose.allCases where
+            BASDecodeLanePolicy.promptLookupEligible(for: purpose) {
+            let lane = BASDecodeLanePolicy.lane(for: purpose)
+            XCTAssertEqual(lane, .greedy,
+                "\(purpose) is prompt-lookup-eligible but does not map to the greedy lane")
+            XCTAssertEqual(lane.preset.temperature, 0,
+                "\(purpose) is prompt-lookup-eligible but its preset isn't temp 0 — byte-identity would break")
+        }
+    }
 }

@@ -83,4 +83,28 @@ public enum BASDecodeLanePolicy {
     public static func preset(for purpose: Purpose) -> BASOrganPreset {
         lane(for: purpose).preset
     }
+
+    /// Whether a turn of this purpose should engage the universal **prompt-lookup** (n-gram) speculative
+    /// decoder (`BASPromptLookupDecoder` — model-free, byte-identical under greedy verify). Gated to the lanes
+    /// the on-device A/B PROVED net-positive (`Docs/UNIVERSAL_SSD_PROBE_RESULTS.md`, iPhone Air, adaptive-K):
+    ///
+    /// - `.factual` → **ON.** RAG-quote / structured-extraction / verification — measured 1.23×–2.05×,
+    ///   byte-identical 5/5. These are exactly the lanes whose output reuses the prompt, so the n-gram draft hits.
+    /// - `.deterministic` → **ON.** Replay-spine / reproducible turns: byte-identical-safe under greedy verify
+    ///   AND structurally reuse prior tokens (the replay spine is repetition by construction).
+    /// - `.creative` → **OFF.** The free-form control measured **0.92× (−8%)**: when nothing is accepted, the
+    ///   per-round n-gram scan isn't amortized. Adaptive-K does NOT remove this (the cost is the scan, not the
+    ///   K-width) — only gating does. 亏的不要: never make a free-form turn pay the scan.
+    /// - `.scoutDefault` → **OFF.** Preserve the ADR-014 byte-equal default (default-on is a separate,
+    ///   evidence-gated step). Also `.scout` is temp 0.1 ≠ 0, so prompt-lookup's argmax-equality accept would
+    ///   not even be byte-valid there.
+    ///
+    /// **Invariant (pinned by test):** eligibility ⟹ the greedy lane (temp 0). Prompt-lookup byte-identity is a
+    /// GREEDY property — under sampling/scout the argmax-equality accept would change the output distribution.
+    public static func promptLookupEligible(for purpose: Purpose) -> Bool {
+        switch purpose {
+        case .factual, .deterministic: return true
+        case .creative, .scoutDefault: return false
+        }
+    }
 }
