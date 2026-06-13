@@ -76,18 +76,22 @@ enum BASANESpecHybridProbe {
         // draft replaces expensive 3B forwards). int8 draft mmaps to ~30MB resident, so 3B+draft fits the cap.
         let targetStr = env["BAS_SPEC_TARGET"] ?? "1b"
         let target = targetStr == "3b" ? MLXModelCatalog.llama3_2_3B_4bit : MLXModelCatalog.llama3_2_1B_4bit
+        // Draft quant: int8 (faithful, 1.2GB) vs int4 (lossy-vs-own-fp32 but CHEAPER per forward — 0.66GB, less
+        // bandwidth; acceptance vs the TARGET may still hold on repetitive content). Path (a): cheaper draft.
+        let quant = env["BAS_SPEC_DRAFT_QUANT"] ?? "int8"
+        let draftFile = "LlamaDraft1B_\(quant).mlpackage"
 
         guard #available(iOS 18.0, *) else {
             fileLog.emit("📊 ane-spec SKIPPED — needs iOS 18 (MLState)"); return
         }
         let units: MLComputeUnits = unitsStr == "ane" ? .cpuAndNeuralEngine : (unitsStr == "gpu" ? .cpuAndGPU : .all)
-        fileLog.emit("📊 ane-spec START target=\(target.providerID) draft=int8 K=\(k) cap=\(cap) units=\(unitsStr) "
+        fileLog.emit("📊 ane-spec START target=\(target.providerID) draft=\(quant) K=\(k) cap=\(cap) units=\(unitsStr) "
             + String(format: "footprint0=%.0fMB", footprintMB()))
 
         guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             fileLog.emit("📊 ane-spec ERROR=no-documents"); return
         }
-        let modelURL = docs.appendingPathComponent("LlamaDraft1B_int8.mlpackage")
+        let modelURL = docs.appendingPathComponent(draftFile)
         let cosURL = docs.appendingPathComponent("rope_cos_f32.bin")
         let sinURL = docs.appendingPathComponent("rope_sin_f32.bin")
         for u in [modelURL, cosURL, sinURL] where !FileManager.default.fileExists(atPath: u.path) {
