@@ -1,8 +1,15 @@
 # Universal Self-Speculative Decode — Probe Results
 
-Program: a universal LLM speculative decoder (any LLM, byte-identical, no per-target draft pairing), two tracks
-— **A** prompt-lookup (model-free n-gram draft) and **B** CoreAI/ANE draft (squeeze the otherwise-idle ANE).
-Doctrine: probe-first, 实测胜出才晋升, byte-identical under greedy verify (ADR-039), zero auto-promotion.
+Program: a universal LLM speculative decoder (any LLM, token-identical under greedy verify, no per-target draft
+pairing), two tracks — **A** prompt-lookup (model-free n-gram draft) and **B** CoreAI/ANE draft (squeeze the
+otherwise-idle ANE). Doctrine: probe-first, 实测胜出才晋升, token-identical under greedy verify (ADR-039), zero
+auto-promotion.
+
+> **Terminology (audit fix):** below, "byte_identical = N/N" / "byte-identical" denote **token-sequence identity**
+> — the probe (`BASPromptLookupProbe`) compares the spec decoder's emitted token IDs to the baseline's
+> (`specTokens == baseTokens`). This is the ADR-039-safe property (every emitted token is the target's greedy
+> argmax). It is NOT a claim about detokenized TEXT bytes: equal tokens through the same tokenizer give equal text,
+> but exact text byte-equality to the production streaming detokenizer was not separately measured.
 
 ---
 
@@ -91,8 +98,10 @@ vs a null-drafter baseline (= pure single-model greedy), compared by direct TOKE
   (shrink K when hit-rate drops) to remove the free-form penalty. Promotion = gate-to-repetitive + the adaptive-K
   refinement; never an unconditional default (亏的不要 on free-form).
 
-Next (refinement, not blocking): adaptive K (drop K when recent hit-rate is low → eliminates the −9% control
-cost while keeping the repetitive wins); purpose-gated adoption (only the deterministic/factual/RAG lanes).
+Next (refinement, not blocking): adaptive K (drop K when recent hit-rate is low — *hypothesized* to reduce the
+−9% control cost; this was MEASURED in the refinement section below and **FALSIFIED** — adaptive-K lifts the
+partial-repetition lanes instead, the free-form penalty needs lane-gating); purpose-gated adoption (only the
+deterministic/factual/RAG lanes).
 
 ### Track A refinement — adaptive K (2026-06-14, iPhone Air, same model/prompts, `BAS_PL_ADAPTIVE=1`)
 
@@ -124,6 +133,13 @@ cheaply probing so re-entry into repetition is still caught). Re-measured A/B vs
   Promotion = adaptive-K on + lane-gated, never an unconditional default.
 
 ---
+
+> ⚠️ **SUPERSEDED — read before the B1 / B1' / B1'' sections below.** Every DECLINE verdict in B1 / B1' / B1''
+> was measured on the **Mac M-series planner only**. The iPhone A19 (the operator's target) **OVERTURNS all of
+> them** — see **Track B2-GO** at the bottom: B1-class stateful KV decode AND B1''-class windowed decode both plan
+> **100% onto the A19 ANE**. The "attention-over-history → GPU" conclusion in these sections is a **Mac cost-model
+> artifact, NOT a Core ML structural wall**. The sections are kept verbatim for provenance; their standalone
+> DECLINE verdicts are no longer true on target hardware.
 
 ## Track B1 — stateful Core ML KV-cache decode (2026-06-14, Mac) — TEMPERS B0
 
@@ -195,6 +211,11 @@ NO attention-over-history (1×1 attention); this attends over W positions (W×W 
 
 ### B-track FINAL verdict (B0 + B1 + B1' + B1'' — four experiments, "严查"-grade)
 
+> ⚠️ **SUPERSEDED by Track B2-GO (A19).** This Mac-only 4-experiment DECLINE was **OVERTURNED on the iPhone A19**:
+> B1/B1' (stateful KV) and B1'' (windowed) all plan 100% onto the A19 ANE. The verdict below is the Mac result,
+> kept for provenance — the "ANE can't do attention-over-history" conclusion is a Mac cost-model heuristic, not a
+> structural Core ML wall. Read Track B2-GO for the corrected, device-grounded conclusion.
+
 | formulation | state? | attention-over-history? | placement |
 |---|---|---|---|
 | **B0** stateless single-token | no | **no** (seq=1) | **100% ANE** ✓ |
@@ -233,7 +254,7 @@ side-by-side, same device:
 
 | formulation | seq / state | **Mac M-series** placement | **iPhone A19** placement | A19 latency (ANE vs GPU) |
 |---|---|---|---|---|
-| **B0** single-token | seq=1, no state | ane=140 (ANE) | **ane=140 (ANE)** | 10.40 vs 10.95 ms |
+| **B0** single-token † | seq=1, no state | ane=140 (ANE) | **ane=140 (ANE)** | 10.40 vs 10.95 ms |
 | **B1''** stateless window | seq=64, no state | gpu=145 (**GPU**) | **ane=145 (ANE)** | **10.64** vs 13.83 ms/tok |
 | **B1'** fixed-window stateful | seq=1 + KV state | gpu=197 (**GPU**) | **ane=197 (ANE)** | **11.13** vs 11.56 ms/step |
 
@@ -264,5 +285,39 @@ decode") is vindicated a SECOND time, on the decisive device.
   needs a real small same-family model converted to Core ML).
 - A19 ANE per-token ≈ 10–11 ms; whether a parallel ANE draft actually beats serial GPU decode depends on the MLX
   verify rate + the draft acceptance length — the real end-to-end A/B, not yet run.
-- The universal win that ALREADY shipped remains Track A (prompt-lookup, byte-identical, 1.58× repetitive,
+- The universal win that ALREADY shipped remains Track A (prompt-lookup, token-identical, 1.58× repetitive,
   production-wired). B2 is now a green-lit build, no longer a declined dead-end.
+
+† The B0 A19 row here (10.40 / 10.95 ms) is a FRESH run; the earlier B0-A19 table (§"B0 on the REAL iPhone A19")
+logged 10.51 / 10.98 ms from a different run. Both agree within run-to-run variance; neither is authoritative over
+the other — treat ±0.5 ms as noise.
+
+### B2 real-draft (Llama-3.2-1B) — conversion PASS, but the fp16 model hits a SIZE wall on the ANE (2026-06-14)
+
+The B2-GO synthetic results said stateful KV decode A19-ANE-places. The next gate was a REAL same-family draft.
+`Tools/llama_draft_to_coreml.py` loads real Llama-3.2-1B-Instruct weights (un-gated mirror, pinned revision; same
+Llama-3.2 tokenizer as the 3B target → draft token ids are valid target ids) into a stateful Core ML module
+(host-fed exact llama3 RoPE, GQA 8→32, tied embeddings, the fixed-window static-slice KV write).
+
+- **Conversion + fidelity PASS:** the torch module is **token-identical to HF greedy 24/24** (fp32 gate). The
+  converter now ALSO re-validates the shipped **fp16** Core ML model through the same greedy loop (audit fix — the
+  fp32 gate alone doesn't certify the fp16 artifact). fp16 re-check result: _to be recorded on the next run._
+- **fp16 (2.3 GB) is SIZE-REJECTED by the ANE — on BOTH devices:**
+
+  | model | size | Mac placement | A19 placement |
+  |---|---|---|---|
+  | LlamaDraft1B **fp16** | 2.3 GB | ops=1205 gpu=1205 **ane_capable=0** | ops=1205 gpu=1203 cpu=2 **ane_capable=0** |
+  | LlamaDraft1B **int4** | 0.66 GB | ops=1208 gpu=1208 **ane_capable=1087** | _pending_ |
+
+  Unlike the synthetic stateful model (`ane_capable=197`, only GPU-*preferred* on Mac), the **fp16 real draft is
+  ane-*incapable* for EVERY op on both Mac and A19** — a per-op diagnostic (`Tools/placement_diag_probe.swift`)
+  showed even trivially-ANE ops (mul/add/matmul) at `ane_capable=0`, i.e. a **model-level** rejection. int4
+  weight-quantization (`Tools/quantize_draft_coreml.py`, 3.5× smaller) **restores Mac `ane_capable` from 0 → 1087
+  of 1208** — decisively confirming the lever is **weight SIZE**: the 2.3 GB fp16 weights exceed the ANE limit;
+  ~0.66 GB int4 is back under it.
+
+- **So the working B2 draft must be QUANTIZED.** The int4 draft A19 placement (does it now ANE-*place*, given the
+  Mac shows it ANE-*capable* and the A19 prefers ANE for these ops?) is the next decisive measurement, then the
+  end-to-end hybrid (int4 ANE draft ∥ MLX/GPU 3B verify, byte-identity + speedup). Open: int4 draft fidelity/
+  acceptance (quantization lowers acceptance, not correctness — the target verify still guarantees output), and
+  whether the 3B target + 0.66 GB draft co-resident fit the A19 memory budget without jetsam.

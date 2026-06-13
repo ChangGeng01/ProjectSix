@@ -101,11 +101,13 @@ extension MLXOrganAdapter {
     ///
     /// **Fail-closed + byte-safe routing:** runs the prompt-lookup decoder ONLY when `shouldUsePromptLookup`
     /// holds (elected AND greedy, temp 0); every other case falls back to `draft(_:)`, byte-identical to today.
-    /// On the prompt-lookup path the emitted tokens are token-identical to greedy single-model decode
-    /// (`BASPromptLookupDecoder`'s construction; device-proven 5/5), and the body is the vendor's canonical
-    /// final-output detokenization `tokenizer.decode(tokenIds:)` (Evaluate.swift:1405) → byte-identical text for
-    /// byte-identical tokens. `completionMetrics` is honestly `nil` (the prompt-lookup loop emits no
-    /// `GenerateCompletionInfo`; the probe owns the timing A/B).
+    /// On the prompt-lookup path the emitted tokens are TOKEN-identical to greedy single-model decode
+    /// (`BASPromptLookupDecoder`'s construction; the device probe verified spec==baseline tokens 5/5), and the
+    /// terminating EOS is excluded (the vendor's stop-before-EOS contract). The body is bulk-decoded via the
+    /// vendor's canonical final-output convention `tokenizer.decode(tokenIds:)` (Evaluate.swift:1405); for
+    /// identical tokens this yields the same text as the production path MODULO streaming-detokenizer boundary
+    /// effects — TOKEN-identity is proven, exact TEXT byte-equality to the streamed body is NOT asserted.
+    /// `completionMetrics` is honestly `nil` (the prompt-lookup loop emits no `GenerateCompletionInfo`).
     public func respondPromptLookup(
         for request: BASOrganRequest,
         electPromptLookup: Bool,
@@ -132,7 +134,14 @@ extension MLXOrganAdapter {
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
 
         let rawBody: String = try await mainContainer.perform(nonSendable: input) { ctx, input in
-            let eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
+            // Production parity: stop on the model's chat terminators too (Llama-3 <|eot_id|>/<|end_of_text|>,
+            // ChatML <|im_end|>, </s>), not just tokenizer.eosTokenId — the production stream stops on this
+            // superset. Best-effort: include those that resolve. (audit fix. The probe path keeps the narrow EOS
+            // so its already-reported measurements retain provenance.)
+            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
+            for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
+                if let id = ctx.tokenizer.convertTokenToId(name) { eos.insert(id) }
+            }
             let result = try BASPromptLookupDecoder.generate(
                 input: input, model: ctx.model, parameters: params,
                 drafter: drafter, eosTokenIds: eos, adaptiveK: true)
