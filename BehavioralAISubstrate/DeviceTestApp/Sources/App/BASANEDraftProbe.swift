@@ -73,8 +73,101 @@ enum BASANEDraftProbe {
         await latency(fp16, units: .cpuAndNeuralEngine, label: "fp16/ANE", fileLog: fileLog)
         await latency(fp16, units: .all, label: "fp16/all", fileLog: fileLog)
 
+        // A19 confirmation of the attention-over-history wall (Mac said: seq=1→ANE, seq=W & stateful→GPU). Same
+        // device, side-by-side. Placement is input-agnostic (plan walk only); latency where feasible.
+        await confirmAttentionWall(docs: docs, fileLog: fileLog)
+
         fileLog.emit("📊 ane-draft DONE — human-read: ane=N in the histogram ⇒ A19 runs decode on the ANE; "
             + "compare fp16/ANE vs fp16/cpuAndGPU latency for the parallel-draft viability.")
+    }
+
+    // MARK: - A19 attention-over-history wall confirmation (B1''/B1' on the real A19)
+
+    private static func confirmAttentionWall(docs: URL, fileLog: FileLog) async {
+        // B1'' — STATELESS windowed recompute (seq=W=64, no MLState). Mac: 100% GPU. Decisive A19 placement.
+        let window = docs.appendingPathComponent("StatelessWindow_fp16.mlpackage")
+        if FileManager.default.fileExists(atPath: window.path) {
+            if #available(iOS 17.4, *) {
+                await plan(window, units: .all, label: "statelessWindow/all", fileLog: fileLog)
+                await plan(window, units: .cpuAndNeuralEngine, label: "statelessWindow/cpuAndANE", fileLog: fileLog)
+            }
+            await latencyWindow(window, units: .cpuAndGPU, label: "statelessWindow/cpuAndGPU", fileLog: fileLog)
+            await latencyWindow(window, units: .cpuAndNeuralEngine, label: "statelessWindow/ANE", fileLog: fileLog)
+            await latencyWindow(window, units: .all, label: "statelessWindow/all", fileLog: fileLog)
+        } else {
+            fileLog.emit("📊 ane-draft statelessWindow SKIPPED — StatelessWindow_fp16.mlpackage not staged")
+        }
+
+        // B1' — fixed-window STATEFUL (elementwise one-hot write + additive mask). Mac: 100% GPU. A19 placement.
+        let stateful = docs.appendingPathComponent("FixedWindowStateful_fp16.mlpackage")
+        if FileManager.default.fileExists(atPath: stateful.path) {
+            if #available(iOS 17.4, *) {
+                await plan(stateful, units: .all, label: "fixedWindowStateful/all", fileLog: fileLog)
+                await plan(stateful, units: .cpuAndNeuralEngine, label: "fixedWindowStateful/cpuAndANE", fileLog: fileLog)
+            }
+            if #available(iOS 18.0, *) {
+                await latencyStateful(stateful, units: .cpuAndGPU, label: "fixedWindowStateful/cpuAndGPU", fileLog: fileLog)
+                await latencyStateful(stateful, units: .cpuAndNeuralEngine, label: "fixedWindowStateful/ANE", fileLog: fileLog)
+                await latencyStateful(stateful, units: .all, label: "fixedWindowStateful/all", fileLog: fileLog)
+            }
+        } else {
+            fileLog.emit("📊 ane-draft fixedWindowStateful SKIPPED — FixedWindowStateful_fp16.mlpackage not staged")
+        }
+    }
+
+    /// Latency for the stateless windowed model: input `hidden_window` [1, 64, 2048], no state.
+    private static func latencyWindow(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+        do {
+            let compiled = try await MLModel.compileModel(at: url)
+            let config = MLModelConfiguration(); config.computeUnits = units
+            let model = try MLModel(contentsOf: compiled, configuration: config)
+            let arr = try MLMultiArray(shape: [1, 64, 2048], dataType: .float32)
+            for i in 0..<arr.count { arr[i] = NSNumber(value: Float.random(in: -1...1)) }
+            let input = try MLDictionaryFeatureProvider(dictionary: ["hidden_window": arr])
+            for _ in 0..<8 { _ = try await model.prediction(from: input) }
+            var t = 0.0; let iters = 60
+            for _ in 0..<iters {
+                let s = DispatchTime.now().uptimeNanoseconds
+                _ = try await model.prediction(from: input)
+                t += Double(DispatchTime.now().uptimeNanoseconds &- s) / 1_000_000
+            }
+            fileLog.emit(String(format: "📊 ane-draft latency %@ mean_ms_per_draft_token=%.3f", label, t / Double(iters)))
+        } catch {
+            fileLog.emit("📊 ane-draft latency \(label) error=\(error)")
+        }
+    }
+
+    /// Latency for the fixed-window stateful model: hidden [1,1,2048] + host-fed write_onehot/attn_bias [256] + KV state.
+    @available(iOS 18.0, *)
+    private static func latencyStateful(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+        do {
+            let compiled = try await MLModel.compileModel(at: url)
+            let config = MLModelConfiguration(); config.computeUnits = units
+            let model = try MLModel(contentsOf: compiled, configuration: config)
+            let state = model.makeState()
+            let hidden = try MLMultiArray(shape: [1, 1, 2048], dataType: .float32)
+            for i in 0..<hidden.count { hidden[i] = NSNumber(value: Float.random(in: -1...1)) }
+            func stepInput(_ pos: Int) throws -> MLFeatureProvider {
+                let oh = try MLMultiArray(shape: [256], dataType: .float32)
+                let bias = try MLMultiArray(shape: [256], dataType: .float32)
+                for i in 0..<256 {
+                    oh[i] = NSNumber(value: i == pos ? 1.0 : 0.0)
+                    bias[i] = NSNumber(value: i <= pos ? 0.0 : -1e4)
+                }
+                return try MLDictionaryFeatureProvider(
+                    dictionary: ["hidden": hidden, "write_onehot": oh, "attn_bias": bias])
+            }
+            for pos in 0..<8 { _ = try await model.prediction(from: stepInput(pos), using: state) }
+            var t = 0.0; let steps = 60
+            for pos in 8..<(8 + steps) {
+                let s = DispatchTime.now().uptimeNanoseconds
+                _ = try await model.prediction(from: stepInput(pos), using: state)
+                t += Double(DispatchTime.now().uptimeNanoseconds &- s) / 1_000_000
+            }
+            fileLog.emit(String(format: "📊 ane-draft latency %@ mean_ms_per_step=%.3f", label, t / Double(steps)))
+        } catch {
+            fileLog.emit("📊 ane-draft latency \(label) error=\(error)")
+        }
     }
 
     // MARK: - MLComputePlan histogram

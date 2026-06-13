@@ -221,3 +221,48 @@ the real, on-device-proven win.
 (both 100% ANE, stateless seq=1), so the attention-over-history→GPU routing — a Core ML lowering property — is
 very likely identical on A19; an A19 re-run of B1/B1''  would confirm (not overturn) the wall. Untested:
 int4-weight ANE attention, and whether a future Core ML release lowers attention-over-history to the ANE.
+
+> ⚠️ **The bracketed paragraph above was WRONG — the A19 OVERTURNED it. See "Track B2-GO" below. I predicted
+> "low probability of flipping"; the device flipped it. 实测胜出, again.**
+
+## Track B2-GO — the A19 OVERTURNS the Mac decline: stateful KV decode runs 100% on the ANE (2026-06-14)
+
+The "剩余部分" step the operator pushed for — the A19 confirmation I expected to *confirm* the wall — **overturned
+it.** `BASANEDraftProbe` (extended) walked `MLComputePlan` for all three formulations on the **real iPhone A19**,
+side-by-side, same device:
+
+| formulation | seq / state | **Mac M-series** placement | **iPhone A19** placement | A19 latency (ANE vs GPU) |
+|---|---|---|---|---|
+| **B0** single-token | seq=1, no state | ane=140 (ANE) | **ane=140 (ANE)** | 10.40 vs 10.95 ms |
+| **B1''** stateless window | seq=64, no state | gpu=145 (**GPU**) | **ane=145 (ANE)** | **10.64** vs 13.83 ms/tok |
+| **B1'** fixed-window stateful | seq=1 + KV state | gpu=197 (**GPU**) | **ane=197 (ANE)** | **11.13** vs 11.56 ms/step |
+
+**Both `ane_capable` counts are identical Mac↔A19 (145, 197) — the ops were ALWAYS ANE-capable; only the planner's
+*preferred* device differs.** The Mac M-series cost model routes attention-over-history to the GPU; the A19 keeps
+it on the ANE. To pin the Mac heuristic, a single self-attention block was swept by seq length (Mac, fp16,
+`Tools/ane_arch_probe_convert.py` + `generic_placement_probe.swift`, fanned out via the `ane-boundary-map` workflow):
+
+| arch (Mac) | mlp | mlp_pool:64 | attn:1 | attn:4 | attn:16 | attn:64 | attn:128 | attn:256 |
+|---|---|---|---|---|---|---|---|---|
+| placement | ane=15 | ane=16 | ane=37 | ane=38 | **ane=38** | **gpu=38** | gpu=38 | gpu=38 |
+
+The Mac flips attention ANE→GPU **between seq=16 and seq=64** (a length-cost heuristic); attention-LIGHT heads
+(MLP, mean-pooled MLP) stay 100% ANE at any length. **The A19 does not flip at all** — seq=64 AND stateful KV
+both stay 100% ANE.
+
+**Corrected verdict — the "attention-over-history → GPU wall" is a Mac-M-series artifact, NOT structural. On the
+A19 (the operator's target), a real Core ML draft decoder — INCLUDING a stateful KV-cache autoregressive loop —
+plans 100% onto the ANE, at latency ≤ the GPU.** So the **ANE-draft ∥ GPU-verify hybrid (B2) is VIABLE on target
+hardware** — the naive/fixed-window DECLINEs above were Mac-bound and are **OVERTURNED**. My earlier "DECLINED on
+4 experiments" was wrong because 3 of the 4 were Mac-only; the operator's instinct ("CoreAI 怎么可能不能参与
+decode") is vindicated a SECOND time, on the decisive device.
+
+**Honest scope — B2 is GREEN to BUILD, not yet PROVEN to win** (亏的不要 still binds the eventual ship):
+- Placement viability ≠ a measured speedup. The hybrid (ANE Core ML draft running ∥ the MLX/GPU verify, end-to-end,
+  with `byte_identical` under greedy argmax verify) is **unbuilt and unmeasured** — that is the next experiment.
+- Synthetic random-weight blocks (placement is weight-independent; real draft ACCEPTANCE/quality is unmeasured —
+  needs a real small same-family model converted to Core ML).
+- A19 ANE per-token ≈ 10–11 ms; whether a parallel ANE draft actually beats serial GPU decode depends on the MLX
+  verify rate + the draft acceptance length — the real end-to-end A/B, not yet run.
+- The universal win that ALREADY shipped remains Track A (prompt-lookup, byte-identical, 1.58× repetitive,
+  production-wired). B2 is now a green-lit build, no longer a declined dead-end.
