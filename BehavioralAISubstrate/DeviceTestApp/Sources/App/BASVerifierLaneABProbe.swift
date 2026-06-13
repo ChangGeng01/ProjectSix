@@ -60,9 +60,14 @@ enum BASVerifierLaneABProbe {
         do {
             // Single shared adapter (greedy default-on → engages spec-decode when the greedy lane sends
             // temp==0). Load once; both lanes use the same loaded weights (only the per-call preset differs).
-            let adapter = MLXOrganAdapter(model: MLXModelCatalog.speculativeOptimalTarget)
+            // MEMORY-SAFE (2026-06-14): cap decode to 256 tokens. An uncapped 4-stage verify (preset budget
+            // up to 1024/stage) on the dual-residency pair (Llama-3B + 1B draft ≈ 2542 MB) spiked past the
+            // ~3376 MB jetsam cap and SIGKILL'd this probe 39× (memoryException). 256 tokens is plenty to
+            // human-read a verdict's gist; both lanes share the cap so the quality comparison stays fair.
+            let adapter = MLXOrganAdapter(
+                model: MLXModelCatalog.speculativeOptimalTarget,
+                maxOutputTokens: 256)
             try await adapter.loadModel()
-            try? await adapter.loadDraftModel()
 
             let draft = BASOrganDraft(
                 requestID: "vlab-draft", providerID: "probe", role: .core,
@@ -74,6 +79,13 @@ enum BASVerifierLaneABProbe {
 
             for lane: BASDecodeLane? in [nil, .greedy] {
                 let label = lane == nil ? "scout-default" : "greedy"
+                // Draft residency per lane (U1): the scout lane is single-model — drop the ~700 MB draft (dead
+                // weight, never used at temp 0.1) to free headroom; the greedy lane needs it for spec-decode.
+                if lane == .greedy {
+                    try? await adapter.loadDraftModel()
+                } else {
+                    _ = await adapter.unloadDraftModel(reason: "scout lane is single-model")
+                }
                 let pipeline = BASLLMVerifierPipeline(
                     adapters: [
                         .reviewer: adapter, .redTeam: adapter,
