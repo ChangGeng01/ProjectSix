@@ -652,3 +652,32 @@ token-identity vs the fp32 REFERENCE but ZERO acceptance data vs the actual 3B T
 (future insurance); Q3 = binary-search TTT layer count for SIGABRT (only if Q2 passes); Q5 = from-scratch Llama-3 TTT distillation
 (the multi-week disqualifier). Verdict flips to TTT only if a Llama-3-distilled vocab-128256 TTT checkpoint appears, OR Q1 fails
 AND Q4 shows Llamba's α is capped by fixed-state forgetting (and even then the first move is a shallower re-distilled Llamba).
+
+### Track E — ✅ Q4 acceptance: Llamba-1B is a STRONG draft for Llama-3.2-3B (host, 2026-06-15) — but the speedup now hinges on draft-SPEED + overlap
+
+Ran the genuinely-open measurement (greedy spec-decode, `Tools` host harness `llamba_q4_acceptance.py`): the faithful fp32
+`LlambaDecode` draft (exact recurrent-state snapshot/restore on partial accept) proposing K=4/round, verified against **bf16
+`unsloth/Llama-3.2-3B-Instruct` (MPS)** over a 24-prompt battery (factual/narrative/code/instruction), 64 tokens each.
+
+**Result: block efficiency τ = 3.298 tokens / target-forward** (K+1=5 ceiling); overall draft acceptance **0.797**; mean accepted
+2.30/4 + bonus. Per-position acceptance **RISES** with depth — d0 0.778, d1 0.784, d2 0.811, d3 0.839 (1573 committed / 477 target
+forwards) → the draft does NOT degrade as the block lengthens, so K>4 has headroom — confirmed by the τ(K) sweep below.
+Stable across the battery (3.27–3.42). **This validates Llamba as a high-quality draft and FALSIFIES the one condition that
+would reopen TTT** (α capped by fixed-state forgetting): Mamba's fixed state is not the bottleneck for this draft/target pair.
+
+**HONEST framing — quality ✅ ≠ guaranteed wall-clock win.** Spec-decode speedup = τ / (K·(t_draft/t_target) + 1) for the
+SEQUENTIAL schedule. The catch for THIS pair: the ANE draft is NOT much faster than the MLX 3B target (KD-9L transformer was 33.6
+tok/s vs the target's 38.3 tok/s) — so a sequential draft→verify schedule can NET-LOSE even at τ=3.3 (a win needs draft ≳1.7× the
+target's per-token speed). **This is exactly why Saguaro's premise is the concurrent OVERLAP** (ANE-draft ∥ GPU/MLX-verify): with
+overlap the draft block is hidden behind the verify, and throughput → τ × target-rate (≈ up to 3.3 × 38.3 ≈ 126 tok/s ideal). So
+the two REMAINING gates for an actual win are now sharp: **(Q1) does 16-layer Mamba run on the ANE + at what tok/s** (draft speed),
+and **(overlap gate, plan Phase-0.4) does ANE∥GPU actually overlap on the A19** (Core ML's was 0.34× — CoreAI ComputeStream +
+zero-copy is the bet). τ=3.3 is the necessary green light on draft quality; draft-speed + overlap decide the throughput.
+Caveats on the number: bf16 target = architectural upper bound (production MLX 4-bit slightly lower); free-form continuation
+(chat-templated may differ).
+
+**τ(K) sweep (`llamba_q4_ksweep.py`, same target/battery) — τ rises monotonically but saturates:**
+K=2 → 2.440, K=4 → 3.298, K=6 → 3.892, K=8 → 4.310, K=12 → 4.762 (marginal τ/added-K step: +0.43, +0.30, +0.21, +0.11). Per-token
+accept-rate falls as the block lengthens (0.72 → 0.31) but never collapses. **Under overlap you want K≈8–12 (τ≈4.3–4.8 → ~4–5
+committed tokens per 3B forward);** the optimal K is draft-speed-dependent (the draft must emit the K-block within the verify
+window). Next (operationally exact): re-measure vs the production MLX 4-bit 3B target + chat-templated prompts.
