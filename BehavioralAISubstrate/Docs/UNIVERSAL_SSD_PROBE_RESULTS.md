@@ -695,3 +695,37 @@ degenerate random-weight constant argmax — proves the path runs end-to-end + i
 NOT change the ship-now verdict: TTT remains dominated by Mamba purely on **(1) no usable Llama-3-vocab checkpoint** (weeks–months
 to distill one) and **(2) 24 layers + heavier op-graph vs the ~12-layer ANE ceiling** (device-unverified) — and Q4 already showed
 we don't NEED TTT (Llamba α=0.80 is strong). Net: TTT is now convertibility-cleared *future insurance*, not a ship-now contender.
+
+### Track E — 🎯 DEVICE VERDICT (real iPhone Air A19, 2026-06-15): Mamba-on-ANE is a WIN, Saguaro spec-decode DECLINES
+
+The full serial Saguaro stack was built (compile-cert iOS-27, host-tested 8/8, adversarially reviewed), then measured on a
+real A19. Three device gates:
+
+**Q1 — does 16-layer Mamba run on the A19 ANE? ✅ GREEN (a genuine first).** The fp16 2.6 GB Mamba `.aimodel` `std::bad_alloc`-
+crashes on LOAD on BOTH ane AND gpu — the CoreAI-0.4.0 beta **~2 GB asset-size limit** (same wall as the 2.3 GB fp16 transformer;
+NOT the layer ceiling, never loads). **int8-quant → 1.41 GB (`Tools/llamba_int8.py`, reuses the transformer's QuantLinear/QuantEmbed
+`constexpr_blockwise_shift_scale`) clears the size wall, and then 16-layer int8 Mamba LOADS + DECODES on the A19 ANE: 39.24 tok/s,
+peak 77 MB (Δ53 MB resident — mmap CLEAN PAGES), gpu 39.74 tok/s.** So **16 RECURRENT Mamba layers CLEAR the per-asset ANE compile
+ceiling the 16-layer TRANSFORMER SIGABRT'd — the first FULL-DEPTH model on the A19 ANE decode lane.** Co-residency is free: the MLX
+3B (1846 MB) + the int8 Mamba draft = **Δ9 MB**, peak 2143 MB ≪ 3248 cap (the litert mmap bet pays).
+
+**Serial Saguaro — ❌ 0.10–0.24× (loses badly).** byte-identity HOLDS on every workload (the loop is CORRECT on device), acceptance
+is real (code mean_acc 3.2/4, factual 1.86/4, narrative 0.37/4), BUT `draft_ms` is **5–7× `target_ms`**. The int8 Mamba is 39 tok/s
+standalone, yet in the loop the draft dominates — because **Mamba's recurrent rewind re-runs the accepted tokens every commit**
+(a recurrent state can't KEEP partial-accept writes the way a KV cache does), so the draft does ~2.5× the committed tokens in
+forwards. The very thing that made Mamba FIT the ANE (recurrent state, no KV) makes its spec-decode rewind expensive. (The snapshot/
+restore deep-clone scalar loop adds more; fixable via bulk memcpy, but doesn't change the verdict.)
+
+**Overlap ρ — ❌ 0.83 < 1 (the decisive gate, FALSIFIED).** Raw ANE-draft ∥ GPU-target concurrency (no rewind, the BEST case):
+target 299 ms→**482 ms (+61%)**, draft 827 ms→**1359 ms (+64%)** when run concurrently → concurrent wall 1359 > serial 1126 →
+**ρ=0.83. ANE and GPU CONTEND for memory bandwidth; running them together is a NET LOSS.** Much better than Core ML's 0.34×, but
+still < 1: **the Saguaro overlap premise — hide the draft behind the verify — does NOT hold on the A19's shared-bandwidth SoC.**
+
+**VERDICT: Saguaro two-stream spec-decode DECLINES on the A19 (亏的不要, evidence-backed).** The decline is STRUCTURAL, not a bug:
+(a) the ANE draft isn't faster than the GPU target → serial can't win; (b) ANE+GPU contend for bandwidth (ρ=0.83) → overlap can't
+win either. This holds for ANY ANE-draft ∥ GPU-target pairing on this SoC, not just Mamba (a transformer KV-draft would avoid the
+rewind cost but still hits draft≈target speed + ρ<1). **What IS banked: (1) Mamba-on-ANE — the first full-depth model on the A19 ANE
+decode lane, 39 tok/s, tiny footprint, byte-identity (a real, reusable capability for a STANDALONE small-model ANE lane, just not
+for spec-decode); (2) the whole Saguaro stack is built, correct, byte-identical, default-OFF — ready if the SoC bandwidth economics
+ever change.** Device run-book: stage assets via `devicectl device copy to --domain-type appDataContainer`; launch with `devicectl
+device process launch --environment-variables '{...}'` (JSON, NOT --environment); app com.changgeng.basdevicetest on the A19.
