@@ -95,4 +95,77 @@ extension MLXOrganAdapter {
                 + MLXOrganAdapter.frameworkUnavailablePlatformSuffix)
         #endif
     }
+
+    /// Host-electable PRODUCTION decode via the serial Saguaro lane (Track E). **ADR-014: DEFAULT-OFF** — nothing
+    /// routes here unless a host opts a turn in with `electSaguaro = true` (typically
+    /// `BASDecodeLanePolicy.saguaroEligible(for: purpose)`, computed host-side so this adapter keeps no
+    /// BASOrgan-policy coupling). The `speculator` (CoreAI Mamba draft) is INJECTED — the adapter can't construct
+    /// a BASAppleAdapters type, and the host owns the draft's lifecycle/loading.
+    ///
+    /// **Fail-closed + byte-safe:** runs Saguaro ONLY when `shouldUseSaguaro` holds (elected AND greedy, temp 0);
+    /// every other case falls back to `draft(_:)`, byte-identical to today. On the Saguaro path the emitted tokens
+    /// are token-identical to greedy single-model decode (the target's argmax decides every token), terminating
+    /// EOS excluded. `completionMetrics` is honestly `nil` (the loop emits no `GenerateCompletionInfo`).
+    public func respondCoreAIMambaSaguaro(
+        for request: BASOrganRequest,
+        speculator: BASSaguaroDraft,
+        electSaguaro: Bool,
+        numDraftTokens K: Int = 4
+    ) async throws -> BASOrganDraft {
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+        #if canImport(MLXLLM)
+        // Fail-closed: not elected OR not greedy → the EXACT normal path (byte-equal, ADR-014).
+        guard Self.shouldUseSaguaro(elect: electSaguaro, request: request) else {
+            return try await draft(request)
+        }
+        guard let mainContainer = self._loadedContainerForStreaming() else {
+            throw BASOrganError.providerUnavailable(
+                reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before respondCoreAIMambaSaguaro"))
+        }
+        var messages: [Chat.Message] = []
+        let instructions = Self.systemInstructions(for: request)
+        if !instructions.isEmpty { messages.append(.system(instructions)) }
+        messages.append(.user(Self.prompt(for: request)))
+        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let params = self._greedyParameters(
+            for: request.preset, maxOutputTokens: request.maxOutputTokens)
+        let maxTokens = request.maxOutputTokens ?? params.maxTokens ?? 256
+
+        let rawBody: String = try await mainContainer.perform(nonSendable: input) { ctx, input in
+            // Production parity: stop on the model's chat terminators too (the superset the production stream uses).
+            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
+            for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
+                if let id = ctx.tokenizer.convertTokenToId(name) { eos.insert(id) }
+            }
+            let promptTokens = input.text.tokens.asArray(Int.self)
+            speculator.reset()
+            let target = try BASSaguaroMLXTarget(
+                model: ctx.model, input: input, parameters: params, eosTokenIds: eos)
+            let result = try await BASSaguaroLoop.generate(
+                promptTokens: promptTokens, draft: speculator, target: target,
+                eosTokenIds: eos, maxTokens: maxTokens, numDraftTokens: K)
+            return ctx.tokenizer.decode(tokenIds: result.tokens)
+        }
+        let body = Self.applyMarkerPostprocessing(rawBody)
+
+        return BASOrganDraft(
+            requestID: request.requestID,
+            providerID: descriptor.providerID,
+            role: request.role,
+            body: body,
+            inputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(from: [request.instruction] + request.context),
+            outputTokensEstimated: BASOrganDeterministicAdapter.estimateTokens(from: [body]),
+            producedAt: Date(),
+            traceID: BASOrganDeterministicAdapter.digest(
+                for: request, providerID: descriptor.providerID),
+            completionMetrics: nil)
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason: MLXOrganAdapter.frameworkUnavailableReason
+                + MLXOrganAdapter.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
 }

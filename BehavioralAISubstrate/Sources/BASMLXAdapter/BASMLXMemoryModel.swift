@@ -74,6 +74,10 @@ public enum BASMLXMemoryModel {
         ("llama3_2.1b",  Estimate(residentBytes: 700 * mib,   peakBytes: nil)),
         ("qwen2_5.3b",   Estimate(residentBytes: 1_800 * mib, peakBytes: nil)),
         ("qwen2_5.1_5b", Estimate(residentBytes: 1_000 * mib, peakBytes: nil)),
+        // Saguaro Mamba (Llamba-1B fp16 .aimodel, 2.81 GB on disk) co-resident DRAFT alongside the 3B target.
+        // resident is an ESTIMATE (fp16 ~1B; mmap clean pages may run lower); peakBytes nil ⇒ admits until the
+        // device probe (BAS_COREAI_SAGUARO_PROBE) measures dual-residency peak, then tighten.
+        ("coreai.mamba", Estimate(residentBytes: 2_000 * mib, peakBytes: nil)),
     ]
 
     /// The merged estimate for a providerID, or nil if unmapped.

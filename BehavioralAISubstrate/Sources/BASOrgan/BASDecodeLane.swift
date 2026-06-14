@@ -107,4 +107,14 @@ public enum BASDecodeLanePolicy {
         case .creative, .scoutDefault: return false
         }
     }
+
+    /// DOCTRINE end for the Saguaro (Mamba∥MLX) lane — same greedy-only invariant as prompt-lookup: Saguaro
+    /// byte-identity is the target's argmax by construction, valid ONLY at temp 0, so `.creative` (temp>0) and
+    /// `.scoutDefault` (0.1, and ADR-014 default-off) are never eligible. eligibility ⟹ greedy (temp 0).
+    public static func saguaroEligible(for purpose: Purpose) -> Bool {
+        switch purpose {
+        case .factual, .deterministic: return true
+        case .creative, .scoutDefault: return false
+        }
+    }
 }
