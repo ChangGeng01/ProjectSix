@@ -96,46 +96,6 @@ extension MLXOrganAdapter {
         #endif
     }
 
-    /// Run `targetForwards` raw target verify forwards (no draft) and return the wall-ms — the GPU-work unit for
-    /// the overlap micro-probe. Awaitable so the caller can run it CONCURRENTLY (`async let`) with the CoreAI ANE
-    /// draft work: R2 — the cross-framework ANE∥GPU overlap is OS-scheduler concurrency of two independent tasks
-    /// (CoreAI executor ∥ this container actor), NOT two CoreAI `ComputeStream`s (which can't span MLX). The
-    /// concurrent-vs-serial wall ratio ρ measured by the caller answers whether ANE and GPU contend on the A19
-    /// (Core ML's was 0.34×; CoreAI is the bet).
-    public func saguaroTargetForwardsMs(
-        for request: BASOrganRequest,
-        targetForwards: Int
-    ) async throws -> Double {
-        #if canImport(MLXLLM)
-        guard let mainContainer = self._loadedContainerForStreaming() else {
-            throw BASOrganError.providerUnavailable(
-                reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before saguaroTargetForwardsMs"))
-        }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
-        let params = self._greedyParameters(
-            for: request.preset, maxOutputTokens: request.maxOutputTokens)
-
-        return try await mainContainer.perform(nonSendable: input) { ctx, input in
-            let eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
-            let target = try BASSaguaroMLXTarget(
-                model: ctx.model, input: input, parameters: params, eosTokenIds: eos)
-            _ = try target.prefill()
-            let t0 = DispatchTime.now().uptimeNanoseconds
-            var i = 0
-            while i < targetForwards { _ = try target.verify(committedLast: 1, draft: []); i += 1 }
-            return Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
-        }
-        #else
-        throw BASOrganError.providerUnavailable(
-            reason: MLXOrganAdapter.frameworkUnavailableReason
-                + MLXOrganAdapter.frameworkUnavailablePlatformSuffix)
-        #endif
-    }
-
     /// Host-electable PRODUCTION decode via the serial Saguaro lane (Track E). **ADR-014: DEFAULT-OFF** — nothing
     /// routes here unless a host opts a turn in with `electSaguaro = true` (typically
     /// `BASDecodeLanePolicy.saguaroEligible(for: purpose)`, computed host-side so this adapter keeps no

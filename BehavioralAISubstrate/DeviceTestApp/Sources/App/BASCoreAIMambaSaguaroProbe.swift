@@ -54,7 +54,6 @@ enum BASCoreAIMambaSaguaroProbe {
             let ssmShape = (env["BAS_COREAI_MAMBA_SSM"] ?? "16,32,64,64").split(separator: ",").compactMap { Int($0) }
             let K = Int(env["BAS_COREAI_SAGUARO_K"] ?? "") ?? 4
             let maxTok = Int(env["BAS_COREAI_SAGUARO_MAXTOK"] ?? "") ?? 96
-            let overlap = (env["BAS_COREAI_OVERLAP"] ?? "0") == "1"   // measure ANE-draft ∥ GPU-verify ρ
             let units = (env["BAS_COREAI_SAGUARO_UNITS"] ?? "ane")
                 .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
 
@@ -96,11 +95,6 @@ enum BASCoreAIMambaSaguaroProbe {
                     mark("📊 saguaro draft ERROR unit=\(u) \(error)  (Q1: did NOT compile/run on \(u))"); continue
                 }
 
-                // Overlap mode: measure ANE-draft ∥ GPU-verify ρ instead of the serial workloads.
-                if overlap {
-                    await measureOverlap(adapter: adapter, session: session, unit: u, K: K)
-                    continue
-                }
 
                 let speculator = BASSaguaroSpeculator(session: session)
                 for w in workloads {
@@ -135,63 +129,4 @@ enum BASCoreAIMambaSaguaroProbe {
         #endif
     }
 
-    #if canImport(CoreAI)
-    /// Measure the ANE-draft ∥ GPU-verify overlap factor ρ = serial_wall / concurrent_wall. R2: this is OS-scheduler
-    /// concurrency of two independent tasks (the CoreAI executor running `session.step` ∥ the MLX container actor
-    /// running target forwards), NOT two CoreAI `ComputeStream`s (which can't span MLX). ρ>1.3 ⇒ the two engines
-    /// overlap → wire `overlap: .computeStream`; ρ≲1.1 ⇒ they contend on memory bandwidth → ship serial only. The
-    /// Core ML answer was 0.34× (concurrent SLOWER); whether CoreAI flips it is THE open device question.
-    @available(iOS 27, macOS 27, *)
-    private static func measureOverlap(
-        adapter: MLXOrganAdapter, session: BASCoreAIMambaSession, unit: String, K: Int
-    ) async {
-        let req = BASOrganRequest(
-            requestID: "saguaro-overlap-\(unit)", role: .core,
-            preset: .greedyDeterministic, instruction: "Describe the ocean in a few sentences.", context: [])
-        let N = 8           // target verify forwards (GPU work unit)
-        let M = K * N       // matched draft steps (ANE work — ~K draft steps per target forward)
-        do {
-            // WARMUP: the first CoreAI session.step pays a one-time per-launch ANE program load. Without this it
-            // lands inside the SERIAL dMs (timer starts at the first step) but NOT inside the warm concurrent dC,
-            // inflating serialWall and biasing ρ HIGH. Discard a few steps so both draft halves run warm. The MLX
-            // target half self-warms (saguaroTargetForwardsMs JIT-compiles its kernels via prefill() pre-timer).
-            let cores = ProcessInfo.processInfo.activeProcessorCount   // <2 free ⇒ a starved pool, not contention
-            _ = await draftStepsMs(session, steps: max(4, K))
-
-            // Serial halves, each INNER-timed (prefill / setup excluded by saguaroTargetForwardsMs / draftStepsMs).
-            let tMs = try await adapter.saguaroTargetForwardsMs(for: req, targetForwards: N)
-            let dMs = await draftStepsMs(session, steps: M)
-            let serialWall = tMs + dMs
-
-            // Concurrent: ANE draft ∥ GPU target via two tasks. tCi/dCi are the SAME inner-timed regions as the
-            // serial halves → directly comparable. The overlapped concurrent wall is the LONGER inner region, so
-            // ρ = serialWall / max(tCi,dCi). The caller-span wall carries one-time prefill+hop overhead and is
-            // logged only as a cross-check, NEVER used for ρ (else asymmetric prefill would deflate it).
-            let c0 = DispatchTime.now().uptimeNanoseconds
-            async let tC = adapter.saguaroTargetForwardsMs(for: req, targetForwards: N)
-            async let dC = draftStepsMs(session, steps: M)
-            let (tCi, dCi) = try await (tC, dC)
-            let cWall = Double(DispatchTime.now().uptimeNanoseconds &- c0) / 1_000_000
-            let concInner = max(tCi, dCi)
-            let rho = concInner > 0 ? serialWall / concInner : 0
-            mark(String(format:
-                "📊 saguaro OVERLAP unit=%@ cores=%d target_ms=%.0f(×%d) draft_ms=%.0f(×%d) serial_ms=%.0f "
-                + "conc_inner_ms=%.0f(t=%.0f d=%.0f) caller_span_ms=%.0f "
-                + "rho=%.2f (ρ>1.3 ⇒ overlap pays; ρ≲1.1 ⇒ contention, serial only; Core ML was 0.34×)",
-                unit, cores, tMs, N, dMs, M, serialWall, concInner, tCi, dCi, cWall, rho))
-        } catch {
-            mark("📊 saguaro OVERLAP unit=\(unit) ERROR=\(error)")
-        }
-    }
-
-    /// Wall-ms of `steps` raw CoreAI Mamba draft forwards (the ANE work unit).
-    @available(iOS 27, macOS 27, *)
-    private static func draftStepsMs(_ session: BASCoreAIMambaSession, steps: Int) async -> Double {
-        let t0 = DispatchTime.now().uptimeNanoseconds
-        var tok = 1
-        var i = 0
-        while i < steps { tok = (try? await session.step(token: max(0, tok))) ?? 1; i += 1 }
-        return Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
-    }
-    #endif
 }
