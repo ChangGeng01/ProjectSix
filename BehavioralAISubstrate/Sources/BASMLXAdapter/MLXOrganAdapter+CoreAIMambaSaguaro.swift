@@ -58,7 +58,7 @@ extension MLXOrganAdapter {
         let input = try await mainContainer.prepare(input: UserInput(chat: messages))
         let params = self._greedyParameters(
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
-        let maxTokens = request.maxOutputTokens ?? params.maxTokens ?? 256   // loop needs a definite cap
+        let maxTokens = params.maxTokens ?? 256   // params.maxTokens is already guard-applied + descriptor-clamped   // loop needs a definite cap
 
         return try await mainContainer.perform(nonSendable: input) { ctx, input in
             let eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
@@ -171,7 +171,7 @@ extension MLXOrganAdapter {
         let input = try await mainContainer.prepare(input: UserInput(chat: messages))
         let params = self._greedyParameters(
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
-        let maxTokens = request.maxOutputTokens ?? params.maxTokens ?? 256
+        let maxTokens = params.maxTokens ?? 256   // params.maxTokens is already guard-applied + descriptor-clamped
 
         let rawBody: String = try await mainContainer.perform(nonSendable: input) { ctx, input in
             // Production parity: stop on the model's chat terminators too (the superset the production stream uses).

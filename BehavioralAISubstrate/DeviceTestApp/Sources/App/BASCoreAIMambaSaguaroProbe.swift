@@ -151,21 +151,34 @@ enum BASCoreAIMambaSaguaroProbe {
         let N = 8           // target verify forwards (GPU work unit)
         let M = K * N       // matched draft steps (ANE work — ~K draft steps per target forward)
         do {
-            // Serial halves, each measured alone.
+            // WARMUP: the first CoreAI session.step pays a one-time per-launch ANE program load. Without this it
+            // lands inside the SERIAL dMs (timer starts at the first step) but NOT inside the warm concurrent dC,
+            // inflating serialWall and biasing ρ HIGH. Discard a few steps so both draft halves run warm. The MLX
+            // target half self-warms (saguaroTargetForwardsMs JIT-compiles its kernels via prefill() pre-timer).
+            let cores = ProcessInfo.processInfo.activeProcessorCount   // <2 free ⇒ a starved pool, not contention
+            _ = await draftStepsMs(session, steps: max(4, K))
+
+            // Serial halves, each INNER-timed (prefill / setup excluded by saguaroTargetForwardsMs / draftStepsMs).
             let tMs = try await adapter.saguaroTargetForwardsMs(for: req, targetForwards: N)
             let dMs = await draftStepsMs(session, steps: M)
             let serialWall = tMs + dMs
-            // Concurrent: ANE draft ∥ GPU target via two tasks.
+
+            // Concurrent: ANE draft ∥ GPU target via two tasks. tCi/dCi are the SAME inner-timed regions as the
+            // serial halves → directly comparable. The overlapped concurrent wall is the LONGER inner region, so
+            // ρ = serialWall / max(tCi,dCi). The caller-span wall carries one-time prefill+hop overhead and is
+            // logged only as a cross-check, NEVER used for ρ (else asymmetric prefill would deflate it).
             let c0 = DispatchTime.now().uptimeNanoseconds
             async let tC = adapter.saguaroTargetForwardsMs(for: req, targetForwards: N)
             async let dC = draftStepsMs(session, steps: M)
-            _ = try await (tC, dC)
-            let concWall = Double(DispatchTime.now().uptimeNanoseconds &- c0) / 1_000_000
-            let rho = concWall > 0 ? serialWall / concWall : 0
+            let (tCi, dCi) = try await (tC, dC)
+            let cWall = Double(DispatchTime.now().uptimeNanoseconds &- c0) / 1_000_000
+            let concInner = max(tCi, dCi)
+            let rho = concInner > 0 ? serialWall / concInner : 0
             mark(String(format:
-                "📊 saguaro OVERLAP unit=%@ target_ms=%.0f(×%d) draft_ms=%.0f(×%d) serial_ms=%.0f conc_ms=%.0f "
+                "📊 saguaro OVERLAP unit=%@ cores=%d target_ms=%.0f(×%d) draft_ms=%.0f(×%d) serial_ms=%.0f "
+                + "conc_inner_ms=%.0f(t=%.0f d=%.0f) caller_span_ms=%.0f "
                 + "rho=%.2f (ρ>1.3 ⇒ overlap pays; ρ≲1.1 ⇒ contention, serial only; Core ML was 0.34×)",
-                unit, tMs, N, dMs, M, serialWall, concWall, rho))
+                unit, cores, tMs, N, dMs, M, serialWall, concInner, tCi, dCi, cWall, rho))
         } catch {
             mark("📊 saguaro OVERLAP unit=\(unit) ERROR=\(error)")
         }

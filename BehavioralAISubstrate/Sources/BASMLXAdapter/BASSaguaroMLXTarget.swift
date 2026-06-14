@@ -40,7 +40,13 @@ public final class BASSaguaroMLXTarget: BASSaguaroTarget {
         self.prefillStepSize = parameters.prefillStepSize
         self.eosTokenIds = eosTokenIds
         let c = model.newCache(parameters: parameters)
-        guard canTrimPromptCache(c) else { throw TargetError.nonTrimmableCache }
+        // ADR-039: the spec-decode rewind requires an UNCONDITIONALLY trimmable cache. canTrimPromptCache only
+        // checks offset==0 at construction; a RotatingKVCache (maxKVSize != nil) flips isTrimmable→false once it
+        // fills past maxCacheSize, after which trimRejected silently no-ops and desyncs the target cache from the
+        // committed prefix — breaking byte-identity mid-run. Reject it up front (fail-closed) rather than corrupt.
+        guard c.allSatisfy({ !($0 is RotatingKVCache) }), canTrimPromptCache(c) else {
+            throw TargetError.nonTrimmableCache
+        }
         self.cache = c
     }
 
