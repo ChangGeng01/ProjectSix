@@ -564,3 +564,21 @@ work, and fast: any **≤12-layer SINGLE-function asset** (L8 36 tok/s, L12 27 t
 16-layer 1B. The host toolchain + fidelity (fp16+int8 24/24) + the Swift split machinery are all built and ready; the
 on-device ceiling is purely the beta ANE compiler's per-asset layer cap. (Plus a 3rd, larger lever if ever needed:
 multi-PROCESS — `AIModelCache(appGroup:)` + XPC so each asset is in its own process — explicitly OUT of scope here.)
+
+### Track E AUDIT cont. — real-weight ≤12-layer ANE decode PROVEN end-to-end (engineering ✅; but truncation ≠ usable draft)
+
+To close the loop, built a REAL-weight **12-layer truncated Llama-3.2-1B** (embed + layers 0–11 + final_norm + tied lm_head,
+fp16, `Tools/llama_to_coreai_12L.py`) and ran it on the A19 via the single-model `BASCoreAIDecodeSession` (`BAS_COREAI_LAYERS=12`):
+- **DEVICE (ANE): compiles + decodes END-TO-END — 27.5 tok/s, peak 2.25 GB, real token ids.** The first real-weight CoreAI
+  ANE decode of a 1B-class LLM on-target. Matches the L12 random-weight (27 tok/s) → confirms the engineering with real weights.
+- **Conversion is FAITHFUL** (fp16-torch vs fp16-`.aimodel`: logit corr 0.997, teacher-forced argmax 22/24).
+- **BUT the truncated model is a DEGENERATE LM** (free-running greedy 1/24, repetition-collapse; near-tied logits make argmax
+  precision-unstable — even fp32-torch vs fp16-torch disagree). Dropping 4 of 16 layers wrecks coherence. So a truncated-12L
+  is *runnable + faithful* but *useless as a generator or a high-acceptance draft*.
+
+**Final CoreAI-ANE picture:** the **engineering is GREEN** — a real ≤12-layer LLM decodes on the A19 ANE end-to-end (27.5
+tok/s), byte-faithful, < cap. The **blocker is the model**: the per-asset ≤~12-layer ANE ceiling (a) excludes the full
+16-layer 1B (can't split around it — per-asset compile + 2nd-AIModel SIGSEGV) and (b) truncating to fit yields garbage. A
+USABLE CoreAI-ANE draft therefore needs a **properly-trained ≤12-layer model (distillation, not truncation)** OR the beta to
+lift the per-asset layer cap. Everything host-side + the Swift drivers are built + committed; the device path works for any
+≤12-layer asset the moment a good ≤12-layer model exists.
