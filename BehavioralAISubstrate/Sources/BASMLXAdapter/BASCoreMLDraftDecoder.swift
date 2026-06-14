@@ -39,7 +39,13 @@ public struct BASCoreMLDraftDecoder {
         numDraftTokens K: Int = 4
     ) throws -> Result {
         var cache = model.newCache(parameters: parameters)
-        guard canTrimPromptCache(cache) else { throw DecodeError.nonTrimmableCache }
+        // ADR-039: the spec-decode rewind needs an UNCONDITIONALLY trimmable cache. canTrimPromptCache only checks
+        // offset==0 at construction; a RotatingKVCache (maxKVSize != nil) flips isTrimmable→false once it fills past
+        // maxCacheSize, after which trimPromptCache silently under-trims and desyncs the cache from the committed
+        // prefix — breaking the token-identical-to-greedy invariant mid-run. Reject it up front (fail-closed).
+        guard cache.allSatisfy({ !($0 is RotatingKVCache) }), canTrimPromptCache(cache) else {
+            throw DecodeError.nonTrimmableCache
+        }
         let sampler = parameters.sampler()
         let maxTokens = parameters.maxTokens
 
