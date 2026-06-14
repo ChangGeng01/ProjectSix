@@ -487,19 +487,29 @@ seq × oh `[1,1,MAX_SEQ,1]` size-1 head), **zeroing every kv-head beyond head 0*
 (→ `broadcasting_where`) for the write — **full 1B `.aimodel` → 24/24**, strictly cheaper. (Applied to
 `Tools/llama_to_coreai.py`; reused identically in the multi-position verify scatter.)
 
-**RED on-device (gate (a) — the decisive device finding):** the **2.3 GB fp16 1B single-asset fails to compile/load on
-ALL THREE A19 backends** in CoreAI 0.4.0 beta:
-- `.default` / `.neuralEngine` → `aned` ANE compiler **OOM** (`ANECCompile FAILED … model.hwx.tmp_n.weights` →
-  `std::bad_alloc` → SIGABRT, uncatchable) — matches the prior Core ML "fp16-1B ANE-size-rejected".
-- `.cpuOnly` → `BNNSCompileError.compilationFailed`.   - `.gpu` → SIGABRT during load.
+**RED on-device (gate (a) — the decisive device finding, fp16 AND int8):** the 1B decode graph **fails to compile/load
+on ALL THREE A19 backends at BOTH precisions** in CoreAI 0.4.0 beta:
 
-A **tiny model (2-layer, vocab 320, headDim 16) COMPILES + LOADS on `.cpuOnly`** (Δ17 MB on device). So CoreAI on-device
-decode is real at small scale; **the 1B failure is a beta-compiler SIZE limit, not fundamental.**
+| model | `.cpuOnly` (BNNS) | `.gpu` | `.neuralEngine` (aned) |
+|---|---|---|---|
+| **fp16 1B** (2.3 GB) | `BNNSCompileError.compilationFailed` | SIGABRT (load) | OOM `std::bad_alloc` → SIGABRT |
+| **int8 1B** (1.24 GB, 24/24 host) | `BNNSCompileError.compilationFailed` | SIGABRT (load) | **SIGABRT (compile)** |
+| **tiny** (2-layer, vocab 320) | ✅ compiles + loads (Δ17 MB) | — | — |
+
+int8 weight-quant (verified: `coreai_torch._compression` → `(Int8, …)` storage, 1.24 GB, **host fidelity 24/24**) was the
+chosen P0.5 unblock — and it **did NOT clear any backend** (still crashes/fails all three). A tiny model compiles + loads
+fine. **So the wall is beta-compiler ROBUSTNESS on the 16-layer / 128k-vocab graph, NOT size/quantization** — halving the
+bytes changed nothing. (The uncatchable `std::bad_alloc`/SIGABRT crashes happen in `AIModel.load`→compile, before any
+Swift decode code runs — not our bug; the fp16-input/state/logits dtype is correct.)
 
 **Verdict — CoreAI is the rigorous substrate (strictly more than Core ML: stateful KV + first-class `ComputeStream`
-concurrency + async `encode`/`AsyncValue` zero-copy + dynamic shapes), the toolchain + fidelity are now SOLVED (24/24),
-the Swift integration compiles on-target — but the 1B-fp16 single-asset throughput-vs-MLX gate (G3) is BLOCKED on-device
-in this beta until the model is made compilable (int8/int4 quant — the B2 finding that int8 restores ANE; or layer-split
-multi-function assets; or sub-1B / Gemma-E2B targets).** Not a DECLINE — a characterized wall with a concrete path
-(P0.5 in the integration plan). The shipped universal decode win remains **Track A (prompt-lookup, byte-identical, 1.58×
-repetitive, production-wired)**; CoreAI/Saguaro is the rigorous next-arc foundation, evidence-gated (G0–G3).
+concurrency + async `encode`/`AsyncValue` zero-copy + dynamic shapes); the HOST toolchain + fidelity are SOLVED (24/24
+fp16 AND int8); the Swift integration compiles + runs on-target — BUT the on-device throughput gate (G3) is BLOCKED by the
+iOS-27 CoreAI 0.4.0 BETA COMPILERS: all three backends crash/fail on a 1B-class LLM decode graph at both fp16 and int8,
+while small models compile fine.** This is a beta-toolchain maturity wall, not a design or memory failure — a legitimate
+**DECLINE-for-now (亏的不要)**: the on-device path is blocked upstream, not by us. Concrete paths when revisited: a future
+CoreAI/`aned` beta that compiles the graph; **heavy layer-split** multi-function assets (each chunk under the beta's
+robustness limit); or a **much smaller target** (sub-1B draft / Gemma-3n-E2B). The shipped universal decode win remains
+**Track A (prompt-lookup, byte-identical, 1.58× repetitive, production-wired)**. The CoreAI foundation (fixed converter +
+int8 + Swift session + the full Saguaro plan in `COREAI_SAGUARO_INTEGRATION_PLAN.md`) is ready for the moment the beta
+compilers mature — evidence-gated (G0 ✅ done; G1–G3 pending an on-device compile).

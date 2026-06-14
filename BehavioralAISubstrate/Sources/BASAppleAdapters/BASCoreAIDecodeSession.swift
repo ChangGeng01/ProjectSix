@@ -100,7 +100,7 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
         self.sinTable = try Self.loadTable(ropeSinURL, count: maxSeq * headDim)
         self.kvShape = [2 * nLayers, 1, nKV, maxSeq, headDim]
         self.kvCount = kvShape.reduce(1, *)
-        self.kv = NDArray(scalars: [Float](repeating: 0, count: kvCount), shape: kvShape)
+        self.kv = NDArray(scalars: [Float16](repeating: 0, count: kvCount), shape: kvShape)
     }
 
     private static func loadTable(_ url: URL, count: Int) throws -> [Float] {
@@ -118,13 +118,15 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
     @discardableResult
     public func step(token: Int, pos: Int) async throws -> Int {
         guard pos < maxSeq else { throw DecodeError.windowOverflow(pos: pos, maxSeq: maxSeq) }
+        // The device artifacts are fp16-compute (weights fp16 / int8-dequant-to-fp16): float inputs, the KV
+        // state, and the logits output are ALL Float16 — feeding Float32 fails run() with a scalar-type mismatch.
         let base = pos * headDim
         let inputID = NDArray(scalars: [Int32(token)], shape: [1, 1])
-        let cos = NDArray(scalars: Array(cosTable[base..<base + headDim]), shape: [headDim])
-        let sin = NDArray(scalars: Array(sinTable[base..<base + headDim]), shape: [headDim])
-        var onehot = [Float](repeating: 0, count: maxSeq)
+        let cos = NDArray(scalars: cosTable[base..<base + headDim].map { Float16($0) }, shape: [headDim])
+        let sin = NDArray(scalars: sinTable[base..<base + headDim].map { Float16($0) }, shape: [headDim])
+        var onehot = [Float16](repeating: 0, count: maxSeq)
         onehot[pos] = 1
-        var bias = [Float](repeating: neg, count: maxSeq)
+        var bias = [Float16](repeating: Float16(neg), count: maxSeq)
         for j in 0...pos { bias[j] = 0 }
         let inputs: [String: NDArray] = [
             "input_id": inputID, "rope_cos": cos, "rope_sin": sin,
@@ -158,10 +160,11 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
         let count = a.shape.reduce(1, *)
         var best = 0
         var bestV = -Float.greatestFiniteMagnitude
-        a.view(as: Float.self).withUnsafePointer { pointer, _, _ in
+        a.view(as: Float16.self).withUnsafePointer { pointer, _, _ in   // logits are fp16
             var i = 0
             while i < count {
-                if pointer[i] > bestV { bestV = pointer[i]; best = i }
+                let v = Float(pointer[i])
+                if v > bestV { bestV = v; best = i }
                 i += 1
             }
         }
@@ -172,7 +175,7 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
 
     /// Fresh KV + frontier for a new generation (reuse the loaded model without reloading).
     public func reset() {
-        self.kv = NDArray(scalars: [Float](repeating: 0, count: kvCount), shape: kvShape)
+        self.kv = NDArray(scalars: [Float16](repeating: 0, count: kvCount), shape: kvShape)
         draftPos = 0
     }
 

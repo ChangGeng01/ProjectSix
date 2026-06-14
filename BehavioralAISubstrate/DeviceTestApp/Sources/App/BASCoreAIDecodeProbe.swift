@@ -78,17 +78,21 @@ enum BASCoreAIDecodeProbe {
         mark(fileLog, String(format: "📊 coreai-decode START footprint0=%.0fMB (beat: MLX 3B=38.3 tok/s; cap 3248MB)", footprintMB()))
         #if canImport(CoreAI)
         if #available(iOS 27, macOS 27, *) {
-            // .default / .neuralEngine OOM-CRASH the aned ANE compiler on the 2.3 GB fp16 1B (uncatchable
-            // std::bad_alloc → SIGABRT — matches the prior Core ML "fp16 ANE size-rejected" finding). So
-            // measure GPU + CPU on fp16; ANE is gated behind BAS_COREAI_TRY_ANE=1 (for a future int8 artifact).
-            await measure(label: "cpuOnly", options: .cpuOnly, fileLog: fileLog)
-            await measure(label: "gpu", options: SpecializationOptions(preferredComputeUnitKind: .gpu), fileLog: fileLog)
-            if (ProcessInfo.processInfo.environment["BAS_COREAI_TRY_ANE"] ?? "0") == "1" {
-                await measure(label: "ane", options: SpecializationOptions(preferredComputeUnitKind: .neuralEngine), fileLog: fileLog)
-            } else {
-                mark(fileLog, "📊 coreai-decode ane SKIPPED (fp16 1B OOM-crashes aned; needs int8 + BAS_COREAI_TRY_ANE=1)")
+            // Each backend can FAIL INDEPENDENTLY and some failures are uncatchable (aned OOM / GPU compile →
+            // std::bad_alloc → SIGABRT, killing the app past Swift try/catch). So units are run in
+            // BAS_COREAI_UNITS order (default "cpu,gpu") — isolate a backend (e.g. "ane") so an earlier crash
+            // can't pre-empt it. The 1B fp16 OOM-crashes aned; int8 (1.24 GB) is the ANE candidate.
+            let units = (ProcessInfo.processInfo.environment["BAS_COREAI_UNITS"] ?? "cpu,gpu")
+                .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            for u in units {
+                switch u {
+                case "cpu": await measure(label: "cpuOnly", options: .cpuOnly, fileLog: fileLog)
+                case "gpu": await measure(label: "gpu", options: SpecializationOptions(preferredComputeUnitKind: .gpu), fileLog: fileLog)
+                case "ane": await measure(label: "ane", options: SpecializationOptions(preferredComputeUnitKind: .neuralEngine), fileLog: fileLog)
+                default: mark(fileLog, "📊 coreai-decode unknown unit \(u)")
+                }
             }
-            mark(fileLog, "📊 coreai-decode DONE — read: tok/s vs 38.3 (gate b); peak_MB vs 3248 (gate c); gpu/cpu ratio = placement (gate d).")
+            mark(fileLog, "📊 coreai-decode DONE — read: tok/s vs 38.3 (gate b); peak_MB vs 3248 (gate c); per-unit = placement (gate d).")
         } else {
             mark(fileLog, "📊 coreai-decode SKIP — needs iOS 27 / macOS 27")
         }
