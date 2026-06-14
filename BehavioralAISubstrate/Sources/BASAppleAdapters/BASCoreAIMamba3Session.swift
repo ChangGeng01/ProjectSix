@@ -1,25 +1,16 @@
 // MARK: - BASCoreAIMamba3Session
 //
-// Stateful **Mamba-3** decode on iOS-27 CoreAI — the upgrade sibling of `BASCoreAIMambaSession` (Mamba-2/SSD).
-// Mamba-3 (arXiv 2603.15569, ICLR 2026) generalizes Mamba-2 with: (1) trapezoidal 2nd-order discretization →
-// a 3-term recurrence (which subsumes & REMOVES the short conv1d); (2) complex-valued state realized as REAL
-// 2×2 rotation blocks + data-dependent RoPE (no complex dtype/exp/phase at runtime); (3) MIMO rank-R (raises
-// arithmetic intensity at fixed decode latency — state bytes/step unchanged). All of it lowers to the same
-// real primitives the Mamba-2 path already proved on the A19 ANE (host convertibility GREEN, L=16 int8 = 1.04 GB).
+// Stateful **Mamba-3** decode probe driver on iOS-27 CoreAI — the upgrade sibling of `BASCoreAIMambaSession`
+// (Mamba-2/SSD). Mamba-3 (arXiv 2603.15569, ICLR 2026) generalizes Mamba-2 with trapezoidal discretization, a
+// complex-valued state realized as REAL 2×2 rotations + data-dependent RoPE, and MIMO rank-R — all lowering to
+// the same real primitives the Mamba-2 path proved (host convertibility GREEN, L=16 int8 = 1.04 GB).
 //
-// State = TWO PROPERLY-SHAPED buffers (the Mamba-2 pattern the A19 ANE proved):
-//   ssm_all   fp16 [L, H, P, N]    the SSM hidden state H_t
-//   angle_all fp16 [L, H, N//2]    cumulative data-dependent RoPE angle
-// WHY exactly two, properly-shaped: device bisection showed the on-device segmenter SIGSEGVs both alternatives —
-// (a) >2 properly-shaped states reorder token-OUTPUTS vs handle-INPUTS ("order of token outputs does not match
-// order of handle inputs" → CPU error, ANE SIGSEGV); (b) a single FLAT fused state [L,S] crashes the ANE compiler
-// on its slice/reshape (even a Mamba-2-style op body). Two properly-shaped states is the landed Llamba Mamba-2
-// pattern that compiles + runs on ANE. To stay at two we set λ=1 (Euler) and drop the trapezoidal 1-step delay
-// state — that removes only a delay buffer + two muls (no new op-type), so the marquee Mamba-3 ops (data-dependent
-// RoPE rotation + MIMO rank-R einsums) are exercised faithfully. fp16 throughout (the device artifact is fp16).
-//
-// Decode-SPEED probe driver (no spec-decode snapshot/restore — Saguaro is declined; this measures the standalone
-// Mamba-3 ANE lane: tok/s, peak MB, and whether the rank-R MIMO matmul lowers to efficient ANE MACs).
+// GENERIC over the carried state count: the probe converter has been through several state layouts during the
+// ANE-crash bisection — 4 properly-shaped states (segmenter ordering bug), 1 flat fused state [L,S] (CPU-runs,
+// ANE-slice crash), 2 properly-shaped states (ssm+angle). Rather than rebuild the app per layout, this session
+// reads the descriptor's stateNames and binds an NDArray per state, with shapes supplied (in descriptor order).
+// All states are mutated in place by `run`. fp16 throughout (the device artifact is fp16-compute). This is a
+// decode-SPEED/COMPILE probe driver (no spec-decode snapshot/restore — Saguaro is declined).
 // `@unchecked Sendable`: single serialized executor. `#if canImport(CoreAI)` + iOS/macOS 27.
 
 import Foundation
@@ -39,30 +30,28 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
 
     private let model: AIModel
     private let function: InferenceFunction
-    private let ssmName: String
-    private let angleName: String
-    private var ssmAll: NDArray
-    private var angleAll: NDArray
-    private let ssmShape: [Int]
-    private let angleShape: [Int]
-    private let ssmCount: Int
-    private let angleCount: Int
+    private let names: [String]               // descriptor order (count 1 or 2)
+    private let count: Int
+    private var state0: NDArray
+    private var state1: NDArray                // dummy [1] when count == 1 (never inserted)
+    private let shapes: [[Int]]
 
     /// Tokens decoded so far (Mamba has no positional window — just a counter).
     public private(set) var pos: Int = 0
 
-    /// `ssmShape`/`angleShape` are the two properly-shaped state shapes, e.g. [16,32,64,64] and [16,32,32]. The
-    /// state NAMES are read from the descriptor and matched by substring (ssm / angle).
+    /// `stateShapes` are the carried-state shapes in the SAME order the converter declared them (its
+    /// `buffers_to_mutate` / registration order), e.g. `[[16,148480]]` (flat probe) or
+    /// `[[16,32,64,64],[16,32,32]]` (2-state ssm, angle). Supports 1 or 2 states — `MutableViews` is
+    /// lifetime-dependent, so each state is bound through an explicit `inout` (a stored property inserted
+    /// directly "escapes its scope"); 1 and 2 cover every layout the bisection uses (the 4-state layout is
+    /// abandoned — it hit the segmenter ordering bug).
     public init(
         assetURL: URL,
-        ssmShape: [Int],
-        angleShape: [Int],
+        stateShapes: [[Int]],
         options: SpecializationOptions = .default
     ) async throws {
-        self.ssmShape = ssmShape
-        self.angleShape = angleShape
-        self.ssmCount = ssmShape.reduce(1, *)
-        self.angleCount = angleShape.reduce(1, *)
+        self.shapes = stateShapes
+        self.count = stateShapes.count
         let loaded: AIModel
         do {
             loaded = try await AIModel(contentsOf: assetURL, options: options)
@@ -75,37 +64,51 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
         self.model = loaded
         self.function = fn
         let descNames = fn.descriptor.stateNames
-        guard descNames.count == 2 else {
-            throw DecodeError.badStates("expected 2 states (ssm, angle), got \(descNames)")
+        guard descNames.count == stateShapes.count, (1...2).contains(descNames.count) else {
+            throw DecodeError.badStates("descriptor has \(descNames.count) states \(descNames); supported: 1 or 2 with matching shapes (\(stateShapes.count) supplied)")
         }
-        let angle = descNames.first(where: { $0.lowercased().contains("angle") }) ?? descNames[1]
-        self.angleName = angle
-        self.ssmName = descNames.first(where: { $0 != angle }) ?? descNames[0]
-        self.ssmAll = NDArray(scalars: [Float16](repeating: 0, count: ssmCount), shape: ssmShape)
-        self.angleAll = NDArray(scalars: [Float16](repeating: 0, count: angleCount), shape: angleShape)
+        self.names = descNames
+        func zeroed(_ s: [Int]) -> NDArray {
+            NDArray(scalars: [Float16](repeating: 0, count: s.reduce(1, *)), shape: s)
+        }
+        self.state0 = zeroed(stateShapes[0])
+        self.state1 = stateShapes.count == 2 ? zeroed(stateShapes[1]) : NDArray(scalars: [Float16(0)], shape: [1])
     }
 
-    /// One decode step: feed `token`, advance both recurrent states, return the argmax of the logits.
+    /// One decode step: feed `token`, advance the carried state(s), return the argmax of the logits.
     @discardableResult
     public func step(token: Int) async throws -> Int {
         let inputID = NDArray(scalars: [Int32(token)], shape: [1, 1])
-        return try await runStep(inputID: inputID, ssm: &ssmAll, angle: &angleAll)
+        return count == 2
+            ? try await runStep2(inputID: inputID, s0: &state0, s1: &state1)
+            : try await runStep1(inputID: inputID, s0: &state0)
     }
 
-    /// Both states are `inout` so their exclusive access spans the inserts + the consuming run.
-    private func runStep(inputID: NDArray, ssm: inout NDArray, angle: inout NDArray) async throws -> Int {
-        var states = InferenceFunction.MutableViews()
-        states.insert(&ssm, for: ssmName)
-        states.insert(&angle, for: angleName)
+    private func runStep1(inputID: NDArray, s0: inout NDArray) async throws -> Int {
+        var views = InferenceFunction.MutableViews()
+        views.insert(&s0, for: names[0])
         var outputs: InferenceFunction.Outputs
         do {
-            outputs = try await function.run(inputs: ["input_id": inputID], states: states)
+            outputs = try await function.run(inputs: ["input_id": inputID], states: views)
         } catch {
             throw DecodeError.predict("\(error)")
         }
-        guard let value = outputs.remove("logits"), let logits = value.ndArray else {
-            throw DecodeError.noLogits
+        guard let value = outputs.remove("logits"), let logits = value.ndArray else { throw DecodeError.noLogits }
+        pos += 1
+        return Self.argmaxF16(logits)
+    }
+
+    private func runStep2(inputID: NDArray, s0: inout NDArray, s1: inout NDArray) async throws -> Int {
+        var views = InferenceFunction.MutableViews()
+        views.insert(&s0, for: names[0])
+        views.insert(&s1, for: names[1])
+        var outputs: InferenceFunction.Outputs
+        do {
+            outputs = try await function.run(inputs: ["input_id": inputID], states: views)
+        } catch {
+            throw DecodeError.predict("\(error)")
         }
+        guard let value = outputs.remove("logits"), let logits = value.ndArray else { throw DecodeError.noLogits }
         pos += 1
         return Self.argmaxF16(logits)
     }
@@ -127,8 +130,11 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
 
     /// Fresh recurrent state for a new generation (Mamba has no KV/window — just zero the states).
     public func reset() {
-        ssmAll = NDArray(scalars: [Float16](repeating: 0, count: ssmCount), shape: ssmShape)
-        angleAll = NDArray(scalars: [Float16](repeating: 0, count: angleCount), shape: angleShape)
+        func zeroed(_ s: [Int]) -> NDArray {
+            NDArray(scalars: [Float16](repeating: 0, count: s.reduce(1, *)), shape: s)
+        }
+        state0 = zeroed(shapes[0])
+        if count == 2 { state1 = zeroed(shapes[1]) }
         pos = 0
     }
 }

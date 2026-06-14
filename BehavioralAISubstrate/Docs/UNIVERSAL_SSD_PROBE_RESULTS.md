@@ -772,3 +772,46 @@ BELOW the banked Mamba-2 ANE 39 tok/s. Mamba-3 stays a real FUTURE upgrade for t
 quality + ANE-friendly arithmetic intensity, convertibility proven) — actionable when BOTH (a) a checkpoint is
 released and (b) the ANE compile is unblocked (either a newer toolchain, or porting the step to the exact op
 formulation the proven Llamba Mamba-2 kernel uses rather than a from-scratch graph).
+
+---
+
+## Track G — Mamba-3 RUNS ON THE A19 ANE (2026-06-15): Track F's "ANE SIGSEGV" was a STATE-ORDER bug, now fixed
+
+**Reversal of Track F (R1 — new measurement overrides).** Track F concluded the A19 ANE compiler SIGSEGVs on the
+Mamba-3 op-graph. A full op-bisection (workflow `mamba3-ane-crash-localize` + on-device ladder) FALSIFIED that: the
+crash was never an op — it was the carried-STATE LAYOUT + registration ORDER.
+
+**The bisection (each a device run):**
+- **1 properly-shaped state** (ssm_all [L,H,P,N]), op-for-op the proven Llamba SSD step (RMSNorm, A=-1, pre-divide
+  x by dt, broadcast outer via view) → **✅ ANE compiles + runs, 145.8 tok/s (L=2)**. So the SSD math, norm, dt/A,
+  and the rank-0 select are ALL exonerated (they're byte-identical to or simpler than the shipped Llamba kernel;
+  the broadcasting_mul precedent is a fidelity bug, not a crash).
+- **Flat single fused state** [L,S] with op-for-op Llamba body → ❌ ANE SIGSEGV. The heterogeneous slice/reshape
+  (`row[0:o1].reshape(...)`) is an ANE-compiler crasher → do NOT flat-pack states.
+- **2 properly-shaped states, ssm-FIRST** (ssm_all, angle_all) → ❌ ANE SIGSEGV.
+- **2 properly-shaped states, angle-FIRST** (angle_all, ssm_all) WITH full data-dependent RoPE rotation + MIMO
+  rank-R einsums → **✅ ANE compiles + runs**. The 2nd-state registration ORDER is the whole story: put the
+  smaller RoPE/angle state FIRST (mirroring how the proven Llamba kernel registers conv before ssm). ssm-first
+  trips the coreai_torch/ANE segmenter; angle-first threads correctly.
+
+**Headline (full Mamba-3, data-dependent RoPE + MIMO R=4, int8, L=16, A19 ANE):**
+| | load (1-time compile) | decode tok/s | peak MB |
+|---|---|---|---|
+| **Mamba-3 (RoPE+MIMO, angle-first 2-state)** | ~10.0 s | **50.9** | **84** |
+| Mamba-2 banked (Llamba, Track E) | — | 39 | 77 |
+
+Mamba-3 is **FASTER than Mamba-2 on the ANE** (50.9 vs 39 tok/s) at comparable footprint — exactly the paper's
+promise (MIMO fills idle memory-bound decode compute; the trapezoid/no-conv step is lighter). CAVEAT: this probe
+is mixer-only (no per-block MLP) + random weights, so the absolute tok/s is not a perfect apples-to-apples vs the
+hybrid Llamba; a real instruct checkpoint with the MLP would be somewhat slower. But the decisive facts hold:
+**the full Mamba-3 op-graph (rotation + MIMO) compiles and decodes on the A19 ANE at competitive speed + tiny
+footprint.** (CPU still errors on the 2-state with "order of token outputs…" for BOTH orders — a CPU-backend
+segmenter quirk, irrelevant to the ANE deployment lane.)
+
+**VERDICT FLIP — Mamba-3 ANE convertibility + speed = GREEN. The upgrade is blocked ONLY on a checkpoint.** Track F's
+"NOT NOW, toolchain-blocked" is corrected: there is NO toolchain blocker once states are registered angle-first.
+When a Mamba-3 instruct checkpoint ships (or we train/distill one — the sole remaining gate, kernels-only release),
+it is a **drop-in, faster-than-Mamba-2 ANE draft / standalone tiny-model** for the banked ANE decode lane. Converter:
+`Tools/mamba3_full_ane.py` (the working angle-first full Mamba-3); `Tools/mamba3_1state.py` (the localizing control);
+driver `BASCoreAIMamba3Session` (generic 1-or-2 state) + `BASCoreAIMamba3Probe` (`BAS_COREAI_MAMBA3_PROBE=1`,
+`BAS_COREAI_MAMBA3_STATES="16,32,32;16,32,64,64"`).

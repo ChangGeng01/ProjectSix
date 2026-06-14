@@ -44,9 +44,10 @@ enum BASCoreAIMamba3Probe {
         if #available(iOS 27, macOS 27, *) {
             let env = ProcessInfo.processInfo.environment
             let assetName = env["BAS_COREAI_MAMBA3_ASSET"] ?? "Mamba3_L16_int8.aimodel"
-            // TWO properly-shaped states: ssm_all [L,H,P,N], angle_all [L,H,N//2] (the ANE-proven Mamba-2 pattern).
-            let ssmShape = (env["BAS_COREAI_MAMBA3_SSM"] ?? "16,32,64,64").split(separator: ",").compactMap { Int($0) }
-            let angleShape = (env["BAS_COREAI_MAMBA3_ANGLE"] ?? "16,32,32").split(separator: ",").compactMap { Int($0) }
+            // Carried-state shapes in the converter's declared order — semicolon-separates shapes, comma within.
+            // Flat probe: "16,148480". 2-state (ssm;angle): "16,32,64,64;16,32,32".
+            let stateShapes = (env["BAS_COREAI_MAMBA3_STATES"] ?? "16,148480")
+                .split(separator: ";").map { $0.split(separator: ",").compactMap { Int($0) } }
             let steps = Int(env["BAS_COREAI_MAMBA3_STEPS"] ?? "") ?? 128
             let units = (env["BAS_COREAI_MAMBA3_UNITS"] ?? "ane")
                 .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -67,12 +68,12 @@ enum BASCoreAIMamba3Probe {
                 case "ane": opts = SpecializationOptions(preferredComputeUnitKind: .neuralEngine)
                 default: mark("🐍 mamba3 unknown unit \(u)"); continue
                 }
-                mark("🐍 mamba3 loading unit=\(u) asset=\(assetName) ssm\(ssmShape) angle\(angleShape)…")
+                mark("🐍 mamba3 loading unit=\(u) asset=\(assetName) states\(stateShapes)…")
                 let t0 = DispatchTime.now().uptimeNanoseconds
                 let session: BASCoreAIMamba3Session
                 do {
                     session = try await BASCoreAIMamba3Session(
-                        assetURL: asset, ssmShape: ssmShape, angleShape: angleShape, options: opts)
+                        assetURL: asset, stateShapes: stateShapes, options: opts)
                     let loadMs = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
                     mark(String(format: "🐍 mamba3 loaded unit=%@ load_ms=%.0f footprint=%.0fMB (Q1: 16L Mamba-3 compiles on %@ ✅)",
                                 u, loadMs, footprintMB(), u))
