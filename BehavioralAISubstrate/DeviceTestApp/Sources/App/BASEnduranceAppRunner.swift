@@ -338,6 +338,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIDecodeProbe.run() }
             return
         }
+        // Track E — SERIAL Saguaro end-to-end: MLX 3B target verifying a CoreAI Mamba (Llamba-1B) draft via
+        // BASSaguaroLoop (BAS_COREAI_SAGUARO_PROBE=1). Measures Q1 (16L Mamba on ANE?) + serial tok/s vs pure
+        // target greedy + the draft/target time split + byte-identity. The 全面开发 Mamba capstone measurement.
+        if (env["BAS_COREAI_SAGUARO_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIMambaSaguaroProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
