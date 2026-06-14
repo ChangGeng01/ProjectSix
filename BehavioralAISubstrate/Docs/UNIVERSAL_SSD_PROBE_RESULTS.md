@@ -729,3 +729,46 @@ decode lane, 39 tok/s, tiny footprint, byte-identity (a real, reusable capabilit
 for spec-decode); (2) the whole Saguaro stack is built, correct, byte-identical, default-OFF — ready if the SoC bandwidth economics
 ever change.** Device run-book: stage assets via `devicectl device copy to --domain-type appDataContainer`; launch with `devicectl
 device process launch --environment-variables '{...}'` (JSON, NOT --environment); app com.changgeng.basdevicetest on the A19.
+
+---
+
+## Track F — Mamba-3 weights-free ANE probe (2026-06-15): host GREEN, CPU runs, **ANE compiler SIGSEGVs**
+
+The "upgrade to Mamba-3" gate. The study (memory `mamba3-coreai-convertibility.md`) predicted Mamba-3 converts + lands
+on the A19 ANE "as cleanly as Mamba-2". A weights-free probe (random weights at the Llamba-1B config — L=16, d=2048,
+H=32, P=64, N=64, MIMO R=4 — int8) was built to test the OP-graph compile + speed, no checkpoint/training. Driver:
+`Tools/mamba3_to_coreai.py` (+ ablations), `Sources/BASAppleAdapters/BASCoreAIMamba3Session.swift`,
+`DeviceTestApp/.../BASCoreAIMamba3Probe.swift` (`BAS_COREAI_MAMBA3_PROBE=1`).
+
+**Host convertibility — ✅ GREEN (prediction confirmed).** The full Mamba-3 step — real 2×2-rotation / data-dependent
+RoPE, trapezoidal 3-term recurrence, AND the MIMO rank-R einsums (`hpr,hrn->hpn`) — lowered through coreai_torch 0.4.0
+first try, no unsupported-op error. L=16 int8 = **1.04 GB** (under the ~2 GB beta load wall). Host CoreAI runtime
+loads + runs it (3 steps OK).
+
+**On-device CPU — ✅ runs.** Flat single-state L=16 int8 loads in 1.85 s and decodes at **23.1 tok/s, 56 MB peak** on
+the A19 CPU. The op-graph is valid silicon.
+
+**On-device ANE — ❌ compiler SIGSEGVs (the prediction FALSIFIED for the ANE lane).** `AIModel(contentsOf:options:
+ane)` crashes with **signal 11** during compile/segmentation — for EVERY variant tried: 4 properly-shaped states,
+1 flat fused state, 2 properly-shaped states, AND op-ablations `norope` / `nomimo` / `plain` (a bare SSD step with
+no rotation, no MIMO, no RMSNorm). So the ANE crash is **NOT the Mamba-3 ops** — it persists in a minimal SSD step —
+while the structurally-similar, PROVEN Llamba Mamba-2 int8 kernel ANE-compiles (Track E, 39 tok/s). ⇒ a beta-ANE-
+compiler limitation on this hand-written-from-scratch op formulation, not a Mamba-3 fundamental. (The concurrent
+boot smoke suite is ruled out: it completes before the crash and CPU runs of the same asset never crash.)
+
+**Secondary converter bug — CoreAI multi-state segmenter ordering.** Models carrying >1 properly-shaped mutable state
+in a "wrong" relative order fail (CPU clean error / ANE SIGSEGV): *"order of token outputs does not match order of
+handle inputs … Failed to rewrite module using segmenter"*. The device segmenter pairs state INPUTS by graph
+first-use with state OUTPUTS by registration; when a layer reads a later-registered state first (here `angle` read
+before `ssm` for the RoPE), they mismatch. Llamba's conv→ssm order dodged it; a single flat state dodges it (one
+state, no ordering) — which is why the flat variant is the one that CPU-runs. Source-order reordering does NOT fix it
+(torch.export reorders by data-dependency). The robust converter fix is a single flat state OR matching the exact
+proven Llamba kernel's state read/write order.
+
+**VERDICT: Mamba-3 is convertible (host + CPU proven) but does NOT compile on the A19 ANE in the current beta toolchain.**
+Combined with the study's hard gate (NO instruct checkpoint exists — kernels-only release), the "upgrade to Mamba-3"
+decision is **NOT NOW, evidence-backed (亏的不要)**: the only on-device lane it currently runs is CPU at 23 tok/s,
+BELOW the banked Mamba-2 ANE 39 tok/s. Mamba-3 stays a real FUTURE upgrade for the tiny-ANE lane (half-state @ equal
+quality + ANE-friendly arithmetic intensity, convertibility proven) — actionable when BOTH (a) a checkpoint is
+released and (b) the ANE compile is unblocked (either a newer toolchain, or porting the step to the exact op
+formulation the proven Llamba Mamba-2 kernel uses rather than a from-scratch graph).

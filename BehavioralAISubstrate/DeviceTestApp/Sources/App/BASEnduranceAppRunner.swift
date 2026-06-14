@@ -345,6 +345,14 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIMambaSaguaroProbe.run() }
             return
         }
+        // Track E — standalone Mamba-3 ANE decode (BAS_COREAI_MAMBA3_PROBE=1): the weights-free upgrade gate.
+        // Host convertibility GREEN (trapezoid + real 2×2-rotation RoPE + MIMO rank-R all lowered; L=16 int8 1.04GB);
+        // this answers Q1 (16L Mamba-3 compiles on the A19 ANE?) + tok/s/peak vs Mamba-2 (39 tok/s, 77MB), i.e. does
+        // the rank-R MIMO matmul lower to efficient ANE MACs or serialize.
+        if (env["BAS_COREAI_MAMBA3_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIMamba3Probe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
