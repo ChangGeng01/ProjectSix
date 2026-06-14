@@ -278,6 +278,90 @@ def convert_chunk_to_aimodel(chunk: LlamaChunk, idx: int, n_chunks: int, out_pat
     }
 
 
+def convert_chunks_to_multifn_aimodel(chunks: list[LlamaChunk], out_path: str) -> dict:
+    """Build ONE multi-function `.aimodel` with TWO entrypoints — stage0 + stage1 — from the 8+8
+    chunk graphs, instead of two separate assets.
+
+    The device CoreAI runtime SIGSEGVs when a 2nd `AIModel` is loaded into one process, so the two
+    chunks must live in ONE asset (one `AIModel.load`, two `loadFunction`s). Each function still
+    compiles independently (8 layers each) under the A19 ANE per-asset layer-count limit because the
+    limit is per-entrypoint-graph, not per-asset-file.
+
+    Steps:
+      1. ONE `coreai_torch.TorchConverter()`. For each chunk idx: torch.export.export ->
+         run_decompositions(get_decomp_table()) -> add_exported_program(ep, ..., entrypoint_name=f"stage{idx}").
+      2. UNIQUE state name per function: pass `state_names=[f"kv{idx}"]` (override the buffer name) so
+         stage0's state is "kv0" and stage1's is "kv1" — no cross-function state collision.
+      3. `conv.to_coreai(entrypoints=[...])`; `prog.optimize()`; `prog.save_asset(Path(out_path))`.
+
+    I/O CONTRACT (the Swift session matches this exactly — do NOT deviate):
+      stage0  inputs ["input_id"(1,1 int32), "rope_cos"(64 fp16), "rope_sin"(64 fp16),
+                      "write_onehot"(512 fp16), "attn_bias"(512 fp16)]  state "kv0"  output "hidden"(1,1,2048 fp32)
+      stage1  inputs ["hidden"(1,1,2048 fp32), rope_cos, rope_sin, write_onehot, attn_bias]
+                      state "kv1"  output "logits"(1,1,128256 fp32)
+    """
+    n_chunks = len(chunks)
+    entrypoints = [f"stage{idx}" for idx in range(n_chunks)]
+    conv = coreai_torch.TorchConverter()
+    fn_infos = []
+    for idx, chunk in enumerate(chunks):
+        is_first = chunk.is_first
+        is_last = chunk.is_last
+        in0 = "input_id" if is_first else "hidden"
+        out0 = "logits" if is_last else "hidden"
+        ch = chunk.eval().half()                         # fp16 weights + fp16 float buffers
+        ep = torch.export.export(ch, chunk_sample_inputs(ch, torch.float16))
+        ep = ep.run_decompositions(coreai_torch.get_decomp_table())
+        # Each chunk has exactly ONE fused KV buffer; override its state name to a UNIQUE per-fn name.
+        buf_states = list(ep.graph_signature.buffers_to_mutate.values())
+        if len(buf_states) != 1:
+            raise RuntimeError(
+                f"stage{idx}: expected exactly 1 mutated buffer (the fused KV), got {len(buf_states)}: "
+                f"{buf_states}. The unique-state-name override assumes one KV buffer per chunk."
+            )
+        unique_state = f"kv{idx}"
+        ep_name = f"stage{idx}"
+        print(f">> {ep_name}: buffers_to_mutate={buf_states} -> override state_name=[{unique_state!r}] "
+              f"in='{in0}' out='{out0}' layers={ch.n_chunk_layers}")
+        conv = conv.add_exported_program(
+            ep,
+            input_names=[in0, "rope_cos", "rope_sin", "write_onehot", "attn_bias"],
+            output_names=[out0],
+            state_names=[unique_state],
+            entrypoint_name=ep_name,
+        )
+        fn_infos.append({
+            "entrypoint": ep_name,
+            "input0": in0,
+            "output0": out0,
+            "state_name": unique_state,
+            "n_chunk_layers": ch.n_chunk_layers,
+        })
+
+    prog = conv.to_coreai(entrypoints=entrypoints)
+    prog.optimize()
+    if Path(out_path).exists():
+        import shutil
+        shutil.rmtree(out_path)
+    asset = prog.save_asset(Path(out_path))
+    print(f">> SAVED MULTI-FN {out_path}  entrypoints={entrypoints}")
+    summary = ""
+    try:
+        summary = str(asset.summary())
+        print(">> multi-fn asset summary:", summary)
+    except Exception as e:  # noqa: BLE001
+        print(">> multi-fn summary n/a:", e)
+    mlirb = next(Path(out_path).glob("*.mlirb"))
+    return {
+        "path": out_path,
+        "entrypoints": entrypoints,
+        "functions": fn_infos,
+        "mlirb": str(mlirb),
+        "mlirb_bytes": mlirb.stat().st_size,
+        "summary": summary,
+    }
+
+
 async def _aw(x):
     return await x if inspect.isawaitable(x) else x
 
@@ -389,6 +473,96 @@ def main() -> None:
     else:
         print(f">> SPLIT FIDELITY FAIL — {chain_match}/{N_NEW}; a chunk boundary or hidden hand-off is wrong.")
         sys.exit(2)
+
+    # ========================================================================= #
+    # MULTI-FUNCTION ASSET — ONE `.aimodel`, TWO entrypoints (stage0 + stage1). #
+    # Built ALONGSIDE the per-chunk assets above (does not replace them). Only   #
+    # the 2-chunk split maps onto the stage0/stage1 Swift contract.              #
+    # ========================================================================= #
+    if n_chunks != 2:
+        print(f"\n>> SKIP multi-fn build — needs exactly 2 chunks (stage0+stage1); SPLITS={SPLITS} -> {n_chunks}.")
+        return
+
+    mfn_path = str(Path(OUT_DIR) / "LlamaDraft1B_mfn88.aimodel")
+    print(f"\n================ MULTI-FN BUILD -> {mfn_path} ================")
+    # Fresh chunks (the per-chunk loop above .half()-ed its instances in place).
+    mfn_chunks = []
+    for idx, (s, e) in enumerate(bounds):
+        ch = LlamaChunk(cfg, s, e, idx == 0, idx == n_chunks - 1).eval()
+        copy_chunk_weights(ch, hf)
+        mfn_chunks.append(ch)
+    mfn_info = convert_chunks_to_multifn_aimodel(mfn_chunks, mfn_path)
+
+    # ---- MULTI-FN HOST FIDELITY GATE: ONE AIModel.load, TWO load_function()s ----
+    async def multifn_fidelity():
+        m = await _aw(AIModel.load(mfn_info["path"]))
+        names = list(m.function_names)
+        print(f">> multi-fn function_names = {names}")
+        fns, states, fn_descs = [], [], {}
+        head_dim = cfg.hidden_size // cfg.num_attention_heads
+        for idx, (s, e) in enumerate(bounds):
+            ep_name = f"stage{idx}"
+            f = await _aw(m.load_function(ep_name))
+            fns.append(f)
+            try:
+                fn_descs[ep_name] = str(f.desc)
+            except Exception as e_:  # noqa: BLE001
+                fn_descs[ep_name] = f"<desc n/a: {e_}>"
+            L = e - s
+            # Each function owns its OWN persistent kv state under its UNIQUE name kv{idx}.
+            states.append({f"kv{idx}": NDArray(np.zeros(
+                (2 * L, 1, cfg.num_key_value_heads, MAX_SEQ, head_dim), np.float16))})
+
+        async def mfn_step(tid: int, p: int):
+            c, s_ = cos_sin(p)
+            oh = np.zeros(MAX_SEQ, np.float16); oh[p] = 1.0
+            bias = np.zeros(MAX_SEQ, np.float16); bias[p + 1:] = -1e4
+            rope_cos = NDArray(c.numpy().astype(np.float16))
+            rope_sin = NDArray(s_.numpy().astype(np.float16))
+            onehot = NDArray(oh)
+            bias_nd = NDArray(bias)
+            # stage0: input_id (+state kv0) -> hidden ; stage1: hidden (+state kv1) -> logits
+            cur = NDArray(np.array([[tid]], np.int32))
+            cur_name = "input_id"
+            for idx in range(n_chunks):
+                out = await _aw(fns[idx](inputs={
+                    cur_name: cur,
+                    "rope_cos": rope_cos, "rope_sin": rope_sin,
+                    "write_onehot": onehot, "attn_bias": bias_nd,
+                }, state=states[idx]))
+                out_name = "logits" if idx == n_chunks - 1 else "hidden"
+                cur = out[out_name]
+                cur_name = "hidden"
+            return np.asarray(cur.numpy()).reshape(-1)
+
+        p = 0
+        for t in ids[0].tolist():
+            lg = await mfn_step(t, p); p += 1
+        mfn_new = []
+        nxt = int(lg.argmax())
+        for _ in range(N_NEW):
+            mfn_new.append(nxt); lg = await mfn_step(nxt, p); p += 1; nxt = int(lg.argmax())
+        return names, fn_descs, mfn_new
+
+    fn_names, fn_descs, mfn_new = asyncio.run(multifn_fidelity())
+    mfn_match = sum(1 for a, b in zip(hf_new, mfn_new) if a == b)
+
+    print("\n================ MULTI-FN SUMMARY ================")
+    print(f">> asset          = {mfn_info['path']}")
+    print(f">> main.mlirb      = {mfn_info['mlirb_bytes']/1e9:.3f} GB ({mfn_info['mlirb_bytes']} bytes)")
+    print(f">> function_names  = {fn_names}")
+    for ep, fi in zip(mfn_info["entrypoints"], mfn_info["functions"]):
+        print(f">> {ep}: in='{fi['input0']}' out='{fi['output0']}' state='{fi['state_name']}' "
+              f"layers={fi['n_chunk_layers']}")
+        print(f"     desc = {fn_descs.get(ep)}")
+    print(f"\n>> MULTI-FN HOST token_match = {mfn_match}/{N_NEW}")
+    print(f">> multi-fn text  = {tok.decode(mfn_new)!r}")
+    print(f">> HF greedy      = {tok.decode(hf_new)!r}")
+    if mfn_match == N_NEW:
+        print(">> MULTI-FN FIDELITY PASS — one asset, two functions, token-identical to HF greedy (24/24).")
+    else:
+        print(f">> MULTI-FN FIDELITY FAIL — {mfn_match}/{N_NEW}; a stage boundary or per-fn state is wrong.")
+        sys.exit(3)
 
 
 if __name__ == "__main__":

@@ -1,21 +1,22 @@
 // MARK: - BASCoreAILayerSplitSession
 //
-// LAYER-SPLIT stateful CoreAI decode: drives the Llama-3.2-1B as N separate `.aimodel` chunks (default 8+8)
-// so each asset stays under the A19 CoreAI-0.4.0 ANE per-asset LAYER-COUNT compile ceiling (~12–15 layers; the
-// monolithic 16-layer asset SIGABRTs, but ≤12-layer assets compile + decode on the ANE — Track E audit). Chained,
-// the chunks are token-identical to the monolith (24/24 vs HF greedy, host-verified).
+// LAYER-SPLIT stateful CoreAI decode driving the Llama-3.2-1B as N entrypoint functions of ONE multi-function
+// `.aimodel` (default stage0+stage1 = 8+8). The monolithic 16-layer graph SIGABRTs the A19 CoreAI-0.4.0 ANE
+// compiler (per-asset LAYER-COUNT ceiling ~12–15; Track E audit), but each 8-layer FUNCTION compiles + decodes
+// fine. Two SEPARATE assets is NOT an option — loading a 2nd `AIModel` into one process SIGSEGVs — so both chunks
+// live in ONE asset: one `AIModel.load`, then `loadFunction("stage0")` + `loadFunction("stage1")`.
 //
-// Per step the residual stream is piped chunk0 → chunk1 → … → chunkLast, each chunk owning its OWN fused KV state:
-//   chunk0:    input_id(int32) + rope/onehot/bias(fp16) + state kv(fp16) → hidden(fp32)
-//   middle:    hidden(fp32)    + rope/onehot/bias(fp16) + state kv(fp16) → hidden(fp32)
-//   last:      hidden(fp32)    + rope/onehot/bias(fp16) + state kv(fp16) → logits(fp32)
+// Per step the residual stream is piped stage0 → stage1 → … → last, each function owning its OWN fused KV state
+// (kv0, kv1, …):
+//   stage0: input_id(int32) + rope/onehot/bias(fp16) + state kv0(fp16) → hidden(fp32)
+//   middle: hidden(fp32)    + rope/onehot/bias(fp16) + state kvI(fp16) → hidden(fp32)
+//   last:   hidden(fp32)    + rope/onehot/bias(fp16) + state kvN(fp16) → logits(fp32)
 //
 // The hidden hand-off + logits are **fp32**: an all-fp16 split is 0/24 — the layer-boundary residual carries
-// outlier activations that fp16-rounding flips (the monolith never materializes that boundary tensor). Weights,
-// matmuls, RoPE/onehot/bias inputs, and the KV state stay fp16.
+// outlier activations that fp16-rounding flips. Weights, RoPE/onehot/bias inputs, and the KV state stay fp16.
 //
-// `@unchecked Sendable`: driven only on a single serialized executor (sequential chunk runs; `&kvs[i]` is one
-// exclusive access at a time — never concurrent). `#if canImport(CoreAI)` + iOS/macOS 27.
+// `@unchecked Sendable`: single serialized executor (sequential function runs; `&kvs[i]` is one exclusive access
+// at a time). `#if canImport(CoreAI)` + iOS/macOS 27.
 
 import Foundation
 
@@ -34,10 +35,11 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         case badConfig(String)
     }
 
-    private let models: [AIModel]              // retain the loaded models
-    private let functions: [InferenceFunction]
-    private let outputNames: [String]          // "hidden" for non-last chunks, "logits" for the last
-    private var kvs: [NDArray]                  // one fused KV per chunk (fp16)
+    private let model: AIModel                  // ONE multi-function asset
+    private let functions: [InferenceFunction]  // stage0, stage1, … in order
+    private let stateNames: [String]            // each function's KV state name ("kv0", "kv1", …)
+    private let outputNames: [String]           // "hidden" for non-last, "logits" for the last
+    private var kvs: [NDArray]                   // one fused KV per function (fp16)
     private let maxSeq: Int
     private let headDim: Int
     private let neg: Float
@@ -48,9 +50,9 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
 
     public private(set) var draftPos: Int = 0
 
-    /// `chunkAssetURLs` / `chunkLayers` are parallel arrays (the per-chunk `.aimodel` and its layer count, in order).
+    /// `chunkLayers` is the per-function layer count, in order (e.g. [8, 8]); it sizes each KV state.
     public init(
-        chunkAssetURLs: [URL],
+        assetURL: URL,
         chunkLayers: [Int],
         ropeCosURL: URL,
         ropeSinURL: URL,
@@ -60,45 +62,42 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         negInfinity: Float = -1e4,
         options: SpecializationOptions = .default
     ) async throws {
-        guard chunkAssetURLs.count == chunkLayers.count, !chunkAssetURLs.isEmpty else {
-            throw DecodeError.badConfig("chunkAssetURLs/chunkLayers mismatch or empty")
-        }
+        guard !chunkLayers.isEmpty else { throw DecodeError.badConfig("empty chunkLayers") }
         self.maxSeq = maxSeq
         self.headDim = headDim
         self.neg = negInfinity
 
-        var loadedModels: [AIModel] = []
-        var loadedFns: [InferenceFunction] = []
-        var names: [String] = []
+        let loaded: AIModel
+        do {
+            loaded = try await AIModel(contentsOf: assetURL, options: options)
+        } catch {
+            throw DecodeError.modelLoad("\(assetURL.lastPathComponent): \(error)")
+        }
+        self.model = loaded
+
+        var fns: [InferenceFunction] = []
+        var snames: [String] = []
+        var onames: [String] = []
         var shapes: [[Int]] = []
         var counts: [Int] = []
         var states: [NDArray] = []
-        for (i, url) in chunkAssetURLs.enumerated() {
-            print("📊 split-init: chunk \(i) AIModel.load \(url.lastPathComponent)…"); fflush(stdout)
-            do {
-                let m = try await AIModel(contentsOf: url, options: options)
-                print("📊 split-init: chunk \(i) loaded; loadFunction…"); fflush(stdout)
-                guard let fname = m.functionNames.first, let fn = try m.loadFunction(named: fname) else {
-                    throw DecodeError.modelLoad("no function in \(url.lastPathComponent)")
-                }
-                print("📊 split-init: chunk \(i) function=\(fname) ready"); fflush(stdout)
-                loadedModels.append(m)
-                loadedFns.append(fn)
-            } catch let e as DecodeError {
-                throw e
-            } catch {
-                throw DecodeError.modelLoad("\(url.lastPathComponent): \(error)")
+        for i in 0..<chunkLayers.count {
+            let fname = "stage\(i)"
+            guard let fn = try loaded.loadFunction(named: fname) else {
+                throw DecodeError.modelLoad("no function \(fname) in \(assetURL.lastPathComponent)")
             }
-            names.append(i == chunkAssetURLs.count - 1 ? "logits" : "hidden")
+            fns.append(fn)
+            snames.append(fn.descriptor.stateNames.first ?? "kv\(i)")
+            onames.append(fn.descriptor.outputNames.first ?? (i == chunkLayers.count - 1 ? "logits" : "hidden"))
             let shape = [2 * chunkLayers[i], 1, nKV, maxSeq, headDim]
             shapes.append(shape)
             let count = shape.reduce(1, *)
             counts.append(count)
             states.append(NDArray(scalars: [Float16](repeating: 0, count: count), shape: shape))
         }
-        self.models = loadedModels
-        self.functions = loadedFns
-        self.outputNames = names
+        self.functions = fns
+        self.stateNames = snames
+        self.outputNames = onames
         self.kvShapes = shapes
         self.kvCounts = counts
         self.kvs = states
@@ -113,8 +112,8 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         return data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
     }
 
-    /// One decode step across all chunks. fp16 rope/onehot/bias are built once and shared; the fp32 hidden is
-    /// piped chunk→chunk; the last chunk yields fp32 logits → argmax.
+    /// One decode step across all functions. fp16 rope/onehot/bias built once and shared; the fp32 hidden is
+    /// piped function→function; the last function yields fp32 logits → argmax.
     @discardableResult
     public func step(token: Int, pos: Int) async throws -> Int {
         guard pos < maxSeq else { throw DecodeError.windowOverflow(pos: pos, maxSeq: maxSeq) }
@@ -126,16 +125,15 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         let onehotND = NDArray(scalars: onehot, shape: [maxSeq])
         let biasND = NDArray(scalars: bias, shape: [maxSeq])
 
-        // chunk 0 takes the token id; produces the fp32 hidden residual.
-        var carry = try await runChunk(
+        // stage0 takes the token id; produces the fp32 hidden residual.
+        var carry = try await runStage(
             0,
             inputs: ["input_id": NDArray(scalars: [Int32(token)], shape: [1, 1]),
                      "rope_cos": cos, "rope_sin": sin, "write_onehot": onehotND, "attn_bias": biasND],
             kv: &kvs[0])
-        // middle + last chunks take the running hidden; the last yields logits.
         var i = 1
         while i < functions.count {
-            carry = try await runChunk(
+            carry = try await runStage(
                 i,
                 inputs: ["hidden": carry, "rope_cos": cos, "rope_sin": sin,
                          "write_onehot": onehotND, "attn_bias": biasND],
@@ -145,19 +143,17 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         return Self.argmaxF32(carry)   // last carry == fp32 logits
     }
 
-    /// Insert the chunk's fused KV (inout — the access must span insert+run; a class stored property would
-    /// "escape its scope") and run; return the chunk's declared output NDArray (hidden fp32, or logits fp32).
-    private func runChunk(_ i: Int, inputs: [String: NDArray], kv: inout NDArray) async throws -> NDArray {
+    private func runStage(_ i: Int, inputs: [String: NDArray], kv: inout NDArray) async throws -> NDArray {
         var states = InferenceFunction.MutableViews()
-        states.insert(&kv, for: "kv")
+        states.insert(&kv, for: stateNames[i])
         var outputs: InferenceFunction.Outputs
         do {
             outputs = try await functions[i].run(inputs: inputs, states: states)
         } catch {
-            throw DecodeError.predict("chunk \(i): \(error)")
+            throw DecodeError.predict("stage \(i): \(error)")
         }
         guard let value = outputs.remove(outputNames[i]), let nd = value.ndArray else {
-            throw DecodeError.noOutput("chunk \(i): \(outputNames[i])")
+            throw DecodeError.noOutput("stage \(i): \(outputNames[i])")
         }
         return nd
     }
@@ -175,8 +171,6 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         }
         return best
     }
-
-    // MARK: - Primitives (mirror BASCoreAIDecodeSession)
 
     public func reset() {
         for i in kvs.indices {

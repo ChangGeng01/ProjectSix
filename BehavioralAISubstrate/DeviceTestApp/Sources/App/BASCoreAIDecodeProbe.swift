@@ -167,7 +167,7 @@ enum BASCoreAIDecodeProbe {
     @available(iOS 27, macOS 27, *)
     private static func measureSplit(label: String, options: SpecializationOptions, fileLog: FileLog) async {
         let env = ProcessInfo.processInfo.environment
-        let dir = env["BAS_COREAI_SPLIT_DIR"] ?? "LlamaDraft1B_split88"
+        let assetName = env["BAS_COREAI_SPLIT_ASSET"] ?? "LlamaDraft1B_mfn88.aimodel"   // ONE multi-function asset
         let layers = (env["BAS_COREAI_SPLIT_LAYERS"] ?? "8,8").split(separator: ",").compactMap { Int($0) }
         let nKV = Int(env["BAS_COREAI_NKV"] ?? "") ?? 8
         let headDim = Int(env["BAS_COREAI_HEADDIM"] ?? "") ?? 64
@@ -176,9 +176,9 @@ enum BASCoreAIDecodeProbe {
             for: .documentDirectory, in: .userDomainMask).first else {
             mark(fileLog, "📊 coreai-decode split/\(label) ERROR=bad-config-or-no-docs"); return
         }
-        let chunkURLs = layers.indices.map { docs.appendingPathComponent("\(dir)/chunk\($0).aimodel") }
-        for u in chunkURLs where !FileManager.default.fileExists(atPath: u.path) {
-            mark(fileLog, "📊 coreai-decode split/\(label) ERROR=\(u.lastPathComponent) missing in \(dir)"); return
+        let assetURL = docs.appendingPathComponent(assetName)
+        guard FileManager.default.fileExists(atPath: assetURL.path) else {
+            mark(fileLog, "📊 coreai-decode split/\(label) ERROR=\(assetName) missing"); return
         }
         let cosURL = docs.appendingPathComponent("rope_cos_h\(headDim).bin")
         let sinURL = docs.appendingPathComponent("rope_sin_h\(headDim).bin")
@@ -190,7 +190,7 @@ enum BASCoreAIDecodeProbe {
         mark(fileLog, String(format: "📊 coreai-decode split/%@ loading %d chunks %@… footprint=%.0fMB", label, layers.count, "\(layers)", mBefore))
         do {
             let session = try await BASCoreAILayerSplitSession(
-                chunkAssetURLs: chunkURLs, chunkLayers: layers,
+                assetURL: assetURL, chunkLayers: layers,
                 ropeCosURL: cosURL, ropeSinURL: sinURL, nKV: nKV, headDim: headDim, maxSeq: maxSeq, options: options)
             let mLoaded = footprintMB()
             mark(fileLog, String(format: "📊 coreai-decode split/%@ loaded footprint=%.0fMB (Δ%.0fMB)", label, mLoaded, mLoaded - mBefore))

@@ -541,3 +541,26 @@ weights, full 128k lm_head every step — wasteful for a draft; optimizable), bu
 overlap, not standalone tok/s. **Gate (a) is GREEN for ≤12 layers; the 1B needs layer-split. Not a decline — a measured,
 fixable per-asset limit.** (GPU/BNNS not re-tested at low layer counts — may share the same limit or differ; ANE is the bet
 and it works.)
+
+### Track E AUDIT cont. — layer-split DEVICE result: the full 1B does NOT run on the ANE (the per-asset cap can't be split around)
+
+The "layer-split → full 1B on the ANE today" hope above was itself too optimistic on the DEVICE side (HOST was 24/24). Built
++ measured the 8+8 split end-to-end and it CORRECTS that:
+- **Converter** (`Tools/llama_to_coreai_split.py`): 16-layer 1B → N chunks; chained **HOST fidelity 24/24** (the cross-chunk
+  hidden hand-off must be fp32 — all-fp16 is 0/24, the layer-boundary residual has outliers fp16-rounding flips). ✅ host
+- **Swift** `BASCoreAILayerSplitSession`: pipes the fp32 hidden chunk→chunk; typechecks; chunk0 alone LOADS + RUNS on device. ✅
+- **DEVICE — every on-ANE form of the full 16-layer 1B FAILS:**
+  - 2 SEPARATE 8-layer assets → **SIGSEGV (signal 11) at the 2nd `AIModel.load`** (the device CoreAI runtime won't hold two
+    separately-loaded AIModels in one process).
+  - 1 MULTI-FUNCTION asset (stage0+stage1, host 24/24, unique kv0/kv1 states) → **SIGABRT (signal 6)**. DECISIVE: loading
+    **stage0 ALONE** (8 layers) from the mfn asset on a clean cache ALSO SIGABRTs → **the ANE compiles the WHOLE ASSET
+    (16 layers) when any function loads — the compile is PER-ASSET, not per-function.**
+
+**Corrected conclusion: the ANE compile ceiling is PER-ASSET (~12–15 layers) and CANNOT be split around on-device** —
+multi-function shares one asset graph (per-asset compile = 16 layers = over limit), and separate assets can't co-load (2nd
+`AIModel.load` SIGSEGV). So **the full 16-layer Llama-3.2-1B does NOT run on the A19 ANE in CoreAI 0.4.0 beta.** What DOES
+work, and fast: any **≤12-layer SINGLE-function asset** (L8 36 tok/s, L12 27 tok/s). **Practical CoreAI/Saguaro-on-ANE path: a
+≤12-layer DRAFT** (truncate/distill the 1B to ≤12 layers — a quality cost; or a naturally ≤12-layer model), NOT the full
+16-layer 1B. The host toolchain + fidelity (fp16+int8 24/24) + the Swift split machinery are all built and ready; the
+on-device ceiling is purely the beta ANE compiler's per-asset layer cap. (Plus a 3rd, larger lever if ever needed:
+multi-PROCESS — `AIModelCache(appGroup:)` + XPC so each asset is in its own process — explicitly OUT of scope here.)
