@@ -45,7 +45,8 @@ enum BASCoreAIMamba3Probe {
             let env = ProcessInfo.processInfo.environment
             let assetName = env["BAS_COREAI_MAMBA3_ASSET"] ?? "Mamba3_L16_int8.aimodel"
             // Carried-state shapes in the converter's declared order — semicolon-separates shapes, comma within.
-            // Flat probe: "16,148480". 2-state (ssm;angle): "16,32,64,64;16,32,32".
+            // Flat probe: "16,148480". 2-state must be ANGLE-FIRST (angle;ssm): "16,32,32;16,32,64,64" — the
+            // proven-on-ANE order (Track G / mamba3_full_ane.py). ssm-first SIGSEGVs the ANE segmenter — do NOT use.
             let stateShapes = (env["BAS_COREAI_MAMBA3_STATES"] ?? "16,148480")
                 .split(separator: ";").map { $0.split(separator: ",").compactMap { Int($0) } }
             let steps = Int(env["BAS_COREAI_MAMBA3_STEPS"] ?? "") ?? 128

@@ -734,6 +734,11 @@ device process launch --environment-variables '{...}'` (JSON, NOT --environment)
 
 ## Track F — Mamba-3 weights-free ANE probe (2026-06-15): host GREEN, CPU runs, **ANE compiler SIGSEGVs**
 
+> **⚠️ SUPERSEDED by Track G.** This track's conclusion — "Mamba-3 does NOT compile on the A19 ANE (SIGSEGV)" —
+> was FALSIFIED: the crash was NOT an op-graph limit but a state-registration-ORDER bug. With the 2 states
+> registered angle-first, the SSD+RoPE+MIMO graph compiles + decodes on the ANE (Track G). Read Track G's audit
+> correction for the honest scope of what runs.
+
 The "upgrade to Mamba-3" gate. The study (memory `mamba3-coreai-convertibility.md`) predicted Mamba-3 converts + lands
 on the A19 ANE "as cleanly as Mamba-2". A weights-free probe (random weights at the Llamba-1B config — L=16, d=2048,
 H=32, P=64, N=64, MIMO R=4 — int8) was built to test the OP-graph compile + speed, no checkpoint/training. Driver:
@@ -776,6 +781,18 @@ formulation the proven Llamba Mamba-2 kernel uses rather than a from-scratch gra
 ---
 
 ## Track G — Mamba-3 RUNS ON THE A19 ANE (2026-06-15): Track F's "ANE SIGSEGV" was a STATE-ORDER bug, now fixed
+
+> **AUDIT CORRECTION (R1, 2026-06-15 — read first).** The "FASTER than Mamba-2, blocked ONLY on a checkpoint"
+> framing below is OVERSTATED on three confirmed counts: (1) the graph that runs at 50.9 tok/s
+> (`Tools/mamba3_full_ane.py`) is **Mamba-2 SSD + data-dependent RoPE + MIMO rank-R — NOT the trapezoidal 3-term
+> recurrence** (it discards the learned A, hardcodes A=−1, Euler 2-term). The faithful trapezoid
+> (`Tools/mamba3_to_coreai.py`) has ZERO on-device decode measurement — **trapezoid-on-ANE is UNPROVEN.** (2) The
+> 50.9 > 39 comparison is **mixer-only (no per-block MLP) vs the full hybrid Mamba-2** — the missing MLP, not MIMO,
+> is the leading explanation; NOT a like-for-like win. (3) Random weights → ZERO quality/acceptance signal. WHAT
+> GENUINELY BANKS: the SSD+RoPE+MIMO op-graph compiles + decodes on the A19 ANE (50.9 tok/s / 84 MB, L=16, int8),
+> and the **angle-first state-order fix is real + reproducible** (correctly overturning Track F's op-crash
+> diagnosis). Honest claim: "an SSD+RoPE+MIMO graph runs on the A19 ANE; angle-first is the ANE-compile fix; the
+> faithful Mamba-3 trapezoid, a real checkpoint, and a fair MLP-included speed A/B all remain to do."
 
 **Reversal of Track F (R1 — new measurement overrides).** Track F concluded the A19 ANE compiler SIGSEGVs on the
 Mamba-3 op-graph. A full op-bisection (workflow `mamba3-ane-crash-localize` + on-device ladder) FALSIFIED that: the
