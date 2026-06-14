@@ -367,7 +367,10 @@ public actor BASLLMVerifierPipeline {
             preset: stagePreset,   // Tranche A2: `.scout` default (byte-equal) or the elected greedy lane.
             instruction: instruction + "\n\n" + userPrompt)
         do {
-            let draft = try await adapter.draft(request)
+            // P1: factual verification → elect prompt-lookup (TOKEN-identical under greedy; .scout/temp>0 stages
+            // fail-close to draft(_:), byte-equal).
+            let draft = try await adapter.draft(
+                request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
             return BASLLMVerifierStageOutcome(
                 stage: stage,
                 rawOutput: draft.body,

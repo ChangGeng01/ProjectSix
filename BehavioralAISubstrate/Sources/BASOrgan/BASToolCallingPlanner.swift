@@ -242,7 +242,9 @@ public actor BASToolCallingPlanner {
 
             let draft: BASOrganDraft
             do {
-                draft = try await adapter.draft(request)
+                // P1: tool-calling (structured/JSON) → elect prompt-lookup (TOKEN-identical under greedy).
+                draft = try await adapter.draft(
+                    request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
             } catch {
                 throw BASToolCallingPlanError
                     .adapterFailed(

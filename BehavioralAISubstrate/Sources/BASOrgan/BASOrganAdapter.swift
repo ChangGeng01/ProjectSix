@@ -48,11 +48,28 @@ public protocol BASOrganAdapter: Sendable {
     /// available to every adapter without extra machinery.
     func draft(_ request: BASOrganRequest) async throws -> BASOrganDraft
 
+    /// Default-OFF ACCELERATED draft: a host elects a turn (typically
+    /// `BASDecodeLanePolicy.promptLookupEligible(for:)`, computed host-side) to engage a model-free
+    /// speculative lane. The default impl IGNORES `electAccelerated` and calls `draft(_:)` — BYTE-EQUAL for
+    /// every adapter (ADR-014: nothing changes until a host elects AND the adapter has a lane). Adapters with
+    /// an accelerated lane (MLX prompt-lookup) override it; under greedy (temp 0) the emitted tokens are
+    /// TOKEN-identical to `draft(_:)`, only faster. Declared as a protocol REQUIREMENT (not extension-only) so
+    /// the override dispatches DYNAMICALLY through a protocol-typed `adapter`.
+    func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft
+
     /// Announce how much work this provider is willing to take on
     /// right now. Adapters that observe device pressure (thermal,
     /// memory, battery) return a reduced capacity; adapters that
     /// don't care return `.unlimited`.
     func currentCapacity() async -> BASOrganCapacity
+}
+
+public extension BASOrganAdapter {
+    /// Default accelerated draft: ignore the elect flag → byte-equal to `draft(_:)`. Adapters without an
+    /// accelerated lane (deterministic, Apple, remote) inherit this unchanged (ADR-014 default-off).
+    func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        try await draft(request)
+    }
 }
 
 /// Describes what an organ provider is. Included in every draft so

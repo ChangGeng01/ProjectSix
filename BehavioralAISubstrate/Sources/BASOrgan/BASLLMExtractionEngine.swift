@@ -399,7 +399,10 @@ public actor BASLLMExtractionEngine {
                 role: role,
                 preset: preset)
         }
-        return try await adapter.draft(request)
+        // P1: factual extraction → elect the model-free prompt-lookup lane (TOKEN-identical under greedy,
+        // ~1.58x on structured/JSON output; fail-closes to draft(_:) byte-equal when temp>0 or no lane).
+        return try await adapter.draft(
+            request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
     }
 
     /// Pure helper:assemble the LLM-facing prompt from the

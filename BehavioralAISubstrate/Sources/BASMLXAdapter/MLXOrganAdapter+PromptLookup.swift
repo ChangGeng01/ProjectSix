@@ -167,4 +167,13 @@ extension MLXOrganAdapter {
                 + MLXOrganAdapter.frameworkUnavailablePlatformSuffix)
         #endif
     }
+
+    /// ADR-014 default-off accelerated draft (the `BASOrganAdapter` requirement). When a host elects an eligible
+    /// (factual/deterministic) turn, decode via the model-free prompt-lookup lane — TOKEN-identical to `draft(_:)`
+    /// under greedy, ~1.58x on repetitive output; every other case (not elected, or temp>0) fail-closes to
+    /// `draft(_:)`, byte-equal. This is the production wire for `respondPromptLookup` (previously reachable only
+    /// from probes); the eligibility decision stays host-side so this adapter keeps NO BASOrgan-policy coupling.
+    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+    }
 }
