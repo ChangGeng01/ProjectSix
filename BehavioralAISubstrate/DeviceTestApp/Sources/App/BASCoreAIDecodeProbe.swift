@@ -64,51 +64,73 @@ enum BASCoreAIDecodeProbe {
         return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
     }
 
+    /// print() → process stdout (captured reliably by `devicectl … --console`, and SURVIVES a crash,
+    /// unlike buffered os_log) + the FileLog.
+    private static func mark(_ fileLog: FileLog, _ s: String) {
+        print(s)
+        fflush(stdout)
+        fileLog.emit(s)
+    }
+
     static func run() async {
         let fileLog = FileLog()
         defer { fileLog.close() }
-        fileLog.emit(String(format: "📊 coreai-decode START footprint0=%.0fMB (beat: MLX 3B=38.3 tok/s; cap 3248MB)", footprintMB()))
+        mark(fileLog, String(format: "📊 coreai-decode START footprint0=%.0fMB (beat: MLX 3B=38.3 tok/s; cap 3248MB)", footprintMB()))
         #if canImport(CoreAI)
         if #available(iOS 27, macOS 27, *) {
-            await measure(label: "default", options: .default, fileLog: fileLog)
+            // .default / .neuralEngine OOM-CRASH the aned ANE compiler on the 2.3 GB fp16 1B (uncatchable
+            // std::bad_alloc → SIGABRT — matches the prior Core ML "fp16 ANE size-rejected" finding). So
+            // measure GPU + CPU on fp16; ANE is gated behind BAS_COREAI_TRY_ANE=1 (for a future int8 artifact).
             await measure(label: "cpuOnly", options: .cpuOnly, fileLog: fileLog)
-            fileLog.emit("📊 coreai-decode DONE — read: tok/s vs 38.3 (gate b); peak_MB vs 3248 (gate c); "
-                + "default/cpuOnly tok/s ratio ≫1 ⇒ ANE/GPU carries decode (gate d).")
+            await measure(label: "gpu", options: SpecializationOptions(preferredComputeUnitKind: .gpu), fileLog: fileLog)
+            if (ProcessInfo.processInfo.environment["BAS_COREAI_TRY_ANE"] ?? "0") == "1" {
+                await measure(label: "ane", options: SpecializationOptions(preferredComputeUnitKind: .neuralEngine), fileLog: fileLog)
+            } else {
+                mark(fileLog, "📊 coreai-decode ane SKIPPED (fp16 1B OOM-crashes aned; needs int8 + BAS_COREAI_TRY_ANE=1)")
+            }
+            mark(fileLog, "📊 coreai-decode DONE — read: tok/s vs 38.3 (gate b); peak_MB vs 3248 (gate c); gpu/cpu ratio = placement (gate d).")
         } else {
-            fileLog.emit("📊 coreai-decode SKIP — needs iOS 27 / macOS 27")
+            mark(fileLog, "📊 coreai-decode SKIP — needs iOS 27 / macOS 27")
         }
         #else
-        fileLog.emit("📊 coreai-decode SKIP — CoreAI not in this build (default toolchain)")
+        mark(fileLog, "📊 coreai-decode SKIP — CoreAI not in this build (default toolchain)")
         #endif
     }
 
     #if canImport(CoreAI)
     @available(iOS 27, macOS 27, *)
     private static func measure(label: String, options: SpecializationOptions, fileLog: FileLog) async {
-        let nLayers = 16, nKV = 8, headDim = 64, maxSeq = 512
+        let env = ProcessInfo.processInfo.environment
+        let assetName = env["BAS_COREAI_ASSET"] ?? "LlamaDraft1B_fp16.aimodel"
+        let nLayers = Int(env["BAS_COREAI_LAYERS"] ?? "") ?? 16
+        let nKV = Int(env["BAS_COREAI_NKV"] ?? "") ?? 8
+        let headDim = Int(env["BAS_COREAI_HEADDIM"] ?? "") ?? 64
+        let maxSeq = Int(env["BAS_COREAI_MAXSEQ"] ?? "") ?? 512
         guard let docs = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask).first else {
-            fileLog.emit("📊 coreai-decode \(label) ERROR=no-documents-dir"); return
+            mark(fileLog, "📊 coreai-decode \(label) ERROR=no-documents-dir"); return
         }
-        let asset = docs.appendingPathComponent("LlamaDraft1B_fp16.aimodel")
+        let asset = docs.appendingPathComponent(assetName)
         guard FileManager.default.fileExists(atPath: asset.path) else {
             fileLog.emit("📊 coreai-decode \(label) ERROR=LlamaDraft1B_fp16.aimodel missing — stage it into Documents")
             return
         }
         // RoPE tables: write right-sized zero buffers if absent (values irrelevant to timing).
-        let cosURL = docs.appendingPathComponent("rope_cos_h64.bin")
-        let sinURL = docs.appendingPathComponent("rope_sin_h64.bin")
+        let cosURL = docs.appendingPathComponent("rope_cos_h\(headDim).bin")
+        let sinURL = docs.appendingPathComponent("rope_sin_h\(headDim).bin")
         let tableBytes = maxSeq * headDim * MemoryLayout<Float>.size
         for url in [cosURL, sinURL] where !FileManager.default.fileExists(atPath: url.path) {
             try? Data(count: tableBytes).write(to: url)
         }
 
         let mBefore = footprintMB()
+        mark(fileLog, String(format: "📊 coreai-decode %@ loading… footprint=%.0fMB", label, mBefore))
         do {
             let session = try await BASCoreAIDecodeSession(
                 assetURL: asset, ropeCosURL: cosURL, ropeSinURL: sinURL,
                 nLayers: nLayers, nKV: nKV, headDim: headDim, maxSeq: maxSeq, options: options)
             let mLoaded = footprintMB()
+            mark(fileLog, String(format: "📊 coreai-decode %@ loaded footprint=%.0fMB (Δ%.0fMB)", label, mLoaded, mLoaded - mBefore))
 
             // Pure decode step loop from pos 0 (KV accumulates). Token values are irrelevant to timing.
             var pos = 0
@@ -121,11 +143,11 @@ enum BASCoreAIDecodeProbe {
             let peak = footprintMB()
             let msPerTok = elapsedMs / Double(steps)
             let tps = msPerTok > 0 ? 1000.0 / msPerTok : -1
-            fileLog.emit(String(format:
+            mark(fileLog, String(format:
                 "📊 coreai-decode %@ ms/tok=%.3f tok/s=%.2f load_MB=%.1f peak_MB=%.1f (MLX 3B=38.3 tok/s, cap 3248MB) lastTok=%d",
                 label, msPerTok, tps, mLoaded - mBefore, peak, tok))
         } catch {
-            fileLog.emit("📊 coreai-decode \(label) ERROR=\(error)")
+            mark(fileLog, "📊 coreai-decode \(label) ERROR=\(error)")
         }
     }
     #endif

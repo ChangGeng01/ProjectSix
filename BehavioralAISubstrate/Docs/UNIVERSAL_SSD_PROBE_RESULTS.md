@@ -461,3 +461,45 @@ The negative is MEASURED, not assumed. Two evidence-gated paths to a win (next a
 leaves the critical path. Until one lands, the shipped universal decode win remains **Track A (prompt-lookup,
 token-identical, 1.58× repetitive, production-wired)** — and the B2 mechanism is a certified, correct foundation
 the next arc builds on, not a dead end.
+
+---
+
+## Track E — Saguaro (SSD) on iOS-27 **CoreAI** — Phase-0 capability gate (2026-06-14, iPhone Air A19)
+
+The NEW `import CoreAI` framework (`AIModel`/`InferenceFunction`/`NDArray`/`ComputeStream`), distinct from the `MLModel`
+Core ML of B0–B2. Goal: a universal speculative-speculative decoder (Saguaro, arxiv 2603.03251) on CoreAI. This is the
+Phase-0 *capability* gate (toolchain + runtime + Swift + on-device compile/throughput). Full build plan:
+`Docs/COREAI_SAGUARO_INTEGRATION_PLAN.md`.
+
+**GREEN (host + Swift):**
+- **Toolchain** — `coreai-torch 0.4.0` converts a stateful Llama-3.2-1B decoder → `.aimodel` with a real fused KV `state`
+  (`read_handle`/`write_handle`; one mutated buffer → one CoreAI state → one Swift `insert`, sidestepping the 32-way
+  `~Escapable` borrow problem). **torch fidelity 24/24** vs HF greedy.
+- **Host runtime** — the `.aimodel` loads + runs on `coreai.runtime`; KV state persists across calls (toy + tiny + 1B).
+- **Swift** — `BASCoreAIDecodeSession` (stateful decode driver: prefill/step/propose/commit/reset; `run(inputs:states:)`
+  with the fused KV via an `inout` helper) **compiles under the real Xcode-27 / iPhoneOS27 SDK** and runs on the A19 far
+  enough to load + attempt the model.
+
+**Fidelity bug — localized then FIXED:** the converted `.aimodel` was 0/24 on greedy. First bisection misattributed it to
+the `attn·vr` matmul; deeper bisection proved the matmul is **faithful** (MAE 1.3e-8) and the real fault is the **one-hot
+KV write** — `coreai_torch 0.4.0`'s `broadcasting_mul` mis-lowers the double-broadcast `v*oh` (v `[1,n_kv,1,hd]` size-1
+seq × oh `[1,1,MAX_SEQ,1]` size-1 head), **zeroing every kv-head beyond head 0**. Fix: a `torch.where` select
+(→ `broadcasting_where`) for the write — **full 1B `.aimodel` → 24/24**, strictly cheaper. (Applied to
+`Tools/llama_to_coreai.py`; reused identically in the multi-position verify scatter.)
+
+**RED on-device (gate (a) — the decisive device finding):** the **2.3 GB fp16 1B single-asset fails to compile/load on
+ALL THREE A19 backends** in CoreAI 0.4.0 beta:
+- `.default` / `.neuralEngine` → `aned` ANE compiler **OOM** (`ANECCompile FAILED … model.hwx.tmp_n.weights` →
+  `std::bad_alloc` → SIGABRT, uncatchable) — matches the prior Core ML "fp16-1B ANE-size-rejected".
+- `.cpuOnly` → `BNNSCompileError.compilationFailed`.   - `.gpu` → SIGABRT during load.
+
+A **tiny model (2-layer, vocab 320, headDim 16) COMPILES + LOADS on `.cpuOnly`** (Δ17 MB on device). So CoreAI on-device
+decode is real at small scale; **the 1B failure is a beta-compiler SIZE limit, not fundamental.**
+
+**Verdict — CoreAI is the rigorous substrate (strictly more than Core ML: stateful KV + first-class `ComputeStream`
+concurrency + async `encode`/`AsyncValue` zero-copy + dynamic shapes), the toolchain + fidelity are now SOLVED (24/24),
+the Swift integration compiles on-target — but the 1B-fp16 single-asset throughput-vs-MLX gate (G3) is BLOCKED on-device
+in this beta until the model is made compilable (int8/int4 quant — the B2 finding that int8 restores ANE; or layer-split
+multi-function assets; or sub-1B / Gemma-E2B targets).** Not a DECLINE — a characterized wall with a concrete path
+(P0.5 in the integration plan). The shipped universal decode win remains **Track A (prompt-lookup, byte-identical, 1.58×
+repetitive, production-wired)**; CoreAI/Saguaro is the rigorous next-arc foundation, evidence-gated (G0–G3).

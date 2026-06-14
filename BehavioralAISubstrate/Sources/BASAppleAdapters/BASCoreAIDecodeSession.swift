@@ -126,16 +126,22 @@ public final class BASCoreAIDecodeSession: @unchecked Sendable {
         onehot[pos] = 1
         var bias = [Float](repeating: neg, count: maxSeq)
         for j in 0...pos { bias[j] = 0 }
-        let onehotND = NDArray(scalars: onehot, shape: [maxSeq])
-        let biasND = NDArray(scalars: bias, shape: [maxSeq])
-
         let inputs: [String: NDArray] = [
             "input_id": inputID, "rope_cos": cos, "rope_sin": sin,
-            "write_onehot": onehotND, "attn_bias": biasND,
+            "write_onehot": NDArray(scalars: onehot, shape: [maxSeq]),
+            "attn_bias": NDArray(scalars: bias, shape: [maxSeq]),
         ]
+        // The fused KV `state` is passed as `inout` so its exclusive access spans BOTH the
+        // MutableViews.insert AND the consuming async `run`. Borrowing the class stored property
+        // `self.kv` directly into a `~Escapable MutableViews` fails ("escapes its scope") because a
+        // stored-property access ends per-statement; an inout parameter's access covers the whole call.
+        return try await runForward(inputs: inputs, kv: &kv)
+    }
+
+    /// Build the one-state `MutableViews` and run one forward, returning the argmax of `logits`.
+    private func runForward(inputs: [String: NDArray], kv: inout NDArray) async throws -> Int {
         var states = InferenceFunction.MutableViews()
         states.insert(&kv, for: "kv")   // ONE fused state; mutated in place by run
-
         var outputs: InferenceFunction.Outputs
         do {
             outputs = try await function.run(inputs: inputs, states: states)

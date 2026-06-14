@@ -84,7 +84,12 @@ class StatefulLlamaDraft(nn.Module):
 
     def forward(self, input_id, rope_cos, rope_sin, write_onehot, attn_bias):
         oh = write_onehot.view(1, 1, MAX_SEQ, 1)
-        keep = 1.0 - oh
+        # One-hot KV write via torch.where (→ coreai.broadcasting_where select), NOT `cache*keep + v*oh`.
+        # coreai_torch 0.4.0's broadcasting_mul MIS-LOWERS the double-broadcast `v*oh` (v [1,n_kv,1,head_dim]
+        # size-1 seq × oh [1,1,MAX_SEQ,1] size-1 head) — it zeros every kv-head beyond head 0, corrupting KV
+        # for all GQA heads (the real cause of the 0/24 fidelity bug; the av-matmul was always faithful).
+        # The select dodges that path → full 1B .aimodel is token-identical (24/24) and it's strictly cheaper.
+        write_mask = (oh > 0.5).expand(1, self.n_kv, MAX_SEQ, self.head_dim)
         bias = attn_bias.view(1, 1, 1, MAX_SEQ)
         cos = rope_cos.view(1, 1, 1, self.head_dim)
         sin = rope_sin.view(1, 1, 1, self.head_dim)
@@ -99,8 +104,8 @@ class StatefulLlamaDraft(nn.Module):
             half = self.head_dim // 2
             q = q * cos + rotate_half(q, half) * sin
             k = k * cos + rotate_half(k, half) * sin
-            kc = kv[2 * li] * keep + k * oh        # [1,n_kv,MAX_SEQ,D] one-hot write
-            vc = kv[2 * li + 1] * keep + v * oh
+            kc = torch.where(write_mask, k.expand(1, self.n_kv, MAX_SEQ, self.head_dim), kv[2 * li])
+            vc = torch.where(write_mask, v.expand(1, self.n_kv, MAX_SEQ, self.head_dim), kv[2 * li + 1])
             new_slots.append(kc)
             new_slots.append(vc)
             kr = kc.repeat_interleave(self.rep, dim=1)
