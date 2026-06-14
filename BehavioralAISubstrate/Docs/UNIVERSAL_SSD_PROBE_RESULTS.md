@@ -582,3 +582,25 @@ tok/s), byte-faithful, < cap. The **blocker is the model**: the per-asset ≤~12
 USABLE CoreAI-ANE draft therefore needs a **properly-trained ≤12-layer model (distillation, not truncation)** OR the beta to
 lift the per-asset layer cap. Everything host-side + the Swift drivers are built + committed; the device path works for any
 ≤12-layer asset the moment a good ≤12-layer model exists.
+
+### Track E AUDIT — 🎯 USABLE ≤12-layer Llama-3 model RUNS ON THE A19 ANE (the win)
+
+Found + ran a real one. Surveyed ≤12-layer decoder LLMs (verified layer counts from HF configs; modern small models trend
+DEEP — Llama-3.2-1B=16, SmolLM2=30, Qwen2.5-0.5B=24 — so ≤12 is rare). Coherence-tested the Llama-3-tokenizer candidates via
+HF greedy:
+- `Axcel7766/...-drafter-500m` (12L, purpose-built drafter) → **degenerate** (emits `<|end_of_text|>` immediately, HF-confirmed).
+- `foss22/vikhr-...-depth-pruned` (10L, raw prune) → **garbage** (repetition/random tokens).
+- **`TheGardener/KD-llama-0.8b-shortened-epoch-1st-ver1` (9L, depth-prune + knowledge-DISTILLATION, vocab 128256) → COHERENT**:
+  "The capital of France is" → *"the city of Paris, the capital of France…"*. KD recovery is what makes the difference.
+
+Converted KD-9L → fp16 `.aimodel` (`Tools/llama_to_coreai.py` is arch-parametric; 9 layers, hidden 2048, 32 heads / 8 KV,
+head_dim 64, vocab 128256, 1.62 GB) with REAL llama3 RoPE tables. **DEVICE (A19 ANE, single-model `BASCoreAIDecodeSession`,
+`BAS_COREAI_LAYERS=9`): compiles + decodes END-TO-END — 33.6 tok/s, peak 1.83 GB, real token ids.**
+
+**This is the first real, USABLE, coherent ≤12-layer Llama-3-tokenizer model running on the A19 ANE** — and because it uses
+the Llama-3 tokenizer it is a **valid speculative-decode DRAFT for a Llama-3.2-3B target** (draft ids are valid target ids).
+Coherence is host-proven (torch); conversion is faithful (same converter as the 24/24 fp16/int8 builds); the ANE runs it at
+33.6 tok/s. **CoreAI ANE decode of a usable LLM is no longer hypothetical — it works today with a KD'd ≤12-layer model.** Open
+next-level work (bigger scope): measure draft **acceptance rate vs the Llama-3.2-3B** + wire the full Saguaro two-stream loop
+(the ANE-draft ∥ GPU/MLX-verify overlap, gate G2); and an end-to-end on-device coherence capture (real prompt → decoded text
+from the ANE) to complement the host-side coherence proof.
