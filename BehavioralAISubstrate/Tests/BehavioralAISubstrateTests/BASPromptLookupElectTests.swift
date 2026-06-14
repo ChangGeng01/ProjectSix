@@ -44,4 +44,68 @@ final class BASPromptLookupElectTests: XCTestCase {
         XCTAssertFalse(BASDecodeLanePolicy.promptLookupEligible(for: .creative))
         XCTAssertFalse(BASDecodeLanePolicy.promptLookupEligible(for: .scoutDefault))
     }
+
+    // MARK: - P1 wrapper propagation (audit must-fix): the elect flag must REACH the inner adapter through the
+    // production wrapper chain (Routing / ContractEnforcing → gate), and the contract gate must STILL fail-closed.
+
+    func testElectPropagatesThroughRoutingWrapper() async throws {
+        let spy = P1SpyAdapter()
+        let routing = BASRoutingOrganAdapter(primary: spy, secondary: P1SpyAdapter(), strategy: .primaryOnly)
+        _ = try await routing.draft(request(), electAccelerated: true)
+        let got = await spy.lastElect
+        XCTAssertEqual(got, true, "routing must FORWARD electAccelerated to the primary (not swallow it)")
+    }
+
+    func testElectPropagatesThroughContractEnforcingWrapper() async throws {
+        let spy = P1SpyAdapter()
+        let wrapped = BASContractEnforcingOrganAdapter(inner: spy, purpose: .verify)
+        _ = try await wrapped.draft(request(), electAccelerated: true)
+        let got = await spy.lastElect
+        XCTAssertEqual(got, true, "contract wrapper must forward elect through the gate to the inner adapter")
+    }
+
+    func testAcceleratedPathStillFailsClosedOnForbiddenContext() async throws {
+        let spy = P1SpyAdapter()
+        let wrapped = BASContractEnforcingOrganAdapter(inner: spy, purpose: .verify, forbiddenContext: ["SECRET"])
+        let req = BASOrganRequest(
+            requestID: "p1-failclosed", role: .core, preset: .greedyDeterministic,
+            instruction: "verify", context: ["SECRET"])
+        do {
+            _ = try await wrapped.draft(req, electAccelerated: true)
+            XCTFail("a forbidden-context contract MUST throw, even on the accelerated path")
+        } catch {
+            let called = await spy.draftCalled
+            XCTAssertFalse(called, "the model MUST NOT be called when the contract is violated (validate-before)")
+        }
+    }
+}
+
+/// Spy adapter: records the `electAccelerated` flag the wrappers forward + whether the model was called, to
+/// prove P1 propagation reaches the inner adapter and that the contract gate fail-closes before the model.
+private actor P1SpyAdapter: BASOrganAdapter {
+    nonisolated let descriptor: BASOrganDescriptor
+    var lastElect: Bool?
+    var draftCalled = false
+
+    init() {
+        descriptor = BASOrganDescriptor(
+            providerID: "p1-spy", providerName: "P1 Spy", supportsStreaming: false,
+            maxInputTokens: 4096, maxOutputTokens: 1024, runsOnDevice: true,
+            supportedRoles: [.scout, .core])
+    }
+
+    func draft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
+        draftCalled = true
+        return BASOrganDraft(
+            requestID: request.requestID, providerID: "p1-spy", role: request.role,
+            body: "spy-body", inputTokensEstimated: 1, outputTokensEstimated: 1,
+            producedAt: Date(), traceID: "spy-trace")
+    }
+
+    func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        lastElect = electAccelerated
+        return try await draft(request)
+    }
+
+    func currentCapacity() async -> BASOrganCapacity { .unlimited }
 }

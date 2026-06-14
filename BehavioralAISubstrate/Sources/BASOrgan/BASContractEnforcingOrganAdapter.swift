@@ -64,6 +64,23 @@ public struct BASContractEnforcingOrganAdapter: BASOrganAdapter {
         return result.draft
     }
 
+    /// P1 wrapper propagation: derive + enforce the SAME contract (validate-before, via the gate), then forward
+    /// the host's `electAccelerated` to the inner adapter. The contract gate is never bypassed.
+    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        let contract = BASLLMContractDeriver.derive(
+            purpose: purpose,
+            request: request,
+            forbiddenContext: forbiddenContext,
+            agentRef: agentRef,
+            verifierRef: verifierRef,
+            sovereignConstraints: sovereignConstraints)
+        let gate = BASContractedOrganGate(adapter: inner, sovereignCheck: sovereignCheck)
+        let result = try await gate.draft(
+            contract: contract, request: request, electAccelerated: electAccelerated)
+        traceSink?(result.trace)
+        return result.draft
+    }
+
     public func currentCapacity() async -> BASOrganCapacity {
         await inner.currentCapacity()
     }

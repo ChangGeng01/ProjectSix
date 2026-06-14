@@ -92,4 +92,19 @@ public struct BASContractedOrganGate: Sendable {
         let trace = BASProcessTrace.accepted(contract: contract, draft: draft)
         return BASContractedDraft(draft: draft, trace: trace)
     }
+
+    /// Accelerated variant (P1 wrapper propagation): contract validation runs FIRST — exactly as the 1-arg form —
+    /// so fail-closed enforcement (禁止随便问模型) is NOT bypassed by the host-elected accelerated lane; only then
+    /// does the inner adapter decode with `electAccelerated`. Byte-equal to the 1-arg path when the inner has no
+    /// lane or the turn isn't greedy.
+    public func draft(
+        contract: BASLLMInvocationContract,
+        request: BASOrganRequest,
+        electAccelerated: Bool
+    ) async throws -> BASContractedDraft {
+        try validate(contract: contract, request: request)
+        let draft = try await adapter.draft(request, electAccelerated: electAccelerated)
+        let trace = BASProcessTrace.accepted(contract: contract, draft: draft)
+        return BASContractedDraft(draft: draft, trace: trace)
+    }
 }

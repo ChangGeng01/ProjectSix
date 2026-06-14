@@ -170,6 +170,32 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         }
     }
 
+    /// P1 wrapper propagation: identical routing, threading the host's `electAccelerated` to whichever provider
+    /// handles the request (so a wrapped MLX provider's prompt-lookup lane can fire). Byte-equal to the 1-arg
+    /// form for providers without an accelerated lane.
+    public func draft(
+        _ request: BASOrganRequest,
+        electAccelerated: Bool
+    ) async throws -> BASOrganDraft {
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+        switch strategy {
+        case .primaryOnly:
+            return try await primary.draft(request, electAccelerated: electAccelerated)
+        case .secondaryOnly:
+            return try await secondary.draft(request, electAccelerated: electAccelerated)
+        case .primaryWithFallback:
+            do {
+                return try await primary.draft(request, electAccelerated: electAccelerated)
+            } catch BASOrganError.providerUnavailable {
+                return try await secondary.draft(request, electAccelerated: electAccelerated)
+            } catch BASOrganError.pressureRefusal {
+                return try await secondary.draft(request, electAccelerated: electAccelerated)
+            }
+        }
+    }
+
     public func currentCapacity() async -> BASOrganCapacity {
         switch strategy {
         case .primaryOnly:
