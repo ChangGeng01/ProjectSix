@@ -36,6 +36,25 @@ regardless (the target verify); only the speedup is limited. The honest levers: 
 real ML investment — not a marathon-tail task. The pipeline (patch + self-distill + honest held-out/autoregressive
 eval) is the reusable foundation.
 
+## Track B3 — Core ML 3B TARGET backend (2026-06-14, A19) — DECLINED: quality↔memory jointly unsatisfiable
+
+The "rewrite the decode backend on Core ML, same target quality, max throughput" bet. Probe-first Phase 0 gate:
+convert Llama-3.2-3B → stateful Core ML (head_dim 128) at int4 AND int8 (`Tools/llama_target_to_coreml.py`, torch
+fidelity 24/24), measure on the A19 (`BASANETargetProbe`, BAS_ANE_TARGET_PROBE).
+
+| 3B quant | size | fidelity vs HF greedy | memory | throughput | gate |
+|---|---|---|---|---|---|
+| int4 | 1.7 GB | **6/24** (coherent but divergent — lossy) | fits | — | ❌ quality NO-GO (not "same target quality") |
+| int8 | 3.2 GB | **24/24** (faithful) | **JETSAM on the 3.2 GB compile/load** (probe printed only START at 12 MB, then SIGKILL) | never reached | ❌ memory NO-GO |
+
+**Verdict — DECLINED. The conventional "move the 3B target to Core ML" is jointly unsatisfiable on the A19:** the
+only faithful quant (int8, 24/24) is 3.2 GB and the app is jetsam-killed compiling/loading it against the 3376 MB
+cap; the only fitting quant (int4) is 6/24 — not "same target quality". Throughput was never even measured — and
+per the int8 1B's ~31 tok/s (already < the MLX 3B's 38.3), a 3B Core ML decode would have failed (b) too. This
+confirms the plan's risks #1 (Core ML decode < MLX) + #2 (quality↔memory tension). **The Core ML backend rewrite
+is the wrong bet on this device; the SSD program's universal win remains Track A (prompt-lookup).** The phase-1/2
+backend was correctly NOT built.
+
 ## Track C — tree-structured prompt-lookup (2026-06-14, iPhone A19) — CORRECT byte-identical, but marginal over linear
 
 The aggressive, training-free successor to linear prompt-lookup: propose a TREE of n-gram continuations (branch
