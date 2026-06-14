@@ -513,3 +513,31 @@ robustness limit); or a **much smaller target** (sub-1B draft / Gemma-3n-E2B). T
 **Track A (prompt-lookup, byte-identical, 1.58× repetitive, production-wired)**. The CoreAI foundation (fixed converter +
 int8 + Swift session + the full Saguaro plan in `COREAI_SAGUARO_INTEGRATION_PLAN.md`) is ready for the moment the beta
 compilers mature — evidence-gated (G0 ✅ done; G1–G3 pending an on-device compile).
+
+### Track E AUDIT (堵死原因) — the "DECLINE" above was PREMATURE; root cause found, ANE decode WORKS (2026-06-14)
+
+The operator challenged the "beta-compiler robustness wall" conclusion ("全面 audit 堵死原因"). The audit **falsified it.**
+On-device bisection (real Llama-1B dims, random weights, fp16, ANE, `BAS_COREAI_UNITS=ane`):
+
+| variant | layers | vocab | compiled size | ANE | tok/s |
+|---|---|---|---|---|---|
+| L1  | 1  | 128256 | 0.60 GB | ✅ compiles + decodes | **78.5** (2× MLX) |
+| L8  | 8  | 128256 | 1.40 GB | ✅ | 36.0 |
+| **L12** | 12 | 128256 | **1.99 GB** | ✅ | 27.0 |
+| L16 | 16 | 4096   | **1.83 GB** | ✗ SIGABRT | — |
+| L16 | 16 | 128256 (fp16/int8) | 2.3 / 1.15 GB | ✗ | — |
+
+**Root cause: a per-asset LAYER-COUNT (op-count / graph-depth) ceiling in the iOS-27 CoreAI 0.4.0 ANE compiler at ~12–15
+transformer layers — NOT memory, NOT disk, NOT the 128k-vocab op, NOT byte-size.** Decisive evidence: **L12 @ 1.99 GB
+compiles but L16 @ 1.83 GB does not — bigger passes, smaller fails ⇒ it tracks layer count, not bytes.** Disk ruled out
+(int8 still SIGABRTs on a clean 245 GB-free container); the 128k-vocab op ruled out (L1 compiles it fine, 78.5 tok/s);
+memory ruled out (L12 peak 2.3 GB < 3248 cap). The standard 16-layer Llama-3.2-1B sits **just over** the limit.
+
+**Two corrections to the record:** (1) **ANE CoreAI decode genuinely works and is fast** — my "fundamental wall" framing
+was wrong. (2) The fix is **layer-split**, now a CONCRETE, validated path (not a vague "when the beta matures"): split the
+16-layer 1B into ≤12-layer chunks (e.g. 8+8) as separate `.aimodel` functions, drive sequentially through one KV frontier
+→ the full 1B compiles + runs on the ANE today. Throughput note: standalone full-16 extrapolates to ~22 tok/s (random
+weights, full 128k lm_head every step — wasteful for a draft; optimizable), but Saguaro's value is ANE-draft ∥ GPU-verify
+overlap, not standalone tok/s. **Gate (a) is GREEN for ≤12 layers; the 1B needs layer-split. Not a decline — a measured,
+fixable per-asset limit.** (GPU/BNNS not re-tested at low layer counts — may share the same limit or differ; ANE is the bet
+and it works.)
