@@ -84,6 +84,7 @@ enum BASCoreAIDecodeProbe {
             // can't pre-empt it. The 1B fp16 OOM-crashes aned; int8 (1.24 GB) is the ANE candidate.
             let env = ProcessInfo.processInfo.environment
             let split = (env["BAS_COREAI_SPLIT"] ?? "0") == "1"   // layer-split: N chunk .aimodels (BAS_COREAI_SPLIT_DIR/LAYERS)
+            let mamba = (env["BAS_COREAI_MAMBA"] ?? "0") == "1"   // Mamba-2 (Llamba-1B): 2 fused states, NO rope/onehot/bias
             let units = (env["BAS_COREAI_UNITS"] ?? "cpu,gpu")
                 .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
             for u in units {
@@ -96,7 +97,8 @@ enum BASCoreAIDecodeProbe {
                 }
                 guard let options = opts else { continue }
                 let label = (u == "cpu") ? "cpuOnly" : u
-                if split { await measureSplit(label: label, options: options, fileLog: fileLog) }
+                if mamba { await measureMamba(label: label, options: options, fileLog: fileLog) }
+                else if split { await measureSplit(label: label, options: options, fileLog: fileLog) }
                 else { await measure(label: label, options: options, fileLog: fileLog) }
             }
             mark(fileLog, "📊 coreai-decode DONE — read: tok/s vs 38.3 (gate b); peak_MB vs 3248 (gate c); per-unit = placement (gate d).")
@@ -159,6 +161,50 @@ enum BASCoreAIDecodeProbe {
                 label, msPerTok, tps, mLoaded - mBefore, peak, tok))
         } catch {
             mark(fileLog, "📊 coreai-decode \(label) ERROR=\(error)")
+        }
+    }
+
+    /// Mamba-2 (Llamba-1B): the decisive "does a 16-layer recurrent-state model clear the per-asset ANE
+    /// LAYER-COUNT ceiling that blocked the 16-layer transformer?" probe. NO RoPE/onehot/bias inputs, NO
+    /// KV window — just two fused recurrent states (conv_all/ssm_all), positionless `step(token:)`. Stage
+    /// only the .aimodel (BAS_COREAI_ASSET, default Llamba1B_fp16.aimodel); state shapes via
+    /// BAS_COREAI_MAMBA_CONV / BAS_COREAI_MAMBA_SSM (defaults match the converter: [16,6144,4] / [16,32,64,64]).
+    @available(iOS 27, macOS 27, *)
+    private static func measureMamba(label: String, options: SpecializationOptions, fileLog: FileLog) async {
+        let env = ProcessInfo.processInfo.environment
+        let assetName = env["BAS_COREAI_ASSET"] ?? "Llamba1B_fp16.aimodel"
+        let convShape = (env["BAS_COREAI_MAMBA_CONV"] ?? "16,6144,4").split(separator: ",").compactMap { Int($0) }
+        let ssmShape = (env["BAS_COREAI_MAMBA_SSM"] ?? "16,32,64,64").split(separator: ",").compactMap { Int($0) }
+        guard convShape.count == 3, ssmShape.count == 4, let docs = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask).first else {
+            mark(fileLog, "📊 coreai-decode mamba/\(label) ERROR=bad-shapes-or-no-docs"); return
+        }
+        let asset = docs.appendingPathComponent(assetName)
+        guard FileManager.default.fileExists(atPath: asset.path) else {
+            mark(fileLog, "📊 coreai-decode mamba/\(label) ERROR=\(assetName) missing — stage it into Documents"); return
+        }
+        let mBefore = footprintMB()
+        mark(fileLog, String(format: "📊 coreai-decode mamba/%@ loading %@ conv%@ ssm%@… footprint=%.0fMB",
+                             label, assetName, "\(convShape)", "\(ssmShape)", mBefore))
+        do {
+            let session = try await BASCoreAIMambaSession(
+                assetURL: asset, convShape: convShape, ssmShape: ssmShape, options: options)
+            let mLoaded = footprintMB()
+            mark(fileLog, String(format: "📊 coreai-decode mamba/%@ loaded footprint=%.0fMB (Δ%.0fMB)", label, mLoaded, mLoaded - mBefore))
+            var tok = 1
+            for _ in 0..<8 { tok = try await session.step(token: max(0, tok)) }   // warmup (state accumulates)
+            let steps = 128
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            for _ in 0..<steps { tok = try await session.step(token: max(0, tok)) }
+            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
+            let peak = footprintMB()
+            let msPerTok = elapsedMs / Double(steps)
+            let tps = msPerTok > 0 ? 1000.0 / msPerTok : -1
+            mark(fileLog, String(format:
+                "📊 coreai-decode mamba/%@ ms/tok=%.3f tok/s=%.2f load_MB=%.1f peak_MB=%.1f (MLX 3B=38.3 tok/s, cap 3248MB) lastTok=%d",
+                label, msPerTok, tps, mLoaded - mBefore, peak, tok))
+        } catch {
+            mark(fileLog, "📊 coreai-decode mamba/\(label) ERROR=\(error)")
         }
     }
 

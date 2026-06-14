@@ -604,3 +604,51 @@ Coherence is host-proven (torch); conversion is faithful (same converter as the 
 next-level work (bigger scope): measure draft **acceptance rate vs the Llama-3.2-3B** + wire the full Saguaro two-stream loop
 (the ANE-draft ∥ GPU/MLX-verify overlap, gate G2); and an end-to-end on-device coherence capture (real prompt → decoded text
 from the ANE) to complement the host-side coherence proof.
+
+### Track E — 🐍 Mamba-2 (SSD) / Llamba-1B FAITHFUL on CoreAI — full-depth recurrent draft, host 24/24 (2026-06-15)
+
+The ≤12-layer transformer ceiling forces either truncation (degenerate) or a scarce KD'd shallow model. **Mamba-2 sidesteps
+the premise:** O(1)/token decode, a FIXED-size recurrent state (no KV growth, no MAX_SEQ window, **no softmax-over-history** —
+the exact op the B-track showed the ANE planner routes off-engine), no RoPE/onehot/bias. Model: **`cartesia-ai/Llamba-1B`**
+(16-layer "discrete Mamba-2", Llama-3 tokenizer vocab 128256, **distilled from Llama-3.1-8B** → a valid Llama-3.2-3B draft).
+
+**Converter `Tools/llamba_to_coreai.py`** → stateful fp16 `.aimodel` (2.81 GB) with **TWO fused fp16 states** (the per-layer
+conv/ssm slots differ in shape so they can't share one rectangle like the transformer KV, but 2 ≪ 32 → two `MutableViews.insert`
+via a 2-`inout` helper): `conv_all [16,6144,4]` (rolling causal-conv window) + `ssm_all [16,32,64,64]` (SSM state), ~4.9 MB total;
+input `input_id` int32 `[1,1]`, output `logits` fp16 `[1,128256]`; function `main`; positionless `step(token)`.
+
+**FIDELITY — GREEN end-to-end (the operator's top-priority question):**
+- **GATE 1** (torch): the exact stateful module that gets exported = **24/24 token-identical** vs an INDEPENDENT fp32 sequential
+  selective-scan reference (built from mamba_ssm's documented `selective_state_update_ref` math, real Cartesia weights) + coherent.
+- **GATE 2** (the saved fp16 `.aimodel`, CoreAI host / ODIE executor) = **24/24** vs the torch ref + coherent
+  (`"The capital of France is" → " Paris. However, the capital of France is not Paris…"`).
+- **Mamba-2 lowered through coreai_torch 0.4.0 cleanly — NO fidelity bug.** Unlike the transformer (whose `broadcasting_mul`
+  size-1×size-1 double-broadcast zeroed GQA heads, needing the `torch.where` fix), Mamba's conv (`cat+sum`) and SSM
+  (explicit-shape muls) have no double-broadcast → converted right the first time. fp16 is faithful for greedy.
+
+**COMPILE-CERT — GREEN:** `Sources/BASAppleAdapters/BASCoreAIMambaSession.swift` (2-fused-state driver, argmax fp16) +
+`measureMamba` path in `BASCoreAIDecodeProbe.swift` (`BAS_COREAI_MAMBA=1`, no RoPE, states via `BAS_COREAI_MAMBA_CONV/_SSM`)
+both **compiled against the iOS-27 SDK** (`** BUILD SUCCEEDED **`, BASDeviceTestApp for device).
+
+**OPEN — Q1 device run (the decisive question), BLOCKED on device connectivity:** does a **16-layer RECURRENT** Mamba-2 clear
+the per-asset ANE layer-count/op-graph ceiling that SIGABRT'd the 16-layer *transformer*? Mamba layers carry no attention/softmax/KV
+→ far fewer/simpler ops/layer, so the per-asset budget is plausibly under the ceiling even at full depth — but that is a device
+MEASUREMENT, not a claim. App built + 2.6 GB asset ready; run: stage `Llamba1B_fp16.aimodel` → Documents, launch
+`BAS_ENDURANCE_AUTOSTART=1 BAS_COREAI_DECODE_PROBE=1 BAS_COREAI_MAMBA=1 BAS_COREAI_UNITS=ane,gpu,cpu`. If 16-layer Mamba clears
+the ceiling it would be the first **full-depth** model on the A19 ANE decode lane.
+
+**TTT-Linear evaluated as the alternative expressive-state RNN — DECLINED for now (source-verified, adversarially checked):**
+no usable checkpoint (every `Test-Time-Training/ttt-*` HF repo is gated JAX *training-state* artifacts, HTTP 401, no weights;
+tokenizer **Llama-2 / vocab 32000**, not Llama-3 → a faithful draft needs a from-scratch Llama-3 distillation, weeks–months);
+**24 layers** (vs Llamba's 16) and a heavier per-layer op graph (batch-1 decode is ALWAYS the primal path → per-token `f×f`
+outer-product einsum + a 2nd `W1_grad` cache + LayerNorm-fwd/bwd) → *worse* against the ANE ceiling, not better; its only real
+edge (>16k long-context) is moot for a short greedy phone draft. The inner "gradient step" is NOT a torch.export blocker
+(no autograd, shape-bounded scan — it IS a delta-rule fast-weight recurrence, arXiv 2602.21204), so it remains a cheap *future*
+insurance probe (convert one random-weight TTT layer), but not a reason to delay the Mamba ship.
+
+**Probe ladder (what to run; Q1/Q4 need no TTT and settle the Mamba path):** Q1 = the device-ceiling run above (hours, gates all);
+**Q4 = Llamba-1B's real acceptance α vs the Llama-3.2-3B target (~1 day, NO device) — the genuinely open risk: we have 24/24
+token-identity vs the fp32 REFERENCE but ZERO acceptance data vs the actual 3B TARGET;** Q2 = convert 1 random-weight TTT layer
+(future insurance); Q3 = binary-search TTT layer count for SIGABRT (only if Q2 passes); Q5 = from-scratch Llama-3 TTT distillation
+(the multi-week disqualifier). Verdict flips to TTT only if a Llama-3-distilled vocab-128256 TTT checkpoint appears, OR Q1 fails
+AND Q4 shows Llamba's α is capped by fixed-state forgetting (and even then the first move is a shallower re-distilled Llamba).
