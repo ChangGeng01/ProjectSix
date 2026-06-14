@@ -681,3 +681,17 @@ K=2 → 2.440, K=4 → 3.298, K=6 → 3.892, K=8 → 4.310, K=12 → 4.762 (marg
 accept-rate falls as the block lengthens (0.72 → 0.31) but never collapses. **Under overlap you want K≈8–12 (τ≈4.3–4.8 → ~4–5
 committed tokens per 3B forward);** the optimal K is draft-speed-dependent (the draft must emit the K-block within the verify
 window). Next (operationally exact): re-measure vs the production MLX 4-bit 3B target + chat-templated prompts.
+
+### Track E — Q2: TTT-Linear DOES convert through coreai_torch (future-insurance probe, 2026-06-15)
+
+Ran the cheap checkpoint-free convertibility probe (`Tools/ttt_linear_q2.py`): a structurally-faithful single-step TTT-Linear
+layer (in-proj→Q/K/V, inner LayerNorm-L2 loss, MANUAL LayerNorm-backward gradient, the `f×f` OUTER-PRODUCT einsum `hi,hj->hij`
+fast-weight update, predict-with-updated-W, SiLU gate; `W1` as a fused mutated CoreAI state). **Verdict: ✅ CONVERTS + host 16/16
+vs torch.** The novel/"scary" ops (outer-product einsum + LN-backward) export and lower fine — they were NEVER the blocker. The
+ONLY obstacle was `aten.var.correction` (from `.var()`/`F.layer_norm`), which coreai_torch 0.4.0 can't lower → fixed by writing
+variance as `((x-mu)**2).mean()` (the same trick the Mamba rmsnorm used). **So the conversion-risk axis against TTT is RESOLVED:
+the toolchain will not be the obstacle if/when a Llama-3-distilled TTT checkpoint ever appears.** (Caveat: the 16/16 is on a
+degenerate random-weight constant argmax — proves the path runs end-to-end + is self-consistent, not strong numerics.) This does
+NOT change the ship-now verdict: TTT remains dominated by Mamba purely on **(1) no usable Llama-3-vocab checkpoint** (weeks–months
+to distill one) and **(2) 24 layers + heavier op-graph vs the ~12-layer ANE ceiling** (device-unverified) — and Q4 already showed
+we don't NEED TTT (Llamba α=0.80 is strong). Net: TTT is now convertibility-cleared *future insurance*, not a ship-now contender.
