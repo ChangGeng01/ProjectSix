@@ -331,6 +331,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASANETargetProbe.run() }
             return
         }
+        // Track E — Saguaro-on-CoreAI Phase-0 GATE: does the iOS-27 CoreAI STATEFUL decode (LlamaDraft1B_fp16.aimodel
+        // via BASCoreAIDecodeSession) run on the A19, and at what tok/s vs MLX 3B (38.3)? Throughput/memory/placement
+        // are fidelity-independent (BAS_COREAI_DECODE_PROBE=1). The decisive bet behind Saguaro-on-CoreAI.
+        if (env["BAS_COREAI_DECODE_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIDecodeProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
