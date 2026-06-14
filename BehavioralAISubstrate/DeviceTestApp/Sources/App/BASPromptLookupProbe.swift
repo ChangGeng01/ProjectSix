@@ -77,9 +77,18 @@ enum BASPromptLookupProbe {
             + "tree=\(tree) branch=\(maxBranch) nodes=\(maxNodes)")
 
         do {
-            // Single-model, no draft (prompt-lookup is model-free) → universality + light memory.
+            // Single-model, no draft (prompt-lookup is model-free) → universality + light memory. Model is
+            // env-selectable (BAS_PLOOKUP_MODEL), default Gemma-4-E2B — the comprehensive-development target
+            // (E2B has NO spec-decode draft, so prompt-lookup is its one decode accelerator).
+            let plookupSel = (ProcessInfo.processInfo.environment["BAS_PLOOKUP_MODEL"] ?? "gemma_e2b").lowercased()
+            let plookupModel: MLXModelCatalog.Entry
+            switch plookupSel {
+            case "llama", "llama_3b": plookupModel = MLXModelCatalog.speculativeOptimalTarget
+            case "qwen", "qwen_3b": plookupModel = MLXModelCatalog.qwen2_5_3B_4bit
+            default: plookupModel = MLXModelCatalog.gemma4_E2B_4bit
+            }
             let adapter = MLXOrganAdapter(
-                model: MLXModelCatalog.speculativeOptimalTarget,
+                model: plookupModel,
                 maxOutputTokens: cap,
                 speculativeDecoding: .off)
             try await adapter.loadModel()
