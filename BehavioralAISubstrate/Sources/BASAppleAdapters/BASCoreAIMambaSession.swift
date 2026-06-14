@@ -129,6 +129,41 @@ public final class BASCoreAIMambaSession: @unchecked Sendable {
         ssmAll = NDArray(scalars: [Float16](repeating: 0, count: ssmCount), shape: ssmShape)
         pos = 0
     }
+
+    // MARK: - Spec-decode state snapshot/restore (partial-accept rewind)
+    //
+    // A recurrent state can't "keep" only the accepted writes the way a position-addressed KV cache can (each
+    // step advances the single fused state), so a speculator that proposes K tokens and gets only `acc` accepted
+    // must REWIND: snapshot the frontier before proposing, then on commit restore + replay [seed, accepted…].
+    // This is the exact pattern the Q4 host harness proved (Tools/llamba_q4_acceptance.py). The clone is DEEP
+    // (read every Float16 scalar into a fresh NDArray) — a shallow `=` could alias the live state and silently
+    // collapse acceptance to ~0 (the BASCoreMLDraftDecoder silent-corruption trap), so we never trust `=`.
+
+    public struct Snapshot: @unchecked Sendable {
+        fileprivate let conv: NDArray
+        fileprivate let ssm: NDArray
+    }
+
+    /// Deep copy of both fused recurrent states at the current frontier.
+    public func snapshot() -> Snapshot {
+        Snapshot(conv: Self.cloneF16(convAll, count: convCount, shape: convShape),
+                 ssm: Self.cloneF16(ssmAll, count: ssmCount, shape: ssmShape))
+    }
+
+    /// Restore both states from a snapshot (fresh deep copies — the snapshot stays pristine for reuse).
+    public func restore(_ s: Snapshot) {
+        convAll = Self.cloneF16(s.conv, count: convCount, shape: convShape)
+        ssmAll = Self.cloneF16(s.ssm, count: ssmCount, shape: ssmShape)
+    }
+
+    private static func cloneF16(_ a: NDArray, count: Int, shape: [Int]) -> NDArray {
+        var scalars = [Float16](repeating: 0, count: count)
+        a.view(as: Float16.self).withUnsafePointer { pointer, _, _ in
+            var i = 0
+            while i < count { scalars[i] = pointer[i]; i += 1 }
+        }
+        return NDArray(scalars: scalars, shape: shape)
+    }
 }
 
 #endif
