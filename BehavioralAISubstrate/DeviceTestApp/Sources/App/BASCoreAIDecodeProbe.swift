@@ -82,15 +82,22 @@ enum BASCoreAIDecodeProbe {
             // std::bad_alloc → SIGABRT, killing the app past Swift try/catch). So units are run in
             // BAS_COREAI_UNITS order (default "cpu,gpu") — isolate a backend (e.g. "ane") so an earlier crash
             // can't pre-empt it. The 1B fp16 OOM-crashes aned; int8 (1.24 GB) is the ANE candidate.
-            let units = (ProcessInfo.processInfo.environment["BAS_COREAI_UNITS"] ?? "cpu,gpu")
+            let env = ProcessInfo.processInfo.environment
+            let split = (env["BAS_COREAI_SPLIT"] ?? "0") == "1"   // layer-split: N chunk .aimodels (BAS_COREAI_SPLIT_DIR/LAYERS)
+            let units = (env["BAS_COREAI_UNITS"] ?? "cpu,gpu")
                 .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
             for u in units {
+                let opts: SpecializationOptions?
                 switch u {
-                case "cpu": await measure(label: "cpuOnly", options: .cpuOnly, fileLog: fileLog)
-                case "gpu": await measure(label: "gpu", options: SpecializationOptions(preferredComputeUnitKind: .gpu), fileLog: fileLog)
-                case "ane": await measure(label: "ane", options: SpecializationOptions(preferredComputeUnitKind: .neuralEngine), fileLog: fileLog)
-                default: mark(fileLog, "📊 coreai-decode unknown unit \(u)")
+                case "cpu": opts = .cpuOnly
+                case "gpu": opts = SpecializationOptions(preferredComputeUnitKind: .gpu)
+                case "ane": opts = SpecializationOptions(preferredComputeUnitKind: .neuralEngine)
+                default: mark(fileLog, "📊 coreai-decode unknown unit \(u)"); opts = nil
                 }
+                guard let options = opts else { continue }
+                let label = (u == "cpu") ? "cpuOnly" : u
+                if split { await measureSplit(label: label, options: options, fileLog: fileLog) }
+                else { await measure(label: label, options: options, fileLog: fileLog) }
             }
             mark(fileLog, "📊 coreai-decode DONE — read: tok/s vs 38.3 (gate b); peak_MB vs 3248 (gate c); per-unit = placement (gate d).")
         } else {
@@ -152,6 +159,56 @@ enum BASCoreAIDecodeProbe {
                 label, msPerTok, tps, mLoaded - mBefore, peak, tok))
         } catch {
             mark(fileLog, "📊 coreai-decode \(label) ERROR=\(error)")
+        }
+    }
+
+    /// Layer-split: drive N chunk `.aimodel`s (BAS_COREAI_SPLIT_DIR, default LlamaDraft1B_split88; BAS_COREAI_SPLIT_LAYERS,
+    /// default "8,8") via BASCoreAILayerSplitSession. Same decode-timing harness as `measure`.
+    @available(iOS 27, macOS 27, *)
+    private static func measureSplit(label: String, options: SpecializationOptions, fileLog: FileLog) async {
+        let env = ProcessInfo.processInfo.environment
+        let dir = env["BAS_COREAI_SPLIT_DIR"] ?? "LlamaDraft1B_split88"
+        let layers = (env["BAS_COREAI_SPLIT_LAYERS"] ?? "8,8").split(separator: ",").compactMap { Int($0) }
+        let nKV = Int(env["BAS_COREAI_NKV"] ?? "") ?? 8
+        let headDim = Int(env["BAS_COREAI_HEADDIM"] ?? "") ?? 64
+        let maxSeq = Int(env["BAS_COREAI_MAXSEQ"] ?? "") ?? 512
+        guard !layers.isEmpty, let docs = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask).first else {
+            mark(fileLog, "📊 coreai-decode split/\(label) ERROR=bad-config-or-no-docs"); return
+        }
+        let chunkURLs = layers.indices.map { docs.appendingPathComponent("\(dir)/chunk\($0).aimodel") }
+        for u in chunkURLs where !FileManager.default.fileExists(atPath: u.path) {
+            mark(fileLog, "📊 coreai-decode split/\(label) ERROR=\(u.lastPathComponent) missing in \(dir)"); return
+        }
+        let cosURL = docs.appendingPathComponent("rope_cos_h\(headDim).bin")
+        let sinURL = docs.appendingPathComponent("rope_sin_h\(headDim).bin")
+        let tableBytes = maxSeq * headDim * MemoryLayout<Float>.size
+        for url in [cosURL, sinURL] where !FileManager.default.fileExists(atPath: url.path) {
+            try? Data(count: tableBytes).write(to: url)
+        }
+        let mBefore = footprintMB()
+        mark(fileLog, String(format: "📊 coreai-decode split/%@ loading %d chunks %@… footprint=%.0fMB", label, layers.count, "\(layers)", mBefore))
+        do {
+            let session = try await BASCoreAILayerSplitSession(
+                chunkAssetURLs: chunkURLs, chunkLayers: layers,
+                ropeCosURL: cosURL, ropeSinURL: sinURL, nKV: nKV, headDim: headDim, maxSeq: maxSeq, options: options)
+            let mLoaded = footprintMB()
+            mark(fileLog, String(format: "📊 coreai-decode split/%@ loaded footprint=%.0fMB (Δ%.0fMB)", label, mLoaded, mLoaded - mBefore))
+            var pos = 0
+            var tok = 1
+            for _ in 0..<8 { tok = try await session.step(token: tok, pos: pos); pos += 1 }   // warmup
+            let steps = 128
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            for _ in 0..<steps { tok = try await session.step(token: max(0, tok), pos: pos); pos += 1 }
+            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
+            let peak = footprintMB()
+            let msPerTok = elapsedMs / Double(steps)
+            let tps = msPerTok > 0 ? 1000.0 / msPerTok : -1
+            mark(fileLog, String(format:
+                "📊 coreai-decode split/%@ ms/tok=%.3f tok/s=%.2f load_MB=%.1f peak_MB=%.1f (MLX 3B=38.3 tok/s, cap 3248MB) lastTok=%d",
+                label, msPerTok, tps, mLoaded - mBefore, peak, tok))
+        } catch {
+            mark(fileLog, "📊 coreai-decode split/\(label) ERROR=\(error)")
         }
     }
     #endif
