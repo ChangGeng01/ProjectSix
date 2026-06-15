@@ -956,3 +956,58 @@ ONE cheap experiment that could flip it (days, no retrain): PTQ-graft ONLY the t
 (RoPE-trick on B/C) onto the EXISTING Llamba-1B weights, run the same int4 PTQ, measure α vs the 0.644 int4
 baseline. Directly measures the sign of Δquant_extra (the one genuinely-open term). Flat/down (mechanism-predicted)
 = NO-GO confirmed decisively; a large rise = escalate to CONDITIONAL-GO. Reuses Tools/mamba3_full_ane.py.
+
+### Track G addendum 6 — Qwen→Mamba-3 distillation: teacher SETTLED + plan re-scoped (2026-06-15)
+
+Two reconciled, adversarially-verified workflows evaluating the operator's plan "distill a Mamba-3 ANE backbone
+from Qwen3.5-0.8B": plan-eval (79 agents) + focused teacher-choice (64 agents). **VERDICT: plan AS WRITTEN =
+NO-GO (wrong teacher); re-scoped = CONDITIONAL-GO.**
+
+TEACHER (high confidence):
+- **DECLINE Qwen3.5-0.8B** (the proposed teacher). config.json-confirmed: Gated-DeltaNet hybrid (18 linear-attn
+  GDN + 6 softmax of 24 text layers, full_attention_interval=4) + 12-layer ViT → multimodal VLM, vocab 248320.
+  NOT a dense transformer. Three disqualifiers: **(1) the GDN layers are NOT a gift** — the "linear-attention is
+  closer to an SSM so easier" hypothesis is REFUTED for a diagonal student: MOHAWK Stage-1 is mixer-agnostic
+  (Frobenius over any materialized mixer, so it doesn't *break*), but SSD duality holds for diagonal/scalar
+  linear attention, NOT Gated DeltaNet. GDN's transition α(I−β·kkᵀ) is a data-dependent non-diagonal Householder
+  (diagonal+rank-1), STRICTLY MORE expressive than the repo's diagonal-SSD student (A=−1). A less-expressive
+  student matching a more-expressive target → Stage-1 residual WORSE not near-zero, with no clean GDN→diagonal
+  warm-start. **(2)** multimodal: vision strip mandatory + unquantified early-fusion text tax (0.8B MMLU-Redux
+  48.5 sits BELOW prior-gen text-only Qwen3-0.6B 51.26); no text-only checkpoint exists (−Base is also VLM).
+  **(3)** 248320 head inflation vs the student's 128256 build.
+- **RECOMMEND Llama-3.2-1B-Instruct** — the EXACT teacher Llamba was MOHAWK-distilled from (proven end-to-end at
+  this scale), vocab 128256 MATCHES the repo student (mamba3_1state.py, llamba_to_coreai.py) → recipe UNCHANGED,
+  Mamba-2→Mamba-3 warm-start intact, lowest-risk. **STRENGTH UPGRADE = Qwen3-1.7B-Base** (clean dense softmax,
+  MMLU 62.6) if the 1B ceiling (Llamba-1B MMLU ~38) is too low; costs a 151936 head resize.
+
+SCOPE (binding): a ~0.8–1B backbone + external SQLite memory is sufficient ONLY for a narrowly-scoped RAG-aware
+grounded-QA reader, NOT a general assistant. Off-the-shelf small models are NET-HARMED by retrieval (injecting
+context destroys 42–64% of known facts); only RAG-aware training (RAFT, woven into Stage-3) works — NOT bolt-on.
+A general assistant needs 3–4B (Qwen3-4B dense), cutting ANE throughput + re-entering the capacity-bound regime.
+
+MAMBA-3 vs MAMBA-2 (unchanged): arch gain tiny (+0.7pp SISO / +1.9pp MIMO iso-param) ≈ 10× smaller than int4 PTQ
+loss → Mamba-3 is a THROUGHPUT play (MIMO weight-read amortization + conv1d removal), not a quality play. The
+FAITHFUL trapezoid recurrence has ZERO on-ANE decode (all 90–140 tok/s numbers used the Mamba-2-equivalent A=−1
+Euler shortcut, random weights, no MLP); 24-layer Mamba-3+MLP clearing the ~12–15 per-asset ceiling is unmeasured.
+Mamba-2 retained as the safe student fallback.
+
+RECIPE (Llama-3.2-1B teacher): MOHAWK unchanged from the proven Llamba run — Stage-1 Frobenius matrix-orientation,
+Stage-2 hidden-state L2, Stage-3 weight-transfer + logit KD (~8–10B tokens) + RAFT RAG-aware objective; then QAT
+(NOT PTQ) to int4/int6. Effort ~6–12 engineer-weeks to a shippable scoped-RAG-reader (GPU compute is cheap,
+~100–135 H100-hr; cost is engineering: re-deriving Stage-1 for the rotated/MIMO/trapezoid mixer, the RAFT corpus,
+QAT, the CoreAI runtime incl. the still-unsolved on-ANE parallel-scan PREFILL kernel, + bringing the faithful
+trapezoid up on ANE).
+
+CHEAPEST DE-RISKS (before any weeks-commit):
+1. **(1–2 days, single GPU, NO training) Stage-1 Frobenius-residual bake-off** — materialize each teacher's
+   per-layer mixing matrix, fit the diagonal Mamba-3 SSD, read the converged residual. 3 arms: Llama-3.2-1B /
+   Qwen3-1.7B / Qwen3.5-0.8B (6 softmax + 18 GDN via chunkwise WY). Settles teacher choice + the GDN-gift
+   hypothesis with a NUMBER. Rule: keep the hybrid only if its GDN residuals ≤ softmax; predicted higher.
+2. **(3–5 days, 8×H100) surrogate** — MOHAWK-distill Qwen3-1.7B → ~1B MAMBA-2 (existing Llamba recipe), measure
+   fp16 + INT4-QAT recovery + RAG-utilization. Answers: does a 2.1× teacher close the gap, does INT4-QAT survive
+   at ~1B, can a RAG-aware small SSM use retrieval. GO to the full Mamba-3 build only if INT4-QAT MMLU ≥ ~85% of
+   teacher AND oracle-context EM beats the off-the-shelf floor.
+
+OPEN OPERATOR DECISIONS: (i) product scope (scoped-RAG-reader ~1B vs general-assistant 3–4B); (ii) is Mamba-2
+acceptable as warm-start scaffold + de-risk surrogate (product stays pure Mamba-3) — the operator said "no
+Mamba-2", but both the recommended teacher path AND both cheap de-risks lean on it.
