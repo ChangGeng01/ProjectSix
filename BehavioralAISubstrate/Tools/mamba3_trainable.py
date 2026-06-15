@@ -57,6 +57,32 @@ def scan_parallel(alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
     return torch.einsum("tsh,shpn->thpn", decay, u)            # [T,H,P,N]
 
 
+def scan_chunked(alpha: torch.Tensor, u: torch.Tensor, C: int = 64) -> torch.Tensor:
+    """Memory-efficient chunked equivalent of scan_parallel: O(C^2) decay/chunk vs O(T^2). Same recurrence
+    ssm_t = alpha_t*ssm_{t-1} + u_t. Intra-chunk via a local CxC 1-SS matmul; inter-chunk via a short carry
+    loop over nc=ceil(T/C) chunk-end states. Lets seq/batch grow past what the full O(T^2) decay allows."""
+    T, Hh = alpha.shape
+    Pp, Ss = u.shape[2], u.shape[3]
+    pad = (-T) % C
+    if pad:
+        alpha = torch.cat([alpha, torch.ones(pad, Hh, dtype=alpha.dtype, device=alpha.device)], 0)
+        u = torch.cat([u, torch.zeros(pad, Hh, Pp, Ss, dtype=u.dtype, device=u.device)], 0)
+    nc = (T + pad) // C
+    cl = torch.cumsum(torch.log(alpha).view(nc, C, Hh), dim=1)         # [nc,C,H] inclusive cumsum within chunk
+    diff = cl.unsqueeze(2) - cl.unsqueeze(1)                           # [nc,Ci,Cj,H]
+    mask = torch.tril(torch.ones(C, C, dtype=torch.bool, device=alpha.device))
+    Dloc = torch.where(mask.view(1, C, C, 1), torch.exp(diff), torch.zeros((), dtype=alpha.dtype, device=alpha.device))
+    intra = torch.einsum("cijh,cjhps->cihps", Dloc, u.view(nc, C, Hh, Pp, Ss))   # within-chunk
+    decay_start = torch.exp(cl)                                        # [nc,C,H] carry decay from chunk start
+    outs = []
+    ssm_in = torch.zeros(Hh, Pp, Ss, dtype=u.dtype, device=u.device)
+    for c in range(nc):
+        ssm_c = decay_start[c].unsqueeze(-1).unsqueeze(-1) * ssm_in.unsqueeze(0) + intra[c]   # [C,H,P,N]
+        outs.append(ssm_c)
+        ssm_in = ssm_c[-1]
+    return torch.cat(outs, 0)[:T]
+
+
 class Lyr(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -127,7 +153,8 @@ class Lyr(nn.Module):
         cur = torch.einsum("thpr,thrn->thpn", x_mimo, Brot)                     # [T,H,P,N]
         cur_prev = torch.cat([torch.zeros_like(cur[:1]), cur[:-1]], 0)          # cur_{t-1}, cur_{-1}=0
         u = beta.view(T, H, 1, 1) * cur_prev + gamma.view(T, H, 1, 1) * cur     # width-2 causal conv
-        ssm_seq = scan_parallel(alpha, u)                                       # [T,H,P,N], parallel-over-time
+        # chunked-segsum scan (== scan_parallel, verified) — O(C^2) decay/chunk so long T fits memory
+        ssm_seq = scan_chunked(alpha, u) if T > 64 else scan_parallel(alpha, u)
         y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)                      # [T,H,P,R]
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(y_out.reshape(T, D_INNER) * F.silu(z))
@@ -260,9 +287,23 @@ def overfit_sanity(steps: int = 80, T: int = 16, vocab: int = 512, layers: int =
     return ok
 
 
+def parity_scan(T: int = 200, Pp: int = 8, Ss: int = 8, C: int = 64, seed: int = 0) -> bool:
+    """chunked-segsum == full parallel 1-SS scan (T=200 not a multiple of C -> tests padding)."""
+    torch.manual_seed(seed)
+    alpha = torch.rand(T, H, dtype=torch.float64) * 0.5 + 0.4          # in (0.4,0.9)
+    u = torch.randn(T, H, Pp, Ss, dtype=torch.float64)
+    err = (scan_parallel(alpha, u) - scan_chunked(alpha, u, C=C)).abs().max().item()
+    ok = err < 1e-9
+    print(f"=== SCAN PARITY (chunked C={C} vs parallel 1-SS, T={T}) ===")
+    print(f"  max-abs-err: {err:.3e}   RESULT: {'PASS ✅' if ok else 'FAIL ❌'}")
+    return ok
+
+
 if __name__ == "__main__":
     import os
     ok = all(parity(seed=s) for s in (0, 1, 2))
+    print()
+    ok = parity_scan() and ok
     print()
     ok = overfit_sanity() and ok
     print()
