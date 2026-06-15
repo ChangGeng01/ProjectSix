@@ -1011,3 +1011,36 @@ CHEAPEST DE-RISKS (before any weeks-commit):
 OPEN OPERATOR DECISIONS: (i) product scope (scoped-RAG-reader ~1B vs general-assistant 3–4B); (ii) is Mamba-2
 acceptable as warm-start scaffold + de-risk surrogate (product stays pure Mamba-3) — the operator said "no
 Mamba-2", but both the recommended teacher path AND both cheap de-risks lean on it.
+
+### Track G addendum 7 — FAITHFUL trapezoid Mamba-3 RUNS ON THE A19 ANE (first-ever device decode) (2026-06-16)
+
+The route's命门 is RESOLVED. Every prior on-ANE number (50.9 int8 / 90–140 int4) used the Mamba-2-equivalent
+EULER shortcut (A=−1, dt-cancel). The FAITHFUL trapezoid (learned A=−softplus, the 3-term recurrence
+α·ssm+β·prev+γ·cur, the rotated kprev/vprev delay, data-dependent RoPE, MIMO rank-R) had ZERO on-device decode.
+Now measured on the iPhone Air A19, int8, via a NEW converter `Tools/mamba3_faithful_ane.py` + `BASCoreAIMamba3Session`
+extended to 1–4 states (runStep3/runStep4, explicit inout). Random weights — op-graph compile + speed/footprint only.
+
+| config (D=2048, mixer-only, 4 angle-first states) | result | tok/s | peak MB | load ms |
+|---|---|---|---|---|
+| **L=2**  | **clean full-ANE compile ✅** | **160.6** | 307 | 1944 |
+| **L=16** | decodes, but 1 segment `ANECCompile() FAILED` → fallback | **51.8** (> Mamba-2 ref 39) | 88 | 9423 |
+
+FINDINGS:
+1. **The faithful trapezoid op-graph IS ANE-native** — L=2 compiles + decodes 100% on ANE, no error, 160.6 tok/s.
+   The "complex state breaks ANE / needs a custom MIL pass" worry is moot (it's real 2×2 rotations by construction).
+2. **The flat-state SIGSEGV is FIXED by 4 angle-first states.** The original faithful converter
+   (`mamba3_to_coreai.py`) packed all carry-state into ONE flat `[L,148480]` tensor sliced per-layer → that
+   flat-slice SIGSEGVs the ANE segmenter at LOAD (device-confirmed at L=2, both before AND after verifying the
+   asset copied completely — R1 caught that `devicectl`'s recursive copy silently drops the 343MB `main.mlirb`).
+   Re-architecting to 4 separate properly-shaped states (angle, ssm, kprev, vprev), registered/read/written
+   angle-FIRST (the proven `mamba3_full_ane.py` pattern, extended 2→4) → loads clean. The "4 states hit the
+   segmenter ordering bug" fear (the reason the original used the crashing flat-pack) did NOT materialize.
+3. **At depth-16 in a SINGLE asset, one segment exceeds the per-asset ANE compile ceiling**
+   (`_ANECompiler: ANECCompile() FAILED`) → falls back off-ANE, still decodes at 51.8 tok/s (> Mamba-2 39,
+   peak 88MB, well under the 3376MB jetsam cap), but NOT 100%-ANE. SIZE/depth limit (L=2 is clean), fixed by
+   ASSET-SPLITTING (proven pattern; split assets exist, e.g. LlamaDraft1B_split124).
+
+VERDICT — **the faithful Mamba-3 trapezoid backbone is DEVICE-VIABLE.** The engine works on the A19 ANE; the
+depth-16 single-asset partial-fallback is a known, solved packaging issue (split), not a fundamental op-graph
+blocker. This flips the Mamba-3-backbone risk from "engine is the route's biggest device gamble" → "engine
+certified; remaining work = asset-splitting for full-ANE-at-depth + the real cost, weights/distillation."

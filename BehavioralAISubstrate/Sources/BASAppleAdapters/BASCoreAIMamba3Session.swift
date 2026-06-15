@@ -33,7 +33,9 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
     private let names: [String]               // descriptor order (count 1 or 2)
     private let count: Int
     private var state0: NDArray
-    private var state1: NDArray                // dummy [1] when count == 1 (never inserted)
+    private var state1: NDArray                // dummy [1] when not used
+    private var state2: NDArray
+    private var state3: NDArray
     private let shapes: [[Int]]
 
     /// Tokens decoded so far (Mamba has no positional window — just a counter).
@@ -64,24 +66,30 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
         self.model = loaded
         self.function = fn
         let descNames = fn.descriptor.stateNames
-        guard descNames.count == stateShapes.count, (1...2).contains(descNames.count) else {
-            throw DecodeError.badStates("descriptor has \(descNames.count) states \(descNames); supported: 1 or 2 with matching shapes (\(stateShapes.count) supplied)")
+        guard descNames.count == stateShapes.count, (1...4).contains(descNames.count) else {
+            throw DecodeError.badStates("descriptor has \(descNames.count) states \(descNames); supported: 1–4 with matching shapes (\(stateShapes.count) supplied)")
         }
         self.names = descNames
         func zeroed(_ s: [Int]) -> NDArray {
             NDArray(scalars: [Float16](repeating: 0, count: s.reduce(1, *)), shape: s)
         }
+        let dummy = NDArray(scalars: [Float16(0)], shape: [1])
         self.state0 = zeroed(stateShapes[0])
-        self.state1 = stateShapes.count == 2 ? zeroed(stateShapes[1]) : NDArray(scalars: [Float16(0)], shape: [1])
+        self.state1 = stateShapes.count >= 2 ? zeroed(stateShapes[1]) : dummy
+        self.state2 = stateShapes.count >= 3 ? zeroed(stateShapes[2]) : dummy
+        self.state3 = stateShapes.count >= 4 ? zeroed(stateShapes[3]) : dummy
     }
 
     /// One decode step: feed `token`, advance the carried state(s), return the argmax of the logits.
     @discardableResult
     public func step(token: Int) async throws -> Int {
         let inputID = NDArray(scalars: [Int32(token)], shape: [1, 1])
-        return count == 2
-            ? try await runStep2(inputID: inputID, s0: &state0, s1: &state1)
-            : try await runStep1(inputID: inputID, s0: &state0)
+        switch count {
+        case 4: return try await runStep4(inputID: inputID, s0: &state0, s1: &state1, s2: &state2, s3: &state3)
+        case 3: return try await runStep3(inputID: inputID, s0: &state0, s1: &state1, s2: &state2)
+        case 2: return try await runStep2(inputID: inputID, s0: &state0, s1: &state1)
+        default: return try await runStep1(inputID: inputID, s0: &state0)
+        }
     }
 
     private func runStep1(inputID: NDArray, s0: inout NDArray) async throws -> Int {
@@ -102,6 +110,35 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
         var views = InferenceFunction.MutableViews()
         views.insert(&s0, for: names[0])
         views.insert(&s1, for: names[1])
+        var outputs: InferenceFunction.Outputs
+        do {
+            outputs = try await function.run(inputs: ["input_id": inputID], states: views)
+        } catch {
+            throw DecodeError.predict("\(error)")
+        }
+        guard let value = outputs.remove("logits"), let logits = value.ndArray else { throw DecodeError.noLogits }
+        pos += 1
+        return Self.argmaxF16(logits)
+    }
+
+    private func runStep3(inputID: NDArray, s0: inout NDArray, s1: inout NDArray, s2: inout NDArray) async throws -> Int {
+        var views = InferenceFunction.MutableViews()
+        views.insert(&s0, for: names[0]); views.insert(&s1, for: names[1]); views.insert(&s2, for: names[2])
+        var outputs: InferenceFunction.Outputs
+        do {
+            outputs = try await function.run(inputs: ["input_id": inputID], states: views)
+        } catch {
+            throw DecodeError.predict("\(error)")
+        }
+        guard let value = outputs.remove("logits"), let logits = value.ndArray else { throw DecodeError.noLogits }
+        pos += 1
+        return Self.argmaxF16(logits)
+    }
+
+    private func runStep4(inputID: NDArray, s0: inout NDArray, s1: inout NDArray, s2: inout NDArray, s3: inout NDArray) async throws -> Int {
+        var views = InferenceFunction.MutableViews()
+        views.insert(&s0, for: names[0]); views.insert(&s1, for: names[1])
+        views.insert(&s2, for: names[2]); views.insert(&s3, for: names[3])
         var outputs: InferenceFunction.Outputs
         do {
             outputs = try await function.run(inputs: ["input_id": inputID], states: views)
@@ -134,7 +171,9 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
             NDArray(scalars: [Float16](repeating: 0, count: s.reduce(1, *)), shape: s)
         }
         state0 = zeroed(shapes[0])
-        if count == 2 { state1 = zeroed(shapes[1]) }
+        if count >= 2 { state1 = zeroed(shapes[1]) }
+        if count >= 3 { state2 = zeroed(shapes[2]) }
+        if count >= 4 { state3 = zeroed(shapes[3]) }
         pos = 0
     }
 }
