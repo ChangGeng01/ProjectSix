@@ -851,3 +851,32 @@ L≈14 (near-full depth). HONEST BOUND (R1): random-weight + mixer-only = the op
 model (with the per-block MLP + trained weights) at the same (depth, quant) would be somewhat slower, and int4 costs
 quality vs int8 — so a *usable* 100-tok/s standalone model = land this (depth × int4 × MLP) point with a real
 checkpoint/distillation. What's proven: the A19 ANE can DECODE a Mamba SSD+RoPE+MIMO graph at 90–140 tok/s.
+
+### Track G addendum 2 — Asymmetric Duo: Mamba-3-as-TARGET + chunked-GEMM verify on ANE (2026-06-15)
+
+The operator's "Asymmetric Duo" reframing — Mamba-3 as the spec-decode TARGET (not draft), tiny transformer as the
+GPU draft — escapes every wall that killed Saguaro, and each escape is now DEVICE-MEASURED. One Mamba-3 .aimodel
+with TWO functions sharing state: `decode[1,1]` (recurrent) + `verify[1,K]` (chunked-GEMM: in_proj/out_proj/lm-head
+batched `[K,d]×W` so weights are read ONCE, amortized over K; SSM recurrence a cheap per-token scan). A19 ANE, int4,
+L=8 (`Tools/mamba3_dual_ane.py`, `BASCoreAIMamba3DualSession`, `BASCoreAIMamba3DualProbe`, BAS_COREAI_DUAL_PROBE=1):
+
+| metric | K=4 | K=8 |
+|---|---|---|
+| decode[1,1] | 7.35 ms (136 tok/s) | 7.30 ms (137 tok/s) |
+| verify[1,K] per token | 3.34 ms | **2.22 ms** |
+| **verify-vs-K-sequential-decodes** | **2.20× cheaper** | **3.29× cheaper** |
+| decode↔verify switch overhead | +1.86 ms | −0.07 ms (≈ free) |
+| peak MB | 603 | 595 |
+
+KEY RESULTS (measured): (1) the `[1,K]` conv-mode verify graph COMPILES + runs on the A19 ANE (one-time ~18–30 s
+compile). (2) The decode↔verify SWITCH is FREE — one asset, two functions, shared fused state → a function
+dispatch, no recompile/reload/state-copy. (3) The UNROLLED verify (K separate `[1,d]` steps) is 1.01× (no win — it
+re-reads weights K times); the CHUNKED-GEMM verify (batched `[K,d]×W`) amortizes the weight read over K → 2.2×
+(K=4) / 3.3× (K=8) cheaper than K sequential decodes, SCALING with K. This is the enabler that flips spec-decode
+from loss to win on this lane: at τ≈4.3 (α=0.8) the verify-bound effective ceiling is ~244 tok/s, ~1.8× over bare
+137. WHY it beats Saguaro: Mamba-3-as-target has NO draft-rewind (the target only forward-scans), and the
+cross-engine payload is K tokens (bytes) not states → no ρ=0.83 bandwidth contention. R1 HONEST: the 2–3× verify
+amortization + free switch + 137 decode are MEASURED; the ~1.8× end-to-end win is PROJECTED, contingent on
+(a) a draft cheap enough to not exceed the verify time (Lookahead/n-gram or a 2-layer tiny transformer),
+(b) the draft's real α (τ assumed from α=0.8), and (c) a trained Mamba-3 target checkpoint (random weights here =
+speed only). Net: the kernel/architecture is validated; the remaining work is TRAINING, not the SoC walls.

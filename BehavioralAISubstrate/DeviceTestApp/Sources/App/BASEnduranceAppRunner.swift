@@ -353,6 +353,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIMamba3Probe.run() }
             return
         }
+        // Track E — Asymmetric-Duo switch probe (BAS_COREAI_DUAL_PROBE=1): ONE Mamba-3 asset, decode[1,1] +
+        // verify[1,K] sharing state. Measures whether the [1,K] conv-verify graph compiles on the A19 ANE, its
+        // latency vs K recurrent steps, and the decode↔verify switch overhead.
+        if (env["BAS_COREAI_DUAL_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIMamba3DualProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
