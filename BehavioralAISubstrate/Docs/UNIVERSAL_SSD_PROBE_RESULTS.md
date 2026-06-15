@@ -832,3 +832,22 @@ it is a **drop-in, faster-than-Mamba-2 ANE draft / standalone tiny-model** for t
 `Tools/mamba3_full_ane.py` (the working angle-first full Mamba-3); `Tools/mamba3_1state.py` (the localizing control);
 driver `BASCoreAIMamba3Session` (generic 1-or-2 state) + `BASCoreAIMamba3Probe` (`BAS_COREAI_MAMBA3_PROBE=1`,
 `BAS_COREAI_MAMBA3_STATES="16,32,32;16,32,64,64"`).
+
+### Track G addendum — standalone Mamba-on-ANE decode SPEED ENVELOPE (2026-06-15)
+
+How fast can the standalone Mamba-on-ANE decode lane go on the A19? Swept layer depth × quant (angle-first
+SSD+RoPE+MIMO, random weights, **mixer-only/no-MLP** — the SPEED CEILING, not a usable model). All on the A19 ANE,
+96 decode steps:
+
+| quant | L=8 | L=10 | L=12 | L=16 |
+|---|---|---|---|---|
+| **int8** | 79.6 (69 MB) | 70.0 (78 MB) | 62.0 (83 MB) | 50.9 (84 MB) |
+| **int4** | **140.7** (72 MB) | — | **107.6** (85 MB) | 89.9 (93 MB) |
+
+Levers (decode is memory-bandwidth-bound; the 128k-vocab tied-head is a large fixed per-step read): **int4 ≈ 1.77×
+over int8** (50.9→89.9 at L=16, asset 991→496 MB); **fewer layers** raises tok/s ~linearly (~0.93 ms/layer + ~4.8 ms
+fixed). Targets: **75 tok/s** = int8 L≈9 OR int4 L=16 (89.9, full depth); **100 tok/s** = int4 L=12 (107.6) OR int4
+L≈14 (near-full depth). HONEST BOUND (R1): random-weight + mixer-only = the op-graph speed ceiling; a real instruct
+model (with the per-block MLP + trained weights) at the same (depth, quant) would be somewhat slower, and int4 costs
+quality vs int8 — so a *usable* 100-tok/s standalone model = land this (depth × int4 × MLP) point with a real
+checkpoint/distillation. What's proven: the A19 ANE can DECODE a Mamba SSD+RoPE+MIMO graph at 90–140 tok/s.
