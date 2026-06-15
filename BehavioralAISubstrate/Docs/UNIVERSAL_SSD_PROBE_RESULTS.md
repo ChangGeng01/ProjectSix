@@ -911,3 +911,48 @@ WHAT THIS DECIDES vs DOESN'T (R1 honest):
 
 Net route: ship QAT-int4 Mamba-2 ANE decoder first (near-certain); the Mamba-3 graft stays a gated upgrade whose
 justifying measurement is not yet taken.
+
+### Track G addendum 4 — "is the Mamba-3 graft worth it?" GATE (b) RESOLVED: NO-GO (2026-06-15)
+
+Gate (b) = does Mamba-3 pay over a QAT-int4 Mamba-2 baseline? Tested via a research+adversarial-verify workflow
+(73 agents: 4 evidence lenses → 2 skeptics per load-bearing claim → synthesis). Hard constraint: NO trained
+Mamba-3 checkpoint exists, so α_Mamba3 cannot be measured — the verdict BOUNDS the expected lift Δarch from the
+paper's own iso-param ablations + distillation/spec-decode literature, adversarially verified. 31 of 34 claims
+were refuted/weakened by skeptics; the verdict held at the defensible floor anyway.
+
+INT8 ANCHOR (measured, same harness): int8 α=0.803 / τ=3.314 ≈ LOSSLESS vs fp32 (0.797/3.298). ⇒ the entire
+int4 PTQ drop (→0.644) is int4-rounding, NOT model fragility → QAT-int4 has large recovery headroom; AND the 1B
+ceiling (~0.80) is NOT quantization-limited → it is a SIZE/capacity ceiling.
+
+VERDICT — **NO-GO. Ship QAT-int4 Mamba-2; do NOT start the multi-week Mamba-2→Mamba-3 graft.** The chain:
+
+| term | value | basis |
+|---|---|---|
+| Δarch_fp (Mamba-3 vs Mamba-2 @~1B, iso-param) | +0.7pp dn / −1.1% ppl (SISO) ; +1.9pp / −2.2% (MIMO) | paper Table 1 (arXiv 2603.15569 / OpenReview HwCvaJOiCj), VERIFIED iso-param/iso-data |
+| → acceptance lift Δα_fp | **+0.005 to +0.02** | inference (paper has NO spec-decode/int4/acceptance result) |
+| × workload discount (Lens B) | 2 of 3 win-regimes (state-tracking, long-ctx) OUT of our short-ctx regime; ppl→argmax sub-linear → stays at low end | literature |
+| − size ceiling (Lens C) | ~80–85% capacity-bound at 1B-vs-3B; residual is MMLU(−8pp)/Lambada(−11.7pp) knowledge/recall an SSM swap can't fix | measured residual + distill lit |
+| − Δquant_extra (Lens D) | ~[−2,+2] pts α, UNMEASURED, sign-open (new rotation on outlier-heavy/recurrence-amplified B/C path = credible negative tail) | inference (no SSM int4 lit touches Mamba-3 ops) |
+| = **Δarch_deployed** | **≈ +0.005 to +0.02 α, with a ≤0 tail** | — |
+| worth-it threshold | **≈ +0.05 α** | must beat the SAFE FALLBACK on the same knob |
+| SAFE FALLBACK: QAT-int4 on existing Mamba-2 | projected **+0.056 to +0.116 α** recovery, zero architecture risk | 50–80% of PTQ gap |
+
+Net: the graft's realistic lift is **2.5–10× below threshold and strictly dominated by QAT-int4 Mamba-2** — which
+recovers MORE acceptance on the same knob with no checkpoint problem and none of the burned pitfalls (dt-cancel,
+broadcasting_mul, fp16 2GB wall, multi-week unmeasurable train). The most expensive graft item (data-dependent
+rotation/complex state) contributes ~0 to LM perplexity — its only verified win is synthetic state-tracking, which
+is out-of-regime for short-context greedy decode vs a 3B teacher. Per 亏的不要, this is a legitimate evidence-backed
+NO-GO. R1 honest: this is bounded fp-proxy inference, not a measured α_Mamba3 — but nothing measured supports a GO,
+and the one acceptance pair we OWN (fp32 0.797 / int4 0.644, int8 0.803) says the binding levers are quantization
+recovery + draft SIZE/distillation, not the SSM variant.
+
+NEXT STEP (the route, decided): **ship QAT-int4 Mamba-2 (Llamba-1B)** — train the scoped QAT-int4 run to recover
+the −0.153 PTQ loss (target α≈0.70–0.76), certify on the 24-prompt greedy harness + on-device. If MORE acceptance
+is wanted after, spend it on Lens-C's high-leverage levers — re-distill the 1B draft directly to the Llama-3.2-3B
+target (current Llamba-1B was distilled to a 1B-class teacher = fixable mismatch), an EAGLE-3-style objective,
+and/or a 1.5–3B draft — NOT an architecture graft.
+
+ONE cheap experiment that could flip it (days, no retrain): PTQ-graft ONLY the trapezoid + real-valued rotation
+(RoPE-trick on B/C) onto the EXISTING Llamba-1B weights, run the same int4 PTQ, measure α vs the 0.644 int4
+baseline. Directly measures the sign of Δquant_extra (the one genuinely-open term). Flat/down (mechanism-predicted)
+= NO-GO confirmed decisively; a large rise = escalate to CONDITIONAL-GO. Reuses Tools/mamba3_full_ane.py.
