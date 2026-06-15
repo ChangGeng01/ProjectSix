@@ -3,12 +3,17 @@
 // Stateful **Mamba-3** decode probe driver on iOS-27 CoreAI — the upgrade sibling of `BASCoreAIMambaSession`
 // (Mamba-2/SSD). Mamba-3 (arXiv 2603.15569, ICLR 2026) generalizes Mamba-2 with trapezoidal discretization, a
 // complex-valued state realized as REAL 2×2 rotations + data-dependent RoPE, and MIMO rank-R — all lowering to
-// the same real primitives the Mamba-2 path proved (host convertibility GREEN, L=16 int8 = 1.04 GB).
+// the same real primitives the Mamba-2 path proved. DEVICE-CERTIFIED on the A19 ANE (commit 5abc1d62b): the
+// FAITHFUL trapezoid (learned A, 3-term recurrence, rotated kprev/vprev delay, RoPE, MIMO) compiles + decodes —
+// L=2 clean 100%-ANE at 160.6 tok/s; L=16 decodes at 51.8 tok/s (one segment exceeds the per-asset compile
+// ceiling and falls back → fixed by asset-splitting).
 //
-// GENERIC over the carried state count: the probe converter has been through several state layouts during the
-// ANE-crash bisection — 4 properly-shaped states (segmenter ordering bug), 1 flat fused state [L,S] (CPU-runs,
-// ANE-slice crash), 2 properly-shaped states (ssm+angle). Rather than rebuild the app per layout, this session
-// reads the descriptor's stateNames and binds an NDArray per state, with shapes supplied (in descriptor order).
+// GENERIC over the carried state count (1–4): the ANE-crash bisection settled it — a single flat fused state
+// [L,S] sliced per layer SIGSEGVs the ANE segmenter at load; SEPARATE properly-shaped states registered
+// angle-FIRST run clean. The 2-state layout (angle,ssm) is the Mamba-2-equivalent Euler path; the 4-state
+// layout (angle,ssm,kprev,vprev) is the CERTIFIED faithful-trapezoid path — the "4 states hit the segmenter
+// ordering bug" fear did NOT recur. Rather than rebuild the app per layout, this session reads the descriptor's
+// stateNames and binds an NDArray per state, with shapes supplied (in descriptor order).
 // All states are mutated in place by `run`. fp16 throughout (the device artifact is fp16-compute). This is a
 // decode-SPEED/COMPILE probe driver (no spec-decode snapshot/restore — Saguaro is declined).
 // `@unchecked Sendable`: single serialized executor. `#if canImport(CoreAI)` + iOS/macOS 27.
@@ -30,7 +35,7 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
 
     private let model: AIModel
     private let function: InferenceFunction
-    private let names: [String]               // descriptor order (count 1 or 2)
+    private let names: [String]               // descriptor order (count 1–4)
     private let count: Int
     private var state0: NDArray
     private var state1: NDArray                // dummy [1] when not used
@@ -42,11 +47,11 @@ public final class BASCoreAIMamba3Session: @unchecked Sendable {
     public private(set) var pos: Int = 0
 
     /// `stateShapes` are the carried-state shapes in the SAME order the converter declared them (its
-    /// `buffers_to_mutate` / registration order), e.g. `[[16,148480]]` (flat probe) or
-    /// `[[16,32,64,64],[16,32,32]]` (2-state ssm, angle). Supports 1 or 2 states — `MutableViews` is
-    /// lifetime-dependent, so each state is bound through an explicit `inout` (a stored property inserted
-    /// directly "escapes its scope"); 1 and 2 cover every layout the bisection uses (the 4-state layout is
-    /// abandoned — it hit the segmenter ordering bug).
+    /// `buffers_to_mutate` / registration order), angle-FIRST — e.g. `[[16,148480]]` (flat, ANE-crashes),
+    /// `[[16,32,32],[16,32,64,64]]` (2-state angle,ssm — Euler), or the CERTIFIED faithful-trapezoid layout
+    /// `[[L,32,32],[L,32,64,64],[L,32,4,64],[L,32,64,4]]` (4-state angle,ssm,kprev,vprev). Supports 1–4 states —
+    /// `MutableViews` is lifetime-dependent, so each state is bound through an explicit `inout` (a stored
+    /// property inserted directly "escapes its scope"), hence the explicit runStep1/2/3/4 rather than a loop.
     public init(
         assetURL: URL,
         stateShapes: [[Int]],
