@@ -204,14 +204,16 @@ class M(nn.Module):
             logits.append(self.head(x))
         return torch.stack(logits, 0), [torch.stack(s, 0) for s in ssm_tr]
 
-    def run_twin(self, tokens, collect_ssm: bool = True):
+    def run_twin(self, tokens, collect_ssm: bool = True, return_hiddens: bool = False):
         x = self.embedding.weight[tokens]                                       # [T,D]
-        ssm_tr = []
+        extra = []                                                              # per-layer hiddens, or ssm trace
         for lyr in self.layers:
             x, ssm_seq, _ = lyr.forward_seq(x)
-            if collect_ssm:
-                ssm_tr.append(ssm_seq)
-        return self.head(x), ssm_tr
+            if return_hiddens:
+                extra.append(x)                                                 # residual after each layer [T,D]
+            elif collect_ssm:
+                extra.append(ssm_seq)
+        return self.head(x), extra
 
 
 def parity(seed: int = 0, T: int = 24, vocab: int = 2048, layers: int = 4) -> bool:
