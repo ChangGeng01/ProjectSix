@@ -880,3 +880,34 @@ amortization + free switch + 137 decode are MEASURED; the ~1.8× end-to-end win 
 (a) a draft cheap enough to not exceed the verify time (Lookahead/n-gram or a 2-layer tiny transformer),
 (b) the draft's real α (τ assumed from α=0.8), and (c) a trained Mamba-3 target checkpoint (random weights here =
 speed only). Net: the kernel/architecture is validated; the remaining work is TRAINING, not the SoC walls.
+
+### Track G addendum 3 — int4 acceptance de-risk: does int4 quantization crater the SSD draft? NO (2026-06-15)
+
+THE GATE. The grafting-recipe go/no-go made the whole Mamba-3-on-ANE direction hinge on one cheap measurement:
+*int4 is mandatory on ANE (fp16 hits the ~2 GB asset-load wall), so does int4 quantization destroy an SSD decoder's
+quality?* Measured on the EXISTING trained Mamba-2 (Llamba-1B), as a fidelity proxy = acceptance vs Llama-3.2-3B,
+same harness as the fp32 baseline (K=4, N_GEN=64, 24 prompts). Method = naive **post-training** per-output-channel
+symmetric int4 fake-quant (qmax=7) on all 80 draft `nn.Linear` + the embedding; conv/D/norms stay fp16. NO QAT.
+
+| config | block-eff τ (tok / target-fwd) | accept-rate α | accepted draft tok/round |
+|---|---|---|---|
+| fp32 baseline | 3.298 | 0.797 | 2.30 / 4 |
+| **int4 PTQ (this de-risk)** | **2.462** | **0.644** | **1.462 / 4** |
+| Δ | −0.836 (−25% rel) | −0.153 (−19% rel) | −0.84 |
+
+VERDICT — **int4 did NOT crater (branch B, greenlight).** PTQ costs ~15 pts of agreement and ~25% of block
+efficiency, but the draft still tracks the target 64% of the time and τ=2.46 keeps spec-decode net-positive (still
+~2.46 tok per target forward vs 1 bare). No collapse. Since this is **PTQ** (the pessimistic floor), QAT is expected
+to claw back a large fraction of the 0.153 gap (typical recovery 50–80% → projected α≈0.70–0.76).
+
+WHAT THIS DECIDES vs DOESN'T (R1 honest):
+- **Decides:** int4 is a viable quantization for an SSD ANE decoder → the int4-on-ANE direction is NOT killed; the
+  **standalone int4 Mamba-2 (Llamba-1B) ANE decoder is greenlit**, with QAT-int4 as the next concrete step to recover
+  the PTQ loss. This is the cheap, near-certain win — now de-risked.
+- **Does NOT decide:** whether Mamba-3's new features (data-dependent rotation, MIMO rank-R, trapezoidal recurrence)
+  pay enough over a QAT-int4 Mamba-2 baseline to justify the multi-week graft. That gate (G2/G3 ablation) is STILL
+  UNMEASURED and STILL the expensive question. This de-risk only confirmed int4 won't slam the door shut on either
+  Mamba-2 OR Mamba-3 — it did not open the Mamba-3-specific door.
+
+Net route: ship QAT-int4 Mamba-2 ANE decoder first (near-certain); the Mamba-3 graft stays a gated upgrade whose
+justifying measurement is not yet taken.
