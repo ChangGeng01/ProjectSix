@@ -1070,9 +1070,12 @@ only); (b) the TRAINED student = D=1024, **+MLP +gnorm**, 422M; (c) the first de
 TRUNCATION** of (b), which is INCOHERENT (feeds an L=16-trained head a post-layer-7 residual → agrees with the
 real student at ~chance; on-device `last_tok=574` is a truncation artifact, not the trained model). So the device
 numbers (148.9 tok/s / 2457 ms / 62 MB) are a truncated + partial-off-ANE-fallback + int8 figure, NOT a valid
-trained-model decode speed. FIXED: `mamba3_deploy.py` now refuses truncation and the coherent FULL L=16 is being
-re-converted; the certified-on-ANE claim covers (a) only — the deployed (b)/(c) graph (+MLP+gnorm) needs its own
-on-device measurement + asset-split for 100%-ANE. Quality is UNPROVEN: ~0.13M tokens (≈4–5 orders below the
+trained-model decode speed. FIXED: `mamba3_deploy.py` now refuses truncation; the coherent FULL L=16 trained
+student (int8, PARITY-B-verified) was re-converted and MEASURED on the A19: **loads (3860 ms, 53 MB) + decodes
+at 96.5 tok/s, peak 91 MB, last_tok=1176** — a VALID coherent trained-model number (vs the discredited
+truncated 148.9). BUT one segment still hit `ANECCompile FAILED` → partial off-ANE fallback, so it is NOT
+100%-ANE (the +MLP+gnorm op count pushes the per-asset compile ceiling) → asset-split is the remaining
+deploy step. The certified-on-ANE claim covers (a) only. Quality is UNPROVEN: ~0.13M tokens (≈4–5 orders below the
 ~8–10B recipe), no RAG/RAFT objective, only top-1 argmax-agreement (~20%) on 8 wikitext seqs (a liveness signal,
 likely dominated by high-frequency tokens, NOT a "mimics Granite" claim). Stage-2's null result is a recipe
 artifact (joint, L2W=1.0, free 1024→2560 projection that launders the loss), not a verdict on hidden-alignment.
