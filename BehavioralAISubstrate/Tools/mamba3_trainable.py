@@ -151,6 +151,24 @@ class Lyr(nn.Module):
         return x1 + self.mlp(x1), new_angle, new_ssm, Brot, x_mimo
 
     # ---- TWIN: the reformulated chunked/parallel path over a [T,D] sequence (differentiable) ----
+    def attn_matrix(self, x_seq):
+        """MOHAWK Stage-1: materialize the per-head token-mixing matrix A[h,t,s] the SSD implements, so it can
+        be aligned to the teacher's softmax-attention matrix. SSD-core form A[t,s] = decay(t,s)·<Crot_t,Brot_s>
+        over s<=t (tril). SIMPLIFICATION (honest): collapses the rank-R/per-P MIMO + trapezoid delay into the
+        scalar token-mixing — the attention-relevant structure, not the exact per-(h,p) operator."""
+        T = x_seq.shape[0]
+        h = rms(x_seq, self.norm)
+        _z, _xin, B, C, dt, _alpha, la, _beta, _gamma, theta, _xm = self._coeffs(h)
+        angle = torch.cumsum(dt.unsqueeze(-1) * theta, dim=0)
+        cos, sin = torch.cos(angle), torch.sin(angle)
+        Brot, Crot = rope(B, cos, sin), rope(C, cos, sin)              # [T,H,R,N]
+        Lc = torch.cumsum(la, dim=0)                                   # [T,H]
+        diff = Lc.unsqueeze(1) - Lc.unsqueeze(0)                       # [T,T,H] = Lc_t - Lc_s
+        content = torch.einsum("thrn,shrn->tsh", Crot, Brot)          # [T,T,H] = <Crot_t, Brot_s>
+        mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=x_seq.device))
+        decay = torch.exp(diff.masked_fill(~mask.unsqueeze(-1), float("-inf")))   # -inf before exp (bwd-safe)
+        return (decay * content).permute(2, 0, 1)                     # [H,T,T]
+
     def forward_seq(self, x_seq):
         T = x_seq.shape[0]
         h = rms(x_seq, self.norm)
@@ -203,6 +221,15 @@ class M(nn.Module):
                 st[li] = (a, ss, k, v); ssm_tr[li].append(ss)
             logits.append(self.head(x))
         return torch.stack(logits, 0), [torch.stack(s, 0) for s in ssm_tr]
+
+    def run_attn(self, tokens):
+        """Per-layer student token-mixing matrices [H,T,T] (Stage-1), on the student's own residual stream."""
+        x = self.embedding.weight[tokens]
+        mats = []
+        for lyr in self.layers:
+            mats.append(lyr.attn_matrix(x))
+            x, _, _ = lyr.forward_seq(x)
+        return mats
 
     def run_twin(self, tokens, collect_ssm: bool = True, return_hiddens: bool = False):
         x = self.embedding.weight[tokens]                                       # [T,D]

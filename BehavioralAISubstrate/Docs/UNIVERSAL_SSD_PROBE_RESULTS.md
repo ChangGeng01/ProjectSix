@@ -1086,3 +1086,57 @@ full-model AND 100%-on-ANE AND quality-measured. The route is de-risked at the p
 demonstrated as a working reader. REMAINING: coherent-L16 on-device measure + asset-split (100%-ANE); a scale
 run (cloud) with a real eval (held-out KL/perplexity + n-gram baseline + content-token agreement); RAFT; Stage-1
 + sequential MOHAWK; QAT-int4.
+
+---
+
+## Track G — Addendum 9: white-box MOHAWK COMPLETED (Stage-1 + sequential 1→2→3 + real metric) — staging is a SCALE lever, NULL locally
+
+The prior addendum listed "Stage-1 + sequential MOHAWK" as REMAINING and flagged Stage-2's earlier null as a
+recipe artifact (joint, free 1024→2560 projection). Both are now resolved. `Tools/mamba3_mohawk.py` was rewritten
+into the CANONICAL sequential MOHAWK and validated against a fair baseline. This addendum records what is now
+mechanically COMPLETE and what the local measurement actually says — kept separate, per doctrine.
+
+WHAT IS NOW COMPLETE + CORRECT (the "名副其实" white-box pipeline):
+- **Stage-1 (matrix orientation), NEW.** `MT.Lyr.attn_matrix(x)` materializes the student's per-head token-mixing
+  matrix `A[t,s] = decay(t,s)·⟨C_rot_t, B_rot_s⟩` over s≤t (the SSD-core simplification — collapses the rank-R/per-P
+  MIMO + trapezoid delay into the scalar mixing, the attention-relevant structure). Sanity-gated: finite + strictly
+  causal (upper-triangle exactly 0). It is a SIGNED operator at init (⟨C,B⟩ unconstrained → ±50 scale, diagonal can
+  be negative — this is correct, NOT softmax). Loss = **relative Frobenius** `‖S−T‖_F/‖T‖_F` per head (canonical;
+  raw MSE is scale-broken: ±50 student vs O(1) row-stochastic teacher). Teacher attention via
+  `attn_implementation="eager"`, GQA-grouped from H40→16. Measured: Stage-1 drives its loss 88→18 (orientation works).
+- **Stage-2 (hidden align) — audit bug FIXED.** The free 1024→2560 projection that laundered the loss is replaced
+  by a **FROZEN orthogonal** projection (init `nn.init.orthogonal_`, detached). Sequential (not joint). Stable
+  (loss →1.16, no NaN).
+- **Stage-3 (logit-KD).** KL(teacher‖student)/τ² + 0.1·CE, τ=2.
+- **A REAL metric** (replaces the weak 8-seq argmax): held-out **KL + perplexity** on a FIXED deterministic held set
+  (`chunks[:8]`, STEPS-independent so runs of different length are comparable — a confound I caught and fixed
+  mid-experiment: `held=chunks[-8:]` had made the 80- and 240-step held sets DIFFERENT).
+- **Hardened harness:** teacher in **bf16** (the INIT KL=nan was input-dependent **fp16** teacher instability on a
+  specific chunk — bf16 has fp32 range, skip=0 after); nan-robust `evaluate()` (drops + counts non-finite chunks);
+  a per-step `assert torch.isfinite(loss)` so any real training NaN fails loud (it never fired — Stage-1 backward is
+  finite, 0 non-finite grads, max grad 2.5).
+
+THE MEASURED VERDICT (Granite-4.1-3b bf16 teacher → 16L D=1024 student, M5 Max MPS, T=128, seed 0, identical held set):
+| run | held-out KL ↓ | ppl ↓ | argmax-agree |
+|-----|:---:|:---:|:---:|
+| INIT (random student) | 9.064 | 126659 | 0.0% |
+| **1→2→3** (80 steps each = 240 total) | 5.442 | 3472 | 14.0% |
+| **Stage-3 ONLY** (240 steps, equal compute) | **5.226** | **2712** | **16.0%** |
+
+At a FAIR comparison (equal total compute, identical held set) **Stage-3-only WINS on all three metrics**. At equal
+*Stage-3* budget (80 vs 80) the full pipeline won on KL/ppl (5.145 vs 5.391 / 1430 vs 1789) — i.e. the pre-alignment
+gives a better Stage-3 *starting point*, but the 160 steps it costs buy MORE if spent directly on Stage-3 at this
+scale. 亏的不要: the staging does NOT beat Stage-3-only locally, and I do not claim it does.
+
+WHY (two honest causes, both pointing the same way): (1) **scale** — MOHAWK's staged benefit amortizes over a long
+Stage-3 / billions of tokens (Phi-Mamba, Llamba); a 240-step PoC never reaches the amortization regime. (2)
+**dim-gap** — the student is deliberately NARROWER than the teacher (1024←2560, for the phone), so Stage-2's
+cross-dim hidden alignment is fundamentally constrained: a frozen-random projection can't be optimal and a free one
+launders the loss. The canonical MOHAWK references keep the student iso-width with the teacher, which this on-device
+target cannot.
+
+BOTTOM LINE (updates Addendum 8, does not overturn it): the white-box MOHAWK is now mechanically COMPLETE,
+CORRECT, and audit-clean — every stage runs finite and demonstrably reduces its own loss, on a real KL/ppl metric.
+But the staged curriculum is a **scale lever, null at local PoC scale**; for a narrower-than-teacher on-device
+student, **Stage-3 logit-KD is the robust workhorse** and Stage-1/2 are optional, cloud-scale-only. This does NOT
+change the Addendum-8 conclusion that a usable, quality-measured on-device reader still requires the scale run.
