@@ -55,7 +55,9 @@ def scan_parallel(log_alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
     Lc = torch.cumsum(log_alpha, dim=0)                         # [T,H], non-increasing
     diff = Lc.unsqueeze(1) - Lc.unsqueeze(0)                    # [T,T,H]  (= L_t - L_s at [t,s])
     mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=log_alpha.device))
-    decay = torch.where(mask.unsqueeze(-1), torch.exp(diff), torch.zeros((), dtype=log_alpha.dtype, device=log_alpha.device))
+    # mask the upper triangle to -inf BEFORE exp: there diff = L_i - L_j > 0 -> exp(+)=inf taints the BACKWARD
+    # (0*inf=NaN). exp(-inf)=0 cleanly. (torch.where(mask, exp(diff), 0) still computes the inf -> NaN in bwd.)
+    decay = torch.exp(diff.masked_fill(~mask.unsqueeze(-1), float("-inf")))
     return torch.einsum("tsh,shpn->thpn", decay, u)            # [T,H,P,N]
 
 
@@ -73,7 +75,7 @@ def scan_chunked(log_alpha: torch.Tensor, u: torch.Tensor, C: int = 64) -> torch
     cl = torch.cumsum(log_alpha.view(nc, C, Hh), dim=1)               # [nc,C,H] inclusive cumsum within chunk
     diff = cl.unsqueeze(2) - cl.unsqueeze(1)                           # [nc,Ci,Cj,H]
     mask = torch.tril(torch.ones(C, C, dtype=torch.bool, device=log_alpha.device))
-    Dloc = torch.where(mask.view(1, C, C, 1), torch.exp(diff), torch.zeros((), dtype=log_alpha.dtype, device=log_alpha.device))
+    Dloc = torch.exp(diff.masked_fill(~mask.view(1, C, C, 1), float("-inf")))   # -inf before exp (avoid exp(+)=inf bwd-NaN)
     intra = torch.einsum("cijh,cjhps->cihps", Dloc, u.view(nc, C, Hh, Pp, Ss))   # within-chunk
     decay_start = torch.exp(cl)                                        # [nc,C,H] carry decay from chunk start
     outs = []
@@ -97,6 +99,7 @@ class Lyr(nn.Module):
         self.bn_w = nn.Parameter(torch.ones(N))
         self.mimo_x = nn.Parameter(torch.randn(H, P, R) * 0.02)
         self.mimo_o = nn.Parameter(torch.randn(H, R, P) * 0.02)
+        self.gnorm = nn.Parameter(torch.ones(D_INNER))        # gated RMSNorm on SSD output (Mamba-2/3 stabilizer)
         self.out_proj = nn.Linear(D_INNER, D_MODEL, bias=False)
         # SwiGLU MLP (post-mixer block) — identical in both paths, so PARITY-A still isolates the mixer
         self.mlp_norm = nn.Parameter(torch.ones(D_MODEL))
@@ -120,7 +123,7 @@ class Lyr(nn.Module):
         B = B * torch.rsqrt((B * B).mean(-1, keepdim=True) + EPS) * self.bn_w
         C = C * torch.rsqrt((C * C).mean(-1, keepdim=True) + EPS) * self.bn_w
         dt = F.softplus(dt_raw + self.dt_bias)
-        A = -F.softplus(A_raw)
+        A = -F.softplus(A_raw)                                    # faithful (ssm stays bounded via small dt-init; no floor needed)
         lam = torch.sigmoid(trap_raw)
         la = dt * A                                              # log_alpha — pass to the scan DIRECTLY (no exp->log)
         alpha = torch.exp(la)                                    # [...,H]  (used by step_ref's recurrence + beta)
@@ -143,7 +146,7 @@ class Lyr(nn.Module):
         new_ssm = a3 * ssm + b3 * prev + g3 * cur
         y = torch.einsum("hrn,hpn->hpr", Crot, new_ssm)
         y_out = torch.einsum("hpr,hrp->hp", y, self.mimo_o) + self.D.view(H, 1) * xin
-        out = self.out_proj(y_out.reshape(D_INNER) * F.silu(z))
+        out = self.out_proj(rms(y_out.reshape(D_INNER) * F.silu(z), self.gnorm))
         x1 = x + out
         return x1 + self.mlp(x1), new_angle, new_ssm, Brot, x_mimo
 
@@ -162,7 +165,7 @@ class Lyr(nn.Module):
         ssm_seq = scan_chunked(la, u) if T > 64 else scan_parallel(la, u)
         y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)                      # [T,H,P,R]
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
-        out = self.out_proj(y_out.reshape(T, D_INNER) * F.silu(z))
+        out = self.out_proj(rms(y_out.reshape(T, D_INNER) * F.silu(z), self.gnorm))
         x1 = x_seq + out
         return x1 + self.mlp(x1), ssm_seq, angle
 
