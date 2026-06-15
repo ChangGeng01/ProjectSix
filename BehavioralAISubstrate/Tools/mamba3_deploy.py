@@ -71,12 +71,16 @@ def main() -> None:
     torch.manual_seed(0)
     m = DeployM().eval()
     if Path(CKPT).exists():
-        sd = torch.load(CKPT, map_location="cpu")["model"]
-        own = m.state_dict()
-        loaded = {k: v for k, v in sd.items() if k in own and own[k].shape == v.shape and v.shape[0] >= 0
-                  and (k.startswith("layers.") and int(k.split(".")[1]) < L or not k.startswith("layers."))}
-        own.update(loaded); m.load_state_dict(own)
-        print(f"loaded {len(loaded)} trained tensors from {CKPT} (first {L} layers)")
+        ck = torch.load(CKPT, map_location="cpu")
+        ck_L = int(ck.get("layers", L))
+        if ck_L != L:                                                  # REFUSE silent truncation (audit must-fix)
+            raise SystemExit(f"checkpoint has {ck_L} layers but deploy L={L} — would be incoherent; run: "
+                             f"mamba3_deploy.py {ck_L} {BITS}")
+        missing, unexpected = m.load_state_dict(ck["model"], strict=False)
+        assert not unexpected, f"checkpoint has tensors DeployM lacks: {unexpected[:3]}"
+        bad = [k for k in missing if not k.endswith("_all")]          # only the decode-state buffers may be missing
+        assert not bad, f"DeployM missing trained params (would deploy uninitialized): {bad[:3]}"
+        print(f"loaded the FULL {ck_L}-layer trained student ({len(ck['model'])} tensors); decode state zero-init")
     else:
         print(f"no checkpoint at {CKPT} — converting random-init (op-graph + ANE deploy test)")
 

@@ -1044,3 +1044,42 @@ VERDICT — **the faithful Mamba-3 trapezoid backbone is DEVICE-VIABLE.** The en
 depth-16 single-asset partial-fallback is a known, solved packaging issue (split), not a fundamental op-graph
 blocker. This flips the Mamba-3-backbone risk from "engine is the route's biggest device gamble" → "engine
 certified; remaining work = asset-splitting for full-ANE-at-depth + the real cost, weights/distillation."
+
+### Track G addendum 8 — LOCAL DISTILLATION HARNESS + the ADVERSARIAL AUDIT correction (2026-06-16)
+
+Built (committed) a local Granite-4.1-3b(dense) → Mamba-3 distillation + deploy pipeline on an M5 Max (torch-MPS):
+`Tools/mamba3_trainable.py` (differentiable student, parity-gated to the per-token recurrence), the chunked-segsum
+scan, Stage-3 logit-KD (`mamba3_distill.py`/`mamba3_poc_distill.py`), Stage-2+3 (`mamba3_mohawk.py`), the deploy
+converter (`mamba3_deploy.py`), and `mamba3_parity_b.py`. A 26-agent adversarial audit (21/21 findings upheld)
+then CORRECTED the session's own overstatements — recorded here so the claims don't outlive the evidence:
+
+GENUINELY PROVEN: (1) **the L=16 training-NaN root cause + fix is the strongest result** — the segsum scan
+`exp(diff)` over the FULL T×T decay matrix exponentiates the causally-invalid upper triangle (i<j, diff>0) →
+exp(+)=inf; tril-zeroing leaves the inf so the BACKWARD is 0·inf=NaN; fix = `masked_fill(~tril, -inf)` BEFORE exp
+(verified inf/NaN-safe). (2) PARITY-A is a real fp64 scan-reformulation gate (twin == per-token reference for the
+trainable family) at **ssm ~1e-8 / logits ~5e-7 / argmax 24/24** — NOT the "~2e-15" the session narrated (that
+figure is in no file; the only ~5e-14 is the unrelated scan-vs-scan check). It is train==inference for the
+trainable family in fp64 ONLY — it is NOT bit-identity, NOT equality to this addendum's certified converter
+(`mamba3_faithful_ane.py`, never numerically cross-checked), and says nothing about the int8/fp16 the device runs.
+(3) the KD loop trains, CE 11.3→5.2 stably. (4) **PARITY-B (NEW, the audit's must-fix): the int8 deploy faithfully
+reproduces the fp32 trained student — 98.3% argmax-agreement, logit max-err 0.76 (int4 = 91.5% → needs QAT).**
+
+OVERSTATED / CORRECTED: "loop closed / trained student decodes on the A19" conflated THREE architecturally
+distinct graphs — (a) the addendum-7 CERTIFIED asset = D=2048, mixer-only, **RANDOM weights** (op-graph/speed
+only); (b) the TRAINED student = D=1024, **+MLP +gnorm**, 422M; (c) the first deploy = an int8 **8-of-16-layer
+TRUNCATION** of (b), which is INCOHERENT (feeds an L=16-trained head a post-layer-7 residual → agrees with the
+real student at ~chance; on-device `last_tok=574` is a truncation artifact, not the trained model). So the device
+numbers (148.9 tok/s / 2457 ms / 62 MB) are a truncated + partial-off-ANE-fallback + int8 figure, NOT a valid
+trained-model decode speed. FIXED: `mamba3_deploy.py` now refuses truncation and the coherent FULL L=16 is being
+re-converted; the certified-on-ANE claim covers (a) only — the deployed (b)/(c) graph (+MLP+gnorm) needs its own
+on-device measurement + asset-split for 100%-ANE. Quality is UNPROVEN: ~0.13M tokens (≈4–5 orders below the
+~8–10B recipe), no RAG/RAFT objective, only top-1 argmax-agreement (~20%) on 8 wikitext seqs (a liveness signal,
+likely dominated by high-frequency tokens, NOT a "mimics Granite" claim). Stage-2's null result is a recipe
+artifact (joint, L2W=1.0, free 1024→2560 projection that launders the loss), not a verdict on hidden-alignment.
+
+HONEST BOTTOM LINE: the plumbing runs end-to-end and the correctness gates (NaN-fix, PARITY-A, PARITY-B-int8)
+hold, but **a usable distilled on-device Mamba-3 reader does NOT exist** — no single artifact is simultaneously
+full-model AND 100%-on-ANE AND quality-measured. The route is de-risked at the plumbing/correctness level, not
+demonstrated as a working reader. REMAINING: coherent-L16 on-device measure + asset-split (100%-ANE); a scale
+run (cloud) with a real eval (held-out KL/perplexity + n-gram baseline + content-token agreement); RAFT; Stage-1
++ sequential MOHAWK; QAT-int4.
