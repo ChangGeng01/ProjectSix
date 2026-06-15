@@ -20,6 +20,7 @@ Run:  ~/.venvs/coreai-cv/bin/python Tools/mamba3_trainable.py
 """
 from __future__ import annotations
 
+import math
 import sys
 
 import torch
@@ -46,32 +47,33 @@ def rope(t: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
     return torch.cat([t1 * c - t2 * s, t2 * c + t1 * s], -1)
 
 
-def scan_parallel(alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
-    """Parallel 1-semiseparable scan: ssm_t = alpha_t*ssm_{t-1} + u_t, alpha [T,H] in (0,1), u [T,H,P,N].
-    ssm_t = sum_{s<=t} exp(L_t - L_s) u_s with L = cumsum(log alpha). exp(non-positive) -> stable, no overflow."""
-    T = alpha.shape[0]
-    Lc = torch.cumsum(torch.log(alpha), dim=0)                  # [T,H], non-increasing
+def scan_parallel(log_alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+    """Parallel 1-semiseparable scan: ssm_t = alpha_t*ssm_{t-1} + u_t. Takes log_alpha = dt*A DIRECTLY (NOT
+    log(exp(dt*A)) — that exp->log round-trip underflows to log(0)=-inf=NaN when dt*A drifts very negative in
+    training). ssm_t = sum_{s<=t} exp(L_t - L_s) u_s, L = cumsum(log_alpha); exp(non-positive) -> stable."""
+    T = log_alpha.shape[0]
+    Lc = torch.cumsum(log_alpha, dim=0)                         # [T,H], non-increasing
     diff = Lc.unsqueeze(1) - Lc.unsqueeze(0)                    # [T,T,H]  (= L_t - L_s at [t,s])
-    mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=alpha.device))
-    decay = torch.where(mask.unsqueeze(-1), torch.exp(diff), torch.zeros((), dtype=alpha.dtype, device=alpha.device))
+    mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=log_alpha.device))
+    decay = torch.where(mask.unsqueeze(-1), torch.exp(diff), torch.zeros((), dtype=log_alpha.dtype, device=log_alpha.device))
     return torch.einsum("tsh,shpn->thpn", decay, u)            # [T,H,P,N]
 
 
-def scan_chunked(alpha: torch.Tensor, u: torch.Tensor, C: int = 64) -> torch.Tensor:
+def scan_chunked(log_alpha: torch.Tensor, u: torch.Tensor, C: int = 64) -> torch.Tensor:
     """Memory-efficient chunked equivalent of scan_parallel: O(C^2) decay/chunk vs O(T^2). Same recurrence
-    ssm_t = alpha_t*ssm_{t-1} + u_t. Intra-chunk via a local CxC 1-SS matmul; inter-chunk via a short carry
-    loop over nc=ceil(T/C) chunk-end states. Lets seq/batch grow past what the full O(T^2) decay allows."""
-    T, Hh = alpha.shape
+    ssm_t = alpha_t*ssm_{t-1} + u_t (takes log_alpha=dt*A directly, no exp->log underflow). Intra-chunk via a
+    local CxC 1-SS matmul; inter-chunk via a short carry loop over nc=ceil(T/C) chunk-end states."""
+    T, Hh = log_alpha.shape
     Pp, Ss = u.shape[2], u.shape[3]
     pad = (-T) % C
     if pad:
-        alpha = torch.cat([alpha, torch.ones(pad, Hh, dtype=alpha.dtype, device=alpha.device)], 0)
+        log_alpha = torch.cat([log_alpha, torch.zeros(pad, Hh, dtype=log_alpha.dtype, device=log_alpha.device)], 0)
         u = torch.cat([u, torch.zeros(pad, Hh, Pp, Ss, dtype=u.dtype, device=u.device)], 0)
     nc = (T + pad) // C
-    cl = torch.cumsum(torch.log(alpha).view(nc, C, Hh), dim=1)         # [nc,C,H] inclusive cumsum within chunk
+    cl = torch.cumsum(log_alpha.view(nc, C, Hh), dim=1)               # [nc,C,H] inclusive cumsum within chunk
     diff = cl.unsqueeze(2) - cl.unsqueeze(1)                           # [nc,Ci,Cj,H]
-    mask = torch.tril(torch.ones(C, C, dtype=torch.bool, device=alpha.device))
-    Dloc = torch.where(mask.view(1, C, C, 1), torch.exp(diff), torch.zeros((), dtype=alpha.dtype, device=alpha.device))
+    mask = torch.tril(torch.ones(C, C, dtype=torch.bool, device=log_alpha.device))
+    Dloc = torch.where(mask.view(1, C, C, 1), torch.exp(diff), torch.zeros((), dtype=log_alpha.dtype, device=log_alpha.device))
     intra = torch.einsum("cijh,cjhps->cihps", Dloc, u.view(nc, C, Hh, Pp, Ss))   # within-chunk
     decay_start = torch.exp(cl)                                        # [nc,C,H] carry decay from chunk start
     outs = []
@@ -88,7 +90,9 @@ class Lyr(nn.Module):
         super().__init__()
         self.norm = nn.Parameter(torch.ones(D_MODEL))
         self.in_proj = nn.Linear(D_MODEL, PO, bias=False)
-        self.dt_bias = nn.Parameter(torch.zeros(H))
+        # Mamba-style dt init: dt ~ U[1e-3, 0.1] via inverse-softplus bias -> small dt = stable SSM dynamics
+        _dt = torch.exp(torch.rand(H) * (math.log(0.1) - math.log(1e-3)) + math.log(1e-3))
+        self.dt_bias = nn.Parameter(torch.log(torch.expm1(_dt)))
         self.D = nn.Parameter(torch.ones(H))
         self.bn_w = nn.Parameter(torch.ones(N))
         self.mimo_x = nn.Parameter(torch.randn(H, P, R) * 0.02)
@@ -118,17 +122,18 @@ class Lyr(nn.Module):
         dt = F.softplus(dt_raw + self.dt_bias)
         A = -F.softplus(A_raw)
         lam = torch.sigmoid(trap_raw)
-        alpha = torch.exp(dt * A)                                # [...,H]
-        beta = (1 - lam) * dt * torch.exp(dt * A)                # [...,H]
+        la = dt * A                                              # log_alpha — pass to the scan DIRECTLY (no exp->log)
+        alpha = torch.exp(la)                                    # [...,H]  (used by step_ref's recurrence + beta)
+        beta = (1 - lam) * dt * alpha                            # [...,H]
         gamma = lam * dt                                         # [...,H]
         theta = th.view(*lead, H, N // 2)
         x_mimo = xin.unsqueeze(-1) * self.mimo_x                 # [...,H,P,R]
-        return z, xin, B, C, dt, alpha, beta, gamma, theta, x_mimo
+        return z, xin, B, C, dt, alpha, la, beta, gamma, theta, x_mimo
 
     # ---- REFERENCE: the exact faithful 4-state single-token step (ground truth = what the .aimodel ships) ----
     def step_ref(self, x, angle, ssm, kprev, vprev):
         h = rms(x, self.norm)
-        z, xin, B, C, dt, alpha, beta, gamma, theta, x_mimo = self._coeffs(h)
+        z, xin, B, C, dt, alpha, _la, beta, gamma, theta, x_mimo = self._coeffs(h)
         a3 = alpha.view(H, 1, 1); b3 = beta.view(H, 1, 1); g3 = gamma.view(H, 1, 1)
         new_angle = angle + dt.view(H, 1) * theta
         cos, sin = torch.cos(new_angle), torch.sin(new_angle)
@@ -146,7 +151,7 @@ class Lyr(nn.Module):
     def forward_seq(self, x_seq):
         T = x_seq.shape[0]
         h = rms(x_seq, self.norm)
-        z, xin, B, C, dt, alpha, beta, gamma, theta, x_mimo = self._coeffs(h)   # leading T axis
+        z, xin, B, C, dt, alpha, la, beta, gamma, theta, x_mimo = self._coeffs(h)   # leading T axis
         angle = torch.cumsum(dt.unsqueeze(-1) * theta, dim=0)                   # [T,H,N//2]
         cos, sin = torch.cos(angle), torch.sin(angle)
         Brot, Crot = rope(B, cos, sin), rope(C, cos, sin)                       # [T,H,R,N]
@@ -154,7 +159,7 @@ class Lyr(nn.Module):
         cur_prev = torch.cat([torch.zeros_like(cur[:1]), cur[:-1]], 0)          # cur_{t-1}, cur_{-1}=0
         u = beta.view(T, H, 1, 1) * cur_prev + gamma.view(T, H, 1, 1) * cur     # width-2 causal conv
         # chunked-segsum scan (== scan_parallel, verified) — O(C^2) decay/chunk so long T fits memory
-        ssm_seq = scan_chunked(alpha, u) if T > 64 else scan_parallel(alpha, u)
+        ssm_seq = scan_chunked(la, u) if T > 64 else scan_parallel(la, u)
         y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)                      # [T,H,P,R]
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(y_out.reshape(T, D_INNER) * F.silu(z))
@@ -291,8 +296,9 @@ def parity_scan(T: int = 200, Pp: int = 8, Ss: int = 8, C: int = 64, seed: int =
     """chunked-segsum == full parallel 1-SS scan (T=200 not a multiple of C -> tests padding)."""
     torch.manual_seed(seed)
     alpha = torch.rand(T, H, dtype=torch.float64) * 0.5 + 0.4          # in (0.4,0.9)
+    la = torch.log(alpha)
     u = torch.randn(T, H, Pp, Ss, dtype=torch.float64)
-    err = (scan_parallel(alpha, u) - scan_chunked(alpha, u, C=C)).abs().max().item()
+    err = (scan_parallel(la, u) - scan_chunked(la, u, C=C)).abs().max().item()
     ok = err < 1e-9
     print(f"=== SCAN PARITY (chunked C={C} vs parallel 1-SS, T={T}) ===")
     print(f"  max-abs-err: {err:.3e}   RESULT: {'PASS ✅' if ok else 'FAIL ❌'}")
