@@ -28,6 +28,7 @@ import torch.nn.functional as F
 
 # Locked student config (D=1024 retarget of the certified D=2048 op-graph; same op-types).
 D_MODEL, H, P, N, R = 1024, 16, 64, 64, 4
+D_FF = round(2.5 * D_MODEL)                                     # SwiGLU MLP inner (locked exp 2.5)
 D_INNER, EPS = H * P, 1e-5
 PO = D_INNER + D_INNER + 2 * H * R * N + 3 * H + H * (N // 2)   # z,xin,B,C,dt,A,trap,theta
 
@@ -67,6 +68,15 @@ class Lyr(nn.Module):
         self.mimo_x = nn.Parameter(torch.randn(H, P, R) * 0.02)
         self.mimo_o = nn.Parameter(torch.randn(H, R, P) * 0.02)
         self.out_proj = nn.Linear(D_INNER, D_MODEL, bias=False)
+        # SwiGLU MLP (post-mixer block) — identical in both paths, so PARITY-A still isolates the mixer
+        self.mlp_norm = nn.Parameter(torch.ones(D_MODEL))
+        self.mlp_gate = nn.Linear(D_MODEL, D_FF, bias=False)
+        self.mlp_up = nn.Linear(D_MODEL, D_FF, bias=False)
+        self.mlp_down = nn.Linear(D_FF, D_MODEL, bias=False)
+
+    def mlp(self, x):
+        h = rms(x, self.mlp_norm)
+        return self.mlp_down(F.silu(self.mlp_gate(h)) * self.mlp_up(h))
 
     # ---- per-token coefficients shared by both paths (keeps the two numerically identical by construction) ----
     def _coeffs(self, h_in: torch.Tensor):
@@ -103,7 +113,8 @@ class Lyr(nn.Module):
         y = torch.einsum("hrn,hpn->hpr", Crot, new_ssm)
         y_out = torch.einsum("hpr,hrp->hp", y, self.mimo_o) + self.D.view(H, 1) * xin
         out = self.out_proj(y_out.reshape(D_INNER) * F.silu(z))
-        return x + out, new_angle, new_ssm, Brot, x_mimo
+        x1 = x + out
+        return x1 + self.mlp(x1), new_angle, new_ssm, Brot, x_mimo
 
     # ---- TWIN: the reformulated chunked/parallel path over a [T,D] sequence (differentiable) ----
     def forward_seq(self, x_seq):
@@ -120,7 +131,8 @@ class Lyr(nn.Module):
         y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)                      # [T,H,P,R]
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(y_out.reshape(T, D_INNER) * F.silu(z))
-        return x_seq + out, ssm_seq, angle
+        x1 = x_seq + out
+        return x1 + self.mlp(x1), ssm_seq, angle
 
 
 class M(nn.Module):
@@ -129,6 +141,18 @@ class M(nn.Module):
         self.embedding = nn.Embedding(vocab, D_MODEL)
         self.layers = nn.ModuleList([Lyr() for _ in range(layers)])
         self.fw = nn.Parameter(torch.ones(D_MODEL))
+        self._init_weights(layers)
+
+    def _init_weights(self, nl: int) -> None:
+        # Standard LM init: std 0.02 (default N(0,1)/kaiming explodes a tied-head LM). GPT-2 residual scaling
+        # 1/sqrt(2L) on the projections that write into the residual stream keeps the deep residual stable.
+        for mod in self.modules():
+            if isinstance(mod, (nn.Linear, nn.Embedding)):
+                nn.init.normal_(mod.weight, mean=0.0, std=0.02)
+        with torch.no_grad():
+            for lyr in self.layers:
+                lyr.out_proj.weight.mul_(1.0 / (2 * nl) ** 0.5)
+                lyr.mlp_down.weight.mul_(1.0 / (2 * nl) ** 0.5)
 
     def head(self, x):
         return rms(x, self.fw) @ self.embedding.weight.t()
@@ -188,6 +212,7 @@ def microbench(T: int = 256, layers: int = 16, vocab: int = 100352, iters: int =
         logits, _ = m.run_twin(toks, collect_ssm=False)
         loss = F.cross_entropy(logits, tgt)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
         opt.step()
         return float(loss.detach())
 
@@ -210,9 +235,36 @@ def microbench(T: int = 256, layers: int = 16, vocab: int = 100352, iters: int =
     print(f"  MPS peak: {peak:.1f} GB  (full 1-SS decay is O(T^2)/layer -> seq>~512 needs chunked-segsum)")
 
 
+def overfit_sanity(steps: int = 80, T: int = 16, vocab: int = 512, layers: int = 2, lr: float = 3e-3) -> bool:
+    """Memorize one fixed batch -> loss must collapse toward 0. Proves gradients flow through the WHOLE
+    student (mixer scan + MLP + tied head), i.e. the harness trains. Not a capacity test."""
+    dev = "mps" if torch.backends.mps.is_available() else "cpu"
+    torch.manual_seed(0)
+    m = M(vocab, layers).to(dev)
+    opt = torch.optim.AdamW(m.parameters(), lr=lr)
+    toks = torch.randint(0, vocab, (T,), device=dev)
+    tgt = torch.randint(0, vocab, (T,), device=dev)
+    losses = []
+    for _ in range(steps):
+        opt.zero_grad(set_to_none=True)
+        logits, _ = m.run_twin(toks, collect_ssm=False)
+        loss = F.cross_entropy(logits, tgt)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
+        opt.step()
+        losses.append(float(loss.detach()))
+    ok = losses[-1] < 0.05
+    print(f"=== OVERFIT SANITY ({dev}, L={layers}, T={T}, vocab={vocab}, {steps} steps) ===")
+    print(f"  CE loss: {losses[0]:.3f} -> {losses[-1]:.4f}   (memorize 1 batch -> ~0 = gradients flow thru twin+MLP)")
+    print(f"  RESULT: {'PASS ✅' if ok else 'FAIL ❌'}")
+    return ok
+
+
 if __name__ == "__main__":
     import os
     ok = all(parity(seed=s) for s in (0, 1, 2))
+    print()
+    ok = overfit_sanity() and ok
     print()
     if ok and os.environ.get("SKIP_BENCH") != "1":
         for t in (128, 256, 512):
