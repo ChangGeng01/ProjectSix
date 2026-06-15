@@ -45,6 +45,17 @@ def rope(t: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
     return torch.cat([t1 * c - t2 * s, t2 * c + t1 * s], -1)
 
 
+def scan_parallel(alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+    """Parallel 1-semiseparable scan: ssm_t = alpha_t*ssm_{t-1} + u_t, alpha [T,H] in (0,1), u [T,H,P,N].
+    ssm_t = sum_{s<=t} exp(L_t - L_s) u_s with L = cumsum(log alpha). exp(non-positive) -> stable, no overflow."""
+    T = alpha.shape[0]
+    Lc = torch.cumsum(torch.log(alpha), dim=0)                  # [T,H], non-increasing
+    diff = Lc.unsqueeze(1) - Lc.unsqueeze(0)                    # [T,T,H]  (= L_t - L_s at [t,s])
+    mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=alpha.device))
+    decay = torch.where(mask.unsqueeze(-1), torch.exp(diff), torch.zeros((), dtype=alpha.dtype, device=alpha.device))
+    return torch.einsum("tsh,shpn->thpn", decay, u)            # [T,H,P,N]
+
+
 class Lyr(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -105,13 +116,7 @@ class Lyr(nn.Module):
         cur = torch.einsum("thpr,thrn->thpn", x_mimo, Brot)                     # [T,H,P,N]
         cur_prev = torch.cat([torch.zeros_like(cur[:1]), cur[:-1]], 0)          # cur_{t-1}, cur_{-1}=0
         u = beta.view(T, H, 1, 1) * cur_prev + gamma.view(T, H, 1, 1) * cur     # width-2 causal conv
-        # scan ssm_t = alpha_t*ssm_{t-1} + u_t  (sequential here; segsum/chunked is a drop-in speed swap, eq by const)
-        ssm = torch.zeros(H, P, N, dtype=x_seq.dtype, device=x_seq.device)
-        outs = []
-        for t in range(T):
-            ssm = alpha[t].view(H, 1, 1) * ssm + u[t]
-            outs.append(ssm)
-        ssm_seq = torch.stack(outs, 0)                                          # [T,H,P,N]
+        ssm_seq = scan_parallel(alpha, u)                                       # [T,H,P,N], parallel-over-time
         y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)                      # [T,H,P,R]
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(y_out.reshape(T, D_INNER) * F.silu(z))
@@ -140,12 +145,13 @@ class M(nn.Module):
             logits.append(self.head(x))
         return torch.stack(logits, 0), [torch.stack(s, 0) for s in ssm_tr]
 
-    def run_twin(self, tokens):
+    def run_twin(self, tokens, collect_ssm: bool = True):
         x = self.embedding.weight[tokens]                                       # [T,D]
         ssm_tr = []
         for lyr in self.layers:
             x, ssm_seq, _ = lyr.forward_seq(x)
-            ssm_tr.append(ssm_seq)
+            if collect_ssm:
+                ssm_tr.append(ssm_seq)
         return self.head(x), ssm_tr
 
 
@@ -168,6 +174,50 @@ def parity(seed: int = 0, T: int = 24, vocab: int = 2048, layers: int = 4) -> bo
     return ok
 
 
+def microbench(T: int = 256, layers: int = 16, vocab: int = 100352, iters: int = 4) -> None:
+    import time
+    dev = "mps" if torch.backends.mps.is_available() else "cpu"
+    torch.manual_seed(0)
+    m = M(vocab, layers).to(dev)
+    opt = torch.optim.AdamW(m.parameters(), lr=1e-4)
+    toks = torch.randint(0, vocab, (T,), device=dev)
+    tgt = torch.randint(0, vocab, (T,), device=dev)
+
+    def step():
+        opt.zero_grad(set_to_none=True)
+        logits, _ = m.run_twin(toks, collect_ssm=False)
+        loss = F.cross_entropy(logits, tgt)
+        loss.backward()
+        opt.step()
+        return float(loss.detach())
+
+    for _ in range(2):                                                  # warmup (compile/alloc)
+        step()
+    if dev == "mps":
+        torch.mps.synchronize()
+    t0 = time.time()
+    for _ in range(iters):
+        step()
+    if dev == "mps":
+        torch.mps.synchronize()
+    dt = (time.time() - t0) / iters
+    tps = T / dt
+    peak = torch.mps.driver_allocated_memory() / 1e9 if dev == "mps" else 0.0
+    params = sum(p.numel() for p in m.parameters()) / 1e6
+    print(f"=== MICROBENCH fwd+bwd ({dev}, L={layers}, D={D_MODEL}, T={T}, bs=1, vocab={vocab}, {params:.0f}M params) ===")
+    print(f"  step: {dt*1000:.0f} ms  ->  {tps:.0f} train tok/s  (bs=1; batching + chunked-segsum raise this)")
+    print(f"  ~tokens/day @ this rate: {tps*86400/1e6:.0f}M  (PoC ~0.3-1B; production ~3-10B)")
+    print(f"  MPS peak: {peak:.1f} GB  (full 1-SS decay is O(T^2)/layer -> seq>~512 needs chunked-segsum)")
+
+
 if __name__ == "__main__":
+    import os
     ok = all(parity(seed=s) for s in (0, 1, 2))
+    print()
+    if ok and os.environ.get("SKIP_BENCH") != "1":
+        for t in (128, 256, 512):
+            try:
+                microbench(T=t)
+            except RuntimeError as e:
+                print(f"  microbench T={t} OOM/err: {str(e)[:80]}"); break
     sys.exit(0 if ok else 1)
