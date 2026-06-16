@@ -1037,13 +1037,23 @@ FINDINGS:
    segmenter ordering bug" fear (the reason the original used the crashing flat-pack) did NOT materialize.
 3. **At depth-16 in a SINGLE asset, one segment exceeds the per-asset ANE compile ceiling**
    (`_ANECompiler: ANECCompile() FAILED`) → falls back off-ANE, still decodes at 51.8 tok/s (> Mamba-2 39,
-   peak 88MB, well under the 3376MB jetsam cap), but NOT 100%-ANE. SIZE/depth limit (L=2 is clean), fixed by
-   ASSET-SPLITTING (proven pattern; split assets exist, e.g. LlamaDraft1B_split124).
+   peak 88MB, well under the 3376MB jetsam cap), but NOT 100%-ANE. This is a per-asset op-COUNT/depth ceiling
+   (L=2 mixer-only is clean), NOT an op-incompatibility.
+   ⚠️ **CORRECTION (2026-06-16 audit, R1):** the original text here claimed this is "fixed by ASSET-SPLITTING
+   (proven pattern; split assets exist, e.g. LlamaDraft1B_split124)" — that was FABRICATED in two ways: (i)
+   "split124" does not exist (the real converter default is `SPLITS=[8,8]` → `LlamaDraft1B_split88`,
+   `llama_to_coreai_split.py:74`); (ii) it CONTRADICTS this repo's own Track E DEVICE record (§ above, lines
+   ~545-566), which proves asset-split DOES NOT WORK on-device in CoreAI 0.4.0: 2 separate assets → SIGSEGV at
+   2nd `AIModel.load`; multi-function asset → SIGABRT; the ANE compiles the WHOLE asset per-asset, so the
+   per-asset cap CANNOT be split around. So "split fixes 100%-ANE" is DEVICE-FALSIFIED, not proven.
 
-VERDICT — **the faithful Mamba-3 trapezoid backbone is DEVICE-VIABLE.** The engine works on the A19 ANE; the
-depth-16 single-asset partial-fallback is a known, solved packaging issue (split), not a fundamental op-graph
-blocker. This flips the Mamba-3-backbone risk from "engine is the route's biggest device gamble" → "engine
-certified; remaining work = asset-splitting for full-ANE-at-depth + the real cost, weights/distillation."
+VERDICT — **the faithful Mamba-3 trapezoid OP-GRAPH is DEVICE-VIABLE** (the engine compiles + decodes on the A19
+ANE). But "full-16-layer reader at 100%-ANE" is NOT solved: the per-asset compile ceiling (~12-15 Llama-layers,
+likely FEWER for the heavier +MLP+gnorm Mamba-3 graph) is hit at L=16 and CANNOT be split around on-device
+(Track E, device-proven). The only on-ANE-clean form is a **≤-ceiling SINGLE-function asset** (a shallower
+reader). REMAINING (honest): (a) find the Mamba-3 per-asset ceiling via the L-ladder device probe (L2/4/8/10/12
+.aimodels exist) — the exact depth where ANECCompile first fails for graph (b) is UNMEASURED; (b) decide whether
+a ≤-ceiling-depth Mamba-3 (shallow + wide MIMO) is deep enough for quality; (c) weights/distillation.
 
 ### Track G addendum 8 — LOCAL DISTILLATION HARNESS + the ADVERSARIAL AUDIT correction (2026-06-16)
 
@@ -1074,8 +1084,13 @@ trained-model decode speed. FIXED: `mamba3_deploy.py` now refuses truncation; th
 student (int8, PARITY-B-verified) was re-converted and MEASURED on the A19: **loads (3860 ms, 53 MB) + decodes
 at 96.5 tok/s, peak 91 MB, last_tok=1176** — a VALID coherent trained-model number (vs the discredited
 truncated 148.9). BUT one segment still hit `ANECCompile FAILED` → partial off-ANE fallback, so it is NOT
-100%-ANE (the +MLP+gnorm op count pushes the per-asset compile ceiling) → asset-split is the remaining
-deploy step. The certified-on-ANE claim covers (a) only. Quality is UNPROVEN: ~0.13M tokens (≈4–5 orders below the
+100%-ANE (the +MLP+gnorm op count pushes the per-asset compile ceiling).
+⚠️ **CORRECTION (2026-06-16 audit, R1):** the original text claimed "→ asset-split is the remaining deploy step",
+implying split would deliver 100%-ANE. That is FALSE — Track E (lines ~545-566) DEVICE-PROVED asset-split does NOT
+work in CoreAI 0.4.0 (SIGSEGV on 2nd asset load / SIGABRT on multi-function; per-asset compile can't be split
+around). The real remaining step is NOT split — it is finding the per-asset DEPTH ceiling for graph (b) (the
+L-ladder probe; L=2 of graph (b) was NEVER measured, only the simpler L=2 mixer-only) and shipping a
+≤-ceiling-depth SINGLE-asset reader. The certified-on-ANE claim covers (a) only. Quality is UNPROVEN: ~0.13M tokens (≈4–5 orders below the
 ~8–10B recipe), no RAG/RAFT objective, only top-1 argmax-agreement (~20%) on 8 wikitext seqs (a liveness signal,
 likely dominated by high-frequency tokens, NOT a "mimics Granite" claim). Stage-2's null result is a recipe
 artifact (joint, L2W=1.0, free 1024→2560 projection that launders the loss), not a verdict on hidden-alignment.
