@@ -20,6 +20,20 @@ from mamba3_trainable import H, N, P, R, rms
 MLA_POSITIONS = (6, 12, 18, 23)                            # 4 of 24; spaced so SSM blocks dominate between attn re-mixes
 
 
+def resolve_ckpt(default_vocab: int, layers: int):
+    """Shared by the hybrid converters (云前audit fix): read the CKPT env → (vocab, state_dict|None). The checkpoint is
+    AUTHORITATIVE on vocab — closes the 4096-vs-Granite-100352 mismatch (the cloud trains on the Granite tokenizer's vocab).
+    No CKPT → (env VOCAB or default, None) = the random-weight op-graph/speed probe. Fail-closed on arch/layer mismatch."""
+    import os
+    p = os.environ.get("CKPT", "")
+    if not p:
+        return int(os.environ.get("VOCAB", str(default_vocab))), None
+    c = torch.load(p, map_location="cpu")
+    assert c.get("arch") == "hybrid", f"CKPT arch={c.get('arch')!r} is not 'hybrid' — wrong converter for this checkpoint"
+    assert c.get("layers", layers) == layers, f"CKPT layers={c.get('layers')} != LAYERS={layers} — would deploy an incoherent graph"
+    return c.get("vocab", default_vocab), c["model"]
+
+
 class HybridM(nn.Module):
     def __init__(self, vocab: int, layers: int = 24, mla_positions=MLA_POSITIONS) -> None:
         super().__init__()

@@ -99,8 +99,11 @@ def build_cache(teacher, train, cache_dir):
 
 def save_ckpt(student, opt, step, path):
     tmp = path + ".tmp"
+    arch = "hybrid" if hasattr(student, "mla_pos") else "mamba"         # portability: the converter must rebuild the SAME graph
     torch.save({"model": student.state_dict(), "opt": opt.state_dict(), "step": step,
-                "layers": LAYERS, "config": (MT.D_MODEL, MT.H, MT.P, MT.N, MT.R)}, tmp)
+                "layers": LAYERS, "config": (MT.D_MODEL, MT.H, MT.P, MT.N, MT.R),
+                "arch": arch, "vocab": student.embedding.weight.shape[0],
+                "mla_positions": sorted(student.mla_pos) if arch == "hybrid" else None}, tmp)
     os.replace(tmp, path)                                               # atomic — survives a mid-write preemption
 
 
@@ -147,11 +150,15 @@ def main() -> None:
 
     torch.manual_seed(0)
     ARCH = os.environ.get("ARCH", "mamba")                            # "hybrid" = 20 Mamba-3 + 4 MLA @ L6/12/18/23 (the DUET reader)
+    ckpt = os.path.join(CKPT_DIR, "ckpt_latest.pt")
+    if RESUME and os.path.exists(ckpt):                               # the ckpt is AUTHORITATIVE on arch/vocab (avoid rebuild mismatch)
+        _peek = torch.load(ckpt, map_location="cpu")
+        ARCH = _peek.get("arch", ARCH); vocab = _peek.get("vocab", vocab)
+        print(f"resume: ckpt arch={ARCH} vocab={vocab}")
     student = (HY.HybridM(vocab, LAYERS) if ARCH == "hybrid" else MT.M(vocab, LAYERS)).to(DEV).to(DT)
-    print(f"student ARCH={ARCH} ({'HybridM 20-Mamba+4-MLA' if ARCH == 'hybrid' else 'pure Mamba-3'})")
+    print(f"student ARCH={ARCH} ({'HybridM 20-Mamba+4-MLA' if ARCH == 'hybrid' else 'pure Mamba-3'}) vocab={vocab}")
     opt = torch.optim.AdamW(student.parameters(), lr=LR, weight_decay=0.1, betas=(0.9, 0.95))
     start = 1
-    ckpt = os.path.join(CKPT_DIR, "ckpt_latest.pt")
     if RESUME and os.path.exists(ckpt):
         st = torch.load(ckpt, map_location=DEV)
         student.load_state_dict(st["model"]); opt.load_state_dict(st["opt"]); start = st["step"] + 1

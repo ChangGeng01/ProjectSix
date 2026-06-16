@@ -126,7 +126,13 @@ def convert() -> None:
     import coreai_torch
     from coreai_torch._compression.utils import inject_subbyte_tensors
     torch.manual_seed(0)
-    m = HybridDecodeFixed(VOCAB, LAYERS, MAX_SEQ).half().eval()
+    vocab, sd = HY.resolve_ckpt(VOCAB, LAYERS)                # CKPT env → trained weights + Granite vocab; else random/4096
+    m = HybridDecodeFixed(vocab, LAYERS, MAX_SEQ)
+    if sd is not None:
+        miss, unexp = m.m.load_state_dict(sd, strict=False)
+        assert not unexp, f"CKPT has keys HybridDecodeFixed.m lacks: {unexp[:3]}"
+        print(f"loaded TRAINED ckpt (vocab={vocab}; {len(miss)} missing = the decode-state buffers, expected)")
+    m = m.half().eval()
     ex = (torch.zeros(1, 1, dtype=torch.long),)
     _ = m(*ex)
     ep = torch.export.export(m, ex)

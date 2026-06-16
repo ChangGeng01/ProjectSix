@@ -1757,3 +1757,28 @@ states + the host ref). Ran on the iPhone Air A19 (GPU; cert log `Docs/cert-logs
 "prefill-once-reuse-many ACROSS LAUNCHES" is real on device, not just in-RAM/host. StateLake coverage: device-port done; the
 .statelake format is the shared contract (host `mamba3_statelake.py` ⇄ device `BASStateLakeReader`). REMAINING (still gated):
 the trained-checkpoint quality gate (cloud distill ARCH=hybrid) — every result here is still random-weight machinery.
+
+## Track G — Addendum 32: 云前audit (pre-cloud) — 就差云吗 = NO; fixed 5 wasted-run BLOCKERS so the cloud output is usable
+
+A 6-agent readiness audit answered 就差云吗 bluntly: **NO.** The trainer is correct (`mamba3_cloud_distill.py:117` derives
+`vocab = tok.vocab_size` ≈ 100352 from Granite — NOT hardcoded), but the trained weights could not REACH the device — a cloud
+run today would buy "a checkpoint nothing can deploy." Fixed the chain (host-side, no cloud/device needed; seam re-verified):
+- **Checkpoint portability** (`save_ckpt`): now records `arch` / `vocab` / `mla_positions` so a converter rebuilds the SAME
+  graph; **resume reads arch/vocab from the ckpt BEFORE building the student** (a hybrid ckpt no longer silently rebuilds as
+  pure-Mamba → key mismatch).
+- **Converters now LOAD the checkpoint** (were `manual_seed(0)` random): shared `HY.resolve_ckpt(default, layers)` → the
+  **checkpoint is AUTHORITATIVE on vocab** (closes the 4096-vs-100352 mismatch), fail-closed on arch/layer mismatch; wired into
+  `mamba3_hybrid_{prefill,decode}_deploy.py` + `mamba3_statelake_device_prep.py` (load into `m.m`/`m`, strict=False). No CKPT →
+  the old random-weight 4096 op-graph probe (unchanged). `mamba3_deploy.py` CKPT is now env-overridable (the pure-Mamba path).
+- **`runpod_distill.sh`**: now `export ARCH=hybrid` (was unset → silently pure-Mamba) + an `HF_TOKEN` gate (Granite may be
+  gated → was failing only AFTER the expensive cache phase).
+- **Seam re-verified** (host, pure-torch): a trained hybrid ckpt (the new metadata) → `resolve_ckpt` picks its vocab, loads into
+  the converter, the **trained MLA weights land** (param allclose), and a wrong-arch ckpt is REJECTED. The cloud→device path is open.
+
+**Verdict:** ready to launch AFTER these fixes (now landed). Launch = `ARCH=hybrid LAYERS=24` on the RunPod kit; post-run set
+`CKPT=/workspace/ckpt/ckpt_latest.pt` for the converters + `mamba3_statelake_device_prep.py`, rebuild the assets, re-run the
+device DUET/StateLake probes (binding-key fail-closed catches any vocab/arch mismatch). **Cost ≈ $50–200** on one A100/H100 80GB
+spot (~20M-token PoC; teacher top-K cache built once). REMAINING NON-BLOCKING GAPS: (a) N_ROWS=20000 silently caps at the
+HotpotQA val split ~7.4k (graceful; log the real count); (b) no torch-vs-on-device-ASSET quality gate on TRAINED weights — the
+conversion-fidelity gates now run on the trained ckpt (decomposition exact) but the asset-vs-trained-model argmax compare is the
+device probe (post-cloud). Training-time eval (RAFT E1/E2/E3 robustness) is wired + trustworthy.

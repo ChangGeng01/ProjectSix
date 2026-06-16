@@ -29,7 +29,7 @@ import mamba3_trainable as MT
 L = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 VOCAB = 100352                                                    # Granite tokenizer
-CKPT = "/tmp/draft_coreai/mamba3_poc_student.pt"
+CKPT = os.environ.get("CKPT", "/tmp/draft_coreai/mamba3_poc_student.pt")   # cloud output → set CKPT=/workspace/ckpt/ckpt_latest.pt
 _TAG = (f"_{os.environ['SPLIT']}" if os.environ.get("SPLIT") else "") + \
        ("_fp16" if os.environ.get("FP16") == "1" else "") + \
        (f"_n{MT.N}p{MT.P}" if (MT.N, MT.P) != (64, 64) else "") + \

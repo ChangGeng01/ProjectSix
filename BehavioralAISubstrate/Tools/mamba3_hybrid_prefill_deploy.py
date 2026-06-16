@@ -60,15 +60,21 @@ class DeployHybridPrefill(nn.Module):
         return torch.stack(ang), torch.stack(ssm), torch.stack(kp), torch.stack(vp), torch.stack(mla)
 
 
-def det_tokens(n):
-    """Deterministic token ids — mirrored in Swift (tok[i] = (i*17+5) % VOCAB) for the E2E."""
-    return torch.tensor([(i * 17 + 5) % VOCAB for i in range(n)], dtype=torch.long)
+def det_tokens(n, vocab=VOCAB):
+    """Deterministic token ids — mirrored in Swift (tok[i] = (i*17+5) % vocab) for the E2E."""
+    return torch.tensor([(i * 17 + 5) % vocab for i in range(n)], dtype=torch.long)
 
 
 def main() -> None:
     torch.manual_seed(0)
-    m = DeployHybridPrefill(VOCAB, LAYERS).half().eval()
-    x = det_tokens(T) if TOKENS else det_input()
+    vocab, sd = HY.resolve_ckpt(VOCAB, LAYERS)                # CKPT env → trained weights + Granite vocab; else random/4096
+    m = DeployHybridPrefill(vocab, LAYERS)
+    if sd is not None:
+        miss, unexp = m.m.load_state_dict(sd, strict=False)
+        assert not unexp, f"CKPT has keys DeployHybridPrefill.m lacks: {unexp[:3]}"
+        print(f"loaded TRAINED ckpt (vocab={vocab}; {len(miss)} missing = expected, none should be params)")
+    m = m.half().eval()
+    x = det_tokens(T, vocab) if TOKENS else det_input()
     in_name = "input_ids" if TOKENS else "x_seq"
     print(f"STEP-3 full {LAYERS}L hybrid prefill converter (T={T}, D={D}, fp16, input={'tokens' if TOKENS else 'hidden'}, {len(m.m.mla_pos)} MLA @ {sorted(m.m.mla_pos)}):")
 

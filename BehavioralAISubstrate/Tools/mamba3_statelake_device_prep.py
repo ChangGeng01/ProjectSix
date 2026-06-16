@@ -69,11 +69,16 @@ def read_statelake(out: str, expected_bkey: str) -> dict:
 
 def main() -> None:
     torch.manual_seed(0)
-    m = HY.HybridM(VOCAB, L).float().eval()
-    seq = torch.tensor([(i * 17 + 5) % VOCAB for i in range(PROMPT + CONT)])    # deterministic, mirrors the duet probe
+    vocab, sd = HY.resolve_ckpt(VOCAB, L)                     # CKPT env → trained weights + Granite vocab; else random/4096
+    m = HY.HybridM(vocab, L).float().eval()
+    if sd is not None:
+        miss, unexp = m.load_state_dict(sd, strict=False)
+        assert not unexp, f"CKPT has keys HybridM lacks: {unexp[:3]}"
+        print(f"loaded TRAINED ckpt (vocab={vocab})")
+    seq = torch.tensor([(i * 17 + 5) % vocab for i in range(PROMPT + CONT)])    # deterministic, mirrors the duet probe
     with torch.no_grad():
         _, st = m.prefill(seq[:PROMPT])
-        dec = HybridDecodeFixed(VOCAB, L, MAX_SEQ).float().eval()
+        dec = HybridDecodeFixed(vocab, L, MAX_SEQ).float().eval()
         dec.m.load_state_dict(m.state_dict())                        # SAME seed-0 weights as the device asset
         dec.load_prefill(st, PROMPT)                                 # build the 6 decode-ready buffers (stack mamba + scatter mla)
         states = {"angle_all": dec.angle_all, "ssm_all": dec.ssm_all, "kprev_all": dec.kprev_all,
@@ -85,7 +90,7 @@ def main() -> None:
 
     # HOST reference: read the .statelake back (int8 dequant) → decode cont via the SAME fixed-buffer logic the device runs
     got = read_statelake(OUT, bkey)
-    d2 = HybridDecodeFixed(VOCAB, L, MAX_SEQ).float().eval()
+    d2 = HybridDecodeFixed(vocab, L, MAX_SEQ).float().eval()
     d2.m.load_state_dict(m.state_dict())
     for k, v in got.items():
         getattr(d2, k).copy_(v)
