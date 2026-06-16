@@ -1489,3 +1489,30 @@ make the int8 step (~1.4 rad) exceed the rotation and break the cache. The wrap 
 long-context cliff, so it is now CANONICAL: `mamba3_trainable.cache_serialize_state(state)` wraps every layer's angle to
 (-pi,pi] before quant — the required first step of State-Cache serialization. Caveat: argmax-agreement is coarse and this
 is a random-init model; the int8 floor should be re-confirmed on the distilled checkpoint where logit competition is tighter.
+
+## Track G — Addendum 21: MLA block BUILT + battery P0-12 — int8 is the hybrid's precision floor (the MLA cache, not Mamba, binds)
+
+The hybrid's dense-coverage operator now exists: `Tools/mamba3_mla.py` (`MLABlock` + `MLAStack`). NoPE Multi-head Latent
+Attention — caches one D_LATENT=128 latent/token (down-projected), re-expands to per-head k,v at compute → 16× smaller KV
+than full MHA (2048 floats/tok). Mirrors the Mamba `Lyr` interface (pre-norm → residual → SwiGLU MLP → residual) so it drops
+into the 24L hybrid at L6/12/18/23, with `forward_seq` (prefill, returns the latent cache) + `step` (decode over cached latents).
+
+`Tools/test_p0_12_mla_kv.py` (4 MLA layers, prompt=512, cont=128, host):
+- **(A) PARITY PASS**: `forward_seq` (prefill) == step-loop decode from empty cache — logit max-err 8.8e-6, argmax 100%.
+- **(B) latent-cache quant floor** (argmax-agree vs fp32, 16× KV cut):
+
+| cache | logit max-err | argmax all | first64 | last64 |
+|------:|--------------:|-----------:|--------:|-------:|
+| fp32  | 0          | 100% | 100% | 100% |
+| fp16  | 3.0e-4     | 100% | 100% | 100% |
+| int8  | 1.7e-2     | 99%  | 100% | 98%  |
+| int4  | 2.5e-1     | 88%  | 89%  | 86%  |
+
+**Findings.** (1) fp16/int8 MLA cache HOLD (100%/99%) at the 16× cut → the attention-path cache ships at int8. (2) **int4
+BREAKS the MLA cache (88%)** — and this is the decisive contrast with the Mamba state, which held int4 at 99% (addendum 20).
+(3) Mechanism = the MLA cache is **NON-CONTRACTIVE**: every cached latent is re-read by softmax every decode step, so a quant
+error never decays (first64≈last64, no contraction recovery; cf. the Mamba state whose error DECAYS). softmax convexity bounds
+the error but does not shrink it, so coarse int4 hurts ~4× more here than in the SSM. **Route consequence (亏的不要): the
+hybrid's unified State-Cache precision floor is int8, set by the 4 MLA layers — not int4. The Mamba state could go int4, but a
+single-precision cache must be int8 to keep the MLA layers faithful.** Unblocks: hybrid M wiring (20 Mamba + 4 MLA) + the full
+two-state DUET handoff test.
