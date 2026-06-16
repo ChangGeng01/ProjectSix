@@ -65,6 +65,17 @@ KD_K = int(os.environ.get("KD_K", "64"))                                # top-K 
 ORDER = os.environ.get("ORDER", "curriculum")                           # curriculum (easy->hard by teacher CE) | random
 
 
+def _sanitize(x):
+    """Recursively replace non-finite floats (NaN/Inf) with None so eval_card.json is STRICT-JSON valid (BUG-4)."""
+    if isinstance(x, float):
+        return x if math.isfinite(x) else None
+    if isinstance(x, dict):
+        return {k: _sanitize(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_sanitize(v) for v in x]
+    return x
+
+
 def kd_kl(student_logits, teacher_logits):
     """Full-vocab Stage-3 KD: KL(teacher || student) at temperature TAU, scaled by TAU^2 (Hinton)."""
     s = F.log_softmax(student_logits.float() / TAU, -1)
@@ -75,6 +86,8 @@ def kd_kl(student_logits, teacher_logits):
 def kd_topk(student_logits, topk_idx, topk_val):
     """Top-K KD from a CACHED teacher: student full-vocab log-softmax gathered at the teacher's top-K indices, vs the
     teacher's top-K soft target (renormalized within the K). Standard cached-distillation approximation."""
+    assert student_logits.shape[0] == topk_idx.shape[0], \
+        f"seq mismatch: student T={student_logits.shape[0]} vs cached T={topk_idx.shape[0]} — cache/example drift"
     lp = F.log_softmax(student_logits.float() / TAU, -1).gather(-1, topk_idx.long())   # [T,K] student logprob @ teacher topk
     q = F.softmax(topk_val.float() / TAU, -1)                                          # [T,K] teacher soft target
     return (q * (q.clamp_min(1e-9).log() - lp)).sum(-1).mean() * (TAU * TAU)
@@ -109,18 +122,20 @@ def build_cache(teacher, train, cache_dir):
             m = torch.arange(tgt.shape[0], device=DEV) >= (ex["prompt_len"] - 1)
             diff = float(F.cross_entropy(lp[m], tgt[m])) if m.any() else 0.0
         rec = {"topk_idx": idx.to(torch.int32).cpu(), "topk_val": val.to(torch.float16).cpu(), "difficulty": diff}
-        torch.save(rec, path); ex.update(rec)
+        torch.save(rec, path + ".tmp"); os.replace(path + ".tmp", path)   # ATOMIC — a spot-preempt mid-save can't leave a corrupt ex{i}.pt
+        ex.update(rec)
         if i % 200 == 0:
             print(f"  cache {i}/{len(train)} (diff={diff:.2f})", flush=True)
 
 
-def save_ckpt(student, opt, step, path):
+def save_ckpt(student, opt, step, path, sched=None):
     tmp = path + ".tmp"
     arch = "hybrid" if hasattr(student, "mla_pos") else "mamba"         # portability: the converter must rebuild the SAME graph
     torch.save({"model": student.state_dict(), "opt": opt.state_dict(), "step": step,
                 "layers": LAYERS, "config": (MT.D_MODEL, MT.H, MT.P, MT.N, MT.R),
                 "arch": arch, "vocab": student.embedding.weight.shape[0],
-                "mla_positions": sorted(student.mla_pos) if arch == "hybrid" else None}, tmp)
+                "mla_positions": sorted(student.mla_pos) if arch == "hybrid" else None,
+                "sched": sched.state_dict() if sched is not None else None}, tmp)   # resume the curriculum RNG deterministically
     os.replace(tmp, path)                                               # atomic — survives a mid-write preemption
 
 
@@ -204,7 +219,18 @@ def main() -> None:
     # gold→distractor staging (raft_params) is NOT wired — distractor composition is frozen at make_examples + locked by the
     # teacher cache. Dynamic per-step RAFT would bust the cache (~10-100x cost). Not 'multi-stage RAFT curriculum'.
     print(f"curriculum: {'difficulty-curriculum (competence sampling) + STATIC RAFT(P=%.2f,K=%d)' % (RAFT.P_GOLDEN, RAFT.K_DISTRACT) if USE_SCHEDULER else 'static ORDER=' + ORDER}", flush=True)
-    best_score, best_path = -float("inf"), os.path.join(CKPT_DIR, "ckpt_best.pt")
+    assert STEPS % ACCUM == 0, f"STEPS={STEPS} must be a multiple of ACCUM={ACCUM} (else the final partial accumulation is dropped)"
+    best_path, best_meta = os.path.join(CKPT_DIR, "ckpt_best.pt"), os.path.join(CKPT_DIR, "best_meta.json")
+    best_score = -float("inf")
+    if RESUME and os.path.exists(ckpt):                              # BUG-1: persist/restore best_score so a resume can't
+        _st = torch.load(ckpt, map_location="cpu")                   # overwrite a genuinely-better ckpt_best with a worse one
+        if sched is not None and _st.get("sched"):
+            sched.load_state_dict(_st["sched"])
+        if os.path.exists(best_meta):
+            best_score = json.load(open(best_meta)).get("best_score", -float("inf"))
+            print(f"RESUMED best_score={best_score:.3f} (curriculum rng {'restored' if sched and _st.get('sched') else 'n/a'})", flush=True)
+        else:
+            print("WARNING: resuming but no best_meta.json — best_score reset to -inf (a worse ckpt_best could be saved)", flush=True)
 
     t0 = time.time()
     opt.zero_grad(set_to_none=True)
@@ -232,33 +258,40 @@ def main() -> None:
             print(f"step {step:6d}/{STEPS} | KD={float(kd):.3f} CE={float(ce) if ce is not None else 0:.3f} "
                   f"| ~{tps:.0f} tok/s", flush=True)
         if step % CKPT_EVERY == 0:
-            save_ckpt(student, opt, step, ckpt)
+            save_ckpt(student, opt, step, ckpt, sched)
         if step % EVAL_EVERY == 0:
             ev = evaluate()
             slope = ev["E2"][0] - ev["E1"][0]
             score = -(ev["E1"][0] + max(0.0, slope))                  # lower E1 nll + smaller distractor-slope = better
             if score > best_score and all(math.isfinite(ev[m][0]) for m in ev):
                 best_score = score
-                save_ckpt(student, opt, step, best_path)              # best-ckpt selection (metric-gated, NOT just last)
+                save_ckpt(student, opt, step, best_path, sched)       # best-ckpt selection (metric-gated, NOT just last)
+                json.dump({"best_score": best_score, "step": step}, open(best_meta + ".tmp", "w"))
+                os.replace(best_meta + ".tmp", best_meta)             # persist best_score so a resume can't regress ckpt_best
             print("  EVAL " + " ".join(f"{m}: nll={ev[m][0]:.3f} acc={ev[m][1]:.1%}" for m in ev)
                   + f"  | slope Δ(E2-E1)={slope:+.3f} | best_score={best_score:.3f}"
                   + ("  ↑best" if score == best_score else ""), flush=True)
-    save_ckpt(student, opt, STEPS, ckpt)
+    save_ckpt(student, opt, STEPS, ckpt, sched)
     print(f"DONE — final ckpt {ckpt}")
 
     # The checkpoint is born WITH its eval card: run the serious battery on the BEST checkpoint + the honest claim_card.
     if os.path.exists(best_path):
         student.load_state_dict(torch.load(best_path, map_location=DEV)["model"])
+        eval_on = "ckpt_best"
         print(f"loaded best ckpt (score={best_score:.3f}) for the final eval card", flush=True)
+    else:                                                            # BUG-3: no best was ever saved (all evals non-finite)
+        eval_on = "ckpt_latest"
+        print("WARNING: no ckpt_best.pt (no finite eval) — eval card runs on ckpt_latest, NOT a best-selected ckpt", flush=True)
     raft = EVAL.eval_raft_robustness(student, E)
     ppl = EVAL.compute_perplexity(student, [], E["E1"])
     fid = EVAL.compute_fidelity(student, teacher, E["E1"][:64]) if "teacher" in dir() else None
     gen = EVAL.generate_and_score(student, E["E1"][:64], maxlen=20)
     res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
-           "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok, "best_score": best_score}
+           "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
+           "best_score": best_score, "eval_on": eval_on}
     res["claim"] = EVAL.claim_card(res)
     with open(os.path.join(CKPT_DIR, "eval_card.json"), "w") as f:
-        json.dump(res, f, indent=2, default=float)
+        json.dump(_sanitize(res), f, indent=2)                       # BUG-4: non-finite floats → null (strict-JSON valid)
     print(f"EVAL CARD → {res['claim']['status']}"
           + (f"  failed: {res['claim']['failed_gates']}" if res['claim']['failed_gates'] else "")
           + f"  (E1 nll={raft['E1']['nll']:.3f}, slope(E2-E1)={raft['slope_e2_e1']:+.3f}, EM={gen['EM']:.2f}, F1={gen['F1']:.2f})", flush=True)

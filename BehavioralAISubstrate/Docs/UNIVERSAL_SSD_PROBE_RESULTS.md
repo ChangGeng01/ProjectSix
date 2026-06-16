@@ -1945,3 +1945,26 @@ the fixes (all host, all landed):
   CKPT → device argmax-consistency → quant-fidelity filled → narrow-RAG scope). Smokes still green; run-path modules import clean.
 
 **Pre-cloud verdict: launch-ready for P0.** Everything that could silently waste or pollute a run is now loud; the only path to 成了 is the gate-chain, run honestly.
+
+## Track G — Addendum 42: 再次全面 audit — micro E2E (empirical) + runtime audit (static) → 4 bugs fixed, resume-safe (launch cleared)
+
+Two-armed runtime audit before the cloud spend. (1) EMPIRICAL: ran the full pipeline end-to-end on real (cached) Granite/MPS —
+`build_cache→curriculum→train→eval→best-ckpt→eval_card` exit 0, emitted a valid eval_card.json with an honest **亏的✗** (30
+steps: failed task_fit/fidelity/generation, passed raft-robust/graceful/stability/no-contamination; loss dropped 11.305→11.002,
+↑best fired). This alone answered the static "teacher-freed? / generate hang? / claim_card KeyError? / json crash?" fears — none occur.
+(2) STATIC: a 4-agent runtime trace found bugs the small-scale run can't surface (they're latent at 30 steps but LIVE on spot+resume):
+- **BUG-1 (CRITICAL) FIXED** — `best_score` reset to −∞ on every resume → first eval overwrote `ckpt_best.pt` with a WORSE model.
+  Now persisted to `best_meta.json` (atomic) + restored on resume.
+- **BUG-2 (HIGH) FIXED** — non-atomic teacher-cache write → preempt mid-save → corrupt `ex{i}.pt` → crash-loop. Now tmp+os.replace.
+- **RISK-1 FIXED** — curriculum RNG not persisted → divergent data order on resume. Now `sched.state_dict()` saved in the ckpt + restored.
+- BUG-3 FIXED — no `ckpt_best` fallback (all-non-finite evals) → card now records `eval_on=ckpt_latest` honestly.
+- BUG-4 FIXED — `eval_card.json` could emit bare NaN/Infinity → `_sanitize` → null (strict-JSON valid).
+- + `kd_topk` seq-shape assert; `STEPS%ACCUM==0` startup guard. (The audit REFUTED several auditor over-claims: grad-tail moot at
+  default config, generate is minutes not 5h, json doesn't crash, teacher not freed — fixes are the verified subset.)
+
+**EMPIRICAL RESUME VERIFICATION** (fresh STEPS=20 → RESUME STEPS=40, real Granite/MPS, both exit 0): `RESUMED best_score=-11.180
+(curriculum rng restored)`; best improved to −10.930 and updated `best_meta` (no regression); cache REUSED (fingerprint match, no
+re-forward); eval card emitted clean. The resume path the first micro run never exercised is now proven.
+
+**Verdict: launch-safe.** The pipeline runs clean fresh AND across resume; spot preemption can no longer corrupt the cache or
+regress the best checkpoint; the eval card is honest + strict-JSON. P0 launch is cleared.
