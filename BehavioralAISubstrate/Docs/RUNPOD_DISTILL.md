@@ -78,3 +78,33 @@ uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layer
 - Stronger/broader (8B-teacher, more tokens): **~$150–600**.
 - The dominant cost is the frozen 3B teacher forward each step — a top-K teacher-cache (run teacher once, reuse across
   epochs) is the next optimization if you do many epochs over a fixed set (not yet wired; on-the-fly KD is the default).
+
+## 云前 pre-launch runbook (P0-first discipline — addendum 41)
+
+**Before any spend (GATE 0):** the cache-pollution guard must be committed (it is) — `build_cache` fingerprints
+{teacher,P,K,T,N_ROWS,KD_K,n_train} and `raise SystemExit` on drift, so a reused stale-config cache can't silently pollute.
+
+**P0 (small, cheap, fast — prove the pipeline + a learning signal BEFORE scaling):**
+```
+export HF_TOKEN=...                       # Granite teacher is gated; runpod_distill.sh fails fast if unset
+rm -rf /workspace/ckpt-p0                 # FRESH dir (the fingerprint guard catches drift, but start clean)
+ARCH=hybrid LAYERS=24 STEPS=2000 N_ROWS=3000 EVAL_EVERY=250 CKPT_EVERY=250 \
+  CKPT_DIR=/workspace/ckpt-p0 USE_SCHEDULER=1 bash scripts/runpod_distill.sh
+```
+(N_ROWS=3000 < the ~7405 HotpotQA-val cap, so no silent truncation. ~30 min / ~$1-2 spot on an A100.)
+
+**Watch 3 signals in the EVAL lines (every 250 steps):** (a) `KD=` falling toward <1; (b) `E1:/E2: nll=` both
+falling = the reader is learning; (c) `slope Δ(E2-E1)=` trending toward <0.05 = distractor-robustness emerging.
+Loss stays finite (the run asserts on NaN). **GO** to STEPS=20000 N_ROWS=7405 only if all three move the right way + `↑best`
+fires; **NO-GO** (don't burn scale money) if KD is flat / nll stuck / slope widens — fix the recipe (LR/warmup/data) first.
+
+## The 成了 gate-chain (only ALL-green is honest)
+- GATE 1 — trained ckpt exists: `ckpt_best.pt` (metric-gated best-selection), born with `eval_card.json`.
+- GATE 2 — `eval_card` PASS: the 7-gate `claim_card` reads `成了 ✓` (task-fit, RAFT E2-robust, E3-graceful, fidelity-argmax,
+  generation EM/F1, stability, no-contamination — the last is now REAL, verifying the disjoint split).
+- GATE 3 — ckpt → device WITH `CKPT` set: the converters now **fail-closed** on a missing CKPT (no silent random-weight asset;
+  `FORCE_RANDOM=1` only for op-graph probes). `resolve_ckpt` is authoritative on vocab.
+- GATE 4 — device argmax-consistency: the A19 `BAS_COREAI_STATELAKE_PROBE` reproduces `HOSTREF_STATELAKE_ARGMAX` (cross-launch int8).
+- GATE 5 — quant-fidelity filled (replace the eval stub with measured int8-vs-fp32 argmax on the trained ckpt; device-phase).
+- GATE 6 — scope honesty: a NARROW HotpotQA-distractor RAG/memory reader; the recipe is **difficulty-curriculum + static
+  RAFT(P=0.8,K=4)**, NOT multi-stage RAFT-curriculum (raft_params staging is intentionally unwired — cache cost).

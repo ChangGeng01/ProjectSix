@@ -1923,3 +1923,25 @@ So the cloud run (`ARCH=hybrid LAYERS=24 USE_SCHEDULER=1` on the RunPod kit) now
 distractors, keeps the metric-best checkpoint, and self-certifies against the honest bar — no human eyeballing, no rubber stamp.
 **The make-or-break is now BUILT end-to-end** (curriculum + serious eval + wiring, addenda 39-40). The only remaining action is
 launching the run (operator compute) → a trained checkpoint + its eval card → only THEN can 成了 be claimed.
+
+## Track G — Addendum 41: 云前 全面 audit — discipline fixes (cache-pollution guard, real contamination gate, fail-closed converters, P0 runbook)
+
+A 6-agent pre-cloud audit verified the operator's pre-launch checklist + hunted extra traps. Verdict: SAFE TO LAUNCH P0 after
+the fixes (all host, all landed):
+- **BLOCKER — cache pollution (the #1 trap)**: `build_cache` (`ex{i}.pt` is index-keyed) now writes `cache/fingerprint.txt` =
+  sha256({teacher,P,K,T,N_ROWS,KD_K,n_train}) and `raise SystemExit('CACHE CONFIG DRIFT…')` on mismatch — reusing a CKPT_DIR
+  after a teacher/RAFT/N_ROWS/KD_K change can no longer SILENTLY train on stale teacher logits (vocab is transitively covered by teacher).
+- **BLOCKER — false-pass contamination gate**: `contamination_ok` was hardcoded `True` + `verify_no_contamination` never called
+  (and would no-op since examples drop `id`). Now VERIFIES the real split: `{train ids}.isdisjoint({held ids})` (assert + fed to
+  the eval card). The split was always disjoint by construction; now the claim_card `no_contamination` gate actually MEANS it.
+- **Fail-closed converters**: `resolve_ckpt` (hybrid) + `mamba3_deploy.py` (pure-Mamba) now `raise SystemExit` on a missing CKPT
+  (no silent random-weight production asset); `FORCE_RANDOM=1` only for op-graph/speed probes.
+- **Guards**: N_ROWS silent-cap now logged (`requested N_ROWS=… got …`; HotpotQA-val ~7405); CUDA VRAM assert ≥40GB (OOM-fail-fast).
+- **Honesty**: the curriculum label is now `difficulty-curriculum + STATIC RAFT(P,K)` — `raft_params` gold→distractor STAGING is
+  intentionally UNWIRED (the teacher cache freezes composition; dynamic per-step RAFT would bust the cache ~10-100×). It is
+  "usable curriculum KD", not multi-stage RAFT-curriculum. No claim_card gate depends on it (verdict integrity preserved).
+- **`Docs/RUNPOD_DISTILL.md`**: the P0-first runbook (HF_TOKEN, fresh CKPT_DIR, the exact `STEPS=2000 N_ROWS=3000` P0 command, the
+  3 go/no-go signals — KD↓ / E1-E2 nll↓ / slope shrink) + the 6-gate 成了 chain (trained ckpt → eval_card PASS → ckpt→device WITH
+  CKPT → device argmax-consistency → quant-fidelity filled → narrow-RAG scope). Smokes still green; run-path modules import clean.
+
+**Pre-cloud verdict: launch-ready for P0.** Everything that could silently waste or pollute a run is now loud; the only path to 成了 is the gate-chain, run honestly.

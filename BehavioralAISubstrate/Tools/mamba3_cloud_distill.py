@@ -19,6 +19,7 @@ RunPod: bash scripts/runpod_setup.sh && bash scripts/runpod_distill.sh   (1× A1
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -84,6 +85,18 @@ def build_cache(teacher, train, cache_dir):
     DIFFICULTY (teacher CE on the answer tokens, for curriculum ordering). Resumable (skips existing .pt). After this,
     training needs NO teacher forward — the dominant cost is amortized across all epochs."""
     os.makedirs(cache_dir, exist_ok=True)
+    # CACHE-POLLUTION GUARD: ex{i}.pt is index-keyed, so reusing a CKPT_DIR after changing teacher/RAFT/N_ROWS/KD_K would
+    # silently train on STALE teacher logits. Fingerprint the config; REFUSE (loud) on drift — never silently reuse.
+    fp = hashlib.sha256(json.dumps({"teacher": TEACHER, "p": RAFT.P_GOLDEN, "k": RAFT.K_DISTRACT, "t": RAFT.MAX_LEN,
+                                    "n_rows": N_ROWS, "kd_k": KD_K, "n_train": len(train)}, sort_keys=True).encode()).hexdigest()[:16]
+    fpf = os.path.join(cache_dir, "fingerprint.txt")
+    if os.path.exists(fpf):
+        old = open(fpf).read().strip()
+        if old != fp:
+            raise SystemExit(f"CACHE CONFIG DRIFT in {cache_dir}: built with {old}, current config {fp} "
+                             f"(teacher/RAFT/N_ROWS/KD_K changed) — reusing would POLLUTE training. Use a FRESH CKPT_DIR or delete the cache.")
+    else:
+        open(fpf, "w").write(fp)
     for i, ex in enumerate(train):
         path = os.path.join(cache_dir, f"ex{i}.pt")
         if os.path.exists(path):
@@ -116,6 +129,10 @@ def main() -> None:
     from transformers import AutoModelForCausalLM, AutoTokenizer
     import hashlib
     os.makedirs(CKPT_DIR, exist_ok=True)
+    if DEV == "cuda":                                                 # OOM mid-run = wasted spend; fail fast on a too-small pod
+        gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+        assert gb >= 40, f"GPU {gb:.0f}GB < 40GB needed (teacher-3B + 24L student + AdamW + top-K cache); use A100/H100 80GB"
+        print(f"GPU VRAM {gb:.0f}GB OK", flush=True)
     print(f"cloud-distill | dev={DEV} dt={DT} | teacher={TEACHER} | student L{LAYERS}/D{MT.D_MODEL} "
           f"(>8L = CoreAI GPU-backed; <=8L pure-ANE) | steps={STEPS} accum={ACCUM} lr={LR} KD_W={KD_W} CE_W={CE_W} "
           f"| CACHE={CACHE} K={KD_K} ORDER={ORDER}")
@@ -135,11 +152,14 @@ def main() -> None:
         p.requires_grad_(False)
 
     rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]")
+    print(f"data rows: requested N_ROWS={N_ROWS}, got {len(rows)}", flush=True)   # HotpotQA val ~7405 → larger N_ROWS silently caps
     ex_all = [build_example(r) for r in rows]
     def bucket(i):
         return int(hashlib.sha1(i.encode()).hexdigest(), 16) % 10
     held_rows = [e for e in ex_all if bucket(e["id"]) < 1][:200]          # ~10% held, capped
     train_rows = [e for e in ex_all if bucket(e["id"]) >= 1]
+    contamination_ok = {e["id"] for e in train_rows}.isdisjoint({e["id"] for e in held_rows})  # VERIFY the real split
+    assert contamination_ok, "train/held id OVERLAP — split is contaminated"   # bucket split is disjoint by construction
     train = make_examples(train_rows, RAFT.P_GOLDEN, RAFT.K_DISTRACT, tok, seed=0)
     E = {m: make_eval_condition(held_rows, m, tok) for m in ("E1", "E2", "E3")}
     print(f"data | HotpotQA distractor | train={len(train)} held={len(held_rows)} | "
@@ -180,7 +200,10 @@ def main() -> None:
 
     USE_SCHEDULER = os.environ.get("USE_SCHEDULER", "0") == "1"       # opt-in: dynamic competence curriculum (else static ORDER)
     sched = CurriculumScheduler([e.get("difficulty", 0.0) for e in train], STEPS) if USE_SCHEDULER else None
-    print(f"curriculum: {'DYNAMIC competence scheduler' if USE_SCHEDULER else 'static ORDER=' + ORDER}", flush=True)
+    # HONEST label: USE_SCHEDULER = difficulty-curriculum (competence sampling) + STATIC RAFT(P,K). The scheduler's RAFT
+    # gold→distractor staging (raft_params) is NOT wired — distractor composition is frozen at make_examples + locked by the
+    # teacher cache. Dynamic per-step RAFT would bust the cache (~10-100x cost). Not 'multi-stage RAFT curriculum'.
+    print(f"curriculum: {'difficulty-curriculum (competence sampling) + STATIC RAFT(P=%.2f,K=%d)' % (RAFT.P_GOLDEN, RAFT.K_DISTRACT) if USE_SCHEDULER else 'static ORDER=' + ORDER}", flush=True)
     best_score, best_path = -float("inf"), os.path.join(CKPT_DIR, "ckpt_best.pt")
 
     t0 = time.time()
@@ -232,7 +255,7 @@ def main() -> None:
     fid = EVAL.compute_fidelity(student, teacher, E["E1"][:64]) if "teacher" in dir() else None
     gen = EVAL.generate_and_score(student, E["E1"][:64], maxlen=20)
     res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
-           "quant": EVAL.quant_fidelity_stub(), "contamination_ok": True, "best_score": best_score}
+           "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok, "best_score": best_score}
     res["claim"] = EVAL.claim_card(res)
     with open(os.path.join(CKPT_DIR, "eval_card.json"), "w") as f:
         json.dump(res, f, indent=2, default=float)

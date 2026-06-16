@@ -132,7 +132,8 @@ def main() -> None:
         assert not bad, f"DeployM missing trained params (would deploy uninitialized): {bad[:3]}"
         print(f"loaded the FULL {ck_L}-layer trained student ({len(ck['model'])} tensors); decode state zero-init")
     else:
-        print(f"no checkpoint at {CKPT} — converting random-init (op-graph + ANE deploy test)")
+        raise SystemExit(f"no checkpoint at {CKPT} — refusing a silent random-weight production asset; "
+                         f"set CKPT=/path/ckpt_best.pt, or FORCE_RANDOM=1 for an op-graph/ANE-deploy probe")
 
     m = (m if os.environ.get("FP16") == "1" else m.quantize()).half()   # FP16: skip int8 quant — clean fp16 ceiling test
     _split = os.environ.get("SPLIT", "")

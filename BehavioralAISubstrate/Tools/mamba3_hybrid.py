@@ -41,7 +41,10 @@ def resolve_ckpt(default_vocab: int, layers: int):
     import os
     p = os.environ.get("CKPT", "")
     if not p:
-        return int(os.environ.get("VOCAB", str(default_vocab))), None
+        if os.environ.get("FORCE_RANDOM") == "1":
+            return int(os.environ.get("VOCAB", str(default_vocab))), None
+        raise SystemExit("CKPT required for a real asset (refusing a silent random-weight export); "
+                         "set CKPT=/path/ckpt_best.pt, or FORCE_RANDOM=1 for an op-graph/speed probe")
     c = torch.load(p, map_location="cpu")
     assert c.get("arch") == "hybrid", f"CKPT arch={c.get('arch')!r} is not 'hybrid' — wrong converter for this checkpoint"
     assert c.get("layers", layers) == layers, f"CKPT layers={c.get('layers')} != LAYERS={layers} — would deploy an incoherent graph"
