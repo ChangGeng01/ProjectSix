@@ -1618,3 +1618,19 @@ here). Asset = 862 MB fp16 (~430 MB int8, under the 2 GB wall). Built via beta X
 binding cost; int8 halves it), **run_ms cold=165.9 / warm_best=42.9** → the full 24-layer prefill computes in ~43 ms warm at
 T=64, footprint 90→148 MB. For prefill-once-reuse-many, a ~2 s one-time load + ~43 ms compute per corpus is comfortable.
 NEXT (STEP 4): the 24L DECODE asset — the harder piece (the 4 MLA layers' growing latent cache as a fixed [MAX_SEQ,128] buffer + fill-offset + masked attention; the 20 Mamba layers reuse the proven angle-first 4-state decode).
+
+## Track G — Addendum 26: on-device DUET STEP 4 — 24L hybrid DECODE asset (MLA growing-cache → fixed buffer) host-exact + CONVERTS
+
+The decode asset is the harder half: the 4 MLA layers' latent cache GROWS per token but CoreAI state is fixed-shape.
+`Tools/mamba3_hybrid_decode_deploy.py` reformulates each MLA layer as a fixed `mla_kv[MAX_SEQ,128]` buffer + scalar `mla_fill`,
+with a ONE-HOT write (`kv*(1-oh)+c_t*oh` at slot=fill — NOT dynamic indexing) and an offset MASK (slots ≥ fill+1 → -inf in
+softmax). The 20 Mamba layers reuse the proven angle-first 4-state stacked decode.
+- **STEP 4a host-equivalence = PASS**: the fixed-buffer hybrid decode vs monolithic `run_ref` over a 48-token continuation
+  (24L, MAX_SEQ=256, prompt=64) → logit max-err **3.0e-6, 100% argmax**. The one-hot+mask reformulation is EXACT vs the
+  growing-cache step — the hard algorithmic risk is retired in pure torch before any device work.
+- **STEP 4b convert = PASS**: exports to `.aimodel` with **6 resident states** (angle_all/ssm_all/kprev_all/vprev_all/mla_kv/mla_fill,
+  stacked — not 88 loose buffers), 891 MB fp16 (~445 MB int8). The one-hot `==`, offset `>=` masked_fill, and the scalar
+  `mla_fill` mutation ALL lower through coreai_torch 0.4.0. (Caught + fixed one export blocker: scalar embedding index
+  `ew[id.view(())]` emits `aten.item()`→unbacked symint; `F.embedding(...)` gathers cleanly — same fix DeployM already uses.)
+NEXT (STEP 5/6/7): the on-disk State-Cache contract + the Swift hybrid decode session (6 states) + sequential-load orchestration
+(prefill deinit BEFORE decode load, dodging the co-load SIGSEGV) → the device E2E: device decode == host monolithic continuation.
