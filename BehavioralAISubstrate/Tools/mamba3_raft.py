@@ -1,0 +1,287 @@
+"""Local RAFT-via-fine-tuning PoC for the Mamba-3 student (HotpotQA distractor setting, M5 Max / MPS).
+
+Tests ONE falsifiable claim: does training the reader WITH distractors (+ sometimes no gold doc) make it robust
+to retrieval noise, vs. training golden-only (oracle)? Two students, identical everything EXCEPT context
+composition, evaluated on the SAME held-out questions under three retrieval conditions:
+  E1 gold-only · E2 gold buried in K distractors · E3 K distractors, NO gold.
+
+Honest headline = the degradation SLOPE  Δ = NLL(E2) - NLL(E1).  RAFT helps IFF  Δ_raft < Δ_oracle
+(a condition×context interaction). A uniform RAFT win with no slope difference is generic regularization, NOT the
+retrieval-noise mechanism. Per the design spec, at 300-500 steps a NULL (CI includes 0) is the EXPECTED outcome —
+this harness MEASURES the effect, it is not built to manufacture one. 亏的不要.
+
+Objective = masked next-token CE on the answer tokens only (faithful RAFT SFT — NO logit-KD by default: Granite is
+not RAFT-trained, so distilling its soft targets would teach NON-robust behavior and confound the test).
+
+Run:  ~/.venvs/coreai-cv/bin/python Tools/mamba3_raft.py            (full: smoke -> seeds × {oracle,raft} grid)
+      RAFT_SMOKE=1 ... mamba3_raft.py                              (toy assertions only, no download/teacher)
+Env: RAFT_P(0.8) RAFT_K(4) RAFT_T(1024) RAFT_COT(0) RAFT_STEPS(300) RAFT_SEEDS(1) RAFT_N(600) RAFT_LAYERS(16).
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import random
+import sys
+
+import torch
+import torch.nn.functional as F
+
+sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
+import mamba3_trainable as MT
+
+TEACHER = "ibm-granite/granite-4.1-3b-base"
+DEV = "mps" if torch.backends.mps.is_available() else "cpu"
+P_GOLDEN = float(os.environ.get("RAFT_P", "0.8"))
+K_DISTRACT = int(os.environ.get("RAFT_K", "4"))
+MAX_LEN = int(os.environ.get("RAFT_T", "1024"))
+COT = os.environ.get("RAFT_COT", "0") == "1"
+STEPS = int(os.environ.get("RAFT_STEPS", "300"))
+SEEDS = int(os.environ.get("RAFT_SEEDS", "1"))
+N_ROWS = int(os.environ.get("RAFT_N", "600"))
+LAYERS = int(os.environ.get("RAFT_LAYERS", "16"))
+WARMUP, LR, DOC_CHARS = 40, 2e-4, 800
+
+
+# ---------- data builder (HotpotQA distractor: native gold + distractor paragraphs) ----------
+def build_example(row) -> dict:
+    ctx, sf = row["context"], row["supporting_facts"]
+    titles, sents = ctx["title"], ctx["sentences"]
+    gold_titles = set(sf["title"])
+    docs = [(t, " ".join(s)[:DOC_CHARS]) for t, s in zip(titles, sents)]
+    golden = [d for d in docs if d[0] in gold_titles]
+    distract = [d for d in docs if d[0] not in gold_titles]
+    gold_sents = []
+    for t, sid in zip(sf["title"], sf["sent_id"]):
+        if t in titles:
+            para = sents[titles.index(t)]
+            if 0 <= sid < len(para):
+                gold_sents.append(para[sid].strip())
+    return {"id": row["id"], "question": row["question"], "answer": str(row["answer"]),
+            "golden": golden, "distract": distract, "gold_sents": gold_sents}
+
+
+def assemble(ex: dict, keep_gold: bool, k: int, rng: random.Random) -> list:
+    if keep_gold:
+        docs = list(ex["golden"]) + ex["distract"][:k]                  # gold kept, never dropped
+    else:
+        docs = ex["distract"][: k + len(ex["golden"])]                  # doc-count held constant, no gold
+    rng.shuffle(docs)                                                   # kill positional shortcut
+    return docs
+
+
+def format_docs(docs: list) -> str:
+    return "".join(f"[Document {i + 1} | {t}]\n{txt}\n" for i, (t, txt) in enumerate(docs))
+
+
+def target_text(ex: dict, keep_gold: bool) -> str:
+    if not COT:
+        return " " + ex["answer"]
+    if keep_gold and ex["gold_sents"]:
+        return f" ##Reason: According to ##begin_quote## {ex['gold_sents'][0]} ##end_quote## ##Answer: {ex['answer']}"
+    return f" ##Reason: Based on parametric knowledge. ##Answer: {ex['answer']}"
+
+
+def to_ids(doc_block: str, question: str, answer: str, tok) -> dict:
+    # Tokenize the three pieces SEPARATELY so truncation drops only DOCUMENT tokens — the question + answer always survive
+    # (the v1 bug: pids[:N] kept the doc front and dropped the trailing "Question: ... Answer:", removing the question).
+    bos = [tok.bos_token_id] if tok.bos_token_id is not None else []
+    doc_ids = tok(doc_block, add_special_tokens=False).input_ids
+    suffix_ids = tok(f"\nQuestion: {question}\nAnswer:", add_special_tokens=False).input_ids
+    aids = tok(answer, add_special_tokens=False).input_ids
+    budget = max(0, MAX_LEN - len(bos) - len(suffix_ids) - len(aids))   # reserve room for question + answer
+    pids = bos + doc_ids[:budget] + suffix_ids                          # question (suffix) is NEVER trimmed
+    full = pids + aids
+    prompt_len = min(len(pids), len(full) - 1)                          # >=1 answer token predicted
+    return {"input_ids": torch.tensor(full), "prompt_len": prompt_len}
+
+
+def make_examples(rows_examples: list, keep_p: float, k: int, tok, seed: int) -> list:
+    out = []
+    for idx, ex in enumerate(rows_examples):
+        rng = random.Random(seed * 100003 + idx)                       # per-(seed,idx) — reproducible across conditions
+        keep = rng.random() < keep_p
+        docs = assemble(ex, keep, k, rng)
+        item = to_ids(format_docs(docs), ex["question"], target_text(ex, keep), tok)
+        if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
+            out.append(item)
+    return out
+
+
+def make_eval_condition(rows_examples: list, mode: str, tok) -> list:
+    """Frozen eval split — same for both trained students. mode in {E1 gold-only, E2 gold-buried, E3 no-gold}."""
+    out = []
+    for idx, ex in enumerate(rows_examples):
+        rng = random.Random(7_000_003 + idx)
+        if mode == "E1":
+            docs = assemble(ex, True, 0, rng)
+        elif mode == "E2":
+            docs = assemble(ex, True, K_DISTRACT, rng)
+        else:
+            docs = assemble(ex, False, K_DISTRACT, rng)
+        item = to_ids(format_docs(docs), ex["question"], target_text(ex, mode != "E3"), tok)
+        if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
+            out.append(item)
+    return out
+
+
+# ---------- objective + eval ----------
+def masked_ce(logits, ids, prompt_len: int):
+    lp, tgt = logits[:-1], ids[1:]                                     # causal shift (project convention)
+    mask = torch.arange(tgt.shape[0], device=ids.device) >= (prompt_len - 1)
+    if not mask.any():
+        return None
+    return F.cross_entropy(lp[mask], tgt[mask], reduction="mean")
+
+
+@torch.no_grad()
+def eval_nll(student, examples: list) -> tuple[float, float, int]:
+    student.eval()
+    tot_nll = tot_tok = hits = 0.0
+    skip = 0
+    for ex in examples:
+        ids = ex["input_ids"].to(DEV)
+        logits, _ = student.run_twin(ids, collect_ssm=False)
+        if not torch.isfinite(logits).all():
+            skip += 1
+            continue
+        lp, tgt = logits[:-1], ids[1:]
+        mask = torch.arange(tgt.shape[0], device=DEV) >= (ex["prompt_len"] - 1)
+        if not mask.any():
+            continue
+        tot_nll += float(F.cross_entropy(lp[mask], tgt[mask], reduction="sum"))
+        hits += float((lp[mask].argmax(-1) == tgt[mask]).sum())        # teacher-forced answer-token accuracy (cheap)
+        tot_tok += int(mask.sum())
+    student.train()
+    return (tot_nll / tot_tok if tot_tok else float("nan"),
+            hits / tot_tok if tot_tok else 0.0, skip)
+
+
+def train_one(student, train_ex: list, steps: int, lr: float):
+    opt = torch.optim.AdamW(student.parameters(), lr=lr, weight_decay=0.1)
+    for step in range(1, steps + 1):
+        for g in opt.param_groups:
+            g["lr"] = lr * min(1.0, step / WARMUP)
+        ex = train_ex[(step - 1) % len(train_ex)]
+        ids = ex["input_ids"].to(DEV)
+        opt.zero_grad(set_to_none=True)
+        logits, _ = student.run_twin(ids, collect_ssm=False)
+        loss = masked_ce(logits, ids, ex["prompt_len"])
+        if loss is None:
+            continue
+        assert torch.isfinite(loss), f"step {step}: non-finite RAFT loss {float(loss)}"
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(student.parameters(), 1.0)
+        opt.step()
+    return student
+
+
+# ---------- smoke (toy, no download/teacher) ----------
+def smoke() -> None:
+    print("RAFT_SMOKE: toy assertions (no dataset, no teacher)")
+    toy = []
+    for i in range(12):
+        toy.append({"id": str(i), "question": f"q{i}?", "answer": f"ans{i}",
+                    "golden": [(f"G{i}a", f"gold sentence {i} alpha."), (f"G{i}b", f"gold beta {i}.")],
+                    "distract": [(f"D{i}_{j}", f"distractor {i} {j} text.") for j in range(8)],
+                    "gold_sents": [f"gold sentence {i} alpha."]})
+    rng = random.Random(0)
+    gk = assemble(toy[0], True, 4, random.Random(1))
+    gd = assemble(toy[0], False, 4, random.Random(1))
+    gold_titles = {d[0] for d in toy[0]["golden"]}
+    assert gold_titles <= {d[0] for d in gk}, "gold-kept context must contain all gold titles"
+    assert not (gold_titles & {d[0] for d in gd}), "gold-dropped context must contain zero gold titles"
+    assert len(gk) == len(gd), f"doc-count invariant broken: {len(gk)} vs {len(gd)}"
+    print(f"  [1] assemble invariants OK (gold-kept docs={len(gk)}, gold-dropped docs={len(gd)})")
+
+    class TokStub:
+        bos_token_id = 1
+
+        def __call__(self, s, add_special_tokens=True):
+            ids = [ord(c) % 500 + 1 for c in s][:300]
+            return type("E", (), {"input_ids": ids})
+
+    tok = TokStub()
+    it = to_ids(format_docs(gk), "what is the answer?", " ans0", tok)
+    full = tok(format_docs(gk), add_special_tokens=False).input_ids
+    qtok = tok("\nQuestion: what is the answer?\nAnswer:", add_special_tokens=False).input_ids
+    decoded_has_q = it["input_ids"].numel() >= len(qtok)               # question must survive into the ids
+    ntgt = it["input_ids"].numel() - 1
+    m = torch.arange(ntgt) >= (it["prompt_len"] - 1)
+    assert it["prompt_len"] >= 1 and int(m.sum()) >= 1, "mask must cover >=1 answer token"
+    assert decoded_has_q, "question suffix must never be truncated away"
+    print(f"  [2] to_ids/mask OK (len={it['input_ids'].numel()} prompt_len={it['prompt_len']} "
+          f"answer_toks={int(m.sum())} question-preserved={decoded_has_q})")
+
+    torch.manual_seed(0)
+    st = MT.M(512, 2).to(DEV)
+    batch = []
+    for i in range(4):
+        full = torch.tensor([1] + [10 + i] * 6 + [20 + i, 21 + i])
+        batch.append({"input_ids": full, "prompt_len": 7})
+    opt = torch.optim.AdamW(st.parameters(), lr=3e-3)
+    last = 9.9
+    for s in range(60):
+        ex = batch[s % 4]
+        ids = ex["input_ids"].to(DEV)
+        opt.zero_grad(set_to_none=True)
+        lg, _ = st.run_twin(ids, collect_ssm=False)
+        loss = masked_ce(lg, ids, ex["prompt_len"])
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(st.parameters(), 1.0)
+        opt.step()
+        last = float(loss)
+    assert last < 0.10, f"overfit failed: masked answer-CE {last:.3f} (gradients not flowing through masked head)"
+    print(f"  [3] overfit OK (masked answer-CE {last:.4f} < 0.10 over 60 steps)")
+    print("RAFT_SMOKE PASS")
+
+
+def main() -> None:
+    if os.environ.get("RAFT_SMOKE") == "1":
+        smoke()
+        return
+    from datasets import load_dataset
+    from transformers import AutoTokenizer
+    tok = AutoTokenizer.from_pretrained(TEACHER)
+    vocab = tok.vocab_size
+    rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]")
+    examples = [build_example(r) for r in rows]
+    def bucket(idstr: str) -> int:                                          # stable hash (Python hash() is salted per process)
+        return int(hashlib.sha1(idstr.encode()).hexdigest(), 16) % 10
+    held = [e for e in examples if bucket(e["id"]) < 3]                     # ~30% held, split by question id, reproducible
+    train_rows = [e for e in examples if bucket(e["id"]) >= 3]
+    E = {m: make_eval_condition(held, m, tok) for m in ("E1", "E2", "E3")}
+    print(f"RAFT | HotpotQA distractor | train_q={len(train_rows)} held_q={len(held)} "
+          f"| P={P_GOLDEN} K={K_DISTRACT} T={MAX_LEN} CoT={COT} | eval E1/E2/E3={[len(E[m]) for m in E]} | vocab={vocab}")
+
+    grid = {}
+    for seed in range(SEEDS):
+        for cond, (p, k) in (("oracle", (1.0, 0)), ("raft", (P_GOLDEN, K_DISTRACT))):
+            torch.manual_seed(seed)
+            student = MT.M(vocab, LAYERS).to(DEV)
+            train_ex = make_examples(train_rows, p, k, tok, seed)
+            train_one(student, train_ex, STEPS, LR)
+            row = {}
+            for m in ("E1", "E2", "E3"):
+                nll, acc, sk = eval_nll(student, E[m])
+                assert sk == 0, f"{m} dropped {sk} non-finite eval examples — slope would be over non-identical subsets"
+                row[m] = (nll, acc)
+            slope = row["E2"][0] - row["E1"][0]
+            grid[(seed, cond)] = (row, slope)
+            print(f"  seed{seed} {cond:6s} | E1 nll={row['E1'][0]:.3f} acc={row['E1'][1]:.1%} "
+                  f"| E2 nll={row['E2'][0]:.3f} acc={row['E2'][1]:.1%} "
+                  f"| E3 nll={row['E3'][0]:.3f} acc={row['E3'][1]:.1%} | slope Δ(E2-E1)={slope:+.3f}")
+
+    print("\n=== RAFT vs ORACLE (paired, per seed) ===")
+    for seed in range(SEEDS):
+        ro, so = grid[(seed, "oracle")]
+        rr, sr = grid[(seed, "raft")]
+        print(f"  seed{seed}: Δ_oracle={so:+.3f}  Δ_raft={sr:+.3f}  | interaction (Δ_raft<Δ_oracle? = RAFT robust): "
+              f"{'YES' if sr < so else 'no'}  | E2 nll raft-oracle={rr['E2'][0]-ro['E2'][0]:+.3f} "
+              f"E3 nll raft-oracle={rr['E3'][0]-ro['E3'][0]:+.3f}")
+    print("HEADLINE = the SLOPE interaction (Δ_raft < Δ_oracle), not any single-cell win. "
+          "At this scale a null (no consistent interaction) is the pre-registered expected outcome.")
+
+
+if __name__ == "__main__":
+    main()
