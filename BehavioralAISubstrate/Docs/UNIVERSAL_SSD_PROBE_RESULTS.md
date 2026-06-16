@@ -1806,3 +1806,24 @@ the 语义层 evidence-compressor's VALUE) — all downstream of #1; cannot be m
 RUNS** — T>64 prefill on-device, fused on-device argmax, verify[1,K] on-device — their CONVERTS/equivalences are host-proven;
 the device runs confirm placement/perf. Every host MECHANISM of the three-pillar system is now built + verified; the spine is
 device-proven. The product is mechanism-complete — it awaits a trained checkpoint (the cloud run) to become a model worth shipping.
+
+## Track G — Addendum 34: 查缺补漏 — completeness audit (56 DONE) + 补'd the 3 most-named host 漏
+
+A 5-auditor completeness sweep over EVERY enumerated requirement (decoder / Context-Compiler 7+5 / StateLake DB-6 / prefill-3
+-layers / earlier asks) → **56 requirements DONE**, 18 host-buildable gaps, 3 gated. Filled the gaps that were NAMED requirements
+I had genuinely skipped (each host-verified):
+- **语义层 prefill / evidence compressor** (the operator's named prefill layer + Context-Compiler item 6 / 可压缩) — was MISSING
+  (only the MLA latent existed). `Tools/mamba3_evidence_compressor.py`: per-token salience = Σ ‖ssm_t−ssm_{t−1}‖ (state-delta);
+  keep top-frac → compile a shorter context. PASS: 128→64 tok (2× shrink), decode-from-compressed-state finite + in-order.
+  Salience source is PLUGGABLE (trained scorer / RAFT relevance); VALUE is trained-gated, mechanism+ratio+validity proven.
+- **完全闭环 generate() + sampling** (decoder was step-only / argmax-only) — `HybridM.generate(prompt, max_new, temperature,
+  top_p, eos)` feeds its own output. PASS: greedy deterministic (len16), nucleus sampling varies across seeds, EOS stops at len4.
+- **tile-ladder context packing** (was fixed-tile=64) — `tile_ladder(n, ladder)` largest-tile-first segmenter; `compile`
+  now uses it (`ladder=(256,64,16)`). `tile_ladder(200,(128,64,16))=[128,64,8]`; dedup (1/2) + serve (100%) still green.
+
+**Precise remaining (honest):** cheap-host-next — StateLake COLD tier is a stub (HOT/WARM real), an explicit invalidation-scope
+test, a unified `DecodeSession` protocol (5 separate classes work). Converter/device-gated — ComputeStream, dynamic-shapes,
+fused-on-device-argmax (host argmax today), INT4-QAT. Distributed chunk-prefill is BLOCKED for one doc (sequential SSM carry —
+composition killed); cross-doc parallel compile is buildable. IRREDUCIBLE — 最强大/quality + int8-cert + the 语义层's VALUE
+(all need the cloud-trained checkpoint); 3 device perf runs; device-side StateRouter (device is read-only by design). NET: of
+everything enumerated, the host MECHANISMS are now ~complete; the irreducible remainder is the cloud run + its downstream quality.

@@ -20,6 +20,20 @@ from mamba3_trainable import H, N, P, R, rms
 MLA_POSITIONS = (6, 12, 18, 23)                            # 4 of 24; spaced so SSM blocks dominate between attn re-mixes
 
 
+def _sample(logit, temperature: float, top_p: float, gen=None) -> int:
+    """Greedy (temperature=0) or nucleus sampling (temperature>0 + top_p). Used by HybridM.generate."""
+    if temperature <= 0.0:
+        return int(logit.argmax())
+    probs = (logit.float() / temperature).softmax(-1)
+    if top_p < 1.0:
+        sp, idx = probs.sort(descending=True)
+        keep = (sp.cumsum(-1) - sp) < top_p                # keep tokens whose cumulative mass (exclusive) < top_p; ≥1 token
+        sp = torch.where(keep, sp, torch.zeros_like(sp))
+        sp = sp / sp.sum()
+        return int(idx[torch.multinomial(sp, 1, generator=gen)])
+    return int(torch.multinomial(probs, 1, generator=gen))
+
+
 def resolve_ckpt(default_vocab: int, layers: int):
     """Shared by the hybrid converters (云前audit fix): read the CKPT env → (vocab, state_dict|None). The checkpoint is
     AUTHORITATIVE on vocab — closes the 4096-vs-Granite-100352 mismatch (the cloud trains on the Granite tokenizer's vocab).
@@ -101,6 +115,27 @@ class HybridM(nn.Module):
             if return_hiddens:
                 extra.append(x)
         return self.head(x), extra
+
+    def generate(self, prompt, max_new, temperature: float = 0.0, top_p: float = 1.0, eos=None, gen=None):
+        """完全闭环 free-running decode: prefill the prompt, then FEED EACH SAMPLED TOKEN BACK (not teacher-forced).
+        temperature=0 → greedy argmax (deterministic); temperature>0 + top_p → nucleus sampling. Stops at `eos` or max_new."""
+        with torch.no_grad():
+            h, st = self.prefill(prompt)
+            nxt = _sample(self.head(h[-1]), temperature, top_p, gen)
+            out = [nxt]
+            for _ in range(max_new - 1):
+                if eos is not None and nxt == eos:
+                    break
+                x = self.embedding.weight[nxt]
+                for i, lyr in enumerate(self.layers):
+                    tag, s = st[i]
+                    if tag == "mla":
+                        x, nc = lyr.step(x, s); st[i] = ("mla", nc)
+                    else:
+                        x, a, sm, k, v = lyr.step_ref(x, *s); st[i] = ("mamba", (a, sm, k, v))
+                nxt = _sample(self.head(x), temperature, top_p, gen)
+                out.append(nxt)
+            return out
 
     def run_ref(self, tokens, init=None):
         """Per-token decode, resuming from `init` (heterogeneous handoff) or zero. Returns logits [T,V]."""

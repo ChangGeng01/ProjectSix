@@ -25,26 +25,41 @@ def tokstr(ids) -> str:
     return ",".join(map(str, ids.tolist())) + ","                      # trailing ',' → token-prefix startswith is exact
 
 
+def tile_ladder(n: int, ladder=(64,)):
+    """Context packing: segment n tokens largest-tile-first into a multi-size ladder (few big tiles for the bulk, small
+    for the tail) → fewer checkpoints for long docs, fine resume granularity at the end. ladder=(64,) = the fixed tile."""
+    sizes, rem = [], n
+    for t in sorted(ladder, reverse=True):
+        while rem >= t:
+            sizes.append(t); rem -= t
+    if rem > 0:
+        sizes.append(rem)
+    return sizes
+
+
 class ContextCompiler:
     def __init__(self, model, lake: SL.StateLake, bkey: str, layer_tags: list[str]):
         self.m, self.lake, self.bkey, self.tags = model, lake, bkey, layer_tags
 
-    def compile(self, tokens, corpus: str, tile: int = 64):
-        """Tile + resume-prefill the corpus; store every cumulative-prefix state with lineage. 资料层 DEDUP: if a cumulative
-        prefix was ALREADY compiled (same content, same model — e.g. a shared system prompt across corpora), REUSE it instead
-        of re-prefilling. Returns (final state id, dedup_hits, tiles_total)."""
-        state, parent, hits, total = None, None, 0, 0
-        for start in range(0, len(tokens), tile):
+    def compile(self, tokens, corpus: str, tile: int = 64, ladder=None):
+        """Tile (via the tile-ladder packer) + resume-prefill the corpus; store every cumulative-prefix state with lineage.
+        资料层 DEDUP: if a cumulative prefix was ALREADY compiled (same content+model — e.g. a shared system prompt across
+        corpora), REUSE it instead of re-prefilling. `ladder` (e.g. (256,64,16)) = variable tile sizes; None = fixed `tile`.
+        Returns (final state id, dedup_hits, tiles_total)."""
+        sizes = tile_ladder(len(tokens), ladder if ladder else (tile,))
+        state, parent, hits, total, start = None, None, 0, 0, 0
+        for sz in sizes:
+            chunk = tokens[start:start + sz]
+            start += len(chunk)
             total += 1
-            cum = start + len(tokens[start:start + tile])
-            pfx = tokstr(tokens[:cum])
+            pfx = tokstr(tokens[:start])
             dup = self.lake.find_by_content(pfx, self.bkey)            # already compiled this exact prefix?
             if dup is not None:
                 state, _ = self.lake.get(dup, "owner", self.bkey, self.tags)   # REUSE — skip prefill (dedup hit)
                 parent, hits = dup, hits + 1
                 continue
-            _, state = self.m.prefill(tokens[start:start + tile], init=state)   # RESUME from the running cumulative state
-            parent = self.lake.put(state, cum, self.bkey, corpus, pfx, self.tags, parent=parent, ttl_s=3600)
+            _, state = self.m.prefill(chunk, init=state)               # RESUME from the running cumulative state
+            parent = self.lake.put(state, start, self.bkey, corpus, pfx, self.tags, parent=parent, ttl_s=3600)
         return parent, hits, total
 
     def serve(self, corpus: str, query, cont):
