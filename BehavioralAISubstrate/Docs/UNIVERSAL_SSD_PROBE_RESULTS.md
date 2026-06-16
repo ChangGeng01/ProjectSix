@@ -1695,3 +1695,28 @@ on a distilled checkpoint with a KL/greedy-accept metric, not argmax; (4) autore
 CONT near MAX_SEQ; (5) actual disk serialize→file→deserialize of all 6 states + a fail-closed binding key {weight_hash, config,
 converter_version, precision, max_seq}; (6) n>1 release/leak test; (7) SISO vs MIMO device A/B. **Bottom line: the host numerics
 + device PLUMBING are PROVEN; the product/persistence layer + a trained-checkpoint quality gate are the open work.**
+
+## Track G — Addendum 29: 全面开发 — closed the scorecard's 2 BLOCKERS + built the 浑然一体 loop (StateLake + resumable prefill + Context Compiler), host
+
+Acting on the coverage scorecard's build-order, three REAL host-verified modules turn the worst-scored pillars from prose into code:
+
+- **STEP 3/4/11 — StateLake** (`Tools/mamba3_statelake.py`, neural-state DB): `binding_key` {weight_hash, arch-config,
+  converter_version, precision, max_seq, angle_wrap} checked **FAIL-CLOSED** on load (the audit's #1 danger — gone); the
+  `.statelake` disk bundle (header.json + int8 blobs + per-tensor scales + blake2b checksum); + the SQLite store with lineage
+  DAG, fork, ACL, TTL/expiry, model-version mass-invalidation, hot-LRU/warm-disk tiering, and a Router (deepest valid
+  ancestor; composition stays KILLED). Self-test PASS: **disk roundtrip int8 → rehydrated state reproduces the decode 100%**;
+  binding-key rejects a stale key; fork/lineage/router/TTL/invalidate all green. → Pillar 3 (was ~5% prose) is now BUILT_HOST.
+- **STEP 5 — resumable prefill** (`scan_parallel`/`scan_chunked` ssm-carry-in; `Lyr.prefill_state(init=)`; `MLABlock.forward_seq(kv_init=)`;
+  `HybridM.prefill(init=)`): `prefill(suffix, init=prefill(prefix)) == prefill(prefix+suffix)` — boundary rel-err **5.5e-6**,
+  decode argmax **100%**, no DUET regression. Mamba carries the O(1) 4-state, MLA carries the O(ctx) latent. → Context Compiler's
+  PREFIX-STATE-REUSE / fork-and-extend / streaming-prefill are unblocked (were DESIGNED_ONLY).
+- **STEP 7(basic)+integration — Context Compiler** (`Tools/mamba3_context_compiler.py`): `compile()` tiles a corpus + resume-prefills
+  + stores every cumulative-prefix state with lineage; `serve()` ROUTEs to the deepest cached prefix → REUSEs → prefills only the
+  suffix → HANDOFF → DECODE. Self-test PASS: a 112-tok query **reused 64 cached tok, prefilled 48, decode == from-scratch 100%**
+  (57% of the prompt not re-computed). → the cross-cutting 浑然一体 (was ~35%, handoff-only) is now an EXECUTABLE closed loop (host).
+
+**Honest scope:** all THREE are HOST builds. Still gated: (a) the Swift/device `.statelake` reader (the on-device half of persistence —
+the host put/get + binding-key contract is proven and portable); (b) T>64 `scan_chunked` ON DEVICE (resumable prefill is host-exact;
+device convert untested); (c) the trained-checkpoint quality gate (最强大 still unsubstantiated — every result is random-weight,
+necessary-not-sufficient); (d) fused on-device argmax + verify[1,K] self-spec. NET coverage delta: Pillar 3 ~5%→~60% (host), Context
+Compiler ~18%→~45%, 浑然一体 ~35%→~65%. The remaining gaps are device-port + the cloud distill (the one lever that makes 最强大 real).
