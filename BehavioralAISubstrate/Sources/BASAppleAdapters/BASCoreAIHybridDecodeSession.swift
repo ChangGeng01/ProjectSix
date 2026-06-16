@@ -20,11 +20,14 @@ public final class BASCoreAIHybridDecodeSession: @unchecked Sendable {
         case badStates(String)
         case run(String)
         case noLogits
+        case overflow(String)          // fill reached MAX_SEQ — the MLA fixed-buffer is full (defined, fail-loud)
     }
 
     private let model: AIModel
     private let function: InferenceFunction
     private let names: [String]
+    private let maxSeq: Int             // MLA fixed-buffer capacity = mla_kv.shape[1]
+    private var written: Int            // valid MLA slots so far (init = prompt length); guards the silent-cap corruption
     private var state0: NDArray
     private var state1: NDArray
     private var state2: NDArray
@@ -33,7 +36,8 @@ public final class BASCoreAIHybridDecodeSession: @unchecked Sendable {
     private var state5: NDArray
 
     /// `initialStates` in the converter's declared stateNames order (angle_all, ssm_all, kprev_all, vprev_all, mla_kv, mla_fill).
-    public init(assetURL: URL, initialStates: [NDArray], options: SpecializationOptions = .default) async throws {
+    /// `initialFill` = the prompt length already written into the MLA buffer (must equal mla_fill); guards the MAX_SEQ cap.
+    public init(assetURL: URL, initialStates: [NDArray], initialFill: Int = 0, options: SpecializationOptions = .default) async throws {
         let loaded: AIModel
         do {
             loaded = try await AIModel(contentsOf: assetURL, options: options)
@@ -53,13 +57,21 @@ public final class BASCoreAIHybridDecodeSession: @unchecked Sendable {
         self.state1 = initialStates[1]
         self.state2 = initialStates[2]
         self.state3 = initialStates[3]
-        self.state4 = initialStates[4]
+        self.state4 = initialStates[4]                          // mla_kv [n_mla, MAX_SEQ, D_LATENT]
         self.state5 = initialStates[5]
+        self.maxSeq = initialStates[4].shape.count >= 2 ? initialStates[4].shape[1] : 0
+        self.written = initialFill
     }
 
     /// One decode step: feed `token`, advance all 6 states in place, return the argmax of the logits. (Returns the argmax
     /// Int, NOT the NDArray — the logits are lifetime-bound to the MutableViews and must be consumed inside the call.)
+    /// FAIL-LOUD on MLA-buffer overflow: at fill == MAX_SEQ the one-hot write matches NO slot and the token would be
+    /// silently dropped (output corrupts with no NaN) — instead throw `.overflow` so the caller applies a defined policy.
     public func step(token: Int) async throws -> Int {
+        guard written < maxSeq else {
+            throw DecodeError.overflow("MLA fixed-buffer full: written=\(written) == MAX_SEQ=\(maxSeq); re-prefill or evict a window before decoding further")
+        }
+        written += 1
         let inputID = NDArray(scalars: [Int32(token)], shape: [1, 1])
         // States bound through inout PARAMETERS (not `&self.stateN`): MutableViews is lifetime-dependent and a
         // stored-property borrow would escape across the `await` (the proven BASCoreAIMamba3Session pattern).

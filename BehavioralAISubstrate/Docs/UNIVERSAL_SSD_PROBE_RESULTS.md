@@ -1658,3 +1658,40 @@ sequential-load (dodges the co-load wall) → decode (24L hybrid, MLA growing-ca
 to fp16 precision. STEP 1→7 complete. REMAINING: (a) persist the handoff to DISK (cross-launch State-Cache reuse — the flagship's
 literal "prefill-once-reuse-many"; the in-memory handoff proves the contract); (b) decode tok/s optimization (warmup, windowed
 MLA attention); (c) the cloud 24L distill (real weights → the quality gate). Host + device fidelity are GREEN end-to-end.
+
+## Track G — Addendum 28: AUDIT (万无一失) — corrections to addenda 23-27 + the HONEST fp16 result (device == host-fp16 32/32)
+
+A 10-agent adversarial audit (7 refute-auditors + 3 architects + synthesis) ruled the DUET work **NOT 万无一失 as worded**: the
+engineering + host-numerics are trustworthy and reproduced, but several DEVICE-RESULT and FLAGSHIP claims were overstated.
+Corrections (the underlying engineering is unchanged; the CLAIMS are downgraded to what is actually proven):
+
+- **The headline is now HONEST and STRONGER.** addendum 27 compared device-fp16 vs host-**fp32** (31/32, "lone diff = fp16
+  near-tie"). The audit found the code's OWN apples-to-apples baseline (`MODE=ref HALF=1`, fp16/MPS) CRASHED — `_zero_state`
+  (mamba3_hybrid.py) and `M.run_ref` (mamba3_trainable.py) built `torch.zeros(...)` with no device=/dtype=. **FIXED** (inherit
+  from `embedding.weight`). Re-run: **device fp16 == host-fp16 monolithic, 32/32 BYTE-IDENTICAL** (incl. position 3 → both 1013).
+  So the seam is EXACT at matched precision; the 31/32 was purely the fp32→fp16 rounding at one 0.001-margin token. Cert log
+  committed: `Docs/cert-logs/duet-e2e-*.log`.
+- **"co-load SIGSEGV dodged" → "sequential-load works on GPU".** Track E's SIGSEGV was ANE-specific; the DUET runs on GPU and
+  never attempted a co-load, so nothing was "dodged". The probe never re-demonstrates (or needs) the ANE co-load wall.
+- **"state-via-disk handoff" → "in-memory STATE-VALUE handoff".** There is NO disk roundtrip — the handoff is a Swift
+  `[String:[Float16]]` dict. Disk persistence remains UNBUILT (it is the flagship's remaining work, not a proven contract).
+- **"reproduces the decode end-to-end" → "teacher-forced PER-STEP fidelity".** Both sides are teacher-forced (fed the ground-
+  truth continuation); this is the correct fidelity test but CANNOT surface autoregressive error accumulation. Not a generation result.
+- **MAX_SEQ=256 was a SILENT cap → now FAIL-LOUD.** `BASCoreAIHybridDecodeSession.step` tracks `written` and throws
+  `.overflow` at `written == MAX_SEQ` (was: the one-hot write matches no slot, token silently dropped, output corrupts with no
+  NaN). A defined overflow policy (re-prefill / evict-window) is still TODO, but the corruption is now trapped.
+- **Random-weight + argmax caveat.** All device/host argmax-agreement is on RANDOM untrained weights (near-flat logits → 7/32
+  positions have margin ≤0.01); the honest fidelity metric is the CONTINUOUS logit max-err (3e-6 fp32 seam, addendum 26). The
+  int8 State-Cache floor (addenda 20-22) is a necessary-not-sufficient smoke test until re-confirmed on a DISTILLED checkpoint.
+- **Scope/labels corrected.** Prefill is device-proven at 24 LAYERS, **T=64 (scan_parallel) only** — the real-corpus T>64
+  `scan_chunked` path is host-equivalent (1e-13) but device-UNCONVERTED. The prefill device match is a **norm/sum/head[:4]**
+  scalar match, not elementwise. "~430MB int8 prefill" is **PROJECTED** (no int8 prefill asset built). "O(1) portable" holds only
+  for the pure-Mamba 8L SKU; the 24L hybrid is O(1)-Mamba + O(ctx)-MLA. The 24L hybrid decode is a **CoreAI-GPU** reader (the
+  ≤8L single-asset is the only 100%-ANE form; asset-split device-refuted — already corrected in BASCoreAIMamba3Session.swift).
+
+**Gated TODO (before any 一鸣惊人 claim — none shippable on random weights):** (1) elementwise device-vs-host readback (replace
+norm/sum/head); (2) device-prove the T>64 scan_chunked prefill or ship the driver-loop fallback; (3) re-certify the int8 floor
+on a distilled checkpoint with a KL/greedy-accept metric, not argmax; (4) autoregressive (feed-back) host-vs-device drift test +
+CONT near MAX_SEQ; (5) actual disk serialize→file→deserialize of all 6 states + a fail-closed binding key {weight_hash, config,
+converter_version, precision, max_seq}; (6) n>1 release/leak test; (7) SISO vs MIMO device A/B. **Bottom line: the host numerics
++ device PLUMBING are PROVEN; the product/persistence layer + a trained-checkpoint quality gate are the open work.**

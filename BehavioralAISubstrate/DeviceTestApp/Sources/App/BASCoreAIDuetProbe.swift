@@ -1,8 +1,10 @@
 // MARK: - BASCoreAIDuetProbe — STEP 5/6/7: the full on-device DUET E2E (BAS_COREAI_DUET_PROBE=1)
 //
-// Orchestrates the state-via-disk-style handoff in ONE process WITHOUT co-loading (the proven SIGSEGV): load prefill →
-// run prompt → COPY the 5 boundary-state tensors out into Swift memory → DEINIT the prefill AIModel → load decode (2nd
-// AIModel.load; must not crash now that prefill is released) → init the 6 decode states from the handoff (4 Mamba stacked
+// Orchestrates the in-memory STATE-VALUE handoff in ONE process via SEQUENTIAL-LOAD (no disk yet; no co-residency): load
+// prefill → run prompt → COPY the 5 boundary-state tensors out into Swift memory → DEINIT the prefill AIModel → load decode
+// (2nd AIModel.load). NOTE: the Track E co-load SIGSEGV was ANE-specific; this runs on GPU and does NOT attempt a co-load,
+// so it shows sequential-load WORKS on GPU — it does not re-demonstrate (or need) dodging the ANE co-load wall. init the 6
+// decode states from the handoff (4 Mamba stacked
 // direct + mla_kv = prompt latents scattered into [0:promptLen] + mla_fill=promptLen) → teacher-forced decode of the
 // continuation → DEV_CONT_ARGMAX. Compare to the host MODE=ref HOSTREF_CONT_ARGMAX: identical ⇒ the DUET reproduces the
 // monolithic decode on the A19, end-to-end.
@@ -72,7 +74,7 @@ enum BASCoreAIDuetProbe {
                 pf = nil                                                   // release the prefill AIModel BEFORE the decode load
             } catch { mark("🎻 duet PREFILL ERROR \(error)"); return }
             await Task.yield()
-            mark(String(format: "🎻 duet prefill released footprint=%.0fMB (now loading decode — the co-load SIGSEGV test)", footprintMB()))
+            mark(String(format: "🎻 duet prefill released footprint=%.0fMB (phys_footprint only — mmap'd weights not counted; loading decode sequentially)", footprintMB()))
 
             // ---- PHASE 2: build the 6 decode init states from the handoff ----
             func nd(_ key: String, _ shape: [Int]) -> NDArray { NDArray(scalars: handoff[key]!, shape: shape) }
@@ -91,9 +93,9 @@ enum BASCoreAIDuetProbe {
             // ---- PHASE 3: load decode (2nd AIModel.load), teacher-forced decode of the continuation ----
             let dec: BASCoreAIHybridDecodeSession
             do {
-                dec = try await BASCoreAIHybridDecodeSession(assetURL: decodeAsset, initialStates: inits, options: opts)
-            } catch { mark("🎻 duet DECODE-LOAD ERROR (co-load wall?) \(error)"); return }
-            mark(String(format: "🎻 duet decode loaded footprint=%.0fMB states=%@ (NO co-load SIGSEGV ✅)", footprintMB(), "\(dec.stateNames)"))
+                dec = try await BASCoreAIHybridDecodeSession(assetURL: decodeAsset, initialStates: inits, initialFill: PROMPT, options: opts)
+            } catch { mark("🎻 duet DECODE-LOAD ERROR (sequential-load on GPU) \(error)"); return }
+            mark(String(format: "🎻 duet decode loaded footprint=%.0fMB states=%@ (sequential-load on GPU OK)", footprintMB(), "\(dec.stateNames)"))
 
             var argmax: [Int] = []
             let s0 = DispatchTime.now().uptimeNanoseconds

@@ -46,12 +46,14 @@ class HybridM(nn.Module):
         return rms(x, self.fw) @ self.embedding.weight.t()
 
     def _zero_state(self):
+        ew = self.embedding.weight                                       # inherit device/dtype (HALF=1/MPS fp16 baseline)
+        z = lambda *s: torch.zeros(*s, device=ew.device, dtype=ew.dtype)
         out = []
         for i in range(len(self.layers)):
             if self._is_mla(i):
                 out.append(("mla", None))
             else:
-                out.append(("mamba", (torch.zeros(H, N // 2), torch.zeros(H, P, N), torch.zeros(H, R, N), torch.zeros(H, P, R))))
+                out.append(("mamba", (z(H, N // 2), z(H, P, N), z(H, R, N), z(H, P, R))))
         return out
 
     def prefill(self, tokens):

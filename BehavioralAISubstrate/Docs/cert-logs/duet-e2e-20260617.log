@@ -1,0 +1,7 @@
+🎻 duet START footprint0=11MB (STEP 5/6/7: does the device DUET reproduce the host decode?)
+🎻 duet prefill done footprint=153MB (states copied out)
+🎻 duet prefill released footprint=73MB (phys_footprint only — mmap'd weights not counted; loading decode sequentially)
+🎻 duet decode loaded footprint=61MB states=["angle_all", "ssm_all", "kprev_all", "vprev_all", "mla_kv", "mla_fill"] (sequential-load on GPU OK)
+🎻 duet decode 32 steps wall_ms=626 tok/s=51.1 footprint=89MB
+🎻 duet DEV_CONT_ARGMAX=2381,3706,1582,1013,1935,3653,1380,3889,264,244,3408,653,3621,686,2334,799,614,3095,374,2526,2884,2871,1516,104,3243,3226,1535,1461,2984,1135,248,1013
+🎻 duet DONE — compare DEV_CONT_ARGMAX to host MODE=ref HOSTREF_CONT_ARGMAX. Identical ⇒ device DUET == host monolithic.

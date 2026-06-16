@@ -258,9 +258,10 @@ class M(nn.Module):
         return x, states
 
     def run_ref(self, tokens, init=None):
+        ew = self.embedding.weight                                      # inherit device/dtype (HALF=1/MPS fp16 baseline)
+        z = lambda *s: torch.zeros(*s, device=ew.device, dtype=ew.dtype)
         st = list(init) if init is not None else \
-            [(torch.zeros(H, N // 2), torch.zeros(H, P, N), torch.zeros(H, R, N), torch.zeros(H, P, R))
-             for _ in self.layers]
+            [(z(H, N // 2), z(H, P, N), z(H, R, N), z(H, P, R)) for _ in self.layers]
         logits, ssm_tr = [], [[] for _ in self.layers]
         for tok in tokens:
             x = self.embedding.weight[tok]
