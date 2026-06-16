@@ -52,6 +52,9 @@ CKPT_EVERY = int(os.environ.get("CKPT_EVERY", "500"))
 EVAL_EVERY = int(os.environ.get("EVAL_EVERY", "1000"))
 COMPILE = os.environ.get("COMPILE", "0") == "1"
 RESUME = os.environ.get("RESUME", "1") == "1"
+CACHE = os.environ.get("CACHE", "1") == "1"                              # precompute teacher top-K ONCE, reuse (cost saver)
+KD_K = int(os.environ.get("KD_K", "64"))                                # top-K logits kept per token in the cache
+ORDER = os.environ.get("ORDER", "curriculum")                           # curriculum (easy->hard by teacher CE) | random
 
 
 def kd_kl(student_logits, teacher_logits):
@@ -59,6 +62,36 @@ def kd_kl(student_logits, teacher_logits):
     s = F.log_softmax(student_logits.float() / TAU, -1)
     t = F.log_softmax(teacher_logits.float() / TAU, -1)
     return F.kl_div(s, t, log_target=True, reduction="batchmean") * (TAU * TAU)
+
+
+def kd_topk(student_logits, topk_idx, topk_val):
+    """Top-K KD from a CACHED teacher: student full-vocab log-softmax gathered at the teacher's top-K indices, vs the
+    teacher's top-K soft target (renormalized within the K). Standard cached-distillation approximation."""
+    lp = F.log_softmax(student_logits.float() / TAU, -1).gather(-1, topk_idx.long())   # [T,K] student logprob @ teacher topk
+    q = F.softmax(topk_val.float() / TAU, -1)                                          # [T,K] teacher soft target
+    return (q * (q.clamp_min(1e-9).log() - lp)).sum(-1).mean() * (TAU * TAU)
+
+
+def build_cache(teacher, train, cache_dir):
+    """Phase 1 (run ONCE): frozen-teacher forward over every train example → cache top-K logits + per-example
+    DIFFICULTY (teacher CE on the answer tokens, for curriculum ordering). Resumable (skips existing .pt). After this,
+    training needs NO teacher forward — the dominant cost is amortized across all epochs."""
+    os.makedirs(cache_dir, exist_ok=True)
+    for i, ex in enumerate(train):
+        path = os.path.join(cache_dir, f"ex{i}.pt")
+        if os.path.exists(path):
+            ex.update(torch.load(path, map_location="cpu")); continue
+        ids = ex["input_ids"].to(DEV)
+        with torch.no_grad():
+            tl = teacher(ids.unsqueeze(0)).logits[0].float()
+            val, idx = tl.topk(KD_K, dim=-1)
+            lp, tgt = tl[:-1], ids[1:]
+            m = torch.arange(tgt.shape[0], device=DEV) >= (ex["prompt_len"] - 1)
+            diff = float(F.cross_entropy(lp[m], tgt[m])) if m.any() else 0.0
+        rec = {"topk_idx": idx.to(torch.int32).cpu(), "topk_val": val.to(torch.float16).cpu(), "difficulty": diff}
+        torch.save(rec, path); ex.update(rec)
+        if i % 200 == 0:
+            print(f"  cache {i}/{len(train)} (diff={diff:.2f})", flush=True)
 
 
 def save_ckpt(student, opt, step, path):
@@ -74,7 +107,8 @@ def main() -> None:
     import hashlib
     os.makedirs(CKPT_DIR, exist_ok=True)
     print(f"cloud-distill | dev={DEV} dt={DT} | teacher={TEACHER} | student L{LAYERS}/D{MT.D_MODEL} "
-          f"(8L = A19 100%-ANE ceiling) | steps={STEPS} accum={ACCUM} lr={LR} KD_W={KD_W} CE_W={CE_W}")
+          f"(>8L = CoreAI GPU-backed; <=8L pure-ANE) | steps={STEPS} accum={ACCUM} lr={LR} KD_W={KD_W} CE_W={CE_W} "
+          f"| CACHE={CACHE} K={KD_K} ORDER={ORDER}")
 
     tok = AutoTokenizer.from_pretrained(TEACHER)
     vocab = tok.vocab_size
@@ -100,6 +134,13 @@ def main() -> None:
     E = {m: make_eval_condition(held_rows, m, tok) for m in ("E1", "E2", "E3")}
     print(f"data | HotpotQA distractor | train={len(train)} held={len(held_rows)} | "
           f"P={RAFT.P_GOLDEN} K={RAFT.K_DISTRACT} T={RAFT.MAX_LEN} CoT={RAFT.COT} | vocab={vocab}")
+    if CACHE:
+        print(f"caching teacher top-{KD_K} over {len(train)} examples (once; resumable)…", flush=True)
+        build_cache(teacher, train, os.path.join(CKPT_DIR, "cache"))
+        if ORDER == "curriculum":
+            train.sort(key=lambda e: e["difficulty"])                    # easy (low teacher-CE) -> hard
+        ds = [e["difficulty"] for e in train]
+        print(f"cache done | order={ORDER} | difficulty [{min(ds):.2f},{max(ds):.2f}] | teacher no longer needed for KD")
 
     torch.manual_seed(0)
     student = MT.M(vocab, LAYERS).to(DEV).to(DT)
@@ -128,10 +169,13 @@ def main() -> None:
             g["lr"] = LR * min(1.0, step / WARMUP)
         ex = train[(step - 1) % len(train)]
         ids = ex["input_ids"].to(DEV)
-        with torch.no_grad():
-            tl = teacher(ids.unsqueeze(0)).logits[0]
         sl = student.run_twin(ids, collect_ssm=False)[0]
-        kd = kd_kl(sl, tl)
+        if CACHE:                                                        # no teacher forward — cached top-K KD
+            kd = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV))
+        else:
+            with torch.no_grad():
+                tl = teacher(ids.unsqueeze(0)).logits[0]
+            kd = kd_kl(sl, tl)
         ce = masked_ce(sl, ids, ex["prompt_len"])
         loss = (KD_W * kd + (CE_W * ce if ce is not None else 0.0)) / ACCUM
         assert torch.isfinite(loss), f"step {step}: non-finite loss"
