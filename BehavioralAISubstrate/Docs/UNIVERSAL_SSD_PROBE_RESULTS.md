@@ -1543,3 +1543,22 @@ int4 degrades to 98% (first div @ tok 6) — the MLA non-contractive floor (adde
 **Route status:** the ENTIRE DUET path is now host-verified — Mamba-only (18), MLA block (21), and the hybrid two-state
 handoff (22). The flagship "State-Cache Reader" rests on a token-identical int8 1.75MB handoff. REMAINING: on-device (prefill
 .aimodel GPU + decode; the two-asset co-load risk P0-22 is device-gated) + cloud 24L distill (the quality gate, recipe now sound at TAU=1).
+
+## Track G — Addendum 23: on-device DUET probe — design workflow + STEP 1 (prefill converts to CoreAI, host-level) = PASS
+
+Operator chose the on-device path (take the host-verified hybrid DUET, addendum 22, onto the A19). An 8-agent design workflow
+(5 readers + 2 adversarial verifiers + synthesis → `Docs/ONDEVICE_DUET_PROBE_PLAN.md`) settled the two claims that could sink it:
+- **Co-load wall = device-PROVEN** (Track E: 2nd `AIModel.load` SIGSEGVs; a single multi-fn asset SIGABRTs — ANE compiles the
+  WHOLE asset per-fn). Chosen escape = **state-via-disk handoff**: prefill runs ONCE → serializes the int8 1.75MB State-Cache →
+  FULLY deinits → decode loads ONCE → reads the cache ONCE. One phase transition (not per-token), so the disk round-trip amortizes away.
+- **"Prefill converts to CoreAI" was an unsupported PLACEHOLDER** (verifier: refuted as proven) — the #1 risk. Prefill is a
+  structurally different graph from the device-proven decode (`step_ref`): it uses `cumsum`, `masked_fill(-inf)`+`exp` over a
+  [T,T] segsum decay, big einsums, `cat`; MLA adds causal `softmax`+`triu` — the op family flagged as the likely converter blocker.
+
+**STEP 1 (smallest de-risk) = PASS.** `Tools/mamba3_prefill_probe.py` exports ONE `MT.Lyr.prefill_state` and ONE
+`MLA.MLABlock.forward_seq` (fp16, fixed T=64) through coreai_torch 0.4.0. **Both CONVERT** → `.aimodel` saved:
+MambaPrefill emits the boundary 4-state (angle[16,32]/ssm[16,64,64]/kprev[16,4,64]/vprev[16,64,4]); MLAPrefill emits c_kv[64,128].
+So `cumsum` + masked-exp-segsum + the einsums + MLA softmax+triu ALL have valid CoreAI lowerings — the prefill op-graph is
+convertible. **Honest scope (R1): this is HOST conversion / op-lowering only.** It does NOT prove device GPU execution or numeric
+fidelity — that is STEP 2 (load the L1 asset on the A19 GPU, run, compare the boundary state to host @ rel-err <1e-2), the real gate.
+The placeholder is now replaced by evidence: scaling to the full 24L hybrid prefill asset (STEP 3) is mechanical IF STEP 2's device run holds.
