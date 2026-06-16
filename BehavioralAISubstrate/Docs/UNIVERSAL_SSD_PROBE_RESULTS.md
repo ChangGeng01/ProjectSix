@@ -1516,3 +1516,30 @@ the error but does not shrink it, so coarse int4 hurts ~4× more here than in th
 hybrid's unified State-Cache precision floor is int8, set by the 4 MLA layers — not int4. The Mamba state could go int4, but a
 single-precision cache must be int8 to keep the MLA layers faithful.** Unblocks: hybrid M wiring (20 Mamba + 4 MLA) + the full
 two-state DUET handoff test.
+
+## Track G — Addendum 22: HYBRID two-state DUET handoff VERIFIED — the full 24L route composes; int8 State-Cache = 1.75MB, token-identical
+
+The integration test the whole route hinges on. Addendum 18 verified the Mamba-only DUET; addendum 21 built+verified the MLA
+block alone. `Tools/mamba3_hybrid.py` (`HybridM` = 20 `MT.Lyr` + 4 `MLA.MLABlock` @ L6/12/18/23) + `Tools/test_hybrid_duet.py`
+close the seam: does prefill→decode reproduce the monolithic decode when BOTH state types hand off at once, and survive a
+single int8 State-Cache serialization? (24L, prompt=512, cont=128, host, argmax vs monolithic):
+
+| config | logit max-err | argmax-agree | first-div |
+|-------:|--------------:|-------------:|:----------|
+| fp32 raw   | 3.7e-6 | 100% | none |
+| fp32 wrap  | 3.6e-6 | 100% | none |
+| int8 wrap  | 7.2e-4 | 100% | none |
+| int8 nowrap| 7.7e-4 | 100% | none |
+| int4 wrap  | 1.4e-2 | 98%  | tok 6 |
+
+**Findings.** (1) **fp32 = exact (3.6e-6, zero divergence)** — the heterogeneous handoff composes: the Mamba 4-state
+(`prefill_state`→`step_ref`) and the MLA latent cache (`forward_seq`→`step`) BOTH reproduce the monolithic continuation when
+interleaved. (2) **int8 wrap = token-identical (100%, zero divergence)** — the shippable flagship State-Cache. (3) Cache size
+= **1.75MB total** for a 512-tok prompt: **1.48MB Mamba (O(1), prompt-INDEPENDENT) + 0.26MB MLA latent (O(ctx))** — only the
+small MLA part grows with context, so a phone-resident LIBRARY of pre-understood corpora at ~MB each is realistic. (4) int8
+nowrap also 100% here (PROMPT=512 → angle ~6 rad, wrap is a no-op at this length; it pays off at >16k per addendum 20). (5)
+int4 degrades to 98% (first div @ tok 6) — the MLA non-contractive floor (addendum 21) shows through the full hybrid → int8 confirmed.
+
+**Route status:** the ENTIRE DUET path is now host-verified — Mamba-only (18), MLA block (21), and the hybrid two-state
+handoff (22). The flagship "State-Cache Reader" rests on a token-identical int8 1.75MB handoff. REMAINING: on-device (prefill
+.aimodel GPU + decode; the two-asset co-load risk P0-22 is device-gated) + cloud 24L distill (the quality gate, recipe now sound at TAU=1).
