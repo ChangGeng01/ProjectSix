@@ -1,0 +1,5 @@
+🗄️ statelake START (cross-launch persistence: read a disk .statelake → decode on the A19)
+🗄️ (A) fail-closed test: PASS — rejected stale key (bindingKey("artifact 446adab298cb != expected dededededede — refusing stale state"))
+🗄️ (B) statelake loaded: 6 states, promptLen=64, binding-key + sha256 OK
+🗄️ DEV_CONT_ARGMAX=2381,3706,1582,1013,1935,3653,1380,3889,264,244,3408,653,3621,686,2334,799,614,3095,374,2526,2884,2871,1516,104,3243,3226,1535,1461,2984,1135,248,1013
+🗄️ statelake DONE — compare to host HOSTREF_STATELAKE_ARGMAX. Match ⇒ a disk-persisted neural state rehydrates + decodes on the A19 (cross-launch StateLake).

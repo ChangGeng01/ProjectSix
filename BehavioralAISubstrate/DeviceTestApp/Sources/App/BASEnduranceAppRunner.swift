@@ -371,6 +371,11 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIDuetProbe.run() }
             return
         }
+        // StateLake cross-launch persistence (BAS_COREAI_STATELAKE_PROBE=1): read a disk .statelake -> decode on the A19; fail-closed key.
+        if (env["BAS_COREAI_STATELAKE_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIStateLakeProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {

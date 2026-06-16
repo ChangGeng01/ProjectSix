@@ -1739,3 +1739,21 @@ pure-Mamba L16 model — so 最强大 is unsubstantiated and the cloud distill t
 actual run needs the operator's cloud compute (cannot self-provision). Once it produces a checkpoint, wire it into
 `mamba3_hybrid_{decode,prefill}_deploy.py` (replace `manual_seed(0)` with `load_state_dict`) → re-run the device DUET + the
 int8 floor cert with a stricter-than-argmax metric → 最强大 becomes a measured number instead of prose. This is the last gate.
+
+## Track G — Addendum 31: 选2/device-port — StateLake CROSS-LAUNCH persistence PROVEN on the A19 (disk .statelake → rehydrate → decode)
+
+The device half of the StateLake (host put/get + binding-key proven in addendum 29). `BASStateLakeReader` (parse header.json,
+**FAIL-CLOSED** binding-key check, **SHA256** payload verify, int8·scale / fp16 dequant → NDArrays) + `BASCoreAIStateLakeProbe`
+(BAS_COREAI_STATELAKE_PROBE) + `Tools/mamba3_statelake_device_prep.py` (writes a device `.statelake` of the 6 decode-ready
+states + the host ref). Ran on the iPhone Air A19 (GPU; cert log `Docs/cert-logs/statelake-*.log`):
+- **(A) fail-closed = PASS** — a wrong binding-key is REJECTED on device ("artifact 446a… != expected dede… — refusing stale
+  state"). The audit's #1 danger (silent garbage on mismatched weights) is now trapped ON DEVICE.
+- **(B) load = PASS** — 6 states rehydrated from the 1.62 MB int8 `.statelake`, binding-key + SHA256 checksum both verified.
+- **(C) decode = 30/32** vs the **fp32** host reference; the 2 diffs are positions 3 & 14 — the SAME known near-ties (pos 3
+  fp32 margin 0.001, pos 14 an exact 0.0 tie). The int8 state survived the disk round-trip faithfully; the diffs are the
+  fp16-device-vs-fp32-host boundary (per addendum 28, device==host-FP16 is exact), NOT a StateLake error.
+
+**A host-serialized neural state rehydrates on the A19 (fail-closed + checksum-verified) and decodes** → the flagship
+"prefill-once-reuse-many ACROSS LAUNCHES" is real on device, not just in-RAM/host. StateLake coverage: device-port done; the
+.statelake format is the shared contract (host `mamba3_statelake.py` ⇄ device `BASStateLakeReader`). REMAINING (still gated):
+the trained-checkpoint quality gate (cloud distill ARCH=hybrid) — every result here is still random-weight machinery.
