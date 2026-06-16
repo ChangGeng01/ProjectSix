@@ -77,6 +77,8 @@ enum BASCoreAIPrefillProbe {
                  ["out_last", "angle", "ssm", "kprev", "vprev"]),
                 ("MLA", env["BAS_COREAI_PREFILL_MLA_ASSET"] ?? "Mamba3MLAPrefill_L1_prefill.aimodel", "x_seq",
                  ["out_last", "c_kv"]),
+                ("Hybrid", env["BAS_COREAI_PREFILL_HYBRID_ASSET"] ?? "Mamba3HybridPrefill_L24_T64.aimodel", "x_seq",
+                 ["angle_all", "ssm_all", "kprev_all", "vprev_all", "mla_all"]),
             ]
             for p in probes {
                 let asset = docs.appendingPathComponent(p.asset)

@@ -1597,3 +1597,24 @@ FIRST CoreAI GPU op, NOT prefill compute. Per-layer at T=64, GPU, warm: **Mamba 
 cold=3.7 / warm_best=1.0** (load_ms 15/6). So the full 24L hybrid prefill projects to **~100 ms warm** (20×4.6 + 4×1.0) plus a
 one-time ~2 s process warmup — the "prefill-once-reuse-many" flagship UX is comfortably fast. (Still single-layer/fp16/random
 weights; the real 24L-single-asset number gets measured at STEP 3, but the compute is clearly not the bottleneck.)
+
+## Track G — Addendum 25: on-device DUET STEP 3 — FULL 24L hybrid prefill RUNS on the A19 GPU, exact + fast (~43ms warm)
+
+`Tools/mamba3_hybrid_prefill_deploy.py` exports `HybridM.prefill` (20 Mamba `prefill_state` + 4 MLA `forward_seq`) to ONE
+.aimodel emitting 5 STACKED boundary tensors (angle_all/ssm_all/kprev_all/vprev_all + mla_all). HOST-fidelity gate (eager vs
+exported-decomposed graph on CPU) = **0.0 rel-err** (no decomposition bug — the broadcasting_mul/torch.where class is clean
+here). Asset = 862 MB fp16 (~430 MB int8, under the 2 GB wall). Built via beta Xcode, staged, ran on the iPhone Air A19 GPU
+(probe "Hybrid" entry, T=64, hidden input):
+
+| state | host norm | device norm | rel-err |
+|------:|----------:|------------:|--------:|
+| angle_all[20,16,32] | 48.7263 | 48.7275 | 2e-5 |
+| ssm_all[20,16,64,64] | 6.4063 | 6.4056 | 1e-4 |
+| kprev_all[20,16,4,64] | 286.2014 | 286.2173 | 6e-5 |
+| vprev_all[20,16,64,4] | 3.6635 | 3.6636 | 3e-5 |
+| mla_all[4,64,128] | 115.6250 | 115.6269 | 2e-5 |
+
+**The entire prefill half of the DUET is device-proven at production depth.** load_ms=1962 (the 862 MB fp16 asset load — the
+binding cost; int8 halves it), **run_ms cold=165.9 / warm_best=42.9** → the full 24-layer prefill computes in ~43 ms warm at
+T=64, footprint 90→148 MB. For prefill-once-reuse-many, a ~2 s one-time load + ~43 ms compute per corpus is comfortable.
+NEXT (STEP 4): the 24L DECODE asset — the harder piece (the 4 MLA layers' growing latent cache as a fixed [MAX_SEQ,128] buffer + fill-offset + masked attention; the 20 Mamba layers reuse the proven angle-first 4-state decode).
