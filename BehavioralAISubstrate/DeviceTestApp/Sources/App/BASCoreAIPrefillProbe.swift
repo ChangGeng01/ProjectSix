@@ -56,7 +56,8 @@ enum BASCoreAIPrefillProbe {
         if #available(iOS 27, macOS 27, *) {
             let env = ProcessInfo.processInfo.environment
             let unit = env["BAS_COREAI_PREFILL_UNIT"] ?? "gpu"
-            let T = 64, D = 1024
+            let T = Int(env["BAS_COREAI_PREFILL_T"] ?? "64") ?? 64     // T>64 → the scan_chunked path (real-corpus prefill)
+            let D = 1024
             var xs = [Float16](repeating: 0, count: T * D)            // det_input mirror — bit-identical to Python
             for i in 0..<(T * D) { xs[i] = Float16((Double(i % 97) - 48.0) / 480.0) }
             let x = NDArray(scalars: xs, shape: [T, D])
@@ -72,14 +73,16 @@ enum BASCoreAIPrefillProbe {
             }
             mark("🧩 prefill availableComputeKinds=\(ComputeUnitKind.availableKinds) unit=\(unit)")
 
-            let probes: [(tag: String, asset: String, input: String, outs: [String])] = [
-                ("Mamba", env["BAS_COREAI_PREFILL_MAMBA_ASSET"] ?? "Mamba3MambaPrefill_L1_prefill.aimodel", "x_seq",
-                 ["out_last", "angle", "ssm", "kprev", "vprev"]),
-                ("MLA", env["BAS_COREAI_PREFILL_MLA_ASSET"] ?? "Mamba3MLAPrefill_L1_prefill.aimodel", "x_seq",
-                 ["out_last", "c_kv"]),
-                ("Hybrid", env["BAS_COREAI_PREFILL_HYBRID_ASSET"] ?? "Mamba3HybridPrefill_L24_T64.aimodel", "x_seq",
+            var probes: [(tag: String, asset: String, input: String, outs: [String])] = [
+                ("Hybrid", env["BAS_COREAI_PREFILL_HYBRID_ASSET"] ?? "Mamba3HybridPrefill_L24_T\(T).aimodel", "x_seq",
                  ["angle_all", "ssm_all", "kprev_all", "vprev_all", "mla_all"]),
             ]
+            if T == 64 {                                              // the L1 single-layer probes are T=64-only assets
+                probes.insert(("Mamba", env["BAS_COREAI_PREFILL_MAMBA_ASSET"] ?? "Mamba3MambaPrefill_L1_prefill.aimodel", "x_seq",
+                               ["out_last", "angle", "ssm", "kprev", "vprev"]), at: 0)
+                probes.insert(("MLA", env["BAS_COREAI_PREFILL_MLA_ASSET"] ?? "Mamba3MLAPrefill_L1_prefill.aimodel", "x_seq",
+                               ["out_last", "c_kv"]), at: 1)
+            }
             for p in probes {
                 let asset = docs.appendingPathComponent(p.asset)
                 guard FileManager.default.fileExists(atPath: asset.path) else {

@@ -55,10 +55,10 @@ class MLAPrefill(nn.Module):
         return out_seq[-1], c_kv
 
 
-def det_input():
-    """Bit-reproducible [T,D] fp16 input (integer mod + exact fp division — IDENTICAL in Python and Swift, no libm).
+def det_input(t=T):
+    """Bit-reproducible [t,D] fp16 input (integer mod + exact fp division — IDENTICAL in Python and Swift, no libm).
     Swift mirror: xs[i] = Float16((Double(i % 97) - 48.0) / 480.0). Lets the device run feed the SAME input → numeric compare."""
-    return (((torch.arange(T * D) % 97).double() - 48.0) / 480.0).to(torch.float16).view(T, D)
+    return (((torch.arange(t * D) % 97).double() - 48.0) / 480.0).to(torch.float16).view(t, D)
 
 
 def stats(t):

@@ -1,0 +1,10 @@
+🧩 prefill START footprint0=11MB (STEP 2: does the prefill asset run+match on the A19 GPU?)
+🧩 prefill availableComputeKinds=[CoreAIDelegates.ComputeUnitKind.gpu, CoreAIDelegates.ComputeUnitKind.neuralEngine, CoreAIDelegates.ComputeUnitKind.cpu] unit=gpu
+🧩 prefill Hybrid loaded unit=gpu load_ms=1821 footprint=208MB
+🧩 prefill Hybrid run_ms cold=1450.3 warm_best=235.8 (cold-warm=1214 ⇒ one-time compile) footprint=335MB
+🧩 prefill DEV Hybrid.angle_all shape=[20, 16, 32] norm=184.6086 sum=366.1411 head=[-0.33154297, -4.3789062, 0.08532715, -2.7871094]
+🧩 prefill DEV Hybrid.ssm_all shape=[20, 16, 64, 64] norm=7.8488 sum=-6.2504 head=[0.0051460266, 0.0007081032, 0.0033054352, 0.0033016205]
+🧩 prefill DEV Hybrid.kprev_all shape=[20, 16, 4, 64] norm=286.2149 sum=-22.9554 head=[-0.92041016, -0.5761719, 1.4433594, -1.2373047]
+🧩 prefill DEV Hybrid.vprev_all shape=[20, 16, 64, 4] norm=3.6296 sum=6.4091 head=[0.00078582764, 0.00082302094, -0.0015134811, -0.00019979477]
+🧩 prefill DEV Hybrid.mla_all shape=[4, 256, 128] norm=230.5763 sum=832.9829 head=[0.9121094, 0.31860352, -0.36645508, 0.4777832]
+🧩 prefill DONE — compare DEV norm/sum/head to the HOSTREF lines (rel-err<1e-2 ⇒ prefill runs + is numerically correct on the A19).

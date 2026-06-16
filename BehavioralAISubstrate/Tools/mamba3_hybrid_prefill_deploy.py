@@ -74,7 +74,7 @@ def main() -> None:
         assert not unexp, f"CKPT has keys DeployHybridPrefill.m lacks: {unexp[:3]}"
         print(f"loaded TRAINED ckpt (vocab={vocab}; {len(miss)} missing = expected, none should be params)")
     m = m.half().eval()
-    x = det_tokens(T, vocab) if TOKENS else det_input()
+    x = det_tokens(T, vocab) if TOKENS else det_input(T)
     in_name = "input_ids" if TOKENS else "x_seq"
     print(f"STEP-3 full {LAYERS}L hybrid prefill converter (T={T}, D={D}, fp16, input={'tokens' if TOKENS else 'hidden'}, {len(m.m.mla_pos)} MLA @ {sorted(m.m.mla_pos)}):")
 

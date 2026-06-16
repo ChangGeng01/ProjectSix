@@ -1842,3 +1842,23 @@ Closed two more named host gaps:
 Remaining host item left (cosmetic, skipped): a unified `DecodeSession` Swift protocol over the 5 working session classes.
 Everything else remaining is converter/device-gated (ComputeStream, dynamic-shapes, fused-argmax, INT4-QAT) or irreducible
 (the cloud-trained checkpoint → 最强大/quality; the 3 device perf runs). Host mechanisms of the full three-pillar system: COMPLETE.
+
+## Track G — Addendum 36: device-confirm #1 — T>64 (scan_chunked) prefill RUNS on the A19 GPU, exact (real-corpus, STEP 6 closed)
+
+The audit's "Context Compiler is a 64-token toy" gap: T=64 ran on device (add. 25), T>64 converted on host (add. 33), but the
+chunked-scan path (T>64 → `scan_chunked`, nc=4) had NEVER run on device. Made `BASCoreAIPrefillProbe` T-configurable
+(BAS_COREAI_PREFILL_T) + fixed a `det_input` bug (it used the probe's T not the converter's → was silently re-converting T=64),
+converted the 24L hybrid prefill at REAL T=256 (host-fidelity 0.0), ran on the iPhone Air A19 GPU:
+
+| state | host | device | rel-err |
+|------:|-----:|-------:|--------:|
+| angle_all | 184.6037 | 184.6086 | 3e-5 |
+| ssm_all | 7.8488 | 7.8488 | exact |
+| kprev_all | 286.2075 | 286.2149 | 3e-5 |
+| vprev_all | 3.6296 | 3.6296 | exact |
+| mla_all [4,**256**,128] | 230.5743 | 230.5763 | 9e-6 |
+
+**The T>64 `scan_chunked` prefill (256-token real-corpus) runs on the A19 GPU and produces the exact boundary state** —
+load 1821 ms, run cold 1450 / **warm 235.8 ms** (the T² segsum scales ~5.5× from T=64's 43 ms; chunked keeps memory O(C²)).
+STEP 6 is fully closed (host-convert add.33 + device-run here). Cert log `Docs/cert-logs/prefill-t256-*.log`. The Context
+Compiler handles real-corpus prefill on device, not just a 64-token toy.
