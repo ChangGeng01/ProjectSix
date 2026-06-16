@@ -42,6 +42,12 @@ enum BASCoreAIMamba3Probe {
         mark(String(format: "🐍 mamba3 START footprint0=%.0fMB (beat: nothing — weights-free compile+speed gate)", footprintMB()))
         #if canImport(CoreAI)
         if #available(iOS 27, macOS 27, *) {
+            // Capability gate (integration-plan-mandated): which compute units the device actually offers. NOTE:
+            // CoreAI 0.4.0 exposes the REQUEST side only (availableKinds + SpecializationOptions.preferredComputeUnitKind);
+            // there is NO per-op actual-placement readback (no MLComputePlan analog). So the real ANE-vs-GPU split is
+            // NOT directly measurable here — the placement PROXY is the ANECompile-FAILED count in the device syslog
+            // (0 ⇒ fully ANE-compilable; N ⇒ N segments forced off-ANE). See Track G addendum 16.
+            mark("🐍 mamba3 availableComputeKinds=\(ComputeUnitKind.availableKinds)")
             let env = ProcessInfo.processInfo.environment
             let assetName = env["BAS_COREAI_MAMBA3_ASSET"] ?? "Mamba3_L16_int8.aimodel"
             // Carried-state shapes in the converter's declared order — semicolon-separates shapes, comma within.

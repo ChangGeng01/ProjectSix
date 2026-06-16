@@ -1360,3 +1360,29 @@ is only mechanism-supported at **≤8 layers** (and even that is "no compile fai
 measurement). Picking a depth (e.g. 24L≈73 tok/s) is a SPEED decision on a GPU-backed reader; its QUALITY is TBD by the
 distill. TODO to actually certify ANE usage: implement the integration-plan-mandated `preferredComputeUnitKind` readback
 (or a CoreAI-native placement probe) — until then, no `.aimodel` run is certified ANE-using.
+
+---
+
+## Track G — Addendum 16: ANE-placement readback (#2) is INFEASIBLE in CoreAI 0.4.0 — no compute-plan API exists
+
+Investigated whether the actual per-op ANE-vs-GPU split for a Mamba-3 `.aimodel` run can be MEASURED (the audit-15
+gap). Grepped the full beta framework interfaces (Xcode-beta iPhoneOS27 SDK): `CoreAIDelegates.swiftinterface` (122
+lines) + `CoreAIRuntime.swiftinterface` (1425 lines). The complete compute-unit API surface is:
+- `ComputeUnitKind` enum + `ComputeUnitKind.availableKinds` (the device's SUPPORTED units — a capability set).
+- `SpecializationOptions(preferredComputeUnitKind:)` + `.allowedComputeUnitKinds` (what you REQUEST).
+- `AIModel` / `InferenceFunction` / `InferenceFunctionDescriptor` (run/encode/ComputeStream; descriptor exposes
+  state/input/output names + shapes) — **NO `computePlan`, `deviceUsage`, `computeDevice`, or actual-placement readback.**
+
+CONCLUSION: **CoreAI 0.4.0 exposes the REQUEST side only; there is NO `MLComputePlan` analog.** A true per-op
+ANE-vs-GPU placement readback (#2 as envisioned) is NOT implementable in this API. The integration plan's "read
+`preferredComputeUnitKind` back to assert it stuck" only confirms the REQUESTED option (trivially what you set), NOT
+what executed. So the actual ANE fraction for any `.aimodel` run is fundamentally not directly measurable here.
+
+WHAT IS DONE INSTEAD: (1) `BASCoreAIMamba3Probe` now logs `ComputeUnitKind.availableKinds` (the mandated capability
+gate — confirms the A19 offers `.neuralEngine`; takes effect on next app rebuild). (2) The placement PROXY is the
+device-syslog **ANECompile-FAILED count** (already captured by `run-mamba3-ane-ladder.sh`): **0 ⇒ the model is fully
+ANE-compilable** (necessary condition for 100%-ANE — no segment is forced off-ANE); **N>0 ⇒ N segments rejected by the
+ANE compiler and forced to GPU/CPU** (e.g. 8L=0, 16L≈83, 24L≈242, 32L≈322). This is a NEGATIVE compile signal, not a
+positive execution measurement, but it is the strongest available bound. A positive ANE-fraction measurement would
+require a future CoreAI compute-plan API OR an energy probe (powermetrics ANE-active), which is not accessible from a
+sandboxed on-device app. So: claims of ANE USAGE remain bounded by the compile-error proxy, never positively certified.
