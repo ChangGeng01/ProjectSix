@@ -33,7 +33,9 @@ import mamba3_raft as RAFT
 from mamba3_raft import build_example, make_examples, make_eval_condition, masked_ce, eval_nll
 
 TEACHER = os.environ.get("TEACHER", "ibm-granite/granite-4.1-3b-base")   # prod: granite-4.1-8b-base
-LAYERS = int(os.environ.get("LAYERS", "8"))                              # the A19 100%-ANE ceiling
+LAYERS = int(os.environ.get("LAYERS", "24"))                             # cloud target: ~600M, ~70 tok/s GPU-backed on A19
+#   (re-verified 3 reps: 73.3/68.4/69.4 tok/s; >8L is a CoreAI GPU-backed reader, NOT pure-ANE — addendum 15.
+#    Set LAYERS=8 for the literal pure-ANE/low-power variant ~112 tok/s; LAYERS=32 for ~0.8B/~57 tok/s.)
 DEV = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
 DT = torch.bfloat16 if DEV == "cuda" else torch.float32
 RAFT.DEV = DEV                                                           # the reused RAFT helpers read this

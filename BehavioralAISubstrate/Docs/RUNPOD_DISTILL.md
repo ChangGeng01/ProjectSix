@@ -1,16 +1,21 @@
-# RunPod runbook — 8-layer Mamba-3 narrow-RAG-reader scale distill
+# RunPod runbook — 24-layer Mamba-3 narrow-RAG-reader scale distill
 
-The cloud scale run that answers the one open question after the A19 ANE work:
-**is an 8-layer Mamba-3 deep enough, given enough tokens, for the narrow-RAG-reader quality bar?**
+The cloud scale run that answers the open question after the A19 device work:
+**is a 24-layer (~600M) Mamba-3 deep enough, given enough tokens, for the narrow-RAG-reader quality bar?**
 
-Why 8 layers is fixed: it is the MEASURED A19 per-asset 100%-ANE ceiling (Track G addendum 10 — a sharp depth cliff at
-9, robust to precision int8≡fp16 and to state-write pattern). 8 layers @ the proven per-layer config
-(D=1024, H=16, P=64, N=64, R=4) is the deepest single-asset reader that deploys 100%-on-ANE today. Split is dead
-(Track E). So we train EXACTLY the artifact that deploys.
+DEPTH CHOICE (Track G addenda 10-15, all on-device): the on-device decode speed/depth/engine tradeoff is:
+- **≤8 layers** → the *only* depth with no fresh ANE-segment compile failures ("100%-ANE", ~112 tok/s) — but ANE
+  participation is INFERRED (no positive placement measurement), and quality is capped low.
+- **>8 layers** → a **CoreAI GPU-backed reader** (the ANE rejects most segments at depth — 24L threw 242 ANE-segment
+  failures, so it runs on the GPU). Re-verified speed: **24L ≈ 70 tok/s GPU** (3 reps 73.3/68.4/69.4), ~600M params,
+  ~80-120 MB resident (weights ~600 MB mmap'd). 32L ≈ 57 tok/s (~0.8B).
+We anchor at **24 layers** for quality (you went cloud for quality; memory is a non-issue). This is a **GPU-backed**
+reader, NOT pure-ANE — set `LAYERS=8` if literal pure-ANE/low-power is a hard requirement. (Quality-vs-depth is what
+THIS run establishes — every on-device number above is random-weight op-graph speed, not quality.)
 
 ## Pod
 
-- **GPU**: 1× **A100 80GB** (cheapest sufficient) or **H100 80GB** (faster). Single GPU — the 8-layer student + frozen
+- **GPU**: 1× **A100 80GB** (cheapest sufficient) or **H100 80GB** (faster). Single GPU — the ~600M student + frozen
   3B teacher fit one card with room. No multi-GPU.
 - **Image**: a RunPod **PyTorch 2.x + CUDA 12.x** template.
 - **Volume**: a **persistent volume mounted at `/workspace`** (≥100 GB) — holds the HF model/data cache (`$HF_HOME`)
@@ -49,7 +54,7 @@ bf16 on CUDA, grad-accum, warmup, grad-clip, atomic checkpoint/resume.
 | `RAFT_T` | 1024 | prompt+answer token budget |
 | `N_ROWS` | 20000 | HotpotQA rows drawn |
 | `TEACHER` | granite-4.1-3b-base | swap to `granite-4.1-8b-base` for the stronger teacher |
-| `LAYERS` | **8** | leave at 8 (the ANE ceiling) — a deeper student will NOT deploy 100%-ANE |
+| `LAYERS` | **24** | ~600M, ~70 tok/s GPU-backed. =8 → pure-ANE/112 tok/s (low quality); =32 → ~0.8B/~57 tok/s |
 
 ## What to watch
 
@@ -61,9 +66,10 @@ bf16 on CUDA, grad-accum, warmup, grad-clip, atomic checkpoint/resume.
 ## Deploy back to the A19 (the loop closes)
 
 ```bash
-# copy /workspace/ckpt/ckpt_latest.pt → /tmp/draft_coreai/mamba3_poc_student.pt (8-layer)
-uv run --with coreai-torch python Tools/mamba3_deploy.py 8 8    # int8, 8 layers → .aimodel
-# then the A19 100%-ANE path is PROVEN for 8 layers (Track G addendum 10): 0 compile errors, ~112 tok/s.
+# copy /workspace/ckpt/ckpt_latest.pt → /tmp/draft_coreai/mamba3_poc_student.pt (24-layer)
+uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layers → .aimodel
+# then run on the A19 (CoreAI GPU backend) ≈ 70 tok/s, ~80-120 MB resident. NOT pure-ANE at 24L (addendum 15).
+# (For the 8-layer pure-ANE variant: mamba3_deploy.py 8 8 — 0 fresh compile errors, ~112 tok/s.)
 ```
 
 ## Cost (honest)

@@ -10,7 +10,7 @@ export HF_HOME="${HF_HOME:-/workspace/hf}"               # cache the 3B teacher 
 # RAFT data knobs (read by mamba3_raft):
 export RAFT_P="${RAFT_P:-0.8}" RAFT_K="${RAFT_K:-4}" RAFT_T="${RAFT_T:-1024}" RAFT_COT="${RAFT_COT:-0}"
 # distill knobs:
-export LAYERS="${LAYERS:-8}" STEPS="${STEPS:-20000}" LR="${LR:-3e-4}" ACCUM="${ACCUM:-8}"
+export LAYERS="${LAYERS:-24}" STEPS="${STEPS:-20000}" LR="${LR:-3e-4}" ACCUM="${ACCUM:-8}"
 export KD_W="${KD_W:-1.0}" CE_W="${CE_W:-0.5}" N_ROWS="${N_ROWS:-20000}"
 export TEACHER="${TEACHER:-ibm-granite/granite-4.1-3b-base}"
 mkdir -p "$CKPT_DIR" "$HF_HOME"
