@@ -2016,3 +2016,29 @@ fresh→resume e2e confirms eval_set.pt reload + data_fp cache-reuse. The honest
 to read the gold doc (context_use), match the MEASURED teacher (task_fit), and reproduce on the device's fp16 sequential graph
 (device_parity). KNOWN LIMITATION (flagged, deferred for P0): HotpotQA-val is likely in Granite's pretraining, so even context_use
 is confounded by memorization; a clean reading test needs a novel-document probe — revisit for the full run.
+
+## Track G — Addendum 44: 大量测试 — 349-test pytest regression suite (确保蒸馏顺利). Full-suite green, 0 source bugs, existing tooling intact.
+
+To make the paid P0 distill run smoothly, locked the audited invariants behind a comprehensive CPU-only pytest suite
+(Tools/tests/, 8 modules, **349 tests, all passing in 213s together**, no network/Granite/coreai). Authored by 8 parallel
+agents each self-verifying with pytest + reporting any source bug; **0 source bugs found** — the add.41/42/43 audits had
+already closed them, and the suite now PREVENTS regressions:
+- test_raft_data (46): gold-survival truncation, to_ids/masking, E1/E2/E3 semantics + answer no-leak (unique sentinel appears
+  EXACTLY once in E3 = the target only), determinism, masked_ce span, eval_nll skip.
+- test_curriculum (60): competence pacing per-schedule, the TRUE-QUANTILE gate on uniform AND skewed (a regression to the old
+  inert value-gate is now caught), sample/replay, raft staging, state_dict rng round-trip (resume), bad-input ValueErrors.
+- test_eval_gates (67): the **8 claim_card gates** incl. the **anti-parrot context_use** (slope_e3_e1≈0 PARROT → FAIL),
+  measured-teacher fail-closed, device_parity None-coercion (no TypeError), answer-span fidelity, text EM/F1, subset guard.
+- test_kd_loss (31): top-K KD renorm/temperature/gather/shape-assert, full-K≈full-vocab-KD, gradient flow, _sanitize.
+- test_forward_consistency (34): run_twin ≡ step_ref on Mamba + hybrid + MLA; **LEAN_MLP one-source-of-truth** (forward_seq now
+  honors it — the add.44 fix; twin≡ref under LEAN_MLP=1 and =0; the context-manager doesn't leak).
+- test_cloud_integration (38): build_cache fingerprint drift (incl. the train+E content hash), save_ckpt round-trip
+  (arch/vocab/mla_positions/config/sched), decode_parity (≈1.0 + graceful None on no-run_ref), eval_set freeze round-trip.
+- test_deploy_carry (29): resolve_ckpt arch/layers/vocab/mla_positions/config guards + FORCE_RANDOM/fail-closed; the
+  assert-not-missing deploy guard (full state_dict → empty missing; a dropped key → non-empty → guard fires).
+- test_hybrid_mla (44): MLA placement (HybridM(96,8)→{6}, (96,4)→{}), prefill→decode DUET handoff = full-sequence (prefix
+  state reuse), deterministic greedy generate + EOS, MLA step ≡ forward_seq.
+
+Dev-only dep: pytest (uv pip install pytest into the venv; the standalone Tools/test_*.py need no pytest). Verified the
+refactors did NOT regress the existing tooling: test_resumable_prefill / test_hybrid_duet / test_verify_kstep /
+test_generate_sampling / test_p0_state_numeric all still pass (rc=0) post-change. The distill pipeline is now regression-locked.
