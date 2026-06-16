@@ -1295,3 +1295,29 @@ segment = ≤8 layers; NO decomposition (depth-partition, single-process split, 
 residual at a boundary can be 100%-ANE.** This is the definitive, mechanism-grounded answer to "can 16 layers be
 100%-ANE": no. 16 layers runs fine at 97 tok/s (GPU, clean) / 88 (ANE-mostly) — that is the path for >8 layers.
 (deploy SPLIT=head|tail knob added for this probe.)
+
+---
+
+## Track G — Addendum 14: full-power CoreAI depth-speed curve — no depth cap, ~linear, memory-trivial
+
+"满血 CoreAI" reframe: stop forcing literal pure-ANE; let CoreAI orchestrate ANE+GPU+CPU (its design — ComputeStream +
+stateful-KV + dynamic shapes). Then the 8-layer cap (literal pure-ANE only) DISSOLVES. Measured the depth-speed curve
+(A19, random-weight op-graph speed — valid for the trained model, same graph; numerics meaningless):
+
+| layers | ~params | ANE-preferred tok/s | GPU tok/s | peak MB |
+|---|---|---|---|---|
+| 8 (pure-ANE, single segment) | ~250M | 112 | — | 67 |
+| 16 | ~420M | 88 | 97 | ~80 |
+| 24 | ~600M | 73 | 74 | 80–118 |
+| 32 | ~780M | 57 | 58 | 98–119 |
+
+FINDINGS: (1) ~linear speed decay with depth — even 32 layers (~0.8B) = 57 tok/s, very usable. (2) ANE-preferred and
+GPU CONVERGE as depth grows (16L 88-vs-97 → 32L 57-vs-58): deeper ⇒ more of the graph rides the GPU regardless, so the
+two backends meet. (3) Memory is NEVER the limit (67–119 MB vs the 3376 MB jetsam cap) — at full power, depth is
+SPEED-bound, not memory/compile-bound. Extrapolating: 48L≈38 tok/s, 64L (~1.5B)≈28 tok/s.
+
+CONSEQUENCE: under full-power CoreAI the cloud-distill target depth is a free QUALITY-vs-tok/s choice (8/16/24/32+),
+not a hard cap. Pure-ANE (≤8 layers, 112 tok/s, lowest power) remains the option ONLY if literal 100%-ANE is a hard
+requirement (always-on / battery / co-residency with a separate GPU model). For a standalone quality reader, pick the
+deepest depth that clears your tok/s floor (e.g. 24L @ 73 tok/s, or 32L @ 57). Speeds are op-graph (random-weight);
+the trained model has the same graph → same speed.
