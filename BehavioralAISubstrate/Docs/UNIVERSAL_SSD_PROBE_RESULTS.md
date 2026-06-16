@@ -1386,3 +1386,34 @@ ANE compiler and forced to GPU/CPU** (e.g. 8L=0, 16L≈83, 24L≈242, 32L≈322)
 positive execution measurement, but it is the strongest available bound. A positive ANE-fraction measurement would
 require a future CoreAI compute-plan API OR an energy probe (powermetrics ANE-active), which is not accessible from a
 sandboxed on-device app. So: claims of ANE USAGE remain bounded by the compile-error proxy, never positively certified.
+
+---
+
+## Track G — Addendum 17: DUET state-cache fidelity kill-switch = GREEN (serialize→rehydrate is safe; error DECAYS, not compounds)
+
+Route step 1 (2026-06-17): the cheapest kill-switch for the disruptive "State-Cache Reader" flagship — does a PREFILLED,
+SERIALIZED, REHYDRATED recurrent state reproduce the monolithic continuation? Built `Tools/mamba3_state_fidelity.py`
+(host, fp32 weights, no training). Isolates the ONE open variable = state serialization precision: BOTH prefill and
+decode use the same per-token `step_ref` path (so chunked-vs-sequential is out of scope, already PARITY-A ~1e-8), weights
+stay fp32 (weight-quant out of scope, already PARITY-B). Boundary 4-state (angle/ssm/kprev/vprev × 24 layers, ~3.6 MB
+fp16) cached at fp32/fp16/int8, then continuation decoded from the rehydrated state vs a monolithic run.
+
+RESULT (L=24, prompt=64, continuation 64/256/512 — IDENTICAL across all three lengths):
+| cache precision | state rel-err | cont logit max-err | argmax agree | first divergence |
+|---|---|---|---|---|
+| fp32 (sanity) | 0 | 0 | 100% | none |
+| **fp16** (deploy state) | 2.1e-4 | **8.4e-6** | **100%** | none/512 |
+| **int8** (compressed cache) | 8.3e-3 | **8.6e-4** | **100%** | none/512 |
+
+KEY: the logit-err is FLAT across 64→256→512 continuation tokens (does NOT grow) → the serialized-state perturbation
+DECAYS, not compounds — a structural consequence of Mamba's contractive recurrence (A=−softplus ⇒ exp(neg) forgets the
+initial error). This REFUTES the flagship's "error compounds geometrically" worry. So: **serializing the recurrent state
+(even int8, ~1.7 MB) and resuming from it is fidelity-safe** → the prefill-once-reuse-many state cache is VIABLE, and the
+cache can be int8 (half size). The flagship's #1 stated risk is CLEARED.
+
+HONEST RESIDUALS: random weights + toy vocab (but the CONTINUOUS metrics are weight-independent — the robust evidence;
+argmax-100% is consistent with the tiny logit-err). This isolated SERIALIZATION; the FULL DUET still needs the
+chunked-scan prefill (`forward_seq`) to emit the decode-compatible 4-state (it exposes ssm+angle but not kprev/vprev —
+the actual handoff-extraction engineering, low-risk per PARITY-A). MLA-KV handoff untested (read-only cached tensors →
+trivial). ROUTE IMPLICATION: DUET serialization-robustness is ~free (no DUET-aware-retrain needed for it); the remaining
+DUET piece is the chunked-prefill 4-state extraction, not state fidelity.
