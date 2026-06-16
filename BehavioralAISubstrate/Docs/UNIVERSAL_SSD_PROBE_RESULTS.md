@@ -1862,3 +1862,19 @@ converted the 24L hybrid prefill at REAL T=256 (host-fidelity 0.0), ran on the i
 load 1821 ms, run cold 1450 / **warm 235.8 ms** (the T² segsum scales ~5.5× from T=64's 43 ms; chunked keeps memory O(C²)).
 STEP 6 is fully closed (host-convert add.33 + device-run here). Cert log `Docs/cert-logs/prefill-t256-*.log`. The Context
 Compiler handles real-corpus prefill on device, not just a 64-token toy.
+
+## Track G — Addendum 37: device-confirm #2 — FUSED on-device argmax RUNS on the A19 (kills the per-token logit readback)
+
+The decode loop read the full V-wide fp16 logits to host every token, then argmaxed in Swift (a ~200 KB/token readback at
+vocab 100352). `FUSED_ARGMAX=1` makes the decode graph emit `next_token` (the argmax INDEX) directly. Key unknown: does
+coreai_torch lower `argmax`? — YES, it CONVERTS (`Mamba3HybridDecode_L24_M256_argmax.aimodel`). `BASCoreAIHybridDecodeSession`
+auto-reads `next_token` (Int32) when present, else falls back to logits→argmaxF16. Device run (DUET, fused decode asset, A19 GPU):
+- **DEV_CONT_ARGMAX == host-fp16 reference 32/32** — the on-device fused argmax is byte-exact vs the host-side argmax.
+- 32 steps, 44.4 tok/s; the per-token full-vocab host readback is GONE (the index is computed in-graph).
+Cert log `Docs/cert-logs/fused-argmax-*.log`. (Sampling/temperature would emit logits or a top-k instead; the greedy fused path is proven.)
+
+### Device perf-confirm scoreboard (operator chose "2"):
+- **#1 T>64 prefill** (add. 36): FULL device PASS — T=256 scan_chunked runs on A19, exact.
+- **#2 fused argmax** (this): FULL device PASS — argmax lowers + runs on A19, 32/32 exact.
+- **#3 verify[1,K]**: host-equivalence PROVEN (add. 33, batched verify == sequential, byte-exact). The DEVICE asset is a
+  K-token-decode entrypoint converter (a new forward) — the remaining scaffolding; its speedup VALUE is trained-gated (acceptance rate).

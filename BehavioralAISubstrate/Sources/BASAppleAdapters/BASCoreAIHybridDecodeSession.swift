@@ -93,6 +93,11 @@ public final class BASCoreAIHybridDecodeSession: @unchecked Sendable {
         } catch {
             throw DecodeError.run("\(error)")
         }
+        if let v = outputs.remove("next_token"), let nd = v.ndArray {   // FUSED on-device argmax: read the index directly
+            var idx = 0
+            nd.view(as: Int32.self).withUnsafePointer { p, _, _ in idx = Int(p[0]) }
+            return idx                                                  // no V-wide host readback
+        }
         guard let value = outputs.remove("logits"), let logits = value.ndArray else { throw DecodeError.noLogits }
         return Self.argmaxF16(logits)
     }

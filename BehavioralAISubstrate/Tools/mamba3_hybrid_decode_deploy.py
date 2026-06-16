@@ -84,7 +84,10 @@ class HybridDecodeFixed(nn.Module):
         self.angle_all[:] = torch.stack(na); self.ssm_all[:] = torch.stack(ns)
         self.kprev_all[:] = torch.stack(nk); self.vprev_all[:] = torch.stack(nv)
         self.mla_kv[:] = torch.stack(nkv); self.mla_fill[:] = torch.stack(nf)
-        return (rms(x, self.m.fw) @ ew.to(x.dtype).t()).view(1, self.vocab)
+        logits = (rms(x, self.m.fw) @ ew.to(x.dtype).t()).view(1, self.vocab)
+        if os.environ.get("FUSED_ARGMAX") == "1":                    # fused on-device argmax: emit the token index, NOT the
+            return logits.argmax(-1).to(torch.int32)                 # full V-wide logits (kills the per-token host readback)
+        return logits
 
     def load_prefill(self, state, prompt_len):
         """Initialize resident state from a HybridM.prefill handoff (the State-Cache, STEP 5)."""
@@ -138,11 +141,13 @@ def convert() -> None:
     ep = torch.export.export(m, ex)
     ep = inject_subbyte_tensors(ep.run_decompositions(coreai_torch.get_decomp_table()))
     st = list(ep.graph_signature.buffers_to_mutate.values())
-    print(f"STEP-4 convert: {len(st)} resident states -> {st[:6]}...")
+    fused = os.environ.get("FUSED_ARGMAX") == "1"
+    out_name = "next_token" if fused else "logits"
+    print(f"STEP-4 convert: {len(st)} resident states -> {st[:6]}... output={out_name}")
     c = coreai_torch.TorchConverter().add_exported_program(
-        ep, input_names=["input_id"], output_names=["logits"], state_names=st, entrypoint_name="main")
+        ep, input_names=["input_id"], output_names=[out_name], state_names=st, entrypoint_name="main")
     p = c.to_coreai(); p.optimize()
-    out = Path(f"/tmp/draft_coreai/Mamba3HybridDecode_L{LAYERS}_M{MAX_SEQ}.aimodel")
+    out = Path(f"/tmp/draft_coreai/Mamba3HybridDecode_L{LAYERS}_M{MAX_SEQ}{'_argmax' if fused else ''}.aimodel")
     if out.exists():
         shutil.rmtree(out)
     out.parent.mkdir(parents=True, exist_ok=True)
