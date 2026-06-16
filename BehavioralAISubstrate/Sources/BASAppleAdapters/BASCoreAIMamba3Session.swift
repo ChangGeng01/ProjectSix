@@ -4,9 +4,13 @@
 // (Mamba-2/SSD). Mamba-3 (arXiv 2603.15569, ICLR 2026) generalizes Mamba-2 with trapezoidal discretization, a
 // complex-valued state realized as REAL 2×2 rotations + data-dependent RoPE, and MIMO rank-R — all lowering to
 // the same real primitives the Mamba-2 path proved. DEVICE-CERTIFIED on the A19 ANE (commit 5abc1d62b): the
-// FAITHFUL trapezoid (learned A, 3-term recurrence, rotated kprev/vprev delay, RoPE, MIMO) compiles + decodes —
-// L=2 clean 100%-ANE at 160.6 tok/s; L=16 decodes at 51.8 tok/s (one segment exceeds the per-asset compile
-// ceiling and falls back → fixed by asset-splitting).
+// FAITHFUL trapezoid (learned A, 3-term recurrence, rotated kprev/vprev delay, RoPE, MIMO) compiles + decodes.
+// The per-asset ANE compile ceiling for the trained Mamba-3 graph is ~8 layers (addendum 10: a SHARP cliff — L=8
+// is clean 100%-ANE, L=9 throws errors). L=2 is clean 100%-ANE (160.6 tok/s). L=16 EXCEEDS the ceiling and runs
+// GPU-mostly (the >8L path, ~88–97 tok/s on the CoreAI GPU backend; addenda 11–14) — and CANNOT be split around:
+// asset-splitting is DEVICE-REFUTED (2nd `AIModel.load` SIGSEGVs, a multi-function asset SIGABRTs, and the D=1024
+// residual hidden cannot cross an ANE segment boundary so even 2×8 multi-process fails at 80 errors; addenda 7/8/13).
+// The ONLY 100%-ANE form is a ≤8-layer single-function asset; deeper models are a CoreAI GPU-backend decoder.
 //
 // GENERIC over the carried state count (1–4): the ANE-crash bisection settled it — a single flat fused state
 // [L,S] sliced per layer SIGSEGVs the ANE segmenter at load; SEPARATE properly-shaped states registered
