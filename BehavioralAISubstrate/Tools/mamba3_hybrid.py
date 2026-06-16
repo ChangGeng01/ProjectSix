@@ -56,16 +56,19 @@ class HybridM(nn.Module):
                 out.append(("mamba", (z(H, N // 2), z(H, P, N), z(H, R, N), z(H, P, R))))
         return out
 
-    def prefill(self, tokens):
-        """DUET prefill: returns (final hidden seq [T,D], heterogeneous per-layer handoff state)."""
+    def prefill(self, tokens, init=None):
+        """DUET prefill: returns (final hidden seq [T,D], heterogeneous per-layer handoff state).
+        RESUMABLE (PREFIX STATE REUSE): `init` = a prior prefill's per-layer handoff → prefill(suffix, init=prefill(prefix))
+        == prefill(prefix+suffix). Each Mamba layer carries its O(1) 4-state; each MLA layer carries its O(ctx) latent cache."""
         x = self.embedding.weight[tokens]
         states = []
         for i, lyr in enumerate(self.layers):
+            li = init[i][1] if init is not None else None
             if self._is_mla(i):
-                x, cache = lyr.forward_seq(x)
+                x, cache = lyr.forward_seq(x, kv_init=li)
                 states.append(("mla", cache))
             else:
-                x, st = lyr.prefill_state(x)
+                x, st = lyr.prefill_state(x, init=li)
                 states.append(("mamba", st))
         return x, states
 

@@ -49,18 +49,25 @@ class MLABlock(nn.Module):
         hh = rms(x, self.mlp_norm)
         return self.mlp_down(F.silu(self.mlp_gate(hh)) * self.mlp_up(hh))
 
-    def forward_seq(self, x_seq):
-        """Prefill/training: causal MLA over [T,D]. Returns (block out [T,D], latent cache c_kv [T,D_LATENT])."""
-        T = x_seq.shape[0]
+    def forward_seq(self, x_seq, kv_init=None):
+        """Prefill/training: causal MLA over [Ts,D]. Returns (block out [Ts,D], FULL latent cache [Tp+Ts, D_LATENT]).
+        RESUMABLE (PREFIX STATE REUSE): `kv_init` [Tp,dc] = a prefix's cached latents — the suffix attends over
+        [prefix; suffix] (MLA is O(ctx), unlike the Mamba O(1) 4-state). kv_init=None reduces to plain causal attention."""
+        Ts = x_seq.shape[0]
         h = rms(x_seq, self.attn_norm)
-        q = self.q_proj(h).view(T, self.h, self.dh)
-        c_kv = self.kv_down(h)                                            # [T, dc] = the cache
-        k = self.k_up(c_kv).view(T, self.h, self.dh)
-        v = self.v_up(c_kv).view(T, self.h, self.dh)
-        scores = torch.einsum("thd,shd->hts", q, k) * self.scale          # [h,T,T]
-        mask = torch.triu(torch.ones(T, T, dtype=torch.bool, device=x_seq.device), 1)
+        q = self.q_proj(h).view(Ts, self.h, self.dh)                     # only the suffix queries
+        c_kv_s = self.kv_down(h)                                          # [Ts, dc] suffix latents
+        c_kv = c_kv_s if kv_init is None else torch.cat([kv_init, c_kv_s], 0)   # [Tp+Ts, dc] FULL cache
+        S = c_kv.shape[0]
+        Tp = S - Ts
+        k = self.k_up(c_kv).view(S, self.h, self.dh)
+        v = self.v_up(c_kv).view(S, self.h, self.dh)
+        scores = torch.einsum("thd,shd->hts", q, k) * self.scale          # [h,Ts,S]
+        keypos = torch.arange(S, device=x_seq.device).view(1, S)
+        qpos = (Tp + torch.arange(Ts, device=x_seq.device)).view(Ts, 1)   # suffix query j is global position Tp+j
+        mask = keypos > qpos                                              # causal: key s allowed iff s <= Tp+j
         a = scores.masked_fill(mask.unsqueeze(0), float("-inf")).softmax(-1)
-        o = torch.einsum("hts,shd->thd", a, v).reshape(T, self.h * self.dh)
+        o = torch.einsum("hts,shd->thd", a, v).reshape(Ts, self.h * self.dh)
         x1 = x_seq + self.o_proj(o)
         return x1 + self._mlp(x1), c_kv
 

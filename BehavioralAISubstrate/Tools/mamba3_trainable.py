@@ -61,10 +61,11 @@ def rope(t: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
     return torch.cat([t1 * c - t2 * s, t2 * c + t1 * s], -1)
 
 
-def scan_parallel(log_alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+def scan_parallel(log_alpha: torch.Tensor, u: torch.Tensor, ssm_in: torch.Tensor | None = None) -> torch.Tensor:
     """Parallel 1-semiseparable scan: ssm_t = alpha_t*ssm_{t-1} + u_t. Takes log_alpha = dt*A DIRECTLY (NOT
     log(exp(dt*A)) — that exp->log round-trip underflows to log(0)=-inf=NaN when dt*A drifts very negative in
-    training). ssm_t = sum_{s<=t} exp(L_t - L_s) u_s, L = cumsum(log_alpha); exp(non-positive) -> stable."""
+    training). ssm_t = sum_{s<=t} exp(L_t - L_s) u_s, L = cumsum(log_alpha); exp(non-positive) -> stable.
+    `ssm_in` (RESUMABLE prefill): carry-in state ssm_{-1} → adds exp(L_t)·ssm_in (the prefix's decayed contribution)."""
     T = log_alpha.shape[0]
     Lc = torch.cumsum(log_alpha, dim=0)                         # [T,H], non-increasing
     diff = Lc.unsqueeze(1) - Lc.unsqueeze(0)                    # [T,T,H]  (= L_t - L_s at [t,s])
@@ -72,10 +73,13 @@ def scan_parallel(log_alpha: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
     # mask the upper triangle to -inf BEFORE exp: there diff = L_i - L_j > 0 -> exp(+)=inf taints the BACKWARD
     # (0*inf=NaN). exp(-inf)=0 cleanly. (torch.where(mask, exp(diff), 0) still computes the inf -> NaN in bwd.)
     decay = torch.exp(diff.masked_fill(~mask.unsqueeze(-1), float("-inf")))
-    return torch.einsum("tsh,shpn->thpn", decay, u)            # [T,H,P,N]
+    out = torch.einsum("tsh,shpn->thpn", decay, u)            # [T,H,P,N]
+    if ssm_in is not None:
+        out = out + torch.exp(Lc).unsqueeze(-1).unsqueeze(-1) * ssm_in.unsqueeze(0)   # carry: alpha_0..alpha_t · ssm_{-1}
+    return out
 
 
-def scan_chunked(log_alpha: torch.Tensor, u: torch.Tensor, C: int = 64) -> torch.Tensor:
+def scan_chunked(log_alpha: torch.Tensor, u: torch.Tensor, C: int = 64, ssm_in: torch.Tensor | None = None) -> torch.Tensor:
     """Memory-efficient chunked equivalent of scan_parallel: O(C^2) decay/chunk vs O(T^2). Same recurrence
     ssm_t = alpha_t*ssm_{t-1} + u_t (takes log_alpha=dt*A directly, no exp->log underflow). Intra-chunk via a
     local CxC 1-SS matmul; inter-chunk via a short carry loop over nc=ceil(T/C) chunk-end states."""
@@ -93,11 +97,11 @@ def scan_chunked(log_alpha: torch.Tensor, u: torch.Tensor, C: int = 64) -> torch
     intra = torch.einsum("cijh,cjhps->cihps", Dloc, u.view(nc, C, Hh, Pp, Ss))   # within-chunk
     decay_start = torch.exp(cl)                                        # [nc,C,H] carry decay from chunk start
     outs = []
-    ssm_in = torch.zeros(Hh, Pp, Ss, dtype=u.dtype, device=u.device)
+    carry = torch.zeros(Hh, Pp, Ss, dtype=u.dtype, device=u.device) if ssm_in is None else ssm_in   # RESUMABLE: seed chunk 0
     for c in range(nc):
-        ssm_c = decay_start[c].unsqueeze(-1).unsqueeze(-1) * ssm_in.unsqueeze(0) + intra[c]   # [C,H,P,N]
+        ssm_c = decay_start[c].unsqueeze(-1).unsqueeze(-1) * carry.unsqueeze(0) + intra[c]   # [C,H,P,N]
         outs.append(ssm_c)
-        ssm_in = ssm_c[-1]
+        carry = ssm_c[-1]
     return torch.cat(outs, 0)[:T]
 
 
@@ -202,21 +206,26 @@ class Lyr(nn.Module):
         x1 = x_seq + out
         return x1 + self.mlp(x1), ssm_seq, angle
 
-    def prefill_state(self, x_seq):
+    def prefill_state(self, x_seq, init=None):
         """DUET prefill: chunked-scan over [T,D]; return (out_seq, boundary 4-state) so step_ref decode can resume.
         The boundary 4-state = (angle[-1], ssm_seq[-1], Brot[-1], x_mimo[-1]) — exactly what step_ref carries
-        (kprev=Brot, vprev=x_mimo). PARITY-A covers ssm; this exposes the FULL handoff so the chunked-prefill ->
-        per-token-decode seam can be fidelity-tested end-to-end."""
+        (kprev=Brot, vprev=x_mimo). RESUMABLE: `init`=(angle,ssm,kprev,vprev) carry-in from a prefix prefill →
+        prefill(suffix, init=prefill(prefix)) == prefill(prefix+suffix) for the suffix positions (PREFIX STATE REUSE)."""
         T = x_seq.shape[0]
         h = rms(x_seq, self.norm)
         z, xin, B, C, dt, alpha, la, beta, gamma, theta, x_mimo = self._coeffs(h)
         angle = torch.cumsum(dt.unsqueeze(-1) * theta, dim=0)
+        if init is not None:
+            angle = angle + init[0]                                    # continue the RoPE phase from the prefix boundary
         cos, sin = torch.cos(angle), torch.sin(angle)
         Brot, Crot = rope(B, cos, sin), rope(C, cos, sin)
         cur = torch.einsum("thpr,thrn->thpn", x_mimo, Brot)
-        cur_prev = torch.cat([torch.zeros_like(cur[:1]), cur[:-1]], 0)
+        # width-2 delay conv: cur_{-1} for suffix tok 0 = the prefix's last cur = einsum(vprev, kprev) (= step_ref's prev)
+        cur_m1 = torch.einsum("hpr,hrn->hpn", init[3], init[2]).unsqueeze(0) if init is not None else torch.zeros_like(cur[:1])
+        cur_prev = torch.cat([cur_m1, cur[:-1]], 0)
         u = beta.view(T, H, 1, 1) * cur_prev + gamma.view(T, H, 1, 1) * cur
-        ssm_seq = scan_chunked(la, u) if T > 64 else scan_parallel(la, u)
+        ssm_in = init[1] if init is not None else None
+        ssm_seq = scan_chunked(la, u, ssm_in=ssm_in) if T > 64 else scan_parallel(la, u, ssm_in=ssm_in)
         y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(rms(y_out.reshape(T, D_INNER) * F.silu(z), self.gnorm))
