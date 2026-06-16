@@ -103,6 +103,14 @@ class HybridDecodeFixed(nn.Module):
         self.mla_kv[:] = torch.stack(kv); self.mla_fill[:] = torch.stack(fl)
 
 
+class VerifyKFixed(HybridDecodeFixed):
+    """verify[1,K] self-spec entrypoint: feed K draft tokens, advance the 6 resident states by K, emit K logits — so the
+    target verifies a draft's K tokens in ONE asset call (greedy spec, byte-exact vs K sequential steps; host-proven add.33)."""
+
+    def forward(self, input_ids):                                    # [K] long -> [K, vocab]
+        return torch.cat([HybridDecodeFixed.forward(self, input_ids[k].view(1, 1)) for k in range(input_ids.shape[0])], 0)
+
+
 def verify_host() -> bool:
     torch.manual_seed(0)
     PROMPT, CONT = 64, 48
@@ -130,24 +138,26 @@ def convert() -> None:
     from coreai_torch._compression.utils import inject_subbyte_tensors
     torch.manual_seed(0)
     vocab, sd = HY.resolve_ckpt(VOCAB, LAYERS)                # CKPT env → trained weights + Granite vocab; else random/4096
-    m = HybridDecodeFixed(vocab, LAYERS, MAX_SEQ)
+    K = int(os.environ.get("VERIFY_K", "0"))                  # VERIFY_K>0 → the verify[1,K] self-spec entrypoint
+    m = (VerifyKFixed if K else HybridDecodeFixed)(vocab, LAYERS, MAX_SEQ)
     if sd is not None:
         miss, unexp = m.m.load_state_dict(sd, strict=False)
-        assert not unexp, f"CKPT has keys HybridDecodeFixed.m lacks: {unexp[:3]}"
+        assert not unexp, f"CKPT has keys lacked: {unexp[:3]}"
         print(f"loaded TRAINED ckpt (vocab={vocab}; {len(miss)} missing = the decode-state buffers, expected)")
     m = m.half().eval()
-    ex = (torch.zeros(1, 1, dtype=torch.long),)
+    ex = (torch.zeros(K, dtype=torch.long),) if K else (torch.zeros(1, 1, dtype=torch.long),)
     _ = m(*ex)
     ep = torch.export.export(m, ex)
     ep = inject_subbyte_tensors(ep.run_decompositions(coreai_torch.get_decomp_table()))
     st = list(ep.graph_signature.buffers_to_mutate.values())
     fused = os.environ.get("FUSED_ARGMAX") == "1"
-    out_name = "next_token" if fused else "logits"
-    print(f"STEP-4 convert: {len(st)} resident states -> {st[:6]}... output={out_name}")
+    in_name = "draft_ids" if K else "input_id"
+    out_name = "verify_logits" if K else ("next_token" if fused else "logits")
+    print(f"STEP-4 convert: {len(st)} resident states -> {st[:6]}... in={in_name} output={out_name} K={K}")
     c = coreai_torch.TorchConverter().add_exported_program(
-        ep, input_names=["input_id"], output_names=[out_name], state_names=st, entrypoint_name="main")
+        ep, input_names=[in_name], output_names=[out_name], state_names=st, entrypoint_name="main")
     p = c.to_coreai(); p.optimize()
-    out = Path(f"/tmp/draft_coreai/Mamba3HybridDecode_L{LAYERS}_M{MAX_SEQ}{'_argmax' if fused else ''}.aimodel")
+    out = Path(f"/tmp/draft_coreai/Mamba3HybridDecode_L{LAYERS}_M{MAX_SEQ}{'_verifyK%d' % K if K else ('_argmax' if fused else '')}.aimodel")
     if out.exists():
         shutil.rmtree(out)
     out.parent.mkdir(parents=True, exist_ok=True)

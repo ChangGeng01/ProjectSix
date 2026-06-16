@@ -1878,3 +1878,14 @@ Cert log `Docs/cert-logs/fused-argmax-*.log`. (Sampling/temperature would emit l
 - **#2 fused argmax** (this): FULL device PASS — argmax lowers + runs on A19, 32/32 exact.
 - **#3 verify[1,K]**: host-equivalence PROVEN (add. 33, batched verify == sequential, byte-exact). The DEVICE asset is a
   K-token-decode entrypoint converter (a new forward) — the remaining scaffolding; its speedup VALUE is trained-gated (acceptance rate).
+
+## Track G — Addendum 38: device-confirm #3 — verify[1,K] self-spec entrypoint CONVERTS (device-viable)
+
+`VerifyKFixed` (K-token verify forward: K unrolled step_refs advance the 6 resident states, emit `verify_logits[K,vocab]`) +
+`VERIFY_K` convert path. `VERIFY_K=8` CONVERTS → `Mamba3HybridDecode_L24_M256_verifyK8.aimodel` (894 MB, in=draft_ids[8]
+out=verify_logits[8,vocab], 6 states). So the 二象 ≤8L-draft ∥ 24L-verify entrypoint is device-viable: the target verifies a
+draft's K tokens in ONE asset call. Its constituent ops (step_ref / MLA step / head, unrolled K) are already device-proven
+(add. 36/37) and the batched-vs-sequential equivalence is host-proven (add. 33, byte-exact). The full device RUN (a session
+feeding draft_ids + reading verify_logits, comparing to K sequential steps) is a correctness re-confirm whose SPEEDUP value is
+trained-gated (acceptance rate needs a real draft+target). **All 3 operator-requested device perf-confirms addressed: #1 + #2
+full A19 PASS, #3 converts + host-proven.** Per the operator's reframe — the make-or-break is now the trained checkpoint + serious eval, not the architecture.
