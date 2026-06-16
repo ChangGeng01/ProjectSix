@@ -15,6 +15,7 @@ Run: cd BehavioralAISubstrate && source ~/.venvs/coreai-cv/bin/activate && pytho
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -29,7 +30,7 @@ from coreai_torch._compression.utils import inject_subbyte_tensors
 import mamba3_mla as MLA
 import mamba3_trainable as MT
 
-T = 64
+T = int(os.environ.get("PROBE_T", "64"))   # PROBE_T>64 forces the chunked-scan path (scan_chunked) — the real-corpus prefill gate
 D = MT.D_MODEL
 OUTDIR = Path("/tmp/draft_coreai")
 

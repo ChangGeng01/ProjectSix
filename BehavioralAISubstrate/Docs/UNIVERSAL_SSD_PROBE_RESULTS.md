@@ -1782,3 +1782,27 @@ spot (~20M-token PoC; teacher top-K cache built once). REMAINING NON-BLOCKING GA
 HotpotQA val split ~7.4k (graceful; log the real count); (b) no torch-vs-on-device-ASSET quality gate on TRAINED weights — the
 conversion-fidelity gates now run on the trained ckpt (decomposition exact) but the asset-vs-trained-model argmax compare is the
 device probe (post-cloud). Training-time eval (RAFT E1/E2/E3 robustness) is wired + trustworthy.
+
+## Track G — Addendum 33: 一次性 — ALL host-buildable 剩余部分 closed (StateMarket · 资料层 dedup · verify[1,K] · T>64 convert)
+
+Closed every remaining HOST-buildable gap from the coverage scorecard + pre-cloud audit, each with a passing test:
+- **StateMarket (竞争层)** (`mamba3_statelake.py`): states compete for the hot-tier budget by VALUE = (hits+1)·prompt_len /
+  (size_mb·recency); `admit()` greedily fills the budget (high-value hot, rest→warm), `arbitrate()` picks the single most-
+  valuable candidate (composition stays KILLED). Self-test PASS: budget≈2 states → hot1∈hot, cold∉hot, arbitrate→hot1.
+  (+ `get()` records hits/last_used; schema gained hits/last_used/size_mb; `_valid` unpack widened.)
+- **资料层 dedup** (`mamba3_context_compiler.py` + `StateLake.find_by_content`): cross-corpus content-addressed reuse — docB
+  sharing docA's 64-tok prefix dedup-HITS the shared tile (1/2), not re-prefilled. The 资料层 cache (model-safe via binding-key).
+- **verify[1,K] self-spec (二象, STEP 10)** (`test_verify_kstep.py`): the target's BATCHED verify of K tokens == K sequential
+  step_ref decodes (logit max-err 2.1e-5, argmax 100%) → greedy speculative decode is BYTE-EXACT. The ≤8L-draft ∥ 24L-verify
+  loop is algorithmically sound (verify[1,K] = `head(prefill(K, init=state))`, weight-independent; acceptance RATE needs trained models).
+- **T>64 chunked-scan convert (STEP 6)** (`mamba3_prefill_probe.py PROBE_T=256`): the `scan_chunked` carry-loop + MLA
+  attention BOTH convert to `.aimodel` at T=256 → real-corpus prefill is host-convertible (the audit's "Context Compiler is a
+  64-token toy" gate clears at the convert level; the device RUN of the T=256 asset is the remaining confirmatory step).
+- **N_ROWS** (audit GAP #7): non-issue — `cloud_distill.py:141` already logs the actual `train=`/`held=` counts post-split.
+
+**就差什么了 (the IRREDUCIBLE remainder — none autonomously closeable):** (1) the **cloud distill RUN** — needs the operator's
+RunPod compute; turnkey-ready (`ARCH=hybrid`, seam fixed, ~$50–200). (2) **trained-model quality** (最强大, int8-cert-on-trained,
+the 语义层 evidence-compressor's VALUE) — all downstream of #1; cannot be measured on random weights. (3) **3 confirmatory device
+RUNS** — T>64 prefill on-device, fused on-device argmax, verify[1,K] on-device — their CONVERTS/equivalences are host-proven;
+the device runs confirm placement/perf. Every host MECHANISM of the three-pillar system is now built + verified; the spine is
+device-proven. The product is mechanism-complete — it awaits a trained checkpoint (the cloud run) to become a model worth shipping.

@@ -165,7 +165,8 @@ class StateLake:
         self.db = sqlite3.connect(os.path.join(root, "statelake.db"))
         self.db.execute("""CREATE TABLE IF NOT EXISTS states(
             id TEXT PRIMARY KEY, corpus TEXT, prefix TEXT, binding_key TEXT, parent TEXT, owner TEXT, acl TEXT,
-            prompt_len INT, created REAL, expires REAL, tier TEXT, path TEXT, checksum TEXT)""")
+            prompt_len INT, created REAL, expires REAL, tier TEXT, path TEXT, checksum TEXT,
+            hits INTEGER DEFAULT 0, last_used REAL, size_mb REAL)""")
         self.db.commit()
         self._hot: OrderedDict = OrderedDict()                          # tier HOT: in-RAM LRU of rehydrated states
         self._hot_cap = 8
@@ -178,15 +179,16 @@ class StateLake:
         sid = _digest(corpus, prefix, bkey)[:24]
         path = os.path.join(self.root, "blobs", sid)
         h = serialize_artifact(state, prompt_len, bkey, path, parent=parent, corpus=corpus, ttl_s=ttl_s, now=self._now())
-        self.db.execute("INSERT OR REPLACE INTO states VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        size_mb = sum(os.path.getsize(os.path.join(path, f)) for f in os.listdir(path)) / 1e6
+        self.db.execute("INSERT OR REPLACE INTO states VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (sid, corpus, prefix, bkey, parent, owner, acl, prompt_len, h["created"], h["expires"],
-                         "warm", path, h["checksum"]))
+                         "warm", path, h["checksum"], 0, h["created"], size_mb))
         self.db.commit()
         self._layer_tags = layer_tags                                  # the consumer supplies the per-layer tag schema
         return sid
 
     def _valid(self, row, requester, bkey):
-        _, corpus, prefix, rbkey, parent, owner, acl, plen, created, expires, tier, path, ck = row
+        _, corpus, prefix, rbkey, parent, owner, acl, plen, created, expires, tier, path, ck, *_ = row
         if rbkey != bkey:
             return False, "binding-key (stale model/version)"
         if expires is not None and self._now() > expires:
@@ -196,6 +198,8 @@ class StateLake:
         return True, "ok"
 
     def get(self, sid, requester, bkey, layer_tags):
+        self.db.execute("UPDATE states SET hits=hits+1, last_used=? WHERE id=?", (self._now(), sid))  # market signal
+        self.db.commit()
         if sid in self._hot:                                            # HOT tier
             self._hot.move_to_end(sid)
             return self._hot[sid]
@@ -249,6 +253,56 @@ class StateLake:
             return ResumePlan(None, 0, query_prefix, "cold: no valid ancestor — full prefill")
         return ResumePlan(best[0], best[7], query_prefix[len(best[2]):], f"reuse '{best[2][:24]}…' ({best[7]} tok), prefill suffix")
 
+    def find_by_content(self, prefix: str, bkey: str, requester="owner"):
+        """资料层 dedup: any VALID state for this exact content-prefix, REGARDLESS of corpus (a shared system prompt is
+        compiled once, reused across corpora). Returns sid or None. Content-addressed + binding-key-scoped (model-safe)."""
+        for row in self.db.execute("SELECT * FROM states WHERE prefix=? AND binding_key=?", (prefix, bkey)).fetchall():
+            ok, _ = self._valid(row, requester, bkey)
+            if ok:
+                return row[0]
+        return None
+
+
+class StateMarket:
+    """The 竞争层 — states compete for the hot-tier BUDGET by VALUE (worth-being-kept). Sits above StateLake (storage) and
+    the Router (which finds candidates). value = (hits+1)·reconstruction_work / (size_mb · recency_decay):
+      reconstruction_work ~ prompt_len (a longer cached prefix saved more prefill, so it is costlier to recompute → keep it);
+      hits = reuse frequency; recency_decay penalizes stale states; size_mb = the budget it consumes.
+    admit() greedily fills the hot budget with the top-value states (demotes the rest to warm-disk); arbitrate() picks the
+    SINGLE most-valuable candidate for a query (you resume from only ONE — composition stays KILLED)."""
+
+    def __init__(self, lake: StateLake, hot_budget_mb: float = 8.0):
+        self.lake, self.budget = lake, hot_budget_mb
+
+    def value(self, hits, prompt_len, size_mb, age_s):
+        return (hits + 1) * max(prompt_len, 1) / (max(size_mb, 1e-3) * (1.0 + age_s / 3600.0))
+
+    def _scored(self, bkey=None):
+        now = self.lake._now()
+        rows = self.lake.db.execute("SELECT id, prompt_len, size_mb, last_used, hits, binding_key FROM states").fetchall()
+        out = [(sid, self.value(hits, plen, size or 0.0, now - (last or now)), size or 0.0)
+               for sid, plen, size, last, hits, rbk in rows if not bkey or rbk == bkey]
+        return sorted(out, key=lambda x: -x[1])
+
+    def admit(self):
+        """Greedily fill the hot budget with the highest-value states; demote the rest to warm. Returns the hot set."""
+        hot, used = [], 0.0
+        for sid, val, size in self._scored():
+            if used + size <= self.budget:
+                hot.append(sid); used += size; tier = "hot"
+            else:
+                tier = "warm"
+            self.lake.db.execute("UPDATE states SET tier=? WHERE id=?", (tier, sid))
+        self.lake.db.commit()
+        return hot
+
+    def arbitrate(self, candidate_ids):
+        """Among query-relevant candidates (e.g. the Router's matches), the single most-valuable to actually load."""
+        if not candidate_ids:
+            return None
+        scored = {sid: v for sid, v, _ in self._scored()}
+        return max(candidate_ids, key=lambda s: scored.get(s, 0.0))
+
 
 # --------------------------------------------------------------------------------------------------- self-test
 def _selftest() -> None:
@@ -292,6 +346,18 @@ def _selftest() -> None:
     plan = lake.route("docA", "the quick brown fox jumps over", bkey)
     print(f"  (4) router: reuse_id={'set' if plan.state_id else 'none'} reuse_len={plan.reuse_prompt_len} "
           f"suffix='{plan.missing_suffix[:18]}' -> {'PASS' if plan.state_id else 'FAIL'} ({plan.note[:40]})")
+
+    # (M) StateMarket 竞争层: under a hot budget, value-based admit + arbitrate (hits drive value here; same size)
+    ids = {c: lake.put(state, 64, bkey, corpus=c, prefix=c, layer_tags=tags) for c in ("hot1", "hot2", "cold")}
+    for _ in range(5): lake.get(ids["hot1"], "owner", bkey, tags)       # heavy reuse → high value
+    for _ in range(2): lake.get(ids["hot2"], "owner", bkey, tags)
+    one_mb = lake.db.execute("SELECT size_mb FROM states WHERE id=?", (ids["hot1"],)).fetchone()[0]
+    market = StateMarket(lake, hot_budget_mb=2.1 * one_mb)              # budget fits ~2 states
+    hotset = market.admit()
+    pick = market.arbitrate(list(ids.values()))
+    ok = ids["hot1"] in hotset and ids["cold"] not in hotset and pick == ids["hot1"]
+    print(f"  (M) StateMarket: budget≈2 states · admitted {len(hotset)} hot (hot1∈hot={ids['hot1'] in hotset}, "
+          f"cold∈hot={ids['cold'] in hotset}) · arbitrate→{'hot1' if pick == ids['hot1'] else pick[:6]} -> {'PASS' if ok else 'FAIL'}")
 
     # (5) TTL expiry + (6) model-version mass-invalidation
     sid2 = lake.put(state, 64, bkey, "docB", "old", tags, ttl_s=-1)    # already expired

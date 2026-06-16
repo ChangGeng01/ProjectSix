@@ -29,15 +29,23 @@ class ContextCompiler:
     def __init__(self, model, lake: SL.StateLake, bkey: str, layer_tags: list[str]):
         self.m, self.lake, self.bkey, self.tags = model, lake, bkey, layer_tags
 
-    def compile(self, tokens, corpus: str, tile: int = 64) -> str:
-        """Tile + resume-prefill the corpus; store every cumulative-prefix state with lineage. Returns the final state id."""
-        state, parent = None, None
+    def compile(self, tokens, corpus: str, tile: int = 64):
+        """Tile + resume-prefill the corpus; store every cumulative-prefix state with lineage. 资料层 DEDUP: if a cumulative
+        prefix was ALREADY compiled (same content, same model — e.g. a shared system prompt across corpora), REUSE it instead
+        of re-prefilling. Returns (final state id, dedup_hits, tiles_total)."""
+        state, parent, hits, total = None, None, 0, 0
         for start in range(0, len(tokens), tile):
-            chunk = tokens[start:start + tile]
-            _, state = self.m.prefill(chunk, init=state)               # RESUME from the running cumulative state
-            cum = start + len(chunk)
-            parent = self.lake.put(state, cum, self.bkey, corpus, tokstr(tokens[:cum]), self.tags, parent=parent, ttl_s=3600)
-        return parent
+            total += 1
+            cum = start + len(tokens[start:start + tile])
+            pfx = tokstr(tokens[:cum])
+            dup = self.lake.find_by_content(pfx, self.bkey)            # already compiled this exact prefix?
+            if dup is not None:
+                state, _ = self.lake.get(dup, "owner", self.bkey, self.tags)   # REUSE — skip prefill (dedup hit)
+                parent, hits = dup, hits + 1
+                continue
+            _, state = self.m.prefill(tokens[start:start + tile], init=state)   # RESUME from the running cumulative state
+            parent = self.lake.put(state, cum, self.bkey, corpus, pfx, self.tags, parent=parent, ttl_s=3600)
+        return parent, hits, total
 
     def serve(self, corpus: str, query, cont):
         """ROUTE→REUSE→PREFILL-suffix→DECODE. Returns (argmax tokens, reused_prefix_len, prefilled_suffix_len, note)."""
@@ -70,8 +78,14 @@ def _selftest() -> None:
     cont = torch.randint(0, V, (16,))                                  # the answer tokens to score
 
     print("Context Compiler self-test (浑然一体 closed loop, 24L hybrid, host):")
-    final = cc.compile(doc, "docA", tile=64)                           # checkpoints at cum=64 and cum=128 (lineage chain)
-    print(f"  compiled corpus (128 tok, tile=64) → {len(lake.lineage(final))} lineage checkpoints, final={final[:8]}")
+    final, hits, total = cc.compile(doc, "docA", tile=64)              # checkpoints at cum=64 and cum=128 (lineage chain)
+    print(f"  compiled corpus (128 tok, tile=64) → {len(lake.lineage(final))} lineage checkpoints, final={final[:8]} (dedup {hits}/{total})")
+
+    # 资料层 cross-corpus dedup: docB SHARES docA's first 64 tokens (a shared 'system prompt'); that tile must dedup-HIT
+    docB = torch.cat([doc[:64], torch.randint(0, V, (64,))])
+    _, hitsB, totalB = cc.compile(docB, "docB", tile=64)
+    print(f"  (dedup) docB shares docA's 64-tok prefix → compile dedup {hitsB}/{totalB} (shared tile reused, not re-prefilled) "
+          f"-> {'PASS' if hitsB == 1 else 'FAIL'}")
 
     arg, reused, prefilled, note = cc.serve("docA", query, cont)       # reuses the cum=64 checkpoint (deepest ≤96 prefix)
     with torch.no_grad():                                              # from-scratch ground truth
