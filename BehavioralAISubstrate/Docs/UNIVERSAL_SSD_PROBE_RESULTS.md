@@ -1889,3 +1889,21 @@ draft's K tokens in ONE asset call. Its constituent ops (step_ref / MLA step / h
 feeding draft_ids + reading verify_logits, comparing to K sequential steps) is a correctness re-confirm whose SPEEDUP value is
 trained-gated (acceptance rate needs a real draft+target). **All 3 operator-requested device perf-confirms addressed: #1 + #2
 full A19 PASS, #3 converts + host-proven.** Per the operator's reframe — the make-or-break is now the trained checkpoint + serious eval, not the architecture.
+
+## Track G — Addendum 39: the make-or-break systems — mature curriculum + SERIOUS eval (the bar for 成了)
+
+The operator's reframe: "成败点在有没有真实 checkpoint 和严肃评测; 没有这两个不能宣称成了." Built both (host, smoke-verified):
+- **`Tools/mamba3_curriculum_scheduler.py`** — `CurriculumScheduler`: difficulty = weighted(teacher-CE + entropy + length +
+  #distractors + rarity), competence pacing c(t) (root_p/linear/step), competence-gated sampling (easy→hard), anti-forgetting
+  replay (replay_prob from the easy pool), RAFT distractor STAGING gold-heavy(E1)→distractor-heavy(E3), resume-safe state_dict.
+  CURRIC_SMOKE PASS (competence monotone 0.10→0.97, sampled difficulty rises 0.12→0.45, staging (1.0,0)→(0.80,4), rng round-trip).
+- **`Tools/mamba3_eval.py`** — 7 batteries: perplexity (wikitext + HotpotQA-held), RAFT robustness (E1/E2/E3 nll/acc + slopes),
+  teacher-student fidelity (full-vocab KL / top-k / argmax agreement), generation EM/F1 (greedy), calibration (ECE), quant
+  fidelity (STUB→device), contamination guard (deterministic sha1 split, train∩held=∅). EVAL_SMOKE PASS (every battery runs
+  finite on random MT.M; claim_card→亏的, correct).
+
+**The honest 成了 bar (`claim_card`, 7 HARD gates — ALL green or 亏的✗ + no checkpoint promoted):**
+1. task-fit: HotpotQA-held nll ≤2.10 AND (E1_nll − teacher_E1) ≤0.15;  2. RAFT robust: slope(E2−E1) <0.05;  3. graceful:
+slope(E3−E1) <0.12;  4. fidelity: argmax-agreement ≥0.60;  5. generation: EM ≥0.50 AND F1 ≥0.60;  6. stability: skip_pct ≤0.05;
+7. no contamination. These run on `ckpt_best.pt` at end-of-training; a random-weight checkpoint FAILS them (proven by the smoke
+— the bar is honest, not a rubber stamp). NEXT: wire curriculum-sample + best-ckpt + the eval-card report into mamba3_cloud_distill.py.
