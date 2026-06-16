@@ -1268,3 +1268,30 @@ CONSEQUENCE for the deploy/distill target: depth is a QUALITY-vs-POWER choice, n
 
 So the cloud distill is NOT forced to 8 layers. (Speeds are random-weight OP-GRAPH measurements — valid for the trained
 model, same graph; numerics meaningless. CPU-only is a separate CoreAI segmenter bug, never a deploy path.)
+
+---
+
+## Track G — Addendum 13: the ROOT CAUSE found — the residual hidden can't cross an ANE boundary; multi-process 2×8 ALSO fails
+
+Pursuing 100%-ANE-16 via the only un-refuted path (multi-process 2×8, per operator "继续尝试 100ane 最谨慎"), built
+the split-half assets (deploy `SPLIT=head|tail`): HEAD = embed + 8 layers → boundary hidden [1,1024]; TAIL = hidden
+[1,1024] → 8 layers + LM head → logits. Each is only 8 layers (the proven-clean depth). Device result:
+| 8-layer variant | "ANE cannot handle" errors |
+|---|---|
+| full (input_id → logits) | **0** (clean) |
+| HEAD (input_id → hidden) | **80** |
+| TAIL (hidden → logits) | **82** |
+
+ROOT CAUSE (unifies addenda 10/11/12): the un-typeable intermediate is the **D=1024 residual HIDDEN when it is
+materialized at an ANE segment / model-I/O boundary.** `input_id` (int → embedding gather) and `logits` (matmul output)
+are valid ANE boundary tensors; the raw residual activation is NOT (it fails as either input OR output — tail-input
+fails too, and input_id is far smaller yet clean, so it is not a min-size issue but the residual tensor's type/role).
+This explains the whole cliff: ≤8 layers compiles as ONE segment so the hidden is never a boundary (clean); ≥9 forces
+partitioning so the hidden lands on a seam (fails); and an explicit 2×8 split makes the hidden an I/O (fails at 8).
+
+CONSEQUENCE: **multi-process 2×8 does NOT escape the wall** — the cross-process boundary IS a residual-hidden I/O, which
+fails to compile 100%-ANE (80 errors at 8 layers). So **100%-ANE is only achievable when the ENTIRE model is one ANE
+segment = ≤8 layers; NO decomposition (depth-partition, single-process split, or multi-process) that materializes the
+residual at a boundary can be 100%-ANE.** This is the definitive, mechanism-grounded answer to "can 16 layers be
+100%-ANE": no. 16 layers runs fine at 97 tok/s (GPU, clean) / 88 (ANE-mostly) — that is the path for >8 layers.
+(deploy SPLIT=head|tail knob added for this probe.)

@@ -30,7 +30,8 @@ L = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 VOCAB = 100352                                                    # Granite tokenizer
 CKPT = "/tmp/draft_coreai/mamba3_poc_student.pt"
-_TAG = ("_fp16" if os.environ.get("FP16") == "1" else "") + \
+_TAG = (f"_{os.environ['SPLIT']}" if os.environ.get("SPLIT") else "") + \
+       ("_fp16" if os.environ.get("FP16") == "1" else "") + \
        (f"_n{MT.N}p{MT.P}" if (MT.N, MT.P) != (64, 64) else "") + \
        ("_leanmlp" if os.environ.get("LEAN_MLP") == "1" else "") + \
        (f"_{os.environ['STATE_WRITE']}" if os.environ.get("STATE_WRITE") else "") + \
@@ -72,6 +73,18 @@ class DeployM(nn.Module):
     def forward(self, input_id):
         import os
         ew = self.embedding.weight_fp16() if hasattr(self.embedding, "weight_fp16") else self.embedding.weight
+        split = os.environ.get("SPLIT", "")
+        if split:                                                      # multi-process 2x8: HEAD=embed+L layers->hidden;
+            x = input_id.view(D) if split == "tail" else F.embedding(input_id, ew).view(D)   # TAIL=hidden->L layers+head->logits
+            na, ns, nk, nv = [], [], [], []
+            for i, l in enumerate(self.layers):
+                x, a, sm, k, v = l.step_ref(x, self.angle_all[i], self.ssm_all[i], self.kprev_all[i], self.vprev_all[i])
+                na.append(a); ns.append(sm); nk.append(k); nv.append(v)
+            self.angle_all[:] = torch.stack(na, 0); self.ssm_all[:] = torch.stack(ns, 0)
+            self.kprev_all[:] = torch.stack(nk, 0); self.vprev_all[:] = torch.stack(nv, 0)
+            if split == "head":
+                return x.view(1, D)                                    # boundary hidden out (to the tail process)
+            return (MT.rms(x, self.fw) @ ew.to(x.dtype).t()).view(1, VOCAB)
         x = F.embedding(input_id, ew).view(D)
         mode = os.environ.get("STATE_WRITE", "stack")
         if mode == "separate":
@@ -122,12 +135,16 @@ def main() -> None:
         print(f"no checkpoint at {CKPT} — converting random-init (op-graph + ANE deploy test)")
 
     m = (m if os.environ.get("FP16") == "1" else m.quantize()).half()   # FP16: skip int8 quant — clean fp16 ceiling test
-    _ = m(torch.zeros(1, 1, dtype=torch.long))
-    ep = torch.export.export(m.eval(), (torch.zeros(1, 1, dtype=torch.long),))
+    _split = os.environ.get("SPLIT", "")
+    in_name = "hidden" if _split == "tail" else "input_id"
+    out_name = "hidden_out" if _split == "head" else "logits"
+    ex_in = (torch.zeros(1, D, dtype=torch.float16),) if _split == "tail" else (torch.zeros(1, 1, dtype=torch.long),)
+    _ = m(*ex_in)
+    ep = torch.export.export(m.eval(), ex_in)
     ep = inject_subbyte_tensors(ep.run_decompositions(coreai_torch.get_decomp_table()))
     st = list(ep.graph_signature.buffers_to_mutate.values()); print("states:", st)
     c = coreai_torch.TorchConverter().add_exported_program(
-        ep, input_names=["input_id"], output_names=["logits"], state_names=st, entrypoint_name="main")
+        ep, input_names=[in_name], output_names=[out_name], state_names=st, entrypoint_name="main")
     p = c.to_coreai(); p.optimize()
     if Path(OUT).exists():
         shutil.rmtree(OUT)
