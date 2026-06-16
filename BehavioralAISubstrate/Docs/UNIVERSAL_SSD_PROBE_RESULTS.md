@@ -1436,3 +1436,30 @@ prefill→decode seam reproduces the monolithic continuation token-identically (
 addendum 17 (serialization safe + non-compounding), the WHOLE DUET handoff (prefill → state-cache → decode) is
 host-verified. Code: `Lyr.prefill_state`, `M.prefill`, `M.run_ref(init=)`. REMAINING for the DUET: on-device (the
 prefill .aimodel runs GPU — convertibility already confirmed) + the MLA-KV handoff (hybrid, once the MLA layer is built).
+
+## Track G — Addendum 19: test battery P0-1 — the teacher top-K cache trained a DIFFERENT objective at TAU=2 (FIXED → TAU=1)
+
+The route-evolution battery's #1 blast-radius test (`Tools/test_p0_1_topk_kd.py`, real Granite-4.1-3b, 12 RAFT HotpotQA
+examples) falsifies the cloud cost model if it fails: the cached top-K KD must train the SAME objective as full-vocab KD,
+else the cloud spends $ optimizing the wrong loss. Initial config (TAU=2, K=64) **FAILED** — top-64 captured only 0.32 of
+the tempered mass, grad-cosine 0.91 (bar ≥0.98), loss-ratio 2.23 (bar [0.9,1.1]). Root cause: TAU=2 over a 100352-vocab
+flattens the softmax so the top-64 logits miss 68% of the mass — the cache is structurally blind to the tail KD trains on.
+
+TAU × K × method sweep (median over the 12 examples) located the fix:
+
+| TAU | K | method | capt.mass | grad-cos | loss-ratio | verdict |
+|----:|---:|--------:|----------:|---------:|-----------:|:--------|
+| 1.0 | 64 | topk | 0.990 | 0.999 | 1.04 | **PASS** |
+| 1.0 | 256 | topk | 0.996 | 1.000 | 1.02 | PASS |
+| 1.5 | 1024 | topk | 0.896 | 0.997 | 1.14 | fail |
+| 2.0 | 64 | topk | 0.319 | 0.910 | 2.23 | fail |
+| 2.0 | 1024 | topk | 0.556 | 0.973 | 1.71 | fail |
+| 1.0 | 64 | topk+TAIL | 0.990 | 1.000 | 0.98 | PASS |
+| 2.0 | 64 | topk+TAIL | 0.319 | 0.999 | 0.69 | fail (scale) |
+
+Findings: (1) **TAU=1, top-64 ≡ full-vocab KD** (captures 99%, grad-cos 0.999, loss-ratio 1.04) — the cache (top-K logits)
+was always fine; the *temperature* was the bug. (2) TAU=2 is unrecoverable by K alone (even K=1024 → 0.556 mass). (3) The
+lumped-TAIL bucket fixes the gradient DIRECTION at TAU=2 (cos 0.999) but not the loss SCALE (ratio 0.69) — so it is not a
+substitute for the right temperature. **FIX APPLIED**: `mamba3_cloud_distill.py` default `TAU` 2.0 → 1.0 (valid for both
+the full-vocab and cached top-K paths; the top-K path *requires* it). TAU=1 KD = match the teacher's native next-token
+distribution, which is standard for LM distillation. The cloud cost model (cache top-K once, reuse) is now sound at TAU=1.

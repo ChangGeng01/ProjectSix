@@ -43,7 +43,9 @@ STEPS = int(os.environ.get("STEPS", "20000"))
 LR = float(os.environ.get("LR", "3e-4"))
 WARMUP = int(os.environ.get("WARMUP", "800"))
 ACCUM = int(os.environ.get("ACCUM", "8"))                               # grad-accum → effective batch
-TAU = float(os.environ.get("TAU", "2.0"))
+TAU = float(os.environ.get("TAU", "1.0"))   # P0-1 (test_p0_1_topk_kd.py): at TAU=2 over 100k vocab the top-K cache misses
+#   68% of the tempered mass (grad-cos 0.91, loss-ratio 2.23 vs full KD). TAU=1 → top-64 captures 99%, grad-cos 0.999,
+#   loss-ratio 1.04 = matches full-vocab KD. The cache (top-K logits) was fine; the temperature was the bug.
 KD_W = float(os.environ.get("KD_W", "1.0"))
 CE_W = float(os.environ.get("CE_W", "0.5"))
 N_ROWS = int(os.environ.get("N_ROWS", "20000"))                         # HotpotQA rows to draw from
