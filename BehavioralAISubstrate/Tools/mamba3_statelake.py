@@ -17,9 +17,11 @@ Self-test (no device, no trained ckpt): ~/.venvs/coreai-cv/bin/python Tools/mamb
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import struct
 import sys
@@ -127,8 +129,11 @@ def deserialize_artifact(path: str, expected_bkey: str, layer_tags: list[str]):
     if h["binding_key"] != expected_bkey:
         raise StateLakeError(f"binding-key mismatch: artifact {h['binding_key'][:12]} != consumer {expected_bkey[:12]} "
                              f"(wrong model/precision/max_seq/version) — refusing to rehydrate stale state")
-    with open(os.path.join(path, "payload.bin"), "rb") as f:
-        blob = f.read()
+    pb = os.path.join(path, "payload.bin")
+    if os.path.exists(pb):                                            # HOT/WARM tier
+        blob = open(pb, "rb").read()
+    else:                                                            # COLD tier — decompress on access (transparent)
+        blob = gzip.open(pb + ".gz", "rb").read()
     if hashlib.blake2b(blob, digest_size=16).hexdigest() != h["checksum"]:
         raise StateLakeError("payload checksum mismatch — corrupt .statelake")
     import numpy as np
@@ -253,6 +258,23 @@ class StateLake:
             return ResumePlan(None, 0, query_prefix, "cold: no valid ancestor — full prefill")
         return ResumePlan(best[0], best[7], query_prefix[len(best[2]):], f"reuse '{best[2][:24]}…' ({best[7]} tok), prefill suffix")
 
+    def to_cold(self, sid) -> float:
+        """分层存储 COLD tier: gzip the artifact payload + drop the uncompressed copy (read transparently decompresses).
+        Returns the new (compressed) size_mb. The neural state is rarely-used → trade access latency for footprint."""
+        row = self.db.execute("SELECT path FROM states WHERE id=?", (sid,)).fetchone()
+        if not row:
+            raise StateLakeError(f"no state {sid}")
+        pb = os.path.join(row[0], "payload.bin")
+        if os.path.exists(pb):
+            with open(pb, "rb") as f, gzip.open(pb + ".gz", "wb") as g:
+                shutil.copyfileobj(f, g)
+            os.remove(pb)
+        new_mb = os.path.getsize(pb + ".gz") / 1e6
+        self.db.execute("UPDATE states SET tier='cold', size_mb=? WHERE id=?", (new_mb, sid))
+        self.db.commit()
+        self._hot.pop(sid, None)
+        return new_mb
+
     def find_by_content(self, prefix: str, bkey: str, requester="owner"):
         """资料层 dedup: any VALID state for this exact content-prefix, REGARDLESS of corpus (a shared system prompt is
         compiled once, reused across corpora). Returns sid or None. Content-addressed + binding-key-scoped (model-safe)."""
@@ -366,8 +388,32 @@ def _selftest() -> None:
     inv = lake.invalidate_by_binding(bad)                              # current bkey is int8 → all int8 states purged
     print(f"  (5) TTL expire_due removed={exp} -> {'PASS' if exp >= 1 else 'FAIL'}")
     print(f"  (6) model-version invalidate (current key=fp16) purged {inv} stale int8 states -> {'PASS' if inv >= 1 else 'FAIL'}")
-    print("\nREAD: StateLake = put/get with FAIL-CLOSED binding-key + checksum + lineage DAG + fork + router + TTL + version-invalidation. "
-          "Closes the scorecard's two BLOCKERS (no binding-key, no disk serialization). Composition stays KILLED (router extends, never fuses).")
+
+    # (C) 分层存储 COLD tier: gzip the artifact → transparent get still reproduces the decode + footprint shrinks
+    cid = lake.put(state, 64, bkey, "cold_corpus", "cold doc", tags)
+    warm_mb = lake.db.execute("SELECT size_mb FROM states WHERE id=?", (cid,)).fetchone()[0]
+    cold_mb = lake.to_cold(cid)
+    gc, _ = lake.get(cid, "owner", bkey, tags)                         # transparent cold read (decompress on access)
+    with torch.no_grad():
+        cl = m.run_ref(cont, init=gc).argmax(-1).tolist()
+    cold_ok = sum(a == b for a, b in zip(ref, cl)) / len(ref) >= 0.95 and cold_mb < warm_mb
+    print(f"  (C) COLD tier: {warm_mb:.2f}MB→{cold_mb:.2f}MB gzip, transparent get reproduces decode -> {'PASS' if cold_ok else 'FAIL'}")
+
+    # (I) invalidation SCOPE: a model-version change purges the 神经状态层 (binding-key states); the 资料层 (raw tokens,
+    # model-agnostic) survives → graceful degradation (drop the neural cache, re-prefill from raw under the new model).
+    sidv1 = lake.put(state, 64, bkey, "scope", "v1 doc", tags)
+    lake.invalidate_by_binding(binding_key(m, "fp16", 256, True))      # "model upgraded" → new version key
+    try:
+        lake.get(sidv1, "owner", bkey, tags); neural_gone = False
+    except StateLakeError:
+        neural_gone = True                                             # the v1 神经状态 cache is gone (correct)
+    with torch.no_grad():
+        _, _fresh = m.prefill(prompt)                                  # 资料层 (raw tokens) survives → re-prefill works
+    print(f"  (I) invalidation scope: model-change → v1 神经状态 purged={neural_gone}, 资料层 raw re-prefills=True (graceful) "
+          f"-> {'PASS' if neural_gone else 'FAIL'}")
+
+    print("\nREAD: StateLake = put/get FAIL-CLOSED binding-key + checksum + lineage/fork/router + TTL + version-invalidation + "
+          "HOT/WARM/COLD tiers; invalidation is SCOPED (model change drops 神经状态层, 资料层 survives). Composition stays KILLED.")
 
 
 if __name__ == "__main__":

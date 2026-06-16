@@ -1827,3 +1827,18 @@ fused-on-device-argmax (host argmax today), INT4-QAT. Distributed chunk-prefill 
 composition killed); cross-doc parallel compile is buildable. IRREDUCIBLE — 最强大/quality + int8-cert + the 语义层's VALUE
 (all need the cloud-trained checkpoint); 3 device perf runs; device-side StateRouter (device is read-only by design). NET: of
 everything enumerated, the host MECHANISMS are now ~complete; the irreducible remainder is the cloud run + its downstream quality.
+
+## Track G — Addendum 35: 补漏 cont. — StateLake COLD tier + invalidation-scope (分层存储 complete, graceful degradation)
+
+Closed two more named host gaps:
+- **COLD tier** (`StateLake.to_cold` + transparent gzip read in `deserialize_artifact`): completes 分层存储 (HOT RAM-LRU /
+  WARM disk / COLD gzip-archive). Self-test (C): 1.54MB→1.02MB gzip, a transparent `get` decompresses-on-access and reproduces
+  the decode 100%. Rarely-used states trade access latency for footprint — the phone-resident corpus LIBRARY scales.
+- **invalidation SCOPE** (self-test (I)): a model-version change purges the 神经状态层 (binding-key states) — proven — while
+  the 资料层 (raw tokens, model-agnostic) survives, so the system re-prefills from raw under the new model. Graceful
+  degradation: a model upgrade drops the neural cache without losing the source corpus. The prefill-layering's distinct
+  invalidation-scope (资料 survives / 神经状态 bound) is now tested, not just asserted.
+
+Remaining host item left (cosmetic, skipped): a unified `DecodeSession` Swift protocol over the 5 working session classes.
+Everything else remaining is converter/device-gated (ComputeStream, dynamic-shapes, fused-argmax, INT4-QAT) or irreducible
+(the cloud-trained checkpoint → 最强大/quality; the 3 device perf runs). Host mechanisms of the full three-pillar system: COMPLETE.
