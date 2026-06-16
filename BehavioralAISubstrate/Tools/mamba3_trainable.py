@@ -37,6 +37,17 @@ D_INNER, EPS = H * P, 1e-5
 PO = D_INNER + D_INNER + 2 * H * R * N + 3 * H + H * (N // 2)   # z,xin,B,C,dt,A,trap,theta
 
 
+def cache_serialize_state(state):
+    """Canonical State-Cache transform: wrap each layer's carried angle to (-pi,pi] BEFORE storing/quantizing.
+    The angle is `new_angle = angle + dt*theta`, UNWRAPPED — it grows ~linearly with prompt length. cos/sin are
+    2pi-periodic, so wrapping is LOSSLESS for the rotation (and the next step's angle stays small) while keeping
+    the stored value O(1). That is what lets int8/int4 quant of the cached state survive long prompts
+    (test_p0_state_numeric.py: unwrapped angle ~45 rad @ T=4096, ~180 @ 16k -> int8 step exceeds the rotation;
+    wrapped stays in (-pi,pi] -> int8 step ~0.025 rad). State layout per layer: [angle, ssm, kprev, vprev]."""
+    tp = 2 * math.pi
+    return [[(a + math.pi) % tp - math.pi, sm, k, v] for a, sm, k, v in state]
+
+
 def rms(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     xf = x.float()
     return (xf * torch.rsqrt(xf.pow(2).mean(-1, keepdim=True) + EPS)).to(x.dtype) * w

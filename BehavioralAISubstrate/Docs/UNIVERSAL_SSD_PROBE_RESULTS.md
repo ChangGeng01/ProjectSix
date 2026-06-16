@@ -1463,3 +1463,29 @@ lumped-TAIL bucket fixes the gradient DIRECTION at TAU=2 (cos 0.999) but not the
 substitute for the right temperature. **FIX APPLIED**: `mamba3_cloud_distill.py` default `TAU` 2.0 → 1.0 (valid for both
 the full-vocab and cached top-K paths; the top-K path *requires* it). TAU=1 KD = match the teacher's native next-token
 distribution, which is standard for LM distillation. The cloud cost model (cache top-K once, reuse) is now sound at TAU=1.
+
+## Track G — Addendum 20: test battery P0-2/3/4 — int8 state-cache HOLDS to T=4096; angle-wrap is the free long-context hardening
+
+The State-Cache Reader's binding spec is the cached 4-state's precision floor. Addendum 17/18 proved fp16/int8 fidelity at
+cont=128 with PROMPT≤64. `Tools/test_p0_state_numeric.py` pushes prompts to 3968 tokens and sweeps precision × scope ×
+angle-wrap (L=24, host, argmax-agree vs fp32 monolithic over a 128-token continuation):
+
+| T (prompt) | max\|angle\| | 16b/all | 8b/all | 4b/all | 8b/ang | 8b/ang_wrap | 4b/ang_wrap | 8b/all_wrap | 4b/all_wrap |
+|-----------:|----------:|--------:|-------:|-------:|-------:|------------:|------------:|------------:|------------:|
+| 512 (384)  | 5.9 rad  | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| 1024 (896) | 12.5 rad | 100% | 100% | 99%  | 100% | 100% | 100% | 100% | 100% |
+| 2048 (1920)| 24.2 rad | 100% | 100% | 99%  | 100% | 100% | 100% | 100% | 98%  |
+| 4096 (3968)| 45.0 rad | 100% | 100% | 99%  | 100% | 100% | 100% | 100% | 99%  |
+
+**Findings.** (1) **fp16 cache = 100% at every T** → safe regardless of prompt length (P0-4 PASS). (2) **int8 cache = 100%
+at every T** → the int8 floor (addendum 17) HOLDS, now extended 64→3968 prompt tokens (P0-2/3 PASS). (3) The carried angle
+is `new_angle = angle + dt*theta` UNWRAPPED, so `max|angle|` grows ~linearly: 5.9 → 45 rad over T=512→4096 (≈ 0.011 rad/tok).
+int4/all dips to 99% — the angle quant is the culprit (`4b/ang_wrap` recovers to 100%). (4) **Angle-wrap is lossless**:
+wrapping the cached angle to (-pi,pi] changes it only by whole multiples of 2π (measured 12.57 = 2·2π at T=1024), so the
+fp32 decode is BYTE-IDENTICAL (wrapped==plain==ref 100%), while keeping the stored value O(1) instead of O(T).
+
+**Decision (亏的不要).** int8 ≤4096 needs no change — but the angle grows linearly, so at T≈16k `max|angle|`≈180 rad would
+make the int8 step (~1.4 rad) exceed the rotation and break the cache. The wrap costs nothing and removes that latent
+long-context cliff, so it is now CANONICAL: `mamba3_trainable.cache_serialize_state(state)` wraps every layer's angle to
+(-pi,pi] before quant — the required first step of State-Cache serialization. Caveat: argmax-agreement is coarse and this
+is a random-init model; the int8 floor should be re-confirmed on the distilled checkpoint where logit competition is tighter.
