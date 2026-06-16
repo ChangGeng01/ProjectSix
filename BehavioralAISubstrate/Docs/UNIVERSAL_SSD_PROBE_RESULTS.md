@@ -1155,3 +1155,51 @@ CORRECT, and audit-clean — every stage runs finite and demonstrably reduces it
 But the staged curriculum is a **scale lever, null at local PoC scale**; for a narrower-than-teacher on-device
 student, **Stage-3 logit-KD is the robust workhorse** and Stage-1/2 are optional, cloud-scale-only. This does NOT
 change the Addendum-8 conclusion that a usable, quality-measured on-device reader still requires the scale run.
+
+---
+
+## Track G — Addendum 10: the trained Mamba-3 per-asset ANE ceiling is MEASURED = 8 layers (and my two root-cause hypotheses were REFUTED on-device)
+
+Following Addendum 9's correction (both "split fixes it" and "even L=2 fails" were fabricated), the operator chose the
+A19 L-ladder to actually MEASURE the per-asset ANE compile ceiling for the TRAINED graph (b) (+MLP+gnorm, D=1024,
+int8). Built `scripts/run-mamba3-ane-ladder.sh` (stage `.aimodel` to Documents incl. the `main.mlirb` recursive-copy
+fix; launch the `BAS_COREAI_MAMBA3_PROBE` with `.neuralEngine`; capture the DEVICE syslog via `idevicesyslog`).
+
+KEY DETECTION FACTS (the prior "ANECCompile FAILED" verdicts rode on a fragile signal — confirmed): the real error
+is `BASDeviceTestApp(ANECompiler) <Error>: Error: ANE cannot handle intermediate tensor type <private>` +
+`Failed to create unit plist` — emitted to the device os_log (NOT the process stdout `--console` captures), and ONLY
+on a FRESH compile (cached after first load: cache-busted with a new `SEED`). A partial fallback STILL loads + decodes
+fast, so tok/s alone can't see it — only the syslog error count distinguishes 100%-ANE from fallback.
+
+THE LADDER (trained graph, fresh compiles, A19):
+| L | "ANE cannot handle" errors | tok/s | 100%-ANE |
+|---|---|---|---|
+| **8** | **0** | 112 | ✅ CLEAN |
+| 9 | 92 | 147 | ❌ fallback |
+| 10 | 102 | 131 | ❌ |
+| 12 | 122 | 115 | ❌ |
+| 16 | 83 | 94 | ❌ |
+
+**The ceiling is EXACTLY 8 layers — a SHARP CLIFF (0 → 92 errors from one extra layer)**, i.e. a hard per-asset
+program-capacity threshold, not a gradual size effect. An ≤8-layer single-asset Mamba-3 reader is **100%-ANE today**
+(L=8: 0 errors, 112 tok/s, 67 MB peak). Track E's Llama ceiling was ~12-15; Mamba-3's is LOWER (8) because its
+per-layer op count is higher (mixer + gnorm + SwiGLU MLP).
+
+TWO ROOT-CAUSE HYPOTHESES BUILT + REFUTED ON-DEVICE (R1 — the data overruled my reasoning):
+- **(refuted) "ANE SRAM working-set / state liveness"**: built `STATE_WRITE=inplace` (per-layer in-place state
+  write, O(1) live state vs the stack-then-write O(L)). It was WORSE (162 vs 83 errors), not better → liveness is not it.
+- **(refuted) "indexing the stacked `[L,...]` state buffer makes an int64 gather the ANE can't type"**: built
+  `STATE_WRITE=separate` (4*L separate per-layer state buffers, ZERO `[L,...]` indexing). Still 162 errors → the
+  state-buffer indexing is not it either.
+- **(survives) per-asset DEPTH/capacity ceiling**: all three state-write patterns (stack/inplace/separate) fail
+  identically at L≥9 and all are clean-equivalent below; L=8's identical per-layer OPS compile 100%-ANE. So the
+  failure is depth-driven, NOT op-incompatibility, NOT the state plumbing. The exact redacted (`<private>`)
+  intermediate type was not unmasked (would need device private-logging), but it is depth-triggered.
+  (int8 not fully isolated — an fp16 ladder to see if the cliff moves is the one untested lever; the SEED/STATE_WRITE
+  knobs are in `mamba3_deploy.py` for it.)
+
+PRODUCT CONSEQUENCE: the on-device pure-100%-ANE constraint for this graph is **≤ 8 layers** (split is dead per Track
+E). The open question shifts from "does a 16-layer reader compile" to "is an 8-layer (wide-MIMO) Mamba-3 deep enough
+for the narrow-RAG-reader quality bar" — and Mamba-3's MIMO (more capacity per layer) is exactly the lever that suits
+a shallow+wide reader. NOTE: the L=9-16 decode tok/s (94-147) are PARTIAL-fallback + random-weight numbers, not
+100%-ANE and not quality.

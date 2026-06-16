@@ -9,6 +9,7 @@ Run: uv run --with coreai-torch python Tools/mamba3_deploy.py <L> <bits>   (e.g.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -29,7 +30,9 @@ L = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 VOCAB = 100352                                                    # Granite tokenizer
 CKPT = "/tmp/draft_coreai/mamba3_poc_student.pt"
-OUT = f"/tmp/draft_coreai/Mamba3Deploy_L{L}_int{BITS}.aimodel"
+_TAG = (f"_{os.environ['STATE_WRITE']}" if os.environ.get("STATE_WRITE") else "") + \
+       (f"_s{os.environ['SEED']}" if os.environ.get("SEED") else "")
+OUT = f"/tmp/draft_coreai/Mamba3Deploy_L{L}_int{BITS}{_TAG}.aimodel"
 H, P, N, R, D = MT.H, MT.P, MT.N, MT.R, MT.D_MODEL
 
 
@@ -39,10 +42,19 @@ class DeployM(nn.Module):
         self.embedding = nn.Embedding(VOCAB, D)
         self.layers = nn.ModuleList([MT.Lyr() for _ in range(L)])          # the TRAINING module — same math
         self.fw = nn.Parameter(torch.ones(D))
-        self.register_buffer("angle_all", torch.zeros(L, H, N // 2))       # state 1 (FIRST)
-        self.register_buffer("ssm_all", torch.zeros(L, H, P, N))           # state 2
-        self.register_buffer("kprev_all", torch.zeros(L, H, R, N))         # state 3
-        self.register_buffer("vprev_all", torch.zeros(L, H, P, R))         # state 4
+        if os.environ.get("STATE_WRITE") == "separate":
+            # 4*L SEPARATE per-layer state buffers — NO [L,...] stacked tensor, so NO integer-index/gather of a
+            # too-big buffer (the suspected source of "ANE cannot handle intermediate tensor type" at L=16).
+            for i in range(L):
+                self.register_buffer(f"angle_{i}", torch.zeros(H, N // 2))
+                self.register_buffer(f"ssm_{i}", torch.zeros(H, P, N))
+                self.register_buffer(f"kprev_{i}", torch.zeros(H, R, N))
+                self.register_buffer(f"vprev_{i}", torch.zeros(H, P, R))
+        else:
+            self.register_buffer("angle_all", torch.zeros(L, H, N // 2))    # state 1 (FIRST)
+            self.register_buffer("ssm_all", torch.zeros(L, H, P, N))        # state 2
+            self.register_buffer("kprev_all", torch.zeros(L, H, R, N))      # state 3
+            self.register_buffer("vprev_all", torch.zeros(L, H, P, R))      # state 4
 
     def quantize(self) -> "DeployM":
         for l in self.layers:
@@ -55,22 +67,44 @@ class DeployM(nn.Module):
         return self
 
     def forward(self, input_id):
+        import os
         ew = self.embedding.weight_fp16()
         x = F.embedding(input_id, ew).view(D)
-        na, ns, nk, nv = [], [], [], []
-        for i, l in enumerate(self.layers):
-            x, a, sm, k, v = l.step_ref(x, self.angle_all[i], self.ssm_all[i], self.kprev_all[i], self.vprev_all[i])
-            na.append(a); ns.append(sm); nk.append(k); nv.append(v)
-        self.angle_all[:] = torch.stack(na, 0); self.ssm_all[:] = torch.stack(ns, 0)
-        self.kprev_all[:] = torch.stack(nk, 0); self.vprev_all[:] = torch.stack(nv, 0)
+        mode = os.environ.get("STATE_WRITE", "stack")
+        if mode == "separate":
+            # each layer reads + writes its OWN buffer (.copy_), no [L,...] indexing at all
+            for i, l in enumerate(self.layers):
+                a_in = getattr(self, f"angle_{i}"); ssm_in = getattr(self, f"ssm_{i}")
+                k_in = getattr(self, f"kprev_{i}"); v_in = getattr(self, f"vprev_{i}")
+                x, a, sm, k, v = l.step_ref(x, a_in, ssm_in, k_in, v_in)
+                a_in.copy_(a); ssm_in.copy_(sm); k_in.copy_(k); v_in.copy_(v)
+            x = MT.rms(x, self.fw)
+            return (x @ ew.to(x.dtype).t()).view(1, VOCAB)
+        if mode == "inplace":
+            # PER-LAYER in-place state write: each layer's 4 states are written back immediately, so at most ONE
+            # layer's state is LIVE at a time (O(1) working set). Tests the ANE-SRAM-liveness ceiling hypothesis vs
+            # the stack-then-write path below, which keeps all L layers' new states live simultaneously (O(L)).
+            for i, l in enumerate(self.layers):
+                x, a, sm, k, v = l.step_ref(x, self.angle_all[i], self.ssm_all[i], self.kprev_all[i], self.vprev_all[i])
+                self.angle_all[i] = a; self.ssm_all[i] = sm; self.kprev_all[i] = k; self.vprev_all[i] = v
+        else:
+            na, ns, nk, nv = [], [], [], []
+            for i, l in enumerate(self.layers):
+                x, a, sm, k, v = l.step_ref(x, self.angle_all[i], self.ssm_all[i], self.kprev_all[i], self.vprev_all[i])
+                na.append(a); ns.append(sm); nk.append(k); nv.append(v)
+            self.angle_all[:] = torch.stack(na, 0); self.ssm_all[:] = torch.stack(ns, 0)
+            self.kprev_all[:] = torch.stack(nk, 0); self.vprev_all[:] = torch.stack(nv, 0)
         x = MT.rms(x, self.fw)
         return (x @ ew.to(x.dtype).t()).view(1, VOCAB)
 
 
 def main() -> None:
-    torch.manual_seed(0)
+    import os
+    torch.manual_seed(int(os.environ.get("SEED", "0")))      # SEED varies content → busts the device ANE compile cache
     m = DeployM().eval()
-    if Path(CKPT).exists():
+    if os.environ.get("FORCE_RANDOM") == "1":
+        print(f"FORCE_RANDOM: L={L} random-weight compile probe (no checkpoint)")
+    elif Path(CKPT).exists():
         ck = torch.load(CKPT, map_location="cpu")
         ck_L = int(ck.get("layers", L))
         if ck_L != L:                                                  # REFUSE silent truncation (audit must-fix)
