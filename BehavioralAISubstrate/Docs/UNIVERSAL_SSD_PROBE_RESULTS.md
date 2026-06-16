@@ -1205,3 +1205,39 @@ E). The open question shifts from "does a 16-layer reader compile" to "is an 8-l
 for the narrow-RAG-reader quality bar" — and Mamba-3's MIMO (more capacity per layer) is exactly the lever that suits
 a shallow+wide reader. NOTE: the L=9-16 decode tok/s (94-147) are PARTIAL-fallback + random-weight numbers, not
 100%-ANE and not quality.
+
+---
+
+## Track G — Addendum 11: "全面修复" of the 16-layer question — single-asset 16L is a HARD WALL (every escape tested), 8 stands
+
+The operator pushed: "16层真的不行吗 是不是忽略了什么". Right to push — addendum 10 proved 8 is the single-asset/
+single-function ceiling but did NOT exhaust the escapes. This addendum tests them. A 4-agent research workflow grounded
+the MECHANISM (Orion paper, arXiv 2603.06728: the ANE compiler bans the `concat` MIL op + has a ~119-compiles/process
+limit; the error `ANE cannot handle intermediate tensor type` + `Failed to create unit plist` is the ANECompiler
+failing to emit a segment ("unit") descriptor). The fit: ≤8 layers compiles as ONE ANE program (the offending tensor
+stays fused/internal → 0 errors); at ≥9 the model exceeds one program, the compiler PARTITIONS, and every segment seam
+materializes a banned-concat / un-typeable boundary intermediate → the 10×-per-layer error explosion.
+
+ESCAPES TESTED ON-DEVICE (all fresh compiles, A19; the `LEAN_MLP` / `MAMBA_N,MAMBA_P` / `STATES_OVR` probe knobs are in
+mamba3_deploy.py / mamba3_trainable.py / run-mamba3-ane-ladder.sh):
+| variant @ L=16 | "ANE cannot handle" | verdict |
+|---|---|---|
+| full block | 83 | fallback |
+| lean (drop SwiGLU MLP) | 130 | fallback → MLP NOT the culprit; the MIXER is |
+| fp16 (skip int8) @ L=9 | 92 (= int8's 92) | fallback → precision-independent |
+| stack / inplace / separate state-write | 83 / 162 / 162 | fallback → state-plumbing-independent |
+| **shrunk N=32,P=32 (¼ SSD state)** | **162** | fallback → **per-layer SIZE is NOT the gate** |
+| L=8 (every variant) | 0 | CLEAN 100%-ANE |
+
+KEY new datum: shrinking the per-layer state made it WORSE (162), not better — so the cliff is **depth/segment-COUNT
+bound, NOT per-layer-size/capacity bound**. This refutes the "shrink enough and 16 fits" hypothesis. Combined with the
+MLP-ablation (mixer is the locus) and the segment-ceiling mechanism, the conclusion is:
+
+**Single-asset 16-layer Mamba-3 is a genuine HARD WALL on the A19 ANE (CoreAI 0.4.0) — robust to precision, state-write
+pattern, MLP presence, AND per-layer size. The ceiling is 8 layers, depth/segment-count-bound.** The ONLY un-refuted
+path to a functional 16-layer 100%-ANE model is **multi-process** (2×8-layer assets in SEPARATE processes via XPC —
+single-process 2-asset co-load SIGSEGVs per Track E). But multi-process adds per-token cross-process latency that would
+erase the ANE speed win → a net-negative for a fast decoder (亏的不要). So **8 layers stands as the real on-device
+constraint**; the cloud distill target is correctly fixed at 8. UNMASK NOTE: reading the exact redacted `<private>`
+tensor type is not feasible on iOS (rejects non-Apple-signed logging profiles); the segment-ceiling mechanism is
+established by the ablation pattern + the Orion constraints, not by unmasking.

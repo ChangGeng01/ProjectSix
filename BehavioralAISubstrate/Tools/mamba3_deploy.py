@@ -31,6 +31,8 @@ BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 VOCAB = 100352                                                    # Granite tokenizer
 CKPT = "/tmp/draft_coreai/mamba3_poc_student.pt"
 _TAG = ("_fp16" if os.environ.get("FP16") == "1" else "") + \
+       (f"_n{MT.N}p{MT.P}" if (MT.N, MT.P) != (64, 64) else "") + \
+       ("_leanmlp" if os.environ.get("LEAN_MLP") == "1" else "") + \
        (f"_{os.environ['STATE_WRITE']}" if os.environ.get("STATE_WRITE") else "") + \
        (f"_s{os.environ['SEED']}" if os.environ.get("SEED") else "")
 OUT = f"/tmp/draft_coreai/Mamba3Deploy_L{L}_int{BITS}{_TAG}.aimodel"

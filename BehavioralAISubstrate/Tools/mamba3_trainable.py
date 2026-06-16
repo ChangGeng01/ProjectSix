@@ -21,6 +21,7 @@ Run:  ~/.venvs/coreai-cv/bin/python Tools/mamba3_trainable.py
 from __future__ import annotations
 
 import math
+import os
 import sys
 
 import torch
@@ -28,7 +29,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Locked student config (D=1024 retarget of the certified D=2048 op-graph; same op-types).
-D_MODEL, H, P, N, R = 1024, 16, 64, 64, 4
+D_MODEL, H, R = 1024, 16, 4
+P = int(os.environ.get("MAMBA_P", "64"))                        # head dim — env-overridable for the ANE shrink probe
+N = int(os.environ.get("MAMBA_N", "64"))                        # state dim — env-overridable for the ANE shrink probe
 D_FF = round(2.5 * D_MODEL)                                     # SwiGLU MLP inner (locked exp 2.5)
 D_INNER, EPS = H * P, 1e-5
 PO = D_INNER + D_INNER + 2 * H * R * N + 3 * H + H * (N // 2)   # z,xin,B,C,dt,A,trap,theta
@@ -148,7 +151,8 @@ class Lyr(nn.Module):
         y_out = torch.einsum("hpr,hrp->hp", y, self.mimo_o) + self.D.view(H, 1) * xin
         out = self.out_proj(rms(y_out.reshape(D_INNER) * F.silu(z), self.gnorm))
         x1 = x + out
-        return x1 + self.mlp(x1), new_angle, new_ssm, Brot, x_mimo
+        blk = x1 if os.environ.get("LEAN_MLP") == "1" else x1 + self.mlp(x1)   # ablation: drop MLP (ANE op-count probe)
+        return blk, new_angle, new_ssm, Brot, x_mimo
 
     # ---- TWIN: the reformulated chunked/parallel path over a [T,D] sequence (differentiable) ----
     def attn_matrix(self, x_seq):

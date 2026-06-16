@@ -22,7 +22,7 @@ if [ -z "$ASSET_OVERRIDE" ] && [ ! -d "$SRC" ]; then
   ( cd "$REPO" && FORCE_RANDOM=1 uv run --with coreai-torch python Tools/mamba3_deploy.py "$L" 8 ) \
     || { echo "L=$L VERDICT=BUILD_FAIL"; exit 2; }
 fi
-ST="${L},16,32;${L},16,64,64;${L},16,4,64;${L},16,64,4"   # angle;ssm;kprev;vprev (H16 P64 N64 R4)
+ST="${STATES_OVR:-${L},16,32;${L},16,64,64;${L},16,4,64;${L},16,64,4}"   # angle;ssm;kprev;vprev (H16 P64 N64 R4); STATES_OVR for shrink probes
 
 echo ">> staging $ASSET → Documents (dir + explicit main.mlirb)…"
 XR devicectl device copy to --device "$DEV" --domain-type appDataContainer --domain-identifier "$BUNDLE" \
