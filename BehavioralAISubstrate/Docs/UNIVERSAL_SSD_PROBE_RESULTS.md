@@ -1321,3 +1321,42 @@ not a hard cap. Pure-ANE (≤8 layers, 112 tok/s, lowest power) remains the opti
 requirement (always-on / battery / co-residency with a separate GPU model). For a standalone quality reader, pick the
 deepest depth that clears your tok/s floor (e.g. 24L @ 73 tok/s, or 32L @ 57). Speeds are op-graph (random-weight);
 the trained model has the same graph → same speed.
+
+---
+
+## Track G — Addendum 15: AUDIT CORRECTION (万无一失) — what is MEASURED vs INFERRED in addenda 12/13/14
+
+A 31-agent adversarial audit (26 candidates, 17 upheld) of the depth-speed curve found that addenda 12/13/14 overstate
+ANE participation and compile-cleanliness. Corrections, so the cloud-target decision rests on honest evidence:
+
+WHAT IS ACTUALLY MEASURED:
+- **Decode WALL-CLOCK speed (tok/s) by depth** — random-weight op-graph, SINGLE-run, 4-warmup + 16-20 timed steps, ±~7%
+  (16L was seen at 88 AND 94 across runs): 8L≈112, 16L≈88(ane-req)/97(gpu), 24L≈73/74, 32L≈57/58. The trend is ~linear;
+  48L/64L are EXTRAPOLATION, not measured. Speed is graph-valid for the trained model (same graph), but is one short shot.
+- **phys_footprint** 67-119 MB. NOTE: this EXCLUDES the int8 weights (~250-740 MB), which are mmap'd file-backed clean
+  pages phys_footprint does not count. Jetsam pressure (dirty/resident) is low, but the weights are 250-740 MB on disk +
+  mmap. "Memory never the limit" should read "resident footprint low; weights are 250-740 MB mmap'd."
+- **ANECompile-FAILED error counts** (a NEGATIVE compile diagnostic, blind on cache hits): 8L=0 fresh, 16L≈83, 24L≈242,
+  32L≈322; head(input_id→hidden)=82, tail(hidden→logits)=84 (addendum 13 said 80/82 — CORRECTED).
+
+WHAT IS **NOT** MEASURED (the audit's core finding):
+- **The actual ANE-vs-GPU compute SPLIT for ANY Mamba-3 `.aimodel` run.** There is NO per-op placement readback (the
+  CoreAI session SETS `preferredComputeUnitKind:.neuralEngine` but never reads back what stuck; the only MLComputePlan/
+  deviceUsage probes are CoreML/.mlpackage and never touch a `.aimodel`). So **every "ANE-mostly", "100%-ANE", and
+  "GPU clean" claim is INFERRED from tok/s + compile-error-count, NOT a positive placement measurement.**
+  - "8L = 100%-ANE" → honestly: "no fresh ANE-segment compile failure observed" (necessary, not sufficient).
+  - "16L ANE-preferred 88 = ANE-mostly" → inferred; 83 segments failed so a large part is GPU regardless.
+  - **"24L/32L ANE-preferred 73/57" → ~ALL GPU** (242/322 ANE-segment failures push the graph off-ANE; that is WHY
+    ane-preferred≈gpu at depth). The "ANE-preferred" column for L>8 is fallback-contaminated and should be read as the
+    GPU column. **For depth>8 the honest statement is: GPU-executed (CoreAI), ANE participation small/unverified.**
+  - "GPU clean" → "loaded + ran, no load-time throw"; the harness has no GPU-side placement/fallback detector either.
+- **Quality vs depth** — every run is RANDOM-WEIGHT, so the curve says NOTHING about whether a deeper model is BETTER.
+  "more quality / deepest depth" is a capacity hypothesis; only the cloud distill establishes quality-vs-depth.
+
+CORRECTED VERDICT for the cloud target: the depth→**speed** curve is roughly valid (≈ -linear, ±7%, single-run — RE-RUN
+≥3 reps before final commit). At **depth>8 it is a GPU reader** (CoreAI GPU backend; ANE does not meaningfully
+participate — confirmed by the rising ANE-segment-failure counts, exact split unmeasured). Literal ANE power-efficiency
+is only mechanism-supported at **≤8 layers** (and even that is "no compile failure observed", not a positive ANE
+measurement). Picking a depth (e.g. 24L≈73 tok/s) is a SPEED decision on a GPU-backed reader; its QUALITY is TBD by the
+distill. TODO to actually certify ANE usage: implement the integration-plan-mandated `preferredComputeUnitKind` readback
+(or a CoreAI-native placement probe) — until then, no `.aimodel` run is certified ANE-using.
