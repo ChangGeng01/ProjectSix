@@ -1195,8 +1195,10 @@ TWO ROOT-CAUSE HYPOTHESES BUILT + REFUTED ON-DEVICE (R1 — the data overruled m
   identically at L≥9 and all are clean-equivalent below; L=8's identical per-layer OPS compile 100%-ANE. So the
   failure is depth-driven, NOT op-incompatibility, NOT the state plumbing. The exact redacted (`<private>`)
   intermediate type was not unmasked (would need device private-logging), but it is depth-triggered.
-  (int8 not fully isolated — an fp16 ladder to see if the cliff moves is the one untested lever; the SEED/STATE_WRITE
-  knobs are in `mamba3_deploy.py` for it.)
+- **(refuted) "int8 quantization is part of the limit"**: built `FP16=1` (skip int8 quant — clean fp16, 539MB asset)
+  at L=9. fp16-L9 = **92 errors, EXACTLY equal to int8-L9's 92**. Precision does NOT move the cliff → int8 is not the
+  limiter; mixed-precision is not a lever. The ceiling is precision-independent AND state-pattern-independent → a pure
+  per-asset op-graph DEPTH capacity limit at 9 layers.
 
 PRODUCT CONSEQUENCE: the on-device pure-100%-ANE constraint for this graph is **≤ 8 layers** (split is dead per Track
 E). The open question shifts from "does a 16-layer reader compile" to "is an 8-layer (wide-MIMO) Mamba-3 deep enough

@@ -30,7 +30,8 @@ L = int(sys.argv[1]) if len(sys.argv) > 1 else 8
 BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 VOCAB = 100352                                                    # Granite tokenizer
 CKPT = "/tmp/draft_coreai/mamba3_poc_student.pt"
-_TAG = (f"_{os.environ['STATE_WRITE']}" if os.environ.get("STATE_WRITE") else "") + \
+_TAG = ("_fp16" if os.environ.get("FP16") == "1" else "") + \
+       (f"_{os.environ['STATE_WRITE']}" if os.environ.get("STATE_WRITE") else "") + \
        (f"_s{os.environ['SEED']}" if os.environ.get("SEED") else "")
 OUT = f"/tmp/draft_coreai/Mamba3Deploy_L{L}_int{BITS}{_TAG}.aimodel"
 H, P, N, R, D = MT.H, MT.P, MT.N, MT.R, MT.D_MODEL
@@ -68,7 +69,7 @@ class DeployM(nn.Module):
 
     def forward(self, input_id):
         import os
-        ew = self.embedding.weight_fp16()
+        ew = self.embedding.weight_fp16() if hasattr(self.embedding, "weight_fp16") else self.embedding.weight
         x = F.embedding(input_id, ew).view(D)
         mode = os.environ.get("STATE_WRITE", "stack")
         if mode == "separate":
@@ -118,7 +119,7 @@ def main() -> None:
     else:
         print(f"no checkpoint at {CKPT} — converting random-init (op-graph + ANE deploy test)")
 
-    m = m.quantize().half()
+    m = (m if os.environ.get("FP16") == "1" else m.quantize()).half()   # FP16: skip int8 quant — clean fp16 ceiling test
     _ = m(torch.zeros(1, 1, dtype=torch.long))
     ep = torch.export.export(m.eval(), (torch.zeros(1, 1, dtype=torch.long),))
     ep = inject_subbyte_tensors(ep.run_decompositions(coreai_torch.get_decomp_table()))
