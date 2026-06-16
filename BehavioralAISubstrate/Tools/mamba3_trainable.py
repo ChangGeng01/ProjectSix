@@ -191,6 +191,28 @@ class Lyr(nn.Module):
         x1 = x_seq + out
         return x1 + self.mlp(x1), ssm_seq, angle
 
+    def prefill_state(self, x_seq):
+        """DUET prefill: chunked-scan over [T,D]; return (out_seq, boundary 4-state) so step_ref decode can resume.
+        The boundary 4-state = (angle[-1], ssm_seq[-1], Brot[-1], x_mimo[-1]) — exactly what step_ref carries
+        (kprev=Brot, vprev=x_mimo). PARITY-A covers ssm; this exposes the FULL handoff so the chunked-prefill ->
+        per-token-decode seam can be fidelity-tested end-to-end."""
+        T = x_seq.shape[0]
+        h = rms(x_seq, self.norm)
+        z, xin, B, C, dt, alpha, la, beta, gamma, theta, x_mimo = self._coeffs(h)
+        angle = torch.cumsum(dt.unsqueeze(-1) * theta, dim=0)
+        cos, sin = torch.cos(angle), torch.sin(angle)
+        Brot, Crot = rope(B, cos, sin), rope(C, cos, sin)
+        cur = torch.einsum("thpr,thrn->thpn", x_mimo, Brot)
+        cur_prev = torch.cat([torch.zeros_like(cur[:1]), cur[:-1]], 0)
+        u = beta.view(T, H, 1, 1) * cur_prev + gamma.view(T, H, 1, 1) * cur
+        ssm_seq = scan_chunked(la, u) if T > 64 else scan_parallel(la, u)
+        y = torch.einsum("thrn,thpn->thpr", Crot, ssm_seq)
+        y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
+        out = self.out_proj(rms(y_out.reshape(T, D_INNER) * F.silu(z), self.gnorm))
+        x1 = x_seq + out
+        out_seq = x1 if os.environ.get("LEAN_MLP") == "1" else x1 + self.mlp(x1)
+        return out_seq, (angle[-1], ssm_seq[-1], Brot[-1], x_mimo[-1])
+
 
 class M(nn.Module):
     def __init__(self, vocab: int, layers: int) -> None:
@@ -214,9 +236,20 @@ class M(nn.Module):
     def head(self, x):
         return rms(x, self.fw) @ self.embedding.weight.t()
 
-    def run_ref(self, tokens):
-        st = [(torch.zeros(H, N // 2), torch.zeros(H, P, N), torch.zeros(H, R, N), torch.zeros(H, P, R))
-              for _ in self.layers]
+    def prefill(self, tokens):
+        """DUET prefill over a prompt: run all layers' chunked-scan, return (final hidden seq, per-layer boundary
+        4-state) for the decode asset (run_ref/step_ref) to resume from — the handoff the local state-cache stores."""
+        x = self.embedding.weight[tokens]                          # [T,D]
+        states = []
+        for lyr in self.layers:
+            x, st = lyr.prefill_state(x)
+            states.append(st)
+        return x, states
+
+    def run_ref(self, tokens, init=None):
+        st = list(init) if init is not None else \
+            [(torch.zeros(H, N // 2), torch.zeros(H, P, N), torch.zeros(H, R, N), torch.zeros(H, P, R))
+             for _ in self.layers]
         logits, ssm_tr = [], [[] for _ in self.layers]
         for tok in tokens:
             x = self.embedding.weight[tok]

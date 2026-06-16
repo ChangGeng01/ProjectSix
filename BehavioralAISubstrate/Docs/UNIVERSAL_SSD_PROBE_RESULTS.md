@@ -1417,3 +1417,22 @@ chunked-scan prefill (`forward_seq`) to emit the decode-compatible 4-state (it e
 the actual handoff-extraction engineering, low-risk per PARITY-A). MLA-KV handoff untested (read-only cached tensors →
 trivial). ROUTE IMPLICATION: DUET serialization-robustness is ~free (no DUET-aware-retrain needed for it); the remaining
 DUET piece is the chunked-prefill 4-state extraction, not state fidelity.
+
+---
+
+## Track G — Addendum 18: full-DUET handoff VERIFIED (chunked-prefill → decode-4-state parity + end-to-end fidelity)
+
+The kill-switch (addendum 17) used step_ref for both paths (serialization only). This closes the ACTUAL DUET seam:
+the CHUNKED-SCAN prefill (new `Lyr.prefill_state` / `M.prefill`) must emit the 4-state the per-token `step_ref` decode
+resumes from. PARITY-A only covered ssm; `Tools/mamba3_duet_handoff.py` covers the FULL handoff (L=24, host, fp32 weights):
+
+(A) chunked-prefill boundary 4-state vs step_ref-prefill 4-state — max rel-err over 24 layers:
+    angle 7.8e-6 · ssm 9.5e-6 · **kprev 6.0e-6 · vprev 5.7e-6** (kprev/vprev/angle never tested before PARITY-A) → PASS.
+(B) end-to-end (chunked-prefill → serialize → step_ref-decode) vs monolithic step_ref, cont=128:
+    fp32 logit-err 3.7e-6 / fp16 7.7e-6 / int8 8.6e-4 — ALL 100% argmax, zero divergence.
+
+So the DUET LEFT-HAND is sound: the parallel prefill produces the exact decode-compatible 4-state, and the
+prefill→decode seam reproduces the monolithic continuation token-identically (even int8 cached). Combined with
+addendum 17 (serialization safe + non-compounding), the WHOLE DUET handoff (prefill → state-cache → decode) is
+host-verified. Code: `Lyr.prefill_state`, `M.prefill`, `M.run_ref(init=)`. REMAINING for the DUET: on-device (the
+prefill .aimodel runs GPU — convertibility already confirmed) + the MLA-KV handoff (hybrid, once the MLA layer is built).
