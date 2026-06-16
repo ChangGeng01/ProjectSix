@@ -93,15 +93,21 @@ enum BASCoreAIPrefillProbe {
                 let loadMs = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
                 mark(String(format: "🧩 prefill %@ loaded unit=%@ load_ms=%.0f footprint=%.0fMB", p.tag, unit, loadMs, footprintMB()))
 
-                let r0 = DispatchTime.now().uptimeNanoseconds
-                let outMap: [String: NDArray]
+                var outMap: [String: NDArray] = [:]
+                var firstMs = 0.0
+                var bestMs = Double.greatestFiniteMagnitude
                 do {
-                    outMap = try await session.run(input: x, inputName: p.input, outputNames: p.outs)
+                    for r in 0..<4 {                                  // r0 = cold (incl. one-time GPU shader compile); r1-3 = warm compute
+                        let r0 = DispatchTime.now().uptimeNanoseconds
+                        outMap = try await session.run(input: x, inputName: p.input, outputNames: p.outs)
+                        let ms = Double(DispatchTime.now().uptimeNanoseconds &- r0) / 1_000_000
+                        if r == 0 { firstMs = ms } else { bestMs = min(bestMs, ms) }
+                    }
                 } catch {
                     mark("🧩 prefill \(p.tag) RUN ERROR unit=\(unit) \(error)"); continue
                 }
-                let runMs = Double(DispatchTime.now().uptimeNanoseconds &- r0) / 1_000_000
-                mark(String(format: "🧩 prefill %@ ran run_ms=%.1f footprint=%.0fMB", p.tag, runMs, footprintMB()))
+                mark(String(format: "🧩 prefill %@ run_ms cold=%.1f warm_best=%.1f (cold-warm=%.0f ⇒ one-time compile) footprint=%.0fMB",
+                            p.tag, firstMs, bestMs, firstMs - bestMs, footprintMB()))
                 for name in p.outs {
                     guard let nd = outMap[name] else { mark("🧩 prefill \(p.tag).\(name) MISSING from outputs"); continue }
                     let s = ndStats(nd)

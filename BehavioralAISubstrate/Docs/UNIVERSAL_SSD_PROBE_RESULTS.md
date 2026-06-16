@@ -1590,3 +1590,10 @@ before trusting a 20-layer prefill-time estimate (this is the next thing to chec
 numerics-correct is proven, end-to-end prefill latency at the full 24L is not. (3) GPU placement is inferred (no MLComputePlan
 readback in 0.4.0); the asset ran + matched, which is the operative result. NEXT (STEP 3): scale to the full 24L hybrid prefill
 converter — now mechanical and de-risked — then STEP 4-7 (decode asset, on-disk State-Cache contract, sequential-load orchestration, device E2E).
+
+### Addendum 24 — latency caveat RESOLVED (warmup re-measure)
+Added a warmup+timed loop to the probe (cold run vs 3 warm runs). The 2161 ms was a one-time process/GPU-stack init on the
+FIRST CoreAI GPU op, NOT prefill compute. Per-layer at T=64, GPU, warm: **Mamba run_ms cold=17.1 / warm_best=4.6**; **MLA
+cold=3.7 / warm_best=1.0** (load_ms 15/6). So the full 24L hybrid prefill projects to **~100 ms warm** (20×4.6 + 4×1.0) plus a
+one-time ~2 s process warmup — the "prefill-once-reuse-many" flagship UX is comfortably fast. (Still single-layer/fp16/random
+weights; the real 24L-single-asset number gets measured at STEP 3, but the compute is clearly not the bottleneck.)
