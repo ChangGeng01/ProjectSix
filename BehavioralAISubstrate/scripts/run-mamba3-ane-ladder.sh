@@ -39,7 +39,8 @@ UDID="$(idevice_id -l 2>/dev/null | head -1)"
   | grep --line-buffered -iE "ANECompiler|ANECCompile|aned|Espresso|ANEServices|H11ANE|com.apple.ane|neuralengine" > "$SYS" ) &
 SYSPID=$!
 sleep 3                                                   # let idevicesyslog connect+stream BEFORE the load-time compile
-ENV_JSON="{\"BAS_ENDURANCE_AUTOSTART\":\"1\",\"BAS_COREAI_MAMBA3_PROBE\":\"1\",\"BAS_COREAI_MAMBA3_ASSET\":\"$ASSET\",\"BAS_COREAI_MAMBA3_UNITS\":\"ane\",\"BAS_COREAI_MAMBA3_STEPS\":\"$STEPS\",\"BAS_COREAI_MAMBA3_STATES\":\"$ST\"}"
+UNITS="${UNITS_OVR:-ane}"                                 # UNITS_OVR=ane,cpu,gpu measures the compute-unit split in one run
+ENV_JSON="{\"BAS_ENDURANCE_AUTOSTART\":\"1\",\"BAS_COREAI_MAMBA3_PROBE\":\"1\",\"BAS_COREAI_MAMBA3_ASSET\":\"$ASSET\",\"BAS_COREAI_MAMBA3_UNITS\":\"$UNITS\",\"BAS_COREAI_MAMBA3_STEPS\":\"$STEPS\",\"BAS_COREAI_MAMBA3_STATES\":\"$ST\"}"
 echo ">> launching probe L=$L (steps=$STEPS, ane, timeout ${TMO}s)…"
 XR devicectl device process launch --terminate-existing --console --device "$DEV" \
    --environment-variables "$ENV_JSON" "$BUNDLE" > "$CAP" 2>&1 &

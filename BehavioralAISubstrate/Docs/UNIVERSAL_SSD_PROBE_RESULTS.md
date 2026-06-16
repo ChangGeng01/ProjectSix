@@ -1241,3 +1241,30 @@ erase the ANE speed win → a net-negative for a fast decoder (亏的不要). So
 constraint**; the cloud distill target is correctly fixed at 8. UNMASK NOTE: reading the exact redacted `<private>`
 tensor type is not feasible on iOS (rejects non-Apple-signed logging profiles); the segment-ceiling mechanism is
 established by the ablation pattern + the Orion constraints, not by unmasking.
+
+---
+
+## Track G — Addendum 12: the 100%-ANE ceiling is moot for a fast reader — 16 layers runs 97 tok/s all-GPU (clean)
+
+After establishing single-asset 16L can't be LITERAL 100%-ANE (addendum 11), the cheap decisive question was skipped:
+how fast does the 16-layer actually RUN, and is the ANE even the right backend? Measured the canonical 16-layer asset
+across forced compute units in one probe run (`UNITS_OVR=ane,cpu,gpu`, A19):
+
+| compute unit | compile | tok/s |
+|---|---|---|
+| ANE-preferred (`.neuralEngine`) | mostly-ANE + small fallback | 88.1 |
+| **GPU (`.gpu`, forced)** | **CLEAN** | **97.3** |
+| CPU (`.cpuOnly`, forced) | ERROR "Failed to rewrite module using segmenter" (CoreAI CPU-segmenter bug) | — |
+
+KEY: the 16-layer 422M reader runs **88–97 tok/s, ~80 MB peak** on-device — and **forced-GPU (97, clean) is FASTER than
+ANE-preferred (88, with the fallback).** So the "100%-ANE ceiling = 8 layers" (addenda 10/11) is REAL but only binds if
+you demand *literal pure-ANE*. It does NOT bound a working fast reader: 16 layers (more quality) runs at 97 tok/s on the
+CoreAI GPU backend, clean, tiny footprint. The ANE-purity goal matters only for (a) max power efficiency or (b) co-residency
+with a separate GPU model; for a STANDALONE 422M narrow-RAG reader the GPU is free and faster.
+
+CONSEQUENCE for the deploy/distill target: depth is a QUALITY-vs-POWER choice, not a hard wall:
+- **8 layers** → literal 100%-ANE, 112 tok/s, lowest power (only if pure-ANE is a hard requirement).
+- **16 layers (or deeper)** → 88 tok/s ANE-mostly / **97 tok/s clean GPU**, more quality, ~80 MB (no jetsam risk for 422M).
+
+So the cloud distill is NOT forced to 8 layers. (Speeds are random-weight OP-GRAPH measurements — valid for the trained
+model, same graph; numerics meaningless. CPU-only is a separate CoreAI segmenter bug, never a deploy path.)
