@@ -54,9 +54,20 @@ class MLAPrefill(nn.Module):
         return out_seq[-1], c_kv
 
 
+def det_input():
+    """Bit-reproducible [T,D] fp16 input (integer mod + exact fp division — IDENTICAL in Python and Swift, no libm).
+    Swift mirror: xs[i] = Float16((Double(i % 97) - 48.0) / 480.0). Lets the device run feed the SAME input → numeric compare."""
+    return (((torch.arange(T * D) % 97).double() - 48.0) / 480.0).to(torch.float16).view(T, D)
+
+
+def stats(t):
+    f = t.detach().float().reshape(-1)
+    return f.pow(2).sum().sqrt().item(), f.sum().item(), [round(v, 5) for v in f[:4].tolist()]
+
+
 def export_probe(model, out_names, tag):
     m = model.half().eval()
-    x = torch.randn(T, D, dtype=torch.float16) * 0.1
+    x = det_input()
     host = m(x)                                            # host fwd must succeed (and tells us the output shapes)
     ep = torch.export.export(m, (x,))
     ep = inject_subbyte_tensors(ep.run_decompositions(coreai_torch.get_decomp_table()))
@@ -83,8 +94,10 @@ def main() -> None:
     for name, model, outs in probes:
         try:
             out, host = export_probe(model, outs, name)
-            shapes = [tuple(h.shape) for h in host]
-            print(f"  OK  {name}: CONVERTED -> {out}\n        output shapes = {dict(zip(outs, shapes))}")
+            print(f"  OK  {name}: CONVERTED -> {out}")
+            for nm, h in zip(outs, host):                 # host REFERENCE stats — device must match these (rel-err<1e-2)
+                nrm, sm, head = stats(h)
+                print(f"        HOSTREF {name}.{nm} shape={tuple(h.shape)} norm={nrm:.4f} sum={sm:.4f} head={head}")
             ok += 1
         except Exception as e:
             import traceback

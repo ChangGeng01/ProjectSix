@@ -1562,3 +1562,31 @@ So `cumsum` + masked-exp-segsum + the einsums + MLA softmax+triu ALL have valid 
 convertible. **Honest scope (R1): this is HOST conversion / op-lowering only.** It does NOT prove device GPU execution or numeric
 fidelity — that is STEP 2 (load the L1 asset on the A19 GPU, run, compare the boundary state to host @ rel-err <1e-2), the real gate.
 The placeholder is now replaced by evidence: scaling to the full 24L hybrid prefill asset (STEP 3) is mechanical IF STEP 2's device run holds.
+
+## Track G — Addendum 24: on-device DUET STEP 2 — prefill RUNS on the A19 GPU + boundary state is NUMERICALLY EXACT vs host
+
+STEP 1 proved host op-lowering; STEP 2 is the real device gate. Built `BASCoreAIPrefillSession` (no-state: feed [T,D], read
+boundary-state OUTPUTS with empty MutableViews) + `BASCoreAIPrefillProbe` (BAS_COREAI_PREFILL_PROBE=1, GPU) + the launch hook;
+`Tools/mamba3_prefill_probe.py` now emits a bit-reproducible input (`xs[i]=fp16((i%97-48)/480)`, mirrored in Swift) + HOSTREF
+stats. Built via beta Xcode, staged the two L1 assets, ran on the iPhone Air A19 GPU:
+
+| output | host norm | device norm | rel-err |
+|-------:|----------:|------------:|--------:|
+| Mamba.out_last | 19.1551 | 19.1546 | 3e-5 |
+| Mamba.angle | 5.4372 | 5.4376 | 7e-5 |
+| Mamba.ssm | 2.0846 | 2.0845 | 5e-5 |
+| Mamba.kprev | 64.0016 | 64.0003 | 2e-5 |
+| Mamba.vprev | 0.7422 | 0.7422 | <1e-4 |
+| MLA.out_last | 7.1472 | 7.1477 | 7e-5 |
+| MLA.c_kv | 59.4553 | 59.4553 | <1e-5 |
+
+Head values agree to ~4 decimals. **Both prefill assets LOAD (load_ms 94/43) + RUN on the A19 GPU and produce the exact
+decode-handoff state** — the #1 route risk ("does the chunked-segsum / MLA-softmax prefill run on device") is now DEVICE-PROVEN
+cleared, not just host-convertible. Footprint tiny (49–86 MB). availableComputeKinds = [gpu, cpu, neuralEngine].
+
+**Honest caveats (R1):** (1) `Mamba run_ms=2161` vs `MLA run_ms=205` — there is NO warmup in the probe, so the Mamba figure
+almost certainly includes the one-time GPU shader compile; prefill compute latency must be re-measured with a warmup pass
+before trusting a 20-layer prefill-time estimate (this is the next thing to check). (2) Single-layer, fp16, RANDOM weights —
+numerics-correct is proven, end-to-end prefill latency at the full 24L is not. (3) GPU placement is inferred (no MLComputePlan
+readback in 0.4.0); the asset ran + matched, which is the operative result. NEXT (STEP 3): scale to the full 24L hybrid prefill
+converter — now mechanical and de-risked — then STEP 4-7 (decode asset, on-disk State-Cache contract, sequential-load orchestration, device E2E).

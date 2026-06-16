@@ -360,6 +360,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIMamba3DualProbe.run() }
             return
         }
+        // DUET STEP 2 — single-layer prefill asset on the A19 GPU (BAS_COREAI_PREFILL_PROBE=1): does the chunked-segsum /
+        // MLA-softmax prefill graph LOAD+RUN on device and match the host boundary state? The gate before the full converter.
+        if (env["BAS_COREAI_PREFILL_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIPrefillProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {
