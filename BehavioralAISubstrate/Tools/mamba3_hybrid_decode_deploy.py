@@ -145,9 +145,35 @@ def convert() -> None:
     print(f"  CONVERTED -> {out} ({sz:.0f} MB)  states={len(st)}")
 
 
+def ref_e2e() -> None:
+    """Host E2E ground truth: deterministic tokens (mirrored in Swift) + the monolithic cont argmax the device must
+    reproduce. HALF=1 runs fp16 on MPS for an apples-to-apples compare with the fp16 device (the fp32 ref can disagree at
+    a near-tie token). Prints the top1-top2 logit MARGIN per position so any device flip can be checked as a near-tie."""
+    PROMPT, CONT = int(os.environ.get("PROMPT", "64")), int(os.environ.get("CONT", "32"))
+    half = os.environ.get("HALF") == "1"
+    dev = "mps" if half and torch.backends.mps.is_available() else "cpu"
+    torch.manual_seed(0)
+    m = HY.HybridM(VOCAB, LAYERS).eval().to(dev)                 # SAME seed/VOCAB as the converters → same weights
+    if half:
+        m = m.half()
+    toks = torch.tensor([(i * 17 + 5) % VOCAB for i in range(PROMPT + CONT)], dtype=torch.long, device=dev)
+    with torch.no_grad():
+        lg = m.run_ref(toks)[PROMPT:].float()
+    arg = lg.argmax(-1).tolist()
+    top2 = lg.topk(2, -1).values
+    margin = (top2[:, 0] - top2[:, 1]).tolist()
+    print(f"E2E-REF ({'fp16/MPS' if half else 'fp32/CPU'} PROMPT={PROMPT} CONT={CONT} VOCAB={VOCAB} tok[i]=(i*17+5)%{VOCAB}):")
+    print(f"  HOSTREF_CONT_ARGMAX={','.join(map(str, arg))}")
+    print(f"  margins (top1-top2)={[round(x, 3) for x in margin]}")
+    print("  READ: the device DUET must match this; a device flip only at a TINY-margin position = fp16 near-tie, not a bug.")
+
+
 def main() -> None:
+    mode = os.environ.get("MODE", "")
     if os.environ.get("CONVERT") == "1":
         convert()
+    elif mode == "ref":
+        ref_e2e()
     else:
         verify_host()
 

@@ -366,6 +366,11 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIPrefillProbe.run() }
             return
         }
+        // DUET STEP 5/6/7 — full E2E (BAS_COREAI_DUET_PROBE=1): prefill prompt -> deinit -> decode cont, device == host monolithic.
+        if (env["BAS_COREAI_DUET_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIDuetProbe.run() }
+            return
+        }
         // SSD Track A — universal prompt-lookup (n-gram) speculative decode: hit-rate + speedup + byte-identity
         // on repetitive vs control workloads (BAS_PROMPT_LOOKUP_PROBE=1)。 Model-free, any-LLM. Device-only。
         if (env["BAS_PROMPT_LOOKUP_PROBE"] ?? "0") == "1" {

@@ -1634,3 +1634,27 @@ softmax). The 20 Mamba layers reuse the proven angle-first 4-state stacked decod
   `ew[id.view(())]` emits `aten.item()`→unbacked symint; `F.embedding(...)` gathers cleanly — same fix DeployM already uses.)
 NEXT (STEP 5/6/7): the on-disk State-Cache contract + the Swift hybrid decode session (6 states) + sequential-load orchestration
 (prefill deinit BEFORE decode load, dodging the co-load SIGSEGV) → the device E2E: device decode == host monolithic continuation.
+
+## Track G — Addendum 27: on-device DUET E2E (STEP 5/6/7) — the device DUET reproduces the host decode on the A19 ✅
+
+The capstone. `BASCoreAIHybridDecodeSession` (6 resident states) + `BASCoreAIDuetProbe` (BAS_COREAI_DUET_PROBE) orchestrate
+the full handoff in ONE process WITHOUT co-loading: load prefill → run the 64-token prompt → COPY the 5 boundary tensors into
+Swift memory → **deinit the prefill AIModel** → build the 6 decode states (4 Mamba stacked direct + mla_kv = prompt latents
+scattered into [0:64] + mla_fill=64) → **load the decode asset (2nd AIModel.load)** → teacher-forced decode of 32 cont tokens.
+Both assets are the device-proven 24L converters; tokens are deterministic (`tok[i]=(i*17+5)%4096`, mirrored host↔Swift).
+
+Device run (iPhone Air A19, GPU):
+- prefill done footprint 148 MB → **prefill released footprint 91 MB** (the AIModel deinit drops resident memory)
+- **decode loaded — NO co-load SIGSEGV** ✅ — the sequential-load escape (deinit-before-load) WORKS on device. This is the
+  architectural bet the whole DUET rested on (Track E proved 2 co-resident assets SIGSEGV); it is now validated.
+- 32 decode steps, 21.6 tok/s (unoptimized: cold, per-step Swift overhead, full MAX_SEQ=256 MLA attention even early).
+- **DEV_CONT_ARGMAX matches the host monolithic 31/32**. The single difference is position 3 (host 1901, dev 1013) — whose
+  fp32 top1−top2 **margin = 0.001** (a near-tie; pos-14 is an exact 0.0 tie yet matched; pos-0/1 at 0.003/0.002 matched).
+  The fixed-buffer decode is fp32-exact vs monolithic (addendum 26, 3e-6), so the lone flip is the fp16-vs-fp32 boundary at a
+  0.001-margin token, NOT a logic error.
+
+**The entire on-device DUET is PROVEN end-to-end on the A19**: prefill (24L, exact, ~43 ms) → state-via-memory handoff →
+sequential-load (dodges the co-load wall) → decode (24L hybrid, MLA growing-cache as fixed buffer) → output == host monolithic
+to fp16 precision. STEP 1→7 complete. REMAINING: (a) persist the handoff to DISK (cross-launch State-Cache reuse — the flagship's
+literal "prefill-once-reuse-many"; the in-memory handoff proves the contract); (b) decode tok/s optimization (warmup, windowed
+MLA attention); (c) the cloud 24L distill (real weights → the quality gate). Host + device fidelity are GREEN end-to-end.

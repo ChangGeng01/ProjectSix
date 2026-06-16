@@ -22,6 +22,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
 import coreai_torch
@@ -35,7 +36,9 @@ T = int(os.environ.get("T", "64"))
 D = MT.D_MODEL
 LAYERS = int(os.environ.get("LAYERS", "24"))
 VOCAB = 4096
-OUT = Path(f"/tmp/draft_coreai/Mamba3HybridPrefill_L{LAYERS}_T{T}.aimodel")
+TOKENS = os.environ.get("TOKENS") == "1"                      # TOKENS=1: input is prompt token ids [T] (embed inside) — the
+#   E2E-consistent form (decode embeds the same way). Default: hidden [T,D] (isolates the 24-layer scan/attention).
+OUT = Path(f"/tmp/draft_coreai/Mamba3HybridPrefill_L{LAYERS}_T{T}{'_tok' if TOKENS else ''}.aimodel")
 OUT_NAMES = ["angle_all", "ssm_all", "kprev_all", "vprev_all", "mla_all"]
 
 
@@ -44,8 +47,8 @@ class DeployHybridPrefill(nn.Module):
         super().__init__()
         self.m = HY.HybridM(vocab, layers)
 
-    def forward(self, x_seq):                                 # [T, D] hidden -> 5 stacked boundary-state tensors
-        x = x_seq
+    def forward(self, inp):                                   # [T,D] hidden, OR [T] token ids if TOKENS -> 5 stacked states
+        x = F.embedding(inp, self.m.embedding.weight) if TOKENS else inp
         ang, ssm, kp, vp, mla = [], [], [], [], []
         for i, lyr in enumerate(self.m.layers):
             if self.m._is_mla(i):
@@ -57,11 +60,17 @@ class DeployHybridPrefill(nn.Module):
         return torch.stack(ang), torch.stack(ssm), torch.stack(kp), torch.stack(vp), torch.stack(mla)
 
 
+def det_tokens(n):
+    """Deterministic token ids — mirrored in Swift (tok[i] = (i*17+5) % VOCAB) for the E2E."""
+    return torch.tensor([(i * 17 + 5) % VOCAB for i in range(n)], dtype=torch.long)
+
+
 def main() -> None:
     torch.manual_seed(0)
     m = DeployHybridPrefill(VOCAB, LAYERS).half().eval()
-    x = det_input()
-    print(f"STEP-3 full {LAYERS}L hybrid prefill converter (T={T}, D={D}, fp16, {len(m.m.mla_pos)} MLA @ {sorted(m.m.mla_pos)}):")
+    x = det_tokens(T) if TOKENS else det_input()
+    in_name = "input_ids" if TOKENS else "x_seq"
+    print(f"STEP-3 full {LAYERS}L hybrid prefill converter (T={T}, D={D}, fp16, input={'tokens' if TOKENS else 'hidden'}, {len(m.m.mla_pos)} MLA @ {sorted(m.m.mla_pos)}):")
 
     eager = m(x)
     ep = torch.export.export(m, (x,))
@@ -72,7 +81,7 @@ def main() -> None:
     print(f"  host-fidelity (eager vs exported-decomposed): worst rel max-err {worst:.2e} -> {'PASS' if worst < 1e-2 else 'FAIL'}")
 
     c = coreai_torch.TorchConverter().add_exported_program(
-        ep, input_names=["x_seq"], output_names=OUT_NAMES, entrypoint_name="main")
+        ep, input_names=[in_name], output_names=OUT_NAMES, entrypoint_name="main")
     p = c.to_coreai(); p.optimize()
     if OUT.exists():
         shutil.rmtree(OUT)
