@@ -29,6 +29,7 @@ import torch.nn.functional as F
 sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mamba3_trainable as MT
+import mamba3_hybrid as HY
 import mamba3_raft as RAFT
 from mamba3_raft import build_example, make_examples, make_eval_condition, masked_ce, eval_nll
 
@@ -145,7 +146,9 @@ def main() -> None:
         print(f"cache done | order={ORDER} | difficulty [{min(ds):.2f},{max(ds):.2f}] | teacher no longer needed for KD")
 
     torch.manual_seed(0)
-    student = MT.M(vocab, LAYERS).to(DEV).to(DT)
+    ARCH = os.environ.get("ARCH", "mamba")                            # "hybrid" = 20 Mamba-3 + 4 MLA @ L6/12/18/23 (the DUET reader)
+    student = (HY.HybridM(vocab, LAYERS) if ARCH == "hybrid" else MT.M(vocab, LAYERS)).to(DEV).to(DT)
+    print(f"student ARCH={ARCH} ({'HybridM 20-Mamba+4-MLA' if ARCH == 'hybrid' else 'pure Mamba-3'})")
     opt = torch.optim.AdamW(student.parameters(), lr=LR, weight_decay=0.1, betas=(0.9, 0.95))
     start = 1
     ckpt = os.path.join(CKPT_DIR, "ckpt_latest.pt")

@@ -72,6 +72,22 @@ class HybridM(nn.Module):
                 states.append(("mamba", st))
         return x, states
 
+    def run_twin(self, tokens, collect_ssm: bool = False, return_hiddens: bool = False):
+        """Parallel TRAINING forward over a sequence → (logits [T,V], extra). Mirrors MT.M.run_twin so the distill
+        harness is arch-agnostic: Mamba layers via Lyr.forward_seq, MLA layers via MLABlock.forward_seq, then the tied head."""
+        x = self.embedding.weight[tokens]
+        extra = []
+        for i, lyr in enumerate(self.layers):
+            if self._is_mla(i):
+                x, _ = lyr.forward_seq(x)
+            else:
+                x, ssm_seq, _ = lyr.forward_seq(x)
+                if collect_ssm:
+                    extra.append(ssm_seq)
+            if return_hiddens:
+                extra.append(x)
+        return self.head(x), extra
+
     def run_ref(self, tokens, init=None):
         """Per-token decode, resuming from `init` (heterogeneous handoff) or zero. Returns logits [T,V]."""
         st = [(tag, (list(s) if tag == "mamba" else s)) for tag, s in (init if init is not None else self._zero_state())]

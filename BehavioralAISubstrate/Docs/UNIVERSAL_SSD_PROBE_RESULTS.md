@@ -1720,3 +1720,22 @@ the host put/get + binding-key contract is proven and portable); (b) T>64 `scan_
 device convert untested); (c) the trained-checkpoint quality gate (最强大 still unsubstantiated — every result is random-weight,
 necessary-not-sufficient); (d) fused on-device argmax + verify[1,K] self-spec. NET coverage delta: Pillar 3 ~5%→~60% (host), Context
 Compiler ~18%→~45%, 浑然一体 ~35%→~65%. The remaining gaps are device-port + the cloud distill (the one lever that makes 最强大 real).
+
+## Track G — Addendum 30: 继续开发 — the HYBRID is now distillable; cloud 24L distill retargeted to the hybrid (the 最强大 prerequisite)
+
+The coverage scorecard's #1 BLOCKER: every device/host result is RANDOM-WEIGHT, and the one trained checkpoint is a DIFFERENT
+pure-Mamba L16 model — so 最强大 is unsubstantiated and the cloud distill trained the wrong arch. Fixed the prerequisite:
+- **`HybridM.run_twin(tokens)`** — a parallel TRAINING forward (Mamba via `Lyr.forward_seq`, MLA via `MLABlock.forward_seq`,
+  tied head), identical interface to `MT.M.run_twin`, so the distill + eval harness is arch-agnostic (verified: `eval_nll`
+  uses `run_twin`; `HybridM(256,24).run_twin → [40,256]` with all 4 MLA layers).
+- **`mamba3_cloud_distill.py ARCH=hybrid`** — builds `HybridM` (20 Mamba + 4 MLA) instead of `MT.M`; the loop (KD@TAU=1 +
+  RAFT-CE, top-K cache, curriculum, atomic resume) is unchanged. The cloud run now produces the HYBRID checkpoint that feeds
+  the device assets.
+- **Trainability PROVEN** (`Tools/mamba3_distill_hybrid_smoke.py`, host overfit, L=8 incl. 1 MLA @ position 6): KD **2.05 → 0.027
+  (99% drop)**, teacher-argmax agreement **0% → 100%**, MLA-layer `kv_down` gradient finite+nonzero, no NaN → the from-scratch
+  MLA layers DO learn; gradients flow through MLA + Mamba end-to-end. The hybrid is distillable.
+
+**Status:** the cloud distill is now READY to produce a trained 24L hybrid (`ARCH=hybrid LAYERS=24` on the RunPod kit). The
+actual run needs the operator's cloud compute (cannot self-provision). Once it produces a checkpoint, wire it into
+`mamba3_hybrid_{decode,prefill}_deploy.py` (replace `manual_seed(0)` with `load_state_dict`) → re-run the device DUET + the
+int8 floor cert with a stricter-than-argmax metric → 最强大 becomes a measured number instead of prose. This is the last gate.
