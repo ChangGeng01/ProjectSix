@@ -48,6 +48,14 @@ def resolve_ckpt(default_vocab: int, layers: int):
     c = torch.load(p, map_location="cpu")
     assert c.get("arch") == "hybrid", f"CKPT arch={c.get('arch')!r} is not 'hybrid' — wrong converter for this checkpoint"
     assert c.get("layers", layers) == layers, f"CKPT layers={c.get('layers')} != LAYERS={layers} — would deploy an incoherent graph"
+    exp_mla = sorted(q for q in MLA_POSITIONS if q < layers)          # the placement HybridM(layers) will build
+    got_mla = c.get("mla_positions")
+    assert got_mla is None or list(got_mla) == exp_mla, \
+        f"CKPT mla_positions={got_mla} != deploy {exp_mla} — MLA placement mismatch (incoherent graph)"
+    exp_cfg = [MT.D_MODEL, MT.H, MT.P, MT.N, MT.R]
+    cfg = c.get("config")
+    assert cfg is None or list(cfg) == exp_cfg, \
+        f"CKPT config={list(cfg) if cfg else cfg} != module {exp_cfg} — shape mismatch (rebuild would be incoherent)"
     return c.get("vocab", default_vocab), c["model"]
 
 

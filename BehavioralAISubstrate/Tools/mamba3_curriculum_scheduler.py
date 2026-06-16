@@ -70,12 +70,15 @@ class CurriculumScheduler:
         return min(1.0, max(0.0, c))
 
     def difficulty_quantile(self, step: int) -> float:
-        return self.competence(step)
+        return max(self.cfg.pace_c0, self.competence(step))      # the easiest-fraction the sampler may draw from
 
     def _candidates(self, step: int) -> np.ndarray:
-        q = max(self.cfg.pace_c0, self.competence(step))         # never below the warmup floor
-        cut = np.searchsorted(self.sorted_diff, q, side="right")  # examples with normalized difficulty ≤ q
-        return self.sort_idx[:max(1, cut)]
+        # TRUE QUANTILE gate (audit-fix): competence selects the easiest FRACTION q of examples, NOT all examples whose
+        # normalized difficulty VALUE <= q. On right-skewed teacher-CE difficulty the value-gate was ~inert (pool ~85% at
+        # step 0); the quantile gate gives the intended easy->hard ramp regardless of the difficulty distribution shape.
+        q = self.difficulty_quantile(step)
+        cut = max(1, int(math.ceil(q * self.N)))
+        return self.sort_idx[:cut]
 
     def sample(self, step: int) -> int:
         """Return a training-example index for this step (competence-gated; replay easy with replay_prob)."""
@@ -114,11 +117,18 @@ def _smoke() -> None:
     a = CurriculumScheduler(diff, 1000); a.sample(100)          # advance a's rng
     b = CurriculumScheduler(diff, 1000); b.load_state_dict(a.state_dict())
     roundtrip = a.sample(500) == b.sample(500)                  # restored rng → identical next draw (resume-safe)
-    ok = mono and rises and raft_mono
+    # TRUE-QUANTILE on a RIGHT-SKEWED (exponential) difficulty — the case where the old value-gate was ~inert.
+    skew = rng.exponential(1.0, 500)
+    ssch = CurriculumScheduler(skew, num_steps=1000)
+    frac_early = len(ssch._candidates(1)) / ssch.N
+    frac_late = len(ssch._candidates(900)) / ssch.N
+    quantile_ok = frac_early <= 0.25 and frac_late >= 0.80      # small easy pool early → most of the set late
+    ok = mono and rises and raft_mono and quantile_ok
     print("CURRIC_SMOKE (synthetic difficulties, no model):")
     print(f"  competence monotone 0→1: {mono} (c[0]={comps[0]:.2f}→c[-1]={comps[-1]:.2f})")
     print(f"  sampled difficulty rises with competence: {rises} (early {early:.2f} → late {late:.2f})")
     print(f"  RAFT staging gold→distractor monotone: {raft_mono} (early {rp_early} → late {rp_late})")
+    print(f"  TRUE-QUANTILE pool ramp on skewed difficulty: {quantile_ok} (frac early {frac_early:.2f} → late {frac_late:.2f})")
     print(f"  state_dict round-trip: {roundtrip}")
     print(f"  -> {'CURRIC_SMOKE PASS' if ok else 'CURRIC_SMOKE FAIL'}")
 

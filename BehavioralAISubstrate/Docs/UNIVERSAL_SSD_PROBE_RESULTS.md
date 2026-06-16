@@ -1968,3 +1968,51 @@ re-forward); eval card emitted clean. The resume path the first micro run never 
 
 **Verdict: launch-safe.** The pipeline runs clean fresh AND across resume; spot preemption can no longer corrupt the cache or
 regress the best checkpoint; the eval card is honest + strict-JSON. P0 launch is cleared.
+
+## Track G — Addendum 43: 深入 audit — eval-VALIDITY rewrite (the parrot common-mode) + 2 latent footguns. 7-dim adversarial workflow, 11 confirmed.
+
+A 7-dimension adversarial audit (69 agents, 31 findings, EACH verified by 2 independent default-refute skeptics → 11 confirmed,
+16 disputed, 4 refuted) of the cloud distill pipeline — past the runtime/resume layer (add.41/42) into whether a "成了" would be
+TRUE. Headline: **the claim_card gate-chain had a common-mode false-成了 — a parametric PARROT that ignores the retrieved docs
+could pass most gates**, and the setup pushed toward it (Granite very likely memorized HotpotQA-val → KD distills parametric
+answering). raft_e2_robust + raft_e3_graceful both pass at slope≈0 (a context-ignorer), generation was gold-length-leaked +
+token-id scored, fidelity_argmax was whole-sequence (document-dominated), and task_fit's teacher gap used a HARDCODED 1.95.
+
+**Full honesty pass (operator-approved) — claim_card is now 8 gates, every one harder for a non-reader:**
+- task_fit: teacher baseline MEASURED LIVE (teacher_answer_nll over the same held E1) — drops the hardcoded 1.95 (real Granite
+  E1 = **1.126**, the guess was off by +0.82). fail-closed if unmeasured.
+- raft_e2_robust: unchanged (gold buried in distractors ≈ gold-only = noise-robust).
+- context_use (REPLACES the backwards raft_e3_graceful): slope_e3_e1 >= CONTEXT_USE_MARGIN — removing the gold doc must
+  MEASURABLY hurt → proves the model USES the context (anti-parrot). The old "<0.12 graceful" rewarded context-ignorers.
+- fidelity_argmax: now masked to the ANSWER SPAN (was diluted over the whole document-dominated sequence).
+- generation: free-running greedy decode to a FIXED budget + EOS (was len(gold)-leaked), EM/F1 over NORMALIZED TEXT (was raw ids).
+- stability: skip_pct<=0.05 AND subset_ok (E1/E2/E3 slopes now computed over an IDENTICAL id-aligned surviving subset — the
+  sk==0 discipline the standalone raft.py had but the gate-path lacked).
+- device_parity (NEW, operator-approved): the A19 runs the SEQUENTIAL fp16 decode (run_ref/step_ref); the card was computed on
+  the PARALLEL bf16 run_twin, proven equal only on random fp64 weights. New decode_parity() casts fp16 + compares argmax over
+  the answer span on the trained ckpt; gate requires >=0.99. (Bonus: measured run_twin≡run_ref argmax-agreement = **1.0000** on a
+  real L8 hybrid w/ MLA — the forward-consistency the audit flagged as unverified, now empirically confirmed.)
+- no_contamination: unchanged (real disjoint split, add.41).
+- DATA FIX (raft.py): gold-survival truncation — gold docs are selected FIRST and never dropped by the front-truncation; the old
+  shuffle+front-cut silently truncated gold out of ~half of E2 at MAX_LEN=1024, collapsing E2→E3 and corrupting the slope.
+- CURRICULUM FIX: competence now gates a TRUE QUANTILE (easiest fraction q), not a difficulty VALUE — on right-skewed teacher-CE
+  the value-gate was ~inert (pool ~85% at step 0); quantile ramps 11%→95%.
+- DEPLOY FIX: both hybrid converters now assert-not-missing trained params (was strict=False, only unexpected) → no silent
+  partial-random deploy; resolve_ckpt also asserts mla_positions + (D,H,P,N,R) config match.
+
+**+ 2 latent footguns (disputed-but-real, operator-requested):**
+- LEAN_MLP train/deploy divergence: forward_seq (train/eval) ignored LEAN_MLP while step_ref/prefill_state honored it → trained
+  WITH the SwiGLU MLP, decoded/deployed WITHOUT. Factored into ONE source of truth Lyr._block_out() called by all three paths
+  (verified: forward_seq≡step_ref under LEAN_MLP=1, max-err 2.5e-7; and unchanged under the default).
+- Eval-set reproducibility: the frozen E was rebuilt from a live HotpotQA download every start. Now (a) HOTPOT_REVISION env pins a
+  commit SHA on both load_dataset calls (mirrors the llama converter precedent), (b) E is persisted atomically to eval_set.pt and
+  RELOADED on resume (byte-identical across the 100x relaunch loop), (c) a CONTENT hash of train+E (data_fp) is folded into the
+  cache fingerprint → any data drift is loud, (d) runpod_distill.sh pins HF OFFLINE once the cache exists (immutable source).
+
+**Verification:** all 4 module smokes pass (RAFT incl. gold-survival + determinism, CURRIC incl. skewed-quantile, EVAL incl. the 8
+gates wiring, deploy py_compile); a struct-e2e on the real HybridM (parity 1.0); a real-Granite micro-e2e (teacher_E1=1.126
+MEASURED, context_use FIRES on a non-reader, device_parity=1.0 on the trained ckpt, EM/F1 text-scored, honest 亏的, valid card);
+fresh→resume e2e confirms eval_set.pt reload + data_fp cache-reuse. The honesty pass is launch-safe: a 成了 now REQUIRES the model
+to read the gold doc (context_use), match the MEASURED teacher (task_fit), and reproduce on the device's fp16 sequential graph
+(device_parity). KNOWN LIMITATION (flagged, deferred for P0): HotpotQA-val is likely in Granite's pretraining, so even context_use
+is confounded by memorization; a clean reading test needs a novel-document probe — revisit for the full run.

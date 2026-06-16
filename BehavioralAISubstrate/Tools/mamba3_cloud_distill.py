@@ -93,21 +93,24 @@ def kd_topk(student_logits, topk_idx, topk_val):
     return (q * (q.clamp_min(1e-9).log() - lp)).sum(-1).mean() * (TAU * TAU)
 
 
-def build_cache(teacher, train, cache_dir):
+def build_cache(teacher, train, cache_dir, extra_fp=""):
     """Phase 1 (run ONCE): frozen-teacher forward over every train example → cache top-K logits + per-example
     DIFFICULTY (teacher CE on the answer tokens, for curriculum ordering). Resumable (skips existing .pt). After this,
     training needs NO teacher forward — the dominant cost is amortized across all epochs."""
     os.makedirs(cache_dir, exist_ok=True)
-    # CACHE-POLLUTION GUARD: ex{i}.pt is index-keyed, so reusing a CKPT_DIR after changing teacher/RAFT/N_ROWS/KD_K would
-    # silently train on STALE teacher logits. Fingerprint the config; REFUSE (loud) on drift — never silently reuse.
+    # CACHE-POLLUTION GUARD: ex{i}.pt is index-keyed, so reusing a CKPT_DIR after changing teacher/RAFT/N_ROWS/KD_K (or
+    # the train/eval DATA itself — extra_fp) would silently train on STALE teacher logits / a moved baseline. Fingerprint
+    # the config + a content hash of the actual examples; REFUSE (loud) on drift — never silently reuse.
     fp = hashlib.sha256(json.dumps({"teacher": TEACHER, "p": RAFT.P_GOLDEN, "k": RAFT.K_DISTRACT, "t": RAFT.MAX_LEN,
-                                    "n_rows": N_ROWS, "kd_k": KD_K, "n_train": len(train)}, sort_keys=True).encode()).hexdigest()[:16]
+                                    "n_rows": N_ROWS, "kd_k": KD_K, "n_train": len(train), "data": extra_fp},
+                                   sort_keys=True).encode()).hexdigest()[:16]
     fpf = os.path.join(cache_dir, "fingerprint.txt")
     if os.path.exists(fpf):
         old = open(fpf).read().strip()
         if old != fp:
             raise SystemExit(f"CACHE CONFIG DRIFT in {cache_dir}: built with {old}, current config {fp} "
-                             f"(teacher/RAFT/N_ROWS/KD_K changed) — reusing would POLLUTE training. Use a FRESH CKPT_DIR or delete the cache.")
+                             f"(teacher/RAFT/N_ROWS/KD_K or the train/eval DATA changed) — reusing would POLLUTE training. "
+                             f"Use a FRESH CKPT_DIR or delete the cache.")
     else:
         open(fpf, "w").write(fp)
     for i, ex in enumerate(train):
@@ -139,6 +142,33 @@ def save_ckpt(student, opt, step, path, sched=None):
     os.replace(tmp, path)                                               # atomic — survives a mid-write preemption
 
 
+@torch.no_grad()
+def decode_parity(student, examples, max_ex=None):
+    """DEVICE-TRUTH gate: the A19 runs the SEQUENTIAL fp16 decode (run_ref/step_ref); the eval card is computed on the
+    PARALLEL run_twin in bf16. Cast a fp16 copy and compare argmax over the ANSWER SPAN on the trained ckpt — bounds the
+    parallel-vs-sequential + dtype gap the eval would otherwise hide. Skips gracefully if the model has no run_ref."""
+    import copy
+    n = int(os.environ.get("DECODE_PARITY_N", "8")) if max_ex is None else max_ex
+    if not hasattr(student, "run_ref"):
+        return {"argmax_agreement": None, "logit_max_err": None, "note": "model has no run_ref (sequential path); skipped"}
+    sf = copy.deepcopy(student).half().eval()
+    agree = tot = 0
+    maxerr = 0.0
+    for ex in examples[:n]:
+        ids = ex["input_ids"].to(DEV)
+        par = sf.run_twin(ids, collect_ssm=False)[0].float()            # parallel (the eval graph)
+        seq = sf.run_ref(ids).float()                                   # sequential (the device graph)
+        plen = int(ex["prompt_len"])
+        m = torch.arange(par.shape[0] - 1, device=DEV) >= (plen - 1)    # answer-span positions
+        if not m.any():
+            continue
+        pa, sa = par[:-1][m], seq[:-1][m]
+        agree += int((pa.argmax(-1) == sa.argmax(-1)).sum()); tot += int(m.sum())
+        maxerr = max(maxerr, float((pa - sa).abs().max()))
+    return {"argmax_agreement": (agree / tot if tot else float("nan")), "logit_max_err": maxerr,
+            "n_positions": tot, "n_examples": min(n, len(examples)), "dtype": "fp16"}
+
+
 def main() -> None:
     from datasets import load_dataset
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -166,7 +196,8 @@ def main() -> None:
     for p in teacher.parameters():
         p.requires_grad_(False)
 
-    rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]")
+    rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]",
+                        revision=os.environ.get("HOTPOT_REVISION") or None)   # pin a commit SHA → fully reproducible source
     print(f"data rows: requested N_ROWS={N_ROWS}, got {len(rows)}", flush=True)   # HotpotQA val ~7405 → larger N_ROWS silently caps
     ex_all = [build_example(r) for r in rows]
     def bucket(i):
@@ -176,12 +207,30 @@ def main() -> None:
     contamination_ok = {e["id"] for e in train_rows}.isdisjoint({e["id"] for e in held_rows})  # VERIFY the real split
     assert contamination_ok, "train/held id OVERLAP — split is contaminated"   # bucket split is disjoint by construction
     train = make_examples(train_rows, RAFT.P_GOLDEN, RAFT.K_DISTRACT, tok, seed=0)
-    E = {m: make_eval_condition(held_rows, m, tok) for m in ("E1", "E2", "E3")}
-    print(f"data | HotpotQA distractor | train={len(train)} held={len(held_rows)} | "
-          f"P={RAFT.P_GOLDEN} K={RAFT.K_DISTRACT} T={RAFT.MAX_LEN} CoT={RAFT.COT} | vocab={vocab}")
+
+    # FROZEN eval set: build once, persist atomically, RELOAD on resume so E1/E2/E3 are byte-identical across the
+    # self-healing relaunch loop (reproducible slopes/gates; immune to an upstream dataset move mid-run).
+    eval_set_path = os.path.join(CKPT_DIR, "eval_set.pt")
+    if RESUME and os.path.exists(eval_set_path):
+        E = torch.load(eval_set_path)
+        print(f"resume: loaded FROZEN eval set from {eval_set_path} (E1/E2/E3={[len(E[m]) for m in E]})", flush=True)
+    else:
+        E = {m: make_eval_condition(held_rows, m, tok) for m in ("E1", "E2", "E3")}
+        _common = set.intersection(*[{x["id"] for x in E[m]} for m in E])    # IDENTICAL subset across E1/E2/E3 → slopes are valid
+        E = {m: [x for x in E[m] if x["id"] in _common] for m in E}
+        _tmp = eval_set_path + ".tmp"; torch.save(E, _tmp); os.replace(_tmp, eval_set_path)   # atomic freeze (save_ckpt pattern)
+
+    def _content_fp(items):                                              # hash the ACTUAL token content → loud on any data drift
+        h = hashlib.sha256()
+        for it in items:
+            h.update(it["input_ids"].cpu().numpy().tobytes())
+        return h.hexdigest()[:16]
+    data_fp = _content_fp(train) + "|" + _content_fp([x for m in ("E1", "E2", "E3") for x in E[m]])
+    print(f"data | HotpotQA distractor | train={len(train)} held={len(held_rows)} | E1/E2/E3={[len(E[m]) for m in E]} | "
+          f"data_fp={data_fp} | P={RAFT.P_GOLDEN} K={RAFT.K_DISTRACT} T={RAFT.MAX_LEN} CoT={RAFT.COT} | vocab={vocab}")
     if CACHE:
         print(f"caching teacher top-{KD_K} over {len(train)} examples (once; resumable)…", flush=True)
-        build_cache(teacher, train, os.path.join(CKPT_DIR, "cache"))
+        build_cache(teacher, train, os.path.join(CKPT_DIR, "cache"), extra_fp=data_fp)
         if ORDER == "curriculum":
             train.sort(key=lambda e: e["difficulty"])                    # easy (low teacher-CE) -> hard
         ds = [e["difficulty"] for e in train]
@@ -282,19 +331,33 @@ def main() -> None:
     else:                                                            # BUG-3: no best was ever saved (all evals non-finite)
         eval_on = "ckpt_latest"
         print("WARNING: no ckpt_best.pt (no finite eval) — eval card runs on ckpt_latest, NOT a best-selected ckpt", flush=True)
-    raft = EVAL.eval_raft_robustness(student, E)
-    ppl = EVAL.compute_perplexity(student, [], E["E1"])
-    fid = EVAL.compute_fidelity(student, teacher, E["E1"][:64]) if "teacher" in dir() else None
-    gen = EVAL.generate_and_score(student, E["E1"][:64], maxlen=20)
-    res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
-           "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
-           "best_score": best_score, "eval_on": eval_on}
-    res["claim"] = EVAL.claim_card(res)
+    eos = getattr(tok, "eos_token_id", None)
+    try:                                                             # never lose the run to an eval crash — the ckpt is saved
+        raft = EVAL.eval_raft_robustness(student, E)
+        ppl = EVAL.compute_perplexity(student, [], E["E1"])
+        t_e1 = EVAL.teacher_answer_nll(teacher, E["E1"])             # MEASURED teacher baseline (the real task_fit gap target)
+        fid = EVAL.compute_fidelity(student, teacher, E["E1"][:64])
+        gen = EVAL.generate_and_score(student, E["E1"][:64], tok, maxlen=24, eos=eos)
+        dp = decode_parity(student, E["E1"])                         # DEVICE-TRUTH: fp16 sequential-vs-parallel parity
+        res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
+               "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
+               "teacher_E1_nll": t_e1, "decode_parity": dp, "best_score": best_score, "eval_on": eval_on}
+        res["claim"] = EVAL.claim_card(res)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        res = {"eval_error": repr(e), "contamination_ok": contamination_ok, "best_score": best_score, "eval_on": eval_on}
+        res["claim"] = EVAL.claim_card(res)                          # fail-closed → 亏的 (missing gates default False)
     with open(os.path.join(CKPT_DIR, "eval_card.json"), "w") as f:
         json.dump(_sanitize(res), f, indent=2)                       # BUG-4: non-finite floats → null (strict-JSON valid)
-    print(f"EVAL CARD → {res['claim']['status']}"
-          + (f"  failed: {res['claim']['failed_gates']}" if res['claim']['failed_gates'] else "")
-          + f"  (E1 nll={raft['E1']['nll']:.3f}, slope(E2-E1)={raft['slope_e2_e1']:+.3f}, EM={gen['EM']:.2f}, F1={gen['F1']:.2f})", flush=True)
+    _c = res["claim"]
+    if "raft" in res:
+        print(f"EVAL CARD → {_c['status']}" + (f"  failed: {_c['failed_gates']}" if _c['failed_gates'] else "")
+              + f"  (E1 nll={res['raft']['E1']['nll']:.3f}, ctx-use slope(E3-E1)={res['raft']['slope_e3_e1']:+.3f}, "
+              + f"teacher_E1={res['teacher_E1_nll']:.3f}, EM={res['generation']['EM']:.2f}, F1={res['generation']['F1']:.2f}, "
+              + f"parity={res['decode_parity'].get('argmax_agreement')})", flush=True)
+    else:
+        print(f"EVAL CARD → {_c['status']}  (eval crashed: {res.get('eval_error')}; ckpt is saved, re-run eval offline)", flush=True)
 
 
 if __name__ == "__main__":

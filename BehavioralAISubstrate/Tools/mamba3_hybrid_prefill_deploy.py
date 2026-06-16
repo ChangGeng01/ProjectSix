@@ -72,7 +72,8 @@ def main() -> None:
     if sd is not None:
         miss, unexp = m.m.load_state_dict(sd, strict=False)
         assert not unexp, f"CKPT has keys DeployHybridPrefill.m lacks: {unexp[:3]}"
-        print(f"loaded TRAINED ckpt (vocab={vocab}; {len(miss)} missing = expected, none should be params)")
+        assert not miss, f"CKPT did NOT supply trained params (would deploy random init): {miss[:5]}"
+        print(f"loaded TRAINED ckpt (vocab={vocab}; all {len(sd)} trained tensors consumed)")
     m = m.half().eval()
     x = det_tokens(T, vocab) if TOKENS else det_input(T)
     in_name = "input_ids" if TOKENS else "x_seq"

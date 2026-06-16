@@ -142,8 +142,9 @@ def convert() -> None:
     m = (VerifyKFixed if K else HybridDecodeFixed)(vocab, LAYERS, MAX_SEQ)
     if sd is not None:
         miss, unexp = m.m.load_state_dict(sd, strict=False)
-        assert not unexp, f"CKPT has keys lacked: {unexp[:3]}"
-        print(f"loaded TRAINED ckpt (vocab={vocab}; {len(miss)} missing = the decode-state buffers, expected)")
+        assert not unexp, f"CKPT has keys HybridM lacks: {unexp[:3]}"
+        assert not miss, f"CKPT did NOT supply trained params (would deploy random init): {miss[:5]}"  # decode buffers live on the wrapper, not m.m
+        print(f"loaded TRAINED ckpt (vocab={vocab}; all {len(sd)} trained tensors consumed; decode-state buffers zero-init on the wrapper)")
     m = m.half().eval()
     ex = (torch.zeros(K, dtype=torch.long),) if K else (torch.zeros(1, 1, dtype=torch.long),)
     _ = m(*ex)

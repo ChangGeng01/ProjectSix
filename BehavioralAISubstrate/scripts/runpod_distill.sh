@@ -19,6 +19,12 @@ mkdir -p "$CKPT_DIR" "$HF_HOME"
 
 echo ">> Mamba-3 distill | arch=$ARCH L=$LAYERS | teacher=$TEACHER | ckpt=$CKPT_DIR | STEPS=$STEPS | resume=on"
 for attempt in $(seq 1 100); do
+  # Once the teacher + dataset are cached (first successful cache phase), PIN them OFFLINE so the dataset/teacher can't
+  # drift across the self-healing relaunch loop (reproducibility + supply-chain). Attempt 1 stays online to download.
+  if [ -f "$CKPT_DIR/cache/fingerprint.txt" ]; then
+    export HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1
+    echo ">> cache present — pinning HF OFFLINE (immutable dataset + teacher for the rest of the loop)"
+  fi
   python -u Tools/mamba3_cloud_distill.py 2>&1 | tee -a "$CKPT_DIR/train.log" && { echo ">> DONE"; break; }
   echo ">> crash/preemption (attempt $attempt) — auto-resuming from $CKPT_DIR in 10s…"; sleep 10
 done

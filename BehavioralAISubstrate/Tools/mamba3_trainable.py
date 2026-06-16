@@ -129,6 +129,13 @@ class Lyr(nn.Module):
         h = rms(x, self.mlp_norm)
         return self.mlp_down(F.silu(self.mlp_gate(h)) * self.mlp_up(h))
 
+    def _block_out(self, x1):
+        """SINGLE SOURCE OF TRUTH for the post-mixer residual: add the SwiGLU MLP unless LEAN_MLP=1 (the ANE op-count
+        ablation, Docs/UNIVERSAL_SSD_PROBE_RESULTS.md). ALL forward paths — forward_seq (train/eval), step_ref (decode),
+        prefill_state (prefill) — MUST route through this so the trained/eval graph can never diverge from the
+        decoded/deployed graph (forward_seq previously ignored LEAN_MLP → a silent train/deploy divergence)."""
+        return x1 if os.environ.get("LEAN_MLP") == "1" else x1 + self.mlp(x1)
+
     # ---- per-token coefficients shared by both paths (keeps the two numerically identical by construction) ----
     def _coeffs(self, h_in: torch.Tensor):
         # h_in: [..., D_MODEL]  ->  returns coeff tensors with a leading [...] (token) axis
@@ -166,7 +173,7 @@ class Lyr(nn.Module):
         y_out = torch.einsum("hpr,hrp->hp", y, self.mimo_o) + self.D.view(H, 1) * xin
         out = self.out_proj(rms(y_out.reshape(D_INNER) * F.silu(z), self.gnorm))
         x1 = x + out
-        blk = x1 if os.environ.get("LEAN_MLP") == "1" else x1 + self.mlp(x1)   # ablation: drop MLP (ANE op-count probe)
+        blk = self._block_out(x1)                                  # one source of truth (honors LEAN_MLP like all paths)
         return blk, new_angle, new_ssm, Brot, x_mimo
 
     # ---- TWIN: the reformulated chunked/parallel path over a [T,D] sequence (differentiable) ----
@@ -204,7 +211,7 @@ class Lyr(nn.Module):
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(rms(y_out.reshape(T, D_INNER) * F.silu(z), self.gnorm))
         x1 = x_seq + out
-        return x1 + self.mlp(x1), ssm_seq, angle
+        return self._block_out(x1), ssm_seq, angle                 # FIX: was unconditional — now honors LEAN_MLP (no train/deploy drift)
 
     def prefill_state(self, x_seq, init=None):
         """DUET prefill: chunked-scan over [T,D]; return (out_seq, boundary 4-state) so step_ref decode can resume.
@@ -230,7 +237,7 @@ class Lyr(nn.Module):
         y_out = torch.einsum("thpr,hrp->thp", y, self.mimo_o) + self.D.view(1, H, 1) * xin
         out = self.out_proj(rms(y_out.reshape(T, D_INNER) * F.silu(z), self.gnorm))
         x1 = x_seq + out
-        out_seq = x1 if os.environ.get("LEAN_MLP") == "1" else x1 + self.mlp(x1)
+        out_seq = self._block_out(x1)                              # one source of truth (honors LEAN_MLP like all paths)
         return out_seq, (angle[-1], ssm_seq[-1], Brot[-1], x_mimo[-1])
 
 

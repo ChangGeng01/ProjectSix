@@ -61,19 +61,6 @@ def build_example(row) -> dict:
             "golden": golden, "distract": distract, "gold_sents": gold_sents}
 
 
-def assemble(ex: dict, keep_gold: bool, k: int, rng: random.Random) -> list:
-    if keep_gold:
-        docs = list(ex["golden"]) + ex["distract"][:k]                  # gold kept, never dropped
-    else:
-        docs = ex["distract"][: k + len(ex["golden"])]                  # doc-count held constant, no gold
-    rng.shuffle(docs)                                                   # kill positional shortcut
-    return docs
-
-
-def format_docs(docs: list) -> str:
-    return "".join(f"[Document {i + 1} | {t}]\n{txt}\n" for i, (t, txt) in enumerate(docs))
-
-
 def target_text(ex: dict, keep_gold: bool) -> str:
     if not COT:
         return " " + ex["answer"]
@@ -82,18 +69,48 @@ def target_text(ex: dict, keep_gold: bool) -> str:
     return f" ##Reason: Based on parametric knowledge. ##Answer: {ex['answer']}"
 
 
-def to_ids(doc_block: str, question: str, answer: str, tok) -> dict:
+def _fmt_doc(idx: int, title: str, txt: str) -> str:
+    return f"[Document {idx + 1} | {title}]\n{txt}\n"
+
+
+def _select_docs(gold: list, distract: list, budget: int, tok, rng: random.Random) -> list:
+    """Audit-fix (gold-survival): pick whole docs that fit `budget` tokens — ALL gold docs FIRST (guaranteed; never
+    dropped in favor of a distractor), then distractors until the budget fills, then shuffle the kept set (kill the
+    positional shortcut, gold still present). Fixes the front-truncation bug where a shuffled-to-the-back gold doc was
+    silently cut out of E2/training (collapsing E2→E3 and corrupting the slope gate)."""
+    def cost(t: str, txt: str) -> int:
+        return len(tok(_fmt_doc(0, t, txt), add_special_tokens=False).input_ids)
+    kept, used = [], 0
+    for t, txt in gold:                                                 # gold guaranteed (kept even if it alone overflows)
+        kept.append((t, txt)); used += cost(t, txt)
+    fill_budget = max(0, budget - 32)                                   # margin absorbs per-doc header-index token drift
+    for t, txt in distract:
+        c = cost(t, txt)
+        if used + c > fill_budget:
+            continue                                                    # drop the distractor, NEVER the gold
+        kept.append((t, txt)); used += c
+    rng.shuffle(kept)                                                   # positional robustness; gold survives the shuffle
+    return kept
+
+
+def to_ids(gold: list, distract: list, question: str, answer: str, tok, rng: random.Random, ex_id=None) -> dict:
     # Tokenize the three pieces SEPARATELY so truncation drops only DOCUMENT tokens — the question + answer always survive
     # (the v1 bug: pids[:N] kept the doc front and dropped the trailing "Question: ... Answer:", removing the question).
+    # GOLD docs are selected FIRST (gold-survival) so they are never the docs truncated away.
     bos = [tok.bos_token_id] if tok.bos_token_id is not None else []
-    doc_ids = tok(doc_block, add_special_tokens=False).input_ids
     suffix_ids = tok(f"\nQuestion: {question}\nAnswer:", add_special_tokens=False).input_ids
     aids = tok(answer, add_special_tokens=False).input_ids
     budget = max(0, MAX_LEN - len(bos) - len(suffix_ids) - len(aids))   # reserve room for question + answer
-    pids = bos + doc_ids[:budget] + suffix_ids                          # question (suffix) is NEVER trimmed
+    kept = _select_docs(gold, distract, budget, tok, rng)
+    block = "".join(_fmt_doc(i, t, txt) for i, (t, txt) in enumerate(kept))
+    doc_ids = tok(block, add_special_tokens=False).input_ids[:budget]   # backstop; gold prioritized so this rarely bites
+    pids = bos + doc_ids + suffix_ids                                   # question (suffix) is NEVER trimmed
     full = pids + aids
     prompt_len = min(len(pids), len(full) - 1)                          # >=1 answer token predicted
-    return {"input_ids": torch.tensor(full), "prompt_len": prompt_len}
+    out = {"input_ids": torch.tensor(full), "prompt_len": prompt_len}
+    if ex_id is not None:
+        out["id"] = ex_id                                              # carry id → cross-condition (E1/E2/E3) subset alignment
+    return out
 
 
 def make_examples(rows_examples: list, keep_p: float, k: int, tok, seed: int) -> list:
@@ -101,8 +118,11 @@ def make_examples(rows_examples: list, keep_p: float, k: int, tok, seed: int) ->
     for idx, ex in enumerate(rows_examples):
         rng = random.Random(seed * 100003 + idx)                       # per-(seed,idx) — reproducible across conditions
         keep = rng.random() < keep_p
-        docs = assemble(ex, keep, k, rng)
-        item = to_ids(format_docs(docs), ex["question"], target_text(ex, keep), tok)
+        if keep:
+            gold, distract = list(ex["golden"]), ex["distract"][:k]    # gold kept, never dropped
+        else:
+            gold, distract = [], ex["distract"][: k + len(ex["golden"])]   # doc-count held constant, no gold
+        item = to_ids(gold, distract, ex["question"], target_text(ex, keep), tok, rng, ex.get("id"))
         if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
             out.append(item)
     return out
@@ -114,12 +134,12 @@ def make_eval_condition(rows_examples: list, mode: str, tok) -> list:
     for idx, ex in enumerate(rows_examples):
         rng = random.Random(7_000_003 + idx)
         if mode == "E1":
-            docs = assemble(ex, True, 0, rng)
+            gold, distract = list(ex["golden"]), []
         elif mode == "E2":
-            docs = assemble(ex, True, K_DISTRACT, rng)
-        else:
-            docs = assemble(ex, False, K_DISTRACT, rng)
-        item = to_ids(format_docs(docs), ex["question"], target_text(ex, mode != "E3"), tok)
+            gold, distract = list(ex["golden"]), ex["distract"][:K_DISTRACT]
+        else:                                                          # E3: no gold, doc-count matched to E2
+            gold, distract = [], ex["distract"][: K_DISTRACT + len(ex["golden"])]
+        item = to_ids(gold, distract, ex["question"], target_text(ex, mode != "E3"), tok, rng, ex.get("id"))
         if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
             out.append(item)
     return out
@@ -179,39 +199,34 @@ def train_one(student, train_ex: list, steps: int, lr: float):
 # ---------- smoke (toy, no download/teacher) ----------
 def smoke() -> None:
     print("RAFT_SMOKE: toy assertions (no dataset, no teacher)")
-    toy = []
-    for i in range(12):
-        toy.append({"id": str(i), "question": f"q{i}?", "answer": f"ans{i}",
-                    "golden": [(f"G{i}a", f"gold sentence {i} alpha."), (f"G{i}b", f"gold beta {i}.")],
-                    "distract": [(f"D{i}_{j}", f"distractor {i} {j} text.") for j in range(8)],
-                    "gold_sents": [f"gold sentence {i} alpha."]})
-    rng = random.Random(0)
-    gk = assemble(toy[0], True, 4, random.Random(1))
-    gd = assemble(toy[0], False, 4, random.Random(1))
-    gold_titles = {d[0] for d in toy[0]["golden"]}
-    assert gold_titles <= {d[0] for d in gk}, "gold-kept context must contain all gold titles"
-    assert not (gold_titles & {d[0] for d in gd}), "gold-dropped context must contain zero gold titles"
-    assert len(gk) == len(gd), f"doc-count invariant broken: {len(gk)} vs {len(gd)}"
-    print(f"  [1] assemble invariants OK (gold-kept docs={len(gk)}, gold-dropped docs={len(gd)})")
 
     class TokStub:
         bos_token_id = 1
 
         def __call__(self, s, add_special_tokens=True):
-            ids = [ord(c) % 500 + 1 for c in s][:300]
+            ids = [ord(c) % 500 + 1 for c in s]
             return type("E", (), {"input_ids": ids})
 
     tok = TokStub()
-    it = to_ids(format_docs(gk), "what is the answer?", " ans0", tok)
-    full = tok(format_docs(gk), add_special_tokens=False).input_ids
+    # [1] GOLD-SURVIVAL: under heavy budget pressure (many big distractors), gold docs must NOT be dropped — distractors are.
+    gold = [("GOLD", "the one gold fact.")]
+    distract = [(f"D{j}", "x" * 200) for j in range(20)]
+    kept = _select_docs(gold, distract, budget=80, tok=tok, rng=random.Random(0))
+    kept_titles = {t for t, _ in kept}
+    assert "GOLD" in kept_titles, "GOLD-SURVIVAL FAILED: gold dropped under budget pressure (the audit bug)"
+    assert len(kept) < 1 + len(distract), "excess distractors must be dropped when over budget (gold-aware truncation)"
+    print(f"  [1] gold-survival OK (kept {len(kept)} docs incl. GOLD; dropped {1 + len(distract) - len(kept)} distractors)")
+
+    # [2] to_ids carries id, never trims the question, predicts >=1 answer token
+    it = to_ids(gold, distract[:4], "what is the answer?", " ans0", tok, random.Random(1), ex_id="qid")
     qtok = tok("\nQuestion: what is the answer?\nAnswer:", add_special_tokens=False).input_ids
-    decoded_has_q = it["input_ids"].numel() >= len(qtok)               # question must survive into the ids
     ntgt = it["input_ids"].numel() - 1
     m = torch.arange(ntgt) >= (it["prompt_len"] - 1)
+    assert it.get("id") == "qid", "eval item must carry id for cross-condition alignment"
     assert it["prompt_len"] >= 1 and int(m.sum()) >= 1, "mask must cover >=1 answer token"
-    assert decoded_has_q, "question suffix must never be truncated away"
-    print(f"  [2] to_ids/mask OK (len={it['input_ids'].numel()} prompt_len={it['prompt_len']} "
-          f"answer_toks={int(m.sum())} question-preserved={decoded_has_q})")
+    assert it["input_ids"].numel() >= len(qtok), "question suffix must never be truncated away"
+    print(f"  [2] to_ids/mask/id OK (len={it['input_ids'].numel()} prompt_len={it['prompt_len']} "
+          f"answer_toks={int(m.sum())} id={it.get('id')})")
 
     torch.manual_seed(0)
     st = MT.M(512, 2).to(DEV)
@@ -233,6 +248,18 @@ def smoke() -> None:
         last = float(loss)
     assert last < 0.10, f"overfit failed: masked answer-CE {last:.3f} (gradients not flowing through masked head)"
     print(f"  [3] overfit OK (masked answer-CE {last:.4f} < 0.10 over 60 steps)")
+
+    # [4] DETERMINISM: make_eval_condition over the SAME rows twice → byte-identical (the frozen eval set is reproducible)
+    toy_rows = [{"id": str(i), "question": f"q{i}?", "answer": f"a{i}",
+                 "golden": [(f"G{i}", f"gold {i} fact.")],
+                 "distract": [(f"D{i}_{j}", f"distractor {i} {j}.") for j in range(6)],
+                 "gold_sents": [f"gold {i} fact."]} for i in range(5)]
+    Ea = make_eval_condition(toy_rows, "E2", tok)
+    Eb = make_eval_condition(toy_rows, "E2", tok)
+    det = len(Ea) == len(Eb) and all(torch.equal(a["input_ids"], b["input_ids"]) and a.get("id") == b.get("id")
+                                     for a, b in zip(Ea, Eb))
+    assert det, "DETERMINISM FAILED: make_eval_condition not reproducible across builds (frozen eval set would drift)"
+    print(f"  [4] eval-set determinism OK (E2 rebuilt byte-identical over {len(Ea)} examples)")
     print("RAFT_SMOKE PASS")
 
 
@@ -244,7 +271,8 @@ def main() -> None:
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(TEACHER)
     vocab = tok.vocab_size
-    rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]")
+    rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]",
+                        revision=os.environ.get("HOTPOT_REVISION") or None)   # pin a commit SHA → fully reproducible source
     examples = [build_example(r) for r in rows]
     def bucket(idstr: str) -> int:                                          # stable hash (Python hash() is salted per process)
         return int(hashlib.sha1(idstr.encode()).hexdigest(), 16) % 10
