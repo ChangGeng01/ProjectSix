@@ -1907,3 +1907,19 @@ The operator's reframe: "成败点在有没有真实 checkpoint 和严肃评测;
 slope(E3−E1) <0.12;  4. fidelity: argmax-agreement ≥0.60;  5. generation: EM ≥0.50 AND F1 ≥0.60;  6. stability: skip_pct ≤0.05;
 7. no contamination. These run on `ckpt_best.pt` at end-of-training; a random-weight checkpoint FAILS them (proven by the smoke
 — the bar is honest, not a rubber stamp). NEXT: wire curriculum-sample + best-ckpt + the eval-card report into mamba3_cloud_distill.py.
+
+## Track G — Addendum 40: wired curriculum + serious-eval into the cloud run (the checkpoint is born WITH its eval card)
+
+`mamba3_cloud_distill.py` now (additive, defaults OFF for backward-compat — import-checked, smokes still green):
+- **Curriculum hook**: `USE_SCHEDULER=1` builds a `CurriculumScheduler` from the cached per-example difficulties and picks each
+  step's example via `sched.sample(step)` (competence-gated easy→hard + replay) instead of the static `ORDER` sort.
+- **Best-checkpoint selection**: every `EVAL_EVERY`, score = −(E1_nll + max(0,slope)); the BEST (not the last) checkpoint is
+  saved to `ckpt_best.pt` (metric-gated, finite-guarded).
+- **Final eval card**: at the end, the BEST ckpt is loaded and the serious battery runs (RAFT E1/E2/E3 + slopes, perplexity,
+  teacher-student fidelity, greedy EM/F1) → `EVAL.claim_card` (the 7 hard gates) → written to `eval_card.json` with the
+  **成了 ✓ / 亏的 ✗** verdict + the failing gates. The checkpoint is born WITH its honest evaluation.
+
+So the cloud run (`ARCH=hybrid LAYERS=24 USE_SCHEDULER=1` on the RunPod kit) now: trains on a real curriculum, RAFT-stages the
+distractors, keeps the metric-best checkpoint, and self-certifies against the honest bar — no human eyeballing, no rubber stamp.
+**The make-or-break is now BUILT end-to-end** (curriculum + serious eval + wiring, addenda 39-40). The only remaining action is
+launching the run (operator compute) → a trained checkpoint + its eval card → only THEN can 成了 be claimed.

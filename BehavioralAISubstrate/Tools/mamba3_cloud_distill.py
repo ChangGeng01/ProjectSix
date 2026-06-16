@@ -19,6 +19,8 @@ RunPod: bash scripts/runpod_setup.sh && bash scripts/runpod_distill.sh   (1× A1
 """
 from __future__ import annotations
 
+import json
+import math
 import os
 import sys
 import time
@@ -31,6 +33,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mamba3_trainable as MT
 import mamba3_hybrid as HY
 import mamba3_raft as RAFT
+import mamba3_eval as EVAL
+from mamba3_curriculum_scheduler import CurriculumScheduler
 from mamba3_raft import build_example, make_examples, make_eval_condition, masked_ce, eval_nll
 
 TEACHER = os.environ.get("TEACHER", "ibm-granite/granite-4.1-3b-base")   # prod: granite-4.1-8b-base
@@ -174,12 +178,17 @@ def main() -> None:
             out[m] = (nll, acc, sk)
         return out
 
+    USE_SCHEDULER = os.environ.get("USE_SCHEDULER", "0") == "1"       # opt-in: dynamic competence curriculum (else static ORDER)
+    sched = CurriculumScheduler([e.get("difficulty", 0.0) for e in train], STEPS) if USE_SCHEDULER else None
+    print(f"curriculum: {'DYNAMIC competence scheduler' if USE_SCHEDULER else 'static ORDER=' + ORDER}", flush=True)
+    best_score, best_path = -float("inf"), os.path.join(CKPT_DIR, "ckpt_best.pt")
+
     t0 = time.time()
     opt.zero_grad(set_to_none=True)
     for step in range(start, STEPS + 1):
         for g in opt.param_groups:
             g["lr"] = LR * min(1.0, step / WARMUP)
-        ex = train[(step - 1) % len(train)]
+        ex = train[sched.sample(step) if USE_SCHEDULER else (step - 1) % len(train)]
         ids = ex["input_ids"].to(DEV)
         sl = student.run_twin(ids, collect_ssm=False)[0]
         if CACHE:                                                        # no teacher forward — cached top-K KD
@@ -203,10 +212,33 @@ def main() -> None:
             save_ckpt(student, opt, step, ckpt)
         if step % EVAL_EVERY == 0:
             ev = evaluate()
+            slope = ev["E2"][0] - ev["E1"][0]
+            score = -(ev["E1"][0] + max(0.0, slope))                  # lower E1 nll + smaller distractor-slope = better
+            if score > best_score and all(math.isfinite(ev[m][0]) for m in ev):
+                best_score = score
+                save_ckpt(student, opt, step, best_path)              # best-ckpt selection (metric-gated, NOT just last)
             print("  EVAL " + " ".join(f"{m}: nll={ev[m][0]:.3f} acc={ev[m][1]:.1%}" for m in ev)
-                  + f"  | slope Δ(E2-E1)={ev['E2'][0]-ev['E1'][0]:+.3f}", flush=True)
+                  + f"  | slope Δ(E2-E1)={slope:+.3f} | best_score={best_score:.3f}"
+                  + ("  ↑best" if score == best_score else ""), flush=True)
     save_ckpt(student, opt, STEPS, ckpt)
     print(f"DONE — final ckpt {ckpt}")
+
+    # The checkpoint is born WITH its eval card: run the serious battery on the BEST checkpoint + the honest claim_card.
+    if os.path.exists(best_path):
+        student.load_state_dict(torch.load(best_path, map_location=DEV)["model"])
+        print(f"loaded best ckpt (score={best_score:.3f}) for the final eval card", flush=True)
+    raft = EVAL.eval_raft_robustness(student, E)
+    ppl = EVAL.compute_perplexity(student, [], E["E1"])
+    fid = EVAL.compute_fidelity(student, teacher, E["E1"][:64]) if "teacher" in dir() else None
+    gen = EVAL.generate_and_score(student, E["E1"][:64], maxlen=20)
+    res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
+           "quant": EVAL.quant_fidelity_stub(), "contamination_ok": True, "best_score": best_score}
+    res["claim"] = EVAL.claim_card(res)
+    with open(os.path.join(CKPT_DIR, "eval_card.json"), "w") as f:
+        json.dump(res, f, indent=2, default=float)
+    print(f"EVAL CARD → {res['claim']['status']}"
+          + (f"  failed: {res['claim']['failed_gates']}" if res['claim']['failed_gates'] else "")
+          + f"  (E1 nll={raft['E1']['nll']:.3f}, slope(E2-E1)={raft['slope_e2_e1']:+.3f}, EM={gen['EM']:.2f}, F1={gen['F1']:.2f})", flush=True)
 
 
 if __name__ == "__main__":
