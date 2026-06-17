@@ -3,6 +3,8 @@ step≡forward_seq, and it actually rotates). These lock the correctness invaria
 the cloud run. CPU-only, fp64 for tight tolerance, no Granite."""
 from __future__ import annotations
 
+import random
+
 import pytest
 import torch
 
@@ -154,6 +156,144 @@ def test_eval_counterfactual_runs_and_reports(stub_tok, monkeypatch):
     r = EV.eval_counterfactual(student, E4, stub_tok, maxlen=4)
     assert set(r) >= {"swap_follow_rate", "orig_recall_rate", "counterfactual_lift", "n"}
     assert r["n"] == len(E4) and 0.0 <= r["swap_follow_rate"] <= 1.0
+
+
+def test_eval_counterfactual_follow_only_skips_recall(stub_tok, monkeypatch):
+    """add.54: follow_only=True (used for the mismatch control) skips the free-greedy orig_recall pass → recall is nan."""
+    import math
+    import mamba3_trainable as MTT, mamba3_eval as EV, mamba3_raft as RAFT
+    monkeypatch.setattr(EV, "DEV", "cpu"); monkeypatch.setattr(RAFT, "DEV", "cpu")
+    torch.manual_seed(0)
+    student = MTT.M(512, 2).eval()
+    E4 = RAFT.make_counterfactual_condition([_swappable_row()], stub_tok)
+    r = EV.eval_counterfactual(student, E4, stub_tok, maxlen=4, follow_only=True)
+    assert math.isnan(r["orig_recall_rate"]) and 0.0 <= r["swap_follow_rate"] <= 1.0   # recall pass skipped
+
+
+# ----------------------------------------------------------------- add.54: question-MISMATCH control
+def _swap_rows_distinct(n=4):
+    return [{"id": f"d{i}", "question": f"who discovered element {i}?", "answer": f"Personne{i}",
+             "golden": [("G", f"Element {i} was discovered by Personne{i} in the old days.")],
+             "distract": [("D", "an unrelated paragraph about weather.")],
+             "gold_sents": [f"Element {i} was discovered by Personne{i} in the old days."]} for i in range(n)]
+
+
+def test_cf_mismatch_pairs_foreign_questions(stub_tok):
+    import mamba3_raft as RAFT
+    rows = _swap_rows_distinct(4)
+    matched = {it["id"]: it["input_ids"] for it in RAFT.make_counterfactual_condition(rows, stub_tok)}
+    mism = RAFT.make_counterfactual_mismatch(rows, stub_tok)
+    assert mism and all(it.get("mismatch") is True for it in mism)
+    assert all(it["prompt_len"] >= 1 and it["input_ids"].numel() > it["prompt_len"] for it in mism)
+    # same swapped doc, FOREIGN question → the tokenized input must DIFFER from the matched item with the same id
+    for it in mism:
+        if it["id"] in matched:
+            a, b = it["input_ids"], matched[it["id"]]
+            assert a.numel() != b.numel() or not bool((a == b).all())
+
+
+def test_cf_mismatch_needs_two_distinct_rows(stub_tok):
+    import mamba3_raft as RAFT
+    assert RAFT.make_counterfactual_mismatch(_swap_rows_distinct(1), stub_tok) == []   # <2 swappable rows → no foreign question
+
+
+class _CharDecodeTok:
+    """A tok whose decode round-trips ids→chars (the StubTok decode emits numeric ids, so it can't test surrogate survival)."""
+    def decode(self, ids):
+        return "".join(chr(int(i)) for i in ids)
+
+
+def test_align_cf_survivors_keeps_only_rows_surviving_in_both():
+    """add.54b: align drops any row whose surrogate was truncated out of EITHER probe, and keeps the matched+mismatch sets
+    over the SAME id set (so genuine compares like-for-like)."""
+    import mamba3_raft as RAFT
+    t = _CharDecodeTok()
+
+    def mk(id_, txt):
+        ids = torch.tensor([ord(c) for c in txt])
+        return {"id": id_, "input_ids": ids, "prompt_len": ids.numel(), "surrogate": "Zelophar"}
+
+    matched = [mk("a", "x Zelophar y"), mk("b", "x Zelophar y"), mk("c", "no surrogate")]   # b: surrogate only in matched
+    mismatch = [mk("a", "p Zelophar q"), mk("b", "no surrogate"), mk("c", "p Zelophar q")]  # c: surrogate only in mismatch
+    km, kmm = RAFT.align_cf_survivors(matched, mismatch, t)
+    assert [it["id"] for it in km] == ["a"] and [it["id"] for it in kmm] == ["a"]           # only 'a' survives in BOTH
+    assert [it["id"] for it in km] == [it["id"] for it in kmm]                              # aligned id sets
+
+
+def test_align_cf_survivors_invariant_equal_ids(stub_tok):
+    """Whatever survives, the two returned lists ALWAYS carry the same id set in the same order (the genuine premise)."""
+    import mamba3_raft as RAFT
+    t = _CharDecodeTok()
+    rows = _swap_rows_distinct(5)
+    km, kmm = RAFT.align_cf_survivors(RAFT.make_counterfactual_condition(rows, stub_tok),
+                                      RAFT.make_counterfactual_mismatch(rows, stub_tok), t)
+    assert [it["id"] for it in km] == [it["id"] for it in kmm]
+
+
+# ----------------------------------------------------------------- KD-C: counterfactual reading-FORCING train pool (add.50)
+def test_cf_train_pool_builds_valid_reading_forcing_examples(stub_tok):
+    import mamba3_raft as RAFT
+    pool = RAFT.make_cf_train_pool([_swappable_row(i) for i in range(6)], stub_tok, seed=0)
+    assert pool, "swappable rows must yield CF examples"
+    for it in pool:
+        assert it["cf"] is True                                       # tagged → CE-only branch (no KD) in the loop
+        assert it["prompt_len"] >= 1 and it["input_ids"].numel() > it["prompt_len"]   # a target token is predicted
+        assert it["surrogate"] != "Paris" and it["orig_answer"] == "Paris"            # the FACT was swapped away from the parametric answer
+
+
+def test_cf_train_pool_surrogate_is_randomized_and_not_the_e4_nonce(stub_tok):
+    """The verifier's load-bearing caveat: the train surrogate MUST be randomized per example AND distinct from the E4 eval
+    nonce — else the model learns 'emit a fixed magic token' (and E4 stops being an independent probe)."""
+    import mamba3_raft as RAFT
+    pool = RAFT.make_cf_train_pool([_swappable_row(i) for i in range(12)], stub_tok, seed=0)
+    surrogates = {it["surrogate"] for it in pool}
+    assert RAFT._SURROGATE not in surrogates                          # never the E4 eval nonce ('Zelophar')
+    assert len(surrogates) >= 2                                       # randomized per example, not one constant
+
+
+def test_cf_train_pool_skips_yesno_and_nonsubstring(stub_tok):
+    import mamba3_raft as RAFT
+    yesno = {"id": "y", "question": "?", "answer": "yes", "golden": [("G", "blah yes blah.")],
+             "distract": [], "gold_sents": ["blah yes blah."]}
+    nonsub = {"id": "n", "question": "?", "answer": "Xyz", "golden": [("G", "no match here.")],
+              "distract": [], "gold_sents": ["no match here."]}
+    assert RAFT.make_cf_train_pool([yesno, nonsub], stub_tok, seed=0) == []
+
+
+def test_cf_train_pool_includes_distractors_multidoc_regime(stub_tok):
+    """add.52 regime-match (dual-verified HIGH): CF examples must be built WITH distractors so reading is forced in the SAME
+    multi-doc shape as E2/E3 — gold-only CF taught reading only in the 1-doc regime the headline never measures."""
+    import mamba3_raft as RAFT
+    row = _swappable_row()
+    row["distract"] = [("D1", "alpha beta gamma delta epsilon."), ("D2", "zeta eta theta iota kappa.")]
+    with_d = RAFT.make_cf_train_pool([row], stub_tok, seed=0, k=2)
+    gold_only = RAFT.make_cf_train_pool([row], stub_tok, seed=0, k=0)
+    assert with_d and gold_only
+    assert with_d[0]["input_ids"].numel() > gold_only[0]["input_ids"].numel()   # distractors add doc tokens → multi-doc
+
+
+def test_cf_numeric_surrogate_has_different_leading_digit(stub_tok):
+    """add.52: numeric surrogates are NOT digit-SHUFFLES of the answer (which share subword tokens, weak reading signal) — a
+    fresh same-length number whose LEADING digit differs (breaks the shared leading subword token, e.g. years 19xx)."""
+    import mamba3_raft as RAFT
+    rng = random.Random(0)
+    for ans in ["1925", "1804", "2011", "47", "365"]:
+        for _ in range(40):
+            s = RAFT._num_surrogate(ans, rng)
+            assert len(s) == len(ans) and s != ans               # same length, different value
+            assert s[0] != ans[0]                                 # leading digit differs → no shared leading subword token
+
+
+def test_cf_frac_at_anneals_after_warmup():
+    """cf_frac_at (the tested helper cf_pick calls) ramps 0 → CF_FRAC linearly AFTER CF_WARM*STEPS, then clamps at CF_FRAC."""
+    import mamba3_cloud_distill as CD
+    assert CD.cf_frac_at(100, 1000, 0.3, 0.15) == 0.0                 # inside the warmup window → no CF yet
+    assert CD.cf_frac_at(150, 1000, 0.3, 0.15) == 0.0                 # exactly at warm boundary → still 0
+    mid = CD.cf_frac_at(575, 1000, 0.3, 0.15)                        # halfway through the post-warm ramp → ~half of CF_FRAC
+    assert abs(mid - 0.15) < 1e-6
+    assert abs(CD.cf_frac_at(1000, 1000, 0.3, 0.15) - 0.3) < 1e-9    # end → full CF_FRAC
+    assert CD.cf_frac_at(2000, 1000, 0.3, 0.15) <= 0.3 + 1e-9        # clamped (never exceeds CF_FRAC)
+    assert CD.cf_frac_at(500, 1000, 0.0, 0.15) == 0.0                # CF_FRAC=0 (default) → always 0 = dead path
 
 
 # ----------------------------------------------------------------- KD-4: exact top-K + lumped-tail KD (add.48)

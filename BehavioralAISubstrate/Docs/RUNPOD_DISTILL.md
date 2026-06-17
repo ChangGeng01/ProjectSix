@@ -109,6 +109,41 @@ ARCH=hybrid LAYERS=24 STEPS=20000 N_ROWS=20000 EVAL_EVERY=1000 CKPT_EVERY=250 \
   CKPT_DIR=/workspace/ckpt-scale USE_SCHEDULER=1 COUNTERFACTUAL=1 PACE_T_FRAC=0.5 bash scripts/runpod_distill.sh
 ```
 
+## The reading-FORCE lever — KD-C counterfactual contrastive (add.50/52)
+**Use when the run learns (E1 nll falls) but STILL PARROTS.** Root cause is information-theoretic: cached-KD + question→answer-CE
+are BOTH satisfiable without reading (the teacher memorized HotpotQA-val), so no gradient pressure ever forces the model to read
+the doc. The lighter levers (`KD_ANSWER_W`, `RAFT_NOGOLD_CE=0`) do NOT fix this — they reweight a signal that's already
+readable-without-reading.
+
+`CF_FRAC>0` mixes in **reading-FORCING** steps: the gold fact is swapped to a **random per-example surrogate** (≠ the E4 eval
+nonce), built **WITH distractors** (same multi-doc shape as E2/E3), target = the surrogate, step is **CE-only (no KD** — the
+teacher doesn't know the swap). The parametric/teacher answer is now WRONG, so the loss is satisfiable ONLY by reading the
+swapped span — the question-only parrot shortcut is killed by construction. The surrogate is randomized (and numeric ones are
+token-disjoint) so the learned rule is "answer = whatever the doc says," not "emit a fixed magic token."
+```
+rm -rf /workspace/ckpt-cf
+ARCH=hybrid LAYERS=24 STEPS=20000 N_ROWS=20000 EVAL_EVERY=1000 CKPT_EVERY=250 CKPT_DIR=/workspace/ckpt-cf \
+  USE_SCHEDULER=1 COUNTERFACTUAL=1 PACE_T_FRAC=0.5 CF_FRAC=0.35 CF_WARM=0.15 CF_CE_W=0.5 bash scripts/runpod_distill.sh
+```
+- `COUNTERFACTUAL=1` is **REQUIRED** — it's what measures the held-out swapped reading signal the verdict gates on (the launcher
+  warns loudly if `CF_FRAC>0` but `COUNTERFACTUAL=0`). `CF_CE_W=0.5` (match `CE_W`) for the first run — no-KD already makes CF CE
+  the sole undiluted answer-span signal; raise to 1.0 as a second lever only if swap-follow doesn't move.
+- **JUDGE BY the held-out swapped counterfactual, NOT the un-swapped `Δ(E3-E1)` slope.** The slope is **structurally BLIND** to a
+  working CF run: E1 (gold) and E3 (no-gold) share byte-identical original-answer targets (COT=0), and CF never trains the
+  no-evidence case E3 measures, so a model can read on E1 and keep its parametric E3 fallback → slope flat on a *working* fix.
+  The verdict (`p0_verdict`) is **regime-aware**: with `COUNTERFACTUAL=1` it requires ALL of —
+  1. `counterfactual_lift = swap_follow − orig_recall > CF_LIFT_MIN` (0.30) — reads-vs-memory;
+  2. recall guard — final `orig_recall` low (< RECALL_LOW 0.15) OR it dropped (tolerant of a non-memorizer's ~0 baseline recall);
+  3. **`genuine = swap_follow(matched) − swap_follow(MISMATCHED) > CF_GENUINE_MIN` (0.20)** — the **question-mismatch control**
+     (add.54): the same swapped doc paired with a FOREIGN question. A genuine question-conditioned reader follows the swap on
+     the matched question but NOT the foreign one; a "copy the salient novel token" heuristic (which teacher-forced
+     `swap_follow` alone can't rule out) follows BOTH → low genuine → NO-GO. Plus E1 not regressing. The slope is corroborating-only.
+- **Watch live** (printed each eval as `E4 lift=… genuine=… (swap=… mism=… recall=…)`): `lift` and especially **`genuine`** must
+  TREND UP past their thresholds while `mism` (the foreign-question follow) stays LOW; `orig_recall` low/falling; E1 nll must keep
+  falling (rising E1 + positive slope = prior degradation, not reading); `gen.EM/F1` must not regress (nonce over-emission).
+  `cf_pool=N`/`cf=<count>` show CF is firing — a small pool (<5% of train) is warned as under-powered, not a verdict.
+- Defaults are OFF (`CF_FRAC=0` ⇒ dead path; a `>> CF READING-FORCE: OFF` banner always prints) — CF is a deliberate opt-in.
+
 ## The 成了 gate-chain (only ALL-green is honest)
 - GATE 1 — trained ckpt exists: `ckpt_best.pt` (metric-gated best-selection), born with `eval_card.json`.
 - GATE 2 — `eval_card` PASS: the **8-gate** `claim_card` reads `成了 ✓` — task_fit (within TEACHER_GAP of the **MEASURED** teacher,

@@ -159,11 +159,13 @@ def generate_and_score(student, examples, tok, maxlen: int = 24, eos=None) -> di
 
 # ---------------------------------------------------------------- 4b) counterfactual reading probe (E4) — reads vs memorizes
 @torch.no_grad()
-def eval_counterfactual(student, E4, tok=None, maxlen: int = 8) -> dict:
+def eval_counterfactual(student, E4, tok=None, maxlen: int = 8, follow_only: bool = False) -> dict:
     """E4 diagnostic (add.48): on rows where the gold fact was SWAPPED to a surrogate, does the model FOLLOW the swap
     (reader) or emit the ORIGINAL memorized answer (memorizer)? `swap_follow_rate` = teacher-forced answer-token accuracy on
     the SWAPPED target (reader→high); `orig_recall_rate` = free-greedy still emits the original answer (memorizer→high).
-    `counterfactual_lift` = follow − recall (a genuine reader is clearly positive). NOT a gate — a default-off DIAGNOSTIC."""
+    `counterfactual_lift` = follow − recall (a genuine reader is clearly positive). NOT a gate — a default-off DIAGNOSTIC.
+    follow_only=True skips the free-greedy orig_recall pass (used for the E4-MISMATCH control, add.54, where only swap_follow
+    is meaningful — the question is foreign — so the costly generation loop is wasted)."""
     if not E4:
         return {"swap_follow_rate": float("nan"), "orig_recall_rate": float("nan"), "counterfactual_lift": float("nan"), "n": 0}
     follow_hits = follow_tok = orig_hits = orig_n = n = 0
@@ -173,7 +175,7 @@ def eval_counterfactual(student, E4, tok=None, maxlen: int = 8) -> dict:
         m = torch.arange(ids.shape[0] - 1, device=DEV) >= (plen - 1)
         if m.any():
             follow_hits += int((lg[:-1][m].argmax(-1) == ids[1:][m]).sum()); follow_tok += int(m.sum())
-        if tok is not None and ex.get("orig_answer"):                  # free-greedy: does it emit the ORIGINAL (memorized) answer?
+        if not follow_only and tok is not None and ex.get("orig_answer"):   # free-greedy: does it emit the ORIGINAL (memorized) answer?
             seq = ids[:plen]; gen = []
             for _ in range(maxlen):
                 nx = int(student.run_twin(seq, collect_ssm=False)[0][-1].argmax())

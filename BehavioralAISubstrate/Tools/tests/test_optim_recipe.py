@@ -49,6 +49,24 @@ def test_lr_linear_and_none(monkeypatch):
     assert CD.lr_at(1000) == pytest.approx(3e-4, rel=1e-6)       # legacy flat-after-warmup
 
 
+def test_lr_wsd_stable_then_decays(monkeypatch):
+    """add.55: WSD = warmup → STABLE(flat@peak) → cosine decay over the last WSD_DECAY_FRAC of steps. Recovers the back-half a
+    long cosine wastes (the 20k run ran ~48% of steps below half-peak while E1 nll was still falling)."""
+    _set_sched(monkeypatch, decay="wsd", floor=0.05)
+    monkeypatch.setattr(CD, "WSD_DECAY_FRAC", 0.2)                # decay over the last 20% → decay_start = 800 (STEPS=1000)
+    assert CD.lr_at(100) == pytest.approx(3e-4, rel=1e-6)         # peak reached at WARMUP
+    assert CD.lr_at(400) == pytest.approx(3e-4, rel=1e-9)         # STABLE phase holds peak (cosine would already be well below)
+    assert CD.lr_at(800) == pytest.approx(3e-4, rel=1e-9)         # at decay_start: still peak
+    mid_decay = CD.lr_at(900)                                     # halfway through the decay window
+    assert 3e-4 * 0.05 < mid_decay < 3e-4
+    assert CD.lr_at(1000) == pytest.approx(3e-4 * 0.05, rel=1e-6)  # floor at STEPS
+    # the WSD stable phase holds a STRICTLY higher LR than cosine at the same mid-run step (the whole point)
+    _set_sched(monkeypatch, decay="cosine", floor=0.05)
+    cosine_mid = CD.lr_at(400)
+    _set_sched(monkeypatch, decay="wsd", floor=0.05); monkeypatch.setattr(CD, "WSD_DECAY_FRAC", 0.2)
+    assert CD.lr_at(400) > cosine_mid
+
+
 # ----------------------------------------------------------------- LR-2: no-decay param split
 def test_split_decay_params_protects_1d_and_embedding(tiny_hybrid):
     decay, no_decay = CD.split_decay_params(tiny_hybrid)
@@ -96,6 +114,129 @@ def test_select_score_penalizes_e1_and_e2_slope():
 def test_select_score_caps_e3_reward():
     # a huge E3 nll (broken-on-E3) can't dominate — reward capped at 1.0 nat
     assert CD.select_score(2.0, 0.0, 5.0, 0.5) == pytest.approx(CD.select_score(2.0, 0.0, 1.0, 0.5), rel=1e-9)
+
+
+def test_select_score_uses_cf_lift_when_present():
+    """add.53: on a CF run the un-swapped slope is BLIND, so the best-ckpt reward must come from the held-out swapped cf_lift.
+    A model with a FLAT slope but a high cf_lift must outscore one with the same flat slope and a low cf_lift."""
+    reader = CD.select_score(e1=2.0, slope_e2=0.0, slope_e3=0.00, ctx_w=0.5, cf_lift=0.50)   # flat slope, high lift
+    weak = CD.select_score(e1=2.0, slope_e2=0.0, slope_e3=0.00, ctx_w=0.5, cf_lift=0.05)     # flat slope, low lift
+    assert reader > weak
+    assert reader == pytest.approx(-2.0 + 0.5 * 0.50, rel=1e-9)                              # cf_lift overrides slope_e3
+    # cf_lift dominates the slope: high lift + flat slope beats zero lift + a (blind, ignored) high slope
+    assert CD.select_score(2.0, 0.0, 0.0, 0.5, cf_lift=0.50) > CD.select_score(2.0, 0.0, 0.40, 0.5, cf_lift=0.0)
+
+
+def test_select_score_cf_lift_nan_is_safe():
+    """A degenerate-E4 NaN lift must not crash or reward — falls to 0 reading reward (conservative)."""
+    nan = float("nan")
+    s = CD.select_score(2.0, 0.0, 0.30, 0.5, cf_lift=nan)
+    assert s == pytest.approx(-2.0, rel=1e-9)                                                # NaN lift → 0 reward (slope ignored too)
+
+
+# ----------------------------------------------------------------- add.51/52/54: P0 GO/NO-GO verdict gate (regime-aware anti-parrot)
+# eval_hist rows are (step, e1, slope_e2, slope_e3, kd, cf|None); cf = {"lift","swap_follow","orig_recall"[,"genuine","swap_mismatch"]}.
+def _cf(lift, swap, recall, genuine=None, mism=None):
+    d = {"lift": lift, "swap_follow": swap, "orig_recall": recall}
+    if genuine is not None:
+        d["genuine"] = genuine
+    if mism is not None:
+        d["swap_mismatch"] = mism
+    return d
+
+
+def _hist(e1s, s3s, cfs=None):
+    n = len(e1s)
+    c = cfs if cfs is not None else [None] * n
+    return [(i * 1000, e1s[i], 0.0, s3s[i], 5.0 - i, c[i]) for i in range(n)]
+
+
+# --- no-swap regime (COUNTERFACTUAL off): the un-swapped slope proxy is the only reading test we have ---
+def test_p0_verdict_noswap_rejects_parrot_big_e1_drop_flat_slope():
+    """add.51 bug: a memorizer's E1 falls a LOT (8.13→7.58, Δ0.55 ≫ 0.20) but Δ(E3-E1) stays flat → NO-GO, not 'GO ✓ scale'."""
+    v = CD.p0_verdict(_hist([8.13, 7.85, 7.58], [0.00, 0.002, 0.005]), e1_drop_min=0.20, reading_slope_margin=0.02, cf_lift_min=0.30)
+    assert v["reading_basis"] == "slope_e3_e1" and v["e1_ok"] is True and v["reading_trend_up"] is False
+    assert v["go"] is False
+
+
+def test_p0_verdict_noswap_accepts_reader_rising_slope():
+    """Smaller E1 drop (0.30 > 0.20) WITH a rising slope (0.0→0.12) and no swap signal → GO on the slope proxy."""
+    v = CD.p0_verdict(_hist([8.00, 7.85, 7.70], [0.00, 0.06, 0.12]), 0.20, 0.02, 0.30)
+    assert v["reading_basis"] == "slope_e3_e1" and v["go"] is True
+
+
+def test_p0_verdict_requires_e1_drop_even_if_slope_rises():
+    """Both gates required: rising slope but E1 barely moved (0.10 < 0.20) = not actually learning → NO-GO."""
+    v = CD.p0_verdict(_hist([8.00, 7.95, 7.90], [0.00, 0.10, 0.20]), 0.20, 0.02, 0.30)
+    assert v["reading_trend_up"] is True and v["e1_ok"] is False and v["go"] is False
+
+
+# --- CF/swap regime (COUNTERFACTUAL on): the held-out counterfactual_lift is the CAUSAL gate; the slope is corroborating-only ---
+def test_p0_verdict_cf_working_passes_even_with_FLAT_slope():
+    """THE add.52 fix: a WORKING CF run has a high held-out swap lift + dropping orig_recall but its un-swapped Δ(E3-E1) slope
+    is STRUCTURALLY FLAT (E1/E3 share targets). The old gate would NO-GO it; the regime-aware gate must GO."""
+    cfs = [_cf(0.02, 0.05, 0.80), _cf(0.55, 0.62, 0.20)]          # lift 0.02→0.55 (>0.30), orig_recall 0.80→0.20 (drops)
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.001, 0.004], cfs=cfs), 0.20, 0.02, 0.30)   # slope FLAT (delta +0.003 < 0.02)
+    assert v["reading_basis"] == "counterfactual_lift+genuine" and v["swap_measured"] is True
+    assert v["reading_trend_up"] is False                          # slope is blind/flat...
+    assert v["cf_reads"] is True and v["go"] is True               # ...but the causal lift+recall-drop carries the GO
+
+
+def test_p0_verdict_cf_low_lift_is_nogo_even_if_slope_rose():
+    """A flat/low swap lift = CF did not force reading → NO-GO, even if the slope happened to rise (slope is not the gate here)."""
+    cfs = [_cf(0.02, 0.05, 0.80), _cf(0.10, 0.15, 0.78)]          # lift 0.10 < 0.30
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.00, 0.20], cfs=cfs), 0.20, 0.02, 0.30)
+    assert v["cf_reads"] is False and v["go"] is False
+
+
+def test_p0_verdict_cf_pseudo_reading_recall_stays_high_is_nogo():
+    """Pseudo-reading guard (add.53b): a high swap-follow lift but orig_recall STAYS HIGH in free generation (>= RECALL_LOW
+    and didn't drop) = the model still defaults to the memorized answer → NO-GO."""
+    cfs = [_cf(0.30, 0.40, 0.40), _cf(0.55, 0.85, 0.42)]          # lift high but orig_recall stays high (0.40→0.42, no drop)
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.00, 0.05], cfs=cfs), 0.20, 0.02, 0.30)
+    assert v["recall_ok"] is False and v["cf_reads"] is False and v["go"] is False
+
+
+def test_p0_verdict_cf_low_baseline_recall_does_not_false_nogo():
+    """add.53b — THE parrot-baseline fix. This small model is NOT a confident memorizer (measured baseline orig_recall≈0.007),
+    so a WORKING CF run has orig_recall ~0 throughout → it can NEVER 'drop'. A strict drop-gate would FALSE-NO-GO it; the
+    relaxed guard (final recall low in ABSOLUTE terms) must GO."""
+    cfs = [_cf(0.00, 0.01, 0.007), _cf(0.52, 0.53, 0.010)]        # lift 0→0.52, orig_recall stays ~0 (never had memory to drop)
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.001, 0.004], cfs=cfs), 0.20, 0.02, 0.30)
+    assert abs(v["orig_recall_drop"]) < 0.05                       # recall did NOT meaningfully drop...
+    assert v["recall_ok"] is True and v["cf_reads"] is True and v["go"] is True    # ...but low absolute recall + high lift → GO
+
+
+def test_p0_verdict_cf_e1_regression_is_nogo():
+    """Specificity guard: if E1 nll RISES (prior degradation) the run is NO-GO regardless of a healthy swap lift —
+    a genuine reader keeps E1 low. e1_ok subsumes 'E1 must not regress'."""
+    cfs = [_cf(0.02, 0.05, 0.80), _cf(0.55, 0.62, 0.20)]          # swap lift healthy...
+    v = CD.p0_verdict(_hist([7.5, 7.9], [0.00, 0.05], cfs=cfs), 0.20, 0.02, 0.30)   # ...but E1 ROSE 7.5→7.9
+    assert v["cf_reads"] is True and v["e1_ok"] is False and v["go"] is False
+
+
+# --- add.54: the question-MISMATCH control (genuine reading vs copy-the-salient-token) ---
+def test_p0_verdict_cf_copy_heuristic_low_genuine_is_nogo():
+    """High matched lift + low orig_recall BUT low genuine (matched ≈ mismatched) = the model copies the salient novel token
+    regardless of the question → NOT question-conditioned reading → NO-GO."""
+    cfs = [_cf(0.0, 0.01, 0.007, genuine=0.0, mism=0.01), _cf(0.55, 0.58, 0.01, genuine=0.05, mism=0.53)]
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.001, 0.004], cfs=cfs), 0.20, 0.02, 0.30)
+    assert v["genuine_ok"] is False and v["cf_reads"] is False and v["go"] is False
+
+
+def test_p0_verdict_cf_genuine_reading_passes():
+    """High lift + low recall + high genuine (matched ≫ mismatched) = genuine question-conditioned reading → GO."""
+    cfs = [_cf(0.0, 0.01, 0.007, genuine=0.0, mism=0.01), _cf(0.55, 0.58, 0.01, genuine=0.45, mism=0.13)]
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.001, 0.004], cfs=cfs), 0.20, 0.02, 0.30)
+    assert v["genuine_ok"] is True and v["genuine_last"] == pytest.approx(0.45) and v["cf_reads"] is True and v["go"] is True
+
+
+def test_p0_verdict_cf_genuine_not_measured_is_not_gated():
+    """Backward-compat / fallback: when the mismatch control wasn't measured (no 'genuine' key), the genuine gate is NOT
+    applied (don't gate on a control we never ran) — lift + recall carry the decision."""
+    cfs = [_cf(0.0, 0.01, 0.007), _cf(0.55, 0.58, 0.01)]          # no genuine key
+    v = CD.p0_verdict(_hist([8.0, 7.7], [0.001, 0.004], cfs=cfs), 0.20, 0.02, 0.30)
+    assert v["genuine_ok"] is None and v["cf_reads"] is True and v["go"] is True
 
 
 # ----------------------------------------------------------------- KD-1: answer-weighted kd_topk

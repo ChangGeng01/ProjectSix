@@ -149,13 +149,12 @@ def make_eval_condition(rows_examples: list, mode: str, tok) -> list:
 _SURROGATE = "Zelophar"                                                # a fixed nonce ~never in a real HotpotQA doc
 
 
-def make_counterfactual_condition(rows_examples: list, tok, surrogate: str = _SURROGATE) -> list:
-    """E4 (reading-VALIDITY probe, add.48): for rows whose answer appears verbatim in a gold sentence, REPLACE the answer
-    with a synthetic surrogate across the gold docs + set the supervised target to the surrogate, built GOLD-ONLY (like E1)
-    so the SWAPPED fact is the ONLY evidence. A reader FOLLOWS the swap (the answer is only in the doc); a memorizer emits
-    the ORIGINAL (Granite-memorized) answer. This separates reading from memorization — the confound HotpotQA-val can't."""
+def _cf_swappable(rows_examples: list, surrogate: str = _SURROGATE) -> list:
+    """Shared swappable-row extraction for the E4 matched + mismatch probes. A row is swappable iff its answer is non-yes/no,
+    appears verbatim in a gold sentence, and the surrogate is novel to the row + LANDS in the gold text after the swap. Returns
+    dicts {gold (swapped docs), question, surrogate, orig_answer, id}."""
     out = []
-    for idx, ex in enumerate(rows_examples):
+    for ex in rows_examples:
         ans = str(ex["answer"]).strip()
         if not ans or ans.lower() in ("yes", "no"):
             continue
@@ -163,14 +162,122 @@ def make_counterfactual_condition(rows_examples: list, tok, surrogate: str = _SU
             continue
         if any(surrogate in txt for _, txt in ex["golden"]) or surrogate in ans:
             continue                                                    # surrogate must be truly novel to this row
-        rng = random.Random(9_000_011 + idx)
         gold = [(t, txt.replace(ans, surrogate)) for t, txt in ex["golden"]]   # swap the FACT in the gold evidence
-        if not any(surrogate in txt for _, txt in gold):           # the answer must be in the (DOC_CHARS-truncated) gold TEXT, not
-            continue                                                #   just the raw gold_sent — else the swap leaves no evidence (impossible row)
-        item = to_ids(gold, [], ex["question"], " " + surrogate, tok, rng, ex.get("id"))
+        if not any(surrogate in txt for _, txt in gold):               # the swap must LAND in the (truncated) gold TEXT, else no evidence
+            continue
+        out.append({"gold": gold, "question": ex["question"], "surrogate": surrogate, "orig_answer": ans, "id": ex.get("id")})
+    return out
+
+
+def make_counterfactual_condition(rows_examples: list, tok, surrogate: str = _SURROGATE) -> list:
+    """E4 (reading-VALIDITY probe, add.48): for rows whose answer appears verbatim in a gold sentence, REPLACE the answer
+    with a synthetic surrogate across the gold docs + set the supervised target to the surrogate, built GOLD-ONLY (like E1)
+    so the SWAPPED fact is the ONLY evidence. A reader FOLLOWS the swap (the answer is only in the doc); a memorizer emits
+    the ORIGINAL (Granite-memorized) answer. This separates reading from memorization — the confound HotpotQA-val can't."""
+    out = []
+    for idx, s in enumerate(_cf_swappable(rows_examples, surrogate)):
+        rng = random.Random(9_000_011 + idx)
+        item = to_ids(s["gold"], [], s["question"], " " + s["surrogate"], tok, rng, s["id"])
         if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
-            item["orig_answer"] = ans                                  # the memorized answer (for the orig-recall check)
-            item["surrogate"] = surrogate
+            item["orig_answer"] = s["orig_answer"]                      # the memorized answer (for the orig-recall check)
+            item["surrogate"] = s["surrogate"]
+            out.append(item)
+    return out
+
+
+def make_counterfactual_mismatch(rows_examples: list, tok, surrogate: str = _SURROGATE) -> list:
+    """E4-MISMATCH control (add.54): the same SWAPPED docs as E4, but each doc is paired with a DIFFERENT row's QUESTION
+    (cyclic). The surrogate does NOT answer the foreign question, so a genuine QUESTION-CONDITIONED reader must NOT follow the
+    swap here → swap_follow_mismatched ≈ 0. A 'copy the salient novel token' heuristic still emits the surrogate → high. The
+    clean discriminator the teacher-forced matched swap_follow alone can't give: genuine reading = matched − mismatched."""
+    sw = _cf_swappable(rows_examples, surrogate)
+    m = len(sw)
+    if m < 2:                                                          # need ≥2 distinct rows to pair a FOREIGN question
+        return []
+    out = []
+    for idx, s in enumerate(sw):
+        q = sw[(idx + 1) % m]["question"]                              # a DIFFERENT row's question
+        if q == s["question"]:                                         # skip the rare duplicate-question collision
+            continue
+        rng = random.Random(9_100_013 + idx)
+        item = to_ids(s["gold"], [], q, " " + s["surrogate"], tok, rng, s["id"])
+        if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
+            item["orig_answer"] = s["orig_answer"]; item["surrogate"] = s["surrogate"]; item["mismatch"] = True
+            out.append(item)
+    return out
+
+
+def _prompt_has_surrogate(item: dict, tok) -> bool:
+    """POST-tokenization survival: is the surrogate still in the (truncated) PROMPT? to_ids reserves budget for the
+    question+answer THEN hard-truncates the doc — so a longer question shrinks the doc budget and can CUT the surrogate."""
+    txt = tok.decode(item["input_ids"][: item["prompt_len"]].tolist())
+    return item.get("surrogate", _SURROGATE) in txt
+
+
+def align_cf_survivors(matched: list, mismatch: list, tok) -> tuple:
+    """add.54b: the matched (own-question) and mismatch (FOREIGN-question) probes share the SAME swapped doc but get a
+    question-length-DEPENDENT doc-truncation point in to_ids — so the surrogate can survive in one probe and be cut from the
+    other, asymmetrically. That would bias genuine = swap_follow(matched) − swap_follow(mismatch) toward FALSE-GO. Keep only
+    rows whose surrogate SURVIVES tokenization+truncation in BOTH probes, aligned to the SAME id set, so genuine compares
+    like-for-like over identical swapped-doc spans. (Unreachable at the P0 config — gold≪budget — but a latent correctness guard.)"""
+    mm_by_id = {it["id"]: it for it in mismatch if "id" in it and _prompt_has_surrogate(it, tok)}
+    keep_matched = [it for it in matched if "id" in it and it["id"] in mm_by_id and _prompt_has_surrogate(it, tok)]
+    keep_ids = [it["id"] for it in keep_matched]
+    keep_mismatch = [mm_by_id[i] for i in keep_ids]                     # same order + same id set as keep_matched
+    return keep_matched, keep_mismatch
+
+
+_CF_NONCES = ["Quillon", "Verraday", "Thurnwald", "Pellimore", "Kasimov", "Drennick", "Oslovar", "Brennick",
+              "Marwick", "Tavendish", "Yulgrave", "Corwenna", "Skellaby", "Fendrake", "Lurmont", "Wexbury"]
+
+
+def _num_surrogate(ans: str, rng: random.Random) -> str:
+    """A numeric surrogate with a DIFFERENT LEADING DIGIT from the original (add.52) — breaks the shared leading subword token
+    (e.g. years 19xx→non-19xx); the trailing digits MAY still overlap. The old digit-SHUFFLE left ~91% of surrogates a
+    same-digit-multiset permutation of the answer (e.g. 1925→5219) that shares subword tokens and weakens the reading signal.
+    Draw a FRESH same-length random int whose leading digit ≠ the original's."""
+    n = len(ans)
+    lo, hi = 10 ** (n - 1), 10 ** n - 1
+    sur = str(rng.randint(lo, hi))
+    for _ in range(8):                                                  # force a different leading digit → no shared prefix token
+        if sur != ans and sur[0] != ans[0]:
+            break
+        sur = str(rng.randint(lo, hi))
+    return sur
+
+
+def make_cf_train_pool(rows_examples: list, tok, seed: int = 0, k: int = None) -> list:
+    """CF TRAINING examples (reading-FORCING, add.50/52). Per swappable row, swap the gold fact to a RANDOM per-example
+    surrogate (≠ the E4 eval nonce → measured by an INDEPENDENT probe), target=surrogate, built WITH k distractors so the
+    reading is forced in the SAME multi-doc shape as E2/E3 (add.52, regime-match — gold-only CF taught reading only in the
+    1-doc regime the headline never measures). The parametric/teacher answer (the original) is now WRONG, so the loss is
+    satisfiable ONLY by READING the swapped span — no question-only or presence-only shortcut (the doc is present, the question
+    identical, the gold span survives truncation via _select_docs gold-survival and is positionally scrambled among the
+    distractors). CE-only (NO KD — the teacher doesn't know the swap). The randomized surrogate makes the learnable rule 'the
+    answer is whatever the doc says', not 'emit a fixed magic token'."""
+    k = K_DISTRACT if k is None else k
+    out = []
+    for idx, ex in enumerate(rows_examples):
+        ans = str(ex["answer"]).strip()
+        if not ans or ans.lower() in ("yes", "no"):
+            continue
+        if not any(ans in s for s in ex.get("gold_sents", [])):        # answer verbatim in a gold sentence → swappable
+            continue
+        rng = random.Random(seed * 100019 + idx)
+        if ans.isdigit() and len(ans) >= 2:                            # numeric → a token-disjoint different number
+            sur = _num_surrogate(ans, rng)
+        else:                                                          # textual → a nonce name + small int
+            sur = rng.choice(_CF_NONCES) + str(rng.randint(10, 99))
+        if sur in ans or any(sur in txt for _, txt in ex["golden"]):
+            continue
+        gold = [(t, txt.replace(ans, sur)) for t, txt in ex["golden"]]
+        if not any(sur in txt for _, txt in gold):                     # the swap must have LANDED in the gold text
+            continue
+        distract = ex.get("distract", [])[:k]                          # multi-doc regime: same shape as the E2/E3 the verdict reads
+        item = to_ids(gold, distract, ex["question"], " " + sur, tok, rng, ex.get("id"))
+        if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
+            item["cf"] = True                                          # tag → CE-only branch in the train loop (no KD)
+            item["surrogate"] = sur; item["orig_answer"] = ans        # audit: which fact was swapped to what (per-example random)
             out.append(item)
     return out
 

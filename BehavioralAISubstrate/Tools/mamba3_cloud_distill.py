@@ -24,6 +24,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import sys
 import time
 
@@ -65,8 +66,12 @@ CACHE = os.environ.get("CACHE", "1") == "1"                              # preco
 KD_K = int(os.environ.get("KD_K", "64"))                                # top-K logits kept per token in the cache
 ORDER = os.environ.get("ORDER", "curriculum")                           # curriculum (easy->hard by teacher CE) | random
 # --- optimization recipe knobs (Track-G addendum 45; adversarially-verified) ---
-DECAY = os.environ.get("DECAY", "cosine")                               # LR-1: cosine | linear | none (legacy flat-after-warmup)
+DECAY = os.environ.get("DECAY", "cosine")                               # LR-1: cosine | linear | none (legacy flat-after-warmup) | wsd (add.55)
 LR_MIN_FRAC = float(os.environ.get("LR_MIN_FRAC", "0.07"))             # LR-1: decay floor as a fraction of LR
+WSD_DECAY_FRAC = float(os.environ.get("WSD_DECAY_FRAC", "0.2"))        # add.55: WSD = warmup→STABLE(flat@peak)→cosine DECAY over the last frac of steps
+#   (recovers the back-half a long cosine wastes — the 20k run ran ~48% of steps below half-peak LR while E1 nll was still falling).
+MAX_SEC = float(os.environ.get("MAX_SEC", "0"))                        # add.55: IN-LOOP wall-clock guard (0 = off). The wrapper MAX_SEC only fires
+#   BETWEEN process restarts (post-crash) — a healthy run ignores it; this saves a ckpt + breaks gracefully so a long run honors a hard time wall.
 KD_ANSWER_W = float(os.environ.get("KD_ANSWER_W", "1.0"))             # KD-1: >1 up-weights KD on the answer span (1.0 = uniform = legacy)
 FP32_MASTER = os.environ.get("FP32_MASTER", "1") == "1"               # TBC-6: fp32 master weights + autocast-bf16 forward on cuda
 CTX_W = float(os.environ.get("CTX_W", "0.5"))                         # BCS-1: best-ckpt reward for context-use (positive E3-E1 slope = reading)
@@ -79,6 +84,23 @@ RAFT_NOGOLD_CE = os.environ.get("RAFT_NOGOLD_CE", "1") == "1"        # train ans
 PACE_T_FRAC = float(os.environ.get("PACE_T_FRAC", "1.0"))           # CURR-1: competence reaches the full set at PACE_T_FRAC*STEPS (0.5 = drill the hard tail in the back half)
 KD_EXACT_TAIL = os.environ.get("KD_EXACT_TAIL", "0") == "1"         # KD-4: exact top-K + lumped-tail KD (needs cached logZ; TAU=1 only). off = renorm-within-K (legacy)
 COUNTERFACTUAL = os.environ.get("COUNTERFACTUAL", "0") == "1"       # E4: counterfactual fact-swap reading DIAGNOSTIC in the eval card (off = not computed)
+CF_FRAC = float(os.environ.get("CF_FRAC", "0.0"))                  # KD-C (add.50): the reading-FORCING lever — fraction of steps trained on a
+CF_WARM = float(os.environ.get("CF_WARM", "0.15"))                #   counterfactual (gold fact swapped to a RANDOM surrogate, CE-only, NO KD),
+CF_CE_W = float(os.environ.get("CF_CE_W", "0.5"))                 #   ramped 0→CF_FRAC after CF_WARM*STEPS so KD bootstraps fluency first. The
+#   parametric/teacher answer is WRONG on a CF step → the loss is satisfiable ONLY by reading the swapped span (kills the question-only parrot).
+#   The train surrogate is RANDOMIZED per example + DISTINCT from the E4 eval nonce → E4 stays an INDEPENDENT reads-vs-memorizes probe (don't
+#   judge a CF run by E4 alone; the headline is slope_e3_e1 on the un-swapped E1/E2/E3 going POSITIVE). Default-off (CF_FRAC=0 → dead path).
+E1_DROP_MIN = float(os.environ.get("E1_DROP_MIN", "0.20"))         # P0 verdict gate: min E1-nll drop = the reader is LEARNING
+READING_SLOPE_MARGIN = float(os.environ.get("READING_SLOPE_MARGIN", "0.02"))  # P0 verdict gate: min GROWTH of Δ(E3-E1) — the NO-SWAP-regime reading proxy
+CF_LIFT_MIN = float(os.environ.get("CF_LIFT_MIN", "0.30"))         # P0 verdict gate (add.52): min held-out swapped counterfactual_lift = the
+#   CAUSAL reading test when COUNTERFACTUAL eval is on. The un-swapped Δ(E3-E1) slope is STRUCTURALLY BLIND to a working CF run (E1/E3 share
+#   byte-identical targets at COT=0; CF never trains the no-evidence/abstain case E3 measures) → it is CORROBORATING-only, NOT the gate, for a CF run.
+RECALL_LOW = float(os.environ.get("RECALL_LOW", "0.15"))           # add.53b: the recall guard passes if FINAL orig_recall is low in ABSOLUTE
+RECALL_DROP_MIN = float(os.environ.get("RECALL_DROP_MIN", "0.05")) #   terms OR it DROPPED by RECALL_DROP_MIN. The parrot baseline showed orig_recall≈0.007
+#   (this small model is NOT a confident memorizer) → a strict 'recall must DROP' gate would FALSE-NO-GO a working CF run (recall starts ~0, can't drop).
+CF_GENUINE_MIN = float(os.environ.get("CF_GENUINE_MIN", "0.20"))    # add.54: min genuine = swap_follow_matched − swap_follow_MISMATCHED. The
+#   matched teacher-forced swap_follow is foolable by a 'copy the salient novel token' heuristic; pairing the swapped doc with a FOREIGN question
+#   (E4-mismatch) is the clean control — a genuine QUESTION-CONDITIONED reader follows the swap on the matched Q but NOT the foreign one.
 
 
 def lr_at(step: int) -> float:
@@ -86,6 +108,12 @@ def lr_at(step: int) -> float:
     Pure function of the module env knobs → unit-testable without a training run."""
     if step <= WARMUP:
         return LR * step / max(1, WARMUP)
+    if DECAY == "wsd":                                                # add.55: warmup → STABLE(flat@peak) → cosine decay over the last WSD_DECAY_FRAC
+        decay_start = STEPS * (1.0 - WSD_DECAY_FRAC)
+        if step <= decay_start:
+            return LR                                                 # stable phase holds peak LR (the cosine-wasted back-half, recovered)
+        dprog = min(1.0, (step - decay_start) / max(1.0, STEPS - decay_start))
+        return LR * (LR_MIN_FRAC + (1.0 - LR_MIN_FRAC) * 0.5 * (1.0 + math.cos(math.pi * dprog)))
     prog = min(1.0, (step - WARMUP) / max(1, STEPS - WARMUP))
     if DECAY == "cosine":
         return LR * (LR_MIN_FRAC + (1.0 - LR_MIN_FRAC) * 0.5 * (1.0 + math.cos(math.pi * prog)))
@@ -105,11 +133,77 @@ def split_decay_params(student):
     return [p for _, p in decay], [p for _, p in no_decay]
 
 
-def select_score(e1, slope_e2, slope_e3, ctx_w=None):
-    """BCS-1: best-ckpt score — low E1 nll + robust to distractors (small E2 slope) + REWARD context-use (a positive
-    E3-E1 slope means the model USES the gold doc, not parrots). Higher is better; the E3 reward is capped at 1.0 nat."""
+def select_score(e1, slope_e2, slope_e3, ctx_w=None, cf_lift=None):
+    """BCS-1: best-ckpt score — low E1 nll + robust to distractors (small E2 slope) + REWARD reading. The reading reward is
+    the held-out swapped cf_lift when available (the CAUSAL signal on a CF run), else the un-swapped E3-E1 slope (add.53: the
+    slope is STRUCTURALLY BLIND to CF — see p0_verdict — so on a CF run the best ckpt MUST be picked by cf_lift, not the slope,
+    else it ships the lowest-E1 ckpt and can miss the best reader / ship a nonce-collapsed late one). Higher is better; capped 1 nat."""
     w = CTX_W if ctx_w is None else ctx_w
-    return -(e1 + max(0.0, slope_e2)) + w * max(0.0, min(slope_e3, 1.0))
+    reading = cf_lift if cf_lift is not None else slope_e3
+    reading = 0.0 if reading != reading else reading                 # NaN-safe (degenerate E4 lift) → no reward (conservative)
+    return -(e1 + max(0.0, slope_e2)) + w * max(0.0, min(reading, 1.0))
+
+
+def cf_frac_at(step: int, steps: int, frac: float, warm: float) -> float:
+    """KD-C anneal (add.50): the counterfactual reading-force fraction ramps 0 → `frac` linearly AFTER warm*steps (so KD
+    bootstraps fluency before reading is forced). Pure fn of step → cf_pick is resume-safe with no rng state to persist."""
+    w = warm * steps
+    return frac * min(1.0, max(0.0, (step - w) / max(1.0, steps - w)))
+
+
+def p0_verdict(eval_hist, e1_drop_min, reading_slope_margin, cf_lift_min, recall_low=0.15, recall_drop_min=0.05, cf_genuine_min=0.20):
+    """Programmatic P0 GO/NO-GO — the 不要亏 gate that decides whether to scale a small run to the full 20k. eval_hist rows are
+    (step, e1, slope_e2, slope_e3, kd, cf|None) where cf is {"lift","swap_follow","orig_recall","swap_mismatch","genuine"} from
+    the held-out swapped E4 probe (or None when COUNTERFACTUAL is off). GO = LEARNING (E1 nll fell by e1_drop_min — this also
+    subsumes the 'E1 must not regress' guard) AND READING. The READING test is REGIME-AWARE:
+      • CF/swap regime (cf present): the CAUSAL test — ALL of (a) counterfactual_lift>cf_lift_min (reads-vs-memory, add.52);
+        (b) recall guard — final orig_recall low OR dropped (add.53b, tolerant of a non-memorizer's ~0 baseline recall);
+        (c) GENUINE — when the E4-MISMATCH control is measured, genuine = swap_follow(matched) − swap_follow(mismatched) >
+        cf_genuine_min, which rejects a 'copy the salient novel token' heuristic that the teacher-forced matched swap_follow
+        alone can't (add.54). The un-swapped Δ(E3-E1) slope is STRUCTURALLY BLIND to a working CF run → corroborating-only.
+      • no-swap regime (cf absent, COUNTERFACTUAL off): fall back to the slope proxy — Δ(E3-E1) GREW by reading_slope_margin
+        (add.51 anti-parrot: E1-drop ALONE was the original false-positive — a memorizer's E1 falls while the slope stays ~0)."""
+    first, last = eval_hist[0], eval_hist[-1]
+    e1_drop = first[1] - last[1]
+    s3_0, s3_N = first[3], last[3]
+    cf0 = first[5] if len(first) > 5 else None
+    cfN = last[5] if len(last) > 5 else None
+    e1_ok = e1_drop > e1_drop_min
+    reading_trend_up = (s3_N - s3_0) > reading_slope_margin           # corroborating; the ONLY reading proxy when no swap signal
+    swap_measured = cf0 is not None and cfN is not None
+    genuine_last = None
+    if swap_measured:                                                # CF/swap regime — the causal reading test
+        lift_last = cfN["lift"]
+        recall_drop = cf0["orig_recall"] - cfN["orig_recall"]
+        # recall guard (add.53b): the model must NOT confidently default to the memorized answer in FREE generation. Tolerant
+        # of an already-low baseline recall — pass if FINAL recall is low in absolute terms OR it DROPPED meaningfully.
+        recall_ok = (cfN["orig_recall"] < recall_low) or (recall_drop > recall_drop_min)
+        genuine_last = cfN.get("genuine")                            # add.54: matched − MISMATCH; question-conditioned reading
+        genuine_measured = genuine_last is not None and genuine_last == genuine_last   # not None, not NaN
+        genuine_ok = (genuine_last > cf_genuine_min) if genuine_measured else True      # don't gate on an unmeasured control
+        cf_reads = (lift_last > cf_lift_min) and recall_ok and genuine_ok
+        reading_ok = bool(cf_reads)
+    else:                                                            # no-swap regime — the slope proxy is all we have
+        lift_last = recall_drop = cf_reads = recall_ok = genuine_measured = None
+        genuine_ok = None
+        reading_ok = reading_trend_up
+    go = bool(e1_ok and reading_ok)
+    return {
+        "go": go, "e1_first": first[1], "e1_last": last[1], "e1_drop": e1_drop, "e1_drop_min": e1_drop_min, "e1_ok": bool(e1_ok),
+        "slope_e3_first": s3_0, "slope_e3_last": s3_N, "slope_e3_delta": s3_N - s3_0,
+        "reading_slope_margin": reading_slope_margin, "reading_trend_up": bool(reading_trend_up),
+        "swap_measured": bool(swap_measured), "cf_lift_min": cf_lift_min,
+        "cf_lift_first": (cf0["lift"] if swap_measured else None), "cf_lift_last": lift_last,
+        "orig_recall_first": (cf0["orig_recall"] if swap_measured else None),
+        "orig_recall_last": (cfN["orig_recall"] if swap_measured else None), "orig_recall_drop": recall_drop,
+        "recall_ok": (None if recall_ok is None else bool(recall_ok)),
+        "swap_mismatch_last": (cfN.get("swap_mismatch") if swap_measured else None),
+        "genuine_last": genuine_last, "cf_genuine_min": cf_genuine_min,
+        "genuine_ok": (bool(genuine_ok) if genuine_measured else None),   # None = the mismatch control wasn't measured
+        "cf_reads": (None if cf_reads is None else bool(cf_reads)),
+        "reading_basis": ("counterfactual_lift+genuine" if swap_measured else "slope_e3_e1"),
+        "kd_first": first[4], "kd_last": last[4], "n_evals": len(eval_hist),
+    }
 
 
 def _sanitize(x):
@@ -288,6 +382,25 @@ def main() -> None:
     contamination_ok = {e["id"] for e in train_rows}.isdisjoint({e["id"] for e in held_rows})  # VERIFY the real split
     assert contamination_ok, "train/held id OVERLAP — split is contaminated"
     train = make_examples(train_rows, RAFT.P_GOLDEN, RAFT.K_DISTRACT, tok, seed=0)
+    cf_pool = RAFT.make_cf_train_pool(train_rows, tok, seed=0) if CF_FRAC > 0 else []   # KD-C: reading-forcing CF pool (CE-only, no cache)
+    # CF state is ALWAYS printed (add.52 observability) — a forgotten/silent CF setting must be unmistakable in train.log.
+    if CF_FRAC > 0:
+        print(f">> CF READING-FORCE: ON | CF_FRAC={CF_FRAC} ramp@{CF_WARM:.2f}*STEPS CF_CE_W={CF_CE_W} CF_LIFT_MIN={CF_LIFT_MIN} | "
+              f"cf_pool={len(cf_pool)} swappable rows (multi-doc +{RAFT.K_DISTRACT} distractors, random surrogate per ex, CE-only, ≠ E4 nonce '{RAFT._SURROGATE}')"
+              + ("" if cf_pool else " — EMPTY pool (no swappable rows): CF is a NO-OP this run"), flush=True)
+        min_pool = max(200, int(0.05 * len(train_rows)))             # add.52 min-pool guard: an under-firing CF run is under-POWERED, not a verdict
+        if 0 < len(cf_pool) < min_pool:
+            print(f"!! WARNING CF under-powered: cf_pool={len(cf_pool)} < {min_pool} (max(200, 5% of {len(train_rows)} train rows)) — CF will "
+                  f"repeat a few facts heavily (overfit/under-power risk). A FLAT reading result then means 'CF barely fired', NOT 'recipe failed'.", flush=True)
+        if not COUNTERFACTUAL:
+            print("!! WARNING CF_FRAC>0 but COUNTERFACTUAL=0: the held-out swapped reading metric (counterfactual_lift) will NOT be measured, "
+                  "so the verdict falls back to the un-swapped slope proxy — which is STRUCTURALLY BLIND to a working CF run (add.52). "
+                  "Set COUNTERFACTUAL=1 to judge a CF run correctly.", flush=True)
+        if BATCH_SIZE > 1:
+            print("!! WARNING CF_FRAC>0 with BATCH_SIZE>1: CF is wired only on the single-row path (the vmap batch path is the "
+                  "deferred OOM-prone one) — CF will be SKIPPED. Use BATCH_SIZE=1 for the reading-forcing run.", flush=True)
+    else:
+        print(">> CF READING-FORCE: OFF (CF_FRAC=0) — set CF_FRAC>0 + COUNTERFACTUAL=1 to force/measure reading", flush=True)
 
     # FROZEN eval set: build once, persist atomically, RELOAD on resume so E1/E2/E3 are byte-identical across the
     # self-healing relaunch loop (reproducible slopes/gates; immune to an upstream dataset move mid-run).
@@ -300,6 +413,26 @@ def main() -> None:
         _common = set.intersection(*[{x["id"] for x in E[m]} for m in E])    # IDENTICAL subset across E1/E2/E3 → slopes are valid
         E = {m: [x for x in E[m] if x["id"] in _common] for m in E}
         _tmp = eval_set_path + ".tmp"; torch.save(E, _tmp); os.replace(_tmp, eval_set_path)   # atomic freeze (save_ckpt pattern)
+
+    # E4 (reads-vs-memorizes) frozen the same way — when COUNTERFACTUAL, the swap-follow rate is measured PER-EVAL and threaded
+    # into the verdict (so a parrot's flat swap-follow forces NO-GO), not just once in the final card. Built from held_rows → an
+    # INDEPENDENT probe disjoint from the CF TRAIN pool (which is built from train_rows; the surrogate is also randomized + ≠ this nonce).
+    E4_eval, E4_mismatch = [], []
+    if COUNTERFACTUAL:
+        cf_eval_path = os.path.join(CKPT_DIR, "cf_eval.pt")
+        cf_mismatch_path = os.path.join(CKPT_DIR, "cf_mismatch.pt")
+        if RESUME and os.path.exists(cf_eval_path):
+            E4_eval = torch.load(cf_eval_path)
+            E4_mismatch = torch.load(cf_mismatch_path) if os.path.exists(cf_mismatch_path) else []
+        else:
+            E4_eval = RAFT.make_counterfactual_condition(held_rows, tok)
+            E4_mismatch = RAFT.make_counterfactual_mismatch(held_rows, tok)   # add.54: same swapped docs, FOREIGN questions
+            if E4_mismatch:                                          # add.54b: keep only surrogate-surviving rows in BOTH, aligned (else
+                E4_eval, E4_mismatch = RAFT.align_cf_survivors(E4_eval, E4_mismatch, tok)   # leave E4_eval intact — don't empty it on a degenerate set)
+            _tmp = cf_eval_path + ".tmp"; torch.save(E4_eval, _tmp); os.replace(_tmp, cf_eval_path)
+            _tmp = cf_mismatch_path + ".tmp"; torch.save(E4_mismatch, _tmp); os.replace(_tmp, cf_mismatch_path)
+        print(f"E4 counterfactual probe: {len(E4_eval)} matched + {len(E4_mismatch)} MISMATCH (foreign-question) held rows "
+              f"→ per-eval genuine = swap_follow(matched) − swap_follow(mismatch) → P0 verdict gate", flush=True)
 
     def _content_fp(items):                                              # hash the ACTUAL token content → loud on any data drift
         h = hashlib.sha256()
@@ -404,17 +537,36 @@ def main() -> None:
         ce = None if (not RAFT_NOGOLD_CE and not ex.get("keep_gold", True)) else masked_ce(sl, ex["input_ids"].to(DEV), ex["prompt_len"])
         return k, ce                                                     # fp32 CE (NS-2)
 
-    t0 = time.time()
+    def cf_pick(step):                                                   # KD-C: deterministic per-step CF draw (resume-safe — seeded by step,
+        if not cf_pool:                                                  #   no rng state to persist) + CF-3 anneal via cf_frac_at
+            return None
+        frac = cf_frac_at(step, STEPS, CF_FRAC, CF_WARM)
+        r = random.Random((step * 2654435761) & 0x7FFFFFFF)
+        return cf_pool[r.randrange(len(cf_pool))] if r.random() < frac else None
+
+    t0 = run_start = time.time()
     opt.zero_grad(set_to_none=True)
-    nonfinite, last_gnorm, eval_hist = 0, 0.0, []
+    nonfinite, last_gnorm, eval_hist, cf_count = 0, 0.0, [], 0
     for step in range(start, STEPS + 1):
+        if MAX_SEC > 0 and (time.time() - run_start) > MAX_SEC:          # add.55: IN-LOOP hard wall — save + break GRACEFULLY (the wrapper
+            save_ckpt(student, opt, step - 1, ckpt, sched)              #   MAX_SEC only fires post-crash; a healthy run needs this to honor a time wall).
+            print(f"!! MAX_SEC={MAX_SEC:.0f}s reached at step {step} — saved ckpt + stopping gracefully (ckpt_best is the ship target)", flush=True)
+            break
         lr_t = lr_at(step)                                               # LR-1: warmup → decay
         for g in opt.param_groups:
             g["lr"] = lr_t
         # TBC-6 + NS-8.2: ALWAYS autocast on cuda — even a bf16-built (FP32_MASTER=0) model then gets fp32 cumsum/exp/carry in
         # the chunked scan by autocast policy (a pure-bf16 scan diverged up to 17% rel-err). Non-cuda (mps/cpu fp32) = nullcontext.
         amp = torch.autocast("cuda", dtype=DT) if DEV == "cuda" else contextlib.nullcontext()
-        if BATCH_SIZE > 1:                                               # TBC-1: vmap-batched forward (≡ per-row, proven 0-err) + per-row loss
+        ce_w = CE_W                                                      # KD-C: a CF step overrides KD→0 + uses CF_CE_W (CE-only reading force)
+        cf_ex = cf_pick(step) if (CF_FRAC > 0 and BATCH_SIZE == 1) else None
+        if cf_ex is not None:                                            # reading-FORCING counterfactual: CE-only (the teacher doesn't know the swap)
+            with amp:
+                sl = student.run_twin(cf_ex["input_ids"].to(DEV), collect_ssm=False)[0]
+            kd = torch.zeros((), device=DEV, dtype=sl.dtype)
+            ce = masked_ce(sl, cf_ex["input_ids"].to(DEV), cf_ex["prompt_len"])
+            ce_w, cf_count = CF_CE_W, cf_count + 1
+        elif BATCH_SIZE > 1:                                             # TBC-1: vmap-batched forward (≡ per-row, proven 0-err) + per-row loss
             if USE_SCHEDULER:
                 exs = [train[sched.sample(step)] for _ in range(BATCH_SIZE)]   # competence(step) correct; B draws
             else:
@@ -436,7 +588,7 @@ def main() -> None:
             with amp:
                 sl = student.run_twin(ex["input_ids"].to(DEV), collect_ssm=False)[0]
             kd, ce = kd_ce(sl, ex)
-        loss = (KD_W * kd + (CE_W * ce if ce is not None else 0.0)) / ACCUM
+        loss = (KD_W * kd + (ce_w * ce if ce is not None else 0.0)) / ACCUM
         if not torch.isfinite(loss):                                     # NS-3: skip a transient non-finite step, do NOT crash the run
             nonfinite += 1
             opt.zero_grad(set_to_none=True)
@@ -455,40 +607,60 @@ def main() -> None:
             tps = 100 * RAFT.MAX_LEN / (time.time() - t0); t0 = time.time()
             curr = (f" | q={sched.difficulty_quantile(step):.2f} pool={len(sched._candidates(step)) / sched.N:.2f}"
                     if USE_SCHEDULER else "")    # CURR-5: is the easy→hard ramp actually firing or saturated? (deterministic, no rng touch)
+            cf_tag = f" cf={cf_count}{'*' if cf_ex is not None else ''}" if CF_FRAC > 0 else ""   # KD-C: CF steps so far (* = this step was CF)
             print(f"step {step:6d}/{STEPS} | lr={lr_t:.2e} KD={float(kd):.3f} CE={float(ce) if ce is not None else 0:.3f} "
-                  f"| gnorm={last_gnorm:.2f}{curr} | ~{tps:.0f} tok/s", flush=True)
+                  f"| gnorm={last_gnorm:.2f}{curr}{cf_tag} | ~{tps:.0f} tok/s", flush=True)
         if step % CKPT_EVERY == 0:
             save_ckpt(student, opt, step, ckpt, sched)
         if step % EVAL_EVERY == 0:
             ev = evaluate()
             e1 = ev["E1"][0]; slope_e2 = ev["E2"][0] - e1; slope_e3 = ev["E3"][0] - e1
             subset_ok = ev["E1"][2] == ev["E2"][2] == ev["E3"][2]    # equal skips → the slope is over the SAME surviving subset
-            score = select_score(e1, slope_e2, slope_e3)             # BCS-1: low E1 + distractor-robust + REWARD context-use
+            cf = None                                                # add.52: held-out swapped counterfactual = the CAUSAL reading signal
+            if COUNTERFACTUAL and E4_eval:                           # computed BEFORE the score so best-ckpt selection can use cf_lift (add.53)
+                cr = EVAL.eval_counterfactual(student, E4_eval, tok)
+                mm = EVAL.eval_counterfactual(student, E4_mismatch, tok, follow_only=True)["swap_follow_rate"] if E4_mismatch else float("nan")
+                genuine = cr["swap_follow_rate"] - mm if mm == mm else float("nan")   # add.54: matched − MISMATCH = question-conditioned reading
+                cf = {"lift": cr["counterfactual_lift"], "swap_follow": cr["swap_follow_rate"], "orig_recall": cr["orig_recall_rate"],
+                      "swap_mismatch": mm, "genuine": genuine}
+            score = select_score(e1, slope_e2, slope_e3, cf_lift=(cf["lift"] if cf else None))   # reward CAUSAL reading on a CF run, not the blind slope
             if score > best_score and subset_ok and all(math.isfinite(ev[m][0]) for m in ev):
                 best_score = score
                 save_ckpt(student, opt, step, best_path, sched)       # best-ckpt selection (metric-gated, NOT just last)
                 json.dump({"best_score": best_score, "step": step, "E1_nll": e1, "E2_nll": ev["E2"][0], "E3_nll": ev["E3"][0],
-                           "slope_e2_e1": slope_e2, "slope_e3_e1": slope_e3,
+                           "slope_e2_e1": slope_e2, "slope_e3_e1": slope_e3, "cf_lift": (cf["lift"] if cf else None),
+                           "orig_recall": (cf["orig_recall"] if cf else None),
                            "E1_acc": ev["E1"][1], "E2_acc": ev["E2"][1], "E3_acc": ev["E3"][1]},
                           open(best_meta + ".tmp", "w"))             # BCS-2: full eval breakdown for auditability
                 os.replace(best_meta + ".tmp", best_meta)             # persist best_score so a resume can't regress ckpt_best
-            eval_hist.append((step, e1, slope_e2, slope_e3, float(kd)))   # for the programmatic P0 GO/NO-GO verdict
+            eval_hist.append((step, e1, slope_e2, slope_e3, float(kd), cf))   # 6-tuple: cf dict = the CAUSAL reading signal
             print("  EVAL " + " ".join(f"{m}: nll={ev[m][0]:.3f} acc={ev[m][1]:.1%} sk={ev[m][2]}" for m in ev)
                   + f"  | Δ(E2-E1)={slope_e2:+.3f} Δ(E3-E1)={slope_e3:+.3f} | best_score={best_score:.3f}"
+                  + (f" | E4 lift={cf['lift']:+.2f} genuine={cf['genuine']:+.2f} (swap={cf['swap_follow']:.2f} "
+                     f"mism={cf['swap_mismatch']:.2f} recall={cf['orig_recall']:.2f})" if cf is not None else "")
                   + ("  ↑best" if score == best_score else "") + ("" if subset_ok else "  [subset≠ — slope unreliable]"), flush=True)
     save_ckpt(student, opt, STEPS, ckpt, sched)
     print(f"DONE — final ckpt {ckpt}")
-    if len(eval_hist) >= 2:                                          # programmatic P0 GO/NO-GO (不要亏 — don't scale a null run)
-        s0, e1_0, _, s3_0, kd0 = eval_hist[0]; sN, e1_N, _, s3_N, kdN = eval_hist[-1]
-        go = (e1_0 - e1_N) > 0.20                                    # E1 NLL fell meaningfully = the reader is learning
-        verdict = {"go": bool(go), "e1_first": e1_0, "e1_last": e1_N, "e1_drop": e1_0 - e1_N,
-                   "slope_e3_first": s3_0, "slope_e3_last": s3_N, "reading_trend_up": bool(s3_N > s3_0),
-                   "kd_first": kd0, "kd_last": kdN, "n_evals": len(eval_hist), "steps": STEPS}
+    if len(eval_hist) >= 2:                                          # programmatic P0 GO/NO-GO (不要亏 — don't scale a PARROT run)
+        verdict = p0_verdict(eval_hist, E1_DROP_MIN, READING_SLOPE_MARGIN, CF_LIFT_MIN, RECALL_LOW, RECALL_DROP_MIN, CF_GENUINE_MIN)
+        verdict["steps"] = STEPS
         with open(os.path.join(CKPT_DIR, "verdict.json"), "w") as f:
-            json.dump(verdict, f, indent=2)
-        print(f">> P0 VERDICT: {'GO ✓ scale to 20k' if go else 'NO-GO ✗ do NOT scale — fix recipe first'} "
-              f"(E1 nll {e1_0:.2f}→{e1_N:.2f}, Δ{e1_0 - e1_N:+.2f} | context-use slope Δ(E3-E1) {s3_0:+.3f}→{s3_N:+.3f} "
-              f"{'↑ reading' if s3_N > s3_0 else '— flat'} | KD {kd0:.2f}→{kdN:.2f}) → verdict.json", flush=True)
+            json.dump(_sanitize(verdict), f, indent=2)               # strict-JSON: non-finite (e.g. NaN lift on a degenerate E4) → null
+        v = verdict
+        # GO = LEARNING (E1 drop) AND READING. READING is the held-out swapped counterfactual_lift+recall-drop when measured
+        # (add.52 — the un-swapped slope is BLIND to a working CF run), else the slope proxy (add.51 anti-parrot fallback).
+        if v["swap_measured"]:
+            gstr = (f"genuine(matched−mism) {v['genuine_last']:+.2f} vs >{CF_GENUINE_MIN}{'✓' if v['genuine_ok'] else '✗'}"
+                    if v["genuine_last"] is not None and v["genuine_last"] == v["genuine_last"] else "genuine n/a")
+            read_str = (f"READ[causal]: lift {v['cf_lift_first']:+.2f}→{v['cf_lift_last']:+.2f} vs >{CF_LIFT_MIN} + "
+                        f"recall {v['orig_recall_first']:.2f}→{v['orig_recall_last']:.2f}{'✓' if v['recall_ok'] else '✗'} + {gstr} "
+                        f"⇒ reads {'✓' if v['cf_reads'] else '✗'} [slope Δ(E3-E1) {v['slope_e3_delta']:+.3f} corroborating-only]")
+        else:
+            read_str = (f"READ[slope-proxy]: Δ(E3-E1) {v['slope_e3_first']:+.3f}→{v['slope_e3_last']:+.3f} "
+                        f"grew {v['slope_e3_delta']:+.3f}{'✓' if v['reading_trend_up'] else '✗'} vs >{READING_SLOPE_MARGIN}")
+        print(f">> P0 VERDICT: {'GO ✓ scale to 20k' if v['go'] else 'NO-GO ✗ do NOT scale — still parrots / fix recipe first'} "
+              f"(LEARN: E1 {v['e1_first']:.2f}→{v['e1_last']:.2f} Δ{v['e1_drop']:+.2f}{'✓' if v['e1_ok'] else '✗'} vs >{E1_DROP_MIN} "
+              f"| {read_str} | KD {v['kd_first']:.2f}→{v['kd_last']:.2f}) → verdict.json", flush=True)
 
     # The checkpoint is born WITH its eval card: run the serious battery on the BEST checkpoint + the honest claim_card.
     if os.path.exists(best_path):
@@ -509,8 +681,12 @@ def main() -> None:
         res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
                "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
                "teacher_E1_nll": t_e1, "decode_parity": dp, "best_score": best_score, "eval_on": eval_on}
-        if COUNTERFACTUAL:                                           # E4: reads-vs-memorizes diagnostic (default off; not a gate)
-            res["counterfactual"] = EVAL.eval_counterfactual(student, RAFT.make_counterfactual_condition(held_rows, tok), tok)
+        if COUNTERFACTUAL and E4_eval:                              # E4: reads-vs-memorizes — reuse the FROZEN per-eval probe (consistency)
+            _cfc = EVAL.eval_counterfactual(student, E4_eval, tok)
+            _mm = EVAL.eval_counterfactual(student, E4_mismatch, tok, follow_only=True)["swap_follow_rate"] if E4_mismatch else float("nan")
+            _cfc["swap_mismatch_rate"] = _mm                        # add.54: foreign-question control
+            _cfc["genuine_reading"] = (_cfc["swap_follow_rate"] - _mm) if _mm == _mm else float("nan")
+            res["counterfactual"] = _cfc
         res["claim"] = EVAL.claim_card(res)
     except Exception as e:
         import traceback
