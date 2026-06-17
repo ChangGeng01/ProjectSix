@@ -36,6 +36,9 @@ P_GOLDEN = float(os.environ.get("RAFT_P", "0.8"))
 K_DISTRACT = int(os.environ.get("RAFT_K", "4"))
 MAX_LEN = int(os.environ.get("RAFT_T", "1024"))
 COT = os.environ.get("RAFT_COT", "0") == "1"
+RAFT_EOS = os.environ.get("RAFT_EOS", "0") == "1"                      # add.56: append EOS to the answer target so the model learns to STOP.
+#   The parrot had free-greedy EM=0.0 STRUCTURALLY — `eos` was in NO training target, so generation never terminated (ran the full maxlen → pred≠gold).
+#   Default off = byte-identical (data_fp/cache unchanged); on REQUIRES a fresh CKPT_DIR (the EOS token changes data_fp → the cache fingerprint).
 STEPS = int(os.environ.get("RAFT_STEPS", "300"))
 SEEDS = int(os.environ.get("RAFT_SEEDS", "1"))
 N_ROWS = int(os.environ.get("RAFT_N", "600"))
@@ -105,7 +108,8 @@ def to_ids(gold: list, distract: list, question: str, answer: str, tok, rng: ran
     block = "".join(_fmt_doc(i, t, txt) for i, (t, txt) in enumerate(kept))
     doc_ids = tok(block, add_special_tokens=False).input_ids[:budget]   # backstop; gold prioritized so this rarely bites
     pids = bos + doc_ids + suffix_ids                                   # question (suffix) is NEVER trimmed
-    full = pids + aids
+    eos = getattr(tok, "eos_token_id", None)                           # add.56: teach STOP — EOS lands in the supervised span (>=prompt_len-1)
+    full = pids + aids + ([eos] if (RAFT_EOS and eos is not None) else [])
     prompt_len = min(len(pids), len(full) - 1)                          # >=1 answer token predicted
     out = {"input_ids": torch.tensor(full), "prompt_len": prompt_len}
     if ex_id is not None:

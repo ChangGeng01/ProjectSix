@@ -32,6 +32,7 @@ TASK_FIT_ABS = float(os.environ.get("TASK_FIT_ABS", "2.10"))         # absolute 
 TEACHER_GAP = float(os.environ.get("TEACHER_GAP", "0.15"))          # student E1 NLL within this many nats of the MEASURED teacher
 CONTEXT_USE_MARGIN = float(os.environ.get("CONTEXT_USE_MARGIN", "0.20"))  # E3(no-gold) must be >= this much WORSE than E1 (anti-parrot)
 PARITY_BAR = float(os.environ.get("PARITY_BAR", "0.99"))            # PyTorch fp16 SEQUENTIAL(run_ref) vs PARALLEL(run_twin) argmax-agreement
+CF_GENUINE_GATE = float(os.environ.get("CF_GENUINE_GATE", "0.20"))  # add.56: min genuine reading (swap_follow matched − MISMATCHED) for the PRESENT-ONLY claim_card gate
 #   NOTE: this is a HOST PyTorch-fp16 parity (run_twin≡run_ref), NOT real A19/CoreAI int8 parity — that is the device phase (quant_fidelity_stub).
 
 
@@ -261,6 +262,13 @@ def claim_card(res: dict) -> dict:
         "fp16_seq_parity": (parity.get("argmax_agreement") or 0) >= PARITY_BAR,
         "no_contamination": res.get("contamination_ok", False),
     }
+    # add.56 PRESENT-ONLY genuine-reading gate: the CAUSAL reading signal (held-out swapped matched − MISMATCHED follow). The
+    # un-swapped slope (context_use gate) is BLIND to a CF-trained reader, so this is the gate that actually credits reading —
+    # but ONLY when measured (COUNTERFACTUAL=1 + a mismatch set), else absent (don't fail a run that never ran the probe).
+    cf = res.get("counterfactual") or {}
+    genuine = cf.get("genuine_reading")
+    if genuine is not None and genuine == genuine:                   # present + not-NaN
+        gates["genuine_reading"] = genuine >= CF_GENUINE_GATE
     passed = all(gates.values())
     failed = [g for g, v in gates.items() if not v]
     return {"status": "成了 ✓ CLAIMABLE" if passed else "亏的 ✗ FAIL", "gates": gates, "failed_gates": failed}

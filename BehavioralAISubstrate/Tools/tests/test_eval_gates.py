@@ -73,6 +73,19 @@ def test_claim_card_exactly_eight_gate_keys():
     }
 
 
+def test_genuine_reading_gate_is_present_only(monkeypatch):
+    """add.56: the genuine-reading gate (held-out swapped matched−MISMATCHED follow) is the CAUSAL reading signal the blind
+    context_use slope can't give — but PRESENT-ONLY: absent unless COUNTERFACTUAL measured it (so a non-CF run isn't failed)."""
+    base = _passing_res()
+    assert "genuine_reading" not in EV.claim_card(base)["gates"]               # no counterfactual → gate absent (8 keys)
+    reads = EV.claim_card({**base, "counterfactual": {"genuine_reading": 0.45}})
+    assert reads["gates"]["genuine_reading"] is True and len(reads["gates"]) == 9
+    copy = EV.claim_card({**base, "counterfactual": {"genuine_reading": 0.05}})  # below CF_GENUINE_GATE=0.20 → copy-heuristic → fail
+    assert copy["gates"]["genuine_reading"] is False and copy["status"].startswith("亏的")
+    nan = EV.claim_card({**base, "counterfactual": {"genuine_reading": float("nan")}})
+    assert "genuine_reading" not in nan["gates"]                               # NaN (degenerate) → absent, not a crash/false-fail
+
+
 def test_claim_card_status_chengle_only_when_all_true():
     card = EV.claim_card(_passing_res())
     assert all(card["gates"].values())

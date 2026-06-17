@@ -123,8 +123,19 @@ token-disjoint) so the learned rule is "answer = whatever the doc says," not "em
 ```
 rm -rf /workspace/ckpt-cf
 ARCH=hybrid LAYERS=24 STEPS=20000 N_ROWS=20000 EVAL_EVERY=1000 CKPT_EVERY=250 CKPT_DIR=/workspace/ckpt-cf \
-  USE_SCHEDULER=1 COUNTERFACTUAL=1 PACE_T_FRAC=0.5 CF_FRAC=0.35 CF_WARM=0.15 CF_CE_W=0.5 bash scripts/runpod_distill.sh
+  USE_SCHEDULER=1 COUNTERFACTUAL=1 PACE_T_FRAC=0.5 CF_FRAC=0.35 CF_WARM=0.15 CF_CE_W=0.5 \
+  RAFT_EOS=1 KD_NOGOLD_W=0.3 KD_EXACT_TAIL=1 GRAD_CLIP=5.0 bash scripts/runpod_distill.sh
 ```
+**add.56 result-driven levers** (from the parrot baseline — all default-off/byte-identical, A/B-able; `RAFT_EOS`/`KD_EXACT_TAIL`
+change `data_fp` so they need a FRESH `CKPT_DIR`):
+- **`RAFT_EOS=1`** — appends EOS to the answer target so the model learns to STOP. The parrot's free-greedy **EM=0 was STRUCTURAL**
+  (no training target ever contained EOS → generation never terminated). Turns a pinned-zero gate into a real signal. Highest-value.
+- **`KD_NOGOLD_W=0.3`** — down-weights KD on the ~20% no-gold steps (the frozen teacher emits its *memorized* answer there →
+  a SECOND parrot channel CF doesn't cover). Pairs with `RAFT_NOGOLD_CE=1`. Complements the CF reading-force; they stack.
+- **`KD_EXACT_TAIL=1`** — exact top-K+lumped-tail KD (logZ already cached → zero extra cost; closes a ~1% fidelity renorm bias).
+- **`GRAD_CLIP=5.0`** — the clip was hardcoded 1.0 but the parrot's back-half PRE-clip gnorm median was 4.96 → clip throttled
+  ~100% of back-half updates 3-18× during the phase nll was still falling. (5.0 ≈ that median; fall back to 2-4 if unstable.)
+- env-A/B only (no code default change): **`CE_W=1.0`** (vs 0.5) — the answer-CE is throttled vs the doc-LM KD; judge by gen EM/F1, not E1 nll.
 - `COUNTERFACTUAL=1` is **REQUIRED** — it's what measures the held-out swapped reading signal the verdict gates on (the launcher
   warns loudly if `CF_FRAC>0` but `COUNTERFACTUAL=0`). `CF_CE_W=0.5` (match `CE_W`) for the first run — no-KD already makes CF CE
   the sole undiluted answer-span signal; raise to 1.0 as a second lever only if swap-follow doesn't move.

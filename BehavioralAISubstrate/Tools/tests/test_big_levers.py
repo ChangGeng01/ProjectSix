@@ -251,6 +251,20 @@ def test_cf_train_pool_surrogate_is_randomized_and_not_the_e4_nonce(stub_tok):
     assert len(surrogates) >= 2                                       # randomized per example, not one constant
 
 
+def test_raft_eos_appends_stop_token_when_on(stub_tok, monkeypatch):
+    """add.56: RAFT_EOS appends EOS to the answer target (in the supervised span) so the model learns to STOP — the structural
+    root cause of the parrot's free-greedy EM=0 (the model otherwise never terminates, runs the full maxlen → pred≠gold)."""
+    import mamba3_raft as RAFT
+    gold = [("G", "The capital is Paris.")]
+    monkeypatch.setattr(RAFT, "RAFT_EOS", False)
+    off = RAFT.to_ids(gold, [], "what is it?", " Paris", stub_tok, random.Random(0), "q")
+    monkeypatch.setattr(RAFT, "RAFT_EOS", True)
+    on = RAFT.to_ids(gold, [], "what is it?", " Paris", stub_tok, random.Random(0), "q")
+    assert on["input_ids"].numel() == off["input_ids"].numel() + 1            # exactly one extra token
+    assert int(on["input_ids"][-1]) == stub_tok.eos_token_id                  # ...and it's EOS
+    assert on["input_ids"].numel() > on["prompt_len"]                         # EOS is in the supervised (predicted) span
+
+
 def test_cf_train_pool_skips_yesno_and_nonsubstring(stub_tok):
     import mamba3_raft as RAFT
     yesno = {"id": "y", "question": "?", "answer": "yes", "golden": [("G", "blah yes blah.")],

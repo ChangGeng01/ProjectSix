@@ -51,6 +51,9 @@ STEPS = int(os.environ.get("STEPS", "20000"))
 LR = float(os.environ.get("LR", "3e-4"))
 WARMUP = int(os.environ.get("WARMUP", "800"))
 ACCUM = int(os.environ.get("ACCUM", "8"))                               # grad-accum → effective batch
+GRAD_CLIP = float(os.environ.get("GRAD_CLIP", "1.0"))                   # NS-9 (add.56): grad-norm clip — hoisted from a hardcoded 1.0. The
+#   parrot's back-half PRE-clip gnorm median was 4.96 (p95 10.7), so clip=1.0 throttled ~100% of back-half steps 3-18× during the phase E1 nll
+#   was STILL falling. 1.0 = byte-identical legacy; try GRAD_CLIP=5.0 to free the productive late updates. (Also: a peak-LR bump is a no-op while clip nullifies it.)
 TAU = float(os.environ.get("TAU", "1.0"))   # P0-1 (test_p0_1_topk_kd.py): at TAU=2 over 100k vocab the top-K cache misses
 #   68% of the tempered mass (grad-cos 0.91, loss-ratio 2.23 vs full KD). TAU=1 → top-64 captures 99%, grad-cos 0.999,
 #   loss-ratio 1.04 = matches full-vocab KD. The cache (top-K logits) was fine; the temperature was the bug.
@@ -73,6 +76,9 @@ WSD_DECAY_FRAC = float(os.environ.get("WSD_DECAY_FRAC", "0.2"))        # add.55:
 MAX_SEC = float(os.environ.get("MAX_SEC", "0"))                        # add.55: IN-LOOP wall-clock guard (0 = off). The wrapper MAX_SEC only fires
 #   BETWEEN process restarts (post-crash) — a healthy run ignores it; this saves a ckpt + breaks gracefully so a long run honors a hard time wall.
 KD_ANSWER_W = float(os.environ.get("KD_ANSWER_W", "1.0"))             # KD-1: >1 up-weights KD on the answer span (1.0 = uniform = legacy)
+KD_NOGOLD_W = float(os.environ.get("KD_NOGOLD_W", "1.0"))            # NS-10 (add.56): down-weight KD on NO-GOLD examples. On those (~20% at P=0.8)
+#   the frozen teacher emits its MEMORIZED answer with no evidence (teacher_E1_nll≈0.76), so KD-only no-gold steps distill the parrot
+#   (counterfactual_lift=-0.007). RAFT_NOGOLD_CE gates the CE only ("KD still applies"); this is the COMPLEMENT — it stacks with CF. 1.0=legacy; try 0.3.
 FP32_MASTER = os.environ.get("FP32_MASTER", "1") == "1"               # TBC-6: fp32 master weights + autocast-bf16 forward on cuda
 CTX_W = float(os.environ.get("CTX_W", "0.5"))                         # BCS-1: best-ckpt reward for context-use (positive E3-E1 slope = reading)
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "1"))                  # TBC-1: vmap-batched forward (1 = single-[T], the 349-test path). >1 OOMs at T=1024 even on 96GB (see warning) — keep 1
@@ -468,7 +474,7 @@ def main() -> None:
     opt = torch.optim.AdamW([{"params": decay_p, "weight_decay": 0.1},
                              {"params": no_decay_p, "weight_decay": 0.0}], lr=LR, betas=(0.9, 0.95))
     print(f"optimizer: AdamW decay={sum(p.numel() for p in decay_p)/1e6:.0f}M / no-decay={sum(p.numel() for p in no_decay_p)/1e3:.0f}K params | "
-          f"LR={LR} DECAY={DECAY}→{LR_MIN_FRAC:.2f} WARMUP={WARMUP} | KD_ANSWER_W={KD_ANSWER_W} CTX_W={CTX_W} | "
+          f"LR={LR} DECAY={DECAY}→{LR_MIN_FRAC:.2f} WARMUP={WARMUP} GRAD_CLIP={GRAD_CLIP} | KD_ANSWER_W={KD_ANSWER_W} KD_NOGOLD_W={KD_NOGOLD_W} CTX_W={CTX_W} | "
           f"BATCH_SIZE={BATCH_SIZE} TRAIN_SPLIT={TRAIN_SPLIT} NOGOLD_CE={int(RAFT_NOGOLD_CE)} MLA_ROPE={int(os.environ.get('MLA_ROPE') == '1')}", flush=True)
     if os.environ.get("MLA_ROPE") == "1":                            # ARCH-3 footgun guard: the deploy converter is still NoPE
         print("!! WARNING MLA_ROPE=1: training WITH MLA RoPE, but the device converter (mamba3_hybrid_decode_deploy) is still "
@@ -533,7 +539,9 @@ def main() -> None:
             with torch.no_grad():
                 tl = teacher(ex["input_ids"].to(DEV).unsqueeze(0)).logits[0]
             k = kd_kl(sl, tl)
-        # RAFT_NOGOLD_CE=0 → no answer-CE on no-gold examples (don't teach "answer without evidence"); KD still applies.
+        if KD_NOGOLD_W != 1.0 and not ex.get("keep_gold", True):         # NS-10: down-weight KD on no-gold (the teacher's evidence-free memorized
+            k = k * KD_NOGOLD_W                                          #   answer = a parrot channel CF doesn't cover). Complements RAFT_NOGOLD_CE (CE-only gate).
+        # RAFT_NOGOLD_CE=0 → no answer-CE on no-gold examples (don't teach "answer without evidence"); KD still applies (unless KD_NOGOLD_W<1).
         ce = None if (not RAFT_NOGOLD_CE and not ex.get("keep_gold", True)) else masked_ce(sl, ex["input_ids"].to(DEV), ex["prompt_len"])
         return k, ce                                                     # fp32 CE (NS-2)
 
@@ -597,7 +605,7 @@ def main() -> None:
             continue
         loss.backward()
         if step % ACCUM == 0:
-            gn = torch.nn.utils.clip_grad_norm_(student.parameters(), 1.0)
+            gn = torch.nn.utils.clip_grad_norm_(student.parameters(), GRAD_CLIP)
             if torch.isfinite(gn):                                       # NS-4: an inf grad-norm must not poison AdamW moments
                 opt.step(); last_gnorm = float(gn)
             else:
