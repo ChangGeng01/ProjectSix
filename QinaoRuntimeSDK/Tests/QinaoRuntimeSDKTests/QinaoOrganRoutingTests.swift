@@ -92,6 +92,25 @@ final class QinaoOrganRoutingTests: XCTestCase {
         XCTAssertEqual(d.reasonCodes, ["seed-role-preserved"])
     }
 
+    func testMaxThroughputPolicyUsesGreedyTemperatureForBothRoles() throws {
+        let b = makeBudget(precision: .balanced, thermal: .nominal)
+        let scout = QinaoLoop.QinaoOrganRouting.decide(
+            budget: b,
+            seedRole: .scout,
+            policy: .maxThroughput)
+        let core = QinaoLoop.QinaoOrganRouting.decide(
+            budget: b,
+            seedRole: .core,
+            policy: .maxThroughput)
+
+        XCTAssertEqual(scout.temperature, 0, accuracy: 1e-9)
+        XCTAssertEqual(core.temperature, 0, accuracy: 1e-9)
+        XCTAssertEqual(scout.maxOutputTokens, 192)
+        XCTAssertEqual(core.maxOutputTokens, 1024)
+        XCTAssertEqual(scout.reasonCodes, ["seed-role-preserved"])
+        XCTAssertEqual(core.reasonCodes, ["seed-role-preserved"])
+    }
+
     // MARK: - 3. Thermal emergency forces scout + cools temperature
 
     func testEmergencyForcesCoreSeedToScout() throws {

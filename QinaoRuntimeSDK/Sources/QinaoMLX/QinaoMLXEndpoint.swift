@@ -71,6 +71,43 @@ public extension QinaoLoop {
         return BASOrganRegistryEndpoint(registry: registry)
     }
 
+    /// Throughput-first MLX factory.
+    ///
+    /// This is deliberately a separate entry point from
+    /// `makeMLXEndpoint(...)`: the public default stays the
+    /// quality-oriented Gemma 4 E4B path, while hosts that want the
+    /// fastest certified on-device lane can opt into the Llama
+    /// 3.2 3B target with its Llama 3.2 1B speculative draft.
+    ///
+    /// The endpoint also maps both Qinao roles to the greedy
+    /// deterministic preset, because MLX greedy speculative decoding
+    /// engages only for `temperature == 0` requests. For routed
+    /// `generateCandidates(..., routedBudget:)` calls, pair this
+    /// endpoint with `QinaoOrganRoutingPolicy.maxThroughput` so the
+    /// routing decision also emits temperature 0.
+    ///
+    /// `prewarm` defaults to true so the first user-visible turn
+    /// avoids paying Metal kernel JIT latency. It increases endpoint
+    /// construction time, but not per-turn output bytes.
+    static func makeMaxThroughputMLXEndpoint(
+        progressHandler: @Sendable @escaping (Progress) -> Void
+            = { _ in },
+        prewarm: Bool = true
+    ) async throws -> any QinaoOrganEndpoint {
+        let adapter = MLXOrganAdapter(
+            model: QinaoMLXModel.speculativeOptimal.catalogEntry)
+        try await adapter.loadModel(progressHandler: progressHandler)
+        if prewarm {
+            try await adapter.prewarmGreedySpeculative()
+        }
+
+        let registry = BASOrganRegistry()
+        await registry.register(adapter)
+        return BASOrganRegistryEndpoint(
+            registry: registry,
+            presetForRole: { _ in .greedyDeterministic })
+    }
+
     /// M234 — public factory for the Qinao + MLX LoRA fine-tuning
     /// path. Returns the substrate trainer typed against
     /// `QinaoMLXModel` so callers don't import BASMLXAdapter.

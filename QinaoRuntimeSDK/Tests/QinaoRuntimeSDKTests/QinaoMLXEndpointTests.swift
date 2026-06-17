@@ -100,6 +100,15 @@ final class QinaoMLXEndpointTests: XCTestCase {
             "subsequent milestone explicitly retires it")
     }
 
+    func testMaxThroughputModelIsSpeculativeOptimal() {
+        XCTAssertEqual(QinaoMLXModel.speculativeOptimal, .llama3_2_3B)
+        XCTAssertEqual(
+            QinaoMLXModel.speculativeOptimal.speculativeDraft,
+            .llama3_2_1B,
+            "max-throughput endpoint must target the certified " +
+            "Llama 3B to 1B speculative lane")
+    }
+
     // MARK: - 6. Certification tier (B — defaults certified, alternatives experimental)
 
     func testCertificationTierMatchesCatalogTiering() {

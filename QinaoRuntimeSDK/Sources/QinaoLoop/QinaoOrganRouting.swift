@@ -99,6 +99,23 @@ public extension QinaoLoop {
             emergencyTemperatureDelta: -0.20,
             minimalPrecisionTokenFraction: 0.5)
 
+        /// Throughput-first routing policy.
+        ///
+        /// Both scout and core route at temperature 0 so MLX's
+        /// greedy speculative-decoding gate can engage on endpoints
+        /// configured for the certified fast lane. Token ceilings
+        /// stay equal to the role defaults; hosts that want lower
+        /// total latency can still pass a narrower per-request cap.
+        public static let maxThroughput = QinaoOrganRoutingPolicy(
+            scoutBaseTemperature: 0,
+            coreBaseTemperature: 0,
+            scoutMaxOutputTokens: 192,
+            coreMaxOutputTokens: 1024,
+            forceScoutUnderEmergency: true,
+            forceDeterministicUnderThrottle: true,
+            emergencyTemperatureDelta: 0,
+            minimalPrecisionTokenFraction: 0.5)
+
         public init(
             scoutBaseTemperature: Double,
             coreBaseTemperature: Double,
