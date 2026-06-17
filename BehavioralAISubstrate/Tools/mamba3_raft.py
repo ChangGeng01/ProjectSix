@@ -146,6 +146,33 @@ def make_eval_condition(rows_examples: list, mode: str, tok) -> list:
     return out
 
 
+_SURROGATE = "Zelophar"                                                # a fixed nonce ~never in a real HotpotQA doc
+
+
+def make_counterfactual_condition(rows_examples: list, tok, surrogate: str = _SURROGATE) -> list:
+    """E4 (reading-VALIDITY probe, add.48): for rows whose answer appears verbatim in a gold sentence, REPLACE the answer
+    with a synthetic surrogate across the gold docs + set the supervised target to the surrogate, built GOLD-ONLY (like E1)
+    so the SWAPPED fact is the ONLY evidence. A reader FOLLOWS the swap (the answer is only in the doc); a memorizer emits
+    the ORIGINAL (Granite-memorized) answer. This separates reading from memorization — the confound HotpotQA-val can't."""
+    out = []
+    for idx, ex in enumerate(rows_examples):
+        ans = str(ex["answer"]).strip()
+        if not ans or ans.lower() in ("yes", "no"):
+            continue
+        if not any(ans in s for s in ex.get("gold_sents", [])):        # swappable iff the answer is verbatim in a gold sentence
+            continue
+        if any(surrogate in txt for _, txt in ex["golden"]) or surrogate in ans:
+            continue                                                    # surrogate must be truly novel to this row
+        rng = random.Random(9_000_011 + idx)
+        gold = [(t, txt.replace(ans, surrogate)) for t, txt in ex["golden"]]   # swap the FACT in the gold evidence
+        item = to_ids(gold, [], ex["question"], " " + surrogate, tok, rng, ex.get("id"))
+        if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
+            item["orig_answer"] = ans                                  # the memorized answer (for the orig-recall check)
+            item["surrogate"] = surrogate
+            out.append(item)
+    return out
+
+
 # ---------- objective + eval ----------
 def masked_ce(logits, ids, prompt_len: int):
     lp, tgt = logits[:-1], ids[1:]                                     # causal shift (project convention)

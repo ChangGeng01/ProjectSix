@@ -157,6 +157,35 @@ def generate_and_score(student, examples, tok, maxlen: int = 24, eos=None) -> di
     return {"EM": em / max(n, 1), "F1": sum(f1s) / max(len(f1s), 1)}
 
 
+# ---------------------------------------------------------------- 4b) counterfactual reading probe (E4) — reads vs memorizes
+@torch.no_grad()
+def eval_counterfactual(student, E4, tok=None, maxlen: int = 8) -> dict:
+    """E4 diagnostic (add.48): on rows where the gold fact was SWAPPED to a surrogate, does the model FOLLOW the swap
+    (reader) or emit the ORIGINAL memorized answer (memorizer)? `swap_follow_rate` = teacher-forced answer-token accuracy on
+    the SWAPPED target (reader→high); `orig_recall_rate` = free-greedy still emits the original answer (memorizer→high).
+    `counterfactual_lift` = follow − recall (a genuine reader is clearly positive). NOT a gate — a default-off DIAGNOSTIC."""
+    if not E4:
+        return {"swap_follow_rate": float("nan"), "orig_recall_rate": float("nan"), "counterfactual_lift": float("nan"), "n": 0}
+    follow_hits = follow_tok = orig_hits = orig_n = n = 0
+    for ex in E4:
+        ids = ex["input_ids"].to(DEV); plen = int(ex["prompt_len"])
+        lg = student.run_twin(ids, collect_ssm=False)[0].float()
+        m = torch.arange(ids.shape[0] - 1, device=DEV) >= (plen - 1)
+        if m.any():
+            follow_hits += int((lg[:-1][m].argmax(-1) == ids[1:][m]).sum()); follow_tok += int(m.sum())
+        if tok is not None and ex.get("orig_answer"):                  # free-greedy: does it emit the ORIGINAL (memorized) answer?
+            seq = ids[:plen]; gen = []
+            for _ in range(maxlen):
+                nx = int(student.run_twin(seq, collect_ssm=False)[0][-1].argmax())
+                gen.append(nx); seq = torch.cat([seq, torch.tensor([nx], device=DEV)])
+            orig_hits += int(str(ex["orig_answer"]).strip().lower() in tok.decode(gen).strip().lower()); orig_n += 1
+        n += 1
+    follow = follow_hits / max(follow_tok, 1)
+    recall = orig_hits / max(orig_n, 1) if orig_n else float("nan")
+    return {"swap_follow_rate": follow, "orig_recall_rate": recall,
+            "counterfactual_lift": (follow - recall) if orig_n else float("nan"), "n": n}
+
+
 # ---------------------------------------------------------------- 5) calibration (ECE)
 def compute_ece(student, examples, bins: int = 10) -> dict:
     confs, corrs = [], []
@@ -334,6 +363,8 @@ def _run_ckpt_eval() -> None:
         res["decode_parity"] = decode_parity(student, E["E1"])
     except Exception as e:
         res["decode_parity"] = {"argmax_agreement": None, "note": f"parity skipped: {e!r}"}
+    if os.environ.get("COUNTERFACTUAL") == "1":                          # E4 reads-vs-memorizes diagnostic (default off)
+        res["counterfactual"] = eval_counterfactual(student, RAFT.make_counterfactual_condition(rows, tok), tok)
     res["claim"] = claim_card(res)
     out = os.environ.get("EVAL_OUT") or os.path.join(os.path.dirname(ckpt_path) or ".", "eval_card_offline.json")
     with open(out, "w") as f:

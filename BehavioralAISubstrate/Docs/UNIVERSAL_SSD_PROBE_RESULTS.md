@@ -2133,3 +2133,38 @@ deferred. Five honesty/feature corrections:
 
 Verification: full suite (373) green; new tests lock the mla_rope deploy fail-closed + the keep_gold tag + the renamed gate. The P0
 launch config is UNCHANGED (all new behavior is default-off or honesty-only): BATCH_SIZE=1, MLA_ROPE unset, RAFT_NOGOLD_CE=1.
+
+## Track G — Addendum 48: 全面优化 round 2 — the NOT-yet-done surface (6-axis × adversarial-verify, 36 agents)
+
+Second deep pass over the surface add.45 hadn't touched (4 implement_now + 4 implement_after_test, 10 defer, 12 reject).
+Implemented (all default-safe or default-off, parity-tested):
+- **CURR-1 (reading): PACE_T_FRAC env** — wires the already-existing-but-unused `pace_T_frac` so competence reaches the full
+  difficulty set at PACE_T_FRAC·STEPS. Default 1.0 = byte-identical; PACE_T_FRAC=0.5 makes the back half actually DRILL the
+  hard tail (the curriculum was near-inert on it). The single highest-leverage curriculum knob; A/B on P0.
+- **CURR-5 (observability): log `q=` (competence quantile) + `pool=` (candidate fraction)** in the step line when
+  USE_SCHEDULER — turns the curriculum from a black box into a live, falsifiable signal. Deterministic, no rng touch.
+- **NS-8.2 (robustness): always autocast on cuda** — a FP32_MASTER=0 run previously ran the WHOLE chunked scan in pure bf16
+  (~17% rel-err in the aggressive-decay regime, silently). Now the forward autocasts on cuda regardless of FP32_MASTER, so
+  the scan's cumsum/exp/carry stay fp32 by autocast policy. One-line ternary; mps/cpu unchanged.
+- **NS-8.3 (lock): test_scan_precision.py** — pins autocast-bf16 scan rel-err <2e-2 across decay regimes + forward argmax
+  agreement ≥0.95 + scan_chunked≡scan_parallel + decay finiteness, so a future bf16-carry leak trips immediately.
+- **KD-4 (reading, opt-in): exact top-K + lumped-tail KD** — build_cache now stores per-token `topk_logZ` (cheap [T]); a new
+  `kd_topk_tail` reconstructs the TRUE teacher masses (q_k=exp(val−logZ)) + one tail bucket, closing the ~1% top-K renorm
+  bias. Flag KD_EXACT_TAIL (default off = legacy renorm-within-K), asserts TAU==1. kd_topk + the 349 tests untouched.
+- **E4-1 (the deepest VALIDITY win, opt-in diagnostic): counterfactual fact-swap probe.** HotpotQA-val is likely in Granite's
+  pretraining → context_use is confounded (use-the-doc vs recall-the-memorized-answer are indistinguishable). E4 SWAPS the
+  gold fact to a surrogate (Zelophar) in the gold docs and sets the target to the surrogate (gold-only, so the swapped fact
+  is the ONLY evidence): a READER follows the swap (`swap_follow_rate` high), a MEMORIZER emits the original
+  (`orig_recall_rate` high); `counterfactual_lift = follow − recall`. Wired into the eval card + EVAL_CKPT behind
+  COUNTERFACTUAL=1 (default off — a DIAGNOSTIC, not yet a gate, so the 8-gate suite stays green). This is the clean
+  reads-vs-memorizes test the contamination caveat demanded.
+
+DEFERRED (real but big/risky — honestly NOT done): **BSCAN-1 native memory-efficient batched scan** (the genuine throughput
+win; the verifier agrees the O(B·C²) chunked design is correct but it's a high-risk rewrite of the audited scan → deferred,
+vmap stays the proven-but-OOMing stopgap); BCS-TOP2 (top-2 ckpt + battery-both); BCS-EARLYSTOP; CURR-2 (cache the full 5-term
+difficulty); NS-8.1 (force fp32 intra-chunk matmul). REJECTED 12 (cargo-cult / already-fp32 / TAU-only caveats).
+
+Verification: full suite (all green incl. 23 new round-2 tests). HONEST STATE: the high-value-low-risk optimization surface is
+now largely EXHAUSTED — what remains is the high-risk batched-scan rewrite (throughput) or marginal tweaks. The P0 launch
+config is UNCHANGED (PACE_T_FRAC=1, KD_EXACT_TAIL=0, COUNTERFACTUAL=0, BATCH_SIZE=1, MLA_ROPE unset, FP32_MASTER=1); every new
+lever is one env var away for a cloud A/B.

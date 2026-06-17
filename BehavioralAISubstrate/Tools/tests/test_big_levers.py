@@ -118,3 +118,78 @@ def test_make_examples_tags_keep_gold(toy_rows, stub_tok):
     nokeep = RAFT.make_examples(toy_rows, keep_p=0.0, k=4, tok=stub_tok, seed=0)
     assert allkeep and all(it["keep_gold"] is True for it in allkeep)
     assert nokeep and all(it["keep_gold"] is False for it in nokeep)
+
+
+# ----------------------------------------------------------------- E4-1: counterfactual reading probe (add.48)
+def _swappable_row(i=0):
+    return {"id": f"q{i}", "question": "what is the capital?", "answer": "Paris",
+            "golden": [("G", "The capital is Paris and it is very old.")],
+            "distract": [("D", "an unrelated paragraph.")], "gold_sents": ["The capital is Paris and it is very old."]}
+
+
+def test_counterfactual_condition_swaps_the_fact(stub_tok):
+    import mamba3_raft as RAFT
+    E4 = RAFT.make_counterfactual_condition([_swappable_row()], stub_tok)
+    assert len(E4) == 1
+    it = E4[0]
+    assert it["orig_answer"] == "Paris" and it["surrogate"] == RAFT._SURROGATE
+    assert it["prompt_len"] >= 1 and it["input_ids"].numel() > it["prompt_len"]   # surrogate target appended
+
+
+def test_counterfactual_skips_yesno_and_nonsubstring(stub_tok):
+    import mamba3_raft as RAFT
+    yesno = {"id": "y", "question": "?", "answer": "yes", "golden": [("G", "blah yes blah.")],
+             "distract": [], "gold_sents": ["blah yes blah."]}
+    nonsub = {"id": "n", "question": "?", "answer": "Xyz", "golden": [("G", "no match here.")],
+              "distract": [], "gold_sents": ["no match here."]}
+    assert RAFT.make_counterfactual_condition([yesno, nonsub], stub_tok) == []
+
+
+def test_eval_counterfactual_runs_and_reports(stub_tok, monkeypatch):
+    import mamba3_trainable as MTT, mamba3_eval as EV, mamba3_raft as RAFT
+    monkeypatch.setattr(EV, "DEV", "cpu"); monkeypatch.setattr(RAFT, "DEV", "cpu")
+    torch.manual_seed(0)
+    student = MTT.M(512, 2).eval()                                   # vocab 512 covers the stub_tok char ids
+    E4 = RAFT.make_counterfactual_condition([_swappable_row()], stub_tok)
+    r = EV.eval_counterfactual(student, E4, stub_tok, maxlen=4)
+    assert set(r) >= {"swap_follow_rate", "orig_recall_rate", "counterfactual_lift", "n"}
+    assert r["n"] == len(E4) and 0.0 <= r["swap_follow_rate"] <= 1.0
+
+
+# ----------------------------------------------------------------- KD-4: exact top-K + lumped-tail KD (add.48)
+def _kd_tail_inputs(T=6, V=96, K=8):
+    torch.manual_seed(0)
+    tl = torch.randn(T, V)
+    val, idx = tl.topk(K, dim=-1)
+    logZ = torch.logsumexp(tl, dim=-1)
+    return tl, idx, val, logZ
+
+
+def test_kd_topk_tail_zero_at_optimum_and_grad_flows():
+    import mamba3_cloud_distill as CD
+    tl, idx, val, logZ = _kd_tail_inputs()
+    assert float(CD.kd_topk_tail(tl.clone(), idx, val, logZ)) < 1e-4   # student==teacher → exact KL ≈ 0
+    sl = torch.randn(tl.shape, requires_grad=True)
+    kd = CD.kd_topk_tail(sl, idx, val, logZ)
+    assert torch.isfinite(kd) and float(kd) >= 0.0
+    kd.backward()
+    assert sl.grad is not None and torch.isfinite(sl.grad).all()
+
+
+def test_kd_topk_tail_requires_tau1(monkeypatch):
+    import mamba3_cloud_distill as CD
+    monkeypatch.setattr(CD, "TAU", 2.0)
+    tl, idx, val, logZ = _kd_tail_inputs()
+    with pytest.raises(AssertionError):
+        CD.kd_topk_tail(tl, idx, val, logZ)                          # exact only at TAU=1
+
+
+# ----------------------------------------------------------------- CURR-1: pace_T_frac drills the hard tail earlier
+def test_pace_t_frac_reaches_full_set_earlier():
+    from mamba3_curriculum_scheduler import CurriculumScheduler, CurriculumConfig
+    import numpy as np
+    d = np.random.default_rng(0).random(200)
+    full = CurriculumScheduler(d, 1000, CurriculumConfig(pace_T_frac=1.0))
+    half = CurriculumScheduler(d, 1000, CurriculumConfig(pace_T_frac=0.5))
+    assert half.competence(500) > full.competence(500)              # half-frac drills the full distribution by the midpoint
+    assert half.competence(500) >= 0.99 and full.competence(1000) >= 0.99

@@ -36,7 +36,7 @@ import mamba3_trainable as MT
 import mamba3_hybrid as HY
 import mamba3_raft as RAFT
 import mamba3_eval as EVAL
-from mamba3_curriculum_scheduler import CurriculumScheduler
+from mamba3_curriculum_scheduler import CurriculumScheduler, CurriculumConfig
 from mamba3_raft import build_example, make_examples, make_eval_condition, masked_ce, eval_nll
 
 TEACHER = os.environ.get("TEACHER", "ibm-granite/granite-4.1-3b-base")   # prod: granite-4.1-8b-base
@@ -76,6 +76,9 @@ HELD_SPLIT = os.environ.get("HELD_SPLIT", "validation")             # held from 
 HELD_N = int(os.environ.get("HELD_N", "300"))
 RAFT_NOGOLD_CE = os.environ.get("RAFT_NOGOLD_CE", "1") == "1"        # train answer-CE on NO-GOLD examples? RAFT default 1; set 0 = KD-only on
 #   no-gold (stops the objective teaching "answer without evidence" — the E3 tension; complements the eval-side context_use gate)
+PACE_T_FRAC = float(os.environ.get("PACE_T_FRAC", "1.0"))           # CURR-1: competence reaches the full set at PACE_T_FRAC*STEPS (0.5 = drill the hard tail in the back half)
+KD_EXACT_TAIL = os.environ.get("KD_EXACT_TAIL", "0") == "1"         # KD-4: exact top-K + lumped-tail KD (needs cached logZ; TAU=1 only). off = renorm-within-K (legacy)
+COUNTERFACTUAL = os.environ.get("COUNTERFACTUAL", "0") == "1"       # E4: counterfactual fact-swap reading DIAGNOSTIC in the eval card (off = not computed)
 
 
 def lr_at(step: int) -> float:
@@ -142,6 +145,24 @@ def kd_topk(student_logits, topk_idx, topk_val, pos_w=None):
     return per_pos.mean() * (TAU * TAU)
 
 
+def kd_topk_tail(student_logits, topk_idx, topk_val, topk_logZ, pos_w=None):
+    """KD-4: EXACT KD via top-K + ONE lumped TAIL bucket (valid at TAU=1 only). Uses the cached per-token logZ to recover
+    the TRUE teacher probs at the K kept tokens (q_k = exp(val - logZ), NOT renormalized-within-K) + a tail mass
+    q_tail = 1 - Σq_k; the student gets the analogous top-K + tail split. Closes the ~1% top-K renorm bias of kd_topk."""
+    assert TAU == 1.0, "kd_topk_tail is exact only at TAU=1 (set KD_EXACT_TAIL=0 or TAU=1)"
+    assert student_logits.shape[0] == topk_idx.shape[0], \
+        f"seq mismatch: student T={student_logits.shape[0]} vs cached T={topk_idx.shape[0]} — cache/example drift"
+    s_logp = F.log_softmax(student_logits.float(), -1)
+    s_k = s_logp.gather(-1, topk_idx.long())                                           # [T,K] student logprob @ teacher topk
+    q_k = (topk_val.float() - topk_logZ.float().unsqueeze(-1)).exp()                    # [T,K] TRUE teacher prob at top-K
+    q_tail = (1.0 - q_k.sum(-1)).clamp_min(1e-9)                                        # [T] teacher tail mass
+    s_tail = (1.0 - s_k.exp().sum(-1)).clamp_min(1e-9)                                  # [T] student tail mass
+    per_pos = (q_k * (q_k.clamp_min(1e-9).log() - s_k)).sum(-1) + q_tail * (q_tail.log() - s_tail.log())   # [T] exact KL(t‖s)
+    if pos_w is not None:
+        return (per_pos * pos_w).sum() / pos_w.sum().clamp_min(1e-9)
+    return per_pos.mean()
+
+
 def build_cache(teacher, train, cache_dir, extra_fp=""):
     """Phase 1 (run ONCE): frozen-teacher forward over every train example → cache top-K logits + per-example
     DIFFICULTY (teacher CE on the answer tokens, for curriculum ordering). Resumable (skips existing .pt). After this,
@@ -170,10 +191,12 @@ def build_cache(teacher, train, cache_dir, extra_fp=""):
         with torch.no_grad():
             tl = teacher(ids.unsqueeze(0)).logits[0].float()
             val, idx = tl.topk(KD_K, dim=-1)
+            logZ = torch.logsumexp(tl, dim=-1)                            # KD-4: per-token logZ → exact top-K + lumped-tail KD (cheap [T] vector)
             lp, tgt = tl[:-1], ids[1:]
             m = torch.arange(tgt.shape[0], device=DEV) >= (ex["prompt_len"] - 1)
             diff = float(F.cross_entropy(lp[m], tgt[m])) if m.any() else 0.0
-        rec = {"topk_idx": idx.to(torch.int32).cpu(), "topk_val": val.to(torch.float16).cpu(), "difficulty": diff}
+        rec = {"topk_idx": idx.to(torch.int32).cpu(), "topk_val": val.to(torch.float16).cpu(),
+               "topk_logZ": logZ.to(torch.float32).cpu(), "difficulty": diff}
         torch.save(rec, path + ".tmp"); os.replace(path + ".tmp", path)   # ATOMIC — a spot-preempt mid-save can't leave a corrupt ex{i}.pt
         ex.update(rec)
         if i % 200 == 0:
@@ -338,7 +361,9 @@ def main() -> None:
         return out
 
     USE_SCHEDULER = os.environ.get("USE_SCHEDULER", "0") == "1"       # opt-in: dynamic competence curriculum (else static ORDER)
-    sched = CurriculumScheduler([e.get("difficulty", 0.0) for e in train], STEPS) if USE_SCHEDULER else None
+    sched = (CurriculumScheduler([e.get("difficulty", 0.0) for e in train], STEPS,
+                                 CurriculumConfig(pace_T_frac=PACE_T_FRAC))    # CURR-1: PACE_T_FRAC<1 drills the hard tail in the back half
+             if USE_SCHEDULER else None)
     # HONEST label: USE_SCHEDULER = difficulty-curriculum (competence sampling) + STATIC RAFT(P,K). The scheduler's RAFT
     # gold→distractor staging (raft_params) is NOT wired — distractor composition is frozen at make_examples + locked by the
     # teacher cache. Dynamic per-step RAFT would bust the cache (~10-100x cost). Not 'multi-stage RAFT curriculum'.
@@ -357,12 +382,15 @@ def main() -> None:
             print("WARNING: resuming but no best_meta.json — best_score reset to -inf (a worse ckpt_best could be saved)", flush=True)
 
     def kd_ce(sl, ex):                                                   # per-example KD + masked CE (shared by single + batched paths)
+        pos_w = None
+        if KD_ANSWER_W != 1.0:                                           # KD-1: up-weight KD on the answer span
+            ans = (torch.arange(sl.shape[0], device=DEV) >= (ex["prompt_len"] - 1)).float()
+            pos_w = 1.0 + (KD_ANSWER_W - 1.0) * ans
         if CACHE:                                                        # no teacher forward — cached top-K KD
-            if KD_ANSWER_W != 1.0:                                       # KD-1: up-weight KD on the answer span
-                ans = (torch.arange(sl.shape[0], device=DEV) >= (ex["prompt_len"] - 1)).float()
-                k = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV), pos_w=1.0 + (KD_ANSWER_W - 1.0) * ans)
+            if KD_EXACT_TAIL and "topk_logZ" in ex:                      # KD-4: exact top-K + lumped-tail KD (TAU=1)
+                k = kd_topk_tail(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV), ex["topk_logZ"].to(DEV), pos_w=pos_w)
             else:
-                k = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV))
+                k = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV), pos_w=pos_w)
         else:
             with torch.no_grad():
                 tl = teacher(ex["input_ids"].to(DEV).unsqueeze(0)).logits[0]
@@ -378,7 +406,9 @@ def main() -> None:
         lr_t = lr_at(step)                                               # LR-1: warmup → decay
         for g in opt.param_groups:
             g["lr"] = lr_t
-        amp = torch.autocast("cuda", dtype=DT) if master_fp32 else contextlib.nullcontext()   # TBC-6: bf16 forward, fp32 master
+        # TBC-6 + NS-8.2: ALWAYS autocast on cuda — even a bf16-built (FP32_MASTER=0) model then gets fp32 cumsum/exp/carry in
+        # the chunked scan by autocast policy (a pure-bf16 scan diverged up to 17% rel-err). Non-cuda (mps/cpu fp32) = nullcontext.
+        amp = torch.autocast("cuda", dtype=DT) if DEV == "cuda" else contextlib.nullcontext()
         if BATCH_SIZE > 1:                                               # TBC-1: vmap-batched forward (≡ per-row, proven 0-err) + per-row loss
             if USE_SCHEDULER:
                 exs = [train[sched.sample(step)] for _ in range(BATCH_SIZE)]   # competence(step) correct; B draws
@@ -418,8 +448,10 @@ def main() -> None:
             opt.zero_grad(set_to_none=True)
         if step % 100 == 0:
             tps = 100 * RAFT.MAX_LEN / (time.time() - t0); t0 = time.time()
+            curr = (f" | q={sched.difficulty_quantile(step):.2f} pool={len(sched._candidates(step)) / sched.N:.2f}"
+                    if USE_SCHEDULER else "")    # CURR-5: is the easy→hard ramp actually firing or saturated? (deterministic, no rng touch)
             print(f"step {step:6d}/{STEPS} | lr={lr_t:.2e} KD={float(kd):.3f} CE={float(ce) if ce is not None else 0:.3f} "
-                  f"| gnorm={last_gnorm:.2f} | ~{tps:.0f} tok/s", flush=True)
+                  f"| gnorm={last_gnorm:.2f}{curr} | ~{tps:.0f} tok/s", flush=True)
         if step % CKPT_EVERY == 0:
             save_ckpt(student, opt, step, ckpt, sched)
         if step % EVAL_EVERY == 0:
@@ -459,6 +491,8 @@ def main() -> None:
         res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
                "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
                "teacher_E1_nll": t_e1, "decode_parity": dp, "best_score": best_score, "eval_on": eval_on}
+        if COUNTERFACTUAL:                                           # E4: reads-vs-memorizes diagnostic (default off; not a gate)
+            res["counterfactual"] = EVAL.eval_counterfactual(student, RAFT.make_counterfactual_condition(held_rows, tok), tok)
         res["claim"] = EVAL.claim_card(res)
     except Exception as e:
         import traceback
