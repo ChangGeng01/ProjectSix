@@ -4,13 +4,16 @@
 # The harness uses ONLY torch (the chunked scan is pure-torch) + transformers + datasets. mamba_ssm is NOT needed
 # (its kernel is for the Mamba-2 SSD, not our trapezoid). flash-attn is OPTIONAL (sdpa fallback is fine).
 set -euo pipefail
-python -m pip install -q --upgrade pip
+# RunPod images ship torch in a Debian-managed system python (PEP 668) → pip refuses without --break-system-packages.
+# The container is disposable, and torch already lives in that env, so we install transformers/datasets ALONGSIDE it there.
+PIP="python -m pip install -q --break-system-packages"
+$PIP --upgrade pip
 # datasets pinned >=3.6 so the Parquet-export HotpotQA loads (the old script-dataset path broke on 2.x); upper bound for safety.
-python -m pip install -q "transformers>=4.45" "datasets>=3.6,<5" accelerate sentencepiece safetensors
+$PIP "transformers>=4.45" "datasets>=3.6,<5" accelerate sentencepiece safetensors
 # flash-attn is OFF by default — no prebuilt wheel for Blackwell sm_120, and a kernel-less import would crash the teacher
 # forward at runtime (the harness default is sdpa, which is fine for the one-time teacher cache). Opt in with FLASH_ATTN=1.
 if [ "${FLASH_ATTN:-0}" = "1" ]; then
-  python -m pip install -q flash-attn --no-build-isolation && echo "flash-attn installed" || echo "flash-attn build failed — sdpa fallback (fine)"
+  $PIP flash-attn --no-build-isolation && echo "flash-attn installed" || echo "flash-attn build failed — sdpa fallback (fine)"
 fi
 python - <<'PY'
 import torch
