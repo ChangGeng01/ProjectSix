@@ -15,7 +15,7 @@ THIS run establishes — every on-device number above is random-weight op-graph 
 
 ## Pod
 
-- **GPU**: 1× **A100 80GB** (cheapest sufficient) or **H100 80GB** (faster). Single GPU — the ~600M student + frozen
+- **GPU**: 1× **RTX PRO 6000 (Blackwell Workstation, 96 GB GDDR7)** — RunPod 'RTX PRO 6000 WK'. Single GPU; 96 GB > A100/H100 80 GB = more headroom. The ~600M student + frozen
   3B teacher fit one card with room. No multi-GPU.
 - **Image**: a RunPod **PyTorch 2.x + CUDA 12.x** template.
 - **Volume**: a **persistent volume mounted at `/workspace`** (≥100 GB) — holds the HF model/data cache (`$HF_HOME`)
@@ -74,10 +74,11 @@ uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layer
 
 ## Cost (honest)
 
-- Narrow-reader PoC (~0.5–2 B tokens ≈ STEPS 5k–20k @ T=1024): **~$50–200** on A100 spot.
-- Stronger/broader (8B-teacher, more tokens): **~$150–600**.
-- The dominant cost is the frozen 3B teacher forward each step — a top-K teacher-cache (run teacher once, reuse across
-  epochs) is the next optimization if you do many epochs over a fixed set (not yet wired; on-the-fly KD is the default).
+- Narrow-reader PoC (STEPS 5k–20k @ T=1024 ≈ **~5–20 M token-forwards** at BATCH_SIZE=1; ×BATCH_SIZE×ACCUM for the
+  effective batch): **~$40–160** on an RTX PRO 6000 (~$0.8/hr on RunPod, cheaper than A100). (NOT "B"-scale — 20k × 1024 ≈ 20 M token-forwards.)
+- Stronger/broader (8B-teacher, more steps/rows): **~$150–600**.
+- The frozen-teacher forward is the dominant cost, and it is AMORTIZED by the top-K teacher CACHE (CACHE=1, the default):
+  the teacher runs ONCE in build_cache, then training does KD from the cached top-K with NO teacher forward in the loop.
 
 ## 云前 pre-launch runbook (P0-first discipline — addendum 41)
 
@@ -91,7 +92,7 @@ rm -rf /workspace/ckpt-p0                 # FRESH dir (the fingerprint guard cat
 ARCH=hybrid LAYERS=24 STEPS=2000 N_ROWS=3000 EVAL_EVERY=250 CKPT_EVERY=250 \
   CKPT_DIR=/workspace/ckpt-p0 USE_SCHEDULER=1 bash scripts/runpod_distill.sh
 ```
-(N_ROWS=3000 < the ~7405 HotpotQA-val cap, so no silent truncation. ~30 min / ~$1-2 spot on an A100.)
+(N_ROWS=3000 < the ~7405 HotpotQA-val cap, so no silent truncation. ~30 min / ~$0.5-1 on an RTX PRO 6000.)
 
 **Watch 3 signals in the EVAL lines (every 250 steps):** (a) `KD=` falling toward <1; (b) `E1:/E2: nll=` both
 falling = the reader is learning; (c) `slope Δ(E2-E1)=` trending toward <0.05 = distractor-robustness emerging.

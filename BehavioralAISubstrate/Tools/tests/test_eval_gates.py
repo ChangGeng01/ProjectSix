@@ -69,7 +69,7 @@ def test_claim_card_exactly_eight_gate_keys():
     card = EV.claim_card(_passing_res())
     assert set(card["gates"].keys()) == {
         "task_fit", "raft_e2_robust", "context_use", "fidelity_argmax",
-        "generation", "stability", "device_parity", "no_contamination",
+        "generation", "stability", "fp16_seq_parity", "no_contamination",
     }
 
 
@@ -194,42 +194,42 @@ def test_task_fit_passes_when_student_beats_teacher():
     assert EV.claim_card(res)["gates"]["task_fit"] is True
 
 
-# =========================================================================== (D) device_parity
-def test_device_parity_none_is_false_no_typeerror():
+# =========================================================================== (D) fp16_seq_parity
+def test_fp16_seq_parity_none_is_false_no_typeerror():
     res = _passing_res()
     res["decode_parity"] = {"argmax_agreement": None}        # no run_ref produced a number
-    assert EV.claim_card(res)["gates"]["device_parity"] is False
+    assert EV.claim_card(res)["gates"]["fp16_seq_parity"] is False
 
 
-def test_device_parity_missing_block_is_false():
+def test_fp16_seq_parity_missing_block_is_false():
     res = _passing_res()
     res.pop("decode_parity")
-    assert EV.claim_card(res)["gates"]["device_parity"] is False
+    assert EV.claim_card(res)["gates"]["fp16_seq_parity"] is False
 
 
-def test_device_parity_high_agreement_passes():
+def test_fp16_seq_parity_high_agreement_passes():
     res = _passing_res()
     res["decode_parity"] = {"argmax_agreement": 0.995}
-    assert EV.claim_card(res)["gates"]["device_parity"] is True
+    assert EV.claim_card(res)["gates"]["fp16_seq_parity"] is True
 
 
-def test_device_parity_below_bar_fails():
+def test_fp16_seq_parity_below_bar_fails():
     res = _passing_res()
     res["decode_parity"] = {"argmax_agreement": 0.989}
-    assert EV.claim_card(res)["gates"]["device_parity"] is False
+    assert EV.claim_card(res)["gates"]["fp16_seq_parity"] is False
 
 
-def test_device_parity_exactly_at_bar_passes():
+def test_fp16_seq_parity_exactly_at_bar_passes():
     res = _passing_res()
     res["decode_parity"] = {"argmax_agreement": EV.PARITY_BAR}
-    assert EV.claim_card(res)["gates"]["device_parity"] is True
+    assert EV.claim_card(res)["gates"]["fp16_seq_parity"] is True
 
 
-def test_device_parity_nan_is_false():
+def test_fp16_seq_parity_nan_is_false():
     """NaN must not slip through the comparison (NaN >= bar is False → fail-closed)."""
     res = _passing_res()
     res["decode_parity"] = {"argmax_agreement": float("nan")}
-    assert EV.claim_card(res)["gates"]["device_parity"] is False
+    assert EV.claim_card(res)["gates"]["fp16_seq_parity"] is False
 
 
 # =========================================================================== (E) stability

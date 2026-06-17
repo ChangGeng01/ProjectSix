@@ -16,6 +16,7 @@ That is why the MLA latent-cache quant floor is tested on its own (test_p0_12_ml
 from __future__ import annotations
 
 import math
+import os
 
 import torch
 import torch.nn as nn
@@ -26,6 +27,35 @@ from mamba3_trainable import D_FF, D_MODEL, rms
 H_ATTN = 16
 D_HEAD = D_MODEL // H_ATTN                                  # 64; H_ATTN*D_HEAD = 1024
 D_LATENT = 128                                             # cached per token; full KV = 2*H*D_HEAD = 2048 -> ~16x cut
+ROPE_THETA = 10000.0
+
+
+def _use_rope() -> bool:
+    """ARCH-3: opt-in RoPE on MLA q/k (env MLA_ROPE=1). Default OFF = the audited NoPE (deploy + 349 tests unchanged).
+    Read at call time (like LEAN_MLP) so it's togglable in tests. NOTE: enabling it for a SHIPPED ckpt also requires the
+    matching RoPE in mamba3_hybrid_decode_deploy.mla_step_fixed — gated for an on-device A/B once it wins a cloud quality A/B."""
+    return os.environ.get("MLA_ROPE") == "1"
+
+
+def _rope_cos_sin(positions, dh: int, device, dtype):
+    """Standard rotate-half RoPE tables for absolute `positions` [N] → (cos, sin) [N, dh]. Computed in fp32 for stability."""
+    half = dh // 2
+    inv_freq = 1.0 / (ROPE_THETA ** (torch.arange(0, half, device=device, dtype=torch.float32) / half))
+    ang = positions.to(torch.float32).unsqueeze(-1) * inv_freq.unsqueeze(0)       # [N, half]
+    cos = torch.cat([ang.cos(), ang.cos()], -1).to(dtype)                         # [N, dh]
+    sin = torch.cat([ang.sin(), ang.sin()], -1).to(dtype)
+    return cos, sin
+
+
+def _rotate_half(x):
+    half = x.shape[-1] // 2
+    return torch.cat([-x[..., half:], x[..., :half]], -1)
+
+
+def _apply_rope(x, cos, sin):
+    """x [N, h, dh], cos/sin [N, dh] → rotate per position, broadcast over heads. Position-dependent at COMPUTE time, so
+    the cached LATENT stays position-independent (MLA's compression is preserved)."""
+    return x * cos.unsqueeze(1) + _rotate_half(x) * sin.unsqueeze(1)
 
 
 class MLABlock(nn.Module):
@@ -62,6 +92,10 @@ class MLABlock(nn.Module):
         Tp = S - Ts
         k = self.k_up(c_kv).view(S, self.h, self.dh)
         v = self.v_up(c_kv).view(S, self.h, self.dh)
+        if _use_rope():                                                   # ARCH-3: rotate q by global pos, k by slot pos (cache stays raw latent)
+            qc, qs = _rope_cos_sin(Tp + torch.arange(Ts, device=x_seq.device), self.dh, x_seq.device, q.dtype)
+            kc, ks = _rope_cos_sin(torch.arange(S, device=x_seq.device), self.dh, x_seq.device, k.dtype)
+            q, k = _apply_rope(q, qc, qs), _apply_rope(k, kc, ks)
         scores = torch.einsum("thd,shd->hts", q, k) * self.scale          # [h,Ts,S]
         keypos = torch.arange(S, device=x_seq.device).view(1, S)
         qpos = (Tp + torch.arange(Ts, device=x_seq.device)).view(Ts, 1)   # suffix query j is global position Tp+j
@@ -79,6 +113,11 @@ class MLABlock(nn.Module):
         c_kv = c_t if cache is None else torch.cat([cache, c_t], 0)       # [S+1,dc]
         k = self.k_up(c_kv).view(-1, self.h, self.dh)
         v = self.v_up(c_kv).view(-1, self.h, self.dh)
+        if _use_rope():                                                   # ARCH-3: q at the new token's pos, k at slot positions (≡ forward_seq)
+            pos_q = 0 if cache is None else cache.shape[0]
+            qc, qs = _rope_cos_sin(torch.tensor([pos_q], device=x_t.device), self.dh, x_t.device, q.dtype)
+            kc, ks = _rope_cos_sin(torch.arange(c_kv.shape[0], device=x_t.device), self.dh, x_t.device, k.dtype)
+            q, k = _apply_rope(q, qc, qs), _apply_rope(k, kc, ks)
         scores = torch.einsum("thd,shd->hts", q, k) * self.scale          # [h,1,S+1] — decode attends ALL (causal auto)
         a = scores.softmax(-1)
         o = torch.einsum("hts,shd->thd", a, v).reshape(1, self.h * self.dh)

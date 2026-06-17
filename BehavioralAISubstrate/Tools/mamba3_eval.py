@@ -31,7 +31,8 @@ RAFT.DEV = DEV
 TASK_FIT_ABS = float(os.environ.get("TASK_FIT_ABS", "2.10"))         # absolute held-answer-NLL bar
 TEACHER_GAP = float(os.environ.get("TEACHER_GAP", "0.15"))          # student E1 NLL within this many nats of the MEASURED teacher
 CONTEXT_USE_MARGIN = float(os.environ.get("CONTEXT_USE_MARGIN", "0.20"))  # E3(no-gold) must be >= this much WORSE than E1 (anti-parrot)
-PARITY_BAR = float(os.environ.get("PARITY_BAR", "0.99"))            # device fp16 sequential-decode vs parallel argmax-agreement
+PARITY_BAR = float(os.environ.get("PARITY_BAR", "0.99"))            # PyTorch fp16 SEQUENTIAL(run_ref) vs PARALLEL(run_twin) argmax-agreement
+#   NOTE: this is a HOST PyTorch-fp16 parity (run_twin≡run_ref), NOT real A19/CoreAI int8 parity — that is the device phase (quant_fidelity_stub).
 
 
 # ---------------------------------------------------------------- 1) perplexity
@@ -180,9 +181,12 @@ def compute_ece(student, examples, bins: int = 10) -> dict:
     return {"ece": ece}
 
 
-# ---------------------------------------------------------------- 6) quant fidelity (STUB until device phase)
+# ---------------------------------------------------------------- 6) quant fidelity (STUB until device phase — NOT gated)
 def quant_fidelity_stub() -> dict:
-    return {"status": "STUB", "note": "fp16→int8→int4 metric deltas — wired at the Track-G device phase (int8 floor proven add.20-22)"}
+    # HONEST: no real int8/CoreAI quality is measured here, and it is NOT a claim_card gate. The fp16_seq_parity gate is a
+    # HOST PyTorch-fp16 check, NOT on-device parity. Real int8/CoreAI fidelity (and A19 argmax parity) is the device phase.
+    return {"status": "STUB", "gated": False,
+            "note": "fp16→int8→int4 + A19/CoreAI metric deltas — measured at the Track-G device phase (int8 floor proven add.20-22)"}
 
 
 # ---------------------------------------------------------------- 7) contamination guard
@@ -220,9 +224,10 @@ def claim_card(res: dict) -> dict:
         "generation": gen.get("EM", 0) >= 0.50 and gen.get("F1", 0) >= 0.60,
         # finite logits AND the E1/E2/E3 slopes were computed over an identical surviving subset.
         "stability": raft.get("skip_pct", 1) <= 0.05 and bool(raft.get("subset_ok", False)),
-        # DEVICE TRUTH: the sequential fp16 decode path (what the A19 runs) matches the parallel eval graph.
+        # HOST fp16 parity: the SEQUENTIAL decode (run_ref, what the device graph mirrors) matches the PARALLEL eval (run_twin),
+        # in PyTorch fp16. This is NOT on-device CoreAI/int8 parity (that is the device phase — quant_fidelity_stub, not yet gated).
         # (None when the model has no run_ref → coerce to 0 = fail-closed; NaN stays False under the comparison.)
-        "device_parity": (parity.get("argmax_agreement") or 0) >= PARITY_BAR,
+        "fp16_seq_parity": (parity.get("argmax_agreement") or 0) >= PARITY_BAR,
         "no_contamination": res.get("contamination_ok", False),
     }
     passed = all(gates.values())
@@ -268,7 +273,7 @@ def _smoke() -> None:
               and 0 <= gen["EM"] <= 1 and 0 <= gen["F1"] <= 1 and math.isfinite(ece["ece"]))
     fid_guard = fid_none is None and fid is not None and 0 <= fid["argmax_agreement"] <= 1
     expect_gates = {"task_fit", "raft_e2_robust", "context_use", "fidelity_argmax",
-                    "generation", "stability", "device_parity", "no_contamination"}
+                    "generation", "stability", "fp16_seq_parity", "no_contamination"}
     gates_ok = set(card["gates"]) == expect_gates                    # the 8 gates wire (no dropped/renamed gate)
     subset_ok = "subset_ok" in raft
     contam_raises = False
@@ -286,6 +291,61 @@ def _smoke() -> None:
     print(f"  -> {'EVAL_SMOKE PASS' if ok else 'EVAL_SMOKE FAIL'} (every battery RUNS, the 8 gates wire; thresholds NOT asserted on random weights)")
 
 
+def _run_ckpt_eval() -> None:
+    """OFFLINE re-eval entry: EVAL_CKPT=/path/ckpt.pt re-runs the full serious battery + claim_card on a trained checkpoint
+    and writes eval_card_offline.json. Loads the real Granite teacher + a held set (HELD_SPLIT, default validation). Mirrors
+    the in-training final eval so a checkpoint can be re-graded standalone (the missing offline 复评 entry)."""
+    import json as _json
+    from datasets import load_dataset
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    import mamba3_trainable as MT
+    import mamba3_hybrid as HY
+
+    ckpt_path = os.environ["EVAL_CKPT"]
+    teacher_id = os.environ.get("TEACHER", "ibm-granite/granite-4.1-3b-base")
+    held_split = os.environ.get("HELD_SPLIT", "validation")
+    held_n = int(os.environ.get("HELD_N", "300"))
+    ck = torch.load(ckpt_path, map_location=DEV)
+    arch, vocab, layers = ck.get("arch", "mamba"), ck.get("vocab"), ck.get("layers")
+    assert vocab and layers, f"{ckpt_path} missing vocab/layers meta — not a distill checkpoint"
+    student = (HY.HybridM(vocab, layers) if arch == "hybrid" else MT.M(vocab, layers)).to(DEV)
+    miss, unexp = student.load_state_dict(ck["model"], strict=False)
+    assert not unexp and not [m for m in miss if not m.endswith("_all")], f"ckpt/model mismatch: missing={miss[:3]} unexpected={unexp[:3]}"
+    student.eval()
+    if os.environ.get("MLA_ROPE") is None and ck.get("mla_rope"):       # eval with the SAME RoPE setting the ckpt trained with
+        os.environ["MLA_ROPE"] = "1"
+    tok = AutoTokenizer.from_pretrained(teacher_id)
+    teacher = AutoModelForCausalLM.from_pretrained(
+        teacher_id, dtype=(torch.bfloat16 if DEV == "cuda" else torch.float32)).to(DEV).eval()
+    rows = [RAFT.build_example(r) for r in load_dataset("hotpotqa/hotpot_qa", "distractor",
+            split=f"{held_split}[:{held_n}]", revision=os.environ.get("HOTPOT_REVISION") or None)]
+    E = {m: RAFT.make_eval_condition(rows, m, tok) for m in ("E1", "E2", "E3")}
+    common = set.intersection(*[{x["id"] for x in E[m]} for m in E])
+    E = {m: [x for x in E[m] if x["id"] in common] for m in E}
+    eos = getattr(tok, "eos_token_id", None)
+    res = {"perplexity": compute_perplexity(student, [], E["E1"]),
+           "raft": eval_raft_robustness(student, E),
+           "teacher_E1_nll": teacher_answer_nll(teacher, E["E1"]),
+           "fidelity": compute_fidelity(student, teacher, E["E1"][:64]),
+           "generation": generate_and_score(student, E["E1"][:64], tok, maxlen=24, eos=eos),
+           "quant": quant_fidelity_stub(), "contamination_ok": True, "eval_on": ckpt_path}
+    try:                                                                # HOST fp16 seq-parity (reuse the cloud helper; lazy import avoids a cycle)
+        from mamba3_cloud_distill import decode_parity
+        res["decode_parity"] = decode_parity(student, E["E1"])
+    except Exception as e:
+        res["decode_parity"] = {"argmax_agreement": None, "note": f"parity skipped: {e!r}"}
+    res["claim"] = claim_card(res)
+    out = os.environ.get("EVAL_OUT") or os.path.join(os.path.dirname(ckpt_path) or ".", "eval_card_offline.json")
+    with open(out, "w") as f:
+        _json.dump(res, f, indent=2, default=lambda o: None)
+    raft = res["raft"]
+    print(f"OFFLINE EVAL CARD → {res['claim']['status']}  failed={res['claim']['failed_gates']}  "
+          f"(E1 nll={raft['E1']['nll']:.3f}, teacher_E1={res['teacher_E1_nll']:.3f}, "
+          f"slope(E3-E1)={raft['slope_e3_e1']:+.3f}, EM={res['generation']['EM']:.2f})  → {out}", flush=True)
+
+
 if __name__ == "__main__":
-    if os.environ.get("EVAL_SMOKE") == "1" or os.environ.get("EVAL_CKPT") is None:
+    if os.environ.get("EVAL_CKPT") and os.environ.get("EVAL_SMOKE") != "1":
+        _run_ckpt_eval()
+    else:
         _smoke()

@@ -2078,3 +2078,58 @@ Verification: full suite **362 passed** (349 + 13 new test_optim_recipe pinning 
 score reader>parrot, kd_topk uniform≡legacy + answer-weight grad-flow + shape-assert, fp32-CE value-match) + a real-Granite
 micro-test of the new recipe (clean run, cosine LR decaying, no-decay split, context-use selection). All optimizations are
 env-tunable; KD_ANSWER_W>1 and any deferred lever can be A/B'd on the cloud once P0 shows the base signal.
+
+## Track G — Addendum 46: 全面优化 (要最重) — the 3 deferred big levers, each flag-gated + parity-PROVEN
+
+Operator selected ALL THREE deferred levers from add.45. Implemented each behind a flag whose DEFAULT preserves the
+362-test-locked behavior, each with a correctness/parity gate (correctness validated locally; throughput/quality A/B'd on cloud):
+
+- **CS-6 — data pool (env TRAIN_SPLIT/HELD_SPLIT/HELD_N).** N_ROWS=20000 from `validation` silently capped at ~7405 → the
+  20k-step run saw ~3 epochs of REPEATS. Now trains from the HotpotQA `train` split (~90k unique) with held from a DISTINCT
+  split (`validation`) → disjoint by construction. Legacy same-split sha1-bucket path retained (TRAIN_SPLIT==HELD_SPLIT) for
+  offline/local. VALIDATED: train[:9000]→9000 unique (vs val's ~7405 cap), train/val ids disjoint (contamination_ok).
+- **ARCH-3 — MLA RoPE (env MLA_ROPE, default OFF = audited NoPE).** The 4 MLA layers were NoPE. Added standard rotate-half
+  RoPE applied at COMPUTE time from position indices, so the cached LATENT stays position-independent (MLA's 16× compression
+  preserved). PROVEN: step≡forward_seq at 3e-15 with RoPE both ON and OFF; in the hybrid, RoPE adds NO extra train≡decode
+  drift (4.53e-7 with vs 4.41e-7 without — the pre-existing Mamba chunked-scan band, <1e-6). NOTE: shipping an MLA_ROPE ckpt
+  to device needs the matching RoPE in mamba3_hybrid_decode_deploy.mla_step_fixed — gated for AFTER it wins a cloud quality A/B.
+- **TBC-1 — batched forward (env BATCH_SIZE, default 1 = the single-[T] 349-test path). HONEST OUTCOME: correct but NOT the
+  production throughput win.** Batched via `torch.vmap` over the EXISTING per-row run_twin — PROVABLY equivalent (max-err
+  0.00e+00 on CPU fp64, 5.5e-6 mps fp32), right-pad causal-safe (0.00e+00), vmap+backward trains all params. BUT a real-Granite
+  run at T=1024 with BATCH_SIZE=4 **OOM'd at 87 GiB**: vmap materializes the O(C²) chunked scan × batch, which is
+  memory-prohibitive at long T even on an 80 GB GPU (NOT an mps artifact). So vmap-batching is viable ONLY at small T;
+  **default stays BATCH_SIZE=1 and a loud warning fires for BATCH_SIZE>1**. TRUE throughput batching still requires the
+  deferred memory-efficient batched-scan rewrite — vmap is not it. The correctness machinery + parity tests remain useful for
+  a future short-context path.
+
+New parity suite test_big_levers.py (9 tests): vmap-batched≡per-row + backward-trains-all + right-pad-causal-safe +
+batched-loss≡single; MLA step≡forward_seq (rope on/off) + rope-off-is-NoPE + rope-actually-rotates + hybrid-rope-no-extra-drift.
+Verification: full suite (371 + big-lever tests) green + real-Granite micro-tests — CS-6 (train=160 unique / held=40 disjoint)
+and the optimizer split confirmed on the real path; TBC-1 BATCH_SIZE>1 surfaced the T=1024 OOM (above). NET of add.46:
+**CS-6 (data pool) and ARCH-3 (MLA RoPE, off-by-default) land as usable env-gated levers; TBC-1 lands as a proven-correct but
+memory-bound experiment with batching DEFERRED.** Defaults keep the launch config exactly the audited+tested recipe.
+
+## Track G — Addendum 47: 复评 audit — 5 operator corrections + RTX PRO 6000 96GB retarget (不要亏)
+
+The final run is on a single **RTX PRO 6000 (Blackwell Workstation, 96 GB GDDR7)** — retargeted all GPU refs (docs, runpod_setup.sh
+assert, the VRAM assert message, the OOM warning) from the stale A100/H100-80GB. 96 GB > 80 GB = MORE headroom (the ~600M student
++ frozen 3B teacher fit with room), but the TBC-1 vmap OOM (87 GiB at B=4/T=1024) still has NO margin even on 96 GB → batching stays
+deferred. Five honesty/feature corrections:
+
+1. **Doc token budget fixed.** RUNPOD_DISTILL.md said "~0.5–2 B tokens" — wrong by ~100×. Corrected to **~5–20 M token-forwards**
+   (20k × 1024 ≈ 20 M; ×BATCH_SIZE×ACCUM for the effective batch), and re-priced for the RTX PRO 6000 (~$0.8/hr RunPod).
+2. **Standalone EVAL_CKPT implemented.** mamba3_eval.py only had the smoke branch; EVAL_CKPT was a no-op. Added `_run_ckpt_eval()`:
+   loads the trained ckpt (arch/vocab/layers from meta, fail-on-mismatch) + the real teacher + a held set (HELD_SPLIT), runs the
+   FULL battery + claim_card + host fp16 seq-parity, writes eval_card_offline.json. The missing offline 复评 entry now exists.
+3. **device_parity gate renamed → `fp16_seq_parity` (honest).** It measures HOST PyTorch fp16 run_twin≡run_ref, NOT A19/CoreAI
+   int8 parity. Renamed the gate + the labels everywhere; quant_fidelity_stub now carries `gated:False` + an explicit "no real
+   int8/CoreAI quality measured here" note. Real device/int8 fidelity remains the (honest) device phase.
+4. **MLA_ROPE deploy footgun closed (fail-closed).** save_ckpt now records `mla_rope`; `resolve_ckpt` ASSERTS `mla_rope==0` (the
+   converter is still NoPE) → a RoPE-trained ckpt CANNOT silently deploy with mismatched semantics; plus a loud train-time WARNING.
+   P0 must keep MLA_ROPE unset; MLA_ROPE=1 is for a cloud quality A/B only.
+5. **E3 no-gold answer-CE tension addressed.** No-gold examples still trained " answer" (teaching "answer without evidence").
+   Examples are now tagged `keep_gold`; `RAFT_NOGOLD_CE=0` (opt-in) drops the answer-CE on no-gold (KD-only) so the objective stops
+   reinforcing parametric answering — complementing the eval-side context_use gate. Default 1 = current RAFT behavior.
+
+Verification: full suite (373) green; new tests lock the mla_rope deploy fail-closed + the keep_gold tag + the renamed gate. The P0
+launch config is UNCHANGED (all new behavior is default-off or honesty-only): BATCH_SIZE=1, MLA_ROPE unset, RAFT_NOGOLD_CE=1.

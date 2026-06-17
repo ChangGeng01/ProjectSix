@@ -15,7 +15,7 @@ NOTE on mamba_ssm: its selective-scan CUDA kernel is for the Mamba-2 SSD, NOT ou
 rotated delay + RoPE + MIMO), so it is NOT a drop-in. The pure-torch chunked scan (mamba3_trainable) runs correctly +
 fast on CUDA (optionally torch.compile-fused, COMPILE=1). A custom trapezoid Triton kernel is a future lever.
 
-RunPod: bash scripts/runpod_setup.sh && bash scripts/runpod_distill.sh   (1× A100/H100 80GB).
+RunPod: bash scripts/runpod_setup.sh && bash scripts/runpod_distill.sh   (1× RTX PRO 6000 96GB / Blackwell 'WK').
 """
 from __future__ import annotations
 
@@ -70,6 +70,12 @@ LR_MIN_FRAC = float(os.environ.get("LR_MIN_FRAC", "0.07"))             # LR-1: d
 KD_ANSWER_W = float(os.environ.get("KD_ANSWER_W", "1.0"))             # KD-1: >1 up-weights KD on the answer span (1.0 = uniform = legacy)
 FP32_MASTER = os.environ.get("FP32_MASTER", "1") == "1"               # TBC-6: fp32 master weights + autocast-bf16 forward on cuda
 CTX_W = float(os.environ.get("CTX_W", "0.5"))                         # BCS-1: best-ckpt reward for context-use (positive E3-E1 slope = reading)
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "1"))                  # TBC-1: vmap-batched forward (1 = single-[T], the 349-test path). >1 OOMs at T=1024 even on 96GB (see warning) — keep 1
+TRAIN_SPLIT = os.environ.get("TRAIN_SPLIT", "train")                 # CS-6: HotpotQA train (~90k unique); validation[:N] caps at ~7405 (3x repeats over 20k steps)
+HELD_SPLIT = os.environ.get("HELD_SPLIT", "validation")             # held from a DIFFERENT split → disjoint by construction
+HELD_N = int(os.environ.get("HELD_N", "300"))
+RAFT_NOGOLD_CE = os.environ.get("RAFT_NOGOLD_CE", "1") == "1"        # train answer-CE on NO-GOLD examples? RAFT default 1; set 0 = KD-only on
+#   no-gold (stops the objective teaching "answer without evidence" — the E3 tension; complements the eval-side context_use gate)
 
 
 def lr_at(step: int) -> float:
@@ -181,15 +187,16 @@ def save_ckpt(student, opt, step, path, sched=None):
                 "layers": LAYERS, "config": (MT.D_MODEL, MT.H, MT.P, MT.N, MT.R),
                 "arch": arch, "vocab": student.embedding.weight.shape[0],
                 "mla_positions": sorted(student.mla_pos) if arch == "hybrid" else None,
+                "mla_rope": os.environ.get("MLA_ROPE") == "1",          # ARCH-3: tag so the (NoPE) deploy converter fails-closed on a RoPE ckpt
                 "sched": sched.state_dict() if sched is not None else None}, tmp)   # resume the curriculum RNG deterministically
     os.replace(tmp, path)                                               # atomic — survives a mid-write preemption
 
 
 @torch.no_grad()
 def decode_parity(student, examples, max_ex=None):
-    """DEVICE-TRUTH gate: the A19 runs the SEQUENTIAL fp16 decode (run_ref/step_ref); the eval card is computed on the
-    PARALLEL run_twin in bf16. Cast a fp16 copy and compare argmax over the ANSWER SPAN on the trained ckpt — bounds the
-    parallel-vs-sequential + dtype gap the eval would otherwise hide. Skips gracefully if the model has no run_ref."""
+    """HOST fp16 parity (NOT on-device CoreAI parity): the device graph mirrors the SEQUENTIAL decode (run_ref/step_ref);
+    the eval card is computed on the PARALLEL run_twin. Cast a fp16 copy and compare argmax over the ANSWER SPAN on the
+    trained ckpt — bounds the parallel-vs-sequential + bf16/fp16 gap. Real A19/CoreAI int8 parity is the device phase."""
     import copy
     n = int(os.environ.get("DECODE_PARITY_N", "8")) if max_ex is None else max_ex
     if not hasattr(student, "run_ref"):
@@ -219,7 +226,7 @@ def main() -> None:
     os.makedirs(CKPT_DIR, exist_ok=True)
     if DEV == "cuda":                                                 # OOM mid-run = wasted spend; fail fast on a too-small pod
         gb = torch.cuda.get_device_properties(0).total_memory / 1e9
-        assert gb >= 40, f"GPU {gb:.0f}GB < 40GB needed (teacher-3B + 24L student + AdamW + top-K cache); use A100/H100 80GB"
+        assert gb >= 40, f"GPU {gb:.0f}GB < 40GB needed (teacher-3B + 24L student + AdamW + top-K cache); target: RTX PRO 6000 96GB"
         print(f"GPU VRAM {gb:.0f}GB OK", flush=True)
     print(f"cloud-distill | dev={DEV} dt={DT} | teacher={TEACHER} | student L{LAYERS}/D{MT.D_MODEL} "
           f"(>8L = CoreAI GPU-backed; <=8L pure-ANE) | steps={STEPS} accum={ACCUM} lr={LR} KD_W={KD_W} CE_W={CE_W} "
@@ -239,16 +246,22 @@ def main() -> None:
     for p in teacher.parameters():
         p.requires_grad_(False)
 
-    rows = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"validation[:{N_ROWS}]",
-                        revision=os.environ.get("HOTPOT_REVISION") or None)   # pin a commit SHA → fully reproducible source
-    print(f"data rows: requested N_ROWS={N_ROWS}, got {len(rows)}", flush=True)   # HotpotQA val ~7405 → larger N_ROWS silently caps
-    ex_all = [build_example(r) for r in rows]
+    def _load(split, n):
+        rs = load_dataset("hotpotqa/hotpot_qa", "distractor", split=f"{split}[:{n}]",
+                          revision=os.environ.get("HOTPOT_REVISION") or None)   # pin a commit SHA → fully reproducible source
+        return [build_example(r) for r in rs]
     def bucket(i):
         return int(hashlib.sha1(i.encode()).hexdigest(), 16) % 10
-    held_rows = [e for e in ex_all if bucket(e["id"]) < 1][:200]          # ~10% held, capped
-    train_rows = [e for e in ex_all if bucket(e["id"]) >= 1]
+    if TRAIN_SPLIT == HELD_SPLIT:                                        # same source → disjoint by sha1 bucket (legacy; offline-cached val)
+        ex_all = _load(TRAIN_SPLIT, N_ROWS)
+        held_rows = [e for e in ex_all if bucket(e["id"]) < 1][:HELD_N]
+        train_rows = [e for e in ex_all if bucket(e["id"]) >= 1]
+    else:                                                               # CS-6: distinct splits → ~N_ROWS UNIQUE train + a disjoint held set
+        train_rows = _load(TRAIN_SPLIT, N_ROWS)
+        held_rows = _load(HELD_SPLIT, HELD_N)
+    print(f"data rows: train={TRAIN_SPLIT}[:{N_ROWS}]→{len(train_rows)} unique | held={HELD_SPLIT}→{len(held_rows)}", flush=True)
     contamination_ok = {e["id"] for e in train_rows}.isdisjoint({e["id"] for e in held_rows})  # VERIFY the real split
-    assert contamination_ok, "train/held id OVERLAP — split is contaminated"   # bucket split is disjoint by construction
+    assert contamination_ok, "train/held id OVERLAP — split is contaminated"
     train = make_examples(train_rows, RAFT.P_GOLDEN, RAFT.K_DISTRACT, tok, seed=0)
 
     # FROZEN eval set: build once, persist atomically, RELOAD on resume so E1/E2/E3 are byte-identical across the
@@ -297,7 +310,17 @@ def main() -> None:
     opt = torch.optim.AdamW([{"params": decay_p, "weight_decay": 0.1},
                              {"params": no_decay_p, "weight_decay": 0.0}], lr=LR, betas=(0.9, 0.95))
     print(f"optimizer: AdamW decay={sum(p.numel() for p in decay_p)/1e6:.0f}M / no-decay={sum(p.numel() for p in no_decay_p)/1e3:.0f}K params | "
-          f"LR={LR} DECAY={DECAY}→{LR_MIN_FRAC:.2f} WARMUP={WARMUP} | KD_ANSWER_W={KD_ANSWER_W} CTX_W={CTX_W}", flush=True)
+          f"LR={LR} DECAY={DECAY}→{LR_MIN_FRAC:.2f} WARMUP={WARMUP} | KD_ANSWER_W={KD_ANSWER_W} CTX_W={CTX_W} | "
+          f"BATCH_SIZE={BATCH_SIZE} TRAIN_SPLIT={TRAIN_SPLIT} NOGOLD_CE={int(RAFT_NOGOLD_CE)} MLA_ROPE={int(os.environ.get('MLA_ROPE') == '1')}", flush=True)
+    if os.environ.get("MLA_ROPE") == "1":                            # ARCH-3 footgun guard: the deploy converter is still NoPE
+        print("!! WARNING MLA_ROPE=1: training WITH MLA RoPE, but the device converter (mamba3_hybrid_decode_deploy) is still "
+              "NoPE — this ckpt will FAIL-CLOSED at deploy (resolve_ckpt asserts mla_rope==0). Use ONLY for a cloud quality "
+              "A/B, NOT for a ckpt you intend to ship to the A19 yet.", flush=True)
+    if BATCH_SIZE > 1:                                               # TBC-1 honest limit: vmap materializes the chunked scan × batch
+        print(f"!! WARNING BATCH_SIZE={BATCH_SIZE}: the vmap-batched forward is PROVEN-equivalent to per-row but materializes the "
+              f"O(C^2) chunked scan × batch — it OOMs at long T (~87 GiB at B=4/T={RAFT.MAX_LEN}, no margin even on the 96 GB RTX PRO 6000). Viable ONLY at "
+              f"SMALL T; for production T={RAFT.MAX_LEN} keep BATCH_SIZE=1. Real throughput batching needs the memory-efficient "
+              f"batched-scan rewrite (still deferred — vmap is NOT it).", flush=True)
     start = 1
     if RESUME and os.path.exists(ckpt):
         st = torch.load(ckpt, map_location=DEV)
@@ -333,6 +356,21 @@ def main() -> None:
         else:
             print("WARNING: resuming but no best_meta.json — best_score reset to -inf (a worse ckpt_best could be saved)", flush=True)
 
+    def kd_ce(sl, ex):                                                   # per-example KD + masked CE (shared by single + batched paths)
+        if CACHE:                                                        # no teacher forward — cached top-K KD
+            if KD_ANSWER_W != 1.0:                                       # KD-1: up-weight KD on the answer span
+                ans = (torch.arange(sl.shape[0], device=DEV) >= (ex["prompt_len"] - 1)).float()
+                k = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV), pos_w=1.0 + (KD_ANSWER_W - 1.0) * ans)
+            else:
+                k = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV))
+        else:
+            with torch.no_grad():
+                tl = teacher(ex["input_ids"].to(DEV).unsqueeze(0)).logits[0]
+            k = kd_kl(sl, tl)
+        # RAFT_NOGOLD_CE=0 → no answer-CE on no-gold examples (don't teach "answer without evidence"); KD still applies.
+        ce = None if (not RAFT_NOGOLD_CE and not ex.get("keep_gold", True)) else masked_ce(sl, ex["input_ids"].to(DEV), ex["prompt_len"])
+        return k, ce                                                     # fp32 CE (NS-2)
+
     t0 = time.time()
     opt.zero_grad(set_to_none=True)
     nonfinite, last_gnorm = 0, 0.0
@@ -340,21 +378,29 @@ def main() -> None:
         lr_t = lr_at(step)                                               # LR-1: warmup → decay
         for g in opt.param_groups:
             g["lr"] = lr_t
-        ex = train[sched.sample(step) if USE_SCHEDULER else (step - 1) % len(train)]
-        ids = ex["input_ids"].to(DEV)
-        with (torch.autocast("cuda", dtype=DT) if master_fp32 else contextlib.nullcontext()):   # TBC-6: bf16 forward, fp32 master
-            sl = student.run_twin(ids, collect_ssm=False)[0]
-        if CACHE:                                                        # no teacher forward — cached top-K KD
-            if KD_ANSWER_W != 1.0:                                       # KD-1: up-weight KD on the answer span
-                ans = (torch.arange(sl.shape[0], device=DEV) >= (ex["prompt_len"] - 1)).float()
-                kd = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV), pos_w=1.0 + (KD_ANSWER_W - 1.0) * ans)
+        amp = torch.autocast("cuda", dtype=DT) if master_fp32 else contextlib.nullcontext()   # TBC-6: bf16 forward, fp32 master
+        if BATCH_SIZE > 1:                                               # TBC-1: vmap-batched forward (≡ per-row, proven 0-err) + per-row loss
+            if USE_SCHEDULER:
+                exs = [train[sched.sample(step)] for _ in range(BATCH_SIZE)]   # competence(step) correct; B draws
             else:
-                kd = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV))
+                exs = [train[((step - 1) * BATCH_SIZE + i) % len(train)] for i in range(BATCH_SIZE)]
+            maxT = max(e["input_ids"].shape[0] for e in exs)
+            ids_b = torch.stack([F.pad(e["input_ids"], (0, maxT - e["input_ids"].shape[0])) for e in exs]).to(DEV)  # right-pad (causal-safe)
+            with amp:
+                sl_b = torch.vmap(lambda t: student.run_twin(t, collect_ssm=False)[0])(ids_b)   # [B,maxT,V]
+            kds, ces = [], []
+            for i, e in enumerate(exs):
+                tb = e["input_ids"].shape[0]
+                k_, c_ = kd_ce(sl_b[i, :tb], e)                          # real positions only — padded outputs never enter the loss
+                kds.append(k_); ces.append(c_)
+            kd = torch.stack(kds).mean()
+            ce_terms = [c for c in ces if c is not None]
+            ce = torch.stack(ce_terms).mean() if ce_terms else None
         else:
-            with torch.no_grad():
-                tl = teacher(ids.unsqueeze(0)).logits[0]
-            kd = kd_kl(sl, tl)
-        ce = masked_ce(sl, ids, ex["prompt_len"])                        # fp32 CE (NS-2)
+            ex = train[sched.sample(step) if USE_SCHEDULER else (step - 1) % len(train)]
+            with amp:
+                sl = student.run_twin(ex["input_ids"].to(DEV), collect_ssm=False)[0]
+            kd, ce = kd_ce(sl, ex)
         loss = (KD_W * kd + (CE_W * ce if ce is not None else 0.0)) / ACCUM
         if not torch.isfinite(loss):                                     # NS-3: skip a transient non-finite step, do NOT crash the run
             nonfinite += 1
@@ -409,7 +455,7 @@ def main() -> None:
         t_e1 = EVAL.teacher_answer_nll(teacher, E["E1"])             # MEASURED teacher baseline (the real task_fit gap target)
         fid = EVAL.compute_fidelity(student, teacher, E["E1"][:64])
         gen = EVAL.generate_and_score(student, E["E1"][:64], tok, maxlen=24, eos=eos)
-        dp = decode_parity(student, E["E1"])                         # DEVICE-TRUTH: fp16 sequential-vs-parallel parity
+        dp = decode_parity(student, E["E1"])                         # HOST fp16 sequential-vs-parallel parity (NOT on-device CoreAI)
         res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
                "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
                "teacher_E1_nll": t_e1, "decode_parity": dp, "best_score": best_score, "eval_on": eval_on}

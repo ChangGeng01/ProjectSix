@@ -123,6 +123,7 @@ def make_examples(rows_examples: list, keep_p: float, k: int, tok, seed: int) ->
         else:
             gold, distract = [], ex["distract"][: k + len(ex["golden"])]   # doc-count held constant, no gold
         item = to_ids(gold, distract, ex["question"], target_text(ex, keep), tok, rng, ex.get("id"))
+        item["keep_gold"] = keep                                       # tag no-gold examples so the loop can opt out of answer-CE (RAFT_NOGOLD_CE)
         if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
             out.append(item)
     return out

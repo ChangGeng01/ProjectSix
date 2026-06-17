@@ -56,6 +56,9 @@ def resolve_ckpt(default_vocab: int, layers: int):
     cfg = c.get("config")
     assert cfg is None or list(cfg) == exp_cfg, \
         f"CKPT config={list(cfg) if cfg else cfg} != module {exp_cfg} — shape mismatch (rebuild would be incoherent)"
+    assert not c.get("mla_rope", False), \
+        "CKPT was trained with MLA_ROPE=1 but this converter is NoPE — deploying it would be SEMANTICALLY INCONSISTENT. " \
+        "Implement the matching RoPE in mamba3_hybrid_decode_deploy.mla_step_fixed first (ARCH-3 deploy-side is gated)."
     return c.get("vocab", default_vocab), c["model"]
 
 

@@ -113,7 +113,7 @@ def test_build_cache_fp_tracks_n_train(tmp_path, monkeypatch):
 # (2) save_ckpt: atomic write, carry keys, arch tag
 # ---------------------------------------------------------------------------
 
-CKPT_KEYS = {"model", "opt", "step", "layers", "config", "arch", "vocab", "mla_positions", "sched"}
+CKPT_KEYS = {"model", "opt", "step", "layers", "config", "arch", "vocab", "mla_positions", "mla_rope", "sched"}
 
 
 def _load(path):
