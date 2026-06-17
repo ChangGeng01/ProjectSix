@@ -19,6 +19,7 @@ RunPod: bash scripts/runpod_setup.sh && bash scripts/runpod_distill.sh   (1× A1
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import math
@@ -63,6 +64,43 @@ RESUME = os.environ.get("RESUME", "1") == "1"
 CACHE = os.environ.get("CACHE", "1") == "1"                              # precompute teacher top-K ONCE, reuse (cost saver)
 KD_K = int(os.environ.get("KD_K", "64"))                                # top-K logits kept per token in the cache
 ORDER = os.environ.get("ORDER", "curriculum")                           # curriculum (easy->hard by teacher CE) | random
+# --- optimization recipe knobs (Track-G addendum 45; adversarially-verified) ---
+DECAY = os.environ.get("DECAY", "cosine")                               # LR-1: cosine | linear | none (legacy flat-after-warmup)
+LR_MIN_FRAC = float(os.environ.get("LR_MIN_FRAC", "0.07"))             # LR-1: decay floor as a fraction of LR
+KD_ANSWER_W = float(os.environ.get("KD_ANSWER_W", "1.0"))             # KD-1: >1 up-weights KD on the answer span (1.0 = uniform = legacy)
+FP32_MASTER = os.environ.get("FP32_MASTER", "1") == "1"               # TBC-6: fp32 master weights + autocast-bf16 forward on cuda
+CTX_W = float(os.environ.get("CTX_W", "0.5"))                         # BCS-1: best-ckpt reward for context-use (positive E3-E1 slope = reading)
+
+
+def lr_at(step: int) -> float:
+    """Warmup → (cosine|linear) decay to LR*LR_MIN_FRAC over [WARMUP, STEPS] (LR-1). DECAY='none' = legacy flat-after-warmup.
+    Pure function of the module env knobs → unit-testable without a training run."""
+    if step <= WARMUP:
+        return LR * step / max(1, WARMUP)
+    prog = min(1.0, (step - WARMUP) / max(1, STEPS - WARMUP))
+    if DECAY == "cosine":
+        return LR * (LR_MIN_FRAC + (1.0 - LR_MIN_FRAC) * 0.5 * (1.0 + math.cos(math.pi * prog)))
+    if DECAY == "linear":
+        return LR * (1.0 - (1.0 - LR_MIN_FRAC) * prog)
+    return LR
+
+
+def split_decay_params(student):
+    """LR-2: partition params into (weight-decayed ≥2-D weights, no-decay 1-D params + tied embedding). The no-decay set
+    protects the RMSNorm gains + dt_bias + D + bn_w + fw, whose small/init values are load-bearing for SSM stability."""
+    decay, no_decay = [], []
+    for pn, pp in student.named_parameters():
+        if not pp.requires_grad:
+            continue
+        (no_decay if (pp.ndim <= 1 or pn.endswith("embedding.weight") or pn == "fw") else decay).append((pn, pp))
+    return [p for _, p in decay], [p for _, p in no_decay]
+
+
+def select_score(e1, slope_e2, slope_e3, ctx_w=None):
+    """BCS-1: best-ckpt score — low E1 nll + robust to distractors (small E2 slope) + REWARD context-use (a positive
+    E3-E1 slope means the model USES the gold doc, not parrots). Higher is better; the E3 reward is capped at 1.0 nat."""
+    w = CTX_W if ctx_w is None else ctx_w
+    return -(e1 + max(0.0, slope_e2)) + w * max(0.0, min(slope_e3, 1.0))
 
 
 def _sanitize(x):
@@ -83,14 +121,19 @@ def kd_kl(student_logits, teacher_logits):
     return F.kl_div(s, t, log_target=True, reduction="batchmean") * (TAU * TAU)
 
 
-def kd_topk(student_logits, topk_idx, topk_val):
+def kd_topk(student_logits, topk_idx, topk_val, pos_w=None):
     """Top-K KD from a CACHED teacher: student full-vocab log-softmax gathered at the teacher's top-K indices, vs the
-    teacher's top-K soft target (renormalized within the K). Standard cached-distillation approximation."""
+    teacher's top-K soft target (renormalized within the K). Standard cached-distillation approximation.
+    pos_w (optional [T] weights, KD-1): a per-position weighted mean instead of the uniform mean — used to up-weight the
+    answer span. pos_w=None ⇒ uniform mean (identical to the legacy behavior; the 349-test default)."""
     assert student_logits.shape[0] == topk_idx.shape[0], \
         f"seq mismatch: student T={student_logits.shape[0]} vs cached T={topk_idx.shape[0]} — cache/example drift"
     lp = F.log_softmax(student_logits.float() / TAU, -1).gather(-1, topk_idx.long())   # [T,K] student logprob @ teacher topk
     q = F.softmax(topk_val.float() / TAU, -1)                                          # [T,K] teacher soft target
-    return (q * (q.clamp_min(1e-9).log() - lp)).sum(-1).mean() * (TAU * TAU)
+    per_pos = (q * (q.clamp_min(1e-9).log() - lp)).sum(-1)                             # [T] per-position KL
+    if pos_w is not None:
+        return (per_pos * pos_w).sum() / pos_w.sum().clamp_min(1e-9) * (TAU * TAU)
+    return per_pos.mean() * (TAU * TAU)
 
 
 def build_cache(teacher, train, cache_dir, extra_fp=""):
@@ -243,9 +286,18 @@ def main() -> None:
         _peek = torch.load(ckpt, map_location="cpu")
         ARCH = _peek.get("arch", ARCH); vocab = _peek.get("vocab", vocab)
         print(f"resume: ckpt arch={ARCH} vocab={vocab}")
-    student = (HY.HybridM(vocab, LAYERS) if ARCH == "hybrid" else MT.M(vocab, LAYERS)).to(DEV).to(DT)
-    print(f"student ARCH={ARCH} ({'HybridM 20-Mamba+4-MLA' if ARCH == 'hybrid' else 'pure Mamba-3'}) vocab={vocab}")
-    opt = torch.optim.AdamW(student.parameters(), lr=LR, weight_decay=0.1, betas=(0.9, 0.95))
+    master_fp32 = (DEV == "cuda" and FP32_MASTER)                     # TBC-6: fp32 master weights + autocast-bf16 forward (cuda)
+    build_dt = torch.float32 if master_fp32 else DT
+    student = (HY.HybridM(vocab, LAYERS) if ARCH == "hybrid" else MT.M(vocab, LAYERS)).to(DEV).to(build_dt)
+    print(f"student ARCH={ARCH} ({'HybridM 20-Mamba+4-MLA' if ARCH == 'hybrid' else 'pure Mamba-3'}) vocab={vocab} "
+          f"| {'fp32-master+autocast-' + str(DT).split('.')[-1] if master_fp32 else 'dtype=' + str(build_dt).split('.')[-1]}")
+    # LR-2: NO-DECAY group for 1-D params (RMSNorm gains, dt_bias, D, bn_w, fw) + the tied embedding. Weight-decaying the
+    # norm gains / dt_bias would erode the small-dt init that keeps the SSM recurrence bounded (architecture-load-bearing).
+    decay_p, no_decay_p = split_decay_params(student)
+    opt = torch.optim.AdamW([{"params": decay_p, "weight_decay": 0.1},
+                             {"params": no_decay_p, "weight_decay": 0.0}], lr=LR, betas=(0.9, 0.95))
+    print(f"optimizer: AdamW decay={sum(p.numel() for p in decay_p)/1e6:.0f}M / no-decay={sum(p.numel() for p in no_decay_p)/1e3:.0f}K params | "
+          f"LR={LR} DECAY={DECAY}→{LR_MIN_FRAC:.2f} WARMUP={WARMUP} | KD_ANSWER_W={KD_ANSWER_W} CTX_W={CTX_W}", flush=True)
     start = 1
     if RESUME and os.path.exists(ckpt):
         st = torch.load(ckpt, map_location=DEV)
@@ -283,42 +335,61 @@ def main() -> None:
 
     t0 = time.time()
     opt.zero_grad(set_to_none=True)
+    nonfinite, last_gnorm = 0, 0.0
     for step in range(start, STEPS + 1):
+        lr_t = lr_at(step)                                               # LR-1: warmup → decay
         for g in opt.param_groups:
-            g["lr"] = LR * min(1.0, step / WARMUP)
+            g["lr"] = lr_t
         ex = train[sched.sample(step) if USE_SCHEDULER else (step - 1) % len(train)]
         ids = ex["input_ids"].to(DEV)
-        sl = student.run_twin(ids, collect_ssm=False)[0]
+        with (torch.autocast("cuda", dtype=DT) if master_fp32 else contextlib.nullcontext()):   # TBC-6: bf16 forward, fp32 master
+            sl = student.run_twin(ids, collect_ssm=False)[0]
         if CACHE:                                                        # no teacher forward — cached top-K KD
-            kd = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV))
+            if KD_ANSWER_W != 1.0:                                       # KD-1: up-weight KD on the answer span
+                ans = (torch.arange(sl.shape[0], device=DEV) >= (ex["prompt_len"] - 1)).float()
+                kd = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV), pos_w=1.0 + (KD_ANSWER_W - 1.0) * ans)
+            else:
+                kd = kd_topk(sl, ex["topk_idx"].to(DEV), ex["topk_val"].to(DEV))
         else:
             with torch.no_grad():
                 tl = teacher(ids.unsqueeze(0)).logits[0]
             kd = kd_kl(sl, tl)
-        ce = masked_ce(sl, ids, ex["prompt_len"])
+        ce = masked_ce(sl, ids, ex["prompt_len"])                        # fp32 CE (NS-2)
         loss = (KD_W * kd + (CE_W * ce if ce is not None else 0.0)) / ACCUM
-        assert torch.isfinite(loss), f"step {step}: non-finite loss"
+        if not torch.isfinite(loss):                                     # NS-3: skip a transient non-finite step, do NOT crash the run
+            nonfinite += 1
+            opt.zero_grad(set_to_none=True)
+            print(f"WARNING step {step}: non-finite loss — skipped ({nonfinite} total)", flush=True)
+            assert nonfinite <= max(20, STEPS // 100), f"too many non-finite losses ({nonfinite}) — diverging, aborting"
+            continue
         loss.backward()
         if step % ACCUM == 0:
-            torch.nn.utils.clip_grad_norm_(student.parameters(), 1.0)
-            opt.step(); opt.zero_grad(set_to_none=True)
+            gn = torch.nn.utils.clip_grad_norm_(student.parameters(), 1.0)
+            if torch.isfinite(gn):                                       # NS-4: an inf grad-norm must not poison AdamW moments
+                opt.step(); last_gnorm = float(gn)
+            else:
+                print(f"WARNING step {step}: non-finite grad-norm — opt.step skipped", flush=True)
+            opt.zero_grad(set_to_none=True)
         if step % 100 == 0:
             tps = 100 * RAFT.MAX_LEN / (time.time() - t0); t0 = time.time()
-            print(f"step {step:6d}/{STEPS} | KD={float(kd):.3f} CE={float(ce) if ce is not None else 0:.3f} "
-                  f"| ~{tps:.0f} tok/s", flush=True)
+            print(f"step {step:6d}/{STEPS} | lr={lr_t:.2e} KD={float(kd):.3f} CE={float(ce) if ce is not None else 0:.3f} "
+                  f"| gnorm={last_gnorm:.2f} | ~{tps:.0f} tok/s", flush=True)
         if step % CKPT_EVERY == 0:
             save_ckpt(student, opt, step, ckpt, sched)
         if step % EVAL_EVERY == 0:
             ev = evaluate()
-            slope = ev["E2"][0] - ev["E1"][0]
-            score = -(ev["E1"][0] + max(0.0, slope))                  # lower E1 nll + smaller distractor-slope = better
+            e1 = ev["E1"][0]; slope_e2 = ev["E2"][0] - e1; slope_e3 = ev["E3"][0] - e1
+            score = select_score(e1, slope_e2, slope_e3)             # BCS-1: low E1 + distractor-robust + REWARD context-use
             if score > best_score and all(math.isfinite(ev[m][0]) for m in ev):
                 best_score = score
                 save_ckpt(student, opt, step, best_path, sched)       # best-ckpt selection (metric-gated, NOT just last)
-                json.dump({"best_score": best_score, "step": step}, open(best_meta + ".tmp", "w"))
+                json.dump({"best_score": best_score, "step": step, "E1_nll": e1, "E2_nll": ev["E2"][0], "E3_nll": ev["E3"][0],
+                           "slope_e2_e1": slope_e2, "slope_e3_e1": slope_e3,
+                           "E1_acc": ev["E1"][1], "E2_acc": ev["E2"][1], "E3_acc": ev["E3"][1]},
+                          open(best_meta + ".tmp", "w"))             # BCS-2: full eval breakdown for auditability
                 os.replace(best_meta + ".tmp", best_meta)             # persist best_score so a resume can't regress ckpt_best
             print("  EVAL " + " ".join(f"{m}: nll={ev[m][0]:.3f} acc={ev[m][1]:.1%}" for m in ev)
-                  + f"  | slope Δ(E2-E1)={slope:+.3f} | best_score={best_score:.3f}"
+                  + f"  | Δ(E2-E1)={slope_e2:+.3f} Δ(E3-E1)={slope_e3:+.3f} | best_score={best_score:.3f}"
                   + ("  ↑best" if score == best_score else ""), flush=True)
     save_ckpt(student, opt, STEPS, ckpt, sched)
     print(f"DONE — final ckpt {ckpt}")

@@ -2042,3 +2042,39 @@ already closed them, and the suite now PREVENTS regressions:
 Dev-only dep: pytest (uv pip install pytest into the venv; the standalone Tools/test_*.py need no pytest). Verified the
 refactors did NOT regress the existing tooling: test_resumable_prefill / test_hybrid_duet / test_verify_kstep /
 test_generate_sampling / test_p0_state_numeric all still pass (rc=0) post-change. The distill pipeline is now regression-locked.
+
+## Track G — Addendum 45: 全面优化 — deep recipe optimization (7-axis × adversarial-verify, 63 agents) → 11 verified wins, regression-locked
+
+After the eval-validity rewrite (add.43) + 349-test lock (add.44), a HEAVIEST optimization pass: a 7-axis analysis workflow
+(LR/optimizer, KD objective, throughput/batching, curriculum, ckpt-selection, architecture, stability) produced 56 concrete
+proposals, EACH adversarially verified by an independent skeptic (really-helps? correct? regression-risk?) → **4 implement_now,
+10 implement_after_test, 19 defer, 23 reject**. The skeptics correctly REJECTED cargo-cult ideas (label smoothing on top of KD,
+KD_W/CE_W reweighting, TF32, length-bucketing micro-opt) and DEFERRED the big rewrites. Implemented this pass (all default-safe
+or env-gated, refactored into UNIT-TESTED helpers lr_at / split_decay_params / select_score / kd_topk(pos_w=)):
+
+- **LR-1 cosine decay** (was warmup-then-FLAT for the whole run): `lr_at()` warmup→cosine to LR*LR_MIN_FRAC(0.07). The single
+  biggest convergence lever — flat-LR parks above the minimum; annealing descends into it.
+- **LR-2 no-decay group**: AdamW wd=0.1 was applied to RMSNorm gains + dt_bias + D + bn_w + fw + embedding; over 20k steps that
+  erodes the small-dt init that keeps the SSM recurrence bounded (architecture-load-bearing). Now wd=0 for all 1-D params + the tied embedding.
+- **NS-1 fp32 eval-NLL** + **NS-2 fp32 train-CE**: eval_nll/masked_ce ran the metric/CE in bf16 (the only paths that didn't upcast);
+  fp32 de-noises the slope/best_score selection (~±0.008 nat) and cleans the answer-span gradient.
+- **NS-3 skip-non-finite** (was a hard `assert` that crashed the whole spot run on one transient) + **NS-4 grad-norm guard/log**
+  (skip an inf-grad step so it can't poison AdamW moments; log the pre-clip norm). Aborts only if non-finite exceeds max(20, STEPS/100).
+- **NS-5 ckpt every 250** (was 500) → ≤250 steps lost per spot preemption.
+- **BCS-1 context-use best-ckpt score**: `select_score = -(E1 + max(0,slopeE2)) + CTX_W·min(slopeE3,1)` — the shipped ckpt is now
+  the one that USES the gold doc (positive E3-E1 slope = reading), not the lowest-E1 parrot. **+BCS-2** persists the full E1/E2/E3
+  breakdown to best_meta.json.
+- **KD-1 answer-span KD up-weight** (env KD_ANSWER_W, default 1.0=uniform=legacy → 349 tests unchanged; >1 focuses KD on the
+  answer span — the prime-objective reading lever, opt-in).
+- **TBC-6 fp32 master weights + autocast-bf16** (cuda, env FP32_MASTER=1): was all-bf16 incl. AdamW master weights (late-run
+  update underflow caps NLL descent); now fp32 params + bf16 autocast forward — strictly safer convergence at ~neutral throughput.
+
+DEFERRED & FLAGGED (real, too big/risky for a pre-launch pass): TBC-1 true [B,T] batching (big GPU-throughput win, rewrites the
+audited single-[T] forward); **CS-6: N_ROWS=20000 silently caps at ~7405 (HotpotQA distractor val) → ~3 epochs of repeats, NOT
+20000 unique rows — broaden the pool (train split / fullwiki) for the full run**; ARCH-3 MLA layers are NoPE (no positions —
+could limit retrieval); CS-2 the 5-term compute_difficulty is dead (curriculum orders by teacher-CE only).
+
+Verification: full suite **362 passed** (349 + 13 new test_optim_recipe pinning lr_at shape, the no-decay split, the context-use
+score reader>parrot, kd_topk uniform≡legacy + answer-weight grad-flow + shape-assert, fp32-CE value-match) + a real-Granite
+micro-test of the new recipe (clean run, cosine LR decaying, no-decay split, context-use selection). All optimizations are
+env-tunable; KD_ANSWER_W>1 and any deferred lever can be A/B'd on the cloud once P0 shows the base signal.

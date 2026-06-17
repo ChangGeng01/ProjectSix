@@ -151,7 +151,7 @@ def masked_ce(logits, ids, prompt_len: int):
     mask = torch.arange(tgt.shape[0], device=ids.device) >= (prompt_len - 1)
     if not mask.any():
         return None
-    return F.cross_entropy(lp[mask], tgt[mask], reduction="mean")
+    return F.cross_entropy(lp[mask].float(), tgt[mask], reduction="mean")   # fp32 CE — cleaner answer-span gradient under bf16 (NS-2)
 
 
 @torch.no_grad()
@@ -165,6 +165,7 @@ def eval_nll(student, examples: list) -> tuple[float, float, int]:
         if not torch.isfinite(logits).all():
             skip += 1
             continue
+        logits = logits.float()                                        # fp32 eval metric — de-noise the slope/best_score signal (NS-1)
         lp, tgt = logits[:-1], ids[1:]
         mask = torch.arange(tgt.shape[0], device=DEV) >= (ex["prompt_len"] - 1)
         if not mask.any():
