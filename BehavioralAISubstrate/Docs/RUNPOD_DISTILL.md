@@ -26,7 +26,7 @@ THIS run establishes — every on-device number above is random-weight op-graph 
 ```bash
 # 1. get the repo onto the volume
 cd /workspace && git clone <this-repo> Project06 && cd Project06/BehavioralAISubstrate
-git checkout vendor-latest-refresh
+git checkout ssd-track-g-distill-optimized            # the branch carrying the audited+optimized distill recipe
 
 # 2. one-time deps (torch is preinstalled in the image; this adds transformers/datasets[/flash-attn])
 bash scripts/runpod_setup.sh
@@ -75,7 +75,8 @@ uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layer
 ## Cost (honest)
 
 - Narrow-reader PoC (STEPS 5k–20k @ T=1024 ≈ **~5–20 M token-forwards** at BATCH_SIZE=1; ×BATCH_SIZE×ACCUM for the
-  effective batch): **~$40–160** on an RTX PRO 6000 (~$0.8/hr on RunPod, cheaper than A100). (NOT "B"-scale — 20k × 1024 ≈ 20 M token-forwards.)
+  effective batch): order **~$50–250** on an RTX PRO 6000 — **VERIFY the live RunPod $/hr for "RTX PRO 6000 WK" before launch**
+  (it has ranged ~$0.8–1.7/hr; use `MAX_SEC` as a hard budget). NOT "B"-scale — 20k × 1024 ≈ 20 M token-forwards.
 - Stronger/broader (8B-teacher, more steps/rows): **~$150–600**.
 - The frozen-teacher forward is the dominant cost, and it is AMORTIZED by the top-K teacher CACHE (CACHE=1, the default):
   the teacher runs ONCE in build_cache, then training does KD from the cached top-K with NO teacher forward in the loop.
@@ -89,23 +90,37 @@ uv run --with coreai-torch python Tools/mamba3_deploy.py 24 8   # int8, 24 layer
 ```
 export HF_TOKEN=...                       # Granite teacher is gated; runpod_distill.sh fails fast if unset
 rm -rf /workspace/ckpt-p0                 # FRESH dir (the fingerprint guard catches drift, but start clean)
-ARCH=hybrid LAYERS=24 STEPS=2000 N_ROWS=3000 EVAL_EVERY=250 CKPT_EVERY=250 \
-  CKPT_DIR=/workspace/ckpt-p0 USE_SCHEDULER=1 bash scripts/runpod_distill.sh
+ARCH=hybrid LAYERS=24 STEPS=2000 WARMUP=200 N_ROWS=3000 EVAL_EVERY=250 CKPT_EVERY=250 \
+  CKPT_DIR=/workspace/ckpt-p0 USE_SCHEDULER=1 COUNTERFACTUAL=1 MAX_SEC=5400 bash scripts/runpod_distill.sh
 ```
-(N_ROWS=3000 < the ~7405 HotpotQA-val cap, so no silent truncation. ~30 min / ~$0.5-1 on an RTX PRO 6000.)
+- `WARMUP=200` (not the 800 default) so a 2000-step run isn't 40% in warmup. `COUNTERFACTUAL=1` adds the **E4 reads-vs-memorizes**
+  diagnostic to the card. `MAX_SEC=5400` is a 1.5 h hard budget (不要亏). First run also pays a one-time HotpotQA-train + Granite-3B
+  (~6 GB) download into `$HF_HOME` (not in the ~30 min estimate). N_ROWS draws from the **train split** (~90k unique) — no cap.
 
-**Watch 3 signals in the EVAL lines (every 250 steps):** (a) `KD=` falling toward <1; (b) `E1:/E2: nll=` both
-falling = the reader is learning; (c) `slope Δ(E2-E1)=` trending toward <0.05 = distractor-robustness emerging.
-Loss stays finite (the run asserts on NaN). **GO** to STEPS=20000 N_ROWS=7405 only if all three move the right way + `↑best`
-fires; **NO-GO** (don't burn scale money) if KD is flat / nll stuck / slope widens — fix the recipe (LR/warmup/data) first.
+**The GO/NO-GO is PROGRAMMATIC now** — at the end the run prints `>> P0 VERDICT: GO ✓ / NO-GO ✗` and writes `verdict.json` from the
+E1-nll trend. **`EVAL CARD → 亏的 ✗ FAIL` at 2000 steps is EXPECTED** (the 8 gates are calibrated for the full 20k run) — do NOT
+read it as "broken." Also watch the EVAL lines (every 250): `KD=` falling, `E1:/E2: nll=` falling = learning, `Δ(E2-E1)` shrinking
+= distractor-robust, `Δ(E3-E1)` *growing* = using the gold doc. GO → scale; NO-GO (KD flat / nll stuck) → fix the recipe first.
+
+**Scale run (only after a GO) — its OWN fresh dir (the P0 cache is config-locked and cannot be reused at scale):**
+```
+rm -rf /workspace/ckpt-scale
+ARCH=hybrid LAYERS=24 STEPS=20000 N_ROWS=20000 EVAL_EVERY=1000 CKPT_EVERY=250 \
+  CKPT_DIR=/workspace/ckpt-scale USE_SCHEDULER=1 COUNTERFACTUAL=1 PACE_T_FRAC=0.5 bash scripts/runpod_distill.sh
+```
 
 ## The 成了 gate-chain (only ALL-green is honest)
 - GATE 1 — trained ckpt exists: `ckpt_best.pt` (metric-gated best-selection), born with `eval_card.json`.
-- GATE 2 — `eval_card` PASS: the 7-gate `claim_card` reads `成了 ✓` (task-fit, RAFT E2-robust, E3-graceful, fidelity-argmax,
-  generation EM/F1, stability, no-contamination — the last is now REAL, verifying the disjoint split).
+- GATE 2 — `eval_card` PASS: the **8-gate** `claim_card` reads `成了 ✓` — task_fit (within TEACHER_GAP of the **MEASURED** teacher,
+  not a hardcoded guess), raft_e2_robust, **context_use** (anti-parrot: removing the gold doc must MEASURABLY hurt — replaced the
+  backwards E3-graceful), fidelity_argmax (answer-span), generation EM/F1, stability (incl. id-aligned subset), **fp16_seq_parity**
+  (HOST run_twin≡run_ref in fp16 — NOT on-device parity), no_contamination (REAL disjoint split). Plus the opt-in **E4 counterfactual**
+  reads-vs-memorizes diagnostic (`COUNTERFACTUAL=1`). Offline re-eval entry: `EVAL_CKPT=/path/ckpt.pt python Tools/mamba3_eval.py`.
 - GATE 3 — ckpt → device WITH `CKPT` set: the converters now **fail-closed** on a missing CKPT (no silent random-weight asset;
-  `FORCE_RANDOM=1` only for op-graph probes). `resolve_ckpt` is authoritative on vocab.
+  `FORCE_RANDOM=1` only for op-graph probes) AND on a mismatched arch/layers/vocab/mla_positions/config or an MLA_ROPE ckpt
+  (the deploy converter is still NoPE). `resolve_ckpt` is authoritative on vocab.
 - GATE 4 — device argmax-consistency: the A19 `BAS_COREAI_STATELAKE_PROBE` reproduces `HOSTREF_STATELAKE_ARGMAX` (cross-launch int8).
-- GATE 5 — quant-fidelity filled (replace the eval stub with measured int8-vs-fp32 argmax on the trained ckpt; device-phase).
+- GATE 5 — quant-fidelity (device phase): `quant_fidelity_stub` is HONESTLY a stub and is NOT a gate; `fp16_seq_parity` is a HOST
+  PyTorch-fp16 check, not real int8/CoreAI. Real int8-vs-fp32 + A19 argmax parity is measured at the device phase.
 - GATE 6 — scope honesty: a NARROW HotpotQA-distractor RAG/memory reader; the recipe is **difficulty-curriculum + static
   RAFT(P=0.8,K=4)**, NOT multi-stage RAFT-curriculum (raft_params staging is intentionally unwired — cache cost).

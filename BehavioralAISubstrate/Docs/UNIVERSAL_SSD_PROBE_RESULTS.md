@@ -2168,3 +2168,35 @@ Verification: full suite (all green incl. 23 new round-2 tests). HONEST STATE: t
 now largely EXHAUSTED — what remains is the high-risk batched-scan rewrite (throughput) or marginal tweaks. The P0 launch
 config is UNCHANGED (PACE_T_FRAC=1, KD_EXACT_TAIL=0, COUNTERFACTUAL=0, BATCH_SIZE=1, MLA_ROPE unset, FP32_MASTER=1); every new
 lever is one env var away for a cloud A/B.
+
+## Track G — Addendum 49: 最后全面检查 — pre-launch OPS readiness (5-surface adversarial, RunPod lens) → 3 blockers + risks FIXED
+
+A FINAL launch-readiness pass with an OPS/RunPod lens (not correctness — that's 385-test-locked): "what would make the REAL
+run on the RTX PRO 6000 CRASH, HANG, or BURN MONEY that the correctness audits + unit tests can't catch." 5 surface-checkers,
+3 LAUNCH-BLOCKERS + 17 risks. The agents correctly DISSOLVED the scary candidates (the hardcoded Mac sys.path is inert on
+Linux — the real Tools dir is inserted right after; the Granite vocab "mismatch" isn't real — tok.vocab_size==config==100352;
+HotpotQA loads on modern `datasets` via the 2025-08 Parquet export). Fixed all 3 blockers + the high-value risks:
+
+**BLOCKERS (would have wasted the spend):**
+1. **Doc pointed at a non-existent branch** — RUNPOD_DISTILL.md:29 said `git checkout vendor-latest-refresh`; the run dies at the
+   FIRST command. → now `git checkout ssd-track-g-distill-optimized` (the pushed branch).
+2. **100× relaunch DEATH-LOOP on a deterministic crash** — runpod_distill.sh relaunched on ANY non-zero exit, so a config-drift
+   `SystemExit` / GPU-too-small / contamination / STEPS%ACCUM / non-finite abort would re-load the 3B teacher and re-fail 100×,
+   billing the whole time. → CIRCUIT-BREAKER: track progress (#cached ex*.pt + ckpt_latest mtime); 3 consecutive FAST (<120 s)
+   ZERO-progress attempts ⇒ ABORT (deterministic, not transient). Uses `PIPESTATUS[0]` (python's rc, not tee's) + a `MAX_SEC`
+   wall-clock budget. Transient preempts (long, or progress-advancing) still self-heal.
+3. **No-go was advisory prose only** — a stuck 20k run burned the full budget with no abort. → PROGRAMMATIC `>> P0 VERDICT:
+   GO ✓ / NO-GO ✗` + `verdict.json` from the E1-nll trend at run end, + the `MAX_SEC` hard budget.
+
+**High-value risk fixes:** flash-attn is now OFF by default (no Blackwell sm_120 wheel; a kernel-less import would crash the
+teacher forward) — DEFAULT sdpa, opt-in `FLASH_ATTN=1`, and a fail-fast HotpotQA Parquet-load smoke in setup.sh; `datasets`
+pinned `>=3.6,<5`; the P0 doc command now sets `WARMUP=200` (was 800 = 40% of a 2k run), `COUNTERFACTUAL=1` (so the E4 signal is
+actually computed), and `MAX_SEC`; an explicit **scale command with its own FRESH dir** (the P0 cache is config-locked); a
+**`亏的 ✗ EXPECTED at P0`** readability note (a make-or-break operator could misread the red FAIL as "broken" → false NO-GO);
+`CACHE=0` loud cost warning; the in-training best-ckpt slope now prints skip counts + is guarded on subset-equality; and the E4
+counterfactual builder verifies the swap actually LANDED in the (DOC_CHARS-truncated) gold text (no impossible rows). Cost table
+re-flagged as "VERIFY live RunPod $/hr". Gate-chain doc corrected to the 8 gates (context_use, fp16_seq_parity) + the E4 + EVAL_CKPT.
+
+Verification: full suite green + the launch path bash-syntax-clean + a real-Granite P0-shaped micro-e2e. The runbook now boots,
+self-heals on a preempt, fast-fails (not death-loops) on a deterministic crash, caps spend, and tells the operator GO/NO-GO
+programmatically. **Launch-cleared.**

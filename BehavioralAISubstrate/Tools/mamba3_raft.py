@@ -165,6 +165,8 @@ def make_counterfactual_condition(rows_examples: list, tok, surrogate: str = _SU
             continue                                                    # surrogate must be truly novel to this row
         rng = random.Random(9_000_011 + idx)
         gold = [(t, txt.replace(ans, surrogate)) for t, txt in ex["golden"]]   # swap the FACT in the gold evidence
+        if not any(surrogate in txt for _, txt in gold):           # the answer must be in the (DOC_CHARS-truncated) gold TEXT, not
+            continue                                                #   just the raw gold_sent — else the swap leaves no evidence (impossible row)
         item = to_ids(gold, [], ex["question"], " " + surrogate, tok, rng, ex.get("id"))
         if item["prompt_len"] >= 1 and item["input_ids"].numel() > item["prompt_len"]:
             item["orig_answer"] = ans                                  # the memorized answer (for the orig-recall check)

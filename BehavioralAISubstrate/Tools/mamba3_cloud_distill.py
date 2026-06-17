@@ -259,11 +259,13 @@ def main() -> None:
     vocab = tok.vocab_size
     tkw = {}
     if DEV == "cuda":
-        try:
-            import flash_attn  # noqa: F401
-            tkw["attn_implementation"] = "flash_attention_2"
-        except Exception:
-            tkw["attn_implementation"] = "sdpa"
+        tkw["attn_implementation"] = "sdpa"                          # DEFAULT sdpa — robust on Blackwell sm_120 (no flash-attn wheel);
+        if os.environ.get("FLASH_ATTN") == "1":                     #   the teacher cache is a ONE-TIME pass, so sdpa speed is fine.
+            try:
+                import flash_attn  # noqa: F401
+                tkw["attn_implementation"] = "flash_attention_2"
+            except Exception as e:
+                print(f"FLASH_ATTN=1 but flash_attn unavailable ({e!r}) — falling back to sdpa", flush=True)
     teacher = AutoModelForCausalLM.from_pretrained(
         TEACHER, dtype=(torch.bfloat16 if DEV == "cuda" else torch.float32), **tkw).to(DEV).eval()
     for p in teacher.parameters():
@@ -344,6 +346,9 @@ def main() -> None:
               f"O(C^2) chunked scan × batch — it OOMs at long T (~87 GiB at B=4/T={RAFT.MAX_LEN}, no margin even on the 96 GB RTX PRO 6000). Viable ONLY at "
               f"SMALL T; for production T={RAFT.MAX_LEN} keep BATCH_SIZE=1. Real throughput batching needs the memory-efficient "
               f"batched-scan rewrite (still deferred — vmap is NOT it).", flush=True)
+    if not CACHE and STEPS > 200:                                   # 不要亏: CACHE=0 = a full 3B teacher forward EVERY step
+        print(f"!! WARNING CACHE=0 with STEPS={STEPS}: the 3B teacher runs a FULL forward on EVERY step (~10-100× the cost of the "
+              f"cached top-K KD). Intended only for tiny debug runs. For the real run use CACHE=1 (the default).", flush=True)
     start = 1
     if RESUME and os.path.exists(ckpt):
         st = torch.load(ckpt, map_location=DEV)
@@ -401,7 +406,7 @@ def main() -> None:
 
     t0 = time.time()
     opt.zero_grad(set_to_none=True)
-    nonfinite, last_gnorm = 0, 0.0
+    nonfinite, last_gnorm, eval_hist = 0, 0.0, []
     for step in range(start, STEPS + 1):
         lr_t = lr_at(step)                                               # LR-1: warmup → decay
         for g in opt.param_groups:
@@ -457,8 +462,9 @@ def main() -> None:
         if step % EVAL_EVERY == 0:
             ev = evaluate()
             e1 = ev["E1"][0]; slope_e2 = ev["E2"][0] - e1; slope_e3 = ev["E3"][0] - e1
+            subset_ok = ev["E1"][2] == ev["E2"][2] == ev["E3"][2]    # equal skips → the slope is over the SAME surviving subset
             score = select_score(e1, slope_e2, slope_e3)             # BCS-1: low E1 + distractor-robust + REWARD context-use
-            if score > best_score and all(math.isfinite(ev[m][0]) for m in ev):
+            if score > best_score and subset_ok and all(math.isfinite(ev[m][0]) for m in ev):
                 best_score = score
                 save_ckpt(student, opt, step, best_path, sched)       # best-ckpt selection (metric-gated, NOT just last)
                 json.dump({"best_score": best_score, "step": step, "E1_nll": e1, "E2_nll": ev["E2"][0], "E3_nll": ev["E3"][0],
@@ -466,11 +472,23 @@ def main() -> None:
                            "E1_acc": ev["E1"][1], "E2_acc": ev["E2"][1], "E3_acc": ev["E3"][1]},
                           open(best_meta + ".tmp", "w"))             # BCS-2: full eval breakdown for auditability
                 os.replace(best_meta + ".tmp", best_meta)             # persist best_score so a resume can't regress ckpt_best
-            print("  EVAL " + " ".join(f"{m}: nll={ev[m][0]:.3f} acc={ev[m][1]:.1%}" for m in ev)
+            eval_hist.append((step, e1, slope_e2, slope_e3, float(kd)))   # for the programmatic P0 GO/NO-GO verdict
+            print("  EVAL " + " ".join(f"{m}: nll={ev[m][0]:.3f} acc={ev[m][1]:.1%} sk={ev[m][2]}" for m in ev)
                   + f"  | Δ(E2-E1)={slope_e2:+.3f} Δ(E3-E1)={slope_e3:+.3f} | best_score={best_score:.3f}"
-                  + ("  ↑best" if score == best_score else ""), flush=True)
+                  + ("  ↑best" if score == best_score else "") + ("" if subset_ok else "  [subset≠ — slope unreliable]"), flush=True)
     save_ckpt(student, opt, STEPS, ckpt, sched)
     print(f"DONE — final ckpt {ckpt}")
+    if len(eval_hist) >= 2:                                          # programmatic P0 GO/NO-GO (不要亏 — don't scale a null run)
+        s0, e1_0, _, s3_0, kd0 = eval_hist[0]; sN, e1_N, _, s3_N, kdN = eval_hist[-1]
+        go = (e1_0 - e1_N) > 0.20                                    # E1 NLL fell meaningfully = the reader is learning
+        verdict = {"go": bool(go), "e1_first": e1_0, "e1_last": e1_N, "e1_drop": e1_0 - e1_N,
+                   "slope_e3_first": s3_0, "slope_e3_last": s3_N, "reading_trend_up": bool(s3_N > s3_0),
+                   "kd_first": kd0, "kd_last": kdN, "n_evals": len(eval_hist), "steps": STEPS}
+        with open(os.path.join(CKPT_DIR, "verdict.json"), "w") as f:
+            json.dump(verdict, f, indent=2)
+        print(f">> P0 VERDICT: {'GO ✓ scale to 20k' if go else 'NO-GO ✗ do NOT scale — fix recipe first'} "
+              f"(E1 nll {e1_0:.2f}→{e1_N:.2f}, Δ{e1_0 - e1_N:+.2f} | context-use slope Δ(E3-E1) {s3_0:+.3f}→{s3_N:+.3f} "
+              f"{'↑ reading' if s3_N > s3_0 else '— flat'} | KD {kd0:.2f}→{kdN:.2f}) → verdict.json", flush=True)
 
     # The checkpoint is born WITH its eval card: run the serious battery on the BEST checkpoint + the honest claim_card.
     if os.path.exists(best_path):
@@ -507,6 +525,9 @@ def main() -> None:
               + f"  (E1 nll={res['raft']['E1']['nll']:.3f}, ctx-use slope(E3-E1)={res['raft']['slope_e3_e1']:+.3f}, "
               + f"teacher_E1={res['teacher_E1_nll']:.3f}, EM={res['generation']['EM']:.2f}, F1={res['generation']['F1']:.2f}, "
               + f"parity={res['decode_parity'].get('argmax_agreement')})", flush=True)
+        if STEPS <= 5000 and _c["failed_gates"]:                     # readability (不要亏): a P0-scale 亏的 is EXPECTED, not "broken"
+            print("   NOTE: a 亏的 ✗ at this STEPS is EXPECTED — the 8 gates are calibrated for the full ~20k run. The GO/NO-GO "
+                  "is the P0 VERDICT line above (E1 nll trend), NOT this card.", flush=True)
     else:
         print(f"EVAL CARD → {_c['status']}  (eval crashed: {res.get('eval_error')}; ckpt is saved, re-run eval offline)", flush=True)
 

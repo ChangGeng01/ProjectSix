@@ -5,14 +5,20 @@
 # (its kernel is for the Mamba-2 SSD, not our trapezoid). flash-attn is OPTIONAL (sdpa fallback is fine).
 set -euo pipefail
 python -m pip install -q --upgrade pip
-python -m pip install -q "transformers>=4.45" "datasets>=2.20" accelerate sentencepiece safetensors
-# optional faster teacher forward; harmless to skip (harness falls back to sdpa):
-python -m pip install -q flash-attn --no-build-isolation 2>/dev/null && echo "flash-attn installed" \
-  || echo "flash-attn skipped — sdpa fallback (fine)"
+# datasets pinned >=3.6 so the Parquet-export HotpotQA loads (the old script-dataset path broke on 2.x); upper bound for safety.
+python -m pip install -q "transformers>=4.45" "datasets>=3.6,<5" accelerate sentencepiece safetensors
+# flash-attn is OFF by default — no prebuilt wheel for Blackwell sm_120, and a kernel-less import would crash the teacher
+# forward at runtime (the harness default is sdpa, which is fine for the one-time teacher cache). Opt in with FLASH_ATTN=1.
+if [ "${FLASH_ATTN:-0}" = "1" ]; then
+  python -m pip install -q flash-attn --no-build-isolation && echo "flash-attn installed" || echo "flash-attn build failed — sdpa fallback (fine)"
+fi
 python - <<'PY'
 import torch
 print("torch", torch.__version__, "| cuda", torch.cuda.is_available(),
       "|", (torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no-gpu"))
 assert torch.cuda.is_available(), "no CUDA GPU — pick an RTX PRO 6000 96GB pod"
+from datasets import load_dataset                                   # fail-fast: confirm the image can actually serve HotpotQA Parquet
+load_dataset("hotpotqa/hotpot_qa", "distractor", split="validation[:1]")
+print("HotpotQA Parquet load OK")
 PY
 echo ">> setup OK. Next:  bash scripts/runpod_distill.sh"
