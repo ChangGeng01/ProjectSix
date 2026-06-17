@@ -27,16 +27,41 @@ GEN_LEN = int(sys.argv[2]) if len(sys.argv) > 2 else 160
 EPOCHS = int(sys.argv[3]) if len(sys.argv) > 3 else 6
 OUT = "/tmp/draft/eagle_head.safetensors"
 
-PROMPTS = [
-    "Explain how photosynthesis works.", "Write a short story about a robot.",
-    "What are the causes of World War I?", "Describe the water cycle.",
-    "Give me a recipe for chocolate chip cookies.", "How does a computer's CPU work?",
-    "Summarize the plot of Romeo and Juliet.", "What is machine learning?",
-    "Describe the solar system.", "How do vaccines work?",
-    "Write a poem about the ocean.", "Explain the theory of relativity simply.",
-    "What is the difference between weather and climate?", "How does the stock market work?",
-    "Describe the human digestive system.", "What caused the fall of the Roman Empire?",
+# Self-distill prompt bank. GREEDY decode is deterministic → one UNIQUE sequence per prompt, so training-data
+# diversity == number of UNIQUE prompts (the old 16-prompt×8 loop produced 8 identical copies each + a held-out
+# tail that duplicated training prompts). Build ~210 diverse prompts across expository / narrative / code / list
+# styles so the head sees varied feature distributions.
+_TOPICS = [
+    "photosynthesis", "the water cycle", "machine learning", "the French Revolution",
+    "how a CPU works", "the solar system", "vaccines", "the theory of relativity",
+    "the stock market", "the human digestive system", "the fall of the Roman Empire",
+    "black holes", "the immune system", "blockchain", "climate change", "DNA replication",
+    "the Internet", "quantum computing", "the Great Depression", "evolution by natural selection",
+    "neural networks", "the carbon cycle", "plate tectonics", "the printing press",
+    "supply and demand", "the nervous system", "renewable energy", "the Cold War",
+    "antibiotics", "the Big Bang", "compound interest", "the water table",
+    "volcanoes", "the electoral system", "cellular respiration", "the Renaissance",
+    "gravity", "the global economy", "the human brain", "World War II",
 ]
+_TEMPLATES = [
+    "Explain how {t} works.",
+    "Write a clear, detailed explanation of {t} for a curious beginner.",
+    "What are the most important facts about {t}?",
+    "Summarize {t} and explain why it matters.",
+    "Describe {t} step by step.",
+]
+_EXTRA = [
+    "Write a short story about a lighthouse keeper who finds a message in a bottle.",
+    "Write a Python function that returns the nth Fibonacci number using iteration.",
+    "Write a poem about the ocean at night.", "Give me a recipe for chocolate chip cookies.",
+    "Describe a walk through a forest in autumn.",
+    "Write a Python function to check whether a string is a palindrome.",
+    "Tell a short story about a robot learning to paint.",
+    "Explain, with an analogy, what a hash table is.",
+    "Write a dialogue between a student and a teacher about why the sky is blue.",
+    "Draft a polite email asking to reschedule a meeting.",
+]
+PROMPTS = [tpl.format(t=t) for t in _TOPICS for tpl in _TEMPLATES] + _EXTRA   # 40*5 + 10 = 210 unique
 
 
 def feats(model, ids):
@@ -74,8 +99,8 @@ def main():
     print(f">> generating self-distill data ({N_PROMPTS} prompts × {GEN_LEN} tokens)…")
     seqs_f, seqs_tok = [], []
     t0 = time.time()
-    for i in range(min(N_PROMPTS, len(PROMPTS) * 8)):
-        prompt = PROMPTS[i % len(PROMPTS)]
+    for i in range(min(N_PROMPTS, len(PROMPTS))):   # ONE greedy sequence per UNIQUE prompt (no dup copies)
+        prompt = PROMPTS[i]
         msg = tok.apply_chat_template([{"role": "user", "content": prompt}], add_generation_prompt=True)
         ids = mx.array(msg)[None]
         cache = make_prompt_cache(model)
@@ -96,7 +121,7 @@ def main():
     print(f">> data: {len(seqs_tok)} sequences, {n_pairs} (f_t, token) pairs, {time.time()-t0:.0f}s")
 
     # HELD-OUT split (no train-on-test): last 12 sequences are eval-only.
-    n_eval = min(12, len(seqs_tok) // 4)
+    n_eval = min(40, len(seqs_tok) // 5)   # genuinely held-out (distinct prompts, no greedy-dup contamination)
     train_f, train_t = seqs_f[:-n_eval], seqs_tok[:-n_eval]
     eval_f, eval_t = seqs_f[-n_eval:], seqs_tok[-n_eval:]
     print(f">> split: {len(train_t)} train / {len(eval_t)} held-out sequences")
