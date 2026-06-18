@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import os
 import random
+import re
 import sys
 
 import torch
@@ -153,20 +154,31 @@ def make_eval_condition(rows_examples: list, mode: str, tok) -> list:
 _SURROGATE = "Zelophar"                                                # a fixed nonce ~never in a real HotpotQA doc
 
 
+def _has_word(text: str, word: str) -> bool:
+    """add.57: WORD-boundary containment (not substring) — short answers ('Ann','US','19') occur inside larger words; a
+    substring swap would corrupt unrelated words + bias swap_follow/genuine. (?<!\\w)…(?!\\w) anchors token edges robustly."""
+    return re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", text) is not None
+
+
+def _swap_fact(text: str, ans: str, surrogate: str) -> str:
+    """add.57: replace the answer ONLY at word boundaries (lambda repl → no backslash/group-ref interpretation of `surrogate`)."""
+    return re.sub(r"(?<!\w)" + re.escape(ans) + r"(?!\w)", lambda _m: surrogate, text)
+
+
 def _cf_swappable(rows_examples: list, surrogate: str = _SURROGATE) -> list:
     """Shared swappable-row extraction for the E4 matched + mismatch probes. A row is swappable iff its answer is non-yes/no,
-    appears verbatim in a gold sentence, and the surrogate is novel to the row + LANDS in the gold text after the swap. Returns
-    dicts {gold (swapped docs), question, surrogate, orig_answer, id}."""
+    appears verbatim (WORD-boundaried, add.57) in a gold sentence, and the surrogate is novel to the row + LANDS in the gold
+    text after the swap. Returns dicts {gold (swapped docs), question, surrogate, orig_answer, id}."""
     out = []
     for ex in rows_examples:
         ans = str(ex["answer"]).strip()
         if not ans or ans.lower() in ("yes", "no"):
             continue
-        if not any(ans in s for s in ex.get("gold_sents", [])):        # swappable iff the answer is verbatim in a gold sentence
+        if not any(_has_word(s, ans) for s in ex.get("gold_sents", [])):   # swappable iff the answer is a WORD in a gold sentence
             continue
         if any(surrogate in txt for _, txt in ex["golden"]) or surrogate in ans:
-            continue                                                    # surrogate must be truly novel to this row
-        gold = [(t, txt.replace(ans, surrogate)) for t, txt in ex["golden"]]   # swap the FACT in the gold evidence
+            continue                                                    # surrogate must be truly novel to this row (substring = conservative)
+        gold = [(t, _swap_fact(txt, ans, surrogate)) for t, txt in ex["golden"]]   # swap the FACT (word-boundaried) in the gold evidence
         if not any(surrogate in txt for _, txt in gold):               # the swap must LAND in the (truncated) gold TEXT, else no evidence
             continue
         out.append({"gold": gold, "question": ex["question"], "surrogate": surrogate, "orig_answer": ans, "id": ex.get("id")})
@@ -265,7 +277,7 @@ def make_cf_train_pool(rows_examples: list, tok, seed: int = 0, k: int = None) -
         ans = str(ex["answer"]).strip()
         if not ans or ans.lower() in ("yes", "no"):
             continue
-        if not any(ans in s for s in ex.get("gold_sents", [])):        # answer verbatim in a gold sentence → swappable
+        if not any(_has_word(s, ans) for s in ex.get("gold_sents", [])):   # answer is a WORD in a gold sentence → swappable (add.57)
             continue
         rng = random.Random(seed * 100019 + idx)
         if ans.isdigit() and len(ans) >= 2:                            # numeric → a token-disjoint different number
@@ -274,7 +286,7 @@ def make_cf_train_pool(rows_examples: list, tok, seed: int = 0, k: int = None) -
             sur = rng.choice(_CF_NONCES) + str(rng.randint(10, 99))
         if sur in ans or any(sur in txt for _, txt in ex["golden"]):
             continue
-        gold = [(t, txt.replace(ans, sur)) for t, txt in ex["golden"]]
+        gold = [(t, _swap_fact(txt, ans, sur)) for t, txt in ex["golden"]]   # word-boundaried swap (add.57)
         if not any(sur in txt for _, txt in gold):                     # the swap must have LANDED in the gold text
             continue
         distract = ex.get("distract", [])[:k]                          # multi-doc regime: same shape as the E2/E3 the verdict reads

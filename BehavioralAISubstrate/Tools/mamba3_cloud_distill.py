@@ -52,6 +52,8 @@ LR = float(os.environ.get("LR", "3e-4"))
 WARMUP = int(os.environ.get("WARMUP", "800"))
 ACCUM = int(os.environ.get("ACCUM", "8"))                               # grad-accum → effective batch
 GRAD_CLIP = float(os.environ.get("GRAD_CLIP", "1.0"))                   # NS-9 (add.56): grad-norm clip — hoisted from a hardcoded 1.0. The
+if GRAD_CLIP <= 0:                                                      # add.57 footgun guard: clip_grad_norm_(., 0) zeroes ALL grads = silent no-train. <=0 ⇒ no clipping (norm still logged).
+    GRAD_CLIP = float("inf")
 #   parrot's back-half PRE-clip gnorm median was 4.96 (p95 10.7), so clip=1.0 throttled ~100% of back-half steps 3-18× during the phase E1 nll
 #   was STILL falling. 1.0 = byte-identical legacy; try GRAD_CLIP=5.0 to free the productive late updates. (Also: a peak-LR bump is a no-op while clip nullifies it.)
 TAU = float(os.environ.get("TAU", "1.0"))   # P0-1 (test_p0_1_topk_kd.py): at TAU=2 over 100k vocab the top-K cache misses
@@ -157,6 +159,17 @@ def cf_frac_at(step: int, steps: int, frac: float, warm: float) -> float:
     return frac * min(1.0, max(0.0, (step - w) / max(1.0, steps - w)))
 
 
+def nogold_kd_scale(k, keep_gold: bool, kd_nogold_w: float):
+    """add.57 (extracted from the kd_ce closure for testability): down-weight KD on NO-GOLD examples (where the teacher emits
+    its evidence-free memorized answer = a parrot channel). 1.0 or keep_gold → unchanged."""
+    return k * kd_nogold_w if (kd_nogold_w != 1.0 and not keep_gold) else k
+
+
+def nogold_ce_skip(keep_gold: bool, raft_nogold_ce: bool) -> bool:
+    """add.57: skip the answer-CE on a no-gold example iff RAFT_NOGOLD_CE is off (don't teach 'answer without evidence')."""
+    return (not raft_nogold_ce) and (not keep_gold)
+
+
 def p0_verdict(eval_hist, e1_drop_min, reading_slope_margin, cf_lift_min, recall_low=0.15, recall_drop_min=0.05, cf_genuine_min=0.20):
     """Programmatic P0 GO/NO-GO — the 不要亏 gate that decides whether to scale a small run to the full 20k. eval_hist rows are
     (step, e1, slope_e2, slope_e3, kd, cf|None) where cf is {"lift","swap_follow","orig_recall","swap_mismatch","genuine"} from
@@ -186,7 +199,7 @@ def p0_verdict(eval_hist, e1_drop_min, reading_slope_margin, cf_lift_min, recall
         recall_ok = (cfN["orig_recall"] < recall_low) or (recall_drop > recall_drop_min)
         genuine_last = cfN.get("genuine")                            # add.54: matched − MISMATCH; question-conditioned reading
         genuine_measured = genuine_last is not None and genuine_last == genuine_last   # not None, not NaN
-        genuine_ok = (genuine_last > cf_genuine_min) if genuine_measured else True      # don't gate on an unmeasured control
+        genuine_ok = (genuine_last >= cf_genuine_min) if genuine_measured else True     # add.57: >= (match claim_card's CF_GENUINE_GATE op — no boundary disagreement; same 0.20 default)
         cf_reads = (lift_last > cf_lift_min) and recall_ok and genuine_ok
         reading_ok = bool(cf_reads)
     else:                                                            # no-swap regime — the slope proxy is all we have
@@ -539,10 +552,9 @@ def main() -> None:
             with torch.no_grad():
                 tl = teacher(ex["input_ids"].to(DEV).unsqueeze(0)).logits[0]
             k = kd_kl(sl, tl)
-        if KD_NOGOLD_W != 1.0 and not ex.get("keep_gold", True):         # NS-10: down-weight KD on no-gold (the teacher's evidence-free memorized
-            k = k * KD_NOGOLD_W                                          #   answer = a parrot channel CF doesn't cover). Complements RAFT_NOGOLD_CE (CE-only gate).
-        # RAFT_NOGOLD_CE=0 → no answer-CE on no-gold examples (don't teach "answer without evidence"); KD still applies (unless KD_NOGOLD_W<1).
-        ce = None if (not RAFT_NOGOLD_CE and not ex.get("keep_gold", True)) else masked_ce(sl, ex["input_ids"].to(DEV), ex["prompt_len"])
+        k = nogold_kd_scale(k, ex.get("keep_gold", True), KD_NOGOLD_W)   # NS-10: down-weight KD on no-gold (the teacher's evidence-free memorized
+        #   answer = a parrot channel CF doesn't cover). Complements RAFT_NOGOLD_CE (CE-only gate); both extracted to module helpers (add.57, testable).
+        ce = None if nogold_ce_skip(ex.get("keep_gold", True), RAFT_NOGOLD_CE) else masked_ce(sl, ex["input_ids"].to(DEV), ex["prompt_len"])
         return k, ce                                                     # fp32 CE (NS-2)
 
     def cf_pick(step):                                                   # KD-C: deterministic per-step CF draw (resume-safe — seeded by step,
@@ -554,11 +566,12 @@ def main() -> None:
 
     t0 = run_start = time.time()
     opt.zero_grad(set_to_none=True)
-    nonfinite, last_gnorm, eval_hist, cf_count = 0, 0.0, [], 0
+    nonfinite, last_gnorm, eval_hist, cf_count, hit_wall = 0, 0.0, [], 0, False
     for step in range(start, STEPS + 1):
         if MAX_SEC > 0 and (time.time() - run_start) > MAX_SEC:          # add.55: IN-LOOP hard wall — save + break GRACEFULLY (the wrapper
             save_ckpt(student, opt, step - 1, ckpt, sched)              #   MAX_SEC only fires post-crash; a healthy run needs this to honor a time wall).
-            print(f"!! MAX_SEC={MAX_SEC:.0f}s reached at step {step} — saved ckpt + stopping gracefully (ckpt_best is the ship target)", flush=True)
+            hit_wall = True                                             # add.57: so the final save below can't overwrite this at step=STEPS (which would make RESUME think it's DONE)
+            print(f"!! MAX_SEC={MAX_SEC:.0f}s reached at step {step} — saved ckpt@{step-1} + stopping gracefully (RESUME continues; ckpt_best is the ship target)", flush=True)
             break
         lr_t = lr_at(step)                                               # LR-1: warmup → decay
         for g in opt.param_groups:
@@ -647,11 +660,15 @@ def main() -> None:
                   + (f" | E4 lift={cf['lift']:+.2f} genuine={cf['genuine']:+.2f} (swap={cf['swap_follow']:.2f} "
                      f"mism={cf['swap_mismatch']:.2f} recall={cf['orig_recall']:.2f})" if cf is not None else "")
                   + ("  ↑best" if score == best_score else "") + ("" if subset_ok else "  [subset≠ — slope unreliable]"), flush=True)
-    save_ckpt(student, opt, STEPS, ckpt, sched)
-    print(f"DONE — final ckpt {ckpt}")
+    if not hit_wall:                                                 # add.57: DON'T overwrite the wall-save (step<STEPS) with step=STEPS — that would
+        save_ckpt(student, opt, STEPS, ckpt, sched)                  #   make RESUME (start=STEPS+1) skip the loop and treat an under-trained model as complete.
+        print(f"DONE — final ckpt {ckpt}")
+    else:
+        print(f"STOPPED at MAX_SEC wall — PARTIAL run (ckpt saved for RESUME, NOT done). The verdict/eval-card below grade a PARTIAL model.", flush=True)
     if len(eval_hist) >= 2:                                          # programmatic P0 GO/NO-GO (不要亏 — don't scale a PARROT run)
         verdict = p0_verdict(eval_hist, E1_DROP_MIN, READING_SLOPE_MARGIN, CF_LIFT_MIN, RECALL_LOW, RECALL_DROP_MIN, CF_GENUINE_MIN)
         verdict["steps"] = STEPS
+        verdict["partial_run"] = hit_wall                           # add.57: a wall-stopped run's GO/NO-GO is premature — flag it
         with open(os.path.join(CKPT_DIR, "verdict.json"), "w") as f:
             json.dump(_sanitize(verdict), f, indent=2)               # strict-JSON: non-finite (e.g. NaN lift on a degenerate E4) → null
         v = verdict
@@ -689,12 +706,8 @@ def main() -> None:
         res = {"perplexity": ppl, "raft": raft, "fidelity": fid, "generation": gen,
                "quant": EVAL.quant_fidelity_stub(), "contamination_ok": contamination_ok,
                "teacher_E1_nll": t_e1, "decode_parity": dp, "best_score": best_score, "eval_on": eval_on}
-        if COUNTERFACTUAL and E4_eval:                              # E4: reads-vs-memorizes — reuse the FROZEN per-eval probe (consistency)
-            _cfc = EVAL.eval_counterfactual(student, E4_eval, tok)
-            _mm = EVAL.eval_counterfactual(student, E4_mismatch, tok, follow_only=True)["swap_follow_rate"] if E4_mismatch else float("nan")
-            _cfc["swap_mismatch_rate"] = _mm                        # add.54: foreign-question control
-            _cfc["genuine_reading"] = (_cfc["swap_follow_rate"] - _mm) if _mm == _mm else float("nan")
-            res["counterfactual"] = _cfc
+        if COUNTERFACTUAL and E4_eval:                              # E4: reads-vs-memorizes — FROZEN per-eval probe via the SHARED full helper
+            res["counterfactual"] = EVAL.eval_counterfactual_full(student, E4_eval, E4_mismatch, tok)   # add.57: single-source w/ the offline path
         res["claim"] = EVAL.claim_card(res)
     except Exception as e:
         import traceback

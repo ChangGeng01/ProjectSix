@@ -142,7 +142,10 @@ def generate_and_score(student, examples, tok, maxlen: int = 24, eos=None) -> di
     with torch.no_grad():
         for ex in examples:
             ids = ex["input_ids"]; plen = int(ex["prompt_len"])
-            gold_txt = _normalize_text(tok.decode(ids[plen:].tolist())) if tok is not None else ""
+            gids = ids[plen:].tolist()
+            if eos is not None and gids and gids[-1] == eos:            # add.57: drop the trailing EOS from gold so it matches pred (which
+                gids = gids[:-1]                                        #   STOPS before eos). Without this, RAFT_EOS=1 leaves EOS in gold only → EM≈0 (self-defeating).
+            gold_txt = _normalize_text(tok.decode(gids)) if tok is not None else ""
             seq = ids[:plen].to(DEV); gen = []
             for _ in range(maxlen):
                 lg, _ = student.run_twin(seq, collect_ssm=False)
@@ -187,6 +190,27 @@ def eval_counterfactual(student, E4, tok=None, maxlen: int = 8, follow_only: boo
     recall = orig_hits / max(orig_n, 1) if orig_n else float("nan")
     return {"swap_follow_rate": follow, "orig_recall_rate": recall,
             "counterfactual_lift": (follow - recall) if orig_n else float("nan"), "n": n}
+
+
+def eval_counterfactual_full(student, matched: list, mismatch: list, tok=None, maxlen: int = 8) -> dict:
+    """add.57: the COMPLETE counterfactual result — matched probe + the foreign-question MISMATCH control + genuine_reading
+    (= swap_follow(matched) − swap_follow(mismatched)). SINGLE source used by BOTH the in-training final card AND the offline
+    EVAL_CKPT path, so they can't drift (the offline path previously built only the matched probe → the present-only
+    genuine_reading claim_card gate silently disappeared, letting a CF ckpt grade 成了 without the causal reading test)."""
+    cr = eval_counterfactual(student, matched, tok, maxlen=maxlen)
+    mm = eval_counterfactual(student, mismatch, tok, maxlen=maxlen, follow_only=True)["swap_follow_rate"] if mismatch else float("nan")
+    cr["swap_mismatch_rate"] = mm
+    cr["genuine_reading"] = (cr["swap_follow_rate"] - mm) if mm == mm else float("nan")
+    return cr
+
+
+def build_e4(rows: list, tok, surrogate: str = None) -> tuple:
+    """add.57: build the aligned (matched, mismatch) E4 sets from held rows — for the OFFLINE path that has no frozen sets."""
+    matched = RAFT.make_counterfactual_condition(rows, tok)
+    mismatch = RAFT.make_counterfactual_mismatch(rows, tok)
+    if mismatch:
+        matched, mismatch = RAFT.align_cf_survivors(matched, mismatch, tok)
+    return matched, mismatch
 
 
 # ---------------------------------------------------------------- 5) calibration (ECE)
@@ -262,13 +286,15 @@ def claim_card(res: dict) -> dict:
         "fp16_seq_parity": (parity.get("argmax_agreement") or 0) >= PARITY_BAR,
         "no_contamination": res.get("contamination_ok", False),
     }
-    # add.56 PRESENT-ONLY genuine-reading gate: the CAUSAL reading signal (held-out swapped matched − MISMATCHED follow). The
-    # un-swapped slope (context_use gate) is BLIND to a CF-trained reader, so this is the gate that actually credits reading —
-    # but ONLY when measured (COUNTERFACTUAL=1 + a mismatch set), else absent (don't fail a run that never ran the probe).
-    cf = res.get("counterfactual") or {}
-    genuine = cf.get("genuine_reading")
-    if genuine is not None and genuine == genuine:                   # present + not-NaN
-        gates["genuine_reading"] = genuine >= CF_GENUINE_GATE
+    # genuine-reading gate (add.56/57): the CAUSAL reading signal (held-out swapped matched − MISMATCHED follow) — the
+    # un-swapped slope (context_use) is BLIND to a CF-trained reader. PRESENT-ONLY but FAIL-CLOSED: absent only when the
+    # counterfactual probe was NOT run at all (no `counterfactual` key — don't fail a non-probe run); but if the probe WAS run
+    # yet genuine is missing/NaN (e.g. an empty/degenerate mismatch set silently waiving the test), the gate is FALSE — we ran
+    # the probe and could NOT certify question-conditioned reading, so we must not credit it (add.57 closes the silent-waive false-GO).
+    cf = res.get("counterfactual")
+    if cf is not None:
+        g = cf.get("genuine_reading")
+        gates["genuine_reading"] = (g is not None and g == g and g >= CF_GENUINE_GATE)
     passed = all(gates.values())
     failed = [g for g, v in gates.items() if not v]
     return {"status": "成了 ✓ CLAIMABLE" if passed else "亏的 ✗ FAIL", "gates": gates, "failed_gates": failed}
@@ -367,14 +393,17 @@ def _run_ckpt_eval() -> None:
            "teacher_E1_nll": teacher_answer_nll(teacher, E["E1"]),
            "fidelity": compute_fidelity(student, teacher, E["E1"][:64]),
            "generation": generate_and_score(student, E["E1"][:64], tok, maxlen=24, eos=eos),
-           "quant": quant_fidelity_stub(), "contamination_ok": True, "eval_on": ckpt_path}
+           # add.57: the offline path has no train set → it CANNOT verify train/held disjointness. Fail-closed (the no_contamination
+           # gate is a vacuous pass otherwise — e.g. re-grading with HELD_SPLIT=train). Operator asserts CONTAMINATION_OK=1 if known-disjoint.
+           "quant": quant_fidelity_stub(), "contamination_ok": os.environ.get("CONTAMINATION_OK", "0") == "1", "eval_on": ckpt_path}
     try:                                                                # HOST fp16 seq-parity (reuse the cloud helper; lazy import avoids a cycle)
         from mamba3_cloud_distill import decode_parity
         res["decode_parity"] = decode_parity(student, E["E1"])
     except Exception as e:
         res["decode_parity"] = {"argmax_agreement": None, "note": f"parity skipped: {e!r}"}
-    if os.environ.get("COUNTERFACTUAL") == "1":                          # E4 reads-vs-memorizes diagnostic (default off)
-        res["counterfactual"] = eval_counterfactual(student, RAFT.make_counterfactual_condition(rows, tok), tok)
+    if os.environ.get("COUNTERFACTUAL") == "1":                          # E4 reads-vs-memorizes — add.57: matched + MISMATCH (genuine), via the
+        matched, mismatch = build_e4(rows, tok)                          #   SHARED full helper so the offline grade carries the genuine_reading gate (was dropped before)
+        res["counterfactual"] = eval_counterfactual_full(student, matched, mismatch, tok)
     res["claim"] = claim_card(res)
     out = os.environ.get("EVAL_OUT") or os.path.join(os.path.dirname(ckpt_path) or ".", "eval_card_offline.json")
     with open(out, "w") as f:

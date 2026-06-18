@@ -127,6 +127,17 @@ def test_select_score_uses_cf_lift_when_present():
     assert CD.select_score(2.0, 0.0, 0.0, 0.5, cf_lift=0.50) > CD.select_score(2.0, 0.0, 0.40, 0.5, cf_lift=0.0)
 
 
+def test_nogold_kd_scale_and_ce_skip():
+    """add.57: the no-gold KD/CE knobs — extracted from the kd_ce closure (which had ZERO coverage) into pure helpers."""
+    k = torch.tensor(2.0)
+    assert CD.nogold_kd_scale(k, keep_gold=True, kd_nogold_w=0.3) is k                       # keep_gold → unchanged
+    assert float(CD.nogold_kd_scale(k, keep_gold=False, kd_nogold_w=0.3)) == pytest.approx(0.6)  # no-gold → down-weighted
+    assert CD.nogold_kd_scale(k, keep_gold=False, kd_nogold_w=1.0) is k                      # w=1.0 → legacy unchanged
+    assert CD.nogold_ce_skip(keep_gold=False, raft_nogold_ce=False) is True                  # no-gold + CE off → skip CE
+    assert CD.nogold_ce_skip(keep_gold=False, raft_nogold_ce=True) is False                  # CE on no-gold when enabled
+    assert CD.nogold_ce_skip(keep_gold=True, raft_nogold_ce=False) is False                  # keep_gold → never skip
+
+
 def test_select_score_cf_lift_nan_is_safe():
     """A degenerate-E4 NaN lift must not crash or reward — falls to 0 reading reward (conservative)."""
     nan = float("nan")

@@ -251,6 +251,18 @@ def test_cf_train_pool_surrogate_is_randomized_and_not_the_e4_nonce(stub_tok):
     assert len(surrogates) >= 2                                       # randomized per example, not one constant
 
 
+def test_word_boundary_swap_does_not_corrupt_substrings():
+    """add.57: the fact-swap MUST be word-boundaried — a short answer that's a substring of larger words ('Ann' in
+    'Announcement'/'Anne', '19' in '192') must NOT be corrupted, or swap_follow/genuine (the make-or-break metric) is biased."""
+    import mamba3_raft as RAFT
+    assert RAFT._swap_fact("Ann wrote the Announcement; Anne too.", "Ann", "Zelophar") == "Zelophar wrote the Announcement; Anne too."
+    assert RAFT._has_word("Ann spoke", "Ann") is True
+    assert RAFT._has_word("Announcement", "Ann") is False
+    assert RAFT._has_word("the year 19 ended", "19") is True
+    assert RAFT._has_word("the year 192 ended", "19") is False
+    assert RAFT._swap_fact("born 1925 in", "1925", "3017") == "born 3017 in"   # numeric word-swap
+
+
 def test_raft_eos_appends_stop_token_when_on(stub_tok, monkeypatch):
     """add.56: RAFT_EOS appends EOS to the answer target (in the supervised span) so the model learns to STOP — the structural
     root cause of the parrot's free-greedy EM=0 (the model otherwise never terminates, runs the full maxlen → pred≠gold)."""

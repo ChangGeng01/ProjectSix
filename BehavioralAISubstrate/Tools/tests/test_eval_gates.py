@@ -73,17 +73,21 @@ def test_claim_card_exactly_eight_gate_keys():
     }
 
 
-def test_genuine_reading_gate_is_present_only(monkeypatch):
-    """add.56: the genuine-reading gate (held-out swapped matched−MISMATCHED follow) is the CAUSAL reading signal the blind
-    context_use slope can't give — but PRESENT-ONLY: absent unless COUNTERFACTUAL measured it (so a non-CF run isn't failed)."""
+def test_genuine_reading_gate_present_only_and_fail_closed(monkeypatch):
+    """add.56/57: the genuine-reading gate (held-out swapped matched−MISMATCHED follow) is the CAUSAL reading signal the blind
+    context_use slope can't give. PRESENT-ONLY (absent if the probe was never run → a non-CF run isn't failed), but FAIL-CLOSED
+    (if the probe WAS run yet genuine is missing/NaN — e.g. an empty mismatch set silently waiving the test — the gate is FALSE)."""
     base = _passing_res()
-    assert "genuine_reading" not in EV.claim_card(base)["gates"]               # no counterfactual → gate absent (8 keys)
+    assert "genuine_reading" not in EV.claim_card(base)["gates"]               # no `counterfactual` key → gate absent (8 keys), probe not run
     reads = EV.claim_card({**base, "counterfactual": {"genuine_reading": 0.45}})
     assert reads["gates"]["genuine_reading"] is True and len(reads["gates"]) == 9
     copy = EV.claim_card({**base, "counterfactual": {"genuine_reading": 0.05}})  # below CF_GENUINE_GATE=0.20 → copy-heuristic → fail
     assert copy["gates"]["genuine_reading"] is False and copy["status"].startswith("亏的")
-    nan = EV.claim_card({**base, "counterfactual": {"genuine_reading": float("nan")}})
-    assert "genuine_reading" not in nan["gates"]                               # NaN (degenerate) → absent, not a crash/false-fail
+    # FAIL-CLOSED: probe ran (counterfactual present) but genuine NaN or missing → gate present + False (not a silent waive)
+    nan = EV.claim_card({**base, "counterfactual": {"swap_follow_rate": 0.5, "genuine_reading": float("nan")}})
+    assert nan["gates"]["genuine_reading"] is False
+    missing = EV.claim_card({**base, "counterfactual": {"swap_follow_rate": 0.5}})  # no genuine_reading key at all
+    assert missing["gates"]["genuine_reading"] is False
 
 
 def test_claim_card_status_chengle_only_when_all_true():
@@ -394,6 +398,28 @@ def test_generate_and_score_respects_eos_stop(tiny_mamba, eval_examples, stub_to
     out = EV.generate_and_score(tiny_mamba, eval_examples(), stub_tok, maxlen=6, eos=stub_tok.eos_token_id)
     assert 0.0 <= out["EM"] <= 1.0
     assert 0.0 <= out["F1"] <= 1.0
+
+
+def test_generate_and_score_strips_gold_eos_for_raft_eos_symmetry(stub_tok):
+    """add.57: when RAFT_EOS appended EOS to the gold answer span, generate_and_score must STRIP the trailing EOS from gold
+    (pred STOPS before eos) — else gold!=pred on every row → EM≈0, making the RAFT_EOS lever self-defeating."""
+    import torch
+
+    class _FakeGen:                                                       # deterministically emits a fixed answer-token list, then EOS
+        def __init__(self, ans, plen, vocab=512):
+            self.ans, self.plen, self.vocab = ans, plen, vocab
+
+        def run_twin(self, seq, collect_ssm=False):
+            i = seq.shape[0] - self.plen
+            nxt = self.ans[i] if i < len(self.ans) else stub_tok.eos_token_id
+            lg = torch.full((seq.shape[0], self.vocab), -1e4); lg[-1, nxt] = 1e4
+            return lg, None
+
+    ans = stub_tok("Paris", add_special_tokens=False).input_ids
+    plen = 3
+    ex = {"input_ids": torch.tensor([1, 1, 1] + ans + [stub_tok.eos_token_id]), "prompt_len": plen}   # RAFT_EOS-style gold (+EOS)
+    out = EV.generate_and_score(_FakeGen(ans, plen), [ex], stub_tok, maxlen=8, eos=stub_tok.eos_token_id)
+    assert out["EM"] == 1.0          # pred (answer, stops at eos) == gold (answer, trailing EOS stripped) → would be 0 without the fix
 
 
 def test_generate_and_score_empty_examples():
