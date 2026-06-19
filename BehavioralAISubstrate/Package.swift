@@ -623,6 +623,13 @@ let package = Package(
             // exposed by the C system bridge target。
             "BASMPSGraphExecutableCacheCxx",
             "BASCSystemBridge"
+        ]),
+        // Universal Draft Layer — XCTest-ONLY target (no swift-testing), so these run in their OWN .xctest bundle
+        // and are not blocked by the swift-testing/XCTest co-bundle load crash in BehavioralAISubstrateTests.
+        .testTarget(name: "BASUniversalDraftLayerTests", dependencies: [
+            "BASRuntimeCore",
+            "BASOrgan",
+            "BASMLXAdapter"
         ])
     ]
 )

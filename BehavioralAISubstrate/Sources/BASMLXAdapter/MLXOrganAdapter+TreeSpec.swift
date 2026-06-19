@@ -26,7 +26,7 @@ extension MLXOrganAdapter {
 
     public func treeSpecAB(
         for request: BASOrganRequest,
-        drafter: BASPromptLookupDrafter,
+        drafter: any BASUniversalDraftSource,
         maxBranch: Int = 2,
         maxNodes: Int = 8
     ) async throws -> TreeSpecAB {

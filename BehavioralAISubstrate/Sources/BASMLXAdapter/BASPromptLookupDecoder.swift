@@ -34,15 +34,22 @@ public struct BASPromptLookupDecoder {
         input: LMInput,
         model: any LanguageModel,
         parameters: GenerateParameters,
-        drafter: BASPromptLookupDrafter,
+        drafter: any BASUniversalDraftSource,
         eosTokenIds: Set<Int>,
         adaptiveK: Bool = false
     ) throws -> Result {
-        var cache = model.newCache(parameters: parameters)
-        // ADR-039: the spec-decode rewind needs an UNCONDITIONALLY trimmable cache. canTrimPromptCache only checks
-        // offset==0 at construction; a RotatingKVCache (maxKVSize != nil) flips isTrimmable→false once it fills past
-        // maxCacheSize, after which trimPromptCache silently under-trims and desyncs the cache from the committed
-        // prefix — breaking the token-identical-to-greedy invariant mid-run. Reject it up front (fail-closed).
+        // Local mutable binding so a STATEFUL source (e.g. the cross-turn `BASCrossTurnDrafter`) can advance its
+        // index across rounds via the `mutating` `propose`; the stateless `BASPromptLookupDrafter` is unaffected.
+        var drafter = drafter
+        // ADR-039: the per-round rewind (`trimPromptCache`) must be lossless. A stock RotatingKVCache (sliding-window
+        // models, e.g. Gemma) CANNOT be rewound — `trim` is scalar bookkeeping over a rotated/rebuilt ring, so it
+        // desyncs the committed prefix (device-measured byte_identical=1/8 on Gemma-4-E4B). So instead of the stock
+        // cache we drive the verify lane with `BASWindowMaskedCache.verifyCache(...)`, which swaps each sliding
+        // RotatingKVCache for an APPEND-ONLY window-masked cache (window enforced by the mask, not eviction): one
+        // update path ⇒ verify-K == K-singles bit-identical, and `trim` is a clean `offset -= n`. Full-attention
+        // caches are left untouched, so Llama/Qwen stay byte-unchanged. The guard below now PASSES for swapped Gemma
+        // (no RotatingKVCache remains) and still fail-closes on any non-trimmable cache we couldn't swap.
+        var cache = BASWindowMaskedCache.verifyCache(for: model, parameters: parameters)
         guard cache.allSatisfy({ !($0 is RotatingKVCache) }), canTrimPromptCache(cache) else {
             throw DecodeError.nonTrimmableCache
         }

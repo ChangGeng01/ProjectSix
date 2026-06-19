@@ -382,6 +382,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASPromptLookupProbe.run() }
             return
         }
+        // Universal Draft Layer Phase 1 — CROSS-TURN suffix-source speculative decode: per-turn speedup +
+        // byte-identity + acceptance across a multi-turn conversation, where later turns reuse earlier turns'
+        // tokens (BAS_SUFFIX_PROBE=1). Model-free, any-LLM, device-only — the cross-turn promotion gate.
+        if (env["BAS_SUFFIX_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASSuffixLookupProbe.run() }
+            return
+        }
         // 全面进化 T1.2 — ANE utilization measurement (BAS_ANE_PROBE=1). MLX-free (CoreML heads only) but
         // launched via the same aux path; runs fine on device (MLComputePlan is iOS 17.4+).
         if (env["BAS_ANE_PROBE"] ?? "0") == "1" {

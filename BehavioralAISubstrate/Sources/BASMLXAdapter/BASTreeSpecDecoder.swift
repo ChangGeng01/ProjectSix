@@ -28,12 +28,16 @@ public struct BASTreeSpecDecoder {
         input: LMInput,
         model: any LanguageModel,
         parameters: GenerateParameters,
-        drafter: BASPromptLookupDrafter,
+        drafter: any BASUniversalDraftSource,
         eosTokenIds: Set<Int>,
         maxBranch: Int = 2,
         maxNodes: Int = 8,
         maskDType: DType = .float16
     ) throws -> Result {
+        // Local mutable binding so a STATEFUL source (e.g. the cross-turn `BASCrossTurnDrafter`) can advance its
+        // index across rounds via the `mutating` `proposeTree`/`propose`; the stateless `BASPromptLookupDrafter`
+        // is unaffected. (Mirrors BASPromptLookupDecoder. Tree-verify is still gated OFF — measure-only.)
+        var drafter = drafter
         guard let treeModel = model as? BASTreeDecodable else {
             // Fail-open: no tree support → linear prompt-lookup (token-identical, just less aggressive).
             let r = try BASPromptLookupDecoder.generate(
@@ -43,7 +47,14 @@ public struct BASTreeSpecDecoder {
         }
 
         var cache = model.newCache(parameters: parameters)
-        guard canTrimPromptCache(cache) else { throw DecodeError.nonTrimmableCache }
+        // ADR-039: mirror BASPromptLookupDecoder's UNCONDITIONALLY-trimmable guard. canTrimPromptCache only checks
+        // offset==0 at construction; a RotatingKVCache (maxKVSize != nil) flips isTrimmable→false once it fills past
+        // maxCacheSize, after which the tree's trim-all+replay rewind silently under-trims and desyncs the cache
+        // from the committed prefix — breaking token-identity. Reject it up front (fail-closed), same as the linear
+        // lane, so this path stays safe under any future drafter-seam widening / warm-cache injection. (audit hardening)
+        guard cache.allSatisfy({ !($0 is RotatingKVCache) }), canTrimPromptCache(cache) else {
+            throw DecodeError.nonTrimmableCache
+        }
         let sampler = parameters.sampler()
         let maxTokens = parameters.maxTokens
 

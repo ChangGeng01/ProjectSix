@@ -289,6 +289,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// stays `fileprivate` — never escapes the type.
     private var sessions: [String: ChatSessionBox] = [:]
 
+    /// Cross-turn draft corpus (Universal Draft Layer, Phase 1): per-conversation token history that feeds the
+    /// model-free cross-turn suffix source (`BASCrossTurnDrafter`). Plain RAM — no MLX residency — bounded both
+    /// per-session and by session count. Actor-isolated, so its mutations are serialized like `sessions`.
+    /// `internal` (not `private`) so the `+SuffixSpec` extension (same module, different file) can reach it.
+    var crossTurnStore = BASSessionTokenStore()
+
+    /// Online per-(source × purpose) acceptance learning for the Universal Draft Layer router
+    /// (`respondAccelerated`). CROSS-session accumulated learning (an EMA), so it is intentionally NOT reset by
+    /// `clearSession`/`clearAllSessions`. Immutable value folded after each accelerated turn. `internal` for
+    /// `+SuffixSpec` access.
+    var draftProfiler = BASAcceptanceProfiler()
+
     /// Read accessor for the streaming extension (different file,
     /// same module). Cannot be `private` because extensions in
     /// other files can't see private storage.
@@ -1084,6 +1096,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// Frees its KV cache; future calls with that ID start fresh.
     /// No-op if no session under that ID exists.
     public func clearSession(sessionID: String) {
+        crossTurnStore.clear(session: sessionID)
         #if canImport(MLXLLM)
         sessions.removeValue(forKey: Self.sessionKey(sessionID, .scout))
         sessions.removeValue(forKey: Self.sessionKey(sessionID, .core))
@@ -1093,6 +1106,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// Evict every cached session at once. Useful for memory
     /// pressure events (L1 thermal/budget pressure) and for tests.
     public func clearAllSessions() {
+        crossTurnStore.clearAll()
         #if canImport(MLXLLM)
         sessions.removeAll()
         #endif

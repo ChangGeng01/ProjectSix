@@ -278,6 +278,12 @@ private class Gemma4Attention: Module {
         super.init()
     }
 
+    /// BAS byte-identity fix (BAS_FP32_VERIFY ∈ {sdpa,full}): run scaled-dot-product attention in fp32 (cast Q/K/V up,
+    /// output back to bf16 for oProj + the bf16 KV cache). The SDPA score matmul + online-softmax KV reduction is the
+    /// other batch-non-invariant op; enable only if fp32-projection alone doesn't reach byte_identical=8/8 (bisect arm 2).
+    private static let fp32VerifyAttention: Bool =
+        ProcessInfo.processInfo.environment["BAS_FP32_VERIFY"].map { ["sdpa", "full"].contains($0) } ?? false
+
     func callAsFunction(
         _ x: MLXArray,
         mask: MLXFast.ScaledDotProductAttentionMaskMode? = nil,
@@ -335,15 +341,20 @@ private class Gemma4Attention: Module {
             }
         }
 
-        let output = MLXFast.scaledDotProductAttention(
-            queries: queries,
-            keys: keys,
-            values: values,
+        let qF = Self.fp32VerifyAttention ? queries.asType(.float32) : queries
+        let kF = Self.fp32VerifyAttention ? keys.asType(.float32) : keys
+        let vF = Self.fp32VerifyAttention ? values.asType(.float32) : values
+        var sdpa = MLXFast.scaledDotProductAttention(
+            queries: qF,
+            keys: kF,
+            values: vF,
             scale: scale,
             mask: adjustedMask ?? .none
         )
-        .transposed(0, 2, 1, 3)
-        .reshaped(B, L, -1)
+        if Self.fp32VerifyAttention { sdpa = sdpa.asType(queries.dtype) }   // back to bf16 for oProj + KV cache
+        let output = sdpa
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
 
         return (oProj(output), (keys, values), activePositionOffset)
     }
@@ -652,8 +663,18 @@ public class Gemma4TextModel: Module, LLMModel, KVCacheDimensionProvider {
         }
     }
 
+    /// BAS byte-identity fix (BAS_FP32_VERIFY ∈ {1,proj,full}): cast the final hidden state to fp32 BEFORE the tied
+    /// 262144-vocab output projection, so the single largest reduction in the network accumulates in fp32. This pins
+    /// the batch-shape-dependent reduction order that otherwise scatters near-tied top-2 logits by bf16 ULP (batch
+    /// non-invariance) and flips ~1% of tokens — the cause of byte_identical=1/8 on Gemma cross-turn spec-decode
+    /// (device-measured). MUST cast the input hidden, not the bf16 logits (the ULP damage is already baked in by then).
+    /// Off by default; verify/probe lane only. Llama/Qwen are other model classes, untouched. See UNIVERSAL_DRAFT_LAYER.md.
+    private static let fp32VerifyProjection: Bool =
+        ProcessInfo.processInfo.environment["BAS_FP32_VERIFY"].map { ["1", "proj", "full"].contains($0) } ?? false
+
     public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]?) -> MLXArray {
         var out = model(inputs, cache: cache)
+        if Self.fp32VerifyProjection { out = out.asType(.float32) }   // fp32-accumulate the vocab projection (+ softcap)
         if let lmHead {
             out = lmHead(out)
         } else {
