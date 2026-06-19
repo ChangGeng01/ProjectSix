@@ -13,7 +13,7 @@
   swift-jinja, EventSource, yyjson).
 - **2 of OURS — never touched by a re-vendor:** `bas-rust-binaries` (Rust XCFramework), `mamba-ssm-fixtures`.
 
-## The FOUR patch classes that MUST be ported (they die silently if forgotten)
+## The patch classes that MUST be ported (they die silently if forgotten)
 
 > **Apply order for the two that touch `Evaluate.swift`:** class 2 (ADR-038 wedge instruments) FIRST, then class 3
 > (rejection sampling) — class 3's diff is cut against the post-ADR-038 file.
@@ -51,6 +51,15 @@
    certified on-device). If a hunk fails after a refresh, port by hand (re-add the enum, the `acceptanceStrategy`
    init param + stored field, the `switch acceptanceStrategy` in `speculateRound`, and the two free-function
    params) and REGENERATE the archived diff.
+4. **Gemma4 fp32-verify diagnostic** (default-OFF; SAFE TO DROP if it ever fails to port) — env-gated fp32 lane in
+   `Vendor/mlx-swift-lm/Libraries/MLXLLM/Models/Gemma4Text.swift`: statics `fp32VerifyProjection` / `fp32VerifyAttention`
+   + the casts before `embedTokens.asLinear` (final projection) and around `scaledDotProductAttention`. `BAS_FP32_VERIFY=
+   {proj,sdpa,full}` casts those to fp32 to BISECT the Gemma cross-turn byte-identity residual — a MEASURED DEAD END
+   (tops out 2/8 byte-identical at ~1.7× latency; the divergence is genuine MLX batch non-invariance, not fixable here).
+   UNSET = byte-identical to upstream (a reproducible diagnostic, NOT a functional patch). No archived `.diff` (low
+   value): re-apply from the inline `// BAS byte-identity fix` docstrings or `git show 9d5b3fcf4 -- …/Gemma4Text.swift`.
+5. **Spec-decode tree mask** — `Docs/patches/spec-decode-tree-mask.diff` (present in Docs/patches/ but was unenumerated
+   here): the candidate-tree attention mask + per-depth RoPE for `BASTreeSpecDecoder`. Port if the tree lane is kept.
 
 ## Procedure (the 2026-06-11 run, verbatim-reusable)
 

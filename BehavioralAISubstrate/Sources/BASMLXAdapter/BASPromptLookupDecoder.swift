@@ -49,7 +49,7 @@ public struct BASPromptLookupDecoder {
         // update path ⇒ verify-K == K-singles bit-identical, and `trim` is a clean `offset -= n`. Full-attention
         // caches are left untouched, so Llama/Qwen stay byte-unchanged. The guard below now PASSES for swapped Gemma
         // (no RotatingKVCache remains) and still fail-closes on any non-trimmable cache we couldn't swap.
-        var cache = BASWindowMaskedCache.verifyCache(for: model, parameters: parameters)
+        let cache = BASWindowMaskedCache.verifyCache(for: model, parameters: parameters)
         guard cache.allSatisfy({ !($0 is RotatingKVCache) }), canTrimPromptCache(cache) else {
             throw DecodeError.nonTrimmableCache
         }

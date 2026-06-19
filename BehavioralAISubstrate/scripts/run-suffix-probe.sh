@@ -22,7 +22,9 @@ PROJECT="${PROJECT:-DeviceTestApp/BASDeviceTest.xcodeproj}"
 BUILD="${BUILD:-0}"
 POLL_SEC="${POLL_SEC:-15}"
 MAX_POLL="${MAX_POLL:-40}"                      # ~MAX_POLL × POLL_SEC budget per K pass
-K_VALUES="${K_VALUES:-4 8}"                     # baseline vs aggressive
+# Single-dash: an explicit empty K_VALUES="" runs ZERO passes (build/install-only); UNSET defaults to "4 8".
+# Must be a non-empty space-separated list to run passes (e.g. K_VALUES="8").
+K_VALUES="${K_VALUES-4 8}"                       # baseline vs aggressive
 SLOOKUP_MODEL="${SLOOKUP_MODEL:-llama_3b}"      # llama_3b (default — full attention, trimmable cache) | qwen_3b
 # NOTE: gemma_e2b is sliding-window (RotatingKVCache) → the byte-identity decoder fail-closes with
 # nonTrimmableCache (verified on-device 2026-06-19). Use a full-attention model for the cross-turn probe.

@@ -38,7 +38,7 @@ public struct BASCoreMLDraftDecoder {
         eosTokenIds: Set<Int>,
         numDraftTokens K: Int = 4
     ) throws -> Result {
-        var cache = model.newCache(parameters: parameters)
+        let cache = model.newCache(parameters: parameters)
         // ADR-039: the spec-decode rewind needs an UNCONDITIONALLY trimmable cache. canTrimPromptCache only checks
         // offset==0 at construction; a RotatingKVCache (maxKVSize != nil) flips isTrimmable→false once it fills past
         // maxCacheSize, after which trimPromptCache silently under-trims and desyncs the cache from the committed

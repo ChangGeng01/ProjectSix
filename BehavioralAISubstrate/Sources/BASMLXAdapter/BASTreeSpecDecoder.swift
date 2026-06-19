@@ -46,7 +46,7 @@ public struct BASTreeSpecDecoder {
                           acceptedTokens: r.accepted, maxPathLen: 0)
         }
 
-        var cache = model.newCache(parameters: parameters)
+        let cache = model.newCache(parameters: parameters)
         // ADR-039: mirror BASPromptLookupDecoder's UNCONDITIONALLY-trimmable guard. canTrimPromptCache only checks
         // offset==0 at construction; a RotatingKVCache (maxKVSize != nil) flips isTrimmable→false once it fills past
         // maxCacheSize, after which the tree's trim-all+replay rewind silently under-trims and desyncs the cache

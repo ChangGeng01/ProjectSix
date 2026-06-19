@@ -94,7 +94,14 @@ enum BASSuffixLookupProbe {
         // byte). On batch-NON-invariant sliding-window models (Gemma) sequential byte-identity is unreachable in MLX
         // (~0.68 bf16 logit drift, mlx-optiq) yet losslessness holds; net-positivity (reuse>1× needs real acceptance)
         // doubles as the broken-source detector. See Docs/UNIVERSAL_DRAFT_LAYER.md.
-        let gateMode = (env["BAS_SL_GATE"] ?? "strict").lowercased()
+        // PER-MODEL DEFAULT (when BAS_SL_GATE is unset): sliding-window Gemma is batch-NON-invariant (strict
+        // byte-identity is structurally unreachable in MLX) so it defaults to "lossless"; full-attention models
+        // (Llama/Qwen, batch-invariant → 8/8) default to "strict". An explicit BAS_SL_GATE always overrides.
+        let selForGate = (env["BAS_SLOOKUP_MODEL"] ?? "llama_3b").lowercased()
+        let defaultGate =
+            (selForGate.contains("gemma") || selForGate.contains("e4b") || selForGate.contains("e2b"))
+            ? "lossless" : "strict"
+        let gateMode = (env["BAS_SL_GATE"] ?? defaultGate).lowercased()
         let losslessGate = gateMode == "lossless"
         fileLog.emit("📊 suffix-lookup START ngram=\(ngramMin)..\(ngramMax) K=\(k) cap=\(cap) gate=\(gateMode)")
 
@@ -108,6 +115,7 @@ enum BASSuffixLookupProbe {
             switch sel {
             case "llama", "llama_3b": model = MLXModelCatalog.speculativeOptimalTarget
             case "qwen", "qwen_3b": model = MLXModelCatalog.qwen2_5_3B_4bit
+            case "qwen_7b", "qwen7b": model = MLXModelCatalog.qwen2_5_7B_4bit
             case "gemma_e4b", "gemma4_e4b", "e4b": model = MLXModelCatalog.gemma4_E4B_4bit
             default: model = MLXModelCatalog.gemma4_E2B_4bit
             }
@@ -133,6 +141,7 @@ enum BASSuffixLookupProbe {
 
             var laterTurnReuseSpeedups: [Double] = []   // turn ≥ 1 of reuse scenarios — the cross-turn win
             var controlSpeedups: [Double] = []          // control turns — expected ~0.90–0.95× (lane-gated off)
+            var controlWeights: [Double] = []           // per-turn (baseMs+specMs): duration-weights the control mean
             var allByteIdentical = true
             var turnCount = 0, identicalCount = 0
             var hadError = false        // any conversation threw → verdict is INVALID, not a measured FAIL
@@ -155,6 +164,7 @@ enum BASSuffixLookupProbe {
                                 if ab.turn >= 1 { laterTurnReuseSpeedups.append(speedup) }
                             } else {
                                 controlSpeedups.append(speedup)
+                                controlWeights.append(ab.baseMs + ab.specMs)
                             }
                             fileLog.emit(String(
                                 format: "📊 suffix convo=%@ turn=%d reuse=%@ tokens=%d rounds=%d hit_rate=%.2f "
@@ -174,8 +184,18 @@ enum BASSuffixLookupProbe {
             }
 
             func mean(_ xs: [Double]) -> Double { xs.isEmpty ? 0 : xs.reduce(0, +) / Double(xs.count) }
+            // Duration-weighted mean: weight each turn's speedup by its wall-clock (baseMs+specMs) so a SHORT free-form
+            // control turn (few tokens → a small/small ratio with huge relative timing variance) can't tank the mean. A
+            // device run showed two control turns at 0.44× and 1.17× (pure noise) on 42/87-tok gens → flat mean 0.80×
+            // (false FAIL) while duration-weighting (the longer turn dominates) recovers ~0.98×. Falls back to the flat
+            // mean if weights are absent/zero. The load-bearing reuseMean (real acceptance) is unaffected.
+            func weightedMean(_ xs: [Double], _ ws: [Double]) -> Double {
+                let wsum = ws.reduce(0, +)
+                guard xs.count == ws.count, wsum > 0 else { return mean(xs) }
+                return zip(xs, ws).reduce(0.0) { $0 + $1.0 * $1.1 } / wsum
+            }
             let reuseMean = mean(laterTurnReuseSpeedups)
-            let controlMean = mean(controlSpeedups)
+            let controlMean = weightedMean(controlSpeedups, controlWeights)
             // Distinguish INVALID (infra failure / missing data) from a genuine measured verdict, so an error or
             // empty arm is never reported as a measured PASS/FAIL.
             let valid = !hadError && excludedTurns == 0

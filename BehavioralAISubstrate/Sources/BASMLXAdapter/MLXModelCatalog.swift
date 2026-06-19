@@ -123,6 +123,17 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Qwen2.5 3B (MLX, 4-bit)",
         extraEOSTokens: ["<|im_end|>"])
 
+    /// Qwen2.5 **7B** instruction-tuned, 4-bit (~4.3 GB). The MODEL-AXIS lever for the cross-turn UDL: a LARGER
+    /// full-attention (batch-invariant → strict byte-identical) model whose slower per-token decode AMORTIZES the
+    /// fixed per-round n-gram-scan overhead — so the cross-turn ratio rises toward the ideal accepted-length and the
+    /// free-form control penalty shrinks toward neutral, with a bigger absolute tok/s win. Memory-marginal on the 8 GB
+    /// A19 (bigger than E4B's ~2.7 GB) — needs the increased-memory entitlement; may jetsam. ChatML `<|im_end|>`.
+    public static let qwen2_5_7B_4bit = Entry(
+        id: "mlx-community/Qwen2.5-7B-Instruct-4bit",
+        providerID: "mlx.qwen2_5.7b.it.4bit",
+        providerName: "Qwen2.5 7B (MLX, 4-bit)",
+        extraEOSTokens: ["<|im_end|>"])
+
     /// Llama 3.2 **1B** instruction-tuned, 4-bit — a SMALLER (sub-2B) throughput pick. Decode tok/s scales
     /// inversely with parameter count, so a 1B should decode meaningfully faster than the ~42.6 tok/s
     /// Gemma-3n-E2B baseline (MLX_DECODE_ANATOMY.md) — at a QUALITY cost (fits fast/scout/classify paths, not
