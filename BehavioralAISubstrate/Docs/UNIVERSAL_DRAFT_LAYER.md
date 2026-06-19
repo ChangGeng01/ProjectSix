@@ -116,4 +116,38 @@ the low-entropy short-suffix worst case while preserving the branch-0==propose()
   `swift build --build-tests` green. XCTest pins exist (`BASSuffixAutomatonTests`, `BASSessionTokenStoreTests`,
   `BASCrossTurnDrafterTests`, `BASDraftSourceRouterTests`) — they run once the pre-existing full-suite bundle
   SIGSEGV-on-load is resolved; their logic is harness-verified now.
-- **Device (pending):** the run above. Net-positivity certifies only on the A19.
+- **Device (DONE 2026-06-20):** all 4 supported models `PROMOTION_GATE=PASS` on the A19 — see the scoreboard below.
+
+## Device results + audit (2026-06-20)
+
+**Scoreboard (cross-turn K=8, iPhone Air A19, all `PROMOTION_GATE=PASS`):**
+
+| model | attention | gate | byte_identical | reuse | note |
+|---|---|---|---|---|---|
+| `qwen_7b` | full | strict | 8/8 | 1.37–1.41× | model-axis lever; ~4.3 GB, fits 8 GB w/ the increased-memory entitlement |
+| `qwen_3b` | full | strict | 8/8 | 1.36× | |
+| `llama_3b` | full | strict | 8/8 | 1.07–1.13× | the certified path |
+| `gemma_e4b` | sliding | lossless | 1/8 | 1.20× | MLX batch non-invariance — see below |
+
+- **Full-attention = batch-invariant = strict byte-identical 8/8** (Llama + Qwen, 3 sizes). **MODEL-AXIS LEVER:** the
+  cross-turn ratio rises with model size as the fixed per-round n-gram-scan overhead amortizes over a slower decode —
+  decisive datum: identical rag-revisit-turn0 workload went `qwen_3b 0.73× → qwen_7b 1.87×`.
+- **Gemma (sliding-window) is byte_identical 1/8 — NOT a bug:** genuine MLX batch non-invariance (~0.68 bf16 logit
+  drift, independently confirmed by dflash-mlx + mlx-optiq, neither of which byte-fixes it). The fp32 verify lane
+  (`BAS_FP32_VERIFY`, default-OFF diagnostic) tops out 2/8 at ~1.7× latency — a measured dead end. So Gemma runs the
+  **`lossless` gate**: the field-standard where every emitted token is the target's verify argmax (= ADR-039,
+  structurally guaranteed), certifying 1.20× without the unreachable sequential-byte-identity bar.
+
+**Gate (`BAS_SL_GATE` strict|lossless):** `strict` (default for full-attention) requires byte-identity; `lossless`
+(default for `gemma_*`) requires the ADR-039 guarantee. Net-positivity = `reuse>1×` AND **duration-weighted**
+control ≥0.90× (a short noisy free-form turn can't tank it) AND `reuse_mean_acc > 0.05` (the **acceptance corruption
+guard** — a byte-identical-but-broken source collapses acceptance to ~0, invisible to byte-identity alone).
+
+**Audit (2026-06-20, multi-agent, adversarially verified — every finding adjudicated):** UDL core SOLID, ADR-039
+intact, no byte-identity/cache bug. Two agent-flagged CRITICALs (EOS-breaks-ADR-039, `windowForwardDiag` value-
+semantics) were **REFUTED** by adversarial re-verification (EOS: the `break` precedes `out.append`, so EOS is never
+emitted; caches are reference types so the restore propagates). Hardened: duration-weighted control mean, per-model
+gate default, acceptance corruption guard, `var→let` ×3, script env-value validation + jetsam fast-fail, fp32 patch
+registered in `VENDOR_REFRESH_RECIPE.md` class 4. **Deferred (P0):** a model-axis router (auto-pick the largest
+full-attention model that fits) — blocked because `BASMLXMemoryBudget` tests the *default* jetsam cap and does not
+model the increased-memory entitlement, so a budget-driven router would wrongly reject the qwen_7b that actually loads.

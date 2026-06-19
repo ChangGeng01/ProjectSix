@@ -70,12 +70,19 @@ if [ "${BUILD}" = "1" ]; then
     xcrun devicectl device install app --device "${DEVICE_ID}" "${APP}" 2>&1 | grep -iE "App installed|error" | tail -2
 fi
 
+app_alive() { xcrun devicectl device info processes --device "${DEVICE_ID}" 2>/dev/null | grep -qi basdevicetest; }
+
 run_pass() {  # run_pass K
     local k="$1"
     echo ""
     echo "### Pass K=${k} ----------------------------------------------"
     terminate_app; sleep 2
     local prior; prior="$(basename "$(newest_log)" 2>/dev/null || echo none)"
+    # Guard: these values flow UNESCAPED into the JSON below — reject anything but a simple identifier so a stray
+    # quote/backslash can't produce malformed JSON (devicectl rejects it) or inject an extra key.
+    for v in "${k}" "${SLOOKUP_MODEL}" "${FP32_VERIFY}" "${GATE}"; do
+        case "${v}" in *[!A-Za-z0-9_.-]*) echo "  ABORT: unsafe env value '${v}' (allowed: A-Za-z0-9_.-)"; return 5 ;; esac
+    done
     local pairs="\"BAS_ENDURANCE_AUTOSTART\":\"1\",\"BAS_SUFFIX_PROBE\":\"1\",\"BAS_SL_K\":\"${k}\",\"BAS_SLOOKUP_MODEL\":\"${SLOOKUP_MODEL}\""
     [ -n "${FP32_VERIFY}" ] && pairs="${pairs},\"BAS_FP32_VERIFY\":\"${FP32_VERIFY}\""
     [ -n "${FWDDIAG}" ] && pairs="${pairs},\"BAS_SL_FWDDIAG\":\"1\""
@@ -86,7 +93,7 @@ run_pass() {  # run_pass K
         --environment-variables "${env}" "${BUNDLE_ID}" 2>&1 | grep -iq "Launched" \
         || { echo "  ABORT: launch failed (device locked/asleep? unlock + retry)"; return 3; }
 
-    local log="" base
+    local log="" base dead=0
     for i in $(seq 1 "${MAX_POLL}"); do
         sleep "${POLL_SEC}"
         log="$(newest_log)"; base="$(basename "${log:-none}")"
@@ -94,6 +101,10 @@ run_pass() {  # run_pass K
         if grep -aq 'suffix-lookup DONE' "${log}" 2>/dev/null; then
             echo "  done (poll ${i}, log ${base})"; break
         fi
+        # app-death fast-fail: a fresh log exists (the app reached the probe) but the process is gone for 2 consecutive
+        # checks with no DONE → it jetsammed/crashed mid-run; fail now instead of polling a dead log to MAX_POLL.
+        if app_alive; then dead=0; else dead=$((dead + 1)); fi
+        [ "${dead}" -ge 2 ] && { echo "  ABORT: app gone (jetsam/crash) at poll ${i}, no DONE — failing fast."; return 6; }
         echo "  poll ${i}: running (${base})"
     done
     if [ -z "${log}" ] || ! grep -aq 'suffix-lookup DONE' "${log}" 2>/dev/null; then

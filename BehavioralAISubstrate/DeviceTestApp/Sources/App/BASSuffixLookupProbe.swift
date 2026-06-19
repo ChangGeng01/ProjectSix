@@ -142,6 +142,7 @@ enum BASSuffixLookupProbe {
             var laterTurnReuseSpeedups: [Double] = []   // turn ≥ 1 of reuse scenarios — the cross-turn win
             var controlSpeedups: [Double] = []          // control turns — expected ~0.90–0.95× (lane-gated off)
             var controlWeights: [Double] = []           // per-turn (baseMs+specMs): duration-weights the control mean
+            var reuseAccepted = 0, reuseRounds = 0       // acceptance corruption guard (byte-id-but-broken source → ~0)
             var allByteIdentical = true
             var turnCount = 0, identicalCount = 0
             var hadError = false        // any conversation threw → verdict is INVALID, not a measured FAIL
@@ -161,7 +162,10 @@ enum BASSuffixLookupProbe {
                         if ab.specMs > 0, ab.baseMs > 0 {
                             let speedup = ab.baseMs / ab.specMs
                             if convo.isReuse {
-                                if ab.turn >= 1 { laterTurnReuseSpeedups.append(speedup) }
+                                if ab.turn >= 1 {
+                                    laterTurnReuseSpeedups.append(speedup)
+                                    reuseAccepted += ab.accepted; reuseRounds += ab.rounds
+                                }
                             } else {
                                 controlSpeedups.append(speedup)
                                 controlWeights.append(ab.baseMs + ab.specMs)
@@ -196,6 +200,7 @@ enum BASSuffixLookupProbe {
             }
             let reuseMean = mean(laterTurnReuseSpeedups)
             let controlMean = weightedMean(controlSpeedups, controlWeights)
+            let reuseMeanAcc = reuseRounds > 0 ? Double(reuseAccepted) / Double(reuseRounds) : 0
             // Distinguish INVALID (infra failure / missing data) from a genuine measured verdict, so an error or
             // empty arm is never reported as a measured PASS/FAIL.
             let valid = !hadError && excludedTurns == 0
@@ -207,13 +212,18 @@ enum BASSuffixLookupProbe {
             // reachable on batch-invariant full-attention models). LOSSLESS gate relies on the structural ADR-039
             // guarantee (every emitted token = the target's verify argmax) — the field standard for sliding-window
             // models where MLX batch non-invariance makes sequential byte-identity unreachable (dflash-mlx / mlx-optiq).
-            let netPositive = valid && reuseMean > 1.0 && controlMean >= 0.90
+            // ACCEPTANCE CORRUPTION GUARD (plan 红线: acceptance is the ONLY silent-corruption detector — never certify
+            // on byte-identity alone): a byte-identical-but-broken draft source (e.g. a desynced index) stays byte-
+            // identical yet its acceptance collapses to ~0 — invisible to byte_identical and near-invisible to a noisy
+            // reuseMean. So ALSO require the reuse turns to show real acceptance (aggregate accepted/rounds > a small
+            // floor; a working source clears it easily on the high-repetition rag-revisit/json-extend turns).
+            let netPositive = valid && reuseMean > 1.0 && controlMean >= 0.90 && reuseMeanAcc > 0.05
             let gatePass = losslessGate ? netPositive : (netPositive && allByteIdentical)
             let verdict = !valid ? "INVALID" : (gatePass ? "PASS" : "FAIL")
             fileLog.emit(String(
                 format: "📊 suffix-lookup DONE ngram=%d..%d K=%d gate=%@ later_turn_reuse_mean=%.2fx control_mean=%.2fx "
-                    + "byte_identical=%d/%d all_identical=%@ excluded=%d errored=%@ PROMOTION_GATE=%@",
-                ngramMin, ngramMax, k, gateMode, reuseMean, controlMean, identicalCount, turnCount,
+                    + "reuse_mean_acc=%.2f byte_identical=%d/%d all_identical=%@ excluded=%d errored=%@ PROMOTION_GATE=%@",
+                ngramMin, ngramMax, k, gateMode, reuseMean, controlMean, reuseMeanAcc, identicalCount, turnCount,
                 allByteIdentical ? "YES" : "NO", excludedTurns, hadError ? "YES" : "NO", verdict))
         } catch {
             fileLog.emit("📊 suffix-lookup ERROR=\(error)")
