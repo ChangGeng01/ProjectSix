@@ -668,7 +668,9 @@ public class Gemma4TextModel: Module, LLMModel, KVCacheDimensionProvider {
     /// the batch-shape-dependent reduction order that otherwise scatters near-tied top-2 logits by bf16 ULP (batch
     /// non-invariance) and flips ~1% of tokens — the cause of byte_identical=1/8 on Gemma cross-turn spec-decode
     /// (device-measured). MUST cast the input hidden, not the bf16 logits (the ULP damage is already baked in by then).
-    /// Off by default; verify/probe lane only. Llama/Qwen are other model classes, untouched. See UNIVERSAL_DRAFT_LAYER.md.
+    /// Off by default. NOTE: this is a GLOBAL process flag — when BAS_FP32_VERIFY is set it casts on EVERY Gemma4
+    /// forward, not just a verify lane; in practice only the byte-identity probe sets it (the diagnostic is a measured
+    /// dead end, 2/8 @ ~1.7× latency). Llama/Qwen are other model classes, untouched. See VENDOR_REFRESH_RECIPE.md class 4.
     private static let fp32VerifyProjection: Bool =
         ProcessInfo.processInfo.environment["BAS_FP32_VERIFY"].map { ["1", "proj", "full"].contains($0) } ?? false
 
