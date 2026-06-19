@@ -337,4 +337,49 @@ extension MLXOrganAdapter {
         throw BASOrganError.providerUnavailable(reason: MLXOrganAdapter.frameworkUnavailableReason)
         #endif
     }
+
+    /// Wall-ms of `forwards` single-token GPU forwards of the loaded target (each reads the full weights — the
+    /// memory-bandwidth unit the ρ probe needs). Uses BASWindowMaskedCache so it works on SLIDING-WINDOW models
+    /// (Gemma E4B) where `saguaroTargetForwardsMs`'s BASSaguaroMLXTarget fail-closes on the non-trimmable
+    /// RotatingKVCache (`nonTrimmableCache`). No accept/trim — just N forwards; result = the GPU verify timing for ρ.
+    public func rawTargetForwardsMs(for request: BASOrganRequest, forwards: Int) async throws -> Double {
+        #if canImport(MLXLLM)
+        guard let mainContainer = self._loadedContainerForStreaming() else {
+            throw BASOrganError.providerUnavailable(
+                reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before rawTargetForwardsMs"))
+        }
+        var messages: [Chat.Message] = []
+        let instructions = Self.systemInstructions(for: request)
+        if !instructions.isEmpty { messages.append(.system(instructions)) }
+        messages.append(.user(Self.prompt(for: request)))
+        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let params = self._greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
+        return try await mainContainer.perform(nonSendable: input) { ctx, input in
+            let cache = BASWindowMaskedCache.verifyCache(for: ctx.model, parameters: params)
+            let sampler = params.sampler()
+            var y: LMInput.Text
+            var state: LMOutput.State? = nil
+            switch try ctx.model.prepare(input, cache: cache, windowSize: params.prefillStepSize) {
+            case .tokens(let toks):
+                y = toks
+            case .logits(let result):
+                let tok = sampler.sample(logits: result.logits[0..., -1, 0...])
+                eval(tok); y = .init(tokens: tok); state = result.state
+            }
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            var i = 0
+            while i < forwards {
+                let r = ctx.model(y[text: .newAxis], cache: cache, state: state)
+                state = r.state
+                let tok = sampler.sample(logits: r.logits[0..., -1, 0...])
+                eval(tok)
+                y = .init(tokens: tok)
+                i += 1
+            }
+            return Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
+        }
+        #else
+        throw BASOrganError.providerUnavailable(reason: MLXOrganAdapter.frameworkUnavailableReason)
+        #endif
+    }
 }

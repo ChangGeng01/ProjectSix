@@ -338,6 +338,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIDecodeProbe.run() }
             return
         }
+        // ρ micro-benchmark (BAS_RHO_PROBE=1): ANE-draft(static int8 Gemma-vocab stub) ∥ GPU-verify(E4B-4bit MLX) —
+        // the decisive cheap test for "can CoreAI/ANE∥GPU beat the E4B bandwidth wall". See BASRhoProbe / COREAI_IOS27_REFERENCE §7.
+        if (env["BAS_RHO_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASRhoProbe.run() }
+            return
+        }
         // Track E — SERIAL Saguaro end-to-end: MLX 3B target verifying a CoreAI Mamba (Llamba-1B) draft via
         // BASSaguaroLoop (BAS_COREAI_SAGUARO_PROBE=1). Measures Q1 (16L Mamba on ANE?) + serial tok/s vs pure
         // target greedy + the draft/target time split + byte-identity. The 全面开发 Mamba capstone measurement.

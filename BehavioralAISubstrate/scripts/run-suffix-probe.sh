@@ -33,6 +33,7 @@ SLOOKUP_MODEL="${SLOOKUP_MODEL:-llama_3b}"      # llama_3b (default — full att
 FP32_VERIFY="${FP32_VERIFY:-}"
 FWDDIAG="${FWDDIAG:-}"
 GATE="${GATE:-}"                                 # "" (strict, default) | lossless (field-standard ADR-039, for Gemma)
+CAP="${CAP:-}"                                   # max output tokens/turn (BAS_SL_CAP); longer = less prefill share = truer steady-state tok/s
 LOG_GLOB="suffix-lookup-*.log"
 PULL_DIR="$(mktemp -d /tmp/bas-suffix.XXXXXX)"
 
@@ -80,13 +81,14 @@ run_pass() {  # run_pass K
     local prior; prior="$(basename "$(newest_log)" 2>/dev/null || echo none)"
     # Guard: these values flow UNESCAPED into the JSON below — reject anything but a simple identifier so a stray
     # quote/backslash can't produce malformed JSON (devicectl rejects it) or inject an extra key.
-    for v in "${k}" "${SLOOKUP_MODEL}" "${FP32_VERIFY}" "${GATE}"; do
+    for v in "${k}" "${SLOOKUP_MODEL}" "${FP32_VERIFY}" "${GATE}" "${CAP}"; do
         case "${v}" in *[!A-Za-z0-9_.-]*) echo "  ABORT: unsafe env value '${v}' (allowed: A-Za-z0-9_.-)"; return 5 ;; esac
     done
     local pairs="\"BAS_ENDURANCE_AUTOSTART\":\"1\",\"BAS_SUFFIX_PROBE\":\"1\",\"BAS_SL_K\":\"${k}\",\"BAS_SLOOKUP_MODEL\":\"${SLOOKUP_MODEL}\""
     [ -n "${FP32_VERIFY}" ] && pairs="${pairs},\"BAS_FP32_VERIFY\":\"${FP32_VERIFY}\""
     [ -n "${FWDDIAG}" ] && pairs="${pairs},\"BAS_SL_FWDDIAG\":\"1\""
     [ -n "${GATE}" ] && pairs="${pairs},\"BAS_SL_GATE\":\"${GATE}\""
+    [ -n "${CAP}" ] && pairs="${pairs},\"BAS_SL_CAP\":\"${CAP}\""
     local env="{${pairs}}"
     echo "  env: ${env}"
     xcrun devicectl device process launch --terminate-existing --device "${DEVICE_ID}" \
