@@ -307,6 +307,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// on-device A/B proves per-lane token-equality. Settable so an A/B probe can toggle it.
     public var decodePlannerAutoSelect = false
 
+    /// Toggle the planner at runtime (the on-device A/B probe flips this to compare flag-off vs flag-on output).
+    public func setDecodePlannerAutoSelect(_ on: Bool) { decodePlannerAutoSelect = on }
+
     /// Read accessor for the streaming extension (different file,
     /// same module). Cannot be `private` because extensions in
     /// other files can't see private storage.

@@ -307,6 +307,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASQuantABProbe.run() }
             return
         }
+        // DecodePlan S4c — flag-off(legacy) vs flag-on(planner) byte-equivalence gate, before flipping
+        // decodePlannerAutoSelect (BAS_DECODE_PLANNER_AB=1). Needs the local 3-bit Llama staged. Device-only.
+        if (env["BAS_DECODE_PLANNER_AB"] ?? "0") == "1" {
+            launchSpecAux { await BASDecodePlannerABProbe.run() }
+            return
+        }
         // Tranche A2 — verifier default-flip evidence: same verify task in .scout vs .greedy lane,
         // per-stage outputs captured for human quality read (BAS_VERIFIER_LANE_AB=1)。 Device-only。
         if (env["BAS_VERIFIER_LANE_AB"] ?? "0") == "1" {
