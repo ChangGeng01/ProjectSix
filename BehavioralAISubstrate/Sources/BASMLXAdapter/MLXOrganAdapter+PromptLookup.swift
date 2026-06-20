@@ -140,32 +140,42 @@ extension MLXOrganAdapter {
     /// under greedy, ~1.58x on repetitive output; every other case (not elected, or temp>0) fail-closes to
     /// `draft(_:)`, byte-equal. This is the production wire for `respondPromptLookup` (previously reachable only
     /// from probes); the eligibility decision stays host-side so this adapter keeps NO BASOrgan-policy coupling.
-    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
-        // DecodePlan S4: when the planner is enabled, IT decides the lane (Option-3 auto-select). Default OFF →
-        // the EXACT legacy elect→prompt-lookup path (byte-identical). The elect Bool is shimmed to a purpose until
-        // S5 migrates callers to pass purpose directly.
+    /// CANONICAL accelerated draft entry (DecodePlan S5): the host passes the turn's PURPOSE and the single planner
+    /// (`BASDecodeLanePolicy.decodeStrategy`) picks the lane (Option-3 auto-select). Output is byte-identical
+    /// regardless of which lane runs — every lane emits the target's argmax (ADR-039) — so only latency/lane changes.
+    ///
+    /// `decodePlannerAutoSelect` is a runtime KILL-SWITCH: when off, fall back to the legacy prompt-lookup path
+    /// (prompt-lookup iff the purpose is eligible), which is byte-equal to the pre-planner behavior.
+    public func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
         guard decodePlannerAutoSelect else {
-            return try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+            return try await respondPromptLookup(
+                for: request, electPromptLookup: BASDecodeLanePolicy.promptLookupEligible(for: purpose))
         }
         #if canImport(MLXLLM)
         guard descriptor.supportedRoles.contains(request.role) else {
             throw BASOrganError.unsupportedRole(request.role)
         }
         let strategy = BASDecodeLanePolicy.decodeStrategy(
-            purpose: Self._purposeForElect(electAccelerated),
+            purpose: purpose,
             temperature: request.preset.temperature,
             capabilities: _decodeCapabilities(),
             profiler: draftProfiler,
             numDraftTokens: numDraftTokens)
         return try await _execute(strategy, for: request)
         #else
-        return try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+        return try await respondPromptLookup(
+            for: request, electPromptLookup: BASDecodeLanePolicy.promptLookupEligible(for: purpose))
         #endif
     }
 
-    /// Elect→purpose shim (S4; removed in S5 when callers pass purpose directly). The Bool reproduces the legacy
-    /// eligibility: `true` → `.factual` (eligible), `false` → `.scoutDefault` (not eligible), so `promptLookupEligible`
-    /// is byte-equal to the old `shouldUsePromptLookup` elect gate.
+    /// DEPRECATED elect-Bool entry (kept for the transition; removed in S6). Shims to the purpose entry via the
+    /// legacy eligibility mapping — byte-equal because `promptLookupEligible(_purposeForElect(e)) == e`.
+    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        try await draft(request, purpose: Self._purposeForElect(electAccelerated))
+    }
+
+    /// Elect→purpose shim mapping (removed in S6 with the Bool entry). `true` → `.factual` (eligible), `false` →
+    /// `.scoutDefault` (not eligible), so it reproduces the legacy `promptLookupEligible` elect gate exactly.
     static func _purposeForElect(_ elect: Bool) -> BASDecodeLanePolicy.Purpose {
         elect ? .factual : .scoutDefault
     }

@@ -57,6 +57,14 @@ public protocol BASOrganAdapter: Sendable {
     /// the override dispatches DYNAMICALLY through a protocol-typed `adapter`.
     func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft
 
+    /// PURPOSE-based accelerated draft (DecodePlan S5 — the successor to the `electAccelerated` Bool). The host
+    /// passes the turn's PURPOSE; an adapter with a decode planner (MLX) resolves it to the best lane
+    /// (`BASDecodeLanePolicy.decodeStrategy`). The default impl IGNORES `purpose` and calls `draft(_:)` —
+    /// BYTE-EQUAL for every adapter without a lane (ADR-014). This replaces the overloaded Bool: a Boolean can
+    /// only say "accelerate or not", whereas a purpose lets the planner pick AMONG lanes (plain / draft-model /
+    /// prompt-lookup / cross-turn / saguaro). The Bool overload above is now a thin shim and is removed in S6.
+    func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft
+
     /// Announce how much work this provider is willing to take on
     /// right now. Adapters that observe device pressure (thermal,
     /// memory, battery) return a reduced capacity; adapters that
@@ -68,6 +76,12 @@ public extension BASOrganAdapter {
     /// Default accelerated draft: ignore the elect flag → byte-equal to `draft(_:)`. Adapters without an
     /// accelerated lane (deterministic, Apple, remote) inherit this unchanged (ADR-014 default-off).
     func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+        try await draft(request)
+    }
+
+    /// Default PURPOSE-based draft: ignore `purpose` → byte-equal to `draft(_:)`. No-lane adapters (deterministic,
+    /// Apple, remote) inherit this unchanged; only adapters with a planner (MLX) override it.
+    func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
         try await draft(request)
     }
 }
