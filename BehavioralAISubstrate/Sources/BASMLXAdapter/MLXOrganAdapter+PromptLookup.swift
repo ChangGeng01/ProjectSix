@@ -121,46 +121,13 @@ extension MLXOrganAdapter {
         guard Self.shouldUsePromptLookup(elect: electPromptLookup, request: request) else {
             return try await draft(request)
         }
-        guard let mainContainer = self._loadedContainerForStreaming() else {
-            throw BASOrganError.providerUnavailable(
-                reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before respondPromptLookup"))
-        }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
-        let params = self._greedyParameters(
-            for: request.preset, maxOutputTokens: request.maxOutputTokens)
-
-        let rawBody: String = try await mainContainer.perform(nonSendable: input) { ctx, input in
-            // Production parity: stop on the model's chat terminators too (Llama-3 <|eot_id|>/<|end_of_text|>,
-            // ChatML <|im_end|>, </s>), not just tokenizer.eosTokenId — the production stream stops on this
-            // superset. Best-effort: include those that resolve. (audit fix. The probe path keeps the narrow EOS
-            // so its already-reported measurements retain provenance.)
-            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
-            for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
-                if let id = ctx.tokenizer.convertTokenToId(name) { eos.insert(id) }
-            }
-            let result = try BASPromptLookupDecoder.generate(
-                input: input, model: ctx.model, parameters: params,
-                drafter: drafter, eosTokenIds: eos, adaptiveK: true)
-            return ctx.tokenizer.decode(tokenIds: result.tokens)
-        }
-        let body = Self.applyMarkerPostprocessing(rawBody)   // M256, same as draft(_:)
-
-        return BASOrganDraft(
-            requestID: request.requestID,
-            providerID: descriptor.providerID,
-            role: request.role,
-            body: body,
-            inputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(from: [request.instruction] + request.context),
-            outputTokensEstimated: BASOrganDeterministicAdapter.estimateTokens(from: [body]),
-            producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID),
-            completionMetrics: nil)
+        // Tier-C3: funnel into the shared model-free decode + draft builder (this block was byte-for-byte the
+        // same as _generateModelFree — same prepare/_greedyParameters/EOS-superset/BASPromptLookupDecoder.generate
+        // /applyMarkerPostprocessing/BASOrganDraft). notLoadedHint preserves the EXACT original not-loaded error text.
+        let g = try await _generateModelFree(
+            for: request, drafter: drafter,
+            notLoadedHint: "loadModel(...) before respondPromptLookup")
+        return _modelFreeDraft(body: g.body, request: request)
         #else
         throw BASOrganError.providerUnavailable(
             reason: MLXOrganAdapter.frameworkUnavailableReason

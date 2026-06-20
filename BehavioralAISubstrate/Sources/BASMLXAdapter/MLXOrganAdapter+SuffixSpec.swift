@@ -110,12 +110,15 @@ extension MLXOrganAdapter {
     #if canImport(MLXLLM)
     /// Shared decode: run a model-free source through the byte-identical `BASPromptLookupDecoder` loop in one
     /// container pass; return the postprocessed body + this turn's prompt/gen tokens + acceptance telemetry.
-    private func _generateModelFree(
-        for request: BASOrganRequest, drafter: any BASUniversalDraftSource
+    // `internal` (not `private`) so the Tier-C3 funnel in MLXOrganAdapter+PromptLookup.swift (a different file)
+    // can reuse this exact decode path. `notLoadedHint` lets each caller preserve its original not-loaded error text.
+    func _generateModelFree(
+        for request: BASOrganRequest, drafter: any BASUniversalDraftSource,
+        notLoadedHint: String = "loadModel(...) before an accelerated draft"
     ) async throws -> (body: String, promptTokens: [Int], genTokens: [Int], accepted: Int, proposed: Int, rounds: Int) {
         guard let mainContainer = self._loadedContainerForStreaming() else {
             throw BASOrganError.providerUnavailable(
-                reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before an accelerated draft"))
+                reason: MLXOrganAdapter.notLoadedReason(notLoadedHint))
         }
         var messages: [Chat.Message] = []
         let instructions = Self.systemInstructions(for: request)
@@ -152,7 +155,7 @@ extension MLXOrganAdapter {
 
     /// Build the `BASOrganDraft` for a model-free accelerated turn (body already M256-postprocessed; metrics nil
     /// — the prompt-lookup loop emits no `GenerateCompletionInfo`). Same shape as `draft(_:)`/`respondPromptLookup`.
-    private func _modelFreeDraft(body: String, request: BASOrganRequest) -> BASOrganDraft {
+    func _modelFreeDraft(body: String, request: BASOrganRequest) -> BASOrganDraft {
         BASOrganDraft(
             requestID: request.requestID,
             providerID: descriptor.providerID,
