@@ -27,30 +27,7 @@ import BASAppleAdapters
 
 enum BASANEUtilizationProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "ane-probe")
-
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyyMMdd-HHmmss"
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = formatter.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("ane-probe-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASANEUtilizationProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     private static let classifierTexts = [
         "hello there how are you today",
@@ -66,7 +43,7 @@ enum BASANEUtilizationProbe {
     ]
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "ane-probe", category: "ane-probe", alsoPrint: false)
         defer { fileLog.close() }
         fileLog.emit("📊 ane-probe START")
 
@@ -130,7 +107,7 @@ enum BASANEUtilizationProbe {
     // MARK: - MLComputePlan walk
 
     @available(iOS 17.4, macOS 14.4, *)
-    private static func planHistogram(name: String, url: URL?, fileLog: FileLog) async {
+    private static func planHistogram(name: String, url: URL?, fileLog: ProbeFileLog) async {
         guard let url else {
             fileLog.emit("⚠️ ane-probe plan head=\(name) model-url-missing")
             return

@@ -23,8 +23,6 @@ import BASMLXAdapter
 
 enum BASQuantABProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "quant-ab")
-
     // Mix of factual + reasoning + generative — quality degradation shows most on the latter two.
     private static let prompts = [
         "What is the capital of France, and name two famous landmarks there?",
@@ -35,30 +33,10 @@ enum BASQuantABProbe {
         "List three pros and three cons of remote work.",
     ]
 
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("quant-ab-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASQuantABProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "quant-ab", category: "quant-ab", alsoPrint: false)
         defer { fileLog.close() }
         let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_QUANT_AB_TOKENS"] ?? "200") ?? 200
         let fourBit = MLXModelCatalog.llama3_2_3B_4bit

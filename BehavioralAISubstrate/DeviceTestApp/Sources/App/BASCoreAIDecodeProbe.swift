@@ -29,29 +29,7 @@ import CoreAI
 
 enum BASCoreAIDecodeProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "coreai-decode")
-
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("coreai-decode-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASCoreAIDecodeProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     private static func footprintMB() -> Double {
         var info = task_vm_info_data_t()
@@ -66,14 +44,14 @@ enum BASCoreAIDecodeProbe {
 
     /// print() → process stdout (captured reliably by `devicectl … --console`, and SURVIVES a crash,
     /// unlike buffered os_log) + the FileLog.
-    private static func mark(_ fileLog: FileLog, _ s: String) {
+    private static func mark(_ fileLog: ProbeFileLog, _ s: String) {
         print(s)
         fflush(stdout)
         fileLog.emit(s)
     }
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "coreai-decode", category: "coreai-decode", alsoPrint: false)
         defer { fileLog.close() }
         mark(fileLog, String(format: "📊 coreai-decode START footprint0=%.0fMB (beat: MLX 3B=38.3 tok/s; cap 3248MB)", footprintMB()))
         #if canImport(CoreAI)
@@ -112,7 +90,7 @@ enum BASCoreAIDecodeProbe {
 
     #if canImport(CoreAI)
     @available(iOS 27, macOS 27, *)
-    private static func measure(label: String, options: SpecializationOptions, fileLog: FileLog) async {
+    private static func measure(label: String, options: SpecializationOptions, fileLog: ProbeFileLog) async {
         let env = ProcessInfo.processInfo.environment
         let assetName = env["BAS_COREAI_ASSET"] ?? "LlamaDraft1B_fp16.aimodel"
         let nLayers = Int(env["BAS_COREAI_LAYERS"] ?? "") ?? 16
@@ -170,7 +148,7 @@ enum BASCoreAIDecodeProbe {
     /// only the .aimodel (BAS_COREAI_ASSET, default Llamba1B_fp16.aimodel); state shapes via
     /// BAS_COREAI_MAMBA_CONV / BAS_COREAI_MAMBA_SSM (defaults match the converter: [16,6144,4] / [16,32,64,64]).
     @available(iOS 27, macOS 27, *)
-    private static func measureMamba(label: String, options: SpecializationOptions, fileLog: FileLog) async {
+    private static func measureMamba(label: String, options: SpecializationOptions, fileLog: ProbeFileLog) async {
         let env = ProcessInfo.processInfo.environment
         let assetName = env["BAS_COREAI_ASSET"] ?? "Llamba1B_fp16.aimodel"
         let convShape = (env["BAS_COREAI_MAMBA_CONV"] ?? "16,6144,4").split(separator: ",").compactMap { Int($0) }
@@ -211,7 +189,7 @@ enum BASCoreAIDecodeProbe {
     /// Layer-split: drive N chunk `.aimodel`s (BAS_COREAI_SPLIT_DIR, default LlamaDraft1B_split88; BAS_COREAI_SPLIT_LAYERS,
     /// default "8,8") via BASCoreAILayerSplitSession. Same decode-timing harness as `measure`.
     @available(iOS 27, macOS 27, *)
-    private static func measureSplit(label: String, options: SpecializationOptions, fileLog: FileLog) async {
+    private static func measureSplit(label: String, options: SpecializationOptions, fileLog: ProbeFileLog) async {
         let env = ProcessInfo.processInfo.environment
         let assetName = env["BAS_COREAI_SPLIT_ASSET"] ?? "LlamaDraft1B_mfn88.aimodel"   // ONE multi-function asset
         let layers = (env["BAS_COREAI_SPLIT_LAYERS"] ?? "8,8").split(separator: ",").compactMap { Int($0) }

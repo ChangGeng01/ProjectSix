@@ -17,32 +17,10 @@ import CoreML
 
 enum BASANEDraftProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "ane-draft")
-
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("ane-draft-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASANEDraftProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "ane-draft", category: "ane-draft", alsoPrint: false)
         defer { fileLog.close() }
         fileLog.emit("📊 ane-draft START — A19 ANE placement + latency for the converted fp16 decoder block")
 
@@ -83,7 +61,7 @@ enum BASANEDraftProbe {
 
     // MARK: - A19 attention-over-history wall confirmation (B1''/B1' on the real A19)
 
-    private static func confirmAttentionWall(docs: URL, fileLog: FileLog) async {
+    private static func confirmAttentionWall(docs: URL, fileLog: ProbeFileLog) async {
         // B1'' — STATELESS windowed recompute (seq=W=64, no MLState). Mac: 100% GPU. Decisive A19 placement.
         let window = docs.appendingPathComponent("StatelessWindow_fp16.mlpackage")
         if FileManager.default.fileExists(atPath: window.path) {
@@ -143,7 +121,7 @@ enum BASANEDraftProbe {
     }
 
     /// Latency for the stateless windowed model: input `hidden_window` [1, 64, 2048], no state.
-    private static func latencyWindow(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+    private static func latencyWindow(_ url: URL, units: MLComputeUnits, label: String, fileLog: ProbeFileLog) async {
         do {
             let compiled = try await MLModel.compileModel(at: url)
             let config = MLModelConfiguration(); config.computeUnits = units
@@ -166,7 +144,7 @@ enum BASANEDraftProbe {
 
     /// Latency for the fixed-window stateful model: hidden [1,1,2048] + host-fed write_onehot/attn_bias [256] + KV state.
     @available(iOS 18.0, *)
-    private static func latencyStateful(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+    private static func latencyStateful(_ url: URL, units: MLComputeUnits, label: String, fileLog: ProbeFileLog) async {
         do {
             let compiled = try await MLModel.compileModel(at: url)
             let config = MLModelConfiguration(); config.computeUnits = units
@@ -200,7 +178,7 @@ enum BASANEDraftProbe {
     // MARK: - MLComputePlan histogram
 
     @available(iOS 17.4, *)
-    private static func plan(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+    private static func plan(_ url: URL, units: MLComputeUnits, label: String, fileLog: ProbeFileLog) async {
         do {
             let compiled = try await MLModel.compileModel(at: url)
             let config = MLModelConfiguration()
@@ -251,7 +229,7 @@ enum BASANEDraftProbe {
 
     // MARK: - Latency A/B
 
-    private static func latency(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+    private static func latency(_ url: URL, units: MLComputeUnits, label: String, fileLog: ProbeFileLog) async {
         do {
             let compiled = try await MLModel.compileModel(at: url)
             let config = MLModelConfiguration()

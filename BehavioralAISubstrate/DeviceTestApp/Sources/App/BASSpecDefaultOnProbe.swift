@@ -30,8 +30,6 @@ import BASMLXAdapter
 
 enum BASSpecDefaultOnProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "spec-defaulton")
-
     private static let prompts = [
         "Summarize the water cycle in one sentence.",
         "Name three primary colors.",
@@ -45,34 +43,13 @@ enum BASSpecDefaultOnProbe {
         "What is half of ten?",
     ]
 
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init(prefix: String) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyyMMdd-HHmmss"
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = formatter.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("\(prefix)-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASSpecDefaultOnProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     // MARK: - 1. Default-on auto-path verification
 
     static func runDefaultOnVerification() async {
         let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_SPEC_MAX_DECODE_TOKENS"] ?? "48") ?? 48
-        let fileLog = FileLog(prefix: "spec-decode-defaulton")
+        let fileLog = ProbeFileLog(filePrefix: "spec-decode-defaulton", category: "spec-defaulton", alsoPrint: false)
         defer { fileLog.close() }
         fileLog.emit("📊 spec-defaulton START decode_cap=\(decodeCap)")
 
@@ -137,7 +114,7 @@ enum BASSpecDefaultOnProbe {
 
     static func runDraftTokenSweep() async {
         let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_SPEC_MAX_DECODE_TOKENS"] ?? "48") ?? 48
-        let fileLog = FileLog(prefix: "spec-decode-sweep")
+        let fileLog = ProbeFileLog(filePrefix: "spec-decode-sweep", category: "spec-defaulton", alsoPrint: false)
         defer { fileLog.close() }
         fileLog.emit("📊 spec-sweep START lane=sampling decode_cap=\(decodeCap) n_prompts=\(prompts.count)")
         let target = MLXModelCatalog.speculativeOptimalTarget
@@ -191,7 +168,7 @@ enum BASSpecDefaultOnProbe {
     // Verdict updates the numDraftTokens default ONLY via a reviewed commit citing this output。
     static func runGreedyDraftTokenSweep() async {
         let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_SPEC_MAX_DECODE_TOKENS"] ?? "48") ?? 48
-        let fileLog = FileLog(prefix: "spec-greedy-sweep")
+        let fileLog = ProbeFileLog(filePrefix: "spec-greedy-sweep", category: "spec-defaulton", alsoPrint: false)
         defer { fileLog.close() }
         let target = MLXModelCatalog.speculativeOptimalTarget
         guard let draft = MLXModelCatalog.recommendedDraft(forTargetProviderID: target.providerID) else {

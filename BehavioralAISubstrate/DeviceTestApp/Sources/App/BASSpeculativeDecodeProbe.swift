@@ -46,8 +46,6 @@ import BASAppleAdapters
 
 enum BASSpeculativeDecodeProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "spec-decode")
-
     /// ≥50 varied short prompts for the LATENCY lane (deterministic — no Date/random). Clears SAMPLES_BELOW_MIN.
     private static let prompts: [String] = [
         "Summarize the water cycle in one sentence.", "Name three primary colors.",
@@ -97,34 +95,7 @@ enum BASSpeculativeDecodeProbe {
 
     // MARK: - File log
 
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-
-        init() {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyyMMdd-HHmmss"
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = formatter.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else {
-                handle = nil
-                return
-            }
-            let url = docs.appendingPathComponent("spec-decode-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-
-        func emit(_ line: String) {
-            BASSpeculativeDecodeProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     /// Knobs (env-tunable so a slow device can dial down).
     private struct Config {
@@ -154,7 +125,7 @@ enum BASSpeculativeDecodeProbe {
             pairingSel: (env["BAS_SPEC_PAIRING"] ?? "all").lowercased())
 
         let selected = pairings.filter { cfg.pairingSel == "all" || $0.tier == cfg.pairingSel }
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "spec-decode", category: "spec-decode", alsoPrint: false)
         defer { fileLog.close() }
         fileLog.emit("📊 spec-decode START budget_mb=\(cfg.memoryBudgetBytes / (1024 * 1024)) "
             + "decode_cap=\(cfg.decodeCap) prompts=\(cfg.promptCount) dist_n=\(cfg.distSamples) "
@@ -175,7 +146,7 @@ enum BASSpeculativeDecodeProbe {
 
     private static func certify(
         pairing: (target: MLXModelCatalog.Entry, draft: MLXModelCatalog.Entry, tier: String),
-        cfg: Config, fileLog: FileLog
+        cfg: Config, fileLog: ProbeFileLog
     ) async throws {
         let lanePrompts = Array(prompts.prefix(cfg.promptCount))
         let distIdx = distPrompts.indices.map { $0 }
@@ -240,7 +211,7 @@ enum BASSpeculativeDecodeProbe {
 
     private static func runSpecLane(
         pairing: (target: MLXModelCatalog.Entry, draft: MLXModelCatalog.Entry, tier: String),
-        mode: BASSpeculativeMode, lanePrompts: [String], cfg: Config, collectDist: Bool, fileLog: FileLog
+        mode: BASSpeculativeMode, lanePrompts: [String], cfg: Config, collectDist: Bool, fileLog: ProbeFileLog
     ) async throws -> (results: [PromptResult], peakMB: Double, distHist: [Int: [String: Int]]) {
         var adapter: MLXOrganAdapter? = MLXOrganAdapter(
             model: pairing.target, draftModel: pairing.draft, speculativeDecoding: mode)
@@ -278,7 +249,7 @@ enum BASSpeculativeDecodeProbe {
     }
 
     private static func runBaselines(
-        target: MLXModelCatalog.Entry, lanePrompts: [String], cfg: Config, fileLog: FileLog
+        target: MLXModelCatalog.Entry, lanePrompts: [String], cfg: Config, fileLog: ProbeFileLog
     ) async throws -> (greedy: [PromptResult], sampling: [PromptResult],
                        baseA: [Int: [String: Int]], baseB: [Int: [String: Int]]) {
         var adapter: MLXOrganAdapter? = MLXOrganAdapter(model: target)

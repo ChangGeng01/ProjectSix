@@ -35,37 +35,10 @@ import BASRuntimeCore  // BASTaskVmInfoProbe (phys_footprint — the jetsam metr
 
 public enum BASLiteRTE4BProbe {
 
-    private static let log = Logger(
-        subsystem: "com.bas.devicetest", category: "litert-probe")
-
-    /// Self-contained file+oslog sink (mirrors the other device probes). Writes
-    /// `litert-probe-<stamp>.log` in Documents for `devicectl device copy from`.
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"
-            f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first
-            else { handle = nil; return }
-            let url = docs.appendingPathComponent("litert-probe-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASLiteRTE4BProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     public static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "litert-probe", category: "litert-probe", alsoPrint: false)
         defer { fileLog.close() }
         let env = ProcessInfo.processInfo.environment
         let docs = FileManager.default.urls(

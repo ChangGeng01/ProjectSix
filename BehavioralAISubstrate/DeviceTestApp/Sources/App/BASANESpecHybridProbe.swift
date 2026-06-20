@@ -20,29 +20,7 @@ import BASMLXAdapter
 
 enum BASANESpecHybridProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "ane-spec")
-
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("ane-spec-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASANESpecHybridProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     private static func footprintMB() -> Double {
         var info = task_vm_info_data_t()
@@ -70,7 +48,7 @@ enum BASANESpecHybridProbe {
     ]
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "ane-spec", category: "ane-spec", alsoPrint: false)
         defer { fileLog.close() }
         let env = ProcessInfo.processInfo.environment
         let k = Int(env["BAS_SPEC_K"] ?? "") ?? 4

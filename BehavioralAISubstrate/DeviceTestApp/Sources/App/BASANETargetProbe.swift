@@ -17,29 +17,7 @@ import BASMLXAdapter
 
 enum BASANETargetProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "ane-target")
-
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("ane-target-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASANETargetProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     private static func footprintMB() -> Double {
         var info = task_vm_info_data_t()
@@ -55,7 +33,7 @@ enum BASANETargetProbe {
     // MARK: - MLComputePlan placement histogram (input-agnostic)
 
     @available(iOS 17.4, *)
-    private static func plan(_ url: URL, units: MLComputeUnits, label: String, fileLog: FileLog) async {
+    private static func plan(_ url: URL, units: MLComputeUnits, label: String, fileLog: ProbeFileLog) async {
         do {
             let compiled = try await MLModel.compileModel(at: url)
             let cfg = MLModelConfiguration(); cfg.computeUnits = units
@@ -89,7 +67,7 @@ enum BASANETargetProbe {
     }
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "ane-target", category: "ane-target", alsoPrint: false)
         defer { fileLog.close() }
         let env = ProcessInfo.processInfo.environment
         let quant = env["BAS_TARGET_QUANT"] ?? "int4"
