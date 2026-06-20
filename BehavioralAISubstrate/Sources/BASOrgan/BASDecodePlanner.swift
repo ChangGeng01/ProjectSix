@@ -25,9 +25,11 @@ extension BASDecodeLanePolicy {
     ///
     /// Precedence (safest-first):
     /// 1. `temperature != 0` → `.plain` — the hard byte-safety gate (argmax-equality accept is valid ONLY at temp 0).
-    /// 2. non-eligible purpose (`.creative`/`.scoutDefault`) → `.plain` (the same gate as `promptLookupEligible`).
-    /// 3. build the capability-gated candidate set: draft-model spec, saguaro, and the model-free choice — reusing
-    ///    `source(for:profiler:)` so the model-free sub-decision stays exactly what `BASDraftSourceRouterTests` pins.
+    /// 2. draft-model spec is a candidate for ANY greedy turn with a draft model loaded (byte-identical, NOT
+    ///    purpose-gated — preserves the legacy `draft()`, which spec'd regardless of elect).
+    /// 3. model-free (prompt-lookup / cross-turn) + saguaro are added ONLY for eligible purposes
+    ///    (`promptLookupEligible`); the model-free pick reuses `source(for:profiler:)` so `BASDraftSourceRouterTests`
+    ///    still pins it. Non-eligible purpose with no draft model → `.plain`.
     /// 4. drop lanes whose smoothed hit-rate is below `minHitRate` (`worthSpeculating`); if none remain → `.plain`.
     /// 5. pick the highest measured `emaAccepted`; ties / cold lanes resolve by capability priority
     ///    (draftModel > saguaro > model-free — a model-backed draft is the safer cold-start default).
@@ -41,37 +43,44 @@ extension BASDecodeLanePolicy {
         minHitRate: Double = 0.05
     ) -> BASDecodeStrategy {
         guard temperature == 0 else { return .plain }
-        guard promptLookupEligible(for: purpose) else { return .plain }
 
         // Candidate lanes in cold-start priority order (model-backed first), each with its profiler ID.
         var candidates: [(strategy: BASDecodeStrategy, id: String)] = []
+
+        // draft-model spec is a VALID accelerator for ANY greedy turn (byte-identical, no per-round scan tax), so it
+        // is NOT purpose-gated — matching the legacy `draft()`, which spec'd regardless of elect (Option-3: select any
+        // valid accelerator; plain only when none is).
         if capabilities.draftModelLoaded {
             candidates.append((
                 .draftModelSpec(numDraftTokens: profiler.recommendedK(
                     sourceID: BASDecodeStrategy.draftModelID, purpose: purpose, cap: numDraftTokens)),
                 BASDecodeStrategy.draftModelID))
         }
-        if capabilities.saguaroAvailable {
-            candidates.append((
-                .saguaro(numDraftTokens: profiler.recommendedK(
-                    sourceID: BASDecodeStrategy.saguaroID, purpose: purpose, cap: numDraftTokens)),
-                BASDecodeStrategy.saguaroID))
-        }
-        if capabilities.modelFreeAvailable {
-            // Reuse the existing model-free router (it applies its own hit-floor) for the prompt-lookup vs cross-turn pick.
-            switch source(for: purpose, profiler: profiler, minHitRate: minHitRate) {
-            case .promptLookup:
+
+        // model-free + saguaro pay a per-round scan / carry purpose-specific value → gated to eligible purposes only.
+        if promptLookupEligible(for: purpose) {
+            if capabilities.saguaroAvailable {
                 candidates.append((
-                    .promptLookup(k: profiler.recommendedK(
-                        sourceID: BASDraftSourceChoice.promptLookupID, purpose: purpose, cap: numDraftTokens)),
-                    BASDraftSourceChoice.promptLookupID))
-            case .suffixAutomaton:
-                candidates.append((
-                    .suffixLookup(k: profiler.recommendedK(
-                        sourceID: BASDraftSourceChoice.suffixAutomatonID, purpose: purpose, cap: numDraftTokens)),
-                    BASDraftSourceChoice.suffixAutomatonID))
-            case .none:
-                break
+                    .saguaro(numDraftTokens: profiler.recommendedK(
+                        sourceID: BASDecodeStrategy.saguaroID, purpose: purpose, cap: numDraftTokens)),
+                    BASDecodeStrategy.saguaroID))
+            }
+            if capabilities.modelFreeAvailable {
+                // Reuse the existing model-free router (it applies its own hit-floor) for prompt-lookup vs cross-turn.
+                switch source(for: purpose, profiler: profiler, minHitRate: minHitRate) {
+                case .promptLookup:
+                    candidates.append((
+                        .promptLookup(k: profiler.recommendedK(
+                            sourceID: BASDraftSourceChoice.promptLookupID, purpose: purpose, cap: numDraftTokens)),
+                        BASDraftSourceChoice.promptLookupID))
+                case .suffixAutomaton:
+                    candidates.append((
+                        .suffixLookup(k: profiler.recommendedK(
+                            sourceID: BASDraftSourceChoice.suffixAutomatonID, purpose: purpose, cap: numDraftTokens)),
+                        BASDraftSourceChoice.suffixAutomatonID))
+                case .none:
+                    break
+                }
             }
         }
 

@@ -27,10 +27,21 @@ final class BASDecodeStrategyTests: XCTestCase {
         XCTAssertEqual(plan(.deterministic, 0.1, all), .plain)
     }
 
-    // 2. Non-eligible purposes (creative/scoutDefault) → plain even at temp 0.
-    func testNonEligiblePurposePlain() {
-        XCTAssertEqual(plan(.creative, 0, all), .plain)
-        XCTAssertEqual(plan(.scoutDefault, 0, all), .plain)
+    // 2a. Non-eligible purpose with NO draft model → plain (model-free + saguaro are purpose-gated).
+    func testNonEligibleNoDraftModelPlain() {
+        XCTAssertEqual(plan(.creative, 0, mfOnly), .plain)
+        XCTAssertEqual(plan(.scoutDefault, 0, mfOnly), .plain)
+    }
+
+    // 2b. Non-eligible purpose WITH a draft model → still draftModelSpec: draft-spec is byte-identical and runs for
+    //     ANY greedy turn regardless of purpose (preserves the legacy draft(), which spec'd regardless of elect).
+    func testNonEligibleWithDraftModelStillSpecs() {
+        guard case .draftModelSpec = plan(.scoutDefault, 0, all) else {
+            return XCTFail(".scoutDefault + draft model should still draftModelSpec (not purpose-gated)")
+        }
+        guard case .draftModelSpec = plan(.creative, 0, all) else {
+            return XCTFail(".creative + draft model should still draftModelSpec")
+        }
     }
 
     // 3. No capabilities → plain.
