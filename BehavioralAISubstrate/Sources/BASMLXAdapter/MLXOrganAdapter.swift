@@ -305,7 +305,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// (`BASDecodeLanePolicy.decodeStrategy`) choose the lane (Option-3 auto-select) instead of the legacy
     /// elect→prompt-lookup gate. Default FALSE = EXACT legacy behavior (byte-identical). Flipped only after the
     /// on-device A/B proves per-lane token-equality. Settable so an A/B probe can toggle it.
-    public var decodePlannerAutoSelect = false
+    public var decodePlannerAutoSelect = true
 
     /// Toggle the planner at runtime (the on-device A/B probe flips this to compare flag-off vs flag-on output).
     public func setDecodePlannerAutoSelect(_ on: Bool) { decodePlannerAutoSelect = on }
