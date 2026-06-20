@@ -914,10 +914,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // live mode, and request eligibility for that mode. Default off path / ineligible requests run the exact
         // single-model code below, byte-identical. (`draftMultiTurn` is deliberately NOT routed — its ChatSession
         // KV-cache reuse beats speculation, which would re-prefill the whole conversation per turn.)
-        if shouldSpeculate(for: request) {
-            return try await _draftSpeculative(request)
-        }
-        return try await _plainDraft(request)
+        // DecodePlan S3: route through the single executor with the LEGACY decision (parity — byte-identical:
+        // shouldSpeculate→draftModelSpec→_draftSpeculative, else plain→_plainDraft). S4 swaps the decider for the planner.
+        let strategy: BASDecodeStrategy = shouldSpeculate(for: request)
+            ? .draftModelSpec(numDraftTokens: numDraftTokens) : .plain
+        return try await _execute(strategy, for: request)
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
