@@ -6,6 +6,10 @@ import MLXLLM
 import MLXLMCommon
 #endif
 
+/// ⚠️ QUARANTINED (Tier-C consolidation, 2026-06-21): measure-only A/B harness (`BAS_PL_TREE` probe). The tree
+/// lane it exercises is ~0.76× on device and is never selected by the production router; this exists purely to
+/// produce the parity (`treeTokens == linearTokens`) + marginal-speedup datum. Production decode never calls it.
+///
 /// Tree-structured prompt-lookup entry for `MLXOrganAdapter` (B2-aggressive). Runs `BASTreeSpecDecoder` (tree) and
 /// the SHIPPED linear `BASPromptLookupDecoder` in ONE container pass and compares TOKEN sequences — tree MUST be
 /// token-identical to linear (which is proven token-identical to greedy), so `treeTokens == linearTokens` is the

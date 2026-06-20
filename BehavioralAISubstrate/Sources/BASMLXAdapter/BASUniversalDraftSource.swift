@@ -25,6 +25,8 @@ public protocol BASUniversalDraftSource: Sendable {
     mutating func propose(over tokens: [Int]) -> [Int]
     /// A candidate TREE (the k most-recent distinct continuations) for one-forward tree-verify. Linear sources
     /// return a degenerate single-branch tree (branch 0 == `propose`), so a caller can always ask for a tree.
+    /// ⚠️ Consumed ONLY by the quarantined measure-only tree lane (`BASTreeSpecDecoder` / `treeSpecAB`, ~0.76× on
+    /// device, router never selects it). Kept as a protocol requirement with parity tests; production decode uses `propose`.
     mutating func proposeTree(over tokens: [Int], maxBranch: Int, maxNodes: Int) -> BASDraftTree
 }
 

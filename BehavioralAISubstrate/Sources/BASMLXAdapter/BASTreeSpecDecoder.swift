@@ -4,6 +4,11 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
+/// ⚠️ QUARANTINED (Tier-C consolidation, 2026-06-21): measure-only — the production `BASDecodeLanePolicy` router
+/// NEVER selects the tree lane (measured ~0.76× on device, slower than the shipped linear lane). The only callers
+/// are the `BAS_PL_TREE` A/B probe (`BASPromptLookupProbe`) + `BASTreeSpecTests`. Kept for the parity/telemetry
+/// datum; NOT a production decode path. The shipped lane is the linear `BASPromptLookupDecoder`.
+///
 /// B2-aggressive — TREE-structured prompt-lookup speculative decode. Verifies a whole candidate tree in ONE
 /// target forward (custom tree attention mask + per-depth RoPE, via the vendor patch) and accepts the longest
 /// root-to-leaf path that is the target's greedy argmax — more tokens per forward than the linear
