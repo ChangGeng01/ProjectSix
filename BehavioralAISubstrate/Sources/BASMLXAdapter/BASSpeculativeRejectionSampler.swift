@@ -1,5 +1,11 @@
 import Foundation
 
+/// ⚠️ QUARANTINED (Tier-C consolidation, 2026-06-21): NOT wired into any production decode path — the only
+/// references are this definition + its host tests (`BASSpeculativeSamplingDistributionTests`). It is the
+/// host-verified SPECIFICATION of the sampling lane (mirrored by the vendored MLX `SpeculativeTokenIterator`
+/// `.rejectionSampling`), kept for the distribution proof + correctness reference. The SHIPPED decode lane is the
+/// greedy, byte-identical `BASPromptLookupDecoder`; do not enable this sampling lane without re-certifying the MLX port.
+///
 /// 结构大重构 — Phase 2: the pure (framework-free) Leviathan speculative-sampling decision rule.
 ///
 /// This is the SPECIFICATION + host-verifiable core of the sampling lane. The vendored MLX
