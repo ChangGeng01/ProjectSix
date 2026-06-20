@@ -344,6 +344,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASRhoProbe.run() }
             return
         }
+        // CoreAI-GPU kernel datum (BAS_COREAI_GPU_PROBE=1): does CoreAI's GPU path (A19 Neural Accelerators)
+        // decode a real-size Llama-1B FASTER than MLX-Metal? The kernel-layer test for the universal收口.
+        if (env["BAS_COREAI_GPU_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASCoreAIGpuProbe.run() }
+            return
+        }
         // Track E — SERIAL Saguaro end-to-end: MLX 3B target verifying a CoreAI Mamba (Llamba-1B) draft via
         // BASSaguaroLoop (BAS_COREAI_SAGUARO_PROBE=1). Measures Q1 (16L Mamba on ANE?) + serial tok/s vs pure
         // target greedy + the draft/target time split + byte-identity. The 全面开发 Mamba capstone measurement.

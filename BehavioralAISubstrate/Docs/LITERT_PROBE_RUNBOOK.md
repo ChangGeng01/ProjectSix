@@ -57,6 +57,39 @@ download above.)
 `ls -lh ~/litert-models/gemma-3n-E4B-it-int4.litertlm`. If it's tiny, the LFS object didn't fetch —
 re-run with the token set.
 
+## ✅ Step 1 RESOLVED (2026-06-20): integrated as a VENDORED LOCAL package — build GREEN
+
+The 2026-06-12 LFS blocker AND a second SwiftPM wall are both solved; the LiteRT-enabled app now builds.
+The recipe (two non-obvious gotchas):
+
+1. **Use a LOCAL package, NOT a remote `url:` ref.** LiteRT's `Package.swift` puts
+   `.unsafeFlags(["-Xlinker","-all_load"])` on the `LiteRTLM` target. SwiftPM FORBIDS depending on an
+   unsafe-flags product via ANY external reference (version OR revision) — both fail with
+   *"package product 'LiteRTLM-product' … uses unsafe build flags."* Only **local/path** references are
+   allowed unsafe flags. So vendor it.
+2. **Vendor the wrapper from the v0.13.1 TAG, not `main`.** `main`'s `swift/Engine.swift` calls a newer C
+   symbol (`litert_lm_conversation_config_set_stream_tool_calls`) absent from the released binary →
+   *"cannot find … in scope."* The **v0.13.1 tag** (`a0afb5a…`) wrapper is matched to its binary. (Note:
+   the v0.13.1 tag's `Package.swift` actually points its `binaryTarget` URL at the **v0.13.0** xcframework
+   — that wrapper↔binary pairing is the consistent one; don't "fix" the URL to v0.13.1.)
+
+**Exact steps used:**
+```bash
+# clone + checkout the matching tag (LFS-skip avoids the broken android .so)
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/google-ai-edge/LiteRT-LM /tmp/litert-lm-src
+git -C /tmp/litert-lm-src fetch --depth 1 origin tag v0.13.1 && git -C /tmp/litert-lm-src checkout v0.13.1
+# vendor ONLY the manifest + swift wrapper (the xcframework downloads from the release URL; rest of repo unused)
+mkdir -p Vendor/LiteRT-LM && cp /tmp/litert-lm-src/Package.swift Vendor/LiteRT-LM/ && cp -R /tmp/litert-lm-src/swift Vendor/LiteRT-LM/
+# wire into DeviceTestApp/BASDeviceTest.xcodeproj as XCLocalSwiftPackageReference relativePath "../Vendor/LiteRT-LM"
+#   + XCSwiftPackageProductDependency {productName=LiteRTLM} + PBXBuildFile in the app Frameworks phase.
+#   Do NOT add app-level -all_load (the package's target-level unsafe flag already propagates).
+xcodebuild -project DeviceTestApp/BASDeviceTest.xcodeproj -scheme BASDeviceTestApp -destination "id=<UDID>" \
+  -allowProvisioningUpdates -skipPackagePluginValidation build   # → BUILD SUCCEEDED; BASLiteRTE4BProbe real body now active
+```
+The 5 probe API fixes (Message("…") positional, `try await createConversation`, `chunk.toString`, `try EngineConfig`)
+are compile-verified against the real v0.13.1 API. **Only remaining gate: the gated model (Step 0.1).** Steps 3-6 below
+resume once it's staged. Original blocker notes kept below for history.
+
 ## ⚠️ Step 1 BLOCKER (2026-06-12): the LiteRTLM SPM package does not currently resolve
 
 Diagnosed on the dev box (git-lfs INSTALLED, so this is NOT a local tooling gap):

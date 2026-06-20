@@ -30,7 +30,7 @@ import Foundation
 import os
 import BASRuntimeCore  // BASTaskVmInfoProbe (phys_footprint — the jetsam metric)
 #if canImport(LiteRTLM)
-import LiteRTLM
+@preconcurrency import LiteRTLM
 #endif
 
 public enum BASLiteRTE4BProbe {
@@ -144,22 +144,37 @@ public enum BASLiteRTE4BProbe {
     ) async -> BackendResult {
         let backendName = backendLabel(backend)
         do {
-            let config = EngineConfig(modelPath: modelPath, backend: backend)
+            let config = try EngineConfig(modelPath: modelPath, backend: backend)
             let engine = Engine(engineConfig: config)
             try await engine.initialize()
             let afterLoadMB = footprintMB()
 
-            // (a) WARM DECODE — bounded, for tps + footprint (no cancel here).
-            let convo = try engine.createConversation(with: nil)
+            // (a) WARM DECODE — LONG generation for STEADY-STATE tps, with TTFT (prefill + first
+            // token) SEPARATED OUT. A short answer is prefill-dominated and badly underestimates the
+            // decode rate; here `tok_per_s` (from decodeTokens/decodeMs) is the steady-state rate
+            // (tokens AFTER the first chunk ÷ time AFTER the first chunk), and the note carries the
+            // gross rate + TTFT. Cap via BAS_LITERT_DECODE_CAP (default 160).
+            let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_LITERT_DECODE_CAP"] ?? "") ?? 160
+            let convo = try await engine.createConversation(with: nil)
             let startNs = DispatchTime.now().uptimeNanoseconds
             var tokens = 0
+            var firstNs: UInt64 = 0
+            var tokensAtFirst = 0
             let stream = convo.sendMessageStream(
-                Message(role: .user, text: "Reply in one short sentence: name a primary color."))
+                Message("Write a long, detailed, multi-paragraph essay about the entire history of "
+                    + "computing, from the abacus and mechanical calculators through to modern AI accelerators."))
             for try await chunk in stream {
-                tokens += max(1, chunk.text.count / 4)
-                if tokens >= 64 { break }
+                let n = max(1, chunk.toString.count / 4)
+                if firstNs == 0 { firstNs = DispatchTime.now().uptimeNanoseconds; tokensAtFirst = n }
+                tokens += n
+                if tokens >= decodeCap { break }
             }
-            let decodeMs = Double(DispatchTime.now().uptimeNanoseconds &- startNs) / 1_000_000
+            let endNs = DispatchTime.now().uptimeNanoseconds
+            let grossMs = Double(endNs &- startNs) / 1_000_000
+            let ttftMs = firstNs > 0 ? Double(firstNs &- startNs) / 1_000_000 : grossMs
+            let steadyTokens = max(1, tokens - tokensAtFirst)
+            let steadyMs = firstNs > 0 ? Double(endNs &- firstNs) / 1_000_000 : grossMs
+            let grossTps = grossMs > 0 ? Double(tokens) * 1000.0 / grossMs : 0
 
             // (b) MID-DECODE CANCEL TEST — the ADR-038 question: does cancel() interrupt an
             // IN-FLIGHT decode? Fresh conversation, a long prompt, fire cancel() ~2s in from a
@@ -169,9 +184,11 @@ public enum BASLiteRTE4BProbe {
             return BackendResult(
                 backend: backendName, loaded: true,
                 physFootprintMB: afterLoadMB,
-                decodeTokens: tokens, decodeMs: decodeMs,
+                decodeTokens: steadyTokens, decodeMs: steadyMs,   // tok_per_s line = STEADY-STATE (TTFT excluded)
                 cancelInterruptedDecode: cancel.interrupted,
-                note: "warm_ok cancel[\(cancel.note) tokens=\(cancel.tokens) "
+                note: "warm_ok gross_tok=\(tokens) gross_tps=\(String(format: "%.1f", grossTps)) "
+                    + "ttft_ms=\(String(format: "%.0f", ttftMs)) "
+                    + "cancel[\(cancel.note) tokens=\(cancel.tokens) "
                     + "ms_after_cancel=\(String(format: "%.0f", cancel.msAfterCancel))]")
         } catch {
             return BackendResult(
@@ -199,7 +216,7 @@ public enum BASLiteRTE4BProbe {
             "Write a long, detailed, multi-paragraph essay about the entire history of computing, "
             + "from the abacus and mechanical calculators through to modern AI accelerators."
         do {
-            let convo = try engine.createConversation(with: nil)
+            let convo = try await engine.createConversation(with: nil)
             let cancelAtNs = DispatchTime.now().uptimeNanoseconds + cancelDelayNs
             let canceller = Task {
                 try? await Task.sleep(nanoseconds: cancelDelayNs)
@@ -210,9 +227,9 @@ public enum BASLiteRTE4BProbe {
             var hitDeadline = false
             do {
                 let stream = convo.sendMessageStream(
-                    Message(role: .user, text: longPrompt))
+                    Message(longPrompt))
                 for try await chunk in stream {
-                    tokens += max(1, chunk.text.count / 4)
+                    tokens += max(1, chunk.toString.count / 4)
                     if tokens >= safetyTokenCap { break }
                     if DispatchTime.now().uptimeNanoseconds >= inLoopDeadlineNs {
                         hitDeadline = true; break
