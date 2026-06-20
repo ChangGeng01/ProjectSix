@@ -85,6 +85,8 @@ enum BASPromptLookupProbe {
             switch plookupSel {
             case "llama", "llama_3b": plookupModel = MLXModelCatalog.speculativeOptimalTarget
             case "qwen", "qwen_3b": plookupModel = MLXModelCatalog.qwen2_5_3B_4bit
+            case "e4b_local", "gemma_e4b_local": plookupModel = MLXModelCatalog.gemma4_E4B_4bit_local
+            case "gemma_e4b", "gemma4_e4b", "e4b": plookupModel = MLXModelCatalog.gemma4_E4B_4bit
             default: plookupModel = MLXModelCatalog.gemma4_E2B_4bit
             }
             let adapter = MLXOrganAdapter(
@@ -92,6 +94,17 @@ enum BASPromptLookupProbe {
                 maxOutputTokens: cap,
                 speculativeDecoding: .off)
             try await adapter.loadModel()
+
+            // CLEAN bit-exact decode baseline: pure decode forwards, NO prefill, NO spec — the honest
+            // current plain-greedy tok/s (answers "can E4B hit 15"). Warm, then time 64 forwards.
+            do {
+                let warmReq = BASOrganRequest(requestID: "pl-clean", role: .core,
+                    preset: .greedyDeterministic, instruction: "Describe the ocean in a few sentences.", context: [])
+                _ = try? await adapter.rawTargetForwardsMs(for: warmReq, forwards: 8)
+                let cleanMs = try await adapter.rawTargetForwardsMs(for: warmReq, forwards: 64)
+                fileLog.emit(String(format: "📊 prompt-lookup CLEAN-BASELINE plain_greedy_tok/s=%.1f (bit-exact, no prefill/spec)",
+                    cleanMs > 0 ? 64.0 * 1000.0 / cleanMs : 0))
+            } catch { fileLog.emit("📊 prompt-lookup clean-baseline ERROR=\(error)") }
 
             var repSpeedups: [Double] = []
             var allByteIdentical = true

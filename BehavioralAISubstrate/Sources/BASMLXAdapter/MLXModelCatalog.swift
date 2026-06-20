@@ -84,6 +84,15 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Gemma 4 E4B (MLX, 4-bit)",
         extraEOSTokens: ["<turn|>"])
 
+    /// Gemma 4 E4B **4-bit LOCAL** (Mac-downloaded + staged via devicectl, bypasses the iPhone-WiFi
+    /// HF download which dropped 3x on a 2.7GB pull). Loads from Documents/<localDirectoryName>/.
+    public static let gemma4_E4B_4bit_local = Entry(
+        id: "local/gemma-4-e4b-it-4bit",
+        providerID: "mlx.gemma4.e4b.it.4bit.local",
+        providerName: "Gemma 4 E4B (MLX, 4-bit local)",
+        extraEOSTokens: ["<turn|>"],
+        localDirectoryName: "models/gemma-4-e4b-it-4bit")
+
     /// Gemma 4 E2B instruction-tuned, 4-bit quantized. Smallest
     /// Gemma 4 variant; pick for iPhone / Watch / tight-memory.
     public static let gemma4_E2B_4bit = Entry(

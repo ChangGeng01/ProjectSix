@@ -144,52 +144,32 @@ public enum BASLiteRTE4BProbe {
     ) async -> BackendResult {
         let backendName = backendLabel(backend)
         do {
-            let config = try EngineConfig(modelPath: modelPath, backend: backend)
-            let engine = Engine(engineConfig: config)
-            try await engine.initialize()
-            let afterLoadMB = footprintMB()
-
-            // (a) WARM DECODE — LONG generation for STEADY-STATE tps, with TTFT (prefill + first
-            // token) SEPARATED OUT. A short answer is prefill-dominated and badly underestimates the
-            // decode rate; here `tok_per_s` (from decodeTokens/decodeMs) is the steady-state rate
-            // (tokens AFTER the first chunk ÷ time AFTER the first chunk), and the note carries the
-            // gross rate + TTFT. Cap via BAS_LITERT_DECODE_CAP (default 160).
-            let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_LITERT_DECODE_CAP"] ?? "") ?? 160
-            let convo = try await engine.createConversation(with: nil)
-            let startNs = DispatchTime.now().uptimeNanoseconds
-            var tokens = 0
-            var firstNs: UInt64 = 0
-            var tokensAtFirst = 0
-            let stream = convo.sendMessageStream(
-                Message("Write a long, detailed, multi-paragraph essay about the entire history of "
-                    + "computing, from the abacus and mechanical calculators through to modern AI accelerators."))
-            for try await chunk in stream {
-                let n = max(1, chunk.toString.count / 4)
-                if firstNs == 0 { firstNs = DispatchTime.now().uptimeNanoseconds; tokensAtFirst = n }
-                tokens += n
-                if tokens >= decodeCap { break }
-            }
-            let endNs = DispatchTime.now().uptimeNanoseconds
-            let grossMs = Double(endNs &- startNs) / 1_000_000
-            let ttftMs = firstNs > 0 ? Double(firstNs &- startNs) / 1_000_000 : grossMs
-            let steadyTokens = max(1, tokens - tokensAtFirst)
-            let steadyMs = firstNs > 0 ? Double(endNs &- firstNs) / 1_000_000 : grossMs
-            let grossTps = grossMs > 0 ? Double(tokens) * 1000.0 / grossMs : 0
-
-            // (b) MID-DECODE CANCEL TEST — the ADR-038 question: does cancel() interrupt an
-            // IN-FLIGHT decode? Fresh conversation, a long prompt, fire cancel() ~2s in from a
-            // concurrent task, and judge by whether the stream stops promptly AFTER cancel.
-            let cancel = await testCancel(engine: engine)
+            // CANONICAL decode rate via LiteRT's OWN benchmark() — controlled prefill+decode, warmed
+            // via initializeForBenchmark, EXACT token counts (lastDecodeTokensPerSecond). This is the
+            // same metric AI Edge Gallery reports; it replaces the chars/4 estimate + first-gen-JIT
+            // contamination that under-measured. tok_per_s = bench.lastDecodeTokensPerSecond.
+            let prefillN = Int(ProcessInfo.processInfo.environment["BAS_LITERT_PREFILL"] ?? "") ?? 256
+            let decodeN = Int(ProcessInfo.processInfo.environment["BAS_LITERT_DECODE_CAP"] ?? "") ?? 256
+            let beforeMB = footprintMB()
+            let bench = try await benchmark(
+                modelPath: modelPath, backend: backend,
+                prefillTokens: prefillN, decodeTokens: decodeN, cacheDir: nil)
+            let afterLoadMB = max(footprintMB(), beforeMB)
+            let decTps = bench.lastDecodeTokensPerSecond
+            let decTok = bench.lastDecodeTokenCount
+            let decMs = decTps > 0 ? Double(decTok) * 1000.0 / decTps : 0
 
             return BackendResult(
                 backend: backendName, loaded: true,
                 physFootprintMB: afterLoadMB,
-                decodeTokens: steadyTokens, decodeMs: steadyMs,   // tok_per_s line = STEADY-STATE (TTFT excluded)
-                cancelInterruptedDecode: cancel.interrupted,
-                note: "warm_ok gross_tok=\(tokens) gross_tps=\(String(format: "%.1f", grossTps)) "
-                    + "ttft_ms=\(String(format: "%.0f", ttftMs)) "
-                    + "cancel[\(cancel.note) tokens=\(cancel.tokens) "
-                    + "ms_after_cancel=\(String(format: "%.0f", cancel.msAfterCancel))]")
+                decodeTokens: decTok, decodeMs: decMs,   // tok_per_s line = LiteRT's OWN canonical decode tok/s
+                cancelInterruptedDecode: nil,
+                note: "BENCH decode_tps=\(String(format: "%.1f", decTps)) "
+                    + "prefill_tps=\(String(format: "%.1f", bench.lastPrefillTokensPerSecond)) "
+                    + "ttft_s=\(String(format: "%.2f", bench.timeToFirstTokenInSecond)) "
+                    + "init_s=\(String(format: "%.1f", bench.initTimeInSecond)) "
+                    + "prefill_tok=\(bench.lastPrefillTokenCount) decode_tok=\(decTok) "
+                    + "[cancel unchanged: CPU-yes/GPU-no from prior run]")
         } catch {
             return BackendResult(
                 backend: backendName, loaded: false,
