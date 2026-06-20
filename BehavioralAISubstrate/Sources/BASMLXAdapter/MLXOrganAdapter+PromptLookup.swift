@@ -141,6 +141,42 @@ extension MLXOrganAdapter {
     /// `draft(_:)`, byte-equal. This is the production wire for `respondPromptLookup` (previously reachable only
     /// from probes); the eligibility decision stays host-side so this adapter keeps NO BASOrgan-policy coupling.
     public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
-        try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+        // DecodePlan S4: when the planner is enabled, IT decides the lane (Option-3 auto-select). Default OFF →
+        // the EXACT legacy elect→prompt-lookup path (byte-identical). The elect Bool is shimmed to a purpose until
+        // S5 migrates callers to pass purpose directly.
+        guard decodePlannerAutoSelect else {
+            return try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+        }
+        #if canImport(MLXLLM)
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+        let strategy = BASDecodeLanePolicy.decodeStrategy(
+            purpose: Self._purposeForElect(electAccelerated),
+            temperature: request.preset.temperature,
+            capabilities: _decodeCapabilities(),
+            profiler: draftProfiler,
+            numDraftTokens: numDraftTokens)
+        return try await _execute(strategy, for: request)
+        #else
+        return try await respondPromptLookup(for: request, electPromptLookup: electAccelerated)
+        #endif
     }
+
+    /// Elect→purpose shim (S4; removed in S5 when callers pass purpose directly). The Bool reproduces the legacy
+    /// eligibility: `true` → `.factual` (eligible), `false` → `.scoutDefault` (not eligible), so `promptLookupEligible`
+    /// is byte-equal to the old `shouldUsePromptLookup` elect gate.
+    static func _purposeForElect(_ elect: Bool) -> BASDecodeLanePolicy.Purpose {
+        elect ? .factual : .scoutDefault
+    }
+
+    #if canImport(MLXLLM)
+    /// The decode lanes physically available right now, for the planner (keeps the planner pure / MLX-free).
+    func _decodeCapabilities() -> BASDecodeCapabilities {
+        BASDecodeCapabilities(
+            draftModelLoaded: isSpeculationActive,                 // draftContainer loaded + mode != .off
+            saguaroAvailable: false,                               // no injected CoreAI speculator on this entry
+            modelFreeAvailable: _loadedContainerForStreaming() != nil)
+    }
+    #endif
 }
