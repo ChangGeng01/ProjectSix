@@ -15,29 +15,7 @@ import BASMLXAdapter
 
 enum BASPromptLookupProbe {
 
-    private static let log = Logger(subsystem: "com.bas.devicetest", category: "prompt-lookup")
-
-    private final class FileLog: @unchecked Sendable {
-        private let handle: FileHandle?
-        private let lock = NSLock()
-        init() {
-            let f = DateFormatter()
-            f.dateFormat = "yyyyMMdd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
-            let stamp = f.string(from: Date())
-            guard let docs = FileManager.default.urls(
-                for: .documentDirectory, in: .userDomainMask).first else { handle = nil; return }
-            let url = docs.appendingPathComponent("prompt-lookup-\(stamp).log")
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            handle = try? FileHandle(forWritingTo: url)
-        }
-        func emit(_ line: String) {
-            BASPromptLookupProbe.log.info("\(line, privacy: .public)")
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            lock.lock(); defer { lock.unlock() }
-            try? handle?.write(contentsOf: data)
-        }
-        func close() { lock.lock(); defer { lock.unlock() }; try? handle?.close() }
-    }
+    // FileLog consolidated into the shared ProbeFileLog (BASProbeCommon.swift) — Tier-B dedup.
 
     // Repetitive workloads (expect hits) + a free-form control (expect ~0 hits).
     private static let workloads: [(name: String, prompt: String)] = [
@@ -60,7 +38,7 @@ enum BASPromptLookupProbe {
     ]
 
     static func run() async {
-        let fileLog = FileLog()
+        let fileLog = ProbeFileLog(filePrefix: "prompt-lookup", category: "prompt-lookup", alsoPrint: false)
         defer { fileLog.close() }
 
         let env = ProcessInfo.processInfo.environment
