@@ -108,6 +108,18 @@ extension MLXOrganAdapter {
     }
 
     #if canImport(MLXLLM)
+    /// The production decode STOP set — the tokenizer's `eosTokenId` plus the resolvable chat terminators (Llama-3
+    /// `<|eot_id|>`/`<|end_of_text|>`, ChatML `<|im_end|>`, `</s>`). Shared by every model-free decode path so the
+    /// stop rule stays identical across production + measure lanes. (Tier-C4 dedup of 3 byte-identical copies.)
+    /// Takes the two capabilities (not the tokenizer) to avoid the cross-module `Tokenizer` type-name ambiguity.
+    static func _productionEOSTokenIds(eosTokenId: Int?, resolve: (String) -> Int?) -> Set<Int> {
+        var eos = Set([eosTokenId].compactMap { $0 })
+        for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
+            if let id = resolve(name) { eos.insert(id) }
+        }
+        return eos
+    }
+
     /// Shared decode: run a model-free source through the byte-identical `BASPromptLookupDecoder` loop in one
     /// container pass; return the postprocessed body + this turn's prompt/gen tokens + acceptance telemetry.
     // `internal` (not `private`) so the Tier-C3 funnel in MLXOrganAdapter+PromptLookup.swift (a different file)
@@ -129,10 +141,8 @@ extension MLXOrganAdapter {
 
         let raw: _GenRaw = try await mainContainer.perform(nonSendable: input) { ctx, input in
             // Production parity: stop on the model's chat terminators too (same superset as respondPromptLookup).
-            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
-            for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
-                if let id = ctx.tokenizer.convertTokenToId(name) { eos.insert(id) }
-            }
+            let eos = Self._productionEOSTokenIds(
+                eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let r = try BASPromptLookupDecoder.generate(
                 input: input, model: ctx.model, parameters: params,
                 drafter: drafter, eosTokenIds: eos, adaptiveK: true)
@@ -242,10 +252,8 @@ extension MLXOrganAdapter {
         let raw: _TurnRaw = try await mainContainer.perform(nonSendable: input) { ctx, input in
             // Stop EXACTLY as production (`_generateModelFree`) does — the chat-terminator superset, not just
             // eosTokenId — so the promotion-gate speedup is measured under the same stop rule that ships.
-            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
-            for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
-                if let id = ctx.tokenizer.convertTokenToId(name) { eos.insert(id) }
-            }
+            let eos = Self._productionEOSTokenIds(
+                eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let s0 = DispatchTime.now().uptimeNanoseconds
             let spec = try BASPromptLookupDecoder.generate(
                 input: input, model: ctx.model, parameters: params,

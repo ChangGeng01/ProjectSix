@@ -175,10 +175,8 @@ extension MLXOrganAdapter {
 
         let rawBody: String = try await mainContainer.perform(nonSendable: input) { ctx, input in
             // Production parity: stop on the model's chat terminators too (the superset the production stream uses).
-            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
-            for name in ["<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "</s>"] {
-                if let id = ctx.tokenizer.convertTokenToId(name) { eos.insert(id) }
-            }
+            let eos = Self._productionEOSTokenIds(
+                eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptTokens = input.text.tokens.asArray(Int.self)
             speculator.reset()
             let target = try BASSaguaroMLXTarget(
