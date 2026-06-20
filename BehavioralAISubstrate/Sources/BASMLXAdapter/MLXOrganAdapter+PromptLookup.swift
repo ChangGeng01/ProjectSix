@@ -168,13 +168,14 @@ extension MLXOrganAdapter {
         #endif
     }
 
-    /// DEPRECATED elect-Bool entry (kept for the transition; removed in S6). Shims to the purpose entry via the
-    /// legacy eligibility mapping — byte-equal because `promptLookupEligible(_purposeForElect(e)) == e`.
+    /// COMPATIBILITY elect-Bool entry — RETAINED, not deleted (production uses `draft(_:purpose:)`; this stays a
+    /// thin shim for any remaining Bool callers). Shims to the purpose entry via the legacy eligibility mapping —
+    /// byte-equal because `promptLookupEligible(_purposeForElect(e)) == e`.
     public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
         try await draft(request, purpose: Self._purposeForElect(electAccelerated))
     }
 
-    /// Elect→purpose shim mapping (removed in S6 with the Bool entry). `true` → `.factual` (eligible), `false` →
+    /// Elect→purpose shim mapping (used by the retained compatibility elect entry). `true` → `.factual` (eligible), `false` →
     /// `.scoutDefault` (not eligible), so it reproduces the legacy `promptLookupEligible` elect gate exactly.
     static func _purposeForElect(_ elect: Bool) -> BASDecodeLanePolicy.Purpose {
         elect ? .factual : .scoutDefault

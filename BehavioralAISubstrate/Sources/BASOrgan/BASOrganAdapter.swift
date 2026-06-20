@@ -62,7 +62,7 @@ public protocol BASOrganAdapter: Sendable {
     /// (`BASDecodeLanePolicy.decodeStrategy`). The default impl IGNORES `purpose` and calls `draft(_:)` —
     /// BYTE-EQUAL for every adapter without a lane (ADR-014). This replaces the overloaded Bool: a Boolean can
     /// only say "accelerate or not", whereas a purpose lets the planner pick AMONG lanes (plain / draft-model /
-    /// prompt-lookup / cross-turn / saguaro). The Bool overload above is now a thin shim and is removed in S6.
+    /// prompt-lookup / cross-turn / saguaro). The Bool overload above is RETAINED as a thin compatibility shim (not deleted).
     func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft
 
     /// Announce how much work this provider is willing to take on

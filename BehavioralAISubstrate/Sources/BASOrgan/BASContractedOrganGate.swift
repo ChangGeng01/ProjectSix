@@ -109,7 +109,7 @@ public struct BASContractedOrganGate: Sendable {
     }
 
     /// S5: purpose-based — validate the contract first (never bypassed), then forward the decode PURPOSE to the
-    /// inner adapter so its planner picks the lane. Removed-with-the-Bool overload in S6.
+    /// inner adapter so its planner picks the lane. Retained alongside the compatibility Bool overload (not deleted).
     public func draft(
         contract: BASLLMInvocationContract,
         request: BASOrganRequest,
