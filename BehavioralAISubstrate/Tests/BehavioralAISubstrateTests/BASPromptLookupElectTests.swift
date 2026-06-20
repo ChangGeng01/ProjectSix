@@ -36,6 +36,18 @@ final class BASPromptLookupElectTests: XCTestCase {
         XCTAssertEqual(electedTrue.providerID, plain.providerID)
     }
 
+    func testDefaultPurposeDraftIsByteEqualToPlainDraft() async throws {
+        // S5: the new purpose-based API's default (no-lane adapter) must ALSO be byte-equal to draft(_:), for
+        // EVERY purpose — the protocol default ignores purpose, so nothing changes until an adapter has a planner.
+        let req = request()
+        let plain = try await BASOrganDeterministicAdapter().draft(req)
+        for purpose in BASDecodeLanePolicy.Purpose.allCases {
+            let viaPurpose = try await BASOrganDeterministicAdapter().draft(req, purpose: purpose)
+            XCTAssertEqual(viaPurpose.body, plain.body, "purpose=\(purpose) must be byte-equal for a no-lane adapter")
+            XCTAssertEqual(viaPurpose.traceID, plain.traceID)
+        }
+    }
+
     func testPromptLookupEligibilityPolicy() {
         // The host-side doctrine end: prompt-lookup is elected ONLY for factual/deterministic purposes,
         // never for creative/scout (free-form is -8%, must stay gated off).

@@ -196,6 +196,31 @@ public actor BASRoutingOrganAdapter: BASOrganAdapter {
         }
     }
 
+    /// S5: PURPOSE-based routing — forwards the turn's purpose to whichever provider handles it (so a wrapped MLX
+    /// provider's planner picks the lane). Mirrors the elect form above; byte-equal for providers without a lane.
+    public func draft(
+        _ request: BASOrganRequest,
+        purpose: BASDecodeLanePolicy.Purpose
+    ) async throws -> BASOrganDraft {
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+        switch strategy {
+        case .primaryOnly:
+            return try await primary.draft(request, purpose: purpose)
+        case .secondaryOnly:
+            return try await secondary.draft(request, purpose: purpose)
+        case .primaryWithFallback:
+            do {
+                return try await primary.draft(request, purpose: purpose)
+            } catch BASOrganError.providerUnavailable {
+                return try await secondary.draft(request, purpose: purpose)
+            } catch BASOrganError.pressureRefusal {
+                return try await secondary.draft(request, purpose: purpose)
+            }
+        }
+    }
+
     public func currentCapacity() async -> BASOrganCapacity {
         switch strategy {
         case .primaryOnly:

@@ -107,4 +107,17 @@ public struct BASContractedOrganGate: Sendable {
         let trace = BASProcessTrace.accepted(contract: contract, draft: draft)
         return BASContractedDraft(draft: draft, trace: trace)
     }
+
+    /// S5: purpose-based — validate the contract first (never bypassed), then forward the decode PURPOSE to the
+    /// inner adapter so its planner picks the lane. Removed-with-the-Bool overload in S6.
+    public func draft(
+        contract: BASLLMInvocationContract,
+        request: BASOrganRequest,
+        purpose: BASDecodeLanePolicy.Purpose
+    ) async throws -> BASContractedDraft {
+        try validate(contract: contract, request: request)
+        let draft = try await adapter.draft(request, purpose: purpose)
+        let trace = BASProcessTrace.accepted(contract: contract, draft: draft)
+        return BASContractedDraft(draft: draft, trace: trace)
+    }
 }

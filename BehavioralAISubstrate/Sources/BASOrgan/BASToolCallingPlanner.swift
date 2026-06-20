@@ -242,9 +242,9 @@ public actor BASToolCallingPlanner {
 
             let draft: BASOrganDraft
             do {
-                // P1: tool-calling (structured/JSON) → elect prompt-lookup (TOKEN-identical under greedy).
-                draft = try await adapter.draft(
-                    request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
+                // P1/S5: tool-calling (structured/JSON) is a .factual turn → pass the purpose; the planner picks
+                // the lane (TOKEN-identical under greedy; byte-equal fallback when temp>0 / no lane).
+                draft = try await adapter.draft(request, purpose: .factual)
             } catch {
                 throw BASToolCallingPlanError
                     .adapterFailed(

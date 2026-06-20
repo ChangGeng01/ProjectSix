@@ -368,9 +368,8 @@ public actor BASLLMVerifierPipeline {
             instruction: instruction + "\n\n" + userPrompt)
         do {
             // P1: factual verification → elect prompt-lookup (TOKEN-identical under greedy; .scout/temp>0 stages
-            // fail-close to draft(_:), byte-equal).
-            let draft = try await adapter.draft(
-                request, electAccelerated: BASDecodeLanePolicy.promptLookupEligible(for: .factual))
+            // fail-close to draft(_:), byte-equal). S5: pass the purpose (.factual); the planner picks the lane.
+            let draft = try await adapter.draft(request, purpose: .factual)
             return BASLLMVerifierStageOutcome(
                 stage: stage,
                 rawOutput: draft.body,
