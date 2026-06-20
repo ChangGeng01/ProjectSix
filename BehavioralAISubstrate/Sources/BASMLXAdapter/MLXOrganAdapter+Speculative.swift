@@ -172,19 +172,8 @@ extension MLXOrganAdapter {
             }
         }
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256 — same contract as draft(_:)
-        return BASOrganDraft(
-            requestID: request.requestID,
-            providerID: descriptor.providerID,
-            role: request.role,
-            body: body,
-            inputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(
-                    from: [request.instruction] + request.context),
-            outputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(from: [body]),
-            producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID),
+        return _buildDraft(
+            body: body, request: request,
             completionMetrics: Self.completionMetrics(from: completionInfo))
         #else
         throw BASOrganError.providerUnavailable(

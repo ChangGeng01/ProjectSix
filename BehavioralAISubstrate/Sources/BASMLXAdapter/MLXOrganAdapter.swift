@@ -917,6 +917,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         if shouldSpeculate(for: request) {
             return try await _draftSpeculative(request)
         }
+        return try await _plainDraft(request)
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
+
+    /// The single-model (non-speculative) draft path: ChatSession decode + terminal-metrics capture, byte-identical
+    /// to `respond(to:)`. Extracted from `draft(_:)` (S1) so the DecodeStrategy executor can dispatch `.plain` here.
+    func _plainDraft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
+        #if canImport(MLXLLM)
         guard let container = modelContainer else {
             throw BASOrganError.providerUnavailable(
                 reason: Self.notLoadedReason(
@@ -937,19 +949,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let (rawBody, completionInfo) = try await Self.streamBody(session, prompt: prompt)
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
-        return BASOrganDraft(
-            requestID: request.requestID,
-            providerID: descriptor.providerID,
-            role: request.role,
-            body: body,
-            inputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(
-                    from: [request.instruction] + request.context),
-            outputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(from: [body]),
-            producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID),
+        return _buildDraft(
+            body: body, request: request,
             completionMetrics: Self.completionMetrics(from: completionInfo))
         #else
         throw BASOrganError.providerUnavailable(
@@ -1029,19 +1030,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let (rawBody, completionInfo) = try await Self.streamBody(box.session, prompt: prompt)
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
-        return BASOrganDraft(
-            requestID: request.requestID,
-            providerID: descriptor.providerID,
-            role: request.role,
-            body: body,
-            inputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(
-                    from: [request.instruction] + request.context),
-            outputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(from: [body]),
-            producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID),
+        return _buildDraft(
+            body: body, request: request,
             completionMetrics: Self.completionMetrics(from: completionInfo))
         #else
         throw BASOrganError.providerUnavailable(

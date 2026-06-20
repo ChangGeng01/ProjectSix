@@ -163,9 +163,13 @@ extension MLXOrganAdapter {
     }
     #endif
 
-    /// Build the `BASOrganDraft` for a model-free accelerated turn (body already M256-postprocessed; metrics nil
-    /// — the prompt-lookup loop emits no `GenerateCompletionInfo`). Same shape as `draft(_:)`/`respondPromptLookup`.
-    func _modelFreeDraft(body: String, request: BASOrganRequest) -> BASOrganDraft {
+    /// Canonical `BASOrganDraft` builder — identical fields for EVERY decode lane (S1 dedup). `completionMetrics`
+    /// is nil for the model-free loop (no `GenerateCompletionInfo`) and the captured metrics for the
+    /// ChatSession/speculative paths. Replaces field-for-field copies in `draft(_:)`/`_draftSpeculative`/Saguaro.
+    func _buildDraft(
+        body: String, request: BASOrganRequest,
+        completionMetrics: BASOrganCompletionMetrics? = nil
+    ) -> BASOrganDraft {
         BASOrganDraft(
             requestID: request.requestID,
             providerID: descriptor.providerID,
@@ -177,7 +181,12 @@ extension MLXOrganAdapter {
             producedAt: Date(),
             traceID: BASOrganDeterministicAdapter.digest(
                 for: request, providerID: descriptor.providerID),
-            completionMetrics: nil)
+            completionMetrics: completionMetrics)
+    }
+
+    /// Model-free accelerated turn draft (metrics nil — the prompt-lookup loop emits no `GenerateCompletionInfo`).
+    func _modelFreeDraft(body: String, request: BASOrganRequest) -> BASOrganDraft {
+        _buildDraft(body: body, request: request)
     }
 
     /// Per-turn cross-turn-spec vs single-model-greedy-baseline result (for the on-device probe).

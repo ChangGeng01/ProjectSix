@@ -188,18 +188,7 @@ extension MLXOrganAdapter {
         }
         let body = Self.applyMarkerPostprocessing(rawBody)
 
-        return BASOrganDraft(
-            requestID: request.requestID,
-            providerID: descriptor.providerID,
-            role: request.role,
-            body: body,
-            inputTokensEstimated: BASOrganDeterministicAdapter
-                .estimateTokens(from: [request.instruction] + request.context),
-            outputTokensEstimated: BASOrganDeterministicAdapter.estimateTokens(from: [body]),
-            producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID),
-            completionMetrics: nil)
+        return _buildDraft(body: body, request: request)
         #else
         throw BASOrganError.providerUnavailable(
             reason: MLXOrganAdapter.frameworkUnavailableReason
