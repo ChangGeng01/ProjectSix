@@ -14,6 +14,7 @@ final class BASDecodeStrategyTests: XCTestCase {
     private let all = BASDecodeCapabilities(draftModelLoaded: true, saguaroAvailable: true, modelFreeAvailable: true)
     private let mfOnly = BASDecodeCapabilities(draftModelLoaded: false, saguaroAvailable: false, modelFreeAvailable: true)
     private let nothing = BASDecodeCapabilities(draftModelLoaded: false, saguaroAvailable: false, modelFreeAvailable: false)
+    private let draftOnly = BASDecodeCapabilities(draftModelLoaded: true, saguaroAvailable: false, modelFreeAvailable: false)
 
     private func plan(_ purpose: P, _ temp: Double, _ caps: BASDecodeCapabilities,
                       _ prof: BASAcceptanceProfiler = BASAcceptanceProfiler(), k: Int = 4) -> BASDecodeStrategy {
@@ -101,5 +102,32 @@ final class BASDecodeStrategyTests: XCTestCase {
         XCTAssertEqual(
             BASDecodeLanePolicy.acceleratedChoice(temperature: 0, purpose: .factual, profiler: BASAcceptanceProfiler()),
             .suffixAutomaton)
+    }
+
+    // 11. Draft-MODEL net-positive floor (Gate 2b cost-aware gate). The draft-model lane is high-cost (a full draft
+    //     forward / token), so once MEASURED below the ≈2.7 accepted-per-round break-even it's a latency LOSS and must
+    //     fall back to plain — even though its hit-rate (0.5) clears the cheap model-free floor (0.05).
+    func testDraftModelBelowNetPositiveFloorFallsBackToPlain() {
+        let prof = BASAcceptanceProfiler().observing(
+            sourceID: BASDecodeStrategy.draftModelID, purpose: .scoutDefault, accepted: 8, proposed: 16, rounds: 4) // a=2.0
+        XCTAssertEqual(plan(.scoutDefault, 0, draftOnly, prof), .plain,
+                       "draft-model measured a=2.0 (<2.7 break-even, free-form) ⇒ latency loss ⇒ fall back to plain")
+    }
+
+    // 12. Above break-even (reasoning-like a=3.0 ≥ 2.7) ⇒ the draft-model lane is net-positive ⇒ kept.
+    func testDraftModelAboveNetPositiveFloorStillSpecs() {
+        let prof = BASAcceptanceProfiler().observing(
+            sourceID: BASDecodeStrategy.draftModelID, purpose: .scoutDefault, accepted: 12, proposed: 16, rounds: 4) // a=3.0
+        guard case .draftModelSpec = plan(.scoutDefault, 0, draftOnly, prof) else {
+            return XCTFail("draft-model measured a=3.0 (≥2.7) should keep draftModelSpec")
+        }
+    }
+
+    // 13. Cold (no measurement yet) ⇒ kept, to engage once and gather the acceptance data — the net-positive floor
+    //     only applies once there IS a measurement (otherwise the lane could never learn its own acceptance).
+    func testColdDraftModelStaysToLearn() {
+        guard case .draftModelSpec = plan(.scoutDefault, 0, draftOnly) else {
+            return XCTFail("cold draft-model should stay in to learn (draftModelSpec)")
+        }
     }
 }

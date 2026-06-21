@@ -30,7 +30,9 @@ extension BASDecodeLanePolicy {
     /// 3. model-free (prompt-lookup / cross-turn) + saguaro are added ONLY for eligible purposes
     ///    (`promptLookupEligible`); the model-free pick reuses `source(for:profiler:)` so `BASDraftSourceRouterTests`
     ///    still pins it. Non-eligible purpose with no draft model → `.plain`.
-    /// 4. drop lanes whose smoothed hit-rate is below `minHitRate` (`worthSpeculating`); if none remain → `.plain`.
+    /// 4. drop lanes not worth their COST: model-free below `minHitRate` (cheap → hit-rate floor); the draft-MODEL lane
+    ///    below `minDraftModelAccepted` (a full draft forward/token ⇒ needs a NET-POSITIVE accepted-per-round floor —
+    ///    Gate 2b: free-form a≈2 is a 0.88× LOSS). Cold lanes stay (to learn); if none remain → `.plain`.
     /// 5. pick the highest measured `emaAccepted`; ties / cold lanes resolve by capability priority
     ///    (draftModel > saguaro > model-free — a model-backed draft is the safer cold-start default).
     /// 6. attach the profiler's warm-started K for the winning lane.
@@ -40,7 +42,11 @@ extension BASDecodeLanePolicy {
         capabilities: BASDecodeCapabilities,
         profiler: BASAcceptanceProfiler,
         numDraftTokens: Int = 4,
-        minHitRate: Double = 0.05
+        minHitRate: Double = 0.05,
+        // Net-positive accepted-per-round floor for the HIGH-COST draft-MODEL lane. On the A19 (1B draft vs 3B target,
+        // K=4) the end-to-end break-even is ≈2.7 (Gate 2b: free-form a≈2 → 0.88× LOSS; reasoning a≈3 → 1.06×). Below
+        // this the draft-model lane is a latency loss → fall back to plain. Model-free lanes (≈0 cost) keep `minHitRate`.
+        minDraftModelAccepted: Double = 2.7
     ) -> BASDecodeStrategy {
         guard Self.isGreedyByteSafe(temperature: temperature) else { return .plain }
 
@@ -84,9 +90,19 @@ extension BASDecodeLanePolicy {
             }
         }
 
-        // Drop lanes not worth the per-round scan tax (cold → kept; the model-free pick already passed its own floor).
-        let viable = candidates.filter {
-            profiler.worthSpeculating(sourceID: $0.id, purpose: purpose, minHitRate: minHitRate)
+        // Drop lanes not worth their COST (cold → kept, to gather a measurement). Two floors by lane cost:
+        //   • model-free (≈0 cost): the smoothed hit-rate `minHitRate` (its own router floor already applied above).
+        //   • draft-MODEL (a full draft forward / token): a NET-POSITIVE accepted-per-round floor `minDraftModelAccepted`
+        //     — below break-even it's a measured latency LOSS (Gate 2b free-form 0.88×), so fall back to plain. Cold (no
+        //     stat) stays in to learn; once measured below break-even it drops out (e.g. free-form .scoutDefault).
+        let viable = candidates.filter { cand in
+            guard profiler.worthSpeculating(sourceID: cand.id, purpose: purpose, minHitRate: minHitRate)
+            else { return false }
+            if cand.id == BASDecodeStrategy.draftModelID,
+               let s = profiler.stat(cand.id, purpose), s.emaAccepted < minDraftModelAccepted {
+                return false
+            }
+            return true
         }
         guard let first = viable.first else { return .plain }
 
