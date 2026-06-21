@@ -45,10 +45,15 @@ enum BASSpecSpeedupProbe {
         let maxTok = Int(env["BAS_SPEC_SPEEDUP_MAXTOK"] ?? "") ?? 128
         fileLog.emit("📊 spec-speedup START — Gate 2b: draft-spec(1B+3B) vs plain free-form tok/s, K=\(K) maxTok=\(maxTok)")
         do {
+            // BAS_SPEC_DRAFT_LOCAL=1 → the locally-staged 1B (reliable when the HF cache is evicted / WiFi DL fails;
+            // the first bracketed re-run hit specActive=false because the HF-id 1B would not load).
+            let draftEntry = (env["BAS_SPEC_DRAFT_LOCAL"] ?? "0") == "1"
+                ? MLXModelCatalog.llama3_2_1B_4bit_local
+                : MLXModelCatalog.llama3_2_1B_4bit
             let adapter = MLXOrganAdapter(
                 model: MLXModelCatalog.speculativeOptimalTarget,
                 maxOutputTokens: maxTok,
-                draftModel: MLXModelCatalog.llama3_2_1B_4bit,
+                draftModel: draftEntry,
                 speculativeDecoding: .greedy,
                 numDraftTokens: K)
             try await adapter.loadModel()

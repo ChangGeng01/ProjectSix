@@ -153,6 +153,16 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Llama 3.2 1B (MLX, 4-bit)",
         extraEOSTokens: ["<|eot_id|>"])
 
+    /// Llama-3.2-1B 4-bit LOCAL-staged (Mac-download + devicectl push) — the reliable spec-draft for on-device probes
+    /// when the HF cache is evicted / iPhone-WiFi download fails (Gate-2b re-measure hit `specActive=false` because
+    /// the HF-id 1B would not load). Same weights as `llama3_2_1B_4bit`; loads from Documents/<localDirectoryName>.
+    public static let llama3_2_1B_4bit_local = Entry(
+        id: "local/Llama-3.2-1B-Instruct-4bit",
+        providerID: "mlx.llama3_2.1b.it.4bit.local",
+        providerName: "Llama 3.2 1B (MLX, 4-bit local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-1B-Instruct-4bit")
+
     /// Qwen2.5 **1.5B** instruction-tuned, 4-bit — the other smaller throughput pick (ChatML `<|im_end|>`).
     /// Same throughput-vs-quality tradeoff as Llama-3.2-1B. (Available, host opt-in; uncertified.)
     public static let qwen2_5_1_5B_4bit = Entry(
