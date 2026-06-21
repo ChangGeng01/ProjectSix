@@ -147,6 +147,20 @@ extension MLXOrganAdapter {
     /// `decodePlannerAutoSelect` is a runtime KILL-SWITCH: when OFF it means PURE PLAIN (no acceleration at all) —
     /// the simplest safe revert — not the legacy prompt-lookup gate.
     public func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
+        try await draft(request, purpose: purpose, sessionID: nil)
+    }
+
+    /// CROSS-TURN variant (查缺补漏 T3): supply a stable conversation `sessionID` so the planner's `.suffixLookup`
+    /// lane seeds its drafter from the cross-turn corpus and folds this turn back in — the device-gated cross-turn
+    /// win (1.07–1.41×) is UNREACHABLE through the no-session entries (they run an empty store = plain prompt-lookup).
+    /// Byte-identical regardless (every lane emits the target's argmax, ADR-039). HOST CONTRACT (footgun): use ONE
+    /// stable sessionID per conversation and do NOT also re-send chat history in `request.context` (the re-rendered
+    /// prompt would re-contain prior turns → duplicate appends + premature FIFO eviction); `clearSession(sessionID:)`
+    /// resets the corpus. NOTE: exposed on the concrete adapter; protocol + wrapper propagation is the multi-turn-
+    /// caller follow-up (no current production caller is multi-turn, so the no-session entries remain the live path).
+    public func draft(
+        _ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose, sessionID: String?
+    ) async throws -> BASOrganDraft {
         guard decodePlannerAutoSelect else {
             return try await _plainDraft(request)
         }
@@ -160,7 +174,7 @@ extension MLXOrganAdapter {
             capabilities: _decodeCapabilities(),
             profiler: draftProfiler,
             numDraftTokens: numDraftTokens)
-        return try await _execute(strategy, for: request)
+        return try await _execute(strategy, for: request, purpose: purpose, sessionID: sessionID)
         #else
         return try await _plainDraft(request)
         #endif

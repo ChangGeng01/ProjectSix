@@ -932,7 +932,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 purpose: .scoutDefault, temperature: request.preset.temperature,
                 capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens)
             : .plain
-        return try await _execute(strategy, for: request)
+        return try await _execute(strategy, for: request, purpose: .scoutDefault)
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

@@ -75,30 +75,50 @@ enum BASSpecSpeedupProbe {
             await adapter.setDecodePlannerAutoSelect(true);  _ = try? await adapter.draft(warm)
             fileLog.emit("📊 spec-speedup warmup done")
 
+            // T4 (gap-audit): THERMAL-BRACKET each workload — plain-pre / spec / plain-post with cooldowns, and
+            // refuse a speedup that falls inside the plain-to-plain drift band (mirrors BASQuantABProbe's discipline).
+            // The original plain-then-spec single-shot gave spec a hot-SECOND bias on a +77-112%-drift device and ran
+            // the free-form workloads last (hottest) — so the 0.88× "NET LOSS" that set minDraftModelAccepted=2.7 was
+            // confounded. This bracket makes each workload self-thermal-controlled; the per-workload drift is reported.
+            func cooldown() async { try? await Task.sleep(nanoseconds: 6_000_000_000) }
+            func ts() -> String {
+                switch ProcessInfo.processInfo.thermalState {
+                case .nominal: return "nominal"; case .fair: return "fair"
+                case .serious: return "serious"; case .critical: return "critical"; @unknown default: return "?"
+                }
+            }
             var freeSpeedups: [Double] = []
             for w in workloads {
                 let req = BASOrganRequest(
                     requestID: "spd-\(w.name)", role: .core,
                     preset: .greedyDeterministic, instruction: w.prompt, context: [])
                 do {
-                    await adapter.setDecodePlannerAutoSelect(false)   // plain (no draft)
-                    let plain = try await timed(req)
-                    await adapter.setDecodePlannerAutoSelect(true)    // draft-model spec
-                    let spec = try await timed(req)
-                    let speedup = plain.tps > 0 ? spec.tps / plain.tps : 0
+                    await adapter.setDecodePlannerAutoSelect(false)   // plain-pre
+                    let plainPre = try await timed(req); await cooldown()
+                    await adapter.setDecodePlannerAutoSelect(true)    // draft-model spec (sandwiched)
+                    let spec = try await timed(req); await cooldown()
+                    await adapter.setDecodePlannerAutoSelect(false)   // plain-post (the drift probe)
+                    let plainPost = try await timed(req); await cooldown()
+                    let bracketMs = (plainPre.ms + plainPost.ms) / 2
+                    let driftBand = abs(plainPost.ms - plainPre.ms)
+                    let driftPct = plainPre.ms > 0 ? (plainPost.ms - plainPre.ms) / plainPre.ms * 100 : 0
+                    let speedup = spec.ms > 0 ? bracketMs / spec.ms : 0     // ms: lower = faster
+                    let win = spec.ms > 0 && spec.ms < (bracketMs - driftBand)
+                    let verdict = win ? "SPEC-WIN" : "WITHIN-DRIFT"
                     if w.klass == "free" { freeSpeedups.append(speedup) }
                     fileLog.emit(String(format:
-                        "📊 spec-speedup workload=%@ class=%@ plain_tps=%.1f spec_tps=%.1f speedup=%.2fx "
-                        + "plain_ms=%.0f spec_ms=%.0f plain_tok=%d spec_tok=%d",
-                        w.name, w.klass, plain.tps, spec.tps, speedup, plain.ms, spec.ms, plain.toks, spec.toks))
+                        "📊 spec-speedup workload=%@ class=%@ plain_bracket_ms=%.0f spec_ms=%.0f drift_pct=%+.1f%% "
+                        + "speedup=%.2fx verdict=%@ thermal=%@ (bracketed; drift-honest)",
+                        w.name, w.klass, bracketMs, spec.ms, driftPct, speedup, verdict, ts()))
                 } catch {
                     fileLog.emit("📊 spec-speedup workload=\(w.name) ERROR=\(error)")
                 }
             }
             let meanFree = freeSpeedups.isEmpty ? 0 : freeSpeedups.reduce(0, +) / Double(freeSpeedups.count)
             fileLog.emit(String(format:
-                "📊 spec-speedup DONE free_speedup_mean=%.2fx K=%d (>1 ⇒ the 1B draft speeds up free-form end-to-end)",
-                meanFree, K))
+                "📊 spec-speedup DONE free_speedup_mean=%.2fx K=%d thermal=%@ (bracketed plain/spec/plain, drift-refused; "
+                + ">1 ⇒ the 1B draft speeds up free-form end-to-end. Recompute minDraftModelAccepted from drift-honest rows)",
+                meanFree, K, ts()))
         } catch {
             fileLog.emit("📊 spec-speedup ERROR=\(error)")
         }
