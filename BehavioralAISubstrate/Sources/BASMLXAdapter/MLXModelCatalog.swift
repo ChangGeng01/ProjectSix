@@ -199,6 +199,17 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: ["<|eot_id|>"],
         localDirectoryName: "models/Llama-3.2-3B-Instruct-mixed-attn4")
 
+    /// Llama-3.2-3B MXFP4 (MX block float, group 32, q_mode=mxfp4; 4.251 bpw, 1.6GB). Audit "weakens" item: does the
+    /// MX format beat affine at ~4-bit? NOTE the bpw is ≥ affine-4bit (4.0) → bandwidth-NEUTRAL by construction (MX has
+    /// no sub-4-bit mode); this entry tests only the kernel/quality angle, not a bandwidth saving. Loads via MLX-swift
+    /// `QuantizationMode.mxfp4` (Ops.swift:1115).
+    public static let llama3_2_3B_mxfp4_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-mxfp4",
+        providerID: "mlx.llama3_2.3b.it.mxfp4.local",
+        providerName: "Llama 3.2 3B (MLX, mxfp4 local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-mxfp4")
+
     /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
     /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
     public static let defaultEntries: [Entry] = [

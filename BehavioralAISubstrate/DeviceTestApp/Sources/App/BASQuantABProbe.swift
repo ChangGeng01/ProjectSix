@@ -38,34 +38,40 @@ enum BASQuantABProbe {
     static func run() async {
         let fileLog = ProbeFileLog(filePrefix: "quant-ab", category: "quant-ab", alsoPrint: false)
         defer { fileLog.close() }
-        let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_QUANT_AB_TOKENS"] ?? "200") ?? 200
+        let env = ProcessInfo.processInfo.environment
+        let decodeCap = Int(env["BAS_QUANT_AB_TOKENS"] ?? "200") ?? 200
         let fourBit = MLXModelCatalog.llama3_2_3B_4bit
         // BAS_QUANT_LOWBIT selects the low-bit challenger: "3bit" (naive group-quant, DECLINED) or "mixed34"
         // (mlx_lm mixed_3_4: 3-bit base + 4-bit sensitive, 3.624 bpw — the quality-preserving bandwidth retry).
-        let lowbit = ProcessInfo.processInfo.environment["BAS_QUANT_LOWBIT"] ?? "3bit"
+        let lowbit = env["BAS_QUANT_LOWBIT"] ?? "3bit"
         let threeBit: MLXModelCatalog.Entry
         switch lowbit {
         case "mixed_attn4": threeBit = MLXModelCatalog.llama3_2_3B_mixed_attn4_local   // embed+attn 4-bit / FFN 3-bit
         case "mixed34":     threeBit = MLXModelCatalog.llama3_2_3B_mixed34_local        // mlx_lm mixed_3_4
+        case "mxfp4":       threeBit = MLXModelCatalog.llama3_2_3B_mxfp4_local          // MX block float, 4.251 bpw
         default:            threeBit = MLXModelCatalog.llama3_2_3B_3bit_local           // naive 3-bit
         }
         fileLog.emit("📊 quant-ab START 4bit=\(fourBit.providerID) lowbit=\(threeBit.providerID) "
             + "decode_cap=\(decodeCap) n_prompts=\(prompts.count) bracket=4bit-first+last")
 
-        func runModel(_ entry: MLXModelCatalog.Entry, label: String, captureBodies: Bool) async
+        func runModel(_ entry: MLXModelCatalog.Entry, label: String, captureBodies: Bool,
+                      kvBits: Int? = nil, promptSet: [String]? = nil) async
             -> (meanMs: Double, bodies: [String]) {
             do {
                 var adapter: MLXOrganAdapter? = MLXOrganAdapter(
-                    model: entry, speculativeDecoding: .off)   // single-model: isolate the quant lever
+                    model: entry,
+                    speculativeDecoding: .off,                 // single-model: isolate the quant lever
+                    kvCacheBits: kvBits)                       // KV-quant lever (nil = fp16 cache)
                 try await adapter!.loadModel()
                 var total = 0.0
                 var bodies: [String] = []
-                for (i, p) in prompts.enumerated() {
+                let ps = promptSet ?? prompts
+                for (i, p) in ps.enumerated() {
                     let (body, ms) = try await timed(adapter!, i, p, decodeCap)
                     total += ms
                     if captureBodies { bodies.append(body) }
                 }
-                let mean = total / Double(prompts.count)
+                let mean = total / Double(ps.count)
                 adapter = nil
                 fileLog.emit(String(format: "📊 quant-ab %@ mean_ms=%.0f", label, mean))
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -74,6 +80,37 @@ enum BASQuantABProbe {
                 fileLog.emit("📊 quant-ab \(label) ERROR=\(error)")
                 return (0, [])
             }
+        }
+
+        // KV-CACHE QUANT lever (BAS_QUANT_KVBITS=4|8) — the audit's only explicit re-open trigger. Same 4-bit model,
+        // kvBits=nil (fp16 cache) vs kvBits=N, at LONG context (a ~2k-token prompt so the KV cache is a real fraction
+        // of the per-token read). Physics caveat: at ≤4k ctx the KV is ~10-20% of bandwidth (weights dominate) →
+        // expect ≤~10% even before the A19's ±78% thermal drift, so a clean win is unlikely; this MEASURES the bound.
+        if let kvb = Int(env["BAS_QUANT_KVBITS"] ?? "") {
+            // ~150-token passage × 14 ≈ 2.1k-token prompt; decodeCap controls generated tokens on top.
+            let passage = "In a quiet coastal town, the lighthouse keeper recorded the tides each morning, noting how "
+                + "the gulls wheeled over the harbour and the fishing boats slipped out before dawn. The old ledger, "
+                + "bound in cracked leather, held decades of weather, of storms that swallowed the breakwater and "
+                + "calm spells when the sea lay flat as glass. Visitors rarely came, but those who did asked about "
+                + "the wreck on the reef and the night the beam went dark. "
+            let longP = String(repeating: passage, count: 14)
+                + "\n\nBased only on the passage above, write a three-sentence summary of the lighthouse keeper's routine."
+            fileLog.emit("📊 quant-ab KVQUANT START kvbits=\(kvb) model=\(fourBit.providerID) "
+                + "long_ctx≈2.1k-tok decode_cap=\(decodeCap) bracket=kvNil-pre+post")
+            let kpre  = await runModel(fourBit, label: "kvNil-pre",  captureBodies: true,  kvBits: nil, promptSet: [longP])
+            let kq    = await runModel(fourBit, label: "kv\(kvb)",   captureBodies: true,  kvBits: kvb, promptSet: [longP])
+            let kpost = await runModel(fourBit, label: "kvNil-post", captureBodies: false, kvBits: nil, promptSet: [longP])
+            let kbracket = (kpre.meanMs + kpost.meanMs) / 2
+            let kdrift = kpre.meanMs > 0 ? (kpost.meanMs - kpre.meanMs) / kpre.meanMs * 100 : 0
+            let kspeedup = kq.meanMs > 0 ? kbracket / kq.meanMs : 0
+            let kverdict = (kq.meanMs > 0 && kq.meanMs < (kbracket - abs(kpost.meanMs - kpre.meanMs)))
+                ? "KV-SPEED-WIN" : "KV-INCONCLUSIVE-WITHIN-DRIFT"
+            fileLog.emit(String(format: "📊 quant-ab KVQUANT kvbits=%d kvNil_bracket_ms=%.0f kv%d_ms=%.0f "
+                + "drift_pct=%+.1f%% speedup=%.2fx verdict=%@", kvb, kbracket, kvb, kq.meanMs, kdrift, kspeedup, kverdict))
+            if let a = kpre.bodies.first { fileLog.emit("   [kvNil] " + String(a.prefix(200))) }
+            if let b = kq.bodies.first   { fileLog.emit("   [kv\(kvb)] " + String(b.prefix(200))) }
+            fileLog.emit("📊 quant-ab DONE (KVQUANT mode — KV-cache bandwidth lever)")
+            return
         }
 
         // Bracket: 4-bit pre → 3-bit → 4-bit post (one model resident at a time)。
