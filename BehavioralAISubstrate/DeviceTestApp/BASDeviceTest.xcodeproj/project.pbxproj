@@ -492,6 +492,7 @@
 		4FA829B7537CE6051ED3D602 /* BASPromptLookupProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C690B72D4245A486524BB17D /* BASPromptLookupProbe.swift */; };
 		12F006E53B376F4DF53F2D74 /* BASSuffixLookupProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ECC271E042E677070CE1615 /* BASSuffixLookupProbe.swift */; };
 		DCABF00D111122223333AAAA /* BASDecodePlannerABProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCABF00D111122223333BBBB /* BASDecodePlannerABProbe.swift */; };
+		DCABF00D111122224444AAAA /* BASSpecAcceptanceProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCABF00D111122224444BBBB /* BASSpecAcceptanceProbe.swift */; };
 		B45C0000111122223333AAAA /* BASProbeCommon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45C0000111122223333BBBB /* BASProbeCommon.swift */; };
 		4FBC958958001EF0AFEE15BD /* BASEnduranceAppRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C45F76979B07DBA98E1ECB8 /* BASEnduranceAppRunner.swift */; };
 		50152698A8A7320C263D692C /* BASV1RoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD8AD1995B61B373A6DC36B /* BASV1RoundTripTests.swift */; };
@@ -2749,6 +2750,7 @@
 		C690B72D4245A486524BB17D /* BASPromptLookupProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASPromptLookupProbe.swift; sourceTree = "<group>"; };
 		9ECC271E042E677070CE1615 /* BASSuffixLookupProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSuffixLookupProbe.swift; sourceTree = "<group>"; };
 		DCABF00D111122223333BBBB /* BASDecodePlannerABProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASDecodePlannerABProbe.swift; sourceTree = "<group>"; };
+		DCABF00D111122224444BBBB /* BASSpecAcceptanceProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSpecAcceptanceProbe.swift; sourceTree = "<group>"; };
 		B45C0000111122223333BBBB /* BASProbeCommon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASProbeCommon.swift; sourceTree = "<group>"; };
 		C6B56F97C8FF9D16C78AB397 /* BASChapter902_5MemoryUsageLogsByteEqTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter902_5MemoryUsageLogsByteEqTests.swift; sourceTree = "<group>"; };
 		C6B61AB26CF1F6F94F6A2E87 /* M385AssertionCeilingGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M385AssertionCeilingGateTests.swift; sourceTree = "<group>"; };
@@ -3164,6 +3166,7 @@
 				C690B72D4245A486524BB17D /* BASPromptLookupProbe.swift */,
 				9ECC271E042E677070CE1615 /* BASSuffixLookupProbe.swift */,
 				DCABF00D111122223333BBBB /* BASDecodePlannerABProbe.swift */,
+				DCABF00D111122224444BBBB /* BASSpecAcceptanceProbe.swift */,
 				B45C0000111122223333BBBB /* BASProbeCommon.swift */,
 				E8AFC88EC3D165B4CD1B8037 /* BASQuantABProbe.swift */,
 				02B8F3EE84FC1F181A9055B4 /* BASRankFuseProbe.swift */,
@@ -4840,6 +4843,7 @@
 				4FA829B7537CE6051ED3D602 /* BASPromptLookupProbe.swift in Sources */,
 				12F006E53B376F4DF53F2D74 /* BASSuffixLookupProbe.swift in Sources */,
 				DCABF00D111122223333AAAA /* BASDecodePlannerABProbe.swift in Sources */,
+				DCABF00D111122224444AAAA /* BASSpecAcceptanceProbe.swift in Sources */,
 				B45C0000111122223333AAAA /* BASProbeCommon.swift in Sources */,
 				22EF5DED570803916330CFE4 /* BASQuantABProbe.swift in Sources */,
 				FE1CD327A351E94092F96CFA /* BASRankFuseProbe.swift in Sources */,

@@ -353,6 +353,13 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIMambaSaguaroProbe.run() }
             return
         }
+        // Decode-accel cascade Gate 2 (BAS_SPEC_ALPHA=1): GPU same-vocab draft (Llama-1B) free-form acceptance α vs the
+        // 3B target, via teacher-forcing (no ANE, no rewind). Gate 1 (ANE overlap) FAILED ρ=0.86; this asks whether a
+        // GPU draft model helps free-form at all. a<0.5 → Gate 3 (bandwidth); a≥0.5 → route the GPU sibling free-form.
+        if (env["BAS_SPEC_ALPHA"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecAcceptanceProbe.run() }
+            return
+        }
         // Track E — standalone Mamba-3 ANE decode (BAS_COREAI_MAMBA3_PROBE=1): the weights-free upgrade gate.
         // Host convertibility GREEN (trapezoid + real 2×2-rotation RoPE + MIMO rank-R all lowered; L=16 int8 1.04GB);
         // this answers Q1 (16L Mamba-3 compiles on the A19 ANE?) + tok/s/peak vs Mamba-2 (39 tok/s, 77MB), i.e. does
