@@ -307,6 +307,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASQuantABProbe.run() }
             return
         }
+        // Surgical device cleanup of the decode-TEST models (BAS_PURGE_TEST_MODELS=1). DRYRUN by default —
+        // BAS_PURGE_DRYRUN=0 to actually delete. Allowlist-only; re-stageable via restage-decode-test-models.sh.
+        if (env["BAS_PURGE_TEST_MODELS"] ?? "0") == "1" {
+            launchSpecAux { await BASModelPurgeProbe.run() }
+            return
+        }
         // DecodePlan S4c — flag-off(legacy) vs flag-on(planner) byte-equivalence gate, before flipping
         // decodePlannerAutoSelect (BAS_DECODE_PLANNER_AB=1). Needs the local 3-bit Llama staged. Device-only.
         if (env["BAS_DECODE_PLANNER_AB"] ?? "0") == "1" {

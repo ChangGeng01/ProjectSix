@@ -64,3 +64,80 @@ final class ProbeFileLog: @unchecked Sendable {
         try? handle?.close()
     }
 }
+
+// MARK: - BASModelPurgeProbe — surgical device cleanup of the 2026-06-22 decode-TEST models (BAS_PURGE_TEST_MODELS=1)
+//
+// devicectl has NO per-file delete, so clearing the staged test models needs an in-app FileManager pass. SAFETY:
+// a HARDCODED allowlist (`deletable`) — only those exact subdirs under Documents/models are removed, plus loose
+// root-orphan FILES (the first-mxfp4 mis-stage); ALL other subdirs (the pre-existing Llama-3.2-3B-Instruct-3bit +
+// gemma-4-e4b-it-4bit) are NEVER touched. DRYRUN is the DEFAULT (lists what WOULD be deleted, deletes nothing);
+// pass BAS_PURGE_DRYRUN=0 to actually delete. Everything removed is re-stageable via
+// scripts/restage-decode-test-models.sh (STAGE=1), so this is fully reversible.
+enum BASModelPurgeProbe {
+    /// EXACT this-session test-model subdir names that are safe to delete (re-stageable). Nothing else is removed.
+    static let deletable = [
+        "Llama-3.2-3B-Instruct-mxfp4",
+        "Llama-3.2-3B-Instruct-g128",
+        "Granite-4.0-H-Micro-4bit",
+        "Granite-4.0-H-Tiny-4bit-DWQ",
+        "Llama-3.2-1B-Instruct-4bit",
+    ]
+
+    static func run() async {
+        let log = ProbeFileLog(filePrefix: "model-purge", category: "model-purge", alsoPrint: true)
+        defer { log.close() }
+        let env = ProcessInfo.processInfo.environment
+        let dryRun = (env["BAS_PURGE_DRYRUN"] ?? "1") != "0"     // DEFAULT dry — must opt OUT to delete
+        let purgeOrphans = (env["BAS_PURGE_ROOT_ORPHANS"] ?? "1") != "0"
+        let fm = FileManager.default
+        guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            log.emit("📊 model-purge ERROR=no-documents-dir"); return
+        }
+        let models = docs.appendingPathComponent("models")
+        log.emit("📊 model-purge START dryrun=\(dryRun) purgeOrphans=\(purgeOrphans) allowlist=\(deletable.count) models_dir=\(models.path)")
+        var freed: Int64 = 0
+
+        // 1) named test-model subdirs (allowlist only)
+        for name in deletable {
+            let url = models.appendingPathComponent(name)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else {
+                log.emit("   skip (absent): \(name)"); continue
+            }
+            let sz = Self.dirSize(url, fm)
+            freed += sz
+            if dryRun { log.emit(String(format: "   [DRYRUN] would delete subdir %@ (%dMB)", name, sz / 1_000_000)); continue }
+            do { try fm.removeItem(at: url); log.emit(String(format: "   deleted subdir %@ (%dMB)", name, sz / 1_000_000)) }
+            catch { log.emit("   ERROR deleting \(name): \(error)"); freed -= sz }
+        }
+
+        // 2) loose ROOT-ORPHAN files directly under models/ (the mis-stage artifacts) — NEVER subdirs
+        if purgeOrphans {
+            let items = (try? fm.contentsOfDirectory(
+                at: models, includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey])) ?? []
+            for item in items {
+                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? true
+                if isDir { continue }   // keep EVERY subdir (incl. the pre-existing 3bit/gemma)
+                let sz = Int64((try? item.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+                freed += sz
+                if dryRun { log.emit(String(format: "   [DRYRUN] would delete root-orphan %@ (%dMB)", item.lastPathComponent, sz / 1_000_000)); continue }
+                do { try fm.removeItem(at: item); log.emit(String(format: "   deleted root-orphan %@ (%dMB)", item.lastPathComponent, sz / 1_000_000)) }
+                catch { log.emit("   ERROR deleting orphan \(item.lastPathComponent): \(error)"); freed -= sz }
+            }
+        }
+
+        let remaining = ((try? fm.contentsOfDirectory(atPath: models.path)) ?? []).sorted()
+        log.emit(String(format: "📊 model-purge DONE%@ freed≈%dMB KEPT=[%@]",
+            dryRun ? " (DRYRUN — nothing deleted)" : "", freed / 1_000_000, remaining.joined(separator: ", ")))
+    }
+
+    private static func dirSize(_ url: URL, _ fm: FileManager) -> Int64 {
+        var total: Int64 = 0
+        if let en = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
+            for case let f as URL in en {
+                total += Int64((try? f.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            }
+        }
+        return total
+    }
+}
