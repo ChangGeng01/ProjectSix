@@ -43,9 +43,12 @@ enum BASQuantABProbe {
         // BAS_QUANT_LOWBIT selects the low-bit challenger: "3bit" (naive group-quant, DECLINED) or "mixed34"
         // (mlx_lm mixed_3_4: 3-bit base + 4-bit sensitive, 3.624 bpw — the quality-preserving bandwidth retry).
         let lowbit = ProcessInfo.processInfo.environment["BAS_QUANT_LOWBIT"] ?? "3bit"
-        let threeBit = lowbit == "mixed34"
-            ? MLXModelCatalog.llama3_2_3B_mixed34_local
-            : MLXModelCatalog.llama3_2_3B_3bit_local
+        let threeBit: MLXModelCatalog.Entry
+        switch lowbit {
+        case "mixed_attn4": threeBit = MLXModelCatalog.llama3_2_3B_mixed_attn4_local   // embed+attn 4-bit / FFN 3-bit
+        case "mixed34":     threeBit = MLXModelCatalog.llama3_2_3B_mixed34_local        // mlx_lm mixed_3_4
+        default:            threeBit = MLXModelCatalog.llama3_2_3B_3bit_local           // naive 3-bit
+        }
         fileLog.emit("📊 quant-ab START 4bit=\(fourBit.providerID) lowbit=\(threeBit.providerID) "
             + "decode_cap=\(decodeCap) n_prompts=\(prompts.count) bracket=4bit-first+last")
 

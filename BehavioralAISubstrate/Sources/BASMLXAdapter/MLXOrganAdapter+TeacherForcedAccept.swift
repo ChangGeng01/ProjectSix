@@ -31,6 +31,14 @@ extension MLXOrganAdapter {
         return (g.promptTokens, g.genTokens)
     }
 
+    /// Real token count of `text` under the loaded tokenizer — for honest tok/s (vs the char-based
+    /// `outputTokensEstimated`). Used by the Gate-2b speedup probe so spec-vs-plain rates compare real tokens, not a
+    /// chars/4 heuristic biased differently on the two lanes' (different-length) bodies.
+    public func tokenCount(of text: String) async -> Int {
+        guard let container = self._loadedContainerForStreaming() else { return 0 }
+        return await container.perform { ctx in ctx.tokenizer.encode(text: text).count }
+    }
+
     /// DRAFT-side: teacher-force THIS adapter's model over `promptTokens + referenceTokens` in ONE forward and return,
     /// for each reference token, whether the draft's greedy argmax (conditioned on the true prefix) matches it.
     /// `agreement[i] == true` ⇔ a real spec round would accept `referenceTokens[i]`. Feed the result to

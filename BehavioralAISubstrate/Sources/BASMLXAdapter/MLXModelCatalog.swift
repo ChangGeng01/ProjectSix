@@ -188,6 +188,17 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: ["<|eot_id|>"],
         localDirectoryName: "models/Llama-3.2-3B-Instruct-mixed34")
 
+    /// Llama-3.2-3B MIXED v2 (audit-driven): spare `embed_tokens` + ALL attention (q/k/v/o) + tied `lm_head` at 4-bit,
+    /// FFN (gate/up/down) at 3-bit (3.843 bpw, ~1.5GB vs ~1.9GB 4-bit). The `mixed_3_4` recipe left `embed_tokens` at
+    /// 3-bit → embedding corruption = the system-prompt LEAK (audit catch); this protects it. Tests whether a
+    /// quality-preserving sub-4-bit bandwidth win exists. Loads via MLX-swift `perLayerQuantization`.
+    public static let llama3_2_3B_mixed_attn4_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-mixed-attn4",
+        providerID: "mlx.llama3_2.3b.it.mixed_attn4.local",
+        providerName: "Llama 3.2 3B (MLX, mixed embed+attn 4-bit / FFN 3-bit local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-mixed-attn4")
+
     /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
     /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
     public static let defaultEntries: [Entry] = [

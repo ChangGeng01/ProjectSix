@@ -58,12 +58,13 @@ enum BASSpecSpeedupProbe {
                 fileLog.emit("📊 spec-speedup ERROR=draft-not-loaded — spec lane inactive (fit budget? staging?)"); return
             }
 
-            // Estimated-token rate; both lanes share the same char-based estimator so the speedup ratio is fair.
+            // REAL-token rate (audit fix): the two lanes emit different-length bodies via different forward paths, so
+            // the prior chars/4 `outputTokensEstimated` was biased differently per lane. Use the actual tokenizer count.
             func timed(_ req: BASOrganRequest) async throws -> (tps: Double, ms: Double, toks: Int) {
                 let t0 = DispatchTime.now().uptimeNanoseconds
                 let d = try await adapter.draft(req)
                 let ms = Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000
-                let toks = d.outputTokensEstimated
+                let toks = await adapter.tokenCount(of: d.body)   // real tokenizer count, not chars/4
                 return (ms > 0 ? Double(toks) * 1000.0 / ms : 0, ms, toks)
             }
 
