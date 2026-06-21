@@ -144,12 +144,11 @@ extension MLXOrganAdapter {
     /// (`BASDecodeLanePolicy.decodeStrategy`) picks the lane (Option-3 auto-select). Output is byte-identical
     /// regardless of which lane runs — every lane emits the target's argmax (ADR-039) — so only latency/lane changes.
     ///
-    /// `decodePlannerAutoSelect` is a runtime KILL-SWITCH: when off, fall back to the legacy prompt-lookup path
-    /// (prompt-lookup iff the purpose is eligible), which is byte-equal to the pre-planner behavior.
+    /// `decodePlannerAutoSelect` is a runtime KILL-SWITCH: when OFF it means PURE PLAIN (no acceleration at all) —
+    /// the simplest safe revert — not the legacy prompt-lookup gate.
     public func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
         guard decodePlannerAutoSelect else {
-            return try await respondPromptLookup(
-                for: request, electPromptLookup: BASDecodeLanePolicy.promptLookupEligible(for: purpose))
+            return try await _plainDraft(request)
         }
         #if canImport(MLXLLM)
         guard descriptor.supportedRoles.contains(request.role) else {
@@ -163,8 +162,7 @@ extension MLXOrganAdapter {
             numDraftTokens: numDraftTokens)
         return try await _execute(strategy, for: request)
         #else
-        return try await respondPromptLookup(
-            for: request, electPromptLookup: BASDecodeLanePolicy.promptLookupEligible(for: purpose))
+        return try await _plainDraft(request)
         #endif
     }
 

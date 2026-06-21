@@ -199,11 +199,9 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
             model: MLXModelCatalog.gemma4_E4B_4bit,
             draftModel: MLXModelCatalog.gemma4_E2B_4bit,
             speculativeDecoding: .off)   // off ⇒ never speculate, even with a draft configured
-        let request = BASOrganRequest(
-            requestID: "r", role: .core, preset: .greedyDeterministic,
-            instruction: "hi", context: [])
-        let speculate = await adapter.shouldSpeculate(for: request)
-        XCTAssertFalse(speculate, "mode .off ⇒ shouldSpeculate false ⇒ byte-identical single-model path")
+        // shouldSpeculate retired → the spec-engagement witness is now isSpeculationActive (draft loaded + mode != .off).
+        let speculate = await adapter.isSpeculationActive
+        XCTAssertFalse(speculate, "mode .off ⇒ isSpeculationActive false ⇒ byte-identical single-model path")
     }
 
     func testShouldSpeculateFalseWhenDraftNotLoaded() async {
@@ -212,11 +210,8 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
             model: MLXModelCatalog.gemma4_E4B_4bit,
             draftModel: MLXModelCatalog.gemma4_E2B_4bit,
             speculativeDecoding: .greedy)
-        let request = BASOrganRequest(
-            requestID: "r", role: .core, preset: .greedyDeterministic,
-            instruction: "hi", context: [])
-        let speculate = await adapter.shouldSpeculate(for: request)
-        XCTAssertFalse(speculate, "no loaded draft container ⇒ shouldSpeculate false (fail-honest fallback)")
+        let speculate = await adapter.isSpeculationActive
+        XCTAssertFalse(speculate, "no loaded draft container ⇒ isSpeculationActive false (fail-honest fallback)")
     }
 
     func testSamplingModeStillRequiresLoadedDraft() async {
@@ -227,10 +222,8 @@ final class BASSpeculativeDecodeConfigTests: XCTestCase {
             model: MLXModelCatalog.gemma4_E4B_4bit,
             draftModel: MLXModelCatalog.gemma4_E2B_4bit,
             speculativeDecoding: .sampling)
-        let request = BASOrganRequest(
-            requestID: "r", role: .core, preset: .core, instruction: "hi", context: [])
-        let speculate = await adapter.shouldSpeculate(for: request)
-        XCTAssertFalse(speculate, "no loaded draft container ⇒ sampling stays single-model")
+        let speculate = await adapter.isSpeculationActive
+        XCTAssertFalse(speculate, "no loaded draft container ⇒ isSpeculationActive false ⇒ sampling stays single-model")
     }
 
     // MARK: - 4. Greedy-lane precondition: temp 0 → ArgMaxSampler (the token-identity guarantee)

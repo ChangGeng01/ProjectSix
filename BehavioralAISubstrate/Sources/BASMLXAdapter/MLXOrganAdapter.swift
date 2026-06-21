@@ -412,16 +412,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
     }
 
-    /// Whether the speculative path should run for `request`. True only when a draft container is LOADED AND the
-    /// request is eligible under the configured mode. `.greedy` (the default) is token-identical to greedy
-    /// target-only decoding AND runs only for greedy requests (byte-safe). `.sampling` is on-device-certified
-    /// `doNotEnable` for the default n=2 lane, so it is never the default; an explicit host/test probe can elect
-    /// `.sampling` to measure the rejection-sampling lane. Role admission is the caller's.
-    func shouldSpeculate(for request: BASOrganRequest) -> Bool {
-        guard draftContainer != nil else { return false }
-        guard speculativeDecoding != .off else { return false }
-        return Self.requestEligibleForSpeculation(mode: speculativeDecoding, request: request)
-    }
+    // `shouldSpeculate(for:)` RETIRED (DecodePlan): the planner (BASDecodeLanePolicy.decodeStrategy) is now the SOLE
+    // decode decider, so this scattered decision is gone. The spec-engagement condition it expressed is now the
+    // planner's `capabilities.draftModelLoaded` (== `isSpeculationActive`: draft loaded + mode != .off) composed with
+    // the shared `isGreedyByteSafe` temp gate. `requestEligibleForSpeculation` above is KEPT as the pure, tested
+    // eligibility rule (it delegates to `isGreedyByteSafe`, so no drift).
     #endif
 
     public init(
@@ -898,7 +893,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             preset: .greedyDeterministic,
             instruction: "Hi.",
             maxOutputTokens: Self.prewarmDecodeTokens)
-        guard shouldSpeculate(for: dummyRequest) else {
+        // Prewarm the draft model whenever speculation is configured (draft loaded + mode != .off). Per-request
+        // eligibility (temp 0) doesn't apply to prewarm — it uses a greedy dummy. (Was shouldSpeculate(dummy).)
+        guard isSpeculationActive else {
             try await prewarm()
             return
         }
@@ -928,15 +925,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // the model-free lanes, so the planner yields draft-model spec (when a draft is loaded — byte-equal to
         // shouldSpeculate) or plain. The kill-switch (decodePlannerAutoSelect off) and the sampling mode fall back
         // to the explicit shouldSpeculate decision, which also still serves streamDraft + the prewarm check.
-        let strategy: BASDecodeStrategy
-        if decodePlannerAutoSelect {
-            strategy = BASDecodeLanePolicy.decodeStrategy(
+        // The planner is the SOLE production decider for eager decode. The kill-switch (decodePlannerAutoSelect off)
+        // now means PURE PLAIN — no acceleration at all (the simplest safe revert), not the legacy spec gate.
+        let strategy: BASDecodeStrategy = decodePlannerAutoSelect
+            ? BASDecodeLanePolicy.decodeStrategy(
                 purpose: .scoutDefault, temperature: request.preset.temperature,
                 capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens)
-        } else {
-            strategy = shouldSpeculate(for: request)
-                ? .draftModelSpec(numDraftTokens: numDraftTokens) : .plain
-        }
+            : .plain
         return try await _execute(strategy, for: request)
         #else
         throw BASOrganError.providerUnavailable(
@@ -949,29 +944,24 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// to `respond(to:)`. Extracted from `draft(_:)` (S1) so the DecodeStrategy executor can dispatch `.plain` here.
     func _plainDraft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
         #if canImport(MLXLLM)
-        guard let container = modelContainer else {
-            throw BASOrganError.providerUnavailable(
-                reason: Self.notLoadedReason(
-                    "loadModel(progressHandler:) before draft(_:)"))
-        }
-
-        let session = ChatSession(
-            container,
-            instructions: Self.systemInstructions(for: request),
-            generateParameters: _generateParameters(
-                for: request.preset,
-                maxOutputTokens: request.maxOutputTokens))
-
-        let prompt = Self.prompt(for: request)
-        // Consume `streamDetails` (the SAME underlying stream `respond(to:)` accumulates — respond does exactly
-        // `output += chunk`) so we ALSO capture the terminal `GenerateCompletionInfo` (real prefill/decode time
-        // + token counts). The joined body is BYTE-IDENTICAL to `respond(to:)`; this is observability-only.
-        let (rawBody, completionInfo) = try await Self.streamBody(session, prompt: prompt)
-        let body = Self.applyMarkerPostprocessing(rawBody)  // M256
-
-        return _buildDraft(
-            body: body, request: request,
-            completionMetrics: Self.completionMetrics(from: completionInfo))
+        // DecodePlan root-fix (byte-identity, point #3). The plain lane now runs the SAME `_buildLMInput` +
+        // `BASPromptLookupDecoder` loop as every accelerated lane, driven by `nullDrafter` (ngram longer than any
+        // generation ⇒ never proposes ⇒ pure single-token greedy). So `plain == model-free == draft-spec`
+        // token-for-token on the N/N kernel (Llama) — one forward + one prompt path for ALL lanes.
+        //
+        // WHY (device-measured): the old plain used `ChatSession`, a SEPARATE forward/templating path. On Llama the
+        // manual loop is byte-exact to single-token greedy ("Llama is N/N" — BASWindowMaskedCache), but ChatSession
+        // is NOT, so plain(ChatSession) diverged from the manual-loop lanes at a thin argmax margin → the decode-
+        // planner A/B was byte_equal=NO on the json workload (plain 2 entries vs model-free 3). `nullDrafter` IS the
+        // AB-proven greedy baseline (the `crossTurnLookupAB` / `saguaroAB` K=0 base lane), so this makes the
+        // planner's lane choice truly byte-invariant ("换 lane 不换 bytes").
+        //
+        // Trade-off: the loop emits no `GenerateCompletionInfo`, so plain's `completionMetrics` is now nil — matching
+        // every other production lane. The prior ChatSession metrics were observability-only (not on any contract).
+        let g = try await _generateModelFree(
+            for: request, drafter: Self.nullDrafter,
+            notLoadedHint: "loadModel(progressHandler:) before draft(_:)")
+        return _modelFreeDraft(body: g.body, request: request)
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

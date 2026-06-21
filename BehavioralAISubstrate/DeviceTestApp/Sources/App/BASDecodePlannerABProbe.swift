@@ -31,7 +31,7 @@ enum BASDecodePlannerABProbe {
     static func run() async {
         let fileLog = ProbeFileLog(filePrefix: "decode-planner-ab", category: "decode-planner-ab", alsoPrint: false)
         defer { fileLog.close() }
-        fileLog.emit("📊 decode-planner-ab START — flag-off(legacy) vs flag-on(planner); expect byte_equal=YES for ALL")
+        fileLog.emit("📊 decode-planner-ab START — flag-off(pure plain) vs flag-on(planner); expect byte_equal=YES for ALL")
         do {
             let model = MLXModelCatalog.llama3_2_3B_3bit_local
             let adapter = MLXOrganAdapter(model: model, maxOutputTokens: 200, speculativeDecoding: .off)
@@ -56,7 +56,7 @@ enum BASDecodePlannerABProbe {
                         format: "📊 dpab workload=%@ elect=%@ byte_equal=%@ legacy_len=%d planner_len=%d",
                         w.name, elect ? "T" : "F", equal ? "YES" : "NO", legacy.body.count, planner.body.count))
                     if !equal {
-                        fileLog.emit("   [legacy ] \(String(legacy.body.prefix(160)))")
+                        fileLog.emit("   [off    ] \(String(legacy.body.prefix(160)))")
                         fileLog.emit("   [planner] \(String(planner.body.prefix(160)))")
                     }
                 }

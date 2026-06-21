@@ -54,10 +54,17 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         }
 
         #if canImport(MLXLLM)
-        // 结构大重构 — route to the speculative decoder when a draft model is loaded AND the mode is live.
-        // Default off (no draft / `.off`) ⇒ this guard is skipped ⇒ the exact pre-speculative single-model path
-        // below runs, byte-identical. Deleting these three lines fully reverts the feature.
-        if shouldSpeculate(for: request) {
+        // Planner-decided streaming (the same single decider as the eager path; kill-switch off = pure plain). With
+        // purpose .scoutDefault the planner yields .draftModelSpec (when a draft is loaded → the streaming spec path)
+        // or .plain; the model-free lanes don't stream, so .scoutDefault never selects them here.
+        var streamSpec = false
+        if decodePlannerAutoSelect,
+           case .draftModelSpec = BASDecodeLanePolicy.decodeStrategy(
+               purpose: .scoutDefault, temperature: request.preset.temperature,
+               capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens) {
+            streamSpec = true
+        }
+        if streamSpec {
             try await _streamDraftSpeculative(request, continuation: continuation)
             return
         }
