@@ -42,7 +42,7 @@ extension BASDecodeLanePolicy {
         numDraftTokens: Int = 4,
         minHitRate: Double = 0.05
     ) -> BASDecodeStrategy {
-        guard temperature == 0 else { return .plain }
+        guard Self.isGreedyByteSafe(temperature: temperature) else { return .plain }
 
         // Candidate lanes in cold-start priority order (model-backed first), each with its profiler ID.
         var candidates: [(strategy: BASDecodeStrategy, id: String)] = []

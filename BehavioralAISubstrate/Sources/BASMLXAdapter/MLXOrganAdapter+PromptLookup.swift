@@ -42,7 +42,7 @@ extension MLXOrganAdapter {
     public nonisolated static func shouldUsePromptLookup(
         elect: Bool, request: BASOrganRequest
     ) -> Bool {
-        elect && request.preset.temperature == 0
+        elect && BASDecodeLanePolicy.isGreedyByteSafe(temperature: request.preset.temperature)
     }
 
     /// Generate the same prompt under prompt-lookup (spec) and the null-drafter baseline, in ONE container pass.

@@ -43,11 +43,7 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before coreMLDraftAB"))
         }
-        var messages: [Chat.Message] = []
-        let instructions = Self.systemInstructions(for: request)
-        if !instructions.isEmpty { messages.append(.system(instructions)) }
-        messages.append(.user(Self.prompt(for: request)))
-        let input = try await mainContainer.prepare(input: UserInput(chat: messages))
+        let input = try await _buildLMInput(for: request, container: mainContainer)
         let params = self._greedyParameters(
             for: request.preset, maxOutputTokens: request.maxOutputTokens)
 

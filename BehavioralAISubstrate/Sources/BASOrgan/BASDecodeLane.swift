@@ -108,6 +108,14 @@ public enum BASDecodeLanePolicy {
         }
     }
 
+    /// THE single byte-safety gate for every argmax-accept lane (point-2 dedup). All argmax-equality accept
+    /// (prompt-lookup, cross-turn, draft-model greedy spec, saguaro) is byte-valid ONLY at `temperature == 0`.
+    /// Defined ONCE here and referenced by `decodeStrategy` + `requestEligibleForSpeculation` +
+    /// `shouldUsePromptLookup` + `shouldUseSaguaro`, so this load-bearing invariant cannot drift between gates.
+    public static func isGreedyByteSafe(temperature: Double) -> Bool {
+        temperature == 0
+    }
+
     /// DOCTRINE end for the Saguaro (Mamba∥MLX) lane — same greedy-only invariant as prompt-lookup: Saguaro
     /// byte-identity is the target's argmax by construction, valid ONLY at temp 0, so `.creative` (temp>0) and
     /// `.scoutDefault` (0.1, and ADR-014 default-off) are never eligible. eligibility ⟹ greedy (temp 0).

@@ -407,7 +407,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     ) -> Bool {
         switch mode {
         case .off: return false
-        case .greedy: return request.preset.temperature == 0
+        case .greedy: return BASDecodeLanePolicy.isGreedyByteSafe(temperature: request.preset.temperature)
         case .sampling: return request.preset.temperature > 0
         }
     }
