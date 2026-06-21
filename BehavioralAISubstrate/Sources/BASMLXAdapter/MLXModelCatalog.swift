@@ -210,6 +210,40 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: ["<|eot_id|>"],
         localDirectoryName: "models/Llama-3.2-3B-Instruct-mxfp4")
 
+    /// Llama-3.2-3B 4-bit GROUP_SIZE 128 (vs the g64 baseline; 4.251 bpw, 1.6GB). Completeness-audit lever: every prior
+    /// quant probe moved BITS — group_size was never the variable. g128 halves the scale/bias metadata (4.5→4.25 bpw) at
+    /// the SAME 4-bit weights, so it cuts decode bytes WITHOUT the 3-bit FFN rot, and hits the IDENTICAL fast qmv kernel
+    /// (`quantized.cpp` fast-path keys on N/K, not group_size). Expected ~3-5% (likely < thermal noise). Local-staged.
+    public static let llama3_2_3B_4bit_g128_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-g128",
+        providerID: "mlx.llama3_2.3b.it.4bit.g128.local",
+        providerName: "Llama 3.2 3B (MLX, 4-bit g128 local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-g128")
+
+    /// Granite-4.0-H-Micro 4-bit (IBM, 3B dense Mamba-2/transformer HYBRID, 36/40 layers Mamba → KV-free state on ~90%
+    /// of layers). Completeness-audit MODEL-AXIS lever: the prior cross-model sweep was dense-only; Mamba had only ever
+    /// been a draft/distill target, never the PRIMARY decode backbone. Quality-NEUTRAL (full 4-bit). Verifier bets
+    /// LATERAL at short ctx (KV-elim = the kvBits no-op pool; weights at parity). Loads via vendored `granitemoehybrid`.
+    public static let granite4_h_micro_4bit_local = Entry(
+        id: "local/Granite-4.0-H-Micro-4bit",
+        providerID: "mlx.granite4.h_micro.4bit.local",
+        providerName: "Granite 4.0 H-Micro (MLX, 4-bit local)",
+        extraEOSTokens: [],
+        localDirectoryName: "models/Granite-4.0-H-Micro-4bit")
+
+    /// Granite-4.0-H-Tiny 4-bit-DWQ (IBM, 7B-total / ~1B-active hybrid MoE, 6-of-64 experts, 36/40 Mamba-2). The unique
+    /// completeness-audit lever that cuts per-token ACTIVE bytes while RAISING capacity, all at full 4-bit (sidesteps the
+    /// sub-4-bit rot wall). RISK: ~3906MB resident > the ~3376MB iPhone-Air jetsam cap → may SIGKILL even with the
+    /// increased-memory entitlement; and batch-1 expert-gather overhead may eat the active-byte saving (<1×). Loads via
+    /// vendored `granitemoehybrid` + `SwitchLayers` gatherQuantizedMM (reads only the 6 selected experts at batch-1).
+    public static let granite4_h_tiny_4bit_local = Entry(
+        id: "local/Granite-4.0-H-Tiny-4bit-DWQ",
+        providerID: "mlx.granite4.h_tiny.4bit.dwq.local",
+        providerName: "Granite 4.0 H-Tiny MoE (MLX, 4-bit DWQ local)",
+        extraEOSTokens: [],
+        localDirectoryName: "models/Granite-4.0-H-Tiny-4bit-DWQ")
+
     /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
     /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
     public static let defaultEntries: [Entry] = [

@@ -46,10 +46,13 @@ enum BASQuantABProbe {
         let lowbit = env["BAS_QUANT_LOWBIT"] ?? "3bit"
         let threeBit: MLXModelCatalog.Entry
         switch lowbit {
-        case "mixed_attn4": threeBit = MLXModelCatalog.llama3_2_3B_mixed_attn4_local   // embed+attn 4-bit / FFN 3-bit
-        case "mixed34":     threeBit = MLXModelCatalog.llama3_2_3B_mixed34_local        // mlx_lm mixed_3_4
-        case "mxfp4":       threeBit = MLXModelCatalog.llama3_2_3B_mxfp4_local          // MX block float, 4.251 bpw
-        default:            threeBit = MLXModelCatalog.llama3_2_3B_3bit_local           // naive 3-bit
+        case "mixed_attn4":   threeBit = MLXModelCatalog.llama3_2_3B_mixed_attn4_local // embed+attn 4-bit / FFN 3-bit
+        case "mixed34":       threeBit = MLXModelCatalog.llama3_2_3B_mixed34_local      // mlx_lm mixed_3_4
+        case "mxfp4":         threeBit = MLXModelCatalog.llama3_2_3B_mxfp4_local        // MX block float, 4.251 bpw
+        case "g128":          threeBit = MLXModelCatalog.llama3_2_3B_4bit_g128_local    // 4-bit group_size 128 (vs g64)
+        case "granite_micro": threeBit = MLXModelCatalog.granite4_h_micro_4bit_local    // 3B Mamba hybrid (model-axis)
+        case "granite_tiny":  threeBit = MLXModelCatalog.granite4_h_tiny_4bit_local     // 7B/1B-active hybrid MoE
+        default:              threeBit = MLXModelCatalog.llama3_2_3B_3bit_local         // naive 3-bit
         }
         fileLog.emit("📊 quant-ab START 4bit=\(fourBit.providerID) lowbit=\(threeBit.providerID) "
             + "decode_cap=\(decodeCap) n_prompts=\(prompts.count) bracket=4bit-first+last")
