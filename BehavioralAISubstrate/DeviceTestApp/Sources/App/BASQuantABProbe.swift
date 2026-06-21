@@ -40,8 +40,13 @@ enum BASQuantABProbe {
         defer { fileLog.close() }
         let decodeCap = Int(ProcessInfo.processInfo.environment["BAS_QUANT_AB_TOKENS"] ?? "200") ?? 200
         let fourBit = MLXModelCatalog.llama3_2_3B_4bit
-        let threeBit = MLXModelCatalog.llama3_2_3B_3bit_local
-        fileLog.emit("📊 quant-ab START 4bit=\(fourBit.providerID) 3bit=\(threeBit.providerID) "
+        // BAS_QUANT_LOWBIT selects the low-bit challenger: "3bit" (naive group-quant, DECLINED) or "mixed34"
+        // (mlx_lm mixed_3_4: 3-bit base + 4-bit sensitive, 3.624 bpw — the quality-preserving bandwidth retry).
+        let lowbit = ProcessInfo.processInfo.environment["BAS_QUANT_LOWBIT"] ?? "3bit"
+        let threeBit = lowbit == "mixed34"
+            ? MLXModelCatalog.llama3_2_3B_mixed34_local
+            : MLXModelCatalog.llama3_2_3B_3bit_local
+        fileLog.emit("📊 quant-ab START 4bit=\(fourBit.providerID) lowbit=\(threeBit.providerID) "
             + "decode_cap=\(decodeCap) n_prompts=\(prompts.count) bracket=4bit-first+last")
 
         func runModel(_ entry: MLXModelCatalog.Entry, label: String, captureBodies: Bool) async

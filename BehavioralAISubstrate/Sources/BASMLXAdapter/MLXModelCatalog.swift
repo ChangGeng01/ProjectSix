@@ -177,6 +177,17 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: ["<|eot_id|>"],
         localDirectoryName: "models/Llama-3.2-3B-Instruct-3bit")
 
+    /// Llama-3.2-3B MIXED-PRECISION (mlx_lm `mixed_3_4`: 3-bit base + 4-bit on the sensitive layers — early/late
+    /// blocks, v_proj / down_proj, lm_head; 3.624 bpw, ~1.4GB vs ~1.9GB for 4-bit). The bandwidth-lever follow-up
+    /// after naive 3-bit DECLINED (quality崩) and the CoreAI/LiteRT kernel levers were exhausted/blocked. Loads via
+    /// MLX-swift's `perLayerQuantization` (config carries 197 per-layer overrides). Local-staged like the 3-bit entry.
+    public static let llama3_2_3B_mixed34_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-mixed34",
+        providerID: "mlx.llama3_2.3b.it.mixed34.local",
+        providerName: "Llama 3.2 3B (MLX, mixed 3/4-bit local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-mixed34")
+
     /// Default Gemma entries, in the order they should appear in UI pickers. Gemma 4 leads (newest +
     /// recommended); Gemma 3 4B trails as the long-context outlier. These are the ON-DEVICE-CERTIFIED picks.
     public static let defaultEntries: [Entry] = [
