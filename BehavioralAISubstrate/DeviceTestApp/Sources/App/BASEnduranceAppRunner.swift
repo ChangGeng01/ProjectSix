@@ -360,6 +360,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASSpecAcceptanceProbe.run() }
             return
         }
+        // Decode-accel cascade Gate 2b (BAS_SPEC_SPEEDUP=1): end-to-end free-form tok/s, draft-model spec vs plain on
+        // ONE loaded adapter (3B + 1B) by toggling the kill-switch. Closes the α→net-speedup gap from Gate 2 (a=2.28).
+        if (env["BAS_SPEC_SPEEDUP"] ?? "0") == "1" {
+            launchSpecAux { await BASSpecSpeedupProbe.run() }
+            return
+        }
         // Track E — standalone Mamba-3 ANE decode (BAS_COREAI_MAMBA3_PROBE=1): the weights-free upgrade gate.
         // Host convertibility GREEN (trapezoid + real 2×2-rotation RoPE + MIMO rank-R all lowered; L=16 int8 1.04GB);
         // this answers Q1 (16L Mamba-3 compiles on the A19 ANE?) + tok/s/peak vs Mamba-2 (39 tok/s, 77MB), i.e. does
