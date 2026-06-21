@@ -923,10 +923,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // live mode, and request eligibility for that mode. Default off path / ineligible requests run the exact
         // single-model code below, byte-identical. (`draftMultiTurn` is deliberately NOT routed — its ChatSession
         // KV-cache reuse beats speculation, which would re-prefill the whole conversation per turn.)
-        // DecodePlan S3: route through the single executor with the LEGACY decision (parity — byte-identical:
-        // shouldSpeculate→draftModelSpec→_draftSpeculative, else plain→_plainDraft). S4 swaps the decider for the planner.
-        let strategy: BASDecodeStrategy = shouldSpeculate(for: request)
-            ? .draftModelSpec(numDraftTokens: numDraftTokens) : .plain
+        // DecodePlan: the planner decides this eager base entry too (so ALL eager production decode — draft /
+        // draft(_:purpose:) / draft(_:electAccelerated:) — flows through ONE decider). Purpose .scoutDefault skips
+        // the model-free lanes, so the planner yields draft-model spec (when a draft is loaded — byte-equal to
+        // shouldSpeculate) or plain. The kill-switch (decodePlannerAutoSelect off) and the sampling mode fall back
+        // to the explicit shouldSpeculate decision, which also still serves streamDraft + the prewarm check.
+        let strategy: BASDecodeStrategy
+        if decodePlannerAutoSelect {
+            strategy = BASDecodeLanePolicy.decodeStrategy(
+                purpose: .scoutDefault, temperature: request.preset.temperature,
+                capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens)
+        } else {
+            strategy = shouldSpeculate(for: request)
+                ? .draftModelSpec(numDraftTokens: numDraftTokens) : .plain
+        }
         return try await _execute(strategy, for: request)
         #else
         throw BASOrganError.providerUnavailable(
