@@ -140,7 +140,7 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
                 kv: &kvs[i])
             i += 1
         }
-        return Self.argmaxF32(carry)   // last carry == fp32 logits
+        return Self.argmaxF16(carry)   // last carry == fp16 logits (the .half() graph; matches every other CoreAI session)
     }
 
     private func runStage(_ i: Int, inputs: [String: NDArray], kv: inout NDArray) async throws -> NDArray {
@@ -158,14 +158,17 @@ public final class BASCoreAILayerSplitSession: @unchecked Sendable {
         return nd
     }
 
-    private static func argmaxF32(_ a: NDArray) -> Int {
+    private static func argmaxF16(_ a: NDArray) -> Int {
         let count = a.shape.reduce(1, *)
         var best = 0
         var bestV = -Float.greatestFiniteMagnitude
-        a.view(as: Float.self).withUnsafePointer { pointer, _, _ in   // logits are fp32
+        // logits are fp16 — the device .aimodel is a `.half()` graph (lm_head fp16). The prior `Float.self` read
+        // crashed `NDArray+MutableView:172 "Type Float does not match scalar type Float16"`. Matches BASCoreAIDecodeSession.
+        a.view(as: Float16.self).withUnsafePointer { pointer, _, _ in
             var k = 0
             while k < count {
-                if pointer[k] > bestV { bestV = pointer[k]; best = k }
+                let v = Float(pointer[k])
+                if v > bestV { bestV = v; best = k }
                 k += 1
             }
         }
