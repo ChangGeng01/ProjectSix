@@ -99,11 +99,20 @@ not sufficient to swap cross-turn in for the production multi-turn path on long 
 - Cross-turn store re-appends the full re-rendered prompt → churn IF a host carries growing history in
   `request.context` (no production caller today; AB uses `context:[]`). Fix when wired: a store-level synced cursor
   (mirroring `BASCrossTurnDrafter.synced`); hosts should accumulate via `sessionID`, not re-send history.
-- **`respondAccelerated` / `respondCrossTurnLookup` are NOT yet wired into the default production path** — those
+- **`respondAccelerated` / `respondCrossTurnLookup` are NOT wired into the default production path** — those
   are Phase-1, host-electable, *measure-only* entries (no production caller; the live path is `respondPromptLookup`
-  via `draft(_:electAccelerated:)`). So the router, the online profiler (`recommendedK` warm-start), and the
-  cross-turn store accumulation run today only in unit tests + the device probe, not in production. Wiring them is
-  gated on the device promotion gate (don't default-on a possibly-net-loss lane).
+  via `draft(_:electAccelerated:)`).
+- **GAP-AUDIT UPDATE (2026-06-22, 查缺补漏):** the production PLANNER path (`draft(_:purpose:)` → `_execute`) DID
+  reach `.suffixLookup` (cold-start router default) but ran it with an **empty cross-turn store** → it silently
+  degraded to plain prompt-lookup, so the device-gated cross-turn win (the scoreboard above) was **UNREACHABLE
+  through the planner** (and the `draftProfiler` was never folded in prod → permanently cold). FIXED (commit
+  `6691159f4`): `_execute` now folds model-free telemetry (the router learns online), and a new
+  `draft(_:purpose:sessionID:)` overload seeds/appends the `crossTurnStore` so the cross-turn win is **reachable**
+  when a caller supplies a stable `sessionID` (byte-identical; suffix byte-id regression re-confirmed 8/8 PASS). It
+  is reachable, not yet default-ON: the no-session entries keep the empty-store path, and no current production
+  caller is multi-turn — protocol/wrapper propagation to a multi-turn caller is the remaining step. The SCOREBOARD
+  numbers above were produced by the SEEDED probe harness (`crossTurnLookupAB`), i.e. they are **probe-measured, not
+  yet shipped** through a production multi-turn caller.
 
 (Already hardened, not deferred: `proposeDistinct`'s backward walk is bounded by `maxScan` (default 512), capping
 the low-entropy short-suffix worst case while preserving the branch-0==propose() invariant for realistic vocabularies.)
