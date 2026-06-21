@@ -83,6 +83,18 @@ enum BASModelPurgeProbe {
         "Llama-3.2-1B-Instruct-4bit",
     ]
 
+    /// Root-ORPHAN file allowlist — the standard MLX-model-snapshot filenames the first-mxfp4 mis-stage merged loose
+    /// into `models/` root. The orphan pass deletes a loose file ONLY if its name is in this set; any UNRECOGNISED
+    /// loose file is KEPT (the safe failure mode — never a name-agnostic sweep). Covers the 8 the DRYRUN found plus
+    /// the rest of a typical snapshot.
+    static let orphanFileAllowlist: Set<String> = [
+        "model.safetensors", "model.safetensors.index.json",
+        "config.json", "generation_config.json",
+        "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json",
+        "added_tokens.json", "vocab.json", "merges.txt",
+        "chat_template.jinja", "README.md", ".gitattributes",
+    ]
+
     static func run() async {
         let log = ProbeFileLog(filePrefix: "model-purge", category: "model-purge", alsoPrint: true)
         defer { log.close() }
@@ -118,11 +130,15 @@ enum BASModelPurgeProbe {
             for item in items {
                 let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? true
                 if isDir { continue }   // keep EVERY subdir (incl. the pre-existing 3bit/gemma)
+                let name = item.lastPathComponent
+                guard Self.orphanFileAllowlist.contains(name) else {
+                    log.emit("   skip (loose file NOT in orphan allowlist — KEPT): \(name)"); continue
+                }
                 let sz = Int64((try? item.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
                 freed += sz
-                if dryRun { log.emit(String(format: "   [DRYRUN] would delete root-orphan %@ (%dMB)", item.lastPathComponent, sz / 1_000_000)); continue }
-                do { try fm.removeItem(at: item); log.emit(String(format: "   deleted root-orphan %@ (%dMB)", item.lastPathComponent, sz / 1_000_000)) }
-                catch { log.emit("   ERROR deleting orphan \(item.lastPathComponent): \(error)"); freed -= sz }
+                if dryRun { log.emit(String(format: "   [DRYRUN] would delete root-orphan %@ (%dMB)", name, sz / 1_000_000)); continue }
+                do { try fm.removeItem(at: item); log.emit(String(format: "   deleted root-orphan %@ (%dMB)", name, sz / 1_000_000)) }
+                catch { log.emit("   ERROR deleting orphan \(name): \(error)"); freed -= sz }
             }
         }
 
