@@ -313,6 +313,11 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASModelPurgeProbe.run() }
             return
         }
+        // Bandwidth-saturation gate for the fused-Metal-kernel lever (BAS_BW_PROBE=1): achieved decode BW vs A19 peak.
+        if (env["BAS_BW_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASBandwidthProbe.run() }
+            return
+        }
         // DecodePlan S4c — flag-off(legacy) vs flag-on(planner) byte-equivalence gate, before flipping
         // decodePlannerAutoSelect (BAS_DECODE_PLANNER_AB=1). Needs the local 3-bit Llama staged. Device-only.
         if (env["BAS_DECODE_PLANNER_AB"] ?? "0") == "1" {

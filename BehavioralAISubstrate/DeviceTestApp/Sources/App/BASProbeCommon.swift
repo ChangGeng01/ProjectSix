@@ -15,6 +15,8 @@
 
 import Foundation
 import os
+import BASOrgan          // BASOrganRequest (BASBandwidthProbe)
+import BASMLXAdapter     // MLXOrganAdapter + MLXModelCatalog (BASBandwidthProbe)
 
 /// Thread-safe probe logger: a timestamped Documents log file + an os_log line, optionally also stdout.
 /// `@unchecked Sendable` mirrors the per-probe FileLog classes (an `NSLock` guards the file handle).
@@ -155,5 +157,76 @@ enum BASModelPurgeProbe {
             }
         }
         return total
+    }
+}
+
+// MARK: - BASBandwidthProbe — is A19 decode bandwidth-SATURATED or dispatch-bound? (BAS_BW_PROBE=1)
+//
+// The decisive feasibility gate for the "fused Metal kernel" lever (DECODE_ACCEL_FRONTIER_2026 #1): a fused kernel
+// can only recover the NON-bandwidth (dispatch/overhead) fraction of per-token decode time. Measure the achieved
+// memory bandwidth = (weight-bytes read per token) × (pure-decode tok/s) and compare to the iPhone-Air A19 peak
+// (68.26 GB/s, binned A19 Pro @ 8533 MT/s). util≥~85% ⇒ bandwidth-SATURATED ⇒ kernel #1 is DEAD (only fewer
+// bytes/token — low-bit quant — can help). util<~75% ⇒ dispatch headroom exists ⇒ the kernel could pay.
+// Uses rawTargetForwardsMs (pure single-token forwards, each reads full weights — exactly the bandwidth unit).
+// Env: BAS_BW_FORWARDS (default 128), BAS_BW_BYTES_GB (default 1.80 = 4-bit Llama-3.2-3B per-token read).
+enum BASBandwidthProbe {
+    static func run() async {
+        let log = ProbeFileLog(filePrefix: "bw-probe", category: "bw-probe", alsoPrint: true)
+        defer { log.close() }
+        let env = ProcessInfo.processInfo.environment
+        let fwd = Int(env["BAS_BW_FORWARDS"] ?? "128") ?? 128
+        let bytesGB = Double(env["BAS_BW_BYTES_GB"] ?? "1.80") ?? 1.80     // 4-bit Llama-3.2-3B read/token (~3.21B×0.5625B)
+        let peak = 68.26                                                   // iPhone Air A19 peak mem BW (GB/s)
+        func ts() -> String {
+            switch ProcessInfo.processInfo.thermalState {
+            case .nominal: return "nominal"; case .fair: return "fair"
+            case .serious: return "serious"; case .critical: return "critical"; @unknown default: return "?"
+            }
+        }
+        // ASSUMPTION-FREE saturation test: measure 4-bit AND 3-bit pure-decode tok/s. If decode is bandwidth-bound,
+        // 3-bit (~0.78× bytes) must be ~1.28× faster; if ~the same, decode is overhead-bound (→ kernel lever, not quant).
+        // bytes/tok est: 4-bit 3B ≈ 1.80GB (4.5bpw), naive 3-bit 3B ≈ 1.40GB (3.5bpw).
+        let models: [(name: String, entry: MLXModelCatalog.Entry, bytesGB: Double)] = [
+            ("4bit", MLXModelCatalog.llama3_2_3B_4bit, bytesGB),
+            ("3bit", MLXModelCatalog.llama3_2_3B_3bit_local, 1.40),
+        ]
+        log.emit("📊 bw-probe START forwards=\(fwd) peak=\(peak)GB/s models=4bit+3bit (saturation = 3bit/4bit tok/s ratio)")
+        var bestTps: [String: Double] = [:]
+        for m in models {
+            do {
+                let adapter = MLXOrganAdapter(model: m.entry, speculativeDecoding: .off)
+                try await adapter.loadModel()
+                let req = BASOrganRequest(
+                    requestID: "bw", role: .core, preset: .greedyDeterministic,
+                    instruction: "Explain in detail why the sky appears blue.", context: [])
+                _ = try await adapter.rawTargetForwardsMs(for: req, forwards: 8)   // warmup
+                var best = Double.greatestFiniteMagnitude
+                for r in 0..<3 {
+                    let ms = try await adapter.rawTargetForwardsMs(for: req, forwards: fwd)
+                    let tps = Double(fwd) * 1000.0 / ms
+                    let bw = m.bytesGB * tps
+                    log.emit(String(format: "📊 bw-probe %@ run=%d ms=%.0f tok/s=%.1f achieved=%.1fGB/s util=%.0f%% thermal=%@",
+                        m.name, r, ms, tps, bw, bw / peak * 100, ts()))
+                    best = min(best, ms)
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                }
+                bestTps[m.name] = Double(fwd) * 1000.0 / best
+            } catch {
+                log.emit("📊 bw-probe \(m.name) ERROR=\(error)")
+            }
+        }
+        if let t4 = bestTps["4bit"], let t3 = bestTps["3bit"], t4 > 0 {
+            let ratio = t3 / t4
+            let bw4 = 1.80 * t4
+            let verdict = ratio >= 1.20
+                ? "BANDWIDTH-BOUND (3bit \(String(format: "%.2f", ratio))× faster) → QUANT is the lever; fused-kernel #1 capped at ~\(Int(max(0, peak/bw4*100-100)))%"
+                : (ratio >= 1.08
+                    ? "PARTIALLY bandwidth-bound (3bit \(String(format: "%.2f", ratio))×) → BOTH quant + kernel have room"
+                    : "OVERHEAD-BOUND (3bit only \(String(format: "%.2f", ratio))×) → fused-KERNEL is the lever, quant barely helps")
+            log.emit(String(format: "📊 bw-probe DONE 4bit=%.1f tok/s 3bit=%.1f tok/s ratio=%.2f× (bytes ratio 1.29×) → %@",
+                t4, t3, ratio, verdict))
+        } else {
+            log.emit("📊 bw-probe DONE (incomplete — a model failed to load; see rows above)")
+        }
     }
 }
