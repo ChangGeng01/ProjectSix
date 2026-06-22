@@ -231,6 +231,17 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: ["<|eot_id|>"],
         localDirectoryName: "models/Llama-3.2-3B-Instruct-g128")
 
+    /// Llama-3.2-3B AWQ 3-bit (mlx_lm.quant.awq: activation-aware scale-search, body 3-bit g64, EMBED kept 4-bit →
+    /// leak-safe). The quality-preserving sub-4-bit retry: decode is bandwidth-bound (3bit measured 1.25× faster,
+    /// BASBandwidthProbe), so the ONLY open question is whether AWQ holds the 3B's reasoning where naive affine-3bit
+    /// ROTTED (17-sheep flip + system-prompt leak). ~1.40GB. Gate = the known rot-prompts pass + ~1.25× over 4-bit.
+    public static let llama3_2_3B_awq3_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-awq3",
+        providerID: "mlx.llama3_2.3b.it.awq3.local",
+        providerName: "Llama 3.2 3B (MLX, AWQ 3-bit local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-awq3")
+
     /// Granite-4.0-H-Micro 4-bit (IBM, 3B dense Mamba-2/transformer HYBRID, 36/40 layers Mamba → KV-free state on ~90%
     /// of layers). Completeness-audit MODEL-AXIS lever: the prior cross-model sweep was dense-only; Mamba had only ever
     /// been a draft/distill target, never the PRIMARY decode backbone. Quality-NEUTRAL (full 4-bit). Verifier bets

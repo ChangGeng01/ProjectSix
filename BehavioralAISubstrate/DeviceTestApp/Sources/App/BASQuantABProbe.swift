@@ -50,6 +50,7 @@ enum BASQuantABProbe {
         case "mixed34":       threeBit = MLXModelCatalog.llama3_2_3B_mixed34_local      // mlx_lm mixed_3_4
         case "mxfp4":         threeBit = MLXModelCatalog.llama3_2_3B_mxfp4_local        // MX block float, 4.251 bpw
         case "g128":          threeBit = MLXModelCatalog.llama3_2_3B_4bit_g128_local    // 4-bit group_size 128 (vs g64)
+        case "awq3":          threeBit = MLXModelCatalog.llama3_2_3B_awq3_local        // AWQ 3-bit body / 4-bit embed
         case "granite_micro": threeBit = MLXModelCatalog.granite4_h_micro_4bit_local    // 3B Mamba hybrid (model-axis)
         case "granite_tiny":  threeBit = MLXModelCatalog.granite4_h_tiny_4bit_local     // 7B/1B-active hybrid MoE
         default:              threeBit = MLXModelCatalog.llama3_2_3B_3bit_local         // naive 3-bit
