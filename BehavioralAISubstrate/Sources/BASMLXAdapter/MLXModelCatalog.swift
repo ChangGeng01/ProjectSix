@@ -242,6 +242,17 @@ public struct MLXModelCatalog: Sendable, Equatable {
         extraEOSTokens: ["<|eot_id|>"],
         localDirectoryName: "models/Llama-3.2-3B-Instruct-awq3")
 
+    /// Llama-3.2-3B DWQ 3-bit (mlx_lm.quant.dwq: gradient distillation w/ KL-div vs the fp16 teacher, distilled ON TOP
+    /// of the AWQ-3bit base so the leak-safe layout is preserved — 196×3-bit body + 1×4-bit embed). The STRONGEST
+    /// sub-4-bit lever (1024 samples, avg_loss ~0.063). Final test of whether a 3B survives 3-bit: if the 1/6
+    /// system-prompt leak that AWQ left STILL survives DWQ → the 3-bit body is fundamentally too lossy for a 3B.
+    public static let llama3_2_3B_dwq3_local = Entry(
+        id: "local/Llama-3.2-3B-Instruct-dwq3",
+        providerID: "mlx.llama3_2.3b.it.dwq3.local",
+        providerName: "Llama 3.2 3B (MLX, DWQ 3-bit local)",
+        extraEOSTokens: ["<|eot_id|>"],
+        localDirectoryName: "models/Llama-3.2-3B-Instruct-dwq3")
+
     /// Granite-4.0-H-Micro 4-bit (IBM, 3B dense Mamba-2/transformer HYBRID, 36/40 layers Mamba → KV-free state on ~90%
     /// of layers). Completeness-audit MODEL-AXIS lever: the prior cross-model sweep was dense-only; Mamba had only ever
     /// been a draft/distill target, never the PRIMARY decode backbone. Quality-NEUTRAL (full 4-bit). Verifier bets
