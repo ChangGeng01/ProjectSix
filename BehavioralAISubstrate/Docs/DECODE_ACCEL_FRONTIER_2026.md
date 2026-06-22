@@ -20,7 +20,20 @@ greedy spec-sibling 1.46×, cross-turn suffix 1.07–1.41×.
 
 ---
 
+## ⚡ DEVICE-TESTED UPDATE (2026-06-22/23, A19) — both top recs RESOLVED, both negative
+Verify-first (`BASBandwidthProbe`, BAS_BW_PROBE=1, pure-decode `rawTargetForwardsMs` on 4bit + 3bit) overturned the
+optimistic framing below:
+- **The "38 tok/s floor" was a chars/4 OVER-COUNT — exact 4-bit-3B decode = ~28 tok/s.**
+- **Decode is BANDWIDTH-BOUND (assumption-free): 3bit 35.3 / 4bit 28.3 = 1.25× ≈ the 1.29× byte ratio**; achieved ~50 GB/s = ~72-75% of the 68.26 GB/s A19(Air) peak.
+- **#1 fused Metal kernel ≈ DEAD (the "BUILD THIS" rec was WRONG).** MetalRT's 1.10-1.19× is M4 Max (546 GB/s, dispatch-bound). The A19's 68 GB/s bus is bandwidth-bound; the gap to *theoretical* peak is mostly unreachable memory-subsystem reality (bytes-scaling proves it), not recoverable dispatch overhead → kernel ceiling ~1.0-1.1×.
+- **#2 quant: sub-4-bit is DEAD for a 3B (4/4 methods leak).** AWQ-3bit (body-3/embed-4) = best: ~1.25× faster, reasoning OK, but 1/6 system-prompt leak (3-bit body). DWQ-3bit (gradient distillation, strongest, distilled on AWQ) FAILED/REGRESSED (leak persists + 17-sheep flipped to 8). 4-bit (~28 tok/s) is the quality floor. Best available = **AWQ-3bit as an opt-in fast tier** (1.25×, documented 1/6 leak — a tradeoff, not lossless).
+- **NOT universal:** the win is per-model + quality-fragile + size-dependent (3-bit rots a 3B; 7B+ absorbs it) and doesn't cover the default (Gemma-E4B).
+- **FINAL:** no clean free-form speedup on the A19 Llama-3B — not drafters, not kernels, not quant. Past the bandwidth wall needs a bigger model (7B+) or different hardware.
+
+---
+
 ## ① Most-promising wall-breakers (free-form, no quality loss) — ranked by EV
+> ⚠️ Superseded by the DEVICE-TESTED UPDATE above — kept for the reasoning; #1 measured ~dead, #2 measured weakened.
 
 ### #1 — Fused Metal decode kernel (MetalRT-class) — **BUILD THIS**
 Replace MLX's general op-graph with a fused 4-bit-dequant→matvec kernel + per-token dispatch reduction. **Does not
