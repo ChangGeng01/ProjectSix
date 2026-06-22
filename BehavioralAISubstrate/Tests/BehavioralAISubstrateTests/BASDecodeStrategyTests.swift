@@ -130,4 +130,31 @@ final class BASDecodeStrategyTests: XCTestCase {
             return XCTFail("cold draft-model should stay in to learn (draftModelSpec)")
         }
     }
+
+    // 14. ReSpec ENTROPY GATE (telemetry-free never-worse safety): a HIGH next-token entropy (novel/free-form region)
+    //     drops the COLD draft-model lane EVEN THOUGH #13 would otherwise keep it — turning the free-form regime from
+    //     the measured 0.88× LOSS into plain (~1.0×). nil entropy (not fed) ⇒ unchanged; low entropy ⇒ kept.
+    private func planH(_ p: P, _ caps: BASDecodeCapabilities, _ h: Double?) -> BASDecodeStrategy {
+        BASDecodeLanePolicy.decodeStrategy(
+            purpose: p, temperature: 0, capabilities: caps, profiler: BASAcceptanceProfiler(), topTokenEntropy: h)
+    }
+    func testEntropyGateDropsColdDraftModelOnHighEntropy() {
+        XCTAssertEqual(planH(.scoutDefault, draftOnly, 5.0), .plain,
+                       "high entropy (>3.0 bits) drops the COLD draft-model lane → plain (never-worse on free-form)")
+        guard case .draftModelSpec = planH(.scoutDefault, draftOnly, 0.5) else {
+            return XCTFail("low entropy should KEEP the draft-model lane")
+        }
+        guard case .draftModelSpec = planH(.scoutDefault, draftOnly, nil) else {
+            return XCTFail("nil entropy (not fed) must NOT change behaviour (cold draft-model stays, == #13)")
+        }
+    }
+
+    // 15. The gate removes ONLY the costly draft-MODEL lane: with model-free also available + an eligible purpose, a
+    //     high-entropy turn falls back to a model-free lane (≈0 cost), NOT all the way to plain.
+    func testEntropyGateFallsBackToModelFreeWhenEligible() {
+        switch planH(.factual, all, 5.0) {
+        case .promptLookup, .suffixLookup: break   // model-free fallback — correct
+        case let s: XCTFail("high entropy + .factual + model-free available → model-free lane, got \(s)")
+        }
+    }
 }

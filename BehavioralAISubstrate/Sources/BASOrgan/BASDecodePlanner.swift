@@ -46,7 +46,17 @@ extension BASDecodeLanePolicy {
         // Net-positive accepted-per-round floor for the HIGH-COST draft-MODEL lane. On the A19 (1B draft vs 3B target,
         // K=4) the end-to-end break-even is ≈2.7 (Gate 2b: free-form a≈2 → 0.88× LOSS; reasoning a≈3 → 1.06×). Below
         // this the draft-model lane is a latency loss → fall back to plain. Model-free lanes (≈0 cost) keep `minHitRate`.
-        minDraftModelAccepted: Double = 2.7
+        minDraftModelAccepted: Double = 2.7,
+        // ReSpec ENTROPY GATE (telemetry-free never-worse safety for the draft-MODEL lane). The `minDraftModelAccepted`
+        // floor above only bites once the profiler has a stat — but `_draftSpeculative` surfaces no accept stats, so in
+        // production that lane is permanently COLD and the floor is INERT (gap-audit finding) → free-form would route to
+        // the measured 0.88× LOSS. A high next-token entropy ⇒ novel/free-form region ⇒ a model-free-equivalent
+        // acceptance ⇒ drafting loses; so when an entropy estimate is supplied the draft-MODEL lane is dropped above
+        // `maxDraftModelEntropyBits` EVEN WHEN COLD — turning the free-form regime from 0.88×-loss into ~1.0×
+        // (never-worse). `topTokenEntropy == nil` (not fed) ⇒ NOT gated ⇒ behaviour unchanged. Bits = log2 of the
+        // target's next-token softmax; the default ≈3.0 bits (top token < ~1/8 mass) is a calibration starting point.
+        topTokenEntropy: Double? = nil,
+        maxDraftModelEntropyBits: Double = 3.0
     ) -> BASDecodeStrategy {
         guard Self.isGreedyByteSafe(temperature: temperature) else { return .plain }
 
@@ -95,9 +105,18 @@ extension BASDecodeLanePolicy {
         //   • draft-MODEL (a full draft forward / token): a NET-POSITIVE accepted-per-round floor `minDraftModelAccepted`
         //     — below break-even it's a measured latency LOSS (Gate 2b free-form 0.88×), so fall back to plain. Cold (no
         //     stat) stays in to learn; once measured below break-even it drops out (e.g. free-form .scoutDefault).
+        // The COSTLY model-backed draft lanes (a real draft forward / token ⇒ cost `f`); the entropy gate applies to
+        // both. Model-free lanes (prompt-lookup / cross-turn, `f`≈0) are never entropy-gated — a miss costs ~nothing.
+        let costlyDraftLanes: Set<String> = [BASDecodeStrategy.draftModelID, BASDecodeStrategy.saguaroID]
         let viable = candidates.filter { cand in
             guard profiler.worthSpeculating(sourceID: cand.id, purpose: purpose, minHitRate: minHitRate)
             else { return false }
+            // (a) telemetry-FREE entropy safety — drop any COSTLY draft lane in a high-entropy (novel/free-form)
+            //     region EVEN WHEN COLD, so the never-worse guarantee holds without per-lane accept telemetry.
+            if costlyDraftLanes.contains(cand.id), let h = topTokenEntropy, h > maxDraftModelEntropyBits {
+                return false
+            }
+            // (b) draft-MODEL learned-acceptance floor — bites only once a stat exists (below break-even ⇒ drop).
             if cand.id == BASDecodeStrategy.draftModelID,
                let s = profiler.stat(cand.id, purpose), s.emaAccepted < minDraftModelAccepted {
                 return false
