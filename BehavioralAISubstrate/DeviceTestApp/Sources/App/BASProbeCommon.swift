@@ -83,6 +83,8 @@ enum BASModelPurgeProbe {
         "Granite-4.0-H-Micro-4bit",
         "Granite-4.0-H-Tiny-4bit-DWQ",
         "Llama-3.2-1B-Instruct-4bit",
+        "Llama-3.2-3B-Instruct-awq3",   // AWQ-3bit quality A/B (concluded — best sub-4-bit but 1/6 leak)
+        "Llama-3.2-3B-Instruct-dwq3",   // DWQ-3bit quality A/B (concluded — regressed; sub-4-bit dead for 3B)
     ]
 
     /// Root-ORPHAN file allowlist — the standard MLX-model-snapshot filenames the first-mxfp4 mis-stage merged loose
