@@ -71,6 +71,6 @@ violations — fixed to assert real behavior.
 | #17 | `mlx_evallock_concurrent_correctness` | Vendor/device-gated: the real GPU evalLock is MLX-package-private + device-only; the host gate built a stdlib NSRecursiveLock (hollow) and was REMOVED in the 2026-06-24 audit. |
 | #99 | `authoritative_test_suite_pass` | A meta/CI invariant ("the whole `swift test` headless gate passes"), not a single unit test. It is the CI command itself, asserted by green CI, not by a nested test. |
 
-So substrate coverage = **98 authored+green / 100** (full CRITICAL + HIGH + MEDIUM); the 2 above are device/CI,
-documented rather than faked. Phase-3 combined release-gate aggregator (`release_gate.py`, EXPECTED_SUBSTRATE_GATES=99)
+So substrate coverage = **98 authored+green / 100** (full CRITICAL + HIGH + MEDIUM); the 3 above are device/CI/vendor,
+documented rather than faked. Phase-3 combined release-gate aggregator (`release_gate.py`, EXPECTED_SUBSTRATE_GATES=98)
 is built: `release_ok = ALL(model_critical) AND ALL(sub_critical) AND never_worse AND data_fp_match AND contamination_clean`.
