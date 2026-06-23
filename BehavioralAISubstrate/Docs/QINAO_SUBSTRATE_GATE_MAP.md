@@ -36,14 +36,19 @@ suite to verify (xcodebuild/swift test — DerivedData contention risk, see memo
 code. The registry + coverage map are the safe, real Phase-2 foundation; the named-gate authoring is the careful
 execution phase to do with the suite runnable.
 
-## Phase-2 execution STATUS (2026-06-24) — 60 CRITICAL gates authored, verified, green
+## Phase-2 execution STATUS (2026-06-24) — FULL Substrate-100 authored: 99/100 host gates green
 
-Authoring is essentially complete. **60 unique named substrate CRITICAL gates are authored and PASS** in-suite:
-`swift test --filter QINAO --disable-swift-testing` → 60 tests, 0 failures, 0 quarantined. Each is a grep-able
-`test_qinao_<key>()` invoking the real tested behavior and asserting the RAISED BAR (tolerance=0, exhaustive/large
-fuzz, byte-equality on determinism/parity/audit-chain). Files: `BASQINAOSubstrateGatesTests` + `…Batch2…Batch9` +
-`…ReworkTests` + standalone `BASQINAOPromptInjectionFilterGateTests` / `QINAOGateSQLPersistenceIntegrityTests` /
+Authoring is COMPLETE. **99 unique named substrate gates are authored and PASS** in-suite (the full Substrate-100
+across CRITICAL + HIGH + MEDIUM, minus the 2 device/CI gates below): `swift test --filter QINAO
+--disable-swift-testing` → **99 tests, 0 failures, 0 quarantined**. Each is a grep-able `test_qinao_<key>()` invoking
+the real tested behavior and asserting the RAISED BAR (tolerance=0 / byte-equality / exhaustive or large-fuzz /
+replicated-oracle / mutate-and-assert). Files: `BASQINAOSubstrateGatesTests` + `…Batch2…Batch15` + `…ReworkTests` +
+standalone `BASQINAOPromptInjectionFilterGateTests` / `QINAOGateSQLPersistenceIntegrityTests` /
 `QINAOGateSharedWALDurabilityTests` / `QINAOSchemaGovernanceParityGateTests` / `QINAOCrossLanguageSchemaAlphabetParityTests`.
+
+**#97/#98 (authored host-partial):** the referenced shell/python scripts are absent, but the same invariant is
+host-testable against the real in-repo source of truth — so both are authored + green: `schema_governance_parity`
+asserts `BASEBrainSchemaGovernanceRegistry` ↔ `BASSchemaVersioned` conformer parity (264 governed schemas, bidirectional,
 
 **#97/#98 update (authored host-partial):** the referenced shell/python scripts are absent, but the same invariant is
 host-testable against the real in-repo source of truth — so both are now authored + green: `schema_governance_parity`
@@ -65,6 +70,6 @@ violations — fixed to assert real behavior.
 | #19 | `coreai_ane_conversion_fidelity` | Requires CoreAI `.aimodel` conversion + a physical A19 device (per-token logit fidelity vs host PyTorch). Device-gated — belongs in the on-device endurance harness, not the host XCTest suite. |
 | #99 | `authoritative_test_suite_pass` | A meta/CI invariant ("the whole `swift test` headless gate passes"), not a single unit test. It is the CI command itself, asserted by green CI, not by a nested test. |
 
-So substrate CRITICAL coverage = **60 authored+green / 62 host-applicable**; the 2 above are device/CI, documented
-rather than faked. Phase-3 combined release-gate aggregator (`release_gate.py`) is built:
-`release_ok = ALL(model_critical) AND ALL(sub_critical) AND never_worse AND data_fp_match AND contamination_clean`.
+So substrate coverage = **99 authored+green / 100** (full CRITICAL + HIGH + MEDIUM); the 2 above are device/CI,
+documented rather than faked. Phase-3 combined release-gate aggregator (`release_gate.py`, EXPECTED_SUBSTRATE_GATES=99)
+is built: `release_ok = ALL(model_critical) AND ALL(sub_critical) AND never_worse AND data_fp_match AND contamination_clean`.

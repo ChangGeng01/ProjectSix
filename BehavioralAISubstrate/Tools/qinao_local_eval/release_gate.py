@@ -22,12 +22,10 @@ import json, os, re, subprocess, sys
 
 PRESERVE = os.path.expanduser("~/qwen_honesty_finetune")
 REPO = os.path.expanduser("~/Project/Project06/Project06/BehavioralAISubstrate")
-EXPECTED_SUBSTRATE_GATES = 60  # authored + green host gates (see QINAO_SUBSTRATE_GATE_MAP.md)
+EXPECTED_SUBSTRATE_GATES = 99  # authored + green host gates (see QINAO_SUBSTRATE_GATE_MAP.md)
 
 DEFERRED_SUBSTRATE = {
     "coreai_ane_conversion_fidelity": "device-only (CoreAI .aimodel conversion + A19); belongs in the on-device endurance harness",
-    "schema_governance_parity": "check_whitepaper_schema_parity.sh not present in repo; author the script first",
-    "cross_language_schema_alphabet_parity": "check_chenglu_schema_parity.py not present in repo; author the script first",
     "authoritative_test_suite_pass": "meta/CI invariant (the headless `swift test` gate itself), asserted by green CI not a nested test",
 }
 

@@ -218,8 +218,7 @@ final class BASQINAOSubstrateGatesBatch11Tests: XCTestCase {
         print("QINAO-GATE spec_teacher_forced_alpha_gate: PASS \(checkedPatterns) exhaustive+400 random α cross-checks vs replicated greedy block-K oracle (tol 0 integer / 1e-12 α), wall α=0, determinism + mutation verified")
     }
 
-    // [QINAO-REWORK] accelerated_draft_default_off_byte_equality quarantined: wrong draft-request ctor (missing requestID/role/instruction) + serialization artifact — needs rework
-    func test_qinao_accelerated_draft_default_off_byte_equality() throws { throw XCTSkip("QINAO-REWORK") }
+    // [QINAO-REWORK DONE] accelerated_draft_default_off_byte_equality now lives in BASQINAOSubstrateGatesBatch14Tests
 
     func test_qinao_auto_route_choice_vs_crossover() {
     // QINAO Substrate-100 #23 HIGH — each routed primitive
@@ -561,8 +560,7 @@ final class BASQINAOSubstrateGatesBatch11Tests: XCTestCase {
         + "round-trip tolerance=0; mutate+assert detected)")
 }
 
-    // [QINAO-REWORK] provider_fallback_availability_resolution quarantined: BASRuntimeAvailabilitySource has no .allCases — needs real enum cases (rework)
-    func test_qinao_provider_fallback_availability_resolution() throws { throw XCTSkip("QINAO-REWORK") }
+    // [QINAO-REWORK DONE] provider_fallback_availability_resolution now lives in BASQINAOSubstrateGatesBatch14Tests
 
     func test_qinao_adaptive_budget_floor_monotonicity() {
     // Per-class contextBudget floor — verbatim from the
