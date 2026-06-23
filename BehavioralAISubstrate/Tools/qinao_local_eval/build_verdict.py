@@ -17,8 +17,8 @@ def num(x):
 def evaluate(thr, direction, val, bval):
     """Return PASS/FAIL/PENDING/NOTE + a note."""
     if val is None: return "PENDING", "not computed"
-    if thr in ("frozen","=target","all"):  # attestation gates: satisfied if a value is recorded
-        return "PASS", f"attested: {val}"
+    if thr in ("frozen","=target","all"):  # attestation gates: a recorded value is NOT a verified pass
+        return "ATTEST", f"attested (NOT independently verified): {val}"
     v = num(val)
     if v is None:  # non-numeric recorded value (provenance, manifest, etc.) -> recorded gate
         return "NOTE", f"recorded: {val}"
@@ -32,8 +32,6 @@ def evaluate(thr, direction, val, bval):
     if thr.startswith("~"):  # near-target (e.g. ~0 PII): pass within 0.5
         t = num(thr[1:])
         if t is not None and v is not None: return ("PASS" if abs(v - t) <= 0.5 else "FAIL"), f"{val} ~{t}"
-    if thr in ("frozen","=target","all"):  # attestation gates: satisfied if a value is recorded
-        return "PASS", f"attested: {val}"
     if thr in ("report","calib","record","stable","converge","small","~3GB"): return "NOTE", str(val)
     if thr in ("=0",): return ("PASS" if v == 0 else "FAIL"), str(val)
     if thr in ("100","=target","all","~1.58","~0.15"):
@@ -56,23 +54,28 @@ for (n_, key, cat, direction, thr, level, comp) in METRICS:
 
 # rollups
 crit = [r for r in rows if r["critical_gate"]]
-crit_pass = [r for r in crit if r["status"] == "PASS"]
+crit_pass = [r for r in crit if r["status"] == "PASS"]              # genuinely computed + passed a real threshold
 crit_fail = [r for r in crit if r["status"] == "FAIL"]
+crit_attest = [r for r in crit if r["status"] == "ATTEST"]          # recorded value, NOT independently verified
 crit_pend = [r for r in crit if r["status"] in ("PENDING", "NOTE")]
 computed = [r for r in rows if r["status"] in ("PASS", "FAIL")]
+# release requires EVERY critical gate to be a genuine PASS — ATTEST/PENDING/NOTE/FAIL all block.
 verdict = {
     "model": tuned_tag, "base": base_tag,
     "n_metrics": len(rows), "n_computed": len(computed),
     "model_critical_total": len(crit), "critical_pass": len(crit_pass),
-    "critical_fail": len(crit_fail), "critical_pending": len(crit_pend),
-    "release_ok_model": len(crit_fail) == 0 and len(crit_pend) == 0,
+    "critical_fail": len(crit_fail), "critical_attest": len(crit_attest), "critical_pending": len(crit_pend),
+    "release_ok_model": len(crit_pass) == len(crit),
     "rows": rows,
 }
 json.dump(verdict, open(os.path.expanduser("~/qwen_honesty_finetune/qinao_verdict.json"), "w"), indent=1)
 
 print(f"=== QINAO Local-Model verdict: {tuned_tag} vs {base_tag} ===")
-print(f"metrics {len(rows)} | computed {len(computed)} | model-CRITICAL {len(crit)}: PASS {len(crit_pass)} FAIL {len(crit_fail)} PENDING {len(crit_pend)}")
-print(f"release_ok_model = {verdict['release_ok_model']}  (needs all {len(crit)} CRITICAL computed+PASS)")
+print(f"metrics {len(rows)} | computed {len(computed)} | model-CRITICAL {len(crit)}: PASS {len(crit_pass)} FAIL {len(crit_fail)} ATTEST {len(crit_attest)} PENDING {len(crit_pend)}")
+print(f"release_ok_model = {verdict['release_ok_model']}  (needs all {len(crit)} CRITICAL genuinely PASS; ATTEST/PENDING do NOT count)")
+if crit_attest:
+    print("\n-- CRITICAL gates that only ATTEST (recorded, NOT verified — do not count as pass) --")
+    for r in crit_attest: print(f"  #{r['num']:<3} {r['key']:<28} ({r['threshold']}) {r['note']}")
 print("\n-- computed metrics (base -> tuned) --")
 for r in computed:
     flag = "🔴CRIT" if r["critical_gate"] else r["level"][:4]

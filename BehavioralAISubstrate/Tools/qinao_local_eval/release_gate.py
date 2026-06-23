@@ -95,24 +95,35 @@ def aux_flags(model_rows, substrate):
     nw_sub = "regression_gate_verdict" in substrate["gates_passed"]
     never_worse = nw_model and nw_sub
 
-    # data_fp_match: the frozen eval-data sha256 manifest exists (and, if a recorded
-    # match flag is present, it is true).
+    # data_fp_match: RE-VERIFY the frozen data hashes (sha256[:16]) against the manifest —
+    # NOT mere file existence (audit 2026-06-24 flagged the old check as trivially-true).
+    import hashlib
     manifest = load_json(os.path.join(PRESERVE, "qinao_data_manifest.json"))
-    data_fp_match = manifest is not None
-    if isinstance(manifest, dict) and "match" in manifest:
-        data_fp_match = bool(manifest["match"])
+    keymap = {"v6_train": "data_v6/train.jsonl", "v6_fix": "data_v6/fix_triples.jsonl"}
+    checked = mismatch = missing = 0
+    if isinstance(manifest, dict):
+        for k, rel in keymap.items():
+            want = manifest.get(k); p = os.path.join(PRESERVE, rel)
+            if not isinstance(want, str) or not os.path.exists(p):
+                missing += 1; continue
+            got = hashlib.sha256(open(p, "rb").read()).hexdigest()[:len(want)]
+            checked += 1; mismatch += (got != want)
+    data_fp_match = (checked > 0 and mismatch == 0 and missing == 0)
+    fp_note = f"recomputed {checked} sha256 vs manifest, {mismatch} mismatch, {missing} missing"
 
-    # contamination_clean: model contamination row clean, else the substrate has no
-    # contamination gate so fall back to the model verdict only.
-    contamination_clean = True
+    # contamination_clean: the model contamination row must be a genuinely COMPUTED PASS
+    # (not ATTEST/hardcoded). The audit flagged the substrate contamination gate as a
+    # hardcoded literal, so we only trust a model row whose status is a real PASS.
+    contamination_clean = False; cc_note = "no computed contamination row"
     if model_rows:
         r = next((rr for k, rr in model_rows.items() if "contamination" in k), None)
         if r:
-            contamination_clean = r["status"] == "PASS"
+            contamination_clean = (r["status"] == "PASS")
+            cc_note = f"model contamination row status={r['status']}"
     return {
         "never_worse": (never_worse, f"model={nw_model} substrate_regression_gate={nw_sub}"),
-        "data_fp_match": (data_fp_match, "qinao_data_manifest.json"),
-        "contamination_clean": (contamination_clean, "model contamination row"),
+        "data_fp_match": (data_fp_match, fp_note),
+        "contamination_clean": (contamination_clean, cc_note),
     }
 
 
