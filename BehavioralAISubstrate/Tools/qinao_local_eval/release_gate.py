@@ -22,7 +22,7 @@ import json, os, re, subprocess, sys
 
 PRESERVE = os.path.expanduser("~/qwen_honesty_finetune")
 REPO = os.path.expanduser("~/Project/Project06/Project06/BehavioralAISubstrate")
-EXPECTED_SUBSTRATE_GATES = 99  # authored + green host gates (see QINAO_SUBSTRATE_GATE_MAP.md)
+EXPECTED_SUBSTRATE_GATES = 98  # authored + green host gates (see QINAO_SUBSTRATE_GATE_MAP.md)
 
 DEFERRED_SUBSTRATE = {
     "coreai_ane_conversion_fidelity": "device-only (CoreAI .aimodel conversion + A19); belongs in the on-device endurance harness",
@@ -127,14 +127,38 @@ def aux_flags(model_rows, substrate):
     }
 
 
+def authored_gate_keys():
+    """The set of substrate gate keys actually authored in the test suite (uncommented)."""
+    tests = os.path.join(os.path.dirname(REPO), "BehavioralAISubstrate", "Tests", "BehavioralAISubstrateTests") \
+        if not os.path.isdir(os.path.join(REPO, "Tests")) else os.path.join(REPO, "Tests", "BehavioralAISubstrateTests")
+    keys = set()
+    try:
+        out = subprocess.run(["grep", "-rhoE", r"func test_qinao_[a-z0-9_]+", tests],
+                             capture_output=True, text=True, timeout=60)
+        for ln in out.stdout.splitlines():
+            keys.add(ln.replace("func test_qinao_", "").strip())
+    except Exception:
+        pass
+    return keys
+
+
 def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     text, src = substrate_log_text(arg)
     substrate = parse_substrate(text)
+    # MEMBERSHIP check (audit 2026-06-24): every authored gate key must actually appear PASSed in the log —
+    # not merely a count >= N (which a stray/duplicate gate could satisfy).
+    authored = authored_gate_keys()
+    passed = set(substrate["gates_passed"])
+    missing_keys = sorted(authored - passed)
+    substrate["authored"] = len(authored)
+    substrate["missing_keys"] = missing_keys
     substrate_ok = (
         substrate["failures"] == 0
         and substrate["executed"] is not None
         and substrate["n_gates_passed"] >= EXPECTED_SUBSTRATE_GATES
+        and len(authored) > 0
+        and len(missing_keys) == 0          # every authored gate genuinely ran + passed
     )
     model, model_rows = model_section()
     aux = aux_flags(model_rows, substrate)

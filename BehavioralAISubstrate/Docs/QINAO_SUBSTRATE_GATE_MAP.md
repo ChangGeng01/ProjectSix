@@ -36,11 +36,11 @@ suite to verify (xcodebuild/swift test — DerivedData contention risk, see memo
 code. The registry + coverage map are the safe, real Phase-2 foundation; the named-gate authoring is the careful
 execution phase to do with the suite runnable.
 
-## Phase-2 execution STATUS (2026-06-24) — FULL Substrate-100 authored: 99/100 host gates green
+## Phase-2 execution STATUS (2026-06-24) — FULL Substrate-100 authored: 98/100 host gates green
 
-Authoring is COMPLETE. **99 unique named substrate gates are authored and PASS** in-suite (the full Substrate-100
+Authoring is COMPLETE. **98 unique named substrate gates are authored and PASS** in-suite (the full Substrate-100
 across CRITICAL + HIGH + MEDIUM, minus the 2 device/CI gates below): `swift test --filter QINAO
---disable-swift-testing` → **99 tests, 0 failures, 0 quarantined**. Each is a grep-able `test_qinao_<key>()` invoking
+--disable-swift-testing` → **98 tests, 0 failures, 0 quarantined**. Each is a grep-able `test_qinao_<key>()` invoking
 the real tested behavior and asserting the RAISED BAR (tolerance=0 / byte-equality / exhaustive or large-fuzz /
 replicated-oracle / mutate-and-assert). Files: `BASQINAOSubstrateGatesTests` + `…Batch2…Batch15` + `…ReworkTests` +
 standalone `BASQINAOPromptInjectionFilterGateTests` / `QINAOGateSQLPersistenceIntegrityTests` /
@@ -68,8 +68,9 @@ violations — fixed to assert real behavior.
 | # | key | why deferred |
 |---|-----|--------------|
 | #19 | `coreai_ane_conversion_fidelity` | Requires CoreAI `.aimodel` conversion + a physical A19 device (per-token logit fidelity vs host PyTorch). Device-gated — belongs in the on-device endurance harness, not the host XCTest suite. |
+| #17 | `mlx_evallock_concurrent_correctness` | Vendor/device-gated: the real GPU evalLock is MLX-package-private + device-only; the host gate built a stdlib NSRecursiveLock (hollow) and was REMOVED in the 2026-06-24 audit. |
 | #99 | `authoritative_test_suite_pass` | A meta/CI invariant ("the whole `swift test` headless gate passes"), not a single unit test. It is the CI command itself, asserted by green CI, not by a nested test. |
 
-So substrate coverage = **99 authored+green / 100** (full CRITICAL + HIGH + MEDIUM); the 2 above are device/CI,
+So substrate coverage = **98 authored+green / 100** (full CRITICAL + HIGH + MEDIUM); the 2 above are device/CI,
 documented rather than faked. Phase-3 combined release-gate aggregator (`release_gate.py`, EXPECTED_SUBSTRATE_GATES=99)
 is built: `release_ok = ALL(model_critical) AND ALL(sub_critical) AND never_worse AND data_fp_match AND contamination_clean`.

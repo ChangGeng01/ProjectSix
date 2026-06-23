@@ -199,7 +199,10 @@ final class BASQINAOSubstrateGatesBatch9Tests: XCTestCase {
 
     XCTAssertEqual(totalCases, configs.count * alphabetSizes.count * trialsPerCell,
         "the full deterministic sweep must have executed")
-    print("QINAO-GATE prompt_lookup_spec_token_identity: PASS (\(totalCases) cases, tolerance 0, verbatim-slice contract holds → decoder is byte-identical to greedy)")
+    // HONEST SCOPE (audit 2026-06-24): this proves BASPromptLookupDrafter.propose ALWAYS returns a verbatim
+    // K-clamped contiguous slice — a NECESSARY (not sufficient) condition for greedy byte-identity. The full
+    // verify/accept/emit loop in BASPromptLookupDecoder.generate is MLXLLM-gated and is NOT host-run here.
+    print("QINAO-GATE prompt_lookup_spec_token_identity: PASS (\(totalCases) cases, tolerance 0; real BASPromptLookupDrafter.propose always returns a verbatim K-clamped slice — NECESSARY condition for greedy identity; full emit loop is MLXLLM-gated, not host-run)")
 }
 }
 #endif
