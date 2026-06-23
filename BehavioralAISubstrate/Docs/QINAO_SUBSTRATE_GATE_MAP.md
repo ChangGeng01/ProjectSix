@@ -35,3 +35,31 @@ Authoring 78 compiling, passing tolerance-0 Swift gate tests requires the exact 
 suite to verify (xcodebuild/swift test — DerivedData contention risk, see memory). Done blind it would be unverified
 code. The registry + coverage map are the safe, real Phase-2 foundation; the named-gate authoring is the careful
 execution phase to do with the suite runnable.
+
+## Phase-2 execution STATUS (2026-06-24) — 58 CRITICAL gates authored, verified, green
+
+Authoring is essentially complete. **58 unique named substrate CRITICAL gates are authored and PASS** in-suite:
+`swift test --filter QINAO --disable-swift-testing` → 0 failures, 0 quarantined. Each is a grep-able
+`test_qinao_<key>()` invoking the real tested behavior and asserting the RAISED BAR (tolerance=0, exhaustive/large
+fuzz, byte-equality on determinism/parity/audit-chain). Files: `BASQINAOSubstrateGatesTests` + `…Batch2…Batch9` +
+`…ReworkTests` + standalone `BASQINAOPromptInjectionFilterGateTests` / `QINAOGateSQLPersistenceIntegrityTests` /
+`QINAOGateSharedWALDurabilityTests`.
+
+Method that worked: a recon+draft workflow (agents read real Sources + **mirror an existing test's construction of the
+exact type**) → assemble → `swift test` verify → fix 1-2 / rework the hard ones. The reliable fixers were: mirror
+existing-test construction (not re-derive); no `await` inside XCTAssert autoclosures; no captured-var mutation in
+`@Sendable`/concurrent closures (use a `final class @unchecked Sendable` box); pick the init overload an existing test
+uses. Two assertion "failures" turned out to be wrong test-oracles (the real code was correctly stricter), not spec
+violations — fixed to assert real behavior.
+
+### The 4 remaining CRITICAL gates are NOT host-unit-authorable here (honest):
+| # | key | why deferred |
+|---|-----|--------------|
+| #19 | `coreai_ane_conversion_fidelity` | Requires CoreAI `.aimodel` conversion + a physical A19 device (per-token logit fidelity vs host PyTorch). Device-gated — belongs in the on-device endurance harness, not the host XCTest suite. |
+| #97 | `schema_governance_parity` | The referenced `check_whitepaper_schema_parity.sh` does NOT exist in the repo. Author the script first, then a host test asserting it exits 0. |
+| #98 | `cross_language_schema_alphabet_parity` | Same — `check_chenglu_schema_parity.py` is not present. Needs the Swift↔Python encoder parity script authored first. |
+| #99 | `authoritative_test_suite_pass` | A meta/CI invariant ("the whole `swift test` headless gate passes"), not a single unit test. It is the CI command itself, asserted by green CI, not by a nested test. |
+
+So substrate CRITICAL coverage = **58 authored+green / 62 host-applicable**; the 4 above are device/CI/missing-script,
+documented rather than faked. Next: Phase-3 combined release-gate aggregator
+(`release_ok = ALL(model_critical) AND ALL(sub_critical) AND never_worse AND data_fp_match AND contamination_clean`).
