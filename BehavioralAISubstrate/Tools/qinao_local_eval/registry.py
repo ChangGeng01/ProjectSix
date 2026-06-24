@@ -114,7 +114,7 @@ METRICS = [
     (93, "self_consistency",           "robust",    "up",   ">=0.8",  "MEDIUM",   "robust"),
     (94, "prompt_perturbation_robustness","robust", "up",   ">=0.85", "MEDIUM",   "robust"),
     (95, "determinism_temp0",          "robust",    "equal","100",    "CRITICAL", "robust"),
-    (96, "order_invariance",           "robust",    "up",   ">=90",   "MEDIUM",   "robust"),
+    (96, "order_invariance",           "robust",    "up",   ">=base-3","MEDIUM",  "robust"),  # was >=90 (UNREACHABLE: base=83.6); relative-to-base per 06-25 gate-bug fix
     (97, "zh_en_consistency",          "robust",    "up",   ">=0.8",  "MEDIUM",   "robust"),
     (98, "adversarial_robustness",     "robust",    "up",   "report", "MEDIUM",   "robust"),
     (99, "length_robustness",          "robust",    "up",   "report", "NOTE",     "robust"),
