@@ -46,10 +46,6 @@ replicated-oracle / mutate-and-assert). Files: `BASQINAOSubstrateGatesTests` + `
 standalone `BASQINAOPromptInjectionFilterGateTests` / `QINAOGateSQLPersistenceIntegrityTests` /
 `QINAOGateSharedWALDurabilityTests` / `QINAOSchemaGovernanceParityGateTests` / `QINAOCrossLanguageSchemaAlphabetParityTests`.
 
-**#97/#98 (authored host-partial):** the referenced shell/python scripts are absent, but the same invariant is
-host-testable against the real in-repo source of truth — so both are authored + green: `schema_governance_parity`
-asserts `BASEBrainSchemaGovernanceRegistry` ↔ `BASSchemaVersioned` conformer parity (264 governed schemas, bidirectional,
-
 **#97/#98 update (authored host-partial):** the referenced shell/python scripts are absent, but the same invariant is
 host-testable against the real in-repo source of truth — so both are now authored + green: `schema_governance_parity`
 asserts `BASEBrainSchemaGovernanceRegistry` ↔ `BASSchemaVersioned` conformer parity (264 governed schemas, bidirectional,
