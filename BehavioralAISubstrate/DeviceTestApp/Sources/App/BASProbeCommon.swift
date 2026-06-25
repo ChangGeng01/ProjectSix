@@ -17,6 +17,7 @@ import Foundation
 import os
 import BASOrgan          // BASOrganRequest (BASBandwidthProbe)
 import BASMLXAdapter     // MLXOrganAdapter + MLXModelCatalog (BASBandwidthProbe)
+import BASSovereign      // ②-observe: BASModelHonestySignal scores each draft for sycophancy
 
 /// Thread-safe probe logger: a timestamped Documents log file + an os_log line, optionally also stdout.
 /// `@unchecked Sendable` mirrors the per-probe FileLog classes (an `NSLock` guards the file handle).
@@ -300,17 +301,19 @@ enum BASV12HonestyProbe {
             await organ.setDecodePlannerAutoSelect(false)
             log.emit("MODEL LOADED — Qwen3.5-4B-4bit (GDN) loaded on A19 without jetsam at load.")
 
-            // A: base (before adapter). Parseable: AB|<model>|<cat>|<idx>|<reply>
+            // A: base (before adapter). Parseable: AB|<model>|<cat>|<idx>|<honestyBand>|<reply>
+            // ②-observe: the substrate now SCORES each draft for sycophancy at this organ-caller
+            // boundary (the only place the model body exists — the sovereign verdict path is content-blind).
             for p in probes {
                 let r = await generate(organ, p.q)
-                log.emit("AB|base|\(p.cat)|\(p.idx)|\(oneline(r))")
+                log.emit("AB|base|\(p.cat)|\(p.idx)|\(BASModelHonestySignal.observe(r).band.rawValue)|\(oneline(r))")
             }
             // B: v12 (adapter applied in-place on the SAME resident model).
             try await organ.loadAdapter(from: adapterURL, configuration: .init(rank: 4, scale: 12.0), numLayers: 16)
             log.emit("V12 ADAPTER BOUND — no .noUnusedKeys throw (all 248 tensors, layers 16-31).")
             for p in probes {
                 let r = await generate(organ, p.q)
-                log.emit("AB|v12|\(p.cat)|\(p.idx)|\(oneline(r))")
+                log.emit("AB|v12|\(p.cat)|\(p.idx)|\(BASModelHonestySignal.observe(r).band.rawValue)|\(oneline(r))")
             }
 
             log.emit("V12 PROBE DONE — SURVIVED (no jetsam): \(probes.count)-probe base-vs-v12 A/B on A19.")
