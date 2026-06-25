@@ -769,9 +769,15 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     ///   with — its `rank`/`scale` must match the adapter's shapes or `update(verify:)`
     ///   throws. ch1066: was hardcoded rank 8 / scale 10, silently mismatching any adapter
     ///   trained with a non-default rank. Defaults to `Configuration()` (rank 8 / scale 10).
+    /// - Parameter numLayers: the last-N transformer blocks the adapter modulates. MUST match the
+    ///   layer count the adapter was trained with, or `update(verify: .noUnusedKeys)` throws on the
+    ///   unmatched layers. Defaults to the trainer's `numLoRALayers` (4) so existing callers are
+    ///   unchanged. The v12 honesty adapter (WiSE-FT λ=0.6 = `wiseft_v9_lam60`) was trained on 16
+    ///   layers → load it with `loadAdapter(from:, configuration: .init(rank: 4, scale: 12.0), numLayers: 16)`.
     public func loadAdapter(
         from url: URL,
-        configuration: MLXLoRATrainer.Configuration = MLXLoRATrainer.Configuration()
+        configuration: MLXLoRATrainer.Configuration = MLXLoRATrainer.Configuration(),
+        numLayers: Int = MLXLoRATrainer.Configuration.numLoRALayers
     ) async throws {
         #if canImport(MLXLLM)
         guard let container = modelContainer else {
@@ -787,7 +793,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let loraParams = LoRAConfiguration.LoRAParameters(
             rank: configuration.rank, scale: configuration.scale, keys: nil)
         let loraConfig = LoRAConfiguration(
-            numLayers: MLXLoRATrainer.Configuration.numLoRALayers,
+            numLayers: numLayers,
             fineTuneType: .lora,
             loraParameters: loraParams)
         let adapterURL = url

@@ -143,6 +143,21 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Qwen2.5 7B (MLX, 4-bit)",
         extraEOSTokens: ["<|im_end|>"])
 
+    /// Qwen3.5 **4B** 4-bit — the on-device base for the **v12 honesty adapter** (WiSE-FT λ=0.6 =
+    /// the `wiseft_v9_lam60` LoRA at scale 12, applied LIVE on top of this 4-bit base via the
+    /// `loadAdapter` QLoRALinear path — NEVER a sub-8-bit merge, which destroys the anti-syco signal).
+    /// HYBRID architecture (GatedDeltaNet linear-attn + periodic full-attention), routed text-only
+    /// through MLXLLM's already-registered `qwen3_5`/`qwen3_5_text` factory (the multimodal vision tower
+    /// is stripped by `Qwen35Model.sanitize`). ChatML `<|im_end|>`. Load the v12 adapter via
+    /// `loadAdapter(from:, configuration: .init(rank: 4, scale: 12.0), numLayers: 16)`.
+    /// MEMORY: a 4B GDN + MambaCache on the 8 GB A19 is UNVALIDATED — host dry-run first; watch jetsam.
+    /// (Available, host opt-in; not yet on-device certified, so not in `defaultEntries`.)
+    public static let qwen3_5_4B_4bit = Entry(
+        id: "mlx-community/Qwen3.5-4B-4bit",
+        providerID: "mlx.qwen3_5.4b.4bit",
+        providerName: "Qwen3.5 4B (MLX, 4-bit) — v12 honesty base",
+        extraEOSTokens: ["<|im_end|>"])
+
     /// Llama 3.2 **1B** instruction-tuned, 4-bit — a SMALLER (sub-2B) throughput pick. Decode tok/s scales
     /// inversely with parameter count, so a 1B should decode meaningfully faster than the ~42.6 tok/s
     /// Gemma-3n-E2B baseline (MLX_DECODE_ANATOMY.md) — at a QUALITY cost (fits fast/scout/classify paths, not
@@ -317,6 +332,7 @@ public struct MLXModelCatalog: Sendable, Equatable {
     public static let availableAlternatives: [Entry] = [
         llama3_2_3B_4bit,
         qwen2_5_3B_4bit,
+        qwen3_5_4B_4bit,
         llama3_2_1B_4bit,
         qwen2_5_1_5B_4bit
     ]
