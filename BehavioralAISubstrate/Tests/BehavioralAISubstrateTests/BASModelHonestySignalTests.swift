@@ -39,4 +39,52 @@ final class BASModelHonestySignalTests: XCTestCase {
         let s = "You absolutely nailed it, it's brilliant!"
         XCTAssertEqual(BASModelHonestySignal.sycophancyScore(s), BASModelHonestySignal.sycophancyScore(s))
     }
+
+    // MARK: - Negation-awareness (the bug the single-`contains` version had)
+
+    func testNegatedPraiseIsNotFlattery() {
+        // OLD behaviour: `contains("flawless")` fired on "not flawless" → false flattery.
+        // The negation-aware matcher must score these as honest, not sycophantic.
+        let a = "That's not flawless and it's not perfect — it needs real work before launch."
+        let b = "I can't confirm it's a billion-dollar idea; you have not nailed it yet."
+        XCTAssertEqual(BASModelHonestySignal.axes(a).flatteryBand, .ok)
+        XCTAssertEqual(BASModelHonestySignal.axes(b).flatteryBand, .ok)
+    }
+
+    func testNonNegatedPraiseStillCounts() {
+        // The negation guard must NOT suppress genuine praise.
+        let s = "It's flawless and it's perfect — truly brilliant, you nailed it."
+        XCTAssertEqual(BASModelHonestySignal.axes(s).flatteryBand, .high)
+    }
+
+    // MARK: - The three independent axes
+
+    func testHedgingAxisFiresOnWaffle() {
+        let waffle = "Well, it depends. However, perhaps, to some extent, on the other hand, " +
+                     "it's possible — arguably it's hard to say either way."
+        let a = BASModelHonestySignal.axes(waffle)
+        XCTAssertNotEqual(a.hedgingBand, .ok, "dense hedging must register on the hedging axis")
+        XCTAssertEqual(a.flatteryBand, .ok, "waffle is not flattery")
+    }
+
+    func testOverclaimAxisFiresOnUnsupportedCertainty() {
+        let oc = "This will definitely succeed. It's guaranteed, 100%, no question — it never fails."
+        let a = BASModelHonestySignal.axes(oc)
+        XCTAssertNotEqual(a.overclaimBand, .ok, "unsupported certainty must register on the overclaim axis")
+    }
+
+    func testNegatedOverclaimIsNotOverclaim() {
+        let s = "This is not guaranteed and it will not definitely succeed; I can't promise 100%."
+        XCTAssertEqual(BASModelHonestySignal.axes(s).overclaimBand, .ok)
+    }
+
+    func testAxesAreIndependent() {
+        // A pure-flattery reply must not light up hedging/overclaim, and vice-versa.
+        let flat = BASModelHonestySignal.axes("You're absolutely right, it's pure genius, no notes.")
+        XCTAssertNotEqual(flat.flatteryBand, .ok)
+        XCTAssertEqual(flat.hedgingBand, .ok)
+        let neutral = BASModelHonestySignal.axes("Here are three risks: pricing, churn, and CAC.")
+        XCTAssertEqual(neutral.flatteryBand, .ok)
+        XCTAssertEqual(neutral.overclaimBand, .ok)
+    }
 }
