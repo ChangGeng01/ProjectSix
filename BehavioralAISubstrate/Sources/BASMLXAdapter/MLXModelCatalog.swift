@@ -158,6 +158,19 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Qwen3.5 4B (MLX, 4-bit) — v12 honesty base",
         extraEOSTokens: ["<|im_end|>"])
 
+    /// Qwen3.5 4B 4-bit **LOCAL** — the device ship form for v12 honesty. Mac-downloaded (~2.9 GB) + staged via
+    /// `devicectl device copy` into `Documents/models/Qwen3.5-4B-4bit/`, loaded with `ModelConfiguration(directory:)`
+    /// (no on-device HF download — that drops for >2 GB pulls on iPhone-WiFi, same reason as the Gemma/Llama
+    /// local entries). The v12 adapter is staged alongside + applied via
+    /// `loadAdapter(…, .init(rank: 4, scale: 12.0), numLayers: 16)`. GDN ⇒ generate via STREAMING with
+    /// `setDecodePlannerAutoSelect(false)` (eager prompt-lookup lanes fail-close on the non-trimmable MambaCache).
+    public static let qwen3_5_4B_4bit_local = Entry(
+        id: "local/Qwen3.5-4B-4bit",
+        providerID: "mlx.qwen3_5.4b.4bit.local",
+        providerName: "Qwen3.5 4B (MLX, 4-bit local) — v12 honesty base",
+        extraEOSTokens: ["<|im_end|>"],
+        localDirectoryName: "models/Qwen3.5-4B-4bit")
+
     /// Llama 3.2 **1B** instruction-tuned, 4-bit — a SMALLER (sub-2B) throughput pick. Decode tok/s scales
     /// inversely with parameter count, so a 1B should decode meaningfully faster than the ~42.6 tok/s
     /// Gemma-3n-E2B baseline (MLX_DECODE_ANATOMY.md) — at a QUALITY cost (fits fast/scout/classify paths, not
