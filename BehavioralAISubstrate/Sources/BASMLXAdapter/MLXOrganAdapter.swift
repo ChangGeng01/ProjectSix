@@ -1218,6 +1218,10 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             You are the Core tier of a behavioural AI substrate.
             Produce a considered response; you are being called
             because a draft has been admitted for full consideration.
+            Answer directly and concisely — default to 2–4 sentences
+            unless the task genuinely needs more. Do NOT add a
+            Status/Role/Tone preamble, headers, or a "thinking process"
+            lead-in; respond as the answer itself.
             """
         }
     }

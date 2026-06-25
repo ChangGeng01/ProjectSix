@@ -37,15 +37,23 @@ final class BASOrganCurriculumTests: XCTestCase {
             "breaks")
     }
 
-    func testCoreBaseMatchesPreM232Text() {
+    func testCoreBaseMatchesCanonicalText() {
+        // Canonical coreBase = the pre-M232 persona + the conciseness/no-preamble
+        // directive added so .core answers don't balloon into a hallucinated
+        // Status/Role/Tone preamble (the model invented that header from the bare
+        // persona cue; the real prompt never contained it).
         let expected = """
             You are the Core tier of a behavioural AI substrate.
             Produce a considered response; you are being called
             because a draft has been admitted for full consideration.
+            Answer directly and concisely — default to 2–4 sentences
+            unless the task genuinely needs more. Do NOT add a
+            Status/Role/Tone preamble, headers, or a "thinking process"
+            lead-in; respond as the answer itself.
             """
         XCTAssertEqual(
             BASOrganCurriculum.coreBase, expected,
-            "coreBase must byte-equal pre-M232 text")
+            "coreBase must byte-equal the canonical (persona + conciseness) text")
     }
 
     // MARK: - 2. Composition opt-out (default = pre-M232)
