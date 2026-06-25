@@ -466,29 +466,11 @@ final class BASQINAOSubstrateGatesBatch8Tests: XCTestCase {
     // It deliberately reuses the PRODUCTION shared matcher `BASMetalDeterminismBoundaryTests.firstBannedSymbol(in:)`
     // so this gate guards the exact predicate the shipped tripwire uses (a refactor breaking it fails here too).
 
-    // --- (a) the determinism-boundary spine file list (relative to Sources/), mirrored from
-    //         BASMetalDeterminismBoundaryTests.spineFiles which is private-static and unreachable here. ---
-    let spineFiles: [String] = [
-        "BASHostKit/EBrainRuntimeCoordinator+SovereignVerdict.swift",
-        "BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift",
-        "BASHostKit/EBrainRuntimeCoordinator+Permit.swift",
-        "BASHostKit/EBrainRuntimeCoordinator+RunTurn.swift",
-        "BASSovereign/BASSovereignVerdictEngine.swift",
-        "BASHostKit/EBrainHostRuntime+RiskService.swift",
-        "BASHostKit/BASMLRiskService.swift",
-        "BASHostKit/BASMLContextService.swift",
-        "BASHostKit/BASSSMCautionInput.swift",
-        "BASHostKit/BASSQLBrainHistoryStore.swift",
-        "BASHostKit/BASRustBrainHistoryStore.swift",
-        "BASMemory/BASSQLiteMemoryAtomStore.swift",
-        "BASRuntimeCore/BASSQLiteEventLogStorage.swift",
-        "BASHostKit/BASEBrainTurnResultReplayDigest.swift",
-        "BASHostKit/BASEBrainTurnResultReplayCanonicalizer.swift",
-        "BASHostKit/BASEBrainTurnResultReplayHarness.swift",
-        "BASSovereign/BASSovereignTokenAuthority.swift",
-        "BASSovereign/BASSovereignCommitEnforcer.swift",
-        "BASSovereign/BASSovereignGatedCommit.swift",
-    ]
+    // --- (a) the determinism-boundary spine file list (relative to Sources/). References the PRODUCTION
+    //         source-of-truth BASMetalDeterminismBoundaryTests.spineFiles directly (now internal, not
+    //         private) instead of a hand-maintained mirror — so a 20th spine file added there is covered
+    //         by this CRITICAL gate automatically. Closes the silent list-drift hole. ---
+    let spineFiles: [String] = BASMetalDeterminismBoundaryTests.spineFiles
 
     // Derive Sources/ from this test file's path (same derivation as the production test):
     // …/Tests/BehavioralAISubstrateTests/<this>.swift → package root → Sources.
@@ -498,15 +480,20 @@ final class BASQINAOSubstrateGatesBatch8Tests: XCTestCase {
         .deletingLastPathComponent()   // package root
         .appendingPathComponent("Sources")
 
-    // Read each spine file once (each must exist — a missing spine writer is itself a tripwire hole).
+    // Read each DISTINCT spine file once (each must exist — a missing spine writer is itself a tripwire
+    // hole). Compare against the DISTINCT count: referencing the production source-of-truth still closes
+    // the list-drift hole (a NEW distinct file is read + scanned automatically), while tolerating the one
+    // latent duplicate path the production list currently carries
+    // (EBrainRuntimeCoordinator+SovereignCommit.swift — counted once by this dict; a separate cleanup in
+    // BASMetalDeterminismBoundaryTests.spineFiles, not removed here per the no-silent-delete rule).
     var contents: [String: String] = [:]
     for rel in spineFiles {
         let url = sources.appendingPathComponent(rel)
         let content = try String(contentsOf: url, encoding: .utf8)
         contents[rel] = content
     }
-    XCTAssertEqual(contents.count, spineFiles.count,
-        "every determinism-boundary spine file must be present + read")
+    XCTAssertEqual(contents.count, Set(spineFiles).count,
+        "every distinct determinism-boundary spine file must be present + read")
 
     // --- (b) the tripwire invariant at tolerance=0, via the PRODUCTION shared matcher. ---
     // For every spine file: firstBannedSymbol(in:) MUST return nil (no banned Metal/approx symbol).

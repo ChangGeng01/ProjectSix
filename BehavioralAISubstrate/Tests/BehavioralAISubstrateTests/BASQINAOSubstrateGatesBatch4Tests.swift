@@ -1028,4 +1028,82 @@ final class BASQINAOSubstrateGatesBatch4Tests: XCTestCase {
             + "ceiling-narrows-only + no-revert + byte-identical replay; "
             + "tamper loosening/revert detected)")
     }
+
+    /// QINAO #69 companion — drives the REAL `BASPermitEscalationFoldExecutor.fold` (not the passive
+    /// ledger `.build`) to VERIFY the threading contract the structural test above only ASSUMES "by
+    /// construction": each stage must receive the PRIOR stage's OUTPUT permit, so a chain of
+    /// non-loosening stages yields a monotone running ceiling that never reverts to `.answer`. The
+    /// stage floors are deliberately NON-monotone (block, then lower) so the chain stays high ONLY if
+    /// the fold truly threads — a non-threading fold would dip at stage 2. Existing structural test retained.
+    func test_qinao_permit_escalation_never_loosen_realFold() async {
+        // @Sendable so the @Sendable EscalationStep closures below may capture it.
+        let sev: @Sendable (BASActionPermitMode) -> Int = { m in
+            switch m {
+            case .answer: return 0; case .mirror: return 1; case .compare: return 2
+            case .delay: return 3; case .draftOnly: return 4; case .localOnly: return 5
+            case .block: return 6; case .replace: return 7; case .escalate: return 8
+            @unknown default: return 99
+            }
+        }
+
+        // A non-loosening stage: output severity = max(input, floor); NEVER lowers.
+        func narrow(_ floor: BASActionPermitMode) -> BASPermitEscalationFoldExecutor.EscalationStep {
+            { permit in
+                let out = sev(permit.mode) >= sev(floor) ? permit.mode : floor
+                return BASPermitEscalationStepResult(
+                    outputPermit: BASActionPermit(mode: out, reasonCodes: permit.reasonCodes + ["n"]),
+                    reasonCodes: [])
+            }
+        }
+        let exec = BASPermitEscalationFoldExecutor(
+            abyssal: narrow(.block),               // raise to block first…
+            assertionCeiling: narrow(.mirror),     // …floors below block: stays at block ONLY if threaded
+            kunlun: narrow(.compare),
+            cthulhuAssertionCeiling: narrow(.delay),
+            cthulhuEscalation: narrow(.draftOnly))
+
+        var verified = 0
+        for initial in BASActionPermitMode.allCases {
+            let r = await exec.fold(initialPermit: BASActionPermit(mode: initial, reasonCodes: []))
+            let chain = [r.abyssal, r.assertionCeiling, r.kunlun,
+                         r.cthulhuAssertionCeiling, r.cthulhuEscalation]
+            var prev = sev(initial)
+            var sawTerminal = false
+            for step in chain {
+                let s = sev(step.outputPermit.mode)
+                XCTAssertGreaterThanOrEqual(s, prev,
+                    "real fold must thread output→input: a non-loosening chain can never dip below the running ceiling")
+                if step.outputPermit.mode == .block || step.outputPermit.mode == .escalate { sawTerminal = true }
+                if sawTerminal {
+                    XCTAssertNotEqual(step.outputPermit.mode, .answer,
+                        "no revert to .answer after a terminal-restrictive stage")
+                }
+                prev = s
+            }
+            verified += 1
+        }
+        XCTAssertEqual(verified, BASActionPermitMode.allCases.count)
+
+        // TAMPER: a stage that explicitly loosens to .answer MUST surface as a severity dip (discriminating power).
+        let tamper = BASPermitEscalationFoldExecutor(
+            abyssal: narrow(.block),
+            assertionCeiling: { _ in
+                BASPermitEscalationStepResult(
+                    outputPermit: BASActionPermit(mode: .answer, reasonCodes: ["LOOSEN"]),
+                    reasonCodes: []) },
+            kunlun: narrow(.block),
+            cthulhuAssertionCeiling: narrow(.block),
+            cthulhuEscalation: narrow(.block))
+        let tr = await tamper.fold(initialPermit: BASActionPermit(mode: .draftOnly, reasonCodes: []))
+        let tchain = [tr.abyssal, tr.assertionCeiling, tr.kunlun,
+                      tr.cthulhuAssertionCeiling, tr.cthulhuEscalation]
+        var dipped = false
+        var p = sev(.draftOnly)
+        for step in tchain { let s = sev(step.outputPermit.mode); if s < p { dipped = true }; p = s }
+        XCTAssertTrue(dipped,
+            "a loosening stage MUST be detectable as a severity dip — the gate is not vacuous")
+
+        print("QINAO-GATE permit_escalation_never_loosen [realFold]: PASS "
+            + "(threading-verified over \(verified) initial permits via the real FoldExecutor; tamper dip detected)")
+    }
 }
