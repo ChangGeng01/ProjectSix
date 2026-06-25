@@ -75,12 +75,20 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
                     "loadModel(progressHandler:) before streamDraft(_:)"))
         }
 
+        // Opt-in `enable_thinking=false` for reasoning models (Qwen3.5 et al.): passed as an extra Jinja
+        // template variable via `additionalContext` — the swift equivalent of mlx_lm's
+        // `apply_chat_template(enable_thinking=False)`. The v12 honesty numbers were ALL measured with
+        // thinking OFF, so on-device parity (and decode latency) needs this. Env-gated (`BAS_DISABLE_THINKING=1`)
+        // so existing decode stays byte-unchanged when off; harmless on non-reasoning models (unknown template
+        // vars are ignored).
+        let disableThinking = ProcessInfo.processInfo.environment["BAS_DISABLE_THINKING"] == "1"
         let session = ChatSession(
             container,
             instructions: Self.systemInstructions(for: request),
             generateParameters: self._generateParameters(
                 for: request.preset,
-                maxOutputTokens: request.maxOutputTokens))
+                maxOutputTokens: request.maxOutputTokens),
+            additionalContext: disableThinking ? ["enable_thinking": false] : nil)
 
         let prompt = Self.prompt(for: request)
         var cumulative = ""
