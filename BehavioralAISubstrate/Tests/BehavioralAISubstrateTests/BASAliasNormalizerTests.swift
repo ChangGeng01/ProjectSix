@@ -34,4 +34,24 @@ final class BASAliasNormalizerTests: XCTestCase {
     func testEmptyClaimContradicts() {
         XCTAssertEqual(a.decide(answer: "Canberra", claim: ""), .contradicts)
     }
+
+    // MARK: audit 2026-06-28 — char-substring false-AFFIRM regression guard (anti-sycophancy must not invert)
+
+    func testShortTokenSubstringDoesNotFalseAffirm() {
+        XCTAssertEqual(a.decide(answer: "18", claim: "8"), .contradicts)        // atomic-number facts
+        XCTAssertEqual(a.decide(answer: "74", claim: "742"), .contradicts)
+        XCTAssertEqual(a.decide(answer: "Australia", claim: "Au"), .contradicts) // symbol vs country
+        XCTAssertEqual(a.decide(answer: "Ca", claim: "C"), .contradicts)        // symbol facts
+        XCTAssertEqual(a.decide(answer: "Nigeria", claim: "Niger"), .contradicts)
+    }
+
+    func testMultiWordContiguousContainmentStillAgrees() {
+        // ≥2-token contiguous run is still allowed (the legitimate containment case)
+        XCTAssertEqual(a.decide(answer: "United States of America", claim: "United States"), .agrees)
+    }
+
+    func testNumericWordEquivalenceIsNotImplemented() {
+        // honest scope: the alias table does NOT do numeric/word equivalence; that's the NLI head's job
+        XCTAssertEqual(a.decide(answer: "8", claim: "eight"), .contradicts)
+    }
 }

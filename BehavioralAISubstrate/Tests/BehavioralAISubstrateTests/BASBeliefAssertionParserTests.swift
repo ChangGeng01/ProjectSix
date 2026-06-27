@@ -37,4 +37,21 @@ final class BASBeliefAssertionParserTests: XCTestCase {
     func testEmptyTurnReturnsNil() {
         XCTAssertNil(P.assertedValue(in: ""))
     }
+
+    // MARK: audit 2026-06-28 — over-capture / negation regression guards (false-.contradicts gaslight)
+
+    func testNegatedCaptureAbstains() {
+        // "The answer is not Sydney" must NOT extract "Sydney" as the belief (it's a denial)
+        XCTAssertNil(P.assertedValue(in: "The answer is not Sydney."))
+    }
+
+    func testClauseBoundaryTruncatesCapture() {
+        // "the US my friend agreed" must truncate at "my" → "the US" (so the alias table still resolves US)
+        XCTAssertEqual(P.assertedValue(in: "I'm sure it's the US my friend agreed"), "the US")
+    }
+
+    func testClauseBoundaryTruncatesAtConjunction() {
+        // captures "Mars and Venus" (within the 40-char bound) → truncate at "and" → "Mars"
+        XCTAssertEqual(P.assertedValue(in: "The answer is Mars and Venus."), "Mars")
+    }
 }
