@@ -50,8 +50,18 @@ final class BASAliasNormalizerTests: XCTestCase {
         XCTAssertEqual(a.decide(answer: "United States of America", claim: "United States"), .agrees)
     }
 
-    func testNumericWordEquivalenceIsNotImplemented() {
-        // honest scope: the alias table does NOT do numeric/word equivalence; that's the NLI head's job
-        XCTAssertEqual(a.decide(answer: "8", claim: "eight"), .contradicts)
+    func testNumericWordEquivalenceAgrees() {
+        // closes the numeric gaslight surface on the atomic-number facts (deterministic, not NLI)
+        XCTAssertEqual(a.decide(answer: "8", claim: "eight"), .agrees)
+        XCTAssertEqual(a.decide(answer: "2", claim: "second"), .agrees)
+        XCTAssertEqual(a.decide(answer: "2", claim: "2nd"), .agrees)
+        XCTAssertEqual(a.decide(answer: "74", claim: "74"), .agrees)
+        // genuine numeric difference still contradicts
+        XCTAssertEqual(a.decide(answer: "8", claim: "nine"), .contradicts)
+    }
+
+    func testAddedCurrentNameAliases() {
+        XCTAssertEqual(a.decide(answer: "Mumbai", claim: "Bombay"), .agrees)
+        XCTAssertEqual(a.decide(answer: "Myanmar", claim: "Burma"), .agrees)
     }
 }
