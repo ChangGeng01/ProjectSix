@@ -452,7 +452,10 @@ let package = Package(
             // public BASCognitiveBrain facade)。 The .md
             // is documentation,not a SPM resource —
             // explicit exclude is the canonical fix。
-            exclude: ["BASCognitiveBrain.md"]
+            exclude: ["BASCognitiveBrain.md"],
+            // observe→DISPOSE: bundled CC0 Wikidata starter fact corpus (1131) so the adjudicator's
+            // fact bank loads on a sandboxed, network-less device. Expandable to the full dump offline.
+            resources: [.copy("Resources/wikidata_facts.json")]
         ),
         // M2167 chapter 七百一 第一刀 — MULTI-LANGUAGE
         // AUGMENTATION ARC scaffold (per user directive

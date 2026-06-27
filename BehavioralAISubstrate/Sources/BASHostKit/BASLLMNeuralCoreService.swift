@@ -56,6 +56,7 @@
 import Foundation
 import BASOrgan
 import BASRuntimeCore
+import BASAppleAdapters   // observe→DISPOSE: BASMiniLMEmbeddingProvider for the on-device semantic adjudicator
 
 // MARK: - Servicing protocol
 
@@ -124,10 +125,29 @@ extension BASLLMNeuralCoreService {
         // ADR-031 §4 step 1 (opt-in / byte-equal-off): when an install is supplied, every LLM call
         // through this engine is contracted (fail-closed) + traced; nil → adapter used unwrapped,
         // identical to before (no behavior change).
-        let effectiveAdapter: any BASOrganAdapter = contractInstall?.wrap(adapter) ?? adapter
+        let contracted: any BASOrganAdapter = contractInstall?.wrap(adapter) ?? adapter
+        // observe→DISPOSE: opt-in (BAS_FACTUAL_ADJUDICATE) — wrap the live organ with the semantic
+        // factual-belief adjudicator. This is the runtime construction site the audit found MISSING (the
+        // adjudicator was DORMANT — built only in Tests/). Default-OFF ⇒ `contracted` unchanged.
+        let effectiveAdapter = Self.adjudicating(contracted)
         return BASLLMNeuralCoreService(
             engine: BASLLMExtractionEngine(
                 adapter: effectiveAdapter,
                 eventLog: eventLog))
+    }
+
+    /// When `BAS_FACTUAL_ADJUDICATE=1`, wrap the live organ with the semantic adjudicator (bundled corpus +
+    /// on-device MiniLM). Default-OFF ⇒ returns `inner` byte-equal. FAIL-OPEN: missing provider/corpus ⇒
+    /// `inner` (the dispose path never breaks the live organ). Only injects a verdict on a covered, confident
+    /// factual-belief turn — otherwise the request passes through untouched.
+    static func adjudicating(
+        _ inner: any BASOrganAdapter,
+        enabled: Bool = BASFactualAdjudicatorWiring.isEnabled()
+    ) -> any BASOrganAdapter {
+        guard enabled else { return inner }
+        let facts = BASBundledFactCorpus.load()
+        guard !facts.isEmpty, let provider = BASMiniLMEmbeddingProvider() else { return inner }
+        let bank = BASEmbeddingFactBank(facts: facts, provider: provider)
+        return BASSemanticAdjudicatingOrganAdapter(wrapping: inner, bank: bank, enabled: true)
     }
 }
