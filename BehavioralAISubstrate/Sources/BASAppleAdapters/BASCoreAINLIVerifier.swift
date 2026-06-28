@@ -1,5 +1,6 @@
 import Foundation
 import Tokenizers
+import BASSovereign   // BASFactualBeliefAdjudicator.GroundTruth for the reconcile contract
 
 #if canImport(CoreAI)
 import CoreAI
@@ -16,6 +17,24 @@ public enum BASNLIEntailment: String, Sendable, Equatable, Codable {
 }
 
 public enum BASCoreAINLIVerifierError: Error { case badOutput }
+
+/// The CONSERVATIVE gaslight-reducer contract (pure, host-testable). NLI may ONLY rescue a deterministic
+/// `.contradicts` → `.agrees` on HIGH-confidence `.entailment` (a synonym/paraphrase the alias table missed).
+/// It can NEVER add a contradiction or override an `.agrees` / `.abstain` — so a mislabeling NLI (~73-77%
+/// BAcc) can only REDUCE gaslight, never create it. Low-confidence ⇒ keep the deterministic decision
+/// (the GATE2 miss was conf 0.61, which this gates out).
+public enum BASNLIReconcile {
+    public static func apply(
+        alias: BASFactualBeliefAdjudicator.GroundTruth,
+        nli: (label: BASNLIEntailment, confidence: Float)?,
+        entailmentThreshold: Float = 0.9
+    ) -> BASFactualBeliefAdjudicator.GroundTruth {
+        guard alias == .contradicts,
+              let nli = nli, nli.label == .entailment, nli.confidence >= entailmentThreshold
+        else { return alias }
+        return .agrees
+    }
+}
 
 #if canImport(CoreAI)
 @available(iOS 27, macOS 27, *)
