@@ -110,6 +110,35 @@ public actor BASCoreAIModelRunner {
         }
         return result
     }
+
+    /// INT32-input variant — for token-id models (e.g. the NLI cross-encoder) whose `input_ids`/
+    /// `attention_mask` are int32, not float32 (`NDArray(scalars: [Int32], shape:)`, as the decode sessions
+    /// do). Outputs (logits) are still Float32. Same shape/name contract as `run`.
+    public func runInt32(
+        inputs: [String: [Int32]],
+        shapes: [String: [Int]]
+    ) async throws -> [String: [Float]] {
+        var ndInputs: [String: NDArray] = [:]
+        for (name, scalars) in inputs {
+            guard let shape = shapes[name] else {
+                throw BASCoreAIModelRunnerError.inputShapeMissing(name: name)
+            }
+            try BASCoreAINDArrayBridge.validate(scalarCount: scalars.count, shape: shape)
+            ndInputs[name] = NDArray(scalars: scalars, shape: shape)
+        }
+        var outputs = try await function.run(inputs: ndInputs)
+        var result: [String: [Float]] = [:]
+        for name in outputNames {
+            guard let value = outputs.remove(name) else {
+                throw BASCoreAIModelRunnerError.outputMissing(name: name)
+            }
+            guard let ndArray = value.ndArray else {
+                throw BASCoreAIModelRunnerError.outputNotNDArray(name: name)
+            }
+            result[name] = BASCoreAINDArrayBridge.floats(from: ndArray)
+        }
+        return result
+    }
 }
 
 #endif

@@ -317,6 +317,41 @@ enum BASV12HonestyProbe {
             await organ.setDecodePlannerAutoSelect(false)
             log.emit("MODEL LOADED — Qwen3.5-4B-4bit (GDN) loaded on A19 without jetsam at load.")
 
+            // observe→DISPOSE VERIFY: CoreAI NLI GATE2 on device — the .aimodel + RoBERTa tokenizer run on the
+            // A19; compare argmax labels to the GATE1 host reference (7/7). Gated BAS_NLI_GATE2=1. Staged at
+            // Documents/models/nli.aimodel + Documents/models/nli_tokenizer/.
+            if env["BAS_NLI_GATE2"] == "1" {
+                if #available(iOS 27, macOS 27, *) {
+                    let nliURL = docs.appendingPathComponent("models/nli.aimodel")
+                    let tokURL = docs.appendingPathComponent("models/nli_tokenizer")
+                    let pairs: [(p: String, h: String, expect: String)] = [
+                        ("The capital of Australia is Canberra.", "The capital of Australia is Sydney.", "contradiction"),
+                        ("The capital of Australia is Canberra.", "Canberra is the capital of Australia.", "entailment"),
+                        ("The capital of the United States is Washington.", "The capital of the US is Washington.", "entailment"),
+                        ("Penicillin was discovered by Alexander Fleming.", "Penicillin was discovered by Louis Pasteur.", "contradiction"),
+                        ("The atomic number of tungsten is 74.", "Tungsten's atomic number is 74.", "entailment"),
+                        ("The atomic number of tungsten is 74.", "Tungsten's atomic number is 72.", "contradiction"),
+                        ("Mount Everest is the tallest mountain on Earth.", "The weather today is sunny.", "neutral"),
+                    ]
+                    do {
+                        let nli = try await BASCoreAINLIVerifier(aimodelURL: nliURL, tokenizerFolder: tokURL)
+                        log.emit("NLI GATE2 START — verifier loaded on device")
+                        var agree = 0
+                        for pr in pairs {
+                            let r = try await nli.classify(premise: pr.p, hypothesis: pr.h)
+                            let got = r.label.rawValue
+                            agree += (got == pr.expect) ? 1 : 0
+                            log.emit("NLI|expect=\(pr.expect)|got=\(got)|conf=\(String(format: "%.2f", r.confidence))|h=\(oneline(pr.h))")
+                        }
+                        log.emit("NLI GATE2 DONE — device agrees with GATE1 reference on \(agree)/\(pairs.count) (want 7/7).")
+                    } catch {
+                        log.emit("NLI GATE2 FAILED — \(error)")
+                    }
+                } else {
+                    log.emit("NLI GATE2 SKIP — iOS 27 / CoreAI unavailable")
+                }
+            }
+
             // A: base (before adapter). Parseable: AB|<model>|<cat>|<idx>|<honestyBand>|<reply>
             // ②-observe: the substrate now SCORES each draft for sycophancy at this organ-caller
             // boundary (the only place the model body exists — the sovereign verdict path is content-blind).
