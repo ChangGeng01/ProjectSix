@@ -1,6 +1,7 @@
 import Foundation
 import BASOrgan
 import BASAppleAdapters
+import BASHostKit   // observe→DISPOSE: BASLLMNeuralCoreService.adjudicating (default-OFF factual-belief wrap)
 import QinaoLoop
 
 /// M180 — public factory for the most common Qinao + Apple
@@ -80,7 +81,16 @@ public extension QinaoLoop {
         if includeDeterministicFallback {
             await registry.register(BASOrganDeterministicAdapter())
         }
-        await registry.register(AppleFoundationOrganAdapter())
+        // observe→DISPOSE (Line A): route the live Apple FM organ through the factual-belief adjudicator.
+        // Default-OFF (`BAS_FACTUAL_ADJUDICATE` unset) ⇒ returns the adapter byte-equal; ON ⇒ the
+        // streaming-capable wrapper, so the chat loop's `as? BASStreamingOrganAdapter` probe resolves it and
+        // the verdict reaches `streamDraft`. The wrapper forwards `descriptor`, so the registry's
+        // on-device/recency selection (Apple FM over the deterministic fallback) is unchanged. FAIL-OPEN:
+        // missing provider/corpus ⇒ the adapter is returned unchanged.
+        let organ = BASLLMNeuralCoreService.adjudicating(AppleFoundationOrganAdapter())
+        // Pre-embed the fact bank so the first ON turn doesn't stall before the first token (no-op when OFF).
+        await BASLLMNeuralCoreService.prewarmAdjudicator(organ)
+        await registry.register(organ)
         return BASOrganRegistryEndpoint(registry: registry)
     }
 }

@@ -268,7 +268,11 @@ let package = Package(
             dependencies: [
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
-                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
+                // observe→DISPOSE: route the registered organ through the default-OFF factual-belief
+                // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). BASHostKit @_exported-imports
+                // BASAppleAdapters, so this adds no new transitive surface for this target.
+                .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // M222 — public factory wiring downloaded MLX Gemma weights
         // behind QinaoOrganEndpoint. Mirrors QinaoAppleFoundation;
@@ -279,7 +283,18 @@ let package = Package(
             dependencies: [
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
-                .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate")
+                .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate"),
+                // observe→DISPOSE: route the registered MLX organ through the default-OFF factual-belief
+                // adjudicator wrap (BASLLMNeuralCoreService.adjudicating). BASHostKit is NOT an MLX/HF type,
+                // so the redaction seam (check_mlx_redaction.sh) stays clean — the wrap is body-only, the
+                // public factory signature is unchanged (still `async throws -> any QinaoOrganEndpoint`).
+                // TRADE-OFF (audit INFO): BASHostKit widens this target's transitive link closure by the
+                // host-kit modules NOT already pulled via QinaoLoop→BASOrchestration→BASMemory — notably
+                // BASAppleAdapters (→ FoundationModels), BASMetalSubstrate, BASEvaluation, BASAdmin. Accepted
+                // because every standalone QinaoMLX consumer (QinaoSample / QinaoSampleHost) already links
+                // QinaoAppleFoundation → BASAppleAdapters → FoundationModels, so NO module newly gains it; the
+                // alternative (relocating `adjudicating` out of BASHostKit) is net-new code for no real win.
+                .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // M228 — testable SwiftUI library backing QinaoSampleApp.
         // ContentView / SampleSession / SampleProvider live here so

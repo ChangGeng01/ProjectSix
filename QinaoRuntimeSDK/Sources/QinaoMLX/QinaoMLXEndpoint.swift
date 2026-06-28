@@ -1,6 +1,7 @@
 import Foundation
 import BASOrgan
 import BASMLXAdapter
+import BASHostKit   // observe→DISPOSE: BASLLMNeuralCoreService.adjudicating (default-OFF factual-belief wrap)
 import QinaoLoop
 
 /// M222 — public factory for the Qinao + MLX (downloaded Gemma)
@@ -67,7 +68,14 @@ public extension QinaoLoop {
         try await adapter.loadModel(
             progressHandler: progressHandler)
         let registry = BASOrganRegistry()
-        await registry.register(adapter)
+        // observe→DISPOSE (Line A): route the live organ through the factual-belief adjudicator. Default-OFF
+        // (`BAS_FACTUAL_ADJUDICATE` unset) ⇒ returns `adapter` byte-equal; ON ⇒ the streaming-capable wrapper,
+        // so the chat loop's `as? BASStreamingOrganAdapter` probe resolves it and the verdict reaches
+        // `streamDraft`. FAIL-OPEN: missing provider/corpus ⇒ `adapter` unchanged.
+        let organ = BASLLMNeuralCoreService.adjudicating(adapter)
+        // Pre-embed the fact bank so the first ON turn doesn't stall before the first token (no-op when OFF).
+        await BASLLMNeuralCoreService.prewarmAdjudicator(organ)
+        await registry.register(organ)
         return BASOrganRegistryEndpoint(registry: registry)
     }
 
@@ -102,7 +110,12 @@ public extension QinaoLoop {
         }
 
         let registry = BASOrganRegistry()
-        await registry.register(adapter)
+        // observe→DISPOSE (Line A): same default-OFF adjudicator wrap as makeMLXEndpoint. Greedy-speculative
+        // byte-identity is unaffected — default-OFF returns the bare adapter, and when ON the verdict changes
+        // the prompt anyway (a different, intended input), so the speculative certification still holds.
+        let organ = BASLLMNeuralCoreService.adjudicating(adapter)
+        await BASLLMNeuralCoreService.prewarmAdjudicator(organ)   // no-op when OFF
+        await registry.register(organ)
         return BASOrganRegistryEndpoint(
             registry: registry,
             presetForRole: { _ in .greedyDeterministic })
