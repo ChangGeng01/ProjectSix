@@ -54,4 +54,11 @@ final class BASBeliefAssertionParserTests: XCTestCase {
         // captures "Mars and Venus" (within the 40-char bound) → truncate at "and" → "Mars"
         XCTAssertEqual(P.assertedValue(in: "The answer is Mars and Venus."), "Mars")
     }
+
+    func testLeadingHedgeAdverbsStripped() {
+        // audit #2: "definitely Canberra" survived as a 2-token claim → false-.contradicts a correct user
+        XCTAssertEqual(P.assertedValue(in: "I think it's definitely Canberra."), "Canberra")
+        XCTAssertEqual(P.assertedValue(in: "The answer is actually Tokyo."), "Tokyo")
+        XCTAssertEqual(P.assertedValue(in: "It's probably Jupiter, right?"), "Jupiter")
+    }
 }

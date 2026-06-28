@@ -43,12 +43,17 @@ public enum BASBeliefAssertionParser {
     private static let negators: Set<String> = ["not", "no", "never", "isn't", "isnt", "aren't", "arent", "wasn't", "wasnt"]
     private static let clauseBoundaries: Set<String> =
         ["but", "because", "and", "so", "my", "while", "although", "though", "if", "since", "or", "yet", "that", "which", "when"]
+    // leading epistemic adverbs to drop ("definitely canberra" → "canberra"); else they survive as a 2-token
+    // claim that the single-token answer can't match → false-.contradicts a CORRECT user (audit #2 2026-06-28).
+    private static let hedges: Set<String> =
+        ["definitely", "actually", "probably", "clearly", "really", "basically", "honestly", "surely",
+         "maybe", "perhaps", "obviously", "certainly", "apparently", "likely", "just", "totally"]
 
-    /// Negated capture ⇒ nil (we can't infer the POSITIVE belief). Otherwise truncate at the first clause
-    /// boundary and cap to 4 words (the {0,40} capture grabbed whole clauses → phantom beliefs that gaslit
-    /// correct users). false-abstain over false-extract — returns nil if nothing survives.
+    /// Drop leading hedge adverbs, then: negated head ⇒ nil (can't infer the POSITIVE belief); truncate at the
+    /// first clause boundary; cap to 4 words. false-abstain over false-extract — returns nil if nothing survives.
     private static func tighten(_ raw: String) -> String? {
         var words = raw.split(separator: " ").map(String.init)
+        while let h = words.first?.lowercased(), hedges.contains(h) { words.removeFirst() }
         guard let head = words.first?.lowercased(), !negators.contains(head) else { return nil }
         if let cut = words.firstIndex(where: { clauseBoundaries.contains($0.lowercased()) }) {
             words = Array(words.prefix(cut))

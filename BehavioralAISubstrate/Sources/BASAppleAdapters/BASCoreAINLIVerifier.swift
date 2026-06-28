@@ -58,14 +58,20 @@ public actor BASCoreAINLIVerifier {
         let p = tokenizer.encode(text: premise, addSpecialTokens: false)
         let h = tokenizer.encode(text: hypothesis, addSpecialTokens: false)
         var ids = [bos] + p + [eos, eos] + h + [eos]            // RoBERTa pair: <s> P </s></s> H </s>
-        if ids.count > seqLen { ids = Array(ids.prefix(seqLen - 1)) + [eos] }
+        if ids.count > seqLen {
+            // truncate the PREMISE, keep the FULL hypothesis + separators (prefix-truncation dropped the
+            // hypothesis → corrupted the cross-encoder → could affirm a wrong user; audit #2 2026-06-28).
+            let pKeep = max(0, p.count - (ids.count - seqLen))
+            ids = [bos] + Array(p.prefix(pKeep)) + [eos, eos] + h + [eos]
+            if ids.count > seqLen { ids = Array(ids.prefix(seqLen)) }   // last resort (hypothesis alone > window)
+        }
         var mask = [Int](repeating: 1, count: ids.count)
         while ids.count < seqLen { ids.append(pad); mask.append(0) }
 
         let out = try await runner.runInt32(
             inputs: ["input_ids": ids.map { Int32($0) }, "attention_mask": mask.map { Int32($0) }],
             shapes: ["input_ids": [1, seqLen], "attention_mask": [1, seqLen]])
-        guard let logits = out.values.first, logits.count >= 3 else { throw BASCoreAINLIVerifierError.badOutput }
+        guard let logits = out["logits"] ?? out.values.first, logits.count >= 3 else { throw BASCoreAINLIVerifierError.badOutput }
 
         let argmax = logits.indices.max(by: { logits[$0] < logits[$1] }) ?? 0
         let mx = logits.max() ?? 0
