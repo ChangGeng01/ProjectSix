@@ -40,10 +40,11 @@ public extension BASHostRuntime {
     /// - Parameters:
     ///   - organ: the live neural organ adapter the host is about to register.
     ///   - enabled: opt-in gate; defaults to the `BAS_FACTUAL_ADJUDICATE` env probe.
-    ///   - gate: the NEUROMODULATION gate deciding, per turn, whether to pay the expensive verification
-    ///     (`ε × stakes × headroom`). Defaults to the `BAS_ADJ_GATE`-derived gate (`.always` when unset). A
-    ///     host holding the governance signals injects `.when { req in … }` to wire predictive-coding ε /
-    ///     `BASEffortBudget` stakes; `.thermalHeadroom()` / `.roles([.core])` work with no extra plumbing.
+    ///   - gate: the NEUROMODULATION gate deciding, per turn, whether to pay the expensive verification by
+    ///     `stakes × headroom` (NOT ε — ε is a compute throttle, backwards for a verify organ; see
+    ///     `BASAdjudicationGate`). Defaults to the `BAS_ADJ_GATE`-derived gate (`.always` when unset). A host
+    ///     holding a richer stakes signal injects `.when { req in … }`; `.thermalHeadroom()` / `.roles([.core])`
+    ///     / `.stakesEstimated` work with no extra plumbing.
     /// - Returns: `organ` wrapped by the adjudicator when enabled+available, else `organ` unchanged.
     func adjudicatingOrgan(
         _ organ: any BASOrganAdapter,

@@ -7,9 +7,15 @@ import BASOrgan
 ///
 /// The adjudicator is a HONESTY organ, not a speed organ — but as first wired it was an UNCONDITIONAL
 /// tier-1 cost: every assertion-bearing turn paid the MiniLM embed + 1131-fact retrieve (+ optional NLI),
-/// blind to surprise / stakes / thermal headroom. That violates the substrate's own efficiency doctrine
-/// (avoided-compute + `EffortBudget = f(ε × stakes × headroom)`): expensive verification should be a TIER the
-/// effort plan ENGAGES, not a wrap that always fires.
+/// blind to stakes / thermal headroom. That violates the substrate's own efficiency doctrine (avoided-compute):
+/// expensive verification should be a TIER the effort plan ENGAGES, not a wrap that always fires.
+///
+/// This gate implements the `stakes` and `headroom` factors of the substrate's effort budget
+/// (`energy ∝ ε × stakes × headroom`). It deliberately does NOT use the ε (surprise) factor: ε is a
+/// COMPUTE-allocation throttle (high surprise ⇒ think harder) whose correct consumer is the effort/tier
+/// allocator — for a HONESTY-verify decision ε is orthogonal-to-backwards (a LOW-ε, confident-on-distribution
+/// assertion is exactly where a wrong belief slips through, so it needs MORE verification, not less). Stakes
+/// (`does getting this right matter`) is the right verify signal, and is what `.stakesEstimated` implements.
 ///
 /// `BASAdjudicationGate` is that engage/skip decision. It sits in `adjudicated(_:)` BEFORE the expensive
 /// embed/retrieve, so a `false` decision is pure avoided-compute (no embed, no allocation). Gating high-stakes
@@ -18,13 +24,13 @@ import BASOrgan
 ///
 /// ## What's wired vs. hooked
 ///
-/// The L2 organ adapter sees only `BASOrganRequest` (role / preset / instruction). The substrate's richer
-/// neuromodulation signals — ε (`BASPredictiveCodingObservation.runningMSE`) and the effort/stakes budget
-/// (`BASEffortBudget.riskCalibration` …) — are computed UPSTREAM in the governance turn and are not (yet)
-/// plumbed onto the request. So:
-///   - `.thermalHeadroom` and `.roles` work END-TO-END today (both signals are on the L2 request/ambient).
-///   - ε / stakes / effort ride through the generic `.when(_:)` hook — a host that holds those signals injects
-///     a predicate; plumbing them onto the request is the documented follow-up.
+/// The L2 organ adapter sees only `BASOrganRequest` (role / preset / instruction). So:
+///   - `.thermalHeadroom`, `.roles`, and `.stakesEstimated` work END-TO-END today (all from the L2
+///     request / ambient state — `.stakesEstimated` runs a pure prompt heuristic, `BASStakesEstimator`).
+///   - A host that holds a richer STAKES signal (e.g. an `BASEffortBudget` risk term computed upstream) can
+///     inject it through the generic `.when(_:)` hook. NOTE: ε (`BASPredictiveCodingObservation.runningMSE`)
+///     is intentionally NOT a consumer here — it gates COMPUTE/effort, not verify (see above); its home is the
+///     effort/tier allocator, not this gate.
 ///
 /// NB: there is deliberately NO preset-`deterministic`-based gate. In this substrate `deterministic` is a
 /// decoding-REPRODUCIBILITY flag, not a stakes signal, and it is ANTI-correlated with the deep tier

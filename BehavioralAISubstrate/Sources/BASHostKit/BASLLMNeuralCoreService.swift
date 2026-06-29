@@ -156,7 +156,7 @@ extension BASLLMNeuralCoreService {
         guard !facts.isEmpty, let provider = BASMiniLMEmbeddingProvider() else { return inner }
         let bank = BASEmbeddingFactBank(facts: facts, provider: provider)
         // NEUROMODULATION: the gate (default `.always`, or `BAS_ADJ_GATE`-derived) decides per turn whether to
-        // pay the embed/retrieve — so the adjudicator is a tier engaged by ε × stakes × headroom, not always-on.
+        // pay the embed/retrieve — so the adjudicator is a tier engaged by stakes × headroom (NOT ε), not always-on.
         // OBSERVE: the observer (default `BAS_ADJ_OBSERVE`-gated os_log, else nil) records the per-turn outcome
         // so an operator can MEASURE skip/inject/abstain rates and tune the gate. Both default to byte-equal.
         return BASSemanticAdjudicatingOrganAdapter(

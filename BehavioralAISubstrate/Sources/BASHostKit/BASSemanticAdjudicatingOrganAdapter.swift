@@ -26,8 +26,9 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     private let bank: BASEmbeddingFactBank
     private let extractAssertion: @Sendable (String) -> String?
     private let enabled: Bool
-    /// NEUROMODULATION gate — engage/skip the expensive embed+retrieve per turn (`ε × stakes × headroom`).
-    /// Default `.always` ⇒ byte-equal with the pre-gate ON behavior. See `BASAdjudicationGate`.
+    /// NEUROMODULATION gate — engage/skip the expensive embed+retrieve per turn by `stakes × headroom` (NOT ε;
+    /// ε is a compute throttle, backwards for a verify organ — see `BASAdjudicationGate`).
+    /// Default `.always` ⇒ byte-equal with the pre-gate ON behavior.
     private let gate: BASAdjudicationGate
     /// OBSERVE lane — a per-turn record of the gate/adjudication outcome. Default `nil` ⇒ byte-equal no-op.
     private let observer: BASAdjudicationObserver?
@@ -81,7 +82,7 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     /// Enabled + gate engages + recognized assertion + semantic bank hit ⇒ a fresh request with the verdict
     /// prepended; otherwise `request` unchanged (default-OFF / gate-skip / no-claim / below-threshold all
     /// abstain). The NEUROMODULATION gate is consulted FIRST — before the cheap parse and the expensive
-    /// embed/retrieve — so a skip is pure avoided-compute (`ε × stakes × headroom`, biomimetic-brain-efficiency).
+    /// embed/retrieve — so a skip is pure avoided-compute (`stakes × headroom`, biomimetic-brain-efficiency).
     func adjudicated(_ request: BASOrganRequest) async -> BASOrganRequest {
         guard enabled else { return request }
         guard await gate.shouldEngage(request) else {            // tier-skip ⇒ no parse, no embed
