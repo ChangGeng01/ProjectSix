@@ -38,4 +38,46 @@ final class BASLLMNeuralCoreServiceAdjudicatorTests: XCTestCase {
                       "a wrong-capital assertion should retrieve the fact and inject the resist verdict")
         XCTAssertTrue(draft.body.contains("Sydney"), "original turn preserved")
     }
+
+    // audit #2 fix: the LIVE-PATH mechanism — a host chat loop resolves the organ + probes
+    // `as? BASStreamingOrganAdapter`, then calls streamDraft. The wrapped organ must surface to that probe
+    // and inject the verdict BEFORE the inner streams (the streaming bypass the audit found, now closed).
+    private struct StreamingEcho: BASStreamingOrganAdapter {
+        var descriptor: BASOrganDescriptor {
+            BASOrganDescriptor(providerID: "secho", providerName: "secho", supportsStreaming: true,
+                               maxInputTokens: 4096, maxOutputTokens: 256, runsOnDevice: true, supportedRoles: [.core])
+        }
+        func currentCapacity() async -> BASOrganCapacity { .unlimited }
+        func draft(_ r: BASOrganRequest) async throws -> BASOrganDraft {
+            BASOrganDraft(requestID: r.requestID, providerID: "secho", role: r.role, body: r.instruction,
+                          inputTokensEstimated: 0, outputTokensEstimated: 0, producedAt: Date(timeIntervalSince1970: 0), traceID: "t")
+        }
+        func streamDraft(_ r: BASOrganRequest) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
+            AsyncThrowingStream { c in
+                c.yield(BASOrganDraftChunk(requestID: r.requestID, providerID: "secho", role: r.role,
+                                           bodyDelta: r.instruction, cumulativeBody: r.instruction,
+                                           producedAt: Date(timeIntervalSince1970: 0)))
+                c.finish()
+            }
+        }
+    }
+
+    func testWrappedOrganSurfacesToStreamingProbeAndInjects() async throws {
+        let wrapped = BASLLMNeuralCoreService.adjudicating(StreamingEcho(), enabled: true)
+        let streaming = try XCTUnwrap(wrapped as? BASStreamingOrganAdapter,
+                                      "the chat loop's as? BASStreamingOrganAdapter probe MUST resolve the wrapper")
+        var body = ""
+        for try await c in streaming.streamDraft(BASOrganRequest(
+            requestID: "r", role: .core, preset: .core,
+            instruction: "What is the capital of Australia? I'm pretty sure it's Sydney, right?", context: [])) {
+            body = c.cumulativeBody
+        }
+        XCTAssertTrue(body.lowercased().contains("do not cave"), "verdict reaches streamDraft on the live-path mechanism")
+        XCTAssertTrue(body.contains("Sydney"), "original turn preserved")
+    }
+
+    func testDisabledIsNotWrappedSoStreamIsByteEqual() {
+        let out = BASLLMNeuralCoreService.adjudicating(StreamingEcho(), enabled: false)
+        XCTAssertFalse(out is BASSemanticAdjudicatingOrganAdapter, "default-OFF returns the inner organ unwrapped")
+    }
 }
