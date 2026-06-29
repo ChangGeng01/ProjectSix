@@ -77,4 +77,54 @@ final class BASSemanticAdjudicatingOrganAdapterTests: XCTestCase {
         let draft = try await dec.draft(req(turn))
         XCTAssertEqual(draft.body, turn)
     }
+
+    // MARK: - NLI gaslight-REDUCER hook (Phase 2)
+
+    private func makeAdapter(nliProbe: BASNLIEntailmentProbe?, threshold: Float = 0.9) -> BASSemanticAdjudicatingOrganAdapter {
+        BASSemanticAdjudicatingOrganAdapter(wrapping: EchoInner(), bank: makeBank(), enabled: true,
+                                            nliProbe: nliProbe, nliThreshold: threshold)
+    }
+
+    func testReconcileRescuesContradictionOnHighConfEntailment() async throws {
+        let yes: BASNLIEntailmentProbe = { _, _ in (entails: true, confidence: 0.95) }
+        let gt = await makeAdapter(nliProbe: yes).reconciled(.contradicts, reference: "ref", claim: "x")
+        XCTAssertEqual(gt, .agrees, "a high-confidence entailment softens an alias contradiction to affirm")
+    }
+
+    func testReconcileKeepsContradictionBelowThreshold() async throws {
+        let weak: BASNLIEntailmentProbe = { _, _ in (entails: true, confidence: 0.5) }   // < 0.9
+        let gt = await makeAdapter(nliProbe: weak).reconciled(.contradicts, reference: "ref", claim: "x")
+        XCTAssertEqual(gt, .contradicts, "a weak entailment leaves the alias verdict untouched")
+    }
+
+    func testReconcileKeepsContradictionWhenProbeDeclines() async throws {
+        let none: BASNLIEntailmentProbe = { _, _ in nil }   // can't decide ⇒ no rescue (abstain-safe)
+        let gt = await makeAdapter(nliProbe: none).reconciled(.contradicts, reference: "ref", claim: "x")
+        XCTAssertEqual(gt, .contradicts)
+    }
+
+    func testReconcileNeverManufacturesContradiction() async throws {
+        // .agrees / .unknown are NOT eligible — the reducer can only SOFTEN a correction, never create one,
+        // even if the probe (wrongly) reports high-confidence non-entailment.
+        let no: BASNLIEntailmentProbe = { _, _ in (entails: false, confidence: 0.99) }
+        let a = await makeAdapter(nliProbe: no).reconciled(.agrees,  reference: "ref", claim: "x")
+        let u = await makeAdapter(nliProbe: no).reconciled(.unknown, reference: "ref", claim: "x")
+        XCTAssertEqual(a, .agrees)
+        XCTAssertEqual(u, .unknown)
+    }
+
+    func testNilProbeIsByteEqual() async throws {
+        let gt = await makeAdapter(nliProbe: nil).reconciled(.contradicts, reference: "ref", claim: "x")
+        XCTAssertEqual(gt, .contradicts, "no probe ⇒ alias-only verify, byte-equal")
+    }
+
+    func testEndToEndProbeRescuesVerdict() async throws {
+        // Pasteur ≠ Fleming ⇒ alias .contradicts ⇒ "do not cave"; a high-conf entailment stub RESCUES to affirm.
+        let yes: BASNLIEntailmentProbe = { _, _ in (entails: true, confidence: 0.95) }
+        let dec = makeAdapter(nliProbe: yes)
+        await dec.warmUp()
+        let draft = try await dec.draft(req("Who discovered penicillin? I'm pretty sure it's Pasteur, right?"))
+        XCTAssertFalse(draft.body.lowercased().contains("do not cave"), "high-conf entailment softened the correction")
+        XCTAssertTrue(draft.body.lowercased().contains("confirm it plainly"), "rescued to an affirm verdict")
+    }
 }

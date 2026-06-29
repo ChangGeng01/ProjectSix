@@ -149,7 +149,8 @@ extension BASLLMNeuralCoreService {
         _ inner: any BASOrganAdapter,
         enabled: Bool = BASFactualAdjudicatorWiring.isEnabled(),
         gate: BASAdjudicationGate = BASAdjudicationGate.fromEnvironment(),
-        observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled()
+        observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled(),
+        nliProbe: BASNLIEntailmentProbe? = nil
     ) -> any BASOrganAdapter {
         guard enabled else { return inner }
         let facts = BASBundledFactCorpus.load()
@@ -159,8 +160,11 @@ extension BASLLMNeuralCoreService {
         // pay the embed/retrieve — so the adjudicator is a tier engaged by stakes × headroom (NOT ε), not always-on.
         // OBSERVE: the observer (default `BAS_ADJ_OBSERVE`-gated os_log, else nil) records the per-turn outcome
         // so an operator can MEASURE skip/inject/abstain rates and tune the gate. Both default to byte-equal.
+        // NLI: an optional gaslight-reducer probe (default nil ⇒ alias-only). The device-only CoreAI verifier is
+        // supplied by the edge (host/endpoint) so the 82–313 MB asset never weighs down hosts that don't want
+        // the synonym tail — see `BASNLIEntailmentProbe`.
         return BASSemanticAdjudicatingOrganAdapter(
-            wrapping: inner, bank: bank, enabled: true, gate: gate, observer: observer)
+            wrapping: inner, bank: bank, enabled: true, gate: gate, observer: observer, nliProbe: nliProbe)
     }
 
     /// Pre-embed the adjudicator's fact bank (idempotent) so the FIRST live ON turn doesn't pay the corpus

@@ -32,6 +32,13 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     private let gate: BASAdjudicationGate
     /// OBSERVE lane — a per-turn record of the gate/adjudication outcome. Default `nil` ⇒ byte-equal no-op.
     private let observer: BASAdjudicationObserver?
+    /// NLI gaslight-REDUCER probe (Phase 2). Default `nil` ⇒ alias-only verify (byte-equal). When set, a
+    /// high-confidence entailment RESCUES an alias `.contradicts` to `.agrees` (a synonym/paraphrase the table
+    /// missed); it NEVER manufactures a contradiction. See `BASNLIEntailmentProbe`.
+    private let nliProbe: BASNLIEntailmentProbe?
+    /// Minimum entailment confidence to rescue a contradiction. Conservative (0.9) — a weak entailment leaves
+    /// the alias verdict untouched, preserving the false-abstain-over-false-affirm bias.
+    private let nliThreshold: Float
 
     public init(
         wrapping inner: BASOrganAdapter,
@@ -39,7 +46,9 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
         extractAssertion: @escaping @Sendable (String) -> String? = { BASBeliefAssertionParser.assertedValue(in: $0) },
         enabled: Bool = BASFactualAdjudicatorWiring.isEnabled(),
         gate: BASAdjudicationGate = .always,
-        observer: BASAdjudicationObserver? = nil
+        observer: BASAdjudicationObserver? = nil,
+        nliProbe: BASNLIEntailmentProbe? = nil,
+        nliThreshold: Float = 0.9
     ) {
         self.inner = inner
         self.bank = bank
@@ -47,6 +56,8 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
         self.enabled = enabled
         self.gate = gate
         self.observer = observer
+        self.nliProbe = nliProbe
+        self.nliThreshold = nliThreshold
     }
 
     public var descriptor: BASOrganDescriptor { inner.descriptor }
@@ -94,9 +105,25 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
         guard let resolved = await bank.resolve(question: request.instruction, assertedValue: asserted) else {
             await observe(request, .belowThreshold); return request
         }
+        // NLI gaslight-REDUCER (Phase 2, conservative): rescue an alias `.contradicts` to `.agrees` ONLY when a
+        // probe reports high-confidence entailment of the asserted VALUE by the reference (a synonym/paraphrase
+        // the alias table missed). Never manufactures a contradiction; nil probe ⇒ alias verdict unchanged.
+        let groundTruth = await reconciled(resolved.groundTruth, reference: resolved.reference, claim: asserted)
         await observe(request, .injected)
         return BASFactualAdjudicatorWiring.applyIfEnabled(
-            to: request, groundTruth: resolved.groundTruth, reference: resolved.reference, enabled: true)
+            to: request, groundTruth: groundTruth, reference: resolved.reference, enabled: true)
+    }
+
+    /// Apply the NLI gaslight-reducer to an alias verdict. Only `.contradicts` is eligible (the reducer can
+    /// SOFTEN a correction, never create one); only a high-confidence entailment flips it. Any other case —
+    /// no probe, non-contradiction, no NLI answer, or low confidence — returns `groundTruth` unchanged.
+    func reconciled(
+        _ groundTruth: BASFactualBeliefAdjudicator.GroundTruth, reference: String, claim: String
+    ) async -> BASFactualBeliefAdjudicator.GroundTruth {
+        guard groundTruth == .contradicts, let probe = nliProbe,
+              let r = await probe(reference, claim), r.entails, r.confidence >= nliThreshold
+        else { return groundTruth }
+        return .agrees
     }
 
     /// Emit a per-turn OBSERVE record. No-op when no observer is wired (byte-equal). Never gates.
