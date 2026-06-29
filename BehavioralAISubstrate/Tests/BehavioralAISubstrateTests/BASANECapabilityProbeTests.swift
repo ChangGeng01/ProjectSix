@@ -105,15 +105,24 @@ final class BASANECapabilityProbeTests: XCTestCase {
             return BASANECapability.conservative(
                 thermalSnapshot: thermal)
         })
-        _ = await probe.capability(forThermal: .nominal)
-        _ = await probe.capability(forThermal: .nominal)
-        // wait one async tick so the counter task can run
-        await Task.yield()
-        let countBeforeInvalidate = await counter.value
+        _ = await probe.capability(forThermal: .nominal)   // reader runs (increment pending)
+        _ = await probe.capability(forThermal: .nominal)   // cached ⇒ no second reader call
+        // The reader increments via a DETACHED Task; a single `Task.yield()` is not a reliable barrier for it
+        // to land — that made this test flaky ("1 is not greater than 1"). The cache guarantees exactly ONE
+        // pre-invalidate increment and ONE post-invalidate increment, so the VALUES are deterministic; only the
+        // Task timing isn't. Poll (bounded) until each settles.
+        var countBeforeInvalidate = await counter.value
+        for _ in 0..<200 where countBeforeInvalidate < 1 {
+            try? await Task.sleep(nanoseconds: 1_000_000)   // 1ms
+            countBeforeInvalidate = await counter.value
+        }
         await probe.invalidate()
-        _ = await probe.capability(forThermal: .nominal)
-        await Task.yield()
-        let countAfterInvalidate = await counter.value
+        _ = await probe.capability(forThermal: .nominal)   // invalidate ⇒ reader MUST run again
+        var countAfterInvalidate = await counter.value
+        for _ in 0..<200 where countAfterInvalidate <= countBeforeInvalidate {
+            try? await Task.sleep(nanoseconds: 1_000_000)   // 1ms
+            countAfterInvalidate = await counter.value
+        }
         XCTAssertGreaterThan(
             countAfterInvalidate, countBeforeInvalidate,
             "invalidate must force the next read to re-" +
