@@ -27,6 +27,13 @@ public enum BASBeliefAssertionParser {
     /// regex cannot reliably tell reported/conditional speech from a genuine belief; the NLI/structured
     /// extractor is the real fix. This only tightens the worst over-captures the audit (2026-06-28) found.
     public static func assertedValue(in turn: String) -> String? {
+        // REPORTED-SPEECH guard (audit 2026-06-29 fix): the patterns match the FIRST assertion frame, so a
+        // third party's claim ("My friend says the answer is Sydney, but he's wrong, it's Canberra") was
+        // extracted as the user's belief → resisted a user who is actually RIGHT (false gaslight). When the turn
+        // carries third-party attribution we cannot tell whose belief the span is, so ABSTAIN (the safe bias).
+        // The markers below never appear in the user's own frames ("I'm sure", "I think", "the answer is",
+        // "it's X right", "isn't it X"), so this adds no false-abstain on a genuine first-person assertion.
+        guard !isReportedSpeech(turn) else { return nil }
         let ns = turn as NSString
         let full = NSRange(location: 0, length: ns.length)
         for p in patterns {
@@ -38,6 +45,23 @@ public enum BASBeliefAssertionParser {
             if let v = tighten(raw) { return v }
         }
         return nil
+    }
+
+    // Third-party attribution: a claim belongs to someone OTHER than the user. Whole-word verbs + phrases that
+    // never occur in a first-person assertion frame ⇒ safe to abstain on. ("think"/"believe" are NOT here —
+    // they are the user's own frame "I think it's X"; only third-person forms like "says"/"claims" attribute.)
+    private static let attributionTokens: Set<String> =
+        ["says", "said", "claims", "claimed", "reckons", "insists", "argues", "argued"]
+    private static let attributionPhrases: [String] =
+        ["according to", "told me", "told us", "people say", "they say", "i heard", "i was told"]
+
+    /// True when the turn attributes a claim to a third party (or hearsay) ⇒ the extractor can't tell whose
+    /// belief a matched span is ⇒ abstain rather than risk resisting a correct user.
+    static func isReportedSpeech(_ turn: String) -> Bool {
+        let lower = turn.lowercased()
+        for ph in attributionPhrases where lower.contains(ph) { return true }
+        let tokens = Set(lower.split(whereSeparator: { !$0.isLetter }).map(String.init))
+        return !tokens.isDisjoint(with: attributionTokens)
     }
 
     private static let negators: Set<String> = ["not", "no", "never", "isn't", "isnt", "aren't", "arent", "wasn't", "wasnt"]

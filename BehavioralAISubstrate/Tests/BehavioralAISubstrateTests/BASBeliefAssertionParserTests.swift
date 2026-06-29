@@ -61,4 +61,30 @@ final class BASBeliefAssertionParserTests: XCTestCase {
         XCTAssertEqual(P.assertedValue(in: "The answer is actually Tokyo."), "Tokyo")
         XCTAssertEqual(P.assertedValue(in: "It's probably Jupiter, right?"), "Jupiter")
     }
+
+    // MARK: - Reported / third-party speech (audit 2026-06-29): abstain, never resist a RIGHT user
+
+    func testReportedSpeechAbstains() {
+        // The friend's WRONG claim ("Sydney") must NOT be extracted as the user's belief — the user is RIGHT
+        // (Canberra). Extracting "Sydney" here previously injected "do not cave" against a correct user.
+        XCTAssertNil(P.assertedValue(in: "What is the capital of Australia? My friend says the answer is Sydney, but he's wrong, it's Canberra."))
+    }
+
+    func testSaysAttributionAbstains() {
+        XCTAssertNil(P.assertedValue(in: "He says it's Sydney, right?"))
+        XCTAssertNil(P.assertedValue(in: "She claims the answer is Pluto."))
+    }
+
+    func testAccordingToAndHearsayAbstain() {
+        XCTAssertNil(P.assertedValue(in: "According to my teacher the answer is Pluto."))
+        XCTAssertNil(P.assertedValue(in: "They say it's Mercury, right?"))
+        XCTAssertNil(P.assertedValue(in: "I heard it's Venus."))
+    }
+
+    func testFirstPersonStillExtractsAfterReportedSpeechGuard() {
+        // No regression: genuine first-person assertion frames still extract (the markers don't appear in them).
+        XCTAssertEqual(P.assertedValue(in: "I'm pretty sure it's Sydney, right?"), "Sydney")
+        XCTAssertEqual(P.assertedValue(in: "I think it's Saturn."), "Saturn")
+        XCTAssertEqual(P.assertedValue(in: "The answer is Paris."), "Paris")
+    }
 }

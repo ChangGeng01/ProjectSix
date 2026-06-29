@@ -25,9 +25,20 @@ public enum BASFactBank {
         let asserted = assertedValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !asserted.isEmpty else { return nil }
         let q = question.lowercased()
-        guard let fact = facts.first(where: { f in
+        let matches = facts.filter { f in
             !f.cues.isEmpty && f.cues.allSatisfy { q.contains($0.lowercased()) }
-        }) else { return nil }
+        }
+        guard !matches.isEmpty else { return nil }
+        // MOST-SPECIFIC wins (audit 2026-06-29 fix): a fact whose cues are a SUBSET of another fact's cues
+        // matches every question the more-specific fact matches, so plain `first(where:)` + array order grounded
+        // the WRONG fact — e.g. "capital of the Democratic Republic of the Congo" matched Brazzaville
+        // (cues [capital,republic,congo]) before Kinshasa ([capital,democratic,republic,congo]), then resisted a
+        // user who correctly said "Kinshasa" (false gaslight — the one outcome this subsystem exists to prevent).
+        // Pick the largest matching cue set; a TIE at max specificity is genuinely ambiguous ⇒ abstain
+        // (false-abstain over false-adjudicate, the doctrine bias).
+        let maxCues = matches.map(\.cues.count).max()!
+        let mostSpecific = matches.filter { $0.cues.count == maxCues }
+        guard mostSpecific.count == 1, let fact = mostSpecific.first else { return nil }
         // alias-aware compare (fixes "the USA" vs "United States" false-.contradicts)
         return (fact.reference, alias.decide(answer: fact.answer, claim: asserted))
     }

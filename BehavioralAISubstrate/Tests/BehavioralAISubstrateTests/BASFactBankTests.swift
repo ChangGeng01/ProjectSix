@@ -105,4 +105,51 @@ final class BASFactBankTests: XCTestCase {
         XCTAssertEqual(loaded[0].answer, "Ottawa")
         XCTAssertEqual(loaded[0].cues, ["capital", "canada"]) // decoded; "category" ignored
     }
+
+    // MARK: - Cue-subset collision (audit 2026-06-29): MOST-specific fact wins; never resist a RIGHT user
+
+    /// Brazzaville's cues are a proper SUBSET of Kinshasa's, and it is EARLIER in array order — the exact shape
+    /// the review found in the shipped corpus. The DRC question must ground on Kinshasa, not resist a right user.
+    private let congoFacts = [
+        BASVerifiedFact(answer: "Brazzaville", reference: "The capital of the Republic of the Congo is Brazzaville.",
+                        cues: ["capital", "republic", "congo"]),                       // subset, earlier in array
+        BASVerifiedFact(answer: "Kinshasa", reference: "The capital of the Democratic Republic of the Congo is Kinshasa.",
+                        cues: ["capital", "democratic", "republic", "congo"]),
+    ]
+
+    func testSubsetCueDoesNotResistCorrectUser() {
+        let r = BASFactBank.resolve(question: "What is the capital of the Democratic Republic of the Congo?",
+                                    assertedValue: "Kinshasa", facts: congoFacts)
+        XCTAssertEqual(r?.groundTruth, .agrees, "must NOT resist a user who correctly said Kinshasa for the DRC")
+        XCTAssertEqual(r?.reference, "The capital of the Democratic Republic of the Congo is Kinshasa.")
+    }
+
+    func testSubsetQuestionStillResolvesToSubsetFact() {
+        // The Republic of the Congo question: the superset (Kinshasa) fact does NOT match (no "democratic"),
+        // so the subset (Brazzaville) fact resolves correctly — the fix doesn't over-abstain on the subset side.
+        let r = BASFactBank.resolve(question: "What is the capital of the Republic of the Congo?",
+                                    assertedValue: "Brazzaville", facts: congoFacts)
+        XCTAssertEqual(r?.groundTruth, .agrees)
+        XCTAssertEqual(r?.reference, "The capital of the Republic of the Congo is Brazzaville.")
+    }
+
+    func testGuineaVariantsResolveToMostSpecific() {
+        let guinea = [
+            BASVerifiedFact(answer: "Conakry", reference: "Guinea → Conakry.", cues: ["capital", "guinea"]),
+            BASVerifiedFact(answer: "Malabo", reference: "Equatorial Guinea → Malabo.", cues: ["capital", "equatorial", "guinea"]),
+            BASVerifiedFact(answer: "Bissau", reference: "Guinea-Bissau → Bissau.", cues: ["capital", "guinea", "bissau"]),
+        ]
+        XCTAssertEqual(BASFactBank.resolve(question: "capital of Equatorial Guinea?", assertedValue: "Malabo", facts: guinea)?.groundTruth, .agrees)
+        XCTAssertEqual(BASFactBank.resolve(question: "capital of Guinea-Bissau?", assertedValue: "Bissau", facts: guinea)?.groundTruth, .agrees)
+        XCTAssertEqual(BASFactBank.resolve(question: "capital of Guinea?", assertedValue: "Conakry", facts: guinea)?.groundTruth, .agrees)
+    }
+
+    func testSpecificityTieAbstains() {
+        // Two facts with the SAME (max) cue count both fully matching ⇒ ambiguous ⇒ abstain (safe bias).
+        let tie = [
+            BASVerifiedFact(answer: "A", reference: "rA", cues: ["foo", "bar"]),
+            BASVerifiedFact(answer: "B", reference: "rB", cues: ["foo", "bar"]),
+        ]
+        XCTAssertNil(BASFactBank.resolve(question: "foo bar baz?", assertedValue: "A", facts: tie))
+    }
 }
