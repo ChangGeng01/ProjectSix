@@ -686,6 +686,7 @@ final class MLXOrganAdapterTests: XCTestCase {
         XCTAssertEqual(altIDs, [
             "mlx-community/Llama-3.2-3B-Instruct-4bit",
             "mlx-community/Qwen2.5-3B-Instruct-4bit",
+            "mlx-community/Qwen3.5-4B-4bit",          // 22f0b2807: opt-in alt (defaults are Gemma-only — R1 honesty held)
             "mlx-community/Llama-3.2-1B-Instruct-4bit",
             "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
         ])
