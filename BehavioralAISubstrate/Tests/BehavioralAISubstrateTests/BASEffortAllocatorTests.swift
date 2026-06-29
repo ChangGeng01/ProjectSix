@@ -18,10 +18,17 @@ final class BASEffortAllocatorTests: XCTestCase {
     }
 
     func testHeadroomForThermalState() {
-        XCTAssertEqual(BASEffortSignals.headroom(for: .nominal), 1.0, accuracy: 1e-9)
-        XCTAssertEqual(BASEffortSignals.headroom(for: .fair), 0.6, accuracy: 1e-9)
-        XCTAssertEqual(BASEffortSignals.headroom(for: .serious), 0.3, accuracy: 1e-9)
-        XCTAssertEqual(BASEffortSignals.headroom(for: .critical), 0.0, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: ProcessInfo.ThermalState.nominal), 1.0, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: ProcessInfo.ThermalState.fair), 0.6, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: ProcessInfo.ThermalState.serious), 0.3, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: ProcessInfo.ThermalState.critical), 0.0, accuracy: 1e-9)
+    }
+
+    func testHeadroomForBASThermalLevel() {
+        XCTAssertEqual(BASEffortSignals.headroom(for: BASThermalLevel.nominal), 1.0, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: BASThermalLevel.warm), 0.6, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: BASThermalLevel.hot), 0.3, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.headroom(for: BASThermalLevel.critical), 0.0, accuracy: 1e-9)
     }
 
     // MARK: - Allocator: auto resolution from demand (surprise × stakes)

@@ -34,4 +34,15 @@ public enum BASEffortSignals {
         @unknown default: return 0.3   // unknown ⇒ assume pressure (conservative)
         }
     }
+
+    /// Headroom from the substrate's own per-turn thermal reading (`BASDeviceState.thermalLevel`) — the source a
+    /// live turn carries, so a chat facade doesn't have to reach for `ProcessInfo`. Same scale as the OS mapper.
+    public static func headroom(for level: BASThermalLevel) -> Double {
+        switch level {
+        case .nominal:  return 1.0
+        case .warm:     return 0.6
+        case .hot:      return 0.3
+        case .critical: return 0.0
+        }
+    }
 }
