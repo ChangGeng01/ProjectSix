@@ -44,4 +44,21 @@ public enum BASEffortGovernor {
         return BASEffortAllocator.resolve(
             requested: requested, surprise: surprise, stakes: stakes, headroom: headroom)
     }
+
+    /// LIVE end-to-end path: drive the per-session surprise probe with this turn (semantic prediction error ε),
+    /// then resolve the plan. This closes the real-ε loop — embed → predictive coding → surprise → allocator —
+    /// so the effort tier reflects the ACTUAL per-turn novelty, not a host-supplied / cold-start ε. A host holds
+    /// one `BASTurnSurpriseProbe` per session and calls this each turn before generation.
+    public static func plan(
+        for request: BASOrganRequest,
+        surprise probe: BASTurnSurpriseProbe,
+        requested: BASEffortLevel = .auto,
+        surpriseScale: Double = BASEffortSignals.defaultSurpriseScale,
+        thermalState: @Sendable () -> ProcessInfo.ThermalState = { ProcessInfo.processInfo.thermalState },
+        estimateStakes: @Sendable (String, [String]) -> Double = BASStakesEstimator.estimate
+    ) async -> BASEffortPlan {
+        let mse = await probe.observe(turn: request.instruction)
+        return plan(for: request, requested: requested, runningMSE: mse, surpriseScale: surpriseScale,
+                    thermalState: thermalState, estimateStakes: estimateStakes)
+    }
 }
