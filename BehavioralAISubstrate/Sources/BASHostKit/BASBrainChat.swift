@@ -67,9 +67,11 @@ public struct BASBrainChatRequest: Sendable, Equatable {
                              hostID: hostID, recordedAt: recordedAt)
     }
 
-    /// Immutable copy with a different effort level. Used to thread the GOVERNED (surprise-gated) effort into
-    /// the executor's request so a consuming pipeline sizes the turn by it (immutability: a new request, never
-    /// a mutation of the caller's).
+    /// Immutable copy with a different effort level. Carries the GOVERNED (surprise-gated) effort on the request
+    /// handed to the executor, for an executor that reads `request.effort` directly. NOTE: the default
+    /// `toTurnRequest()` mapping does NOT copy effort onto `BASEBrainTurnRequest`, so the standard
+    /// `coord.runTurn(req.toTurnRequest())` path is unaffected until a host wires effort consumption. (Immutability:
+    /// a new request, never a mutation of the caller's.)
     public func withEffort(_ level: BASEffortLevel) -> BASBrainChatRequest {
         BASBrainChatRequest(hostID: hostID, message: message, effort: level, transcript: transcript,
                             activeAgents: activeAgents, memoryScope: memoryScope, toolScope: toolScope,
@@ -151,9 +153,14 @@ public struct BASBrainChat {
     private let traceProvider: TraceProvider
     /// Opt-in per-session surprise probe (ADR-014 byte-equal-off). `nil` ⇒ the effort receipt uses the simple
     /// lease rule, the executor receives the request unchanged — byte-identical to the pre-integration facade.
-    /// Set ⇒ each turn is SURPRISE-GATED end-to-end: ε (semantic prediction error over the message) × stakes
-    /// within the device's thermal headroom → the governed effort, threaded into the executor's request AND
-    /// returned as the receipt. The probe accumulates ε across turns on this instance (one per session).
+    /// Set ⇒ each turn's effort is SURPRISE-GATED: ε (semantic prediction error over the message) × stakes within
+    /// the device's thermal headroom → the governed effort. That governed level is RETURNED as the receipt and
+    /// SET on the request handed to the executor. HONEST SCOPE (matches the class caveat above, line ~19): the
+    /// default `toTurnRequest()` mapping does NOT carry effort onto `BASEBrainTurnRequest`, and no in-repo
+    /// pipeline reads `request.effort` yet — so today the governed level changes the RECEIPT (and is available to
+    /// a custom executor that reads `request.effort`), NOT in-repo compute. Sizing in-repo compute by it is the
+    /// host executor's remaining wiring. The probe accumulates ε across turns on this instance (one per session;
+    /// drive turns sequentially — see `BASTurnSurpriseProbe`).
     private let surpriseProbe: BASTurnSurpriseProbe?
 
     /// - executor: runs the host's real pipeline for a chat request (e.g. `coord.runTurn(req.toTurnRequest())`).
@@ -175,15 +182,19 @@ public struct BASBrainChat {
             return BASBrainChatResponse.from(result: result, request: request,
                                              processTraces: traceProvider(result))
         }
-        // SURPRISE-GATED path: resolve the governed effort from THIS turn, thread its applied level into the
-        // executor's request (so a consuming pipeline sizes by it), then let the L1 run lease have the last say.
+        // SURPRISE-GATED path: resolve the governed effort from THIS turn and SET it on the request handed to the
+        // executor (for an executor that reads `request.effort`; see `withEffort` / the class caveat — the default
+        // `toTurnRequest()` path does not carry effort, so the in-repo runTurn pipeline is unaffected today). The
+        // receipt is the governed plan itself, so it always EQUALS the effort the executor was given (audit
+        // 2026-06-29 fix). We deliberately do NOT re-floor on `runLease == nil`: a nil lease means "no lease
+        // REQUIRED" for the ordinary interactive run modes (.engage/.reflect/…), not "lease DENIED" — flooring it
+        // to `.guarded` mis-reported the receipt on every normal turn and discarded the governed thermal/auto
+        // provenance. Thermal headroom (already a hard cap inside the plan) is the real budget constraint here;
+        // genuine lease arbitration on a DENIAL is the L1/executor's concern, not a nil-misread at this seam.
         let governed = await Self.governedPlan(request, probe: probe)
         let result = try await executor(request.withEffort(governed.applied))
-        let receipt = result.runLease != nil
-            ? governed
-            : Self.effortReceipt(requested: request.effort, leaseGranted: false)
         return BASBrainChatResponse.from(result: result, request: request,
-                                         processTraces: traceProvider(result), effortReceipt: receipt)
+                                         processTraces: traceProvider(result), effortReceipt: governed)
     }
 
     /// Resolve the surprise-gated effort for a turn (before the lease is known): ε (the probe's prediction error

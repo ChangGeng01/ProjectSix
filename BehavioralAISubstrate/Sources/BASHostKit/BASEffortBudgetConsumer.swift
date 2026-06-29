@@ -2,14 +2,16 @@ import Foundation
 import BASRuntimeCore
 import BASMemory
 
-/// observe→DISPOSE (biomimetic-brain-efficiency) — the LAST loop-closing piece: translate the effort plan the
-/// allocator computes into the EXISTING runtime work-sizing knobs, so the surprise-gated tier decision actually
-/// CHANGES compute (the whole point — avoided compute on low-demand turns, more breadth on high-demand ones).
+/// observe→DISPOSE (biomimetic-brain-efficiency) — the loop-closing CONSUMER SEAM: translate the effort plan the
+/// allocator computes into the EXISTING runtime work-sizing knob, so the surprise-gated tier decision CAN change
+/// compute (avoided compute on low-demand turns, more breadth on high-demand ones) — once a host routes through it.
 ///
-/// The cleanest real consumer that already sizes work is `BASAgentRouter`: its `EffortPreference` (`.deep`)
-/// pulls extra `.coldSeat` agents awake ("effort.deep-cold-wake"), so a deeper plan wakes MORE agents = more
-/// compute, and a `.shallow`/`.standard` plan keeps the roster lean. This maps `BASEffortLevel → EffortPreference`
-/// and builds the router context, so a host drives the agent roster from the plan instead of a hardcoded default.
+/// The cleanest existing work-sizer is `BASAgentRouter`: its `EffortPreference` (`.deep`) pulls extra `.coldSeat`
+/// agents awake ("effort.deep-cold-wake"), so a deeper plan wakes MORE agents = more compute, and a
+/// `.shallow`/`.standard` plan keeps the roster lean. This maps `BASEffortLevel → EffortPreference` and builds the
+/// router context. HONEST SCOPE: `BASAgentRouter.route(...)` has NO in-repo caller today — like the other effort
+/// seams, this is the wiring a host adopts (call `route(allSpecs:context:)` with `routerContext(for:plan:)`),
+/// proven end-to-end against the real router in tests, not yet driven on a live in-repo turn.
 ///
 /// The plan's finer dials (`budget.candidateCount` for L9, `criticStrength` for L10, `memoryDepth` for L8,
 /// `toolVerificationStrength`) ride on `plan.budget` directly — a consumer that sizes those reads them off the

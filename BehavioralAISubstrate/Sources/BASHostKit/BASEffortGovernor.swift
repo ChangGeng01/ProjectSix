@@ -12,9 +12,11 @@ import BASRuntimeCore
 /// `observation.predictive?.runningMSE` and passes it in. Stakes and thermal are produced END-TO-END here
 /// (BASStakesEstimator + ProcessInfo), with both injectable for tests.
 ///
-/// All inputs are real today; the two honest follow-ups are (1) driving the turn observer live so `runningMSE`
-/// reflects the actual on-chat prediction error every turn, and (2) consuming `plan.budget` to size L9/L10
-/// work. The DECISION (signals → plan) is what this builds.
+/// All inputs are real today. The two earlier follow-ups now have seams: (1) live per-turn ε via
+/// `BASTurnSurpriseProbe` (semantic prediction error over the message); (2) sizing via `BASEffortBudgetConsumer`
+/// → `BASAgentRouter`. The remaining honest gap is host adoption — the in-repo runTurn pipeline does not yet read
+/// `request.effort` / call `route(...)`, so the plan changes the RECEIPT, not in-repo compute, until a host wires
+/// it. The DECISION (signals → plan) is what this builds.
 public enum BASEffortGovernor {
 
     /// Cold-start surprise when no ε signal is available yet (no predictive-coding MSE). Neutral 0.5 —

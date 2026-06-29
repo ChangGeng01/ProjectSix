@@ -86,4 +86,17 @@ final class BASBrainChatEffortTests: XCTestCase {
         let resp = try await makeChat(probe: probe(), capture: cap).chat(request(health, effort: .auto))
         XCTAssertEqual(resp.effortReceipt.requested, .auto, "the receipt honestly records what the caller requested")
     }
+
+    func testReceiptEqualsThreadedEffortOnNormalTurn() async throws {
+        // audit 2026-06-29 fix: the stub runs mode .engage ⇒ result.runLease == nil, which is the NORMAL
+        // interactive mode (no lease REQUIRED), NOT a denial. The receipt must EQUAL the governed effort the
+        // executor was actually threaded — it must NOT be floored to .guarded (the prior bug mis-reported every
+        // normal turn and discarded the governed provenance).
+        let cap = Capture()
+        let resp = try await makeChat(probe: probe(), capture: cap).chat(request(health, effort: .auto))
+        XCTAssertEqual(resp.effortReceipt.applied, cap.effort,
+                       "receipt.applied must equal the effort the executor was given")
+        XCTAssertNotEqual(resp.effortReceipt.applied, .guarded,
+                          "a normal (no-lease-required) turn is not floored to guarded")
+    }
 }

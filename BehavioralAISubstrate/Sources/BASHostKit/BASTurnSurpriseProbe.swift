@@ -15,10 +15,17 @@ import BASAppleAdapters
 /// topic shift (off-distribution), low on a continuation. That is exactly "surprise" — not a fixed-reference
 /// distance but a deviation from what the conversation has been about.
 ///
-/// `observe(turn:)` returns the instantaneous prediction-error ENERGY ‖ε‖² for THIS turn (sharper per-turn
-/// than the probe's smoothed `runningMSE`). Feed it to `BASEffortGovernor.plan(runningMSE:)`; `nil` (embedding
-/// unavailable) ⇒ the governor falls back to its neutral cold-start surprise. Pure on-device, ~one MiniLM
-/// embed + a vector subtraction per turn.
+/// `observe(turn:)` returns the instantaneous prediction-error ENERGY ‖ε‖² for THIS turn (the SUM of squared
+/// per-dim errors, not a per-dim mean — `BASEffortSignals.surprise(fromMSE:)`'s `scale` is tuned to that
+/// magnitude). Sharper per-turn than the probe's smoothed `runningMSE`. Feed it to
+/// `BASEffortGovernor.plan(runningMSE:)`; `nil` (embedding unavailable) ⇒ the governor falls back to its neutral
+/// cold-start surprise. Pure on-device, ~one MiniLM embed + a vector subtraction per turn.
+///
+/// HONEST CAVEATS: (1) the signal is only ADAPTIVE from turn 2 on — the FIRST turn after construction/`reset()`
+/// always scores the cold-start error against the zero prediction (a fixed-ish high value, no history to be
+/// surprised relative to). (2) Drive turns SEQUENTIALLY per session: the probe is an actor (no state
+/// corruption), but the `embed` await means concurrent `observe(turn:)` calls can interleave so an earlier
+/// turn's ε reflects a later turn's update — order, not safety. One probe per session, one turn at a time.
 public actor BASTurnSurpriseProbe {
 
     private let provider: BASMemory.BASEmbeddingProvider
