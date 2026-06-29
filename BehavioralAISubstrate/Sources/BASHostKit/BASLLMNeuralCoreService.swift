@@ -140,14 +140,35 @@ extension BASLLMNeuralCoreService {
     /// on-device MiniLM). Default-OFF ⇒ returns `inner` byte-equal. FAIL-OPEN: missing provider/corpus ⇒
     /// `inner` (the dispose path never breaks the live organ). Only injects a verdict on a covered, confident
     /// factual-belief turn — otherwise the request passes through untouched.
-    static func adjudicating(
+    ///
+    /// `public` so the real runtime / a live host can route its organ adapter through the wrap at the
+    /// adapter-registration seam (see `BASHostRuntime.adjudicatingOrgan(_:)`), not just the in-package
+    /// `makeDefault(...)` extraction path. The returned wrapper conforms to `BASStreamingOrganAdapter`, so the
+    /// chat loop's `as? BASStreamingOrganAdapter` probe resolves it and the verdict reaches `streamDraft`.
+    public static func adjudicating(
         _ inner: any BASOrganAdapter,
-        enabled: Bool = BASFactualAdjudicatorWiring.isEnabled()
+        enabled: Bool = BASFactualAdjudicatorWiring.isEnabled(),
+        gate: BASAdjudicationGate = BASAdjudicationGate.fromEnvironment(),
+        observer: BASAdjudicationObserver? = BASAdjudicationObservation.defaultObserverIfEnabled()
     ) -> any BASOrganAdapter {
         guard enabled else { return inner }
         let facts = BASBundledFactCorpus.load()
         guard !facts.isEmpty, let provider = BASMiniLMEmbeddingProvider() else { return inner }
         let bank = BASEmbeddingFactBank(facts: facts, provider: provider)
-        return BASSemanticAdjudicatingOrganAdapter(wrapping: inner, bank: bank, enabled: true)
+        // NEUROMODULATION: the gate (default `.always`, or `BAS_ADJ_GATE`-derived) decides per turn whether to
+        // pay the embed/retrieve — so the adjudicator is a tier engaged by stakes × headroom (NOT ε), not always-on.
+        // OBSERVE: the observer (default `BAS_ADJ_OBSERVE`-gated os_log, else nil) records the per-turn outcome
+        // so an operator can MEASURE skip/inject/abstain rates and tune the gate. Both default to byte-equal.
+        return BASSemanticAdjudicatingOrganAdapter(
+            wrapping: inner, bank: bank, enabled: true, gate: gate, observer: observer)
+    }
+
+    /// Pre-embed the adjudicator's fact bank (idempotent) so the FIRST live ON turn doesn't pay the corpus
+    /// load cost synchronously before the first token. NO-OP when `adapter` is not the adjudicator wrapper —
+    /// i.e. default-OFF, where `adjudicating(_:)` returned the bare organ and this downcast simply fails (so
+    /// the OFF path stays byte-equal: O(1) failed downcast, no embed, no allocation). Hosts call this once at
+    /// endpoint construction, right after `adjudicating(_:)`, before registering the organ.
+    public static func prewarmAdjudicator(_ adapter: any BASOrganAdapter) async {
+        await (adapter as? BASSemanticAdjudicatingOrganAdapter)?.warmUp()
     }
 }
