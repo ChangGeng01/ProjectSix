@@ -47,4 +47,27 @@ public enum BASEffortBudgetConsumer {
             intentLayers: intentLayers,
             requestedAgentIDs: requestedAgentIDs)
     }
+
+    // MARK: - runTurn deliberation sizing (the LIVE compute consumer)
+
+    /// Max deliberation refinement passes an APPLIED effort level is worth — the in-repo compute `runTurn`
+    /// actually sizes by. Mirrors the `BASEffortBudget.candidateCount` scale (1 / 2 / 4 / 6) so a deeper tier
+    /// earns more refinement and a reflex tier runs the single base pass. `.guarded` keeps the balanced count.
+    public static func deliberationPasses(for level: BASEffortLevel) -> Int {
+        switch level {
+        case .fast:                      return 1
+        case .balanced, .auto, .guarded: return 2
+        case .deep:                      return 4
+        case .max:                       return 6
+        }
+    }
+
+    /// FLOOR the routed `maxLoops` by the effort plan — the `runTurn` consumer (mirrors `BASDeliberationThermalFloor`).
+    /// `nil` plan ⇒ passthrough (byte-equal pipeline). A plan can only TIGHTEN (`min`): a low tier spends fewer
+    /// refinement passes (avoided compute), a high tier never RAISES the thermally/lease-routed ceiling. The
+    /// caller still applies `max(1, …)`, so at least the base pass always runs.
+    public static func flooredMaxLoops(_ routedMaxLoops: Int, effortPlan: BASEffortPlan?) -> Int {
+        guard let plan = effortPlan else { return routedMaxLoops }
+        return min(routedMaxLoops, deliberationPasses(for: plan.applied))
+    }
 }

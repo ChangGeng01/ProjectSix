@@ -67,6 +67,17 @@ public struct BASBrainChatRequest: Sendable, Equatable {
                              hostID: hostID, recordedAt: recordedAt)
     }
 
+    /// As `toTurnRequest()` but CARRIES the request's `effort` (e.g. the surprise-gated `governed.applied` after
+    /// `withEffort`) onto `BASEBrainTurnRequest.effortPlan`, so `runTurn` sizes the deliberation pass budget by
+    /// it (a low tier spends fewer refinement passes). A host wiring the effort loop calls THIS in its executor
+    /// (`coord.runTurn(req.toTurnRequest(carryingEffort: true))`); the no-arg overload stays byte-equal (effort
+    /// dropped) for hosts that have not adopted effort sizing.
+    public func toTurnRequest(carryingEffort: Bool) -> BASEBrainTurnRequest {
+        BASEBrainTurnRequest(userInput: message, deviceState: deviceState, hostID: hostID,
+                             recordedAt: recordedAt,
+                             effortPlan: carryingEffort ? .granted(effort) : nil)
+    }
+
     /// Immutable copy with a different effort level. Carries the GOVERNED (surprise-gated) effort on the request
     /// handed to the executor, for an executor that reads `request.effort` directly. NOTE: the default
     /// `toTurnRequest()` mapping does NOT copy effort onto `BASEBrainTurnRequest`, so the standard
@@ -155,12 +166,13 @@ public struct BASBrainChat {
     /// lease rule, the executor receives the request unchanged — byte-identical to the pre-integration facade.
     /// Set ⇒ each turn's effort is SURPRISE-GATED: ε (semantic prediction error over the message) × stakes within
     /// the device's thermal headroom → the governed effort. That governed level is RETURNED as the receipt and
-    /// SET on the request handed to the executor. HONEST SCOPE (matches the class caveat above, line ~19): the
-    /// default `toTurnRequest()` mapping does NOT carry effort onto `BASEBrainTurnRequest`, and no in-repo
-    /// pipeline reads `request.effort` yet — so today the governed level changes the RECEIPT (and is available to
-    /// a custom executor that reads `request.effort`), NOT in-repo compute. Sizing in-repo compute by it is the
-    /// host executor's remaining wiring. The probe accumulates ε across turns on this instance (one per session;
-    /// drive turns sequentially — see `BASTurnSurpriseProbe`).
+    /// SET on the request handed to the executor. HOW IT SIZES IN-REPO COMPUTE: the default `toTurnRequest()`
+    /// does NOT carry effort (byte-equal), but a host executor that wants effort sizing calls
+    /// `coord.runTurn(req.toTurnRequest(carryingEffort: true))` — `runTurn` then FLOORS its deliberation pass
+    /// budget by the tier (`BASEffortBudgetConsumer.flooredMaxLoops`, a low tier ⇒ fewer refinement passes ⇒
+    /// avoided compute; opt-in, never raises the routed ceiling). Until the host adopts that one-line executor
+    /// change, the governed level changes the RECEIPT only, not compute. The probe accumulates ε across turns on
+    /// this instance (one per session; drive turns sequentially — see `BASTurnSurpriseProbe`).
     private let surpriseProbe: BASTurnSurpriseProbe?
 
     /// - executor: runs the host's real pipeline for a chat request (e.g. `coord.runTurn(req.toTurnRequest())`).

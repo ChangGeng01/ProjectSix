@@ -291,8 +291,16 @@ extension BASEBrainRuntimeCoordinator {
                 BASDeliberationThermalFloor.flooredMaxLoops(
                     routedBudget.maxLoops,
                     thermalLevel: request.deviceState.thermalLevel)
+            // OPT-IN surprise-gated EFFORT floor (mirrors the thermal floor above): a low effort tier spends
+            // FEWER refinement passes (avoided compute), composing by `min` with the thermal floor — effort can
+            // only TIGHTEN, never raise the routed pass budget. `request.effortPlan == nil` ⇒ passthrough,
+            // byte-equal with the pre-effort pipeline (and `max(1, …)` below keeps ≥ 1 base pass).
+            let effortFlooredMaxLoops =
+                BASEffortBudgetConsumer.flooredMaxLoops(
+                    thermallyFlooredMaxLoops,
+                    effortPlan: request.effortPlan)
             let targetPasses = max(1, min(
-                thermallyFlooredMaxLoops, thoughtFrame.stepIndex))
+                effortFlooredMaxLoops, thoughtFrame.stepIndex))
             // T3.2 — thread the actual pass budget to the SSM suggestion seam (local-only, see above).
             ssmActualTargetPasses = targetPasses
             while deliberationPassIndex < targetPasses,

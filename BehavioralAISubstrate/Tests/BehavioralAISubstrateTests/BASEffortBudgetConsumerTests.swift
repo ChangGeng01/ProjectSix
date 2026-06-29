@@ -60,4 +60,32 @@ final class BASEffortBudgetConsumerTests: XCTestCase {
         XCTAssertGreaterThan(BASEffortPlan.granted(.max).budget.criticStrength,
                              BASEffortPlan.granted(.fast).budget.criticStrength)
     }
+
+    // MARK: - runTurn deliberation floor (the LIVE compute consumer)
+
+    func testDeliberationPassesScalesWithTier() {
+        XCTAssertEqual(BASEffortBudgetConsumer.deliberationPasses(for: .fast), 1)
+        XCTAssertEqual(BASEffortBudgetConsumer.deliberationPasses(for: .balanced), 2)
+        XCTAssertEqual(BASEffortBudgetConsumer.deliberationPasses(for: .auto), 2)
+        XCTAssertEqual(BASEffortBudgetConsumer.deliberationPasses(for: .guarded), 2)
+        XCTAssertEqual(BASEffortBudgetConsumer.deliberationPasses(for: .deep), 4)
+        XCTAssertEqual(BASEffortBudgetConsumer.deliberationPasses(for: .max), 6)
+    }
+
+    func testFlooredMaxLoopsNilIsPassthrough() {
+        XCTAssertEqual(BASEffortBudgetConsumer.flooredMaxLoops(5, effortPlan: nil), 5,
+                       "nil plan ⇒ byte-equal passthrough (no effort sizing)")
+    }
+
+    func testFlooredMaxLoopsLowTierTightens() {
+        // fast (1 pass) floors a routed budget of 5 to 1 — avoided compute.
+        XCTAssertEqual(BASEffortBudgetConsumer.flooredMaxLoops(5, effortPlan: .granted(.fast)), 1)
+        XCTAssertEqual(BASEffortBudgetConsumer.flooredMaxLoops(5, effortPlan: .granted(.deep)), 4)
+    }
+
+    func testFlooredMaxLoopsHighTierNeverRaisesTheRoutedCeiling() {
+        // max (6) can only TIGHTEN within the routed ceiling, never exceed it.
+        XCTAssertEqual(BASEffortBudgetConsumer.flooredMaxLoops(3, effortPlan: .granted(.max)), 3)
+        XCTAssertEqual(BASEffortBudgetConsumer.flooredMaxLoops(8, effortPlan: .granted(.max)), 6)
+    }
 }
