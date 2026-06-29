@@ -4,8 +4,9 @@ import BASOrgan
 import BASMemory
 
 /// observe→DISPOSE — the NEUROMODULATION gate (biomimetic-brain-efficiency): the adjudicator is a TIER engaged
-/// by `ε × stakes × headroom`, not an always-on wrap. These tests cover the gate decisions, env parsing,
-/// composition, and — the load-bearing one — that a gate SKIP is genuine AVOIDED COMPUTE (no embed at all).
+/// by `stakes × headroom` (NOT ε — ε gates compute, not verify), not an always-on wrap. These tests cover the
+/// gate decisions, env parsing, composition, and — the load-bearing one — that a gate SKIP is genuine AVOIDED
+/// COMPUTE (no embed at all).
 final class BASAdjudicationGateTests: XCTestCase {
 
     // MARK: - Doubles

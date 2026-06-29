@@ -19,28 +19,46 @@ final class BASStakesEstimatorTests: XCTestCase {
             BASStakesEstimator.estimate("How much should I invest in my 401k for retirement?"), 0.8)
     }
 
-    func testClearlyCasualScoresLow() {
-        XCTAssertLessThanOrEqual(BASStakesEstimator.estimate("What's your favorite color?"), 0.2)
-        XCTAssertLessThanOrEqual(BASStakesEstimator.estimate("Tell me a joke about cats."), 0.2)
-        XCTAssertLessThanOrEqual(BASStakesEstimator.estimate("Good morning! How are you today?"), 0.2)
+    /// Pre-PR-audit fix (MEDIUM under-verify hole CLOSED): there is NO casual down-weight. A casual marker
+    /// could mask a casually-framed high-stakes turn ("just for fun, what warfarin dose?"), so casual chit-chat
+    /// scores the unknown BASELINE (≈0.6) and ENGAGES at the default threshold — over-verify is the safe
+    /// direction. Low-stakes is skipped only by RAISING the threshold, uniformly. (Previously these capped to
+    /// 0.15 and skipped even at the default — the under-verify hole the deep audit caught.)
+    func testCasualTurnsEngageAtDefaultNotSkipped() {
+        for casual in ["What's your favorite color?", "Tell me a joke about cats.", "Good morning! How are you today?"] {
+            let s = BASStakesEstimator.estimate(casual)
+            XCTAssertGreaterThanOrEqual(s, 0.5, "casual engages at the default (no under-verify hole): \(casual)")
+            XCTAssertLessThan(s, 0.8, "…but still skippable by raising the threshold: \(casual)")
+        }
     }
 
     func testUnknownTurnDefaultsToEngageBaseline() {
-        // No high-stakes and no casual markers ⇒ mid-high baseline ⇒ engages at a 0.5 threshold (coverage-first).
+        // No high-stakes markers ⇒ mid-high baseline ⇒ engages at a 0.5 threshold (coverage-first).
         XCTAssertGreaterThanOrEqual(BASStakesEstimator.estimate("Who painted the Mona Lisa?"), 0.5)
     }
 
     func testCasualSoundingMedicalStillScoresHigh() {
-        // A casual phrase must NOT cap a genuinely high-stakes turn.
+        // A casual phrase does NOT lower a genuinely high-stakes turn (its lexicon boosts win).
         XCTAssertGreaterThanOrEqual(
             BASStakesEstimator.estimate("Just for fun — what dose of insulin should I take?"), 0.8)
     }
 
-    /// Audit fix (MEDIUM): a casual FRAME must NOT suppress a confidence signal — a confidently-asserted false
-    /// belief still warrants verification even if its topic isn't in the lexicon.
+    /// A confidently-asserted belief in a casual frame stays at ≥ baseline (engages) — a confident false belief
+    /// still warrants verification even if its topic isn't in the lexicon.
     func testCasualFrameDoesNotSuppressConfidence() {
         let s = BASStakesEstimator.estimate("Just for fun, I'm 100% sure the earth is flat.")
-        XCTAssertGreaterThanOrEqual(s, 0.5, "casual + confidence (no lexicon hit) must stay ≥ baseline, not cap to 0.15")
+        XCTAssertGreaterThanOrEqual(s, 0.5, "casual + confidence still engages (no casual down-weight)")
+    }
+
+    /// The exact hole the pre-PR deep audit caught: a casually-framed, lexicon-MISSED high-stakes turn must NOT
+    /// be skipped at the default threshold. It now scores the baseline (engages), identical to the same turn
+    /// without the casual softener.
+    func testCasualFramedLexiconMissHighStakesEngagesAtDefault() async {
+        let s = BASStakesEstimator.estimate("Just for fun, what's the right warfarin amount to take?")
+        XCTAssertGreaterThanOrEqual(s, 0.5, "casual + lexicon-missed high-stakes must engage at the default, not skip")
+        let engaged = await BASAdjudicationGate.stakesEstimated(atLeast: 0.5)
+            .shouldEngage(req("Just for fun, what's the right warfarin amount to take?"))
+        XCTAssertTrue(engaged, "the .stakesEstimated gate must engage this turn at the default threshold")
     }
 
     /// CHARACTERIZATION of the documented sharp edge: a genuinely high-stakes turn the English lexicon does NOT
@@ -69,12 +87,15 @@ final class BASStakesEstimatorTests: XCTestCase {
         BASOrganRequest(requestID: "r", role: .core, preset: .core, instruction: s, context: [])
     }
 
-    func testStakesGateEngagesHighSkipsCasual() async {
-        let g = BASAdjudicationGate.stakesEstimated(atLeast: 0.5)
-        let high = await g.shouldEngage(req("Is it safe to take ibuprofen with my blood pressure medication?"))
-        let casual = await g.shouldEngage(req("What's your favorite movie?"))
-        XCTAssertTrue(high, "high-stakes medical turn must engage")
-        XCTAssertFalse(casual, "clearly-casual turn skipped")
+    func testStakesGateEngagesHighAndCasualOnlySkipsAtRaisedThreshold() async {
+        let g05 = BASAdjudicationGate.stakesEstimated(atLeast: 0.5)
+        let high = await g05.shouldEngage(req("Is it safe to take ibuprofen with my blood pressure medication?"))
+        let casualAtDefault = await g05.shouldEngage(req("What's your favorite movie?"))
+        XCTAssertTrue(high, "high-stakes medical turn engages")
+        XCTAssertTrue(casualAtDefault, "casual ENGAGES at the default (coverage-first; over-verify is the safe direction)")
+        // Casual is skipped only by RAISING the threshold — uniformly with every other baseline turn.
+        let casualAtHigh = await BASAdjudicationGate.stakesEstimated(atLeast: 0.8).shouldEngage(req("What's your favorite movie?"))
+        XCTAssertFalse(casualAtHigh, "casual skipped only at a raised threshold")
     }
 
     func testHigherThresholdSkipsTrivia() async {
@@ -96,11 +117,13 @@ final class BASStakesEstimatorTests: XCTestCase {
     // MARK: - Env parsing
 
     func testEnvStakesDefaultThreshold() async {
+        // Default `stakes` ⇒ 0.5: high-stakes engages; a baseline turn ALSO engages (coverage-first), and is
+        // skipped only by raising the threshold (verified in testEnvStakesExplicitThreshold).
         let g = BASAdjudicationGate.fromEnvironment(["BAS_ADJ_GATE": "stakes"])
         let medical = await g.shouldEngage(req("Is it safe to take this medication?"))
         let casual = await g.shouldEngage(req("Tell me a joke."))
         XCTAssertTrue(medical)
-        XCTAssertFalse(casual)
+        XCTAssertTrue(casual, "at the default threshold a casual/baseline turn engages (no under-verify hole)")
     }
 
     func testEnvStakesExplicitThreshold() async {
@@ -119,12 +142,14 @@ final class BASStakesEstimatorTests: XCTestCase {
     }
 
     func testEnvStakesUnparseableFallsBackTo0point5() async {
+        // Behaves like stakes:0.5 — trivia skips only at a raised threshold; high-stakes engages.
         let g = BASAdjudicationGate.fromEnvironment(["BAS_ADJ_GATE": "stakes:wat"])
-        // Behaves like stakes:0.5 — casual skipped, high-stakes engaged.
-        let casual = await g.shouldEngage(req("What's your favorite color?"))
+        let trivia = await g.shouldEngage(req("Who painted the Mona Lisa?"))
         let medical = await g.shouldEngage(req("Is it safe to take this medication?"))
-        XCTAssertFalse(casual)
+        let triviaAtHigh = await BASAdjudicationGate.fromEnvironment(["BAS_ADJ_GATE": "stakes:0.8"]).shouldEngage(req("Who painted the Mona Lisa?"))
+        XCTAssertTrue(trivia, "unparseable ⇒ 0.5 fallback ⇒ baseline turns engage")
         XCTAssertTrue(medical)
+        XCTAssertFalse(triviaAtHigh, "trivia skips at a raised threshold")
     }
 
     func testEnvStakesComposesWithCore() async {

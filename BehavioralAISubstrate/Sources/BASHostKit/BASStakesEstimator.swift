@@ -21,11 +21,13 @@ import Foundation
 /// This is a HONESTY organ, so the default leans toward verifying:
 ///   - **High-stakes domains** (health / legal / financial / safety) or advice-seeking ("should I…", "is it
 ///     safe…") ⇒ score ≈ 1.0 — always verify; a confidently-wrong belief here causes real harm.
-///   - **Unknown** (no markers) ⇒ a MID-HIGH baseline (engages at a 0.5 threshold) — don't skip what you
-///     can't classify.
-///   - **Clearly casual** (greetings, opinions, jokes) ⇒ capped LOW — the one class safe to skip.
-/// The GATE's threshold then sets aggressiveness (`BAS_ADJ_GATE=stakes:0.8` skips more). The lexicons are a
-/// deliberately-simple STARTER set, tunable; the estimator is documented as a heuristic, never a classifier.
+///   - **Everything else** (incl. casual chit-chat) ⇒ the MID-HIGH unknown baseline (engages at a ≤ 0.6
+///     threshold) — don't skip what you can't classify. There is NO casual down-weight (it would risk skipping
+///     a casually-framed high-stakes turn — see `estimate(_:context:)`); low-stakes turns are skipped purely by
+///     raising the threshold, UNIFORMLY.
+/// The GATE's threshold then sets aggressiveness (`BAS_ADJ_GATE=stakes:0.8` skips more — incl. lexicon-missed
+/// turns). The lexicons are a deliberately-simple STARTER set, tunable; the estimator is a heuristic, never a
+/// classifier.
 ///
 /// ## LIMITATIONS (honest — it is a coarse heuristic)
 ///
@@ -64,40 +66,26 @@ public enum BASStakesEstimator {
         "guaranteed", "absolutely", "without a doubt", "no doubt",
     ]
 
-    /// Clearly-casual markers — the one class safe to skip for an honesty organ.
-    static let casualTerms: [String] = [
-        "favorite", "favourite", "fun fact", "just for fun", "for fun", "tell me a joke", "a joke",
-        "your opinion", "what do you think about", "good morning", "good evening",
-    ]
-
     /// Estimate the turn's stakes in `[0, 1]`. Pure + deterministic. `context` lines are folded in so a
     /// high-stakes prior turn keeps the conversation's stakes warm.
     ///
     /// Matching is SUBSTRING + case-insensitive and intentionally over-inclusive: for a coverage-first honesty
     /// organ, a false POSITIVE (over-verify a turn that didn't need it) is the SAFE direction — it costs a
-    /// little compute, never a missed correction. The dangerous direction is a false NEGATIVE, so the cap
-    /// logic below only ever fires for a TRULY-casual turn (no stakes signal of any kind).
+    /// little compute, never a missed correction.
+    ///
+    /// There is deliberately NO "casual" DOWN-WEIGHT (pre-PR-audit fix). A casual marker cannot reliably
+    /// distinguish trivia from a casually-FRAMED high-stakes turn ("just for fun, what warfarin dose?"), and a
+    /// down-weight there would drop a lexicon-MISSED high-stakes turn below the engage threshold — a silent
+    /// under-verify hole even at the default threshold, contradicting the coverage-first guarantee. So EVERY
+    /// turn without a high-stakes signal scores the unknown baseline (engages at threshold ≤ 0.6); low-stakes
+    /// turns are skipped purely by RAISING the gate threshold, UNIFORMLY (see LIMITATIONS — the one sharp edge).
     public static func estimate(_ instruction: String, context: [String] = []) -> Double {
         let text = ([instruction] + context).joined(separator: " ").lowercased()
-        let hitsHighStakes = highStakesTerms.contains { text.contains($0) }
-        let hitsAdvice = adviceTerms.contains { text.contains($0) }
-        let hitsConfidence = confidenceTerms.contains { text.contains($0) }
-        let hitsCasual = casualTerms.contains { text.contains($0) }
-
         var score = 0.6 // mid-high baseline: unknown ⇒ engage (coverage-first)
-        if hitsHighStakes { score += 0.5 }
-        if hitsAdvice { score += 0.3 }
-        if hitsConfidence { score += 0.1 }
+        if highStakesTerms.contains(where: { text.contains($0) }) { score += 0.5 }
+        if adviceTerms.contains(where: { text.contains($0) }) { score += 0.3 }
+        if confidenceTerms.contains(where: { text.contains($0) }) { score += 0.1 }
         if text.contains("?") { score += 0.05 }
-
-        // Cap to LOW only for a TRULY-casual turn — i.e. a casual marker AND no high-stakes / advice /
-        // confidence signal at all (a greeting, an opinion, a joke). A casual FRAME must never suppress a
-        // confidence or advice signal: a confidently-asserted false belief ("just for fun, I'm 100% sure X")
-        // still warrants verification, so it stays at ≥ baseline. (Audit fix: the old `score <= 0.75` cap
-        // wrongly skipped casual+confident turns whose stakes-ness wasn't in the lexicon.)
-        if hitsCasual && !hitsHighStakes && !hitsAdvice && !hitsConfidence {
-            score = min(score, 0.15)
-        }
         return min(1.0, max(0.0, score))
     }
 }
