@@ -50,9 +50,12 @@ public struct BASAliasNormalizer: Sendable, Equatable {
         return m
     }()
 
-    /// Alias-aware agree/contradict. `.agrees` iff the normalized claim and answer are EQUAL, or one is a
-    /// multi-word contiguous WORD-token run of the other ("united states" ⊑ "united states of america").
-    /// NEVER char-substring: single tokens must match exactly, so "8"≠"18", "74"≠"742", "au"≠"australia",
+    /// Alias-aware agree / contradict / ABSTAIN. `.agrees` iff the normalized claim and answer are EQUAL (after
+    /// alias-group canonicalization + number-word folding); a multi-word contiguous overlap that is NOT equal is
+    /// AMBIGUOUS ⇒ `.unknown` (abstain), because the same run can mean the same entity ("new york" ⊑ "new york
+    /// city") or different ones ("Republic of Korea" ⊑ "Democratic People's Republic of Korea"); a value with no
+    /// shared run ⇒ `.contradicts`. NEVER char-substring: single tokens must match exactly, so "8"≠"18",
+    /// "74"≠"742", "au"≠"australia",
     /// "c"≠"ca" all correctly `.contradicts` (the prior `contains` false-AFFIRMED wrong users — anti-
     /// sycophancy inverted — across the numeric/symbol facts; audit 2026-06-28).
     public func decide(answer: String, claim: String) -> BASFactualBeliefAdjudicator.GroundTruth {
@@ -62,7 +65,15 @@ public struct BASAliasNormalizer: Sendable, Equatable {
         if a == c { return .agrees }
         let at = a.split(separator: " ").map(String.init)
         let ct = c.split(separator: " ").map(String.init)
-        return (Self.containsTokenRun(at, ct) || Self.containsTokenRun(ct, at)) ? .agrees : .contradicts
+        // AMBIGUOUS multi-word overlap ⇒ ABSTAIN, not affirm (audit 2026-06-29). A contiguous run shared by both
+        // can be the SAME entity ("new york" ⊑ "new york city") OR DIFFERENT entities split by a qualifier
+        // ("Republic of Korea" ⊑ "Democratic People's Republic of Korea") — a token-only rule cannot tell them
+        // apart, so the old `.agrees` FALSE-AFFIRMED a wrong user (the symmetric gaslight). Curated synonyms are
+        // already resolved above by normalize()→`a == c`; the unlisted overlap tail is the NLI head's job. Return
+        // .unknown so the caller ABSTAINS (false-abstain over false-adjudicate). A genuine mismatch with NO shared
+        // run still `.contradicts`.
+        if Self.containsTokenRun(at, ct) || Self.containsTokenRun(ct, at) { return .unknown }
+        return .contradicts
     }
 
     /// True iff `sub` (≥2 tokens) appears as a contiguous run inside `seq`. Single-token `sub` returns false
