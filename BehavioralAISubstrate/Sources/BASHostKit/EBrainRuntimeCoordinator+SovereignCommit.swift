@@ -97,6 +97,17 @@ extension BASEBrainRuntimeCoordinator {
             )
         }
 
+        // SOVEREIGNTY TODO — verified NON-GAP as of 2026-06-30 (4-tracer + 3-refuter trace
+        // `toolcall-sovereign-gate-trace`). The verdict ALSO revokes `.toolWrite` / `.externalActuation`
+        // (see EBrainRuntimeCoordinator+SovereignVerdict.swift:142), but there is DELIBERATELY no commit-scope
+        // for them here yet: the LLM tool-dispatch path (BASToolDispatcher, in BASOrgan) is currently dead in
+        // production — `toolPlanner` defaults nil and is never set, so the live turn only runs
+        // `materializeToolIntent` (RunTurn.swift), which DESCRIBES tool intent without ever dispatching. A
+        // whole-repo grep for `contains(.toolWrite)` matches only tests ⇒ the toolWrite revocation is write-only.
+        // When a live tool-execution path is wired, CLOSE the gap here: mint a `.toolWrite` scope guarded by
+        // `sovereignVerdict.revokedPermissions.contains(.toolWrite) == false` (mirroring the `.memoryWrite` branch
+        // above) and wrap the live dispatch in a `BASSovereignGatedTurn` so an ungated tool-call throws
+        // `noCommitTokenForScope`. Until then this is wiring debt, not an open breach.
         return tokens
     }
 
