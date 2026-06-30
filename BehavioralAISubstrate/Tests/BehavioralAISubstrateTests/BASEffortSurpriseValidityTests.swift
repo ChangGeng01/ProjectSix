@@ -2,7 +2,9 @@ import XCTest
 @testable import BASHostKit
 @testable import BASRuntimeCore
 @testable import BASAppleAdapters
+@testable import BASMLXAdapter
 import BASMemory
+import BASOrgan
 
 /// VALIDITY check for the effort loop's core premise: that semantic SURPRISE (the probe's prediction error over
 /// turn embeddings) is a good proxy for DIFFICULTY (turns that actually need more compute). I flagged this as
@@ -47,6 +49,38 @@ final class BASEffortSurpriseValidityTests: XCTestCase {
         let easyAvg = easy.reduce(0,+)/Double(easy.count), hardAvg = hard.reduce(0,+)/Double(hard.count)
         print("  A VERDICT: easyAvg=\(String(format: "%.3f", easyAvg)) hardAvg=\(String(format: "%.3f", hardAvg)) " +
               "→ \(hardAvg > easyAvg + 0.1 ? "tracks difficulty" : "DIFFICULTY-BLIND (surprise ~ same for easy & hard)")")
+    }
+
+    /// TEST C — the deeper question: does the REASONING MODEL already self-allocate effort? Qwen3.5 does extended
+    /// "Thinking Process" — if its own output length scales with difficulty, an EXTERNAL effort gate is redundant
+    /// (the model already spends more compute on hard turns). Measures output length on a controlled easy/hard
+    /// set. Heavy (loads the 4B) — gated BAS_EFFORT_VALIDITY_4B=1.
+    func testReasoningModelSelfAllocatesEffort() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_EFFORT_VALIDITY_4B"] == "1" else {
+            throw XCTSkip("set BAS_EFFORT_VALIDITY_4B=1 to measure whether the 4B's own thinking length tracks difficulty")
+        }
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        try await organ.loadModel()
+        await organ.setDecodePlannerAutoSelect(false)
+
+        func length(_ turn: String) async -> Int {
+            let req = BASOrganRequest(requestID: "len", role: .core, preset: .core, instruction: turn, context: [])
+            var body = ""
+            do { for try await c in organ.streamDraft(req) { body = c.cumulativeBody } } catch { return -1 }
+            return body.split(whereSeparator: { $0 == " " || $0 == "\n" }).count   // word count ~ thinking depth
+        }
+        let easy = ["What is 2 plus 2?", "What color is grass?", "What is the capital of France?", "Is water wet?"]
+        let hard = ["Prove that the square root of 2 is irrational.",
+                    "Derive the closed-form energy levels of a hydrogen atom from the Schrodinger equation.",
+                    "What is 6371 multiplied by 8429? Show full working.",
+                    "Explain rigorously why P versus NP remains unresolved."]
+        print("=== C: does the reasoning model self-allocate (output length vs difficulty)? ===")
+        var easyLen = 0, hardLen = 0
+        for t in easy { let n = await length(t); easyLen += n; print("  [EASY] words=\(n) | \(t)") }
+        for t in hard { let n = await length(t); hardLen += n; print("  [HARD] words=\(n) | \(t)") }
+        let ea = Double(easyLen)/4, ha = Double(hardLen)/4
+        print("  C VERDICT: easyAvg=\(Int(ea)) words, hardAvg=\(Int(ha)) words → " +
+              "\(ha > ea * 1.5 ? "MODEL SELF-ALLOCATES (thinks ~\(String(format: "%.1f", ha/max(ea,1)))× longer on hard) ⇒ external effort gate is redundant" : "no strong self-allocation signal")")
     }
 
     /// TEST B — novelty dominates difficulty: a TRIVIAL topic-SHIFT vs a HARD CONTINUATION of the current topic.
