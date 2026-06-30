@@ -15,6 +15,7 @@
 import Foundation
 import MLX
 import MLXLMCommon
+import MLXLLM
 import BASOrgan
 
 extension MLXOrganAdapter {
@@ -118,6 +119,30 @@ extension MLXOrganAdapter {
                 probs.append((tok >= 0 && tok < vocab) ? Foundation.exp(flat[base + tok] - mx) / sum : 0)
             }
             return probs
+        }
+    }
+
+    /// Probe-D primitive: the model's FINAL hidden state at the last prompt token (the chat-templated `request`).
+    /// One backbone forward (no generation, no LM head) — the feature a difference-of-means correctness/abstention
+    /// probe is fit on. Returns [] if the loaded model isn't a Qwen35Model (the only one exposing the backbone).
+    public func lastTokenHiddenState(for request: BASOrganRequest) async throws -> [Float] {
+        guard let container = self._loadedContainerForStreaming() else {
+            throw BASOrganError.providerUnavailable(
+                reason: Self.notLoadedReason("loadModel(progressHandler:) before lastTokenHiddenState(for:)"))
+        }
+        var messages: [Chat.Message] = []
+        let instr = Self.systemInstructions(for: request)
+        if !instr.isEmpty { messages.append(.system(instr)) }
+        messages.append(.user(Self.prompt(for: request)))
+        let input = try await container.prepare(input: UserInput(chat: messages))
+        let promptTokens = input.text.tokens.asArray(Int.self)   // [Int] is Sendable across the perform boundary
+        return await container.perform { ctx in
+            guard let m = ctx.model as? Qwen35Model, !promptTokens.isEmpty else { return [Float]() }
+            let toks = MLXArray(promptTokens.map { Int32($0) }).reshaped([1, -1])  // [1, seq]
+            let hidden = m.finalHiddenStates(toks)             // [1, seq, hidden]
+            let last = hidden[0, -1, 0...]                     // [hidden] — last prompt token
+            eval(last)
+            return last.asArray(Float.self)
         }
     }
 }

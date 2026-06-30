@@ -680,3 +680,13 @@ extension Qwen35Model: LoRAModel {
         languageModel.model.layers
     }
 }
+
+extension Qwen35Model {
+    /// Observation-only: the FINAL (post-norm, pre-LM-head) hidden states for `inputs` ([batch, seq]) →
+    /// [batch, seq, hidden]. Exposes the text backbone's output (the same tensor `callAsFunction` then projects
+    /// through the LM head) so the substrate can probe it (difference-of-means correctness/abstention sensor).
+    /// Pure read of the existing forward — no decode-path or kernel change.
+    public func finalHiddenStates(_ inputs: MLXArray) -> MLXArray {
+        languageModel.model(inputs, cache: nil)
+    }
+}
