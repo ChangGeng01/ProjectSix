@@ -72,5 +72,53 @@ extension MLXOrganAdapter {
             return zip(preds, referenceTokens).map { $0 == $1 }
         }
     }
+
+    /// CGR offline-validation primitive (GDN-safe: ONE forward, plain `newCache`, no trim). Teacher-forces the
+    /// model over (chat-templated prompt for `request`) + `answer`, and returns the model's softmax PROBABILITY of
+    /// each `answer` token given the true prefix — i.e. its confidence in the correct answer WITHOUT thinking.
+    /// The MIN across answer tokens is the "does this turn need thinking" signal: high ⇒ the model already knows
+    /// (thinking is waste), low ⇒ it needs to reason. This tests whether the model's OWN confidence is a real
+    /// difficulty signal — the thing the external surprise/length signals failed to be. (Append " /no_think" to
+    /// the instruction to suppress the reasoning scaffold so the answer-slot prob is the direct-answer confidence.)
+    public func teacherForcedAnswerConfidence(
+        for request: BASOrganRequest, answer: String
+    ) async throws -> [Float] {
+        guard let container = self._loadedContainerForStreaming() else {
+            throw BASOrganError.providerUnavailable(
+                reason: Self.notLoadedReason("loadModel(progressHandler:) before teacherForcedAnswerConfidence(...)"))
+        }
+        var messages: [Chat.Message] = []
+        let instructions = Self.systemInstructions(for: request)
+        if !instructions.isEmpty { messages.append(.system(instructions)) }
+        messages.append(.user(Self.prompt(for: request)))
+        let input = try await container.prepare(input: UserInput(chat: messages))
+        let promptTokens = input.text.tokens.asArray(Int.self)
+        let params = self._greedyParameters(for: .greedyDeterministic, maxOutputTokens: nil)
+
+        return await container.perform { ctx in
+            let answerTokens = ctx.tokenizer.encode(text: answer)
+            let promptLen = promptTokens.count, n = answerTokens.count
+            guard promptLen > 0, n > 0 else { return [Float]() }
+            let seq = promptTokens + answerTokens
+            let cache = ctx.model.newCache(parameters: params)
+            let toks = MLXArray(seq.map { Int32($0) })
+            let r = ctx.model(LMInput.Text(tokens: toks)[text: .newAxis], cache: cache, state: nil)
+            let predLogits = r.logits[0..., (promptLen - 1) ..< (promptLen - 1 + n), 0...].squeezed(axis: 0)
+            eval(predLogits)
+            let flat = predLogits.asArray(Float.self)
+            let vocab = predLogits.dim(1)
+            var probs = [Float]()
+            for i in 0..<n {
+                let base = i * vocab
+                var mx = -Float.greatestFiniteMagnitude
+                for j in 0..<vocab where flat[base + j] > mx { mx = flat[base + j] }
+                var sum: Float = 0
+                for j in 0..<vocab { sum += Foundation.exp(flat[base + j] - mx) }
+                let tok = answerTokens[i]
+                probs.append((tok >= 0 && tok < vocab) ? Foundation.exp(flat[base + tok] - mx) / sum : 0)
+            }
+            return probs
+        }
+    }
 }
 #endif
