@@ -52,6 +52,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASSovereign
 import BASWorldPrior
 
 extension BASEBrainRuntimeCoordinator {
@@ -1286,6 +1287,19 @@ extension BASEBrainRuntimeCoordinator {
             auditFindings: auditFindings,
             killSwitches: killSwitches
         )
+        // ②-observe (opt-in, 红线 7) — emit THIS turn's model-honesty observation (flattery / hedging /
+        // overclaim scored on the realized body; pure + deterministic). Guarded on the optional sink so a host
+        // that did NOT opt in takes the exact pre-existing code path (byte-equal, mirrors `provisionalVerdictSink`).
+        // Side-emission only: it never touches `renderedOutput`, the sovereign verdict, or the result, so the
+        // canonical turn output is unchanged. Closes the "sycophancy is structurally invisible" gap.
+        if let modelHonestyObservationSink {
+            modelHonestyObservationSink(BASModelHonestyObservationRecord(
+                eventID: "\(derivedSessionID)#\(derivedTurnID)#model-honesty",
+                sessionID: derivedSessionID,
+                turnID: derivedTurnID,
+                axes: BASModelHonestySignal.axes(renderedOutput.headline + "\n" + renderedOutput.body),
+                observedAtMs: Int64((runtimeTrace.recordedAt.timeIntervalSince1970 * 1000).rounded())))
+        }
         let wakeIntent = buildWakeIntent(
             request: request,
             budgetFrame: routedBudget

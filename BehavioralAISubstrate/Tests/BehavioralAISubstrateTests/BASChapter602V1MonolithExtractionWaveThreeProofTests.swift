@@ -86,6 +86,10 @@ final class BASChapter602V1MonolithExtractionWaveThreeProofTests:
                 hostForgetRequest:
                 memoryEventLog:
                 memoryMutationEventEmitter:
+                // ②-observe — model-honesty observation sink OPT-IN slot
+                // added。 Default-nil preserves all prior caller compat per
+                // 红线 7;this pin tracks the canonical signature。
+                modelHonestyObservationSink:
                 projectionBlockEmissionHandler:
                 // chapter 九百六十 / M3505 — Phase 2 ch1 Agent
                 // Fabric OPT-IN slot added。 Default-nil
