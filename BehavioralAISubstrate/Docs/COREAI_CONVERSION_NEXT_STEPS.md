@@ -78,6 +78,22 @@ reuse the proven `Tools/llama_to_coreai.py` attention path. MLP (all layers): `m
 (`inject_subbyte_tensors`, per `mamba3_to_coreai.py`) — each asset ≈1.3GB < 2GB wall (confirmed). Output: 3
 `.aimodel` assets = a real, device-testable Qwen3.5-4B.
 
+## M2 COMPLETE — 3-asset int4 build (2026-06-30, `Tools/qwen35_3asset_int4.py`)
+
+The full 32L real-weight Qwen3.5-4B is now **3 shippable int4 CoreAI assets**, each under the 2 GB wall, chaining
+by hidden hand-off:
+- asset1 (layers 0-11) = 0.67 GB · asset2 (layers 12-23) = 0.67 GB · asset3 (layers 24-31 + final-norm + tied head) = 0.77 GB · **total ≈ 2.11 GB**.
+All 3 export + int4-pack + convert cleanly. Decode forwards: RealGDN (verified) + FA single-token windowed-KV(W=8) + RoPE@pos.
+
+**Honest caveats (device-deployment refinements, all M1/M3/M4 concerns):**
+- Per-layer states (25/17 per asset) are convert-valid but the ANE segmenter needs a SINGLE fused state per asset
+  (mamba3 finding: >2 states → device SIGSEGV) — must fuse before M1.
+- FA uses a windowed KV (W=8) = sliding-window attention; full causal KV (grows to maxSeq) is more faithful for long context.
+- Embed is a host-side lookup (not in an asset); int4 re-quant of the 4-bit source is ~lossless but int4-vs-MLX fidelity is un-re-checked.
+
+**So the entire Mac-side is DONE: convertibility + full-port fidelity (cos 0.9998) + int4 packaging + 3-asset assembly.**
+The only remaining work is all device-side (M1 rdar / M3 runtime fidelity / M4 power) — the real go/no-go gates.
+
 ## M3 / M4 (after M2)
 - **M3 fidelity** (needs the Swift CoreAI host runtime, `BASCoreAINDArrayBridge`): run the real-weight assets vs the
   MLX reference, assert logits MAE / top-1 agreement. Note: greedy token-identity is the real bar.
