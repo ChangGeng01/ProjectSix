@@ -4,8 +4,13 @@
 Proves the real-WEIGHT port path (not random weights): safetensors 4-bit dequant + the faithful GDN forward
 (conv1d→silu→split→qk-rmsnorm→decay=exp(-exp(A_log)*softplus(a+dt_bias)), beta=sigmoid(b)→gated-delta recurrence
 →gated-rmsnorm(out,z)→out_proj, from Qwen35.swift:228-296 + GatedDelta.swift:14-15) → lowers through coreai_torch.
-Scope: ONE real GDN layer (layer 0), reduced embed/head (the layer's real weights are the point). Gated-norm form
-is approximate (fidelity is M3, not M2). Decode single-token; conv window carried as state.
+Scope: ONE real GDN layer (layer 0), reduced embed/head (the layer's real weights are the point).
+Decode single-token; conv window carried as state.
+
+FIDELITY VERIFIED (2026-06-30) vs the MLX reference (mlx_lm 0.31.3 loading the same checkpoint, layer-0 block on
+token 100): after fixing the qk-norm scale (invScale^2 on q, invScale on k — the fidelity check caught cos=0.64
+without it), the port matches at **cosine=0.9999, MAE=0.0005** (mean|ref|=0.027, fp16-level). So the dequant + the
+faithful forward are numerically correct, not just convertible. (Gated-norm = rmsnorm(x,weight)*silu(gate), matches.)
 """
 from __future__ import annotations
 import glob, json, shutil, struct, sys, time
@@ -84,7 +89,8 @@ class RealGDN(nn.Module):
         win = torch.cat([convwin, qkv.view(1, 8192)], 0)          # [4,8192]
         conv = F.silu((win.t() * s.convw.view(8192, 4)).sum(-1))  # depthwise causal conv k=4 → [8192]
         q, k, v = conv[:KEYDIM].view(GK, GHD), conv[KEYDIM:2 * KEYDIM].view(GK, GHD), conv[2 * KEYDIM:].view(GV, GHD)
-        q = rms(q).repeat_interleave(GV // GK, 0); k = rms(k).repeat_interleave(GV // GK, 0)   # qk-rmsnorm + GQA
+        inv = GHD ** -0.5   # 1/sqrt(headKDim); q gets inv^2, k gets inv (Qwen35.swift:266-272) — REQUIRED for fidelity
+        q = ((inv * inv) * rms(q)).repeat_interleave(GV // GK, 0); k = (inv * rms(k)).repeat_interleave(GV // GK, 0)
         decay = torch.exp(-torch.exp(s.A_log) * F.softplus(s.a(h) + s.dt_bias)).view(GV, 1, 1)
         beta = torch.sigmoid(s.b(h)).view(GV, 1); z = s.z(h).view(GV, GHD)
         state = state * decay

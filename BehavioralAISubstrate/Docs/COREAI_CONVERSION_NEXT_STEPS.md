@@ -44,7 +44,7 @@ from the local 4-bit checkpoint (dequant verified sane, out_proj mean|w|=0.009),
 (conv1d→qk-rmsnorm→`decay=exp(-exp(A_log)·softplus(a+dt_bias))`→beta=sigmoid→gated-delta→gated-rmsnorm→out_proj+SwiGLU),
 lowers + converts to a CoreAI `.aimodel` (228 MB, states = recurrence + conv-window). So the dequant + the faithful
 GDN forward — the crux of the whole port — WORK on real weights. Remaining M2 = scale to 32L + 3-asset split + int8
-+ real embed/head; then M3 fidelity vs MLX (the gated-norm form is approximate until M3 verifies it).
++ real embed/head. **Layer-0 fidelity vs MLX is now VERIFIED** (mlx_lm reference, block on token 100: cosine=0.9999, MAE=0.0005 — after the fidelity check caught+fixed a missing qk-norm scale that gave cos=0.64). So dequant + faithful forward are numerically correct. Full-model M3 (all 32L through the CoreAI runtime) still open.
 
 Turns the weights-free probes into a **real-weight** asset (for real fidelity + a real device run). No 8GB
 download needed — dequantize the LOCAL 4-bit checkpoint.
