@@ -136,6 +136,10 @@ extension SampleHostModel {
                             // inside the task body since the
                             // raw `Response<String>` type is not
                             // Sendable per Apple's API contract。
+                            // INTENTIONAL raw `LanguageModelSession` — this benchmarks *raw* Apple
+                            // Foundation Models latency/success. Do NOT route through
+                            // `AppleFoundationOrganAdapter`: that would time adapter+FM, not raw FM, and
+                            // corrupt the baseline. See Docs/CURRENCY_AUDIT_2026-06.md D3.
                             let content: String =
                                 try await withTimeout(
                                     seconds: afmTimeoutSec
