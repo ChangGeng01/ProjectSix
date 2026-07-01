@@ -10,8 +10,13 @@ import BASSovereign
 /// `threshold` becomes the NEW coverage gate: below it ⇒ nil ⇒ caller ABSTAINS — preserving the
 /// false-abstain-over-false-override bias (top-1 can confidently retrieve a wrong fact for an off-bank
 /// question, so the floor must be tuned conservatively on held-out off-bank questions). Verify stays
-/// substring for Phase 1 (NLI entailment is Phase 2); only RETRIEVE changes here. Gated host-side by a new
-/// `BAS_FACTUAL_SEMANTIC` flag with `BASFactBank` substring as the fail-closed fallback.
+/// substring for Phase 1 (NLI entailment is Phase 2); only RETRIEVE changes here. Under
+/// `BAS_FACTUAL_ADJUDICATE=1` this semantic bank is the ONLY live RETRIEVE path: `BASLLMNeuralCoreService`
+/// `.adjudicating(_:)` constructs it unconditionally and wraps the organ in `BASSemanticAdjudicatingOrganAdapter`
+/// (fail-OPEN — a missing provider/corpus falls back to the unwrapped organ, never to substring matching).
+/// The brittle substring `BASFactBank` path is the SIBLING adapter (`BASAdjudicatingOrganAdapter` via
+/// `BASFactualAdjudicatorWiring`); semantic-vs-substring is selected by which adapter a host wraps with, NOT
+/// by an env flag. (There is no `BAS_FACTUAL_SEMANTIC` flag.)
 public actor BASEmbeddingFactBank {
 
     private let facts: [BASVerifiedFact]
