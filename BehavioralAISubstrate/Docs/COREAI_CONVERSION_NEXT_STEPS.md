@@ -1,5 +1,19 @@
 # Qwen3.5-4B → Core AI: next steps (M1 device kill-switch + M2 real-weight port)
 
+> **⚠️ AUDIT CORRECTION (2026-07-01) — READ FIRST; the celebratory language below OVERSTATES.** A strict audit
+> (measuring the claims that had only been asserted) found:
+> - The **fp16, full-causal REFERENCE port IS faithful** — cos 0.9998 vs MLX (T=6), every component MLX-verified. REAL.
+> - The **shipped 3 int4 assets use windowed-KV (W=8) = sliding-window attention — a DIFFERENT forward that was never
+>   fidelity-tested.** MEASURED: on T=16 (context > window) it gives top-1=900 vs MLX **350**, top-5 overlap **0/5**,
+>   cos **0.79** — **known-WRONG past 8 tokens** (i.e. for real decode). int4 alone (full-causal) costs cos
+>   0.9998→**0.9384** — **NOT "lossless"** (affine-per-group → symmetric-per-channel is a scheme change).
+> - Per-layer states (25/17 per asset) will **SIGSEGV on ANE** without single-state fusion → the assets are a
+>   **proof-of-concept, NOT shippable.**
+> So every "M2 COMPLETE / shippable / entire-Mac-side-DONE / cos 0.9998" line below is true **only for the fp16
+> full-causal reference**, NOT for what would ship. The shipped form is size-valid but numerically UNVALIDATED (and
+> windowed = wrong). The real go/no-go gates (M1 rdar / M3 fidelity / M4 power) all still stand.
+
+
 Follows the proven convertibility (`Tools/{gdn,qwen35_hybrid,qwen35_real}_to_coreai.py` — op-graph + real-structure
 + int8/3-asset wall all verified; see `COREML_COREAI_DECISION.md`). Pursued as an explicit power/thermal/
 Apple-native strategic bet — the "should it" speed verdict (ANE ~3.7× slower than GPU) is unchanged; these steps
@@ -89,7 +103,7 @@ All 3 export + int4-pack + convert cleanly. Decode forwards: RealGDN (verified) 
 - Per-layer states (25/17 per asset) are convert-valid but the ANE segmenter needs a SINGLE fused state per asset
   (mamba3 finding: >2 states → device SIGSEGV) — must fuse before M1.
 - FA uses a windowed KV (W=8) = sliding-window attention; full causal KV (grows to maxSeq) is more faithful for long context.
-- Embed is a host-side lookup (not in an asset); int4 re-quant of the 4-bit source is ~lossless but int4-vs-MLX fidelity is un-re-checked.
+- Embed is a host-side lookup (not in an asset); int4 re-quant is an affine-per-group→symmetric-per-channel SCHEME CHANGE with MEASURED loss (T=16 full-causal cos 0.9384, top-5 2/5; windowed form far worse).
 
 **So the entire Mac-side is DONE: convertibility + full-port fidelity (cos 0.9998) + int4 packaging + 3-asset assembly.**
 The only remaining work is all device-side (M1 rdar / M3 runtime fidelity / M4 power) — the real go/no-go gates.

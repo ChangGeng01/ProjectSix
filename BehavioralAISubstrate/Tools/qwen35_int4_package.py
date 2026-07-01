@@ -3,7 +3,7 @@
 
 Reuses the fidelity-verified RealGDN (Tools/qwen35_realweights_to_coreai.py) but wraps every linear in the int4
 QuantLinear (llama_to_coreai_int8) + inject_subbyte_tensors — proving real-weight int4 packaging (the 3-asset wall
-strategy). int4 is the natural target: the source is 4-bit, so dequant-4bit→int4 is ~lossless.
+strategy). NOTE: int4 here is symmetric-per-channel — a SCHEME CHANGE from the source's 4-bit-affine-per-group, and it is NOT lossless: audit measured cos 0.9384 (full-causal T=16) vs fp16 0.9998. See qwen35_audit_shipped_form.py.
 """
 from __future__ import annotations
 import sys, shutil, time

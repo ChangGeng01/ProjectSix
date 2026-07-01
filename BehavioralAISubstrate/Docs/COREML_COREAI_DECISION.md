@@ -63,8 +63,8 @@ no real-weight port, no device run). Blockers, worst first:
 - **Estimate: weeks, gated on an Apple OS bug.**
 
 **SHOULD IT — NO, it's a speed regression.**
-- ANE decode is **~3.7× slower than GPU** at this scale (measured: Core AI GPU-pipelined 181 tok/s vs ANE
-  static-shape 49 tok/s, `COREAI_IOS27_REFERENCE.md:146`). ANE has no native matmul (Conv1×1, ~⅓ GEMM efficiency)
+- ANE decode is slower than GPU (published bench: 181 vs 49 tok/s — but that is **Qwen3-0.6B on iPhone 17 Pro**,
+  `COREAI_IOS27_REFERENCE.md:146`; the 4B-on-A19 figure is **UNMEASURED**, extrapolated cross-model+cross-device). ANE has no native matmul (Conv1×1, ~⅓ GEMM efficiency)
   → a **power** win, not a throughput win.
 - The **doNotMigrate reasoning transfers and worsens**: the gate killed a byte-perfect small candidate for being
   4-6× slower + memory-heavy; a larger 4B on the same engine is strictly worse (bigger state, 3 assets, more host
