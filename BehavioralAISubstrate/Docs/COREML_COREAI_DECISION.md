@@ -38,11 +38,16 @@ FEASIBLE-WITH-WORK, but it's a speed *regression*, so no.** (Verified against th
 conversion work; a feasibility workflow cross-checked every claim + caught an invented latency number in its own
 drafts.)
 
-**CAN IT — feasible with net-new work + an OS-bug gate.** Qwen3.5-4B text backbone = 32 layers (24 GatedDeltaNet
-+ 8 full-attn, `full_attention_interval:4`, hidden 2560). The GDN ops (`exp`/`softplus`/`sigmoid`/broadcast-mul/
-`sum`/`where`/`stacked`, `GatedDelta.swift:172-267`) are a strict **subset of the already-proven Mamba-3 Core AI op
-set** (`Tools/mamba3_to_coreai.py`); the 8 full-attn layers are Llama-style, already converted. No unsupported op.
-Blockers, worst first:
+**CAN IT — YES, now TOOLCHAIN-PROVEN (2026-06-30), not just reasoned.** Two weights-free op-graph probes were
+run through the real `coreai_torch 0.4.0`: `Tools/gdn_to_coreai.py` (the GDN gated-delta recurrence alone) and
+`Tools/qwen35_hybrid_to_coreai.py` (the **real Qwen3.5 structure** — 6 GDN + 2 full-attn at `interval=4` with a
+single fused ANE-ordering-safe state). **Both exported + lowered + saved a CoreAI `.aimodel` with zero
+unsupported-op** (GDN 6.34 MB, hybrid 11.10 MB, ~1-2s each). This confirms the reasoning below: Qwen3.5-4B text
+backbone = 32 layers (24 GatedDeltaNet + 8 full-attn, `full_attention_interval:4`, hidden 2560); the GDN ops
+(`exp`/`softplus`/`sigmoid`/broadcast-mul/`sum`/`where`, `GatedDelta.swift:172-267`) are a strict subset of the
+already-proven Mamba-3 op set (`Tools/mamba3_to_coreai.py`), and the full-attn layers are Llama-style. So the
+op-graph converts — VERIFIED. What remains is ENGINEERING + a runtime gate (the probes are op-type only:
+weights-free, probe-scale, no fidelity check, no 32L/3-asset chunk, no device run). Blockers, worst first:
 - **⛔ rdar 177354777** — Apple's own seed doc: "linear-attention LLMs may crash," **explicitly names Qwen3.5/3.6**
   (`Docs/COREAI_IOS27_REFERENCE.md:195`). An OS-seed crash for exactly this architecture; you don't control it.
 - 32 layers → **≥3 chained assets** (12+12+8; ANE per-asset ceiling 12, 16→SIGABRT). Existing split converter is
