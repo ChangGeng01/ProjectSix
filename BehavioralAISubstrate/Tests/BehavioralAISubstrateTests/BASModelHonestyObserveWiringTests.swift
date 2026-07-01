@@ -40,19 +40,24 @@ final class BASModelHonestyObserveWiringTests: XCTestCase {
 
     // (2) 红线-7 BYTE-EQUALITY — the sink is a pure side-emission; the turn result must be unchanged by it.
     //     (Byte-equality is already guaranteed by construction: when the sink is nil the seam runs zero new
-    //     code, and when set it only READS renderedOutput. This test corroborates it — but first establishes
-    //     that `runTurn` is even stable across separate calls, since the result carries Dictionary fields whose
-    //     cross-call stability isn't guaranteed; if it isn't, result-comparison can't isolate the sink's effect.)
-    func testHonestySinkIsByteEqualToNoSink() throws {
-        let baseline1 = BASCoordinatorTestStubs.makeStub().runTurn(BASCoordinatorTestStubs.makeStubRequest())
-        let baseline2 = BASCoordinatorTestStubs.makeStub().runTurn(BASCoordinatorTestStubs.makeStubRequest())
-        try XCTSkipUnless(baseline1 == baseline2,
-            "runTurn result is not stable across separate calls (Dictionary ordering / inherent nondeterminism) — " +
-            "byte-equality of the honesty sink holds by the nil-guard construction, not via result comparison")
+    //     code, and when set it only READS renderedOutput. This test corroborates it against the CANONICAL
+    //     replay form.) Compare on the canonical form, NOT raw in-memory `==`: two separate `runTurn` calls
+    //     are never raw-Equatable because `memoryBundle.retrievedAt` is a real-clock `Date()` observation stamp
+    //     (see BASCoordinatorTurnDeterminismTests / BASThoughtFoldCompactSlotsDeterminismProbe). The earlier
+    //     `XCTSkipUnless(baseline1 == baseline2)` guard therefore ALWAYS skipped, and it misattributed the
+    //     drift to "Dictionary ordering" — `Dictionary ==` is order-independent and never the cause; the
+    //     compactSlots content is byte-stable and its hash-order only varies in DEFAULT-order serialization.
+    //     `BASEBrainTurnResultReplayCanonicalizer.canonicalized(_:)` pins the observation clock so the sink's
+    //     (non-)effect on the canonical output is isolated and the assertion actually runs.
+    func testHonestySinkIsByteEqualToNoSink() {
+        let baseline = BASCoordinatorTestStubs.makeStub().runTurn(BASCoordinatorTestStubs.makeStubRequest())
         var withSink = BASCoordinatorTestStubs.makeStub()
         withSink.modelHonestyObservationSink = { _ in }
         let sinked = withSink.runTurn(BASCoordinatorTestStubs.makeStubRequest())
-        XCTAssertEqual(sinked, baseline1, "the honesty sink never perturbs the canonical turn output (OBSERVE lane, 红线 7)")
+        XCTAssertEqual(
+            BASEBrainTurnResultReplayCanonicalizer.canonicalized(sinked),
+            BASEBrainTurnResultReplayCanonicalizer.canonicalized(baseline),
+            "the honesty sink never perturbs the canonical turn output (OBSERVE lane, 红线 7)")
     }
 
     // (3) SIGNAL VALIDITY (measure-first) — the axes separate flattering/overclaiming text from neutral facts.
