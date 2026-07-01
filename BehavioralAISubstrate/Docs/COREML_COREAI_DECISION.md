@@ -46,8 +46,12 @@ unsupported-op** (GDN 6.34 MB, hybrid 11.10 MB, ~1-2s each). This confirms the r
 backbone = 32 layers (24 GatedDeltaNet + 8 full-attn, `full_attention_interval:4`, hidden 2560); the GDN ops
 (`exp`/`softplus`/`sigmoid`/broadcast-mul/`sum`/`where`, `GatedDelta.swift:172-267`) are a strict subset of the
 already-proven Mamba-3 op set (`Tools/mamba3_to_coreai.py`), and the full-attn layers are Llama-style. So the
-op-graph converts — VERIFIED. What remains is ENGINEERING + a runtime gate (the probes are op-type only:
-weights-free, probe-scale, no fidelity check, no 32L/3-asset chunk, no device run). Blockers, worst first:
+op-graph converts — VERIFIED. **A third probe at the REAL Qwen3.5 dims** (`Tools/qwen35_real_to_coreai.py` —
+GDN 32 value / 16 key heads with GQA, head_dim 128, real MLP 9216 SwiGLU, full-attn 16h/4kv/256 GQA) **also
+converts, and confirms the size math**: ~109M params/layer → a 12-layer asset ≈ 1.31B → **int8 ≈1.31GB (under the
+2GB wall)**, while fp16 would be ~2.6GB (over) — so **int8 + a 3-asset split is confirmed, not just estimated.**
+What remains is ENGINEERING + a runtime gate (the probes are op-type + size only: weights-free, no fidelity check,
+no real-weight port, no device run). Blockers, worst first:
 - **⛔ rdar 177354777** — Apple's own seed doc: "linear-attention LLMs may crash," **explicitly names Qwen3.5/3.6**
   (`Docs/COREAI_IOS27_REFERENCE.md:195`). An OS-seed crash for exactly this architecture; you don't control it.
 - 32 layers → **≥3 chained assets** (12+12+8; ANE per-asset ceiling 12, 16→SIGABRT). Existing split converter is
