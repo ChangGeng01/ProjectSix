@@ -39,6 +39,13 @@ xcodegen. Easiest path: paste the snippet into an existing probe's body and swap
 
 ## M2 — real-weight port (Mac; the big piece; only worth it if M1 survives)
 
+**Foundation PROVEN (2026-06-30, `Tools/qwen35_realweights_to_coreai.py`):** a REAL layer-0 GDN block loaded
+from the local 4-bit checkpoint (dequant verified sane, out_proj mean|w|=0.009), run through the faithful forward
+(conv1d→qk-rmsnorm→`decay=exp(-exp(A_log)·softplus(a+dt_bias))`→beta=sigmoid→gated-delta→gated-rmsnorm→out_proj+SwiGLU),
+lowers + converts to a CoreAI `.aimodel` (228 MB, states = recurrence + conv-window). So the dequant + the faithful
+GDN forward — the crux of the whole port — WORK on real weights. Remaining M2 = scale to 32L + 3-asset split + int8
++ real embed/head; then M3 fidelity vs MLX (the gated-norm form is approximate until M3 verifies it).
+
 Turns the weights-free probes into a **real-weight** asset (for real fidelity + a real device run). No 8GB
 download needed — dequantize the LOCAL 4-bit checkpoint.
 
