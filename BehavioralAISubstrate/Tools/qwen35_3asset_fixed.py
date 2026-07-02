@@ -9,8 +9,7 @@ from __future__ import annotations
 import sys, shutil, time
 from pathlib import Path
 import torch, torch.nn as nn
-SD = "/private/tmp/claude-501/-Users-changgeng-Project-Project06-Project06/c3ffc755-9222-4370-81cc-7a004da44172/scratchpad"
-sys.path.insert(0, SD); sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))  # co-located Tools/ deps
 from qwen35_realweights_to_coreai import RealGDN, load_st, raw, dequant, rms, D, GV, GHD
 from qwen35_fixed_decode import FAFull, NB, MAXSEQ, AKV, AHD, is_lin
 import coreai_torch

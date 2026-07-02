@@ -8,8 +8,7 @@ sequence (exceeds W=8, so windowing bites) and compares last-token logits to MLX
 """
 from __future__ import annotations
 import sys, numpy as np, torch, torch.nn.functional as F
-SD = "/private/tmp/claude-501/-Users-changgeng-Project-Project06-Project06/c3ffc755-9222-4370-81cc-7a004da44172/scratchpad"
-sys.path.insert(0, SD); sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))  # co-located Tools/ deps
 from qwen35_realweights_to_coreai import RealGDN, load_st, raw, rms, dequant, D, GV, GHD
 from qwen35_3asset_int4 import FA, q4, is_lin, W
 P = "language_model.model."

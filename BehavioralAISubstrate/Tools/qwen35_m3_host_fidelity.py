@@ -9,8 +9,7 @@ T=32 golden token sequence, compare final logits vs the MLX golden + report per-
 from __future__ import annotations
 import asyncio, glob, inspect, sys
 import numpy as np
-SD = "/private/tmp/claude-501/-Users-changgeng-Project-Project06-Project06/c3ffc755-9222-4370-81cc-7a004da44172/scratchpad"
-sys.path.insert(0, SD); sys.path.insert(0, "/Users/changgeng/Project/Project06/Project06/BehavioralAISubstrate/Tools")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))  # co-located Tools/ deps
 
 GV, GHD, MAXSEQ, AKV, AHD, D = 32, 128, 64, 4, 256, 2560
 def is_lin(i): return (i + 1) % 4 != 0

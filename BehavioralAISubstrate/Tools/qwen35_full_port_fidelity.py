@@ -6,8 +6,7 @@ dims 64 + causal GQA, verified) + tied embed/head + final norm. Run MLX first (f
 """
 from __future__ import annotations
 import sys, numpy as np, torch, torch.nn.functional as F
-SD = "/private/tmp/claude-501/-Users-changgeng-Project-Project06-Project06/c3ffc755-9222-4370-81cc-7a004da44172/scratchpad"
-sys.path.insert(0, SD)
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from qwen35_realweights_to_coreai import load_st, lin, raw, rms, dequant, RealGDN, GV, GHD
 
 D, AH, AKV, AHD, BASE, RD = 2560, 16, 4, 256, 1e7, 64

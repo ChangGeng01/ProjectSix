@@ -49,3 +49,27 @@ audit optimized the serving layer; the measured reality is throughput is generat
 making each decoded token cheaper (a fused kernel — red-lined; or mixed-precision quant — modest + device-gated).
 The honest recommendation if max throughput truly matters: reconsider the decode-kernel red-line **as a decision**,
 with a byte-parity-safe design in front of you — not as a default. Nothing else on the list is a bigger, cleaner win.
+
+
+## Addendum 2026-07-02 — the two open measure-firsts are now CLOSED with numbers (+ P0/P1 audit adjudicated)
+
+- **Intra-turn candidate batching: CLOSED — NOT worth building.** Measured on the production adapter
+  (`BASServingResidueMeasureTests.testCandidateConcurrencyVsSerial`, BAS_CANDIDATE_CONCURRENCY=1, real 4B
+  generations validity-guarded): serial 2-gen 32.6s vs `async let` 2-gen 30.0s → **1.09×**, matching metric #17's
+  pre-registered ≈1.0. Mechanism: `MLXOrganAdapter` is an actor and MLX's ModelContainer serializes `perform` —
+  GPU work serializes regardless of task concurrency. Instrument note: the first attempt read 3ms/gen — invalid;
+  root cause `draft()` throws `nonTrimmableCache` on Qwen3.5-GDN (trim-checked verifyCache vs MambaCache) and
+  `try?` swallowed it. The GDN-safe generation path is `streamDraft`/`draftMultiTurn`. The same phantom invalidated
+  the KV probe's fresh arm (BASKVReprefillCostProbe — now corrected with guards).
+- **Event-log appendMany: CLOSED — CORRECTLY-AS-IS.** Measured (`testEventLogAppendsPerTurnWhenOptedIn`): an
+  opted-in stub turn appends **0 events** — `runTurn` never writes the event log; the only writers are opt-in
+  orchestration bridges (trace bridge / mutation emitter) off the turn path. Default path is 0 by construction
+  (memoryEventLog default-nil). Batched append only becomes relevant if a host wires a high-frequency bridge and
+  measures >100ms/turn.
+- **P0/P1 "backend not modern" 10-point audit (2026-07-02) adjudicated** — descriptions ~13/14 accurate; conclusions
+  ~9/10 rejected for THIS substrate: datacenter-assumption imports (fan-out/continuous-batching/paged-KV/adaptive-
+  scheduler/batched-tokenizer at batch-1), 红线-7/ADR-014 design guarantees misread as staleness (V1-byte-equal V2,
+  deterministic scheduler constants, `.default()==.nativeV2` already documented at BASTurnRuntimeEngine.swift:427 +
+  Configuration:270), and re-litigation of already-measured verdicts (CoreAI doNotMigrate ✓ correctly cited by the
+  audit; MiniLM `.cpuOnly` is deliberate — ANE/GPU fp16 NaN). The two genuine residues are the closures above.
+  Do not re-open these without NEW measurements.
