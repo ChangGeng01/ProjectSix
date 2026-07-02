@@ -22,6 +22,13 @@
 > under the 2 GB wall). So a FAITHFUL shipped form is achievable = full-causal + int8; the current windowed/int4
 > assets must be rebuilt with that recipe (mechanical). Device gates (M1/M3/M4) unchanged.
 
+> **✅ FIX IMPLEMENTED + PACKAGED (2026-07-01, `Tools/qwen35_fixed_decode.py` + `qwen35_3asset_fixed.py`).**
+> Shipped DECODE form (int8 + full-causal one-hot-write maxSeq KV) verified vs MLX at **T=32: cos 0.9999, top-5 5/5**
+> (top-1 3086↔693 is the fp16 tie). Repackaged into 3 int8+full-causal assets: **1.34 / 1.34 / 1.53 GB, each < 2 GB**
+> (supersedes the audit-failed int4/windowed `qwen35_3asset_int4.py`). HONEST residual: the torch RECIPE is
+> fidelity-verified, but the CONVERTED-asset runtime fidelity is M3 (CoreAI runtime, not yet run); per-layer states
+> still need single-state fusion for ANE (M1). Should-not-ship speed verdict UNCHANGED — the fix makes it faithful, not fast.
+
 
 
 Follows the proven convertibility (`Tools/{gdn,qwen35_hybrid,qwen35_real}_to_coreai.py` — op-graph + real-structure
