@@ -22,6 +22,21 @@
 > under the 2 GB wall). So a FAITHFUL shipped form is achievable = full-causal + int8; the current windowed/int4
 > assets must be rebuilt with that recipe (mechanical). Device gates (M1/M3/M4) unchanged.
 
+> **✅✅ M1 DEVICE GATE CLOSED (2026-07-02, iPhone Air, live run).** Both probes ran via `BASQwen35RdarProbe`
+> (BAS_QWEN35_RDAR_PROBE=1; parameterized for asset/state/input contract):
+> - **Structure test** (11MB toy hybrid, 6 GDN + 2 FA @interval-4, single fused state): SURVIVED — default
+>   placement 261.5 ms/step, **ANE-pinned 2.4 ms/step**, 8/8 steps both. **rdar 177354777 does NOT crash the
+>   Qwen3.5 GDN-hybrid structure on this seed; the ANE executes GDN.**
+> - **Real-scale test** (Qwen35fused_asset1: 1.34GB int8, 12 REAL Qwen3.5-4B layers, state [13,548864], hidden
+>   contract): SURVIVED — loads + 8/8 steps; default 268.7 ms/step, **ANE-pinned 27.2 ms/step**.
+> - Forensics: the earlier fp16 1.6GB probe died at load with no crash line ⇒ **memory/spec-spike death (the E4B
+>   jetsam class), NOT the rdar** — int8 confirmed as the fix. Operational: auto-placement is ~10× slower than
+>   ANE-pinning for these assets — PIN the ANE.
+> - Rough extrapolation (NOT a measurement): 27.2 ms/step × (32/12) ≈ 73 ms/step ≈ ~14 tok/s full-model on ANE —
+>   in the expected ANE-slower-than-GPU band; the bet remains power, not speed. Caveats: zeros-input smoke (not
+>   fidelity), 8 steps (no sustained/thermal), asset1 only.
+> **Remaining device gates: M3-device (3-asset chain fidelity vs host logits) + M4 power (the bet's payoff).**
+
 > **✅ FIX IMPLEMENTED + PACKAGED (2026-07-01, `Tools/qwen35_fixed_decode.py` + `qwen35_3asset_fixed.py`).**
 > Shipped DECODE form (int8 + full-causal one-hot-write maxSeq KV) verified vs MLX at **T=32: cos 0.9999, top-5 5/5**
 > (top-1 3086↔693 is the fp16 tie). Repackaged into 3 int8+full-causal assets: **1.34 / 1.34 / 1.53 GB, each < 2 GB**

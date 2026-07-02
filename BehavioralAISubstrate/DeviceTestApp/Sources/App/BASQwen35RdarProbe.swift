@@ -30,17 +30,34 @@ import CoreAI
 
 enum BASQwen35RdarProbe {
 
-    /// Probe-model constants — MUST match Tools/qwen35_real_to_coreai.py (L=8; ROW = GDN state
-    /// 32·128·128 = 524288, the max row of the fused per-layer state).
-    private static let stateRows = 8 + 0     // one row per layer (pos is folded by the converter's buffer)
-    private static let stateRow = 524_288
+    /// Probe-model constants — defaults match Tools/qwen35_real_to_coreai.py (L=8; ROW = GDN state
+    /// 32·128·128 = 524288). Overridable via env so the SAME probe can run the 11MB toy-hybrid asset
+    /// (BAS_RDAR_ASSET=Qwen35Hybrid_probe BAS_RDAR_STATE_ROW=16384) to split STRUCTURE-crash vs MEMORY-death.
+    private static var assetName: String {
+        ProcessInfo.processInfo.environment["BAS_RDAR_ASSET"] ?? "Qwen35Real_probe"
+    }
+    private static var stateRows: Int {
+        Int(ProcessInfo.processInfo.environment["BAS_RDAR_STATE_ROWS"] ?? "") ?? 8
+    }
+    private static var stateRow: Int {
+        Int(ProcessInfo.processInfo.environment["BAS_RDAR_STATE_ROW"] ?? "") ?? 524_288
+    }
     private static let steps = 8             // a few tokens: exercise state carry-over, not just step 0
+    /// Input contract override: unset = token model ("input_id" [1,1] int32). BAS_RDAR_INPUT_DIM=2560 = the
+    /// real fused assets' hidden contract ("x" [1,dim] fp16) — enough for a load+step smoke (zeros in).
+    private static var inputDim: Int? {
+        Int(ProcessInfo.processInfo.environment["BAS_RDAR_INPUT_DIM"] ?? "")
+    }
 
     static func run() async {
         #if canImport(CoreAI)
-        print("[qwen35-rdar] M1 probe start — rdar 177354777 crash test (Qwen3.5 GDN-hybrid structure)")
+        guard #available(iOS 27, macOS 27, *) else {
+            print("[qwen35-rdar] iOS 27 required for CoreAI — probe skipped")
+            return
+        }
+        print("[qwen35-rdar] M1 probe start — rdar 177354777 crash test (asset=\(assetName), state [\(stateRows), \(stateRow)])")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let asset = docs.appendingPathComponent("Qwen35Real_probe.aimodel")
+        let asset = docs.appendingPathComponent("\(assetName).aimodel")
         guard FileManager.default.fileExists(atPath: asset.path) else {
             print("[qwen35-rdar] MISSING asset at \(asset.path) — stage it via devicectl (see header) ✗")
             return
@@ -60,6 +77,7 @@ enum BASQwen35RdarProbe {
     }
 
     #if canImport(CoreAI)
+    @available(iOS 27, macOS 27, *)
     private static func runOnce(asset: URL, label: String) async throws {
         // Mirror BASCoreAIDecodeProbe: `.default` lets CoreAI place freely; "ane" pins the neural engine —
         // the placement rdar 177354777 is most likely to bite.
@@ -77,12 +95,17 @@ enum BASQwen35RdarProbe {
         let t0 = Date()
         for step in 0..<steps {
             print("[qwen35-rdar] \(label): STEP \(step) …")   // last line before a crash localizes it
-            let inputs: [String: NDArray] = ["input_id": NDArray(scalars: [Int32(step)], shape: [1, 1])]
+            let inputs: [String: NDArray]
+            if let d = inputDim {
+                inputs = ["x": NDArray(scalars: [Float16](repeating: 0, count: d), shape: [1, d])]
+            } else {
+                inputs = ["input_id": NDArray(scalars: [Int32(step)], shape: [1, 1])]
+            }
             var states = InferenceFunction.MutableViews()
             states.insert(&state, for: "state_all")
             var outputs = try await fn.run(inputs: inputs, states: states)
-            guard let value = outputs.remove("logits"), let logits = value.ndArray else {
-                print("[qwen35-rdar] \(label): STEP \(step) returned no logits ✗")
+            guard let value = outputs.remove(inputDim == nil ? "logits" : "out"), let logits = value.ndArray else {
+                print("[qwen35-rdar] \(label): STEP \(step) returned no output ✗")
                 return
             }
             lastDim = logits.shape.reduce(1, *)
