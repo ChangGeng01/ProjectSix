@@ -73,3 +73,13 @@ with a byte-parity-safe design in front of you — not as a default. Nothing els
   Configuration:270), and re-litigation of already-measured verdicts (CoreAI doNotMigrate ✓ correctly cited by the
   audit; MiniLM `.cpuOnly` is deliberate — ANE/GPU fp16 NaN). The two genuine residues are the closures above.
   Do not re-open these without NEW measurements.
+- **Audit #4 (12-pt "unified modern stack", 2026-07-02) adjudicated: 0/11 actionable.** ~3 pts re-litigate this
+  addendum (paged-KV/continuous-batching/unification at batch-1; SSMScan.metal probes whose own headers say "not to
+  compete with vendor BLAS"; ModelExecutionProfile for a ~5-model batch-1 catalog); ~4 read the project's own
+  honesty-notes back as findings (Package.swift scaffold block, registry "no V1 hot path consults yet", the
+  documented quality-vs-throughput dual-endpoint election, the documented spec-re-prefill debt note); the rest were
+  answered BEFORE the audit ran — esp. pt-11 memory-policy defaults: kvCacheBits/maxKVSize/enforceMemoryAdmission
+  are documented ADR-014 output-changing opt-ins, and the on-device A/B ALREADY EXISTS
+  (KV_LEVERS_DEVICE_VERDICT_2026-06-12: kvBits 4/8 = −7% tok/s for ~32 MB; maxKVSize neutral; admission gate =
+  jetsam SAFETY not throughput). Optional hygiene noted: per-phase spans in TurnMetric; long-context kvBits re-run;
+  E4B-factory admission default (host-policy). Same pin applies: no re-open without NEW measurements.
