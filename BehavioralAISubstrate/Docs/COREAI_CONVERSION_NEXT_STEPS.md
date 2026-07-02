@@ -37,6 +37,19 @@
 >   fidelity), 8 steps (no sustained/thermal), asset1 only.
 > **Remaining device gates: M3-device (3-asset chain fidelity vs host logits) + M4 power (the bet's payoff).**
 
+> **✅✅✅ M3-DEVICE PASS (2026-07-02, iPhone Air, live).** The COMPLETE real-weight Qwen3.5-4B ran end-to-end on
+> device and matched the MLX golden: 4-stage sequential-residency chain (`BAS_RDAR_CHAIN=1`, real embedded T=32
+> inputs) — L0-11 ANE 27.3 ms/step · L12-23 ANE 26.2 · L24-31 ANE 18.1 · head GPU 28.0 → **FINAL top-5
+> [3086,693,198,62,16] = golden 5/5** (693/3086 fp16 tie; logit values within ~0.05 of MLX).
+> **New device finding: ANE `InvalidWidth` wall — the 248320-vocab head matmul exceeds the ANE max tensor width**
+> (compile warning + signal 9 on the original asset3; same class as the E4B-262k rejection; Llama-128k/Qwen-152k
+> compiled). FIX (verified): head-split — `Tools/qwen35_headsplit.py` builds asset3body (8L, ANE-safe, final norm
+> inside) + head_only (0.64GB int8, load with `.default`/GPU placement, dummy 1-row state for the probe contract).
+> Sum ≈100 ms/token across stages (~10 tok/s if per-token-chained, sequential-residency measured) — ANE-slower
+> band as expected; the bet remains POWER. **Remaining: M4 only** (sustained watts vs MLX/GPU: the payoff
+> question) + deployment residency design (4 assets ≈4.2GB vs the ~3.2GB cap — relies on mmap-clean-page
+> eviction or per-stage residency).
+
 > **✅ FIX IMPLEMENTED + PACKAGED (2026-07-01, `Tools/qwen35_fixed_decode.py` + `qwen35_3asset_fixed.py`).**
 > Shipped DECODE form (int8 + full-causal one-hot-write maxSeq KV) verified vs MLX at **T=32: cos 0.9999, top-5 5/5**
 > (top-1 3086↔693 is the fp16 tie). Repackaged into 3 int8+full-causal assets: **1.34 / 1.34 / 1.53 GB, each < 2 GB**

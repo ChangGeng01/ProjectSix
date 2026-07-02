@@ -55,6 +55,10 @@ enum BASQwen35RdarProbe {
             print("[qwen35-rdar] iOS 27 required for CoreAI — probe skipped")
             return
         }
+        if ProcessInfo.processInfo.environment["BAS_RDAR_CHAIN"] == "1" {
+            await runChainFidelity()
+            return
+        }
         print("[qwen35-rdar] M1 probe start — rdar 177354777 crash test (asset=\(assetName), state [\(stateRows), \(stateRow)])")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let asset = docs.appendingPathComponent("\(assetName).aimodel")
@@ -77,6 +81,96 @@ enum BASQwen35RdarProbe {
     }
 
     #if canImport(CoreAI)
+
+    // MARK: - M3-device — 3-asset chain fidelity (BAS_RDAR_CHAIN=1)
+    //
+    // Sequential-residency (all 3 assets = 4.21GB > the ~3.2GB jetsam cap, so ONE asset resident at a time):
+    // asset1 runs all T steps carrying its fused state (saving hidden outs), releases; asset2 consumes them;
+    // asset3 emits the final-step logits → print top-5 ids/values for host comparison vs the MLX golden
+    // (expected [693, 3086, 198, 62, 16] — 693/3086 are an fp16 TIE). Inputs = Documents/qwen35_embeds32.bin
+    // (T=32 × 2560 fp16, the REAL embedded golden tokens dumped on the host).
+    @available(iOS 27, macOS 27, *)
+    private static func runChainFidelity() async {
+        print("[qwen35-chain] M3-device start — 3-asset chain fidelity (sequential residency, ANE-pinned)")
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let embURL = docs.appendingPathComponent("qwen35_embeds32.bin")
+        guard let raw = try? Data(contentsOf: embURL) else {
+            print("[qwen35-chain] MISSING qwen35_embeds32.bin ✗"); return
+        }
+        let dim = 2560
+        let T = raw.count / (dim * 2)
+        var inputs: [[Float16]] = raw.withUnsafeBytes { buf in
+            let p = buf.bindMemory(to: Float16.self)
+            return (0..<T).map { t in Array(p[(t * dim)..<((t + 1) * dim)]) }
+        }
+        print("[qwen35-chain] inputs: T=\(T) dim=\(dim)")
+        // Head split (ANE InvalidWidth: vocab 248320 > ANE max tensor width) — the body stages pin the ANE,
+        // the head-only stage loads with .default (GPU) placement. head's state is a dummy [1, ROW].
+        let chain: [(name: String, rows: Int, ane: Bool)] = [
+            ("Qwen35fused_asset1_L0-11_int8", 13, true),
+            ("Qwen35fused_asset2_L12-23_int8", 13, true),
+            ("Qwen35fused_asset3body_int8", 9, true),
+            ("Qwen35fused_head_only_int8", 1, false),
+        ]
+        var finalLogits: [Float16] = []
+        for (idx, stage) in chain.enumerated() {
+            let url = docs.appendingPathComponent("\(stage.name).aimodel")
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                print("[qwen35-chain] MISSING \(stage.name) ✗"); return
+            }
+            do {
+                let t0 = Date()
+                let model = try await AIModel(
+                    contentsOf: url,
+                    options: stage.ane
+                        ? SpecializationOptions(preferredComputeUnitKind: .neuralEngine) : .default)
+                guard let fname = model.functionNames.first, let fn = try model.loadFunction(named: fname) else {
+                    print("[qwen35-chain] \(stage.name): no function ✗"); return
+                }
+                print("[qwen35-chain] stage \(idx + 1)/\(chain.count) \(stage.name) loaded in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+                var state = NDArray(scalars: [Float16](repeating: 0, count: stage.rows * stateRow),
+                                    shape: [stage.rows, stateRow])
+                var outs: [[Float16]] = []
+                let t1 = Date()
+                for t in 0..<T {
+                    let x = NDArray(scalars: inputs[t], shape: [1, dim])
+                    var views = InferenceFunction.MutableViews()
+                    views.insert(&state, for: "state_all")
+                    var outputs = try await fn.run(inputs: ["x": x], states: views)
+                    guard let value = outputs.remove("out"), let nd = value.ndArray else {
+                        print("[qwen35-chain] \(stage.name): step \(t) no output ✗"); return
+                    }
+                    var vec = [Float16](repeating: 0, count: nd.shape.reduce(1, *))
+                    nd.view(as: Float16.self).withUnsafePointer { p, _, _ in
+                        for i in 0..<vec.count { vec[i] = p[i] }
+                    }
+                    if idx < chain.count - 1 { outs.append(vec) } else if t == T - 1 { finalLogits = vec }
+                }
+                let ms = Date().timeIntervalSince(t1) * 1000 / Double(T)
+                print(String(format: "[qwen35-chain] stage %d done: %d steps, %.1f ms/step", idx + 1, T, ms))
+                if idx < chain.count - 1 { inputs = outs }
+            } catch {
+                print("[qwen35-chain] \(stage.name): FAILED \(error) ✗"); return
+            }
+            // model/fn go out of scope here → released before the next stage loads (sequential residency)
+        }
+        guard !finalLogits.isEmpty else { print("[qwen35-chain] no final logits ✗"); return }
+        var top: [(Int, Float)] = []
+        for (i, v) in finalLogits.enumerated() {
+            let f = Float(v)
+            if top.count < 5 { top.append((i, f)); top.sort { $0.1 > $1.1 } }
+            else if f > top[4].1 { top[4] = (i, f); top.sort { $0.1 > $1.1 } }
+        }
+        let ids = top.map { $0.0 }
+        print("[qwen35-chain] FINAL top5 ids=\(ids) logits=\(top.map { $0.1 })")
+        print("[qwen35-chain] expected (MLX golden) ≈ [693, 3086, 198, 62, 16] (693/3086 fp16-tied)")
+        let expect: Set<Int> = [693, 3086, 198, 62, 16]
+        let overlap = expect.intersection(ids).count
+        print("[qwen35-chain] " + (overlap >= 4
+            ? "✅ M3-DEVICE PASS — on-device 3-asset chain matches the MLX golden (top-5 overlap \(overlap)/5)"
+            : "⚠️ M3-DEVICE DIVERGES — top-5 overlap \(overlap)/5"))
+    }
+
     @available(iOS 27, macOS 27, *)
     private static func runOnce(asset: URL, label: String) async throws {
         // Mirror BASCoreAIDecodeProbe: `.default` lets CoreAI place freely; "ane" pins the neural engine —
