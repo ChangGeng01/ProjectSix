@@ -13,6 +13,16 @@
 > full-causal reference**, NOT for what would ship. The shipped form is size-valid but numerically UNVALIDATED (and
 > windowed = wrong). The real go/no-go gates (M1 rdar / M3 fidelity / M4 power) all still stand.
 
+> **✅ FIX VERIFIED (2026-07-01) — the faithful shipped recipe is `full-causal KV + int8`.** After the audit, I
+> measured the fix: (a) **full-causal KV** (not windowed W=8) removes the context>8 divergence; (b) **int8** (not
+> int4-symmetric) removes the quant loss. int8 + full-causal vs MLX at **T=32: cos 0.9999, top-5 5/5** (the top-1
+> "flip" 3086↔693 is an fp16 TIE — both logit 10.3125). By contrast **int4-symmetric + full-causal flips at T=32**
+> (cos 0.969, top-1 = MLX's #6) — the affine-per-group→symmetric-per-channel re-quant is too lossy, and its error
+> ACCUMULATES with length (held at T=16, broke at T=32). Cost: int8 ≈2× int4 (~1.3 GB / 12-layer asset, still
+> under the 2 GB wall). So a FAITHFUL shipped form is achievable = full-causal + int8; the current windowed/int4
+> assets must be rebuilt with that recipe (mechanical). Device gates (M1/M3/M4) unchanged.
+
+
 
 Follows the proven convertibility (`Tools/{gdn,qwen35_hybrid,qwen35_real}_to_coreai.py` — op-graph + real-structure
 + int8/3-asset wall all verified; see `COREML_COREAI_DECISION.md`). Pursued as an explicit power/thermal/
