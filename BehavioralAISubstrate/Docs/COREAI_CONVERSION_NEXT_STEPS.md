@@ -35,6 +35,17 @@
 > again). So the CONVERTED `.aimodel`s are RUNTIME-faithful, not just the torch recipe — the audit's biggest honest
 > residual is closed. Remaining now: single-state fusion (ANE segmenter) + M1 rdar + M4 power — all device-facing.
 
+> **✅ 全面开发 COMPLETE (2026-07-02) — everything developable off-device is now BUILT + VERIFIED:**
+> - **Fused single-state assets** (`Tools/qwen35_3asset_fused.py`): all per-layer states packed into ONE
+>   `state_all [n+1, 548864]` per asset (ANE-segmenter-safe, the mamba3 trick; pos in the last row). Torch chain
+>   re-verified (cos 0.9997, top-5 5/5 — not trusted "by construction") + all 3 converted with exactly
+>   `states=['state_all']`: 1.34 / 1.34 / 1.53 GB. These are the DEVICE-READY artifacts.
+> - **M1 device probe BUILT + WIRED** (`DeviceTestApp/Sources/App/BASQwen35RdarProbe.swift`, launch
+>   `BAS_QWEN35_RDAR_PROBE=1`, wired in BASEnduranceAppRunner + pbxproj, plutil-linted, API mirrored from
+>   BASCoreAIDecodeSession/DecodeProbe — SpecializationOptions .default + .neuralEngine, single `state_all`
+>   MutableViews). Staging command in the probe header. Crash ⇒ rdar confirmed; SURVIVED ⇒ M3-device/M4.
+> Remaining is EXECUTION on your A19 (M1 run → fused-asset device fidelity → M4 power), not development.
+
 
 
 Follows the proven convertibility (`Tools/{gdn,qwen35_hybrid,qwen35_real}_to_coreai.py` — op-graph + real-structure

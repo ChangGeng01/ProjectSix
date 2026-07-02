@@ -355,6 +355,14 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASCoreAIDecodeProbe.run() }
             return
         }
+        // M1 kill-switch — Qwen3.5-4B→CoreAI direction: does rdar 177354777 (linear-attention crash, Apple's
+        // seed notes name Qwen3.5) hit the GDN-hybrid STRUCTURE on this device? (BAS_QWEN35_RDAR_PROBE=1;
+        // stage Qwen35Real_probe.aimodel per the probe header.) Crash = direction BLOCKED at Apple until GA;
+        // SURVIVED = runnable → device M3 (fused-asset fidelity) / M4 (power).
+        if (env["BAS_QWEN35_RDAR_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASQwen35RdarProbe.run() }
+            return
+        }
         // (BASRhoProbe + BASCoreAIGpuProbe peeled to Sources/Experiments/ — dead negatives, see git history /
         //  Docs + memory litert-onphone-reality. Their BAS_RHO_PROBE / BAS_COREAI_GPU_PROBE dispatch removed.)
         // Track E — SERIAL Saguaro end-to-end: MLX 3B target verifying a CoreAI Mamba (Llamba-1B) draft via
