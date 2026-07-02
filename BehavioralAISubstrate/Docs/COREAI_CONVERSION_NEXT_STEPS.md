@@ -29,6 +29,12 @@
 > fidelity-verified, but the CONVERTED-asset runtime fidelity is M3 (CoreAI runtime, not yet run); per-layer states
 > still need single-state fusion for ANE (M1). Should-not-ship speed verdict UNCHANGED — the fix makes it faithful, not fast.
 
+> **✅ M3-HOST PASS (2026-07-02, `Tools/qwen35_m3_host_fidelity.py`).** The converted 3-asset chain ran on the REAL
+> CoreAI host runtime (`coreai.runtime.AIModel` — the same runtime that certified Llamba 24/24): asset1→asset2→asset3
+> with host-side embed + explicit state dicts, T=32 golden sequence → **cos=0.9998 vs MLX, top-5 5/5** (the fp16 tie
+> again). So the CONVERTED `.aimodel`s are RUNTIME-faithful, not just the torch recipe — the audit's biggest honest
+> residual is closed. Remaining now: single-state fusion (ANE segmenter) + M1 rdar + M4 power — all device-facing.
+
 
 
 Follows the proven convertibility (`Tools/{gdn,qwen35_hybrid,qwen35_real}_to_coreai.py` — op-graph + real-structure
