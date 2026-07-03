@@ -52,7 +52,9 @@ final class BASQwen35MTPSpecTests: XCTestCase {
             let prompt: [Int] = [100, 200, 300, 400, 500, 600, 700, 800]
             let n = 48
             let plain = dec.generatePlain(prompt: prompt, maxTokens: n)
-            let spec = dec.generateSpec(prompt: prompt, maxTokens: n)
+            let kEnv = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
+            let spec = kEnv > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: n, k: kEnv)
+                                : dec.generateSpec(prompt: prompt, maxTokens: n)
             out.plainTokens = plain.tokens; out.specTokens = spec.tokens
             out.plainSec = plain.decodeSeconds; out.specSec = spec.decodeSeconds
             out.accepted = spec.accepted; out.iterations = spec.iterations

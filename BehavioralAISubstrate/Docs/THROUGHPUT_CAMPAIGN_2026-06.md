@@ -215,3 +215,26 @@ int8 the MTP block if more headroom needed); K=1 (K=2 measured net-negative on d
   pegged-load ≈ 14-17 tok/s** — both numbers are true, use the one matching the workload. The 30 tok/s target is
   MET for the turn-shaped production workload; a fanless phone cannot hold ANY 4B decode at peak for 10 continuous
   minutes (baseline plain would sustain ~10-12 under the same pegging).
+
+## Sustained-30 campaign (2026-07-03 night) — the honest frontier: statistics PROVEN, implementation WALLED
+
+Attacked sustained-pegged 30 via the power-cap insight: under thermal throttle the SoC is POWER-bound and power ∝
+bytes moved, so deep MTP chains (K≈5) that cut trunk-reads/token are a 1:1 sustained lever (bytes/token 1.30 →
+~0.62 GB ⇒ projected sustained ≈ 30 from the measured 14.4 K=1 floor).
+
+**What PROVED OUT:** deep-chain statistics are real ON DEVICE — K=5 live acceptance a=2.35 accepted-tok/iter
+(E[tok]≈3.35); golden-trajectory depth survival 0.94 through depth 4 (a2..a4=1.000). Lossless bookkeeping for
+arbitrary-K (prefix-accept + carry-forward, `generateSpecK`) verified serial-div@-1 on Mac.
+
+**What WALLED:** every implementation of the K-step draft chain hits Swift-MLX SEQUENTIAL-SUBMISSION overhead:
+naive chain 43ms/step (device cold K=5 = 12.4 tok/s = 0.61×); per-step compiled 12.6ms/step (Mac; compiled-call
+boundaries force input evals = one GPU round-trip per step); whole-chain single-compile (5 steps unrolled in one
+graph incl. in-graph 8K sub-head argmax + resident embed-gather) WORSE still (Mac 0.45×). Since sustained ≤ cold,
+deep-K is LATENCY-bound below the K=1 floor on this stack → dead via this route tonight.
+
+**Honest final map for sustained-pegged 30 (满血):** (a) an MLX-level fused/batched chain kernel (vendor/red-line
+territory) or an async two-stream pipeline that hides draft submission under the verify forward — the identified
+real route, needs design work, not build-measure cycles; (b) fused decode kernel: +~15% ⇒ ~16.5 sustained, not 30;
+(c) sub-4-bit quant: banned by 满血; (d) ANE lane: sustained ≈ cold ≈ 13.7 (no throttle but no win). Turn-shaped
+30 (the production workload) remains BANKED at 30.1-31.5; sustained-pegged 30 on a fanless chassis stays OPEN with
+exactly one viable identified mechanism.

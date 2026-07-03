@@ -67,7 +67,9 @@ enum BASQwen35MTPProbe {
                     throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
                 }
                 let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
-                let run = dec.generateSpec(prompt: prompt, maxTokens: 96)
+                let kEnvS = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
+                let run = kEnvS > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: 96, k: kEnvS)
+                                    : dec.generateSpec(prompt: prompt, maxTokens: 96)
                 let a = run.iterations > 0 ? Double(run.accepted) / Double(run.iterations) : 0
                 return (Double(run.tokens.count) / max(run.decodeSeconds, 0.001), a)
             }
@@ -125,9 +127,14 @@ enum BASQwen35MTPProbe {
                         throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
                     }
                     let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
-                    _ = spec ? dec.generateSpec(prompt: prompt, maxTokens: 8)
+                    let kEnv = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
+                    func specRun(_ m: Int) -> BASQwen35MTPSpecDecoder.Run {
+                        kEnv > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: m, k: kEnv)
+                                 : dec.generateSpec(prompt: prompt, maxTokens: m)
+                    }
+                    _ = spec ? specRun(8)
                              : dec.generatePlain(prompt: prompt, maxTokens: 8)      // warmup (JIT both paths)
-                    let r = spec ? dec.generateSpec(prompt: prompt, maxTokens: n)
+                    let r = spec ? specRun(n)
                                  : dec.generatePlain(prompt: prompt, maxTokens: n)
                     return Arm(name: name, tokens: r.tokens, seconds: r.decodeSeconds,
                                accepted: r.accepted, iterations: r.iterations)

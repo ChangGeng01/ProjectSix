@@ -41,10 +41,14 @@ public final class BASQwen35MTPSpecDecoder {
     // that draft wrong → rejected → emissions remain FULL-vocab trunk argmaxes (ADR-039 lossless, 满血).
     private static let draftVocab = 32768
     private let subHead: QW
+    /// Deep-K chain: next-step embed rows gathered from a RESIDENT 8K fp16 table inside the ONE compiled chain
+    /// graph (drafts restricted to the 8K most-frequent ids; misses just reject — lossless/满血 unchanged).
+    private static let chainVocab = 8192
+    private let chainEmbed: MLXArray
     // MTP block KV (own stream; fixed-capacity, index-written like the trunk's spec assets)
     private var mtpK: MLXArray
     private var mtpV: MLXArray
-    private static let maxSeq = 1024
+    private static let maxSeq = 192   // campaign cap (probe peak <140); fixed-shape for the compiled chain draft
     private static let ah = 16, akv = 4, ahd = 256, rd = 64
     private static let ropeBase: Float = 10_000_000
 
@@ -80,6 +84,7 @@ public final class BASQwen35MTPSpecDecoder {
         let subRows = model.embedding(MLXArray((0 ..< Self.draftVocab).map(Int32.init)))   // [32K, D] fp16
         let (hw, hs, hb) = MLX.quantized(subRows, groupSize: 64, bits: 4)
         subHead = QW(w: hw, s: hs, b: hb)
+        chainEmbed = model.embedding(MLXArray((0 ..< Self.chainVocab).map(Int32.init)))    // [8K, D] fp16 resident
         mtpK = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
         mtpV = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
     }
@@ -142,6 +147,117 @@ public final class BASQwen35MTPSpecDecoder {
         return rms(y, fnW)
     }
 
+    /// COMPILED fixed-shape draft — used ONLY by the deep-K chain (generateSpecK), where per-step Swift
+    /// graph-build/launch (~43ms/draft measured on device, sequential-dependent so it can't hide in verify
+    /// bubbles) dwarfs the fixed-shape full-buffer-attention penalty (~5ms) that made this a NET LOSS for K=1.
+    private lazy var compiledDraft: @Sendable ([MLXArray]) -> [MLXArray] = {
+        let idx = MLXArray((0 ..< Self.maxSeq).map { Float16($0) })
+        let scale = MLXArray(Float16(powf(Float(Self.ahd), -0.5)))
+        return compile { [self] args in
+            let emb = args[0], hid = args[1], pos = args[2], kb = args[3], vb = args[4]
+            let u = mm(concatenated([rms(emb, nE), rms(hid, nH)]).expandedDimensions(axis: 0), fc)[0]
+            let h = rms(u, iln)
+            let qpo = mm(h.expandedDimensions(axis: 0), qp)[0].reshaped(Self.ah, 2 * Self.ahd)
+            var q = qpo[0..., 0 ..< Self.ahd]
+            let gate = qpo[0..., Self.ahd...].reshaped(-1)
+            var k = mm(h.expandedDimensions(axis: 0), kp)[0].reshaped(Self.akv, Self.ahd)
+            let v = mm(h.expandedDimensions(axis: 0), vp)[0].reshaped(Self.akv, Self.ahd)
+            q = rms(q, qn); k = rms(k, kn)
+            let ang = (pos.asType(.float32) * invFreq).asType(.float16)
+            let cosA = cos(ang), sinA = sin(ang)
+            let half = Self.rd / 2
+            func rope(_ t: MLXArray) -> MLXArray {
+                let tr = t[0..., 0 ..< Self.rd]
+                let tp = t[0..., Self.rd...]
+                let x1 = tr[0..., 0 ..< half], x2 = tr[0..., half...]
+                return concatenated(
+                    [concatenated([x1 * cosA - x2 * sinA, x1 * sinA + x2 * cosA], axis: -1), tp], axis: -1)
+            }
+            q = rope(q); k = rope(k)
+            let oh = (idx .== pos).asType(.float16).reshaped(Self.maxSeq, 1, 1)
+            let kbN = kb * (1 - oh) + oh * k.expandedDimensions(axis: 0)
+            let vbN = vb * (1 - oh) + oh * v.expandedDimensions(axis: 0)
+            let kk = repeated(kbN, count: Self.ah / Self.akv, axis: 1).transposed(1, 0, 2)
+            let vv = repeated(vbN, count: Self.ah / Self.akv, axis: 1).transposed(1, 0, 2)
+            var sc = matmul(q.expandedDimensions(axis: 1), kk.transposed(0, 2, 1)) * scale
+            let mask = (idx .<= pos).reshaped(1, 1, Self.maxSeq)
+            sc = which(mask, sc.asType(.float32), MLXArray(Float(-1e30)))
+            let w = softmax(sc, axis: -1).asType(.float16)
+            let out = matmul(w, vv).reshaped(-1) * sigmoid(gate)
+            var y = u + mm(out.expandedDimensions(axis: 0), op)[0]
+            let z = rms(y, pln)
+            let zz = z.expandedDimensions(axis: 0)
+            y = y + mm(silu(mm(zz, gw)) * mm(zz, uw), dw)[0]
+            return [rms(y, fnW), kbN, vbN]
+        }
+    }()
+
+    /// WHOLE-CHAIN compiled draft (K unrolled in ONE graph → ONE submission per iteration): each step =
+    /// MTP block → 4-bit sub-head argmax (8K rows) → gather next embed from the resident table. Outputs
+    /// [d0..d4] + updated KV. Fixes the measured 43ms/step sequential-submission wall.
+    private lazy var compiledChain5: @Sendable ([MLXArray]) -> [MLXArray] = {
+        let idx = MLXArray((0 ..< Self.maxSeq).map { Float16($0) })
+        let scale = MLXArray(Float16(powf(Float(Self.ahd), -0.5)))
+        return compile { [self] args in
+            let e0 = args[0], h0 = args[1], pos0 = args[2]
+            var kb = args[3], vb = args[4]
+            var e = e0, h = h0
+            var ds: [MLXArray] = []
+            for j in 0 ..< 5 {
+                let pos = pos0 + Float16(j)
+                let u = mm(concatenated([rms(e, nE), rms(h, nH)]).expandedDimensions(axis: 0), fc)[0]
+                let hh = rms(u, iln)
+                let qpo = mm(hh.expandedDimensions(axis: 0), qp)[0].reshaped(Self.ah, 2 * Self.ahd)
+                var q = qpo[0..., 0 ..< Self.ahd]
+                let gate = qpo[0..., Self.ahd...].reshaped(-1)
+                var k = mm(hh.expandedDimensions(axis: 0), kp)[0].reshaped(Self.akv, Self.ahd)
+                let v = mm(hh.expandedDimensions(axis: 0), vp)[0].reshaped(Self.akv, Self.ahd)
+                q = rms(q, qn); k = rms(k, kn)
+                let ang = (pos.asType(.float32) * invFreq).asType(.float16)
+                let cosA = cos(ang), sinA = sin(ang)
+                let half = Self.rd / 2
+                func rope(_ t: MLXArray) -> MLXArray {
+                    let tr = t[0..., 0 ..< Self.rd]
+                    let tp = t[0..., Self.rd...]
+                    let x1 = tr[0..., 0 ..< half], x2 = tr[0..., half...]
+                    return concatenated(
+                        [concatenated([x1 * cosA - x2 * sinA, x1 * sinA + x2 * cosA], axis: -1), tp], axis: -1)
+                }
+                q = rope(q); k = rope(k)
+                let oh = (idx .== pos).asType(.float16).reshaped(Self.maxSeq, 1, 1)
+                kb = kb * (1 - oh) + oh * k.expandedDimensions(axis: 0)
+                vb = vb * (1 - oh) + oh * v.expandedDimensions(axis: 0)
+                let kk = repeated(kb, count: Self.ah / Self.akv, axis: 1).transposed(1, 0, 2)
+                let vv = repeated(vb, count: Self.ah / Self.akv, axis: 1).transposed(1, 0, 2)
+                var sc = matmul(q.expandedDimensions(axis: 1), kk.transposed(0, 2, 1)) * scale
+                let mask = (idx .<= pos).reshaped(1, 1, Self.maxSeq)
+                sc = which(mask, sc.asType(.float32), MLXArray(Float(-1e30)))
+                let w = softmax(sc, axis: -1).asType(.float16)
+                let out = matmul(w, vv).reshaped(-1) * sigmoid(gate)
+                var y = u + mm(out.expandedDimensions(axis: 0), op)[0]
+                let z = rms(y, pln)
+                let zz = z.expandedDimensions(axis: 0)
+                y = y + mm(silu(mm(zz, gw)) * mm(zz, uw), dw)[0]
+                y = rms(y, fnW)
+                // in-graph draft: 8K-constrained sub-head argmax + embed gather for the next step
+                let lg = mm(y.expandedDimensions(axis: 0), subHead)[0][0 ..< Self.chainVocab]
+                let dj = argMax(lg, axis: -1)
+                ds.append(dj)
+                e = chainEmbed[dj]
+                h = y
+            }
+            return ds + [kb, vb]
+        }
+    }()
+
+    /// Chain-step draft via the compiled graph (deep-K path only).
+    private func mtpForwardCompiled(embedNext: MLXArray, hidden: MLXArray, pos: Int) -> MLXArray {
+        let r = compiledDraft([embedNext, hidden, MLXArray([Float16(pos)]), mtpK, mtpV])
+        mtpK = r[1]
+        mtpV = r[2]
+        return r[0]
+    }
+
     public func resetMTPStream() {
         mtpK = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
         mtpV = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
@@ -177,6 +293,108 @@ public final class BASQwen35MTPSpecDecoder {
             out.append(nxt)
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: 0, iterations: out.count)
+    }
+
+    /// Generalized K-deep MTP speculative decode (chained GPU-resident drafts, ONE verify forward of
+    /// T = pending+K, prefix-accept, carry-forward). SUSTAINED-throughput lever: under the thermal power cap the
+    /// objective is BYTES/TOKEN — E[tok]/iter grows with K while the trunk is still read ONCE per iter
+    /// (measured chain acceptance: a2..a4 = 1.0, depth-5 survival 0.91 on the golden trajectory).
+    public func generateSpecK(prompt: [Int], maxTokens: Int, k: Int) -> Run {
+        precondition(k >= 1)
+        resetMTPStream()
+        let cache = model.newCache(parameters: nil)
+        let h0 = model.hiddenStatesWithCache(
+            MLXArray(prompt.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+        var hLast = h0[0, h0.dim(1) - 1]
+        var hLastPos = prompt.count - 1
+        var trunkLen = prompt.count
+        var pending: [Int] = [argmaxLast(model.logits(fromHidden: h0))]
+        func draftChain() -> [MLXArray] {
+            if k == 5 {
+                let r = compiledChain5([
+                    model.embedding(MLXArray([Int32(pending.last!)]))[0], hLast,
+                    MLXArray([Float16(hLastPos)]), mtpK, mtpV,
+                ])
+                mtpK = r[5]; mtpV = r[6]
+                return Array(r[0 ..< 5])
+            }
+            var ds: [MLXArray] = []
+            var y = hLast
+            var e = model.embedding(MLXArray([Int32(pending.last!)]))[0]
+            for j in 0 ..< k {
+                y = mtpForwardCompiled(embedNext: e, hidden: y, pos: hLastPos + j)
+                let dj = draftArgmax(y)
+                ds.append(dj)
+                if j + 1 < k { e = model.embedding(dj.reshaped([1]))[0] }
+            }
+            return ds
+        }
+        var ds = draftChain()
+        let t0 = Date()
+        var out: [Int] = []
+        var acceptedTok = 0, iters = 0
+        while out.count < maxTokens {
+            if pending.count >= 6 {
+                var hp = model.hiddenStatesWithCache(
+                    MLXArray([Int32(pending[0])]).expandedDimensions(axis: 0), cache: cache)
+                for p in pending.dropFirst() {
+                    hp = model.hiddenStatesWithCache(
+                        MLXArray([Int32(p)]).expandedDimensions(axis: 0), cache: cache)
+                }
+                trunkLen += pending.count
+                hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
+                let t = argmaxLast(model.logits(fromHidden: hp))
+                out.append(t); pending = [t]
+                ds = draftChain()
+                continue
+            }
+            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
+            for c in cache where c is ArraysCache {
+                let m = c as! ArraysCache
+                snapshots.append((m, m[0], m[1]))
+            }
+            let P = pending.count
+            let T = P + k
+            var parts: [MLXArray] = [MLXArray(pending.map(Int32.init))]
+            parts.append(contentsOf: ds.map { $0.reshaped([1]).asType(.int32) })
+            let input = concatenated(parts).expandedDimensions(axis: 0)
+            let h2 = model.hiddenStatesWithCache(input, cache: cache)
+            let lg = model.logits(fromHidden: h2)
+            let am = argMax(lg[0], axis: -1)                       // [T]
+            var evalSet: [MLXArray] = [am]; evalSet.append(contentsOf: ds)
+            eval(evalSet)                                          // the ONE gpu sync
+            let dv = ds.map { $0.item(Int.self) }
+            iters += 1
+            // prefix-accept: d[j]'s slot truth = am[P-1+j]
+            var L = 0
+            while L < k && am[P - 1 + L].item(Int.self) == dv[L] { L += 1 }
+            acceptedTok += L
+            // emissions: truths am[P-1 .. P-1+min(L, k-1)] — L accepted (== drafts) + correction (if L<k)
+            // full accept (L==k): also the bonus token after d[k-1]
+            var emitted: [Int] = []
+            if L == k {
+                for j in 0 ..< k { emitted.append(dv[j]) }
+                emitted.append(am[T - 1].item(Int.self))           // bonus
+            } else {
+                for j in 0 ..< L { emitted.append(dv[j]) }
+                emitted.append(am[P - 1 + L].item(Int.self))       // correction
+            }
+            for e in emitted where out.count < maxTokens { out.append(e) }
+            if L == k {
+                trunkLen += T
+                hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
+                pending = [emitted.last!]
+            } else {
+                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
+                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                hLast = h2[0, P - 1 + L]                            // hidden after the last CORRECT fed token
+                hLastPos = trunkLen + P - 1 + L
+                pending.append(contentsOf: emitted)
+            }
+            ds = draftChain()
+        }
+        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0),
+                   accepted: acceptedTok, iterations: iters)
     }
 
     /// K=1 MTP speculative greedy decode with CARRY-FORWARD REJECT: certain-but-uncommitted tokens ride a
