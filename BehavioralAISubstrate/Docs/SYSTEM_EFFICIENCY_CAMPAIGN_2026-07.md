@@ -1,0 +1,91 @@
+# SYSTEM EFFICIENCY CAMPAIGN 2026-07 — 移动端极高效 · 多 agent 协作 · 大模型与 14 层契合
+
+Operator directive (2026-07-04): "目前效率还是不够 希望以后可以移动端极其高效 仍然 ok 多 agents 协作
+大模型与 14 层完美契合 全面优化"。
+
+## The physics frame (settled by the decode campaigns)
+
+The decode axis is at its wall: cold 30-36 tok/s, real-prose 1.20× certified, sustained-pegged-30
+physics-closed (needs E[tok]≥6/trunk-read; the head tops at 3-4). **The next order of magnitude cannot
+come from decoding faster — only from decoding LESS**: avoided-compute (don't invoke the 4B unless
+surprise×stakes demand it) and shared-state multiplexing (N agents over ONE trunk). This is the
+biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
+
+## Recon verdicts (workflow wf_4fad3916, 2026-07-04 — 4 readers, file:line evidence in transcript)
+
+1. **The surprise-gated tiered loop is BUILT and seam-complete but DORMANT.** ε-probe
+   (BASTurnSurpriseProbe, MiniLM) → BASEffortGovernor/Allocator (surprise×stakes×headroom → tier,
+   reflex knee 0.10) → BASBrainChat.governedPlan → EBrainTurnRequest.effortPlan →
+   RunTurn:300 flooredMaxLoops. Every link implemented + unit-tested; engaged by NO host
+   (deliberationLoopEnabled=false, effortPlan=nil, BASBrainChat constructed only in Tests).
+   Activation ≈ 10 lines of host code + 2 default flips.
+2. **Today's production topology**: the 14-layer runtime is DETERMINISTIC; ONE adapter.draft() per
+   turn (endurance runner shape). The 8 generative seats (scout/planner/critic/risk/surface/
+   evolutionShadow/sentinel/hostAlignment) exist as purpose CONTRACTS (BASAgentLLMPurposeMap), not
+   as live LLM consumers. BASOrganRegistry/BASLLMNeuralCoreService have zero production consumers —
+   binding is an explicit host install step (ADR-014).
+3. **Multi-agent mechanics exist but are orphaned**: ChatSession pool keyed (sessionID, role) shares
+   ONE ModelContainer (M254; weights loaded once; vendor-documented parallel-session support);
+   draftMultiTurn has ZERO production callers. 9 concrete gaps: sessionID not on the adapter
+   protocol; no agent identity in BASOrganRequest; per-agent state loses ALL acceleration lanes;
+   session pool unbounded/unaccounted; concurrency ungoverned (no fairness queue); instructions
+   frozen per session; shared-prefix KV unused; GDN cache save/trim semantics unvalidated for
+   per-agent state; memory budget has no N-session term.
+4. **No tier-0 answer path exists** — every avoided-compute asset today is signal-side (CoreML
+   context classifier L0 ✓wired, MLRiskService L11 ✓, stakes/ε probes) not answer-side. The
+   deterministic fact-bank adjudicator computes verdicts and then STILL calls the LLM
+   (prompt-injection only).
+5. **Measurement**: agent-turn latency p50/p99 + substrate-vs-LLM split ALREADY emitted per turn
+   (endurance 📊 turn-breakdown / FINAL); LLM-invocation rate derivable (mlx_total_inferences/iters)
+   but reads 1.0 until a gate exists; energy/turn = the M4 battery protocol driven by brain.process
+   turns; ALL 12 qinao perf metrics (#65-76) are name-only — one log parser (qinao_device.py)
+   unblocks 8 of them.
+
+## Targets (quantified; each gets a measured BASELINE before its lever — the eval-rigor rule)
+
+| # | Metric | Baseline (to measure in P0) | Target | Gate style |
+|---|--------|------------------------------|--------|------------|
+| T1 | LLM-invocation rate (LLM calls / agent turn) | ~1.0 (no gate) | **≤0.6 mixed workload** (stretch 0.3) | quality co-gate: v6-900 honesty/capability subset unchanged |
+| T2 | Agent-turn latency p50 (turn-shaped, device) | measure (turn-breakdown exists) | tier-0 <100ms · gated-skip turns <300ms · LLM turns unchanged | never-worse p95 |
+| T3 | Energy/turn (battery-%/turn → mWh) | measure (M4-on-turns) | −30% mixed workload | pin baseline, never-worse >10% (raised-bar #70 discipline) |
+| T4 | Multi-agent: N=8 seats, one trunk | N/A today | 8-seat deliberation round on-device, ≤3000MB, no jetsam | endurance-style cert |
+| T5 | Sustained thermal | serious by ~min 5 (pegged) | gated workload stays ≤fair for 20-min mixed session | sustained smoke |
+
+## Phases
+
+**P0 — MEASURE FIRST (no levers).**
+  qinao_device.py log parser (endurance FINAL/turn-breakdown/ch1025 → registry #65,66,67,68,71,72 +
+  invocation-rate + turn-p50) · one 20-min mixed-workload endurance baseline run capturing T1-T3 ·
+  M4-on-turns energy protocol run. Output: the baseline row of the table above, committed.
+
+**P1 — AVOIDED-COMPUTE (the ×2-3 lever).**
+  (a) Wire the dormant effort loop live (host adoption + flips; overrideReason logged); consume
+  effort dials beyond maxLoops (candidateCount → fewer L9 candidates).
+  (b) Stakes×headroom gate at the verifier seam (BASLLMVerifierPipeline's unconditional extra LLM
+  call — the proven BASAdjudicationGate applied where it was designed to go).
+  (c) Covered-and-confident factual short-circuit: the fact-bank verdict RETURNS as the draft
+  (propose/dispose made load-bearing); off-corpus/uncertain passes through untouched.
+  Gate: T1 ≤0.6 with quality co-gate green; T2 gated-turns target.
+
+**P2 — MULTI-AGENT MULTIPLEXING (one trunk, N seats).**
+  sessionID + agentRef on the adapter protocol (decorator chain forwards) · session-pool LRU +
+  memory accounting priced against the 3376MiB jetsam model (N-session term) · shared system-prefix
+  KV (vendor saveCache/prebuilt-KV — the obvious N-agent memory saver) · a decode fairness governor
+  (priority queue over container.perform) · seat personas → session instructions
+  (BASAgentPersonaRoleTemplates finally consumed). Gate: T4 cert.
+
+**P3 — 契合 (the LLM as a scheduled organ).**
+  ThermalTwin → deviceState bridge (close the module island) · tier-0 responder organ (answer-cache
+  + covered-factual + classifier-routed reflex) in front of the router · effort-tier → decode-lane
+  coupling (fast tier → scout/0.8B-class or reflex; deep tier → core 4B) · dream-loop/consolidation
+  activation (BGTask, the three-guard gating already built). Gate: T1 stretch 0.3 + T5.
+
+**P4 — ENERGY DISCIPLINE.**
+  Pin mWh/1k-tok + mWh/turn baselines into the registry (report → never-worse gates) · sustained
+  mixed-session smoke as a release gate · substrate #77 per-layer latency p95 harness.
+
+## Standing constraints
+满血 (no trunk quality change) · ADR-014 default-off/opt-in for every lever (kill-switches) ·
+ADR-039 lossless decode semantics untouched · never-worse gates with measured baselines · quality
+co-gates from the v6-900 harness on every avoided-compute lever (skipping compute must not skip
+honesty) · single-device evidence labeled as such.
