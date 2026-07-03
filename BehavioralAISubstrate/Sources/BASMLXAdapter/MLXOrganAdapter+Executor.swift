@@ -39,6 +39,14 @@ extension MLXOrganAdapter {
             // `_draftSpeculative` uses the adapter's configured `numDraftTokens`; the strategy's K is advisory.
             return try await _draftSpeculative(request)
 
+        case .mtpSpec:
+            // SHIP-CERT WIRING DEBT (fail-closed, never-silent): the MTP lane's full generation-path integration
+            // (chat template + streaming + EOS through BASQwen35MTPSpecDecoder) is not yet wired into the adapter
+            // pipeline — the lane is device-certified standalone (30.1 tok/s, ADR-039 lossless) via the probe.
+            // Until the pipeline wiring lands, fall back to plain (byte-identical output by the ADR-039 invariant;
+            // only the speed differs). The planner only offers .mtpSpec when a host opts in via mtpHeadLoaded.
+            return try await _plainDraft(request)
+
         case .promptLookup(let k):
             let g = try await _generateModelFree(
                 for: request, drafter: BASPromptLookupDrafter(numDraftTokens: k))

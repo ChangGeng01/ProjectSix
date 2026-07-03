@@ -238,3 +238,25 @@ real route, needs design work, not build-measure cycles; (b) fused decode kernel
 (c) sub-4-bit quant: banned by 满血; (d) ANE lane: sustained ≈ cold ≈ 13.7 (no throttle but no win). Turn-shaped
 30 (the production workload) remains BANKED at 30.1-31.5; sustained-pegged 30 on a fanless chassis stays OPEN with
 exactly one viable identified mechanism.
+
+## SHIP-CERT 2026-07-03 — planner integration DONE + endurance cert PASS (never-worse), honest ledger
+
+**Planner integration (checklist §2) LANDED (all Mac-tested, 7/7):** `.mtpSpec` strategy case + `mtpHeadLoaded`
+capability (default false ⇒ every existing host byte-equal, ADR-014) + the lane's OWN floor `minMTPAccepted=0.15`
+(NOT the 2.7 draft-model floor — trap #1) + entropy-gate EXEMPTION (trap #3) + profiler-floor collapse detector +
+**THERMAL GATE** (new cert finding, below) + executor fail-closed dispatch (`.mtpSpec` → plain until the adapter
+generation-pipeline wiring lands — byte-identical by ADR-039, documented wiring debt).
+
+**Endurance cert (50 real tokenized prompts, turn-paced, single device):**
+- Take 1 (ungated) FAILED and taught the two real lessons: (a) REAL-text acceptance a≈0.63 (the golden-prompt
+  0.85 was an optimistic sample) ⇒ engaged speedup ≈1.35×, not 1.48×; (b) under `serious` throttle the lane is
+  NET-NEGATIVE (0.52-0.62× — down-clocked GPU inflates the fixed draft overhead) ⇒ the THERMAL GATE was added to
+  the planner (serious+ → plain; never-worse), with a regression test.
+- Take 2 (gated, 3-min pre-cool): **PASS — fail 0/50, engaged ratio 1.20× (up to 1.36×), a=0.65, engaged spec
+  mean 23.5 tok/s; 42/50 thermal-gated to plain** (the 2s-gap cadence is far denser than real chat — the phone
+  reaches `serious` by ~turn 9 and the gate correctly yields; realistic conversational gaps = high engagement).
+
+**Ship-cert remaining (honest):** ① the 2-device leg (one iPhone Air available — OPEN); ② adapter
+generation-pipeline wiring for `.mtpSpec` (chat template + streaming + EOS through the decoder; the lane is
+certified standalone); ③ maxSeq config (192 campaign cap); ④ int8 the MTP block for jetsam margin. The lane is
+default-OFF everywhere until those close.

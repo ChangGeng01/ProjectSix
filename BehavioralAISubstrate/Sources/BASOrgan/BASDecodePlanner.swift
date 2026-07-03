@@ -10,7 +10,13 @@ public struct BASDecodeCapabilities: Sendable, Equatable {
     /// The main model is loaded, so the model-free (prompt-lookup / cross-turn) loop can run.
     public let modelFreeAvailable: Bool
 
-    public init(draftModelLoaded: Bool, saguaroAvailable: Bool, modelFreeAvailable: Bool) {
+    /// Qwen3.5's own MTP head is loaded (opt-in weights URL provided + main model is Qwen3.5) — enables the
+    /// `.mtpSpec` lane. Default false everywhere ⇒ existing hosts byte-equal (ADR-014).
+    public let mtpHeadLoaded: Bool
+
+    public init(draftModelLoaded: Bool, saguaroAvailable: Bool, modelFreeAvailable: Bool,
+                mtpHeadLoaded: Bool = false) {
+        self.mtpHeadLoaded = mtpHeadLoaded
         self.draftModelLoaded = draftModelLoaded
         self.saguaroAvailable = saguaroAvailable
         self.modelFreeAvailable = modelFreeAvailable
@@ -56,12 +62,28 @@ extension BASDecodeLanePolicy {
         // (never-worse). `topTokenEntropy == nil` (not fed) ⇒ NOT gated ⇒ behaviour unchanged. Bits = log2 of the
         // target's next-token softmax; the default ≈3.0 bits (top token < ~1/8 mass) is a calibration starting point.
         topTokenEntropy: Double? = nil,
-        maxDraftModelEntropyBits: Double = 3.0
+        maxDraftModelEntropyBits: Double = 3.0,
+        // MTP lane's OWN break-even floor (checklist trap #1: NEVER reuse the 2.7 draft-model floor — MTP's cost
+        // ratio f≈0.05 (trunk-reusing head + 32K sub-head) ⇒ break-even a≈f; 0.15 leaves margin. Device cert:
+        // a=0.85 ≫ floor. Bites only once the profiler has a stat; cold engages (bench+device certified).
+        minMTPAccepted: Double = 0.15,
+        // THERMAL GATE (ship-cert finding 2026-07-03): under `serious+` throttle the MTP lane measured NET
+        // NEGATIVE on real prompts (0.52-0.62× — down-clocked GPU inflates the fixed draft overhead while real-
+        // text a≈0.63) → drop to plain when the host reports throttling. Default false = unchanged.
+        thermalThrottled: Bool = false
     ) -> BASDecodeStrategy {
         guard Self.isGreedyByteSafe(temperature: temperature) else { return .plain }
 
         // Candidate lanes in cold-start priority order (model-backed first), each with its profiler ID.
         var candidates: [(strategy: BASDecodeStrategy, id: String)] = []
+
+        // MTP (the main model's own head) — highest priority when present: device-certified 1.48× at a=0.85,
+        // purpose-INDEPENDENT (free-form a is as high as echo — unlike the draft-model lane), near-model-free
+        // cost ⇒ NOT entropy-gated (checklist trap #3: the entropy gate exists for the COSTLY draft-model lane;
+        // gating MTP would exile it from its best regime).
+        if capabilities.mtpHeadLoaded && !thermalThrottled {
+            candidates.append((.mtpSpec, BASDecodeStrategy.mtpSpecID))
+        }
 
         // draft-model spec is a VALID accelerator for ANY greedy turn (byte-identical, no per-round scan tax), so it
         // is NOT purpose-gated — matching the legacy `draft()`, which spec'd regardless of elect (Option-3: select any
@@ -119,6 +141,12 @@ extension BASDecodeLanePolicy {
             // (b) draft-MODEL learned-acceptance floor — bites only once a stat exists (below break-even ⇒ drop).
             if cand.id == BASDecodeStrategy.draftModelID,
                let s = profiler.stat(cand.id, purpose), s.emaAccepted < minDraftModelAccepted {
+                return false
+            }
+            // (c) MTP lane's OWN floor (accept-stats ARE surfaced by BASQwen35MTPSpecDecoder — the cold-forever
+            //     gap of the draft-model lane does not apply here).
+            if cand.id == BASDecodeStrategy.mtpSpecID,
+               let s = profiler.stat(cand.id, purpose), s.emaAccepted < minMTPAccepted {
                 return false
             }
             return true

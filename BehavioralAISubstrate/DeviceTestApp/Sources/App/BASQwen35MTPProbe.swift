@@ -93,6 +93,74 @@ enum BASQwen35MTPProbe {
                          : "⚠️ sustained degradation below 25 — thermal wall"))
     }
 
+    /// SHIP-CERT endurance (BAS_MTP_CERT=1): 50 diverse tokenized prompts × (plain 48 + spec 48), turn-paced
+    /// (2s gaps = realistic cooling windows), per-prompt lossless telemetry + timing + thermal; aggregate verdict
+    /// per the greedy-spec cert precedent (single-device run — the 2-device requirement is noted as open).
+    static func runCert(container: ModelContainer, wURL: URL) async throws {
+        let topics = ["the ocean", "photosynthesis", "a small village", "gravity", "friendship", "volcanoes",
+                      "chess", "the moon", "bread baking", "electricity", "a rainy day", "whales", "honesty",
+                      "deserts", "music theory", "bicycles", "the seasons", "memory", "rivers", "telescopes",
+                      "courage", "spiders", "clocks", "islands", "language", "maps", "gardens", "thunder",
+                      "libraries", "glaciers", "patience", "bridges", "the stars", "salt", "forests", "trains",
+                      "kindness", "caves", "lighthouses", "clouds", "iron", "bees", "harbors", "mirrors",
+                      "wind", "paper", "mountains", "lanterns", "tides", "roots"]
+        var ratios: [Double] = []
+        var specRates: [Double] = []
+        var accs: [Double] = []
+        var divergences = 0
+        var failures = 0
+        var gated = 0
+        for (i, t) in topics.enumerated() {
+            do {
+                // LIVE thermal gate (the planner's production posture): spec only when not throttled.
+                let throttled = ProcessInfo.processInfo.thermalState == .serious
+                    || ProcessInfo.processInfo.thermalState == .critical
+                let r: (Double, Double, Double, Bool) = try await container.perform { ctx in
+                    guard let model = ctx.model as? Qwen35Model else {
+                        throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+                    }
+                    let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
+                    let ids = ctx.tokenizer.encode(text: "Write two sentences about \(t).")
+                    let plain = dec.generatePlain(prompt: ids, maxTokens: 48)
+                    if throttled {
+                        let pT = Double(plain.tokens.count) / max(plain.decodeSeconds, 0.001)
+                        return (pT, pT, -1, true)                        // gated: spec==plain by construction
+                    }
+                    let spec = dec.generateSpec(prompt: ids, maxTokens: 48)
+                    let a = spec.iterations > 0 ? Double(spec.accepted) / Double(spec.iterations) : 0
+                    let pT = Double(plain.tokens.count) / max(plain.decodeSeconds, 0.001)
+                    let sT = Double(spec.tokens.count) / max(spec.decodeSeconds, 0.001)
+                    return (pT, sT, a, spec.tokens == plain.tokens)
+                }
+                if r.2 < 0 {
+                    gated += 1
+                    print(String(format: "[qwen35-cert] %02d/50 %@: plain %.1f [thermal-GATED → plain] thermal=%@",
+                                 i + 1, t, r.0, thermal()))
+                } else {
+                    ratios.append(r.1 / r.0); specRates.append(r.1); accs.append(r.2)
+                    if !r.3 { divergences += 1 }
+                    print(String(format: "[qwen35-cert] %02d/50 %@: plain %.1f | spec %.1f (%.2fx) a=%.2f%@ thermal=%@",
+                                 i + 1, t, r.0, r.1, r.1 / r.0, r.2, r.3 ? "" : " [tie-div]", thermal()))
+                }
+            } catch {
+                failures += 1
+                print("[qwen35-cert] \(i + 1)/50 \(t): FAILED \(error)")
+            }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+        guard !specRates.isEmpty else { print("[qwen35-cert] no data ✗"); return }
+        let mR = ratios.reduce(0, +) / Double(ratios.count)
+        let mS = specRates.reduce(0, +) / Double(specRates.count)
+        let mA = accs.reduce(0, +) / Double(accs.count)
+        let minS = specRates.min() ?? 0
+        print(String(format: "[qwen35-cert] SUMMARY: engaged=%d gated=%d fail=%d | engaged spec mean %.1f min %.1f tok/s | ratio mean %.2fx | a mean %.2f | tie-div %d/%d | thermal-end %@",
+                     specRates.count, gated, failures, mS, minS, mR, mA, divergences, specRates.count, thermal()))
+        let pass = failures == 0 && mR >= 1.2 && mA >= 0.5 && mS >= 22
+        print("[qwen35-cert] " + (pass
+            ? "✅ ENDURANCE CERT PASS (single-device; 2nd-device leg OPEN)"
+            : "⚠️ CERT NOT MET — see summary"))
+    }
+
     static func run() async {
         print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -116,6 +184,10 @@ enum BASQwen35MTPProbe {
             print("[qwen35-mtp] model loaded in \(Int(Date().timeIntervalSince(t0)))s footprint=\(Int(footprintMB()))MB")
             if let m = Double(ProcessInfo.processInfo.environment["BAS_MTP_SUSTAIN_MIN"] ?? "") {
                 try await runSustained(minutes: m, container: container, wURL: wURL)
+                return
+            }
+            if ProcessInfo.processInfo.environment["BAS_MTP_CERT"] == "1" {
+                try await runCert(container: container, wURL: wURL)
                 return
             }
 
