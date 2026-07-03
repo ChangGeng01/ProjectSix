@@ -179,3 +179,24 @@ drafting: (a) mixed-precision quant (3.5-bit, sensitive layers protected — qua
 device A/B; prior naive-3bit FAILED quality) or (b) the fused decode kernel (behind the decode red-line, operator
 waiver). Both are baseline-lift decisions, not spec stacking. **25.7 × a ~1.15× baseline lift ≈ 30** — reachable,
 but only by combining MTP with one baseline lever, which is the operator's next call.
+
+## ★★★ 2026-07-03 — 30 tok/s MET: 30.1 on the iPhone Air, 满血 Qwen3.5-4B (1.48×)
+
+`BASQwen35MTPProbe` bracketed protocol: **plain-pre 21.2 → spec 30.1 → plain-post 19.4 tok/s** (band ±9%, ratio
+1.48× ≫ band), **a=0.85, serial-div@4 (ADR-039 lossless), thermal nominal, footprint 3023 MB.**
+
+The final unlock (after compile-v2 and K=2 both REGRESSED on device and were reverted): re-deriving the iter
+budget at DEVICE bandwidth exposed the real eater — **the draft's full-vocab head matmul (248K×2560 4-bit ≈
+6.4 ms/draft at ~50 GB/s; only 0.94 ms on the Mac, which had masked it)**. Fixes, all QUALITY-NEUTRAL (满血):
+1. **Draft SUB-HEAD**: drafts argmax over the FIRST 32K vocab rows (BPE id ≈ frequency order; 4-bit-quantized
+   embed rows at init) → 6.4 → ~0.8 ms. A true-argmax outside 32K only makes that draft wrong → rejected →
+   emissions remain FULL-vocab trunk argmaxes. Device acceptance UNCHANGED (a=0.85).
+2. **GPU-resident single-sync iteration**: the draft token stays an MLXArray (embed lookup consumes the argmax
+   array; verify input assembled by concatenation) — ONE gpu sync per iteration.
+Journey: 20.3 plain → 22.4 (MTP v1) → 25.7 (4-bit draft + carry-forward reject) → **30.1** (sub-head +
+single-sync). Trunk = production 4-bit checkpoint, untouched at every step; the quant lever (mixed-precision)
+was DROPPED under the 满血 constraint and never used.
+
+Caveats (unchanged class): 64-token arms, nominal-thermal cold protocol (sustained/thermal = ship-cert, not this
+gate); maxSeq=192 campaign cap in the decoder (production needs a config); footprint 3023 MB (jetsam margin —
+int8 the MTP block if more headroom needed); K=1 (K=2 measured net-negative on device, reverted).

@@ -36,6 +36,11 @@ public final class BASQwen35MTPSpecDecoder {
     private let fc, qp, kp, vp, op, gw, uw, dw: QW
     private let iln, pln, qn, kn, nE, nH, fnW: MLXArray
     private let invFreq: MLXArray                      // rope table, computed ONCE
+    // DRAFT SUB-HEAD (quality-neutral): drafts argmax over the FIRST 32K vocab rows only (BPE ids ≈ frequency
+    // order; device full-head = ~6.4ms/draft at ~50GB/s vs ~0.8ms for 32K). A true-argmax outside 32K just makes
+    // that draft wrong → rejected → emissions remain FULL-vocab trunk argmaxes (ADR-039 lossless, 满血).
+    private static let draftVocab = 32768
+    private let subHead: QW
     // MTP block KV (own stream; fixed-capacity, index-written like the trunk's spec assets)
     private var mtpK: MLXArray
     private var mtpV: MLXArray
@@ -72,8 +77,16 @@ public final class BASQwen35MTPSpecDecoder {
         invFreq = MLXArray(stride(from: 0, to: Self.rd, by: 2).map {
             powf(Self.ropeBase, -Float($0) / Float(Self.rd))
         })
+        let subRows = model.embedding(MLXArray((0 ..< Self.draftVocab).map(Int32.init)))   // [32K, D] fp16
+        let (hw, hs, hb) = MLX.quantized(subRows, groupSize: 64, bits: 4)
+        subHead = QW(w: hw, s: hs, b: hb)
         mtpK = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
         mtpV = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
+    }
+
+    /// Draft-only argmax over the 32K sub-head (returns a GPU-resident scalar; no sync).
+    private func draftArgmax(_ y: MLXArray) -> MLXArray {
+        argMax(mm(y.expandedDimensions(axis: 0), subHead)[0], axis: -1)
     }
 
     // MARK: - MTP forward (draft hidden for ONE step; own KV stream at `pos`)
@@ -182,12 +195,9 @@ public final class BASQwen35MTPSpecDecoder {
         var hLastPos = prompt.count - 1
         var trunkLen = prompt.count
         var pending: [Int] = [argmaxLast(model.logits(fromHidden: h0))]
-        var d = argmaxLast(model.logits(
-            fromHidden: mtpForward(
-                embedNext: model.embedding(MLXArray([Int32(pending[0])]))[0], hidden: hLast, pos: hLastPos)
-                .expandedDimensions(axes: [0, 1])))
-        if forceRejectForDiagnostics { d = 0 }
-        eval(MLXArray(Int32(d)))
+        var d = draftArgmax(mtpForward(
+            embedNext: model.embedding(MLXArray([Int32(pending[0])]))[0], hidden: hLast, pos: hLastPos))
+        if forceRejectForDiagnostics { d = MLXArray(Int32(0)) }
         let t0 = Date()
         var out: [Int] = []
         var accepted = 0, iters = 0
@@ -204,10 +214,8 @@ public final class BASQwen35MTPSpecDecoder {
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
                 let t = argmaxLast(model.logits(fromHidden: hp))
                 out.append(t); pending = [t]
-                d = argmaxLast(model.logits(
-                    fromHidden: mtpForward(
-                        embedNext: model.embedding(MLXArray([Int32(t)]))[0], hidden: hLast, pos: hLastPos)
-                        .expandedDimensions(axes: [0, 1])))
+                d = draftArgmax(mtpForward(
+                    embedNext: model.embedding(MLXArray([Int32(t)]))[0], hidden: hLast, pos: hLastPos))
                 continue
             }
             var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
@@ -215,16 +223,20 @@ public final class BASQwen35MTPSpecDecoder {
                 let m = c as! ArraysCache
                 snapshots.append((m, m[0], m[1]))
             }
-            let input = pending + [d]
-            let T = input.count
-            let h2 = model.hiddenStatesWithCache(
-                MLXArray(input.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+            let T = pending.count + 1
+            let input = concatenated([
+                MLXArray(pending.map(Int32.init)), d.reshaped([1]).asType(.int32),
+            ]).expandedDimensions(axis: 0)
+            let h2 = model.hiddenStatesWithCache(input, cache: cache)
             let lg = model.logits(fromHidden: h2)                     // [1, T, V]
-            let trueD = argMax(lg[0, T - 2], axis: -1).item(Int.self) // truth for d's slot
+            let am = argMax(lg[0], axis: -1)                          // [T] all-row argmaxes
+            eval(am, d)                                               // the ONE gpu sync per iteration
+            let dv = d.item(Int.self)
+            let trueD = am[T - 2].item(Int.self)                      // truth for d's slot
             iters += 1
-            if trueD == d {
+            if trueD == dv {
                 accepted += 1
-                let em = argMax(lg[0, T - 1], axis: -1).item(Int.self)
+                let em = am[T - 1].item(Int.self)
                 out.append(trueD)
                 if out.count < maxTokens { out.append(em) }
                 trunkLen += T                                          // committed (pending + d in state)
@@ -238,12 +250,9 @@ public final class BASQwen35MTPSpecDecoder {
                 hLastPos = trunkLen + T - 2                            // its absolute position (state rolled back)
                 pending.append(trueD)
             }
-            d = argmaxLast(model.logits(
-                fromHidden: mtpForward(
-                    embedNext: model.embedding(MLXArray([Int32(pending.last!)]))[0], hidden: hLast, pos: hLastPos)
-                    .expandedDimensions(axes: [0, 1])))
-            if forceRejectForDiagnostics { d = 0 }
-            eval(MLXArray(Int32(d)))
+            d = draftArgmax(mtpForward(
+                embedNext: model.embedding(MLXArray([Int32(pending.last!)]))[0], hidden: hLast, pos: hLastPos))
+            if forceRejectForDiagnostics { d = MLXArray(Int32(0)) }
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters)
     }
