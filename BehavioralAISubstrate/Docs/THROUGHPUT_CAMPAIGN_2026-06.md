@@ -83,3 +83,27 @@ with a byte-parity-safe design in front of you — not as a default. Nothing els
   (KV_LEVERS_DEVICE_VERDICT_2026-06-12: kvBits 4/8 = −7% tok/s for ~32 MB; maxKVSize neutral; admission gate =
   jetsam SAFETY not throughput). Optional hygiene noted: per-phase spans in TurnMetric; long-context kvBits re-run;
   E4B-factory admission default (host-policy). Same pin applies: no re-open without NEW measurements.
+
+## ★ Addendum 2026-07-03 — the free-form wall HAS a lever after all: Qwen3.5's own MTP head (operator's catch)
+
+The pin said "no re-open without NEW measurements" — this is that measurement. The operator asked "不是有 Qwen3.5
+MTP 头吗?" and was RIGHT where four audits and the frontier sweep were wrong:
+- **Qwen3.5-4B ships a 1-layer MTP (multi-token-prediction) head** (config `mtp_num_hidden_layers:1`; 15 tensors
+  in the ORIGINAL Qwen repo — `mtp.fc` fusion + 1 gated-attention block + norms, shared embed/head). The
+  mlx-community 4-bit conversion STRIPS it — which is why every MLX-stack measurement concluded "no cheap drafter
+  exists". Fetched via per-tensor HTTP-Range (~240 MB, no 8 GB download): `Tools/qwen35_fetch_mtp.py`.
+- **MEASURED acceptance (`Tools/qwen35_mtp_acceptance.py`, int8 shipped-form port, greedy self-trajectory):
+  a = 0.674 over 95 steps — and 32/32 = 100% on the final natural-text stretch** (the low early region is the
+  random golden prefix). Estimated speedup (K=1): (1+a)/(1+f) with f≈0.18-0.25 (MTP block ~0.11B + shared-head
+  reuse vs the 4B trunk) → **~1.36-1.42× free-form, likely ~1.5×+ on natural text.**
+- WHY the prior verdicts stay coherent: draft-MODEL spec was killed by COST (f≈0.33 for a 1B draft → 0.88× loss);
+  MTP rewrites the cost term (f≈0.2) by reusing the trunk — the physics formula (1+a)/(1+f·K) was always the
+  ruling, and MTP changes its inputs, not the law.
+- Instrument archaeology (2 bugs caught by the discipline): first run read a=0.000 EXACTLY — not "low", broken:
+  HF Qwen3-Next RMSNorms are ZERO-CENTERED (applied as 1+w; vLLM's fused kernel literally adds +1.0) while the
+  mlx-baked main weights are plain — mixing conventions silently zeroed the head. Fix = (1+w) on all 7 MTP norms
+  → 0.000 → 0.674.
+- REMAINING to bank the win (not yet done): implement the MTP drafter in the live decode loop (MLX GPU lane
+  and/or a 5th tiny CoreAI/ANE asset), measure END-TO-END wall-clock tok/s (the 1.42× is an estimate from a+f,
+  not a measured wall-clock), and greedy byte-safety plumbing (same-vocab, argmax-verify — the existing spec
+  machinery fits).
