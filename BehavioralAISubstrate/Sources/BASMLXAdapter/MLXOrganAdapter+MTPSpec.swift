@@ -35,8 +35,8 @@ extension MLXOrganAdapter {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before an accelerated draft"))
         }
-        guard let wURL = mtpDrafterWeightsURL else {
-            throw BASQwen35MTPSpecDecoder.SpecError.missingWeights("mtpDrafterWeightsURL not configured")
+        guard let wURL = _resolveMTPWeightsURL() else {
+            throw BASQwen35MTPSpecDecoder.SpecError.missingWeights("no MTP weights resolved (see _resolveMTPWeightsURL)")
         }
         let input = try await _buildLMInput(for: request, container: container)
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
@@ -61,6 +61,12 @@ extension MLXOrganAdapter {
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
         return (draft, raw.accepted, raw.rounds)
     }
+    /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).
+    nonisolated static func _thermalThrottled() -> Bool {
+        let t = ProcessInfo.processInfo.thermalState
+        return t == .serious || t == .critical
+    }
+
     /// Test/telemetry accessor: the profiler stat for the MTP lane (nil until first fold).
     func mtpProfilerStat() -> BASAcceptanceProfiler.Stat? {
         draftProfiler.stat(BASDecodeStrategy.mtpSpecID, .factual)

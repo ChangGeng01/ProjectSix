@@ -173,7 +173,8 @@ extension MLXOrganAdapter {
             temperature: request.preset.temperature,
             capabilities: _decodeCapabilities(),
             profiler: draftProfiler,
-            numDraftTokens: numDraftTokens)
+            numDraftTokens: numDraftTokens,
+            thermalThrottled: MLXOrganAdapter._thermalThrottled())
         return try await _execute(strategy, for: request, purpose: purpose, sessionID: sessionID)
         #else
         return try await _plainDraft(request)
@@ -202,7 +203,7 @@ extension MLXOrganAdapter {
             modelFreeAvailable: _loadedContainerForStreaming() != nil,
             // Offered only when a host opted in AND the main model is loaded; execution fail-closes to plain
             // if the model is not Qwen3.5 (SpecError.notQwen35 → _plainDraft, never-silent).
-            mtpHeadLoaded: mtpDrafterWeightsURL != nil && _loadedContainerForStreaming() != nil)
+            mtpHeadLoaded: _resolveMTPWeightsURL() != nil && _loadedContainerForStreaming() != nil)
     }
     #endif
 }

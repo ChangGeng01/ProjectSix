@@ -61,7 +61,8 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         if decodePlannerAutoSelect,
            case .draftModelSpec = BASDecodeLanePolicy.decodeStrategy(
                purpose: .scoutDefault, temperature: request.preset.temperature,
-               capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens) {
+               capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens,
+                thermalThrottled: MLXOrganAdapter._thermalThrottled()) {
             streamSpec = true
         }
         if streamSpec {

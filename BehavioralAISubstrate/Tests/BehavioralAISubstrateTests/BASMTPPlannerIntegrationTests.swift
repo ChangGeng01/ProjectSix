@@ -1,5 +1,6 @@
 import XCTest
 @testable import BASOrgan
+@testable import BASMLXAdapter
 
 /// Ship-cert planner integration for the .mtpSpec lane (checklist §2): own floor (NOT 2.7), entropy-gate
 /// exemption, default-off byte-equality, temperature gate, profiler-floor drop.
@@ -66,5 +67,27 @@ final class BASMTPPlannerIntegrationTests: XCTestCase {
         let s = BASDecodeLanePolicy.decodeStrategy(
             purpose: .factual, temperature: 0, capabilities: caps(mtp: true), profiler: p)
         XCTAssertEqual(s, BASDecodeStrategy.mtpSpec)
+    }
+}
+
+/// Default-ON resolution (operator-elected 2026-07-03): canonical discovery + kill-switch.
+final class BASMTPDefaultOnTests: XCTestCase {
+    func testAutoResolutionFindsCanonicalWeights() throws {
+        // Mac dev canonical path (staged by the campaign tooling)
+        guard FileManager.default.fileExists(atPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors") else {
+            throw XCTSkip("canonical weights not staged")
+        }
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)          // NO explicit URL
+        XCTAssertNotNil(organ._resolveMTPWeightsURL(), "default-ON must discover canonical weights")
+    }
+
+    func testKillSwitchDisablesResolution() {
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit, mtpSpecEnabled: false)
+        XCTAssertNil(organ._resolveMTPWeightsURL(), "kill-switch must disable the lane entirely")
+    }
+
+    func testNonQwenModelNeverResolves() {
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.llama3_2_3B_4bit)
+        XCTAssertNil(organ._resolveMTPWeightsURL(), "the MTP head is Qwen3.5's — never offered elsewhere")
     }
 }

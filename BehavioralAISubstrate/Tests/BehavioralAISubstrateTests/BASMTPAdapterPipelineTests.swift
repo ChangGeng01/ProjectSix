@@ -10,9 +10,8 @@ final class BASMTPAdapterPipelineTests: XCTestCase {
         guard ProcessInfo.processInfo.environment["BAS_MTP_PIPE"] == "1" else {
             throw XCTSkip("set BAS_MTP_PIPE=1 (needs /tmp/gdn_coreai/qwen35_mtp_folded.safetensors)")
         }
-        let organ = MLXOrganAdapter(
-            model: MLXModelCatalog.qwen3_5_4B_4bit,
-            mtpDrafterWeightsURL: URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors"))
+        // DEFAULT-ON path: no explicit URL — canonical auto-resolution must find the staged weights.
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
         try await organ.loadModel()
         await organ.setDecodePlannerAutoSelect(false)
         let req = BASOrganRequest(

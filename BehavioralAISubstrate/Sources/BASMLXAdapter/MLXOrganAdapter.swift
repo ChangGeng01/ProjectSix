@@ -141,8 +141,30 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// default. A larger-RAM / entitled host passes its own. Only consulted when `enforceMemoryAdmission`.
     public nonisolated let activeHardCapBytes: Int?
 
-    /// OPT-IN MTP drafter weights URL (see init). nil ⇒ `.mtpSpec` never offered (byte-equal default).
+    /// MTP drafter weights URL override (see init; default-ON resolves canonically when nil).
     public nonisolated let mtpDrafterWeightsURL: URL?
+    /// Kill-switch for the default-ON MTP lane (false ⇒ lane never offered, pure legacy byte-equal).
+    public nonisolated let mtpSpecEnabled: Bool
+
+    /// DEFAULT-ON resolution: explicit URL ?? canonical discovery (Qwen3.5-family main model only).
+    /// Candidates: Documents/qwen35_mtp_folded.safetensors (device staging), the model's local directory,
+    /// /tmp/gdn_coreai (Mac dev). nil ⇒ lane not offered.
+    nonisolated func _resolveMTPWeightsURL() -> URL? {
+        guard mtpSpecEnabled else { return nil }
+        if let explicit = mtpDrafterWeightsURL { return explicit }
+        guard model.id.lowercased().contains("qwen3.5") else { return nil }
+        let fm = FileManager.default
+        var candidates: [URL] = []
+        if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+            candidates.append(docs.appendingPathComponent("qwen35_mtp_folded.safetensors"))
+            if let local = model.localDirectoryName {
+                candidates.append(docs.appendingPathComponent(local)
+                    .appendingPathComponent("qwen35_mtp_folded.safetensors"))
+            }
+        }
+        candidates.append(URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors"))
+        return candidates.first { fm.fileExists(atPath: $0.path) }
+    }
     /// Cached MTP decoder (created on first `.mtpSpec` execution inside the container actor; the box mirrors
     /// `ChatSessionBox`'s @unchecked-Sendable pattern — exclusively used within `container.perform`).
     var mtpDecoderBox: MTPDecoderBox?
@@ -448,10 +470,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         maxKVSize: Int? = nil,
         enforceMemoryAdmission: Bool = false,
         activeHardCapBytes: Int? = nil,
-        // OPT-IN MTP drafter weights (Tools/qwen35_fetch_mtp.py → qwen35_mtp_folded.safetensors). nil (default)
-        // = the .mtpSpec lane is never offered = byte-equal (ADR-014). Only meaningful for Qwen3.5 main models
-        // (execution fail-closes to plain otherwise). Device-certified: engaged 1.20-1.36×, thermal-gated.
-        mtpDrafterWeightsURL: URL? = nil
+        // MTP DRAFTER DEFAULT-ON (operator-elected, 2026-07-03 — same election format as the 2026-06-11 greedy
+        // speculation default-ON): when the main model is Qwen3.5-family and qwen35_mtp_folded.safetensors is
+        // found at a canonical location (see _resolveMTPWeightsURL), the .mtpSpec lane is OFFERED by default —
+        // ship-cert: planner 7/7 + endurance PASS (thermal-gated never-worse) + E2E pipeline 1.30×, ADR-039
+        // lossless. `mtpDrafterWeightsURL` overrides discovery; `mtpSpecEnabled: false` is the kill-switch
+        // (pure legacy behavior, byte-equal).
+        mtpDrafterWeightsURL: URL? = nil,
+        mtpSpecEnabled: Bool = true
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
@@ -461,6 +487,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         self.enforceMemoryAdmission = enforceMemoryAdmission
         self.activeHardCapBytes = activeHardCapBytes
         self.mtpDrafterWeightsURL = mtpDrafterWeightsURL
+        self.mtpSpecEnabled = mtpSpecEnabled
         // GREEDY SPECULATION DEFAULT-ON (operator-elected, 2026-06-11): when speculation is enabled and the caller
         // didn't pass an explicit draft, auto-resolve the curated same-family draft from `speculativePairings`.
         // A target with no pairing (e.g. a small model used directly, or Gemma 3 4B) resolves to nil → no draft →
@@ -952,7 +979,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let strategy: BASDecodeStrategy = decodePlannerAutoSelect
             ? BASDecodeLanePolicy.decodeStrategy(
                 purpose: .scoutDefault, temperature: request.preset.temperature,
-                capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens)
+                capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens,
+                thermalThrottled: MLXOrganAdapter._thermalThrottled())
             : .plain
         return try await _execute(strategy, for: request, purpose: .scoutDefault)
         #else

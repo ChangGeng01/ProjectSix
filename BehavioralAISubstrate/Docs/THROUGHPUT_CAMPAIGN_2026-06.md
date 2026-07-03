@@ -282,3 +282,18 @@ fail-closes (nonTrimmableCache) so errors PROPAGATE (never-silent); the GDN plai
 **Ship-cert scorecard: planner ✓ (7/7) · endurance cert ✓ (thermal-gated never-worse) · adapter pipeline ✓
 (E2E 1.30×) · maxSeq/memory ✓ · 2nd-device leg = the ONLY open item (hardware). Lane remains default-OFF
 (ADR-014) — flipping default-ON is the operator's call once a second device runs the cert.**
+
+## ★ DEFAULT-ON (operator-elected 2026-07-03) — the MTP lane is now the Qwen3.5 default
+
+Same election format as the 2026-06-11 greedy-spec default-ON. Mechanics:
+- **Auto-resolution**: `MLXOrganAdapter(model: .qwen3_5_4B_4bit)` (zero config) discovers
+  `qwen35_mtp_folded.safetensors` at canonical locations (device `Documents/`, the model's local dir, Mac
+  `/tmp/gdn_coreai/`); explicit `mtpDrafterWeightsURL:` overrides; **kill-switch `mtpSpecEnabled: false`** =
+  pure legacy byte-equal. Non-Qwen3.5 models never resolve (tested).
+- **Thermal gate wired at all 3 planner call sites** (`_thermalThrottled()`: serious+ → plain).
+- E2E default-ON path (no URL): plain(streaming) 15.8s → mtpSpec 12.3s = **1.28× zero-config**, telemetry folds.
+- Bonus fixed en route: `draft(_:)` on Qwen3.5 used to THROW (nonTrimmableCache — no lane existed); with
+  default-ON it now routes .mtpSpec and WORKS. Tests: BASMTPDefaultOnTests (resolution/kill-switch/non-Qwen) +
+  planner 7/7 + E2E, all green.
+Residual on the record: the 2nd-device cert leg (hardware) — the election was made with single-device cert
+evidence, per the operator's explicit call.
