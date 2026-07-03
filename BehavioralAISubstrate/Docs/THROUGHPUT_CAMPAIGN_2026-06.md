@@ -122,3 +122,23 @@ on the verified int8 port: each iter = 1 MTP draft + ONE T=2 trunk forward with 
   wiring into the vendored decode path — which is DECODE-RED-LINE-ADJACENT (byte-parity waiver territory), so it is
   a scoped decision, not a default. The lever is REAL and now wall-clock-corroborated; banking it on-device is the
   remaining (gated) step.
+
+**Final update 2026-07-03 — PRODUCTION-PRECISION GPU number: 1.44× (84 → 120.6 tok/s). The lever is BANKED at the
+bench level.** Full honest arc (`Tools/qwen35_mtp_gpu.py`, own mx port, correctness gate 5/5 = exact production
+quantized math):
+- CPU torch int8: 1.61× (mechanism proof; greedy-identity 40/40).
+- GPU **fp16**: 0.86-0.91× LOSS — wrong precision + implementation artifact (isolated: T=2 trunk cost ×2.06 in the
+  unfused fp16 path; head 2.8ms / MTP draft 3.4ms were cheap). Kept as the instrument lesson.
+- GPU **4-bit (the ACTUAL main-model serving precision — operator's second catch: "主推是 Qwen3.5")**: plain 84.0
+  tok/s → MTP-spec **120.6 tok/s = 1.44×**, live a=0.88, greedy-identity 64/64, matching the (1+a)/(1+f) estimate
+  (1.42×). mx.quantized_matmul amortizes the T=2 step exactly as the bandwidth math predicts.
+- STRATEGIC REFRAME (also the operator's point): the production Qwen3.5 lane has ZERO speculative decoding today
+  (vendored spec fails closed on GDN `nonTrimmableCache`; the shipped 1.46× is the LLAMA lane). MTP is the ONLY
+  spec candidate for the MAIN model — and it is now bench-proven at production precision with byte-safety.
+- 5th CoreAI asset BUILT (`Tools/qwen35_mtp_to_coreai.py`): the MTP drafter as a 120.7MB int8 single-state
+  `.aimodel` (zero-centered norms pre-folded; fidelity gate vs the torch reference passed) — ready for the ANE
+  lane (draft cost there ≈ (MTP + head-GPU) vs ~100ms/token chain ⇒ est ~1.4×, unmeasured).
+- REMAINING to ship: wire the K=1 MTP loop into the vendored Swift MLX path (2-token verify forward + GDN
+  mid-state capture — the vendored spec machinery already does multi-token verify for Llama; the GDN mid-state
+  needs the capture-not-rollback mechanism proven here). This is DECODE-RED-LINE territory: byte-parity waiver
+  decision for the operator. The bench says the prize is ~1.4× on every free-form turn of the main model.
