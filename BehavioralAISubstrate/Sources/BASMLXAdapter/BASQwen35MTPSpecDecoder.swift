@@ -124,6 +124,13 @@ public final class BASQwen35MTPSpecDecoder {
     }
 
     /// draft hidden [D] from (embed(next) [D], trunk post-norm hidden [D]); writes this step's K/V at `pos`.
+    ///
+    /// ⚠️ KEEP the hand-rolled body — a fusedLink delegation was TRIED and REVERTED (全面修复 2026-07-04):
+    /// the lean MLXFast/SDPA numerics (G1 cos 0.993→0.966) cost the SAMPLING lane ~0.13 acceptance on
+    /// device (a 0.72→0.59 < its 0.60 break-even floor ⇒ the lane would self-gate OFF). Temperature
+    /// sampling's min(1,p/q) is far more sensitive to q drift than greedy argmax (the chain lanes keep
+    /// lean fusedLink — F1 proves draft-argmax exactness there). This fat body is the REFERENCE numerics
+    /// the sampling lane's floor and measured 1.05× were calibrated against.
     func mtpForward(embedNext: MLXArray, hidden: MLXArray, pos: Int) -> MLXArray {
         let u = mm(concatenated([rms(embedNext, nE), rms(hidden, nH)]).expandedDimensions(axis: 0), fc)[0]
         let h = rms(u, iln)
@@ -151,6 +158,9 @@ public final class BASQwen35MTPSpecDecoder {
         return rms(y, fnW)
     }
 
+    /// ⚠️ SUPERSEDED by the fused chain (BASQwen35MTPSpecDecoder+FusedChain.swift) — kept for the probe-era
+    /// BAS_MTP_K sequential baseline only; do NOT extend. The qmv T≥6 cliff (not this code) was the real
+    /// historical deep-K killer.
     /// COMPILED fixed-shape draft — used ONLY by the deep-K chain (generateSpecK), where per-step Swift
     /// graph-build/launch (~43ms/draft measured on device, sequential-dependent so it can't hide in verify
     /// bubbles) dwarfs the fixed-shape full-buffer-attention penalty (~5ms) that made this a NET LOSS for K=1.
@@ -196,6 +206,7 @@ public final class BASQwen35MTPSpecDecoder {
         }
     }()
 
+    /// ⚠️ SUPERSEDED by the fused lazy chain — kept as the compile-approach record; do NOT extend.
     /// WHOLE-CHAIN compiled draft (K unrolled in ONE graph → ONE submission per iteration): each step =
     /// MTP block → 4-bit sub-head argmax (8K rows) → gather next embed from the resident table. Outputs
     /// [d0..d4] + updated KV. Fixes the measured 43ms/step sequential-submission wall.
@@ -493,12 +504,10 @@ public final class BASQwen35MTPSpecDecoder {
         _ = emit(pending[0])
         while out.count < maxTokens && !hitEOS {
             if pending.count >= 4 {
-                var hp = model.hiddenStatesWithCache(
-                    MLXArray([Int32(pending[0])]).expandedDimensions(axis: 0), cache: cache)
-                for p in pending.dropFirst() {
-                    hp = model.hiddenStatesWithCache(
-                        MLXArray([Int32(p)]).expandedDimensions(axis: 0), cache: cache)
-                }
+                // ONE multi-token forward (全面修复 — see the K=1 lane's identical fix; distribution
+                // semantics unchanged: the sample still comes from the trunk's own last-position logits).
+                let hp = model.hiddenStatesWithCache(
+                    MLXArray(pending.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
                 trunkLen += pending.count
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
                 let t = sampleTarget(model.logits(fromHidden: hp)[0, hp.dim(1) - 1])
@@ -577,12 +586,10 @@ public final class BASQwen35MTPSpecDecoder {
         while out.count < maxTokens && !hitEOS {
             // pending-cap safety: commit a long reject run without a draft (rare at a≈0.86)
             if pending.count >= 4 {
-                var hp = model.hiddenStatesWithCache(
-                    MLXArray([Int32(pending[0])]).expandedDimensions(axis: 0), cache: cache)
-                for p in pending.dropFirst() {
-                    hp = model.hiddenStatesWithCache(
-                        MLXArray([Int32(p)]).expandedDimensions(axis: 0), cache: cache)
-                }
+                // ONE multi-token forward (全面修复: the one-token-at-a-time loop here was deep-K killer #2 —
+                // P×~16ms/refeed; same forward class as the verify feed ⇒ same ADR-039 lossless family).
+                let hp = model.hiddenStatesWithCache(
+                    MLXArray(pending.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
                 trunkLen += pending.count
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
                 let t = argmaxLast(model.logits(fromHidden: hp))

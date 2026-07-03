@@ -427,3 +427,22 @@ adaptiveK: true)`; sampling lane unchanged (K=1 rejection sampling). Adapter Mac
 16.4s → 9.9s = **1.66×** (was 1.30× at K=1). The adaptive+thermal-tiered controller is the production
 embodiment of the campaign's core lesson: acceptance is a WORKLOAD × THERMAL surface, not a constant —
 the lane now walks that surface instead of betting on one point. Open: 2nd-device cert leg (hardware).
+
+## 全面修复 2026-07-04 — batched refeeds, sleep-freeze closure, a unification tried-and-reverted
+
+- **Batched refeeds land in the K=1 + SAMPLING lanes** (deep-K killer #2, now fixed everywhere): the
+  pending≥4 one-token-at-a-time loops → ONE multi-token forward (same ADR-039 family as the verify feed).
+- **Task.sleep freeze: CLOSED as lock-state-conditional.** Forensics probe (BAS_MTP_SLEEPTEST=1): with the
+  phone awake, Task.sleep / GCD asyncAfter / Thread.sleep ALL resume normally (+3.0-3.1s). The 21:20-22:30
+  freezes correlate with the locked screen at launch; ops rule: Auto-Lock=Never during campaigns; probes
+  keep the NOCOOL/spin defenses anyway.
+- **buildTag** printed at probe start — a stale binary after BUILD FAILED (two VOID incidents tonight) is
+  now visible in the first log line.
+- **Unification TRIED AND REVERTED (the honest record)**: mtpForward delegating to the lean fusedLink
+  (one MTP-block implementation) passed every greedy gate (F1 exact, G1 0.966>0.95, K=1 1.43× Mac) but
+  cost the SAMPLING lane ~0.13 device acceptance (a 0.72→0.59 < its 0.60 floor ⇒ the lane would
+  self-gate OFF). min(1,p/q) is far more sensitive to q numerics than greedy argmax-match. mtpForward
+  stays the FAT reference implementation (the sampling lane's floor/1.05× calibration basis); the chain
+  lanes keep lean fusedLink (argmax-exactness F1-proven, cert PASS). Note: G1's "0.9931" is the
+  PRE-quantization number — the 4-bit-draft era's normal is ~0.97 (gate 0.95).
+- SUPERSEDED markers on compiledDraft/compiledChain5/generateSpecK (probe-era baselines; do not extend).

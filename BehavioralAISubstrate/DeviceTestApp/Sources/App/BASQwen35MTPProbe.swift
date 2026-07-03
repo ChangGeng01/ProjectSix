@@ -282,10 +282,50 @@ enum BASQwen35MTPProbe {
             : mS / mP >= 0.95 ? "≈ parity — engagement verified, speed marginal" : "⚠️ net loss at 0.7 — gate it"))
     }
 
+    /// Bump on every deployed change — printed at start so a stale binary (the take-3 VOID incident:
+    /// BUILD FAILED + old app relaunched) is visible in the FIRST log line.
+    static let buildTag = "2026-07-04a-unified-mtp"
+
+    /// Sleep-mechanism forensics (BAS_MTP_SLEEPTEST=1): the Task.sleep freeze gotcha — which async wait
+    /// primitives actually resume in a devicectl-launched app? Each gets 3s; a mechanism that hasn't
+    /// reported within 12s is FROZEN (the watchdog prints survivors; run with --console).
+    static func runSleepTest() async {
+        print("[sleeptest] start thermal=\(thermal())")
+        let t0 = Date()
+        func stamp(_ name: String) { print(String(format: "[sleeptest] %@ RESUMED at +%.1fs", name, Date().timeIntervalSince(t0))); fflush(stdout) }
+        Task.detached {                                   // watchdog: pure spin, no async wait
+            var x = 1.0
+            while Date().timeIntervalSince(t0) < 12 { x = sin(x) + 1.000001 }
+            print("[sleeptest] watchdog: 12s elapsed (spin) — anything unreported above is FROZEN x=\(x > 0)")
+            fflush(stdout)
+        }
+        Task.detached { try? await Task.sleep(nanoseconds: 3_000_000_000); stamp("Task.sleep") }
+        Task.detached {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global().asyncAfter(deadline: .now() + 3) { c.resume() }
+            }
+            stamp("GCD.asyncAfter")
+        }
+        Task.detached {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global().async { Thread.sleep(forTimeInterval: 3); c.resume() }
+            }
+            stamp("Thread.sleep(GCD)")
+        }
+        // give everything 15s of wall clock (spin — this function must not itself rely on a sleep)
+        var y = 1.0
+        while Date().timeIntervalSince(t0) < 15 { y = sin(y) + 1.000001 }
+        print("[sleeptest] done y=\(y > 0)")
+    }
+
     static func run() async {
         setvbuf(stdout, nil, _IOLBF, 0)      // line-buffer: devicectl console pipes are block-buffered —
                                              // mid-run prints were invisible during hang forensics
-        print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol")
+        print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol [\(buildTag)]")
+        if ProcessInfo.processInfo.environment["BAS_MTP_SLEEPTEST"] == "1" {
+            await runSleepTest()
+            return
+        }
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let wURL = docs.appendingPathComponent("qwen35_mtp_folded.safetensors")
         guard FileManager.default.fileExists(atPath: wURL.path) else {
