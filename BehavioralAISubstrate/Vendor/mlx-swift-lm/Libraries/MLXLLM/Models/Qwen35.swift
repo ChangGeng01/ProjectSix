@@ -577,6 +577,12 @@ public class Qwen35TextModel: Module, LLMModel, KVCacheDimensionProvider {
         return out
     }
 
+    /// ADDITIVE (spec lane): head logits from post-norm hidden — the tail of `callAsFunction` factored for reuse.
+    public func logitsFromHidden(_ hidden: MLXArray) -> MLXArray {
+        if let lmHead { return lmHead(hidden) }
+        return model.embedTokens.asLinear(hidden)
+    }
+
     public func newCache(parameters: GenerateParameters?) -> [KVCache] {
         return model.layers.map { layer in
             if layer.isLinear {
@@ -686,6 +692,21 @@ extension Qwen35Model {
     /// [batch, seq, hidden]. Exposes the text backbone's output (the same tensor `callAsFunction` then projects
     /// through the LM head) so the substrate can probe it (difference-of-means correctness/abstention sensor).
     /// Pure read of the existing forward — no decode-path or kernel change.
+    /// ADDITIVE spec-lane accessors (BASQwen35MTPSpecDecoder) — observation/opt-in only; no existing decode
+    /// path consults these. Same precedent as `finalHiddenStates` (additive public surface, zero logic change).
+    /// `hiddenStatesWithCache` returns the POST-final-norm hidden ([B,T,D]) advancing `cache`.
+    public func hiddenStatesWithCache(_ inputs: MLXArray, cache: [KVCache]?) -> MLXArray {
+        languageModel.model(inputs, cache: cache)
+    }
+    /// Tied-or-untied head logits from post-norm hidden.
+    public func logits(fromHidden hidden: MLXArray) -> MLXArray {
+        languageModel.logitsFromHidden(hidden)
+    }
+    /// Embedding rows for token ids ([T] → [T,D]) — the MTP drafter's fused input.
+    public func embedding(_ tokens: MLXArray) -> MLXArray {
+        languageModel.model.embedTokens(tokens)
+    }
+
     public func finalHiddenStates(_ inputs: MLXArray) -> MLXArray {
         languageModel.model(inputs, cache: nil)
     }
