@@ -71,7 +71,9 @@ enum BASQwen35MTPProbe {
                 let kEnvS = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
                 let kFusedS = Int(ProcessInfo.processInfo.environment["BAS_MTP_FUSED_K"] ?? "") ?? 0
                 let tCapS = Int(ProcessInfo.processInfo.environment["BAS_MTP_TCAP"] ?? "") ?? 5
-                let run = kFusedS >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: 96, k: kFusedS, tCap: tCapS)
+                // PRODUCTION MIRROR: adaptive K + thermal tier (nominal EMA{1-3} / fair K=1), as shipped.
+                let run = kFusedS >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: 96, k: kFusedS,
+                                                                tCap: tCapS, adaptiveK: true)
                     : kEnvS > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: 96, k: kEnvS)
                                 : dec.generateSpec(prompt: prompt, maxTokens: 96)
                 let a = run.iterations > 0 ? Double(run.accepted) / Double(run.iterations) : 0
