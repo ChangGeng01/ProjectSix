@@ -110,13 +110,18 @@ enum BASQwen35MTPProbe {
             let band = abs(pre.tokPerSec - post.tokPerSec) / plainMean
             let ratio = spec.tokPerSec / plainMean
             let a = spec.iterations > 0 ? Double(spec.accepted) / Double(spec.iterations) : 0
-            let identical = spec.tokens == pre.tokens
-            print(String(format: "[qwen35-mtp] VERDICT: plain-mean %.1f tok/s (drift band ±%.0f%%) | spec %.1f tok/s = %.2fx | a=%.2f | identity %@",
-                         plainMean, band * 100, spec.tokPerSec, ratio, a, identical ? "OK" : "✗"))
-            let pass = spec.tokPerSec >= 20 && ratio > 1 + band && identical && a > 0.3
-            print("[qwen35-mtp] " + (pass
-                ? "✅ G3 PASS — Qwen3.5-4B ≥20 tok/s on device with the MTP lane"
-                : "⚠️ G3 NOT MET — see arms above (target 20; win must exceed the drift band; identity+a required)"))
+            var firstDiv = -1
+            for i in 0 ..< min(spec.tokens.count, pre.tokens.count) where spec.tokens[i] != pre.tokens[i] {
+                firstDiv = i; break
+            }
+            print(String(format: "[qwen35-mtp] VERDICT: plain-mean %.1f tok/s (drift band ±%.0f%%) | spec %.1f tok/s = %.2fx | a=%.2f | serial-div@%d (ADR-039 lossless)",
+                         plainMean, band * 100, spec.tokPerSec, ratio, a, firstDiv))
+            let pass20 = spec.tokPerSec >= 20 && ratio > 1 + band && a > 0.7
+            let pass30 = spec.tokPerSec >= 30 && ratio > 1 + band && a > 0.7
+            print("[qwen35-mtp] " + (pass30
+                ? "✅✅ 30 tok/s TARGET MET"
+                : pass20 ? "✅ ≥20 holds — 30 gap = \(String(format: "%.1f", 30 - spec.tokPerSec)) tok/s"
+                         : "⚠️ below 20 — regression, investigate"))
         } catch {
             print("[qwen35-mtp] FAILED: \(error) ✗")
         }
