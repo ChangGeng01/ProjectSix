@@ -363,6 +363,12 @@ final class BASEnduranceAppController: ObservableObject {
             launchSpecAux { await BASQwen35RdarProbe.run() }
             return
         }
+        // G3 — the ≥20 tok/s verdict: MTP spec lane vs plain on Qwen3.5-4B (BAS_QWEN35_MTP_PROBE=1;
+        // stage qwen35_mtp_folded.safetensors per the probe header). Bracketed protocol, identity+a gated.
+        if (env["BAS_QWEN35_MTP_PROBE"] ?? "0") == "1" {
+            launchSpecAux { await BASQwen35MTPProbe.run() }
+            return
+        }
         // (BASRhoProbe + BASCoreAIGpuProbe peeled to Sources/Experiments/ — dead negatives, see git history /
         //  Docs + memory litert-onphone-reality. Their BAS_RHO_PROBE / BAS_COREAI_GPU_PROBE dispatch removed.)
         // Track E — SERIAL Saguaro end-to-end: MLX 3B target verifying a CoreAI Mamba (Llamba-1B) draft via

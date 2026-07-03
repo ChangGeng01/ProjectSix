@@ -142,3 +142,18 @@ quantized math):
   mid-state capture — the vendored spec machinery already does multi-token verify for Llama; the GDN mid-state
   needs the capture-not-rollback mechanism proven here). This is DECODE-RED-LINE territory: byte-parity waiver
   decision for the operator. The bench says the prize is ~1.4× on every free-form turn of the main model.
+
+## ★★ Final 2026-07-03 — G3 DEVICE PASS: Qwen3.5-4B ≥20 tok/s on the iPhone Air (the operator's target, MET)
+
+`BASQwen35MTPProbe` (BAS_QWEN35_MTP_PROBE=1), full inherited protocol (bracketed, cooldowns, identity+a gated):
+- **plain-pre 19.3 → spec 22.4 → plain-post 19.3 tok/s** (drift band ±0%, thermal nominal throughout) = **1.16×,
+  a=0.86, greedy-identity OK. VERDICT: 22.4 ≥ 20 → PASS.**
+- THE point: the plain baseline (19.3) does NOT meet the 20 tok/s target — **the MTP lane is what puts the main
+  model over the line**, exactly as the bandwidth archaeology predicted (plain ~20±, MTP = the amortization lever).
+- Gate chain that got here: G1 Swift module fidelity 0.9931 → G2 Mac identity 48/48 (1.12×) → G3 device PASS.
+  Zero vendored-kernel changes (3 additive accessors + a standalone opt-in decoder; snapshot-restore on MambaCache).
+- HEADROOM (not yet taken): device ratio 1.16× vs the 1.44× 4-bit bench — the vendored T=2 forward path is the
+  gap (same signature as the Mac-Swift 1.12×); a T=2 fast path could push ~27 tok/s. K=2 MTP is a further lever.
+- WATCH: footprint 3268 MB with the fp16 MTP head — at the jetsam margin; int8-quantize the head (~-120 MB) before
+  any default-ON cert. This G3 gate is NOT the ship cert (that needs the ≥50-prompt × 2-device × endurance protocol
+  per SPEC_DECODE_CERT_RESULTS.md + the planner integration per MTP_LANDING_CHECKLIST.md §2).
