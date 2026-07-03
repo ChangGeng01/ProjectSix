@@ -29,29 +29,29 @@ public final class BASQwen35MTPSpecDecoder {
 
     public enum SpecError: Error { case missingWeights(String), notQwen35 }
 
-    private let model: Qwen35Model
+    let model: Qwen35Model
     // MTP linears quantized 4-bit at init (device: 240MB fp16 ≈ 4.8ms/draft at ~50GB/s → 4-bit ≈ 1.2ms);
     // norms stay fp16 (pre-folded to plain).
-    private struct QW { let w, s: MLXArray; let b: MLXArray? }
-    private let fc, qp, kp, vp, op, gw, uw, dw: QW
-    private let iln, pln, qn, kn, nE, nH, fnW: MLXArray
-    private let invFreq: MLXArray                      // rope table, computed ONCE
+    struct QW { let w, s: MLXArray; let b: MLXArray? }
+    let fc, qp, kp, vp, op, gw, uw, dw: QW
+    let iln, pln, qn, kn, nE, nH, fnW: MLXArray
+    let invFreq: MLXArray                      // rope table, computed ONCE
     // DRAFT SUB-HEAD (quality-neutral): drafts argmax over the FIRST 32K vocab rows only (BPE ids ≈ frequency
     // order; device full-head = ~6.4ms/draft at ~50GB/s vs ~0.8ms for 32K). A true-argmax outside 32K just makes
     // that draft wrong → rejected → emissions remain FULL-vocab trunk argmaxes (ADR-039 lossless, 满血).
-    private static let draftVocab = 32768
-    private let subHead: QW
+    static let draftVocab = 32768
+    let subHead: QW
     /// Deep-K chain: next-step embed rows gathered from a RESIDENT 8K fp16 table inside the ONE compiled chain
     /// graph (drafts restricted to the 8K most-frequent ids; misses just reject — lossless/满血 unchanged).
     private static let chainVocab = 8192
     private lazy var chainEmbed: MLXArray =
         model.embedding(MLXArray((0 ..< Self.chainVocab).map(Int32.init)))   // [8K, D] fp16 (deep-K only)
     // MTP block KV (own stream; fixed-capacity, index-written like the trunk's spec assets)
-    private var mtpK: MLXArray
-    private var mtpV: MLXArray
-    private static let maxSeq = 2048  // MTP-stream KV bound (buffers 2×8MB fp16); production prompt+gen cap
-    private static let ah = 16, akv = 4, ahd = 256, rd = 64
-    private static let ropeBase: Float = 10_000_000
+    var mtpK: MLXArray
+    var mtpV: MLXArray
+    static let maxSeq = 2048  // MTP-stream KV bound (buffers 2×8MB fp16); production prompt+gen cap
+    static let ah = 16, akv = 4, ahd = 256, rd = 64
+    static let ropeBase: Float = 10_000_000
 
     public init(model: Qwen35Model, mtpWeightsURL: URL) throws {
         self.model = model
@@ -91,24 +91,24 @@ public final class BASQwen35MTPSpecDecoder {
     }
 
     /// Draft-only argmax over the 32K sub-head (returns a GPU-resident scalar; no sync).
-    private func draftArgmax(_ y: MLXArray) -> MLXArray {
+    func draftArgmax(_ y: MLXArray) -> MLXArray {
         argMax(mm(y.expandedDimensions(axis: 0), subHead)[0], axis: -1)
     }
 
     // MARK: - MTP forward (draft hidden for ONE step; own KV stream at `pos`)
 
-    private func rms(_ x: MLXArray, _ w: MLXArray? = nil) -> MLXArray {
+    func rms(_ x: MLXArray, _ w: MLXArray? = nil) -> MLXArray {
         var y = x * rsqrt(mean(x.asType(.float32) * x.asType(.float32), axis: -1, keepDims: true) + 1e-6)
             .asType(.float16)
         if let w { y = y * w }
         return y
     }
 
-    private func mm(_ x: MLXArray, _ w: QW) -> MLXArray {
+    func mm(_ x: MLXArray, _ w: QW) -> MLXArray {
         quantizedMatmul(x, w.w, scales: w.s, biases: w.b, transpose: true, groupSize: 64, bits: 4)
     }
 
-    private func rope(_ t: MLXArray, pos: Int) -> MLXArray {
+    func rope(_ t: MLXArray, pos: Int) -> MLXArray {
         // NeoX partial rotary: first 64 of 256 dims, base 1e7. t: [H, 256].
         let half = Self.rd / 2
         let ang = (Float(pos) * invFreq).asType(.float16)
@@ -273,7 +273,7 @@ public final class BASQwen35MTPSpecDecoder {
         public let iterations: Int
     }
 
-    private func argmaxLast(_ logits: MLXArray) -> Int {
+    func argmaxLast(_ logits: MLXArray) -> Int {
         // logits [1, T, V] → argmax of the LAST row
         let last = logits[0, logits.dim(1) - 1]
         return argMax(last, axis: -1).item(Int.self)

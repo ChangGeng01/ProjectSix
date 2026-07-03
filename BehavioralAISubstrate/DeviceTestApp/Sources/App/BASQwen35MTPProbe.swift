@@ -69,8 +69,10 @@ enum BASQwen35MTPProbe {
                 }
                 let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
                 let kEnvS = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
-                let run = kEnvS > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: 96, k: kEnvS)
-                                    : dec.generateSpec(prompt: prompt, maxTokens: 96)
+                let kFusedS = Int(ProcessInfo.processInfo.environment["BAS_MTP_FUSED_K"] ?? "") ?? 0
+                let run = kFusedS >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: 96, k: kFusedS)
+                    : kEnvS > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: 96, k: kEnvS)
+                                : dec.generateSpec(prompt: prompt, maxTokens: 96)
                 let a = run.iterations > 0 ? Double(run.accepted) / Double(run.iterations) : 0
                 return (Double(run.tokens.count) / max(run.decodeSeconds, 0.001), a)
             }
@@ -255,6 +257,8 @@ enum BASQwen35MTPProbe {
     }
 
     static func run() async {
+        setvbuf(stdout, nil, _IOLBF, 0)      // line-buffer: devicectl console pipes are block-buffered —
+                                             // mid-run prints were invisible during hang forensics
         print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let wURL = docs.appendingPathComponent("qwen35_mtp_folded.safetensors")
@@ -301,9 +305,12 @@ enum BASQwen35MTPProbe {
                     }
                     let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
                     let kEnv = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
+                    let kFused = Int(ProcessInfo.processInfo.environment["BAS_MTP_FUSED_K"] ?? "") ?? 0
+                    let fp16S = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_FP16"] == "1"
                     func specRun(_ m: Int) -> BASQwen35MTPSpecDecoder.Run {
-                        kEnv > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: m, k: kEnv)
-                                 : dec.generateSpec(prompt: prompt, maxTokens: m)
+                        kFused >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: m, k: kFused, fp32Scores: !fp16S)
+                            : kEnv > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: m, k: kEnv)
+                                       : dec.generateSpec(prompt: prompt, maxTokens: m)
                     }
                     _ = spec ? specRun(8)
                              : dec.generatePlain(prompt: prompt, maxTokens: 8)      // warmup (JIT both paths)
