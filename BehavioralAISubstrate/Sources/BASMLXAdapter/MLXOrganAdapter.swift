@@ -21,6 +21,11 @@ import MLXNN
 fileprivate struct ChatSessionBox: @unchecked Sendable {
     let session: ChatSession
 }
+
+/// Same guarantee as ChatSessionBox: the decoder is only ever touched inside `container.perform` closures.
+struct MTPDecoderBox: @unchecked Sendable {
+    let decoder: BASQwen35MTPSpecDecoder
+}
 #endif
 
 /// MLX organ adapter (Apple Silicon, on-device, downloaded
@@ -135,6 +140,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// The device's per-process jetsam (ActiveHard) cap for the admission check; nil ⇒ the measured iPhone Air
     /// default. A larger-RAM / entitled host passes its own. Only consulted when `enforceMemoryAdmission`.
     public nonisolated let activeHardCapBytes: Int?
+
+    /// OPT-IN MTP drafter weights URL (see init). nil ⇒ `.mtpSpec` never offered (byte-equal default).
+    public nonisolated let mtpDrafterWeightsURL: URL?
+    /// Cached MTP decoder (created on first `.mtpSpec` execution inside the container actor; the box mirrors
+    /// `ChatSessionBox`'s @unchecked-Sendable pattern — exclusively used within `container.perform`).
+    var mtpDecoderBox: MTPDecoderBox?
 
     /// ADR-041 §C — OPT-IN cap (bytes) for MLX's **load-time** memory peak, applied via `MLXRuntimeConfig`
     /// BEFORE the container load. Unlike `cacheLimitBytes` (a post-load recycling ceiling), `MLX.Memory.memoryLimit`
@@ -436,7 +447,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         kvCacheBits: Int? = nil,
         maxKVSize: Int? = nil,
         enforceMemoryAdmission: Bool = false,
-        activeHardCapBytes: Int? = nil
+        activeHardCapBytes: Int? = nil,
+        // OPT-IN MTP drafter weights (Tools/qwen35_fetch_mtp.py → qwen35_mtp_folded.safetensors). nil (default)
+        // = the .mtpSpec lane is never offered = byte-equal (ADR-014). Only meaningful for Qwen3.5 main models
+        // (execution fail-closes to plain otherwise). Device-certified: engaged 1.20-1.36×, thermal-gated.
+        mtpDrafterWeightsURL: URL? = nil
     ) {
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
@@ -445,6 +460,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         self.maxKVSize = maxKVSize
         self.enforceMemoryAdmission = enforceMemoryAdmission
         self.activeHardCapBytes = activeHardCapBytes
+        self.mtpDrafterWeightsURL = mtpDrafterWeightsURL
         // GREEDY SPECULATION DEFAULT-ON (operator-elected, 2026-06-11): when speculation is enabled and the caller
         // didn't pass an explicit draft, auto-resolve the curated same-family draft from `speculativePairings`.
         // A target with no pairing (e.g. a small model used directly, or Gemma 3 4B) resolves to nil → no draft →

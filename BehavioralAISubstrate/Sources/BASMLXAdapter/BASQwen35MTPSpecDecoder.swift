@@ -44,11 +44,12 @@ public final class BASQwen35MTPSpecDecoder {
     /// Deep-K chain: next-step embed rows gathered from a RESIDENT 8K fp16 table inside the ONE compiled chain
     /// graph (drafts restricted to the 8K most-frequent ids; misses just reject — lossless/满血 unchanged).
     private static let chainVocab = 8192
-    private let chainEmbed: MLXArray
+    private lazy var chainEmbed: MLXArray =
+        model.embedding(MLXArray((0 ..< Self.chainVocab).map(Int32.init)))   // [8K, D] fp16 (deep-K only)
     // MTP block KV (own stream; fixed-capacity, index-written like the trunk's spec assets)
     private var mtpK: MLXArray
     private var mtpV: MLXArray
-    private static let maxSeq = 192   // campaign cap (probe peak <140); fixed-shape for the compiled chain draft
+    private static let maxSeq = 2048  // MTP-stream KV bound (buffers 2×8MB fp16); production prompt+gen cap
     private static let ah = 16, akv = 4, ahd = 256, rd = 64
     private static let ropeBase: Float = 10_000_000
 
@@ -84,7 +85,7 @@ public final class BASQwen35MTPSpecDecoder {
         let subRows = model.embedding(MLXArray((0 ..< Self.draftVocab).map(Int32.init)))   // [32K, D] fp16
         let (hw, hs, hb) = MLX.quantized(subRows, groupSize: 64, bits: 4)
         subHead = QW(w: hw, s: hs, b: hb)
-        chainEmbed = model.embedding(MLXArray((0 ..< Self.chainVocab).map(Int32.init)))    // [8K, D] fp16 resident
+        // chainEmbed moved to a lazy property (experimental deep-K only) — production K=1 skips its 42MB.
         mtpK = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
         mtpV = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
     }
@@ -285,7 +286,7 @@ public final class BASQwen35MTPSpecDecoder {
         var nxt = argmaxLast(model.logits(fromHidden: h))
         eval(MLXArray(Int32(nxt)))
         let t0 = Date()
-        var out: [Int] = []
+        var out: [Int] = [nxt]                    // first generated token included (production semantics)
         while out.count < maxTokens {
             h = model.hiddenStatesWithCache(MLXArray([Int32(nxt)]).expandedDimensions(axis: 0), cache: cache)
             nxt = argmaxLast(model.logits(fromHidden: h))
@@ -404,7 +405,16 @@ public final class BASQwen35MTPSpecDecoder {
     /// Test-only: force every draft to be wrong (isolates reject-path bookkeeping; identity must STILL hold).
     public var forceRejectForDiagnostics = false
 
+    /// Production entry: EOS-aware (stops BEFORE emitting an eos token — matching the plain lanes' semantics).
+    public func generateSpec(prompt: [Int], maxTokens: Int, eosTokens: Set<Int>) -> Run {
+        _generateSpec(prompt: prompt, maxTokens: maxTokens, eosTokens: eosTokens)
+    }
+
     public func generateSpec(prompt: [Int], maxTokens: Int) -> Run {
+        _generateSpec(prompt: prompt, maxTokens: maxTokens, eosTokens: [])
+    }
+
+    private func _generateSpec(prompt: [Int], maxTokens: Int, eosTokens: Set<Int>) -> Run {
         resetMTPStream()
         let cache = model.newCache(parameters: nil)
         let h0 = model.hiddenStatesWithCache(
@@ -419,7 +429,16 @@ public final class BASQwen35MTPSpecDecoder {
         let t0 = Date()
         var out: [Int] = []
         var accepted = 0, iters = 0
-        while out.count < maxTokens {
+        var hitEOS = false
+        func emit(_ tok: Int) -> Bool {          // false = stop (eos hit or budget reached); eos NOT emitted
+            if eosTokens.contains(tok) { hitEOS = true; return false }
+            out.append(tok)
+            return out.count < maxTokens
+        }
+        // FIRST generated token (the prefill argmax) is part of the stream (production semantics — the earlier
+        // probe convention skipped it symmetrically in both arms; the wiring E2E caught the mismatch vs streaming).
+        _ = emit(pending[0])
+        while out.count < maxTokens && !hitEOS {
             // pending-cap safety: commit a long reject run without a draft (rare at a≈0.86)
             if pending.count >= 4 {
                 var hp = model.hiddenStatesWithCache(
@@ -431,7 +450,8 @@ public final class BASQwen35MTPSpecDecoder {
                 trunkLen += pending.count
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
                 let t = argmaxLast(model.logits(fromHidden: hp))
-                out.append(t); pending = [t]
+                if !emit(t) { break }
+                pending = [t]
                 d = draftArgmax(mtpForward(
                     embedNext: model.embedding(MLXArray([Int32(t)]))[0], hidden: hLast, pos: hLastPos))
                 continue
@@ -455,15 +475,14 @@ public final class BASQwen35MTPSpecDecoder {
             if trueD == dv {
                 accepted += 1
                 let em = am[T - 1].item(Int.self)
-                out.append(trueD)
-                if out.count < maxTokens { out.append(em) }
+                if emit(trueD) { _ = emit(em) }
                 trunkLen += T                                          // committed (pending + d in state)
                 hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
                 pending = [em]
             } else {
                 for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
                 for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
-                out.append(trueD)
+                _ = emit(trueD)
                 hLast = h2[0, T - 2]                                   // hidden after the last CERTAIN token
                 hLastPos = trunkLen + T - 2                            // its absolute position (state rolled back)
                 pending.append(trueD)

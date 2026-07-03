@@ -199,7 +199,10 @@ extension MLXOrganAdapter {
         BASDecodeCapabilities(
             draftModelLoaded: isSpeculationActive,                 // draftContainer loaded + mode != .off
             saguaroAvailable: false,                               // no injected CoreAI speculator on this entry
-            modelFreeAvailable: _loadedContainerForStreaming() != nil)
+            modelFreeAvailable: _loadedContainerForStreaming() != nil,
+            // Offered only when a host opted in AND the main model is loaded; execution fail-closes to plain
+            // if the model is not Qwen3.5 (SpecError.notQwen35 → _plainDraft, never-silent).
+            mtpHeadLoaded: mtpDrafterWeightsURL != nil && _loadedContainerForStreaming() != nil)
     }
     #endif
 }

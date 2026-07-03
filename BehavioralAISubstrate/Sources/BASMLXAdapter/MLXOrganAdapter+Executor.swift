@@ -40,12 +40,21 @@ extension MLXOrganAdapter {
             return try await _draftSpeculative(request)
 
         case .mtpSpec:
-            // SHIP-CERT WIRING DEBT (fail-closed, never-silent): the MTP lane's full generation-path integration
-            // (chat template + streaming + EOS through BASQwen35MTPSpecDecoder) is not yet wired into the adapter
-            // pipeline — the lane is device-certified standalone (30.1 tok/s, ADR-039 lossless) via the probe.
-            // Until the pipeline wiring lands, fall back to plain (byte-identical output by the ADR-039 invariant;
-            // only the speed differs). The planner only offers .mtpSpec when a host opts in via mtpHeadLoaded.
-            return try await _plainDraft(request)
+            // Full pipeline via _generateMTPSpec (template + EOS + ADR-039 lossless decode). FAIL-CLOSED:
+            // any error (not Qwen3.5 / weights missing / decode failure) falls back to plain — byte-identical
+            // output by the ADR-039 invariant, never silent (reason logged via the thrown error's description).
+            do {
+                let g = try await _generateMTPSpec(for: request)
+                // LIVE acceptance telemetry (checklist trap #2: the draft-model lane's cold-forever gap must not
+                // be replicated) — the planner's 0.15 floor bites on real stats.
+                draftProfiler = draftProfiler.observing(
+                    sourceID: BASDecodeStrategy.mtpSpecID, purpose: purpose,
+                    accepted: g.accepted, proposed: g.rounds, rounds: g.rounds)
+                return g.draft
+            } catch {
+                print("[mtp-spec] lane fail-closed to plain: \(error)")
+                return try await _plainDraft(request)
+            }
 
         case .promptLookup(let k):
             let g = try await _generateModelFree(

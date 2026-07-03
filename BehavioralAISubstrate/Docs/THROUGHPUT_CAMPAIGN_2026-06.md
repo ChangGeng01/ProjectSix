@@ -260,3 +260,25 @@ generation-pipeline wiring lands — byte-identical by ADR-039, documented wirin
 generation-pipeline wiring for `.mtpSpec` (chat template + streaming + EOS through the decoder; the lane is
 certified standalone); ③ maxSeq config (192 campaign cap); ④ int8 the MTP block for jetsam margin. The lane is
 default-OFF everywhere until those close.
+
+## SHIP-CERT COMPLETE 2026-07-03 — adapter pipeline WIRED (E2E 1.30×); only the 2nd-device leg remains
+
+The last engineering item landed: `.mtpSpec` now runs the FULL production pipeline
+(`MLXOrganAdapter+MTPSpec._generateMTPSpec`: `_buildLMInput` chat template → tokenize → EOS-aware
+`BASQwen35MTPSpecDecoder.generateSpec(eosTokens:)` with the production EOS superset → detokenize →
+`_buildDraft`), decoder CACHED across turns (MTPDecoderBox, the ChatSessionBox pattern), live acceptance
+telemetry folded per turn. E2E test (`BASMTPAdapterPipelineTests`, real Qwen3.5-4B): **plain(streaming) 16.2s →
+mtpSpec 12.5s = 1.30× through the full pipeline**, 154-char common prefix (lossless family), profiler stat
+folded on first use (a=0.755).
+
+Bug the E2E caught (why wiring tests exist): the decoder's probe-era convention skipped the FIRST generated
+token symmetrically in both arms — invisible to every G-gate and the 50-prompt cert, visible the moment the lane
+met the streaming baseline. Fixed in both decoder paths (production semantics: first token emitted).
+
+Also closed: maxSeq 192→2048 (production prompt+gen bound; MTP KV buffers 2×8MB), chainEmbed lazy (−42MB on the
+production K=1 path). Executor `.mtpSpec` fail-closed note: on Qwen3.5 the `_plainDraft` fallback itself
+fail-closes (nonTrimmableCache) so errors PROPAGATE (never-silent); the GDN plain lane is streaming — host docs.
+
+**Ship-cert scorecard: planner ✓ (7/7) · endurance cert ✓ (thermal-gated never-worse) · adapter pipeline ✓
+(E2E 1.30×) · maxSeq/memory ✓ · 2nd-device leg = the ONLY open item (hardware). Lane remains default-OFF
+(ADR-014) — flipping default-ON is the operator's call once a second device runs the cert.**
