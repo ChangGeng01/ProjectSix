@@ -29,6 +29,10 @@ public enum BASDecodeStrategy: Sendable, Equatable {
     /// Device-certified 30.1 tok/s vs plain 20.3 (bracketed, a=0.85, ADR-039 lossless). Executed via
     /// `BASQwen35MTPSpecDecoder` behind an OPT-IN weights URL (default nil = lane never offered = byte-equal).
     case mtpSpec
+    /// MTP spec-SAMPLING (temperature > 0): rejection-sampling verify — output distribution EXACTLY the
+    /// production sampling distribution (unit-proven TV < 0.007); covers the substrate's real presets
+    /// (scout 0.1 / core 0.7). Speed via the same trunk-read amortization; a is distributional overlap.
+    case mtpSpecSampling
     /// Measure-only (AB harnesses / device probes). NEVER returned by the production planner — it documents that
     /// the measure lanes exist outside the production decision surface.
     case probeOnly
@@ -38,4 +42,5 @@ public enum BASDecodeStrategy: Sendable, Equatable {
     public static let draftModelID = "draft-model"
     public static let saguaroID = "saguaro"
     public static let mtpSpecID = "mtp-qwen35"
+    public static let mtpSpecSamplingID = "mtp-qwen35-sampling"
 }

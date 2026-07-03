@@ -312,3 +312,46 @@ evidence, per the operator's explicit call.
   lane serves `greedyDeterministic`-class (temp-0) requests.** Extending the win to sampling turns requires
   LOSSLESS SPEC-SAMPLING (rejection-sampling verify) — a separate correctness surface (the draft-model version
   was certified doNotEnable) — the next real ticket, not silently bundled into this election.
+
+## ★ LOSSLESS SPEC-SAMPLING 2026-07-03 — the temp>0 ticket closed (device ~1.05× at core 0.7, cost-aware gated)
+
+The temperature-boundary ticket from the default-ON verification, done end-to-end. **Math**: rejection-sampling
+verify (`samplingVerdict`: draft d~q accepted iff u < min(1, p(d)/q(d)); reject → resample from
+normalize(max(0, p−q))) — output distribution EXACTLY the trunk's TopPSampler p for ANY draft q. q replicates
+the vendored transform bit-for-bit (top-p masks UN-tempered logSoftmax, temperature divides after). Statistical
+losslessness unit-pinned: 30k-trial TV vs vendored sampler = 0.0044 (temp-only) / 0.0063 (top-p) / 0.0056
+(32K sub-vocab draft), gate <0.02 (`BASMTPSamplingLosslessTests`). Wiring: `.mtpSpecSampling` strategy,
+planner temp>0 branch, executor fail-closed arm, `_generateMTPSpec(sampling:)` pipeline param,
+`generateSpecSampling` decoder loop (carry-forward reject, bonus p-sample on accept, EOS superset).
+
+**The device saga (3 runs, each one honest):**
+1. **Run 1 CRASHED** — and exposed a PRE-EXISTING hole, not a sampling bug: thermal `serious` → planner
+   (correctly) rerouted temp>0 to `.plain` → the eager plain lane (`_plainDraft` → nullDrafter greedy loop)
+   throws `nonTrimmableCache` on GDN caches UPFRONT — so the fail-closed landing itself crashed. Every eager
+   `.plain` on Qwen3.5 (incl. the executor's fail-closed) was broken; production had never noticed because the
+   GDN plain lane is streaming. **Fix: `_plainDraft` catches `nonTrimmableCache` → `_chatSessionPlainDraft`**
+   (the pre-703e8666d ChatSession body): on GDN, plain-eager == plain-streaming is the right invariant (the
+   manual-loop byte-identity is a trimmable-KV property). Device-proven in run 3 (thermal-gated turn ran the
+   fallback at 20.9 tok/s — pre-fix this exact path killed the app).
+2. **Run 2 read 0.78× — a measurement artifact**: "two sentences" prompts let spec EOS at 43-67 tok while
+   plain capped at 256 → prefill amortization biased tok/s ~6× against spec (the one length-matched topic read
+   0.93×). Acceptance telemetry was real though: short-prose a≈0.34-0.47.
+3. **Run 3 length-matched (256/256 both arms, cooldowns, thermal logged per arm): 0.97×/1.09×/1.08× = 1.05×
+   mean, a=0.62-0.68** — physics-consistent to 1%: greedy bracket cost model (per-round ≈1.58× a plain step)
+   predicts (1+0.65)/1.58 = 1.04×.
+
+**Break-even floor (the draft-model 0.88× lesson, applied)**: acceptance is WORKLOAD-dependent (short prose
+0.34-0.47 → 0.78-0.93× loss; essays/thinking 0.62-0.68 → 1.03-1.09× win); break-even a* = 0.58. Planner:
+`minMTPSamplingAccepted = 0.60` — cold engages (learns in 1-2 turns), sub-break-even workloads self-gate to
+plain, STICKY by design (gated ⇒ no new folds ⇒ no self-un-gate; conservative at the boundary — forfeits a
+~1.05× marginal win rather than re-probe into a 0.78× loss; fresh session re-probes). Thermal gate applies as
+on the greedy lane. Mixed-regime device run 4/4 topics NO CRASH: engaged 1.23×/1.05×/1.03× (a=0.68 ≥ floor,
+lane stayed), thermal-serious turn gated → ChatSession fallback ran clean.
+
+**Verdict: SHIP.** temp>0 production presets (scout 0.1 / core 0.7) now get a distribution-lossless,
+cost-aware-gated MTP lane: parity-to-marginal-win (1.0-1.1×) on thinking/essay-class turns, self-gating on
+low-overlap turns, never-worse under throttle, and the fail-closed path is now actually closed on GDN. Tests:
+losslessness 3/3 (TV<0.007) · planner 11/11 (incl. break-even both directions) · E2E Mac a=0.656 · device runs
+×3. Honest limits on the record: n=3-4 stochastic turns per run (rate CIs are wide — the claim is
+"parity-to-marginal", NOT a certified speedup); acceptance-at-boundary means real chat will mix engaged and
+gated turns; K>1 sampling unexplored (sequential-draft wall applies).

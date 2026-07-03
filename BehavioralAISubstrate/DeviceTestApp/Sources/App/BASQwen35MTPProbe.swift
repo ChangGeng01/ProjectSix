@@ -201,6 +201,59 @@ enum BASQwen35MTPProbe {
         print("[mtp-defaulton] " + (off ? "✅ DEFAULT-ON VERIFIED ON DEVICE" : "⚠️ kill-switch broken"))
     }
 
+    /// SPEC-SAMPLING device A/B at the PRODUCTION preset (.core, temp 0.7): per-token rates over 3 prompts
+    /// (sampling is stochastic → compare tok/s, not total seconds). Distribution-losslessness is unit-proven
+    /// (TV<0.007); this verifies device ENGAGEMENT + SPEED + acceptance at real presets.
+    static func runSamplingVerify() async throws {
+        print("[mtp-sampling] step1: adapter init")
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)   // default-ON
+        print("[mtp-sampling] step2: loadModel…")
+        try await organ.loadModel()
+        print("[mtp-sampling] step3: loaded, footprint=\(Int(footprintMB()))MB")
+        // Fairness (first-run lesson): cap BOTH arms at 256 tokens — uncapped, stochastic lengths diverged
+        // 354 vs 1024 tok, confounding tok/s with KV-growth + thermal drift. Cooldowns between arms/topics
+        // (bracket-protocol discipline); thermal printed per ARM, not per topic.
+        //
+        // MIXED-REGIME final verification (post 0.60 break-even floor): 2 short-prose topics (device a≈0.34-0.47
+        // sub-break-even → the floor should GATE turns 2+ to plain — which exercises the `_chatSessionPlainDraft`
+        // fallback, the exact path that crashed pre-fix) then 2 essay topics (length-matched a=0.62-0.68 → 1.05×;
+        // if reached while gated they demonstrate STICKINESS: a frozen + ratio≈1.0 + no crash).
+        // Read per-topic `a=`: rising ⇒ sampling engaged; frozen ⇒ gated (plain fallback ran).
+        let topics = [("lighthouses", false), ("glaciers", false), ("market squares", true), ("mountain passes", true)]
+        var plainRates: [Double] = []
+        var specRates: [Double] = []
+        for (t, essay) in topics {
+            let req = BASOrganRequest(requestID: "s-\(t)", role: .core, preset: .core,
+                                      instruction: essay ? "Write a detailed 500-word essay about \(t)."
+                                                         : "Describe \(t) in two sentences.", context: [],
+                                      maxOutputTokens: 256)
+            print("[mtp-sampling] step4: streamDraft \(t)… thermal=\(thermal())")
+            var t0 = Date()
+            var plainBody = ""
+            for try await c in organ.streamDraft(req) { plainBody = c.cumulativeBody }
+            let pSec = Date().timeIntervalSince(t0)
+            let pTok = await organ.tokenCount(of: plainBody)
+            try await Task.sleep(nanoseconds: 30_000_000_000)
+            print("[mtp-sampling] step5: draft() \(t)… thermal=\(thermal())")
+            t0 = Date()
+            let d = try await organ.draft(req)                                 // planner → .mtpSpecSampling
+            let sSec = Date().timeIntervalSince(t0)
+            let sTok = await organ.tokenCount(of: d.body)
+            let pR = Double(pTok) / max(pSec, 0.001), sR = Double(sTok) / max(sSec, 0.001)
+            plainRates.append(pR); specRates.append(sR)
+            let a = await organ.mtpSamplingProfilerStat().map { String(format: "%.2f", $0.emaHitRate) } ?? "n/a"
+            print(String(format: "[mtp-sampling] %@: plain %.1f tok/s (%d tok) | spec-sampling %.1f tok/s (%d tok) = %.2fx a=%@ thermal=%@",
+                         t, pR, pTok, sR, sTok, sR / pR, a, thermal()))
+            try await Task.sleep(nanoseconds: 30_000_000_000)
+        }
+        let n = Double(plainRates.count)
+        let mP = plainRates.reduce(0, +) / n, mS = specRates.reduce(0, +) / n
+        print(String(format: "[mtp-sampling] SUMMARY: plain %.1f | spec-sampling %.1f tok/s = %.2fx @ core(0.7)", mP, mS, mS / mP))
+        print("[mtp-sampling] " + (mS / mP >= 1.15
+            ? "✅ SAMPLING LANE WINS at the production preset"
+            : mS / mP >= 0.95 ? "≈ parity — engagement verified, speed marginal" : "⚠️ net loss at 0.7 — gate it"))
+    }
+
     static func run() async {
         print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -209,6 +262,10 @@ enum BASQwen35MTPProbe {
             print("[qwen35-mtp] MISSING qwen35_mtp_folded.safetensors — stage per header ✗"); return
         }
         do {
+            if ProcessInfo.processInfo.environment["BAS_MTP_SAMPLEON"] == "1" {
+                try await runSamplingVerify()               // has its own adapter/container — no probe container
+                return
+            }
             // Local staged dir preferred (the ship form); HF-cache id as fallback (M4-arm precedent).
             // (sustained-mode dispatch happens after load below)
             let localDir = docs.appendingPathComponent("models/Qwen3.5-4B-4bit")

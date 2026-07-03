@@ -67,12 +67,35 @@ extension BASDecodeLanePolicy {
         // ratio f≈0.05 (trunk-reusing head + 32K sub-head) ⇒ break-even a≈f; 0.15 leaves margin. Device cert:
         // a=0.85 ≫ floor. Bites only once the profiler has a stat; cold engages (bench+device certified).
         minMTPAccepted: Double = 0.15,
+        // SAMPLING lane's break-even floor (device A/B 2026-07-03, the draft-model 0.88× lesson applied — a
+        // cost-aware gate, not purpose-blind routing). Physics from the greedy device bracket (30.1/25.7 at
+        // a=0.85): per-round cost ≈1.58× a plain step ⇒ break-even a* = 0.58. Device-measured acceptance is
+        // WORKLOAD-dependent: short prose a≈0.34-0.47 → 0.78-0.93× LOSS; length-matched essays a=0.62-0.68 →
+        // 1.05× (physics-consistent: 1.65/1.58). Floor 0.60 = the break-even line: cold engages (learns its a
+        // in 1-2 turns), sub-break-even workloads gate to plain, high-overlap ones keep the lane. STICKY BY
+        // DESIGN: a gated lane folds no new observations, so it does NOT self-un-gate on a workload shift —
+        // conservative at the boundary (forfeits a ~1.05× marginal win to avoid re-probing into a 0.78× loss);
+        // a fresh profiler (new session) re-probes. Distribution-losslessness is unconditional either way —
+        // this floor is purely a SPEED gate.
+        minMTPSamplingAccepted: Double = 0.60,
         // THERMAL GATE (ship-cert finding 2026-07-03): under `serious+` throttle the MTP lane measured NET
         // NEGATIVE on real prompts (0.52-0.62× — down-clocked GPU inflates the fixed draft overhead while real-
         // text a≈0.63) → drop to plain when the host reports throttling. Default false = unchanged.
         thermalThrottled: Bool = false
     ) -> BASDecodeStrategy {
-        guard Self.isGreedyByteSafe(temperature: temperature) else { return .plain }
+        guard Self.isGreedyByteSafe(temperature: temperature) else {
+            // SAMPLING lane (temperature > 0 — the substrate's production presets): rejection-sampling verify is
+            // DISTRIBUTION-lossless (unit-proven), so the MTP lane may engage; same thermal gate + own floor via
+            // its profiler stream. All other speculation stays plain (byte/distribution safety per lane).
+            if capabilities.mtpHeadLoaded && !thermalThrottled {
+                if let s = profiler.stat(BASDecodeStrategy.mtpSpecSamplingID, purpose),
+                   s.emaAccepted < minMTPSamplingAccepted {
+                    return .plain
+                }
+                return .mtpSpecSampling
+            }
+            return .plain
+        }
 
         // Candidate lanes in cold-start priority order (model-backed first), each with its profiler ID.
         var candidates: [(strategy: BASDecodeStrategy, id: String)] = []

@@ -405,6 +405,139 @@ public final class BASQwen35MTPSpecDecoder {
     /// Test-only: force every draft to be wrong (isolates reject-path bookkeeping; identity must STILL hold).
     public var forceRejectForDiagnostics = false
 
+    // MARK: - LOSSLESS SPEC-SAMPLING (temperature > 0) — the production-preset lane (scout 0.1 / core 0.7)
+    //
+    // Standard rejection-sampling speculative decoding (Leviathan/Chen): draft d ~ q, accept with
+    // min(1, p(d)/q(d)); on reject emit r ~ normalize(max(0, p − q)). The OUTPUT distribution is exactly p —
+    // the target's production sampling distribution — for ANY draft q (q only affects SPEED via the acceptance
+    // rate). p replicates the vendored TopPSampler transform bit-for-bit: top-p masks the UN-tempered
+    // log-softmax, temperature divides after, categorical normalizes (Evaluate.swift:263-298).
+
+    /// Testable core: given target logits (full vocab), draft logprobs (sub-vocab), the sampled draft id and
+    /// u ~ U(0,1), return (accepted, residualLogits) where residualLogits are `log(max(0, p − q))` over the FULL
+    /// vocab (−inf where zero) ready for `categorical`. Pure function of its inputs (unit-tested exactly).
+    static func samplingVerdict(
+        targetLogits: MLXArray, draftLogprobsSub: MLXArray, draftVocab: Int,
+        temperature: Float, topP: Float, draftId: Int, u: Float
+    ) -> (accepted: Bool, residualLogits: MLXArray) {
+        var lp = logSoftmax(targetLogits.asType(.float32))
+        if topP > 0 && topP < 1 {                       // vendored applyTopP (mask BEFORE temperature)
+            let sortedIndices = argSort(lp, axis: -1)
+            let sortedLp = takeAlong(lp, sortedIndices, axis: -1)
+            let cum = cumsum(exp(sortedLp), axis: -1)
+            let filtered = MLX.where(cum .> (1 - topP), sortedLp, MLXArray(-Float.infinity))
+            lp = putAlong(lp, sortedIndices, values: filtered, axis: -1)
+        }
+        let p = softmax(lp * (1 / temperature), axis: -1)                 // full-vocab target distribution
+        let q = softmax(draftLogprobsSub.asType(.float32) * (1 / temperature), axis: -1)  // sub-vocab draft dist
+        let pd = p[draftId].item(Float.self)
+        let qd = q[draftId].item(Float.self)
+        if qd > 0, u < min(1, pd / max(qd, 1e-30)) {
+            return (true, MLXArray(0))
+        }
+        // residual = max(0, p − q) over full vocab (q occupies the first `draftVocab` ids)
+        var residual = p
+        let head = maximum(p[0 ..< draftVocab] - q, MLXArray(Float(0)))
+        residual = concatenated([head, p[draftVocab...]], axis: -1)
+        return (false, log(residual + 1e-30))
+    }
+
+    /// Lossless spec-sampling generation (production presets; distribution-equal to plain sampling, NOT
+    /// byte-equal — sampling is stochastic). Carry-forward reject identical to the greedy lane.
+    public func generateSpecSampling(
+        prompt: [Int], maxTokens: Int, eosTokens: Set<Int>,
+        temperature: Float, topP: Float
+    ) -> Run {
+        resetMTPStream()
+        let cache = model.newCache(parameters: nil)
+        let h0 = model.hiddenStatesWithCache(
+            MLXArray(prompt.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+        var hLast = h0[0, h0.dim(1) - 1]
+        var hLastPos = prompt.count - 1
+        var trunkLen = prompt.count
+
+        func sampleTarget(_ logits: MLXArray) -> Int {   // EXACT production transform + categorical
+            var lp = logSoftmax(logits.asType(.float32))
+            if topP > 0 && topP < 1 {
+                let si = argSort(lp, axis: -1)
+                let sl = takeAlong(lp, si, axis: -1)
+                let cum = cumsum(exp(sl), axis: -1)
+                let filtered = MLX.where(cum .> (1 - topP), sl, MLXArray(-Float.infinity))
+                lp = putAlong(lp, si, values: filtered, axis: -1)
+            }
+            return categorical(lp * (1 / temperature)).item(Int.self)
+        }
+        func draftSample() -> (id: Int, qLogprobsSub: MLXArray) {
+            let y = mtpForward(
+                embedNext: model.embedding(MLXArray([Int32(pendingTail)]))[0], hidden: hLast, pos: hLastPos)
+            let subLogits = mm(y.expandedDimensions(axis: 0), subHead)[0]
+            let qlp = logSoftmax(subLogits.asType(.float32))
+            let id = categorical(qlp * (1 / temperature)).item(Int.self)
+            return (id, qlp)
+        }
+
+        var pending: [Int] = [sampleTarget(model.logits(fromHidden: h0)[0, h0.dim(1) - 1])]
+        var pendingTail: Int { pending.last! }
+        let t0 = Date()
+        var out: [Int] = []
+        var accepted = 0, iters = 0
+        var hitEOS = false
+        func emit(_ tok: Int) -> Bool {
+            if eosTokens.contains(tok) { hitEOS = true; return false }
+            out.append(tok)
+            return out.count < maxTokens
+        }
+        _ = emit(pending[0])
+        while out.count < maxTokens && !hitEOS {
+            if pending.count >= 4 {
+                var hp = model.hiddenStatesWithCache(
+                    MLXArray([Int32(pending[0])]).expandedDimensions(axis: 0), cache: cache)
+                for p in pending.dropFirst() {
+                    hp = model.hiddenStatesWithCache(
+                        MLXArray([Int32(p)]).expandedDimensions(axis: 0), cache: cache)
+                }
+                trunkLen += pending.count
+                hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
+                let t = sampleTarget(model.logits(fromHidden: hp)[0, hp.dim(1) - 1])
+                if !emit(t) { break }
+                pending = [t]
+                continue
+            }
+            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
+            for c in cache where c is ArraysCache {
+                let m = c as! ArraysCache
+                snapshots.append((m, m[0], m[1]))
+            }
+            let (dId, qlp) = draftSample()
+            let T = pending.count + 1
+            let input = MLXArray((pending + [dId]).map(Int32.init)).expandedDimensions(axis: 0)
+            let h2 = model.hiddenStatesWithCache(input, cache: cache)
+            let lg = model.logits(fromHidden: h2)
+            iters += 1
+            let u = Float.random(in: 0 ..< 1)
+            let verdict = Self.samplingVerdict(
+                targetLogits: lg[0, T - 2], draftLogprobsSub: qlp, draftVocab: Self.draftVocab,
+                temperature: temperature, topP: topP, draftId: dId, u: u)
+            if verdict.accepted {
+                accepted += 1
+                let bonus = sampleTarget(lg[0, T - 1])              // genuine p-sample at the next position
+                if emit(dId) { _ = emit(bonus) }
+                trunkLen += T
+                hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
+                pending = [bonus]
+            } else {
+                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
+                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                let r = categorical(verdict.residualLogits).item(Int.self)   // r ~ normalize(max(0, p − q))
+                _ = emit(r)
+                hLast = h2[0, T - 2]
+                hLastPos = trunkLen + T - 2
+                pending.append(r)
+            }
+        }
+        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters)
+    }
+
     /// Production entry: EOS-aware (stops BEFORE emitting an eos token — matching the plain lanes' semantics).
     public func generateSpec(prompt: [Int], maxTokens: Int, eosTokens: Set<Int>) -> Run {
         _generateSpec(prompt: prompt, maxTokens: maxTokens, eosTokens: eosTokens)

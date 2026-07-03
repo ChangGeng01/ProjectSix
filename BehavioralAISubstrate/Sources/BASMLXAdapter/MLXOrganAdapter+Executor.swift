@@ -39,6 +39,18 @@ extension MLXOrganAdapter {
             // `_draftSpeculative` uses the adapter's configured `numDraftTokens`; the strategy's K is advisory.
             return try await _draftSpeculative(request)
 
+        case .mtpSpecSampling:
+            do {
+                let g = try await _generateMTPSpec(for: request, sampling: true)
+                draftProfiler = draftProfiler.observing(
+                    sourceID: BASDecodeStrategy.mtpSpecSamplingID, purpose: purpose,
+                    accepted: g.accepted, proposed: g.rounds, rounds: g.rounds)
+                return g.draft
+            } catch {
+                print("[mtp-spec-sampling] lane fail-closed to plain: \(error)")
+                return try await _plainDraft(request)
+            }
+
         case .mtpSpec:
             // Full pipeline via _generateMTPSpec (template + EOS + ADR-039 lossless decode). FAIL-CLOSED:
             // any error (not Qwen3.5 / weights missing / decode failure) falls back to plain — byte-identical

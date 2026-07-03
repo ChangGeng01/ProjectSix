@@ -29,7 +29,7 @@ extension MLXOrganAdapter {
     /// Full-pipeline `.mtpSpec` turn: template → tokenize → MTP spec decode (EOS-aware) → detokenize.
     /// Throws (e.g. `notQwen35`, missing weights) — the executor fail-closes to `_plainDraft`.
     func _generateMTPSpec(
-        for request: BASOrganRequest
+        for request: BASOrganRequest, sampling: Bool = false
     ) async throws -> (draft: BASOrganDraft, accepted: Int, rounds: Int) {
         guard let container = _loadedContainerForStreaming() else {
             throw BASOrganError.providerUnavailable(
@@ -51,7 +51,11 @@ extension MLXOrganAdapter {
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)
-            let r = dec.generateSpec(prompt: promptIds, maxTokens: maxTokens, eosTokens: eos)
+            let r = sampling
+                ? dec.generateSpecSampling(
+                    prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
+                    temperature: Float(request.preset.temperature), topP: Float(request.preset.topP))
+                : dec.generateSpec(prompt: promptIds, maxTokens: maxTokens, eosTokens: eos)
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
@@ -71,8 +75,14 @@ extension MLXOrganAdapter {
     public nonisolated func mtpResolvedWeightsURL() -> URL? { _resolveMTPWeightsURL() }
 
     /// Test/telemetry accessor: the profiler stat for the MTP lane (nil until first fold).
-    func mtpProfilerStat() -> BASAcceptanceProfiler.Stat? {
+    /// Public like `mtpResolvedWeightsURL` — the device probe (separate module) reads it for the A/B verdict line.
+    public func mtpProfilerStat() -> BASAcceptanceProfiler.Stat? {
         draftProfiler.stat(BASDecodeStrategy.mtpSpecID, .factual)
+    }
+
+    /// Test/telemetry accessor for the SAMPLING lane (draft() routes purpose .scoutDefault).
+    public func mtpSamplingProfilerStat() -> BASAcceptanceProfiler.Stat? {
+        draftProfiler.stat(BASDecodeStrategy.mtpSpecSamplingID, .scoutDefault)
     }
     #endif
 }

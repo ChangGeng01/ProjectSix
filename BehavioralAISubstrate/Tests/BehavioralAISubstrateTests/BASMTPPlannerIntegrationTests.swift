@@ -25,11 +25,54 @@ final class BASMTPPlannerIntegrationTests: XCTestCase {
         XCTAssertEqual(s, BASDecodeStrategy.mtpSpec, "cold MTP must engage (device-certified a=0.85 >> floor 0.15)")
     }
 
-    func testTemperatureGateForcesPlain() {
+    func testTemperatureRoutesToSamplingLane() {
+        // Updated post spec-sampling: temp>0 + mtp head → the DISTRIBUTION-lossless sampling lane.
         let s = BASDecodeLanePolicy.decodeStrategy(
             purpose: .factual, temperature: 0.7, capabilities: caps(mtp: true),
             profiler: BASAcceptanceProfiler())
-        XCTAssertEqual(s, BASDecodeStrategy.plain, "byte-safety: no speculation at temperature > 0")
+        XCTAssertEqual(s, BASDecodeStrategy.mtpSpecSampling)
+    }
+
+    func testTemperatureWithoutMTPStaysPlain() {
+        let s = BASDecodeLanePolicy.decodeStrategy(
+            purpose: .factual, temperature: 0.7, capabilities: caps(mtp: false),
+            profiler: BASAcceptanceProfiler())
+        XCTAssertEqual(s, BASDecodeStrategy.plain)
+    }
+
+    func testSamplingLaneThermalGated() {
+        let s = BASDecodeLanePolicy.decodeStrategy(
+            purpose: .factual, temperature: 0.7, capabilities: caps(mtp: true),
+            profiler: BASAcceptanceProfiler(), thermalThrottled: true)
+        XCTAssertEqual(s, BASDecodeStrategy.plain)
+    }
+
+    func testSamplingLaneBreakEvenFloor() {
+        // Device A/B 2026-07-03: rejection-sampling acceptance at core(0.7) measured a≈0.34-0.47 → 0.78-0.93×
+        // NET LOSS (break-even a*≈0.58 from the greedy bracket's 1.58× per-round cost). The lane's OWN floor
+        // (0.60) must route the measured device regime to plain — the draft-model 0.88× lesson, cost-aware.
+        var p = BASAcceptanceProfiler()
+        for _ in 0 ..< 8 {
+            p = p.observing(sourceID: BASDecodeStrategy.mtpSpecSamplingID, purpose: .factual,
+                            accepted: 45, proposed: 100, rounds: 100)   // a=0.45 per round (device-measured)
+        }
+        let s = BASDecodeLanePolicy.decodeStrategy(
+            purpose: .factual, temperature: 0.7, capabilities: caps(mtp: true), profiler: p)
+        XCTAssertEqual(s, BASDecodeStrategy.plain,
+                       "sub-break-even sampling acceptance must gate the lane (0.78x device loss)")
+    }
+
+    func testSamplingLaneHighOverlapKeepsLane() {
+        // Above break-even (structured/echo regimes) the lane stays; cold engages (learns in 1-2 turns) — the
+        // floor only bites on MEASURED sub-break-even acceptance.
+        var p = BASAcceptanceProfiler()
+        for _ in 0 ..< 8 {
+            p = p.observing(sourceID: BASDecodeStrategy.mtpSpecSamplingID, purpose: .factual,
+                            accepted: 80, proposed: 100, rounds: 100)
+        }
+        let s = BASDecodeLanePolicy.decodeStrategy(
+            purpose: .factual, temperature: 0.7, capabilities: caps(mtp: true), profiler: p)
+        XCTAssertEqual(s, BASDecodeStrategy.mtpSpecSampling)
     }
 
     func testEntropyGateDoesNotExileMTP() {

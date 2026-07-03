@@ -1008,16 +1008,51 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         //
         // Trade-off: the loop emits no `GenerateCompletionInfo`, so plain's `completionMetrics` is now nil — matching
         // every other production lane. The prior ChatSession metrics were observability-only (not on any contract).
-        let g = try await _generateModelFree(
-            for: request, drafter: Self.nullDrafter,
-            notLoadedHint: "loadModel(progressHandler:) before draft(_:)")
-        return _modelFreeDraft(body: g.body, request: request)
+        do {
+            let g = try await _generateModelFree(
+                for: request, drafter: Self.nullDrafter,
+                notLoadedHint: "loadModel(progressHandler:) before draft(_:)")
+            return _modelFreeDraft(body: g.body, request: request)
+        } catch BASPromptLookupDecoder.DecodeError.nonTrimmableCache {
+            // GDN/SSM caches (Qwen3.5) fail the greedy loop's UPFRONT trimmable guard — before any forward — so
+            // every eager `.plain` on these models crashed, INCLUDING the executor's fail-closed landing and the
+            // planner's thermal-gate rerouting (device-caught 2026-07-03: thermal serious → temp>0 rerouted to
+            // .plain → nonTrimmableCache). Fall back to the ChatSession path (the pre-703e8666d plain): on GDN
+            // the production plain lane IS ChatSession (streamDraft), so plain-eager == plain-streaming is the
+            // byte-invariant that matters here — the manual-loop identity is a trimmable-KV property.
+            return try await _chatSessionPlainDraft(request)
+        }
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
                 + Self.frameworkUnavailablePlatformSuffix)
         #endif
     }
+
+    #if canImport(MLXLLM)
+    /// The ChatSession plain lane (the pre-703e8666d `_plainDraft` body, byte-identical to `respond(to:)`).
+    /// Serves models whose caches can't run the trim-based greedy loop (GDN/SSM — see the catch above);
+    /// on trimmable-KV models the manual loop remains the sole plain path.
+    private func _chatSessionPlainDraft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
+        guard let container = modelContainer else {
+            throw BASOrganError.providerUnavailable(
+                reason: Self.notLoadedReason(
+                    "loadModel(progressHandler:) before draft(_:)"))
+        }
+        let session = ChatSession(
+            container,
+            instructions: Self.systemInstructions(for: request),
+            generateParameters: _generateParameters(
+                for: request.preset,
+                maxOutputTokens: request.maxOutputTokens))
+        let prompt = Self.prompt(for: request)
+        let (rawBody, completionInfo) = try await Self.streamBody(session, prompt: prompt)
+        let body = Self.applyMarkerPostprocessing(rawBody)
+        return _buildDraft(
+            body: body, request: request,
+            completionMetrics: Self.completionMetrics(from: completionInfo))
+    }
+    #endif
 
     // MARK: - Multi-turn (M254)
 
