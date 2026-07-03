@@ -51,6 +51,46 @@ enum BASQwen35MTPProbe {
         var tokPerSec: Double { Double(tokens.count) / max(seconds, 0.001) }
     }
 
+    /// SUSTAINED smoke (BAS_MTP_SUSTAIN_MIN=10): repeated spec generations (96 tok each, fresh state — the
+    /// production turn shape, also inside the maxSeq cap) for N minutes; per-gen tok/s + thermal + footprint;
+    /// verdict = mean over the window + first-vs-last-quartile degradation (thermal drift is the known enemy:
+    /// past sustained runs drifted +44-78%).
+    static func runSustained(minutes: Double, container: ModelContainer, wURL: URL) async throws {
+        let prompt: [Int] = [100, 200, 300, 400, 500, 600, 700, 800]
+        let deadline = Date().addingTimeInterval(minutes * 60)
+        var rates: [Double] = []
+        var accs: [Double] = []
+        var gen = 0
+        while Date() < deadline {
+            let r: (Double, Double) = try await container.perform { ctx in
+                guard let model = ctx.model as? Qwen35Model else {
+                    throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+                }
+                let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
+                let run = dec.generateSpec(prompt: prompt, maxTokens: 96)
+                let a = run.iterations > 0 ? Double(run.accepted) / Double(run.iterations) : 0
+                return (Double(run.tokens.count) / max(run.decodeSeconds, 0.001), a)
+            }
+            gen += 1
+            rates.append(r.0); accs.append(r.1)
+            print(String(format: "[qwen35-sustain] gen %02d: %.1f tok/s a=%.2f thermal=%@ footprint=%dMB",
+                         gen, r.0, r.1, thermal(), Int(footprintMB())))
+        }
+        guard rates.count >= 4 else { print("[qwen35-sustain] too few gens ✗"); return }
+        let mean = rates.reduce(0, +) / Double(rates.count)
+        let q = rates.count / 4
+        let first = rates.prefix(q).reduce(0, +) / Double(q)
+        let last = rates.suffix(q).reduce(0, +) / Double(q)
+        let minR = rates.min() ?? 0
+        let aMean = accs.reduce(0, +) / Double(accs.count)
+        print(String(format: "[qwen35-sustain] SUMMARY: %d gens | mean %.1f | min %.1f | firstQ %.1f → lastQ %.1f (%+.0f%%) | a-mean %.2f | thermal-end %@",
+                     rates.count, mean, minR, first, last, (last - first) / first * 100, aMean, thermal()))
+        print("[qwen35-sustain] " + (mean >= 30 && last >= 28
+            ? "✅ SUSTAINED ≥30 (mean) with lastQ ≥28"
+            : mean >= 25 ? "✅ sustained ≥25 — thermal tax visible, cold 30 confirmed separately"
+                         : "⚠️ sustained degradation below 25 — thermal wall"))
+    }
+
     static func run() async {
         print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -60,6 +100,7 @@ enum BASQwen35MTPProbe {
         }
         do {
             // Local staged dir preferred (the ship form); HF-cache id as fallback (M4-arm precedent).
+            // (sustained-mode dispatch happens after load below)
             let localDir = docs.appendingPathComponent("models/Qwen3.5-4B-4bit")
             let configuration: ModelConfiguration
             if FileManager.default.fileExists(atPath: localDir.path) {
@@ -71,6 +112,10 @@ enum BASQwen35MTPProbe {
             let container = try await #huggingFaceLoadModelContainer(
                 configuration: configuration, progressHandler: { _ in })
             print("[qwen35-mtp] model loaded in \(Int(Date().timeIntervalSince(t0)))s footprint=\(Int(footprintMB()))MB")
+            if let m = Double(ProcessInfo.processInfo.environment["BAS_MTP_SUSTAIN_MIN"] ?? "") {
+                try await runSustained(minutes: m, container: container, wURL: wURL)
+                return
+            }
 
             let prompt: [Int] = [100, 200, 300, 400, 500, 600, 700, 800]
             let n = 64
