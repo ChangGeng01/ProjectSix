@@ -114,7 +114,7 @@ extension BASQwen35MTPSpecDecoder {
     /// the trunk argmax vector — replacing the 2K+2 `.item` shower of `generateSpecK`.
     public func generateSpecKFused(
         prompt: [Int], maxTokens: Int, eosTokens: Set<Int> = [], k: Int, fp32Scores: Bool = true,
-        tCap: Int = 12
+        tCap: Int = 12, adaptiveK: Bool = false
     ) -> Run {
         precondition(k >= 1)
         let dbgE = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
@@ -141,9 +141,26 @@ extension BASQwen35MTPSpecDecoder {
         // iPhone ('p' arch): get_qmv_batch_limit = 6 for the MLP(9728)/lm_head(248K) dims → T ≥ 6 flips
         // those matmuls qmv→qmm tile kernels → verify 119ms/round vs ~50 (device-split 2026-07-03, the
         // TRUE killer of every historical deep-K device run) → device callers pass tCap 5.
+        //
+        // ADAPTIVE K (endurance-cert finding 2026-07-03): chain acceptance is WORKLOAD-dependent — real
+        // short prose a/iter ≈ 1.0 (fixed K=3 → 0.90×; per-link conditional acceptance ~0.35) vs synthetic/
+        // thinking trajectories 2.05-2.69 (1.51×, cold 31.0). A per-round EMA of the accepted prefix L
+        // steers kEff ∈ {1,2,3}: prose settles at K=1 (the certified 1.20-1.36× regime), high-overlap
+        // workloads ride K=3. α=0.4 (the codebase EMA idiom); optimistic start (learns in 2-3 rounds).
+        // PERSISTED across turns (instance property): the production decoder is cached across turns
+        // (MTPDecoderBox), so the regime estimate must survive the call boundary — a local EMA re-paid
+        // the 2-3-round optimistic learning tax EVERY 48-token turn (cert take-2: 1.08× < the K=1 1.20×).
+        func adaptedK() -> Int {
+            guard adaptiveK else { return k }
+            // THERMAL TIER (cert take-4): at `fair` the downclocked GPU makes chain overhead net-negative
+            // (0.91-0.99× measured) while K=1 held ~1.2× through the K=1 cert → force K=1; `serious+` is
+            // already planner-gated to plain. Nominal: EMA-driven K ∈ {1,2,3}.
+            if ProcessInfo.processInfo.thermalState != .nominal { return 1 }
+            return chainEmaL >= 1.6 ? min(k, 3) : chainEmaL >= 0.9 ? min(k, 2) : 1
+        }
         func draftAndCommit() -> [MLXArray] {
             // Clamp so chain positions stay inside the MTP KV bound (fp16-exact ≤ 2047 also holds).
-            let kEff = max(1, min(k, tCap - pending.count, Self.maxSeq - 1 - hLastPos))
+            let kEff = max(1, min(adaptedK(), tCap - pending.count, Self.maxSeq - 1 - hLastPos))
             let (ds, ks, vs) = fusedChain(
                 k: kEff, firstToken: pending.last!, hidden: hLast, pos0: hLastPos, fp32Scores: fp32Scores)
             // Batched slot commit — post-round mtpK/mtpV state is bit-identical to the sequential path's
@@ -204,6 +221,7 @@ extension BASQwen35MTPSpecDecoder {
             let amH = host.dropFirst().map(Int.init)                   // trunk argmaxes, host side
             iters += 1
             acceptedTok += L
+            if adaptiveK { chainEmaL = 0.6 * chainEmaL + 0.4 * Double(L) }
             var emitted: [Int] = []
             if L == kNow {
                 emitted = Array(amH[(P - 1) ..< (P - 1 + kNow)]) + [amH[T - 1]]   // drafts (== truths) + bonus

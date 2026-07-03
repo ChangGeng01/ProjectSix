@@ -105,11 +105,25 @@ final class BASMTPPlannerIntegrationTests: XCTestCase {
         var p = BASAcceptanceProfiler()
         for _ in 0 ..< 8 {
             p = p.observing(sourceID: BASDecodeStrategy.mtpSpecID, purpose: .factual,
-                            accepted: 85, proposed: 100, rounds: 100)   // a=0.85 per round (device cert)
+                            accepted: 205, proposed: 300, rounds: 100)  // a/iter=2.05 (fused K=3 device cert)
         }
         let s = BASDecodeLanePolicy.decodeStrategy(
             purpose: .factual, temperature: 0, capabilities: caps(mtp: true), profiler: p)
         XCTAssertEqual(s, BASDecodeStrategy.mtpSpec)
+    }
+
+    func testProseRegimeKeepsLane() {
+        // With ADAPTIVE K the lane self-tunes to K=1 on prose (a/iter ∈ [0,1]) — the planner floor is
+        // collapse-detection ONLY (0.15); a prose-regime EMA must NOT exile the lane (it would forfeit
+        // the certified K=1 1.20-1.36× win — the 2026-07-03 fixed-K=3 cert failure lesson).
+        var p = BASAcceptanceProfiler()
+        for _ in 0 ..< 8 {
+            p = p.observing(sourceID: BASDecodeStrategy.mtpSpecID, purpose: .factual,
+                            accepted: 63, proposed: 100, rounds: 100)   // K=1-regime real-text a=0.63
+        }
+        let s = BASDecodeLanePolicy.decodeStrategy(
+            purpose: .factual, temperature: 0, capabilities: caps(mtp: true), profiler: p)
+        XCTAssertEqual(s, BASDecodeStrategy.mtpSpec, "prose regime stays on the lane (adaptive K owns it)")
     }
 }
 

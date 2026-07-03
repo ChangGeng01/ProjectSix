@@ -397,3 +397,33 @@ between launches provide the cooling); the sustained mode never sleeps and is un
 K=1/30.1 as cert'd). Promoting production to fused K=3/tCap5 (cold +3%, sustained +8-16%) needs the
 50-prompt endurance cert + planner floor re-derivation (a/iter ∈ [0,3] scale, not [0,1]) — the next
 ticket, not silently bundled.
+
+## ★ PRODUCTION → ADAPTIVE-K FUSED (endurance-certified 2026-07-04, take-5 of 5 honest takes)
+
+Operator ordered the production upgrade + endurance cert. The road there was five cert takes, each
+teaching something real:
+- **Take-1 (fixed K=3): FAIL 0.90×** — real-prose chain acceptance is a/iter ≈ 1.01 (per-link conditional
+  ~0.35 vs the golden trajectory's 1.0) — the SAME workload-dependence trap as the sampling lane. Fixed
+  K=3 loses on prose; the synthetic 31.0 was the high-acceptance regime only.
+- **Fix: ADAPTIVE K** — per-round EMA of the accepted prefix steers kEff ∈ {1,2,3} (prose → K=1, the
+  certified regime; thinking/structured → K=3). Planner floor REVERTED to collapse-detection 0.15 (a
+  break-even floor would misread the K=1 regime's a∈[0,1] and exile the lane, forfeiting the K=1 win).
+- **Take-2 (adaptive, local EMA): 1.08×** — the EMA reset every turn → 2-3 optimistic-K=3 learning rounds
+  re-paid per 48-token turn. Fix: `chainEmaL` persists on the decoder instance (production caches the
+  decoder across turns — the estimate must too).
+- **Take-3: VOID** — build FAILED (Sendable) and the old binary re-ran; caught by the build line. CertBox
+  (@unchecked, the MTPDecoderBox pattern) + the cert now hoists ONE decoder for all 50 prompts (the old
+  per-prompt re-init re-quantized ~300MB × 50 — self-inflicted thermal load).
+- **Take-4: 1.12×** — settled regime healthy (1.17-1.37 nominal) but turn-1 paid spec-path Metal JIT
+  (0.97×, cert had no warmup) and the `fair` thermal zone dragged 0.91-0.99× (chain overhead on a
+  downclocked GPU). Fix: **THERMAL-TIERED K** — nominal: EMA-driven {1,2,3}; fair: force K=1 (held ~1.2×
+  through the K=1 cert); serious+: planner-gated plain. Plus cert warmup for both paths.
+- **Take-5: ✅ PASS — engaged mean 1.20× (nominal 1.29/1.37/1.40, fair-tier 0.99-1.14), spec mean 24.1,
+  min 19.5, fail 0/50, a=0.70, tie-div 3/7 (ADR-039 family).** Same bar as the K=1 cert (1.20×) with a
+  higher nominal ceiling. Default-ON zero-config verified on device (1.10× short-turn engagement).
+
+**Production posture (shipped)**: `.mtpSpec` greedy → `generateSpecKFused(k≤3, tCap=5(iOS)/12(Mac),
+adaptiveK: true)`; sampling lane unchanged (K=1 rejection sampling). Adapter Mac pipeline E2E: plain
+16.4s → 9.9s = **1.66×** (was 1.30× at K=1). The adaptive+thermal-tiered controller is the production
+embodiment of the campaign's core lesson: acceptance is a WORKLOAD × THERMAL surface, not a constant —
+the lane now walks that surface instead of betting on one point. Open: 2nd-device cert leg (hardware).

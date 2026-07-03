@@ -63,9 +63,12 @@ extension BASDecodeLanePolicy {
         // target's next-token softmax; the default ≈3.0 bits (top token < ~1/8 mass) is a calibration starting point.
         topTokenEntropy: Double? = nil,
         maxDraftModelEntropyBits: Double = 3.0,
-        // MTP lane's OWN break-even floor (checklist trap #1: NEVER reuse the 2.7 draft-model floor — MTP's cost
-        // ratio f≈0.05 (trunk-reusing head + 32K sub-head) ⇒ break-even a≈f; 0.15 leaves margin. Device cert:
-        // a=0.85 ≫ floor. Bites only once the profiler has a stat; cold engages (bench+device certified).
+        // MTP lane's OWN floor (checklist trap #1: NEVER reuse the 2.7 draft-model floor). COLLAPSE
+        // detection only (0.15): the fused production lane runs an ADAPTIVE-K controller that owns the
+        // break-even internally (prose → K=1, the certified 1.20-1.36× regime; high-overlap → K=3) — a
+        // break-even floor HERE would misread the K=1 regime's a/iter ∈ [0,1] as sub-par and exile the
+        // whole lane to plain, forfeiting the certified K=1 win (the 2026-07-03 fixed-K=3 cert failure).
+        // 0.15 still catches wiring-break collapse in both scales.
         minMTPAccepted: Double = 0.15,
         // SAMPLING lane's break-even floor (device A/B 2026-07-03, the draft-model 0.88× lesson applied — a
         // cost-aware gate, not purpose-blind routing). Physics from the greedy device bracket (30.1/25.7 at

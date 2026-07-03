@@ -46,6 +46,9 @@ public final class BASQwen35MTPSpecDecoder {
     private static let chainVocab = 8192
     private lazy var chainEmbed: MLXArray =
         model.embedding(MLXArray((0 ..< Self.chainVocab).map(Int32.init)))   // [8K, D] fp16 (deep-K only)
+    /// Adaptive-K regime EMA (fused chain) — persists across turns like the decoder itself; 1.6 = optimistic
+    /// cold start (K=3, settles within ~3 rounds of the FIRST turn only).
+    var chainEmaL: Double = 1.6
     // MTP block KV (own stream; fixed-capacity, index-written like the trunk's spec assets)
     var mtpK: MLXArray
     var mtpV: MLXArray

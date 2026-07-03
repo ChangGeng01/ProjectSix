@@ -55,7 +55,9 @@ extension MLXOrganAdapter {
                 ? dec.generateSpecSampling(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
                     temperature: Float(request.preset.temperature), topP: Float(request.preset.topP))
-                : dec.generateSpec(prompt: promptIds, maxTokens: maxTokens, eosTokens: eos)
+                : dec.generateSpecKFused(
+                    prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
+                    k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true)
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
@@ -65,6 +67,21 @@ extension MLXOrganAdapter {
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
         return (draft, raw.accepted, raw.rounds)
     }
+    /// PRODUCTION deep-K election (2026-07-03, the fused-chain campaign): the greedy `.mtpSpec` lane runs the
+    /// FUSED chain with ADAPTIVE K ≤ 3 — endurance-cert finding: chain acceptance is workload-dependent
+    /// (real prose a/iter≈1.0 ⇒ fixed K=3 is 0.90×; synthetic/thinking 2.05+ ⇒ 1.51×, cold 31.0). The
+    /// per-round EMA controller settles prose at K=1 (the certified 1.20-1.36× regime) and rides K=3 on
+    /// high-overlap workloads — never worse than the certified K=1 lane by construction.
+    static let mtpProductionK = 3
+    /// Verify-width cap: keeps EVERY trunk forward in the qmv regime. Phone-class GPUs flip the MLP-9728 /
+    /// lm_head-248K matmuls qmv→qmm at T ≥ 6 (`get_qmv_batch_limit` — verify measured 119ms/round vs ~50);
+    /// Mac 'd'-arch limit is 12+ (its T-curve is linear to 11, measured). THE historical deep-K device killer.
+    #if os(iOS)
+    static let mtpProductionTCap = 5
+    #else
+    static let mtpProductionTCap = 12
+    #endif
+
     /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).
     nonisolated static func _thermalThrottled() -> Bool {
         let t = ProcessInfo.processInfo.thermalState
