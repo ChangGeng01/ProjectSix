@@ -53,7 +53,18 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
 
 ## Phases
 
-**P0 — MEASURE FIRST (no levers).**
+**P0 — MEASURE FIRST (no levers).** — STATUS 2026-07-04 05:20:
+  ✅ T1 baseline: llm_invocation_rate = 1.0 (19-iter mixed endurance; every turn 1 unconditional LLM call)
+  ✅ T2 baseline: turn p50 = 4083 ms, p95 = 4989 ms; substrate(14 层) = 37.6 ms/turn (0.9%) — the LLM is
+     ~99% of turn wall-clock; peak RAM 2983 MB; thermal drift −3.9% (adaptive cooldowns healthy)
+  ⚠️ #65-67 (decode/prefill/ttft): per-iter mlx-decode lines absent from this endurance config — covered
+     separately by the bracket probes (30.1-36.3 cold on record); wire ch1025 decode lines next run
+  ⏳ T3 energy: M4 take-2 INVALID (plugged=true throughout — battery pinned 100%). Rerun needs the phone
+     UNPLUGGED for 12 min:
+     devicectl launch --terminate-existing --activate --console <BID> with
+     {"BAS_ENDURANCE_AUTOSTART":"1","BAS_QWEN35_RDAR_PROBE":"1","BAS_RDAR_M4":"mlx","BAS_M4_MINUTES":"12"}
+     Side-finding: plugged+pegged = serious-throttled ~12.8 tok/s (charging heat compounds the wall).
+
   qinao_device.py log parser (endurance FINAL/turn-breakdown/ch1025 → registry #65,66,67,68,71,72 +
   invocation-rate + turn-p50) · one 20-min mixed-workload endurance baseline run capturing T1-T3 ·
   M4-on-turns energy protocol run. Output: the baseline row of the table above, committed.
