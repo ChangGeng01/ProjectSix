@@ -107,3 +107,18 @@ MTP 头吗?" and was RIGHT where four audits and the frontier sweep were wrong:
   and/or a 5th tiny CoreAI/ANE asset), measure END-TO-END wall-clock tok/s (the 1.42× is an estimate from a+f,
   not a measured wall-clock), and greedy byte-safety plumbing (same-vocab, argmax-verify — the existing spec
   machinery fits).
+
+**Update 2026-07-03 — END-TO-END wall-clock MEASURED (`Tools/qwen35_mtp_wallclock.py`).** Built the real spec loop
+on the verified int8 port: each iter = 1 MTP draft + ONE T=2 trunk forward with per-token GDN MID-state capture
+(GDN can't rollback → on reject, adopt the mid state, no refeed). Result: **PLAIN 2.71 tok/s vs SPEC 4.38 tok/s =
+1.61× wall-clock, live-loop a=0.82.** The estimate (1.42×) held — direction and magnitude both.
+- MECHANISM (why CPU corroborates GPU): the T=2 batched forward is a GEMM that reads each weight matrix ONCE and
+  reuses it for both rows → ~1 forward-cost for 2 tokens whether the bottleneck is CPU cache or GPU HBM bandwidth.
+  Same weight-read-amortization that makes spec win on-device, so the CPU 1.61× is a real corroboration, not an
+  artifact — but ABSOLUTE tok/s and the draft-cost ratio f still need the MLX-GPU lane (the CPU numbers are slow).
+- HONEST CAVEATS (do not overclaim): (a) greedy-IDENTITY to the plain stream is by-construction (verify=argmax
+  match) but NOT yet asserted equal token-for-token — a quick check is pending; (b) a=0.82 here is a short
+  natural-text-dominated run (vs 0.674 over the 95-step cold-start); (c) production still needs the MLX-GPU lane +
+  wiring into the vendored decode path — which is DECODE-RED-LINE-ADJACENT (byte-parity waiver territory), so it is
+  a scoped decision, not a default. The lever is REAL and now wall-clock-corroborated; banking it on-device is the
+  remaining (gated) step.
