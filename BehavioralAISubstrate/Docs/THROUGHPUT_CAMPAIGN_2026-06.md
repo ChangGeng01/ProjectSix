@@ -297,3 +297,18 @@ Same election format as the 2026-06-11 greedy-spec default-ON. Mechanics:
   planner 7/7 + E2E, all green.
 Residual on the record: the 2nd-device cert leg (hardware) — the election was made with single-device cert
 evidence, per the operator's explicit call.
+
+## DEFAULT-ON DEVICE-VERIFIED 2026-07-03 (+ the temperature-boundary reality the verification exposed)
+
+`BAS_MTP_DEFAULTON=1` on the iPhone Air, behavioral triple:
+- **A) zero-config** `MLXOrganAdapter(model:)` auto-resolved the staged weights and `draft(_:)` — which THREW
+  `nonTrimmableCache` on Qwen3.5 before this lane — **succeeded via `.mtpSpec`** (1.2s vs streaming 1.3s on a
+  short turn; short-turn ratios are prefill-diluted — the engagement, not the ratio, is the verification).
+- **B) kill-switch** (`mtpSpecEnabled:false`): resolution nil ✓ (lane never offered; the nil→plain chain is
+  Mac-unit-pinned). First B attempt loaded a SECOND 4B (2×2.3GB → jetsam killed the app) — arm made lightweight.
+- **HONEST BOUNDARY (first run caught it):** the planner correctly REFUSED a `.core` (temp 0.7) request — the
+  byte-safe speculation doctrine engages ONLY temp-0 requests (same boundary as the certified 1.46× greedy draft
+  lane). **This substrate's production presets are scout=0.1 / core=0.7 ⇒ ordinary turns stay plain; the MTP
+  lane serves `greedyDeterministic`-class (temp-0) requests.** Extending the win to sampling turns requires
+  LOSSLESS SPEC-SAMPLING (rejection-sampling verify) — a separate correctness surface (the draft-model version
+  was certified doNotEnable) — the next real ticket, not silently bundled into this election.

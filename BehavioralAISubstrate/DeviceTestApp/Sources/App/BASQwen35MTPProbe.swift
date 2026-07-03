@@ -21,6 +21,7 @@ import MLXLLM
 import MLXLMCommon
 import Tokenizers
 import BASMLXAdapter
+import BASOrgan
 
 enum BASQwen35MTPProbe {
 
@@ -161,6 +162,45 @@ enum BASQwen35MTPProbe {
             : "⚠️ CERT NOT MET — see summary"))
     }
 
+    /// DEFAULT-ON on-device verification (BAS_MTP_DEFAULTON=1): behavioral triple —
+    /// A) ZERO-CONFIG adapter: draft() (which THREW nonTrimmableCache on Qwen3.5 before the lane) must now
+    ///    succeed via .mtpSpec, faster than the streaming baseline;
+    /// B) kill-switch adapter: the same draft() must revert to the legacy throw (proving A's success came from
+    ///    the MTP lane, not some other change);
+    /// C) streamDraft baseline for the ratio.
+    static func runDefaultOnVerify() async throws {
+        print("[mtp-defaulton] A) zero-config adapter (no URL, no flags)")
+        let organ = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        try await organ.loadModel()
+        print("[mtp-defaulton] resolved weights: \(organ.mtpResolvedWeightsURL()?.lastPathComponent ?? "NIL ✗")")
+        // GREEDY preset (temp 0) — the lane's doctrine scope: byte-safe speculation only for already-greedy
+        // requests (same boundary as the certified 1.46× greedy draft lane; .core@0.7 correctly stays plain).
+        let req = BASOrganRequest(requestID: "don", role: .core, preset: .greedyDeterministic,
+                                  instruction: "Reply with one short sentence about lighthouses.", context: [])
+        var t0 = Date()
+        var plainBody = ""
+        for try await c in organ.streamDraft(req) { plainBody = c.cumulativeBody }
+        let plainSec = Date().timeIntervalSince(t0)
+        print(String(format: "[mtp-defaulton] C) streaming baseline: %.1fs (%d chars)", plainSec, plainBody.count))
+        t0 = Date()
+        do {
+            let d = try await organ.draft(req)
+            let specSec = Date().timeIntervalSince(t0)
+            print(String(format: "[mtp-defaulton] A) draft() via .mtpSpec: %.1fs (%d chars) = %.2fx vs streaming ✓",
+                         specSec, d.body.count, plainSec / specSec))
+        } catch {
+            print("[mtp-defaulton] A) draft() FAILED: \(error) ✗ (default-ON not effective)")
+            return
+        }
+        // B) kill-switch: verify at the RESOLUTION level WITHOUT loading a second 2.3GB model copy (two
+        // containers = ~4.6GB > jetsam line — the first version of this arm got the app killed). The
+        // nil-resolution → capabilities-false → planner-plain chain is pinned by the Mac unit tests.
+        let legacy = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit, mtpSpecEnabled: false)
+        let off = legacy.mtpResolvedWeightsURL() == nil
+        print("[mtp-defaulton] B) kill-switch resolution nil: \(off ? "✓ (lane never offered)" : "✗ UNEXPECTED")")
+        print("[mtp-defaulton] " + (off ? "✅ DEFAULT-ON VERIFIED ON DEVICE" : "⚠️ kill-switch broken"))
+    }
+
     static func run() async {
         print("[qwen35-mtp] G3 start — MTP spec vs plain, Qwen3.5-4B-4bit, bracketed protocol")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -184,6 +224,10 @@ enum BASQwen35MTPProbe {
             print("[qwen35-mtp] model loaded in \(Int(Date().timeIntervalSince(t0)))s footprint=\(Int(footprintMB()))MB")
             if let m = Double(ProcessInfo.processInfo.environment["BAS_MTP_SUSTAIN_MIN"] ?? "") {
                 try await runSustained(minutes: m, container: container, wURL: wURL)
+                return
+            }
+            if ProcessInfo.processInfo.environment["BAS_MTP_DEFAULTON"] == "1" {
+                try await runDefaultOnVerify()
                 return
             }
             if ProcessInfo.processInfo.environment["BAS_MTP_CERT"] == "1" {

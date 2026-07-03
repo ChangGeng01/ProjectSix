@@ -67,6 +67,9 @@ extension MLXOrganAdapter {
         return t == .serious || t == .critical
     }
 
+    /// Public diagnostics: the URL default-ON resolution found (nil = lane not offered).
+    public nonisolated func mtpResolvedWeightsURL() -> URL? { _resolveMTPWeightsURL() }
+
     /// Test/telemetry accessor: the profiler stat for the MTP lane (nil until first fold).
     func mtpProfilerStat() -> BASAcceptanceProfiler.Stat? {
         draftProfiler.stat(BASDecodeStrategy.mtpSpecID, .factual)
