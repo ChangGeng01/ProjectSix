@@ -157,3 +157,25 @@ quantized math):
 - WATCH: footprint 3268 MB with the fp16 MTP head — at the jetsam margin; int8-quantize the head (~-120 MB) before
   any default-ON cert. This G3 gate is NOT the ship cert (that needs the ≥50-prompt × 2-device × endurance protocol
   per SPEC_DECODE_CERT_RESULTS.md + the planner integration per MTP_LANDING_CHECKLIST.md §2).
+
+## ★★ 30 tok/s campaign (2026-07-03) — 20 SMASHED (25.7), 30 NOT reachable by stacking spec (honest wall)
+
+Pushed hard for 30 tok/s on the iPhone Air. Measured everything; the honest ceiling:
+- **BEST (banked): K=1 MTP, 4-bit draft + carry-forward reject = 25.7 tok/s device** (plain-mean 20.3, bracketed,
+  a=0.85, ADR-039 lossless). The T-cost isolation (Mac) reframed it: the vendored multi-token forward is ~FREE
+  (T=1 14.9ms → T=4 16.6ms); the eater was the fp16 MTP draft (4.77ms/step) → 4-bit-quantized it + eliminated the
+  reject refeed (carry-forward pending) → device 25.7.
+- **K=2 chained MTP: DEVICE REGRESSION 23.6 < 25.7.** Chain acceptance is real (a1=0.944, a2|a1=1.00 on the
+  golden self-trajectory ⇒ E[tok/iter]≈2.9), but on-device the per-iter cost (2 draft forwards + a T=3 verify +
+  larger softmax) grew FASTER than the token yield (real-stream a=1.52 acc/iter ≈ 1.9 eff tok). Higher acceptance
+  did NOT buy speed — the exact "acceptance≠speed" lesson from the 0.88× draft-model episode, re-confirmed.
+- **compile(fixed-shape draft): REGRESSION** (Mac K=1 1.28→0.96×) — the full-buffer masked attention it needs for
+  shape-stability is O(maxSeq) per draft, costing more than the graph-build it saves. Reverted.
+
+**WHY 30 is a different problem, not more spec:** plain baseline ≈20 tok/s is the 4-bit bandwidth wall
+(~2.3GB/step ÷ ~50GB/s). Realistic spec speedup on this trunk tops out ≈1.3× (K=1 measured; K=2 net-negative), so
+spec alone ceils at ~26. To reach 30 the PLAIN baseline must rise to ~23-24 — that means **lifting bandwidth**, not
+drafting: (a) mixed-precision quant (3.5-bit, sensitive layers protected — quality-gated, needs the fp16 ckpt +
+device A/B; prior naive-3bit FAILED quality) or (b) the fused decode kernel (behind the decode red-line, operator
+waiver). Both are baseline-lift decisions, not spec stacking. **25.7 × a ~1.15× baseline lift ≈ 30** — reachable,
+but only by combining MTP with one baseline lever, which is the operator's next call.
