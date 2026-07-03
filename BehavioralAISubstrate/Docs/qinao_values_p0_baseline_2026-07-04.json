@@ -1,0 +1,11 @@
+{
+  "peak_ram_mb": 2983.0,
+  "thermal_drift_pct": -3.9,
+  "turn_p50_ms": 4083.0,
+  "turn_p95_ms": 4989.0,
+  "latency_p50_ms": 4083.0,
+  "latency_p95_ms": 4989.0,
+  "llm_invocation_rate": 1.0,
+  "substrate_brain_ms_mean": 37.6,
+  "substrate_pct_mean": 0.9
+}
