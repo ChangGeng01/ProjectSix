@@ -32,20 +32,36 @@ extension BASQwen35MTPSpecDecoder {
     /// `fp32Scores` reproduces the production K=1 lane's fp32 QKᵀ+softmax semantics (acceptance was
     /// measured there; fp16 scores only shift tie-breaks — acceptance-, never correctness-relevant).
     /// Returns (draft hidden, k, v) — k/v are NOT scattered here (the round batch-commits them).
+    /// Lean norm/rope: MLXFast fused primitives (1 kernel each) instead of the hand-rolled compositions
+    /// (~7 kernels per rms site, ~11 per rope site). On the iPhone the draft link is DISPATCH-bound
+    /// (~0.3 ms/kernel → measured ~27 ms/link at ~75 kernels; the Mac GPU never showed it) — kernel COUNT,
+    /// not FLOPs, is the wall. Semantics: rmsNorm(x,w,eps) == x·rsqrt(mean(x²)+ε)·w (weights pre-folded
+    /// 1+w, matching `rms`); roPE(dims:64, traditional:false, base:1e7, offset:pos) == the hand-rolled
+    /// NeoX rotate-half on the first 64 of 256 dims. fp32-vs-fp16 angle-table micro-diffs only move draft
+    /// tie-breaks (acceptance-, never correctness-relevant; F1 gates it).
+    private func leanRms(_ x: MLXArray, _ w: MLXArray) -> MLXArray {
+        MLXFast.rmsNorm(x, weight: w, eps: 1e-6)
+    }
+    private func leanRope(_ t: MLXArray, pos: Int) -> MLXArray {
+        MLXFast.RoPE(t.reshaped(t.dim(0), 1, Self.ahd), dimensions: Self.rd, traditional: false,
+                     base: Self.ropeBase, scale: 1, offset: pos)
+            .reshaped(t.dim(0), Self.ahd)
+    }
+
     func fusedLink(
         embedNext: MLXArray, hidden: MLXArray, pos: Int,
         baseK: MLXArray, baseV: MLXArray, chainK: [MLXArray], chainV: [MLXArray],
         fp32Scores: Bool
     ) -> (y: MLXArray, k: MLXArray, v: MLXArray) {
-        let u = mm(concatenated([rms(embedNext, nE), rms(hidden, nH)]).expandedDimensions(axis: 0), fc)[0]
-        let h = rms(u, iln)
+        let u = mm(concatenated([leanRms(embedNext, nE), leanRms(hidden, nH)]).expandedDimensions(axis: 0), fc)[0]
+        let h = leanRms(u, iln)
         let qpo = mm(h.expandedDimensions(axis: 0), qp)[0].reshaped(Self.ah, 2 * Self.ahd)
         var q = qpo[0..., 0 ..< Self.ahd]
         let gate = qpo[0..., Self.ahd...].reshaped(-1)
         var k = mm(h.expandedDimensions(axis: 0), kp)[0].reshaped(Self.akv, Self.ahd)
         let v = mm(h.expandedDimensions(axis: 0), vp)[0].reshaped(Self.akv, Self.ahd)
-        q = rope(rms(q, qn), pos: pos)
-        k = rope(rms(k, kn), pos: pos)
+        q = leanRope(leanRms(q, qn), pos: pos)
+        k = leanRope(leanRms(k, kn), pos: pos)
         // keys/values seen by this link: committed [0..<pos0] ++ chain links ++ self — the exact set the
         // sequential path sees after its own scatter (mtpK[pos]=k then slice [0..<pos+1]).
         let ks = concatenated([baseK] + chainK.map { $0.expandedDimensions(axis: 0) }
@@ -60,10 +76,10 @@ extension BASQwen35MTPSpecDecoder {
             queries: qq, keys: kk, values: vv, scale: powf(Float(Self.ahd), -0.5), mask: .none)
         let out = attn.reshaped(-1).asType(.float16) * sigmoid(gate)            // [4096]
         var y = u + mm(out.expandedDimensions(axis: 0), op)[0]
-        let z = rms(y, pln)
+        let z = leanRms(y, pln)
         let zz = z.expandedDimensions(axis: 0)
         y = y + mm(silu(mm(zz, gw)) * mm(zz, uw), dw)[0]
-        return (rms(y, fnW), k, v)
+        return (leanRms(y, fnW), k, v)
     }
 
     /// K-link fused chain — ONE lazy graph, zero host syncs, zero compile boundaries. Inter-link handoff is
@@ -97,7 +113,8 @@ extension BASQwen35MTPSpecDecoder {
     /// prefix-accept length L is computed IN-GRAPH (cumprod of the match vector) and comes back packed with
     /// the trunk argmax vector — replacing the 2K+2 `.item` shower of `generateSpecK`.
     public func generateSpecKFused(
-        prompt: [Int], maxTokens: Int, eosTokens: Set<Int> = [], k: Int, fp32Scores: Bool = true
+        prompt: [Int], maxTokens: Int, eosTokens: Set<Int> = [], k: Int, fp32Scores: Bool = true,
+        tCap: Int = 12
     ) -> Run {
         precondition(k >= 1)
         let dbgE = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
@@ -119,11 +136,11 @@ extension BASQwen35MTPSpecDecoder {
             out.append(tok)
             return out.count < maxTokens
         }
-        // Verify width cap: T = pending + kEff ≤ 12. The Mac T-curve is LINEAR (15.6ms @T=1 → 29ms @T=11,
-        // no qmv cliff on this trajectory), so unlike the K=1 lane there is NO bare-commit path — every
-        // round verifies pending AND fresh drafts (the no-draft commit rounds were 1-token trunk passes,
-        // 8/22 rounds at K=5 — the true deep-K killer after the refeed fix).
-        let tCap = 12
+        // Verify width cap (now a parameter — PLATFORM-dependent): T = pending + kEff ≤ tCap.
+        // Mac ('d' GPU arch): qmv batch limit 12+ → T-curve LINEAR to 11+ → tCap 12.
+        // iPhone ('p' arch): get_qmv_batch_limit = 6 for the MLP(9728)/lm_head(248K) dims → T ≥ 6 flips
+        // those matmuls qmv→qmm tile kernels → verify 119ms/round vs ~50 (device-split 2026-07-03, the
+        // TRUE killer of every historical deep-K device run) → device callers pass tCap 5.
         func draftAndCommit() -> [MLXArray] {
             // Clamp so chain positions stay inside the MTP KV bound (fp16-exact ≤ 2047 also holds).
             let kEff = max(1, min(k, tCap - pending.count, Self.maxSeq - 1 - hLastPos))
@@ -143,7 +160,7 @@ extension BASQwen35MTPSpecDecoder {
         if dbg { print("[fused-dbg] first chain built"); fflush(stdout) }
         let t0 = Date()
         while out.count < maxTokens && !hitEOS {
-            if pending.count >= tCap - 1 {              // last-resort commit (pending alone fills the cap)
+            if pending.count >= tCap {                  // commit refeed (itself ≤ tCap ⇒ stays in the qmv regime)
                 // ONE multi-token forward (the sequential-lane one-token-at-a-time loop was the first
                 // deep-K killer; the cap-6 no-draft round itself was the second — both retired, this
                 // branch is nearly unreachable). Same forward class as the verify feed → same ADR-039

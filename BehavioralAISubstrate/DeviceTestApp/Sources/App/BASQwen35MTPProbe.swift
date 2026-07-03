@@ -70,7 +70,8 @@ enum BASQwen35MTPProbe {
                 let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
                 let kEnvS = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
                 let kFusedS = Int(ProcessInfo.processInfo.environment["BAS_MTP_FUSED_K"] ?? "") ?? 0
-                let run = kFusedS >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: 96, k: kFusedS)
+                let tCapS = Int(ProcessInfo.processInfo.environment["BAS_MTP_TCAP"] ?? "") ?? 5
+                let run = kFusedS >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: 96, k: kFusedS, tCap: tCapS)
                     : kEnvS > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: 96, k: kEnvS)
                                 : dec.generateSpec(prompt: prompt, maxTokens: 96)
                 let a = run.iterations > 0 ? Double(run.accepted) / Double(run.iterations) : 0
@@ -307,8 +308,10 @@ enum BASQwen35MTPProbe {
                     let kEnv = Int(ProcessInfo.processInfo.environment["BAS_MTP_K"] ?? "") ?? 1
                     let kFused = Int(ProcessInfo.processInfo.environment["BAS_MTP_FUSED_K"] ?? "") ?? 0
                     let fp16S = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_FP16"] == "1"
+                    let tCap = Int(ProcessInfo.processInfo.environment["BAS_MTP_TCAP"] ?? "") ?? 5
                     func specRun(_ m: Int) -> BASQwen35MTPSpecDecoder.Run {
-                        kFused >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: m, k: kFused, fp32Scores: !fp16S)
+                        kFused >= 1 ? dec.generateSpecKFused(prompt: prompt, maxTokens: m, k: kFused,
+                                                             fp32Scores: !fp16S, tCap: tCap)
                             : kEnv > 1 ? dec.generateSpecK(prompt: prompt, maxTokens: m, k: kEnv)
                                        : dec.generateSpec(prompt: prompt, maxTokens: m)
                     }
@@ -327,8 +330,23 @@ enum BASQwen35MTPProbe {
                              a.name, a.tokPerSec, a.tokens.count, a.seconds, acc, thermal(), Int(footprintMB())))
             }
             func cooldown() async {
+                if ProcessInfo.processInfo.environment["BAS_MTP_NOCOOL"] == "1" {
+                    print("[qwen35-mtp] cooldown SKIPPED (BAS_MTP_NOCOOL) thermal=\(thermal())")
+                    return
+                }
                 print("[qwen35-mtp] cooldown 20s … thermal=\(thermal())")
+                // LOCKED-PHONE suspension guard (forensics 2026-07-03): a devicectl-launched app whose
+                // screen locks gets suspended at its first fully-idle await — three K-sweeps froze at THIS
+                // sleep while every GPU-busy phase ran full speed. A live utility-QoS spinner keeps one
+                // e-core runnable so the process never goes idle and the sleep's timer actually fires;
+                // the GPU (the thing the cooldown exists to cool) still rests.
+                let spinner = Task.detached(priority: .utility) {
+                    var x = 1.0
+                    while !Task.isCancelled { x = sin(x) + 1.000001 }
+                    if x == .infinity { print("") }        // unreachable; defeats spin elision
+                }
                 try? await Task.sleep(nanoseconds: 20_000_000_000)
+                spinner.cancel()
             }
 
             let pre = try await runArm("plain-pre", spec: false); report(pre)

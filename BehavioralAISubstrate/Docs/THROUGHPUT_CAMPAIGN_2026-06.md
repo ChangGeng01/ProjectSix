@@ -355,3 +355,45 @@ losslessness 3/3 (TV<0.007) · planner 11/11 (incl. break-even both directions) 
 ×3. Honest limits on the record: n=3-4 stochastic turns per run (rate CIs are wide — the claim is
 "parity-to-marginal", NOT a certified speedup); acceptance-at-boundary means real chat will mix engaged and
 gated turns; K>1 sampling unexplored (sequential-draft wall applies).
+
+## ★ FUSED DEEP-K CHAIN 2026-07-03 — the qmv cliff unmasked; cold 31.0-34.6; sustained-30 physics-closed
+
+The "fused chain kernel" ticket, executed end-to-end. The lazy fused chain (ONE graph for all K links —
+no compile, dynamic-slice SDPA attention, in-graph 32K-sub-head argmax → quantized embed gather, batched
+KV commit, single packed readback/round) reproduced the sequential reference 5/5 bit-exact (F1) and the
+device statistics (a/iter 2.35-2.69 at K=5-8) — then device speed CONTRADICTED Mac (Mac 1.55×, device
+0.9×) until the per-phase split isolated it: **chain 24.6ms, verify 119.3ms/round at T=6 — the trunk
+verify forward falls off the qmv→qmm dispatch cliff at T ≥ 6 on the iPhone** (`get_qmv_batch_limit`,
+vendored quantized.cpp: limit = 6 for the MLP-9728/lm_head-248K dims on phone-class GPUs; 12+ on Mac 'd'
+arch — why the Mac T-curve measured LINEAR 15.6→29ms and never showed it). THIS cliff — not submission
+overhead, not compile boundaries, not kernel counts (MLXFast lean-link A/B: no device change) — is what
+killed every historical deep-K device run (K=5 "12.4 tok/s", "43ms/step"). Three OTHER killers were also
+found and fixed en route (Mac): per-link compile submissions; the one-token-at-a-time pending refeed
+(HALF of K=5 rounds paid P×16ms); the cap-6 no-draft commit rounds (1-token trunk passes).
+
+**Fix: tCap — keep T = pending + kEff ≤ 5 (the qmv regime), shrink kEff, refeed at P ≥ 5 (refeed itself
+stays ≤ 5).** Device brackets (cold, 64 tok, bracketed, NOCOOL — see suspension note):
+K=3/tCap5 = **31.0 tok/s (1.51×, a/iter=2.05, serial-div@-1)** > the K=1 production 30.1; K=4 23.7;
+sustained-cold gen-1 (96 tok) **34.6**. 20-min sustained @K=3: **mean 16.7 | lastQ 15.9 (−17%) |
+a/iter=2.23 dead-stable | footprint 3116-3130MB flat | thermal-end serious** vs the K=1 baseline
+14.4-15.9 mean / 13.2-14.2 lastQ → **+8-16% sustained, honest**.
+
+**Sustained-pegged-30: PHYSICS-CLOSED (honest).** At the serious-throttle power cap the SoC delivers
+~13-16 GB/s effective; fused K=3 already cuts bytes/token 1.32→~0.82GB. Pegged-30 needs ≤0.45GB/token
+⇒ E[tok] ≥ 6 per trunk read — beyond the MTP head's measured statistics (real-text E[tok] ceilings
+~3.2-4.0 at K=3-8, golden-trajectory depth-survival included). No drafting scheme closes that gap;
+the remaining levers are trunk BYTES (sub-4-bit = banned by 满血) or hardware. The wall stands, now
+with its exact coordinates.
+
+**Env/protocol notes**: MLX_MAX_OPS_PER_BUFFER=200 ≈ +10% at deep K (minor); fp16-vs-fp32 SDPA scores —
+no device delta; NEW probe knobs BAS_MTP_FUSED_K / BAS_MTP_TCAP / BAS_MTP_FUSED_FP16 / BAS_MTP_NOCOOL /
+BAS_MTP_FUSED_DEBUG. ⚠ DEVICE-RUN GOTCHA discovered tonight: devicectl-launched runs FREEZE at any long
+`Task.sleep` (cooldowns!) — GPU-busy phases finish, the first idle await never resumes (lock-state and
+--activate did NOT fix it; suspension-guard spinner did NOT fix it; root cause unresolved — likely
+launchd/RunLoop, NOT our code). Bracket cooldowns now env-skippable (BAS_MTP_NOCOOL=1; host-side gaps
+between launches provide the cooling); the sustained mode never sleeps and is unaffected.
+
+**Ship status**: the fused lane is probe-certified, NOT yet the production `.mtpSpec` route (that stays
+K=1/30.1 as cert'd). Promoting production to fused K=3/tCap5 (cold +3%, sustained +8-16%) needs the
+50-prompt endurance cert + planner floor re-derivation (a/iter ∈ [0,3] scale, not [0,1]) — the next
+ticket, not silently bundled.
