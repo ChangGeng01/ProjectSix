@@ -107,11 +107,19 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     /// assertion recognized + semantic bank resolves + (NLI-reconciled) verdict ∈ {agrees, contradicts}.
     /// Every other outcome returns nil — the request flows to the LLM exactly as before (same conservative
     /// false-abstain-over-false-affirm bias; the bank's cosine threshold IS the confidence gate).
+    /// TWO-TIER retrieval bar (co-gate finding 2026-07-04): verdict-INJECTION tolerates an
+    /// adjacent-topic hit (the LLM still answers the actual question); ANSWERING does not — an
+    /// off-point reference becomes a non-sequitur reply. The short-circuit therefore demands a
+    /// noticeably higher cosine than the inject threshold (0.45); below it, fall through to the
+    /// normal inject+LLM path (conservative direction: fewer short-circuits, never a wrong answer).
+    static let shortCircuitMinCosine: Float = 0.60
+
     func shortCircuited(_ request: BASOrganRequest) async -> BASOrganDraft? {
         guard shortCircuitCovered, enabled else { return nil }
         guard await gate.shouldEngage(request) else { return nil }        // gate skip → normal path
         guard let asserted = extractAssertion(request.instruction) else { return nil }
-        guard let resolved = await bank.resolve(question: request.instruction, assertedValue: asserted)
+        guard let resolved = await bank.resolveWithScore(question: request.instruction, assertedValue: asserted),
+              resolved.cosine >= Self.shortCircuitMinCosine
         else { return nil }
         let verdict = await reconciled(resolved.groundTruth, reference: resolved.reference, claim: asserted)
         let ref = resolved.reference.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -59,6 +59,18 @@ public actor BASEmbeddingFactBank {
         question: String,
         assertedValue: String
     ) async -> (reference: String, groundTruth: BASFactualBeliefAdjudicator.GroundTruth)? {
+        await resolveWithScore(question: question, assertedValue: assertedValue)
+            .map { ($0.reference, $0.groundTruth) }
+    }
+
+    /// As `resolve` but carries the top-1 cosine — the P3 short-circuit's TWO-TIER gate needs it
+    /// (co-gate finding 2026-07-04: an adjacent-topic question — "which planet is closest to the sun" —
+    /// cleared the 0.45 inject threshold against the "eight planets" fact and the short-circuit answered
+    /// a non-sequitur; verdict-INJECTION tolerates that, ANSWERING does not).
+    public func resolveWithScore(
+        question: String,
+        assertedValue: String
+    ) async -> (reference: String, groundTruth: BASFactualBeliefAdjudicator.GroundTruth, cosine: Float)? {
         let asserted = assertedValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !asserted.isEmpty else { return nil }
         if !loaded { await load() }
@@ -77,7 +89,7 @@ public actor BASEmbeddingFactBank {
         // confidently-WRONG top-1 doesn't gaslight the user when two facts are similarly close).
         guard bestIndex >= 0, best >= threshold, (best - second) >= margin else { return nil }
         let fact = facts[bestIndex]
-        return (fact.reference, alias.decide(answer: fact.answer, claim: asserted)) // alias-aware verify
+        return (fact.reference, alias.decide(answer: fact.answer, claim: asserted), best) // alias-aware verify
     }
 
     private static func dot(_ a: [Float], _ b: [Float]) -> Float {

@@ -181,6 +181,24 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   are the identified levers. Session invocation rate reproduced: 0.69-0.79 across three session runs.
   ▷ Substrate #77 per-layer latency p95 harness — open (needs runTurn per-layer timing aggregation).
 
+## QUALITY CO-GATE — CLOSED 2026-07-04 (BASQualityCoGateDeviceTests, device, PASS)
+
+The standing constraint ("skipping compute must not skip honesty") discharged with evidence:
+- **On-corpus anti-sycophancy**: wrong-assertion pushback on the 10 bank facts, greedy, 320-tok —
+  raw 10/10 resist, gated stack 10/10 resist. (Take-1's "raw 0/10" was a MEASUREMENT ARTIFACT — the
+  96-token cap truncated inside the think 段; the eval-rigor broken-instrument lesson, caught again.
+  Consistent with the v12 clean-prose finding: the base 4B resists one-shot natural-prose falsehoods.)
+  The stack's on-corpus value is therefore: SAME correct outcome at ZERO LLM calls + by-construction
+  immunity to multi-turn cave pressure (the base's measured weakness on the cave_rate axis).
+- **Off-corpus lever identity 5/5** vs the injection-only baseline: the short-circuit lever adds zero
+  byte change where it doesn't fire.
+- **CO-GATE-CAUGHT BUG, FIXED**: an adjacent-topic question ("which planet is closest to the sun")
+  cleared the 0.45 inject threshold against the "eight planets" fact and the short-circuit answered a
+  NON-SEQUITUR. Fix: TWO-TIER retrieval bar (`shortCircuitMinCosine = 0.60` via the new
+  `resolveWithScore`) — verdict-injection tolerates adjacency (the LLM still answers the question);
+  ANSWERING does not. Below the bar → normal inject+LLM path (conservative: never a wrong answer).
+  Base-adjudicator adjacent-topic INJECTION remains as designed (documented Line-A behavior).
+
 ## Standing constraints
 满血 (no trunk quality change) · ADR-014 default-off/opt-in for every lever (kill-switches) ·
 ADR-039 lossless decode semantics untouched · never-worse gates with measured baselines · quality
