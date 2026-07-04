@@ -89,6 +89,22 @@ public struct BASSleepConsolidationDriver: Sendable {
         self.clock = clock
     }
 
+    /// OBSERVATION factory (dream-loop first activation, 2026-07-04): constructs the driver with the
+    /// standard tracker/applier quartet around the host's store, dryRun HARD-CODED true (the doctrine
+    /// mandates manual reviewed promotion — this factory can only observe). Hides the
+    /// BASRustCoreBridge dependency from app targets. nil = rust tracker unavailable.
+    public static func makeObservation(
+        store: any BASMemoryAtomStore
+    ) -> BASSleepConsolidationDriver? {
+        guard let tracker = try? BASRustMemoryUsageTrackerActor(useRustCore: true) else { return nil }
+        return BASSleepConsolidationDriver(
+            tracker: tracker,
+            applier: BASMemoryClosedLoopApplier(store: store, tracker: BASMemoryUsageTracker()),
+            store: store,
+            atomTiersProvider: { [:] },
+            dryRun: true)
+    }
+
     /// The PRIMARY entry point。 nil ⇒ one of the three guards said
     /// no (flag off / L1 denied / window zeroed) — and when the flag
     /// is off,nil is returned WITHOUT constructing the pass actor。

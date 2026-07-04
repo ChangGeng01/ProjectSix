@@ -1291,9 +1291,24 @@ final class BASEnduranceAppController: ObservableObject {
         // nothing flipped — every turn byte-equal with the prior build (ADR-014).
         var effortProbe: BASTurnSurpriseProbe?
         var effortDecodeCap: Int?
+        // dream-loop OBSERVATION activation (BAS_DREAM_LOOP=1): the sleep-consolidation driver with
+        // dryRun HARD-CODED true — the doctrine mandates manual reviewed promotion; this first
+        // activation only OBSERVES (checkpoints logged, no memory mutation). Guards stay honest:
+        // L1 maintenanceAllowed + non-zero window still decide per turn (expect frequent denials
+        // under load — that's the telemetry we want).
+        var dreamDriver: BASSleepConsolidationDriver?
         // P3 契合: the ThermalTwin feed (hysteresis-bearing thermal signal) — constructed with the
         // effort loop; each governed turn folds the twin's reading into the device state.
         var thermalFeed: BASThermalTwinFeed?
+        if ProcessInfo.processInfo.environment["BAS_DREAM_LOOP"] == "1", let store = memoryStore {
+            BASMemorySleepConsolidationPass.sleepConsolidationEnabled = true
+            if let driver = BASSleepConsolidationDriver.makeObservation(store: store) {
+                dreamDriver = driver
+                await emitBoth("📍 ch1025 dream-loop OBSERVATION armed (dryRun=true, three-guard live)")
+            } else {
+                await emitBoth("📍 ch1025 dream-loop requested but rust tracker unavailable — OFF")
+            }
+        }
         if ProcessInfo.processInfo.environment["BAS_EFFORT_LOOP"] == "1" {
             if let probe = BASTurnSurpriseProbe() {
                 effortProbe = probe
@@ -1998,6 +2013,14 @@ final class BASEnduranceAppController: ObservableObject {
                         .map { String(format: "%@=%.1f", $0.key, $0.value) }
                         .joined(separator: " ")
                     await emitBoth("📊 ch1025 layer-latency iter=\(iter) \(parts)")
+                }
+                // dream-loop OBSERVATION: consult the three-guard driver post-turn (dryRun — logs only).
+                if let dreamDriver {
+                    if let cp = await dreamDriver.runIfPermitted(after: turnResult) {
+                        await emitBoth("📊 ch1025 dream-loop iter=\(iter) GRANTED stages=\(cp.completedStages.count) dryRun=true")
+                    } else {
+                        await emitBoth("📊 ch1025 dream-loop iter=\(iter) denied (flag/L1-maintenance/window guard)")
+                    }
                 }
                 // ADR-018 P2 — carry THIS turn's records for the next
                 // turn's injection (evaluate() itself skips

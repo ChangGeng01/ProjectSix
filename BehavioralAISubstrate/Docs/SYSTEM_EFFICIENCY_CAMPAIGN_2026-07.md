@@ -155,10 +155,15 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
      closed — the effort loop's device state now folds the twin's hysteresis-bearing reading
      (guard level + accumulated pressure telemetry on the effort line); app targets never import
      BASLeaseLife. Live in the endurance BAS_EFFORT_LOOP path.
-  ▷ Dream-loop activation — DEFERRED with rationale: BASSleepConsolidationDriver requires the real
-     memory infrastructure quartet (tracker actor + closed-loop applier + atom store + tier provider)
-     — an integration project, and its own doctrine mandates manual reviewed promotion. Not wiring a
-     hollow dry-run.
+  ✅ Dream-loop OBSERVATION ACTIVATED 2026-07-04 (the "zero Sources callers" gap closed):
+     `BASSleepConsolidationDriver.makeObservation(store:)` (HostKit factory hiding the RustCoreBridge
+     tracker + closed-loop applier; **dryRun hard-coded true** — the doctrine's manual-promotion
+     mandate is structural, not a flag). Endurance BAS_DREAM_LOOP=1 consults the three-guard driver
+     post-turn. DEVICE TELEMETRY (10-iter run): armed ✓, guards consulted every turn, **all denied —
+     the L1 power-clock grants no maintenance window under active decode load** ("no dreaming while
+     working": the biomimetic gate behaving exactly as designed). Follow-up on record: a granted-path
+     demo needs an idle/trusted session state (fresh sessions land in quarantine mode, which zeroes
+     windows — the trust ladder is upstream of consolidation).
   ▷ Tier-0 responder beyond covered-factual — DEFERRED: an answer-cache/phatic-reflex responder is a
      quality-risk design (canned text in an honesty-first substrate); the covered-factual short-circuit
      IS the tier-0 for its provable subset. Revisit with a quality co-gate design.
