@@ -240,9 +240,13 @@ public actor BASLLMVerifierPipeline {
         // BASAdjudicationGate-style stakes×headroom closures here (BASOrgan cannot import BASHostKit —
         // the closure is the layering-clean seam). A skipped verify returns an honest `gated` report
         // (finalRecommendedAnswer = the unreviewed draft, confidence = default, gatedSkip counted).
-        verifyGate: @escaping @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool = { _, _ in true }
+        verifyGate: @escaping @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool = { _, _ in true },
+        // P1 follow-up: stage decode cap. nil (default) = preset budget, byte-equal; hosts measuring
+        // turn-shaped cost pass a small cap (a review verdict needs ~a paragraph, not 1024 tokens).
+        stageMaxOutputTokens: Int? = nil
     ) {
         self.verifyGate = verifyGate
+        self.stageMaxOutputTokens = stageMaxOutputTokens
         // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
         // (fail-closed) + traced; nil → adapters used unwrapped (byte-equal-off, R1).
         if let ci = contractInstall {
@@ -266,6 +270,8 @@ public actor BASLLMVerifierPipeline {
 
     /// P1(b): the avoided-compute gate (see init). True = run the stages; false = gated skip.
     private let verifyGate: @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool
+    /// P1: per-stage decode cap (nil = preset budget, byte-equal).
+    private let stageMaxOutputTokens: Int?
     /// Telemetry: verify() calls that were gated to a skip (avoided-compute wins, honest count).
     private(set) var gatedSkips: Int = 0
 
@@ -390,7 +396,8 @@ public actor BASLLMVerifierPipeline {
                 "\(taskPackage.taskID)-\(stage.rawValue)",
             role: .scout,
             preset: stagePreset,   // Tranche A2: `.scout` default (byte-equal) or the elected greedy lane.
-            instruction: instruction + "\n\n" + userPrompt)
+            instruction: instruction + "\n\n" + userPrompt,
+            maxOutputTokens: stageMaxOutputTokens)
         do {
             // P1: factual verification → elect prompt-lookup (TOKEN-identical under greedy; .scout/temp>0 stages
             // fail-close to draft(_:), byte-equal). S5: pass the purpose (.factual); the planner picks the lane.

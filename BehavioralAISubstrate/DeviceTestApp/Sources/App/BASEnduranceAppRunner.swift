@@ -1455,6 +1455,48 @@ final class BASEnduranceAppController: ObservableObject {
             model: mlxModel,
             kvCacheBits: kvBits,
             maxKVSize: maxKV)
+        // P1 T1-measurement COMPOSED TOPOLOGY (BAS_RICH_TOPOLOGY=1; SYSTEM_EFFICIENCY_CAMPAIGN):
+        // counting decorator (ground-truth LLM calls) + semantic adjudicator (inline T1 fact bank) +
+        // a reviewer-stage verifier per turn. BAS_T1_GATED=1 arms the avoided-compute levers
+        // (covered-factual short-circuit + stakes×thermal verify gate); =0 is the CONTROL arm
+        // (verdict-inject only + verifier always ⇒ 2.0 calls/turn expected). Env unset ⇒ nothing built.
+        let richTopology = (env["BAS_RICH_TOPOLOGY"] ?? "0") == "1"
+        let t1Gated = (env["BAS_T1_GATED"] ?? "0") == "1"
+        let llmCounter = BASLLMCallCounter()
+        var t1Organ: (any BASOrganAdapter)?
+        var t1Verifier: BASLLMVerifierPipeline?
+        if richTopology {
+            let counted = BASCountingOrganAdapter(wrapping: adapter, counter: llmCounter)
+            if let mini = BASMiniLMEmbeddingProvider() {
+                let bank = BASEmbeddingFactBank(facts: BAST1Topology.t1Facts(), provider: mini)
+                let adjudicator = BASSemanticAdjudicatingOrganAdapter(
+                    wrapping: counted, bank: bank, enabled: true,
+                    shortCircuitCovered: t1Gated)
+                await adjudicator.warmUp()
+                t1Organ = adjudicator
+            } else {
+                t1Organ = counted
+                await emitBoth("📍 t1 MiniLM unavailable — counting only, no adjudicator")
+            }
+            let verifyOrgan: any BASOrganAdapter = t1Organ ?? counted
+            t1Verifier = BASLLMVerifierPipeline(
+                adapters: [.reviewer: verifyOrgan],
+                verifyGate: t1Gated
+                    ? { @Sendable _, pkg in
+                        // stakes×thermal (the BASAdjudicationGate composition, closure-inlined): skip the
+                        // verify LLM pass on low-stakes turns or without thermal headroom. Stakes come from
+                        // the USER TURN (pkg.goal), not the draft body — the estimator is a prompt lexicon.
+                        let stakes = BASStakesEstimator.estimate(pkg.goal, context: [])
+                        let thermalOK = ProcessInfo.processInfo.thermalState.rawValue
+                            <= ProcessInfo.ThermalState.fair.rawValue
+                        return stakes >= 0.6 && thermalOK
+                    }
+                    : { @Sendable _, _ in true },
+                stageMaxOutputTokens: 96)
+            await emitBoth("📍 t1 topology ARMED gated=\(t1Gated) (adjudicator+verifier+counter)")
+        }
+        var t1CallsTotal = 0
+        var t1Turns = 0
         // U1 — opt-in between-turns speculation memory governor
         // (BAS_SPEC_GOVERNOR=1)。 Samples phys_footprint (jetsam
         // metric) + system pressure each iter and advises draft
@@ -1868,9 +1910,8 @@ final class BASEnduranceAppController: ObservableObject {
                     prompt = enriched
                     pendingEnrichedPrompt = nil
                 } else {
-                    prompt = Self.promptPool[
-                        (iter * mlxPrompts + p)
-                        % Self.promptPool.count]
+                    let pool = richTopology ? BAST1Topology.t1PromptPool : Self.promptPool
+                    prompt = pool[(iter * mlxPrompts + p) % pool.count]
                 }
                 let promptLen = prompt.count
 
@@ -2121,7 +2162,27 @@ final class BASEnduranceAppController: ObservableObject {
                 await livenessMonitor?.beginTurn(
                     id: "ch1025-iter\(iter)-prompt\(p)")
                 do {
-                    let draft = try await adapter.draft(request)
+                    let draft: BASOrganDraft
+                    if let organ = t1Organ {
+                        await llmCounter.mark()
+                        draft = try await organ.draft(request)
+                        if let verifier = t1Verifier {
+                            _ = await verifier.verify(
+                                draft: draft,
+                                taskPackage: BASLLMTaskPackage(
+                                    taskID: request.requestID,
+                                    originSessionID: "t1-endurance",
+                                    compiledAtMs: Int64(Date().timeIntervalSince1970 * 1000),
+                                    intent: "verify",
+                                    goal: prompt))
+                        }
+                        let calls = await llmCounter.delta()
+                        await emitBoth("📊 ch1025 t1 iter=\(iter) prompt=\(p + 1) llm_calls=\(calls) gated=\(t1Gated)")
+                        t1CallsTotal += calls
+                        t1Turns += 1
+                    } else {
+                        draft = try await adapter.draft(request)
+                    }
                     await livenessMonitor?.endTurn()
                     let mlxMs = monoElapsedMs(since: mlxStartNs)
                     iterMlxMs += mlxMs   // M1.1 — MLX GPU decode time (the dominant, non-parallelizable part)
@@ -2381,8 +2442,18 @@ final class BASEnduranceAppController: ObservableObject {
                 // attribution in MetricKit reports)。
                 BASFieldMetricsCollector.phase("cooldown")
                 let preCoolSnap = snapshot()
-                try? await Task.sleep(
-                    for: .seconds(cooldown))
+                if ProcessInfo.processInfo.environment["BAS_COOLDOWN_SPIN"] == "1" {
+                    // Locked-phone freeze guard (the Task.sleep-at-idle suspension, 2026-07-04): a sync
+                    // spin keeps the process schedulable; the GPU (what the cooldown cools) still rests.
+                    // ~1 e-core for `cooldown` seconds — accepted tax for unattended device runs.
+                    let end = Date().addingTimeInterval(Double(cooldown))
+                    var x = 1.0
+                    while Date() < end { x = sin(x) + 1.000001 }
+                    if x == .infinity { await emitBoth("unreachable") }
+                } else {
+                    try? await Task.sleep(
+                        for: .seconds(cooldown))
+                }
                 let postCoolSnap = snapshot()
                 let recovery =
                     "\(preCoolSnap.thermalState)" +
@@ -2515,6 +2586,11 @@ final class BASEnduranceAppController: ObservableObject {
                 "p99_lat_ms=%.0f est_total_tokens=%d",
                 allMlxLatenciesMs.count, avgMlxMs,
                 p50MlxMs, p99MlxMs, totalTokens))
+            if t1Turns > 0 {
+                await emitBoth(String(format:
+                    "📊 ch1025 FINAL t1_rate=%.2f t1_calls=%d t1_turns=%d gated=%@",
+                    Double(t1CallsTotal) / Double(t1Turns), t1CallsTotal, t1Turns, "\(t1Gated)"))
+            }
             await emitBoth(String(format:
                 "📊 ch1025 FINAL memory " +
                 "avg_rss_before_mb=%.1f " +
