@@ -79,11 +79,20 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   (c) ✅ covered-factual short-circuit: `shortCircuitCovered` opt-in on BASSemanticAdjudicatingOrganAdapter —
       covered+confident verdict RETURNS as the draft (draft/purpose/elect/streaming paths all covered;
       `.shortCircuited` observation case). Conservative: unknown/abstain/gate-skip → LLM unchanged.
-  ⚠️ HONEST VALIDATION GAP: the in-repo endurance topology is a THIN harness (deterministic 14 layers +
-  ONE raw adapter.draft per turn) — it exercises (a) but NOT (b)/(c), whose seams live in the composed chat
-  topology (neural-core service + adjudicator decorator + verifier). T1 movement below 1.0 requires a
-  COMPOSED-TOPOLOGY endurance mode (wrap the runner's adapter in the semantic adjudicator + drive the
-  extraction-engine verifier path) — the next work block before any T1 claim.
+  ✅ T1 DEVICE VERDICT (2026-07-04, BAST1DeviceTests via xcodebuild test — the suspension-immune lane):
+  composed topology (counting → adjudicator → reviewer-verifier), 30-prompt mixed pool, both arms:
+  **control 2.00 calls/turn (60/30, exactly as predicted) → gated 1.37 (41/30) = 32% of LLM calls avoided.**
+  Per-turn decomposition: covered factual 9/10 short-circuited to 0 calls (1 bank miss degraded gracefully
+  to 1 call); substantive 10/10 correctly ran draft+verify; casual 10/10 still paid verify — BY DOCTRINE:
+  BASStakesEstimator deliberately has NO casual down-weight (a casually-framed high-stakes turn must not
+  slip the verifier; every non-high-stakes turn scores the 0.6 unknown baseline, and the gate stays ≤0.6
+  coverage-first). The identified NEXT lever for the casual band is the already-wired non-LLM L0 context
+  classifier (taskType=chat × no stakes terms → skip verify; projected ratio ~0.52) — a P3 item.
+  MEASUREMENT-LANE FIX ON RECORD: every devicectl-launched run died at ~60-90s (background-launch process
+  suspension, kernel-level — spin guards useless); xcodebuild-test sessions are immune (the 10h runbook's
+  mechanism) — BAST1DeviceTests is the template for ALL future device measurements. Also: the test process
+  needs explicit ModelFactoryRegistry registration (NSClassFromString trampolines don't resolve there) and
+  the LOCAL staged model dir.
   (a) Wire the dormant effort loop live (host adoption + flips; overrideReason logged); consume
   effort dials beyond maxLoops (candidateCount → fewer L9 candidates).
   (b) Stakes×headroom gate at the verifier seam (BASLLMVerifierPipeline's unconditional extra LLM

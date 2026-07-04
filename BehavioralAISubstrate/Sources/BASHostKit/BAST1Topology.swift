@@ -12,49 +12,49 @@
 // runs → expect 2.0 calls/turn. GATED arm (=1): short-circuit + stakes×thermal verify gate → T1 target.
 import Foundation
 import BASOrgan
-import BASHostKit
 import BASSovereign
 import BASMemory
 
 /// Ground-truth LLM-call counter (actor: the decorator is called from concurrent contexts).
-actor BASLLMCallCounter {
-    private(set) var total = 0
+public actor BASLLMCallCounter {
+    public init() {}
+    public private(set) var total = 0
     private var markStart = 0
-    func increment() { total += 1 }
+    public func increment() { total += 1 }
     /// Per-turn window: mark, run the turn, then delta.
-    func mark() { markStart = total }
-    func delta() -> Int { total - markStart }
+    public func mark() { markStart = total }
+    public func delta() -> Int { total - markStart }
 }
 
 /// Counting decorator — transparent passthrough that increments the counter on EVERY inner LLM entry.
-final class BASCountingOrganAdapter: BASOrganAdapter, BASStreamingOrganAdapter {
+public final class BASCountingOrganAdapter: BASOrganAdapter, BASStreamingOrganAdapter {
     private let inner: any BASOrganAdapter
     private let counter: BASLLMCallCounter
 
-    init(wrapping inner: any BASOrganAdapter, counter: BASLLMCallCounter) {
+    public init(wrapping inner: any BASOrganAdapter, counter: BASLLMCallCounter) {
         self.inner = inner
         self.counter = counter
     }
 
-    var descriptor: BASOrganDescriptor { inner.descriptor }
-    func currentCapacity() async -> BASOrganCapacity { await inner.currentCapacity() }
+    public var descriptor: BASOrganDescriptor { inner.descriptor }
+    public func currentCapacity() async -> BASOrganCapacity { await inner.currentCapacity() }
 
-    func draft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
+    public func draft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
         await counter.increment()
         return try await inner.draft(request)
     }
 
-    func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
+    public func draft(_ request: BASOrganRequest, electAccelerated: Bool) async throws -> BASOrganDraft {
         await counter.increment()
         return try await inner.draft(request, electAccelerated: electAccelerated)
     }
 
-    func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
+    public func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
         await counter.increment()
         return try await inner.draft(request, purpose: purpose)
     }
 
-    func streamDraft(_ request: BASOrganRequest) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
+    public func streamDraft(_ request: BASOrganRequest) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         guard let streaming = inner as? BASStreamingOrganAdapter else {
             return AsyncThrowingStream { continuation in
                 Task {
@@ -81,10 +81,10 @@ final class BASCountingOrganAdapter: BASOrganAdapter, BASStreamingOrganAdapter {
     }
 }
 
-enum BAST1Topology {
+public enum BAST1Topology {
 
     /// Inline verified facts matching the pool's 10 covered claims (deterministic short-circuit hit set).
-    static func t1Facts() -> [BASVerifiedFact] {
+    public static func t1Facts() -> [BASVerifiedFact] {
         [
             .init(answer: "Fleming", reference: "Penicillin was discovered by Alexander Fleming.", cues: ["penicillin"]),
             .init(answer: "Canberra", reference: "The capital of Australia is Canberra.", cues: ["australia", "capital"]),
@@ -101,7 +101,7 @@ enum BAST1Topology {
 
     /// Mixed T1 workload — 10 covered factual claims (assert a WRONG value so the verdict is a correction),
     /// 10 casual (low stakes → verify gate skips), 10 substantive (full path expected).
-    static let t1PromptPool: [String] = [
+    public static let t1PromptPool: [String] = [
         // covered factual claims (assertion parser shape: question + "I'm pretty sure it's X, right?")
         "Who discovered penicillin? I'm pretty sure it's Pasteur, right?",
         "What's the capital of Australia? I'm pretty sure it's Sydney, right?",
