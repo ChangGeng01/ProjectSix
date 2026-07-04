@@ -82,6 +82,53 @@ extension MLXOrganAdapter {
     static let mtpProductionTCap = 12
     #endif
 
+    /// 会话→加速lane — the fused decode over an EXPLICIT message transcript (the stateless session
+    /// path): identical to `_generateMTPSpec` except the prompt is the caller's multi-turn transcript
+    /// (same Chat.Message → UserInput machinery as ChatSession ⇒ zero template drift).
+    func _generateMTPSpecFromMessages(
+        _ transcript: [(role: String, text: String)], for request: BASOrganRequest
+    ) async throws -> (draft: BASOrganDraft, accepted: Int, rounds: Int) {
+        guard let container = _loadedContainerForStreaming() else {
+            throw BASOrganError.providerUnavailable(
+                reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before an accelerated draft"))
+        }
+        guard let wURL = _resolveMTPWeightsURL() else {
+            throw BASQwen35MTPSpecDecoder.SpecError.missingWeights("no MTP weights resolved")
+        }
+        let input = try await Self._prepareTranscript(transcript, container: container)
+        let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
+        let maxTokens = params.maxTokens ?? 512
+        let priorBox = mtpDecoderBox
+        let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
+            guard let qwen = ctx.model as? Qwen35Model else {
+                throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+            }
+            let dec = try priorBox?.decoder
+                ?? BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+            let eos = Self._productionEOSTokenIds(
+                eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
+            let promptIds = input.text.tokens.asArray(Int.self)
+            let r = dec.generateSpecKFused(
+                prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
+                k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true)
+            return _MTPRaw(
+                body: ctx.tokenizer.decode(tokenIds: r.tokens),
+                accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
+        }
+        mtpDecoderBox = raw.box
+        let draft = _buildDraft(
+            body: Self.applyMarkerPostprocessing(raw.body), request: request)
+        return (draft, raw.accepted, raw.rounds)
+    }
+
+    /// `sending`-annotated transcript prepare (the `_buildLMInput` pattern — the LMInput must cross
+    /// into `container.perform(nonSendable:)`).
+    static func _prepareTranscript(
+        _ transcript: [(role: String, text: String)], container: ModelContainer
+    ) async throws -> sending LMInput {
+        try await container.prepare(input: UserInput(chat: MLXOrganAdapter.chatMessages(from: transcript)))
+    }
+
     /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).
     nonisolated static func _thermalThrottled() -> Bool {
         let t = ProcessInfo.processInfo.thermalState

@@ -327,6 +327,22 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     private var sessionLRU: [String] = []
     static let maxLiveSessions = 16
 
+    /// 会话→加速lane (P2 gap #3, device-measured crossover 2026-07-04): greedy seat turns with SHORT
+    /// histories run the STATELESS fused-MTP path (re-prefill whole conversation + 30 tok/s decode) —
+    /// measured faster than KV-reuse+plain up to ~200-300 history tokens (stateless won depth-1/-2 by
+    /// 350/228ms; reuse won depth-3 @400 tok). Past the threshold the session transitions ONCE to a
+    /// ChatSession re-hydrated from the transcript (the vendored `init(history:)` — template-perfect,
+    /// one amortized re-prefill). ADR-014: default false ⇒ byte-equal (all session turns = ChatSession).
+    public nonisolated let sessionFusedLane: Bool
+    /// History budget (est tokens) under which the stateless fused path wins (device crossover data).
+    static let fusedSessionMaxTokens = 250
+    /// Transcripts for fused-mode sessions (key = sessionKey; Sendable tuples — Chat.Message can carry
+    /// media and is non-Sendable, so messages are rebuilt locally where consumed). Purged on
+    /// clearSession/transition.
+    private var fusedTranscripts: [String: [(role: String, text: String)]] = [:]
+    /// Telemetry: turns served by the fused session lane (tests/observability).
+    private(set) var fusedSessionTurnCount = 0
+
     /// P2 gap #5 — BOUNDED session-decode concurrency (the fairness governor's safety half). Device
     /// measurement (T4 concurrent, 2026-07-04): 8 seats decoding at once COMPLETE correctly (vendor
     /// parallel-ChatSession contract holds on GDN) but the in-flight footprint peaked 3241MB — 135MB
@@ -508,8 +524,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // lossless. `mtpDrafterWeightsURL` overrides discovery; `mtpSpecEnabled: false` is the kill-switch
         // (pure legacy behavior, byte-equal).
         mtpDrafterWeightsURL: URL? = nil,
-        mtpSpecEnabled: Bool = true
+        mtpSpecEnabled: Bool = true,
+        // 会话→加速lane opt-in (device crossover 2026-07-04): greedy short-history session turns via the
+        // stateless fused-MTP path; transition to ChatSession re-hydration past ~250 est tokens.
+        sessionFusedLane: Bool = false
     ) {
+        self.sessionFusedLane = sessionFusedLane
         self.model = model
         self.cacheLimitBytes = cacheLimitBytes
         self.memoryLimitBytes = memoryLimitBytes
@@ -1140,6 +1160,45 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // Composite key — same caller session ID with different
         // role gets its own ChatSession (different system prompt).
         let key = Self.sessionKey(sessionID, request.role)
+
+        // 会话→加速lane: greedy + short history + MTP head present + no ChatSession yet → the stateless
+        // fused path (device-measured faster below the crossover). Past the budget: re-hydrate a
+        // ChatSession from the transcript ONCE (vendored init(history:) — template-perfect) and fall
+        // through to the normal pooled path.
+        if sessionFusedLane, sessions[key] == nil,
+           request.preset.temperature == 0, _resolveMTPWeightsURL() != nil {
+            var transcript = fusedTranscripts[key] ?? [
+                (role: "system", text: request.personaInstructions ?? Self.systemInstructions(for: request)),
+            ]
+            let estTokens = BASOrganDeterministicAdapter.estimateTokens(
+                from: transcript.map(\.text) + [request.instruction])
+            if estTokens < Self.fusedSessionMaxTokens {
+                transcript.append((role: "user", text: Self.prompt(for: request)))
+                let r = try await _generateMTPSpecFromMessages(transcript, for: request)
+                transcript.append((role: "assistant", text: r.draft.body))
+                fusedTranscripts[key] = transcript
+                fusedSessionTurnCount += 1
+                sessionLRU.removeAll { $0 == key }
+                sessionLRU.append(key)
+                while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
+                    sessionLRU.removeFirst()
+                    sessions.removeValue(forKey: oldest)
+                    fusedTranscripts.removeValue(forKey: oldest)
+                }
+                return r.draft
+            }
+            // TRANSITION: one amortized re-prefill via history re-hydration; transcript already carries
+            // the system message → instructions nil (the vendored init's documented contract).
+            let rehydrated = ChatSession(
+                container,
+                instructions: nil,
+                history: Self.chatMessages(from: transcript),
+                generateParameters: _generateParameters(
+                    for: request.preset, maxOutputTokens: request.maxOutputTokens))
+            sessions[key] = ChatSessionBox(session: rehydrated)
+            fusedTranscripts.removeValue(forKey: key)
+        }
+
         let box: ChatSessionBox
         if let existing = sessions[key] {
             box = existing
@@ -1218,6 +1277,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     #endif
 
     #if canImport(MLXLLM)
+    /// Rebuild non-Sendable Chat.Messages from the Sendable transcript tuples (local consumption only).
+    static func chatMessages(from transcript: [(role: String, text: String)]) -> [Chat.Message] {
+        transcript.map { entry in
+            switch entry.role {
+            case "system": return .system(entry.text)
+            case "assistant": return .assistant(entry.text)
+            default: return .user(entry.text)
+            }
+        }
+    }
+
     /// ch1066 — single source of truth for the multi-turn session-pool key
     /// (`<sessionID>#<role>`); used by `draftMultiTurn` + `clearSession` so they can't drift.
     private static func sessionKey(
@@ -1235,6 +1305,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #if canImport(MLXLLM)
         sessions.removeValue(forKey: Self.sessionKey(sessionID, .scout))
         sessions.removeValue(forKey: Self.sessionKey(sessionID, .core))
+        fusedTranscripts.removeValue(forKey: Self.sessionKey(sessionID, .scout))
+        fusedTranscripts.removeValue(forKey: Self.sessionKey(sessionID, .core))
         sessionLRU.removeAll { $0 == Self.sessionKey(sessionID, .scout) || $0 == Self.sessionKey(sessionID, .core) }
         #endif
     }
@@ -1245,6 +1317,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         crossTurnStore.clearAll()
         #if canImport(MLXLLM)
         sessions.removeAll()
+        fusedTranscripts.removeAll()
         sessionLRU.removeAll()
         #endif
     }

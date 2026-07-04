@@ -217,13 +217,20 @@ lever at production scale (1131-fact bundled corpus, on-device MiniLM, no LLM):
   probe: 1/8. Deeper fix (follow-up): an NLI question-fit check on the answering path (the nliProbe
   hook exists for answer rescue; a question↔reference entailment gate is the same machinery).
 
-**SESSION→ACCELERATED-LANE ROUTING — DESIGNED, implementation deferred to a fresh block**:
-short-history sessions (< ~600 tok) run the fused-stateless path (full multi-turn templated prompt
-via the same Chat.Message machinery — no template drift) with the adapter keeping the transcript; on
-crossing the threshold, prefill ONCE and hand the KV to `ChatSession(container, instructions: nil,
-cache:)` (the vendored prebuilt-KV init — verified present). Value honesty: ~1.4× on greedy seat
-turns, only ~1.05× at the .core preset seats use today — implement when seats elect deterministic
-deliberation (reproducibility argues they should).
+**SESSION→ACCELERATED-LANE ROUTING — IMPLEMENTED + DEVICE-VERIFIED 2026-07-04**:
+- MEASURE-FIRST (crossover, device): stateless-fused beats KV-reuse+plain by 350/228ms at 40/160
+  history tokens; reuse wins at 400 → **crossover ≈ 200-300 tok** (deeper than the analytic ~110) —
+  squarely inside the seat-deliberation sweet zone → build justified by data.
+- Router (`sessionFusedLane: Bool = false` opt-in, ADR-014): greedy + short-history (<250 est tok) +
+  MTP head present + no ChatSession yet → the STATELESS fused path over the adapter-owned transcript
+  (Sendable tuples; Chat.Messages rebuilt locally — same UserInput machinery as ChatSession, zero
+  template drift); past the budget → ONE re-hydrated `ChatSession(history:)` (the vendored
+  Prompt-Re-hydration init — template-perfect) and the pooled path takes over. LRU + clear hygiene
+  shared with the session pool.
+- DEVICE VERDICT (BASSessionLaneCrossoverDeviceTests router test, PASS): turns 1-2 fused
+  (fused_turns=2, zero ChatSessions), budget-crossing turn transitions to exactly ONE re-hydrated
+  session, turn 4 continues pooled. The last P2 gap (#3, accel × sessions) is CLOSED for the greedy
+  regime; .core sessions keep ChatSession (sampling lane gain ~1.05× doesn't justify routing).
 
 ## Standing constraints
 满血 (no trunk quality change) · ADR-014 default-off/opt-in for every lever (kill-switches) ·
