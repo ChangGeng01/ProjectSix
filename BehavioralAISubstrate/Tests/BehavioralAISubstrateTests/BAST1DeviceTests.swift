@@ -2,6 +2,8 @@ import XCTest
 import BASOrgan
 import BASSovereign
 import BASAppleAdapters
+import BASOrchestration
+@testable import BASRuntimeCore
 @testable import BASHostKit
 @testable import BASMLXAdapter
 #if canImport(MLXLLM)
@@ -35,6 +37,11 @@ final class BAST1DeviceTests: XCTestCase {
             throw XCTSkip("MiniLM unavailable on this device")
         }
 
+        // P3: the L0 CoreML classifier (non-LLM, ~ms, LRU-cached) for the positive-casual verify skip.
+        // nil (model unavailable) → the gated arm falls back to the stakes-only gate (P1 behavior).
+        // The raw adapter's classify(text:) label maps to BASContextTaskType by rawValue.
+        let ctxAdapter = try? BASContextClassifierMLAdapter(computeUnits: nil)
+
         func runArm(gated: Bool) async throws -> (rate: Double, calls: Int, turns: Int) {
             let counter = BASLLMCallCounter()
             let counted = BASCountingOrganAdapter(wrapping: adapter, counter: counter)
@@ -42,13 +49,26 @@ final class BAST1DeviceTests: XCTestCase {
             let organ = BASSemanticAdjudicatingOrganAdapter(
                 wrapping: counted, bank: bank, enabled: true, shortCircuitCovered: gated)
             await organ.warmUp()
+            // P3 gated arm: classifier-casual skip (positive .chat + clean lexicon ⇒ skip) × thermal.
+            // Coverage-first intact: lexicon hits and unknown classifications still verify.
+            let casualGate: BASAdjudicationGate? = ctxAdapter.map { adapter in
+                BASAdjudicationGate.classifierCasualSkip(classify: { text in
+                    (try? adapter.classify(text: text)).flatMap { BASContextTaskType(rawValue: $0.label) }
+                })
+            }
             let verifier = BASLLMVerifierPipeline(
                 adapters: [.reviewer: organ],
                 verifyGate: gated
                     ? { @Sendable _, pkg in
-                        BASStakesEstimator.estimate(pkg.goal, context: []) >= 0.6
-                            && ProcessInfo.processInfo.thermalState.rawValue
-                                <= ProcessInfo.ThermalState.fair.rawValue
+                        let thermalOK = ProcessInfo.processInfo.thermalState.rawValue
+                            <= ProcessInfo.ThermalState.fair.rawValue
+                        guard thermalOK else { return false }
+                        if let casualGate {
+                            let req = BASOrganRequest(
+                                requestID: pkg.taskID, role: .core, preset: .core, instruction: pkg.goal)
+                            return await casualGate.shouldEngage(req)
+                        }
+                        return BASStakesEstimator.estimate(pkg.goal, context: []) >= 0.6
                     }
                     : { @Sendable _, _ in true },
                 stageMaxOutputTokens: 96)

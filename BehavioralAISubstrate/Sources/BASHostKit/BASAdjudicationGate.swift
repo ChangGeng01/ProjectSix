@@ -92,6 +92,23 @@ public struct BASAdjudicationGate: Sendable {
         BASAdjudicationGate { estimate($0.instruction, $0.context) >= threshold }
     }
 
+    /// P3 契合 — POSITIVE-casual skip via the L0 CoreML context classifier (a wired NON-LLM organ, ~ms
+    /// per call). Coverage-first SURVIVES: a lexicon hit (stakes > the unknown baseline) always engages;
+    /// an UNKNOWN classification still engages; ONLY a positive `.chat` classification with a clean
+    /// stakes lexicon skips. This is the doctrine-compatible casual lever the raw threshold could never
+    /// be (P1's T1 finding: casual turns all paid verify because unknown-baseline == threshold).
+    public static func classifierCasualSkip(
+        classify: @escaping @Sendable (String) async -> BASContextTaskType?,
+        estimate: @escaping @Sendable (String, [String]) -> Double = BASStakesEstimator.estimate
+    ) -> BASAdjudicationGate {
+        BASAdjudicationGate { req in
+            let stakes = estimate(req.instruction, req.context)
+            if stakes > 0.6 { return true }                    // lexicon hit → always verify
+            let kind = await classify(req.instruction)
+            return kind != .chat                               // positive chat + clean lexicon → skip
+        }
+    }
+
     /// Host-supplied predicate — the integration point for stakes / ε / effort. NOTE: the predicate receives
     /// only `BASOrganRequest` (the L2 surface), which carries no ε/risk today; a host wires the governance
     /// signals by CAPTURING them in the closure (e.g. a session-scoped ε/risk holder it refreshes each turn).

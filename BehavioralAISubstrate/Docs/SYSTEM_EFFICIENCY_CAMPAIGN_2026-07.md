@@ -132,7 +132,22 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   (priority queue over container.perform) · seat personas → session instructions
   (BASAgentPersonaRoleTemplates finally consumed). Gate: T4 cert.
 
-**P3 — 契合 (the LLM as a scheduled organ).**
+**P3 — 契合 (the LLM as a scheduled organ).** — P3a STATUS 2026-07-04:
+  ✅ Classifier-casual verify gate (BASAdjudicationGate.classifierCasualSkip): the wired NON-LLM L0
+     CoreML classifier provides a POSITIVE .chat signal — skip only on positive-chat + clean stakes
+     lexicon; lexicon hits / advice frames / "?" / unknown classifications all still engage
+     (coverage-first survives; 6 Mac unit tests pin the logic). HONEST ATTRIBUTION NOTE: the dense T1
+     re-run measured ratio 0.33 (control 2.00 → gated 0.67) but per-turn decomposition shows turns
+     11-30 were THERMAL-gate skips (serious from turn ~9; the classifier was never consulted — the
+     thermal check runs first). 0.33 = short-circuit + thermal-never-worse under dense load; the
+     classifier's OWN contribution needs a thermally-paced run (open).
+  ✅ Effort→decode budget coupling: BASEffortBudget.maxDecodeTokens (outputDetail 0→64 · 1→160 ·
+     2→384 · 3→1024 — the adaptive think-budget dial, previously unread) + the endurance rig couples
+     it into the LLM request cap (BAS_EFFORT_LOOP path; decode_cap telemetry). Device measurement
+     rides the next endurance run.
+  ▷ ThermalTwin bridge · tier-0 responder beyond covered-factual · dream-loop activation — P3
+     remainder (the thermal signal already flows via ProcessInfo in every gate; the twin adds
+     pressure-accumulation richness).
   ThermalTwin → deviceState bridge (close the module island) · tier-0 responder organ (answer-cache
   + covered-factual + classifier-routed reflex) in front of the router · effort-tier → decode-lane
   coupling (fast tier → scout/0.8B-class or reflex; deep tier → core 4B) · dream-loop/consolidation

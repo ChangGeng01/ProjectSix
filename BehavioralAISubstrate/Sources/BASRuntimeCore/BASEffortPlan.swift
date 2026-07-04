@@ -33,6 +33,13 @@ public struct BASEffortBudget: Sendable, Equatable, Codable {
     public let outputDetail: Int             // 输出详细度 (0…3)
     public let toolVerificationStrength: Int // 工具验证强度 (0…3)
 
+    /// P3 契合 (SYSTEM_EFFICIENCY_CAMPAIGN) — the decode-token budget derived from `outputDetail`:
+    /// the biomimetic "adaptive think-budget" made concrete. A `.fast`-tier turn answers in a short
+    /// breath (64 tok); only the deep tiers earn the full preset budget. Consumers `min()` this with
+    /// their own caps; a nil-consumer keeps the historical preset budget (ADR-014).
+    /// Mapping: outputDetail 0→64 · 1→160 · 2→384 · 3→1024.
+    public var maxDecodeTokens: Int { [64, 160, 384, 1024][max(0, min(3, outputDetail))] }
+
     public init(
         candidateCount: Int, agentCount: Int, memoryDepth: Int,
         criticStrength: Int, riskCalibration: Int, outputDetail: Int,

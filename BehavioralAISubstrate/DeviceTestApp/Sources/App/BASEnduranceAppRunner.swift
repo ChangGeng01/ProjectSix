@@ -1290,6 +1290,7 @@ final class BASEnduranceAppController: ObservableObject {
         // coordinator's effort-loop consumer via the reachability pipe. Env unset ⇒ nothing constructed,
         // nothing flipped — every turn byte-equal with the prior build (ADR-014).
         var effortProbe: BASTurnSurpriseProbe?
+        var effortDecodeCap: Int?
         if ProcessInfo.processInfo.environment["BAS_EFFORT_LOOP"] == "1" {
             if let probe = BASTurnSurpriseProbe() {
                 effortProbe = probe
@@ -1966,8 +1967,11 @@ final class BASEnduranceAppController: ObservableObject {
                         hostID: BASCognitiveBrain.defaultHostID)
                     req.effortPlan = plan
                     turnResult = await brain.process(req)
-                    await emitBoth(String(format: "📊 ch1025 effort iter=%d applied=%@ requested=%@%@",
-                                          iter, "\(plan.applied)", "\(plan.requested)",
+                    // P3 契合: the effort budget's decode-token dial COUPLES to the LLM request below —
+                    // a fast-tier turn answers in a short breath (the adaptive think-budget lever).
+                    effortDecodeCap = BASEffortBudget.forLevel(plan.applied).maxDecodeTokens
+                    await emitBoth(String(format: "📊 ch1025 effort iter=%d applied=%@ requested=%@ decode_cap=%d%@",
+                                          iter, "\(plan.applied)", "\(plan.requested)", effortDecodeCap ?? -1,
                                           plan.overrideReason.map { " override=\($0)" } ?? ""))
                 } else {
                     turnResult = await brain.process(prompt)
@@ -2155,7 +2159,8 @@ final class BASEnduranceAppController: ObservableObject {
                     preset: greedyLane ? .greedyDeterministic : .core,
                     instruction: prompt,
                     context: [],
-                    maxOutputTokens: maxDecodeTokens)   // WS2: explicit low decode cap (was preset 1024)
+                    // WS2 cap ∧ the effort budget's decode dial (P3 契合; nil when the loop is off = WS2 only)
+                    maxOutputTokens: min(maxDecodeTokens, effortDecodeCap ?? maxDecodeTokens))
                 // U3 — liveness marks bracket the decode (non-streaming:
                 // the threshold bounds the WHOLE call;a wedged draft()
                 // never returns, the checker task fires the verdict)。
