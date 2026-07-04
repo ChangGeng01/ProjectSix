@@ -216,6 +216,22 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
     /// change vs pre-M852)。
     public let outputSchema: BASGuidedGenerationSchema?
 
+    // MARK: - P2 多agent复用 (SYSTEM_EFFICIENCY_CAMPAIGN) — seat identity on the REQUEST
+
+    /// Optional AGENT-SEAT session key. nil (default) = the historical stateless turn (byte-equal,
+    /// ADR-014). Non-nil = the adapter maintains per-(sessionID, role) conversation state (KV cache +
+    /// history reuse — MLX: the M254 ChatSession pool). Carried on the REQUEST rather than the adapter
+    /// protocol so every decorator (router / contract / adjudicator / counter) forwards it for free —
+    /// the recon's gap #1/#2 closed with one field. Seat convention: "seat:<agentRole>" (e.g.
+    /// "seat:planner"), but any stable string works.
+    public let sessionID: String?
+
+    /// Optional per-seat SYSTEM persona, consumed ONCE at session creation (sessions freeze their system
+    /// prompt; later turns' values are ignored — pass the same persona every turn for clarity). nil =
+    /// the adapter's role-derived default instructions. Enables the 8 generative seats to differ in voice
+    /// while sharing ONE trunk (BASAgentPersonaRoleTemplates-shaped strings).
+    public let personaInstructions: String?
+
     public init(
         requestID: String,
         role: BASOrganRole,
@@ -226,7 +242,9 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
         stopSequences: [String] = [],
         deadline: Date? = nil,
         tools: [BASTool] = [],
-        outputSchema: BASGuidedGenerationSchema? = nil
+        outputSchema: BASGuidedGenerationSchema? = nil,
+        sessionID: String? = nil,
+        personaInstructions: String? = nil
     ) {
         self.requestID = requestID
         self.role = role
@@ -238,6 +256,8 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
         self.deadline = deadline
         self.tools = tools
         self.outputSchema = outputSchema
+        self.sessionID = sessionID
+        self.personaInstructions = personaInstructions
     }
 }
 

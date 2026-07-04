@@ -321,6 +321,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// executor, so no cross-task aliasing is possible. The wrapper
     /// stays `fileprivate` — never escapes the type.
     private var sessions: [String: ChatSessionBox] = [:]
+    /// P2: access order for the session-pool LRU bound (oldest first). 16 = the BASSessionTokenStore
+    /// precedent; per-session KV for turn-shaped seat traffic is ~4-8MB — 16 sessions ≈ well under the
+    /// dual-residency budget's slack.
+    private var sessionLRU: [String] = []
+    static let maxLiveSessions = 16
 
     /// Cross-turn draft corpus (Universal Draft Layer, Phase 1): per-conversation token history that feeds the
     /// model-free cross-turn suffix source (`BASCrossTurnDrafter`). Plain RAM — no MLX residency — bounded both
@@ -965,6 +970,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
 
         #if canImport(MLXLLM)
+        // P2 多agent复用: a seat request (sessionID set) routes to the per-seat session pool — KV/history
+        // reuse beats re-prefill + speculation on conversational turns (M254 measured), and the planner's
+        // lanes are deliberately excluded there. nil sessionID = the historical stateless path, byte-equal.
+        if let sid = request.sessionID {
+            return try await draftMultiTurn(request, sessionID: sid)
+        }
         // Route to the speculative decoder under the same fail-closed gates as `streamDraft`: loaded draft,
         // live mode, and request eligibility for that mode. Default off path / ineligible requests run the exact
         // single-model code below, byte-identical. (`draftMultiTurn` is deliberately NOT routed — its ChatSession
@@ -1109,13 +1120,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         } else {
             let fresh = ChatSession(
                 container,
+                // P2: per-seat persona (frozen at creation — sessions keep their system prompt);
+                // nil = the role-derived default (byte-equal with the pre-persona pool).
                 instructions:
-                    Self.systemInstructions(for: request),
+                    request.personaInstructions ?? Self.systemInstructions(for: request),
                 generateParameters: _generateParameters(
                     for: request.preset,
                     maxOutputTokens: request.maxOutputTokens))
             box = ChatSessionBox(session: fresh)
             sessions[key] = box
+        }
+        // P2: LRU bound on the pool (recon gap #4 — it was unbounded/unaccounted). Touch on every use;
+        // evict the least-recently-used session beyond the cap (its KV frees with the ChatSession).
+        sessionLRU.removeAll { $0 == key }
+        sessionLRU.append(key)
+        while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
+            sessionLRU.removeFirst()
+            sessions.removeValue(forKey: oldest)
         }
 
         let prompt = Self.prompt(for: request)
@@ -1185,6 +1206,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #if canImport(MLXLLM)
         sessions.removeValue(forKey: Self.sessionKey(sessionID, .scout))
         sessions.removeValue(forKey: Self.sessionKey(sessionID, .core))
+        sessionLRU.removeAll { $0 == Self.sessionKey(sessionID, .scout) || $0 == Self.sessionKey(sessionID, .core) }
         #endif
     }
 
@@ -1194,6 +1216,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         crossTurnStore.clearAll()
         #if canImport(MLXLLM)
         sessions.removeAll()
+        sessionLRU.removeAll()
         #endif
     }
 

@@ -101,7 +101,18 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   (propose/dispose made load-bearing); off-corpus/uncertain passes through untouched.
   Gate: T1 ≤0.6 with quality co-gate green; T2 gated-turns target.
 
-**P2 — MULTI-AGENT MULTIPLEXING (one trunk, N seats).**
+**P2 — MULTI-AGENT MULTIPLEXING (one trunk, N seats).** — P2a STATUS 2026-07-04: ✅ T4 CERT PASS.
+  Design: seat identity ON THE REQUEST (BASOrganRequest.sessionID + personaInstructions, defaults nil =
+  byte-equal ADR-014) — every decorator forwards it for free, closing recon gaps #1/#2 with two fields;
+  MLXOrganAdapter.draft() routes sessionID → the M254 session pool (KV/history reuse; planner lanes
+  deliberately bypassed there); pool LRU-bounded (16, gap #4); personas frozen at session creation (gap #6).
+  **T4 device cert (BAST4MultiAgentDeviceTests, xcodebuild-test lane): 8 generative seats over ONE
+  Qwen3.5-4B trunk — 8/8 outputs, KV reuse 8/8 (round-2 prompt tokens < round-1 prefill per seat),
+  base 2380 → peak 3118MB (inside the jetsam margin; the single-trunk operating band is ~3100-3180
+  regardless of session count — 8 seats' marginal memory ≈ noise), sessions=8, 67s.**
+  P2 remainder (open): shared system-prefix KV (gap #7) · decode fairness governor for concurrent seats
+  (gap #5) · per-agent state × acceleration lanes (gap #3) · N-session term in the memory budget model
+  (gap #9) · GDN save/trim beyond append-only conversations (gap #8; append-only validated by T4).
   sessionID + agentRef on the adapter protocol (decorator chain forwards) · session-pool LRU +
   memory accounting priced against the 3376MiB jetsam model (N-session term) · shared system-prefix
   KV (vendor saveCache/prebuilt-KV — the obvious N-agent memory saver) · a decode fairness governor
