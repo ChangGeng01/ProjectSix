@@ -205,6 +205,26 @@ The standing constraint ("skipping compute must not skip honesty") discharged wi
   ANSWERING does not. Below the bar → normal inject+LLM path (conservative: never a wrong answer).
   Base-adjudicator adjacent-topic INJECTION remains as designed (documented Line-A behavior).
 
+## 完善 addenda 2026-07-04 evening
+
+**CORPUS-SCALE VALIDATION (BASCorpusScaleDeviceTests, device, PASS)** — the shipped short-circuit
+lever at production scale (1131-fact bundled corpus, on-device MiniLM, no LLM):
+- Hit rate 93% (27/29 reference-derived wrong assertions clear the 0.60 answering bar — the two-tier
+  bar does NOT starve genuine hits) · wrong-verdicts 0/27 · resolve 35.4ms avg · embed-load 4.4s once.
+- **RESIDUAL RISK CLASS (recorded)**: qualifier-differing questions at HIGH cosine — "capital of
+  Australia's LARGEST STATE" hits "capital of Australia is Canberra" at cos 0.82 (≫ the 0.60 bar) and
+  would answer a non-sequitur. Cosine similarity cannot see the qualifier. Rate in the adversarial
+  probe: 1/8. Deeper fix (follow-up): an NLI question-fit check on the answering path (the nliProbe
+  hook exists for answer rescue; a question↔reference entailment gate is the same machinery).
+
+**SESSION→ACCELERATED-LANE ROUTING — DESIGNED, implementation deferred to a fresh block**:
+short-history sessions (< ~600 tok) run the fused-stateless path (full multi-turn templated prompt
+via the same Chat.Message machinery — no template drift) with the adapter keeping the transcript; on
+crossing the threshold, prefill ONCE and hand the KV to `ChatSession(container, instructions: nil,
+cache:)` (the vendored prebuilt-KV init — verified present). Value honesty: ~1.4× on greedy seat
+turns, only ~1.05× at the .core preset seats use today — implement when seats elect deterministic
+deliberation (reproducibility argues they should).
+
 ## Standing constraints
 满血 (no trunk quality change) · ADR-014 default-off/opt-in for every lever (kill-switches) ·
 ADR-039 lossless decode semantics untouched · never-worse gates with measured baselines · quality
