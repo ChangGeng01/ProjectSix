@@ -32,7 +32,8 @@ public final class BASQwen35MTPSpecDecoder {
     let model: Qwen35Model
     // MTP linears quantized 4-bit at init (device: 240MB fp16 ≈ 4.8ms/draft at ~50GB/s → 4-bit ≈ 1.2ms);
     // norms stay fp16 (pre-folded to plain).
-    struct QW { let w, s: MLXArray; let b: MLXArray? }
+    /// s == nil ⇒ UNQUANTIZED fp16 head (M3 A/B arm only — production stays 4-bit).
+    struct QW { let w: MLXArray; let s: MLXArray?; let b: MLXArray? }
     let fc, qp, kp, vp, op, gw, uw, dw: QW
     let iln, pln, qn, kn, nE, nH, fnW: MLXArray
     let invFreq: MLXArray                      // rope table, computed ONCE
@@ -56,7 +57,10 @@ public final class BASQwen35MTPSpecDecoder {
     static let ah = 16, akv = 4, ahd = 256, rd = 64
     static let ropeBase: Float = 10_000_000
 
-    public init(model: Qwen35Model, mtpWeightsURL: URL) throws {
+    /// `headFP16` — M3 A/B arm: keep the native MTP linears + draft sub-head UNQUANTIZED fp16
+    /// (≈3× draft bandwidth vs the production 4-bit; the A/B asks whether quantizing the head
+    /// costs acceptance). Default false = the certified production decoder, bit-unchanged.
+    public init(model: Qwen35Model, mtpWeightsURL: URL, headFP16: Bool = false) throws {
         self.model = model
         let a = try MLX.loadArrays(url: mtpWeightsURL)
         func need(_ k: String) throws -> MLXArray {
@@ -64,6 +68,7 @@ public final class BASQwen35MTPSpecDecoder {
             return t
         }
         func q4(_ k: String) throws -> QW {
+            if headFP16 { return QW(w: try need(k), s: nil, b: nil) }
             let (wq, sc, bi) = MLX.quantized(try need(k), groupSize: 64, bits: 4)
             return QW(w: wq, s: sc, b: bi)
         }
@@ -86,8 +91,12 @@ public final class BASQwen35MTPSpecDecoder {
             powf(Self.ropeBase, -Float($0) / Float(Self.rd))
         })
         let subRows = model.embedding(MLXArray((0 ..< Self.draftVocab).map(Int32.init)))   // [32K, D] fp16
-        let (hw, hs, hb) = MLX.quantized(subRows, groupSize: 64, bits: 4)
-        subHead = QW(w: hw, s: hs, b: hb)
+        if headFP16 {
+            subHead = QW(w: subRows, s: nil, b: nil)
+        } else {
+            let (hw, hs, hb) = MLX.quantized(subRows, groupSize: 64, bits: 4)
+            subHead = QW(w: hw, s: hs, b: hb)
+        }
         // chainEmbed moved to a lazy property (experimental deep-K only) — production K=1 skips its 42MB.
         mtpK = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
         mtpV = MLXArray.zeros([Self.maxSeq, Self.akv, Self.ahd], dtype: .float16)
@@ -108,7 +117,8 @@ public final class BASQwen35MTPSpecDecoder {
     }
 
     func mm(_ x: MLXArray, _ w: QW) -> MLXArray {
-        quantizedMatmul(x, w.w, scales: w.s, biases: w.b, transpose: true, groupSize: 64, bits: 4)
+        guard let s = w.s else { return matmul(x, w.w.transposed(1, 0)) }   // fp16 A/B arm
+        return quantizedMatmul(x, w.w, scales: s, biases: w.b, transpose: true, groupSize: 64, bits: 4)
     }
 
     func rope(_ t: MLXArray, pos: Int) -> MLXArray {
