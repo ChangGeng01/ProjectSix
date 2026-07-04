@@ -114,11 +114,20 @@ extension BASQwen35MTPSpecDecoder {
     /// the trunk argmax vector — replacing the 2K+2 `.item` shower of `generateSpecK`.
     public func generateSpecKFused(
         prompt: [Int], maxTokens: Int, eosTokens: Set<Int> = [], k: Int, fp32Scores: Bool = true,
-        tCap: Int = 12, adaptiveK: Bool = false
+        tCap: Int = 12, adaptiveK: Bool = false, traceExit: BASTraceExitConfig? = nil
     ) -> Run {
         precondition(k >= 1)
         let dbgE = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
         if dbgE { print("[fused-dbg] entry, reset+prefill…"); fflush(stdout) }
+        // B3 trace early-exit (opt-in): armed only when a config is passed. Primed if the prompt
+        // itself ends inside an open think block (template variants that pre-open `<think>`).
+        var tracePolicy: BASTraceExitPolicy? = traceExit.map { cfg in
+            let lastOpen = prompt.lastIndex(of: cfg.thinkOpenToken)
+            let lastClose = prompt.lastIndex(of: cfg.thinkCloseToken)
+            let primed = lastOpen.map { oi in lastClose.map { $0 < oi } ?? true } ?? false
+            return BASTraceExitPolicy(config: cfg, primedInThink: primed)
+        }
+        var traceTel: BASTraceExitTelemetry? = nil
         resetMTPStream()
         let cache = model.newCache(parameters: nil)
         let h0 = model.hiddenStatesWithCache(
@@ -169,9 +178,17 @@ extension BASQwen35MTPSpecDecoder {
             mtpV[hLastPos ..< hLastPos + kEff] = stacked(vs, axis: 0)
             return ds
         }
+        // Signal-free observation (prefill / refeed argmaxes carry no packed entropy): tracks the
+        // think open/close markers; a .close verdict HERE is deferred — these paths have no verify
+        // round in flight to unwind, and the persisting condition refires within the next round.
+        func observeNoSignal(_ tok: Int) {
+            _ = tracePolicy?.observe(token: tok, entropyMillinats: nil,
+                                     outCount: out.count, maxTokens: maxTokens)
+        }
         let dbg = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
         var dbgSlow = 0, dbgChainMs = 0.0, dbgVerifyMs = 0.0
         _ = emit(pending[0])
+        observeNoSignal(pending[0])
         if dbg { print("[fused-dbg] prefill done, first chain…"); fflush(stdout) }
         var ds = draftAndCommit()
         if dbg { print("[fused-dbg] first chain built"); fflush(stdout) }
@@ -189,6 +206,7 @@ extension BASQwen35MTPSpecDecoder {
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
                 let t = argmaxLast(model.logits(fromHidden: hp))
                 if !emit(t) { break }
+                observeNoSignal(t)
                 pending = [t]
                 ds = draftAndCommit()
                 continue
@@ -212,13 +230,27 @@ extension BASQwen35MTPSpecDecoder {
             let truth = am[(P - 1) ..< (P - 1 + kNow)]
             let match = (truth .== dsVec).asType(.int32)
             let lAcc = cumprod(match, axis: 0).sum(keepDims: false)
-            let packed = concatenated([lAcc.reshaped([1]), am])
+            // B3 signal armed only while the policy can still fire — after the one-shot latch (forced
+            // OR model self-close) the vocab-wide entropy reductions must stop (review MEDIUM-1: a long
+            // answer would otherwise pay ~1MB fp32 softmax×T every remaining round for nothing).
+            let traceActive = !(tracePolicy?.closed ?? true)
+            var packedParts = [lAcc.reshaped([1]), am]
+            if traceActive {
+                // Trunk next-token distribution entropy per row, packed as millinats so the
+                // ONE-readback-per-round discipline holds (fp32 for stability; ~T×1MB, negligible).
+                let lf = lg[0].asType(.float32)
+                let pr = softmax(lf, axis: -1)
+                let ent = -(pr * log(pr + 1e-9)).sum(axis: -1)
+                packedParts.append((ent * 1000).asType(.int32))
+            }
+            let packed = concatenated(packedParts)
             if dbg { print("[fused-dbg] round \(iters) pre-sync T=\(T) P=\(P)"); fflush(stdout) }
             let tv = dbg ? Date() : Date.distantPast
             let host = packed.asArray(Int32.self)                      // ⚠ the ONE gpu sync per round
             if dbg { dbgVerifyMs += Date().timeIntervalSince(tv) * 1000 }
             let L = Int(host[0])
-            let amH = host.dropFirst().map(Int.init)                   // trunk argmaxes, host side
+            let amH = host[1 ... T].map(Int.init)                      // trunk argmaxes, host side
+            let entH = traceActive ? host[(T + 1)...].map(Int.init) : []   // millinats per row
             iters += 1
             acceptedTok += L
             if adaptiveK { chainEmaL = 0.6 * chainEmaL + 0.4 * Double(L) }
@@ -229,8 +261,50 @@ extension BASQwen35MTPSpecDecoder {
                 emitted = Array(amH[(P - 1) ..< (P - 1 + L)]) + [amH[P - 1 + L]]  // accepted + correction
             }
             var stop = false
-            for e in emitted where !stop { stop = !emit(e) }
+            var closeAt = -1
+            var closeReason: BASTraceExitPolicy.Reason? = nil
+            for (i, e) in emitted.enumerated() {
+                if !emit(e) { stop = true; break }
+                // Row mapping: emitted[i] is drawn from the trunk distribution at input row P-1+i
+                // (both branches emit consecutive rows; the full-accept bonus row is T-1 = P-1+kNow).
+                if tracePolicy != nil,
+                   case .close(let r)? = tracePolicy?.observe(
+                       token: e, entropyMillinats: entH.isEmpty ? nil : entH[P - 1 + i],
+                       outCount: out.count, maxTokens: maxTokens) {
+                    closeAt = i; closeReason = r
+                    break
+                }
+            }
             if stop { break }
+            if let reason = closeReason, let cfg = traceExit {
+                // FORCE-CLOSE the think trace: inject "\n</think>\n\n", unwind this round's verify
+                // forward entirely (snapshots + trim — the reject-branch mechanics), then rebuild the
+                // stream state with ONE refeed of everything not in cache. Runs at most once per
+                // generation (one-shot latch); the refeed may exceed tCap's qmv width — a single
+                // qmm-regime forward per fire is accepted (correctness-identical forward class).
+                // Known skew (review LOW-4): acceptedTok counted the full prefix L but emitted tokens
+                // past closeAt are discarded — Run.accepted over-counts by ≤ kNow−closeAt−1, once per
+                // generation; immaterial to the acceptance profiler's EMA.
+                tracePolicy?.markForcedClose()
+                traceTel = BASTraceExitTelemetry(
+                    reason: reason, thinkTokensAtExit: tracePolicy?.thinkTokens ?? 0,
+                    outCountAtExit: out.count)
+                for t in cfg.closeSequence where !stop { stop = !emit(t) }
+                if stop { break }              // budget died mid-injection — no refeed to waste (review LOW-3)
+                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
+                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                let feed = pending + Array(emitted[0 ... closeAt]) + cfg.closeSequence
+                let hp = model.hiddenStatesWithCache(
+                    MLXArray(feed.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+                trunkLen += feed.count
+                hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
+                let t = argmaxLast(model.logits(fromHidden: hp))
+                if !emit(t) { break }
+                observeNoSignal(t)
+                pending = [t]
+                ds = draftAndCommit()
+                continue
+            }
             if L == kNow {
                 trunkLen += T
                 hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
@@ -251,7 +325,7 @@ extension BASQwen35MTPSpecDecoder {
                          dbgSlow, dbgChainMs / Double(max(iters, 1)), dbgVerifyMs / Double(max(iters, 1)), iters))
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0),
-                   accepted: acceptedTok, iterations: iters)
+                   accepted: acceptedTok, iterations: iters, traceExit: traceTel)
     }
 }
 #endif

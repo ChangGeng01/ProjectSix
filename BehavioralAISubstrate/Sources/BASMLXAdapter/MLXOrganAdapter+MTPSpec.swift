@@ -51,13 +51,20 @@ extension MLXOrganAdapter {
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)
+            let trace = Self._traceExitConfigFromEnv(
+                resolve: { ctx.tokenizer.convertTokenToId($0) },
+                encode: { ctx.tokenizer.encode(text: $0) })
             let r = sampling
                 ? dec.generateSpecSampling(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
                     temperature: Float(request.preset.temperature), topP: Float(request.preset.topP))
                 : dec.generateSpecKFused(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
-                    k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true)
+                    k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
+                    traceExit: trace)
+            if let te = r.traceExit {
+                print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
+            }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
@@ -108,9 +115,16 @@ extension MLXOrganAdapter {
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)
+            let trace = Self._traceExitConfigFromEnv(
+                resolve: { ctx.tokenizer.convertTokenToId($0) },
+                encode: { ctx.tokenizer.encode(text: $0) })
             let r = dec.generateSpecKFused(
                 prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
-                k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true)
+                k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
+                traceExit: trace)
+            if let te = r.traceExit {
+                print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
+            }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
@@ -127,6 +141,37 @@ extension MLXOrganAdapter {
         _ transcript: [(role: String, text: String)], container: ModelContainer
     ) async throws -> sending LMInput {
         try await container.prepare(input: UserInput(chat: MLXOrganAdapter.chatMessages(from: transcript)))
+    }
+
+    /// B3 trace early-exit config (ADR-014: env-armed, default OFF). Token ids resolved from the LIVE
+    /// tokenizer with Qwen3.5-family fallbacks (`<think>`=248068, `</think>`=248069, `\n`=198, `\n\n`=271
+    /// — verified against the mlx-community 4-bit tokenizer 2026-07-04; the MLX chat template does NOT
+    /// pre-open think blocks — the model emits the markers itself — and the policy is marker-gated so a
+    /// no-think generation is untouched). Knobs: BAS_TRACE_EXIT=1 (arm), _TAU millinats (default 300),
+    /// _WINDOW (8), _MIN (24), _RESERVE (32), _BUDGET_ONLY=1 (entropy rule off, budget guard only).
+    nonisolated static func _traceExitConfigFromEnv(
+        resolve: (String) -> Int?, encode: (String) -> [Int]
+    ) -> BASTraceExitConfig? {
+        let env = ProcessInfo.processInfo.environment
+        guard env["BAS_TRACE_EXIT"] == "1" else { return nil }
+        let open = resolve("<think>") ?? 248068
+        let close = resolve("</think>") ?? 248069
+        let nl = encode("\n").last ?? 198
+        let nl2 = encode("\n\n").last ?? 271
+        var tau: Int? = env["BAS_TRACE_EXIT_TAU"].flatMap(Int.init) ?? 300
+        if env["BAS_TRACE_EXIT_BUDGET_ONLY"] == "1" { tau = nil }
+        let closeSeq = [nl, close, nl2]
+        // Reserve clamp (review MEDIUM-2): the loop observes AFTER emit, so a reserve below
+        // closeSequence+1 lets emit() exhaust the budget before the guard can ever fire —
+        // the edge knob value would silently disable the exact artifact-fix the guard exists for.
+        let reserve = max(env["BAS_TRACE_EXIT_RESERVE"].flatMap(Int.init) ?? 32, closeSeq.count + 1)
+        return BASTraceExitConfig(
+            thinkOpenToken: open, thinkCloseToken: close,
+            closeSequence: closeSeq, boundaryTokens: [nl, nl2],
+            minThinkTokens: env["BAS_TRACE_EXIT_MIN"].flatMap(Int.init) ?? 24,
+            entropyWindow: env["BAS_TRACE_EXIT_WINDOW"].flatMap(Int.init) ?? 8,
+            entropyThresholdMillinats: tau,
+            answerReserveTokens: reserve)
     }
 
     /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).

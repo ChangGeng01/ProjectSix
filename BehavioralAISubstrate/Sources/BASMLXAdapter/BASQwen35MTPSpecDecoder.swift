@@ -285,6 +285,17 @@ public final class BASQwen35MTPSpecDecoder {
         public let decodeSeconds: Double
         public let accepted: Int
         public let iterations: Int
+        /// B3 trace early-exit: non-nil iff the stop rule fired this run (fused lane, opt-in).
+        public let traceExit: BASTraceExitTelemetry?
+
+        init(tokens: [Int], decodeSeconds: Double, accepted: Int, iterations: Int,
+             traceExit: BASTraceExitTelemetry? = nil) {
+            self.tokens = tokens
+            self.decodeSeconds = decodeSeconds
+            self.accepted = accepted
+            self.iterations = iterations
+            self.traceExit = traceExit
+        }
     }
 
     func argmaxLast(_ logits: MLXArray) -> Int {

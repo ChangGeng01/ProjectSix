@@ -126,4 +126,71 @@ final class BASMTPFusedChainTests: XCTestCase {
         XCTAssertGreaterThan(aPerIter, 1.2, "chain acceptance collapsed — fused wiring broke (golden ≈2.35 device)")
         XCTAssertGreaterThan(eTok, 2.0, "E[tok]/iter below deep-K value — chain not paying")
     }
+
+    /// F3 — B3 trace early-exit end-to-end on a REAL reasoning trace (BAS_TRACE_EXIT_TEST=1):
+    /// aggressive τ makes the entropy rule fire deterministically; asserts the full force-close path
+    /// (policy → inject "\n</think>\n\n" → verify-round unwind → refeed → answer continues) and that
+    /// the exited run never emits more than the control. Plumbing gate — QUALITY is judged on device.
+    func testTraceExitForcedCloseOnRealTrace() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_TRACE_EXIT_TEST"] == "1" else {
+            throw XCTSkip("set BAS_TRACE_EXIT_TEST=1 (heavy — loads Qwen3.5-4B)")
+        }
+        let wURL = URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors")
+        let container = try await #huggingFaceLoadModelContainer(
+            configuration: ModelConfiguration(id: "mlx-community/Qwen3.5-4B-4bit",
+                                              extraEOSTokens: ["<|im_end|>"]),
+            progressHandler: { _ in })
+        let input = try await container.prepare(input: UserInput(chat: [
+            .user("How many prime numbers are there between 10 and 50? Think step by step.")]))
+        struct TR: Sendable {
+            var firedReason: String?
+            var thinkAtExit = 0
+            var closeID = 0
+            var exitTok: [Int] = []
+            var ctrlTok: [Int] = []
+            var exitText = ""
+        }
+        let r: TR = try await container.perform(nonSendable: input) { ctx, input in
+            guard let model = ctx.model as? Qwen35Model else {
+                throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+            }
+            let dec = try BASQwen35MTPSpecDecoder(model: model, mtpWeightsURL: wURL)
+            let promptIds = input.text.tokens.asArray(Int.self)
+            var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
+            if let imEnd = ctx.tokenizer.convertTokenToId("<|im_end|>") { eos.insert(imEnd) }
+            let open = ctx.tokenizer.convertTokenToId("<think>") ?? 248068
+            let close = ctx.tokenizer.convertTokenToId("</think>") ?? 248069
+            let nl = ctx.tokenizer.encode(text: "\n").last ?? 198
+            let nl2 = ctx.tokenizer.encode(text: "\n\n").last ?? 271
+            let cfg = BASTraceExitConfig(
+                thinkOpenToken: open, thinkCloseToken: close,
+                closeSequence: [nl, close, nl2], boundaryTokens: [nl, nl2],
+                minThinkTokens: 8, entropyWindow: 4,
+                entropyThresholdMillinats: 100_000,          // fire at the first post-min boundary
+                answerReserveTokens: 16)
+            var out = TR()
+            out.closeID = close
+            let a = dec.generateSpecKFused(prompt: promptIds, maxTokens: 160, eosTokens: eos,
+                                           k: 3, tCap: 12, adaptiveK: true, traceExit: cfg)
+            out.firedReason = a.traceExit?.reason.rawValue
+            out.thinkAtExit = a.traceExit?.thinkTokensAtExit ?? 0
+            out.exitTok = a.tokens
+            out.exitText = ctx.tokenizer.decode(tokenIds: a.tokens)
+            let b = dec.generateSpecKFused(prompt: promptIds, maxTokens: 160, eosTokens: eos,
+                                           k: 3, tCap: 12, adaptiveK: true)
+            out.ctrlTok = b.tokens
+            return out
+        }
+        print("=== F3 fired=\(r.firedReason ?? "NO") think@exit=\(r.thinkAtExit) exit=\(r.exitTok.count)tok ctrl=\(r.ctrlTok.count)tok ===")
+        print("=== F3 exit text: \(r.exitText.replacingOccurrences(of: "\n", with: "⏎")) ===")
+        XCTAssertEqual(r.firedReason, "entropy",
+                       "aggressive τ must fire the entropy rule on a real thinking trace (no fire ⇒ the model never opened <think> or plumbing broke)")
+        guard let closeIdx = r.exitTok.firstIndex(of: r.closeID) else {
+            return XCTFail("</think> was not injected into the stream")
+        }
+        XCTAssertGreaterThan(r.exitTok.count - closeIdx - 1, 0,
+                             "an answer tail must continue after the forced close (refeed path)")
+        XCTAssertLessThanOrEqual(r.exitTok.count, r.ctrlTok.count,
+                                 "the exited run must never emit more than the control")
+    }
 }
