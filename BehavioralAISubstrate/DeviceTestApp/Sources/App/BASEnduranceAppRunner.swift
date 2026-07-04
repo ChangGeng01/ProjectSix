@@ -1535,6 +1535,26 @@ final class BASEnduranceAppController: ObservableObject {
                 + "\(g.configuration.strikesToDrop) clean_to_restore="
                 + "\(g.configuration.cleanSamplesToRestore)")
         }
+        // B4 预测式热控 (BAS_THERMAL_PREDICT=1) — duty-budget hazard predictor + pre-fair duty
+        // shaping (FRONTIER_2026H2 B4): learn the nominal zone's decode-duty budget online, insert
+        // micro-cooldowns BEFORE the OS flips to fair (where the fused chain measured 0.91-0.99×).
+        var thermalPredictor: BASThermalHazardPredictor? =
+            (env["BAS_THERMAL_PREDICT"] ?? "0") == "1" ? BASThermalHazardPredictor() : nil
+        var predictGaps = 0
+        var predictGapSeconds = 0.0
+        if let tp = thermalPredictor {
+            await emitBoth(String(format:
+                "🌡 thermal-predict ARMED prior_budget=%.0fs safety=%.2f recovery=%.2f gap=%.0fs",
+                tp.config.priorNominalDutyBudget, tp.config.safetyFraction,
+                tp.config.recoveryCredit, tp.config.cooldownSeconds))
+        }
+        // B4 效率核解码 (BAS_DECODE_QOS=utility) — the decode subtree runs at .utility so the
+        // scheduler prefers E-cores for the CPU-side encode work (MNN-AECS pattern; decode is
+        // memory-bound). Speed-neutrality is the gate; energy claims need the battery window.
+        let decodeQoSUtility = (env["BAS_DECODE_QOS"] ?? "") == "utility"
+        if decodeQoSUtility {
+            await emitBoth("🌡 decode-qos ARMED — draft() subtree at Task(priority: .utility)")
+        }
         // U3 — opt-in decode liveness monitor (BAS_LIVENESS_MONITOR=1)。
         // DETECTION ONLY — never cancels (ch1066/ADR-038:the wedge is
         // uncancellable;a timeout races a jetsam kill it can't win)。
@@ -1917,6 +1937,21 @@ final class BASEnduranceAppController: ObservableObject {
             iterAvailMemBefore.append(
                 snapBefore.availableMemoryMB)
 
+            // B4 — feed the hazard predictor + duty shaping (pre-fair micro-cooldown)。
+            if var tp = thermalPredictor {
+                tp.recordTier(ProcessInfo.processInfo.thermalState.rawValue)
+                if let gap = tp.recommendedCooldown {
+                    await emitBoth(String(format:
+                        "🌡 ch1025 thermal-predict iter=%d HAZARD duty=%.0fs budget=%.0fs → gap=%.0fs",
+                        iter, tp.dutyInWindow, tp.learnedBudget, gap))
+                    try? await Task.sleep(nanoseconds: UInt64(gap * 1_000_000_000))
+                    tp.recordIdle(seconds: gap)
+                    predictGaps += 1
+                    predictGapSeconds += gap
+                }
+                thermalPredictor = tp
+            }
+
             var iterTokens = 0
             // ADR-039 concurrency arc M1.1 — per-iter substrate (brain.process) vs MLX-decode (adapter.draft)
             // time, to measure what fraction of a turn is the parallelizable substrate vs the GPU decode.
@@ -1986,6 +2021,15 @@ final class BASEnduranceAppController: ObservableObject {
                         deviceState = folded.state
                         twinNote = String(format: " twin_guard=%@ twin_pressure=%.2f",
                                           folded.guardLevel, folded.pressure)
+                    }
+                    // B4 — predictive EARLY WARNING into the effort loop: hazard while still
+                    // nominal plans the turn as if fair had already arrived (shrink headroom →
+                    // smaller budgets BEFORE the OS throttles — avoided compute, not sleep-gaps;
+                    // the continuous-load A/B proved duty shaping throughput-negative at 100% duty)。
+                    if let tp = thermalPredictor, tp.hazard,
+                       deviceState.thermalLevel == .nominal {
+                        deviceState.thermalLevel = .warm
+                        twinNote += " predict_hazard=1"
                     }
                     let plan = await BASBrainChat.governedPlan(
                         message: prompt, thermalLevel: deviceState.thermalLevel,
@@ -2229,12 +2273,24 @@ final class BASEnduranceAppController: ObservableObject {
                         await emitBoth("📊 ch1025 t1 iter=\(iter) prompt=\(p + 1) llm_calls=\(calls) gated=\(t1Gated)")
                         t1CallsTotal += calls
                         t1Turns += 1
+                    } else if decodeQoSUtility {
+                        // B4 — E-core preference for the decode subtree (priority propagates into
+                        // the adapter + MLX CPU-side encode threads; GPU work is unaffected)。
+                        let req = request
+                        let a = adapter
+                        draft = try await Task(priority: .utility) { try await a.draft(req) }.value
                     } else {
                         draft = try await adapter.draft(request)
                     }
                     await livenessMonitor?.endTurn()
                     let mlxMs = monoElapsedMs(since: mlxStartNs)
                     iterMlxMs += mlxMs   // M1.1 — MLX GPU decode time (the dominant, non-parallelizable part)
+                    // B4 — duty at PROMPT granularity (validation #2 finding: per-iter recording is
+                    // too coarse — fair arrives before the account catches up to the hazard line)。
+                    if var tp = thermalPredictor {
+                        tp.recordDecode(seconds: mlxMs / 1000.0)
+                        thermalPredictor = tp
+                    }
                     let mlxPostSnap = snapshot()
                     let bodyLen = draft.body.count
                     // ch 1025.8 HIGH-1 fix:`outputTokensEstimated` is
@@ -2623,6 +2679,13 @@ final class BASEnduranceAppController: ObservableObject {
                 "p99_iter_ms=%.0f",
                 totalSec, totalIters,
                 avgDurMs, p50DurMs, p99DurMs))
+            if let tp = thermalPredictor {
+                await emitBoth(String(format:
+                    "📊 ch1025 FINAL thermal-predict gaps=%d gap_sec=%.0f "
+                    + "learned_budget=%.0fs transitions=%d",
+                    predictGaps, predictGapSeconds,
+                    tp.learnedBudget, tp.observedTransitions))
+            }
             // ch 1025.8 HIGH-1:est_total_tokens(chars/4,not real)。
             // p50/p99 below use nearest-rank percentiles via
             // `Self.nearestRankIndex(...)`(rank=ceil(p×N), 0-based
