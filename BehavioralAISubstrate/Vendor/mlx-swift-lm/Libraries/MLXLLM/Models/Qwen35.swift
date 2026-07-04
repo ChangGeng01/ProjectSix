@@ -545,6 +545,34 @@ public class Qwen35TextModelInner: Module {
 
         return norm(hiddenStates)
     }
+
+    /// ADDITIVE (DFlash spec lane): the same forward, additionally collecting the OUTPUTS of the
+    /// given layer indices (0-indexed, post-layer — the DFlash drafter's conditioning contract,
+    /// `target_layer_ids`). Taps are returned in ascending layer order. Certified paths call
+    /// `callAsFunction` and are untouched.
+    func forwardWithTaps(
+        _ inputs: MLXArray, cache: [KVCache?]? = nil, tapLayers: [Int]
+    ) -> (hidden: MLXArray, taps: [MLXArray]) {
+        var hiddenStates = embedTokens(inputs)
+        var cacheArray = cache
+        if cacheArray == nil {
+            cacheArray = Array(repeating: nil as KVCache?, count: layers.count)
+        }
+        let faMask = createAttentionMask(h: hiddenStates, cache: cacheArray?[faIdx])
+        let ssmMask = createSSMMask(h: hiddenStates, cache: cacheArray?[ssmIdx] as? MambaCache)
+        let wanted = Set(tapLayers)
+        var taps: [MLXArray] = []
+        for (i, layer) in layers.enumerated() {
+            let mask = layer.isLinear ? ssmMask : nil
+            let attnMask =
+                layer.isLinear
+                ? MLXFast.ScaledDotProductAttentionMaskMode.none : faMask
+            hiddenStates = layer(
+                hiddenStates, attentionMask: attnMask, ssmMask: mask, cache: cacheArray?[i])
+            if wanted.contains(i) { taps.append(hiddenStates) }
+        }
+        return (norm(hiddenStates), taps)
+    }
 }
 
 public class Qwen35TextModel: Module, LLMModel, KVCacheDimensionProvider {
@@ -705,6 +733,13 @@ extension Qwen35Model {
     /// Embedding rows for token ids ([T] → [T,D]) — the MTP drafter's fused input.
     public func embedding(_ tokens: MLXArray) -> MLXArray {
         languageModel.model.embedTokens(tokens)
+    }
+    /// ADDITIVE (DFlash spec lane): forward advancing `cache`, also returning the outputs of the
+    /// requested layers (ascending order) — the drafter's conditioning features.
+    public func hiddenStatesWithTaps(
+        _ inputs: MLXArray, cache: [KVCache]?, tapLayers: [Int]
+    ) -> (hidden: MLXArray, taps: [MLXArray]) {
+        languageModel.model.forwardWithTaps(inputs, cache: cache, tapLayers: tapLayers)
     }
 
     public func finalHiddenStates(_ inputs: MLXArray) -> MLXArray {

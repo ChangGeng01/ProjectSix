@@ -240,4 +240,58 @@ final class BASMTPFusedChainTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(hard.budget, easy.budget, "budgets must follow the ranking")
         XCTAssertLessThanOrEqual(easy.tokens, easy.budget, "the refined budget must actually bind")
     }
+
+    /// F5 — M1 Gate-b: the Swift DFlash port vs the Python reference (BAS_DFLASH_TEST=1).
+    /// Reference (z-lab model_mlx.py, SAME target 4-bit + drafter q4, Mac): accept-len
+    /// 5.02 / 3.29 / 6.24 / 3.57 on these four prompts. The Swift port adds the 32K sub-head
+    /// (drafts outside just reject) so slight deltas are expected — the gate is the BAND
+    /// (mean accept ≥ 2.5 across prompts = the port is faithful), plus e2e tok/s vs plain.
+    func testDFlashSwiftPortGateB() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_DFLASH_TEST"] == "1" else {
+            throw XCTSkip("set BAS_DFLASH_TEST=1 (heavy — loads Qwen3.5-4B + DFlash drafter)")
+        }
+        let dURL = URL(fileURLWithPath: "/tmp/gdn_coreai/dflash_draft/model.safetensors")
+        let wURL = URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors")
+        let container = try await #huggingFaceLoadModelContainer(
+            configuration: ModelConfiguration(id: "mlx-community/Qwen3.5-4B-4bit",
+                                              extraEOSTokens: ["<|im_end|>"]),
+            progressHandler: { _ in })
+        let prompts = [
+            "How many prime numbers are there between 10 and 50? Think step by step.",
+            "Describe a quiet morning in a mountain village.",
+            "What is 23 multiplied by 17? Show your reasoning.",
+            "Explain what a tide pool is to a curious child.",
+        ]
+        struct R: Sendable {
+            let accPerIter: Double; let eTok: Double; let dfTps: Double; let plainTps: Double
+        }
+        var accs: [Double] = []
+        for q in prompts {
+            let input = try await container.prepare(input: UserInput(chat: [.user(q)]))
+            let r: R = try await container.perform(nonSendable: input) { ctx, input in
+                guard let qwen = ctx.model as? Qwen35Model else {
+                    throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+                }
+                let dec = try BASQwen35DFlashDecoder(model: qwen, draftWeightsURL: dURL)
+                let mtp = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+                var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
+                if let imEnd = ctx.tokenizer.convertTokenToId("<|im_end|>") { eos.insert(imEnd) }
+                let ids = input.text.tokens.asArray(Int.self)
+                let run = dec.generateDFlash(prompt: ids, maxTokens: 256, eosTokens: eos)
+                let plain = mtp.generatePlain(prompt: ids, maxTokens: 256)
+                let a = run.iterations > 0 ? Double(run.accepted) / Double(run.iterations) : 0
+                let e = run.iterations > 0 ? Double(run.tokens.count) / Double(run.iterations) : 0
+                return R(accPerIter: a, eTok: e,
+                         dfTps: Double(run.tokens.count) / max(run.decodeSeconds, 0.001),
+                         plainTps: Double(plain.tokens.count) / max(plain.decodeSeconds, 0.001))
+            }
+            accs.append(r.accPerIter)
+            print(String(format: "=== F5 %@ acc/cycle=%.2f E[tok]/cycle=%.2f dflash=%.1f plain=%.1f ratio=%.2fx ===",
+                         String(q.prefix(40)), r.accPerIter, r.eTok, r.dfTps, r.plainTps,
+                         r.dfTps / max(r.plainTps, 0.001)))
+        }
+        let mean = accs.reduce(0, +) / Double(accs.count)
+        print(String(format: "=== F5 MEAN accept=%.2f (python-ref band 3.3-6.2) ===", mean))
+        XCTAssertGreaterThan(mean, 2.5, "Swift port acceptance collapsed vs the Python reference — port bug")
+    }
 }
