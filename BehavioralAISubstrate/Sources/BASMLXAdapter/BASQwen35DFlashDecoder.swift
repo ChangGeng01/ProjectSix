@@ -34,10 +34,6 @@ public final class BASQwen35DFlashDecoder {
     static let nLayers = 6, nHeads = 32, nKV = 8, hd = 128, hidden = 2560
     static let slidingLayers = 5                       // layers 0-4 sliding, layer 5 full
     static let ropeBase: Float = 10_000_000
-    /// Draft head rows. UNLIKE the MTP lane (per-LINK head reads ⇒ 32K sub-head mandatory), the
-    /// DFlash head runs once per 16-token CYCLE — the full quantized vocab (248320×2560 q4 ≈318MB
-    /// ≈20MB/token amortized) is affordable and avoids sub-head acceptance loss on rarer tokens.
-    let draftVocab: Int
 
     struct QW { let w: MLXArray; let s: MLXArray; let b: MLXArray? }
     struct Layer {
@@ -50,15 +46,13 @@ public final class BASQwen35DFlashDecoder {
     let hiddenNorm: MLXArray
     let finalNorm: MLXArray
     let layers: [Layer]
-    let subHead: QW
     // Drafter ctx-KV cache: per layer, rows for every stream token before the current anchor.
     var ctxK: [MLXArray?] = Array(repeating: nil, count: nLayers)
     var ctxV: [MLXArray?] = Array(repeating: nil, count: nLayers)
     var ctxLen = 0                                     // == absolute stream position covered
 
-    public init(model: Qwen35Model, draftWeightsURL: URL, draftVocab: Int = 248320) throws {
+    public init(model: Qwen35Model, draftWeightsURL: URL) throws {
         self.model = model
-        self.draftVocab = draftVocab
         let a = try MLX.loadArrays(url: draftWeightsURL)
         func need(_ k: String) throws -> MLXArray {
             guard let t = a[k] else { throw DFlashError.missingWeights(k) }
@@ -66,8 +60,11 @@ public final class BASQwen35DFlashDecoder {
         }
         // Drafter norms are HF-plain (model_type qwen3) — used RAW (no +1 shift, unlike the
         // vendored target's zero-centered sanitize; the Python reference loads them as-is).
+        // Per-tensor eval bounds the load→cast→quantize transient to ONE tensor (device jetsam
+        // discipline: the whole-graph lazy eval materialized every fp16 intermediate at once).
         func q4(_ k: String) throws -> QW {
             let (wq, sc, bi) = MLX.quantized(try need(k), groupSize: 64, bits: 4)
+            eval(wq, sc)
             return QW(w: wq, s: sc, b: bi)
         }
         fcW = try q4("fc.weight")
@@ -90,9 +87,6 @@ public final class BASQwen35DFlashDecoder {
                 kn: try need(p + "self_attn.k_norm.weight")))
         }
         layers = ls
-        let subRows = model.embedding(MLXArray((0 ..< draftVocab).map(Int32.init)))
-        let (hw, hs, hb) = MLX.quantized(subRows, groupSize: 64, bits: 4)
-        subHead = QW(w: hw, s: hs, b: hb)
     }
 
     func mm(_ x: MLXArray, _ w: QW) -> MLXArray {
@@ -168,7 +162,10 @@ public final class BASQwen35DFlashDecoder {
             let z = rms(h, L.pln)
             h = h + mm(silu(mm(z, L.gw)) * mm(z, L.uw), L.dw)
         }
-        let logits = mm(rms(h, finalNorm), subHead)                    // [16, 32K]
+        // Draft head = the TARGET'S OWN (already-quantized) lm-head family — exactly the
+        // reference semantics (target.lm_head on drafter hidden), zero extra memory. The Gate-c
+        // take-1 device crash was the fp16 full-vocab materialization this replaces (1.27GB spike).
+        let logits = model.logits(fromHidden: rms(h, finalNorm).expandedDimensions(axis: 0))[0]
         return argMax(logits[1...], axis: -1).asType(.int32)           // [15]
     }
 
