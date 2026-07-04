@@ -36,9 +36,13 @@ STANDS everywhere; the frontier moved in exactly four places (BUILD/MEASURE belo
 time **-41%**, quality EXIT **6/6** vs CTRL **0/6** — the control burned 384/384 tokens THINKING on
 every prompt including "23×17" and never answered: at realistic caps the un-exited lane is
 all-think-no-answer, so B3 is a CORRECTNESS fix, not just an optimizer. Fires 8/8 @τ=300.
-Honest misses: BUDGET@128 reserve-32 answer tail too short for this verbose model (answers emerged
-but the number got cap-truncated, 0/2) → scale reserve with cap (48-64@128) before relying on the
-budget regime; quiz is math-narrow — run the co-gate quality suite before default-ON promotion. | EntroCut/DEER/EAT [PAPER-MEASURED]; 4B overthinks 2.5× vs 27B | -25-50% reasoning-phase tokens. TRAP honored: convergence window+boundary+min-trace, NOT raw answer-confidence | LOW |
+Honest misses (both since FIXED): BUDGET@128 reserve-32 tail too short → reserve now cap-scaled
+(48 @ ≤160); math-narrow quiz → **CO-GATE QUALITY SUITE PASS 2026-07-04 with B3 armed on the
+production route** (on-corpus anti-syco resist raw 10/10 + stack 10/10 with 7 live fires incl. a
+budget-guard save@288; off-corpus BYTE-IDENTITY 5/5 through the armed lane).
+**PROMOTED — 效率环 wire live**: any request carrying an explicit decode cap (the effort loop's
+maxDecodeTokens dial → request.maxOutputTokens, runner :2207) arms the policy in production;
+un-capped turns stay unarmed; BAS_TRACE_EXIT_OFF=1 = ADR-014 kill-switch. | EntroCut/DEER/EAT [PAPER-MEASURED]; 4B overthinks 2.5× vs 27B | -25-50% reasoning-phase tokens. TRAP honored: convergence window+boundary+min-trace, NOT raw answer-confidence | LOW |
 | B4 | **Predictive thermal + efficiency-core decode** | EnerInfer 2606.23001: horizon thermal *prediction* pre-empts throttle, **-65% energy**; MNN-AECS: decode is memory-bound → efficiency cores, **-23% energy ~zero speed cost**, iOS-viable [PAPER-MEASURED] | upgrade our REACTIVE thermal-lease to PREDICTIVE; near-free energy win | LOW-MED |
 | B5 | **Persistent Q4 KV cache (cross-session warm-start)** | "Agent Memory Below the Prompt" 2603.04428 + open code: KV→4-bit safetensors→disk, M4 warm TTFT **27-35×**, Q4 quality ≈lossless, survives reboot; in-paper iPhone projection ~1.7s@4K [SHIPPED-CODE, Apple-Silicon-measured] | extends session KV reuse across sessions; slots into dream-loop idle window; NOT learning — warm-start caching | MED |
 
