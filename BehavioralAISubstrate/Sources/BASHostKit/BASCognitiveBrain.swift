@@ -631,6 +631,14 @@ public actor BASCognitiveBrain {
         return await engine.runTurn(request)
     }
 
+    /// P1(a) 全面优化 — forward the effort-loop consumer flag to the coordinator (the engine's
+    /// reachability pipe). With this true AND a turn request carrying `effortPlan`, `runTurn` sizes the
+    /// deliberation pass budget by the governed effort (fewer LLM passes on low-surprise×low-stakes turns).
+    /// ADR-014: never calling this = byte-equal (flag stays false as constructed).
+    public func setDeliberationLoopEnabled(_ enabled: Bool) async {
+        await engine.setDeliberationLoopEnabled(enabled)
+    }
+
     /// ADR-018 P2 host adoption (2026-06-12) — forward the shadow-
     /// trial N→N+1 carrier seams to the engine's coordinator(see
     /// `BASTurnRuntimeEngine.setShadowTrialFeedback`)。 Host loop:

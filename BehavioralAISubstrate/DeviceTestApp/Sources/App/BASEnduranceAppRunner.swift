@@ -1286,6 +1286,20 @@ final class BASEnduranceAppController: ObservableObject {
             "📍 ch1025 BASCognitiveBrain loaded load_ms=%.0f",
             cognitiveBrainMs))
 
+        // P1(a) 全面优化 setup (BAS_EFFORT_LOOP=1): construct the ε probe (live MiniLM) + flip the
+        // coordinator's effort-loop consumer via the reachability pipe. Env unset ⇒ nothing constructed,
+        // nothing flipped — every turn byte-equal with the prior build (ADR-014).
+        var effortProbe: BASTurnSurpriseProbe?
+        if ProcessInfo.processInfo.environment["BAS_EFFORT_LOOP"] == "1" {
+            if let probe = BASTurnSurpriseProbe() {
+                effortProbe = probe
+                await brain.setDeliberationLoopEnabled(true)
+                await emitBoth("📍 ch1025 effort-loop LIVE (ε probe + deliberation consumer on)")
+            } else {
+                await emitBoth("📍 ch1025 effort-loop requested but MiniLM unavailable — staying OFF")
+            }
+        }
+
         // ch1063 — CROSS-RESTART proof: reload the durable store into the routed snapshot at start.
         // store_atoms is 0 on launch #1 over a fresh container, and >0 on launch #2 over the SAME
         // container — i.e. a prior run's self-populated memory survived an app restart.
@@ -1896,7 +1910,27 @@ final class BASEnduranceAppController: ObservableObject {
                 // activation yet (pipeline.runTurn deferred to ch 1025.6
                 // — needs fabric+roster+graph build in app target)。
                 let brainStartNs = monoNowNs()
-                let turnResult = await brain.process(prompt)
+                // P1(a) 全面优化 (BAS_EFFORT_LOOP=1): the surprise-gated effort loop, live. ε (MiniLM
+                // predictive-coding probe) × stakes × thermal headroom → governed plan carried on the turn
+                // request; the coordinator (deliberationLoopEnabled, flipped at setup) sizes deliberation
+                // passes by it. Env unset ⇒ the exact prior brain.process(prompt) path, byte-equal (ADR-014).
+                let turnResult: BASEBrainTurnResult
+                if let probe = effortProbe {
+                    let plan = await BASBrainChat.governedPlan(
+                        message: prompt, thermalLevel: BASCognitiveBrain.defaultDeviceState.thermalLevel,
+                        probe: probe)
+                    var req = BASEBrainTurnRequest(
+                        userInput: prompt,
+                        deviceState: BASCognitiveBrain.defaultDeviceState,
+                        hostID: BASCognitiveBrain.defaultHostID)
+                    req.effortPlan = plan
+                    turnResult = await brain.process(req)
+                    await emitBoth(String(format: "📊 ch1025 effort iter=%d applied=%@ requested=%@%@",
+                                          iter, "\(plan.applied)", "\(plan.requested)",
+                                          plan.overrideReason.map { " override=\($0)" } ?? ""))
+                } else {
+                    turnResult = await brain.process(prompt)
+                }
                 let brainMs = monoElapsedMs(since: brainStartNs)
                 iterBrainMs += brainMs   // M1.1 — substrate (L1-L14 cascade) time
                 // ADR-018 P2 — carry THIS turn's records for the next

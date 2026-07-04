@@ -213,13 +213,24 @@ public struct BASBrainChat {
     /// over the message embedding) → surprise, × stakes (`BASStakesEstimator`), capped by the device's thermal
     /// headroom (`request.deviceState.thermalLevel`). `request.effort` is the requested level — `.auto` ⇒ fully
     /// system-chosen, an explicit level is honored and only thermal-downgraded.
-    static func governedPlan(_ request: BASBrainChatRequest, probe: BASTurnSurpriseProbe) async -> BASEffortPlan {
-        let mse = await probe.observe(turn: request.message)
+    public static func governedPlan(_ request: BASBrainChatRequest, probe: BASTurnSurpriseProbe) async -> BASEffortPlan {
+        await governedPlan(message: request.message, thermalLevel: request.deviceState.thermalLevel,
+                           requested: request.effort, probe: probe)
+    }
+
+    /// P1(a) 全面优化 — the primitives overload for hosts that drive `brain.process()` directly (the
+    /// endurance runner / device hosts) without a `BASBrainChatRequest`: ε (probe) × stakes (lexicon) ×
+    /// thermal headroom → the governed effort plan to carry on `BASEBrainTurnRequest.effortPlan`.
+    public static func governedPlan(
+        message: String, thermalLevel: BASThermalLevel, requested: BASEffortLevel = .auto,
+        probe: BASTurnSurpriseProbe
+    ) async -> BASEffortPlan {
+        let mse = await probe.observe(turn: message)
         let surprise = mse.map { BASEffortSignals.surprise(fromMSE: $0) } ?? BASEffortGovernor.unknownSurprise
-        let stakes = BASStakesEstimator.estimate(request.message)
-        let headroom = BASEffortSignals.headroom(for: request.deviceState.thermalLevel)
+        let stakes = BASStakesEstimator.estimate(message)
+        let headroom = BASEffortSignals.headroom(for: thermalLevel)
         return BASEffortAllocator.resolve(
-            requested: request.effort, surprise: surprise, stakes: stakes, headroom: headroom)
+            requested: requested, surprise: surprise, stakes: stakes, headroom: headroom)
     }
 
     /// The effort receipt rule (pure, testable): the requested effort is applied when the turn was

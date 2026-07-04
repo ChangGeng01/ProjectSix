@@ -450,6 +450,14 @@ public actor BASTurnRuntimeEngine {
     /// in-turn block feeds the sink and gates nothing(RunTurn block
     /// doc)。 ADR-014 byte-equal-off:a host that never calls this
     /// leaves the coordinator exactly as constructed。
+    /// P1(a) 全面优化 (SYSTEM_EFFICIENCY_CAMPAIGN) — the same reachability-pipe pattern as
+    /// `setShadowTrialFeedback` below: `deliberationLoopEnabled` is a coordinator public var buried behind
+    /// the engine's `private let` chain; this setter lets a production host flip the effort-loop consumer
+    /// live. ADR-014: a host that never calls this leaves the coordinator exactly as constructed (false).
+    public func setDeliberationLoopEnabled(_ enabled: Bool) {
+        coordinator.deliberationLoopEnabled = enabled
+    }
+
     public func setShadowTrialFeedback(
         enabled: Bool,
         pendingLedger: BASShadowTrialFeedbackLedger?,

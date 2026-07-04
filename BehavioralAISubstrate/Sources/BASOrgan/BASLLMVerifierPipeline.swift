@@ -233,8 +233,16 @@ public actor BASLLMVerifierPipeline {
         // evidence-gated step (needs a verification-quality A/B — the first device run was DEFERRED, device
         // thermally cooked; see SPEC_DECODE_CERT_RESULTS.md §A2). The default now routes THROUGH the policy,
         // so the doctrine encoder has a real production caller instead of zero.
-        decodeLane: BASDecodeLane? = nil
+        decodeLane: BASDecodeLane? = nil,
+        // P1(b) 全面优化 (SYSTEM_EFFICIENCY_CAMPAIGN): injectable AVOIDED-COMPUTE gate. The verifier's
+        // stages are EXTRA LLM calls per turn; on low-stakes / thermally-throttled turns they are the
+        // measured-waste case. Default `{ _, _ in true }` = byte-equal-ON (ADR-014). Hosts wire
+        // BASAdjudicationGate-style stakes×headroom closures here (BASOrgan cannot import BASHostKit —
+        // the closure is the layering-clean seam). A skipped verify returns an honest `gated` report
+        // (finalRecommendedAnswer = the unreviewed draft, confidence = default, gatedSkip counted).
+        verifyGate: @escaping @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool = { _, _ in true }
     ) {
+        self.verifyGate = verifyGate
         // §13 #12 opt-in: when an install is supplied, every stage adapter is contracted
         // (fail-closed) + traced; nil → adapters used unwrapped (byte-equal-off, R1).
         if let ci = contractInstall {
@@ -256,6 +264,11 @@ public actor BASLLMVerifierPipeline {
     /// host electing `decodeLane: .greedy` gets `.greedyDeterministic` → spec-decode + reproducibility.
     private let stagePreset: BASOrganPreset
 
+    /// P1(b): the avoided-compute gate (see init). True = run the stages; false = gated skip.
+    private let verifyGate: @Sendable (BASOrganDraft, BASLLMTaskPackage) async -> Bool
+    /// Telemetry: verify() calls that were gated to a skip (avoided-compute wins, honest count).
+    private(set) var gatedSkips: Int = 0
+
     // MARK: - Verify
 
     /// Run the wired stages on `draft`。Returns typed report。
@@ -266,6 +279,18 @@ public actor BASLLMVerifierPipeline {
         taskPackage: BASLLMTaskPackage
     ) async -> BASLLMVerifierReport {
         totalVerifyCalls += 1
+
+        // P1(b) avoided-compute: a gated turn skips EVERY stage (each stage = one full LLM call) and
+        // returns the unreviewed draft honestly (default confidence, no stage entries — downstream
+        // consumers see exactly the "no stages wired" shape, which they already handle).
+        guard await verifyGate(draft, taskPackage) else {
+            gatedSkips += 1
+            return BASLLMVerifierReport(
+                perStage: [:],
+                finalRecommendedAnswer: draft.body,
+                overallConfidence: Self.defaultOverallConfidence,
+                aggregatedCounterArguments: [])
+        }
 
         var outcomes: [BASLLMVerifierStage:
             BASLLMVerifierStageOutcome] = [:]

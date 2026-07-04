@@ -39,6 +39,13 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     /// Minimum entailment confidence to rescue a contradiction. Conservative (0.9) — a weak entailment leaves
     /// the alias verdict untouched, preserving the false-abstain-over-false-affirm bias.
     private let nliThreshold: Float
+    /// P1(c) 全面优化 (SYSTEM_EFFICIENCY_CAMPAIGN): when true, a covered-and-confident factual-belief turn
+    /// (assertion recognized + bank resolves + verdict ≠ unknown after NLI reconcile) RETURNS the bank's
+    /// verdict AS the draft — no LLM call at all. Off-corpus / abstain / gated turns pass through untouched.
+    /// Default false = byte-equal (ADR-014). This is the propose/dispose frame made load-bearing: on the
+    /// covered subset the deterministic adjudicator IS the answerer (P0 baseline: every avoided call
+    /// ≈ −4 s wall / −99% of turn compute).
+    private let shortCircuitCovered: Bool
 
     public init(
         wrapping inner: BASOrganAdapter,
@@ -48,8 +55,10 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
         gate: BASAdjudicationGate = .always,
         observer: BASAdjudicationObserver? = nil,
         nliProbe: BASNLIEntailmentProbe? = nil,
-        nliThreshold: Float = 0.9
+        nliThreshold: Float = 0.9,
+        shortCircuitCovered: Bool = false
     ) {
+        self.shortCircuitCovered = shortCircuitCovered
         self.inner = inner
         self.bank = bank
         self.extractAssertion = extractAssertion
@@ -68,7 +77,8 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     public func warmUp() async { await bank.load() }
 
     public func draft(_ request: BASOrganRequest) async throws -> BASOrganDraft {
-        try await inner.draft(await adjudicated(request))
+        if let short = await shortCircuited(request) { return short }
+        return try await inner.draft(await adjudicated(request))
     }
 
     /// observe→DISPOSE: stay transparent across the FULL adapter surface. The ACCELERATED overloads are
@@ -81,13 +91,51 @@ public final class BASSemanticAdjudicatingOrganAdapter: BASOrganAdapter {
     public func draft(
         _ request: BASOrganRequest, electAccelerated: Bool
     ) async throws -> BASOrganDraft {
-        try await inner.draft(await adjudicated(request), electAccelerated: electAccelerated)
+        if let short = await shortCircuited(request) { return short }
+        return try await inner.draft(await adjudicated(request), electAccelerated: electAccelerated)
     }
 
     public func draft(
         _ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose
     ) async throws -> BASOrganDraft {
-        try await inner.draft(await adjudicated(request), purpose: purpose)
+        if let short = await shortCircuited(request) { return short }
+        return try await inner.draft(await adjudicated(request), purpose: purpose)
+    }
+
+    /// P1(c): the covered-and-confident short-circuit. Returns a deterministic draft when (and only when)
+    /// the FULL adjudication chain lands on a definite verdict: opt-in flag + enabled + gate engages +
+    /// assertion recognized + semantic bank resolves + (NLI-reconciled) verdict ∈ {agrees, contradicts}.
+    /// Every other outcome returns nil — the request flows to the LLM exactly as before (same conservative
+    /// false-abstain-over-false-affirm bias; the bank's cosine threshold IS the confidence gate).
+    func shortCircuited(_ request: BASOrganRequest) async -> BASOrganDraft? {
+        guard shortCircuitCovered, enabled else { return nil }
+        guard await gate.shouldEngage(request) else { return nil }        // gate skip → normal path
+        guard let asserted = extractAssertion(request.instruction) else { return nil }
+        guard let resolved = await bank.resolve(question: request.instruction, assertedValue: asserted)
+        else { return nil }
+        let verdict = await reconciled(resolved.groundTruth, reference: resolved.reference, claim: asserted)
+        let ref = resolved.reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body: String
+        switch verdict {
+        case .agrees:
+            body = "Correct — \(ref)"
+        case .contradicts:
+            body = "That is not correct. \(ref)"
+        case .unknown:
+            return nil                                                    // never manufacture an answer
+        }
+        await observe(request, .shortCircuited)
+        return BASOrganDraft(
+            requestID: request.requestID,
+            providerID: descriptor.providerID,
+            role: request.role,
+            body: body,
+            inputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(from: [request.instruction] + request.context),
+            outputTokensEstimated: BASOrganDeterministicAdapter.estimateTokens(from: [body]),
+            producedAt: Date(),
+            traceID: BASOrganDeterministicAdapter.digest(
+                for: request, providerID: descriptor.providerID))
     }
 
     /// Enabled + gate engages + recognized assertion + semantic bank hit ⇒ a fresh request with the verdict
@@ -153,6 +201,19 @@ extension BASSemanticAdjudicatingOrganAdapter: BASStreamingOrganAdapter {
         AsyncThrowingStream { continuation in
             Task {
                 do {
+                    // P1(c): a covered-and-confident short-circuit ends the stream with ONE terminal chunk —
+                    // the LLM never runs (opt-in; nil → unchanged behavior).
+                    if let short = await self.shortCircuited(request) {
+                        continuation.yield(BASOrganDraftChunk(
+                            requestID: short.requestID,
+                            providerID: short.providerID,
+                            role: short.role,
+                            bodyDelta: short.body,
+                            cumulativeBody: short.body,
+                            producedAt: short.producedAt))
+                        continuation.finish()
+                        return
+                    }
                     // Prepend the verdict (or pass through unchanged when disabled / abstaining) BEFORE the
                     // inner organ generates a single token.
                     let adjudicatedRequest = await self.adjudicated(request)

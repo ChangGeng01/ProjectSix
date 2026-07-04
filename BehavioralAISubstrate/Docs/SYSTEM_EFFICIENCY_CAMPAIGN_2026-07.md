@@ -69,7 +69,21 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   invocation-rate + turn-p50) · one 20-min mixed-workload endurance baseline run capturing T1-T3 ·
   M4-on-turns energy protocol run. Output: the baseline row of the table above, committed.
 
-**P1 — AVOIDED-COMPUTE (the ×2-3 lever).**
+**P1 — AVOIDED-COMPUTE (the ×2-3 lever).** — STATUS 2026-07-04: all three levers IMPLEMENTED at their
+  seams, compile + 10 test suites green, each ADR-014 default-off:
+  (a) ✅ effort loop: `BASBrainChat.governedPlan` public (+ primitives overload for process()-driving hosts);
+      `setDeliberationLoopEnabled` reachability pipes (engine + brain, the setShadowTrialFeedback pattern);
+      endurance runner BAS_EFFORT_LOOP=1 wiring (ε probe + governed plan on every turn, 📊 effort telemetry).
+  (b) ✅ verifier gate: injectable `verifyGate` closure on BASLLMVerifierPipeline (layering-clean; default
+      always ⇒ byte-equal). Gated skip returns the unreviewed draft honestly + gatedSkips telemetry.
+  (c) ✅ covered-factual short-circuit: `shortCircuitCovered` opt-in on BASSemanticAdjudicatingOrganAdapter —
+      covered+confident verdict RETURNS as the draft (draft/purpose/elect/streaming paths all covered;
+      `.shortCircuited` observation case). Conservative: unknown/abstain/gate-skip → LLM unchanged.
+  ⚠️ HONEST VALIDATION GAP: the in-repo endurance topology is a THIN harness (deterministic 14 layers +
+  ONE raw adapter.draft per turn) — it exercises (a) but NOT (b)/(c), whose seams live in the composed chat
+  topology (neural-core service + adjudicator decorator + verifier). T1 movement below 1.0 requires a
+  COMPOSED-TOPOLOGY endurance mode (wrap the runner's adapter in the semantic adjudicator + drive the
+  extraction-engine verifier path) — the next work block before any T1 claim.
   (a) Wire the dormant effort loop live (host adoption + flips; overrideReason logged); consume
   effort dials beyond maxLoops (candidateCount → fewer L9 candidates).
   (b) Stakes×headroom gate at the verifier seam (BASLLMVerifierPipeline's unconditional extra LLM

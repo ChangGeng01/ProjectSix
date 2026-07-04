@@ -26,6 +26,9 @@ public struct BASAdjudicationObservationRecord: Sendable, Equatable, Codable {
         case belowThreshold
         /// A verdict was injected into the turn.
         case injected
+        /// P1(c) 全面优化: covered-and-confident verdict RETURNED as the draft — the LLM call was avoided
+        /// entirely (opt-in `shortCircuitCovered`; the propose/dispose adjudicator made load-bearing).
+        case shortCircuited
     }
 
     public let requestID: String
