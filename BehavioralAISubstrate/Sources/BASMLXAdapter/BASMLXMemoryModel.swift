@@ -13,6 +13,18 @@ import Foundation
 public enum BASMLXMemoryModel {
 
     static let mib = 1024 * 1024
+
+    // MARK: - P2 多agent复用 N-session terms (device-measured, T4 cert 2026-07-04, Qwen3.5-4B trunk)
+    //
+    // Per-SESSION marginal memory at turn scale (≤~200-token conversations) is NOISE against the MLX
+    // buffer cache + decode activations: 8 live seats measured the SAME ~3100-3180MB single-trunk
+    // operating band as zero sessions. The term that DOES move the needle is CONCURRENT DECODES:
+    // 8-at-once spiked +222MB over base (≈ +32MB per in-flight decode beyond the first) → in-flight
+    // peak 3241MB, 135MB from the jetsam cap. `MLXOrganAdapter.maxConcurrentSessionDecodes = 2`
+    // bounds that spike (re-measured 3163MB peak, wall-clock unchanged — the GPU is the bottleneck,
+    // not the gate).
+    /// Marginal in-flight memory per concurrent session decode beyond the first (empirical, T4).
+    public static let concurrentSessionDecodeSpikeBytes = 32 * mib
     static let gib = 1024 * 1024 * 1024
 
     // MARK: - Canonical constants (the ONLY place these numbers are written)

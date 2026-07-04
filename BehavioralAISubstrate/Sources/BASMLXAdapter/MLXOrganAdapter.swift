@@ -327,6 +327,32 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     private var sessionLRU: [String] = []
     static let maxLiveSessions = 16
 
+    /// P2 gap #5 — BOUNDED session-decode concurrency (the fairness governor's safety half). Device
+    /// measurement (T4 concurrent, 2026-07-04): 8 seats decoding at once COMPLETE correctly (vendor
+    /// parallel-ChatSession contract holds on GDN) but the in-flight footprint peaked 3241MB — 135MB
+    /// from the jetsam cap. Cap 2: activation memory stays in the single-decode band while still hiding
+    /// one decode's latency under another; FIFO waiters (no starvation). Stateless draft()/streamDraft
+    /// are NOT gated (their concurrency profile is the historical one).
+    static let maxConcurrentSessionDecodes = 2
+    private var activeSessionDecodes = 0
+    private var sessionDecodeWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private func acquireSessionDecodeSlot() async {
+        if activeSessionDecodes < Self.maxConcurrentSessionDecodes {
+            activeSessionDecodes += 1
+            return
+        }
+        await withCheckedContinuation { sessionDecodeWaiters.append($0) }
+        activeSessionDecodes += 1
+    }
+
+    private func releaseSessionDecodeSlot() {
+        activeSessionDecodes -= 1
+        if !sessionDecodeWaiters.isEmpty {
+            sessionDecodeWaiters.removeFirst().resume()
+        }
+    }
+
     /// Cross-turn draft corpus (Universal Draft Layer, Phase 1): per-conversation token history that feeds the
     /// model-free cross-turn suffix source (`BASCrossTurnDrafter`). Plain RAM — no MLX residency — bounded both
     /// per-session and by session count. Actor-isolated, so its mutations are serialized like `sessions`.
@@ -1140,6 +1166,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
 
         let prompt = Self.prompt(for: request)
+        // P2 gap #5: bounded-concurrency gate around the decode (see maxConcurrentSessionDecodes).
+        await acquireSessionDecodeSlot()
+        defer { releaseSessionDecodeSlot() }
         // Same byte-equal stream-consume as draft(_:) — also surfaces the real prefill/decode metrics. On a
         // REUSED session (KV warm) the captured `promptTokenCount` reflects only the new turn → this is also
         // how the Phase-2 KV-reuse lever would be measured.

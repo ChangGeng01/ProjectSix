@@ -110,9 +110,22 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   Qwen3.5-4B trunk — 8/8 outputs, KV reuse 8/8 (round-2 prompt tokens < round-1 prefill per seat),
   base 2380 → peak 3118MB (inside the jetsam margin; the single-trunk operating band is ~3100-3180
   regardless of session count — 8 seats' marginal memory ≈ noise), sessions=8, 67s.**
-  P2 remainder (open): shared system-prefix KV (gap #7) · decode fairness governor for concurrent seats
-  (gap #5) · per-agent state × acceleration lanes (gap #3) · N-session term in the memory budget model
-  (gap #9) · GDN save/trim beyond append-only conversations (gap #8; append-only validated by T4).
+  P2 REMAINDER CLOSED 2026-07-04:
+  ✅ #5 fairness governor — measurement first: 8 seats decoding CONCURRENTLY complete 8/8 (vendor
+     parallel-session contract holds on GDN) at wall 12.1s, but in-flight peak hit 3241MB (135MB from
+     jetsam). Fix: bounded concurrency (maxConcurrentSessionDecodes=2, FIFO waiters, gate around the
+     session decode only) — re-measured peak 3163MB (normal band) at wall 11.9s: ZERO latency cost
+     (the GPU is the bottleneck, not the gate).
+  ✅ #9 N-session budget terms — pinned into BASMLXMemoryModel: per-session marginal ≈ noise at turn
+     scale; concurrent-decode spike ≈ +32MB per in-flight decode beyond the first (empirical).
+  ▷ #7 shared-prefix KV — DEFERRED with rationale: the seat design gives every seat a DIFFERENT
+     persona (no shared system prefix); prefill is a one-time ~0.4s per session. Revisit only if a
+     common substrate preamble is introduced.
+  ▷ #3 acceleration × sessions — DEFERRED to its own block: the MTP decoder owns its trunk cache
+     lifecycle, ChatSession owns the session cache — reconciling is real surgery; upside ≈1.3× on
+     2-4s seat turns.
+  ▷ #8 GDN non-append-only session semantics — append-only VALIDATED by T4 (conversations only
+     append); within-session history trimming = context-overflow management, a separate concern.
   sessionID + agentRef on the adapter protocol (decorator chain forwards) · session-pool LRU +
   memory accounting priced against the 3376MiB jetsam model (N-session term) · shared system-prefix
   KV (vendor saveCache/prebuilt-KV — the obvious N-agent memory saver) · a decode fairness governor
