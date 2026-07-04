@@ -145,9 +145,23 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
      2→384 · 3→1024 — the adaptive think-budget dial, previously unread) + the endurance rig couples
      it into the LLM request cap (BAS_EFFORT_LOOP path; decode_cap telemetry). Device measurement
      rides the next endurance run.
-  ▷ ThermalTwin bridge · tier-0 responder beyond covered-factual · dream-loop activation — P3
-     remainder (the thermal signal already flows via ProcessInfo in every gate; the twin adds
-     pressure-accumulation richness).
+  ✅ PACED CLASSIFIER ATTRIBUTION (the P3a measurement debt, closed): 20s-gap paced run, thermal
+     healthy throughout → gated_rate 1.17 vs analytic control 2.00 = **ratio 0.58 — T1 ≤0.6 MET** with
+     ZERO coverage-first compromise. The 35 calls decompose EXACTLY to the conservative design:
+     covered 10×0 (short-circuit) + casual-no-? 5×1 (classifier skip) + casual-with-? 5×2 ("?"
+     engages before the classifier) + substantive 10×2 (all verified). Under dense/throttled load the
+     thermal gate deepens it to 0.33 (never-worse by design). T1 ladder: 2.00 → 1.37 (P1) → 1.17 (P3).
+  ✅ ThermalTwin bridge (BASThermalTwinFeed, BASHostKit ← BASLeaseLife dep added): the module island
+     closed — the effort loop's device state now folds the twin's hysteresis-bearing reading
+     (guard level + accumulated pressure telemetry on the effort line); app targets never import
+     BASLeaseLife. Live in the endurance BAS_EFFORT_LOOP path.
+  ▷ Dream-loop activation — DEFERRED with rationale: BASSleepConsolidationDriver requires the real
+     memory infrastructure quartet (tracker actor + closed-loop applier + atom store + tier provider)
+     — an integration project, and its own doctrine mandates manual reviewed promotion. Not wiring a
+     hollow dry-run.
+  ▷ Tier-0 responder beyond covered-factual — DEFERRED: an answer-cache/phatic-reflex responder is a
+     quality-risk design (canned text in an honesty-first substrate); the covered-factual short-circuit
+     IS the tier-0 for its provable subset. Revisit with a quality co-gate design.
   ThermalTwin → deviceState bridge (close the module island) · tier-0 responder organ (answer-cache
   + covered-factual + classifier-routed reflex) in front of the router · effort-tier → decode-lane
   coupling (fast tier → scout/0.8B-class or reflex; deep tier → core 4B) · dream-loop/consolidation

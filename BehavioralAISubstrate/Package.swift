@@ -415,6 +415,7 @@ let package = Package(
                 "BASEvaluation",
                 "BASAdmin",
                 "BASAppleAdapters",
+                "BASLeaseLife",
                 // M320 — `buildSovereignAuditEntry` accepts an
                 // optional `BASUnknownReserve` projection (white
                 // paper §5.4). The schema lives in BASWorldPrior;

@@ -1291,11 +1291,15 @@ final class BASEnduranceAppController: ObservableObject {
         // nothing flipped — every turn byte-equal with the prior build (ADR-014).
         var effortProbe: BASTurnSurpriseProbe?
         var effortDecodeCap: Int?
+        // P3 契合: the ThermalTwin feed (hysteresis-bearing thermal signal) — constructed with the
+        // effort loop; each governed turn folds the twin's reading into the device state.
+        var thermalFeed: BASThermalTwinFeed?
         if ProcessInfo.processInfo.environment["BAS_EFFORT_LOOP"] == "1" {
             if let probe = BASTurnSurpriseProbe() {
                 effortProbe = probe
+                thermalFeed = BASThermalTwinFeed()
                 await brain.setDeliberationLoopEnabled(true)
-                await emitBoth("📍 ch1025 effort-loop LIVE (ε probe + deliberation consumer on)")
+                await emitBoth("📍 ch1025 effort-loop LIVE (ε probe + deliberation consumer + thermal twin)")
             } else {
                 await emitBoth("📍 ch1025 effort-loop requested but MiniLM unavailable — staying OFF")
             }
@@ -1958,21 +1962,31 @@ final class BASEnduranceAppController: ObservableObject {
                 // passes by it. Env unset ⇒ the exact prior brain.process(prompt) path, byte-equal (ADR-014).
                 let turnResult: BASEBrainTurnResult
                 if let probe = effortProbe {
+                    // P3: twin-fed device state (guard level + accumulated pressure telemetry); falls
+                    // back to defaults when the feed is absent.
+                    var deviceState = BASCognitiveBrain.defaultDeviceState
+                    var twinNote = ""
+                    if let feed = thermalFeed {
+                        let folded = await feed.foldedDeviceState(base: deviceState)
+                        deviceState = folded.state
+                        twinNote = String(format: " twin_guard=%@ twin_pressure=%.2f",
+                                          folded.guardLevel, folded.pressure)
+                    }
                     let plan = await BASBrainChat.governedPlan(
-                        message: prompt, thermalLevel: BASCognitiveBrain.defaultDeviceState.thermalLevel,
+                        message: prompt, thermalLevel: deviceState.thermalLevel,
                         probe: probe)
                     var req = BASEBrainTurnRequest(
                         userInput: prompt,
-                        deviceState: BASCognitiveBrain.defaultDeviceState,
+                        deviceState: deviceState,
                         hostID: BASCognitiveBrain.defaultHostID)
                     req.effortPlan = plan
                     turnResult = await brain.process(req)
                     // P3 契合: the effort budget's decode-token dial COUPLES to the LLM request below —
                     // a fast-tier turn answers in a short breath (the adaptive think-budget lever).
                     effortDecodeCap = BASEffortBudget.forLevel(plan.applied).maxDecodeTokens
-                    await emitBoth(String(format: "📊 ch1025 effort iter=%d applied=%@ requested=%@ decode_cap=%d%@",
+                    await emitBoth(String(format: "📊 ch1025 effort iter=%d applied=%@ requested=%@ decode_cap=%d%@%@",
                                           iter, "\(plan.applied)", "\(plan.requested)", effortDecodeCap ?? -1,
-                                          plan.overrideReason.map { " override=\($0)" } ?? ""))
+                                          plan.overrideReason.map { " override=\($0)" } ?? "", twinNote))
                 } else {
                     turnResult = await brain.process(prompt)
                 }

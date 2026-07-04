@@ -42,7 +42,7 @@ final class BAST1DeviceTests: XCTestCase {
         // The raw adapter's classify(text:) label maps to BASContextTaskType by rawValue.
         let ctxAdapter = try? BASContextClassifierMLAdapter(computeUnits: nil)
 
-        func runArm(gated: Bool) async throws -> (rate: Double, calls: Int, turns: Int) {
+        func runArm(gated: Bool, pauseSec: UInt64 = 0) async throws -> (rate: Double, calls: Int, turns: Int) {
             let counter = BASLLMCallCounter()
             let counted = BASCountingOrganAdapter(wrapping: adapter, counter: counter)
             let bank = BASEmbeddingFactBank(facts: BAST1Topology.t1Facts(), provider: mini)
@@ -88,10 +88,23 @@ final class BAST1DeviceTests: XCTestCase {
                 let d = await counter.delta()
                 calls += d; turns += 1
                 print("[t1-xctest] arm=\(gated ? "gated" : "control") turn=\(i + 1) llm_calls=\(d) thermal=\(ProcessInfo.processInfo.thermalState.rawValue)")
+                if pauseSec > 0 { try? await Task.sleep(nanoseconds: pauseSec * 1_000_000_000) }
             }
             return (Double(calls) / Double(max(turns, 1)), calls, turns)
         }
 
+        // PACED attribution mode (BAS_T1_PACED=1): 20s cooling gap per turn keeps thermal ≤fair so the
+        // CLASSIFIER gate (not the thermal gate) decides — the P3a dense run was thermal-dominated from
+        // turn ~9 and never consulted the classifier. Paced mode runs the GATED arm only (control's 2.00
+        // is analytically fixed: verifyGate=always ⇒ draft+verify every turn) to halve the wall clock.
+        let paced = ProcessInfo.processInfo.environment["BAS_T1_PACED"] == "1"
+        if paced {
+            let gatedArm = try await runArm(gated: true, pauseSec: 20)
+            print(String(format: "[t1-xctest] PACED VERDICT gated_rate=%.2f vs analytic control 2.00 → ratio %.2f (calls %d over %d turns)",
+                         gatedArm.rate, gatedArm.rate / 2.0, gatedArm.calls, gatedArm.turns))
+            XCTAssertEqual(gatedArm.turns, 30)
+            return
+        }
         let control = try await runArm(gated: false)
         let gatedArm = try await runArm(gated: true)
         print(String(format: "[t1-xctest] VERDICT control_rate=%.2f gated_rate=%.2f ratio=%.2f (calls %d/%d over %d turns each)",
