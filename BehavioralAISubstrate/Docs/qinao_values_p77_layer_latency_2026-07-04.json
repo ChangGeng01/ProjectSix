@@ -1,0 +1,17 @@
+{
+  "peak_ram_mb": 2979.0,
+  "turn_p50_ms": 2692.0,
+  "turn_p95_ms": 3236.0,
+  "latency_p50_ms": 2692.0,
+  "latency_p95_ms": 3236.0,
+  "llm_invocation_rate": 1.0,
+  "substrate_brain_ms_mean": 15.7,
+  "substrate_pct_mean": 0.8,
+  "layer_l0_context_p95_ms": 0.9,
+  "layer_l11_risk_p95_ms": 0.3,
+  "layer_l12_render_p95_ms": 1.1,
+  "layer_l1_budget_p95_ms": 0.0,
+  "layer_l2_7_decompose_p95_ms": 0.0,
+  "layer_l8_to_l10_p95_ms": 8.6,
+  "layer_tail_p95_ms": 0.1
+}

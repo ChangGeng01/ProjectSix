@@ -7,6 +7,13 @@ import BASRuntimeCore
 import BASWorldPrior
 
 public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
+    /// substrate #77 (per_layer_latency) — coarse STAGE wall-clock (ms) captured by runTurn's
+    /// stopwatch. nil (default) on any result not produced by an instrumented runTurn — codable- and
+    /// byte-compatible. Keys: l1_budget · l0_context · l2_7_decompose · l8_memory · l9_10_deliberate ·
+    /// l11_risk · l12_render · tail (verdict/audit/assembly). Stage-level (grouped layers) is the
+    /// honest first cut of the metric — finer per-layer splits need service-internal instrumentation.
+    public var layerTimingsMs: [String: Double]?
+
     public var deviceState: BASDeviceState
     public var budgetFrame: BASBudgetFrame
     public var wakeIntent: BASWakeIntent

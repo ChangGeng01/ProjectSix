@@ -1992,6 +1992,13 @@ final class BASEnduranceAppController: ObservableObject {
                 }
                 let brainMs = monoElapsedMs(since: brainStartNs)
                 iterBrainMs += brainMs   // M1.1 — substrate (L1-L14 cascade) time
+                // substrate #77 — per-stage wall-clock (coarse layer groups) from the runTurn stopwatch.
+                if let lt = turnResult.layerTimingsMs, !lt.isEmpty {
+                    let parts = lt.sorted { $0.key < $1.key }
+                        .map { String(format: "%@=%.1f", $0.key, $0.value) }
+                        .joined(separator: " ")
+                    await emitBoth("📊 ch1025 layer-latency iter=\(iter) \(parts)")
+                }
                 // ADR-018 P2 — carry THIS turn's records for the next
                 // turn's injection (evaluate() itself skips
                 // non-pending ones)。

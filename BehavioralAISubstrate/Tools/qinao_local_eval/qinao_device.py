@@ -85,6 +85,16 @@ def parse(text: str) -> dict:
     sub = [float(m) for m in re.findall(r"turn-breakdown .*?substrate_pct=([\d.]+)", text)]
     if sub:
         out["substrate_pct_mean"] = round(statistics.mean(sub), 1)
+
+    # substrate #77 — per-stage p95 from 📊 layer-latency lines (stage=ms pairs).
+    stage_samples: dict = {}
+    for line in re.findall(r"layer-latency iter=\d+ ([^\n]+)", text):
+        for k, v in re.findall(r"(\w+)=([\d.]+)", line):
+            stage_samples.setdefault(k, []).append(float(v))
+    for k, vals in stage_samples.items():
+        if len(vals) >= 4:
+            srt = sorted(vals)
+            out[f"layer_{k}_p95_ms"] = round(srt[min(len(srt) - 1, int(len(srt) * 0.95))], 1)
     return out
 
 

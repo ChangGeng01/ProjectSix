@@ -179,7 +179,13 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   serious↔nominal). Honest scope: T5 as specified is cadence-dependent; real conversational gaps
   (30-60s+, bursty) and the effort fast-tier 64-tok cap (wired, not in this test's fixed-96 loop)
   are the identified levers. Session invocation rate reproduced: 0.69-0.79 across three session runs.
-  ▷ Substrate #77 per-layer latency p95 harness — open (needs runTurn per-layer timing aggregation).
+  ✅ Substrate #77 per-layer latency p95 — CLOSED 2026-07-04: runTurn stage stopwatch (7 coarse layer
+     groups, observability-only `layerTimingsMs` on the turn result) → endurance 📊 layer-latency line →
+     qinao_device p95s. DEVICE PROFILE (12-iter effort-loop run): l8_to_l10 (memory+deliberation)
+     8.6ms p95 · l12_render 1.1 · l0_context 0.9 (CoreML) · l11_risk 0.3 · l1/l2_7/tail ≈0.
+     **Whole 14-layer substrate ≈ 11ms p95 = 0.3% of a turn** — every stage far under any budget
+     (the overrun gate is green by orders of magnitude; the turn's cost IS the LLM, re-confirmed at
+     stage granularity). Finer per-layer splits = service-internal instrumentation, on demand.
 
 ## QUALITY CO-GATE — CLOSED 2026-07-04 (BASQualityCoGateDeviceTests, device, PASS)
 

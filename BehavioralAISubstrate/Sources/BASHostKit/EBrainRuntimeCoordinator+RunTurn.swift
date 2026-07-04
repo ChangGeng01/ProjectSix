@@ -60,6 +60,15 @@ extension BASEBrainRuntimeCoordinator {
     public func runTurn(
         _ request: BASEBrainTurnRequest
     ) -> BASEBrainTurnResult {
+        // substrate #77 — coarse stage stopwatch (pure local; attached to the result as
+        // `layerTimingsMs`; zero behavior effect).
+        var stageT0 = DispatchTime.now()
+        var stageMs: [String: Double] = [:]
+        func markStage(_ label: String) {
+            let now = DispatchTime.now()
+            stageMs[label] = Double(now.uptimeNanoseconds - stageT0.uptimeNanoseconds) / 1_000_000
+            stageT0 = now
+        }
         let requestedBudget = powerClockService.planBudget(
             deviceState: request.deviceState,
             taskPing: request.userInput,
@@ -92,6 +101,7 @@ extension BASEBrainRuntimeCoordinator {
             contextFrame: nil,
             riskCard: nil
         )
+        markStage("l1_budget")
         let rawContextFrame = contextService.analyzeContext(
             userInput: request.userInput,
             hostContext: hostContext,
@@ -142,6 +152,7 @@ extension BASEBrainRuntimeCoordinator {
             resolvedTrialSink(evaluated)
         }
 
+        markStage("l0_context")
         var decomposeFrame = decomposeService.decompose(
             contextFrame: contextFrame,
             memoryHints: []
@@ -168,6 +179,7 @@ extension BASEBrainRuntimeCoordinator {
             .withDerivedDecompositionObservationBundle(
                 frameContext: frameContext)
 
+        markStage("l2_7_decompose")
         let rawMemoryBundle = memoryService.retrieve(
             decomposeFrame: decomposeFrame,
             hostContext: hostContext,
@@ -387,6 +399,7 @@ extension BASEBrainRuntimeCoordinator {
                 frameContext: frameContext)
 
         let riskService = self.riskService
+        markStage("l8_to_l10")
         let rawRiskDecisionPackage = riskService.buildRiskDecisionPackage(
             contextFrame: contextFrame,
             thoughtFrame: thoughtFrame,
@@ -1107,6 +1120,7 @@ extension BASEBrainRuntimeCoordinator {
             degradedReasonCodes: neuralDegradedReasonCodes
         )
 
+        markStage("l11_risk")
         let baseRenderedOutput = actionService.render(
             choice: mergedChoice,
             riskCard: boundRiskCard,
@@ -1966,7 +1980,8 @@ extension BASEBrainRuntimeCoordinator {
             thoughtFrame.neuralLeaseReceipt?.leaseID = runLease.leaseID
         }
 
-        return BASEBrainTurnResult(
+        markStage("l12_render")   // covers render → verdict/audit/trace assembly up to here
+        var turnResult = BASEBrainTurnResult(
             // chapter 五百三十一 / M1503 — V1 splice:
             // 6 device/lifecycle args collapse to 1 typed
             // deviceLifecycleBundle (deviceState +
@@ -2131,6 +2146,9 @@ extension BASEBrainRuntimeCoordinator {
                     yaochiSanctumEntry:
                         kunlunYaochiSanctumForAudit)
         )
+        markStage("tail")
+        turnResult.layerTimingsMs = stageMs   // substrate #77 — observability-only attach
+        return turnResult
     }
 
     /// A terminal stop ends the deliberation loop immediately; a non-terminal
