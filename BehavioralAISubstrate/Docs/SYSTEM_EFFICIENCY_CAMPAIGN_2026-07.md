@@ -167,9 +167,19 @@ biomimetic verdict made operational: energy ∝ surprise × stakes × headroom.
   coupling (fast tier → scout/0.8B-class or reflex; deep tier → core 4B) · dream-loop/consolidation
   activation (BGTask, the three-guard gating already built). Gate: T1 stretch 0.3 + T5.
 
-**P4 — ENERGY DISCIPLINE.**
-  Pin mWh/1k-tok + mWh/turn baselines into the registry (report → never-worse gates) · sustained
-  mixed-session smoke as a release gate · substrate #77 per-layer latency p95 harness.
+**P4 — ENERGY DISCIPLINE.** — STATUS 2026-07-04 evening:
+  ✅ **T3 ENERGY BASELINE PINNED (valid, dip-anchored window, unplugged)**: gated mixed session
+  (P1/P3 composed stack, 15s cadence, 96-tok caps) — **0.128 %/turn · 1.72 %/1k-tok** (window:
+  95%→90% over 39 turns / 2910 est-tokens). iPhone Air ≈12.3Wh ⇒ **≈15.7 mWh/turn · ≈212 mWh/1k-tok**.
+  Never-worse gate: >10% regression on either number fails (the raised-bar #70 discipline).
+  Protocol hard-lessons on record: THREE invalid takes (plugged cable ×2, MagSafe counts as plugged,
+  100%-plateau eats early drain → the M4 burn-in window is now in the test).
+  ⚠️ T5 AT 15s CADENCE: fair-or-better = 45% (target ≥90% NOT met at this density) — the gated stack
+  bounds CALLS but 15s gaps don't thermally amortize continuous 96-tok turns (thermal oscillates
+  serious↔nominal). Honest scope: T5 as specified is cadence-dependent; real conversational gaps
+  (30-60s+, bursty) and the effort fast-tier 64-tok cap (wired, not in this test's fixed-96 loop)
+  are the identified levers. Session invocation rate reproduced: 0.69-0.79 across three session runs.
+  ▷ Substrate #77 per-layer latency p95 harness — open (needs runTurn per-layer timing aggregation).
 
 ## Standing constraints
 满血 (no trunk quality change) · ADR-014 default-off/opt-in for every lever (kill-switches) ·

@@ -1,0 +1,11 @@
+{
+  "_source": "BAST5EnergySessionDeviceTests final take (bmwhbflh9), dip-anchored unplugged window",
+  "_device": "iPhone Air (A19, ~12.3Wh battery), Qwen3.5-4B-4bit trunk, P1/P3 gated composed stack",
+  "energy_pct_per_turn": 0.128,
+  "energy_pct_per_1k_tok": 1.72,
+  "energy_mwh_per_turn_est": 15.7,
+  "energy_mwh_per_1k_tok_est": 212,
+  "session_invocation_rate": 0.79,
+  "fair_or_better_pct_at_15s_cadence": 45,
+  "_gate": "never-worse >10% on energy numbers (QINAO_200 raised-bar #70 discipline)"
+}
