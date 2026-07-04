@@ -168,6 +168,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// Cached MTP decoder (created on first `.mtpSpec` execution inside the container actor; the box mirrors
     /// `ChatSessionBox`'s @unchecked-Sendable pattern — exclusively used within `container.perform`).
     var mtpDecoderBox: MTPDecoderBox?
+    // B2 探针路由器 — the difficulty-probe head (BAS_DIFF_PROBE=1), resolved once per adapter.
+    var diffProbeBox: BASDifficultyProbe?
+    var diffProbeResolved = false
 
     /// ADR-041 §C — OPT-IN cap (bytes) for MLX's **load-time** memory peak, applied via `MLXRuntimeConfig`
     /// BEFORE the container load. Unlike `cacheLimitBytes` (a post-load recycling ceiling), `MLX.Memory.memoryLimit`

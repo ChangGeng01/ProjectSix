@@ -114,7 +114,8 @@ extension BASQwen35MTPSpecDecoder {
     /// the trunk argmax vector — replacing the 2K+2 `.item` shower of `generateSpecK`.
     public func generateSpecKFused(
         prompt: [Int], maxTokens: Int, eosTokens: Set<Int> = [], k: Int, fp32Scores: Bool = true,
-        tCap: Int = 12, adaptiveK: Bool = false, traceExit: BASTraceExitConfig? = nil
+        tCap: Int = 12, adaptiveK: Bool = false, traceExit: BASTraceExitConfig? = nil,
+        postPrefillBudget: ((MLXArray) -> Int)? = nil
     ) -> Run {
         precondition(k >= 1)
         let dbgE = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
@@ -134,6 +135,10 @@ extension BASQwen35MTPSpecDecoder {
             MLXArray(prompt.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
         if dbgE { print("[fused-dbg] prefill graph built, eval…"); fflush(stdout) }
         var hLast = h0[0, h0.dim(1) - 1]
+        // B2 探针路由器 — the post-prefill budget hook: the difficulty probe reads THIS hidden
+        // state (the prefill the decode shares anyway — the observation is free) and may refine
+        // the decode budget before the first token. nil = certified lane, byte-unchanged.
+        let cap = postPrefillBudget.map { max(8, $0(hLast)) } ?? maxTokens
         var hLastPos = prompt.count - 1
         var trunkLen = prompt.count
         var pending: [Int] = [argmaxLast(model.logits(fromHidden: h0))]
@@ -143,7 +148,7 @@ extension BASQwen35MTPSpecDecoder {
         func emit(_ tok: Int) -> Bool {
             if eosTokens.contains(tok) { hitEOS = true; return false }
             out.append(tok)
-            return out.count < maxTokens
+            return out.count < cap
         }
         // Verify width cap (now a parameter — PLATFORM-dependent): T = pending + kEff ≤ tCap.
         // Mac ('d' GPU arch): qmv batch limit 12+ → T-curve LINEAR to 11+ → tCap 12.
@@ -183,7 +188,7 @@ extension BASQwen35MTPSpecDecoder {
         // round in flight to unwind, and the persisting condition refires within the next round.
         func observeNoSignal(_ tok: Int) {
             _ = tracePolicy?.observe(token: tok, entropyMillinats: nil,
-                                     outCount: out.count, maxTokens: maxTokens)
+                                     outCount: out.count, maxTokens: cap)
         }
         let dbg = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
         var dbgSlow = 0, dbgChainMs = 0.0, dbgVerifyMs = 0.0
@@ -193,7 +198,7 @@ extension BASQwen35MTPSpecDecoder {
         var ds = draftAndCommit()
         if dbg { print("[fused-dbg] first chain built"); fflush(stdout) }
         let t0 = Date()
-        while out.count < maxTokens && !hitEOS {
+        while out.count < cap && !hitEOS {
             if pending.count >= tCap {                  // commit refeed (itself ≤ tCap ⇒ stays in the qmv regime)
                 // ONE multi-token forward (the sequential-lane one-token-at-a-time loop was the first
                 // deep-K killer; the cap-6 no-draft round itself was the second — both retired, this
@@ -270,7 +275,7 @@ extension BASQwen35MTPSpecDecoder {
                 if tracePolicy != nil,
                    case .close(let r)? = tracePolicy?.observe(
                        token: e, entropyMillinats: entH.isEmpty ? nil : entH[P - 1 + i],
-                       outCount: out.count, maxTokens: maxTokens) {
+                       outCount: out.count, maxTokens: cap) {
                     closeAt = i; closeReason = r
                     break
                 }

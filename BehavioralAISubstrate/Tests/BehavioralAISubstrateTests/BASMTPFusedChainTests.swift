@@ -193,4 +193,51 @@ final class BASMTPFusedChainTests: XCTestCase {
         XCTAssertLessThanOrEqual(r.exitTok.count, r.ctrlTok.count,
                                  "the exited run must never emit more than the control")
     }
+
+    /// F4 — B2 difficulty probe e2e (BAS_DIFF_PROBE_TEST=1): real weights + real hidden states.
+    /// Rank-order assertions (AUC 0.833 ⇒ per-example asserts would flake; ordering on the two
+    /// EXTREME families — percent acc 1.00 vs 3d×3d mul acc 0.00 — is the robust contract).
+    func testDifficultyProbeEndToEnd() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_DIFF_PROBE_TEST"] == "1" else {
+            throw XCTSkip("set BAS_DIFF_PROBE_TEST=1 (needs /tmp/gdn_coreai/probe_weights.json)")
+        }
+        let probe = try BASDifficultyProbe(
+            weightsURL: URL(fileURLWithPath: "/tmp/gdn_coreai/probe_weights.json"))
+        print("=== F4 probe heldout_auc=\(probe.heldoutAUC) dims=\(probe.w.count) ===")
+        let wURL = URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors")
+        let container = try await #huggingFaceLoadModelContainer(
+            configuration: ModelConfiguration(id: "mlx-community/Qwen3.5-4B-4bit",
+                                              extraEOSTokens: ["<|im_end|>"]),
+            progressHandler: { _ in })
+        func run(_ q: String) async throws -> (p: Double, budget: Int, tokens: Int) {
+            let input = try await container.prepare(input: UserInput(chat: [.user(q)]))
+            return try await container.perform(nonSendable: input) { ctx, input in
+                guard let qwen = ctx.model as? Qwen35Model else {
+                    throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+                }
+                let dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+                var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
+                if let imEnd = ctx.tokenizer.convertTokenToId("<|im_end|>") { eos.insert(imEnd) }
+                let ids = input.text.tokens.asArray(Int.self)
+                var seenP = 0.0, seenBudget = 160
+                let hook: (MLXArray) -> Int = { hLast in
+                    let h = hLast.asType(.float32).asArray(Float.self)
+                    seenP = (try? probe.successProbability(hidden: h)) ?? -1
+                    seenBudget = probe.refinedBudget(planned: 160, pSuccess: seenP)
+                    return seenBudget
+                }
+                let r = dec.generateSpecKFused(prompt: ids, maxTokens: 160, eosTokens: eos,
+                                               k: 3, tCap: 12, adaptiveK: true,
+                                               postPrefillBudget: hook)
+                return (seenP, seenBudget, r.tokens.count)
+            }
+        }
+        let easy = try await run("What is 25% of 320?")
+        let hard = try await run("What is 847 multiplied by 693?")
+        print(String(format: "=== F4 easy p=%.2f budget=%d tok=%d | hard p=%.2f budget=%d tok=%d ===",
+                     easy.p, easy.budget, easy.tokens, hard.p, hard.budget, hard.tokens))
+        XCTAssertGreaterThan(easy.p, hard.p, "probe must rank the easy prompt above the hard one")
+        XCTAssertGreaterThanOrEqual(hard.budget, easy.budget, "budgets must follow the ranking")
+        XCTAssertLessThanOrEqual(easy.tokens, easy.budget, "the refined budget must actually bind")
+    }
 }

@@ -42,6 +42,7 @@ extension MLXOrganAdapter {
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
+        let diffProbe = _armedDifficultyProbe()
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
@@ -62,7 +63,7 @@ extension MLXOrganAdapter {
                 : dec.generateSpecKFused(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
                     k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
-                    traceExit: trace)
+                    traceExit: trace, postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens))
             if let te = r.traceExit {
                 print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
             }
@@ -107,6 +108,7 @@ extension MLXOrganAdapter {
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
+        let diffProbe = _armedDifficultyProbe()
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
@@ -123,7 +125,7 @@ extension MLXOrganAdapter {
             let r = dec.generateSpecKFused(
                 prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
                 k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
-                traceExit: trace)
+                traceExit: trace, postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens))
             if let te = r.traceExit {
                 print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
             }
@@ -184,6 +186,45 @@ extension MLXOrganAdapter {
             entropyWindow: env["BAS_TRACE_EXIT_WINDOW"].flatMap(Int.init) ?? 8,
             entropyThresholdMillinats: tau,
             answerReserveTokens: reserve)
+    }
+
+    /// B2 — build the post-prefill budget hook for the fused lane. The hidden-state read is ONE
+    /// small host sync (hidden-dim floats) after prefill; the refinement is bounded ±1 tier so
+    /// the probe REFINES the effort plan, never overrules it.
+    nonisolated static func _probeBudgetHook(
+        _ probe: BASDifficultyProbe?, planned: Int
+    ) -> ((MLXArray) -> Int)? {
+        guard let probe else { return nil }
+        return { hLast in
+            let h = hLast.asType(.float32).asArray(Float.self)
+            guard let p = try? probe.successProbability(hidden: h) else { return planned }
+            let refined = probe.refinedBudget(planned: planned, pSuccess: p)
+            if refined != planned {
+                print(String(format: "📊 diff-probe p_success=%.2f budget %d→%d", p, planned, refined))
+            }
+            return refined
+        }
+    }
+
+    /// B2 — difficulty-probe weights resolution (env override → Documents → the Mac dev path).
+    nonisolated static func _resolveDiffProbeURL() -> URL? {
+        let env = ProcessInfo.processInfo.environment
+        if let p = env["BAS_DIFF_PROBE_WEIGHTS"] { return URL(fileURLWithPath: p) }
+        if let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("probe_weights.json"),
+            FileManager.default.fileExists(atPath: d.path) { return d }
+        let tmp = URL(fileURLWithPath: "/tmp/gdn_coreai/probe_weights.json")
+        return FileManager.default.fileExists(atPath: tmp.path) ? tmp : nil
+    }
+
+    /// B2 — the armed probe (nil unless BAS_DIFF_PROBE=1 AND weights resolve+parse). Cached.
+    func _armedDifficultyProbe() -> BASDifficultyProbe? {
+        guard ProcessInfo.processInfo.environment["BAS_DIFF_PROBE"] == "1" else { return nil }
+        if !diffProbeResolved {
+            diffProbeResolved = true
+            diffProbeBox = Self._resolveDiffProbeURL().flatMap { try? BASDifficultyProbe(weightsURL: $0) }
+        }
+        return diffProbeBox
     }
 
     /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).
