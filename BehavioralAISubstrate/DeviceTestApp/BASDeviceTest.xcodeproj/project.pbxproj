@@ -58,6 +58,7 @@
 		BE75F6A8B9C0D1E2F3A4B5C6 /* BASDFlashDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF86A7B9C0D1E2F3A4B5C6D7 /* BASDFlashDeviceTests.swift */; };
 		D097B8C0D1E2F3A4B5C6D7E8 /* BASDWQ3DeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A8C9D1E2F3A4B5C6D7E8F9 /* BASDWQ3DeviceTests.swift */; };
 		F2B9D0E2F3A4B5C6D7E8F9A0 /* BASDecodeFloorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C0E1F3A4B5C6D7E8F9A0B1 /* BASDecodeFloorTests.swift */; };
+		B4D1F2A4B5C6D7E8F9A0B1C2 /* BASSustainedDecodeDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E2A3B5C6D7E8F9A0B1C2D3 /* BASSustainedDecodeDeviceTests.swift */; };
 		06E9FFFF00EA00C99E3067D8 /* BASOrganRequestM852Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5F2899B523913FFA92CF68 /* BASOrganRequestM852Tests.swift */; };
 		06EB0BD00CD5BE4E2F54DAEA /* M389DoctrineRedLineLintTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CAF8873265DA943884387A4 /* M389DoctrineRedLineLintTests.swift */; };
 		07341950A0EEF6454041DCC4 /* BASChapter707FlashAttentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334BB129A54B11C3E2C4A09D /* BASChapter707FlashAttentionTests.swift */; };
@@ -1945,6 +1946,7 @@
 		CF86A7B9C0D1E2F3A4B5C6D7 /* BASDFlashDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASDFlashDeviceTests.swift; sourceTree = "<group>"; };
 		E1A8C9D1E2F3A4B5C6D7E8F9 /* BASDWQ3DeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASDWQ3DeviceTests.swift; sourceTree = "<group>"; };
 		A3C0E1F3A4B5C6D7E8F9A0B1 /* BASDecodeFloorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASDecodeFloorTests.swift; sourceTree = "<group>"; };
+		C5E2A3B5C6D7E8F9A0B1C2D3 /* BASSustainedDecodeDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSustainedDecodeDeviceTests.swift; sourceTree = "<group>"; };
 		416285CD9C92A2726289E932 /* BASChapter994AuthoritativeModeScaffoldTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASChapter994AuthoritativeModeScaffoldTests.swift; sourceTree = "<group>"; };
 		4167305B1D44B4A56FC328C7 /* BASTurnRuntimeStageLedgerPerGroupSummariesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASTurnRuntimeStageLedgerPerGroupSummariesTests.swift; sourceTree = "<group>"; };
 		41A0C61370F52E0D40835BD9 /* BASOrganRegistryObservationCoverageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASOrganRegistryObservationCoverageTests.swift; sourceTree = "<group>"; };
@@ -3244,6 +3246,7 @@
 				CF86A7B9C0D1E2F3A4B5C6D7 /* BASDFlashDeviceTests.swift */,
 				E1A8C9D1E2F3A4B5C6D7E8F9 /* BASDWQ3DeviceTests.swift */,
 				A3C0E1F3A4B5C6D7E8F9A0B1 /* BASDecodeFloorTests.swift */,
+				C5E2A3B5C6D7E8F9A0B1C2D3 /* BASSustainedDecodeDeviceTests.swift */,
 				81F2923645AC561D225C47DB /* BAS14LayerMeshMapTests.swift */,
 				F5CB3A1BC1DBACFD0DB88AC0 /* BAS185MemoryAtomEventConstantsPinTests.swift */,
 				7B32106779FBAFB2F8066209 /* BAS211MemoryAtomSingleSourceOfTruthPinTests.swift */,
@@ -4925,6 +4928,7 @@
 				BE75F6A8B9C0D1E2F3A4B5C6 /* BASDFlashDeviceTests.swift in Sources */,
 				D097B8C0D1E2F3A4B5C6D7E8 /* BASDWQ3DeviceTests.swift in Sources */,
 				F2B9D0E2F3A4B5C6D7E8F9A0 /* BASDecodeFloorTests.swift in Sources */,
+				B4D1F2A4B5C6D7E8F9A0B1C2 /* BASSustainedDecodeDeviceTests.swift in Sources */,
 				E108BEFCCC1C36F250856C53 /* BAS14LayerMeshMapTests.swift in Sources */,
 				8DC8981D71DCF4A3E1B16192 /* BAS185MemoryAtomEventConstantsPinTests.swift in Sources */,
 				36E05C93606E892317059F7D /* BAS211MemoryAtomSingleSourceOfTruthPinTests.swift in Sources */,
