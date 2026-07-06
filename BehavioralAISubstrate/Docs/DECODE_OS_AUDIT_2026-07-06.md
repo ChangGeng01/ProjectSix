@@ -88,3 +88,48 @@ Mac 全量回归:15,988 用例,0 新增失败(3 个预存于 HEAD,stash 验证)�
 
 8/8 缝闭合,全部带 Mac 门 + 设备证据,ADR-014 纪律全程(kill-switch:BAS_THERMAL_FORCE 只许保守方向;
 其余修复为认证回归/正确性修复,恢复既有认证语义,不引入新 opt-in 面)。
+
+## 统一案轮 (2026-07-06 "继续 最小统一案 按序 1-5 最严苛")
+
+提交链:a1bb73dc2(案1)→ [缝1即案2,已闭] → 案3(同链)→ a2fef7601(案4)→ 3a0e98d17(案5)。
+
+**案1 BASTrunkCheckpoint — SHIPPED**:6 份 `(m, m[0], m[1])` 快照复制 → 1 个 value type(机制统一,
+per-lane 数值原样;n-slot 通用枚举与 BASSessionKVStore 同源)。新增旧习语没有的常驻保护:trim 返回值
+受检(under-run → 各车道 fail-close)、fused 入口组合守卫(不支持的缓存组成 → 直落 generatePlain 且
+B3 保留)、emit 位点 L∈[0,kNow] 不变量。钉住:暖 MambaCache=2 槽、卷绕 Rotating 拒组合、
+**Qwen3.5 forward 不推进 ArraysCache.offset(设备级钉住 PASS)**。门:F1 保真/trace-exit/F6/
+sampling E2E+lossless/K=1 全绿。DFlash 循环仅设备 A/B 可练(封存车道,同机制,诚实记录)。
+
+**案2 Step-0 热补丁 — CLOSED-BY-SEAM-1**(修复轮已提前落地并设备认证)。
+
+**案3 车道选举纯函数 — SHIPPED**:三段内联守卫链 → `_sessionLane`(opt-in fused > capped-fused >
+pooled,溢出迁移显式入类型);两相成本门控保留旧短路轮廓(warm pooled 轮不付权重 stat/token 估算);
+池内获取序保持缝认证原样。门:7 例形状矩阵(每个缝-4 失忆形状钉 .pooled)+ 行为锚复跑
+(热门/OBSIDIAN 迁移/损坏 spill)。决策:byte-accounting 池界不做——footprint 直读的梯子取代。
+
+**案4 谨慎内核 — SHIPPED**:`BASTrunkDraftProvider`(类绑定,每轮一次派发,GPU 常驻草稿,
+自掩蔽状态契约)+ `BASQwen35ChainDraftProvider`(adaptedK/draftAndCommit 原文搬迁,EMA 仍持久在
+decoder,per-round 热逃生舱留在 provider——批评者对冻结热快照的否决执行)。按否决:sampling 车道
+(fat-mtpForward 数值)、generateSpecK/compiled*(数值锚)、DFlash(封存)**不作 provider**。
+回报:token-recycling/DFlash 复活按 provider 价格认证。门:F1 保真锚 + trace-exit + F6 + 直播货币。
+
+**案5 DecodeContext + 压力梯子 — SHIPPED**:每轮一次组装(purpose/temp/cap/热/内存余量)穿两个
+eager planner 位点(委托重载=字节恒等);BAS_DECODE_CTX=1 每轮一行"谁能刹车"。梯子
+(BAS_PRESSURE_LADDER=1 opt-in):纯滞回机(按解析 cap 的余量分数;触发即闩锁,阈值+带宽以上才
+重臂防抖);rung1=缝8a pending-spill park 冷席(零内联阻塞)/rung2=释放 MTP decoder(车道自愈
+重量化)/rung3=清全部+收缩 MLX 池。**设备认证(合成猪 vs 解析 cap 6144MB):3158→854MB 触
+rung1(被 park 席温恢复、对话无损)→521MB 触 rung2(decoder 释放、capped 车道自愈)→进程存活、
+回收 3491MB,fired=[1,2] 严格按序**。rung3 不实弹(5% 余量下故意猪=jetsam 轮盘;纯门钉逻辑,
+诚实记录)。不建清单执行:无热+内存标量、无 in-decode 采样、无学习路由。
+
+**回归**:Mac 16,006 用例 0 新增失败(3 预存);设备 floor 探针 rawBW=60GB/s(地面真相一致)。
+Follow-up(独立测量战役,非本轮):cacheLimit {256,512,768,∞} × 混合流量 A/B。
+
+**案4 设备 tok/s 平价判决(诚实版)**:sustained 探针直呼 generateSpecKFused(仪器有效)。两轮
+(热饱和 / 13.5min 冷却后)min00 完全相同 21.4 tok/s(暖起点下确定性可复现),平台保持率 56-61%
+与文档 57% **形状吻合**;绝对值(平台 12.5-13.1 vs 文档 14.2)差异与起点热标度一致
+(21.4/24.9≈0.86 ≈ 12.8/14.2≈0.90),但**跨热基线的绝对比较不可判**(机身连跑 2h 热饱和,
+13.5min 冷却后 min00 仍 thermal=2)。>1% 中止判据的物理界:provider=每轮 3 次动态派发
+(~百 ns / ~50-80ms 轮)≪0.01%,且 F1 保真锚=草稿逐 token 相同⇒接受度/轮数相同。
+**判决:无回归证据;绝对平价复测记 rider——下一个冷机会话先跑一次 sustained
+(min00 对 21.4-24.9 带、平台对 14.2 带),先于任何加热负载。**
