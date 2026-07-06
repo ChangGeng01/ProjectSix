@@ -143,4 +143,9 @@ transitions ONCE to ChatSession via init(history:). DEVICE CERT: **cap-48 recall
 (the exact take-4 failure shape), pooled_sessions=0, all three levers composing in telemetry
 (probe 0.88-0.98, budget guard closing think at 2-16 tokens — correct for tiny caps). Noted
 behavior: sub-64 caps normalize UP to the 64 tier on easy questions (the probe's tier lattice).
-Default-on rides a future endurance batch.
+**DEFAULT ON (2026-07-06 endurance batch)**: mixed-traffic device batch (4 capped + 2 uncapped
+seats, 744s, per-turn watchdog) — recall **5/5 across all three route classes** (capped-lane@48,
+post-transition@160, pooled-uncapped), seat-0 transition exercised at turn 6, zero hangs.
+BAS_SESSION_CAPPED_FUSED=0 = kill-switch; the spill-cert suite pins it (its assertions need pool
+churn). Batch take-1 lesson: uncapped whale-turns starve probabilistic probe schedules —
+deterministic final probes per route class are the pattern.

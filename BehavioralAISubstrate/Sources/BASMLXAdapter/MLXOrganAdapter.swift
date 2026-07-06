@@ -1359,9 +1359,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     }
     /// B3-gap closure lane (spill-cert take-4 structural finding): CAPPED session turns route
     /// through the FUSED loop — the pooled ChatSession path has no trace-exit, so small-cap turns
-    /// on the thinking model truncate inside <think>. Opt-in pending its own cert (ADR-014).
+    /// on the thinking model truncate inside <think>. DEFAULT ON since the 2026-07-06 endurance
+    /// batch (mixed traffic 744s: recall 5/5 across all three route classes incl. the
+    /// post-transition seat; transition exercised; zero hangs). BAS_SESSION_CAPPED_FUSED=0 =
+    /// the ADR-014 kill-switch (the spill-cert suite pins it — those assertions need pool churn).
     nonisolated static var sessionCappedFusedEnabled: Bool {
-        ProcessInfo.processInfo.environment["BAS_SESSION_CAPPED_FUSED"] == "1"
+        ProcessInfo.processInfo.environment["BAS_SESSION_CAPPED_FUSED"] != "0"
     }
     /// The capped-fused route serves histories up to this estimate (stateless re-prefill stays
     /// cheaper than losing B3/B2/MTP; beyond it the turn falls through to ChatSession KV-reuse).

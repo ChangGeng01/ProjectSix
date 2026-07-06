@@ -14,6 +14,9 @@ final class BASSessionPersistTests: XCTestCase {
         }
         #if canImport(MLXLLM)
         print("[persist] loading model…"); 
+        guard !MLXOrganAdapter.sessionCappedFusedEnabled else {
+            throw XCTSkip("persist/spill tests need BAS_SESSION_CAPPED_FUSED=0 — capped turns live in transcript-land otherwise")
+        }
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
         try await adapter.loadModel()
         print("[persist] model loaded, turn 1…")
@@ -59,6 +62,9 @@ final class BASSessionPersistTests: XCTestCase {
         #if canImport(MLXLLM)
         XCTAssertEqual(MLXOrganAdapter.maxLiveSessions, 1, "runner must set BAS_MAX_LIVE_SESSIONS=1")
         XCTAssertTrue(MLXOrganAdapter.sessionSpillEnabled, "runner must set BAS_SESSION_SPILL=1")
+        guard !MLXOrganAdapter.sessionCappedFusedEnabled else {
+            throw XCTSkip("persist/spill tests need BAS_SESSION_CAPPED_FUSED=0 — capped turns live in transcript-land otherwise")
+        }
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
         try await adapter.loadModel()
         func turn(_ sid: String, _ text: String) async throws -> String {

@@ -26,6 +26,9 @@ final class BASSessionSpillEnduranceDeviceTests: XCTestCase {
         #if canImport(MLXLLM)
         XCTAssertTrue(MLXOrganAdapter.sessionSpillEnabled, "runner must set BAS_SESSION_SPILL=1")
         XCTAssertEqual(MLXOrganAdapter.maxLiveSessions, 4, "runner must set BAS_MAX_LIVE_SESSIONS=4")
+        guard !MLXOrganAdapter.sessionCappedFusedEnabled else {
+            throw XCTSkip("spill cert needs BAS_SESSION_CAPPED_FUSED=0 — capped turns bypass the pool otherwise")
+        }
         ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
         MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
@@ -145,6 +148,106 @@ final class BASSessionSpillEnduranceDeviceTests: XCTestCase {
         print("[capped-fused] VERDICT recall=\(correct)/\(probes) pooled_sessions=\(pooled)")
         XCTAssertEqual(correct, probes, "cap-48 recall must be 100% on the fused session lane")
         XCTAssertEqual(pooled, 0, "capped turns must stay in transcript-land (no ChatSession)")
+        #else
+        throw XCTSkip("MLXLLM unavailable")
+        #endif
+    }
+
+    /// Capped-fused DEFAULT-ON endurance batch (TEST_RUNNER_BAS_CF_ENDURANCE=1 +
+    /// TEST_RUNNER_BAS_SESSION_CAPPED_FUSED=1): 6-min mixed traffic —
+    ///  • seats 0-3: cap-48 turns on the capped-fused lane (recall probes @48)
+    ///  • seats 4-5: UNCAPPED turns on the ChatSession pool (coexistence; recall @nil-cap)
+    ///  • seat 0 additionally gets LONG story turns to outgrow the 1024 est-token budget and
+    ///    force the one-way TRANSITION to ChatSession; post-transition recall probes run @160
+    ///    (the ChatSession lane has no B3 — cap-48 post-transition is the documented edge).
+    func testCappedFusedEnduranceMixed() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_CF_ENDURANCE"] == "1" else {
+            throw XCTSkip("set TEST_RUNNER_BAS_CF_ENDURANCE=1 (+BAS_SESSION_CAPPED_FUSED=1; ~7 min)")
+        }
+        #if canImport(MLXLLM)
+        XCTAssertTrue(MLXOrganAdapter.sessionCappedFusedEnabled)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        try await adapter.loadModel()
+        let codewords = ["lantern", "obsidian", "cascade", "juniper", "meridian", "tundra"]
+        func turn(_ seat: Int, _ text: String, cap: Int?) async throws -> String {
+            NSLog("[cf-endure] turn seat%d begin", seat)
+            let r = try await withThrowingTaskGroup(of: String?.self) { group in
+                group.addTask {
+                    try await adapter.draft(BASOrganRequest(
+                        requestID: "cfe-\(seat)-\(abs(text.hashValue))", role: .core,
+                        preset: .greedyDeterministic, instruction: text, maxOutputTokens: cap,
+                        sessionID: "cfeseat\(seat)")).body
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 150_000_000_000)
+                    return nil
+                }
+                defer { group.cancelAll() }
+                guard let first = try await group.next(), let body = first else {
+                    throw NSError(domain: "cf-endure", code: 1,
+                                  userInfo: [NSLocalizedDescriptionKey: "watchdog seat\(seat)"])
+                }
+                return body
+            }
+            NSLog("[cf-endure] turn seat%d done", seat)
+            return r
+        }
+        for (i, w) in codewords.enumerated() {
+            _ = try await turn(i, "My codeword is \(w). Remember it. Reply with just: OK.",
+                               cap: i < 4 ? 48 : nil)
+        }
+        var asked = 0, correct = 0, turns = 6
+        var transitioned = false
+        let longFiller = "Continue our epic sea saga with three rich sentences full of vivid detail. "
+        let t0 = Date()
+        while Date().timeIntervalSince(t0) < 360 {
+            let seat = turns % 6
+            let capped = seat < 4
+            let pooledNow = await adapter.sessionCount()
+            let seatTransitioned = seat == 0 && pooledNow > 0 && transitioned
+            if turns % 5 == 0 {
+                let probeCap: Int? = capped ? (seatTransitioned ? 160 : 48) : nil
+                let a = try await turn(seat, "What is my codeword? Answer with the single word only.",
+                                       cap: probeCap)
+                asked += 1
+                if a.localizedCaseInsensitiveContains(codewords[seat]) {
+                    correct += 1
+                } else {
+                    print("[cf-endure] MISS seat\(seat) (transitioned=\(seatTransitioned)) got: \(a.prefix(80))")
+                }
+            } else if seat == 0 {
+                // long turns drive seat 0 toward the transition budget
+                _ = try await turn(0, longFiller, cap: 192)
+                if !transitioned {
+                    let p = await adapter.sessionCount()
+                    if p > 0 { transitioned = true; print("[cf-endure] seat0 TRANSITIONED at turn \(turns)") }
+                }
+            } else {
+                _ = try await turn(seat, "Add one short sentence to our story about the sea.",
+                                   cap: capped ? 48 : nil)
+            }
+            turns += 1
+        }
+        // Deterministic final probes — take-1 of this batch let the uncapped whales starve the
+        // probe schedule (2 probes in 18 turns; the TRANSITIONED seat was never probed). One per
+        // route class, guaranteed: transitioned@160, capped-lane@48, pooled-uncapped@nil.
+        for (seat, cap) in [(0, Optional(160)), (1, Optional(48)), (4, nil)] {
+            let a = try await turn(seat, "What is my codeword? Answer with the single word only.",
+                                   cap: cap)
+            asked += 1
+            if a.localizedCaseInsensitiveContains(codewords[seat]) {
+                correct += 1
+            } else {
+                print("[cf-endure] FINAL-MISS seat\(seat) cap=\(String(describing: cap)) got: \(a.prefix(80))")
+            }
+        }
+        let pooled = await adapter.sessionCount()
+        print("[cf-endure] VERDICT turns=\(turns) recall=\(correct)/\(asked) transitioned=\(transitioned) pooled=\(pooled)")
+        XCTAssertEqual(correct, asked, "mixed-traffic recall must be 100%")
+        XCTAssertTrue(transitioned, "the endurance batch must exercise the transition path")
+        XCTAssertGreaterThan(pooled, 0, "uncapped seats + transitioned seat must live in the pool")
         #else
         throw XCTSkip("MLXLLM unavailable")
         #endif
