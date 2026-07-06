@@ -38,9 +38,17 @@ extension MLXOrganAdapter {
     static func _persist(
         _ box: ChatSessionBox, url: URL, quantizeKV: Bool
     ) async throws -> Int {
-        try await box.session.withLiveCache { cache in
+        let bytes = try await box.session.withLiveCache { cache in
             try BASSessionKVStore.save(cache: cache, tokenCount: 0, to: url, quantizeKV: quantizeKV)
         }
+        #if os(iOS)
+        // 缝2 (2026-07-06 audit): conversation KV on disk gets Data Protection — readable after
+        // first unlock (background restores keep working), never in the pre-unlock window.
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path)
+        #endif
+        return bytes
     }
 
     /// Warm-start a pooled session from a snapshot: fresh model cache ← restored state, wrapped

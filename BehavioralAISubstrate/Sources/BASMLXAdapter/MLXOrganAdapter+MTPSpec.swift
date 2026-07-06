@@ -24,6 +24,7 @@ extension MLXOrganAdapter {
         let accepted: Int
         let rounds: Int
         let box: MTPDecoderBox
+        var thermalFallback: Bool = false
     }
 
     /// Full-pipeline `.mtpSpec` turn: template → tokenize → MTP spec decode (EOS-aware) → detokenize.
@@ -122,18 +123,33 @@ extension MLXOrganAdapter {
                 resolve: { ctx.tokenizer.convertTokenToId($0) },
                 encode: { ctx.tokenizer.encode(text: $0) },
                 requestCapped: request.maxOutputTokens != nil, maxTokens: maxTokens)
-            let r = dec.generateSpecKFused(
-                prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
-                k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
-                traceExit: trace, postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens))
+            // 缝1 (2026-07-06 audit): the session lanes bypassed the planner's certified serious+→plain
+            // gate — the fused loop's adaptedK only clamps K=1 (calibrated for fair). At serious+ run
+            // PLAIN in transcript-land (route class unchanged ⇒ no transcript orphaning), keeping the
+            // B3 answer guarantee on capped turns via the plain loop's traceExit support. B2 budget
+            // refinement is deliberately NOT consulted under thermal (no upshifts while throttled).
+            let r: BASQwen35MTPSpecDecoder.Run
+            let thermalFallback = MLXOrganAdapter._thermalThrottled()
+            if thermalFallback {
+                r = dec.generatePlain(
+                    prompt: promptIds, maxTokens: maxTokens, eosTokens: eos, traceExit: trace)
+                print("📊 session-thermal fallback=plain out=\(r.tokens.count)/\(maxTokens)")
+            } else {
+                r = dec.generateSpecKFused(
+                    prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
+                    k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
+                    traceExit: trace, postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens))
+            }
             if let te = r.traceExit {
                 print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
             }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
-                accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
+                accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec),
+                thermalFallback: thermalFallback)
         }
         mtpDecoderBox = raw.box
+        if raw.thermalFallback { sessionThermalFallbackCount += 1 }
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
         return (draft, raw.accepted, raw.rounds)
@@ -235,6 +251,8 @@ extension MLXOrganAdapter {
 
     /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).
     nonisolated static func _thermalThrottled() -> Bool {
+        // Test/probe seam — can only FORCE the conservative direction, never defeat the gate.
+        if ProcessInfo.processInfo.environment["BAS_THERMAL_FORCE"] == "1" { return true }
         let t = ProcessInfo.processInfo.thermalState
         return t == .serious || t == .critical
     }

@@ -315,20 +315,75 @@ public final class BASQwen35MTPSpecDecoder {
     }
 
     /// Plain greedy decode (the A/B baseline; identical bookkeeping to the spec loop).
-    public func generatePlain(prompt: [Int], maxTokens: Int) -> Run {
+    /// With the defaults this is TOKEN-IDENTICAL to the historical probe loop (no EOS, no policy —
+    /// the A/B baselines pin it). `eosTokens`/`traceExit` make it the PRODUCTION thermal fallback
+    /// for session lanes (缝1, 2026-07-06): at serious+ the certified design is plain decode, but
+    /// capped turns must keep the B3 answer guarantee — so the plain loop carries the same
+    /// BASTraceExitPolicy + packed argmax+entropy readback as the fused lane. Force-close here is
+    /// simpler than fused (no verify round in flight to unwind): inject the close sequence into the
+    /// output and feed it together with the pending token in ONE multi-token forward (same lossless
+    /// forward class — every emitted token remains the trunk's own argmax, ADR-039).
+    public func generatePlain(
+        prompt: [Int], maxTokens: Int, eosTokens: Set<Int> = [],
+        traceExit: BASTraceExitConfig? = nil
+    ) -> Run {
         let cache = model.newCache(parameters: nil)
-        var h = model.hiddenStatesWithCache(MLXArray(prompt.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
-        var nxt = argmaxLast(model.logits(fromHidden: h))
-        eval(MLXArray(Int32(nxt)))
-        let t0 = Date()
-        var out: [Int] = [nxt]                    // first generated token included (production semantics)
-        while out.count < maxTokens {
-            h = model.hiddenStatesWithCache(MLXArray([Int32(nxt)]).expandedDimensions(axis: 0), cache: cache)
-            nxt = argmaxLast(model.logits(fromHidden: h))
-            eval(MLXArray(Int32(nxt)))
-            out.append(nxt)
+        // Primed-in-think scan over the PROMPT — identical to the fused lane's (:128): template
+        // variants pre-open `<think>`, so the policy must start in-think or the budget guard is dead.
+        var tracePolicy: BASTraceExitPolicy? = traceExit.map { cfg in
+            let lastOpen = prompt.lastIndex(of: cfg.thinkOpenToken)
+            let lastClose = prompt.lastIndex(of: cfg.thinkCloseToken)
+            let primed = lastOpen.map { oi in lastClose.map { $0 < oi } ?? true } ?? false
+            return BASTraceExitPolicy(config: cfg, primedInThink: primed)
         }
-        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: 0, iterations: out.count)
+        var traceTel: BASTraceExitTelemetry? = nil
+        var out: [Int] = []
+        var hitEOS = false
+        func emit(_ tok: Int) -> Bool {
+            if eosTokens.contains(tok) { hitEOS = true; return false }
+            out.append(tok)
+            return out.count < maxTokens
+        }
+        // Packed argmax+entropy single readback while the policy is live (the fused lane's
+        // determinism idiom — every emitted token carries entropy, or none do after the latch).
+        func argmaxAndEntropy(_ lastRow: MLXArray) -> (tok: Int, ent: Int?) {
+            guard tracePolicy != nil, !(tracePolicy?.closed ?? true) else {
+                return (argMax(lastRow, axis: -1).item(Int.self), nil)
+            }
+            let lf = lastRow.asType(.float32)
+            let pr = softmax(lf, axis: -1)
+            let ent = -(pr * log(pr + 1e-9)).sum(keepDims: false)
+            let packed = concatenated([argMax(lastRow, axis: -1).reshaped([1]).asType(.int32),
+                                       (ent * 1000).asType(.int32).reshaped([1])])
+            let host = packed.asArray(Int32.self)
+            return (Int(host[0]), Int(host[1]))
+        }
+        var h = model.hiddenStatesWithCache(
+            MLXArray(prompt.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+        var (tok, ent) = argmaxAndEntropy(model.logits(fromHidden: h)[0, h.dim(1) - 1])
+        let t0 = Date()
+        var feed: [Int] = [tok]                   // emitted-but-not-yet-fed tokens
+        var stop = !emit(tok)                     // first generated token included (production semantics)
+        while !stop && !hitEOS {
+            if tracePolicy != nil, let cfg = traceExit,
+               case .close(let reason)? = tracePolicy?.observe(
+                   token: tok, entropyMillinats: ent, outCount: out.count, maxTokens: maxTokens) {
+                tracePolicy?.markForcedClose()
+                traceTel = BASTraceExitTelemetry(
+                    reason: reason, thinkTokensAtExit: tracePolicy?.thinkTokens ?? 0,
+                    outCountAtExit: out.count)
+                for t in cfg.closeSequence where !stop { stop = !emit(t) }
+                if stop { break }                 // budget died mid-injection
+                feed += cfg.closeSequence         // pending token + injected close: ONE forward below
+            }
+            h = model.hiddenStatesWithCache(
+                MLXArray(feed.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+            (tok, ent) = argmaxAndEntropy(model.logits(fromHidden: h)[0, h.dim(1) - 1])
+            feed = [tok]
+            stop = !emit(tok)
+        }
+        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: 0,
+                   iterations: out.count, traceExit: traceTel)
     }
 
     /// Generalized K-deep MTP speculative decode (chained GPU-resident drafts, ONE verify forward of

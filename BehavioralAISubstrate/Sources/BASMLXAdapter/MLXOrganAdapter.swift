@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import BASRuntimeCore
 import BASOrgan
 #if canImport(os)
@@ -171,6 +172,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// `ChatSessionBox`'s @unchecked-Sendable pattern — exclusively used within `container.perform`).
     var mtpDecoderBox: MTPDecoderBox?
     // B2 探针路由器 — the difficulty-probe head (BAS_DIFF_PROBE=1), resolved once per adapter.
+    /// 缝1 telemetry/test surface: session turns decoded via the thermal plain-fallback.
+    var sessionThermalFallbackCount = 0
+
     var diffProbeBox: BASDifficultyProbe?
     var diffProbeResolved = false
 
@@ -1256,6 +1260,22 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             if dbgS { NSLog("[sess-dbg] %@ spill-restored", key) }
             box = restored                                  // B5: warm-start from the spill file
             sessions[key] = restored
+        } else if let transcript = fusedTranscripts[key] {
+            // 缝4 (2026-07-06 audit): a transcript-land seat whose next request fails the fused
+            // guards (temp>0 / uncapped / cap>384) lands HERE — the fresh branch built a persona-only
+            // ChatSession and silently dropped the whole conversation. Migrate through the same
+            // init(history:) contract the history-overflow transitions use (the transcript already
+            // carries its system message → instructions nil).
+            if dbgS { NSLog("[sess-dbg] %@ route-change MIGRATION turns=%d", key, transcript.count) }
+            let migrated = ChatSession(
+                container,
+                instructions: nil,
+                history: Self.chatMessages(from: transcript),
+                generateParameters: _generateParameters(
+                    for: request.preset, maxOutputTokens: request.maxOutputTokens))
+            box = ChatSessionBox(session: migrated)
+            sessions[key] = box
+            fusedTranscripts.removeValue(forKey: key)
         } else {
             if dbgS { NSLog("[sess-dbg] %@ fresh", key) }
             let fresh = ChatSession(
@@ -1380,12 +1400,19 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     nonisolated static var sessionSpillEnabled: Bool {
         ProcessInfo.processInfo.environment["BAS_SESSION_SPILL"] != "0"
     }
-    nonisolated static func _spillURL(forKey key: String) -> URL {
+    nonisolated static func _spillDir() -> URL {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("bas_session_spill", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent(
-            key.replacingOccurrences(of: "#", with: "_") + ".safetensors")
+        return dir
+    }
+    /// 缝3 (2026-07-06 audit): filenames are SHA256(key) — the old '#'→'_' sanitization mapped
+    /// `a#scout` and `a_scout` to ONE file (a seat could warm-restore ANOTHER seat's conversation).
+    /// Old-named files become orphans and age out via the GC bound / clearAllSessions (spill = cache).
+    nonisolated static func _spillURL(forKey key: String) -> URL {
+        let digest = SHA256.hash(data: Data(key.utf8))
+        let name = digest.map { String(format: "%02x", $0) }.joined()
+        return _spillDir().appendingPathComponent(name + ".safetensors")
     }
     /// Evict past the LRU cap, spilling each victim when the lane is armed (fp16-exact snapshots;
     /// a failed spill just falls back to the old drop-the-KV behavior). Each spill write triggers
@@ -1438,6 +1465,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// B5 cert telemetry.
     var spillCount = 0
     var spillRestoreCount = 0
+    var spillRestoreFailCount = 0
     public func sessionSpillStats() -> (spilled: Int, restored: Int) {
         (spillCount, spillRestoreCount)
     }
@@ -1457,7 +1485,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             _ = try BASSessionKVStore.restore(into: fresh, from: url)
             for c in fresh { eval(c.innerState()) }
             return CacheBox(cache: fresh)
-        }) else { return nil }
+        }) else {
+            // 缝3 (2026-07-06 audit): a corrupt/incompatible snapshot must be CONSUMED on failure —
+            // leaving it meant every future miss re-paid the failed restore forever.
+            try? FileManager.default.removeItem(at: url)
+            spillRestoreFailCount += 1
+            return nil
+        }
         try? FileManager.default.removeItem(at: url)
         spillRestoreCount += 1
         return ChatSessionBox(session: ChatSession(
@@ -1478,10 +1512,15 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     public func clearSession(sessionID: String) {
         crossTurnStore.clear(session: sessionID)
         #if canImport(MLXLLM)
-        sessions.removeValue(forKey: Self.sessionKey(sessionID, .scout))
-        sessions.removeValue(forKey: Self.sessionKey(sessionID, .core))
-        fusedTranscripts.removeValue(forKey: Self.sessionKey(sessionID, .scout))
-        fusedTranscripts.removeValue(forKey: Self.sessionKey(sessionID, .core))
+        for role in [BASOrganRole.scout, .core] {
+            let key = Self.sessionKey(sessionID, role)
+            sessions.removeValue(forKey: key)
+            fusedTranscripts.removeValue(forKey: key)
+            // 缝2 (2026-07-06 audit): clear must reach the DISK tier too — a spilled (or dream-loop
+            // warm-parked) snapshot would otherwise RESURRECT the cleared conversation on the next
+            // turn, violating the documented fresh-start contract and leaving conversation KV on disk.
+            try? FileManager.default.removeItem(at: Self._spillURL(forKey: key))
+        }
         sessionLRU.removeAll { $0 == Self.sessionKey(sessionID, .scout) || $0 == Self.sessionKey(sessionID, .core) }
         #endif
     }
@@ -1494,7 +1533,15 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         sessions.removeAll()
         fusedTranscripts.removeAll()
         sessionLRU.removeAll()
+        Self._clearSpillDir()                        // 缝2: the disk tier goes with the pool
         #endif
+    }
+    /// 缝2: wipe every spill snapshot (clear-all semantics + the old-naming orphan migration path).
+    nonisolated static func _clearSpillDir() {
+        let dir = _spillDir()
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil) else { return }
+        for f in files { try? FileManager.default.removeItem(at: f) }
     }
 
     // MARK: - GPU memory cache control (opt-in memory tool)
@@ -1543,6 +1590,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
 
     /// Number of active sessions. Hosts use this for UI / metrics
     /// (e.g. "5 ongoing conversations cached").
+    /// Test/telemetry: transcript-land seat count (缝4 gate asserts route residency).
+    func _transcriptSeatCount() -> Int {
+        #if canImport(MLXLLM)
+        return fusedTranscripts.count
+        #else
+        return 0
+        #endif
+    }
     public func sessionCount() -> Int {
         #if canImport(MLXLLM)
         return sessions.count
