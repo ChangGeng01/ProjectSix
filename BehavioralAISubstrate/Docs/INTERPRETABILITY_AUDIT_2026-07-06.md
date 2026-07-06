@@ -76,3 +76,11 @@ pooled 轮报获取方式(warm/pending-reclaim/spill-restore/transcript-migratio
 | 4 | 中层 taps/persona 读探针(需转向战役 ADR) | UNMET | ADR-006..041 无转向;★**经验前提已在测过的轴上失败**:BASMultiTurnPressureTests 基座 4B 多轮权威施压 **0/5 服软**(cf2725d98"B targets a non-problem");tap 面休眠可用(hiddenStatesWithTaps 任意层,零生产调用者)→ 真立项时读探针≈1 天 harness,无需 P1 缝无需 vendor 改动 | 下令把压力 harness 扩到两条未测轴(中文施压轮/观点-谄媚-含糊轴);实测服软才立 ADR-042(user-is-right 回归守卫强制) |
 
 **评估顺带入册的三个硬事实**:①zh 支持是研究非接线的机制性证明——否定词窗口按空格分词(:107-110),无分词中文上朴素移植会把"不完美"计为吹捧,重蹈该文件头部已修过的 bug;②转向战役的经验前提在已测轴上是**非问题**(0/5 服软),未来立项必须落在未测轴或 anti_syco 提示词的实测失效上;③卫生项:DeviceTestApp endurance runner **无条件**武装 file-key 收据 sink(每次跑写签名收据进 Documents)——参考宿主,低优先,但与 opt-in 姿态不符,记录在案。
+
+**触发器① FIRED (2026-07-07,操作员令"把三轴 band 打进每轮日志")**:署名消费者=操作员日志流,
+经 coordinator init 单缝自动装(BAS_HONESTY_OBSERVE=1 门内,宿主自供 sink 优先;env 不设=nil=
+字节恒等如旧)。实弹行:`🪞 honesty id=<session>#<turn> flattery=ok hedging=ok overclaim=ok`;
+CJK 主导轮三轴齐打 `n/a(zh)`(lexiconApplicable 检测器与英文词表同居,假绿被构造性排除)。
+**后果**:zh 词表暗点升格为可立项研究(消费者已在;n/a(zh) 顶线直到验证过的词表落地)——
+验证门按 v6-v14 教训预注册:分词/否定窗重设计 + 至少一组中文施压轮的人工标注对照,不许朴素移植。
+触发器 ②③④ 维持 UNMET。
