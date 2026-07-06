@@ -44,3 +44,20 @@
 ## 元结论
 
 decode-OS 审计的 8 条缝本质全是可解释性失败(五个热读者五种意见)。但修法不是"更多仪器",而是**已算出的解释走到署名读者面前,一步不多**——本库最不缺表面,最缺的是让一行日志把一轮的故事讲完。
+
+---
+
+## 四立即项落地 (2026-07-06 深夜,同日)
+
+全部 SHIPPED,commit 见 git log(feat(interp)):
+① **THE turn line** — BASDecodeAttribution 附着 BASOrganDraft(completionMetrics 契约),
+executor 在 EXECUTED 车道已知处组装,BAS_DECODE_CTX=1 每轮一行,eager+会话双路径;实测行:
+`📊 turn id=tl-s1 lane=session:cappedFused b2=agreed(p=0.90) trace=budget:think=16` 与热强制下
+`lane=session:cappedFused→plain(thermal) b2=off`——armed-and-agreed 三态可见,规划≠执行一眼可辨,
+pooled 轮报获取方式(warm/pending-reclaim/spill-restore/transcript-migration/fresh)。零落盘。
+② **分歧哨** — 静默 max() → ROUTED_DIVERGENCE reason code(经既有审计路径持久)+ 进程计数器;
+纯助手 applyHitsFloor 3 测钉住(fail-safe 语义不变:Swift 地板仍赢)。
+③ **清除探针** — XCTExpectFailure 三腿全触发并留证:使用记录不墓碑/跨轮语料不清/KV spill 不清;
+健康腿(投影折叠隔离)过。套件绿、缺口响、修复日强制显式确认。
+④ **anti_syco 资源** — 入库+加载器+条款钉住测试(防反谄媚→反常态的 v2 教训条款单独钉)。
+回归:16,016 用例 0 新失败。
