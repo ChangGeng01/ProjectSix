@@ -1,4 +1,6 @@
 import Foundation
+import os
+import BASRuntimeCore
 
 /// SINGLE SOURCE OF TRUTH for the MLX adapter's memory model — every cap, fit budget, cache floor/default,
 /// watermark ratio, and the per-model resident/peak estimate table. Pure, framework-free. Everything else
@@ -31,7 +33,25 @@ public enum BASMLXMemoryModel {
 
     /// Measured iOS per-process jetsam (ActiveHard) cap on the iPhone Air (11.5 GB phys, iOS 27): a load whose
     /// PEAK footprint crosses this is SIGKILL'd before the first token (observed twice for Gemma4 E4B at load).
+    /// 缝7 (2026-07-06 audit): this 2026-06-12 number was measured on an UN-ENTITLED process — a host with
+    /// `increased-memory-limit` really has ~6.29GB on the 12GB Air (FRONTIER_2026H2 measured), so this
+    /// constant UNDER-admits entitled hosts by ~2.9GB. It is now the CONSERVATIVE FALLBACK only; runtime
+    /// call sites resolve the true cap via `resolvedActiveHardCapBytes()`.
     public static let measuredIPhoneAirActiveHardCapBytes = 3_376 * mib
+
+    /// 缝7: RUNTIME-resolved per-process cap for THIS process — `os_proc_available_memory()` (bytes the
+    /// process may still allocate before jetsam) + current `phys_footprint`. Entitlement-aware by
+    /// construction: entitled hosts resolve ~6.29GB on the Air, un-entitled ones their true smaller cap.
+    /// nil off-iOS / on probe failure → callers keep the conservative fallback constant above.
+    public static func resolvedActiveHardCapBytes() -> Int? {
+        #if os(iOS)
+        let available = os_proc_available_memory()
+        guard available > 0, let snap = try? BASTaskVmInfoProbe.rawSnapshot() else { return nil }
+        return Int(available) + Int(snap.physFootprintBytes)
+        #else
+        return nil
+        #endif
+    }
 
     /// Conservative per-process FIT budget for auto-engaging dual residency (greedy speculative default-on). A
     /// pair whose estimated dual residency exceeds this stays single-model (byte-identical).

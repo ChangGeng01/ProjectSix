@@ -112,6 +112,11 @@ extension MLXOrganAdapter {
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
+        // 缝8b (2026-07-06 audit): the 2-slot decode governor was acquired only on the POOLED
+        // route — the default-on capped-fused class ran ungoverned past the jetsam-margin cap
+        // (135MB from the limit at 8-wide) that justified the governor.
+        await acquireSessionDecodeSlot()
+        defer { releaseSessionDecodeSlot() }
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
@@ -216,7 +221,11 @@ extension MLXOrganAdapter {
         return { hLast in
             let h = hLast.asType(.float32).asArray(Float.self)
             guard let p = try? probe.successProbability(hidden: h) else { return planned }
-            let refined = probe.refinedBudget(planned: planned, pSuccess: p)
+            var refined = probe.refinedBudget(planned: planned, pSuccess: p)
+            // 缝8c (2026-07-06 audit): difficulty and thermal never saw each other — a hard
+            // question under throttle got MORE budget exactly when the device needs less. Under
+            // throttle the probe may only downshift (B3's budget guard still protects the tail).
+            if refined > planned, MLXOrganAdapter._thermalThrottled() { refined = planned }
             if refined != planned {
                 print(String(format: "📊 diff-probe p_success=%.2f budget %d→%d", p, planned, refined))
             }

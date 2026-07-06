@@ -326,7 +326,8 @@ public struct MLXModelCatalog: Sendable, Equatable {
     /// - Returns: `gemma4_E4B_4bit` where it fits under the cap, else `gemma4_E2B_4bit` (the measured survivor).
     public static func recommendedDefault(
         forActiveHardCapBytes capBytes: Int =
-            BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
+            BASMLXMemoryModel.resolvedActiveHardCapBytes()             // 缝7: entitlement-aware
+                ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
     ) -> Entry {
         if !BASMLXMemoryBudget.wouldExceedActiveHardCap(
             targetProviderID: gemma4_E4B_4bit.providerID,

@@ -363,16 +363,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     private var activeSessionDecodes = 0
     private var sessionDecodeWaiters: [CheckedContinuation<Void, Never>] = []
 
-    private func acquireSessionDecodeSlot() async {
+    /// 缝8b telemetry: high-water mark of concurrent decodes — the governor-coverage gate reads it.
+    var peakSessionDecodes = 0
+    func acquireSessionDecodeSlot() async {
         if activeSessionDecodes < Self.maxConcurrentSessionDecodes {
             activeSessionDecodes += 1
+            peakSessionDecodes = max(peakSessionDecodes, activeSessionDecodes)
             return
         }
         await withCheckedContinuation { sessionDecodeWaiters.append($0) }
         activeSessionDecodes += 1
+        peakSessionDecodes = max(peakSessionDecodes, activeSessionDecodes)
     }
 
-    private func releaseSessionDecodeSlot() {
+    func releaseSessionDecodeSlot() {
         activeSessionDecodes -= 1
         if !sessionDecodeWaiters.isEmpty {
             sessionDecodeWaiters.removeFirst().resume()
@@ -664,6 +668,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // CATCHABLE error instead of an uncatchable jetsam. The data-grounded fix the 2026-06-12 run mandated.
         if enforceMemoryAdmission {
             let cap = activeHardCapBytes
+                ?? BASMLXMemoryModel.resolvedActiveHardCapBytes()          // 缝7: entitlement-aware
                 ?? BASMLXMemoryBudget.measurediPhoneAirActiveHardCapBytes
             if BASMLXMemoryBudget.wouldExceedActiveHardCap(
                 targetProviderID: model.providerID, capBytes: cap) {
@@ -1190,12 +1195,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 transcript.append((role: "assistant", text: r.draft.body))
                 fusedTranscripts[key] = transcript
                 fusedSessionTurnCount += 1
-                sessionLRU.removeAll { $0 == key }
-                sessionLRU.append(key)
-                while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
-                    sessionLRU.removeFirst()
-                    sessions.removeValue(forKey: oldest)
-                    fusedTranscripts.removeValue(forKey: oldest)
+                // 缝8a: the old inline LRU loop here was the audit's SECOND eviction copy — it
+                // dropped pooled victims' KV WITHOUT spilling (silently defeating the certified
+                // B5 guarantee). Transcript seats carry no KV → bound them like the capped-fused
+                // lane does; pooled eviction stays single-sourced in _evictBeyondCap.
+                if fusedTranscripts.count > Self.maxTranscriptSessions,
+                   let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
+                    fusedTranscripts.removeValue(forKey: drop)
                 }
                 return r.draft
             }
@@ -1254,6 +1260,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         if let existing = sessions[key] {
             if dbgS { NSLog("[sess-dbg] %@ pooled", key) }
             box = existing
+        } else if let pending = pendingSpill.removeValue(forKey: key) {
+            // 缝8a: the seat was evicted but its spill write hasn't landed — take the LIVE box back
+            // (the in-flight write sees the removed entry and deletes its stale file).
+            if dbgS { NSLog("[sess-dbg] %@ pending-spill reclaim", key) }
+            box = pending.box
+            sessions[key] = pending.box
         } else if let restored = await _restoreFromSpill(
             key: key, container: container,
             params: _generateParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)) {
@@ -1414,19 +1426,47 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let name = digest.map { String(format: "%02x", $0) }.joined()
         return _spillDir().appendingPathComponent(name + ".safetensors")
     }
-    /// Evict past the LRU cap, spilling each victim when the lane is armed (fp16-exact snapshots;
-    /// a failed spill just falls back to the old drop-the-KV behavior). Each spill write triggers
-    /// the GC bound — never-reclaimed seats must not accumulate snapshots unboundedly.
+    /// 缝8a (2026-07-06 audit): eviction no longer awaits the victim's spill INLINE — _persist
+    /// serializes behind the victim's ChatSession lock, so a 17th seat's turn could block behind a
+    /// long-decoding victim's ENTIRE generation plus a multi-MB synchronous write (priority
+    /// inversion). Victims park in a pending-spill side table; the write completes on a detached
+    /// task; a seat reclaimed while pending returns LIVE (zero-cost resurrection) and the stale
+    /// write self-deletes (generation guard). Also single-sources transcript cleanup here — the
+    /// audit's second divergent eviction copy dropped KV without spilling.
+    struct _PendingSpill { let box: ChatSessionBox; let generation: Int }
+    var pendingSpill: [String: _PendingSpill] = [:]
+    private var spillGeneration = 0
     func _evictBeyondCap() async {
         while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
             sessionLRU.removeFirst()
-            if let victim = sessions.removeValue(forKey: oldest), Self.sessionSpillEnabled {
-                if (try? await Self._persist(victim, url: Self._spillURL(forKey: oldest),
-                                             quantizeKV: false)) != nil {
-                    spillCount += 1
-                    Self._pruneSpillDir()
-                }
+            fusedTranscripts.removeValue(forKey: oldest)
+            guard let victim = sessions.removeValue(forKey: oldest), Self.sessionSpillEnabled
+            else { continue }
+            spillGeneration += 1
+            let hadPending = pendingSpill[oldest] != nil
+            pendingSpill[oldest] = _PendingSpill(box: victim, generation: spillGeneration)
+            if !hadPending {
+                Task { [weak self] in await self?._completePendingSpill(key: oldest) }
             }
+        }
+    }
+    /// Drain the pending-spill entry for `key` (looping across supersessions; actor-reentrant).
+    func _completePendingSpill(key: String) async {
+        while let entry = pendingSpill[key] {
+            let gen = entry.generation
+            let ok = (try? await Self._persist(entry.box, url: Self._spillURL(forKey: key),
+                                               quantizeKV: false)) != nil
+            if pendingSpill[key] == nil {
+                // Reclaimed live while we were writing — the snapshot is stale; consume it.
+                if ok { try? FileManager.default.removeItem(at: Self._spillURL(forKey: key)) }
+                return
+            }
+            if let cur = pendingSpill[key], cur.generation == gen {
+                pendingSpill.removeValue(forKey: key)
+                if ok { spillCount += 1; Self._pruneSpillDir() }
+                return
+            }
+            // Superseded by a newer eviction of the same key → loop and persist the newer box.
         }
     }
     /// Snapshot GC: keep the newest `keep` spill files (default 32 ≈ 2GB worst-case at 64MB each);
@@ -1516,6 +1556,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             let key = Self.sessionKey(sessionID, role)
             sessions.removeValue(forKey: key)
             fusedTranscripts.removeValue(forKey: key)
+            pendingSpill.removeValue(forKey: key)        // 缝8a: in-flight write self-deletes
             // 缝2 (2026-07-06 audit): clear must reach the DISK tier too — a spilled (or dream-loop
             // warm-parked) snapshot would otherwise RESURRECT the cleared conversation on the next
             // turn, violating the documented fresh-start contract and leaving conversation KV on disk.
@@ -1533,6 +1574,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         sessions.removeAll()
         fusedTranscripts.removeAll()
         sessionLRU.removeAll()
+        pendingSpill.removeAll()                         // 缝8a: in-flight writes self-delete
         Self._clearSpillDir()                        // 缝2: the disk tier goes with the pool
         #endif
     }
