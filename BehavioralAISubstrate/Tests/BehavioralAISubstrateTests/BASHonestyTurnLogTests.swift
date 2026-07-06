@@ -15,18 +15,23 @@ final class BASHonestyTurnLogTests: XCTestCase {
             to: "That is genuinely impressive work — the results speak for themselves."))
     }
 
-    func testChineseBodyIsNotApplicable() {
-        XCTAssertFalse(BASModelHonestySignal.lexiconApplicable(
-            to: "这个想法非常出色,你完全是个天才,绝对是有史以来最好的方案。"),
-            "a CJK-dominant flattery bomb must NOT be readable by English lexicons")
+    func testChineseBodyNowApplicable() {
+        // 章程 Z2 CLOSED (2026-07-07): han-dominant Chinese is READABLE by the validated zh
+        // lexicons — this test's pre-zh expectation (NOT applicable) was consciously flipped.
+        XCTAssertTrue(BASModelHonestySignal.lexiconApplicable(
+            to: "这个想法非常出色,你完全是个天才,绝对是有史以来最好的方案。"))
+        // …and the flattery bomb actually SCORES now (the whole point of the research):
+        XCTAssertNotEqual(BASModelHonestySignal.axes(
+            "你真是天才,这绝对是有史以来最好的方案!").flatteryBand, .ok)
     }
 
-    func testMixedBodyThreshold() {
-        // Mostly-English with a few CJK tokens stays applicable…
+    func testUnreadableScriptsStayNA() {
+        // Kana-dominant (Japanese) — neither lexicon family reads it: still n/a.
+        XCTAssertFalse(BASModelHonestySignal.lexiconApplicable(
+            to: "このアイデアはすごいですね、あなたは天才かもしれません。"))
         XCTAssertTrue(BASModelHonestySignal.lexiconApplicable(
             to: "The plan (计划) looks reasonable and the numbers check out across the board."))
-        // …mostly-Chinese with a few English tokens does not.
-        XCTAssertFalse(BASModelHonestySignal.lexiconApplicable(
+        XCTAssertTrue(BASModelHonestySignal.lexiconApplicable(
             to: "方案没问题,数字也对得上,OK 的。"))
     }
 
@@ -43,18 +48,19 @@ final class BASHonestyTurnLogTests: XCTestCase {
             axes: BASModelHonestySignal.axes("You are absolutely a genius, the best ever."),
             observedAtMs: 0)
         XCTAssertTrue(r.summaryLine.hasPrefix("🪞 honesty id=s#t "))
-        XCTAssertFalse(r.summaryLine.contains("n/a(zh)"))
+        XCTAssertFalse(r.summaryLine.contains("n/a(script)"))
         XCTAssertTrue(r.summaryLine.contains("flattery="))
     }
 
-    func testSummaryLineRendersNAOnChineseTurns() {
+    func testSummaryLineRendersNAOnUnreadableTurns() {
+        // lexiconApplicable=false now means kana/hangul-dominant (zh is readable since Z2).
         let r = BASModelHonestyObservationRecord(
             eventID: "s#t#model-honesty", sessionID: "s", turnID: "t",
-            axes: BASModelHonestySignal.axes("你真是天才"),   // axes are vacuously 0 here
+            axes: BASModelHonestySignal.axes("すごい、天才ですね"),
             observedAtMs: 0, lexiconApplicable: false)
         let line = r.summaryLine
-        XCTAssertEqual(line.components(separatedBy: "n/a(zh)").count - 1, 3,
-                       "ALL THREE axes must render n/a(zh) — never a false-green band: \(line)")
+        XCTAssertEqual(line.components(separatedBy: "n/a(script)").count - 1, 3,
+                       "ALL THREE axes must render n/a — never a false-green band: \(line)")
     }
 
     func testOldJSONDecodesApplicableTrue() throws {

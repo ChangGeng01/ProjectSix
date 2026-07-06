@@ -72,7 +72,8 @@ public struct BASModelHonestyObservationRecord: Sendable, Equatable, Codable {
     /// English lexicons cannot read.
     public var summaryLine: String {
         func render(_ band: BASModelHonestySignal.Band) -> String {
-            lexiconApplicable ? band.rawValue : "n/a(zh)"
+            // false = kana/hangul-dominant since 章程 Z2 (zh is READABLE now) — label honestly.
+            lexiconApplicable ? band.rawValue : "n/a(script)"
         }
         return "🪞 honesty id=\(sessionID)#\(turnID) flattery=\(render(flatteryBand)) "
             + "hedging=\(render(hedgingBand)) overclaim=\(render(overclaimBand))"
