@@ -192,3 +192,27 @@ session 态)②cacheLimit {256,512,768,∞} A/B(独立测量战役)③token-recy
 **本战役的元结论**:最强 decoder = 一条削到骨头的车道 × 一个让组合诚实的 OS。这一天把后半句从
 隐喻变成了机器:不变量从注释进了代码,路由从守卫链进了类型,清除到达了磁盘,预算只剩一种货币,
 而全部代价 —— 以同机二进制 A/B 为证 —— 是零个 token 每秒。
+
+---
+
+# TOKEN-RECYCLING 立项章程 (2026-07-06 深夜,预注册先于测量)
+
+**论据**:纯核 BASTokenRecyclingMatrix 已在库(UDL 弧遗产,全测试)——目标自身 top-k logit 邻接,
+f≈0(起草=字典走查,零模型 forward),普适(免训练/免权重/模型无关),ADR-039 天然保持(只提议,
+发射仍全部来自主干 argmax)。当年停在"红线解码器不能喂 logits";案 4 的 provider 缝正是它等的门。
+无既判(FRONTIER 网调标"#1 新杠杆",未测)。**设计红线**:链式 only(tree verify 0.76× 既判),
+verify 宽度共享 tCap=5,新增每轮成本只有一处=verify logits 的有序 argtop-8 提取(并入单读回)。
+
+**候选设计**(按 R1 数据择一):
+A. **MTP 链尾免费延伸**——adaptive-K 在 prose 收敛 K=1 留下的备用 verify 宽度,用 TR 免费填
+   (pending1+MTP1+TR2 ⇒ T=4<5)。若 TR 条件命中 ≥0.15/链位,即 prose 每轮 +0.15+ E[tok],
+   零起草成本 —— 自由形式墙后的第一个真 tok/s 上行候选。
+B. **独立 provider(普适车道)**——无 MTP 权重的模型(Llama/Gemma 未来)或 TR 单独胜出的类别。
+
+**预注册门与中止判据**:
+- R0(成本):Mac 轮时 +top-k >3% 且 32K 子词表救不回 → 重设计(每 N 轮更新/仅尾行)。
+- R1(接受度,观察零风险):BAS_TR_PROBE=1 逐行同真值对比 TR/MTP 命中。TR link-1 命中 <0.15
+  且各链位全面劣于 MTP → **诚实负面归档,不进 R2**。
+- R2(集成):F 门 + 字节恒等 + Mac e2e;kernel 反馈缝保持单读回纪律。
+- R3(设备):镜像热序同 harness 共测;发船 = 某真实类别 e2e ≥+3% 且他处零回归(opt-in
+  BAS_TOKEN_RECYCLE);否则诚实负面。DFlash 教训为中止家规:机器成本一旦现形,数字说话即停。
