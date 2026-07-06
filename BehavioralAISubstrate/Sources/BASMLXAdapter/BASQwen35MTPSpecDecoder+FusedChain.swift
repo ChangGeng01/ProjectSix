@@ -19,6 +19,7 @@
 // ADR-039 unchanged: emissions are read EXCLUSIVELY from the trunk's own argmax vector `am` (the accepted
 // prefix equals the drafts by definition of the match test, so drafts never need a readback at all).
 import Foundation
+import BASOrgan
 #if canImport(MLXLLM)
 import MLX          // MLXFast (scaledDotProductAttention et al.) lives inside the MLX module in this vendor
 import MLXNN
@@ -272,6 +273,15 @@ extension BASQwen35MTPSpecDecoder {
         }
         let dbg = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
         var dbgSlow = 0, dbgChainMs = 0.0, dbgVerifyMs = 0.0
+        // TR-R0/R1 probe (BAS_TR_PROBE=1, observation-only — emissions untouched): extend the
+        // packed readback with the ORDERED argtop-8 of every verify row, feed the recycling
+        // adjacency, and score TR-hit vs MTP-hit on the SAME rows/truths. Charter:
+        // Docs/DECODE_OS_AUDIT_2026-07-06.md TOKEN-RECYCLING 章程.
+        let trProbe = ProcessInfo.processInfo.environment["BAS_TR_PROBE"] == "1"
+        let trK = 8
+        var trMatrix = BASTokenRecyclingMatrix(k: trK)
+        var trStats = (rows: 0, trHits: [Int: Int](), mtpHits: [Int: Int](), linkRows: [Int: Int](),
+                       trTop3Hits: 0, coveredRows: 0)
         _ = emit(pending[0])
         observeCarrying(pending[0], t0Ent)
         if dbg { print("[fused-dbg] prefill done, first chain…"); fflush(stdout) }
@@ -316,6 +326,19 @@ extension BASQwen35MTPSpecDecoder {
             // answer would otherwise pay ~1MB fp32 softmax×T every remaining round for nothing).
             let traceActive = !(tracePolicy?.closed ?? true)
             var packedParts = [lAcc.reshaped([1]), am]
+            if trProbe {
+                // ORDERED top-8 per row, in-graph (argPartition → gather values → argSort of 8),
+                // appended to the ONE readback: [T×8] int32 row-major most-likely-first, then the
+                // kNow draft ids (row-input reconstruction needs them host-side, probe-only).
+                let lf32 = lg[0].asType(.float32)                       // [T, V]
+                let part = argPartition(lf32, kth: lf32.dim(1) - trK, axis: -1)
+                let topIdx = part[0..., (lf32.dim(1) - trK)...]         // [T, 8] unordered
+                let topVal = takeAlong(lf32, topIdx, axis: -1)          // [T, 8]
+                let order = argSort(topVal, axis: -1)                   // ascending
+                let ordered = takeAlong(topIdx, order, axis: -1)        // ascending by prob
+                packedParts.append(ordered[0..., .stride(by: -1)].flattened().asType(.int32))
+                packedParts.append(dsVec)
+            }
             if traceActive {
                 // Trunk next-token distribution entropy per row, packed as millinats so the
                 // ONE-readback-per-round discipline holds (fp32 for stability; ~T×1MB, negligible).
@@ -338,7 +361,40 @@ extension BASQwen35MTPSpecDecoder {
                 break
             }
             let amH = host[1 ... T].map(Int.init)                      // trunk argmaxes, host side
-            let entH = traceActive ? host[(T + 1)...].map(Int.init) : []   // millinats per row
+            var cursor = T + 1
+            let entH: [Int]
+            if traceActive {
+                entH = host[cursor ..< cursor + T].map(Int.init)
+                cursor += T
+            } else { entH = [] }
+            if trProbe {
+                let flat = host[cursor ..< cursor + T * trK].map(Int.init)
+                cursor += T * trK
+                let dsH = host[cursor ..< cursor + kNow].map(Int.init)
+                // Row i's INPUT token: pending[i] for i<P, else the draft ds[i-P]; amH[i] = the
+                // trunk's truth for the token FOLLOWING input[i].
+                let inputTok: [Int] = pending + dsH
+                // Score BEFORE observing this round (the matrix may only use PAST state):
+                // link j (1-based) sits at row P-1+j-1; TR's counterfactual draft for that row is
+                // M[input].top-1 — same row, same truth as MTP's draft j (apples-to-apples).
+                for j in 1 ... kNow {
+                    let row = P - 1 + (j - 1)
+                    let truth = amH[row]
+                    trStats.linkRows[j, default: 0] += 1
+                    if j - 1 < L { trStats.mtpHits[j, default: 0] += 1 }
+                    let proposal = trMatrix.proposeChain(from: inputTok[row], length: 1).first
+                    if proposal != nil { trStats.coveredRows += 1 }
+                    if proposal == truth { trStats.trHits[j, default: 0] += 1 }
+                    let m3 = trMatrix.proposeBranches(from: inputTok[row], maxBranch: 3, depth: 1)
+                        .compactMap { $0.first }
+                    if m3.contains(truth) { trStats.trTop3Hits += 1 }
+                }
+                trStats.rows += kNow
+                // Feed the adjacency with EVERY row's fresh top-k (recycling the verify's trash).
+                for i in 0 ..< T {
+                    trMatrix.observe(after: inputTok[i], topK: Array(flat[(i * trK) ..< (i * trK + trK)]))
+                }
+            }
             iters += 1
             acceptedTok += L
             proposedTok += kNow
@@ -413,6 +469,19 @@ extension BASQwen35MTPSpecDecoder {
             let tc = dbg ? Date() : Date.distantPast
             ds = draftAndCommit()
             if dbg { eval(ds); dbgChainMs += Date().timeIntervalSince(tc) * 1000 }
+        }
+        if trProbe, trStats.rows > 0 {
+            let links = trStats.linkRows.keys.sorted()
+            let per = links.map { j -> String in
+                let n = max(1, trStats.linkRows[j] ?? 1)
+                return String(format: "L%d tr=%.2f mtp=%.2f n=%d", j,
+                              Double(trStats.trHits[j] ?? 0) / Double(n),
+                              Double(trStats.mtpHits[j] ?? 0) / Double(n), n)
+            }.joined(separator: " | ")
+            print(String(format: "[tr-probe] rows=%d covered=%.2f top3=%.2f matrix=%d :: %@",
+                         trStats.rows, Double(trStats.coveredRows) / Double(trStats.rows),
+                         Double(trStats.trTop3Hits) / Double(trStats.rows),
+                         trMatrix.coverage, per))
         }
         if dbg {
             print(String(format: "[fused-debug] slowPaths=%d chain=%.1fms/round verifySync=%.1fms/round iters=%d",
