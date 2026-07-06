@@ -538,6 +538,22 @@ public final class ChatSession {
             }
         }
     }
+
+    /// ADDITIVE (BAS B5): run `body` over the live `[KVCache]` under the serial-access lock.
+    /// Exists because `savePromptCache` drops `ArraysCache.offset` (the GDN recurrent cache) —
+    /// external persisters that handle offset correctly need direct, locked access.
+    public func withLiveCache<R: Sendable>(
+        _ body: @Sendable ([KVCache]) throws -> R
+    ) async throws -> R {
+        try await cache.read { cache in
+            switch cache {
+            case .kvcache(let c):
+                return try body(c)
+            default:
+                throw ChatSessionError.noCacheAvailable
+            }
+        }
+    }
 }
 
 /// Errors thrown by ``ChatSession``.

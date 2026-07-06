@@ -294,4 +294,73 @@ final class BASMTPFusedChainTests: XCTestCase {
         print(String(format: "=== F5 MEAN accept=%.2f (python-ref band 3.3-6.2) ===", mean))
         XCTAssertGreaterThan(mean, 2.5, "Swift port acceptance collapsed vs the Python reference — port bug")
     }
+
+    /// F6 — B5 KV persistence gate (BAS_KV_PERSIST_TEST=1): snapshot a ~1.2K-token session cache,
+    /// restore into a fresh cache, and measure (a) warm-restore vs cold-re-prefill TTFT and
+    /// (b) 48-token greedy continuation fidelity vs the live cache (Q4 attention-KV is lossy;
+    /// GDN state is stored raw so divergence should be attention-tie-break class only).
+    func testKVPersistRoundtripAndTTFT() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_KV_PERSIST_TEST"] == "1" else {
+            throw XCTSkip("set BAS_KV_PERSIST_TEST=1 (heavy — loads Qwen3.5-4B)")
+        }
+        let container = try await #huggingFaceLoadModelContainer(
+            configuration: ModelConfiguration(id: "mlx-community/Qwen3.5-4B-4bit",
+                                              extraEOSTokens: ["<|im_end|>"]),
+            progressHandler: { _ in })
+        let story = String(repeating: "The expedition crossed the ridge before dawn, keeping the river to the east and the storm at their backs. ", count: 55)
+        let input = try await container.prepare(input: UserInput(chat: [
+            .user(story + "\n\nSummarize the expedition's route in one sentence.")]))
+        struct R: Sendable {
+            let histLen: Int; let coldMs: Double; let saveMs: Double; let restoreMs: Double
+            let bytes: Int; let match: Int; let n: Int
+        }
+        let r: R = try await container.perform(nonSendable: input) { ctx, input in
+            guard let qwen = ctx.model as? Qwen35Model else {
+                throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
+            }
+            let ids = input.text.tokens.asArray(Int.self)
+            let url = URL(fileURLWithPath: "/tmp/gdn_coreai/kv_session_test.safetensors")
+            func greedy(_ cache: [KVCache], seed: Int, n: Int) -> [Int] {
+                var out: [Int] = []
+                var tok = seed
+                for _ in 0 ..< n {
+                    let h = qwen.hiddenStatesWithCache(
+                        MLXArray([Int32(tok)]).expandedDimensions(axis: 0), cache: cache)
+                    tok = argMax(qwen.logits(fromHidden: h)[0, 0], axis: -1).item(Int.self)
+                    out.append(tok)
+                }
+                return out
+            }
+            // 1. cold prefill (the thing warm-restore replaces) + seed token
+            let cache1 = qwen.newCache(parameters: nil)
+            let t0 = Date()
+            let h0 = qwen.hiddenStatesWithCache(
+                MLXArray(ids.map(Int32.init)).expandedDimensions(axis: 0), cache: cache1)
+            let seed = argMax(qwen.logits(fromHidden: h0)[0, h0.dim(1) - 1], axis: -1).item(Int.self)
+            let coldMs = Date().timeIntervalSince(t0) * 1000
+            // 2. snapshot BEFORE continuing (in-place buffer contract)
+            let q4 = ProcessInfo.processInfo.environment["BAS_KV_PERSIST_Q4"] == "1"
+            let tS = Date()
+            let bytes = try BASSessionKVStore.save(cache: cache1, tokenCount: ids.count, to: url,
+                                                   quantizeKV: q4)
+            let saveMs = Date().timeIntervalSince(tS) * 1000
+            // 3. live continuation (the fidelity reference)
+            let live = greedy(cache1, seed: seed, n: 48)
+            // 4. restore into a fresh cache (timed INCLUSIVE of GPU materialization)
+            let cache2 = qwen.newCache(parameters: nil)
+            let tR = Date()
+            _ = try BASSessionKVStore.restore(into: cache2, from: url)
+            for c in cache2 { eval(c.innerState()) }
+            let restoreMs = Date().timeIntervalSince(tR) * 1000
+            let warm = greedy(cache2, seed: seed, n: 48)
+            let match = zip(live, warm).prefix(while: ==).count
+            return R(histLen: ids.count, coldMs: coldMs, saveMs: saveMs, restoreMs: restoreMs,
+                     bytes: bytes, match: match, n: 48)
+        }
+        print(String(format: "=== F6 hist=%dtok cold_prefill=%.0fms save=%.0fms restore=%.0fms (%.1fx) file=%.1fMB match=%d/%d ===",
+                     r.histLen, r.coldMs, r.saveMs, r.restoreMs, r.coldMs / max(r.restoreMs, 0.001),
+                     Double(r.bytes) / 1e6, r.match, r.n))
+        XCTAssertGreaterThan(r.match, 24, "restored-cache continuation diverged early — persistence bug (Q4 tie-breaks tolerated)")
+        XCTAssertLessThan(r.restoreMs, r.coldMs, "restore must beat cold re-prefill")
+    }
 }

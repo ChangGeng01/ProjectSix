@@ -18,7 +18,9 @@ import MLXNN
 /// only ever crosses the actor's executor, so no cross-task
 /// aliasing is possible. Marked fileprivate so the unchecked
 /// guarantee never leaks out of this file.
-fileprivate struct ChatSessionBox: @unchecked Sendable {
+// internal (was fileprivate): the B5 SessionPersist extension (same type, separate file) rides the
+// same actor-confinement contract — sessions are only ever reached via this actor's executor.
+struct ChatSessionBox: @unchecked Sendable {
     let session: ChatSession
 }
 
@@ -1299,6 +1301,22 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         "\(sessionID)#\(role.rawValue)"
     }
     #endif
+
+    /// B5 internal surface (SessionPersist extension; the pool dict is private to this file).
+    func _sessionBox(sessionID: String, role: BASOrganRole) -> ChatSessionBox? {
+        sessions[Self.sessionKey(sessionID, role)]
+    }
+    /// B5: install a (restored) session under the key, honoring the pool's LRU bound.
+    func _installSession(_ session: ChatSession, sessionID: String, role: BASOrganRole) {
+        let key = Self.sessionKey(sessionID, role)
+        sessions[key] = ChatSessionBox(session: session)
+        sessionLRU.removeAll { $0 == key }
+        sessionLRU.append(key)
+        while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
+            sessionLRU.removeFirst()
+            sessions.removeValue(forKey: oldest)
+        }
+    }
 
     /// Drop the `ChatSession` keyed by `sessionID` for both roles.
     /// Frees its KV cache; future calls with that ID start fresh.

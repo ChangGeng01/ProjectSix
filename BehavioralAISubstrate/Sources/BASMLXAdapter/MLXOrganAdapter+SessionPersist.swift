@@ -1,0 +1,68 @@
+// MLXOrganAdapter+SessionPersist — B5 KV 跨会话持久化 production surface (opt-in API, ADR-014:
+// nothing calls these unless a host explicitly does — e.g. the dream-loop idle window snapshotting
+// warm seats, or app-relaunch warm-start).
+//
+// F6 gate (Mac, 1177-token session): fp16 restore 6ms vs cold re-prefill 279ms = 45.7×, 48/48
+// exact greedy continuation; Q4 tier 33.6×/~8KB-per-token with tie-break-class divergence.
+// Goes through BASSessionKVStore (NOT the upstream savePromptCache — which drops
+// ArraysCache.offset, corrupting the GDN mask geometry on restore).
+import Foundation
+import BASOrgan
+
+#if canImport(MLXLLM)
+import MLX
+import MLXLMCommon
+
+extension MLXOrganAdapter {
+
+    public enum SessionPersistError: Error {
+        case noSuchSession(String)
+        case notLoaded
+    }
+
+    /// Snapshot a pooled session's trunk cache to `url` (fp16-exact by default; `quantizeKV`
+    /// = the Q4 space tier). Call between turns — never mid-decode (the serial lock guarantees
+    /// consistency, but a mid-stream snapshot captures a half-turn).
+    @discardableResult
+    public func persistSession(
+        sessionID: String, role: BASOrganRole = .core, to url: URL, quantizeKV: Bool = false
+    ) async throws -> Int {
+        guard let box = _sessionBox(sessionID: sessionID, role: role) else {
+            throw SessionPersistError.noSuchSession(sessionID)
+        }
+        return try await Self._persist(box, url: url, quantizeKV: quantizeKV)
+    }
+
+    /// The streamBody idiom: the @unchecked Sendable box crosses the region boundary; the session
+    /// inside is only ever reached via this actor (the ChatSessionBox contract).
+    private static func _persist(
+        _ box: ChatSessionBox, url: URL, quantizeKV: Bool
+    ) async throws -> Int {
+        try await box.session.withLiveCache { cache in
+            try BASSessionKVStore.save(cache: cache, tokenCount: 0, to: url, quantizeKV: quantizeKV)
+        }
+    }
+
+    /// Warm-start a pooled session from a snapshot: fresh model cache ← restored state, wrapped
+    /// in a ChatSession and installed under `sessionID#role` (replacing any existing session).
+    /// `instructions` must be nil when the snapshot already encodes the system prompt (it does,
+    /// for sessions persisted after their first turn) — the upstream re-tokenization trap.
+    public func restoreSession(
+        sessionID: String, role: BASOrganRole = .core, from url: URL,
+        instructions: String? = nil
+    ) async throws {
+        guard let container = _loadedContainerForStreaming() else {
+            throw SessionPersistError.notLoaded
+        }
+        struct CacheBox: @unchecked Sendable { let cache: [KVCache] }   // actor-confined handoff
+        let box: CacheBox = try await container.perform { ctx in
+            let fresh = ctx.model.newCache(parameters: nil)
+            _ = try BASSessionKVStore.restore(into: fresh, from: url)
+            for c in fresh { eval(c.innerState()) }
+            return CacheBox(cache: fresh)
+        }
+        let session = ChatSession(container, instructions: instructions, cache: box.cache)
+        _installSession(session, sessionID: sessionID, role: role)
+    }
+}
+#endif
