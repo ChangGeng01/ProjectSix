@@ -105,8 +105,14 @@ Field-validated pipeline for our three-guard windows, all [SHIPPED-CODE/PAPER-ME
 3. **Q4 KV persistence** (B5) — snapshot warm session caches to disk in the same window.
 NOT in the window: weight edits (SEAL forgetting), TTT (latency), cartridge training (joint-training trap, 8B-only validated).
 
-## Priority order (when the user opens the next campaign)
+## Priority order — ALL TEN ITEMS CLOSED (2026-07-04 → 07-06, one campaign)
 
-**B3 → B4 → M3 → B2 → M1 → M2 → B5 → B1 → M4 → M5** — cheapest-first within
-avoided-compute before bandwidth before new-mechanism; B1 last only because iOS 27 is beta and
-it compounds with whatever M1 decides.
+B3✅shipped+promoted · B4✅shipped · M3✅closed(4-bit head optimal) · B2✅shipped(AUC 0.833) ·
+M1✅honest-FAIL(device) · M2✅don't-swap(levers don't compose) · B5✅shipped(45.7× exact) ·
+B1✅closed-rescoped(**Air=59GB/s re-base**) · M4✅closed(sustained = stable 57% plateau) ·
+M5✅deferred-with-triggers(dominated by AFM-3).
+
+Four production levers shipped, three honest negatives, one ground-truth re-base, one adjudicated
+deferral. The shipped fused-MTP lane (25.7 tok/s) stands ABOVE the Air's plain bandwidth wall
+(25.0 @59GB/s) — remaining speed lives in acceptance depth, bytes (kernel-gated), and avoided
+compute. The next frontier sweep runs DIFFERENTIAL to this document.
