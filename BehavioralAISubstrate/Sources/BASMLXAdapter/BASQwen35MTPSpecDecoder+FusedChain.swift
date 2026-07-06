@@ -25,6 +25,69 @@ import MLXNN
 import MLXLLM
 import MLXLMCommon
 
+
+/// 案4 (2026-07-06 decode-OS audit, CAUTIOUS version) — the trunk-draft provider contract for
+/// the ONE certified verify kernel (`generateSpecKFused`'s loop). One dispatch per ROUND, never
+/// per token; drafts stay GPU-resident (no readback inside a provider). Contract obligations:
+///   • `draft` must leave any provider-private state SELF-MASKING beyond `pos0 + k` — a rejected
+///     round is rolled back by the NEXT round's pos0, not by a callback (the MTP slot-slice rule).
+///   • `preferredK` owns the regime policy INCLUDING the per-round thermal read (the in-flight
+///     escape hatch the cert measured — a frozen per-turn snapshot loses the mid-turn K=1 clamp).
+///   • `observe` folds the accepted length for regime learning (may persist across turns).
+/// Per the critic's veto: the SAMPLING lane, generateSpecK/compiled* (frozen numerics anchors),
+/// and DFlash (closed honest-negative) are NOT providers — this contract serves greedy
+/// prefix-accept sources only; per-lane numerics stay per-lane.
+protocol BASTrunkDraftProvider: AnyObject {
+    /// Regime width for the next round (≥1); thermal-aware, EMA-driven.
+    func preferredK() -> Int
+    /// Provider-state position bound (e.g. the MTP stream's KV capacity).
+    func maxDraftWidth(pos0: Int) -> Int
+    /// ONE fused drafting dispatch: k GPU-resident ids anchored at (firstToken, hidden@pos0).
+    func draft(k: Int, firstToken: Int, hidden: MLXArray, pos0: Int) -> [MLXArray]
+    /// Fold the round's accepted prefix length (regime learning).
+    func observe(acceptedLen: Int)
+}
+
+/// The production MTP fused-chain provider — the exact `adaptedK`/`draftAndCommit` bodies that
+/// lived inline in the loop, relocated verbatim. Regime EMA persists on the DECODER (cached
+/// across turns via MTPDecoderBox), same as before.
+final class BASQwen35ChainDraftProvider: BASTrunkDraftProvider {
+    private let dec: BASQwen35MTPSpecDecoder
+    private let k: Int
+    private let adaptiveK: Bool
+    private let fp32Scores: Bool
+    init(decoder: BASQwen35MTPSpecDecoder, k: Int, adaptiveK: Bool, fp32Scores: Bool) {
+        self.dec = decoder
+        self.k = k
+        self.adaptiveK = adaptiveK
+        self.fp32Scores = fp32Scores
+    }
+    func preferredK() -> Int {
+        guard adaptiveK else { return k }
+        // THERMAL TIER (cert take-4): at `fair` the downclocked GPU makes chain overhead
+        // net-negative (0.91-0.99×) while K=1 held ~1.2× — force K=1; `serious+` is gated to
+        // plain upstream (planner / session thermal fallback). Nominal: EMA-driven K ∈ {1,2,3}.
+        if ProcessInfo.processInfo.thermalState != .nominal { return 1 }
+        return dec.chainEmaL >= 1.6 ? min(k, 3) : dec.chainEmaL >= 0.9 ? min(k, 2) : 1
+    }
+    func maxDraftWidth(pos0: Int) -> Int {
+        BASQwen35MTPSpecDecoder.maxSeq - 1 - pos0
+    }
+    func draft(k kEff: Int, firstToken: Int, hidden: MLXArray, pos0: Int) -> [MLXArray] {
+        let (ds, ks, vs) = dec.fusedChain(
+            k: kEff, firstToken: firstToken, hidden: hidden, pos0: pos0, fp32Scores: fp32Scores)
+        // Batched slot commit — post-round mtpK/mtpV state is bit-identical to the sequential
+        // path's per-link scatters (stale higher slots masked by the [0..<pos0] slice, same as ever).
+        dec.mtpK[pos0 ..< pos0 + kEff] = stacked(ks, axis: 0)
+        dec.mtpV[pos0 ..< pos0 + kEff] = stacked(vs, axis: 0)
+        return ds
+    }
+    func observe(acceptedLen: Int) {
+        guard adaptiveK else { return }
+        dec.chainEmaL = 0.6 * dec.chainEmaL + 0.4 * Double(acceptedLen)
+    }
+}
+
 extension BASQwen35MTPSpecDecoder {
 
     /// One chain link: the MTP block with attention over `baseK/baseV` (committed slice, shared across the
@@ -175,24 +238,15 @@ extension BASQwen35MTPSpecDecoder {
         // PERSISTED across turns (instance property): the production decoder is cached across turns
         // (MTPDecoderBox), so the regime estimate must survive the call boundary — a local EMA re-paid
         // the 2-3-round optimistic learning tax EVERY 48-token turn (cert take-2: 1.08× < the K=1 1.20×).
-        func adaptedK() -> Int {
-            guard adaptiveK else { return k }
-            // THERMAL TIER (cert take-4): at `fair` the downclocked GPU makes chain overhead net-negative
-            // (0.91-0.99× measured) while K=1 held ~1.2× through the K=1 cert → force K=1; `serious+` is
-            // already planner-gated to plain. Nominal: EMA-driven K ∈ {1,2,3}.
-            if ProcessInfo.processInfo.thermalState != .nominal { return 1 }
-            return chainEmaL >= 1.6 ? min(k, 3) : chainEmaL >= 0.9 ? min(k, 2) : 1
-        }
+        // 案4: the drafting side is a PROVIDER behind BASTrunkDraftProvider — the kernel below is
+        // draft-source-agnostic; regime policy (thermal escape hatch + EMA) lives in the provider.
+        let provider: BASTrunkDraftProvider = BASQwen35ChainDraftProvider(
+            decoder: self, k: k, adaptiveK: adaptiveK, fp32Scores: fp32Scores)
         func draftAndCommit() -> [MLXArray] {
-            // Clamp so chain positions stay inside the MTP KV bound (fp16-exact ≤ 2047 also holds).
-            let kEff = max(1, min(adaptedK(), tCap - pending.count, Self.maxSeq - 1 - hLastPos))
-            let (ds, ks, vs) = fusedChain(
-                k: kEff, firstToken: pending.last!, hidden: hLast, pos0: hLastPos, fp32Scores: fp32Scores)
-            // Batched slot commit — post-round mtpK/mtpV state is bit-identical to the sequential path's
-            // per-link scatters (stale higher slots masked by the [0..<pos0] slice, same as ever).
-            mtpK[hLastPos ..< hLastPos + kEff] = stacked(ks, axis: 0)
-            mtpV[hLastPos ..< hLastPos + kEff] = stacked(vs, axis: 0)
-            return ds
+            // Clamp so chain positions stay inside the provider's KV bound (fp16-exact ≤ 2047 holds).
+            let kEff = max(1, min(provider.preferredK(), tCap - pending.count,
+                                  provider.maxDraftWidth(pos0: hLastPos)))
+            return provider.draft(k: kEff, firstToken: pending.last!, hidden: hLast, pos0: hLastPos)
         }
         // Non-round emissions (prefill / refeed argmaxes) MUST carry entropy too — nil-entropy
         // tokens made the window's fill rhythm depend on ROUND STRUCTURE, which depends on the
@@ -288,7 +342,7 @@ extension BASQwen35MTPSpecDecoder {
             iters += 1
             acceptedTok += L
             proposedTok += kNow
-            if adaptiveK { chainEmaL = 0.6 * chainEmaL + 0.4 * Double(L) }
+            provider.observe(acceptedLen: L)
             var emitted: [Int] = []
             if L == kNow {
                 emitted = Array(amH[(P - 1) ..< (P - 1 + kNow)]) + [amH[T - 1]]   // drafts (== truths) + bonus
