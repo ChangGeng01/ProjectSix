@@ -1,0 +1,58 @@
+import XCTest
+@testable import BASMLXAdapter
+
+/// 案5 gates — the pressure ladder's pure hysteresis machine. Thresholds are fractions of the
+/// RESOLVED cap (缝7); rungs latch on fire and re-arm only a full band above their threshold
+/// (anti-thrash — the U1 design's spill-storm failure mode).
+final class BASPressureLadderTests: XCTestCase {
+
+    private func ladder(cap: Int = 1000) -> BASPressureLadder {
+        BASPressureLadder(config: .init(capBytes: cap))    // thresholds: 150/100/50, band 50
+    }
+
+    func testGradualDescentFiresRungsInOrder() {
+        var l = ladder()
+        XCTAssertNil(l.advise(headroomBytes: 400), "plenty of headroom must be a no-op")
+        XCTAssertEqual(l.advise(headroomBytes: 140), .parkColdSeats)
+        XCTAssertNil(l.advise(headroomBytes: 130), "rung 1 latched — no refire")
+        XCTAssertEqual(l.advise(headroomBytes: 90), .dropSpecDecoder)
+        XCTAssertEqual(l.advise(headroomBytes: 40), .clearAllSessions)
+        XCTAssertNil(l.advise(headroomBytes: 30), "all latched")
+        XCTAssertEqual(l.firedHistory, [.parkColdSeats, .dropSpecDecoder, .clearAllSessions])
+    }
+
+    func testCollapseFiresWorstRungFirst() {
+        var l = ladder()
+        // memory falls straight through every threshold — act at the SEVERE rung (its actuator
+        // subsumes the milder ones); the milder rungs latch too (no pointless follow-up fires).
+        XCTAssertEqual(l.advise(headroomBytes: 30), .clearAllSessions)
+        XCTAssertNil(l.advise(headroomBytes: 25))
+    }
+
+    func testRearmNeedsFullBandAboveThreshold() {
+        var l = ladder()
+        XCTAssertEqual(l.advise(headroomBytes: 140), .parkColdSeats)
+        XCTAssertNil(l.advise(headroomBytes: 160), "inside the re-arm band — still latched")
+        XCTAssertNil(l.advise(headroomBytes: 210), "recovery above threshold+band re-arms silently")
+        XCTAssertEqual(l.advise(headroomBytes: 140), .parkColdSeats,
+                       "re-armed rung fires again on the next descent")
+    }
+
+    func testZeroAndNegativeHeadroomClampSafely() {
+        var l = ladder()
+        XCTAssertEqual(l.advise(headroomBytes: 0), .clearAllSessions)
+        var l2 = ladder()
+        XCTAssertEqual(l2.advise(headroomBytes: -5), .clearAllSessions)
+    }
+
+    func testMacWiringIsInert() async {
+        // Off-iOS the headroom probe is nil ⇒ the adapter's _pressureCheck must be a no-op even
+        // when armed (the ladder is a device lever; Mac tests stay deterministic).
+        #if !os(iOS)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        await adapter._pressureCheck(keeping: nil)
+        let fired = await adapter.pressureLadderTelemetry()
+        XCTAssertTrue(fired.isEmpty)
+        #endif
+    }
+}

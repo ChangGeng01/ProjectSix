@@ -168,13 +168,17 @@ extension MLXOrganAdapter {
         guard descriptor.supportedRoles.contains(request.role) else {
             throw BASOrganError.unsupportedRole(request.role)
         }
+        // 案5: ONE context per turn (thermal + memory headroom sampled once; BAS_DECODE_CTX=1
+        // prints the who-could-throttle line).
+        let ctx = MLXOrganAdapter._decodeContext(purpose: purpose, request: request)
         let strategy = BASDecodeLanePolicy.decodeStrategy(
-            purpose: purpose,
-            temperature: request.preset.temperature,
+            context: ctx,
             capabilities: _decodeCapabilities(),
             profiler: draftProfiler,
-            numDraftTokens: numDraftTokens,
-            thermalThrottled: MLXOrganAdapter._thermalThrottled())
+            numDraftTokens: numDraftTokens)
+        if ProcessInfo.processInfo.environment["BAS_DECODE_CTX"] == "1" {
+            print("[decode-ctx] \(ctx.summary) lane=\(strategy)")
+        }
         return try await _execute(strategy, for: request, purpose: purpose, sessionID: sessionID)
         #else
         return try await _plainDraft(request)

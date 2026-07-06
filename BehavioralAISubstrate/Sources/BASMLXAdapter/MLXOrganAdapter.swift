@@ -1048,12 +1048,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // to the explicit shouldSpeculate decision, which also still serves streamDraft + the prewarm check.
         // The planner is the SOLE production decider for eager decode. The kill-switch (decodePlannerAutoSelect off)
         // now means PURE PLAIN — no acceleration at all (the simplest safe revert), not the legacy spec gate.
+        _pressureCheck(keeping: nil)                     // 案5: between-turn reclaim sample
+        // 案5: ONE context per turn — every decider sees the same facts (and one telemetry line
+        // says who could throttle and why; BAS_DECODE_CTX=1).
+        let ctx = MLXOrganAdapter._decodeContext(purpose: .scoutDefault, request: request)
         let strategy: BASDecodeStrategy = decodePlannerAutoSelect
             ? BASDecodeLanePolicy.decodeStrategy(
-                purpose: .scoutDefault, temperature: request.preset.temperature,
-                capabilities: _decodeCapabilities(), profiler: draftProfiler, numDraftTokens: numDraftTokens,
-                thermalThrottled: MLXOrganAdapter._thermalThrottled())
+                context: ctx, capabilities: _decodeCapabilities(),
+                profiler: draftProfiler, numDraftTokens: numDraftTokens)
             : .plain
+        if ProcessInfo.processInfo.environment["BAS_DECODE_CTX"] == "1" {
+            print("[decode-ctx] \(ctx.summary) lane=\(strategy)")
+        }
         return try await _execute(strategy, for: request, purpose: .scoutDefault)
         #else
         throw BASOrganError.providerUnavailable(
@@ -1177,6 +1183,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let key = Self.sessionKey(sessionID, request.role)
         let dbgS = ProcessInfo.processInfo.environment["BAS_SESSION_DEBUG"] == "1"
         if dbgS { NSLog("[sess-dbg] %@ enter", key) }
+        _pressureCheck(keeping: key)                     // 案5: between-turn reclaim sample
 
         // 案3 (2026-07-06 decode-OS audit): lane election is ONE pure function (_sessionLane) —
         // the three inline guard chains re-deriving route class per turn were the seam-1/4 bug
@@ -1453,12 +1460,59 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             fusedTranscripts.removeValue(forKey: oldest)
             guard let victim = sessions.removeValue(forKey: oldest), Self.sessionSpillEnabled
             else { continue }
-            spillGeneration += 1
-            let hadPending = pendingSpill[oldest] != nil
-            pendingSpill[oldest] = _PendingSpill(box: victim, generation: spillGeneration)
-            if !hadPending {
-                Task { [weak self] in await self?._completePendingSpill(key: oldest) }
-            }
+            _parkPending(oldest, victim)
+        }
+    }
+    /// Shared pending-spill park (缝8a machinery): the ONE way a live box leaves the pool with
+    /// its KV preserved — LRU eviction and the pressure ladder's rung-1 both ride it.
+    private func _parkPending(_ key: String, _ victim: ChatSessionBox) {
+        spillGeneration += 1
+        let hadPending = pendingSpill[key] != nil
+        pendingSpill[key] = _PendingSpill(box: victim, generation: spillGeneration)
+        if !hadPending {
+            Task { [weak self] in await self?._completePendingSpill(key: key) }
+        }
+    }
+    /// 案5 rung-1 actuator: warm-park every pooled seat except `key` (zero inline blocking;
+    /// a reclaim-while-pending returns the live box — the certified seam-8a semantics).
+    func _spillEvictAll(except key: String?) {
+        for k in sessions.keys where k != key {
+            sessionLRU.removeAll { $0 == k }
+            fusedTranscripts.removeValue(forKey: k)
+            guard let victim = sessions.removeValue(forKey: k), Self.sessionSpillEnabled
+            else { continue }
+            _parkPending(k, victim)
+        }
+    }
+
+    // MARK: - 案5 pressure ladder (BAS_PRESSURE_LADDER=1, opt-in per ADR-014)
+
+    nonisolated static var pressureLadderEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_PRESSURE_LADDER"] == "1"
+    }
+    var pressureLadder: BASPressureLadder? = nil
+    var ladderFired: [Int] = []
+    func pressureLadderTelemetry() -> [Int] { ladderFired }
+    func _specDecoderResident() -> Bool { mtpDecoderBox != nil }
+    /// Between-turn sample → graduated reclaim. Never called from inside a decode loop.
+    func _pressureCheck(keeping key: String?) {
+        guard Self.pressureLadderEnabled else { return }
+        guard let headroom = Self._memoryHeadroomBytes() else { return }
+        if pressureLadder == nil {
+            guard let cap = BASMLXMemoryModel.resolvedActiveHardCapBytes() else { return }
+            pressureLadder = BASPressureLadder(config: .init(capBytes: cap))
+        }
+        guard let rung = pressureLadder!.advise(headroomBytes: headroom) else { return }
+        ladderFired.append(rung.rawValue)
+        print("📊 pressure-ladder rung=\(rung.rawValue)(\(rung)) headroom=\(headroom / (1024 * 1024))MB")
+        switch rung {
+        case .parkColdSeats:
+            _spillEvictAll(except: key)
+        case .dropSpecDecoder:
+            mtpDecoderBox = nil                          // ~300MB; lazily re-quantized later
+        case .clearAllSessions:
+            clearAllSessions()                           // survival over warmth
+            setGPUCacheLimit(bytes: 256 * 1024 * 1024)
         }
     }
     /// Drain the pending-spill entry for `key` (looping across supersessions; actor-reentrant).

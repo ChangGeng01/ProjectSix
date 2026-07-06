@@ -260,6 +260,29 @@ extension MLXOrganAdapter {
         return diffProbeBox
     }
 
+    /// 案5: process memory headroom (bytes until the jetsam cap) — the DecodeContext / pressure
+    /// ladder feed. nil off-iOS (macOS has no per-process jetsam semantics).
+    nonisolated static func _memoryHeadroomBytes() -> Int? {
+        #if os(iOS)
+        let a = os_proc_available_memory()
+        return a > 0 ? Int(a) : nil
+        #else
+        return nil
+        #endif
+    }
+
+    /// 案5: assemble the per-turn decode context ONCE (thermal sampled here; the fused chain's
+    /// per-round re-read stays as the certified in-flight escape hatch).
+    nonisolated static func _decodeContext(
+        purpose: BASDecodeLanePolicy.Purpose, request: BASOrganRequest
+    ) -> BASDecodeContext {
+        BASDecodeContext(
+            purpose: purpose, temperature: request.preset.temperature,
+            maxOutputTokens: request.maxOutputTokens,
+            thermalThrottled: _thermalThrottled(),
+            memoryHeadroomBytes: _memoryHeadroomBytes())
+    }
+
     /// Thermal throttle probe for the planner gate (cert finding: MTP is net-negative under serious+).
     nonisolated static func _thermalThrottled() -> Bool {
         // Test/probe seam — can only FORCE the conservative direction, never defeat the gate.

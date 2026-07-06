@@ -61,6 +61,7 @@
 		B4D1F2A4B5C6D7E8F9A0B1C2 /* BASSustainedDecodeDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E2A3B5C6D7E8F9A0B1C2D3 /* BASSustainedDecodeDeviceTests.swift */; };
 		D6F3A4B5C6D7E8F9A0B1C2D4 /* BASSessionSpillEnduranceDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A4B5C6D7E8F9A0B1C2D3E5 /* BASSessionSpillEnduranceDeviceTests.swift */; };
 		F8B5C6D7E8F9A0B1C2D3E4F6 /* BASKVPersistDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C6D7E8F9A0B1C2D3E4F5A7 /* BASKVPersistDeviceTests.swift */; };
+		1A2B3C4D5E6F708192A3B4C8 /* BASPressureLadderDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192A3B4C7 /* BASPressureLadderDeviceTests.swift */; };
 		1A2B3C4D5E6F708192A3B4C6 /* BASSeam8Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192A3B4C5 /* BASSeam8Tests.swift */; };
 		1A2B3C4D5E6F708192A3B4C4 /* BASSessionThermalGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192A3B4C3 /* BASSessionThermalGateTests.swift */; };
 		1A2B3C4D5E6F708192A3B4C2 /* BASJetsamCapResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192A3B4C1 /* BASJetsamCapResolutionTests.swift */; };
@@ -1954,6 +1955,7 @@
 		C5E2A3B5C6D7E8F9A0B1C2D3 /* BASSustainedDecodeDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSustainedDecodeDeviceTests.swift; sourceTree = "<group>"; };
 		E7A4B5C6D7E8F9A0B1C2D3E5 /* BASSessionSpillEnduranceDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSessionSpillEnduranceDeviceTests.swift; sourceTree = "<group>"; };
 		A9C6D7E8F9A0B1C2D3E4F5A7 /* BASKVPersistDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASKVPersistDeviceTests.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F708192A3B4C7 /* BASPressureLadderDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASPressureLadderDeviceTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F708192A3B4C5 /* BASSeam8Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSeam8Tests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F708192A3B4C3 /* BASSessionThermalGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASSessionThermalGateTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F708192A3B4C1 /* BASJetsamCapResolutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BASJetsamCapResolutionTests.swift; sourceTree = "<group>"; };
@@ -3259,6 +3261,7 @@
 				C5E2A3B5C6D7E8F9A0B1C2D3 /* BASSustainedDecodeDeviceTests.swift */,
 				E7A4B5C6D7E8F9A0B1C2D3E5 /* BASSessionSpillEnduranceDeviceTests.swift */,
 				A9C6D7E8F9A0B1C2D3E4F5A7 /* BASKVPersistDeviceTests.swift */,
+				1A2B3C4D5E6F708192A3B4C7 /* BASPressureLadderDeviceTests.swift */,
 				1A2B3C4D5E6F708192A3B4C5 /* BASSeam8Tests.swift */,
 				1A2B3C4D5E6F708192A3B4C3 /* BASSessionThermalGateTests.swift */,
 				1A2B3C4D5E6F708192A3B4C1 /* BASJetsamCapResolutionTests.swift */,
@@ -4946,6 +4949,7 @@
 				B4D1F2A4B5C6D7E8F9A0B1C2 /* BASSustainedDecodeDeviceTests.swift in Sources */,
 				D6F3A4B5C6D7E8F9A0B1C2D4 /* BASSessionSpillEnduranceDeviceTests.swift in Sources */,
 				F8B5C6D7E8F9A0B1C2D3E4F6 /* BASKVPersistDeviceTests.swift in Sources */,
+				1A2B3C4D5E6F708192A3B4C8 /* BASPressureLadderDeviceTests.swift in Sources */,
 				1A2B3C4D5E6F708192A3B4C6 /* BASSeam8Tests.swift in Sources */,
 				1A2B3C4D5E6F708192A3B4C4 /* BASSessionThermalGateTests.swift in Sources */,
 				1A2B3C4D5E6F708192A3B4C2 /* BASJetsamCapResolutionTests.swift in Sources */,
