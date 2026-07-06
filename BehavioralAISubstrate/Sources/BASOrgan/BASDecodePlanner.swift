@@ -5,6 +5,13 @@ import Foundation
 public struct BASDecodeCapabilities: Sendable, Equatable {
     /// A valid same-family draft model is loaded AND speculation is live (the `shouldSpeculate` precondition).
     public let draftModelLoaded: Bool
+    /// 缝6 (2026-07-06 audit): the draft-model lane's TWO protective gates were structurally inert —
+    /// `_draftSpeculative` surfaces no accept telemetry (the 2.7 break-even floor stays cold forever)
+    /// and `topTokenEntropy` is nil at every production call site (the 3.0-bit gate never evaluates).
+    /// A host loading a draft model would route greedy free-form straight into the device-measured
+    /// 0.88× LOSS with both guards armed on paper. Until accept-stat plumbing exists this stays
+    /// false and the planner refuses the lane BY CONSTRUCTION (the honest negative, enforced).
+    public let draftModelTelemetryAvailable: Bool
     /// A CoreAI Mamba speculator is injected / available for the Saguaro lane.
     public let saguaroAvailable: Bool
     /// The main model is loaded, so the model-free (prompt-lookup / cross-turn) loop can run.
@@ -15,11 +22,12 @@ public struct BASDecodeCapabilities: Sendable, Equatable {
     public let mtpHeadLoaded: Bool
 
     public init(draftModelLoaded: Bool, saguaroAvailable: Bool, modelFreeAvailable: Bool,
-                mtpHeadLoaded: Bool = false) {
+                mtpHeadLoaded: Bool = false, draftModelTelemetryAvailable: Bool = false) {
         self.mtpHeadLoaded = mtpHeadLoaded
         self.draftModelLoaded = draftModelLoaded
         self.saguaroAvailable = saguaroAvailable
         self.modelFreeAvailable = modelFreeAvailable
+        self.draftModelTelemetryAvailable = draftModelTelemetryAvailable
     }
 }
 
@@ -114,7 +122,9 @@ extension BASDecodeLanePolicy {
         // draft-model spec is a VALID accelerator for ANY greedy turn (byte-identical, no per-round scan tax), so it
         // is NOT purpose-gated — matching the legacy `draft()`, which spec'd regardless of elect (Option-3: select any
         // valid accelerator; plain only when none is).
-        if capabilities.draftModelLoaded {
+        // 缝6: BOTH bits required — a loaded draft model with no accept telemetry is a lane whose
+        // break-even floor can never bite (the June device verdict: free-form 0.88× net loss).
+        if capabilities.draftModelLoaded && capabilities.draftModelTelemetryAvailable {
             candidates.append((
                 .draftModelSpec(numDraftTokens: profiler.recommendedK(
                     sourceID: BASDecodeStrategy.draftModelID, purpose: purpose, cap: numDraftTokens)),

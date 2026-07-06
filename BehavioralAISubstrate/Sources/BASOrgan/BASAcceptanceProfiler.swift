@@ -15,6 +15,10 @@ public struct BASAcceptanceProfiler: Sendable, Equatable {
         /// EMA of accepted draft tokens per round (the speedup signal; drives `recommendedK`).
         public let emaAccepted: Double
         /// EMA of accepted/proposed (the hit-rate; drives the `worthSpeculating` fallback decision).
+        /// UNIT CONTRACT (缝5, 2026-07-06): `proposed` is TRUE proposed draft tokens on EVERY lane
+        /// (fused MTP folds Σ kEff per round, not rounds) ⇒ emaHitRate ≤ 1 by construction. The
+        /// per-round-calibrated floors (0.15 collapse / 0.60 sampling break-even / 2.7 draft-model)
+        /// read `emaAccepted` — a DIFFERENT currency (accepted per round, may exceed 1).
         public let emaHitRate: Double
         /// Number of folded observations (rounds-bearing turns) — distinguishes cold from warm.
         public let observations: Int

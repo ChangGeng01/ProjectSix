@@ -23,6 +23,7 @@ extension MLXOrganAdapter {
         let body: String
         let accepted: Int
         let rounds: Int
+        let proposed: Int
         let box: MTPDecoderBox
         var thermalFallback: Bool = false
     }
@@ -31,7 +32,7 @@ extension MLXOrganAdapter {
     /// Throws (e.g. `notQwen35`, missing weights) — the executor fail-closes to `_plainDraft`.
     func _generateMTPSpec(
         for request: BASOrganRequest, sampling: Bool = false
-    ) async throws -> (draft: BASOrganDraft, accepted: Int, rounds: Int) {
+    ) async throws -> (draft: BASOrganDraft, accepted: Int, rounds: Int, proposed: Int) {
         guard let container = _loadedContainerForStreaming() else {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before an accelerated draft"))
@@ -70,12 +71,13 @@ extension MLXOrganAdapter {
             }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
-                accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec))
+                accepted: r.accepted, rounds: r.iterations, proposed: r.proposed,
+                box: MTPDecoderBox(decoder: dec))
         }
         mtpDecoderBox = raw.box                                    // cache across turns (init quantizes ~300MB)
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
-        return (draft, raw.accepted, raw.rounds)
+        return (draft, raw.accepted, raw.rounds, raw.proposed)
     }
     /// PRODUCTION deep-K election (2026-07-03, the fused-chain campaign): the greedy `.mtpSpec` lane runs the
     /// FUSED chain with ADAPTIVE K ≤ 3 — endurance-cert finding: chain acceptance is workload-dependent
@@ -97,7 +99,7 @@ extension MLXOrganAdapter {
     /// (same Chat.Message → UserInput machinery as ChatSession ⇒ zero template drift).
     func _generateMTPSpecFromMessages(
         _ transcript: [(role: String, text: String)], for request: BASOrganRequest
-    ) async throws -> (draft: BASOrganDraft, accepted: Int, rounds: Int) {
+    ) async throws -> (draft: BASOrganDraft, accepted: Int, rounds: Int, proposed: Int) {
         guard let container = _loadedContainerForStreaming() else {
             throw BASOrganError.providerUnavailable(
                 reason: MLXOrganAdapter.notLoadedReason("loadModel(...) before an accelerated draft"))
@@ -145,14 +147,14 @@ extension MLXOrganAdapter {
             }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
-                accepted: r.accepted, rounds: r.iterations, box: MTPDecoderBox(decoder: dec),
-                thermalFallback: thermalFallback)
+                accepted: r.accepted, rounds: r.iterations, proposed: r.proposed,
+                box: MTPDecoderBox(decoder: dec), thermalFallback: thermalFallback)
         }
         mtpDecoderBox = raw.box
         if raw.thermalFallback { sessionThermalFallbackCount += 1 }
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
-        return (draft, raw.accepted, raw.rounds)
+        return (draft, raw.accepted, raw.rounds, raw.proposed)
     }
 
     /// `sending`-annotated transcript prepare (the `_buildLMInput` pattern — the LMInput must cross

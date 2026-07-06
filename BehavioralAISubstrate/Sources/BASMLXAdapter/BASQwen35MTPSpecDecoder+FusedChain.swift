@@ -145,6 +145,7 @@ extension BASQwen35MTPSpecDecoder {
         var pending: [Int] = [t0Tok]
         var out: [Int] = []
         var acceptedTok = 0, iters = 0
+        var proposedTok = 0
         var hitEOS = false
         func emit(_ tok: Int) -> Bool {
             if eosTokens.contains(tok) { hitEOS = true; return false }
@@ -274,6 +275,7 @@ extension BASQwen35MTPSpecDecoder {
             let entH = traceActive ? host[(T + 1)...].map(Int.init) : []   // millinats per row
             iters += 1
             acceptedTok += L
+            proposedTok += kNow
             if adaptiveK { chainEmaL = 0.6 * chainEmaL + 0.4 * Double(L) }
             var emitted: [Int] = []
             if L == kNow {
@@ -303,9 +305,10 @@ extension BASQwen35MTPSpecDecoder {
                 // stream state with ONE refeed of everything not in cache. Runs at most once per
                 // generation (one-shot latch); the refeed may exceed tCap's qmv width — a single
                 // qmm-regime forward per fire is accepted (correctness-identical forward class).
-                // Known skew (review LOW-4): acceptedTok counted the full prefix L but emitted tokens
-                // past closeAt are discarded — Run.accepted over-counts by ≤ kNow−closeAt−1, once per
-                // generation; immaterial to the acceptance profiler's EMA.
+                // 缝5 (2026-07-06): the round credited the full prefix L, but emitted tokens past
+                // closeAt are DISCARDED — return them so Run.accepted is exact (the old LOW-4
+                // 'immaterial' skew still fed the profiler EMA the 0.15 collapse floor reads).
+                acceptedTok -= max(0, L - min(closeAt + 1, L))
                 tracePolicy?.markForcedClose()
                 traceTel = BASTraceExitTelemetry(
                     reason: reason, thinkTokensAtExit: tracePolicy?.thinkTokens ?? 0,
@@ -346,7 +349,8 @@ extension BASQwen35MTPSpecDecoder {
                          dbgSlow, dbgChainMs / Double(max(iters, 1)), dbgVerifyMs / Double(max(iters, 1)), iters))
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0),
-                   accepted: acceptedTok, iterations: iters, traceExit: traceTel)
+                   accepted: acceptedTok, iterations: iters, proposed: proposedTok,
+                   traceExit: traceTel)
     }
 }
 #endif

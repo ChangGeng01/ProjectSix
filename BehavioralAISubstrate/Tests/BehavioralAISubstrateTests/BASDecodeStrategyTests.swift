@@ -11,10 +11,10 @@ import XCTest
 final class BASDecodeStrategyTests: XCTestCase {
 
     typealias P = BASDecodeLanePolicy.Purpose
-    private let all = BASDecodeCapabilities(draftModelLoaded: true, saguaroAvailable: true, modelFreeAvailable: true)
+    private let all = BASDecodeCapabilities(draftModelLoaded: true, saguaroAvailable: true, modelFreeAvailable: true, draftModelTelemetryAvailable: true)
     private let mfOnly = BASDecodeCapabilities(draftModelLoaded: false, saguaroAvailable: false, modelFreeAvailable: true)
     private let nothing = BASDecodeCapabilities(draftModelLoaded: false, saguaroAvailable: false, modelFreeAvailable: false)
-    private let draftOnly = BASDecodeCapabilities(draftModelLoaded: true, saguaroAvailable: false, modelFreeAvailable: false)
+    private let draftOnly = BASDecodeCapabilities(draftModelLoaded: true, saguaroAvailable: false, modelFreeAvailable: false, draftModelTelemetryAvailable: true)
 
     private func plan(_ purpose: P, _ temp: Double, _ caps: BASDecodeCapabilities,
                       _ prof: BASAcceptanceProfiler = BASAcceptanceProfiler(), k: Int = 4) -> BASDecodeStrategy {
@@ -155,6 +155,24 @@ final class BASDecodeStrategyTests: XCTestCase {
         switch planH(.factual, all, 5.0) {
         case .promptLookup, .suffixLookup: break   // model-free fallback — correct
         case let s: XCTFail("high entropy + .factual + model-free available → model-free lane, got \(s)")
+        }
+    }
+}
+
+/// 缝6 (2026-07-06 audit): a loaded draft model WITHOUT accept telemetry must be refused BY
+/// CONSTRUCTION — its 2.7 break-even floor is cold forever and its entropy gate never evaluates,
+/// so electing it routes greedy free-form into the device-measured 0.88× loss unguarded.
+extension BASDecodeStrategyTests {
+    func testDraftModelWithoutTelemetryIsStructurallyRefused() {
+        let inert = BASDecodeCapabilities(
+            draftModelLoaded: true, saguaroAvailable: false, modelFreeAvailable: false)
+        for purpose in BASDecodeLanePolicy.Purpose.allCases {
+            let s = BASDecodeLanePolicy.decodeStrategy(
+                purpose: purpose, temperature: 0, capabilities: inert,
+                profiler: BASAcceptanceProfiler(), numDraftTokens: 8)
+            if case .draftModelSpec = s {
+                XCTFail("telemetry-less draft model elected on \(purpose) — both gates are inert")
+            }
         }
     }
 }

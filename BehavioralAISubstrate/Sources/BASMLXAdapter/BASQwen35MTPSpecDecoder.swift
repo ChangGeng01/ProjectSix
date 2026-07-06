@@ -295,15 +295,21 @@ public final class BASQwen35MTPSpecDecoder {
         public let decodeSeconds: Double
         public let accepted: Int
         public let iterations: Int
+        /// 缝5 (2026-07-06 audit): TRUE proposed-draft-token count. The profiler's emaHitRate is
+        /// accepted/proposed — folding rounds as "proposed" put the fused lane's hit-rate on a
+        /// 0-3 scale in the same ledger as the model-free lanes' ≤1 scale (three currencies, one
+        /// floor). 0 = the lane predates the field / proposes nothing (plain).
+        public let proposed: Int
         /// B3 trace early-exit: non-nil iff the stop rule fired this run (fused lane, opt-in).
         public let traceExit: BASTraceExitTelemetry?
 
         init(tokens: [Int], decodeSeconds: Double, accepted: Int, iterations: Int,
-             traceExit: BASTraceExitTelemetry? = nil) {
+             proposed: Int = 0, traceExit: BASTraceExitTelemetry? = nil) {
             self.tokens = tokens
             self.decodeSeconds = decodeSeconds
             self.accepted = accepted
             self.iterations = iterations
+            self.proposed = proposed
             self.traceExit = traceExit
         }
     }
@@ -485,7 +491,7 @@ public final class BASQwen35MTPSpecDecoder {
             ds = draftChain()
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0),
-                   accepted: acceptedTok, iterations: iters)
+                   accepted: acceptedTok, iterations: iters, proposed: iters)
     }
 
     /// K=1 MTP speculative greedy decode with CARRY-FORWARD REJECT: certain-but-uncommitted tokens ride a
@@ -623,7 +629,7 @@ public final class BASQwen35MTPSpecDecoder {
                 pending.append(r)
             }
         }
-        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters)
+        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters, proposed: iters)
     }
 
     /// Production entry: EOS-aware (stops BEFORE emitting an eos token — matching the plain lanes' semantics).
@@ -710,6 +716,6 @@ public final class BASQwen35MTPSpecDecoder {
                 embedNext: model.embedding(MLXArray([Int32(pending.last!)]))[0], hidden: hLast, pos: hLastPos))
             if forceRejectForDiagnostics { d = MLXArray(Int32(0)) }
         }
-        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters)
+        return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters, proposed: iters)
     }
 }

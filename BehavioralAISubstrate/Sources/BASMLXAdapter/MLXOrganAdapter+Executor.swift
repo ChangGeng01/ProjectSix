@@ -42,9 +42,10 @@ extension MLXOrganAdapter {
         case .mtpSpecSampling:
             do {
                 let g = try await _generateMTPSpec(for: request, sampling: true)
+                // 缝5: TRUE proposed (K=1 ⇒ equals rounds here, but the field is now honest).
                 draftProfiler = draftProfiler.observing(
                     sourceID: BASDecodeStrategy.mtpSpecSamplingID, purpose: purpose,
-                    accepted: g.accepted, proposed: g.rounds, rounds: g.rounds)
+                    accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
                 return g.draft
             } catch {
                 print("[mtp-spec-sampling] lane fail-closed to plain: \(error)")
@@ -59,9 +60,13 @@ extension MLXOrganAdapter {
                 let g = try await _generateMTPSpec(for: request)
                 // LIVE acceptance telemetry (checklist trap #2: the draft-model lane's cold-forever gap must not
                 // be replicated) — the planner's 0.15 floor bites on real stats.
+                // 缝5 (2026-07-06 audit): fold TRUE proposed tokens (Σ kEff per round) — folding
+                // rounds put the fused lane's emaHitRate on a 0-3 scale in the same ledger as the
+                // model-free lanes' ≤1 (three currencies, one 0.05 floor). The per-round floors
+                // (0.15/0.60) read emaAccepted and are untouched — calibration preserved.
                 draftProfiler = draftProfiler.observing(
                     sourceID: BASDecodeStrategy.mtpSpecID, purpose: purpose,
-                    accepted: g.accepted, proposed: g.rounds, rounds: g.rounds)
+                    accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
                 return g.draft
             } catch {
                 print("[mtp-spec] lane fail-closed to plain: \(error)")
