@@ -372,7 +372,16 @@ public struct BASEBrainRuntimeCoordinator {
         self.memoryEventLog = memoryEventLog
         self.memoryMutationEventEmitter =
             memoryMutationEventEmitter
-        self.modelHonestyObservationSink = modelHonestyObservationSink
+        // 触发器①落地 (2026-07-07, operator order "把三轴 band 打进每轮日志"): when the host
+        // provides no sink, BAS_HONESTY_OBSERVE=1 arms the DEFAULT log-line consumer — one 🪞
+        // line per turn to the operator's log stream (the named reader; zero disk, OBSERVE lane
+        // semantics unchanged). Env unset ⇒ nil ⇒ nothing computed, byte-equal as before.
+        if modelHonestyObservationSink == nil,
+           ProcessInfo.processInfo.environment["BAS_HONESTY_OBSERVE"] == "1" {
+            self.modelHonestyObservationSink = { print($0.summaryLine) }
+        } else {
+            self.modelHonestyObservationSink = modelHonestyObservationSink
+        }
         self.projectionBlockEmissionHandler =
             projectionBlockEmissionHandler
         self.agentFabric = agentFabric

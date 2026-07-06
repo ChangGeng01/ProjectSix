@@ -1307,12 +1307,16 @@ extension BASEBrainRuntimeCoordinator {
         // Side-emission only: it never touches `renderedOutput`, the sovereign verdict, or the result, so the
         // canonical turn output is unchanged. Closes the "sycophancy is structurally invisible" gap.
         if let modelHonestyObservationSink {
+            let scored = renderedOutput.headline + "\n" + renderedOutput.body
             modelHonestyObservationSink(BASModelHonestyObservationRecord(
                 eventID: "\(derivedSessionID)#\(derivedTurnID)#model-honesty",
                 sessionID: derivedSessionID,
                 turnID: derivedTurnID,
-                axes: BASModelHonestySignal.axes(renderedOutput.headline + "\n" + renderedOutput.body),
-                observedAtMs: Int64((runtimeTrace.recordedAt.timeIntervalSince1970 * 1000).rounded())))
+                axes: BASModelHonestySignal.axes(scored),
+                observedAtMs: Int64((runtimeTrace.recordedAt.timeIntervalSince1970 * 1000).rounded()),
+                // 触发器①: CJK-dominant bodies are unreadable by the English lexicons — flag it
+                // so every consumer renders n/a(zh) instead of a false-green "ok".
+                lexiconApplicable: BASModelHonestySignal.lexiconApplicable(to: scored)))
         }
         let wakeIntent = buildWakeIntent(
             request: request,

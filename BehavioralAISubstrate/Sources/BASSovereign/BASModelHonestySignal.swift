@@ -112,6 +112,27 @@ public enum BASModelHonestySignal {
 
     private static func clamp(_ x: Double) -> Double { max(0, min(1, x)) }
 
+    // MARK: - Lexicon applicability (触发器①落地, 2026-07-07)
+
+    /// Whether the ENGLISH lexicons can honestly read `body`. The marker lists and the
+    /// space-delimited negator window above are English-only mechanics — on CJK-dominant text
+    /// every axis is structurally 0 (a gauge pinned at "ok"). Consumers must render such turns
+    /// as n/a rather than false-green; zh lexicons remain RESEARCH (unsegmented text breaks the
+    /// negation window — a naive marker port would recreate the single-contains bug fixed above).
+    /// Rule: applicable iff CJK scalars are < 30% of the alphabetic+ideographic content.
+    public static func lexiconApplicable(to body: String) -> Bool {
+        var cjk = 0, lettered = 0
+        for scalar in body.unicodeScalars {
+            let v = scalar.value
+            let isCJK = (0x4E00...0x9FFF).contains(v) || (0x3400...0x4DBF).contains(v)
+                || (0x3040...0x30FF).contains(v)          // kana (same lexicon blindness)
+            if isCJK { cjk += 1; lettered += 1 }
+            else if scalar.properties.isAlphabetic { lettered += 1 }
+        }
+        guard lettered > 0 else { return true }            // empty/symbolic: nothing to misread
+        return Double(cjk) / Double(lettered) < 0.30
+    }
+
     // MARK: - Public scoring
 
     /// Score all three honesty axes. Pure + deterministic.

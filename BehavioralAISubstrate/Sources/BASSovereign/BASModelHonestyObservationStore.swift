@@ -26,13 +26,18 @@ public struct BASModelHonestyObservationRecord: Sendable, Equatable, Codable {
     public let hedgingBand: BASModelHonestySignal.Band
     public let overclaimBand: BASModelHonestySignal.Band
     public let observedAtMs: Int64
+    /// 触发器①: whether the English lexicons could honestly read the scored body (false on
+    /// CJK-dominant turns — consumers MUST render n/a(zh), never a false-green "ok").
+    /// Additive: old serialized records decode as `true` (they predate the flag).
+    public let lexiconApplicable: Bool
 
     public init(
         eventID: String,
         sessionID: String,
         turnID: String,
         axes: BASModelHonestySignal.Axes,
-        observedAtMs: Int64
+        observedAtMs: Int64,
+        lexiconApplicable: Bool = true
     ) {
         self.eventID = eventID
         self.sessionID = sessionID
@@ -44,6 +49,33 @@ public struct BASModelHonestyObservationRecord: Sendable, Equatable, Codable {
         self.hedgingBand = axes.hedgingBand
         self.overclaimBand = axes.overclaimBand
         self.observedAtMs = observedAtMs
+        self.lexiconApplicable = lexiconApplicable
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        eventID = try c.decode(String.self, forKey: .eventID)
+        sessionID = try c.decode(String.self, forKey: .sessionID)
+        turnID = try c.decode(String.self, forKey: .turnID)
+        flattery = try c.decode(Double.self, forKey: .flattery)
+        hedging = try c.decode(Double.self, forKey: .hedging)
+        overclaim = try c.decode(Double.self, forKey: .overclaim)
+        flatteryBand = try c.decode(BASModelHonestySignal.Band.self, forKey: .flatteryBand)
+        hedgingBand = try c.decode(BASModelHonestySignal.Band.self, forKey: .hedgingBand)
+        overclaimBand = try c.decode(BASModelHonestySignal.Band.self, forKey: .overclaimBand)
+        observedAtMs = try c.decode(Int64.self, forKey: .observedAtMs)
+        lexiconApplicable = try c.decodeIfPresent(Bool.self, forKey: .lexiconApplicable) ?? true
+    }
+
+    /// 触发器①的署名消费者面 — THE per-turn honesty line (one line, grep-friendly, zero disk;
+    /// the operator's log stream is the reader). n/a(zh) keeps the gauge honest on turns the
+    /// English lexicons cannot read.
+    public var summaryLine: String {
+        func render(_ band: BASModelHonestySignal.Band) -> String {
+            lexiconApplicable ? band.rawValue : "n/a(zh)"
+        }
+        return "🪞 honesty id=\(sessionID)#\(turnID) flattery=\(render(flatteryBand)) "
+            + "hedging=\(render(hedgingBand)) overclaim=\(render(overclaimBand))"
     }
 }
 
