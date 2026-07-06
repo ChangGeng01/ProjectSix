@@ -330,7 +330,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// precedent; per-session KV for turn-shaped seat traffic is ~4-8MB — 16 sessions ≈ well under the
     /// dual-residency budget's slack.
     private var sessionLRU: [String] = []
-    static let maxLiveSessions = 16
+    static let maxLiveSessions =
+        Int(ProcessInfo.processInfo.environment["BAS_MAX_LIVE_SESSIONS"] ?? "") ?? 16
 
     /// 会话→加速lane (P2 gap #3, device-measured crossover 2026-07-04): greedy seat turns with SHORT
     /// histories run the STATELESS fused-MTP path (re-prefill whole conversation + 30 tok/s decode) —
@@ -1207,6 +1208,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let box: ChatSessionBox
         if let existing = sessions[key] {
             box = existing
+        } else if let restored = await _restoreFromSpill(key: key, container: container) {
+            box = restored                                  // B5: warm-start from the spill file
+            sessions[key] = restored
         } else {
             let fresh = ChatSession(
                 container,
@@ -1224,10 +1228,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // evict the least-recently-used session beyond the cap (its KV frees with the ChatSession).
         sessionLRU.removeAll { $0 == key }
         sessionLRU.append(key)
-        while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
-            sessionLRU.removeFirst()
-            sessions.removeValue(forKey: oldest)
-        }
+        await _evictBeyondCap()
 
         let prompt = Self.prompt(for: request)
         // P2 gap #5: bounded-concurrency gate around the decode (see maxConcurrentSessionDecodes).
@@ -1306,16 +1307,51 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _sessionBox(sessionID: String, role: BASOrganRole) -> ChatSessionBox? {
         sessions[Self.sessionKey(sessionID, role)]
     }
+    /// B5 spill lane (BAS_SESSION_SPILL=1): LRU-evicted sessions snapshot to Caches instead of
+    /// losing their KV; a session miss tries the spill file before re-prefilling from scratch.
+    nonisolated static var sessionSpillEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_SESSION_SPILL"] == "1"
+    }
+    nonisolated static func _spillURL(forKey key: String) -> URL {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("bas_session_spill", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent(
+            key.replacingOccurrences(of: "#", with: "_") + ".safetensors")
+    }
+    /// Evict past the LRU cap, spilling each victim when the lane is armed (fp16-exact snapshots;
+    /// a failed spill just falls back to the old drop-the-KV behavior).
+    func _evictBeyondCap() async {
+        while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
+            sessionLRU.removeFirst()
+            if let victim = sessions.removeValue(forKey: oldest), Self.sessionSpillEnabled {
+                _ = try? await Self._persist(victim, url: Self._spillURL(forKey: oldest),
+                                             quantizeKV: false)
+            }
+        }
+    }
+    /// Try to warm-restore `key` from its spill file (one-shot: the file is consumed).
+    func _restoreFromSpill(key: String, container: ModelContainer) async -> ChatSessionBox? {
+        guard Self.sessionSpillEnabled else { return nil }
+        let url = Self._spillURL(forKey: key)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        struct CacheBox: @unchecked Sendable { let cache: [KVCache] }
+        guard let box: CacheBox = try? await container.perform({ ctx in
+            let fresh = ctx.model.newCache(parameters: nil)
+            _ = try BASSessionKVStore.restore(into: fresh, from: url)
+            for c in fresh { eval(c.innerState()) }
+            return CacheBox(cache: fresh)
+        }) else { return nil }
+        try? FileManager.default.removeItem(at: url)
+        return ChatSessionBox(session: ChatSession(container, instructions: nil, cache: box.cache))
+    }
     /// B5: install a (restored) session under the key, honoring the pool's LRU bound.
-    func _installSession(_ session: ChatSession, sessionID: String, role: BASOrganRole) {
+    func _installSession(_ session: ChatSession, sessionID: String, role: BASOrganRole) async {
         let key = Self.sessionKey(sessionID, role)
         sessions[key] = ChatSessionBox(session: session)
         sessionLRU.removeAll { $0 == key }
         sessionLRU.append(key)
-        while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
-            sessionLRU.removeFirst()
-            sessions.removeValue(forKey: oldest)
-        }
+        await _evictBeyondCap()
     }
 
     /// Drop the `ChatSession` keyed by `sessionID` for both roles.

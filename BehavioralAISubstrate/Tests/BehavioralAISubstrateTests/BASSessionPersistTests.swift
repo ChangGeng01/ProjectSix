@@ -47,4 +47,42 @@ final class BASSessionPersistTests: XCTestCase {
         throw XCTSkip("MLXLLM unavailable")
         #endif
     }
+
+    /// B5 promotion — the LRU-SPILL lane e2e (BAS_SESSION_SPILL_TEST=1; requires the env seams
+    /// BAS_SESSION_SPILL=1 and BAS_MAX_LIVE_SESSIONS=1 set by the runner): seat A seeds a fact,
+    /// seat B evicts A (cap 1 ⇒ spill to Caches), seat A returns and must remember the fact via
+    /// the spill warm-restore — no transcript, no re-prefill.
+    func testLRUSpillRoundtrip() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_SESSION_SPILL_TEST"] == "1" else {
+            throw XCTSkip("set BAS_SESSION_SPILL_TEST=1 BAS_SESSION_SPILL=1 BAS_MAX_LIVE_SESSIONS=1")
+        }
+        #if canImport(MLXLLM)
+        XCTAssertEqual(MLXOrganAdapter.maxLiveSessions, 1, "runner must set BAS_MAX_LIVE_SESSIONS=1")
+        XCTAssertTrue(MLXOrganAdapter.sessionSpillEnabled, "runner must set BAS_SESSION_SPILL=1")
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        try await adapter.loadModel()
+        func turn(_ sid: String, _ text: String) async throws -> String {
+            try await adapter.draft(BASOrganRequest(
+                requestID: "spill-\(abs(text.hashValue))", role: .core, preset: .greedyDeterministic,
+                instruction: text, maxOutputTokens: 64, sessionID: sid)).body
+        }
+        print("[spill] model loaded, turn A…"); fflush(stdout)
+        _ = try await turn("seatA", "My name is Quilliam and I breed axolotls. Reply with just: OK.")
+        print("[spill] turn A done, turn B (evicts A)…"); fflush(stdout)
+        _ = try await turn("seatB", "Say hello in three words.")     // evicts A → spill
+        print("[spill] turn B done"); fflush(stdout)
+        let spillURL = MLXOrganAdapter._spillURL(forKey: "seatA#core")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: spillURL.path),
+                      "eviction must have spilled seat A")
+        print("[spill] spill file present, seat A returns…"); fflush(stdout)
+        let back = try await turn("seatA", "What is my name? One word.")
+        print("[spill] seat A returns: \(back.prefix(100))")
+        XCTAssertTrue(back.localizedCaseInsensitiveContains("Quilliam"),
+                      "spill warm-restore lost the context")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: spillURL.path),
+                       "spill file must be consumed on restore")
+        #else
+        throw XCTSkip("MLXLLM unavailable")
+        #endif
+    }
 }

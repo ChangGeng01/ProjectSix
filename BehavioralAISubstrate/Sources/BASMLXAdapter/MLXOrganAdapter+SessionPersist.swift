@@ -35,7 +35,7 @@ extension MLXOrganAdapter {
 
     /// The streamBody idiom: the @unchecked Sendable box crosses the region boundary; the session
     /// inside is only ever reached via this actor (the ChatSessionBox contract).
-    private static func _persist(
+    static func _persist(
         _ box: ChatSessionBox, url: URL, quantizeKV: Bool
     ) async throws -> Int {
         try await box.session.withLiveCache { cache in
@@ -62,7 +62,7 @@ extension MLXOrganAdapter {
             return CacheBox(cache: fresh)
         }
         let session = ChatSession(container, instructions: instructions, cache: box.cache)
-        _installSession(session, sessionID: sessionID, role: role)
+        await _installSession(session, sessionID: sessionID, role: role)
     }
 }
 #endif
