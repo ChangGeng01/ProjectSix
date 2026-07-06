@@ -8,7 +8,7 @@ import XCTest
 /// (the FRONTIER_2026H2 measured truth the 3376MB constant under-admitted by ~2.9GB).
 final class BASJetsamCapResolutionTests: XCTestCase {
 
-    func testMacFallsBackToConservativeConstant() {
+    func testMacFallsBackToConservativeConstant() throws {
         #if os(iOS)
         throw XCTSkip("Mac-only determinism gate")
         #else

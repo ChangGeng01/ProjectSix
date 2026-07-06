@@ -2,6 +2,10 @@ import XCTest
 import MLX
 import BASOrgan
 @testable import BASMLXAdapter
+#if canImport(MLXLLM)
+import MLXLMCommon
+import MLXLLM
+#endif
 
 /// 缝8 gates.
 /// 8c (pure + env): under thermal throttle the B2 probe may only DOWNSHIFT — difficulty and
@@ -57,7 +61,13 @@ final class BASSeam8Tests: XCTestCase {
         guard !MLXOrganAdapter.sessionCappedFusedEnabled else {
             throw XCTSkip("needs BAS_SESSION_CAPPED_FUSED=0 — pooled seats are the eviction subjects")
         }
+        #if os(iOS)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        #else
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        #endif
         try await adapter.loadModel()
         // UNCAPPED turns: this test forces the POOLED lane (capped-fused off ⇒ no B3), where a
         // tiny cap dies inside the think block — EOS-terminated turns keep the gate about
@@ -97,7 +107,13 @@ final class BASSeam8Tests: XCTestCase {
         guard MLXOrganAdapter.sessionCappedFusedEnabled else {
             throw XCTSkip("needs the capped-fused lane armed (default-on)")
         }
+        #if os(iOS)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        #else
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        #endif
         try await adapter.loadModel()
         // 4 concurrent capped session turns — pre-fix the fused lane never touched the governor,
         // so peak concurrency would track the task count; post-fix it is clamped at 2.

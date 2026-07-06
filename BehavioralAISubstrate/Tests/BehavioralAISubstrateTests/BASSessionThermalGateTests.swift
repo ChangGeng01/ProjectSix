@@ -1,6 +1,11 @@
 import XCTest
+import MLX
 import BASOrgan
 @testable import BASMLXAdapter
+#if canImport(MLXLLM)
+import MLXLMCommon
+import MLXLLM
+#endif
 
 /// 缝1 gate (BAS_SESSION_THERMAL_TEST=1 + BAS_THERMAL_FORCE=1, Mac, heavy — loads Qwen3.5-4B):
 /// under thermal throttle the session lanes must decode PLAIN in transcript-land — same route
@@ -21,7 +26,13 @@ final class BASSessionThermalGateTests: XCTestCase {
         guard MLXOrganAdapter.sessionCappedFusedEnabled else {
             throw XCTSkip("needs the capped-fused lane armed (default-on)")
         }
+        #if os(iOS)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        #else
         let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        #endif
         try await adapter.loadModel()
         let sid = "thermal-gate"
         func turn(_ text: String) async throws -> String {
