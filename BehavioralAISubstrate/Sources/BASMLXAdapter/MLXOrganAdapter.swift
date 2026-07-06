@@ -1178,82 +1178,63 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let dbgS = ProcessInfo.processInfo.environment["BAS_SESSION_DEBUG"] == "1"
         if dbgS { NSLog("[sess-dbg] %@ enter", key) }
 
-        // 会话→加速lane: greedy + short history + MTP head present + no ChatSession yet → the stateless
-        // fused path (device-measured faster below the crossover). Past the budget: re-hydrate a
-        // ChatSession from the transcript ONCE (vendored init(history:) — template-perfect) and fall
-        // through to the normal pooled path.
-        if sessionFusedLane, sessions[key] == nil,
-           request.preset.temperature == 0, _resolveMTPWeightsURL() != nil {
-            var transcript = fusedTranscripts[key] ?? [
+        // 案3 (2026-07-06 decode-OS audit): lane election is ONE pure function (_sessionLane) —
+        // the three inline guard chains re-deriving route class per turn were the seam-1/4 bug
+        // class. Bodies below are the certified ones, unchanged; the pooled acquisition order
+        // (existing → pending-reclaim → spill-restore → transcript-migration → fresh) stays the
+        // seam-certified sequence.
+        // Two-phase cost gating (mirrors the old guards' short-circuit profile): warm pooled
+        // turns never pay the weights file-stat or the token estimate.
+        let laneWanted = sessions[key] == nil && request.preset.temperature == 0
+            && (sessionFusedLane || Self.sessionCappedFusedEnabled)
+            && _resolveMTPWeightsURL() != nil
+        let seedTranscript: [(role: String, text: String)] = laneWanted
+            ? (fusedTranscripts[key] ?? [
                 (role: "system", text: request.personaInstructions ?? Self.systemInstructions(for: request)),
-            ]
-            let estTokens = BASOrganDeterministicAdapter.estimateTokens(
-                from: transcript.map(\.text) + [request.instruction])
-            if estTokens < Self.fusedSessionMaxTokens {
-                transcript.append((role: "user", text: Self.prompt(for: request)))
-                let r = try await _generateMTPSpecFromMessages(transcript, for: request)
-                transcript.append((role: "assistant", text: r.draft.body))
-                fusedTranscripts[key] = transcript
-                fusedSessionTurnCount += 1
-                // 缝8a: the old inline LRU loop here was the audit's SECOND eviction copy — it
-                // dropped pooled victims' KV WITHOUT spilling (silently defeating the certified
-                // B5 guarantee). Transcript seats carry no KV → bound them like the capped-fused
-                // lane does; pooled eviction stays single-sourced in _evictBeyondCap.
-                if fusedTranscripts.count > Self.maxTranscriptSessions,
-                   let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
-                    fusedTranscripts.removeValue(forKey: drop)
-                }
-                return r.draft
+              ])
+            : []
+        let lane = Self._sessionLane(
+            fusedLaneEnabled: sessionFusedLane,
+            cappedFusedEnabled: Self.sessionCappedFusedEnabled,
+            hasLiveBox: sessions[key] != nil,
+            temperature: request.preset.temperature,
+            cap: request.maxOutputTokens,
+            weightsAvailable: laneWanted,
+            estTokens: laneWanted ? BASOrganDeterministicAdapter.estimateTokens(
+                from: seedTranscript.map(\.text) + [request.instruction]) : 0,
+            fusedMax: Self.fusedSessionMaxTokens,
+            cappedMax: Self.cappedFusedMaxHistoryTokens)
+        switch lane {
+        case .fusedTranscript(transition: false), .cappedFusedTranscript(transition: false):
+            var transcript = seedTranscript
+            if dbgS { NSLog("[sess-dbg] %@ lane=%@", key, String(describing: lane)) }
+            transcript.append((role: "user", text: Self.prompt(for: request)))
+            let r = try await _generateMTPSpecFromMessages(transcript, for: request)
+            transcript.append((role: "assistant", text: r.draft.body))
+            fusedTranscripts[key] = transcript
+            if case .fusedTranscript = lane { fusedSessionTurnCount += 1 }
+            // Transcript seats carry no KV — their own FIFO bound (缝8a: pooled eviction stays
+            // single-sourced in _evictBeyondCap; the old inline LRU loop dropped KV unspilled).
+            if fusedTranscripts.count > Self.maxTranscriptSessions,
+               let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
+                fusedTranscripts.removeValue(forKey: drop)
             }
-            // TRANSITION: one amortized re-prefill via history re-hydration; transcript already carries
-            // the system message → instructions nil (the vendored init's documented contract).
+            return r.draft
+        case .fusedTranscript(transition: true), .cappedFusedTranscript(transition: true):
+            // TRANSITION: one amortized re-prefill via history re-hydration; the transcript
+            // already carries the system message → instructions nil (the vendored init's
+            // documented contract). Falls through to the pooled path with the box installed.
+            if dbgS { NSLog("[sess-dbg] %@ TRANSITION lane=%@", key, String(describing: lane)) }
             let rehydrated = ChatSession(
                 container,
                 instructions: nil,
-                history: Self.chatMessages(from: transcript),
+                history: Self.chatMessages(from: seedTranscript),
                 generateParameters: _generateParameters(
                     for: request.preset, maxOutputTokens: request.maxOutputTokens))
             sessions[key] = ChatSessionBox(session: rehydrated)
             fusedTranscripts.removeValue(forKey: key)
-        }
-
-        // B3-gap closure: greedy CAPPED turns (≤384) ride the fused loop (B3 trace-exit + B2
-        // probe + MTP live there) while the session has no ChatSession and the history fits.
-        // Transcript sessions carry no KV — they do NOT enter the pool LRU (own FIFO bound).
-        if Self.sessionCappedFusedEnabled, sessions[key] == nil,
-           request.preset.temperature == 0, _resolveMTPWeightsURL() != nil,
-           let cap = request.maxOutputTokens, cap <= 384 {
-            var transcript = fusedTranscripts[key] ?? [
-                (role: "system", text: request.personaInstructions ?? Self.systemInstructions(for: request)),
-            ]
-            let estTokens = BASOrganDeterministicAdapter.estimateTokens(
-                from: transcript.map(\.text) + [request.instruction])
-            if estTokens < Self.cappedFusedMaxHistoryTokens {
-                if dbgS { NSLog("[sess-dbg] %@ capped-fused est=%d", key, estTokens) }
-                transcript.append((role: "user", text: Self.prompt(for: request)))
-                let r = try await _generateMTPSpecFromMessages(transcript, for: request)
-                transcript.append((role: "assistant", text: r.draft.body))
-                fusedTranscripts[key] = transcript
-                if fusedTranscripts.count > Self.maxTranscriptSessions {
-                    // FIFO-ish bound: drop an arbitrary non-self entry (transcripts are tiny RAM;
-                    // the bound only guards pathological seat cardinality).
-                    if let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
-                        fusedTranscripts.removeValue(forKey: drop)
-                    }
-                }
-                return r.draft
-            }
-            // History outgrew the stateless budget: transition ONCE to a ChatSession (KV reuse),
-            // seeded from the transcript — the vendored init(history:) contract.
-            if dbgS { NSLog("[sess-dbg] %@ capped-fused TRANSITION est=%d", key, estTokens) }
-            let rehydrated = ChatSession(
-                container,
-                instructions: nil,
-                history: Self.chatMessages(from: transcript),
-                generateParameters: _generateParameters(
-                    for: request.preset, maxOutputTokens: request.maxOutputTokens))
-            sessions[key] = ChatSessionBox(session: rehydrated)
-            fusedTranscripts.removeValue(forKey: key)
+        case .pooled:
+            break
         }
 
         let box: ChatSessionBox
@@ -1403,6 +1384,36 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     static let cappedFusedMaxHistoryTokens = 1024
     /// Transcript-land sessions hold NO KV — bounded separately from the ChatSession pool.
     static let maxTranscriptSessions = 64
+
+    /// 案3 (2026-07-06 decode-OS audit): the session LANE election as ONE pure function — the
+    /// audit found three inline guard chains re-deriving route class per turn (the seam-1/4 bug
+    /// class lived exactly there). This decides WHICH lane a turn rides; the pooled acquisition
+    /// order (existing → pending-reclaim → spill-restore → transcript-migration → fresh) stays
+    /// in the actor, certified by the seam gates. `transition: true` = history outgrew the
+    /// stateless budget → rehydrate to a ChatSession ONCE, then continue pooled this same turn.
+    enum BASSessionLane: Equatable {
+        case fusedTranscript(transition: Bool)        // opt-in uncapped fused lane
+        case cappedFusedTranscript(transition: Bool)  // default-on capped lane (B2+B3+MTP live)
+        case pooled
+    }
+    /// Precedence mirror of the certified guard chains: opt-in fused > capped-fused > pooled.
+    /// A live ChatSession, a sampling temperature, missing MTP weights, or an out-of-band cap
+    /// all force the pooled lane. PURE — the caller pre-gates the (weights-stat, token-estimate)
+    /// costs so warm pooled turns pay neither (the old guards' short-circuit profile).
+    nonisolated static func _sessionLane(
+        fusedLaneEnabled: Bool, cappedFusedEnabled: Bool, hasLiveBox: Bool,
+        temperature: Double, cap: Int?, weightsAvailable: Bool,
+        estTokens: Int, fusedMax: Int, cappedMax: Int
+    ) -> BASSessionLane {
+        guard !hasLiveBox, temperature == 0, weightsAvailable else { return .pooled }
+        if fusedLaneEnabled {
+            return .fusedTranscript(transition: estTokens >= fusedMax)
+        }
+        if cappedFusedEnabled, let cap, cap <= 384 {
+            return .cappedFusedTranscript(transition: estTokens >= cappedMax)
+        }
+        return .pooled
+    }
 
     /// B5 spill lane — DEFAULT ON since the 2026-07-06 endurance cert (6 seats over a 4-cap pool,
     /// 55 spill/55 restore cycles, recall 10/10, stable latency at serious thermal, zero hangs;
