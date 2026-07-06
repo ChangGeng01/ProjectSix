@@ -116,3 +116,16 @@ Four production levers shipped, three honest negatives, one ground-truth re-base
 deferral. The shipped fused-MTP lane (25.7 tok/s) stands ABOVE the Air's plain bandwidth wall
 (25.0 @59GB/s) — remaining speed lives in acceptance depth, bytes (kernel-gated), and avoided
 compute. The next frontier sweep runs DIFFERENTIAL to this document.
+
+## Promotion round (2026-07-06, post-campaign)
+
+**B2 PROMOTED (a59b28d47)** — armed on budget-capped production turns (weights staged on-device;
+kill-switch BAS_DIFF_PROBE_OFF). Device co-gate with B2+B3 both live: resist 10/10+10/10,
+byte-identity 5/5; the probe downshifted every easy factual turn 320→160 (p_success 0.87-0.99).
+**B3 determinism fix en route (8890aa2de)** — the co-gate take-1 caught identity violations:
+nil-entropy tokens tied the entropy window to ROUND STRUCTURE (→ the cross-turn adaptive-K EMA);
+every emitted token now carries entropy. The co-gate's third real catch.
+**B5 production consumer (482525d55)** — the LRU-SPILL lane (BAS_SESSION_SPILL=1): evicted seats
+warm-park to disk, restore on return (one-shot files); e2e proven (seat evicted → returns →
+remembers). Remaining opt-ins by design: spill default-off pending endurance cert; device
+persist smoke rides the next device batch.
