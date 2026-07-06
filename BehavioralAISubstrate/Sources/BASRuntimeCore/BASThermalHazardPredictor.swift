@@ -41,9 +41,12 @@ public struct BASThermalHazardPredictor: Sendable {
     public private(set) var lastTier: Int = 0          // 0 nominal · 1 fair · 2 serious · 3 critical
     public private(set) var observedTransitions: Int = 0
 
-    public init(config: Config = Config()) {
+    /// `learnedBudget` restores a PERSISTED estimate from prior runs (per-device recalibration —
+    /// the 4-run calibration showed 35-52s inter-run variance; carrying the EMA across runs keeps
+    /// the line tracking THIS device instead of re-paying the prior each launch). nil = prior.
+    public init(config: Config = Config(), learnedBudget: Double? = nil) {
         self.config = config
-        self.learnedBudget = config.priorNominalDutyBudget
+        self.learnedBudget = learnedBudget ?? config.priorNominalDutyBudget
     }
 
     /// Decode work done. Counts ONLY inside the nominal window — once hot, the reactive layer

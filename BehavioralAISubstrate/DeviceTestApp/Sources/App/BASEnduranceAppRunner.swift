@@ -1538,14 +1538,20 @@ final class BASEnduranceAppController: ObservableObject {
         // B4 预测式热控 (BAS_THERMAL_PREDICT=1) — duty-budget hazard predictor + pre-fair duty
         // shaping (FRONTIER_2026H2 B4): learn the nominal zone's decode-duty budget online, insert
         // micro-cooldowns BEFORE the OS flips to fair (where the fused chain measured 0.91-0.99×).
+        // Per-device recalibration: restore the budget the LAST run learned (UserDefaults is
+        // per-device by construction); sanity-clamp so a corrupt store can't wedge the predictor.
+        let storedBudget = UserDefaults.standard.double(forKey: "bas.thermal.learned_budget")
+        let restoredBudget: Double? = (20.0 ... 300.0).contains(storedBudget) ? storedBudget : nil
         var thermalPredictor: BASThermalHazardPredictor? =
-            (env["BAS_THERMAL_PREDICT"] ?? "0") == "1" ? BASThermalHazardPredictor() : nil
+            (env["BAS_THERMAL_PREDICT"] ?? "0") == "1"
+                ? BASThermalHazardPredictor(learnedBudget: restoredBudget) : nil
         var predictGaps = 0
         var predictGapSeconds = 0.0
         if let tp = thermalPredictor {
             await emitBoth(String(format:
-                "🌡 thermal-predict ARMED prior_budget=%.0fs safety=%.2f recovery=%.2f gap=%.0fs",
-                tp.config.priorNominalDutyBudget, tp.config.safetyFraction,
+                "🌡 thermal-predict ARMED prior_budget=%.0fs (restored=%@) safety=%.2f recovery=%.2f gap=%.0fs",
+                tp.learnedBudget, restoredBudget.map { String(format: "%.0fs", $0) } ?? "none",
+                tp.config.safetyFraction,
                 tp.config.recoveryCredit, tp.config.cooldownSeconds))
         }
         // B4 效率核解码 (BAS_DECODE_QOS=utility) — the decode subtree runs at .utility so the
@@ -2062,6 +2068,13 @@ final class BASEnduranceAppController: ObservableObject {
                 if let dreamDriver {
                     if let cp = await dreamDriver.runIfPermitted(after: turnResult) {
                         await emitBoth("📊 ch1025 dream-loop iter=\(iter) GRANTED stages=\(cp.completedStages.count) dryRun=true")
+                        // B5 tail: the granted window is the app's only certified-idle moment —
+                        // warm-park every pooled seat so a jetsam/kill after this point restores
+                        // at spill speed (device 122.9×) instead of re-prefilling.
+                        let parked = await adapter.snapshotWarmSeats()
+                        if parked > 0 {
+                            await emitBoth("📊 ch1025 dream-loop snapshot warm_seats=\(parked)")
+                        }
                     } else {
                         await emitBoth("📊 ch1025 dream-loop iter=\(iter) denied (flag/L1-maintenance/window guard)")
                     }
@@ -2685,6 +2698,11 @@ final class BASEnduranceAppController: ObservableObject {
                     + "learned_budget=%.0fs transitions=%d",
                     predictGaps, predictGapSeconds,
                     tp.learnedBudget, tp.observedTransitions))
+                if tp.observedTransitions > 0 {
+                    UserDefaults.standard.set(tp.learnedBudget, forKey: "bas.thermal.learned_budget")
+                    await emitBoth(String(format:
+                        "📊 ch1025 thermal-predict PERSISTED learned_budget=%.0fs", tp.learnedBudget))
+                }
             }
             // ch 1025.8 HIGH-1:est_total_tokens(chars/4,not real)。
             // p50/p99 below use nearest-rank percentiles via

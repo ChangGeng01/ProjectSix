@@ -1388,7 +1388,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             key.replacingOccurrences(of: "#", with: "_") + ".safetensors")
     }
     /// Evict past the LRU cap, spilling each victim when the lane is armed (fp16-exact snapshots;
-    /// a failed spill just falls back to the old drop-the-KV behavior).
+    /// a failed spill just falls back to the old drop-the-KV behavior). Each spill write triggers
+    /// the GC bound — never-reclaimed seats must not accumulate snapshots unboundedly.
     func _evictBeyondCap() async {
         while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
             sessionLRU.removeFirst()
@@ -1396,9 +1397,43 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 if (try? await Self._persist(victim, url: Self._spillURL(forKey: oldest),
                                              quantizeKV: false)) != nil {
                     spillCount += 1
+                    Self._pruneSpillDir()
                 }
             }
         }
+    }
+    /// Snapshot GC: keep the newest `keep` spill files (default 32 ≈ 2GB worst-case at 64MB each);
+    /// one-shot restore already consumes reclaimed files — this bounds the never-reclaimed tail.
+    nonisolated static func _pruneSpillDir(keep: Int = 32) {
+        _pruneSpillDir(in: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("bas_session_spill", isDirectory: true), keep: keep)
+    }
+    nonisolated static func _pruneSpillDir(in dir: URL, keep: Int) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        guard files.count > keep else { return }
+        let dated = files.compactMap { url -> (URL, Date)? in
+            guard let d = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate else { return nil }
+            return (url, d)
+        }.sorted { $0.1 < $1.1 }
+        for (url, _) in dated.prefix(max(0, dated.count - keep)) {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+    /// Dream-loop window action (B5 follow-up): warm-park EVERY pooled seat to its spill URL
+    /// WITHOUT evicting — an app kill after this point warm-starts instead of re-prefilling.
+    /// Returns the number of seats snapshotted. Call from idle windows only (persist walks each
+    /// session's serial lock; a decoding seat would serialize behind its own turn).
+    public func snapshotWarmSeats() async -> Int {
+        guard Self.sessionSpillEnabled else { return 0 }
+        var n = 0
+        for (key, box) in sessions {
+            if (try? await Self._persist(box, url: Self._spillURL(forKey: key),
+                                         quantizeKV: false)) != nil { n += 1 }
+        }
+        Self._pruneSpillDir()
+        return n
     }
     /// B5 cert telemetry.
     var spillCount = 0

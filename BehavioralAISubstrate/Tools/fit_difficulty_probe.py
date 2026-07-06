@@ -86,6 +86,16 @@ fam_auc = auc(F[te] @ wf + bf, y[te])
 
 print(f"\nHELD-OUT AUC: probe={probe_auc:.3f} | qlen-baseline={len_auc:.3f} | family+band-baseline={fam_auc:.3f} (lam={lam})")
 
+# per-domain held-out AUC (v2 acceptance: broad must become rankable WITHOUT in-domain regression)
+BROAD_FAMS = {"recall", "reading", "alpha", "reverse"}
+te_scores = Xte @ w + b
+for name, keep in (("math", [i for i, t in enumerate(te) if fam[t] not in BROAD_FAMS]),
+                   ("broad", [i for i, t in enumerate(te) if fam[t] in BROAD_FAMS])):
+    if keep:
+        a = auc(te_scores[keep], y[te][keep])
+        n_pos = int(y[te][keep].sum())
+        print(f"  held-out {name}: n={len(keep)} pos={n_pos} auc={a:.3f}")
+
 json.dump({"w": w.tolist(), "b": float(b), "mu": mu.tolist(), "sd": sd.tolist(),
            "heldout_auc": probe_auc, "len_auc": len_auc, "fam_auc": fam_auc,
            "lam": lam, "n_train": int(len(tr)), "n_test": int(len(te))},

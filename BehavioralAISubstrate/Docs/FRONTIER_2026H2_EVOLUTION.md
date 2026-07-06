@@ -172,3 +172,56 @@ post-transition@160, pooled-uncapped), seat-0 transition exercised at turn 6, ze
 BAS_SESSION_CAPPED_FUSED=0 = kill-switch; the spill-cert suite pins it (its assertions need pool
 churn). Batch take-1 lesson: uncapped whale-turns starve probabilistic probe schedules —
 deterministic final probes per route class are the pattern.
+
+## Tail-closure round (2026-07-06 — "尾巴也需要收掉 最严苛")
+
+The five open follow-ups from the archive stamp, each closed with evidence:
+
+1. **M1 DFlash prose-parity probe — CLOSED, port EXONERATED.** Teacher-forced the SAME
+   fixed stream through both stacks (Tools/dflash_proto/parity_stream.py dumps the Python
+   greedy stream + official-drafter per-block accepts; BASDFlashParityTests replays it through
+   BASQwen35DFlashDecoder with identical block semantics). Result: **Swift = Python-q4
+   BLOCK-FOR-BLOCK IDENTICAL** on all 4 prompts (total accepted 120 = 120; e.g. prose blocks
+   [0,15,6,13,5,7,1] equal on both sides). Native-stream divergence measured: prose splits at
+   token 20-65/128 (fp16-vs-bf16), the reasoning stream is identical 128/128 — Gate-b's
+   "prose ~half" was 100% stream-divergence artifact (different TEXT was being drafted), zero
+   port/numerics gap. M1's honest-negative verdict unchanged (cycle cost was the killer);
+   the revival package now starts from a numerically-certified port. Bonus replication:
+   drafter q4 costs ~zero acceptance again (py bf16 6.00/2.57/6.71/2.57 vs q4 5.57/2.29/6.71/2.57).
+2. **B5 dream-loop warm-seat auto-snapshot — SHIPPED.** MLXOrganAdapter.snapshotWarmSeats()
+   parks EVERY pooled seat to its spill URL without evicting (idle-window contract: persist
+   walks each session's serial lock); wired into the endurance runner's dream-loop GRANTED
+   branch (the app's only certified-idle moment) with telemetry `dream-loop snapshot
+   warm_seats=N`. Mac gate: BASSpillGCTests.testSnapshotWarmSeats (2 seats parked, pool intact,
+   post-snapshot turns unaffected). Device firing inherits the dream-loop's own observation
+   status (three-guard windows are all-denied under load — by design).
+3. **B5 snapshot GC — SHIPPED.** Spill dir bounded at 32 newest files (~2GB worst-case),
+   pruned on every spill write and on snapshotWarmSeats; one-shot restore already consumes
+   reclaimed files, so GC only has to bound the never-reclaimed tail. Pure tests:
+   testPruneKeepsNewestUnderBound / NoopAtOrUnderBound / MissingDirIsSafe.
+4. **B4 thermal-prior per-device recalibration — SHIPPED.** The predictor now accepts a
+   persisted learnedBudget at init (BASThermalHazardPredictor(learnedBudget:)); the runner
+   restores it from UserDefaults (`bas.thermal.learned_budget`, sanity-clamped to 20-300s)
+   at arm — ARMED line logs `restored=...` — and persists it at FINAL when the run observed
+   ≥1 transition. Cross-run EMA continuity replaces re-paying the 60s prior each launch;
+   per-device by construction (UserDefaults is device-local). Unit gate:
+   testThermalPredictorRestoresPersistedBudget. Device firing is telemetry-observable
+   (`thermal-predict PERSISTED`) on the next BAS_THERMAL_PREDICT=1 endurance run.
+5. **B2 broader-domain calibration — MEASURED (see verdict below).** 4 new VERIFIABLE
+   non-math families (recall/reading/alpha/reverse, 84 questions, makeBroadQuestions seed
+   20260705) through the identical collect pipeline; Tools/eval_probe_ood.py scores the
+   frozen v1 probe out-of-domain (per-family AUC + act-band safety: what lands outside the
+   no-op band p∈[0.35,0.85] and whether those actions are safe).
+
+**B2 broad-domain VERDICT (2026-07-06): v1 did NOT generalize — v2 refit SHIPPED.**
+v1 out-of-domain on the 4 broad families: pooled AUC **0.507** (coin flip; reading 0.25
+INVERTED), and 62/84 prompts landed in the confident-downshift bucket p>0.85 with realized
+success only 0.71 (reverse: 16 downshifted at 0.38 success) — a harmful routing signal outside
+math. Pre-registered rule fired → v2 refit on the combined 231 (147 math + 84 broad):
+held-out **math 0.830** (v1 was 0.833 — zero in-domain regression), **broad 0.817** (from
+0.507), pooled 0.821 (baselines: qlen 0.442, family+band 0.806). Shipped as
+Docs/probe_weights_v2_2026-07-06.json, staged to BOTH phones' Documents/probe_weights.json;
+device re-cert (capped-fused recall): probe live, p_success 0.98-1.00 on easy session turns,
+recall 6/6, budget lattice unchanged. Scope honesty carried forward: "broad" = 4 verifiable
+non-arithmetic families; free-form/creative traffic remains uncharacterizable by a
+correctness-labeled probe (mid-band no-op is the designed safe default there).

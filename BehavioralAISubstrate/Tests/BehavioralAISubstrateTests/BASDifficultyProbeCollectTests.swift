@@ -95,19 +95,101 @@ final class BASDifficultyProbeCollectTests: XCTestCase {
         return out
     }
 
+
+    // ── B2 tail-closure: BROAD-DOMAIN families (non-arithmetic, still VERIFIABLE) ──
+    // The v1 probe trained on 7 math/counting families only; these 4 probe whether it
+    // generalizes: factual recall, reading extraction, alphabetical ordering, string reversal.
+    private static let capitals: [[(String, String)]] = [
+        [("France", "Paris"), ("Japan", "Tokyo"), ("Italy", "Rome"), ("Spain", "Madrid"),
+         ("Germany", "Berlin"), ("England", "London"), ("Russia", "Moscow"), ("China", "Beijing")],
+        [("Norway", "Oslo"), ("Kenya", "Nairobi"), ("Thailand", "Bangkok"), ("Peru", "Lima"),
+         ("Portugal", "Lisbon"), ("Austria", "Vienna"), ("Cuba", "Havana"), ("Greece", "Athens")],
+        [("Bhutan", "Thimphu"), ("Suriname", "Paramaribo"), ("Burkina Faso", "Ouagadougou"),
+         ("Kyrgyzstan", "Bishkek"), ("Eritrea", "Asmara"), ("Vanuatu", "Port Vila"),
+         ("Lesotho", "Maseru"), ("Moldova", "Chisinau")],
+    ]
+    private static let readColors = ["red", "green", "blue", "yellow", "black", "white", "silver", "purple"]
+    private static let readItems = ["book", "cup", "key", "coin", "pen", "map", "bell", "comb"]
+    private static let readPlaces = ["shelf", "drawer", "table", "basket", "windowsill", "cupboard", "bench", "tray"]
+    private static let alphaPools: [[[String]]] = [
+        [["apple", "mango", "zebra", "kite", "orange"], ["banana", "tiger", "cloud", "wolf", "grape"],
+         ["desk", "river", "yarn", "hill", "plum"]],
+        [["stone", "star", "sting", "stew", "stack"], ["brick", "brave", "bloom", "batch", "burn"],
+         ["crane", "cliff", "chess", "count", "cycle"]],
+        [["bring", "brink", "brisk", "bride", "bright"], ["stack", "stall", "stamp", "stark", "stab"],
+         ["chart", "charm", "chase", "champ", "chalk"]],
+    ]
+    private static let reverseWords: [[String]] = [
+        ["lamp", "frog", "mint", "dusk", "coal", "vine", "peak"],
+        ["blanket", "harvest", "lantern", "monster", "gravity", "postage", "whisper"],
+        ["motorcycle", "watermelon", "toothbrush", "coordinate", "lighthouse", "brainstorm", "spreadsheet"],
+    ]
+    static func makeBroadQuestions(seed: UInt64, perCell: Int) -> [(q: String, ans: String, family: String, band: Int)] {
+        var r = LCG(state: seed)
+        var out: [(String, String, String, Int)] = []
+        for band in 0 ..< 3 {
+            for _ in 0 ..< perCell {
+                // recall — capitals, band = obscurity tier
+                let (country, capital) = capitals[band][r.next(capitals[band].count)]
+                out.append(("What is the capital city of \(country)? Answer with just the city name.",
+                            capital, "recall", band))
+                // reading — extract one placed fact among 2/5/8 distractor facts
+                let nFacts = [2, 5, 8][band]
+                var pairs: [(String, String, String)] = []
+                var used = Set<Int>()
+                while pairs.count < nFacts {
+                    let ci = r.next(readColors.count), ii = r.next(readItems.count)
+                    guard used.insert(ci * 100 + ii).inserted else { continue }
+                    pairs.append((readColors[ci], readItems[ii], readPlaces[r.next(readPlaces.count)]))
+                }
+                let passage = pairs.map { "The \($0.0) \($0.1) is on the \($0.2)." }.joined(separator: " ")
+                let pick = pairs[r.next(pairs.count)]
+                out.append(("\(passage) Where is the \(pick.0) \(pick.1)? Answer with one word.",
+                            pick.2, "reading", band))
+                // alpha — first-alphabetically among 3, band = shared-prefix depth
+                let pool = alphaPools[band][r.next(alphaPools[band].count)]
+                var trio = Set<String>()
+                while trio.count < 3 { trio.insert(pool[r.next(pool.count)]) }
+                let items = Array(trio)
+                out.append(("Which of these words comes first alphabetically: \(items.joined(separator: ", "))? Answer with the word.",
+                            items.min()!, "alpha", band))
+                // reverse — spell backwards, band = word length tier
+                let word = reverseWords[band][r.next(reverseWords[band].count)]
+                out.append(("Spell the word \"\(word)\" backwards. Answer with the reversed letters only, no separators.",
+                            String(word.reversed()), "reverse", band))
+            }
+        }
+        return out
+    }
+
     func testCollectProbeFeatures() async throws {
         guard ProcessInfo.processInfo.environment["BAS_PROBE_COLLECT"] == "1" else {
             throw XCTSkip("set BAS_PROBE_COLLECT=1 (Mac, heavy — ~300 generations on Qwen3.5-4B)")
         }
+        try await collect(questions: Self.makeQuestions(seed: 20260704, perCell: 7),
+                          defaultOut: "/tmp/gdn_coreai/probe_features.jsonl")
+    }
+
+    /// B2 tail-closure: same pipeline over the 4 broad-domain families (84 questions) —
+    /// the v1-probe generalization set (evaluated by Tools/eval_probe_ood.py).
+    func testCollectBroadProbeFeatures() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_PROBE_BROAD"] == "1" else {
+            throw XCTSkip("set BAS_PROBE_BROAD=1 (Mac, heavy — 84 generations on Qwen3.5-4B)")
+        }
+        try await collect(questions: Self.makeBroadQuestions(seed: 20260705, perCell: 7),
+                          defaultOut: "/tmp/gdn_coreai/probe_features_broad.jsonl")
+    }
+
+    private func collect(
+        questions: [(q: String, ans: String, family: String, band: Int)], defaultOut: String
+    ) async throws {
         #if canImport(MLXLLM)
-        let outPath = ProcessInfo.processInfo.environment["BAS_PROBE_OUT"]
-            ?? "/tmp/gdn_coreai/probe_features.jsonl"
+        let outPath = ProcessInfo.processInfo.environment["BAS_PROBE_OUT"] ?? defaultOut
         let wURL = URL(fileURLWithPath: "/tmp/gdn_coreai/qwen35_mtp_folded.safetensors")
         let container = try await #huggingFaceLoadModelContainer(
             configuration: ModelConfiguration(id: "mlx-community/Qwen3.5-4B-4bit",
                                               extraEOSTokens: ["<|im_end|>"]),
             progressHandler: { _ in })
-        let questions = Self.makeQuestions(seed: 20260704, perCell: 7)   // 3 bands × 7 × 7 fam = 147×... = 441? (7 fam × 3 × 7 = 147)
         FileManager.default.createFile(atPath: outPath, contents: nil)
         let fh = try XCTUnwrap(FileHandle(forWritingAtPath: outPath))
         defer { try? fh.close() }
@@ -163,7 +245,7 @@ final class BASDifficultyProbeCollectTests: XCTestCase {
             }
         }
         print("[probe-collect] DONE n=\(done) acc=\(String(format: "%.3f", Double(correct) / Double(done))) → \(outPath)")
-        XCTAssertGreaterThan(done, 100)
+        XCTAssertEqual(done, questions.count, "collection incomplete")
         #else
         throw XCTSkip("MLXLLM unavailable")
         #endif
