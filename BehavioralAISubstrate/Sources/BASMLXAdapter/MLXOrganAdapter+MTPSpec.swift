@@ -26,6 +26,8 @@ extension MLXOrganAdapter {
         let proposed: Int
         let box: MTPDecoderBox
         var thermalFallback: Bool = false
+        var traceExitReason: String? = nil
+        var traceThinkTokens: Int? = nil
     }
 
     /// Full-pipeline `.mtpSpec` turn: template → tokenize → MTP spec decode (EOS-aware) → detokenize.
@@ -45,6 +47,7 @@ extension MLXOrganAdapter {
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
+        let probeReport = Self._ProbeReportBox()
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
@@ -65,18 +68,30 @@ extension MLXOrganAdapter {
                 : dec.generateSpecKFused(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
                     k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
-                    traceExit: trace, postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens))
+                    traceExit: trace,
+                    postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens,
+                                                             reportInto: probeReport))
             if let te = r.traceExit {
                 print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
             }
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, proposed: r.proposed,
-                box: MTPDecoderBox(decoder: dec))
+                box: MTPDecoderBox(decoder: dec),
+                traceExitReason: r.traceExit?.reason.rawValue,
+                traceThinkTokens: r.traceExit?.thinkTokensAtExit)
         }
         mtpDecoderBox = raw.box                                    // cache across turns (init quantizes ~300MB)
+        let laneName = sampling ? "mtpSpecSampling" : "mtpSpec"
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
+            .withDecodeAttribution(BASDecodeAttribution(
+                requestID: request.requestID, context: nil,
+                plannedLane: laneName, executedLane: laneName,
+                traceExitReason: raw.traceExitReason, traceThinkTokens: raw.traceThinkTokens,
+                diffProbe: probeReport.report.map {
+                    .armed(pSuccess: $0.pSuccess, planned: $0.planned, refined: $0.refined)
+                } ?? .off))
         return (draft, raw.accepted, raw.rounds, raw.proposed)
     }
     /// PRODUCTION deep-K election (2026-07-03, the fused-chain campaign): the greedy `.mtpSpec` lane runs the
@@ -112,6 +127,7 @@ extension MLXOrganAdapter {
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
+        let probeReport = Self._ProbeReportBox()
         // 缝8b (2026-07-06 audit): the 2-slot decode governor was acquired only on the POOLED
         // route — the default-on capped-fused class ran ungoverned past the jetsam-margin cap
         // (135MB from the limit at 8-wide) that justified the governor.
@@ -145,7 +161,9 @@ extension MLXOrganAdapter {
                 r = dec.generateSpecKFused(
                     prompt: promptIds, maxTokens: maxTokens, eosTokens: eos,
                     k: Self.mtpProductionK, tCap: Self.mtpProductionTCap, adaptiveK: true,
-                    traceExit: trace, postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens))
+                    traceExit: trace,
+                    postPrefillBudget: Self._probeBudgetHook(diffProbe, planned: maxTokens,
+                                                             reportInto: probeReport))
             }
             if let te = r.traceExit {
                 print("📊 trace-exit fired reason=\(te.reason.rawValue) think=\(te.thinkTokensAtExit) out=\(te.outCountAtExit)/\(maxTokens)")
@@ -153,12 +171,23 @@ extension MLXOrganAdapter {
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, proposed: r.proposed,
-                box: MTPDecoderBox(decoder: dec), thermalFallback: thermalFallback)
+                box: MTPDecoderBox(decoder: dec), thermalFallback: thermalFallback,
+                traceExitReason: r.traceExit?.reason.rawValue,
+                traceThinkTokens: r.traceExit?.thinkTokensAtExit)
         }
         mtpDecoderBox = raw.box
         if raw.thermalFallback { sessionThermalFallbackCount += 1 }
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
+            .withDecodeAttribution(BASDecodeAttribution(
+                requestID: request.requestID, context: nil,
+                plannedLane: "sessionFused",
+                executedLane: raw.thermalFallback ? "plain" : "sessionFused",
+                failCloseReason: raw.thermalFallback ? "thermal" : nil,
+                traceExitReason: raw.traceExitReason, traceThinkTokens: raw.traceThinkTokens,
+                diffProbe: probeReport.report.map {
+                    .armed(pSuccess: $0.pSuccess, planned: $0.planned, refined: $0.refined)
+                } ?? .off))
         return (draft, raw.accepted, raw.rounds, raw.proposed)
     }
 
@@ -214,8 +243,13 @@ extension MLXOrganAdapter {
     /// B2 — build the post-prefill budget hook for the fused lane. The hidden-state read is ONE
     /// small host sync (hidden-dim floats) after prefill; the refinement is bounded ±1 tier so
     /// the probe REFINES the effort plan, never overrules it.
+    /// 可解释性①: the hook's decision, captured for the turn line (armed-and-AGREED is now
+    /// distinguishable from never-armed — the audit's exact complaint).
+    final class _ProbeReportBox: @unchecked Sendable {
+        var report: (pSuccess: Double, planned: Int, refined: Int)?
+    }
     nonisolated static func _probeBudgetHook(
-        _ probe: BASDifficultyProbe?, planned: Int
+        _ probe: BASDifficultyProbe?, planned: Int, reportInto box: _ProbeReportBox? = nil
     ) -> ((MLXArray) -> Int)? {
         guard let probe else { return nil }
         return { hLast in
@@ -226,6 +260,7 @@ extension MLXOrganAdapter {
             // question under throttle got MORE budget exactly when the device needs less. Under
             // throttle the probe may only downshift (B3's budget guard still protects the tail).
             if refined > planned, MLXOrganAdapter._thermalThrottled() { refined = planned }
+            box?.report = (p, planned, refined)
             if refined != planned {
                 print(String(format: "📊 diff-probe p_success=%.2f budget %d→%d", p, planned, refined))
             }

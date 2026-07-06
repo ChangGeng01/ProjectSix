@@ -192,6 +192,7 @@ let package = Package(
         .target(
             name: "BASSovereign",
             dependencies: ["BASRuntimeCore"],
+            resources: [.process("Resources")],
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
             ]),

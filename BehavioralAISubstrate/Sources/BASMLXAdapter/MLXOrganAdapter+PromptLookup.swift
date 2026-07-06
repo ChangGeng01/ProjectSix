@@ -176,10 +176,9 @@ extension MLXOrganAdapter {
             capabilities: _decodeCapabilities(),
             profiler: draftProfiler,
             numDraftTokens: numDraftTokens)
-        if ProcessInfo.processInfo.environment["BAS_DECODE_CTX"] == "1" {
-            print("[decode-ctx] \(ctx.summary) lane=\(strategy)")
-        }
-        return try await _execute(strategy, for: request, purpose: purpose, sessionID: sessionID)
+        // 可解释性①: THE turn line is emitted by _execute once the EXECUTED lane is known.
+        return try await _execute(strategy, for: request, purpose: purpose, sessionID: sessionID,
+                                  context: ctx)
         #else
         return try await _plainDraft(request)
         #endif

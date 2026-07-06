@@ -264,6 +264,25 @@ public actor BASSovereignVerdictEngine {
     /// The pure output of `evaluateLevel`: the verdict LEVEL plus its reason
     /// codes and revoked permissions — with NO verdict/audit IDs, NO clock, and
     /// NO ledger side-effect. (ADR-024.)
+    /// 可解释性②: Swift-hits-floor vs Rust-routed-level disagreement (should be impossible
+    /// while both derivations are healthy — the Rust table covers the hard-bit cap).
+    public struct RoutedDivergence: Sendable, Equatable {
+        public let rustLevel: BASSovereignVerdictLevel
+        public let swiftFloor: BASSovereignVerdictLevel
+    }
+    /// Process-lifetime divergence counter (telemetry; >0 = investigate the vendor/Rust pin).
+    public nonisolated(unsafe) static var routedDivergenceCount = 0
+    /// Pure floor application: returns the effective level plus the divergence record when the
+    /// Swift floor EXCEEDED the routed level. Host-unit-testable without the Rust FFI.
+    static func applyHitsFloor(
+        routed: BASSovereignVerdictLevel, floors: [BASSovereignVerdictLevel]
+    ) -> (BASSovereignVerdictLevel, RoutedDivergence?) {
+        var level = routed
+        for f in floors where f > level { level = f }
+        guard level > routed else { return (level, nil) }
+        return (level, RoutedDivergence(rustLevel: routed, swiftFloor: level))
+    }
+
     public struct LevelDecision: Sendable, Equatable {
         public let level: BASSovereignVerdictLevel
         public let reasonCodes: [String]
@@ -313,6 +332,7 @@ public actor BASSovereignVerdictEngine {
         var level: BASSovereignVerdictLevel
         let softPinnedDomain: String?
 
+        var routedDivergence: RoutedDivergence? = nil
         if useRouted,
            let routedLevel = Self.routedDeriveLevel(
             hardObservations: context.hardObservations,
@@ -323,9 +343,15 @@ public actor BASSovereignVerdictEngine {
             // Rust path:single C ABI call covers Stages 2+3
             // + hard bit cap promotion。 Cross-check max with
             // hits' min levels (belt-and-suspenders)。
-            level = routedLevel
-            for hit in hits where hit.minLevel > level {
-                level = hit.minLevel
+            // 可解释性② (2026-07-06): the belt-and-suspenders max() used to fire SILENTLY —
+            // but the Rust derive computes the hard-bit cap itself, so a Swift hits-floor that
+            // EXCEEDS the routed level means the two derivations DISAGREE (corruption /
+            // marshalling drift / vendor bump), not normal promotion. Record it: reason code +
+            // counter — the one dark spot that could silently corrupt the core dispose logic.
+            (level, routedDivergence) = Self.applyHitsFloor(routed: routedLevel, floors: hits.map { $0.minLevel })
+            if let d = routedDivergence {
+                Self.routedDivergenceCount += 1
+                print("⚠️ [verdict] ROUTED-DIVERGENCE rust=\(d.rustLevel) swiftFloor=\(d.swiftFloor) — Swift floor wins (fail-safe)")
             }
             let (_, pinned) =
                 evaluateSoftSignals(context.softSignals)
@@ -368,6 +394,9 @@ public actor BASSovereignVerdictEngine {
         }
         if isIrreversible(context.operation) && !context.evidenceSufficient && level == .toolCut {
             reasonCodes.append("EVIDENCE_INSUFFICIENT:\(context.operation.rawValue)")
+        }
+        if let d = routedDivergence {
+            reasonCodes.append("ROUTED_DIVERGENCE:rust=\(d.rustLevel.rawValue):swift=\(d.swiftFloor.rawValue)")
         }
 
         return LevelDecision(

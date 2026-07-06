@@ -5,7 +5,7 @@ import Foundation
 /// sampling the world separately (the audit found five thermal readers with five opinions).
 /// The fused chain's PER-ROUND thermal re-read stays — that is the certified in-flight escape
 /// hatch, not a decider. Pure value; the adapter fills it, the planner consumes it.
-public struct BASDecodeContext: Sendable, Equatable {
+public struct BASDecodeContext: Sendable, Equatable, Codable {
     public let purpose: BASDecodeLanePolicy.Purpose
     public let temperature: Double
     public let maxOutputTokens: Int?

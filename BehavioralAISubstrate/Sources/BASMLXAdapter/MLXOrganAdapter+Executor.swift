@@ -26,18 +26,45 @@ extension MLXOrganAdapter {
     /// `GenerateCompletionInfo` and never surfaces per-round accept stats, so the draft-MODEL `emaAccepted` (the
     /// `minDraftModelAccepted=2.7` gate) cannot learn from here. It is currently MOOT (no draft model is deployed);
     /// making the 2.7 gate live needs spec-accept-stat plumbing out of MLX generate (deferred follow-up).
+    /// 可解释性①: THE turn line — one grep-friendly line per eager turn, emitted where the
+    /// EXECUTED lane is finally known (the audit: planned-vs-executed divergence was visible
+    /// only as a console error; a fail-closed draft was indistinguishable from planned-plain).
+    static let turnLineEnabled = ProcessInfo.processInfo.environment["BAS_DECODE_CTX"] == "1"
+    private func _finish(
+        _ draft: BASOrganDraft, planned: BASDecodeStrategy, context: BASDecodeContext?,
+        request: BASOrganRequest, failClose: String? = nil
+    ) -> BASOrganDraft {
+        // Lane funcs may have attached partial facts (trace-exit/B2/thermal) — keep them,
+        // overwrite the election fields the executor owns.
+        let partial = draft.decodeAttribution
+        let executed = failClose != nil ? "plain"
+            : (partial?.executedLane ?? String(describing: planned))
+        let a = BASDecodeAttribution(
+            requestID: request.requestID, context: context,
+            plannedLane: String(describing: planned), executedLane: executed,
+            failCloseReason: failClose ?? partial?.failCloseReason,
+            traceExitReason: partial?.traceExitReason,
+            traceThinkTokens: partial?.traceThinkTokens,
+            diffProbe: partial?.diffProbe ?? .off)
+        if Self.turnLineEnabled { print(a.summaryLine) }
+        return draft.withDecodeAttribution(a)
+    }
+
     func _execute(
         _ strategy: BASDecodeStrategy, for request: BASOrganRequest,
-        purpose: BASDecodeLanePolicy.Purpose, sessionID: String? = nil
+        purpose: BASDecodeLanePolicy.Purpose, sessionID: String? = nil,
+        context: BASDecodeContext? = nil
     ) async throws -> BASOrganDraft {
         #if canImport(MLXLLM)
         switch strategy {
         case .plain:
-            return try await _plainDraft(request)
+            return _finish(try await _plainDraft(request), planned: strategy,
+                           context: context, request: request)
 
         case .draftModelSpec:
             // `_draftSpeculative` uses the adapter's configured `numDraftTokens`; the strategy's K is advisory.
-            return try await _draftSpeculative(request)
+            return _finish(try await _draftSpeculative(request), planned: strategy,
+                           context: context, request: request)
 
         case .mtpSpecSampling:
             do {
@@ -46,10 +73,11 @@ extension MLXOrganAdapter {
                 draftProfiler = draftProfiler.observing(
                     sourceID: BASDecodeStrategy.mtpSpecSamplingID, purpose: purpose,
                     accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
-                return g.draft
+                return _finish(g.draft, planned: strategy, context: context, request: request)
             } catch {
                 print("[mtp-spec-sampling] lane fail-closed to plain: \(error)")
-                return try await _plainDraft(request)
+                return _finish(try await _plainDraft(request), planned: strategy,
+                               context: context, request: request, failClose: "\(error)")
             }
 
         case .mtpSpec:
@@ -67,10 +95,11 @@ extension MLXOrganAdapter {
                 draftProfiler = draftProfiler.observing(
                     sourceID: BASDecodeStrategy.mtpSpecID, purpose: purpose,
                     accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
-                return g.draft
+                return _finish(g.draft, planned: strategy, context: context, request: request)
             } catch {
                 print("[mtp-spec] lane fail-closed to plain: \(error)")
-                return try await _plainDraft(request)
+                return _finish(try await _plainDraft(request), planned: strategy,
+                               context: context, request: request, failClose: "\(error)")
             }
 
         case .promptLookup(let k):
@@ -80,7 +109,8 @@ extension MLXOrganAdapter {
             draftProfiler = draftProfiler.observing(
                 sourceID: BASDraftSourceChoice.promptLookupID, purpose: purpose,
                 accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
-            return _modelFreeDraft(body: g.body, request: request)
+            return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
+                           context: context, request: request)
 
         case .suffixLookup(let k):
             // T3: seed from the session corpus when present; nil session → empty store = byte-identical to
@@ -99,7 +129,8 @@ extension MLXOrganAdapter {
             draftProfiler = draftProfiler.observing(
                 sourceID: BASDraftSourceChoice.suffixAutomatonID, purpose: purpose,
                 accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
-            return _modelFreeDraft(body: g.body, request: request)
+            return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
+                           context: context, request: request)
 
         case .saguaro:
             throw BASOrganError.providerUnavailable(
@@ -107,7 +138,8 @@ extension MLXOrganAdapter {
 
         case .probeOnly:
             // Measure-only sentinel; the production planner never returns it. Fail-closed to plain.
-            return try await _plainDraft(request)
+            return _finish(try await _plainDraft(request), planned: strategy,
+                           context: context, request: request, failClose: "probeOnly-sentinel")
         }
         #else
         throw BASOrganError.providerUnavailable(

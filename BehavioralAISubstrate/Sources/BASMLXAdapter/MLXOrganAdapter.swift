@@ -1057,10 +1057,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 context: ctx, capabilities: _decodeCapabilities(),
                 profiler: draftProfiler, numDraftTokens: numDraftTokens)
             : .plain
-        if ProcessInfo.processInfo.environment["BAS_DECODE_CTX"] == "1" {
-            print("[decode-ctx] \(ctx.summary) lane=\(strategy)")
-        }
-        return try await _execute(strategy, for: request, purpose: .scoutDefault)
+        // 可解释性①: THE turn line is emitted by _execute once the EXECUTED lane is known.
+        return try await _execute(strategy, for: request, purpose: .scoutDefault, context: ctx)
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason
@@ -1220,13 +1218,30 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             transcript.append((role: "assistant", text: r.draft.body))
             fusedTranscripts[key] = transcript
             if case .fusedTranscript = lane { fusedSessionTurnCount += 1 }
+            // 可解释性①: THE turn line, session flavor — lane election + thermal fallback +
+            // B3/B2 facts carried up from the generation.
+            let laneName = { if case .fusedTranscript = lane { return "session:fused" }
+                             return "session:cappedFused" }()
+            var draftOut = r.draft
+            if let partial = draftOut.decodeAttribution {
+                let a = BASDecodeAttribution(
+                    requestID: request.requestID, context: nil,
+                    plannedLane: laneName,
+                    executedLane: partial.executedLane == "plain" ? "plain" : laneName,
+                    failCloseReason: partial.failCloseReason,
+                    traceExitReason: partial.traceExitReason,
+                    traceThinkTokens: partial.traceThinkTokens,
+                    diffProbe: partial.diffProbe)
+                if Self.turnLineEnabled { print(a.summaryLine) }
+                draftOut = draftOut.withDecodeAttribution(a)
+            }
             // Transcript seats carry no KV — their own FIFO bound (缝8a: pooled eviction stays
             // single-sourced in _evictBeyondCap; the old inline LRU loop dropped KV unspilled).
             if fusedTranscripts.count > Self.maxTranscriptSessions,
                let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
                 fusedTranscripts.removeValue(forKey: drop)
             }
-            return r.draft
+            return draftOut
         case .fusedTranscript(transition: true), .cappedFusedTranscript(transition: true):
             // TRANSITION: one amortized re-prefill via history re-hydration; the transcript
             // already carries the system message → instructions nil (the vendored init's
@@ -1245,21 +1260,25 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
 
         let box: ChatSessionBox
+        let poolAcquisition: String
         if let existing = sessions[key] {
             if dbgS { NSLog("[sess-dbg] %@ pooled", key) }
             box = existing
+            poolAcquisition = "warm"
         } else if let pending = pendingSpill.removeValue(forKey: key) {
             // 缝8a: the seat was evicted but its spill write hasn't landed — take the LIVE box back
             // (the in-flight write sees the removed entry and deletes its stale file).
             if dbgS { NSLog("[sess-dbg] %@ pending-spill reclaim", key) }
             box = pending.box
             sessions[key] = pending.box
+            poolAcquisition = "pending-reclaim"
         } else if let restored = await _restoreFromSpill(
             key: key, container: container,
             params: _generateParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)) {
             if dbgS { NSLog("[sess-dbg] %@ spill-restored", key) }
             box = restored                                  // B5: warm-start from the spill file
             sessions[key] = restored
+            poolAcquisition = "spill-restore"
         } else if let transcript = fusedTranscripts[key] {
             // 缝4 (2026-07-06 audit): a transcript-land seat whose next request fails the fused
             // guards (temp>0 / uncapped / cap>384) lands HERE — the fresh branch built a persona-only
@@ -1276,6 +1295,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             box = ChatSessionBox(session: migrated)
             sessions[key] = box
             fusedTranscripts.removeValue(forKey: key)
+            poolAcquisition = "transcript-migration"
         } else {
             if dbgS { NSLog("[sess-dbg] %@ fresh", key) }
             let fresh = ChatSession(
@@ -1289,6 +1309,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                     maxOutputTokens: request.maxOutputTokens))
             box = ChatSessionBox(session: fresh)
             sessions[key] = box
+            poolAcquisition = "fresh"
         }
         // P2: LRU bound on the pool (recon gap #4 — it was unbounded/unaccounted). Touch on every use;
         // evict the least-recently-used session beyond the cap (its KV frees with the ChatSession).
@@ -1310,9 +1331,15 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         if dbgS { NSLog("[sess-dbg] %@ decoded %d chars", key, rawBody.count) }
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
+        let pooledLane = "session:pooled(\(poolAcquisition))"
+        let attribution = BASDecodeAttribution(
+            requestID: request.requestID, context: nil,
+            plannedLane: pooledLane, executedLane: pooledLane)
+        if Self.turnLineEnabled { print(attribution.summaryLine) }
         return _buildDraft(
             body: body, request: request,
             completionMetrics: Self.completionMetrics(from: completionInfo))
+            .withDecodeAttribution(attribution)
         #else
         throw BASOrganError.providerUnavailable(
             reason: Self.frameworkUnavailableReason

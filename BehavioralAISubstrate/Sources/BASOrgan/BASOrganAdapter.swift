@@ -303,6 +303,9 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
     /// REAL prefill/decode anatomy when the adapter can surface it (e.g. MLX); `nil` otherwise. Additive +
     /// optional → existing callers + serialized drafts are unaffected (decodeIfPresent ⇒ nil for old JSON).
     public let completionMetrics: BASOrganCompletionMetrics?
+    /// 可解释性① — THE turn line's carrier (planned vs executed lane, fail-close reason, B3
+    /// trace-exit, B2 tri-state). Additive + optional, same contract as completionMetrics.
+    public let decodeAttribution: BASDecodeAttribution?
 
     public init(
         requestID: String,
@@ -313,7 +316,8 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
         outputTokensEstimated: Int,
         producedAt: Date,
         traceID: String,
-        completionMetrics: BASOrganCompletionMetrics? = nil
+        completionMetrics: BASOrganCompletionMetrics? = nil,
+        decodeAttribution: BASDecodeAttribution? = nil
     ) {
         self.requestID = requestID
         self.providerID = providerID
@@ -324,6 +328,17 @@ public struct BASOrganDraft: Sendable, Equatable, Codable {
         self.producedAt = producedAt
         self.traceID = traceID
         self.completionMetrics = completionMetrics
+        self.decodeAttribution = decodeAttribution
+    }
+
+    /// Immutable-update helper (coding-style rule: new copy, never mutate).
+    public func withDecodeAttribution(_ a: BASDecodeAttribution?) -> BASOrganDraft {
+        BASOrganDraft(
+            requestID: requestID, providerID: providerID, role: role, body: body,
+            inputTokensEstimated: inputTokensEstimated,
+            outputTokensEstimated: outputTokensEstimated,
+            producedAt: producedAt, traceID: traceID,
+            completionMetrics: completionMetrics, decodeAttribution: a)
     }
 }
 
