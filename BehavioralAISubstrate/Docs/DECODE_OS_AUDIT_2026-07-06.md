@@ -160,3 +160,35 @@ min00=22.0 @ thermal=1(fair——模型加载突发+首分钟满负荷即离开 
 方法教训入册:①跨热基线绝对 tok/s 不可判,同机同晚二进制 A/B 才是仲裁器;②保持率在热饱和
 起点下失义(min00=地板 ⇒ retention≈100% 是伪信号);③"冷却 N 分钟"不等于冷机 —— 机身热质量
 以小时计,真冷机只有过夜。
+
+---
+
+# 归档章 (2026-07-06 深夜 — DECODE-OS 三部曲 CLOSED)
+
+**一天完成的完整弧**:操作员论纲("最强 decoder = 解码操作系统")→ 9 员审计(裁决:半对——赢的是
+削到骨头的车道;OS 当施工蓝图重蹈 DFlash、当组合审计清单抓出 8 条真缝)→ 8 缝按序修复+设备认证
+→ 最小统一案 1-5 全落地 → 新旧二进制同机 A/B 平价终判(无回归)。
+
+**提交链(13 commits,d78a87fee 尾巴收殺 → 98c45ff87 平价终判)**:
+a0af3c20c(缝1-4)· 70f03f0c4(缝5-6)· 131512b02(缝7-8)· cc277b7f8(设备批)·
+a1bb73dc2(案1 checkpoint)· e58d02081(案3 车道选举)· a2fef7601(案4 谨慎内核)·
+3a0e98d17(案5 上下文+梯子)· b8daeb79e/98d3c03ce/67eee8faf/98c45ff87(账本+平价)。
+
+**生产面变化(全部恢复/加固既有认证语义,零新 default-on 行为)**:
+- 修复:热闸覆盖会话车道 · clear 达盘+文件保护 · SHA256 spill 文件名 · 路由迁移 · profiler 真
+  proposed · draft-model 结构性拒绝 · 6144MB 运行时解析 cap · pending-spill 异步逐出 ·
+  governor 全覆盖 · B2 热抑制
+- 结构:BASTrunkCheckpoint(1 所有者+3 常驻不变量+3 钉住)· _sessionLane 纯选举 ·
+  BASTrunkDraftProvider(下一根杠杆按 provider 价格认证)· BASDecodeContext(每轮一次事实)
+- 新 opt-in:BAS_PRESSURE_LADDER(设备认证 rungs 1-2)· 新测试缝:BAS_THERMAL_FORCE(仅保守向)·
+  BAS_DECODE_CTX(遥测)
+- 回归:Mac 16,006 用例 0 新失败;设备:spill endurance 67轮 12/12 · capped-fused mixed 17轮 5/5 ·
+  压力梯子存活认证 · 同机二进制 A/B 6528=6528
+
+**立着的 rider**:①07-07 07:52 晨任务(nominal 起点 24.5 复现,完整性数据点,cron 6e5dc1ae,
+session 态)②cacheLimit {256,512,768,∞} A/B(独立测量战役)③token-recycling = 第一个新 provider
+(有 tok/s 上行空间的下一根杠杆)。
+
+**本战役的元结论**:最强 decoder = 一条削到骨头的车道 × 一个让组合诚实的 OS。这一天把后半句从
+隐喻变成了机器:不变量从注释进了代码,路由从守卫链进了类型,清除到达了磁盘,预算只剩一种货币,
+而全部代价 —— 以同机二进制 A/B 为证 —— 是零个 token 每秒。
