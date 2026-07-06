@@ -131,6 +131,15 @@ extension BASQwen35MTPSpecDecoder {
         var traceTel: BASTraceExitTelemetry? = nil
         resetMTPStream()
         let cache = model.newCache(parameters: nil)
+        // 案1: entry composition guard — every layer must be snapshot-restorable or trimmable
+        // (the fail-closed check the model-free lanes carry and the MTP lanes lacked). A vendor
+        // or model change that introduces an unsupported cache refuses speculation up front
+        // instead of corrupting state mid-generation; plain keeps the B3 contract.
+        guard BASTrunkCheckpoint.compositionSupported(cache) else {
+            print("[fused] unsupported cache composition — fail-close to plain")
+            return generatePlain(prompt: prompt, maxTokens: maxTokens,
+                                 eosTokens: eosTokens, traceExit: traceExit)
+        }
         let h0 = model.hiddenStatesWithCache(
             MLXArray(prompt.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
         if dbgE { print("[fused-dbg] prefill graph built, eval…"); fflush(stdout) }
@@ -233,11 +242,7 @@ extension BASQwen35MTPSpecDecoder {
                 ds = draftAndCommit()
                 continue
             }
-            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
-            for c in cache where c is ArraysCache {
-                let m = c as! ArraysCache
-                snapshots.append((m, m[0], m[1]))
-            }
+            let checkpoint = BASTrunkCheckpoint(cache: cache)   // 案1: the ONE snapshot owner
             let P = pending.count
             let kNow = ds.count
             let T = P + kNow
@@ -271,6 +276,13 @@ extension BASQwen35MTPSpecDecoder {
             let host = packed.asArray(Int32.self)                      // ⚠ the ONE gpu sync per round
             if dbg { dbgVerifyMs += Date().timeIntervalSince(tv) * 1000 }
             let L = Int(host[0])
+            // 案1 always-on invariant: L ∈ [0, kNow] bounds every emitted-row index below
+            // (P-1+L ≤ T-1). A violation means a corrupt readback — fail-close, never emit from
+            // out-of-range rows (everything already out is a trunk argmax; stopping is safe).
+            guard L >= 0, L <= kNow else {
+                print("[fused] INVARIANT violated: L=\(L) kNow=\(kNow) — fail-close")
+                break
+            }
             let amH = host[1 ... T].map(Int.init)                      // trunk argmaxes, host side
             let entH = traceActive ? host[(T + 1)...].map(Int.init) : []   // millinats per row
             iters += 1
@@ -315,8 +327,10 @@ extension BASQwen35MTPSpecDecoder {
                     outCountAtExit: out.count)
                 for t in cfg.closeSequence where !stop { stop = !emit(t) }
                 if stop { break }              // budget died mid-injection — no refeed to waste (review LOW-3)
-                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
-                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                guard checkpoint.restore(cache: cache, trimming: T) else {
+                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    break
+                }
                 let feed = pending + Array(emitted[0 ... closeAt]) + cfg.closeSequence
                 let hp = model.hiddenStatesWithCache(
                     MLXArray(feed.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
@@ -334,8 +348,10 @@ extension BASQwen35MTPSpecDecoder {
                 hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
                 pending = [emitted.last!]
             } else {
-                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
-                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                guard checkpoint.restore(cache: cache, trimming: T) else {
+                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    break
+                }
                 hLast = h2[0, P - 1 + L]
                 hLastPos = trunkLen + P - 1 + L
                 pending.append(contentsOf: emitted)

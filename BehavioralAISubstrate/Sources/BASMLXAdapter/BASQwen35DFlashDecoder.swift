@@ -196,12 +196,8 @@ public final class BASQwen35DFlashDecoder {
             // 1. Draft 15 from the block anchored at pending.last (position vBase+|pending|-1).
             let anchor = MLXArray(Int32(pending.last!))
             let ds = draftBlock(anchor: anchor, blockStart: vBase + pending.count - 1)
-            // 2. Snapshot (GDN restore-by-reference; FA trim) — the MTP-lane mechanics verbatim.
-            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
-            for c in cache where c is ArraysCache {
-                let m = c as! ArraysCache
-                snapshots.append((m, m[0], m[1]))
-            }
+            // 2. Snapshot (GDN restore-by-reference; FA trim) — BASTrunkCheckpoint (案1 owner).
+            let checkpoint = BASTrunkCheckpoint(cache: cache)
             let P = pending.count
             let T = P + Self.blockSize - 1
             let input = concatenated([MLXArray(pending.map(Int32.init)), ds])
@@ -237,8 +233,10 @@ public final class BASQwen35DFlashDecoder {
                 pending = [emitted.last!]
                 vBase = trunkLen
             } else {
-                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
-                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                guard checkpoint.restore(cache: cache, trimming: T) else {
+                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    break
+                }
                 pending.append(contentsOf: emitted)
                 // vBase unchanged — pending still starts at the same absolute position.
             }

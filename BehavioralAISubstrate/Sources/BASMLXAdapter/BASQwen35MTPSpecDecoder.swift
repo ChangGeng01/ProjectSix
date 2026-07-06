@@ -445,11 +445,7 @@ public final class BASQwen35MTPSpecDecoder {
                 ds = draftChain()
                 continue
             }
-            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
-            for c in cache where c is ArraysCache {
-                let m = c as! ArraysCache
-                snapshots.append((m, m[0], m[1]))
-            }
+            let checkpoint = BASTrunkCheckpoint(cache: cache)   // 案1: the ONE snapshot owner
             let P = pending.count
             let T = P + k
             var parts: [MLXArray] = [MLXArray(pending.map(Int32.init))]
@@ -482,8 +478,10 @@ public final class BASQwen35MTPSpecDecoder {
                 hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
                 pending = [emitted.last!]
             } else {
-                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
-                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                guard checkpoint.restore(cache: cache, trimming: T) else {
+                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    break
+                }
                 hLast = h2[0, P - 1 + L]                            // hidden after the last CORRECT fed token
                 hLastPos = trunkLen + P - 1 + L
                 pending.append(contentsOf: emitted)
@@ -597,11 +595,7 @@ public final class BASQwen35MTPSpecDecoder {
                 pending = [t]
                 continue
             }
-            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
-            for c in cache where c is ArraysCache {
-                let m = c as! ArraysCache
-                snapshots.append((m, m[0], m[1]))
-            }
+            let checkpoint = BASTrunkCheckpoint(cache: cache)   // 案1: the ONE snapshot owner
             let (dId, qlp) = draftSample()
             let T = pending.count + 1
             let input = MLXArray((pending + [dId]).map(Int32.init)).expandedDimensions(axis: 0)
@@ -620,8 +614,10 @@ public final class BASQwen35MTPSpecDecoder {
                 hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
                 pending = [bonus]
             } else {
-                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
-                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                guard checkpoint.restore(cache: cache, trimming: T) else {
+                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    break
+                }
                 let r = categorical(verdict.residualLogits).item(Int.self)   // r ~ normalize(max(0, p − q))
                 _ = emit(r)
                 hLast = h2[0, T - 2]
@@ -681,11 +677,7 @@ public final class BASQwen35MTPSpecDecoder {
                     embedNext: model.embedding(MLXArray([Int32(t)]))[0], hidden: hLast, pos: hLastPos))
                 continue
             }
-            var snapshots: [(ArraysCache, MLXArray?, MLXArray?)] = []
-            for c in cache where c is ArraysCache {
-                let m = c as! ArraysCache
-                snapshots.append((m, m[0], m[1]))
-            }
+            let checkpoint = BASTrunkCheckpoint(cache: cache)   // 案1: the ONE snapshot owner
             let T = pending.count + 1
             let input = concatenated([
                 MLXArray(pending.map(Int32.init)), d.reshaped([1]).asType(.int32),
@@ -705,8 +697,10 @@ public final class BASQwen35MTPSpecDecoder {
                 hLast = h2[0, T - 1]; hLastPos = trunkLen - 1
                 pending = [em]
             } else {
-                for (m, s0, s1) in snapshots { m[0] = s0; m[1] = s1 }
-                for c in cache where !(c is ArraysCache) { _ = c.trim(T) }
+                guard checkpoint.restore(cache: cache, trimming: T) else {
+                    print("[spec] trim under-returned — fail-close (emitted tokens are all trunk argmaxes)")
+                    break
+                }
                 _ = emit(trueD)
                 hLast = h2[0, T - 2]                                   // hidden after the last CERTAIN token
                 hLastPos = trunkLen + T - 2                            // its absolute position (state rolled back)
