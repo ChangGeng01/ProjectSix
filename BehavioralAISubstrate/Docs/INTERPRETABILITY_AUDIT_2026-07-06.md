@@ -61,3 +61,18 @@ pooled 轮报获取方式(warm/pending-reclaim/spill-restore/transcript-migratio
 健康腿(投影折叠隔离)过。套件绿、缺口响、修复日强制显式确认。
 ④ **anti_syco 资源** — 入库+加载器+条款钉住测试(防反谄媚→反常态的 v2 教训条款单独钉)。
 回归:16,016 用例 0 新失败。
+
+---
+
+## 触发器按序评估 (2026-07-07 凌晨,4 评估员 file:line 取证)
+
+**判决:4/4 UNMET —— 不建即正确,章程按设计工作。** 每个触发器附"最便宜的合法翻转"(操作员可下的单命令,非绕过)。
+
+| # | 触发器 | 判决 | 关键证据 | 最便宜合法翻转 |
+|---|---|---|---|---|
+| 1 | zh 词表(需诚实观测有署名消费者) | UNMET | ②-observe sink 在**所有**生产宿主为 nil(RunTurn:1304 计算根本不跑);store 仅测试;唯一活消费=DeviceTestApp 评测日志行。**层级事实**:turn line 在 BASMLXAdapter,不依赖 BASSovereign——廉价消费者在宿主层 | 下令"把三轴 band 打进每轮日志":宿主层 ~10 行(sink→🪞 行,BAS_HONESTY_OBSERVE=1 门内);中文体先打 `band=n/a(zh)` 防假绿 |
+| 2 | P1 观察者缝(需每 token 干预立项) | UNMET | CGR=黄旗 do-not-build(ef46f6b77 已指定干净离线复验法);emission-guard 零代码零章程;probe-D 不可判(模型太强无失败类);B3/TR 两个活的每 token 消费者都由**单读回扩展**服务(两次证明,+0.4ms) | 下令 CGR 干净离线复验(harness 在,BAS_CGR_VALIDATE=1,一下午);分离才立项;立项后先查单读回可否承载 |
+| 3 | 持久收据(需 keychain 托管 ∧ 明确 opt-in ∧ 历史查询实证) | UNMET (0/3) | keychain 原语**已在库且有测试**(BASSovereignKeychainBinding)但零生产调用者+R1 设计未定(可达性类/迁移语义/轮换;SE 不支持 Ed25519);opt-in 面不存在;签名/封链机械已生产默认(Rust routed seal)。决定后代码距离仅 ~20 行工厂+1 旗 | 下令 R1 钥匙托管 ADR(纯决策零表面);(b)(c) 无法代码侧合法制造 |
+| 4 | 中层 taps/persona 读探针(需转向战役 ADR) | UNMET | ADR-006..041 无转向;★**经验前提已在测过的轴上失败**:BASMultiTurnPressureTests 基座 4B 多轮权威施压 **0/5 服软**(cf2725d98"B targets a non-problem");tap 面休眠可用(hiddenStatesWithTaps 任意层,零生产调用者)→ 真立项时读探针≈1 天 harness,无需 P1 缝无需 vendor 改动 | 下令把压力 harness 扩到两条未测轴(中文施压轮/观点-谄媚-含糊轴);实测服软才立 ADR-042(user-is-right 回归守卫强制) |
+
+**评估顺带入册的三个硬事实**:①zh 支持是研究非接线的机制性证明——否定词窗口按空格分词(:107-110),无分词中文上朴素移植会把"不完美"计为吹捧,重蹈该文件头部已修过的 bug;②转向战役的经验前提在已测轴上是**非问题**(0/5 服软),未来立项必须落在未测轴或 anti_syco 提示词的实测失效上;③卫生项:DeviceTestApp endurance runner **无条件**武装 file-key 收据 sink(每次跑写签名收据进 Documents)——参考宿主,低优先,但与 opt-in 姿态不符,记录在案。
