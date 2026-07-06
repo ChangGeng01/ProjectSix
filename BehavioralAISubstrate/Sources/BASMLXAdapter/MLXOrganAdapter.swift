@@ -1252,7 +1252,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 instructions: nil,
                 history: Self.chatMessages(from: seedTranscript),
                 generateParameters: _generateParameters(
-                    for: request.preset, maxOutputTokens: request.maxOutputTokens))
+                    for: request.preset, maxOutputTokens: request.maxOutputTokens),
+                additionalContext: Self._sessionAdditionalContext)
             sessions[key] = ChatSessionBox(session: rehydrated)
             fusedTranscripts.removeValue(forKey: key)
         case .pooled:
@@ -1291,7 +1292,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 instructions: nil,
                 history: Self.chatMessages(from: transcript),
                 generateParameters: _generateParameters(
-                    for: request.preset, maxOutputTokens: request.maxOutputTokens))
+                    for: request.preset, maxOutputTokens: request.maxOutputTokens),
+                additionalContext: Self._sessionAdditionalContext)
             box = ChatSessionBox(session: migrated)
             sessions[key] = box
             fusedTranscripts.removeValue(forKey: key)
@@ -1306,7 +1308,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                     request.personaInstructions ?? Self.systemInstructions(for: request),
                 generateParameters: _generateParameters(
                     for: request.preset,
-                    maxOutputTokens: request.maxOutputTokens))
+                    maxOutputTokens: request.maxOutputTokens),
+                additionalContext: Self._sessionAdditionalContext)
             box = ChatSessionBox(session: fresh)
             sessions[key] = box
             poolAcquisition = "fresh"
@@ -1418,6 +1421,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     static let cappedFusedMaxHistoryTokens = 1024
     /// Transcript-land sessions hold NO KV — bounded separately from the ChatSession pool.
     static let maxTranscriptSessions = 64
+
+    /// Opt-in `enable_thinking=false`(BAS_DISABLE_THINKING=1)— the streaming path's existing
+    /// seam extended to the POOLED session lane (观点施压轴 harness 需要格式化最终答案;v12 诚实
+    /// 测量全部 thinking-off 先例)。Default nil ⇒ byte-unchanged。
+    nonisolated static var _sessionAdditionalContext: [String: any Sendable]? {
+        ProcessInfo.processInfo.environment["BAS_DISABLE_THINKING"] == "1"
+            ? ["enable_thinking": false] : nil
+    }
 
     /// 案3 (2026-07-06 decode-OS audit): the session LANE election as ONE pure function — the
     /// audit found three inline guard chains re-deriving route class per turn (the seam-1/4 bug
@@ -1627,7 +1638,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         try? FileManager.default.removeItem(at: url)
         spillRestoreCount += 1
         return ChatSessionBox(session: ChatSession(
-            container, instructions: nil, cache: box.cache, generateParameters: params))
+            container, instructions: nil, cache: box.cache, generateParameters: params,
+            additionalContext: Self._sessionAdditionalContext))
     }
     /// B5: install a (restored) session under the key, honoring the pool's LRU bound.
     func _installSession(_ session: ChatSession, sessionID: String, role: BASOrganRole) async {
