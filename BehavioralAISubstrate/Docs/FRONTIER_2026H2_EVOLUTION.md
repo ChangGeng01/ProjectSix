@@ -6,6 +6,29 @@ test-time-compute / Apple-platform / radical-futurist), ~100 web calls, every cl
 **Differential to:** DECODE_ACCEL_FRONTIER_2026.md, FRONTIER_2026_PLAYBOOK.md, biomimetic-brain (June 2026).
 **Hard filter:** A19 batch-1 bandwidth-bound · 满血 lossless trunk · ADR-014 opt-in · spec speedup=(1+a)/(1+f·K).
 
+---
+
+## ★ ARCHIVE STAMP — CAMPAIGN CLOSED 2026-07-06
+
+One continuous arc, 2026-07-04 → 07-06, every verdict device-evidenced:
+
+**Phase 1 — Sweep** (8223f94d1): 6 parallel research agents, ~100 web calls, 2 load-bearing agent
+conflicts hand-adjudicated (DFlash checkpoint EXISTS / mlx-lm has NO spec lane).
+**Phase 2 — Ten verdicts** (a6d805c3b → 65d432103): B3 shipped+promoted · B4 shipped · M3 closed ·
+B2 shipped · M1 honest-FAIL · M2 don't-swap · B5 shipped · B1 closed-rescoped (★Air=59GB/s
+re-base) · M4 closed (57% stable plateau) · M5 deferred-w/-triggers.
+**Phase 3 — Promotions + gap closures** (8890aa2de → 0e57fbad8): B2 promoted (composition co-gate)
+· B3 determinism fix · B5 spill default-ON (5-take endurance cert) · capped-fused session lane
+default-ON (mixed-traffic batch). Three REAL bugs caught by the cert machinery and fixed same-day:
+①B3 entropy-window round-structure coupling ②restored-session parameter loss ③session-lane B3 gap.
+
+**The stack as archived**: fused-MTP lane (25.7 tok/s, ABOVE the Air's 25.0 plain bandwidth wall)
++ B2 budget refinement (armed-when-capped) + B3 trace-exit (all lanes incl. sessions) + B4
+predictive thermal & QoS + B5 KV persistence/spill (default-on) + capped-fused session routing
+(default-on). All kill-switched, all device-certified. Next sweep runs differential to this doc.
+
+---
+
 **Conflict adjudicated by hand (2026-07-04):** agents disagreed on DFlash availability. Verified directly:
 `z-lab/Qwen3.5-4B-DFlash` **EXISTS on HF** (0.6B drafter, target = our exact base, block 8/16, Apache-2.0,
 40k-seq retrain) — but **mlx-lm ships NO spec lane** (README verified: zero mention of dflash/eagle/mtp;
