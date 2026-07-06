@@ -141,7 +141,8 @@ extension BASQwen35MTPSpecDecoder {
         let cap = postPrefillBudget.map { max(8, $0(hLast)) } ?? maxTokens
         var hLastPos = prompt.count - 1
         var trunkLen = prompt.count
-        var pending: [Int] = [argmaxLast(model.logits(fromHidden: h0))]
+        let (t0Tok, t0Ent) = argmaxAndEntropy(model.logits(fromHidden: h0)[0, -1])
+        var pending: [Int] = [t0Tok]
         var out: [Int] = []
         var acceptedTok = 0, iters = 0
         var hitEOS = false
@@ -183,17 +184,32 @@ extension BASQwen35MTPSpecDecoder {
             mtpV[hLastPos ..< hLastPos + kEff] = stacked(vs, axis: 0)
             return ds
         }
-        // Signal-free observation (prefill / refeed argmaxes carry no packed entropy): tracks the
-        // think open/close markers; a .close verdict HERE is deferred — these paths have no verify
-        // round in flight to unwind, and the persisting condition refires within the next round.
-        func observeNoSignal(_ tok: Int) {
-            _ = tracePolicy?.observe(token: tok, entropyMillinats: nil,
+        // Non-round emissions (prefill / refeed argmaxes) MUST carry entropy too — nil-entropy
+        // tokens made the window's fill rhythm depend on ROUND STRUCTURE, which depends on the
+        // cross-turn adaptive-K EMA ⇒ nondeterministic exit points between byte-identical prompts
+        // (the device co-gate caught the identity violation 2026-07-06). One packed readback.
+        func argmaxAndEntropy(_ lastRow: MLXArray) -> (tok: Int, ent: Int?) {
+            guard tracePolicy != nil, !(tracePolicy?.closed ?? true) else {
+                return (argMax(lastRow, axis: -1).item(Int.self), nil)
+            }
+            let lf = lastRow.asType(.float32)
+            let pr = softmax(lf, axis: -1)
+            let ent = -(pr * log(pr + 1e-9)).sum(keepDims: false)
+            let packed = concatenated([argMax(lastRow, axis: -1).reshaped([1]).asType(.int32),
+                                       (ent * 1000).asType(.int32).reshaped([1])])
+            let host = packed.asArray(Int32.self)
+            return (Int(host[0]), Int(host[1]))
+        }
+        // A .close verdict HERE is deferred — these paths have no verify round in flight to
+        // unwind; the persisting condition refires within the next round.
+        func observeCarrying(_ tok: Int, _ ent: Int?) {
+            _ = tracePolicy?.observe(token: tok, entropyMillinats: ent,
                                      outCount: out.count, maxTokens: cap)
         }
         let dbg = ProcessInfo.processInfo.environment["BAS_MTP_FUSED_DEBUG"] == "1"
         var dbgSlow = 0, dbgChainMs = 0.0, dbgVerifyMs = 0.0
         _ = emit(pending[0])
-        observeNoSignal(pending[0])
+        observeCarrying(pending[0], t0Ent)
         if dbg { print("[fused-dbg] prefill done, first chain…"); fflush(stdout) }
         var ds = draftAndCommit()
         if dbg { print("[fused-dbg] first chain built"); fflush(stdout) }
@@ -209,9 +225,9 @@ extension BASQwen35MTPSpecDecoder {
                     MLXArray(pending.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
                 trunkLen += pending.count
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
-                let t = argmaxLast(model.logits(fromHidden: hp))
+                let (t, tEnt) = argmaxAndEntropy(model.logits(fromHidden: hp)[0, -1])
                 if !emit(t) { break }
-                observeNoSignal(t)
+                observeCarrying(t, tEnt)
                 pending = [t]
                 ds = draftAndCommit()
                 continue
@@ -303,9 +319,9 @@ extension BASQwen35MTPSpecDecoder {
                     MLXArray(feed.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
                 trunkLen += feed.count
                 hLast = hp[0, hp.dim(1) - 1]; hLastPos = trunkLen - 1
-                let t = argmaxLast(model.logits(fromHidden: hp))
+                let (t, tEnt) = argmaxAndEntropy(model.logits(fromHidden: hp)[0, -1])
                 if !emit(t) { break }
-                observeNoSignal(t)
+                observeCarrying(t, tEnt)
                 pending = [t]
                 ds = draftAndCommit()
                 continue
