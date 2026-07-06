@@ -1207,6 +1207,45 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             fusedTranscripts.removeValue(forKey: key)
         }
 
+        // B3-gap closure: greedy CAPPED turns (≤384) ride the fused loop (B3 trace-exit + B2
+        // probe + MTP live there) while the session has no ChatSession and the history fits.
+        // Transcript sessions carry no KV — they do NOT enter the pool LRU (own FIFO bound).
+        if Self.sessionCappedFusedEnabled, sessions[key] == nil,
+           request.preset.temperature == 0, _resolveMTPWeightsURL() != nil,
+           let cap = request.maxOutputTokens, cap <= 384 {
+            var transcript = fusedTranscripts[key] ?? [
+                (role: "system", text: request.personaInstructions ?? Self.systemInstructions(for: request)),
+            ]
+            let estTokens = BASOrganDeterministicAdapter.estimateTokens(
+                from: transcript.map(\.text) + [request.instruction])
+            if estTokens < Self.cappedFusedMaxHistoryTokens {
+                if dbgS { NSLog("[sess-dbg] %@ capped-fused est=%d", key, estTokens) }
+                transcript.append((role: "user", text: Self.prompt(for: request)))
+                let r = try await _generateMTPSpecFromMessages(transcript, for: request)
+                transcript.append((role: "assistant", text: r.draft.body))
+                fusedTranscripts[key] = transcript
+                if fusedTranscripts.count > Self.maxTranscriptSessions {
+                    // FIFO-ish bound: drop an arbitrary non-self entry (transcripts are tiny RAM;
+                    // the bound only guards pathological seat cardinality).
+                    if let drop = fusedTranscripts.keys.first(where: { $0 != key }) {
+                        fusedTranscripts.removeValue(forKey: drop)
+                    }
+                }
+                return r.draft
+            }
+            // History outgrew the stateless budget: transition ONCE to a ChatSession (KV reuse),
+            // seeded from the transcript — the vendored init(history:) contract.
+            if dbgS { NSLog("[sess-dbg] %@ capped-fused TRANSITION est=%d", key, estTokens) }
+            let rehydrated = ChatSession(
+                container,
+                instructions: nil,
+                history: Self.chatMessages(from: transcript),
+                generateParameters: _generateParameters(
+                    for: request.preset, maxOutputTokens: request.maxOutputTokens))
+            sessions[key] = ChatSessionBox(session: rehydrated)
+            fusedTranscripts.removeValue(forKey: key)
+        }
+
         let box: ChatSessionBox
         if let existing = sessions[key] {
             if dbgS { NSLog("[sess-dbg] %@ pooled", key) }
@@ -1318,6 +1357,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _sessionBox(sessionID: String, role: BASOrganRole) -> ChatSessionBox? {
         sessions[Self.sessionKey(sessionID, role)]
     }
+    /// B3-gap closure lane (spill-cert take-4 structural finding): CAPPED session turns route
+    /// through the FUSED loop — the pooled ChatSession path has no trace-exit, so small-cap turns
+    /// on the thinking model truncate inside <think>. Opt-in pending its own cert (ADR-014).
+    nonisolated static var sessionCappedFusedEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_SESSION_CAPPED_FUSED"] == "1"
+    }
+    /// The capped-fused route serves histories up to this estimate (stateless re-prefill stays
+    /// cheaper than losing B3/B2/MTP; beyond it the turn falls through to ChatSession KV-reuse).
+    static let cappedFusedMaxHistoryTokens = 1024
+    /// Transcript-land sessions hold NO KV — bounded separately from the ChatSession pool.
+    static let maxTranscriptSessions = 64
+
     /// B5 spill lane — DEFAULT ON since the 2026-07-06 endurance cert (6 seats over a 4-cap pool,
     /// 55 spill/55 restore cycles, recall 10/10, stable latency at serious thermal, zero hangs;
     /// the cert also caught + fixed the restored-session parameter loss). LRU-evicted sessions

@@ -135,4 +135,12 @@ on ChatSession DEFAULT generate parameters** — no token cap, sampling temp; on
 decoded 5,604 chars (also the take-1 1-hour silent hang) — FIXED (params flow through
 _restoreFromSpill + restoreSession); (take-4) exposed a STRUCTURAL gap: the pooled ChatSession
 lane has **no B3 trace-exit** — small-cap turns on a thinking model truncate inside the think
-block (recorded follow-up: extend B3 to the session lane or route via the fused lane).
+block.
+**GAP CLOSED (2026-07-06)** — the CAPPED-FUSED session lane (BAS_SESSION_CAPPED_FUSED=1, opt-in):
+greedy session turns with cap ≤384 and history ≤1024 est-tokens route through the fused loop
+(B3+B2+MTP live) in transcript-land — no ChatSession, no KV pool pressure; history overflow
+transitions ONCE to ChatSession via init(history:). DEVICE CERT: **cap-48 recall 6/6**
+(the exact take-4 failure shape), pooled_sessions=0, all three levers composing in telemetry
+(probe 0.88-0.98, budget guard closing think at 2-16 tokens — correct for tiny caps). Noted
+behavior: sub-64 caps normalize UP to the 64 tier on easy questions (the probe's tier lattice).
+Default-on rides a future endurance batch.

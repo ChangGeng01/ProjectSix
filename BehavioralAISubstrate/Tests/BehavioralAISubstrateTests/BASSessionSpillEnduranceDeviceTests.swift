@@ -103,4 +103,50 @@ final class BASSessionSpillEnduranceDeviceTests: XCTestCase {
         throw XCTSkip("MLXLLM unavailable")
         #endif
     }
+
+    /// B3-gap closure cert (TEST_RUNNER_BAS_CAPPED_FUSED_CERT=1 + TEST_RUNNER_BAS_SESSION_CAPPED_FUSED=1):
+    /// capped session turns route through the fused loop — codeword recall must hold at **cap 48**
+    /// (the exact shape that failed take-4 on the ChatSession lane: thinking ate the budget; the
+    /// fused loop's B3 budget guard reserves the answer tail). Also asserts the sessions really
+    /// live in transcript-land (no ChatSession created).
+    func testCappedFusedSessionRecall() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_CAPPED_FUSED_CERT"] == "1" else {
+            throw XCTSkip("set TEST_RUNNER_BAS_CAPPED_FUSED_CERT=1 (+BAS_SESSION_CAPPED_FUSED=1)")
+        }
+        #if canImport(MLXLLM)
+        XCTAssertTrue(MLXOrganAdapter.sessionCappedFusedEnabled, "runner must arm the lane")
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        try await adapter.loadModel()
+        let codewords = ["lantern", "obsidian", "cascade"]
+        func turn(_ seat: Int, _ text: String) async throws -> String {
+            try await adapter.draft(BASOrganRequest(
+                requestID: "cf-\(seat)-\(abs(text.hashValue))", role: .core,
+                preset: .greedyDeterministic, instruction: text, maxOutputTokens: 48,
+                sessionID: "cfseat\(seat)")).body
+        }
+        for (i, w) in codewords.enumerated() {
+            _ = try await turn(i, "My codeword is \(w). Remember it. Reply with just: OK.")
+        }
+        var correct = 0
+        let probes = 6
+        for p in 0 ..< probes {
+            let seat = p % 3
+            _ = try await turn(seat, "Add one short sentence to our story about the sea.")
+            let a = try await turn(seat, "What is my codeword? Answer with the single word only.")
+            if a.localizedCaseInsensitiveContains(codewords[seat]) {
+                correct += 1
+            } else {
+                print("[capped-fused] MISS seat\(seat) expected \(codewords[seat]) got: \(a.prefix(80))")
+            }
+        }
+        let pooled = await adapter.sessionCount()
+        print("[capped-fused] VERDICT recall=\(correct)/\(probes) pooled_sessions=\(pooled)")
+        XCTAssertEqual(correct, probes, "cap-48 recall must be 100% on the fused session lane")
+        XCTAssertEqual(pooled, 0, "capped turns must stay in transcript-land (no ChatSession)")
+        #else
+        throw XCTSkip("MLXLLM unavailable")
+        #endif
+    }
 }
