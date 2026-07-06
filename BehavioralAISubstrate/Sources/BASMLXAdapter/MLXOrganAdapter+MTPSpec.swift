@@ -42,7 +42,7 @@ extension MLXOrganAdapter {
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
-        let diffProbe = _armedDifficultyProbe()
+        let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
@@ -108,7 +108,7 @@ extension MLXOrganAdapter {
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
-        let diffProbe = _armedDifficultyProbe()
+        let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
@@ -217,9 +217,15 @@ extension MLXOrganAdapter {
         return FileManager.default.fileExists(atPath: tmp.path) ? tmp : nil
     }
 
-    /// B2 — the armed probe (nil unless BAS_DIFF_PROBE=1 AND weights resolve+parse). Cached.
-    func _armedDifficultyProbe() -> BASDifficultyProbe? {
-        guard ProcessInfo.processInfo.environment["BAS_DIFF_PROBE"] == "1" else { return nil }
+    /// B2 — the armed probe. PROMOTED 2026-07-06 (the B3 arming shape): arms in PRODUCTION on
+    /// budget-capped requests whenever weights resolve (the effort loop's turns), because the
+    /// refinement is bounded ±1 tier AND the B3 budget guard protects the answer tail on any
+    /// downshift (the composition the device co-gate validates). BAS_DIFF_PROBE=1 force-arms
+    /// un-capped turns (probes); BAS_DIFF_PROBE_OFF=1 is the ADR-014 kill-switch.
+    func _armedDifficultyProbe(requestCapped: Bool) -> BASDifficultyProbe? {
+        let env = ProcessInfo.processInfo.environment
+        guard env["BAS_DIFF_PROBE_OFF"] != "1" else { return nil }
+        guard env["BAS_DIFF_PROBE"] == "1" || requestCapped else { return nil }
         if !diffProbeResolved {
             diffProbeResolved = true
             diffProbeBox = Self._resolveDiffProbeURL().flatMap { try? BASDifficultyProbe(weightsURL: $0) }
