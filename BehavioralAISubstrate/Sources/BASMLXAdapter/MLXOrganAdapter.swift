@@ -1166,6 +1166,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // Composite key — same caller session ID with different
         // role gets its own ChatSession (different system prompt).
         let key = Self.sessionKey(sessionID, request.role)
+        let dbgS = ProcessInfo.processInfo.environment["BAS_SESSION_DEBUG"] == "1"
+        if dbgS { NSLog("[sess-dbg] %@ enter", key) }
 
         // 会话→加速lane: greedy + short history + MTP head present + no ChatSession yet → the stateless
         // fused path (device-measured faster below the crossover). Past the budget: re-hydrate a
@@ -1207,11 +1209,16 @@ public actor MLXOrganAdapter: BASOrganAdapter {
 
         let box: ChatSessionBox
         if let existing = sessions[key] {
+            if dbgS { NSLog("[sess-dbg] %@ pooled", key) }
             box = existing
-        } else if let restored = await _restoreFromSpill(key: key, container: container) {
+        } else if let restored = await _restoreFromSpill(
+            key: key, container: container,
+            params: _generateParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)) {
+            if dbgS { NSLog("[sess-dbg] %@ spill-restored", key) }
             box = restored                                  // B5: warm-start from the spill file
             sessions[key] = restored
         } else {
+            if dbgS { NSLog("[sess-dbg] %@ fresh", key) }
             let fresh = ChatSession(
                 container,
                 // P2: per-seat persona (frozen at creation — sessions keep their system prompt);
@@ -1228,16 +1235,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         // evict the least-recently-used session beyond the cap (its KV frees with the ChatSession).
         sessionLRU.removeAll { $0 == key }
         sessionLRU.append(key)
+        if dbgS { NSLog("[sess-dbg] %@ pre-evict lru=%d", key, sessionLRU.count) }
         await _evictBeyondCap()
+        if dbgS { NSLog("[sess-dbg] %@ post-evict", key) }
 
         let prompt = Self.prompt(for: request)
         // P2 gap #5: bounded-concurrency gate around the decode (see maxConcurrentSessionDecodes).
         await acquireSessionDecodeSlot()
         defer { releaseSessionDecodeSlot() }
+        if dbgS { NSLog("[sess-dbg] %@ slot acquired (active=%d)", key, activeSessionDecodes) }
         // Same byte-equal stream-consume as draft(_:) — also surfaces the real prefill/decode metrics. On a
         // REUSED session (KV warm) the captured `promptTokenCount` reflects only the new turn → this is also
         // how the Phase-2 KV-reuse lever would be measured.
         let (rawBody, completionInfo) = try await Self.streamBody(box.session, prompt: prompt)
+        if dbgS { NSLog("[sess-dbg] %@ decoded %d chars", key, rawBody.count) }
         let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
         return _buildDraft(
@@ -1307,10 +1318,13 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _sessionBox(sessionID: String, role: BASOrganRole) -> ChatSessionBox? {
         sessions[Self.sessionKey(sessionID, role)]
     }
-    /// B5 spill lane (BAS_SESSION_SPILL=1): LRU-evicted sessions snapshot to Caches instead of
-    /// losing their KV; a session miss tries the spill file before re-prefilling from scratch.
+    /// B5 spill lane — DEFAULT ON since the 2026-07-06 endurance cert (6 seats over a 4-cap pool,
+    /// 55 spill/55 restore cycles, recall 10/10, stable latency at serious thermal, zero hangs;
+    /// the cert also caught + fixed the restored-session parameter loss). LRU-evicted sessions
+    /// snapshot to Caches instead of losing their KV; a session miss warm-restores from the spill
+    /// file before re-prefilling. BAS_SESSION_SPILL=0 is the ADR-014 kill-switch.
     nonisolated static var sessionSpillEnabled: Bool {
-        ProcessInfo.processInfo.environment["BAS_SESSION_SPILL"] == "1"
+        ProcessInfo.processInfo.environment["BAS_SESSION_SPILL"] != "0"
     }
     nonisolated static func _spillURL(forKey key: String) -> URL {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -1325,13 +1339,26 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
             sessionLRU.removeFirst()
             if let victim = sessions.removeValue(forKey: oldest), Self.sessionSpillEnabled {
-                _ = try? await Self._persist(victim, url: Self._spillURL(forKey: oldest),
-                                             quantizeKV: false)
+                if (try? await Self._persist(victim, url: Self._spillURL(forKey: oldest),
+                                             quantizeKV: false)) != nil {
+                    spillCount += 1
+                }
             }
         }
     }
+    /// B5 cert telemetry.
+    var spillCount = 0
+    var spillRestoreCount = 0
+    public func sessionSpillStats() -> (spilled: Int, restored: Int) {
+        (spillCount, spillRestoreCount)
+    }
     /// Try to warm-restore `key` from its spill file (one-shot: the file is consumed).
-    func _restoreFromSpill(key: String, container: ModelContainer) async -> ChatSessionBox? {
+    /// `params` MUST carry the restoring request's generate parameters — the spill-cert take-3
+    /// probes caught a restored session running on ChatSession DEFAULTS (no token cap, sampling
+    /// temperature): one "48-token" turn decoded 5,604 chars before the watchdog fired.
+    func _restoreFromSpill(
+        key: String, container: ModelContainer, params: GenerateParameters
+    ) async -> ChatSessionBox? {
         guard Self.sessionSpillEnabled else { return nil }
         let url = Self._spillURL(forKey: key)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
@@ -1343,7 +1370,9 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             return CacheBox(cache: fresh)
         }) else { return nil }
         try? FileManager.default.removeItem(at: url)
-        return ChatSessionBox(session: ChatSession(container, instructions: nil, cache: box.cache))
+        spillRestoreCount += 1
+        return ChatSessionBox(session: ChatSession(
+            container, instructions: nil, cache: box.cache, generateParameters: params))
     }
     /// B5: install a (restored) session under the key, honoring the pool's LRU bound.
     func _installSession(_ session: ChatSession, sessionID: String, role: BASOrganRole) async {

@@ -125,7 +125,14 @@ byte-identity 5/5; the probe downshifted every easy factual turn 320→160 (p_su
 **B3 determinism fix en route (8890aa2de)** — the co-gate take-1 caught identity violations:
 nil-entropy tokens tied the entropy window to ROUND STRUCTURE (→ the cross-turn adaptive-K EMA);
 every emitted token now carries entropy. The co-gate's third real catch.
-**B5 production consumer (482525d55)** — the LRU-SPILL lane (BAS_SESSION_SPILL=1): evicted seats
-warm-park to disk, restore on return (one-shot files); e2e proven (seat evicted → returns →
-remembers). Remaining opt-ins by design: spill default-off pending endurance cert; device
-persist smoke rides the next device batch.
+**B5 production consumer (482525d55)** — the LRU-SPILL lane: evicted seats warm-park to disk,
+restore on return (one-shot files).
+**B5 SPILL DEFAULT-ON (2026-07-06)** — endurance cert PASS on device (6 seats over a 4-cap pool,
+6-min churn: **55 spill/55 restore cycles, codeword recall 10/10, latency stable at serious
+thermal, zero hangs**; BAS_SESSION_SPILL=0 = kill-switch). The cert run earned its keep THREE
+times over: (take-2/3) the per-turn watchdog + adapter probes caught **restored sessions running
+on ChatSession DEFAULT generate parameters** — no token cap, sampling temp; one "48-token" turn
+decoded 5,604 chars (also the take-1 1-hour silent hang) — FIXED (params flow through
+_restoreFromSpill + restoreSession); (take-4) exposed a STRUCTURAL gap: the pooled ChatSession
+lane has **no B3 trace-exit** — small-cap turns on a thinking model truncate inside the think
+block (recorded follow-up: extend B3 to the session lane or route via the fused lane).

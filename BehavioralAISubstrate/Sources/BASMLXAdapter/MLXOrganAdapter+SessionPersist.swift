@@ -47,9 +47,12 @@ extension MLXOrganAdapter {
     /// in a ChatSession and installed under `sessionID#role` (replacing any existing session).
     /// `instructions` must be nil when the snapshot already encodes the system prompt (it does,
     /// for sessions persisted after their first turn) — the upstream re-tokenization trap.
+    /// `generateParameters` must be supplied for bounded decoding — restored sessions do NOT
+    /// inherit any prior session's parameters (the spill-cert unbounded-generation lesson).
     public func restoreSession(
         sessionID: String, role: BASOrganRole = .core, from url: URL,
-        instructions: String? = nil
+        instructions: String? = nil,
+        generateParameters: GenerateParameters = .init(maxTokens: 512, temperature: 0)
     ) async throws {
         guard let container = _loadedContainerForStreaming() else {
             throw SessionPersistError.notLoaded
@@ -61,7 +64,8 @@ extension MLXOrganAdapter {
             for c in fresh { eval(c.innerState()) }
             return CacheBox(cache: fresh)
         }
-        let session = ChatSession(container, instructions: instructions, cache: box.cache)
+        let session = ChatSession(container, instructions: instructions, cache: box.cache,
+                                  generateParameters: generateParameters)
         await _installSession(session, sessionID: sessionID, role: role)
     }
 }
