@@ -77,3 +77,33 @@ extension BASB2RefitLoopTests {
         XCTAssertEqual(rejected.state, .rejected)
     }
 }
+
+extension BASB2RefitLoopTests {
+    /// R2 走环:judge JSON → FSM(判据未过 ⇒ rejected)→ 收据持久。
+    func testWalkR2FromJudgement() throws {
+        let judgeURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r2_judgement.json")
+        guard let data = try? Data(contentsOf: judgeURL),
+              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let verdict = j["verdict"] as? String,
+              let inc = j["incumbent_on_device_heldout"] as? [String: Any],
+              let cand = j["candidate"] as? [String: Any],
+              let boot = j["paired_bootstrap"] as? [String: Any]
+        else { throw XCTSkip("no R2 judgement — run b2_r2_pipeline.py judge first") }
+        var c = BASImprovementCandidate(
+            id: "2026-07-07-b2-refit-r2", kind: .constant,
+            currentValueProvenance: "probe_weights_v2.json(Mac 特征拟合)on 设备 heldout n=360",
+            currentValue: "AUC \(inc["auc"] ?? "?") (math \(inc["math"] ?? "?") broad \(inc["broad"] ?? "?"))",
+            proposedValue: "设备语料 λ=\(cand["lam"] ?? "?")×\(cand["iters"] ?? "?") → AUC \(cand["auc"] ?? "?") (math \(cand["math"] ?? "?") broad \(cand["broad"] ?? "?"))",
+            preRegisteredCriteriaRef: "RSI_IMPLANT_CHARTER 第五部分 R2/J2(配对 bootstrap)",
+            evidenceRefs: ["/tmp/gdn_coreai/b2_r2_evidence.json", "/tmp/gdn_coreai/b2_r2_judgement.json",
+                           "corpus sha=a72caf5978…(n=1171 设备同源)",
+                           "bootstrap Δ=\(boot["delta"] ?? "?") CI95=\(boot["ci95"] ?? "?")"])
+        c = try c.transitioned(to: .shadowTesting, atMs: 1, reasonCodes: ["R1 grid on device corpus"])
+        XCTAssertEqual(verdict, "REJECTED", "本轮判决应为 REJECTED(判据三项全未过)")
+        c = try c.transitioned(to: .rejected, atMs: 2,
+                               reasonCodes: ["J2: CI [-0.0297,+0.0344] 含 0", "Δ=0.0017<0.01",
+                                             "math 0.900 vs 0.916 越域容差 −0.016"])
+        print("📜 " + c.receiptLine(gitHash: "j2-verdict-2026-07-07"))
+        try JSONEncoder().encode(c).write(to: URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r2_candidate_fsm.json"))
+    }
+}
