@@ -126,3 +126,43 @@ extension BASB2RefitLoopTests {
         try JSONEncoder().encode(c).write(to: r2fsmURL)
     }
 }
+
+extension BASB2RefitLoopTests {
+    /// R4 走环:纯确认轮(功效充足)→ FSM rejected,理由 = alpha 真赢但 math 真损的权衡。
+    func testWalkR4FromJudgement() throws {
+        let judgeURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r4_judgement.json")
+        guard let data = try? Data(contentsOf: judgeURL),
+              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let verdict = j["verdict"] as? String,
+              let a = j["alpha_primary"] as? [String: Any],
+              let m = j["math_guard"] as? [String: Any]
+        else { throw XCTSkip("no R4 judgement — run judge4 first") }
+        let fsmURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r4_candidate_fsm.json")
+        if let d = try? Data(contentsOf: fsmURL) {
+            guard let existing = try? JSONDecoder().decode(BASImprovementCandidate.self, from: d) else {
+                return XCTFail("R4 FSM 不可解码——守卫拒绝旁路")
+            }
+            if [.rejected, .adopted, .rolledBack].contains(existing.state) {
+                throw XCTSkip("R4 candidate already terminal \(existing.state.rawValue)")
+            }
+        }
+        var c = BASImprovementCandidate(
+            id: "2026-07-07-b2-refit-r4", kind: .constant,
+            currentValueProvenance: "probe_weights_v2.json on 全新设备题库 n=572(alpha n=277)",
+            currentValue: "alpha \(a["inc"] ?? "?") / math \(m["inc"] ?? "?")",
+            proposedValue: "设备拟合:alpha \(a["cand"] ?? "?")(Δ\(a["delta"] ?? "?")双CI清零)/ math \(m["cand"] ?? "?")(Δ\(m["delta"] ?? "?"))",
+            preRegisteredCriteriaRef: "RSI_IMPLANT_CHARTER 第六部分 R4/J4(纯确认,双 CI 同号)",
+            evidenceRefs: ["/tmp/gdn_coreai/b2_r4_judgement.json", "corpus sha 413349cb…",
+                           "★alpha 效应 CONFIRMED:Δ+0.148 行级[0.056,0.239]∧簇级[0.061,0.257]",
+                           "★math 非劣 FAIL:Δ−0.115[−0.175,−0.056] = 真权衡非噪声"])
+        c = try c.transitioned(to: .shadowTesting, atMs: 1, reasonCodes: ["R4 纯确认,功效充足 n_neg alpha=86 math=193"])
+        XCTAssertEqual(verdict, "REJECTED")
+        XCTAssertEqual(a["n_neg"] as? Int, 86, "alpha 功效脱离悬崖")
+        c = try c.transitioned(to: .rejected, atMs: 2, reasonCodes: [
+            "R2 alpha 发现 CONFIRMED(双 bootstrap 同号清零)——环工作了",
+            "但候选是权衡非帕累托改进:math −0.115 击穿非劣门",
+            "生产不采纳单一权重;levers=按 purpose 路由 alpha↔math 或域自适应权重"])
+        print("📜 " + c.receiptLine(gitHash: "j4-verdict-2026-07-07"))
+        try JSONEncoder().encode(c).write(to: fsmURL)
+    }
+}
