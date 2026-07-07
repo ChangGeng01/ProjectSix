@@ -262,3 +262,25 @@
 - 立即层其余(masked-FA NaN 守卫 H2 / metal commit-await 序 H3 / SPSCRing H15 / Dictionary
   H17 / PolicyCore fail-closed H19 / 两道主权门 x-sov#3#4):**待操作员调度**——多数需设备
   parity 复验或触及并发原语,不在无验证的夜间盲改窗口内(纪律:改状态前证据须支持该具体动作)。
+
+## 本周层修复进度(2026-07-07 夜,操作员"本周层修复开工 最严苛")
+
+**梯次1 信任锚 — DONE(commit,TDD 5/5)**:H13 主权账本 persist 失败原子回滚(内存==盘,
+消除幽灵尾致冷启永久 quarantine)、H14 reload 用 Σsegment.entryCount 对账 entries.count
+抓尾截断(数据本已持久仅未接线)、MED-5 签名种子 ThisDeviceOnly(阻断备份迁机)。
+双存储测试替身(flaky-once / tail-truncating)证回滚与对账。
+
+**梯次2 删除教义 — DONE(commit,TDD 4/4)**:H11 tombstone 跨重启回灌 + 读查询真过滤
+(消除"被遗忘记录复活";假称的 LEFT JOIN 从未存在)、H12 purge 事务同删 notes+FTS
+(第四红腿:"物删"后内容仍全文可搜)+ 时间 GC 同修。清除探针加 (d) 腿标记 CLOSED。
+memory tracker byte-eq 套件零回归。
+
+**梯次3 MLX 并发 — 地基 DONE(commit,TDD 4/4),接线+认证 SCOPED**:
+H4-H7 根因同一 = 会话池缺 per-key 串行化。已交付经验证的共同原语
+`BASPerKeyInFlightGate`(per-key FIFO 续体交接锁:同 key 严格串行/不同 key 并发/FIFO/
+抛错释放,20 并发零交错单测证)。**剩余(须带设备 endurance 认证,不在无验证窗口赶)**:
+① H6 把 draftMultiTurn 方法体抽取后裹进 `gate.serialize(key:)`(ADR-014 opt-in,默认关
+字节等价,设备并发认证后默认开);② H5 `_completePendingSpill` 经门单写者化(替代 gen
+竞态);③ H7 clear 写后代际校验;④ H4 2-slot 信号量 handoff(独立于门的次修)。
+理由:并发正确性 Mac 单元测不透(需真设备多座位突发),原语已去风险,接线是机械但
+生产解码路径关键的一步,按纪律须设备验证不可夜间盲上。
