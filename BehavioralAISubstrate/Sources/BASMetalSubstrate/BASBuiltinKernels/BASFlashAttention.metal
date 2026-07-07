@@ -251,7 +251,15 @@ kernel void flash_attention_forward_masked(
         for (uint j = 0; j < B_C; ++j) {
             if (S_i[j] > m_new) { m_new = S_i[j]; }
         }
-        float alpha = exp(m_i - m_new);
+        // H2 (mega-audit, 2026-07-08): a row whose keys so far are ALL
+        // masked keeps m_i == m_new == -INF ⇒ exp(-INF-(-INF)) = NaN
+        // poisons l_i and the row silently outputs 0 instead of the
+        // attention over its LATER unmasked keys。 In that state nothing
+        // has been accumulated (l_i == 0, O_i == 0) so a 0 rescale is
+        // the identity。 Only this masked kernel can reach m_new == -INF:
+        // the unmasked kernel's first tile always holds a real score,
+        // and the causal kernel always admits key j ≤ i。
+        float alpha = (m_new == -INFINITY) ? 0.0 : exp(m_i - m_new);
         float l_new = alpha * l_i;
         for (uint d = 0; d < Dv; ++d) { O_i[d] *= alpha; }
         for (uint j = 0; j < B_C; ++j) {

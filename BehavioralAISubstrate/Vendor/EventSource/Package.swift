@@ -3,6 +3,28 @@
 
 import PackageDescription
 
+// BAS vendor freeze (M225 / mega-audit x-sov #3, 2026-07-08): the
+// AsyncHTTPClient trait is OFF in every BAS build,so its remote dependency
+// must not present SwiftPM a remote resolution face by default。 Opt in with
+// BAS_VENDOR_ALLOW_REMOTE=1 only for a deliberate vendor refresh。
+var packageDependencies: [Package.Dependency] = [
+    .package(path: "../swift-nio"),  // M224 vendor freeze: url -> path
+]
+var eventSourceDependencies: [Target.Dependency] = [
+    .product(name: "NIOCore", package: "swift-nio"),
+]
+var eventSourceTestDependencies: [Target.Dependency] = ["EventSource"]
+if Context.environment["BAS_VENDOR_ALLOW_REMOTE"] == "1" {
+    packageDependencies.append(.package(
+        url: "https://github.com/swift-server/async-http-client.git",
+        from: "1.24.0"))
+    let ahc = Target.Dependency.product(
+        name: "AsyncHTTPClient", package: "async-http-client",
+        condition: .when(traits: ["AsyncHTTPClient"]))
+    eventSourceDependencies.append(ahc)
+    eventSourceTestDependencies.append(ahc)
+}
+
 let package = Package(
     name: "EventSource",
     platforms: [
@@ -23,34 +45,17 @@ let package = Package(
     traits: [
         .trait(name: "AsyncHTTPClient")
     ],
-    dependencies: [
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.24.0"),
-        .package(path: "../swift-nio"),  // M224 vendor freeze: url -> path
-    ],
+    dependencies: packageDependencies,
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "EventSource",
-            dependencies: [
-                .product(
-                    name: "AsyncHTTPClient",
-                    package: "async-http-client",
-                    condition: .when(traits: ["AsyncHTTPClient"])
-                ),
-                .product(name: "NIOCore", package: "swift-nio"),
-            ]
+            dependencies: eventSourceDependencies
         ),
         .testTarget(
             name: "EventSourceTests",
-            dependencies: [
-                "EventSource",
-                .product(
-                    name: "AsyncHTTPClient",
-                    package: "async-http-client",
-                    condition: .when(traits: ["AsyncHTTPClient"])
-                ),
-            ]
+            dependencies: eventSourceTestDependencies
         ),
     ]
 )

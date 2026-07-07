@@ -43,6 +43,10 @@ public enum BASConfigRegistry {
               owner: "MLXOrganAdapter+MTPSpec.swift:289-290",
               what: "B2 难度探针(capped 轮武装,v2 权重 AUC 0.817;OFF=1 杀)",
               adrRef: "FRONTIER_2026H2_EVOLUTION B2 (probe v2)"),
+        .init(envName: "BAS_SESSION_GATE", polarity: .defaultOnKill,
+              owner: "MLXOrganAdapter.swift:363",
+              what: "梯次3 per-key 会话闸(串行化 draftMultiTurn/spill/clear;GATE=0 杀)",
+              adrRef: "MEGA_AUDIT 梯次3 双设备认证 07-08(endurance 71t + 并发同座位)"),
         // ── opt-in ───────────────────────────────────────────────────────────
         .init(envName: "BAS_THERMAL_PREDICT", polarity: .optIn,
               owner: "BASEnduranceAppRunner.swift:1545 (app host)",

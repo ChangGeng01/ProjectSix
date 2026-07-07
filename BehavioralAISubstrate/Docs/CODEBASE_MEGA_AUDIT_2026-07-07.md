@@ -300,3 +300,36 @@ cap-breach/starvation/error-paths/telemetry/composition,全 high confidence,含
 残留注记(审查发现,非缺陷):stateless `_generateMTPSpec` 车道按文档化范围不受闸
 (一次性车道保历史并发形貌)——混合负载可超 2 路重解码,是既有 scoping 决定,留册。
 **梯次3 至此全部收口(H4+H5+H6+H7)。**
+
+**立即层四件 — DONE(2026-07-08,TDD+双模型对抗审查+回归)**:
+- **H2 masked-FA NaN 守卫**:TDD RED(N=40/B_C=32 行首全 mask tile → 整行静默输出 0,
+  25 断言全炸)→ 内核 `alpha=(m_new==-INFINITY)?0:exp(m_i-m_new)`(行首全 mask 时
+  l_i=O_i=0,0-rescale 是恒等)→ GREEN 13/13 FA parity。仅 masked 内核可达 m_new=-INF
+  (unmasked 首 tile 必有实分、causal 必纳 j≤i),守卫作用域正确。
+- **H3 metal commit/await 序**:PlasticityFold+MambaSSMState 两处
+  `commit();await completed()` → handler-before-commit 续体(照抄 KernelLibraryLoader
+  正典形态,同错误类型/reason,fault 仍阻 readback)。全仓已无残留该形态。GPU 套 44+12 绿。
+- **H19 PolicyCore fail-closed**:TDD RED(3/4)→ 未匹配+云请求一律 deny、本地维持 allow
+  (sovereign-local 缺省);childSafe 补 output 规则(高敏 deny/中险确认)→ GREEN。
+  零生产调用者(scaffold-vs-wired 既有缺口,本修不改)。**回归抓 2 处黄金值镜像**:
+  BASQINAOSubstrateGatesBatch2 的 oracle(自证镜像 decide())+ BASImprovementCandidate
+  的 P2 注册表门(BAS_SESSION_GATE 毕业默认开须同 commit 入册——梯次3 遗漏,此处补登)。
+- **主权门③ vendor-leak 复活**:EventSource(async-http-client)/swift-huggingface(swift-xet)
+  的远程二级依赖移入 `BAS_VENDOR_ALLOW_REMOTE=1` env-gate(trait 默认关+零消费者=
+  consequence-free,对抗审查证 canImport/#if 全守)。**★对抗审查抓真缺陷(Opus,
+  high)**:LiteRT-LM 起初也被 env-gate 变 inert,但 DeviceTest.xcodeproj 无条件链
+  `LiteRTLM` product(BASLiteRTE4BProbe 设备研究)→ env 未设时 Xcode 解析找不到 product
+  →DeviceTestApp 编译失败,被纯 SPM 回归完全掩盖。**修**:LiteRT 清单还原(校验和锁定
+  binaryTarget,"二级依赖被换"风险不适用),gate 加显式 allowlist(脚本自身 option (b));
+  `xcodebuild -resolvePackageDependencies` 证 `LiteRTLM @ local` 解析通。**★留待操作员:
+  探针 doc 自称"NOT added by default"却与 pbxproj 无条件链矛盾——按删除铁律不擅自拆线,
+  上报待裁。**
+- **主权门④ redaction 复活**:根因 = QinaoSample/ContentView `@ViewBuilder` 内联
+  `if #available` 令 Xcode-beta 合成 `TupleContent<repeat each Content>:View`(仅 OS26 有)
+  →`dump-symbol-graph` 编译失败→门不产判定。**修**:分支路由经返回 `AnyView` 的非
+  ViewBuilder 函数(类型擦除绕过合成)——门可编 AND 保住 macOS14-25 legacy showcase
+  (首版曾误升 floor 到 OS26 致 showcase 退化,对抗审查点出过声,已纠为窄修)。
+  + 7 个 QinaoSampleHost bench 文件 public→package(消 16 处 BAS* 泄漏;executable
+  内消费,零外部导入)。门 clean 跨 25 模块。**双模型对抗审查:Fable5 6 员因额度中断
+  (非发现缺陷)→ Opus 6 员重跑,5/6 零缺陷 high + 1 真缺陷(LiteRT,已修)+ 1 low
+  过声(ContentView,已纠)。triage 全套 NO NEW REGRESSION。**

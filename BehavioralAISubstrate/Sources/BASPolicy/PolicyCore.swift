@@ -135,10 +135,14 @@ public struct BASPolicySet: Codable, Sendable, Equatable {
         }
 
         guard !matchingRules.isEmpty else {
-            if cloudRequested && riskLevel >= .medium {
+            // H19(大审计立即层,2026-07-08):默认分支 fail-closed。云出口没有任何
+            // 显式规则授权时一律 deny——旧行为(仅 medium+ 风险才 confirm,其余 allow)
+            // 让 localOnly/childSafe 档的未覆盖动作类静默放行云端。本地动作维持
+            // sovereign-local 缺省 allow(设备内动作不经此闸约束)。
+            if cloudRequested {
                 return BASPolicyDecisionRecord(
-                    decision: .requireConfirmation,
-                    reason: "cloud request requires confirmation in medium-or-higher risk"
+                    decision: .deny,
+                    reason: "no rule matched; cloud egress is fail-closed by default"
                 )
             }
             return BASPolicyDecisionRecord(decision: .allow, reason: "no rule matched")
@@ -269,6 +273,16 @@ public enum BASPolicyProfiles {
                     enforcementPoints: [.toolDispatch],
                     minimumRiskForConfirmation: BASRiskScore(0.2),
                     blockedScopes: [.user],
+                    allowCloud: false
+                ),
+                // H19:childSafe 原无 output 规则 → 任意敏感度输出放行(经默认分支)。
+                // 补上与 recall 同向的输出闸:高敏感输出 deny,中等以上风险须确认。
+                BASPolicyRule(
+                    id: "child-safe-output",
+                    actionClass: .outputRelease,
+                    enforcementPoints: [.outputRelease],
+                    minimumRiskForConfirmation: BASRiskScore(0.4),
+                    blockedSensitivities: [.high],
                     allowCloud: false
                 )
             ])

@@ -32,20 +32,20 @@ import BASSovereign
 /// `BASBenchLatencyStats` (M355) with p50/p95/p99/p99.9/max/min/
 /// mean/stddev/outliers. Caller may compare to a baseline JSON
 /// via M356 `BASBenchBaselineStorage`.
-public struct AuditLedgerBench {
+package struct AuditLedgerBench {
 
-    public static let scopeStatement: String =
+    package static let scopeStatement: String =
         "[scope] regression alarm, not an SLA. measures " +
         "in-process audit ledger append + Ed25519 signature " +
         "compute only — no SQLite I/O, no network, no actor " +
         "hops across runtime layers. do not quote these numbers " +
         "as customer-facing latency."
 
-    public struct Outcome: Sendable, Equatable {
-        public let entryCount: Int
-        public let elapsedSeconds: Double
-        public let latency: BASBenchLatencyStats
-        public init(
+    package struct Outcome: Sendable, Equatable {
+        package let entryCount: Int
+        package let elapsedSeconds: Double
+        package let latency: BASBenchLatencyStats
+        package init(
             entryCount: Int,
             elapsedSeconds: Double,
             latency: BASBenchLatencyStats
@@ -59,7 +59,7 @@ public struct AuditLedgerBench {
     /// Run the bench: build a fresh Ed25519-backed ledger and
     /// append `entryCount` entries, measuring per-entry latency
     /// in milliseconds.
-    public static func run(
+    package static func run(
         entryCount: Int = 10_000
     ) async throws -> Outcome {
         let ledger = try BASSovereignAuditLedger

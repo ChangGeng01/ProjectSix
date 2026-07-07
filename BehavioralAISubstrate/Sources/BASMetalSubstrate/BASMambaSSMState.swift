@@ -612,12 +612,23 @@ public actor BASMambaSSMState {
         encoder.dispatchThreads(
             gridSize, threadsPerThreadgroup: tgSize)
         encoder.endEncoding()
-        cmdBuf.commit()
-        _ = await cmdBuf.completed()
-        if let err = cmdBuf.error {
-            throw BASMambaSSMError.gpuDispatchFailure(
-                reason: "command buffer error:" +
-                " \(err.localizedDescription)")
+        // H3 (mega-audit, 2026-07-08): handler BEFORE commit — the
+        // `commit(); await completed()` form deterministically hangs on
+        // iPhone Air for tiny dispatches (ch1034 forensics);Mac stays
+        // falsely green。 Canonical bridge per BASMetalKernelLibraryLoader。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASMambaSSMError.gpuDispatchFailure(
+                            reason: "command buffer error:" +
+                            " \(err.localizedDescription)"))
+                } else {
+                    cont.resume()
+                }
+            }
+            cmdBuf.commit()
         }
         // Read back updated hidden state + output
         let hUpdated = Array(

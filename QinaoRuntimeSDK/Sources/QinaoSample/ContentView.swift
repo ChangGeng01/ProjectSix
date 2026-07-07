@@ -126,22 +126,37 @@ public struct ContentView: View {
     /// state, no provider wiring — the showcase is a checklist
     /// view of canonical demo models so hosts immediately see
     /// what every Qinao surface looks like.
-    @ViewBuilder
     private var surfaceShowcaseBody: some View {
+        // x-sov #4 (mega-audit, 2026-07-08): the ORIGINAL `macOS 14` floor is
+        // preserved — the showcase still renders on macOS 14-25 / iOS 18-25。
+        // The real problem was NOT an OS-26 feature requirement:it was that an
+        // inline `if #available` limited-availability branch inside a
+        // `@ViewBuilder` property makes the Xcode-beta compiler synthesize a
+        // `TupleContent<repeat each Content>: View` conformance it only ships on
+        // OS 26,which broke `swift package dump-symbol-graph`(the sovereign
+        // redaction gate then produced NO verdict)。 Routing the branch through a
+        // NON-ViewBuilder function that returns a type-erased `AnyView` avoids
+        // that synthesis entirely — the gate compiles AND the legacy showcase
+        // survives。 (Prefer restoring the `some View` ViewBuilder form once the
+        // SDK ships the conformance on the deployment floor.)
+        surfaceShowcaseContent()
+    }
+
+    private func surfaceShowcaseContent() -> AnyView {
         if #available(iOS 18, macOS 14, watchOS 11, *) {
-            QinaoSurfaceShowcaseView(
-                model: .canonicalDemo)
+            return AnyView(QinaoSurfaceShowcaseView(model: .canonicalDemo))
         } else {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Surface Showcase")
-                    .font(.headline)
-                Text(
-                    "Requires iOS 18 / macOS 14 / watchOS 11 " +
-                    "or newer.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
+            return AnyView(
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Surface Showcase")
+                        .font(.headline)
+                    Text(
+                        "Requires iOS 18 / macOS 14 / watchOS 11 " +
+                        "or newer.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                })
         }
     }
 

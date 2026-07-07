@@ -489,9 +489,11 @@ func test_qinao_policy_decision_determinism() {
                 cloud: Bool) -> (BASPolicyDecision, String) {
         let matches = (point == .routeSelection)
         guard matches else {
-            // no rule matched: cloud+medium-or-higher -> confirm, else allow
-            if cloud && risk >= .medium {
-                return (.requireConfirmation, "cloud request requires confirmation in medium-or-higher risk")
+            // H19 (mega-audit, 2026-07-08): the default branch is now fail-closed
+            // — no rule matched + cloud requested ⇒ deny; local action ⇒ allow.
+            // This oracle MIRRORS decide()'s precedence, so it tracks the fix.
+            if cloud {
+                return (.deny, "no rule matched; cloud egress is fail-closed by default")
             }
             return (.allow, "no rule matched")
         }

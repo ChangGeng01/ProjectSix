@@ -657,12 +657,24 @@ public actor BASPlasticityFold {
         encoder.dispatchThreads(
             gridSize, threadsPerThreadgroup: tgSize)
         encoder.endEncoding()
-        cmdBuf.commit()
-        _ = await cmdBuf.completed()
-        if let err = cmdBuf.error {
-            throw BASPlasticityError.gpuDispatchFailure(
-                reason: "command buffer error:" +
-                " \(err.localizedDescription)")
+        // H3 (mega-audit, 2026-07-08): register the completion handler
+        // BEFORE commit — the library's own MPSGraphMatMul fix (ch1034)
+        // records `commit(); await completed()` deterministically hanging
+        // on iPhone Air for tiny dispatches while the Mac stays falsely
+        // green。 Same canonical bridge as BASMetalKernelLibraryLoader。
+        try await withCheckedThrowingContinuation {
+            (cont: CheckedContinuation<Void, Error>) in
+            cmdBuf.addCompletedHandler { buffer in
+                if let err = buffer.error {
+                    cont.resume(throwing:
+                        BASPlasticityError.gpuDispatchFailure(
+                            reason: "command buffer error:" +
+                            " \(err.localizedDescription)"))
+                } else {
+                    cont.resume()
+                }
+            }
+            cmdBuf.commit()
         }
         // Read back updated weights + delta
         let updatedWeights = Array(
