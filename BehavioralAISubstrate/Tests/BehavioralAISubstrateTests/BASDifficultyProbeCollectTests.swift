@@ -162,6 +162,93 @@ final class BASDifficultyProbeCollectTests: XCTestCase {
         return out
     }
 
+    // ── R4 新题库(RSI 章程第六部分,2026-07-07 冻结)——alpha 主战场 + 次级域 ──
+    private static let r4Band0Words = [
+        "anchor", "breeze", "copper", "dolphin", "ember", "falcon", "garnet", "harbor",
+        "island", "jungle", "kettle", "lantern", "meadow", "nectar", "orbit", "pebble",
+        "quartz", "ribbon", "saddle", "timber", "umbrella", "velvet", "walnut", "xenon",
+        "yonder", "zephyr",
+    ]
+    private static let r4Band1Pools = [
+        ["magnet", "meadow", "mirror", "morsel", "muffin", "mantle", "mellow"],
+        ["damsel", "deputy", "dinghy", "donkey", "dampen", "dexter", "dimple"],
+        ["hammer", "hedges", "hollow", "hazel", "hinge", "hoist", "humble"],
+        ["padded", "pencil", "pillow", "pocket", "puddle", "parcel", "pigeon"],
+        ["rabbit", "reason", "ripple", "rocket", "rustic", "raven", "riddle"],
+        ["sample", "settle", "signal", "sorrow", "supper", "saloon", "sizzle"],
+        ["tackle", "temper", "tinder", "topple", "tunnel", "tailor", "tissue"],
+        ["wander", "weasel", "wicker", "wobble", "warden", "walrus", "willow"],
+    ]
+    private static let r4Band2Clusters = [
+        ["grain", "grand", "grant", "grasp", "grass", "grave", "gravel"],
+        ["plane", "plank", "plant", "plate", "plaza", "place", "plaid"],
+        ["crest", "crews", "creed", "creek", "creep", "cream", "crease"],
+        ["shine", "shift", "shirt", "shiver", "shield", "shimmer", "shin"],
+        ["trace", "track", "trade", "trail", "train", "trait", "tram"],
+        ["frost", "front", "frown", "froze", "frozen", "frock", "fringe"],
+        ["click", "climb", "cling", "clinic", "clip", "clique", "clinch"],
+        ["spray", "spread", "spring", "sprint", "sprout", "spruce", "sprig"],
+        ["thread", "threat", "thrift", "throne", "throat", "throb", "thrive"],
+        ["bland", "blank", "blast", "blaze", "bleak", "blend", "bless"],
+    ]
+    private static let r4ReverseWords: [[String]] = [
+        ["quartz", "anchor", "breeze", "saddle", "walnut", "velvet"],
+        ["avocado", "biscuit", "caravan", "dungeon", "epsilon", "flamingo"],
+        ["chandelier", "grasshopper", "thermometer", "periscope", "binoculars", "peninsula"],
+    ]
+    private static let r4Elements: [[(String, String)]] = [
+        [("oxygen", "O"), ("hydrogen", "H"), ("carbon", "C"), ("nitrogen", "N"),
+         ("helium", "He"), ("neon", "Ne"), ("zinc", "Zn"), ("calcium", "Ca")],
+        [("sodium", "Na"), ("iron", "Fe"), ("copper", "Cu"), ("silver", "Ag"),
+         ("gold", "Au"), ("magnesium", "Mg"), ("aluminium", "Al"), ("silicon", "Si")],
+        [("lead", "Pb"), ("mercury", "Hg"), ("tin", "Sn"), ("potassium", "K"),
+         ("tungsten", "W"), ("antimony", "Sb"), ("bismuth", "Bi"), ("manganese", "Mn")],
+    ]
+
+    static func makeR4Questions(seed: UInt64) -> [(q: String, ans: String, family: String, band: Int)] {
+        var r = LCG(state: seed)
+        var out: [(String, String, String, Int)] = []
+        // alpha ~300:band0 3-选 / band1 4-选 / band2 5-选(深前缀,负例源)
+        for band in 0 ..< 3 {
+            for _ in 0 ..< 100 {
+                let pool: [String]
+                let k: Int
+                switch band {
+                case 0: pool = r4Band0Words; k = 3
+                case 1: pool = r4Band1Pools[r.next(r4Band1Pools.count)]; k = 4
+                default: pool = r4Band2Clusters[r.next(r4Band2Clusters.count)]; k = 5
+                }
+                var pick = Set<String>()
+                while pick.count < k { pick.insert(pool[r.next(pool.count)]) }
+                // 确定性洗牌:先 sorted() 定基序(消 Set 进程随机序——审计抓过的同款坑),
+                // 再 LCG Fisher-Yates(随机比较器非严格弱序,禁用)。
+                var items = pick.sorted()
+                for i in stride(from: items.count - 1, to: 0, by: -1) {
+                    items.swapAt(i, r.next(i + 1))
+                }
+                out.append(("Which of these words comes first alphabetically: \(items.joined(separator: ", "))? Answer with the word.",
+                            items.min()!, "alpha", band))
+            }
+        }
+        // reverse ~45(新词,band=词长)
+        for band in 0 ..< 3 {
+            for _ in 0 ..< 15 {
+                let w = r4ReverseWords[band][r.next(r4ReverseWords[band].count)]
+                out.append(("Spell the word \"\(w)\" backwards. Answer with the reversed letters only, no separators.",
+                            String(w.reversed()), "reverse", band))
+            }
+        }
+        // elements ~45(新模板次级域,band=生僻度)
+        for band in 0 ..< 3 {
+            for _ in 0 ..< 15 {
+                let (name, sym) = r4Elements[band][r.next(r4Elements[band].count)]
+                out.append(("What is the chemical symbol for \(name)? Answer with just the symbol.",
+                            sym, "elements", band))
+            }
+        }
+        return out
+    }
+
     func testCollectProbeFeatures() async throws {
         guard ProcessInfo.processInfo.environment["BAS_PROBE_COLLECT"] == "1" else {
             throw XCTSkip("set BAS_PROBE_COLLECT=1 (Mac, heavy — ~300 generations on Qwen3.5-4B)")

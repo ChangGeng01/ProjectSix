@@ -264,6 +264,96 @@ def describe3():
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
 
+R4_FRESH = "/tmp/gdn_coreai/b2_r4_fresh.jsonl"
+R4_SHA_FILE = "/tmp/gdn_coreai/b2_r4_fresh.sha"
+R4_OUT = "/tmp/gdn_coreai/b2_r4_judgement.json"
+R4_BOOT_SEED = 20260718
+
+
+def merge_r4(*paths):
+    """R4 合并:语义键内部去重 + 对 1171 语料与 R3 fresh 双集排除。"""
+    excl = {semantic_key(json.loads(l)) for l in open(CORPUS) if l.strip()}
+    import os
+    if os.path.exists(FRESH):
+        excl |= {semantic_key(json.loads(l)) for l in open(FRESH) if l.strip()}
+    seen, kept, dup, leaked = set(), [], 0, 0
+    for path in paths:
+        for line in open(path):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            k = semantic_key(r)
+            if k in excl:
+                leaked += 1
+                continue
+            if k in seen:
+                dup += 1
+                continue
+            seen.add(k)
+            kept.append(line.rstrip("\n"))
+    with open(R4_FRESH, "w") as f:
+        f.write("\n".join(kept) + "\n")
+    open(R4_SHA_FILE, "w").write(sha256(R4_FRESH))
+    rows = [json.loads(l) for l in kept]
+    from collections import Counter
+    print(f"r4-fresh: kept={len(kept)} dup={dup} excluded={leaked}")
+    print("families:", dict(Counter(r["family"] for r in rows)))
+    for f in sorted(set(r["family"] for r in rows)):
+        sub = [r for r in rows if r["family"] == f]
+        print(f"  {f}: n={len(sub)} neg={sum(1 for r in sub if r['label'] == 0)}")
+
+
+def judge4():
+    """J4(章程第六部分,冻结):纯确认——alpha 主门 + math 非劣 + overall 守卫。"""
+    sha = sha256(R4_FRESH)
+    assert sha == open(R4_SHA_FILE).read().strip(), "r4 fresh sha mismatch"
+    rows = [json.loads(l) for l in open(R4_FRESH) if l.strip()]
+    H = np.array([r["h"] for r in rows], dtype=np.float64)
+    y = np.array([r["label"] for r in rows], dtype=np.float64)
+    fam = [r["family"] for r in rows]
+    arms = {}
+    for name, (path, pin) in PIN.items():
+        actual = sha256(path)[:16]
+        assert actual == pin, f"{name} sha mismatch: {actual} != pinned {pin}"
+        wj = json.load(open(path))
+        arms[name] = ((H - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
+    sc, si = arms["r2_candidate"], arms["incumbent"]
+
+    def dom(name_filter):
+        return np.array([i for i, f in enumerate(fam) if name_filter(f)])
+
+    def block(idx):
+        ys = y[idx]
+        a_c, a_i = auc(sc[idx], ys), auc(si[idx], ys)
+        ci = _strat_boot_delta(sc[idx], si[idx], ys, BOOT_N, R4_BOOT_SEED)
+        return {"n": int(len(idx)), "n_neg": int((ys == 0).sum()),
+                "inc": round(a_i, 4) if a_i == a_i else None,
+                "cand": round(a_c, 4) if a_c == a_c else None,
+                "delta": round(a_c - a_i, 4) if a_c == a_c and a_i == a_i else None,
+                "ci95_strat": ci}
+
+    alpha = block(dom(lambda f: f == "alpha"))
+    math_ = block(dom(lambda f: f not in BROAD_FAMS and f != "elements"))
+    overall = block(dom(lambda f: True))
+    desc = {f: block(dom(lambda x, f=f: x == f)) for f in ("reverse", "elements")}
+    underpowered = alpha["n_neg"] < 60
+    crit = {"alpha_n_neg_ge_60": not underpowered,
+            "alpha_ci_lo_gt_0": bool(alpha["ci95_strat"] and alpha["ci95_strat"][0] > 0),
+            "alpha_delta_ge_0.10": bool(alpha["delta"] is not None and alpha["delta"] >= 0.10),
+            "math_noninferior_ci_lo_gt_-0.03": bool(math_["ci95_strat"] and math_["ci95_strat"][0] > -0.03),
+            "overall_ci_lo_gt_-0.02": bool(overall["ci95_strat"] and overall["ci95_strat"][0] > -0.02)}
+    verdict = ("UNDERPOWERED-DESCRIPTIVE" if underpowered
+               else "CERTIFIED" if all(crit.values()) else "REJECTED")
+    out = {"rule": "J4 (charter part 6, pure confirmation on new banks)",
+           "fresh": {"sha256": sha, "n": len(rows)},
+           "arm_shas": {k: sha256(p)[:16] for k, (p, _) in PIN.items()},
+           "attempt_history": "第 3 次判决尝试(R1 人驳/R2 J2 驳/R4)——多重比较注记",
+           "alpha_primary": alpha, "math_guard": math_, "overall_guard": overall,
+           "descriptive": desc, "criteria": crit, "verdict": verdict}
+    json.dump(out, open(R4_OUT, "w"), indent=1)
+    print(json.dumps(out, indent=1, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "merge":
@@ -274,6 +364,10 @@ if __name__ == "__main__":
         judge3()
     elif cmd == "describe3":
         describe3()
+    elif cmd == "merge-r4":
+        merge_r4(*sys.argv[2:])
+    elif cmd == "judge4":
+        judge4()
     elif cmd == "propose":
         propose()
     elif cmd == "judge":
