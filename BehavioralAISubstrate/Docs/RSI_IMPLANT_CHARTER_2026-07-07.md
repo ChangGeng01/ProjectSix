@@ -484,7 +484,7 @@ candidate `2026-07-07-b2-refit-r1` FSM 终态 = **rejected**,理由入迁移历�
 
 **冻结参数**:题面 = v2 重生成(math 种子 20260704 perCell=7 + broad 20260705
 perCell=7)∪ R2 新题(math 20260707 perCell=30 + broad 20260708 perCell=30),
-共 1,231 题,偶/奇下标分两机;解码形状 = 生产(k=3,tCap=生产常数[iOS 5],
+共 1,221 题(147+84+630+360;预注册初稿误写 1,231,以生成器实数为准),偶/奇下标分两机;解码形状 = 生产(k=3,tCap=生产常数[iOS 5],
 adaptiveK,B3 同 cfg 武装,cap 224);判对 = 同 v2 正则;输出 = 设备 Documents
 b2_r2_features_{0,1}.jsonl → devicectl 拉回 → 合并去重 → sha 钉死 → R1 网格 +
 J2 bootstrap 判决(预注册见上)。温度=0 全程;label 字节确定(ADR-039),
