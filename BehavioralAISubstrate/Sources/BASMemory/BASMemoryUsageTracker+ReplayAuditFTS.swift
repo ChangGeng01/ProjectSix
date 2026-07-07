@@ -657,16 +657,52 @@ extension BASMemoryUsageTracker {
         }
     }
 
+    /// H11 — SELECT all tombstoned record_ids (for reload into inMemoryTombstones).
+    static func fetchAllTombstoneIDs(db: OpaquePointer) throws -> [String] {
+        let sql = "SELECT record_id FROM memory_usage_tombstones"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var ids: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 0) { ids.append(String(cString: c)) }
+        }
+        return ids
+    }
+
     static func purgeTombstonedRows(
         db: OpaquePointer
     ) throws {
-        // Atomic two-step:DELETE the records,then
-        // truncate the tombstones table。 Wrapped in a
-        // transaction so the two tables can never get
-        // out of sync。
+        // Atomic multi-step:DELETE the records + their notes + FTS rows,then
+        // truncate the tombstones table。 Wrapped in a transaction so the tables
+        // can never get out of sync。 H12 (mega-audit 2026-07-07): the notes +
+        // FTS deletes were MISSING — "physical deletion" left host-supplied atom
+        // content in memory_usage_record_notes + its FTS5 index, so searchNotesFTS
+        // still surfaced purged records and the on-disk text stayed readable (the
+        // 4th purge red-leg, hidden behind an "already implemented" delete path).
+        // Notes/FTS tables are created lazily (only on first attachNotes); ensure they
+        // exist so the H12 cleanup DELETEs never hit "no such table" when purge runs
+        // before any note was attached.
+        try ensureNotesAndFTSchema(db: db)
         try runExec(db: db,
             sql: "BEGIN IMMEDIATE TRANSACTION;")
         do {
+            try runExec(db: db, sql: """
+                DELETE FROM memory_usage_record_notes_fts
+                 WHERE record_id IN (
+                    SELECT record_id FROM memory_usage_tombstones
+                 );
+                """)
+            try runExec(db: db, sql: """
+                DELETE FROM memory_usage_record_notes
+                 WHERE record_id IN (
+                    SELECT record_id FROM memory_usage_tombstones
+                 );
+                """)
             try runExec(db: db, sql: """
                 DELETE FROM memory_usage_records
                  WHERE record_id IN (
@@ -747,27 +783,38 @@ extension BASMemoryUsageTracker {
         db: OpaquePointer,
         cutoff: Date
     ) throws {
-        let sql = """
-            DELETE FROM memory_usage_records
-             WHERE retrieved_at_ms < ?
-            """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
-            == SQLITE_OK,
-            let stmt
-        else {
-            throw TrackerError.prepareFailed(
-                sql: sql,
-                message: String(cString: sqlite3_errmsg(db)))
+        // H12 (mega-audit 2026-07-07): time-based GC must also clear notes + FTS for
+        // the deleted records, else host-supplied content survives the purge in
+        // memory_usage_record_notes(_fts) and stays full-text searchable + readable.
+        let cutoffMs = Int64(cutoff.timeIntervalSince1970 * 1000)
+        func execBound(_ sql: String) throws {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt
+            else {
+                throw TrackerError.prepareFailed(
+                    sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_int64(stmt, 1, cutoffMs)
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                throw TrackerError.stepFailed(
+                    sql: sql, message: String(cString: sqlite3_errmsg(db)))
+            }
         }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int64(
-            stmt, 1,
-            Int64(cutoff.timeIntervalSince1970 * 1000))
-        guard sqlite3_step(stmt) == SQLITE_DONE else {
-            throw TrackerError.stepFailed(
-                sql: sql,
-                message: String(cString: sqlite3_errmsg(db)))
+        let staleSubquery =
+            "SELECT record_id FROM memory_usage_records WHERE retrieved_at_ms < ?"
+        try ensureNotesAndFTSchema(db: db)   // lazy tables — ensure before cleanup DELETE
+        try runExec(db: db, sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            try execBound("DELETE FROM memory_usage_record_notes_fts "
+                          + "WHERE record_id IN (\(staleSubquery));")
+            try execBound("DELETE FROM memory_usage_record_notes "
+                          + "WHERE record_id IN (\(staleSubquery));")
+            try execBound("DELETE FROM memory_usage_records WHERE retrieved_at_ms < ?;")
+            try runExec(db: db, sql: "COMMIT;")
+        } catch {
+            try? runExec(db: db, sql: "ROLLBACK;")
+            throw error
         }
     }
 

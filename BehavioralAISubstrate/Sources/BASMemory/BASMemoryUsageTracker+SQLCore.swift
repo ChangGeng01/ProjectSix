@@ -417,9 +417,12 @@ extension BASMemoryUsageTracker {
     /// Every record in the log, sorted ascending by `retrievedAt`.
     /// Used by the scorer to compute global frequency stats.
     public func allRecords() -> [BASMemoryUsageRecord] {
-        inMemory.values.sorted {
-            $0.retrievedAt < $1.retrievedAt
-        }
+        // H11 (mega-audit 2026-07-07): filter tombstoned — the doc claimed a
+        // (nonexistent) LEFT JOIN did this; callers like the closed-loop importance
+        // scorer must NOT re-weight forgotten atoms. Now honored in-memory.
+        inMemory.values
+            .filter { !inMemoryTombstones.contains($0.recordID) }
+            .sorted { $0.retrievedAt < $1.retrievedAt }
     }
 
     // MARK: - 主线 全面 提升: native SQL query paths
@@ -650,7 +653,8 @@ extension BASMemoryUsageTracker {
 
     /// Look up one record by ID. Returns nil if absent.
     public func record(forID id: String) -> BASMemoryUsageRecord? {
-        inMemory[id]
+        // H11: a tombstoned (forgotten) record must not be served as live.
+        inMemoryTombstones.contains(id) ? nil : inMemory[id]
     }
 
     /// Garbage-collect records older than `olderThan`. Returns

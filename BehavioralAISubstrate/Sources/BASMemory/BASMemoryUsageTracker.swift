@@ -247,6 +247,15 @@ public actor BASMemoryUsageTracker {
         for record in prior {
             inMemory[record.recordID] = record
         }
+        // H11 (mega-audit 2026-07-07): reload tombstones too. Without this a
+        // SQLite-backed tracker resurrects "forgotten" records on restart —
+        // isTombstoned==false, allRecords() yields them, activeRecordCount counts
+        // them, and purgeTombstoned() returns 0 while the in-memory cache still
+        // serves already-physically-deleted rows.
+        try Self.ensureTombstoneSchema(db: handle)
+        for id in try Self.fetchAllTombstoneIDs(db: handle) {
+            inMemoryTombstones.insert(id)
+        }
     }
 
     deinit {

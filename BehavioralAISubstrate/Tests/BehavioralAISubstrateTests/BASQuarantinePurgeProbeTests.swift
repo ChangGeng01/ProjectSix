@@ -71,4 +71,10 @@ final class BASQuarantinePurgeProbeTests: XCTestCase {
                            "KV spill snapshot survives quarantine — the conversation is still on disk")
         }
     }
+
+    // (d) 第四条红腿(大审计 H12,2026-07-07 CLOSED):usage-tracker 的 purge 曾不清
+    // memory_usage_record_notes(_fts) → "物理删除"后宿主附加的 atom 内容仍全文可搜。
+    // 已修(BASMemoryUsageTracker+ReplayAuditFTS purge 事务同删 notes+FTS),真绿验收在
+    // BASMemoryTombstonePurgeTests.testH12_PurgeClearsNotesAndFTS(非 XCTExpectFailure)。
+    // 记于此:这条曾藏在"已实现物删"背后,是隐蔽第四残留通道,勿在未来回归中重开。
 }
