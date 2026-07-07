@@ -618,3 +618,48 @@ harness 同轮更换(Mac HF 容器 → 设备采集),无锚行隔离 ⇒ **"Mac�
 = BASMLXAdapter 单目录两种习语(全仓级承诺为过声,以此为准);P0 单元门实数 13;
 autopilot 超时预算无 jetsam 重试余量(已重写);merge 文件序未入 evidence(修订:
 以后 evidence 记全 argv)。
+
+---
+
+# 第六部分:R4 新题库真确认(2026-07-07 深夜立项,采集前冻结)
+
+**使命**:R2 发现(设备拟合权重修复 alpha 路由,已见数据上 +0.454)当前状态 UNPROVEN
+——R3 审计证明旧题库无法确认它。R4 = 新题库 + 纯确认轮。
+
+## 设计公理(今日元教训直译)
+
+1. **纯确认,零拟合**:三臂权重 sha 钉死(v2=cf8276…/R1=2eac90…/R2 候选=1aa86c…,
+   judge 强制断言)——不 refit ⇒ **全部新数据都是评估集**(无 train/heldout 切分,
+   n 全额入功效)。
+2. **效应在哪测哪**:J4 主门 = **alpha 域**(R2 效应所在),不再借代理域。
+3. **功效先算(元教训①)**:检出 Δ_alpha≥0.10 需 CI95 半宽 ≲0.07 ⇒ 单臂
+   SE=√(A(1−A)/n_neg)≈0.357/√n_neg ⇒ **n_neg(alpha)≥90**;配对相关使实际更紧。
+   题库按此设计(band2 五选深前缀,预期 pos≈0.5-0.6,300 alpha 槽 ⇒ 负例 ~90-120)。
+   若实收 n_neg<60 ⇒ 判决自动降级 UNDERPOWERED-DESCRIPTIVE(预注册,不临场裁量)。
+4. **语义键防泄漏(从头)**:新题对 1171 语料 + R3 fresh 双集语义键排除;新 alpha
+   为 3/4/5-选新模板+全新词库(与旧池零 trio 重叠 by construction)。
+5. **多重比较诚实(M3)**:这是该候选家族第 3 次判决尝试——FSM 新 id
+   `2026-07-07-b2-refit-r4`(rejected 终态不可复活,H3 出边),呈报携带全history。
+
+## 冻结题库与参数
+
+- **alpha 新库**(主战场,~300 槽):band0 = 26 词异首字母池 3-选(易,正例源);
+  band1 = 8×7 词同首字母池 4-选;band2 = 10×7 词深共享前缀簇 5-选(难,负例源;
+  C(7,5)=21/簇 ×10 簇 = 210 唯一)。perCell=100/band,种子 20260717。
+- **reverse 新词**(~45 槽,band=词长梯),**elements 新模板**(化学符号,~45 槽,
+  band=生僻度)——次级描述域(模板新颖性泛化,只报不判)。
+- **math 守卫**(~105 槽,makeQuestions 种子 20260716 perCell=5)——非劣性门数据。
+- 解码 = 生产形状(同 R2-C);崩溃语义采集器(EXTRA=4);两机偶/奇。
+
+## J4 判据(冻结)
+
+candidate(=R2 候选,新 id r4)certified ⇔ 全部成立:
+1. **alpha ΔAUC(候选−在位)分层配对 bootstrap(10k,种子 20260718)CI95 下界 > 0
+   ∧ Δ ≥ 0.10**(R2 观察 +0.454 的 1/4.5,保守);
+2. math(fresh)非劣:CI95 下界 > −0.03;
+3. overall 不实质倒退:CI95 下界 > −0.02;
+4. 仪器:三臂 sha 断言过 + 语料 sha 钉 + n_neg(alpha)≥60(不足 ⇒
+   UNDERPOWERED-DESCRIPTIVE,非 REJECTED——功效不足不冒充证伪)。
+certified ⇒ FSM r4 走 certified 呈操作员签名;部署 = probe_weights_v3.json 两机
+staging + 回滚锚 v2 sha(人类介质动作)。rejected ⇒ R2 发现记"在新 alpha 题库上
+未复现"(这次是真检验后的诚实负面)。reverse/elements/reading 域只报不判。
