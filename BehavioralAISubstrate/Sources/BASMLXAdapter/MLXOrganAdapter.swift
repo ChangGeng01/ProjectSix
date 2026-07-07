@@ -379,21 +379,26 @@ public actor MLXOrganAdapter: BASOrganAdapter {
 
     /// 缝8b telemetry: high-water mark of concurrent decodes — the governor-coverage gate reads it.
     var peakSessionDecodes = 0
+    /// 测试观测:当前占用槽数(H4 守恒腿读)。
+    var _activeSessionDecodesForTest: Int { activeSessionDecodes }
     func acquireSessionDecodeSlot() async {
-        if activeSessionDecodes < Self.maxConcurrentSessionDecodes {
+        // H4(大审计梯次3):快路径仅当无人排队且有空槽——交接语义下 waiters 非空 ⇒
+        // active==cap,此守卫兼防不变量漂移与越队。
+        if sessionDecodeWaiters.isEmpty && activeSessionDecodes < Self.maxConcurrentSessionDecodes {
             activeSessionDecodes += 1
             peakSessionDecodes = max(peakSessionDecodes, activeSessionDecodes)
             return
         }
         await withCheckedContinuation { sessionDecodeWaiters.append($0) }
-        activeSessionDecodes += 1
-        peakSessionDecodes = max(peakSessionDecodes, activeSessionDecodes)
+        // 交接唤醒:releaser 未减计数,槽随 resume 直接转移——resume 与本切片之间
+        // 新到者看到的 active 恒为 cap,插队击穿(旧代码实测峰值 14)结构性不可能。
     }
 
     func releaseSessionDecodeSlot() {
-        activeSessionDecodes -= 1
-        if !sessionDecodeWaiters.isEmpty {
-            sessionDecodeWaiters.removeFirst().resume()
+        if sessionDecodeWaiters.isEmpty {
+            activeSessionDecodes -= 1
+        } else {
+            sessionDecodeWaiters.removeFirst().resume()   // 交接:计数不动,FIFO 头继承槽
         }
     }
 

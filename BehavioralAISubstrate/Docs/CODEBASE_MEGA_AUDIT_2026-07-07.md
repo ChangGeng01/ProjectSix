@@ -289,4 +289,14 @@ fused writeback 同守卫、clear 双双提升(消 clear-vs-写回复活)。
 (H6 失败场景直接证伪,BASSessionGateConcurrencyDeviceTests)。**ADR-014 收口:
 门默认开,kill-switch `BAS_SESSION_GATE=0`(默认路径回字节等价直调)**;Mac 全套
 回归门开下绿(hygiene 5/5 + 门 4/4 + 会话池 55)。
-**剩余:④ H4 2-slot 信号量 handoff(独立于门的次修)——未动,待下令。**
+**④ H4 2-slot 信号量 handoff — DONE(2026-07-08,TDD+对抗审查+设备认证)**:
+RED 实测比审计更糟——旧代码错峰竞争下峰值 **14**(审计估 3;每个 release→resume
+窗口都放进插队者,击穿复利)。修 = 与门原语同款交接语义:release 有 waiter 不减计数
+直接交槽(FIFO 头继承),acquire 快路径加 `waiters.isEmpty` 守卫。Mac gates 3/3×5
+(压力峰值≤2 / FIFO 不可越队 / 排空计数守恒)。**6 员对抗审查零缺陷**(deadlock/
+cap-breach/starvation/error-paths/telemetry/composition,全 high confidence,含
+逐 actor-切片不变量归纳证明:waiters≠∅⇒active==cap;交接窗口 C 高估占用=只欠不超)。
+设备认证 9E9E:8 座位错峰突发 `peak=2 completed=8/8`(闸用满未击穿)。
+残留注记(审查发现,非缺陷):stateless `_generateMTPSpec` 车道按文档化范围不受闸
+(一次性车道保历史并发形貌)——混合负载可超 2 路重解码,是既有 scoping 决定,留册。
+**梯次3 至此全部收口(H4+H5+H6+H7)。**

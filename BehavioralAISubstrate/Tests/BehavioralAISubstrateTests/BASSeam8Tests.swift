@@ -136,4 +136,45 @@ final class BASSeam8Tests: XCTestCase {
         throw XCTSkip("MLXLLM unavailable")
         #endif
     }
+
+    /// H4 设备认证腿(大审计梯次3 尾修):错峰突发——8 座位、到达间隔 0.4s,让新到者持续
+    /// 与 release→resume 交接窗口在生产 decode 时标上赛跑(旧代码 Mac 压测峰值 14)。
+    /// 门槛:peak ≤ cap 且 8 轮全部完成非空。
+    func testH4_StaggeredBurstRespectsCap() async throws {
+        guard ProcessInfo.processInfo.environment["BAS_SEAM8_TEST"] == "1" else {
+            throw XCTSkip("set BAS_SEAM8_TEST=1 (heavy)")
+        }
+        #if canImport(MLXLLM)
+        #if os(iOS)
+        ModelFactoryRegistry.shared.addTrampoline { LLMModelFactory.shared }
+        MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit_local)
+        #else
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        #endif
+        try await adapter.loadModel()
+        let bodies = await withTaskGroup(of: String.self, returning: [String].self) { group in
+            for i in 0 ..< 8 {
+                group.addTask {
+                    try? await Task.sleep(nanoseconds: UInt64(i) * 400_000_000)
+                    let r = try? await adapter.draft(BASOrganRequest(
+                        requestID: "h4-burst-\(i)", role: .core, preset: .greedyDeterministic,
+                        instruction: "Reply with just: OK.", maxOutputTokens: 24,
+                        sessionID: "h4-seat-\(i)"))
+                    return r?.body ?? ""
+                }
+            }
+            var out: [String] = []
+            for await b in group { out.append(b) }
+            return out
+        }
+        let peak = await adapter.peakSessionDecodes
+        print("[h4-cert] peak=\(peak) completed=\(bodies.filter { !$0.isEmpty }.count)/8")
+        XCTAssertEqual(bodies.filter { !$0.isEmpty }.count, 8, "错峰突发 8 轮必须全部完成")
+        XCTAssertLessThanOrEqual(peak, MLXOrganAdapter.maxConcurrentSessionDecodes,
+                                 "H4:错峰突发击穿 \(MLXOrganAdapter.maxConcurrentSessionDecodes)-slot 闸(peak=\(peak))")
+        #else
+        throw XCTSkip("MLXLLM unavailable")
+        #endif
+    }
 }
