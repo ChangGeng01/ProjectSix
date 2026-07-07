@@ -90,7 +90,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     public nonisolated let model: MLXModelCatalog.Entry
 
     /// Default MLX cache-pool cap (512 MB) — the band is ~384-768 MB (low enough to bound the pool, high
-    /// enough to avoid §8's cap=64 re-alloc churn). This is the value with measured on-device evidence (E2B).
+    /// enough to avoid §8's cap=64 re-alloc churn). Evidence: E2B wedge prevention (ADR-038) AND the
+    /// 2026-07-07 {256,512,768,∞} device sweep on Qwen3.5-4B production decode
+    /// (Docs/CACHELIMIT_AB_2026-07-07.md): fixed shapes plateau the pool naturally at ~290 MB and all four
+    /// arms are speed-identical (12.3 tok/s, thermal=0) — 512 is zero-cost insurance above the natural
+    /// plateau; its only ACTIVE role is variable-shape models (E2B class). Measured DON'T-CARE for speed
+    /// on the Qwen lane — do not tune it expecting tok/s.
     public static let defaultCacheLimitBytes: Int = BASMLXMemoryModel.defaultCacheLimitBytes
 
     /// ADR-038 §11.7-§11.9 — cap for MLX's **free-buffer cache pool** (bytes), applied on `loadModel` (default
