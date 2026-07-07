@@ -208,6 +208,62 @@ def judge():
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
 
+def _strat_boot_delta(sc, si, y_sub, n_boot, seed):
+    """类别保持(分层)配对 bootstrap;退化不可能(每类各自重采样)。"""
+    pos = np.where(y_sub == 1)[0]
+    neg = np.where(y_sub == 0)[0]
+    if len(pos) == 0 or len(neg) == 0:
+        return None
+    rng = np.random.default_rng(seed)
+    deltas = np.empty(n_boot)
+    for k in range(n_boot):
+        b = np.concatenate([pos[rng.integers(0, len(pos), len(pos))],
+                            neg[rng.integers(0, len(neg), len(neg))]])
+        deltas[k] = auc(sc[b], y_sub[b]) - auc(si[b], y_sub[b])
+    lo, hi = np.percentile(deltas, [2.5, 97.5])
+    return [round(float(lo), 4), round(float(hi), 4)]
+
+
+def describe3():
+    """R3 修订1:描述性轮——三臂分域 AUC 表,无 verdict,无采纳通道。"""
+    sha = sha256(FRESH)
+    assert sha == open(FRESH_SHA_FILE).read().strip(), "fresh sha mismatch"
+    rows = [json.loads(l) for l in open(FRESH) if l.strip()]
+    H = np.array([r["h"] for r in rows], dtype=np.float64)
+    y = np.array([r["label"] for r in rows], dtype=np.float64)
+    fam = [r["family"] for r in rows]
+    arms = {}
+    for name, (path, pin) in PIN.items():
+        actual = sha256(path)[:16]
+        assert actual == pin, f"{name} sha mismatch: {actual} != pinned {pin}"
+        wj = json.load(open(path))
+        arms[name] = ((H - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
+    from collections import Counter
+    fam_n = Counter(fam)
+    domains = {"overall": list(range(len(rows)))}
+    for f in sorted(fam_n):
+        domains[f] = [i for i, x in enumerate(fam) if x == f]
+    out = {"rule": "R3-DESCRIPTIVE (修订1,无 verdict 无采纳通道;R2 发现维持 UNPROVEN)",
+           "fresh": {"sha256": sha, "n": len(rows),
+                     "families": {k: int(v) for k, v in fam_n.items()},
+                     "pos_rate": round(float(y.mean()), 3)},
+           "arm_shas": {k: sha256(p)[:16] for k, (p, _) in PIN.items()},
+           "domains": {}}
+    sc, si = arms["r2_candidate"], arms["incumbent"]
+    for dname, idx in domains.items():
+        idx = np.array(idx)
+        ys = y[idx]
+        entry = {"n": int(len(idx)), "n_neg": int((ys == 0).sum())}
+        for name, s_arm in arms.items():
+            a = auc(s_arm[idx], ys)
+            entry[name] = round(a, 4) if a == a else None
+        ci = _strat_boot_delta(sc[idx], si[idx], ys, BOOT_N, J3_BOOT_SEED)
+        entry["delta_cand_vs_inc_ci95_strat"] = ci
+        out["domains"][dname] = entry
+    json.dump(out, open("/tmp/gdn_coreai/b2_r3_descriptive.json", "w"), indent=1)
+    print(json.dumps(out, indent=1, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "merge":
@@ -216,6 +272,8 @@ if __name__ == "__main__":
         merge_fresh(*sys.argv[2:])
     elif cmd == "judge3":
         judge3()
+    elif cmd == "describe3":
+        describe3()
     elif cmd == "propose":
         propose()
     elif cmd == "judge":
@@ -236,22 +294,43 @@ PIN = {  # 三臂文件 sha256 前缀,冻结于新数据之前(账本 R3 节)—
 }
 
 
+def semantic_key(r):
+    """R3 修订2:排除键 = 语义键(alpha 三词排序/recall 国家/reverse 词;其余题文)。
+    封死 Swift Set 迭代序造成的 alpha 换序马甲泄漏;recall/reverse 语义重复正确判已知。"""
+    q, fam = r["q"], r["family"]
+    if fam == "alpha":
+        try:
+            words = q.split(": ", 1)[1].split("? Answer")[0].split(", ")
+            return ("alpha", tuple(sorted(w.strip() for w in words)))
+        except IndexError:
+            return ("alpha", q)
+    if fam == "recall":
+        return ("recall", q.split("capital city of ", 1)[-1].split("?")[0].strip())
+    if fam == "reverse":
+        try:
+            return ("reverse", q.split('"')[1])
+        except IndexError:
+            return ("reverse", q)
+    return (fam, q)
+
+
 def merge_fresh(*paths):
-    """新 heldout 合并:内部去重 + 对 1171 训练语料【排除】(泄漏防线)。"""
-    corpus_qs = {json.loads(l)["q"] for l in open(CORPUS) if l.strip()}
+    """新 heldout 合并:内部去重 + 对 1171 训练语料【按语义键排除】(泄漏防线,修订2)。"""
+    corpus_keys = {semantic_key(json.loads(l)) for l in open(CORPUS) if l.strip()}
     seen, kept, dup, leaked = set(), [], 0, 0
     for path in paths:
         for line in open(path):
             if not line.strip():
                 continue
             r = json.loads(line)
-            if r["q"] in corpus_qs:
+            k = semantic_key(r)
+            if k in corpus_keys:
                 leaked += 1
                 continue
-            if r["q"] in seen:
+            if k in seen:
                 dup += 1
                 continue
-            seen.add(r["q"])
+            seen.add(k)
             kept.append(line.rstrip("\n"))
     with open(FRESH, "w") as f:
         f.write("\n".join(kept) + "\n")

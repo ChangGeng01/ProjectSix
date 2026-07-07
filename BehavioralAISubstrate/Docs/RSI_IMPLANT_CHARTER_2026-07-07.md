@@ -566,3 +566,24 @@ R2 候选 certified ⇔ 在新集上:
 全过 ⇒ certified(候选进 FSM certified,呈操作员签名部署 v3);任一不过 ⇒ rejected
 = 诚实负面,R2 的域假设在新数据上不成立即入册。仪器锚:三臂文件 sha 复核 + 新语料
 sha 钉 + 全程确定性。
+
+## R3 修订(全面审计令出的 C1;fresh 数据未看,合法轮间人改)
+
+**审计发现(方法审计员,R2 已见数据的域分解——用于改规则合法,确认必须在新数据)**:
+R2 broad +0.166 分解 = **alpha +0.454(效应几乎全在此)**、reverse −0.05、
+**reading −0.13(名义负向)**;而 fresh 集因题库饱和只可能存活 reading ⇒ 原 J3 的
+"broad(reading-proxy) 确认门"将在效应不在、甚至名义反向的子族上检验 R2 假设——
+必然 REJECTED 且结论不被数据支持;叠加 reading pos_rate≈0.97 ⇒ 域 bootstrap 退化
+重采样 NaN 毒化 CI ⇒ 机械 REJECT 零诊断。**一个结构性无法确认目标假设的"确认轮"
+不配出 verdict。**
+
+**修订(冻结)**:
+1. **R3 降级为描述性轮**:无 certified/rejected,无采纳通道。产出 = 三臂(sha 钉不变)
+   在 fresh 集上的分域 AUC 表(math/reading/全体;分层[类别保持] bootstrap CI,
+   退化重采样剔除并计数暴露)。**R2 发现状态 = 维持未证(UNPROVEN),非被证伪**。
+2. merge_fresh 排除键升级为语义键(alpha=排序三词/recall=国家/reverse=词;
+   其余=题文)——修双向坏:recall/reverse 按语义正确判"已知"消失(预期,入册),
+   alpha 换序马甲泄漏封死(Swift Set 迭代序跨进程不稳定,审计实锤)。
+3. **R4 立项建议(操作员令决)**:新 alpha/recall/reverse 生成器(新题库,负例可产),
+   真确认轮 J4 = alpha 域配对分层 bootstrap;届时候选以【新 id】走 FSM(rejected 为
+   终态,H3 出边预注册:同一权重文件的再判 = 新候选对象,人裁历史不可改写)。
