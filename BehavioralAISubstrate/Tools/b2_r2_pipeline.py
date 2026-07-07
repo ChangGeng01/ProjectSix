@@ -272,11 +272,13 @@ R4_BOOT_SEED = 20260718
 
 def merge_r4(*paths):
     """R4 合并:语义键内部去重 + 对 1171 语料与 R3 fresh 双集排除。"""
+    # R4v2(批判 MED-6):排除集来源先验 sha——语料被截断/误编辑时排除集静默缩水
+    # = 已见题混进"fresh"(与 J2 静默丢锚同类缺陷)。
+    assert sha256(CORPUS) == open(CORPUS_SHA_FILE).read().strip(), "corpus sha mismatch(排除集来源)"
     excl = {semantic_key(json.loads(l)) for l in open(CORPUS) if l.strip()}
     import os
-    # 预注册 = 双集排除;R3 fresh 缺失 ⇒ 硬失败(fail-open 静默跳过会让 math 种子
-    # 碰撞题混进"fresh"——自审 #16)。
     assert os.path.exists(FRESH), "R3 fresh 集缺失——先跑 merge-fresh(双集排除是冻结条款)"
+    assert sha256(FRESH) == open(FRESH_SHA_FILE).read().strip(), "r3 fresh sha mismatch(排除集来源)"
     excl |= {semantic_key(json.loads(l)) for l in open(FRESH) if l.strip()}
     seen, kept, dup, leaked = set(), [], 0, 0
     for path in paths:
@@ -322,7 +324,53 @@ def judge4():
     sc, si = arms["r2_candidate"], arms["incumbent"]
 
     def dom(name_filter):
-        return np.array([i for i, f in enumerate(fam) if name_filter(f)])
+        return np.array([i for i, f in enumerate(fam) if name_filter(f)], dtype=int)
+
+    # R4v2(批判 HIGH-3,兑现章程 M6 承诺):alpha 行按簇强相关(band2 十簇/band1 八池),
+    # iid 重采样 CI 偏窄且正打主门。簇 id 从题面词重建;主门 = 簇级 CI 与行级分层 CI
+    # 【同号才 CERTIFY】(预注册双读数规则)。
+    B2SETS = [frozenset(c) for c in [
+        ["grain","grand","grant","grasp","grass","grave","gravel"],
+        ["plane","plank","plant","plate","plaza","place","plaid"],
+        ["crest","crews","creed","creek","creep","cream","crease"],
+        ["shine","shift","shirt","shiver","shield","shimmer","shin"],
+        ["trace","track","trade","trail","train","trait","tram"],
+        ["frost","front","frown","froze","frozen","frock","frolic"],
+        ["click","climb","cling","clinic","clip","clique","clinch"],
+        ["spray","spread","spring","sprint","sprout","spruce","sprig"],
+        ["thread","threat","thrift","throne","throat","throb","thrive"],
+        ["bland","blank","blast","blaze","blade","blame","blare"]]]
+
+    def alpha_cluster_id(r):
+        words = r["q"].split(": ", 1)[1].split("? Answer")[0].split(", ")
+        wset = set(w.strip() for w in words)
+        for ci, cs in enumerate(B2SETS):
+            if wset <= cs:
+                return f"b2c{ci}"
+        first = sorted(wset)[0][0]
+        if all(w[0] == first for w in wset):
+            return f"b1p{first}"
+        return "b0:" + "|".join(sorted(wset))   # band0 每题自成簇
+
+    def cluster_boot_delta(sc_d, si_d, y_d, clusters, n_boot, seed):
+        uniq = sorted(set(clusters))
+        if len(uniq) < 3:
+            return None
+        by = {c: np.array([i for i, x in enumerate(clusters) if x == c], dtype=int) for c in uniq}
+        rng = np.random.default_rng(seed)
+        deltas = []
+        for _ in range(n_boot):
+            pick = [uniq[j] for j in rng.integers(0, len(uniq), len(uniq))]
+            idx = np.concatenate([by[c] for c in pick])
+            ys = y_d[idx]
+            if ys.min() == ys.max():
+                continue   # 退化簇样本剔除(计数见 degenerate)
+            deltas.append(auc(sc_d[idx], ys) - auc(si_d[idx], ys))
+        if len(deltas) < n_boot // 2:
+            return None
+        lo, hi = np.percentile(deltas, [2.5, 97.5])
+        return {"ci95": [round(float(lo), 4), round(float(hi), 4)],
+                "n_clusters": len(uniq), "valid_resamples": len(deltas)}
 
     def block(idx):
         ys = y[idx]
@@ -334,13 +382,22 @@ def judge4():
                 "delta": round(a_c - a_i, 4) if a_c == a_c and a_i == a_i else None,
                 "ci95_strat": ci}
 
-    alpha = block(dom(lambda f: f == "alpha"))
+    alpha_idx = dom(lambda f: f == "alpha")
+    alpha = block(alpha_idx)
+    alpha_clusters = [alpha_cluster_id(rows[i]) for i in alpha_idx]
+    cluster_ci = cluster_boot_delta(sc[alpha_idx], si[alpha_idx], y[alpha_idx],
+                                    alpha_clusters, BOOT_N, R4_BOOT_SEED + 1)
+    alpha["ci95_cluster"] = cluster_ci
     math_ = block(dom(lambda f: f not in BROAD_FAMS and f != "elements"))
     overall = block(dom(lambda f: True))
     desc = {f: block(dom(lambda x, f=f: x == f)) for f in ("reverse", "elements")}
-    underpowered = alpha["n_neg"] < 60 or alpha["ci95_strat"] is None or alpha["delta"] is None
-    crit = {"alpha_n_neg_ge_60": not underpowered,
-            "alpha_ci_lo_gt_0": bool(alpha["ci95_strat"] and alpha["ci95_strat"][0] > 0),
+    # R4v2(批判 MED-5):任一门 CI 为 None = 功效不足,全部并入 UNDERPOWERED(不冒充证伪)。
+    underpowered = (alpha["n_neg"] < 60 or alpha["ci95_strat"] is None
+                    or alpha["delta"] is None or cluster_ci is None
+                    or math_["ci95_strat"] is None or overall["ci95_strat"] is None)
+    crit = {"alpha_n_neg_ge_60": alpha["n_neg"] >= 60,
+            "alpha_strat_ci_lo_gt_0": bool(alpha["ci95_strat"] and alpha["ci95_strat"][0] > 0),
+            "alpha_cluster_ci_lo_gt_0": bool(cluster_ci and cluster_ci["ci95"][0] > 0),
             "alpha_delta_ge_0.10": bool(alpha["delta"] is not None and alpha["delta"] >= 0.10),
             "math_noninferior_ci_lo_gt_-0.03": bool(math_["ci95_strat"] and math_["ci95_strat"][0] > -0.03),
             "overall_ci_lo_gt_-0.02": bool(overall["ci95_strat"] and overall["ci95_strat"][0] > -0.02)}
@@ -356,29 +413,6 @@ def judge4():
     print(json.dumps(out, indent=1, ensure_ascii=False))
 
 
-if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd == "merge":
-        merge(*sys.argv[2:])
-    elif cmd == "merge-fresh":
-        merge_fresh(*sys.argv[2:])
-    elif cmd == "judge3":
-        judge3()
-    elif cmd == "describe3":
-        describe3()
-    elif cmd == "merge-r4":
-        merge_r4(*sys.argv[2:])
-    elif cmd == "judge4":
-        judge4()
-    elif cmd == "propose":
-        propose()
-    elif cmd == "judge":
-        judge()
-    else:
-        print(__doc__)
-
-
-# ── R3 / J3(域级判据,确认性检验;预注册见账本 R3 节)─────────────────────────
 FRESH = "/tmp/gdn_coreai/b2_r3_fresh.jsonl"
 FRESH_SHA_FILE = "/tmp/gdn_coreai/b2_r3_fresh.sha"
 J3_OUT = "/tmp/gdn_coreai/b2_r3_judgement.json"
@@ -487,3 +521,28 @@ def judge3():
            "criteria": crit, "verdict": verdict}
     json.dump(out, open(J3_OUT, "w"), indent=1)
     print(json.dumps(out, indent=1, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "merge":
+        merge(*sys.argv[2:])
+    elif cmd == "merge-fresh":
+        merge_fresh(*sys.argv[2:])
+    elif cmd == "judge3":
+        judge3()
+    elif cmd == "describe3":
+        describe3()
+    elif cmd == "merge-r4":
+        merge_r4(*sys.argv[2:])
+    elif cmd == "judge4":
+        judge4()
+    elif cmd == "propose":
+        propose()
+    elif cmd == "judge":
+        judge()
+    else:
+        print(__doc__)
+
+
+# ── R3 / J3(域级判据,确认性检验;预注册见账本 R3 节)─────────────────────────

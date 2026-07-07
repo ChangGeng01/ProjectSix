@@ -39,7 +39,7 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
         // EXTRA=4 = R4 新题库真确认(alpha 主战场 20260717 + math 守卫 20260716)。
         let all = extraRaw == "4"
             ? BASDifficultyProbeCollectTests.makeR4Questions(seed: 20260717)
-                + BASDifficultyProbeCollectTests.makeQuestions(seed: 20260716, perCell: 5)
+                + BASDifficultyProbeCollectTests.makeR4MathGuard(seed: 20260719)
             : extraRaw == "3"
             ? BASDifficultyProbeCollectTests.makeBroadQuestions(seed: 20260713, perCell: 40)
                 + BASDifficultyProbeCollectTests.makeQuestions(seed: 20260714, perCell: 10)
@@ -78,6 +78,15 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
         let todo = mine.filter { seenQ.insert($0.q).inserted && !doneQs.contains($0.q) }
         print("[r2-collect] resume: already=\(doneQs.count) todo=\(todo.count)")
         let fh = try XCTUnwrap(FileHandle(forWritingAtPath: outURL.path))
+        // R4v2(批判 MED-7):续采先截断到最后一个换行——jetsam 落在行中间时,残行会
+        // 与新行黏连成永久损毁行;截断后 doneQs 解析与追加两侧都干净。
+        if let data = try? Data(contentsOf: outURL), !data.isEmpty {
+            if let lastNL = data.lastIndex(of: UInt8(ascii: "\n")) {
+                try fh.truncate(atOffset: UInt64(lastNL + 1))
+            } else {
+                try fh.truncate(atOffset: 0)
+            }
+        }
         try fh.seekToEnd()
         defer { try? fh.close() }
 
@@ -134,7 +143,16 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
             for row in batch.rows {
                 let item = todoFixed[row.idx]
                 let answerText = row.text.range(of: "</think>").map { String(row.text[$0.upperBound...]) } ?? row.text
-                let ok = answerText.range(of: "\\b\(item.ans)\\b", options: .regularExpression) != nil
+                // R4v2(批判 MED-8):alpha 判分取答案末行——五选难题下模型枚举比较选项,
+                // 全文匹配把"出现在枚举里"误判为对,虚高正例抽干负例。其余族保持全文匹配
+                // (与 R2/R3 仪器可比性),差异入册。
+                let scoreText: Substring
+                if item.family == "alpha" {
+                    scoreText = answerText.split(separator: "\n").last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) ?? Substring(answerText)
+                } else {
+                    scoreText = Substring(answerText)
+                }
+                let ok = scoreText.range(of: "\\b\(item.ans)\\b", options: .regularExpression) != nil
                 if ok { correct += 1 }
                 written += 1
                 let rec: [String: Any] = [
@@ -142,8 +160,9 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
                     "label": ok ? 1 : 0, "q": item.q, "ans": item.ans,
                     "h": row.h.map { Double($0) },
                 ]
-                fh.write(try JSONSerialization.data(withJSONObject: rec))
-                fh.write("\n".data(using: .utf8)!)
+                var line = try JSONSerialization.data(withJSONObject: rec)
+                line.append(0x0A)
+                fh.write(line)   // R4v2(MED-7):单次原子性更好的整行写
             }
             MLX.GPU.clearCache()
             print("[r2-collect] \(written)/\(mine.count) batch_acc=\(String(format: "%.2f", Double(correct) / Double(cursor))) thermal=\(ProcessInfo.processInfo.thermalState.rawValue)")

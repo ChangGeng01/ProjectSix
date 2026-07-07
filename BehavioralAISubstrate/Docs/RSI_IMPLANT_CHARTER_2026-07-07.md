@@ -673,3 +673,37 @@ staging + 回滚锚 v2 sha(人类介质动作)。rejected ⇒ R2 发现记"在�
    UNDERPOWERED 路径(#12)——功效不足不冒充证伪,一以贯之。
 3. 残余已知(不修,注记):r4_autopilot 等待循环超时后不退出直接推进(R3 已近收尾,
    4h 窗不会触发;下版脚本模板加 exit 守卫)。
+
+## R4v2 修订(起飞前批判员 1C+3H+4M+3L 全修;数据仍未存在,合法)
+
+批判员以逐位复刻 LCG 的仿真实锤:①(CRITICAL)原 math 守卫 105 槽经双集排除只活
+38(speed 0/primes 1/percent 2——空间饱和),守卫门在 n≈38 下结构性必败 = R3 病复发
+于守卫门;②选项数 k=3/4/5 是裸露 band 标记,pooled alpha AUC 把"band 可分性"混进
+"路由能力";③章程 M6 承诺的簇 bootstrap 未兑现(band2 十簇强相关,iid CI 偏窄正打
+主门,方向假 CERTIFY);④300 槽实为 262 语义唯一,n_neg 贴 60 悬崖。
+
+**修订(全部落码后仿真复验)**:
+- math 守卫重生成(makeR4MathGuard 种子 20260719):仅 mul/gcd/weekday,参数域外扩
+  (mul 千位段/gcd 基数 {21,24,27}/weekday 位移 500-999)——**仿真存活 38→258**;
+- alpha 统一 k=4(难度只由前缀深度承载),band 槽位 80/100/150——**仿真存活 277
+  (band2 117)**,负例余量脱离悬崖;词库修 fringe→frolic(71% 同答案塌陷)、
+  bleak/blend/bless→blade/blame/blare;
+- **主门升级为双 CI 同号**:行级分层 bootstrap ∧ 簇级 bootstrap(簇 id 从题面词重建:
+  band2 按十簇词集/band1 按首字母/band0 每题自簇)都 CI95 下界>0 才 CERTIFY;
+- 任一门 CI=None ⇒ UNDERPOWERED(全门,含 math/overall);merge-r4 排除集来源
+  加双 sha 断言;alpha 判分取答案末行(五选枚举式作答的假阳会抽干负例——与 R2/R3
+  仪器差异注记);JSONL 写行单次化 + 续采截断至最后换行(jetsam 撕行修复);
+  judge4 空族 dtype 修复。
+- **仿真存活清单 = 预注册附件**(r4_sim_v2.py,双集=真实 corpus 1171 + 真实 R3
+  fresh 207):alpha 277(79/81/117)/mul 90/gcd 79/weekday 89/reverse 16/
+  elements 21,总评估集 ~572。
+- 工具模块结构修复(cat>> 追加的函数落在 __main__ 之后从未被执行——merge-fresh
+  首跑即 NameError;调度块移至文件末尾,模块加载测试过)。
+
+## R3 描述性报告(2026-07-07 深夜,207 行 fresh,42 负例)
+
+overall:在位 0.879 / R1 臂 0.883 / 候选 0.871——三臂噪声内(Δ CI [−0.056,+0.041])。
+**alpha(n=18,负例 3)**:候选 0.778 vs 在位 0.622——方向与 R2 一致,功效为零
+(CI [−0.27,+0.60])= R4 存在理由的现场版。reading(n=120,负例仅 6,正率 95%):
+三臂全 <0.5——该域对探针不可排序(退化正率 + 可能的任务性盲区),入册。
+math 族:三臂 0.95-1.0 全强。h1 采集短 20 题(325/345,jetsam)——描述轮如实注记。

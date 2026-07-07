@@ -185,11 +185,11 @@ final class BASDifficultyProbeCollectTests: XCTestCase {
         ["crest", "crews", "creed", "creek", "creep", "cream", "crease"],
         ["shine", "shift", "shirt", "shiver", "shield", "shimmer", "shin"],
         ["trace", "track", "trade", "trail", "train", "trait", "tram"],
-        ["frost", "front", "frown", "froze", "frozen", "frock", "fringe"],
+        ["frost", "front", "frown", "froze", "frozen", "frock", "frolic"],
         ["click", "climb", "cling", "clinic", "clip", "clique", "clinch"],
         ["spray", "spread", "spring", "sprint", "sprout", "spruce", "sprig"],
         ["thread", "threat", "thrift", "throne", "throat", "throb", "thrive"],
-        ["bland", "blank", "blast", "blaze", "bleak", "blend", "bless"],
+        ["bland", "blank", "blast", "blaze", "blade", "blame", "blare"],
     ]
     private static let r4ReverseWords: [[String]] = [
         ["quartz", "anchor", "breeze", "saddle", "walnut", "velvet"],
@@ -205,18 +205,50 @@ final class BASDifficultyProbeCollectTests: XCTestCase {
          ("tungsten", "W"), ("antimony", "Sb"), ("bismuth", "Bi"), ("manganese", "Mn")],
     ]
 
+    /// R4v2 math 守卫(批判 CRITICAL-1:原 105 槽经双集排除只活 38——speed/percent/
+    /// letters/primes 空间饱和)。只用 mul/gcd/weekday 且参数域外扩(与语料draw不相交
+    /// 的区间),仿真预验存活。种子 20260719。
+    static func makeR4MathGuard(seed: UInt64) -> [(q: String, ans: String, family: String, band: Int)] {
+        var r = LCG(state: seed)
+        var out: [(String, String, String, Int)] = []
+        func gcd(_ a: Int, _ b: Int) -> Int { b == 0 ? a : gcd(b, a % b) }
+        for band in 0 ..< 3 {
+            for _ in 0 ..< 30 {
+                // mul:外扩区间(千位段,语料为 2-3 位段)
+                let (a, b): (Int, Int) = band == 0 ? (1000 + r.next(9000), 2 + r.next(8))
+                    : band == 1 ? (1000 + r.next(9000), 10 + r.next(90))
+                    : (1000 + r.next(9000), 100 + r.next(900))
+                out.append(("What is \(a) multiplied by \(b)?", "\(a * b)", "mul", band))
+                // gcd:外扩基数(语料 g∈{6,12,18};此处 {21,24,27})
+                let g = [21, 24, 27][band]
+                let (m1, m2) = (2 + r.next(8 + band * 12), 3 + r.next(8 + band * 12))
+                out.append(("What is the greatest common divisor of \(g * m1) and \(g * m2)?",
+                            "\(gcd(g * m1, g * m2))", "gcd", band))
+                // weekday:外扩位移(语料 ≤400;此处 500-999)
+                let d = r.next(7)
+                let shift = 500 + r.next(500)
+                out.append(("If today is \(weekdays[d]), what day of the week will it be \(shift) days from now?",
+                            weekdays[(d + shift) % 7], "weekday", band))
+            }
+        }
+        return out
+    }
+
     static func makeR4Questions(seed: UInt64) -> [(q: String, ans: String, family: String, band: Int)] {
         var r = LCG(state: seed)
         var out: [(String, String, String, Int)] = []
-        // alpha ~300:band0 3-选 / band1 4-选 / band2 5-选(深前缀,负例源)
+        // R4v2(起飞前批判 HIGH-2a):全 band 统一 k=4——"选项数"曾是裸露的 band 标记,
+        // 会把 band 可分性混进"路由能力";难度只由前缀深度承载。band 槽位 80/100/150
+        // (HIGH-4:band2 C(7,4)=35×10=350 唯一空间,150 槽喂足负例)。
+        let perBand = [80, 100, 150]
         for band in 0 ..< 3 {
-            for _ in 0 ..< 100 {
+            for _ in 0 ..< perBand[band] {
                 let pool: [String]
-                let k: Int
+                let k = 4
                 switch band {
-                case 0: pool = r4Band0Words; k = 3
-                case 1: pool = r4Band1Pools[r.next(r4Band1Pools.count)]; k = 4
-                default: pool = r4Band2Clusters[r.next(r4Band2Clusters.count)]; k = 5
+                case 0: pool = r4Band0Words
+                case 1: pool = r4Band1Pools[r.next(r4Band1Pools.count)]
+                default: pool = r4Band2Clusters[r.next(r4Band2Clusters.count)]
                 }
                 var pick = Set<String>()
                 while pick.count < k { pick.insert(pool[r.next(pool.count)]) }
