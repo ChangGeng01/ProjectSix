@@ -542,3 +542,27 @@ sha=a72caf5978…;pos_rate 0.659;math 重(broad 按构造饱和,预注册已注)
 **R3 的自然假设(留给操作员立项判断,本轮不改规则——规则只能在轮间由人改)**:
 J3 判据升级为域级配对 bootstrap(broad 与 math 各自 CI),或语料按域配平后重扫;
 以及"在位基线该不该继续是 Mac-fit 权重"本身成为候选(设备特征时代的基线问题)。
+
+## R3 立项:域级判据(2026-07-07 开工令,采集前冻结)
+
+**卫生裁定(最严苛第一刀)**:J2 的 heldout 已被评过、域级假设正来自看它——同 heldout
+换判据再判 = 事后择判据。**J3 必须在全新从未接触的设备数据上确认**;三臂权重文件
+现在 sha 钉死(v2=cf8276421e5d12bf… / R1 被驳=2eac90211acaae7d… / R2 被驳=1aa86c252a7415fa…),全部冻结于新数据
+存在之前 ⇒ 零泄漏、纯确认性检验。
+
+**新 heldout 采集(冻结)**:makeBroadQuestions(seed=20260713, perCell=40)(480 槽;
+唯一存活主要是 reading——组合空间宽;recall/reverse/alpha 题库已尽,按题文对 1171
+语料去重后自然消失)+ makeQuestions(seed=20260714, perCell=10)(210 槽,math 基本全新)。
+两机偶/奇分采(EXTRA=3),对全语料去重后预期 ~300-350 全新行。
+**诚实改名(预注册)**:新集的 broad 实质 = reading 代理域;certified 判词写
+"broad(reading-proxy)",不冒充全 broad。
+
+**J3 判据(冻结;三臂同场,配对 bootstrap 10k,种子 20260715,只评一次)**:
+R2 候选 certified ⇔ 在新集上:
+1. **broad(reading-proxy) ΔAUC(候选−在位)CI95 下界 > 0 ∧ Δ ≥ 0.05**(域级效应量门;
+   R2 观察 +0.166,门取其三分之一为保守);
+2. **math Δ 非劣性:CI95 下界 > −0.03**(预注册非劣边际);
+3. **overall Δ CI95 下界 > −0.02**(总体不实质倒退)。
+全过 ⇒ certified(候选进 FSM certified,呈操作员签名部署 v3);任一不过 ⇒ rejected
+= 诚实负面,R2 的域假设在新数据上不成立即入册。仪器锚:三臂文件 sha 复核 + 新语料
+sha 钉 + 全程确定性。

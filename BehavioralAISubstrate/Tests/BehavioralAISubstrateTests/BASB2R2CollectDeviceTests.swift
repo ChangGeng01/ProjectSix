@@ -33,9 +33,13 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
         // R2-C 修订二:BAS_R2_EXTRA=1 ⇒ 扩展批(仅 math 生成器,种子 20260710——
         // broad 族按构造饱和已枯竭;796<1000 触发线的补齐批)。
         let extraRaw = ProcessInfo.processInfo.environment["BAS_R2_EXTRA"]
-        let extra = extraRaw == "1" || extraRaw == "2"
-        // EXTRA=1 种子 20260710;EXTRA=2 = 修订二的"再批一轮"(种子 20260711,994<1000)。
-        let all = extra
+        let extra = extraRaw == "1" || extraRaw == "2" || extraRaw == "3"
+        // EXTRA=1 种子 20260710;EXTRA=2 = 修订二再批(20260711);
+        // EXTRA=3 = R3 全新 heldout(broad 20260713/40 + math 20260714/10,确认性检验)。
+        let all = extraRaw == "3"
+            ? BASDifficultyProbeCollectTests.makeBroadQuestions(seed: 20260713, perCell: 40)
+                + BASDifficultyProbeCollectTests.makeQuestions(seed: 20260714, perCell: 10)
+            : extra
             ? BASDifficultyProbeCollectTests.makeQuestions(
                 seed: extraRaw == "2" ? 20260711 : 20260710, perCell: 20)
             : BASDifficultyProbeCollectTests.makeQuestions(seed: 20260704, perCell: 7)
@@ -49,7 +53,8 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
             configuration: ModelConfiguration(directory: localDir, extraEOSTokens: ["<|im_end|>"]),
             progressHandler: { _ in })
         let outURL = docs.appendingPathComponent(
-            extraRaw == "2" ? "b2_r2_features_extra2_\(half).jsonl"
+            extraRaw == "3" ? "b2_r3_fresh_\(half).jsonl"
+                : extraRaw == "2" ? "b2_r2_features_extra2_\(half).jsonl"
                 : extra ? "b2_r2_features_extra_\(half).jsonl"
                 : "b2_r2_features_\(half).jsonl")
         // 可续采(崩溃后 xcodebuild 自动重试从破坏性变无害):已有行按题文跳过,APPEND 永不截断。
