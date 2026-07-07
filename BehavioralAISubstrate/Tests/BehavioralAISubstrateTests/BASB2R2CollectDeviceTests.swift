@@ -68,7 +68,9 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
         if !FileManager.default.fileExists(atPath: outURL.path) {
             FileManager.default.createFile(atPath: outURL.path, contents: nil)
         }
-        let todo = mine.filter { !doneQs.contains($0.q) }
+        // H2 修:轮内按 q 去重(生成器池小必撞;重复槽位曾白烧算力+断言假红)。
+        var seenQ = Set<String>()
+        let todo = mine.filter { seenQ.insert($0.q).inserted && !doneQs.contains($0.q) }
         print("[r2-collect] resume: already=\(doneQs.count) todo=\(todo.count)")
         let fh = try XCTUnwrap(FileHandle(forWritingAtPath: outURL.path))
         try fh.seekToEnd()

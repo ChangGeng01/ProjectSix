@@ -7,12 +7,16 @@ import XCTest
 /// 【adopted 不在这里发生】——签名是操作员对话中的人类行为,部署是人类介质动作。
 final class BASB2RefitLoopTests: XCTestCase {
     func testWalkCandidateFSMFromJudgement() throws {
-        // 终态防覆写:操作员已裁(rejected/adopted)的 FSM 文件不得被重走环覆写。
+        // 终态防覆写:操作员已裁的 FSM 文件不得被重走环覆写;守卫解码失败 = fatal
+        // (审计 M1:try? 静默旁路会让守卫在 schema 演进时形同虚设——守卫的意义就是这文件)。
         let fsmURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_candidate_fsm.json")
-        if let d = try? Data(contentsOf: fsmURL),
-           let existing = try? JSONDecoder().decode(BASImprovementCandidate.self, from: d),
-           existing.state == .rejected || existing.state == .adopted || existing.state == .rolledBack {
-            throw XCTSkip("candidate already in terminal state \(existing.state.rawValue) — 人裁不可被重走环覆写")
+        if let d = try? Data(contentsOf: fsmURL) {
+            guard let existing = try? JSONDecoder().decode(BASImprovementCandidate.self, from: d) else {
+                return XCTFail("FSM 文件存在但不可解码——守卫拒绝旁路,人工核查后再走环")
+            }
+            if existing.state == .rejected || existing.state == .adopted || existing.state == .rolledBack {
+                throw XCTSkip("candidate already in terminal state \(existing.state.rawValue) — 人裁不可被重走环覆写")
+            }
         }
         let judgeURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_judgement.json")
         guard let data = try? Data(contentsOf: judgeURL),
@@ -98,12 +102,27 @@ extension BASB2RefitLoopTests {
             evidenceRefs: ["/tmp/gdn_coreai/b2_r2_evidence.json", "/tmp/gdn_coreai/b2_r2_judgement.json",
                            "corpus sha=a72caf5978…(n=1171 设备同源)",
                            "bootstrap Δ=\(boot["delta"] ?? "?") CI95=\(boot["ci95"] ?? "?")"])
+        // 审计 M1:终态守卫 + verdict 驱动分支 + 理由从判决 JSON 读(不再硬编码陈旧数字)。
+        let r2fsmURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r2_candidate_fsm.json")
+        if let d = try? Data(contentsOf: r2fsmURL) {
+            guard let existing = try? JSONDecoder().decode(BASImprovementCandidate.self, from: d) else {
+                return XCTFail("R2 FSM 文件不可解码——守卫拒绝旁路")
+            }
+            if existing.state == .rejected || existing.state == .adopted || existing.state == .rolledBack {
+                throw XCTSkip("R2 candidate already terminal \(existing.state.rawValue)")
+            }
+        }
         c = try c.transitioned(to: .shadowTesting, atMs: 1, reasonCodes: ["R1 grid on device corpus"])
-        XCTAssertEqual(verdict, "REJECTED", "本轮判决应为 REJECTED(判据三项全未过)")
-        c = try c.transitioned(to: .rejected, atMs: 2,
-                               reasonCodes: ["J2: CI [-0.0297,+0.0344] 含 0", "Δ=0.0017<0.01",
-                                             "math 0.900 vs 0.916 越域容差 −0.016"])
+        let criteria = (j["criteria"] as? [String: Any]).map { "\($0)" } ?? "criteria-unavailable"
+        switch verdict {
+        case "REJECTED":
+            c = try c.transitioned(to: .rejected, atMs: 2, reasonCodes: ["J2 REJECTED", criteria])
+        case "CERTIFIED":
+            c = try c.transitioned(to: .certified, atMs: 2, reasonCodes: ["J2 CERTIFIED", criteria])
+        default:
+            return XCTFail("unknown verdict \(verdict) — 不落任何 FSM 记录")
+        }
         print("📜 " + c.receiptLine(gitHash: "j2-verdict-2026-07-07"))
-        try JSONEncoder().encode(c).write(to: URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r2_candidate_fsm.json"))
+        try JSONEncoder().encode(c).write(to: r2fsmURL)
     }
 }
