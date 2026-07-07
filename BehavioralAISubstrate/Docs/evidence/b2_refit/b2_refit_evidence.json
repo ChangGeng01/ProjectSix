@@ -1,0 +1,77 @@
+{
+ "rule": "R1 (RSI_IMPLANT_CHARTER \u7b2c\u4e94\u90e8\u5206)",
+ "dataset_sha256": "e7b49b9547045cc75794baef0adf7b924219beafbc6e380fa933bda713cde673",
+ "split_seed": 20260704,
+ "grid": [
+  {
+   "lam": 0.0001,
+   "iters": 3000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.0001,
+   "iters": 9000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.0003,
+   "iters": 3000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.0003,
+   "iters": 9000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.001,
+   "iters": 3000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.001,
+   "iters": 9000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.003,
+   "iters": 3000,
+   "inner_val_auc": 0.925
+  },
+  {
+   "lam": 0.003,
+   "iters": 9000,
+   "inner_val_auc": 0.925
+  },
+  {
+   "lam": 0.01,
+   "iters": 3000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.01,
+   "iters": 9000,
+   "inner_val_auc": 0.9194
+  },
+  {
+   "lam": 0.03,
+   "iters": 3000,
+   "inner_val_auc": 0.9222
+  },
+  {
+   "lam": 0.03,
+   "iters": 9000,
+   "inner_val_auc": 0.9306
+  }
+ ],
+ "chosen": {
+  "lam": 0.03,
+  "iters": 9000,
+  "inner_val_auc": 0.9306
+ },
+ "incumbent_point_in_grid": {
+  "lam": 0.003,
+  "iters": 3000
+ },
+ "candidate_out": "/tmp/gdn_coreai/b2_refit_candidate_weights.json"
+}

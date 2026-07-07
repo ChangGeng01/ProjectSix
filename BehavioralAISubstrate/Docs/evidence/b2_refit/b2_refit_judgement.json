@@ -1,0 +1,28 @@
+{
+ "rule": "J1 (RSI_IMPLANT_CHARTER \u7b2c\u4e94\u90e8\u5206)",
+ "anchor": {
+  "incumbent_carried": 0.8213507625272332,
+  "incumbent_reeval": 0.8214,
+  "tolerance": 0.002,
+  "ok": true
+ },
+ "incumbent": {
+  "auc": 0.8214,
+  "math": 0.8297,
+  "broad": 0.8167,
+  "sha256": "cf8276421e5d12bfb66454c910c84d37381ddbff0a72f4ad9ab31375cc8d038c"
+ },
+ "candidate": {
+  "auc": 0.833,
+  "math": 0.828,
+  "broad": 0.85,
+  "lam": 0.03,
+  "iters": 9000,
+  "sha256": "2eac90211acaae7d5b03214d0b9e3d520868686a2617f751f40397c10491c53c"
+ },
+ "criteria": {
+  "delta_certify": 0.01,
+  "domain_regression_tol": 0.01
+ },
+ "verdict": "CERTIFIED"
+}

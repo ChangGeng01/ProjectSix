@@ -1,0 +1,72 @@
+{
+ "rule": "R1 grid on R2 corpus",
+ "corpus_sha256": "a72caf597821bfb29878606f4ab6c8163e402cf62b60e79c92a2698f37b34f8b",
+ "split_seed": 20260704,
+ "grid": [
+  {
+   "lam": 0.0001,
+   "iters": 3000,
+   "inner_val_auc": 0.903
+  },
+  {
+   "lam": 0.0001,
+   "iters": 9000,
+   "inner_val_auc": 0.8984
+  },
+  {
+   "lam": 0.0003,
+   "iters": 3000,
+   "inner_val_auc": 0.9032
+  },
+  {
+   "lam": 0.0003,
+   "iters": 9000,
+   "inner_val_auc": 0.8992
+  },
+  {
+   "lam": 0.001,
+   "iters": 3000,
+   "inner_val_auc": 0.9039
+  },
+  {
+   "lam": 0.001,
+   "iters": 9000,
+   "inner_val_auc": 0.9023
+  },
+  {
+   "lam": 0.003,
+   "iters": 3000,
+   "inner_val_auc": 0.9067
+  },
+  {
+   "lam": 0.003,
+   "iters": 9000,
+   "inner_val_auc": 0.9083
+  },
+  {
+   "lam": 0.01,
+   "iters": 3000,
+   "inner_val_auc": 0.9158
+  },
+  {
+   "lam": 0.01,
+   "iters": 9000,
+   "inner_val_auc": 0.9175
+  },
+  {
+   "lam": 0.03,
+   "iters": 3000,
+   "inner_val_auc": 0.9147
+  },
+  {
+   "lam": 0.03,
+   "iters": 9000,
+   "inner_val_auc": 0.9151
+  }
+ ],
+ "chosen": {
+  "lam": 0.01,
+  "iters": 9000,
+  "inner_val_auc": 0.9175
+ }
+}
