@@ -2,7 +2,7 @@
 """R2 pipeline — 合并去重 → sha 钉 → R1 网格提案 → J2 bootstrap 判决(协议冻结于账本第五部分)。
 
 用法:
-  b2_r2_pipeline.py merge <half0.jsonl> <half1.jsonl>   # 合并+按题文去重(首现胜)+sha
+  b2_r2_pipeline.py merge <f1.jsonl> [f2.jsonl ...]     # 合并+按题文去重(首现胜)+sha
   b2_r2_pipeline.py propose                              # R1 12 点网格,内部验证选点
   b2_r2_pipeline.py judge                                # J2:heldout 只碰一次,配对 bootstrap
 
@@ -44,12 +44,12 @@ def sha256(path):
     return h.hexdigest()
 
 
-def merge(half0, half1):
+def merge(*paths):
     seen = set()
     kept, dup = [], 0
     # 首现胜:half 文件内部本身按题面顺序;先 0 后 1 与生成顺序交错无妨——
     # 题文相同即同题(答案确定),first-wins 保证 v2 重生成题优先存活。
-    for path in (half0, half1):
+    for path in paths:
         for line in open(path):
             if not line.strip():
                 continue
@@ -211,7 +211,7 @@ def judge():
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "merge":
-        merge(sys.argv[2], sys.argv[3])
+        merge(*sys.argv[2:])
     elif cmd == "propose":
         propose()
     elif cmd == "judge":

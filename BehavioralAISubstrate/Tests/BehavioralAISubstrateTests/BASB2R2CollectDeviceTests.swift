@@ -30,37 +30,68 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
             throw XCTSkip("model/MTP weights not staged in Documents")
         }
         // 冻结题面:v2 重生成 ∪ R2 新题,稳定顺序,偶/奇下标分机。
-        let all = BASDifficultyProbeCollectTests.makeQuestions(seed: 20260704, perCell: 7)
-            + BASDifficultyProbeCollectTests.makeBroadQuestions(seed: 20260705, perCell: 7)
-            + BASDifficultyProbeCollectTests.makeQuestions(seed: 20260707, perCell: 30)
-            + BASDifficultyProbeCollectTests.makeBroadQuestions(seed: 20260708, perCell: 30)
+        // R2-C 修订二:BAS_R2_EXTRA=1 ⇒ 扩展批(仅 math 生成器,种子 20260710——
+        // broad 族按构造饱和已枯竭;796<1000 触发线的补齐批)。
+        let extra = ProcessInfo.processInfo.environment["BAS_R2_EXTRA"] == "1"
+        let all = extra
+            ? BASDifficultyProbeCollectTests.makeQuestions(seed: 20260710, perCell: 20)
+            : BASDifficultyProbeCollectTests.makeQuestions(seed: 20260704, perCell: 7)
+                + BASDifficultyProbeCollectTests.makeBroadQuestions(seed: 20260705, perCell: 7)
+                + BASDifficultyProbeCollectTests.makeQuestions(seed: 20260707, perCell: 30)
+                + BASDifficultyProbeCollectTests.makeBroadQuestions(seed: 20260708, perCell: 30)
         let mine = all.enumerated().filter { $0.offset % 2 == half }.map(\.element)
         print("[r2-collect] half=\(half) questions=\(mine.count)/\(all.count)")
 
         let container = try await #huggingFaceLoadModelContainer(
             configuration: ModelConfiguration(directory: localDir, extraEOSTokens: ["<|im_end|>"]),
             progressHandler: { _ in })
-        let outURL = docs.appendingPathComponent("b2_r2_features_\(half).jsonl")
-        FileManager.default.createFile(atPath: outURL.path, contents: nil)
+        let outURL = docs.appendingPathComponent(extra ? "b2_r2_features_extra_\(half).jsonl"
+                                                       : "b2_r2_features_\(half).jsonl")
+        // 可续采(崩溃后 xcodebuild 自动重试从破坏性变无害):已有行按题文跳过,APPEND 永不截断。
+        var doneQs = Set<String>()
+        if let data = try? Data(contentsOf: outURL), let text = String(data: data, encoding: .utf8) {
+            for line in text.split(separator: "\n") where !line.isEmpty {
+                if let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                   let q = obj["q"] as? String { doneQs.insert(q) }
+            }
+        }
+        if !FileManager.default.fileExists(atPath: outURL.path) {
+            FileManager.default.createFile(atPath: outURL.path, contents: nil)
+        }
+        let todo = mine.filter { !doneQs.contains($0.q) }
+        print("[r2-collect] resume: already=\(doneQs.count) todo=\(todo.count)")
         let fh = try XCTUnwrap(FileHandle(forWritingAtPath: outURL.path))
+        try fh.seekToEnd()
         defer { try? fh.close() }
 
-        var done = 0, correct = 0
-        for item in mine {
+        // 预 tokenize(避免 perform 内 async;sustained 式单 perform 单解码器——
+        // 崩因修复:v1 每题一次 perform + 每题重建解码器(每次重量化 MTP 头)= jetsam churn)。
+        var tokenized: [[Int]] = []
+        for item in todo {
             let input = try await container.prepare(input: UserInput(chat: [.user(item.q)]))
-            struct S: Sendable { let h: [Float]; let qlen: Int; let text: String }
-            let s: S = try await container.perform(nonSendable: input) { ctx, input in
+            let ids: [Int] = try await container.perform(nonSendable: input) { _, input in
+                input.text.tokens.asArray(Int.self)
+            }
+            tokenized.append(ids)
+        }
+        let todoFixed = todo
+        let tokFixed = tokenized
+        struct Row: Sendable { let h: [Float]; let qlen: Int; let text: String; let idx: Int }
+        struct Batch: Sendable { let rows: [Row] }
+        var written = doneQs.count
+        var correct = 0
+        // 分段 perform(每段 25 题):段间回到 actor 落盘+清缓存,段内单解码器复用。
+        var cursor = 0
+        while cursor < todoFixed.count {
+            let lo = cursor, hi = min(cursor + 25, todoFixed.count)
+            cursor = hi
+            let batch: Batch = try await container.perform { ctx -> Batch in
                 guard let qwen = ctx.model as? Qwen35Model else {
                     throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
                 }
                 let dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
                 var eos = Set([ctx.tokenizer.eosTokenId].compactMap { $0 })
                 if let imEnd = ctx.tokenizer.convertTokenToId("<|im_end|>") { eos.insert(imEnd) }
-                let ids = input.text.tokens.asArray(Int.self)
-                let cache = qwen.newCache(parameters: nil)
-                let h0 = qwen.hiddenStatesWithCache(
-                    MLXArray(ids.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
-                let h = h0[0, h0.dim(1) - 1].asType(.float32).asArray(Float.self)
                 let open = ctx.tokenizer.convertTokenToId("<think>") ?? 248068
                 let close = ctx.tokenizer.convertTokenToId("</think>") ?? 248069
                 let nl = ctx.tokenizer.encode(text: "\n").last ?? 198
@@ -68,30 +99,42 @@ final class BASB2R2CollectDeviceTests: XCTestCase {
                 let cfg = BASTraceExitConfig(
                     thinkOpenToken: open, thinkCloseToken: close,
                     closeSequence: [nl, close, nl2], boundaryTokens: [nl, nl2])
-                // 生产形状:tCap = 生产常数(iOS 5——qmv 悬崖之下;Mac 版收集用 12 是 Mac 常数)
-                let run = dec.generateSpecKFused(
-                    prompt: ids, maxTokens: 224, eosTokens: eos, k: 3,
-                    tCap: MLXOrganAdapter.mtpProductionTCap, adaptiveK: true, traceExit: cfg)
-                return S(h: h, qlen: ids.count, text: ctx.tokenizer.decode(tokenIds: run.tokens))
+                var rows: [Row] = []
+                for i in lo ..< hi {
+                    let ids = tokFixed[i]
+                    let cache = qwen.newCache(parameters: nil)
+                    let h0 = qwen.hiddenStatesWithCache(
+                        MLXArray(ids.map(Int32.init)).expandedDimensions(axis: 0), cache: cache)
+                    let h = h0[0, h0.dim(1) - 1].asType(.float32).asArray(Float.self)
+                    let run = dec.generateSpecKFused(
+                        prompt: ids, maxTokens: 224, eosTokens: eos, k: 3,
+                        tCap: MLXOrganAdapter.mtpProductionTCap, adaptiveK: true, traceExit: cfg)
+                    rows.append(Row(h: h, qlen: ids.count,
+                                    text: ctx.tokenizer.decode(tokenIds: run.tokens), idx: i))
+                }
+                return Batch(rows: rows)
             }
-            let answerText = s.text.range(of: "</think>").map { String(s.text[$0.upperBound...]) } ?? s.text
-            let ok = answerText.range(of: "\\b\(item.ans)\\b", options: .regularExpression) != nil
-            if ok { correct += 1 }
-            done += 1
-            let rec: [String: Any] = [
-                "family": item.family, "band": item.band, "qlen": s.qlen,
-                "label": ok ? 1 : 0, "q": item.q, "ans": item.ans,
-                "h": s.h.map { Double($0) },
-            ]
-            fh.write(try JSONSerialization.data(withJSONObject: rec))
-            fh.write("\n".data(using: .utf8)!)
-            if done % 25 == 0 {
-                print("[r2-collect] \(done)/\(mine.count) acc=\(String(format: "%.2f", Double(correct) / Double(done))) thermal=\(ProcessInfo.processInfo.thermalState.rawValue)")
-                MLX.GPU.clearCache()
+            for row in batch.rows {
+                let item = todoFixed[row.idx]
+                let answerText = row.text.range(of: "</think>").map { String(row.text[$0.upperBound...]) } ?? row.text
+                let ok = answerText.range(of: "\\b\(item.ans)\\b", options: .regularExpression) != nil
+                if ok { correct += 1 }
+                written += 1
+                let rec: [String: Any] = [
+                    "family": item.family, "band": item.band, "qlen": row.qlen,
+                    "label": ok ? 1 : 0, "q": item.q, "ans": item.ans,
+                    "h": row.h.map { Double($0) },
+                ]
+                fh.write(try JSONSerialization.data(withJSONObject: rec))
+                fh.write("\n".data(using: .utf8)!)
             }
+            MLX.GPU.clearCache()
+            print("[r2-collect] \(written)/\(mine.count) batch_acc=\(String(format: "%.2f", Double(correct) / Double(cursor))) thermal=\(ProcessInfo.processInfo.thermalState.rawValue)")
         }
-        print("[r2-collect] DONE half=\(half) n=\(done) acc=\(String(format: "%.3f", Double(correct) / Double(done))) → \(outURL.path)")
-        XCTAssertEqual(done, mine.count)
+        let done = written - doneQs.count
+        print("[r2-collect] DONE half=\(half) new=\(done) total=\(written)/\(mine.count) → \(outURL.path)")
+        // 生成器内部有重复题(broad 饱和)——集齐 = 唯一题全收,非槽位数。
+        XCTAssertEqual(written, Set(mine.map(\.q)).count, "含续采在内必须集齐本半全部唯一题")
         #else
         throw XCTSkip("MLXLLM unavailable")
         #endif
