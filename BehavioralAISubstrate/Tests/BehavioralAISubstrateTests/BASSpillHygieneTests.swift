@@ -47,3 +47,33 @@ final class BASSpillHygieneTests: XCTestCase {
         XCTAssertTrue(left.isEmpty, "clear-all left spill snapshots on disk: \(left)")
     }
 }
+
+// ── 大审计梯次3 接线 gates(H5 单写者 / H7 clear-epoch,2026-07-07)──────────────
+
+extension BASSpillHygieneTests {
+
+    /// H7:clear 后的 epoch 必须领先——snapshot/fused writeback 用它判"写期间是否被 clear"。
+    func testH7_ClearBumpsEpoch() async {
+        let adapter = MLXOrganAdapter(model: MLXModelCatalog.qwen3_5_4B_4bit)
+        let e0 = await adapter._clearEpoch("victim#core")
+        await adapter.clearSession(sessionID: "victim")
+        let e1 = await adapter._clearEpoch("victim#core")
+        XCTAssertGreaterThan(e1, e0, "clearSession 必须提升该 key 的 clear epoch")
+        // clearAll 覆盖任意 key(不枚举)。
+        let f0 = await adapter._clearEpoch("any#core")
+        await adapter.clearAllSessions()
+        let f1 = await adapter._clearEpoch("any#core")
+        XCTAssertGreaterThan(f1, f0, "clearAllSessions 必须提升所有 key 的 epoch")
+    }
+
+    /// H6 门:opt-in env 默认关(字节等价直调),设了才启用——纯静态断言,无模型。
+    func testH6_GateOptInDefaultOff() {
+        // 未设 BAS_SESSION_GATE ⇒ 默认关(本测试进程未设)。
+        if ProcessInfo.processInfo.environment["BAS_SESSION_GATE"] == "1" {
+            XCTAssertTrue(MLXOrganAdapter._perKeySessionGateEnabled)
+        } else {
+            XCTAssertFalse(MLXOrganAdapter._perKeySessionGateEnabled,
+                           "H6 门必须默认关——默认路径字节等价")
+        }
+    }
+}

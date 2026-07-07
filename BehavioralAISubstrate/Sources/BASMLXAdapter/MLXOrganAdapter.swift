@@ -355,6 +355,14 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// media and is non-Sendable, so messages are rebuilt locally where consumed). Purged on
     /// clearSession/transition.
     private var fusedTranscripts: [String: [(role: String, text: String)]] = [:]
+
+    /// H6 (mega-audit tranche-3, 2026-07-07): per-key FIFO gate serializing the session-pool
+    /// critical section. Opt-in via `BAS_SESSION_GATE=1`; default off ⇒ direct call, byte-equal
+    /// with the pre-gate path. Device endurance cert flips it default-on.
+    let sessionGate = BASPerKeyInFlightGate()
+    nonisolated static var _perKeySessionGateEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_SESSION_GATE"] == "1"
+    }
     /// Telemetry: turns served by the fused session lane (tests/observability).
     private(set) var fusedSessionTurnCount = 0
 
@@ -1205,6 +1213,35 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         _persistExperienceIfDue()                        // P0: session lane persists on next-turn entry
         _pressureCheck(keeping: key)                     // 案5: between-turn reclaim sample
 
+        // H6 (mega-audit tranche-3, 2026-07-07): per-key serialization of the session-pool
+        // critical section. Opt-in (BAS_SESSION_GATE=1) — default off is a DIRECT call (byte-equal
+        // with the pre-gate path); device endurance cert flips it default-on. When on, two turns
+        // for the same key queue FIFO instead of interleaving across await points and clobbering
+        // sessions[key]/fusedTranscripts[key]/pending-spill (audit H5/H6/H7 root cause).
+        if Self._perKeySessionGateEnabled {
+            return try await sessionGate.serialize(key: key) {
+                try await self._draftMultiTurnLocked(
+                    request, key: key, container: container, dbgS: dbgS)
+            }
+        }
+        return try await _draftMultiTurnLocked(
+            request, key: key, container: container, dbgS: dbgS)
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
+
+
+    #if canImport(MLXLLM)
+    /// H6 (mega-audit tranche-3): the session-pool critical section of draftMultiTurn, extracted
+    /// verbatim so it can run either directly (default, byte-equal) or inside the per-key gate
+    /// (BAS_SESSION_GATE=1). It mutates sessions[key]/fusedTranscripts[key]/pendingSpill/sessionLRU
+    /// across await points — the interleaving hole H5/H6/H7 flagged.
+    private func _draftMultiTurnLocked(
+        _ request: BASOrganRequest, key: String, container: ModelContainer, dbgS: Bool
+    ) async throws -> BASOrganDraft {
         // 案3 (2026-07-06 decode-OS audit): lane election is ONE pure function (_sessionLane) —
         // the three inline guard chains re-deriving route class per turn were the seam-1/4 bug
         // class. Bodies below are the certified ones, unchanged; the pooled acquisition order
@@ -1236,10 +1273,16 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             var transcript = seedTranscript
             if dbgS { NSLog("[sess-dbg] %@ lane=%@", key, String(describing: lane)) }
             transcript.append((role: "user", text: Self.prompt(for: request)))
+            // H7 (mega-audit tranche-3): capture the clear epoch before the generation await; if
+            // clearSession(key) intervenes during decode, do NOT write the transcript back —
+            // otherwise the cleared conversation is resurrected in memory (fusedTranscripts[key]).
+            let fusedEpoch = _clearEpoch(key)
             let r = try await _generateMTPSpecFromMessages(transcript, for: request)
             transcript.append((role: "assistant", text: r.draft.body))
-            fusedTranscripts[key] = transcript
-            if case .fusedTranscript = lane { fusedSessionTurnCount += 1 }
+            if _clearEpoch(key) == fusedEpoch {
+                fusedTranscripts[key] = transcript
+                if case .fusedTranscript = lane { fusedSessionTurnCount += 1 }
+            }
             // 可解释性①: THE turn line, session flavor — lane election + thermal fallback +
             // B3/B2 facts carried up from the generation.
             let laneName = { if case .fusedTranscript = lane { return "session:fused" }
@@ -1365,12 +1408,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             body: body, request: request,
             completionMetrics: Self.completionMetrics(from: completionInfo))
             .withDecodeAttribution(attribution)
-        #else
-        throw BASOrganError.providerUnavailable(
-            reason: Self.frameworkUnavailableReason
-                + Self.frameworkUnavailablePlatformSuffix)
-        #endif
     }
+    #endif
 
     #if canImport(MLXLLM)
     /// Consume `ChatSession.streamDetails` (the same stream `respond(to:)` accumulates) → the joined body
@@ -1514,6 +1553,20 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     struct _PendingSpill { let box: ChatSessionBox; let generation: Int }
     var pendingSpill: [String: _PendingSpill] = [:]
     private var spillGeneration = 0
+    /// H5 (mega-audit tranche-3): single spill-writer per key. `!hadPending` could double-spawn a
+    /// second writer when a seat was reclaimed mid-write then re-parked; the two writers then raced
+    /// to delete each other's valid snapshot. A key with an active writer never spawns a second —
+    /// the active writer's loop picks up newer boxes via `pendingSpill[key]`.
+    private var spillWriterActive: Set<String> = []
+    /// H7 (mega-audit tranche-3): per-key clear epoch. Bumped on clearSession/clearAllSessions;
+    /// an in-flight snapshot/writeback compares the epoch it captured before its await against the
+    /// current one and DISCARDS its result if a clear intervened — so a cleared session can't be
+    /// resurrected on disk (snapshotWarmSeats) or in memory (fused writeback). clearAllEpoch covers
+    /// clearAllSessions without enumerating every key.
+    private var keyClearEpoch: [String: Int] = [:]
+    private var clearAllEpoch = 0
+    /// The clear-epoch for `key` at this instant (folds the global clearAll tick in).
+    func _clearEpoch(_ key: String) -> Int { (keyClearEpoch[key] ?? 0) + clearAllEpoch }
     func _evictBeyondCap() async {
         while sessionLRU.count > Self.maxLiveSessions, let oldest = sessionLRU.first {
             sessionLRU.removeFirst()
@@ -1527,9 +1580,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// its KV preserved — LRU eviction and the pressure ladder's rung-1 both ride it.
     private func _parkPending(_ key: String, _ victim: ChatSessionBox) {
         spillGeneration += 1
-        let hadPending = pendingSpill[key] != nil
         pendingSpill[key] = _PendingSpill(box: victim, generation: spillGeneration)
-        if !hadPending {
+        // H5: spawn a writer only if none is draining this key; an active writer picks up the
+        // newer box via its loop. (The old `!hadPending` double-spawned after a mid-write reclaim.)
+        if !spillWriterActive.contains(key) {
+            spillWriterActive.insert(key)
             Task { [weak self] in await self?._completePendingSpill(key: key) }
         }
     }
@@ -1632,18 +1687,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             let gen = entry.generation
             let ok = (try? await Self._persist(entry.box, url: Self._spillURL(forKey: key),
                                                quantizeKV: false)) != nil
+            // H5: the writer-active flag is cleared atomically with the pending check below (no
+            // await between), so a park that runs after this sees active=false and spawns fresh.
             if pendingSpill[key] == nil {
-                // Reclaimed live while we were writing — the snapshot is stale; consume it.
+                // Reclaimed live (or cleared) while we were writing — the snapshot is stale; consume it.
                 if ok { try? FileManager.default.removeItem(at: Self._spillURL(forKey: key)) }
+                spillWriterActive.remove(key)
                 return
             }
             if let cur = pendingSpill[key], cur.generation == gen {
                 pendingSpill.removeValue(forKey: key)
                 if ok { spillCount += 1; Self._pruneSpillDir() }
+                spillWriterActive.remove(key)
                 return
             }
             // Superseded by a newer eviction of the same key → loop and persist the newer box.
         }
+        spillWriterActive.remove(key)
     }
     /// Snapshot GC: keep the newest `keep` spill files (default 32 ≈ 2GB worst-case at 64MB each);
     /// one-shot restore already consumes reclaimed files — this bounds the never-reclaimed tail.
@@ -1672,8 +1732,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         guard Self.sessionSpillEnabled else { return 0 }
         var n = 0
         for (key, box) in sessions {
-            if (try? await Self._persist(box, url: Self._spillURL(forKey: key),
-                                         quantizeKV: false)) != nil { n += 1 }
+            // H7: capture the clear epoch BEFORE the write; if clearSession(key) intervenes during
+            // the await, discard the just-written file so a cleared session can't be resurrected.
+            let epoch = _clearEpoch(key)
+            let ok = (try? await Self._persist(box, url: Self._spillURL(forKey: key),
+                                               quantizeKV: false)) != nil
+            if ok {
+                if _clearEpoch(key) != epoch || sessions[key] == nil {
+                    try? FileManager.default.removeItem(at: Self._spillURL(forKey: key))
+                } else {
+                    n += 1
+                }
+            }
         }
         Self._pruneSpillDir()
         return n
@@ -1731,9 +1801,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #if canImport(MLXLLM)
         for role in [BASOrganRole.scout, .core] {
             let key = Self.sessionKey(sessionID, role)
+            keyClearEpoch[key, default: 0] += 1          // H7: mark this key cleared
             sessions.removeValue(forKey: key)
             fusedTranscripts.removeValue(forKey: key)
             pendingSpill.removeValue(forKey: key)        // 缝8a: in-flight write self-deletes
+            spillWriterActive.remove(key)
             // 缝2 (2026-07-06 audit): clear must reach the DISK tier too — a spilled (or dream-loop
             // warm-parked) snapshot would otherwise RESURRECT the cleared conversation on the next
             // turn, violating the documented fresh-start contract and leaving conversation KV on disk.
@@ -1748,10 +1820,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     public func clearAllSessions() {
         crossTurnStore.clearAll()
         #if canImport(MLXLLM)
+        clearAllEpoch += 1                               // H7: mark all keys cleared
         sessions.removeAll()
         fusedTranscripts.removeAll()
         sessionLRU.removeAll()
         pendingSpill.removeAll()                         // 缝8a: in-flight writes self-delete
+        spillWriterActive.removeAll()
         Self._clearSpillDir()                        // 缝2: the disk tier goes with the pool
         #endif
     }
