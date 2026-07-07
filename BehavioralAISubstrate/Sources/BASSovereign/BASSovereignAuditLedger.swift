@@ -370,6 +370,24 @@ public actor BASSovereignAuditLedger {
         guard !reloadVerified else { return }
         reloadVerified = true
         guard !entries.isEmpty else { return }
+        // H14 (mega-audit 2026-07-07): tail truncation leaves an internally-consistent
+        // prefix that auditChainFull() cannot detect (all priorHash links + signatures
+        // still verify). Cross-check the loaded entry count against the persisted
+        // per-segment entryCounts — a high-water mark storage already keeps but no code
+        // consulted. entries < Σ entryCount ⇒ audit_entries rows were deleted; any
+        // mismatch ⇒ tamper ⇒ quarantine. Scoped to segment-persisting storages
+        // (segments non-empty); a segment-less storage stays byte-equal.
+        if !segments.isEmpty {
+            let segmentTotal = segments.reduce(0) { $0 + $1.entryCount }
+            if segmentTotal != entries.count {
+                integrityQuarantined = true
+                FileHandle.standardError.write(Data(
+                    ("[BASSovereignAuditLedger] QUARANTINED on reload — entry/segment "
+                     + "count mismatch (entries=\(entries.count) segmentSum=\(segmentTotal))"
+                     + "; tail truncation or tamper suspected; refusing new appends.\n").utf8))
+                return
+            }
+        }
         let report = auditChainFull()
         guard !report.corruptions.isEmpty else { return }
         integrityQuarantined = true
@@ -529,6 +547,17 @@ public actor BASSovereignAuditLedger {
             selfHash = hash(canonical)
         }
         let appended = AppendedEntry(entry: sealed, priorHash: priorHash, selfHash: selfHash)
+
+        // H13 (mega-audit 2026-07-07): capture rollback state BEFORE any mutation so a
+        // persist failure leaves the in-memory chain byte-identical to disk. The prior
+        // note ("actor state already mutated, acceptable") was WRONG: a phantom tail
+        // survives in memory, the NEXT append's priorHash points at it, disk gets a
+        // chain whose priorHash references a never-persisted entry, and cold-start
+        // reload quarantines the whole persistent ledger on one transient disk hiccup.
+        let priorRefIndex = auditRefIndex[sealed.auditID]
+        let segmentsCountBefore = segments.count
+        let priorOpenSegment = openSegmentBySession[sealed.sessionID]
+
         entries.append(appended)
         auditRefIndex[sealed.auditID] = entries.count - 1
 
@@ -542,17 +571,27 @@ public actor BASSovereignAuditLedger {
             openedAt: sealed.appendedAt)
         segments[segIndex].entryCount += 1
 
-        // M91 — mirror to persistent storage. Entries first so
-        // readers that tail the storage see the chain grow; then
-        // the updated segment (entryCount and any open-to-closed
-        // transition). Both are best-effort in the sense that any
-        // throw here propagates out of `append(_:)` — the actor
-        // state has already been mutated, which is acceptable
-        // because the ledger is integrity-over-availability: a
-        // storage write failure fails the whole append so the caller
-        // can decide whether to retry or abort.
-        try storage.persistAppended(appended)
-        try storage.persistSegment(segments[segIndex])
+        // M91 — mirror to persistent storage; H13 — atomic across memory+disk.
+        do {
+            try storage.persistAppended(appended)
+            try storage.persistSegment(segments[segIndex])
+        } catch {
+            // H13 rollback — undo every mutation in reverse so memory == disk.
+            segments[segIndex].entryCount -= 1
+            if segments.count > segmentsCountBefore {
+                // ensureOpenSegment opened a fresh segment (only when none existed) —
+                // drop it and restore the (nil) open-segment mapping.
+                segments.removeLast(segments.count - segmentsCountBefore)
+                openSegmentBySession[sealed.sessionID] = priorOpenSegment
+            }
+            if let priorRefIndex {
+                auditRefIndex[sealed.auditID] = priorRefIndex
+            } else {
+                auditRefIndex.removeValue(forKey: sealed.auditID)
+            }
+            entries.removeLast()
+            throw error
+        }
 
         return appended
     }
