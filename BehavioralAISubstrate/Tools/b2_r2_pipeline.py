@@ -212,9 +212,103 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "merge":
         merge(*sys.argv[2:])
+    elif cmd == "merge-fresh":
+        merge_fresh(*sys.argv[2:])
+    elif cmd == "judge3":
+        judge3()
     elif cmd == "propose":
         propose()
     elif cmd == "judge":
         judge()
     else:
         print(__doc__)
+
+
+# ── R3 / J3(域级判据,确认性检验;预注册见账本 R3 节)─────────────────────────
+FRESH = "/tmp/gdn_coreai/b2_r3_fresh.jsonl"
+FRESH_SHA_FILE = "/tmp/gdn_coreai/b2_r3_fresh.sha"
+J3_OUT = "/tmp/gdn_coreai/b2_r3_judgement.json"
+J3_BOOT_SEED = 20260715
+PIN = {  # 三臂文件 sha256 前缀,冻结于新数据之前(账本 R3 节)——judge3 强制校验
+    "incumbent": ("/tmp/gdn_coreai/probe_weights_v2.json", "cf8276421e5d12bf"),
+    "r1_rejected": ("/tmp/gdn_coreai/b2_refit_candidate_weights.json", "2eac90211acaae7d"),
+    "r2_candidate": ("/tmp/gdn_coreai/b2_r2_candidate_weights.json", "1aa86c252a7415fa"),
+}
+
+
+def merge_fresh(*paths):
+    """新 heldout 合并:内部去重 + 对 1171 训练语料【排除】(泄漏防线)。"""
+    corpus_qs = {json.loads(l)["q"] for l in open(CORPUS) if l.strip()}
+    seen, kept, dup, leaked = set(), [], 0, 0
+    for path in paths:
+        for line in open(path):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if r["q"] in corpus_qs:
+                leaked += 1
+                continue
+            if r["q"] in seen:
+                dup += 1
+                continue
+            seen.add(r["q"])
+            kept.append(line.rstrip("\n"))
+    with open(FRESH, "w") as f:
+        f.write("\n".join(kept) + "\n")
+    sha = sha256(FRESH)
+    open(FRESH_SHA_FILE, "w").write(sha)
+    rows = [json.loads(l) for l in kept]
+    from collections import Counter
+    print(f"fresh: kept={len(kept)} dup={dup} excluded_in_corpus={leaked} sha={sha}")
+    print("families:", dict(Counter(r["family"] for r in rows)))
+    print(f"pos_rate={sum(r['label'] for r in rows) / len(rows):.3f}")
+
+
+def judge3():
+    sha = sha256(FRESH)
+    assert sha == open(FRESH_SHA_FILE).read().strip(), "fresh sha mismatch"
+    rows = [json.loads(l) for l in open(FRESH) if l.strip()]
+    H = np.array([r["h"] for r in rows], dtype=np.float64)
+    y = np.array([r["label"] for r in rows], dtype=np.float64)
+    fam = [r["family"] for r in rows]
+    arms = {}
+    for name, (path, pin) in PIN.items():
+        actual = sha256(path)[:16]
+        assert actual == pin, f"{name} sha mismatch: {actual} != pinned {pin}(臂文件被动过,判决拒开)"
+        wj = json.load(open(path))
+        arms[name] = ((H - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
+    broad_idx = [i for i, f in enumerate(fam) if f in BROAD_FAMS]
+    math_idx = [i for i, f in enumerate(fam) if f not in BROAD_FAMS]
+
+    def boot_delta(sc, si, idx):
+        idx = np.array(idx)
+        a_c, a_i = auc(sc[idx], y[idx]), auc(si[idx], y[idx])
+        rng = np.random.default_rng(J3_BOOT_SEED)
+        deltas = np.empty(BOOT_N)
+        for k in range(BOOT_N):
+            b = idx[rng.integers(0, len(idx), len(idx))]
+            deltas[k] = auc(sc[b], y[b]) - auc(si[b], y[b])
+        lo, hi = np.percentile(deltas, [2.5, 97.5])
+        return {"cand": round(a_c, 4), "inc": round(a_i, 4),
+                "delta": round(a_c - a_i, 4), "ci95": [round(lo, 4), round(hi, 4)]}
+
+    sc, si = arms["r2_candidate"], arms["incumbent"]
+    broad = boot_delta(sc, si, broad_idx)
+    math_ = boot_delta(sc, si, math_idx)
+    overall = boot_delta(sc, si, list(range(len(rows))))
+    crit = {"broad_ci_lo_gt_0": broad["ci95"][0] > 0,
+            "broad_delta_ge_0.05": broad["delta"] >= 0.05,
+            "math_noninferior_ci_lo_gt_-0.03": math_["ci95"][0] > -0.03,
+            "overall_ci_lo_gt_-0.02": overall["ci95"][0] > -0.02}
+    verdict = "CERTIFIED" if all(crit.values()) else "REJECTED"
+    sr = arms["r1_rejected"]
+    out = {"rule": "J3 (domain-level paired bootstrap, charter R3)",
+           "fresh": {"sha256": sha, "n": len(rows), "n_broad": len(broad_idx),
+                     "n_math": len(math_idx)},
+           "arm_shas": {k: sha256(p)[:16] for k, (p, _) in PIN.items()},
+           "broad_reading_proxy": broad, "math": math_, "overall": overall,
+           "r1_rejected_context": {"broad": round(auc(sr[broad_idx], y[broad_idx]), 4),
+                                   "math": round(auc(sr[math_idx], y[math_idx]), 4)},
+           "criteria": crit, "verdict": verdict}
+    json.dump(out, open(J3_OUT, "w"), indent=1)
+    print(json.dumps(out, indent=1, ensure_ascii=False))
