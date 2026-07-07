@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""R2 pipeline — 合并去重 → sha 钉 → R1 网格提案 → J2 bootstrap 判决(协议冻结于账本第五部分)。
+
+用法:
+  b2_r2_pipeline.py merge <half0.jsonl> <half1.jsonl>   # 合并+按题文去重(首现胜)+sha
+  b2_r2_pipeline.py propose                              # R1 12 点网格,内部验证选点
+  b2_r2_pipeline.py judge                                # J2:heldout 只碰一次,配对 bootstrap
+
+J2(冻结):certified ⇔ 配对 bootstrap(10,000 重采样,种子 20260709)ΔAUC 95% CI
+下界 > 0 ∧ Δ ≥ 0.01 ∧ math/broad 域回归容差 0.01(同 J1)。基线臂 = 在位 v2 权重
+(Mac 特征上拟合)在设备新 heldout 上重评——Mac→设备特征漂移会显形为在位 AUC 变化,
+本身是发现;对"生产该用哪份权重"这一判据对双方公平。对照臂 = R1 被驳候选(λ=0.03×9000
+旧权重文件)同场重评。
+"""
+import hashlib
+import json
+import sys
+
+import numpy as np
+
+CORPUS = "/tmp/gdn_coreai/b2_r2_corpus.jsonl"
+CORPUS_SHA_FILE = "/tmp/gdn_coreai/b2_r2_corpus.sha"
+INCUMBENT = "/tmp/gdn_coreai/probe_weights_v2.json"
+R1_REJECTED = "/tmp/gdn_coreai/b2_refit_candidate_weights.json"
+CAND_OUT = "/tmp/gdn_coreai/b2_r2_candidate_weights.json"
+EVIDENCE_OUT = "/tmp/gdn_coreai/b2_r2_evidence.json"
+JUDGE_OUT = "/tmp/gdn_coreai/b2_r2_judgement.json"
+
+SPLIT_SEED = 20260704          # 划分法与种子同 R1(冻结)
+BOOT_SEED = 20260709
+BOOT_N = 10_000
+LAM_GRID = [0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03]
+ITER_GRID = [3000, 9000]
+DELTA_CERTIFY = 0.01
+DOMAIN_TOL = 0.01
+BROAD_FAMS = {"recall", "reading", "alpha", "reverse"}
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def merge(half0, half1):
+    seen = set()
+    kept, dup = [], 0
+    # 首现胜:half 文件内部本身按题面顺序;先 0 后 1 与生成顺序交错无妨——
+    # 题文相同即同题(答案确定),first-wins 保证 v2 重生成题优先存活。
+    for path in (half0, half1):
+        for line in open(path):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if r["q"] in seen:
+                dup += 1
+                continue
+            seen.add(r["q"])
+            kept.append(line.rstrip("\n"))
+    with open(CORPUS, "w") as f:
+        f.write("\n".join(kept) + "\n")
+    sha = sha256(CORPUS)
+    open(CORPUS_SHA_FILE, "w").write(sha)
+    print(f"merged: kept={len(kept)} dup_dropped={dup} sha={sha}")
+    rows = [json.loads(l) for l in kept]
+    from collections import Counter
+    print("families:", dict(Counter(r["family"] for r in rows)))
+    print(f"pos_rate={sum(r['label'] for r in rows) / len(rows):.3f}")
+
+
+def load():
+    sha = sha256(CORPUS)
+    pinned = open(CORPUS_SHA_FILE).read().strip()
+    assert sha == pinned, f"corpus sha mismatch: {sha} != pinned {pinned}"
+    rows = [json.loads(l) for l in open(CORPUS) if l.strip()]
+    H = np.array([r["h"] for r in rows], dtype=np.float64)
+    y = np.array([r["label"] for r in rows], dtype=np.float64)
+    fam = [r["family"] for r in rows]
+    band = np.array([r["band"] for r in rows])
+    return rows, H, y, fam, band
+
+
+def split(rows, y, fam, band):
+    rng = np.random.default_rng(SPLIT_SEED)
+    tr_idx, te_idx = [], []
+    for key in sorted(set(zip(fam, band.tolist(), y.tolist()))):
+        idx = [i for i in range(len(rows)) if (fam[i], band[i], y[i]) == key]
+        idx = list(rng.permutation(idx))
+        k = max(1, int(round(len(idx) * 0.3)))
+        te_idx += idx[:k]
+        tr_idx += idx[k:]
+    return np.array(tr_idx), np.array(te_idx), rng
+
+
+def standardize(X, mu=None, sd=None):
+    if mu is None:
+        mu = X.mean(0)
+        sd = X.std(0) + 1e-8
+    return (X - mu) / sd, mu, sd
+
+
+def fit_logistic(X, t, lam, iters, lr=0.05):
+    w = np.zeros(X.shape[1])
+    b = 0.0
+    for _ in range(iters):
+        p = 1 / (1 + np.exp(-(X @ w + b)))
+        g = X.T @ (p - t) / len(t) + lam * w
+        gb = (p - t).mean()
+        w -= lr * g
+        b -= lr * gb
+    return w, b
+
+
+def auc(scores, labels):
+    order = np.argsort(scores)
+    ranks = np.empty(len(scores))
+    ranks[order] = np.arange(1, len(scores) + 1)
+    pos = labels == 1
+    n1, n0 = pos.sum(), (~pos).sum()
+    if n1 == 0 or n0 == 0:
+        return float("nan")
+    return float((ranks[pos].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
+
+
+def propose():
+    rows, H, y, fam, band = load()
+    tr, te, rng = split(rows, y, fam, band)
+    Xtr, mu, sd = standardize(H[tr])
+    inner = rng.permutation(len(tr))
+    cut = int(len(tr) * 0.75)
+    itr, iva = inner[:cut], inner[cut:]
+    grid, best = [], (None, None, -1.0)
+    for lam in LAM_GRID:
+        for iters in ITER_GRID:
+            w, b = fit_logistic(Xtr[itr], y[tr][itr], lam, iters)
+            a = auc(Xtr[iva] @ w + b, y[tr][iva])
+            grid.append({"lam": lam, "iters": iters, "inner_val_auc": round(a, 4)})
+            print(f"  lam={lam} iters={iters}: inner_val_auc={a:.4f}")
+            if a > best[2]:
+                best = (lam, iters, a)
+    lam, iters, val_a = best
+    print(f"R2 PROPOSAL: lam={lam} iters={iters} (inner_val={val_a:.4f})")
+    w, b = fit_logistic(Xtr, y[tr], lam, iters)
+    json.dump({"w": w.tolist(), "b": float(b), "mu": mu.tolist(), "sd": sd.tolist(),
+               "heldout_auc": float("nan"), "lam": lam, "iters": iters,
+               "n_train": int(len(tr)), "n_test": int(len(te))}, open(CAND_OUT, "w"))
+    json.dump({"rule": "R1 grid on R2 corpus", "corpus_sha256": open(CORPUS_SHA_FILE).read().strip(),
+               "split_seed": SPLIT_SEED, "grid": grid,
+               "chosen": {"lam": lam, "iters": iters, "inner_val_auc": round(val_a, 4)}},
+              open(EVIDENCE_OUT, "w"), indent=1)
+    print(f"candidate → {CAND_OUT}")
+
+
+def judge():
+    rows, H, y, fam, band = load()
+    tr, te, _ = split(rows, y, fam, band)
+    fam_te = [fam[i] for i in te]
+    inc = json.load(open(INCUMBENT))
+    cand = json.load(open(CAND_OUT))
+    r1_rej = json.load(open(R1_REJECTED)) if __import__("os").path.exists(R1_REJECTED) else None
+
+    def scores(wj):
+        return ((H[te] - np.array(wj["mu"])) / np.array(wj["sd"])) @ np.array(wj["w"]) + wj["b"]
+
+    si, sc = scores(inc), scores(cand)
+    yte = y[te]
+
+    def domain_auc(s, keep_broad):
+        keep = [i for i, f in enumerate(fam_te) if (f in BROAD_FAMS) == keep_broad]
+        return auc(s[keep], yte[keep]) if keep else float("nan")
+
+    inc_auc, cand_auc = auc(si, yte), auc(sc, yte)
+    # 配对 bootstrap(同一重采样下标同时作用双臂 = 配对)
+    brng = np.random.default_rng(BOOT_SEED)
+    n = len(te)
+    deltas = np.empty(BOOT_N)
+    for i in range(BOOT_N):
+        idx = brng.integers(0, n, n)
+        deltas[i] = auc(sc[idx], yte[idx]) - auc(si[idx], yte[idx])
+    lo, hi = np.percentile(deltas, [2.5, 97.5])
+    delta = cand_auc - inc_auc
+    inc_math, inc_broad = domain_auc(si, False), domain_auc(si, True)
+    cand_math, cand_broad = domain_auc(sc, False), domain_auc(sc, True)
+    certified = (lo > 0 and delta >= DELTA_CERTIFY
+                 and cand_math >= inc_math - DOMAIN_TOL
+                 and cand_broad >= inc_broad - DOMAIN_TOL)
+    out = {"rule": "J2 (paired bootstrap, RSI charter part 5 R2)",
+           "corpus": {"sha256": open(CORPUS_SHA_FILE).read().strip(), "n": len(rows),
+                      "n_test": int(len(te))},
+           "incumbent_on_device_heldout": {"auc": round(inc_auc, 4), "math": round(inc_math, 4),
+                                           "broad": round(inc_broad, 4),
+                                           "note": "Mac-fit weights on device features — drift shows here"},
+           "candidate": {"auc": round(cand_auc, 4), "math": round(cand_math, 4),
+                         "broad": round(cand_broad, 4), "lam": cand["lam"], "iters": cand["iters"]},
+           "paired_bootstrap": {"n_resamples": BOOT_N, "seed": BOOT_SEED,
+                                "delta": round(delta, 4), "ci95": [round(lo, 4), round(hi, 4)]},
+           "criteria": {"ci_lower_gt_zero": bool(lo > 0), "delta_ge": DELTA_CERTIFY,
+                        "domain_tol": DOMAIN_TOL},
+           "verdict": "CERTIFIED" if certified else "REJECTED"}
+    if r1_rej is not None:
+        sr = scores(r1_rej)
+        out["r1_rejected_comparison_arm"] = {
+            "auc": round(auc(sr, yte), 4),
+            "math": round(domain_auc(sr, False), 4), "broad": round(domain_auc(sr, True), 4)}
+    json.dump(out, open(JUDGE_OUT, "w"), indent=1)
+    print(json.dumps(out, indent=1, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "merge":
+        merge(sys.argv[2], sys.argv[3])
+    elif cmd == "propose":
+        propose()
+    elif cmd == "judge":
+        judge()
+    else:
+        print(__doc__)
