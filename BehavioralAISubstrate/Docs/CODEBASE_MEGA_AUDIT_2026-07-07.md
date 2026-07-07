@@ -249,3 +249,16 @@
 # 附:20 员子审计原始报告索引
 各员全文存 evidence（非入 git 的大文本存 ~/bas_evidence_durable/megaaudit/）。合成见正文。
 覆盖率自白已并入正文 §7。全量回归腿(并行):NO NEW REGRESSION。
+
+## 合成后即时更正(2026-07-07 夜,操作员在场核对)
+
+- **C1(HF token)= CLOSED**:操作员已轮换该 token(失效);仓库两文件就地打码
+  (dd4ecf556,内容编辑非删除),`git grep` 验证 0 残留;历史清洗(重删类)留操作员裁,
+  死 token 无害不强推。★流程教训入册:追踪大不透明语料(会话转录)前必须先扫 secrets。
+- **H22(triage fail-open)= 已在本周复审修复**(审计员基于旧快照):scripts/triage-full-suite.sh:23-27
+  无聚合行 = UNGROUNDED exit 1,:67 mktemp 失败 fail-closed,三路退出码已自验。此条降级为
+  非活。
+- 全量回归腿(并行,同夜):**NO NEW REGRESSION**(今日全部改动 + 3 已知 pre-existing 正确分类)。
+- 立即层其余(masked-FA NaN 守卫 H2 / metal commit-await 序 H3 / SPSCRing H15 / Dictionary
+  H17 / PolicyCore fail-closed H19 / 两道主权门 x-sov#3#4):**待操作员调度**——多数需设备
+  parity 复验或触及并发原语,不在无验证的夜间盲改窗口内(纪律:改状态前证据须支持该具体动作)。
