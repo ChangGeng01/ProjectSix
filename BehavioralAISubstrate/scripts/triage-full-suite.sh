@@ -20,11 +20,23 @@ if [ "$LOG" = "--run" ]; then
 fi
 [ -f "$LOG" ] || { echo "usage: $0 <sweep.log> | --run [filter]"; exit 2; }
 
-# ── 步骤 1:聚合行 ─────────────────────────────────────────────────────────────
-AGG=$(grep -E "Executed [0-9]+ tests, with [0-9]+ failure" "$LOG" | tail -1)
+# ── 步骤 1:聚合行(复审修4a:fail-closed——无聚合行 = 不可判,绝不发绿)────────
+AGG=$(grep -E "Executed [0-9]+ tests?, with [0-9]+ failure" "$LOG" | tail -1)
 echo "[triage] aggregate: ${AGG:-<none found>}"
-TOTAL_FAILS=$(grep -E "Executed [0-9]+ tests, with" "$LOG" \
+if [ -z "$AGG" ]; then
+  echo "[triage] VERDICT: UNGROUNDED — no XCTest aggregate line (compile failure / crash-before-aggregate / truncated log). NOT a pass."
+  exit 1
+fi
+TOTAL_FAILS=$(grep -E "Executed [0-9]+ tests?, with" "$LOG" \
   | sed -E 's/.*with ([0-9]+) failure.*/\1/' | awk '{s+=$1} END {print s+0}')
+# 复审修5a:swift-testing(@Test)失败不产生 XCTest 聚合行——单独可见化。
+# SIGBUS(signal code 10)是登记 flake#1;真 ✘ 断言失败不是。
+ST_FAILS=$(grep -cE "✘ .*recorded an issue|✘ Test run with .* failed" "$LOG")
+if [ "${ST_FAILS:-0}" -gt 0 ]; then
+  echo "[triage] swift-testing failures detected ($ST_FAILS ✘ lines) — NOT covered by flake #1 (that exempts SIGBUS only)"
+  echo "[triage] VERDICT: REGRESSION-CANDIDATE (swift-testing) — hand triage required (no per-suite isolation protocol for @Test yet)"
+  exit 1
+fi
 if [ "${TOTAL_FAILS:-0}" -eq 0 ]; then
   if grep -qE "unexpected signal code 10" "$LOG"; then
     echo "[triage] VERDICT: NO REGRESSION (0 XCTest failures; swift-testing SIGBUS flake #1 present)"
@@ -54,7 +66,14 @@ for SUITE in $SUITES; do
   echo "[triage] isolating $SUITE${KNOWN:+ (registry: $KNOWN)} ..."
   ISO=$(mktemp /tmp/bas-iso-XXXXXXXX) || { echo "[triage]   $SUITE: mktemp FAILED -> UNGROUNDED, treating as REGRESSION (fail-closed)"; REGRESSIONS="$REGRESSIONS $SUITE"; continue; }
   swift test --filter "$SUITE" > "$ISO" 2>&1
-  ISO_FAILS=$(grep -E "Executed [0-9]+ tests, with" "$ISO" \
+  # 复审修4b:隔离日志无聚合行 = UNGROUNDED ⇒ fail-closed 按回归处理(崩溃在聚合前/
+  # 编译失败都不得洗白);正则容单数 "1 test"。
+  if ! grep -qE "Executed [0-9]+ tests?, with" "$ISO"; then
+    echo "[triage]   $SUITE: NO AGGREGATE in isolation run -> UNGROUNDED, treating as REGRESSION (fail-closed)"
+    REGRESSIONS="$REGRESSIONS $SUITE"
+    continue
+  fi
+  ISO_FAILS=$(grep -E "Executed [0-9]+ tests?, with" "$ISO" \
     | sed -E 's/.*with ([0-9]+) failure.*/\1/' | awk '{s+=$1} END {print s+0}')
   if [ "${ISO_FAILS:-0}" -eq 0 ]; then
     echo "[triage]   $SUITE: passes isolated -> FLAKE${KNOWN:+ (matches $KNOWN)}"

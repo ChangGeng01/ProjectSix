@@ -45,26 +45,53 @@ public enum BASSleepMeasurementStation {
     /// What to measure — suite filters run sequentially (one heavy job at a time, 铁律).
     public struct Manifest: Codable, Sendable, Equatable {
         public let suiteFilters: [String]
-        public init(suiteFilters: [String]) { self.suiteFilters = suiteFilters }
+        /// Per-suite wall-clock ceiling (seconds; default 30min)。夜窗铁律:一个挂死的
+        /// 套件不得挂死整站——超时 = kill + TIMEOUT 判决候选行,站继续下一项。
+        public let perSuiteTimeoutS: Double
+        public init(suiteFilters: [String], perSuiteTimeoutS: Double = 1_800) {
+            self.suiteFilters = suiteFilters
+            self.perSuiteTimeoutS = max(30, perSuiteTimeoutS)
+        }
     }
 
-    /// Parse the XCTest aggregate line ("Executed N tests, with M failures") — the SAME
+    /// Parse the XCTest aggregate ("Executed N test(s), with M failure(s)") — the SAME
     /// signal the triage discipline trusts (never the bare exit code, ch1042 案底).
+    /// 复审修6:多 test-bundle 下【求和 bundle 级聚合】(跟在 'All tests'/'Selected tests'
+    /// 套件行之后的那条)而非取末行——两 bundle 时末行覆写曾把红 bundle 洗成 "GREEN 0";
+    /// 无 bundle 级行时回退为全行求和(过计但失败检测方向安全)。单数 "1 test" 兼容。
     public static func parseAggregate(_ output: String) -> (tests: Int, failures: Int)? {
-        var tests = 0, failures = 0, seen = false
-        for line in output.split(separator: "\n") {
-            guard line.contains("Executed"), line.contains("tests, with") else { continue }
+        func parseLine(_ line: Substring) -> (Int, Int)? {
+            guard line.contains("Executed"), line.contains(", with") else { return nil }
+            var t: Int?, f: Int?
             let parts = line.split(separator: " ")
             for (i, p) in parts.enumerated() {
-                if p == "Executed", i + 1 < parts.count, let n = Int(parts[i + 1]) {
-                    tests = n
-                }
-                if p.hasPrefix("failure"), i >= 1, let n = Int(parts[i - 1]) {
-                    failures = n; seen = true
-                }
+                if p == "Executed", i + 1 < parts.count { t = Int(parts[i + 1]) }
+                if p.hasPrefix("failure"), i >= 1 { f = Int(parts[i - 1]) }
             }
+            if let t, let f { return (t, f) }
+            return nil
         }
-        return seen ? (tests, failures) : nil
+        let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
+        var bundleT = 0, bundleF = 0, bundleSeen = false
+        var allT = 0, allF = 0, allSeen = false
+        var prevWasTopSuite = false
+        for line in lines {
+            if let (t, f) = parseLine(line) {
+                if prevWasTopSuite { bundleT += t; bundleF += f; bundleSeen = true }
+                allT += t; allF += f; allSeen = true
+            }
+            prevWasTopSuite = line.contains("Test Suite 'All tests'")
+                || line.contains("Test Suite 'Selected tests'")
+        }
+        if bundleSeen { return (bundleT, bundleF) }
+        return allSeen ? (allT, allF) : nil
+    }
+
+    /// 复审修5b:swift-testing(@Test)失败不产生 XCTest 聚合行——单独检测 ✘ 标记。
+    public static func swiftTestingFailures(_ output: String) -> Int {
+        output.split(separator: "\n").filter {
+            $0.contains("✘") && ($0.contains("recorded an issue") || $0.contains("failed"))
+        }.count
     }
 
     /// Append records to the JSONL ledger (append-only by construction — O_APPEND semantics;
@@ -135,13 +162,38 @@ public enum BASSleepMeasurementStation {
                     verdictCandidate: "LAUNCH-FAIL: \(error)"))
                 continue
             }
-            let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(),
-                             encoding: .utf8) ?? ""
+            // 超时看门狗:后台读避免管道阻塞;截止即 terminate(升级 kill)。
+            var outData = Data()
+            let readQueue = DispatchQueue(label: "bas.station.read")
+            let readDone = DispatchSemaphore(value: 0)
+            readQueue.async {
+                outData = pipe.fileHandleForReading.readDataToEndOfFile()
+                readDone.signal()
+            }
+            let deadline = Date().addingTimeInterval(manifest.perSuiteTimeoutS)
+            var timedOut = false
+            while proc.isRunning {
+                if Date() > deadline {
+                    timedOut = true
+                    proc.terminate()
+                    Thread.sleep(forTimeInterval: 5)
+                    if proc.isRunning { kill(proc.processIdentifier, SIGKILL) }
+                    break
+                }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
             proc.waitUntilExit()
+            _ = readDone.wait(timeout: .now() + 10)
+            let out = String(data: outData, encoding: .utf8) ?? ""
             let dt = Date().timeIntervalSince(t0)
             let agg = parseAggregate(out)
             let verdict: String
-            if let a = agg {
+            let stFails = swiftTestingFailures(out)
+            if timedOut {
+                verdict = "TIMEOUT after \(Int(manifest.perSuiteTimeoutS))s — killed; triage by hand"
+            } else if stFails > 0 {
+                verdict = "RED(swift-testing) \(stFails) ✘ — hand triage (no XCTest aggregate covers these)"
+            } else if let a = agg {
                 verdict = a.failures == 0
                     ? "GREEN \(a.tests) tests"
                     : "RED \(a.failures)/\(a.tests) — triage required (isolation re-run, flake registry)"

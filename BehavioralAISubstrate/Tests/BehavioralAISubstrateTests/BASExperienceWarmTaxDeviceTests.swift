@@ -57,7 +57,9 @@ final class BASExperienceWarmTaxDeviceTests: XCTestCase {
             let req = BASOrganRequest(requestID: "tax-\(i)", role: .core, preset: .core,
                                       instruction: q, context: [], maxOutputTokens: 192)
             let t0 = Date()
-            let draft = try await organ.draft(req, purpose: .factual)   // greedy fused ⇒ chainEmaL 真演化
+            // 实测更正:preset .core temp>0 ⇒ 采样车道压过 purpose(chainEmaL 不演化,
+            // 由快照携带默认值往返)——folds 照常,机制门不受影响。
+            let draft = try await organ.draft(req, purpose: .factual)
             let dt = Date().timeIntervalSince(t0)
             print(String(format: "[exp-tax] turn=%d wall_s=%.2f body_chars=%d thermal=%d",
                          i, dt, draft.body.count, ProcessInfo.processInfo.thermalState.rawValue))

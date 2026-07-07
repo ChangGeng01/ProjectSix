@@ -58,7 +58,10 @@ public struct BASImprovementCandidate: Codable, Sendable, Equatable {
     public var evidenceRefs: [String]
     /// 回滚锚(旧值文件/commit hash/快照路径)——adopted 前必填。
     public var rollbackAnchor: String?
-    /// 人签(操作员标识 + 时刻)——采纳权的唯一载体,机器永远填不了自己的名字。
+    /// 人签【形式收据】(操作员标识字符串)。复审修11 诚实降级:这是非空字符串检查,
+    /// 不是认证——机器在技术上能填任意字符串;真正防伪 = ADR-032 R1 钥匙托管 +
+    /// Ed25519 签名链绑定(未落地,操作员默认拒绝中)。当下的保证是【流程性】的:
+    /// ADOPT 在基座内 0% 接线,无机器环调用此 API;落钥后本字段升级为签名验证。
     public var operatorSignature: String?
     public private(set) var state: BASImprovementState
     public private(set) var history: [BASImprovementTransition]
@@ -100,6 +103,9 @@ public struct BASImprovementCandidate: Codable, Sendable, Equatable {
             throw LifecycleError.illegalTransition(from: state, to: next)
         }
         var copy = self
+        if next == .rolledBack, copy.rollbackAnchor == nil {
+            throw LifecycleError.missingRollbackAnchor   // 注释契约(:46)补齐守卫
+        }
         if next == .adopted {
             guard let sig = operatorSignature ?? copy.operatorSignature, !sig.isEmpty else {
                 throw LifecycleError.missingOperatorSignature

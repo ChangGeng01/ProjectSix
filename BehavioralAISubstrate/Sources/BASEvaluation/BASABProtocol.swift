@@ -141,7 +141,13 @@ public enum BASABJudge {
             perArm[arm] = (pooledTps(m), blocks, tiers,
                            m.count, armRows.contains(where: \.aborted))
         }
-        guard let incumbent = perArm[spec.incumbentArm], incumbent.pooled > 0 else {
+        // 复审修7:在位臂自身必须过 quorum/aborted/热闸——坏基线(冷启 burst 分母/
+        // 降频分母)会把全场候选判成假 parity/假 realEffect。基线不可用 ⇒ 整报告 DNF。
+        guard let incumbent = perArm[spec.incumbentArm], incumbent.pooled > 0,
+              !incumbent.aborted,
+              incumbent.measured >= spec.minMeasuredRowsPerArm,
+              Self.tierSpread(incumbent.maxTier) < spec.thermalConfoundTierDelta
+        else {
             return BASABReport(overall: .dnf, fidelityMismatches: mismatches, arms: [])
         }
 
@@ -163,8 +169,8 @@ public enum BASABJudge {
             } else if a.aborted || a.measured < spec.minMeasuredRowsPerArm {
                 finding = .dnf
                 dnfCount += 1
-            } else if let t0 = a.maxTier[0], let t1 = a.maxTier[1],
-                      abs(t0 - t1) >= spec.thermalConfoundTierDelta {
+            } else if Self.tierSpread(a.maxTier) >= spec.thermalConfoundTierDelta {
+                // 复审修8:块索引不点名 0/1(三块/非零起始设计下静默跳检)——取全块 max−min。
                 finding = .thermalConfounded
             } else if abs(deltaPct) <= spec.parityBandPct {
                 finding = .parity
@@ -187,6 +193,13 @@ public enum BASABJudge {
         return BASABReport(overall: overall, fidelityMismatches: mismatches, arms: findings)
     }
 
+    /// Max−min thermal tier across an arm's blocks (0 when <2 blocks carry data).
+    static func tierSpread(_ tiers: [Int: Int]) -> Int {
+        guard tiers.count >= 2, let lo = tiers.values.min(), let hi = tiers.values.max()
+        else { return 0 }
+        return hi - lo
+    }
+
     /// Row-level fidelity: per prompt, all rows (warmup included) must agree on tokHash.
     public static func fidelityMismatches(rows: [BASABMeasurementRow]) -> Int {
         var mismatches = 0
@@ -205,12 +218,31 @@ public enum BASABJudge {
 public enum BASClimitLogParser {
 
     /// Parse `[climit] b=0 arm=256 g=1 p=1 tok=192 tok/s=20.7 … thermal=0 …( (warmup))?` rows,
-    /// plus the harness-computed `FIDELITY-FAIL prompt=N` count.
-    public static func parse(log: String) -> (rows: [BASABMeasurementRow], fidelityMismatches: Int) {
+    /// plus the harness-computed `FIDELITY-FAIL prompt=N` count, `ABORT` lines (mark the arm's
+    /// last row aborted so the judge's DNF rule is reachable through this adapter), and a
+    /// `skipped` count — 复审修9:坏行(tok/s≤0/缺字段)绝不静默消失(最慢行消失 =
+    /// 臂均值向快偏),调用方必须核对 skipped==0 或注记。
+    public static func parse(
+        log: String
+    ) -> (rows: [BASABMeasurementRow], fidelityMismatches: Int, skipped: Int) {
         var rows: [BASABMeasurementRow] = []
         var fidelityFails = 0
+        var skipped = 0
+        var abortKeys: [(arm: String, block: Int)] = []
         for line in log.split(separator: "\n") {
             if line.contains("[climit] FIDELITY-FAIL prompt=") { fidelityFails += 1; continue }
+            if line.contains("[climit] ABORT arm=") {
+                var f: [String: String] = [:]
+                for tok in line.split(separator: " ") {
+                    if let eq = tok.firstIndex(of: "=") {
+                        f[String(tok[..<eq])] = String(tok[tok.index(after: eq)...])
+                    }
+                }
+                if let arm = f["arm"], let b = f["b"].flatMap({ Int($0) }) {
+                    abortKeys.append((arm, b))
+                }
+                continue
+            }
             guard line.contains("[climit] b=") else { continue }
             var fields: [String: String] = [:]
             for tokenSub in line.split(separator: " ") {
@@ -226,12 +258,21 @@ public enum BASClimitLogParser {
                   let tok = fields["tok"].flatMap({ Int($0) }),
                   let tps = fields["tok/s"].flatMap({ Double($0) }), tps > 0,
                   let thermal = fields["thermal"].flatMap({ Int($0) })
-            else { continue }
+            else { skipped += 1; continue }
             rows.append(BASABMeasurementRow(
                 block: b, arm: arm, gen: g, prompt: p, tokens: tok,
                 seconds: Double(tok) / tps, thermal: thermal,
                 measured: !line.contains("(warmup)")))
         }
-        return (rows, fidelityFails)
+        for key in abortKeys {
+            if let idx = rows.lastIndex(where: { $0.arm == key.arm && $0.block == key.block }) {
+                let r = rows[idx]
+                rows[idx] = BASABMeasurementRow(
+                    block: r.block, arm: r.arm, gen: r.gen, prompt: r.prompt, tokens: r.tokens,
+                    seconds: r.seconds, thermal: r.thermal, measured: r.measured,
+                    tokHash: r.tokHash, aborted: true)
+            }
+        }
+        return (rows, fidelityFails, skipped)
     }
 }

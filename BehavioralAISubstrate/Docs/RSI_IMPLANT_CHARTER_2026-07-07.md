@@ -315,15 +315,17 @@ BASABJudge 纯判决器 + BASClimitLogParser 边缘适配器);`scripts/triage-fu
 
 **建**:`BASSovereign/BASImprovementCandidate.swift`(kind{constant/route/prompt/skill},
 权重轴不存在;FSM proposed→shadow→certified→adopted/rejected/rolledBack,非法迁移抛错,
-**采纳双前提硬制:人签(机器填不了自己的名字)+回滚锚**;不可变迁移;receiptLine 人类
-可读收据);`BASSovereign/BASConfigRegistry.swift`(读者3 census 的生产开关只读枚举:
+**采纳双前提:人签【形式收据——非空字符串检查,非认证;防伪待 ADR-032 R1 钥匙托管落地,
+当下保证是流程性的(ADOPT 在基座内 0% 接线)】+回滚锚(adopted 与 rolledBack 双守卫)**;
+不可变迁移;receiptLine 人类可读收据);`BASSovereign/BASConfigRegistry.swift`(读者3 census 的生产开关只读枚举:
 默认开+杀 4 个/opt-in 9 个/常数旋钮 4 个;**宪法条款:明文禁运行时写**——kill-switch
 永在环路写域之外)。
 
 **验收 PASS**:两役回填无损(capped-fused 默认开 = adopted 带人签+回滚锚 env;
-cacheLimit DON'T-CARE = rejected 带判据6 理由)+ Codable 往返;**CI grep 断言**:
-BASMLXAdapter 源里默认开签名(`!="0"` / `_OFF"]=="1"`)100% 在注册表——新增生产开关
-不入册即测试红。
+cacheLimit DON'T-CARE = rejected 带判据6 理由)+ Codable 往返;**CI grep 断言 v2**
+(v1 被复审判纸糊,见下):签名 = 任意下标 `["BAS_X"] != "0"` + 杀开关守卫
+`["BAS_X_OFF"] != "1"`(真实代码形),**双向断言**(未入册即红 + 幻影条目即红 +
+found≥4 自证有牙)。
 
 ## P3 睡眠窗测量站 — SHIPPED(verdict-only)+ 真执行门 PASS
 
@@ -354,3 +356,39 @@ pre-existing(ReplayHarness/HonestyObserveWiring byteEqual/ThoughtFoldCompactSlot
 (mktemp 失败 ⇒ 按回归处理)+ 两个未接地隔离补跑接地(各 1 failure 孤立复现 = 登记
 pre-existing 一致,NOT NEW)+ ThoughtFold 套件名对齐。教训入册:判决工具自身的第一次
 执行也要人逐行——P1 的"怀疑不可机器化"条款在它自己身上首验。
+
+
+## 复审轮(操作员"目前你完全满意吗 最严苛 最仔细",2026-07-07)
+
+答案是不满意。自审 4 项 + 3 员对抗复审 11 项 = **15 个确认缺陷,全修,门全绿**。
+
+**自审 4 项(先修)**:A chainEmaL 跨线程读(2-slot 并发下 actor 线程读 perform 线程写的
+非原子 Double)→ _MTPRaw 快照携带,box 读全灭;B 经验文件补 iOS Data Protection(对齐
+缝2);C 已被实测证伪的测试注释(temp 压过 purpose);D 测量站 Process 超时看门狗
+(挂死套件不得挂死夜窗)。
+
+**复审 11 项**:
+- 并发面 3:①(HIGH)首载窗口 store 提前发布 ⇒ 并发轮可用空快照覆写 7 天经验(防抖
+  lastSaveMs=nil 不拦)→ load 完成后才发布;②(MED)温恢复无条件赋值覆写 await 间隙
+  的在线学习 → 仅冷时赋值;③(MED)isSane 漏 observations 上界 ⇒ 损坏快照下一次 fold
+  整数溢出崩进程 → 补上界(违反自己的 can't-wedge 契约被抓)。CLEAN 判定 4 轴:关死
+  字节等价逐 guard 验过、Task 逃逸、时钟回拨、key 碰撞。
+- 数学面 6:④(CRITICAL)triage 双 fail-open——无聚合行(编译失败/聚合前崩溃)与单数
+  "1 test" 正则 miss 都判 0 失败 ⇒ 真回归洗白 → 无聚合 = UNGROUNDED fail-closed,
+  正则容单数,三路自验退出码正确;⑤(CRITICAL)swift-testing(@Test,76 文件)失败
+  无 XCTest 聚合行 ⇒ 对脚本与站双双隐形 → ✘ 标记检测入两处(注:flake#1 只豁免
+  SIGBUS,不豁免 ✘ 真断言失败);⑥(HIGH)站 parseAggregate 多 bundle 取末覆写 ⇒
+  "GREEN 0" 掩红 → bundle 级聚合求和 + 单数;⑦(HIGH)判决器在位臂豁免 quorum/
+  aborted/热闸 ⇒ 坏基线产假判决 → 基线不过闸 = 整报告 DNF;⑧(MED-HIGH)热混杂
+  硬编码块 0/1 → 全块 max−min;⑨(MED)climit 解析器静默丢行(最慢行消失 = 均值向快
+  偏)→ skipped 显式计数 + ABORT 行解析(judge 的 DNF 经适配器可达)。
+- 宪法面 2:⑩(HIGH)P2 CI 断言纸糊——正则匹配不上真实 `env[...] != "1"` 写法,4 个
+  默认开只抓到 2 个,且无反向断言(幻影条目不红)→ v2 双向断言 + found≥4 自证有牙;
+  账本自己对签名的描述也写错了(已上修正);⑪(MED-HIGH)operatorSignature 过声——
+  "机器填不了自己的名字"实为非空字符串检查 → 代码注释与账本双双诚实降级为【形式收据,
+  防伪待 R1 钥匙托管】,rolledBack 锚守卫补齐(注释契约与代码对齐)。
+
+**方法结论**:操作员的这一问值 15 个缺陷。其中 ④⑤⑩ 三个直接命中"判决工具自身"——
+P1 建的护栏第一天就被抓出三处会静默放行真回归的 fail-open;这精确复核章程"最不该
+机器化的是纪律里的怀疑":工具的第一轮输出必须被当嫌疑人审。CLEAN 判定同样有价值
+(关死字节等价、FSM 终态、chainEmaL 恢复属四级允许面③——复审确认非越界)。

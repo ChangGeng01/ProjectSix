@@ -25,6 +25,9 @@ extension MLXOrganAdapter {
         let rounds: Int
         let proposed: Int
         let box: MTPDecoderBox
+        /// P0 线程安全化:EMA 在 perform 闭包内读出(与写同线程),actor 侧只消费快照——
+        /// 消灭 actor 线程对 decoder.chainEmaL 的跨线程读(2-slot 并发下的数据竞争)。
+        let chainEmaLAfter: Double
         var thermalFallback: Bool = false
         var traceExitReason: String? = nil
         var traceThinkTokens: Int? = nil
@@ -85,11 +88,12 @@ extension MLXOrganAdapter {
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, proposed: r.proposed,
-                box: MTPDecoderBox(decoder: dec),
+                box: MTPDecoderBox(decoder: dec), chainEmaLAfter: dec.chainEmaL,
                 traceExitReason: r.traceExit?.reason.rawValue,
                 traceThinkTokens: r.traceExit?.thinkTokensAtExit)
         }
         mtpDecoderBox = raw.box                                    // cache across turns (init quantizes ~300MB)
+        if Self._profilerPersistEnabled { restoredChainEmaL = raw.chainEmaLAfter }   // P0 快照携带
         let laneName = sampling ? "mtpSpecSampling" : "mtpSpec"
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)
@@ -187,11 +191,13 @@ extension MLXOrganAdapter {
             return _MTPRaw(
                 body: ctx.tokenizer.decode(tokenIds: r.tokens),
                 accepted: r.accepted, rounds: r.iterations, proposed: r.proposed,
-                box: MTPDecoderBox(decoder: dec), thermalFallback: thermalFallback,
+                box: MTPDecoderBox(decoder: dec), chainEmaLAfter: dec.chainEmaL,
+                thermalFallback: thermalFallback,
                 traceExitReason: r.traceExit?.reason.rawValue,
                 traceThinkTokens: r.traceExit?.thinkTokensAtExit)
         }
         mtpDecoderBox = raw.box
+        if Self._profilerPersistEnabled { restoredChainEmaL = raw.chainEmaLAfter }   // P0 快照携带
         if raw.thermalFallback { sessionThermalFallbackCount += 1 }
         let draft = _buildDraft(
             body: Self.applyMarkerPostprocessing(raw.body), request: request)

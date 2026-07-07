@@ -1570,15 +1570,23 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func _ensureExperienceLoaded() async {
         guard Self._profilerPersistEnabled, !experienceLoadAttempted else { return }
         experienceLoadAttempted = true
+        // 复审修1 (HIGH):store 在 load 完成【之后】才发布——发布提前会让并发轮在
+        // await 窗口内经 _persistExperienceIfDue 用冷态空快照覆写 7 天累积经验
+        // (新 store lastSaveMs=nil ⇒ 防抖不拦)。窗口内 experienceStore==nil 短路一切写。
         let store = BASAcceptanceProfilerStore(url: _experienceFileURL())
-        experienceStore = store
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-        guard let snap = await store.load(expectedModelID: model.id, nowMs: nowMs) else {
+        let snap = await store.load(expectedModelID: model.id, nowMs: nowMs)
+        experienceStore = store
+        guard let snap else {
             print("📊 experience cold-start (no valid snapshot)")
             return
         }
-        draftProfiler = BASAcceptanceProfiler(cells: snap.cells)
-        restoredChainEmaL = snap.chainEmaL
+        // 复审修2 (MED):恢复只在仍冷时生效——await 间隙完成的并发轮可能已折叠在线
+        // 学习/已置新鲜 chainEmaL,磁盘旧值不得覆盖活值。
+        if draftProfiler.exportCells().isEmpty {
+            draftProfiler = BASAcceptanceProfiler(cells: snap.cells)
+        }
+        if restoredChainEmaL == nil { restoredChainEmaL = snap.chainEmaL }
         let ema = snap.chainEmaL.map { String(format: "%.2f", $0) } ?? "nil"
         print("📊 experience warm-start cells=\(snap.cells.count) chainEmaL=\(ema) age_s=\((nowMs - snap.savedAtMs) / 1000)")
     }
@@ -1586,7 +1594,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// P0: debounced fire-and-forget snapshot (never blocks or fails the decode path).
     func _persistExperienceIfDue(force: Bool = false) {
         guard let store = experienceStore else { return }
-        if let live = mtpDecoderBox?.decoder.chainEmaL { restoredChainEmaL = live }
+        // restoredChainEmaL 由 _MTPRaw 快照在每次 MTP 生成后刷新(perform 闭包内读,
+        // 与写同线程)——此处绝不读 box(2-slot 并发下跨线程读 Double = 数据竞争)。
         let snap = BASDecodeExperienceSnapshot(
             modelID: model.id,
             savedAtMs: Int64(Date().timeIntervalSince1970 * 1000),
@@ -1609,10 +1618,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         case .parkColdSeats:
             _spillEvictAll(except: key)
         case .dropSpecDecoder:
-            // P0: carry the live regime EMA across the drop (persist-on only ⇒ off = today).
-            if Self._profilerPersistEnabled, let live = mtpDecoderBox?.decoder.chainEmaL {
-                restoredChainEmaL = live
-            }
+            // P0: restoredChainEmaL 已由每次生成的 _MTPRaw 快照保持最新(线程安全),
+            // 丢 box 无需再读——直接丢,重建时由快照播种。
             mtpDecoderBox = nil                          // ~300MB; lazily re-quantized later
         case .clearAllSessions:
             clearAllSessions()                           // survival over warmth

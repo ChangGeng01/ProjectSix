@@ -39,7 +39,9 @@ public struct BASDecodeExperienceSnapshot: Codable, Sendable, Equatable {
             let s = cell.stat
             guard s.emaAccepted.isFinite, (0.0 ... 16.0).contains(s.emaAccepted),
                   s.emaHitRate.isFinite, (0.0 ... 1.0).contains(s.emaHitRate),
-                  s.observations >= 0
+                  // 复审修3:上界防溢出 trap(损坏快照 observations=Int.max ⇒ 首次
+                  // fold 的 +1 崩进程,违反本文件自己的 can't-wedge 契约)。
+                  (0 ... 1_000_000_000).contains(s.observations)
             else { return false }
         }
         return true
@@ -93,7 +95,13 @@ public actor BASAcceptanceProfilerStore {
         do {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            #if os(iOS)
+            // 缝2 卫生对齐:落盘文件带 Data Protection(锁屏后不可读,首解锁后可用——
+            // 经验文件在解锁前不会被读:load 只发生在 draft 路径)。
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            #else
             try data.write(to: url, options: .atomic)
+            #endif
             lastSaveMs = nowMs
         } catch {
             // Non-fatal: log-and-continue (never let persistence failures touch the decode path).

@@ -120,20 +120,25 @@ final class BASImprovementCandidateTests: XCTestCase {
             at: adapterDir, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }
         XCTAssertFalse(files.isEmpty)
+        // 复审修10:v1 正则是纸糊的——真实代码写法是 `env["BAS_X_OFF"] != "1"`(变量名
+        // env、运算符 != "1"),v1 的 `environment[...] == "1"` 两处全 miss(4 个默认开
+        // 只抓到 2 个),且无反向断言 ⇒ 幻影条目/断言失牙都不红。v2:①去变量名前缀
+        // (任意下标访问),②杀开关守卫形 != "1",③双向断言(found⊆registered ∧
+        // registered⊆found)——断言自身失牙即红。
         var found = Set<String>()
         for f in files {
             let src = try String(contentsOf: f, encoding: .utf8)
-            for line in src.split(separator: "\n") {
-                // 默认开签名 A:environment["BAS_X"] != "0"
-                if let r = line.range(of: #"environment\["(BAS_[A-Z0-9_]+)"\]\s*!=\s*"0""#,
+            for line in src.split(separator: "\n") where !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+                // 默认开签名 A:["BAS_X"] != "0"(开关本体,默认开)
+                if let r = line.range(of: #"\["(BAS_[A-Z0-9_]+)"\]\s*!=\s*"0""#,
                                       options: .regularExpression) {
                     let m = String(line[r])
                     if let name = m.range(of: #"BAS_[A-Z0-9_]+"#, options: .regularExpression) {
                         found.insert(String(m[name]))
                     }
                 }
-                // 默认开签名 B:BAS_X_OFF == "1"(杀开关形态)
-                if let r = line.range(of: #"environment\["(BAS_[A-Z0-9_]+_OFF)"\]\s*==\s*"1""#,
+                // 默认开签名 B:["BAS_X_OFF"] != "1" 或 == "1"(杀开关守卫两种极性写法)
+                if let r = line.range(of: #"\["(BAS_[A-Z0-9_]+_OFF)"\]\s*[!=]=\s*"1""#,
                                       options: .regularExpression) {
                     let m = String(line[r])
                     if let name = m.range(of: #"BAS_[A-Z0-9_]+_OFF"#, options: .regularExpression) {
@@ -142,10 +147,14 @@ final class BASImprovementCandidateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertFalse(found.isEmpty, "grep 一无所获 = 断言失效,检查签名模式")
         let registered = Set(BASConfigRegistry.defaultOnKillSwitches.map(\.envName))
         let missing = found.subtracting(registered)
         XCTAssertTrue(missing.isEmpty,
                       "生产默认开开关未入册(P2 宪法:新增开关须同 commit 入注册表): \(missing.sorted())")
+        let phantom = registered.subtracting(found)
+        XCTAssertTrue(phantom.isEmpty,
+                      "注册表幻影/改名条目(或断言失牙——源里找不到): \(phantom.sorted())")
+        XCTAssertGreaterThanOrEqual(found.count, 4,
+                                    "已知 4 个默认开必须全被抓到(断言有牙的自证): \(found.sorted())")
     }
 }

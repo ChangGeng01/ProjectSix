@@ -96,9 +96,10 @@ final class BASABProtocolTests: XCTestCase {
     }
 
     func testReplayCacheLimitDeviceVerdict() {
-        let (rows, fid) = BASClimitLogParser.parse(log: BASABReplayFixtures.cacheLimitDeviceLog)
+        let (rows, fid, skipped) = BASClimitLogParser.parse(log: BASABReplayFixtures.cacheLimitDeviceLog)
         XCTAssertEqual(rows.count, 56, "56 行(48 计入 + 8 热身)必须全解析")
         XCTAssertEqual(fid, 0)
+        XCTAssertEqual(skipped, 0, "复审修9:丢行必须显式计数")
         let report = BASABJudge.judge(spec: climitSpec, rows: rows, externalFidelityMismatches: fid)
         XCTAssertEqual(report.overall, .pass)
         // 人类判决:512=在位,768/∞ = PARITY,256 = 位置伪影否决(pooled +21% 但 b1 平)
@@ -109,8 +110,9 @@ final class BASABProtocolTests: XCTestCase {
     }
 
     func testReplayCacheLimitMacV1InstrumentFailure() {
-        let (rows, fid) = BASClimitLogParser.parse(log: BASABReplayFixtures.cacheLimitMacV1Log)
+        let (rows, fid, skipped) = BASClimitLogParser.parse(log: BASABReplayFixtures.cacheLimitMacV1Log)
         XCTAssertEqual(rows.count, 56)
+        XCTAssertEqual(skipped, 0)
         XCTAssertEqual(fid, 3, "v1 三个 prompt 全部 FIDELITY-FAIL")
         let report = BASABJudge.judge(spec: climitSpec, rows: rows, externalFidelityMismatches: fid)
         XCTAssertEqual(report.overall, .instrumentInvalid,
