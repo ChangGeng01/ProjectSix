@@ -274,8 +274,10 @@ def merge_r4(*paths):
     """R4 合并:语义键内部去重 + 对 1171 语料与 R3 fresh 双集排除。"""
     excl = {semantic_key(json.loads(l)) for l in open(CORPUS) if l.strip()}
     import os
-    if os.path.exists(FRESH):
-        excl |= {semantic_key(json.loads(l)) for l in open(FRESH) if l.strip()}
+    # 预注册 = 双集排除;R3 fresh 缺失 ⇒ 硬失败(fail-open 静默跳过会让 math 种子
+    # 碰撞题混进"fresh"——自审 #16)。
+    assert os.path.exists(FRESH), "R3 fresh 集缺失——先跑 merge-fresh(双集排除是冻结条款)"
+    excl |= {semantic_key(json.loads(l)) for l in open(FRESH) if l.strip()}
     seen, kept, dup, leaked = set(), [], 0, 0
     for path in paths:
         for line in open(path):
@@ -336,7 +338,7 @@ def judge4():
     math_ = block(dom(lambda f: f not in BROAD_FAMS and f != "elements"))
     overall = block(dom(lambda f: True))
     desc = {f: block(dom(lambda x, f=f: x == f)) for f in ("reverse", "elements")}
-    underpowered = alpha["n_neg"] < 60
+    underpowered = alpha["n_neg"] < 60 or alpha["ci95_strat"] is None or alpha["delta"] is None
     crit = {"alpha_n_neg_ge_60": not underpowered,
             "alpha_ci_lo_gt_0": bool(alpha["ci95_strat"] and alpha["ci95_strat"][0] > 0),
             "alpha_delta_ge_0.10": bool(alpha["delta"] is not None and alpha["delta"] >= 0.10),

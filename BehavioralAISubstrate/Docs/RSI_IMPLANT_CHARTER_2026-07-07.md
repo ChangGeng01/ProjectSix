@@ -663,3 +663,13 @@ candidate(=R2 候选,新 id r4)certified ⇔ 全部成立:
 certified ⇒ FSM r4 走 certified 呈操作员签名;部署 = probe_weights_v3.json 两机
 staging + 回滚锚 v2 sha(人类介质动作)。rejected ⇒ R2 发现记"在新 alpha 题库上
 未复现"(这次是真检验后的诚实负面)。reverse/elements/reading 域只报不判。
+
+## R4 自审补注(判决前冻结,数据未存在)
+
+1. **J4 alpha 的检验范围(#9,预注册解释)**:新库 alpha = band0 三选(与训练同模板)
+   + band1 四选 + band2 五选(加宽任务)。REJECTED 的正确读法 = "R2 发现不能泛化到
+   加宽的 alpha 任务族"——窄模板(纯三选)问题仍开放,判词按此写,不过度外推。
+2. merge-r4 的 R3-fresh 排除从 fail-open 改硬断言(#16);None-CI 并入
+   UNDERPOWERED 路径(#12)——功效不足不冒充证伪,一以贯之。
+3. 残余已知(不修,注记):r4_autopilot 等待循环超时后不退出直接推进(R3 已近收尾,
+   4h 窗不会触发;下版脚本模板加 exit 守卫)。
