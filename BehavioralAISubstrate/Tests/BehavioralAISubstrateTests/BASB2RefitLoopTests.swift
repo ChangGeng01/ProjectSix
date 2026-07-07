@@ -7,6 +7,13 @@ import XCTest
 /// 【adopted 不在这里发生】——签名是操作员对话中的人类行为,部署是人类介质动作。
 final class BASB2RefitLoopTests: XCTestCase {
     func testWalkCandidateFSMFromJudgement() throws {
+        // 终态防覆写:操作员已裁(rejected/adopted)的 FSM 文件不得被重走环覆写。
+        let fsmURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_candidate_fsm.json")
+        if let d = try? Data(contentsOf: fsmURL),
+           let existing = try? JSONDecoder().decode(BASImprovementCandidate.self, from: d),
+           existing.state == .rejected || existing.state == .adopted || existing.state == .rolledBack {
+            throw XCTSkip("candidate already in terminal state \(existing.state.rawValue) — 人裁不可被重走环覆写")
+        }
         let judgeURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_judgement.json")
         guard let data = try? Data(contentsOf: judgeURL),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -46,5 +53,27 @@ final class BASB2RefitLoopTests: XCTestCase {
         let encoded = try JSONEncoder().encode(c)
         try encoded.write(to: URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_candidate_fsm.json"))
         print("📜 candidate FSM state persisted → /tmp/gdn_coreai/b2_refit_candidate_fsm.json")
+    }
+}
+
+extension BASB2RefitLoopTests {
+    /// 操作员终审执行器(BAS_B2_OPERATOR_REJECT=1 一次性):certified 候选 → rejected,
+    /// 理由 = 操作员原话;终态收据与 FSM 持久。人裁的机器留痕,不是机器裁。
+    func testApplyOperatorRejection() throws {
+        guard ProcessInfo.processInfo.environment["BAS_B2_OPERATOR_REJECT"] == "1" else {
+            throw XCTSkip("operator-verdict executor — set BAS_B2_OPERATOR_REJECT=1")
+        }
+        let url = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_candidate_fsm.json")
+        let c = try JSONDecoder().decode(BASImprovementCandidate.self,
+                                         from: Data(contentsOf: url))
+        XCTAssertEqual(c.state, .certified)
+        let rejected = try c.transitioned(
+            to: .rejected, atMs: 4,
+            reasonCodes: ["操作员终审 2026-07-07:②驳回",
+                          "n_test=78 下 ΔAUC=+0.0116 统计上与噪声不可区分",
+                          "先扩数据,R2 重扫再判(J2 带统计牙齿,预注册见账本)"])
+        try JSONEncoder().encode(rejected).write(to: url)
+        print("📜 " + rejected.receiptLine(gitHash: "operator-verdict-2026-07-07"))
+        XCTAssertEqual(rejected.state, .rejected)
     }
 }
