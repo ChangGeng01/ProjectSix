@@ -1,0 +1,151 @@
+import XCTest
+@testable import BASSovereign
+
+/// P2 gates(RSI 章程)——改进候选一等对象 + 生产开关只读注册表 + 采纳收据。
+/// 验收:①FSM 非法迁移全堵、采纳双前提(人签+回滚锚)硬制;②07-06/07-07 两役回填
+/// 无损(capped-fused 默认开 = adopted;cacheLimit DON'T-CARE = rejected);③注册表
+/// 100% 覆盖默认开集合(对源码 grep 的 CI 断言——新增生产开关不入册即红)。
+final class BASImprovementCandidateTests: XCTestCase {
+
+    private func makeCandidate() -> BASImprovementCandidate {
+        BASImprovementCandidate(
+            id: "test-1", kind: .constant,
+            currentValueProvenance: "X.swift:1", currentValue: "1", proposedValue: "2",
+            preRegisteredCriteriaRef: "Docs/TEST.md#criteria")
+    }
+
+    // MARK: - FSM
+
+    func testHappyPathToAdopted() throws {
+        var c = makeCandidate()
+        c = try c.transitioned(to: .shadowTesting, atMs: 1)
+        c = try c.transitioned(to: .certified, atMs: 2, reasonCodes: ["gate:PASS"])
+        c.rollbackAnchor = "git:abc123"
+        c = try c.transitioned(to: .adopted, atMs: 3, operatorSignature: "operator@2026-07-07")
+        XCTAssertEqual(c.state, .adopted)
+        XCTAssertEqual(c.history.count, 3)
+        let rolled = try c.transitioned(to: .rolledBack, atMs: 4, reasonCodes: ["regression"])
+        XCTAssertEqual(rolled.state, .rolledBack)
+    }
+
+    func testAdoptionRequiresSignature() throws {
+        var c = makeCandidate()
+        c = try c.transitioned(to: .shadowTesting, atMs: 1)
+        c = try c.transitioned(to: .certified, atMs: 2)
+        c.rollbackAnchor = "git:abc"
+        XCTAssertThrowsError(try c.transitioned(to: .adopted, atMs: 3)) { e in
+            XCTAssertEqual(e as? BASImprovementCandidate.LifecycleError, .missingOperatorSignature,
+                           "机器永远填不了自己的名字——无人签不得采纳")
+        }
+    }
+
+    func testAdoptionRequiresRollbackAnchor() throws {
+        var c = makeCandidate()
+        c = try c.transitioned(to: .shadowTesting, atMs: 1)
+        c = try c.transitioned(to: .certified, atMs: 2)
+        XCTAssertThrowsError(try c.transitioned(to: .adopted, atMs: 3, operatorSignature: "op")) { e in
+            XCTAssertEqual(e as? BASImprovementCandidate.LifecycleError, .missingRollbackAnchor)
+        }
+    }
+
+    func testIllegalJumpsBlocked() {
+        let c = makeCandidate()
+        // proposed → adopted 直跳(绕过影子测+认证)必须非法。
+        XCTAssertThrowsError(try c.transitioned(to: .adopted, atMs: 1, operatorSignature: "op"))
+        // proposed → certified 直跳(绕过影子测)必须非法。
+        XCTAssertThrowsError(try c.transitioned(to: .certified, atMs: 1))
+        // rejected 是终态。
+        let rejected = try! c.transitioned(to: .rejected, atMs: 1)
+        XCTAssertThrowsError(try rejected.transitioned(to: .shadowTesting, atMs: 2))
+    }
+
+    func testImmutability() throws {
+        let c = makeCandidate()
+        _ = try c.transitioned(to: .shadowTesting, atMs: 1)
+        XCTAssertEqual(c.state, .proposed, "transitioned 必须返回新副本,原对象不动(不可变纪律)")
+    }
+
+    // MARK: - 两役回填(P2 验收:历史采纳事件 schema 表示无损)
+
+    func testBackfillCappedFusedAdoption() throws {
+        var c = BASImprovementCandidate(
+            id: "2026-07-06-capped-fused-default-on", kind: .route,
+            currentValueProvenance: "MLXOrganAdapter.swift:1422 (BAS_SESSION_CAPPED_FUSED)",
+            currentValue: "opt-in", proposedValue: "default-on + kill-switch(!=\"0\")",
+            preRegisteredCriteriaRef: "Docs/DECODE_OS_AUDIT_2026-07-06.md 缝1/endurance-cert",
+            evidenceRefs: ["capped-fused mixed 17轮5/5 设备认证", "同机二进制 A/B 6528=6528"])
+        c = try c.transitioned(to: .shadowTesting, atMs: 1)
+        c = try c.transitioned(to: .certified, atMs: 2, reasonCodes: ["device-cert:PASS"])
+        c.rollbackAnchor = "env:BAS_SESSION_CAPPED_FUSED=0"
+        c = try c.transitioned(to: .adopted, atMs: 3, operatorSignature: "操作员(整体归档令 07-06)")
+        // 无损往返 + 收据行可读。
+        let data = try JSONEncoder().encode(c)
+        let back = try JSONDecoder().decode(BASImprovementCandidate.self, from: data)
+        XCTAssertEqual(back, c)
+        XCTAssertTrue(c.receiptLine(gitHash: "d4debe26a").contains("BAS_SESSION_CAPPED_FUSED"))
+        XCTAssertFalse(c.receiptLine(gitHash: "d4debe26a").contains("UNSIGNED"))
+    }
+
+    func testBackfillCacheLimitRejection() throws {
+        var c = BASImprovementCandidate(
+            id: "2026-07-07-cachelimit-sweep", kind: .constant,
+            currentValueProvenance: "BASMLXMemoryModel.swift:65 (defaultCacheLimitBytes)",
+            currentValue: "512MiB", proposedValue: "任一 {256,768,∞}",
+            preRegisteredCriteriaRef: "Docs/CACHELIMIT_AB_2026-07-07.md 判据1-7",
+            evidenceRefs: ["设备扫测 941s thermal=0 四臂 12.3 平价", "b0/256 位置伪影双块否决"])
+        c = try c.transitioned(to: .shadowTesting, atMs: 1)
+        c = try c.transitioned(to: .rejected, atMs: 2,
+                               reasonCodes: ["DON'T-CARE", "判据6:无臂过双块同号门"])
+        XCTAssertEqual(c.state, .rejected)
+        let data = try JSONEncoder().encode(c)
+        XCTAssertEqual(try JSONDecoder().decode(BASImprovementCandidate.self, from: data), c)
+    }
+
+    // MARK: - 注册表(只读 + 覆盖断言)
+
+    func testRegistryLookups() {
+        XCTAssertNotNil(BASConfigRegistry.entry("BAS_SESSION_SPILL"))
+        XCTAssertEqual(BASConfigRegistry.entry("BAS_SESSION_CAPPED_FUSED")?.polarity, .defaultOnKill)
+        XCTAssertEqual(BASConfigRegistry.entry("BAS_PROFILER_PERSIST")?.polarity, .optIn)
+        XCTAssertGreaterThanOrEqual(BASConfigRegistry.defaultOnKillSwitches.count, 4)
+    }
+
+    /// CI grep 断言:BASMLXAdapter 生产源里的默认开签名(`!= "0"` / `_OFF"] == "1"`)
+    /// 必须 100% 在注册表——新增生产开关不入册即此测试红。
+    func testRegistryCoversDefaultOnSwitchesInSource() throws {
+        let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let adapterDir = testsDir.deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/BASMLXAdapter")
+        let files = try FileManager.default.contentsOfDirectory(
+            at: adapterDir, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "swift" }
+        XCTAssertFalse(files.isEmpty)
+        var found = Set<String>()
+        for f in files {
+            let src = try String(contentsOf: f, encoding: .utf8)
+            for line in src.split(separator: "\n") {
+                // 默认开签名 A:environment["BAS_X"] != "0"
+                if let r = line.range(of: #"environment\["(BAS_[A-Z0-9_]+)"\]\s*!=\s*"0""#,
+                                      options: .regularExpression) {
+                    let m = String(line[r])
+                    if let name = m.range(of: #"BAS_[A-Z0-9_]+"#, options: .regularExpression) {
+                        found.insert(String(m[name]))
+                    }
+                }
+                // 默认开签名 B:BAS_X_OFF == "1"(杀开关形态)
+                if let r = line.range(of: #"environment\["(BAS_[A-Z0-9_]+_OFF)"\]\s*==\s*"1""#,
+                                      options: .regularExpression) {
+                    let m = String(line[r])
+                    if let name = m.range(of: #"BAS_[A-Z0-9_]+_OFF"#, options: .regularExpression) {
+                        found.insert(String(m[name]))
+                    }
+                }
+            }
+        }
+        XCTAssertFalse(found.isEmpty, "grep 一无所获 = 断言失效,检查签名模式")
+        let registered = Set(BASConfigRegistry.defaultOnKillSwitches.map(\.envName))
+        let missing = found.subtracting(registered)
+        XCTAssertTrue(missing.isEmpty,
+                      "生产默认开开关未入册(P2 宪法:新增开关须同 commit 入注册表): \(missing.sorted())")
+    }
+}

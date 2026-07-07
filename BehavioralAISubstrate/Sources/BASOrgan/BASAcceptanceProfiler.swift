@@ -10,8 +10,9 @@ import Foundation
 /// `MLXOrganAdapter` (or host-side), folded after each accelerated turn.
 public struct BASAcceptanceProfiler: Sendable, Equatable {
 
-    /// Smoothed statistics for one (sourceID, purpose) cell.
-    public struct Stat: Sendable, Equatable {
+    /// Smoothed statistics for one (sourceID, purpose) cell. Codable = P0 经验持久化
+    /// (BASAcceptanceProfilerStore) — 序列化面只加不改语义。
+    public struct Stat: Sendable, Equatable, Codable {
         /// EMA of accepted draft tokens per round (the speedup signal; drives `recommendedK`).
         public let emaAccepted: Double
         /// EMA of accepted/proposed (the hit-rate; drives the `worthSpeculating` fallback decision).
@@ -90,5 +91,24 @@ public struct BASAcceptanceProfiler: Sendable, Equatable {
     ) -> Bool {
         guard let s = stats[Self.key(sourceID, purpose)] else { return true }
         return s.emaHitRate >= minHitRate
+    }
+
+    // MARK: - P0 持久化内缝(仅供 BASAcceptanceProfilerStore 的导出/恢复;不改任何在线语义)
+
+    /// All learned cells, key split back into (sourceID, purpose rawValue). Internal — the
+    /// public exportable form is `exportCells()`.
+    func allCells() -> [(sourceID: String, purpose: String, stat: Stat)] {
+        stats.compactMap { key, stat in
+            guard let sep = key.lastIndex(of: "|") else { return nil }
+            return (String(key[..<sep]), String(key[key.index(after: sep)...]), stat)
+        }
+    }
+
+    /// Pure builder used by restore — returns a NEW profiler with the cell inserted verbatim
+    /// (no EMA fold; this is deserialization, not observation).
+    func inserting(sourceID: String, purposeRaw: String, stat: Stat) -> BASAcceptanceProfiler {
+        var copy = stats
+        copy["\(sourceID)|\(purposeRaw)"] = stat
+        return BASAcceptanceProfiler(stats: copy, alpha: alpha)
     }
 }

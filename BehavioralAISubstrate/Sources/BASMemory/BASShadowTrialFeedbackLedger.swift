@@ -57,6 +57,12 @@ public struct BASShadowTrialFeedbackLedger: Codable, Equatable, Sendable {
 // MARK: - Pure feedback evaluator (ADR-018 P2)
 
 extension BASShadowTrialFeedbackLedger {
+    /// ⚖️ P4 遗留清算判决 (RSI 章程 2026-07-07):维持进化程序审计的 CARRY+VISIBILITY
+    /// 降格判决——本 evaluator 在结果盲基座上(pending ∩ verdict 词表 = ∅)结构性恒等:
+    /// 【只携带、永不学习】。这不是 bug,是 ADR-021 prereq-b(actualOutcome 信号不存在)
+    /// 的诚实表达;在它之上机器化 ADAPT = 一向安全棘轮(自我锁死)。翻转前提 = 基座内
+    /// 出现真 outcome 信号源(操作员战役级立项),届时按 ADR-014 全阶梯重判。
+    ///
     /// Evaluate a prior-turn trial one step forward via the pure state
     /// machine, returning a NEW record whose `completionState` reflects
     /// the transitioned phase。

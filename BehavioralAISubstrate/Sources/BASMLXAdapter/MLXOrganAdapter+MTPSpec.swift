@@ -48,12 +48,20 @@ extension MLXOrganAdapter {
         let priorBox = mtpDecoderBox
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let probeReport = Self._ProbeReportBox()
+        let seedChainEmaL = restoredChainEmaL            // P0: actor read before the closure
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
             }
-            let dec = try priorBox?.decoder
-                ?? BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+            let dec: BASQwen35MTPSpecDecoder
+            if let prior = priorBox?.decoder {
+                dec = prior
+            } else {
+                dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+                // P0: seed the regime EMA from the persisted/carried value (nil unless
+                // BAS_PROFILER_PERSIST=1 ⇒ off = cold 1.6 default, byte-equal today).
+                if let seed = seedChainEmaL { dec.chainEmaL = seed }
+            }
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)
@@ -133,12 +141,20 @@ extension MLXOrganAdapter {
         // (135MB from the limit at 8-wide) that justified the governor.
         await acquireSessionDecodeSlot()
         defer { releaseSessionDecodeSlot() }
+        let seedChainEmaL = restoredChainEmaL            // P0: actor read before the closure
         let raw: _MTPRaw = try await container.perform(nonSendable: input) { ctx, input in
             guard let qwen = ctx.model as? Qwen35Model else {
                 throw BASQwen35MTPSpecDecoder.SpecError.notQwen35
             }
-            let dec = try priorBox?.decoder
-                ?? BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+            let dec: BASQwen35MTPSpecDecoder
+            if let prior = priorBox?.decoder {
+                dec = prior
+            } else {
+                dec = try BASQwen35MTPSpecDecoder(model: qwen, mtpWeightsURL: wURL)
+                // P0: seed the regime EMA from the persisted/carried value (nil unless
+                // BAS_PROFILER_PERSIST=1 ⇒ off = cold 1.6 default, byte-equal today).
+                if let seed = seedChainEmaL { dec.chainEmaL = seed }
+            }
             let eos = Self._productionEOSTokenIds(
                 eosTokenId: ctx.tokenizer.eosTokenId, resolve: { ctx.tokenizer.convertTokenToId($0) })
             let promptIds = input.text.tokens.asArray(Int.self)

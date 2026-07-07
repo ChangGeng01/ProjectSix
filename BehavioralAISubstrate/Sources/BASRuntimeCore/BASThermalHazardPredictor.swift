@@ -12,6 +12,10 @@
 // nominal window, idle refunds duty at a recovery rate (heat sheds), and each observed
 // nominal→hot exit tightens/loosens the learned budget by EMA (α=0.4, the codebase idiom).
 // Pure value type: no clocks, no ProcessInfo — the caller feeds observations (testable, ADR-014).
+// ⚰️ P4 注 (RSI 章程 2026-07-07):本预测器生产接线仅在 DeviceTestApp host(env 门控
+// BAS_THERMAL_PREDICT);库内(BASMLXAdapter 车道)零调用者——库侧热响应刻意保持反应式
+// (per-round 读 + planner 闸,已设备认证)。库内采纳 = 新 ADR-014 阶梯,非顺手接线。
+// 持久化已提库:BASThermalBudgetStore(P0)。
 public struct BASThermalHazardPredictor: Sendable {
 
     public struct Config: Sendable {

@@ -90,6 +90,9 @@ public protocol BASModelHonestyObservationStore: Sendable {
 
 // MARK: - In-memory reference impl (mirrors BASInMemoryPresenceObservationStore)
 
+// ⚰️ P4 墓碑注 (RSI 章程 2026-07-07):in-memory store 现零生产调用者(审计读者1实锤)
+// ——生产消费者是 🪞 summaryLine(log 行,coordinator sink)。store 保留原因:R1 收据
+// 决议(主权默认 NO)翻转时的现成落点;宪法条款:本观察通道永不进任何 fitness。
 public actor BASInMemoryModelHonestyObservationStore: BASModelHonestyObservationStore {
     public enum StoreError: Error, Equatable, Sendable {
         case duplicateEventID(String)

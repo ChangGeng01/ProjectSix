@@ -9,6 +9,10 @@ import Foundation
 ///   • probes/tests asserting on `draft.decodeAttribution`.
 /// Deliberately NOT persisted anywhere (charter: no receipts-about-the-owner on disk until the
 /// owner opts in; a JSONL sink waits for a real past-turn question to go unanswered twice).
+// ⚰️ P4 注 (RSI 章程 2026-07-07):默认路径(env 未设)= 每轮构造、附着、无读者——
+// 有意识的成本(纯值构造,零落盘),换取探针/测试的断言面永远在场。指名消费者:
+// BAS_DECODE_CTX=1 操作员日志流 + draft.decodeAttribution 断言。JSONL sink 两次落空,
+// 等一个真实的过去轮问题再立(可解释性章程原判)。
 public struct BASDecodeAttribution: Sendable, Equatable, Codable {
 
     /// B2 difficulty-probe tri-state — the audit's exact complaint was that "armed and agreed"

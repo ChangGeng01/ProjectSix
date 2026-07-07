@@ -264,3 +264,93 @@
 - 评估基座面:纪律作为判例极强(9 要素协议/诚实 FAIL 案底)、作为代码≈0
   (0 协议对象/全仓 0 统计函数/wilson 为零);机器可直接消费的净信号只有
   qinao_local_eval 98 gate 带(实跑 22 computed)。
+
+---
+
+# 第四部分:P0-P4 执行账本(2026-07-07 开工令"开工 P0-P4 按序 最严苛")
+
+## P0 经验持久化 — SHIPPED + 设备验收(机制 PASS / 税收益诚实负面)
+
+**建**:`BASOrgan/BASAcceptanceProfilerStore.swift`(schema v1 快照 {modelID, savedAtMs,
+cells, chainEmaL},actor store:staleness 7d 门 + modelID 门 + schemaVersion 门 +
+整体越界拒载(emaHitRate≤1 单位契约)+ 防抖 10s + 原子写 + 损坏不删);profiler 加
+exportCells()/init(cells:)(确定序,未知 purpose 前向跳过);`BASRuntimeCore/
+BASThermalBudgetStore.swift`(B4 提库:key 字符串冻结 = 既有设备学习值存活,clamp 20-300,
+零观察不覆盖;runner 切换到库实现)。接线:`_ensureExperienceLoaded` 在 `_execute`
+单漏斗(盖全部 eager 重载)+ draftMultiTurn 入口;persist 在 `_finish`(eager 每轮)+
+会话入口(次轮滞后);chainEmaL 播种在两个解码器创建点(仅 fresh 创建);压力梯子
+rung-2 丢弃前活值携带(env 门控,off = 字节等价今日)。opt-in `BAS_PROFILER_PERSIST=1`。
+
+**Mac 门**:14 单元 + 双实例跨进程温启动实弹 PASS。
+**设备验收(5E5C,两进程 A/B,5min 热沉降)**:
+- v1 仪器教训(诚实入册):会话轮 preset .core 是 temp>0 ⇒ 选举 pooled 采样车道
+  (capped-fused 为 greedy-only)⇒ 空快照 + 30s 间隔热混杂 ⇒ v2 改 eager 轮 +
+  行为硬门(热免疫)+ 空快照自愈判臂。
+- **机制 PASS**:真学习值跨进程往返(`mtp-qwen35-sampling|factual accepted=0.75
+  hit=0.75 n=6`);冷臂重播种 + 温臂恢复行全绿。
+- **税收益 = 诚实负面(该负载)**:冷启动本就乐观(cold ⇒ worthSpeculating true),
+  hit 0.75 > 0.60 floor ⇒ 温冷同选举,逐轮 wall 噪声内相同(7.0-7.4 起,热尾一致)。
+  ★洞见:profiler 先验的可测收益在【学到该被闸的车道】上(免每进程重付亏损轮,
+  如 free-form draft-spec 0.88×)——该测量 = future rider,不阻塞 P0(交付物 =
+  记忆基座本身)。chainEmaL 演化需 greedy fused 轮(采样车道不动它)——机制携带默认值
+  往返已证。
+
+## P1 判决对象类型化 + triage 脚本化 — SHIPPED + 回放验收 PASS
+
+**建**:`BASEvaluation/BASStatistics.swift`(全仓第一份统计函数:Wilson CI(golden
+8/10≈[0.490,0.943];N=57 半宽≈±12.5pp = eval-rigor 教训数字复核)+ exact McNemar
+(b=1,c=8 ⇒ 0.0391));`BASEvaluation/BASABProtocol.swift`(BASABProtocolSpec 预注册对象
+{臂/镜像块/热身计入/平价带/双块同号规则/fidelity anchor/热混杂 tier 差/quorum} +
+MeasurementRow + ArmFinding{parity/realEffect/artifactSuspect/thermalConfounded/dnf} +
+BASABJudge 纯判决器 + BASClimitLogParser 边缘适配器);`scripts/triage-full-suite.sh`
+(三步规则机器化:聚合行→flake 登记核对→隔离复跑;绝不裸信退出码,ch1042 案底)。
+
+**回放验收(预注册)PASS**:cacheLimit 设备日志(56 行,入库 fixture)⇒ 复现
+512/768/∞ PARITY + **256 位置伪影否决**;Mac v1 日志 ⇒ 复现 FIDELITY 仪器失效。
+注记:DWQ3/fixed-K cert 原始日志已不在盘(仅 Docs 判决存留)——回放覆盖 cacheLimit 的
+三个判决类(平价/伪影否决/仪器失效);后续战役原生走 P1 类型。判决权零移交:judge 输出
+判决候选,采纳在人。
+
+## P2 改进候选一等对象 + 只读注册表 + 采纳收据 — SHIPPED + 回填验收 PASS
+
+**建**:`BASSovereign/BASImprovementCandidate.swift`(kind{constant/route/prompt/skill},
+权重轴不存在;FSM proposed→shadow→certified→adopted/rejected/rolledBack,非法迁移抛错,
+**采纳双前提硬制:人签(机器填不了自己的名字)+回滚锚**;不可变迁移;receiptLine 人类
+可读收据);`BASSovereign/BASConfigRegistry.swift`(读者3 census 的生产开关只读枚举:
+默认开+杀 4 个/opt-in 9 个/常数旋钮 4 个;**宪法条款:明文禁运行时写**——kill-switch
+永在环路写域之外)。
+
+**验收 PASS**:两役回填无损(capped-fused 默认开 = adopted 带人签+回滚锚 env;
+cacheLimit DON'T-CARE = rejected 带判据6 理由)+ Codable 往返;**CI grep 断言**:
+BASMLXAdapter 源里默认开签名(`!="0"` / `_OFF"]=="1"`)100% 在注册表——新增生产开关
+不入册即测试红。
+
+## P3 睡眠窗测量站 — SHIPPED(verdict-only)+ 真执行门 PASS
+
+**建**:`BASEvaluation/BASSleepMeasurementStation.swift` —— 三重门(静态 opt-in
+`BAS_MEASUREMENT_STATION=1` 默认关零构造/宿主窗许可(站不猜设备态)/manifest 非空),
+执行器 macOS-only(Mac = RSI 评估站),聚合行解析(绝不裸信退出码),JSONL append-only
+账本 + 往返读回(坏行计数暴露)。产物 = 判决候选行;提案功能不存在(先决门 = 暗点3)。
+**真执行门 PASS**:独立迷你包全链(Process→swift test→GREEN 2 tests→JSONL→往返)。
+Riders:单夜等价 + 7 夜一致率(站启用后);挂宿主充电窗(与 consolidation driver 同席)
+= 宿主接线项。
+
+## P4 进化程序遗留清算 — 五件全判,零删除
+
+| # | 件 | 判决 |
+|---|----|------|
+| ① | ShadowTrial evaluator | CARRY+VISIBILITY 降格维持;契约注释升级为章程引用(结构性恒等 = ADR-021 prereq-b 的诚实表达;其上机器化 ADAPT = 自我锁死) |
+| ② | BASBCMMetaPlasticity + BASPlasticityFold | 封存【二阶禁区证物】标本(Tests-only/入口默认 nil;永不引为"已有基建";激活 = 推翻 ADR-021/P4 需操作员战役级新证据) |
+| ③ | BASStateLakeReader + DFlash taps 调用者 | 死线遗产,**提请操作员批准 git mv → Experiments/**(移不删;DFlash 文件被设备探针引用,移动需连探针一起或保留——待操作员裁) |
+| ④ | dead-end 观察四件 | 墓碑注入源:routedDivergenceCount(reason code 已随裁决走,计数器待 P3 晨读/R1)/🪞 store(R1 翻转落点;永不进 fitness)/attribution 默认路径(有意识成本,断言面常在)/B4 库内零接线(库侧刻意反应式;库内采纳 = 新 ADR-014 阶梯) |
+| ⑤ | 清除探针三条红腿 | 复响确认(XCTExpectFailure 全部仍响 = 缺口自证器官在岗) |
+
+**git rm 计数 = 0**;全量 suite 判决见 triage 行(P1 脚本自食狗粮)。
+
+**全量 suite triage 判决(P1 脚本自食狗粮)**:VERDICT = NO NEW REGRESSION——三个已知
+pre-existing(ReplayHarness/HonestyObserveWiring byteEqual/ThoughtFoldCompactSlots,
+07-06 stash-verified)全部正确分类;其余全绿。★狗粮首跑即抓到脚本真 bug:mktemp XXXX
+模板复用碰撞 ⇒ 空变量重定向 ⇒ 隔离判决未接地(可把回归误判 flake)——已修为 fail-closed
+(mktemp 失败 ⇒ 按回归处理)+ 两个未接地隔离补跑接地(各 1 failure 孤立复现 = 登记
+pre-existing 一致,NOT NEW)+ ThoughtFold 套件名对齐。教训入册:判决工具自身的第一次
+执行也要人逐行——P1 的"怀疑不可机器化"条款在它自己身上首验。

@@ -271,6 +271,9 @@ public actor BASSovereignVerdictEngine {
         public let swiftFloor: BASSovereignVerdictLevel
     }
     /// Process-lifetime divergence counter (telemetry; >0 = investigate the vendor/Rust pin).
+    /// ⚰️ P4 墓碑注 (RSI 章程 2026-07-07):本计数器现无生产读者(审计读者1实锤)——
+    /// 保留原因:reason code 已随裁决走(可解释性②的真载体),计数器是廉价的进程级
+    /// 聚合备胎,等 P3 测量站晨读或 R1 收据决议后自然获得读者。勿因零读者删除。
     public nonisolated(unsafe) static var routedDivergenceCount = 0
     /// Pure floor application: returns the effective level plus the divergence record when the
     /// Swift floor EXCEEDED the routed level. Host-unit-testable without the Rust FFI.

@@ -62,6 +62,10 @@ import Foundation
 
 // MARK: - Typed shape
 
+// ⚖️ P4 遗留清算判决 (RSI 章程 2026-07-07):本文件 = 全库唯一二阶可塑性基元,
+// 调用者 = Tests + doctrine 文本(审计读者2实锤)。封存为【二阶禁区证物】标本:
+// 章程教义第④级(机器改规则)= 禁止;本基元永不引为"已有基建",激活它 = 推翻
+// ADR-021/ADR-018-P4,需操作员战役级新证据。保留原因:删除厌恶 + 证物价值。
 public struct BASBCMMetaPlasticityShape:
     Equatable, Hashable, Sendable, Codable
 {

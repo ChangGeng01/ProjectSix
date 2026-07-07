@@ -400,6 +400,21 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// `+SuffixSpec` access.
     var draftProfiler = BASAcceptanceProfiler()
 
+    // ── P0 经验持久化 (RSI charter 2026-07-07): opt-in cross-process memory for the profiler
+    // table + the fused lane's chainEmaL. Off (default) ⇒ byte-equal current behavior: no load,
+    // no write, no seed. Latency-only by construction — bytes stay anchored by ADR-039; the
+    // prior only warm-starts lane election / K ramp. Staleness gate + whole-snapshot sanity in
+    // BASAcceptanceProfilerStore; a corrupt/stale file = cold start (= current behavior).
+    nonisolated static var _profilerPersistEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_PROFILER_PERSIST"] == "1"
+    }
+    var experienceStore: BASAcceptanceProfilerStore?
+    var experienceLoadAttempted = false
+    /// Freshest chainEmaL carry: disk-restored at load, refreshed at each persist and at the
+    /// pressure ladder's rung-2 drop — seeds the fused decoder at (re)creation so the regime
+    /// EMA survives both process death and in-process decoder drops. nil unless persist is on.
+    var restoredChainEmaL: Double?
+
     /// DecodePlan S4 — when true, `draft(_:electAccelerated:)` lets the single planner
     /// (`BASDecodeLanePolicy.decodeStrategy`) choose the lane (Option-3 auto-select) instead of the legacy
     /// elect→prompt-lookup gate. Default FALSE = EXACT legacy behavior (byte-identical). Flipped only after the
@@ -1186,6 +1201,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         let key = Self.sessionKey(sessionID, request.role)
         let dbgS = ProcessInfo.processInfo.environment["BAS_SESSION_DEBUG"] == "1"
         if dbgS { NSLog("[sess-dbg] %@ enter", key) }
+        await _ensureExperienceLoaded()                  // P0: opt-in warm-start (once)
+        _persistExperienceIfDue()                        // P0: session lane persists on next-turn entry
         _pressureCheck(keeping: key)                     // 案5: between-turn reclaim sample
 
         // 案3 (2026-07-06 decode-OS audit): lane election is ONE pure function (_sessionLane) —
@@ -1538,6 +1555,46 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     func pressureLadderTelemetry() -> [Int] { ladderFired }
     func _specDecoderResident() -> Bool { mtpDecoderBox != nil }
     /// Between-turn sample → graduated reclaim. Never called from inside a decode loop.
+    /// P0: per-model experience file (SHA256(model.id) prefix — same hygiene as 缝3 spill names)
+    /// under Application Support (durable, unlike the purgeable caches dir the spill uses).
+    nonisolated func _experienceFileURL() -> URL {
+        let digest = SHA256.hash(data: Data(model.id.utf8))
+        let hex = digest.map { String(format: "%02x", $0) }.joined().prefix(16)
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("bas_experience", isDirectory: true)
+            .appendingPathComponent("experience-\(hex).json")
+    }
+
+    /// P0: one-shot load at the first draft entry (opt-in). Invalid/stale/mismatched snapshot
+    /// ⇒ cold start, identical to today.
+    func _ensureExperienceLoaded() async {
+        guard Self._profilerPersistEnabled, !experienceLoadAttempted else { return }
+        experienceLoadAttempted = true
+        let store = BASAcceptanceProfilerStore(url: _experienceFileURL())
+        experienceStore = store
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        guard let snap = await store.load(expectedModelID: model.id, nowMs: nowMs) else {
+            print("📊 experience cold-start (no valid snapshot)")
+            return
+        }
+        draftProfiler = BASAcceptanceProfiler(cells: snap.cells)
+        restoredChainEmaL = snap.chainEmaL
+        let ema = snap.chainEmaL.map { String(format: "%.2f", $0) } ?? "nil"
+        print("📊 experience warm-start cells=\(snap.cells.count) chainEmaL=\(ema) age_s=\((nowMs - snap.savedAtMs) / 1000)")
+    }
+
+    /// P0: debounced fire-and-forget snapshot (never blocks or fails the decode path).
+    func _persistExperienceIfDue(force: Bool = false) {
+        guard let store = experienceStore else { return }
+        if let live = mtpDecoderBox?.decoder.chainEmaL { restoredChainEmaL = live }
+        let snap = BASDecodeExperienceSnapshot(
+            modelID: model.id,
+            savedAtMs: Int64(Date().timeIntervalSince1970 * 1000),
+            cells: draftProfiler.exportCells(),
+            chainEmaL: restoredChainEmaL)
+        Task { await store.save(snap, nowMs: snap.savedAtMs, force: force) }
+    }
+
     func _pressureCheck(keeping key: String?) {
         guard Self.pressureLadderEnabled else { return }
         guard let headroom = Self._memoryHeadroomBytes() else { return }
@@ -1552,6 +1609,10 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         case .parkColdSeats:
             _spillEvictAll(except: key)
         case .dropSpecDecoder:
+            // P0: carry the live regime EMA across the drop (persist-on only ⇒ off = today).
+            if Self._profilerPersistEnabled, let live = mtpDecoderBox?.decoder.chainEmaL {
+                restoredChainEmaL = live
+            }
             mtpDecoderBox = nil                          // ~300MB; lazily re-quantized later
         case .clearAllSessions:
             clearAllSessions()                           // survival over warmth

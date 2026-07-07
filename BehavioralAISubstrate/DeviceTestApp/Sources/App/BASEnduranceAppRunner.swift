@@ -1540,8 +1540,9 @@ final class BASEnduranceAppController: ObservableObject {
         // micro-cooldowns BEFORE the OS flips to fair (where the fused chain measured 0.91-0.99×).
         // Per-device recalibration: restore the budget the LAST run learned (UserDefaults is
         // per-device by construction); sanity-clamp so a corrupt store can't wedge the predictor.
-        let storedBudget = UserDefaults.standard.double(forKey: "bas.thermal.learned_budget")
-        let restoredBudget: Double? = (20.0 ... 300.0).contains(storedBudget) ? storedBudget : nil
+        // P0 (RSI charter): persistence lifted into BASRuntimeCore.BASThermalBudgetStore —
+        // same key string, same clamp; hosts share one implementation.
+        let restoredBudget = BASThermalBudgetStore.restore()
         var thermalPredictor: BASThermalHazardPredictor? =
             (env["BAS_THERMAL_PREDICT"] ?? "0") == "1"
                 ? BASThermalHazardPredictor(learnedBudget: restoredBudget) : nil
@@ -2699,7 +2700,8 @@ final class BASEnduranceAppController: ObservableObject {
                     predictGaps, predictGapSeconds,
                     tp.learnedBudget, tp.observedTransitions))
                 if tp.observedTransitions > 0 {
-                    UserDefaults.standard.set(tp.learnedBudget, forKey: "bas.thermal.learned_budget")
+                    BASThermalBudgetStore.persist(
+                        tp.learnedBudget, observedTransitions: tp.observedTransitions)
                     await emitBoth(String(format:
                         "📊 ch1025 thermal-predict PERSISTED learned_budget=%.0fs", tp.learnedBudget))
                 }

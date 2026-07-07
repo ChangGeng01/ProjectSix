@@ -36,6 +36,7 @@ extension MLXOrganAdapter {
     ) -> BASOrganDraft {
         // Lane funcs may have attached partial facts (trace-exit/B2/thermal) — keep them,
         // overwrite the election fields the executor owns.
+        _persistExperienceIfDue()   // P0: every eager turn exits through here (post-fold)
         let partial = draft.decodeAttribution
         let executed = failClose != nil ? "plain"
             : (partial?.executedLane ?? String(describing: planned))
@@ -56,6 +57,7 @@ extension MLXOrganAdapter {
         context: BASDecodeContext? = nil
     ) async throws -> BASOrganDraft {
         #if canImport(MLXLLM)
+        await _ensureExperienceLoaded()   // P0: THE eager funnel (covers all draft overloads)
         switch strategy {
         case .plain:
             return _finish(try await _plainDraft(request), planned: strategy,
