@@ -275,12 +275,18 @@
 (第四红腿:"物删"后内容仍全文可搜)+ 时间 GC 同修。清除探针加 (d) 腿标记 CLOSED。
 memory tracker byte-eq 套件零回归。
 
-**梯次3 MLX 并发 — 地基 DONE(commit,TDD 4/4),接线+认证 SCOPED**:
-H4-H7 根因同一 = 会话池缺 per-key 串行化。已交付经验证的共同原语
+**梯次3 MLX 并发 — 接线+双设备认证 DONE,门默认开(2026-07-08)**:
+H4-H7 根因同一 = 会话池缺 per-key 串行化。地基 = 经验证共同原语
 `BASPerKeyInFlightGate`(per-key FIFO 续体交接锁:同 key 严格串行/不同 key 并发/FIFO/
-抛错释放,20 并发零交错单测证)。**剩余(须带设备 endurance 认证,不在无验证窗口赶)**:
-① H6 把 draftMultiTurn 方法体抽取后裹进 `gate.serialize(key:)`(ADR-014 opt-in,默认关
-字节等价,设备并发认证后默认开);② H5 `_completePendingSpill` 经门单写者化(替代 gen
-竞态);③ H7 clear 写后代际校验;④ H4 2-slot 信号量 handoff(独立于门的次修)。
-理由:并发正确性 Mac 单元测不透(需真设备多座位突发),原语已去风险,接线是机械但
-生产解码路径关键的一步,按纪律须设备验证不可夜间盲上。
+抛错释放,20 并发零交错单测证)。接线三修:① H6 draftMultiTurn 临界区逐字抽取为
+`_draftMultiTurnLocked` 后裹 `sessionGate.serialize(key:)`(抽取期默认关字节等价,
+会话/路由/spill 回归全绿证);② H5 `spillWriterActive` 单写者集合替代 `!hadPending`
+双生成竞态(park 仅在无写者时孵化 completer,三出口原子清除);③ H7
+`keyClearEpoch`/`clearAllEpoch` 代际:snapshotWarmSeats 写后校验 epoch 变则丢弃、
+fused writeback 同守卫、clear 双双提升(消 clear-vs-写回复活)。
+**设备认证(两台两腿)**:endurance 5E5C 门开 71 轮召回 13/13、67 spill/67 restore
+零丢失(380s,无 watchdog);并发同座位 9E9E 两并发 turn+双召回两码词都在历史
+(H6 失败场景直接证伪,BASSessionGateConcurrencyDeviceTests)。**ADR-014 收口:
+门默认开,kill-switch `BAS_SESSION_GATE=0`(默认路径回字节等价直调)**;Mac 全套
+回归门开下绿(hygiene 5/5 + 门 4/4 + 会话池 55)。
+**剩余:④ H4 2-slot 信号量 handoff(独立于门的次修)——未动,待下令。**

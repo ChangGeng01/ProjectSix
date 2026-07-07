@@ -66,14 +66,14 @@ extension BASSpillHygieneTests {
         XCTAssertGreaterThan(f1, f0, "clearAllSessions 必须提升所有 key 的 epoch")
     }
 
-    /// H6 门:opt-in env 默认关(字节等价直调),设了才启用——纯静态断言,无模型。
-    func testH6_GateOptInDefaultOff() {
-        // 未设 BAS_SESSION_GATE ⇒ 默认关(本测试进程未设)。
-        if ProcessInfo.processInfo.environment["BAS_SESSION_GATE"] == "1" {
-            XCTAssertTrue(MLXOrganAdapter._perKeySessionGateEnabled)
-        } else {
+    /// H6 门:ADR-014 认证后默认开(双设备 cert 07-07),kill-switch BAS_SESSION_GATE=0。
+    func testH6_GateDefaultOnWithKillSwitch() {
+        if ProcessInfo.processInfo.environment["BAS_SESSION_GATE"] == "0" {
             XCTAssertFalse(MLXOrganAdapter._perKeySessionGateEnabled,
-                           "H6 门必须默认关——默认路径字节等价")
+                           "BAS_SESSION_GATE=0 必须关门(kill-switch)")
+        } else {
+            XCTAssertTrue(MLXOrganAdapter._perKeySessionGateEnabled,
+                          "H6 门认证后必须默认开(ADR-014)")
         }
     }
 }

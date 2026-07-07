@@ -357,11 +357,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     private var fusedTranscripts: [String: [(role: String, text: String)]] = [:]
 
     /// H6 (mega-audit tranche-3, 2026-07-07): per-key FIFO gate serializing the session-pool
-    /// critical section. Opt-in via `BAS_SESSION_GATE=1`; default off ⇒ direct call, byte-equal
-    /// with the pre-gate path. Device endurance cert flips it default-on.
+    /// critical section. DEFAULT-ON per ADR-014 after two device certs (endurance 5E5C: 71 turns
+    /// 13/13 recall, 67 spill/restore; concurrent same-seat 9E9E: both interleaved turns land in
+    /// history). Kill-switch: `BAS_SESSION_GATE=0` ⇒ direct call, byte-equal with the pre-gate path.
     let sessionGate = BASPerKeyInFlightGate()
     nonisolated static var _perKeySessionGateEnabled: Bool {
-        ProcessInfo.processInfo.environment["BAS_SESSION_GATE"] == "1"
+        ProcessInfo.processInfo.environment["BAS_SESSION_GATE"] != "0"
     }
     /// Telemetry: turns served by the fused session lane (tests/observability).
     private(set) var fusedSessionTurnCount = 0
