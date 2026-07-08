@@ -76,6 +76,15 @@ let package = Package(
         // direct deps still leaves SPM resolving transitives from
         // remote URLs, which defeats the purpose if upstream is
         // unreachable. Updates require an explicit `Vendor/` swap.
+        // audit M-o MED-3 — swift-crypto (Ed25519 sovereign seals +
+        // NIST-SHA256 chain hashes) was in the graph ONLY transitively via
+        // swift-huggingface / swift-transformers; a vendor refresh that
+        // dropped it would break 87 security-critical `import Crypto` files
+        // across 10 targets. Declared explicitly at root so the crypto
+        // dependency is first-class, not contingent on an ML tokenizer
+        // package. Same on-disk path SPM already resolves ⇒ same identity,
+        // no duplicate (byte-equal build).
+        .package(path: "Vendor/swift-crypto"),
         .package(path: "Vendor/mlx-swift-lm"),
         .package(path: "Vendor/swift-transformers"),
         .package(path: "Vendor/swift-huggingface")
@@ -96,6 +105,8 @@ let package = Package(
             // matching the binary target。
             dependencies: [
                 "BASCSystemBridge",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(
@@ -154,6 +165,8 @@ let package = Package(
             // gate matches the binary target's gate。
             dependencies: [
                 "BASRuntimeCore",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(
@@ -191,7 +204,11 @@ let package = Package(
         // chapter 七百四十一 第一/二刀 Rust seal/verify primitives。
         .target(
             name: "BASSovereign",
-            dependencies: ["BASRuntimeCore"],
+            // audit M-o MED-3 — explicit swift-crypto: L14 sovereign seals
+            // (Ed25519) must not depend on an ML package's transitive graph.
+            dependencies: [
+                "BASRuntimeCore",
+                .product(name: "Crypto", package: "swift-crypto")],
             resources: [.process("Resources")],
             plugins: [
                 .plugin(name: "BASSQLSchemaGen")
@@ -221,7 +238,9 @@ let package = Package(
         // protocol + Scout/Core presets + an in-memory deterministic
         // fake for tests. Platform providers (Apple FoundationModels,
         // MLX, remote LLMs) live in adapter layers.
-        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore"]),
+        .target(name: "BASOrgan", dependencies: ["BASRuntimeCore",
+            // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+            .product(name: "Crypto", package: "swift-crypto")]),
         // BASChatCompletionsAdapter — generic remote-LLM organ
         // provider. URLSession-backed, OpenAI Chat Completions
         // JSON shape. Conforms to BASOrganAdapter so it drops into
@@ -347,6 +366,8 @@ let package = Package(
             dependencies: [
                 "BASRuntimeCore",
                 "BASOrgan",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(
                     name: "MLXLLM",
                     package: "mlx-swift-lm"),
@@ -370,14 +391,18 @@ let package = Package(
                     name: "HuggingFace",
                     package: "swift-huggingface")
             ]),
-        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
+        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy",
+            // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+            .product(name: "Crypto", package: "swift-crypto")]),
         // BASOrchestration depends on BASObservability because M58
         // `BASUpdateTicketObservationDerivation` needs to read
         // `BASUpdateTicket` (defined in BASObservability) to produce a
         // per-ticket observation bundle on the main-chain thought frame.
         // Safe topology: BASObservability does not import BASOrchestration,
         // so no cycle.
-        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability"]),
+        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability",
+            // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+            .product(name: "Crypto", package: "swift-crypto")]),
         .target(
             name: "BASEvaluation",
             // Memory + Policy dropped (audit ch1040): no BASEvaluation source imports them —
@@ -389,6 +414,8 @@ let package = Package(
         .target(
             name: "BASAppleAdapters",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife",
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 // RoBERTa BPE tokenizer for the CoreAI NLI verifier (BASCoreAINLIVerifier)
                 .product(name: "Tokenizers", package: "swift-transformers")],
             // MiniLM-L6-v2 sentence embedder (CoreML, fp32) + its BERT WordPiece vocab,
@@ -407,6 +434,8 @@ let package = Package(
         .target(
             name: "BASHostKit",
             dependencies: [
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 "BASRuntimeCore",
                 "BASMemory",
                 "BASPolicy",
@@ -596,6 +625,8 @@ let package = Package(
         .executableTarget(
             name: "BASJournalCLI",
             dependencies: [
+                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
+                .product(name: "Crypto", package: "swift-crypto"),
                 "BASMemory",
                 "BASRuntimeCore",
                 "BASSovereign",
