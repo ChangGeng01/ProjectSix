@@ -214,18 +214,29 @@ public actor BASSharedStateGraph {
                 existingWriterAgentID: existing,
                 newWriterAgentID: agentID)
         }
-        // chapter 九百五十六.11 USER-PASS-4 CR2 fix:persist BEFORE
-        // mutating in-memory state。 Previously the order was:
-        //   1. mutate in-memory `domainWriters[domain] = agentID`
-        //   2. await storage.upsertWriter (suspension point)
-        // If step 2 threw,in-memory state had a phantom claim with
-        // no corresponding persisted row — `hydrate()` after restart
-        // would revert the in-memory state silently。 New order is
-        // SQL-first:if persistence fails,in-memory is untouched
-        // and caller sees the throw + can retry idempotently。
-        try await storage?.upsertWriter(
-            domain: domain, agentID: agentID)
+        // audit H8 (2026-07-07): RESERVE the claim in-memory in the SAME suspension-free
+        // region as the nil-check above。 Actor reentrancy happens ONLY at `await`, so
+        // validate+reserve is atomic — a concurrent registerWriter for the same domain that
+        // arrives during the persist below now sees this claim and is correctly rejected。
+        //
+        // The prior order (ch 956.11) was SQL-first: `await upsertWriter` THEN
+        // `domainWriters[domain] = agentID`。 That put a suspension point BETWEEN the
+        // validation and the in-memory write, so two callers both passed the nil-check during
+        // each other's await and the later resume clobbered the earlier → last-wins, and the
+        // loser believed it owned a domain that was actually the winner's (silent divergence,
+        // then writerIdentityMismatch on its writes)。 SQL-first bought crash-consistency
+        // (no phantom in-memory claim on persist failure); we keep that property below via an
+        // explicit rollback instead of by opening the race window。
         domainWriters[domain] = agentID
+        do {
+            try await storage?.upsertWriter(
+                domain: domain, agentID: agentID)
+        } catch {
+            // Persist failed → undo the reservation so no phantom in-memory claim survives。
+            // (Passed the nil-check, so the prior value was nil — restore that。)
+            domainWriters[domain] = nil
+            throw error
+        }
     }
 
     /// Read accessor for the registry — used by tests + audit + the
@@ -244,14 +255,20 @@ public actor BASSharedStateGraph {
     /// graph in inconsistent state where one wire() throws but its
     /// EARLIER batch entries are committed。
     ///
-    /// Fix:provide a single atomic method that runs validate-then-
-    /// install INSIDE the graph actor's isolation domain — Swift's
-    /// actor reentrancy is the only thing that could break atomicity,
-    /// and this method has NO await suspension points (the per-domain
-    /// upsertWriter call is the only async work,and it's part of the
-    /// commit-phase which only runs if validation passed)。 Two
-    /// concurrent batches now serialize at the actor mailbox boundary,
-    /// not at Phase 1 vs Phase 2 boundary。
+    /// audit H8 (2026-07-07) — CORRECTED COMMENT + FIX。 The prior comment claimed "this
+    /// method has NO await suspension points" — that was FALSE: Phase 2's per-domain
+    /// `upsertWriter` (below) IS an await, and it sat BETWEEN Phase-1 validation and the
+    /// in-memory `domainWriters[domain] = agentID` write。 So two concurrent batches both
+    /// passed Phase-1B against empty state, then interleaved at that await → last-wins /
+    /// partial install (exactly the race this method was supposed to close)。 The existing
+    /// regression test only exercised the storage==nil path (`storage?.upsertWriter` on nil
+    /// never suspends), so it never triggered the race。
+    ///
+    /// Fix: run validate-then-RESERVE (in-memory install) as ONE suspension-free region
+    /// (Phase 1 + Phase 1C), so actor reentrancy cannot interleave two batches between
+    /// validation and reservation。 Persistence (Phase 2) happens AFTER all reservations are
+    /// held, with full-batch compensating rollback on any failure (delete already-persisted
+    /// rows + drop every reservation) so neither memory nor storage keeps a partial install。
     ///
     /// - Parameter claims: array of (agentID, domain) pairs to install。
     ///   Intra-batch conflicts (same domain claimed by two different
@@ -297,24 +314,40 @@ public actor BASSharedStateGraph {
             }
         }
 
-        // Phase 2:commit。 Now invokes per-claim async upsertWriter
-        // + in-memory map mutation。 Each per-claim step has SQL-first
-        // discipline per ch 956.11 USER-PASS-4 CR2:if persistence
-        // throws,in-memory state is untouched。 Atomicity for the
-        // FULL batch beyond the first throw is graceful-degradation:
-        // earlier successful claims persist (intentional — the throw
-        // gives caller enough info to retry the failed claim,not a
-        // full rollback)。 But because Phase 1 already validated,a
-        // Phase-2 throw in practice means a storage / IO failure,not
-        // a logic conflict。
+        // Phase 1C (audit H8): RESERVE every non-idempotent claim in-memory NOW — still in the
+        // same suspension-free region as Phase 1A/1B (no `await` has run yet)。 This is what
+        // makes two concurrent batches serialize: the second batch's Phase-1B sees these
+        // reservations and throws domainAlreadyClaimed instead of racing us at Phase 2's await。
+        // Track exactly what we reserved so a persist failure rolls back precisely those。
+        var reserved: [(agentID: String, domain: BASStateDomain)] = []
         for (agentID, domain) in claims {
-            // Skip idempotent re-claim (same agent same domain)
             if domainWriters[domain] == agentID {
-                continue
+                continue  // idempotent re-claim — already ours
             }
-            try await storage?.upsertWriter(
-                domain: domain, agentID: agentID)
             domainWriters[domain] = agentID
+            reserved.append((agentID: agentID, domain: domain))
+        }
+
+        // Phase 2 (audit H8): persist the reservations。 Full-batch atomicity via compensating
+        // rollback — if any upsertWriter throws, delete the rows already persisted in THIS batch
+        // and drop every in-memory reservation, so neither storage nor memory keeps a partial
+        // install (was: graceful-degradation left earlier claims committed, which under the race
+        // produced a partial + interleaved install)。
+        var persisted: [BASStateDomain] = []
+        do {
+            for (agentID, domain) in reserved {
+                try await storage?.upsertWriter(
+                    domain: domain, agentID: agentID)
+                persisted.append(domain)
+            }
+        } catch {
+            for domain in persisted {
+                try? await storage?.deleteWriter(domain: domain)
+            }
+            for (_, domain) in reserved {
+                domainWriters[domain] = nil
+            }
+            throw error
         }
     }
 
@@ -393,13 +426,19 @@ public actor BASSharedStateGraph {
             }
         } else {
             // Auto-claim: this agent becomes the canonical writer。
-            // chapter 九百五十六.11 USER-PASS-4 CR2 fix:persist
-            // BEFORE mutating in-memory state — same rationale as
-            // registerWriter above。 If `upsertWriter` throws,no
-            // phantom in-memory claim is left behind。
-            try await storage?.upsertWriter(
-                domain: domain, agentID: agent.agentID)
+            // audit H8 (2026-07-07): same race as registerWriter — the prior SQL-first order
+            // (await upsertWriter THEN set domainWriters) let two agents auto-claiming the SAME
+            // domain on their first write both pass the nil-check during each other's await →
+            // last-wins。 Reserve synchronously (atomic vs reentrancy) then persist with
+            // rollback-on-failure (keeps the ch 956.11 no-phantom-claim guarantee)。
             domainWriters[domain] = agent.agentID
+            do {
+                try await storage?.upsertWriter(
+                    domain: domain, agentID: agent.agentID)
+            } catch {
+                domainWriters[domain] = nil
+                throw error
+            }
         }
         // chapter 九百五十六.11 USER-PASS-4 CR2 fix:persist object
         // BEFORE bumping in-memory state + version counter。 If
