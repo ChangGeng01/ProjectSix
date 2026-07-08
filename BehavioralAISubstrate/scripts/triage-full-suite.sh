@@ -47,10 +47,22 @@ if [ "${TOTAL_FAILS:-0}" -eq 0 ]; then
 fi
 
 # ── 步骤 2:失败套件提取 + flake 签名核对 ──────────────────────────────────────
-SUITES=$(grep -E "Test Case '-\[[A-Za-z]+\.[A-Za-z0-9_]+ " "$LOG" \
+# 审计 H22 修:模块名类放宽到 [A-Za-z0-9_]+(纯字母类会漏掉带数字/下划线的模块名,
+# 如 BASKit2Tests / BAS_CoreTests → 失败套件提不出来 → 洗成绿)。
+SUITES=$(grep -E "Test Case '-\[[A-Za-z0-9_]+\.[A-Za-z0-9_]+ " "$LOG" \
   | grep "' failed (" \
-  | sed -E "s/.*'-\[[A-Za-z]+\.([A-Za-z0-9_]+) .*/\1/" | sort -u)
+  | sed -E "s/.*'-\[[A-Za-z0-9_]+\.([A-Za-z0-9_]+) .*/\1/" | sort -u)
 echo "[triage] failing suites: $(echo "$SUITES" | tr '\n' ' ')"
+
+# 审计 H22 修(核心 fail-open 洞):聚合行数了 N>0 个失败,但一个失败套件都提不出来
+# ⇒ 提取正则漏了 / 格式漂移 / 未知失败格式。此时下面的 SUITES 循环空转,REGRESSIONS
+# 保持空,直落 `exit 0 NO NEW REGRESSION` —— 把真失败洗成绿。fail-closed:提不出疑犯
+# 就不可判,绝不发绿。
+if [ -z "$(echo "$SUITES" | tr -d '[:space:]')" ]; then
+  echo "[triage] VERDICT: UNGROUNDED — aggregate counted $TOTAL_FAILS failure(s) but ZERO failing suites extracted"
+  echo "[triage]   (name-regex miss / output-format drift / unrecognized failure format). Cannot triage ⇒ NOT a pass."
+  exit 1
+fi
 
 REGRESSIONS=""
 for SUITE in $SUITES; do
