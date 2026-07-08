@@ -33,7 +33,10 @@ import BASRuntimeCore
 
 // Persistent store root. Defaults to ~/.qinao-journal; QINAO_JOURNAL_DIR overrides it
 // (used by the integration test to point at a throwaway temp dir).
-private let journalDir: URL = {
+// `journalDir` / `journalSessionID` are module-internal (not file-private) so the sovereign
+// ledger (Ledger.swift) can site `ledger.sqlite` + `identity.key` in the same journal root
+// and stamp seals with the same session id.
+let journalDir: URL = {
     if let override = ProcessInfo.processInfo.environment["QINAO_JOURNAL_DIR"], !override.isEmpty {
         return URL(fileURLWithPath: override, isDirectory: true)
     }
@@ -41,7 +44,7 @@ private let journalDir: URL = {
         .appendingPathComponent(".qinao-journal", isDirectory: true)
 }()
 private let journalDBURL = journalDir.appendingPathComponent("journal.sqlite")
-private let journalSessionID = "qinao-journal"
+let journalSessionID = "qinao-journal"
 
 private func makeStore() throws -> BASEventSourcedMemoryAtomStore {
     try FileManager.default.createDirectory(
@@ -146,11 +149,26 @@ private func cmdAdd(_ text: String) async throws {
     let atom = makeEntry(text, tag: "decision")
     let admitted = try await store.admit(atom)
     guard admitted else {
-        print("(not admitted — a conflicting entry already exists)")
+        // admit returns false only on an event-ID collision with an already-admitted atom
+        // (each add mints a fresh UUID, so this is effectively unreachable, not a content dedup).
+        print("(not admitted — event-id collision with an existing entry; retry)")
         return
     }
     try writeContent(atom.id, text)
     print("logged \(String(atom.id.uuidString.prefix(8)))  \(text)")
+    // Increment 2 — seal the sovereign action into the Ed25519 audit ledger (append-only,
+    // tamper-evident, cross-boot). Integrity-over-availability: surface a seal failure LOUDLY
+    // and DISTINCTLY — the atom is already logged, so the operator must be able to tell a
+    // logged-but-UNSEALED partial success from a total failure.
+    do {
+        let sealID = try await sealAdmit(atomID: atom.id, contentText: text)
+        print("sealed \(String(sealID.prefix(8)))  admit:governed  (Ed25519 sovereign ledger)")
+    } catch {
+        FileHandle.standardError.write(Data(
+            ("SEAL FAILED — the entry is LOGGED to memory but NOT sealed into the sovereign "
+             + "ledger: \(error)\n").utf8))
+        exit(1)
+    }
 }
 
 private func cmdRecall(_ query: String?) async throws {
@@ -182,6 +200,9 @@ private func cmdForget(_ prefix: String) async throws {
             : "ambiguous: \(matches.count) entries match \"\(prefix)\" — use more characters")
         return
     }
+    // Capture the content digest source BEFORE secure-delete so the forget-seal records
+    // WHAT was forgotten (by digest) — after the delete the raw text is unrecoverable.
+    let forgottenText = readContent(target.id)
     let removed = await store.remove(forID: target.id.uuidString)
     guard removed != nil else {
         print("forget failed for \(prefix)")
@@ -195,8 +216,21 @@ private func cmdForget(_ prefix: String) async throws {
     if stillThere || !contentGone {
         FileHandle.standardError.write(Data(
             "WARNING: forgotten entry still projects — deletion doctrine VIOLATED\n".utf8))
-    } else {
-        print("forgotten \(String(target.id.uuidString.prefix(8)))  (verified gone from projection)")
+        return
+    }
+    print("forgotten \(String(target.id.uuidString.prefix(8)))  (verified gone from projection)")
+    // Increment 2 — seal the forget as an append-only tombstone in the sovereign ledger. The
+    // seal survives even though the content is gone: a deleted sovereign entry is provably
+    // deleted, not silently vanished. A seal failure is surfaced distinctly (the content is
+    // already gone, so the operator must know the deletion went UNSEALED).
+    do {
+        let sealID = try await sealForget(atomID: target.id, contentText: forgottenText)
+        print("sealed \(String(sealID.prefix(8)))  forget:tombstoned  (Ed25519 sovereign ledger)")
+    } catch {
+        FileHandle.standardError.write(Data(
+            ("SEAL FAILED — the entry is FORGOTTEN (content secure-deleted) but the deletion "
+             + "was NOT sealed into the sovereign ledger: \(error)\n").utf8))
+        exit(1)
     }
 }
 
@@ -210,12 +244,17 @@ private func printHelp() {
     print("""
     qinao-journal — sovereign decision & thread journal (#20 first daily workload)
 
-      add "<text>"       log a decision/thread into event-sourced memory
+      add "<text>"       log a decision/thread into event-sourced memory + seal it
       recall [query]     list entries (optionally filtered), oldest→newest
-      forget <id-prefix> tombstone an entry + verify it is gone (deletion doctrine)
+      forget <id-prefix> tombstone an entry + verify it is gone (deletion doctrine) + seal it
       count              how many entries
+      ledger             verify the Ed25519 sovereign chain + show every sealed action
 
-    Stored on-device at ~/.qinao-journal/journal.sqlite. Zero egress. A mirror, not an oracle.
+    Stored on-device at ~/.qinao-journal/. Zero egress. A mirror, not an oracle.
+    Every add/forget is sealed into an append-only Ed25519 audit ledger (the 3 first-run seed
+    threads are unsealed sample data). Tamper-evident against edits to ledger.sqlite by anyone
+    who lacks identity.key — the private key (0600) sits beside it, so this is CLI-grade, not
+    Secure-Enclave-bound: an attacker who can read the key can forge the chain.
     """)
 }
 
@@ -239,6 +278,8 @@ func runJournal() async {
             try await cmdForget(prefix)
         case "count":
             try await cmdCount()
+        case "ledger":
+            try await cmdLedger()
         case "--help", "-h", "help":
             printHelp()
         default:

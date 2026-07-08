@@ -597,7 +597,8 @@ let package = Package(
             name: "BASJournalCLI",
             dependencies: [
                 "BASMemory",
-                "BASRuntimeCore"
+                "BASRuntimeCore",
+                "BASSovereign"
             ],
             path: "Sources/BASJournalCLI"),
         .plugin(
