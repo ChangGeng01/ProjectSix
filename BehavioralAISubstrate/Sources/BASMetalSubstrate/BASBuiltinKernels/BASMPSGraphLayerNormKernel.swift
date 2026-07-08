@@ -229,7 +229,10 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
                     [batch, hidden],
                     [hidden],
                     [hidden]
-                ])
+                ],
+                // audit M-l / metal #4: epsilon is baked into the compiled graph — key on it so two
+                // LayerNorm instances with different epsilon don't share (+ reuse) one executable.
+                epsilonBits: epsilon.bitPattern)
             let executable: MPSGraphExecutable
             if let cached = await cache.cachedExecutable(
                 forKey: cacheKey)

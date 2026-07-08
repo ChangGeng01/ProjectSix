@@ -250,7 +250,10 @@ public actor BASMPSGraphRMSNormKernel: BASMetalKernel {
                 inputShapes: [
                     [batch, hidden],
                     [hidden]
-                ])
+                ],
+                // audit M-l / metal #4: epsilon is baked into the compiled graph — key on it so two
+                // RMSNorm instances with different epsilon don't share (+ reuse) one executable.
+                epsilonBits: epsilon.bitPattern)
             let executable: MPSGraphExecutable
             if let cached = await cache.cachedExecutable(
                 forKey: cacheKey)
