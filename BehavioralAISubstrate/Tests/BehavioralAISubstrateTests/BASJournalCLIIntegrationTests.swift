@@ -110,11 +110,27 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
         XCTAssertFalse(afterForget.stdout.contains(secret),
             "forgotten entry must NOT resurface in recall (H11 tombstone): \(afterForget.stdout)")
 
-        // The secure-deleted content file must be physically gone from disk.
-        let contentDir = dir.appendingPathComponent("content")
-        let survivors = (try? FileManager.default.contentsOfDirectory(atPath: contentDir.path)) ?? []
-        XCTAssertFalse(survivors.contains { $0.hasPrefix(idPrefix) },
-            "forgotten entry's content file must be secure-deleted from disk")
+        // Increment 4: content lives in a secure_delete-ON SQLite store. After forget, the raw
+        // plaintext must be gone from EVERY content.sqlite* file — including the -wal, which the
+        // WAL-truncate step exists to scrub (plain secure_delete only zeroes the main DB). This is
+        // the real teeth: without the checkpoint(TRUNCATE), the secret would survive in the -wal.
+        let plaintextGone = !contentDBContains(dir: dir, needle: secret)
+        XCTAssertTrue(plaintextGone,
+            "forgotten entry's plaintext must be secure-deleted from all content.sqlite* files")
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: dir.appendingPathComponent("content").appendingPathComponent("\(idPrefix)").path),
+            "no legacy content file should survive")
+    }
+
+    /// True iff the raw `needle` bytes appear in ANY content.sqlite* file (main DB / WAL / SHM).
+    private func contentDBContains(dir: URL, needle: String) -> Bool {
+        let needleData = Data(needle.utf8)
+        for suffix in ["content.sqlite", "content.sqlite-wal", "content.sqlite-shm"] {
+            let url = dir.appendingPathComponent(suffix)
+            guard let data = try? Data(contentsOf: url) else { continue }
+            if data.range(of: needleData) != nil { return true }
+        }
+        return false
     }
 
     // MARK: - Increment 2: the Ed25519 sovereign audit ledger
@@ -247,6 +263,74 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
         XCTAssertEqual(afterB.exit, 1,
             "truncation-to-empty MUST fail closed, not read as a cold start: "
             + "\(afterB.stdout)\(afterB.stderr)")
+    }
+
+    /// Increment 4: a legacy increment-1 content/<uuid>.txt file is migrated into the secure
+    /// SQLite store on first store-open (any command), then the plaintext file is retired — a
+    /// MOVE (content preserved), verified before the source is removed.
+    func testLegacyContentFileIsMigratedAndRetired() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let fm = FileManager.default
+
+        let contentDir = dir.appendingPathComponent("content")
+        try fm.createDirectory(at: contentDir, withIntermediateDirectories: true)
+        let legacyText = "legacy-increment1-entry-\(Int.random(in: 1000...9999))"
+        let legacyID = UUID().uuidString
+        let legacyFile = contentDir.appendingPathComponent("\(legacyID).txt")
+        try Data(legacyText.utf8).write(to: legacyFile)
+
+        // Any command opens the content store, which runs the one-time migration.
+        let r = try run(["count"], journalDir: dir)
+        XCTAssertEqual(r.exit, 0)
+
+        XCTAssertFalse(fm.fileExists(atPath: legacyFile.path),
+            "the legacy plaintext file must be retired after migration")
+        XCTAssertTrue(contentDBContains(dir: dir, needle: legacyText),
+            "the migrated content must now live in the secure SQLite store")
+    }
+
+    /// Increment 4 (review HIGH fix): migration is NON-CLOBBERING. If the store already holds an
+    /// atom's content, a legacy file for the same atom (e.g. one a concurrent process is
+    /// mid-zeroing) must NOT overwrite the correct row — it is retired without a re-import.
+    func testMigrationDoesNotClobberExistingStoreContent() throws {
+        guard let sqlite3 = sqlite3BinaryURL() else { throw XCTSkip("sqlite3 CLI unavailable") }
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let fm = FileManager.default
+
+        let real = "REAL-content-must-survive-\(Int.random(in: 1000...9999))"
+        _ = try run(["add", real], journalDir: dir)
+
+        // Read the atom_id the store keyed THIS content under (add also seeds 3 rows, so filter
+        // by our distinctive text to get exactly the real entry's id).
+        let p = Process(); p.executableURL = sqlite3
+        p.arguments = [dir.appendingPathComponent("content.sqlite").path,
+            "SELECT atom_id FROM content WHERE text LIKE 'REAL-content%';"]
+        let out = Pipe(); p.standardOutput = out; try p.run(); p.waitUntilExit()
+        let atomID = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        XCTAssertFalse(atomID.isEmpty, "should resolve exactly one atom id for the real content")
+        XCTAssertNotNil(UUID(uuidString: atomID), "atom id must be a single UUID: '\(atomID)'")
+
+        // Plant a legacy file for the SAME atom with different (clobbering) content.
+        let contentDir = dir.appendingPathComponent("content")
+        try fm.createDirectory(at: contentDir, withIntermediateDirectories: true)
+        let legacyFile = contentDir.appendingPathComponent("\(atomID).txt")
+        try Data("CLOBBER-attempt-should-be-ignored".utf8).write(to: legacyFile)
+
+        // Trigger migration.
+        _ = try run(["count"], journalDir: dir)
+
+        // The store keeps the REAL content; the clobber attempt never landed; the file is retired.
+        let recall = try run(["recall", "REAL-content"], journalDir: dir)
+        XCTAssertTrue(recall.stdout.contains(real),
+            "the store's real content must survive migration of a same-atom legacy file: \(recall.stdout)")
+        XCTAssertFalse(recall.stdout.contains("CLOBBER-attempt"),
+            "the legacy file must NOT overwrite the store row")
+        XCTAssertFalse(fm.fileExists(atPath: legacyFile.path), "the legacy file must be retired")
     }
 
     // MARK: - Increment 3: the "was I right?" ShadowTrial loop

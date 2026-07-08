@@ -56,34 +56,120 @@ private func makeStore() throws -> BASEventSourcedMemoryAtomStore {
         source: "qinao-journal")
 }
 
-// MARK: - Content sidecar (the substrate stores DIGEST only — privacy doctrine)
+// MARK: - Content store (the substrate stores DIGEST only — privacy doctrine)
 //
-// BASMemoryAtomReducer projects atom *state* but leaves content empty on replay: the event
-// log persists only a SHA256 contentDigest, never the raw text (L8 privacy doctrine). So the
-// journal — which must recall the actual entry across reboots — owns raw content itself, in
-// a per-atom file. On forget we SECURE-DELETE it (overwrite the bytes, then unlink), so a
-// sovereign journal's deleted entry is truly gone, matching the substrate's deletion doctrine.
+// BASMemoryAtomReducer projects atom *state* but leaves content empty on replay: the event log
+// persists only a SHA256 contentDigest, never the raw text (L8 privacy doctrine). So the journal
+// — which must recall the actual entry across reboots — owns raw content itself.
+//
+// Increment 4: content lives in a secure_delete-ON SQLite store (ContentStore), NOT per-atom
+// *.txt files. On APFS a file overwrite-in-place is copy-on-write and can leave the old plaintext
+// in freed blocks, so the increment-1 file "secure delete" under-delivered. SQLite secure_delete
+// zeroes freed pages on DELETE, matching the #16 doctrine used across the 18 substrate stores.
 
-private let contentDir = journalDir.appendingPathComponent("content", isDirectory: true)
+private let contentDir = journalDir.appendingPathComponent("content", isDirectory: true)  // legacy
+private let contentDBURL = journalDir.appendingPathComponent("content.sqlite")
 
-private func contentURL(_ id: UUID) -> URL {
+private func contentURL(_ id: UUID) -> URL {   // legacy-file path (migration + belt-and-suspenders)
     contentDir.appendingPathComponent(id.uuidString + ".txt")
 }
 
+// Memoized per-process so recall of N entries opens the DB once (and migrates once). The CLI is
+// single-threaded — one command, sequential awaits — so unsynchronized global state is safe.
+nonisolated(unsafe) private var _contentStore: ContentStore?
+
+private func contentStore() throws -> ContentStore {
+    if let s = _contentStore { return s }
+    try FileManager.default.createDirectory(at: journalDir, withIntermediateDirectories: true)
+    let store = try ContentStore(path: contentDBURL.path)
+    migrateLegacyContentFiles(into: store)   // one-time; a no-op once the legacy dir is drained
+    _contentStore = store
+    return store
+}
+
+/// One-time migration of the increment-1 content/*.txt sidecar into the secure store. For each
+/// legacy file: import its text, VERIFY the round-trip, then retire the plaintext file. A MOVE
+/// (content preserved in the store), not a destroy — fail-safe per file.
+///
+/// Concurrency-safe against a second CLI process migrating the same file: a file being
+/// secure-deleted is zeroed (all-NUL) before it is unlinked, so a racing read can see an
+/// all-NUL / empty buffer. We NEVER import an empty or NUL-bearing read (it would clobber a
+/// correct row), and migration is NON-CLOBBERING — if the store already holds this atom we just
+/// retire the file rather than overwrite.
+private func migrateLegacyContentFiles(into store: ContentStore) {
+    let fm = FileManager.default
+    guard let files = try? fm.contentsOfDirectory(
+        at: contentDir, includingPropertiesForKeys: nil), !files.isEmpty else { return }
+    for file in files where file.pathExtension == "txt" {
+        guard let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent),
+              let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
+        // Skip a file a concurrent process may be mid-zeroing (all-NUL/empty read).
+        guard !text.isEmpty, !text.contains("\u{0}") else { continue }
+        do {
+            if try store.has(id) { retireLegacyFile(file); continue }   // idempotent, non-clobbering
+            try store.put(id, text)
+            guard try store.get(id) == text else { continue }   // verify BEFORE retiring the source
+            retireLegacyFile(file)
+        } catch {
+            FileHandle.standardError.write(Data(
+                ("WARNING: could not migrate legacy content \(file.lastPathComponent): \(error)\n").utf8))
+        }
+    }
+}
+
 private func writeContent(_ id: UUID, _ text: String) throws {
-    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
-    try Data(text.utf8).write(to: contentURL(id), options: .atomic)
+    try contentStore().put(id, text)
 }
 
 private func readContent(_ id: UUID) -> String {
-    (try? String(contentsOf: contentURL(id), encoding: .utf8)) ?? "(content unavailable)"
+    do {
+        if let text = try contentStore().get(id) { return text }   // genuinely present
+        // Genuinely ABSENT in the store → a pre-migration legacy file is the only other source.
+        if let legacy = try? String(contentsOf: contentURL(id), encoding: .utf8) { return legacy }
+        return "(content unavailable)"
+    } catch {
+        // A real store error must NOT silently fall back to a legacy file — that file could be
+        // forgotten plaintext the store already deleted. Surface the error instead of resurrecting.
+        return "(content unavailable — store error)"
+    }
 }
 
-/// Secure-delete: overwrite the file's bytes with zeros before unlinking so the plaintext
-/// entry can't be recovered from the freed disk region — the file-level analogue of the
-/// SQLite secure_delete the stores now default to.
+/// Secure-delete the content: remove the SQLite row (secure_delete=ON + verified WAL truncate) AND
+/// retire any lingering legacy plaintext file, so a forgotten entry is gone from both surfaces.
+/// A checkpoint that could not truncate the WAL throws — surface it (plaintext may linger); the
+/// forget verification (`contentIsGone`) will then correctly report the entry as NOT gone.
 private func secureDeleteContent(_ id: UUID) {
-    let url = contentURL(id)
+    do {
+        try contentStore().delete(id)
+    } catch {
+        FileHandle.standardError.write(Data(
+            ("WARNING: content secure-delete incomplete (plaintext may linger): \(error)\n").utf8))
+    }
+    retireLegacyFile(contentURL(id))
+}
+
+/// True iff the content is gone from BOTH the store and any legacy file — the forget verification.
+/// Fail-closed: if the store lookup errors we cannot confirm removal, so we report NOT gone.
+private func contentIsGone(_ id: UUID) -> Bool {
+    let inStore: Bool
+    do { inStore = try contentStore().has(id) } catch { return false }
+    return !inStore && !FileManager.default.fileExists(atPath: contentURL(id).path)
+}
+
+/// Retire a legacy plaintext file: best-effort secure-delete, then VERIFY it is gone. If it
+/// somehow survives, warn — the increment-4 goal is that no weak-secure-delete plaintext lingers,
+/// so a silent survival must be surfaced, not assumed away.
+private func retireLegacyFile(_ file: URL) {
+    secureDeleteLegacyFile(file)
+    if FileManager.default.fileExists(atPath: file.path) {
+        FileHandle.standardError.write(Data(
+            ("WARNING: legacy content file \(file.lastPathComponent) survived secure-delete\n").utf8))
+    }
+}
+
+/// Overwrite a legacy plaintext file's bytes then unlink it (best-effort; APFS COW makes this
+/// imperfect, which is exactly why content moved into the secure_delete SQLite store).
+private func secureDeleteLegacyFile(_ url: URL) {
     if let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
        size > 0,
        let handle = try? FileHandle(forWritingTo: url) {
@@ -219,7 +305,7 @@ private func cmdForget(_ prefix: String) async throws {
     // Deletion doctrine: verify the projection no longer returns it (H11 tombstone path)
     // AND the raw content is gone from disk.
     let stillThere = await store.allAtoms().contains { $0.id == target.id }
-    let contentGone = !FileManager.default.fileExists(atPath: contentURL(target.id).path)
+    let contentGone = contentIsGone(target.id)
     if stillThere || !contentGone {
         FileHandle.standardError.write(Data(
             "WARNING: forgotten entry still projects — deletion doctrine VIOLATED\n".utf8))

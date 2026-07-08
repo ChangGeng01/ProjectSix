@@ -137,8 +137,40 @@ Verified by `BASShadowTrialCoordinatorTests` (resume + guards) and `BASJournalCL
   `setShadowTrialFeedback` so a live EBrain turn CONSUMES the recorded trial outcomes (the
   grounding panel found this is Mac-constructible but observation-only / cross-turn, so it buys
   nothing for a batch CLI until the journal drives live turns). Deferred, stated honestly.
-- **Content store hardening.** Move the content sidecar into a `secure_delete`-ON SQLite
-  table (via `BASSQLiteSecureDelete`) for uniform deletion-doctrine coverage.
+## Increment 4 — content-store hardening (SHIPPED)
+
+`Sources/BASJournalCLI/ContentStore.swift`.
+
+Content moved from increment 1's per-atom `content/*.txt` files into a `secure_delete`-ON SQLite
+store (`content.sqlite`). This is a real fix, not polish: on **APFS (copy-on-write)** the old
+in-place-overwrite secure-delete could land on new blocks and leave the old plaintext in the
+freed region — the "truly gone" guarantee under-delivered. SQLite `secure_delete` zeroes freed
+pages, matching the #16 doctrine across the 18 substrate stores. A one-time, verify-before-delete
+migration moves any legacy `*.txt` into the store (a MOVE, content preserved), and `forget`
+removes the row.
+
+**Hardened by an adversarial refute panel (find→verify) that confirmed 7 findings, all fixed:**
+- **WAL secure-delete gap** (found by my own smoke test first): under WAL, the plaintext INSERT
+  frame lives in `content.sqlite-wal`, which `secure_delete` (main-DB-only) never touches — so a
+  forgotten entry's plaintext lingered in the WAL. `delete()` now runs a **verified**
+  `wal_checkpoint(TRUNCATE)` (`sqlite3_wal_checkpoint_v2`, asserting `framesLeftInWAL == 0`); a
+  busy/blocked checkpoint throws rather than reporting a clean delete, and the store checkpoints
+  on open to scrub a WAL orphaned by a crash between a delete and its checkpoint.
+- **Concurrent-migration data loss**: a file being secure-deleted is zeroed (all-NUL) before
+  unlink, so a racing second process could read the all-NUL buffer and (via `bind_text(-1)`)
+  overwrite the correct row with an empty string. Migration now skips empty/NUL reads and is
+  **non-clobbering** (retire, don't re-import, if the store already holds the atom).
+- **Embedded-NUL truncation**: `bind_text(-1)` truncated content at the first NUL. Now binds by
+  explicit UTF-8 byte length and reads back by `column_bytes` (defense-in-depth — CLI argv can't
+  carry a NUL, but a file/stream path could).
+- **Unverified legacy retirement** + **error-vs-absent confusion**: `retireLegacyFile` now
+  verifies the file is gone; `get()` THROWS on a real DB error (vs `nil` for genuine absence) so
+  `readContent` never resurrects a forgotten legacy file on a transient error, and `contentIsGone`
+  is fail-closed.
+
+Verified by `BASJournalCLIIntegrationTests`: content in SQLite not files; the forgotten
+plaintext is absent from EVERY `content.sqlite*` file (incl. the `-wal`); legacy files migrate +
+retire; and migration does not clobber existing store content.
 
 ## Honest limits (from the panel, kept)
 
