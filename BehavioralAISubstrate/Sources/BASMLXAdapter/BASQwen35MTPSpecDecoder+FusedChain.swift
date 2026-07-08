@@ -91,6 +91,16 @@ final class BASQwen35ChainDraftProvider: BASTrunkDraftProvider {
 
 extension BASQwen35MTPSpecDecoder {
 
+    /// audit M-g — clamp the post-prefill probe budget. The B2 difficulty
+    /// probe REFINES the decode budget after reading the prefill hidden
+    /// state, but it must only ever spend LESS than the caller asked for:
+    /// floor at 8 (a probe can't kill generation outright) and cap at the
+    /// caller's `maxTokens` (a probe returning a large number must never
+    /// let the decode overrun the caller's hard limit). Pure + testable.
+    static func clampedProbeBudget(_ probe: Int, maxTokens: Int) -> Int {
+        min(maxTokens, max(8, probe))
+    }
+
     /// One chain link: the MTP block with attention over `baseK/baseV` (committed slice, shared across the
     /// chain) ++ this chain's earlier links ++ self. Math mirrors `mtpForward` exactly (same rms/rope/gate);
     /// `fp32Scores` reproduces the production K=1 lane's fp32 QKᵀ+softmax semantics (acceptance was
@@ -211,7 +221,9 @@ extension BASQwen35MTPSpecDecoder {
         // B2 探针路由器 — the post-prefill budget hook: the difficulty probe reads THIS hidden
         // state (the prefill the decode shares anyway — the observation is free) and may refine
         // the decode budget before the first token. nil = certified lane, byte-unchanged.
-        let cap = postPrefillBudget.map { max(8, $0(hLast)) } ?? maxTokens
+        let cap = postPrefillBudget.map {
+            Self.clampedProbeBudget($0(hLast), maxTokens: maxTokens)
+        } ?? maxTokens
         var hLastPos = prompt.count - 1
         var trunkLen = prompt.count
         let (t0Tok, t0Ent) = argmaxAndEntropy(model.logits(fromHidden: h0)[0, -1])
@@ -362,15 +374,17 @@ extension BASQwen35MTPSpecDecoder {
             }
             let amH = host[1 ... T].map(Int.init)                      // trunk argmaxes, host side
             var cursor = T + 1
-            let entH: [Int]
-            if traceActive {
-                entH = host[cursor ..< cursor + T].map(Int.init)
-                cursor += T
-            } else { entH = [] }
+            // audit M-g/M-i — UNPACK must mirror the PACK order above: the
+            // trProbe block (flat[T×trK] + ds[kNow]) is packed BEFORE the
+            // traceActive entropy[T]. Reading entH first (as this used to)
+            // corrupted BOTH channels whenever trProbe + traceActive were on
+            // together — entH sliced the top-k region while flat/ds sliced
+            // the entropy region + overran. Read trProbe first, then entH.
             if trProbe {
                 let flat = host[cursor ..< cursor + T * trK].map(Int.init)
                 cursor += T * trK
                 let dsH = host[cursor ..< cursor + kNow].map(Int.init)
+                cursor += kNow
                 // Row i's INPUT token: pending[i] for i<P, else the draft ds[i-P]; amH[i] = the
                 // trunk's truth for the token FOLLOWING input[i].
                 let inputTok: [Int] = pending + dsH
@@ -395,6 +409,16 @@ extension BASQwen35MTPSpecDecoder {
                     trMatrix.observe(after: inputTok[i], topK: Array(flat[(i * trK) ..< (i * trK + trK)]))
                 }
             }
+            // traceActive entropy — packed LAST, so unpacked last (audit M-g/M-i).
+            let entH: [Int]
+            if traceActive {
+                entH = host[cursor ..< cursor + T].map(Int.init)
+                cursor += T
+            } else { entH = [] }
+            // The readback must be fully consumed — a mismatch means the PACK
+            // and UNPACK layouts drifted apart again (the M-g/M-i bug).
+            assert(cursor == host.count,
+                   "fused readback layout drift: cursor \(cursor) != \(host.count)")
             iters += 1
             acceptedTok += L
             proposedTok += kNow
