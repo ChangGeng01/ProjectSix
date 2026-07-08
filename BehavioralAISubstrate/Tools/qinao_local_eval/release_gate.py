@@ -69,9 +69,20 @@ def substrate_log_text(arg_path):
 
 def parse_substrate(text):
     """Parse the executed/failed counts + the per-gate PASS lines."""
+    # audit M-j — take the MAX-executed "Executed N tests, with M failures"
+    # line, not the LAST. The suite total is always the largest such count
+    # (it aggregates every sub-suite, failures included); the old "last" logic
+    # misjudged a truncated or stderr-interleaved log whose final line was a
+    # small PARTIAL sub-suite count (e.g. a 5-test class with 0 failures
+    # trailing after the real 98/3 total). A log truncated BEFORE the total is
+    # still caught downstream by the gate-count + membership checks.
     executed = failures = None
+    _best = -1
     for m in re.finditer(r"Executed (\d+) tests, with (\d+) failures", text):
-        executed, failures = int(m.group(1)), int(m.group(2))  # take the last (suite-level) line
+        e = int(m.group(1))
+        if e > _best:
+            _best = e
+            executed, failures = e, int(m.group(2))
     # Gate lines come in two print styles: "QINAO-GATE <key>: PASS" (batches 6-9)
     # and "📊 qinao-gate <key>: PASS" (batches 1-5). Match both, case-insensitively.
     gates = sorted(set(re.findall(r"qinao-gate (\w+):? (?:PASS|SKIP)", text, re.I)))
@@ -103,16 +114,27 @@ def model_section():
     }, rows
 
 
-def aux_flags(model_rows, substrate):
-    """never_worse / data_fp_match / contamination_clean — each (bool, evidence)."""
-    # never_worse: model regression-gate row(s) + the substrate regression_gate_verdict gate.
-    nw_model = True
+def regression_gate_status(model_rows):
+    """audit M-j — FAIL-CLOSED never_worse (model side). Returns (passed, note).
+
+    The old inline check defaulted `nw_model = True`, so an ABSENT regression
+    row — `model_rows` empty/None, or the row renamed/dropped — passed
+    never_worse with ZERO regression evidence: fail-open on a safety-critical
+    "never ship a model that got worse" gate. Absence is now a FAIL (surfaced
+    with a note), mirroring `contamination_clean`'s fail-closed default; only a
+    regression row with a genuine PASS passes."""
     if model_rows:
         for key in ("regression_gate", "regression-gate", "never_worse_regression"):
             r = next((rr for k, rr in model_rows.items() if key in k), None)
             if r:
-                nw_model = r["status"] == "PASS"
-                break
+                return (r["status"] == "PASS", f"regression row status={r['status']}")
+    return (False, "no model regression_gate row — fail-closed")
+
+
+def aux_flags(model_rows, substrate):
+    """never_worse / data_fp_match / contamination_clean — each (bool, evidence)."""
+    # never_worse: model regression-gate row(s) + the substrate regression_gate_verdict gate.
+    nw_model, nw_model_note = regression_gate_status(model_rows)
     nw_sub = "regression_gate_verdict" in substrate["gates_passed"]
     never_worse = nw_model and nw_sub
 
@@ -155,7 +177,7 @@ def aux_flags(model_rows, substrate):
             contamination_clean = (r["status"] == "PASS")
             cc_note = f"model contamination row status={r['status']}"
     return {
-        "never_worse": (never_worse, f"model={nw_model} substrate_regression_gate={nw_sub}"),
+        "never_worse": (never_worse, f"model={nw_model} ({nw_model_note}) substrate_regression_gate={nw_sub}"),
         "data_fp_match": (data_fp_match, fp_note),
         "contamination_clean": (contamination_clean, cc_note),
     }
