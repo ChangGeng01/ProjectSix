@@ -272,6 +272,16 @@ int32_t bas_memory_vm_stats(
     int64_t *out_wired,
     int64_t *out_page_size);
 int32_t bas_memory_pressure_percent(int32_t *out_pct);
+// audit M-e #2 — pure, platform-independent pressure arithmetic so the
+// ratio is unit-testable with synthetic page counts. `inactive` pages
+// are reclaimable cache (NOT resident pressure); genuine used = active +
+// wired. Returns 0 + writes 0-100 on success, -1 on NULL/degenerate.
+int32_t bas_memory_pressure_percent_from(
+    int64_t free_pages,
+    int64_t active_pages,
+    int64_t inactive_pages,
+    int64_t wired_pages,
+    int32_t *out_pct);
 
 // MARK: - chapter 七百六十一 — L1 partial C system probes
 //

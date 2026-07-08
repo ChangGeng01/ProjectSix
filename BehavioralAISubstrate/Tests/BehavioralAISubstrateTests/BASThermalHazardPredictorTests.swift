@@ -93,4 +93,48 @@ final class BASThermalHazardPredictorTests: XCTestCase {
                        "0.6×100+0.4×50 — any nominal→hot exit is a budget observation")
         XCTAssertEqual(p.observedTransitions, 1)
     }
+
+    // MARK: - audit M-e #3 — external heat must not poison the budget
+
+    /// A near-zero-duty nominal→hot exit (external heat — hot car, sun,
+    /// another app pinning the GPU) is BELOW the attribution floor
+    /// (100×0.25 = 25) and must NOT drag the learned budget toward zero.
+    func testExternalHeatSpikeDoesNotPoisonBudget() {
+        var p = BASThermalHazardPredictor(config: cfg)
+        p.recordTier(0)
+        p.recordDecode(seconds: 3)            // we did almost no work…
+        p.recordTier(2)                       // …yet the device went hot ⇒ external
+        XCTAssertEqual(p.learnedBudget, 100, accuracy: 1e-9,
+                       "3s ≪ 25 floor ⇒ external, budget untouched (was 0.6×100+0.4×3=61.2)")
+        XCTAssertEqual(p.observedTransitions, 0, "nothing was learned")
+        XCTAssertEqual(p.externalTransitions, 1, "recorded as external, not learned")
+    }
+
+    /// Repeated external spikes across a session never collapse the
+    /// budget — the persisted line stays intact for the next run。
+    func testRepeatedExternalSpikesNeverCollapseBudget() {
+        var p = BASThermalHazardPredictor(config: cfg)
+        for _ in 0..<8 {
+            p.recordTier(0)
+            p.recordDecode(seconds: 4)        // trivial duty each window
+            p.recordTier(2)                   // external hot
+        }
+        XCTAssertEqual(p.learnedBudget, 100, accuracy: 1e-9,
+                       "8 external spikes leave the budget exactly where it started")
+        XCTAssertEqual(p.observedTransitions, 0)
+        XCTAssertEqual(p.externalTransitions, 8)
+    }
+
+    /// A genuine transition just above the floor still learns — the
+    /// guard rejects external heat, not legitimate short windows。
+    func testTransitionAtFloorStillLearns() {
+        var p = BASThermalHazardPredictor(config: cfg)
+        p.recordTier(0)
+        p.recordDecode(seconds: 25)           // exactly 100×0.25 — inclusive
+        p.recordTier(1)
+        XCTAssertEqual(p.learnedBudget, 70, accuracy: 1e-9,
+                       "0.6×100+0.4×25 — at-floor duty is attributable")
+        XCTAssertEqual(p.observedTransitions, 1)
+        XCTAssertEqual(p.externalTransitions, 0)
+    }
 }

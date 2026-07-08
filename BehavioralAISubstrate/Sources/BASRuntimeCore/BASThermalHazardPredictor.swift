@@ -34,6 +34,19 @@ public struct BASThermalHazardPredictor: Sendable {
         public var recoveryCredit: Double = 0.5
         /// EMA step for budget learning on each observed nominal→hot exit.
         public var emaAlpha: Double = 0.4
+        /// audit M-e #3 — attribution floor. A nominal→hot transition only
+        /// LEARNS (feeds the EMA) when the window's decode duty reached at
+        /// least `learnedBudget × minAttributableDutyFraction`. Below it the
+        /// heat is deemed EXTERNAL (hot car, sun, another app pinning the
+        /// GPU) — a near-zero-duty exit that, left unguarded, pulled the EMA
+        /// toward ~0 and collapsed `learnedBudget`; because the budget
+        /// PERSISTS across runs (BASThermalBudgetStore) the poisoned line
+        /// then survived every relaunch, pinning hazard=true forever.
+        /// 0.25 sits BELOW every observed genuine transition (the 4-run
+        /// calibration ratios were 0.58-0.87 of budget) yet rejects the
+        /// implausibly-low external spikes; the floor scales with the budget
+        /// so it never has to be re-tuned per device.
+        public var minAttributableDutyFraction: Double = 0.25
         /// Recommended gap when hazard is predicted.
         public var cooldownSeconds: Double = 4
         public init() {}
@@ -44,6 +57,11 @@ public struct BASThermalHazardPredictor: Sendable {
     public private(set) var dutyInWindow: Double = 0
     public private(set) var lastTier: Int = 0          // 0 nominal · 1 fair · 2 serious · 3 critical
     public private(set) var observedTransitions: Int = 0
+    /// audit M-e #3 — nominal→hot exits rejected as external heat (duty
+    /// below the attribution floor). Counted, never learned; surfaced for
+    /// observability so a device that keeps overheating externally is
+    /// distinguishable from one whose budget genuinely tightened.
+    public private(set) var externalTransitions: Int = 0
 
     /// `learnedBudget` restores a PERSISTED estimate from prior runs (per-device recalibration —
     /// the 4-run calibration showed 35-52s inter-run variance; carrying the EMA across runs keeps
@@ -71,8 +89,17 @@ public struct BASThermalHazardPredictor: Sendable {
     public mutating func recordTier(_ tier: Int) {
         defer { lastTier = tier }
         if lastTier == 0 && tier > 0 {
-            learnedBudget = (1 - config.emaAlpha) * learnedBudget + config.emaAlpha * dutyInWindow
-            observedTransitions += 1
+            // audit M-e #3 — only LEARN when our decode duty plausibly
+            // CAUSED the transition. A near-zero-duty nominal→hot exit is
+            // external heat; feeding it to the EMA would poison the
+            // persisted budget toward zero. The window still freezes
+            // (defer) and resets on recovery either way.
+            if dutyInWindow >= learnedBudget * config.minAttributableDutyFraction {
+                learnedBudget = (1 - config.emaAlpha) * learnedBudget + config.emaAlpha * dutyInWindow
+                observedTransitions += 1
+            } else {
+                externalTransitions += 1
+            }
         } else if lastTier > 0 && tier == 0 {
             dutyInWindow = 0
         }
