@@ -73,15 +73,24 @@ enum BASQwen35RdarProbe {
             print("[qwen35-rdar] MISSING asset at \(asset.path) — stage it via devicectl (see header) ✗")
             return
         }
+        var completed = 0
         for label in ["default", "ane"] {
             do {
-                try await runOnce(asset: asset, label: label)
+                if try await runOnce(asset: asset, label: label) { completed += 1 }
             } catch {
                 // A TYPED error is NOT the rdar crash (that would kill the process) — report + continue.
                 print("[qwen35-rdar] \(label): typed failure (not a crash): \(error) ✗")
             }
         }
-        print("[qwen35-rdar] ✅ SURVIVED — no rdar-177354777 crash on this seed; direction is runnable (→ device M3/M4)")
+        // audit M-i/M1 — "no crash" alone is NOT "runnable". The green banner
+        // used to fire even when BOTH placements failed (typed error / no
+        // output): a loaded gun reporting a hit it never fired. Require ≥1
+        // genuine completion before claiming the direction is demonstrated.
+        if completed > 0 {
+            print("[qwen35-rdar] ✅ SURVIVED — no rdar-177354777 crash AND \(completed)/2 placement(s) ran to completion; direction is runnable (→ device M3/M4)")
+        } else {
+            print("[qwen35-rdar] ⚠️ no rdar-177354777 crash, but EVERY placement failed (typed error / no output) — direction NOT demonstrated ✗")
+        }
         #else
         print("[qwen35-rdar] CoreAI framework unavailable on this OS — probe skipped")
         #endif
@@ -332,7 +341,11 @@ enum BASQwen35RdarProbe {
     }
 
     @available(iOS 27, macOS 27, *)
-    private static func runOnce(asset: URL, label: String) async throws {
+    /// audit M-i/M1 — returns TRUE only when a placement actually ran all
+    /// steps to completion. The two ✗ early-returns and any thrown error
+    /// return/propagate false so the caller's SURVIVED banner can't claim
+    /// "direction is runnable" when every placement failed.
+    private static func runOnce(asset: URL, label: String) async throws -> Bool {
         // Mirror BASCoreAIDecodeProbe: `.default` lets CoreAI place freely; "ane" pins the neural engine —
         // the placement rdar 177354777 is most likely to bite.
         let opts: SpecializationOptions =
@@ -340,7 +353,7 @@ enum BASQwen35RdarProbe {
         let model = try await AIModel(contentsOf: asset, options: opts)
         guard let name = model.functionNames.first, let fn = try model.loadFunction(named: name) else {
             print("[qwen35-rdar] \(label): no inference function in asset ✗")
-            return
+            return false
         }
         // ONE fused state, zero-initialized (mirrors BASCoreAIDecodeSession's single-state pattern).
         var state = NDArray(scalars: [Float16](repeating: 0, count: stateRows * stateRow),
@@ -360,13 +373,14 @@ enum BASQwen35RdarProbe {
             var outputs = try await fn.run(inputs: inputs, states: states)
             guard let value = outputs.remove(inputDim == nil ? "logits" : "out"), let logits = value.ndArray else {
                 print("[qwen35-rdar] \(label): STEP \(step) returned no output ✗")
-                return
+                return false
             }
             lastDim = logits.shape.reduce(1, *)
         }
         let ms = Date().timeIntervalSince(t0) * 1000 / Double(steps)
         print(String(format: "[qwen35-rdar] %@: %d steps OK, logits dim %d, %.1f ms/step ✓",
                      label, steps, lastDim, ms))
+        return true
     }
     #endif
 }
