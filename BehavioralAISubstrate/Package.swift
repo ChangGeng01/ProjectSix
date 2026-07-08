@@ -22,6 +22,9 @@ let package = Package(
         .library(name: "BASObservability", targets: ["BASObservability"]),
         .library(name: "BASEvaluation", targets: ["BASEvaluation"]),
         .library(name: "BASAdmin", targets: ["BASAdmin"]),
+        // audit M-o MED-2 — SwiftUI-only console view, split out of BASAdmin
+        // so the substrate core (and headless hosts) stay SwiftUI-free.
+        .library(name: "BASAdminUI", targets: ["BASAdminUI"]),
         .library(name: "BASAppleAdapters", targets: ["BASAppleAdapters"]),
         .library(name: "BASSovereign", targets: ["BASSovereign"]),
         .library(name: "BASWorldPrior", targets: ["BASWorldPrior"]),
@@ -411,6 +414,10 @@ let package = Package(
             dependencies: ["BASRuntimeCore", "BASObservability"]
         ),
         .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASEvaluation", "BASWorldPrior"]),
+        // audit M-o MED-2 — the SwiftUI BASConsoleView (was inside BASAdmin,
+        // forcing headless hosts to link SwiftUI transitively). Isolated here
+        // so only explicit UI hosts pull in SwiftUI.
+        .target(name: "BASAdminUI", dependencies: ["BASAdmin"]),
         .target(
             name: "BASAppleAdapters",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife",
