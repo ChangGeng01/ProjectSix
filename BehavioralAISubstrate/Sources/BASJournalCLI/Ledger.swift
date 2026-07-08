@@ -119,8 +119,10 @@ private func writeIdentityKey0600(_ raw: Data) throws {
 }
 
 /// Construct the persistent, Ed25519-signed sovereign audit ledger. Rehydrates the prior
-/// chain from `ledger.sqlite` (M91) and re-verifies it on first write (ch1044).
-private func makeLedger() throws -> BASSovereignAuditLedger {
+/// chain from `ledger.sqlite` (M91) and re-verifies it on first write (ch1044). Internal so
+/// increment 3 (Trials.swift) can hand the SAME ledger to the ShadowTrial coordinator, so
+/// trial seals share the one Ed25519 chain.
+func makeLedger() throws -> BASSovereignAuditLedger {
     try FileManager.default.createDirectory(at: journalDir, withIntermediateDirectories: true)
     let storage = try BASSovereignLedgerSQLiteStorage(path: ledgerDBURL.path)
     // Probe the persisted chain BEFORE constructing the ledger, for two reasons:
@@ -156,7 +158,7 @@ private func makeLedger() throws -> BASSovereignAuditLedger {
 /// The content digest that ties a ledger entry to the entry's text WITHOUT persisting the raw
 /// text into the audit record — the L8 privacy doctrine the event store follows (digest, not
 /// content). Same content ⇒ same digest, so the seal is verifiable against the content sidecar.
-private func contentDigestHex(_ text: String) -> String {
+func contentDigestHex(_ text: String) -> String {
     SHA256.hash(data: Data(text.utf8))
         .map { String(format: "%02x", $0) }.joined()
 }
@@ -267,10 +269,27 @@ func cmdLedger() async throws {
     let iso = ISO8601DateFormatter()
     for appended in entries {
         let e = appended.entry
-        let id = String(e.auditID.prefix(8))
-        let digest = String(e.snapshotRef.prefix(8))
-        let when = iso.string(from: e.appendedAt)
-        print("  \(id)  \(e.verdictRef.padding(toLength: 18, withPad: " ", startingAt: 0)) "
-            + "\(digest)  \(when)")
+        // Actor distinguishes the operator's DECISION seals — the admit:governed / forget:tombstoned
+        // rows for add/forget/bet (.operator) — from the shadow-trial machinery the coordinator
+        // appends (.system: shadow_trial open/observe/finalize, evolution_seal, retraction). Note a
+        // right/wrong resolve emits ONLY .system rows (no .operator seal). verdictRef is sanitized:
+        // the coordinator packs trial refs with a U+001F unit separator ("shadow_trial\u{1F}<id>")
+        // that renders invisibly — surface it as ":" so the record is human-readable.
+        let id = ledgerDisplayID(e.auditID).padding(toLength: 12, withPad: " ", startingAt: 0)
+        let who = e.actor.rawValue.padding(toLength: 8, withPad: " ", startingAt: 0)
+        let what = ledgerSanitize(e.verdictRef).padding(toLength: 30, withPad: " ", startingAt: 0)
+        print("  \(id)  \(who)  \(what)  \(iso.string(from: e.appendedAt))")
     }
+}
+
+/// Trial events use `"audit-"+UUID` ids while journal seals use a bare UUID; show 12 chars so
+/// the `"audit-"` prefix still leaves visible entropy instead of colliding at `prefix(8)`.
+private func ledgerDisplayID(_ auditID: String) -> String {
+    auditID.hasPrefix("audit-") ? String(auditID.dropFirst(6).prefix(12)) : String(auditID.prefix(12))
+}
+
+/// Replace the ASCII control separators the coordinator uses in composite refs (U+001F unit,
+/// U+001E record) with a printable ":" so `ledger` never emits invisible/garbled bytes.
+private func ledgerSanitize(_ s: String) -> String {
+    String(s.map { ($0 == "\u{001F}" || $0 == "\u{001E}") ? ":" : $0 })
 }

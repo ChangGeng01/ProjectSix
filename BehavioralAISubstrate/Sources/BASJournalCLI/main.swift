@@ -143,16 +143,18 @@ private func sortedAtoms(_ store: BASEventSourcedMemoryAtomStore) async -> [BASG
     })
 }
 
-private func cmdAdd(_ text: String) async throws {
+/// Log a decision into event-sourced memory + seal it into the Ed25519 ledger. Shared by `add`
+/// and (increment 3) `bet`. Returns the atom id on success, nil if not admitted. Fails-loud
+/// (exit 1) on a seal failure — the entry is logged but the operator must know it went unsealed.
+func logDecision(_ text: String, tag: String) async throws -> UUID? {
     let store = try makeStore()
     try await seedIfEmpty(store)
-    let atom = makeEntry(text, tag: "decision")
-    let admitted = try await store.admit(atom)
-    guard admitted else {
+    let atom = makeEntry(text, tag: tag)
+    guard try await store.admit(atom) else {
         // admit returns false only on an event-ID collision with an already-admitted atom
-        // (each add mints a fresh UUID, so this is effectively unreachable, not a content dedup).
+        // (each call mints a fresh UUID, so this is effectively unreachable, not a content dedup).
         print("(not admitted — event-id collision with an existing entry; retry)")
-        return
+        return nil
     }
     try writeContent(atom.id, text)
     print("logged \(String(atom.id.uuidString.prefix(8)))  \(text)")
@@ -169,6 +171,11 @@ private func cmdAdd(_ text: String) async throws {
              + "ledger: \(error)\n").utf8))
         exit(1)
     }
+    return atom.id
+}
+
+private func cmdAdd(_ text: String) async throws {
+    _ = try await logDecision(text, tag: "decision")
 }
 
 private func cmdRecall(_ query: String?) async throws {
@@ -219,6 +226,9 @@ private func cmdForget(_ prefix: String) async throws {
         return
     }
     print("forgotten \(String(target.id.uuidString.prefix(8)))  (verified gone from projection)")
+    // Increment 3 — the deletion doctrine extends to the trials index: purge any bet rows for
+    // this decision so a forgotten bet's operator-readable text is secure-deleted too.
+    purgeTrialsForAtom(target.id)
     // Increment 2 — seal the forget as an append-only tombstone in the sovereign ledger. The
     // seal survives even though the content is gone: a deleted sovereign entry is provably
     // deleted, not silently vanished. A seal failure is surfaced distinctly (the content is
@@ -244,18 +254,36 @@ private func printHelp() {
     print("""
     qinao-journal — sovereign decision & thread journal (#20 first daily workload)
 
-      add "<text>"       log a decision/thread into event-sourced memory + seal it
-      recall [query]     list entries (optionally filtered), oldest→newest
-      forget <id-prefix> tombstone an entry + verify it is gone (deletion doctrine) + seal it
-      count              how many entries
-      ledger             verify the Ed25519 sovereign chain + show every sealed action
+      add "<text>"        log a decision/thread into event-sourced memory + seal it
+      recall [query]      list entries (optionally filtered), oldest→newest
+      forget <id-prefix>  tombstone an entry + verify it is gone (deletion doctrine) + seal it
+      count               how many entries
+      ledger              verify the Ed25519 sovereign chain + show every sealed action
+
+    "Was I right?" — track ship/drop bets and resolve them with the real outcome:
+      bet "<text>" [-q "<question>"]  log a decision AND open it as a shadow trial
+      review              re-surface open bets, oldest first (the morning check-in)
+      right <trial-id>    you judge the bet right → finalize the trial (seal issued)
+      wrong <trial-id> [reason]   you judge it wrong → finalize (seal denied, retraction queued)
+      verdict <trial-id>  your recorded outcome + the fail-closed promotion gate for a bet
 
     Stored on-device at ~/.qinao-journal/. Zero egress. A mirror, not an oracle.
-    Every add/forget is sealed into an append-only Ed25519 audit ledger (the 3 first-run seed
-    threads are unsealed sample data). Tamper-evident against edits to ledger.sqlite by anyone
-    who lacks identity.key — the private key (0600) sits beside it, so this is CLI-grade, not
-    Secure-Enclave-bound: an attacker who can read the key can forge the chain.
+    Every add/forget/bet + trial outcome is sealed into an append-only Ed25519 audit ledger (the
+    3 first-run seed threads are unsealed sample data). Tamper-evident against edits to
+    ledger.sqlite by anyone who lacks identity.key — the private key (0600) sits beside it, so
+    this is CLI-grade, not Secure-Enclave-bound: an attacker who can read the key can forge it.
     """)
+}
+
+/// Parse `bet` args: everything before a `-q` / `--open-question` flag is the decision text; the
+/// tokens after it are the open question. No flag ⇒ all tokens are the text, no question.
+private func parseBetArgs(_ rest: [String]) -> (text: String, question: String?) {
+    if let flagIdx = rest.firstIndex(where: { $0 == "-q" || $0 == "--open-question" }) {
+        let text = rest[..<flagIdx].joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        let q = rest[(flagIdx + 1)...].joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        return (text, q.isEmpty ? nil : q)
+    }
+    return (rest.joined(separator: " ").trimmingCharacters(in: .whitespaces), nil)
 }
 
 // MARK: - Dispatch
@@ -280,6 +308,22 @@ func runJournal() async {
             try await cmdCount()
         case "ledger":
             try await cmdLedger()
+        case "bet":
+            let (text, question) = parseBetArgs(rest)
+            guard !text.isEmpty else { print("usage: bet \"<text>\" [-q \"<question>\"]"); return }
+            try await cmdBet(text, question: question)
+        case "review":
+            try await cmdReview()
+        case "right":
+            guard let prefix = rest.first, !prefix.isEmpty else { print("usage: right <trial-id>"); return }
+            try await cmdRight(prefix)
+        case "wrong":
+            guard let prefix = rest.first, !prefix.isEmpty else { print("usage: wrong <trial-id> [reason]"); return }
+            let reason = rest.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            try await cmdWrong(prefix, reason: reason.isEmpty ? nil : reason)
+        case "verdict":
+            guard let prefix = rest.first, !prefix.isEmpty else { print("usage: verdict <trial-id>"); return }
+            try await cmdVerdict(prefix)
         case "--help", "-h", "help":
             printHelp()
         default:

@@ -568,6 +568,60 @@ public actor BASShadowTrialCoordinator {
         return finalized
     }
 
+    // MARK: - Cross-process resume (mega-audit 2026-07-08, The Ledger increment 3)
+
+    /// Re-inject a trial that was OPENED in an earlier process so a subsequent public
+    /// `observe()` / `finalize()` can drive it to a terminal state.
+    ///
+    /// WHY THIS EXISTS. The coordinator holds trial state in memory only — its sole ledger use
+    /// is the append-only write in `appendOrThrow`; neither init reads the ledger back, so a
+    /// fresh process starts empty. A host that persists trials across restarts (a daily journal
+    /// opens a bet today and resolves it next week) would therefore hit `.unknownTrial` on
+    /// `finalize`, because the in-memory record died with the opening process. This seam lets
+    /// such a host — which owns the cross-boot persistence — RE-INJECT the persisted open trial
+    /// and its candidate WITHOUT emitting any ledger event, so the later `observe`/`finalize`
+    /// appends only the genuinely new terminal events and every H9 optimistic-concurrency
+    /// guarantee still holds. It is purely additive and opt-in: consumers that never persist +
+    /// resume never call it and stay byte-identical (ADR-014).
+    ///
+    /// Fail-closed guards: the candidate must match the record; the record must still be OPEN
+    /// (pending/observing); and neither the trial nor another active trial for the candidate may
+    /// already be resident — no silent overwrite of live state, no second concurrent trial.
+    public func resumeTrial(
+        candidate: BASExperienceCandidate,
+        record: BASShadowTrialRecord
+    ) async throws {
+        try Self.ensureNonEmpty(candidate.candidateID, label: "candidateID")
+        try Self.ensureNonEmpty(record.trialID, label: "trialID")
+        guard candidate.candidateID == record.candidateRef else {
+            throw TrialError.invalidInput(
+                reason: "candidate.candidateID '\(candidate.candidateID)' != record.candidateRef "
+                    + "'\(record.candidateRef)'")
+        }
+        guard record.isPending else {
+            throw TrialError.trialAlreadyFinalized(
+                id: record.trialID, state: record.completionState)
+        }
+
+        await acquireCandidate(candidate.candidateID)
+        defer { releaseCandidate(candidate.candidateID) }
+
+        // Re-check UNDER the lock (a concurrent op on this candidate may have raced ahead).
+        if trialsByID[record.trialID] != nil {
+            throw TrialError.duplicateTrial(id: record.trialID)
+        }
+        if let active = activeTrialID(for: candidate.candidateID) {
+            throw TrialError.candidateAlreadyHasActiveTrial(
+                candidateID: candidate.candidateID, trialID: active)
+        }
+
+        candidates[candidate.candidateID] = candidate
+        trialsByID[record.trialID] = record
+        var history = trialsByCandidate[candidate.candidateID] ?? []
+        history.append(record)
+        trialsByCandidate[candidate.candidateID] = history
+    }
+
     // MARK: - Read-side
 
     public func candidate(for candidateID: String) -> BASExperienceCandidate? {

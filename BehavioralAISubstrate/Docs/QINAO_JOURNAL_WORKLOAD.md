@@ -88,15 +88,55 @@ Verified end-to-end by `BASJournalCLIIntegrationTests`: add→ledger verifies in
 a tombstone, out-of-band signature tamper exits 1, and out-of-band tail truncation (partial +
 to-empty) exits 1.
 
+## Increment 3 — the "was I right?" ShadowTrial loop (SHIPPED)
+
+`Sources/BASJournalCLI/Trials.swift` + `TrialIndexStore.swift` + the `bet`/`review`/`right`/
+`wrong`/`verdict` commands.
+
+```
+swift run BASJournalCLI bet "DROP sampling-spec: 0.88x" -q "did latency actually regress?"
+swift run BASJournalCLI review                 # open bets, oldest first (the morning check-in)
+swift run BASJournalCLI right <trial-id>       # you judge it right → finalize .passed
+swift run BASJournalCLI wrong <trial-id> [why] # you judge it wrong → finalize .failed
+swift run BASJournalCLI verdict <trial-id>     # your recorded outcome + the promotion gate
+```
+
+A journal DECISION is opened as a shadow TRIAL. Open bets are re-surfaced by `review`; the
+operator records the REAL outcome, fed back through the substrate's **CORRECT public
+`BASShadowTrialCoordinator.finalize()`** (NOT the private `advanceOpenTrial`), firing the
+H9-fixed optimistic-concurrency paths and sealing every event into increment-2's SAME Ed25519
+`ledger.sqlite` (under `journalSessionID`, so `ledger` displays them and the truncation
+high-water check stays correct).
+
+**Key finding — the workload truth-checked the substrate again.** The coordinator holds trial
+state **in memory only**; it appends to the ledger but never reads it back, so a fresh process
+starts blank. That is the digest-only contract from increment 1, one layer up. So (a) the CLI
+owns a `TrialIndexStore` (a `secure_delete`-ON SQLite index of open bets) for cross-boot
+`review`, and (b) the substrate gained a small **opt-in `resumeTrial(candidate:record:)`** seam
+(purely additive, byte-equal for consumers that don't call it) so a later process can re-inject
+a persisted open trial and drive it through the real `finalize()`.
+
+**Honest framing (findings from the adversarial panel, all fixed).** The `verdict` is NOT an
+independent judgment of whether the bet was truly right — the substrate has no window onto the
+world. The OPERATOR records the outcome; the substrate faithfully records + gates it. The
+promotion gate is fail-closed and follows deterministically from the recorded outcome. The
+resolve path is a **single atomic `finalize`** (the reason is a sidecar note, not a second
+ledger append) with a **ledger-authoritative idempotency guard** — a retry after a torn
+finalize/index write reconciles from the chain instead of double-sealing. `forget` now also
+purges the trials index (deletion doctrine).
+
+Verified by `BASShadowTrialCoordinatorTests` (resume + guards) and `BASJournalCLIIntegrationTests`
+(bet→review cross-process, right/wrong fail-closed verdicts, and idempotent-retry-does-not-double-seal).
+
 ## Next increments (planned, not yet built)
 
 - **Increment 2b — the L2 verdict (device).** Route `add` through `runTurnAndIngest` for a
   calibrated verdict/abstention and fold it into the seal's `verdictRef`. Heavy: needs the
   on-device 4B — run on device, one call per entry.
-- **Increment 3 — the "was I right?" loop.** Morning re-surfacing of open decisions feeds
-  real outcomes back via the CORRECT public `observe()`/`finalize()` (NOT the private
-  `advanceOpenTrial`), flipping `setDeliberationLoopEnabled` / `setShadowTrialFeedback` ON —
-  firing ShadowTrial (H9) with real stakes.
+- **Increment 3b — the deliberation-loop toggles.** Wire `setDeliberationLoopEnabled` /
+  `setShadowTrialFeedback` so a live EBrain turn CONSUMES the recorded trial outcomes (the
+  grounding panel found this is Mac-constructible but observation-only / cross-turn, so it buys
+  nothing for a batch CLI until the journal drives live turns). Deferred, stated honestly.
 - **Content store hardening.** Move the content sidecar into a `secure_delete`-ON SQLite
   table (via `BASSQLiteSecureDelete`) for uniform deletion-doctrine coverage.
 

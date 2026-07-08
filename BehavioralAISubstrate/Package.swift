@@ -598,7 +598,12 @@ let package = Package(
             dependencies: [
                 "BASMemory",
                 "BASRuntimeCore",
-                "BASSovereign"
+                "BASSovereign",
+                // increment 3: the ShadowTrial "was I right?" loop. BASOrchestration is the only
+                // module that can see both BASMemory (the coordinator) and BASSovereign (the
+                // ledger), so it hosts the BASSovereignAuditLedger→BASShadowTrialLedger bridge +
+                // the makeWithDefaultStateMachine factory.
+                "BASOrchestration"
             ],
             path: "Sources/BASJournalCLI"),
         .plugin(

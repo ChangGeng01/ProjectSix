@@ -248,5 +248,146 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
             "truncation-to-empty MUST fail closed, not read as a cold start: "
             + "\(afterB.stdout)\(afterB.stderr)")
     }
+
+    // MARK: - Increment 3: the "was I right?" ShadowTrial loop
+
+    /// Extract the first `trial-XXXXXX` id printed by `review` (from "trial-" to whitespace).
+    private func firstTrialID(in review: String) -> String? {
+        for line in review.split(separator: "\n") {
+            guard let r = line.range(of: "trial-") else { continue }
+            return String(line[r.lowerBound...].prefix { !$0.isWhitespace })
+        }
+        return nil
+    }
+
+    /// bet opens a shadow trial; a SEPARATE process lists it via `review` (cross-boot — the
+    /// coordinator is memory-only, so this exercises the CLI-owned open-trials index) and the
+    /// trial event is sealed onto the SAME Ed25519 chain as the journal seals.
+    func testBetOpensTrialAndReviewListsItCrossProcess() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let bet = try run(["bet", "DROP sampling-spec draft", "-q", "did latency regress?"],
+            journalDir: dir)
+        XCTAssertEqual(bet.exit, 0, bet.stdout + bet.stderr)
+        XCTAssertTrue(bet.stdout.contains("bet opened"), "bet must open a trial: \(bet.stdout)")
+
+        // Fresh process reads the open bet back.
+        let review = try run(["review"], journalDir: dir)
+        XCTAssertTrue(review.stdout.contains("DROP sampling-spec draft"),
+            "review must re-surface the open bet cross-process: \(review.stdout)")
+        XCTAssertTrue(review.stdout.contains("did latency regress?"),
+            "review must show the open question: \(review.stdout)")
+
+        // The trial event sealed onto the same chain; chain still verifies.
+        let ledger = try run(["ledger"], journalDir: dir)
+        XCTAssertEqual(ledger.exit, 0, "chain must stay intact with trial events: \(ledger.stderr)")
+        XCTAssertTrue(ledger.stdout.contains("shadow_trial"),
+            "the trial-opened event must be on the sovereign ledger: \(ledger.stdout)")
+    }
+
+    /// `wrong` finalizes via the real public finalize(.failed): the promotion verdict is
+    /// FAIL-CLOSED (denied) and the outcome is recalled by `verdict` cross-process. The bet then
+    /// no longer shows as open.
+    func testWrongFinalizesFailClosedAndVerdictRecalls() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        _ = try run(["bet", "DROP sampling-spec", "-q", "did latency regress?"], journalDir: dir)
+        let tid = firstTrialID(in: try run(["review"], journalDir: dir).stdout)
+        let trialID = try XCTUnwrap(tid, "review must print a trial id")
+
+        let wrong = try run(["wrong", trialID, "latency was flat"], journalDir: dir)
+        XCTAssertEqual(wrong.exit, 0, wrong.stdout + wrong.stderr)
+        XCTAssertTrue(wrong.stdout.contains("WRONG") && wrong.stdout.contains("failed"),
+            "wrong must finalize the trial as failed: \(wrong.stdout)")
+        XCTAssertTrue(wrong.stdout.contains("DENIED"),
+            "a failed trial's promotion verdict must be fail-closed DENIED: \(wrong.stdout)")
+
+        // verdict recalls the recorded outcome + fail-closed reasons cross-process.
+        let verdict = try run(["verdict", trialID], journalDir: dir)
+        XCTAssertTrue(verdict.stdout.contains("failed"), verdict.stdout)
+        XCTAssertTrue(verdict.stdout.contains("latency was flat"),
+            "verdict must show the recorded reason: \(verdict.stdout)")
+
+        // No longer open.
+        let review2 = try run(["review"], journalDir: dir)
+        XCTAssertTrue(review2.stdout.contains("no open bets"),
+            "resolved bet must not remain open: \(review2.stdout)")
+
+        // Chain (now carrying seal-denied + retraction events) still verifies.
+        XCTAssertEqual(try run(["ledger"], journalDir: dir).exit, 0)
+    }
+
+    /// `right` finalizes via finalize(.passed): the promotion verdict is ALLOWED (a genuinely
+    /// passed trial + approved seal — the H9 fail-closed gate's positive-evidence path).
+    func testRightFinalizesAllowedVerdict() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        _ = try run(["bet", "KEEP fused-MTP take-5", "-q", "held 1.20x?"], journalDir: dir)
+        let trialID = try XCTUnwrap(firstTrialID(in: try run(["review"], journalDir: dir).stdout))
+
+        let right = try run(["right", trialID], journalDir: dir)
+        XCTAssertEqual(right.exit, 0, right.stdout + right.stderr)
+        XCTAssertTrue(right.stdout.contains("RIGHT") && right.stdout.contains("passed"),
+            "right must finalize the trial as passed: \(right.stdout)")
+        XCTAssertTrue(right.stdout.contains("ALLOWED"),
+            "a passed trial + approved seal must ALLOW promotion: \(right.stdout)")
+
+        let verdict = try run(["verdict", trialID], journalDir: dir)
+        XCTAssertTrue(verdict.stdout.contains("passed") && verdict.stdout.contains("ALLOWED"),
+            verdict.stdout)
+        XCTAssertEqual(try run(["ledger"], journalDir: dir).exit, 0)
+    }
+
+    /// IDEMPOTENCY (the HIGH review finding): if a resolve's ledger finalize succeeds but the
+    /// sidecar write-back fails, the row is left stale-open. A retry must NOT re-finalize (which
+    /// would double-seal the append-only chain) — it must consult the authoritative ledger, see
+    /// the trial is already terminal, and reconcile. We simulate the torn state by forcing the
+    /// sidecar row back to 'pending' out-of-band, then asserting the retry adds ZERO ledger rows.
+    func testResolveIsIdempotentAgainstTornSidecar() throws {
+        guard sqlite3BinaryURL() != nil else { throw XCTSkip("sqlite3 CLI unavailable") }
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        _ = try run(["bet", "DROP sampling-spec", "-q", "regressed?"], journalDir: dir)
+        let trialID = try XCTUnwrap(firstTrialID(in: try run(["review"], journalDir: dir).stdout))
+        _ = try run(["wrong", trialID, "latency flat"], journalDir: dir)
+
+        let ledgerDB = dir.appendingPathComponent("ledger.sqlite")
+        let indexDB = dir.appendingPathComponent("trials_index.sqlite")
+
+        func ledgerRowCount() throws -> Int {
+            let p = Process(); p.executableURL = sqlite3BinaryURL()
+            p.arguments = [ledgerDB.path, "SELECT COUNT(*) FROM audit_entries;"]
+            let out = Pipe(); p.standardOutput = out; try p.run(); p.waitUntilExit()
+            let s = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            return Int(s.trimmingCharacters(in: .whitespacesAndNewlines)) ?? -1
+        }
+
+        let before = try ledgerRowCount()
+        XCTAssertGreaterThan(before, 0)
+
+        // Simulate the torn state: finalize sealed the terminal event, but the sidecar close
+        // "failed" — force the row back to pending.
+        XCTAssertTrue(try sqlite3Exec(indexDB,
+            "UPDATE trial_index SET state='pending', outcome=NULL;"))
+
+        // Retry: must reconcile, not double-seal.
+        let retry = try run(["wrong", trialID, "retry"], journalDir: dir)
+        XCTAssertEqual(retry.exit, 0)
+        XCTAssertTrue(retry.stdout.contains("already resolved") && retry.stdout.contains("reconciled"),
+            "retry must reconcile from the ledger, not re-finalize: \(retry.stdout)")
+
+        let after = try ledgerRowCount()
+        XCTAssertEqual(after, before,
+            "a reconciled retry MUST NOT append duplicate terminal events (\(before) → \(after))")
+        XCTAssertEqual(try run(["ledger"], journalDir: dir).exit, 0, "chain must remain intact")
+    }
 }
 #endif
