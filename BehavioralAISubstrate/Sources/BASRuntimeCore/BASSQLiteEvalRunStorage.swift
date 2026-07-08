@@ -121,6 +121,11 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
         }
         self.db = handle
 
+        // audit M-c (损坏=空): make the file-header doctrine ("a corrupt store is surfaced rather
+        // than [read as empty]") TRUE for structural corruption — the read paths' `(try? …) ?? []`
+        // could not deliver it. Default-on, fail-closed.
+        try BASSQLiteIntegrity.assertOK(db: handle, store: "eval-run")
+
         try Self.runExec(
             db: handle, sql: "PRAGMA journal_mode=WAL;")
         // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on (kill-switch BAS_SECURE_DELETE=0).

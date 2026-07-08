@@ -142,6 +142,11 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
                 .sqliteOpenFailed(code: openRC, message: msg)
         }
         self.db = opened
+        // audit M-c (损坏=空): surface a structurally-corrupt store at OPEN — the read paths
+        // returned `[]` on any error, mistaking corruption for "no observations" (a risk gate
+        // reading empty is fail-open). Default-on, fail-closed. Runs BEFORE the best-effort
+        // secure_delete pragma — a corrupt file must block open, not silently proceed.
+        try BASSQLiteIntegrity.assertOK(db: opened, store: "risk-observations")
         // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages at delete
         // time so purged risk observations aren't forensically recoverable. Default-on;
         // kill-switch BAS_SECURE_DELETE=0. Best-effort — a failure here must not block open.
