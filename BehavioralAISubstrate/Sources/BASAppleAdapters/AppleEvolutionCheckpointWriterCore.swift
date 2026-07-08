@@ -35,7 +35,8 @@ public enum BASAppleEvolutionCheckpointWriter {
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
         let existing = fetchCheckpoints(in: context) as [Checkpoint]
-        var checkpointsByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.basSnapshot.id, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var checkpointsByID = Dictionary(existing.map { ($0.basSnapshot.id, $0) }, uniquingKeysWith: { _, last in last })
         let latest = canonicalOrder(existing).first?.basSnapshot
 
         if BASEvolutionCheckpointPlanner.shouldDeduplicate(latest: latest, input: input) {
@@ -276,7 +277,8 @@ public enum BASAppleEvolutionCheckpointWriter {
             )
         }
 
-        var checkpointsByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.basSnapshot.id, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var checkpointsByID = Dictionary(existing.map { ($0.basSnapshot.id, $0) }, uniquingKeysWith: { _, last in last })
         context.delete(target)
 
         let replacement = Checkpoint.basMake(from: updatedFields)

@@ -403,7 +403,8 @@ extension BASEBrainTurnResult {
             morphActiveOrganIDs: requiredOrganIDs,
             morphExecutionOrder: executionOrder,
             morphPrecisionRecords: precisionRecords,
-            morphDeviceRouteMap: Dictionary(uniqueKeysWithValues: activeOrgans.map { ($0.rawValue, budgetFrame.deviceRoute.rawValue) }),
+            // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+            morphDeviceRouteMap: Dictionary(activeOrgans.map { ($0.rawValue, budgetFrame.deviceRoute.rawValue) }, uniquingKeysWith: { _, last in last }),
             morphThermalProfile: [
                 "thermal.\(deviceState.thermalLevel.rawValue)",
                 "guard.\(budgetFrame.thermalGuardLevel.rawValue)",

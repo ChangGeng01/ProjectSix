@@ -584,11 +584,15 @@ public enum BASProviderPlanner {
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor]
     ) -> BASProviderSelectionPlan {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let descriptorByID = Dictionary(
-            uniqueKeysWithValues: descriptors.map { ($0.providerID, $0) }
+            descriptors.map { ($0.providerID, $0) },
+            uniquingKeysWith: { first, _ in first }
         )
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let baseIndexByID = Dictionary(
-            uniqueKeysWithValues: baseOrderedProviderIDs.enumerated().map { ($0.element, $0.offset) }
+            baseOrderedProviderIDs.enumerated().map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first }
         )
 
         let compatibleProviderIDs = strategy.map { strategy in

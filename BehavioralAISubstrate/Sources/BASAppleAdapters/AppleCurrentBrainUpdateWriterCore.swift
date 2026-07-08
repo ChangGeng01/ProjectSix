@@ -26,7 +26,8 @@ public enum BASAppleCurrentBrainUpdateWriter {
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleCurrentBrainUpdateWriteResult<Update> {
         let existing = fetchUpdates(in: context) as [Update]
-        var updatesByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.basSnapshot.id, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var updatesByID = Dictionary(existing.map { ($0.basSnapshot.id, $0) }, uniquingKeysWith: { _, last in last })
 
         if let current = updatesByID[fields.id] {
             context.delete(current)

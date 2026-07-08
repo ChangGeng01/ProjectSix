@@ -122,7 +122,8 @@ public enum BASAppleMemoryPersistenceAdapter {
         _ plans: [BASGovernedMemoryWritePlan],
         to existing: [BASExistingGovernedMemorySnapshot]
     ) -> [BASExistingGovernedMemorySnapshot] {
-        var recordsByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var recordsByID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         for plan in plans {
             switch plan.operation {
             case .delete:
@@ -140,7 +141,8 @@ public enum BASAppleMemoryPersistenceAdapter {
         _ plans: [BASCandidateMemoryWritePlan],
         to existing: [BASExistingCandidateMemorySnapshot]
     ) -> [BASExistingCandidateMemorySnapshot] {
-        var candidatesByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var candidatesByID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         for plan in plans {
             switch plan.operation {
             case .delete:

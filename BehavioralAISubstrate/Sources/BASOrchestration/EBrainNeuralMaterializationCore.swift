@@ -137,7 +137,8 @@ public enum BASNeuralMaterializationCompiler {
         riskLevelResolver: @Sendable (Double) -> BASBrainRiskLevel
     ) -> [BASRiskPermitBinding] {
         let critiqueLookup = Dictionary(grouping: thoughtFrame.critiques, by: \.candidateID)
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
 
         return thoughtFrame.candidates.map { candidate in
             let critiques = critiqueLookup[candidate.candidateID] ?? []
@@ -282,7 +283,8 @@ public enum BASNeuralMaterializationCompiler {
             return nil
         }
 
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
         let critiqueLookup = Dictionary(grouping: thoughtFrame.critiques, by: \.candidateID)
         let candidateIDs = thoughtFrame.candidates.map(\.candidateID)
         // chapter 八百三十八 / M2843 — L9 dominance order routed to
@@ -394,14 +396,16 @@ public enum BASNeuralMaterializationCompiler {
         let sessionID = thoughtFrame.decomposeRef
         let emittedAt = Date()
 
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let candidateByID = Dictionary(
-            uniqueKeysWithValues:
-                thoughtFrame.candidates.map { ($0.candidateID, $0) })
+            thoughtFrame.candidates.map { ($0.candidateID, $0) },
+            uniquingKeysWith: { first, _ in first })
         let dominanceOrder = frontier.dominanceOrder
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let dominanceRank = Dictionary(
-            uniqueKeysWithValues:
-                dominanceOrder.enumerated()
-                .map { ($0.element, $0.offset) })
+            dominanceOrder.enumerated()
+                .map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first })
         let reversibleSet = Set(frontier.reversiblePaths)
         let guardSet = Set(frontier.guardPaths)
         let delayedSet = Set(frontier.delayedPaths)
@@ -555,8 +559,10 @@ public enum BASNeuralMaterializationCompiler {
         from thoughtFrame: BASThoughtFrame,
         critiqueBundles: [BASCritiqueBundle]?
     ) -> BASUncertaintyLedger? {
-        let critiqueLookup = Dictionary(uniqueKeysWithValues: (critiqueBundles ?? []).map { ($0.candidateID, $0) })
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let critiqueLookup = Dictionary((critiqueBundles ?? []).map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
         let unresolvedUnknowns = unique(
             thoughtFrame.candidates.flatMap(\.requiredEvidence).filter { !$0.isEmpty }
         )
@@ -609,7 +615,8 @@ public enum BASNeuralMaterializationCompiler {
             return nil
         }
 
-        let critiqueLookup = Dictionary(uniqueKeysWithValues: (critiqueBundles ?? []).map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let critiqueLookup = Dictionary((critiqueBundles ?? []).map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
 
         return thoughtFrame.candidates.map { candidate in
             let critiqueBundle = critiqueLookup[candidate.candidateID]
@@ -774,7 +781,8 @@ public enum BASNeuralMaterializationCompiler {
             return nil
         }
 
-        let candidateLookup = Dictionary(uniqueKeysWithValues: candidates.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let candidateLookup = Dictionary(candidates.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
         let ordered = frontier.dominanceOrder.compactMap { candidateLookup[$0] }
         let seenIDs = Set(ordered.map(\.candidateID))
         let remaining = candidates.filter { !seenIDs.contains($0.candidateID) }

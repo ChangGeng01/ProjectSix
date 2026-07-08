@@ -227,8 +227,10 @@ public enum BASMemoryReconciler {
     public static func plan(
         _ request: BASMemoryReconciliationRequest
     ) -> BASMemoryReconciliationPlan {
-        var recordsByID = Dictionary(uniqueKeysWithValues: request.existingRecords.map { ($0.id, $0) })
-        var candidatesByID = Dictionary(uniqueKeysWithValues: request.existingCandidates.map { ($0.id, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var recordsByID = Dictionary(request.existingRecords.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var candidatesByID = Dictionary(request.existingCandidates.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         var recordPlansByID: [String: BASGovernedMemoryWritePlan] = [:]
         var candidatePlansByID: [String: BASCandidateMemoryWritePlan] = [:]
         var seenDraftIDs = Set<String>()

@@ -144,7 +144,8 @@ extension BASEBrainRuntimeCoordinator {
         actionPermit: BASActionPermit
     ) -> [BASRiskPermitBinding] {
         let critiqueLookup = Dictionary(grouping: thoughtFrame.critiques, by: \.candidateID)
-        let forecastLookup = Dictionary(uniqueKeysWithValues: thoughtFrame.forecasts.map { ($0.candidateID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let forecastLookup = Dictionary(thoughtFrame.forecasts.map { ($0.candidateID, $0) }, uniquingKeysWith: { first, _ in first })
 
         return thoughtFrame.candidates.map { candidate in
             let critiques = critiqueLookup[candidate.candidateID] ?? []

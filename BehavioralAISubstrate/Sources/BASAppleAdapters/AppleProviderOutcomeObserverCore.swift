@@ -300,8 +300,9 @@ public enum BASAppleHostProviderObservationBridge {
         activeResolutionDetail: (Descriptor) -> String?,
         activeBackendID: (Descriptor) -> String?
     ) -> [String: BASAppleProviderProfile] {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         Dictionary(
-            uniqueKeysWithValues: descriptors.map { descriptor in
+            descriptors.map { descriptor in
                 let id = providerID(descriptor)
                 return (
                     id,
@@ -312,7 +313,8 @@ public enum BASAppleHostProviderObservationBridge {
                         activeBackendID: activeBackendID(descriptor)
                     )
                 )
-            }
+            },
+            uniquingKeysWith: { first, _ in first }
         )
     }
 

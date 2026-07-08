@@ -74,8 +74,10 @@ public enum BASAgentMergeApplier {
         agents: [String: BASAgentSpec],
         graph: BASSharedStateGraph
     ) async -> [BASAgentDeltaApplicationOutcome] {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let deltaByID = Dictionary(
-            uniqueKeysWithValues: deltas.map { ($0.deltaID, $0) })
+            deltas.map { ($0.deltaID, $0) },
+            uniquingKeysWith: { first, _ in first })
         var outcomes: [BASAgentDeltaApplicationOutcome] = []
         // Strip "delta:" prefix used by mergeResult
         let acceptedIDs = mergeResult.acceptedDeltaIDs.map {

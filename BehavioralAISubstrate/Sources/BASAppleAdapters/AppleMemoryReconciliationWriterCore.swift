@@ -53,8 +53,10 @@ public enum BASAppleMemoryReconciliationWriter {
             )
         )
 
-        var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.basID, $0) })
-        var candidatesByID = Dictionary(uniqueKeysWithValues: existingCandidates.map { ($0.basID, $0) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var recordsByID = Dictionary(existingRecords.map { ($0.basID, $0) }, uniquingKeysWith: { _, last in last })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        var candidatesByID = Dictionary(existingCandidates.map { ($0.basID, $0) }, uniquingKeysWith: { _, last in last })
 
         for mutation in outcome.recordMutations {
             apply(mutation, in: context, recordsByID: &recordsByID)
@@ -148,8 +150,10 @@ public enum BASAppleMemoryReconciliationWriter {
         _ records: [Record],
         orderedRecordIDs: [String]
     ) -> [Record] {
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
         let ordering = Dictionary(
-            uniqueKeysWithValues: orderedRecordIDs.enumerated().map { ($0.element, $0.offset) }
+            orderedRecordIDs.enumerated().map { ($0.element, $0.offset) },
+            uniquingKeysWith: { first, _ in first }
         )
         return records.sorted { lhs, rhs in
             let lhsIndex = ordering[lhs.basID] ?? Int.max

@@ -334,7 +334,8 @@ extension BASEBrainTurnResult {
                 + hotColdMap.coldOrgans.filter { $0 == .hostModulationMesh || $0 == .toolIntentMesh }
         )
         let downgradeTier: BASNeuralPrecisionTier = predictedBand == "critical" ? .minimal : .balanced
-        let currentTiers = Dictionary(uniqueKeysWithValues: precisionMap.map { ($0.organ, $0.tier) })
+        // audit H17: uniquing-guard — was Dictionary(uniqueKeysWithValues:), traps on duplicate key
+        let currentTiers = Dictionary(precisionMap.map { ($0.organ, $0.tier) }, uniquingKeysWith: { first, _ in first })
 
         return candidateOrgans.compactMap { organ in
             guard protectedOrgans.contains(organ) == false else { return nil }
