@@ -289,7 +289,17 @@
     3 个 testWalkR*FromJudgement 读+改 ambient /tmp/gdn_coreai 状态(非 hermetic)→ BAS_B2_LOOP=1 门控,默认套件不碰 /tmp。
     ★方法:先造带 teeth 的共享 helper(防"用新恒真替旧恒真")+ 单文件模板验证 → 才扇出;扇出只改不构(构建是串行资源)→
     单次验证构建 + 迭代修(仅 1 处漏 import)。★发现:agreement-oracle(同量两算比对)是 perf 测的最强真锚。
-19. KG codec 上生产前重建 XCFramework（M-n）。
+19. **KG codec 上生产前重建 XCFramework**（M-n）— **DONE(2026-07-08,重建由 #14 承载 + 端到端验证 + 回归 pin)**。
+    M-n = 纯二进制漂移:06-14 `canonicalize_weight()` 把 -0.0→+0.0 的修在 Rust 源里,但发船的
+    `BASRustMemoryTracker.xcframework` 是 06-11 build(先于修)→该修**生产可达性零**(canonical-bytes 重放
+    等价被破:-0.0 符号位存活令同权重编码不一致)。★**关键**:#14 的 XCFramework 双冷重建(07-08,commit
+    d92aeeffc)编译的是**当前全源**,已把 06-14 修(及自 06-11 起的一切源漂移)带入发船二进制——M-n 的重建
+    已由 #14 顺带完成,无需再建(再建 byte-identical,复现性已验)。#19 做**端到端验证 + 回归 pin**:新增
+    2 个 Swift FFI 测(BASChapter744)——经 FFI 打进现committed 二进制,断 **-0.0 与 +0.0 编码字节相同**
+    (旧二进制会因 -0.0 符号位存活而不同 → 测会红)+ 任意 NaN payload 归一到一个 quiet NaN,双双通过=修在发船
+    二进制里 live。cargo codec 测 44 绿 + AutoRouteRanker 套 132 绿。★教训:二进制漂移类审计项(源已修但发船
+    二进制陈旧)的正确闭环 = 重建(可由邻近项顺带)+ **经 FFI 打进committed 二进制的端到端 pin**(源级测抓不到
+    漂移;唯有走真二进制的测能钉),否则"生产可达性零"会静默复发。
 20. **补审下一轮**（本轮结构性盲区,见 §7）：跨设备 CRDT/gossip 主权真实性、Contradiction/Unknown 两个 P2 账本 store、Rust↔Swift 状态机迁移等价性、L3-L14 投影/协议业务逻辑层、test↔production 对应完整性。
 
 ---
