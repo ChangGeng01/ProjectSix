@@ -131,20 +131,20 @@ public enum BASRustCoreBridge {
     ///     (+`bas_ranker_decayed_fuse_batch` + force-link anchor;cold ×2
     ///     byte-identical again)。
     public static let macosArm64SliceSHA256: String =
-        "c798eaa2683cd52d96ff3cefca3db0de15201b01c5caa0c3cac51e749de3e896"
+        "5a1acd536d7820295051e47d114dcd7d3913bd1f26c3e7ea7c3ed43f09e8ce9a"
 
     /// XCFramework ios-arm64 slice byte-equality SHA256。
     /// Bumped: chapter 七百八十三 / M2566 (+atom-lifecycle); "latest-languages"
     /// cut (Rust 1.96 + iOS-18 deployment-target pin); 全面进化 T2.1a
     /// (canonical-bytes ABI v2 + cold-rebuild reproducibility pin)。
     public static let iosArm64SliceSHA256: String =
-        "f2312c63a277c7a882d3a30e66b583af6ff9e4f928ad72bd0a066ea5d11b8df5"
+        "71bc70d54a96925c217078e22d2deb3d34a65b72de6eef8a90642769fb3ceea1"
 
     /// XCFramework ios-arm64-simulator slice byte-equality
     /// SHA256。 Bumped: chapter 七百八十三 / M2566; "latest-languages" cut;
     /// 全面进化 T2.1a (canonical-bytes ABI v2 + cold-rebuild pin)。
     public static let iosArm64SimulatorSliceSHA256: String =
-        "d400251824c468129eaa9e9f2e23c82530b17419f1cba6e8b3e2515b4a191f08"
+        "d3066db02bcbca815fc85749d63f37b1a081912b36775d4219a36a164fa5529d"
 
     /// Total per-slice SHA256 count = shippedSlices
     /// .count。 Cross-mirror invariant pinned in tests

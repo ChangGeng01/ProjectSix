@@ -1829,6 +1829,20 @@ int32_t bas_l8_event_log_events_since_ts(
     uint8_t* out_buf,
     size_t out_capacity);
 
+// H10 (mega-audit, 2026-07-08) — cursor-paginated session read. Returns events with
+// sequence_number > after_seq (ascending, up to `limit`, clamped to [1, 100000]). Loop with
+// after_seq advanced to the last seq of each batch until a batch returns < limit events, to
+// read the FULL history in bounded allocations. The un-paginated events_for_session variant
+// caps at the oldest 100k events, silently dropping late removed/quarantined events and
+// resurrecting deleted atoms; this variant is immune. Two-call size-probe protocol.
+int32_t bas_l8_event_log_events_for_session_page(
+    const L8Engine* engine,
+    const char* session_id_utf8, size_t session_id_len,
+    int64_t after_seq,
+    int64_t limit,
+    uint8_t* out_buf,
+    size_t out_capacity);
+
 // MARK: - bas-l8-engine memory_usage_records module
 // (chapter 九百二 / M3200 — HIGH-risk migration #2 SCOPED:
 //  records-table-only subset of BASMemoryUsageTracker)

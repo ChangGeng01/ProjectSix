@@ -234,7 +234,24 @@
     5/5 零缺陷 high**(无死锁/无残留 check-then-act/finalize 原子/F8 零破坏调用者/主权桥 byte-equal 保);
     诚实边界:append-only ledger 不可回滚,seal-fail 后重试会双 append trial_finalized+烧 seal ID(已文档化
     权衡,胜过旧的静默丢撤回令);续体无取消处理=与认证基座原语同性质非本修引入。现有 34 ShadowTrial 测零回归。
-14. Rust event log 100k 截断分页（H10,含 XCFramework 重建,1d）。
+14. **Rust event log 100k 截断分页**（H10）— **DONE(2026-07-08,Rust TDD+XCFramework 双冷重建 byte-equal+Swift 分页+Opus 审查)**。
+    病:`events_for_session_json` LIMIT MAX_HOTPATH_LIMIT(100k)只读最旧 10 万事件→固定 sessionID 超 10 万后,
+    某原子的 removed/quarantined 落 seq>100k 被静默丢→投影以删前 governed 态**复活**已删原子(删除教义/主权违规)。
+    **修**:①Rust `events_for_session_page_json(after_seq,limit)` 游标分页(seq>after_seq ASC,limit 夹 [1,100000])
+    + FFI `bas_l8_event_log_events_for_session_page`(两段式尺寸探测)+ C 头声明(force_link 靠既有
+    bas_l8_engine_abi_version 锚+codegen-units=1 整体链接自动保留同 crate 符号,nm 已验)。②Swift
+    `eventsArrayViaJsonFfi` 会话路改**游标循环**(afterSeq=-1 起,进到 last.sequenceNumber,页<10000 止)——读全史
+    有界分配,任何 late 治理事件都不漏。③cargo TDD(游标读全尾+排他+越界空+夹紧,110 crate 测零回归);
+    ④XCFramework **两次冷重建 byte-identical**(macos slice run1==run2 复现性铁律满足)→3 SHA pin(源常量+测字面各 3)更新。
+    Swift 分页测(pageSize=2 强制多页,late 事件必在+升序无重)+70 event-log 回归绿。**★Opus 4 员对抗审查抓真缺陷
+    (2 员汇聚,已修)**:Swift 循环终止条件 `page.count < pageSize` 是 **fail-OPEN**——`fetchSessionPage` 对任何错误
+    (FFI 负码 / 一行 decode 失败)都返 `[]`,循环把"错误页"当"流末"→静默截断尾部→**经错误路径重新引入 H10 复活**。
+    修:`fetchSessionPage` 返 `[BASEventLogEntry]?`(nil=读错,[]=真空页,靠 needed≥2/written≥2 区分);循环仅在**真空页**
+    终止(短非空页续读一次,修 DEFECT2 空 payload 早停)、读错→整读 **fail-CLOSED 到空**(空投影不复活任何原子,partial 会)。
+    审查确认核心(复活已治愈+升序+FFI/ABI 安全+复现性 pin)全稳;acc 数组随会话增长的 OOM 迁移是留册权衡(流式 fold 是更优未来项)。★权衡(诚实):旧代码"错但有界"
+    (丢事件避 OOM)→新"对但随会话增长"(投影需全事件才正确;单次 Rust String 分配仍每页有界 10k,消除巨串 OOM;
+    Swift acc 数组随会话规模增长是正确投影的固有代价,>100k 会话曾给错答案)。SOURCE_DATE_EPOCH=git 提交时;
+    pin 取自提交前重建,提交后同源码同 SDE 重建应 byte-identical。
 15. **热表示统一**（x-arch MED-1）— **DONE(2026-07-08,TDD 8 门)**。★根因比审计更深:`thermalState:
     String` 被两生产者喂**非热数据**——`AppleInspectionBridgeCore:202` 塞 `environmentClass.rawValue`
     ({simulator,lowPower,memoryConstrained,normal})、`AppleAdaptiveRuntimeAdapterCore:227` 塞

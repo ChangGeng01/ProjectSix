@@ -709,6 +709,50 @@ pub fn events_for_session_json(
     Ok(out)
 }
 
+/// H10 (mega-audit, 2026-07-08) — CURSOR-PAGINATED session read.
+///
+/// `events_for_session_json` reads only the OLDEST `MAX_HOTPATH_LIMIT` (100k) events for a
+/// session (ORDER BY sequence_number ASC LIMIT N). For a long-lived session that exceeds
+/// 100k events, an atom's `removed`/`quarantined` event lands at seq > 100k and is silently
+/// dropped from the read — so the event-source projection REVIVES the atom in its pre-
+/// deletion `governed` state (a deletion-doctrine / sovereignty violation, and pure silent
+/// truncation with no partial flag).
+///
+/// This variant returns the batch of events with `sequence_number > after_seq`, ordered
+/// ascending, up to `limit` rows. A caller loops with `after_seq` advanced to the last seq
+/// of each batch until a batch returns fewer than `limit` rows — reading the ENTIRE history
+/// in bounded allocations, so no governance event is ever missed regardless of session size.
+/// `limit` is clamped to `[1, MAX_HOTPATH_LIMIT]` to keep each FFI String allocation bounded.
+pub fn events_for_session_page_json(
+    conn: &Connection,
+    session_id: &str,
+    after_seq: i64,
+    limit: i64,
+) -> rusqlite::Result<String> {
+    let bounded_limit = if limit <= 0 { 1 }
+        else if limit as usize > crate::MAX_HOTPATH_LIMIT {
+            crate::MAX_HOTPATH_LIMIT as i64
+        } else { limit };
+    let mut stmt = conn.prepare(
+        "SELECT payload_json, sequence_number FROM event_log \
+         WHERE session_id = ? AND payload_format = 1 AND sequence_number > ? \
+         ORDER BY sequence_number \
+         LIMIT ?")?;
+    let mut rows = stmt.query(params![session_id, after_seq, bounded_limit])?;
+    let mut out = String::from("[");
+    let mut first = true;
+    while let Some(row) = rows.next()? {
+        let pj: String = row.get(0)?;
+        let seq: i64 = row.get(1)?;
+        if pj.is_empty() { continue; }
+        if !first { out.push(','); }
+        first = false;
+        out.push_str(&splice_sequence_number(&pj, seq));
+    }
+    out.push(']');
+    Ok(out)
+}
+
 pub fn events_since_timestamp_json(
     conn: &Connection,
     since_ms: i64,
@@ -813,6 +857,47 @@ pub unsafe extern "C" fn bas_l8_event_log_events_since_ts(
         std::ptr::null(), 0,
         since_ms, limit,
         out_buf, out_capacity)
+}
+
+/// H10 (mega-audit, 2026-07-08) — FFI for the cursor-paginated session read. Returns the
+/// batch of events with `sequence_number > after_seq` (ascending, up to `limit`). Two-call
+/// protocol: pass `out_buf = null` / `out_capacity = 0` to learn the needed byte count,
+/// then call again with a buffer. The Swift caller loops, advancing `after_seq` to the last
+/// seq of each batch, until a batch returns fewer than `limit` events — a full-history read
+/// with bounded allocations, immune to the 100k truncation that resurrected deleted atoms.
+#[no_mangle]
+pub unsafe extern "C" fn bas_l8_event_log_events_for_session_page(
+    engine: *const L8Engine,
+    session_id_utf8: *const c_char, session_id_len: usize,
+    after_seq: i64,
+    limit: i64,
+    out_buf: *mut u8,
+    out_capacity: usize,
+) -> i32 {
+    if engine.is_null() { return -1; }
+    let engine_ref = unsafe { &*engine };
+    let key = match crate::cstr_to_str(session_id_utf8, session_id_len) {
+        Some(s) => s, None => return -3,
+    };
+    let json_result = engine_ref.with_conn(|conn| {
+        events_for_session_page_json(conn, key, after_seq, limit)
+    });
+    let json = match json_result {
+        Ok(s) => s, Err(_) => return -2,
+    };
+    let bytes = json.as_bytes();
+    let needed = bytes.len();
+    let safe_needed = match crate::safe_i32_size(needed) {
+        Ok(n) => n, Err(c) => return c,
+    };
+    if out_buf.is_null() || out_capacity == 0 {
+        return safe_needed;
+    }
+    if out_capacity < needed { return -3; }
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), out_buf, needed);
+    }
+    safe_needed
 }
 
 // MARK: - Tests (careful coverage of HIGH-risk semantics)
@@ -1282,6 +1367,69 @@ mod tests {
                 conn, 0, i64::MAX).unwrap();
             // No assertion on content — just verify no panic
             // and clean return when result is empty
+        });
+        unsafe { bas_l8_engine_close(engine); }
+    }
+
+    // H10 (mega-audit, 2026-07-08) — cursor pagination reads the FULL session history,
+    // including late governance events that the 100k single-shot LIMIT would drop.
+    #[test]
+    fn session_page_cursor_reads_full_tail() {
+        let engine = make_engine();
+        let _ = unsafe { bas_l8_event_log_init_schema(engine) };
+        let engine_ref = unsafe { &*engine };
+        engine_ref.with_conn(|conn| {
+            // 5 events for one session (seq 0..4); the LAST is a "removed" event —
+            // exactly the kind that lands past the cap in a long session and gets lost.
+            for (i, kind) in ["created", "governed", "touched", "touched", "removed"]
+                .iter().enumerate()
+            {
+                // `idx` is a per-event marker the read returns verbatim (used to check
+                // cursor exclusivity); `sequenceNumber` is the field splice populates.
+                let (was_new, _) = append_event(
+                    conn, &format!("ev-{i}"), "long-sess",
+                    100 + i as i64, kind, "rb",
+                    &format!("{{\"kind\":\"{kind}\",\"idx\":{i},\"sequenceNumber\":0}}"), 1, None).unwrap();
+                assert!(was_new);
+            }
+
+            // Page with limit=2, cursor starts BELOW 0 so seq 0 is included (exclusive `>`).
+            let mut after: i64 = -1;
+            let mut all = String::new();
+            let mut pages = 0;
+            loop {
+                let page = events_for_session_page_json(conn, "long-sess", after, 2).unwrap();
+                pages += 1;
+                let count = page.matches("\"kind\"").count();
+                all.push_str(&page);
+                if count < 2 { break; }
+                // Advance cursor to the highest seq in this page.
+                after += 2;
+                assert!(pages < 10, "pagination did not terminate");
+            }
+            assert_eq!(pages, 3, "5 events / batch 2 → pages of 2,2,1");
+            // The CRUX: the late `removed` event (seq 4) is present via pagination — the
+            // resurrection bug is that a capped single-shot read would have dropped it.
+            assert!(all.contains("\"kind\":\"removed\""),
+                "late removed event must be read by pagination (H10 resurrection guard)");
+            assert!(all.contains("\"kind\":\"created\""), "first event also present");
+            assert_eq!(all.matches("\"kind\"").count(), 5, "all 5 events read exactly once");
+
+            // Cursor is EXCLUSIVE: after_seq=1 skips seq 0,1 (idx 0,1) and returns seq 2,3.
+            let mid = events_for_session_page_json(conn, "long-sess", 1, 2).unwrap();
+            assert!(!mid.contains("\"idx\":0"), "cursor>1 must skip seq 0");
+            assert!(!mid.contains("\"idx\":1"), "cursor>1 must skip seq 1");
+            assert!(mid.contains("\"idx\":2") && mid.contains("\"idx\":3"), "cursor>1 returns seq 2,3");
+            // splice populates the authoritative seq: seq 2's payload reads sequenceNumber:2.
+            assert!(mid.contains("\"sequenceNumber\":2"), "splice writes the real seq on read-back");
+
+            // Past the end → empty batch.
+            let empty = events_for_session_page_json(conn, "long-sess", 4, 2).unwrap();
+            assert_eq!(empty, "[]");
+
+            // limit is clamped to >= 1 (a 0/negative limit must not silently read nothing-forever).
+            let clamped = events_for_session_page_json(conn, "long-sess", -1, 0).unwrap();
+            assert_eq!(clamped.matches("\"kind\"").count(), 1, "limit<=0 clamps to 1");
         });
         unsafe { bas_l8_engine_close(engine); }
     }
