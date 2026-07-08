@@ -43,7 +43,12 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // audit H18: cancel the PRODUCER task on stream termination. The docstring above says
+            // "just cancel the enclosing task" — but cancelling the CONSUMER task only exits the
+            // consumer's for-await; the producer Task here is unstructured, so without
+            // onTermination it kept pumping FoundationModels to completion. This makes the
+            // documented cancellation actually true on the producer side too.
+            let task = Task {
                 guard
                     descriptor.supportedRoles.contains(request.role)
                 else {
@@ -78,6 +83,7 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
                             "unavailable in this build"))
                 #endif
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 

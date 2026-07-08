@@ -109,11 +109,16 @@ extension BASAdjudicatingOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // audit H18: capture the pump Task + cancel it on stream termination. Without
+            // onTermination, a consumer that cancels/stops iterating leaks this Task — the inner
+            // LLM decode / network pump keeps running to completion. checkCancellation stops the
+            // yield loop promptly when the consumer is gone.
+            let task = Task {
                 do {
                     let adjudicatedRequest = await self.adjudicated(request)
                     if let streamingInner = self.inner as? BASStreamingOrganAdapter {
                         for try await chunk in streamingInner.streamDraft(adjudicatedRequest) {
+                            try Task.checkCancellation()
                             continuation.yield(chunk)
                         }
                     } else {
@@ -131,6 +136,7 @@ extension BASAdjudicatingOrganAdapter: BASStreamingOrganAdapter {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 }

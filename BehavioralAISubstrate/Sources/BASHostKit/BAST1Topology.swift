@@ -57,7 +57,8 @@ public final class BASCountingOrganAdapter: BASOrganAdapter, BASStreamingOrganAd
     public func streamDraft(_ request: BASOrganRequest) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         guard let streaming = inner as? BASStreamingOrganAdapter else {
             return AsyncThrowingStream { continuation in
-                Task {
+                // audit H18: cancel the pump on stream termination (consumer cancel must not leak it).
+                let task = Task {
                     do {
                         await self.counter.increment()
                         let draft = try await self.inner.draft(request)
@@ -67,16 +68,22 @@ public final class BASCountingOrganAdapter: BASOrganAdapter, BASStreamingOrganAd
                         continuation.finish()
                     } catch { continuation.finish(throwing: error) }
                 }
+                continuation.onTermination = { @Sendable _ in task.cancel() }
             }
         }
         return AsyncThrowingStream { continuation in
-            Task {
+            // audit H18: cancel the pump on stream termination + stop yielding promptly on cancel.
+            let task = Task {
                 await self.counter.increment()
                 do {
-                    for try await chunk in streaming.streamDraft(request) { continuation.yield(chunk) }
+                    for try await chunk in streaming.streamDraft(request) {
+                        try Task.checkCancellation()
+                        continuation.yield(chunk)
+                    }
                     continuation.finish()
                 } catch { continuation.finish(throwing: error) }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 }

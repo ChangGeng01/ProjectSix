@@ -39,7 +39,10 @@ extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // audit H18: cancel the pump on stream termination, else a consumer cancel leaks the
+            // SSE network pump (it keeps reading to completion). onTermination propagates
+            // cooperative cancellation into `streamViaSSE`'s await points (URLSession honors it).
+            let task = Task {
                 guard
                     descriptor.supportedRoles.contains(request.role)
                 else {
@@ -64,6 +67,7 @@ extension BASChatCompletionsOrganAdapter: BASStreamingOrganAdapter {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 

@@ -207,7 +207,9 @@ extension BASSemanticAdjudicatingOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // audit H18: capture the pump Task + cancel it on stream termination, else a consumer
+            // cancel leaks the inner LLM decode / network pump (it runs to completion unwatched).
+            let task = Task {
                 do {
                     // P1(c): a covered-and-confident short-circuit ends the stream with ONE terminal chunk —
                     // the LLM never runs (opt-in; nil → unchanged behavior).
@@ -227,6 +229,7 @@ extension BASSemanticAdjudicatingOrganAdapter: BASStreamingOrganAdapter {
                     let adjudicatedRequest = await self.adjudicated(request)
                     if let streamingInner = self.inner as? BASStreamingOrganAdapter {
                         for try await chunk in streamingInner.streamDraft(adjudicatedRequest) {
+                            try Task.checkCancellation()
                             continuation.yield(chunk)
                         }
                     } else {
@@ -245,6 +248,7 @@ extension BASSemanticAdjudicatingOrganAdapter: BASStreamingOrganAdapter {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 }

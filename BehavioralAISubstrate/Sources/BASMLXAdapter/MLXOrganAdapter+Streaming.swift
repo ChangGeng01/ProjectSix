@@ -26,7 +26,10 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
         _ request: BASOrganRequest
     ) -> AsyncThrowingStream<BASOrganDraftChunk, Error> {
         AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            // audit H18: cancel the pump on stream termination, else a consumer cancel leaks the
+            // MLX decode loop (it runs to completion unwatched). onTermination propagates
+            // cooperative cancellation into `_streamDraft`'s await points.
+            let task = Task { [weak self] in
                 guard let self = self else {
                     continuation.finish()
                     return
@@ -40,6 +43,7 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
