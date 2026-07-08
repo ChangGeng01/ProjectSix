@@ -74,6 +74,21 @@ import BASRuntimeCore
 
 public actor BASAgentTraceLogEventLogBridge {
 
+    /// audit M-l / orchestration MED-4: `recordEvent` appends to the traceLog FIRST, then the
+    /// durable eventLog. If the eventLog throws, the traceLog write already committed and the bare
+    /// rethrow HID that partial state — a caller could not tell whether the traceLog was written,
+    /// and a naive retry double-writes it. This carries the orphaned traceSeq so the partial commit
+    /// is EXPLICIT and reconcilable (the eventLog is missing the event at this traceSeq).
+    public struct PartialWriteError: Error, Sendable, CustomStringConvertible {
+        public let orphanedTraceSeq: Int64
+        public let underlying: any Error
+        public var description: String {
+            "BASAgentTraceLogEventLogBridge: traceLog committed at seq \(orphanedTraceSeq) but the "
+                + "eventLog write failed (\(underlying)) — the durable log is missing this event; "
+                + "reconcile rather than blindly retry (retry re-appends the traceLog)."
+        }
+    }
+
     private let traceLog: BASAgentTraceLog
     private let eventLog: any BASEventLogStorage
     private let sessionID: String
@@ -112,7 +127,14 @@ public actor BASAgentTraceLogEventLogBridge {
             payloadJson: event.payloadJson)
         let logEntry = Self.synthesizeEventLogEntry(
             traceEvent: stamped, sessionID: sessionID)
-        let result = try await eventLog.append(logEntry)
+        // audit M-l / orchestration MED-4: the traceLog is already committed at `traceSeq`. If the
+        // durable write fails, surface the orphaned seq instead of a bare rethrow that hides it.
+        let result: (wasNew: Bool, assignedSequenceNumber: Int64)
+        do {
+            result = try await eventLog.append(logEntry)
+        } catch {
+            throw PartialWriteError(orphanedTraceSeq: traceSeq, underlying: error)
+        }
         return (traceSeq: traceSeq, eventLogResult: result)
     }
 

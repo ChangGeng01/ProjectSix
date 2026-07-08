@@ -137,12 +137,18 @@ public enum BASMCPInvocationAuditBridge {
         // `validation` are non-empty when permit allows tools。
         // This makes the parameter behaviorally-checked rather
         // than syntactically-discarded。
-        precondition(
-            !validation.accepted ||
-            !validation.auditRefs.isEmpty,
-            "ch 1010.6 MED-5: accepted invocation MUST produce " +
-            "non-empty auditRefs from the permit gate — empty " +
-            "refs on accept indicate a gate-internal bug")
+        // audit M-l / orchestration MED-1: this used to `precondition(accepted → !auditRefs.empty)`
+        // — a feedable PROCESS CRASH on a caller-supplied validation tuple. An audit bridge must
+        // NEVER take down the sovereign process on a downstream gate bug; the fail-safe is to
+        // RECORD the anomaly in the (tamper-evident) audit trail, not lose the whole process. Byte-
+        // equal for every normal case (accepted-with-refs / rejected); only the anomalous
+        // accepted-with-empty-refs case changes from a trap to a recorded diagnostic signalRef.
+        let signalRefs: [String]
+        if validation.accepted && validation.auditRefs.isEmpty {
+            signalRefs = ["anomaly\(sep)accepted-with-empty-auditRefs\(sep)gate-internal-bug"]
+        } else {
+            signalRefs = validation.auditRefs
+        }
         _ = permit  // intentionally unused — kept in signature
         // for caller-doc clarity (the permit IS the gate the
         // decision was made against);its fields are already
@@ -160,7 +166,7 @@ public enum BASMCPInvocationAuditBridge {
             turnID: turnID,
             verdictRef: verdictRef,
             ruleIDs: [],
-            signalRefs: validation.auditRefs,
+            signalRefs: signalRefs,
             actionRefs: [],
             snapshotRef: "",
             actor: .system,
