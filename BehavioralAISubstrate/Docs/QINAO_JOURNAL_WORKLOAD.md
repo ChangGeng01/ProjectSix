@@ -236,6 +236,46 @@ on manipulation cues.
   Until those three exist, 3b remains a **documented substrate gap**. This is the strictest honest
   outcome: the workload did its job by exposing that the "close the loop" feature has no substrate
   channel, and we refuse to ship theater in its place.
+
+## Increment 3c — opt-in deliberation on the add turn (SHIPPED)
+
+`Sources/BASJournalCLI/Verdict.swift` + `add [--deliberate]` / `bet [--deliberate]`.
+
+3b established that `setShadowTrialFeedback` is vacuous for the journal. `setDeliberationLoopEnabled`
+is the OTHER toggle — and unlike 3b's, it is a **real** capability: enabling it on the add turn runs
+extra (cheap, CPU) deliberation passes + a caution block that can change the sealed governance
+verdict. 3c wires it as an **opt-in** `--deliberate` flag.
+
+**Why opt-in + a distinct namespace.** Two facts were established EMPIRICALLY (not just read), which
+is exactly why 3c is real where 3b was theater:
+- It is **deterministic** and **genuinely changes the verdict** — the anti-theater teeth: for
+  `maybe delete the whole thing, not sure it matters` the baseline seals `gov2:…|risk:high` and
+  `--deliberate` seals `gov2d:…|risk:medium`. The `gov2d:` namespace records that deliberation ran,
+  so the sealed record distinguishes a deliberated verdict from a baseline one.
+- It is a **RE-ASSESSMENT, not a safety raise.** Measured, it changes only a small minority of
+  entries and can LOWER or raise the risk BAND — so forcing it on could *under*-caution. Hence
+  opt-in and default-OFF (the baseline stays byte-equal to increment 2b: the coordinator's flag
+  defaults false and setting it false is a no-op). Critically, the re-rating only moves the risk
+  BAND; it never flips the sealed disposition — a protective `abstain`/`permit:delay` stays
+  protective (the delete-everything example keeps `permit:delay|abstain`), so a lower band is a
+  calmer re-read, never a green light.
+
+**Hardened by an adversarial refute panel (find→verify) — the confirmed defects, fixed:**
+- **MEDIUM (content integrity):** the first `--deliberate` parser stripped the token from ANYWHERE
+  in the args, so a decision note whose text contained `--deliberate` (e.g. `add remember to pass
+  --deliberate to the harness`) had that word silently deleted from the stored content AND the
+  sealed SHA-256 digest — a tamper-evident ledger rewriting the content it attests to. Fixed:
+  `--deliberate` is now a **leading option only** (parsing stops at the first content token; `--`
+  is an end-of-options sentinel), so a text-internal `--deliberate` is preserved byte-faithfully.
+- **LOW (honesty):** the help now states the re-rating never flips the protective disposition, so a
+  lower risk band is not read as a green light.
+
+Verified by `BASJournalCLIIntegrationTests`: `--deliberate` seals `gov2d:` (baseline stays `gov2:`)
+and the chain verifies; the verdict is deterministic; it genuinely differs from baseline beyond the
+namespace (anti-theater); and a text-internal `--deliberate` is not stripped from the sealed
+content. (Note: `bet`'s pre-existing `-q` mid-stream delimiter has the same class of edge for
+unquoted text containing a standalone `-q` token; quoting protects it — left as-is, out of 3c scope.)
+
 ## Increment 4 — content-store hardening (SHIPPED)
 
 `Sources/BASJournalCLI/ContentStore.swift`.

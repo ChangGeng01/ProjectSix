@@ -70,23 +70,38 @@ private actor BrainBox {
 private let brainBox = BrainBox()
 
 /// Run the entry text through the L1–L14 spine and return an HONEST governance verdictRef, or nil
-/// if the brain cannot construct (caller degrades to a labeled "gov2:unavailable" fallback).
-func governanceVerdictRef(action: String, for text: String) async -> String? {
+/// if the brain cannot construct (caller degrades to a labeled "…:unavailable" fallback).
+///
+/// `deliberate` (increment 3c) flips `deliberationLoopEnabled` on the turn: the spine runs extra
+/// (cheap, CPU) deliberation passes + a caution block. It is OPT-IN and default-OFF so the sealed
+/// verdict stays byte-equal to the increment-2b baseline (ADR-014) — and because deliberation is a
+/// RE-ASSESSMENT, not a strict safety raise (measured: it can lower OR raise the risk band), it is
+/// wrong to force it on. When on, the verdict is namespaced `gov2d:` so the sealed record shows
+/// deliberation produced it. The change is real + deterministic but affects a small minority of
+/// entries; most seal identically to the non-deliberated verdict.
+func governanceVerdictRef(action: String, for text: String, deliberate: Bool = false) async -> String? {
     guard let brain = await brainBox.get() else { return nil }
+    // Set unconditionally (not only when true): the brain is memoized per process, so a sticky
+    // "once true, always true" would leak deliberation into a later non-deliberate call in the
+    // same process. Setting the exact requested state keeps each call independent.
+    await brain.setDeliberationLoopEnabled(deliberate)
     let result = await brain.process(text, deviceState: ledgerDeviceState(), hostID: "ledger.host")
-    return honestVerdictRef(action: action, result: result)
+    return honestVerdictRef(action: action, result: result, deliberated: deliberate)
 }
 
 /// Fold the sovereign verdict + permit + risk into a single printable, injective-safe verdictRef.
-/// Format: `<action>|gov2:<level>|permit:<mode>|risk:<risk>|<allow|abstain>`. All fields use stable
-/// `.rawValue`s; the "|"/":" delimiters are safe under the seal's hardened 1.2.0 canonical form
-/// (length-prefixed, injective) and print cleanly in `ledger`.
-func honestVerdictRef(action: String, result: BASEBrainTurnResult) -> String {
+/// Format: `<action>|<ns>:<level>|permit:<mode>|risk:<risk>|<allow|abstain>`, where `<ns>` is
+/// `gov2` (baseline spine) or `gov2d` (deliberation ran, increment 3c) so the sealed record shows
+/// which mode produced the verdict. All fields use stable `.rawValue`s; the "|"/":" delimiters are
+/// safe under the seal's hardened 1.2.0 canonical form (length-prefixed, injective) and print
+/// cleanly in `ledger`.
+func honestVerdictRef(action: String, result: BASEBrainTurnResult, deliberated: Bool = false) -> String {
+    let ns = deliberated ? "gov2d" : "gov2"
     let permit = result.actionPermit.mode.rawValue
     let risk = result.riskCard.riskLevel.rawValue
     guard let v = result.sovereignVerdict else {
         // Fail-closed: an absent sovereign verdict is NOT a pass.
-        return "\(action)|gov2:absent|permit:\(permit)|risk:\(risk)|abstain"
+        return "\(action)|\(ns):absent|permit:\(permit)|risk:\(risk)|abstain"
     }
     // Structural abstention — there is no single "abstain" Bool; it is any of: a verdict above
     // pass, a refusal-only user stub, or a WITHHELD/guarded permit mode. Classify the permit off
@@ -96,5 +111,5 @@ func honestVerdictRef(action: String, result: BASEBrainTurnResult) -> String {
         || v.userStubMode == .refusalOnly
         || result.actionPermit.mode.isProtective
     let disposition = abstaining ? "abstain" : "allow"
-    return "\(action)|gov2:\(v.verdictLevel.rawValue)|permit:\(permit)|risk:\(risk)|\(disposition)"
+    return "\(action)|\(ns):\(v.verdictLevel.rawValue)|permit:\(permit)|risk:\(risk)|\(disposition)"
 }

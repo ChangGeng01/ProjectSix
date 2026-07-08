@@ -405,6 +405,112 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
         XCTAssertNotEqual(benign, risky, "the spine must differentiate risky from benign input")
     }
 
+    // MARK: - Increment 3c: opt-in deliberation
+
+    /// `--deliberate` runs the extra deliberation passes and seals under the `gov2d:` namespace
+    /// (baseline `add` stays `gov2:`), so the sealed record shows which mode produced the verdict.
+    /// The chain still verifies with the deliberated verdictRef.
+    func testDeliberateSealsGov2dNamespace() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let base = try XCTUnwrap(sealedVerdict(in:
+            try run(["add", "a plain note"], journalDir: dir).stdout))
+        XCTAssertTrue(base.hasPrefix("admit|gov2:"), "baseline add must seal gov2: — \(base)")
+
+        let delibDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: delibDir) }
+        let out = try run(["add", "--deliberate", "a plain note"], journalDir: delibDir)
+        let delib = try XCTUnwrap(out.stdout.split(separator: "\n")
+            .first(where: { $0.contains("sealed ") && $0.contains("gov2d") })
+            .flatMap { line -> String? in
+                guard let r = line.range(of: "  (Ed25519") else { return nil }
+                let parts = line[..<r.lowerBound].split(separator: " ")
+                guard let i = parts.firstIndex(of: "sealed"), i + 2 < parts.count else { return nil }
+                return parts[(i + 2)...].joined(separator: " ")
+            }, "add --deliberate must seal a gov2d: verdict: \(out.stdout)")
+        XCTAssertTrue(delib.hasPrefix("admit|gov2d:"), "deliberated add must seal gov2d: — \(delib)")
+        XCTAssertEqual(try run(["ledger"], journalDir: delibDir).exit, 0, "chain must verify with gov2d:")
+    }
+
+    /// Deliberation is DETERMINISTIC — a signed field must not drift across runs.
+    func testDeliberateIsDeterministic() throws {
+        func delibVerdict(_ text: String) throws -> String {
+            let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            return try XCTUnwrap(sealedVerdictAny(in:
+                try run(["add", "--deliberate", text], journalDir: dir).stdout))
+        }
+        XCTAssertEqual(try delibVerdict("same deliberated text"), try delibVerdict("same deliberated text"),
+            "deliberation must be deterministic")
+    }
+
+    /// ANTI-THEATER TEETH: 3c must GENUINELY change the verdict (not just the namespace) for at
+    /// least one entry — otherwise it is the vacuous no-op 3b was correctly refused for. The
+    /// measured example re-rates "maybe delete the whole thing, not sure it matters" from risk:high
+    /// (baseline) to risk:medium (deliberated). If the substrate ever changes such that this entry
+    /// no longer differs, revisit whether deliberation still delivers a real effect for the journal.
+    func testDeliberateGenuinelyChangesVerdictBeyondNamespace() throws {
+        let entry = "maybe delete the whole thing, not sure it matters"
+        func core(_ dir: URL, _ args: [String]) throws -> String {
+            let v = try XCTUnwrap(sealedVerdictAny(in: try run(args + [entry], journalDir: dir).stdout))
+            // Strip the gov2/gov2d namespace so we compare the ACTUAL disposition, not the label.
+            return v.replacingOccurrences(of: "gov2d:", with: "|")
+                    .replacingOccurrences(of: "gov2:", with: "|")
+        }
+        let d1 = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("qj-\(UUID().uuidString)")
+        let d2 = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("qj-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: d1); try? FileManager.default.removeItem(at: d2) }
+        let baseline = try core(d1, ["add"])
+        let deliberated = try core(d2, ["add", "--deliberate"])
+        XCTAssertNotEqual(baseline, deliberated,
+            "deliberation must genuinely change the verdict (not just the gov2→gov2d label): "
+            + "base=\(baseline) delib=\(deliberated)")
+    }
+
+    /// CONTENT-INTEGRITY (review MEDIUM): a `--deliberate` that appears INSIDE the entry text must
+    /// NOT be stripped — the tamper-evident ledger must seal exactly what the operator typed. Only
+    /// a LEADING `--deliberate` is the flag.
+    func testDeliberateInsideTextIsNotStrippedFromSealedContent() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let text = "remember to pass --deliberate to the eval harness"
+
+        // The real corruption trigger: the text arrives as SEPARATE argv tokens (the CLI joins
+        // `rest`), so "--deliberate" is a standalone token mid-stream — the old order-independent
+        // filter would strip it. Passing the words individually reproduces that.
+        let added = try run(
+            ["add", "remember", "to", "pass", "--deliberate", "to", "the", "eval", "harness"],
+            journalDir: dir)
+        XCTAssertTrue(added.stdout.contains(text),
+            "the literal '--deliberate' inside the text must be preserved: \(added.stdout)")
+        // It is content, NOT the flag → baseline gov2: (deliberation NOT enabled).
+        let vref = try XCTUnwrap(sealedVerdictAny(in: added.stdout))
+        XCTAssertTrue(vref.hasPrefix("admit|gov2:"),
+            "a text-internal --deliberate must not enable deliberation (should be gov2:): \(vref)")
+        // Recall returns the intact text (content + sealed digest are byte-faithful).
+        let recalled = try run(["recall", "eval harness"], journalDir: dir)
+        XCTAssertTrue(recalled.stdout.contains(text),
+            "recall must return the byte-faithful content: \(recalled.stdout)")
+    }
+
+    /// Extract the sealed verdictRef from an add's stdout regardless of gov2/gov2d namespace.
+    private func sealedVerdictAny(in addStdout: String) -> String? {
+        for line in addStdout.split(separator: "\n")
+        where line.contains("sealed ") && (line.contains("gov2:") || line.contains("gov2d:")) {
+            guard let r = line.range(of: "  (Ed25519") else { continue }
+            let parts = line[..<r.lowerBound].split(separator: " ", omittingEmptySubsequences: true)
+            if let i = parts.firstIndex(of: "sealed"), i + 2 < parts.count {
+                return parts[(i + 2)...].joined(separator: " ")
+            }
+        }
+        return nil
+    }
+
     // MARK: - Increment 3: the "was I right?" ShadowTrial loop
 
     /// Extract the first `trial-XXXXXX` id printed by `review` (from "trial-" to whitespace).

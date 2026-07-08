@@ -112,11 +112,11 @@ private func rebuild(from row: TrialIndexRow) -> (BASExperienceCandidate, BASSha
 
 // MARK: - bet
 
-func cmdBet(_ text: String, question: String?) async throws {
-    // Log + seal the decision exactly like `add` (reuses the increment-1/2 path), then open a
+func cmdBet(_ text: String, question: String?, deliberate: Bool = false) async throws {
+    // Log + seal the decision exactly like `add` (reuses the increment-1/2/2b/3c path), then open a
     // trial on it. A fresh atom ⇒ a fresh candidate, so there is never a pre-existing open trial
     // to collide with.
-    guard let atomID = try await logDecision(text, tag: "bet") else { return }
+    guard let atomID = try await logDecision(text, tag: "bet", deliberate: deliberate) else { return }
     let q = (question?.isEmpty == false) ? sanitizeListField(question!) : "was this decision right?"
     let digest = contentDigestHex(text)
 

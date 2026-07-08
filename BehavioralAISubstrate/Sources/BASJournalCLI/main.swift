@@ -232,7 +232,7 @@ private func sortedAtoms(_ store: BASEventSourcedMemoryAtomStore) async -> [BASG
 /// Log a decision into event-sourced memory + seal it into the Ed25519 ledger. Shared by `add`
 /// and (increment 3) `bet`. Returns the atom id on success, nil if not admitted. Fails-loud
 /// (exit 1) on a seal failure — the entry is logged but the operator must know it went unsealed.
-func logDecision(_ text: String, tag: String) async throws -> UUID? {
+func logDecision(_ text: String, tag: String, deliberate: Bool = false) async throws -> UUID? {
     let store = try makeStore()
     try await seedIfEmpty(store)
     let atom = makeEntry(text, tag: tag)
@@ -245,12 +245,13 @@ func logDecision(_ text: String, tag: String) async throws -> UUID? {
     try writeContent(atom.id, text)
     print("logged \(String(atom.id.uuidString.prefix(8)))  \(text)")
     // Increment 2b — run the entry through the L1–L14 spine for a real GOVERNANCE verdict and fold
-    // it into the seal's verdictRef (replacing the hardcoded "admit:governed" assertion). Degrade
+    // it into the seal's verdictRef (replacing the hardcoded "admit:governed" assertion). Increment
+    // 3c — `deliberate` opts the turn into extra deliberation passes (namespace gov2d:). Degrade
     // HONESTLY: if the spine can't construct (model missing / non-Apple host) we seal a labeled
-    // "…|gov2:unavailable" — never a fabricated pass. The add must not be held hostage to the
-    // verdict organ, so a spine miss still logs + seals the entry.
-    let verdictRef = await governanceVerdictRef(action: "admit", for: text)
-        ?? "admit:governed|gov2:unavailable"
+    // "…:unavailable" — never a fabricated pass. The add must not be held hostage to the verdict
+    // organ, so a spine miss still logs + seals the entry.
+    let verdictRef = await governanceVerdictRef(action: "admit", for: text, deliberate: deliberate)
+        ?? "admit:governed|\(deliberate ? "gov2d" : "gov2"):unavailable"
     // Increment 2 — seal the sovereign action into the Ed25519 audit ledger (append-only,
     // tamper-evident, cross-boot). Integrity-over-availability: surface a seal failure LOUDLY
     // and DISTINCTLY — the atom is already logged, so the operator must be able to tell a
@@ -267,8 +268,8 @@ func logDecision(_ text: String, tag: String) async throws -> UUID? {
     return atom.id
 }
 
-private func cmdAdd(_ text: String) async throws {
-    _ = try await logDecision(text, tag: "decision")
+private func cmdAdd(_ text: String, deliberate: Bool) async throws {
+    _ = try await logDecision(text, tag: "decision", deliberate: deliberate)
 }
 
 private func cmdRecall(_ query: String?) async throws {
@@ -347,7 +348,7 @@ private func printHelp() {
     print("""
     qinao-journal — sovereign decision & thread journal (#20 first daily workload)
 
-      add "<text>"        log a decision/thread into event-sourced memory + seal it
+      add [--deliberate] "<text>"   log a decision/thread into event-sourced memory + seal it
       recall [query]      list entries (optionally filtered), oldest→newest
       forget <id-prefix>  tombstone an entry + verify it is gone (deletion doctrine) + seal it
       count               how many entries
@@ -372,7 +373,36 @@ private func printHelp() {
     write, so it abstains (it is NOT flagging your note as dangerous). The useful signal is the
     ESCALATION band: a manipulation-cued entry rises to gov2:memoryFreeze|risk:high. It is a
     governance disposition proving the lattice ran — never a judgment that your decision is right.
+
+    --deliberate (a LEADING option; use "--" to end options if your text itself starts with "--")
+    runs extra (cheap) deliberation passes and seals the verdict under gov2d: instead of
+    gov2:. Honest scope: this is a RE-ASSESSMENT, not a safety raise — measured, it changes the
+    verdict for only a small minority of entries and can lower OR raise the risk band (e.g. it
+    re-rated "maybe delete the whole thing, not sure it matters" from risk:high to risk:medium).
+    The re-rating only moves the risk BAND; it never flips the sealed disposition — a protective
+    abstain/permit stays protective (that example keeps permit:delay|abstain), so a lower band is
+    a calmer re-read, never a green light. Off by default so the baseline verdict stays
+    byte-stable; use it when you want a second look.
     """)
+}
+
+/// Consume a LEADING `--deliberate` option (increment 3c), returning the remaining args + whether
+/// it was present. Parsing stops at the first non-`--`-prefixed token or an explicit `--`
+/// end-of-options sentinel — so a `--deliberate` that appears INSIDE the entry text is left
+/// intact. A prior version filtered every `--deliberate` token anywhere, which silently deleted
+/// that word from the stored content AND the sealed SHA-256 digest (e.g. `add "pass --deliberate
+/// to the harness"`) — a tamper-evident ledger must never rewrite the content it attests to.
+private func extractDeliberate(_ rest: [String]) -> (rest: [String], deliberate: Bool) {
+    var deliberate = false
+    var i = 0
+    loop: while i < rest.count {
+        switch rest[i] {
+        case "--deliberate": deliberate = true; i += 1
+        case "--": i += 1; break loop            // end-of-options: rest is literal text
+        default: break loop                       // first content token → stop stripping
+        }
+    }
+    return (Array(rest[i...]), deliberate)
 }
 
 /// Parse `bet` args: everything before a `-q` / `--open-question` flag is the decision text; the
@@ -396,9 +426,10 @@ func runJournal() async {
     do {
         switch cmd {
         case "add":
-            let text = rest.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { print("usage: add \"<text>\""); return }
-            try await cmdAdd(text)
+            let (args, deliberate) = extractDeliberate(rest)
+            let text = args.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { print("usage: add [--deliberate] \"<text>\""); return }
+            try await cmdAdd(text, deliberate: deliberate)
         case "recall":
             try await cmdRecall(rest.joined(separator: " "))
         case "forget":
@@ -409,9 +440,10 @@ func runJournal() async {
         case "ledger":
             try await cmdLedger()
         case "bet":
-            let (text, question) = parseBetArgs(rest)
-            guard !text.isEmpty else { print("usage: bet \"<text>\" [-q \"<question>\"]"); return }
-            try await cmdBet(text, question: question)
+            let (betArgs, deliberate) = extractDeliberate(rest)
+            let (text, question) = parseBetArgs(betArgs)
+            guard !text.isEmpty else { print("usage: bet [--deliberate] \"<text>\" [-q \"<question>\"]"); return }
+            try await cmdBet(text, question: question, deliberate: deliberate)
         case "review":
             try await cmdReview()
         case "right":
