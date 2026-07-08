@@ -132,10 +132,17 @@ public actor BASBreathScheduler {
     /// escalates to `.emergency` — at that point every maintenance
     /// wakeup is a liability.
     public func cancelAll() async {
-        for id in scheduled.keys {
+        // audit M-p / x-concurrency MED-7: was `for id in scheduled.keys { await cancel } ; removeAll`.
+        // This is an actor, so a concurrent `schedule()` completing during the `await bridge.cancel`
+        // below adds its id to `scheduled` (+ a LIVE platform registration) AFTER the key snapshot;
+        // the trailing `removeAll()` then wipes that id from the dict WITHOUT cancelling its platform
+        // registration → a GHOST maintenance wakeup survives a thermal-emergency cancelAll. Drain to
+        // empty, cancelling then removing each id individually, so no id is ever dropped un-cancelled
+        // (a re-check after each await catches any concurrently-registered breath).
+        while let id = scheduled.keys.first {
             await bridge.cancel(id: id)
+            scheduled[id] = nil
         }
-        scheduled.removeAll()
     }
 
     public func scheduledBreaths() -> [ScheduledBreath] {
