@@ -416,3 +416,26 @@ cap-breach/starvation/error-paths/telemetry/composition,全 high confidence,含
   内消费,零外部导入)。门 clean 跨 25 模块。**双模型对抗审查:Fable5 6 员因额度中断
   (非发现缺陷)→ Opus 6 员重跑,5/6 零缺陷 high + 1 真缺陷(LiteRT,已修)+ 1 low
   过声(ContentView,已纠)。triage 全套 NO NEW REGRESSION。**
+
+---
+
+## §8 修复终账(2026-07-08 "全部都要" 收口)
+
+审计的 1 CRITICAL + 23 HIGH 里,**全部可修项已闭**(剩 #17 token 历史清洗=删除类,操作员亲裁;4 盲区补审=方向抉择)。逐条:
+
+**CRITICAL**:C1(HF token)当晚轮换+就地打码,已闭(见 §1 / commit dd4ecf556)。
+
+**HIGH(23)** — 13 条经"本周层 / 立即层 / 项目层"梯次先闭(H2/H3/H4/H5/H6/H7/H9/H10/H11/H12/H13/H14/H19/H23,见上文各条目 + 主权门③④复活),剩 8 条 open HIGH 于 07-08 "全部都要" 一并闭,**每条 TDD teeth + 对抗反转验证(禁用守卫→测须红)+ 独立 commit + push**:
+
+| 编号 | 病灶 | 修 | commit |
+|---|---|---|---|
+| **H22** | triage-full-suite.sh fail-open(纯字母模块名正则 + 空聚合洗成 exit 0) | 正则纳数字/下划线 + `TOTAL_FAILS>0 && SUITES 空 → UNGROUNDED exit 1` | 3d08989ef |
+| **H17** | Dictionary(uniqueKeysWithValues:) 遇重复键 trap 杀常驻进程 | uniquingKeysWith 全 25 站点/16 文件 | 5940afce1 |
+| **H1** | prompt/suffix-lookup 车道无 do/catch,GDN/Qwen3.5 抛 nonTrimmableCache 逃逸 | 两臂 fail-close 到 _plainDraft(镜像 .mtpSpec) | 48eb7d8c4 |
+| **H18** | 流式 decorator 无 onTermination,取消后 LLM 解码/网络泵跑完 | **审计采样 3 → 实为 7 站点/6 文件**;onTermination + checkCancellation;teeth=挂死 mock 经 BASCountingOrganAdapter | 8a5e5d17b |
+| **H15** | BASSPSCRing 文档承诺的 `_isPOD` runtime 检查不存在→非 POD UAF | **强于审计**:`Element: BitwiseCopyable` 编译期约束(`<String>` 变不可编译) | 5b07895c3 |
+| **H21** | draft(_:purpose:) 无视 request.sessionID→席位池静默绕过,历史丢失 | 补 request.sessionID→draftMultiTurn 路由(决策表跨入口闭合,字节等价现有调用方) | afbbcc93e |
+| **H8** | 单写者不变量被 validate→await→commit 窗打穿 + registerWriterBatch"NO await"撒谎注释 | **审计采样 2 → 实为 3 站点**(writeObject auto-claim 补);validate→**同步预留内存**→persist+回滚;修撒谎注释;teeth=**真挂起 storage**(ch996.9 只用 nil storage 从不挂起=洗白竞态) | a45f7354a |
+| **H20** | 睡眠站超时只杀直接子进程→挂死孙 xctest 存活 + 站起下一套件→pile-on 冻机 | 进程组 SIGKILL(setpgid + kill(-pgid),killTargetForTimeout 自保绝不杀本站组)+ **超时停整站** | 2e2483e05 |
+
+★方法教训:(a)**审计采样的病灶类常更广**——H18 3→7、H8 2→3,修时必扫全 class,不止修被点名的行;(b)**竞态 teeth 必须用真挂起替身**逼出重入窗口(nil/即返替身洗白竞态,正是 ch996.9 旧测的盲点);(c)危险操作(kill/pgid)抽纯函数单测自保逻辑,不 spawn 真重活(违一次一重活铁律);(d)每修都对抗反转才算有牙。134 测跨 8 域零回归。
