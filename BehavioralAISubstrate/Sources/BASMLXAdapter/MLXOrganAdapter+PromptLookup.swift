@@ -147,7 +147,17 @@ extension MLXOrganAdapter {
     /// `decodePlannerAutoSelect` is a runtime KILL-SWITCH: when OFF it means PURE PLAIN (no acceleration at all) —
     /// the simplest safe revert — not the legacy prompt-lookup gate.
     public func draft(_ request: BASOrganRequest, purpose: BASDecodeLanePolicy.Purpose) async throws -> BASOrganDraft {
-        try await draft(request, purpose: purpose, sessionID: nil)
+        // audit H21: close the cross-entry decision table. `draft(_:)` routes a seat request
+        // (request.sessionID set) to the per-seat pool (draftMultiTurn) for KV/history reuse; this
+        // purpose overload did not, so the SAME seat request got stateful via one entry and
+        // stateless (conversation history LOST) via the other — byte-different output, no error.
+        // Every purpose-aware decorator (adjudicating / routing / gate / verifier / tool-planner)
+        // forwards a bare `request` here, so the moment a host sets request.sessionID this path
+        // silently bypassed the seat pool. Mirror draft(_:): seat routing wins before the planner.
+        if let sid = request.sessionID {
+            return try await draftMultiTurn(request, sessionID: sid)
+        }
+        return try await draft(request, purpose: purpose, sessionID: nil)
     }
 
     /// CROSS-TURN variant (查缺补漏 T3): supply a stable conversation `sessionID` so the planner's `.suffixLookup`
