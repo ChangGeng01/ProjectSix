@@ -9,9 +9,15 @@
 """
 import hashlib
 import json
+import os
 import sys
 
 import numpy as np
+
+# audit M-j — shared tie-correct AUC (the old local argsort AUC biased the
+# tied baseline scores the candidate is judged against).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _auc import auc  # noqa: E402
 
 DATA = "/tmp/gdn_coreai/probe_features_v2.jsonl"
 INCUMBENT = "/tmp/gdn_coreai/probe_weights_v2.json"
@@ -81,17 +87,6 @@ def fit_logistic(X, t, lam, iters, lr=0.05):
     return w, b
 
 
-def auc(scores, labels):
-    order = np.argsort(scores)
-    ranks = np.empty(len(scores))
-    ranks[order] = np.arange(1, len(scores) + 1)
-    pos = labels == 1
-    n1, n0 = pos.sum(), (~pos).sum()
-    if n1 == 0 or n0 == 0:
-        return float("nan")
-    return float((ranks[pos].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
-
-
 def propose():
     rows, H, y, fam, band = load_rows()
     tr, te, rng = split(rows, y, fam, band)
@@ -113,17 +108,22 @@ def propose():
     lam, iters, val_a = best
     print(f"PROPOSAL: lam={lam} iters={iters} (inner_val_auc={val_a:.4f})")
     w, b = fit_logistic(Xtr, y[tr], lam, iters)
+    # audit M-j — heldout is UNKNOWN at propose time. Emit JSON `null`, not
+    # a bare `NaN`: json.dump(allow_nan=True) writes the literal `NaN`, which
+    # is invalid JSON — Swift's JSONDecoder (and any strict reader) throws on
+    # integration. allow_nan=False also fails LOUDLY here if a diverged fit
+    # ever put NaN into w/b/mu/sd, instead of silently shipping bad JSON.
     json.dump({"w": w.tolist(), "b": float(b), "mu": mu.tolist(), "sd": sd.tolist(),
-               "heldout_auc": float("nan"),   # 提案端不许知道 heldout——judge 填
+               "heldout_auc": None,   # 提案端不许知道 heldout——judge 填
                "lam": lam, "iters": iters,
                "n_train": int(len(tr)), "n_test": int(len(te))},
-              open(CAND_OUT, "w"))
+              open(CAND_OUT, "w"), allow_nan=False)
     json.dump({"rule": "R1 (RSI_IMPLANT_CHARTER 第五部分)", "dataset_sha256": DATA_SHA_PINNED,
                "split_seed": SPLIT_SEED, "grid": grid,
                "chosen": {"lam": lam, "iters": iters, "inner_val_auc": round(val_a, 4)},
                "incumbent_point_in_grid": {"lam": 0.003, "iters": 3000},
                "candidate_out": CAND_OUT},
-              open(EVIDENCE_OUT, "w"), indent=1)
+              open(EVIDENCE_OUT, "w"), indent=1, allow_nan=False)
     print(f"candidate → {CAND_OUT}\nevidence → {EVIDENCE_OUT}")
 
 
@@ -169,7 +169,7 @@ def judge():
                          "lam": cand["lam"], "iters": cand["iters"], "sha256": sha256(CAND_OUT)},
            "criteria": {"delta_certify": DELTA_CERTIFY, "domain_regression_tol": DOMAIN_REGRESSION_TOL},
            "verdict": verdict}
-    json.dump(out, open(JUDGE_OUT, "w"), indent=1)
+    json.dump(out, open(JUDGE_OUT, "w"), indent=1, allow_nan=False)
     print(json.dumps(out, indent=1, ensure_ascii=False))
     print(f"judgement → {JUDGE_OUT}")
 

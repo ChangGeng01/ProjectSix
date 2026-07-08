@@ -7,7 +7,14 @@ Rigor: 70/30 split STRATIFIED by (family, band); held-out AUC reported for
 n≈147 vs d=4096 ⇒ heavy L2 swept on a small validation slice of TRAIN only.
 """
 import json, sys, math
+import os
 import numpy as np
+
+# audit M-j — tie-correct AUC now lives in the shared _auc module (the old
+# local version gave tied baseline scores arbitrary distinct ranks, biasing
+# the qlen / family control lines the probe is judged against by ±0.05-0.1).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _auc import auc  # noqa: E402
 
 path = sys.argv[1] if len(sys.argv) > 1 else "/tmp/gdn_coreai/probe_features.jsonl"
 out = sys.argv[2] if len(sys.argv) > 2 else "/tmp/gdn_coreai/probe_weights.json"
@@ -48,14 +55,6 @@ def fit_logistic(X, t, lam, iters=3000, lr=0.05):
         gb = (p - t).mean()
         w -= lr * g; b -= lr * gb
     return w, b
-
-def auc(scores, labels):
-    order = np.argsort(scores)
-    ranks = np.empty(len(scores)); ranks[order] = np.arange(1, len(scores) + 1)
-    pos = labels == 1
-    n1, n0 = pos.sum(), (~pos).sum()
-    if n1 == 0 or n0 == 0: return float("nan")
-    return (ranks[pos].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)
 
 Xtr_raw, Xte_raw = H[tr], H[te]
 Xtr, mu, sd = standardize(Xtr_raw)
