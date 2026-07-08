@@ -356,6 +356,13 @@ public actor BASSovereignVerdictEngine {
                 Self.routedDivergenceCount += 1
                 print("⚠️ [verdict] ROUTED-DIVERGENCE rust=\(d.rustLevel) swiftFloor=\(d.swiftFloor) — Swift floor wins (fail-safe)")
             }
+            // audit M-d MED-4: re-apply the Swift Stage-3 evidence floor over the routed level too.
+            // It previously lived ONLY in the Swift else-branch below, so a Rust derive that dropped
+            // the evidence-insufficient upgrade for an irreversible op could pass a level below
+            // .toolCut. The Swift floor is the fail-safe: it can only RAISE, never lower.
+            if isIrreversible(context.operation) && !context.evidenceSufficient && level < .toolCut {
+                level = .toolCut
+            }
             let (_, pinned) =
                 evaluateSoftSignals(context.softSignals)
             softPinnedDomain = pinned

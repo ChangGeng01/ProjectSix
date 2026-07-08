@@ -116,6 +116,9 @@ public actor BASSovereignTokenAuthority {
         let actionDigest: String
         let scope: BASSovereignCommitScope
         let policyHash: String
+        /// audit M-d MED-6: the minting session, captured so `revokeAllTokens(forSession:)` can
+        /// burn ONLY that session's tokens instead of nuking every session's.
+        let sessionID: String
         var redeemed: Bool
     }
 
@@ -202,6 +205,7 @@ public actor BASSovereignTokenAuthority {
             actionDigest: intent.actionDigest,
             scope: intent.scope,
             policyHash: intent.policyHash,
+            sessionID: intent.sessionID,
             redeemed: false
         )
 
@@ -287,6 +291,7 @@ public actor BASSovereignTokenAuthority {
             actionDigest: intent.actionDigest,
             scope: intent.scope,
             policyHash: intent.policyHash,
+            sessionID: intent.sessionID,
             redeemed: false
         )
 
@@ -382,16 +387,12 @@ public actor BASSovereignTokenAuthority {
     /// `BASSovereignRevocationEvent` per newly-revoked token with
     /// `reasonCode: "session-revoked-all"`.
     public func revokeAllTokens(forSession sessionID: String) async {
-        // We don't store sessionID in the record (it's in the token
-        // itself, which lives outside the actor). A real implementation
-        // persists session refs; for v1 we provide the hook as a
-        // broadcast-all nuke when the caller cannot enumerate.
-        //
-        // Callers that track which tokens belong to which session can
-        // instead call `revoke(tokenID:)` for precision.
-        _ = sessionID
+        // audit M-d MED-6: the record now carries its minting sessionID, so revoke ONLY this
+        // session's un-redeemed tokens. Previously `_ = sessionID` and the loop nuked EVERY
+        // session's tokens — an L14 ROLLBACK on session A would silently invalidate sessions B/C/…
         var revokedIDs: [String] = []
-        for (id, var record) in mintedTokens where !record.redeemed {
+        for (id, var record) in mintedTokens
+            where !record.redeemed && record.sessionID == sessionID {
             record.redeemed = true
             mintedTokens[id] = record
             revokedIDs.append(id)
