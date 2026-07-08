@@ -222,7 +222,18 @@
     子串回退;(d)release_ok_model 恒 False 且 release_gate 只读它=永久红无解锁路→outer gate 改读
     model_eval_ok(可过)+ attestations_pending 作显式 DEFERRED 行。诚实边界:门是本地开发装置非
     生产信任边界,防"自证剧场"(硬编码/一次真发生过的 /tmp 注入)非防恶意内鬼。
-13. ShadowTrial 乐观并发 + ledger 回滚（H9,1.5d）——L13 上生产前必修。
+13. **ShadowTrial 乐观并发 + ledger 回滚**（H9）— **DONE(2026-07-08,TDD 6 门+5 员 Opus 对抗审查零缺陷)**。
+    四病:F1 submit check-then-act 跨 `await ledger.append`→并发双开+账本永久双记;F2 advanceOpenTrial
+    并发 observe 读同 record 后写胜→丢观察+账实分叉;F3 finalize 落终态**在** seal/retraction append **之前**
+    提交→后者失败则试验已终态但撤回令(failed/blocked 的安全机制)永久丢(头注"never partial"撒谎);
+    F8 promotionVerdict 空证据→allowsPromotion=true(缺席即通过 fail-open)。**修**:①**per-candidate
+    in-flight 门**(续体交接,复用梯次3 认证原语,内嵌于 coordinator actor 自身执行器=更强)——
+    submit/observe/reportFail/finalize 皆 acquireCandidate(key)+锁下重读(乐观复核);②finalize 重构
+    =**建全部条目→append 全部→再原子提交所有内存 map**(任一 append 失败零内存变更,试验留 pending);
+    ③promotionVerdict 要 hasPassedTrial && hasApprovedSeal(fail-closed);④修两处撒谎注释。**★对抗审查
+    5/5 零缺陷 high**(无死锁/无残留 check-then-act/finalize 原子/F8 零破坏调用者/主权桥 byte-equal 保);
+    诚实边界:append-only ledger 不可回滚,seal-fail 后重试会双 append trial_finalized+烧 seal ID(已文档化
+    权衡,胜过旧的静默丢撤回令);续体无取消处理=与认证基座原语同性质非本修引入。现有 34 ShadowTrial 测零回归。
 14. Rust event log 100k 截断分页（H10,含 XCFramework 重建,1d）。
 15. **热表示统一**（x-arch MED-1）— **DONE(2026-07-08,TDD 8 门)**。★根因比审计更深:`thermalState:
     String` 被两生产者喂**非热数据**——`AppleInspectionBridgeCore:202` 塞 `environmentClass.rawValue`
