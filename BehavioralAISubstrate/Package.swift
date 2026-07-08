@@ -589,6 +589,17 @@ let package = Package(
                 "BASPolicy"
             ],
             path: "Sources/BASBrainCLI"),
+
+        // BASJournalCLI — "The Ledger" (#20 first daily workload). A sovereign decision &
+        // thread journal over the real event-sourced memory store; the first LIVE workload
+        // that fires the memory / deletion-doctrine / pagination chambers on a daily path.
+        .executableTarget(
+            name: "BASJournalCLI",
+            dependencies: [
+                "BASMemory",
+                "BASRuntimeCore"
+            ],
+            path: "Sources/BASJournalCLI"),
         .plugin(
             name: "BASSQLSchemaGen",
             capability: .buildTool(),
