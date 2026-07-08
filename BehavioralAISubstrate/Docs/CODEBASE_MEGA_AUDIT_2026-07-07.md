@@ -439,3 +439,29 @@ cap-breach/starvation/error-paths/telemetry/composition,全 high confidence,含
 | **H20** | 睡眠站超时只杀直接子进程→挂死孙 xctest 存活 + 站起下一套件→pile-on 冻机 | 进程组 SIGKILL(setpgid + kill(-pgid),killTargetForTimeout 自保绝不杀本站组)+ **超时停整站** | 2e2483e05 |
 
 ★方法教训:(a)**审计采样的病灶类常更广**——H18 3→7、H8 2→3,修时必扫全 class,不止修被点名的行;(b)**竞态 teeth 必须用真挂起替身**逼出重入窗口(nil/即返替身洗白竞态,正是 ch996.9 旧测的盲点);(c)危险操作(kill/pgid)抽纯函数单测自保逻辑,不 spawn 真重活(违一次一重活铁律);(d)每修都对抗反转才算有牙。134 测跨 8 域零回归。
+
+## §9 MED 收口(2026-07-09 "全面继续修复 audit 相关")
+
+CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now MED 已闭**,每条 TDD teeth + 对抗反转 + 独立 commit + push:
+
+| 主题 | 病灶 | 修 | commit |
+|---|---|---|---|
+| **M-h F6** | 睡眠固化 ⑥ ledger-mark 在 pipeline 内,窗口耗尽 break 跳过它→store 变但 preChainHash==postChainHash(篡改证据不变量破) | ⑥ 移出窗口预算,`didMutate` 恒锚链;teeth=③变异后窗口耗尽仍 pre≠post | 3c7bba0e3 |
+| **M-e #2/#3** | ①memory_pressure 用 `total-free`(inactive 可回收缓存当占用)→健康机 isUnderPressure 恒真;②HazardPredictor 无占空下限→外因热跳变毒化持久 learnedBudget | ①拆纯 `bas_memory_pressure_percent_from`=active+wired(600k-cache 机 90%→30%);②`minAttributableDutyFraction=0.25` 归因下限(8×外因尖峰不动 budget) | 5f36be54a |
+| **M-o MED-3** | 87 安全关键 `import Crypto`(Ed25519/SHA)靠 ML vendored 传递,root+10 target 均未声明→vendor 刷新即断编译 | root `.package(swift-crypto)`(同路径同 identity,字节等价)+ 10 target 声明 product;swift-crypto 升为 indent-0 直接依赖 | dfb37327b |
+| **M-g/M-i** | ①fused readback PACK/UNPACK 双可选块反序(trProbe∥traceActive 同开时熵/topk 互相污染)②B2 探针预算 `max(8,probe)` 无上限可越 maxTokens | ①UNPACK 镜像 PACK(trProbe 先,补 `cursor+=kNow`)+ `cursor==host.count` 断言;②纯 `clampedProbeBudget=min(maxTokens,max(8,probe))` | 2c1fdf437 |
+| **M-i/M1** | RdarProbe 两 placement 全 typed-fail 仍印 "✅ SURVIVED direction runnable"(上膛报中靶) | runOnce→Bool,仅 ≥1 真完成才印绿,否则诚实 ⚠️(设备 app,查验+设备门) | dd3736ed2 |
+| **M-l MED-8** | 事件溯源 atom store 用 `Task.detached` 播种→makeAtomStore 即返未播种 store,即读竞态见空 | makeAtomStore→`async`,inline await 播种;teeth=即读两 atom(反转 detached 版 5/5 红) | ca07528c3 |
+| **M-j AUC/NaN** | fit_difficulty_probe/b2_refit AUC 无并列校正(基线并列分 ±0.05-0.1 偏移,正是立项判据)+ b2 候选 JSON 裸 NaN(Swift JSONDecoder 爆) | 共享 `_auc.py` 并列平均 rank;heldout_auc→null + `allow_nan=False`;teeth=全并列 0.5(旧 0.0)+50 例对 scipy.rankdata | 870052374 |
+| **M-j gate** | release_gate never_worse `nw_model=True` 缺省(回归行缺→零证据放行)+ parse_substrate 取末行(截断日志误判) | `regression_gate_status` fail-closed(缺席=红)+ parse 取 max-executed 行;teeth 8 例(反转缺省 True 红 3/3) | 3485393d6 |
+| **M-j zh** | qinao_bench_zh 按学科 `except:pass` 静默丢→base/tuned 题集不可比 | 记录 loaded/dropped 学科入结果 JSON(题集漂移可检) | 04a68f638 |
+| **M-o MED-2** | SwiftUI BASConsoleView 在 substrate-core BASAdmin,headless 宿主(BASBrainCLI/BASJournalCLI)被迫传递链 SwiftUI | 拆 `BASAdminUI` target(view+typealias 迁入),BASAdmin/BASHostKit 净 SwiftUI;teeth=源树扫描守卫(含正控) | f7b93ccb2 |
+
+★MED 教训:(a)**fail-open 缺省是 MED 最常见形**(never_worse=True、isUnderPressure 用错分母、AUC 并列偏、SURVIVED 恒印)——修=fail-closed 缺省 + 缺席即红;(b)**纯函数抽取换 teeth**:GPU/模型/设备内联逻辑(pressure 比、probe budget、AUC)抽纯函数才可确定性单测;(c)**竞态 teeth 可靠红**:M-l detached 播种反转 5/5 红(非 flaky——detached 确定性输给即返);(d)**模块图卫生**用源树扫描守卫(SwiftUI-free)+ 正控防误抽。
+
+**诚实账——未闭项(非 mac-纯,须操作员/设备/Rust)**:
+- **M-k F1**(actor 重入 audit 归因)——核 actor 高风险改(4 emit-helper 签名 + seq 预分配 + ledger-locality + barrier test),留待专注单修。
+- **M-l MED-4**(向量 rowid TOCTOU)——须 Rust XCFramework 重建。
+- **架构 3 条**——操作员抉择(跨设备主权/L3-14 器官逻辑边界等)。
+- **device-gated 5+2**(含 x-sov #5/#6 Data Protection——iOS 锁屏真机才现,macOS `.protectionKey` 不支持)。
+- **b2 /tmp→Docs/evidence 冻结**——实验 I/O 布局,操作员域(改默认路径可能断上游管线)。
