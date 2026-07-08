@@ -105,34 +105,53 @@ extension MLXOrganAdapter {
             }
 
         case .promptLookup(let k):
-            let g = try await _generateModelFree(
-                for: request, drafter: BASPromptLookupDrafter(numDraftTokens: k))
-            // T2: online telemetry → the router learns prompt-lookup's net acceptance for this purpose.
-            draftProfiler = draftProfiler.observing(
-                sourceID: BASDraftSourceChoice.promptLookupID, purpose: purpose,
-                accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
-            return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
-                           context: context, request: request)
+            // audit H1: FAIL-CLOSED like .mtpSpec — `_generateModelFree` throws `nonTrimmableCache`
+            // on a GDN/Qwen3.5 (non-trimmable Mamba/Arrays cache), and this arm had NO catch, so a
+            // Qwen3.5 + serious/critical-thermal turn (which drops .mtpSpec then elects model-free)
+            // threw uncaught EVERY turn instead of degrading. `_plainDraft` is the certified GDN path.
+            do {
+                let g = try await _generateModelFree(
+                    for: request, drafter: BASPromptLookupDrafter(numDraftTokens: k))
+                // T2: online telemetry → the router learns prompt-lookup's net acceptance for this purpose.
+                draftProfiler = draftProfiler.observing(
+                    sourceID: BASDraftSourceChoice.promptLookupID, purpose: purpose,
+                    accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
+                return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
+                               context: context, request: request)
+            } catch {
+                print("[prompt-lookup] lane fail-closed to plain: \(error)")
+                return _finish(try await _plainDraft(request), planned: strategy,
+                               context: context, request: request, failClose: "\(error)")
+            }
 
         case .suffixLookup(let k):
             // T3: seed from the session corpus when present; nil session → empty store = byte-identical to
             // prompt-lookup (the BASCrossTurnDrafter empty-store parity anchor).
             let prior = sessionID.map { crossTurnStore.tokens(session: $0) } ?? []
-            let g = try await _generateModelFree(
-                for: request, drafter: BASCrossTurnDrafter(priorTokens: prior, numDraftTokens: k))
-            // Carry THIS turn (prompt + generated) into the corpus for the next turn's cross-turn draft.
-            // HOST CONTRACT (footgun): accumulate via a stable sessionID and do NOT re-send chat history in
-            // request.context, else the re-rendered prompt re-contains prior turns → duplicate appends + premature
-            // FIFO eviction. (A store-level synced cursor mirroring BASCrossTurnDrafter.synced is the eventual fix.)
-            if let sid = sessionID {
-                crossTurnStore.append(session: sid, contentsOf: g.promptTokens + g.genTokens)
+            // audit H1: FAIL-CLOSED (same GDN nonTrimmableCache throw as .promptLookup). The corpus
+            // append + telemetry only run on a successful generate, so a throw degrades to plain with
+            // no partial cross-turn mutation.
+            do {
+                let g = try await _generateModelFree(
+                    for: request, drafter: BASCrossTurnDrafter(priorTokens: prior, numDraftTokens: k))
+                // Carry THIS turn (prompt + generated) into the corpus for the next turn's cross-turn draft.
+                // HOST CONTRACT (footgun): accumulate via a stable sessionID and do NOT re-send chat history in
+                // request.context, else the re-rendered prompt re-contains prior turns → duplicate appends + premature
+                // FIFO eviction. (A store-level synced cursor mirroring BASCrossTurnDrafter.synced is the eventual fix.)
+                if let sid = sessionID {
+                    crossTurnStore.append(session: sid, contentsOf: g.promptTokens + g.genTokens)
+                }
+                // T2: online telemetry for the cross-turn lane.
+                draftProfiler = draftProfiler.observing(
+                    sourceID: BASDraftSourceChoice.suffixAutomatonID, purpose: purpose,
+                    accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
+                return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
+                               context: context, request: request)
+            } catch {
+                print("[suffix-lookup] lane fail-closed to plain: \(error)")
+                return _finish(try await _plainDraft(request), planned: strategy,
+                               context: context, request: request, failClose: "\(error)")
             }
-            // T2: online telemetry for the cross-turn lane.
-            draftProfiler = draftProfiler.observing(
-                sourceID: BASDraftSourceChoice.suffixAutomatonID, purpose: purpose,
-                accepted: g.accepted, proposed: g.proposed, rounds: g.rounds)
-            return _finish(_modelFreeDraft(body: g.body, request: request), planned: strategy,
-                           context: context, request: request)
 
         case .saguaro:
             throw BASOrganError.providerUnavailable(
