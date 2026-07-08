@@ -33,6 +33,97 @@ public enum BASThermalBucket:
     case fair      = "fair"
     case serious   = "serious"
     case critical  = "critical"
+
+    /// Monotonic severity (0 = coolest)。 Lets callers compare buckets
+    /// with `>=` instead of ad-hoc string matching。
+    public var severity: Int {
+        switch self {
+        case .nominal:  return 0
+        case .fair:     return 1
+        case .serious:  return 2
+        case .critical: return 3
+        }
+    }
+
+    /// x-arch MED-1 (mega-audit #15, 2026-07-08): the canonical parse for the loosely-typed
+    /// `BASDeviceProfile.thermalState: String`。 The field has been fed THREE different
+    /// vocabularies by different producers, and the old consumer only substring-matched the
+    /// `BASThermalBucket` words ("serious"/"critical") — so a `BASThermalLevel` "hot" (which
+    /// IS thermally serious) and every unknown string silently fell through to no-downgrade
+    /// (fail-open on an overheating device)。 This maps EVERY recognized thermal vocabulary
+    /// to a bucket and returns nil for anything genuinely unrecognized so the caller can
+    /// fail-LOUD + fail-CLOSED rather than fail-open。
+    ///   * BASThermalBucket:  nominal / fair / serious / critical
+    ///   * BASThermalLevel:   nominal / warm(→fair) / hot(→serious) / critical
+    ///   * Darwin/ProcessInfo raw: nominal / fair / serious / critical
+    public static func thermalSeverity(from raw: String) -> BASThermalBucket? {
+        switch raw.lowercased().trimmingCharacters(in: .whitespaces) {
+        case "nominal":            return .nominal
+        case "fair", "warm":       return .fair
+        case "serious", "hot":     return .serious
+        case "critical":           return .critical
+        default:                   return nil
+        }
+    }
+
+    /// Producer strings that are NOT thermal signals at all (an environment class or a
+    /// power flag mis-populated into `thermalState`)。 They carry no thermal information,
+    /// so they map to `.nominal` (no false downgrade) — as opposed to a genuinely unknown
+    /// string, which must fail-closed。 Keeping this set explicit means a NEW non-thermal
+    /// producer value fails loudly instead of silently reading as cool。
+    public static let knownNonThermalProfileStrings: Set<String> = [
+        "normal", "lowpower", "low_power", "memoryconstrained",
+        "memory_constrained", "simulator", "unknown", "",
+    ]
+}
+
+public enum BASThermalLevel_Bridge {
+    /// Explicit BASThermalLevel → BASThermalBucket conversion (x-arch MED-1)。 Defined
+    /// here (not on BASThermalLevel, which lives in another file) to keep the mapping in
+    /// one place next to the severity model。
+    public static func bucket(forThermalLevelRawValue raw: String) -> BASThermalBucket? {
+        switch raw.lowercased() {
+        case "nominal":  return .nominal
+        case "warm":     return .fair
+        case "hot":      return .serious
+        case "critical": return .critical
+        default:         return nil
+        }
+    }
+}
+
+/// The classification of a loosely-typed `thermalState` string for routing decisions。
+public enum BASThermalClassification: Equatable, Sendable {
+    /// A recognized thermal reading。
+    case thermal(BASThermalBucket)
+    /// A recognized NON-thermal producer string (environment class / power flag)。
+    /// Carries no thermal signal ⇒ treat as nominal, do not downgrade。
+    case nonThermalNominal(String)
+    /// Genuinely unrecognized ⇒ callers MUST fail-closed (assume serious) and log。
+    case unrecognized(String)
+
+    /// The severity to route on, fail-CLOSED (unrecognized ⇒ serious)。
+    public var routingSeverity: BASThermalBucket {
+        switch self {
+        case .thermal(let b):        return b
+        case .nonThermalNominal:     return .nominal
+        case .unrecognized:          return .serious
+        }
+    }
+
+    /// True when the thermal state should downgrade the route toward cooler execution。
+    public var shouldDowngradeForHeat: Bool { routingSeverity.severity >= BASThermalBucket.serious.severity }
+
+    public static func classify(_ raw: String) -> BASThermalClassification {
+        if let bucket = BASThermalBucket.thermalSeverity(from: raw) {
+            return .thermal(bucket)
+        }
+        let key = raw.lowercased().trimmingCharacters(in: .whitespaces)
+        if BASThermalBucket.knownNonThermalProfileStrings.contains(key) {
+            return .nonThermalNominal(raw)
+        }
+        return .unrecognized(raw)
+    }
 }
 
 /// One-shot read of the host's thermal + CPU + memory state。

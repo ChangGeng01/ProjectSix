@@ -224,7 +224,17 @@
     生产信任边界,防"自证剧场"(硬编码/一次真发生过的 /tmp 注入)非防恶意内鬼。
 13. ShadowTrial 乐观并发 + ledger 回滚（H9,1.5d）——L13 上生产前必修。
 14. Rust event log 100k 截断分页（H10,含 XCFramework 重建,1d）。
-15. **热表示统一**（x-arch MED-1）：钉规范枚举 + 显式互转 + `thermalState` 类型化 + 未识别 fail-loud。
+15. **热表示统一**（x-arch MED-1）— **DONE(2026-07-08,TDD 8 门)**。★根因比审计更深:`thermalState:
+    String` 被两生产者喂**非热数据**——`AppleInspectionBridgeCore:202` 塞 `environmentClass.rawValue`
+    ({simulator,lowPower,memoryConstrained,normal})、`AppleAdaptiveRuntimeAdapterCore:227` 塞
+    `"low_power"/"nominal"` 电源旗标——全不含 "serious"/"critical",故消费者 `RuntimeCore:414` 的
+    子串匹配对生产路径**是死码,永远 fail-open**;且 `BASThermalLevel` 的 "hot"(热义=serious)也
+    从不匹配。**修**(不破 Codable schema):`BASThermalBucket.severity` 单调序 + `thermalSeverity(from:)`
+    规范解析(认 Bucket+Level+Darwin 三词表)+ `BASThermalLevel_Bridge` 显式互转 + `BASThermalClassification`
+    三分类(thermal/nonThermalNominal/unrecognized)。消费者改按分类路由:识别热词按真严重度(修 "hot"
+    不降级)、已知非热生产串→nominal(不误降级保正常)、**真未识别→fail-CLOSED(serious)+ 大声记 rationale**。
+    RuntimeCore 124 测零回归。**残留**:生产者把非热数据塞 thermalState 的范畴错误(应喂真 ProcessInfo
+    热态)是更深的生产者侧修,留册待专案;本修让消费者对该错误 fail-loud 而非静默 fail-open。
 16. **删除教义收口**：全 store secure_delete/VACUUM default-on（ADR-014 opt-in→certified→default-on）。
 17. token 历史清洗（filter-repo/LFS purge）——**删除类,必须操作员亲自裁决**。
 18. 测试诚实度：~300 条 assertCodable 自比较升级为真 round-trip；9 条 print-only 加断言或门控；B2 /tmp 状态依赖去除。

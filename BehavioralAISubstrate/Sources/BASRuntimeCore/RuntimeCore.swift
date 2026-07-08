@@ -411,9 +411,19 @@ public enum BASDefaultRoutingPlanner {
         if context.deviceProfile.lowPowerMode {
             rationale.append("Low power mode prefers lower-latency descriptors.")
         }
-        if context.deviceProfile.thermalState.lowercased().contains("serious") ||
-            context.deviceProfile.thermalState.lowercased().contains("critical") {
-            rationale.append("Thermal pressure downgraded the route toward cooler execution.")
+        // x-arch MED-1 (mega-audit #15, 2026-07-08): route on a CANONICAL thermal
+        // classification, not a substring match. The old `.contains("serious"/"critical")`
+        // missed BASThermalLevel "hot" (thermally serious) and every unknown string,
+        // failing OPEN on an overheating device. Now: recognized thermal → its severity;
+        // known non-thermal producer strings → nominal; anything else → fail-CLOSED (serious)
+        // with a loud rationale so a new mis-populated producer surfaces instead of hiding.
+        let thermalClass = BASThermalClassification.classify(context.deviceProfile.thermalState)
+        if thermalClass.shouldDowngradeForHeat {
+            if case .unrecognized(let raw) = thermalClass {
+                rationale.append("Unrecognized thermal state \"\(raw)\" — failing closed and downgrading the route toward cooler execution.")
+            } else {
+                rationale.append("Thermal pressure downgraded the route toward cooler execution.")
+            }
         }
         if !context.networkAvailable {
             rationale.append("Network is unavailable, so remote-only routes are excluded.")
