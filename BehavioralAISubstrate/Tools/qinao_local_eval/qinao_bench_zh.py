@@ -35,23 +35,34 @@ def run_mcq(rows, qk, akey, optkeys, seed):
 try:
     ds=load_dataset("ceval/ceval-exam", "computer_network", split="val")  # one subject as a quick proxy; broaden later
     rows=[ds[i] for i in range(len(ds))]
-    # gather a few subjects for breadth
+    # gather a few subjects for breadth。 audit M-j — RECORD which subjects
+    # loaded vs dropped; the old `except: pass` silently discarded a failed
+    # subject, so base and tuned runs could score on DIFFERENT question sets
+    # (incomparable) with no trace. The loaded set is now part of the result.
+    ceval_loaded=["computer_network"]; ceval_dropped={}
     for sub in ["high_school_physics","logic","high_school_chemistry","college_economics"]:
         try:
             d2=load_dataset("ceval/ceval-exam", sub, split="val"); rows+=[d2[i] for i in range(len(d2))]
-        except Exception: pass
+            ceval_loaded.append(sub)
+        except Exception as se:
+            ceval_dropped[sub]=str(se)[:80]
     out["31"]=run_mcq(rows, "question", "answer", ["A","B","C","D"], 3)
+    out["31_subjects"]={"loaded":ceval_loaded,"dropped":ceval_dropped}
 except Exception as e:
     out["31_err"]=str(e)[:140]
 # #32 CMMLU
 try:
     ds=load_dataset("haonan-li/cmmlu", "logical", split="test")
     rows=[ds[i] for i in range(len(ds))]
+    cmmlu_loaded=["logical"]; cmmlu_dropped={}   # audit M-j — record, never silently drop
     for sub in ["college_medicine","chinese_history","computer_science","elementary_mathematics"]:
         try:
             d2=load_dataset("haonan-li/cmmlu", sub, split="test"); rows+=[d2[i] for i in range(len(d2))]
-        except Exception: pass
+            cmmlu_loaded.append(sub)
+        except Exception as se:
+            cmmlu_dropped[sub]=str(se)[:80]
     out["32"]=run_mcq(rows, "Question", "Answer", ["A","B","C","D"], 4)
+    out["32_subjects"]={"loaded":cmmlu_loaded,"dropped":cmmlu_dropped}
 except Exception as e:
     out["32_err"]=str(e)[:140]
 json.dump(out, open(f"/tmp/qinao_bench_zh_{tag}.json","w"), indent=1)
