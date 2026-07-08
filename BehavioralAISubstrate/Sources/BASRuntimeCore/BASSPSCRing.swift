@@ -16,11 +16,22 @@
 //
 // ## Safety
 //
-// `Element` must be a trivially-copyable POD type (Int, Int64,
-// SIMD types,plain structs of primitives)。 The C ring uses
-// memcpy under the hood,so reference-counted types (String,
-// Array,class instances) would leak。 The init enforces a
-// runtime check via `_isPOD(Element.self)` where available。
+// `Element` is constrained to `BitwiseCopyable` (Swift 6)。 The C
+// ring uses memcpy under the hood,so a reference-counted element
+// (String,Array,class instances) would be copied WITHOUT a retain
+// and dangle on pop — a use-after-free / heap corruption。 The
+// `BitwiseCopyable` constraint makes such an instantiation (e.g.
+// `BASSPSCRing<String>`) a COMPILE error rather than a runtime
+// foot-gun。 All built-in primitives (Int,Int64,SIMD) and
+// structs/enums whose stored properties are all BitwiseCopyable
+// satisfy it automatically。
+//
+// audit H15: the prior docstring promised a runtime `_isPOD` check
+// that was never wired (`.nonPODElement` was never thrown), so
+// `BASSPSCRing<String>` constructed fine, memcpy'd the String's
+// pointer without a retain, and dangled on pop。 Replaced with the
+// compile-time constraint — strictly stronger (un-constructable vs。
+// throws-at-runtime)。
 
 import Foundation
 #if canImport(BASCSystemBridge)
@@ -36,6 +47,9 @@ public enum BASSPSCRingError: Error, Equatable, Sendable {
     /// C-side malloc returned NULL。 Extremely rare。
     case allocationFailed
     /// Element type is not POD (would leak references)。
+    /// audit H15: retained for source compatibility — the non-POD case
+    /// is now rejected at COMPILE time by the `Element: BitwiseCopyable`
+    /// constraint, so this error is no longer thrown at runtime。
     case nonPODElement
 }
 
@@ -44,7 +58,7 @@ public enum BASSPSCRingError: Error, Equatable, Sendable {
 /// exactly-one-consumer。 Wrapping in an actor would serialize
 /// the producer/consumer threads, defeating the lock-free
 /// design。
-public final class BASSPSCRing<Element>: @unchecked Sendable {
+public final class BASSPSCRing<Element: BitwiseCopyable>: @unchecked Sendable {
 
     #if canImport(BASCSystemBridge)
     /// Raw C struct pointer。 The C `BASSPSCRing` is a forward-

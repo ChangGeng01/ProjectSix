@@ -55,6 +55,34 @@ final class BASChapter705IntegrationTests: XCTestCase {
         XCTAssertEqual(ring.capacity, 128)
     }
 
+    // audit H15 — the ring is memcpy-backed, so `Element` MUST be POD.
+    // The fix constrains `Element: BitwiseCopyable`, which (a) still
+    // accepts user-defined structs whose fields are all POD, and
+    // (b) makes a reference-holding element a COMPILE error rather
+    // than a runtime UAF. This positive test proves a custom POD
+    // struct round-trips every field intact through the C memcpy.
+    //
+    // The negative case is enforced by the compiler, not this test:
+    //   let bad = try BASSPSCRing<String>()   // ← does NOT compile:
+    //   "type 'String' does not conform to 'BitwiseCopyable'"
+    // (Uncomment to confirm the foot-gun is un-constructable.)
+    private struct PODPayload: BitwiseCopyable, Equatable {
+        var a: Int32
+        var b: UInt16
+        var c: Float
+    }
+
+    func testSPSCRingCustomPODStructRoundTrips() throws {
+        let ring = try BASSPSCRing<PODPayload>(capacityHint: 4)
+        let p1 = PODPayload(a: -7, b: 65000, c: 3.5)
+        let p2 = PODPayload(a: 123456, b: 1, c: -0.25)
+        XCTAssertTrue(ring.push(p1))
+        XCTAssertTrue(ring.push(p2))
+        XCTAssertEqual(ring.pop(), p1, "every field survives the memcpy round-trip")
+        XCTAssertEqual(ring.pop(), p2)
+        XCTAssertNil(ring.pop())
+    }
+
     // MARK: - Rust SIMD vs scalar perf
 
     func testRustSIMDvsScalarPerf() throws {
