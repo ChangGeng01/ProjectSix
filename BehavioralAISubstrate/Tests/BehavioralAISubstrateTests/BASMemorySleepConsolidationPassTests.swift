@@ -201,6 +201,51 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty)
     }
 
+    /// audit M-h F6 — the tamper-evidence invariant. The ledger mark
+    /// (⑥, the ONLY chain-hash mover) used to sit INSIDE the `pipeline`
+    /// block after ⑤, so a window-exhaust `break` AFTER a mutating stage
+    /// (③ tier-apply) skipped it → the store was mutated but
+    /// preChainHash == postChainHash. An external tamper that also
+    /// skipped the mark would then read as clean。 ⑥ now fires OUTSIDE
+    /// the window budget: any pass that mutated state moves the chain,
+    /// wherever the pipeline stopped。
+    func testMutationThenWindowExhaustStillMovesChainHash() async throws {
+        let fx = try await makeSeededFixture()
+        // step 10s per clock read; startedAt + guards at ①/②/③ ⇒
+        // elapsed 10s/20s/30s. A 25s window survives ①②③ (③ demotes
+        // the old atoms — a REAL store mutation) then exhausts at the
+        // tier-apply post-guard, BEFORE ④⑤。
+        let leaps = LeapClock(start: referenceNow, stepSeconds: 10)
+        let pass = makePass(
+            tracker: fx.tracker, applier: fx.applier, store: fx.store,
+            clock: { leaps.next() })
+        let checkpoint = await pass.run(BASSleepConsolidationRequest(
+            atomTiers: fx.atomTiers,
+            now: referenceNow,
+            retainFraction: 0.5,
+            maintenanceClass: .standard,
+            windowMs: 25_000,
+            dryRun: false))
+        XCTAssertTrue(checkpoint.partialCompletion,
+            "a 25s window exhausts at the tier-apply post-guard")
+        XCTAssertTrue(checkpoint.completedStages.contains(
+            BASConsolidationCheckpoint.Stage.tierApply),
+            "③ tier-apply ran")
+        XCTAssertFalse(checkpoint.appliedMutations.isEmpty,
+            "③ demoted the old atoms — a REAL store mutation")
+        XCTAssertFalse(checkpoint.completedStages.contains(
+            BASConsolidationCheckpoint.Stage.quarantineWrite),
+            "the window exhausted BEFORE ④⑤ — a genuine mid-pipeline stop")
+        XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty,
+            "⑤ was skipped by the exhausted window")
+        // THE invariant — the anchor fires outside the window budget:
+        XCTAssertTrue(checkpoint.completedStages.contains(
+            BASConsolidationCheckpoint.Stage.ledgerMark),
+            "the tamper-evidence anchor must fire on a mutating partial pass")
+        XCTAssertNotEqual(checkpoint.preChainHash, checkpoint.postChainHash,
+            "mutation ⟹ chain moves — even when the window exhausted mid-pipeline")
+    }
+
     // MARK: - 5. Unjoined candidates recorded, never acted on
 
     func testUnjoinedCandidatesAreRecordedNotActedOn() async throws {
