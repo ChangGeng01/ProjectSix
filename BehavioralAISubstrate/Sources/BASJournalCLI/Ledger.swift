@@ -215,6 +215,18 @@ func sealForget(atomID: UUID, contentText: String) async throws -> String {
         ledger: ledger, atomID: atomID, verdict: "forget:tombstoned", contentText: contentText)
 }
 
+/// Seal a `council` deliberation (increment 5). `fabricRef` carries the honest multi-seat
+/// deliberation summary (`council|4of9|emitted:…|surface:…`) produced by firing the multi-agent
+/// state fabric — mirror-not-oracle, never a correctness verdict. Like the other seals the decision
+/// text is DIGESTED (not stored raw) into the append-only Ed25519 record; `deliberationID`
+/// identifies this council action. Returns the seal's auditID.
+@discardableResult
+func sealCouncil(deliberationID: UUID, decisionText: String, fabricRef: String) async throws -> String {
+    let ledger = try makeLedger()
+    return try await sealAction(
+        ledger: ledger, atomID: deliberationID, verdict: fabricRef, contentText: decisionText)
+}
+
 // MARK: - `ledger` command (verify + display, fail-closed on tamper)
 
 /// Verify the whole Ed25519 hash chain and display the sealed sovereign record. Fail-closed:

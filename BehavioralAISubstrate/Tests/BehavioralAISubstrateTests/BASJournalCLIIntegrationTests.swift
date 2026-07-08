@@ -651,5 +651,88 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
             "a reconciled retry MUST NOT append duplicate terminal events (\(before) → \(after))")
         XCTAssertEqual(try run(["ledger"], journalDir: dir).exit, 0, "chain must remain intact")
     }
+
+    // MARK: - Increment 5: fire the multi-agent deliberation fabric (audit blind-spot ③ / H8 loaded gun)
+
+    /// `council "<decision>"` convenes the previously-DORMANT multi-agent state fabric: the 4-of-9
+    /// mandatory seats emit deltas, the merge engine arbitrates, and each accepted delta is written
+    /// to the single-writer-per-domain graph — firing the just-hardened H8 path (registerWriterBatch
+    /// via wireRosterToGraph + per-delta writeObject) and the H17 merge applier. NOT a tautology:
+    /// the fire is fail-closed (refuses to seal unless every accepted delta applied to a DISTINCT
+    /// domain), and the anti-vacuity proof is the DURABLE cross-process seal — this test verifies the
+    /// council seal exists in the Ed25519 chain from a SECOND process (`ledger`) and the chain is intact.
+    func testCouncilFiresFabricAndSeals() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let out = try run(["council", "should I migrate the store to SQLite this sprint?"], journalDir: dir)
+        XCTAssertEqual(out.exit, 0, "council must fire + seal: \(out.stderr)")
+        // A GENUINE multi-seat fire: all 4 mandatory deltas accepted + applied to 4 distinct domains.
+        XCTAssertTrue(out.stdout.contains("4/4 deltas accepted + applied"),
+            "the fabric must genuinely fire all 4 mandatory seats: \(out.stdout)")
+        XCTAssertTrue(out.stdout.contains("4 distinct domains written"),
+            "4 distinct single-writer domains must be written (anti-vacuity): \(out.stdout)")
+        XCTAssertTrue(out.stdout.contains("4-of-9 mandatory-seat"),
+            "must honestly label the 4-of-9 scope, not claim a full 9-seat council: \(out.stdout)")
+        // Mirror-not-oracle: the surface mode is framed as a disposition, never a correctness verdict.
+        XCTAssertTrue(out.stdout.contains("NOT a verdict on whether the decision is right"),
+            "must frame the disposition honestly (mirror-not-oracle): \(out.stdout)")
+        XCTAssertTrue(out.stdout.contains("sealed ") && out.stdout.contains("council|4of9|"),
+            "the deliberation must be sealed with the honest fabricRef: \(out.stdout)")
+
+        // DURABLE, cross-process proof (the real anti-vacuity check): a SECOND process verifies the
+        // council seal is in the signed chain and the chain is intact.
+        let verify = try run(["ledger"], journalDir: dir)
+        XCTAssertEqual(verify.exit, 0, "ledger must verify intact")
+        XCTAssertTrue(verify.stdout.contains("chain INTACT"), "chain must verify: \(verify.stdout)")
+        XCTAssertTrue(verify.stdout.contains("council|4of9|") && verify.stdout.contains("surface:"),
+            "the sealed council deliberation must persist cross-process: \(verify.stdout)")
+    }
+
+    /// The sealed fabricRef must be a REPRODUCIBLE function of the decision text (the clock is pinned,
+    /// the candidate ID is a content hash) — the same decision in two independent journals seals the
+    /// identical council verdictRef. Mirrors the increment-2b governance-verdict determinism test;
+    /// a non-deterministic fabricRef would muddy the tamper-evident record.
+    func testCouncilDeliberationIsDeterministic() throws {
+        func fabricRef(for decision: String) throws -> String {
+            let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let out = try run(["council", decision], journalDir: dir)
+            XCTAssertEqual(out.exit, 0, out.stderr)
+            // Extract the "council|4of9|…" token from the sealed line.
+            let line = out.stdout.split(separator: "\n").first { $0.contains("council|4of9|") } ?? ""
+            let token = line.split(separator: " ").first { $0.hasPrefix("council|4of9|") } ?? ""
+            return String(token)
+        }
+        let a = try fabricRef(for: "adopt the new caching layer")
+        let b = try fabricRef(for: "adopt the new caching layer")
+        XCTAssertFalse(a.isEmpty, "a fabricRef must be produced")
+        XCTAssertEqual(a, b, "same decision ⇒ identical sealed fabricRef (pinned clock, content-hash candidate)")
+    }
+
+    /// Increment 5 is additive: `council` and `add` seal into ONE chain and interoperate. `add`'s
+    /// governance seal is unchanged by the new command (ADR-014 — the add path is untouched), and a
+    /// mixed council+add chain still verifies intact from a fresh process.
+    func testCouncilAndAddCoexistInOneIntactChain() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        XCTAssertEqual(try run(["council", "review the incident postmortem"], journalDir: dir).exit, 0)
+        let added = try run(["add", "decided: adopt weekly postmortems"], journalDir: dir)
+        XCTAssertEqual(added.exit, 0)
+        // add still seals its increment-2b governance verdict, unperturbed by the council increment.
+        XCTAssertTrue(added.stdout.contains("gov2:") || added.stdout.contains("admit"),
+            "add's governance seal must be unchanged by the council increment: \(added.stdout)")
+
+        let verify = try run(["ledger"], journalDir: dir)
+        XCTAssertEqual(verify.exit, 0)
+        XCTAssertTrue(verify.stdout.contains("chain INTACT"),
+            "a mixed council+add chain must verify intact: \(verify.stdout)")
+        XCTAssertTrue(verify.stdout.contains("council|4of9|"),
+            "the council seal must coexist with the add seal in one chain: \(verify.stdout)")
+    }
 }
 #endif

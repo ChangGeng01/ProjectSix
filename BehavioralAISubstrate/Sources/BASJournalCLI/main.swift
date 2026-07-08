@@ -272,6 +272,37 @@ private func cmdAdd(_ text: String, deliberate: Bool) async throws {
     _ = try await logDecision(text, tag: "decision", deliberate: deliberate)
 }
 
+/// Increment 5 — convene the multi-agent deliberation fabric on a decision. Fires the dormant
+/// state-fabric HIGH path (H8 single-writer + H17 merge applier + the L-layer seat organs), records
+/// the honest multi-seat deliberation, and seals it into the Ed25519 ledger. Fail-closed: a fabric
+/// that did not genuinely fire (some accepted delta unapplied / refs collapsed) is NOT sealed.
+private func cmdCouncil(_ decision: String) async throws {
+    let outcome: CouncilOutcome
+    do {
+        outcome = try await fireCouncil(on: decision)
+    } catch let CouncilError.fireIncomplete(why) {
+        FileHandle.standardError.write(Data(
+            ("council: FABRIC FIRE INCOMPLETE — refusing to seal a non-fire: \(why)\n").utf8))
+        exit(1)
+    }
+    print("council: 4-of-9 mandatory-seat deliberation (scout · planner · risk · surface)")
+    for line in outcome.lines { print(line) }
+    print("  merged: \(outcome.appliedCount)/\(outcome.emittedCount) deltas accepted + applied · "
+        + "\(outcome.distinctDomains.count) distinct domains written · \(outcome.traceEventCount) trace events")
+    print("  surface disposition: \(outcome.surfaceMode)  — a disposition toward rendering, "
+        + "NOT a verdict on whether the decision is right")
+    // Integrity-over-availability: a council that fired but could not be sealed is surfaced loudly.
+    do {
+        let sealID = try await sealCouncil(
+            deliberationID: UUID(), decisionText: decision, fabricRef: outcome.fabricRef)
+        print("sealed \(String(sealID.prefix(8)))  \(outcome.fabricRef)  (Ed25519 sovereign ledger)")
+    } catch {
+        FileHandle.standardError.write(Data(
+            ("council: the deliberation RAN but was NOT sealed into the sovereign ledger: \(error)\n").utf8))
+        exit(1)
+    }
+}
+
 private func cmdRecall(_ query: String?) async throws {
     let store = try makeStore()
     try await seedIfEmpty(store)
@@ -352,6 +383,7 @@ private func printHelp() {
       recall [query]      list entries (optionally filtered), oldest→newest
       forget <id-prefix>  tombstone an entry + verify it is gone (deletion doctrine) + seal it
       count               how many entries
+      council "<decision>"  convene the multi-agent deliberation fabric on a decision + seal it
       ledger              verify the Ed25519 sovereign chain + show every sealed action
 
     "Was I right?" — track ship/drop bets and resolve them with the real outcome:
@@ -360,6 +392,14 @@ private func printHelp() {
       right <trial-id>    you judge the bet right → finalize the trial (seal issued)
       wrong <trial-id> [reason]   you judge it wrong → finalize (seal denied, retraction queued)
       verdict <trial-id>  your recorded outcome + the fail-closed promotion gate for a bet
+
+    council "<decision>" convenes the sovereign deliberation fabric: a 4-of-9 mandatory-seat pass
+    (scout=pressure, planner=a framed candidate, risk=reversibility, surface=a disposition), merged
+    into the single-writer state graph and sealed as council|4of9|emitted:…|surface:<mode>. It is a
+    DELIBERATION record — what each seat surfaced — never a judgment that the decision is right; the
+    surface mode is a rendering disposition, not a correctness verdict. It runs entirely on-device
+    (no model), and refuses to seal unless the fabric genuinely fired (every accepted delta applied,
+    distinct domains written). Only the 4 mandatory seats run; the 5 optional seats are a follow-up.
 
     Stored on-device at ~/.qinao-journal/. Zero egress. A mirror, not an oracle.
     Every add/forget/bet + trial outcome is sealed into an append-only Ed25519 audit ledger (the
@@ -437,6 +477,10 @@ func runJournal() async {
             try await cmdForget(prefix)
         case "count":
             try await cmdCount()
+        case "council":
+            let decision = rest.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !decision.isEmpty else { print("usage: council \"<decision>\""); return }
+            try await cmdCouncil(decision)
         case "ledger":
             try await cmdLedger()
         case "bet":
