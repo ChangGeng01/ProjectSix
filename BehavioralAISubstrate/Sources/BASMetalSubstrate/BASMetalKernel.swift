@@ -102,6 +102,42 @@ public struct BASKernelInputs: Equatable, Hashable, Sendable, Codable {
     /// take no inputs (e.g. constant generators)。
     public static let empty = BASKernelInputs(
         descriptors: [], payloads: [])
+
+    private enum CodingKeys: String, CodingKey { case descriptors, payloads }
+
+    /// audit M-l / metal #3: the memberwise init's `byteCount == payload.count` preconditions are
+    /// BYPASSED by synthesized `Codable` — a crafted bundle whose descriptor.byteCount exceeds its
+    /// payload decodes fine, then a kernel copies `byteCount` bytes out of the shorter payload →
+    /// heap out-of-bounds read. Re-validate at this untrusted decode boundary and THROW (not trap).
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let descriptors = try c.decode([BASTensorDescriptor].self, forKey: .descriptors)
+        let payloads = try c.decode([Data].self, forKey: .payloads)
+        try BASKernelBundleValidation.check(
+            descriptors: descriptors, payloads: payloads,
+            label: "BASKernelInputs", codingPath: decoder.codingPath)
+        self.descriptors = descriptors
+        self.payloads = payloads
+    }
+}
+
+/// Shared decode-boundary validation for the kernel input/output bundles (audit M-l / metal #3).
+enum BASKernelBundleValidation {
+    static func check(
+        descriptors: [BASTensorDescriptor], payloads: [Data],
+        label: String, codingPath: [any CodingKey]
+    ) throws {
+        guard descriptors.count == payloads.count else {
+            throw DecodingError.dataCorrupted(.init(codingPath: codingPath,
+                debugDescription: "\(label): descriptors.count (\(descriptors.count)) != "
+                    + "payloads.count (\(payloads.count))"))
+        }
+        for (i, desc) in descriptors.enumerated() where desc.byteCount != payloads[i].count {
+            throw DecodingError.dataCorrupted(.init(codingPath: codingPath,
+                debugDescription: "\(label): payload[\(i)].count (\(payloads[i].count)) != "
+                    + "descriptor.byteCount (\(desc.byteCount))"))
+        }
+    }
 }
 
 /// Sendable output bundle returned from a kernel。 Mirrors
@@ -136,6 +172,22 @@ public struct BASKernelOutputs: Equatable, Hashable, Sendable, Codable {
                 "count (\(payloads[i].count)) must equal " +
                 "descriptor.byteCount (\(desc.byteCount))")
         }
+        self.descriptors = descriptors
+        self.payloads = payloads
+        self.executionNanos = executionNanos
+    }
+
+    private enum CodingKeys: String, CodingKey { case descriptors, payloads, executionNanos }
+
+    /// audit M-l / metal #3: same synthesized-Codable precondition bypass as BASKernelInputs.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let descriptors = try c.decode([BASTensorDescriptor].self, forKey: .descriptors)
+        let payloads = try c.decode([Data].self, forKey: .payloads)
+        let executionNanos = try c.decode(UInt64.self, forKey: .executionNanos)
+        try BASKernelBundleValidation.check(
+            descriptors: descriptors, payloads: payloads,
+            label: "BASKernelOutputs", codingPath: decoder.codingPath)
         self.descriptors = descriptors
         self.payloads = payloads
         self.executionNanos = executionNanos
