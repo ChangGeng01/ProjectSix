@@ -155,8 +155,8 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
         XCTAssertEqual(ledger.exit, 0, "healthy chain must verify: \(ledger.stdout)\(ledger.stderr)")
         XCTAssertTrue(ledger.stdout.contains("chain INTACT"),
             "ledger must report the chain intact: \(ledger.stdout)")
-        XCTAssertTrue(ledger.stdout.contains("admit:governed"),
-            "the add must appear as an admit seal: \(ledger.stdout)")
+        XCTAssertTrue(ledger.stdout.contains("admit|gov2:"),
+            "the add must appear as an admit seal carrying the governance verdict: \(ledger.stdout)")
 
         // The persisted ledger file actually exists on disk (cross-boot record).
         XCTAssertTrue(FileManager.default.fileExists(
@@ -186,9 +186,9 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
 
         let ledger = try run(["ledger"], journalDir: dir)
         XCTAssertEqual(ledger.exit, 0)
-        XCTAssertTrue(ledger.stdout.contains("admit:governed")
+        XCTAssertTrue(ledger.stdout.contains("admit|gov2:")
             && ledger.stdout.contains("forget:tombstoned"),
-            "the ledger must record BOTH the add and the forget seals: \(ledger.stdout)")
+            "the ledger must record BOTH the add (governance verdict) and the forget seals: \(ledger.stdout)")
     }
 
     /// TAMPER TEST (the teeth): corrupt a signature in ledger.sqlite out-of-band, then verify
@@ -331,6 +331,78 @@ final class BASJournalCLIIntegrationTests: XCTestCase {
         XCTAssertFalse(recall.stdout.contains("CLOBBER-attempt"),
             "the legacy file must NOT overwrite the store row")
         XCTAssertFalse(fm.fileExists(atPath: legacyFile.path), "the legacy file must be retired")
+    }
+
+    // MARK: - Increment 2b: the L1–L14 governance verdict
+
+    /// Extract the sealed verdictRef from an `add`'s stdout ("sealed <id>  <verdictRef>  (Ed25519…)").
+    private func sealedVerdict(in addStdout: String) -> String? {
+        for line in addStdout.split(separator: "\n") where line.contains("sealed ") && line.contains("gov2") {
+            // token between the id and the "  (Ed25519" suffix
+            guard let range = line.range(of: "  (Ed25519") else { continue }
+            let head = line[..<range.lowerBound]
+            // drop "sealed <8-char-id>  "
+            let parts = head.split(separator: " ", omittingEmptySubsequences: true)
+            if let idx = parts.firstIndex(of: "sealed"), idx + 2 < parts.count {
+                return parts[(idx + 2)...].joined(separator: " ")
+            }
+        }
+        return nil
+    }
+
+    /// add now routes the entry through the L1–L14 spine (runTurn) and seals the REAL governance
+    /// verdict — not the old hardcoded "admit:governed" assertion. Proves the spine ran (gov2:) and
+    /// the chain still verifies with the richer verdictRef.
+    func testAddSealsGovernanceVerdictFromSpine() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let added = try run(["add", "DROP sampling-spec draft: 0.88x"], journalDir: dir)
+        XCTAssertEqual(added.exit, 0, added.stdout + added.stderr)
+        let vref = try XCTUnwrap(sealedVerdict(in: added.stdout),
+            "add must seal a gov2 governance verdict from the spine: \(added.stdout)")
+        XCTAssertTrue(vref.hasPrefix("admit|gov2:"),
+            "verdictRef must be the spine's governance verdict, not the hardcoded assertion: \(vref)")
+        XCTAssertTrue(vref.contains("permit:") && vref.contains("risk:"),
+            "verdictRef must carry the permit + risk band: \(vref)")
+        XCTAssertNotEqual(vref, "admit:governed", "the old hardcoded assertion must be gone")
+
+        // The richer verdictRef must not break increment-2's chain verification.
+        XCTAssertEqual(try run(["ledger"], journalDir: dir).exit, 0,
+            "the hardened 1.2.0 chain must verify with the governance verdictRef")
+    }
+
+    /// The verdict is DETERMINISTIC: the same entry text in two fresh journals seals an identical
+    /// verdictRef (the device state is pinned to a constant so the verdict is a function of text
+    /// + fixed metadata only — a signed field must not drift across runs).
+    func testGovernanceVerdictIsDeterministic() throws {
+        func verdict(for text: String) throws -> String {
+            let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            return try XCTUnwrap(sealedVerdict(in: try run(["add", text], journalDir: dir).stdout))
+        }
+        XCTAssertEqual(try verdict(for: "same decision text here"),
+                       try verdict(for: "same decision text here"),
+                       "identical text must seal an identical (deterministic) verdictRef")
+    }
+
+    /// The verdict is not a constant rubber-stamp: a manipulation-cued entry ESCALATES the risk
+    /// band above a benign one (the honest, differentiated signal — mirror, not oracle).
+    func testGovernanceVerdictEscalatesOnRiskCues() throws {
+        func verdict(for text: String) throws -> String {
+            let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("qinao-journal-test-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            return try XCTUnwrap(sealedVerdict(in: try run(["add", text], journalDir: dir).stdout))
+        }
+        let benign = try verdict(for: "note: refactored the parser today")
+        let risky = try verdict(for: "you must do this immediately now, everyone says you always should")
+        XCTAssertTrue(benign.contains("risk:low"), "a benign entry should read risk:low: \(benign)")
+        XCTAssertFalse(risky.contains("risk:low"),
+            "a manipulation-cued entry must escalate above risk:low: \(risky)")
+        XCTAssertNotEqual(benign, risky, "the spine must differentiate risky from benign input")
     }
 
     // MARK: - Increment 3: the "was I right?" ShadowTrial loop

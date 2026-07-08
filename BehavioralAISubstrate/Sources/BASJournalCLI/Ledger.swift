@@ -192,12 +192,17 @@ private func sealAction(
     return appended.entry.auditID
 }
 
-/// Seal an `add` (the atom was admitted to governed memory). Returns the seal's auditID.
+/// Seal an `add` (the atom was admitted to governed memory). `verdictRef` carries the increment-2b
+/// governance verdict from the L1–L14 spine — for a private journal write this is observed to be
+/// "admit|gov2:shadowLock|permit:answer|risk:low|abstain" (the lattice abstains on an ungrounded
+/// write; it escalates the band on risk cues). When nil the caller hasn't run the spine, so we
+/// fall back to the honest legacy marker. Returns the seal's auditID.
 @discardableResult
-func sealAdmit(atomID: UUID, contentText: String) async throws -> String {
+func sealAdmit(atomID: UUID, contentText: String, verdictRef: String? = nil) async throws -> String {
     let ledger = try makeLedger()
     return try await sealAction(
-        ledger: ledger, atomID: atomID, verdict: "admit:governed", contentText: contentText)
+        ledger: ledger, atomID: atomID,
+        verdict: verdictRef ?? "admit:governed", contentText: contentText)
 }
 
 /// Seal a `forget` (the atom was tombstoned + its content secure-deleted). `contentText` MUST
@@ -267,6 +272,10 @@ func cmdLedger() async throws {
 
     print("ledger: \(entries.count) sealed entries · chain INTACT (Ed25519, cross-process)")
     let iso = ISO8601DateFormatter()
+    // DYNAMIC width = the longest sanitized verdictRef (min 30). `padding(toLength:)` TRUNCATES a
+    // string longer than the target, so a fixed width would silently drop the honesty-critical
+    // trailing "|abstain"/"|allow" disposition on every non-pass 2b verdict (they run 48–60 chars).
+    let verdictWidth = max(30, entries.map { ledgerSanitize($0.entry.verdictRef).count }.max() ?? 30)
     for appended in entries {
         let e = appended.entry
         // Actor distinguishes the operator's DECISION seals — the admit:governed / forget:tombstoned
@@ -277,7 +286,7 @@ func cmdLedger() async throws {
         // that renders invisibly — surface it as ":" so the record is human-readable.
         let id = ledgerDisplayID(e.auditID).padding(toLength: 12, withPad: " ", startingAt: 0)
         let who = e.actor.rawValue.padding(toLength: 8, withPad: " ", startingAt: 0)
-        let what = ledgerSanitize(e.verdictRef).padding(toLength: 30, withPad: " ", startingAt: 0)
+        let what = ledgerSanitize(e.verdictRef).padding(toLength: verdictWidth, withPad: " ", startingAt: 0)
         print("  \(id)  \(who)  \(what)  \(iso.string(from: e.appendedAt))")
     }
 }

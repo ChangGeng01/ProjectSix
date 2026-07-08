@@ -128,11 +128,48 @@ purges the trials index (deletion doctrine).
 Verified by `BASShadowTrialCoordinatorTests` (resume + guards) and `BASJournalCLIIntegrationTests`
 (bet→review cross-process, right/wrong fail-closed verdicts, and idempotent-retry-does-not-double-seal).
 
+## Increment 2b — the L1–L14 governance verdict (SHIPPED)
+
+`Sources/BASJournalCLI/Verdict.swift`.
+
+Each `add` now runs the entry through the verified public spine (`BASCognitiveBrain.process` →
+`EBrainRuntimeCoordinator.runTurn`) and folds the sovereign **governance** verdict into the seal's
+`verdictRef` — replacing increment 2's hardcoded `"admit:governed"` assertion with an earned,
+tamper-evidently proven disposition, e.g. `admit|gov2:shadowLock|permit:answer|risk:low|abstain`.
+
+**Feasibility surprise — it is fully Mac-runnable, no 4B.** The grounding panel (and an empirical
+run: exit 0, ~14 ms) confirmed `runTurn`'s synchronous spine touches only the small in-tree 68 KB
+`BASContextClassifier.mlmodel`, never the 4B MLX. The sealed governance verdict is byte-identical
+Mac-side and device-side (a device's neural core feeds prose/organ artifacts only, never the
+risk→permit→verdict lattice), so there was **nothing to device-defer** after all. Added deps:
+`BASHostKit` + `BASPolicy`; the seal stays hardened 1.2.0 (the injective canonical form is exactly
+what makes the richer `|`/`:` verdictRef collision-safe); all truncation/verify gates untouched.
+
+**Honest reality (verified by running, then corrected in the comments — mirror, not oracle).** The
+sovereign lattice does NOT rubber-stamp a private journal write: a benign entry seals
+`gov2:shadowLock|…|abstain` (it abstains because it can't sovereignly GROUND an ungrounded write —
+`gov2:pass/allow` effectively never occurs here), and a manipulation-cued entry ESCALATES to
+`gov2:memoryFreeze|permit:delay|risk:high`. The value over the old string: that string *asserted*
+governance with nothing behind it; `gov2:<level>` is the lattice's real, deterministic, sealed
+disposition, and `gov2:unavailable` honestly marks a spine that couldn't run. It is a governance
+disposition proving the lattice ran — never a judgment that the logged decision is *right*.
+
+**Hardened by an adversarial refute panel (find→verify) — 8 findings, all fixed:** the `ledger`
+display truncated the honesty-critical `|abstain` disposition (fixed → dynamic width); the
+abstention predicate omitted `.draftOnly`/`.localOnly` (fixed → uses the substrate's own
+`isProtective`, now public); a `BrainBox` actor-reentrancy early-nil (fixed → shared in-flight
+Task); and comment/example/legend honesty (a docstring showed a never-occurring `pass/allow`; help
+now explains `shadowLock/abstain` is the expected normal disposition, not a danger flag). One
+finding — a pre-existing `.mlmodelc` temp-compile leak in the shared `BASContextClassifierMLAdapter`
+that the workload now fires per `add` — was **spawned as its own task** (critical shared substrate,
+deserves a focused tested session), not rushed into this increment.
+
+Verified by `BASJournalCLIIntegrationTests`: add seals a `gov2:` verdict (not the hardcoded
+string) and the chain still verifies; the verdict is deterministic; and it escalates the risk band
+on manipulation cues.
+
 ## Next increments (planned, not yet built)
 
-- **Increment 2b — the L2 verdict (device).** Route `add` through `runTurnAndIngest` for a
-  calibrated verdict/abstention and fold it into the seal's `verdictRef`. Heavy: needs the
-  on-device 4B — run on device, one call per entry.
 - **Increment 3b — the deliberation-loop toggles.** Wire `setDeliberationLoopEnabled` /
   `setShadowTrialFeedback` so a live EBrain turn CONSUMES the recorded trial outcomes (the
   grounding panel found this is Mac-constructible but observation-only / cross-turn, so it buys

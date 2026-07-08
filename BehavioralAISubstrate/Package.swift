@@ -603,7 +603,12 @@ let package = Package(
                 // module that can see both BASMemory (the coordinator) and BASSovereign (the
                 // ledger), so it hosts the BASSovereignAuditLedger→BASShadowTrialLedger bridge +
                 // the makeWithDefaultStateMachine factory.
-                "BASOrchestration"
+                "BASOrchestration",
+                // increment 2b: route add through the L1-L14 spine for a governance verdict.
+                // BASHostKit holds BASCognitiveBrain + runTurn; BASPolicy holds the permit/risk
+                // enums (BASActionPermitMode / BASBrainRiskLevel) named in the honest verdict string.
+                "BASHostKit",
+                "BASPolicy"
             ],
             path: "Sources/BASJournalCLI"),
         .plugin(

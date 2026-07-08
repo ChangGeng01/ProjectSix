@@ -244,13 +244,20 @@ func logDecision(_ text: String, tag: String) async throws -> UUID? {
     }
     try writeContent(atom.id, text)
     print("logged \(String(atom.id.uuidString.prefix(8)))  \(text)")
+    // Increment 2b — run the entry through the L1–L14 spine for a real GOVERNANCE verdict and fold
+    // it into the seal's verdictRef (replacing the hardcoded "admit:governed" assertion). Degrade
+    // HONESTLY: if the spine can't construct (model missing / non-Apple host) we seal a labeled
+    // "…|gov2:unavailable" — never a fabricated pass. The add must not be held hostage to the
+    // verdict organ, so a spine miss still logs + seals the entry.
+    let verdictRef = await governanceVerdictRef(action: "admit", for: text)
+        ?? "admit:governed|gov2:unavailable"
     // Increment 2 — seal the sovereign action into the Ed25519 audit ledger (append-only,
     // tamper-evident, cross-boot). Integrity-over-availability: surface a seal failure LOUDLY
     // and DISTINCTLY — the atom is already logged, so the operator must be able to tell a
     // logged-but-UNSEALED partial success from a total failure.
     do {
-        let sealID = try await sealAdmit(atomID: atom.id, contentText: text)
-        print("sealed \(String(sealID.prefix(8)))  admit:governed  (Ed25519 sovereign ledger)")
+        let sealID = try await sealAdmit(atomID: atom.id, contentText: text, verdictRef: verdictRef)
+        print("sealed \(String(sealID.prefix(8)))  \(verdictRef)  (Ed25519 sovereign ledger)")
     } catch {
         FileHandle.standardError.write(Data(
             ("SEAL FAILED — the entry is LOGGED to memory but NOT sealed into the sovereign "
@@ -358,6 +365,13 @@ private func printHelp() {
     3 first-run seed threads are unsealed sample data). Tamper-evident against edits to
     ledger.sqlite by anyone who lacks identity.key — the private key (0600) sits beside it, so
     this is CLI-grade, not Secure-Enclave-bound: an attacker who can read the key can forge it.
+
+    Each add runs the entry through the L1–L14 governance spine and seals the verdict, e.g.
+    "admit|gov2:shadowLock|permit:answer|risk:low|abstain". gov2:shadowLock|abstain is the NORMAL,
+    expected disposition for a private note — the lattice cannot sovereignly GROUND an ungrounded
+    write, so it abstains (it is NOT flagging your note as dangerous). The useful signal is the
+    ESCALATION band: a manipulation-cued entry rises to gov2:memoryFreeze|risk:high. It is a
+    governance disposition proving the lattice ran — never a judgment that your decision is right.
     """)
 }
 
