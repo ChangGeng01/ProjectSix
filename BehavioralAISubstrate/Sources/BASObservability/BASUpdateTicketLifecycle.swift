@@ -85,6 +85,33 @@ public enum BASUpdateTicketLifecycleState:
     case queuedForDistillation
     case distilled
     case rejected
+
+    /// audit M-c / policy-obs-misc MED-1: a MONOTONIC rank over the lifecycle DAG — every LEGAL
+    /// transition strictly increases it (proposed→trialing→{passed,failed,contaminated};
+    /// passed→queued→{distilled,rejected}; any pre-terminal→rejected). The durable store uses this
+    /// to reject a STALE writer that would regress a ticket's rank.
+    public var rank: Int {
+        switch self {
+        case .proposed:              return 0
+        case .trialing:              return 1
+        case .trialPassed:           return 2
+        case .trialFailed:           return 3
+        case .trialContaminated:     return 4
+        case .queuedForDistillation: return 5
+        case .distilled:             return 6
+        case .rejected:              return 7
+        }
+    }
+
+    /// Terminal states are FROZEN in the durable store — no writer may overwrite them. This is the
+    /// direct enforcer of invariant #3: a rejected / failed / contaminated / distilled ticket must
+    /// never resurrect (least of all back into a distillation-eligible state).
+    public var isTerminal: Bool {
+        switch self {
+        case .trialFailed, .trialContaminated, .distilled, .rejected: return true
+        case .proposed, .trialing, .trialPassed, .queuedForDistillation: return false
+        }
+    }
 }
 
 public struct BASUpdateTicketLifecycleTransition:
@@ -160,11 +187,22 @@ public struct BASUpdateTicketLifecycleEntry:
 ///   simultaneously can lose one set of changes (atomic-replace
 ///   races at the filesystem layer). Single-host only.
 ///
-/// - `BASUpdateTicketLifecycleSQLiteStorage` (M270): **IS**
-///   cross-process safe. SQLite's own lock manager handles
-///   serialization via `SQLITE_OPEN_FULLMUTEX` + the natural
-///   `BEGIN TRANSACTION` exclusive lock. Two host processes
-///   pointing at the same `.sqlite` file see consistent state.
+/// - `BASUpdateTicketLifecycleSQLiteStorage` (M270): cross-process
+///   safe for the property that matters to invariant #3 (audit M-c
+///   / policy-obs-misc MED-1). SQLite's lock manager serializes
+///   writes so no BYTE corruption occurs — but that alone does NOT
+///   stop a STALE coordinator's snapshot from logically overwriting
+///   a newer one (the old DELETE-all + INSERT-all was last-full-
+///   snapshot-wins and could resurrect a rejected ticket). The
+///   store now ALSO enforces a per-row upsert guarded by a monotonic
+///   `state_rank` + a TERMINAL FREEZE: a stale / older writer can
+///   neither regress a ticket's rank nor overwrite a terminal
+///   (rejected / failed / contaminated / distilled) state, so a
+///   rejected or distilled ticket can never resurrect into a
+///   distillation-eligible state. Non-terminal concurrent writes
+///   still resolve last-writer-wins — a safe direction, since a
+///   ticket cannot enter weights without passing the guarded
+///   terminal transitions.
 ///
 /// Hosts deploying multi-process scenarios (one writer + N
 /// readers, or load-balanced workers) should pick the SQLite
@@ -277,6 +315,18 @@ public actor BASUpdateTicketLifecycleCoordinator {
     /// leaving the file in a stale state.
     private var saveChain: Task<Void, Never>?
 
+    /// audit M-c / policy-obs-misc MED-1: `persistQuietly()` used to SILENTLY swallow save errors,
+    /// so a lost durable write was invisible — the in-memory state and disk could silently diverge.
+    /// These make a persist failure OBSERVABLE (fail-closed-observable): hosts + tests can read them
+    /// to detect that a mutation did not reach disk, instead of trusting a swallowed catch.
+    public private(set) var persistFailureCount: Int = 0
+    public private(set) var lastPersistError: String?
+
+    private func recordPersistFailure(_ description: String) {
+        persistFailureCount += 1
+        lastPersistError = description
+    }
+
     public init(
         clock: @escaping @Sendable () -> Date = { .now },
         auditSink: AuditSink? = nil,
@@ -324,14 +374,15 @@ public actor BASUpdateTicketLifecycleCoordinator {
         // inline await prevents stale reads downstream.
         let snapshot = entries
         let prior = saveChain
-        let task = Task { [storage, snapshot, prior] in
+        let task = Task { [weak self, storage, snapshot, prior] in
             await prior?.value
             do {
                 try await storage.save(snapshot)
             } catch {
-                // absorbed — persistence failures don't crash
-                // lifecycle (mutation already completed in
-                // memory; chain advances regardless)
+                // Persistence failures don't crash the lifecycle (the mutation already completed in
+                // memory; the chain advances regardless) — but audit M-c: they are NO LONGER
+                // invisible. Record so a lost write is observable instead of silently swallowed.
+                await self?.recordPersistFailure("\(error)")
             }
         }
         saveChain = task

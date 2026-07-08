@@ -28,7 +28,8 @@ import BASRuntimeCore
 /// CREATE TABLE IF NOT EXISTS lifecycle_entries (
 ///     ticket_id  TEXT PRIMARY KEY NOT NULL,
 ///     state      TEXT NOT NULL,
-///     entry_json TEXT NOT NULL
+///     entry_json TEXT NOT NULL,
+///     state_rank INTEGER NOT NULL DEFAULT 0   -- audit M-c: monotonic lifecycle rank
 /// );
 /// ```
 ///
@@ -40,9 +41,14 @@ import BASRuntimeCore
 /// column so callers can bypass the JSON parse for queries
 /// like "what's in the distillation queue right now."
 ///
-/// `ticket_id` is the natural primary key. `INSERT OR REPLACE`
-/// (UPSERT) handles the create vs update branching internally
-/// — no need for the caller to track which path applies.
+/// `ticket_id` is the natural primary key. `save` performs a per-row
+/// `ON CONFLICT(ticket_id) DO UPDATE` GUARDED by `state_rank` + a
+/// terminal-state freeze (audit M-c / policy-obs-misc MED-1): a
+/// stale writer can neither regress a ticket's rank nor overwrite a
+/// terminal (rejected / failed / contaminated / distilled) state, so
+/// a rejected/distilled ticket can never resurrect. It is a MERGE, not
+/// a whole-table replace — no DELETE-all (terminal rows are retained
+/// for audit; the pool is append-mostly).
 ///
 /// ## Concurrency
 ///
@@ -168,19 +174,26 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     private func performSave(
         _ entries: [String: BASUpdateTicketLifecycleEntry]
     ) throws {
-        // Atomic batch write: BEGIN, DELETE all, INSERT each,
-        // COMMIT. On error rollback so a half-written batch
-        // doesn't corrupt prior state.
+        // audit M-c / policy-obs-misc MED-1: was DELETE-all + INSERT-all of the caller's WHOLE
+        // snapshot inside one transaction — last-full-snapshot-wins. A stale coordinator committing
+        // its snapshot AFTER another process advanced a ticket WIPED the newer row and RESURRECTED
+        // the ticket at its stale (possibly terminal→non-terminal) state, brushing invariant #3.
+        // Now: per-row upsert guarded by a monotonic `state_rank` + a terminal-freeze, so a stale /
+        // older write can neither regress a ticket's rank nor overwrite a terminal state. No
+        // DELETE-all — terminal tickets are retained for audit and the pool is append-mostly.
         try execute(sql: "BEGIN TRANSACTION", phase: "begin")
         do {
-            try execute(
-                sql: "DELETE FROM lifecycle_entries",
-                phase: "delete-all")
-
             let upsertSQL = """
                 INSERT INTO lifecycle_entries
-                  (ticket_id, state, entry_json)
-                VALUES (?, ?, ?)
+                  (ticket_id, state, entry_json, state_rank)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(ticket_id) DO UPDATE SET
+                  state = excluded.state,
+                  entry_json = excluded.entry_json,
+                  state_rank = excluded.state_rank
+                WHERE excluded.state_rank >= lifecycle_entries.state_rank
+                  AND lifecycle_entries.state NOT IN
+                      ('trialFailed', 'trialContaminated', 'distilled', 'rejected')
                 """
             var stmt: OpaquePointer?
             let prepRC = sqlite3_prepare_v2(
@@ -219,6 +232,8 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
                 _ = sqlite3_bind_text(
                     stmt, 3, json, -1,
                     Self.sqliteTransient)
+                _ = sqlite3_bind_int64(
+                    stmt, 4, sqlite3_int64(entry.state.rank))
 
                 guard sqlite3_step(stmt) == SQLITE_DONE else {
                     throw SQLiteError.stepFailed(
@@ -392,20 +407,59 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     }
 
     private func createSchemaIfNeeded() throws {
+        // audit M-c: `state_rank` carries the monotonic lifecycle rank so the upsert can reject a
+        // stale writer's regression (new DBs get the column here; existing 3-column DBs are migrated).
         let sql = """
             CREATE TABLE IF NOT EXISTS lifecycle_entries (
                 ticket_id  TEXT PRIMARY KEY NOT NULL,
                 state      TEXT NOT NULL,
-                entry_json TEXT NOT NULL
+                entry_json TEXT NOT NULL,
+                state_rank INTEGER NOT NULL DEFAULT 0
             )
             """
         try execute(sql: sql, phase: "create-table")
+        try migrateAddStateRankIfNeeded()
 
         let indexSQL = """
             CREATE INDEX IF NOT EXISTS lifecycle_state_idx
               ON lifecycle_entries(state)
             """
         try execute(sql: indexSQL, phase: "create-index")
+    }
+
+    /// audit M-c / policy-obs-misc MED-1: bring a pre-existing 3-column table up to the `state_rank`
+    /// schema. Idempotent — the ALTER + backfill run only when the column is absent. Backfills from
+    /// the authoritative `state` string so existing terminal rows are protected from the first open.
+    private func migrateAddStateRankIfNeeded() throws {
+        if try columnExists(table: "lifecycle_entries", column: "state_rank") { return }
+        try execute(
+            sql: "ALTER TABLE lifecycle_entries ADD COLUMN state_rank INTEGER NOT NULL DEFAULT 0",
+            phase: "migrate-add-state-rank")
+        try execute(sql: """
+            UPDATE lifecycle_entries SET state_rank = CASE state
+              WHEN 'proposed' THEN 0 WHEN 'trialing' THEN 1 WHEN 'trialPassed' THEN 2
+              WHEN 'trialFailed' THEN 3 WHEN 'trialContaminated' THEN 4
+              WHEN 'queuedForDistillation' THEN 5 WHEN 'distilled' THEN 6 WHEN 'rejected' THEN 7
+              ELSE 0 END
+            """, phase: "backfill-state-rank")
+    }
+
+    /// True iff `table` already has a column named `column`. `table` is a fixed internal literal
+    /// (PRAGMA takes no bind params for the table name), so there is no injection surface.
+    private func columnExists(table: String, column: String) throws -> Bool {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(\(table))", -1, &stmt, nil) == SQLITE_OK else {
+            throw SQLiteError.prepareFailed(
+                sql: "PRAGMA table_info(\(table))", reason: lastErrorMessage() ?? "prepare failed")
+        }
+        defer { sqlite3_finalize(stmt) }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            // table_info columns: cid(0), name(1), type(2), notnull(3), dflt(4), pk(5).
+            if let namePtr = sqlite3_column_text(stmt, 1), String(cString: namePtr) == column {
+                return true
+            }
+        }
+        return false
     }
 
     private func execute(sql: String, phase: String) throws {
