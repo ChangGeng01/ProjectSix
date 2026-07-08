@@ -170,10 +170,72 @@ on manipulation cues.
 
 ## Next increments (planned, not yet built)
 
-- **Increment 3b — the deliberation-loop toggles.** Wire `setDeliberationLoopEnabled` /
-  `setShadowTrialFeedback` so a live EBrain turn CONSUMES the recorded trial outcomes (the
-  grounding panel found this is Mac-constructible but observation-only / cross-turn, so it buys
-  nothing for a batch CLI until the journal drives live turns). Deferred, stated honestly.
+- **Increment 3b — the deliberation-loop toggles. VERDICT: NOT SHIPPED — substrate gap, not a
+  deferral.** The envisioned feature was: wire `setDeliberationLoopEnabled` /
+  `setShadowTrialFeedback` so a live EBrain add-turn CONSUMES the journal's recorded ShadowTrial
+  bet outcomes into the sealed governance verdict. A two-report grounding audit (source-verified,
+  2026-07-08) found **the channel from the journal's bets to a future add's sealed verdict does
+  not exist in the substrate.** Building the toggle-wiring would ship a no-op dressed as a loop —
+  exactly the dormant-feature pretense this workload exists to kill. So 3b-as-envisioned is
+  **classified VACUOUS and is NOT built.** The precise reasons, each verified in source:
+
+  1. **The two systems are disjoint.** The journal's bet loop (`Trials.swift`) drives
+     `BASShadowTrialCoordinator.submit/resumeTrial/finalize/promotionVerdict`, which is memory-only
+     and **never calls `runTurn`**; its outcomes influence only its own `promotionVerdict` and the
+     SQLite trial-index sidecar. `grep` of `Sources/BASJournalCLI/` confirms **zero** references to
+     `pendingTrialLedgerIn`, `resolvedTrialSink`, `shadowTrialFeedbackEnabled`, or
+     `BASShadowTrialFeedbackLedger` — the coordinator and the in-turn feedback carrier are
+     different types with no wiring between them.
+
+  2. **The in-turn feedback block is OBSERVATION-ONLY by design.** The only trial-consumption block
+     in `EBrainRuntimeCoordinator+RunTurn.swift` (lines 145-153) reads a *host-supplied*
+     `BASShadowTrialFeedbackLedger` (NOT the journal's coordinator) and its sole effect is
+     `resolvedTrialSink(evaluated)`. The header comment (132-153) states it verbatim: feeds
+     `resolvedTrialSink` ONLY — *gates nothing; NOT in any render / seal / verdict / governance /
+     canonical-bytes / hash path.* Nothing reads `evaluated` back into `riskCard` / `permit` /
+     `thoughtFrame`.
+
+  3. **The verdict core has no trial parameter.** `computeVerdictDecision` /
+     `buildSovereignVerdict` (`EBrainRuntimeCoordinator+SovereignVerdict.swift`) are pure functions
+     of `budgetFrame` / `riskCard` / `actionPermit` / `emergencyBrake` / `activeKillSwitches` /
+     `policyLineage`. There is **no trial-state input at all** — trial outcomes structurally cannot
+     enter the sealed lattice.
+
+  4. **The feedback ledger is DORMANT and structurally identity.**
+     `BASShadowTrialFeedbackLedger.evaluate` (`BASMemory`, lines 60-113) is documented DORMANT: it
+     carries, never learns (pending-state vocab and terminal-verdict vocab are disjoint), and no
+     real `actualOutcome` signal source exists (ADR-021 prereq absent). Even the host-side carrier
+     it would read has nothing to learn from yet.
+
+  5. **The journal never turns the flags on.** The add path is `BASCognitiveBrain.makeWithDefaults()
+     → brain.process(text, …)`; both `deliberationLoopEnabled` and `shadowTrialFeedbackEnabled`
+     default `false` (constructor) and are never set on the journal route, so the sealed verdict is
+     **byte-identical** (红线 7 / ADR-014) to the flag-off pipeline. The flags are a real substrate
+     *capability* for a host that populates the carriers — they are simply not a journal-bet loop.
+
+  **What IS possible today (and is honestly just observation, if ever built):** flipping the toggle
+  on the journal add would, at most, fire `resolvedTrialSink` with the *host-owned* carrier's
+  records — an observation side-channel the CLI could print as "trials the substrate observed this
+  turn." That would be legitimate **only if labeled as observation** and **never** as a
+  verdict-influencing or bet-consuming loop. It is not built here because on the journal route the
+  carrier is empty (nil), so the sink would fire on nothing — a print with no content is not a
+  feature.
+
+  **What would have to exist in the substrate for the envisioned loop to become real** (so this is
+  a precise gap, not defeatism):
+  - a signal source that turns a resolved `promotionVerdict` / finalized trial completionState into
+    a real `actualOutcome` (the ADR-021 prereq that is currently absent), so
+    `BASShadowTrialFeedbackLedger.evaluate` stops being structural identity and actually *learns*;
+  - a bridge type that adapts the journal's `BASShadowTrialCoordinator` state into a
+    `pendingTrialLedgerIn` carrier keyed to the PRIOR turn (respecting the
+    NEVER-EFFECTIVE-SAME-TURN doctrine at RunTurn lines 132-141);
+  - a genuine consumption edge: a trial-state parameter threaded into `computeVerdictDecision` (or
+    a documented `riskCard`/`policyLineage` write-back from the evaluated outcomes), which today
+    does not exist and would itself need an ADR + byte-equality re-baselining under 红线 7.
+
+  Until those three exist, 3b remains a **documented substrate gap**. This is the strictest honest
+  outcome: the workload did its job by exposing that the "close the loop" feature has no substrate
+  channel, and we refuse to ship theater in its place.
 ## Increment 4 — content-store hardening (SHIPPED)
 
 `Sources/BASJournalCLI/ContentStore.swift`.
