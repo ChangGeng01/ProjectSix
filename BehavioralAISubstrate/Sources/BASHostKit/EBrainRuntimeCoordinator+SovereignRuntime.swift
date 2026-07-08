@@ -216,7 +216,11 @@ extension BASEBrainRuntimeCoordinator {
             powerMargin: powerMargin,
             continuityScore: max(
                 0,
-                min(1, 0.82 - continuityPenalty + (budgetFrame.hasActiveLease() ? 0.08 : 0))
+                // audit M-k F5: pin the lease check to the TURN timestamp, not `.now` — continuityScore
+                // lands in the (byte-equal replayable) turn result, and a wall-clock read made it
+                // replay-unstable (the same turn scored differently on replay).
+                min(1, 0.82 - continuityPenalty
+                    + (budgetFrame.hasActiveLease(asOf: runtimeTrace.recordedAt) ? 0.08 : 0))
             ),
             stabilityScore: max(
                 0,

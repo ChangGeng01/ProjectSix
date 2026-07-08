@@ -493,6 +493,11 @@ public actor BASTurnRuntimeEngine {
             return await runWithPlan(
                 request,
                 plan: stagePlan ?? BASTurnRuntimeStagePlan.canonical(),
+                // audit M-k F2: thread the caller's audit projections + permit-escalation ledger
+                // into the native path — the .nativeV2 branch used to silently DROP them (the
+                // complete-envelope reported nil,nil), breaking the documented threading promise.
+                auditProjections: auditProjections,
+                permitEscalationLedger: permitEscalationLedger,
                 timestampMsOverride: timestampMsOverride)
         }
         let result = coordinator.runTurn(request)
@@ -554,6 +559,11 @@ public actor BASTurnRuntimeEngine {
         _ request: BASEBrainTurnRequest,
         plan: BASTurnRuntimeStagePlan =
             BASTurnRuntimeStagePlan.canonical(),
+        // audit M-k F2: accept the caller's audit projections + permit-escalation ledger so the
+        // native path can thread them into the complete envelope. `nil` defaults keep every
+        // existing caller byte-equal.
+        auditProjections: BASRuntimeAuditProjectionsBundle? = nil,
+        permitEscalationLedger: BASPermitEscalationLedger? = nil,
         delegate: BASRuntimeInternalDelegate? = nil,
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
@@ -635,8 +645,8 @@ public actor BASTurnRuntimeEngine {
             timestampMsOverride: timestampMsOverride)
         await emitCompleteEnvelope(
             for: result,
-            auditProjections: nil,
-            permitEscalationLedger: nil,
+            auditProjections: auditProjections,          // audit M-k F2: was hardcoded nil (dropped)
+            permitEscalationLedger: permitEscalationLedger,  // audit M-k F2: was hardcoded nil (dropped)
             stageLedger: stageLedger,
             stagePlan: plan,
             timestampMsOverride: timestampMsOverride)

@@ -1298,7 +1298,8 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         vitalState = try container.decodeIfPresent(BASVitalState.self, forKey: .vitalState)
             ?? BASEBrainTurnResult.defaultVitalState(
                 deviceState: deviceState,
-                budgetFrame: budgetFrame
+                budgetFrame: budgetFrame,
+                asOf: runtimeTrace.recordedAt   // audit M-k F5: deterministic replay, not `.now`
             )
         runLease = try container.decodeIfPresent(BASRunLease.self, forKey: .runLease)
         emergencyBrake = try container.decodeIfPresent(BASEmergencyBrake.self, forKey: .emergencyBrake)
@@ -1440,16 +1441,19 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         )
     }
 
-    private static func defaultVitalState(
+    static func defaultVitalState(
         deviceState: BASDeviceState,
-        budgetFrame: BASBudgetFrame
+        budgetFrame: BASBudgetFrame,
+        asOf date: Date
     ) -> BASVitalState {
         BASVitalState(
             wakeState: budgetFrame.runMode,
             survivalMargin: max(0.1, deviceState.batteryLevel),
             thermalMargin: thermalMargin(for: deviceState.thermalLevel),
             powerMargin: max(0.1, 1 - max(deviceState.cpuLoad, deviceState.gpuLoad)),
-            continuityScore: budgetFrame.hasActiveLease() ? 0.82 : 0.58,
+            // audit M-k F5: this fallback runs on the Decodable REPLAY path — pin the lease check to
+            // the decoded turn timestamp, not `.now`, so a replayed result reproduces its own score.
+            continuityScore: budgetFrame.hasActiveLease(asOf: date) ? 0.82 : 0.58,
             stabilityScore: budgetFrame.thermalGuardLevel == .emergency ? 0.2 : 0.64
         )
     }
