@@ -209,7 +209,19 @@
 11. purpose 入口 sessionID 路由（H21,0.5d）。
 
 **立项（结构性,需专案 + 操作员裁决）**
-12. **QINAO/eval 门重接地**（H23,2-3d）：实现已承诺的 merge 步、删硬编码 PASS、复核 eval 集指纹、缺行 fail-closed——这是"最严谨"叙事的信誉修复。
+12. **QINAO/eval 门重接地**（H23）— **DONE(2026-07-08,TDD 17 门+双轮 Opus 对抗审查)**。
+    ①硬编码 PASS 删除:#88/#92/#89 是部署架构事实模型 eval 无法验证→按 registry 身份
+    (ATTEST_ONLY_CRITICAL,不看值不可伪造)恒路由 ATTEST;#83 contamination 改真算
+    (contamination.py 泄漏检查,数据缺→None→PENDING fail-closed)。②F1 merge/注入:_prov
+    provenance 侧信道,CRITICAL 值无 kind=="computed" 出处→ATTEST。③F3 指纹:FINGERPRINT_KEYMAP
+    扩到 4 eval 集(train 必需/eval present-verify)。④缺行/截断 fail-closed(_load_values
+    非零退出)。**★第一轮 Opus 对抗审查抓 4 真缺陷全修**:(a)model_eval_ok 漏 verifiable-ATTEST
+    (注入 fixture 曾 model_eval_ok=True crit_pass=0)→加 v_attest_blocking 阻断;(b)_prov 明文可伪造
+    →诚实降 docstring(防意外/懒注入非防蓄意伪造者;release_ok_model 按门身份是不可伪造后盾);
+    (c)contamination 读不了真 train(chat messages schema)=对生产 no-op→加 messages 解析+短问
+    子串回退;(d)release_ok_model 恒 False 且 release_gate 只读它=永久红无解锁路→outer gate 改读
+    model_eval_ok(可过)+ attestations_pending 作显式 DEFERRED 行。诚实边界:门是本地开发装置非
+    生产信任边界,防"自证剧场"(硬编码/一次真发生过的 /tmp 注入)非防恶意内鬼。
 13. ShadowTrial 乐观并发 + ledger 回滚（H9,1.5d）——L13 上生产前必修。
 14. Rust event log 100k 截断分页（H10,含 XCFramework 重建,1d）。
 15. **热表示统一**（x-arch MED-1）：钉规范枚举 + 显式互转 + `thermalState` 类型化 + 未识别 fail-loud。

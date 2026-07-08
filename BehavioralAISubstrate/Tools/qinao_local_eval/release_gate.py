@@ -24,6 +24,21 @@ PRESERVE = os.path.expanduser("~/qwen_honesty_finetune")
 REPO = os.path.expanduser("~/Project/Project06/Project06/BehavioralAISubstrate")
 EXPECTED_SUBSTRATE_GATES = 98  # authored + green host gates (see QINAO_SUBSTRATE_GATE_MAP.md)
 
+# H23 (mega-audit F3, 2026-07-08): the data-fingerprint gate must re-verify the EVAL
+# corpora, not only the 2 train files — contamination hides in the eval sets, and the
+# old keymap left them unhashed. TRAIN files are REQUIRED in the manifest (their absence
+# fails the gate); EVAL files are verified whenever the manifest names them. `data_eval/`
+# is the eval-corpus root (holdout_*.json, tqa_mc.jsonl, syco-eval/*).
+FINGERPRINT_KEYMAP = {
+    "v6_train":       "data_v6/train.jsonl",
+    "v6_fix":         "data_v6/fix_triples.jsonl",
+    "eval_holdout":   "data_eval/holdout_belief.json",
+    "eval_tqa":       "data_eval/tqa_mc.jsonl",
+    "eval_are_sure":  "data_eval/syco-eval/are_you_sure.jsonl",
+    "eval_fabricate": "data_eval/syco-eval/fabricate.jsonl",
+}
+FINGERPRINT_REQUIRED = {"v6_train", "v6_fix"}
+
 DEFERRED_SUBSTRATE = {
     "coreai_ane_conversion_fidelity": "device-only (CoreAI .aimodel conversion + A19); belongs in the on-device endurance harness",
     "authoritative_test_suite_pass": "meta/CI invariant (the headless `swift test` gate itself), asserted by green CI not a nested test",
@@ -71,14 +86,20 @@ def parse_substrate(text):
 def model_section():
     v = load_json(os.path.join(PRESERVE, "qinao_verdict.json"))
     if v is None:
-        return {"available": False, "release_ok_model": False,
+        return {"available": False, "model_eval_ok": False,
                 "reason": "qinao_verdict.json absent — run build_verdict.py first"}, None
     rows = {r["key"]: r for r in v.get("rows", [])}
+    # H23 (mega-audit, 2026-07-08): the model-critical component now keys on
+    # `model_eval_ok` (every gate the eval CAN adjudicate genuinely passes), NOT the
+    # tautologically-False `release_ok_model`. The architectural attestations (#88/#89/#92)
+    # a model eval structurally cannot verify are surfaced as an explicit DEFERRED line
+    # instead of silently pinning the whole gate red with no unblock path.
     return {
         "available": True,
-        "release_ok_model": bool(v.get("release_ok_model")),
+        "model_eval_ok": bool(v.get("model_eval_ok")),
+        "attestations_pending": v.get("attestations_pending", []),
         "critical_pass": v.get("critical_pass"), "critical_fail": v.get("critical_fail"),
-        "critical_pending": v.get("critical_pending"),
+        "critical_attest": v.get("critical_attest"), "critical_pending": v.get("critical_pending"),
     }, rows
 
 
@@ -97,17 +118,30 @@ def aux_flags(model_rows, substrate):
 
     # data_fp_match: RE-VERIFY the frozen data hashes (sha256[:16]) against the manifest —
     # NOT mere file existence (audit 2026-06-24 flagged the old check as trivially-true).
+    # H23 (mega-audit F3, 2026-07-08): re-verify the EVAL sets too, not only the 2 TRAIN
+    # files. Contamination lives in the eval corpora — fingerprinting only train left the
+    # exact files that could carry leakage unchecked. Any eval-set entry PRESENT in the
+    # manifest must match; a manifest that names an eval file whose hash drifted now FAILs.
     import hashlib
     manifest = load_json(os.path.join(PRESERVE, "qinao_data_manifest.json"))
-    keymap = {"v6_train": "data_v6/train.jsonl", "v6_fix": "data_v6/fix_triples.jsonl"}
     checked = mismatch = missing = 0
-    if isinstance(manifest, dict):
-        for k, rel in keymap.items():
-            want = manifest.get(k); p = os.path.join(PRESERVE, rel)
-            if not isinstance(want, str) or not os.path.exists(p):
-                missing += 1; continue
-            got = hashlib.sha256(open(p, "rb").read()).hexdigest()[:len(want)]
-            checked += 1; mismatch += (got != want)
+    for k, rel in FINGERPRINT_KEYMAP.items():
+        if isinstance(manifest, dict):
+            want = manifest.get(k)
+        else:
+            want = None
+        # Train files are REQUIRED in the manifest; eval files are verified when present
+        # (they may be added incrementally) — but a NAMED eval file with a missing blob
+        # still counts as missing (fail-closed).
+        p = os.path.join(PRESERVE, rel)
+        if want is None:
+            if k in FINGERPRINT_REQUIRED:
+                missing += 1
+            continue
+        if not isinstance(want, str) or not os.path.exists(p):
+            missing += 1; continue
+        got = hashlib.sha256(open(p, "rb").read()).hexdigest()[:len(want)]
+        checked += 1; mismatch += (got != want)
     data_fp_match = (checked > 0 and mismatch == 0 and missing == 0)
     fp_note = f"recomputed {checked} sha256 vs manifest, {mismatch} mismatch, {missing} missing"
 
@@ -163,8 +197,13 @@ def main():
     model, model_rows = model_section()
     aux = aux_flags(model_rows, substrate)
 
+    model_deferred = {
+        f"model_attest_{n}": "architectural attestation a model eval cannot verify — "
+        "needs a deployment-level attestation channel (offline/sovereignty/traceability)"
+        for n in model.get("attestations_pending", [])
+    }
     release_ok = (
-        model["release_ok_model"]
+        model.get("model_eval_ok", False)
         and substrate_ok
         and all(v for v, _ in aux.values())
     )
@@ -172,11 +211,12 @@ def main():
     verdict = {
         "release_ok": release_ok,
         "components": {
-            "model_critical": model["release_ok_model"],
+            "model_critical": model.get("model_eval_ok", False),
             "substrate_critical": substrate_ok,
             **{k: v for k, (v, _) in aux.items()},
         },
         "model": model,
+        "model_deferred": model_deferred,
         "substrate": {**substrate, "source": src, "substrate_ok": substrate_ok,
                       "expected_gates": EXPECTED_SUBSTRATE_GATES},
         "substrate_deferred": DEFERRED_SUBSTRATE,
@@ -189,8 +229,9 @@ def main():
 
     print("=== QINAO Phase-3 combined RELEASE GATE ===")
     print(f"substrate source: {src}")
-    print(f"  model_critical      : {_mark(model['release_ok_model'])}  "
-          f"(PASS {model.get('critical_pass')} / FAIL {model.get('critical_fail')} / PEND {model.get('critical_pending')})"
+    print(f"  model_critical      : {_mark(model['model_eval_ok'])}  "
+          f"(PASS {model.get('critical_pass')} / FAIL {model.get('critical_fail')} / "
+          f"ATTEST {model.get('critical_attest')} / PEND {model.get('critical_pending')})"
           if model["available"] else f"  model_critical      : {_mark(False)}  ({model.get('reason')})")
     print(f"  substrate_critical  : {_mark(substrate_ok)}  "
           f"(executed {substrate['executed']}, failures {substrate['failures']}, "
@@ -198,6 +239,10 @@ def main():
     for k, (v, ev) in aux.items():
         print(f"  {k:<19} : {_mark(v)}  ({ev})")
     print(f"\nRELEASE_OK = {release_ok}")
+    if model_deferred:
+        print(f"\nmodel CRITICAL deferred (architectural attestation, NOT counted as pass — needs deployment channel):")
+        for k, why in model_deferred.items():
+            print(f"  - {k}: {why}")
     print(f"\nsubstrate CRITICAL deferred (device/CI/missing-script, NOT counted as pass):")
     for k, why in DEFERRED_SUBSTRATE.items():
         print(f"  - {k}: {why}")

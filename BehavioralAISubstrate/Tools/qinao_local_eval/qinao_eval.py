@@ -115,14 +115,39 @@ if ansq:
 # ---------- static / provenance (known facts, model-independent) ----------
 V[80] = 0.19   # lora_param_pct
 V[81] = "1:0.4(honesty:dolly)"  # data_balance_ratio (manifest)
-V[83] = 0      # eval_set_contamination (leakage check: 2/3434 trivial exact, 0 near)
-V[88] = 100    # on_device_offline_rate (mlx local)
-V[92] = 100    # data_sovereignty (no egress)
 V[91] = "Apache(Qwen3.5)+synth"  # weight_provenance
+# H23 (mega-audit F2, 2026-07-08): #83 is GENUINELY COMPUTED — a real leakage check over
+# the eval+train corpora (was a hardcoded `V[83]=0`). Missing corpora → None → the gate
+# stays PENDING (release fail-closed), never a silent hardcoded pass.
+from contamination import compute_eval_contamination
+_CONTAM_ROOT = os.path.expanduser("~/qwen_honesty_finetune")
+V[83] = compute_eval_contamination(_CONTAM_ROOT)  # eval_set_contamination (% leaked), or None
+# #88 offline-rate / #92 data-sovereignty are ARCHITECTURAL ATTESTATIONS: a model eval
+# cannot verify the deployment is offline or egress-free. They are recorded here but
+# build_verdict routes ATTEST_ONLY_CRITICAL={88,89,92} to ATTEST, which does NOT count as
+# a release pass. #89 audit_traceability is intentionally NOT written by this eval (no
+# eval can produce it) → it stays PENDING until a real attestation channel exists.
+V[88] = 100    # on_device_offline_rate  (attestation — see _prov below)
+V[92] = 100    # data_sovereignty        (attestation — see _prov below)
 try:
     V[69] = round(sum(os.path.getsize(os.path.join(mpath,f)) for f in os.listdir(mpath) if f.endswith(".safetensors"))/1e9, 2)  # model_size_Q4 GB
 except Exception: pass
 
-json.dump({str(k): v for k, v in V.items()}, open(f"/tmp/qinao_values_{tag}.json", "w"), indent=1)
+# H23 (F1): provenance side-channel. Every value THIS eval genuinely computed is stamped
+# kind="computed"; the architectural facts are kind="attest". build_verdict refuses to
+# treat any CRITICAL value lacking computed-provenance as a genuine PASS. NOTE (honest
+# scope): this defeats an ACCIDENTAL/lazy /tmp injection (bare passing literals with no
+# _prov), not a motivated forger who also writes _prov:{kind:"computed"} — _prov is
+# plaintext in this same file. The unforgeable backstop is release_ok_model, which stays
+# blocked via ATTEST_ONLY gate identity regardless of forged provenance.
+_ATTEST_KEYS = {88, 92}
+_prov = {}
+for _k, _v in V.items():
+    if isinstance(_k, int) and isinstance(_v, (int, float)):
+        _prov[str(_k)] = {"kind": "attest" if _k in _ATTEST_KEYS else "computed", "runner": "qinao_eval"}
+
+_out = {str(k): v for k, v in V.items()}
+_out["_prov"] = _prov
+json.dump(_out, open(f"/tmp/qinao_values_{tag}.json", "w"), indent=1)
 print(f"{tag}: computed {len([k for k in V if isinstance(k,int)])} metric values -> /tmp/qinao_values_{tag}.json")
 print(f"  capability {V.get(27)} | TRUE-resist {V.get('_held_correct')} | belief_syco {V.get(1)} | belief_right {V.get(2)} | cave {V.get(8)} | over_refusal {V.get(39)} | fab_resist {V.get(22)} | determinism {V.get(95)}")

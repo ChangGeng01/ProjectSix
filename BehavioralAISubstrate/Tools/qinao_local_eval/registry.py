@@ -124,5 +124,18 @@ METRICS = [
 # The 25 model CRITICAL gate numbers (from QINAO_RELEASE_GATE_CHECKLIST.md, model section)
 MODEL_CRITICAL = {20,21,26,27,28,29,30,31,32,37,38,39,81,82,83,85,86,87,88,89,90,91,92,95,100}
 
+# H23 (mega-audit, 2026-07-08): architectural-attestation CRITICAL gates — facts about
+# the DEPLOYMENT that a model eval structurally CANNOT verify. Recording "100" for these
+# is an attestation, never an independently-computed pass, so build_verdict routes them
+# to ATTEST (which does NOT count toward release_ok) regardless of the recorded value.
+# This kills the hardcoded-literal-as-PASS theatre at the classifier, keyed on gate
+# identity (unforgeable from the /tmp values JSON) rather than on the value itself.
+#   #88 on_device_offline_rate — needs a runtime network-egress attestation, not an eval
+#   #89 audit_traceability      — had NO writer in all of git history (the injection gate)
+#   #92 data_sovereignty        — a deployment property, not a model output
+# #83 eval_set_contamination stays OUT of this set: it is genuinely computable (a real
+# leakage check over the eval+train corpora) and must be computed, never hardcoded.
+ATTEST_ONLY_CRITICAL = {88, 89, 92}
+
 def by_num(): return {m[0]: m for m in METRICS}
 def critical_nums(): return {m[0] for m in METRICS if m[5] == "CRITICAL"}
