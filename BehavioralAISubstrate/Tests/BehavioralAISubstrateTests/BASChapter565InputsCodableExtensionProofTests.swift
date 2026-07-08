@@ -37,28 +37,24 @@ final class BASChapter565InputsCodableExtensionProofTests:
     XCTestCase
 {
 
-    // MARK: - Compile-time conformance helper
+    // MARK: - 2 conformance PROOFs
 
-    /// Compiles only when `T: Codable`。 If
-    /// BASAuditObservationProjectionsKunlunInputs or
-    /// CthulhuInputs lose Codable,this test fails to
-    /// COMPILE — loudest possible failure mode。
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
-    // MARK: - 2 compile-time conformance PROOFs
-
+    // #18: real round-trip — both Inputs types are HIGH-LEVEL
+    // composites whose stored fields (BASBudgetFrame with 13
+    // fields, BASActionPermit, ...) cannot be confidently
+    // constructed as minimal valid instances here, so use the
+    // honest compile-time-only fallback (no fake x==x
+    // assertion). Synthesized Codable is still enforced at
+    // compile time: if a field type loses Codable, this fails
+    // to build.
     func testKunlunInputsConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASAuditObservationProjectionsKunlunInputs
                 .self)
     }
 
     func testCthulhuInputsConformsToCodable() {
-        assertCodable(
+        assertConformsToCodableAtCompileTime(
             BASAuditObservationProjectionsCthulhuInputs
                 .self)
     }

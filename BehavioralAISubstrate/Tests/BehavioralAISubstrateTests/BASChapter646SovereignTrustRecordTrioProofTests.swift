@@ -36,30 +36,35 @@
 
 import XCTest
 @testable import BASSovereign
+@testable import BASRuntimeCore
 
 final class BASChapter646SovereignTrustRecordTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignIntegritySentinelArtifactClaimConformsToCodable() {
-        assertCodable(
-            BASSovereignIntegritySentinel
-                .ArtifactClaim.self)
+        // #18: real round-trip
+        let value = BASSovereignIntegritySentinel.ArtifactClaim(
+            id: "", claimedHash: "", kind: .modelOrPolicyArtifact)
+        assertCodableRoundTrips(value)
     }
 
     func testBASSovereignAuditLedgerAppendedEntryConformsToCodable() {
-        assertCodable(
-            BASSovereignAuditLedger.AppendedEntry.self)
+        // #18: real round-trip
+        let entry = BASSovereignAuditEntry(
+            auditID: "", sessionID: "", turnID: "",
+            verdictRef: "", snapshotRef: "", signature: "",
+            appendedAt: Date(timeIntervalSince1970: 0))
+        let value = BASSovereignAuditLedger.AppendedEntry(
+            entry: entry, priorHash: "", selfHash: "")
+        assertCodableRoundTrips(value)
     }
 
     func testBASSovereignTokenAuthorityWarrantIntentConformsToCodable() {
-        assertCodable(
-            BASSovereignTokenAuthority.WarrantIntent.self)
+        // #18: real round-trip
+        let value = BASSovereignTokenAuthority.WarrantIntent(
+            scope: .toolRead, actionDigest: "",
+            jurisdictionRef: "", snapshotRef: "", timeLockRef: "")
+        assertCodableRoundTrips(value)
     }
 }

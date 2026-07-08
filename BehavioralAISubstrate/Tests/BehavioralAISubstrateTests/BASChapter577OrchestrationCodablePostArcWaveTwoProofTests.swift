@@ -27,17 +27,19 @@ final class BASChapter577OrchestrationCodablePostArcWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testProviderReleaseAssessmentConformsToCodable() {
-        assertCodable(BASProviderReleaseAssessment.self)
+        // #18: real round-trip
+        let assessment = BASProviderReleaseAssessment(
+            outputPreview: "",
+            consistencyCheck: nil)
+        assertCodableRoundTrips(assessment)
     }
 
     func testProviderReleaseEvaluationRequestConformsToCodable() {
-        assertCodable(BASProviderReleaseEvaluationRequest.self)
+        // #18: compile-time fallback — required kernelSnapshot
+        // (BASCognitionKernelSnapshot) nests BASCompiledPrompt /
+        // BASContextKernelPolicy, too deep to construct confidently.
+        assertConformsToCodableAtCompileTime(
+            BASProviderReleaseEvaluationRequest.self)
     }
 }

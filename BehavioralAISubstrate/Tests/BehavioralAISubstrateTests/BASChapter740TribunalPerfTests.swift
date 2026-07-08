@@ -209,7 +209,12 @@ final class BASChapter740TribunalPerfTests: XCTestCase {
 
     // MARK: - 5-axis decision
 
-    func testFiveAxisComparisonScorecard() {
+    func testFiveAxisComparisonScorecard() throws {
+        // #18: assertion — pure human-read scorecard (all output is static
+        // print()) with no computed value to check; gate behind env flag.
+        guard ProcessInfo.processInfo.environment["BAS_PERF_PRINT"] == "1" else {
+            throw XCTSkip("perf print-only — set BAS_PERF_PRINT=1")
+        }
         print("")
         print(
             "## chapter 七百四十 第四刀 — 5-axis comparison + decision")

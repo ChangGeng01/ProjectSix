@@ -38,24 +38,35 @@ final class BASChapter619MemoryPostTrilogyProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testEventSourcedMemoryAtomStoreCachePolicyConformsToCodable() {
-        assertCodable(
-            BASEventSourcedMemoryAtomStoreCachePolicy.self)
+        // #18: real round-trip (non-CaseIterable enum, representative cases)
+        assertCodableRoundTrips(
+            BASEventSourcedMemoryAtomStoreCachePolicy.lazy)
+        assertCodableRoundTrips(
+            BASEventSourcedMemoryAtomStoreCachePolicy
+                .cachedWithTTL(seconds: 0))
     }
 
     func testMemoryTieringReconciliationOutcomeConformsToCodable() {
-        assertCodable(
-            BASMemoryTieringReconciliationOutcome.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMemoryTieringReconciliationOutcome(
+                evaluatedCount: 0,
+                heldCount: 0,
+                promotedCount: 0,
+                demotedCount: 0,
+                quarantineSuggestedCount: 0,
+                evictSuggestedCount: 0,
+                decisions: [],
+                startedAt: Date(timeIntervalSince1970: 0),
+                completedAt: Date(timeIntervalSince1970: 0)))
     }
 
     func testMemoryTieringReconcilerOrderingConformsToCodable() {
-        assertCodable(
-            BASMemoryTieringReconcilerOrdering.self)
+        // #18: real round-trip (non-CaseIterable enum, representative cases)
+        assertCodableRoundTrips(
+            BASMemoryTieringReconcilerOrdering.insertionOrder)
+        assertCodableRoundTrips(
+            BASMemoryTieringReconcilerOrdering.highestHeatFirst)
     }
 }

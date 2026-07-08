@@ -33,14 +33,12 @@ final class BASChapter624RuntimeCoreSoloEnumProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASEventLogFailureInjectionScenarioConformsToCodable() {
-        assertCodable(
-            BASEventLogFailureInjectionScenario.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASEventLogFailureInjectionScenario.contradiction(
+                failedAction: "",
+                retryAction: "",
+                project: ""))
     }
 }

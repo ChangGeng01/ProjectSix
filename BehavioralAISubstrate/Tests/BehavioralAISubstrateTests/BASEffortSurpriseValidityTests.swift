@@ -49,6 +49,10 @@ final class BASEffortSurpriseValidityTests: XCTestCase {
         let easyAvg = easy.reduce(0,+)/Double(easy.count), hardAvg = hard.reduce(0,+)/Double(hard.count)
         print("  A VERDICT: easyAvg=\(String(format: "%.3f", easyAvg)) hardAvg=\(String(format: "%.3f", hardAvg)) " +
               "→ \(hardAvg > easyAvg + 0.1 ? "tracks difficulty" : "DIFFICULTY-BLIND (surprise ~ same for easy & hard)")")
+        // #18: assertion — the test NAME claims cold-start surprise does NOT track difficulty; assert the
+        // difficulty-blindness the verdict prints: hard turns are NOT meaningfully more surprising than easy ones.
+        XCTAssertLessThanOrEqual(hardAvg, easyAvg + 0.1,
+            "cold-start surprise tracked difficulty (hardAvg=\(hardAvg) > easyAvg+0.1=\(easyAvg + 0.1)) — contradicts test name")
     }
 
     /// TEST C — the deeper question: does the REASONING MODEL already self-allocate effort? Qwen3.5 does extended
@@ -105,5 +109,9 @@ final class BASEffortSurpriseValidityTests: XCTestCase {
         print("  HARD continuation (6371×8429, same topic): surprise=\(String(format: "%.3f", hardCont)) tier=\(tier(hardCont).rawValue)")
         print("  EASY topic-shift (1+1, after cooking):     surprise=\(String(format: "%.3f", easyShift)) tier=\(tier(easyShift).rawValue)")
         print("  B VERDICT: \(easyShift > hardCont ? "NOVELTY WINS — the trivial topic-shift earns MORE effort than the hard turn (wrong axis)" : "difficulty held up against novelty")")
+        // #18: assertion — the test NAME claims novelty outweighs difficulty; assert the trivial-but-novel
+        // topic shift earns MORE surprise than the hard-but-familiar continuation (the "wrong axis" verdict).
+        XCTAssertGreaterThan(easyShift, hardCont,
+            "novelty did NOT outweigh difficulty (easyShift=\(easyShift) <= hardCont=\(hardCont)) — contradicts test name")
     }
 }

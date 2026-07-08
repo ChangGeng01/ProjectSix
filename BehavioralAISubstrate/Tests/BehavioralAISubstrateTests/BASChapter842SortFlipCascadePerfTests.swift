@@ -162,6 +162,12 @@ final class BASChapter842SortFlipCascadePerfTests: XCTestCase {
         // Per-turn floor saved:5-7 ms。 Per-session floor saved
         // across 100 turns:0.5-0.7 seconds — meaningful for
         // hosts running long sessions or batch evaluations。
+        // #18: assertion — pure human-read verdict scorecard with no
+        // computed invariant to check; gate behind env flag so it does
+        // not pass unconditionally in normal runs.
+        guard ProcessInfo.processInfo.environment["BAS_PERF_PRINT"] == "1" else {
+            throw XCTSkip("perf print-only — set BAS_PERF_PRINT=1")
+        }
         print("== chapter 842 FLIP CASCADE VERDICT ==")
         print("   6 production sort sites flipped since v0.61.0")
         print("   All 4 axes pass per chapter 837 framework:")

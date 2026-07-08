@@ -39,23 +39,28 @@ final class BASChapter650RuntimeCoreKnowledgeMeshTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASKnowledgeGraphErrorConformsToCodable() {
-        assertCodable(BASKnowledgeGraphError.self)
+        // #18: real round-trip (non-CaseIterable enum, representative case)
+        assertCodableRoundTrips(BASKnowledgeGraphError.nodeNotFound(""))
     }
 
     func testBASMeshSyncFrameApplierSlotDiffConformsToCodable() {
-        assertCodable(
-            BASMeshSyncFrameApplier.SlotDiff.self)
+        // #18: real round-trip
+        let value = BASMeshSyncFrameApplier.SlotDiff(
+            conflict: .identical,
+            headID: "",
+            layerID: .l1,
+            localSlot: nil,
+            remoteSlot: nil)
+        assertCodableRoundTrips(value)
     }
 
     func testBAS14LayerMeshAssemblyReportConformsToCodable() {
-        assertCodable(
-            BAS14LayerMeshAssemblyReport.self)
+        // #18: real round-trip
+        let value = BAS14LayerMeshAssemblyReport(
+            registeredHeadCount: 0,
+            perLayerCounts: [:],
+            totalCanonicalSlots: 0)
+        assertCodableRoundTrips(value)
     }
 }

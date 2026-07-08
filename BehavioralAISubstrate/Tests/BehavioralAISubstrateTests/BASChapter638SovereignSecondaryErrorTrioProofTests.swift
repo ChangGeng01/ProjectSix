@@ -40,26 +40,30 @@ final class BASChapter638SovereignSecondaryErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignLedgerSQLiteStorageStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignLedgerSQLiteStorage
-                .StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignLedgerSQLiteStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSovereignLedgerSQLiteStorage.StorageError
+                .corruptedRow(table: "", reason: ""))
     }
 
     func testBASSovereignSnapshotManagerManagerErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignSnapshotManager.ManagerError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignSnapshotManager.ManagerError
+                .unknownAnchor(id: ""))
+        assertCodableRoundTrips(
+            BASSovereignSnapshotManager.ManagerError
+                .anchorAlreadyRegistered(id: ""))
     }
 
     func testBASSovereignIntegritySentinelSentinelErrorConformsToCodable() {
-        assertCodable(
-            BASSovereignIntegritySentinel
-                .SentinelError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignIntegritySentinel.SentinelError
+                .unknownArtifact(id: ""))
     }
 }

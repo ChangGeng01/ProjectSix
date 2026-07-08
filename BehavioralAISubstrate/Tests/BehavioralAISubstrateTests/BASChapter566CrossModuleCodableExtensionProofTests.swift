@@ -30,34 +30,44 @@ final class BASChapter566CrossModuleCodableExtensionProofTests:
     XCTestCase
 {
 
-    // MARK: - Compile-time conformance helper
+    // MARK: - 5 conformance PROOFs
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
-    // MARK: - 5 compile-time conformance PROOFs
-
+    // #18: real round-trip — construct a minimal valid instance
+    // of each type and assert it survives an encode/decode cycle.
     func testCoreMLFeatureFrameConformsToCodable() {
-        assertCodable(BASCoreMLFeatureFrame.self)
+        assertCodableRoundTrips(
+            BASCoreMLFeatureFrame(featureValues: [:]))
     }
 
     func testKnowledgeCycleConformsToCodable() {
-        assertCodable(BASKnowledgeCycle.self)
+        assertCodableRoundTrips(
+            BASKnowledgeCycle(nodeIDs: [], edgeKinds: []))
     }
 
     func testRAGResultConformsToCodable() {
-        assertCodable(BASRAGResult.self)
+        assertCodableRoundTrips(
+            BASRAGResult(
+                atoms: [],
+                scores: [:],
+                staleAtomIDs: [],
+                reasonCodes: []))
     }
 
     func testVectorIndexEntryConformsToCodable() {
-        assertCodable(BASVectorIndexEntry.self)
+        assertCodableRoundTrips(
+            BASVectorIndexEntry(
+                atomID: "",
+                normalizedEmbedding: BASEmbedding(
+                    vector: [],
+                    dimension: 0,
+                    providerVersion: ""),
+                domain: "",
+                metadata: [:]))
     }
 
     func testVectorTopKResultConformsToCodable() {
-        assertCodable(BASVectorTopKResult.self)
+        assertCodableRoundTrips(
+            BASVectorTopKResult(atomID: "", score: 0.0))
     }
 
     // MARK: - Populated round-trip PROOFs (2 simple types)

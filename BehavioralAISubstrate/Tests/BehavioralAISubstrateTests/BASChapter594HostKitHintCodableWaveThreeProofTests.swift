@@ -28,17 +28,21 @@ final class BASChapter594HostKitHintCodableWaveThreeProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testChengluMultiHeadHintConformsToCodable() {
-        assertCodable(BASChengluMultiHeadHint.self)
+        // #18: real round-trip
+        let value = BASChengluMultiHeadHint(
+            outputKey: "",
+            score: 0.0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
     }
 
     func testChengluPermitPredictHintConformsToCodable() {
-        assertCodable(BASChengluPermitPredictHint.self)
+        // #18: real round-trip
+        let value = BASChengluPermitPredictHint(
+            policy: .block,
+            blockProbability: 0.0,
+            confidence: .high)
+        assertCodableRoundTrips(value)
     }
 }

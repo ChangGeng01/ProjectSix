@@ -115,7 +115,7 @@ final class BASChapter723ImportanceScorerPerfGridTests:
         return CFAbsoluteTimeGetCurrent()
     }
 
-    func testPerfGridAtProductionTypicalSizes() {
+    func testPerfGridAtProductionTypicalSizes() throws {
         #if os(iOS) || os(macOS)
         // 3-cell grid mirrors the byte-equality test's
         // sizes but skips the small one (FFI overhead
@@ -150,14 +150,31 @@ final class BASChapter723ImportanceScorerPerfGridTests:
                 recordsPerAtom: cell.recordsPerAtom)
 
             // Warm both paths
-            _ = scorer.scoreAll(
+            let swiftReport = scorer.scoreAll(
                 atomTiers: f.swiftTiers,
                 records: f.swiftRecords,
                 now: f.now)
-            _ = BASAutoRouteRanker.importanceScoreAll(
+            let rustScores = BASAutoRouteRanker.importanceScoreAll(
                 records: f.rustRecords,
                 tiers: f.rustTiers,
                 nowMs: f.nowMs)
+
+            // #18: assertion — both paths must produce one
+            // non-degenerate score per atom AND agree on the
+            // count (a real cross-implementation oracle: they
+            // compute the same thing two ways).
+            XCTAssertEqual(
+                swiftReport.scores.count, cell.atomCount,
+                "\(cell.label): Swift scoreAll must yield one "
+                + "score per atom")
+            let unwrappedRust = try XCTUnwrap(
+                rustScores,
+                "\(cell.label): Rust importanceScoreAll returned "
+                + "nil (FFI failure)")
+            XCTAssertEqual(
+                unwrappedRust.count, swiftReport.scores.count,
+                "\(cell.label): Swift and Rust must produce an "
+                + "equal number of scores")
 
             // Time Swift
             let swiftStart = now()
@@ -184,6 +201,20 @@ final class BASChapter723ImportanceScorerPerfGridTests:
             let rustUs =
                 rustElapsed / Double(cell.iterations) * 1e6
             let speedup = swiftElapsed / rustElapsed
+
+            // #18: assertion — measured timings must be finite
+            // and strictly positive, and the derived speedup a
+            // finite positive ratio (a degenerate/zero elapsed
+            // means the benchmark did not actually run).
+            XCTAssertTrue(
+                swiftElapsed.isFinite && swiftElapsed > 0,
+                "\(cell.label): Swift elapsed must be finite > 0")
+            XCTAssertTrue(
+                rustElapsed.isFinite && rustElapsed > 0,
+                "\(cell.label): Rust elapsed must be finite > 0")
+            XCTAssertTrue(
+                speedup.isFinite && speedup > 0,
+                "\(cell.label): speedup must be finite > 0")
 
             print(String(
                 format: "  %@ |   %9.1f |  %9.1f |  %.2f×",

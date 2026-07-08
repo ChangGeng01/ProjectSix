@@ -236,5 +236,21 @@ final class BASChapter732EventLogBinaryWiringTests:
 
         // No strict gate — let the chapter close-out (knife 5)
         // decide based on actual measurement
+
+        // #18: assertion — non-degeneracy: both append loops must have
+        // done real, finite work and both DB files must hold the 200
+        // written entries (>0 bytes), so all derived metrics are valid.
+        XCTAssertTrue(jsonElapsed.isFinite && jsonElapsed > 0,
+                      "JSON append elapsed must be finite and > 0")
+        XCTAssertTrue(binElapsed.isFinite && binElapsed > 0,
+                      "binary append elapsed must be finite and > 0")
+        XCTAssertGreaterThan(jsonBytes, 0,
+                             "JSON DB file must be non-empty after 200 appends")
+        XCTAssertGreaterThan(binBytes, 0,
+                             "binary DB file must be non-empty after 200 appends")
+        XCTAssertTrue(speedup.isFinite && speedup > 0,
+                      "speedup ratio must be finite and > 0")
+        XCTAssertTrue(storageRatio.isFinite && storageRatio > 0,
+                      "storage ratio must be finite and > 0")
     }
 }

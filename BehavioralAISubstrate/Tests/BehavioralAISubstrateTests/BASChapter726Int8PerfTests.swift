@@ -35,7 +35,7 @@ final class BASChapter726Int8PerfTests: XCTestCase {
         return c
     }
 
-    func testPerfGridQuantizeAndMatmul() {
+    func testPerfGridQuantizeAndMatmul() throws {
         #if os(iOS) || os(macOS)
         // Quantize-only timing across 3 vector sizes
         let qCells: [(label: String, n: Int)] = [
@@ -103,12 +103,37 @@ final class BASChapter726Int8PerfTests: XCTestCase {
         let iter = 50
 
         // Warm
-        _ = swiftFloat32MatMul(a: af, b: bf,
+        let f32Ref = swiftFloat32MatMul(a: af, b: bf,
             m: m, k: k, n: n)
-        _ = BASAutoRouteRanker.matmulInt8(
+        let i8Ref = BASAutoRouteRanker.matmulInt8(
             a: aQ.quantized, scaleA: aQ.scale,
             b: bQ.quantized, scaleB: bQ.scale,
             m: m, k: k, n: n)
+
+        // #18: assertion — int8 matmul computes the SAME product as
+        // the Float32 baseline (up to quantization error); if the
+        // computation grossly broke, results would diverge far beyond
+        // the quantization tolerance.
+        let i8Result = try XCTUnwrap(
+            i8Ref, "int8 matmul returned nil (FFI failure)")
+        XCTAssertEqual(i8Result.count, f32Ref.count,
+            "int8/f32 matmul output sizes must match")
+        XCTAssertEqual(i8Result.count, m * n)
+        // #18: int8 is a LOSSY approximation of Float32 — near-exact per-element
+        // equality is NOT expected (normal quantization error here is a few %). The
+        // honest oracle is that int8 APPROXIMATES the baseline: relative L2 error must
+        // be small. A grossly-broken int8 path (wrong matmul / transpose / garbage)
+        // blows this far past the bound; normal quantization stays well under it.
+        var diffSq: Float = 0
+        var refSq: Float = 0
+        for idx in 0..<f32Ref.count {
+            let d = i8Result[idx] - f32Ref[idx]
+            diffSq += d * d
+            refSq += f32Ref[idx] * f32Ref[idx]
+        }
+        let relL2 = refSq > 0 ? (diffSq / refSq).squareRoot() : diffSq.squareRoot()
+        XCTAssertLessThan(relL2, 0.2,
+            "int8 matmul relative L2 error \(relL2) too high — quantization path likely broken")
 
         // Swift Float32
         let f32Start = now()
@@ -205,6 +230,17 @@ final class BASChapter726Int8PerfTests: XCTestCase {
         print(
             "    Memory: 3.98× shrink (verified Knife 2)。")
         print("")
+
+        // #18: assertion — measured timings must be finite and
+        // strictly positive (a broken/zero-time run is degenerate).
+        for (label, us) in [
+            ("f32", f32Us), ("int8", i8Us), ("rustF32", rustF32Us),
+        ] {
+            XCTAssertTrue(us.isFinite && us > 0,
+                "\(label) timing must be finite and > 0, got \(us)")
+        }
+        XCTAssertTrue(speedup.isFinite && speedup > 0)
+        XCTAssertTrue(honestSpeedup.isFinite && honestSpeedup > 0)
         #endif
     }
 }

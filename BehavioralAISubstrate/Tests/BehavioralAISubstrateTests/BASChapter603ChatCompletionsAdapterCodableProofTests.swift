@@ -28,14 +28,12 @@ final class BASChapter603ChatCompletionsAdapterCodableProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testChatCompletionsEndpointConformsToCodable() {
-        assertCodable(
-            BASChatCompletionsOrganAdapter.Endpoint.self)
+        // #18: real round-trip (URL required — use a valid one)
+        let value = BASChatCompletionsOrganAdapter.Endpoint(
+            url: URL(string: "https://example.com")!,
+            headers: [:],
+            model: "")
+        assertCodableRoundTrips(value)
     }
 }

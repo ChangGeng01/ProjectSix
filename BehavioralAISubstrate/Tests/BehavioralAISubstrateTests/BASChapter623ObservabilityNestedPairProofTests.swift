@@ -34,19 +34,17 @@ final class BASChapter623ObservabilityNestedPairProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testLifecycleErrorConformsToCodable() {
-        assertCodable(
-            BASUpdateTicketLifecycleCoordinator.LifecycleError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASUpdateTicketLifecycleCoordinator
+                .LifecycleError.unknownTicket(id: ""))
     }
 
     func testTrialOutcomeConformsToCodable() {
-        assertCodable(
-            BASUpdateTicketLifecycleCoordinator.TrialOutcome.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASUpdateTicketLifecycleCoordinator
+                .TrialOutcome.passed(reasonCodes: []))
     }
 }

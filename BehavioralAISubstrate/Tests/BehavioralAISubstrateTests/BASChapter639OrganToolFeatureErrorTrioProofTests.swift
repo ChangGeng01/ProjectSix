@@ -45,23 +45,22 @@ final class BASChapter639OrganToolFeatureErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASOrganRegistryRegistryErrorConformsToCodable() {
-        assertCodable(
-            BASOrganRegistry.RegistryError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASOrganRegistry.RegistryError.unknownProvider(id: ""))
     }
 
     func testBASToolCallingPlanErrorConformsToCodable() {
-        assertCodable(BASToolCallingPlanError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASToolCallingPlanError.policyFailed(reason: ""))
     }
 
     func testBASChengluFeatureRefBuilderErrorConformsToCodable() {
-        assertCodable(
-            BASChengluFeatureRefBuilderError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASChengluFeatureRefBuilderError.fieldContainsSeparator(
+                fieldName: "", value: ""))
     }
 }

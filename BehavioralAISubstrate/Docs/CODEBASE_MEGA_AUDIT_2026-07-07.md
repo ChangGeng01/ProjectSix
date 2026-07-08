@@ -259,7 +259,19 @@
     (VACUUM 全库重写代价高)——secure_delete 只清此后的删除;②x-sov #5(atom 库 Data Protection
     class)+ #6(KV try? 吞错)是同族但独立项,未在本收口内。
 17. token 历史清洗（filter-repo/LFS purge）——**删除类,必须操作员亲自裁决**。
-18. 测试诚实度：~300 条 assertCodable 自比较升级为真 round-trip；9 条 print-only 加断言或门控；B2 /tmp 状态依赖去除。
+18. **测试诚实度** — **DONE(2026-07-08,共享 helper 带 teeth + 2 轮 Workflow 扇出 + 单次验证构建)**。
+    ①**assertCodable 自比较**:~76 文件各自的 `assertCodable<T:Codable>(_:T.Type){ XCTAssertEqual(String(describing:type),
+    String(describing:type)) }` = x==x 恒真,只有编译期 `T:Codable` 约束做事,Codable 真坏也"过"。**修**:
+    共享 `BASCodableRoundTripSupport`(encode→decode→**再 encode 字节比对**,`.sortedKeys` 确定性,不需 Equatable)
+    + 反向 teeth 测试(故意坏的 asymmetric Codable 必被抓,3/3)。276 站点升级:CaseIterable 枚举走
+    `assertCodableRoundTripsAllCases`(全 case),其余构真实例走 `assertCodableRoundTrips(instance)`;17 个深嵌类型
+    用**诚实**的 `assertConformsToCodableAtCompileTime`(不再撒谎,显式标注为编译期-only 残债)。336 测零失败=覆盖的
+    Codable 全真无坏。②**print-only 22 条**(审计估 9,实为 22):behavioral(testVeryShortManipulationStillBlocks
+    →断 `.block`;ColdStart 难度盲/Novelty 赢 →断名字声称的行为)+ **跨实现一致性 oracle**(Rust vs Swift、int8 vs
+    f32 逐元素等价=真正确性锚,非仅 perf)+ 非退化界;5 条纯人读 scorecard 用 BAS_PERF_PRINT=1 门控。③**B2 /tmp**:
+    3 个 testWalkR*FromJudgement 读+改 ambient /tmp/gdn_coreai 状态(非 hermetic)→ BAS_B2_LOOP=1 门控,默认套件不碰 /tmp。
+    ★方法:先造带 teeth 的共享 helper(防"用新恒真替旧恒真")+ 单文件模板验证 → 才扇出;扇出只改不构(构建是串行资源)→
+    单次验证构建 + 迭代修(仅 1 处漏 import)。★发现:agreement-oracle(同量两算比对)是 perf 测的最强真锚。
 19. KG codec 上生产前重建 XCFramework（M-n）。
 20. **补审下一轮**（本轮结构性盲区,见 §7）：跨设备 CRDT/gossip 主权真实性、Contradiction/Unknown 两个 P2 账本 store、Rust↔Swift 状态机迁移等价性、L3-L14 投影/协议业务逻辑层、test↔production 对应完整性。
 

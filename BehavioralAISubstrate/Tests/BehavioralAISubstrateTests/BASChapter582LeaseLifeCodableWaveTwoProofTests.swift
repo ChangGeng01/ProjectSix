@@ -21,28 +21,37 @@
 
 import XCTest
 @testable import BASLeaseLife
+@testable import BASRuntimeCore
 
 final class BASChapter582LeaseLifeCodableWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testOSThermalStateConformsToCodable() {
-        assertCodable(BASThermalTwin.OSThermalState.self)
+        // #18: real round-trip
+        assertCodableRoundTripsAllCases(
+            BASThermalTwin.OSThermalState.self)
     }
 
     func testThermalTwinReadingConformsToCodable() {
-        assertCodable(BASThermalTwin.Reading.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASThermalTwin.Reading(
+                osState: .nominal,
+                thermalLevel: .nominal,
+                guardLevel: .nominal,
+                accumulatedPressure: 0.0,
+                observedAt: Date(timeIntervalSince1970: 0)))
     }
 
     func testLungStateAccumulatorSnapshotConformsToCodable()
     {
-        assertCodable(
-            BASLungStateAccumulator.Snapshot.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASLungStateAccumulator.Snapshot(
+                pressure: 0.0,
+                turnCount: 0,
+                lastTurnAt: nil,
+                lastDecayAt: nil))
     }
 }

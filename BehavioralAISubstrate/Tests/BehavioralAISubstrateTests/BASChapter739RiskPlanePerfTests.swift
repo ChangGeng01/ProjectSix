@@ -333,5 +333,35 @@ final class BASChapter739RiskPlanePerfTests: XCTestCase {
         print(
             "  Future port chapters will exercise the invariant。")
         print("")
+
+        // #18: assertion — the scorecard's verdict (Axis 5 "RUST
+        // WIN — all byte-equal" → 3 strictly-better → FLIP) is
+        // only honest if the Rust path and the Swift baseline
+        // actually agree byte-for-byte. Independently recompute
+        // both across the exhaustive (band, climate, current)
+        // grid and assert full agreement + non-degeneracy.
+        #if os(iOS) || os(macOS)
+        var comparedCells = 0
+        for band in Int32(0)...Int32(3) {
+            for climate in Int32(0)...Int32(3) {
+                for current in Int32(0)...Int32(8) {
+                    let rust = BASAutoRouteRanker.riskPlaneTransition(
+                        band: band, climate: climate, currentMode: current)
+                    let swift = swiftClassifier(
+                        band: band, climate: climate, current: current)
+                    XCTAssertEqual(
+                        rust, swift,
+                        "Axis 5 byte-equality broken at "
+                            + "(band=\(band), climate=\(climate), "
+                            + "current=\(current)): rust=\(String(describing: rust)) "
+                            + "swift=\(String(describing: swift))")
+                    comparedCells += 1
+                }
+            }
+        }
+        XCTAssertEqual(
+            comparedCells, 4 * 4 * 9,
+            "Scorecard must exercise the full risk-plane grid")
+        #endif
     }
 }

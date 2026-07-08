@@ -44,25 +44,33 @@ final class BASChapter637RuntimeCoreSQLiteErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSQLiteEventLogStorageStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSQLiteEventLogStorage.StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSQLiteEventLogStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSQLiteEventLogStorage.StorageError
+                .corruptedRow(eventID: "", reason: ""))
     }
 
     func testBASSQLiteEvalRunStorageStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSQLiteEvalRunStorage.StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSQLiteEvalRunStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSQLiteEvalRunStorage.StorageError
+                .corruptedRow(runID: "", reason: ""))
     }
 
     func testBASSQLiteKnowledgeGraphStorageStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSQLiteKnowledgeGraphStorage
-                .StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSQLiteKnowledgeGraphStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSQLiteKnowledgeGraphStorage.StorageError
+                .corruptedRow(id: "", reason: ""))
     }
 }

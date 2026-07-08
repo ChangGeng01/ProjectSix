@@ -35,17 +35,27 @@ final class BASChapter616OrganCodableWaveThreeProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASOrganRequestConformsToCodable() {
-        assertCodable(BASOrganRequest.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASOrganRequest(
+                requestID: "",
+                role: .scout,
+                preset: .scout,
+                instruction: ""))
     }
 
     func testBASNeuralHeadEvalPromptConformsToCodable() {
-        assertCodable(BASNeuralHeadEvalPrompt.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASNeuralHeadEvalPrompt(
+                promptID: "",
+                head: "",
+                request: BASOrganRequest(
+                    requestID: "",
+                    role: .scout,
+                    preset: .scout,
+                    instruction: ""),
+                expects: .nonEmpty))
     }
 }

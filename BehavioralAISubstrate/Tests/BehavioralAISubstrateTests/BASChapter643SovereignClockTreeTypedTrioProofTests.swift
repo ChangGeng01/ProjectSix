@@ -42,24 +42,30 @@ final class BASChapter643SovereignClockTreeTypedTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignCrossDeviceClockOrderConformsToCodable() {
-        assertCodable(
-            BASSovereignCrossDeviceClock.Order.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignCrossDeviceClock.Order.before)
     }
 
     func testBASSovereignHostVersionTreeNodeConformsToCodable() {
-        assertCodable(
-            BASSovereignHostVersionTree.Node.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignHostVersionTree.Node(
+                versionID: "",
+                parentID: nil,
+                diffSummary: "",
+                recordedAt: Date(timeIntervalSince1970: 0)))
     }
 
     func testBASSovereignHostVersionTreeLineagePathConformsToCodable() {
-        assertCodable(
-            BASSovereignHostVersionTree.LineagePath.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignHostVersionTree.LineagePath(
+                from: "",
+                to: "",
+                commonAncestor: nil,
+                up: [],
+                down: []))
     }
 }

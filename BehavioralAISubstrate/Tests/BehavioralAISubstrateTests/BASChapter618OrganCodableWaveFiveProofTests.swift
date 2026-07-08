@@ -36,19 +36,19 @@ final class BASChapter618OrganCodableWaveFiveProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASFoundationModelsToolBridgeStatusConformsToCodable() {
-        assertCodable(
-            BASFoundationModelsToolBridgeStatus.self)
+        // #18: real round-trip (non-CaseIterable enum, representative cases)
+        assertCodableRoundTrips(
+            BASFoundationModelsToolBridgeStatus.audited(traceID: ""))
+        assertCodableRoundTrips(
+            BASFoundationModelsToolBridgeStatus
+                .bridgedRuntimeSchema(toolCount: 0))
     }
 
     func testBASToolInvocationDecisionConformsToCodable() {
-        assertCodable(
-            BASToolInvocationDecision.self)
+        // #18: real round-trip (non-CaseIterable enum, both cases)
+        assertCodableRoundTrips(BASToolInvocationDecision.allow)
+        assertCodableRoundTrips(
+            BASToolInvocationDecision.reject(reasonCodes: []))
     }
 }

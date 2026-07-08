@@ -15,24 +15,24 @@ final class BASChapter655ValidationIssueTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASTurnRuntimeStagePlanValidationIssueConformsToCodable() {
-        assertCodable(
-            BASTurnRuntimeStagePlanValidationIssue.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASTurnRuntimeStagePlanValidationIssue
+                .sequentialStepHasMultipleStages(
+                    stepIndex: 0, stageCount: 0))
     }
 
     func testBASTurnRuntimeStageLedgerValidationIssueConformsToCodable() {
-        assertCodable(
-            BASTurnRuntimeStageLedgerValidationIssue.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASTurnRuntimeStageLedgerValidationIssue
+                .recordsExceedingPlanCount(0))
     }
 
     func testBASLayerMLHeadRegistrationErrorConformsToCodable() {
-        assertCodable(
-            BASLayerMLHeadRegistrationError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASLayerMLHeadRegistrationError.duplicateHeadID(""))
     }
 }

@@ -25,19 +25,15 @@ final class BASChapter612SovereignCodableWaveThreeProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testHardObservationsConformsToCodable() {
-        assertCodable(
-            BASSovereignVerdictEngine.HardObservations.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignVerdictEngine.HardObservations.clean)
     }
 
     func testSoftSignalsConformsToCodable() {
-        assertCodable(
-            BASSovereignVerdictEngine.SoftSignals.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignVerdictEngine.SoftSignals.calm)
     }
 }

@@ -28,18 +28,30 @@ final class BASChapter587MemoryPostCrossModuleArcExtensionProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testMemoryTrustProfileConformsToCodable() {
-        assertCodable(BASMemoryTrustProfile.self)
+        // #18: real round-trip
+        let value = BASMemoryTrustProfile(
+            score: 0,
+            tier: .low,
+            provenanceRisk: false,
+            confidenceMultiplier: 0,
+            decayGraceMultiplier: 0)
+        assertCodableRoundTrips(value)
     }
 
     func testMemoryTieringReconciliationOutcomeDecisionConformsToCodable() {
-        assertCodable(
-            BASMemoryTieringReconciliationOutcome.Decision.self)
+        // #18: real round-trip
+        let profile = BASMemoryTieringProfile(
+            atomID: "",
+            currentTier: .hot,
+            recencyScore: 0,
+            accessFrequency: 0,
+            sensitivityDrift: 0,
+            worldContextStaleness: 0,
+            observedAt: Date(timeIntervalSince1970: 0))
+        let value = BASMemoryTieringReconciliationOutcome.Decision(
+            profile: profile,
+            transition: .hold(tier: .hot, reason: .withinThresholds))
+        assertCodableRoundTrips(value)
     }
 }

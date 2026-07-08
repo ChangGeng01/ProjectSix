@@ -7,6 +7,12 @@ import XCTest
 /// 【adopted 不在这里发生】——签名是操作员对话中的人类行为,部署是人类介质动作。
 final class BASB2RefitLoopTests: XCTestCase {
     func testWalkCandidateFSMFromJudgement() throws {
+        // #18 测试诚实 (2026-07-08): env-gate the /tmp loop executor so the DEFAULT suite is
+        // hermetic — never reads/mutates ambient /tmp/gdn_coreai state. Opt in with BAS_B2_LOOP=1
+        // when actually driving the operator's evidence loop.
+        guard ProcessInfo.processInfo.environment["BAS_B2_LOOP"] == "1" else {
+            throw XCTSkip("B2 refit loop executor — set BAS_B2_LOOP=1 (default suite stays hermetic)")
+        }
         // 终态防覆写:操作员已裁的 FSM 文件不得被重走环覆写;守卫解码失败 = fatal
         // (审计 M1:try? 静默旁路会让守卫在 schema 演进时形同虚设——守卫的意义就是这文件)。
         let fsmURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_refit_candidate_fsm.json")
@@ -85,6 +91,12 @@ extension BASB2RefitLoopTests {
 extension BASB2RefitLoopTests {
     /// R2 走环:judge JSON → FSM(判据未过 ⇒ rejected)→ 收据持久。
     func testWalkR2FromJudgement() throws {
+        // #18 测试诚实 (2026-07-08): env-gate the /tmp loop executor so the DEFAULT suite is
+        // hermetic — never reads/mutates ambient /tmp/gdn_coreai state. Opt in with BAS_B2_LOOP=1
+        // when actually driving the operator's evidence loop.
+        guard ProcessInfo.processInfo.environment["BAS_B2_LOOP"] == "1" else {
+            throw XCTSkip("B2 refit loop executor — set BAS_B2_LOOP=1 (default suite stays hermetic)")
+        }
         let judgeURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r2_judgement.json")
         guard let data = try? Data(contentsOf: judgeURL),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -130,6 +142,12 @@ extension BASB2RefitLoopTests {
 extension BASB2RefitLoopTests {
     /// R4 走环:纯确认轮(功效充足)→ FSM rejected,理由 = alpha 真赢但 math 真损的权衡。
     func testWalkR4FromJudgement() throws {
+        // #18 测试诚实 (2026-07-08): env-gate the /tmp loop executor so the DEFAULT suite is
+        // hermetic — never reads/mutates ambient /tmp/gdn_coreai state. Opt in with BAS_B2_LOOP=1
+        // when actually driving the operator's evidence loop.
+        guard ProcessInfo.processInfo.environment["BAS_B2_LOOP"] == "1" else {
+            throw XCTSkip("B2 refit loop executor — set BAS_B2_LOOP=1 (default suite stays hermetic)")
+        }
         let judgeURL = URL(fileURLWithPath: "/tmp/gdn_coreai/b2_r4_judgement.json")
         guard let data = try? Data(contentsOf: judgeURL),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

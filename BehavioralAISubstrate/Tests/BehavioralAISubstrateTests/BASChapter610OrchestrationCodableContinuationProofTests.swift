@@ -27,13 +27,8 @@ final class BASChapter610OrchestrationCodableContinuationProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testNeuralThoughtMaterializationConformsToCodable() {
-        assertCodable(BASNeuralThoughtMaterialization.self)
+        // #18: real round-trip (all fields optional, default nil)
+        assertCodableRoundTrips(BASNeuralThoughtMaterialization())
     }
 }

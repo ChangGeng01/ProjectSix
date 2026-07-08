@@ -33,21 +33,22 @@ final class BASChapter625HostKitErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASTrainingDataExportErrorConformsToCodable() {
-        assertCodable(BASTrainingDataExportError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASTrainingDataExportError.stateContextRequestedButNoStore)
     }
 
     func testBASHostMeshErrorConformsToCodable() {
-        assertCodable(BASHostMeshError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHostMeshError.noRegistryWired(attemptedLayer: .l1))
     }
 
     func testBASHostIntegrationErrorConformsToCodable() {
-        assertCodable(BASHostIntegrationError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHostIntegrationError.missingWorkflowModeMapping(
+                profileID: ""))
     }
 }

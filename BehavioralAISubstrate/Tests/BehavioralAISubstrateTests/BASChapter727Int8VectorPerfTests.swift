@@ -64,6 +64,8 @@ final class BASChapter727Int8VectorPerfTests: XCTestCase {
         // Chapter 七百十八 batched-cosine is the Float32 baseline
         BASVectorIndex.useBatchedTopK = true
 
+        var worstInt8ToF32RAMRatio = 0.0
+
         print("")
         print(
             "## chapter 七百二十七 第四刀 — int8 vs Float32 topK perf")
@@ -129,6 +131,25 @@ final class BASChapter727Int8VectorPerfTests: XCTestCase {
             let i8MB = Double(int8RAMBytes) / 1024.0 / 1024.0
             let f32MB = Double(f32RAMBytes) / 1024.0 / 1024.0
 
+            // #18: assertion — non-degenerate elapsed times, positive corpus
+            // footprints, valid speedup, and the CLAIMED int8 RAM shrink:
+            // int8 storage must be well under half of Float32 (print claims
+            // ~25%). Independent bounds, computed values two different ways.
+            XCTAssertTrue(f32Elapsed.isFinite && f32Elapsed > 0,
+                          "f32 topK elapsed must be finite and positive")
+            XCTAssertTrue(i8Elapsed.isFinite && i8Elapsed > 0,
+                          "int8 topK elapsed must be finite and positive")
+            XCTAssertTrue(speedup.isFinite && speedup > 0,
+                          "speedup must be finite and positive")
+            XCTAssertGreaterThan(int8RAMBytes, 0,
+                          "int8 corpus footprint must be > 0")
+            XCTAssertEqual(f32RAMBytes, cell.n * dim * 4,
+                          "Float32 footprint must equal n·dim·4 bytes")
+            let ratio = Double(int8RAMBytes) / Double(f32RAMBytes)
+            XCTAssertLessThan(ratio, 0.5,
+                          "int8 corpus must occupy < 50% of Float32 (claimed ~25%)")
+            worstInt8ToF32RAMRatio = max(worstInt8ToF32RAMRatio, ratio)
+
             print(String(
                 format: "  %@ | %9.2f | %8.2f | %5.2f×  | %5.2f MB | %5.2f MB",
                 cell.label.padding(
@@ -147,6 +168,12 @@ final class BASChapter727Int8VectorPerfTests: XCTestCase {
         print(
             "  the per-entry scale + shape overhead amortizes away)。")
         print("")
+
+        // #18: assertion — the print claims int8 stores the corpus at ~25%
+        // of Float32; the worst-case (smallest corpus, most overhead) ratio
+        // across all cells must still satisfy the shrink claim.
+        XCTAssertLessThan(worstInt8ToF32RAMRatio, 0.5,
+                      "worst-case int8/Float32 RAM ratio must confirm ~25% shrink claim")
         #endif
     }
 }

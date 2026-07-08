@@ -34,24 +34,33 @@ final class BASChapter629MemorySQLiteErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSQLiteMemoryAtomStoreStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSQLiteMemoryAtomStore.StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSQLiteMemoryAtomStore.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSQLiteMemoryAtomStore.StorageError
+                .schemaVersionMismatch(found: 0, expected: 0))
     }
 
     func testBASSQLiteUserStateStorageStorageErrorConformsToCodable() {
-        assertCodable(
-            BASSQLiteUserStateStorage.StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSQLiteUserStateStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASSQLiteUserStateStorage.StorageError
+                .decodeFailed(stateID: "", message: ""))
     }
 
     func testBASHostConstitutionSQLiteStorageStorageErrorConformsToCodable() {
-        assertCodable(
-            BASHostConstitutionSQLiteStorage.StorageError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHostConstitutionSQLiteStorage.StorageError
+                .openFailed(code: 0, message: ""))
+        assertCodableRoundTrips(
+            BASHostConstitutionSQLiteStorage.StorageError
+                .corruptedRow(vaultID: "", reason: ""))
     }
 }

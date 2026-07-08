@@ -14,21 +14,37 @@ final class BASChapter658BiomimeticObservationTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASPredictiveCodingObservationConformsToCodable() {
-        assertCodable(BASPredictiveCodingObservation.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASPredictiveCodingObservation(
+                observed: [],
+                priorPrediction: [],
+                error: [],
+                updatedPrediction: [],
+                runningMSE: 0,
+                observationIndex: 0))
     }
 
     func testBASPlasticityUpdateConformsToCodable() {
-        assertCodable(BASPlasticityUpdate.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASPlasticityUpdate(
+                pre: [],
+                post: [],
+                outcome: 0,
+                weightDelta: [],
+                updatedWeightSnapshot: [],
+                updateIndex: 0))
     }
 
     func testBASHierarchicalObservationConformsToCodable() {
-        assertCodable(BASHierarchicalObservation.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASHierarchicalObservation(
+                perLayer: [],
+                topLayerError: [],
+                topLayerMSE: 0,
+                observationIndex: 0))
     }
 }

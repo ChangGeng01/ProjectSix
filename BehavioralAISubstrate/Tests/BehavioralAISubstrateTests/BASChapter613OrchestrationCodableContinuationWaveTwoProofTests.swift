@@ -56,19 +56,22 @@ final class BASChapter613OrchestrationCodableContinuationWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testProposedIntentConformsToCodable() {
-        assertCodable(
-            BASWorldAwareRiskBridge.ProposedIntent.self)
+        // #18: real round-trip (operation .pureInference; other
+        // fields defaulted — baselineSignals/.calm, .clean, "")
+        assertCodableRoundTrips(
+            BASWorldAwareRiskBridge.ProposedIntent(
+                sessionID: "",
+                turnID: "",
+                operation: .pureInference,
+                matchedTemplateID: ""))
     }
 
     func testDecisionConformsToCodable() {
-        assertCodable(
+        // #18: HONEST compile-time fallback — Decision requires a
+        // BASSovereignVerdict + BASWorldPriorRiskAssessment, both
+        // deeply-nested types not cheaply constructible here.
+        assertConformsToCodableAtCompileTime(
             BASWorldAwareRiskBridge.Decision.self)
     }
 }

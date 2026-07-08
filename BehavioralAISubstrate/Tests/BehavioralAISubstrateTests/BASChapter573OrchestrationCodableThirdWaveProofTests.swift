@@ -24,17 +24,17 @@ final class BASChapter573OrchestrationCodableThirdWaveProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testLatentTissueStateConformsToCodable() {
-        assertCodable(BASLatentTissueState.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASLatentTissueState())
     }
 
     func testBadToneLinterViolationConformsToCodable() {
-        assertCodable(BASBadToneLinter.Violation.self)
+        // #18: real round-trip
+        let violation = BASBadToneLinter.Violation(
+            rule: .oracular,
+            offendingInput: "",
+            matchedSubstring: "")
+        assertCodableRoundTrips(violation)
     }
 }

@@ -29,17 +29,17 @@ final class BASChapter605MetalSubstrateCodableProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testKernelInputsConformsToCodable() {
-        assertCodable(BASKernelInputs.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASKernelInputs.empty)
     }
 
     func testKernelOutputsConformsToCodable() {
-        assertCodable(BASKernelOutputs.self)
+        // #18: real round-trip
+        let value = BASKernelOutputs(
+            descriptors: [],
+            payloads: [],
+            executionNanos: 0)
+        assertCodableRoundTrips(value)
     }
 }

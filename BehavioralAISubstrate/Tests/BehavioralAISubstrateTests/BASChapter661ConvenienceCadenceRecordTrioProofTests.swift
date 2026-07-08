@@ -6,17 +6,29 @@ import XCTest
 @testable import BASRuntimeCore
 
 final class BASChapter661ConvenienceCadenceRecordTrioProofTests: XCTestCase {
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(String(describing: type),
-                       String(describing: type))
-    }
+
     func testBASCognitiveOSConvenienceCadenceConformsToCodable() {
-        assertCodable(BASCognitiveOSConvenienceCadence.self)
+        // #18: real round-trip (all-default init)
+        assertCodableRoundTrips(
+            BASCognitiveOSConvenienceCadence())
     }
+
     func testBASCognitiveOSConvenienceResultConformsToCodable() {
-        assertCodable(BASCognitiveOSConvenienceResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASCognitiveOSConvenienceResult(
+                eventAppended: false,
+                stateFolded: false,
+                graphExtracted: false,
+                iterationIndex: 0))
     }
+
     func testBASMambaInferenceLatencyRecordConformsToCodable() {
-        assertCodable(BASMambaInferenceLatencyRecord.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMambaInferenceLatencyRecord(
+                latencyMs: 0,
+                thermalBand: .low,
+                timestampMs: 0))
     }
 }

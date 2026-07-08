@@ -36,32 +36,35 @@
 //   - ADR-016 advances M1957 → M1958
 
 import XCTest
+import Foundation
 @testable import BASSovereign
 
 final class BASChapter645SovereignContaminationGuardTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASSovereignContaminationGuardKeyConformsToCodable() {
-        assertCodable(
-            BASSovereignContaminationGuard.Key.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignContaminationGuard.Key(
+                id: "", kind: .memoryAtom))
     }
 
     func testBASSovereignContaminationGuardQuarantineRecordConformsToCodable() {
-        assertCodable(
-            BASSovereignContaminationGuard
-                .QuarantineRecord.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignContaminationGuard.QuarantineRecord(
+                key: BASSovereignContaminationGuard.Key(
+                    id: "", kind: .memoryAtom),
+                reasonCode: "",
+                originatingVerdictID: nil,
+                quarantinedAt: Date(timeIntervalSince1970: 0)))
     }
 
     func testBASSovereignContaminationGuardProbeReportConformsToCodable() {
-        assertCodable(
-            BASSovereignContaminationGuard
-                .ProbeReport.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignContaminationGuard.ProbeReport(
+                quarantinedIDs: [], cleanIDs: []))
     }
 }

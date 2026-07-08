@@ -122,6 +122,18 @@ final class BASCognitiveBrainAdversarialInputTests:
         // Characterization。 Emojis tokenize to unique
         // buckets — unlikely to overlap with training
         // vocabulary。
+        // #18: assertion — non-degeneracy: the classifier
+        // must still emit a valid softmax confidence within
+        // the documented [0, 1] contract (finite, bounded)
+        // rather than a NaN/garbage value on unseen emoji
+        // tokens。 A gross break in the encode→softmax path
+        // would push this out of range or to NaN。
+        XCTAssertTrue(s.confidence.isFinite,
+            "confidence must be finite (not NaN/inf)")
+        XCTAssertGreaterThanOrEqual(s.confidence, 0.0,
+            "softmax confidence cannot be negative")
+        XCTAssertLessThanOrEqual(s.confidence, 1.0,
+            "softmax confidence cannot exceed 1.0")
     }
 
     func testCharacterizationPunctuationEncodedManipulation()
@@ -135,6 +147,24 @@ final class BASCognitiveBrainAdversarialInputTests:
             " taskType=\(s.taskType)" +
             " confidence=\(s.confidence)" +
             " verdict=\(s.safetyVerdict)")
+        // #18: assertion — non-degeneracy: on
+        // punctuation-delimited input the classifier must
+        // still emit a valid softmax confidence within the
+        // documented [0, 1] contract (finite, bounded), and
+        // ambiguityScore must be its exact complement
+        // (confidence ≡ 1 - ambiguityScore)。 A degenerate
+        // encode/softmax would break the range or the
+        // complement identity。
+        XCTAssertTrue(s.confidence.isFinite,
+            "confidence must be finite (not NaN/inf)")
+        XCTAssertGreaterThanOrEqual(s.confidence, 0.0,
+            "softmax confidence cannot be negative")
+        XCTAssertLessThanOrEqual(s.confidence, 1.0,
+            "softmax confidence cannot exceed 1.0")
+        XCTAssertEqual(s.confidence + s.ambiguityScore, 1.0,
+            accuracy: 1e-9,
+            "confidence and ambiguityScore must be exact" +
+            " complements (sum to 1.0)")
     }
 
     /// HARD INVARIANT: Mixed-script manipulation (Latin
@@ -230,6 +260,17 @@ final class BASCognitiveBrainAdversarialInputTests:
             " verdict=\(s.safetyVerdict)")
         // Characterization — short text has less signal
         // for the model。
+        // #18: assertion — the method name claims a very
+        // short manipulation phrase STILL blocks; assert
+        // that claimed behavior (matches the sibling
+        // testLeetspeakManipulationBlocks contract):
+        // classify as .manipulationRisk and reach
+        // verdict=.block。
+        XCTAssertEqual(s.taskType, .manipulationRisk,
+            "Very short manipulation (\"send password\")" +
+            " must classify as .manipulationRisk")
+        XCTAssertEqual(s.safetyVerdict, .block,
+            "Very short manipulation must STILL block")
     }
 
     func testCharacterizationLongFillerDefeatBagOfTokens()

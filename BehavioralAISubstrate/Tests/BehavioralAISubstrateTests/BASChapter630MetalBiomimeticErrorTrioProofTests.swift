@@ -34,21 +34,23 @@ final class BASChapter630MetalBiomimeticErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASBiomimeticSnapshotErrorConformsToCodable() {
-        assertCodable(BASBiomimeticSnapshotError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASBiomimeticSnapshotError.shapeMismatch(reason: ""))
     }
 
     func testBASPlasticityErrorConformsToCodable() {
-        assertCodable(BASPlasticityError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASPlasticityError.shapeMismatch(reason: ""))
+        assertCodableRoundTrips(
+            BASPlasticityError.gpuUnavailable(reason: ""))
     }
 
     func testBASPredictiveCodingErrorConformsToCodable() {
-        assertCodable(BASPredictiveCodingError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASPredictiveCodingError.shapeMismatch(reason: ""))
     }
 }

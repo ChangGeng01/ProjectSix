@@ -27,18 +27,16 @@ final class BASChapter578OrchestrationCodablePostArcWaveThreeProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testNeuralPublicThoughtProjectionConformsToCodable() {
-        assertCodable(BASNeuralPublicThoughtProjection.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(BASNeuralPublicThoughtProjection())
     }
 
     func testSoftHandModeSelectorSelectionResultConformsToCodable() {
-        assertCodable(
-            BASSoftHandModeSelector.SelectionResult.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSoftHandModeSelector.SelectionResult(
+                mode: .compare,
+                reasonCodes: []))
     }
 }

@@ -36,21 +36,25 @@ final class BASChapter626MetalErrorTrioProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testBASKernelErrorConformsToCodable() {
-        assertCodable(BASKernelError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASKernelError.shapeMismatch(reason: ""))
     }
 
     func testBASKernelLookupErrorConformsToCodable() {
-        assertCodable(BASKernelLookupError.self)
+        // #18: real round-trip — key built from minimal simple-enum members
+        let key = BASKernelKey(
+            operation: .matMul,
+            dataType: .float32,
+            backingKind: .mlxArray)
+        assertCodableRoundTrips(
+            BASKernelLookupError.noKernelRegistered(key: key))
     }
 
     func testBASMambaSSMErrorConformsToCodable() {
-        assertCodable(BASMambaSSMError.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASMambaSSMError.shapeMismatch(reason: ""))
     }
 }

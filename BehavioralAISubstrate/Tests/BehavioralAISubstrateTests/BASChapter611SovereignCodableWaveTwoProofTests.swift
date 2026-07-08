@@ -21,24 +21,24 @@
 
 import XCTest
 @testable import BASSovereign
+import BASRuntimeCore
 
 final class BASChapter611SovereignCodableWaveTwoProofTests:
     XCTestCase
 {
 
-    private func assertCodable<T: Codable>(_ type: T.Type) {
-        XCTAssertEqual(
-            String(describing: type),
-            String(describing: type))
-    }
-
     func testSovereignStubRendererStubOutputConformsToCodable() {
-        assertCodable(
-            BASSovereignStubRenderer.StubOutput.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignStubRenderer.StubOutput(
+                body: "",
+                auditRef: "",
+                mode: .minimalReceipt))
     }
 
     func testSovereignStubRendererRefusalPhrasesConformsToCodable() {
-        assertCodable(
-            BASSovereignStubRenderer.RefusalPhrases.self)
+        // #18: real round-trip
+        assertCodableRoundTrips(
+            BASSovereignStubRenderer.RefusalPhrases.builtIn)
     }
 }
