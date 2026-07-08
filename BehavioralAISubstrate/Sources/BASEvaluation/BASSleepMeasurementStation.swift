@@ -45,8 +45,10 @@ public enum BASSleepMeasurementStation {
     /// What to measure — suite filters run sequentially (one heavy job at a time, 铁律).
     public struct Manifest: Codable, Sendable, Equatable {
         public let suiteFilters: [String]
-        /// Per-suite wall-clock ceiling (seconds; default 30min)。夜窗铁律:一个挂死的
-        /// 套件不得挂死整站——超时 = kill + TIMEOUT 判决候选行,站继续下一项。
+        /// Per-suite wall-clock ceiling (seconds; default 30min)。夜窗铁律:一个挂死的套件
+        /// 不得拖垮整机——超时 = SIGKILL 整个进程组(swift driver + 真正挂死满载的孙 xctest
+        /// 二进制)+ TIMEOUT 判决候选行,然后【停整站】(audit H20:绝不在一个挂死套件之上再
+        /// 起第二个重活——该机曾因这种 pile-on 冻结、被迫重启)。剩余套件记 SKIPPED 行。
         public let perSuiteTimeoutS: Double
         public init(suiteFilters: [String], perSuiteTimeoutS: Double = 1_800) {
             self.suiteFilters = suiteFilters
@@ -132,6 +134,33 @@ public enum BASSleepMeasurementStation {
     }
 
     #if os(macOS)
+    /// audit H20 — where a per-suite timeout sends SIGKILL. Killing the whole process GROUP
+    /// reaps the grandchild xctest binary (the process that actually hangs at full load), not
+    /// just the swift driver. `.single` is the self-protecting fallback.
+    public enum StationKillTarget: Equatable {
+        case group(pid_t)    // kill(-pid, SIGKILL) — child is its own group leader
+        case single(pid_t)   // kill(pid,  SIGKILL) — child shares our group; group-kill unsafe
+    }
+
+    /// Decide the SIGKILL target. Kill the whole group ONLY when the child is its own group
+    /// leader (`childPgid == pid`) AND that group differs from the station's own group — so the
+    /// station can never SIGKILL itself. Otherwise fall back to the single child pid.
+    public static func killTargetForTimeout(
+        pid: pid_t, childPgid: pid_t, ownPgid: pid_t
+    ) -> StationKillTarget {
+        if childPgid == pid && childPgid != ownPgid { return .group(pid) }
+        return .single(pid)
+    }
+
+    /// audit H20 — the remaining suites to SKIP when the station halts after a timeout (the
+    /// one-heavy-task iron law: never launch another heavy suite while a hung one may survive).
+    public static func suitesToSkipAfterHalt(
+        all: [String], haltedIndex: Int
+    ) -> [String] {
+        guard haltedIndex >= 0, haltedIndex + 1 < all.count else { return [] }
+        return Array(all[(haltedIndex + 1)...])
+    }
+
     /// Gate ②③ + execute (macOS station only). `windowPermitted` is the HOST's verdict
     /// (charging/idle/thermal-nominal) — the station never guesses device state itself.
     /// Returns nil when a gate says no (byte-equal off path).
@@ -144,7 +173,8 @@ public enum BASSleepMeasurementStation {
         guard windowPermitted else { return nil }                   // 门②
         guard !manifest.suiteFilters.isEmpty else { return nil }    // 门③
         var records: [BASStationRunRecord] = []
-        for filter in manifest.suiteFilters {
+        let ownPgid = getpgrp()   // audit H20: the station's own process group — never SIGKILL it
+        for (suiteIndex, filter) in manifest.suiteFilters.enumerated() {
             let t0 = Date()
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
@@ -162,7 +192,12 @@ public enum BASSleepMeasurementStation {
                     verdictCandidate: "LAUNCH-FAIL: \(error)"))
                 continue
             }
-            // 超时看门狗:后台读避免管道阻塞;截止即 terminate(升级 kill)。
+            // audit H20: put the child in its OWN process group so a timeout can SIGKILL the whole
+            // group (swift driver + the grandchild xctest binary that actually hangs), not only the
+            // driver. Best-effort — races the child's exec; the GUARANTEED invariant-preserver is
+            // the station halt below (killTargetForTimeout self-protects if the child didn't detach).
+            setpgid(proc.processIdentifier, proc.processIdentifier)
+            // 超时看门狗:后台读避免管道阻塞;截止即 terminate(升级 group-kill)。
             var outData = Data()
             let readQueue = DispatchQueue(label: "bas.station.read")
             let readDone = DispatchSemaphore(value: 0)
@@ -175,9 +210,22 @@ public enum BASSleepMeasurementStation {
             while proc.isRunning {
                 if Date() > deadline {
                     timedOut = true
+                    // audit H20: SIGTERM the driver, then SIGKILL the whole process GROUP so the
+                    // hung grandchild xctest binary dies too (was: kill only the direct child →
+                    // the grandchild survived at full load and the station piled on the next suite).
                     proc.terminate()
                     Thread.sleep(forTimeInterval: 5)
-                    if proc.isRunning { kill(proc.processIdentifier, SIGKILL) }
+                    if proc.isRunning {
+                        let pid = proc.processIdentifier
+                        switch Self.killTargetForTimeout(
+                            pid: pid, childPgid: getpgid(pid), ownPgid: ownPgid) {
+                        case .group(let p):  kill(-p, SIGKILL)
+                        case .single(let p): kill(p, SIGKILL)
+                        }
+                    }
+                    // Close the pipe's write end so the background reader can't block forever on a
+                    // descendant that still holds it open (was: leaked reader thread).
+                    try? pipe.fileHandleForWriting.close()
                     break
                 }
                 Thread.sleep(forTimeInterval: 0.5)
@@ -190,7 +238,8 @@ public enum BASSleepMeasurementStation {
             let verdict: String
             let stFails = swiftTestingFailures(out)
             if timedOut {
-                verdict = "TIMEOUT after \(Int(manifest.perSuiteTimeoutS))s — killed; triage by hand"
+                verdict = "TIMEOUT after \(Int(manifest.perSuiteTimeoutS))s — killed (process group); " +
+                          "STATION HALTED (one-heavy-task invariant); triage by hand"
             } else if stFails > 0 {
                 verdict = "RED(swift-testing) \(stFails) ✘ — hand triage (no XCTest aggregate covers these)"
             } else if let a = agg {
@@ -205,6 +254,22 @@ public enum BASSleepMeasurementStation {
                 executedTests: agg?.tests ?? 0, failures: agg?.failures ?? 0,
                 durationS: dt, verdictCandidate: verdict))
             print("📊 station suite=\(filter) \(verdict) t=\(String(format: "%.1f", dt))s")
+            if timedOut {
+                // audit H20: HALT the whole station — do NOT launch another heavy suite while a
+                // hung process may have survived the kill. The freeze this machine hit was the
+                // pile-on of a second suite on top of a hung one. Record the rest as SKIPPED so
+                // the ledger shows they were intentionally not run (not silently dropped).
+                for skipped in Self.suitesToSkipAfterHalt(
+                    all: manifest.suiteFilters, haltedIndex: suiteIndex) {
+                    records.append(BASStationRunRecord(
+                        startedAtMs: nowMs, suiteFilter: skipped, exitCode: -1,
+                        executedTests: 0, failures: 0, durationS: 0,
+                        verdictCandidate:
+                            "SKIPPED — station halted after prior timeout (one-heavy-task invariant)"))
+                    print("⏹️ station suite=\(skipped) SKIPPED — station halted after timeout")
+                }
+                break
+            }
         }
         try? appendToLedger(records, ledgerURL: ledgerURL)
         return records
