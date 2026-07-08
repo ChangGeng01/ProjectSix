@@ -142,6 +142,12 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
                 .sqliteOpenFailed(code: openRC, message: msg)
         }
         self.db = opened
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages at delete
+        // time so purged risk observations aren't forensically recoverable. Default-on;
+        // kill-switch BAS_SECURE_DELETE=0. Best-effort — a failure here must not block open.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            sqlite3_exec(opened, sdSQL, nil, nil, nil)
+        }
         try applySchema()
     }
 

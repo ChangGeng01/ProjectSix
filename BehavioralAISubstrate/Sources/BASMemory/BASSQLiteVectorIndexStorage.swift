@@ -126,6 +126,11 @@ public actor BASSQLiteVectorIndexStorage {
         }
         self.db = handle
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
         // 先稳 P2 — bound WAL growth over long sessions (mirrors the event log's M891 setting).

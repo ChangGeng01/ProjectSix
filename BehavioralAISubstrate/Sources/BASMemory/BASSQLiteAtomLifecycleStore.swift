@@ -29,6 +29,7 @@
 
 import Foundation
 import SQLite3
+import BASRuntimeCore
 
 public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
 
@@ -81,6 +82,11 @@ public actor BASSQLiteAtomLifecycleStore: BASAtomLifecycleStore {
         // WAL + sync mode for concurrent reader compatibility
         // (mirrors BASSQLiteMemoryAtomStore pattern)。
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete zeroes freed pages
+        // at delete time — default-on, BAS_SECURE_DELETE=0 kill-switch.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
         try Self.runExec(db: handle, sql: "PRAGMA synchronous=NORMAL;")
 
         // PRAGMA user_version branch:0 = empty DB,write our version;

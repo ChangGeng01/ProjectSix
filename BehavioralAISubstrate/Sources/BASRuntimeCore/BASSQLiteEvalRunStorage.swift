@@ -123,6 +123,10 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
 
         try Self.runExec(
             db: handle, sql: "PRAGMA journal_mode=WAL;")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on (kill-switch BAS_SECURE_DELETE=0).
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try Self.runExec(db: handle, sql: sdSQL)
+        }
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
 

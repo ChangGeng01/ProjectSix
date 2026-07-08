@@ -364,6 +364,11 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
                     phase: "wal-mode")
         try execute(sql: "PRAGMA synchronous=NORMAL",
                     phase: "synchronous-normal")
+        // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on so a revoked/
+        // expired ticket's bytes are zeroed, not left recoverable. kill-switch BAS_SECURE_DELETE=0.
+        if let sdSQL = BASSQLiteSecureDelete.openPragmaSQL {
+            try execute(sql: sdSQL, phase: "secure-delete")
+        }
     }
 
     /// M274 — return the active journal mode string. Public so

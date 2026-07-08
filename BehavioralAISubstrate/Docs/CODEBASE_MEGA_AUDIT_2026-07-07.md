@@ -235,7 +235,18 @@
     不降级)、已知非热生产串→nominal(不误降级保正常)、**真未识别→fail-CLOSED(serious)+ 大声记 rationale**。
     RuntimeCore 124 测零回归。**残留**:生产者把非热数据塞 thermalState 的范畴错误(应喂真 ProcessInfo
     热态)是更深的生产者侧修,留册待专案;本修让消费者对该错误 fail-loud 而非静默 fail-open。
-16. **删除教义收口**：全 store secure_delete/VACUUM default-on（ADR-014 opt-in→certified→default-on）。
+16. **删除教义收口** — **secure_delete DONE(2026-07-08,TDD 取证 4 门)**。共享助手
+    `BASSQLiteSecureDelete`(BASRuntimeCore,默认开+kill-switch `BAS_SECURE_DELETE=0`)在 open 时
+    紧随 `journal_mode=WAL` 打 `PRAGMA secure_delete=ON`,已接线**全部 18 个磁盘 store**
+    (12 单行 runExec 形 + 4 多行形 + BASRiskObservations sqlite3_exec 形 + BASUpdateTicket
+    execute 形;第 19 个 BASChapterDoctrineSQLLoader 是 `:memory:` 无盘无删故豁免,已注记。
+    审计原估"9 store"是低计)。**★TDD 取证验证**:
+    写入独特秘串→DELETE→wal_checkpoint(TRUNCATE)→扫 db+`-wal`+`-shm` 原始字节,secure_delete=ON
+    下秘串**物理消失**;pragma 读回 =1 证真开非 no-op(teeth 不靠平台默认差异);kill-switch 双态套件皆绿
+    (默认 4/4,OFF 2 过 2 skip)。存储回归 275+ 零回归。**残留(留册)**:①VACUUM/auto_vacuum
+    对**已部署旧库的历史空闲页**(secure_delete 前的删除留下的未清零页)是一次性迁移,非每次 open 跑
+    (VACUUM 全库重写代价高)——secure_delete 只清此后的删除;②x-sov #5(atom 库 Data Protection
+    class)+ #6(KV try? 吞错)是同族但独立项,未在本收口内。
 17. token 历史清洗（filter-repo/LFS purge）——**删除类,必须操作员亲自裁决**。
 18. 测试诚实度：~300 条 assertCodable 自比较升级为真 round-trip；9 条 print-only 加断言或门控；B2 /tmp 状态依赖去除。
 19. KG codec 上生产前重建 XCFramework（M-n）。
