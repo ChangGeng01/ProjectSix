@@ -37,7 +37,7 @@ final class BASHostStorageWireBuilderM947Tests: XCTestCase {
         async throws
     {
         let opts = BASHostStorageOptions()
-        let store = try BASHostStorageWireBuilder
+        let store = try await BASHostStorageWireBuilder
             .makeAtomStore(options: opts)
         // Type check: legacy in-memory or SQLite store —
         // NOT BASEventSourcedMemoryAtomStore
@@ -53,7 +53,7 @@ final class BASHostStorageWireBuilderM947Tests: XCTestCase {
     {
         let opts = BASHostStorageOptions(
             useEventSourcedAtomStore: true)
-        let store = try BASHostStorageWireBuilder
+        let store = try await BASHostStorageWireBuilder
             .makeAtomStore(
                 options: opts,
                 eventSourcedSessionID: "test-sess")
@@ -190,28 +190,29 @@ final class BASHostStorageWireBuilderM947Tests: XCTestCase {
         }
     }
 
-    func testEventSourcedAtomStoreRequiringSQLiteThrowsWithoutURL() {
+    func testEventSourcedAtomStoreRequiringSQLiteThrowsWithoutURL()
+        async
+    {
         let opts = BASHostStorageOptions(
             preference: .sqliteRequired,
             useEventSourcedAtomStore: true)
-        XCTAssertThrowsError(
-            try BASHostStorageWireBuilder.makeAtomStore(
+        // audit M-l MED-8 — makeAtomStore is now async; assert via do/catch.
+        do {
+            _ = try await BASHostStorageWireBuilder.makeAtomStore(
                 options: opts)
-        ) { error in
+            XCTFail("expected a throw, got success")
+        } catch let we as BASHostStorageWireError {
             // The error originates from makeEventLog
             // (event-sourced path requires event log) which
             // throws .missingSQLiteURL(component: "event-log")
-            guard let we = error as?
-                BASHostStorageWireError else {
-                XCTFail("wrong error type")
-                return
-            }
             switch we {
             case .missingSQLiteURL(let component):
                 XCTAssertEqual(component, "event-log")
             default:
                 XCTFail("wrong case")
             }
+        } catch {
+            XCTFail("wrong error type")
         }
     }
 
