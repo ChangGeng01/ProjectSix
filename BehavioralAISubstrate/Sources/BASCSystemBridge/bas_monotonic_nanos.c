@@ -346,21 +346,27 @@ int32_t bas_process_disk_io_blocks_version(void) {
 
 // MARK: - bas_wallclock_nanos (chapter 七百六十一 第一刀 / M2456)
 //
-// Sleep-INCLUSIVE monotonic timestamp via `mach_absolute_time()`
+// Sleep-INCLUSIVE monotonic timestamp via `mach_continuous_time()`
 // + Mach timebase scaling。 Counterpart to `bas_monotonic_nanos`
 // (CLOCK_UPTIME_RAW which EXCLUDES sleep)。
+//
+// audit runtimecore-a #1 — this used `mach_absolute_time()`, which on Apple
+// platforms does NOT advance during system sleep (same sleep-EXCLUDED semantics
+// as CLOCK_UPTIME_RAW / bas_monotonic_nanos). The comment claiming it "INCLUDES
+// sleep" was a lie: two timestamps straddling a sleep read the SAME elapsed span
+// as the monotonic clock, so a stale post-sleep attestation looked fresh. The
+// truly sleep-inclusive source is `mach_continuous_time()`.
 //
 // Why two clocks
 // --------------
 //
 // Apple's runtime distinguishes:
-//   - CLOCK_UPTIME_RAW :time since boot,EXCLUDING sleep intervals
-//                       (useful for turn-duration measurement —
-//                        sleep doesn't「count」 against your CPU)
-//   - mach_absolute_time:time since boot,INCLUDING sleep intervals
-//                       (useful for detecting how long the device
-//                        was asleep between two timestamps —
-//                        thermal management,attestation freshness)
+//   - CLOCK_UPTIME_RAW / mach_absolute_time :time since boot, EXCLUDING sleep
+//                       (turn-duration measurement — sleep doesn't「count」
+//                        against your CPU)
+//   - mach_continuous_time:time since boot, INCLUDING sleep intervals
+//                       (detecting how long the device was asleep between two
+//                        timestamps — thermal management, attestation freshness)
 //
 // The substrate's chapter 一 (L1) thermal scheduler needs BOTH
 // values:turn duration to gate inferences,sleep latency to
@@ -403,7 +409,9 @@ int32_t bas_wallclock_nanos(uint64_t *out) {
             return -2;
         }
     }
-    uint64_t abs = mach_absolute_time();
+    // audit runtimecore-a #1: mach_CONTINUOUS_time (sleep-INCLUSIVE), NOT mach_absolute_time
+    // (which stops during sleep). Same Mach timebase units, so the scaling below is unchanged.
+    uint64_t abs = mach_continuous_time();
     // Apply timebase scaling:nsec = abs * numer / denom。
     // On Apple Silicon both are 1 so this collapses to abs。
     if (bas_timebase_cache.numer == bas_timebase_cache.denom) {
