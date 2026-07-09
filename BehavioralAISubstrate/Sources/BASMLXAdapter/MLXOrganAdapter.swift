@@ -675,6 +675,29 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     ///   during the Hugging Face download. Pass an empty closure to
     ///   ignore.
     ///
+    #if canImport(MLXLLM)
+    /// audit mlx-adapter-core MED-9 — in-flight single-flight guard for the model load. Between
+    /// the `modelContainer != nil` guard and the assignment there is an `await` (the container
+    /// download/materialize), so two concurrent `loadModel` callers both passed the guard and
+    /// BOTH downloaded + materialized → a transient double footprint that jetsam-SIGKILLs the load.
+    private var loadInFlight: Task<Void, Error>?
+
+    /// Run `materialize` at most once concurrently: a second caller awaits the first instead of
+    /// re-materializing. The check-and-set is synchronous on the actor (before the first `await`),
+    /// so no two callers can both create the task. Pure coordination — Mac-testable with a stub.
+    func _loadOnce(_ materialize: @Sendable @escaping () async throws -> Void) async throws {
+        if modelContainer != nil { return }
+        if let inFlight = loadInFlight {
+            try await inFlight.value          // a load is already running — reuse it, don't re-materialize
+            return
+        }
+        let task = Task { try await materialize() }
+        loadInFlight = task
+        defer { loadInFlight = nil }
+        try await task.value
+    }
+    #endif
+
     /// First call against a cold cache downloads ~1.4–3 GB depending
     /// on the entry; second call hits the local cache and returns
     /// in seconds.
@@ -695,7 +718,25 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 "unavailable on the iOS Simulator")
         #endif
         if modelContainer != nil { return }
+        // audit mlx-adapter-core MED-9: single-flight — a concurrent loadModel awaits the in-flight
+        // load rather than double-downloading/materializing (the load-time-jetsam double footprint).
+        try await _loadOnce { [progressHandler] in
+            try await self._materializeModel(progressHandler: progressHandler)
+        }
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason: Self.frameworkUnavailableReason
+                + Self.frameworkUnavailablePlatformSuffix)
+        #endif
+    }
 
+    /// audit mlx-adapter-core MED-9 — the actual model materialize, extracted so `loadModel`
+    /// routes it through the `_loadOnce` single-flight coordinator. Only the FIRST concurrent
+    /// caller reaches it; a second awaits the first. Runs on the actor.
+    func _materializeModel(
+        progressHandler: @Sendable @escaping (Progress) -> Void
+    ) async throws {
+        #if canImport(MLXLLM)
         // OPT-IN pre-load jetsam admission (default off ⇒ byte-equal, ADR-014). A single-model load whose
         // estimated peak footprint crosses the device's ActiveHard cap is SIGKILL'd before the first token
         // (E4B died this way twice on the iPhone Air, deviceB) — refuse it cleanly here so the host gets a
