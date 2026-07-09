@@ -52,8 +52,9 @@
     {
       "med_id": "devicetestapp MED-1",
       "title": "Liveness watchdog stamps 'mlx-process-local-wedge' signature on slow-but-healthy non-streaming decode → external Mac watchdog false-kills a healthy overnight run",
-      "disposition": "unaccounted",
-      "detail": "BASEnduranceAppRunner.swift:1573-1590 + BASDecodeLivenessMonitor.swift:133-146. Not referenced in any remediation ledger (§8/§9/§10/§11) nor in the §11 line-501 residual list. §11 device-gated closure only handled M-i MED-2/4/6; MED-7 via §9. git log b6b31a3b1..HEAD shows BASEnduranceAppRunner.swift / BASDecodeLivenessMonitor.swift were NEVER touched post-audit. §8 line 485 claims 'all MED closed' — this one is silently dropped."
+      "disposition": "closed",
+      "detail": "BASEnduranceAppRunner.swift:1573-1590 + BASDecodeLivenessMonitor.swift:133-146. Not referenced in any remediation ledger (§8/§9/§10/§11) nor in the §11 line-501 residual list. §11 device-gated closure only handled M-i MED-2/4/6; MED-7 via §9. git log b6b31a3b1..HEAD shows BASEnduranceAppRunner.swift / BASDecodeLivenessMonitor.swift were NEVER touched post-audit. §8 line 485 claims 'all MED closed' — this one is silently dropped.",
+      "remediation": "commit 3eeb6e678 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "devicetestapp MED-2",
@@ -64,8 +65,9 @@
     {
       "med_id": "devicetestapp MED-3",
       "title": "Endurance main loop loads the entire durable memory store (store.allAtoms()) every iteration → cross-restart monotonic growth pollutes measurement",
-      "disposition": "unaccounted",
-      "detail": "BASEnduranceAppRunner.swift:2460 + BASSQLiteMemoryAtomStore.swift:364-370. Fix suggested was SELECT COUNT(*) + created_at cursor. No ledger entry and not in §11 residual. BASEnduranceAppRunner.swift untouched post-audit (git log b6b31a3b1..HEAD). Silently dropped under the M-i theme's aggregate close."
+      "disposition": "closed",
+      "detail": "BASEnduranceAppRunner.swift:2460 + BASSQLiteMemoryAtomStore.swift:364-370. Fix suggested was SELECT COUNT(*) + created_at cursor. No ledger entry and not in §11 residual. BASEnduranceAppRunner.swift untouched post-audit (git log b6b31a3b1..HEAD). Silently dropped under the M-i theme's aggregate close.",
+      "remediation": "commit 86178dedf (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "devicetestapp MED-4",
@@ -76,8 +78,9 @@
     {
       "med_id": "devicetestapp MED-5",
       "title": "RdarProbe M3 (runChainFidelity) and M4 use different state-row-width defaults for the SAME fused asset (524_288 vs 548_864) → chain probe self-breaks under default params",
-      "disposition": "unaccounted",
-      "detail": "BASQwen35RdarProbe.swift:184/291/46. RdarProbe was touched post-audit by cebea725a (MED-4/6) and dd3736ed2 (MED-7) but neither reconciles the contradictory stateRow hardcodes. No ledger reference, not in §11 residual. Silently dropped."
+      "disposition": "closed",
+      "detail": "BASQwen35RdarProbe.swift:184/291/46. RdarProbe was touched post-audit by cebea725a (MED-4/6) and dd3736ed2 (MED-7) but neither reconciles the contradictory stateRow hardcodes. No ledger reference, not in §11 residual. Silently dropped.",
+      "remediation": "commit 21daa2157 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "devicetestapp MED-6",
@@ -94,14 +97,16 @@
     {
       "med_id": "devicetestapp MED-8",
       "title": "GPU heartbeat silently freezes ~21min into a long wedge (64-buffer command-queue quota exhausted at the 65th makeCommandBuffer) → adjudication read polluted by a third state",
-      "disposition": "unaccounted",
-      "detail": "BASEnduranceAppRunner.swift:1878-1901 + BASMetalGPUProbe.swift:165-201. Neither file touched post-audit (git log b6b31a3b1..HEAD). No ledger entry, not in §11 residual — even though it is a device-runtime concern it was never folded into the device-gated batch. Silently dropped."
+      "disposition": "closed",
+      "detail": "BASEnduranceAppRunner.swift:1878-1901 + BASMetalGPUProbe.swift:165-201. Neither file touched post-audit (git log b6b31a3b1..HEAD). No ledger entry, not in §11 residual — even though it is a device-runtime concern it was never folded into the device-gated batch. Silently dropped.",
+      "remediation": "commit 46cb7fd4a (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "devicetestapp MED-9",
       "title": "BASQwen35MTPProbe.runSustained re-inits the spec decoder every generation → the cert-fixed self-heating bug remains in the sustained arm, inflating thermal drift → false 'thermal wall' negative",
-      "disposition": "unaccounted",
-      "detail": "BASQwen35MTPProbe.swift:66-70. cebea725a touched MTPProbe only for MED-2 (4 lines, the sleeps); the per-gen decoder rebuild in runSustained is untouched. No ledger reference, not in §11 residual. Silently dropped."
+      "disposition": "device-only",
+      "detail": "BASQwen35MTPProbe.swift:66-70. cebea725a touched MTPProbe only for MED-2 (4 lines, the sleeps); the per-gen decoder rebuild in runSustained is untouched. No ledger reference, not in §11 residual. Silently dropped.",
+      "remediation": "DEVICE-ONLY (workflow verdict macFixableCore=false): the per-gen decoder rebuild fix is a hoist, but the probe is too MLX-coupled for a Mac test with red-on-reversal teeth; the self-heating symptom is device-runtime."
     },
     {
       "med_id": "hostkit-rest MED-1",
@@ -255,44 +260,51 @@
     {
       "med_id": "mlx-adapter-core MED-6",
       "title": "Pressure ladder passing through multiple rungs: lighter-rung actions latched-but-not-executed; ~300MB MTP decoder retained after a rung-3 event",
-      "disposition": "unaccounted",
-      "detail": "Member of the M-f 'MLX memory governance' MED group, enumerated only in §2-A line 62 ('pressure-ladder 直穿档漏收 300MB (MED-6)') and grouped under §3 theme 'M-f/M-g'. Theme M-f has NO closure row anywhere in §8/§9/§10/§11 — the only M-f/M-g commit (2c1fdf437) closes the sibling M-g DECODE-instrument findings (MED-2/3) exclusively. The jetsam-aware pressure ladder it critiques (commit 3a0e98d17, 07-06) predates the audit. No remediation; the aggregate '全部 MED 全闭' claim does not cover it. Silently dropped."
+      "disposition": "closed",
+      "detail": "Member of the M-f 'MLX memory governance' MED group, enumerated only in §2-A line 62 ('pressure-ladder 直穿档漏收 300MB (MED-6)') and grouped under §3 theme 'M-f/M-g'. Theme M-f has NO closure row anywhere in §8/§9/§10/§11 — the only M-f/M-g commit (2c1fdf437) closes the sibling M-g DECODE-instrument findings (MED-2/3) exclusively. The jetsam-aware pressure ladder it critiques (commit 3a0e98d17, 07-06) predates the audit. No remediation; the aggregate '全部 MED 全闭' claim does not cover it. Silently dropped.",
+      "remediation": "commit a57c426e6 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "mlx-adapter-core MED-7",
       "title": "rung-2 decoder discard is immediately undone by an in-flight / next MTP generation",
-      "disposition": "unaccounted",
-      "detail": "M-f group, §2-A line 62 ('rung-2 decoder 被下一 MTP gen 撤销 (MED-7)'). Grouped in §3 theme M-f/M-g but M-f has no closure row; 2c1fdf437 only covers M-g decode-instrument (MED-2/3). No commit references it. Note: the 'MED-7' hits in git log (ch1044 scaffold headline; DeviceTestApp M1 SURVIVED = M-i MED-7, commit dd3736ed2) are DIFFERENT auditors' MED-7, not this one. Silently dropped."
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('rung-2 decoder 被下一 MTP gen 撤销 (MED-7)'). Grouped in §3 theme M-f/M-g but M-f has no closure row; 2c1fdf437 only covers M-g decode-instrument (MED-2/3). No commit references it. Note: the 'MED-7' hits in git log (ch1044 scaffold headline; DeviceTestApp M1 SURVIVED = M-i MED-7, commit dd3736ed2) are DIFFERENT auditors' MED-7, not this one. Silently dropped.",
+      "remediation": "commit a28f4c9e0 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "mlx-adapter-core MED-8",
       "title": "Cold-start concurrent MTP turns double-build the decoder: transient ~600MB overlap + EMA loss",
-      "disposition": "unaccounted",
-      "detail": "M-f group, §2-A line 62 ('冷启并发双建 decoder ~600MB (MED-8=mlx-decode LOW-2)'). M-f theme has no closure row; not addressed by the H4-H7 per-key SESSION gate (that serializes session keys, not decoder construction). No commit. Note: 'M-l/MED-8' (ca07528c3) is a different finding (hostkit event-sourced seed race), NOT this. Silently dropped."
+      "disposition": "deferred",
+      "detail": "M-f group, §2-A line 62 ('冷启并发双建 decoder ~600MB (MED-8=mlx-decode LOW-2)'). M-f theme has no closure row; not addressed by the H4-H7 per-key SESSION gate (that serializes session keys, not decoder construction). No commit. Note: 'M-l/MED-8' (ca07528c3) is a different finding (hostkit event-sourced seed race), NOT this. Silently dropped.",
+      "remediation": "DEFERRED (device follow-up): the cold-start double-build lives INSIDE a container.perform(nonSendable:) closure; deduping it safely requires restructuring the hottest decode path (build-vs-decode separation) with only device-verifiable payoff. The single-flight primitive is shipped (_loadOnce, MED-9); MED-7 drop-epoch already hardens the decoder lifecycle. Deferred to avoid destabilizing production decode."
     },
     {
       "med_id": "mlx-adapter-core MED-9",
       "title": "loadModel concurrent reentrancy has no in-progress dedup: double download + double materialization → load-time jetsam",
-      "disposition": "unaccounted",
-      "detail": "M-f group, §2-A line 62 ('loadModel 无 in-flight 去重双下载 (MED-9)'). No M-f closure row, no remediation commit. The nearest code — dff443ebf 'in-loadModel admission + prewarm-wiring' (06-14) — predates the audit and is not referenced as a fix for this finding; the audit was written against that codebase and still flagged it. Silently dropped."
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('loadModel 无 in-flight 去重双下载 (MED-9)'). No M-f closure row, no remediation commit. The nearest code — dff443ebf 'in-loadModel admission + prewarm-wiring' (06-14) — predates the audit and is not referenced as a fix for this finding; the audit was written against that codebase and still flagged it. Silently dropped.",
+      "remediation": "commit 556ff5db8 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "mlx-adapter-core MED-10",
       "title": "Spill snapshot not bound to model identity → wrong/lost seat restore after a model swap",
-      "disposition": "unaccounted",
-      "detail": "M-f group, §2-A line 62 ('spill 不绑 model.id 换模型错恢复 (MED-10)'). BASSessionKVStore lacks model-identity binding (noted in the evidence file's CLEAN section as 'see MED-10'). H5 (single-writer spill, commit b502aed2b/a45f7354a) fixes the double-writer delete race but adds no model-identity binding. No M-f closure, no commit. Silently dropped."
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('spill 不绑 model.id 换模型错恢复 (MED-10)'). BASSessionKVStore lacks model-identity binding (noted in the evidence file's CLEAN section as 'see MED-10'). H5 (single-writer spill, commit b502aed2b/a45f7354a) fixes the double-writer delete race but adds no model-identity binding. No M-f closure, no commit. Silently dropped.",
+      "remediation": "commit 85f0809ef (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "mlx-adapter-core MED-11",
       "title": "rung-3 setGPUCacheLimit(256MB) is a one-way ratchet, never restored",
-      "disposition": "unaccounted",
-      "detail": "M-f group, §2-A line 62 ('rung-3 cacheLimit 256MB 单向棘轮 (MED-11)'). No M-f closure row, no remediation commit. The cacheLimit=512 default pool bound (4ee2a315e, 06-09) and the DON'T-CARE sweep (b3e920c46, 07-07) are a different mechanism (default pool cap) and predate the audit; they do not restore the rung-3 downward ratchet. Silently dropped."
+      "disposition": "closed",
+      "detail": "M-f group, §2-A line 62 ('rung-3 cacheLimit 256MB 单向棘轮 (MED-11)'). No M-f closure row, no remediation commit. The cacheLimit=512 default pool bound (4ee2a315e, 06-09) and the DON'T-CARE sweep (b3e920c46, 07-07) are a different mechanism (default pool cap) and predate the audit; they do not restore the rung-3 downward ratchet. Silently dropped.",
+      "remediation": "commit f52810730 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "mlx-decode MED-1",
       "title": "MTP stream KV bound maxSeq=2048 not enforced: max(1,…) defeats its own clamp → long context silently enters net-negative speedup region",
-      "disposition": "unaccounted",
-      "detail": "Member of the M-f group (§2-A line 62: 'MTP maxSeq=2048 未强制致长上下文净负增速 (mlx-decode MED-1)'). No M-f closure row in §8-§11, no commit. The evidence file's own §6 CLEAN note assumes 'after the MED-1 clamp fix' the fp16 position-table ≤2048 premise holds — but that fix was never made. Note: the 'x-arch MED-1' commits (aabcf959a/dd2fb8a21) are the THERMAL finding, unrelated. Silently dropped."
+      "disposition": "closed",
+      "detail": "Member of the M-f group (§2-A line 62: 'MTP maxSeq=2048 未强制致长上下文净负增速 (mlx-decode MED-1)'). No M-f closure row in §8-§11, no commit. The evidence file's own §6 CLEAN note assumes 'after the MED-1 clamp fix' the fp16 position-table ≤2048 premise holds — but that fix was never made. Note: the 'x-arch MED-1' commits (aabcf959a/dd2fb8a21) are the THERMAL finding, unrelated. Silently dropped.",
+      "remediation": "commit b81490202 (2026-07-09 device-gated re-exam campaign — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "mlx-decode MED-2",
@@ -569,8 +581,9 @@
     {
       "med_id": "x-concurrency MED-LOW-10",
       "title": "Synchronous Metal bridge blocks a cooperative thread: DispatchSemaphore.wait blocks the calling actor-executor thread up to timeoutMs waiting on its own spawned Task → pool-saturation degradation (BASMetalSyncBridge.swift:38-49)",
-      "disposition": "unaccounted",
-      "detail": "NOT referenced anywhere in §3/§8/§9/§10/§11 (grep of the audit doc finds no MetalSyncBridge/semaphore mention). No post-audit commit to the file. Severity tag MED-LOW; auditor judged it degradation-not-deadlock (has timeout + guaranteed fallback, only caller in DeviceTestApp:1216), so low urgency — but it was silently dropped from the rollup."
+      "disposition": "device-only",
+      "detail": "NOT referenced anywhere in §3/§8/§9/§10/§11 (grep of the audit doc finds no MetalSyncBridge/semaphore mention). No post-audit commit to the file. Severity tag MED-LOW; auditor judged it degradation-not-deadlock (has timeout + guaranteed fallback, only caller in DeviceTestApp:1216), so low urgency — but it was silently dropped from the rollup.",
+      "remediation": "DEVICE-ONLY + LOW (workflow verdict macFixableCore=false, fixSound=false): the DispatchSemaphore sync-bridge has a timeout + guaranteed fallback (degradation-not-deadlock); a restructure to an async variant risks worse (priority inversion) and needs on-device thermal/load to certify. Left as a documented low-severity item."
     },
     {
       "med_id": "x-sovereignty #2 (MED)",
@@ -652,5 +665,28 @@
       "x-concurrency MED-LOW-10"
     ],
     "swift_build": "green (2.18s)"
+  },
+  "device_gated_reexam_2026_07_09": {
+    "method": "ultracode workflow (24-agent analyze→adversarial-verify) re-examined the 13 \"device/runtime-gated\" items for a Mac-fixable code CORE; overturned the coarse classification — 10 had pure-logic cores",
+    "closed": [
+      "devicetestapp MED-5",
+      "mlx-decode MED-1",
+      "mlx-adapter-core MED-10",
+      "devicetestapp MED-1",
+      "devicetestapp MED-8",
+      "mlx-adapter-core MED-6",
+      "mlx-adapter-core MED-11",
+      "mlx-adapter-core MED-9",
+      "mlx-adapter-core MED-7",
+      "devicetestapp MED-3"
+    ],
+    "not_mac_fixable": {
+      "mlx-adapter-core MED-8": "deferred (in-perform-closure build; risky restructure)",
+      "devicetestapp MED-9": "device-only (MLX-coupled probe)",
+      "x-concurrency MED-LOW-10": "device-only + LOW (async restructure risks worse)"
+    },
+    "final_tally": "37 unaccounted = 32 closed + 2 not-reproduced/refuted (memory-b F5, hostkit-spine F3) + 3 honest residuals (mlx MED-8 deferred, devicetestapp MED-9 + x-conc MED-LOW-10 device-only)",
+    "lesson": "\"device/runtime-gated\" conflated \"symptom manifests on device\" with \"fix cannot be written/tested on Mac\". 10 of 13 had a pure-Swift core (a constant reconciliation, a self-defeating clamp, a model-id binding, a persistence horizon, a command-buffer budget, a subsume relation, a rearm-report, a load single-flight, a drop-epoch, an O(1) count). The adversarial-verify layer kept the honest negatives honest (2 confirmed device-only, 1 deferred).",
+    "swift_build": "green; 53 tests across touched modules green"
   }
 }
