@@ -123,6 +123,9 @@ final class BASProvisionalVerdictTests: XCTestCase {
                 || permit.mode == .delay
                 || permit.mode == .replace
                 || permit.mode == .block
+                // audit hostkit-spine F8: a high-risk card must ALSO require the protected lane (the
+                // proxy's "never under-states" contract) — mirrors the production predicate.
+                || risk.riskLevel >= .high
 
             let decision = BASEBrainRuntimeCoordinator.computeVerdictDecision(
                 policyLineagePresent: true,
