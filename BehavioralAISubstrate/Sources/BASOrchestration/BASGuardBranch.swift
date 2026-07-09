@@ -9,6 +9,27 @@
 import Foundation
 import BASRuntimeCore
 
+/// audit orchestration HIGH-1 — the CANONICAL reversibility bands, single source of truth for the
+/// two producers of `BASCandidateFrontier.reversiblePaths` / `.guardPaths`. A `guardPath` is a
+/// PROTECTIVE SAFE-RETREAT fallback (HIGH reversibility) — `BASGuardBranch.fromGuardPaths` makes
+/// each one "a minimal REVERSIBLE guard branch". `BASAgentFabricAdapters` previously INVERTED this
+/// (`guardPaths = reversibility < 0.3`, the DANGER band) while `EBrainNeuralMaterializationCore`
+/// used `>= 0.7` (safe band), so the SAME frontier field fed L9 planning OPPOSITE guard sets
+/// depending on which producer ran; the `reversiblePaths` threshold also drifted (0.7 vs 0.6).
+public enum BASReversibilityBands {
+    /// A path is a guard branch (protective, safe to fall back to) at or above this reversibility.
+    public static let guardThreshold: Double = 0.7
+    /// A path is "reversible" (can be undone) at or above this reversibility.
+    public static let reversibleThreshold: Double = 0.7
+
+    public static func isGuardPath(reversibility: Double) -> Bool {
+        reversibility >= guardThreshold
+    }
+    public static func isReversiblePath(reversibility: Double) -> Bool {
+        reversibility >= reversibleThreshold
+    }
+}
+
 /// A protective fallback path in the L9 candidate frontier — the "守护分支".
 public struct BASGuardBranch: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"

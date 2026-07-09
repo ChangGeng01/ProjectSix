@@ -322,12 +322,15 @@ public enum BASNeuralMaterializationCompiler {
                 }
                 .map(\.candidateID)
         }()
+        // audit orchestration HIGH-1: single source of truth for the bands (was 0.6, drifting from
+        // the adapter's 0.7). guardPaths = safe-retreat fallbacks (high reversibility) OR an explicit
+        // guard-lexicon match — consistent now with BASAgentFabricAdapters.
         let reversiblePaths = thoughtFrame.candidates
-            .filter { $0.reversibility >= 0.6 }
+            .filter { BASReversibilityBands.isReversiblePath(reversibility: $0.reversibility) }
             .map(\.candidateID)
         let guardPaths = thoughtFrame.candidates
             .filter { candidate in
-                candidate.reversibility >= 0.7
+                BASReversibilityBands.isGuardPath(reversibility: candidate.reversibility)
                     || containsGuardLexicon(candidate.title)
                     || containsGuardLexicon(candidate.actionSummary)
             }

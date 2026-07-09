@@ -10,7 +10,7 @@
 //   1. candidateIDs in input order (preserves enumeration)
 //   2. dominanceOrder confidence-descending with lex tie-break
 //   3. reversiblePaths >= 0.7 band classification
-//   4. guardPaths < 0.3 band classification
+//   4. guardPaths high-reversibility (safe-retreat) band classification
 //   5. frontierWidth = candidate count
 //   6. diversityScore [0,1] bounded
 //   7. Empty + single-candidate edge cases
@@ -86,20 +86,33 @@ final class BASChapter989CandidateFrontierProjectionTests:
             "ch 989 Gap 5: reversibility >= 0.7 → reversiblePaths")
     }
 
-    func testGuardPaths_LowReversibilityBand() {
+    func testGuardPaths_AreHighReversibilitySafeRetreat() {
+        // audit orchestration HIGH-1: guardPaths are PROTECTIVE SAFE-RETREAT fallbacks (HIGH
+        // reversibility), per BASGuardBranch ("a minimal REVERSIBLE guard branch") — NOT the danger
+        // band. This test previously pinned the INVERTED semantic (reversibility < 0.3), the exact
+        // opposite of the neural producer, feeding L9 planning the wrong guard set.
         let candidates = [
-            makeCand(id: "high", reversibility: 0.9),
+            makeCand(id: "safe", reversibility: 0.9),
             makeCand(id: "midhigh", reversibility: 0.4),
-            makeCand(id: "low", reversibility: 0.1),
-            makeCand(id: "boundary", reversibility: 0.3),
+            makeCand(id: "danger", reversibility: 0.1),
+            makeCand(id: "boundary", reversibility: 0.7),
         ]
         let frontier = BASAgentFabricAdapters
             .candidateFrontierProjection(from: candidates)
-        // < 0.3 only (NOT <=)
         XCTAssertEqual(Set(frontier.guardPaths),
-            Set(["low"]),
-            "ch 989 Gap 5: reversibility < 0.3 → guardPaths " +
-            "(STRICT less-than, boundary excluded)")
+            Set(["safe", "boundary"]),
+            "reversibility >= 0.7 (safe-retreat band) → guardPaths")
+        XCTAssertFalse(frontier.guardPaths.contains("danger"),
+            "a low-reversibility (danger) candidate is NEVER a guard path — that was the inversion")
+    }
+
+    func testGuardBandsAreSharedSingleSourceOfTruth() {
+        // The canonical band both producers now use.
+        XCTAssertTrue(BASReversibilityBands.isGuardPath(reversibility: 0.7))
+        XCTAssertTrue(BASReversibilityBands.isGuardPath(reversibility: 0.9))
+        XCTAssertFalse(BASReversibilityBands.isGuardPath(reversibility: 0.69))
+        XCTAssertFalse(BASReversibilityBands.isGuardPath(reversibility: 0.1),
+            "the danger band is NOT a guard path")
     }
 
     // MARK: - frontierWidth

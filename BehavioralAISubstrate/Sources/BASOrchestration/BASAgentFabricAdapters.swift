@@ -357,10 +357,12 @@ public enum BASAgentFabricAdapters {
     //   - `dominanceOrder` = candidates sorted by confidence
     //     DESCENDING (ties broken by candidateID lex ascending
     //     for determinism)
-    //   - `reversiblePaths` = candidates with `reversibility >= 0.7`
-    //     (matches the ch 967 high-reversibility band)
-    //   - `guardPaths` = candidates with `reversibility < 0.3`
-    //     (matches the ch 958 low-reversibility / guard-needed band)
+    //   - `reversiblePaths` = candidates in the canonical reversible band
+    //     (`BASReversibilityBands.isReversiblePath`)
+    //   - `guardPaths` = candidates that are PROTECTIVE SAFE-RETREAT fallbacks —
+    //     HIGH reversibility (`BASReversibilityBands.isGuardPath`), per BASGuardBranch.
+    //     audit orchestration HIGH-1: this was INVERTED (`reversibility < 0.3`),
+    //     feeding L9 the opposite guard set from the neural producer.
     //   - `frontierWidth` = candidate count
     //   - `diversityScore` = `1 - <std-dev of confidence>` clamped
     //     to [0,1] (high diversity = low std-dev across confidences
@@ -396,10 +398,13 @@ public enum BASAgentFabricAdapters {
         // Reversibility-band classification per ch 958 + ch 967
         // bands。
         let reversiblePaths = candidates
-            .filter { $0.reversibility >= 0.7 }
+            .filter { BASReversibilityBands.isReversiblePath(reversibility: $0.reversibility) }
             .map { $0.candidateID }
+        // audit orchestration HIGH-1: guardPaths are SAFE-RETREAT fallbacks (HIGH reversibility),
+        // not the danger band — was `reversibility < 0.3`, the exact opposite of the canonical
+        // BASGuardBranch semantic + the neural producer.
         let guardPaths = candidates
-            .filter { $0.reversibility < 0.3 }
+            .filter { BASReversibilityBands.isGuardPath(reversibility: $0.reversibility) }
             .map { $0.candidateID }
         // Diversity score = 1 - std-dev(confidence),clamped。
         // Empty / single-candidate case is "perfectly diverse"
