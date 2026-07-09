@@ -55,24 +55,48 @@ import BASOrchestration
 ///     event log (nil when no trace log bridge supplied)
 ///   - `frontierProjection`: aggregate frontier summary the host
 ///     can present to user / feed into next turn's L9
+/// audit hostkit-rest MED-1 — an explicit, inspectable marker that a post-turn
+/// side-effect committed only PARTIALLY. The warrant is written to the sovereign
+/// ledger at Step 3; if the Step-4 durable trace flush then throws, discarding the
+/// whole `turnResult` would fork the host's view from the ledger (the ledger recorded
+/// the turn, the host got nothing). Instead the bundle is still delivered with this
+/// marker so the host learns the outcome AND that a durable write is behind — reconcile,
+/// don't blindly retry. `nil` ⇒ every side effect committed (the normal path).
+public struct BASAgentFabricFullTurnPartialCommit: Sendable, Equatable {
+    /// Which post-turn side-effect did not durably commit (e.g. `"traceFlush"`).
+    public let stage: String
+    /// The failure's description — the durable write the host must reconcile.
+    public let errorDescription: String
+    public init(stage: String, errorDescription: String) {
+        self.stage = stage
+        self.errorDescription = errorDescription
+    }
+}
+
 public struct BASAgentFabricFullTurnResult: Sendable {
     public let turnResult: BASAgentTurnResult
     public let warrantAuditEntry:
         BASSovereignAuditLedger.AppendedEntry?
     public let flushedTraceEventCount: Int?
     public let frontierProjection: BASCandidateFrontier
+    /// Non-nil iff a post-turn side-effect failed AFTER the warrant committed (audit
+    /// hostkit-rest MED-1). The host reconciles the lagging durable write; the
+    /// turnResult + warrantAuditEntry above are still valid.
+    public let partialCommit: BASAgentFabricFullTurnPartialCommit?
 
     public init(
         turnResult: BASAgentTurnResult,
         warrantAuditEntry:
             BASSovereignAuditLedger.AppendedEntry? = nil,
         flushedTraceEventCount: Int? = nil,
-        frontierProjection: BASCandidateFrontier
+        frontierProjection: BASCandidateFrontier,
+        partialCommit: BASAgentFabricFullTurnPartialCommit? = nil
     ) {
         self.turnResult = turnResult
         self.warrantAuditEntry = warrantAuditEntry
         self.flushedTraceEventCount = flushedTraceEventCount
         self.frontierProjection = frontierProjection
+        self.partialCommit = partialCommit
     }
 }
 
@@ -163,12 +187,14 @@ public enum BASAgentFabricFullTurnAdapter {
     ///   doesn't have fabric configured
     /// - Throws:
     ///   - if warrant audit append fails (ledger validation:
-    ///     empty sessionID etc.)
-    ///   - if trace flush fails (event-log storage append throw)
-    ///   chapter 九百九十四.5 META-REVIEW Round-10 MED-1 fix:
-    ///   pre-fix docstring underdeclared throw paths (claimed
-    ///   only warrant could throw)。 Both warrant + flush can
-    ///   throw,so calling code MUST handle both。
+    ///     empty sessionID etc.) — nothing committed, so failing
+    ///     the whole turn is safe (no ledger/host fork)。
+    ///   audit hostkit-rest MED-1: a Step-4 trace-flush failure no
+    ///   longer throws — the warrant is already committed at Step 3,
+    ///   so the bundle is delivered with `partialCommit` set instead
+    ///   of discarding the turnResult (which would fork the host's
+    ///   view from the ledger)。 Callers inspect `result.partialCommit`
+    ///   to reconcile the lagging durable trace write。
     public static func run(
         sessionID: String,
         turnID: String,
@@ -289,10 +315,24 @@ public enum BASAgentFabricFullTurnAdapter {
         }
 
         // Step 4:post-turn trace flush (ch 984)
+        // audit hostkit-rest MED-1: the warrant is ALREADY committed to the sovereign
+        // ledger (Step 3). A flush that throws must NOT unwind `run()` and discard the
+        // turnResult — that forks the host's view from the ledger (ledger has the turn,
+        // host got nothing). Capture the failure as an explicit partial-commit marker
+        // and STILL deliver the bundle; the host reconciles the lagging durable write.
+        // (Step 3 is deliberately left propagating: if the LEDGER append throws, nothing
+        // committed, so there is no fork and failing the whole turn is correct.)
         var flushedCount: Int? = nil
+        var partialCommit: BASAgentFabricFullTurnPartialCommit? = nil
         if let bridge = traceLogBridge {
-            flushedCount = try await bridge
-                .flush(forTurn: turnID)
+            do {
+                flushedCount = try await bridge
+                    .flush(forTurn: turnID)
+            } catch {
+                partialCommit = BASAgentFabricFullTurnPartialCommit(
+                    stage: "traceFlush",
+                    errorDescription: String(describing: error))
+            }
         }
 
         // Step 5:post-turn frontier projection (ch 989)
@@ -307,7 +347,8 @@ public enum BASAgentFabricFullTurnAdapter {
             turnResult: turnResult,
             warrantAuditEntry: warrantAuditEntry,
             flushedTraceEventCount: flushedCount,
-            frontierProjection: projection)
+            frontierProjection: projection,
+            partialCommit: partialCommit)
     }
 }
 
