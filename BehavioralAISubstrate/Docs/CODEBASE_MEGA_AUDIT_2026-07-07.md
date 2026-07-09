@@ -484,6 +484,8 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 
 **★ 架构 3 条闭合后:mega-audit 的 1 CRITICAL + 23 HIGH + 全部 MED(fix-now/xcframework/architecture)全闭。** 剩仅 device-gated(真机)+ b2-evidence(操作员实验域)两类,皆非"不惊动操作员、不用硬件可安全自主"的项。
 
+> ⚠️ **2026-07-09 更正(见 §12):此"全部 MED 全闭"是 THEME-级过声。** 逐项(per-item)复核发现 37 条 MED-级发现从未被任何 remediation commit / §8-§11 账本行个别追踪——被主题级聚合闭合掩盖。此行的"全闭"只在"每个主题至少动过一次"意义上成立,非"每条 MED 已闭"。真实态见 §12。
+
 ## §11 device-gated 收口(2026-07-09,操作员"device-gated 5+2 也修了")
 
 先清点:x-sov #2(Ed25519 `…ThisDeviceOnly`)、M-h dream-loop H7 守卫、M-i/M1 SURVIVED 谎(MED-7)三项**盘查发现已闭**(分别 line 142-144 / 既有 inline / commit dd3736ed2)。余下逐条实现:
@@ -499,3 +501,20 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 ★device-gated 教训:(a)**"不支持"须验非假设**——`.protectionKey` mac 经验证是"存储但惰性"非"不支持",纠正 §10 line 481 原注(=项目本身叙事漂移抗性);(b)**FALSE-GREEN 反转必做**——x-sov readback 首版 macOS 默认值令测恒绿(改与 not-fixed 无别),反转揪出→改预设 `.complete` 证翻转才有牙;(c)**device-gated ≠ 完全不可验**——分层:代码路径(helper 翻转/编译)mac 可判,只 at-rest/锁屏/崩溃存活须真机;诚实标注哪层验了;(d)**统一 knob**:`BAS_COOLDOWN_SPIN` 一钮护 endurance+探针全部冷却,非各处重造。
 
 **★ device-gated 收口后:mega-audit 全部非删除、非纯实验域项闭合。** 余:①x-sov #5/#6 at-rest 锁屏前不可读 + M-i MED-2/4/6 真机运行时行为(代码路径已 mac 验/iOS 编译验,仅硬件行为待操作员真机跑);②b2 /tmp→Docs/evidence 冻结(实验域);③完全删除项(bas_thermal_probe git-mv 等,consult-before-deleting 须操作员亲裁);④#17 token 历史清除(operator-gated)。皆须操作员/硬件,无可"安全自主"项剩。
+
+## §12 MED 逐项(55/55)对账 + 主题级"全闭"过声更正(2026-07-09,操作员"完成剩余部分")
+
+操作员指出闭合是 THEME-级(16 主题)非 ITEM-级,可能掩盖被折进"已闭主题"的漏项。6-agent 逐项扫全 22 个 evidence 文件(`~/bas_evidence_durable/megaaudit/`)+ 交叉 §8-§11 账本 + git log。**全表 artifact:[Docs/evidence/MED_55_ITEM_ACCOUNTING_2026-07-09.json](evidence/MED_55_ITEM_ACCOUNTING_2026-07-09.json)。**
+
+**对账结果(94 逐项 hit = MED + F-编号发现 + 少量 LOW):49 closed + 4 folded(进 HIGH)+ 4 tracked-open + 37 UNACCOUNTED。** ⚠️**37 条"未入账"= 追不到任何 remediation commit / §8-§11 账本行 / §11 line-501 残留表——被"全部 MED 全闭"聚合掩盖的真漏项。** 主题级"44 验/40 开"与逐项不可数字对齐(94 vs ~55 vs 84-加总),但实质:**"40 开"低估真未闭群(4 tracked + 37 untracked = 41),且把 37 条真漏项当作被主题聚合吸收——它们没有。** 整簇掉落:mlx-adapter-core MED-6..11(M-f 主题无闭合行)、organ-eval 全 5 条(只在 §4 健康分特征化,从未 themed)、runtimecore-b 4 条。
+
+**抽验校准(反 FALSE-GREEN,防 agent 反向假阳)**:抽 3 条核实——organ-eval MED-1(BASSleepMeasurementStation `outData` 数据竞态)= **真**(BASEvaluation,mac 可修);devicetestapp MED-3(每迭代载全库)= **真**;mlx-adapter-core MED-6(pressure-ladder)= **灰**(子系统被非-audit commit 统一案5 重做,但无 audit 闭合行)。⇒ 37 大体可靠,含少数"灰"(区域被非-审计提交顺带重构)。
+
+**37 条未入账(按可修性分组;完整描述见 artifact)**:
+- **Mac-可修(~20,非 device-gated)**:organ-eval MED-1(outData 竞态,**本轮已修见下**)/ MED-2/3/4/5(AB 判据/验证管道)· memory-a F5 · memory-b F4/F5/F7 · runtimecore-b MED-2(prune 重置 seq 碰撞)/MED-4(7×fatalError 打包失败)/MED-5(v2 解码 fail-open)/MED-6(BASPQIndex 无同步)· orchestration MED-2(Rust FFI OOB precondition 崩)· policy-obs-misc MED-4(quiet-hours 跨午夜)· x-concurrency MED-5(静态计数器无同步)· x-test-integrity F4(release_gate 自 06-25 永 FAIL)/F6/F7 · hostkit-spine F3 · tests-arch ④(161 文件 iOS-source-gated)
+- **device/runtime-gated**:devicetestapp MED-1/3/5/8/9 · mlx-adapter-core MED-6..11 · mlx-decode MED-1 · x-concurrency MED-LOW-10
+- **hostkit-rest MED-1/4/5**(FullTurnAdapter 部分效应分叉 / sleep-consolidation 空 dry-run / audit-observation Task.detached 乱序)
+
+**本轮已修 1 条真漏项(demo + concrete)**:organ-eval MED-1 = `outData` 竞态(见下方 commit)。**其余 36 条从"静默掉落"转为"显式追踪-open"**;~20 mac-可修者构成一个新 remediation 战役(须操作员授权规模),device-gated 者须真机。
+
+★教训:**主题级"全闭"是审计诚实的头号陷阱**——"每个主题动过一次"≠"每条发现已闭";逐项对账是唯一能揪出"折进已闭主题"漏项的手段;operator 的"非 55/55 逐项"直觉正确,揪出 37 条。此更正本身 = 项目诚实教义(注释/账本不得声称代码/闭合不维持的属性)对审计账本自身的应用。
