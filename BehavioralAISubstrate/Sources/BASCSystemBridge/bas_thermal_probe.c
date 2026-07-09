@@ -2,16 +2,24 @@
 //
 // bas_thermal_probe.c — chapter 七百三 第五刀 / M2175
 //
-// Read the device's current thermal state via Darwin's
-// `processInfo.thermalState`-equivalent kernel sysctl。 Exposed
-// to Swift via the BASCSystemBridge module map。
+// audit M-e #4 (comment-lie fix) — the original comment claimed this reads
+// "Darwin's processInfo.thermalState-equivalent kernel sysctl". THAT SYSCTL
+// DOES NOT EXIST。 Apple platforms expose thermal state ONLY through the
+// userspace `ProcessInfo.thermalState` API (NSProcessInfoThermalState) —
+// there is no `hw.thermal_state` / `hw.thermalstate` (or any) sysctl OID for
+// it (empirically confirmed;the old fake sysctl dance ALWAYS returned -1)。
+//
+// This function is therefore a DELIBERATE unsupported stub that ALWAYS
+// returns -1 on Apple platforms。 It has NO production caller: the real
+// thermal source is `BASSystemProbe`, which reads `ProcessInfo.thermalState`
+// directly。 It is kept (not deleted) as a bridge placeholder;full removal
+// (git-mv to Experiments/) is an operator call per the deletion-aversion
+// rule。 Callers MUST route thermal decisions through ProcessInfo and NEVER
+// map the -1 return to `.nominal` (that would be fail-open on a hot device)。
 //
 // Returns one of:
-//   0 = nominal
-//   1 = fair
-//   2 = serious
-//   3 = critical
-//  -1 = read failed (unsupported platform or sysctl error)
+//   0..3 = nominal/fair/serious/critical — NEVER produced on Apple (no sysctl)
+//  -1    = unsupported / read failed (the only value on Apple platforms)
 
 #include "include/bas_csystem_bridge.h"
 
@@ -24,31 +32,17 @@
 #include <sys/sysctl.h>
 #include <string.h>
 
-/// Probe the current Darwin thermal state via sysctl。 On older
-/// hardware that lacks the `hw.thermal_state` sysctl key, this
-/// function falls back to reading `hw.thermalstate` (legacy
-/// spelling)。
+/// audit M-e #4 — HONEST unsupported stub。 There is no thermal-state sysctl
+/// on Apple platforms (the removed `hw.thermal_state` / `hw.thermalstate`
+/// probes are unknown OIDs that always fail);thermal state lives only in
+/// `ProcessInfo.thermalState`。 This ALWAYS returns -1 — it does NOT pretend
+/// to succeed。 The fake sysctl dance was removed so the code no longer
+/// implies a capability it never had (comment-vs-code honesty)。
 int32_t bas_thermal_probe(int32_t *out_state) {
     if (out_state == NULL) {
         return -1;
     }
-
-    int state = -1;
-    size_t state_size = sizeof(state);
-
-    if (sysctlbyname("hw.thermal_state",
-                     &state, &state_size, NULL, 0) == 0) {
-        *out_state = (int32_t)state;
-        return 0;
-    }
-
-    // Legacy spelling fallback
-    if (sysctlbyname("hw.thermalstate",
-                     &state, &state_size, NULL, 0) == 0) {
-        *out_state = (int32_t)state;
-        return 0;
-    }
-
+    // No thermal sysctl exists on Darwin — fail closed, honestly + always。
     *out_state = -1;
     return -1;
 }

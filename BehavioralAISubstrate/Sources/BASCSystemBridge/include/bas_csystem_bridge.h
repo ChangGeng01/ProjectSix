@@ -238,8 +238,11 @@ int32_t bas_process_disk_io_blocks_version(void);
 // MARK: - chapter 七百三 第五刀 / M2175 — C widening
 //
 // New probes added in this chapter:
-//   - bas_thermal_probe          : raw Darwin thermal state
-//   - bas_thermal_bucket         : 4-bucket coarse classification
+//   - bas_thermal_probe          : audit M-e #4 — UNSUPPORTED stub, always
+//                                  -1 (no thermal sysctl exists on Apple;
+//                                  use ProcessInfo.thermalState via
+//                                  BASSystemProbe — never map -1 to .nominal)
+//   - bas_thermal_bucket         : coarse bucket OF the (unsupported) probe → -1
 //   - bas_thermal_bucket_name    : static string-ify helper
 //   - bas_cpu_logical_count      : hw.ncpu
 //   - bas_cpu_physical_count     : hw.physicalcpu

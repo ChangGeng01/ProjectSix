@@ -2,9 +2,12 @@
 // chapter 七百四 第四刀 / M2194
 //
 // Swift actor wrapping the chapter-七百三-第五刀 C system probes
-// (bas_thermal_probe / bas_cpu_*_count / bas_memory_*)。 Hosts
-// use this for "should I throttle / defer this turn?" decisions
-// before kicking off heavy compute。
+// (bas_cpu_*_count / bas_memory_*)。 Hosts use this for "should I
+// throttle / defer this turn?" decisions before kicking off heavy
+// compute。 audit M-e #4: thermal state does NOT come from the C
+// bridge — `bas_thermal_probe` is an unsupported stub (Apple has no
+// thermal sysctl); `snapshotNow()` reads the real thermal state from
+// `ProcessInfo.thermalState` via `mapThermalState`。
 //
 // Per 「术业有专攻」 — C owns the Darwin sysctl + host_statistics64
 // + mach_host_self syscalls。 Swift orchestrates。 The actor wraps
