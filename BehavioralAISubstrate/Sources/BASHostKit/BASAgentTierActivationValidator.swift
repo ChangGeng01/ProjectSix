@@ -184,7 +184,12 @@ public enum BASAgentTierActivationValidator {
             for name in activeNames {
                 if !coreSeatNames.contains(name) &&
                     !watcherNames.contains(name) &&
-                    !skillNames.contains(name)
+                    !skillNames.contains(name) &&
+                    // audit hostkit-rest LOW-3: also accept the pipeline's role ALIASES (sentinel /
+                    // sovereign / evolution / hostalign / …). canonicalRoles is the single source of
+                    // truth (drift-proof per the ch1000.5/1010.5 single-canonical doctrine) — a name
+                    // it recognizes is a VALID role, not an unknown-tier mismatch.
+                    BASAgentFabricHostPipeline.canonicalRoles(fromActiveAgents: [name]).isEmpty
                 {
                     diagnostics.append(
                         "tier.mismatch\(sep)tier=all" +

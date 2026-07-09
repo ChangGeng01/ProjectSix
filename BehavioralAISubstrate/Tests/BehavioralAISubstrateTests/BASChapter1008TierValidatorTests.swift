@@ -138,6 +138,20 @@ final class BASChapter1008TierValidatorTests: XCTestCase {
             "mismatch in .all tier (catches typos)")
     }
 
+    // MARK: - 6b. audit hostkit-rest LOW-3: .all + a role ALIAS → consistent (not a false mismatch)
+
+    func test_AllTier_WithRoleAlias_IsConsistent() {
+        // "sentinel"/"sovereign"/"evolution"/"hostalign" are pipeline role ALIASES (canonicalRoles) —
+        // the validator must accept them, not flag them as unknown-tier mismatches.
+        for alias in ["sentinel", "sovereign", "evolution", "hostalign"] {
+            let activation = Self.makeActivation(tier: .all, activeAgents: [alias, "Planner"])
+            let diag = BASAgentTierActivationValidator.validate(activation)
+            XCTAssertFalse(
+                diag.contains { $0.contains("tier.mismatch") && $0.contains(alias.lowercased()) },
+                "ch 1008 / hostkit-rest LOW-3: role alias '\(alias)' must NOT be a mismatch")
+        }
+    }
+
     // MARK: - 7. Output sorted
 
     func test_Output_IsSortedAlphabetically() {
