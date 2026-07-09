@@ -26,6 +26,22 @@ struct BASPressureLadder: Equatable {
         static func < (a: Rung, b: Rung) -> Bool { a.rawValue < b.rawValue }
     }
 
+    /// audit mlx-adapter-core MED-6 — the reclaim ACTIONS a fired deepest rung must execute.
+    /// `advise` returns only the deepest newly-crossed rung, but a straight collapse latches the
+    /// milder rungs at the same instant; executing ONLY the deepest left rung-2's ~300MB MTP
+    /// decoder resident (clearAllSessions drops seats + shrinks the pool but never nulls the
+    /// decoder box). So the deepest rung subsumes the milder rungs' DISTINCT actions:
+    ///   • clearAllSessions ⊇ dropSpecDecoder (parkColdSeats is subsumed — clearing drops all seats)
+    ///   • dropSpecDecoder ⊇ parkColdSeats (both latched below the drop threshold)
+    /// Pure relation — the adapter drives its actuator off this so the switch cannot drift.
+    static func reclaimActions(forDeepest deepest: Rung) -> [Rung] {
+        switch deepest {
+        case .parkColdSeats:    return [.parkColdSeats]
+        case .dropSpecDecoder:  return [.parkColdSeats, .dropSpecDecoder]
+        case .clearAllSessions: return [.dropSpecDecoder, .clearAllSessions]
+        }
+    }
+
     struct Config: Equatable {
         let capBytes: Int
         /// Headroom fractions of the resolved cap; descending severity.

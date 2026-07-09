@@ -10,6 +10,28 @@ final class BASPressureLadderTests: XCTestCase {
         BASPressureLadder(config: .init(capBytes: cap))    // thresholds: 150/100/50, band 50
     }
 
+    // MARK: - audit mlx-adapter-core MED-6 — the deepest rung subsumes milder actions
+
+    func testClearAllSessionsSubsumesDropSpecDecoder() {
+        // THE fix: firing rung 3 (clearAllSessions) must ALSO execute rung 2's decoder drop —
+        // clearAllSessions latched it too, but the old deepest-only switch left the ~300MB
+        // decoder resident.
+        let actions = BASPressureLadder.reclaimActions(forDeepest: .clearAllSessions)
+        XCTAssertTrue(actions.contains(.dropSpecDecoder),
+            "a rung-3 collapse must also drop the spec decoder (rung 2), not leave it resident")
+        XCTAssertTrue(actions.contains(.clearAllSessions))
+    }
+
+    func testDropSpecDecoderSubsumesParkColdSeats() {
+        let actions = BASPressureLadder.reclaimActions(forDeepest: .dropSpecDecoder)
+        XCTAssertTrue(actions.contains(.parkColdSeats), "rung 2 also parked cold seats (rung 1)")
+        XCTAssertTrue(actions.contains(.dropSpecDecoder))
+    }
+
+    func testParkColdSeatsIsJustItself() {
+        XCTAssertEqual(BASPressureLadder.reclaimActions(forDeepest: .parkColdSeats), [.parkColdSeats])
+    }
+
     func testGradualDescentFiresRungsInOrder() {
         var l = ladder()
         XCTAssertNil(l.advise(headroomBytes: 400), "plenty of headroom must be a no-op")

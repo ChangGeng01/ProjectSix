@@ -1675,6 +1675,18 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         guard let rung = pressureLadder!.advise(headroomBytes: headroom) else { return }
         ladderFired.append(rung.rawValue)
         print("📊 pressure-ladder rung=\(rung.rawValue)(\(rung)) headroom=\(headroom / (1024 * 1024))MB")
+        // audit mlx-adapter-core MED-6: execute the fired rung's action AND the milder rungs'
+        // distinct actions it subsumes (they latched in the same collapse) — driving off the pure
+        // relation so a straight rung-3 collapse also drops the ~300MB decoder (rung 2), which the
+        // old deepest-only switch left resident.
+        for action in BASPressureLadder.reclaimActions(forDeepest: rung) {
+            _executeReclaimAction(action, keeping: key)
+        }
+    }
+
+    /// audit mlx-adapter-core MED-6 — the per-rung actuator, extracted so `_pressureCheck` can
+    /// drive it off `reclaimActions(forDeepest:)` (the fired rung subsumes milder rungs' actions).
+    private func _executeReclaimAction(_ rung: BASPressureLadder.Rung, keeping key: String?) {
         switch rung {
         case .parkColdSeats:
             _spillEvictAll(except: key)
