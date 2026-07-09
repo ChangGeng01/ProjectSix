@@ -163,25 +163,41 @@ public enum BASABJudge {
             let s = sel.reduce(0.0) { $0 + $1.seconds }
             return s > 0 ? Double(t) / s : 0
         }
-        var perArm: [String: (pooled: Double, blocks: [Int: Double], maxTier: [Int: Int], measured: Int, aborted: Bool)] = [:]
+        var perArm: [String: (pooled: Double, blocks: [Int: Double], maxTier: [Int: Int], measured: Int, aborted: Bool, wellFormed: Bool)] = [:]
         for arm in spec.arms {
             let armRows = rows.filter { $0.arm == arm }
             let m = armRows.filter(\.measured)
             var blocks: [Int: Double] = [:]
             var tiers: [Int: Int] = [:]
+            var blockMeasured: [Int: Int] = [:]
             for b in Set(m.map(\.block)) {
                 let bm = m.filter { $0.block == b }
                 blocks[b] = pooledTps(bm)
                 tiers[b] = bm.map(\.thermal).max() ?? 0
+                blockMeasured[b] = bm.count
             }
-            perArm[arm] = (pooledTps(m), blocks, tiers,
-                           m.count, armRows.contains(where: \.aborted))
+            // audit organ-eval MED-3: wire the pre-registered block-structure
+            // fields the judge never read. `mirroredBlocks` ⇒ the mirror block
+            // must exist — a SINGLE-block arm can't satisfy the two-block
+            // same-sign realEffect test, so it was silently .artifactSuspect;
+            // it is now an explicit DNF (the unreachable-realEffect gap).
+            // `measuredPerArmBlock` ⇒ EACH block needs its own measured quorum,
+            // not just the pooled `minMeasuredRowsPerArm` total (an arm with all
+            // its rows in one block passed the total check but had no comparable
+            // second block).
+            let enoughBlocks = spec.mirroredBlocks ? blocks.count >= 2 : blocks.count >= 1
+            let perBlockQuorum = !blockMeasured.isEmpty
+                && blockMeasured.values.allSatisfy { $0 >= spec.measuredPerArmBlock }
+            perArm[arm] = (pooledTps(m), blocks, tiers, m.count,
+                           armRows.contains(where: \.aborted),
+                           enoughBlocks && perBlockQuorum)
         }
         // 复审修7:在位臂自身必须过 quorum/aborted/热闸——坏基线(冷启 burst 分母/
         // 降频分母)会把全场候选判成假 parity/假 realEffect。基线不可用 ⇒ 整报告 DNF。
         guard let incumbent = perArm[spec.incumbentArm], incumbent.pooled > 0,
               !incumbent.aborted,
               incumbent.measured >= spec.minMeasuredRowsPerArm,
+              incumbent.wellFormed,   // audit organ-eval MED-3: per-block quorum + mirror block
               Self.tierSpread(incumbent.maxTier) < spec.thermalConfoundTierDelta
         else {
             return BASABReport(overall: .dnf, fidelityMismatches: mismatches,
@@ -203,7 +219,9 @@ public enum BASABJudge {
             let finding: BASABArmFinding.Finding
             if arm == spec.incumbentArm {
                 finding = .incumbent
-            } else if a.aborted || a.measured < spec.minMeasuredRowsPerArm {
+            } else if a.aborted || a.measured < spec.minMeasuredRowsPerArm || !a.wellFormed {
+                // audit organ-eval MED-3: a malformed arm (single block when
+                // mirrored / below the per-block quorum) is DNF, not a silent pass.
                 finding = .dnf
                 dnfCount += 1
             } else if Self.tierSpread(a.maxTier) >= spec.thermalConfoundTierDelta {
