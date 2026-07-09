@@ -967,6 +967,11 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         // action code can't corrupt the list, unlike the legacy comma-joined memoryRefs.)
         let actionsJson = (try? JSONEncoder().encode(entry.actions))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        // audit runtimecore-b MED-5: JSON-encode memoryRefs too — the legacy
+        // comma-join corrupted any ref CONTAINING a comma on round-trip (split
+        // into wrong pieces). Same delimiter-safe pattern as actions.
+        let memoryRefsJson = (try? JSONEncoder().encode(entry.memoryRefs))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let payloadEnvelope: [String: String] = [
             "riskBand":       entry.riskBand.rawValue,
             "source":         entry.source ?? "",
@@ -974,7 +979,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
             "intent":         entry.intent ?? "",
             "emotion":        entry.emotion ?? "",
             "project":        entry.project ?? "",
-            "memoryRefs":     entry.memoryRefs.joined(separator: ","),
+            "memoryRefs":     memoryRefsJson,
             "stateBeforeID":  entry.stateBeforeID ?? "",
             "stateAfterID":   entry.stateAfterID ?? "",
             "confidence":     String(entry.confidence),
@@ -1000,6 +1005,22 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         return try? BASEventLogBinaryCodec.encode(
             binaryEntry)
     }
+
+    /// audit runtimecore-b MED-5: decode the v2 payload envelope, THROWING on a
+    /// corrupt payload instead of silently returning nil (which stripped EVERY
+    /// field to its default — corruption read as an empty-but-valid entry).
+    /// Internal for @testable exercise of the corrupt path.
+    static func decodePayloadEnvelope(_ payloadJson: String) throws -> [String: String] {
+        guard let data = payloadJson.data(using: .utf8) else {
+            throw StorageError.decodeFailed(
+                eventID: "envelope", message: "payload envelope not UTF-8")
+        }
+        return try JSONDecoder().decode([String: String].self, from: data)
+    }
+
+    /// Surfaced when a v2 binary payload envelope fails to decode (was a silent
+    /// all-default entry — the corrupt==empty fail-open). nil ⇒ unobserved.
+    nonisolated(unsafe) static var _onBinaryDecodeFailure: (@Sendable (Error) -> Void)?
 
     /// chapter 七百三十二 第二刀 — inverse of encodeEntryAsBinary。
     /// Decodes a v=2 binary blob back to BASEventLogEntry。
@@ -1030,38 +1051,47 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         var payloadJson: String? = nil
         var confidence: Double = 0
         var actions: [String] = []
-        if let payloadStr = binary.payloadJson,
-           let payloadData = payloadStr.data(using: .utf8),
-           let env = try? JSONDecoder().decode(
-            [String: String].self, from: payloadData)
-        {
-            if let rb = env["riskBand"],
-               let parsed = BASEventLogRiskBand(rawValue: rb)
-            { riskBand = parsed }
-            source         = env["source"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            rawInputDigest = env["rawInputDigest"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            intent         = env["intent"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            emotion        = env["emotion"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            project        = env["project"].flatMap {
-                $0.isEmpty ? nil : $0 }
-            if let refs = env["memoryRefs"],
-               !refs.isEmpty
-            {
-                memoryRefs = refs.split(separator: ",")
-                    .map { String($0) }
-            }
-            // ADR-040 durability fix — recover the formerly-dropped fields (faithful round-trip).
-            stateBeforeID = env["stateBeforeID"].flatMap { $0.isEmpty ? nil : $0 }
-            stateAfterID  = env["stateAfterID"].flatMap { $0.isEmpty ? nil : $0 }
-            payloadJson   = env["payloadJson"].flatMap { $0.isEmpty ? nil : $0 }
-            if let c = env["confidence"].flatMap({ Double($0) }) { confidence = c }
-            if let a = env["actions"], let aData = a.data(using: .utf8),
-               let parsed = try? JSONDecoder().decode([String].self, from: aData) {
-                actions = parsed
+        // audit runtimecore-b MED-5: decode the envelope with do/catch — a
+        // CORRUPT payload used to `try?` to nil and silently leave EVERY field at
+        // its default (corruption read as an empty-but-valid entry). Now the
+        // failure is SURFACED via _onBinaryDecodeFailure instead of swallowed.
+        if let payloadStr = binary.payloadJson {
+            do {
+                let env = try decodePayloadEnvelope(payloadStr)
+                if let rb = env["riskBand"],
+                   let parsed = BASEventLogRiskBand(rawValue: rb)
+                { riskBand = parsed }
+                source         = env["source"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                rawInputDigest = env["rawInputDigest"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                intent         = env["intent"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                emotion        = env["emotion"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                project        = env["project"].flatMap {
+                    $0.isEmpty ? nil : $0 }
+                if let refs = env["memoryRefs"], !refs.isEmpty {
+                    // audit runtimecore-b MED-5: JSON array (delimiter-safe);
+                    // fall back to the legacy comma-split for pre-fix rows.
+                    if let d = refs.data(using: .utf8),
+                       let parsed = try? JSONDecoder().decode([String].self, from: d) {
+                        memoryRefs = parsed
+                    } else {
+                        memoryRefs = refs.split(separator: ",").map { String($0) }
+                    }
+                }
+                // ADR-040 durability fix — recover the formerly-dropped fields (faithful round-trip).
+                stateBeforeID = env["stateBeforeID"].flatMap { $0.isEmpty ? nil : $0 }
+                stateAfterID  = env["stateAfterID"].flatMap { $0.isEmpty ? nil : $0 }
+                payloadJson   = env["payloadJson"].flatMap { $0.isEmpty ? nil : $0 }
+                if let c = env["confidence"].flatMap({ Double($0) }) { confidence = c }
+                if let a = env["actions"], let aData = a.data(using: .utf8),
+                   let parsed = try? JSONDecoder().decode([String].self, from: aData) {
+                    actions = parsed
+                }
+            } catch {
+                _onBinaryDecodeFailure?(error)
             }
         }
         let kindParsed: BASEventLogKind =
