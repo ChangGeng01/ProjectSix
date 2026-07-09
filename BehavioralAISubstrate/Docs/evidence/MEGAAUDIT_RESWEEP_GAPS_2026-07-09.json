@@ -1161,6 +1161,12 @@
    ],
    "memory-b (3/3)": [
     "F10 reducer drops non-UUID (no random mint) + F11 remove honors dedupe + F13 comment ff10d49d2"
+   ],
+   "runtimecore-a (2/3)": [
+    "#5 surprise +inf saturates to 1 (not NaN→0) + #6 wallclock negative/non-finite floors to 0 (no UInt64 trap) b2abf8697"
+   ],
+   "runtimecore-b (2/4)": [
+    "#7 decode rebases non-zero-based Data slice + #9 tribunal empty-input baseAddress guard 718300892"
    ]
   },
   "deferred_with_reason": {
@@ -1174,6 +1180,6 @@
     "hostkit-rest LOW-5 = TrainingDataExporter atomic-rename c6fd1ebee"
    ]
   },
-  "remaining_open": "~50 LOW: metal(1)/mlx-adapter-core(4)/mlx-decode(2)/organ-eval(3)/runtimecore-a(3)/runtimecore-b(4)/rust(3)/sovereign(1)/tests-arch(4)/x-architecture(5)/x-concurrency(2)/x-sovereignty(1)/x-test-integrity(3)/hostkit-rest(3)/hostkit-spine(4)/devicetestapp(7 mostly device-gated)"
+  "remaining_open": "~44 LOW: runtimecore-a(#7 MED)/runtimecore-b(#8/#10 SQLite)/x-architecture(5)/x-test-integrity(3)/x-concurrency(2)/organ-eval(3)/mlx-decode(2)/mlx-adapter-core(4)/hostkit-rest(3)/hostkit-spine(4)/rust(3)/metal(1)/sovereign(1)/x-sovereignty(1)/devicetestapp(7 device-gated)"
  }
 }
