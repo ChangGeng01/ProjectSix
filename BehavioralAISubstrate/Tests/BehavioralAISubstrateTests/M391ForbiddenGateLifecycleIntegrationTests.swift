@@ -252,5 +252,22 @@ final class M391ForbiddenGateLifecycleIntegrationTests: XCTestCase {
         XCTAssertEqual(stateB, .rejected)
         XCTAssertEqual(stateC, .proposed)
     }
+
+    // audit hostkit-rest LOW-2 (sibling of ZoneGate MED-2): a re-presented already-rejected ticket
+    // must report its true state, not a hardcoded .proposed that inflates the ingest accept count.
+    func testResubmitOfRejectedTicketReportsTrueStateNotProposed() async throws {
+        let coord = makeCoordinator()
+        _ = try await coord.submit(ticket(id: "tk-1"))
+        try await coord.markRejected(ticketID: "tk-1", reasonCodes: ["override"])
+        // Re-present with no forbidden candidate → the gate allows → falls to the fixed return.
+        let dupState = try await coord.submitWithForbiddenGate(ticket(id: "tk-1"), forbidden: nil)
+        XCTAssertEqual(dupState, .rejected,
+            "a re-presented already-rejected ticket must report its true state, not .proposed")
+        let accepted = await coord.ingestTicketsWithForbiddenGate(
+            [ticket(id: "tk-1"), ticket(id: "tk-2")], forbiddenByTicketID: [:])
+        XCTAssertEqual(accepted, 1, "an already-rejected duplicate must not inflate the accept count")
+        let e2 = await coord.entry(ticketID: "tk-2")?.state
+        XCTAssertEqual(e2, .proposed, "the fresh ticket is genuinely proposed")
+    }
 }
 #endif
