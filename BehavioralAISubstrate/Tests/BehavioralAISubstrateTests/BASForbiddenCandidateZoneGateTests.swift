@@ -104,6 +104,44 @@ final class BASForbiddenCandidateZoneGateTests: XCTestCase {
 
     // MARK: - Gateable actions denied when quarantined
 
+    // MARK: - audit orchestration MED-3 — empty release conditions must FAIL-CLOSED
+
+    func testEmptyReleaseConditionsDeniesQuarantinedPromotion() {
+        // A quarantined candidate whose zone has NO release conditions must NOT be auto-released:
+        // `Set().isSubset(of:)` is true for any set, so the old predicate promoted it silently.
+        let zone = makeZone(
+            quarantinedRefs: ["cand-x"],
+            reasonCodes: ["forbidden"],
+            releaseConditions: [])
+        let decision = BASForbiddenCandidateZoneGate.gate(
+            action: .promote,
+            candidateRef: "cand-x",
+            zone: zone,
+            satisfiedReleaseConditions: [])
+        XCTAssertTrue(decision.denied,
+            "no release conditions ⇒ a quarantined candidate stays quarantined (fail-closed)")
+        XCTAssertTrue(decision.wasQuarantined)
+        XCTAssertFalse(decision.releaseConditionsMet,
+            "an empty condition set is NOT 'met' — it is 'no defined exit'")
+        XCTAssertTrue(decision.reasonCodes[0].contains("no-release-conditions"),
+            "the denial names the empty-conditions cause (No-silent-gate)")
+    }
+
+    func testWhitespaceOnlyReleaseConditionsAlsoFailClosed() {
+        // Init collapses ["", " "] to [] — the same fail-open input by another spelling.
+        let zone = makeZone(
+            quarantinedRefs: ["cand-x"],
+            reasonCodes: ["forbidden"],
+            releaseConditions: ["", " "])
+        let decision = BASForbiddenCandidateZoneGate.gate(
+            action: .promote,
+            candidateRef: "cand-x",
+            zone: zone,
+            satisfiedReleaseConditions: ["anything"])
+        XCTAssertTrue(decision.denied, "whitespace-only conditions collapse to empty ⇒ fail-closed")
+        XCTAssertFalse(decision.releaseConditionsMet)
+    }
+
     func testStartShadowTrialDeniedWhenQuarantined() {
         let zone = makeZone(
             quarantinedRefs: ["cand-x"],
