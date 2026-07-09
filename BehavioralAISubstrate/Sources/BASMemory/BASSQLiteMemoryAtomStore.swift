@@ -397,8 +397,12 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
     @discardableResult
     public func admit(_ atom: BASGovernedMemory) async throws -> Bool {
         guard let db else { return false }
-        let existed = (try? Self.fetchAtom(
-            db: db, atomID: atom.id.uuidString)) != nil
+        // audit memory-a F7: `try?` swallowed fetch errors, so a decode-corrupt existing row read
+        // as "did not exist" → this admit reported wasNew=true for a row it actually overwrote (and
+        // masked the corruption). admit already throws, so surface the StorageError, mirroring the
+        // *OrThrow siblings in this file.
+        let existed = try Self.fetchAtom(
+            db: db, atomID: atom.id.uuidString) != nil
         try Self.upsertAtom(db: db, atom: atom)
         return !existed
     }

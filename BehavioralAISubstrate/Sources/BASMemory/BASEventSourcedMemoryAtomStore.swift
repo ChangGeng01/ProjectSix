@@ -312,8 +312,11 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
         let removed = hydrateContent(existing)
         let payload = BASMemoryAtomEventPayload(remove: id)
         do {
-            _ = try await appendEventAndUpdateCache(
+            // audit memory-b F11: honor the append result — a deduped (wasNew=false) remove event
+            // did NOT append, so don't evict the content cache or claim `removed` for a no-op.
+            let appended = try await appendEventAndUpdateCache(
                 payload: payload)
+            guard appended else { return nil }
             contentCache.removeValue(forKey: id)
             return removed
         } catch {

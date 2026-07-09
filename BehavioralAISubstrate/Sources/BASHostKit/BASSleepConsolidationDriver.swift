@@ -46,7 +46,7 @@ public struct BASSleepConsolidationDriver: Sendable {
     /// Canonical BGTask identifier for the SECONDARY (OS-fired)
     /// path。 Hosts list it under `BGTaskSchedulerPermittedIdentifiers`
     /// in Info.plist and register a launch handler at app launch
-    /// (`AppleBGTaskSchedulerBridge.registerConsolidationLaunchHandler`)。
+    /// (`AppleBGTaskSchedulerBridge.registerLaunchHandler`)。  // audit memory-b F13: real symbol
     public static let backgroundTaskIdentifier =
         "bas.sleep.consolidation"
 
