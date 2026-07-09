@@ -27,11 +27,18 @@ public enum BASSQLiteFileProtection {
         ProcessInfo.processInfo.environment["BAS_FILE_PROTECTION"] != "0"
     }
 
+    /// Test seam: how many times `apply` has been INVOKED (kill-switch or not).
+    /// Lets a call-site test prove a store actually calls the helper at open —
+    /// `fileProtectionError == nil` alone is a FALSE-GREEN (nil both when
+    /// protection succeeds AND when the call was never made). Reset in tests.
+    nonisolated(unsafe) public static var _applyInvocationCount: Int = 0
+
     /// Apply the protection class to `path` and its `-wal` / `-shm` sidecars
     /// (each only if it exists on disk). Returns the FIRST error encountered
     /// (the caller surfaces it), or nil on success / kill-switch off.
     @discardableResult
     public static func apply(toDatabaseAt path: String) -> Error? {
+        _applyInvocationCount += 1
         guard isEnabled else { return nil }
         #if os(iOS) || os(macOS)
         let attrs: [FileAttributeKey: Any] =

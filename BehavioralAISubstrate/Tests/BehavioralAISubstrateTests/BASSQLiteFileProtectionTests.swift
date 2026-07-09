@@ -81,18 +81,24 @@ final class BASSQLiteFileProtectionTests: XCTestCase {
             "kill-switch must NOT touch the file's existing protection class")
     }
 
-    /// INTEGRATION (non-distinguishing on macOS by nature — a fresh DB is born
-    /// with the default class): asserts the atom-store wiring RAN and surfaced
-    /// no error. The distinguishing proof lives in the helper teeth above.
-    func testAtomStoreOpensWithoutProtectionError() async throws {
+    /// DISTINGUISHING call-site wiring: the store must actually INVOKE the helper
+    /// at open. `fileProtectionError == nil` alone is a FALSE-GREEN (nil both when
+    /// protection succeeds AND when the call was never made), so this asserts the
+    /// helper's invocation counter advanced — that reds if the store stops calling
+    /// it, unlike the nil-error check.
+    func testAtomStoreInvokesProtectionHelperAtOpen() async throws {
         let u = tempURL(); defer { cleanup(u) }
         let seed = BASGovernedMemory(
             id: UUID(), kind: .episodic, content: "sensitive", scope: .session,
             sensitivity: .high, tier: .warm, confidence: 0.9, sourceType: "test",
             governanceStatus: .governed, provenanceSummary: "t")
+        let before = BASSQLiteFileProtection._applyInvocationCount
         let store = try BASSQLiteMemoryAtomStore(databaseURL: u, initial: [seed])
         let err = await store.fileProtectionError
         XCTAssertNil(err, "the memory-atom DB protection wiring must run clean at open")
+        XCTAssertGreaterThan(BASSQLiteFileProtection._applyInvocationCount, before,
+            "opening the store must INVOKE the protection helper (not just leave "
+            + "fileProtectionError nil, which is nil even when the call is absent)")
         _ = store
     }
 }
