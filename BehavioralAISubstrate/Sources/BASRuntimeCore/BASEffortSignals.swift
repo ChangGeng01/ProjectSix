@@ -19,6 +19,10 @@ public enum BASEffortSignals {
     /// scale-tunable surprise signal. `mse ≤ 0` (or a non-positive scale) ⇒ 0 (no surprise / no signal).
     public static func surprise(fromMSE mse: Double, scale: Double = defaultSurpriseScale) -> Double {
         guard mse > 0, scale > 0 else { return 0 }
+        // audit runtimecore-a #5: a non-finite MSE (+inf) makes `inf/(inf+scale)` = NaN, which the
+        // allocator's clamp01(NaN) collapses to 0 — INVERTING maximal surprise into "no signal". The
+        // saturating curve's limit as mse→∞ is 1, so a non-finite MSE saturates to 1.
+        guard mse.isFinite else { return 1 }
         return mse / (mse + scale)
     }
 

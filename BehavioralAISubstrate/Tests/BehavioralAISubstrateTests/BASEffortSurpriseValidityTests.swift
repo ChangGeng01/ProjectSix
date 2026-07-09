@@ -114,4 +114,14 @@ final class BASEffortSurpriseValidityTests: XCTestCase {
         XCTAssertGreaterThan(easyShift, hardCont,
             "novelty did NOT outweigh difficulty (easyShift=\(easyShift) <= hardCont=\(hardCont)) — contradicts test name")
     }
+
+    // audit runtimecore-a #5: a non-finite MSE must saturate to 1 (max surprise), not become NaN
+    // (which clamp01 would collapse to 0 — inverting max surprise into "no signal").
+    func testNonFiniteMSESaturatesNotNaN() {
+        let s = BASEffortSignals.surprise(fromMSE: .infinity)
+        XCTAssertFalse(s.isNaN, "a +inf MSE must not produce NaN surprise")
+        XCTAssertEqual(s, 1.0, accuracy: 1e-9, "a +inf MSE saturates to the curve's limit, 1.0")
+        XCTAssertEqual(BASEffortSignals.surprise(fromMSE: 1.0, scale: 1.0), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(BASEffortSignals.surprise(fromMSE: -1.0), 0.0)
+    }
 }
