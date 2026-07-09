@@ -183,18 +183,32 @@ def aux_flags(model_rows, substrate):
     }
 
 
+# audit x-test-integrity F4 (2026-07-09): the class MUST allow UPPERCASE. It was
+# `[a-z0-9_]+`, which stops at the first uppercase letter — truncating a
+# mixed-case suffix (e.g. `test_qinao_..._realFold` → key `..._real`). That made
+# the authored-key membership check permanently FAIL (the joint release gate
+# could never report PASS) from the day such a test was added.
+_GATE_KEY_RE = re.compile(r"func test_qinao_([A-Za-z0-9_]+)")
+
+
+def gate_keys_in_text(text):
+    """Substrate gate keys authored in `text` (test source) — pure + testable."""
+    return {m.group(1) for m in _GATE_KEY_RE.finditer(text)}
+
+
 def authored_gate_keys():
     """The set of substrate gate keys actually authored in the test suite (uncommented)."""
     tests = os.path.join(os.path.dirname(REPO), "BehavioralAISubstrate", "Tests", "BehavioralAISubstrateTests") \
         if not os.path.isdir(os.path.join(REPO, "Tests")) else os.path.join(REPO, "Tests", "BehavioralAISubstrateTests")
     keys = set()
-    try:
-        out = subprocess.run(["grep", "-rhoE", r"func test_qinao_[a-z0-9_]+", tests],
-                             capture_output=True, text=True, timeout=60)
-        for ln in out.stdout.splitlines():
-            keys.add(ln.replace("func test_qinao_", "").strip())
-    except Exception:
-        pass
+    for root, _dirs, files in os.walk(tests):
+        for fn in files:
+            if fn.endswith(".swift"):
+                try:
+                    with open(os.path.join(root, fn)) as fh:
+                        keys |= gate_keys_in_text(fh.read())
+                except OSError:
+                    pass
     return keys
 
 
