@@ -375,10 +375,22 @@ extension BASMemoryUsageTracker {
             sessionRef: sessionRef,
             turnRef: turnRef,
             permitMode: permitMode)
+        // audit memory-a F5: durable write FIRST, then cache — so a failed
+        // insert (SQLITE_FULL, dropped table, …) throws WITHOUT leaving a phantom
+        // record in the in-memory cache that never reached disk (cache/disk fork).
+        if let db {
+            if Self._forceWriteFailureForTesting {
+                throw TrackerError.stepFailed(sql: "INSERT", message: "forced (testing)")
+            }
+            try Self.insertRecord(db: db, record: record)
+        }
         inMemory[record.recordID] = record
-        if let db { try Self.insertRecord(db: db, record: record) }
         return record.recordID
     }
+
+    /// Test seam (memory-a F5): force the durable write to fail so the
+    /// disk-then-cache ordering (no phantom on failure) is exercisable WAL-immune.
+    nonisolated(unsafe) public static var _forceWriteFailureForTesting = false
 
     /// Update the `.helped` / `.notHelped` flag on a recorded
     /// event. Throws if the recordID is unknown.
@@ -390,8 +402,15 @@ extension BASMemoryUsageTracker {
             throw TrackerError.unknownRecord(id: recordID)
         }
         record.helpedFlag = helped ? .helped : .notHelped
+        // audit memory-a F5: durable write FIRST — on upsert failure the cache
+        // keeps its prior value instead of forking to an unpersisted update.
+        if let db {
+            if Self._forceWriteFailureForTesting {
+                throw TrackerError.stepFailed(sql: "UPSERT", message: "forced (testing)")
+            }
+            try Self.upsertRecord(db: db, record: record)
+        }
         inMemory[recordID] = record
-        if let db { try Self.upsertRecord(db: db, record: record) }
     }
 
     /// Total number of records in the log.
