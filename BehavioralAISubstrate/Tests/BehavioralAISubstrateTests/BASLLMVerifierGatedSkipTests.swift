@@ -22,6 +22,38 @@ final class BASLLMVerifierGatedSkipTests: XCTestCase {
                              overallConfidence: 0.5, aggregatedCounterArguments: [], gatedSkip: gated)
     }
 
+    // MARK: - audit organ-eval MED-5 clause 2 — failure labels in DETERMINISTIC order
+
+    private func outcome(_ s: BASLLMVerifierStage, ok: Bool) -> BASLLMVerifierStageOutcome {
+        BASLLMVerifierStageOutcome(stage: s, rawOutput: "", succeeded: ok,
+                                   errorMessage: ok ? "" : "boom")
+    }
+    private func reportWith(_ perStage: [BASLLMVerifierStage: BASLLMVerifierStageOutcome]) -> BASLLMVerifierReport {
+        BASLLMVerifierReport(perStage: perStage, finalRecommendedAnswer: "d",
+                             overallConfidence: 0.5, aggregatedCounterArguments: [])
+    }
+
+    func testFailureLabelsFollowAllCasesOrderNotDictOrder() {
+        // reviewer(0) + compressor(3) fail, factChecker(2) succeeds → canonical allCases order.
+        let r = reportWith([
+            .compressor: outcome(.compressor, ok: false),
+            .reviewer: outcome(.reviewer, ok: false),
+            .factChecker: outcome(.factChecker, ok: true),
+        ])
+        XCTAssertEqual(r.orderedFailureLabels,
+            ["verifier-stage-failed:reviewer", "verifier-stage-failed:compressor"],
+            "failure labels must be in BASLLMVerifierStage.allCases (declaration) order — reviewer "
+            + "before compressor — never in nondeterministic Dictionary order (M892 replay-determinism)")
+    }
+
+    func testAllStagesFailedIsTheFullCanonicalSequence() {
+        let r = reportWith(Dictionary(uniqueKeysWithValues:
+            BASLLMVerifierStage.allCases.map { ($0, outcome($0, ok: false)) }))
+        XCTAssertEqual(r.orderedFailureLabels,
+            BASLLMVerifierStage.allCases.map { "verifier-stage-failed:" + $0.rawValue },
+            "every failed stage in exact declaration order")
+    }
+
     // MARK: report-level
 
     func testGatedSkipDistinguishesFromRanReportOfSameShape() {

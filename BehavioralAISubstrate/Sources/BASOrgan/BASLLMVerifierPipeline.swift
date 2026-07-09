@@ -147,6 +147,19 @@ public struct BASLLMVerifierReport:
     /// must treat `gatedSkip == true` as "not verified", not "verified clean".
     public let gatedSkip: Bool
 
+    /// audit organ-eval MED-5 (clause 2) — the failed stages' `verifier-stage-failed:<stage>`
+    /// labels in a DETERMINISTIC order (`BASLLMVerifierStage.allCases`, i.e. declaration order),
+    /// NOT nondeterministic Dictionary iteration. The M892 replay-determinism contract requires the
+    /// serialized verifier feedback to be byte-reproducible cross-process; iterating `perStage`
+    /// directly appended these labels in hash-seed-dependent order, so two identical runs produced
+    /// different feedback bytes. Pure + Mac-testable.
+    public var orderedFailureLabels: [String] {
+        BASLLMVerifierStage.allCases.compactMap { stage in
+            guard let outcome = perStage[stage], !outcome.succeeded else { return nil }
+            return "verifier-stage-failed:" + stage.rawValue
+        }
+    }
+
     public init(
         perStage: [BASLLMVerifierStage:
             BASLLMVerifierStageOutcome],
@@ -551,15 +564,11 @@ extension BASLLMVerifierPipeline {
             // M940:append failure-stage names so downstream
             // can detect partial failure even when other
             // stages produced output
+            // audit organ-eval MED-5 (clause 2): append failure-stage labels in a DETERMINISTIC
+            // order (allCases), not nondeterministic Dictionary iteration (M892 replay-determinism).
             var counterArgs =
                 report.aggregatedCounterArguments
-            for (stage, outcome) in report.perStage {
-                if !outcome.succeeded {
-                    counterArgs.append(
-                        "verifier-stage-failed:" +
-                        stage.rawValue)
-                }
-            }
+            counterArgs.append(contentsOf: report.orderedFailureLabels)
             return BASLLMVerifierFeedback(
                 approved: allSucceeded,
                 amendedAnswer:
