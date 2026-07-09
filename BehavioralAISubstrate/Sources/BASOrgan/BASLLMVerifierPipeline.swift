@@ -139,12 +139,21 @@ public struct BASLLMVerifierReport:
     /// M932 verifier feedback's `counterArguments` field。
     public let aggregatedCounterArguments: [String]
 
+    /// audit organ-eval MED-5: true when verification was GATED-SKIPPED (no
+    /// stage ran — the avoided-compute path). Distinguishes an UNREVIEWED draft
+    /// from a genuinely-verified one: the old empty-`perStage` report read
+    /// identically whether verification was skipped, unwired, or ran-and-passed,
+    /// so skipping verification looked like passing it (a fail-open). Consumers
+    /// must treat `gatedSkip == true` as "not verified", not "verified clean".
+    public let gatedSkip: Bool
+
     public init(
         perStage: [BASLLMVerifierStage:
             BASLLMVerifierStageOutcome],
         finalRecommendedAnswer: String,
         overallConfidence: Double,
-        aggregatedCounterArguments: [String]
+        aggregatedCounterArguments: [String],
+        gatedSkip: Bool = false
     ) {
         self.perStage = perStage
         self.finalRecommendedAnswer =
@@ -152,6 +161,19 @@ public struct BASLLMVerifierReport:
         self.overallConfidence = overallConfidence
         self.aggregatedCounterArguments =
             aggregatedCounterArguments
+        self.gatedSkip = gatedSkip
+    }
+
+    // audit organ-eval MED-5: byte-stable decode — a report persisted BEFORE the
+    // gatedSkip field decodes with gatedSkip = false (absent key ⇒ not-gated).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        perStage = try c.decode(
+            [BASLLMVerifierStage: BASLLMVerifierStageOutcome].self, forKey: .perStage)
+        finalRecommendedAnswer = try c.decode(String.self, forKey: .finalRecommendedAnswer)
+        overallConfidence = try c.decode(Double.self, forKey: .overallConfidence)
+        aggregatedCounterArguments = try c.decode([String].self, forKey: .aggregatedCounterArguments)
+        gatedSkip = try c.decodeIfPresent(Bool.self, forKey: .gatedSkip) ?? false
     }
 }
 
@@ -295,7 +317,8 @@ public actor BASLLMVerifierPipeline {
                 perStage: [:],
                 finalRecommendedAnswer: draft.body,
                 overallConfidence: Self.defaultOverallConfidence,
-                aggregatedCounterArguments: [])
+                aggregatedCounterArguments: [],
+                gatedSkip: true)   // audit organ-eval MED-5: mark unreviewed, not "passed"
         }
 
         var outcomes: [BASLLMVerifierStage:
