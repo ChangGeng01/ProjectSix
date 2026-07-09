@@ -22,5 +22,16 @@ if grep -vE '^[[:space:]]*#' scripts/pre-commit-gates.sh | grep -q '/tmp/gate\.o
     echo "FAIL: pre-commit-gates.sh still references a fixed /tmp/gate.out in code"; fail=1
 fi
 
+# 3. audit x-architecture LOW-7 completeness gate: every Sources/ module is classified, so the full
+#    boundary check passes (an unclassified module would exit 1).
+if ! bash scripts/check_sdk_import_boundaries.sh >/dev/null 2>&1; then
+    echo "FAIL: check_sdk_import_boundaries.sh — an unclassified module or a real boundary violation"; fail=1
+fi
+
+# 4. audit x-architecture LOW-8: the god-file gate passes (stale pins removed, small files unpinned).
+if ! bash scripts/check_god_files.sh >/dev/null 2>&1; then
+    echo "FAIL: check_god_files.sh — a god-file exceeds its error threshold"; fail=1
+fi
+
 if (( fail == 0 )); then echo "CI-GATE HYGIENE PASS"; fi
 exit "$fail"

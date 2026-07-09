@@ -38,6 +38,8 @@ declare -a SDK_CONSUMERS=(
     "BASMLXAdapter"
     "BASMetalSubstrate"
     "BASMPSGraphExecutableCacheCxx"
+    "BASAdminUI"      # audit x-architecture LOW-7: SwiftUI host UI (M-o MED-2 split)
+    "BASJournalCLI"   # audit x-architecture LOW-7: CLI host
 )
 
 # Substrate core modules — these are checked for forbidden imports
@@ -58,6 +60,29 @@ declare -a SUBSTRATE_CORE=(
     "BASRustCoreBridge"
     "BASAdmin"
 )
+
+# audit x-architecture LOW-7 — completeness gate: every Sources/ module must be classified as either
+# an SDK consumer OR substrate core, else a NEW module silently escapes the boundary check entirely.
+# (Skip on --self-test, which doesn't scan the tree.)
+if [[ "${1:-}" != "--self-test" ]]; then
+    unclassified=0
+    for src_dir in Sources/*/; do
+        module="$(basename "$src_dir")"
+        found=0
+        for c in "${SDK_CONSUMERS[@]}" "${SUBSTRATE_CORE[@]}"; do
+            if [[ "$c" == "$module" ]]; then found=1; break; fi
+        done
+        if (( found == 0 )); then
+            echo "UNCLASSIFIED MODULE: Sources/${module} is in neither SDK_CONSUMERS nor SUBSTRATE_CORE"
+            echo "  → add it to one of the two lists in this script so the boundary check covers it"
+            unclassified=$((unclassified + 1))
+        fi
+    done
+    if (( unclassified > 0 )); then
+        echo "RESULT: $unclassified unclassified module(s) — the boundary gate is incomplete"
+        exit 1
+    fi
+fi
 
 # Build forbidden-pattern regex (one alternation per SDK consumer).
 # audit tools-scripts LOW: the old `^import ${c}\b` missed the declaration-kind form
