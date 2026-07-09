@@ -1154,6 +1154,13 @@
    ],
    "tools-scripts (2 of 5)": [
     "check_sdk_import_boundaries.sh regex bypass + pre-commit-gates.sh /tmp race fb7d1dcc9"
+   ],
+   "memory-a (2/2)": [
+    "F7 admit fail-closed on corrupt row ff10d49d2",
+    "F6 notes UPSERT+FTS atomic transaction d0e45f103"
+   ],
+   "memory-b (3/3)": [
+    "F10 reducer drops non-UUID (no random mint) + F11 remove honors dedupe + F13 comment ff10d49d2"
    ]
   },
   "deferred_with_reason": {
@@ -1167,6 +1174,6 @@
     "hostkit-rest LOW-5 = TrainingDataExporter atomic-rename c6fd1ebee"
    ]
   },
-  "remaining_open": "~56 LOW across metal(1)/memory-a(2)/memory-b(3)/mlx-adapter-core(4)/mlx-decode(2)/organ-eval(3)/runtimecore-a(3)/runtimecore-b(4)/rust(3)/sovereign(1)/tests-arch(4)/x-architecture(5)/x-concurrency(2)/x-sovereignty(1)/x-test-integrity(3)/hostkit-rest(3)/hostkit-spine(4)/devicetestapp(7 mostly device-gated)"
+  "remaining_open": "~50 LOW: metal(1)/mlx-adapter-core(4)/mlx-decode(2)/organ-eval(3)/runtimecore-a(3)/runtimecore-b(4)/rust(3)/sovereign(1)/tests-arch(4)/x-architecture(5)/x-concurrency(2)/x-sovereignty(1)/x-test-integrity(3)/hostkit-rest(3)/hostkit-spine(4)/devicetestapp(7 mostly device-gated)"
  }
 }
