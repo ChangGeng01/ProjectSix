@@ -5,7 +5,10 @@ Emits substrate_registry.json + a coverage verdict. Run from repo root (Behavior
 """
 import re, os, json, subprocess, sys
 
-ROOT = os.path.expanduser("~/Project/Project06/Project06/BehavioralAISubstrate")
+# Repo-relative (this file lives at Tools/qinao_local_eval/), overridable via
+# BAS_ROOT — was a hardcoded ~/Project/... path that only ran on one machine.
+ROOT = os.environ.get("BAS_ROOT") or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", ".."))
 DOCS = os.path.join(ROOT, "Docs")
 TESTS = os.path.join(ROOT, "Tests")
 
@@ -61,7 +64,11 @@ verdict = {
     "critical_missing": len([r for r in crit_rows if r["coverage"] == "MISSING"]),
     "rows": rows,
 }
-json.dump(verdict, open(os.path.expanduser("~/qwen_honesty_finetune/qinao_substrate_coverage.json"), "w"), indent=1)
+# repo-local, version-controlled coverage bound (reviewable in the tree)
+json.dump(verdict, open(os.path.join(os.path.dirname(__file__), "substrate_coverage.json"), "w"), indent=1)
+_home_out = os.path.expanduser("~/qwen_honesty_finetune/qinao_substrate_coverage.json")
+if os.path.isdir(os.path.dirname(_home_out)):
+    json.dump(verdict, open(_home_out, "w"), indent=1)
 print(f"=== QINAO Substrate-100 coverage ===")
 print(f"metrics {len(rows)} | CRITICAL {len(crit_rows)} | NAMED-gate {len(named)} | BEHAVIOR-covered {len(behavior)} | MISSING {len(missing)}")
 print(f"CRITICAL: NAMED {verdict['critical_named']} | BEHAVIOR {verdict['critical_behavior']} | MISSING {verdict['critical_missing']}")

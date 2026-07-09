@@ -1,0 +1,1120 @@
+{
+ "n_metrics": 100,
+ "n_critical": 52,
+ "named_gate": 98,
+ "behavior_covered": 0,
+ "missing": 2,
+ "critical_named": 50,
+ "critical_behavior": 0,
+ "critical_missing": 2,
+ "rows": [
+  {
+   "num": 1,
+   "key": "thermal_guard_mapping_purity",
+   "level": "CRITICAL",
+   "symbol": "BASThermalTwin",
+   "all_symbols": [
+    "BASThermalTwin",
+    "BASThermalLevel"
+   ],
+   "by_key": 1,
+   "by_symbol": 11,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 2,
+   "key": "emergency_cancels_all_breaths",
+   "level": "CRITICAL",
+   "symbol": "BASBreathScheduler",
+   "all_symbols": [
+    "BASBreathScheduler"
+   ],
+   "by_key": 1,
+   "by_symbol": 14,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 3,
+   "key": "throttle_class_admission_correctness",
+   "level": "CRITICAL",
+   "symbol": "BASMaintenanceClass",
+   "all_symbols": [
+    "BASMaintenanceClass"
+   ],
+   "by_key": 1,
+   "by_symbol": 9,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 4,
+   "key": "lung_pressure_decay_fidelity",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 5,
+   "key": "coordinator_turn_ordering_invariant",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 6,
+   "key": "emergency_forces_cpu_route",
+   "level": "CRITICAL",
+   "symbol": "BASDeviceRouting",
+   "all_symbols": [
+    "BASDeviceRouting"
+   ],
+   "by_key": 1,
+   "by_symbol": 4,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 7,
+   "key": "compute_router_floor_no_overheat",
+   "level": "HIGH",
+   "symbol": "BASComputeRouter",
+   "all_symbols": [
+    "BASComputeRouter",
+    "BASComputeTierThermalSnapshot"
+   ],
+   "by_key": 1,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 8,
+   "key": "metal_vs_cpu_ssm_scan_parity_mae",
+   "level": "CRITICAL",
+   "symbol": "BASSSMScanCPUReference",
+   "all_symbols": [
+    "BASSSMScanCPUReference",
+    "BASMetalSSMScanDispatcher",
+    "BASMambaGPUShadowParity"
+   ],
+   "by_key": 1,
+   "by_symbol": 14,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 9,
+   "key": "rmsnorm_layernorm_epsilon_fidelity",
+   "level": "HIGH",
+   "symbol": "BASNormEpsilon",
+   "all_symbols": [
+    "BASNormEpsilon"
+   ],
+   "by_key": 1,
+   "by_symbol": 1,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 10,
+   "key": "mpsgraph_kernel_proof_coverage",
+   "level": "HIGH",
+   "symbol": "BASMPSGraphKernelCoverageBundle",
+   "all_symbols": [
+    "BASMPSGraphKernelCoverageBundle"
+   ],
+   "by_key": 1,
+   "by_symbol": 5,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 11,
+   "key": "mlx_cache_pool_ceiling",
+   "level": "HIGH",
+   "symbol": "BASMLXMemoryModel",
+   "all_symbols": [
+    "BASMLXMemoryModel"
+   ],
+   "by_key": 1,
+   "by_symbol": 7,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 12,
+   "key": "mlx_preload_memory_admission",
+   "level": "HIGH",
+   "symbol": "BASMLXMemoryBudget",
+   "all_symbols": [
+    "BASMLXMemoryBudget"
+   ],
+   "by_key": 1,
+   "by_symbol": 6,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 13,
+   "key": "mlx_runtime_config_conflict_safety",
+   "level": "HIGH",
+   "symbol": "MLXRuntimeConfig",
+   "all_symbols": [
+    "MLXRuntimeConfig"
+   ],
+   "by_key": 1,
+   "by_symbol": 5,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 14,
+   "key": "decode_stall_wedge_detection",
+   "level": "HIGH",
+   "symbol": "BASDecodeLivenessMonitor",
+   "all_symbols": [
+    "BASDecodeLivenessMonitor",
+    "BASDecodeStallVerdict"
+   ],
+   "by_key": 1,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 15,
+   "key": "prompt_lookup_spec_token_identity",
+   "level": "CRITICAL",
+   "symbol": "BASPromptLookupDecoder",
+   "all_symbols": [
+    "BASPromptLookupDecoder"
+   ],
+   "by_key": 1,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 16,
+   "key": "spec_teacher_forced_alpha_gate",
+   "level": "HIGH",
+   "symbol": "MLXOrganAdapter",
+   "all_symbols": [
+    "MLXOrganAdapter",
+    "BASAcceptanceBlockReducer"
+   ],
+   "by_key": 1,
+   "by_symbol": 59,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 17,
+   "key": "mlx_evallock_concurrent_correctness",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 18,
+   "key": "accelerated_draft_default_off_byte_equality",
+   "level": "HIGH",
+   "symbol": "BASOrganAdapter",
+   "all_symbols": [
+    "BASOrganAdapter"
+   ],
+   "by_key": 2,
+   "by_symbol": 27,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 19,
+   "key": "coreai_ane_conversion_fidelity",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 0,
+   "by_symbol": 0,
+   "coverage": "MISSING"
+  },
+  {
+   "num": 20,
+   "key": "coreml_to_coreai_migration_gate",
+   "level": "HIGH",
+   "symbol": "BASCoreAIMigrationVerdict",
+   "all_symbols": [
+    "BASCoreAIMigrationVerdict"
+   ],
+   "by_key": 1,
+   "by_symbol": 4,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 21,
+   "key": "provider_routing_determinism",
+   "level": "MEDIUM",
+   "symbol": "BASNeuralProviderMatrix",
+   "all_symbols": [
+    "BASNeuralProviderMatrix",
+    "BASLLMModelRouter"
+   ],
+   "by_key": 1,
+   "by_symbol": 4,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 22,
+   "key": "bastensor_descriptor_phantom_agreement",
+   "level": "MEDIUM",
+   "symbol": "BASTensor",
+   "all_symbols": [
+    "BASTensor"
+   ],
+   "by_key": 1,
+   "by_symbol": 45,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 23,
+   "key": "auto_route_choice_vs_crossover",
+   "level": "HIGH",
+   "symbol": "BASAutoRouteRanker",
+   "all_symbols": [
+    "BASAutoRouteRanker",
+    "BASAutoRouteChoice",
+    "BASAutoRouteCalibrator"
+   ],
+   "by_key": 1,
+   "by_symbol": 69,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 24,
+   "key": "calibration_cache_invalidation",
+   "level": "HIGH",
+   "symbol": "BASAutoRouteCalibrationStore",
+   "all_symbols": [
+    "BASAutoRouteCalibrationStore"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 25,
+   "key": "calibration_threshold_field_coverage",
+   "level": "HIGH",
+   "symbol": "BASAutoRouteThresholds",
+   "all_symbols": [
+    "BASAutoRouteThresholds"
+   ],
+   "by_key": 1,
+   "by_symbol": 15,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 26,
+   "key": "provider_plan_route_constraint_soundness",
+   "level": "HIGH",
+   "symbol": "BASDefaultRoutingPlanner",
+   "all_symbols": [
+    "BASDefaultRoutingPlanner"
+   ],
+   "by_key": 1,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 27,
+   "key": "provider_plan_determinism_tiebreak",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 28,
+   "key": "provider_fallback_availability_resolution",
+   "level": "HIGH",
+   "symbol": "BASRuntimeAvailabilityResolver",
+   "all_symbols": [
+    "BASRuntimeAvailabilityResolver"
+   ],
+   "by_key": 2,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 29,
+   "key": "adaptive_budget_floor_monotonicity",
+   "level": "HIGH",
+   "symbol": "BASAdaptiveRuntimeMatrixRequest",
+   "all_symbols": [
+    "BASAdaptiveRuntimeMatrixRequest"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 30,
+   "key": "adaptive_strategy_idempotence",
+   "level": "MEDIUM",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 31,
+   "key": "routing_policy_lineage_completeness",
+   "level": "MEDIUM",
+   "symbol": "BASRuntimePolicyLineage",
+   "all_symbols": [
+    "BASRuntimePolicyLineage"
+   ],
+   "by_key": 1,
+   "by_symbol": 31,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 32,
+   "key": "durable_cosine_topk_recall",
+   "level": "CRITICAL",
+   "symbol": "BASSQLiteVectorIndexStorage",
+   "all_symbols": [
+    "BASSQLiteVectorIndexStorage",
+    "BASVectorIndex"
+   ],
+   "by_key": 1,
+   "by_symbol": 8,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 33,
+   "key": "int8_vector_cosine_drift",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 34,
+   "key": "vector_index_dimension_bind",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 35,
+   "key": "non_finite_embedding_rejection",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 36,
+   "key": "rag_stale_atom_lockstep",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 37,
+   "key": "governed_excluded_domains_adherence",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 38,
+   "key": "memory_governance_determinism",
+   "level": "HIGH",
+   "symbol": "BASMemoryGovernance",
+   "all_symbols": [
+    "BASMemoryGovernance"
+   ],
+   "by_key": 1,
+   "by_symbol": 20,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 39,
+   "key": "event_projection_replay_determinism",
+   "level": "CRITICAL",
+   "symbol": "BASMemoryAtomReducer",
+   "all_symbols": [
+    "BASMemoryAtomReducer"
+   ],
+   "by_key": 1,
+   "by_symbol": 10,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 40,
+   "key": "event_log_sequence_monotonicity",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 41,
+   "key": "projection_content_empty_on_replay",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 42,
+   "key": "forget_cascade_execution_correctness",
+   "level": "CRITICAL",
+   "symbol": "BASMemoryForgetCascadeRunner",
+   "all_symbols": [
+    "BASMemoryForgetCascadeRunner"
+   ],
+   "by_key": 1,
+   "by_symbol": 7,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 43,
+   "key": "kv_cache_eviction_determinism",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 44,
+   "key": "sql_persistence_integrity_gate",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 45,
+   "key": "shared_wal_durability",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 2,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 46,
+   "key": "memory_tiering_band_non_collision",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 47,
+   "key": "silent_failure_observability",
+   "level": "MEDIUM",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 48,
+   "key": "turn_replay_determinism",
+   "level": "CRITICAL",
+   "symbol": "BASEBrainTurnResultReplayDigest",
+   "all_symbols": [
+    "BASEBrainTurnResultReplayDigest"
+   ],
+   "by_key": 1,
+   "by_symbol": 7,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 49,
+   "key": "opt_in_seam_dormancy",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 50,
+   "key": "budget_overrun_escape_rate",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 2,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 51,
+   "key": "redline_permit_downgrade_completeness",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 52,
+   "key": "caution_monotonicity_optin_seams",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 53,
+   "key": "dream_loop_pass_count_vs_budget",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 54,
+   "key": "dream_loop_stop_reason_reconciliation",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 55,
+   "key": "observation_coverage_14layer",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 56,
+   "key": "observation_coordinate_coherence",
+   "level": "MEDIUM",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 57,
+   "key": "audit_finding_enforcement_coherence",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 58,
+   "key": "prompt_injection_filter_catch_rate",
+   "level": "CRITICAL",
+   "symbol": "BASPromptEvidenceGuard",
+   "all_symbols": [
+    "BASPromptEvidenceGuard"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 59,
+   "key": "prompt_budget_suffix_floor",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 60,
+   "key": "admission_lane_decision_determinism",
+   "level": "CRITICAL",
+   "symbol": "BASAdmissionRequest",
+   "all_symbols": [
+    "BASAdmissionRequest",
+    "BASAdmissionDecision"
+   ],
+   "by_key": 1,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 61,
+   "key": "lane_skip_reason_soundness",
+   "level": "HIGH",
+   "symbol": "BASAdmissionSkipReason",
+   "all_symbols": [
+    "BASAdmissionSkipReason"
+   ],
+   "by_key": 1,
+   "by_symbol": 1,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 62,
+   "key": "workflow_checkpoint_rewind_fidelity",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 63,
+   "key": "entry_plan_approval_coverage",
+   "level": "CRITICAL",
+   "symbol": "BASIntentEnvelope",
+   "all_symbols": [
+    "BASIntentEnvelope"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 64,
+   "key": "tribunal_full_body_coverage",
+   "level": "CRITICAL",
+   "symbol": "BASTribunalCoverageReport",
+   "all_symbols": [
+    "BASTribunalCoverageReport"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 65,
+   "key": "tribunal_veto_monotonicity",
+   "level": "CRITICAL",
+   "symbol": "BASVetoMark",
+   "all_symbols": [
+    "BASVetoMark"
+   ],
+   "by_key": 1,
+   "by_symbol": 7,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 66,
+   "key": "release_consistency_gate",
+   "level": "CRITICAL",
+   "symbol": "BASStructuredTruthState",
+   "all_symbols": [
+    "BASStructuredTruthState"
+   ],
+   "by_key": 1,
+   "by_symbol": 6,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 67,
+   "key": "policy_decision_determinism",
+   "level": "CRITICAL",
+   "symbol": "BASPolicySet",
+   "all_symbols": [
+    "BASPolicySet"
+   ],
+   "by_key": 1,
+   "by_symbol": 4,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 68,
+   "key": "cloud_egress_sovereignty",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 69,
+   "key": "permit_escalation_never_loosen",
+   "level": "CRITICAL",
+   "symbol": "BASPermitEscalationFoldExecutor",
+   "all_symbols": [
+    "BASPermitEscalationFoldExecutor"
+   ],
+   "by_key": 1,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 70,
+   "key": "permit_escalation_ledger_replay",
+   "level": "HIGH",
+   "symbol": "BASPermitEscalationLedger",
+   "all_symbols": [
+    "BASPermitEscalationLedger"
+   ],
+   "by_key": 1,
+   "by_symbol": 10,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 71,
+   "key": "risk_calibration_replace_safety",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 72,
+   "key": "risk_calibration_delta_bound",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 73,
+   "key": "risk_card_monotonic_ordering",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 74,
+   "key": "replay_fingerprint_determinism",
+   "level": "CRITICAL",
+   "symbol": "BASReplayBundle",
+   "all_symbols": [
+    "BASReplayBundle"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 75,
+   "key": "replay_disposition_forget_vault_gate",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 76,
+   "key": "trace_release_mismatch_coverage",
+   "level": "HIGH",
+   "symbol": "BASInspectionBundle",
+   "all_symbols": [
+    "BASInspectionBundle"
+   ],
+   "by_key": 1,
+   "by_symbol": 6,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 77,
+   "key": "per_layer_latency_overrun",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 78,
+   "key": "verdict_kernel_determinism_noncompensatory",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 79,
+   "key": "verdict_hardrule_min_level_floor",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 80,
+   "key": "rust_swift_verdict_parity",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 81,
+   "key": "verdict_parity_shadow_laxer_halt",
+   "level": "CRITICAL",
+   "symbol": "BASSovereignTurnVerifier",
+   "all_symbols": [
+    "BASSovereignTurnVerifier"
+   ],
+   "by_key": 2,
+   "by_symbol": 4,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 82,
+   "key": "ledger_fail_closed_on_append",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 83,
+   "key": "chain_seal_determinism_byte_equal",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 84,
+   "key": "chain_tamper_detection_coverage",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 85,
+   "key": "ledger_quarantine_on_corrupt_reload",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 86,
+   "key": "append_only_no_mutation_surface",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 87,
+   "key": "commit_token_single_use_burn",
+   "level": "CRITICAL",
+   "symbol": "BASSovereignTokenAuthority",
+   "all_symbols": [
+    "BASSovereignTokenAuthority"
+   ],
+   "by_key": 1,
+   "by_symbol": 19,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 88,
+   "key": "commit_enforcer_digest_target_binding",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 89,
+   "key": "dual_key_two_principal",
+   "level": "HIGH",
+   "symbol": "BASSovereignDualKeyVerifier",
+   "all_symbols": [
+    "BASSovereignDualKeyVerifier"
+   ],
+   "by_key": 1,
+   "by_symbol": 7,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 90,
+   "key": "ed25519_cross_verifier_no_secret",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 91,
+   "key": "rollback_target_known_good_anchor",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 92,
+   "key": "restore_payload_hash_gate",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 93,
+   "key": "integrity_sentinel_unknown_is_failure",
+   "level": "HIGH",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 94,
+   "key": "regression_gate_verdict",
+   "level": "CRITICAL",
+   "symbol": "BASEvaluationSuite",
+   "all_symbols": [
+    "BASEvaluationSuite"
+   ],
+   "by_key": 1,
+   "by_symbol": 2,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 95,
+   "key": "byte_determinism_spine_replay",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 96,
+   "key": "metal_spine_boundary_tripwire",
+   "level": "CRITICAL",
+   "symbol": "BASMetalDeterminismBoundaryTests",
+   "all_symbols": [
+    "BASMetalDeterminismBoundaryTests",
+    "BASApproxValue"
+   ],
+   "by_key": 2,
+   "by_symbol": 3,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 97,
+   "key": "schema_governance_parity",
+   "level": "CRITICAL",
+   "symbol": "BASSchemaVersioned",
+   "all_symbols": [
+    "BASSchemaVersioned"
+   ],
+   "by_key": 1,
+   "by_symbol": 10,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 98,
+   "key": "cross_language_schema_alphabet_parity",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  },
+  {
+   "num": 99,
+   "key": "authoritative_test_suite_pass",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 0,
+   "by_symbol": 0,
+   "coverage": "MISSING"
+  },
+  {
+   "num": 100,
+   "key": "mlx_wedge_prevention_compliance",
+   "level": "CRITICAL",
+   "symbol": null,
+   "all_symbols": [],
+   "by_key": 1,
+   "by_symbol": 0,
+   "coverage": "NAMED"
+  }
+ ]
+}
