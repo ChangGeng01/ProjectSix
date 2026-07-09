@@ -50,6 +50,20 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
     public let databaseURL: URL
     private nonisolated(unsafe) let enginePtr: OpaquePointer
 
+    /// audit memory-b F12 — OPT-IN diagnostic hook (default nil), mirroring
+    /// BASSQLiteEventLogStorage.onSilentFailure. The non-throwing read
+    /// accessors route a swallowed FFI/decode error here BEFORE defaulting to
+    /// [], so a host can tell "no events" (genuinely empty session) from
+    /// "event log CORRUPT" (which the read used to present as an empty store =
+    /// false total-amnesia). Fires only on the error path ⇒ byte-equal on
+    /// success + genuine-empty. Default nil ⇒ today's exact behavior.
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+
+    /// Wire the diagnostic hook (actor-isolated; set once at setup).
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     public init(databaseURL: URL) throws {
         self.databaseURL = databaseURL
         let pathStr = databaseURL.path
@@ -162,11 +176,13 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         // (FINAL — closes the USER-PASS arc)。 Append stores full
         // BASEventLogEntry as payload_json (format=1) so read-back
         // just concatenates payload_json bytes into JSON array。
-        return Self.eventsArrayViaJsonFfi(
-            engine: enginePtr,
-            sessionID: sessionID,
-            sinceMs: nil,
-            limit: nil)
+        // audit memory-b F12: route a corrupt/error read to onSilentFailure
+        // before defaulting to [] (was silent corrupt-as-empty).
+        do {
+            return try Self.eventsArrayViaJsonFfiThrowing(
+                engine: enginePtr, sessionID: sessionID,
+                sinceMs: nil, limit: nil)
+        } catch { onSilentFailure?(error); return [] }
     }
 
     public func events(
@@ -174,17 +190,46 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
         limit: Int
     ) async -> [BASEventLogEntry] {
         // chapter 九百三十八 / M3395 — see events(forSession:)
-        return Self.eventsArrayViaJsonFfi(
-            engine: enginePtr,
-            sessionID: nil,
-            sinceMs: since,
-            limit: limit)
+        do {
+            return try Self.eventsArrayViaJsonFfiThrowing(
+                engine: enginePtr, sessionID: nil,
+                sinceMs: since, limit: limit)
+        } catch { onSilentFailure?(error); return [] }
+    }
+
+    /// audit memory-b F12 — THROWING sibling of `events(forSession:)`。 A
+    /// corrupt / unreadable event log throws `StoreError.readFailed` instead of
+    /// presenting as an empty session (false total-amnesia). A genuinely empty
+    /// session still returns []。 Consumers that must not project amnesia over a
+    /// corrupt log (e.g. BASMemoryAtomReducer) read through this.
+    public func eventsOrThrow(
+        forSession sessionID: String
+    ) async throws -> [BASEventLogEntry] {
+        try Self.eventsArrayViaJsonFfiThrowing(
+            engine: enginePtr, sessionID: sessionID,
+            sinceMs: nil, limit: nil)
+    }
+
+    /// audit memory-b F12 — THROWING sibling of `events(sinceTimestampMs:limit:)`。
+    public func eventsOrThrow(
+        sinceTimestampMs since: Int64,
+        limit: Int
+    ) async throws -> [BASEventLogEntry] {
+        try Self.eventsArrayViaJsonFfiThrowing(
+            engine: enginePtr, sessionID: nil,
+            sinceMs: since, limit: limit)
     }
 
     public var totalCount: Int {
         get async {
             let c = bas_l8_event_log_count(enginePtr)
-            return c < 0 ? 0 : Int(c)
+            // audit memory-b F12: a negative count is an error, not "0 events" —
+            // surface it to the hook before defaulting (byte-equal return).
+            if c < 0 {
+                onSilentFailure?(StoreError.readFailed(code: Int32(clamping: c)))
+                return 0
+            }
+            return Int(c)
         }
     }
 
@@ -312,12 +357,18 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
     // only test setUp/tearDown assigns it, single-threaded, so `nonisolated(unsafe)` is sound.
     nonisolated(unsafe) static var sessionPageSize = 10_000
 
-    private static func eventsArrayViaJsonFfi(
+    // audit memory-b F12 — THROWING core. Every path that used to collapse a
+    // read ERROR (negative FFI code, cursor anomaly, non-empty-buffer decode
+    // failure) into an empty [] now throws StoreError.readFailed;a GENUINELY
+    // empty result still returns [] (a real "[]" decodes without throwing).
+    // The non-throwing `events(...)` catch → onSilentFailure → [] for
+    // byte-equal behavior; `eventsOrThrow(...)` lets it propagate.
+    private static func eventsArrayViaJsonFfiThrowing(
         engine: OpaquePointer,
         sessionID: String?,
         sinceMs: Int64?,
         limit: Int?
-    ) -> [BASEventLogEntry] {
+    ) throws -> [BASEventLogEntry] {
         // Session-filtered read: PAGINATE the full history by sequence_number cursor. The
         // cursor is exclusive (`seq > after`), so it starts at -1 to include seq 0, and
         // advances to the last event's seq each batch.
@@ -337,23 +388,28 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
                     engine: engine, sessionID: sid,
                     afterSeq: afterSeq, limit: Int64(sessionPageSize))
                 else {
-                    return []   // read error mid-stream → fail closed (no torn history)
+                    // read error mid-stream (fetchSessionPage nil = FFI/decode failure,
+                    // distinct from an empty page) → THROW, don't present as empty history。
+                    throw StoreError.readFailed(code: -1)
                 }
                 if page.isEmpty { break }   // genuine end of stream
                 acc.append(contentsOf: page)
                 // The cursor MUST advance on a non-empty page (Rust returns seq > afterSeq,
-                // ascending); if it somehow can't, that is an anomaly → fail closed.
+                // ascending); if it somehow can't, that is an anomaly → THROW.
                 guard let last = page.last, last.sequenceNumber > afterSeq else {
-                    return []
+                    throw StoreError.readFailed(code: -2)
                 }
                 afterSeq = last.sequenceNumber
             }
             return acc
         }
 
-        // Timestamp-window read (bounded-preview path, caller supplies the limit) — unchanged.
+        // Timestamp-window read (bounded-preview path, caller supplies the limit)。
+        // audit memory-b F12: a NEGATIVE size probe is an error (throw); a genuinely
+        // empty window ("[]", needed 2 — or a 0/1 non-negative probe) returns [].
         let needed = bas_l8_event_log_events_since_ts(
             engine, sinceMs ?? 0, Int64(limit ?? 0), nil, 0)
+        if needed < 0 { throw StoreError.readFailed(code: needed) }
         guard needed >= 2 else { return [] }
         var buf = [UInt8](repeating: 0, count: Int(needed))
         let written = buf.withUnsafeMutableBufferPointer { oBuf in
@@ -361,10 +417,11 @@ public actor BASRoutedEventLogStorage: BASEventLogStorage {
                 engine, sinceMs ?? 0, Int64(limit ?? 0),
                 oBuf.baseAddress, oBuf.count)
         }
-        guard written >= 0 else { return [] }
-        return (try? JSONDecoder().decode(
+        guard written >= 0 else { throw StoreError.readFailed(code: written) }
+        // A non-empty buffer that fails to decode is CORRUPT → throw (was ?? []).
+        return try JSONDecoder().decode(
             [BASEventLogEntry].self,
-            from: Data(buf.prefix(Int(written))))) ?? []
+            from: Data(buf.prefix(Int(written))))
     }
 
     /// One paginated batch: events with `sequence_number > afterSeq`, up to `limit`, via the
