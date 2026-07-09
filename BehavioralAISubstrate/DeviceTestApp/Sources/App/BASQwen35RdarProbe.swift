@@ -157,6 +157,14 @@ enum BASQwen35RdarProbe {
         // 100%-plateau BURN-IN: while unplugged at ≥99.5%, decode WITHOUT counting until the reading first dips
         // (iOS holds "100%" ~10-20 min after unplug) — then zero the counters and restart the window. Immune to
         // launch timing AND the top-buffer.
+        //
+        // audit M-i MED-4: this deadline/burning state machine is EXTRACTED and
+        // Mac-unit-tested as `BASBurnInDeadline` (BASRuntimeCore) — see
+        // BASBurnInDeadlineTests, which deterministically proves the guard that a
+        // plateau outlasting the window does NOT end M4 mid-burn-in. The inline
+        // vars below MIRROR that tested spec (kept inline here because runM4's
+        // log/loop state is device-instrument-coupled; a full call-through rewire
+        // is a device-verified follow-up, not a Mac-safe change).
         var burning = false
         func sampleIfDue() {
             guard Date().timeIntervalSince(lastSample) >= 30 else { return }
