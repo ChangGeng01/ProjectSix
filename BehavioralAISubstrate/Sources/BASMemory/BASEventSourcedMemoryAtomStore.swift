@@ -95,6 +95,17 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
     private var hasWarmedCache: Bool = false
     private var lastSeq: Int64? = nil
 
+    /// audit memory-b F4 — surfaced when a mutation (updateTier /
+    /// updateGovernanceStatus / remove) FAILS on an EXISTING atom. The Bool/nil
+    /// returns can't distinguish "atom not found" from "store write errored"
+    /// (both false/nil), so a real write failure was silently fail-open (counted
+    /// downstream as not-found). A host wires this to observe the real error.
+    /// nil ⇒ unobserved (default).
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Init
 
     public init(
@@ -239,6 +250,9 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             return try await appendEventAndUpdateCache(
                 payload: payload)
         } catch {
+            // audit memory-b F4: the atom EXISTS (guard passed) — a false here is
+            // a store WRITE error, not "not found". Surface it, don't fail-open.
+            onSilentFailure?(error)
             return false
         }
     }
@@ -256,6 +270,7 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             return try await appendEventAndUpdateCache(
                 payload: payload)
         } catch {
+            onSilentFailure?(error)   // audit memory-b F4: surface the write error
             return false
         }
     }
@@ -276,6 +291,7 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             contentCache.removeValue(forKey: id)
             return removed
         } catch {
+            onSilentFailure?(error)   // audit memory-b F4: surface the write error (atom existed)
             return nil
         }
     }
