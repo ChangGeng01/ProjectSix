@@ -57,6 +57,46 @@ final class BASExperiencePersistenceTests: XCTestCase {
         XCTAssertTrue(restored.exportCells().isEmpty, "未知 purpose 前向兼容 = 跳过该 cell")
     }
 
+    // MARK: - audit organ-eval MED-4 — sticky sampling lane re-probes on a "new session" restore
+    //
+    // The sampling lane's break-even gate (BASDecodePlanner `minMTPSamplingAccepted` = 0.60) is
+    // STICKY BY DESIGN: a gated lane folds NO new observations (the `.plain` arm records nothing),
+    // so it never self-un-gates on a workload shift. The planner's ONLY documented escape
+    // (BASDecodePlanner.swift:89) is "a fresh profiler (new session) re-probes". P0 persistence
+    // restored the sampling cell VERBATIM, silently defeating that contract: one sub-break-even
+    // measurement (device a≈0.34–0.47 on short prose) exiled the temp>0 mtpSpecSampling lane to
+    // `.plain` FOREVER across sessions, forfeiting the ~1.05× win even after the workload shifts
+    // to the a≈0.62–0.68 regime where sampling-spec is net positive. The restore now drops the
+    // re-probe-on-restore lanes so a "new session" is genuinely cold for them.
+
+    func testSamplingLaneReprobesAfterRestore() {
+        // A sub-break-even sampling measurement (a≈0.33 < 0.60) that gated the lane to `.plain`.
+        let warm = BASAcceptanceProfiler()
+            .observing(sourceID: BASDecodeStrategy.mtpSpecSamplingID,
+                       purpose: .scoutDefault, accepted: 1, proposed: 3, rounds: 3)
+        let ema = warm.stat(BASDecodeStrategy.mtpSpecSamplingID, .scoutDefault)?.emaAccepted ?? 1
+        XCTAssertLessThan(ema, 0.60, "fixture must be sub-break-even to be a real gate")
+
+        // "New session": round-trip through persistence, then re-consult the planner.
+        let restored = BASAcceptanceProfiler(cells: warm.exportCells())
+        let caps = BASDecodeCapabilities(draftModelLoaded: false, saguaroAvailable: false,
+                                         modelFreeAvailable: false, mtpHeadLoaded: true)
+        let s = BASDecodeLanePolicy.decodeStrategy(
+            purpose: .scoutDefault, temperature: 0.7, capabilities: caps, profiler: restored)
+        XCTAssertEqual(s, .mtpSpecSampling,
+            "a fresh-session restore must re-probe the sticky sampling lane, not inherit its frozen sub-0.60 gate")
+    }
+
+    func testNonReprobeLanesSurviveRestoreVerbatim() {
+        // Companion (anti-over-broadening): a purpose-independent lane keeps its warm value on restore.
+        let warm = BASAcceptanceProfiler()
+            .observing(sourceID: "promptLookup", purpose: .factual, accepted: 18, proposed: 20, rounds: 6)
+        let restored = BASAcceptanceProfiler(cells: warm.exportCells())
+        XCTAssertEqual(restored.stat("promptLookup", .factual),
+                       warm.stat("promptLookup", .factual),
+                       "non-reprobe lanes must restore verbatim (warm-start preserved)")
+    }
+
     // MARK: - store: staleness 门(整体拒载 ⇒ 冷启动 = 现行为)
 
     private func makeSnapshot(modelID: String = "m1", savedAtMs: Int64 = 1_000_000,

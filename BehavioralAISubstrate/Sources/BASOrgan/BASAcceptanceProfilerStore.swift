@@ -134,10 +134,23 @@ extension BASAcceptanceProfiler {
             .sorted { ($0.sourceID, $0.purpose) < ($1.sourceID, $1.purpose) }
     }
 
-    /// Restore from exported cells. Unknown purpose rawValues (future schema) are skipped.
+    /// Lanes whose break-even gate is STICKY BY DESIGN (a gated lane folds no new observations, so
+    /// it never self-un-gates) and therefore MUST re-probe cold each session — see
+    /// `BASDecodePlanner.swift:89` "a fresh profiler (new session) re-probes". Restoring their cell
+    /// verbatim (P0 persistence) would defeat that contract: one sub-break-even measurement would
+    /// exile the lane to `.plain` forever across sessions (audit organ-eval MED-4). The warm-start
+    /// benefit for these lanes is a single cold probe turn, so dropping them on restore costs nothing
+    /// while honoring the planner's per-session re-probe invariant.
+    public static let reprobeOnRestoreSourceIDs: Set<String> = [BASDecodeStrategy.mtpSpecSamplingID]
+
+    /// Restore from exported cells. Unknown purpose rawValues (future schema) are skipped, and the
+    /// sticky-by-design re-probe lanes (`reprobeOnRestoreSourceIDs`) are dropped so a "new session"
+    /// is genuinely cold for them (audit organ-eval MED-4).
     public init(cells: [ExportedCell], alpha: Double = 0.4) {
         var restored = BASAcceptanceProfiler(alpha: alpha)
-        for cell in cells where BASDecodeLanePolicy.Purpose(rawValue: cell.purpose) != nil {
+        for cell in cells
+        where BASDecodeLanePolicy.Purpose(rawValue: cell.purpose) != nil
+            && !BASAcceptanceProfiler.reprobeOnRestoreSourceIDs.contains(cell.sourceID) {
             restored = restored.inserting(
                 sourceID: cell.sourceID, purposeRaw: cell.purpose, stat: cell.stat)
         }
