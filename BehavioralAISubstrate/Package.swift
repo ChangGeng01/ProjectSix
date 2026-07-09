@@ -441,8 +441,10 @@ let package = Package(
         .target(
             name: "BASHostKit",
             dependencies: [
-                // audit M-o MED-3 — explicit swift-crypto (was transitive-only)
-                .product(name: "Crypto", package: "swift-crypto"),
+                // (swift-crypto dep removed: commit 44ba14dad moved the sole
+                //  swift-crypto user, BASSovereignLedgerHostSink, to native
+                //  CryptoKit; all ~40 crypto files in this target now use
+                //  CryptoKit, so the M-o MED-3 explicit dep here is vestigial.)
                 "BASRuntimeCore",
                 "BASMemory",
                 "BASPolicy",
