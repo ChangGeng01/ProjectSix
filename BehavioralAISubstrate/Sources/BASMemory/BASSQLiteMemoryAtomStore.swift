@@ -142,6 +142,13 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         self.onSilentFailure = handler
     }
 
+    /// audit x-sov #5/#6 — the error (if any) from applying file Data
+    /// Protection to the DB + `-wal`/`-shm` at open. `onSilentFailure` isn't
+    /// wired until AFTER construction, so the init-time protection outcome is
+    /// SURFACED here (never swallowed) for a host to inspect. nil ⇒ protection
+    /// applied cleanly (or the kill-switch is off).
+    public private(set) var fileProtectionError: Error?
+
     // MARK: - Lifecycle
 
     /// Open or create the SQLite-backed store at `databaseURL`.
@@ -223,6 +230,14 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
                 }
             }
         }
+
+        // audit x-sov #5 — pin file Data Protection on the memory-atom DB (the
+        // highest-sensitivity on-disk point) + its -wal/-shm sidecars, matching
+        // the session-KV snapshot's protection (缝2) and killing the same-repo
+        // double standard. Applied AFTER the WAL pragma + seed write so the
+        // sidecars exist. The outcome is surfaced (x-sov #6: not swallowed).
+        self.fileProtectionError =
+            BASSQLiteFileProtection.apply(toDatabaseAt: databaseURL.path)
     }
 
     deinit {

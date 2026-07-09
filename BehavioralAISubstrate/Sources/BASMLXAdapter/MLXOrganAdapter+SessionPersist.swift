@@ -8,12 +8,19 @@
 // ArraysCache.offset, corrupting the GDN mask geometry on restore).
 import Foundation
 import BASOrgan
+import BASRuntimeCore
 
 #if canImport(MLXLLM)
 import MLX
 import MLXLMCommon
 
 extension MLXOrganAdapter {
+
+    /// audit x-sov #6 — diagnostic hook for a KV-snapshot Data-Protection
+    /// failure (test seam). The persist path used to `try?`-swallow the
+    /// setAttributes error; it now surfaces here. nil ⇒ unobserved (default).
+    nonisolated(unsafe) static var _sessionProtectionFailureHook:
+        (@Sendable (Error) -> Void)?
 
     public enum SessionPersistError: Error {
         case noSuchSession(String)
@@ -41,13 +48,15 @@ extension MLXOrganAdapter {
         let bytes = try await box.session.withLiveCache { cache in
             try BASSessionKVStore.save(cache: cache, tokenCount: 0, to: url, quantizeKV: quantizeKV)
         }
-        #if os(iOS)
-        // 缝2 (2026-07-06 audit): conversation KV on disk gets Data Protection — readable after
-        // first unlock (background restores keep working), never in the pre-unlock window.
-        try? FileManager.default.setAttributes(
-            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-            ofItemAtPath: url.path)
-        #endif
+        // 缝2 (2026-07-06 audit): conversation KV on disk gets Data Protection —
+        // readable after first unlock (background restores keep working), sealed
+        // in the pre-unlock window。 audit x-sov #6: the setAttributes error is
+        // now SURFACED via the hook (was `try?`-swallowed) so a failure to
+        // protect sensitive KV is observable; routed through the shared
+        // BASSQLiteFileProtection helper (same class, kill-switch, +sidecars)。
+        if let err = BASSQLiteFileProtection.apply(toDatabaseAt: url.path) {
+            Self._sessionProtectionFailureHook?(err)
+        }
         return bytes
     }
 
