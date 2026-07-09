@@ -35,6 +35,9 @@ public actor BASWorldPriorVault {
         case unknownBridge(String)
         case axiomCollision(id: String, incoming: String, resident: String)
         case bridgeReferencesUnknownTemplate(bridgeID: String, templateID: String)
+        /// audit policy-obs-misc LOW-8 — a bridge whose sourceDomain has no registered horizon would
+        /// half-register (findable by id, absent from any horizon's bridgesOutbound = unroutable).
+        case bridgeReferencesUnknownDomain(bridgeID: String, domain: String)
     }
 
     // MARK: - State
@@ -163,18 +166,24 @@ public actor BASWorldPriorVault {
                 )
             }
         }
-        bridgesByID[bridge.id] = bridge
-        if var horizon = horizons[bridge.sourceDomain] {
-            var merged = horizon.bridgesOutbound
-            merged.append(bridge)
-            horizon = BASWorldPriorHorizon(
-                domain: horizon.domain,
-                axioms: horizon.axioms,
-                templates: horizon.templates,
-                bridgesOutbound: merged
-            )
-            horizons[bridge.sourceDomain] = horizon
+        // audit policy-obs-misc LOW-8: fail closed when the sourceDomain has no registered horizon —
+        // otherwise the bridge lands in bridgesByID but never in any horizon's bridgesOutbound, so it
+        // is findable by id yet UNROUTABLE (outboundBridges(from:) returns []). Mirrors the existing
+        // bridgeReferencesUnknownTemplate validation above.
+        guard var horizon = horizons[bridge.sourceDomain] else {
+            throw VaultError.bridgeReferencesUnknownDomain(
+                bridgeID: bridge.id, domain: bridge.sourceDomain.rawValue)
         }
+        bridgesByID[bridge.id] = bridge
+        var merged = horizon.bridgesOutbound
+        merged.append(bridge)
+        horizon = BASWorldPriorHorizon(
+            domain: horizon.domain,
+            axioms: horizon.axioms,
+            templates: horizon.templates,
+            bridgesOutbound: merged
+        )
+        horizons[bridge.sourceDomain] = horizon
     }
 
     // MARK: - Queries
