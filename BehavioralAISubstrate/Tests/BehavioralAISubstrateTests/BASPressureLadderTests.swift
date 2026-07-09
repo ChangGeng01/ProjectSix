@@ -34,12 +34,12 @@ final class BASPressureLadderTests: XCTestCase {
 
     func testGradualDescentFiresRungsInOrder() {
         var l = ladder()
-        XCTAssertNil(l.advise(headroomBytes: 400), "plenty of headroom must be a no-op")
-        XCTAssertEqual(l.advise(headroomBytes: 140), .parkColdSeats)
-        XCTAssertNil(l.advise(headroomBytes: 130), "rung 1 latched — no refire")
-        XCTAssertEqual(l.advise(headroomBytes: 90), .dropSpecDecoder)
-        XCTAssertEqual(l.advise(headroomBytes: 40), .clearAllSessions)
-        XCTAssertNil(l.advise(headroomBytes: 30), "all latched")
+        XCTAssertNil(l.advise(headroomBytes: 400).fired, "plenty of headroom must be a no-op")
+        XCTAssertEqual(l.advise(headroomBytes: 140).fired, .parkColdSeats)
+        XCTAssertNil(l.advise(headroomBytes: 130).fired, "rung 1 latched — no refire")
+        XCTAssertEqual(l.advise(headroomBytes: 90).fired, .dropSpecDecoder)
+        XCTAssertEqual(l.advise(headroomBytes: 40).fired, .clearAllSessions)
+        XCTAssertNil(l.advise(headroomBytes: 30).fired, "all latched")
         XCTAssertEqual(l.firedHistory, [.parkColdSeats, .dropSpecDecoder, .clearAllSessions])
     }
 
@@ -47,24 +47,37 @@ final class BASPressureLadderTests: XCTestCase {
         var l = ladder()
         // memory falls straight through every threshold — act at the SEVERE rung (its actuator
         // subsumes the milder ones); the milder rungs latch too (no pointless follow-up fires).
-        XCTAssertEqual(l.advise(headroomBytes: 30), .clearAllSessions)
-        XCTAssertNil(l.advise(headroomBytes: 25))
+        XCTAssertEqual(l.advise(headroomBytes: 30).fired, .clearAllSessions)
+        XCTAssertNil(l.advise(headroomBytes: 25).fired)
     }
 
     func testRearmNeedsFullBandAboveThreshold() {
         var l = ladder()
-        XCTAssertEqual(l.advise(headroomBytes: 140), .parkColdSeats)
-        XCTAssertNil(l.advise(headroomBytes: 160), "inside the re-arm band — still latched")
-        XCTAssertNil(l.advise(headroomBytes: 210), "recovery above threshold+band re-arms silently")
-        XCTAssertEqual(l.advise(headroomBytes: 140), .parkColdSeats,
+        XCTAssertEqual(l.advise(headroomBytes: 140).fired, .parkColdSeats)
+        XCTAssertNil(l.advise(headroomBytes: 160).fired, "inside the re-arm band — still latched")
+        XCTAssertNil(l.advise(headroomBytes: 210).fired, "recovery above threshold+band re-arms silently")
+        XCTAssertEqual(l.advise(headroomBytes: 140).fired, .parkColdSeats,
                        "re-armed rung fires again on the next descent")
     }
 
     func testZeroAndNegativeHeadroomClampSafely() {
         var l = ladder()
-        XCTAssertEqual(l.advise(headroomBytes: 0), .clearAllSessions)
+        XCTAssertEqual(l.advise(headroomBytes: 0).fired, .clearAllSessions)
         var l2 = ladder()
-        XCTAssertEqual(l2.advise(headroomBytes: -5), .clearAllSessions)
+        XCTAssertEqual(l2.advise(headroomBytes: -5).fired, .clearAllSessions)
+    }
+
+    // MARK: - audit mlx-adapter-core MED-11 — recovery re-arm is REPORTED (not a ratchet)
+
+    func testRearmEventIsReportedForCacheLimitRestore() {
+        var l = ladder()
+        // Straight collapse latches rung 3 (and the milder rungs).
+        XCTAssertEqual(l.advise(headroomBytes: 30).fired, .clearAllSessions)
+        // Full recovery: headroom rises a band above rung 3's threshold (50) + band (50) = 100.
+        let recovered = l.advise(headroomBytes: 210)
+        XCTAssertNil(recovered.fired, "recovery fires nothing new…")
+        XCTAssertTrue(recovered.rearmed.contains(.clearAllSessions),
+            "…but the rung-3 RE-ARM must be reported so the adapter can RESTORE the clamped cacheLimit")
     }
 
     func testMacWiringIsInert() async {

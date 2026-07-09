@@ -1613,6 +1613,10 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     }
     var pressureLadder: BASPressureLadder? = nil
     var ladderFired: [Int] = []
+    /// audit mlx-adapter-core MED-11 — the cacheLimit in force before rung 3 clamped it to 256MB,
+    /// restored when rung 3 re-arms (nil = not currently clamped). Makes the clamp a two-way
+    /// governor instead of a one-way ratchet.
+    var priorCacheLimitBeforeClamp: Int? = nil
     func pressureLadderTelemetry() -> [Int] { ladderFired }
     func _specDecoderResident() -> Bool { mtpDecoderBox != nil }
     /// Between-turn sample → graduated reclaim. Never called from inside a decode loop.
@@ -1672,7 +1676,17 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             guard let cap = BASMLXMemoryModel.resolvedActiveHardCapBytes() else { return }
             pressureLadder = BASPressureLadder(config: .init(capBytes: cap))
         }
-        guard let rung = pressureLadder!.advise(headroomBytes: headroom) else { return }
+        let advice = pressureLadder!.advise(headroomBytes: headroom)
+        // audit mlx-adapter-core MED-11: rung 3 clamps cacheLimit → 256MB but never restored it —
+        // a one-way ratchet that starved the free-buffer pool for the rest of the process even
+        // after headroom fully recovered. When rung 3 RE-ARMS, restore the limit in force before
+        // the clamp (the rearm event was previously discarded with the rest of `advise`'s return).
+        if advice.rearmed.contains(.clearAllSessions), let prior = priorCacheLimitBeforeClamp {
+            setGPUCacheLimit(bytes: prior)
+            priorCacheLimitBeforeClamp = nil
+            print("📊 pressure-ladder rung=3 REARMED → cacheLimit restored to \(prior / (1024 * 1024))MB")
+        }
+        guard let rung = advice.fired else { return }
         ladderFired.append(rung.rawValue)
         print("📊 pressure-ladder rung=\(rung.rawValue)(\(rung)) headroom=\(headroom / (1024 * 1024))MB")
         // audit mlx-adapter-core MED-6: execute the fired rung's action AND the milder rungs'
@@ -1696,6 +1710,12 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             mtpDecoderBox = nil                          // ~300MB; lazily re-quantized later
         case .clearAllSessions:
             clearAllSessions()                           // survival over warmth
+            // audit mlx-adapter-core MED-11: remember the limit in force so the rung-3 re-arm can
+            // restore it (the clamp is now a two-way governor, not a ratchet).
+            if priorCacheLimitBeforeClamp == nil {
+                priorCacheLimitBeforeClamp = MLXRuntimeConfig.shared.currentCacheLimitBytes
+                    ?? BASMLXMemoryModel.defaultCacheLimitBytes
+            }
             setGPUCacheLimit(bytes: 256 * 1024 * 1024)
         }
     }

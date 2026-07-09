@@ -67,13 +67,25 @@ struct BASPressureLadder: Equatable {
         }
     }
 
-    /// Sample between turns. Returns the DEEPEST newly-crossed rung (worst-first — when memory
-    /// collapses straight through two thresholds, act at the severe one; the milder rung latches
-    /// too, so recovery re-arms them independently). nil = no action.
-    mutating func advise(headroomBytes: Int) -> Rung? {
+    /// The outcome of one between-turn sample (audit mlx-adapter-core MED-11). `fired` is the
+    /// DEEPEST newly-crossed rung (nil = none); `rearmed` lists the rungs that RECOVERED this
+    /// sample (un-latched because headroom rose a full band above their threshold). The rearm
+    /// event was previously discarded (advise returned only `fired`), so a rung whose actuator
+    /// clamped a process-global (rung 3's cacheLimit → 256MB) was never told to RESTORE it —
+    /// a one-way ratchet. The adapter now reads `rearmed` to reverse the clamp on recovery.
+    struct Advice: Equatable {
+        var fired: Rung?
+        var rearmed: [Rung]
+    }
+
+    /// Sample between turns. See `Advice`. When memory collapses straight through two thresholds,
+    /// `fired` is the severe one; the milder rungs latch too (recovery re-arms them independently).
+    mutating func advise(headroomBytes: Int) -> Advice {
         let frac = Double(max(0, headroomBytes)) / Double(config.capBytes)
-        for r in latched where frac > threshold(r) + config.rearmBand {
+        var rearmed: [Rung] = []
+        for r in latched.sorted(by: <) where frac > threshold(r) + config.rearmBand {
             latched.remove(r)
+            rearmed.append(r)
         }
         var fired: Rung? = nil
         for r in Rung.allCases.sorted(by: >) where frac <= threshold(r) && !latched.contains(r) {
@@ -81,6 +93,6 @@ struct BASPressureLadder: Equatable {
             if fired == nil { fired = r }
         }
         if let fired { firedHistory.append(fired) }
-        return fired
+        return Advice(fired: fired, rearmed: rearmed)
     }
 }
