@@ -1302,9 +1302,20 @@ final class BASEnduranceAppController: ObservableObject {
         var thermalFeed: BASThermalTwinFeed?
         if ProcessInfo.processInfo.environment["BAS_DREAM_LOOP"] == "1", let store = memoryStore {
             BASMemorySleepConsolidationPass.sleepConsolidationEnabled = true
-            if let driver = BASSleepConsolidationDriver.makeObservation(store: store) {
+            // audit memory-b F7 / hostkit-rest MED-4: supply the LIVE store's (atomID → tier)
+            // snapshot so the observation reflects the real corpus (was hard-coded empty → the
+            // instrument read a structural constant zero). Enumerates the concrete store's atoms
+            // at each pass; the driver never guesses at corpus shape.
+            let atomTiersProvider: @Sendable () async -> [String: BASMemoryTier] = {
+                let atoms = (try? await store.allAtoms()) ?? []
+                return Dictionary(
+                    atoms.map { ($0.id.uuidString, $0.tier) },
+                    uniquingKeysWith: { first, _ in first })
+            }
+            if let driver = BASSleepConsolidationDriver.makeObservation(
+                store: store, atomTiersProvider: atomTiersProvider) {
                 dreamDriver = driver
-                await emitBoth("📍 ch1025 dream-loop OBSERVATION armed (dryRun=true, three-guard live)")
+                await emitBoth("📍 ch1025 dream-loop OBSERVATION armed (dryRun=true, three-guard live, real atomTiers)")
             } else {
                 await emitBoth("📍 ch1025 dream-loop requested but rust tracker unavailable — OFF")
             }

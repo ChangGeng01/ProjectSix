@@ -93,15 +93,29 @@ public struct BASSleepConsolidationDriver: Sendable {
     /// standard tracker/applier quartet around the host's store, dryRun HARD-CODED true (the doctrine
     /// mandates manual reviewed promotion — this factory can only observe). Hides the
     /// BASRustCoreBridge dependency from app targets. nil = rust tracker unavailable.
+    ///
+    /// audit memory-b F7 / hostkit-rest MED-4: `atomTiersProvider` is now REQUIRED (was hard-coded
+    /// `{ [:] }`). An empty atom-tiers map made the importance scorer iterate nothing, so every
+    /// observation was a structural constant zero — the instrument read blank regardless of the real
+    /// corpus. The caller MUST supply the live store's (atomID → tier) snapshot (e.g. built from a
+    /// concrete store's `allAtoms()`), so the observation reflects the real universe.
+    ///
+    /// HONEST BOUND (not yet closed): the Rust importance/forget half is fed by a usage tracker that
+    /// no retrieval path currently records into (there are no live `recordRetrieval` callers), so
+    /// `rustImportanceScoreCount` stays 0 until retrieval-recording is wired — a separate, larger
+    /// workload. This factory fixes the atom-tiers half (which drives `recommendedTierMoves`); the
+    /// tracker half remains honestly empty rather than presenting 0 as a measurement.
     public static func makeObservation(
-        store: any BASMemoryAtomStore
+        store: any BASMemoryAtomStore,
+        atomTiersProvider:
+            @escaping @Sendable () async -> [String: BASMemoryTier]
     ) -> BASSleepConsolidationDriver? {
         guard let tracker = try? BASRustMemoryUsageTrackerActor(useRustCore: true) else { return nil }
         return BASSleepConsolidationDriver(
             tracker: tracker,
             applier: BASMemoryClosedLoopApplier(store: store, tracker: BASMemoryUsageTracker()),
             store: store,
-            atomTiersProvider: { [:] },
+            atomTiersProvider: atomTiersProvider,
             dryRun: true)
     }
 

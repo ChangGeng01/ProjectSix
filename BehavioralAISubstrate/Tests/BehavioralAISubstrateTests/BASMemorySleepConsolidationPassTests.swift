@@ -131,6 +131,41 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         }
     }
 
+    // MARK: - audit memory-b F7 — a dry-run observation reflects the REAL universe
+    //
+    // Before the fix, a dry-run checkpoint's tier-move surface was structurally empty:
+    // appliedMutations/rejectedMutations are both [:] on a dry-run (nothing is written),
+    // and the scorer's report.mutations (the actual verdict) was dropped — so the
+    // "instrument read a constant zero" regardless of the corpus. recommendedTierMoves
+    // now carries the scorer's verdict on a dry-run, so the observation is informative
+    // WITHOUT writing anything.
+
+    func testDryRunSurfacesRecommendedTierMovesFromRealUniverse() async throws {
+        let fx = try await makeSeededFixture()
+        let pass = makePass(
+            tracker: fx.tracker, applier: fx.applier, store: fx.store)
+        let checkpoint = await pass.run(BASSleepConsolidationRequest(
+            atomTiers: fx.atomTiers,   // a REAL (atomID → .warm) universe
+            now: referenceNow,
+            retainFraction: 0.5,
+            maintenanceClass: .standard,
+            windowMs: 60_000,
+            dryRun: true))
+        // The load-bearing teeth: the scorer's tier-move verdict is surfaced on a dry-run.
+        XCTAssertFalse(checkpoint.recommendedTierMoves.isEmpty,
+            "a dry-run over a populated universe must surface the scorer's tier-move verdict, "
+            + "not a structural zero")
+        // Every recommendation is a genuine MOVE off the seeded .warm tier.
+        for (_, tier) in checkpoint.recommendedTierMoves {
+            XCTAssertNotEqual(tier, .warm, "recommendedTierMoves holds only actual changes")
+        }
+        // Still a proper dry-run — nothing written, hash unmoved.
+        XCTAssertTrue(checkpoint.appliedMutations.isEmpty, "dry-run applies nothing")
+        XCTAssertTrue(checkpoint.quarantinedAtomIDs.isEmpty, "dry-run quarantines nothing")
+        XCTAssertEqual(checkpoint.preChainHash, checkpoint.postChainHash,
+            "dry-run leaves no ledger mark")
+    }
+
     // MARK: - 1+3. Applied pass: quarantine-never-remove + hash moves
 
     func testAppliedPassQuarantinesReversiblyAndMovesChainHash() async throws {
@@ -288,6 +323,26 @@ final class BASMemorySleepConsolidationPassTests: XCTestCase {
         XCTAssertEqual(decoded.preChainHash, checkpoint.preChainHash)
         XCTAssertEqual(decoded.completedStages, checkpoint.completedStages)
         XCTAssertEqual(decoded.dryRun, true)
+        XCTAssertEqual(decoded.recommendedTierMoves, checkpoint.recommendedTierMoves,
+            "new field round-trips")
+    }
+
+    // audit memory-b F7 — byte-stability: a checkpoint LOGGED before recommendedTierMoves
+    // existed omits the key and must still decode (to [:]), not throw.
+    func testCheckpointDecodesLegacyLogMissingRecommendedTierMoves() async throws {
+        let fx = try await makeSeededFixture()
+        let pass = makePass(tracker: fx.tracker, applier: fx.applier, store: fx.store)
+        let checkpoint = await pass.run(BASSleepConsolidationRequest(
+            atomTiers: fx.atomTiers, now: referenceNow,
+            maintenanceClass: .standard, windowMs: 60_000, dryRun: true))
+        var obj = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(checkpoint)) as! [String: Any]
+        obj.removeValue(forKey: "recommendedTierMoves")   // checkpoint logged before the field
+        let legacy = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(BASConsolidationCheckpoint.self, from: legacy)
+        XCTAssertTrue(decoded.recommendedTierMoves.isEmpty,
+            "absent key ⇒ [:] (byte-stable; pre-field checkpoints still decode)")
+        XCTAssertEqual(decoded.dryRun, true, "the rest of the legacy checkpoint decodes intact")
     }
 }
 

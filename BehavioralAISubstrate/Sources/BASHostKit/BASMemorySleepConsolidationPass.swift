@@ -218,6 +218,9 @@ public actor BASMemorySleepConsolidationPass {
         var preChainHash = ""
         var appliedMutations: [String: BASMemoryTier] = [:]
         var rejectedMutations: [String: BASMemoryTier] = [:]
+        // audit memory-b F7 — the scorer's tier-move verdict, captured on BOTH dry-run
+        // and applied passes so a dry-run observation is not structurally empty.
+        var recommendedTierMoves: [String: BASMemoryTier] = [:]
         var rustImportanceScoreCount = 0
         var forgetCandidateIDs: [String] = []
         var quarantinedAtomIDs: [String] = []
@@ -282,6 +285,13 @@ public actor BASMemorySleepConsolidationPass {
                 dryRun: request.dryRun)
             appliedMutations = applyOutcome.appliedMutations
             rejectedMutations = applyOutcome.rejectedMutations
+            // audit memory-b F7: surface the scorer's recommendation regardless of
+            // dryRun — the report is computed either way; a dry-run just doesn't WRITE
+            // it. Without this the dry-run checkpoint dropped the entire verdict.
+            recommendedTierMoves = Dictionary(
+                uniqueKeysWithValues: applyOutcome.report.mutations.map {
+                    ($0.atomID, $0.recommendedTier)
+                })
             completedStages.append(
                 BASConsolidationCheckpoint.Stage.tierApply)
             if windowExhausted() {
@@ -398,6 +408,7 @@ public actor BASMemorySleepConsolidationPass {
             postChainHash: postChainHash,
             appliedMutations: appliedMutations,
             rejectedMutations: rejectedMutations,
+            recommendedTierMoves: recommendedTierMoves,
             forgetCandidateAtomIDs: forgetCandidateIDs,
             quarantinedAtomIDs: quarantinedAtomIDs,
             unjoinedForgetCandidateAtomIDs: unjoinedCandidateIDs,
