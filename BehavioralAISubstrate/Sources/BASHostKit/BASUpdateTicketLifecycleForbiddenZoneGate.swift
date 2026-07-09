@@ -87,6 +87,13 @@ public extension BASUpdateTicketLifecycleCoordinator {
     /// `approveForDistillationWithForbiddenZoneGate` — not at submit.
     ///
     /// Returns the resulting entry's `state`.
+    ///
+    /// audit hostkit-rest MED-2 (count-inflation half) — this used to hardcode `return .proposed`,
+    /// so a re-presented ticket whose ID already existed in a TERMINAL state (`.rejected` /
+    /// `.distilled` / …) still reported `.proposed`. `ingestTicketsWithForbiddenZoneGate` counts a
+    /// `.proposed` result as "accepted", so an already-rejected duplicate inflated the accepted
+    /// count. The fix returns the ACTUAL persisted state (a fresh submit lands in `.proposed`, so
+    /// new tickets are unaffected; a duplicate reports its true state and is no longer miscounted).
     @discardableResult
     func submitWithForbiddenZoneGate(
         _ ticket: BASUpdateTicket,
@@ -105,9 +112,13 @@ public extension BASUpdateTicketLifecycleCoordinator {
         do {
             _ = try await submit(ticket)
         } catch LifecycleError.duplicateTicket {
-            // Idempotent: re-presenting a turn is fine.
+            // Idempotent: re-presenting a turn is fine — but the pre-existing entry's TRUE state
+            // may not be `.proposed` (it could already be `.rejected` / `.trialing` / `.distilled`).
         }
-        return .proposed
+        // Return the ACTUAL persisted state, not a hardcoded `.proposed`, so the ingest count of
+        // "reached .proposed" never counts an already-terminal duplicate as accepted (fail-closed
+        // to `.rejected` on the unreachable no-entry path — duplicateTicket implies the entry exists).
+        return entry(ticketID: ticket.ticketID)?.state ?? .rejected
     }
 
     /// **M457** — forbidden-zone-aware variant of

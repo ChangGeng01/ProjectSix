@@ -207,6 +207,37 @@ final class M457ForbiddenZoneGateLifecycleIntegrationTests: XCTestCase {
                        "in only at trial / promote")
     }
 
+    // MARK: - audit hostkit-rest MED-2: an already-terminal duplicate must not inflate the count
+
+    /// submitWithForbiddenZoneGate used to hardcode `return .proposed`, so re-presenting a ticket
+    /// whose ID is already `.rejected` reported `.proposed` and inflated the ingest "accepted" count.
+    /// It now returns the ACTUAL persisted state.
+    func testResubmitOfRejectedTicketReportsTrueStateNotProposed() async throws {
+        let coord = makeCoordinator()
+        _ = try await coord.submit(makeTicket(id: "tk-1"))
+        try await coord.markRejected(ticketID: "tk-1", reasonCodes: ["sovereign-override"])
+        // Direct: the gate must report the TRUE persisted state for the duplicate, not `.proposed`.
+        let dupState = try await coord.submitWithForbiddenZoneGate(makeTicket(id: "tk-1"), zone: nil)
+        XCTAssertEqual(dupState, .rejected,
+            "a re-presented already-rejected ticket must report its true state, not a hardcoded .proposed")
+        let e1 = await coord.entry(ticketID: "tk-1")
+        XCTAssertEqual(e1?.state, .rejected, "the rejected ticket stays rejected (no state corruption)")
+    }
+
+    /// Count-inflation half: re-ingesting an already-rejected duplicate alongside a fresh ticket must
+    /// count exactly ONE acceptance (the fresh one), not two.
+    func testResubmitOfRejectedTicketIsNotCountedAsAccepted() async throws {
+        let coord = makeCoordinator()
+        _ = try await coord.submit(makeTicket(id: "tk-1"))
+        try await coord.markRejected(ticketID: "tk-1", reasonCodes: ["sovereign-override"])
+        let count = await coord.ingestTicketsWithForbiddenZoneGate(
+            [makeTicket(id: "tk-1"), makeTicket(id: "tk-2")], zone: nil)
+        XCTAssertEqual(count, 1,
+            "already-rejected duplicate must not inflate the accepted count (only fresh tk-2 accepted)")
+        let e2 = await coord.entry(ticketID: "tk-2")
+        XCTAssertEqual(e2?.state, .proposed, "the fresh ticket is genuinely proposed")
+    }
+
     // MARK: - audit M-b (hostkit-rest MED-3): the .promote guardrail (isolation escape)
 
     /// Drive a fresh ticket to `.trialPassed` (the state from which distillation is approved).
