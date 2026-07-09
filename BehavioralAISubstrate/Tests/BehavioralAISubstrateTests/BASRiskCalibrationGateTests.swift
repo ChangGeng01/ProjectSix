@@ -147,6 +147,19 @@ final class BASRiskCalibrationGateTests: XCTestCase {
         XCTAssertEqual(v, "v2.0.0")
     }
 
+    // MARK: - 4b. audit policy-obs-misc LOW-1: v9 → v10 is monotonic (numeric, not lexical)
+
+    func testReplaceAcceptsMultiDigitVersionBump() async throws {
+        let gate = BASRiskCalibrationGate()
+        _ = try await gate.replace(makeBundle(version: "v9.0.0"))
+        // v10 > v9 numerically; the old raw String `>` rejected it ("v10" < "v9" lexically).
+        let v10 = makeBundle(version: "v10.0.0", supersedes: "v9.0.0")
+        let outcome = try await gate.replace(v10)
+        XCTAssertNotNil(outcome)
+        let cur = await gate.currentBundleVersion
+        XCTAssertEqual(cur, "v10.0.0", "a legitimate v9→v10 upgrade must be accepted as monotonic")
+    }
+
     // MARK: - 5. Replace enforces supersedes-chain consistency
 
     func testReplaceEnforcesSupersedesChain() async throws {
