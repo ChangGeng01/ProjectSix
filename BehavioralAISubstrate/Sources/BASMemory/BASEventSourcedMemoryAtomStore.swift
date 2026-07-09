@@ -282,10 +282,15 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
 
     // MARK: - Parity surface (matches BASSQLiteMemoryAtomStore)
 
-    /// Admit a new atom into the store。Returns true if the
-    /// atom was new (event was appended);false if a conflicting
-    /// admission existed and was suppressed by the M942 reducer's
-    /// confidence tiebreak rule。
+    /// Admit a new atom into the store。Returns true if the admit
+    /// event was appended (the normal path);false only if the
+    /// underlying event log reports the event was not new — i.e. its
+    /// eventID already existed (idempotent-retry dedup)。Because each
+    /// admit mints a fresh `UUID().uuidString` eventID, false is
+    /// effectively unreachable in normal use and never signals a
+    /// content/atom conflict。The M942 reducer's confidence tiebreak
+    /// (BASMemoryAtomReducer) runs only inside the projection and does
+    /// not influence this Bool。
     @discardableResult
     public func admit(
         _ atom: BASGovernedMemory
