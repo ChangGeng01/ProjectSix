@@ -254,4 +254,71 @@ final class BASChapter1004TraceStreamingSinkTests: XCTestCase {
         XCTAssertEqual(count, 0,
             "ch 1004: clear() MUST empty the buffer")
     }
+
+    // MARK: - audit orchestration LOW-2: concurrent recordEvent can't interleave the two writes
+
+    func testLOW2_ConcurrentRecordEventsKeepEventLogInTraceOrder() async throws {
+        let traceLog = BASAgentTraceLog()
+        let gated = GatedAppendEventLog()
+        let bridge = BASAgentTraceLogEventLogBridge(
+            traceLog: traceLog, eventLog: gated, sessionID: "low2.test")
+        let e1 = Self.makeEvent(turnID: "T", agentID: "a1")
+        let e2 = Self.makeEvent(turnID: "T", agentID: "a2")
+
+        // A enters recordEvent, holds the lane, and parks inside the FIRST event-log append.
+        let ta = Task { _ = try? await bridge.recordEvent(e1) }
+        await gated.waitUntilParked()
+        // B attempts recordEvent while A holds the lane — with the lane it must wait for A.
+        let tb = Task { _ = try? await bridge.recordEvent(e2) }
+        await Task.yield()
+        await gated.release()
+        _ = await ta.value
+        _ = await tb.value
+
+        // The durable event log's append order must agree with the embedded trace sequence.
+        let ids = await gated.appendedEventIDs()
+        let traceSeqs = ids.map { Int($0.split(separator: ".").last ?? "") ?? -1 }
+        XCTAssertEqual(traceSeqs.count, 2)
+        XCTAssertEqual(traceSeqs, traceSeqs.sorted(),
+            "event-log append order must be monotonic in trace seq — a reentrant interleave inverts it")
+    }
+}
+
+/// Event-log double that parks the FIRST append so the two-write reentrancy window is forced open,
+/// and records the eventIDs in append order.
+private actor GatedAppendEventLog: BASEventLogStorage {
+    private let inner = BASInMemoryEventLogStorage()
+    private var order: [String] = []
+    private var firstParked = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var parkedWaiter: CheckedContinuation<Void, Never>?
+    private var didPark = false
+
+    func append(_ entry: BASEventLogEntry) async throws -> (wasNew: Bool, assignedSequenceNumber: Int64) {
+        if !firstParked {
+            firstParked = true
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                gate = c; didPark = true
+                parkedWaiter?.resume(); parkedWaiter = nil
+            }
+        }
+        order.append(entry.eventID)
+        return try await inner.append(entry)
+    }
+    func events(forSession sessionID: String) async -> [BASEventLogEntry] {
+        await inner.events(forSession: sessionID)
+    }
+    func events(sinceTimestampMs since: Int64, limit: Int) async -> [BASEventLogEntry] {
+        await inner.events(sinceTimestampMs: since, limit: limit)
+    }
+    var totalCount: Int { get async { await inner.totalCount } }
+    func pruneEventsBefore(timestampMs cutoff: Int64) async throws -> Int {
+        try await inner.pruneEventsBefore(timestampMs: cutoff)
+    }
+    func appendedEventIDs() -> [String] { order }
+    func waitUntilParked() async {
+        if didPark { return }
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in parkedWaiter = c }
+    }
+    func release() { gate?.resume(); gate = nil }
 }

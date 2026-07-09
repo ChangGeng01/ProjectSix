@@ -93,6 +93,23 @@ public actor BASAgentTraceLogEventLogBridge {
     private let eventLog: any BASEventLogStorage
     private let sessionID: String
 
+    // audit orchestration LOW-2: recordEvent has TWO suspension points (traceLog.append then
+    // eventLog.append). Without a lane, two reentrant recordEvent calls interleave — A stamps trace
+    // seq N, B stamps seq N+1, then B's event lands BEFORE A's, so the durable event log's append
+    // order disagrees with the embedded trace sequence. This single-lane in-flight gate makes each
+    // recordEvent's two-write critical section complete before the next begins (FIFO by arrival).
+    private var isWriting = false
+    private var writeWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private func acquireWriteLane() async {
+        if !isWriting { isWriting = true; return }
+        await withCheckedContinuation { writeWaiters.append($0) }
+    }
+    private func releaseWriteLane() {
+        if writeWaiters.isEmpty { isWriting = false }
+        else { writeWaiters.removeFirst().resume() }
+    }
+
     public init(
         traceLog: BASAgentTraceLog,
         eventLog: any BASEventLogStorage,
@@ -114,6 +131,10 @@ public actor BASAgentTraceLogEventLogBridge {
         traceSeq: Int64, eventLogResult: (
             wasNew: Bool, assignedSequenceNumber: Int64))
     {
+        // audit orchestration LOW-2: serialize the two-write critical section so a concurrent
+        // recordEvent cannot interleave between the trace-log and event-log appends.
+        await acquireWriteLane()
+        defer { releaseWriteLane() }
         let traceSeq = await traceLog.append(event)
         // Build a stamped event (with assigned seq) for synthesis
         // so the eventID is stable + the timestamp is preserved。
