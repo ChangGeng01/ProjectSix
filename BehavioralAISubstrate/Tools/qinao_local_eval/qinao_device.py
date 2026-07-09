@@ -116,6 +116,31 @@ FINAL avg_iter_ms=5820 p50_iter_ms=5610 p99_iter_ms=6470 mlx_total_inferences=8 
 """
 
 
+# audit x-test-integrity F6: qinao_device emitted NAMED metric keys, but
+# build_verdict looks metrics up by NUMBER (`base.get(str(n))`), so #65/#66/#67/
+# #68/#71 stayed PENDING forever after a device merge. Translate the device
+# metrics to their registry NUMBERS (build_verdict's convention). (The named keys
+# are also whitelisted so they survive as human-readable diagnostics.)
+_DEVICE_NAMED_TO_NUM: dict[str, int] = {
+    "decode_tok_s": 65,      # #65 decode_tok_s
+    "ttft_ms": 66,           # #66 TTFT
+    "prefill_tok_s": 67,     # #67 prefill_tok_s
+    "peak_ram_mb": 68,       # #68 peak_RAM
+    "thermal_drift_pct": 71,  # #71 thermal_drift
+}
+
+
+def to_numeric_device_keys(vals: dict) -> dict:
+    """Return a NEW dict adding a registry-NUMBER key for every recognized device
+    metric (build_verdict's lookup convention), preserving the named diagnostics.
+    Unmapped keys (turn_p50_ms, latency_p50_ms, …) stay as named diagnostics."""
+    out = dict(vals)
+    for name, num in _DEVICE_NAMED_TO_NUM.items():
+        if name in vals:
+            out[str(num)] = vals[name]
+    return out
+
+
 def main() -> None:
     if "--selftest" in sys.argv:
         vals = parse(SELFTEST_LOG)
@@ -137,7 +162,7 @@ def main() -> None:
     log_path = sys.argv[1]
     tag = sys.argv[sys.argv.index("--tag") + 1] if "--tag" in sys.argv else "device"
     text = open(log_path, errors="replace").read()
-    vals = parse(text)
+    vals = to_numeric_device_keys(parse(text))
     if not vals:
         print("no 📊/FINAL lines recognized — is this an endurance-runner log?")
         sys.exit(1)
