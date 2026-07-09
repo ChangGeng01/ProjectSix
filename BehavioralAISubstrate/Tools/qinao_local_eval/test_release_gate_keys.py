@@ -26,3 +26,16 @@ def test_authored_gate_keys_includes_the_real_mixed_case_key():
     keys = rg.authored_gate_keys()
     assert "permit_escalation_never_loosen_realFold" in keys, \
         "the mixed-case gate key must be discovered whole, not truncated"
+
+
+def test_f10_deferred_substrate_holds_exactly_the_two_unauthorable_gates():
+    # audit x-test-integrity F10: the docstring's stale "4 gates … #97/#98 scripts absent" was
+    # corrected to 2 — DEFERRED_SUBSTRATE must hold exactly #19 (coreai device) + #99 (CI invariant),
+    # NOT the schema-parity gates, which now have tests and are counted.
+    assert set(rg.DEFERRED_SUBSTRATE) == {
+        "coreai_ane_conversion_fidelity", "authoritative_test_suite_pass"
+    }, "DEFERRED_SUBSTRATE drifted — reconcile the docstring count too"
+    assert not any("schema" in k for k in rg.DEFERRED_SUBSTRATE), \
+        "#97/#98 schema-parity gates must NOT be deferred (they now have tests)"
+    # The docstring must say "2 substrate CRITICAL gates", matching the dict.
+    assert "2 substrate\nCRITICAL gates" in rg.__doc__ or "2 substrate CRITICAL gates" in rg.__doc__.replace("\n", " ")

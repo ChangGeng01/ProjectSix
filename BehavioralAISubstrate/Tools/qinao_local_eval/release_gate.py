@@ -9,10 +9,13 @@ Rolls the two QINAO halves into one release decision:
            AND contamination_clean               # train/eval contamination probe clean
 
 The substrate half is read from a `swift test --filter QINAO` log (env SUBSTRATE_LOG or
-the first CLI arg); if none is given the script runs the suite itself. The 4 substrate
-CRITICAL gates that are NOT host-unit-authorable (#19 coreai device, #97/#98 schema-parity
-scripts absent, #99 = the CI command itself) are reported as DEFERRED with their reason —
-they are never silently counted as PASS.
+the first CLI arg); if none is given the script runs the suite itself. The 2 substrate
+CRITICAL gates that are NOT host-unit-authorable (#19 coreai device, #99 = the CI command
+itself) are reported as DEFERRED with their reason — they are never silently counted as PASS.
+(audit x-test-integrity F10: the #97/#98 schema-parity gates now HAVE tests —
+QINAOSchemaGovernanceParityGateTests + BASEBrainSchemaGovernanceRegistryTests — and are
+counted, so the old "4 gates … #97/#98 scripts absent" line was stale; DEFERRED_SUBSTRATE below
+holds exactly these 2.)
 
 Usage:
   python release_gate.py [substrate_log_path]
