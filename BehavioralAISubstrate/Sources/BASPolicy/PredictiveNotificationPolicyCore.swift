@@ -204,8 +204,23 @@ public enum BASPredictiveNotificationPolicyEngine {
         input: BASPredictiveNotificationPolicyInput,
         calendar: Calendar
     ) -> Bool {
-        let hour = calendar.component(.hour, from: input.now)
-        return hour >= input.quietHoursStartHour || hour < input.quietHoursEndHour
+        isHourInQuietWindow(
+            hour: calendar.component(.hour, from: input.now),
+            start: input.quietHoursStartHour,
+            end: input.quietHoursEndHour)
+    }
+
+    /// audit policy-obs-misc MED-4: quiet-hours window membership. The old
+    /// formula `hour >= start || hour < end` expressed ONLY a cross-midnight
+    /// window — so a same-day window (start<end) silenced almost every hour, and
+    /// start==end silenced a FULL 24h. Now all three cases are correct:
+    ///   * start == end ⇒ empty window, NEVER quiet (was: 24h silent)
+    ///   * start <  end ⇒ same-day window [start, end)
+    ///   * start >  end ⇒ cross-midnight window (hour >= start OR hour < end)
+    static func isHourInQuietWindow(hour: Int, start: Int, end: Int) -> Bool {
+        if start == end { return false }
+        if start < end { return hour >= start && hour < end }
+        return hour >= start || hour < end
     }
 
     private static func deliveredTriggerCount(
