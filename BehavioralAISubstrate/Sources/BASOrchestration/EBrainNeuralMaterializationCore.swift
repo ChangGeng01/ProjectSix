@@ -301,26 +301,25 @@ public enum BASNeuralMaterializationCompiler {
             let scores: [Double] = thoughtFrame.candidates.map {
                 Self.candidateDominanceScore($0)
             }
-            if let indices = BASAutoRouteRanker
-                .dreamLoopDominanceOrderDouble(scores: scores) {
-                return indices.map { idx -> String in
-                    let i = Int(idx)
-                    precondition(i >= 0
-                        && i < thoughtFrame.candidates.count,
-                        "Rust dominance_order_f64 returned " +
-                        "out-of-bounds index \(i) for n=" +
-                        "\(thoughtFrame.candidates.count)")
-                    return thoughtFrame.candidates[i].candidateID
-                }
+            // Swift legacy fallback (V1 implementation, kept active per 「依旧 不删除 只 comment」
+            // + cross-platform safety) — also the fail-safe when Rust returns a bad permutation.
+            let swiftFallback: () -> [String] = {
+                thoughtFrame.candidates
+                    .sorted { Self.candidateDominanceScore($0) > Self.candidateDominanceScore($1) }
+                    .map(\.candidateID)
             }
-            // Swift legacy fallback (V1 implementation,kept active
-            // per 「依旧 不删除 只 comment」 + cross-platform safety)
-            return thoughtFrame.candidates
-                .sorted { lhs, rhs in
-                    Self.candidateDominanceScore(lhs)
-                        > Self.candidateDominanceScore(rhs)
-                }
-                .map(\.candidateID)
+            // audit orchestration MED-2: the Rust index list must be a VALID PERMUTATION of
+            // 0..<n (all in bounds, no duplicates, complete). An out-of-bounds index used to
+            // `precondition`-ABORT the whole process (a caller could feed a crash); a repeated
+            // index would silently drop/duplicate a candidateID. Fail-SAFE to the deterministic
+            // Swift sort instead. Mirrors the sibling fix at BASMLMemoryService (13a7e5b66).
+            guard let indices = BASAutoRouteRanker
+                    .dreamLoopDominanceOrderDouble(scores: scores),
+                  Self.isValidDominancePermutation(indices, count: thoughtFrame.candidates.count)
+            else {
+                return swiftFallback()
+            }
+            return indices.map { thoughtFrame.candidates[Int($0)].candidateID }
         }()
         // audit orchestration HIGH-1: single source of truth for the bands (was 0.6, drifting from
         // the adapter's 0.7). guardPaths = safe-retreat fallbacks (high reversibility) OR an explicit
@@ -843,6 +842,21 @@ public enum BASNeuralMaterializationCompiler {
             + (candidate.reversibility * 0.30)
             + (candidate.confidence * 0.20)
             - (candidate.expectedCost * 0.25)
+    }
+
+    /// audit orchestration MED-2 — a Rust dominance-order result is only usable if it is a VALID
+    /// PERMUTATION of `0..<count`: exactly `count` indices, every one in bounds, none repeated.
+    /// Anything else (out-of-bounds → would crash the array subscript / repeated → would drop or
+    /// duplicate a candidate) means fail-safe to the Swift sort. Pure + Mac-testable.
+    static func isValidDominancePermutation(_ indices: [Int32], count: Int) -> Bool {
+        guard indices.count == count else { return false }
+        var seen = Set<Int>()
+        seen.reserveCapacity(count)
+        for idx in indices {
+            let i = Int(idx)
+            guard i >= 0, i < count, seen.insert(i).inserted else { return false }
+        }
+        return true
     }
 
     private static func containsGuardLexicon(
