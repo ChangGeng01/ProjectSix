@@ -26,11 +26,15 @@ final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
     /// silent drift. Lowering it (un-gating) is always welcome and never blocks.
     private static let ceiling = 161
 
-    /// This file's own basename — excluded from the count (it is gated but is the
-    /// tripwire itself, not a shrinkage of behavioral coverage).
-    private var selfBasename: String {
-        URL(fileURLWithPath: #filePath).lastPathComponent
-    }
+    /// Source-scanning LINT infrastructure — gated `#if !os(iOS)` because it reads the Mac dev-tree
+    /// via `#filePath` (absent in the iOS sandbox), NOT because it covers Mac-only runtime behavior.
+    /// These carry ZERO behavioral coverage that the device bundle loses, so they are excluded from
+    /// the shrinkage count (same rationale by which the tripwire excludes itself). Adding a new
+    /// source-tree lint here is not a device-coverage shrinkage.
+    private static let lintInfrastructure: Set<String> = [
+        "BASIOSGatedTestBundleCeilingTripwireTests.swift",  // this tripwire
+        "BASTautologyBudgetLintTests.swift",                // audit tests-arch ②b ratchet-lint
+    ]
 
     private var testsDir: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -48,7 +52,7 @@ final class BASIOSGatedTestBundleCeilingTripwireTests: XCTestCase {
         var gated: [String] = []
         for case let url as URL in enumerator where url.pathExtension == "swift" {
             let name = url.lastPathComponent
-            if name == selfBasename { continue }
+            if Self.lintInfrastructure.contains(name) { continue }
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
             let isGated = text.split(separator: "\n", omittingEmptySubsequences: false)
                 .contains { $0.hasPrefix("#if !os(iOS)") }
