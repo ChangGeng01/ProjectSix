@@ -274,7 +274,25 @@ public actor BASSovereignVerdictEngine {
     /// ⚰️ P4 墓碑注 (RSI 章程 2026-07-07):本计数器现无生产读者(审计读者1实锤)——
     /// 保留原因:reason code 已随裁决走(可解释性②的真载体),计数器是廉价的进程级
     /// 聚合备胎,等 P3 测量站晨读或 R1 收据决议后自然获得读者。勿因零读者删除。
-    public nonisolated(unsafe) static var routedDivergenceCount = 0
+    ///
+    /// audit x-concurrency MED-5 (2026-07-09): `verdict(...)` can run concurrently
+    /// across isolation domains, so the old `nonisolated(unsafe) static var` + a
+    /// non-atomic `+= 1` was a lost-update data race on the very ">0 = investigate"
+    /// interpretability signal — silently UNDER-counting real divergences. All
+    /// access is now lock-guarded; the public read API is preserved.
+    private static let _divergenceLock = NSLock()
+    nonisolated(unsafe) private static var _routedDivergenceCount = 0
+    public static var routedDivergenceCount: Int {
+        _divergenceLock.lock(); defer { _divergenceLock.unlock() }
+        return _routedDivergenceCount
+    }
+    static func _incrementRoutedDivergence() {
+        _divergenceLock.lock(); _routedDivergenceCount += 1; _divergenceLock.unlock()
+    }
+    /// Test-only reset for isolation (no production caller mutates the counter).
+    static func _resetRoutedDivergenceForTesting() {
+        _divergenceLock.lock(); _routedDivergenceCount = 0; _divergenceLock.unlock()
+    }
     /// Pure floor application: returns the effective level plus the divergence record when the
     /// Swift floor EXCEEDED the routed level. Host-unit-testable without the Rust FFI.
     static func applyHitsFloor(
@@ -353,7 +371,7 @@ public actor BASSovereignVerdictEngine {
             // counter — the one dark spot that could silently corrupt the core dispose logic.
             (level, routedDivergence) = Self.applyHitsFloor(routed: routedLevel, floors: hits.map { $0.minLevel })
             if let d = routedDivergence {
-                Self.routedDivergenceCount += 1
+                Self._incrementRoutedDivergence()   // audit x-concurrency MED-5: atomic (lock-guarded)
                 print("⚠️ [verdict] ROUTED-DIVERGENCE rust=\(d.rustLevel) swiftFloor=\(d.swiftFloor) — Swift floor wins (fail-safe)")
             }
             // audit M-d MED-4: re-apply the Swift Stage-3 evidence floor over the routed level too.
