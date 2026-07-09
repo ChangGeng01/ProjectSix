@@ -52,4 +52,14 @@ final class BASSessionLaneTests: XCTestCase {
     func testBothLanesOffPools() {
         XCTAssertEqual(lane(fused: false, capped: false), .pooled)
     }
+
+    // audit mlx-adapter-core LOW-15: BAS_MAX_LIVE_SESSIONS must clamp to a floor of 1 — a 0/negative
+    // value would make _evictBeyondCap thrash (evict-everything / never-satisfiable cap).
+    func testMaxLiveSessionsClampsToFloorOfOne() {
+        XCTAssertEqual(MLXOrganAdapter.clampedMaxLiveSessions("0"), 1, "0 must clamp to 1")
+        XCTAssertEqual(MLXOrganAdapter.clampedMaxLiveSessions("-5"), 1, "negative must clamp to 1")
+        XCTAssertEqual(MLXOrganAdapter.clampedMaxLiveSessions("8"), 8, "a valid value passes through")
+        XCTAssertEqual(MLXOrganAdapter.clampedMaxLiveSessions(nil), 16, "unset ⇒ default 16")
+        XCTAssertEqual(MLXOrganAdapter.clampedMaxLiveSessions("nope"), 16, "non-numeric ⇒ default 16")
+    }
 }

@@ -344,8 +344,15 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// precedent; per-session KV for turn-shaped seat traffic is ~4-8MB — 16 sessions ≈ well under the
     /// dual-residency budget's slack.
     private var sessionLRU: [String] = []
-    static let maxLiveSessions =
-        Int(ProcessInfo.processInfo.environment["BAS_MAX_LIVE_SESSIONS"] ?? "") ?? 16
+    static let maxLiveSessions = MLXOrganAdapter.clampedMaxLiveSessions(
+        ProcessInfo.processInfo.environment["BAS_MAX_LIVE_SESSIONS"])
+
+    /// audit mlx-adapter-core LOW-15: `Int(env) ?? 16` accepted 0 or a negative value, which makes
+    /// `_evictBeyondCap` thrash (a cap ≤ 0 evicts every session on each insert / can never be
+    /// satisfied). Clamp to a floor of 1 live session.
+    static func clampedMaxLiveSessions(_ raw: String?) -> Int {
+        max(1, Int(raw ?? "") ?? 16)
+    }
 
     /// 会话→加速lane (P2 gap #3, device-measured crossover 2026-07-04): greedy seat turns with SHORT
     /// histories run the STATELESS fused-MTP path (re-prefill whole conversation + 30 tok/s decode) —

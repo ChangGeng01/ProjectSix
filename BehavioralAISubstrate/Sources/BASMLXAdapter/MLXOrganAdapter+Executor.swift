@@ -65,8 +65,17 @@ extension MLXOrganAdapter {
 
         case .draftModelSpec:
             // `_draftSpeculative` uses the adapter's configured `numDraftTokens`; the strategy's K is advisory.
-            return _finish(try await _draftSpeculative(request), planned: strategy,
-                           context: context, request: request)
+            // audit mlx-adapter-core LOW-13: fail-close to plain on error, matching every other fallible
+            // arm — greedy speculation is token-identical to target-only decode, so plain is a byte-safe
+            // fallback and the failure is logged (never silent).
+            do {
+                return _finish(try await _draftSpeculative(request), planned: strategy,
+                               context: context, request: request)
+            } catch {
+                print("[draft-model-spec] lane fail-closed to plain: \(error)")
+                return _finish(try await _plainDraft(request), planned: strategy,
+                               context: context, request: request, failClose: "\(error)")
+            }
 
         case .mtpSpecSampling:
             do {
