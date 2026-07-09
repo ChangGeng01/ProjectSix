@@ -1167,6 +1167,13 @@
    ],
    "runtimecore-b (2/4)": [
     "#7 decode rebases non-zero-based Data slice + #9 tribunal empty-input baseAddress guard 718300892"
+   ],
+   "x-architecture (2 of 5)": [
+    "LOW-7 boundary completeness gate + BASAdminUI/BASJournalCLI classified + LOW-8 stale god-file pins c206340f9"
+   ],
+   "x-test-integrity (2 of 3)": [
+    "F10 release_gate deferred-gate docstring reconciled 0a1fe2c1a",
+    "F9 arc-seal comment-not-delete permatrue → compile-time ref pin 6484b113b"
    ]
   },
   "deferred_with_reason": {
@@ -1178,8 +1185,11 @@
    ],
    "ALREADY_CLOSED": [
     "hostkit-rest LOW-5 = TrainingDataExporter atomic-rename c6fd1ebee"
-   ]
+   ],
+   "x-architecture manifest/deletion": "LOW-4 (add mlx-swift direct dep) + LOW-5 (remove phantom Package.swift edges) need xcodebuild build-for-testing verification per standing rule (swift-build-masks-xcodebuild trap + DerivedData contention); LOW-6 (git mv 4 dead-code files to Archive) is deletion-class = operator-gated. All 3 flagged for operator.",
+   "x-test-integrity F8": "#95 determinism gate letter→byte-identical = release-gate STRICTNESS change (operator eval domain, needs sign-off) + teeth blocked by un-importable model imports"
   },
-  "remaining_open": "~44 LOW: runtimecore-a(#7 MED)/runtimecore-b(#8/#10 SQLite)/x-architecture(5)/x-test-integrity(3)/x-concurrency(2)/organ-eval(3)/mlx-decode(2)/mlx-adapter-core(4)/hostkit-rest(3)/hostkit-spine(4)/rust(3)/metal(1)/sovereign(1)/x-sovereignty(1)/devicetestapp(7 device-gated)"
+  "remaining_open": "~44 LOW: runtimecore-a(#7 MED)/runtimecore-b(#8/#10 SQLite)/x-architecture(5)/x-test-integrity(3)/x-concurrency(2)/organ-eval(3)/mlx-decode(2)/mlx-adapter-core(4)/hostkit-rest(3)/hostkit-spine(4)/rust(3)/metal(1)/sovereign(1)/x-sovereignty(1)/devicetestapp(7 device-gated)",
+  "closed_count": "28 LOW + 6 MED (tranche-3) this campaign"
  }
 }
