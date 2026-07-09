@@ -109,6 +109,16 @@ public actor BASSQLiteKnowledgeGraphStorage {
     public let databaseURL: URL
     private nonisolated(unsafe) var db: OpaquePointer?
 
+    /// audit runtimecore-b MED-3 — surfaced when a bulk READ (allNodes/allEdges) errors on a BUSY
+    /// or corrupt DB. The non-throwing accessors return [] on error, which is indistinguishable
+    /// from a genuinely-empty graph (silent fail-open — a stale/locked read looked like "no graph").
+    /// A host wires this to observe the real error; the *OrThrow siblings surface it directly.
+    /// nil ⇒ unobserved (default).
+    public var onSilentFailure: (@Sendable (Error) -> Void)?
+    public func setOnSilentFailure(_ handler: (@Sendable (Error) -> Void)?) {
+        self.onSilentFailure = handler
+    }
+
     // MARK: - Lifecycle
 
     public init(databaseURL: URL) throws {
@@ -134,6 +144,9 @@ public actor BASSQLiteKnowledgeGraphStorage {
         // reads' `(try? fetchAll) ?? []` mistake corruption for empty. Default-on, fail-closed.
         try BASSQLiteIntegrity.assertOK(db: handle, store: "knowledge-graph")
 
+        // audit runtimecore-b MED-3: wait up to 5s on a locked DB (checkpoint/reader collision)
+        // instead of immediately erroring → far fewer transient busy-errors on the read paths.
+        try Self.runExec(db: handle, sql: "PRAGMA busy_timeout=5000;")
         try Self.runExec(
             db: handle, sql: "PRAGMA journal_mode=WAL;")
         // #16 删除教义 (mega-audit, 2026-07-08): secure_delete default-on (kill-switch BAS_SECURE_DELETE=0).
@@ -247,7 +260,18 @@ public actor BASSQLiteKnowledgeGraphStorage {
     /// stable preload sequence。
     public func allNodes() async -> [BASKnowledgeNode] {
         guard let db else { return [] }
-        return (try? Self.fetchAllNodes(db: db)) ?? []
+        // audit runtimecore-b MED-3: surface a busy/corrupt read error, don't fail-open to [].
+        do { return try Self.fetchAllNodes(db: db) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 — throwing sibling of `allNodes`: surfaces a SQLite error instead of returning [],
+    /// so a caller can distinguish "empty graph" from "DB busy/broken" (audit runtimecore-b MED-3).
+    public func allNodesOrThrow() async throws -> [BASKnowledgeNode] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchAllNodes(db: db)
     }
 
     /// Remove a node + all incident edges。Returns true if a
@@ -358,7 +382,17 @@ public actor BASSQLiteKnowledgeGraphStorage {
     /// Bulk-fetch all edges ordered by createdAtMs ASC。
     public func allEdges() async -> [BASKnowledgeEdge] {
         guard let db else { return [] }
-        return (try? Self.fetchAllEdges(db: db)) ?? []
+        // audit runtimecore-b MED-3: surface a busy/corrupt read error, don't fail-open to [].
+        do { return try Self.fetchAllEdges(db: db) }
+        catch { onSilentFailure?(error); return [] }
+    }
+
+    /// 先稳 — throwing sibling of `allEdges` (audit runtimecore-b MED-3).
+    public func allEdgesOrThrow() async throws -> [BASKnowledgeEdge] {
+        guard let db else {
+            throw StorageError.openFailed(code: -1, message: "db handle unavailable")
+        }
+        return try Self.fetchAllEdges(db: db)
     }
 
     @discardableResult
