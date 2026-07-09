@@ -333,8 +333,9 @@
     {
       "med_id": "orchestration MED-3",
       "title": "Forbidden-zone gate fail-open: empty releaseConditions promotes a quarantined candidate (BASForbiddenCandidateZoneGate.swift:183-195; BASAbyssalLayerNaming.swift:307)",
-      "disposition": "open",
-      "detail": "Referenced in §0 line 15 as a named systemic fail-open exemplar but NEVER folded into an M-theme and never remediated. git log on BASForbiddenCandidateZoneGate.swift/BASAbyssalLayerNaming.swift shows only pre-audit commits (M444/M440); the H19 fix fail-closed a SIBLING gate (PolicyCore.decide) but not this one. Blocker: latent — audit found only test-side zone constructors (no production constructor), so deprioritized rather than fixed; safe-direction should be fail-closed. Still live-risk if any production zone producer lands."
+      "disposition": "closed",
+      "detail": "Referenced in §0 line 15 as a named systemic fail-open exemplar but NEVER folded into an M-theme and never remediated. git log on BASForbiddenCandidateZoneGate.swift/BASAbyssalLayerNaming.swift shows only pre-audit commits (M444/M440); the H19 fix fail-closed a SIBLING gate (PolicyCore.decide) but not this one. Blocker: latent — audit found only test-side zone constructors (no production constructor), so deprioritized rather than fixed; safe-direction should be fail-closed. Still live-risk if any production zone producer lands.",
+      "remediation": "commit e187d350c (2026-07-09 tracked-open re-exam — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "orchestration MED-4",
@@ -382,8 +383,9 @@
     {
       "med_id": "policy-obs-misc MED-2",
       "title": "risk-observation SQL persistence: event_id ms-collision silent row-drop + 'production wired' actually never wired (BASRiskObservationLedger+RoutedStorage.swift:150-159, 82-91, 54-55)",
-      "disposition": "open",
-      "detail": "Only the corrupt-as-empty half (shared with LOW-2) was closed: commit af4b38b9f (M-c) added a PRAGMA integrity_check open-gate to BASRiskObservationsSQLiteStorage.swift. But the MED-2 core is UNTOUCHED — af4b38b9f does not touch BASRiskObservationLedger+RoutedStorage.swift at all. deriveEventID (ON CONFLICT DO NOTHING ms-collision silent drop) and persistToSharedStorage (record() never calls it — the ch754 'production seam' claim) show only pre-audit commits (a97400bb7, 5b3c17f93). Blocker: event_id derivation + production wiring remain unremediated."
+      "disposition": "closed",
+      "detail": "Only the corrupt-as-empty half (shared with LOW-2) was closed: commit af4b38b9f (M-c) added a PRAGMA integrity_check open-gate to BASRiskObservationsSQLiteStorage.swift. But the MED-2 core is UNTOUCHED — af4b38b9f does not touch BASRiskObservationLedger+RoutedStorage.swift at all. deriveEventID (ON CONFLICT DO NOTHING ms-collision silent drop) and persistToSharedStorage (record() never calls it — the ch754 'production seam' claim) show only pre-audit commits (a97400bb7, 5b3c17f93). Blocker: event_id derivation + production wiring remain unremediated.",
+      "remediation": "commit c523ed324 (2026-07-09 tracked-open re-exam — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "policy-obs-misc MED-3",
@@ -575,8 +577,9 @@
     {
       "med_id": "x-concurrency MED-9",
       "title": "Biomimetic GPU organ cross-await lost update: concurrent applyGPU both copy same weights baseline into GPU buffer, await returns and overwrites whole → W0+d2 not W0+d1+d2 (one plasticity update silently lost); Mamba hiddenState same (BASPlasticityFold.swift:680, BASMambaSSMState.swift:635)",
-      "disposition": "open",
-      "detail": "Blocker: experiment-domain. Named in §3 M-l (line 138) but NO closure commit addresses it — M-l's fix commits cover MED-4/6/8 + metal#3/#4 + orch, not the biomimetic cross-await lost-update. The only post-audit touch to these files is 3cb95a156, which fixed the DIFFERENT H3 bug (addCompletedHandler-before-commit at lines 660-661/615-616, a Mac-false-green hang), not the reentrancy lost-update at line 680. Auditor itself flagged these as probe/experiment-wired ('入produ前必须加 in-flight 防重入'), so real harm is low; fold declared closed in §11 without a dedicated fix."
+      "disposition": "closed",
+      "detail": "Blocker: experiment-domain. Named in §3 M-l (line 138) but NO closure commit addresses it — M-l's fix commits cover MED-4/6/8 + metal#3/#4 + orch, not the biomimetic cross-await lost-update. The only post-audit touch to these files is 3cb95a156, which fixed the DIFFERENT H3 bug (addCompletedHandler-before-commit at lines 660-661/615-616, a Mac-false-green hang), not the reentrancy lost-update at line 680. Auditor itself flagged these as probe/experiment-wired ('入produ前必须加 in-flight 防重入'), so real harm is low; fold declared closed in §11 without a dedicated fix.",
+      "remediation": "commit 917e6452e (2026-07-09 tracked-open re-exam — TDD + adversarial reversal-must-red + regression + push)"
     },
     {
       "med_id": "x-concurrency MED-LOW-10",
@@ -688,5 +691,17 @@
     "final_tally": "37 unaccounted = 32 closed + 2 not-reproduced/refuted (memory-b F5, hostkit-spine F3) + 3 honest residuals (mlx MED-8 deferred, devicetestapp MED-9 + x-conc MED-LOW-10 device-only)",
     "lesson": "\"device/runtime-gated\" conflated \"symptom manifests on device\" with \"fix cannot be written/tested on Mac\". 10 of 13 had a pure-Swift core (a constant reconciliation, a self-defeating clamp, a model-id binding, a persistence horizon, a command-buffer budget, a subsume relation, a rearm-report, a load single-flight, a drop-epoch, an O(1) count). The adversarial-verify layer kept the honest negatives honest (2 confirmed device-only, 1 deferred).",
     "swift_build": "green; 53 tests across touched modules green"
+  },
+  "tracked_open_reexam_2026_07_09": {
+    "method": "ultracode workflow (6-agent analyze→adversarial-verify) on the 4 tracked-open-with-blocker items; the verifier OVERTURNED the analysis on x-concurrency MED-9 (pure actor-reentrancy lost-update, not GPU-runtime)",
+    "closed": [
+      "orchestration MED-3",
+      "policy-obs-misc MED-2",
+      "x-concurrency MED-9"
+    ],
+    "operator_gated": {
+      "tools-scripts MED (R2/R3 /tmp corpus)": "experiment-domain, operator-gated: move R2/R3 frozen corpus + sha pins from /tmp to Docs/evidence/. Involves moving files (deletion-aversion hard rule) and is the operator experiment-domain per §11 line 501 — NOT touched."
+    },
+    "final_tally": "4 tracked-open = 3 closed (orchestration MED-3 fail-closed, policy-obs-misc MED-2 eventID+comment-lie, x-concurrency MED-9 apply/scan mutex) + 1 operator-gated (tools R2/R3 corpus move)"
   }
 }
