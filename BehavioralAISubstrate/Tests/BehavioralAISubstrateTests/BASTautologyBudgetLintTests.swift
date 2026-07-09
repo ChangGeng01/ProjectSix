@@ -15,8 +15,9 @@ import XCTest
 final class BASTautologyBudgetLintTests: XCTestCase {
 
     /// The pinned ceiling. LOWER this (never silently raise it) as tautologies are converted.
-    /// 2026-07-10: 50 → 47 (3 signature-freeze sites converted to the M824 compile-time-proof idiom).
-    private static let budget = 47
+    /// 2026-07-10: 50 → 47 (3 signature-freeze sites converted to the M824 compile-time-proof idiom)
+    ///           → 46 (audit x-test-integrity F9: arc-seal comment-not-delete pin → compile-time ref).
+    private static let budget = 46
 
     private func testsDir() -> URL {
         // #filePath = <repo>/Tests/BehavioralAISubstrateTests/<thisfile>.swift
