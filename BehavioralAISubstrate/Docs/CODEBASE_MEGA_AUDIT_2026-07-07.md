@@ -478,8 +478,24 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 ★MED 教训:(a)**fail-open 缺省是 MED 最常见形**(never_worse=True、isUnderPressure 用错分母、AUC 并列偏、SURVIVED 恒印)——修=fail-closed 缺省 + 缺席即红;(b)**纯函数抽取换 teeth**:GPU/模型/设备内联逻辑(pressure 比、probe budget、AUC)抽纯函数才可确定性单测;(c)**竞态 teeth 可靠红**:M-l detached 播种反转 5/5 红(非 flaky——detached 确定性输给即返);(d)**模块图卫生**用源树扫描守卫(SwiftUI-free)+ 正控防误抽。
 
 **诚实账——未闭项(须真机/操作员域)**:
-- **device-gated 5+2**(含 x-sov #5/#6 Data Protection——iOS 锁屏真机才现,macOS `.protectionKey` 不支持)。
+- ~~**device-gated 5+2**(含 x-sov #5/#6 Data Protection)~~ → **§11 收口**。⚠️修正:原注"macOS `.protectionKey` 不支持"**不准**——经验证 macOS **存储且读回** `.protectionKey`(设 `.complete` 读回 `.complete`;仅 `.none` 被地板回默认),只是 at-rest **加密**惰性(macOS 用 FileVault)。故代码路径 mac 可测,只有"锁屏前不可读"须真机。
 - **b2 /tmp→Docs/evidence 冻结**——实验 I/O 布局,操作员域(改默认路径可能断上游管线)。
 - **M-e #4 / device-gated 的完全删除项**(如 bas_thermal_probe 整函数 git-mv 移除、x-arch MED-1 生产者范畴错误)——删除类/真机验须操作员亲裁。
 
 **★ 架构 3 条闭合后:mega-audit 的 1 CRITICAL + 23 HIGH + 全部 MED(fix-now/xcframework/architecture)全闭。** 剩仅 device-gated(真机)+ b2-evidence(操作员实验域)两类,皆非"不惊动操作员、不用硬件可安全自主"的项。
+
+## §11 device-gated 收口(2026-07-09,操作员"device-gated 5+2 也修了")
+
+先清点:x-sov #2(Ed25519 `…ThisDeviceOnly`)、M-h dream-loop H7 守卫、M-i/M1 SURVIVED 谎(MED-7)三项**盘查发现已闭**(分别 line 142-144 / 既有 inline / commit dd3736ed2)。余下逐条实现:
+
+| 项 | 病灶 | 修 | teeth(诚实等级) | commit |
+|---|---|---|---|---|
+| **x-sov #5** | 记忆原子库(最高敏落盘点,payload_json 含 `sensitivity` 列)无 file Data Protection,与"缝2"KV 快照同库双标 | 新 `BASSQLiteFileProtection`(BASRuntimeCore):DB+`-wal`/`-shm` 钉 `completeUntilFirstUserAuthentication`,DEFAULT-ON+kill-switch `BAS_FILE_PROTECTION=0`,**返错不吞**;atom store open 后(WAL+seed 后 sidecar 已在)apply,经 `fileProtectionError` 面 | **mac 可判**(反转earned):裸"读回 X"是 FALSE-GREEN(macOS 新文件默认已 cUFUA)→改**预设 `.complete` 证 helper 翻转**;反转跳 setAttributes→2 断言红。at-rest 锁屏前不可读=真机 | 6c600c0c1 |
+| **x-sov #6** | SessionPersist KV 保护 `try?` 吞 setAttributes 错 + 写后补设窗 | 路由到共享 helper(同类+kill-switch+sidecar);错经 `_sessionProtectionFailureHook` **surface**(去 `#if os(iOS)` 令 mac 可测) | 同上(helper teeth 共用) | 6c600c0c1 |
+| **M-i MED-2** | `runSamplingVerify` 两裸 `Task.sleep(30s)` 臂间冷却=锁屏冻结坑(devicectl app 锁屏挂起→夜跑搁浅) | 共享 `idleGuardedSleep`(BASProbeCommon)认同 endurance 同款 `BAS_COOLDOWN_SPIN=1`:同步 ~1 e-core 转,GPU 仍凉;关则退 Task.sleep | **iOS-SDK 编译验**(BUILD SUCCEEDED);冻结行为真机 | cebea725a |
+| **M-i MED-4** | runM4 100% 平台期烧机 deadline(waitUnplug 设 20min 帽)被随后**无条件**覆盖回 12min 窗→平台期>12min(iOS 持"100%"~10-20min)令 M4 半烧结束=无效空测 | 两臂 `if !burning { deadline=… }` 保烧机帽;burn-in-complete 路(读数首跌)才重启计数窗 | 同上(编译验;能量/token 测须真机) | cebea725a |
+| **M-i MED-6** | M1 崩溃定位 `STEP n…` 行走 `print`/stdout=devicectl 下块缓冲→硬崩吞掉缓冲行(定位锚失) | M1 入口 `setvbuf(stderr,_IONBF)` 一次 + STEP 行 `fputs` 到无缓冲 stderr→崩前即达 console | 同上(编译验;崩溃存活须真机 rdar 触发) | cebea725a |
+
+★device-gated 教训:(a)**"不支持"须验非假设**——`.protectionKey` mac 经验证是"存储但惰性"非"不支持",纠正 §10 line 481 原注(=项目本身叙事漂移抗性);(b)**FALSE-GREEN 反转必做**——x-sov readback 首版 macOS 默认值令测恒绿(改与 not-fixed 无别),反转揪出→改预设 `.complete` 证翻转才有牙;(c)**device-gated ≠ 完全不可验**——分层:代码路径(helper 翻转/编译)mac 可判,只 at-rest/锁屏/崩溃存活须真机;诚实标注哪层验了;(d)**统一 knob**:`BAS_COOLDOWN_SPIN` 一钮护 endurance+探针全部冷却,非各处重造。
+
+**★ device-gated 收口后:mega-audit 全部非删除、非纯实验域项闭合。** 余:①x-sov #5/#6 at-rest 锁屏前不可读 + M-i MED-2/4/6 真机运行时行为(代码路径已 mac 验/iOS 编译验,仅硬件行为待操作员真机跑);②b2 /tmp→Docs/evidence 冻结(实验域);③完全删除项(bas_thermal_probe git-mv 等,consult-before-deleting 须操作员亲裁);④#17 token 历史清除(operator-gated)。皆须操作员/硬件,无可"安全自主"项剩。
