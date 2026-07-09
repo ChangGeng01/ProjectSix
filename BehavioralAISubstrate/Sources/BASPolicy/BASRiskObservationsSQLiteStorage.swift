@@ -260,7 +260,8 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
         Self.bindText(stmt, 1, sessionID)
 
         var rows: [BASRiskObservationRecord] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             let eventID = Self.readText(stmt, 0)
             let sessID = Self.readText(stmt, 1)
             let turnID = Self.readText(stmt, 2)
@@ -290,6 +291,13 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
                 salience: salience,
                 confidence: confidence,
                 payloadJSON: payloadJSON))
+            rc = sqlite3_step(stmt)
+        }
+        // audit policy-obs-misc LOW-2: a non-DONE terminal (BUSY/CORRUPT) is NOT a clean end-of-rows —
+        // surface it instead of returning a silently-truncated partial result.
+        guard rc == SQLITE_DONE else {
+            throw BASRiskObservationsSQLiteStorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return rows
     }
@@ -320,8 +328,11 @@ public final class BASRiskObservationsSQLiteStorage: @unchecked
         Self.bindText(stmt, 1, band)
         sqlite3_bind_int64(stmt, 2, sinceMs)
 
+        // audit policy-obs-misc LOW-2: a COUNT(*) query always yields exactly one ROW — a non-ROW
+        // terminal is a BUSY/CORRUPT error, NOT a legitimate count of 0. Surface it, don't fabricate 0.
         guard sqlite3_step(stmt) == SQLITE_ROW else {
-            return 0
+            throw BASRiskObservationsSQLiteStorageError.stepFailed(
+                sql: sql, message: String(cString: sqlite3_errmsg(db)))
         }
         return Int(sqlite3_column_int64(stmt, 0))
     }

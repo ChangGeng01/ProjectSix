@@ -139,12 +139,19 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
         }
         defer { sqlite3_finalize(stmt) }
 
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let idC = sqlite3_column_text(stmt, 0)
-            else { continue }
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
+            // audit policy-obs-misc LOW-2: a NULL in a NOT-NULL column (primary key / required json)
+            // is corruption, not a row to silently `continue` past — surface it as a decode failure.
+            guard let idC = sqlite3_column_text(stmt, 0) else {
+                throw SQLiteError.decodeEntryFailed(
+                    ticketID: "<null>", reason: "null ticket_id column")
+            }
             let ticketID = String(cString: idC)
-            guard let jsonC = sqlite3_column_text(stmt, 1)
-            else { continue }
+            guard let jsonC = sqlite3_column_text(stmt, 1) else {
+                throw SQLiteError.decodeEntryFailed(
+                    ticketID: ticketID, reason: "null json column")
+            }
             let json = String(cString: jsonC)
             guard let data = json.data(using: .utf8) else {
                 throw SQLiteError.decodeEntryFailed(
@@ -161,6 +168,11 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
                     ticketID: ticketID,
                     reason: "\(error)")
             }
+            rc = sqlite3_step(stmt)
+        }
+        // audit policy-obs-misc LOW-2: a non-DONE terminal (BUSY/CORRUPT) is not a clean end-of-rows.
+        guard rc == SQLITE_DONE else {
+            throw SQLiteError.stepFailed(sql: sql, reason: lastErrorMessage() ?? "rc=\(rc)")
         }
         return result
     }
