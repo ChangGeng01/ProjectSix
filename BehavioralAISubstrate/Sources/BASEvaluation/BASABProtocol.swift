@@ -104,7 +104,31 @@ public struct BASABReport: Codable, Sendable, Equatable {
     }
     public let overall: Overall
     public let fidelityMismatches: Int
+    /// audit organ-eval MED-2: whether the fidelity anchor had COMPARABLE DATA
+    /// (an external count OR ≥1 row with a tokHash). `false` ⇒ `fidelityMismatches
+    /// == 0` means "nothing to compare", NOT "verified clean" — the anchor was
+    /// never actually applied. Consumers that require fidelity must treat `false`
+    /// as unverified rather than a silent pass.
+    public let fidelityVerifiable: Bool
     public let arms: [BASABArmFinding]
+
+    public init(overall: Overall, fidelityMismatches: Int,
+                fidelityVerifiable: Bool = true, arms: [BASABArmFinding]) {
+        self.overall = overall
+        self.fidelityMismatches = fidelityMismatches
+        self.fidelityVerifiable = fidelityVerifiable
+        self.arms = arms
+    }
+
+    // Byte-stable decode — a report logged before the field decodes as
+    // fidelityVerifiable = true (those came from real runs with token hashes).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        overall = try c.decode(Overall.self, forKey: .overall)
+        fidelityMismatches = try c.decode(Int.self, forKey: .fidelityMismatches)
+        fidelityVerifiable = try c.decodeIfPresent(Bool.self, forKey: .fidelityVerifiable) ?? true
+        arms = try c.decode([BASABArmFinding].self, forKey: .arms)
+    }
 }
 
 public enum BASABJudge {
@@ -115,10 +139,22 @@ public enum BASABJudge {
         externalFidelityMismatches: Int? = nil
     ) -> BASABReport {
         // ── 判据 1: fidelity anchor ───────────────────────────────────────────
+        // audit organ-eval MED-2: `mismatches == 0` is AMBIGUOUS — it means
+        // "verified clean" when there is comparable data, but "nothing to compare"
+        // when no external count is given and no row carries a tokHash. The old
+        // code read both as a silent PASS. The report now records
+        // `fidelityVerifiable` so a consumer can tell a real clean pass from an
+        // unverified one (the anchor is no longer SILENTLY bypassed). A stricter
+        // verdict-level fail-closed is deferred: judge() has no production caller
+        // yet, and it would require reworking the synthetic-row test suite (which
+        // deliberately omits tokHash to exercise the OTHER criteria in isolation).
         let mismatches = externalFidelityMismatches ?? Self.fidelityMismatches(rows: rows)
+        let fidelityVerifiable =
+            externalFidelityMismatches != nil || Self.fidelityVerifiable(rows: rows)
         if spec.fidelityAnchorRequired, mismatches > 0 {
             return BASABReport(overall: .instrumentInvalid,
-                               fidelityMismatches: mismatches, arms: [])
+                               fidelityMismatches: mismatches,
+                               fidelityVerifiable: fidelityVerifiable, arms: [])
         }
 
         // ── per-arm pooled + per-block tok/s ─────────────────────────────────
@@ -148,7 +184,8 @@ public enum BASABJudge {
               incumbent.measured >= spec.minMeasuredRowsPerArm,
               Self.tierSpread(incumbent.maxTier) < spec.thermalConfoundTierDelta
         else {
-            return BASABReport(overall: .dnf, fidelityMismatches: mismatches, arms: [])
+            return BASABReport(overall: .dnf, fidelityMismatches: mismatches,
+                               fidelityVerifiable: fidelityVerifiable, arms: [])
         }
 
         // ── 判据 3/5/6: parity band + two-block same-sign + thermal confound ──
@@ -190,7 +227,8 @@ public enum BASABJudge {
         }
         let overall: BASABReport.Overall =
             dnfCount >= max(1, spec.arms.count - 1) ? .dnf : .pass
-        return BASABReport(overall: overall, fidelityMismatches: mismatches, arms: findings)
+        return BASABReport(overall: overall, fidelityMismatches: mismatches,
+                           fidelityVerifiable: fidelityVerifiable, arms: findings)
     }
 
     /// Max−min thermal tier across an arm's blocks (0 when <2 blocks carry data).
@@ -210,6 +248,14 @@ public enum BASABJudge {
             }
         }
         return mismatches
+    }
+
+    /// audit organ-eval MED-2: whether the fidelity anchor is VERIFIABLE from
+    /// these rows (at least one carries a tokHash). Distinguishes "0 mismatches =
+    /// verified clean" from "0 = no comparable data", so a REQUIRED anchor can't
+    /// be silently satisfied by absence.
+    public static func fidelityVerifiable(rows: [BASABMeasurementRow]) -> Bool {
+        rows.contains { $0.tokHash != nil }
     }
 }
 
