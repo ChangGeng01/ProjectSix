@@ -648,8 +648,9 @@
     {
       "med_id": "x-test-integrity F5 (MED)",
       "title": "CRITICAL reading gates #20/#21/#26 backed by known-saturated probes (base=tuned=1.0); corrected qinao_reading_hard probe wrote /tmp with no consumer; #26 unit mismatch (registry >0.20 lift vs qinao_reading records percent 100.0) (qinao_reading.py; qinao_reading_hard.py:1-3)",
-      "disposition": "folded",
-      "detail": "Incidentally addressed by H23 orphan-wiring: commit 6c9f77c38 fix(H23) added qinao_merge.py whose KNOWN_SIDEFILES now maps 'reading_hard': 'qinao_reading_hard' (line 36), so the previously-orphan corrected probe is now ingested. Theme H23 (§2 line 122) — but F5 was NEVER named (truncated at F3); the wiring was incidental and the saturation-backing and #26 lift-vs-percent unit-mismatch sub-parts are not confirmed addressed by any F5-targeted fix."
+      "disposition": "partial",
+      "detail": "Incidentally addressed by H23 orphan-wiring: commit 6c9f77c38 fix(H23) added qinao_merge.py whose KNOWN_SIDEFILES now maps 'reading_hard': 'qinao_reading_hard' (line 36), so the previously-orphan corrected probe is now ingested. Theme H23 (§2 line 122) — but F5 was NEVER named (truncated at F3); the wiring was incidental and the saturation-backing and #26 lift-vs-percent unit-mismatch sub-parts are not confirmed addressed by any F5-targeted fix.",
+      "remediation": "PARTIAL: (1) #26 novel_doc_read toothless-CRITICAL-gate unit-mismatch (percent *100 vs fraction >0.20 threshold) CLOSED — commit a35c2254f, computed as a fraction so the gate discriminates (poor reader FAILS), Mac-tested + reversal-red. (2) orphan-wiring CLOSED incidentally by H23 (6c9f77c38). REMAINING: the discriminating qinao_reading_hard probe (reading_hard_followrate) runs+merges but is gated by NO registry metric — a QINAO design decision (new metric ID + threshold) to repoint the saturated #20/#21 backing. Operator/QINAO-campaign scope."
     },
     {
       "med_id": "x-test-integrity F6 (MED)",
@@ -732,5 +733,8 @@
       "tools-scripts MED (R2/R3 /tmp corpus)": "experiment-domain, operator-gated: move R2/R3 frozen corpus + sha pins from /tmp to Docs/evidence/. Involves moving files (deletion-aversion hard rule) and is the operator experiment-domain per §11 line 501 — NOT touched."
     },
     "final_tally": "4 tracked-open = 3 closed (orchestration MED-3 fail-closed, policy-obs-misc MED-2 eventID+comment-lie, x-concurrency MED-9 apply/scan mutex) + 1 operator-gated (tools R2/R3 corpus move)"
+  },
+  "x_test_f5_partial_close_2026_07_09": {
+    "note": "x-test-integrity F5 #26 unit-mismatch closed (a35c2254f). The saturation-backing sub-part (gate the harder reading_hard probe) remains a QINAO metrics design decision (which metric ID + threshold)."
   }
 }
