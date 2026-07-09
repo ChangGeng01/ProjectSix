@@ -107,41 +107,21 @@ final class QINAOGateSharedWALDurabilityTests: XCTestCase {
             "the store must PERSIST journal_mode=WAL into the DB header "
             + "(observed cross-connection: \(observedJournalMode))")
 
-        // ── Step 2: replay the store's EXACT open sequence on a raw ──
-        // handle, then read back the per-connection pragmas it sets.
-        // Flags + statements copied verbatim from BASSQLiteMemoryAtomStore.init.
-        var replay: OpaquePointer?
+        // ── Step 2: audit x-test-integrity F7 — read the per-connection ──
+        // pragmas from the PRODUCTION store's OWN connection. (They are
+        // per-connection, NOT cross-connection observable, so the previous
+        // approach — open a fresh handle and RE-ISSUE the pragmas, then verify
+        // them — was a tautology that stayed green even if init dropped one.)
         let flags = SQLITE_OPEN_READWRITE
             | SQLITE_OPEN_CREATE
-            | SQLITE_OPEN_FULLMUTEX
-        XCTAssertEqual(
-            sqlite3_open_v2(tempURL.path, &replay, flags, nil),
-            SQLITE_OK, "raw open mirroring init's open flags")
-        defer { sqlite3_close_v2(replay) }
-        for sql in [
-            "PRAGMA journal_mode=WAL;",
-            "PRAGMA synchronous=NORMAL;",
-            "PRAGMA foreign_keys=ON;",
-            "PRAGMA wal_autocheckpoint=200;",
-        ] {
-            XCTAssertEqual(
-                sqlite3_exec(replay, sql, nil, nil, nil), SQLITE_OK,
-                "init pragma exec: \(sql)")
-        }
-
-        let journalMode = pragmaText(replay, "journal_mode")
-        let synchronous = pragmaInt(replay, "synchronous")
-        let walAutocheckpoint = pragmaInt(replay, "wal_autocheckpoint")
-        let foreignKeys = pragmaInt(replay, "foreign_keys")
-
-        XCTAssertEqual(journalMode.lowercased(), "wal",
-            "journal_mode must be WAL on the configured connection")
-        XCTAssertEqual(synchronous, 1,
-            "synchronous must be NORMAL (numeric 1), got \(synchronous)")
-        XCTAssertEqual(walAutocheckpoint, 200,
-            "wal_autocheckpoint must be 200, got \(walAutocheckpoint)")
-        XCTAssertEqual(foreignKeys, 1,
-            "foreign_keys must be ON (numeric 1), got \(foreignKeys)")
+            | SQLITE_OPEN_FULLMUTEX   // (kept for the Step-3 defaults control)
+        let prod = await store._connectionPragmasForTesting()
+        XCTAssertEqual(prod.synchronous, 1,
+            "the STORE's connection must have synchronous=NORMAL(1), got \(prod.synchronous)")
+        XCTAssertEqual(prod.walAutocheckpoint, 200,
+            "the STORE's connection must have wal_autocheckpoint=200, got \(prod.walAutocheckpoint)")
+        XCTAssertEqual(prod.foreignKeys, 1,
+            "the STORE's connection must have foreign_keys=ON(1), got \(prod.foreignKeys)")
 
         // ── Step 3: negative control — a DEFAULT connection (no ──
         // pragmas set) must report the SQLite defaults, proving the

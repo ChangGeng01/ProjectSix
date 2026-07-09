@@ -244,6 +244,27 @@ public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore {
         if let db { sqlite3_close_v2(db) }
     }
 
+    /// audit x-test-integrity F7 — the per-connection pragmas
+    /// (synchronous / foreign_keys / wal_autocheckpoint) are NOT cross-connection
+    /// observable, so a durability gate must read them from THIS store's OWN
+    /// connection rather than re-issue them on a fresh handle (which verifies its
+    /// own copy — a tautology that stays green even if init drops the pragma).
+    /// Test seam.
+    public func _connectionPragmasForTesting()
+        -> (synchronous: Int, foreignKeys: Int, walAutocheckpoint: Int) {
+        guard let db else { return (-1, -1, -1) }
+        return (Self._pragmaIntForTesting(db, "synchronous"),
+                Self._pragmaIntForTesting(db, "foreign_keys"),
+                Self._pragmaIntForTesting(db, "wal_autocheckpoint"))
+    }
+    private static func _pragmaIntForTesting(_ db: OpaquePointer, _ name: String) -> Int {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA \(name);", -1, &stmt, nil) == SQLITE_OK,
+              let s = stmt else { return -1 }
+        defer { sqlite3_finalize(s) }
+        return sqlite3_step(s) == SQLITE_ROW ? Int(sqlite3_column_int64(s, 0)) : -1
+    }
+
     /// 先稳 P2 — run `PRAGMA integrity_check` and throw if the result is not "ok" (proactive corruption
     /// detection). Called at init only when `runIntegrityCheckOnOpen` is set.
     private static func assertIntegrity(db: OpaquePointer) throws {
