@@ -505,3 +505,27 @@ enum BASV12HonestyProbe {
         #endif
     }
 }
+
+/// audit M-i MED-2 — cooldown/idle sleep that survives a LOCKED screen.
+///
+/// A bare `Task.sleep` in a devicectl-launched app can be SUSPENDED
+/// indefinitely once the phone locks (the "Task.sleep-at-idle freeze pit",
+/// 2026-07-04) — stranding an unattended multi-minute probe mid-run. Under
+/// `BAS_COOLDOWN_SPIN=1` (the SAME knob the endurance runner uses for its
+/// inter-tick cooldown) this keeps the process schedulable with a sync ~1-e-core
+/// spin; the GPU — what a cooldown actually cools — still rests. Without the
+/// knob it falls back to `Task.sleep` (best thermal recovery; attended runs).
+///
+/// One knob for the whole app: set `BAS_COOLDOWN_SPIN=1` on unattended device
+/// runs and every cooldown, in the endurance runner AND the probes, is guarded.
+func idleGuardedSleep(seconds: Double) async {
+    guard seconds > 0 else { return }
+    if ProcessInfo.processInfo.environment["BAS_COOLDOWN_SPIN"] == "1" {
+        let end = Date().addingTimeInterval(seconds)
+        var x = 1.0
+        while Date() < end { x = sin(x) + 1.000001 }
+        if x == .infinity { print("[idle-guard] unreachable") }   // defeat dead-code elimination
+    } else {
+        try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+    }
+}

@@ -261,7 +261,7 @@ enum BASQwen35MTPProbe {
             for try await c in organ.streamDraft(req) { plainBody = c.cumulativeBody }
             let pSec = Date().timeIntervalSince(t0)
             let pTok = await organ.tokenCount(of: plainBody)
-            try await Task.sleep(nanoseconds: 30_000_000_000)
+            await idleGuardedSleep(seconds: 30)   // audit M-i MED-2: lock-screen freeze guard (BAS_COOLDOWN_SPIN=1)
             print("[mtp-sampling] step5: draft() \(t)… thermal=\(thermal())")
             t0 = Date()
             let d = try await organ.draft(req)                                 // planner → .mtpSpecSampling
@@ -272,7 +272,7 @@ enum BASQwen35MTPProbe {
             let a = await organ.mtpSamplingProfilerStat().map { String(format: "%.2f", $0.emaHitRate) } ?? "n/a"
             print(String(format: "[mtp-sampling] %@: plain %.1f tok/s (%d tok) | spec-sampling %.1f tok/s (%d tok) = %.2fx a=%@ thermal=%@",
                          t, pR, pTok, sR, sTok, sR / pR, a, thermal()))
-            try await Task.sleep(nanoseconds: 30_000_000_000)
+            await idleGuardedSleep(seconds: 30)   // audit M-i MED-2: lock-screen freeze guard (BAS_COOLDOWN_SPIN=1)
         }
         let n = Double(plainRates.count)
         let mP = plainRates.reduce(0, +) / n, mS = specRates.reduce(0, +) / n

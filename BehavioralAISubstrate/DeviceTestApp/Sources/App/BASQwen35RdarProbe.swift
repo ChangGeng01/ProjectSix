@@ -66,6 +66,14 @@ enum BASQwen35RdarProbe {
             await runChainFidelity()
             return
         }
+        // audit M-i MED-6: the per-STEP localizer (below) is the crash-forensics
+        // anchor — the LAST line before an rdar 177354777 crash marks WHERE it
+        // bit. print() → stdout is BLOCK-buffered under devicectl (not a TTY), so
+        // a hard crash swallows the buffered STEP line, defeating the probe. Force
+        // stderr unbuffered ONCE here (before any stderr I/O), and emit the STEP
+        // localizer to stderr so it flushes to the console the instant it's
+        // written. Safe per C: no stderr write has happened on the M1 path yet.
+        setvbuf(stderr, nil, _IONBF, 0)
         print("[qwen35-rdar] M1 probe start — rdar 177354777 crash test (asset=\(assetName), state [\(stateRows), \(stateRow)])")
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let asset = docs.appendingPathComponent("\(assetName).aimodel")
@@ -196,7 +204,13 @@ enum BASQwen35RdarProbe {
             }
             log.emit("[m4-ane] all 4 resident — residency experiment PASSED load; looping")
             await waitUnplug()
-            deadline = Date().addingTimeInterval(minutes * 60)
+            // audit M-i MED-4: DON'T clobber the burn-in cap. When waitUnplug hit
+            // the 100% plateau it set `burning=true` + a 20-min burn deadline;
+            // overwriting it with the 12-min window here would end M4 mid-burn-in
+            // (the plateau holds ~10-20 min → an invalid, empty measurement). Only
+            // (re)arm the counted window when NOT burning; the burn-in-complete
+            // path (sampleIfDue) restarts the window once the reading first dips.
+            if !burning { deadline = Date().addingTimeInterval(minutes * 60) }
             var x = embeds[0]
             while Date() < deadline {
                 do {
@@ -230,7 +244,9 @@ enum BASQwen35RdarProbe {
             }
             log.emit("[m4-mlx] model loaded; looping")
             await waitUnplug()
-            deadline = Date().addingTimeInterval(minutes * 60)
+            // audit M-i MED-4 (see the ane arm): preserve the burn-in cap at the
+            // 100% plateau instead of clobbering it with the 12-min window.
+            if !burning { deadline = Date().addingTimeInterval(minutes * 60) }
             var i = 0
             while Date() < deadline {
                 let req = BASOrganRequest(requestID: "m4-\(i)", role: .core, preset: .core,
@@ -361,7 +377,8 @@ enum BASQwen35RdarProbe {
         var lastDim = -1
         let t0 = Date()
         for step in 0..<steps {
-            print("[qwen35-rdar] \(label): STEP \(step) …")   // last line before a crash localizes it
+            // audit M-i MED-6: unbuffered stderr (setvbuf in run()) — survives a crash to localize it.
+            fputs("[qwen35-rdar] \(label): STEP \(step) …\n", stderr)
             let inputs: [String: NDArray]
             if let d = inputDim {
                 inputs = ["x": NDArray(scalars: [Float16](repeating: 0, count: d), shape: [1, d])]
