@@ -1135,5 +1135,38 @@
    }
   ],
   "still_open": "~1 CRITICAL (HF token history, operator-gated) + ~5 device/hardware-gated MED (MED-8/MED-9 decoder re-build, memory-a F4 VACUUM, x-sov #5 at-rest, x-concurrency semaphore) + tools-scripts R2/R3 (operator experiment domain, do not touch) + tests-arch ④ un-gating (device/infra campaign) + #21/#26 reading-probe discriminating repoint (eval-validity program) + ~79 LOW."
+ },
+ "tranche_4_LOW_2026_07_10": {
+  "directive": "全面开发 → operator chose Exhaustive LOW close-out; 21-agent read-only triage first (wpi32vmij): 76 LOW → 73 OPEN + 2 NOT_A_DEFECT + 1 ALREADY_CLOSED",
+  "method": "per-subsystem cluster; unit-testable → TDD+reversal, device/observability → fix+honest note, each cluster one build + individual/coherent push",
+  "closed_so_far": {
+   "policy-obs-misc (8/8)": [
+    "LOW-1 numeric version compare e32c1092e",
+    "LOW-3 replayFingerprint non-finite collision + LOW-4 latest-snapshot ordering be5296d44",
+    "LOW-5 breath TOCTOU + LOW-6 thermal TTL + LOW-7 routing comment 7015efbd4",
+    "LOW-8 vault half-register 87ddf1e89",
+    "LOW-2 SQLite step-error-as-EOF e20dcd829"
+   ],
+   "orchestration (5/5)": [
+    "LOW-4 dominance tiebreak + LOW-3 boundary docs + CLEAN comment ff0f3655f",
+    "LOW-1 recordTurn cancellation cd1cee5b7",
+    "LOW-2 recordEvent serialize lane 5d1a7b644"
+   ],
+   "tools-scripts (2 of 5)": [
+    "check_sdk_import_boundaries.sh regex bypass + pre-commit-gates.sh /tmp race fb7d1dcc9"
+   ]
+  },
+  "deferred_with_reason": {
+   "tools-scripts b2 domain": "b2_r2_pipeline.py + b2_refit_candidate.py + eval_probe_ood.py = operator b2/RSI experiment domain (recorded verdict rule + /tmp experiment data); do not touch per standing constraint",
+   "tools-scripts qinao_humaneval.py": "unsandboxed exec = security hardening needing sandbox/opt-in design + hard teeth past un-importable model imports; flagged as follow-up",
+   "NOT_A_DEFECT": [
+    "hostkit-rest LOW-4 (by-design, needs host repeated writes)",
+    "organ-eval LOW-1 (accepted/proposed fed straight from spec decoders)"
+   ],
+   "ALREADY_CLOSED": [
+    "hostkit-rest LOW-5 = TrainingDataExporter atomic-rename c6fd1ebee"
+   ]
+  },
+  "remaining_open": "~56 LOW across metal(1)/memory-a(2)/memory-b(3)/mlx-adapter-core(4)/mlx-decode(2)/organ-eval(3)/runtimecore-a(3)/runtimecore-b(4)/rust(3)/sovereign(1)/tests-arch(4)/x-architecture(5)/x-concurrency(2)/x-sovereignty(1)/x-test-integrity(3)/hostkit-rest(3)/hostkit-spine(4)/devicetestapp(7 mostly device-gated)"
  }
 }
