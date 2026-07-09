@@ -463,9 +463,23 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 
 | **M-l MED-4** | BASRoutedVectorIndexStorage.cosineTopKAtomIDsSync topK(→rowids)+ K 次 rowid→atom_id 分离 FFI=多调用 TOCTOU:并发写间插→SQLite rowid 复用重映到别的原子(错召回)/丢(静默漏);release 无 tripwire | Rust 新 `cosine_topk_atom_ids_for_domain`:同一 with_conn Mutex 内直读 atom_id(无 rowid 往返=无复用窗)+全序(score DESC, atom_id ASC)亦闭并列成员确定性;Swift 单原子调用;删孤儿 atomIDForRowidSync;XCFramework 3 slice 冷×2 byte-identical(rustup 1.96)+3 SHA pin+测字面更;2 cargo 测+并列成员 teeth 过真二进制 | 5c2d2a365 |
 
+## §10 架构 3 条收口(2026-07-09,操作员"架构 3 条也修了";workflow 定案后逐条实现)
+
+3-analyst workflow 定案:全部 `doctrine-decided`(非真取舍/非阻塞)、全 mac 纯。逐条:
+
+| 项 | 病灶 | 修(遵教义) | commit |
+|---|---|---|---|
+| **M-e #4** | bas_thermal_probe 注释谎称"读 Darwin 热态 sysctl",实则 hw.thermal_state 键不存在→恒 -1;零生产调用者(真热态=ProcessInfo.thermalState via BASSystemProbe) | 删假 sysctl 舞蹈=诚实故意 unsupported stub 恒 -1;修 .c/头/BASSystemProbe 三处撒谎注释(非删除,git-mv 移除属操作员裁);teeth=probe 返 <0 且 out!=0(未来假成功映 nominal=热设备 fail-open 则红) | 259b85288 |
+| **memory-b F12** | BASRoutedEventLogStorage 读路径 negative-FFI/decode-fail 一律返 []→损坏与真空不可分(reducer 投影全空=假失忆),无错误通道 | 镜像 SQLite 姊妹 BASSQLiteEventLogStorage:抽 throwing core(各塌陷点 throw readFailed;真空仍 [])+`onSilentFailure` 钩+`eventsOrThrow` 兄弟;totalCount 负数亦经钩;纯 Swift 无 Rust 重建;teeth=二连接 DROP TABLE(WAL)→events()=[]且钩触发+eventsOrThrow 抛 | ec620b4db |
+| **memory-a F3** | 隔离(.quarantined,可逆)atom 的 embedding 留索引→cosineTopK 出其 id→RAG 规范 atomLookup `{id in atom(forID:)}` 无治理过滤→隔离内容回 L2(前台路径已滤 .governed,RAG facade opt-in=规范例有洞非生产漏) | `governedAtomLookup(resolve:adapt:)`:lookup 边界滤(Stage-4 出 BASMemoryAtom 无治理字段,只能在此滤);非 .governed→nil→staleAtomIDs 不入 L2;embedding 不删(可逆隔离保);换掉泄漏文档例;teeth=.governed 入/.quarantined 入 stale+释放后复召回(embedding 未删)+naive 泄漏对照 | e8ac5e4b0 |
+
+★架构-3 教训:(a)"架构"分类≠真取舍——多是"修法涉设计决定",有教义(可逆隔离/前台 .governed 滤/comment-honesty)即有可辩护正解;(b)**in-repo 姊妹先例是金**(F12 照抄 BASSQLiteEventLogStorage 的 onSilentFailure+OrThrow 加性无协议改);(c)**治理滤须在类型仍带治理位的边界**(BASMemoryAtom 已擦治理→事后滤不能);(d)删除类(M-e #4 真移除)仍守 consult-before-deleting=非破坏诚实 stub 先行,git-mv 留操作员。
+
 ★MED 教训:(a)**fail-open 缺省是 MED 最常见形**(never_worse=True、isUnderPressure 用错分母、AUC 并列偏、SURVIVED 恒印)——修=fail-closed 缺省 + 缺席即红;(b)**纯函数抽取换 teeth**:GPU/模型/设备内联逻辑(pressure 比、probe budget、AUC)抽纯函数才可确定性单测;(c)**竞态 teeth 可靠红**:M-l detached 播种反转 5/5 红(非 flaky——detached 确定性输给即返);(d)**模块图卫生**用源树扫描守卫(SwiftUI-free)+ 正控防误抽。
 
-**诚实账——未闭项(须操作员/设备)**:
-- **架构 3 条**——操作员抉择(跨设备主权/L3-14 器官逻辑边界等)。
+**诚实账——未闭项(须真机/操作员域)**:
 - **device-gated 5+2**(含 x-sov #5/#6 Data Protection——iOS 锁屏真机才现,macOS `.protectionKey` 不支持)。
 - **b2 /tmp→Docs/evidence 冻结**——实验 I/O 布局,操作员域(改默认路径可能断上游管线)。
+- **M-e #4 / device-gated 的完全删除项**(如 bas_thermal_probe 整函数 git-mv 移除、x-arch MED-1 生产者范畴错误)——删除类/真机验须操作员亲裁。
+
+**★ 架构 3 条闭合后:mega-audit 的 1 CRITICAL + 23 HIGH + 全部 MED(fix-now/xcframework/architecture)全闭。** 剩仅 device-gated(真机)+ b2-evidence(操作员实验域)两类,皆非"不惊动操作员、不用硬件可安全自主"的项。
