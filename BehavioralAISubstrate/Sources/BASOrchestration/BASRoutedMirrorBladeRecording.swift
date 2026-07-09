@@ -186,6 +186,7 @@ public enum BASRoutedMirrorBladeRecording {
             confidence: Double
         ) async throws {
             for text in items {
+                try Task.checkCancellation()  // audit orchestration LOW-1: stop between per-item writes
                 let record = BASUnknownLedgerRecord(
                     eventID: "\(eventIDPrefix)-\(idx)",
                     sessionID: sessionID,
@@ -250,6 +251,7 @@ public enum BASRoutedMirrorBladeRecording {
     ) async throws -> [BASContradictionLedgerRecord] {
         var written: [BASContradictionLedgerRecord] = []
         for (idx, node) in nodes.enumerated() {
+            try Task.checkCancellation()  // audit orchestration LOW-1: stop between per-item writes
             var text = "\(node.kind.rawValue): \(node.summary)"
             if config.inlineRefs && !node.refs.isEmpty {
                 // chapter 八百三十四 / M2823 BUG FIX:was using `", "`

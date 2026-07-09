@@ -163,4 +163,69 @@ final class BASChapter834PostShipReviewFixesTests: XCTestCase {
             "Unknown rows did NOT advance — L7 never ran because " +
             "L6 (earlier in pipeline order) threw first")
     }
+
+    // MARK: - audit orchestration LOW-1: recordTurn honors cooperative cancellation
+
+    func testRecordTurnHonorsCancellationBetweenWrites() async throws {
+        let gatedUnknown = GatedUnknownStore()
+        let pipeline = BASAuditPipeline(
+            presenceStore: BASInMemoryPresenceObservationStore(),
+            unknownStore: gatedUnknown,
+            contradictionStore: BASInMemoryContradictionLedgerStore(),
+            atomLifecycleStore: BASInMemoryAtomLifecycleStore(),
+            versionTreeStore: BASInMemoryHostConstitutionVersionTreeStore())
+        // Two unknowns → the per-item loop runs twice; the store parks the FIRST write.
+        let input = BASAuditPipeline.PerTurnInput(
+            sessionID: "s", turnID: "t", nowMs: 0, eventIDPrefix: "c",
+            unknownSet: BASUnknownSet(missingFacts: ["a", "b"]))
+
+        let task = Task { try await pipeline.recordTurn(input: input) }
+        await gatedUnknown.waitUntilParked()   // parked inside the FIRST unknown write
+        task.cancel()
+        await gatedUnknown.release()
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled recordTurn must throw")
+        } catch is CancellationError {
+            // expected: the loop's next checkCancellation caught the cancellation
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+        let written = await gatedUnknown.writeCount()
+        XCTAssertEqual(written, 1,
+            "only the first item committed; the loop stopped on cancellation before the 2nd write")
+    }
+}
+
+/// Parks the FIRST appendRecord so a cancellation can be injected mid-pipeline.
+private actor GatedUnknownStore: BASUnknownLedgerStore {
+    private let inner = BASInMemoryUnknownLedgerStore()
+    private var firstParked = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var parkedWaiter: CheckedContinuation<Void, Never>?
+    private var didPark = false
+
+    func appendRecord(_ record: BASUnknownLedgerRecord) async throws -> BASUnknownLedgerRecord {
+        if !firstParked {
+            firstParked = true
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                gate = c; didPark = true
+                parkedWaiter?.resume(); parkedWaiter = nil
+            }
+        }
+        return try await inner.appendRecord(record)
+    }
+    func records(forSession sessionID: String) async -> [BASUnknownLedgerRecord] {
+        await inner.records(forSession: sessionID)
+    }
+    func records(forTurn turnID: String) async -> [BASUnknownLedgerRecord] {
+        await inner.records(forTurn: turnID)
+    }
+    func count() async -> Int { await inner.count() }
+    func writeCount() async -> Int { await inner.count() }
+    func waitUntilParked() async {
+        if didPark { return }
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in parkedWaiter = c }
+    }
+    func release() { gate?.resume(); gate = nil }
 }
