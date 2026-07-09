@@ -82,6 +82,13 @@ public struct BASAppleAdaptiveMatrixRequest: Codable, Equatable, Sendable {
     public var physicalMemoryGB: Int
     public var isLowPowerModeEnabled: Bool
     public var preferredLanguages: [String]
+    /// x-arch MED-1 (2026-07-09): an OPTIONAL real thermal reading the host can
+    /// plumb from live ProcessInfo.thermalState. nil-default keeps Codable
+    /// byte-stable and every existing caller unchanged. When absent the producer
+    /// feeds honest "unknown" (⇒ nominal) instead of stuffing the POWER flag
+    /// ("low_power") into the thermal field — a category error that read a hot
+    /// device (not in low-power) as nominal.
+    public var thermalStateRaw: String?
 
     public init(
         executionTierID: String,
@@ -90,7 +97,8 @@ public struct BASAppleAdaptiveMatrixRequest: Codable, Equatable, Sendable {
         isSimulator: Bool,
         physicalMemoryGB: Int,
         isLowPowerModeEnabled: Bool,
-        preferredLanguages: [String]
+        preferredLanguages: [String],
+        thermalStateRaw: String? = nil
     ) {
         self.executionTierID = executionTierID
         self.preferredProviderID = preferredProviderID
@@ -99,6 +107,7 @@ public struct BASAppleAdaptiveMatrixRequest: Codable, Equatable, Sendable {
         self.physicalMemoryGB = physicalMemoryGB
         self.isLowPowerModeEnabled = isLowPowerModeEnabled
         self.preferredLanguages = preferredLanguages
+        self.thermalStateRaw = thermalStateRaw
     }
 }
 
@@ -216,7 +225,9 @@ public enum BASAppleAdaptiveRuntimeAdapter {
         }
     }
 
-    private static func substrateDeviceProfile(
+    // internal (was private) so the x-arch MED-1 thermal-relabel teeth can
+    // observe the produced profile's thermalState via @testable import.
+    static func substrateDeviceProfile(
         for request: BASAppleAdaptiveMatrixRequest
     ) -> BASDeviceProfile {
         BASDeviceProfile(
@@ -224,7 +235,10 @@ public enum BASAppleAdaptiveRuntimeAdapter {
             memoryMB: request.physicalMemoryGB * 1024,
             batteryLevel: request.isLowPowerModeEnabled ? 0.18 : 1.0,
             lowPowerMode: request.isLowPowerModeEnabled,
-            thermalState: request.isLowPowerModeEnabled ? "low_power" : "nominal"
+            // x-arch MED-1: the real thermal reading (canonicalized downstream),
+            // or honest "unknown" (⇒ nominal) when absent — NOT the isLowPowerMode
+            // POWER flag, which is not a thermal signal (the old category error).
+            thermalState: request.thermalStateRaw ?? "unknown"
         )
     }
 

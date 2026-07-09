@@ -12,6 +12,14 @@ public struct BASAppleRuntimeContextSourceInput: Codable, Equatable, Sendable {
     public var deviceClass: BASDevicePerformanceClass
     public var riskLevel: BASRiskLevel
     public var budget: BASAdaptiveRuntimeBudget
+    /// x-arch MED-1 (2026-07-09): an OPTIONAL real thermal reading the host can
+    /// plumb from live ProcessInfo.thermalState. nil-default keeps Codable
+    /// byte-stable (synthesized encodeIfPresent omits the absent key) and every
+    /// existing caller unchanged. When absent the producer feeds an honest
+    /// "unknown" (⇒ nominal, no false downgrade) instead of the old
+    /// environmentClass.rawValue — a non-thermal category error that made an
+    /// overheating device routed here read cool.
+    public var thermalStateRaw: String?
 
     public init(
         primaryTraceKind: String?,
@@ -19,7 +27,8 @@ public struct BASAppleRuntimeContextSourceInput: Codable, Equatable, Sendable {
         environmentClass: BASEnvironmentClass,
         deviceClass: BASDevicePerformanceClass,
         riskLevel: BASRiskLevel,
-        budget: BASAdaptiveRuntimeBudget
+        budget: BASAdaptiveRuntimeBudget,
+        thermalStateRaw: String? = nil
     ) {
         self.primaryTraceKind = primaryTraceKind
         self.runtimeGear = runtimeGear
@@ -27,6 +36,7 @@ public struct BASAppleRuntimeContextSourceInput: Codable, Equatable, Sendable {
         self.deviceClass = deviceClass
         self.riskLevel = riskLevel
         self.budget = budget
+        self.thermalStateRaw = thermalStateRaw
     }
 }
 
@@ -199,7 +209,10 @@ public enum BASAppleInspectionBridgeBuilder {
                 memoryMB: memoryMB(for: input.deviceClass),
                 batteryLevel: 1.0,
                 lowPowerMode: input.environmentClass == .lowPower,
-                thermalState: input.environmentClass.rawValue
+                // x-arch MED-1: the real thermal reading (canonicalized downstream
+                // by BASThermalClassification), or honest "unknown" (⇒ nominal)
+                // when absent — NOT environmentClass.rawValue (a non-thermal value).
+                thermalState: input.thermalStateRaw ?? "unknown"
             ),
             privacyMode: .localOnly,
             riskLevel: input.riskLevel,
