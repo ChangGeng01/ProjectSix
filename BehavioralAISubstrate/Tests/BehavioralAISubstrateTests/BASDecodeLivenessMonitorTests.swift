@@ -39,10 +39,12 @@ final class BASDecodeLivenessMonitorTests: XCTestCase {
     private func makeMonitor(
         harness: Harness,
         thresholdSec: Double = 30,
+        wedgeConfirmSec: Double = 120,
         gpuProbe: (@Sendable () -> Bool)? = nil
     ) -> BASDecodeLivenessMonitor {
         BASDecodeLivenessMonitor(
             stallThresholdSec: thresholdSec,
+            wedgeConfirmSec: wedgeConfirmSec,
             gpuProbe: gpuProbe,
             clock: { harness.now() },
             onStall: { harness.record($0) })
@@ -129,17 +131,69 @@ final class BASDecodeLivenessMonitorTests: XCTestCase {
     // MARK: - GPU probe + wedge signature
 
     func testGpuProbeRunsAtDetectionAndLandsInVerdict() async {
+        // audit devicetestapp MED-1: the wedge signature now requires PERSISTENCE past
+        // the confirmation horizon — a healthy GPU + a stall that outlives the horizon.
         let h = Harness()
-        let m = makeMonitor(harness: h, thresholdSec: 30,
+        let m = makeMonitor(harness: h, thresholdSec: 30, wedgeConfirmSec: 120,
                             gpuProbe: { true })
         await m.beginTurn(id: "t1")
-        h.advance(seconds: 40)
+        h.advance(seconds: 130)   // past the wedge horizon
         let v = await m.check()
         XCTAssertEqual(v?.gpuProbeHealthy, true)
+        XCTAssertTrue(v!.isWedgeConfirmed)
         XCTAssertTrue(v!.verdictLine.contains("signature=mlx-process-local-wedge"),
-            "healthy GPU + stalled decode = the measured ADR-038 wedge " +
-            "signature (2026-06-09 on-device control)")
+            "healthy GPU + a stall PERSISTING past the horizon = the measured ADR-038 " +
+            "wedge signature (2026-06-09 on-device control)")
         XCTAssertTrue(v!.verdictLine.contains("turn=t1"))
+    }
+
+    // MARK: - audit devicetestapp MED-1 — persistence horizon gates the wedge claim
+
+    func testNonStreamingStallBelowHorizonIsStallNotWedge() async {
+        // A slow-but-healthy non-streaming decode crosses the base threshold but is
+        // still WELL under the wedge horizon: it must be a plain stall, never a wedge
+        // (so the external watchdog does NOT kill a healthy long decode).
+        let h = Harness()
+        let m = makeMonitor(harness: h, thresholdSec: 30, wedgeConfirmSec: 120,
+                            gpuProbe: { true })
+        await m.beginTurn(id: "slow-but-healthy")
+        h.advance(seconds: 31)
+        let v = await m.check()
+        XCTAssertNotNil(v, "31s > 30s base threshold still fires a stall verdict")
+        XCTAssertFalse(v!.isWedgeConfirmed, "31s < 120s horizon ⇒ NOT a confirmed wedge")
+        XCTAssertTrue(v!.verdictLine.contains("signature=stall"))
+        XCTAssertFalse(v!.verdictLine.contains("mlx-process-local-wedge"),
+            "a healthy first-crossing stall must NEVER stamp the wedge kill signature")
+    }
+
+    func testSlowHealthyDecodeThatCompletesNeverEmitsWedge() async {
+        let h = Harness()
+        let m = makeMonitor(harness: h, thresholdSec: 30, wedgeConfirmSec: 120,
+                            gpuProbe: { true })
+        await m.beginTurn(id: "completes")
+        h.advance(seconds: 31)
+        _ = await m.check()                 // one stall verdict
+        await m.endTurn()                   // the decode COMPLETED (healthy, just slow)
+        h.advance(seconds: 3600)
+        let v = await m.check()
+        XCTAssertNil(v, "a completed turn reports nothing further")
+        XCTAssertFalse(h.verdicts.contains { $0.isWedgeConfirmed },
+            "a slow-but-healthy decode that finishes must never earn the wedge signature")
+    }
+
+    func testPersistingStallPastHorizonEscalatesToWedge() async {
+        let h = Harness()
+        let m = makeMonitor(harness: h, thresholdSec: 30, wedgeConfirmSec: 120,
+                            gpuProbe: { true })
+        await m.beginTurn(id: "truly-wedged")
+        h.advance(seconds: 31)
+        let stall = await m.check()
+        XCTAssertEqual(stall?.isWedgeConfirmed, false, "first crossing is a stall")
+        h.advance(seconds: 100)             // 131s total — past the horizon
+        let wedge = await m.check()
+        XCTAssertNotNil(wedge, "a stall persisting past the horizon escalates")
+        XCTAssertTrue(wedge!.isWedgeConfirmed)
+        XCTAssertTrue(wedge!.verdictLine.contains("signature=mlx-process-local-wedge"))
     }
 
     func testNoProbeYieldsUnprobedStallSignature() async {

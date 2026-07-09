@@ -43,19 +43,29 @@ public struct BASDecodeStallVerdict: Sendable, Equatable {
     /// Result of the injected GPU sibling probe at detection time;
     /// nil = no probe injected。
     public let gpuProbeHealthy: Bool?
+    /// audit devicetestapp MED-1 — the strong "mlx-process-local-wedge" claim requires
+    /// BOTH a healthy GPU AND the stall PERSISTING past the wedge-confirmation horizon
+    /// (≫ the base stall threshold). A single base-threshold crossing on a slow-but-
+    /// healthy non-streaming decode is only a `stall` (observability), NEVER a wedge —
+    /// so an external Mac watchdog no longer false-kills a healthy long decode.
+    public let isWedgeConfirmed: Bool
 
     public init(turnID: String, secondsSinceProgress: Double,
-                gpuProbeHealthy: Bool?) {
+                gpuProbeHealthy: Bool?, isWedgeConfirmed: Bool = false) {
         self.turnID = turnID
         self.secondsSinceProgress = secondsSinceProgress
         self.gpuProbeHealthy = gpuProbeHealthy
+        self.isWedgeConfirmed = isWedgeConfirmed
     }
 
     /// Machine-parsable one-liner for syslog (external watchdogs)。
     public var verdictLine: String {
         let gpu = gpuProbeHealthy.map { $0 ? "healthy" : "unhealthy" }
             ?? "unprobed"
-        let signature = (gpuProbeHealthy == true)
+        // audit devicetestapp MED-1: the wedge signature (which an external watchdog
+        // acts on with a kill+relaunch) is stamped ONLY on a confirmed wedge, not on a
+        // first-crossing healthy-GPU stall.
+        let signature = isWedgeConfirmed
             ? "mlx-process-local-wedge" : "stall"
         return "🛑 decode-stall turn=\(turnID) "
             + "stalled_s=\(String(format: "%.1f", secondsSinceProgress)) "
@@ -72,6 +82,9 @@ public actor BASDecodeLivenessMonitor {
     public typealias Clock = @Sendable () -> UInt64
 
     private let stallThresholdSec: Double
+    /// audit devicetestapp MED-1 — the persistence horizon a stall must exceed (with a
+    /// healthy GPU) before it is escalated to the strong `mlx-process-local-wedge` claim.
+    private let wedgeConfirmSec: Double
     private let clock: Clock
     /// Optional GPU sibling probe run at detection time (host wires
     /// e.g. BASMetalGPUProbe;kept as a closure so this module gains
@@ -82,12 +95,15 @@ public actor BASDecodeLivenessMonitor {
 
     private var currentTurnID: String?
     private var lastProgressNs: UInt64 = 0
-    /// One verdict per stall episode;re-armed by the next progress。
+    /// One base-stall verdict per episode;re-armed by the next progress。
     private var stallReported = false
+    /// One escalated wedge verdict per episode (audit devicetestapp MED-1)。
+    private var wedgeReported = false
     private var checkTask: Task<Void, Never>?
 
     public init(
         stallThresholdSec: Double = 30,
+        wedgeConfirmSec: Double = 120,
         gpuProbe: (@Sendable () -> Bool)? = nil,
         clock: @escaping Clock = { DispatchTime.now().uptimeNanoseconds },
         onStall: @escaping @Sendable (BASDecodeStallVerdict) -> Void
@@ -95,6 +111,8 @@ public actor BASDecodeLivenessMonitor {
         // Boundary clamp: a non-positive threshold is a host bug;
         // 1s floor keeps the monitor honest rather than hyperactive。
         self.stallThresholdSec = max(1, stallThresholdSec)
+        // The wedge horizon can never be below the base stall threshold.
+        self.wedgeConfirmSec = max(self.stallThresholdSec, wedgeConfirmSec)
         self.gpuProbe = gpuProbe
         self.clock = clock
         self.onStall = onStall
@@ -108,6 +126,7 @@ public actor BASDecodeLivenessMonitor {
         currentTurnID = id
         lastProgressNs = clock()
         stallReported = false
+        wedgeReported = false
     }
 
     /// Mark token/chunk progress (streaming hosts;optional for
@@ -116,12 +135,14 @@ public actor BASDecodeLivenessMonitor {
         guard currentTurnID != nil else { return }
         lastProgressNs = clock()
         stallReported = false
+        wedgeReported = false
     }
 
     /// Mark turn completion (call after the decode returns/throws)。
     public func endTurn() {
         currentTurnID = nil
         stallReported = false
+        wedgeReported = false
     }
 
     // MARK: Detection
@@ -131,19 +152,39 @@ public actor BASDecodeLivenessMonitor {
     /// idle, progressing, or already reported this episode。
     @discardableResult
     public func check() -> BASDecodeStallVerdict? {
-        guard let turnID = currentTurnID, !stallReported else {
-            return nil
-        }
+        guard let turnID = currentTurnID else { return nil }
         let elapsedNs = clock() &- lastProgressNs
         let elapsedSec = Double(elapsedNs) / 1_000_000_000
-        guard elapsedSec >= stallThresholdSec else { return nil }
-        stallReported = true
-        let verdict = BASDecodeStallVerdict(
-            turnID: turnID,
-            secondsSinceProgress: elapsedSec,
-            gpuProbeHealthy: gpuProbe?())
-        onStall(verdict)
-        return verdict
+
+        // audit devicetestapp MED-1 — escalate to the WEDGE signature only once the
+        // stall has PERSISTED past the confirmation horizon with a healthy GPU. This is
+        // the only path that stamps "mlx-process-local-wedge" (which the external
+        // watchdog kills on). One escalated verdict per episode.
+        if elapsedSec >= wedgeConfirmSec && !wedgeReported {
+            wedgeReported = true
+            stallReported = true            // the wedge subsumes the base stall
+            let healthy = gpuProbe?()
+            let verdict = BASDecodeStallVerdict(
+                turnID: turnID,
+                secondsSinceProgress: elapsedSec,
+                gpuProbeHealthy: healthy,
+                isWedgeConfirmed: healthy == true)   // healthy GPU + persistence = a real wedge
+            onStall(verdict)
+            return verdict
+        }
+
+        // Base stall (observability only — NOT a wedge, no external kill). One per episode.
+        if elapsedSec >= stallThresholdSec && !stallReported {
+            stallReported = true
+            let verdict = BASDecodeStallVerdict(
+                turnID: turnID,
+                secondsSinceProgress: elapsedSec,
+                gpuProbeHealthy: gpuProbe?(),
+                isWedgeConfirmed: false)
+            onStall(verdict)
+            return verdict
+        }
+        return nil
     }
 
     // MARK: Self-driving checker (host convenience)
