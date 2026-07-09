@@ -132,15 +132,52 @@ public actor BASAgentTraceBufferingSink:
 
 extension BASAgentTraceLogEventLogBridge {
 
+    /// audit orchestration MED-4 (streaming facet) — thrown when BOTH bridge writes committed
+    /// durably but the streaming sink notification then failed。 The bridge writes are DONE;
+    /// re-invoking `recordEvent(_:streamingTo:)` re-appends a DUPLICATE (a fresh `traceLog.append`
+    /// assigns a new traceSeq ⇒ a new eventID ⇒ the event-log's idempotency dedup misses it too,
+    /// so BOTH logs double-write)。 This carries the committed result + stamped event so a caller
+    /// can RE-DELIVER to the sink out-of-band — `sink.receive(stampedEvent, eventLogResult:)` —
+    /// instead of blindly re-recording。 Mirrors the sibling `PartialWriteError` doctrine:make the
+    /// post-commit failure EXPLICIT and reconcilable rather than a bare rethrow that looks like the
+    /// write itself failed。
+    public struct SinkNotificationError: Error, Sendable, CustomStringConvertible {
+        public let committedTraceSeq: Int64
+        public let eventLogWasNew: Bool
+        public let eventLogAssignedSequenceNumber: Int64
+        public let stampedEvent: BASAgentTraceEvent
+        public let underlying: any Error
+
+        /// The exact tuple `recordEvent` would have returned — feed
+        /// `.eventLogResult` straight back into `sink.receive(stampedEvent,eventLogResult:)`。
+        public var committedResult: (
+            traceSeq: Int64,
+            eventLogResult: (wasNew: Bool, assignedSequenceNumber: Int64)
+        ) {
+            (traceSeq: committedTraceSeq,
+             eventLogResult: (wasNew: eventLogWasNew,
+                              assignedSequenceNumber: eventLogAssignedSequenceNumber))
+        }
+
+        public var description: String {
+            "BASAgentTraceLogEventLogBridge: both bridge writes committed (traceSeq "
+                + "\(committedTraceSeq)) but the streaming sink threw (\(underlying)) — the durable "
+                + "logs ALREADY hold this event; re-deliver to the sink with `committedResult`, do "
+                + "NOT re-invoke recordEvent (retry re-appends a duplicate to both logs)."
+        }
+    }
+
     /// Record an event with streaming-sink notification。
     /// Wraps `recordEvent(_:)` — same trace-log + event-log
     /// fan-out semantics — then notifies the supplied sink。
     ///
     /// Sink notification happens AFTER both bridge writes
     /// complete and is best-effort:if the sink throws,the
-    /// bridge writes are NOT rolled back (matches the
-    /// bridge's existing eventLog-throw-doesn't-roll-back-
-    /// traceLog semantics)。
+    /// bridge writes are NOT rolled back。 But the throw is
+    /// wrapped in `SinkNotificationError` (audit orchestration
+    /// MED-4) so the caller can tell "the write is durable,only
+    /// the notification failed" from "the write failed" — a bare
+    /// rethrow would invite a retry that DOUBLE-WRITES both logs。
     ///
     /// Returns the same tuple as `recordEvent(_:)` so callers
     /// can chain。
@@ -164,9 +201,22 @@ extension BASAgentTraceLogEventLogBridge {
             agentID: event.agentID,
             deltaID: event.deltaID,
             payloadJson: event.payloadJson)
-        try await sink.receive(
-            stamped,
-            eventLogResult: result.eventLogResult)
+        // audit orchestration MED-4: the bridge writes are ALREADY durable here. If the sink throws,
+        // surface it as SinkNotificationError carrying the committed result — a naive retry of this
+        // overload re-appends a duplicate (new traceSeq ⇒ new eventID ⇒ event-log dedup misses).
+        do {
+            try await sink.receive(
+                stamped,
+                eventLogResult: result.eventLogResult)
+        } catch {
+            throw SinkNotificationError(
+                committedTraceSeq: result.traceSeq,
+                eventLogWasNew: result.eventLogResult.wasNew,
+                eventLogAssignedSequenceNumber:
+                    result.eventLogResult.assignedSequenceNumber,
+                stampedEvent: stamped,
+                underlying: error)
+        }
         return result
     }
 }
