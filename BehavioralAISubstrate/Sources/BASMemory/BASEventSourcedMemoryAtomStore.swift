@@ -21,9 +21,13 @@
 //   - `CachePolicy` enum (`.lazy` / `.warmAtInit` /
 //     `.cachedWithTTL`)。`.lazy` projects on every read;
 //     `.warmAtInit` keeps an in-actor cache that mutates on
-//     every successful append (still serialized via actor
-//     isolation,so cache and event log can never diverge
-//     mid-write)
+//     every successful append。 Actor isolation serializes each
+//     STATEMENT but NOT the multi-`await` warm/append critical
+//     sections — every `await` is a reentrancy point。 The warm
+//     path commits its projection into locals and flips
+//     `hasWarmedCache` LAST, and the append path re-projects on a
+//     sequence gap, so a reentrant read never observes a
+//     half-warmed cache (audit memory-b F5)。
 //   - Parity surface: `admit(_:)`,`count`,`allIDs`,
 //     `allAtoms()`,`projectAll()`,`lastReplayedSequenceNumber`
 //   - Content cache: `BASGovernedMemory.content` is host-side
@@ -137,14 +141,24 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
             if hasWarmedCache {
                 return
             }
-            hasWarmedCache = true
-            stateCache = await BASMemoryAtomReducer.project(
+            // audit memory-b F5: compute the projection into LOCALS across the awaits, then commit
+            // stateCache + set the flag LAST (with a re-check). Setting hasWarmedCache BEFORE the
+            // populating awaits left a window where a REENTRANT reader saw hasWarmedCache==true but
+            // stateCache still `[:]`; a concurrent updateTier/updateGovernanceStatus/remove whose
+            // existence guard read that false-empty projection PERMANENTLY dropped its mutation.
+            let projected = await BASMemoryAtomReducer.project(
                 from: eventLog,
                 sessionID: sessionID)
             // lastSeq from latest projected event
             let events = await eventLog.events(
                 forSession: sessionID)
+            if hasWarmedCache {
+                // A reentrant warm finished during our awaits — don't clobber its committed state.
+                return
+            }
+            stateCache = projected
             lastSeq = events.last?.sequenceNumber
+            hasWarmedCache = true
         }
     }
 
@@ -194,12 +208,24 @@ public actor BASEventSourcedMemoryAtomStore: BASMemoryAtomStore {
         if !result.wasNew {
             return false
         }
+        // audit memory-b F5: capture the pre-append high-water mark so the O(1) incremental fold is
+        // only taken when THIS append resumed in sequence order (assignedSeq == prevSeq+1). Under a
+        // store whose async append may suspend, task-resumption order can differ from sequence order;
+        // an out-of-order fold would diverge the warm cache from the canonical log projection.
+        let prevSeq = lastSeq
         lastSeq = result.assignedSequenceNumber
         switch cachePolicy {
         case .lazy:
             return true
         case .warmAtInit, .cachedWithTTL:
             await warmCacheIfNeeded()
+            guard result.assignedSequenceNumber == (prevSeq ?? -1) + 1 else {
+                // Sequence gap ⇒ resumption order != append order. Re-derive from the authoritative
+                // log rather than fold this event onto a cache that may be missing an earlier one.
+                stateCache = await BASMemoryAtomReducer.project(
+                    from: eventLog, sessionID: sessionID)
+                return true
+            }
             stateCache = BASMemoryAtomReducer.reduce(
                 priorAtoms: stateCache,
                 event: BASEventLogEntry(
