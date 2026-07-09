@@ -143,6 +143,70 @@ final class BASBreathSchedulerTests: XCTestCase {
         XCTAssertEqual(registrations, ["x"])
         XCTAssertEqual(cancels, ["x"])
     }
+
+    // MARK: - audit policy-obs-misc LOW-5: concurrent same-id schedule can't both land
+
+    func testConcurrentSameIdScheduleRejectsExactlyOne() async throws {
+        let bridge = GatedRegisterBridge()
+        let scheduler = BASBreathScheduler(bridge: bridge)
+        let req = request(id: "b1", class: .light)
+
+        // Task A enters schedule() and parks inside bridge.register (the suspension point).
+        async let aRes = scheduleCatching(scheduler, req)
+        await bridge.waitUntilParked()
+        // Task B runs while A is parked: it passes the pre-await duplicate check (A hasn't inserted).
+        let bRes = await scheduleCatching(scheduler, req)
+        await bridge.release()
+        let aFinal = await aRes
+
+        let outcomes = [aFinal, bRes]
+        let successes = outcomes.filter { if case .success = $0 { return true }; return false }
+        let dupes = outcomes.filter {
+            if case .failure(let e) = $0,
+               case BASBreathScheduler.ScheduleError.duplicateRequest = e { return true }
+            return false
+        }
+        XCTAssertEqual(successes.count, 1, "exactly ONE concurrent same-id schedule may land")
+        XCTAssertEqual(dupes.count, 1, "the other must be rejected as duplicate, not double-register")
+        let cancels = await bridge.cancelledIDs()
+        XCTAssertEqual(cancels, ["b1"], "the loser's own OS registration must be cancelled, not orphaned")
+    }
+}
+
+/// Free function (not an instance method) so the concurrent `async let` does not capture the
+/// non-Sendable XCTestCase `self`.
+private func scheduleCatching(
+    _ s: BASBreathScheduler, _ r: BASBreathScheduler.Request
+) async -> Result<BASBreathScheduler.ScheduledBreath, Error> {
+    do { return .success(try await s.schedule(r, guardLevel: .nominal)) }
+    catch { return .failure(error) }
+}
+
+/// Parks the FIRST register call on a test-held gate so the reentrancy window is forced open.
+private actor GatedRegisterBridge: BASBreathScheduler.PlatformBridge {
+    private var firstParked = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var parkedWaiter: CheckedContinuation<Void, Never>?
+    private var didPark = false
+    private var cancelled: [String] = []
+
+    func register(_ request: BASBreathScheduler.Request) async -> Bool {
+        if !firstParked {
+            firstParked = true
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                gate = c; didPark = true
+                parkedWaiter?.resume(); parkedWaiter = nil
+            }
+        }
+        return true
+    }
+    func cancel(id: String) async { cancelled.append(id) }
+    func cancelledIDs() -> [String] { cancelled }
+    func waitUntilParked() async {
+        if didPark { return }
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in parkedWaiter = c }
+    }
+    func release() { gate?.resume(); gate = nil }
 }
 
 /// Test double. Isolated as an actor so the test can observe what

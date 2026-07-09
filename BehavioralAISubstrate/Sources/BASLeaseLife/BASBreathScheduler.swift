@@ -112,6 +112,15 @@ public actor BASBreathScheduler {
         }
         try Self.validate(class: request.maintenanceClass, at: guardLevel)
         _ = await bridge.register(request)
+        // audit policy-obs-misc LOW-5: `await bridge.register` is a reentrancy point — a concurrent
+        // schedule() for the SAME id may have passed the duplicate check and inserted while we were
+        // suspended. Re-check and fail closed (cancelling our own now-duplicate OS registration) so
+        // two concurrent same-id schedules cannot both land. (The register-result is deliberately not
+        // honored — see PlatformBridge.register's "records the breath either way" contract.)
+        if scheduled[request.id] != nil {
+            await bridge.cancel(id: request.id)
+            throw ScheduleError.duplicateRequest(id: request.id)
+        }
         let breath = ScheduledBreath(
             request: request,
             scheduledAt: clock(),

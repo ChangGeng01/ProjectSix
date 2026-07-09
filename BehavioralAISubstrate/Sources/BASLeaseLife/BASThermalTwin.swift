@@ -144,6 +144,24 @@ public actor BASThermalTwin {
 
     public func currentReading() -> Reading? { lastReading }
 
+    /// Default freshness window for `readingFresherThan(_:)`. Thermal state moves on the order of
+    /// seconds; `sample()` is cheap (a `ProcessInfo.thermalState` read), so a short TTL is safe.
+    public static let defaultReadingMaxAge: TimeInterval = 2.0
+
+    /// audit policy-obs-misc LOW-6 — return the cached reading ONLY if it is younger than `maxAge`;
+    /// otherwise take a fresh `sample()`. Callers that preferred `currentReading()` unconditionally
+    /// (and the twin's notification observation is opt-in) could act on an arbitrarily stale thermal
+    /// state — e.g. a breath scheduled at `.nominal` guard while the device has since gone `.serious`.
+    @discardableResult
+    public func readingFresherThan(
+        _ maxAge: TimeInterval = BASThermalTwin.defaultReadingMaxAge
+    ) -> Reading {
+        if let last = lastReading, clock().timeIntervalSince(last.observedAt) < maxAge {
+            return last
+        }
+        return sample()
+    }
+
     // MARK: - Subscription
 
     /// Subscribe to reading updates. The stream terminates when the

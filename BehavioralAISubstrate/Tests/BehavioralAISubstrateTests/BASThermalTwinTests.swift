@@ -97,4 +97,33 @@ final class BASThermalTwinTests: XCTestCase {
         let count = await twin.observerCount()
         XCTAssertEqual(count, 1)
     }
+
+    // MARK: - audit policy-obs-misc LOW-6: readingFresherThan re-samples a stale cache
+
+    private final class ClockBox: @unchecked Sendable {
+        var now = Date(timeIntervalSince1970: 1000)
+        var state: BASThermalTwin.OSThermalState = .nominal
+    }
+
+    func testStaleCachedReadingTriggersFreshSample() async {
+        let box = ClockBox()
+        let twin = BASThermalTwin(reader: { box.state }, clock: { box.now })
+        _ = await twin.sample()                              // seed cache at t0 (.nominal → .nominal)
+        box.now = Date(timeIntervalSince1970: 1000 + 10)     // 10s later — past the 2s TTL
+        box.state = .serious                                 // device has since heated
+        let r = await twin.readingFresherThan(2.0)
+        XCTAssertEqual(r.thermalLevel, .hot,
+            "a stale cache must trigger a fresh sample (.serious → .hot), not return the stale .nominal")
+    }
+
+    func testFreshCachedReadingIsReturnedVerbatim() async {
+        let box = ClockBox()
+        let twin = BASThermalTwin(reader: { box.state }, clock: { box.now })
+        _ = await twin.sample()                              // t0 (.nominal)
+        box.now = Date(timeIntervalSince1970: 1000 + 1)      // within the 2s TTL
+        box.state = .serious                                 // underlying changed but cache is fresh
+        let r = await twin.readingFresherThan(2.0)
+        XCTAssertEqual(r.thermalLevel, .nominal,
+            "a fresh cache is returned as-is — no needless resample within the TTL")
+    }
 }

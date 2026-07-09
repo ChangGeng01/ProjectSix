@@ -105,12 +105,8 @@ extension BASBudgetFrame {
         from coordinator: BASLeaseLifeCoordinator
     ) async -> BASBudgetFrame {
         let twin = await coordinator.thermalActor()
-        let reading: BASThermalTwin.Reading
-        if let cached = await twin.currentReading() {
-            reading = cached
-        } else {
-            reading = await twin.sample()
-        }
+        // audit policy-obs-misc LOW-6: use a fresh-or-resample reading, not a possibly-stale cache.
+        let reading = await twin.readingFresherThan()
         return withLiveThermalGuardLevel(reading.guardLevel)
     }
 }

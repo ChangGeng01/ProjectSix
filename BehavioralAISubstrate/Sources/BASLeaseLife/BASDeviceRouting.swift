@@ -89,9 +89,12 @@ public enum BASDeviceRouting {
         // Rule 5 deferred fallback path (used in multiple branches)
         let cpuFallback: BASDeviceRoute = .scoutCPU
 
-        // Throttle thermal: still allow GPU but never NPU
-        // (NPU is high-throughput; under throttle we want lower-
-        // power GPU instead).
+        // Throttle thermal: currently DISABLE ANE — leaving GPU as the compute engine.
+        // NOTE (audit policy-obs-misc LOW-7): the old rationale here ("we want lower-power GPU") was
+        // BACKWARDS — device data shows ANE is the LOW-power engine, not the GPU (GPU ~181 vs ANE ~49
+        // tok/s: ANE is a power engine, not a speed engine). Whether to instead KEEP ANE under
+        // throttle is a routing-POLICY change whose thermal payoff is only verifiable on real
+        // hardware (device-gated), so behavior is left unchanged pending that measurement.
         let canUseANE: Bool = {
             guard hasANE else { return false }
             return thermalGuard != .throttle

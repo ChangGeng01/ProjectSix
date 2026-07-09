@@ -124,12 +124,8 @@ public actor BASLeaseLifeCoordinator {
     public func scheduleBreath(
         _ request: BASBreathScheduler.Request
     ) async throws -> BASBreathScheduler.ScheduledBreath {
-        let reading: BASThermalTwin.Reading
-        if let existing = await thermal.currentReading() {
-            reading = existing
-        } else {
-            reading = await thermal.sample()
-        }
+        // audit policy-obs-misc LOW-6: use a fresh-or-resample reading, not a possibly-stale cache.
+        let reading = await thermal.readingFresherThan()
         return try await scheduler.schedule(
             request, guardLevel: reading.guardLevel)
     }
