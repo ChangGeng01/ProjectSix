@@ -199,10 +199,15 @@ public enum BASSleepMeasurementStation {
             setpgid(proc.processIdentifier, proc.processIdentifier)
             // 超时看门狗:后台读避免管道阻塞;截止即 terminate(升级 group-kill)。
             var outData = Data()
+            // audit organ-eval MED-1: outData is WRITTEN by the read thread and READ by this
+            // thread after a wait that CAN TIME OUT — so on the timeout path the read raced an
+            // in-flight write of a value struct (torn read / UB). Guard both ends with a lock.
+            let outLock = NSLock()
             let readQueue = DispatchQueue(label: "bas.station.read")
             let readDone = DispatchSemaphore(value: 0)
             readQueue.async {
-                outData = pipe.fileHandleForReading.readDataToEndOfFile()
+                let d = pipe.fileHandleForReading.readDataToEndOfFile()
+                outLock.lock(); outData = d; outLock.unlock()
                 readDone.signal()
             }
             let deadline = Date().addingTimeInterval(manifest.perSuiteTimeoutS)
@@ -232,7 +237,9 @@ public enum BASSleepMeasurementStation {
             }
             proc.waitUntilExit()
             _ = readDone.wait(timeout: .now() + 10)
-            let out = String(data: outData, encoding: .utf8) ?? ""
+            outLock.lock()
+            let out = String(data: outData, encoding: .utf8) ?? ""   // audit organ-eval MED-1: read under lock
+            outLock.unlock()
             let dt = Date().timeIntervalSince(t0)
             let agg = parseAggregate(out)
             let verdict: String
