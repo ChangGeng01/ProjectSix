@@ -55,6 +55,17 @@ public final class BASQwen35MTPSpecDecoder {
     var mtpV: MLXArray
     static let maxSeq = 2048  // MTP-stream KV bound (buffers 2×8MB fp16); production prompt+gen cap
     static let ah = 16, akv = 4, ahd = 256, rd = 64
+
+    /// audit mlx-decode MED-1 (complete) — the MTP KV buffers are fixed `[maxSeq]`, and a draft at
+    /// `pos` (a `width`-wide chain writes positions `pos … pos+width-1`) writes `mtpK[pos] = k`, so
+    /// the positions MUST all stay `< maxSeq` or the write OVERRUNS the buffer. Every drafting lane
+    /// (sampling / greedy / chain / compiled) checks this before calling `mtpForward`/`mtpForwardCompiled`
+    /// and degrades to a plain trunk step when the stream is full (the model's own cache carries the
+    /// longer context) instead of overrunning. Pure + Mac-testable. b81490202 fixed only the fused
+    /// chain's draft WIDTH; this closes the per-position WRITE bound on every lane.
+    static func mtpStreamHasRoom(pos: Int, width: Int = 1) -> Bool {
+        pos >= 0 && pos + width <= maxSeq
+    }
     static let ropeBase: Float = 10_000_000
 
     /// `headFP16` — M3 A/B arm: keep the native MTP linears + draft sub-head UNQUANTIZED fp16
@@ -407,6 +418,9 @@ public final class BASQwen35MTPSpecDecoder {
         var trunkLen = prompt.count
         var pending: [Int] = [argmaxLast(model.logits(fromHidden: h0))]
         func draftChain() -> [MLXArray] {
+            // audit mlx-decode MED-1: no room for a k-wide chain in the MTP KV buffer ⇒ no draft
+            // (the caller plain-steps on an empty ds). Prevents mtpForwardCompiled writing out of bounds.
+            guard Self.mtpStreamHasRoom(pos: hLastPos, width: k) else { return [] }
             if k == 5 {
                 let r = compiledChain5([
                     model.embedding(MLXArray([Int32(pending.last!)]))[0], hLast,
@@ -431,7 +445,9 @@ public final class BASQwen35MTPSpecDecoder {
         var out: [Int] = []
         var acceptedTok = 0, iters = 0
         while out.count < maxTokens {
-            if pending.count >= 6 {
+            // audit mlx-decode MED-1: an empty ds means the MTP buffer is full — plain-step (the
+            // verify path below assumes ds has exactly k elements, so it must NOT run empty).
+            if pending.count >= 6 || ds.isEmpty {
                 var hp = model.hiddenStatesWithCache(
                     MLXArray([Int32(pending[0])]).expandedDimensions(axis: 0), cache: cache)
                 for p in pending.dropFirst() {
@@ -583,7 +599,9 @@ public final class BASQwen35MTPSpecDecoder {
         }
         _ = emit(pending[0])
         while out.count < maxTokens && !hitEOS {
-            if pending.count >= 4 {
+            // audit mlx-decode MED-1: when the MTP KV buffer is full (pos ≥ maxSeq), take the plain
+            // trunk step instead of drafting — draftSample would write mtpK[hLastPos] out of bounds.
+            if pending.count >= 4 || !Self.mtpStreamHasRoom(pos: hLastPos) {
                 // ONE multi-token forward (全面修复 — see the K=1 lane's identical fix; distribution
                 // semantics unchanged: the sample still comes from the trunk's own last-position logits).
                 let hp = model.hiddenStatesWithCache(
@@ -646,8 +664,12 @@ public final class BASQwen35MTPSpecDecoder {
         var hLastPos = prompt.count - 1
         var trunkLen = prompt.count
         var pending: [Int] = [argmaxLast(model.logits(fromHidden: h0))]
-        var d = draftArgmax(mtpForward(
-            embedNext: model.embedding(MLXArray([Int32(pending[0])]))[0], hidden: hLast, pos: hLastPos))
+        // audit mlx-decode MED-1: guard every mtpForward draft with the KV-buffer bound. When full,
+        // use a dummy (never verified — a full buffer always routes to the plain-cap branch below).
+        var d = Self.mtpStreamHasRoom(pos: hLastPos)
+            ? draftArgmax(mtpForward(
+                embedNext: model.embedding(MLXArray([Int32(pending[0])]))[0], hidden: hLast, pos: hLastPos))
+            : MLXArray(Int32(0))
         if forceRejectForDiagnostics { d = MLXArray(Int32(0)) }
         let t0 = Date()
         var out: [Int] = []
@@ -662,8 +684,9 @@ public final class BASQwen35MTPSpecDecoder {
         // probe convention skipped it symmetrically in both arms; the wiring E2E caught the mismatch vs streaming).
         _ = emit(pending[0])
         while out.count < maxTokens && !hitEOS {
-            // pending-cap safety: commit a long reject run without a draft (rare at a≈0.86)
-            if pending.count >= 4 {
+            // pending-cap safety: commit a long reject run without a draft (rare at a≈0.86).
+            // audit mlx-decode MED-1: also plain-step when the MTP buffer is full (no room to draft).
+            if pending.count >= 4 || !Self.mtpStreamHasRoom(pos: hLastPos) {
                 // ONE multi-token forward (全面修复: the one-token-at-a-time loop here was deep-K killer #2 —
                 // P×~16ms/refeed; same forward class as the verify feed ⇒ same ADR-039 lossless family).
                 let hp = model.hiddenStatesWithCache(
@@ -673,8 +696,10 @@ public final class BASQwen35MTPSpecDecoder {
                 let t = argmaxLast(model.logits(fromHidden: hp))
                 if !emit(t) { break }
                 pending = [t]
-                d = draftArgmax(mtpForward(
-                    embedNext: model.embedding(MLXArray([Int32(t)]))[0], hidden: hLast, pos: hLastPos))
+                d = Self.mtpStreamHasRoom(pos: hLastPos)
+                    ? draftArgmax(mtpForward(
+                        embedNext: model.embedding(MLXArray([Int32(t)]))[0], hidden: hLast, pos: hLastPos))
+                    : MLXArray(Int32(0))
                 continue
             }
             let checkpoint = BASTrunkCheckpoint(cache: cache)   // 案1: the ONE snapshot owner
@@ -706,8 +731,10 @@ public final class BASQwen35MTPSpecDecoder {
                 hLastPos = trunkLen + T - 2                            // its absolute position (state rolled back)
                 pending.append(trueD)
             }
-            d = draftArgmax(mtpForward(
-                embedNext: model.embedding(MLXArray([Int32(pending.last!)]))[0], hidden: hLast, pos: hLastPos))
+            d = Self.mtpStreamHasRoom(pos: hLastPos)
+                ? draftArgmax(mtpForward(
+                    embedNext: model.embedding(MLXArray([Int32(pending.last!)]))[0], hidden: hLast, pos: hLastPos))
+                : MLXArray(Int32(0))   // audit MED-1: full buffer ⇒ dummy (next iter plain-steps)
             if forceRejectForDiagnostics { d = MLXArray(Int32(0)) }
         }
         return Run(tokens: out, decodeSeconds: Date().timeIntervalSince(t0), accepted: accepted, iterations: iters, proposed: iters)

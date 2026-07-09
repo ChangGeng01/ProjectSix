@@ -26,4 +26,23 @@ final class BASClampedChainWidthTests: XCTestCase {
         XCTAssertEqual(w(2, 11, 5), 2, "preferredK still wins over a larger maxDraftWidth")
         XCTAssertEqual(w(9, 4, 6), 4, "the tightest of the three bounds wins")
     }
+
+    // audit mlx-decode MED-1 (complete) — b81490202 clamped only the FUSED-chain draft width; the
+    // per-position write bound (mtpForward writes mtpK[pos]) was still unguarded on the sampling,
+    // greedy, chain, and compiled lanes. mtpStreamHasRoom gates every draft site.
+    private func room(_ pos: Int, _ width: Int) -> Bool {
+        BASQwen35MTPSpecDecoder.mtpStreamHasRoom(pos: pos, width: width)
+    }
+
+    func testStreamBoundGuardsThePerPositionWrite() {
+        let maxSeq = BASQwen35MTPSpecDecoder.maxSeq   // 2048
+        // A single draft at the last valid slot is OK; one past the end is NOT (mtpK[maxSeq] overruns).
+        XCTAssertTrue(room(maxSeq - 1, 1), "pos maxSeq-1 writes the last valid slot")
+        XCTAssertFalse(room(maxSeq, 1), "pos maxSeq would write out of bounds")
+        XCTAssertFalse(room(maxSeq + 5, 1), "well past the end is never in bounds")
+        XCTAssertFalse(room(-1, 1), "a negative position is never in bounds")
+        // A k-wide chain writes pos … pos+k-1: the LAST must stay < maxSeq.
+        XCTAssertTrue(room(maxSeq - 5, 5), "a 5-wide chain ending exactly at the last slot fits")
+        XCTAssertFalse(room(maxSeq - 4, 5), "a 5-wide chain that would write mtpK[maxSeq] does NOT fit")
+    }
 }
