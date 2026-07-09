@@ -1,5 +1,6 @@
 import XCTest
 @testable import BASMLXAdapter
+@testable import BASRuntimeCore
 
 /// per-key in-flight 门 gates(大审计梯次3 地基):同 key 严格串行、不同 key 并发、FIFO。
 final class BASPerKeyInFlightGateTests: XCTestCase {

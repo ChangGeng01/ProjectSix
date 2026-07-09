@@ -1,5 +1,6 @@
 import XCTest
 @testable import BASMLXAdapter
+@testable import BASRuntimeCore
 
 /// H4(大审计梯次3 尾修)gates:2-slot 会话解码闸的交接语义。
 ///

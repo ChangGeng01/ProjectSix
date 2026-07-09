@@ -167,6 +167,30 @@ public actor BASTurnRuntimeEngine {
     private let observationFailureLog:
         BASTurnRuntimeEngineObservationFailureLog?
 
+    // MARK: - audit M-k F1 — turn serialization
+    //
+    // This actor is REENTRANT: without a gate, two turns driven concurrently
+    // on ONE engine interleave at every await and cross-write the shared
+    // last*/sequenceCounter state (stale `last*()` accessors; crossed audit
+    // attribution). The ledger-locality fix already made the EMITTED events
+    // self-consistent; this gate additionally ENFORCES the documented
+    // one-turn-per-engine invariant so the shared accessors are coherent too.
+    // Per-engine FIFO serial lock (pure-logic, zero-MLX — lives in
+    // BASRuntimeCore). Kill-switch BAS_TURN_SERIAL=0 ⇒ direct call, byte-equal
+    // to the pre-gate path (production drivers build a fresh engine per turn /
+    // are single-stream, so default-on never contends). Mirrors
+    // MLXOrganAdapter.sessionGate / BAS_SESSION_GATE. HOST CONTRACT: a
+    // host-supplied routed/fallback stage executor must NOT call back into this
+    // engine's runTurn/runWithPlan (the gate is non-reentrant on its one key).
+    private let turnSerializer = BASPerKeyInFlightGate()
+    private static let turnSerialKey = "bas.turn-runtime-engine.turn"
+    private let turnSerializationEnabled: Bool
+
+    /// Default from env (read at construction). `BAS_TURN_SERIAL=0` disables.
+    nonisolated public static var defaultTurnSerializationEnabled: Bool {
+        ProcessInfo.processInfo.environment["BAS_TURN_SERIAL"] != "0"
+    }
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
@@ -243,9 +267,14 @@ public actor BASTurnRuntimeEngine {
         biomimeticCheckpointEveryNTurns: Int? = nil,
         observationFailureLog:
             BASTurnRuntimeEngineObservationFailureLog?
-            = nil
+            = nil,
+        // audit M-k F1 — default from env (BAS_TURN_SERIAL); tests inject
+        // explicit true/false to exercise both modes without process env.
+        turnSerializationEnabled: Bool =
+            BASTurnRuntimeEngine.defaultTurnSerializationEnabled
     ) {
         self.coordinator = coordinator
+        self.turnSerializationEnabled = turnSerializationEnabled
         self.eventLog = eventLog
         self.eventIDFactory = eventIDFactory
         self.clockMs = clockMs
@@ -469,7 +498,46 @@ public actor BASTurnRuntimeEngine {
         coordinator.resolvedTrialSink = resolvedSink
     }
 
+    // audit M-k F1 — run the whole turn inside the per-engine serialization
+    // gate so the shared last*/sequenceCounter state is never cross-written by
+    // a concurrent turn. Kill-switch off ⇒ direct call (byte-equal). The op is
+    // a single `await self._core(...)` hop (mirrors MLXOrganAdapter.sessionGate;
+    // keeps all engine-isolated work inside one actor hop, not the @Sendable
+    // closure body).
+    private func withTurnSerialization(
+        _ op: @Sendable () async -> BASEBrainTurnResult
+    ) async -> BASEBrainTurnResult {
+        guard turnSerializationEnabled else { return await op() }
+        return await turnSerializer.serialize(key: Self.turnSerialKey, op)
+    }
+
     public func runTurn(
+        _ request: BASEBrainTurnRequest,
+        auditProjections:
+            BASRuntimeAuditProjectionsBundle? = nil,
+        permitEscalationLedger:
+            BASPermitEscalationLedger? = nil,
+        stageLedger:
+            BASTurnRuntimeStageLedger? = nil,
+        stagePlan:
+            BASTurnRuntimeStagePlan? = nil,
+        timestampMsOverride: Int64? = nil
+    ) async -> BASEBrainTurnResult {
+        await withTurnSerialization {
+            await self._runTurnCore(
+                request,
+                auditProjections: auditProjections,
+                permitEscalationLedger: permitEscalationLedger,
+                stageLedger: stageLedger,
+                stagePlan: stagePlan,
+                timestampMsOverride: timestampMsOverride)
+        }
+    }
+
+    /// audit M-k F1 — the UNGATED core of runTurn. The `.nativeV2` branch calls
+    /// the UNGATED `_runWithPlanCore` (NEVER the gated public runWithPlan) so a
+    /// single public runTurn acquires the non-reentrant turn lock exactly once.
+    private func _runTurnCore(
         _ request: BASEBrainTurnRequest,
         auditProjections:
             BASRuntimeAuditProjectionsBundle? = nil,
@@ -490,7 +558,7 @@ public actor BASTurnRuntimeEngine {
         // unchanged (ADR-014 byte-equal-off / R1). The native path's only observable effect
         // is additional stage-ledger / dispatch telemetry, NOT a different answer.
         if runtimeMode == .nativeV2 {
-            return await runWithPlan(
+            return await _runWithPlanCore(
                 request,
                 plan: stagePlan ?? BASTurnRuntimeStagePlan.canonical(),
                 // audit M-k F2: thread the caller's audit projections + permit-escalation ledger
@@ -556,6 +624,31 @@ public actor BASTurnRuntimeEngine {
     /// the stage ledger is emitted via the .complete
     /// envelope payload。
     public func runWithPlan(
+        _ request: BASEBrainTurnRequest,
+        plan: BASTurnRuntimeStagePlan =
+            BASTurnRuntimeStagePlan.canonical(),
+        auditProjections: BASRuntimeAuditProjectionsBundle? = nil,
+        permitEscalationLedger: BASPermitEscalationLedger? = nil,
+        delegate: BASRuntimeInternalDelegate? = nil,
+        timestampMsOverride: Int64? = nil
+    ) async -> BASEBrainTurnResult {
+        // audit M-k F1 — serialize the whole turn (see withTurnSerialization).
+        await withTurnSerialization {
+            await self._runWithPlanCore(
+                request,
+                plan: plan,
+                auditProjections: auditProjections,
+                permitEscalationLedger: permitEscalationLedger,
+                delegate: delegate,
+                timestampMsOverride: timestampMsOverride)
+        }
+    }
+
+    /// audit M-k F1 — the UNGATED core. Called by the gated public
+    /// `runWithPlan` AND (directly, without re-acquiring the gate) by the
+    /// gated `runTurn`'s `.nativeV2` branch, so a single public entry acquires
+    /// the non-reentrant turn lock exactly once.
+    private func _runWithPlanCore(
         _ request: BASEBrainTurnRequest,
         plan: BASTurnRuntimeStagePlan =
             BASTurnRuntimeStagePlan.canonical(),

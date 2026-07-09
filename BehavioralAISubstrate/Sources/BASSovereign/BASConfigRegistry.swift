@@ -47,6 +47,10 @@ public enum BASConfigRegistry {
               owner: "MLXOrganAdapter.swift:363",
               what: "梯次3 per-key 会话闸(串行化 draftMultiTurn/spill/clear;GATE=0 杀)",
               adrRef: "MEGA_AUDIT 梯次3 双设备认证 07-08(endurance 71t + 并发同座位)"),
+        .init(envName: "BAS_TURN_SERIAL", polarity: .defaultOnKill,
+              owner: "BASTurnRuntimeEngine.swift (turnSerializer)",
+              what: "M-k F1 引擎整轮串行化(一turn一engine不变量;共享 last*/seq 不跨turn串扰;SERIAL=0 杀)",
+              adrRef: "MEGA_AUDIT §9 M-k F1 整轮串行化 07-09"),
         // ── opt-in ───────────────────────────────────────────────────────────
         .init(envName: "BAS_THERMAL_PREDICT", polarity: .optIn,
               owner: "BASEnduranceAppRunner.swift:1545 (app host)",
