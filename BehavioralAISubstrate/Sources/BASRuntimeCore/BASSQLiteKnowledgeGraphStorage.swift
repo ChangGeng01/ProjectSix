@@ -288,9 +288,21 @@ public actor BASSQLiteKnowledgeGraphStorage {
         _ nodeID: String
     ) async throws -> Bool {
         guard let db else { return false }
-        // Delete incident edges first (referential consistency)
-        try Self.deleteIncidentEdges(db: db, nodeID: nodeID)
-        return try Self.deleteNode(db: db, nodeID: nodeID)
+        // audit runtimecore-b #10: the incident-edge delete + the node delete must be ATOMIC. Run as
+        // two separate autocommits, a failure after the edges are gone would leave the node with no
+        // edges (or a failed node-delete would strand already-deleted edges) — an inconsistent
+        // half-delete. Wrap both in one transaction.
+        try Self.runExec(db: db, sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            // Delete incident edges first (referential consistency)
+            try Self.deleteIncidentEdges(db: db, nodeID: nodeID)
+            let removed = try Self.deleteNode(db: db, nodeID: nodeID)
+            try Self.runExec(db: db, sql: "COMMIT;")
+            return removed
+        } catch {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
     }
 
     /// Cascade-DELETE every edge incident to `nodeID` (either

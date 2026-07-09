@@ -50,6 +50,35 @@ final class BASKnowledgeGraphCorruptSurfacingTests: XCTestCase {
         XCTAssertEqual(box.fired, 0, "an empty graph is NOT corruption")
     }
 
+    // audit runtimecore-b #10: removeNode's incident-edge delete + node delete must be ATOMIC. If the
+    // node delete fails after the edges are deleted, the whole thing must roll back (edges survive).
+    func testRemoveNodeRollsBackEdgeDeleteWhenNodeDeleteFails() async throws {
+        let u = url("removeatomic"); defer { cleanup(u) }
+        let store = try BASSQLiteKnowledgeGraphStorage(databaseURL: u)
+        try await store.upsertNode(node("n1"))
+        _ = try await store.appendEdge(BASKnowledgeEdge(
+            edgeID: "e1", fromNodeID: "n1", toNodeID: "n1", kind: .supports, weight: 1.0,
+            createdAtMs: 1_700_000_000_000))
+        let edgesBefore = await store.allEdges().count
+        XCTAssertEqual(edgesBefore, 1)
+
+        // Drop the node table via a second connection so deleteNode fails (schema change ⇒ the store's
+        // next prepare of the node-delete sees SQLITE_SCHEMA and fails). The incident-edge delete runs
+        // first inside the transaction and must roll back with it.
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open_v2(u.path, &raw, SQLITE_OPEN_READWRITE, nil), SQLITE_OK)
+        _ = sqlite3_exec(raw, "DROP TABLE knowledge_node;", nil, nil, nil)
+        sqlite3_close_v2(raw)
+
+        do {
+            _ = try await store.removeNode("n1")
+            XCTFail("removeNode must throw when the node delete fails")
+        } catch { /* expected */ }
+        let edgesAfter = await store.allEdges().count
+        XCTAssertEqual(edgesAfter, 1,
+            "the incident-edge delete must roll back with the failed node delete (atomic half-delete guard)")
+    }
+
     // NOTE on teeth: a read-time SQLite failure cannot be induced DETERMINISTICALLY on this store —
     // structural corruption is caught at OPEN by the prior fix's integrity_check, and a busy/locked
     // read needs nondeterministic lock contention. The error-SURFACING code path added here
