@@ -46,7 +46,19 @@
       "x-test-integrity F6 (MED)",
       "x-test-integrity F7 (MED)"
     ],
-    "summary": "The per-item ledger does NOT reconcile with the theme-level \"44验/40开\" — it reveals a large silent-drop gap. Per-item totals: 94 items → 49 closed + 4 folded (into HIGHs: memory-b F8/F9, mlx MED-5, x-test-integrity F5) + 4 explicitly-open-with-blocker (orch MED-3, policy MED-2, tools R2/R3 corpus, x-concurrency MED-9) + 37 unaccounted. The granularities differ (94 per-item hits vs ~55 theme MEDs vs the 84-summing 44/40 figure), so a raw digit match was never possible; but the substantive finding is that the theme-level \"40开\" does NOT cover the 37 unaccounted items. Those 37 are qualitatively worse than \"open\": each is traceable to NO remediation commit, NO §8–§11 ledger row, and is absent from the §11 line-501 residual list — they were swallowed behind aggregate theme closures that claimed \"all MED closed\" (e.g. §8 line 485 for the M-i device batch, the M-f \"全部 MED 全闭\" rollup which has no closure row at all, the M-k spine fold that closed F1/F2/F4/F5 and skipped F3, and the x-test-integrity report truncated at F3 so F4/F6/F7 never entered the ledger). Whole clusters are dropped wholesale: all 6 mlx-adapter-core MED-6..11 (M-f theme never got a closure row), all 5 organ-eval findings (only characterized in the §4 health score, never themed), and 4 runtimecore-b findings. So the honest verdict: 44验 overstates verification (several \"closes\" are doc-only comment-lie fixes leaving the behavioral clause live — memory-b F3, or partial — hostkit-rest MED-2), and 40开 understates the true not-closed population (4 tracked-open + 37 untracked = 41), while mislabeling 37 genuinely-dropped items as if the theme aggregates had absorbed them. The 55/55 attestation cannot be honestly signed: 37 MED findings are unaccounted."
+    "summary": "The per-item ledger does NOT reconcile with the theme-level \"44验/40开\" — it reveals a large silent-drop gap. Per-item totals: 94 items → 49 closed + 4 folded (into HIGHs: memory-b F8/F9, mlx MED-5, x-test-integrity F5) + 4 explicitly-open-with-blocker (orch MED-3, policy MED-2, tools R2/R3 corpus, x-concurrency MED-9) + 37 unaccounted. The granularities differ (94 per-item hits vs ~55 theme MEDs vs the 84-summing 44/40 figure), so a raw digit match was never possible; but the substantive finding is that the theme-level \"40开\" does NOT cover the 37 unaccounted items. Those 37 are qualitatively worse than \"open\": each is traceable to NO remediation commit, NO §8–§11 ledger row, and is absent from the §11 line-501 residual list — they were swallowed behind aggregate theme closures that claimed \"all MED closed\" (e.g. §8 line 485 for the M-i device batch, the M-f \"全部 MED 全闭\" rollup which has no closure row at all, the M-k spine fold that closed F1/F2/F4/F5 and skipped F3, and the x-test-integrity report truncated at F3 so F4/F6/F7 never entered the ledger). Whole clusters are dropped wholesale: all 6 mlx-adapter-core MED-6..11 (M-f theme never got a closure row), all 5 organ-eval findings (only characterized in the §4 health score, never themed), and 4 runtimecore-b findings. So the honest verdict: 44验 overstates verification (several \"closes\" are doc-only comment-lie fixes leaving the behavioral clause live — memory-b F3, or partial — hostkit-rest MED-2), and 40开 understates the true not-closed population (4 tracked-open + 37 untracked = 41), while mislabeling 37 genuinely-dropped items as if the theme aggregates had absorbed them. The 55/55 attestation cannot be honestly signed: 37 MED findings are unaccounted.",
+    "disposition_backfill_2026_07_09": {
+      "note": "The per-item disposition fields lagged the prose ledger; backfilled to reflect the actual remediation commits. All three re-exam campaigns (tail, device-gated, tracked-open) are now reflected per-item.",
+      "final_by_disposition": {
+        "closed": 84,
+        "device-only": 2,
+        "not-reproduced": 2,
+        "folded": 4,
+        "deferred": 1,
+        "open": 1
+      },
+      "true_remaining": "device-only(3: devicetestapp MED-9, x-concurrency MED-LOW-10, mlx-adapter-core MED-8-deferred) + not-reproduced/refuted(2: memory-b F5, hostkit-spine F3) + folded-into-HIGH(4: memory-b F8/F9, mlx-adapter-core MED-5, x-test-integrity F5) + operator-gated(1: tools R2/R3 corpus). Everything else CLOSED."
+    }
   },
   "items": [
     {
@@ -193,8 +205,9 @@
     {
       "med_id": "memory-a F5",
       "title": "Write-error path cache/disk fork: tracker sets inMemory[id]=record BEFORE insertRecord; on SQLITE_FULL throw the phantom record stays in cache (read APIs serve a record not on disk until restart); markHelped and insertBatchInTransaction ROLLBACK share the shape",
-      "disposition": "unaccounted",
-      "detail": "BASMemoryUsageTracker+SQLCore.swift:361-381/384-395 + +ReplayAuditFTS.swift:696-744. +SQLCore.swift was only touched post-audit by an extraction refactor (9d9a0856c) and the H11/H12 tranche-2 (fbc22d5f7, tombstone reload + purge notes/FTS) — neither reorders inMemory-vs-insert nor adds rollback. No ledger reference, no theme fold, not in §11 residual. Silently dropped."
+      "disposition": "closed",
+      "detail": "BASMemoryUsageTracker+SQLCore.swift:361-381/384-395 + +ReplayAuditFTS.swift:696-744. +SQLCore.swift was only touched post-audit by an extraction refactor (9d9a0856c) and the H11/H12 tranche-2 (fbc22d5f7, tombstone reload + purge notes/FTS) — neither reorders inMemory-vs-insert nor adds rollback. No ledger reference, no theme fold, not in §11 residual. Silently dropped.",
+      "remediation": "commit dab6d9223 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "memory-b F3",
@@ -205,14 +218,16 @@
     {
       "med_id": "memory-b F4",
       "title": "Store mutation errors swallowed and conflated with 'atom not found' → forget/quarantine path fail-open",
-      "disposition": "unaccounted",
-      "detail": "BASEventSourcedMemoryAtomStore.swift:238-244/255-261/272-281 (updateTier/updateGovernanceStatus/remove catch{return false/nil}); downstream BASMemoryMutationWriter.swift:75-88 counts as notFound, BASMemorySleepConsolidationPass.swift:327-333 as unjoinedCandidateIDs. Searched all §8-§11 ledgers, git log --oneline --all, and theme table §3 — no reference. Distinct from F12 (ec620b4db, which added onSilentFailure/eventsOrThrow to the ROUTED event-log READ path BASRoutedEventLogStorage, not the atom-store MUTATION path). No commit, no theme, no blocker stated. Silently dropped."
+      "disposition": "closed",
+      "detail": "BASEventSourcedMemoryAtomStore.swift:238-244/255-261/272-281 (updateTier/updateGovernanceStatus/remove catch{return false/nil}); downstream BASMemoryMutationWriter.swift:75-88 counts as notFound, BASMemorySleepConsolidationPass.swift:327-333 as unjoinedCandidateIDs. Searched all §8-§11 ledgers, git log --oneline --all, and theme table §3 — no reference. Distinct from F12 (ec620b4db, which added onSilentFailure/eventsOrThrow to the ROUTED event-log READ path BASRoutedEventLogStorage, not the atom-store MUTATION path). No commit, no theme, no blocker stated. Silently dropped.",
+      "remediation": "commit 2c1125467 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "memory-b F5",
       "title": "Warm-cache incremental reduction can diverge from event-log order under actor reentrancy (state-machine consistency)",
-      "disposition": "unaccounted",
-      "detail": "BASEventSourcedMemoryAtomStore.swift:172-216 (appendEventAndUpdateCache); .warmAtInit strategy, two concurrent updateTier continuations resume without FIFO → cache终态 vs replay终态 diverge, contradicting the file's line 25-26 'cache and event log can never diverge mid-write' claim. No reference in any §8-§11 ledger, git log, or §3 theme grouping. Not the same as M-k F1 (engine reentrancy, different file BASTurnRuntimeEngine, commit f42d034c8). Silently dropped."
+      "disposition": "not-reproduced",
+      "detail": "BASEventSourcedMemoryAtomStore.swift:172-216 (appendEventAndUpdateCache); .warmAtInit strategy, two concurrent updateTier continuations resume without FIFO → cache终态 vs replay终态 diverge, contradicting the file's line 25-26 'cache and event log can never diverge mid-write' claim. No reference in any §8-§11 ledger, git log, or §3 theme grouping. Not the same as M-k F1 (engine reentrancy, different file BASTurnRuntimeEngine, commit f42d034c8). Silently dropped.",
+      "remediation": "NOT-REPRODUCED (honest revert): 60-way stress + structural proof that warmCacheIfNeeded is a synchronous no-op post-warm ⇒ reduce runs atomically in append-FIFO order; reversal did not red ⇒ did not ship a false-green defensive fix."
     },
     {
       "med_id": "memory-b F6",
@@ -327,8 +342,9 @@
     {
       "med_id": "orchestration MED-2",
       "title": "Rust FFI out-of-bounds index → precondition crash instead of Swift fallback; also unchecked duplicate indices (EBrainNeuralMaterializationCore.swift:306-310)",
-      "disposition": "unaccounted",
-      "detail": "NOT referenced in any §3 theme (M-l line 138 lists only orch MED-1 and MED-4), not in §8/§9/§10/§11, and no git commit addresses the dreamLoopDominanceOrderDouble index precondition/duplicate-index. The §2 line 104 NeuralMaterialization reference is the H17 duplicate-KEY Dictionary trap (closed 5940afce1) — a different finding at different lines. This FFI-boundary crash-vs-fallback finding was silently dropped by the theme fold."
+      "disposition": "closed",
+      "detail": "NOT referenced in any §3 theme (M-l line 138 lists only orch MED-1 and MED-4), not in §8/§9/§10/§11, and no git commit addresses the dreamLoopDominanceOrderDouble index precondition/duplicate-index. The §2 line 104 NeuralMaterialization reference is the H17 duplicate-KEY Dictionary trap (closed 5940afce1) — a different finding at different lines. This FFI-boundary crash-vs-fallback finding was silently dropped by the theme fold.",
+      "remediation": "commit 13a7e5b66 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "orchestration MED-3",
@@ -346,20 +362,23 @@
     {
       "med_id": "organ-eval MED-1",
       "title": "watchdog reads outData racing the background read thread (BASSleepMeasurementStation.swift:167-187)",
-      "disposition": "unaccounted",
-      "detail": "Not in any §3 theme; §4 line 157 only names the 'zombie' (=HIGH-2/H20). H20 commit 2e2483e05 touched the same function but for process-group SIGKILL + closing the pipe write end — the DATA RACE on the shared `var outData` (main thread reads String(data: outData) after readDone.wait timeout while readQueue.async may still be writing it) remains unsynchronized in the current tree (no lock/isolation added). The race itself was never themed, ledgered, or committed."
+      "disposition": "closed",
+      "detail": "Not in any §3 theme; §4 line 157 only names the 'zombie' (=HIGH-2/H20). H20 commit 2e2483e05 touched the same function but for process-group SIGKILL + closing the pipe write end — the DATA RACE on the shared `var outData` (main thread reads String(data: outData) after readDone.wait timeout while readQueue.async may still be writing it) remains unsynchronized in the current tree (no lock/isolation added). The race itself was never themed, ledgered, or committed.",
+      "remediation": "commit 983ea4c4f (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "organ-eval MED-2",
       "title": "AB judgment fidelity anchor silently bypassable — parser rows carry nil tokHash, fidelityMismatches==0 (BASABProtocol.swift:114-121, 262-265)",
-      "disposition": "unaccounted",
-      "detail": "Appears ONLY as a §4 health-score diagnosis line ('AB fidelity 可旁路', line 157) — never folded into any M-theme (M-a..M-p), never in §8/§9/§10/§11, no git commit. BASABProtocol.swift's only history is pre-mega-audit RSI commits (6dd25dda0, 33711315e). The §3 theme fold dropped it."
+      "disposition": "closed",
+      "detail": "Appears ONLY as a §4 health-score diagnosis line ('AB fidelity 可旁路', line 157) — never folded into any M-theme (M-a..M-p), never in §8/§9/§10/§11, no git commit. BASABProtocol.swift's only history is pre-mega-audit RSI commits (6dd25dda0, 33711315e). The §3 theme fold dropped it.",
+      "remediation": "commit f8f382c6c (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "organ-eval MED-3",
       "title": "AB protocol: three pre-registered fields never executed + single-block realEffect structurally unreachable (BASABProtocol.swift:18-24, 33-48, 177-182)",
-      "disposition": "unaccounted",
-      "detail": "Not referenced anywhere — no §3 theme, no §4 mention, no remediation ledger row, no git commit. BASABProtocol.swift only touched by pre-audit RSI commits. Fully dropped by the theme fold."
+      "disposition": "closed",
+      "detail": "Not referenced anywhere — no §3 theme, no §4 mention, no remediation ledger row, no git commit. BASABProtocol.swift only touched by pre-audit RSI commits. Fully dropped by the theme fold.",
+      "remediation": "commit be44248e1 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "organ-eval MED-4",
@@ -371,8 +390,9 @@
     {
       "med_id": "organ-eval MED-5",
       "title": "verification pipeline: gated-skip / zero-stage indistinguishable from all-pass in feedback shape; failure-label order not replayable (BASLLMVerifierPipeline.swift)",
-      "disposition": "unaccounted",
-      "detail": "Not referenced in any theme, ledger, or commit. BASLLMVerifierPipeline.swift history is efficiency-feature work (9a8f4494f verifier gate, ae0ea6ab7), none audit-remediation. Both the field-truth gap ('no review' == 'all four pass') and the M892 replay-determinism violation (dictionary-random stage-failure order) remain."
+      "disposition": "closed",
+      "detail": "Not referenced in any theme, ledger, or commit. BASLLMVerifierPipeline.swift history is efficiency-feature work (9a8f4494f verifier gate, ae0ea6ab7), none audit-remediation. Both the field-truth gap ('no review' == 'all four pass') and the M892 replay-determinism violation (dictionary-random stage-failure order) remain.",
+      "remediation": "commit a7c5e093e (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "policy-obs-misc MED-1",
@@ -396,8 +416,9 @@
     {
       "med_id": "policy-obs-misc MED-4",
       "title": "predictive-notification quiet-hours formula only expresses cross-midnight windows; start==end → 24h fully silent (PredictiveNotificationPolicyCore.swift:203-209)",
-      "disposition": "unaccounted",
-      "detail": "Appears ONLY as a §4 health-score diagnosis phrase ('quiet-hours 公式', line 159) — never folded into an M-theme, never in §8/§9/§10/§11, no git commit. PredictiveNotificationPolicyCore.swift history is only genericize/move commits (5c037f63e, 38239ed5a), none audit-remediation. Dropped by the theme fold (direction is fail-closed so low urgency, but the feature is silently killable with no way to express an empty window)."
+      "disposition": "closed",
+      "detail": "Appears ONLY as a §4 health-score diagnosis phrase ('quiet-hours 公式', line 159) — never folded into an M-theme, never in §8/§9/§10/§11, no git commit. PredictiveNotificationPolicyCore.swift history is only genericize/move commits (5c037f63e, 38239ed5a), none audit-remediation. Dropped by the theme fold (direction is fail-closed so low urgency, but the feature is silently killable with no way to express an empty window).",
+      "remediation": "commit fb064ab07 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "runtimecore-a #2 (MED)",
@@ -414,8 +435,9 @@
     {
       "med_id": "runtimecore-b MED-2",
       "title": "SQLite event-log whole-session prune resets sequence_number → collision with already-exported (sessionID,seq) keys",
-      "disposition": "unaccounted",
-      "detail": "BASSQLiteEventLogStorage.swift:1136-1162 vs BASEventLog.swift:495-499. NOT referenced in any §3 theme (M-c covers only fail-open READS, not seq collision) nor any §8-11 ledger. The only prune-related fix is 40804fa2d (comprehensive-audit-2, 2026-06-09, PRE-mega-audit) which made the integrity SIDECAR prune in lockstep — it did NOT touch seq assignment. Current code still `COALESCE(MAX(sequence_number),-1)+1` from surviving rows only (verified Sources/BASRuntimeCore/BASSQLiteEventLogStorage.swift:1141-1146), so the whole-session-prune → seq-reset → downstream-key-collision defect described in the finding is silently dropped. No git log hit for the seq-reset mechanism."
+      "disposition": "closed",
+      "detail": "BASSQLiteEventLogStorage.swift:1136-1162 vs BASEventLog.swift:495-499. NOT referenced in any §3 theme (M-c covers only fail-open READS, not seq collision) nor any §8-11 ledger. The only prune-related fix is 40804fa2d (comprehensive-audit-2, 2026-06-09, PRE-mega-audit) which made the integrity SIDECAR prune in lockstep — it did NOT touch seq assignment. Current code still `COALESCE(MAX(sequence_number),-1)+1` from surviving rows only (verified Sources/BASRuntimeCore/BASSQLiteEventLogStorage.swift:1141-1146), so the whole-session-prune → seq-reset → downstream-key-collision defect described in the finding is silently dropped. No git log hit for the seq-reset mechanism.",
+      "remediation": "commit 0767a20aa (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "runtimecore-b MED-3",
@@ -426,20 +448,23 @@
     {
       "med_id": "runtimecore-b MED-4",
       "title": "BASChapterDoctrineSQLLoader: 7 fatalError on lazy-load resource/packaging failure → unrecoverable process crash",
-      "disposition": "unaccounted",
-      "detail": "BASChapterDoctrineSQLLoader.swift:57,70,79,93,144,276,297. The file is referenced once in the audit doc (§6 line 270) but ONLY to EXEMPT it from the secure_delete/#16 sweep ('第19个…是 :memory: 无盘无删故豁免') — that note is about disk deletion, and does NOT address the fatalError-vs-typed-error finding. No theme (not in M-a..M-p) and no commit converts the 7 fatalErrors to typed error + empty-collection degrade. Silently dropped."
+      "disposition": "closed",
+      "detail": "BASChapterDoctrineSQLLoader.swift:57,70,79,93,144,276,297. The file is referenced once in the audit doc (§6 line 270) but ONLY to EXEMPT it from the secure_delete/#16 sweep ('第19个…是 :memory: 无盘无删故豁免') — that note is about disk deletion, and does NOT address the fatalError-vs-typed-error finding. No theme (not in M-a..M-p) and no commit converts the 7 fatalErrors to typed error + empty-collection degrade. Silently dropped.",
+      "remediation": "commit 8cddae88c (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "runtimecore-b MED-5",
       "title": "v2 binary event decode fail-open: envelope decode failure silently strips fields to defaults + memoryRefs comma-join splits refs containing commas",
-      "disposition": "unaccounted",
-      "detail": "BASSQLiteEventLogStorage.swift:1009-1042 (envelope `try? JSONDecoder().decode` returns all-default entry instead of throwing) and :953/:1027-1032 (memoryRefs legacy comma-join round-trip splits). Mitigated by useBinaryPayload default false (ADR-014 opt-in). Not referenced in any §3 theme or §8-11 ledger; no git log hit for envelope/memoryRefs remediation. Silently dropped (dormant behind opt-in flag)."
+      "disposition": "closed",
+      "detail": "BASSQLiteEventLogStorage.swift:1009-1042 (envelope `try? JSONDecoder().decode` returns all-default entry instead of throwing) and :953/:1027-1032 (memoryRefs legacy comma-join round-trip splits). Mitigated by useBinaryPayload default false (ADR-014 opt-in). Not referenced in any §3 theme or §8-11 ledger; no git log hit for envelope/memoryRefs remediation. Silently dropped (dormant behind opt-in flag).",
+      "remediation": "commit 7567660a0 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "runtimecore-b MED-6",
       "title": "BASPQIndex @unchecked Sendable wraps mutable Rust state; train/add have zero synchronization → &mut aliasing UB",
-      "disposition": "unaccounted",
-      "detail": "BASPQIndex.swift:27,76-125. 'writes serialize via caller's actor context' is a comment-only contract with no enforcement, unlike the truly-read-only BASBpeTokenizerHandle it mimics. Not referenced in any §3 theme or §8-11 ledger; git log for PQIndex shows only the original build commit (2d1e6ae31, chapter 729) — no NSLock/actor remediation. Silently dropped."
+      "disposition": "closed",
+      "detail": "BASPQIndex.swift:27,76-125. 'writes serialize via caller's actor context' is a comment-only contract with no enforcement, unlike the truly-read-only BASBpeTokenizerHandle it mimics. Not referenced in any §3 theme or §8-11 ledger; git log for PQIndex shows only the original build commit (2d1e6ae31, chapter 729) — no NSLock/actor remediation. Silently dropped.",
+      "remediation": "commit de18c7876 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "rust MED",
@@ -553,8 +578,9 @@
     {
       "med_id": "x-concurrency MED-5",
       "title": "Adjudication engine process-global static counter has no synchronized accumulation — nonisolated(unsafe) static var routedDivergenceCount with plain += RMW across isolation domains → data race / lost increments, on the very '>0 = investigate' interpretability counter (BASSovereignVerdictEngine.swift:277/356)",
-      "disposition": "unaccounted",
-      "detail": "NOT referenced in any ledger: §3 M-l (line 138) lists x-concurrency MED-4/6/8/9 but conspicuously SKIPS MED-5; the doc's other 'MED-5' mentions are different auditors (mlx-adapter-core MED-5=H4; M-d MED-5=x-sov#2; M-i MED-5=DeviceTestApp). Source unchanged: lines 277/356 still nonisolated(unsafe) static + non-atomic +=. Only post-audit commit to the file is 4f0385598 (M-d: revoke/Stage-3/canonical gate) which does NOT touch the counter. No ManagedAtomic fix. Silently dropped MED."
+      "disposition": "closed",
+      "detail": "NOT referenced in any ledger: §3 M-l (line 138) lists x-concurrency MED-4/6/8/9 but conspicuously SKIPS MED-5; the doc's other 'MED-5' mentions are different auditors (mlx-adapter-core MED-5=H4; M-d MED-5=x-sov#2; M-i MED-5=DeviceTestApp). Source unchanged: lines 277/356 still nonisolated(unsafe) static + non-atomic +=. Only post-audit commit to the file is 4f0385598 (M-d: revoke/Stage-3/canonical gate) which does NOT touch the counter. No ManagedAtomic fix. Silently dropped MED.",
+      "remediation": "commit bfd670547 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "x-concurrency MED-6",
@@ -615,8 +641,9 @@
     {
       "med_id": "x-test-integrity F4 (MED, fail-closed)",
       "title": "release_gate authored-key membership check permanently FAILs since 2026-06-25 → joint release gate can never report PASS; grep 'test_qinao_[a-z0-9_]+' (case-sensitive) truncates '..._realFold'→'..._real', mismatching the PASS-line parse (release_gate.py:136 / Batch4Tests:1038,1106)",
-      "disposition": "unaccounted",
-      "detail": "F4 never entered the ledger: synthesis explicitly truncated the x-test-integrity report at F3 (§ note line 5 + §7 line 309: 'only covers F1/F2/partial-F3'). H23 = F1+F2+F3 only. Two post-audit release_gate.py commits (3485393d6 M-j never_worse/parse; 02b534b8a H23 hardcoded-PASS/fingerprint-keymap/fail-closed) address DIFFERENT defects. Current release_gate.py:192 authored_gate_keys() STILL greps case-sensitive 'func test_qinao_[a-z0-9_]+' (truncates mixed-case suffix) — F4's specific bug unaddressed. Silently dropped MED."
+      "disposition": "closed",
+      "detail": "F4 never entered the ledger: synthesis explicitly truncated the x-test-integrity report at F3 (§ note line 5 + §7 line 309: 'only covers F1/F2/partial-F3'). H23 = F1+F2+F3 only. Two post-audit release_gate.py commits (3485393d6 M-j never_worse/parse; 02b534b8a H23 hardcoded-PASS/fingerprint-keymap/fail-closed) address DIFFERENT defects. Current release_gate.py:192 authored_gate_keys() STILL greps case-sensitive 'func test_qinao_[a-z0-9_]+' (truncates mixed-case suffix) — F4's specific bug unaddressed. Silently dropped MED.",
+      "remediation": "commit 8ace4a187 (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "x-test-integrity F5 (MED)",
@@ -627,14 +654,16 @@
     {
       "med_id": "x-test-integrity F6 (MED)",
       "title": "qinao_device.py output-key convention incompatible with build_verdict — writes named keys (decode_tok_s) but build_verdict.py:49 only looks up numeric keys base.get(str(n)); its own docstring's 'build_verdict reads them' contract is false → #65-72 stay PENDING after device merge (qinao_device.py:4-5)",
-      "disposition": "unaccounted",
-      "detail": "F6 never entered the ledger (x-test-integrity truncated at F3). qinao_device.py has ZERO post-audit commits; still writes named out['decode_tok_s'] (line 37/123). The H23 qinao_merge.py does NOT translate device named→numeric — its line-32 comment even asserts 'qinao_device already writes the values file' (the exact false contract F6 flags), so qinao_device is not in KNOWN_SIDEFILES. Defect stands. Silently dropped MED."
+      "disposition": "closed",
+      "detail": "F6 never entered the ledger (x-test-integrity truncated at F3). qinao_device.py has ZERO post-audit commits; still writes named out['decode_tok_s'] (line 37/123). The H23 qinao_merge.py does NOT translate device named→numeric — its line-32 comment even asserts 'qinao_device already writes the values file' (the exact false contract F6 flags), so qinao_device is not in KNOWN_SIDEFILES. Defect stands. Silently dropped MED.",
+      "remediation": "commit df4966b4a (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     },
     {
       "med_id": "x-test-integrity F7 (MED)",
       "title": "shared_wal_durability gate Step 2 pins the test's own re-issued PRAGMA copy, not production init — 3 of 4 asserts (synchronous=NORMAL / wal_autocheckpoint=200 / foreign_keys=ON) are 'replay verification'; deleting the pragma from prod init leaves the gate green (QINAOGateSharedWALDurabilityTests.swift:121-130)",
-      "disposition": "unaccounted",
-      "detail": "F7 never entered the ledger (truncated at F3). The test (current lines 118-132) STILL opens a fresh tempURL connection and re-executes the 4 PRAGMAs itself via sqlite3_exec(replay,...) — exactly F7's complaint. No post-audit commit to QINAOGateSharedWALDurabilityTests.swift; the finding's requested internal read-only pragma probe on the real store was not added. Silently dropped MED."
+      "disposition": "closed",
+      "detail": "F7 never entered the ledger (truncated at F3). The test (current lines 118-132) STILL opens a fresh tempURL connection and re-executes the 4 PRAGMAs itself via sqlite3_exec(replay,...) — exactly F7's complaint. No post-audit commit to QINAOGateSharedWALDurabilityTests.swift; the finding's requested internal read-only pragma probe on the real store was not added. Silently dropped MED.",
+      "remediation": "commit 8962e922b (first §12 remediation campaign — TDD + adversarial reversal + push; per-item disposition backfilled 2026-07-09)"
     }
   ],
   "tail_campaign_2026_07_09": {
