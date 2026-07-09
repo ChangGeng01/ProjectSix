@@ -461,10 +461,11 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 
 ★4-lens 背景 workflow 定案(A serialize vs B ledger-locality):**seq 连续性不重要**(引擎 counter 仅 per-turn start<complete 提示;日志真排序键=存储 MAX+1 per session)+ **accessor 零 in-repo 读者(休眠)**⇒ 唯一活 bug=emit payload 串扰⇒选 B(正范围、字节等价、保并发、不越界入"整轮串行化"这一独立并发决策)。
 
+| **M-l MED-4** | BASRoutedVectorIndexStorage.cosineTopKAtomIDsSync topK(→rowids)+ K 次 rowid→atom_id 分离 FFI=多调用 TOCTOU:并发写间插→SQLite rowid 复用重映到别的原子(错召回)/丢(静默漏);release 无 tripwire | Rust 新 `cosine_topk_atom_ids_for_domain`:同一 with_conn Mutex 内直读 atom_id(无 rowid 往返=无复用窗)+全序(score DESC, atom_id ASC)亦闭并列成员确定性;Swift 单原子调用;删孤儿 atomIDForRowidSync;XCFramework 3 slice 冷×2 byte-identical(rustup 1.96)+3 SHA pin+测字面更;2 cargo 测+并列成员 teeth 过真二进制 | 5c2d2a365 |
+
 ★MED 教训:(a)**fail-open 缺省是 MED 最常见形**(never_worse=True、isUnderPressure 用错分母、AUC 并列偏、SURVIVED 恒印)——修=fail-closed 缺省 + 缺席即红;(b)**纯函数抽取换 teeth**:GPU/模型/设备内联逻辑(pressure 比、probe budget、AUC)抽纯函数才可确定性单测;(c)**竞态 teeth 可靠红**:M-l detached 播种反转 5/5 红(非 flaky——detached 确定性输给即返);(d)**模块图卫生**用源树扫描守卫(SwiftUI-free)+ 正控防误抽。
 
-**诚实账——未闭项(非 mac-纯,须操作员/设备/Rust)**:
-- **M-l MED-4**(向量 rowid TOCTOU)——须 Rust XCFramework 重建。
+**诚实账——未闭项(须操作员/设备)**:
 - **架构 3 条**——操作员抉择(跨设备主权/L3-14 器官逻辑边界等)。
 - **device-gated 5+2**(含 x-sov #5/#6 Data Protection——iOS 锁屏真机才现,macOS `.protectionKey` 不支持)。
 - **b2 /tmp→Docs/evidence 冻结**——实验 I/O 布局,操作员域(改默认路径可能断上游管线)。
