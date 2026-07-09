@@ -40,8 +40,11 @@ final class BASABProtocolTests: XCTestCase {
         }
     }
     private var spec: BASABProtocolSpec {
+        // These synthetic rows deliberately omit tokHash to exercise the parity / realEffect /
+        // thermal-confound criteria in ISOLATION; fidelity is not under test, so the anchor is not
+        // required (audit organ-eval MED-2 now fail-closes a REQUIRED-but-unverifiable anchor).
         BASABProtocolSpec(arms: ["a", "b", "inc"], incumbentArm: "inc",
-                          minMeasuredRowsPerArm: 8)
+                          fidelityAnchorRequired: false, minMeasuredRowsPerArm: 8)
     }
 
     func testParityAndRealEffect() {
@@ -73,9 +76,12 @@ final class BASABProtocolTests: XCTestCase {
     }
 
     func testFidelityAnchorInvalidatesInstrument() {
+        // This one DOES test the fidelity anchor (mismatched hashes), so it requires the anchor.
+        let anchoredSpec = BASABProtocolSpec(arms: ["a", "b", "inc"], incumbentArm: "inc",
+                                             fidelityAnchorRequired: true, minMeasuredRowsPerArm: 8)
         let r = rows(arm: "inc", block: 0, tps: 10, hash: 1)
             + rows(arm: "a", block: 0, tps: 10, hash: 2)   // 同 prompt 不同 hash
-        let report = BASABJudge.judge(spec: spec, rows: r)
+        let report = BASABJudge.judge(spec: anchoredSpec, rows: r)
         XCTAssertEqual(report.overall, .instrumentInvalid)
         XCTAssertTrue(report.arms.isEmpty, "仪器失效 ⇒ 不出任何臂判决")
     }

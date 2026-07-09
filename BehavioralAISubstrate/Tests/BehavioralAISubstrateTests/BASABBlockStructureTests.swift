@@ -15,8 +15,12 @@ final class BASABBlockStructureTests: XCTestCase {
         }
     }
     private func spec() -> BASABProtocolSpec {
+        // These exercise BLOCK-STRUCTURE criteria with nil-tokHash rows; the fidelity anchor is
+        // not under test here, so it is not required (audit organ-eval MED-2 now fail-closes a
+        // REQUIRED-but-unverifiable anchor, which would otherwise mask the block-structure verdicts).
         BASABProtocolSpec(arms: ["cand", "inc"], incumbentArm: "inc",
-                          mirroredBlocks: true, measuredPerArmBlock: 6, minMeasuredRowsPerArm: 8)
+                          mirroredBlocks: true, measuredPerArmBlock: 6,
+                          fidelityAnchorRequired: false, minMeasuredRowsPerArm: 8)
     }
     private func incumbent() -> [BASABMeasurementRow] {
         rows(arm: "inc", block: 0, tps: 10, n: 6) + rows(arm: "inc", block: 1, tps: 10, n: 6)

@@ -31,11 +31,25 @@ final class BASABFidelityVerifiableTests: XCTestCase {
         XCTAssertTrue(BASABJudge.fidelityVerifiable(rows: rows(tokHash: 7)))
     }
 
-    func testReportMarksUnverifiableWhenNoComparableData() {
+    func testRequiredButUnverifiableAnchorFailsClosed() {
+        // audit organ-eval MED-2: the anchor is REQUIRED (default) but there is NOTHING to compare
+        // (nil tokHash, no external count). 0 mismatches here means "unverified", not "clean" — the
+        // verdict must FAIL CLOSED (.instrumentInvalid), not silently pass through to the per-arm logic.
         let report = BASABJudge.judge(spec: spec(), rows: rows(tokHash: nil))
         XCTAssertEqual(report.fidelityMismatches, 0)
         XCTAssertFalse(report.fidelityVerifiable,
-            "0 mismatches with NO comparable data must be marked NOT verifiable (no silent pass)")
+            "0 mismatches with NO comparable data is NOT verifiable")
+        XCTAssertEqual(report.overall, .instrumentInvalid,
+            "a REQUIRED-but-unverifiable fidelity anchor fails closed — no silent bypass")
+    }
+
+    func testUnverifiableIsAllowedWhenAnchorNotRequired() {
+        // With the anchor NOT required, an unverifiable run is not invalidated on fidelity grounds.
+        let s = BASABProtocolSpec(arms: ["a", "inc"], incumbentArm: "inc",
+                                  fidelityAnchorRequired: false, minMeasuredRowsPerArm: 8)
+        let report = BASABJudge.judge(spec: s, rows: rows(tokHash: nil))
+        XCTAssertNotEqual(report.overall, .instrumentInvalid,
+            "anchor not required ⇒ an unverifiable run is not fidelity-invalidated")
     }
 
     func testReportMarksVerifiableWithTokHashes() {

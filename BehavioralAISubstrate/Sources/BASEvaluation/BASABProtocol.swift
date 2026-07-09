@@ -141,17 +141,16 @@ public enum BASABJudge {
         // ── 判据 1: fidelity anchor ───────────────────────────────────────────
         // audit organ-eval MED-2: `mismatches == 0` is AMBIGUOUS — it means
         // "verified clean" when there is comparable data, but "nothing to compare"
-        // when no external count is given and no row carries a tokHash. The old
-        // code read both as a silent PASS. The report now records
-        // `fidelityVerifiable` so a consumer can tell a real clean pass from an
-        // unverified one (the anchor is no longer SILENTLY bypassed). A stricter
-        // verdict-level fail-closed is deferred: judge() has no production caller
-        // yet, and it would require reworking the synthetic-row test suite (which
-        // deliberately omits tokHash to exercise the OTHER criteria in isolation).
+        // when no external count is given and no row carries a tokHash. Reading both
+        // as a PASS SILENTLY BYPASSES a REQUIRED fidelity anchor (a log full of
+        // FIDELITY-FAIL lines but nil tokHash yielded mismatches==0 → overall pass).
+        // FAIL-CLOSED: when the anchor is REQUIRED, a non-zero mismatch OR an
+        // unverifiable anchor (nothing to compare) both invalidate the instrument —
+        // 0 mismatches is only a clean pass when it was actually verifiable.
         let mismatches = externalFidelityMismatches ?? Self.fidelityMismatches(rows: rows)
         let fidelityVerifiable =
             externalFidelityMismatches != nil || Self.fidelityVerifiable(rows: rows)
-        if spec.fidelityAnchorRequired, mismatches > 0 {
+        if spec.fidelityAnchorRequired, mismatches > 0 || !fidelityVerifiable {
             return BASABReport(overall: .instrumentInvalid,
                                fidelityMismatches: mismatches,
                                fidelityVerifiable: fidelityVerifiable, arms: [])
