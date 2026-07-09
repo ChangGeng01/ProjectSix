@@ -25,6 +25,7 @@
 import Foundation
 import UIKit
 import BASMLXAdapter   // MLX GPU arm (M4)
+import BASRuntimeCore  // audit devicetestapp MED-5: single-source fused-state geometry
 import BASOrgan
 
 #if canImport(CoreAI)
@@ -206,7 +207,7 @@ enum BASQwen35RdarProbe {
                         log.emit("[m4-ane] \(name): no fn ✗"); log.close(); return
                     }
                     fns.append(fn)
-                    states.append(NDArray(scalars: [Float16](repeating: 0, count: rows * 548_864), shape: [rows, 548_864]))
+                    states.append(NDArray(scalars: [Float16](repeating: 0, count: rows * BASQwen35FusedStateGeometry.row), shape: [rows, BASQwen35FusedStateGeometry.row]))  // audit MED-5: single-source ROW
                     log.emit("[m4-ane] resident: \(name)")
                 } catch { log.emit("[m4-ane] \(name) LOAD FAILED \(error) ✗"); log.close(); return }
             }
@@ -321,8 +322,11 @@ enum BASQwen35RdarProbe {
                     print("[qwen35-chain] \(stage.name): no function ✗"); return
                 }
                 print("[qwen35-chain] stage \(idx + 1)/\(chain.count) \(stage.name) loaded in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
-                var state = NDArray(scalars: [Float16](repeating: 0, count: stage.rows * stateRow),
-                                    shape: [stage.rows, stateRow])
+                // audit devicetestapp MED-5: the FUSED chain uses ROW = GDN state + conv band
+                // (548_864), not the M1 toy-probe GDN-only width (stateRow default 524_288).
+                let fusedRow = BASQwen35FusedStateGeometry.row
+                var state = NDArray(scalars: [Float16](repeating: 0, count: stage.rows * fusedRow),
+                                    shape: [stage.rows, fusedRow])
                 var outs: [[Float16]] = []
                 let t1 = Date()
                 for t in 0..<T {
