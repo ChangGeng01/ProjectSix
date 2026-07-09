@@ -456,12 +456,15 @@ CRITICAL + HIGH 全闭后转 MED。**全部 mac 纯(无 Rust/设备)的 fix-now 
 | **M-j gate** | release_gate never_worse `nw_model=True` 缺省(回归行缺→零证据放行)+ parse_substrate 取末行(截断日志误判) | `regression_gate_status` fail-closed(缺席=红)+ parse 取 max-executed 行;teeth 8 例(反转缺省 True 红 3/3) | 3485393d6 |
 | **M-j zh** | qinao_bench_zh 按学科 `except:pass` 静默丢→base/tuned 题集不可比 | 记录 loaded/dropped 学科入结果 JSON(题集漂移可检) | 04a68f638 |
 | **M-o MED-2** | SwiftUI BASConsoleView 在 substrate-core BASAdmin,headless 宿主(BASBrainCLI/BASJournalCLI)被迫传递链 SwiftUI | 拆 `BASAdminUI` target(view+typealias 迁入),BASAdmin/BASHostKit 净 SwiftUI;teeth=源树扫描守卫(含正控) | f7b93ccb2 |
+| **M-k F1** | BASTurnRuntimeEngine 可重入 actor:runWithPlan 跨 await 写共享 lastDispatchLedger/lastAssignmentLedger,两 routed emit helper 读它建 payload 而 sessionID 取本地 result→并发 turn 覆写共享→审计事件 sessionID(A)配 payload(B) | ledger-locality:每 turn 账本抽本地,值传入两 emit helper(不再读共享);teeth=非空 param 账本驱动发射而共享仍 .empty(反转共享读→guard 跳过红)+canonical60 .nativeV2 平价+并发 liveness 绿 | e0639494e |
+
+★4-lens 背景 workflow 定案(A serialize vs B ledger-locality):**seq 连续性不重要**(引擎 counter 仅 per-turn start<complete 提示;日志真排序键=存储 MAX+1 per session)+ **accessor 零 in-repo 读者(休眠)**⇒ 唯一活 bug=emit payload 串扰⇒选 B(正范围、字节等价、保并发、不越界入"整轮串行化"这一独立并发决策)。
 
 ★MED 教训:(a)**fail-open 缺省是 MED 最常见形**(never_worse=True、isUnderPressure 用错分母、AUC 并列偏、SURVIVED 恒印)——修=fail-closed 缺省 + 缺席即红;(b)**纯函数抽取换 teeth**:GPU/模型/设备内联逻辑(pressure 比、probe budget、AUC)抽纯函数才可确定性单测;(c)**竞态 teeth 可靠红**:M-l detached 播种反转 5/5 红(非 flaky——detached 确定性输给即返);(d)**模块图卫生**用源树扫描守卫(SwiftUI-free)+ 正控防误抽。
 
 **诚实账——未闭项(非 mac-纯,须操作员/设备/Rust)**:
-- **M-k F1**(actor 重入 audit 归因)——核 actor 高风险改(4 emit-helper 签名 + seq 预分配 + ledger-locality + barrier test),留待专注单修。
 - **M-l MED-4**(向量 rowid TOCTOU)——须 Rust XCFramework 重建。
+- **引擎整轮串行化**(M-k F1 的休眠残留)——`last*` accessor 跨 turn 陈旧只有整轮 in-flight gate(BASPerKeyInFlightGate)能修;in-repo 零读者(休眠),且改引擎并发语义须操作员抉择,故不并入 M-k F1(后者已按范围用 ledger-locality 闭活 bug)。
 - **架构 3 条**——操作员抉择(跨设备主权/L3-14 器官逻辑边界等)。
 - **device-gated 5+2**(含 x-sov #5/#6 Data Protection——iOS 锁屏真机才现,macOS `.protectionKey` 不支持)。
 - **b2 /tmp→Docs/evidence 冻结**——实验 I/O 布局,操作员域(改默认路径可能断上游管线)。
