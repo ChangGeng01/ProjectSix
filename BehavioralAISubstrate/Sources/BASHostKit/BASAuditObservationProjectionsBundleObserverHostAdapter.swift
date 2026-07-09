@@ -20,15 +20,17 @@
 //
 //   - Takes a `BASAuditObservationProjectionsBundle
 //     Observer` actor instance
-//   - Exposes a SYNC `handler` closure that wraps each
-//     emission in a detached Task to forward to the
-//     actor
+//   - Exposes a SYNC `handler` closure that FIFO-enqueues
+//     each emission onto a single ordered pump, which
+//     forwards them to the actor in ARRIVAL order
 //   - Hosts wire `adapter.handler` to the coordinator's
 //     `projectionBlockEmissionHandler` slot
 //
-// Trade-off:Task launch overhead per emission (~µs)。
-// Acceptable for the substrate's per-turn audit
-// emission cadence (turns are ms-scale)。
+// Trade-off:one long-lived consumer Task per adapter (not
+// per emission)。 The sync `yield` is O(1);ordering is
+// guaranteed by the single consumer, honoring 章节 三百九二
+// (audit hostkit-rest MED-5 — the prior per-emission
+// Task.detached delivered in scheduler order, not arrival)。
 //
 // ## Doctrine pins
 //
@@ -51,6 +53,37 @@
 import Foundation
 import BASRuntimeCore
 
+/// Order-preserving serial pump (audit hostkit-rest MED-5). A SINGLE long-lived
+/// consumer drains a FIFO `AsyncStream` into the actor observer, so emissions land
+/// in ARRIVAL order. The prior adapter launched a `Task.detached` PER emission, so
+/// N independent tasks reached the actor in SCHEDULER order — silently breaking the
+/// chapter 三百九二 "replay-determinism, fired in arrival order" contract the
+/// header still pins (a comment-lie: detached tasks are unordered). `yield` is
+/// synchronous + thread-safe + FIFO, so it captures the sync handler's arrival order
+/// exactly; the single consumer then appends strictly in that order.
+private final class BASAuditEmissionOrderedPump: Sendable {
+    private let continuation:
+        AsyncStream<BASAuditObservationProjectionsBundleObservation>.Continuation
+
+    init(observer: BASAuditObservationProjectionsBundleObserver) {
+        let (stream, continuation) = AsyncStream<
+            BASAuditObservationProjectionsBundleObservation>.makeStream()
+        self.continuation = continuation
+        // Exactly ONE consumer ⇒ records append in yield (arrival) order, never
+        // interleaved. Unbounded buffering (makeStream default) ⇒ no emission dropped.
+        Task {
+            for await observation in stream {
+                await observer.recordEmission(observation)
+            }
+        }
+    }
+
+    /// Synchronous, thread-safe, FIFO enqueue — captures arrival order exactly.
+    func submit(_ observation: BASAuditObservationProjectionsBundleObservation) {
+        continuation.yield(observation)
+    }
+}
+
 /// Typed bridge from the M1453 sync handler slot to the
 /// M1426 actor observer。 Hosts wire `adapter.handler`
 /// to the coordinator's
@@ -65,28 +98,31 @@ public struct BASAuditObservationProjectionsBundleObserverHostAdapter:
     public let observer:
         BASAuditObservationProjectionsBundleObserver
 
+    /// The order-preserving pump backing `handler`。 One consumer per adapter,
+    /// created at init so every emission through this adapter is serialized in
+    /// arrival order (audit hostkit-rest MED-5).
+    private let pump: BASAuditEmissionOrderedPump
+
     public init(
         observer:
             BASAuditObservationProjectionsBundleObserver
     ) {
         self.observer = observer
+        self.pump = BASAuditEmissionOrderedPump(observer: observer)
     }
 
     /// Sync closure ready to wire to the M1453
     /// `projectionBlockEmissionHandler` slot。 Each
-    /// invocation launches a detached Task that
-    /// forwards the observation to the actor's
-    /// `recordEmission(_:)` method。
+    /// invocation FIFO-enqueues the observation onto the
+    /// adapter's single ordered pump, which forwards it to
+    /// the actor's `recordEmission(_:)` in arrival order。
     public var handler: @Sendable
         (BASAuditObservationProjectionsBundleObservation)
         -> Void
     {
-        let observer = self.observer
+        let pump = self.pump
         return { observation in
-            Task.detached {
-                await observer.recordEmission(
-                    observation)
-            }
+            pump.submit(observation)
         }
     }
 }
