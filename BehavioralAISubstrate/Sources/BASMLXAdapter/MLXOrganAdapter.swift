@@ -176,6 +176,11 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// Cached MTP decoder (created on first `.mtpSpec` execution inside the container actor; the box mirrors
     /// `ChatSessionBox`'s @unchecked-Sendable pattern — exclusively used within `container.perform`).
     var mtpDecoderBox: MTPDecoderBox?
+    /// audit mlx-adapter-core MED-7 — monotonic epoch bumped every time a pressure DROP nils the
+    /// decoder. An MTP generation captures the epoch before its `container.perform` await and
+    /// republishes the (rebuilt) box only if the epoch is UNCHANGED — otherwise a drop that raced
+    /// the generation would be undone (the ~300MB decoder resurrected right after pressure freed it).
+    var mtpDecoderDropEpoch = 0
     // B2 探针路由器 — the difficulty-probe head (BAS_DIFF_PROBE=1), resolved once per adapter.
     /// 缝1 telemetry/test surface: session turns decoded via the thermal plain-fallback.
     var sessionThermalFallbackCount = 0
@@ -1739,6 +1744,21 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
     }
 
+    /// audit mlx-adapter-core MED-7 — drop the cached MTP decoder under pressure AND bump the
+    /// drop epoch, so an in-flight MTP generation that captured the old epoch will NOT republish
+    /// (resurrect) the box it is about to free.
+    func _dropSpecDecoderForPressure() {
+        mtpDecoderBox = nil
+        mtpDecoderDropEpoch += 1
+    }
+
+    /// audit mlx-adapter-core MED-7 — pure republish decision: an MTP generation may publish its
+    /// (rebuilt) decoder box only if NO pressure drop happened during its `container.perform`
+    /// window (the epoch it captured before the await still holds). Mac-testable in isolation.
+    static func _shouldRepublishDecoder(epochAtStart: Int, epochNow: Int) -> Bool {
+        epochAtStart == epochNow
+    }
+
     /// audit mlx-adapter-core MED-6 — the per-rung actuator, extracted so `_pressureCheck` can
     /// drive it off `reclaimActions(forDeepest:)` (the fired rung subsumes milder rungs' actions).
     private func _executeReclaimAction(_ rung: BASPressureLadder.Rung, keeping key: String?) {
@@ -1748,7 +1768,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         case .dropSpecDecoder:
             // P0: restoredChainEmaL 已由每次生成的 _MTPRaw 快照保持最新(线程安全),
             // 丢 box 无需再读——直接丢,重建时由快照播种。
-            mtpDecoderBox = nil                          // ~300MB; lazily re-quantized later
+            _dropSpecDecoderForPressure()                // ~300MB; lazily re-quantized later
         case .clearAllSessions:
             clearAllSessions()                           // survival over warmth
             // audit mlx-adapter-core MED-11: remember the limit in force so the rung-3 re-arm can

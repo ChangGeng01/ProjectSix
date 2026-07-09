@@ -49,6 +49,7 @@ extension MLXOrganAdapter {
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
+        let dropEpochAtStart = mtpDecoderDropEpoch        // audit MED-7: republish only if no drop races us
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let probeReport = Self._ProbeReportBox()
         let seedChainEmaL = restoredChainEmaL            // P0: actor read before the closure
@@ -92,7 +93,11 @@ extension MLXOrganAdapter {
                 traceExitReason: r.traceExit?.reason.rawValue,
                 traceThinkTokens: r.traceExit?.thinkTokensAtExit)
         }
-        mtpDecoderBox = raw.box                                    // cache across turns (init quantizes ~300MB)
+        // audit mlx-adapter-core MED-7: only cache the (re)built decoder if NO pressure drop raced
+        // this generation — otherwise the drop that just freed ~300MB would be silently undone.
+        if Self._shouldRepublishDecoder(epochAtStart: dropEpochAtStart, epochNow: mtpDecoderDropEpoch) {
+            mtpDecoderBox = raw.box                                // cache across turns (init quantizes ~300MB)
+        }
         if Self._profilerPersistEnabled { restoredChainEmaL = raw.chainEmaLAfter }   // P0 快照携带
         let laneName = sampling ? "mtpSpecSampling" : "mtpSpec"
         let draft = _buildDraft(
@@ -138,6 +143,7 @@ extension MLXOrganAdapter {
         let params = _greedyParameters(for: request.preset, maxOutputTokens: request.maxOutputTokens)
         let maxTokens = params.maxTokens ?? 512
         let priorBox = mtpDecoderBox
+        let dropEpochAtStart = mtpDecoderDropEpoch        // audit MED-7: republish only if no drop races us
         let diffProbe = _armedDifficultyProbe(requestCapped: request.maxOutputTokens != nil)
         let probeReport = Self._ProbeReportBox()
         // 缝8b (2026-07-06 audit): the 2-slot decode governor was acquired only on the POOLED
@@ -196,7 +202,10 @@ extension MLXOrganAdapter {
                 traceExitReason: r.traceExit?.reason.rawValue,
                 traceThinkTokens: r.traceExit?.thinkTokensAtExit)
         }
-        mtpDecoderBox = raw.box
+        // audit mlx-adapter-core MED-7: suppress the republish if a pressure drop raced this turn.
+        if Self._shouldRepublishDecoder(epochAtStart: dropEpochAtStart, epochNow: mtpDecoderDropEpoch) {
+            mtpDecoderBox = raw.box
+        }
         if Self._profilerPersistEnabled { restoredChainEmaL = raw.chainEmaLAfter }   // P0 快照携带
         if raw.thermalFallback { sessionThermalFallbackCount += 1 }
         let draft = _buildDraft(
