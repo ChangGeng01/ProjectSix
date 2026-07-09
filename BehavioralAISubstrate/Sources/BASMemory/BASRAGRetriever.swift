@@ -54,7 +54,14 @@
 //         queryText: prompt,
 //         embeddingProvider: provider,
 //         vectorIndex: index,
-//         atomLookup: { id in atomStore.atom(forID: id) })
+//         // audit memory-a F3 — use the GOVERNANCE-AWARE lookup, NOT the
+//         // naive `{ id in atomStore.atom(forID: id) }`。 A QUARANTINED atom
+//         // keeps its embedding (reversible isolation) so cosineTopK still
+//         // returns its ID; the naive lookup would bring its ISOLATED CONTENT
+//         // back to L2。 governedAtomLookup drops any non-.governed atom。
+//         atomLookup: BASRAGRetriever.governedAtomLookup(
+//             resolve: { id in await atomStore.atom(forID: id) },
+//             adapt: { governed in /* host maps BASGovernedMemory → BASMemoryAtom */ }))
 //     // Caller decides how to merge bundle.atoms + rag.atoms
 //
 // Future M851+ may inline this into `retrieve()` once the
@@ -250,6 +257,50 @@ public enum BASRAGRetriever {
             scores: scoreMap,
             staleAtomIDs: stale,
             reasonCodes: reasonCodes)
+    }
+
+    // MARK: - audit memory-a F3 — governance-aware atomLookup
+
+    /// The RECOMMENDED atomLookup, REPLACING the naive
+    /// `{ id in atomStore.atom(forID: id) }` shown in this file's header。
+    ///
+    /// A QUARANTINED (isolated) atom keeps its embedding in the vector index —
+    /// quarantine is REVERSIBLE ("亏的不要": the atom REMAINS in the store) — so
+    /// `cosineTopK` still returns its ID。 This gate resolves the ID to its
+    /// `BASGovernedMemory` and returns `nil` for anything whose
+    /// `governanceStatus` is not `.governed`, so the isolated ID lands in
+    /// `staleAtomIDs` and is NEVER materialized into a `BASMemoryAtom` for L2。
+    /// It mirrors the frontstage `.governed` filter
+    /// (`MemoryAtomBootstrapCore.frontstageEligibleMemories`)。
+    ///
+    /// The gate MUST sit at THIS lookup boundary: the Stage-4 output
+    /// `BASMemoryAtom` has no governance field, so a post-hoc filter on
+    /// `result.atoms` is impossible。 Releasing the atom
+    /// (`updateGovernanceStatus(.governed)`) makes it recall again — the
+    /// embedding was never removed。
+    public static func governedAtomLookup(
+        resolve: @escaping @Sendable (String) async -> BASGovernedMemory?,
+        adapt: @escaping @Sendable (BASGovernedMemory) -> BASMemoryAtom
+    ) -> @Sendable (String) async -> BASMemoryAtom? {
+        return { id in
+            guard let governed = await resolve(id),
+                  governed.governanceStatus == .governed
+            else { return nil }   // isolated / non-governed ⇒ stale, never to L2
+            return adapt(governed)
+        }
+    }
+
+    /// Sync sibling for `resolveCandidatesSync` — same `.governed`-only gate。
+    public static func governedAtomLookupSync(
+        resolve: @escaping (String) -> BASGovernedMemory?,
+        adapt: @escaping (BASGovernedMemory) -> BASMemoryAtom
+    ) -> (String) -> BASMemoryAtom? {
+        return { id in
+            guard let governed = resolve(id),
+                  governed.governanceStatus == .governed
+            else { return nil }
+            return adapt(governed)
+        }
     }
 
     // MARK: - chapter 八百八十六 / M3120 — sync resolution helper
